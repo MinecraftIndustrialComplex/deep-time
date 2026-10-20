@@ -48,8 +48,10 @@ pub mod belts;
 pub mod check;
 pub mod collapse;
 pub mod collision;
+pub mod crust_budget;
 pub mod dynamics;
 pub mod events;
+pub mod flow;
 pub mod forces;
 pub mod gap_budget;
 pub mod geometry;
@@ -63,6 +65,7 @@ pub mod pools;
 pub mod rate;
 pub mod ridges;
 pub mod rifting;
+pub mod settle;
 pub mod shortening;
 pub mod state;
 pub mod stats;
@@ -165,7 +168,14 @@ pub struct PlatesStage {
     /// Whether to keep the land's gap budget (`gap_budget.rs`, measurement only). Off, unless
     /// `DEEPTIME_GAP_BUDGET` is set.
     record_gap_budget: bool,
+    /// The continental crust budget (`crust_budget.rs`, measurement only): kept while
+    /// `DEEPTIME_CRUST_BUDGET` is set, started at the first step.
+    record_crust_budget: bool,
+    crust_budget: Option<crust_budget::CrustBudget>,
 }
+
+/// `WorldState::notes` key of the continental crust budget's lines (`crust_budget.rs`, when on).
+pub const CRUST_BUDGET_NOTE: &str = "crust_budget";
 
 impl PlatesStage {
     pub fn new(preset: PlanetPreset) -> PlatesStage {
@@ -179,7 +189,16 @@ impl PlatesStage {
             cache: None,
             record_dynamics: std::env::var_os(dynamics::OFF_ENV).is_none(),
             record_gap_budget: gap_budget::enabled(),
+            record_crust_budget: crust_budget::enabled(),
+            crust_budget: None,
         }
+    }
+
+    /// The same stage keeping the continental crust budget (`crust_budget.rs`): the world it
+    /// makes is the same, but for the budget's note.
+    pub fn with_crust_budget(mut self) -> PlatesStage {
+        self.record_crust_budget = true;
+        self
     }
 
     /// The same stage keeping the land's gap budget (`gap_budget.rs`): the world it makes is the
@@ -248,21 +267,58 @@ impl PlatesStage {
         // The surface's flexure under the samples, for the foreland basins of the collisions'
         // record (`belts.rs`); measurement only. Sampled beside the feedback where it can be.
         let collisions = st.contacts.iter().any(|c| c.collision.is_some());
-        let (mut cones, flexure) = self.apply_surface_feedback(st, world, &env, collisions)?;
+        // The continental crust budget (`crust_budget.rs`, measurement only), taken out of the
+        // stage for the step; its first snapshot is the run's start.
+        let mut cb = self.crust_budget.take();
+        let sea_m = |world: &WorldState| {
+            world
+                .globals
+                .get(crate::climate::SEA_LEVEL_GLOBAL)
+                .copied()
+                .unwrap_or(0.0)
+        };
+        if self.record_crust_budget && cb.is_none() {
+            let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
+            let mut b = crust_budget::CrustBudget::start(&st.samples, z_0, env.gravity);
+            let geo = &self.cache.as_ref().expect("built above").geo;
+            let pos0 = geometry::positions(st, geo);
+            b.snapshot(
+                &st.samples,
+                &pos0,
+                st.t_myr,
+                env.norm.sample_area_km2(),
+                sea_m(world),
+                &world.globals,
+            );
+            cb = Some(b);
+        }
+        // The settling (`settle.rs`) reads the flexure too.
+        let settles = k.isostasy_relax_myr.is_finite() && k.isostasy_relax_myr > 0.0;
+        let (mut cones, flexure) =
+            self.apply_surface_feedback(st, world, &env, collisions || settles)?;
         cones.resize(st.samples.len(), [0.0; 2]);
+        if let Some(b) = cb.as_mut() {
+            b.book(&st.samples, gap_budget::Part::Erosion);
+        }
+        let cb = std::cell::RefCell::new(cb);
         lap(&mut clock, "feedback");
         // The land's gap budget (`gap_budget.rs`, measurement only): each process's change of the
-        // gap between the samples' elevation and their columns' Airy height.
+        // gap between the samples' elevation and their columns' Airy height; the crust budget's
+        // change of the continental stocks, on the same brackets.
         let book = |st: &mut PlateState, part: gap_budget::Part| {
             if let Some(gb) = st.gap_budget.as_mut() {
                 gb.book(&st.samples, part);
             }
+            if let Some(b) = cb.borrow_mut().as_mut() {
+                b.book(&st.samples, part);
+            }
         };
-        let flexure = if collisions {
+        let flexure = if collisions || settles {
             flexure.or_else(|| self.sample_flexure(world))
         } else {
             None
         };
+        let sea = sea_m(world);
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
         if let Some(gb) = st.gap_budget.as_mut() {
             gb.begin_step(&st.samples);
@@ -294,7 +350,16 @@ impl PlatesStage {
         let begun = subduction::fronts_begin(st, &cache.geo, &pos, &env);
         let geo = &cache.geo;
         let (stacked, arcs) = rayon::join(
-            || belts::stack(st, geo, &pos, &env, &fronts, flexure.as_deref()),
+            || {
+                belts::stack(
+                    st,
+                    geo,
+                    &pos,
+                    &env,
+                    &fronts,
+                    flexure.as_deref().filter(|_| collisions),
+                )
+            },
             || subduction::fronts_reach(geo, &begun, &env),
         );
         book(st, gap_budget::Part::Belts);
@@ -366,7 +431,23 @@ impl PlatesStage {
             .globals
             .entry(collapse::GAINED_GLOBAL.to_owned())
             .or_insert(0.0) += f64::from(fell.converted) * env.norm.sample_area_km2();
+        *world
+            .globals
+            .entry(collapse::HELD_GLOBAL.to_owned())
+            .or_insert(0.0) += quiet.held_km2_m / 1000.0;
+        *world
+            .globals
+            .entry(collapse::UNPLACED_GLOBAL.to_owned())
+            .or_insert(0.0) += quiet.unplaced_km2_m / 1000.0;
         lap(&mut clock, "collapse");
+        // Thickened crust spreads through its lower crust (`flow.rs`).
+        let flowed = flow::step(st, &cache.geo, &env);
+        book(st, gap_budget::Part::Flow);
+        *world
+            .globals
+            .entry(flow::MOVED_GLOBAL.to_owned())
+            .or_insert(0.0) += flowed.moved_km2_m / 1000.0;
+        lap(&mut clock, "flow");
         // Rifted margins taper from continent to ocean over Earth's width (`transition.rs`).
         let taper = transition::step(st, &cache.geo, &pos, &env);
         book(st, gap_budget::Part::Transition);
@@ -428,6 +509,18 @@ impl PlatesStage {
         hotspots::step(st, world, &pos, &tree, &env, &mut cones)?;
         book(st, gap_budget::Part::Hotspots);
         lap(&mut clock, "hotspots");
+        // Continental columns settle towards the height their crust holds up (`settle.rs`).
+        let settled = settle::step(st, &env, flexure.as_deref(), sea);
+        book(st, gap_budget::Part::Settle);
+        *world
+            .globals
+            .entry(settle::RISE_GLOBAL.to_owned())
+            .or_insert(0.0) += settled.rise_km2_m / 1000.0;
+        *world
+            .globals
+            .entry(settle::FALL_GLOBAL.to_owned())
+            .or_insert(0.0) += settled.fall_km2_m / 1000.0;
+        lap(&mut clock, "settle");
         // No column ends the step's processes thicker than its ceiling or higher than its top
         // (ledger: PLT-287, PLT-288).
         let limited = rate::limit(st, &cache.geo, &env);
@@ -497,6 +590,9 @@ impl PlatesStage {
         let final_step = step >= self.total;
         if ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step) {
             let geo = ridges::resample(st, world, &pos, &tree, &cache.geo, &env)?;
+            if let Some(b) = cb.borrow_mut().as_mut() {
+                b.book(&st.samples, gap_budget::Part::ResampleBlend);
+            }
             // The accretion is thickening too (ledger: PLT-287); the surface's change counts as
             // the step's uplift, as the accretion's own rise does.
             let z: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
@@ -533,6 +629,24 @@ impl PlatesStage {
                 gb.snapshot(&st.samples, env.t_myr, env.dt_myr);
             }
         }
+        let mut cb = cb.into_inner();
+        if let Some(b) = cb.as_mut() {
+            let every = (GAP_SNAPSHOT_MYR / env.dt_myr).round().max(1.0) as u64;
+            if step >= self.total || step.is_multiple_of(every) {
+                b.snapshot(
+                    &st.samples,
+                    &pos,
+                    env.t_myr,
+                    env.norm.sample_area_km2(),
+                    sea_m(world),
+                    &world.globals,
+                );
+            }
+            if step >= self.total {
+                world.notes.insert(CRUST_BUDGET_NOTE.to_owned(), b.lines());
+            }
+        }
+        self.crust_budget = cb;
         dynamics::record_step(
             st,
             world,

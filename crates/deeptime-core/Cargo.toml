@@ -34,5 +34,18 @@ rustfft = "6.4.1"
 # without a GPU stack; the CLI and the natives (macOS aside, for now) turn it on.
 deeptime-gpu = { workspace = true, optional = true }
 
+# mimalloc (MIT) under the counting allocator (crate::alloc): the small blocks come from it where
+# the platform's allocator was the default. Off by default and shipped nowhere: it did not beat the
+# pair noise (STATUS build log 2026-10-20); the CLI and the natives expose it as their `mimalloc` feature.
+mimalloc = { version = "=0.1.52", optional = true }
+# Its static library gives mi_usable_size and mi_collect (declared in crate::alloc); `extended`
+# would only add safe-looking bindings and the cty crate.
+libmimalloc-sys = { version = "=0.1.49", optional = true }
+
 [features]
 gpu = ["dep:deeptime-gpu"]
+mimalloc = ["dep:mimalloc", "dep:libmimalloc-sys"]
+# Experiments and the loadable library: mimalloc 2 instead of 3; thread-local storage that a library
+# the JVM loads later can use (initial-exec TLS needs static TLS space).
+mimalloc-v2 = ["mimalloc", "libmimalloc-sys/v2"]
+mimalloc-dyn-tls = ["mimalloc", "libmimalloc-sys/local_dynamic_tls"]

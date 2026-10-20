@@ -75,6 +75,8 @@
     "collapse_quiet_myr": 10.0,
     "collapse_reach_km": 200.0,
     "crust_max_km": 0.0,
+    "crust_channel_km2_myr": 0.0,
+    "isostasy_relax_myr": 0.0,
     "transition_width_km": 0.0,
     "transition_myr": 0.0,
     "initial_plates": 14,

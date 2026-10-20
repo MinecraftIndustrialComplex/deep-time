@@ -40,11 +40,13 @@ public final class DeepTimeClient {
             PolarStorm.reset();
             DhCurvatureClient.release();
         });
-        // Client settings and their screen (Mods, Deep Time, Config); Distant Horizons' curvature follows the planet.
+        // Client settings and their screen (Mods, Deep Time, Config); Distant Horizons' curvature follows the planet,
+        // and its world generator stays on there (DhGenerationGate: it switches itself off when Chunky is installed).
         ModContainer container = ModLoadingContext.get().getActiveContainer();
         container.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC);
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
         DhCurvatureClient.init();
+        DhGenerationClient.init();
     }
 
     /** True when the planet info the server sent is for the level the client shows. */
