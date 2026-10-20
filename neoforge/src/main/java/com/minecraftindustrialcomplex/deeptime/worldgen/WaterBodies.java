@@ -42,6 +42,10 @@ import net.minecraft.world.level.material.Fluids;
  *       +1 beside a river), lowered to their {@code maxGround} (a 1:1 slope from the channel), and
  *       air between the neighbours' beds and {@code minGround} is sealed, so no water finds a way
  *       out. A bank keeps its top block (grass on a raised or lowered bank).</li>
+ *   <li><b>Fills.</b> Whatever the pass fills (a raised bank, ground under a channel's bed, a
+ *       sealed or plugged cave) is soil, or a channel's sediment, in its top {@link #SOIL_BLOCKS}
+ *       blocks and the column's own rock below (HYD-079). The router keeps cave mouths away from
+ *       the water ({@link WaterCaveShield}, HYD-078), so the fills stay a few blocks deep.</li>
  *   <li><b>Steps.</b> Where a water column's neighbour holds water higher up (a river's one-block
  *       step, a waterfall, a river entering a lake), the block the higher water would spread into
  *       gets the flowing water vanilla would put there (falling water down a waterfall), so the
