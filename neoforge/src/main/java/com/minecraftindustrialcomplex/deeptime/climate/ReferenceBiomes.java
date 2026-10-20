@@ -128,10 +128,11 @@ public final class ReferenceBiomes {
                     }
                 }
                 return row;
-            }).reduce(new Tally(), (a, b) -> {
+            }).reduce((a, b) -> {
+                // Each row's tally is its own object: folding b into a is safe in parallel.
                 a.add(b);
                 return a;
-            });
+            }).orElseGet(Tally::new);
             all.add(t);
         }
         JsonObject o = new JsonObject();
