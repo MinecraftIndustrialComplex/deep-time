@@ -2284,6 +2284,86 @@ mod tests {
         assert!(ntop <= 0.1 + 1e-6, "a cap of 0.1: {ntop}");
     }
 
+    /// The ice spikes report (Ben, 2026-10-20, "like 20x more ice spike biomes than I'd usually
+    /// see"): Terralith 2.6.2 draws ice spikes on the whole near-inland flat of the frozen, dry
+    /// corner (continentalness -0.11 to 0.03, erosion -0.375 to 0.05) on both branches of the
+    /// variant noise (BIO-161), so the flats rule above (BIO-077) cannot thin them there, and a
+    /// planet's land within 200 blocks of the sea is near-inland: 78 % of Ben's play planet's land,
+    /// all of this fixture's. EF land inland of the beach strip is held mid-inland, where vanilla
+    /// draws the same biomes as near-inland and Terralith its snowy plains; the beach strip keeps
+    /// its own value and nothing else moves. Without the floor every inland EF cell of the fixture
+    /// is near-inland: the test that would have caught the report.
+    #[test]
+    fn ef_land_is_held_mid_inland_off_terraliths_near_inland_ice_spikes() {
+        let b = &reference().bands;
+        let params = BiomeParams::default();
+        let classes = ["EF", "EF", "Dfc", "ET"];
+        let glaciated = [true, false, false, false];
+        let (m, w2) = fixture_of(&params, placement::builtin(), classes, glaciated);
+        let mut v: serde_json::Value = serde_json::from_str(placement::PLACEMENT_JSON).unwrap();
+        let floor = v["classes"]["EF"]["continentalness"]["min"]
+            .as_f64()
+            .expect("EF has a continentalness floor (BIO-161)");
+        v["classes"]["EF"]
+            .as_object_mut()
+            .unwrap()
+            .remove("continentalness");
+        let (free, _) = fixture_of(
+            &params,
+            &Placement::from_value(&v).unwrap(),
+            classes,
+            glaciated,
+        );
+        // Vanilla's near | mid inland edge, where Terralith's near-inland ice spikes end.
+        let mid = b.continents[5];
+        assert_eq!(mid, 0.03);
+        assert!(
+            floor > mid && floor < b.continents[6],
+            "the floor is in the mid-inland band: {floor}"
+        );
+        // Land is L2 rows 16 to 47 (8 blocks a cell); a cell's distance to the sea is taken at its
+        // centre, so rows 16, 17, 46 and 47 are within the 16-block beach strip.
+        let (mut inland, mut near_without) = (0usize, 0usize);
+        for q in [0, 1] {
+            let (lo, hi) = (q * w2 / 4 + 2, (q + 1) * w2 / 4 - 2);
+            for j in 16..48usize {
+                for i in lo..hi {
+                    let k = j * w2 + i;
+                    let (c, c0) = (m.layers[2][k], free.layers[2][k]);
+                    if (18..46).contains(&j) {
+                        inland += 1;
+                        near_without += usize::from(f64::from(c0) < mid);
+                        assert!(
+                            f64::from(c) >= floor - 1e-6,
+                            "EF quarter {q}, cell ({i}, {j}): continentalness {c}"
+                        );
+                    } else {
+                        assert_eq!(c.to_bits(), c0.to_bits(), "beach cell ({i}, {j})");
+                    }
+                }
+            }
+        }
+        assert!(inland > 1000, "inland EF cells: {inland}");
+        assert_eq!(
+            near_without, inland,
+            "without the floor all of the fixture's inland EF land is near-inland"
+        );
+        // The other inputs, and the other classes' continentalness, are as without the key.
+        for layer in [0, 1, 3, 4] {
+            assert_eq!(m.layers[layer], free.layers[layer], "layer {layer}");
+        }
+        for q in [2, 3] {
+            let (lo, hi) = (q * w2 / 4 + 2, (q + 1) * w2 / 4 - 2);
+            for k in (0..64usize).flat_map(|j| (lo..hi).map(move |i| j * w2 + i)) {
+                assert_eq!(
+                    m.layers[2][k].to_bits(),
+                    free.layers[2][k].to_bits(),
+                    "quarter {q}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn the_inland_distances_and_wetland_thresholds_are_settings() {
         let b = &reference().bands;
