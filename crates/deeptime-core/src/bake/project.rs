@@ -45,9 +45,11 @@ use deeptime_format::structure::{Shape, read_structure, write_structure};
 use deeptime_format::tilepack::write_stored_tiles;
 use deeptime_format::{DType, FileEntry, GridDesc, LayerDesc, LoadedLayer, Manifest, Written};
 
+use crate::bake::strata::{Moved, key_shift};
 use crate::bake::{load_layer, stored_tiles};
 use crate::error::CoreError;
 use crate::params::{EdgeBorder, LAMBDA_C_AUTO, PlanetPreset};
+use crate::structure::bake_horizons::Horizons;
 
 /// The version of the pass's record (`notes.bake.projection.version`).
 pub const VERSION: u32 = 1;
@@ -859,7 +861,8 @@ fn band_anisotropy(
 /// `TOP_MARGIN_BLOCKS`, capped at `max_y` (`bake::strata::raise_tops` on the simulation's grid),
 /// the thickest rock unit near the surface taking up the raise (`bake::strata::raise_stack`).
 /// Beyond a turning edge the window reads the glued cells (row −k is row k at column w − i).
-/// Returns (cells raised, largest raise in blocks).
+/// Returns (cells raised, largest raise in blocks, and with `record` what the raise did to each
+/// raised cell: its index and `Moved`, no lift, the raise and the last horizon it moved).
 fn raise_world_tops(
     desc: &LayerDesc,
     bytes: &mut [u8],
@@ -867,8 +870,9 @@ fn raise_world_tops(
     amp: Option<&LoadedLayer>,
     min_y: i32,
     max_y: i32,
-) -> (u64, f64) {
-    use crate::bake::strata::{TOP_MARGIN_BLOCKS, raise_stack};
+    record: bool,
+) -> (u64, f64, Vec<(u32, Moved)>) {
+    use crate::bake::strata::{TOP_MARGIN_BLOCKS, raise_stack_unit};
     use crate::structure::bake_horizons::{NO_CLASS, NO_TOP};
     let unconsolidated = crate::structure::columns::Tables::get().unconsolidated;
     let k = desc.stack_depth.unwrap_or(0) as usize;
@@ -876,7 +880,7 @@ fn raise_world_tops(
     let (w1, h1) = (g1.w as usize, g1.h as usize);
     let g3 = &elev.desc.grid;
     if g3.r == 0 || !g1.r.is_multiple_of(g3.r) {
-        return (0, 0.0);
+        return (0, 0.0, Vec::new());
     }
     let ratio = (g1.r / g3.r) as usize;
     let (w3, h3) = (g3.w as usize, g3.h as usize);
@@ -929,12 +933,13 @@ fn raise_world_tops(
     };
     let cb = desc.cell_bytes();
     // A row in parallel (P1-19): each cell reads only `e` and `a`; the count is a sum of whole
-    // numbers and the largest raise a maximum, so both are the same in any order.
+    // numbers and the largest raise a maximum, so both are the same in any order, and the
+    // record's rows join in order.
     bytes
         .par_chunks_mut(w1 * cb)
         .enumerate()
         .map(|(j, row)| {
-            let (mut raised, mut max_raise) = (0u64, 0.0f64);
+            let (mut raised, mut max_raise, mut cells) = (0u64, 0.0f64, Vec::new());
             for i in 0..w1 {
                 let (mut me, mut ma) = (f64::NEG_INFINITY, 0.0f64);
                 // A window symmetric about the cell (the bake's is i − 2 ..= i + 1 on square
@@ -966,7 +971,7 @@ fn raise_world_tops(
                 let mut tops: Vec<i16> = (0..n)
                     .map(|h| i16::from_le_bytes([cell[2 * h], cell[2 * h + 1]]))
                     .collect();
-                let raise = raise_stack(
+                let (raise, upto) = raise_stack_unit(
                     &mut tops,
                     &classes[..n],
                     &keys,
@@ -979,10 +984,84 @@ fn raise_world_tops(
                 }
                 raised += 1;
                 max_raise = max_raise.max(f64::from(raise) / 16.0);
+                if record && raise > 0 {
+                    let moved = Moved {
+                        lift: 0,
+                        raise,
+                        upto: upto as u16,
+                    };
+                    cells.push(((j * w1 + i) as u32, moved));
+                }
             }
-            (raised, max_raise)
+            (raised, max_raise, cells)
         })
-        .reduce(|| (0, 0.0), |x, y| (x.0 + y.0, x.1.max(y.1)))
+        .reduce(
+            || (0, 0.0, Vec::new()),
+            |mut x, y| {
+                x.2.extend(y.2);
+                (x.0 + y.0, x.1.max(y.1), x.2)
+            },
+        )
+}
+
+/// The world's horizon stacks as [`Horizons`], from their layer's bytes (per cell K i16 tops, K
+/// u8 classes, K u16 key tops, K u16 key bases, as `Horizons::to_layer` writes them).
+fn horizons_of(desc: &LayerDesc, bytes: &[u8], min_y: i32) -> Horizons {
+    let k = desc.stack_depth.unwrap_or(0) as usize;
+    let cb = desc.cell_bytes();
+    let n = if cb == 0 { 0 } else { bytes.len() / cb };
+    let (mut tops, mut classes, mut keys) = (
+        Vec::with_capacity(n * k),
+        Vec::with_capacity(n * k),
+        Vec::with_capacity(n * k),
+    );
+    let u16_at = |c: &[u8], at: usize| u16::from_le_bytes([c[at], c[at + 1]]);
+    for cell in bytes.chunks_exact(cb.max(1)).take(n) {
+        tops.extend((0..k).map(|h| i16::from_le_bytes([cell[2 * h], cell[2 * h + 1]])));
+        classes.extend_from_slice(&cell[2 * k..3 * k]);
+        keys.extend((0..k).map(|h| [u16_at(cell, 3 * k + 2 * h), u16_at(cell, 5 * k + 2 * h)]));
+    }
+    Horizons {
+        grid: desc.grid.clone(),
+        k: k as u32,
+        min_y,
+        tops,
+        classes,
+        keys,
+        tongues: (
+            desc.tongue_band_keys.unwrap_or(1),
+            desc.tongue_minor_share.unwrap_or(0.0),
+        ),
+        min_blocks: desc.min_blocks.clone().unwrap_or_default(),
+    }
+}
+
+/// How far the world's top raise ([`raise_world_tops`], its record `moved`) moved the rock at each
+/// of `points` (world blocks x, y, z), blocks: the bake's own rule for what rises with the rock
+/// ([`key_shift`], STR-056) on the raised world stacks (`desc`, `bytes`). The raise lifts the
+/// thickest rock unit near the surface and every horizon over it, so a stratabound body in one of
+/// those horizons rises with it and keeps its host (ORE-271). Zero everywhere when nothing rose.
+fn world_raise_shifts(
+    desc: &LayerDesc,
+    bytes: &[u8],
+    min_y: i32,
+    moved: &[(u32, Moved)],
+    points: &[[f64; 3]],
+) -> Vec<f64> {
+    if moved.is_empty() || points.is_empty() {
+        return vec![0.0; points.len()];
+    }
+    let hz = horizons_of(desc, bytes, min_y);
+    let mut dense = vec![Moved::default(); hz.cells()];
+    for &(c, m) in moved {
+        if let Some(d) = dense.get_mut(c as usize) {
+            *d = m;
+        }
+    }
+    points
+        .par_iter()
+        .map(|p| key_shift(&hz, &dense, p[0], p[1], p[2]))
+        .collect()
 }
 
 /// Rewrites the Lambert world folder `dir` (its manifest `m`) in the preset's world projection.
@@ -1148,6 +1227,22 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         write_ms += ms(tl);
     }
     m.grids = new_grids;
+    let bodies = read_bodies(dir)?;
+    let sites = read_sites(dir)?;
+    // A body of an in-stratum type (`hosts.in_stratum`: MVT) lies in its host horizon. The bake
+    // already raised it with that horizon (`bake::strata::Lift::bodies`, STR-056), and the world's
+    // stacks are the nearest Lambert cell's, so the horizon lies at the block y the body does: it
+    // does not move with the drawn ground (that took it out of a thin horizon), only with the
+    // world's own raise of the stacks where that raises its horizon (`world_raise_shifts`), as
+    // its site's centre does.
+    let stratabound = match &sites {
+        Some((ss, _)) => stratabound_sites(ss.iter().map(|s| (s.id, s.deposit_type.as_str())))?,
+        None => Default::default(),
+    };
+    let strata_body = |b: &deeptime_format::Body| b.site.is_some_and(|s| stratabound.contains(&s));
+    // Per body and per site, how far the world's top raise moved its host (blocks; 0 for the
+    // others).
+    let (mut body_host_dy, mut site_host_dy) = (Vec::new(), Vec::new());
     // The first horizon covers the world's terrain (the bake's top rule, `bake::strata`): the
     // stacks come from the nearest cell and the terrain from a footprint mean, so a stack can sit
     // under the drawn ground where the footprint is wide.
@@ -1155,15 +1250,51 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     if let Some((entry, desc, mut bytes)) = world_stack {
         let tl = Instant::now();
         if let Some(we) = &world_elev {
-            let (raised, max_raise) = raise_world_tops(
+            let record = !stratabound.is_empty();
+            let (raised, max_raise, moved) = raise_world_tops(
                 &desc,
                 &mut bytes,
                 we,
                 world_amp.as_ref(),
                 m.scale.min_y,
                 m.scale.max_y,
+                record,
             );
             tops_note = json!({"raised_cells": raised, "max_raise_blocks": max_raise});
+            if !moved.is_empty() {
+                // The stratabound bodies' and sites' world centres, then their hosts' shifts.
+                let (mut points, mut of_body) = (Vec::new(), Vec::new());
+                if let Some(bs) = &bodies {
+                    for (i, b) in bs.iter().enumerate().filter(|(_, b)| strata_body(b)) {
+                        points.push(project_body(&map, b).center);
+                        of_body.push(i);
+                    }
+                }
+                let n_bodies = points.len();
+                let mut of_site = Vec::new();
+                if let Some((ss, _)) = &sites {
+                    for (i, s) in ss.iter().enumerate() {
+                        if stratabound.contains(&s.id) {
+                            let c = project_site(&map, s, &[], 0).center;
+                            points.push([f64::from(c[0]), f64::from(c[1]), f64::from(c[2])]);
+                            of_site.push(i);
+                        }
+                    }
+                }
+                let dy = world_raise_shifts(&desc, &bytes, m.scale.min_y, &moved, &points);
+                if let Some(bs) = &bodies {
+                    body_host_dy = vec![0.0; bs.len()];
+                    for (&i, &d) in of_body.iter().zip(&dy[..n_bodies]) {
+                        body_host_dy[i] = d;
+                    }
+                }
+                if let Some((ss, _)) = &sites {
+                    site_host_dy = vec![0.0; ss.len()];
+                    for (&i, &d) in of_site.iter().zip(&dy[n_bodies..]) {
+                        site_host_dy[i] = d;
+                    }
+                }
+            }
         }
         let e = &mut m.layers[entry];
         let written = write_deferred(&mut flusher, &dir.join(&e.path), &desc, &bytes)?;
@@ -1261,23 +1392,14 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         set_file(m, deeptime_format::structure::STRUCTURE_PATH, bytes, crc);
         vec_note.insert("structure_events".into(), json!(out.events.len()));
     }
-    let bodies = read_bodies(dir)?;
-    let sites = read_sites(dir)?;
-    // A body of an in-stratum type (`hosts.in_stratum`: MVT) lies in its host horizon, which the
-    // world's stacks hold at the block y the simulation's do (each world cell takes the nearest
-    // Lambert cell's stack; only the first top is raised to the new ground): it keeps its y, as
-    // its site's centre does. Moving it with the drawn ground took it out of a thin horizon.
-    let stratabound = match &sites {
-        Some((ss, _)) => stratabound_sites(ss.iter().map(|s| (s.id, s.deposit_type.as_str())))?,
-        None => Default::default(),
-    };
     let mut new_bodies = Vec::new();
     let mut shifts = (0usize, 0.0f64);
     if let (Some(bs), Some(we)) = (&bodies, &world_elev) {
         // Each body keeps its depth under the drawn terrain: it moves up or down by the change of
         // the drawn height between its old column and its new one (the resampling smooths the
         // terrain a little, more near the poles), so a crater's lens stays under the floor and a
-        // placer on the ground. A stratabound one stays in its horizon instead (above).
+        // placer on the ground. A stratabound one stays in its horizon instead (above the world
+        // stacks' raise).
         // The detail term of a drawing: its noise (spec and seed) for x period `c` in projection
         // `wpj`; paired with the amplitude layer by `drawn_detail`.
         let noise = |c: u32, wpj: &WorldProjection| match (spec.as_ref(), spec_seed) {
@@ -1299,24 +1421,25 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             detail: drawn_detail(world_amp.as_ref(), noise(period, &wp)),
             c: f64::from(period),
         };
-        let mut clipped = 0usize;
+        let (mut clipped, mut with_host) = (0usize, (0usize, 0.0f64));
         new_bodies = bs
             .iter()
-            .map(|b| {
+            .enumerate()
+            .map(|(i, b)| {
                 let mut nb = project_body(&map, b);
                 let ground = new.height(nb.center[0], nb.center[2]);
                 let dy = ground - old.height(b.center[0], b.center[2]);
-                match body_y(
-                    &mut nb,
-                    dy,
-                    b.site.is_some_and(|s| stratabound.contains(&s)),
-                    ground,
-                ) {
+                let host = strata_body(b).then(|| body_host_dy.get(i).copied().unwrap_or(0.0));
+                match body_y(&mut nb, dy, host, ground) {
                     BodyY::Moved(d) => {
                         shifts.0 += usize::from(d.abs() >= 1.0);
                         shifts.1 = shifts.1.max(d.abs());
                     }
-                    BodyY::Clipped => clipped += 1,
+                    BodyY::InHost { dy, clipped: c } => {
+                        clipped += usize::from(c);
+                        with_host.0 += usize::from(dy.abs() >= 1.0);
+                        with_host.1 = with_host.1.max(dy.abs());
+                    }
                     BodyY::Kept => {}
                 }
                 nb
@@ -1326,13 +1449,17 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         set_file(m, deeptime_format::bodies::BODIES_PATH, bytes, crc);
         vec_note.insert(
             "bodies".into(),
-            json!({"count": new_bodies.len(), "moved_a_block_or_more": shifts.0, "largest_move_blocks": shifts.1, "stratabound_clipped_to_ground": clipped}),
+            json!({"count": new_bodies.len(), "moved_a_block_or_more": shifts.0, "largest_move_blocks": shifts.1, "stratabound_clipped_to_ground": clipped, "stratabound_raised_with_host": with_host.0, "stratabound_largest_host_raise_blocks": with_host.1}),
         );
     }
     if let Some((sites, _)) = sites {
         let out: Vec<_> = sites
             .iter()
-            .map(|s| project_site(&map, s, &new_bodies))
+            .enumerate()
+            .map(|(i, s)| {
+                let dy = site_host_dy.get(i).map_or(0, |d| d.round() as i32);
+                project_site(&map, s, &new_bodies, dy)
+            })
             .collect();
         let w = write_sites_in(dir, period, frame, &out)?;
         set_file(
@@ -1678,8 +1805,8 @@ pub fn project_structure(
 }
 
 /// Of (site id, deposit type) pairs, the sites of an in-stratum type (`hosts.in_stratum`, the
-/// built-in types): their bodies lie in a host horizon and keep their block y through the
-/// projection.
+/// built-in types): their bodies lie in a host horizon and move through the projection only with
+/// it ([`body_y`]).
 fn stratabound_sites<'a>(
     sites: impl IntoIterator<Item = (deeptime_format::sites::SiteId, &'a str)>,
 ) -> Result<std::collections::HashSet<deeptime_format::sites::SiteId>, CoreError> {
@@ -1696,41 +1823,55 @@ fn stratabound_sites<'a>(
 enum BodyY {
     /// Moved by this many blocks with the drawn ground.
     Moved(f64),
-    /// A stratabound body kept at its y and clipped under the world's ground.
-    Clipped,
+    /// A stratabound body, moved by `dy` with its host horizon (0 where the world's raise left
+    /// the horizon where it was) and, with `clipped`, clipped under the world's ground.
+    InHost { dy: f64, clipped: bool },
     /// Left as it was.
     Kept,
 }
 
-/// A projected body's y. Most move with the drawn ground: by `dy`, the change of the drawn
-/// height between the body's old column and its new one, with their clip. A stratabound one
-/// (`stratabound`: its site's type is in-stratum) keeps its y, where the world's stacks keep its
-/// host horizon, and is clipped [`crate::deposits::SOIL_BLOCKS`] under `ground`, the world's
-/// drawn ground over its centre: the young landscape and the amplifier ran after the deposit
-/// stage placed it, and the drawing differs from the simulation's, so the ground over a horizon
-/// can lie lower than the one the deposit stage kept the body under (ORE-271).
-fn body_y(nb: &mut deeptime_format::Body, dy: f64, stratabound: bool, ground: f64) -> BodyY {
-    if stratabound {
-        if !ground.is_finite() {
-            return BodyY::Kept;
-        }
-        // ledger: ORE-271
-        let clip = ground.floor() as i32 - crate::deposits::SOIL_BLOCKS;
-        if clip >= nb.aabb[1][1] {
-            return BodyY::Kept;
-        }
-        nb.clip_top_y = nb.clip_top_y.min(clip);
-        nb.aabb = nb.computed_aabb();
-        return BodyY::Clipped;
-    }
-    if !dy.is_finite() {
-        return BodyY::Kept;
-    }
+/// Moves a body's centre, clip and box up by `dy` blocks.
+fn lift_body(nb: &mut deeptime_format::Body, dy: f64) {
     nb.center[1] += dy;
     if nb.clip_top_y != deeptime_format::bodies::NO_CLIP {
         nb.clip_top_y += dy.round() as i32;
     }
     nb.aabb = nb.computed_aabb();
+}
+
+/// A projected body's y. Most move with the drawn ground: by `dy`, the change of the drawn
+/// height between the body's old column and its new one, with their clip. A stratabound one
+/// (`host`: its site's type is in-stratum) moves only with its host horizon, by `host` blocks
+/// (the world's top raise there, [`world_raise_shifts`]; the bake's own raise already moved it,
+/// STR-056), and is clipped [`crate::deposits::SOIL_BLOCKS`] under `ground`, the world's drawn
+/// ground over its centre: the young landscape and the amplifier ran after the deposit stage
+/// placed it, and the drawing differs from the simulation's, so the ground over a horizon can lie
+/// lower than the one the deposit stage kept the body under (ORE-271).
+fn body_y(nb: &mut deeptime_format::Body, dy: f64, host: Option<f64>, ground: f64) -> BodyY {
+    if let Some(host) = host {
+        let host = if host.is_finite() { host } else { 0.0 };
+        if host != 0.0 {
+            lift_body(nb, host);
+        }
+        if !ground.is_finite() {
+            return BodyY::InHost {
+                dy: host,
+                clipped: false,
+            };
+        }
+        // ledger: ORE-271
+        let clip = ground.floor() as i32 - crate::deposits::SOIL_BLOCKS;
+        let clipped = clip < nb.aabb[1][1];
+        if clipped {
+            nb.clip_top_y = nb.clip_top_y.min(clip);
+            nb.aabb = nb.computed_aabb();
+        }
+        return BodyY::InHost { dy: host, clipped };
+    }
+    if !dy.is_finite() {
+        return BodyY::Kept;
+    }
+    lift_body(nb, dy);
     BodyY::Moved(dy)
 }
 
@@ -1762,12 +1903,15 @@ pub fn project_body(map: &Mapping, b: &deeptime_format::Body) -> deeptime_format
     out
 }
 
-/// A site in the world: its centre through the projection; its box the union of its bodies'
-/// (already projected) or, without bodies, its old box moved with the centre.
+/// A site in the world: its centre through the projection, up by `dy` blocks (a stratabound
+/// site's host horizon's move in the world's top raise, [`world_raise_shifts`]; 0 for the
+/// others); its box the union of its bodies' (already projected) or, without bodies, its old box
+/// moved with the centre.
 pub fn project_site(
     map: &Mapping,
     s: &deeptime_format::Site,
     bodies: &[deeptime_format::Body],
+    dy: i32,
 ) -> deeptime_format::Site {
     let mut out = s.clone();
     // The centre block's centre through the projection, and the world block holding it (the
@@ -1794,10 +1938,10 @@ pub fn project_site(
     if !any {
         let [olo, ohi] = s.aabb;
         let (dx, dz) = (cx - s.center[0], cz - s.center[2]);
-        lo = [olo[0] + dx, olo[1], olo[2] + dz];
-        hi = [ohi[0] + dx, ohi[1], ohi[2] + dz];
+        lo = [olo[0] + dx, olo[1] + dy, olo[2] + dz];
+        hi = [ohi[0] + dx, ohi[1] + dy, ohi[2] + dz];
     }
-    out.center = [cx, s.center[1], cz];
+    out.center = [cx, s.center[1] + dy, cz];
     out.aabb = [lo, hi];
     out
 }
@@ -1925,10 +2069,10 @@ mod tests {
         sum / (nx * nz) as f64
     }
 
-    /// MVT's bodies keep their block y through the projection (they lie in a host horizon the
-    /// world's stacks hold at that y); a porphyry's move with the drawn ground.
+    /// MVT's bodies move through the projection only with their host horizon (by the world
+    /// raise of the stacks, not the drawn ground); a porphyry's move with the drawn ground.
     #[test]
-    fn only_in_stratum_sites_keep_their_y() {
+    fn only_in_stratum_sites_move_with_their_host() {
         let got = stratabound_sites([(1, "deeptime:mvt_zn_pb"), (2, "deeptime:porphyry_cu_mo_au")])
             .unwrap();
         assert_eq!(got.into_iter().collect::<Vec<_>>(), vec![1]);
@@ -1948,29 +2092,266 @@ mod tests {
         )
     }
 
-    /// A body moves with the drawn ground; a stratabound one keeps its y and is clipped four
-    /// blocks under the world's ground where that lies lower than its top.
+    /// A body moves with the drawn ground; a stratabound one moves only with its host (by the
+    /// world's top raise there) and is clipped four blocks under the world's ground where that
+    /// lies lower than its top.
     #[test]
-    fn a_stratabound_body_keeps_its_y_and_is_clipped_under_the_ground() {
+    fn a_stratabound_body_moves_with_its_host_and_is_clipped_under_the_ground() {
         let mut b = lens(40.0);
-        assert_eq!(body_y(&mut b, 5.0, false, 80.0), BodyY::Moved(5.0));
+        assert_eq!(body_y(&mut b, 5.0, None, 80.0), BodyY::Moved(5.0));
         assert_eq!(b.center[1], 45.0);
-        // Kept: the ground (80) is well over its top (43).
+        // Kept: the ground (80) is well over its top (43), and its host did not move.
         let mut b = lens(40.0);
-        assert_eq!(body_y(&mut b, 5.0, true, 80.0), BodyY::Kept);
+        let kept = BodyY::InHost {
+            dy: 0.0,
+            clipped: false,
+        };
+        assert_eq!(body_y(&mut b, 5.0, Some(0.0), 80.0), kept);
         assert_eq!(
             (b.center[1], b.clip_top_y),
             (40.0, deeptime_format::bodies::NO_CLIP)
         );
         // The ground at 44.7: nothing of it above block 40 (44, less the four of soil).
-        assert_eq!(body_y(&mut b, -30.0, true, 44.7), BodyY::Clipped);
+        let clipped = BodyY::InHost {
+            dy: 0.0,
+            clipped: true,
+        };
+        assert_eq!(body_y(&mut b, -30.0, Some(0.0), 44.7), clipped);
         assert_eq!((b.center[1], b.clip_top_y, b.aabb[1][1]), (40.0, 40, 40));
         // Never above a clip it had.
         let mut b = lens(40.0);
         b.clip_top_y = 38;
         b.aabb = b.computed_aabb();
-        assert_eq!(body_y(&mut b, 0.0, true, 44.7), BodyY::Kept);
+        assert_eq!(body_y(&mut b, 0.0, Some(0.0), 44.7), kept);
         assert_eq!(b.clip_top_y, 38);
+        // Its host rose 6 blocks: so does it, whatever the drawn ground did, clip and all.
+        let mut b = lens(40.0);
+        b.clip_top_y = 41;
+        b.aabb = b.computed_aabb();
+        let raised = BodyY::InHost {
+            dy: 6.0,
+            clipped: false,
+        };
+        assert_eq!(body_y(&mut b, -30.0, Some(6.0), 80.0), raised);
+        assert_eq!((b.center[1], b.clip_top_y), (46.0, 47));
+    }
+
+    /// The column rule's undeformed column of `hz` at block (x, z).
+    fn column(hz: &Horizons, x: i64, z: i64) -> Vec<deeptime_format::strata::ColumnHorizon> {
+        let desc = hz.desc(deeptime_format::Codec::Raw);
+        let (k, w) = (hz.k as usize, hz.grid.w as usize);
+        let mut out = Vec::new();
+        deeptime_format::strata::stack_at(
+            &desc,
+            hz.min_y,
+            |i, j, h| {
+                let n = (j as usize * w + i as usize) * k + h as usize;
+                deeptime_format::strata::StoredHorizon {
+                    top: hz.tops[n],
+                    class: hz.classes[n],
+                    key: hz.keys[n],
+                }
+            },
+            x,
+            z,
+            &mut out,
+        );
+        out
+    }
+
+    /// The class of a drawn column at block y (`None` over its first top).
+    fn class_at(col: &[deeptime_format::strata::ColumnHorizon], y: i32) -> Option<u8> {
+        if col.is_empty() || y > col[0].0 {
+            return None;
+        }
+        let mut h = 0;
+        while h + 1 < col.len() && col[h + 1].0 >= y {
+            h += 1;
+        }
+        Some(col[h].1)
+    }
+
+    /// An MVT body placed in a thin limestone stays in it through both of the steps that raise
+    /// the rock after the deposit stage: the bake's lift and crest raise (`bake::strata`, the
+    /// bodies risen by `key_shift`, STR-056) and the projection's raise of the world stacks to
+    /// the drawn ground (`raise_world_tops`, the body moved by `world_raise_shifts` in `body_y`;
+    /// ORE-271). The stacks are a soil, a 6 to 10 block limestone, a 2 to 5 block sandstone, a
+    /// granite thick enough to take up both raises and gabbro, so each raise lifts the limestone
+    /// whole. Keeping the body's y through the projection (the exemption before) leaves some of
+    /// them out of it.
+    #[test]
+    fn a_stratabound_body_stays_in_its_host_through_the_bake_and_the_projection() {
+        use crate::bake::strata::{Lift, raise_stack_unit, shifts};
+        let class = |n: &str| crate::surface::lithology::index(n) as u8;
+        let t = crate::structure::columns::Tables::get();
+        let grid = GridDesc::for_planet("L1", 1024, 16).unwrap();
+        let n = grid.cells();
+        let (k, min_y, max_y) = (5usize, -64, 2000);
+        let classes = [
+            class("soil"),
+            class("limestone"),
+            class("sandstone"),
+            class("granite"),
+            class("gabbro"),
+        ];
+        let limestone = classes[1];
+        let keys = [
+            [0u16, 10],
+            [5000, 5004],
+            [5005, 5010],
+            [32_768 + 64, 32_768 + 127],
+            [33_100, 33_163],
+        ];
+        let mut rng = crate::sphere::SplitMix64::new(23);
+        let mut tops = vec![i16::MIN; n * k];
+        for c in 0..n {
+            let s = 64 * 16 + rng.below(32 * 16) as i32;
+            // Granite begins under 16 blocks of rock, so it takes up both raises.
+            let lime = 6 * 16 + rng.below(4 * 16) as i32;
+            let sand = 2 * 16 + rng.below(3 * 16) as i32;
+            let granite = 60 * 16 + rng.below(40 * 16) as i32;
+            let t0 = [
+                s,
+                s - 32,
+                s - 32 - lime,
+                s - 32 - lime - sand,
+                s - 32 - lime - sand - granite,
+            ];
+            for (h, &v) in t0.iter().enumerate() {
+                tops[c * k + h] = v as i16;
+            }
+        }
+        let before = Horizons {
+            grid: grid.clone(),
+            k: k as u32,
+            min_y,
+            tops,
+            classes: classes.repeat(n),
+            keys: keys.repeat(n),
+            tongues: (64, 0.15),
+            min_blocks: Vec::new(),
+        };
+        // The deposit stage's bodies: mid-limestone, clear of its contacts.
+        let mut bodies = Vec::new();
+        while bodies.len() < 300 {
+            let (x, z) = (rng.below(1024) as i64 - 512, rng.below(400) as i64 - 200);
+            let col = column(&before, x, z);
+            let Some(h) = col.iter().position(|c| c.1 == limestone) else {
+                continue;
+            };
+            let bottom = col.get(h + 1).map_or(min_y, |c| c.0 + 1);
+            if col[h].0 - bottom < 6 {
+                continue;
+            }
+            let y = (col[h].0 + bottom) / 2;
+            bodies.push(deeptime_format::Body::new(
+                bodies.len() as u32,
+                Some(bodies.len() as u32),
+                deeptime_format::bodies::Shape::Lens,
+                "ore",
+                [x as f64 + 0.5, f64::from(y) + 0.5, z as f64 + 0.5],
+                [6.0, 1.0, 6.0],
+                0.0,
+                0.0,
+                deeptime_format::bodies::NO_CLIP,
+            ));
+        }
+        // Step 1, the bake: a lift of 0 to 40 blocks on two cells in three and a crest raise of
+        // up to 30 on every other cell; the bodies rise with the rock at their centres.
+        let mut after = before.clone();
+        let mut moved = vec![Moved::default(); n];
+        for (c, m) in moved.iter_mut().enumerate() {
+            let tops = &mut after.tops[c * k..(c + 1) * k];
+            let lift = if rng.below(3) > 0 {
+                rng.below(40 * 16) as i32
+            } else {
+                0
+            };
+            for t in tops.iter_mut() {
+                *t = (i32::from(*t) + lift) as i16;
+            }
+            let need = i32::from(tops[0])
+                + if rng.below(2) == 0 {
+                    rng.below(30 * 16) as i32
+                } else {
+                    0
+                };
+            let (raise, upto) =
+                raise_stack_unit(tops, &classes, &keys, need, min_y * 16, &t.unconsolidated);
+            *m = Moved {
+                lift,
+                raise,
+                upto: upto as u16,
+            };
+        }
+        let (bodies_dy, _) = shifts(&after, &moved, &bodies, &[]);
+        let lift = Lift {
+            grid: grid.clone(),
+            blocks: moved.iter().map(|m| m.lift as f32 / 16.0).collect(),
+            bodies_dy,
+            sites_dy: Vec::new(),
+        };
+        let risen = lift.bodies(&bodies);
+        let host = |hz: &Horizons, b: &deeptime_format::Body| {
+            let col = column(hz, b.center[0].floor() as i64, b.center[2].floor() as i64);
+            class_at(&col, b.center[1].floor() as i32)
+        };
+        for b in &risen {
+            assert_eq!(
+                host(&after, b),
+                Some(limestone),
+                "body {} after the bake",
+                b.id
+            );
+        }
+        // Step 2, the projection (the world's stacks the bake's, the same grid): the drawn
+        // ground over half the cells stands up to 24 blocks over the stack's top.
+        let desc = after.desc(deeptime_format::Codec::Raw);
+        let mut bytes = after.to_layer(deeptime_format::Codec::Raw).unwrap().bytes;
+        let ground: Vec<u8> = (0..n)
+            .flat_map(|c| {
+                let top = f32::from(after.tops[c * k]) / 16.0;
+                let over = if rng.below(2) == 0 {
+                    rng.below(24) as f32
+                } else {
+                    -40.0
+                };
+                (top + over).to_le_bytes()
+            })
+            .collect();
+        let elev = LoadedLayer::new(
+            crate::bake::desc("terrain/elevation", DType::F32, &grid, 1.0, "blocks", None),
+            ground,
+        )
+        .unwrap();
+        let (raised, _, world_moved) =
+            raise_world_tops(&desc, &mut bytes, &elev, None, min_y, max_y, true);
+        assert!(raised > 0 && !world_moved.is_empty());
+        let world = horizons_of(&desc, &bytes, min_y);
+        let points: Vec<[f64; 3]> = risen.iter().map(|b| b.center).collect();
+        let dy = world_raise_shifts(&desc, &bytes, min_y, &world_moved, &points);
+        let (mut rose, mut kept_leaves) = (0, 0);
+        for (b, &d) in risen.iter().zip(&dy) {
+            let mut nb = b.clone();
+            let got = body_y(&mut nb, f64::NAN, Some(d), f64::INFINITY);
+            assert!(matches!(got, BodyY::InHost { clipped: false, .. }));
+            assert_eq!(
+                host(&world, &nb),
+                Some(limestone),
+                "body {} in the world",
+                b.id
+            );
+            rose += usize::from(nb.center[1] > b.center[1]);
+            kept_leaves += usize::from(host(&world, b) != Some(limestone));
+        }
+        assert!(
+            rose > risen.len() / 4,
+            "only {rose} bodies rose in the world"
+        );
+        assert!(
+            kept_leaves > 0,
+            "the test needs bodies the world's raise takes their host away from"
+        );
     }
 
     /// A site's centre goes to the world block that holds its centre block's centre.
@@ -1993,13 +2374,16 @@ mod tests {
                 parent: None,
                 extraction: deeptime_format::Extraction::default(),
             };
-            let out = project_site(&map, &s, &[]);
+            let out = project_site(&map, &s, &[], 0);
             let (wx, wz) = map.to_world(f64::from(x) + 0.5, f64::from(z) + 0.5);
             assert_eq!(
                 (out.center[0], out.center[2]),
                 (wx.floor() as i32, wz.floor() as i32)
             );
             assert_eq!(out.center[1], 40);
+            // A stratabound site's host rose 3 blocks in the world's top raise: so does it.
+            let up = project_site(&map, &s, &[], 3);
+            assert_eq!((up.center[1], up.aabb[0][1], up.aabb[1][1]), (43, 40, 46));
         }
     }
 
