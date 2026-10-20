@@ -39,7 +39,7 @@ use rayon::prelude::*;
 use super::collapse::iso_height;
 use super::gap_budget::{NAMES, PARTS, Part};
 use super::geometry::Tree;
-use super::state::{OROGENY_ANDEAN, OROGENY_HIMALAYAN, Sample};
+use super::state::{OROGENY_ANDEAN, OROGENY_HIMALAYAN, Sample, pool};
 
 /// Set to switch the budget on.
 pub const ON_ENV: &str = "DEEPTIME_CRUST_BUDGET";
@@ -53,8 +53,12 @@ pub fn enabled() -> bool {
 
 /// The stocks, in order: visible continental samples, hidden continental samples, their volumes
 /// (Σ thickness, m), visible samples above 0 m, visible continental samples above 0 m, Σ
-/// elevation of the visible continental samples (m), visible samples.
-const STOCKS: [&str; 8] = [
+/// elevation of the visible continental samples (m), visible samples, and the felsic rock (the
+/// conserved pools, `pool::CONSERVED`) of every sample, visible and hidden, and of the oceanic
+/// ones alone (m): a part's change of the first is felsic rock made or destroyed, of the second
+/// felsic rock moved onto or off the ocean floor (the loss budget against Stern & Scholl 2010,
+/// `tools/review/loss-budget.py`).
+const STOCKS: [&str; 10] = [
     "cont",
     "cont_hidden",
     "vol",
@@ -63,6 +67,8 @@ const STOCKS: [&str; 8] = [
     "dry",
     "z_cont",
     "vis",
+    "felsic",
+    "felsic_ocean",
 ];
 const NT: usize = STOCKS.len();
 const CONT: usize = 0;
@@ -71,6 +77,8 @@ const VOL: usize = 2;
 const VOL_HIDDEN: usize = 3;
 const LAND: usize = 4;
 const DRY: usize = 5;
+const FELSIC: usize = 8;
+const FELSIC_OCEAN: usize = 9;
 
 /// The changes of state counted per sample: ocean floor made continental (count, Σ elevation,
 /// Σ thickness, m), continental crust made oceanic, hidden, surfacing, drowned, emerging.
@@ -99,7 +107,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 28] = [
+const GLOBALS: [(&str, &str); 35] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -131,6 +139,19 @@ const GLOBALS: [(&str, &str); 28] = [
     ("front_c", super::subduction::ARC_FRONT_CONTINENTAL_GLOBAL),
     ("front_g_full", super::subduction::FRONT_G_FULL_GLOBAL),
     ("front_g_normal", super::subduction::FRONT_G_NORMAL_GLOBAL),
+    (
+        "front_gc_full",
+        super::subduction::FRONT_G_CONTINENTAL_FULL_GLOBAL,
+    ),
+    (
+        "front_gc_normal",
+        super::subduction::FRONT_G_CONTINENTAL_NORMAL_GLOBAL,
+    ),
+    ("transition_moved", super::transition::MOVED_GLOBAL),
+    ("hotspot_magma", super::hotspots::MAGMA_GLOBAL),
+    ("rate_capped", super::rate::CAPPED_GLOBAL),
+    ("accreted_visible", super::ridges::ACCRETED_VISIBLE_GLOBAL),
+    ("cone_mafic", super::CONE_MAFIC_GLOBAL),
 ];
 
 /// Earth's radius, km: the distances to the coast are Earth-normalized.
@@ -193,6 +214,14 @@ fn stocks(samples: &[Sample]) -> [f64; NT] {
                 if !s.is_hidden() {
                     a[LAND] += f64::from(u8::from(dry));
                     a[7] += 1.0;
+                }
+                let felsic: f64 = s.pools[..pool::CONSERVED]
+                    .iter()
+                    .map(|&x| f64::from(x))
+                    .sum();
+                a[FELSIC] += felsic;
+                if !s.is_continental() {
+                    a[FELSIC_OCEAN] += felsic;
                 }
                 a
             },
@@ -405,7 +434,8 @@ impl CrustBudget {
         let mut line = format!(
             "\ncb_t t={t_myr:.0} vis={:.0} cont={:.4} cont_hidden={:.4} vol_km3={:.4e} \
              vol_hidden_km3={:.4e} land0={:.4} land={:.4} sea_m={sea_m:.0} dry={:.4} \
-             above_2km={:.4} ocean_land={:.4} coast_p50_km={coast_p50:.0} mean_t_km={:.2}",
+             above_2km={:.4} ocean_land={:.4} coast_p50_km={coast_p50:.0} mean_t_km={:.2} \
+             felsic_km3={:.4e} felsic_ocean_km3={:.4e}",
             s[7],
             s[CONT] / vis,
             s[CONT_HIDDEN] / vis,
@@ -417,6 +447,8 @@ impl CrustBudget {
             above_2km / n_land_sl.max(1.0),
             ocean_land / n_land_sl.max(1.0),
             s[VOL] / s[CONT].max(1.0) / 1000.0,
+            s[FELSIC] * area_km2 / 1000.0,
+            s[FELSIC_OCEAN] * area_km2 / 1000.0,
         );
         line += &origin_line;
         // The thickness bands of the visible continental crust.
@@ -470,6 +502,8 @@ impl CrustBudget {
             ("vol_hidden", VOL_HIDDEN, area_km2 / 1000.0 / 1.0e6),
             ("land", LAND, 1.0 / vis),
             ("dry", DRY, 1.0 / vis),
+            ("felsic", FELSIC, area_km2 / 1000.0 / 1.0e6),
+            ("felsic_ocean", FELSIC_OCEAN, area_km2 / 1000.0 / 1.0e6),
         ] {
             let row: Vec<String> = (0..PARTS)
                 .filter(|&p| self.parts[p][k] != 0.0)

@@ -1,0 +1,231 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
+"""The continental crust's additions and losses against Stern & Scholl 2010, Table 1.
+
+  python3 tools/review/loss-budget.py <length Myr> <summary.txt> ... [--label NAME]
+
+Reads each run's crust budget (`DEEPTIME_CRUST_BUDGET=1`: the last `cb_t`, `cb_parts`,
+`cb_moves` and `cb_globals` lines, cumulative over the run) and prints, in km^3 a year over the
+whole run (Earth-normalized; 1 AU = 1 km^3/yr), Stern & Scholl's rows with the model's own
+number beside Earth's, per run and as the mean [lowest, highest] over the runs.
+
+Stern & Scholl 2010 (Int. Geol. Rev. 52:1-31, full text, Table 1 p. 12 and pp. 11-19):
+  additions  intra-oceanic arcs 1.5, continental arcs 1.0, crust-suturing zones 0.2,
+             rifts / hotspots / volcanic rifted margins 0.5; total 3.2
+  losses     ocean margins: sediment subduction 1.1, subduction erosion 1.4 (about 60 km^3/km/Myr
+             over 43,000 km of margin: 25 sediment, 35 forearc, after Scholl & von Huene 2009);
+             crust-suturing zones: sediment 0.1, erosion 0.3, deep subduction of continental
+             crust 0.3 (115 km^3/km/Myr over 6,000 km long-term); foundering unknown; total > 3.2
+  lengths    intra-oceanic arcs 14,500 km (100 km^3/km/Myr), continental arcs 27,500 km (35)
+
+The model's rows:
+  island arcs        arc magma on oceanic crust (`arc_o`); it turns continental when the arc
+                     matures (PLT-047), with the ocean floor under it (row "ocean floor")
+  continental arcs   arc magma on continental crust (`arc_c`; the cones counted inside)
+  hotspots           the hotspots' own magma (`hotspot_magma`)
+  ocean floor        crust of ocean floor made continental, less the felsic rock it carried
+                     (made continental: `cb_moves` o2c x thickness, every part; the felsic rock
+                     on the ocean floor is in `felsic_ocean`)
+  pelagic            felsic rock the plate step's surface makes (`cb_parts` felsic, part
+                     `plate_surface`: the pelagic sediment, `pelagic_m_per_myr`)
+  sediment subd.,    none: the conserved pools of subducted crust accrete to the column on top
+  subd. erosion      at a resampling (`accreted`, of it ocean floor's: accreted - accreted_continent)
+  collision          crust a collision took across its front less the share stacked (crossed - kept)
+  foundering         crust beyond `crust_max_km` sunk from the column's bottom (`foundered`)
+  rate cap           crust over the thickening ceiling with no room, sent down (`rate_lost`)
+  dropped            crust a resampling drops (`dropped` + `mafic_dropped`)
+and the felsic rock made or destroyed per part (`cb_parts` felsic), the flows between the
+continental and oceanic labels (`cb_parts` vol by part) and the net change of the continental
+volume (visible and hidden) over the run.
+"""
+import re
+import sys
+
+NUM = r"(-?[0-9.]+(?:e[+-]?[0-9]+)?|NaN|nan|inf|-inf)"
+PLANET_KM2 = 5.1007e8  # Earth's surface, km^2: the budget's shares are of the planet.
+OCEAN_CRUST_KM = 7.0  # the ocean floor's own crust (`transition::oceanic_m`), km
+
+
+def kv(text):
+    return {k: float(v) for k, v in re.findall(r"([A-Za-z0-9_/]+)=" + NUM + r"(?=[\s\]]|$)", text)}
+
+
+def read(path):
+    last = {}
+    first_t = None
+    with open(path) as f:
+        for line in f:
+            m = re.match(r"(cb_t|cb_parts|cb_moves|cb_globals) t=(-?[0-9.]+)", line)
+            if not m:
+                continue
+            kind, body = m.group(1), line[m.end():]
+            if kind == "cb_t":
+                d = kv(body)
+                if first_t is None:
+                    first_t = d
+                last["t"] = d
+            elif kind == "cb_parts":
+                last["parts"] = {
+                    name: {p: float(x) for p, x in re.findall(r"(\w+):" + NUM, inner)}
+                    for name, inner in re.findall(r"(\w+)=\[([^\]]*)\]", body)
+                }
+            elif kind == "cb_moves":
+                last["moves"] = {
+                    name: kv(inner) for name, inner in re.findall(r"(\w+)=\[([^\]]*)\]", body)
+                }
+            else:
+                last["globals"] = kv(body)
+    last["first"] = first_t
+    return last
+
+
+def budget(run, length):
+    yrs = length * 1.0e6
+    g = run["globals"]
+    parts = run["parts"]
+    moves = run["moves"]
+    per = lambda km3: km3 / yrs  # a global (km^3 over the run) in km^3/yr
+    part = lambda stock, name: parts.get(stock, {}).get(name, 0.0) * 1.0e6 / yrs
+    o2c_km3 = sum(m.get("o2c", 0.0) * PLANET_KM2 * m.get("o2c_t_km", 0.0) for m in moves.values())
+    o2c_floor = sum(m.get("o2c", 0.0) * PLANET_KM2 * OCEAN_CRUST_KM for m in moves.values())
+    out = {
+        "island_arcs": per(g.get("arc_o", 0.0)),
+        "continental_arcs": per(g.get("arc_c", 0.0)),
+        "hotspots": per(g.get("hotspot_magma", 0.0)),
+        "made_continental": o2c_km3 / yrs,
+        "ocean_floor": o2c_floor / yrs,
+        "pelagic": part("felsic", "plate_surface"),
+        "accreted_ocean": per(g.get("accreted", 0.0) - g.get("accreted_continent", 0.0)),
+        "collision": per(g.get("crossed", 0.0) - g.get("kept", 0.0)),
+        "foundering": per(g.get("foundered", 0.0)),
+        "rate_cap": per(g.get("rate_lost", 0.0)),
+        "dropped": per(g.get("dropped", 0.0) + g.get("mafic_dropped", 0.0)),
+        "cordillera": per(g.get("cordillera", 0.0)),
+        "crossed": per(g.get("crossed", 0.0)),
+        "erosion_off": -part("vol", "erosion"),
+        "transition_off": -part("vol", "transition"),
+        "front_o_km": g.get("front_o", 0.0) / length,
+        "front_c_km": g.get("front_c", 0.0) / length,
+        "g_c_full": g.get("front_gc_full", float("nan")) / max(g.get("front_c", 0.0), 1e-9),
+        "g_c_normal": g.get("front_gc_normal", float("nan")) / max(g.get("front_c", 0.0), 1e-9),
+        "g_full": g.get("front_g_full", 0.0) / max(g.get("front_o", 0.0) + g.get("front_c", 0.0), 1e-9),
+        "g_normal": g.get("front_g_normal", 0.0) / max(g.get("front_o", 0.0) + g.get("front_c", 0.0), 1e-9),
+    }
+    out["arc_o_per_km"] = g.get("arc_o", 0.0) / max(g.get("front_o", 0.0), 1e-9)
+    out["arc_c_per_km"] = g.get("arc_c", 0.0) / max(g.get("front_c", 0.0), 1e-9)
+    out["cord_per_km"] = g.get("cordillera", 0.0) / max(g.get("front_c", 0.0), 1e-9)
+    t0, t1 = run["first"], run["t"]
+    vol = lambda t: t.get("vol_km3", 0.0) + t.get("vol_hidden_km3", 0.0)
+    out["net"] = (vol(t1) - vol(t0)) / yrs
+    out["cont_end"] = t1.get("cont", float("nan"))
+    out["felsic_parts"] = {k: v * 1.0e6 / yrs for k, v in parts.get("felsic", {}).items()}
+    out["felsic_ocean_parts"] = {k: v * 1.0e6 / yrs for k, v in parts.get("felsic_ocean", {}).items()}
+    out["vol_parts"] = {
+        k: (parts.get("vol", {}).get(k, 0.0) + parts.get("vol_hidden", {}).get(k, 0.0)) * 1.0e6 / yrs
+        for k in set(parts.get("vol", {})) | set(parts.get("vol_hidden", {}))
+    }
+    return out
+
+
+ROWS = [
+    ("additions", None, None),
+    ("intra-oceanic (island) arcs", "island_arcs", 1.5),
+    ("continental arcs", "continental_arcs", 1.0),
+    ("crust-suturing zones", None, 0.2),
+    ("rifts, hotspots, rifted margins", "hotspots", 0.5),
+    ("model only: ocean floor's own crust made continental", "ocean_floor", 0.0),
+    ("model only: pelagic sediment made", "pelagic", 0.0),
+    ("losses", None, None),
+    ("ocean margins: sediment subduction", None, 1.1),
+    ("ocean margins: subduction erosion", None, 1.4),
+    ("crust-suturing zones (all three)", "collision", 0.7),
+    ("foundering", "foundering", float("nan")),
+    ("model only: rate cap sent down", "rate_cap", 0.0),
+    ("model only: resampling drops", "dropped", 0.0),
+    ("flows (moved, not made or lost)", None, None),
+    ("ocean-floor felsic rock accreted at resamplings", "accreted_ocean", float("nan")),
+    ("off the continents by the surface stage", "erosion_off", float("nan")),
+    ("off the continents by the transition", "transition_off", float("nan")),
+    ("crust made continental (o2c x thickness)", "made_continental", float("nan")),
+    ("crossed collision fronts", "crossed", float("nan")),
+    ("shortened into cordilleras", "cordillera", float("nan")),
+    ("net change of the continental volume", "net", 0.0),
+]
+
+LENGTHS = [
+    ("island-arc front, km (Earth 14,500)", "front_o_km", "{:.0f}"),
+    ("continental-arc front, km (Earth 27,500)", "front_c_km", "{:.0f}"),
+    ("island arcs per km of front, km3/km/Myr (Earth ~100 at full rate)", "arc_o_per_km", "{:.1f}"),
+    ("continental arcs per km, km3/km/Myr (Earth 35)", "arc_c_per_km", "{:.1f}"),
+    ("cordillera per km of continental front, km3/km/Myr", "cord_per_km", "{:.1f}"),
+    ("mean g, all oceanic fronts, full speed", "g_full", "{:.3f}"),
+    ("mean g, all oceanic fronts, normal", "g_normal", "{:.3f}"),
+    ("mean g, continental fronts, full speed", "g_c_full", "{:.3f}"),
+    ("mean g, continental fronts, normal", "g_c_normal", "{:.3f}"),
+    ("continental crust at the end, share of the planet", "cont_end", "{:.3f}"),
+]
+
+
+def stats(xs):
+    xs = [x for x in xs if x == x]
+    if not xs:
+        return float("nan"), float("nan"), float("nan")
+    return sum(xs) / len(xs), min(xs), max(xs)
+
+
+def main():
+    args = sys.argv[1:]
+    label = None
+    if "--label" in args:
+        i = args.index("--label")
+        label = args[i + 1]
+        del args[i : i + 2]
+    length = float(args[0])
+    runs = []
+    for p in args[1:]:
+        r = read(p)
+        if "globals" not in r:
+            print(f"# {p}: no crust budget", file=sys.stderr)
+            continue
+        runs.append((p, budget(r, length)))
+    if not runs:
+        sys.exit("no runs with a crust budget")
+    print(f"# loss budget{' ' + label if label else ''}: {len(runs)} runs, km3/yr over {length:.0f} Myr")
+    print(f"{'row':58s} {'model mean [min, max]':>26s} {'Earth':>6s}")
+    for name, key, earth in ROWS:
+        if key is None and earth is None:
+            print(f"-- {name}")
+            continue
+        if key is None:
+            print(f"{name:58s} {'0 (no rule)':>26s} {earth:6.2f}")
+            continue
+        m, lo, hi = stats([b[key] for _, b in runs])
+        e = "" if earth != earth else f"{earth:6.2f}"
+        print(f"{name:58s} {m:8.2f} [{lo:6.2f}, {hi:6.2f}]  {e:>6s}")
+    print("-- lengths and rates")
+    for name, key, fmt in LENGTHS:
+        m, lo, hi = stats([b[key] for _, b in runs])
+        print(f"{name:58s} {fmt.format(m):>8s} [{fmt.format(lo)}, {fmt.format(hi)}]")
+    for title, key in [
+        ("felsic rock made (+) or destroyed (-) by part", "felsic_parts"),
+        ("felsic rock onto (+) or off (-) the ocean floor by part", "felsic_ocean_parts"),
+        ("continental volume (visible + hidden) by part", "vol_parts"),
+    ]:
+        names = sorted({k for _, b in runs for k in b[key]})
+        if not names:
+            continue
+        print(f"-- {title}, km3/yr")
+        for n in names:
+            m, lo, hi = stats([b[key].get(n, 0.0) for _, b in runs])
+            if abs(m) < 0.005 and abs(lo) < 0.005 and abs(hi) < 0.005:
+                continue
+            print(f"   {n:55s} {m:8.2f} [{lo:6.2f}, {hi:6.2f}]")
+    if len(runs) > 1:
+        print("-- per run: island arcs, continental arcs, ocean floor, pelagic, collision, foundering, rate cap, net")
+        for p, b in runs:
+            keys = ["island_arcs", "continental_arcs", "ocean_floor", "pelagic", "collision", "foundering", "rate_cap", "net"]
+            print(f"   {p.rsplit('/', 1)[-1]:45s} " + " ".join(f"{b[k]:6.2f}" for k in keys))
+
+
+if __name__ == "__main__":
+    main()

@@ -105,7 +105,7 @@
     "island_arc_km3_per_km_myr": 100.0,
     "continental_arc_km3_per_km_myr": 35.0,
     "arc_mature_crust_km": 15.0,
-    "cordillera_shortening_mm_yr": 6.0,
+    "cordillera_shortening_mm_yr": 1.7,
     "cordillera_width_km": 120.0,
     "cordillera_height_m": 2500.0,
     "trench_half_life_myr": 2.0,
