@@ -482,6 +482,7 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         "surface_final={} land_frac={:.3} max_elevation_m={:.0} sea_level_m={:.1} sediment_km3={:.3e} \
          eroded_km3={:.3e} fluvial_km3={:.3e} lake_km3={:.3e} marine_km3={:.3e} carbonate_km3={:.3e} \
          evaporite_km3={:.3e} pelagic_km3={:.3e} periplatform_km3={:.3e} periplatform_source_km3={:.3e} photic_km2_myr={:.3e} photic_warm_km2_myr={:.3e} photic_warm_clear_km2_myr={:.3e} \
+         black_shale_km3={:.3e} platform_km2_myr={:.3e} euxinic_km2_myr={:.3e} toc_km2_myr={:.3e} toc_rich_km2_myr={:.3e} \
          to_sea_km3={:.3e} mass_residual_km3={:.3e} mean_log_layers={:.2} \
          spl_iterations_per_step={:.2} cg_iterations_per_step={:.1} sinks={} erosion_pulses={} basins={} sea_events={} frames={} \
          history_mib={:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_z_p99_m={:.0} plate_cap_bound_share={:.5} \
@@ -508,6 +509,12 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         t.photic_km2_myr,
         t.photic_warm_km2_myr,
         t.photic_warm_clear_km2_myr,
+        // The facies fields' reach (`surface::Totals`).
+        t.black_shale_km3,
+        t.platform_km2_myr,
+        t.euxinic_km2_myr,
+        t.toc_km2_myr,
+        t.toc_rich_km2_myr,
         t.to_sea_km3,
         t.mass_residual_km3,
         layers,
