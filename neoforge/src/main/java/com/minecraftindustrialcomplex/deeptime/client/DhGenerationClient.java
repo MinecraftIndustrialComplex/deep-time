@@ -37,11 +37,19 @@ public final class DhGenerationClient {
 
     private DhGenerationClient() {}
 
-    /** Called from {@link DeepTimeClient#init}; does nothing without Distant Horizons. */
+    /**
+     * Called from {@link DeepTimeClient#init}; does nothing without Distant Horizons, or with
+     * {@code -Ddeeptime.dhGenerationGate=false} (the control in {@code tools/client/dh-client-check.sh}).
+     */
     static void init() {
         if (!DhFarTerrain.installed())
             return;
         chunky = present(DhGenerationGate.CHUNKY_API_CLASS);
+        if ("false".equalsIgnoreCase(System.getProperty("deeptime.dhGenerationGate", "true"))) {
+            DeepTime.LOGGER.info("[deeptime] Distant Horizons' world generator gate is off (-Ddeeptime.dhGenerationGate=false; Chunky {})",
+                    chunky ? "installed" : "not installed");
+            return;
+        }
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(ClientTickEvent.Pre.class, e -> onClientTick());
     }
 
