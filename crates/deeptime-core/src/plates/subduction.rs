@@ -38,7 +38,8 @@
 //! the height its column holds (plate task 8; until then a height-only `arc_uplift_mm_yr`).
 //! Island-arc crust becomes continental once it is `arc_mature_crust_km` thick
 //! (`plates::finish_samples`). A wider band around the arc (`cordillera_width_km`) thickens
-//! continental crust by the crust shortened into it at `cordillera_shortening_mm_yr`, taken from
+//! continental crust by the crust shortened into it at `cordillera_shortening_mm_yr` (Earth's
+//! mean over its continental arcs, however fast the plates converge: PLT-048, PLT-320), taken from
 //! the plate's continental crust behind the range (volume kept; until plate task 8 an uplift with
 //! an Airy root made from nothing), slowing as the column's Airy height nears
 //! `cordillera_height_m` (P1-27: the arc's own range, which h(z̃) of an abyssal slab leaves at a
@@ -606,6 +607,9 @@ pub const ARC_FRONT_OCEANIC_GLOBAL: &str = "plates/arc_front_oceanic_km_myr";
 /// with the full relative speed and with the convergence normal to the front ([`Pull`]).
 pub const FRONT_G_FULL_GLOBAL: &str = "plates/arc_front_g_full_km_myr";
 pub const FRONT_G_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_km_myr";
+/// The same two over the fronts under continental overriding crust, km × Myr.
+pub const FRONT_G_CONTINENTAL_FULL_GLOBAL: &str = "plates/arc_front_g_full_continental_km_myr";
+pub const FRONT_G_CONTINENTAL_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_continental_km_myr";
 /// World global: crust shortened into the arcs' cordilleras over the run, km³ (moved, not made).
 pub const CORDILLERA_GLOBAL: &str = "plates/cordillera_shortened_km3";
 
@@ -629,6 +633,9 @@ pub struct Pull {
     pub front_g_full_km_myr: f64,
     /// … and with v the convergence normal to the front (measurement, either rule).
     pub front_g_normal_km_myr: f64,
+    /// The same two over the fronts under continental overriding crust (the continental arcs and
+    /// their cordilleras), km × Myr.
+    pub front_g_continental_km_myr: [f64; 2],
 }
 
 /// One subducting-side sample's effect on its contact and on the crust budget.
@@ -700,12 +707,14 @@ struct Boundary {
     front: Option<(u32, usize, DVec3, DVec3)>,
 }
 
-/// Set to 1 to scale the arcs, the cordillera and the subduction uplift by the convergence normal
-/// to the front (the boundary's normal, [`boundary_normal`]) instead of the full relative speed.
-/// Off by default: an experiment of the land-shape task (2026-10-20), which measured it to bring
-/// the arcs' yearly crust near Earth's and to take a fifth of the land away, so it waits for the
-/// continental crust's losses to be brought to Earth's (`docs/science/plates.md`, "Land shape and
-/// the high ground"). ledger: PLT-312
+/// Set to 1 to scale the arcs and the subduction uplift by the convergence normal to the front
+/// (the boundary's normal, [`boundary_normal`]) instead of the full relative speed (the cordillera
+/// takes no convergence since PLT-320). Off by default: an experiment of the land-shape task
+/// (2026-10-20), which measured it to bring the arcs' yearly crust near Earth's and to take a fifth
+/// of the land away, so it waits for the continental crust's losses to be brought to Earth's
+/// (`docs/science/plates.md`, "Land shape and the high ground"); the crust-budget task measured it
+/// again with the cordillera at Earth's typical arc and the collisions still losing four times
+/// Earth's ("The crust budget against Stern & Scholl"). ledger: PLT-312
 pub const NORMAL_CONVERGENCE_ENV: &str = "DEEPTIME_ARC_NORMAL";
 
 fn normal_convergence() -> bool {
@@ -877,6 +886,7 @@ pub fn fronts_finish(
     let by_normal = normal_convergence();
     let v0 = k.convergence_ref_mm_yr; // ledger: PLT-037
     let (mut g_full_km_myr, mut g_normal_km_myr) = (0.0_f64, 0.0_f64);
+    let mut g_continental_km_myr = [0.0_f64; 2];
     for (v, b) in boundary.iter().enumerate() {
         if let Some((u, c, rel, out)) = b.front {
             let su = state.samples[u as usize];
@@ -888,6 +898,10 @@ pub fn fronts_finish(
             if su.kind != CONTINENTAL {
                 g_full_km_myr += front_km * env.dt_myr * (speed / v0).min(1.0);
                 g_normal_km_myr += front_km * env.dt_myr * (across / v0).min(1.0);
+                if state.samples[v].kind == CONTINENTAL {
+                    g_continental_km_myr[0] += front_km * env.dt_myr * (speed / v0).min(1.0);
+                    g_continental_km_myr[1] += front_km * env.dt_myr * (across / v0).min(1.0);
+                }
             }
             let (conv, facing) = if by_normal {
                 (across, normal)
@@ -944,10 +958,11 @@ pub fn fronts_finish(
     let band_km = std::f64::consts::PI.sqrt() * k.arc_width_km;
     let island_axis_m = k.island_arc_km3_per_km_myr / band_km * 1000.0 * env.dt_myr; // ledger: PLT-045
     let continental_axis_m = k.continental_arc_km3_per_km_myr / band_km * 1000.0 * env.dt_myr; // ledger: PLT-285
-    // The cordillera: pure shear of the range at `cordillera_shortening_mm_yr`, the strain spread
-    // over its Gaussian band (integral √π · `cordillera_width_km`), fed by the crust behind the
-    // range (from twice the band's half-width beyond the arc to r_s), which shortens at the same
-    // rate and gives the volume. ledger: PLT-048
+    // The cordillera: pure shear of the range at `cordillera_shortening_mm_yr` (Earth's typical
+    // continental arc, at any convergence), the strain spread over its Gaussian band (integral
+    // √π · `cordillera_width_km`), fed by the crust behind the range (from twice the band's
+    // half-width beyond the arc to r_s), which shortens at the same rate and gives the volume.
+    // ledger: PLT-048, PLT-320
     let shorten_km = k.cordillera_shortening_mm_yr * 1.0e-3 * dt_yr / 1000.0;
     let strain_axis = shorten_km / (std::f64::consts::PI.sqrt() * k.cordillera_width_km);
     let range_edge_km = k.arc_distance_km + 2.0 * k.cordillera_width_km;
@@ -991,7 +1006,11 @@ pub fn fronts_finish(
                     // Altiplano and the Puna stop near 4 km).
                     let iso = iso_height(&s.pools, z_0, gravity);
                     let room = (1.0 - iso.max(0.0) / k.cordillera_height_m).max(0.0);
-                    plan.demand_m = f64::from(s.thickness_m) * strain_axis * w * g * room;
+                    // Not scaled by the convergence (g): back-arc deformation follows the upper
+                    // plate's own motion, not the convergence (Heuret & Lallemand 2005; Jarrard
+                    // 1986), and the rate is the length-weighted mean over Earth's continental
+                    // arcs, whatever their convergence. ledger: PLT-320
+                    plan.demand_m = f64::from(s.thickness_m) * strain_axis * w * room;
                 } else {
                     plan.source = true;
                 }
@@ -1231,6 +1250,7 @@ pub fn fronts_finish(
         cordillera_km3: cordillera_m * area / 1000.0,
         front_g_full_km_myr: g_full_km_myr,
         front_g_normal_km_myr: g_normal_km_myr,
+        front_g_continental_km_myr: g_continental_km_myr,
     }
 }
 
