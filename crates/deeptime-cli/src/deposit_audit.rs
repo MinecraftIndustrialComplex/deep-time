@@ -40,6 +40,7 @@ use std::path::{Path, PathBuf};
 use deeptime_core::deposits::types::{self, DepositType};
 use deeptime_core::surface::lithology;
 use deeptime_core::synth::SplitMix;
+use deeptime_format::raster::RasterRead;
 use deeptime_format::sites::read_sites;
 use deeptime_format::{Body, ColumnWorld, Site};
 use serde_json::{Value, json};
@@ -521,6 +522,14 @@ pub fn run(o: &Options) -> CliResult<Value> {
         .unwrap_or_else(|| world_scatter_mult(&w.manifest.notes));
     let mut m = Model::new(&w, o.soil);
     let c = w.c;
+    // The crust under each site (the bake's meta layers): oceanic where the crust has an age.
+    let meta = |name: &str| -> Option<deeptime_format::lazy::LazyLayer> {
+        let e = w.manifest.layer(name)?;
+        deeptime_format::lazy::LazyLayer::open(&o.world_data.join(&e.path)).ok()
+    };
+    let crust_age = meta("meta/crust_age_myr");
+    let mut deform = deeptime_format::structure::DeformScratch::default();
+    let mut stack = Vec::new();
 
     // Scatter on random land chunks.
     let mut rng = SplitMix(o.seed);
@@ -670,11 +679,31 @@ pub fn run(o: &Options) -> CliResult<Value> {
             .unwrap_or(0);
         let tonnage = s.products.first().map_or(0.0, |p| p.tonnage_t);
         let chunks = tot.chunks.len() as f64;
-        let here = w.hydro(i64::from(s.center[0]), i64::from(s.center[2]));
+        let (sx, sy, sz) = (
+            i64::from(s.center[0]),
+            s.center[1],
+            i64::from(s.center[2]),
+        );
+        let here = w.hydro(sx, sz);
+        // The stratum at the site's centre (the baked stack, without the site's own bodies), the
+        // rock there with them, the crust and the ground's height over the sea.
+        w.stack(sx, sz, &mut deform, &mut stack);
+        let stratum = deeptime_format::column::horizon_at(&stack, sy)
+            .and_then(|h| w.classes.get(usize::from(stack[h].1)))
+            .cloned();
+        let rock = m.class(sx, sy, sz).map(str::to_owned);
+        let age = crust_age
+            .as_ref()
+            .map(|l| l.nearest(w.wrap_x(sx) as f64, sz as f64))
+            .filter(|a| a.is_finite());
+        let col = w.sample(sx, sz);
+        let ground_m = (col.surface - f64::from(sea)) * w.manifest.scale.m_per_block_v;
         rows.push(json!({
             "site": s.id, "type": s.deposit_type, "center": s.center, "bodies": bodies.len(),
             // The ground and the water at the site's centre column.
             "ground_y": here.ground, "water": here.kind.name(),
+            "stratum": stratum, "rock": rock, "oceanic": age.is_some(), "crust_age_myr": age,
+            "ground_m": ground_m,
             "tonnage_t": tonnage,
             "grade": s.products.first().map(|p| p.grade),
             "primary": primary,
