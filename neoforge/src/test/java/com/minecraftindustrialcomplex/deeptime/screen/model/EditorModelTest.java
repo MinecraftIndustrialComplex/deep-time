@@ -88,17 +88,28 @@ class EditorModelTest {
         assertFalse(has(m.problems(), "editor.warning.placeholder"));
     }
 
-    /** No default story: Run is disabled until both parts of the timeline are chosen. */
+    /**
+     * The default timeline (Ben, decisions log 2026-10-19: one-click Create): supercontinent, 1000 Myr,
+     * so Run is allowed once the estimate is in; a cleared or invalid part disables it again.
+     */
     @Test
-    void runDisabledWithoutATimeline() {
+    void defaultTimelineAndClearedParts() {
         EditorModel m = model();
+        assertEquals(Optional.of(EditorModel.DEFAULT_START), m.start());
+        assertEquals("1000", m.lengthText());
+        assertFalse(m.canRun(), "the estimate is not in yet");
+        assertTrue(has(m.problems(), "editor.problem.estimating"));
         m.refreshEstimate();
+        assertTrue(m.canRun(), () -> m.problems().toString());
+        assertTrue(m.effectivePresetJson().contains("\"timeline\":{\"length_myr\":1000.0,\"start\":\"supercontinent\"}"),
+                m.effectivePresetJson());
+        m.setStart(null);
         assertFalse(m.canRun());
         assertTrue(has(m.problems(), "editor.problem.start"));
-        assertTrue(has(m.problems(), "editor.problem.length_missing"));
-        assertFalse(m.effectivePresetJson().contains("\"timeline\""), "no timeline is invented");
+        assertFalse(m.effectivePresetJson().contains("\"timeline\""), "no half timeline is written");
         m.setStart("random");
-        assertFalse(m.canRun());
+        m.setLengthText("");
+        assertTrue(has(m.problems(), "editor.problem.length_missing"));
         m.setLengthText("0.5");
         assertTrue(has(m.problems(), "editor.problem.length_range"));
         m.setLengthText("abc");
@@ -112,9 +123,63 @@ class EditorModelTest {
         assertTrue(m.canRun(), () -> m.problems().toString());
         assertTrue(m.effectivePresetJson().contains("\"timeline\":{\"length_myr\":4600.0,\"start\":\"random\"}"),
                 m.effectivePresetJson());
-        m.setStart(null);
-        assertFalse(m.canRun());
         assertThrows(IllegalArgumentException.class, () -> m.setStart("pangaea"));
+    }
+
+    /** Generate (Create World's Create button): the run starts by itself once the estimate is in. */
+    @Test
+    void generateStartsOnceTheEstimateIsIn() {
+        EditorModel m = model();
+        m.generate();
+        assertEquals(EditorModel.Page.RUN, m.page());
+        assertTrue(m.generating());
+        assertTrue(m.tickAutoStart().isEmpty(), "waits for the estimate");
+        assertTrue(m.generating());
+        assertTrue(launched.isEmpty());
+        m.refreshEstimate();
+        assertTrue(m.tickAutoStart().isPresent());
+        assertFalse(m.generating());
+        assertEquals(1, launched.size());
+        assertTrue(m.runIsCurrent());
+        // Generate again with the same settings: the run going is shown, not restarted.
+        m.generate();
+        assertFalse(m.generating());
+        assertEquals(1, launched.size());
+        // Customize changed the settings: Generate cancels the run going and starts the new one.
+        m.openCustomize(true);
+        assertTrue(m.customizeFromRun());
+        assertEquals(EditorModel.Page.SETUP, m.page());
+        m.setLengthText("500");
+        assertFalse(m.runIsCurrent());
+        FakeRunHandle first = launched.get(0);
+        m.generate();
+        assertTrue(first.cancelled, "the stale run is cancelled");
+        assertTrue(m.run().isEmpty());
+        m.refreshEstimate();
+        assertTrue(m.tickAutoStart().isPresent());
+        assertEquals(2, launched.size());
+        assertTrue(m.effectivePresetJson().contains("\"length_myr\":500.0"), m.effectivePresetJson());
+    }
+
+    /** A blocking problem other than the estimate ends Generate's wait (the page shows it). */
+    @Test
+    void generateStopsWaitingOnABlockingProblem() {
+        EditorModel m = model();
+        peak = 64 * GIB;
+        m.generate();
+        m.refreshEstimate();
+        assertTrue(has(m.problems(), "editor.problem.over_cap"), () -> m.problems().toString());
+        assertTrue(m.tickAutoStart().isEmpty());
+        assertFalse(m.generating());
+        assertTrue(launched.isEmpty());
+        // Cancel while waiting ends the wait too.
+        EditorModel n = model();
+        peak = 100_000_000L;
+        n.generate();
+        n.cancelRun();
+        n.refreshEstimate();
+        assertTrue(n.tickAutoStart().isEmpty());
+        assertTrue(launched.isEmpty());
     }
 
     @Test
