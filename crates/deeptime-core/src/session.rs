@@ -466,7 +466,7 @@ pub struct Session {
     threads: usize,
     pool: rayon::ThreadPool,
     gauge: Arc<dyn MemoryGauge>,
-    log: LogRing,
+    log: Arc<LogRing>,
     state: AtomicU8,
     stage_index: AtomicU32,
     stage_count: u32,
@@ -500,8 +500,9 @@ pub struct Session {
     /// Whether a group's followers that can step beside the lead's next step do (P1-19;
     /// [`Session::set_overlap`]).
     overlap: AtomicBool,
-    /// The compute mode, as `ComputeMode as u8` ([`Session::set_compute`]).
-    compute: AtomicU8,
+    /// The compute mode ([`Session::set_compute`]) and the log, also on every pool worker for
+    /// the kernels that have no stage context (`compute::ambient`).
+    ambient: Arc<crate::compute::Ambient>,
 }
 
 /// The share of the memory cap kept free after a step: the history is trimmed to
@@ -852,9 +853,16 @@ impl Session {
         } else {
             options.threads
         };
+        let log = Arc::new(LogRing::default());
+        let ambient = Arc::new(crate::compute::Ambient::new(
+            ComputeMode::from_env(),
+            log.clone(),
+        ));
+        let worker_ambient = ambient.clone();
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
             .thread_name(|i| format!("deeptime-rayon-{i}"))
+            .start_handler(move |_| crate::compute::enter(worker_ambient.clone()))
             // The few small blocks a thread keeps for reuse go back when it ends (P1-19).
             .exit_handler(|_| crate::alloc::unpark_thread())
             .build()
@@ -944,7 +952,7 @@ impl Session {
             threads,
             pool,
             gauge,
-            log: LogRing::default(),
+            log,
             state: AtomicU8::new(SessionState::Running as u8),
             stage_index: AtomicU32::new(next_stage as u32),
             stage_permille: AtomicU32::new(0),
@@ -979,7 +987,7 @@ impl Session {
             needed_peak: [AtomicU64::new(0), AtomicU64::new(0)],
             resumed: None,
             overlap: AtomicBool::new(true),
-            compute: AtomicU8::new(ComputeMode::from_env() as u8),
+            ambient,
         };
         session.log.push(
             Level::Info,
@@ -1018,15 +1026,11 @@ impl Session {
     /// Where the kernels that have a GPU version run (`compute.rs`; default
     /// [`ComputeMode::from_env`]). Takes effect from the next stage step.
     pub fn set_compute(&self, mode: ComputeMode) {
-        self.compute.store(mode as u8, Ordering::Release);
+        self.ambient.set_mode(mode);
     }
 
     pub fn compute(&self) -> ComputeMode {
-        match self.compute.load(Ordering::Acquire) {
-            1 => ComputeMode::Cpu,
-            2 => ComputeMode::Gpu,
-            _ => ComputeMode::Auto,
-        }
+        self.ambient.mode()
     }
 
     /// The spill store: the disk the recorded history used (bytes and frames written).
