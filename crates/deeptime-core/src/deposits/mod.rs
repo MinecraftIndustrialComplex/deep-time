@@ -4444,18 +4444,26 @@ mod tests {
                 assert!(top((depth, half)) >= surf - EXPOSED_BLOCKS);
             } else {
                 let formation = stage.types[k].preservation.formation_depth_m;
-                assert!(depth >= formation, "{id}: never shallower than its formation depth");
+                assert!(
+                    depth >= formation,
+                    "{id}: never shallower than its formation depth"
+                );
             }
         }
         let mvt = ti("mvt_zn_pb");
         assert_eq!(
-            stage.guaranteed_depth(mvt, &ess("c:zinc", false), surf, &sc).0,
+            stage
+                .guaranteed_depth(mvt, &ess("c:zinc", false), surf, &sc)
+                .0,
             stage.types[mvt].preservation.formation_depth_m,
             "MVT's 1,000 m is already under the soil"
         );
         let low = f64::from(sc.min_y + 18);
         let (depth, _) = stage.guaranteed_depth(mvt, &ess("c:zinc", false), low, &sc);
-        assert!((depth - 2.0 * sc.m_per_block_v).abs() < 1.0e-9, "the floor cap wins");
+        assert!(
+            (depth - 2.0 * sc.m_per_block_v).abs() < 1.0e-9,
+            "the floor cap wins"
+        );
     }
 
     /// Acceptance: a synthetic run places sites of several families, every site has a forming
