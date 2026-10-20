@@ -1747,6 +1747,209 @@ stages 0.63 and 0.68, the rest of the run fixed), and its ensemble stage sums ar
 master's at 500 and 1000 Myr, so at the gate's length it would save about a third of the run. It
 stays out for the planet's sake (above).
 
+## The 4-Myr plate step (P1-19 #27 unlock, 2026-10-19)
+
+The task after C20 landed: find every place where a longer plate step changes the physics rather
+than only the cost, make it per Myr or exact in the step, and measure a 4-Myr step against C20 as
+ensembles with the chaos separated from the bias. Ben (decisions log 2026-10-19): "I'm a little
+worried about the impact on quality of worlds by increasing the plate step, make sure to do
+thorough testing on it". So the 4-Myr step is a preset switch and the 2-Myr step stays the
+default; whether it becomes the default is Ben's call after the comparison. Code:
+`surface/{advect,mod,params}.rs`, `climate/mod.rs`, `surface/volcanoes/mod.rs`. Ledger: ERO-185,
+ERO-186, VOL-040.
+
+**What changed in the code.** None of the three changes a run at a 2-Myr step.
+
+- *The carry's blur* (ERO-185; erosion-and-sediment.md, "The carry's blur and the spreading at
+  long plate steps"). The surface rides the plates by one bilinear carry a plate step, and each
+  carry blurs by the same amount whatever the displacement, so a 4-Myr step blurred half as much
+  per Myr. A step longer than 2 Myr now adds the blur the 2-Myr carries would have left, over
+  cells of the same crust; the regolith and the climate's ice and ELA fields take the same.
+- *The crust's spreading* (ERO-186). Its diffusivity is the cube of the excess height, and one
+  solve over a step holds it at the step's start; a long step is now solved in sub-steps of at
+  most 2 Myr.
+- *A dead cone's slot* (VOL-040). A stratovolcano that outlived its drawn life frees its place on
+  the arc from the end of that life, not from the step that found it dead (at 4-Myr steps the
+  slot stayed shut up to a step too long).
+
+**What still depends on the step** (the per-step audit of the coupled stages; the rules that
+counted steps were made per Myr in the cadence task above).
+
+| what | at a 2-Myr step | at a 4-Myr step |
+|---|---|---|
+| the landscape step (`surface.substeps`, ERO-018) | one of 2 Myr | one of 4 Myr, or two of 2 with `substeps` 2; inside it the river solver's iterations (`spl_max_iter`), the slope failure's (ERO-169), the glacial sub-steps' caps (4 a landscape step, each taking at most 100 m of till and lowering the bed by at most half the ice's thickness) and the frozen flow routing are per landscape step |
+| the isostatic answer to a step's erosion | lands after that step's erosion | the same, over twice the erosion; the diagnosis branch's `rebound_ref_myr` (screened as p4fix, not in this branch) holds back the share beyond 2 Myr |
+| a stratovolcano without arc flux (VOL-010) | one 2-Myr step forgiven | one 4-Myr step forgiven |
+| a cone's life (VOL-038) | ends at the first step end after its drawn death, 1 Myr late on average | 2 Myr late on average |
+| hotspot births | at most one a hotspot a step | the same: above 17.5 mm/yr over the plume (35 at 2 Myr) a chain's spacing is the plate's motion in a step |
+| cadences of round(X ÷ step) steps | every 10 Myr (margins, ages, arc bases VOL-071) | every 12 Myr; the 20-Myr climate snapshot stays 20 |
+| times compared at step ends (orogeny minimum, slowdown PLT-226, welds PLT-246) | rounded up to 2 Myr | rounded up to 4 Myr |
+| the event record (`surface/events.rs`) | events on 2-Myr step ends; pulses and basins found from the step's mean rates | on 4-Myr step ends, from 4-Myr means |
+| the strata log | consecutive entries of a land column 2 Myr apart at the median | 4 Myr apart (with `substeps` 2 as well) |
+| contacts and collisions | found from 2 Myr of motion (200 km at 100 mm/yr) | from 4 Myr (400 km), not sub-stepped |
+| the ocean floor's subsidence (pools.rs) | one explicit step, 0.8 % of the way to the −10 km floor at 0.04 mm/yr | 1.6 %; the exact exponential differs by about 0.01 % |
+| `ice_relax_kyr` (GLA-074) | per plate step | the same; inert, as the ice dynamics are off in every preset |
+
+The plate checks that measure one step are reported per 2 Myr of step (`TARGET_STEP_MYR`, above),
+but the rotation's change, the land one step gains and the partings' lengths still read the
+step's sampling.
+
+**The screen** (quick 16k, 2026-10-20). `earthlike_quick_16k`, 1000 Myr, 2 threads, seeds 1 to 3
+on both starts, six runs a setting, all on this branch's build (0c368e27) except p4fix and
+p4fs2, which ran the diagnosis branch's (0c368e27 with 29bfe825 and afaec853, `rebound_ref_myr`
+2). **C20** is the default; **c20tw** is C20 with the serial flood fill
+(`surface.numerics.flood=serial`), which changes only rounding, so C20 against c20tw is what
+chaos alone does (the A/A row); **p4** `tectonics.time_step_myr=4`; **p4s2** p4 with
+`surface.substeps=2`; **p4fix** p4 with the rebound hold-back; **p4fs2** p4fix with
+`surface.substeps=2`. Each run's 820 numbers (`build/p4/metrics.py`: relief, belts, plates and
+the plate checks, ocean floor, continents and coasts, rivers, crust, strata, volcanoes, climate,
+the event record) were compared with C20's by `build/p4/compare.py`: a number is flagged when
+the Mann-Whitney p ≤ 0.1, or |d| ≥ 0.8, or all of five or more pairs (the same seed and start)
+move the same way, or the pairs' Wilcoxon signed-rank p ≤ 0.1, or (against the twin) the pair
+differences differ from the twin's at p ≤ 0.1. The rule that picked the setting for the
+full runs was written before the tables were computed: the flagged numbers among 66 headline
+ones (land share, high ground and the plate checks met counted twice) plus the flagged
+plate-check numbers (141); lowest wins.
+
+| | c20tw (A/A) | p4 | p4s2 | p4fix | p4fs2 |
+|---|---|---|---|---|---|
+| headline numbers flagged (weighted) | 8 (9) | 37 (43) | 30 (36) | 33 (36) | 28 (31) |
+| plate-check numbers flagged, of 141 | 23 | 65 | 48 | 72 | 65 |
+| all numbers flagged, of 820 | 68 | 391 | 377 | 436 | 372 |
+| score | 32 | 108 | 84 | 108 | 96 |
+
+The written rule described the flag without its Wilcoxon part; scored that way the five are
+26, 107, 80, 106 and 94, the same order. p4s2 against p4fs2 directly: 160 of 820 flagged. Means
+over the six runs (C20's range in
+brackets; * flagged, † outside C20's range):
+
+| | C20 | c20tw | p4 | p4s2 | p4fix | p4fs2 |
+|---|---|---|---|---|---|---|
+| land | 0.166 [0.126, 0.193] | 0.179 | 0.191* | 0.205*† | 0.216*† | 0.205*† |
+| land above 2 km (share of land) | 0.248 [0.124, 0.383] | 0.254 | 0.324* | 0.334* | 0.299 | 0.290 |
+| highest cell, m | 7,038 [5,415, 7,563] | 6,866 | 8,989*† | 9,255*† | 7,790*† | 7,985*† |
+| land median, m | 809 [466, 1,312] | 884 | 1,094* | 1,181* | 1,008* | 1,010 |
+| mountain belts | 19.2 [17, 22] | 20.0 | 15.8*† | 17.0 | 16.7*† | 16.8*† |
+| plates (run mean) | 21.6 [17.6, 23.8] | 22.9* | 22.3 | 22.7 | 22.1 | 22.6 |
+| size ranks' L1 to Bird 2003 | 0.282 [0.251, 0.308] | 0.288 | 0.274 | 0.269 | 0.261* | 0.255* |
+| plate speed p50, mm/yr | 21.3 [17.8, 25.1] | 23.4 | 26.1*† | 22.7 | 23.8* | 25.0* |
+| plate checks met, of 45 | 25.8 [22, 28] | 28.3*† | 28.0* | 27.3* | 25.8 | 27.5* |
+| ocean floor age mean, Myr | 89.3 [71.1, 120] | 85.5 | 88.0 | 79.1 | 79.5 | 82.7 |
+| collisions per 100 Myr | 1.92 [1.70, 2.20] | 2.00 | 1.58*† | 1.70 | 1.67*† | 1.68*† |
+| Hack's exponent | 0.450 [0.348, 0.500] | 0.482* | 0.465 | 0.428 | 0.473 | 0.494 |
+| carbonate, km³ | 1,452,583 | 1,404,667 | 670,017*† | 1,086,433* | 606,417*† | 1,088,833* |
+| eroded, km³ | 296.5 M | 308.2 M | 241.2 M*† | 296.7 M | 272.8 M* | 321.2 M |
+| stratovolcanoes born | 30,898 | 30,720 | 24,388* | 25,283* | 25,331* | 26,480* |
+| T, °C | 19.1 [16.0, 26.9] | 17.5 | 21.2* | 20.4 | 22.5* | 21.7 |
+| natural CO₂, ppm | 907 [532, 2,434] | 818 | 1,010 | 1,241* | 1,571* | 1,161 |
+| distinct event times per 100 Myr | 46.9 [46.1, 48.3] | 47.2 | 24.0*† | 24.0*† | 24.0*† | 24.1*† |
+| strata layer span p50, Myr | 2 | 2 | 4*† | 4*† | 4*† | 4*† |
+| strata log layers per land column | 5.37 [4.41, 5.97] | 6.42*† | 4.22*† | 4.11*† | 4.75* | 4.15*† |
+
+p4s2 scored lowest and went to the full runs (C20 and p4s2 only; the coordinator's call).
+Shared by every 4-Myr setting: the event record and the strata log on 4-Myr ends, the per-step
+plate numbers (the rotation's change, the land one step gains, partings of 8 against 5.3 Myr and
+24 against 35 per 100 Myr) and the arcs read higher by the sampling effect above (continental
+arcs' median 1.19 to 1.41 km against 0.66). The screen's full tables are on the review page
+below.
+
+**The full runs** (full 16k, 2026-10-20). `earthlike_full_16k`, 1000 Myr, 8 threads, C20 and
+p4s2 on scattered seeds 1 to 6 and supercontinent seeds 1 to 3 (nine runs each, the same seeds),
+c20tw on scattered seeds 1 and 2, all on 0c368e27's build; each run baked (deposits, the young
+landscape, amplify) and measured twice, at the end of the coupled stages and in the baked world
+(`metrics.py`, 1,146 numbers a run), then compared by the same rule. The A/A row sets C20's nine
+runs on both starts against c20tw's two scattered ones, so its sides differ in their starts too;
+the last two rows set both settings against C20 on c20tw's two runs only, where only |d| ≥ 0.8 can
+flag a number.
+
+| | c20tw (A/A) | p4s2 |
+|---|---|---|
+| runs: C20, the setting, pairs | 9, 2, 2 | 9, 9, 9 |
+| headline numbers flagged (weighted) | 18 (18) | 29 (34) |
+| plate-check numbers flagged | 41 of 138 | 43 of 141 |
+| all numbers flagged | 293 of 1,146 | 461 of 1,157 |
+| on c20tw's two runs (2 v 2): headline (weighted), plate checks, all | 28 (28), 71 of 138, 483 of 1,146 | 42 (45), 95 of 136, 685 of 1,146 |
+
+Means over the nine runs (C20's range in brackets; * flagged, † outside C20's range; "baked" is
+the same number in the baked world):
+
+| | C20 | p4s2 |
+|---|---|---|
+| land | 0.208 [0.170, 0.268] | 0.215 |
+| land, baked | 0.194 [0.150, 0.259] | 0.200 |
+| land above 2 km (share of land) | 0.274 [0.134, 0.384] | 0.353* |
+| land above 2 km (share of land), baked | 0.227 [0.115, 0.320] | 0.284* |
+| highest cell, m | 6,754 [5,639, 7,484] | 9,071*† |
+| highest cell, m, baked | 6,411 [5,518, 7,075] | 7,556*† |
+| land median, m | 993 [644, 1,458] | 1,278* |
+| land median, m, baked | 857 [585, 1,165] | 1,048* |
+| mountain belts | 25.0 [15.0, 39.0] | 20.7 |
+| plates (run mean) | 20.6 [17.2, 23.6] | 21.1 |
+| size ranks' L1 to Bird 2003 | 0.284 [0.215, 0.430] | 0.279 |
+| plate speed p50, mm/yr | 19.8 [14.3, 25.5] | 19.4 |
+| plate checks met, of 45 | 26.8 [25.0, 30.0] | 25.7* |
+| ocean floor age mean, Myr | 95.9 [73.9, 117.1] | 90.9 |
+| collisions per 100 Myr | 2.50 [1.50, 3.90] | 2.07 |
+| Hack's exponent | 0.478 [0.403, 0.574] | 0.465 |
+| carbonate, km³ | 1,458,222 [1,129,000, 1,757,000] | 1,358,578 |
+| eroded, km³ | 310.5 M [239.6 M, 378.3 M] | 287.3 M* |
+| stratovolcanoes born | 34,551 [26,388, 41,028] | 26,846* |
+| T, °C | 19.7 [14.5, 26.1] | 20.6 |
+| natural CO₂, ppm | 673 [311, 1,460] | 1,167* |
+| distinct event times per 100 Myr | 47.8 [47.3, 48.8] | 24.3*† |
+| strata layer span p50, Myr | 2 [2, 2] | 4*† |
+| strata log layers per land column | 6.53 [5.22, 7.89] | 4.43*† |
+
+**Time** (the VM, paired, 2026-10-20: `build/p4/pair.sh`, `deeptime bench --preset
+earthlike_full_16k --start scattered_continents --length-myr 1000` with 8 threads, C20 and p4s2
+side by side on two pinned sets of 8 CPUs, then swapped, through `tools/review/bench-quiet.py`;
+other jobs kept 18 to 20 of the VM's CPUs busy on average). Wall, C20 against p4s2: 1,183
+against 868 s, then 1,269 against 953 s (p4s2 at 0.73 and 0.75 of C20). Stage means of the two
+rounds: plates 306 against 167 s, the surface 588 against 481, climate 134 against 104,
+volcanoes 28.6 against 12.6, structure 43 against 36, the bake (deposits to finalize) 117 against
+101. Largest resident set 4.44 and 4.48 GiB against 4.34 and 4.32 GiB.
+
+**The 2-Myr step, unchanged** (identity check, 2026-10-20, `build/p4/idcheck.sh`). The master
+side of the merge (3e7edd49: the same crates without this change, built as the shipped x86-64-v3
+binary) and the branch's build (0c368e27) ran the defaults: quick 16k, scattered seed 1, 100 Myr
+to the volcanoes stage, 2 threads. The 101 fields read back from the two checkpoints are
+byte-identical, the dynamics records are identical, and so is the plate-check report but for the
+checkpoint's own path in it. The stage lines differ in wall times and in the logged preset,
+which on the branch names the two new settings at 2 Myr. The checkpoint files differ in length by
+72 bytes: their JSON summaries are identical, and the body, which holds the preset, is longer on
+the branch.
+
+All of it, with the per-seed tables (every headline number, each run's value under both settings
+and c20tw's where it ran), the curves, the keyframes and bakes side by side and two BlueMap sites
+a world (the highest mountain box and the most coastline box, by a rule fixed before any picture
+was taken), is on the review page,
+[deeptime-p4-c20-review](https://spacesheep.dev/@benmac/deeptime-p4-c20-review) (private).
+
+**Measured before the continents' fix.** Every run above is on 0c368e27, before the
+lower-crustal flow and the settling ("Mountains eat the world: the continents drown", below; land
+0.16 to 0.22 before them, 0.31 to 0.32 after, on its runs), so none of these numbers says how a
+4-Myr step behaves with them. Their rules, read for the step and not run:
+
+- *The settling* (ISO-078) moves a column 1 − e^(−δt/τ) of the way to its height, with τ = 4
+  kyr: the whole way at 2 and at 4 Myr. The surface's flexure it adds is the surface stage's
+  last one, a plate step old.
+- *The flow's heights* (PLT-281) follow from each column's crust before and after the step, as
+  the collapse's do, and the settling then takes them to equilibrium.
+- *The flow's substeps* (PLT-300): explicit, as many as keep it stable, at most 64 a step, past
+  which the step moves less than the law. At the thickest channel (K = 8 K₀ = 12,000 km²/Myr) on
+  six edges and the preset's mean spacing taken as a hexagonal lattice's (about 77 km at quick
+  16k's 100,000 samples, 48 km at full 16k's 250,000), the cap holds the step to 3.1 Myr of the
+  law at quick 16k and 1.3 Myr at full 16k, whatever the step. So it binds at quick 16k only at 4
+  Myr (crust above about 78 km), and at full 16k at both (above about 76 km at 2 Myr, 70 km at 4
+  Myr). At the thickest channel a 4-Myr step then moves crust 0.79 as far per Myr as a 2-Myr
+  one at quick 16k, and half as far at full 16k. These are estimates from the constants; the substeps a step takes (`Flow::substeps`) are not logged, and
+  how much crust is that thick was not measured.
+- *The flow's reach.* Crust moves only among the channel columns and the two rings of their
+  plate's crust around them, found once a step, so a channel's front can move at most two rings
+  (about 150 km at quick 16k, 100 km at full 16k) a step, half as far per Myr at 4 Myr. K₀'s
+  length over 15 Myr is Rey, Teyssier & Whitney's 150 km, √(K₀ t) = 77 km over 4 Myr at K₀ and
+  220 km at 8 K₀; not measured here.
+
 ## L1 sampling on a GPU (2026-10-19)
 
 **What changes.** With a usable GPU (`compute` auto or gpu; `docs/design/gpu-compute.md`, section
@@ -1785,3 +1988,192 @@ four, equal in one), where one f32 ulp on one weight moved the CPU's own land sh
 planet by up to 0.004 and, before the cadence change, by 0.024. The same-state comparison above
 finds no lean, so the four in five is chance or an effect too indirect to show in a single
 sampling; a larger paired ensemble would tell.
+
+## Mountains eat the world: the continents drown (2026-10-19)
+
+Ben, watching a planet form (earthlike_quick_16k, supercontinent, 1000 Myr): "mountains will
+'eat' the world and delete most of the continents and leave things as a stringy mess of
+'islands.'" One supercontinent at 900 Myr ago, narrow snow-capped chains and island strings in a
+mostly empty ocean by 650 Myr ago. Ledger PLT-300 to PLT-302, ISO-078 and HYP-035; the sources'
+bibliography entries name those ids. Code: `plates/{flow.rs, settle.rs, crust_budget.rs,
+collapse.rs, mod.rs}`; tables and maps by `tools/review/continent-budget.py`.
+
+**The budget (measurement only, PLT-302).** `DEEPTIME_CRUST_BUDGET=1` keeps the continental
+crust's stocks every 50 Myr (area, volume visible and hidden, land at the climate's sea level, the
+dry share of the continental crust, the land above 2 km, the median distance from land to the
+coast, the thickness bands with their elevation and Airy height), books each stock's change to the
+process of the plate step that made it (the gap budget's brackets, PLT-283) and counts single
+samples changing state (ocean floor made continental, hidden, drowned, emerged).
+`DEEPTIME_CRUST_BUDGET_MAPS=<dir>` also writes the visible samples at every snapshot. On master
+(c88c2eb5 plus the budget, which changes nothing: test `the_crust_budget_changes_nothing`),
+quick 16k, 1000 Myr, seeds 1 to 3 (scattered: seeds 1 and 2):
+
+| | supercontinent, start | supercontinent, end (3 seeds) | scattered, end (2 seeds) | Earth |
+|---|---|---|---|---|
+| continental crust, share of the planet | 0.422 | 0.417 (0.387 to 0.473) | 0.463 | 0.41 (Cogley 1984, HYP-012) |
+| its volume, 10^9 km³ | 7.56 | 8.69 | 9.62 | |
+| land at sea level | 0.300 | 0.178 | 0.160 | 0.289 (HYP-001) |
+| dry share of the continental crust | 0.71 | 0.39 | 0.30 | 0.71 (HYP-012) |
+| land above 2 km, share of land | 0 | 0.25 | 0.23 | 0.102 (HYP-004) |
+| median distance from land to the coast, km | 2,220 | 169 | 155 | |
+| mean continental thickness, km | 35.1 | 41.0 | 40.8 | 41.1 (Christensen & Mooney 1995) |
+
+The continents do not lose their area: it holds near the start's 0.42 and the scattered start
+gains. They lose their land. Half of the continental crust that was dry is under the sea at the end,
+the land is a sixth of the planet, and the median coast is 150 to 190 km from any land, an
+archipelago. The thickness spreads both ways at once (supercontinent seed 2 at the end): 30 % of
+the continental crust is thinner than 35 km, 41 % thicker than 45 km, 15 % 55 to 70 km, and every
+band stands 1.1 to 1.9 km below its Airy height, so even crust of a normal thickness is drowned:
+
+| band, km | share of the continental area | median elevation, m | Airy height, m | dry |
+|---|---|---|---|---|
+| 30 to 35 | 0.127 | -1,079 | 178 | 0.18 |
+| 35 to 40 | 0.166 | -349 | 868 | 0.33 |
+| 40 to 45 | 0.170 | -132 | 1,581 | 0.42 |
+| 45 to 55 | 0.230 | 244 | 2,520 | 0.64 |
+| 55 to 70 | 0.123 | 1,814 | 4,271 | 0.90 |
+
+Where the land goes, over the run (mean of the three supercontinent runs, as shares of the
+planet; a stock's parts add up): the belts raise 0.53 of land and the arcs 0.38, the collapse
+0.13; subduction drowns 0.52 (the plate going under), the ocean-floor step 0.39 (arcs that are
+still ocean floor), the transition 0.38 and the surface's erosion 0.20. Of the dry continental
+crust, the transition takes 0.46, the surface 0.47 and subduction 0.49. The area turns over: the
+plates going under hide 0.85 of the planet's worth of continental crust in 1000 Myr and the
+resamplings take 0.84 of it back, while arcs that mature turn 0.58 of ocean floor continental
+(`finish_samples`) at a mean of -3,219 m and 19.6 km of crust, 1.5 km under that crust's own Airy
+height and 0.8 km under its water-loaded one. The collisions turn area into thickness at
+17.5 km³ a year (the crust the belts keep), the collapse moves 4.1 km³ a year of it back out.
+
+**What Earth does.** Continental crust is 41 % of the surface and 71 % of it is dry (Cogley 1984,
+HYP-012). Earth's freeboard holds because a column out of isostatic balance does not stay so: the
+mantle under Fennoscandia gives back an ice load's depression with relaxation times "close to
+3-5 kyr" (Wieczerkowski, Mitrovica & Wolf 1999, abstract), and what a cooling lithosphere adds is
+spent on its thermal time, 62.8 Myr (McKenzie 1978, full text, Table 1). Thickened crust does not
+stay thick either: its hot lower crust flows out from under the high ground, "Over 15 m.y., the
+length scale of channel-flow extrusion is 150 km rather than 1500 km" (Rey, Teyssier & Whitney
+2010, full text), the eastern margin of Tibet was built by lower-crustal flow (Clark & Royden
+2000), and the Basin and Range "cannot maintain short-wavelength (100 km) Moho relief of more
+than 1 km for times greater than 10-20 m.y. at most" (Bird 1991, abstract). Crust of every
+thickness ends near its isostatic height and spreads when it is thick and hot.
+
+**The cause.** Two things in the plate model, neither of them the mountains' height:
+
+1. *Nothing returns a column to its isostatic height.* Every process moves a column's surface by
+   the change it makes (`collapse::toward`, collapse.rs:205 on master; the belts', arcs' and
+   transition's own height lines), and none moves it towards the height its crust holds up. A gap
+   once made stays. The largest maker is the arcs: island-arc crust becomes continental "whatever
+   its height" (`finish_samples`, mod.rs:1076 on master) and keeps the ocean floor's height as it
+   thickens, so the continents a run grows stand on the ocean's line. Accretion, the ocean-floor
+   step, the transition's height line (f = 4.24, steeper than Airy's 7.02) and the surface's
+   flexure add theirs (the gap budget, "Which process holds the gap" above).
+2. *Thickened crust inside a continent keeps its root.* The collapse releases only quiet crust
+   (collapse.rs:241 to 252, PLT-259) and only into room thinner than the normal column within
+   200 km (collapse.rs:328 to 351, PLT-257): a belt ringed by crust of normal thickness has no
+   room, and of the about 33 km³ a year its rule would release, 4.1 moves.
+
+The transition's width (PLT-262) is Ben's (decisions log 2026-10-05, "Keep 200 km, raise crust in
+7–8") and is not changed here.
+
+**The fix.** Two rules on the plate model's samples, each with its own parameter and its own
+ledger row, run each plate step after the collapse and before the rate limits:
+
+1. *The lower-crustal flow* (`plates/flow.rs`, PLT-300, PLT-301): continental crust thicker than
+   `collapse_thickness_km` (50 km, PLT-256) spreads into the crust around it on its plate,
+   orogeny or not, by diffusion of thickness, ∂T/∂t = ∇·(K∇T) with K = K₀ (h/15 km)³ and h the
+   channel's thickness above 50 km (at most 30 km). It is the thin-channel flux in the isostatic
+   limit (Bird 1991; Clark & Royden 2000). K₀ = `crust_channel_km2_myr` = 1,500 km²/Myr, the
+   diffusivity whose length over 15 Myr, √(K t), is Rey, Teyssier & Whitney's 150 km. It moves
+   crust, not area: the test `a_thick_belt_spreads_into_the_crust_around_it_and_keeps_its_volume`
+   holds the volume to a millionth.
+2. *The settling* (`plates/settle.rs`, ISO-078): every visible continental column moves to the
+   height its crust holds up, z* = z_A above the sea and s + (z_A − s) · 1.454 below it (its
+   water on it), plus the surface's flexure. Its time, `isostasy_relax_myr`, is the mantle's:
+   4 kyr (Wieczerkowski, Mitrovica & Wolf 1999, abstract), so a 2 Myr step settles the whole way.
+   The model's thermal heights (the ocean floor's age-depth law, the margins' transition on
+   McKenzie's 62.8 Myr) have their own rules; the gaps the plate rules leave are mechanical.
+
+The flow alone does not bring the land back, and the settling on the thermal time does not either
+(`earthlike_quick_16k`, supercontinent seed 2, 1000 Myr, the end):
+
+| run | land | dry share of the continental crust | land above 2 km, of land | coast distance p50, km | continental crust |
+|---|---|---|---|---|---|
+| master (c88c2eb5 with the budget) | 0.192 | 0.45 | 0.336 | 166 | 0.392 |
+| flow only | 0.200 | 0.44 | 0.233 | 189 | 0.411 |
+| settling on 62.8 Myr only | 0.244 | 0.56 | 0.206 | 151 | 0.422 |
+| flow, settling on 62.8 Myr | 0.250 | 0.61 | 0.294 | 175 | 0.399 |
+| flow, settling on 10 Myr | 0.274 | 0.71 | 0.448 | 174 | 0.347 |
+| flow, settling on 0.5 Myr | 0.338 | 0.68 | 0.301 | 152 | 0.433 |
+| Earth | 0.289 | 0.71 | 0.102 | 433 | 0.41 |
+
+One seed each, so the differences between the fast settlings are within a run's chaos; every
+settling of 10 Myr or less brings every thickness band to its Airy height. The flow takes the
+thickest crust down (the 55-70 km band's share) and the land above 2 km with it when the settling
+is off; with the settling on, the land above 2 km is set by the thickness distribution under the
+model's Airy line (z_0 = 525 m at 35.1 km, 1 km per 7.02 km of crust): 45 km of crust stands at
+1.9 km and 50 km at 2.6 km. At the end of a run with the fix, 0.20 (supercontinent seed 1) and
+0.28 (scattered seed 1) of the continental crust is thicker than 45 km, 0.41 on master
+(supercontinent seed 2, the table above), where Earth's mean is 41.1 km and its orogens 46.3 km
+(Christensen & Mooney 1995).
+
+**The result.** Master (c88c2eb5 with the budget) against the fix, `earthlike_quick_16k`,
+1000 Myr, seeds 1 to 3, the end of the run, means of the three seeds; the full row is
+`earthlike_16k`, scattered seed 1, one run (`tools/review/force-balance-ensemble.sh` with
+`DEEPTIME_CRUST_BUDGET=1`, tables and figures by `tools/review/continent-budget.py`):
+
+| start | run | land | continental crust under the sea | land above 2 km, of land | coast p50, km | continental crust | mean thickness, km |
+|---|---|---|---|---|---|---|---|
+| supercontinent | master | 0.178 | 0.61 | 0.251 | 169 | 0.417 | 41.0 |
+| supercontinent | fix | 0.310 | 0.34 | 0.285 | 166 | 0.432 | 37.5 |
+| scattered | master | 0.155 | 0.68 | 0.282 | 162 | 0.426 | 41.0 |
+| scattered | fix | 0.305 | 0.33 | 0.354 | 148 | 0.408 | 39.0 |
+| scattered, full 16k | master | 0.221 | 0.46 | 0.400 | 163 | 0.386 | 42.8 |
+| scattered, full 16k | fix | 0.317 | 0.35 | 0.350 | 129 | 0.442 | 39.5 |
+| Earth | | 0.289 | 0.29 | 0.102 | 433 (409 at 250,000 points) | 0.41 | 41.1 |
+
+Halfway (500 Myr ago) the fix holds 0.28 and 0.31 of the planet as land where master has 0.19 and
+0.16, and the dry share of the continental crust stays at 0.59 to 0.67 through the whole run
+(master falls to 0.32 to 0.42). The continental area holds on both (0.39 to 0.48 at the end). The
+budget's parts (mean of the six quick runs): the settling raises 2.09 of the planet's worth of
+land over the run and the surface's flexure and erosion take back what is above the line (the
+plate surface -1.24, erosion -0.92 where master's are -0.40 and -0.25); the flow moves
+10.2 km³ a year, the collapse's own release falls from 4.3 to 2.0 km³ a year (likely because the
+flow has taken the thick crust first), and the foundering halves (2.1 to 1.1 km³ a year).
+
+*The climate.* More land weathers more: the end's global temperature is lower on six of the seven
+pairs, by 2.2 to 4.3 °C (supercontinent seed 3 is 1.5 °C warmer), and the natural CO2 is lower on
+five (full 16k: 1,461 to 810 ppm, 19.3 to 15.0 °C). The cold land grows: the Köppen E share of
+the land rises from 0.23 to 0.33 (supercontinent) and from 0.28 to 0.40 (scattered), and with
+nearly twice the land the area of E climate is 2.5 to 2.8 times master's on the quick runs; on the full
+run it falls from 0.41 to 0.33.
+
+*The sea floor.* The two rules touch only visible continental crust, never the ocean floor, but the
+sea floor changes through it: the drowned continental crust stands at its water-loaded Airy height,
+so its median depth goes from 1.2 to 1.9 km to 0.4 to 0.9 km (500 Myr ago and at the end; the
+shelves' share of the sea goes
+from 0.05 to 0.09 to 0.07 to 0.16), and the shallowest tenth of the ocean floor proper is
+shallower (its p90 -0.5 to -0.9 km against -1.3 to -1.9 km on master, the end of seed 1 of each
+start and the full run), likely through the resampling's blend at the margins (not traced). The
+median sea depth falls by about 0.3 km. The relief between neighbouring sea samples (the p90 of
+the height difference within 1.5 spacings) is 721, 1,084 and 722 m with the fix against 877, 706
+and 852 m on master: no consistent change, and the drowned continental crust is smoother (p90 444
+to 546 m against 554 to 717 m).
+
+**What it does not fix: the shape.** The continents keep their land and their freeboard, but not
+their shape. The median distance from land to the coast stays at 130 to 170 km on both, against
+Earth's 433 km (HYP-035), and the land at the end is still the belts and their forelands with
+island strings between them (the maps the budget writes, `maps-*.png`). The pieces of land holding 90 % of it at the end:
+6, 6 and 10 with the fix, 14, 13 and 1 on master (seed 1 of each start, the full run). Three leads,
+not yet measured one by one: the collisions turn area into thickness (the belts keep about
+18 km³ a year, so a continent shrinks where it meets another), the arcs build continental crust
+along thin strings (4.1 km³ a year of island-arc crust, where Earth's 14,500 km of
+intra-oceanic arcs grow about 1.5 km³ a year, Stern & Scholl 2010, PLT-045), and the resampling fills the gaps inside a continent with ocean
+floor (it turns 15.9 of the planet's worth of continental samples to ocean floor and 14.7 back
+over a run). The land above 2 km is also still too much (0.29 to 0.35 of land, Earth 0.10): the
+thickness distribution is wider than Earth's, and the model's Airy line puts 41 km of crust at
+1.4 km.
+
+The figures are not kept in the repo: `tools/review/continent-budget.py --out <dir> --group
+master=<summaries> --group fix=<summaries> --maps <name>=<maps dir>` makes them from the runs'
+summaries and maps (`series.png` the stocks over time per seed, `bands-*.png` the thickness bands,
+`maps-*.png` six snapshots of elevation and of the continental crust); the build log entry of
+2026-10-20 has the commands.

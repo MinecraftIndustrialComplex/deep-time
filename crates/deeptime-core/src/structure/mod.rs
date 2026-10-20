@@ -511,6 +511,17 @@ type Finished = (
     Vec<deform::Feature>,
 );
 
+/// The contact aureoles of the last step's plutons and stocks, and the roots of the stocks
+/// rooted on plutons ([`StructureStage::aureoles`]), on their way to bodies.
+#[derive(Default)]
+struct Aureoles {
+    plutons: Vec<plutons::Aureole>,
+    stocks: Vec<plutons::Aureole>,
+    roots: Vec<plutons::StockRoot>,
+    /// The end of the history, Myr (their ages count back from it).
+    now_myr: f64,
+}
+
 /// Estimate: the per-frame host fields and columns (plan §5.7.5 has no line for it yet).
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
     let c = u64::from(p.scale.circumference_blocks);
@@ -606,8 +617,18 @@ impl StructureStage {
                 self.st.next_kf_years = t0 + (((t_end_years - t0) / every).floor() + 1.0) * every;
             }
         }
-        let summary = if last {
+        let (summary, hosts) = if last {
             let horizons = bake_horizons::bake_with(&src, &self.preset, p, tables);
+            // The columns at the stocks' and plutons' centres as the strata pass will paint them:
+            // what the stocks' cover and the aureoles' bands read.
+            let centres = self
+                .st
+                .features
+                .iter()
+                .filter(|f| f.kind == deform::Kind::Stock)
+                .map(|f| (f.x, f.z))
+                .chain(self.st.plutons.iter().map(|pl| (pl.x, pl.z)));
+            let hosts = plutons::HostColumns::of(&horizons, centres);
             // Kept for the deposit stage's cover and the bake, which read the same inputs: in a
             // file of their own in the run's folder, so they hold no memory meanwhile.
             kept.keep(
@@ -623,9 +644,9 @@ impl StructureStage {
                     if kept.on_disk() { "in a file of their own" } else { "in memory" }
                 ),
             );
-            Some((horizons.mean_horizons(), horizons.check()))
+            (Some((horizons.mean_horizons(), horizons.check())), hosts)
         } else {
-            None
+            (None, plutons::HostColumns::default())
         };
         let trap_shares = last.then(|| self.trap_shares(&src, &d, fields));
         add_time(&mut self.timings, "outputs", started);
@@ -640,6 +661,7 @@ impl StructureStage {
         };
         // The folds and faults as the world's structural events, with a lattice evaluation of
         // the whole planet (what it finds, and what it costs).
+        let mut rooted = Vec::new();
         let structure = if last {
             let started = Instant::now();
             // Everything the run left, with the plugs of the volcanoes that have died (made
@@ -658,6 +680,39 @@ impl StructureStage {
             deform::undo_order(&mut all);
             let span = (src.now_myr - self.preset.t_start_years() / 1.0e6).max(1.0);
             let now = src.now_myr;
+            // A stock lies in the rock older than itself: under younger cover (the column as the
+            // strata pass paints it, `hosts`) its top goes down to the cover's base (its depth is
+            // drawn under the present ground, DEF-044).
+            let covers: Vec<f32> = all
+                .par_iter()
+                .map_init(Vec::new, |units, f| {
+                    if f.kind != deform::Kind::Stock || f.base <= 0.0 {
+                        return 0.0;
+                    }
+                    let c = plutons::cell_of(&grid, f.x, f.z);
+                    let y = src.surface_y(c, &s);
+                    hosts.units(f.x, f.z, y, s.min_y, s.m_per_block_v, units);
+                    let key = columns::key::of_age(0, now - f64::from(f.t_myr), span);
+                    (plutons::cover_m(units, key) / s.m_per_block_v) as f32
+                })
+                .collect();
+            let mut under_cover = 0usize;
+            for (f, &cover) in all.iter_mut().zip(&covers) {
+                if cover > 0.0 && cover > f.depth {
+                    f.depth = cover;
+                    under_cover += 1;
+                }
+            }
+            // The stocks over a pluton of their own episode rise from its roof.
+            rooted = deform::intrude::root_on_plutons(
+                &mut all,
+                &self.st.plutons,
+                &surface_y,
+                |x, z| src.surface_y(plutons::cell_of(&grid, x, z), &s),
+                &crate::sphere::BlockFrame::new(grid.circumference() as u32),
+                s.m_per_block_h,
+                s.m_per_block_v,
+            );
             let mut st = deform::finish(
                 &all,
                 |x, z| src.surface_y(plutons::cell_of(&grid, x, z), &s),
@@ -678,6 +733,8 @@ impl StructureStage {
             )?;
             add_time(&mut self.timings, "deformation_lattice", started);
             let mut report = report;
+            report["stocks_rooted"] = json!(rooted.len());
+            report["stocks_under_cover"] = json!(under_cover);
             if let Some(serde_json::Value::Object(timing)) =
                 report.as_object_mut().and_then(|o| o.remove("timing"))
             {
@@ -697,6 +754,16 @@ impl StructureStage {
         } else {
             None
         };
+        let aureoles = match &structure {
+            Some((st, _, _, all)) => {
+                let started = Instant::now();
+                let a = self.aureoles(&src, &s, &hosts, &surface_y, st, all, &rooted);
+                add_time(&mut self.timings, "aureoles", started);
+                a
+            }
+            None => Aureoles::default(),
+        };
+        drop(hosts);
         drop(src);
         for (name, data) in outputs {
             fields.insert(
@@ -710,7 +777,15 @@ impl StructureStage {
 
         // 5. The end: bodies and the summary.
         if last {
-            self.finish(world, ctx, &surface_y, summary, structure, trap_shares)?;
+            self.finish(
+                world,
+                ctx,
+                &surface_y,
+                summary,
+                structure,
+                trap_shares,
+                aureoles,
+            )?;
         }
         Ok(())
     }
@@ -1010,8 +1085,10 @@ impl StructureStage {
         Ok(())
     }
 
-    /// The last step's end: the plutons as bodies, the folds and faults as the world's structure
+    /// The last step's end: the aureoles, the stocks' roots and the plutons as bodies (in that
+    /// order, so each paints over the one before), the folds and faults as the world's structure
     /// and its events, and the stage's note.
+    #[allow(clippy::too_many_arguments)]
     fn finish(
         &mut self,
         world: &mut WorldState,
@@ -1020,27 +1097,47 @@ impl StructureStage {
         summary: Option<(f64, Result<(), String>)>,
         structure: Option<Finished>,
         trap_shares: Option<serde_json::Value>,
+        aureoles: Aureoles,
     ) -> Result<(), CoreError> {
         let s = self.preset.scale.clone();
-        let p = &self.p;
-        let mut bodies = 0u64;
-        let plutons = std::mem::take(&mut self.st.plutons);
-        for (pl, &y) in plutons.iter().zip(surface_y) {
+        let (mh, mv) = (s.m_per_block_h, s.m_per_block_v);
+        let mut written = [0u64; 3];
+        let mut zones = 0u64;
+        let mut widths: [Vec<f64>; 2] = [Vec::new(), Vec::new()];
+        for (k, list) in [&aureoles.plutons, &aureoles.stocks]
+            .into_iter()
+            .enumerate()
+        {
+            for a in list {
+                let id = world.next_body_id();
+                if let Some(b) = a.to_body(id, mh, mv, s.min_y) {
+                    zones += b.zones.len() as u64;
+                    widths[k].push(a.width_m);
+                    world.add_body(b)?;
+                    written[k] += 1;
+                }
+            }
+        }
+        for r in &aureoles.roots {
             let id = world.next_body_id();
-            if let Some(b) = plutons::to_body(
-                pl,
-                id,
-                y,
-                s.m_per_block_h,
-                s.m_per_block_v,
-                s.min_y,
-                p.aureole_shell,
-            ) {
+            if let Some(b) = r.to_body(id, s.min_y) {
+                world.add_body(b)?;
+                written[2] += 1;
+            }
+        }
+        let mut bodies = 0u64;
+        let now = aureoles.now_myr;
+        for (pl, &y) in self.st.plutons.iter().zip(surface_y) {
+            let id = world.next_body_id();
+            if let Some(b) = plutons::to_body(pl, id, y, mh, mv, s.min_y, now) {
                 world.add_body(b)?;
                 bodies += 1;
             }
         }
-        self.st.plutons = plutons;
+        let median = |v: &mut Vec<f64>| {
+            v.sort_by(f64::total_cmp);
+            v.get(v.len() / 2).copied().unwrap_or(0.0).round()
+        };
         let (mean_horizons, check) = summary.expect("baked on the last step");
         let (structure, mut deformation, relief, all) =
             structure.expect("finished on the last step");
@@ -1086,6 +1183,13 @@ impl StructureStage {
                 "eroded": self.st.counts.eroded,
                 "subducted": self.st.counts.subducted,
                 "bodies": bodies,
+            },
+            "aureoles": {
+                "plutons": written[0],
+                "stocks": written[1],
+                "zones": zones,
+                "median_width_m": [median(&mut widths[0]), median(&mut widths[1])],
+                "stock_roots": written[2],
             },
             "metamorphosed_km3": self.st.metamorphosed_km3,
             "deformation": deformation,
@@ -1264,11 +1368,129 @@ impl StructureStage {
             .collect()
     }
 
-    /// The rock at the surface: each cell's top baked horizon, and plutons where they crop out.
+    /// The contact aureoles of the plutons alive at the end and of the stocks of `all` (baked as
+    /// `st`'s events), each with its bands read from the column at its centre
+    /// ([`plutons::aureole_bands`]: only rock older than the intrusion) as the strata pass paints
+    /// it (`hosts`), and the roots of the stocks `rooted` on plutons
+    /// ([`deform::intrude::root_on_plutons`]). `pluton_y`: the ground's y at each pluton's centre.
+    #[allow(clippy::too_many_arguments)]
+    fn aureoles(
+        &self,
+        src: &CellSource<'_>,
+        s: &ScaleParams,
+        hosts: &plutons::HostColumns,
+        pluton_y: &[f64],
+        st: &deeptime_format::structure::Structure,
+        all: &[deform::Feature],
+        rooted: &[(usize, usize, f64)],
+    ) -> Aureoles {
+        let p = &self.p;
+        let t = &self.tables;
+        let grid = &src.grid;
+        let now = src.now_myr;
+        let span = (now - self.preset.t_start_years() / 1.0e6).max(1.0);
+        let (mh, mv) = (s.m_per_block_h, s.m_per_block_v);
+        let key_of = |t_myr: f32| columns::key::of_age(0, now - f64::from(t_myr), span);
+        let age_of = |t_myr: f32| Some((now - f64::from(t_myr)).max(0.0) as f32);
+        // The bands of `a` from its centre's column as the strata pass paints it (`baked`, from
+        // `hosts`), for an intrusion with stratigraphic key `key`.
+        let bands = |a: &mut plutons::Aureole, key: u16, baked: &[columns::Unit]| {
+            let [top, base] = a.depths_m(mh, mv);
+            a.bands = plutons::aureole_bands(baked, t, top.max(0.0), base, key);
+        };
+        // The other intrusions at an aureole's centre (`plutons::mask_intrusions`).
+        let circ = s.circumference_blocks;
+        let index = deeptime_format::structure::StructIndex::new(st, circ);
+        let mask = |a: &plutons::Aureole,
+                    own: Option<usize>,
+                    cands: &mut Vec<u32>,
+                    baked: &mut Vec<columns::Unit>| {
+            index.candidates(st, a.centre[0], a.centre[2], cands);
+            plutons::mask_intrusions(baked, a, &st.events, cands, own, mv, f64::from(circ));
+        };
+        let of_plutons: Vec<plutons::Aureole> = self
+            .st
+            .plutons
+            .par_iter()
+            .zip(pluton_y.par_iter())
+            .map_init(
+                || (Vec::new(), Vec::new()),
+                |(baked, cands), (pl, &y)| {
+                    let mut a = plutons::Aureole::of_pluton(pl, y, mh, mv, now);
+                    if a.width_m > 0.0 {
+                        hosts.units(pl.x, pl.z, y, s.min_y, mv, baked);
+                        mask(&a, None, cands, baked);
+                        bands(&mut a, key_of(pl.t_myr), baked);
+                    }
+                    a
+                },
+            )
+            .collect();
+        let of_stocks: Vec<plutons::Aureole> = all
+            .par_iter()
+            .zip(st.events.par_iter())
+            .enumerate()
+            .filter(|(_, (f, _))| f.kind == deform::Kind::Stock)
+            .map_init(
+                || (Vec::new(), Vec::new()),
+                |(baked, cands), (k, (f, e))| {
+                    let (centre, axes, yaw) = plutons::stock_frame(e)?;
+                    let c = plutons::cell_of(grid, centre[0], centre[2]);
+                    let surface_y = src.surface_y(c, s);
+                    let top_m = (surface_y - (centre[1] + axes[1])) * mv;
+                    let mut a = plutons::Aureole {
+                        centre,
+                        axes,
+                        yaw,
+                        width_m: 0.0,
+                        surface_y,
+                        bands: Vec::new(),
+                        hollow: true,
+                        age_ma: age_of(f.t_myr),
+                    };
+                    hosts.units(centre[0], centre[2], surface_y, s.min_y, mv, baked);
+                    mask(&a, Some(k), cands, baked);
+                    let host = plutons::host_class(baked, top_m.max(0.0));
+                    let size = plutons::stock_size_m(axes, mh, mv);
+                    a.width_m = plutons::aureole_width_m(p, t, size, host);
+                    if a.width_m > 0.0 {
+                        bands(&mut a, e.key, baked);
+                    }
+                    Some(a)
+                },
+            )
+            .flatten()
+            .collect();
+        let roots = rooted
+            .iter()
+            .filter_map(|&(k, i, roof_y)| {
+                let (centre, axes, yaw) = plutons::stock_frame(&st.events[k])?;
+                Some(plutons::StockRoot {
+                    centre,
+                    axes,
+                    yaw,
+                    // From the top of the pluton's aureole (a block above it) down.
+                    from_y: roof_y + f64::from(self.st.plutons[i].aureole_m) / mv + 1.0,
+                    class: all[k].rock,
+                    age_ma: age_of(all[k].t_myr),
+                })
+            })
+            .collect();
+        Aureoles {
+            plutons: of_plutons,
+            stocks: of_stocks,
+            roots,
+            now_myr: now,
+        }
+    }
+
+    /// The rock at the surface: each cell's top baked horizon, and plutons and their aureoles
+    /// where they crop out.
     fn rock_map(&self, src: &CellSource<'_>, s: &ScaleParams) -> Vec<f32> {
         let n = src.grid.cells();
         let p = &self.p;
         let t = &self.tables;
+        let mut top_keys = Vec::with_capacity(n);
         let mut rock: Vec<f32> = (0..n)
             .into_par_iter()
             .map_init(
@@ -1295,13 +1517,25 @@ impl StructureStage {
                         classes,
                         keys,
                     );
-                    f32::from(classes[0])
+                    // The horizon's own key, its youngest part: the structural events' test.
+                    (classes[0], keys[0][0])
                 },
             )
+            .collect::<Vec<(u8, u16)>>()
+            .into_iter()
+            .map(|(class, key)| {
+                top_keys.push(key);
+                f32::from(class)
+            })
             .collect();
+        let span = (src.now_myr - self.preset.t_start_years() / 1.0e6).max(1.0);
         for pl in &self.st.plutons {
-            plutons::for_each_cell(pl, &src.grid, s.m_per_block_h, |c, r2| {
-                if let Some(k) = plutons::outcrop_at(pl, r2, p.aureole_shell) {
+            let key = columns::key::of_age(0, src.now_myr - f64::from(pl.t_myr), span);
+            let grow = f64::from(pl.aureole_m);
+            plutons::for_each_cell_grown(pl, &src.grid, s.m_per_block_h, grow, |c, r2, r2g| {
+                // The rock at the surface there, when it is older than the pluton.
+                let host = (top_keys[c] >= key).then_some(rock[c] as u16);
+                if let Some(k) = plutons::outcrop_at(pl, t, r2, r2g, host) {
                     rock[c] = f32::from(k);
                 }
             });

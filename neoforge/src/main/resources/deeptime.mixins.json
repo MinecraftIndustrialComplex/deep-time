@@ -21,6 +21,10 @@
   "server": [
     "DedicatedServerFirstStartMixin"
   ],
+  "client": [
+    "client.CreateWorldScreenMixin",
+    "client.CreateWorldScreenInvoker"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

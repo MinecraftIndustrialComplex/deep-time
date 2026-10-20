@@ -10,3 +10,9 @@ plugins {
 }
 
 rootProject.name = 'deeptime'
+
+// The internal developer map (devmap/, mod id deeptime_devmap): a separate jar compiled against
+// Deep Time, never shipped in Deep Time's jar or the MIC pack. `./gradlew build test` builds and
+// tests it with the mod.
+include 'devmap'
+project(':devmap').projectDir = file('../devmap')

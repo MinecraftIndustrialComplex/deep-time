@@ -19,8 +19,9 @@ import java.util.Map;
 /**
  * The review page (plan §7.12 page 3): the final map (the world data's elevation in the viewer's
  * colours), the spawn marker, ore-province hints (coarse cells, never exact deposits), a summary
- * and the elevation legend; Accept binds the world to the run. The pack's biome names over the map
- * (§7.2) come with P1-09.
+ * and the elevation legend; Play binds the world to the run and creates it, as the generation page's
+ * Play does. Opened from the generation page's More tab. The pack's biome names over the map (§7.2)
+ * come with P1-09.
  */
 final class ReviewPage implements PlanetEditorScreen.Page {
 
@@ -30,7 +31,12 @@ final class ReviewPage implements PlanetEditorScreen.Page {
     private ReviewModel model;
     private final KeyframeTexture texture = new KeyframeTexture("review");
     private boolean uploaded;
-    private int mapX, mapY, mapW, mapH, sideX, sideW;
+    /** The height kept under a stacked map for the legend and the summary. */
+    private static final int STACK_TEXT_H = 24 + 100;
+
+    private int mapX, mapY, mapW, mapH, sideX, sideW, textY;
+    /** True when the map spans the width and the summary sits under it (a tall screen). */
+    private boolean stacked;
     private Button accept;
 
     @Override
@@ -38,30 +44,36 @@ final class ReviewPage implements PlanetEditorScreen.Page {
         screen = s;
         model = s.model().review().orElseGet(() -> s.model().openReview());
         int top = 22, bottom = s.height - 30;
-        sideW = s.width >= 420 ? 150 : 110;
-        sideX = s.width - sideW - 6;
-        int[] fit = MapWidget.fit(sideX - 12, bottom - top - 12);
-        mapX = 6 + (sideX - 12 - fit[0]) / 2;
+        int columnW = s.width >= 420 ? 150 : 110;
+        int columnX = s.width - columnW - 6;
+        int[] side = MapWidget.fit(columnX - 12, bottom - top - 12);
+        int fullW = s.width - 12;
+        int[] stack = MapWidget.fit(fullW, Math.max(20, bottom - top - STACK_TEXT_H));
+        // As on the generation page: stacked when that makes the map much larger (2000x1500 at GUI
+        // scale 3), else the summary beside it (1920x1080).
+        stacked = stack[0] > side[0] * 5 / 4;
+        int[] fit = stacked ? stack : side;
+        mapX = stacked ? 6 + (fullW - fit[0]) / 2 : 6 + (columnX - 12 - fit[0]) / 2;
         mapY = top;
         mapW = fit[0];
         mapH = fit[1];
+        sideX = stacked ? mapX : columnX;
+        sideW = stacked ? (mapW - 12) / 2 : columnW;
+        textY = stacked ? mapY + mapH + 4 + 20 + 6 : mapY;
         s.add(new MapWidget(mapX, mapY, mapW, mapH, texture, this::spawnMarker, this::provinceBoxes));
         int by = s.height - 24;
-        int bw = Math.min(90, (s.width - 40) / 4);
-        int x = s.width / 2 - (4 * bw + 12) / 2;
-        s.add(Button.builder(hints ? Lang.tr("review.hints.on") : Lang.tr("review.hints.off"), b -> {
-            hints = !hints;
-            b.setMessage(hints ? Lang.tr("review.hints.on") : Lang.tr("review.hints.off"));
-        }).bounds(x, by, bw, 20).build());
+        int bw = Math.min(96, (s.width - 32) / 3);
         s.add(Button.builder(Lang.tr("review.back"), b -> {
             s.model().showRun();
             s.refresh();
-        }).bounds(x + bw + 4, by, bw, 20).build());
-        s.add(Button.builder(Lang.tr("review.discard"), b -> {
-            s.model().discardRun();
-            s.refresh();
-        }).bounds(x + 2 * (bw + 4), by, bw, 20).build());
-        accept = s.add(Button.builder(Lang.tr("review.accept"), b -> s.accept()).bounds(x + 3 * (bw + 4), by, bw, 20).build());
+        }).bounds(8, by, bw, 20).build());
+        s.add(Button.builder(hints ? Lang.tr("review.hints.on") : Lang.tr("review.hints.off"), b -> {
+            hints = !hints;
+            b.setMessage(hints ? Lang.tr("review.hints.on") : Lang.tr("review.hints.off"));
+        }).bounds(8 + bw + 4, by, bw, 20).build());
+        int pw = Math.min(120, bw + 24);
+        accept = s.add(Button.builder(Lang.tr("gen.play").withStyle(net.minecraft.ChatFormatting.BOLD), b -> s.play())
+                .bounds(s.width - 8 - pw, by, pw, 20).build());
         uploaded = false;
         tick();
     }
@@ -88,18 +100,16 @@ final class ReviewPage implements PlanetEditorScreen.Page {
             uploaded = true;
         }
         accept.active = model.ready() && screen.model().canAccept();
+        accept.setTooltip(net.minecraft.client.gui.components.Tooltip.create(Lang.tr("gen.play.hint")));
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         Font font = screen.font();
-        int y = mapY;
-        int x = sideX;
         if (!model.ready()) {
             g.drawCenteredString(font, Lang.tr("review.computing"), mapX + mapW / 2, mapY + mapH / 2, 0xffa0a0a0);
             return;
         }
-        model.error().ifPresent(e -> g.drawString(font, font.plainSubstrByWidth(e, sideW), sideX, mapY + mapH + 4, 0xffff7070, true));
         // Legend: the elevation ramp, sea level marked.
         Ramps.Ramp ramp = Ramps.builtin().forLayer(WorldData.ELEVATION);
         int ly = mapY + mapH + 4, lw = Math.min(mapW, 200);
@@ -113,8 +123,9 @@ final class ReviewPage implements PlanetEditorScreen.Page {
         model.map().ifPresent(m -> g.drawString(font, Lang.tr("review.source." + ("keyframe".equals(m.source()) ? "keyframe" : "world_data")),
                 mapX + lw + 6, ly, 0xffa0a0a0, false));
 
-        // Summary.
+        // Summary (beside the map, or under it in two columns: the run, then the provinces).
         List<Component> lines = new ArrayList<>();
+        model.error().ifPresent(e -> lines.add(Component.literal(e).withColor(0xff7070)));
         model.summary().ifPresent(sm -> {
             lines.add(Lang.tr("review.size", sm.circumference()));
             lines.add(Lang.tr("review.counts", sm.events(), sm.sites(), sm.keyframes()));
@@ -122,22 +133,71 @@ final class ReviewPage implements PlanetEditorScreen.Page {
         });
         lines.add(model.spawn().map(p -> (Component) Lang.tr("review.spawn", String.format(java.util.Locale.ROOT, "%.1f", p[0]),
                 String.format(java.util.Locale.ROOT, "%.1f", p[1]))).orElse(Lang.tr("review.spawn.none")));
-        lines.add(Component.empty());
+        if (screen.model().accepted().map(a -> a.stagingId().equals(screen.model().run().map(r -> r.stagingId()).orElse(""))).orElse(false))
+            lines.add(Lang.tr("review.already_accepted").withColor(0x80ff80));
+        List<Component> provinces = new ArrayList<>();
         Map<String, Integer> byType = new LinkedHashMap<>();
         for (ProvinceHints.Cell c : model.provinces())
             byType.merge(c.type(), 1, Integer::sum);
-        lines.add(byType.isEmpty() ? Lang.tr("review.hints.none") : Lang.tr("review.hints.title"));
+        provinces.add(byType.isEmpty() ? Lang.tr("review.hints.none") : Lang.tr("review.hints.title"));
         for (var e : byType.entrySet())
-            lines.add(Component.literal("■ ").withColor(ProvinceHints.colour(e.getKey()))
-                    .append(Component.literal(Formats.humanize(e.getKey()) + " (" + e.getValue() + ")").withColor(0xe0e0e0)));
-        for (Component c : lines) {
+            provinces.add(Component.literal("■ ").withColor(ProvinceHints.colour(e.getKey()))
+                    .append(Component.empty().append(Lang.dynamic(ProvinceHints.nameKey(e.getKey()), e.getKey()))
+                            .append(" (" + e.getValue() + ")").withColor(0xe0e0e0)));
+        if (stacked) {
+            drawLines(g, font, lines, sideX, textY);
+            drawLines(g, font, provinces, sideX + sideW + 12, textY);
+        } else {
+            // Beside the map (a wide window) the map is bound by its width and leaves room under the
+            // legend: the provinces go there, side by side, when they fit, else under the summary.
+            int underY = ly + 7 + 10 + 8;
+            if (!flowLines(g, font, provinces, mapX, underY, mapW, screen.height - 30 - underY)) {
+                lines.add(Component.empty());
+                lines.addAll(provinces);
+            }
+            drawLines(g, font, lines, sideX, textY);
+        }
+    }
+
+    /**
+     * The first line (the heading) on a line of its own, the rest side by side in rows of {@code w};
+     * nothing is drawn and false is returned when that takes more than {@code h}.
+     */
+    private static boolean flowLines(GuiGraphics g, Font font, List<Component> items, int x, int y, int w, int h) {
+        int n = items.size();
+        int[] ox = new int[n], oy = new int[n];
+        int line = 0, cx = 0;
+        for (int i = 1; i < n; i++) {
+            int tw = font.width(items.get(i));
+            if (tw > w)
+                return false;
+            if (i == 1 || cx + tw > w) {
+                line++;
+                cx = 0;
+            }
+            ox[i] = cx;
+            oy[i] = line * 10;
+            cx += tw + 10;
+        }
+        if (n == 0 || font.width(items.get(0)) > w || (line + 1) * 10 > h)
+            return false;
+        g.drawString(font, items.get(0), x, y, 0xffe0e0e0, false);
+        for (int i = 1; i < n; i++)
+            g.drawString(font, items.get(i), x + ox[i], y + oy[i], 0xffe0e0e0, false);
+        return true;
+    }
+
+    private void drawLines(GuiGraphics g, Font font, List<Component> lines, int x, int y) {
+        for (Component c : lines)
             for (var seq : font.split(c, sideW)) {
                 g.drawString(font, seq, x, y, 0xffe0e0e0, false);
                 y += 10;
             }
-        }
-        if (screen.model().accepted().map(a -> a.stagingId().equals(screen.model().run().map(r -> r.stagingId()).orElse(""))).orElse(false))
-            g.drawString(font, Lang.tr("review.already_accepted"), x, y + 4, 0xff80ff80, false);
+    }
+
+    @Override
+    public Component title() {
+        return Lang.tr("review.title");
     }
 
     @Override

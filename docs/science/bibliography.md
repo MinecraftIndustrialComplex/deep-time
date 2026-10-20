@@ -804,6 +804,8 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Substitute: repository or open copy found by the lookups and saved as above (version not stated: the first pages were matched against the title, not compared with the printed version).
 - Read in this pass: not fetched (metadata only)
 - Used for: suggested stage-2 reference for LIP area and frequency; the fields were not read.
+- Ledger ids: PRV-006 (REV-2, 2026-10-19).
+- Read in REV-2 (2026-10-19): the abstract on ADS, for the definition: over 0.1 Mkm2 in area and 0.1 Mkm3 in volume, mainly mafic, emplaced within about 50 Myr with most of the volume (over 75 %) in pulses of 1 to 5 Myr; seamounts, hotspot tracks and normal oceanic crust are excluded. The library's full text was not reopened.
 
 ### Hildreth2007
 - Reference: Hildreth, W. (2007). Quaternary magmatism in the Cascades: geologic perspectives. U.S. Geological Survey Professional Paper 1744.
@@ -999,7 +1001,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Clark, M. K. and Royden, L. H. (2000). Topographic ooze: Building the eastern margin of Tibet by lower crustal flow. Geology 28(8):703-706.
 - DOI or URL: 10.1130/0091-7613(2000)28<703:TOBTEM>2.0.CO;2.
 - Cited as: (ERO, ISO, HYP) "Clark & Royden 2000, Geology 28(8):703-706" (spread.rs). (PLT) "Clark & Royden 2000, Geology 28:703".
-- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy)
+- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory)
 - Access: paywalled (GeoScienceWorld 403); not fetched. [other sections: paywalled (GSA; not tested).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1012,7 +1014,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Royden, L. H., Burchfiel, B. C., King, R. W., Wang, E., Chen, Z., Shen, F. and Liu, Y. (1997). Surface deformation and lower crustal flow in eastern Tibet. Science 276(5313):788-790.
 - DOI or URL: 10.1126/science.276.5313.788.
 - Cited as: (ERO, ISO, HYP) "Royden et al. 1997, Science 276:788-790". (PLT) "Royden et al. 1997".
-- Ledger ids: ISO-018, ISO-020
+- Ledger ids: ISO-018, ISO-020; PLT-300 (2026-10-20, as the channel flow's background; not fetched)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1049,7 +1051,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Bird, P. (1991). Lateral extrusion of lower crust from under high topography in the isostatic limit. Journal of Geophysical Research 96(B6):10275-10286.
 - DOI or URL: 10.1029/91JB00370.
 - Cited as: (ERO, ISO, HYP) "Bird 1991, JGR 96(B6):10275-10286". (PLT) "Bird 1991 (JGR 96:10275)".
-- Ledger ids: ISO-019, ISO-020, PLT-255 (orogenic collapse, 2026-10-03: the abstract's "cannot maintain short-wavelength (100 km) Moho relief of more than 1 km for times greater than 10–20 m.y. at most", Basin and Range)
+- Ledger ids: ISO-019, ISO-020, PLT-255 (orogenic collapse, 2026-10-03: the abstract's "cannot maintain short-wavelength (100 km) Moho relief of more than 1 km for times greater than 10–20 m.y. at most", Basin and Range); PLT-300 (2026-10-20: the same abstract quote beside the lower-crustal flow)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1122,7 +1124,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Cogley, J. G. (1984). Continental margins and the extent and number of the continents. Reviews of Geophysics 22(2):101-122.
 - DOI or URL: 10.1029/RG022i002p00101.
 - Cited as: (ERO, ISO, HYP) "Cogley 1984 (continental crust 41 % of the surface)". (PLT) "Cogley 1984, Rev. Geophys. 22:101-122" (29 percent land on 41 percent continental crust).
-- Ledger ids: HYP-012, HYP-013, PLT-158, PLT-159, PLT-205
+- Ledger ids: HYP-012, HYP-013, PLT-158, PLT-159, PLT-205; HYP-035 (2026-10-20: the 41 % share as the stand-in contour for the continental edge)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1216,7 +1218,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Tozer, B., Sandwell, D. T., Smith, W. H. F., Olson, C., Beale, J. R. and Wessel, P. (2019). Global bathymetry and topography at 15 arc sec: SRTM15+. Earth and Space Science 6(10):1847-1864.
 - DOI or URL: (ERO, ISO, HYP) 10.1029/2019EA000658 (gold open access; DOAJ record https://doaj.org/article/95db1757cac2402aaa9c72408bdc82ed). (MOI, BIO) https://doi.org/10.1029/2019EA000658 (gold open access) (PLT) 10.1029/2019EA000658 (open access in Wiley). (CLM) 10.1029/2019EA000658
 - Cited as: (ERO, ISO, HYP) "Tozer et al. 2019" (SRTM15+) in build log 2026-10-01. (MOI, BIO) "GMT earth_relief (SRTM15+, Tozer et al. 2019)" (PLT) "Tozer et al. 2019 (SRTM15+, GMT earth_relief 30 arc-minute)".
-- Ledger ids: HYP-001 to HYP-011, HYP-032, PLT-168, PLT-170; none (relief used in the Earth comparisons); notes: as the dataset behind GMT earth_relief; relief used in the Earth comparisons
+- Ledger ids: HYP-001 to HYP-011, HYP-032, PLT-168, PLT-170; none (relief used in the Earth comparisons); notes: as the dataset behind GMT earth_relief; relief used in the Earth comparisons; HYP-035 (2026-10-20: the median distance from land to the coast on the model's sampling, computed on earth_relief_15m_p)
 - Access: open access. [other sections: open access (Wiley/AGU). / not checked (journal is open access)]
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): (ERO, ISO, HYP) no record. (MOI, BIO) used as data (PLT) numbers computed by the project from the GMT grid. (CLM) data used
@@ -4961,7 +4963,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Reference: NOAA National Centers for Environmental Information (2022). ETOPO 2022 15 Arc-Second Global Relief Model. NOAA NCEI.
 - DOI or URL: 10.25921/fd45-gt74 (title and year confirmed through the DataCite API)
 - Cited as: "ETOPO 2022"
-- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03), PLT-265 (the ocean–continent transition, 2026-10-04: the same transects as the comparison)
+- Ledger ids: ERO-168, HNT-093 (margins and spires task, 2026-10-03), PLT-265 (the ocean–continent transition, 2026-10-04: the same transects as the comparison), YNG-022 and AMP-074 (sea-floor spikes task, 2026-10-20: deep sea-floor slope distributions from the 60 and 15 arc-second grids)
 - Access: open access (dataset)
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://doi.org/10.25921/fd45-gt74. File: ETOPO2022.txt.
 - Read so far (by the project): data named
@@ -5249,7 +5251,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Wieczerkowski, K., Mitrovica, J. X., Wolf, D. (1999). A revised relaxation-time spectrum for Fennoscandia. Geophysical Journal International 139(1):69-86.
 - DOI or URL: 10.1046/j.1365-246X.1999.00924.x
 - Cited as: docs/design/flexure.md sections 7 and 11
-- Ledger ids: ISO-064
+- Ledger ids: ISO-064, ISO-078 (2026-10-20, the continent budget: the abstract's 3-5 kyr as the settling's time, 4 kyr, `plates/settle.rs`)
 - Access: open (publisher page).
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: relaxation times "close to 3-5 kyr".
@@ -5260,11 +5262,12 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Mojang Studios. Minecraft 1.21.1, `net.minecraft.world.level.biome.OverworldBiomeBuilder`, as decompiled and published in the NeoForge 21.1.249 sources jar.
 - DOI or URL: none (the jar is built by the project's Gradle setup, `neoforge-21.1.249-sources.jar`)
 - Cited as: "OverworldBiomeBuilder, Minecraft 1.21.1" (default.json, OverworldBands.java, VolcanicBiomes.java)
-- Ledger ids: BIO-021 to BIO-024, BIO-112
+- Ledger ids: BIO-021 to BIO-024, BIO-112, BIO-161
 - Access: game source, not redistributed
 - Library (the project's source library, not distributed): the one class, text file MinecraftSrc1211/OverworldBiomeBuilder.java.
 - Stage 2 read (WP-11, 2026-10-02): the temperature, humidity, continentalness, erosion and weirdness constants; all equal the bake's reference bands.
 - Read 2026-10-03 (volcanic biomes): the depth parameters of `addSurfaceBiome` (points 0.0 and 1.0), `addUndergroundBiome` (span 0.2 to 0.9) and `addBottomBiome` (point 1.1); BIO-112.
+- Read 2026-10-20 (the ice spikes report, in the workbench's NeoForge 21.1.249 sources jar on the test machine): `addHighSlice`, `addMidSlice` and `addLowSlice`, which pick each continentalness and erosion cell takes (in the frozen, driest cell near-inland and mid-inland differ at erosion E0 and E1, and at E5 in the high slice: in the low slice near-inland E0 and E1 take the middle biome, mid-inland the slope-if-cold pick; in the high slice near-inland E0 takes the slope biome, mid-inland the peak biome), and the tables `MIDDLE_BIOMES`, `MIDDLE_BIOMES_VARIANT`, `PLATEAU_BIOMES` and `PLATEAU_BIOMES_VARIANT` (ice spikes the positive-weirdness variant of the frozen, driest middle and plateau cells) and `mushroomFieldsContinentalness` (-1.2 to -1.05); BIO-161.
 
 ### DeCellesGiles1996_flexure
 - Reference: DeCelles, P. G., Giles, K. A. (1996). Foreland basin systems. Basin Research 8(2):105-123. (Also `DeCellesGiles1996` in the Plate tectonics section, where stage 1 saw the abstract only.)
@@ -5766,9 +5769,10 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 
 ### Annen2017
 - Reference: Annen, C. (2017). Factors affecting the thickness of thermal aureoles. Frontiers in Earth Science 5:82. doi 10.3389/feart.2017.00082
-- Ledger ids: RCK-053
+- Ledger ids: RCK-053, RCK-091
 - Library: `Annen2017/Annen2017.pdf` and `.txt`.
 - Read: primary full text of the abstract and introduction (aureole thickness proportional to intrusion thickness in the idealised case; Manaslu about 100 m round a several-km sheet; Western Adamello 1.7 km round a 5.5-km intrusion).
+- Read in REV-2 (2026-10-19, a Sonnet lookup, full text online): aureole thickness 'is a linear function of the intrusion thickness' for a single pulse; its table of aureoles: Alta stock 2-3 km, tremolite isograd about 1 km out and (citing Cook and Bowman 1994) talc about 1.5 km, periclase about 200 m; Western Adamello 5.5 km, andalusite 1.7 km; Cupsuctic 6-8 km, biotite a few hundred m to 1.5 km; Skaergaard 4 km radius, floor aureole 390 m; Mooselookmeguntic 2 km, garnet beyond 1 km; Manaslu 5-12 km, under 100 m. Incremental emplacement narrows the aureole up to about fourfold; diffusivity contrasts halve or double it. No comparison of carbonate with pelite hosts.
 
 ### Mottram2014
 - Reference: Mottram, C. M. et al. (2014). Developing an inverted Barrovian sequence; insights from monazite petrochronology. Earth and Planetary Science Letters 403:418-431. CC BY.
@@ -5904,7 +5908,7 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Reference: Pratson, L. F. and Haxby, W. F. (1996). What is the slope of the U.S. continental slope? Geology 24(1):3-6.
 - DOI or URL: 10.1130/0091-7613(1996)024<0003:WITSOT>2.3.CO;2
 - Cited as: "Pratson & Haxby 1996" (the regional slope of the steepest clastic margin, 2.5°).
-- Ledger ids: ERO-168, HNT-093
+- Ledger ids: ERO-168, HNT-093, YNG-022 (sea-floor spikes task, 2026-10-20: the steepest mean local slope of a margin, 12.0°, against the sea floor's critical slope)
 - Access: paywalled (GSA); the abstract is on Duke Scholars (https://fds.duke.edu/db/pratt/gendell/faculty/lincoln.pratson/publications/279477).
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): abstract only, 2026-10-03 (margins and spires task): regional and mean local slopes, West Florida (passive carbonate) 4.4° and 12.0°, New Jersey–Maryland (passive clastic) 2.5° and 7.6°, Louisiana (salt) 0.5° and 2.9°, California (strike-slip) 1.8° and 5.2°, Oregon (convergent) 2.0° and 5.2°, from multibeam bathymetry of five U.S. margins.
@@ -5993,7 +5997,7 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### ReyTeyssierWhitney2010
 - Reference: Rey, P. F., Teyssier, C. and Whitney, D. L. (2010). Limit of channel flow in orogenic plateaux. Lithosphere 2(5):328-332.
 - DOI or URL: 10.1130/L114.1 (author copy https://www.earthbyte.org/Resources/Pdf/rey_L114_v1.pdf)
-- Ledger ids: PLT-257
+- Ledger ids: PLT-257, PLT-300 (2026-10-20: K₀ = 150² / 15 km²/Myr, the lower-crustal flow `plates/flow.rs`)
 - Access: open author copy; full text read.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03: "Over 15 m.y., the length scale of channel-flow extrusion is 150 km rather than 1500 km"; a channel "travels at most 150 km into the foreland after 12 m.y. of gravitational collapse"; flow "1 cm yr–1 or less".
@@ -6121,7 +6125,7 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 - Cited as: "Petroff 2021".
 - Ledger ids: SCL-083, SCL-086
 - Access: open (arXiv; Zenodo).
-- Read so far (by the project): full text and code read by a sub-agent, 2026-10-03: forward Eqs 1-41, inverse Eqs 47-74, Table 1 (Collignon quincuncial mean omega 0.68 rad, max 1.05; Gringorten 0.52, 1.05; this work 0.54, 0.95), "phi0 was set to this exact value" (3 pi / 8); the inverse ported to numpy and Rust in the survey's tools and Table 1's mean and maximum reproduced. The 2026-10-02 note world-projection-options.md also read §§1-3 and Table 1. The supplement archive (square-map-projection-supplement.zip) downloaded from Zenodo 2026-10-04 and `new_projection.py` (both directions, CC0 header) ported line by line into `crates/deeptime-format/src/petroff.rs` (the seamless world, format 0.5).
+- Read so far (by the project): full text and code read by a sub-agent, 2026-10-03: forward Eqs 1-41, inverse Eqs 47-74, Table 1 (Collignon quincuncial mean omega 0.68 rad, max 1.05; Gringorten 0.52, 1.05; this work 0.54, 0.95), "phi0 was set to this exact value" (3 pi / 8); the inverse ported to numpy and Rust in the survey's tools and Table 1's mean and maximum reproduced. The 2026-10-02 note world-projection-options.md also read §§1-3 and Table 1. The supplement archive (square-map-projection-supplement.zip) downloaded from Zenodo 2026-10-04 and `new_projection.py` (both directions, CC0 header) ported line by line into `crates/deeptime-format/src/petroff.rs` (the seamless world, format 0.5). 2026-10-20: `new_projection.py` re-read at the forward's `alphaprime` step (its "Avoid divide by zero" fallback `alphaprime = (xiprime - np.pi / 6) * idx` where `uprime * rprime <= 0`, the cause of the forward's misses on exact inputs on the diagonals and at the cone points; SCL-083); the paper not re-read.
 
 ### RoscaPlonka2011
 - Reference: Roşca, D. and Plonka, G. (2011). Uniform spherical grids via equal area projection from the cube to the sphere. Journal of Computational and Applied Mathematics 236(6):1033-1041. doi:10.1016/j.cam.2011.07.009.
@@ -6337,7 +6341,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: McKenzie, D. (1978). Some remarks on the development of sedimentary basins. Earth and Planetary Science Letters 40:25-32.
 - DOI or URL: 10.1016/0012-821X(78)90071-7 (the DOI from the standard citation, not seen on the scan); scan at http://www.zetaware.com/public/McKenzie_1978.pdf
 - Cited as: "McKenzie 1978" (uniform stretching by β; initial and thermal subsidence).
-- Ledger ids: PLT-261, PLT-263, PLT-264
+- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`)
 - Access: scanned copy, open.
 - Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
 
@@ -6898,3 +6902,122 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Access: paywalled; the abstract is open (USGS Publications Warehouse).
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-20: "large-scale export of bank-top sediment and rapid progradation of the slope during the Holocene"; a wedge "up to 90 m thick" of "predominantly aragonite mud derived from the bank since flooding of the platform 6-8 ka"; its volume "40%-80% that of Holocene sediment currently retained on the bank"; vertical accumulation up to 11 to 15 m/ka.
+## The sea floor's critical slope (YNG-022, YNG-023, AMP-074), added 2026-10-20
+
+The sea-floor spikes task (build log 2026-10-20) measured the planet's deep sea floor against ETOPO 2022 (entry above, under the climate section: the 60 arc-second global grid and five 15 arc-second tiles were downloaded to the test VM and their slopes measured with `tools/review/seafloor/earth_stats.py`) and set the sea floor's critical slope from it. The papers below give what the grids cannot: trench walls and scarps from multibeam, abyssal hill sizes, seamount flank slopes, and how much of the ocean the grids only predict.
+
+### StewartJamieson2018
+- Reference: Stewart, H. A. and Jamieson, A. J. (2018). Habitat heterogeneity of hadal trenches: considerations and implications for future studies. Progress in Oceanography 161:47-65.
+- DOI or URL: 10.1016/j.pocean.2018.01.007 (printed on the PDF's first page).
+- Cited as: "Stewart & Jamieson 2018" (trench walls, scarps and ridges in multibeam bathymetry).
+- Ledger ids: YNG-022, AMP-074
+- Access: open copy (the PDF was fetched by a sub-agent, 2026-10-20).
+- Library (the project's source library, not distributed): not filed; read as a text extraction (pdftotext) on the laptop, 2026-10-20.
+- Read so far (by the project): full text, 2026-10-20 (sea-floor spikes task). Kermadec Trench: "The mean slope on the overidding west side is 7.7° ± 1.2 S.D. and on the underridding east side is 5.9° ± 1.8 S.D." (sic); the bend faults' "seafloor offsets frequently between 400 and 1200 m ... within 30 km of the trench axis, reducing to 150–400 m offset with increasing distance", and "Slope angles associated with the fault scarps are typically between 10° and 40° with slopes frequently in excess of 25°"; accretionary ridges "form slopes generally up to 15°, although locally can exceed 20°"; a pinnacle "approximately 750 m in height" in a sediment pond; "slope angles of up to 40° locally". Sediment ponds are nearly flat (under 4°). The hadal zone as a whole: its areas "combined total over 800,000 km−2 [sic] and represents the deepest 45% of the global ocean (Jamieson et al., 2010)"; hadal means "deeper than 6000 m (or 6500 m; Watling et al., 2013)".
+- Reference check: correct (journal, volume, pages and DOI on the PDF's first page). Not the same work as StewartJamieson2019 (the five deeps).
+
+### GoffSmithMarks2004
+- Reference: Goff, J. A., Smith, W. H. F. and Marks, K. M. (2004). The contributions of abyssal hill morphology and noise to altimetric gravity fabric. Oceanography 17(1):24-37.
+- DOI or URL: 10.5670/oceanog.2004.64 (OpenAlex, 2026-10-20); open copy on tos.org.
+- Cited as: "Goff, Smith & Marks 2004" (abyssal hill heights and widths).
+- Ledger ids: YNG-022
+- Access: open (The Oceanography Society).
+- Library (the project's source library, not distributed): not filed; read as a text extraction on the laptop, 2026-10-20.
+- Read so far (by the project): full text, 2026-10-20. Table 2 (mean abyssal hill properties, after Goff et al. 1997): rms height Hb 56.1 m (Pacific-Cocos, 110 mm/yr) to 235.8 m (northern MAR, 28 mm/yr), characteristic width λbn 1.76 to 8.21 km, aspect ratio 2.6 to 6.6. Text: along the slow-spreading Mid-Atlantic Ridge "abyssal hills have characteristic heights of 150-400 m and widths of 4-14 km", along the fast East Pacific Rise "50-200 m height, 1-5 km width"; the altimetric gravity filter is "~18-20 km wide (full-wavelength)".
+- Reference check: authors, journal, volume and issue on the PDF; pages 24-37 and the DOI from OpenAlex.
+
+### Sandwell2022
+- Reference: Sandwell, D. T., Goff, J. A., Gevorgian, J., Harper, H., Kim, S.-S., Yu, Y., Tozer, B., Wessel, P. and Smith, W. H. F. (2022). Improved bathymetric prediction using geological information: SYNBATH. Earth and Space Science 9(2):e2021EA002069.
+- DOI or URL: 10.1029/2021EA002069 (printed on the PDF).
+- Cited as: "Sandwell et al. 2022 (SYNBATH)".
+- Ledger ids: YNG-022, AMP-074
+- Access: gold open access (AGU).
+- Library (the project's source library, not distributed): not filed; read as a text extraction on the laptop, 2026-10-20.
+- Read so far (by the project): full text, 2026-10-20. "∼20% of the ocean floor has been surveyed by ships at a spatial resolution of 400 m or better. The remaining 80% has depth predicted from satellite altimeter-derived gravity measurements"; satellite gravity "can only resolve ½ wavelength of 6 km when the regional depth is 4 km"; seamounts are fitted with a Gaussian whose width is 2.4 times the height, "a maximum seamount slope of 0.25 independent of seamount height" (14°). This is why the ETOPO deep-sea slope statistics are a lower bound for the true sea floor.
+- Reference check: correct (title, authors and DOI on the PDF; volume 9, issue 2 from OpenAlex).
+
+### WesselSandwellKim2010
+- Reference: Wessel, P., Sandwell, D. T. and Kim, S.-S. (2010). The global seamount census. Oceanography 23(1):24-33.
+- DOI or URL: 10.5670/oceanog.2010.60 (OpenAlex, 2026-10-20).
+- Cited as: "Wessel, Sandwell & Kim 2010" (abyssal hill and fracture zone amplitudes on slow-ridge flanks; mean sea-floor slope).
+- Ledger ids: YNG-022
+- Access: open (The Oceanography Society).
+- Library (the project's source library, not distributed): not filed; read as a text extraction on the laptop, 2026-10-20.
+- Read so far (by the project): full text, 2026-10-20. "Abyssal hills and fracture zones on the flanks of slow spreading ridges commonly have topographic amplitude greater than 1 km"; Figure 3: the mean slope of the sea floor from ship soundings "commonly exceeds 0.05 on the flanks of the seafloor spreading ridges, especially the ridges spreading at a rate of < 70 mm yr-1 (Becker and Sandwell, 2008)". Wessel 2001 (below) was read in its abstract only; this later census by the same author gives the slope figure.
+- Reference check: authors, title, journal, volume, issue and first page on the PDF.
+
+### BeckerSandwell2008
+- Reference: Becker, J. J. and Sandwell, D. T. (2008). Global estimates of seafloor slope from single-beam ship soundings. Journal of Geophysical Research 113:C05028.
+- DOI or URL: 10.1029/2006JC003879 (OpenAlex).
+- Cited as: "Becker & Sandwell 2008" (satellite bathymetry is not a proxy for multibeam slopes).
+- Ledger ids: YNG-022
+- Access: paywalled (AGU); the abstract is open. The PDF fetch returned an empty file.
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-20 (OpenAlex): "the small-scale but ubiquitous abyssal hills and fracture zones dominate the global map of rough topography"; "satellite bathymetry is not a valid proxy for multibeam measurements, but edited single-beam sonar data are adequate to provide a global perspective on features with horizontal wavelengths as small as 2 km". Its global slope numbers were not read.
+- Reference check: title, year, DOI, volume 113 and issue C5 from OpenAlex; the article number C05028 from memory.
+
+### GoffJordan1988
+- Reference: Goff, J. A. and Jordan, T. H. (1988). Stochastic modeling of seafloor morphology: inversion of Sea Beam data for second-order statistics. Journal of Geophysical Research 93(B11):13589-13608.
+- DOI or URL: 10.1029/JB093iB11p13589 (OpenAlex, 2026-10-20).
+- Cited as: "Goff & Jordan 1988" (the abyssal hill statistical model).
+- Ledger ids: YNG-022 (context only: no value rests on it)
+- Access: paywalled (AGU).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-20 (OpenAlex): "The seafloor is modeled as a stationary, zero-mean, Gaussian random field completely specified by its two-point covariance function", an anisotropic covariance with "five free parameters describing the amplitude, orientation, characteristic wave numbers, and Hausdorff (fractal) dimension", inverted from Sea Beam data "at scale lengths less than 100 km or so". The abstract gives no number the project uses; the hill sizes come from GoffSmithMarks2004, which tabulates the later inversions.
+- Reference check: authors, year, journal, volume, issue and pages from OpenAlex.
+
+### Goff1991
+- Reference: Goff, J. A. (1991). A global and regional stochastic analysis of near-ridge abyssal hill morphology. Journal of Geophysical Research 96(B13):21713-21737.
+- DOI or URL: 10.1029/91JB02275 (OpenAlex, 2026-10-20).
+- Cited as: "Goff 1991" (abyssal hill rms height and width against spreading rate).
+- Ledger ids: YNG-022 (context only)
+- Access: paywalled (AGU).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-20 (OpenAlex): 64 Sea Beam swaths from the East Pacific Rise, the Mid-Atlantic Ridge and the Central Indian Ridge; "The slowest spreading rate subset (Mid-Atlantic data) exhibit the largest scales (rms height and characteristic width and length) of abyssal hills. These parameters generally decrease as spreading rate increases up to the fast spreading rate data (Pacific-Cocos) but increase going from fast to very fast (Pacific-Nazca)"; "steeper inward facing slopes in the medium and fast spreading rate data". Its own numbers were not read; GoffSmithMarks2004 Table 2 gives its Pacific-Cocos values (Hb 56.1 m, λbn 2.00 km) with the citation "Goff (1991)".
+- Reference check: authors, year, journal, volume, issue and pages from OpenAlex.
+
+### SmithJordan1988
+- Reference: Smith, D. K. and Jordan, T. H. (1988). Seamount statistics in the Pacific Ocean. Journal of Geophysical Research 93(B4):2899-2918.
+- DOI or URL: 10.1029/JB093iB04p02899 (OpenAlex, 2026-10-20).
+- Cited as: "Smith & Jordan 1988" (seamount size distribution).
+- Ledger ids: YNG-022 (context only)
+- Access: paywalled (AGU).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-20 (OpenAlex): about 157,000 km of wide-beam profiles in eight regions of the eastern and southern Pacific; "the average number of seamounts with summit heights h ≥ H is well-approximated by the exponential frequency-size distribution: ν(H)=νo e^(−βH)", better than a power law. It says nothing of flank slopes. No value in the code rests on it.
+- Reference check: authors, year, journal, volume, issue and pages from OpenAlex.
+
+### Smith1988
+- Reference: Smith, D. K. (1988). Shape analysis of Pacific seamounts. Earth and Planetary Science Letters 90(4):457-466.
+- DOI or URL: 10.1016/0012-821X(88)90143-4 (OpenAlex, 2026-10-20; OpenAlex has no abstract).
+- Cited as: "Smith 1988" (seamount height to basal radius).
+- Ledger ids: YNG-022 (context only)
+- Access: paywalled (Elsevier).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): not read. From memory only: a height to basal radius ratio of about 0.21 ± 0.08 for Pacific seamounts, which would put a cone's flank at about 12°; the project uses Sandwell2022's measured 0.25 maximum slope instead.
+- Reference check: title, journal, volume, issue and pages from OpenAlex; the ratio from memory.
+
+### Wessel2001
+- Reference: Wessel, P. (2001). Global distribution of seamounts inferred from gridded Geosat/ERS-1 altimetry. Journal of Geophysical Research 106(B9):19431-19441.
+- DOI or URL: 10.1029/2000JB000083 (OpenAlex, 2026-10-20).
+- Cited as: "Wessel 2001" (seamounts as axisymmetric Gaussians; heights limited by plate age).
+- Ledger ids: YNG-022 (context only)
+- Access: paywalled (AGU).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract only, 2026-10-20 (OpenAlex): "a forward modeling approach based on an axisymmetric Gaussian seamount"; "The global seamount distribution is long-tailed and resembles a power law distribution for seamounts in the height range 2-7 km"; the limiting height is "a simple function of plate age at the time of seamount emplacement". No flank slope in the abstract; the Gaussian's measured width is in Sandwell2022.
+- Reference check: authors, year, journal, volume, issue and pages from OpenAlex.
+## Contact aureoles, stocks and the LIP rule (RCK-053, RCK-091, DEF-078, DEF-079, PRV-006), added 2026-10-19
+
+Annen2017 (RCK-053, RCK-091) and Bryan2008 (PRV-006) have their entries above; their REV-2 reading is recorded there.
+
+### Johansson2018
+- Reference: Johansson, L., Zahirovic, S. and Mueller, R. D. (2018). The interplay between the eruption and weathering of Large Igneous Provinces and the deep-time carbon cycle. Geophysical Research Letters 45(11): 5380-5389.
+- DOI or URL: 10.1029/2017GL076691; the LIP polygons are EarthByte's published dataset (CC-BY 4.0).
+- Ledger ids: none (an Earth comparison in provinces.md, not a constant in the code).
+- Access: the polygons are open; the paper was not opened.
+- Read in REV-2 (2026-10-19, a Sonnet lookup on the test machine): the polygons were downloaded and their area measured on the sphere: union 29.84 Mkm2, 5.85 % of Earth's surface; on land 9.80 Mkm2, 1.92 % of the surface and 6.68 % of the land (Natural Earth 50 m land, 146.7 Mkm2); polygons at least half on land 9.76 Mkm2 (1,025), the rest 20.09 Mkm2 (1,501); dropping seamount and ridge polygons leaves 23.6 Mkm2, 4.6 %. Single provinces: Ontong Java 1.88 Mkm2, Caribbean 0.90, Manihiki 0.78, Parana 0.67, Siberian 0.64, Ethiopian 0.57, Deccan 0.51. The polygons are mapped outcrop and inferred extent, so the area is a present-day footprint, not an erupted area. The scripts are on the test machine under /Volumes/Graphide/ban/deeptime-runs/rev2-lip/.
+
+### Brenner2021
+- Reference: from-memory: a 2021 study of fluid-borne heat transport in a carbonate-hosted contact aureole (Brenner et al.); the full reference was not pinned down.
+- Ledger ids: RCK-091 (from-memory).
+- Access: not fetched; search excerpts only.
+- Read: nothing beyond search excerpts saying fluid flow carries heat further into a carbonate host. Do not cite it as read.

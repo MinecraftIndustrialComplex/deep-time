@@ -73,7 +73,8 @@ public final class BodyData {
                     recs.getFloat(a + 52), recs.getFloat(a + 56), recs.getInt(a + 60),
                     new int[]{recs.getInt(a + 64), recs.getInt(a + 68), recs.getInt(a + 72)},
                     new int[]{recs.getInt(a + 76), recs.getInt(a + 80), recs.getInt(a + 84)},
-                    s.optString(strings, recs.getInt(a + 96), "body rock class"), List.copyOf(zs));
+                    s.optString(strings, recs.getInt(a + 96), "body rock class"), List.copyOf(zs),
+                    recs.getFloat(a + 100));
             for (float ax : b.axes())
                 if (!(ax > 0) || Float.isInfinite(ax))
                     throw Sectioned.corrupt(path, "body " + id + ": semi-axes must be finite and > 0");

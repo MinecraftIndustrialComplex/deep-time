@@ -9,7 +9,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -37,8 +39,24 @@ public final class Ramps {
         this.defaultRamp = defaultRamp;
     }
 
-    /** One ramp: stop values ascending, colours as {@code 0xRRGGBB}. */
-    public record Ramp(double[] values, int[] rgb) {
+    /**
+     * One ramp: stop values ascending, colours as {@code 0xRRGGBB}; a categorical ramp's class names
+     * ({@code labels}: class k is the value k, as the viewer's legend reads them) and a view's extra
+     * colours ({@code keys}: the satellite view's lakes and salt flats, the rivers view's land and sea)
+     * and the legend's headings over runs of classes ({@code groups}: name, first and last class),
+     * all empty when the ramp has none.
+     */
+    public record Ramp(double[] values, int[] rgb, List<String> labels, Map<String, Integer> keys, List<Group> groups) {
+
+        public Ramp {
+            labels = List.copyOf(labels);
+            keys = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(keys));
+            groups = List.copyOf(groups);
+        }
+
+        public Ramp(double[] values, int[] rgb) {
+            this(values, rgb, List.of(), Map.of(), List.of());
+        }
 
         /** The colour of {@code v} as {@code 0xRRGGBB}. */
         public int colour(double v) {
@@ -79,6 +97,9 @@ public final class Ramps {
         }
     }
 
+    /** A legend heading over classes {@code from} to {@code to} (inclusive). */
+    public record Group(String name, int from, int to) {}
+
     /** The ramps shipped in the jar. */
     public static Ramps builtin() {
         Ramps r = builtin;
@@ -107,7 +128,21 @@ public final class Ramps {
                 values[i] = stop.get(0).getAsDouble();
                 rgb[i] = hex(stop.get(1).getAsString());
             }
-            ramps.put(e.getKey(), new Ramp(values, rgb));
+            JsonObject r = e.getValue().getAsJsonObject();
+            List<String> labels = new ArrayList<>();
+            if (r.has("labels") && r.get("labels").isJsonArray())
+                r.getAsJsonArray("labels").forEach(l -> labels.add(l.getAsString()));
+            Map<String, Integer> keys = new LinkedHashMap<>();
+            if (r.has("keys") && r.get("keys").isJsonObject())
+                for (Map.Entry<String, JsonElement> k : r.getAsJsonObject("keys").entrySet())
+                    keys.put(k.getKey(), hex(k.getValue().getAsString()));
+            List<Group> groups = new ArrayList<>();
+            if (r.has("groups") && r.get("groups").isJsonArray())
+                for (JsonElement g : r.getAsJsonArray("groups")) {
+                    var a = g.getAsJsonArray();
+                    groups.add(new Group(a.get(0).getAsString(), a.get(1).getAsInt(), a.get(2).getAsInt()));
+                }
+            ramps.put(e.getKey(), new Ramp(values, rgb, labels, keys, groups));
         }
         Map<String, String> layers = new LinkedHashMap<>();
         for (Map.Entry<String, JsonElement> e : o.getAsJsonObject("layers").entrySet())
@@ -161,5 +196,10 @@ public final class Ramps {
     /** A ramp by name, or the default. */
     public Ramp ramp(String name) {
         return ramps.getOrDefault(name, ramps.get(defaultRamp));
+    }
+
+    /** Every ramp's name. */
+    public java.util.Set<String> names() {
+        return java.util.Collections.unmodifiableSet(ramps.keySet());
     }
 }
