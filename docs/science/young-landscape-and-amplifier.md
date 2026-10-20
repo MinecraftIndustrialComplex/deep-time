@@ -187,12 +187,18 @@ moved to 193.25° or 13.5° when a few coastal cells changed). Deep sea floor, a
 |---|---|---|---|---|---|---|
 | off (the play world) | 0 | 0.6 (31°, the land's) | 2.29 (1.67) % | 0.75 (0.40) % | 28.1 / 40.8° | 312 / 618 m |
 | young only | 15° | 0.6 | 1.10 (0.66) % | 0.21 (0.079) % | 20.6 / 33.5° | 259 / 416 m |
-| amplifier only | 0 | 0.268 (15°) | not run yet | | | |
+| amplifier only | 0 | 0.268 (15°) | 1.07 (0.78) % | 0.16 (0.10) % | 20.3 / 33.5° | 270 / 477 m |
 | 10° | 10° | 0.176 | 0.25 (0.16) % | 0.044 (0.020) % | 13.7 / 25.6° | 198 / 303 m |
 | **15° (the default)** | 15° | 0.268 | **0.50 (0.35) %** | **0.096 (0.053) %** | 17.6 / 29.7° | 246 / 391 m |
 | 20° | 20° | 0.364 | 1.42 (0.86) % | 0.16 (0.096) % | 21.3 / 33.3° | 279 / 465 m |
 | ETOPO 2022 15″, five rough tiles (460 m) | | | 0.26 to 1.32 % | 0.029 to 0.15 % | 12.9 to 21.3 / 24.6 to 31.8° | 109 to 232 / 244 to 331 m |
 | ETOPO 2022 60″, whole ocean (1.85 km) | | | (0.088 %) | (0.0036 %) | (12.2 / 19.6°) | (148 / 274 m) |
+
+Each step alone halves the share steeper than 20° (1.10 and 1.07 %, inside the rough tiles' range
+near its top) but leaves the share steeper than 30° above it (0.21 and 0.16 % against at most
+0.15 %); only the two together bring both into the middle of the range. The young step does more
+at 1.8 km (0.66 against 0.78 % steeper than 20°), where the long walls are, and the amplifier more
+on the steepest blocks at 590 m, where the interpolation had steepened them.
 
 The rule (the coordinator's call, 2026-10-20): the steepest critical slope that brings the
 planet's share steeper than 20° and steeper than 30° into the range of Earth's rough tiles. 15°
