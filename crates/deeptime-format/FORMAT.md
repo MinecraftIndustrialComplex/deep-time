@@ -194,6 +194,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `surface/regolith_blocks` | L2 | u8 | 1/16, block | — | regolith thickness |
 | `surface/class_top` | L2 | u8 | 1, class index | 255 | the rock class at the surface (`strata/classes.json`) |
 | `meta/plate_id` | L1 | u16 | 1, plate id | 65535 | the plate |
+| `meta/crust_type` | L1 | u8 | 1, crust type code | 255 | the plate model's crust type at the present (L1 field `plates/crust_type`, its nearest sample): **0 oceanic, 1 continental** (the codes of `plates::state`); nodata where the model has nothing. `meta/crust_age_myr` has data exactly where this is 0, `meta/heat_flow_mw_m2` exactly where it is 1. A category: the projection pass takes the nearest cell. The column inspectors read it ("Inspecting a column"; added 2026-10-19) |
 | `meta/crust_age_myr` | L1 | u16 | 1, Myr | 65535 | oceanic crust age; nodata on continental crust |
 | `meta/heat_flow_mw_m2` | L1 | u16 | 0.1, mW/m² | 65535 | the plate model's surface heat flow at the present, on **continental crust only** (nodata on oceanic crust, whose heat flow is the sea floor's age law: a coastal land column must not read the young ridge crust beside it through the bilinear sample; the plate mesh's heat flow is interpolated over its continental corners only, L1 field `plates/continental_heat_flow_mw_m2`); the model's continental values run from 55 (old, quiet crust) up to 200 (a young orogen on a hotspot, an arc and a rift at once): 55 + 35 e^(−t/60) for the time t in Myr since the last orogeny, plus 40 on an arc, 40 on a hotspot, 30 at a divergent boundary (Java: geothermal fields, "Geothermal features (P2-14) and their settings"; added 2026-10-02) |
 | `meta/province` | L1 | u16 | 1, province id | — | geologic provinces (P1-10, "The geologic provinces"): contiguous areas of one USGS-style class, each at least the preset's `provinces.min_area_km2` (50,000 km² by default); `notes.bake.meta.provinces` lists them. With TerraBlender installed the game gives every province one biome region |
@@ -226,8 +227,8 @@ baked and gets a Lambert layout block.
   widened along the parallel, by (0.52 / cos φ)⁴, at most 8 times (reached near 72°): the simulation's solvers work in Lambert
   blocks, so its polar terrain has the grid's shape (long north–south, thin east–west on the
   planet), which an isotropic footprint only shortens. Categories (`climate/koppen`,
-  `climate/koppen_l2`, `climate/wetland`, `surface/class_top`, `meta/plate_id`, `meta/province`, and
-  any layer whose `units` is `flag`), horizon stacks and any footprint touching no-data take the
+  `climate/koppen_l2`, `climate/wetland`, `surface/class_top`, `meta/plate_id`, `meta/crust_type`,
+  `meta/province`, and any layer whose `units` is `flag`), horizon stacks and any footprint touching no-data take the
   nearest cell (`climate/koppen_l2` only since 2026-10-18: averaged as a number, a class border named
   a class neither side had). The
   `climate/ice_cover` takes the **cover rule** (BIO-159, "The ice cover"): the world cell is covered
@@ -901,7 +902,7 @@ than the rock above it: a sedimentary or volcanic pool under a metamorphosed log
 along its metamorphic path at least as far as that layer's formation temperature (the pools
 themselves know only today's geotherm), and a plutonic pool stays what it is (it may be younger
 than the metamorphism of its roof) but for granite turning to gneiss at the 650 °C isotherm.
-Plutons are bodies (role `pluton`, below), not horizons.
+Plutons and contact aureoles are bodies (roles `pluton` and `aureole`, below), not horizons.
 
 **The 0.2 bake** smooths the stacks laterally before writing them, because the strata log is
 carried cell by cell and neighbouring cells' stacks differ more than the rocks would: each cell's
@@ -1041,6 +1042,52 @@ The 500 columns: 10 % within 40 blocks of the seam, 10 % near and past the poles
 random bodies' boxes (none when the world has no bodies), with a river network 10 % on and beside
 random river vertices and 5 % around the mouths of rivers that end in lakes, with lakes 5 % within 8
 blocks of random shore cells of `water_level` (wet beside dry), the rest anywhere with x over two laps.
+
+### Inspecting a column (added 2026-10-19)
+
+`deeptime inspect-column --world-data <dir> x z` (without `--parity`) prints the column object
+above plus what a reader wants to know about it; the workbench's Inspect panel shows the same JSON,
+and its sections (`/api/runs/<id>/rock/section`) carry the same fields per sampled column. None of
+it is part of the parity contract (`--parity` prints the column alone), the game reads none of it,
+and it adds no physical value: it reads the world data, the key layout of
+`deeptime_core::structure::columns::key` and the folder's `preset.json`.
+
+- `lat`, `lon`, `world`, `layers` (every other layer's nearest value, and its bilinear one for a
+  continuous layer), `sites` (the sites whose box holds the column; `--why` adds each one's forming
+  event and chain).
+- `strata`: the horizons `{top, bottom, class, unit}`, and per horizon `unit_info`, its unit key
+  decoded (`deeptime_core::column_info`): `part` (`regolith`, `log`, `pool`, `mantle`, or
+  `intrusion` for a horizon an intrusion event made: its key and class are the event's), `band`,
+  `peak_c` (`[lower, upper]` °C of the band, upper null for the last; null for the regolith and the
+  mantle), `grade` (words), `age_ma` for a log unit (Myr before the end of the history at the unit's
+  top: `(k − first) / (last − first)` of the log's span `(now − t_start).max(1)` Myr, the inverse of
+  `key::of_age`, so to within one key) and for an intrusion (its event's age), `key_myr` (one key's
+  span), `pool` and `pool_step` for a basement unit, `parent` (`kind` `pool`, `inferred`, `itself`
+  or `none`, `rocks`, `text`) and `text`. A basement unit's parent is its pool; for a unit some steps
+  along its class's path also the pool's classes that reach its class at that step, worked out from
+  the columns' own pool rule. A metamorphic log unit's parent is **inferred**: the strata log keeps
+  only what the deepest burial made of a layer, so `rocks` lists the sedimentary and volcanic
+  classes whose metamorphic path reaches its class. Plutonic basement is keyed in the last band
+  whatever its temperature, which `grade` says.
+- `body_details`: per body run of step 4, `{id, top, bottom, site, role, shape, rock_class, age_ma,
+  deposit_type, zones}`, `age_ma` the body's own (null: no age), `deposit_type` its site's, `zones`
+  `{name, rock_class, material}`; and `drawn_scale` `{size_mult_h, size_mult_v, ledger, text}` when
+  the body's deposit type is drawn larger than the deposit model (its `balance.size_mult_*` as the
+  run's preset selected the types, `feature_scale.deposits` included): "coal seam drawn 35 x its
+  modelled thickness (game choice, ledger DEP-127)". Other types cite ORE-055 (DEP-195 for the
+  porphyries).
+- `crust`: `{type, type_name, age_myr}` from `meta/crust_type` and `meta/crust_age_myr` at the
+  column (nearest cell); `age_myr` is null on continental crust, which the plate model gives no
+  formation age. Null when the folder has neither layer.
+- `structure_events`, youngest first: the column rule's candidates ("Structural events") whose
+  window weight at the column is above 0, and any other candidate that changed the column's stack.
+  `{id, kind, t_years, age_ma, key, weight, changed}` plus, for a fold, `wavelength`, `amplitude`
+  and `uplift` (blocks the fold lifted the column's rock here); for a fault, `plane_y` (the plane's
+  height at the column), `throw` and `heave` (weight x slip); for an intrusion, `class`, `inside`
+  and `top_y`, `bottom_y`. `changed` compares the deformed stack with every candidate against the
+  stack with all but that one (the column rule reads only the column's own candidates, so this is
+  exact); it is null past 64 candidates. `structure_candidates` counts the candidates.
+- `units_note`: how to read `unit_info`.
 
 ## Rivers (`rivers/rivers.dtrv`, P1-22)
 
@@ -1703,9 +1750,14 @@ body record                                      zone record
 88   4  u32 first zone
 92   4  u32 zone count
 96   4  u32 rock class of the whole body (string, u32::MAX = none)
-100  4  reserved, 0
+100  4  f32 age: when the body formed, Myr before the end of the world's history (NaN = none)
 104  8  reserved, 0 (voxel blobs, later)
 ```
+
+The age (2026-10-19, decisions log "Add the fields"; within 0.5, no minor of its own, since nothing
+is released): plutons, their aureoles, stocks' aureoles and stock roots carry their emplacement
+(the aureole takes its intrusion's), every other body NaN for now. A file written before it holds 0
+there.
 
 Shapes: 0 ellipsoid, 1 stockwork_shell, 2 lens, 3 pod, 10 dome use the **ellipsoid metric**;
 4 sheet, 5 dyke, 6 pipe, 7 blanket, 8 seam, 9 channel use the **cylinder metric**. Evaluation of
@@ -1734,17 +1786,38 @@ material's raw-ore block instead (`#c:storage_blocks/raw_<material>`, else vanil
 the same hash with the body id XOR `0x52415721`, falls below `raw`: vanilla's ore veins carry raw
 blocks among their ore the same way (Ben, 2026-10-02).
 
-**Plutons** (P1-07, `structure::plutons`): ellipsoid bodies with no site, role `pluton`, the
-body's `rock_class` its intrusion (granodiorite, granite or diorite), and, where the roof's host
-was a carbonate or another non-crystalline rock, one zone `aureole` (no material, density 0) whose
-`rock_class` (skarn or hornfels) holds the outer shell d ∈ [0.85, 1] (`structure.aureole_shell`).
-Their ids come before any deposit body the deposit stage adds later, so where they overlap the
-pluton paints first.
+**Plutons** (P1-07, `structure::plutons`): ellipsoid bodies with no site, role `pluton`, no zones,
+the body's `rock_class` its intrusion (granodiorite, granite or diorite).
+
+**Contact aureoles** (REV-2, 2026-10-19): ellipsoid bodies with no site, role `aureole`, no
+`rock_class`, one per pluton and per stock whose host can be baked. The body is its intrusion grown
+by the aureole's width on every axis (`structure.aureole_share` of the intrusion's smallest
+dimension, `structure.aureole_carbonate_factor` times that in a carbonate host). Its zones (named
+`aureole`, no material, density 0) hold the baked rock band by band down the column: each zone's
+`rock_class` is skarn or hornfels and its v range the depths of a host horizon older than the
+intrusion, read on the column at the intrusion's centre as the strata pass paints it (the column rule over `strata/horizons`) and by the structural
+events' test (a horizon whose top key is at least the intrusion's); a pluton's zones span d ∈ [0, 1], so the pluton body, painted later, keeps its own
+rock inside. A stock's aureole is hollow: the stock is a structural event, which bodies paint
+over, so its zones are cut into eight horizontal slabs whose d range starts at the stock's wall
+in that slab. The centre's column also holds the other intrusion events that reach the inner half
+of the intrusion's plan (any of the centre and the points half a semi-axis out along and across:
+an older stock it was emplaced in or beside, a younger one through it), applied there as the
+column rule applies them, as thick as at the point they hold deepest: an older one's rock is
+crystalline and a younger one's is younger than the aureole, so no zone paints over either (the
+aureole goes unbaked at those depths all round). **Stock roots**: a stock rooted on a pluton (`structure::deform::intrude::
+root_on_plutons`) also gets an ellipsoid body of role `stock`, its own ellipsoid, with one zone
+`root` (its rock class, no material) from the top of the pluton's aureole down, so the stock's
+rock reads through the aureole it rises across. Ids: every aureole first, then the stock roots,
+then the plutons, then any deposit body the deposit stage adds later, so where they overlap the
+later body wins (a body with a higher id paints over a lower one). `notes.structure.aureoles`
+counts them: `plutons`, `stocks`, `zones`, `median_width_m` [pluton, stock] and `stock_roots`;
+`notes.structure.deformation.stocks_rooted` the stocks rooted on a pluton and `stocks_under_cover`
+the stocks whose top was taken down to the base of younger cover.
 
 The AABB is conservative: the world extent along axis i is `Σ_j |R_ji|·h_j` around the centre
 (R the rotation above, h the semi-axes), clipped at `clip_top_y`. The viewer's `report.js` carries
 each body as JSON: `id, site, shape, metric, role, center, axes, yaw, dip, clip_top_y (null = none),
-aabb, rock_class, zones [{name, material, rock_class, d, v, grade, density, raw}]`.
+aabb, rock_class, age_ma (null = none), zones [{name, material, rock_class, d, v, grade, density, raw}]`.
 
 `manifest.json` `notes.deposits` (runs with the deposit stage) is the stage's census: per type
 `id, sites, target (the survivors the density asks for: count_mult · ρ · Σ permissive area, plan
@@ -1851,8 +1924,10 @@ normal and strike-slip faults whose slip dies out along the trace and away from 
 (kind 2: stocks in orogens, dykes along rifts, plugs under extinct volcanoes), each dated to
 the plate step that made it; the key is `structure::columns::key::of_age(0, age, span)`, the
 unmetamorphosed strata log's key of that age, so basement and metamorphic units (larger keys) are
-deformed by every event; a fault's `y` is the ground at its centre; an intrusion's `y` is the
-world's floor (it is rooted there and narrows upwards to its top). `notes.bake.structure` records
+deformed by every event; a fault's `y` is the ground at its centre; an intrusion's `y` is its
+ellipsoid's centre: for dykes and plugs the world's floor (they are rooted there and narrow
+upwards to their top), for a stock the middle of its own thickness (Cruden & McCaffrey's law
+on its outline) or of its reach down into the roof of the pluton it rises from. `notes.bake.structure` records
 the counts and the margin, `notes.structure.deformation` what the run made.
 
 ## Keyframes (`keyframes/index.json`, `keyframes/kf-<n>.dtk`)

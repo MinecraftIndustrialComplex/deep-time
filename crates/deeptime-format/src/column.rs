@@ -17,11 +17,12 @@ use crate::detail::{DetailSpec, Noise};
 use crate::error::{FormatError, Result};
 use crate::lazy::LazyLayer;
 use crate::manifest::Manifest;
+use crate::projection::IndexFrame;
 use crate::raster::{DType, RasterRead};
 use crate::rivers::{Rivers, read_rivers};
 use crate::sites::{Site, SiteIndex, read_sites};
 use crate::strata::ColumnHorizon;
-use crate::structure::{DeformScratch, Deformer};
+use crate::structure::{DeformScratch, Deformer, Shape as EventShape, StructIndex, Structure};
 use crate::water::{self, WaterColumn, WaterSource, WaterSpec};
 
 /// The terrain layer.
@@ -368,7 +369,10 @@ impl ColumnWorld {
 
     /// Everything `deeptime inspect-column` shows about column (x, z): the [`Column`], its
     /// latitude and longitude, every other layer's value there, the horizons with their class
-    /// names, the bodies with their roles, and the sites whose box holds the column.
+    /// names, the bodies with their roles, ages, deposit types and zones, the sites whose box
+    /// holds the column, the crust ([`ColumnWorld::crust_at`]) and the structural events at it
+    /// ([`events_at`]). FORMAT.md, "Inspecting a column"; `deeptime_core::column_info::annotate`
+    /// adds what needs the core (unit keys decoded, ages, drawn scales).
     pub fn inspect(&self, x: i64, z: i64) -> Value {
         let col = self.sample(x, z);
         let (bx, bz) = (col.wx as f64, z as f64);
@@ -403,10 +407,21 @@ impl ColumnWorld {
             .iter()
             .map(|&(id, top, bottom)| {
                 let b = self.bodies.iter().find(|b| b.id == id);
+                let deposit_type = b.and_then(|b| b.site).and_then(|s| {
+                    self.sites
+                        .as_ref()
+                        .and_then(|(sites, _)| sites.iter().find(|x| x.id == s))
+                        .map(|x| x.deposit_type.clone())
+                });
                 json!({
                     "id": id, "top": top, "bottom": bottom,
                     "site": b.and_then(|b| b.site), "role": b.map(|b| b.role.clone()),
                     "shape": b.map(|b| b.shape.name()), "rock_class": b.and_then(|b| b.rock_class.clone()),
+                    "age_ma": b.and_then(|b| b.age_ma).map(f64::from).filter(|a| a.is_finite()).map(round3),
+                    "deposit_type": deposit_type,
+                    "zones": b.map(|b| b.zones.iter().map(|z| json!({
+                        "name": z.name, "rock_class": z.rock_class, "material": z.material,
+                    })).collect::<Vec<_>>()).unwrap_or_default(),
                 })
             })
             .collect();
@@ -436,8 +451,184 @@ impl ColumnWorld {
         v["strata"] = json!(horizons);
         v["body_details"] = json!(bodies);
         v["sites"] = json!(sites);
+        v["crust"] = self.crust_at(col.wx, z);
+        let (events, candidates) = match &self.structure {
+            Some(d) => events_at(
+                d,
+                self.c as u32,
+                x,
+                z,
+                self.min_y,
+                &self.classes,
+                true,
+                &mut |sx, sz, o| self.plain_stack(sx, sz, o),
+            ),
+            None => (Vec::new(), 0),
+        };
+        v["structure_events"] = json!(events);
+        v["structure_candidates"] = json!(candidates);
         v
     }
+
+    /// The crust under column (x, z) as the bake's meta layers give it ("Inspecting a column" in
+    /// FORMAT.md): `type` (the `meta/crust_type` code, 0 oceanic, 1 continental), `type_name` and
+    /// `age_myr` (`meta/crust_age_myr`, oceanic crust only: the plate model gives continental
+    /// crust no formation age). Null when the world has neither layer.
+    pub fn crust_at(&self, x: i64, z: i64) -> Value {
+        let at = |name: &str| {
+            self.others
+                .iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, l)| l.nearest(self.wrap_x(x) as f64, z as f64))
+        };
+        let (kind, age) = (at("meta/crust_type"), at("meta/crust_age_myr"));
+        if kind.is_none() && age.is_none() {
+            return Value::Null;
+        }
+        let code = kind.filter(|k| k.is_finite()).map(|k| k.round() as i64);
+        let name = match code {
+            Some(0) => Some("oceanic"),
+            Some(1) => Some("continental"),
+            _ => None,
+        };
+        json!({
+            "type": code,
+            "type_name": name,
+            "age_myr": age.and_then(|a| finite(a).as_f64()),
+        })
+    }
+}
+
+/// The most candidates [`events_at`] undoes one at a time to tell which changed the column; past
+/// it `changed` is null (each check is a deformed stack of its own).
+pub const CHANGED_CHECK_MAX: usize = 64;
+
+/// The structural events of `d` at column (x, z) of a world `c` blocks around ("Inspecting a
+/// column" in FORMAT.md), youngest first, and the number of candidates the column rule undoes
+/// there ([`crate::structure::StructIndex::candidates`]). Listed are the candidates whose window
+/// holds the column (weight above 0) and, when `check` is set, the ones that changed its stack:
+/// the stack with every candidate against the stack with all but that one, which is the whole
+/// answer because the column rule reads only the column's own candidates (a fault can carry rock
+/// into another event's window, so an event may change a column outside its window). `stack` is
+/// the undeformed column rule. Each entry: `id`, `kind` (fold, fault, intrusion), `t_years`,
+/// `key`, `weight`, `changed` (null when not checked) and the shape's own numbers at the column.
+#[allow(clippy::too_many_arguments)]
+pub fn events_at(
+    d: &Deformer,
+    c: u32,
+    x: i64,
+    z: i64,
+    min_y: i32,
+    classes: &[String],
+    check: bool,
+    stack: &mut dyn FnMut(i64, i64, &mut Vec<ColumnHorizon>),
+) -> (Vec<Value>, usize) {
+    let st = &d.structure;
+    let (fx, fz) = (x as f64, z as f64);
+    let mut cands = Vec::new();
+    d.index.candidates(st, fx, fz, &mut cands);
+    let mut changed: Vec<Option<bool>> = vec![None; cands.len()];
+    if check && !cands.is_empty() && cands.len() <= CHANGED_CHECK_MAX {
+        let mut scratch = DeformScratch::default();
+        let mut base = Vec::new();
+        st.deformed_stack(&d.index, x, z, min_y, stack, &mut scratch, &mut base);
+        // An index of one bucket about the column: the rule's candidates are then every event
+        // of the reduced structure (each was a candidate of the full one).
+        let frame = IndexFrame {
+            origin: (x - 64, z - 64),
+            span: (128, 128),
+        };
+        let mut mini = Structure {
+            events: Vec::with_capacity(cands.len()),
+            profiles: st.profiles.clone(),
+            margin: st.margin,
+        };
+        let mut out = Vec::new();
+        for (n, slot) in changed.iter_mut().enumerate() {
+            mini.events.clear();
+            mini.events.extend(
+                cands
+                    .iter()
+                    .enumerate()
+                    .filter(|&(m, _)| m != n)
+                    .map(|(_, &e)| st.events[e as usize]),
+            );
+            let index = StructIndex::new_in(&mini, c, frame);
+            mini.deformed_stack(&index, x, z, min_y, stack, &mut scratch, &mut out);
+            *slot = Some(out != base);
+        }
+    }
+    let named = |i: u8| {
+        classes
+            .get(usize::from(i))
+            .cloned()
+            .unwrap_or_else(|| format!("#{i}"))
+    };
+    let mut events = Vec::new();
+    for (n, &e) in cands.iter().enumerate() {
+        let ev = &st.events[e as usize];
+        let (a, b) = ev.window.local(fx, fz, f64::from(c));
+        let w = ev.window.weight(a, b);
+        if w <= 0.0 && changed[n] != Some(true) {
+            continue;
+        }
+        let mut v = json!({
+            "id": ev.id, "t_years": ev.t_years, "key": ev.key,
+            "weight": round3(w), "changed": changed[n],
+        });
+        match ev.shape {
+            EventShape::Fold {
+                wavelength,
+                amplitude,
+                offset,
+                profile,
+            } => {
+                let phase = (b - offset) * crate::structure::NODDY_TAU / wavelength;
+                let p = st
+                    .profiles
+                    .get(usize::from(profile))
+                    .map_or(0.0, |t| crate::structure::profile_at(t, phase));
+                v["kind"] = json!("fold");
+                v["wavelength"] = json!(round3(wavelength));
+                v["amplitude"] = json!(round3(amplitude));
+                // How far the fold lifted the column's rock at this column, blocks.
+                v["uplift"] = json!(round3(w * amplitude * p));
+            }
+            EventShape::Fault { y, pole, slip } => {
+                let (dx, dz) = (
+                    a * ev.window.along[0] + b * ev.window.across[0],
+                    a * ev.window.along[1] + b * ev.window.across[1],
+                );
+                v["kind"] = json!("fault");
+                // The plane's height at the column, before any younger event moved it.
+                v["plane_y"] = json!(round3(y - (dx * pole[0] + dz * pole[2]) / pole[1]));
+                v["throw"] = json!(round3(w * slip[1]));
+                v["heave"] = json!(round3(w * slip[0].hypot(slip[2])));
+            }
+            EventShape::Intrusion {
+                y,
+                half_height,
+                class,
+            } => {
+                let (ua, ub) = (a / ev.window.half_along, b / ev.window.half_across);
+                let r2 = ua * ua + ub * ub;
+                v["kind"] = json!("intrusion");
+                v["class"] = json!(named(class));
+                v["inside"] = json!(r2 < 1.0);
+                if r2 < 1.0 {
+                    let hh = half_height * (1.0 - r2).sqrt();
+                    v["top_y"] = json!(round3(y + hh));
+                    v["bottom_y"] = json!(round3(y - hh));
+                }
+            }
+        }
+        events.push(v);
+    }
+    (events, cands.len())
+}
+
+fn round3(x: f64) -> f64 {
+    (x * 1000.0).round() / 1000.0
 }
 
 impl WaterSource for ColumnWorld {
@@ -539,5 +730,87 @@ mod tests {
         assert_eq!(horizon_at(&h, 10), Some(2));
         assert_eq!(horizon_at(&h, -352), Some(2));
         assert_eq!(horizon_at(&[], 0), None);
+    }
+
+    /// `events_at` lists the events whose window holds the column and tells the one that changed
+    /// its stack (an intrusion into older rock) from the one that did not (a fold older than all
+    /// the rock), and leaves out an event too far away to be a candidate.
+    #[test]
+    fn events_at_tells_which_events_changed_the_column() {
+        use crate::structure::{PROFILE_SAMPLES, StructEvent, Window};
+        let window = |x: f64| Window {
+            centre: [x, 0.0],
+            along: [1.0, 0.0],
+            across: [0.0, 1.0],
+            half_along: 50.0,
+            half_across: 50.0,
+        };
+        let st = Structure {
+            events: vec![
+                StructEvent {
+                    id: 1,
+                    key: 4_100,
+                    t_years: -1.0e6,
+                    window: window(0.0),
+                    shape: EventShape::Intrusion {
+                        y: 60.0,
+                        half_height: 20.0,
+                        class: 2,
+                    },
+                },
+                StructEvent {
+                    id: 2,
+                    key: 65_000,
+                    t_years: -500.0e6,
+                    window: window(10.0),
+                    shape: EventShape::Fold {
+                        wavelength: 200.0,
+                        amplitude: 10.0,
+                        offset: -50.0,
+                        profile: 0,
+                    },
+                },
+                StructEvent {
+                    id: 3,
+                    key: 40_000,
+                    t_years: -600.0e6,
+                    window: window(1_000.0),
+                    shape: EventShape::Fault {
+                        y: 50.0,
+                        pole: [0.6, 0.8, 0.0],
+                        slip: [3.0, 4.0, 0.0],
+                    },
+                },
+            ],
+            profiles: vec![vec![50.0; PROFILE_SAMPLES]],
+            margin: 64.0,
+        };
+        let d = Deformer::new(st, 4096);
+        let classes: Vec<String> = ["sandstone", "granite", "diorite"]
+            .map(String::from)
+            .to_vec();
+        let mut stack = |_: i64, _: i64, o: &mut Vec<ColumnHorizon>| {
+            o.clear();
+            o.extend([(100, 0u8, 40_000u16), (50, 1, 41_000)]);
+        };
+        let (events, candidates) = events_at(&d, 4096, 0, 0, -64, &classes, true, &mut stack);
+        assert_eq!(candidates, 2, "the fault 1,000 blocks away is no candidate");
+        assert_eq!(events.len(), 2, "{events:?}");
+        let intrusion = &events[0];
+        assert_eq!(intrusion["kind"], "intrusion");
+        assert_eq!(intrusion["class"], "diorite");
+        assert_eq!(intrusion["inside"], true);
+        assert_eq!(intrusion["changed"], true);
+        assert_eq!(intrusion["top_y"], 80.0);
+        let fold = &events[1];
+        assert_eq!(fold["kind"], "fold");
+        assert!(fold["weight"].as_f64().unwrap() > 0.0);
+        assert_eq!(
+            fold["changed"], false,
+            "older than every unit of the column"
+        );
+        // Unchecked, `changed` is null.
+        let (events, _) = events_at(&d, 4096, 0, 0, -64, &classes, false, &mut stack);
+        assert!(events.iter().all(|e| e["changed"].is_null()));
     }
 }
