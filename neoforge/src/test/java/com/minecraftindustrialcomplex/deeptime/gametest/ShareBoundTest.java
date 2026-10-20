@@ -55,11 +55,11 @@ class ShareBoundTest {
         // Shares measured on 2026-10-20 (docs/science/biomes.md, "Ice spikes and the rare variants"; ledger
         // BIO-162), checked from the fewest columns asserted (40) up to a large planet's thousands.
         int[] sizes = {40, 132, 1000, 20000};
-        // The ice cap's steep ground (erosion E0 and E1): after the fix at most 0.018, before it 0.175 to 0.212
-        // (vanilla's near-inland low slice).
+        // The ice cap's steep ground (erosion E0 and E1): after the fix at most 0.030 (a real bake), before it 0.175
+        // to 0.212 (vanilla's near-inland low slice).
         double steep = BiomeGameTests.STEEP_ICE_SPIKES_CEILING;
         for (int n : sizes) {
-            assertFalse(above(0.018, n, steep), "steep 0.018 of " + n);
+            assertFalse(above(0.030, n, steep), "steep 0.030 of " + n);
             for (double p : new double[] {0.175, 0.212})
                 assertTrue(above(p, n, steep), "steep " + p + " of " + n);
         }
@@ -74,7 +74,7 @@ class ShareBoundTest {
         }
         // A share at its ceiling is the sample's noise, not a failure.
         assertFalse(above(0.345, 20000, terralith));
-        assertFalse(above(0.05, 40, steep));
+        assertFalse(above(0.07, 40, steep));
     }
 
     private static boolean above(double share, int n, double ceiling) {
