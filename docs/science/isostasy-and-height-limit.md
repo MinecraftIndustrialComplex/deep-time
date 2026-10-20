@@ -14,8 +14,9 @@ The crust floats on the denser mantle: thick or light crust stands high, thin or
 | [ISO](ledger/ISO.md) | sea level | ISO-033 to ISO-039 (7) |
 | [ISO](ledger/ISO.md) | lithospheric flexure (its own page: [flexure.md](flexure.md)) | ISO-040 to ISO-069 (30) |
 | [ISO](ledger/ISO.md) | the continent's settling on the plate model (written up in [plates.md](plates.md), "Mountains eat the world", 2026-10-20) | ISO-078 (1) |
+| [ISO](ledger/ISO.md) | the sedimentary cover's pore water in the column's height (written up in [rivers-and-lakes.md](rivers-and-lakes.md), "Lakes against Earth", 2026-10-20) | ISO-080 to ISO-082 (3) |
 
-Rows by status (67 active, 2 `merged`): `verified` 3, `cited-unverified` 8, `abstract-only` 6, `calibrated` 6, `game-choice` 14, `uncited` 30.
+Rows by status (70 active, 2 `merged`): `verified` 3, `cited-unverified` 9, `abstract-only` 8, `calibrated` 6, `game-choice` 14, `uncited` 30.
 
 ## Material for the stage 2 writer
 
@@ -29,3 +30,4 @@ Rows by status (67 active, 2 `merged`): `verified` 3, `cited-unverified` 8, `abs
 - Three different crust densities are in use (2,650, 2,700 and 2,800 kg/m3) in different places, none cited (extraction notes ERO, flag 9).
 - The shipped ocean floor is 0.3 to 0.6 km shallower than the GDH1 age-depth curve it is named after (flag 5).
 - The sea floor could reach below the world's bottom (y -412 to -472 against a floor of y -352). Settled by Ben on 2026-10-02 ("Lower min_y to -512 (Recommended)"): the floor is y -512, under the plate model's nominal trench (y -437 at the default scale). Measured on the quick 16k planet: the finished sea floor reaches y -528, so the old floor cut 69,011 L3 cells flat (and 147,824 more sat in the bottom 24-block slide) where -512 cuts 33 (81 in the slide), up to 16 blocks deep. The bake records `lowest_y`, `cells_below_min_y` and `cells_in_floor_slide`. A bottom squeeze for settings deeper than the floor (the recommended option's net) is not built; it is a pending question.
+- A sedimentary cover is porous and its pores hold water, so a metre of sediment weighs less than a metre of crust and floats less of its own thickness (ISO-080 to ISO-082, 2026-10-20). Before, the column's height counted the cover as crust at 2,830 kg/m3, so a closed basin filled with sediment only after about seven times its depth had come in; with Athy's porosity law (Sclater & Christie's shaly sandstone) it fills with about 3.6 times its depth on the normal column. The cover is the SEDIMENT and SEDIMENTARY pools together, compacting as one column under its own thickness, so new sediment on an old cover lands on rock already squeezed (a fresh metre nets 0.47 m of height on a bare column and 0.31 m on the normal cover).
