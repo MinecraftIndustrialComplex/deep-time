@@ -127,7 +127,9 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Flow {
         }
         front = next;
     }
-    let active: Vec<u32> = (0..n as u32).filter(|&i| ring[i as usize] != u8::MAX).collect();
+    let active: Vec<u32> = (0..n as u32)
+        .filter(|&i| ring[i as usize] != u8::MAX)
+        .collect();
     let mut slot = vec![u32::MAX; n];
     for (a, &i) in active.iter().enumerate() {
         slot[i as usize] = a as u32;
@@ -250,7 +252,11 @@ mod tests {
         let fx = Fx::new();
         let belt = |p: DVec3| p.x < -0.1 && p.y > 0.88 && p.y < 0.93;
         let mut st = planet(&fx.geo, belt, 26_000.0);
-        let t0: Vec<f64> = st.samples.iter().map(|s| f64::from(s.thickness_m)).collect();
+        let t0: Vec<f64> = st
+            .samples
+            .iter()
+            .map(|s| f64::from(s.thickness_m))
+            .collect();
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
         let crust0 = crust_m(&st);
         let top0 = t0.iter().copied().fold(f64::MIN, f64::max);

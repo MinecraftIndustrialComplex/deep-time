@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [hypsometry-and-calibration.md](../hypsometry-and-calibration.md). Extraction notes with flags: [extraction-notes/ERO.md](../extraction-notes/ERO.md).
 
-Rows: 34 (1 further row `merged`, retired with plate tasks 3 and 4, 2026-10-02, and not counted). By status: `cited-unverified` 11, `abstract-only` 1, `calibrated` 17, `game-choice` 1, `uncited` 4 (HYP-035 added 2026-10-20, the continent budget).
+Rows: 33 (2 further rows are `merged` and not counted: HYP-016, retired with plate tasks 3 and 4, 2026-10-02, and HYP-017, into PLT-045 with plate task 8, 2026-10-17). By status: `cited-unverified` 11, `abstract-only` 1, `calibrated` 16, `game-choice` 1, `uncited` 4 (HYP-035 added 2026-10-20, the continent budget).
 
 Extracted from the code as it stood on 2026-10-01/02 by a stage-1 agent. Nothing here has been checked against its source. Paths are relative to the repository root; line numbers are left out on purpose.
 

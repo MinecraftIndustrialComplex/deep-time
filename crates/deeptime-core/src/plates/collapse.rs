@@ -488,7 +488,11 @@ pub(in crate::plates) mod tests {
     /// Plate 0 is x < 0, plate 1 x ≥ 0. A continent (35.1 km, 300 m) within 40° of +y on both,
     /// ocean floor at −4.5 km elsewhere; on the continent a belt (`belt(p)`) thickened by
     /// `thick_m` and raised by `thick_m` / 7.0.
-    pub(in crate::plates) fn planet(geo: &Geo, belt: impl Fn(DVec3) -> bool, thick_m: f32) -> PlateState {
+    pub(in crate::plates) fn planet(
+        geo: &Geo,
+        belt: impl Fn(DVec3) -> bool,
+        thick_m: f32,
+    ) -> PlateState {
         let samples: Vec<Sample> = geo
             .points()
             .iter()
@@ -739,7 +743,10 @@ pub(in crate::plates) mod tests {
         let before = st.samples.clone();
         let c = step_once(&fx, &mut st, 1);
         assert_eq!(moves(c), Collapse::default());
-        assert!(c.unplaced_km2_m > 0.0, "the crust with no room is counted: {c:?}");
+        assert!(
+            c.unplaced_km2_m > 0.0,
+            "the crust with no room is counted: {c:?}"
+        );
         assert_eq!(st.samples, before);
         // Off.
         fx.k.collapse_reach_km = 1500.0;
