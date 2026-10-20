@@ -1265,20 +1265,25 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             detail: drawn_detail(world_amp.as_ref(), noise(period, &wp)),
             c: f64::from(period),
         };
+        let mut clipped = 0usize;
         new_bodies = bs
             .iter()
             .map(|b| {
                 let mut nb = project_body(&map, b);
-                let dy =
-                    new.height(nb.center[0], nb.center[2]) - old.height(b.center[0], b.center[2]);
-                if dy.is_finite() && !b.site.is_some_and(|s| stratabound.contains(&s)) {
-                    nb.center[1] += dy;
-                    if nb.clip_top_y != deeptime_format::bodies::NO_CLIP {
-                        nb.clip_top_y += dy.round() as i32;
+                let ground = new.height(nb.center[0], nb.center[2]);
+                let dy = ground - old.height(b.center[0], b.center[2]);
+                match body_y(
+                    &mut nb,
+                    dy,
+                    b.site.is_some_and(|s| stratabound.contains(&s)),
+                    ground,
+                ) {
+                    BodyY::Moved(d) => {
+                        shifts.0 += usize::from(d.abs() >= 1.0);
+                        shifts.1 = shifts.1.max(d.abs());
                     }
-                    nb.aabb = nb.computed_aabb();
-                    shifts.0 += usize::from(dy.abs() >= 1.0);
-                    shifts.1 = shifts.1.max(dy.abs());
+                    BodyY::Clipped => clipped += 1,
+                    BodyY::Kept => {}
                 }
                 nb
             })
@@ -1287,7 +1292,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         set_file(m, deeptime_format::bodies::BODIES_PATH, bytes, crc);
         vec_note.insert(
             "bodies".into(),
-            json!({"count": new_bodies.len(), "moved_a_block_or_more": shifts.0, "largest_move_blocks": shifts.1}),
+            json!({"count": new_bodies.len(), "moved_a_block_or_more": shifts.0, "largest_move_blocks": shifts.1, "stratabound_clipped_to_ground": clipped}),
         );
     }
     if let Some((sites, _)) = sites {
@@ -1652,6 +1657,49 @@ fn stratabound_sites<'a>(
         .collect())
 }
 
+/// What [`body_y`] did to a body.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum BodyY {
+    /// Moved by this many blocks with the drawn ground.
+    Moved(f64),
+    /// A stratabound body kept at its y and clipped under the world's ground.
+    Clipped,
+    /// Left as it was.
+    Kept,
+}
+
+/// A projected body's y. Most move with the drawn ground: by `dy`, the change of the drawn
+/// height between the body's old column and its new one, with their clip. A stratabound one
+/// (`stratabound`: its site's type is in-stratum) keeps its y, where the world's stacks keep its
+/// host horizon, and is clipped [`crate::deposits::SOIL_BLOCKS`] under `ground`, the world's
+/// drawn ground over its centre: the young landscape and the amplifier ran after the deposit
+/// stage placed it, and the drawing differs from the simulation's, so the ground over a horizon
+/// can lie lower than the one the deposit stage kept the body under (ORE-271).
+fn body_y(nb: &mut deeptime_format::Body, dy: f64, stratabound: bool, ground: f64) -> BodyY {
+    if stratabound {
+        if !ground.is_finite() {
+            return BodyY::Kept;
+        }
+        // ledger: ORE-271
+        let clip = ground.floor() as i32 - crate::deposits::SOIL_BLOCKS;
+        if clip >= nb.aabb[1][1] {
+            return BodyY::Kept;
+        }
+        nb.clip_top_y = nb.clip_top_y.min(clip);
+        nb.aabb = nb.computed_aabb();
+        return BodyY::Clipped;
+    }
+    if !dy.is_finite() {
+        return BodyY::Kept;
+    }
+    nb.center[1] += dy;
+    if nb.clip_top_y != deeptime_format::bodies::NO_CLIP {
+        nb.clip_top_y += dy.round() as i32;
+    }
+    nb.aabb = nb.computed_aabb();
+    BodyY::Moved(dy)
+}
+
 /// A body in the world: its centre through the projection, its horizontal axes and yaw through
 /// the local Jacobian, its box recomputed.
 pub fn project_body(map: &Mapping, b: &deeptime_format::Body) -> deeptime_format::Body {
@@ -1688,8 +1736,10 @@ pub fn project_site(
     bodies: &[deeptime_format::Body],
 ) -> deeptime_format::Site {
     let mut out = s.clone();
-    let (wx, wz) = map.to_world(f64::from(s.center[0]), f64::from(s.center[2]));
-    let (cx, cz) = (wx.round() as i32, wz.round() as i32);
+    // The centre block's centre through the projection, and the world block holding it (the
+    // corner, rounded, could land a block off the column the body's centre is in).
+    let (wx, wz) = map.to_world(f64::from(s.center[0]) + 0.5, f64::from(s.center[2]) + 0.5);
+    let (cx, cz) = (wx.floor() as i32, wz.floor() as i32);
     let mut lo = [i32::MAX; 3];
     let mut hi = [i32::MIN; 3];
     let mut any = false;
@@ -1848,6 +1898,75 @@ mod tests {
         let got = stratabound_sites([(1, "deeptime:mvt_zn_pb"), (2, "deeptime:porphyry_cu_mo_au")])
             .unwrap();
         assert_eq!(got.into_iter().collect::<Vec<_>>(), vec![1]);
+    }
+
+    fn lens(y: f64) -> deeptime_format::Body {
+        deeptime_format::Body::new(
+            1,
+            Some(7),
+            deeptime_format::bodies::Shape::Lens,
+            "ore",
+            [100.5, y, 200.5],
+            [12.0, 3.0, 12.0],
+            0.0,
+            0.0,
+            deeptime_format::bodies::NO_CLIP,
+        )
+    }
+
+    /// A body moves with the drawn ground; a stratabound one keeps its y and is clipped four
+    /// blocks under the world's ground where that lies lower than its top.
+    #[test]
+    fn a_stratabound_body_keeps_its_y_and_is_clipped_under_the_ground() {
+        let mut b = lens(40.0);
+        assert_eq!(body_y(&mut b, 5.0, false, 80.0), BodyY::Moved(5.0));
+        assert_eq!(b.center[1], 45.0);
+        // Kept: the ground (80) is well over its top (43).
+        let mut b = lens(40.0);
+        assert_eq!(body_y(&mut b, 5.0, true, 80.0), BodyY::Kept);
+        assert_eq!(
+            (b.center[1], b.clip_top_y),
+            (40.0, deeptime_format::bodies::NO_CLIP)
+        );
+        // The ground at 44.7: nothing of it above block 40 (44, less the four of soil).
+        assert_eq!(body_y(&mut b, -30.0, true, 44.7), BodyY::Clipped);
+        assert_eq!((b.center[1], b.clip_top_y, b.aabb[1][1]), (40.0, 40, 40));
+        // Never above a clip it had.
+        let mut b = lens(40.0);
+        b.clip_top_y = 38;
+        b.aabb = b.computed_aabb();
+        assert_eq!(body_y(&mut b, 0.0, true, 44.7), BodyY::Kept);
+        assert_eq!(b.clip_top_y, 38);
+    }
+
+    /// A site's centre goes to the world block that holds its centre block's centre.
+    #[test]
+    fn a_projected_site_centre_is_the_block_holding_the_centre() {
+        let c_sim = 4096;
+        let g = PetroffGuyou::new(PetroffGuyou::hemisphere_for(c_sim), 30.0);
+        let map = Mapping::new(g, c_sim, 16);
+        for (x, z) in [(100, 200), (-1500, 700), (1900, -1200), (-7, -3)] {
+            let s = deeptime_format::Site {
+                id: 7,
+                kind: deeptime_format::sites::SiteKind::Deposit,
+                deposit_type: "deeptime:mvt_zn_pb".into(),
+                center: [x, 40, z],
+                lat_lon: [0.0, 0.0],
+                aabb: [[x - 3, 37, z - 3], [x + 3, 43, z + 3]],
+                body: None,
+                products: Vec::new(),
+                forming_event: deeptime_format::EventId(1),
+                parent: None,
+                extraction: deeptime_format::Extraction::default(),
+            };
+            let out = project_site(&map, &s, &[]);
+            let (wx, wz) = map.to_world(f64::from(x) + 0.5, f64::from(z) + 0.5);
+            assert_eq!(
+                (out.center[0], out.center[2]),
+                (wx.floor() as i32, wz.floor() as i32)
+            );
+            assert_eq!(out.center[1], 40);
+        }
     }
 
     /// A body anywhere on the simulation's grid, the pole rows and the rows past them included, projects to a body the
