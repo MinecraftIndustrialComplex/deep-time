@@ -6726,7 +6726,7 @@ The methods behind the P1-19 changes to the surface stage's solvers (build log 2
 - Library: not fetched.
 - Read so far (by the project): from memory (piecewise-constant aggregation makes the Galerkin coarse operator too stiff for smooth error, about twice for the Laplacian, remedied by over-weighting the coarse correction). The project uses the equivalent halving of the coarse couplings (`SCALE` 0.5) and measured the effect itself (ERO-183).
 
-## Ocean crust as drilled: the Penrose sequence (PLT-104, PLT-293, RCK-091, RCK-092), added 2026-10-19
+## Ocean crust as drilled: the Penrose sequence (PLT-104, PLT-293, PLT-294, RCK-091, RCK-092), added 2026-10-19
 
 The sources behind the ocean crust's own column (build log 2026-10-19 "Crust templates and the relief lift"): the thickness of new crust and of its layer 2, the share of lavas and sheeted dikes in two drilled holes, the ophiolite sequence the classes follow, and the sediment the census compares with.
 
@@ -6783,3 +6783,12 @@ The sources behind the ocean crust's own column (build log 2026-10-19 "Crust tem
 - Access: open author copy.
 - Library: not kept (read 2026-10-19 from the author-accepted PDF, text-extracted).
 - Read so far (by the project): 2026-10-19 (crust templates agent): abstract, "sediment thickness increases with age of the oceanic crust, towards high southern and northern latitudes, and towards the equator"; Table 3, the mean over the whole grid 927 m, continental margins 3044 m, the deep ocean more than 200 km from the continent-ocean boundary 404 m; section 3, the ocean younger than 82 Myr within 72 degS to 72 degN "is characterized by an average sediment thickness of 267 m".
+
+### WhiteMcKenzie1989
+- Reference: White, R. and McKenzie, D. (1989). Magmatism at rift zones: the generation of volcanic continental margins and flood basalts. Journal of Geophysical Research 94(B6):7685-7729.
+- DOI or URL: 10.1029/JB094iB06p07685
+- Cited as: "White & McKenzie 1989" (the thick igneous crust of a volcanic margin's transition).
+- Ledger ids: PLT-294
+- Access: Wiley, not fetched.
+- Library: not kept.
+- Read so far (by the project): nothing. Cited from memory (crust templates agent, 2026-10-19): the ocean–continent transition of a volcanic margin is thick igneous crust (seaward-dipping lavas over a high-velocity lower crust of underplated gabbro), thicker than normal ocean crust and thinning to it seaward. No thickness is quoted because none was read. Franke 2013 (above, read in full on 2026-10-04) gives the share of volcanic margins; its accepted manuscript did not answer (HTTP 522) when it was checked again on 2026-10-19.
