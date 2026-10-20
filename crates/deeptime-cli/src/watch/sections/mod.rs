@@ -361,7 +361,12 @@ fn section_reply(run: &Run, query: &str) -> Reply {
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or_else(|| len.ceil() as usize + 1)
         .clamp(2, section::MAX_COLUMNS);
-    let file = cache_dir(run).join(format!("section-{}_{}_{}_{}-n{n}.json", a.0, a.1, b.0, b.1));
+    // `section2-`: the answer gained units, crust and events (2026-10-19); older files are
+    // not read.
+    let file = cache_dir(run).join(format!(
+        "section2-{}_{}_{}_{}-n{n}.json",
+        a.0, a.1, b.0, b.1
+    ));
     let cached = || {
         std::fs::read(&file).ok().map(|body| Reply {
             status: 200,
@@ -408,11 +413,38 @@ fn section_reply(run: &Run, query: &str) -> Reply {
         .filter_map(|id| world.cw.bodies.iter().find(|b| b.id == *id))
         .map(|b| {
             let site = b.site.and_then(|s| world.site(s));
+            let deposit_type = site.map(|s| s.deposit_type.clone());
+            let drawn = deposit_type
+                .as_deref()
+                .and_then(|t| world.facts.scale_of(t, b.shape.name()));
             json!({ "id": b.id, "role": b.role, "site": b.site, "rock_class": b.rock_class,
-                    "shape": b.shape.name(),
-                    "deposit_type": site.map(|s| s.deposit_type.clone()) })
+                    "shape": b.shape.name(), "deposit_type": deposit_type,
+                    "age_ma": b.age_ma.map(f64::from).filter(|a| a.is_finite())
+                        .map(|a| (a * 1000.0).round() / 1000.0),
+                    "zones": b.zones.iter().map(|z| json!({
+                        "name": z.name, "rock_class": z.rock_class, "material": z.material,
+                    })).collect::<Vec<_>>(),
+                    "drawn_scale": drawn })
         })
         .collect();
+    // The units the columns' horizons hold and the events at them, decoded as the column
+    // inspector decodes them (`deeptime_core::column_info::annotate`).
+    let units = sec.units();
+    let mut decoded = json!({
+        "strata": units.iter().map(|&(unit, class)| json!({
+            "unit": unit, "class": names.get(usize::from(class)),
+        })).collect::<Vec<_>>(),
+        "structure_events": sec.events(),
+    });
+    deeptime_core::column_info::annotate(&mut decoded, &world.facts);
+    let unit_table: Vec<Value> = decoded["strata"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .map(|u| json!({ "key": u["unit"], "class": u["class"], "info": u["unit_info"] }))
+                .collect()
+        })
+        .unwrap_or_default();
     let doc = json!({
         "available": true,
         "run": run.id,
@@ -425,8 +457,11 @@ fn section_reply(run: &Run, query: &str) -> Reply {
         "length_km": sec.length_blocks * s.m_per_block_h / 1000.0,
         "n": sec.columns.len(),
         "classes": classes_json(&names),
-        "columns": sec.columns_json(),
+        "columns": sec.columns_json(&units),
         "bodies": bodies,
+        "units": unit_table,
+        "events": decoded["structure_events"],
+        "units_note": decoded["units_note"],
     });
     println!(
         "deeptime watch: {} rock: section ({}, {}) → ({}, {}), {} columns, in {seconds:.2}s",

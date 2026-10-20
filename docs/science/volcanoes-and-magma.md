@@ -125,7 +125,10 @@ catalogue of individual volcanoes that ride on their plates.
    (VOL-030). Half of the removed rock is laid around it as a tuff sheet (VOL-046). The volcano
    then dies.
 8. **Flood basalts.** Each large igneous province the plate model creates is laid as eight flows,
-   88 % basalt and 12 % tuff each (VOL-052, VOL-060).
+   88 % basalt and 12 % tuff each (VOL-052, VOL-060). Since REV-2 (2026-10-19) the strata log
+   marks these flows with their own provenance (`LIP_FLOW`), so they can be told from shield and
+   arc basalt after burial, erosion and rifting; the geologic provinces count a column as a large
+   igneous province by them alone (PRV-006).
 9. **Block scale.** The amplifier restores each volcano's true profile, which the coarse grids
    blur, and adds the crater or caldera floor. Sharp detail on an extinct volcano fades with a time
    constant of 5 Myr (VOL-063 to VOL-072).

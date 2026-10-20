@@ -122,6 +122,9 @@ pub mod field {
     pub const DEPOSITION: &str = "surface/deposition_m_myr";
     /// Thickness of the strata log, m.
     pub const SEDIMENT: &str = "surface/sediment_m";
+    /// Thickness of the strata log's flood basalts (the layers of provenance
+    /// `strata_log::LIP_FLOW`), m: what the geologic provinces count as a LIP.
+    pub const LIP: &str = "surface/lip_m";
     /// The plate and the rigid group under each cell after the last step (`plates/plate_id`,
     /// `plates/group_id` as the stage saw them): the next step's advection carries the offset only
     /// from cells that held the same crust (`advect::bilinear_same`).
@@ -301,6 +304,7 @@ impl Moved {
         parents: &'a [Option<u32>],
         (w, h): (usize, usize),
         dt_yr: f64,
+        blur_ref_yr: f64,
     ) -> advect::Carry<'a> {
         let prev_ids = |name: &str| {
             world
@@ -323,6 +327,7 @@ impl Moved {
             parents,
             known_plates: self.known_plates,
             dt_yr,
+            blur_ref_yr,
         }
     }
 }
@@ -683,6 +688,8 @@ impl SurfaceStage {
         let pf = PlateFields::read(world, n)?;
         let cls = self.classes;
         let p = self.p.clone();
+        // The carry's blur is kept per Myr at the reference step (`advect::blur_owed`).
+        let blur_ref = p.numerics.carry_blur_ref_myr * 1.0e6;
 
         // 1. The state, carried with the plates: first what the priority flood needs, the
         // elevation; the rest of the carry runs beside the flood (P1-19).
@@ -728,8 +735,14 @@ impl SurfaceStage {
                 // The elevation moves with its own crust and takes the plate model's uplift
                 // (`advect::carried_elevation`); the offset is what stands over the plate model's
                 // elevation here.
-                let (carried, foreign) =
-                    advect::carried_elevation(&m.carry(world, &pf, &parents, (w, hgt), dt));
+                let (carried, foreign) = advect::carried_elevation(&m.carry(
+                    world,
+                    &pf,
+                    &parents,
+                    (w, hgt),
+                    dt,
+                    blur_ref,
+                ));
                 foreign_cells = foreign;
                 // Crust born this step starts bare.
                 m.newborn = pf
@@ -842,7 +855,7 @@ impl SurfaceStage {
             || {
                 let started = Instant::now();
                 if let Some(m) = &moved {
-                    let carry = m.carry(world, &pf, &parents, (w, hgt), dt);
+                    let carry = m.carry(world, &pf, &parents, (w, hgt), dt, blur_ref);
                     // The plate's load and deflection move with the same crust.
                     if p.flexure.active() {
                         st.flexure
@@ -857,6 +870,10 @@ impl SurfaceStage {
                         .par_iter()
                         .map(|&[fi, fj]| advect::bilinear(w, hgt, &reg, fi, fj).max(0.0))
                         .collect();
+                    // The regolith's carry blurs it as the elevation's does (it crosses plates).
+                    if let Some(var) = advect::blur_owed(w, src, dt, blur_ref) {
+                        advect::blur(w, hgt, &var, &mut st.regolith_m, |_, _| true);
+                    }
                     let nearest: Vec<usize> = src
                         .par_iter()
                         .map(|&[fi, fj]| advect::nearest(w, hgt, fi, fj))
@@ -1588,15 +1605,23 @@ impl SurfaceStage {
         // it comes after the step's net change was logged; the plate model learns of it through
         // the feedback.
         let started = Instant::now();
-        let flow = spread::step_in(
-            &mut sc.solve,
-            &d,
-            &mut sc.h,
-            sea,
-            self.preset.tectonics.strength_height_m(gravity),
-            self.preset.tectonics.crust_flow_km2_myr,
-            dt,
-        );
+        // In equal steps no longer than `numerics.spread_step_myr` (ERO-186): the diffusivity is
+        // the excess's cube, so one solve of a long step holds it at the step's start for longer.
+        let spread_steps = p.numerics.spread_steps(dt_myr);
+        let mut flow = spread::Spread::default();
+        for _ in 0..spread_steps {
+            let one = spread::step_in(
+                &mut sc.solve,
+                &d,
+                &mut sc.h,
+                sea,
+                self.preset.tectonics.strength_height_m(gravity),
+                self.preset.tectonics.crust_flow_km2_myr,
+                dt / spread_steps as f64,
+            );
+            flow.cells += one.cells;
+            flow.moved_m += one.moved_m;
+        }
         if flow.cells > 0 {
             *world
                 .globals
@@ -1839,6 +1864,11 @@ impl SurfaceStage {
         put(world, field::EROSION, crate::alloc::copied(&erosion));
         put(world, field::DEPOSITION, crate::alloc::copied(&deposition));
         put(world, field::SEDIMENT, sediment);
+        let lip: Vec<f32> = (0..n)
+            .into_par_iter()
+            .map(|c| st.log.thickness_of(c, strata_log::LIP_FLOW) as f32)
+            .collect();
+        put(world, field::LIP, lip);
         put(world, field::CLASS, class_now);
         put(world, field::DRAINAGE, drainage);
         put(world, field::REGOLITH, crate::alloc::copied(&st.regolith_m));

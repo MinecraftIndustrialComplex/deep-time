@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! The meta part of the bake, on L1 (plan §5.3): `meta/plate_id` (u16), `meta/crust_age_myr`
-//! (u16, Myr; nodata 65535 on continental crust, whose formation age the plate model does not
-//! track), `meta/heat_flow_mw_m2` (u16, 0.1 mW/m²; the plate model's continental heat flow, nodata
-//! on oceanic crust: the game's geothermal fields, GEO-055) and `meta/province` (u16), for the
-//! viewer, "Why here?" and legends; `province` also drives TerraBlender's regions (plan §7.3,
-//! P1-10).
+//! The meta part of the bake, on L1 (plan §5.3): `meta/plate_id` (u16), `meta/crust_type` (u8,
+//! the plate model's crust codes `plates::state::OCEANIC` 0 and `CONTINENTAL` 1; nodata 255 where
+//! it has none), `meta/crust_age_myr` (u16, Myr; nodata 65535 on continental crust, whose
+//! formation age the plate model does not track), `meta/heat_flow_mw_m2` (u16, 0.1 mW/m²; the
+//! plate model's continental heat flow, nodata on oceanic crust: the game's geothermal fields,
+//! GEO-055) and `meta/province` (u16), for the viewer, "Why here?", the column inspectors and
+//! legends; `province` also drives TerraBlender's regions (plan §7.3, P1-10).
 //!
 //! **Provinces** (P1-10). Every L1 cell gets its USGS class from [`crate::provinces`] (shield,
 //! platform, orogen, basin, large igneous province, extended crust, oceanic crust in three age
@@ -37,6 +38,22 @@ pub const HEAT_FLOW_LAYER: &str = "meta/heat_flow_mw_m2"; // ledger: GEO-055
 pub const HEAT_FLOW_SCALE: f64 = 0.1;
 /// Its nodata: oceanic crust, and a cell the plate model has nothing for.
 pub const HEAT_FLOW_NODATA: u16 = u16::MAX;
+
+/// The layer holding the plate model's crust type (L1, u8).
+pub const CRUST_TYPE_LAYER: &str = "meta/crust_type";
+/// Its nodata: a cell the plate model has nothing for (or a code outside u8).
+pub const CRUST_TYPE_NODATA: u8 = u8::MAX;
+
+/// The stored code of a cell's crust type `t` (the `plates/crust_type` field, whose values are
+/// `plates::state`'s codes): nodata where the field has none.
+fn crust_type_raw(t: f32) -> u8 {
+    // NaN and anything that would round to the nodata code fall outside.
+    if (0.0..f32::from(CRUST_TYPE_NODATA) - 0.5).contains(&t) {
+        t.round() as u8
+    } else {
+        CRUST_TYPE_NODATA
+    }
+}
 
 /// The stored count of a cell's continental heat flow `q` (mW/m²): nodata where the plate model
 /// has none (oceanic crust, a gap).
@@ -186,6 +203,23 @@ pub fn bake(
         )?;
         written.push("meta/plate_id");
     }
+    // The crust type beside its age (the inspectors read both): the plate model's own codes, so a
+    // reader names them with `plates::state` (FORMAT.md, "meta layers").
+    if let Some(v) = sample("plates/crust_type") {
+        let raw: Vec<u8> = v.iter().map(|&t| crust_type_raw(t)).collect();
+        out.layer(
+            desc(
+                CRUST_TYPE_LAYER,
+                DType::U8,
+                &l1,
+                1.0,
+                "crust type (0 oceanic, 1 continental)",
+                Some(f64::from(CRUST_TYPE_NODATA)),
+            ),
+            &raw,
+        )?;
+        written.push(CRUST_TYPE_LAYER);
+    }
     if let Some(v) = sample("crust_age") {
         let raw: Vec<u16> = v
             .iter()
@@ -329,6 +363,18 @@ mod tests {
         let inside: Vec<f64> = g.row_weights().into_iter().filter(|&w| w == 1.0).collect();
         assert!(inside.len() >= h);
         inside[..h].to_vec()
+    }
+
+    #[test]
+    fn crust_type_codes_are_the_plate_models_and_gaps_are_nodata() {
+        use crate::plates::state::{CONTINENTAL, OCEANIC};
+        assert_eq!(crust_type_raw(f32::from(OCEANIC)), OCEANIC);
+        assert_eq!(crust_type_raw(f32::from(CONTINENTAL)), CONTINENTAL);
+        // A nearest sample of the f32 field is a whole code; a stray fraction rounds.
+        assert_eq!(crust_type_raw(0.9999), CONTINENTAL);
+        for gap in [f32::NAN, f32::INFINITY, -1.0, 255.0, 1.0e6] {
+            assert_eq!(crust_type_raw(gap), CRUST_TYPE_NODATA, "{gap}");
+        }
     }
 
     #[test]

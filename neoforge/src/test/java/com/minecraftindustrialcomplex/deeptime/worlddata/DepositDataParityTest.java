@@ -114,6 +114,9 @@ class DepositDataParityTest {
             assertEquals(rb.get("id").getAsInt(), jb.id());
             assertEquals(rb.get("shape").getAsString(), jb.shapeName());
             assertEquals(rb.get("role").getAsString(), jb.role());
+            JsonElement age = rb.get("age_ma");
+            assertEquals(age == null || age.isJsonNull() ? Float.NaN : age.getAsFloat(), jb.ageMa(),
+                    "age of body " + jb.id());
             assertEquals(rb.getAsJsonArray("zones").size(), jb.zones().size(), "zones of body " + jb.id());
             JsonArray aabb = rb.getAsJsonArray("aabb");
             assertTrue(Arrays.equals(jb.min(), ints(aabb.get(0).getAsJsonArray()))
