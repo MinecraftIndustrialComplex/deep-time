@@ -47,8 +47,9 @@
 //!   slab going under an overriding plate's oceanic or continental crust), `COLLISION` (continental
 //!   crust at the subducting side), `RIDGE`, `RIFT` and `OTHER` (transform, or converging with no
 //!   contact yet). The subducting length is the first two. It is taken right after the step's
-//!   fronts are found, with the same relative-motion test the fronts use
-//!   (`subduction::fronts_and_uplift`), because the sample flags are cleared by a resampling.
+//!   fronts are found (`subduction::fronts_and_uplift`), because the sample flags are cleared by
+//!   a resampling; the motion is judged across the boundary's normal, with Bird's 20 degrees for
+//!   a transform (PLT-310, PLT-311).
 //! - `StepRec::arc_oceanic` and `arc_continental` ([`ArcStat`]): the elevation, m above the plate
 //!   model's sea datum, of the samples that received arc magma this step (flag `ARC`, the code's
 //!   own arc cells: within `arc_width_km` of the arc distance from a front). An *oceanic arc* is
@@ -104,6 +105,7 @@ use serde::{Deserialize, Serialize};
 use super::Env;
 use super::events::{PLATE_BIRTH, PLATE_DEATH};
 use super::geometry::Geo;
+use super::shortening;
 use super::kinematics::{quat, tangent};
 use super::state::{ARC, CONTINENTAL, OCEANIC, PlateState, Sample};
 use crate::world::WorldState;
@@ -855,6 +857,10 @@ pub struct Neighbour {
     /// The neighbour's velocity relative to the sample's plate, along the direction from the sample
     /// to the neighbour, mm/yr: positive is moving apart, negative converging.
     pub along: f64,
+    /// The same velocity along the boundary's normal towards the neighbour's plate
+    /// ([`shortening::boundary_normal`]), mm/yr, with the same sign; zero where the boundary is a
+    /// transform ([`shortening::is_transform`]).
+    pub normal: f64,
     /// The neighbour's crust ([`OCEANIC`] or [`CONTINENTAL`]).
     pub kind: u8,
     pub side: Side,
@@ -862,19 +868,24 @@ pub struct Neighbour {
 
 /// What kind of boundary a visible sample is on (ledger: PLT-221), from its other-plate neighbours, and how much of
 /// the boundary it stands for in half sample spacings (2 or 1): `None` when it is on no boundary
-/// or on the subducting side of a front (the overriding side counts that front). The tests are
-/// those of `subduction::fronts_and_uplift`: a front is the fastest-converging neighbour of a
-/// sample on the overriding side of an active contact; a sample with any neighbour moving apart is
-/// divergent. A front counts one sample spacing (one plate's side of the boundary, as
-/// `PlateStep::front_km` does); the others count half a spacing from each of their two sides.
+/// or on the subducting side of a front (the overriding side counts that front). The motion is
+/// judged across the boundary, not along single lattice edges ([`Neighbour::normal`]): Bird's
+/// classes are by the relative velocity against the boundary's azimuth, and one lattice edge's
+/// direction is no azimuth (plates sliding past each other converge along half the edges of a
+/// zigzag boundary and part along the rest). A sample on the overriding side of an active contact
+/// whose boundary converges is a front, its class named by the crust of its fastest-converging
+/// neighbour there; a sample with a neighbour across a parting boundary is divergent; transforms
+/// and converging boundaries with no contact are the rest. A front counts one sample spacing (one
+/// plate's side of the boundary, as `PlateStep::front_km` does); the others count half a spacing
+/// from each of their two sides.
 pub fn classify_boundary(v_kind: u8, nbrs: &[Neighbour]) -> Option<(usize, u32)> {
     if nbrs.is_empty() {
         return None;
     }
-    let mut best = 0.0;
+    let mut best = f64::NEG_INFINITY;
     let mut front: Option<&Neighbour> = None;
     for n in nbrs {
-        if n.along < 0.0 && n.side == Side::Over && -n.along > best {
+        if n.normal < 0.0 && n.side == Side::Over && -n.along > best {
             best = -n.along;
             front = Some(n);
         }
@@ -889,13 +900,13 @@ pub fn classify_boundary(v_kind: u8, nbrs: &[Neighbour]) -> Option<(usize, u32)>
         };
         return Some((class, 2));
     }
-    if nbrs.iter().any(|n| n.along > 0.0) {
+    if nbrs.iter().any(|n| n.normal > 0.0) {
         let continental =
-            v_kind == CONTINENTAL || nbrs.iter().any(|n| n.along > 0.0 && n.kind == CONTINENTAL);
+            v_kind == CONTINENTAL || nbrs.iter().any(|n| n.normal > 0.0 && n.kind == CONTINENTAL);
         let class = if continental { mix::RIFT } else { mix::RIDGE };
         return Some((class, 1));
     }
-    if nbrs.iter().any(|n| n.along < 0.0 && n.side == Side::Under) {
+    if nbrs.iter().any(|n| n.normal < 0.0 && n.side == Side::Under) {
         return None;
     }
     Some((mix::OTHER, 1))
@@ -943,10 +954,13 @@ pub fn boundary_mix(
                 let rot = rots[sv.group as usize];
                 let mut buf = [Neighbour {
                     along: 0.0,
+                    normal: 0.0,
                     kind: OCEANIC,
                     side: Side::None,
                 }; 16];
                 let mut n = 0;
+                // The boundary's normal towards each plate met, found once per plate.
+                let mut normals: [(u32, DVec3); 4] = [(u32::MAX, DVec3::ZERO); 4];
                 for (u, _) in geo.edges(v as u32) {
                     let pu = plate_of[u as usize];
                     if pu == pv || n == buf.len() {
@@ -954,8 +968,26 @@ pub fn boundary_mix(
                     }
                     let out = tangent(x, rot * (pts[u as usize] - pts[v])).normalize_or_zero();
                     let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
+                    let slot = normals
+                        .iter()
+                        .position(|&(p, _)| p == pu || p == u32::MAX)
+                        .unwrap_or(normals.len() - 1);
+                    if normals[slot].0 != pu {
+                        let nrm = shortening::boundary_normal(
+                            geo, pos, &rots, samples, &plate_of, v, pu,
+                        );
+                        normals[slot] = (pu, nrm);
+                    }
+                    let nrm = normals[slot].1;
+                    // ledger: PLT-311 (Bird's transforms: within 20 degrees of the boundary)
+                    let across = if shortening::is_transform(rel, nrm) {
+                        0.0
+                    } else {
+                        rel.dot(nrm)
+                    };
                     buf[n] = Neighbour {
                         along: rel.dot(out),
+                        normal: across,
                         kind: samples[u as usize].kind,
                         side: if active.contains(&(pu, pv)) {
                             Side::Over
@@ -1506,7 +1538,12 @@ mod tests {
     }
 
     fn nb(along: f64, kind: u8, side: Side) -> Neighbour {
-        Neighbour { along, kind, side }
+        Neighbour {
+            along,
+            normal: along,
+            kind,
+            side,
+        }
     }
 
     #[test]
@@ -1560,6 +1597,18 @@ mod tests {
             classify_boundary(OCEANIC, &[nb(0.0, OCEANIC, Side::Over)]),
             Some((OTHER, 1))
         );
+        // A transform judged across its boundary: the zigzag's edges converge and part, the
+        // boundary's normal does neither; on an active contact it is still no front.
+        let slide = |along, side| Neighbour {
+            along,
+            normal: 0.0,
+            kind: OCEANIC,
+            side,
+        };
+        let zigzag = [slide(-20.0, Side::Over), slide(20.0, Side::Over)];
+        assert_eq!(classify_boundary(OCEANIC, &zigzag), Some((OTHER, 1)));
+        let under = [slide(-20.0, Side::Under), slide(20.0, Side::None)];
+        assert_eq!(classify_boundary(OCEANIC, &under), Some((OTHER, 1)));
     }
 
     fn arc_cell(kind: u8, z: f32, oceanic_m: f32, continental_m: f32, flags: u8) -> Sample {

@@ -59,7 +59,7 @@ use super::events::{self, SUBDUCTION_ONSET};
 use super::geometry::{Cover, Geo, Tree, cover, dijkstra_parts};
 use super::kinematics::{quat, tangent, to_group, to_world};
 use super::pools::isostatic_change_m;
-use super::shortening::voronoi_edge_rad;
+use super::shortening::boundary_normal;
 use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
@@ -698,14 +698,10 @@ struct Boundary {
     divergent: bool,
     trench: bool,
     front: Option<(u32, usize, DVec3, DVec3)>,
-    /// At a front: the sum of the directions of every lattice edge from the sample to the
-    /// front's other plate, each weighted by its Voronoi edge (the boundary's normal before
-    /// smoothing, [`front_normals`]).
-    across: DVec3,
 }
 
 /// Set to 1 to scale the arcs, the cordillera and the subduction uplift by the convergence normal
-/// to the front (the boundary's smoothed normal, [`front_normals`]) instead of the full relative
+/// to the front (the boundary's normal, [`boundary_normal`]) instead of the full relative
 /// speed (the land-shape task's experiment, 2026-10-20).
 pub const NORMAL_CONVERGENCE_ENV: &str = "DEEPTIME_ARC_NORMAL";
 
@@ -714,37 +710,6 @@ fn normal_convergence() -> bool {
     *M.get_or_init(|| std::env::var(NORMAL_CONVERGENCE_ENV).is_ok_and(|v| v == "1"))
 }
 
-/// Each front sample's boundary normal, unit, pointing from the sample to the front's other
-/// plate: the edge directions across the boundary summed over the sample and its neighbours on
-/// its own plate that front the same plate. One lattice edge is no normal: on a hexagonal
-/// lattice the edges that cross a straight boundary lie 30 degrees either side of its normal,
-/// so plates sliding past each other converge along half of them at half their relative speed.
-/// The sum over a sample's crossing edges points along the normal of a straight boundary; the
-/// neighbours' share smooths a ragged one over a lattice spacing.
-fn front_normals(boundary: &[Boundary], plate_of: &[u32], geo: &Geo) -> Vec<DVec3> {
-    (0..boundary.len())
-        .into_par_iter()
-        .map(|v| {
-            let Some((u, ..)) = boundary[v].front else {
-                return DVec3::ZERO;
-            };
-            let (pv, pu) = (plate_of[v], plate_of[u as usize]);
-            let mut n = boundary[v].across;
-            for (w, _) in geo.edges(v as u32) {
-                let w = w as usize;
-                if plate_of[w] != pv {
-                    continue;
-                }
-                if let Some((uw, ..)) = boundary[w].front
-                    && plate_of[uw as usize] == pu
-                {
-                    n += boundary[w].across;
-                }
-            }
-            n.normalize_or_zero()
-        })
-        .collect()
-}
 
 /// The first part of [`fronts_and_uplift`]: what it reads of the plates, their groups, the
 /// hidden flags, the positions, the motions and the contacts, none of which the belts' stacking
@@ -753,6 +718,9 @@ fn front_normals(boundary: &[Boundary], plate_of: &[u32], geo: &Geo) -> Vec<DVec
 pub struct FrontsBegun {
     plate_of: Vec<u32>,
     boundary: Vec<Boundary>,
+    /// Per front sample: the boundary's unit normal towards the front's other plate
+    /// ([`boundary_normal`]); zero elsewhere.
+    normals: Vec<DVec3>,
     /// The fronts as the distance field's sources (sample, 0, the front's number).
     sources: Vec<(u32, f64, u32)>,
     /// Per sample: its group, with [`HIDDEN_KEY`] added when it is hidden.
@@ -791,7 +759,6 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
                 divergent: false,
                 trench: false,
                 front: None,
-                across: DVec3::ZERO,
             };
             if sv.is_hidden() {
                 return b;
@@ -821,19 +788,17 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
                     b.front = Some((u, c, rel, out));
                 }
             }
-            // The boundary's normal: each crossing edge's direction weighted by the stretch of
-            // boundary it stands for, as the collision fronts weigh them. ledger: PLT-222
-            if let Some((u, ..)) = b.front {
-                let pu = plate_of[u as usize];
-                for (w, _) in geo.edges(v as u32) {
-                    if plate_of[w as usize] == pu {
-                        let len = voronoi_edge_rad(geo, v as u32, w);
-                        b.across +=
-                            len * tangent(x, rot * (pts[w as usize] - pts[v])).normalize_or_zero();
-                    }
-                }
-            }
             b
+        })
+        .collect();
+    // Each front's boundary normal (zero elsewhere). ledger: PLT-310
+    let normals: Vec<DVec3> = (0..n)
+        .into_par_iter()
+        .map(|v| match boundary[v].front {
+            Some((u, ..)) => {
+                boundary_normal(geo, pos, &rots, samples, &plate_of, v, plate_of[u as usize])
+            }
+            None => DVec3::ZERO,
         })
         .collect();
     let mut sources: Vec<(u32, f64, u32)> = Vec::new();
@@ -850,6 +815,7 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
     FrontsBegun {
         plate_of,
         boundary,
+        normals,
         sources,
         key,
     }
@@ -885,7 +851,10 @@ pub fn fronts_finish(
     let k = env.k;
     let norm = env.norm;
     let FrontsBegun {
-        plate_of, boundary, ..
+        plate_of,
+        boundary,
+        normals,
+        ..
     } = begun;
     let (dist, label, reached) = reach;
     let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
@@ -903,7 +872,6 @@ pub fn fronts_finish(
             s.flags |= TRENCH;
         }
     }
-    let normals = front_normals(&boundary, &plate_of, geo);
     let by_normal = normal_convergence();
     let v0 = k.convergence_ref_mm_yr; // ledger: PLT-037
     let (mut g_full_km_myr, mut g_normal_km_myr) = (0.0_f64, 0.0_f64);
@@ -912,7 +880,7 @@ pub fn fronts_finish(
             let su = state.samples[u as usize];
             let speed = rel.length();
             // The convergence normal to the boundary, mm/yr: the other plate's motion towards
-            // the sample's across the smoothed normal.
+            // the sample's along the boundary's normal. ledger: PLT-312
             let normal = normals[v];
             let across = (-rel.dot(normal)).max(0.0);
             if su.kind != CONTINENTAL {
