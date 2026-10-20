@@ -52,7 +52,14 @@ impl Essential {
     pub fn counts(&self, products: &[Product]) -> bool {
         products
             .iter()
-            .any(|p| p.material == self.material && (!self.primary_only || p.role == "primary"))
+            .any(|p| self.produced_as(&p.material, &p.role))
+    }
+
+    /// Whether a product of `material` in the role `role` counts toward this essential (the
+    /// guarantee step's producers are the types with such a product, so the deposit it forces
+    /// is one that counts).
+    pub fn produced_as(&self, material: &str, role: &str) -> bool {
+        material == self.material && (!self.primary_only || role == "primary")
     }
 }
 
