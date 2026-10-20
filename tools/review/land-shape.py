@@ -25,7 +25,7 @@ def kv(line):
     return {k: float(v) for k, v in re.findall(r"(\w+)=(-?[0-9.]+(?:e[-+]?[0-9]+)?|nan)", line)}
 
 
-def read(path):
+def read(path, length_myr=None):
     text = Path(path).read_text(errors="replace")
     out = {}
     m = re.search(r"koppen_land=A([0-9.]+)/B([0-9.]+)/C([0-9.]+)/D([0-9.]+)/E([0-9.]+)", text)
@@ -61,9 +61,19 @@ def read(path):
     g = last_line(text, "cb_globals")
     if g:
         d = kv(g)
-        for k in ["flow_steps", "flow_substeps", "flow_short_myr", "flow_edge", "channel_flow"]:
+        for k in ["flow_steps", "flow_substeps", "flow_short_myr", "flow_edge", "channel_flow", "arc_o",
+                  "arc_c", "cordillera", "foundered", "kept", "front_o", "front_c", "front_g_full",
+                  "front_g_normal"]:
             if k in d:
                 out[k] = d[k]
+        if d.get("front_g_full", 0) > 0:
+            out["g_normal_share"] = d.get("front_g_normal", 0) / d["front_g_full"]
+        # Rates over the run, km3 a year.
+        if length_myr:
+            years = length_myr * 1e6
+            for k in ["arc_o", "arc_c", "cordillera", "foundered"]:
+                if k in d:
+                    out[k + "_km3_yr"] = d[k] / years
     return out
 
 
@@ -89,6 +99,7 @@ def main():
     keys += [f"{n}_{s}" for n in ORIGINS for s in ("land", "hi", "coast", "hi_share")]
     keys += [f"band{e}" for e in (0, 20, 25, 30, 35, 40, 45, 55, 70)]
     keys += ["flow_steps", "flow_substeps", "flow_short_myr", "flow_edge"]
+    keys += ["arc_o_km3_yr", "arc_c_km3_yr", "cordillera_km3_yr", "foundered_km3_yr", "g_normal_share"]
     for start in starts:
         print(f"\n== {start}, {length} Myr, seeds {','.join(seeds)}")
         rows = {}
@@ -96,7 +107,7 @@ def main():
             runs = []
             for seed in seeds:
                 f = Path(folder) / f"{label}-{start}-{seed}-{length}.txt"
-                runs.append(read(f) if f.exists() else {})
+                runs.append(read(f, float(length)) if f.exists() else {})
             rows[name] = runs
         head = f"{'':24}" + "".join(f"{n:>34}" for n, _, _ in groups)
         print(head)
