@@ -1198,10 +1198,17 @@ fn lowstand_m(history: &[(f64, f64)], t_years: f64) -> f64 {
     (now - lowest).max(0.0)
 }
 
+/// The top solid blocks of a column that hold no in-stratum body: a dry column's soil, which the
+/// game's deposit feature leaves without ore (an unconsolidated block hosts only a loose body)
+/// and the deposit audit counts as soil (`--soil`, 4); a sea or river bed's top blocks are kept
+/// clear the same way (its loose sediment, and one rule for both).
+const SOIL_BLOCKS: i32 = 4; // ledger: ORE-271
+
 /// The host horizon of a column for a body wanted at block `want_y`: of the `horizons` (top,
 /// the next horizon's top or the floor, class; top-down) whose class `is_host`, each cut to its
-/// blocks under a block of ground below `surf` and above the floor's last 4 blocks (`min_y` the
-/// floor), the one whose middle is nearest `want_y`. (middle y, half thickness in blocks).
+/// blocks under the top [`SOIL_BLOCKS`] solid blocks of the column whose ground is `surf` and
+/// above the floor's last 4 blocks (`min_y` the floor), the one whose middle is nearest `want_y`.
+/// (middle y, half thickness in blocks).
 fn host_horizon(
     horizons: &[(i32, i32, u8)],
     is_host: impl Fn(u8) -> bool,
@@ -1209,7 +1216,7 @@ fn host_horizon(
     want_y: f64,
     min_y: i32,
 ) -> Option<(f64, f64)> {
-    let hi_max = surf.floor() as i32 - 1;
+    let hi_max = surf.floor() as i32 - SOIL_BLOCKS;
     let lo_min = min_y + 4; // ledger: ORE-271
     // (distance from the wanted depth, middle y, half thickness)
     let mut best: Option<(f64, f64, f64)> = None;
@@ -3919,16 +3926,19 @@ mod tests {
         // Top-down: soil 70..=66, limestone 65..=61, shale 60..=41, dolostone 40..=-60.
         let col = [(70, 65, 0u8), (65, 60, 1), (60, 40, 2), (40, -61, 1)];
         let host = |c: u8| c == 1;
-        // Wanted shallow: the limestone, its 5 blocks under a ground at 70.5.
+        // Wanted shallow: the limestone, its 5 blocks well under the soil of a ground at 70.5.
         let (mid, half) = host_horizon(&col, host, 70.5, 64.0, -64).unwrap();
         assert_eq!((mid, half), (63.5, 2.5));
         // Wanted deep: the dolostone, cut above the floor's last 4 blocks (-60).
         let (mid, half) = host_horizon(&col, host, 70.5, 0.0, -64).unwrap();
         assert_eq!((mid, half), (-9.5, 50.5));
-        // Ground cut into the limestone: only its blocks under a block of ground count (61
-        // and 62, the span 61 to 63).
-        let (mid, half) = host_horizon(&col, host, 63.2, 64.0, -64).unwrap();
+        // Ground at block 66: its soil is blocks 63 to 66, so only the limestone's 61 and 62
+        // count (the span 61 to 63).
+        let (mid, half) = host_horizon(&col, host, 66.2, 64.0, -64).unwrap();
         assert_eq!((mid, half), (62.0, 1.0));
+        // Ground at block 64: the limestone lies all in the soil, so the dolostone is the host.
+        let (mid, _) = host_horizon(&col, host, 64.5, 64.0, -64).unwrap();
+        assert_eq!(mid, -9.5);
         // No host class: none.
         assert!(host_horizon(&col, |c| c == 9, 70.5, 64.0, -64).is_none());
     }
