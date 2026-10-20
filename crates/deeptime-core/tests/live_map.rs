@@ -144,23 +144,25 @@ fn the_live_map_changes_nothing() {
     let kf_times: Vec<f64> = a
         .keyframes
         .iter()
-        .map(|(info, _)| serde_json::from_str::<Value>(info).unwrap()["t"].as_f64().unwrap())
+        .map(|(info, _)| {
+            serde_json::from_str::<Value>(info).unwrap()["t"]
+                .as_f64()
+                .unwrap()
+        })
         .collect();
     assert!(kf_times.len() >= 3, "keyframes {kf_times:?}");
     assert!(b.live.len() >= 10, "live frames seen: {:?}", b.live);
     assert!(b.live.iter().all(|l| l.2 == "satellite"));
-    let between = b
-        .live
-        .iter()
-        .filter(|l| !kf_times.contains(&l.1))
-        .count();
+    let between = b.live.iter().filter(|l| !kf_times.contains(&l.1)).count();
     assert!(
         between >= 10,
         "live frames at times no keyframe has: {between} of {:?} (keyframes {kf_times:?})",
         b.live
     );
     assert!(
-        b.live.windows(2).all(|w| w[0].0 < w[1].0 && w[0].1 < w[1].1),
+        b.live
+            .windows(2)
+            .all(|w| w[0].0 < w[1].0 && w[0].1 < w[1].1),
         "newer frames, later times"
     );
     assert_eq!(a.files, b.files, "no live frame written");
