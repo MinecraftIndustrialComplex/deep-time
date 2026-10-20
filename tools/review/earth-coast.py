@@ -53,6 +53,14 @@ def main():
         dist = 2 * np.arcsin(np.minimum(d / 2, 1)) * R
         print(f"N={n}: land {land.mean():.4f}, above 2 km {np.mean(e[land] > 2000):.4f} of land, "
               f"coast p50 {np.median(dist):.0f} km, p90 {np.percentile(dist, 90):.0f} km, mean {dist.mean():.0f} km")
+        # The continental crust's stand-in: the highest 41 % of the planet (Cogley 1984's
+        # continental share, HYP-012), and the median distance from it to the deeper floor.
+        z41 = np.quantile(e, 0.59)
+        up = e > z41
+        d, _ = cKDTree(xyz[~up]).query(xyz[up])
+        dist = 2 * np.arcsin(np.minimum(d / 2, 1)) * R
+        print(f"N={n}: the highest 41 % stands above {z41:.0f} m; its median distance to the deeper floor "
+              f"{np.median(dist):.0f} km")
 
 
 main()

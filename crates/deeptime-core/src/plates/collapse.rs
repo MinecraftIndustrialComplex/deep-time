@@ -655,6 +655,15 @@ pub(in crate::plates) mod tests {
         }
     }
 
+    /// What a step moved, without its measurements of the crust it held or could not place.
+    fn moves(c: Collapse) -> Collapse {
+        Collapse {
+            held_km2_m: 0.0,
+            unplaced_km2_m: 0.0,
+            ..c
+        }
+    }
+
     /// One collapse step on fixed positions.
     fn step_once(fx: &Fx, st: &mut PlateState, n: u64) -> Collapse {
         let env = fx.env(n);
@@ -678,7 +687,9 @@ pub(in crate::plates) mod tests {
             }
         }
         let before = st.samples.clone();
-        assert_eq!(step_once(&fx, &mut st, 1), Collapse::default());
+        let c = step_once(&fx, &mut st, 1);
+        assert_eq!(moves(c), Collapse::default());
+        assert!(c.held_km2_m > 0.0, "the held crust is counted: {c:?}");
         assert_eq!(st.samples, before);
         // The same belt stamped last step collapses now.
         assert!(step_once(&fx, &mut st.clone(), 2).sources > 0);
@@ -687,7 +698,7 @@ pub(in crate::plates) mod tests {
         quiet.k.collapse_quiet_myr = 10.0;
         for step in 2..=6 {
             assert_eq!(
-                step_once(&quiet, &mut st, step),
+                moves(step_once(&quiet, &mut st, step)),
                 Collapse::default(),
                 "{step}"
             );
@@ -723,7 +734,9 @@ pub(in crate::plates) mod tests {
         let middle = |p: DVec3| p.x < -0.02 && p.y > 0.95;
         let mut st = planet(&fx.geo, middle, 26_000.0);
         let before = st.samples.clone();
-        assert_eq!(step_once(&fx, &mut st, 1), Collapse::default());
+        let c = step_once(&fx, &mut st, 1);
+        assert_eq!(moves(c), Collapse::default());
+        assert!(c.unplaced_km2_m > 0.0, "the crust with no room is counted: {c:?}");
         assert_eq!(st.samples, before);
         // Off.
         fx.k.collapse_reach_km = 1500.0;

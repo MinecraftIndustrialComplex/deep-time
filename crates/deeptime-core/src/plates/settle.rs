@@ -11,15 +11,25 @@
 //! turns continental at its height on the ocean's line, below the continent's Airy line, and
 //! keeps the difference as it thickens. Normal continental crust (35 to 45 km) then lies under
 //! the sea: at the end of a 1000 Myr supercontinent run (seed 2) the 35–40 km band's median is
-//! −380 m against an Airy height of +855 m, and only 45 % of the continental crust is dry.
+//! −349 m against an Airy height of +868 m, and only 45 % of the continental crust is dry.
 //!
 //! # What happens on Earth
 //! A column out of isostatic balance does not stay so: the mantle flows back within thousands
-//! of years (the relaxation times of glacial rebound, 4 to 7 kyr: Mitrovica, Forte & Simons
-//! 2000; Roy & Peltier 2015), except for what the lithosphere's flexural strength holds up or
-//! down. What a cooled lithosphere adds to an ocean floor's depth goes on the lithosphere's
-//! thermal time (McKenzie 1978's τ = 62.8 Myr): an arc built on old ocean floor stands as low
-//! as its cold lithosphere makes it until that lithosphere warms or is replaced.
+//! of years (Fennoscandia's rebound, relaxation times "close to 3-5 kyr": Wieczerkowski,
+//! Mitrovica & Wolf 1999, abstract, ISO-064), except for what the lithosphere's flexural
+//! strength holds up or down (the surface's flexure, below). What is thermal in a column's height
+//! goes on the lithosphere's thermal time (McKenzie 1978's τ = 62.8 Myr): the model keeps that
+//! part in its own rules (the ocean floor's age-depth law, the margins' transition, PLT-261 to
+//! PLT-264), whose end states are the isostatic ones this rule settles to. The gaps the plate
+//! rules leave are mechanical (a height moved by a change and not to an equilibrium; an arc's
+//! crust on old ocean floor, whose cold lithosphere is about the continental reference column:
+//! the water-loaded Airy height of 7 km of crust, −5.06 km, is the depth of 100 Myr old floor),
+//! so they settle on the mantle's time, within the step.
+//!
+//! The settling time was 62.8 Myr (McKenzie's τ) at first: on `earthlike_quick_16k`
+//! (supercontinent seed 2, 1000 Myr) it left the 35–45 km crust 0.6 to 0.7 km under its Airy
+//! height and the continental crust 0.56 to 0.61 dry; 0.5 Myr and 10 Myr gave 0.68 and 0.71
+//! (Earth 0.71, HYP-012) with every band at its Airy height (build log 2026-10-20).
 //!
 //! # The rule
 //! Each plate step every visible continental sample (none at a trench) moves the share
@@ -30,11 +40,10 @@
 //! with z_A its column's Airy height (`collapse::iso_height`), s the sea level, ρ_w the sea water
 //! (ISO-044: a column below the sea carries the water above it) and F the surface's flexure
 //! (`surface/flexure_m`, the flexure solve of ISO-040: how far the plate holds the ground above
-//! or below local isostasy; 0 without a surface stage), τ = `isostasy_relax_myr`. The model cannot tell which
-//! part of a gap is mechanical (gone in kyr) and which is thermal, so it settles on the slower,
-//! thermal time (ISO-078). The change is the step's uplift, which the surface stage takes as it
-//! takes any uplift; the step's rise guard (PLT-288) runs after it.
-// ledger: ISO-078 (the rule and τ), ISO-044 (ρ_w), ISO-043 (ρ_m).
+//! or below local isostasy; 0 without a surface stage), τ = `isostasy_relax_myr` (4 kyr: the
+//! whole way at any plate step, ISO-078). The change is the step's uplift, which the surface
+//! stage takes as it takes any uplift; the step's rise guard (PLT-288) runs after it.
+// ledger: ISO-078 (the rule and τ), ISO-064 (the 3-5 kyr), ISO-044 (ρ_w), ISO-043 (ρ_m).
 
 use rayon::prelude::*;
 
