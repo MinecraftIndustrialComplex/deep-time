@@ -238,10 +238,11 @@ pub struct AmplifyParams {
     pub thermal_slope: f64,
     pub thermal_rate: f64,
     pub thermal_noise: f64,
-    /// Critical slope of the sea floor (every cell below sea level) at drama 1, in place of
-    /// `thermal_slope` (sea-floor spikes task, 2026-10-20): the L3 counterpart of the young
-    /// stage's `sea_floor_slope_deg`, which relaxes the plate model's sea-floor steps on L2. The
-    /// land's talus angle let what the interpolation steepened stand under the sea.
+    /// Critical slope of the sea floor (every cell below sea level, except under a glacier's
+    /// ice: a fjord keeps the land's) at drama 1, in place of `thermal_slope` (sea-floor spikes
+    /// task, 2026-10-20): the L3 counterpart of the young stage's `sea_floor_slope_deg`, which
+    /// relaxes the plate model's sea-floor steps on L2. The land's talus angle let what the
+    /// interpolation steepened stand under the sea.
     pub submarine_slope: f64, // ledger: AMP-074
     /// Sediment, m per cell, a flow of 100 km² at slope 0.1 carries; the share of a load's excess
     /// over the capacity a cell drops per iteration.
