@@ -13,10 +13,10 @@
 //! - 0/0 cases the original masks with array arithmetic are explicit branches, and arguments of
 //!   `acos`, `asin` and `sqrt` that rounding pushes past their domain are clamped;
 //! - the forward places P′ by coordinates when it lies on a side of the planar triangle
-//!   ([`NEAR_SIDE`]). The original's law-of-cosines angle there is rounding noise, and at the cone
-//!   points (up = 0) its fallback angle ξ′ − π/6 is right only for sub-triangle 2, so exact inputs on
-//!   the Petroff diagonals and at the cone points landed off by up to 10° (found by the developer
-//!   map, 2026-10-20; the original `new_projection.py` has the same fallback).
+//!   ([`NEAR_SIDE`]). The original's law-of-cosines angle there is rounding noise, and at the
+//!   cone points (up = 0) its fallback angle ξ′ − π/6 is right only for sub-triangle 2, so exact
+//!   inputs on the Petroff diagonals and at the cone points landed up to 10.5° off (found by the
+//!   developer map, 2026-10-20; the original `new_projection.py` has the same fallback).
 //!
 //! **Frame.** The square is [−1, 1]² with the north pole at its centre and the equator the diamond
 //! |x| + |y| = 1 (the southern hemisphere in the four corners); longitude λ in [0, 2π) runs counter-
@@ -60,8 +60,8 @@ impl Default for Petroff {
 /// The forward's switch to the coordinate form of its last step: when P′ is within this many local
 /// units (about 0.002 blocks at 6656 blocks a hemisphere) of the side V′U′ (`up`) or U′C′ (`yp`).
 /// A numerical switch, not a physical value (ledger: SCL-083): above it the law of cosines is good
-/// to about 1e-7 blocks (measured against a 50-digit reference, 2026-10-20), and every random input
-/// keeps its bits.
+/// to about 1.5e-7 blocks (measured against a 50-digit reference, 2026-10-20), and every random
+/// input keeps its bits.
 const NEAR_SIDE: f64 = 1e-6;
 
 /// The sign of `x`: −1, 0 or 1 (numpy's `sign`).
@@ -439,8 +439,8 @@ mod tests {
     fn the_diagonals_and_the_corners_round_trip() {
         // Where P′ lies on a side of the planar triangle (ledger: SCL-083): each quadrant's central
         // meridian (the square's diagonals, through V at 67.5° and the equator's midpoint M) at
-        // every latitude, and the equator's corners E (the Guyou world's cone points), exactly and a
-        // hair off. The original's law-of-cosines angle is rounding noise there (up to 10° off).
+        // every latitude, and the equator's corners E (the Guyou world's cone points), exactly and
+        // a hair off. The original's law-of-cosines angle is rounding noise there (up to 10.5°).
         let p = Petroff::new();
         let mut worst: f64 = 0.0;
         let mut check = |lam: f64, phi: f64| {
@@ -449,7 +449,10 @@ mod tests {
             let d = angle(unit(lam, phi), unit(l2, p2));
             worst = worst.max(d);
             // The inverse's own error on the diagonals is up to ~1e-8 rad; the forward's is 1e-11.
-            assert!(d < 1e-7, "({lam}, {phi}) -> ({x}, {y}) -> ({l2}, {p2}): {d}");
+            assert!(
+                d < 1e-7,
+                "({lam}, {phi}) -> ({x}, {y}) -> ({l2}, {p2}): {d}"
+            );
             (x, y)
         };
         for q in 0..4 {
