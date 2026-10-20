@@ -17,6 +17,9 @@ import java.util.Optional;
  * (singleplayer). The rule, and why Distant Horizons switches it off when Chunky is installed, is
  * {@link DhGenerationGate}.
  *
+ * <p>Only Distant Horizons 3.3.2 and older have the start-up rule; on 3.3.3 and newer this lifts
+ * nothing ({@link DhGenerationGate#chunkyRuleAtStartup}).
+ *
  * <p>Registered only when Distant Horizons is installed, bound by name ({@link DhApiBinding}), and
  * checked once a second on the client tick like {@link DhCurvatureClient}: Distant Horizons'
  * API starts after the game does, and the planet's info arrives after the player joins. A change
@@ -31,6 +34,8 @@ public final class DhGenerationClient {
     private static final int POLL_TICKS = 20;
     private static final DhGenerationGate.Controller CONTROLLER = new DhGenerationGate.Controller();
     private static boolean chunky;
+    /** Chunky is installed and this Distant Horizons switches generation off for it at start-up; null until the API is bound. */
+    private static Boolean startupRule;
     private static int ticks;
     private static boolean broken;
     private static DhGenerationGate.Outcome logged = DhGenerationGate.Outcome.UNCHANGED;
@@ -79,7 +84,14 @@ public final class DhGenerationClient {
             DhGenerationGate.Slot slot = api.get().generationEnabled();
             if (slot == null)
                 return; // Distant Horizons has not started its API yet
-            DhGenerationGate.Outcome outcome = CONTROLLER.reconcile(slot, onPlanet, chunky);
+            if (startupRule == null) {
+                String version = api.get().version();
+                startupRule = chunky && DhGenerationGate.chunkyRuleAtStartup(version);
+                if (chunky && !startupRule)
+                    DeepTime.LOGGER.info("[deeptime] Distant Horizons {} pauses its world generator only while Chunky generates; "
+                            + "Deep Time leaves that alone", version);
+            }
+            DhGenerationGate.Outcome outcome = CONTROLLER.reconcile(slot, onPlanet, startupRule);
             if (outcome == DhGenerationGate.Outcome.UNCHANGED)
                 return;
             boolean repeat = outcome == logged && outcome != DhGenerationGate.Outcome.LIFTED && outcome != DhGenerationGate.Outcome.RESTORED;
@@ -91,8 +103,9 @@ public final class DhGenerationClient {
                         + "Distant Horizons switches it off when Chunky is installed, and Deep Time's far terrain is that generator "
                         + "(API layer only; your Distant Horizons config still decides)");
                 case RESTORED -> DeepTime.LOGGER.info("[deeptime] Distant Horizons' world generator setting handed back (not on a Deep Time planet)");
-                case FOREIGN_OVERRIDE -> DeepTime.LOGGER.warn("[deeptime] Distant Horizons' world generator is switched off by another "
-                        + "mod's override: no far terrain reaches this client on a Deep Time planet");
+                case FOREIGN_OVERRIDE -> DeepTime.LOGGER.warn("[deeptime] Distant Horizons' world generator is switched off by an override "
+                        + "Deep Time leaves alone (another mod's, or Distant Horizons' own while Chunky generates): "
+                        + "no far terrain reaches this client on a Deep Time planet while it lasts");
                 case PLAYER_OFF -> DeepTime.LOGGER.warn("[deeptime] Distant Horizons' world generator is off in your Distant Horizons "
                         + "config (generatorPlan DISABLED): no far terrain reaches this client on a Deep Time planet");
                 case NOT_OVERRIDABLE -> DeepTime.LOGGER.warn("[deeptime] Distant Horizons does not let mods change its world generator "

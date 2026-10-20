@@ -139,4 +139,18 @@ class DhGenerationGateTest {
         assertEquals(Boolean.FALSE, slot.layer);
         assertFalse(gate.lifted());
     }
+
+    /** 3.3.3 replaced the start-up rule with one that holds only while Chunky generates (its changelog, read 2026-10-20). */
+    @Test
+    void onlyVersionsBefore333HaveTheStartupRule() {
+        assertTrue(DhGenerationGate.chunkyRuleAtStartup("3.3.1 (API 7.1.0)"));
+        assertTrue(DhGenerationGate.chunkyRuleAtStartup("3.3.2"));
+        assertTrue(DhGenerationGate.chunkyRuleAtStartup("3.2.0-b (API 6.0.0)"));
+        assertTrue(DhGenerationGate.chunkyRuleAtStartup("2.3.6"));
+        assertFalse(DhGenerationGate.chunkyRuleAtStartup("3.3.3 (API 7.1.0)"));
+        assertFalse(DhGenerationGate.chunkyRuleAtStartup("3.4"));
+        assertFalse(DhGenerationGate.chunkyRuleAtStartup("4.0.0"));
+        assertTrue(DhGenerationGate.chunkyRuleAtStartup("unknown (java.lang.ClassNotFoundException)"));
+        assertTrue(DhGenerationGate.chunkyRuleAtStartup(null));
+    }
 }

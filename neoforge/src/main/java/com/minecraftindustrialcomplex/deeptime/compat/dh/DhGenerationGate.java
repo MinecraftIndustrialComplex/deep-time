@@ -30,13 +30,42 @@ package com.minecraftindustrialcomplex.deeptime.compat.dh;
  * player's config file is never written: a player who sets the plan to DISABLED keeps it off. Off
  * the planet (title screen, the Nether, another server) it puts Distant Horizons' value back. If
  * something sets "off" again after it lifted it, that is left alone for the rest of the session.
+ *
+ * <p><b>Which versions.</b> Distant Horizons 3.3.3 (2026-09-29, "Only disable DH world gen when
+ * Chunky world gen is active") dropped the start-up rule: its {@code AbstractChunkyAccessor} sets
+ * the same override only while Chunky generates and clears it two seconds after. That one is
+ * right and is left alone ({@link #chunkyRuleAtStartup}).
  */
 public final class DhGenerationGate {
 
     /** The class Distant Horizons looks for to decide Chunky is installed. */
     public static final String CHUNKY_API_CLASS = "org.popcraft.chunky.api.ChunkyAPI";
 
+    private static final java.util.regex.Pattern VERSION = java.util.regex.Pattern.compile("^\\s*(\\d+)\\.(\\d+)(?:\\.(\\d+))?");
+
     private DhGenerationGate() {}
+
+    /**
+     * Whether this Distant Horizons version switches its generator off at start-up whenever Chunky
+     * is installed: 3.3.2 and older. 3.3.3 and newer switch it off only while Chunky generates.
+     * A version that cannot be read counts as the old rule (without the lift the client gets no
+     * far terrain at all; with it, the worst is generation running beside a Chunky run).
+     *
+     * @param dhVersion {@code DhApiBinding.version()}, e.g. {@code 3.3.1 (API 7.1.0)}
+     */
+    public static boolean chunkyRuleAtStartup(String dhVersion) {
+        java.util.regex.Matcher m = VERSION.matcher(dhVersion == null ? "" : dhVersion);
+        if (!m.find())
+            return true;
+        int major = Integer.parseInt(m.group(1));
+        int minor = Integer.parseInt(m.group(2));
+        int patch = m.group(3) == null ? 0 : Integer.parseInt(m.group(3));
+        if (major != 3)
+            return major < 3;
+        if (minor != 3)
+            return minor < 3;
+        return patch < 3;
+    }
 
     /**
      * Distant Horizons' "distant generation enabled" setting ({@code IDhApiWorldGenerationConfig.
@@ -86,6 +115,7 @@ public final class DhGenerationGate {
          * @param slot     Distant Horizons' setting
          * @param onPlanet the player is in a Deep Time planet level
          * @param chunky   Chunky is installed (Distant Horizons' own test, {@link #CHUNKY_API_CLASS})
+         *                 and this Distant Horizons has the start-up rule ({@link #chunkyRuleAtStartup})
          */
         public Outcome reconcile(Slot slot, boolean onPlanet, boolean chunky) {
             Boolean api = slot.apiValue();
