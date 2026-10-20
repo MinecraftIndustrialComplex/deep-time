@@ -502,6 +502,9 @@ enum Command {
         /// count, the second horizon's top and the water kind.
         #[arg(long)]
         columns: bool,
+        /// Also the ground distance one block spans there, metres (the projection's local scale).
+        #[arg(long)]
+        scale: bool,
         /// The .npy file to write (and <out>.json).
         #[arg(long)]
         out: PathBuf,
@@ -1209,6 +1212,7 @@ fn main() -> ExitCode {
             step,
             layers,
             columns,
+            scale,
             out,
         }) => {
             let b = heightmap::Box2 {
@@ -1217,7 +1221,7 @@ fn main() -> ExitCode {
                 x1: area[2],
                 z1: area[3],
             };
-            match heightmap::run(&world_data, &b, step, &layers, columns, &out) {
+            match heightmap::run(&world_data, &b, step, &layers, columns, scale, &out) {
                 Ok((rows, cols)) => {
                     println!("deeptime heightmap: {rows} x {cols} -> {}", out.display());
                     ExitCode::SUCCESS
