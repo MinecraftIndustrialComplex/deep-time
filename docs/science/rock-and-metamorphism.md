@@ -1,13 +1,13 @@
 # Rock classes, metamorphism and intrusions
 
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02, package WP-7; the ocean crust's
-classes added 2026-10-19)`. Of the 81 active rows, 11 are `verified`, 1 `abstract-only`, 8 `cited-unverified`, 1
-`from-memory`, 1 `calibrated`, 56 `game-choice` and 3 `uncited` (the ledger's count).
+classes added 2026-10-19)`. Of the 82 active rows, 11 are `verified`, 1 `abstract-only`, 8 `cited-unverified`, 1
+`from-memory`, 1 `calibrated`, 57 `game-choice` and 3 `uncited` (the ledger's count).
 Where a book the code cites (Winter 2010, Yardley 1989, Telford et al. 1990) could not be read, the row says so and
 says what was read instead.
 
-Ledger ids on this page: `RCK-001` to `RCK-092` (see [claims.md](claims.md)); the layer order, the traps and the
-checks are on [strata.md](strata.md).
+Ledger ids on this page: `RCK-001` to `RCK-091`, `RCK-095` and `RCK-096` (see [claims.md](claims.md)); the layer
+order, the traps and the checks are on [strata.md](strata.md).
 
 ## What you see in the world
 
@@ -21,8 +21,9 @@ as the nearest look-alike (calcite for limestone, granite for granite, tuff for 
 Where plates collided, the buried sediments have been heated and turned into slate, schist, gneiss, marble and
 quartzite; on a 500 Myr planet two thirds of all columns hold some of this, and 98 % of the columns on land. Under
 volcanic arcs, bodies of granodiorite and granite stand as rounded masses 8 to 80 km long (27 to 270 blocks), 2 to 8
-km thick, which erosion exposes as granite country; round them lies a rim of hornfels, or of skarn where the roof was
-limestone.
+km thick, which erosion exposes as granite country; round them, and round the smaller stocks that rise from them,
+lies a rim of hornfels in shale, sandstone or volcanic rock, or of skarn in limestone and dolomite, a few hundred metres
+to about 2 km wide (tens of blocks deep, a few blocks wide at 16k scale). Rock laid down after the intrusion is not baked.
 
 Under the sea floor the rock is ocean crust, as drilling and ophiolites show it: chalk or mud over shale near the
 top, then basalt lavas, then the sheeted dikes (drawn as greenstone), then gabbro, then peridotite. Granite and
@@ -46,16 +47,28 @@ The structure stage runs each step after the surface stage has laid down or stri
 4. **Basement.** The plate model's rock pools under the loose cover (sediment, sedimentary, volcanic, metamorphic, plutonic)
    have no burial history, so each is stepped along its path by the present geotherm and split at the depths of the
    isotherms. A column never gets cooler downward: a unit under metamorphosed rock takes at least that grade (RCK-050, RCK-051).
-   Each crust kind has its own classes (RCK-092). On ocean crust the mafic volcanic pool is seismic layer 2: its lower
-   1.2 km on fresh crust are the sheeted dikes, greenstone, and the rest the lavas, basalt (RCK-091); the felsic
+   Each crust kind has its own classes (RCK-096). On ocean crust the mafic volcanic pool is seismic layer 2: its lower
+   1.2 km on fresh crust are the sheeted dikes, greenstone, and the rest the lavas, basalt (RCK-095); the felsic
    volcanic pool is andesite, the felsic plutonic pool diorite under an active arc and granodiorite elsewhere, the
    metamorphic pool schist. On a continent the pools keep their classes (granite, rhyolite, gneiss and so on).
 5. **Plutons.** Under arcs, and weakly in collision zones, a Poisson number of plutons is emplaced each step. Each is an
    ellipsoid with a roof 2 to 6 km below the surface, a lognormal length (median 25 km), a width of 0.5 to 1 times that, and a
    thickness from the Cruden-McCaffrey power law. They ride their plate, are unroofed by erosion, and are lost if the oceanic
    crust carrying them is subducted (RCK-056 to RCK-067).
-6. **Aureoles.** The outer 15 % of a pluton's radius is its contact aureole: skarn if its host was a carbonate, hornfels if it
-   was other soft rock, none in crystalline host (RCK-053, RCK-054).
+6. **Aureoles.** Every pluton and every stock bakes a shell of its host rock: the contact aureole. Its width is 0.3 of the
+   intrusion's smallest dimension (a pluton's thickness; a stock's height or width, whichever is less), 1.5 times that where the
+   host at the roof is a carbonate (RCK-053, RCK-091). The shell is read band by band down the column at the intrusion's
+   centre: skarn where a band is a carbonate, hornfels where it is other soft rock, nothing in crystalline rock, and only rock
+   older than the intrusion is baked, by the test the structural events use (a unit whose youngest part is older), so cover
+   laid on an unroofed pluton stays as it was (RCK-054). The test reads the column as the strata pass paints it (the column
+   rule over the horizons the structure stage keeps for the bake): the rule joins equal rocks in a row into one horizon
+   dated by its top, so shale laid over older shale across an unconformity is young cover as a whole, as it is to the
+   intrusion. Another stock that reaches the inner half of the intrusion's plan is part of that column: a stock emplaced
+   inside or beside an older one bakes none of the older granite, and a younger stock through it is not painted over
+   (the aureole then goes unbaked at those depths all round, since its bands are depth layers). Each aureole is a body of
+   its own in the world data (role `aureole`), written before the intrusions so the intrusion paints over it; a stock's
+   aureole is hollow, cut into slabs that stop at the stock's wall, so the stock itself stays intact. A typical 3 km thick
+   pluton has a 900 m aureole, about 26 blocks of height at 16k scale and 3 blocks of width.
 7. **Blocks.** Each class resolves to a block through the rock tags of the pack, else a vanilla stand-in (RCK-074 to RCK-084).
 
 ## Equations and constants
@@ -89,8 +102,9 @@ T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of t
 | RCK-044 | gneiss | 650 | degC | Baxter 2002: sillimanite zone 650-700 | `cited-unverified` |
 | RCK-045 | gypsum to anhydrite | 50 | degC | Orti 2012: about 50 degC at 450-500 m; Hardie 1967: 58 degC pure water | `verified` |
 | RCK-049 | diagenesis ends | 200 | degC | Nelson | `verified` |
-| RCK-053 | contact aureole | outer 15 % of radius | - | Annen 2017: a few % to 30 % | `game-choice` |
-| RCK-054 | skarn on carbonate, hornfels elsewhere | - | - | Meinert 1992; Nelson | `verified` |
+| RCK-053 | contact aureole width | 0.3 x smallest dimension | - | Annen 2017: linear in thickness; 0.02 to 0.5 in its examples | `game-choice` |
+| RCK-054 | skarn on carbonate, hornfels elsewhere, band by band | - | - | Meinert 1992; Nelson | `verified` |
+| RCK-091 | aureole in a carbonate host | x 1.5 | - | Alta (Cook and Bowman 1994 via Annen 2017); Brenner 2021 from-memory | `game-choice` |
 | RCK-056 | pluton rate | 1e-5 | per km2 per Myr | calibrated to the Coastal Batholith (secondary) | `calibrated` |
 | RCK-057 | volume exponent | V proportional to D^2.6 | - | Cruden 2008 (a = 0.6) | `verified` |
 | RCK-058 | collision granite rate | 0.3 of arc | - | design; Vigneresse and Burg 2003 | `game-choice` |
@@ -118,6 +132,10 @@ T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of t
 | Crust thickness | mean 41.1 km; orogens 46.3 km; never over about 75 km | Christensen and Mooney 1995 abstract; Hacker part 14 | 35 km reference; burial factor up to 2 (70 km) | - |
 | Columns holding some metamorphic rock | not counted | - | 67.4 % of 20,000 random columns; 97.8 % of land columns | run below |
 | Grade inversions, thin metamorphic slivers, plutonic sheets | zero by construction of the check | - | 0.07 % grade inversions, 0.25 % thin metamorphic slivers, 0.05 % plutonic sheets (20,000 columns); none in the stored stacks | run below |
+| Contact aureole width over the intrusion's smallest dimension | 0.02 to 0.5 in the examples modelled and cited (wider round wet, hot or carbonate-hosted intrusions) | Annen 2017 (full text) | 0.3 (RCK-053), 0.45 in a carbonate host (RCK-091) | arithmetic |
+| Median aureole width | - | - | plutons 1,183 to 1,254 m, stocks 688 to 693 m | REV-2 runs |
+| Aureole rock | hornfels in clastic and volcanic hosts, skarn in carbonate | Meinert 1992 | 99.3 to 99.7 % of the zones hornfels, 0.3 to 0.7 % skarn | REV-2 runs |
+| Stocks | - | - | 16 to 29 rooted on a pluton's roof, 8,233 to 9,122 under younger cover, none from the world's floor (all of them on master) | REV-2 runs |
 
 Run below: `earthlike_quick_16k`, start `scattered_continents`, 500 Myr, default seed, 2 threads, `deeptime run` and
 `deeptime strata-check --columns 20000`, test machine, 2026-10-02; before is master 9e84fcf and after is this branch (commit 5cb328c3). The pluton thickness fix lowered the surviving pluton bodies by 12 of 230 (5 %) and raised the eroded ones from 616 to 628; nothing else in the run changed (emplaced 1,034, subducted 104, metamorphosed volume 4.058e7 km3, deformed share 0.4805), and `strata-check` is identical (see [strata.md](strata.md)).
@@ -194,6 +212,45 @@ body.
 No new class was needed: greenstone, andesite, diorite, granodiorite and schist all exist. Measured results are in
 the plates page's section and on [strata.md](strata.md).
 
+### REV-2: aureoles and stocks (2026-10-20)
+
+The external review of run 1a156f22b66 (supercontinent, 1000 Myr, seed 1) found stocks standing from the world's floor,
+each pluton's aureole drawn as an inner shell of the pluton in the one rock at its roof, and no age on any body. Measured
+on `earthlike_quick_16k`, 1000 Myr, `deeptime run --threads 4`, both starts, seeds 1 and 2, test machine, 2026-10-20;
+master be17a7cf against the branch at 69b90141; counts from `bodies/bodies.dtb` and `notes.structure`:
+
+| Run | Pluton bodies | Aureoles of plutons / stocks | Zones, hornfels / skarn | Median width m, pluton / stock | Stocks rooted / under cover | bodies.dtb KB, master to branch | Pluton age, median and range, Ma |
+|---|---|---|---|---|---|---|---|
+| supercontinent 1 | 520 | 379 / 6,761 | 35,525 / 182 | 1,209 / 693 | 16 / 8,754 | 298 to 2,462 | 130, 0 to 946 |
+| supercontinent 2 | 569 | 435 / 6,841 | 34,994 / 104 | 1,254 / 688 | 21 / 8,716 | 296 to 2,451 | 110, 0 to 938 |
+| scattered 1 | 759 | 608 / 7,351 | 43,472 / 317 | 1,183 / 689 | 29 / 8,233 | 353 to 2,918 | 198, 0 to 874 |
+| scattered 2 | 634 | 475 / 6,912 | 37,404 / 260 | 1,191 / 690 | 22 / 9,122 | 388 to 2,654 | 200, 0 to 784 |
+
+Master has no aureole bodies, no stock under cover and age 0 on every body; the pluton bodies are the same in number on
+both sides. Along the line of the review's picture (A (-6682, -482) to B (-5633, -1374), 345 columns, supercontinent seed
+1, `deeptime inspect-column` at each, the rock with the bodies painted as the game places it), granite falls from 50,448
+blocks to 45,727 and hornfels rises from 932 to 2,219. At 55 km along it the stock that stood about 400 blocks from the
+floor sits under the 140 blocks of shale cover, in basalt and phyllite with a hornfels rim (granite 3,236 to 1,419,
+hornfels 0 to 420); at 220 km two stocks, a younger one beside an older one, are one granite body with hornfels in the
+sandstone above and below it and none inside it (6,586 to 3,435, 0 to 863); at 320 km a stock under shale with its rim
+(3,387 to 950, 0 to 915).
+
+What this says:
+
+- The width is 0.3 of the smallest dimension by construction, inside the 0.02 to 0.5 of Annen 2017; the medians follow
+  from the smallest dimensions: 3.8 km for the median pluton, about 2.3 km for the median stock.
+- Skarn is rare (0.3 to 0.7 % of the zones) because little carbonate lies at the depths the intrusions reach in these
+  runs; it is the share of carbonate in the hosts, not a separate rule.
+- Most stocks sit under younger cover and few root on a pluton, since a stock roots only on a pluton of its own episode
+  within 10 Myr (DEF-078).
+- The other stocks at an aureole's centre (`mask_intrusions`) take the aureole of about a third of the stocks and most
+  of the zones on supercontinent seed 1: 10,076 stock aureoles and 90,636 zones without them, 8,577 and 51,526 when only
+  a stock holding the whole inner half of the plan counted, 6,761 and 35,707 with any of its five probe points held.
+  Stocks of one episode crowd together, and the bands are depth layers, so a stock beside another loses its aureole at
+  the other's depths all round. Without the rule the younger stock's ring of hornfels crossed the older stock's granite
+  (the 220 km close-up before it).
+- bodies.dtb grows about eightfold (0.3 to 2.5 to 2.9 MB), mostly the stocks' hollow aureoles of eight slabs each.
+
 ## Simplifications and limits
 
 - **Temperature only.** No pressure and no time. Blueschist and eclogite (high pressure, low temperature) are never formed
@@ -207,7 +264,15 @@ the plates page's section and on [strata.md](strata.md).
 - **Pools have no burial history.** The basement is stepped along its path by today's geotherm, not by the heat it once had.
 - **One body per intrusive suite.** A pluton in the mod stands for a whole suite; real plutons grow in increments of
   sheets over millions of years (Glazner et al. 2004).
-- **Aureoles have no distance.** They are a fixed outer shell, not a temperature field, and exist only on soft hosts.
+- **Aureoles are a width, not a temperature field.** No isotherm is computed and no peak temperature is stored; the zone
+  is one class (skarn or hornfels) across its width, with no isograds inside it, and it exists only on soft hosts.
+- **Aureoles are read from the undeformed column at the intrusion's centre** and are not offset by younger faults; a host
+  that changes sideways within the aureole takes the class of the centre's host at that depth.
+- **Aureole and pluton bodies paint over younger dykes and stocks** that cut them, because the world data paints bodies over
+  every structural event. A stock rooted on its own pluton is repainted through that pluton's aureole by a `stock` body; a
+  dyke or a much younger stock is not, unless the stock reaches the inner half of the aureole's intrusion in plan (then
+  the aureole's bands leave its depths alone, `mask_intrusions`); one that crosses only the aureole's rim is painted over. A format rule "a body with an age paints only older
+  rock" would fix it; it is not built (REV-2 follow-up).
 - **Plutons are rounder than the big real ones** (width over length 0.5 to 1 against 0.17 to 0.4), and sit shallower
   than the Sierra's 3.5 to 10 km.
 - **Nothing reads a class's density.** The 62 densities are loaded from the rock-class files into the Rust table and the
@@ -216,17 +281,17 @@ the plates page's section and on [strata.md](strata.md).
 - **Densities are of fresh rock.** Weathered and porous rock is lighter (the New Zealand database runs down to 1500-2000 kg/m3
   for igneous rock); the table is for unweathered crust.
 - **One CCD** of 4,500 m for every ocean, the Pacific value.
-- **A fixed share of lavas and dikes.** Layer 2 is 0.4 lavas everywhere (RCK-091); Earth's share varies with spreading
+- **A fixed share of lavas and dikes.** Layer 2 is 0.4 lavas everywhere (RCK-095); Earth's share varies with spreading
   rate (0.31 in 504B, 0.65 in 1256D).
 - **Arc crust by regime.** An ocean column's felsic plutonic rock is diorite where the cell is an arc now and
-  granodiorite otherwise (RCK-092); the pool does not record which process made it.
+  granodiorite otherwise (RCK-096); the pool does not record which process made it.
 - **Loose and rock.** Sediment turns to rock at 150 m only for beds under 20 Myr old; real mud and sand stay soft for 1 to 3 km.
 
 ## Game choices
 
 The vocabulary, families and groups (RCK-013, the MIC rock-tag README); the metamorphic grade index (RCK-047); continental crust
-only (RCK-036); forward-only metamorphism (RCK-038); every pool and path table (RCK-016 to RCK-023, RCK-046); aureole shell
-(RCK-053); pluton shares, length and width (RCK-058 to RCK-065); the stone and deepslate stand-ins (RCK-075 to RCK-079,
+only (RCK-036); forward-only metamorphism (RCK-038); every pool and path table (RCK-016 to RCK-023, RCK-046); aureole width and
+the carbonate factor (RCK-053, RCK-091); pluton shares, length and width (RCK-058 to RCK-065); the stone and deepslate stand-ins (RCK-075 to RCK-079,
 decisions log 2026-10-01, Ben), the block resolution order (RCK-080, plan section 7.5). The appearance claims in the
 generator comments ("dark grey", "banded") are descriptions, not data (RCK-089).
 

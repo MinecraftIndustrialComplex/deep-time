@@ -1998,7 +1998,7 @@ sampling; a larger paired ensemble would tell.
 metamorphic rock in 67 to 78 % of the sea-floor columns of run 1a156f22b66, and 11 to 14 km from
 the sea floor to the peridotite where Earth has about 7.5 km (GlobSed's 0.4 km of deep-ocean
 sediment over White et al. 1992's 7.1 km of igneous crust). Part of that was drawing: every crust
-kind's pools were drawn with the continental classes (the rock page, RCK-091 and RCK-092). The
+kind's pools were drawn with the continental classes (the rock page, RCK-095 and RCK-096). The
 rest is rock the plate model puts there.
 
 **Where the rock came from.** A diagnosis build (master d54c7f0f with counters on every
@@ -2074,7 +2074,7 @@ master, "after" the branch's default, "switch on" the branch with PLT-294 on; ea
 
 On the new master PLT-293 moves more than it did on d54c7f0f (0.72 to 0.55 at 9 to 13 cells), and
 the switch takes the ocean side's granite nearly away (0.23 there). The column draws whatever felsic
-plutonic rock is left on ocean crust as diorite or granodiorite (RCK-092), never granite, so the
+plutonic rock is left on ocean crust as diorite or granodiorite (RCK-096), never granite, so the
 review's census of the sea floor (strata.md, "The ocean crust and the mountains, measured") shows
 no granite either way; the switch decides how much of the ocean column is arc-like rock between the
 lavas and the gabbro.
@@ -2097,7 +2097,7 @@ stretches, which the model's fixed boundary cannot do without the ratchet PLT-28
 
 **What is left under the sea** (switch on, seed 1 supercontinent on master bc2e5472, the table
 above): all the arc cells and 0.73 of the back-arc cells hold island-arc rock (drawn as andesite over
-diorite or granodiorite, RCK-092; the model's oceanic fronts are about 8.6 times Earth's length,
+diorite or granodiorite, RCK-096; the model's oceanic fronts are about 8.6 times Earth's length,
 PLT-045), and 0.46 of the ocean basin, 0.21 of the ridges and 0.16 of the crust younger than 20 Myr
 hold some; on d54c7f0f these were 0.61, 0.45, 0.16 and 0.07. On crust older than 150 Myr the
 sediment pile averages 9.6 to 9.9 km (6.4 km on d54c7f0f) and its base turns to schist (the

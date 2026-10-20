@@ -184,6 +184,10 @@ pub struct Body {
     /// A rock class the whole body's host becomes (`banded_iron_formation`), or none.
     pub rock_class: Option<String>,
     pub zones: Vec<Zone>,
+    /// When the body formed, Myr before the end of the world's history (a pluton's emplacement;
+    /// decisions log 2026-10-19), or none.
+    #[serde(default)]
+    pub age_ma: Option<f32>,
 }
 
 /// Where a block centre sits in a body.
@@ -222,6 +226,7 @@ impl Body {
             aabb: [[0; 3]; 2],
             rock_class: None,
             zones: Vec::new(),
+            age_ma: None,
         };
         b.aabb = b.computed_aabb();
         b
@@ -319,6 +324,9 @@ impl Body {
         if !self.yaw.is_finite() || !self.dip.is_finite() {
             return bad("rotation is not finite".into());
         }
+        if self.age_ma.is_some_and(|a| !a.is_finite()) {
+            return bad("age is not finite".into());
+        }
         let [lo, hi] = self.aabb;
         if (0..3).any(|k| lo[k] > hi[k]) {
             return bad(format!("empty AABB {:?}", self.aabb));
@@ -355,6 +363,7 @@ impl Body {
             "clip_top_y": (self.clip_top_y != NO_CLIP).then_some(self.clip_top_y),
             "aabb": self.aabb,
             "rock_class": self.rock_class,
+            "age_ma": self.age_ma,
             "zones": self.zones.iter().map(|z| json!({
                 "name": z.name, "material": z.material, "rock_class": z.rock_class,
                 "d": z.d, "v": z.v, "grade": z.grade, "density": z.density, "raw": z.raw,
@@ -417,7 +426,7 @@ pub fn encode_bodies(bodies: &[Body]) -> Result<Vec<u8>> {
         records.extend_from_slice(&first_zone.to_le_bytes());
         records.extend_from_slice(&(b.zones.len() as u32).to_le_bytes());
         records.extend_from_slice(&opt_string(&mut strings, &b.rock_class).to_le_bytes());
-        records.extend_from_slice(&0u32.to_le_bytes());
+        records.extend_from_slice(&b.age_ma.unwrap_or(f32::NAN).to_le_bytes());
         records.extend_from_slice(&0u64.to_le_bytes());
         debug_assert_eq!(records.len() - start, BODY_BYTES);
     }
@@ -487,6 +496,7 @@ pub fn decode_bodies(path: &Path, b: &[u8]) -> Result<Vec<Body>> {
             aabb: [i3(64), i3(76)],
             rock_class: opt_str(u32_at(rec, 96), "body rock class")?,
             zones: zs,
+            age_ma: Some(f32_at(rec, 100)).filter(|a| a.is_finite()),
         };
         body.validate()?;
         out.push(body);
@@ -566,6 +576,7 @@ mod tests {
             30,
         );
         sheet.rock_class = Some("coal".into());
+        sheet.age_ma = Some(412.5);
         let bodies = vec![sheet, porphyry(2)];
         let bytes = encode_bodies(&bodies).unwrap();
         let back = decode_bodies(Path::new("b.dtb"), &bytes).unwrap();

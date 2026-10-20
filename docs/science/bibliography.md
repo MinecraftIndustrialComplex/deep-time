@@ -802,6 +802,8 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Substitute: repository or open copy found by the lookups and saved as above (version not stated: the first pages were matched against the title, not compared with the printed version).
 - Read in this pass: not fetched (metadata only)
 - Used for: suggested stage-2 reference for LIP area and frequency; the fields were not read.
+- Ledger ids: PRV-006 (REV-2, 2026-10-19).
+- Read in REV-2 (2026-10-19): the abstract on ADS, for the definition: over 0.1 Mkm2 in area and 0.1 Mkm3 in volume, mainly mafic, emplaced within about 50 Myr with most of the volume (over 75 %) in pulses of 1 to 5 Myr; seamounts, hotspot tracks and normal oceanic crust are excluded. The library's full text was not reopened.
 
 ### Hildreth2007
 - Reference: Hildreth, W. (2007). Quaternary magmatism in the Cascades: geologic perspectives. U.S. Geological Survey Professional Paper 1744.
@@ -5764,9 +5766,10 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 
 ### Annen2017
 - Reference: Annen, C. (2017). Factors affecting the thickness of thermal aureoles. Frontiers in Earth Science 5:82. doi 10.3389/feart.2017.00082
-- Ledger ids: RCK-053
+- Ledger ids: RCK-053, RCK-091
 - Library: `Annen2017/Annen2017.pdf` and `.txt`.
 - Read: primary full text of the abstract and introduction (aureole thickness proportional to intrusion thickness in the idealised case; Manaslu about 100 m round a several-km sheet; Western Adamello 1.7 km round a 5.5-km intrusion).
+- Read in REV-2 (2026-10-19, a Sonnet lookup, full text online): aureole thickness 'is a linear function of the intrusion thickness' for a single pulse; its table of aureoles: Alta stock 2-3 km, tremolite isograd about 1 km out and (citing Cook and Bowman 1994) talc about 1.5 km, periclase about 200 m; Western Adamello 5.5 km, andalusite 1.7 km; Cupsuctic 6-8 km, biotite a few hundred m to 1.5 km; Skaergaard 4 km radius, floor aureole 390 m; Mooselookmeguntic 2 km, garnet beyond 1 km; Manaslu 5-12 km, under 100 m. Incremental emplacement narrows the aureole up to about fourfold; diffusivity contrasts halve or double it. No comparison of carbonate with pelite hosts.
 
 ### Mottram2014
 - Reference: Mottram, C. M. et al. (2014). Developing an inverted Barrovian sequence; insights from monazite petrochronology. Earth and Planetary Science Letters 403:418-431. CC BY.
@@ -6727,7 +6730,7 @@ The methods behind the P1-19 changes to the surface stage's solvers (build log 2
 - Library: not fetched.
 - Read so far (by the project): from memory (piecewise-constant aggregation makes the Galerkin coarse operator too stiff for smooth error, about twice for the Laplacian, remedied by over-weighting the coarse correction). The project uses the equivalent halving of the coarse couplings (`SCALE` 0.5) and measured the effect itself (ERO-183).
 
-## Ocean crust as drilled: the Penrose sequence (PLT-104, PLT-293, PLT-294, RCK-091, RCK-092), added 2026-10-19
+## Ocean crust as drilled: the Penrose sequence (PLT-104, PLT-293, PLT-294, RCK-095, RCK-096), added 2026-10-19
 
 The sources behind the ocean crust's own column (build log 2026-10-19 "Crust templates and the relief lift"): the thickness of new crust and of its layer 2, the share of lavas and sheeted dikes in two drilled holes, the ophiolite sequence the classes follow, and the sediment the census compares with.
 
@@ -6744,7 +6747,7 @@ The sources behind the ocean crust's own column (build log 2026-10-19 "Crust tem
 - Reference: Christeson, G. L., Goff, J. A. and Reece, R. S. (2019). Synthesis of oceanic crustal structure from two-dimensional seismic profiles. Reviews of Geophysics 57:504-529.
 - DOI or URL: 10.1029/2019RG000641
 - Cited as: "Christeson et al. 2019" (plates/pools.rs oceanic_column; structure/columns.rs OCEAN_LAVA_SHARE).
-- Ledger ids: PLT-104, RCK-091
+- Ledger ids: PLT-104, RCK-095
 - Access: open (AGU review).
 - Library: not kept.
 - Read so far (by the project): abstract, 2026-10-19 (crust templates agent): "Layer 2 has an average thickness of 1.84 km", "Total crustal thickness averages 6.15 km and is similar across all spreading rates". The layer 2 and layer 3 thicknesses with their deviations (1.84 ± 0.61 km, 4.31 ± 0.99 km) come from a secondary reading of section 4.1 and were not checked.
@@ -6753,7 +6756,7 @@ The sources behind the ocean crust's own column (build log 2026-10-19 "Crust tem
 - Reference: Alt, J. C., Laverne, C. and others (1996). The synthesis of the alteration of Hole 504B. Proceedings of the Ocean Drilling Program, Scientific Results 148, chapter 34 (the full title and author list not checked).
 - DOI or URL: https://www-odp.tamu.edu/publications/148_SR/VOLUME/CHAPTERS/sr148_34.pdf
 - Cited as: "Hole 504B" (structure/columns.rs OCEAN_LAVA_SHARE).
-- Ledger ids: RCK-091
+- Ledger ids: RCK-095
 - Access: open (ODP publications).
 - Library: not kept (fetched 2026-10-19).
 - Read so far (by the project): the chapter, 2026-10-19 (crust templates agent): Hole 504B penetrated "274.5 m sediment, 571.5 m of volcanic rocks, a 209 m transition zone, and 1050 m into a sheeted dike complex" (1056 m elsewhere in the chapter), the dikes altered to greenschist assemblages at 300 to 400 degC.
@@ -6762,7 +6765,7 @@ The sources behind the ocean crust's own column (build log 2026-10-19 "Crust tem
 - Reference: Expedition 309/312 Scientists (2006). Expedition 309/312 summary. Proceedings of the Integrated Ocean Drilling Program 309/312 (the editors and the page not checked).
 - DOI or URL: https://iodp.tamu.edu/publications/exp309_312/103/103_7.htm
 - Cited as: "Hole 1256D" (structure/columns.rs OCEAN_LAVA_SHARE).
-- Ledger ids: RCK-091
+- Ledger ids: RCK-095
 - Access: open (IODP publications).
 - Library: not kept (fetched 2026-10-19).
 - Read so far (by the project): the summary's section on the drilled sequence, 2026-10-19 (crust templates agent): Hole 1256D, in crust formed at a superfast spreading rate, has 754 m of extrusive rocks, a 57 m transition zone and 346 m of sheeted dikes over gabbro reached at 1406.6 m below the sea floor.
@@ -6771,7 +6774,7 @@ The sources behind the ocean crust's own column (build log 2026-10-19 "Crust tem
 - Reference: Anonymous (1972). Penrose Field Conference on ophiolites. Geotimes 17(12):24-25.
 - DOI or URL: none (print).
 - Cited as: "Penrose Field Conference 1972" (structure/columns.rs pool_class).
-- Ledger ids: RCK-092
+- Ledger ids: RCK-096
 - Access: print only; copy not located.
 - Library: not fetched.
 - Read so far (by the project): through a secondary page that reproduces the definition (travelinggeologist.com, "Pilgrimage to the Semail ophiolite", 2015), 2026-10-19 (crust templates agent): from the bottom, an ultramafic complex, a gabbroic complex, a mafic sheeted dike complex and a mafic volcanic complex, with sediments and minor sodic felsic intrusive rocks (plagiogranite) as associated rocks. Not read in Geotimes, so the row is `from-memory`.
@@ -6919,3 +6922,19 @@ The sea-floor spikes task (build log 2026-10-20) measured the planet's deep sea 
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): abstract only, 2026-10-20 (OpenAlex): "a forward modeling approach based on an axisymmetric Gaussian seamount"; "The global seamount distribution is long-tailed and resembles a power law distribution for seamounts in the height range 2-7 km"; the limiting height is "a simple function of plate age at the time of seamount emplacement". No flank slope in the abstract; the Gaussian's measured width is in Sandwell2022.
 - Reference check: authors, year, journal, volume, issue and pages from OpenAlex.
+## Contact aureoles, stocks and the LIP rule (RCK-053, RCK-091, DEF-078, DEF-079, PRV-006), added 2026-10-19
+
+Annen2017 (RCK-053, RCK-091) and Bryan2008 (PRV-006) have their entries above; their REV-2 reading is recorded there.
+
+### Johansson2018
+- Reference: Johansson, L., Zahirovic, S. and Mueller, R. D. (2018). The interplay between the eruption and weathering of Large Igneous Provinces and the deep-time carbon cycle. Geophysical Research Letters 45(11): 5380-5389.
+- DOI or URL: 10.1029/2017GL076691; the LIP polygons are EarthByte's published dataset (CC-BY 4.0).
+- Ledger ids: none (an Earth comparison in provinces.md, not a constant in the code).
+- Access: the polygons are open; the paper was not opened.
+- Read in REV-2 (2026-10-19, a Sonnet lookup on the test machine): the polygons were downloaded and their area measured on the sphere: union 29.84 Mkm2, 5.85 % of Earth's surface; on land 9.80 Mkm2, 1.92 % of the surface and 6.68 % of the land (Natural Earth 50 m land, 146.7 Mkm2); polygons at least half on land 9.76 Mkm2 (1,025), the rest 20.09 Mkm2 (1,501); dropping seamount and ridge polygons leaves 23.6 Mkm2, 4.6 %. Single provinces: Ontong Java 1.88 Mkm2, Caribbean 0.90, Manihiki 0.78, Parana 0.67, Siberian 0.64, Ethiopian 0.57, Deccan 0.51. The polygons are mapped outcrop and inferred extent, so the area is a present-day footprint, not an erupted area. The scripts are on the test machine under /Volumes/Graphide/ban/deeptime-runs/rev2-lip/.
+
+### Brenner2021
+- Reference: from-memory: a 2021 study of fluid-borne heat transport in a carbonate-hosted contact aureole (Brenner et al.); the full reference was not pinned down.
+- Ledger ids: RCK-091 (from-memory).
+- Access: not fetched; search excerpts only.
+- Read: nothing beyond search excerpts saying fluid flow carries heat further into a carbonate host. Do not cite it as read.
