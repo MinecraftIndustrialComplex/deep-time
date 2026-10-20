@@ -47,14 +47,14 @@ public final class BaseImage {
      * The latitude/longitude picture of a block-space image, for Deep Time's globe
      * ({@code GlobeProjection.render}): {@code w × h} pixels, pixel (x, y) at longitude
      * {@link Projection#pictureLongitudeDeg}(x) and latitude {@link Projection#pictureLatitudeDeg}(y)
-     * (the keyframes' layout), coloured by the block image at {@link WorldProjection#blockOf}.
+     * (the keyframes' layout), coloured by the block image at {@link PlanetGeometry#blockOf} (Deep Time's forward, checked).
      */
     public static int[] latLonPicture(int[] block, MapFrame f, WorldProjection p, int w, int h) {
         int[] out = new int[w * h];
         for (int y = 0; y < h; y++) {
             double lat = Projection.pictureLatitudeDeg(y, h);
             for (int x = 0; x < w; x++) {
-                double[] b = p.blockOf(lat, Projection.pictureLongitudeDeg(x, w));
+                double[] b = PlanetGeometry.blockOf(p, lat, Projection.pictureLongitudeDeg(x, w));
                 out[y * w + x] = f.sample(block, b[0], b[1]);
             }
         }
