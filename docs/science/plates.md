@@ -2273,11 +2273,27 @@ transform or converging without contact, against Bird's 28.4 %. The classes now 
 across the boundary's normal over two rings of samples (PLT-310) with Bird's own 20 degrees
 (PLT-311, read in the paper):
 
-@@CLASSES@@
+| share of the boundary, mean over the steps after the first 100 Myr | before (lattice edges) | after (normal, 20 degrees) | Earth (Bird 2003) |
+|---|---|---|---|
+| subducting (ocean-ocean and ocean-continent) | 46.4 % | 31.1 % | 19.7 % (target 15 to 25) |
+| spreading (ridge and rift) | 40.0 % | 35.6 % | 36.4 % |
+| collision | 10.5 % | 8.4 % | 8.8 % |
+| transform, or converging with no contact | 3.1 % | 24.9 % | 28.4 % + 6.7 % |
+| subducting in the first 50 Myr | 32.1 % | 25.3 % | |
+| subducting boundary, km a step | 243,926 | 144,340 | 51,310 |
+| total boundary, km a step | 522,534 | 462,627 | 260,487 |
+| plate checks met (pooled) | 27 of 45 | 27 of 45 | |
+| full 16k, seed 1, subducting (supercontinent / scattered) | 48.3 % / 49.8 % | 32.1 % / 32.8 % | |
+| full 16k, plate checks met | 25 / 27 of 45 | 25 / 27 of 45 | |
+
+(Quick 16k, seeds 1 to 3, both starts pooled; the full 16k is `earthlike_full_16k` at 8 threads.)
+The subducting share still fails its target, at 1.6 times Earth's share and 2.8 times its length.
 
 The classes are measurement only (nothing a plate rule reads), so the planets are the same bit for
-bit (@@SAME@@). The total boundary is about twice Earth's in km (522,534 against 260,487), a
-lattice boundary being rougher than a surveyed one, so lengths compare as shares.
+bit: in all six quick runs and both full runs the crust budget's last line (every crust volume and
+area to the km³) and every number of the land-shape table equal the runs before the change. The total boundary is about twice Earth's in km (463,000 to
+523,000 against 260,487), a lattice boundary being rougher than a surveyed one, so lengths compare
+as shares.
 
 The other half is physical. The arcs, the cordillera and the subduction uplift took the full
 relative speed as their convergence on every front, oblique or strike-slip; along the boundary's
@@ -2305,6 +2321,19 @@ arcs at 2.7 times Earth's rate, which balance losses above Earth's. So PLT-312 s
 continental crust's losses are on Earth's numbers too (a loss budget against Stern & Scholl's
 Table 1, which the crust budget's bookings can give); landed alone it moves the land away from its
 target.
+
+The full 16k pair (`earthlike_full_16k`, seed 1, 8 threads; the switch off / on) says the same:
+
+| | supercontinent | scattered |
+|---|---|---|
+| land | 0.332 / 0.280 | 0.317 / 0.202 |
+| land above 2 km | 0.304 / 0.407 | 0.350 / 0.484 |
+| coast p50, km | 137 / 193 | 129 / 142 |
+| continental crust | 0.457 / 0.349 | 0.442 / 0.261 |
+| island arcs, km³ a year | 4.46 / 1.64 | 4.75 / 2.13 |
+| Köppen E | 0.34 / 0.30 | 0.33 / 0.34 |
+| natural CO₂, ppm | 375 / 1,112 | 810 / 2,075 |
+| plate checks met | 25 / 29 of 45 | 27 / 30 of 45 |
 
 **What is left, and for whom.**
 1. *The extent of young orogen* is the high ground. Its sources: subduction on about half the
