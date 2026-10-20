@@ -1297,6 +1297,12 @@ all processors at server first start and in the CLI. Rust threads never attach t
   Gradle's host native and the tests stay on `release`. Cost and gain: STATUS.md build log
   2026-10-18 (natives). On `x86_64-apple-darwin`, `.cargo/config.toml`'s `codegen-units=2` (above)
   outranks it.
+- **Build-level speed-ups not taken** (STATUS.md build log 2026-10-20). mimalloc under the counting
+  allocator (`--features mimalloc` on `deeptime-cli` and `deeptime-jni`, off) and profile-guided
+  optimisation (`tools/natives/pgo-profile.sh`, then `gate-bins.sh --pgo`; not in `build-natives.sh`)
+  each changed a full 16k run by under the pair noise (about 4 %), so the natives ship with
+  neither. A PGO profile fits only the target triple that made it, and the CLI's profile does not
+  fit the library's build, so PGO would be one instrumented build and training run per target.
 - **Toolchain.** Stable Rust 1.98.1 (the latest stable on 2026-09-28), no nightly features. zig 0.13.0
   for cargo-zigbuild 0.23.4, wired in through the package override of §4.4 (nixpkgs' own pairing is
   zig 0.16.0, which cargo-zigbuild's documentation does not yet cover; if 0.13 ever blocks a build,

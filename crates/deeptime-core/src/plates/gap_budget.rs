@@ -120,6 +120,8 @@ pub enum Part {
     Founder,
     /// `collapse::step`.
     Collapse,
+    /// `flow::step`: the lower-crustal flow.
+    Flow,
     /// `transition::step`.
     Transition,
     /// `collision::collide`.
@@ -128,6 +130,8 @@ pub enum Part {
     Rifting,
     /// `hotspots::step`.
     Hotspots,
+    /// `settle::step`: the columns' settling towards their isostatic height.
+    Settle,
     /// `rate::limit`: thickening beyond a step's ceiling released (after the processes above and
     /// after a resampling).
     Rate,
@@ -159,7 +163,7 @@ pub const SURFACE_PARTS: [(Part, &str); 8] = [
 ];
 
 /// The number of parts.
-pub const PARTS: usize = 28;
+pub const PARTS: usize = 30;
 
 /// The parts' names, in order.
 pub const NAMES: [&str; PARTS] = [
@@ -180,10 +184,12 @@ pub const NAMES: [&str; PARTS] = [
     "arcs",
     "founder",
     "collapse",
+    "flow",
     "transition",
     "collision",
     "rifting",
     "hotspots",
+    "settle",
     "rate",
     "plate_surface",
     "finish",

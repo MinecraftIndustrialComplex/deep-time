@@ -13,16 +13,16 @@ import net.minecraft.network.chat.contents.TranslatableContents;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import org.lwjgl.glfw.GLFW;
 
 /**
- * Keeps the Create World screen's Create button disabled for a Deep Time world until it has world
- * data to be created from (plan §6.6, §7.12): a finished, accepted run in the planet editor. There
- * is no default story (decisions file, "Timeline"), so a Deep Time world cannot be created without
- * a run; with the natives missing, Create stays disabled for Deep Time only. Enter, which also
- * creates the world, is held back the same way. The rule itself is
- * {@link PlanetGenerators#createBlock}, which the GameTests check. Also starts the background
- * memory reading for the editor's setup page ({@link MachineInfo#prime()}).
+ * The Create World screen's Create button for a Deep Time world (plan §6.6, §7.12; the one-click
+ * flow of 2026-10-19, docs/design/create-world-ux.md). A Deep Time world is created from world data,
+ * a finished run of the planet's history; without it Create opens the generation screen
+ * ({@link CreateWorldFlow#interceptCreate}), so the button stays enabled and its tooltip says what
+ * it will do. Only with the natives missing is it disabled, for Deep Time only (Enter is held back
+ * by the same interception). The rule itself is {@link PlanetGenerators#createBlock}, which the
+ * GameTests check. Also starts the background memory reading for the editor's Customize page
+ * ({@link MachineInfo#prime()}).
  */
 final class CreateWorldGuard {
 
@@ -30,7 +30,6 @@ final class CreateWorldGuard {
 
     static void init() {
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Init.Post.class, CreateWorldGuard::onInit);
-        NeoForge.EVENT_BUS.addListener(ScreenEvent.KeyPressed.Pre.class, CreateWorldGuard::onKey);
     }
 
     static PlanetGenerators.CreateBlock block(WorldCreationUiState ui) {
@@ -40,7 +39,7 @@ final class CreateWorldGuard {
     private static void onInit(ScreenEvent.Init.Post event) {
         if (!(event.getScreen() instanceof CreateWorldScreen screen))
             return;
-        // The setup page's "free memory" is read in the background (macOS: a vm_stat process); starting
+        // The Customize page's "free memory" is read in the background (macOS: a vm_stat process); starting
         // it here has the figure ready by the time the editor opens. Rate-limited, returns at once.
         MachineInfo.prime();
         for (GuiEventListener l : event.getListenersList()) {
@@ -55,19 +54,12 @@ final class CreateWorldGuard {
 
     private static void update(Button create, WorldCreationUiState ui) {
         PlanetGenerators.CreateBlock why = block(ui);
-        create.active = why == PlanetGenerators.CreateBlock.NONE;
+        create.active = why != PlanetGenerators.CreateBlock.NATIVES;
         create.setTooltip(switch (why) {
             case NONE -> null;
             case NATIVES -> Tooltip.create(Lang.tr("create.blocked.natives"));
             case NOT_SIMULATED -> Tooltip.create(Lang.tr("create.blocked.not_simulated"));
             case STAGING_MISSING -> Tooltip.create(Lang.tr("create.blocked.staging_missing"));
         });
-    }
-
-    private static void onKey(ScreenEvent.KeyPressed.Pre event) {
-        if (event.getScreen() instanceof CreateWorldScreen screen
-                && (event.getKeyCode() == GLFW.GLFW_KEY_ENTER || event.getKeyCode() == GLFW.GLFW_KEY_KP_ENTER)
-                && block(screen.getUiState()) != PlanetGenerators.CreateBlock.NONE)
-            event.setCanceled(true);
     }
 }

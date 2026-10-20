@@ -51,7 +51,7 @@ source tools/client/mac-client-laptop-lib.sh
 mcl_check_m6lock
 
 if [ "$BUILD" = 1 ]; then
-    tools/remote/mac.sh -- '[ -f smoke/ev-client/install.json ] || tools/smoke/install.sh ev-client 2>&1 | tail -3; cd neoforge && ./gradlew --console=plain -q -PrunSet=ev-client classes gametestClasses createClientLaunchScript linkRunModsClient'
+    tools/remote/mac.sh -- 'set -eo pipefail; [ -f smoke/ev-client/install.json ] || tools/smoke/install.sh ev-client 2>&1 | tail -3; cd neoforge && ./gradlew --console=plain -q -PrunSet=ev-client classes gametestClasses createClientLaunchScript linkRunModsClient'
 fi
 mcl_push_m6lock
 mcl_stop_on_interrupt
