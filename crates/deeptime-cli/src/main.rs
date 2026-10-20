@@ -575,7 +575,8 @@ enum Command {
         out: PathBuf,
     },
     /// Write fields of a checkpoint's world as raw little-endian f32 files (`<dir>/<name>.f32`,
-    /// `/` in a name becomes `__`) with an `index.json` of their grids, for analysis scripts.
+    /// `/` in a name becomes `__`) with an `index.json` of their grids and a `globals.json` (the
+    /// time and the world's globals: the sea level, the run totals), for analysis scripts.
     DumpFields {
         /// Checkpoint to read.
         #[arg(long = "in")]
