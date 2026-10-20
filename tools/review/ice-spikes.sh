@@ -24,6 +24,9 @@
 #       tools/review/ice_spikes.py over them, against both references when both exist
 #   tools/remote/mac.sh --kind cargo:build -- tools/review/ice-spikes.sh testplanet <name> <tree|binary> [run args]
 #       the GameTests' 4k planet (planet_world_4k) baked by this tree or a saved CLI, dumped into <name>-layers.npy
+#   tools/remote/mac.sh --kind sim:planet_world_4k:8t -- tools/review/ice-spikes.sh testplanets <prefix>
+#       `testplanet` four times with this tree (8 threads): <prefix>-{before,after}-{std,mic}, mic with Terralith's
+#       table as gametest.sh -PwithMic bakes it, before without EF's continentalness floor
 #   tools/remote/mac.sh --no-sync -- tools/review/ice-spikes.sh emulate <ice_spikes.py arguments>
 #   tools/remote/mac.sh --no-sync -- tools/review/ice-spikes.sh clean
 set -euo pipefail
@@ -109,6 +112,15 @@ print("deeptime:planet" + ("" if pg else "_lambert") + ("" if c <= 16384 else "_
             > "$RUNS/$name.log" 2>&1
         "$0" dump "$name" "$RUNS/$name-world"
         ;;
+    testplanets)
+        prefix="${2:?prefix}"
+        terralith=crates/deeptime-core/data/climate_mapping/packs/terralith.json
+        "$0" testplanet "$prefix-after-std" tree --threads 8
+        "$0" testplanet "$prefix-before-std" "$RUNS/deeptime-tree" --threads 8 --placement-patch "$RUNS/no-ef-floor.json"
+        "$0" testplanet "$prefix-after-mic" "$RUNS/deeptime-tree" --threads 8 --placement-patch "$terralith"
+        "$0" testplanet "$prefix-before-mic" "$RUNS/deeptime-tree" --threads 8 --placement-patch "$RUNS/no-ef-floor.json" \
+            --placement-patch "$terralith"
+        ;;
     emulate)
         # Any arguments of tools/review/ice_spikes.py.
         shift
@@ -130,6 +142,6 @@ print("deeptime:planet" + ("" if pg else "_lambert") + ("" if c <= 16384 else "_
         rm -rf "$RUNS"
         ;;
     *)
-        sed -n '3,29p' "$0"; exit 2
+        sed -n '3,31p' "$0"; exit 2
         ;;
 esac
