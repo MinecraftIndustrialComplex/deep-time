@@ -91,8 +91,10 @@ fn a_valley_carries_a_river_that_grows_to_the_sea_and_a_bowl_holds_a_lake() {
     // downstream.
     let far = cell(&v, 5, 30);
     assert_eq!((v.river[far], v.q[far]), (0.0, 0.0));
+    // At 16 blocks a pixel the head is a thread (under half a pixel wide, so faint), the reach
+    // near the mouth wide enough to be hard-edged.
     let (upper, lower) = (cell(&v, 64, 22), cell(&v, 64, 37));
-    assert!(v.river[upper] >= 0.5 && v.river[lower] >= 0.5);
+    assert!(v.river[upper] > 0.0 && v.river[lower] >= 0.5);
     assert!(
         v.q[lower] > 2.0 * v.q[upper],
         "{} {}",
@@ -125,7 +127,7 @@ fn thresholds_follow_the_presets_hydrology() {
     view.hydro.river_min_discharge_m3s = 100.0;
     let strict = derive(&w, &view, SIZE).unwrap();
     let normal = derive(&w, &ViewScale::default(), SIZE).unwrap();
-    let px = |v: &WaterView| v.river.iter().filter(|&&c| c >= 0.5).count();
+    let px = |v: &WaterView| v.river.iter().filter(|&&c| c > 0.0).count();
     assert!(
         px(&strict) < px(&normal) / 2,
         "{} {}",
@@ -397,7 +399,8 @@ fn a_river_crosses_the_seam() {
             x,
             z,
             w: 100.0 - k as f32,
-            hw: 1.0,
+            // 32 blocks across: 2 pixels at 16 blocks a pixel, so hard-edged.
+            hw: 16.0,
             depth: 1.0,
             q: 50.0,
         });
@@ -417,6 +420,54 @@ fn a_river_crosses_the_seam() {
     assert!(v.river[cell(&v, 0, 20)] >= 0.5);
     assert_eq!(v.river[cell(&v, 64, 20)], 0.0);
     let _ = std::fs::remove_dir_all(d);
+}
+
+/// A straight river along one picture row, `hw` blocks to each bank, from x = −450 to 350 (its
+/// joints clear of x = 0).
+fn straight_river(hw: f32) -> WaterView {
+    let oz = GridDesc::for_planet("L1", C, 16).unwrap().origin_block_z;
+    let z = oz as f32 + 20.0 * 16.0;
+    let mut rivers = Rivers::empty(C);
+    for k in 0..5 {
+        rivers.vertices.push(RiverVertex {
+            x: -450.0 + 200.0 * k as f32,
+            z,
+            w: 100.0,
+            hw,
+            depth: 1.0,
+            q: 50.0,
+        });
+    }
+    rivers.chains.push(Chain {
+        first: 0,
+        count: 5,
+        mouth: Mouth::Sea,
+        into: u32::MAX,
+    });
+    rivers.build_index();
+    let d = dir(&format!("straight-{hw}"));
+    write_rivers(&d, &rivers).unwrap();
+    let v = from_bake(&world(), &ViewScale::default(), &d, None, SIZE)
+        .unwrap()
+        .unwrap();
+    let _ = std::fs::remove_dir_all(d);
+    v
+}
+
+#[test]
+fn a_river_is_inked_at_its_width_in_the_game() {
+    // Across the river (picture column 64, x = 0) the coverage sums to the channel's width in
+    // pixels, 2 hw / 16 on this map: the ink is the game's water. A thread under a quarter pixel is
+    // kept at a quarter so it still shows (HYD-091).
+    for (hw, want) in [(1.0, 0.25), (3.0, 0.375), (10.0, 1.25), (16.0, 2.0)] {
+        let v = straight_river(hw);
+        let column: Vec<f32> = (0..v.h).map(|y| v.river[at(&v, 64, y)]).collect();
+        let sum: f32 = column.iter().sum();
+        assert!((sum - want).abs() < 1e-3, "hw {hw}: {sum} {column:?}");
+        // Only a river at least a pixel wide has a pixel the pointer reads (coverage >= 0.5).
+        let peak = column.iter().cloned().fold(0.0, f32::max);
+        assert_eq!(peak >= 0.5, hw >= 10.0, "hw {hw}: {column:?}");
+    }
 }
 
 #[test]
