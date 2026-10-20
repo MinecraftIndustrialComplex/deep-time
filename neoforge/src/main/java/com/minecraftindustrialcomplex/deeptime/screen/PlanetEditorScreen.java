@@ -176,9 +176,7 @@ public final class PlanetEditorScreen extends Screen {
     }
 
     private Object wanted() {
-        if (guidanceOnly())
-            return "guidance";
-        return model.page() == EditorModel.Page.RUN && model.run().isEmpty() ? "preparing" : model.page();
+        return guidanceOnly() ? "guidance" : model.page();
     }
 
     @Override
@@ -191,15 +189,7 @@ public final class PlanetEditorScreen extends Screen {
         } else {
             page = switch (model.page()) {
                 case SETUP -> new SetupPage();
-                case RUN -> model.run().isPresent() ? new RunPage() : new Page() {
-                    @Override
-                    public void init(PlanetEditorScreen s) {}
-
-                    @Override
-                    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-                        g.drawCenteredString(font, Lang.tr("editor.problem.estimating"), width / 2, height / 2, 0xffa0a0a0);
-                    }
-                };
+                case RUN -> new GenerationPage();
                 case REVIEW -> new ReviewPage();
             };
         }
@@ -224,6 +214,23 @@ public final class PlanetEditorScreen extends Screen {
             page.tick();
         if (!wanted().equals(shown))
             rebuildWidgets();
+    }
+
+    /**
+     * An opaque backdrop (docs/design/create-world-ux.md: the map is the hero, not a picture
+     * floating over the dimmed title panorama): the menus' own dark texture over solid black.
+     */
+    @Override
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        g.fill(0, 0, width, height, 0xff0c0e12);
+        renderMenuBackground(g);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (page instanceof GenerationPage gp && gp.keyPressed(keyCode))
+            return true;
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override

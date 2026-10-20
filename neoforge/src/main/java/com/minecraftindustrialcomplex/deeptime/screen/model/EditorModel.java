@@ -704,8 +704,9 @@ public final class EditorModel {
     /**
      * Generate: shows the generation page with a run of the current settings. A run of these settings
      * that is going or finished is shown as it is; otherwise one starts by itself as soon as Run is
-     * allowed ({@link #tickAutoStart}), and a run of other settings still going is cancelled now (its
-     * folder goes once it stopped; the new one waits for its natives to let go).
+     * allowed ({@link #tickAutoStart}), and any other run is dropped now: one still going is
+     * cancelled (its folder goes once it stopped; the new one waits for its natives to let go), a
+     * finished, cancelled or failed one is deleted unless it was accepted.
      */
     public void generate() {
         page = Page.RUN;
@@ -713,10 +714,14 @@ public final class EditorModel {
         if (run != null && effectivePresetJson().equals(runFor)
                 && (run.state() == TimelapseModel.State.RUNNING || run.state() == TimelapseModel.State.DONE))
             return;
-        if (run != null && run.state() == TimelapseModel.State.RUNNING) {
+        // Any other run (going with old settings, finished with old settings, cancelled, failed) goes,
+        // so the page never shows it while the new one waits for its estimate.
+        if (run != null) {
             dropRun();
             run = null;
+            review = null;
         }
+        launchError = null;
         autoStart = true;
     }
 
