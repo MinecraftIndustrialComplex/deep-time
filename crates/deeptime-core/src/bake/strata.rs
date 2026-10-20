@@ -99,7 +99,11 @@ pub fn bake(
     })?;
     // The bodies and sites rise with the rock at their centre (STR-056).
     let (bodies_dy, sites_dy) = shifts(&hz, &moved, &world.bodies, &world.sites);
-    lift_note["bodies"] = shift_note(&lift, &bodies_dy, world.bodies.iter().map(|b| (b.center[0], b.center[2])));
+    lift_note["bodies"] = shift_note(
+        &lift,
+        &bodies_dy,
+        world.bodies.iter().map(|b| (b.center[0], b.center[2])),
+    );
     lift_note["sites"] = shift_note(
         &lift,
         &sites_dy,
@@ -379,15 +383,12 @@ fn raise_tops(
                         if !relief {
                             continue;
                         }
-                        let (bx, bz) = (
-                            l3.block_x(gi as i64) as f64,
-                            l3.block_z(gj as i64) as f64,
-                        );
+                        let (bx, bz) = (l3.block_x(gi as i64) as f64, l3.block_z(gj as i64) as f64);
                         let under = bspline_at(&g1, &coarse_blocks, bx, bz);
                         if under.is_finite() {
                             local_sum[c].0 += v - under;
                             local_sum[c].1 += 1;
-                            if v >= sea_y && gi % stride == 0 && gj % stride == 0 {
+                            if v >= sea_y && gi.is_multiple_of(stride) && gj.is_multiple_of(stride) {
                                 points.push(Point {
                                     x: bx,
                                     z: bz,
@@ -549,13 +550,8 @@ fn raise_tops(
         }
     }
     let raise16: Vec<i32> = moved.iter().map(|m| m.raise).collect();
-    let fill = strata_census::mountain_fill(
-        hz,
-        &coarse,
-        &node_relief,
-        &raise16,
-        &tables.unconsolidated,
-    );
+    let fill =
+        strata_census::mountain_fill(hz, &coarse, &node_relief, &raise16, &tables.unconsolidated);
     let note = json!({
         "cells": lifted,
         "mean_blocks": if lifted > 0 { lift_sum / lifted as f64 } else { 0.0 },
@@ -825,7 +821,13 @@ pub fn key_shift(hz: &Horizons, moved: &[Moved], x: f64, y: f64, z: f64) -> f64 
     for &(c, w) in &cells {
         let (tops, _, ks) = hz.cell(c);
         let mv = moved[c];
-        heights_sorted(|h| i32::from(tops[h]) - mv.top(h), ks, floor, &keys, &mut hb);
+        heights_sorted(
+            |h| i32::from(tops[h]) - mv.top(h),
+            ks,
+            floor,
+            &keys,
+            &mut hb,
+        );
         heights_sorted(|h| i32::from(tops[h]), ks, floor, &keys, &mut ha);
         for q in 0..m {
             before[q] += w * hb[q];
