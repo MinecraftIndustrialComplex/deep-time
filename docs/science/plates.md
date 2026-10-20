@@ -10,7 +10,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 |---|---|---|
 | [PLT](ledger/PLT.md) | plate setup | PLT-001 to PLT-021, PLT-203, PLT-205, PLT-209 to PLT-211 (26) |
 | [PLT](ledger/PLT.md) | plate motion | PLT-022 to PLT-028 (7) |
-| [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252, PLT-285 to PLT-286, PLT-289, PLT-312 (48; PLT-312 the arcs on the convergence normal to the front, an experiment kept off, the land-shape task, 2026-10-20; PLT-289 ocean floor as thick as a continent turns continental, the resampling lumps, 2026-10-18; PLT-285 and PLT-286 the continental arcs and the cones as rock, plate task 8, 2026-10-17) |
+| [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252, PLT-285 to PLT-286, PLT-289, PLT-312, PLT-320 (49; PLT-320 the cordillera at Earth's typical arc, with no convergence factor, the crust budget against Stern & Scholl, 2026-10-20; PLT-312 the arcs on the convergence normal to the front, an experiment kept off, the land-shape task, 2026-10-20; PLT-289 ocean floor as thick as a continent turns continental, the resampling lumps, 2026-10-18; PLT-285 and PLT-286 the continental arcs and the cones as rock, plate task 8, 2026-10-17) |
 | [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250, PLT-253, PLT-290 to PLT-292 (34; PLT-290 to PLT-292 the crust a collision took counted once, the resampling lumps, 2026-10-18; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228, PLT-293 (20; PLT-293 ocean crust keeps its own rock at resamplings and in the L1 sampling, 2026-10-19) |
@@ -2485,3 +2485,217 @@ km³ a year, plate checks 33 of 45 against 26. The high ground and the coast are
    counts the ice sheets' tops. By rock Earth's figure is 0.047 (HYP-041). The model's present-day
    comparisons of high ground should use 0.05 by rock (or 0.10 counting the model's own ice on
    top).
+
+## The crust budget against Stern & Scholl (2026-10-20)
+
+The coordinator's task after "Land shape and the high ground" above: book the continental crust's
+gains and losses against Stern & Scholl 2010's Table 1 per Myr, find the one off Earth and fix it
+at its law; land PLT-312 only if land, high ground, coast and the plate checks all move toward
+Earth or hold; source the cordillera for a typical arc instead of Bolivia; shorten the collisions
+(p50 15 to 50 Myr, p90 at most 120) at their law. Ledger PLT-048 and PLT-320, HNT-127, HYP-018,
+PRS-039; sources in the bibliography, "The cordillera at Earth's typical continental arc". Code:
+`plates/subduction.rs` (the cordillera). Tables: `tools/review/loss-budget.py` (Stern & Scholl's
+rows from each run's crust budget, `DEEPTIME_CRUST_BUDGET=1`), `tools/review/collision-ends.py`
+(how the check's collisions end) and `tools/review/land-shape.py`; the build log entry of
+2026-10-20 "Crust budget against Stern & Scholl" has the commands.
+
+**Earth's budget** (Stern & Scholl 2010, Int. Geol. Rev. 52:1-31, read in full; Table 1, p. 12;
+km³ a year). Additions: intra-oceanic arcs 1.5 (100 km³ per km and Myr over 14,500 km),
+continental arcs 1.0 (35 over 27,500 km), crust-suturing zones 0.2, rifts, hotspots and volcanic
+rifted margins 0.5; 3.2 in all. Losses: at ocean margins sediment subduction 1.1 and subduction
+erosion 1.4 (about 60 km³ per km and Myr over 43,000 km of margin), at suturing zones 0.7
+(sediment 0.1, erosion 0.3, deep subduction of continental crust 0.3), foundering not known; at
+least 3.2 in all, so the losses at least match the additions.
+
+**The model's budget** (`earthlike_quick_16k`, 1000 Myr, seeds 1 to 3, supercontinent and
+scattered continents, the mean of the six runs over the whole run, km³ a year; master c24ff793
+against this branch, both with the transition's ocean crust switch PLT-294 off):
+
+| Stern & Scholl's row | master | branch | Earth |
+|---|---|---|---|
+| intra-oceanic (island) arcs | 4.12 | 4.20 | 1.5 |
+| continental arcs | 1.62 | 1.56 | 1.0 |
+| crust-suturing zones (additions) | no rule | no rule | 0.2 |
+| rifts, hotspots, rifted margins | not booked | 0.04 | 0.5 |
+| model only: the ocean floor under a matured island arc made continental | 4.62 | 4.67 | |
+| model only: pelagic sediment, counted felsic | not booked | 1.40 | |
+| ocean margins: sediment subduction and subduction erosion | no rule | no rule | 2.5 |
+| crust-suturing zones (losses): crust crossing a collision front and not stacked | 2.57 | 2.65 | 0.7 |
+| foundering (crust beyond `crust_max_km`) | 1.24 | 1.23 | not known |
+| model only: crust over the thickening ceiling sent down | 0.65 | 0.92 | |
+| model only: crust a resampling drops | 0.76 | 0.89 | |
+| net change of the continental volume | +0.98 | -0.12 | about 0 |
+| island-arc front, lattice km | 134,790 | 142,395 | 14,500 |
+| continental-arc front, lattice km | 96,339 | 99,288 | 27,500 |
+| moved, not made: shortened into cordilleras | 3.59 | 1.66 | |
+
+("Not booked": master's binary does not write those two lines; this branch's budget stocks, commit
+3dd2e2e0, add them.) The rows do not sum to the net: the surface stage moves 18.3 km³ a year of
+sediment off the continents and the resamplings accrete 21.4 of ocean-floor felsic rock back, flows
+that the budget books as moved.
+
+**What is off Earth, and at which law.**
+1. *Island arcs, 2.8 times Earth's.* Per lattice km of front they add 29.5 km³ a Myr, below
+   Stern & Scholl's 100 (the model's rate is 100 times g, and the mean g of its oceanic fronts is
+   0.59); the front is 9.8 times Earth's in lattice km, about 5 times as a share of the boundary (a
+   lattice boundary is about twice as long as a surveyed one: "Land shape and the high ground").
+   The gain is the length of ocean-ocean subduction: the subducting share of the boundary is
+   31.6 % (target 15 to 25), 54 % of it ocean-ocean. Its law is the plate geometry, fewer and
+   longer-lived subduction zones from the force balance: plate work beyond this task. PLT-312 cuts
+   the rate per km instead (below).
+2. *The arc's ocean floor made continental, 4.67 with no row in Table 1.* When an island arc
+   matures (PLT-047) its whole column turns continental, the ocean crust under the arc included;
+   Stern & Scholl's 1.5 counts the arc's own magma. It doubles what the island arcs add. A column
+   holds one crust kind, so counting only the arc's magma as continental is a change to the crust's
+   data model: left for Ben.
+3. *Collisions lose 2.65, 3.8 times Earth's 0.7.* The crust crossing collision fronts is 22.3 km³ a
+   year and 0.12 of it is not stacked. The collision boundary is Earth's share (8.5 % against
+   Bird's 8.8 %); the collisions last long (p90 125 Myr) and shorten far (275 km at the median).
+   The slab tear below tried the collisions' end.
+4. *Ocean margins lose nothing by rule* (Earth 2.5). The model's sinks (foundering 1.23, the rate
+   cap 0.92, the resampling's drops 0.89, together 3.0) stand in for them at about Earth's total,
+   but inside the continents, not at their margins.
+5. *Hotspots and rifts add 0.04, twelve times below Earth's 0.5*: flood basalts and volcanic rifted
+   margins have no rule of their own.
+6. *Pelagic sediment counted felsic, 1.40*: the plate step's pelagic rain (`pelagic_m_per_myr`)
+   books as felsic rock on the ocean floor and reaches the continents at resamplings.
+
+Table 1's rows add about 12 km³ a year on the branch against Earth's 3.2 and take 5.7 against at
+least 3.2, but the continental volume moves far more by the budget's own parts: the surface stage
+takes 18.3 km³ a year off as sediment, the resampling's blend 14.8 and the transition 2.7, while
+the collision belts add 19.7 (crust stacked onto the continents, the sediment and arc crust on the
+ocean floor with it), the subduction step 6.5 and the step's finish 6.2. The net holds at -0.12
+(-1.43 to +1.09 over the six runs). Bringing one of Table 1's rows to Earth's alone moves that
+balance: PLT-312 below brings the arcs to Earth's and the crust shrinks.
+
+**The cordillera at Earth's typical arc** (PLT-048, PLT-320). The cordillera shortened every
+continental arc at Bolivia's 6 mm a year (Eichelberger et al. 2015), the Andes' most shortened
+part, scaled by g = min(v / v0, 1). Heuret & Lallemand (2005, full text) find that the upper
+plate's own motion over the mantle, not the convergence, controls back-arc deformation ("upper
+plate absolute motion appears to exert a dominant control on back-arc deformation"; Vup "the best
+single predictor of strain regime", after Jarrard 1986). Their Table 1 gives 88 two-degree segments
+of continental upper plates; 21 of them are class C3, back-arc thrusting, at a mean measured rate of
+7.1 mm/yr, the rest shorten little or extend: 1.7 mm/yr on average (21 x 7.1 / 88). The cordillera
+now shortens at 1.7 mm/yr at every continental arc above an oceanic slab, with no convergence
+factor; the per-front law (about 0.09 of max(Vup, 0), the mean of which over the 88 segments is
+18.1 mm/yr) waits for the force balance's plate motions to reach the arcs. Measured (supercontinent
+/ scattered; master c24ff793 against the branch):
+
+| | master | branch | Earth |
+|---|---|---|---|
+| shortened into the ranges, km³ a year | 3.40 / 3.77 | 1.62 / 1.71 | |
+| land | 0.322 / 0.326 | 0.284 / 0.256 | 0.29 |
+| land above 2 km | 0.335 / 0.306 | 0.320 / 0.359 | 0.05 by rock, 0.10 by surface |
+| coast p50, km | 173 / 161 | 149 / 158 | 433 |
+| continental crust, share of the planet | 0.434 / 0.429 | 0.418 / 0.349 | 0.41 |
+| collision length p50 / p90, Myr (pooled check) | 51 / 134 | 43 / 125 | 15 to 50 / at most 120 |
+| collisions per 100 Myr | 1.90 | 2.17 | 2 to 6 |
+| plate checks met (pooled) | 26 of 45 | 27 of 45 | |
+
+The collisions shorten (the median passes, and so does their number); the plate checks gain those
+two and lose one (the speed of slab-edged plates over slab-free ones, 2.51 to 2.38 against at least
+2.5). The land falls to Earth's on the supercontinent and below it on the scattered start, the coast
+comes nearer, the high ground holds. On master 9d6758bb, before the ocean crust merge, the same
+change moved land 0.310 / 0.305 to 0.319 / 0.298, land above 2 km 0.285 / 0.354 to 0.385 / 0.347,
+the coast 166 / 148 to 173 / 159 km and the plate checks 27 to 29: within the seeds' spread either
+way.
+
+**PLT-312, the arcs on the normal convergence, again** (`DEEPTIME_ARC_NORMAL=1`; the branch off
+against on, supercontinent / scattered):
+
+| | off | on | Earth |
+|---|---|---|---|
+| island arcs, km³ a year | 4.20 | 2.19 | 1.5 |
+| continental arcs, km³ a year | 1.56 | 0.80 | 1.0 |
+| collisions lose, km³ a year | 2.65 | 2.98 | 0.7 |
+| net change of the continental volume, km³ a year | -0.12 | -1.52 | about 0 |
+| land | 0.284 / 0.256 | 0.231 / 0.233 | 0.29 |
+| land above 2 km | 0.320 / 0.359 | 0.418 / 0.427 | 0.05 by rock |
+| coast p50, km | 149 / 158 | 189 / 183 | 433 |
+| continental crust | 0.418 / 0.349 | 0.282 / 0.288 | 0.41 |
+| plate checks met | 27 of 45 | 30 of 45 | |
+
+The arcs come near Earth's and the plate checks and coast improve, but with the collisions still
+losing four times Earth's the crust shrinks, the land falls below Earth's and the high ground's
+share rises. Two of the four measures move away from Earth, so PLT-312 stays off (decisions log
+2026-10-20). It is half of a pair: it can land with a collision loss at Earth's.
+
+**The ocean crust switch, PLT-294** (`tectonics.transition_ocean_crust`; the ocean-basin felsic
+share is the share of `ocean_basin` cells (the regime field) on oceanic crust holding more than
+50 m of felsic plutonic rock, `tools/review/geo_template_fields.py` on the final checkpoint, the
+six runs' range):
+
+| | master off | master on | branch off | branch on | Earth |
+|---|---|---|---|---|---|
+| land | 0.322 / 0.326 | 0.274 / 0.270 | 0.284 / 0.256 | 0.271 / 0.272 | 0.29 |
+| land above 2 km | 0.335 / 0.306 | 0.328 / 0.356 | 0.320 / 0.359 | 0.348 / 0.297 | 0.05 by rock |
+| coast p50, km | 173 / 161 | 149 / 168 | 149 / 158 | 149 / 145 | 433 |
+| ocean-basin felsic share | 0.75 (0.72 to 0.78) | 0.45 (0.40 to 0.48) | 0.76 (0.61 to 0.91) | 0.46 (0.34 to 0.57) | near 0 |
+| collision length p50 / p90, Myr | 51 / 134 | 43 / 154 | 43 / 125 | 38 / 121 | 15 to 50 / at most 120 |
+| collisions lose, km³ a year | 2.57 | 1.96 | 2.65 | 1.85 | 0.7 |
+| plate checks met | 26 of 45 | 25 of 45 | 27 of 45 | 28 of 45 | |
+
+On the branch the switch takes the felsic rock off 0.30 of the ocean basins and moves the land to
+0.27, the high ground and coast within the seeds' spread, and the plate checks hold (27 to 28). It
+stays the coordinator's call (decisions log 2026-10-20, "off until the high-ground fix lands").
+
+**The collisions' end: a slab tear, tried and reverted.** Every collision the check counts ends by
+stalling into a weld (130 of 130 on the branch: convergence under 5 mm/yr for 10 Myr; at the end
+1.2 mm/yr at the median), none by a terrane transfer or a plate's death. The tail's fourteen
+(124 to 320 Myr) take up 800 to 7,100 km of shortening, so they keep converging at tens of mm a
+year long after the continents meet. On Earth a colliding continent's slab breaks off 10 to 25 Myr after the continent
+arrives and the tear runs along the trench at 100 to 300 mm/yr (van Hunen & Allen 2011, full text:
+"20-25 Myr" for old slabs, about 10 for young; tear 100 to 150 mm/yr for old slabs, up to 800 for
+young, about 300 in their asymmetric model). The tear was built (PLT-324): a contact's slab breaks
+off after it has held continental crust for `breakoff_myr`, then the tear runs from that crust along
+the trench at 300 mm/yr, and the torn front stops pulling. On master 9d6758bb with the cordillera at
+1.7 it lengthened the tail (p90 124 to 157 Myr, p50 40 to 32), took the plate checks from 29 to 21
+of 45, the land from 0.319 / 0.298 to 0.241 / 0.239, the coast from 173 / 159 to 122 / 110 km
+(the land above 2 km 0.385 / 0.347 to 0.227 / 0.215). The tail does not run on its own slab: its
+convergence comes from the other plates' forces, so dropping the slab's pull takes speed from the
+plates (and the arcs they feed) without ending the collision. The tear was reverted and has no
+ledger row (decisions log 2026-10-20). The other law the task named, a plate reorganisation that
+ends a collision by breaking or re-forcing the plate behind it, is a change to how plates split:
+left for Ben as its own task.
+
+**The full 16k planet** (`earthlike_full_16k`, seed 1, 8 threads, 1000 Myr; supercontinent /
+scattered; one seed each, so within the spread the quick ensemble shows):
+
+| | master, PLT-294 off | branch, off | branch, on | Earth |
+|---|---|---|---|---|
+| land | 0.333 / 0.334 | 0.365 / 0.330 | 0.312 / 0.268 | 0.29 |
+| land above 2 km | 0.255 / 0.305 | 0.299 / 0.314 | 0.380 / 0.455 | 0.05 by rock |
+| coast p50, km | 158 / 123 | 185 / 146 | 151 / 210 | 433 |
+| continental crust | 0.435 / 0.440 | 0.465 / 0.409 | 0.421 / 0.383 | 0.41 |
+| ocean-basin felsic share | | 0.82 / 0.79 | 0.45 / 0.45 | near 0 |
+| shortened into the ranges, km³ a year | 2.81 / 3.76 | 1.71 / 1.79 | 1.46 / 1.71 | |
+| collision length p50 / p90, Myr (pooled check) | 41 / 117 | 45 / 135 | 38 / 125 | 15 to 50 / at most 120 |
+| collisions lose, km³ a year | 2.26 | 1.67 | 2.01 | 0.7 |
+| plate checks met (pooled) | 26 of 45 | 25 of 45 | 29 of 45 | |
+
+**Stage times** (`tools/review/p1-19-pair.sh`, `earthlike_full_16k`, scattered continents,
+1000 Myr, 8 threads, master c24ff793 and the branch side by side on the VM's two halves, then
+swapped; the VM was loaded, 18 to 22 other cores busy, so the totals are above a quiet run's):
+
+| pair | plates, master / branch, s | total, master / branch, s |
+|---|---|---|
+| ab | 409.2 / 402.0 | 1,634.9 / 1,675.5 |
+| ba | 347.6 / 341.5 | 1,422.0 / 1,430.8 |
+| mean ratio | 0.982 | 1.016 |
+
+The plates take 1.8 % less (the shorter cordillera moves less rock); the total takes 1.6 % more,
+all of it in the surface stage (747 to 780 s), which works on a different planet. The branch
+adds no work per step, so the 900 s gate stands where master left it.
+
+**What is left, and for whom.**
+1. *The island-arc front* (gain, 2.8 times Earth's): fewer and longer-lived ocean-ocean subduction
+   zones from the force balance. Plate work; with it PLT-312 can be measured again.
+2. *The collision loss* (3.8 times Earth's) and the collision tail (p90 121 to 135 Myr against at
+   most 120): the slab tear is not the tail's law; a plate reorganisation is the other candidate,
+   a change to how plates split (Ben's).
+3. *The arc's ocean floor made continental* (4.67 km³ a year, no row in Table 1): a column holding
+   its arc's magma apart from its ocean crust is a crust data-model change (Ben's).
+4. *The cordillera per front*: 0.09 of the upper plate's motion over the mantle (Heuret &
+   Lallemand) once the force balance hands each arc its upper plate's motion.
+5. *Hotspots and rifted margins* (0.04 against 0.5): flood basalts and volcanic margins have no
+   rule.

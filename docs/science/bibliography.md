@@ -4252,6 +4252,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read in this pass: metadata only.
 - Reference check: correct.
 - Read in WP-13a (2026-10-02): text not obtainable (Durham's repository refuses scripts). The break-off times are read in the same group's EGU 2011 abstract (vanHunen2011EGU, below). PLT-184.
+- Read 2026-10-20 (the crust-budget task; a research sub-agent fetched the full text from a course copy, https://www.eps.mcgill.ca/~courses/c350/ProbSets/vanHunen_2011_EPSL.pdf, and quoted it): "collision after the subduction of old, strong subducting oceanic slab leads to slab break-off at 20–25 Myr after the onset of continental collision, and subsequently a slab tear migrates more or less horizontally through the slab with a propagation speed of 100–150 mm/yr. In contrast, young, weak oceanic slabs show the first break-off already 10 Myr after continental collision, and can experience tear migration rates up to 800 mm/yr"; in the asymmetric model "the tear propagates over 1000–1200 km, which suggests an average tear propagation rate of about 300 mm/yr"; observed rates "20–940 mm/yr ... (Yoshioka and Wortel, 1995)" and Carpathian depocentre migration 70–450 mm/yr. PLT-184's 10 Myr is the paper's young-slab break-off time. A tear along the trench at 300 mm/yr was tried as the collisions' end (plates.md "The crust budget against Stern & Scholl") and not kept.
 
 ### Zahirovic2015
 - Reference: Zahirovic, S., Müller, R. D., Seton, M., Flament, N. (2015). Tectonic speed limits from plate kinematic reconstructions. Earth and Planetary Science Letters 418:40-52.
@@ -6949,3 +6950,15 @@ Annen2017 (RCK-053, RCK-091) and Bryan2008 (PRV-006) have their entries above; t
 - Ledger ids: RCK-091 (from-memory).
 - Access: not fetched; search excerpts only.
 - Read: nothing beyond search excerpts saying fluid flow carries heat further into a carbonate host. Do not cite it as read.
+
+## The cordillera at Earth's typical continental arc (PLT-048, PLT-320), added 2026-10-20
+
+The source of the cordillera's shortening rate since the crust-budget task (build log 2026-10-20 "Crust budget against Stern & Scholl"). Stern & Scholl 2010 (above) gives the budget the model's crust was booked against; van Hunen & Allen 2011 (above) was read in full for the collisions' end.
+
+### HeuretLallemand2005
+- Reference: Heuret, A. and Lallemand, S. (2005). Plate motions, slab dynamics and back-arc deformation. Physics of the Earth and Planetary Interiors 149(1-2):31-51.
+- DOI or URL: 10.1016/j.pepi.2004.08.022
+- Cited as: "Heuret & Lallemand 2005".
+- Ledger ids: PLT-048 (the value since 2026-10-20), PLT-320, HNT-127, HYP-018
+- Access: paywalled at the publisher; a full-text PDF was fetched 2026-10-20 (kept in the agent's scratch, not in the library).
+- Read so far (by the project): full text, 2026-10-20. Section 3.2: "upper plate absolute motion appears to exert a dominant control on back-arc deformation, relative to the influence of trench absolute motion"; "back-arc deformation rates cannot exceed the Vup(n) value"; section 1: "among a set of 26 parameters tested by Jarrard (1986), Vup was found to be the best single predictor of strain regime". Table 1, read in its text layer and tabulated by the agent: 88 two-degree segments of continental upper plates (Andaman, Sumatra, Java, Ryukyu, Nankai, Japan, Kamchatka, Alaska, Cascadia, Mexico, Costa Rica, Colombia, Peru, North Chile, Juan Fernandez, South Chile, the Chile triple junction and Patagonia); 21 of them are class C3, "lithospheric scale back-arc thrusting", with a mean measured back-arc deformation rate Vd(n) of 7.1 mm/yr over the 14 that give one; the others shorten little or extend. The length-weighted mean shortening is about 1.7 mm/yr (21 x 7.1 / 88, the agent's arithmetic), and the mean of max(Vup(n), 0) over the 88 is 18.1 mm/yr (the shortening about 0.09 of it). Segments over oceanic upper plates (Izu-Bonin, Mariana, Tonga, Kermadec, the Aleutians, the Antilles, the Sandwich arc and others) were left out.
