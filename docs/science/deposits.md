@@ -552,9 +552,12 @@ The rules (ORE-269):
   tonnage), its dip 0, and no erosion cut is applied to it. The site's centre is the block
   holding the body's centre (rounding had put the centre of a one-block horizon in the block
   above it, and x and z a column off the one the host was read in), projected through that
-  block's centre. The projection to Petroff-Guyou leaves such a body at its block y, where the
-  world's stacks keep its horizon, instead of moving it with the drawn ground, and clips it four
-  blocks under the world's final ground (the young landscape and the amplifier run after the
+  block's centre. The bake raises it with the rock at its centre, as it raises every body
+  (`key_shift`, STR-056). The projection to Petroff-Guyou moves it with its host horizon instead
+  of with the drawn ground: the world's stacks are raised to the drawn ground by the bake's rule
+  (the thickest rock unit near the surface takes up the raise and the beds over it rise whole),
+  and the body rises by the same `key_shift` on those stacks. It is clipped four blocks under
+  the world's final ground (the young landscape and the amplifier run after the
   deposit stage, so that ground can lie lower than the one the stage kept the body under). A
   site with no such horizon places nothing, nor does one on crust that is oceanic now
   (`plates/crust_type`); `survives()` decides the same way as `materialise()`, and the guarantee
@@ -615,6 +618,13 @@ against the code before it was fixed.
 - The projection kept a stratabound body at its y but not under the final ground; it now clips it
   there. A site was projected through its block's corner, which could land a block off; now
   through the block's centre.
+- Keeping the body's y through the projection was itself wrong once the ocean crust branch
+  (master c24ff793) moved bodies by `key_shift` in the bake: the projection raises the world's
+  stacks again to the drawn ground, and where that raise lifted the host the body stayed under
+  it. The body now rises by `key_shift` on the raised world stacks (no double lift: the bake's
+  lift is applied once, and the projection's shift is only its own raise). A test carries 300
+  bodies set in a 6 to 10 block limestone through the bake's lift and crest raise and then the
+  projection's raise, and finds every one still in limestone; keeping the y leaves some out.
 - The guarantee pass read a candidate's host fit for each essential, with a new deform scratch
   each time; the fits are now cached per type, exposure and cell, with one scratch. An exposed
   essential's fit whose body top lies below the exposed band is no fit, so it stays exposed.
