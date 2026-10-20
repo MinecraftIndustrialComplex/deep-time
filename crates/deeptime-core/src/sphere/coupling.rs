@@ -129,9 +129,12 @@ pub struct Coupling {
     /// The cells' unit vectors from their row's (sin φ, cos φ) and their column's (sin λ, cos λ),
     /// each as `Projection::unit` finds it, so a cell's vector is exactly `frame.unit`'s (P1-19:
     /// the plates relink every cell every step and found both from scratch each time).
-    rows: Vec<(f64, f64)>,
-    cols: Vec<(f64, f64)>,
+    rows: Vec<SinCos>,
+    cols: Vec<SinCos>,
 }
+
+/// An angle's (sine, cosine).
+pub type SinCos = (f64, f64);
 
 /// The unit vector from a row's (sin φ, cos φ) and a column's (sin λ, cos λ), in
 /// `Projection::unit`'s order of operations.
@@ -223,6 +226,13 @@ impl Coupling {
                 f(c, unit_of(rows[j], cols[i]), link)
             })
             .collect()
+    }
+
+    /// The rows' (sin φ, cos φ) and the columns' (sin λ, cos λ) the cells' unit vectors are made
+    /// of (`unit_of`: cell (i, j) is (cos φ_j cos λ_i, cos φ_j sin λ_i, sin φ_j)), for a device
+    /// that rebuilds them (the plates' L1 relink on a GPU).
+    pub fn axes(&self) -> [&[SinCos]; 2] {
+        [&self.rows, &self.cols]
     }
 
     /// The grid this coupling serves.
