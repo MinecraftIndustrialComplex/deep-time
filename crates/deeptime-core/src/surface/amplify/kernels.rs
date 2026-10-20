@@ -131,6 +131,9 @@ pub struct NoiseCfg {
     pub seed_relief: f32,
     /// The threshold angle varies by ± this fraction.
     pub thermal_noise: f32,
+    /// The sea floor's critical slope over the land's (`amplify.submarine_slope` /
+    /// `amplify.thermal_slope`): the threshold multiplier of a cell below sea level.
+    pub submarine: f32,
     /// Blocks per cell of this level, and the block of global cell (0, 0).
     pub cell_blocks: f64,
     pub origin_x: f64,
@@ -468,14 +471,21 @@ pub fn incision_cap(win: &Win, z: &[f32], ph: &Physics, out: &mut [f32]) {
     });
 }
 
-/// The threshold-angle multiplier 1 ± `thermal_noise` (smooth, ~40 cells across).
-pub fn tmult_fill(win: &Win, cfg: &NoiseCfg, out: &mut [f32]) {
+/// The threshold-angle multiplier 1 ± `thermal_noise` (smooth, ~40 cells across), times
+/// `cfg.submarine` where the cell is under the sea (`z < sea`): the sea floor's own critical
+/// slope (sea-floor spikes task, 2026-10-20; AMP-074).
+pub fn tmult_fill(win: &Win, cfg: &NoiseCfg, z: &[f32], sea: f32, out: &mut [f32]) {
     let cell = cfg.cell_blocks;
     map_cells(win, out, |i, j, o| {
         let (gi, gj) = win.global(i, j);
         let x = cfg.origin_x + gi as f64 * cell;
         let zb = cfg.origin_z + gj as f64 * cell;
-        *o = 1.0 + cfg.thermal_noise * cfg.noise.value(x, zb, 40.0 * cell, 103) as f32;
+        let m = 1.0 + cfg.thermal_noise * cfg.noise.value(x, zb, 40.0 * cell, 103) as f32;
+        *o = if z[j * win.w + i] < sea {
+            m * cfg.submarine
+        } else {
+            m
+        };
     });
 }
 
@@ -768,7 +778,7 @@ fn seed_and_flood(buf: &mut Buf, ph: &Physics, cfg: &NoiseCfg, times: &mut Times
     let started = Instant::now();
     seed_step(&win, &buf.z, ph, cfg, &mut buf.z2);
     std::mem::swap(&mut buf.z, &mut buf.z2);
-    tmult_fill(&win, cfg, &mut buf.tmult);
+    tmult_fill(&win, cfg, &buf.z, ph.sea, &mut buf.tmult);
     times.seed_ms += started.elapsed().as_secs_f64() * 1000.0;
     let started = Instant::now();
     buf.sed2.copy_from_slice(&buf.z);
