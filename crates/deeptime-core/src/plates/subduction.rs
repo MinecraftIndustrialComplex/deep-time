@@ -827,8 +827,8 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
     // is no azimuth (plates sliding past each other converge along half the edges of a zigzag
     // boundary). Until 2026-10-20 every lattice edge converging on an active contact was a
     // front, and the contacts' strike-slip stretches built arcs: 142,000 km of island-arc front
-    // a step against the mix's 82,000 km of ocean-ocean subduction (build log, "The arcs'
-    // fronts"). ledger: PLT-330
+    // a step against the mix's 82,000 km of ocean-ocean subduction (build log 2026-10-20, "The
+    // arc's basement and the arcs' fronts"). ledger: PLT-330
     for (b, nrm) in boundary.iter_mut().zip(normals.iter_mut()) {
         if let Some((_, _, rel, _)) = b.front
             && (is_transform(rel, *nrm) || rel.dot(*nrm) >= 0.0)
