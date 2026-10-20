@@ -955,10 +955,11 @@ pub fn fronts_finish(
     let band_km = std::f64::consts::PI.sqrt() * k.arc_width_km;
     let island_axis_m = k.island_arc_km3_per_km_myr / band_km * 1000.0 * env.dt_myr; // ledger: PLT-045
     let continental_axis_m = k.continental_arc_km3_per_km_myr / band_km * 1000.0 * env.dt_myr; // ledger: PLT-285
-    // The cordillera: pure shear of the range at `cordillera_shortening_mm_yr`, the strain spread
-    // over its Gaussian band (integral √π · `cordillera_width_km`), fed by the crust behind the
-    // range (from twice the band's half-width beyond the arc to r_s), which shortens at the same
-    // rate and gives the volume. ledger: PLT-048
+    // The cordillera: pure shear of the range at `cordillera_shortening_mm_yr` (Earth's typical
+    // continental arc, at any convergence), the strain spread over its Gaussian band (integral
+    // √π · `cordillera_width_km`), fed by the crust behind the range (from twice the band's
+    // half-width beyond the arc to r_s), which shortens at the same rate and gives the volume.
+    // ledger: PLT-048, PLT-320
     let shorten_km = k.cordillera_shortening_mm_yr * 1.0e-3 * dt_yr / 1000.0;
     let strain_axis = shorten_km / (std::f64::consts::PI.sqrt() * k.cordillera_width_km);
     let range_edge_km = k.arc_distance_km + 2.0 * k.cordillera_width_km;
@@ -1002,7 +1003,11 @@ pub fn fronts_finish(
                     // Altiplano and the Puna stop near 4 km).
                     let iso = iso_height(&s.pools, z_0, gravity);
                     let room = (1.0 - iso.max(0.0) / k.cordillera_height_m).max(0.0);
-                    plan.demand_m = f64::from(s.thickness_m) * strain_axis * w * g * room;
+                    // Not scaled by the convergence (g): back-arc deformation follows the upper
+                    // plate's own motion, not the convergence (Heuret & Lallemand 2005; Jarrard
+                    // 1986), and the rate is the length-weighted mean over Earth's continental
+                    // arcs, whatever their convergence. ledger: PLT-320
+                    plan.demand_m = f64::from(s.thickness_m) * strain_axis * w * room;
                 } else {
                     plan.source = true;
                 }

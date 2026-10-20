@@ -593,12 +593,13 @@ pub struct TectonicParams {
     /// activity to reach it. 0 turns every sample that has received arc magma continental at
     /// once. ledger: PLT-047
     pub arc_mature_crust_km: f64,
-    /// Shortening across a continental arc above an oceanic slab at v = v_0, mm/yr: the arc's
-    /// own cordillera thickens by the crust shortened into it, which the model takes from the
-    /// plate's continental crust behind the range (volume kept; `plates::subduction`). About 6 in
-    /// the Bolivian Andes, the chain's largest (about 300 km since 50 Ma, Eichelberger et al.
-    /// 2015). 0, the default and the plate-only presets' value, leaves only Cortial's subduction
-    /// uplift. ledger: PLT-048
+    /// Shortening across a continental arc above an oceanic slab, mm/yr, at any convergence: the
+    /// arc's own cordillera thickens by the crust shortened into it, which the model takes from
+    /// the plate's continental crust behind the range (volume kept; `plates::subduction`). About
+    /// 1.7 over Earth's continental arcs, length-weighted (Heuret & Lallemand 2005, Table 1: 21
+    /// of 88 two-degree segments shorten across the whole lithosphere, at about 7 mm/yr; the
+    /// Bolivian Andes, the chain's largest, about 6). 0, the default and the plate-only presets'
+    /// value, leaves only Cortial's subduction uplift. ledger: PLT-048, PLT-320
     pub cordillera_shortening_mm_yr: f64,
     /// … the half-width of its band, centred on the arc axis, km (Earth-normalized; the Andes
     /// and Cascades ranges are 100–300 km wide across the arc) …
