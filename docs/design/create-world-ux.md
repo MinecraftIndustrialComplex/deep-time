@@ -77,14 +77,17 @@ From top to bottom:
   by the same code as a keyframe and redrawn every few seconds, so it follows the status line
   instead of waiting up to one keyframe (50 Myr on the quick presets) behind it. It is paced to cost
   at most 2 % of the run: the next frame waits 49 times the last one's drawing time, at least
-  250 ms. The live map is only a picture: it is not kept, not in the keyframe list, not on disk and
-  not on the scrubber, and the world is the same with or without it (`tests/live_map.rs`).
-  Scrubbing back shows the keyframes, a layer the stages running now do not draw stays at its
-  newest keyframe, and once the run ends the map is the newest keyframe. "Stop here" and "Pick this epoch" are
+  250 ms (a satellite frame of quick 16k takes 70 to 95 ms, so on a 1,000-Myr run it is redrawn
+  every 5 to 6 s, 10 to 14 Myr apart; measured cost 1.3 to 1.8 % of the run's wall time). The live
+  map is only a picture: it is not kept, not in the keyframe list, not on disk and not on the
+  scrubber, and the world is the same with or without it (`tests/live_map.rs`). Scrubbing back
+  shows the keyframes, a layer the stages running now do not draw stays at its newest keyframe,
+  and once the run ends the map is the newest keyframe. "Stop here" and "Pick this epoch" are
   optional and stay beside the scrubber; both stay on keyframes, so "Stop here" while the live map
-  shows stops at the newest kept map, and its tooltip says so. Where the panel sits beside the map (a wide window), the map spans its column at the
-  projection's π:1, top-aligned, and the band under the time row shows the layer's key (the same
-  `model.Legend` as the Map tab, cut with "…" when it does not fit).
+  shows stops at the newest kept map, and its tooltip says so. Where the panel sits beside the map
+  (a wide window), the map spans its column at the projection's π:1, top-aligned, and the band
+  under the time row shows the layer's key (the same `model.Legend` as the Map tab, cut with "…"
+  when it does not fit).
 - **A panel with three tabs**:
   - **History**: the event log grouped and counted (`model.Milestones`). It is cut into time
     windows (a fiftieth of the run, at least 1 Myr), with one row per kind per window ("8 new
