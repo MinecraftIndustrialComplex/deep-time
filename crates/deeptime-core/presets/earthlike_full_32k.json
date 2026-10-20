@@ -159,7 +159,6 @@
     "slab_pull": 1.0,
     "slab_depth_km": 700.0,
     "slab_breakoff_myr": 10.0,
-    "slab_tear_mm_yr": 300.0,
     "slab_resistance": 3.0,
     "slab_suction_share": 0.3,
     "edge_energy": 0.1,

@@ -73,14 +73,6 @@
 //! as at a front) and is gone after `slab_breakoff_myr` without a front. A subduction initiation
 //! plants a slab of `initiation_slab_km` (`rifting.rs`), which pulls the new plate towards its
 //! parent until the trench forms.
-//!
-//! With `slab_tear_mm_yr` the slab also tears (ledger PLT-324; van Hunen & Allen 2011): once any
-//! continental crust has stood at the front for `slab_breakoff_myr` the slab has broken off there,
-//! and the tear runs along the trench from it at that speed. An oceanic front sample within the
-//! tear's reach of the front's continental crust has no slab (no pull, no slab resistance); when
-//! the reach covers the whole oceanic front the slab is gone, as at a majority break-off. A
-//! collision that a slab elsewhere on the same trench kept converging (the majority rule never
-//! fires while most of the front is oceanic) so loses its drive within some tens of Myr.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -690,38 +682,16 @@ pub struct FrontSum {
 /// continental crust holds at least half of the front the block time runs, and after
 /// `breakoff_myr` of it the slab is gone (length 0; returns true). An unblocked step resets the
 /// block time.
-///
-/// The tear (ledger PLT-324): while any continental crust stands at the front the hold time
-/// runs, and while none does it runs down again (the tear is forgotten when it reaches 0). Once
-/// it has reached `breakoff_myr` the slab has broken off at that crust and the tear runs along the
-/// trench from it, `tear_km_myr` a Myr (`balance_step` drops the pull of the oceanic front within
-/// its reach, and the whole slab once it has run the whole front).
 pub fn grow_slab(
     s: &mut SlabTrack,
     f: &FrontSum,
     dt_myr: f64,
     depth_km: f64,
     breakoff_myr: f64,
-    tear_km_myr: f64,
 ) -> bool {
     if f.oceanic > 0 {
         let conv = f.conv_sum / f64::from(f.oceanic);
         s.km = (s.km + conv * dt_myr).min(depth_km); // ledger: FRC-020
-    }
-    if tear_km_myr > 0.0 {
-        if f.continental > 0 {
-            s.held_myr += dt_myr;
-            if s.held_myr >= breakoff_myr - 1e-9 {
-                s.torn_km += tear_km_myr * dt_myr; // ledger: PLT-324
-            }
-        } else if s.held_myr > 0.0 {
-            // game-choice (agent, 2026-10-20): the hold runs down as fast as it built up, so a
-            // continent that flickers off the front for a step keeps its tear.
-            s.held_myr = (s.held_myr - dt_myr).max(0.0);
-            if s.held_myr == 0.0 {
-                s.torn_km = 0.0;
-            }
-        }
     }
     if f.continental > 0 && f.continental >= f.oceanic {
         // ledger: FRC-019
@@ -729,7 +699,6 @@ pub fn grow_slab(
         if s.blocked_myr >= breakoff_myr - 1e-9 {
             s.km = 0.0;
             s.blocked_myr = 0.0;
-            s.torn_km = 0.0;
             return true;
         }
     } else {
@@ -939,30 +908,17 @@ fn balance_step(
     // the trench for `slab_breakoff_myr`; a slab no front feeds hangs and pulls along the shared
     // boundary for `slab_breakoff_myr` and is then gone.
     let mut fronts: BTreeMap<usize, FrontSum> = BTreeMap::new();
-    // Each contact's front samples (the overriding side's positions), continental and oceanic
-    // (with the sample), for the slab tears.
-    let tear_km_myr = k.slab_tear_mm_yr; // mm/yr = km/Myr; ledger: PLT-324
-    let mut cont_at: BTreeMap<usize, Vec<DVec3>> = BTreeMap::new();
-    let mut ocean_at: BTreeMap<usize, Vec<(u32, DVec3)>> = BTreeMap::new();
     for e in &edges {
         if let Some((u, c, _, conv)) = e.front {
             let f = fronts.entry(c).or_default();
             if samples[u as usize].kind == CONTINENTAL {
                 f.continental += 1;
-                if tear_km_myr > 0.0 {
-                    cont_at.entry(c).or_default().push(pos[e.v as usize]);
-                }
             } else {
                 f.oceanic += 1;
                 f.conv_sum += conv;
-                if tear_km_myr > 0.0 {
-                    ocean_at.entry(c).or_default().push((e.v, pos[e.v as usize]));
-                }
             }
         }
     }
-    // The oceanic front samples whose slab has torn off this step (PLT-324).
-    let mut torn: BTreeSet<u32> = BTreeSet::new();
     let mut by_key: BTreeMap<(u32, u32), SlabTrack> = std::mem::take(slabs)
         .into_iter()
         .map(|s| ((s.under, s.over), s))
@@ -982,36 +938,8 @@ fn balance_step(
             over: c.over,
             ..SlabTrack::default()
         });
-        if grow_slab(
-            s,
-            f,
-            env.dt_myr,
-            k.slab_depth_km,
-            k.slab_breakoff_myr,
-            tear_km_myr,
-        ) {
+        if grow_slab(s, f, env.dt_myr, k.slab_depth_km, k.slab_breakoff_myr) {
             breakoffs += 1;
-        }
-        // The tear (van Hunen & Allen 2011; ledger PLT-324): the oceanic front within its reach
-        // of the continental crust at the front has lost its slab; once that is all of it, the
-        // slab is gone.
-        if s.torn_km > 0.0 && f.oceanic > 0 {
-            if let (Some(at), Some(oc)) = (cont_at.get(&ci), ocean_at.get(&ci)) {
-                let cos_reach = norm.rad(s.torn_km).min(std::f64::consts::PI).cos();
-                let reached: Vec<u32> = oc
-                    .iter()
-                    .filter(|(_, x)| at.iter().any(|y| x.dot(*y) >= cos_reach))
-                    .map(|&(v, _)| v)
-                    .collect();
-                if reached.len() == oc.len() {
-                    s.km = 0.0;
-                    s.torn_km = 0.0;
-                    s.blocked_myr = 0.0;
-                    breakoffs += 1;
-                } else {
-                    torn.extend(reached);
-                }
-            }
         }
         if f.oceanic > 0 {
             s.idle_myr = 0.0;
@@ -1124,9 +1052,6 @@ fn balance_step(
                             term: Resist::Collision,
                         });
                     }
-                    None
-                } else if torn.contains(&e.v) {
-                    // Its slab has torn off (PLT-324): no pull and no slab to resist.
                     None
                 } else {
                     Some((under, u, dir, slab_km.get(&ci).copied().unwrap_or(0.0)))
@@ -1538,10 +1463,10 @@ mod tests {
             conv_sum: conv * f64::from(n),
         };
         // 50 mm/yr for 2 Myr: 100 km a step, up to the depth of 700 km.
-        assert!(!grow_slab(&mut s, &ocean(10, 50.0), 2.0, 700.0, 10.0, 0.0));
+        assert!(!grow_slab(&mut s, &ocean(10, 50.0), 2.0, 700.0, 10.0));
         assert!((s.km - 100.0).abs() < 1e-9);
         for _ in 0..10 {
-            grow_slab(&mut s, &ocean(10, 50.0), 2.0, 700.0, 10.0, 0.0);
+            grow_slab(&mut s, &ocean(10, 50.0), 2.0, 700.0, 10.0);
         }
         assert_eq!(s.km, 700.0);
         // A continent in a minority of the front: still growing, no block time.
@@ -1551,7 +1476,7 @@ mod tests {
             conv_sum: 8.0 * 40.0,
         };
         s.km = 300.0;
-        assert!(!grow_slab(&mut s, &some, 2.0, 700.0, 10.0, 0.0));
+        assert!(!grow_slab(&mut s, &some, 2.0, 700.0, 10.0));
         assert!((s.km - 380.0).abs() < 1e-9 && s.blocked_myr == 0.0);
         // Blocked for 10 Myr (5 steps of 2): it breaks off on the fifth and starts again.
         let blocked = FrontSum {
@@ -1560,54 +1485,16 @@ mod tests {
             conv_sum: 2.0 * 30.0,
         };
         for i in 0..4 {
-            assert!(!grow_slab(&mut s, &blocked, 2.0, 700.0, 10.0, 0.0), "step {i}");
+            assert!(!grow_slab(&mut s, &blocked, 2.0, 700.0, 10.0), "step {i}");
         }
         assert!(s.km > 380.0 && (s.blocked_myr - 8.0).abs() < 1e-9);
-        assert!(grow_slab(&mut s, &blocked, 2.0, 700.0, 10.0, 0.0));
+        assert!(grow_slab(&mut s, &blocked, 2.0, 700.0, 10.0));
         assert_eq!((s.km, s.blocked_myr), (0.0, 0.0));
         // An unblocked step in between resets the clock.
-        grow_slab(&mut s, &blocked, 2.0, 700.0, 10.0, 0.0);
-        grow_slab(&mut s, &ocean(5, 20.0), 2.0, 700.0, 10.0, 0.0);
+        grow_slab(&mut s, &blocked, 2.0, 700.0, 10.0);
+        grow_slab(&mut s, &ocean(5, 20.0), 2.0, 700.0, 10.0);
         assert_eq!(s.blocked_myr, 0.0);
         assert!((s.km - 100.0).abs() < 1e-9, "{}", s.km);
-    }
-
-    #[test]
-    fn a_continent_in_a_minority_of_the_front_starts_a_tear_after_the_breakoff_time() {
-        let mut s = SlabTrack::default();
-        let some = FrontSum {
-            oceanic: 8,
-            continental: 2,
-            conv_sum: 8.0 * 40.0,
-        };
-        // Held 10 Myr (5 steps of 2): the tear starts on the fifth and runs 300 km a Myr.
-        for i in 0..4 {
-            assert!(!grow_slab(&mut s, &some, 2.0, 700.0, 10.0, 300.0), "step {i}");
-            assert_eq!(s.torn_km, 0.0, "step {i}");
-        }
-        assert!(!grow_slab(&mut s, &some, 2.0, 700.0, 10.0, 300.0));
-        assert!((s.torn_km - 600.0).abs() < 1e-9 && s.blocked_myr == 0.0);
-        grow_slab(&mut s, &some, 2.0, 700.0, 10.0, 300.0);
-        assert!((s.torn_km - 1200.0).abs() < 1e-9);
-        // The continent leaves the front: the tear stops and is forgotten once the hold has run
-        // down (12 Myr held, 6 steps of 2).
-        let ocean = FrontSum {
-            oceanic: 10,
-            continental: 0,
-            conv_sum: 400.0,
-        };
-        for i in 0..5 {
-            grow_slab(&mut s, &ocean, 2.0, 700.0, 10.0, 300.0);
-            assert!((s.torn_km - 1200.0).abs() < 1e-9, "step {i}");
-        }
-        grow_slab(&mut s, &ocean, 2.0, 700.0, 10.0, 300.0);
-        assert_eq!((s.held_myr, s.torn_km), (0.0, 0.0));
-        // Without the tear speed nothing tears.
-        let mut s = SlabTrack::default();
-        for _ in 0..10 {
-            grow_slab(&mut s, &some, 2.0, 700.0, 10.0, 0.0);
-        }
-        assert_eq!((s.held_myr, s.torn_km), (0.0, 0.0));
     }
 
     #[test]
