@@ -61,7 +61,8 @@ small pluton, as thick as the plutons' law gives for its outline (0.6 D^0.6 km, 
 4 to 20 km across), and one that rises over a batholith of about its age is a cupola of it: its base
 sits in the batholith's roof. A stock lies in rock older than itself: where younger cover is
 thicker than its drawn depth, its top goes down to the cover's base, so it is cut by that
-unconformity instead of vanishing in rock laid after it. Each bakes a rim of hornfels or skarn in
+unconformity instead of vanishing in rock laid after it. Cover is read from the column as the
+bake lays it, where a pile of one rock across an unconformity is one horizon dated by its top. Each bakes a rim of hornfels or skarn in
 its host, 0.3 of its smallest dimension wide. Basalt dykes,
 1.7 to 3 blocks wide at depth (1 to 2 where they reach the ground) and 15 km (50 blocks) long at the
 median, cut the rock along rifts. Under every extinct volcano still standing on land a plug of
