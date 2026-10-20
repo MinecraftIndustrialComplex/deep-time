@@ -36,7 +36,11 @@ import java.util.Set;
  * {@code SurfaceSystem.buildSurface} makes for a chunk, with the level's random state and surface
  * system and no chunk, updated for the column and its top block as that loop does (one block of
  * stone above it, water standing over it or not, the solid column under it: far terrain has no
- * caves, and a Deep Time chunk has none before its carvers). The biome is the one the chunk's
+ * caves, and a Deep Time chunk has none before its carvers). Where the table stands in, one more
+ * piece of vanilla's rule is run here on its own ({@link #shallowFloor}, BAK-050): under shallow
+ * water vanilla paints the sea bed as it paints under a dry floor's top (dirt in a lukewarm ocean
+ * up to 6 + surface depth blocks down, sand only deeper), so far terrain draws the table's lake bed
+ * there and its sea bed below. The biome is the one the chunk's
  * biome manager gives a block, the quart cells blended by the seed's zoom, x folded into the lap.
  * A rule is run here only when everything in it reads the column, the block's height, its biome,
  * noise or the random state: {@code steep} (the chunk's heightmap), {@code above_preliminary_surface}
@@ -56,6 +60,18 @@ public final class PackSurfaceRule {
 
     private static final BlockState STONE = Blocks.STONE.defaultBlockState();
 
+    /**
+     * Vanilla's shallow band (ledger BAK-050): the overworld rule ({@code SurfaceRuleData.overworldLike})
+     * paints a floor whose water starts at most 6 + surface depth blocks above it
+     * ({@code waterStartCheck(-6, -1)}) and lies within the surface depth ({@code UNDER_FLOOR}) with
+     * the rule it paints under a dry floor's top (dirt in an ocean or a lukewarm ocean, sand on a beach),
+     * before its sea-bed rule (sand in a lukewarm ocean, gravel in most others) is reached. The block
+     * placed here only marks that the band holds.
+     */
+    private static final SurfaceRules.RuleSource SHALLOW_BAND = SurfaceRules.ifTrue(SurfaceRules.waterStartCheck(-6, -1),
+            SurfaceRules.ifTrue(SurfaceRules.UNDER_FLOOR, SurfaceRules.state(STONE)));
+
+    /** The leading chunk-free rules, or null when not even the first can run without a chunk. */
     private final SurfaceRules.RuleSource rule;
     private final boolean complete;
     private final RandomState random;
@@ -65,8 +81,8 @@ public final class PackSurfaceRule {
     private final int minY;
     private final ThreadLocal<Runner> runners;
 
-    /** One thread's context and the rule applied to it (a SurfaceRule is bound to its context). */
-    private record Runner(SurfaceRules.Context context, SurfaceRules.SurfaceRule rule) {}
+    /** One thread's context and the rules applied to it (a SurfaceRule is bound to its context; {@code rule} null with no rule run here). */
+    private record Runner(SurfaceRules.Context context, SurfaceRules.SurfaceRule rule, SurfaceRules.SurfaceRule band) {}
 
     /** The quart cells a thread read last (at most 4,096, then it starts again). */
     private static final class QuartCache implements BiomeManager.NoiseBiomeSource {
@@ -110,12 +126,13 @@ public final class PackSurfaceRule {
     private Runner runner() {
         SurfaceRules.Context context = new SurfaceRules.Context(random.surfaceSystem(), random, null, null, biomes::getBiome,
                 level.registryAccess().registryOrThrow(Registries.BIOME), new WorldGenerationContext(generator, level));
-        return new Runner(context, rule.apply(context));
+        return new Runner(context, rule == null ? null : rule.apply(context), SHALLOW_BAND.apply(context));
     }
 
     /**
-     * The part of {@code levelRule} far terrain runs, or null when not even its first rule can run
-     * without a chunk. {@code quarts} gives the biome a chunk stores at a quart cell.
+     * The part of {@code levelRule} far terrain runs (none when not even its first rule can run
+     * without a chunk: {@link #top} is then null, and {@link #shallowFloor} still answers).
+     * {@code quarts} gives the biome a chunk stores at a quart cell.
      */
     public static PackSurfaceRule of(ServerLevel level, ChunkGenerator generator, SurfaceRules.RuleSource levelRule,
                                      BiomeManager.NoiseBiomeSource quarts) {
@@ -129,9 +146,8 @@ public final class PackSurfaceRule {
         boolean complete = run.size() == all.size();
         DeepTime.LOGGER.info("[deeptime] far terrain: runs {} of the surface rule's {} top-level rules itself{}", run.size(), all.size(),
                 complete ? " (all of them)" : "; the surface table stands for the rest");
-        if (run.isEmpty())
-            return null;
-        return new PackSurfaceRule(SurfaceRules.sequence(run.toArray(SurfaceRules.RuleSource[]::new)), complete, level, generator, quarts);
+        SurfaceRules.RuleSource leading = run.isEmpty() ? null : SurfaceRules.sequence(run.toArray(SurfaceRules.RuleSource[]::new));
+        return new PackSurfaceRule(leading, complete && leading != null, level, generator, quarts);
     }
 
     /**
@@ -146,6 +162,8 @@ public final class PackSurfaceRule {
      */
     public BlockState top(int x, int y, int z, int waterHeight) {
         Runner r = runners.get();
+        if (r.rule == null)
+            return null;
         r.context.updateXZ(x, z);
         r.context.updateY(1, y - minY + 1, waterHeight, x, y, z);
         BlockState s = r.rule.tryApply(x, y, z);
@@ -154,6 +172,20 @@ public final class PackSurfaceRule {
         if (s.isAir() || !s.getFluidState().isEmpty())
             return null;
         return s;
+    }
+
+    /**
+     * Whether the top block (x, y, z) of a column under water to {@code waterHeight} (the y just
+     * above the water) lies in vanilla's shallow band ({@link #SHALLOW_BAND}, ledger BAK-050), with
+     * the surface depth the chunk's surface system gives the column. There the rule paints the sea
+     * bed as it paints under a dry floor's top, so far terrain draws a lake's bed, not the surface
+     * table's sea bed.
+     */
+    public boolean shallowFloor(int x, int y, int z, int waterHeight) {
+        Runner r = runners.get();
+        r.context.updateXZ(x, z);
+        r.context.updateY(1, y - minY + 1, waterHeight, x, y, z);
+        return r.band.tryApply(x, y, z) != null;
     }
 
     /** Whether the rule reads nothing of a chunk (every condition and rule in it is one of the known chunk-free ones). */
