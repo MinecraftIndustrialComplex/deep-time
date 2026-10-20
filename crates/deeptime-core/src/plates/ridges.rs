@@ -194,6 +194,13 @@ pub const ACCRETED_VISIBLE_GLOBAL: &str = "plates/resample_accreted_visible_km3"
 /// World global: the surface accretion raised at resamplings, km² × m / 1000 (km³ of rise,
 /// Earth-normalized; plate task 8).
 pub const ACCRETED_RISE_GLOBAL: &str = "plates/resample_accreted_rise_km3";
+/// World global (measurement, the crust budget `crust_budget.rs`): visible continental crust of
+/// another plate under the top cover that neither accretes nor is consumed (no subduction
+/// contact puts it under the top's plate), dropped with all its pools, km³ (Earth-normalized) …
+pub const DROPPED_GLOBAL: &str = "plates/resample_dropped_km3";
+/// … and the mafic pools of the continental crust that accretes, which `pools::accrete` does not
+/// carry (only the conserved pools join the column on top), km³.
+pub const MAFIC_DROPPED_GLOBAL: &str = "plates/resample_mafic_dropped_km3";
 
 /// Resamples the crust onto a fresh lattice and returns its geometry. `tree` holds every sample
 /// at `pos` (`Tree::over(pos, |_| true)`, the one the step's motion built).
@@ -305,7 +312,7 @@ pub fn resample(
     // belt or went down with the slab (`belts.rs`): it is consumed here, not accreted a second
     // time (ledger: PLT-276, PLT-292). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
-    let mut tally: Vec<[f64; 5]> = vec![[0.0; 5]; n];
+    let mut tally: Vec<[f64; 7]> = vec![[0.0; 7]; n];
     // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
     let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
     // The step's limits (`rate.rs`) on the new lattice: a covered sample's ceiling and top are
@@ -367,8 +374,17 @@ pub fn resample(
                             } else if under.kind == CONTINENTAL {
                                 tally[2] += conserved;
                             }
+                            if under.kind == CONTINENTAL {
+                                tally[6] += u.pools[pool::CONSERVED..]
+                                    .iter()
+                                    .map(|&x| f64::from(x))
+                                    .sum::<f64>();
+                            }
                             accrete(&mut s.pools, &u.pools);
                         }
+                    } else if under.kind == CONTINENTAL {
+                        let u = interpolate(src, c2, rots[*g2 as usize]);
+                        tally[5] += f64::from(u.thickness_m);
                     }
                 }
                 // Accreted crust stands up by its Airy height, capped at the column's, and the
@@ -400,6 +416,8 @@ pub fn resample(
         (ACCRETED_HIDDEN_CONTINENT_GLOBAL, 2),
         (ACCRETED_VISIBLE_GLOBAL, 3),
         (ACCRETED_RISE_GLOBAL, 4),
+        (DROPPED_GLOBAL, 5),
+        (MAFIC_DROPPED_GLOBAL, 6),
     ] {
         *world.globals.entry(name.to_owned()).or_insert(0.0) += sum(k);
     }
