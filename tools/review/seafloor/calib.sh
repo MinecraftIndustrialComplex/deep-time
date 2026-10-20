@@ -3,20 +3,22 @@
 # Sea-floor spikes study (2026-10-20): the young and amplify stages again from run-s1's deposits
 # checkpoint with a sea-floor critical slope, baked, then the whole world's heightmap and the
 # survey at the L3 baseline and at ETOPO 60s's.
-#   calib.sh <tag> <young.sea_floor_slope_deg> <amplify.submarine_slope> [scale.lambda_c_deg]
+#   calib.sh <tag> <young.sea_floor_slope_deg> <amplify.submarine_slope> [scale.lambda_c_deg [run [binary]]]
+# <run> is a folder under the study dir holding checkpoints/6-deposits.dtcp (default run-s1, the play
+# world's planet); <binary> the deeptime to use (default the study's deeptime-fix).
 # The projection's central meridian is pinned (default 146, what the bake chose for run-s1 with
 # the sea floor as it was): left to choose, a few coastal cells can move it (to 193.25 at 15 and
 # 20 degrees), and the runs would then compare different parts of the planet block for block.
 set -euo pipefail
-tag=$1 deg=$2 sub=$3 lam=${4:-146}
+tag=$1 deg=$2 sub=$3 lam=${4:-146} run=${5:-run-s1}
 S=/data/ban/deeptime-runs/seafloor
 R=/data/ban/mic/mods/agent-a178044f2a1370861
-B=$S/deeptime-fix
+B=${6:-$S/deeptime-fix}
 W=$S/cal-$tag
 PY='(builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux.python3.withPackages (p: [p.numpy p.scipy p.matplotlib])'
 rm -rf "$W"
 mkdir -p "$W"
-"$B" stage young --threads 8 --in $S/run-s1/checkpoints/6-deposits.dtcp --out "$W/y.dtcp" --work "$W/yw" \
+"$B" stage young --threads 8 --in "$S/$run/checkpoints/6-deposits.dtcp" --out "$W/y.dtcp" --work "$W/yw" \
     --set young.sea_floor_slope_deg="$deg" 2>&1 | grep -E "young_final|error" || true
 "$B" stage amplify --threads 8 --in "$W/y.dtcp" --out "$W/a.dtcp" --work "$W/aw" --bake \
     --set amplify.submarine_slope="$sub" --set scale.lambda_c_deg="$lam" 2>&1 | grep -E "amplify_final|bake|error" | cut -c1-400 || true
