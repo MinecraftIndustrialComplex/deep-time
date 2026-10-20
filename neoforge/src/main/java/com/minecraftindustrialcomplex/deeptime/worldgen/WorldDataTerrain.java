@@ -29,6 +29,7 @@ public final class WorldDataTerrain implements TerrainSource {
     private final Object peatLock = new Object();
     private volatile VolcanicBiomeRules volcanicBiomeRules;
     private volatile VolcanicZones volcanicZones;
+    private volatile WaterCaveShield waterCaveShield;
 
     public WorldDataTerrain(WorldDataRef ref) {
         this.ref = ref;
@@ -283,6 +284,21 @@ public final class WorldDataTerrain implements TerrainSource {
     public double height(int x, int z) {
         return data().height(wrapX(x), z);
     }
+
+    /** The cave-entrance shield beside the world's water (HYD-078), with the planet's 4-block noise cell as the shore reach. */
+    @Override
+    public double waterShield(int x, int z) {
+        WaterCaveShield s = waterCaveShield;
+        if (s == null) {
+            WorldData wd = data();
+            s = new WaterCaveShield(wd, com.minecraftindustrialcomplex.deeptime.worlddata.Water.Spec.of(wd, PLANET_CELL));
+            waterCaveShield = s;
+        }
+        return s.at(x, z);
+    }
+
+    /** {@code deeptime:planet}'s noise cell width, blocks (size_horizontal 1), which the shore rule's reach equals. */
+    private static final int PLANET_CELL = 4;
 
     /**
      * A biome input through the world's mapping. In a world the P1-09 bake wrote, the weirdness is

@@ -16,6 +16,7 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.density.DepthDensity;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.LavaLakesDensity;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.RasterDensity;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.TerrainDensity;
+import com.minecraftindustrialcomplex.deeptime.worldgen.density.WaterShieldDensity;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.chunk.ChunkGenerator;
@@ -56,6 +57,7 @@ public final class DeepTimeRegistries {
         DENSITY_FUNCTIONS.register("raster", () -> RasterDensity.MAP_CODEC);
         DENSITY_FUNCTIONS.register("beyond_pole", () -> BeyondPoleDensity.MAP_CODEC);
         DENSITY_FUNCTIONS.register("lava_lakes", () -> LavaLakesDensity.MAP_CODEC);
+        DENSITY_FUNCTIONS.register("water_shield", () -> WaterShieldDensity.MAP_CODEC);
         RULES.register("delegate", () -> DelegatingRuleSource.MAP_CODEC);
         BIOME_MODIFIERS.register("claim_ores", () -> ClaimOresBiomeModifier.CODEC);
     }

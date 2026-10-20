@@ -212,6 +212,36 @@ public final class Rivers {
         return sampleRange(segs, 0, segs.length, wx, z);
     }
 
+    /**
+     * How far column (qx, qz), any lap, lies outside the nearest channel that comes within
+     * {@code reach} blocks of it: the distance to the segment's centreline less its half-width (at
+     * least {@link #MIN_HALF_WIDTH}, as {@link #sample} counts it), so 0 or less inside a channel;
+     * {@code +∞} when no channel comes that close. A game-side rule ({@code WaterCaveShield}), not
+     * part of the column rule Rust mirrors.
+     */
+    public double edgeDistance(long qx, long qz, double reach) {
+        long wx = Math.floorMod(qx + c / 2, (long) c) - c / 2;
+        long r = (long) Math.ceil(Math.max(0.0, reach));
+        // A channel edge within reach lies in the box; the tiles there list the segment (the index
+        // lists a segment in every tile its channel covers, or sample() would miss it).
+        int[] segs = entriesIn(wx - r, qz - r, wx + r, qz + r);
+        double cc = c, best = Double.POSITIVE_INFINITY;
+        for (int s : segs) {
+            double ax = x[s], az = this.z[s], bx = x[s + 1], bz = this.z[s + 1];
+            double k = Math.floor((ax - wx) / cc + 0.5);
+            double px = wx + k * cc, pz = qz;
+            double ex = bx - ax, ez = bz - az;
+            double l2 = ex * ex + ez * ez;
+            double t = l2 > 0.0 ? ((px - ax) * ex + (pz - az) * ez) / l2 : 0.0;
+            t = t < 0.0 ? 0.0 : (t > 1.0 ? 1.0 : t);
+            double dx = px - (ax + t * ex), dz = pz - (az + t * ez);
+            double e = Math.sqrt(dx * dx + dz * dz) - Math.max(lerp(hw[s], hw[s + 1], t), MIN_HALF_WIDTH);
+            if (e < best)
+                best = e;
+        }
+        return best <= reach ? best : Double.POSITIVE_INFINITY;
+    }
+
     private Sample sampleRange(int[] segs, int from, int to, long wx, long z) {
         double cc = c;
         double px0 = wx, pz = z;
