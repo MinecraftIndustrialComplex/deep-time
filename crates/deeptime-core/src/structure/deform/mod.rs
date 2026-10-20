@@ -453,7 +453,16 @@ pub fn report(
         })
         .collect();
     let step = 4.0;
-    let check = lattice::noddy_check(features, st, &index, &sample, min_y, max_y, step);
+    let check = lattice::noddy_check(
+        features,
+        st,
+        &index,
+        &sample,
+        min_y,
+        max_y,
+        step,
+        lattice::STAGE_PLANE_GUARD_BLOCKS,
+    );
     let voxels = cols.columns as f64 * ((max_y - min_y) / step);
     let alive = |k: Kind| features.iter().filter(|f| f.kind == k).count();
     let of = |k: Kind, get: &dyn Fn(&Feature) -> f64| {

@@ -10,13 +10,13 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 |---|---|---|
 | [PLT](ledger/PLT.md) | plate setup | PLT-001 to PLT-021, PLT-203, PLT-205, PLT-209 to PLT-211 (26) |
 | [PLT](ledger/PLT.md) | plate motion | PLT-022 to PLT-028 (7) |
-| [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252, PLT-285 to PLT-286, PLT-289 (47; PLT-289 ocean floor as thick as a continent turns continental, the resampling lumps, 2026-10-18; PLT-285 and PLT-286 the continental arcs and the cones as rock, plate task 8, 2026-10-17) |
+| [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252, PLT-285 to PLT-286, PLT-289, PLT-312 (48; PLT-312 the arcs on the convergence normal to the front, an experiment kept off, the land-shape task, 2026-10-20; PLT-289 ocean floor as thick as a continent turns continental, the resampling lumps, 2026-10-18; PLT-285 and PLT-286 the continental arcs and the cones as rock, plate task 8, 2026-10-17) |
 | [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250, PLT-253, PLT-290 to PLT-292 (34; PLT-290 to PLT-292 the crust a collision took counted once, the resampling lumps, 2026-10-18; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
-| [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228 (19) |
+| [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228, PLT-293 (20; PLT-293 ocean crust keeps its own rock at resamplings and in the L1 sampling, 2026-10-19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
-| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288 (43; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
-| [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265 (41; PLT-265 Earth's passive margins, the transition's comparison) |
+| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288, PLT-294 (44; PLT-294 the switch for the transition's ocean side, ocean crust or the continent's rock, 2026-10-19; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
+| [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265, PLT-310 to PLT-311 (43; PLT-310 and PLT-311 the boundary's normal and Bird's transform test, the land-shape task, 2026-10-20; PLT-265 Earth's passive margins, the transition's comparison) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
 
@@ -274,9 +274,12 @@ orogenic collapse and before the surface processes:
    stretch of margin (boundary samples grouped round seeds at least W/2 apart; every sample of the
    zone belongs to the seed of its nearest boundary sample, through its own crust and plate), the
    share 1 − e^(−δt/τ) per step of what would bring the stretch to the profile (τ =
-   `transition_myr`, 20 Myr, PLT-263), as the source's own rock thinned in proportion (pure shear).
-   Volume is conserved, and crust types do not change: the thickened ocean-side samples stay
-   oceanic, so the continental area and the crust share are not redefined by this rule.
+   `transition_myr`, 20 Myr, PLT-263), the sources thinned in proportion (pure shear), as their
+   own rock. A switch added on 2026-10-19, off by default (`transition_ocean_crust`, PLT-294,
+   "Ocean crust keeps its own rock" below), gives an oceanic sink the same volume as ocean crust
+   instead, lavas and gabbro in the ocean column's proportion. Volume is conserved, and crust types do not change: the thickened
+   ocean-side samples stay oceanic, so the continental area and the crust share are not redefined
+   by this rule.
 4. *Heights* (PLT-264). A metre of crust moved changes the height by 1/f, f = (T_n − T_o) / (z_0 −
    z_f) = 4.24 m/m with the presets' continent (z_0 = 525 m) and old ocean floor (z_f = −5,600 m),
    on both sides, so the two sides meet. An oceanic sample of the zone then cools with its age (the
@@ -440,8 +443,13 @@ measure outside its range.
 
 **Limits.** Lengths are counts of lattice samples times the sample spacing (about 70-80 km), so the
 subducting share is an estimate in the same unit as the slab front length, not a surveyed length.
-Bird's classes are not the model's: his transform class is by azimuth against the relative
-velocity, the model's "other" also holds converging boundaries that have no contact yet. The arc
+Bird's classes are not the model's: his subduction zones were marked by hand where a Benioff zone
+or an arc is, and the model's "other" also holds converging boundaries that have no contact yet.
+Since 2026-10-20 the model's transform is Bird's (PLT-311): motion within 20 degrees of the
+boundary's own direction, the direction from the boundary's normal over two rings of samples
+(PLT-310). Until then each sample judged the motion along its own lattice edges, which zigzag
+about 30 degrees either side of a boundary, and read strike-slip as convergence on one edge and
+divergence on the next (section "Land shape and the high ground" below has the before and after). The arc
 comparison is by cells (area) against Earth's count of volcanoes. The oceanic arc crest limit
 (1 km) and the Andean crest limit (6 km) are from memory (PLT-217, PLT-219). The target ranges
 fail today's model by design: they are what the force-balance and belt tasks are to move.
@@ -1935,20 +1943,26 @@ lower-crustal flow and the settling ("Mountains eat the world: the continents dr
   last one, a plate step old.
 - *The flow's heights* (PLT-281) follow from each column's crust before and after the step, as
   the collapse's do, and the settling then takes them to equilibrium.
-- *The flow's substeps* (PLT-300): explicit, as many as keep it stable, at most 64 a step, past
-  which the step moves less than the law. At the thickest channel (K = 8 K₀ = 12,000 km²/Myr) on
-  six edges and the preset's mean spacing taken as a hexagonal lattice's (about 77 km at quick
-  16k's 100,000 samples, 48 km at full 16k's 250,000), the cap holds the step to 3.1 Myr of the
-  law at quick 16k and 1.3 Myr at full 16k, whatever the step. So it binds at quick 16k only at 4
-  Myr (crust above about 78 km), and at full 16k at both (above about 76 km at 2 Myr, 70 km at 4
-  Myr). At the thickest channel a 4-Myr step then moves crust 0.79 as far per Myr as a 2-Myr
-  one at quick 16k, and half as far at full 16k. These are estimates from the constants; the substeps a step takes (`Flow::substeps`) are not logged, and
-  how much crust is that thick was not measured.
+- *The flow's substeps* (PLT-300): explicit, as many as keep it stable. The P4 review estimated
+  that the old bound of 64 a step would bind at full 16k above about 74 km of crust; but the
+  crust is held to `crust_max_km` 70, where the channel is 20 km and K = 2.4 K₀, not the 8 K₀
+  the estimate took. Measured on 2026-10-20 (land-shape task; the step's substeps and the plate
+  time they left uncovered are now world globals, `plates/channel_flow_substeps` and
+  `plates/channel_flow_short_myr`, printed by the crust budget): a full 16k run (seed 1, both
+  starts, 1000 Myr) with the bound and one without are the same to the bit, the steps took 30
+  substeps on average (12 at quick 16k), and no plate time went uncovered. The bound is now only a
+  guard (4096), and a step longer than 2 Myr runs in 2-Myr pieces, each finding its channels and
+  rings again, so a 4-Myr step moves crust as two 2-Myr steps do (test
+  `a_long_step_is_two_short_ones`).
 - *The flow's reach.* Crust moves only among the channel columns and the two rings of their
-  plate's crust around them, found once a step, so a channel's front can move at most two rings
-  (about 150 km at quick 16k, 100 km at full 16k) a step, half as far per Myr at 4 Myr. K₀'s
-  length over 15 Myr is Rey, Teyssier & Whitney's 150 km, √(K₀ t) = 77 km over 4 Myr at K₀ and
-  220 km at 8 K₀; not measured here.
+  plate's crust around them, found once a piece, so a channel's front can move at most two rings
+  (about 150 km at quick 16k, 100 km at full 16k) per 2 Myr. K₀'s length over 15 Myr is Rey,
+  Teyssier & Whitney's 150 km; √(K t) over a 2-Myr piece at the thickest channel (2.4 K₀) is 84
+  km. Measured with the substeps (`plates/channel_flow_edge`, the outermost-ring columns left
+  with a channel): about 9 a step at full 16k and 1.5 at quick 16k, against roughly 13,000
+  columns thicker than 50 km at full 16k (about 12 % of the continental crust in the crust
+  budget's bands, 0.43 of 250,000 samples), so the reach's dependence on the lattice moves almost
+  nothing and was left as it is.
 
 ## L1 sampling on a GPU (2026-10-19)
 
@@ -1988,6 +2002,129 @@ four, equal in one), where one f32 ulp on one weight moved the CPU's own land sh
 planet by up to 0.004 and, before the cadence change, by 0.024. The same-state comparison above
 finds no lean, so the four in five is chance or an effect too indirect to show in a single
 sampling; a larger paired ensemble would tell.
+
+## Ocean crust keeps its own rock (2026-10-19)
+
+**What was wrong.** The external review of 2026-10-19 (defect D1) found granite in 73 to 86 % and
+metamorphic rock in 67 to 78 % of the sea-floor columns of run 1a156f22b66, and 11 to 14 km from
+the sea floor to the peridotite where Earth has about 7.5 km (GlobSed's 0.4 km of deep-ocean
+sediment over White et al. 1992's 7.1 km of igneous crust). Part of that was drawing: every crust
+kind's pools were drawn with the continental classes (the rock page, RCK-095 and RCK-096). The
+rest is rock the plate model puts there.
+
+**Where the rock came from.** A diagnosis build (master d54c7f0f with counters on every
+mechanism that adds felsic plutonic or metamorphic rock to an ocean sample, except the
+transition; `earthlike_quick_16k`, supercontinent start, seed 1, 1000 Myr) counted:
+
+| Felsic plutonic rock gained by ocean samples | Share |
+|---|---|
+| from continental corners, when a resampling blended all three corners' pools | 51 % |
+| island arcs (PLT-043 to PLT-046) | 32 % |
+| crust accreted at a resampling (the footprints under the new sample) | 17 % |
+
+| Metamorphic rock gained by ocean samples | Share |
+|---|---|
+| diagenesis of sediment piles thicker than about 11 km | 52 % |
+| from continental corners at resamplings | 34 % |
+| accretion at resamplings | 13 % |
+
+Blending within the ocean then moved 3.2 times as much felsic plutonic rock between ocean samples
+as all the sources added, a little further at every resampling. The first change (PLT-293) stops
+both: a resampling and the L1 sampling blend each pool over corners of the sample's own kind, and
+on ocean crust a resampling keeps the felsic and metamorphic pools of the nearest corner. On its
+own, on master d54c7f0f, it barely moved where the rock lay. The final checkpoints, read with
+`deeptime dump-fields` (`tools/review/geo_template_fields.py`), show why: the share of ocean L1
+cells holding more than 50 m of felsic plutonic rock falls with the distance (L1 cells, 4.8 km
+each on the planet) from the nearest continental cell over about the transition's half-width
+(W/2 = 100 km = 21 cells), and switching the transition off (`transition_width_km` = 0) takes
+most of it away (master d54c7f0f, 2026-10-19):
+
+| cells to land | ocean cells (master) | master | PLT-293 | PLT-293, no transition | PLT-293 and PLT-294 on |
+|---|---|---|---|---|---|
+| 1 | 36,171 | 0.96 | 0.91 | 0.72 | 0.73 |
+| 2 | 23,360 | 0.93 | 0.91 | 0.69 | 0.70 |
+| 3 | 17,839 | 0.90 | 0.89 | 0.60 | 0.61 |
+| 4 to 5 | 27,380 | 0.85 | 0.84 | 0.48 | 0.48 |
+| 6 to 8 | 29,531 | 0.78 | 0.76 | 0.34 | 0.37 |
+| 9 to 13 | 31,611 | 0.67 | 0.66 | 0.23 | 0.31 |
+| 14 to 21 | 23,576 | 0.52 | 0.50 | 0.15 | 0.21 |
+| 22 to 34 | 12,340 | 0.37 | 0.29 | 0.10 | 0.12 |
+| farther | 5,054 | 0.12 | 0.20 | 0.25 | 0.01 |
+
+(Supercontinent start, seed 1, each column its own run, so the planets differ by chaos.) The
+transition (PLT-261) moves the continent's own rock to the oceanic samples of its ocean side and
+keeps them oceanic; on this planet nearly all the ocean lies within W/2 of a margin, so it laid
+granite and gneiss between the lavas and the gabbro of nearly every ocean column.
+
+**On today's master** (bc2e5472, the continents fix, PLT-300 to PLT-302; the sea-floor fix
+49f5f543 does not touch the plate model), the same planet with checkpoints, 2026-10-20. "Before" is
+master, "after" the branch's default, "switch on" the branch with PLT-294 on; each its own run:
+
+| cells to land | ocean cells (before) | before | after | after, switch on |
+|---|---|---|---|---|
+| 1 | 37,906 | 0.96 | 0.89 | 0.75 |
+| 2 | 23,108 | 0.94 | 0.88 | 0.71 |
+| 3 | 16,875 | 0.93 | 0.84 | 0.62 |
+| 4 to 5 | 23,839 | 0.90 | 0.77 | 0.48 |
+| 6 to 8 | 24,484 | 0.83 | 0.67 | 0.34 |
+| 9 to 13 | 26,710 | 0.72 | 0.55 | 0.23 |
+| 14 to 21 | 24,364 | 0.56 | 0.41 | 0.12 |
+| 22 to 34 | 16,442 | 0.32 | 0.26 | 0.06 |
+| farther | 5,899 | 0.04 | 0.05 | 0.00 |
+
+| ocean L1 cells | before | after | after, switch on |
+|---|---|---|---|
+| crust 0 to 20 Myr old: felsic plutonic over 50 m | 0.27 | 0.35 | 0.16 |
+| crust 0 to 20 Myr old: crystalline crust, sediment cover (km) | 8.2, 0.5 | 8.0, 0.8 | 7.5, 0.4 |
+| crust 20 to 65 Myr: felsic plutonic over 50 m | 0.67 | 0.73 | 0.47 |
+| crust 65 to 150 Myr: felsic plutonic over 50 m | 0.89 | 0.84 | 0.63 |
+| crust over 150 Myr: felsic plutonic over 50 m; sediment cover (km) | 0.99; 7.8 | 0.98; 9.6 | 0.79; 9.9 |
+| regime ocean basin: felsic plutonic, metamorphic over 50 m | 0.81, 0.72 | 0.73, 0.65 | 0.46, 0.38 |
+| regime ridge: felsic plutonic over 50 m | 0.48 | 0.36 | 0.21 |
+| regime arc; back-arc: felsic plutonic over 50 m | 0.99; 0.87 | 1.00; 0.79 | 1.00; 0.73 |
+
+On the new master PLT-293 moves more than it did on d54c7f0f (0.72 to 0.55 at 9 to 13 cells), and
+the switch takes most of the ocean side's felsic rock away (0.23 there). The column draws the felsic
+plutonic rock left on ocean crust as diorite or granodiorite and its metamorphic rock as schist
+(RCK-096), never granite or gneiss; the switch decides how much of the ocean column is arc-like rock
+between the lavas and the gabbro. The review's census of the sea floor (strata.md, "The ocean crust
+and the mountains, measured") still finds granite in 4 % and gneiss in 21 % of the ocean columns
+(62 % and 77 % before), and both come from the continent beside them: the column rule blends 4 x 4
+horizon cells by key whatever their crust kind, so near a coast the continent's granite and its
+gneiss (its metamorphic pool and its strata log's layers buried to 650 degC, which only continental
+crust metamorphoses) reach into the ocean columns and pinch out. Of 80 such columns on the
+supercontinent planet (seed 1), 58 lie within 5 km of continental crust or land and 69 within 15 km;
+before the change, 6 and 12, with 33 more than 75 km from any.
+
+**The transition's ocean side: a switch for Ben** (PLT-294). With `transition_ocean_crust` on, an
+oceanic sink takes the same volume as ocean crust (lavas and gabbro in the ocean column's
+proportion), as the thick igneous crust of a volcanic margin would be. That takes most of the
+transition's granite off the sea floor (the "switch on" columns above), but the continental rock that
+the sources give up is then lost, and land falls (`earthlike_quick_16k`, 1000 Myr, the end of the
+run, seeds 1 to 3; "before" is master 49f5f543, which holds the continents fix bc2e5472, "after" the
+branch's default; 2026-10-20):
+
+| start | land, before | after | switch on | continental crust (10^9 km3), before | after | switch on |
+|---|---|---|---|---|---|---|
+| supercontinent | 0.264, 0.326, 0.321 | 0.309, 0.307, 0.344 | 0.277, 0.286, 0.252 | 7.5, 8.8, 8.1 | 8.0, 8.4, 9.1 | 7.9, 7.8, 7.0 |
+| scattered continents | 0.289, 0.342, 0.282 | 0.356, 0.323, 0.294 | 0.221, 0.289, 0.293 | 7.5, 8.6, 7.7 | 8.5, 8.7, 7.8 | 7.2, 7.7, 8.3 |
+
+The means: before 0.30 on both starts, after 0.32, switch on 0.27 on both, against Earth's 0.29.
+"After" against "before" is within the seeds' spread (0.26 to 0.34). On master d54c7f0f, before the continents fix, the switch cost more: supercontinent 0.140,
+0.131 and 0.139 against 0.165, 0.189 and 0.177.
+
+Ben weighed the transition's land cost on 2026-10-05 ("Keep 200 km, raise crust in 7-8"), so the
+switch is off by default and the choice is his. The physical fix is a continent that widens as it
+stretches, which the model's fixed boundary cannot do without the ratchet PLT-289 records.
+
+**What is left under the sea** (switch on, seed 1 supercontinent on master bc2e5472, the table
+above): all the arc cells and 0.73 of the back-arc cells hold island-arc rock (drawn as andesite over
+diorite or granodiorite, RCK-096; the model's oceanic fronts were about 8.6 times Earth's length,
+125,000 km against 14,500 at 500 Myr in plate task 8, 2026-10-17, "The crust budget on sourced
+rates" above, inferred from the fronts' km × Myr and not re-measured since, PLT-045), and 0.46 of the ocean basin, 0.21 of the ridges and 0.16 of the crust younger than 20 Myr
+hold some; on d54c7f0f these were 0.61, 0.45, 0.16 and 0.07. On crust older than 150 Myr the
+sediment pile averages 9.6 to 9.9 km (6.4 km on d54c7f0f) and its base turns to schist (the
+diagenesis above): the pile, not the ocean crust, makes old sea floor deep to its mantle.
 
 ## Mountains eat the world: the continents drown (2026-10-19)
 
@@ -2177,3 +2314,174 @@ master=<summaries> --group fix=<summaries> --maps <name>=<maps dir>` makes them 
 summaries and maps (`series.png` the stocks over time per seed, `bands-*.png` the thickness bands,
 `maps-*.png` six snapshots of elevation and of the continental crust); the build log entry of
 2026-10-20 has the commands.
+
+## Land shape and the high ground (2026-10-20)
+
+The coordinator's task after "Mountains eat the world" above: with the land right (0.29 to 0.31 of
+the planet), land above 2 km is 0.29 to 0.35 of the land (Earth 0.10, HYP-004) and the median
+distance from land to the coast 130 to 170 km (Earth 433, HYP-035). Each lead's share by paired
+ablation, the causes fixed at the source with sourced rates where that needs no choice of Ben's,
+and the Köppen E share and natural CO₂ beside, the climate untouched. Ledger PLT-310 to PLT-312,
+HYP-040 and HYP-041, with PLT-221, PLT-300 and PLT-301 changed. Code: `plates/{shortening.rs,
+dynamics.rs, subduction.rs, flow.rs, crust_budget.rs}`. Tables: `tools/review/land-shape.py` (each
+run's crust budget and climate), `tools/review/land-maps.py` (the budget's maps: land pieces, the
+drowned crust, the high ground by its last orogeny) and `tools/review/earth-crust.py` (Earth's
+crust from CRUST1.0); the build log entry of 2026-10-20 "Land shape" has the commands.
+
+**What Earth looks like** (CRUST1.0, Laske et al. 2013, on a 1-degree grid with its own surface
+heights; HYP-040 and HYP-041, the model file read, the paper not). Earth's land stands on crust of
+32.0 / 38.6 / 45.8 km (p10 / p50 / p90); crust 45 km or thicker carries 0.12 of the land (45 to
+55 km 0.097, 55 to 70 km 0.019, 70 km and more 0.006), and 35 to 45 km 0.64 of it. Land above 2 km
+is 0.104 of the land by its surface, which counts the ice sheets' tops (HYP-004's 0.102), 0.047 by
+the rock under the ice and 0.052 of the ice-free land. Pooled over the ice-free land, rock height
+rises only 81 m per km of crust (−2,559 m + 81 m/km × T); land on 45 to 55 km of crust stands at
+940 m (median), where the model's Airy line (143 m/km, 525 m at 35.1 km) puts 45.5 km at 2 km.
+The pooled slope is not Earth's isostasy: inside one thermal regime Hyndman & Currie (2011, full
+text) measure 131 ± 12 m/km (the Cordillera) and 141 ± 27 m/km (stable areas), the model's slope,
+with sea-level crust about 27 km thick in hot back-arcs and about 38 km under cold cratons. Earth's
+thick crust is mostly old, cold shield standing low; the pooled line mixes the two regimes.
+
+**What the model makes** (master 5e0615b9 with the budget, `earthlike_quick_16k`, 1000 Myr, seeds
+1 to 3; supercontinent / scattered, mean of the seeds; ranges are over the six runs):
+
+| | supercontinent | scattered | Earth |
+|---|---|---|---|
+| land, share of the planet | 0.310 | 0.305 | 0.289 |
+| land above 2 km, share of the land | 0.285 | 0.354 | 0.104 by surface, 0.047 by rock |
+| median distance from land to the coast, km | 166 | 148 | 433 |
+| continental crust under the sea, share of it | 0.34 | 0.33 | 0.19 (crust 25 km and thicker) |
+| the land's crust, p50 / p75 / p90, km | 37.0 to 41.7 / 43.5 to 52.8 / 52.2 to 63.3 | 38.7 to 41.9 / 50.5 to 52.4 / 62.9 to 64.9 | 38.6 / 42.0 / 45.8 |
+| Köppen E, share of the land | 0.33 | 0.40 | |
+| natural CO₂ (before the present's nudge), ppm | 703 | 864 | |
+
+*The high ground is young orogen.* By the column's last orogeny, 0.54 to 0.72 of the land above
+2 km is Himalayan (a collision) and 0.25 to 0.43 Andean; under 0.05 has none. The last orogeny is
+0 to 14 Myr old at the median and under a fifth of it is older than 100 Myr; the crust under it is
+50 to 54 km (Andean) and 55 to 60 km (Himalayan) at the median. So a lithosphere temperature per
+column, which would sink old orogens by up to Hyndman & Currie's 1,600 m and is what the Urals
+need (section "The eclogite root" above), would lower at most that old fifth: it is not what makes
+the high ground. Earth's young orogens are as high as the model's; the model has too many of them.
+
+*The coast is a drowned margin.* A third of the continental crust is under the sea (Earth 0.19).
+It is margin: its median sample is 71 to 85 km from the ocean floor and all of it lies within
+800 km, on 28 to 30 km of crust, below the Airy line's sea-level crossing (31.4 km). The
+continental crust itself holds together (1 to 4 pieces hold 90 % of it, the largest 0.56 to 0.92
+of it); the land on it is in 1 to 8 pieces holding 90 %. The land's median crust is Earth's, its
+upper quartile and tail are not: Earth's land is 0.64 on 35 to 45 km of crust, the model's middle
+is thin and its tail is orogen.
+
+**The leads, one at a time** (the same seeds with one process off; supercontinent / scattered):
+
+| run | land | above 2 km | coast p50, km | Köppen E | natural CO₂, ppm |
+|---|---|---|---|---|---|
+| base | 0.310 / 0.305 | 0.285 / 0.354 | 166 / 148 | 0.33 / 0.40 | 703 / 864 |
+| no island arcs (`island_arc_km3_per_km_myr` 0) | 0.154 / 0.129 | 0.398 / 0.366 | 187 / 155 | 0.22 / 0.28 | 1,398 / 1,710 |
+| no collision stacking (`collision_stacking_share` 0) | 0.161 / 0.134 | 0.155 / 0.200 | 101 / 97 | 0.23 / 0.26 | 615 / 718 |
+| no cordillera, no continental arcs | 0.289 / 0.260 | 0.306 / 0.326 | 190 / 146 | 0.33 / 0.35 | 616 / 995 |
+| margin taper 24.5 km instead of 200 (`transition_width_km`) | 0.323 / 0.315 | 0.346 / 0.329 | 155 / 149 | 0.39 / 0.33 | 726 / 917 |
+
+By the origin of the crust under it (the budget's tag), the land above 2 km is 0.49 to 0.51
+island-arc crust, 0.27 to 0.33 collision crust, 0.16 to 0.21 Andean and 0.02 other; the land is
+0.53 to 0.55 island-arc crust. Every process builds land with a quarter to a half of it above
+2 km, so taking one away takes land with it and leaves the share of high ground about where it
+was. The one exception is the collisions: without stacking the land above 2 km falls to 0.16 to
+0.20 and the crust 55 km and thicker from 0.105 to 0.016 of the continental crust (supercontinent), but the land
+halves (the crust a collision does not stack is lost) and the coast comes nearer (100 km). The
+margin taper and the cordillera move the land little. The lower-crustal flow plays no part: its
+bound never bound and its flux at plate edges is negligible (P4 notes in "The 4-Myr plate step").
+The resampling does not break the continents apart (above); it was not ablated.
+
+**The subducting boundary** (the known issue, five times Earth's). Half of it was the
+measurement. Each boundary sample judged its motion towards the other plate along its own lattice
+edges, which on the Fibonacci lattice lie about 30 degrees either side of the boundary, so
+strike-slip read as convergence on one edge and divergence on the next: 3.1 % of the boundary was
+transform or converging without contact, against Bird's 28.4 %. The classes now judge the motion
+across the boundary's normal over two rings of samples (PLT-310) with Bird's own 20 degrees
+(PLT-311, read in the paper):
+
+| share of the boundary, mean over the steps after the first 100 Myr | before (lattice edges) | after (normal, 20 degrees) | Earth (Bird 2003) |
+|---|---|---|---|
+| subducting (ocean-ocean and ocean-continent) | 46.4 % | 31.1 % | 19.7 % (target 15 to 25) |
+| spreading (ridge and rift) | 40.0 % | 35.6 % | 36.4 % |
+| collision | 10.5 % | 8.4 % | 8.8 % |
+| transform, or converging with no contact | 3.1 % | 24.9 % | 28.4 % + 6.7 % |
+| subducting in the first 50 Myr | 32.1 % | 25.3 % | |
+| subducting boundary, km a step | 243,926 | 144,340 | 51,310 |
+| total boundary, km a step | 522,534 | 462,627 | 260,487 |
+| plate checks met (pooled) | 27 of 45 | 27 of 45 | |
+| full 16k, seed 1, subducting (supercontinent / scattered) | 48.3 % / 49.8 % | 32.1 % / 32.8 % | |
+| full 16k, plate checks met | 25 / 27 of 45 | 25 / 27 of 45 | |
+
+(Quick 16k, seeds 1 to 3, both starts pooled; the full 16k is `earthlike_full_16k` at 8 threads.)
+The subducting share still fails its target, at 1.6 times Earth's share and 2.8 times its length.
+
+The classes are measurement only (nothing a plate rule reads), so the planets are the same bit for
+bit: in all six quick runs and both full runs the crust budget's last line (every crust volume and
+area to the km³) and every number of the land-shape table equal the runs before the change. The total boundary is about twice Earth's in km (463,000 to
+523,000 against 260,487), a lattice boundary being rougher than a surveyed one, so lengths compare
+as shares.
+
+The other half is physical. The arcs, the cordillera and the subduction uplift took the full
+relative speed as their convergence on every front, oblique or strike-slip; along the boundary's
+normal (PLT-312, the switch `DEEPTIME_ARC_NORMAL=1`) the fronts' convergence factor is 0.54 of it.
+Measured on the same seeds (supercontinent / scattered):
+
+| | base | arcs on the normal convergence | Earth |
+|---|---|---|---|
+| island arcs, km³ a year | 3.95 / 4.17 | 2.47 / 2.48 | 1.5 (Stern & Scholl 2010) |
+| continental arcs, km³ a year | 1.43 / 1.56 | 0.87 / 0.95 | 1.0 |
+| cordillera shortened, km³ a year | 3.27 / 3.45 | 1.99 / 2.20 | |
+| continental crust, share of the planet | 0.43 / 0.41 | 0.29 / 0.31 | 0.41 (HYP-012) |
+| land | 0.310 / 0.305 | 0.233 / 0.245 | 0.289 |
+| land above 2 km | 0.285 / 0.354 | 0.384 / 0.454 | 0.104 / 0.047 |
+| coast p50, km | 166 / 148 | 167 / 188 | 433 |
+| Köppen E | 0.33 / 0.40 | 0.36 / 0.36 | |
+| natural CO₂, ppm | 703 / 864 | 1,282 / 1,493 | |
+| plate checks met (pooled) | 27 of 45 | 30 of 45 | |
+
+The arcs come near Earth's rates and the plate checks improve (the plates speed up from 31.8 to
+39.5 mm/yr RMS, the old ocean floor passes; collisions fall below 2 per 100 Myr and the lowest
+continental share below 0.37), but the continents lose a third of their area and the low
+island-arc land goes first, so the high ground's share rises. The model's continents are held up by
+arcs at 2.7 times Earth's rate, which balance losses above Earth's. So PLT-312 stays off until the
+continental crust's losses are on Earth's numbers too (a loss budget against Stern & Scholl's
+Table 1, which the crust budget's bookings can give); landed alone it moves the land away from its
+target.
+
+The full 16k pair (`earthlike_full_16k`, seed 1, 8 threads; the switch off / on) says the same:
+
+| | supercontinent | scattered |
+|---|---|---|
+| land | 0.332 / 0.280 | 0.317 / 0.202 |
+| land above 2 km | 0.304 / 0.407 | 0.350 / 0.484 |
+| coast p50, km | 137 / 193 | 129 / 142 |
+| continental crust | 0.457 / 0.349 | 0.442 / 0.261 |
+| island arcs, km³ a year | 4.46 / 1.64 | 4.75 / 2.13 |
+| Köppen E | 0.34 / 0.30 | 0.33 / 0.34 |
+| natural CO₂, ppm | 375 / 1,112 | 810 / 2,075 |
+| plate checks met | 25 / 29 of 45 | 27 / 30 of 45 |
+
+**On the ocean crust branch's planets** (its rock pools kept within one crust kind, PLT-293;
+measured on this branch with that branch's head 45de0c9a merged, the same seeds; supercontinent /
+scattered): land 0.322 / 0.326, land above 2 km 0.335 / 0.306, coast p50 173 / 161 km, Köppen E
+0.34 / 0.32, natural CO₂ 764 / 731 ppm. With its transition switch on (PLT-294): land 0.274 /
+0.270, above 2 km 0.328 / 0.356, coast 149 / 168 km. With PLT-312 on: land 0.252 / 0.238, the
+continental crust 0.317 / 0.296 of the planet, above 2 km 0.343 / 0.352, island arcs 2.07 / 2.20
+km³ a year, plate checks 33 of 45 against 26. The high ground and the coast are where they were.
+
+**What is left, and for whom.**
+1. *The extent of young orogen* is the high ground. Its sources: subduction on about half the
+   boundary (Earth's 20 %), the active share of the continental margin (0.47 against 0.25 to 0.40)
+   and collisions that last too long (90th percentile 146 Myr against at most 120), each a plate
+   check that fails. The cordillera shortens every active continental margin at Bolivia's 6 mm a
+   year (PLT-048, the Andes' most shortened part) up to 3,000 m; most of Earth's continental arcs
+   shorten far less. Bringing these to Earth's is plate work on the force balance and the
+   cordillera's source, with PLT-312 and the loss budget.
+2. *The height of old thick crust* (the Urals, cold cratons): a lithosphere temperature per column.
+   It is the right physics and Earth's pooled 81 m/km shows it, but it moves only the old fifth of
+   the high ground; it is an architecture change the coordinator deferred on 2026-10-17, and the
+   numbers here say it can keep waiting behind item 1.
+3. *What the target counts.* The model's land above 2 km is the rock's height; HYP-004's 0.10
+   counts the ice sheets' tops. By rock Earth's figure is 0.047 (HYP-041). The model's present-day
+   comparisons of high ground should use 0.05 by rock (or 0.10 counting the model's own ice on
+   top).

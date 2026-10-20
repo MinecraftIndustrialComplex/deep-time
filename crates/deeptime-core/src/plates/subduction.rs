@@ -59,6 +59,7 @@ use super::events::{self, SUBDUCTION_ONSET};
 use super::geometry::{Cover, Geo, Tree, cover, dijkstra_parts};
 use super::kinematics::{quat, tangent, to_group, to_world};
 use super::pools::isostatic_change_m;
+use super::shortening::boundary_normal;
 use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
@@ -601,6 +602,10 @@ pub const CONTINENTAL_VOLUME_GLOBAL: &str = "plates/continental_volume_km3";
 pub const ARC_FRONT_CONTINENTAL_GLOBAL: &str = "plates/arc_front_continental_km_myr";
 /// … and where it is oceanic (an island arc), km × Myr.
 pub const ARC_FRONT_OCEANIC_GLOBAL: &str = "plates/arc_front_oceanic_km_myr";
+/// World globals: oceanic fronts over the run weighted by the arcs' convergence factor, km × Myr,
+/// with the full relative speed and with the convergence normal to the front ([`Pull`]).
+pub const FRONT_G_FULL_GLOBAL: &str = "plates/arc_front_g_full_km_myr";
+pub const FRONT_G_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_km_myr";
 /// World global: crust shortened into the arcs' cordilleras over the run, km³ (moved, not made).
 pub const CORDILLERA_GLOBAL: &str = "plates/cordillera_shortened_km3";
 
@@ -619,6 +624,11 @@ pub struct Pull {
     pub front_oceanic_km_myr: f64,
     /// Crust shortened into cordilleras this step, km³ (moved from behind the ranges).
     pub cordillera_km3: f64,
+    /// Oceanic fronts this step weighted by the arcs' convergence factor min(v / v_0, 1), km × Myr,
+    /// with v the full relative speed …
+    pub front_g_full_km_myr: f64,
+    /// … and with v the convergence normal to the front (measurement, either rule).
+    pub front_g_normal_km_myr: f64,
 }
 
 /// One subducting-side sample's effect on its contact and on the crust budget.
@@ -690,6 +700,19 @@ struct Boundary {
     front: Option<(u32, usize, DVec3, DVec3)>,
 }
 
+/// Set to 1 to scale the arcs, the cordillera and the subduction uplift by the convergence normal
+/// to the front (the boundary's normal, [`boundary_normal`]) instead of the full relative speed.
+/// Off by default: an experiment of the land-shape task (2026-10-20), which measured it to bring
+/// the arcs' yearly crust near Earth's and to take a fifth of the land away, so it waits for the
+/// continental crust's losses to be brought to Earth's (`docs/science/plates.md`, "Land shape and
+/// the high ground"). ledger: PLT-312
+pub const NORMAL_CONVERGENCE_ENV: &str = "DEEPTIME_ARC_NORMAL";
+
+fn normal_convergence() -> bool {
+    static M: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *M.get_or_init(|| std::env::var(NORMAL_CONVERGENCE_ENV).is_ok_and(|v| v == "1"))
+}
+
 /// The first part of [`fronts_and_uplift`]: what it reads of the plates, their groups, the
 /// hidden flags, the positions, the motions and the contacts, none of which the belts' stacking
 /// (`belts::stack`) changes, so the arcs' distance field ([`fronts_reach`]) can run beside it
@@ -697,6 +720,9 @@ struct Boundary {
 pub struct FrontsBegun {
     plate_of: Vec<u32>,
     boundary: Vec<Boundary>,
+    /// Per front sample: the boundary's unit normal towards the front's other plate
+    /// ([`boundary_normal`]); zero elsewhere.
+    normals: Vec<DVec3>,
     /// The fronts as the distance field's sources (sample, 0, the front's number).
     sources: Vec<(u32, f64, u32)>,
     /// Per sample: its group, with [`HIDDEN_KEY`] added when it is hidden.
@@ -767,6 +793,16 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
             b
         })
         .collect();
+    // Each front's boundary normal (zero elsewhere). ledger: PLT-310
+    let normals: Vec<DVec3> = (0..n)
+        .into_par_iter()
+        .map(|v| match boundary[v].front {
+            Some((u, ..)) => {
+                boundary_normal(geo, pos, &rots, samples, &plate_of, v, plate_of[u as usize])
+            }
+            None => DVec3::ZERO,
+        })
+        .collect();
     let mut sources: Vec<(u32, f64, u32)> = Vec::new();
     for (v, b) in boundary.iter().enumerate() {
         if b.front.is_some() {
@@ -781,6 +817,7 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
     FrontsBegun {
         plate_of,
         boundary,
+        normals,
         sources,
         key,
     }
@@ -816,7 +853,10 @@ pub fn fronts_finish(
     let k = env.k;
     let norm = env.norm;
     let FrontsBegun {
-        plate_of, boundary, ..
+        plate_of,
+        boundary,
+        normals,
+        ..
     } = begun;
     let (dist, label, reached) = reach;
     let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
@@ -834,12 +874,31 @@ pub fn fronts_finish(
             s.flags |= TRENCH;
         }
     }
+    let by_normal = normal_convergence();
+    let v0 = k.convergence_ref_mm_yr; // ledger: PLT-037
+    let (mut g_full_km_myr, mut g_normal_km_myr) = (0.0_f64, 0.0_f64);
     for (v, b) in boundary.iter().enumerate() {
         if let Some((u, c, rel, out)) = b.front {
             let su = state.samples[u as usize];
-            let conv = rel.length();
-            let obliquity = if conv > 0.0 {
-                (rel.dot(-out) / conv).clamp(-1.0, 1.0).acos().to_degrees()
+            let speed = rel.length();
+            // The convergence normal to the boundary, mm/yr: the other plate's motion towards
+            // the sample's along the boundary's normal. ledger: PLT-312
+            let normal = normals[v];
+            let across = (-rel.dot(normal)).max(0.0);
+            if su.kind != CONTINENTAL {
+                g_full_km_myr += front_km * env.dt_myr * (speed / v0).min(1.0);
+                g_normal_km_myr += front_km * env.dt_myr * (across / v0).min(1.0);
+            }
+            let (conv, facing) = if by_normal {
+                (across, normal)
+            } else {
+                (speed, out)
+            };
+            let obliquity = if speed > 0.0 {
+                (rel.dot(-facing) / speed)
+                    .clamp(-1.0, 1.0)
+                    .acos()
+                    .to_degrees()
             } else {
                 0.0
             };
@@ -1170,6 +1229,8 @@ pub fn fronts_finish(
         front_continental_km_myr: front_continental,
         front_oceanic_km_myr: front_oceanic,
         cordillera_km3: cordillera_m * area / 1000.0,
+        front_g_full_km_myr: g_full_km_myr,
+        front_g_normal_km_myr: g_normal_km_myr,
     }
 }
 

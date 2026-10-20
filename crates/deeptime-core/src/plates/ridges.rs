@@ -97,8 +97,37 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
         (0..3).map(|k| w[k] * f64::from(f(corners[k]))).sum::<f64>() as f32
     };
     s.elevation_m = lerp(&|x| x.elevation_m);
+    // The corners of the sample's own kind and their weight (the major corner is one of them).
+    let same_kind: f64 = (0..3)
+        .filter(|&k| corners[k].kind == s.kind)
+        .map(|k| w[k])
+        .sum();
+    // The crust's own rock belongs to its kind: the rock pools are blended over the corners of
+    // the sample's kind only, the loose sediment (which drapes across a margin) over all three.
+    // Blending them all made every resampling put a share of a continent's granite, gneiss and
+    // platform cover into the ocean crust beside it. On ocean crust the felsic and metamorphic
+    // pools are not blended at all but stay the nearest corner's, as its kind does: they are
+    // local (an island arc, the thinned continental crust of a margin's ocean side, crust
+    // accreted at a resampling, the base of a thick sediment pile), and a blend spread them a
+    // little further at every resampling, so that over the run they reached most of the sea
+    // floor (ledger: PLT-293).
+    let oceanic = s.kind == OCEANIC;
+    let local = |p: usize| {
+        oceanic
+            && (p == pool::FELSIC_PLUTONIC || p == pool::FELSIC_VOLCANIC || p == pool::METAMORPHIC)
+    };
     for p in 0..pool::COUNT {
-        s.pools[p] = lerp(&|x| x.pools[p]);
+        s.pools[p] = if local(p) {
+            src[m as usize].pools[p]
+        } else if p == pool::SEDIMENT || same_kind <= 0.0 {
+            lerp(&|x| x.pools[p])
+        } else {
+            ((0..3)
+                .filter(|&k| corners[k].kind == s.kind)
+                .map(|k| w[k] * f64::from(corners[k].pools[p]))
+                .sum::<f64>()
+                / same_kind) as f32
+        };
     }
     s.arc_continental_m = lerp(&|x| x.arc_continental_m);
     s.arc_oceanic_m = lerp(&|x| x.arc_oceanic_m);
@@ -109,10 +138,6 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
     // coast must not take the young ridge crust's 300 mW/m² from an oceanic corner. (The next
     // step sets every sample's heat flow again; this only matters for what is read right after
     // a resampling, the final snapshot among them: the bake's `meta/heat_flow_mw_m2`.)
-    let same_kind: f64 = (0..3)
-        .filter(|&k| corners[k].kind == s.kind)
-        .map(|k| w[k])
-        .sum();
     if same_kind > 0.0 {
         let blend: f64 = (0..3)
             .filter(|&k| corners[k].kind == s.kind)

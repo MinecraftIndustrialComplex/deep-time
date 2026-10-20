@@ -341,9 +341,19 @@ enum Command {
         #[arg(long)]
         world_data: PathBuf,
         /// Block x (any lap: it is folded into the canonical span).
-        x: i64,
+        #[arg(required_unless_present = "points")]
+        x: Option<i64>,
         /// Block z.
-        z: i64,
+        #[arg(required_unless_present = "points")]
+        z: Option<i64>,
+        /// Many columns from one opening of the world data: a file of `X Z` or `X,Z` lines (`-`
+        /// reads stdin); prints one compact JSON object a line, in the file's order, each with its
+        /// `x` and `z` (censuses and sections).
+        #[arg(long, conflicts_with_all = ["x", "z"])]
+        points: Option<PathBuf>,
+        /// With `--points`: the lines are `LAT LON` (degrees), placed by the world's projection.
+        #[arg(long, requires = "points")]
+        latlon: bool,
         /// Only what `parity/columns.json` holds per column.
         #[arg(long)]
         parity: bool,
@@ -969,10 +979,22 @@ fn main() -> ExitCode {
             world_data,
             x,
             z,
+            points,
+            latlon,
             parity,
             why,
         }) => match deeptime_format::ColumnWorld::open(&world_data) {
+            Ok(w) if points.is_some() => {
+                match inspect_points(&w, &world_data, points.as_deref(), latlon, parity, why) {
+                    Ok(()) => ExitCode::SUCCESS,
+                    Err(e) => {
+                        eprintln!("deeptime inspect-column: {e}");
+                        ExitCode::FAILURE
+                    }
+                }
+            }
             Ok(w) => {
+                let (x, z) = (x.unwrap_or(0), z.unwrap_or(0));
                 let mut v = if parity {
                     w.sample(x, z).to_json()
                 } else {
@@ -1563,6 +1585,81 @@ fn preset_command(action: PresetAction) -> run::CliResult<()> {
         PresetAction::Decode { code } => println!("{}", share_code::decode(&code)?),
     }
     Ok(())
+}
+
+/// `inspect-column --points`: every column of a points file (`X Z` or `X,Z` a line; `-` is
+/// stdin), one compact JSON object a line with its `x` and `z`.
+fn inspect_points(
+    w: &deeptime_format::ColumnWorld,
+    world_data: &std::path::Path,
+    points: Option<&std::path::Path>,
+    latlon: bool,
+    parity: bool,
+    why: bool,
+) -> Result<(), String> {
+    use std::io::{BufRead, Write};
+    let projection = if latlon {
+        Some(
+            deeptime_format::Manifest::read(world_data)
+                .map_err(|e| e.to_string())?
+                .world_projection(),
+        )
+    } else {
+        None
+    };
+    let text = match points {
+        Some(p) if p.as_os_str() != "-" => {
+            std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?
+        }
+        _ => {
+            let mut s = String::new();
+            for line in std::io::stdin().lock().lines() {
+                s.push_str(&line.map_err(|e| e.to_string())?);
+                s.push('\n');
+            }
+            s
+        }
+    };
+    let out = std::io::stdout();
+    let mut out = std::io::BufWriter::new(out.lock());
+    for (n, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut it = line
+            .split(|c: char| c == ',' || c.is_whitespace())
+            .filter(|t| !t.is_empty())
+            .map(str::parse::<f64>);
+        let (Some(Ok(a)), Some(Ok(b))) = (it.next(), it.next()) else {
+            return Err(format!(
+                "points line {}: want two numbers, got {line:?}",
+                n + 1
+            ));
+        };
+        let (x, z) = match &projection {
+            Some(p) => p.block_of(a, b),
+            None => (a, b),
+        };
+        let (x, z) = (x.round() as i64, z.round() as i64);
+        let mut v = if parity {
+            w.sample(x, z).to_json()
+        } else {
+            w.inspect(x, z)
+        };
+        if why {
+            attach_why(&mut v, world_data)?;
+        }
+        v["x"] = serde_json::json!(x);
+        v["z"] = serde_json::json!(z);
+        writeln!(
+            out,
+            "{}",
+            serde_json::to_string(&v).expect("a column serialises")
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    out.flush().map_err(|e| e.to_string())
 }
 
 /// `inspect-column --why`: puts `why` on each of the answer's sites: the forming event and its
