@@ -47,6 +47,10 @@ OUT="$REPO/smoke/$P/client-check.txt"
 # The set's world (and this check's client folder) are this run's until it ends.
 exec 8>"$REPO/smoke/$P/.world.lock"
 flock -n 8 || { echo "dh-client-check: waiting for smoke/$P's world (another run of this set uses it)"; flock 8; }
+# A fresh server-side Distant Horizons database: the world is linked, not copied, so sections an
+# earlier check had generated are served from it without Deep Time's generator, and step 4 counts
+# nothing asked (2026-10-20: 5 generator calls for 24,126 sections the client received).
+find "$SET_SRV/planet" -path '*/data/DistantHorizons.sqlite*' -delete 2>/dev/null
 if [ -n "${DEEPTIME_SERVER_DIR:-}" ]; then
     SRV="$DEEPTIME_SERVER_DIR/server"
     python3 "$REPO/tools/smoke/instance.py" make --set "$SET_SRV" --dest "$SRV" --world-link planet >/dev/null \
