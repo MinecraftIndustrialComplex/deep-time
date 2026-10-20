@@ -105,8 +105,8 @@ use serde::{Deserialize, Serialize};
 use super::Env;
 use super::events::{PLATE_BIRTH, PLATE_DEATH};
 use super::geometry::Geo;
-use super::shortening;
 use super::kinematics::{quat, tangent};
+use super::shortening;
 use super::state::{ARC, CONTINENTAL, OCEANIC, PlateState, Sample};
 use crate::world::WorldState;
 
@@ -973,9 +973,8 @@ pub fn boundary_mix(
                         .position(|&(p, _)| p == pu || p == u32::MAX)
                         .unwrap_or(normals.len() - 1);
                     if normals[slot].0 != pu {
-                        let nrm = shortening::boundary_normal(
-                            geo, pos, &rots, samples, &plate_of, v, pu,
-                        );
+                        let nrm =
+                            shortening::boundary_normal(geo, pos, &rots, samples, &plate_of, v, pu);
                         normals[slot] = (pu, nrm);
                     }
                     let nrm = normals[slot].1;
