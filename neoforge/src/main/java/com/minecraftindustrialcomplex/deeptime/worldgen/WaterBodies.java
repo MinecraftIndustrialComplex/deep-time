@@ -78,6 +78,7 @@ public final class WaterBodies {
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
     private static final BlockState WATER = Blocks.WATER.defaultBlockState();
     private static final BlockState DIRT = Blocks.DIRT.defaultBlockState();
+    private static final BlockState STONE = Blocks.STONE.defaultBlockState();
     private static final BlockState ICE = Blocks.ICE.defaultBlockState();
     private static final BlockState FLOWING = Fluids.FLOWING_WATER.getFlowing(7, false).createLegacyBlock();
     private static final BlockState FALLING = Fluids.FLOWING_WATER.getFlowing(8, true).createLegacyBlock();
@@ -100,6 +101,36 @@ public final class WaterBodies {
     static boolean skin(BlockState s) {
         return s.getBlock() instanceof SpreadingSnowyDirtBlock || s.is(BlockTags.DIRT) || s.is(BlockTags.SAND)
                 || s.is(Blocks.GRAVEL) || s.is(Blocks.SNOW_BLOCK) || s.is(Blocks.CLAY);
+    }
+
+    /**
+     * How many blocks under a fill's top stay soil (or a river bed's sediment); below them a fill is
+     * the column's own rock ({@link #rockUnder}), so a raised bank or bed reads as soil over rock, never
+     * as a wall of dirt (Ben, 2026-10-20). Game-choice, ledger HYD-079: about the soil the surface
+     * rules lay on the ground around (vanilla's dirt under grass is 3 to 4 blocks).
+     */
+    static final int SOIL_BLOCKS = 3;
+
+    /** How far under the ground {@link #rockUnder} looks for the column's rock, blocks (game-choice, HYD-079). */
+    static final int ROCK_SEARCH = 16;
+
+    /**
+     * The column's own rock at (x, z): the first block from {@code y} down that is neither open, nor
+     * soil or loose ground ({@link #skin}), nor a fluid, within {@link #ROCK_SEARCH} blocks; stone
+     * when there is none. A fill deeper than its soil uses it.
+     */
+    static BlockState rockUnder(ChunkAccess chunk, BlockPos.MutableBlockPos pos, int x, int y, int z, int minY) {
+        for (int k = 0; k < ROCK_SEARCH && y - k >= minY; k++) {
+            BlockState s = chunk.getBlockState(pos.set(x, y - k, z));
+            if (!open(s) && !skin(s) && s.getFluidState().isEmpty())
+                return s;
+        }
+        return STONE;
+    }
+
+    /** What a fill puts at {@code y} under its top at {@code top}: {@code soil} in the top {@link #SOIL_BLOCKS}, {@code rock} deeper. */
+    static BlockState fillAt(int y, int top, BlockState soil, BlockState rock) {
+        return y > top - SOIL_BLOCKS ? soil : rock;
     }
 
     /** Whether any cell of {@code layer} in (or next to) block box [x0, x1] × [z0, z1] is below {@code level}. */
@@ -296,22 +327,23 @@ public final class WaterBodies {
                             }
                         }
                         shielded += shield(masks, lx, lz, bed + 1, t, minY, maxY);
+                        Rivers.Hit h = col.river();
+                        BlockState sediment = h != null && h.hw() >= 3.0 ? Blocks.SAND.defaultBlockState() : Blocks.GRAVEL.defaultBlockState();
+                        BlockState rock = rockUnder(chunk, pos, x, Math.min(g, maxY), z, minY);
+                        // Ground under the channel's bed: its sediment over the column's rock (HYD-079).
                         for (int y = g + 1; y <= bed && y <= maxY; y++) {
-                            chunk.setBlockState(pos.set(x, y, z), DIRT, false);
+                            chunk.setBlockState(pos.set(x, y, z), fillAt(y, bed, sediment, rock), false);
                             filled++;
                         }
                         if (bed >= minY && bed <= maxY) {
-                            // Support under the bed: plug a cave right under it.
+                            // Support under the bed: plug a cave right under it, with rock (HYD-074).
                             int y = bed - 1;
                             for (; y >= Math.max(minY, bed - 8) && chunk.getBlockState(pos.set(x, y, z)).isAir(); y--) {
-                                chunk.setBlockState(pos, DIRT, false);
+                                chunk.setBlockState(pos, rock, false);
                                 filled++;
                             }
                             boolean supported = y < minY || !chunk.getBlockState(pos.set(x, y, z)).isAir();
-                            Rivers.Hit h = col.river();
-                            BlockState bedBlock = !supported ? DIRT
-                                    : h != null && h.hw() >= 3.0 ? Blocks.SAND.defaultBlockState() : Blocks.GRAVEL.defaultBlockState();
-                            chunk.setBlockState(pos.set(x, bed, z), bedBlock, false);
+                            chunk.setBlockState(pos.set(x, bed, z), supported ? sediment : DIRT, false);
                         }
                     }
                     case LAKE -> {
@@ -344,10 +376,12 @@ public final class WaterBodies {
                         if (lakeIce != null && y < t && t >= minY && lakeIce.frozen(x, z)
                                 && chunk.getBlockState(pos.set(x, t, z)).is(Blocks.WATER))
                             chunk.setBlockState(pos, ICE, false);
-                        if (y == bed && bed >= minY) {
-                            // The analytic bed: open ground under it is a cave; plug a few blocks.
+                        if (y == bed && bed >= minY && open(chunk.getBlockState(pos.set(x, bed, z)))) {
+                            // The analytic bed: open ground under it is a cave; plug a few blocks,
+                            // soil over the column's rock (HYD-074, HYD-079).
+                            BlockState rock = rockUnder(chunk, pos, x, bed, z, minY);
                             for (int p = bed; p >= Math.max(minY, bed - 3) && open(chunk.getBlockState(pos.set(x, p, z))); p--) {
-                                chunk.setBlockState(pos, DIRT, false);
+                                chunk.setBlockState(pos, fillAt(p, bed, DIRT, rock), false);
                                 filled++;
                             }
                         }
@@ -369,11 +403,15 @@ public final class WaterBodies {
                                 chunk.setBlockState(pos.set(x, maxG, z), top, false);
                             g = maxG;
                         }
+                        // A raised bank and a sealed cave beside the water: soil under the bank's top,
+                        // the column's own rock deeper (HYD-079).
+                        BlockState rock = minG != null && (g < minG || col.sealFrom() != null)
+                                ? rockUnder(chunk, pos, x, Math.min(g, maxY), z, minY) : STONE;
                         if (minG != null && g < minG && minG <= maxY) {
                             if (g >= minY && chunk.getBlockState(pos.set(x, g, z)).getBlock() instanceof SpreadingSnowyDirtBlock)
                                 chunk.setBlockState(pos, DIRT, false);
                             for (int y = Math.max(g + 1, minY); y < minG; y++) {
-                                chunk.setBlockState(pos.set(x, y, z), DIRT, false);
+                                chunk.setBlockState(pos.set(x, y, z), fillAt(y, minG, DIRT, rock), false);
                                 filled++;
                             }
                             chunk.setBlockState(pos.set(x, minG, z), skin(top) ? top : DIRT, false);
@@ -383,7 +421,7 @@ public final class WaterBodies {
                         if (minG != null && col.sealFrom() != null) {
                             for (int y = Math.max(minY, col.sealFrom()); y <= Math.min(minG, maxY); y++)
                                 if (chunk.getBlockState(pos.set(x, y, z)).isAir()) {
-                                    chunk.setBlockState(pos, DIRT, false);
+                                    chunk.setBlockState(pos, fillAt(y, minG, DIRT, rock), false);
                                     filled++;
                                 }
                         }

@@ -44,6 +44,15 @@ public interface TerrainSource {
         return seamless() ? circumference() / 4.0 : com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(circumference());
     }
 
+    /**
+     * How near column (x, z) lies to the level's rivers, lakes and shallow sea, for the router's
+     * cave-entrance band ({@code deeptime:water_shield}, {@link WaterCaveShield}): 1 at and beside
+     * the water, 0 away from it. 0 in a level without Deep Time's water (the analytic terrains).
+     */
+    default double waterShield(int x, int z) {
+        return 0.0;
+    }
+
     /** Folds x into the canonical span [-C/2, C/2). */
     default int wrapX(int x) {
         int c = circumference();
