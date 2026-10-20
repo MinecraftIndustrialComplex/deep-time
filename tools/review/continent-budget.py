@@ -189,12 +189,12 @@ def plots(out, groups, maps):
     # Series.
     fig, axes = plt.subplots(2, 3, figsize=(15, 8))
     panels = [
-        ("cont", "continental crust, share of planet", 0.40, "Earth incl. shelves about 0.40"),
-        ("land", "land at sea level, share of planet", 0.29, "Earth 0.29"),
-        ("dry", "dry share of continental crust", 0.71, "Earth about 0.71"),
-        ("vol_km3", "continental volume, 10^9 km^3", 7.2, "Earth about 7.2"),
-        ("above_2km", "land above 2 km, share of land", 0.107, "Earth 0.107"),
-        ("coast_p50_km", "median distance to coast, km", 366, "Earth 366"),
+        ("cont", "continental crust, share of planet", 0.41, "Earth incl. shelves 0.41 (Cogley 1984)"),
+        ("land", "land at sea level, share of planet", 0.289, "Earth 0.289 (HYP-001)"),
+        ("dry", "dry share of continental crust", 0.71, "Earth 0.71 (HYP-012)"),
+        ("vol_km3", "continental volume, 10^9 km^3", None, None),
+        ("above_2km", "land above 2 km, share of land", 0.102, "Earth 0.102 (HYP-004)"),
+        ("coast_p50_km", "median distance from land to the coast, km", 433, "Earth 433 (HYP-035)"),
     ]
     for ax, (key, title, earth, label) in zip(axes.flat, panels):
         for gi, (gname, runs) in enumerate(groups.items()):
@@ -203,7 +203,8 @@ def plots(out, groups, maps):
                 ys = [series_value(snaps[t], key) for t in ts]
                 ax.plot(ts, ys, color=colors[gi % len(colors)], alpha=0.8, lw=1.2,
                         label=gname if ri == 0 else None)
-        ax.axhline(earth, color="k", ls=":", lw=1, label=label)
+        if earth is not None:
+            ax.axhline(earth, color="k", ls=":", lw=1, label=label)
         ax.set_title(title)
         ax.set_xlabel("Myr since start")
         ax.legend(fontsize=7)
@@ -241,7 +242,7 @@ def plots(out, groups, maps):
         plt.close(fig)
     # Maps.
     for name, folder in maps:
-        files = sorted(Path(folder).glob("t*.bin"))
+        files = sorted(Path(folder).glob("t*.bin"), key=lambda f: float(f.stem[1:]))
         if not files:
             continue
         pick = [files[0], files[min(len(files) - 1, 2)], files[len(files) // 3], files[len(files) // 2],
@@ -250,21 +251,29 @@ def plots(out, groups, maps):
         for row, f in zip(axes, pick):
             a = np.fromfile(f, dtype="<f4").reshape(-1, 5)
             lat, lon, z, thick, kind = a.T
-            row[0].scatter(lon, lat, c=np.clip(z, -6000, 6000), cmap="terrain", vmin=-6000, vmax=6000, s=0.6, lw=0)
             land = z > 0
-            row[0].scatter(lon[land], lat[land], c="none", edgecolors="none", s=0.1)
-            row[0].set_title(f"{name} {f.stem[1:]} Myr: elevation (land and sea, m)")
-            sc = row[1].scatter(lon[kind > 0.5], lat[kind > 0.5], c=np.clip(thick[kind > 0.5] / 1000, 10, 80),
-                                cmap="magma_r", vmin=10, vmax=80, s=0.6, lw=0)
-            dry = (kind > 0.5) & land
-            row[1].scatter(lon[dry], lat[dry], color="tab:green", s=0.15, lw=0, alpha=0.6)
-            row[1].set_title(f"continental crust thickness (km), green dots: dry; continental {np.mean(kind > 0.5):.2f}, land {np.mean(land):.2f}")
+            cont = kind > 0.5
+            # Left: the sea floor in blues, the land from pale (low) to brown (high).
+            row[0].scatter(lon[~land], lat[~land], c=np.clip(z[~land], -6000, 0), cmap="Blues_r",
+                           vmin=-7000, vmax=500, s=0.6, lw=0)
+            sc0 = row[0].scatter(lon[land], lat[land], c=np.clip(z[land], 0, 5000), cmap="YlOrBr",
+                                 vmin=-800, vmax=5000, s=0.6, lw=0)
+            row[0].set_title(f"{name} {float(f.stem[1:]):.0f} Myr: elevation; land {np.mean(land):.2f}")
+            fig.colorbar(sc0, ax=row[0], fraction=0.02, label="land, m")
+            # Right: continental crust, drowned in grey, dry coloured by its thickness.
+            wet = cont & ~land
+            dry = cont & land
+            row[1].scatter(lon[wet], lat[wet], color="#9aa7b4", s=0.6, lw=0)
+            sc = row[1].scatter(lon[dry], lat[dry], c=np.clip(thick[dry] / 1000, 20, 70),
+                                cmap="viridis", vmin=20, vmax=70, s=0.6, lw=0)
+            row[1].set_title(f"continental crust {np.mean(cont):.2f}: grey under the sea, dry ones by thickness "
+                             f"(dry share {np.sum(dry) / max(1, np.sum(cont)):.2f})")
             for ax in row:
                 ax.set_xlim(-180, 180)
                 ax.set_ylim(-90, 90)
                 ax.set_aspect("equal")
-                ax.set_facecolor("#dfe8f0")
-            fig.colorbar(sc, ax=row[1], fraction=0.02)
+                ax.set_facecolor("#e4edf5")
+            fig.colorbar(sc, ax=row[1], fraction=0.02, label="dry crust, km")
         fig.tight_layout()
         fig.savefig(out / f"maps-{name}.png", dpi=90)
         plt.close(fig)

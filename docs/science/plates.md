@@ -1785,3 +1785,88 @@ four, equal in one), where one f32 ulp on one weight moved the CPU's own land sh
 planet by up to 0.004 and, before the cadence change, by 0.024. The same-state comparison above
 finds no lean, so the four in five is chance or an effect too indirect to show in a single
 sampling; a larger paired ensemble would tell.
+
+## Mountains eat the world: the continents drown (2026-10-19)
+
+Ben, watching a planet form (earthlike_quick_16k, supercontinent, 1000 Myr): "mountains will
+'eat' the world and delete most of the continents and leave things as a stringy mess of
+'islands.'" One supercontinent at 900 Myr ago, narrow snow-capped chains and island strings in a
+mostly empty ocean by 650 Myr ago. Ledger PLT-293 to PLT-295 and ISO-078; sources in the
+bibliography, "Mountains eat the world". Code: `plates/{flow.rs, settle.rs, crust_budget.rs,
+collapse.rs, mod.rs}`; tables and maps by `tools/review/continent-budget.py`.
+
+**The budget (measurement only, PLT-295).** `DEEPTIME_CRUST_BUDGET=1` keeps the continental
+crust's stocks every 50 Myr (area, volume visible and hidden, land at the climate's sea level, the
+dry share of the continental crust, the land above 2 km, the median distance from land to the
+coast, the thickness bands with their elevation and Airy height), books each stock's change to the
+process of the plate step that made it (the gap budget's brackets, PLT-283) and counts single
+samples changing state (ocean floor made continental, hidden, drowned, emerged).
+`DEEPTIME_CRUST_BUDGET_MAPS=<dir>` also writes the visible samples at every snapshot. On master
+(c88c2eb5 plus the budget, which changes nothing: test `the_crust_budget_changes_nothing`),
+quick 16k, 1000 Myr, seeds 1 to 3 (scattered: seeds 1 and 2):
+
+| | supercontinent, start | supercontinent, end (3 seeds) | scattered, end (2 seeds) | Earth |
+|---|---|---|---|---|
+| continental crust, share of the planet | 0.422 | 0.417 (0.387 to 0.473) | 0.463 | 0.41 (Cogley 1984, HYP-012) |
+| its volume, 10^9 km³ | 7.56 | 8.69 | 9.62 | |
+| land at sea level | 0.300 | 0.178 | 0.160 | 0.289 (HYP-001) |
+| dry share of the continental crust | 0.71 | 0.39 | 0.30 | 0.71 (HYP-012) |
+| land above 2 km, share of land | 0 | 0.25 | 0.23 | 0.102 (HYP-004) |
+| median distance from land to the coast, km | 2,220 | 169 | 155 | |
+| mean continental thickness, km | 35.1 | 41.0 | 40.8 | 41.1 (Christensen & Mooney 1995) |
+
+The continents do not lose their area: it holds near the start's 0.42 and the scattered start
+gains. They lose their land. Half of the continental crust that was dry is under the sea at the end,
+the land is a sixth of the planet, and the median coast is 150 to 190 km from any land, an
+archipelago. The thickness spreads both ways at once (supercontinent seed 2 at the end): 30 % of
+the continental crust is thinner than 35 km, 41 % thicker than 45 km, 15 % 55 to 70 km, and every
+band stands 1.1 to 1.9 km below its Airy height, so even crust of a normal thickness is drowned:
+
+| band, km | share of the continental area | median elevation, m | Airy height, m | dry |
+|---|---|---|---|---|
+| 30 to 35 | 0.127 | -1,079 | 178 | 0.18 |
+| 35 to 40 | 0.166 | -349 | 868 | 0.33 |
+| 40 to 45 | 0.170 | -132 | 1,581 | 0.42 |
+| 45 to 55 | 0.230 | 244 | 2,520 | 0.64 |
+| 55 to 70 | 0.123 | 1,814 | 4,271 | 0.90 |
+
+Where the land goes, over the run (mean of the three supercontinent runs, as shares of the
+planet; a stock's parts add up): the belts raise 0.53 of land and the arcs 0.38, the collapse
+0.13; subduction drowns 0.52 (the plate going under), the ocean-floor step 0.39 (arcs that are
+still ocean floor), the transition 0.38 and the surface's erosion 0.20. Of the dry continental
+crust, the transition takes 0.46, the surface 0.47 and subduction 0.49. The area turns over: the
+plates going under hide 0.85 of the planet's worth of continental crust in 1000 Myr and the
+resamplings take 0.84 of it back, while arcs that mature turn 0.58 of ocean floor continental
+(`finish_samples`) at a mean of -3,219 m and 19.6 km of crust, 1.5 km under that crust's own Airy
+height and 0.8 km under its water-loaded one. The collisions turn area into thickness at
+17.5 km³ a year (the crust the belts keep), the collapse moves 4.1 km³ a year of it back out.
+
+**What Earth does.** Continental crust is 41 % of the surface and 71 % of it is dry (Cogley 1984,
+HYP-012). Earth's freeboard holds because a column out of isostatic balance does not stay so: the
+mantle under Fennoscandia gives back an ice load's depression with relaxation times "close to
+3-5 kyr" (Wieczerkowski, Mitrovica & Wolf 1999, abstract), and what a cooling lithosphere adds is
+spent on its thermal time, 62.8 Myr (McKenzie 1978, full text, Table 1). Thickened crust does not
+stay thick either: its hot lower crust flows out from under the high ground, "Over 15 m.y., the
+length scale of channel-flow extrusion is 150 km rather than 1500 km" (Rey, Teyssier & Whitney
+2010, full text), the eastern margin of Tibet was built by lower-crustal flow (Clark & Royden
+2000), and the Basin and Range "cannot maintain short-wavelength (100 km) Moho relief of more
+than 1 km for times greater than 10-20 m.y. at most" (Bird 1991, abstract). Crust of every
+thickness ends near its isostatic height and spreads when it is thick and hot.
+
+**The cause.** Two things in the plate model, neither of them the mountains' height:
+
+1. *Nothing returns a column to its isostatic height.* Every process moves a column's surface by
+   the change it makes (`collapse::toward`, collapse.rs:205 on master; the belts', arcs' and
+   transition's own height lines), and none moves it towards the height its crust holds up. A gap
+   once made stays. The largest maker is the arcs: island-arc crust becomes continental "whatever
+   its height" (`finish_samples`, mod.rs:1076 on master) and keeps the ocean floor's height as it
+   thickens, so the continents a run grows stand on the ocean's line. Accretion, the ocean-floor
+   step, the transition's height line (f = 4.24, steeper than Airy's 7.02) and the surface's
+   flexure add theirs (the gap budget, "Which process holds the gap" above).
+2. *Thickened crust inside a continent keeps its root.* The collapse releases only quiet crust
+   (collapse.rs:241 to 252, PLT-259) and only into room thinner than the normal column within
+   200 km (collapse.rs:328 to 351, PLT-257): a belt ringed by crust of normal thickness has no
+   room, and of the about 33 km³ a year its rule would release, 4.1 moves.
+
+The transition's width (PLT-262) is Ben's (decisions log 2026-10-05, "Keep 200 km, raise crust in
+7–8") and is not changed here.
