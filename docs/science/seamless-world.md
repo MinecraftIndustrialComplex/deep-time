@@ -68,6 +68,47 @@ its axis so these four points lie as far from land as the planet allows.
    points) move through the projection; directions and lengths through its local stretch. A river
    that crosses a turning edge is cut there.
 
+## The forward on the diagonals and at the cone points
+
+The forward (latitude and longitude to block) is Petroff's construction step by step. It finds the
+point's spherical triangle (the 67.5° vertex V, a corner C and a third vertex W) and then places the
+point P′ in the matching flat triangle: U′ on the side V′W′ at the distance up from V′ (the area
+share), P′ on C′U′ at the fraction xpxpyp from C′, and P′'s angle at V′ (alphap) from the three
+sides of the triangle V′U′P′ by the law of cosines (SCL-083).
+
+**What was wrong (found 2026-10-20 by the developer map).** When P′ lies on one of that triangle's
+sides the triangle V′U′P′ is flat, and the law of cosines gives rounding noise. That happens on
+exact inputs on the square's diagonals, which in the world are the equator and the meridians λc and
+λc + 180°: from a tile's centre to its 67.5° vertex (the equator at λc ± 22.5°, latitude ±22.5° on
+the centre meridian) up is rounding noise, and from that vertex to the edge P′ lies on V′U′ (yp ≈ 0).
+At the cone points P is the corner C itself, so up = 0, and the code took the fallback angle
+ξ′ − π/6, which is the whole angle of one of the three flat triangles but not of the two the cone
+points belong to. Petroff's own `new_projection.py` (Zenodo 4661351, re-read 2026-10-20 at its
+`alphaprime` step) has the same fallback ("Avoid divide by zero": `alphaprime = (xiprime - np.pi /
+6) * idx` where `uprime * rprime <= 0`). On the play planet (b 6,656, λc 146°) 180 of 4,341 exact
+inputs on these lines came back more than 1e-5° from where they were asked: up to 1.6° on the
+equator, 1.1° to 1.4° on the meridians λc and λc + 180°, and 10.5° at the cone points, where
+(45° N, 236°) landed 616 blocks along the edge. Random inputs never land exactly on a line, which is
+why the round-trip tests had not seen it.
+
+**How the forward does it now.** Within 1e-6 local units of either side (up or yp at most 1e-6,
+about 0.002 blocks on a 6,656-block hemisphere) it places P′ by coordinates instead: V′ at the
+origin, U′ = (up, 0), C′ = cp (cos gp, sin gp), P′ = C′ + xpxpyp (U′ − C′), and P′'s distance and
+angle are read from its coordinates. That is the same point the law of cosines describes, without
+the cancellation. Everywhere else the code is unchanged and gives the same bits: none of 200,000
+random inputs in each of four worlds changes, nor any existing row of the parity fixture. The switch
+is numerical, not physical: just above it the law of cosines is still good to about 1.5e-7 blocks
+(measured against a 50-digit mpmath reference of the construction, inputs 10⁻² to 10⁻¹⁵ degrees off
+the lines). Rust, Java and the pages make the same change and agree bit for bit on the fixture's
+exact rows.
+
+Measured after the fix: every exact input on the equator (every 0.1° of longitude), on the meridians
+λc, λc ± 90° and λc + 180° (every 0.1° of latitude), at the cone points, the 67.5° vertices, the
+tile centres and the poles comes back within 1e-5° in five worlds (`exact_inputs_on_the_diagonals_round_trip`,
+`ProjectionParityTest.exactInputsOnTheDiagonalsRoundTrip`); the worst is 4.2e-7°, which is the
+inverse's own rounding on the diagonals (the forward is within 1.4e-7 blocks of the reference
+there). The inverse is unchanged.
+
 ## Equations and constants
 
 | Ledger id | Quantity | As coded | Units | Source | Status |
