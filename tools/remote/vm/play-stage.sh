@@ -22,6 +22,13 @@
 #   --no-rock-tags    skip it (a pack that ships the tags itself)
 #   --ops-from DIR    the folder whose ops.json is carried over (default: the folder /etc/default/deeptime-play
 #               serves now), so the operators (Ben) stay operators across a rebuild; --ops-from none skips it
+#   --devmap    also put the internal developer map (devmap/, mod id deeptime_devmap; never in the pack) in
+#               mods/: the jar this checkout built, devmap/build/libs/deeptime_devmap-*.jar (build it first:
+#               cd neoforge && ./gradlew :devmap:build). Opt-in, for dev play tests only.
+#   --extra-mod JAR   also put JAR in mods/ (repeatable; --devmap is the same with the dev map's jar)
+#   --mods-only only copy the --devmap / --extra-mod jars into the existing folder /data/ban/play/<--hash>/mods
+#               (nothing else changes; then restart the play unit: sudo systemctl restart deeptime-play).
+#               Pair it with play-client-stage.sh --mods-only --devmap so the client has the jar too.
 #
 # server.properties is Ben's (2026-10-18): port 25765 on 127.0.0.1 (the laptop's deeptime-play-tunnel
 # forwards to it), RCON 25775, creative with force-gamemode, peaceful, no spawn protection, offline
@@ -33,6 +40,7 @@ REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 RUNS="${DEEPTIME_WORKBENCH_RUNS:-/data/ban/deeptime-cache/workbench/runs}"
 PLAY=/data/ban/play
 RUN=""; HASH=""; LABEL=""; TAGS="${DEEPTIME_ROCK_TAGS:-$(cd "$REPO/../.." && pwd)/Docs/datapacks/deeptime-mic-rock-tags}"; NO_TAGS=0
+EXTRA=(); MODS_ONLY=0
 OPS_FROM="$(sed -n 's/^PLAY_DIR=//p' /etc/default/deeptime-play 2>/dev/null || true)"
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -42,9 +50,37 @@ while [ $# -gt 0 ]; do
         --rock-tags) TAGS="$2"; shift 2 ;;
         --no-rock-tags) NO_TAGS=1; shift ;;
         --ops-from) OPS_FROM="$2"; shift 2 ;;
-        *) echo "usage: play-stage.sh --run <id> [--hash H] [--label S] [--rock-tags DIR | --no-rock-tags] [--ops-from DIR|none]" >&2; exit 2 ;;
+        --devmap)
+            DM=""
+            for j in "$REPO"/devmap/build/libs/deeptime_devmap-*.jar; do
+                case "$j" in *-sources.jar) ;; *) [ -f "$j" ] && DM="$j" ;; esac
+            done
+            [ -n "$DM" ] || { echo "play-stage.sh: no dev map jar in $REPO/devmap/build/libs (cd neoforge && ./gradlew :devmap:build)" >&2; exit 1; }
+            EXTRA+=("$DM"); shift ;;
+        --extra-mod) [ -f "$2" ] || { echo "play-stage.sh: no jar at $2" >&2; exit 1; }; EXTRA+=("$2"); shift 2 ;;
+        --mods-only) MODS_ONLY=1; shift ;;
+        *) echo "usage: play-stage.sh --run <id> [--hash H] [--label S] [--rock-tags DIR | --no-rock-tags] [--ops-from DIR|none] [--devmap] [--extra-mod JAR]..." >&2
+           echo "       play-stage.sh --mods-only --hash H (--devmap | --extra-mod JAR)..." >&2; exit 2 ;;
     esac
 done
+# Adds the opt-in jars (the dev map) to a play folder's mods/, replacing an older build of the same mod.
+add_extra_mods() {
+    local dest="$1" j base stem
+    for j in "${EXTRA[@]}"; do
+        base="$(basename "$j")"
+        stem="${base%%-[0-9]*}"   # deeptime_devmap-1.21.1-0.0.1.jar -> deeptime_devmap
+        find "$dest/mods" -maxdepth 1 -name "$stem-*.jar" ! -name "$base" -print -delete
+        cp -v "$j" "$dest/mods/"
+    done
+}
+if [ "$MODS_ONLY" = 1 ]; then
+    { [[ "$HASH" =~ ^[0-9A-Za-z._-]+$ ]] && [ -d "$PLAY/$HASH/mods" ]; } || { echo "play-stage.sh: --mods-only needs --hash <an existing play folder>" >&2; exit 2; }
+    [ ${#EXTRA[@]} -gt 0 ] || { echo "play-stage.sh: --mods-only without --devmap or --extra-mod does nothing" >&2; exit 2; }
+    echo "== extra mods into $PLAY/$HASH/mods"
+    add_extra_mods "$PLAY/$HASH"
+    echo "ready: $PLAY/$HASH (restart the play unit to load them: sudo systemctl restart deeptime-play)"
+    exit 0
+fi
 [ -n "$RUN" ] || { echo "play-stage.sh: --run <workbench run id> is required" >&2; exit 2; }
 [[ "$RUN" =~ ^[0-9a-f]+$ ]] || { echo "play-stage.sh: odd run id '$RUN'" >&2; exit 2; }
 if [ -z "$HASH" ]; then
@@ -134,4 +170,8 @@ if [ "$NO_TAGS" = 0 ]; then
 else
     echo "== rock tags: skipped (--no-rock-tags)"
 fi
-echo "ready: $DEST (mods: $(find "$DEST/mods" -maxdepth 1 -name '*.jar' | wc -l))"
+if [ ${#EXTRA[@]} -gt 0 ]; then
+    echo "== extra mods (opt-in): ${EXTRA[*]}"
+    add_extra_mods "$DEST"
+fi
+echo "ready: $DEST (mods:$(find "$DEST/mods" -maxdepth 1 -name '*.jar' | wc -l))"
