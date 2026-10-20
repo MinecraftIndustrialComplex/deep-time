@@ -253,12 +253,15 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
 
     // Each plate's sources and what they would release this step, m of thickness.
     let mut by_plate: BTreeMap<u32, Vec<(usize, f64)>> = BTreeMap::new();
-    // P1-19: found in parallel, kept in sample order.
+    // P1-19: found in parallel, kept in sample order (and summed in it: a parallel sum's order,
+    // so its last bits, would change from run to run).
     let held: f64 = state
         .samples
         .par_iter()
         .filter(|s| s.kind == CONTINENTAL && !s.is_hidden() && s.orogeny_myr >= quiet_before)
         .map(|s| (rate * (f64::from(s.thickness_m) - t_c)).max(0.0))
+        .collect::<Vec<f64>>()
+        .iter()
         .sum();
     let release: Vec<(usize, f64)> = state
         .samples

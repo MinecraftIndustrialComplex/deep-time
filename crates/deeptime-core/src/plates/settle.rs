@@ -87,13 +87,15 @@ pub fn step(state: &mut PlateState, env: &Env, flexure: Option<&[f64]>, sea: f64
     let share = 1.0 - (-env.dt_myr / tau).exp();
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
     let g = env.gravity;
-    let (rise, fall) = state
+    // The changes are collected and summed in sample order: a parallel sum's order, so its last
+    // bits, would change from run to run.
+    let changes: Vec<f64> = state
         .samples
         .par_iter_mut()
         .enumerate()
         .map(|(i, s)| {
             if s.kind != CONTINENTAL || s.is_hidden() || s.flags & TRENCH != 0 {
-                return (0.0, 0.0);
+                return 0.0;
             }
             let f = flexure
                 .and_then(|f| f.get(i).copied())
@@ -103,9 +105,12 @@ pub fn step(state: &mut PlateState, env: &Env, flexure: Option<&[f64]>, sea: f64
             let z = f64::from(s.elevation_m);
             let dz = (target - z) * share;
             s.elevation_m = (z + dz) as f32;
-            (dz.max(0.0), (-dz).max(0.0))
+            dz
         })
-        .reduce(|| (0.0, 0.0), |a, b| (a.0 + b.0, a.1 + b.1));
+        .collect();
+    let (rise, fall) = changes.iter().fold((0.0, 0.0), |(r, f), &dz| {
+        (r + dz.max(0.0), f + (-dz).max(0.0))
+    });
     let area = env.norm.sample_area_km2();
     Settle {
         rise_km2_m: rise * area,
