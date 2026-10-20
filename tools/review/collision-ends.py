@@ -25,12 +25,14 @@ def pct(xs, q):
 
 
 def end_of(c):
-    if c.get("died") is not None:
-        return "died"
+    # `died` is the plate a weld killed, not an end of its own: classify by the stall and the
+    # suture first.
     if c.get("stalled"):
         return "stalled" + ("+sutured" if c.get("sutured") else "")
     if c.get("sutured"):
         return "sutured"
+    if c.get("died") is not None:
+        return "died"
     return "transfer"
 
 
