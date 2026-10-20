@@ -10,8 +10,9 @@
 //! and 96 blocks under it (−1 where there is none), the number of horizons, the second horizon's
 //! top, and the water kind (0 none, 1 bank, 2 river, 3 lake, 4 sea), then with `--scale` the
 //! ground distance one block spans there in metres (`m_per_block`: the projection's local scale, so
-//! real slopes can be read off a Petroff-Guyou world, whose scale varies; SCL-075). `<out>.json` says
-//! which channel is which.
+//! real slopes can be read off a Petroff-Guyou world, whose scale varies; SCL-075) and the block's
+//! latitude and longitude (degrees, the simulation's frame: where it lies on the run's own grids).
+//! `<out>.json` says which channel is which.
 
 use std::io::Write;
 use std::path::Path;
@@ -68,7 +69,7 @@ pub fn run(
     let rows = ((b.z1 - b.z0) / step).max(0) as usize;
     let base = 3 + layers.len();
     let cols_end = base + if columns { COLUMN_CHANNELS.len() } else { 0 };
-    let ch = cols_end + usize::from(scale);
+    let ch = cols_end + if scale { 3 } else { 0 };
     // Metres of ground per radian of arc on the sphere the projection maps (its radius in blocks
     // times the nominal horizontal scale).
     let proj = w.manifest.world_projection();
@@ -125,6 +126,9 @@ pub fn run(
                             let d = [a[0] - c[0], a[1] - c[1], a[2] - c[2]];
                             let chord = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
                             row[o + cols_end] = (2.0 * (0.5 * chord).asin() * m_per_rad) as f32;
+                            let (lat, lon) = proj.lat_lon(xf, zf);
+                            row[o + cols_end + 1] = lat as f32;
+                            row[o + cols_end + 2] = lon as f32;
                         }
                     }
                 }
@@ -156,7 +160,7 @@ pub fn run(
         names.extend(COLUMN_CHANNELS.iter().map(|s| (*s).to_owned()));
     }
     if scale {
-        names.push("m_per_block".to_owned());
+        names.extend(["m_per_block", "lat_deg", "lon_deg"].map(str::to_owned));
     }
     let meta = json!({
         "box": [b.x0, b.z0, b.x1, b.z1], "step": step, "channels": names,
