@@ -43,7 +43,8 @@
 //! sources thin in proportion (pure shear) and the sinks take their rock. With
 //! `transition_ocean_crust` (off by default; PLT-294, Ben's to choose) an oceanic sink takes the
 //! same volume as ocean crust instead (lavas and gabbro in the ocean column's proportion), as the
-//! thick igneous crust of a volcanic margin, the commoner kind (Franke 2013): the crust-template
+//! thick igneous crust of a volcanic margin (from-memory: White & McKenzie 1989, not read), the
+//! commoner kind (Franke 2013, read; ledger PLT-294, a game-choice): the crust-template
 //! review of 2026-10-19 found the sources' rock is the main source of granite and gneiss under
 //! the sea on the quick planet, whose oceans lie mostly within W/2 of a margin, but the
 //! continental rock the switch stops parking on the ocean side is then lost, and with it about

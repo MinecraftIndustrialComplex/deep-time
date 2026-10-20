@@ -18,7 +18,7 @@
 //!    which the pools already hold (the surface's deposits join the sediment pool, and its erosion
 //!    strips the pools from the top). Each pool is one unit whose class follows the surface's
 //!    basement rule (`surface::basement_class`, so a column shows at its top what the surface
-//!    eroded). Each crust kind has its own classes (ledger: RCK-096):
+//!    eroded). Each crust kind has its own classes (ledger: RCK-096, from-memory):
 //!    - **continental**: sediment → mudstone, sedimentary → sandstone, felsic volcanic →
 //!      rhyolite (andesite in arcs), mafic volcanic → basalt, metamorphic → gneiss (schist in a
 //!      Himalayan orogen younger than 100 Myr), felsic plutonic → granite (granodiorite under an
@@ -409,7 +409,8 @@ pub fn pool_class(t: &Tables, cell: &Cell<'_>, p: usize) -> u16 {
         // island arc's andesite over its tonalitic middle crust (diorite under an active arc,
         // granodiorite where the arc has died or the rock is the thinned continental crust a
         // margin's transition moved to its ocean side), and schist, the metasediment of a thick
-        // sediment pile or an accreted wedge: never granite, rhyolite or gneiss (ledger: RCK-096).
+        // sediment pile or an accreted wedge: never granite, rhyolite or gneiss (ledger: RCK-096,
+        // from-memory: arc middle crust as tonalitic, not read).
         pool::FELSIC_VOLCANIC => {
             if oceanic
                 || cell.regime == crate::plates::state::regime::ARC

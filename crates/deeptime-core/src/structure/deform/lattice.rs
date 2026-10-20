@@ -127,7 +127,7 @@ pub struct NoddyCheck {
     /// The largest distance between the two restored positions, blocks, over the points where
     /// both put the point on the same side of every fault.
     pub worst: f64,
-    /// Points the two put on different sides of a fault (within 1e-4 of a block of its plane).
+    /// Points the two put on different sides of a fault (within the caller's plane guard of it).
     pub side_flips: u64,
     /// The longest history (events) of a sampled column, and the columns whose history did not
     /// fit one Noddy history (127 events) and was undone as a chain of them.
@@ -151,8 +151,16 @@ impl NoddyCheck {
     }
 }
 
+/// The plane guard of the stage's own check (`deform::report`, the run note the dense-structures
+/// test reads): the agreement that test asks of a long history, 1e-4 of a block. ledger: CRE-034
+pub const STAGE_PLANE_GUARD_BLOCKS: f64 = 1.0e-4;
+
 /// Compares the two at the columns `sample` (block positions), at heights `min_y`, `min_y +
-/// step`, … below `max_y`. `features` are the structures in the order of `st.events`.
+/// step`, … below `max_y`. `features` are the structures in the order of `st.events`. A point
+/// within `plane_guard` blocks of a fault plane may fall on either side (a side flip, left out of
+/// `worst`): each caller passes the agreement it asks, so the guard never excuses a disagreement
+/// larger than the caller's own tolerance. ledger: CRE-034
+#[allow(clippy::too_many_arguments)]
 pub fn noddy_check(
     features: &[Feature],
     st: &Structure,
@@ -161,6 +169,7 @@ pub fn noddy_check(
     min_y: f64,
     max_y: f64,
     step: f64,
+    plane_guard: f64,
 ) -> NoddyCheck {
     assert_eq!(features.len(), st.events.len());
     let c = index.circumference();
@@ -227,13 +236,14 @@ pub fn noddy_check(
                 + (mine[2] - theirs[2]).powi(2))
             .sqrt();
             // A point within rounding of a fault plane may fall on either side. "Within rounding"
-            // is the agreement the tests ask of a long history (1e-4 of a block), not f64's: on
-            // 2026-10-20 a point 5.3e-6 of a block above a cut, in a column undoing 740 events,
-            // fell on the other side in the Noddy port (a fault tip, 0.33 blocks of slip apart;
-            // the dense-structures test, scattered continents, seed 3), where 1e-6 had held.
-            let near_plane = segs
-                .iter()
-                .any(|s| (y - s.y_lo).abs() < 1e-4 || (y - s.y_hi).abs() < 1e-4);
+            // is the caller's (`plane_guard`): the unit tests keep 1e-6, the stage's own check the
+            // 1e-4 of a block its dense-structures test asks of a long history (on 2026-10-20 a
+            // point 5.3e-6 of a block above a cut, in a column undoing 740 events, fell on the
+            // other side in the Noddy port: a fault tip, 0.33 blocks of slip apart, scattered
+            // continents seed 3, where 1e-6 had held).
+            let near_plane = segs.iter().any(|s| {
+                (y - s.y_lo).abs() < plane_guard || (y - s.y_hi).abs() < plane_guard
+            });
             if d > 1e-3 && near_plane {
                 out.side_flips += 1;
             } else {
