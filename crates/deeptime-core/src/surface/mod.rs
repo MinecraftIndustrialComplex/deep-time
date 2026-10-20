@@ -186,11 +186,16 @@ pub struct Totals {
     pub photic_warm_km2_myr: f64,
     #[serde(default)]
     pub photic_warm_clear_km2_myr: f64,
-    /// Carbonate the marine diffusion and slope failure moved off platforms and laid on their
-    /// slopes and the floor around them (`carbonate::exported`; part of `carbonate_km3` and
-    /// `pelagic_km3` before it moved, and not in `marine_km3`).
+    /// Carbonate the marine diffusion moved off platforms and laid on their slopes and the floor
+    /// around them (`carbonate::exported`; part of `carbonate_km3` and `pelagic_km3`, or of the
+    /// strata log's carbonate, before it moved, and not in `marine_km3`).
     #[serde(default)]
     pub periplatform_km3: f64,
+    /// The carbonate the marine diffusion took off sea cells, the periplatform tracer's source:
+    /// `periplatform_km3` is at most this (the tracer conserves carbonate; what it spreads too
+    /// thin or onto land is not laid as carbonate).
+    #[serde(default)]
+    pub periplatform_source_km3: f64,
     pub evaporite_km3: f64,
     pub to_sea_km3: f64,
     pub weathered_km3: f64,
@@ -412,9 +417,8 @@ struct Parts {
     carbonate: Vec<f32>,
     /// The open sea's calcareous ooze (`carbonate::pelagic`).
     pelagic: Vec<f32>,
-    /// Carbonate the marine diffusion and slope failure brought off platforms
-    /// (`carbonate::exported`; taken out of `marine`, and in neither `carbonate` nor the totals'
-    /// production).
+    /// Carbonate the marine diffusion brought off platforms (`carbonate::exported`; taken out of
+    /// `marine`, and in neither `carbonate` nor the totals' production).
     periplatform: Vec<f32>,
     evaporite: Vec<f32>,
     /// Till and glaciomarine diamict (`glacial.rs`).
@@ -431,6 +435,14 @@ struct Parts {
 }
 
 impl Parts {
+    /// What the step laid at cell `c` other than carbonate (river, lake, sea-fill, glacial and
+    /// evaporite sediment), m.
+    fn laid_other(&self, c: usize) -> f64 {
+        f64::from(
+            self.marine[c] + self.till[c] + self.evaporite[c] + self.fluvial[c] + self.lake[c],
+        )
+    }
+
     /// Every part empty, written in parallel (P1-19).
     fn new(n: usize) -> Parts {
         use crate::alloc::filled;
@@ -619,7 +631,10 @@ pub fn estimate(p: &PlanetPreset) -> StageEstimate {
         + 13 * 8 // f64 working arrays
         + 3 * 4 // the step's erosion by process (`erosion_bands`)
         + log // the log's advected copy
-        + 21 * 8; // the glaciers' ice state, loads and passes (`glacial.rs`)
+        + 21 * 8 // the glaciers' ice state, loads and passes (`glacial.rs`)
+        // The carbonate parts (pelagic, periplatform), the step-top record and the periplatform
+        // tracer's arrays at their peak (ERO-191, ERO-195).
+        + 80;
     let frames = (p.run_myr() / s.frame_every_myr).ceil().max(1.0) as u64;
     let history = frames * cells * 12; // packed frames, ~12 B/cell after LZ4 (measured in P1-04)
     let steps = p.plate_steps() as f64 * f64::from(s.substeps);
@@ -1110,6 +1125,13 @@ impl SurfaceStage {
             .map(|c| st.log.total(c) + f64::from(st.regolith_m[c]))
             .collect();
         let mut failed_m_cells = 0.0f64;
+        // The periplatform tracer's record of the step's deposit (`carbonate::StepTop`), what the
+        // parts held at the last substep's end, and the carbonate its diffusion took off sea cells
+        // (m × cells; the periplatform carbonate laid is at most this).
+        let mut tops = crate::alloc::filled(n, carbonate::StepTop::default());
+        let mut prev_other = crate::alloc::filled(n, 0.0f32);
+        let mut prev_eroded = crate::alloc::filled(n, 0.0f32);
+        let mut peri_source_m_cells = 0.0f64;
         // The photic factory's limits over the step's substeps (cells; measurement only).
         let mut photic = [0.0f64; 3];
         let epoch = self.epoch();
@@ -1527,67 +1549,115 @@ impl SurfaceStage {
             }
             self.time("diffusion", started);
 
-            // Periplatform carbonate (ledger ERO-195): the carbonate the diffusion and the slope
-            // failure moved off platforms is carbonate where it lands, not marine clastic.
+            // Periplatform carbonate (ledger ERO-195): the carbonate the diffusion moved off
+            // platforms is carbonate where it lands, not marine clastic. The tracer follows the
+            // diffusion's own change (the solve's heights less those before it); slope failure's
+            // debris is laid as clastic, and what fails off a cell takes its share of the
+            // carbonate the diffusion laid there (`carbonate::StepTop::substep`).
             let started = Instant::now();
             {
                 let (h, kind, log, reg) = (&sc.h, &sc.kind, &st.log, &st.regolith_m);
                 let sea_mask: Vec<bool> = kind.par_iter().map(|&k| k == BASE).collect();
-                let change: Vec<f64> = (0..n)
+                let carb_class =
+                    |k: u16| k == cls.limestone || k == cls.dolostone || k == cls.chalk;
+                // The carbonate in the column the step began with, from `from` m to `from + m` m
+                // under its top: its regolith (none), then its strata log top-down.
+                let old_carb = |c: usize| {
+                    let reg = f64::from(reg[c]);
+                    move |from: f64, m: f64| -> f64 {
+                        let hi = from + m;
+                        let mut depth = reg;
+                        let mut carb = 0.0;
+                        for layer in log.column(c).iter().rev() {
+                            if depth >= hi {
+                                break;
+                            }
+                            let bottom = depth + f64::from(layer.thickness_m);
+                            if bottom > from && carb_class(layer.class) {
+                                carb += bottom.min(hi) - depth.max(from);
+                            }
+                            depth = bottom;
+                        }
+                        carb
+                    }
+                };
+                // What the substep laid before the diffusion other than carbonate (its parts
+                // less what they held at the last substep's end and the diffusion's own gain).
+                let new_other: Vec<f32> = (0..n)
                     .into_par_iter()
                     .map(|c| {
-                        if kind[c] == BASE {
-                            h[c] - before[c]
+                        let gained = (h[c] - before[c]).max(0.0);
+                        (parts.laid_other(c) - f64::from(prev_other[c]) - gained).max(0.0) as f32
+                    })
+                    .collect();
+                let cell = |c: usize| {
+                    let lost = (before[c] - h[c]).max(0.0);
+                    carbonate::SubstepCell {
+                        pre_erosion: (f64::from(parts.eroded[c] - prev_eroded[c]) - lost).max(0.0),
+                        new_other: f64::from(new_other[c]),
+                        fresh: f64::from(parts.carbonate[c] + parts.pelagic[c] - carb_before[c])
+                            .max(0.0),
+                        diffusion: solved[c] - before[c],
+                        failure: h[c] - solved[c],
+                    }
+                };
+                let diffusion = |c: usize| {
+                    if sea_mask[c] {
+                        solved[c] - before[c]
+                    } else {
+                        0.0
+                    }
+                };
+                let loss: Vec<f64> = (0..n)
+                    .into_par_iter()
+                    .map(|c| (-diffusion(c)).max(0.0))
+                    .collect();
+                let gain: Vec<f64> = (0..n)
+                    .into_par_iter()
+                    .map(|c| diffusion(c).max(0.0))
+                    .collect();
+                let loss_carb: Vec<f64> = (0..n)
+                    .into_par_iter()
+                    .map(|c| {
+                        if loss[c] > 0.0 {
+                            tops[c].diffusion_carbonate(&cell(c), &old_carb(c))
                         } else {
                             0.0
                         }
                     })
                     .collect();
-                let loss: Vec<f64> = change.par_iter().map(|&x| (-x).max(0.0)).collect();
-                let gain: Vec<f64> = change.par_iter().map(|&x| x.max(0.0)).collect();
-                let carb_class =
-                    |k: u16| k == cls.limestone || k == cls.dolostone || k == cls.chalk;
-                // What a cell lost, from the top down: this substep's carbonate, then the rest
-                // of what the step laid there, the regolith, then its strata log.
-                let loss_carb: Vec<f64> = (0..n)
-                    .into_par_iter()
-                    .map(|c| {
-                        let mut left = loss[c];
-                        if left <= 0.0 {
-                            return 0.0;
-                        }
-                        let fresh =
-                            f64::from(parts.carbonate[c] + parts.pelagic[c] - carb_before[c])
-                                .max(0.0);
-                        let mut carb = fresh.min(left);
-                        left -= carb;
-                        let other = f64::from(
-                            parts.marine[c] + parts.till[c] + parts.evaporite[c] + reg[c],
-                        );
-                        left -= other.min(left);
-                        for layer in log.column(c).iter().rev() {
-                            if left <= 0.0 {
-                                break;
-                            }
-                            let take = f64::from(layer.thickness_m).min(left);
-                            if carb_class(layer.class) {
-                                carb += take;
-                            }
-                            left -= take;
-                        }
-                        carb
+                peri_source_m_cells += loss_carb.par_iter().sum::<f64>();
+                let mut laid = crate::alloc::filled(n, 0.0f32);
+                for (c, m) in carbonate::exported(
+                    &d, &sc.kd, dts, &solved, &sea_mask, &loss, &loss_carb, &gain,
+                ) {
+                    laid[c as usize] = m as f32;
+                }
+                drop((loss, gain, loss_carb));
+                let kept: Vec<f32> = tops
+                    .par_iter_mut()
+                    .enumerate()
+                    .map(|(c, top)| {
+                        let (_, kept) = top.substep(&cell(c), f64::from(laid[c]), &old_carb(c));
+                        kept as f32
                     })
                     .collect();
-                let laid = carbonate::exported(
-                    &d, &sc.kd, dts, &solved, &sea_mask, &loss, &loss_carb, &gain,
-                );
-                for (c, m) in laid {
-                    let c = c as usize;
-                    let m = (m as f32).min(parts.marine[c]).max(0.0);
-                    parts.marine[c] -= m;
-                    parts.periplatform[c] += m;
-                }
+                parts
+                    .marine
+                    .par_iter_mut()
+                    .zip(parts.periplatform.par_iter_mut())
+                    .zip(kept.par_iter())
+                    .for_each(|((marine, peri), &k)| {
+                        let m = k.min(*marine).max(0.0);
+                        *marine -= m;
+                        *peri += m;
+                    });
             }
+            prev_other
+                .par_iter_mut()
+                .enumerate()
+                .for_each(|(c, p)| *p = parts.laid_other(c) as f32);
+            prev_eroded.copy_from_slice(&parts.eroded);
             self.time("periplatform", started);
         }
 
@@ -1943,6 +2013,7 @@ impl SurfaceStage {
         t.carbonate_km3 += carb * km3;
         t.pelagic_km3 += pel * km3;
         t.periplatform_km3 += peri * km3;
+        t.periplatform_source_km3 += peri_source_m_cells * km3;
         let km2_myr = a / 1.0e6 * dts / 1.0e6;
         t.photic_km2_myr += photic[0] * km2_myr;
         t.photic_warm_km2_myr += photic[1] * km2_myr;
