@@ -747,8 +747,10 @@ went:
 | commit | what it is | chalk on the sea floor |
 |---|---|---|
 | 2fd6f154 | P1-07 merge | 47.4 % |
-| ae27fb71 | before the P1-17 calibration | {AE} |
-| a3c63fed | P1-17 partial: calibration with the real climate | {A3} |
+| 6d8171f0 | before the P1-05 climate merge | 47.4 % |
+| f70e20b5 | P1-05 climate merge | 36.1 % |
+| ae27fb71 | before the P1-17 calibration | 36.1 % |
+| a3c63fed | P1-17 partial: calibration with the real climate | 32.4 % |
 | ba8019af | | 32.4 % |
 | efafc88c | | 30.7 % |
 | 8600e031 | P1-17 hypsometry merge | 20.6 % |
@@ -757,17 +759,24 @@ went:
 | b438d47a | master | 21.9 % |
 | this branch | | 25.1 % |
 
-{STEPS} Both steps deepen the ocean floor, and the column builder draws the basement's sediment
-pool as chalk only above the CCD (`structure/columns.rs:368`, 4,500 m): with the age-depth law
-z(a) = z_f + (z_r - z_f) exp(-a / tau), tau = |z_f| / damping (`plates/pools.rs`
-`ocean_elevation`), the floor crossed the CCD at an age of about 123 Myr before a3c63fed (ridge
--1,000 m, trench -10,000 m, 0.04 mm/yr), 62 Myr after it (ridge -2,500 m and 0.05 mm/yr,
-`pipeline_quick_16k.json:46, 54` at a3c63fed) and 48 Myr after 8600e031, whose floor follows GDH1
-(`oceanic_floor_elevation_m` -5,600 m and 0.12 mm/yr, `pipeline_quick_16k.json:71-72` at 8600e031,
-read in place of the trench at `plates/init.rs:328, 359`). Those are calibrations toward Earth's
-ocean depths (the median sea depth of a 500 Myr planet is near Earth's 4,062 m, plates.md), so
-they were kept; the chalk they removed was chalk on floor deeper than the CCD would allow. The
-deep floor's chalk now comes from the surface stage's own pelagic rule above.
+One run of one seed moves by about 6 points with nothing relevant changed (3e4c1967 rose from
+20.6 to 26.5 %; P1-07's own run read 33 % where its merge commit reads 47.4 % here), so two steps
+stand out. The first is f70e20b5, the P1-05 climate merge (47.4 to 36.1 %), which gave the
+preset its climate section (`pipeline_quick_16k.json:168` at f70e20b5) in place of the zonal
+stand-in: the land grew (88,053 to 106,788 cells) and the sea floor's shale, mudstone and mud
+rose from 46.7 to 56.5 % as its chalk fell, so more of the floor was covered by a strata log, and
+the column builder's pool chalk shows only where none covers it (inferred from the census). The
+second is 8600e031, the P1-17 hypsometry merge (30.7 to 20.6 %), which gave the ocean floor an
+asymptote of -5,600 m with damping 0.12 mm/yr after GDH1
+(`pipeline_quick_16k.json:71-72` at 8600e031, read in place of the -10,000 m trench at
+`plates/init.rs:328, 359`). By the age-depth law (`plates/pools.rs` `ocean_elevation`) the floor
+then reaches the CCD, below which the column builder draws no pool chalk
+(`structure/columns.rs:368`, 4,500 m), at an age of about 48 Myr instead of 62 (inferred from the
+law, not measured on the planets). a3c63fed, which moved the ridge from -1,000 to -2,500 m, moved
+the chalk only from 36.1 to 32.4 %, inside the noise. The hypsometry merge is a calibration toward
+Earth's depths (a median sea depth of 4.0 km against Earth's 4.06, the parameter's note) and the
+climate is the real one, so both were kept: the chalk they removed was the basement pool's
+stand-in, and the deep floor's chalk now comes from the surface stage's own pelagic rule above.
 
 **The carbon cycle.** The climate's carbon budget is degassing against silicate weathering, and
 its weathering supply is blind to rock type: the surface stage's erosion x 2,700 kg/m3 x
