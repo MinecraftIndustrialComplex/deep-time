@@ -101,6 +101,27 @@ pub fn view(
     m_per_block_h: f64,
     source: &str,
 ) -> Value {
+    view_in_world(
+        sites,
+        bodies,
+        circumference,
+        m_per_block_h,
+        source,
+        &HashMap::new(),
+    )
+}
+
+/// [`view`] for sites whose `x` and `z` are not the world's blocks: `world` maps a site's id to
+/// its block (x, z) in the world the game plays (a Petroff–Guyou bake's, [`from_bake`]). Each site's
+/// `block` is that, or its `x` and `z` when it has none.
+fn view_in_world(
+    sites: &[Site],
+    bodies: &[Body],
+    circumference: u32,
+    m_per_block_h: f64,
+    source: &str,
+    world: &HashMap<u32, [i32; 2]>,
+) -> Value {
     let c = f64::from(circumference);
     let km = m_per_block_h / 1000.0;
     let mut by_site: HashMap<u32, Vec<&Body>> = HashMap::new();
@@ -116,6 +137,10 @@ pub fn view(
         .map(|s| {
             let own = by_site.get(&s.id).map_or(&[][..], Vec::as_slice);
             let f = footprint(s, own);
+            let block = world
+                .get(&s.id)
+                .copied()
+                .unwrap_or([s.center[0], s.center[2]]);
             json!({
                 "id": s.id,
                 "kind": s.kind.name(),
@@ -125,6 +150,7 @@ pub fn view(
                 "x": s.center[0],
                 "y": s.center[1],
                 "z": s.center[2],
+                "block": block,
                 "y_range": [s.aabb[0][1], s.aabb[1][1]],
                 "fp": {
                     "x": round(wrap_x(f.x, c), 1),
@@ -169,9 +195,12 @@ pub fn m_per_block_h(preset_json: &str) -> f64 {
 /// The overlay is drawn over the simulation's Lambert pictures (circumference `circumference`), so a
 /// Petroff–Guyou bake's sites and bodies (format 0.5) are brought back to the simulation's frame: each
 /// position through the world's projection to latitude and longitude, then to the Lambert block.
+/// Each site's `block` keeps its baked centre, the world block the inspector and the game use
+/// (the site card's "Block x, z"); its `x` and `z` are the simulation's.
 pub fn from_bake(world: &Path, circumference: u32, m_per_block_h: f64) -> Option<Value> {
     let (mut sites, _) = read_sites(world).ok()??;
     let mut bodies = read_bodies(world).ok()?.unwrap_or_default();
+    let mut blocks = HashMap::new();
     if let Ok(m) = deeptime_format::Manifest::read(world) {
         let wp = m.world_projection();
         if let deeptime_format::projection::WorldProjection::PetroffGuyou(_) = wp {
@@ -181,6 +210,7 @@ pub fn from_bake(world: &Path, circumference: u32, m_per_block_h: f64) -> Option
                 sim.block_of(lat, lon)
             };
             for s in &mut sites {
+                blocks.insert(s.id, [s.center[0], s.center[2]]);
                 let (x, z) = sim.block_of(f64::from(s.lat_lon[0]), f64::from(s.lat_lon[1]));
                 let (dx, dz) = (
                     x.round() as i32 - s.center[0],
@@ -201,7 +231,14 @@ pub fn from_bake(world: &Path, circumference: u32, m_per_block_h: f64) -> Option
             }
         }
     }
-    Some(view(&sites, &bodies, circumference, m_per_block_h, BAKE))
+    Some(view_in_world(
+        &sites,
+        &bodies,
+        circumference,
+        m_per_block_h,
+        BAKE,
+        &blocks,
+    ))
 }
 
 /// The source and the JSON text of an answer.
@@ -385,6 +422,51 @@ mod tests {
         let a: Value = serde_json::from_slice(&answer(&cache, true, &dir, 1024, "{}")).unwrap();
         assert_eq!(a["source"], "bake");
         assert_eq!(a["sites"][0]["type"], "deeptime:bif_fe");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_petroff_bake_keeps_each_sites_world_block_beside_the_simulations() {
+        // Site 15 of the REV-2 inspector's bake (b 6,656, λc 176.25, a 16k simulation): its
+        // record's latitude and longitude, and its baked centre, the block holding its bodies.
+        use deeptime_format::projection::PetroffGuyou;
+        use deeptime_format::{Manifest, Scale, Writer};
+        let dir = std::env::temp_dir().join(format!("deeptime-deposits-pg-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let g = PetroffGuyou::new(6_656, 176.25);
+        let mut m = Manifest::new("test", Writer::this("unit"), Scale::default_for(13_312));
+        m.projection = Some(g.spec(None));
+        m.write(&dir).unwrap();
+        let ll = [40.2804_f32, 335.0288];
+        let (wx, wz) = g.block_of(f64::from(ll[0]), f64::from(ll[1]));
+        let world = [wx.round() as i32, wz.round() as i32];
+        assert_eq!(world, [2391, -1829]);
+        let sites = [site(15, "deeptime:coal_seam", ll, [world[0], 40, world[1]])];
+        deeptime_format::sites::write_sites(&dir, 13_312, &sites).unwrap();
+        let v = from_bake(&dir, 16_384, 300.0).unwrap();
+        let s = &v["sites"][0];
+        // `block` is the world's: the inspector reads the site's own latitude and longitude there.
+        assert_eq!(s["block"], json!(world));
+        let (lat, lon) = g.lat_lon(f64::from(world[0]), f64::from(world[1]));
+        assert!((lat - f64::from(ll[0])).abs() < 0.02 && (lon - f64::from(ll[1])).abs() < 0.02);
+        // `x` and `z` are the simulation's Lambert block the overlay is drawn at, not a world block:
+        // read as one, they are another place (the inspector's 23.875° N, 101.11° E).
+        let sim = deeptime_format::Projection::new(16_384);
+        let (sx, sz) = sim.block_of(f64::from(ll[0]), f64::from(ll[1]));
+        assert_eq!(
+            (s["x"].as_i64().unwrap(), s["z"].as_i64().unwrap()),
+            (sx.round() as i64, sz.round() as i64)
+        );
+        assert_eq!(
+            (s["x"].as_i64(), s["z"].as_i64()),
+            (Some(7056), Some(-1686))
+        );
+        let (elat, elon) = g.lat_lon(7056.0, -1686.0);
+        assert!((elat - 23.875).abs() < 0.01 && (elon - 101.11).abs() < 0.01);
+        // A Lambert world's block is its x and z.
+        let live = view(&sites, &[], 13_312, 300.0, LIVE);
+        assert_eq!(live["sites"][0]["block"], json!(world));
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

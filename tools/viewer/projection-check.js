@@ -63,6 +63,15 @@ for (const w of fixture.worlds) {
     same(`b ${w.b} inverse[${k}].x`, x, r.x);
     same(`b ${w.b} inverse[${k}].z`, z, r.z);
   }
+  // Exact inputs on the forward's degenerate lines (ledger: SCL-083).
+  if (!w.exact || w.exact.length < 400) {
+    console.error(`b ${w.b}: the fixture has no exact rows`); process.exit(1);
+  }
+  for (const [k, r] of w.exact.entries()) {
+    const [x, z] = g.blockOf(f(r.lat), f(r.lon));
+    same(`b ${w.b} exact[${k}].x`, x, r.x);
+    same(`b ${w.b} exact[${k}].z`, z, r.z);
+  }
 }
 // The world object a manifest's layout block builds, and the Lambert fallback.
 const world = globalThis.DTProj.world({ kind: 'petroff_guyou', hemisphere_blocks: 6656, lambda_c_deg: 31.25 }, 13312);

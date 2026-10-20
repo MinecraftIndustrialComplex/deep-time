@@ -133,6 +133,12 @@ assert.ok(/data-fam="coal_seam" aria-pressed="false"/.test(leg) && /data-fam="mv
 assert.ok(leg.includes('data-fam="glow_stone"'), 'a datapack family is listed');
 const rows = D.factRows(m.byId.get(3), m, { where: '12.0° N · 30° E', age: '312.4 Myr ago' }).map(r => r[0]);
 assert.deepStrictEqual(rows.slice(0, 3), ['Family', 'Size', 'Formed']);
+// The card's block is the world's (`block`, a Petroff-Guyou bake's centre), not the simulation's
+// x and z the overlay is drawn at; without one, x and z.
+const blockRow = s => D.factRows(s, m, {}).find(r => r[0] === 'Block x, z')[1];
+assert.strictEqual(blockRow(m.byId.get(3)), '4000, 900');
+const pg = D.prepare(Object.assign({}, answer, { sites: [raw(15, 'deeptime:coal_seam', 7056, -1686, { block: [2391, -1829] })] }));
+assert.strictEqual(blockRow(pg.byId.get(15)), '2391, -1829');
 
 // The cause chain: breadth first, each once, to the depth asked, unknown ids skipped.
 const ev = id => ({ id, causes: [] });
