@@ -68,8 +68,10 @@ public final class GeothermalGameTests {
      *       column is the palette's block for it (columns with a fluid or magma on top are left alone),
      *       and a vent's heart is the vent block.</li>
      * </ul>
-     * A planet whose active volcanoes have no site (none, or all under the sea) passes with a line
-     * saying so: the geometry itself is {@code GeothermalTest}'s.
+     * The test planet's preset puts fields on its hot continental ground (heat flow of 50 mW/m2 or
+     * more), so it always has sites: a planet with none fails (Ben's rule, decisions log 2026-10-01: a
+     * test that reads nothing is not a pass). Whether its active volcanoes have sites of their own
+     * depends on dry land beside them, so their count is logged, not asserted.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void geothermalAroundActiveVolcanoes(GameTestHelper helper) {
@@ -87,11 +89,12 @@ public final class GeothermalGameTests {
         Geothermal geo = t.geothermal(g.waterReach(), minY, sea);
         Magma magma = t.magma(g.waterReach(), minY, sea);
         int[] counts = geo.counts();
+        DeepTime.LOGGER.info("[gametest] geothermalAroundActiveVolcanoes filters: activeVolcanoes={} sites={} ofVolcanoes={} "
+                        + "fromHeatFlow={} pools={} vents={} patches={}", t.data().volcanoes().list().size(), geo.sites().size(),
+                geo.sites().size() - geo.heatFlowSites(), geo.heatFlowSites(), counts[0], counts[1], counts[2]);
         if (geo.sites().isEmpty()) {
-            DeepTime.LOGGER.info("[gametest] geothermalAroundActiveVolcanoes activeVolcanoes={} sites=0 rules={}: this planet has no "
-                    + "geothermal site (no active volcano, or none on ground a site can use); nothing to read back",
-                    t.data().volcanoes().list().size(), t.geothermalRules());
-            helper.succeed();
+            helper.fail("the test planet has no geothermal site (" + t.geothermalRules() + ", " + t.data().volcanoes().list().size()
+                    + " active volcanoes): its preset's heat-flow fields should always place some");
             return;
         }
         List<Geothermal.Site> picked = new ArrayList<>();

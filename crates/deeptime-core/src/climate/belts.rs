@@ -159,9 +159,17 @@ pub fn midlatitudes(phi: f64) -> f64 {
 /// The shift of the belts at latitude `phi` (degrees), given the column's ITCZ latitude and the
 /// month's hemispheric shift of the subtropical highs.
 pub fn shift(phi: f64, itcz: f64, hemi: f64) -> f64 {
-    let t = smoothstep(10.0, 30.0, phi.abs());
-    let s = itcz * (1.0 - t) + hemi * t;
-    s * (1.0 - 0.6 * smoothstep(50.0, 85.0, phi.abs()))
+    let (t, f) = shift_parts(phi);
+    (itcz * (1.0 - t) + hemi * t) * f
+}
+
+/// The two factors of [`shift`] that depend only on the latitude: the ITCZ's share given to the
+/// highs' shift, t, and the damping toward the poles, f (`shift` = (itcz·(1 − t) + hemi·t)·f).
+pub fn shift_parts(phi: f64) -> (f64, f64) {
+    (
+        smoothstep(10.0, 30.0, phi.abs()),
+        1.0 - 0.6 * smoothstep(50.0, 85.0, phi.abs()),
+    )
 }
 
 /// The month's hemispheric shift of the subtropical highs, degrees (north in northern summer,
