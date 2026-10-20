@@ -14,18 +14,18 @@
     "combine": "product",
     "source": [
       {
-        "field": "deeptime:impact_basin",
+        "field": "deeptime:crust_thickness_km",
         "curve": [
           [
-            0.5,
+            15,
             0
           ],
           [
-            1.0,
+            30,
             1
           ]
         ],
-        "note": "inside the rim of an impact structure at least 5 km across: a closed basin with fractured, permeable rock under it"
+        "note": "a uranium source in the target: felsic continental crust (upper crust about 2.7 ppm U, Rudnick & Gao 2003, from-memory; N-MORB about 0.07 ppm, Hofmann 1988, from-memory), so an impact into oceanic crust has none to leach; thresholds design (oceanic crust is about 7 km, continental about 35)"
       }
     ],
     "driver": [
@@ -44,8 +44,7 @@
         "note": "the basin is filling with sediment (lake beds, reworked ejecta); design thresholds"
       }
     ],
-    "pathway": [],
-    "trap": [
+    "pathway": [
       {
         "field": "deeptime:reservoir_quality",
         "curve": [
@@ -58,7 +57,37 @@
             1
           ]
         ],
-        "note": "porous beds for the groundwater to move through (design)"
+        "note": "the fluid: oxidised groundwater carries uranium (as uranyl) through porous beds and the fractured breccia (design)"
+      }
+    ],
+    "trap": [
+      {
+        "field": "deeptime:impact_basin",
+        "curve": [
+          [
+            0.5,
+            0
+          ],
+          [
+            1.0,
+            1
+          ]
+        ],
+        "note": "inside the rim of an impact structure at least 5 km across: a closed basin"
+      },
+      {
+        "field": "deeptime:source_rock_toc",
+        "curve": [
+          [
+            0,
+            0.3
+          ],
+          [
+            1,
+            1
+          ]
+        ],
+        "note": "the reductant that fixes the uranium: organic matter in the fill (uraninite precipitates where oxidised water meets reduced, organic-rich beds); 1 wt% TOC counts fully (design)"
       }
     ]
   },
@@ -111,9 +140,9 @@
     "correlations": [],
     "ore_density_t_m3": 2.4,
     "density_per_1e5km2": {
-      "p90": 15,
-      "p50": 50,
-      "p10": 150
+      "p90": 1.5,
+      "p50": 4,
+      "p10": 10
     },
     "density_basis": "estimate",
     "min_separation_m": 2000,
@@ -171,7 +200,9 @@
   "requires_fields": {},
   "notes": [
     "P2-08 (meteor impacts). Uranium in impact structures: the Cluff Lake deposits in the Carswell structure, Saskatchewan (39 km; unconformity-type ore brought up and reworked by the central uplift), and uranium in the crater-fill and breccias of other structures (Grieve & Masaitis 1994 (The economic potential of terrestrial impact craters, Int. Geol. Rev. 36(2):105-151); Grieve 2005, Geol. Soc. London Spec. Publ. 248:1-29). Uranium moves only in oxidised water, hence the clock.",
-    "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, deposit density, separation, clustering, geometry and the curves' thresholds.",
+    "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, separation, clustering, geometry and the curves' thresholds.",
+    "DENSITY (2026-10-19, coordinator's call, ledger IMP-143): 1.5 / 4 / 10 per 100,000 km2 of permissive crater, from Earth's inventory: the confirmed structures cover about 136,000 km2 (the Wikipedia list of impact structures, from the Earth Impact Database: 199 structures, pi/4 D^2 summed; 134,649 km2 for the 105 at least 8 km across), and 10 of 208 craters host major mineral resources (James et al. 2022 / LPSC 2023; Grieve & Masaitis 1994: about a quarter of craters have economic resources, 12 % are exploited), so about 2 to 3 craters per metal type with about 3 deposits each: about 4 per 100,000 km2. The old 50 and 100 were placeholders some 10 to 25 times that.",
+    "PATHWAY (2026-10-19, ledger IMP-142): source, fluid and trap as in uranium deposit models (a uranium-bearing source, oxidised water to carry it, a reductant to fix it): the source is now felsic crust under the crater (before: the crater itself, which gave uranium to craters in oceanic crust), the fluid the porous fill, the trap the closed basin and its organic matter. Carswell (Cluff Lake) is the type example: basement uranium brought up by the central uplift.",
     "Crater-basin oil is not a type of its own: the impact stage adds the closure of crater rims and central uplifts to deeptime:trap_structure, impact breccia is a reservoir rock, and deeptime:petroleum_trap names the impact among its trap causes.",
     "minecraft.claims_scatter is false: impact deposits are too rare to be a world's only source of their products, so the game leaves the pack's own scatter of these materials in place (a material another type claims, such as copper, zinc or gold, stays claimed).",
     "VERTICAL SCALE (decisions log 2026-10-03, \"Keep today's block height\"): at 35 m per block the vertical multipliers are 1.75 times their 20 m values (balance.size_mult_v 4.0 -> 7.0), so a body keeps the height in blocks it had at 20 m per block; its size in metres is unchanged. game-choice, ledger IMP-123."

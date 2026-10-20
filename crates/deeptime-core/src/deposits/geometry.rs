@@ -133,6 +133,9 @@ pub struct Placement {
     /// Depth of the present water table below the surface at the site (m; 0 = not known: a body
     /// that follows the water table then keeps its fixed thickness).
     pub water_table_m: f64,
+    /// The ore body's vertical semi-axis is at most this many blocks (a stratabound body no
+    /// thicker than its host horizon, `hosts.in_stratum`); infinite for no bound.
+    pub max_half_v_blocks: f64,
 }
 
 /// The ore body and its extra bodies (lithocap, gossan) for one site. Ids come from `next_id`.
@@ -148,7 +151,10 @@ pub fn bodies_for(
     let shape = t.shape();
     let volume = tonnage_t / t.sizing.ore_density_t_m3;
     let semi_m = semi_axes_m(shape, t.geometry.aspect, volume);
-    let axes = to_blocks(semi_m, t, sc);
+    let mut axes = to_blocks(semi_m, t, sc);
+    if f64::from(axes[1]) > at.max_half_v_blocks {
+        axes[1] = at.max_half_v_blocks.max(0.5) as f32;
+    }
     let centre_y = at.surface_y - at.centre_depth_m / sc.m_per_block_v;
     let surface_clip = at.surface_y.floor() as i32;
     let id = next_id();
@@ -577,6 +583,7 @@ mod tests {
             dip: 0.0,
             truncated: false,
             water_table_m: 0.0,
+            max_half_v_blocks: f64::INFINITY,
         };
         let mut rich = t.clone();
         rich.balance.richness_mult *= 1.5;
@@ -611,6 +618,43 @@ mod tests {
     }
 
     #[test]
+    fn a_hosted_body_is_no_thicker_than_its_horizon() {
+        let t = builtin()
+            .unwrap()
+            .into_iter()
+            .find(|t| t.id == "deeptime:mvt_zn_pb")
+            .unwrap();
+        let mut id = 0u32;
+        let mut next = || {
+            id += 1;
+            id
+        };
+        let free = Placement {
+            x: 0.0,
+            z: 0.0,
+            surface_y: 120.0,
+            centre_depth_m: 300.0,
+            yaw: 0.0,
+            dip: 0.0,
+            truncated: false,
+            water_table_m: 0.0,
+            max_half_v_blocks: f64::INFINITY,
+        };
+        let sc = Scales::default();
+        let open = bodies_for(&t, 1, 10.0e6, &Grades::new(), &free, &sc, &mut next);
+        assert!(open[0].axes[1] > 1.5, "{:?}", open[0].axes);
+        let capped = Placement {
+            max_half_v_blocks: 1.5,
+            ..free
+        };
+        let b = bodies_for(&t, 1, 10.0e6, &Grades::new(), &capped, &sc, &mut next);
+        assert_eq!(b[0].axes[1], 1.5);
+        assert_eq!(b[0].axes[0], open[0].axes[0]);
+        // The MVT body keeps its host rock (no dolostone lens).
+        assert!(b[0].rock_class.is_none());
+    }
+
+    #[test]
     fn bodies_hold_the_zones_and_clip() {
         let t = builtin().unwrap().remove(0);
         let grades: Grades = [("c:copper".to_string(), 0.0044)].into_iter().collect();
@@ -628,6 +672,7 @@ mod tests {
             dip: 0.0,
             truncated: true,
             water_table_m: 0.0,
+            max_half_v_blocks: f64::INFINITY,
         };
         let b = bodies_for(&t, 4, 240.0e6, &grades, &at, &Scales::default(), &mut next);
         let ore = &b[0];
@@ -680,6 +725,7 @@ mod tests {
             dip: 0.0,
             truncated: true,
             water_table_m: 0.0,
+            max_half_v_blocks: f64::INFINITY,
         };
         let gossan_height = |wt: f64| {
             let at = Placement {
@@ -867,6 +913,7 @@ mod tests {
                 dip: 0.0,
                 truncated: false,
                 water_table_m: 0.0,
+                max_half_v_blocks: f64::INFINITY,
             };
             stack_bodies(&t, &k, 9, 2.0e10, &grades, &at, &plan, &sc, &mut || {
                 id += 1;
