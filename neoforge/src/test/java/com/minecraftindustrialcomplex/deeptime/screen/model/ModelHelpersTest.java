@@ -148,6 +148,15 @@ class ModelHelpersTest {
         assertEquals(c.lonEast() - c.lonWest(), 30, 1e-9);
         assertEquals(0xd7301f, ProvinceHints.colour("porphyry_cu_mo_au"));
         assertEquals(0xffb000, ProvinceHints.colour("deeptime:dummy"));
+        assertEquals("deeptime.layer.word.mvt_zn_pb", ProvinceHints.nameKey("deeptime:mvt_zn_pb"));
+    }
+
+    /** The review page names every deposit type in words ("MVT Zn-Pb"), not its id ("Mvt zn pb"). */
+    @Test
+    void everyDepositTypeHasAName() throws java.io.IOException {
+        com.google.gson.JsonObject lang = LayerCatalogTest.lang();
+        for (String type : ProvinceHints.COLOURS.keySet())
+            assertTrue(lang.has(ProvinceHints.nameKey(type)), type);
     }
 
     /**
@@ -243,5 +252,25 @@ class ModelHelpersTest {
         // Stages without coupling count on their own.
         Estimate plain = new Estimate(1, List.of(new Estimate.Stage("a", 1, 10), new Estimate.Stage("b", 1, 30)));
         assertEquals(35_000, plain.timeLeftMs(0, 500, 0));
+    }
+
+    /** The bake after the stages counts in the run's seconds, as a share of amplify's, at the stages' pace. */
+    @Test
+    void theBakeCountsAsAShareOfAmplify() {
+        Estimate e = new Estimate(1, List.of(new Estimate.Stage("plates", 1, 100), new Estimate.Stage("amplify", 1, 50)));
+        assertEquals(150, e.stageSeconds(), 1e-9);
+        assertEquals(50 * Estimate.BAKE_PER_AMPLIFY, e.bakeSeconds(), 1e-9);
+        assertEquals(150 + e.bakeSeconds(), e.seconds(), 1e-9);
+        assertEquals(100 / e.seconds(), e.fraction(1, 0), 1e-9);
+        assertEquals(150 / e.seconds(), e.fraction(1, 1000), 1e-9, "the stages done, the bake not");
+        assertEquals(-1, e.fraction(2, 0));
+        assertEquals(Math.round(e.bakeSeconds() * 1000), e.timeLeftMs(1, 1000, 0));
+        // Stages that ran twice as slow as estimated: so is the bake.
+        assertEquals(Math.round(2 * e.bakeSeconds() * 1000), e.bakeMs(300_000));
+        assertEquals(Math.round(e.bakeSeconds() * 1000), e.bakeMs(0), "the estimate's own pace when the stages' time is unknown");
+        assertEquals(0, e.bakeLeftMs(300_000, 999_000));
+        assertEquals(150 / e.seconds(), e.bakeFraction(300_000, 0), 1e-9);
+        assertEquals((150 + Estimate.BAKE_HOLD * e.bakeSeconds()) / e.seconds(), e.bakeFraction(300_000, 999_000), 1e-9);
+        assertEquals(0, new Estimate(1, List.of(new Estimate.Stage("plates", 1, 100))).bakeSeconds(), "no amplify: no bake share");
     }
 }

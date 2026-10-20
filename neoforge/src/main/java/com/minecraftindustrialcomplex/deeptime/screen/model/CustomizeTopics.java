@@ -121,13 +121,22 @@ public final class CustomizeTopics {
     }
 
     /**
-     * A field's range and unit as the player reads it: {@code 0.1 to 99.9 m/s²}, {@code on or off},
-     * {@code one of 4 choices}; empty for a choice whose list comes from elsewhere.
+     * A maximum this large is no limit the player meets (the seed's is 2^53 - 1, the most a
+     * double holds exactly), so the range says only its minimum. game-choice (P1-11d): a display
+     * rule, not a physical value; 1e15 is where {@link Formats#number} stops writing whole numbers.
+     */
+    static final double NO_MAX = 1e15;
+
+    /**
+     * A field's range and unit as the player reads it: {@code 0.1 to 99.9 m/s²}, {@code 0 or more},
+     * {@code on or off}, {@code 4 choices}, {@code from the pack's lists}.
      */
     public static Phrase range(EditorFields.Field f) {
         return switch (f.kind()) {
-            case NUMBER -> Phrase.of(f.unit().isEmpty() ? "customize.range" : "customize.range.unit",
-                    Formats.number(f.min()), Formats.number(f.max()), f.unit());
+            case NUMBER -> f.max() >= NO_MAX
+                    ? Phrase.of(f.unit().isEmpty() ? "customize.range.min" : "customize.range.min.unit", Formats.number(f.min()), f.unit())
+                    : Phrase.of(f.unit().isEmpty() ? "customize.range" : "customize.range.unit",
+                            Formats.number(f.min()), Formats.number(f.max()), f.unit());
             case TOGGLE -> Phrase.of("customize.range.toggle");
             case CHOICE -> f.options().isEmpty() ? Phrase.of("customize.range.list") : Phrase.of("customize.range.choices", f.options().size());
         };
