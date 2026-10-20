@@ -121,6 +121,10 @@ T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of t
 | Crust thickness | mean 41.1 km; orogens 46.3 km; never over about 75 km | Christensen and Mooney 1995 abstract; Hacker part 14 | 35 km reference; burial factor up to 2 (70 km) | - |
 | Columns holding some metamorphic rock | not counted | - | 67.4 % of 20,000 random columns; 97.8 % of land columns | run below |
 | Grade inversions, thin metamorphic slivers, plutonic sheets | zero by construction of the check | - | 0.07 % grade inversions, 0.25 % thin metamorphic slivers, 0.05 % plutonic sheets (20,000 columns); none in the stored stacks | run below |
+| Contact aureole width over the intrusion's smallest dimension | 0.02 to 0.5 in the examples modelled and cited (wider round wet, hot or carbonate-hosted intrusions) | Annen 2017 (full text) | 0.3 (RCK-053), 0.45 in a carbonate host (RCK-091) | arithmetic |
+| Median aureole width | - | - | plutons 1,183 to 1,254 m, stocks 688 to 693 m | REV-2 runs |
+| Aureole rock | hornfels in clastic and volcanic hosts, skarn in carbonate | Meinert 1992 | 99.3 to 99.7 % of the zones hornfels, 0.3 to 0.7 % skarn | REV-2 runs |
+| Stocks | - | - | 16 to 29 rooted on a pluton's roof, 8,233 to 9,122 under younger cover, none from the world's floor (all of them on master) | REV-2 runs |
 
 Run below: `earthlike_quick_16k`, start `scattered_continents`, 500 Myr, default seed, 2 threads, `deeptime run` and
 `deeptime strata-check --columns 20000`, test machine, 2026-10-02; before is master 9e84fcf and after is this branch (commit 5cb328c3). The pluton thickness fix lowered the surviving pluton bodies by 12 of 230 (5 %) and raised the eroded ones from 616 to 628; nothing else in the run changed (emplaced 1,034, subducted 104, metamorphosed volume 4.058e7 km3, deformed share 0.4805), and `strata-check` is identical (see [strata.md](strata.md)).
@@ -172,6 +176,45 @@ did not fall while its column share did. Raising the threshold moved rock from s
 planet's own changes put more into gneiss). The inversions that exist are all made by the structure stage (thrusts and
 dykes put a hotter rock over a colder one, as in the Himalaya: Mottram et al. 2014), none by the stored stacks or by the
 columns before folds are applied; a wider phyllite band (350 to 525) makes more pairs such as gneiss over phyllite.
+
+### REV-2: aureoles and stocks (2026-10-20)
+
+The external review of run 1a156f22b66 (supercontinent, 1000 Myr, seed 1) found stocks standing from the world's floor,
+each pluton's aureole drawn as an inner shell of the pluton in the one rock at its roof, and no age on any body. Measured
+on `earthlike_quick_16k`, 1000 Myr, `deeptime run --threads 4`, both starts, seeds 1 and 2, test machine, 2026-10-20;
+master be17a7cf against the branch at 69b90141; counts from `bodies/bodies.dtb` and `notes.structure`:
+
+| Run | Pluton bodies | Aureoles of plutons / stocks | Zones, hornfels / skarn | Median width m, pluton / stock | Stocks rooted / under cover | bodies.dtb KB, master to branch | Pluton age, median and range, Ma |
+|---|---|---|---|---|---|---|---|
+| supercontinent 1 | 520 | 379 / 6,761 | 35,525 / 182 | 1,209 / 693 | 16 / 8,754 | 298 to 2,462 | 130, 0 to 946 |
+| supercontinent 2 | 569 | 435 / 6,841 | 34,994 / 104 | 1,254 / 688 | 21 / 8,716 | 296 to 2,451 | 110, 0 to 938 |
+| scattered 1 | 759 | 608 / 7,351 | 43,472 / 317 | 1,183 / 689 | 29 / 8,233 | 353 to 2,918 | 198, 0 to 874 |
+| scattered 2 | 634 | 475 / 6,912 | 37,404 / 260 | 1,191 / 690 | 22 / 9,122 | 388 to 2,654 | 200, 0 to 784 |
+
+Master has no aureole bodies, no stock under cover and age 0 on every body; the pluton bodies are the same in number on
+both sides. Along the line of the review's picture (A (-6682, -482) to B (-5633, -1374), 345 columns, supercontinent seed
+1, `deeptime inspect-column` at each, the rock with the bodies painted as the game places it), granite falls from 50,448
+blocks to 45,727 and hornfels rises from 932 to 2,219. At 55 km along it the stock that stood about 400 blocks from the
+floor sits under the 140 blocks of shale cover, in basalt and phyllite with a hornfels rim (granite 3,236 to 1,419,
+hornfels 0 to 420); at 220 km two stocks, a younger one beside an older one, are one granite body with hornfels in the
+sandstone above and below it and none inside it (6,586 to 3,435, 0 to 863); at 320 km a stock under shale with its rim
+(3,387 to 950, 0 to 915).
+
+What this says:
+
+- The width is 0.3 of the smallest dimension by construction, inside the 0.02 to 0.5 of Annen 2017; the medians follow
+  from the smallest dimensions: 3.8 km for the median pluton, about 2.3 km for the median stock.
+- Skarn is rare (0.3 to 0.7 % of the zones) because little carbonate lies at the depths the intrusions reach in these
+  runs; it is the share of carbonate in the hosts, not a separate rule.
+- Most stocks sit under younger cover and few root on a pluton, since a stock roots only on a pluton of its own episode
+  within 10 Myr (DEF-078).
+- The other stocks at an aureole's centre (`mask_intrusions`) take the aureole of about a third of the stocks and most
+  of the zones on supercontinent seed 1: 10,076 stock aureoles and 90,636 zones without them, 8,577 and 51,526 when only
+  a stock holding the whole inner half of the plan counted, 6,761 and 35,707 with any of its five probe points held.
+  Stocks of one episode crowd together, and the bands are depth layers, so a stock beside another loses its aureole at
+  the other's depths all round. Without the rule the younger stock's ring of hornfels crossed the older stock's granite
+  (the 220 km close-up before it).
+- bodies.dtb grows about eightfold (0.3 to 2.5 to 2.9 MB), mostly the stocks' hollow aureoles of eight slabs each.
 
 ## Simplifications and limits
 
