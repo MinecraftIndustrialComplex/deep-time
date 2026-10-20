@@ -141,14 +141,19 @@ final class ScreenshotDriver {
                     if (screen instanceof CreateWorldScreen cws) {
                         if (createScreen == null) {
                             createScreen = cws;
+                            worldTab(cws);
+                            stepTicks = 0;
+                        } else if (stepTicks == 15) {
+                            // The screen exactly as Create World opens it, before the driver touches it.
                             WorldCreationUiState ui = cws.getUiState();
+                            DeepTime.LOGGER.info("[deeptime-shot] fresh world type: {}",
+                                    ui.getWorldType().preset() == null ? "custom" : ui.getWorldType().preset().unwrapKey().map(Object::toString).orElse("?"));
+                            shot("00-create-world-fresh");
                             ui.getNormalPresetList().stream()
                                     .filter(e -> e.preset() != null && e.preset().is(PlanetGenerators.PLANET)).findFirst()
                                     .ifPresentOrElse(ui::setWorldType,
                                             () -> DeepTime.LOGGER.error("[deeptime-shot] FAILED: deeptime:planet is not in the world type list"));
-                            worldTab(cws);
-                            stepTicks = 0;
-                        } else if (stepTicks == 20) {
+                        } else if (stepTicks == 35) {
                             DeepTime.LOGGER.info("[deeptime-shot] create button blocked: {}", CreateWorldGuard.block(cws.getUiState()));
                             shot("01-create-world-deeptime");
                             var editor = cws.getUiState().getPresetEditor();

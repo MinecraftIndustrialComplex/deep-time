@@ -20,7 +20,10 @@
 #   --no-build     skip the Gradle step (classes, host natives, launch script, run/mods links)
 #   --no-guidance  skip the second pass (natives forced off: the guidance panel, Create blocked)
 #   --no-create    stop after Accept (no world creation, no in-world shot)
-#   --size WxH     window size (default 1280x720; the GUI scale is 2)
+#   --size WxH     window size (default 1280x720)
+#   --gui-scale N  Minecraft's GUI scale (default 2; 0 is the game's "Auto", the largest that fits)
+#   --mods SET     link smoke/<SET>/server/mods into the client too (Gradle -PrunSet=SET; e.g. mic for
+#                  the MIC pack's worldgen mods); DEEPTIME_RUN_MODS=<dir> points at another copy's set
 #   --timeout S    per client pass (default 7200: a 1,000-Myr quick planet's ETA was ~2 h on the
 #                  loaded VM; --prop length=300 takes a fraction of that)
 #   --threads N    processors the client JVM sees (-XX:ActiveProcessorCount; default 8): the editor
@@ -39,6 +42,7 @@ REPO="$PWD"
 ADMIT="${DEEPTIME_ADMIT:-/usr/local/lib/deeptime/admit.py}"
 
 NAME=vm-client; BUILD=1; GUIDANCE=1; CREATE=true; WSIZE=1280x720; TIMEOUT=7200; THREADS=8; PROPS=()
+GUISCALE=2; RUNSET=""; GRADLE_SET=()
 ARGS=("$@")
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -47,6 +51,8 @@ while [ $# -gt 0 ]; do
         --no-guidance) GUIDANCE=0; shift ;;
         --no-create) CREATE=false; shift ;;
         --size) WSIZE="$2"; shift 2 ;;
+        --gui-scale) GUISCALE="$2"; shift 2 ;;
+        --mods) RUNSET="$2"; shift 2 ;;
         --timeout) TIMEOUT="$2"; shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --prop) [[ "$2" =~ ^[a-z]+=[-0-9.,\;a-z_/]+$ ]] || { echo "vm-client: bad --prop $2" >&2; exit 2; }
@@ -57,19 +63,25 @@ while [ $# -gt 0 ]; do
 done
 [[ "$NAME" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "vm-client: --name must be one plain word" >&2; exit 2; }
 [[ "$WSIZE" =~ ^[0-9]+x[0-9]+$ ]] || { echo "vm-client: --size is WxH" >&2; exit 2; }
+[[ "$GUISCALE" =~ ^[0-9]$ ]] || { echo "vm-client: --gui-scale is 0 (auto) to 9" >&2; exit 2; }
+if [ -n "$RUNSET" ]; then
+    [[ "$RUNSET" =~ ^[a-z0-9-]+$ ]] || { echo "vm-client: --mods is a server set name" >&2; exit 2; }
+    GRADLE_SET=("-PrunSet=$RUNSET")
+fi
 [ "$(uname -s)" = Linux ] || { echo "vm-client: runs on the test VM (Linux)" >&2; exit 2; }
 
 # --- phase 1: the build (its own admitted job), then the client run as a server job ---------------
 if [ "${DEEPTIME_ADMIT_PID:-}" != "$$" ] && [ -f "$ADMIT" ]; then
     if [ "$BUILD" = 1 ]; then
         python3 "$ADMIT" run --kind gradle:build --label "$(basename "$REPO")" -- \
-            bash -c 'cd neoforge && ./gradlew --console=plain -q classes gametestClasses createClientLaunchScript linkRunModsClient' \
+            bash -c 'cd neoforge && ./gradlew --console=plain -q "$@" classes gametestClasses createClientLaunchScript linkRunModsClient' \
+            vm-client-gradle ${GRADLE_SET[@]+"${GRADLE_SET[@]}"} \
             || { echo "vm-client: the Gradle step failed" >&2; exit 1; }
     fi
     exec python3 "$ADMIT" run --kind client:editor --server --label "$(basename "$REPO")" -- "$SELF" "${ARGS[@]}" --no-build
 fi
 if [ "$BUILD" = 1 ]; then
-    (cd neoforge && ./gradlew --console=plain -q classes gametestClasses createClientLaunchScript linkRunModsClient) \
+    (cd neoforge && ./gradlew --console=plain -q ${GRADLE_SET[@]+"${GRADLE_SET[@]}"} classes gametestClasses createClientLaunchScript linkRunModsClient) \
         || { echo "vm-client: the Gradle step failed" >&2; exit 1; }
 fi
 
@@ -123,14 +135,14 @@ setsid "$XVFB" "$DISP" -screen 0 "${WSIZE}x24" -nolisten tcp +extension GLX > "$
 XPID=$!
 sleep 3
 kill -0 "$XPID" 2>/dev/null || { say "Xvfb $DISP did not start ($(tail -3 "$WORK/xvfb.log"))"; exit 1; }
-say "display $DISP (${WSIZE}, llvmpipe), client JVM sees $THREADS processors"
+say "display $DISP (${WSIZE}, llvmpipe, GUI scale $GUISCALE${RUNSET:+, mods $RUNSET}), client JVM sees $THREADS processors"
 
 write_options() {
     mkdir -p "$GAMEDIR/config"
-    cat > "$GAMEDIR/options.txt" <<'EOF'
+    cat > "$GAMEDIR/options.txt" <<EOF
 onboardAccessibility:false
 pauseOnLostFocus:false
-guiScale:2
+guiScale:$GUISCALE
 narrator:0
 tutorialStep:none
 joinedFirstServer:true
