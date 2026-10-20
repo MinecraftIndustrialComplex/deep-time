@@ -221,10 +221,14 @@ public final class BiomeGameTests {
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
     /**
-     * Families whose bound is not {@link #FORBIDDEN_CEILING}. The ice cap's ice spikes (BiomeCensus.EF_ICE_SPIKES; ledger:
-     * BIO-162, the ice spikes report of 2026-10-20): CEILING_PLACEHOLDER
+     * Families bounded rather than banned: their share fails only when its one-sided 99 % lower bound is above the
+     * ceiling ({@link ShareBound#above}). The ice cap's ice spikes (BiomeCensus.EF_ICE_SPIKES; ledger: BIO-162, the
+     * ice spikes report of 2026-10-20), 0.10: the game's census emulated on bakes gave 0.034 to 0.071 of the ice cap
+     * after EF's continentalness floor (BIO-161) and 0.153 to 0.254 before it, with vanilla and MIC, on Ben's play
+     * world and the 2026-10-20 master's supercontinent. On the GameTests' 4k planet the ice cap is 3 census columns,
+     * under {@link #MIN_COLUMNS}, so there it is logged; it is asserted on a planet with an ice cap.
      */
-    static final Map<String, Double> FORBIDDEN_CEILINGS = Map.of(BiomeCensus.EF_ICE_SPIKES, 0.12);
+    static final Map<String, Double> FORBIDDEN_CEILINGS = Map.of(BiomeCensus.EF_ICE_SPIKES, 0.10); // ledger: BIO-162
 
     /**
      * P1-09: biomes follow the simulated climate. On the real baked planet ({@code test_planet_real},
