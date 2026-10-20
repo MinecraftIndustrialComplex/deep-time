@@ -38,7 +38,8 @@
 //! the height its column holds (plate task 8; until then a height-only `arc_uplift_mm_yr`).
 //! Island-arc crust becomes continental once it is `arc_mature_crust_km` thick
 //! (`plates::finish_samples`). A wider band around the arc (`cordillera_width_km`) thickens
-//! continental crust by the crust shortened into it at `cordillera_shortening_mm_yr`, taken from
+//! continental crust by the crust shortened into it at `cordillera_shortening_mm_yr` (Earth's
+//! mean over its continental arcs, however fast the plates converge: PLT-048, PLT-320), taken from
 //! the plate's continental crust behind the range (volume kept; until plate task 8 an uplift with
 //! an Airy root made from nothing), slowing as the column's Airy height nears
 //! `cordillera_height_m` (P1-27: the arc's own range, which h(z̃) of an abyssal slab leaves at a
