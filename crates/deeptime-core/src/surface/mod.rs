@@ -171,6 +171,18 @@ pub struct Totals {
     pub lake_km3: f64,
     pub marine_km3: f64,
     pub carbonate_km3: f64,
+    /// Pelagic chalk (`carbonate::pelagic`; not in `carbonate_km3`).
+    #[serde(default)]
+    pub pelagic_km3: f64,
+    /// What limits the photic carbonate factory (measurement only), km² × Myr summed over the
+    /// steps: the sea floor in its photic zone (0 to [`carbonate::PHOTIC_M`] deep), that area
+    /// weighted by the water's warmth factor, and by warmth times clarity (`carbonate::produce`).
+    #[serde(default)]
+    pub photic_km2_myr: f64,
+    #[serde(default)]
+    pub photic_warm_km2_myr: f64,
+    #[serde(default)]
+    pub photic_warm_clear_km2_myr: f64,
     pub evaporite_km3: f64,
     pub to_sea_km3: f64,
     pub weathered_km3: f64,
@@ -384,6 +396,8 @@ struct Parts {
     lake: Vec<f32>,
     marine: Vec<f32>,
     carbonate: Vec<f32>,
+    /// The open sea's calcareous ooze (`carbonate::pelagic`).
+    pelagic: Vec<f32>,
     evaporite: Vec<f32>,
     /// Till and glaciomarine diamict (`glacial.rs`).
     till: Vec<f32>,
@@ -408,6 +422,7 @@ impl Parts {
             lake: filled(n, 0.0),
             marine: filled(n, 0.0),
             carbonate: filled(n, 0.0),
+            pelagic: filled(n, 0.0),
             evaporite: filled(n, 0.0),
             till: filled(n, 0.0),
             glacial_eroded: filled(n, 0.0),
@@ -1063,6 +1078,9 @@ impl SurfaceStage {
             .map(|c| st.log.total(c) + f64::from(st.regolith_m[c]))
             .collect();
         let mut failed_m_cells = 0.0f64;
+        // The photic factory's limits over the step's substeps (cells; measurement only).
+        let mut photic = [0.0f64; 3];
+        let epoch = self.epoch();
         for sub in 0..subs {
             // The first substep's flood ran beside the setup (above).
             if sub > 0 {
@@ -1307,11 +1325,46 @@ impl SurfaceStage {
             let evap_rate = p.evaporite_m_myr * 1.0e-6;
             // Cell by cell, so in parallel (P1-17).
             let (kind, filled, clastic) = (&sc.kind, &sc.filled, &parts.marine);
+            // The photic factory's limits (measurement only): its area, warm, warm and clear.
+            // (Summed in fixed chunks, then in order: the same bits on any thread count.)
+            let lim: Vec<[f64; 3]> = sc
+                .h
+                .par_chunks(4096)
+                .enumerate()
+                .map(|(i, hs)| {
+                    let mut acc = [0.0f64; 3];
+                    for (j, &h) in hs.iter().enumerate() {
+                        let c = i * 4096 + j;
+                        if kind[c] == BASE {
+                            let l = carbonate::limits(
+                                sea - h,
+                                f64::from(clim.sst_c[c]),
+                                f64::from(clastic[c]),
+                                &carb_p,
+                            );
+                            for (x, y) in acc.iter_mut().zip(l) {
+                                *x += y;
+                            }
+                        }
+                    }
+                    acc
+                })
+                .collect();
+            for l in lim {
+                for (x, y) in photic.iter_mut().zip(l) {
+                    *x += y;
+                }
+            }
+            // The planktic calcifiers' rain at the substep's middle (`deposits::clocks`).
+            let calcifiers = epoch.pelagic_calcifiers_at(
+                (t_end_myr - dt_myr + (sub as f64 + 0.5) * dts / 1.0e6) * 1.0e6,
+            );
             sc.h.par_iter_mut()
                 .zip(parts.carbonate.par_iter_mut())
+                .zip(parts.pelagic.par_iter_mut())
                 .zip(parts.evaporite.par_iter_mut())
                 .enumerate()
-                .for_each(|(c, ((h, carb), evaporite))| {
+                .for_each(|(c, (((h, carb), pel), evaporite))| {
                     if kind[c] == BASE {
                         let z = sea - *h;
                         let add = carbonate::produce(
@@ -1331,6 +1384,19 @@ impl SurfaceStage {
                             let extra = cap_m.min(z);
                             *h += extra;
                             *carb += extra as f32;
+                        }
+                        // The open sea's calcareous ooze above the compensation depth (the column
+                        // builder's CCD, RCK-015).
+                        let z = sea - *h;
+                        if calcifiers > 0.0 && z > 0.0 {
+                            let ooze = carbonate::pelagic(
+                                z,
+                                calcifiers,
+                                dts,
+                                crate::structure::columns::CCD_M,
+                            );
+                            *h += ooze;
+                            *pel += ooze as f32;
                         }
                         let z = sea - *h;
                         if restricted[c]
@@ -1488,6 +1554,7 @@ impl SurfaceStage {
                         carbonate: f64::from(parts.carbonate[c]),
                         evaporite: f64::from(parts.evaporite[c]),
                         glacial: f64::from(parts.till[c]),
+                        pelagic: f64::from(parts.pelagic[c]),
                         rate_m_myr: dm / dt_myr,
                         land_plants,
                     };
@@ -1752,6 +1819,7 @@ impl SurfaceStage {
         let started = Instant::now();
         let sum_net: f64 = net.iter().sum();
         let carb: f64 = parts.carbonate.iter().map(|&x| f64::from(x)).sum();
+        let pel: f64 = parts.pelagic.iter().map(|&x| f64::from(x)).sum();
         let evap: f64 = parts.evaporite.iter().map(|&x| f64::from(x)).sum();
         let km3 = a / 1.0e9;
         let t = &mut st.totals;
@@ -1760,12 +1828,17 @@ impl SurfaceStage {
         t.lake_km3 += parts.lake.iter().map(|&x| f64::from(x)).sum::<f64>() * km3;
         t.marine_km3 += parts.marine.iter().map(|&x| f64::from(x)).sum::<f64>() * km3;
         t.carbonate_km3 += carb * km3;
+        t.pelagic_km3 += pel * km3;
+        let km2_myr = a / 1.0e6 * dts / 1.0e6;
+        t.photic_km2_myr += photic[0] * km2_myr;
+        t.photic_warm_km2_myr += photic[1] * km2_myr;
+        t.photic_warm_clear_km2_myr += photic[2] * km2_myr;
         t.evaporite_km3 += evap * km3;
         t.to_sea_km3 += to_sea / 1.0e9;
         t.weathered_km3 += weathered * km3;
         t.isostasy_km3 += iso * km3;
         t.slope_failure_km3 += failed_m_cells * km3;
-        t.mass_residual_km3 += (sum_net - carb - evap) * km3;
+        t.mass_residual_km3 += (sum_net - carb - pel - evap) * km3;
         t.steps += 1;
         t.spl_iterations += iterations;
         t.diffusion_iterations += cg_iterations;
