@@ -8,6 +8,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.minecraftindustrialcomplex.deeptime.preset.Presets;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorFields;
+import com.minecraftindustrialcomplex.deeptime.screen.model.GenerationStatus;
+import com.minecraftindustrialcomplex.deeptime.screen.model.Legend;
+import com.minecraftindustrialcomplex.deeptime.screen.model.Ramps;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -89,6 +92,9 @@ class ScreenSourcesTest {
 
     private static final Pattern TR = Pattern.compile("\\btr\\(\"([a-z0-9_.]+)\"\\s*[,)]");
     private static final Pattern PROBLEM = Pattern.compile("Problem\\.(?:of|warning)\\(\"([a-z0-9_.]+)\"");
+    private static final Pattern PHRASE = Pattern.compile("Phrase\\.of\\(\"([a-z0-9_.]+)\"\\s*[,)]");
+    /** Phrase's own time words, {@code of("time.…")}. */
+    private static final Pattern TIME = Pattern.compile("(?<![\\w.])of\\(\"(time\\.[a-z0-9_.]+)\"\\s*[,)]");
 
     @Test
     void everyLanguageKeyExists() throws IOException {
@@ -97,7 +103,7 @@ class ScreenSourcesTest {
         Set<String> used = new TreeSet<>();
         for (Path p : javaFiles()) {
             String text = Files.readString(p, StandardCharsets.UTF_8);
-            for (Pattern pat : List.of(TR, PROBLEM)) {
+            for (Pattern pat : List.of(TR, PROBLEM, PHRASE, TIME)) {
                 Matcher m = pat.matcher(text);
                 while (m.find())
                     used.add("deeptime." + m.group(1));
@@ -120,9 +126,39 @@ class ScreenSourcesTest {
             used.add("deeptime.editor.size." + k);
         for (String k : List.of("world_data", "keyframe"))
             used.add("deeptime.review.source." + k);
+        // The generation page: every event kind's History words (one and many), every stage's words,
+        // every legend line a ramp can produce.
+        for (String k : o.keySet())
+            if (k.startsWith("deeptime.event.")) {
+                String kind = k.substring("deeptime.event.".length());
+                used.add("deeptime.milestone." + kind);
+                used.add("deeptime.milestone." + kind + ".many");
+            }
+        for (String unit : List.of("billion", "million", "thousand"))
+            for (String dir : List.of("ago", "ahead"))
+                used.add("deeptime.time." + unit + "." + dir);
+        used.add("deeptime.stage.other");
+        for (String s : GenerationStatus.STAGES)
+            used.add("deeptime.stage." + s);
+        for (String u : Legend.UNITS)
+            used.add("deeptime.legend.value." + u);
+        Ramps ramps = Ramps.builtin();
+        for (String r : ramps.names())
+            for (String key : ramps.ramp(r).keys().keySet())
+                used.add("deeptime.legend.key." + key);
+        Legend.CODED.forEach((ramp, codes) -> {
+            assertTrue(ramps.names().contains(ramp), "Legend names codes of a ramp ramps.json lacks: " + ramp);
+            for (int c : codes)
+                used.add("deeptime.legend." + ramp + "." + c);
+        });
+        for (String t : List.of("history", "map", "more"))
+            used.add("deeptime.gen.tab." + t);
         used.add("generator.deeptime.planet");
         used.add("generator.deeptime.planet_32k");
         List<String> missing = used.stream().filter(k -> !o.has(k)).toList();
         assertEquals(List.of(), missing);
+        // Ben's rule: no em dashes in any text the player reads.
+        List<String> dashed = o.keySet().stream().filter(k -> o.get(k).getAsString().contains("—")).toList();
+        assertEquals(List.of(), dashed, "em dashes in en_us.json");
     }
 }

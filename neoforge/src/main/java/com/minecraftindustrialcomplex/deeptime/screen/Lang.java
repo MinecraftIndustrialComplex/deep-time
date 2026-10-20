@@ -3,6 +3,8 @@ package com.minecraftindustrialcomplex.deeptime.screen;
 
 import com.minecraftindustrialcomplex.deeptime.screen.model.Formats;
 import com.minecraftindustrialcomplex.deeptime.screen.model.LayerCatalog;
+import com.minecraftindustrialcomplex.deeptime.screen.model.Milestones;
+import com.minecraftindustrialcomplex.deeptime.screen.model.Phrase;
 import com.minecraftindustrialcomplex.deeptime.screen.model.Problem;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
@@ -50,6 +52,29 @@ final class Lang {
     /** A layer group's name (Planet, Climate, …). */
     static Component layerGroup(String group) {
         return dynamic(LayerCatalog.groupKey(group), group.isEmpty() ? "planet" : group);
+    }
+
+    /**
+     * A model phrase ({@link Phrase}): its translation with the arguments (phrases among them
+     * translated first), the literal text of a literal phrase, or, for a key the language lacks
+     * (a stage or an event kind the game has no words for yet), its last part humanised.
+     */
+    static MutableComponent phrase(Phrase p) {
+        if (p.isLiteral())
+            return Component.literal(p.args().isEmpty() ? "" : String.valueOf(p.args().get(0)));
+        Object[] args = p.args().stream().map(a -> a instanceof Phrase q ? (Object) phrase(q) : a).toArray();
+        if (Language.getInstance().has(p.translationKey()))
+            return Component.translatable(p.translationKey(), args);
+        return Component.literal(Formats.humanize(p.key().substring(p.key().lastIndexOf('.') + 1)));
+    }
+
+    /** A History row: its words, else the event kind's name with the count. */
+    static MutableComponent milestone(Milestones.Row r) {
+        Phrase p = r.phrase();
+        if (Language.getInstance().has(p.translationKey()))
+            return phrase(p);
+        MutableComponent name = eventKind(r.kind()).copy();
+        return r.count() > 1 ? name.append(" ×" + r.count()) : name;
     }
 
     static Component eventKind(String kind) {

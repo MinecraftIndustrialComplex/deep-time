@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
+import com.minecraftindustrialcomplex.deeptime.nativebridge.SimSession;
 import com.minecraftindustrialcomplex.deeptime.preset.Presets;
 import com.minecraftindustrialcomplex.deeptime.preset.ShareCode;
 import com.minecraftindustrialcomplex.deeptime.server.Staging;
@@ -159,6 +160,92 @@ class EditorModelTest {
         assertTrue(m.tickAutoStart().isPresent());
         assertEquals(2, launched.size());
         assertTrue(m.effectivePresetJson().contains("\"length_myr\":500.0"), m.effectivePresetJson());
+        // Cancel, then Create again: the stopped run is not shown while the new one waits.
+        m.cancelRun();
+        assertTrue(launched.get(1).cancelled);
+        m.run().orElseThrow().poll();
+        assertEquals(TimelapseModel.State.CANCELLED, m.run().orElseThrow().state());
+        m.generate();
+        assertTrue(m.run().isEmpty(), "the cancelled run is dropped");
+        assertEquals(GenerationStatus.State.PREPARING, GenerationStatus.state(m));
+        m.refreshEstimate();
+        assertTrue(m.tickAutoStart().isPresent());
+        assertEquals(3, launched.size());
+    }
+
+    /**
+     * The generation page's status line follows the run in plain words: preparing (with the
+     * estimate's expected time), starting, a stage at a time ago (with the time left), writing the
+     * world, done; cancelled and failed runs and a blocking problem say so.
+     */
+    @Test
+    void generationStatusFollowsTheRun() {
+        EditorModel m = model();
+        m.generate();
+        assertEquals(GenerationStatus.State.PREPARING, GenerationStatus.state(m));
+        assertEquals(Phrase.of("gen.status.preparing"), GenerationStatus.sentence(m));
+        assertTrue(GenerationStatus.timeLeft(m).isEmpty(), "no estimate yet");
+        m.refreshEstimate();
+        assertEquals(Optional.of(Phrase.of("gen.status.expected", Phrase.of("time.duration.under_minute"))), GenerationStatus.timeLeft(m),
+                "the fake estimate is 10 s");
+        assertTrue(m.tickAutoStart().isPresent());
+        FakeRunHandle h = launched.get(0);
+        TimelapseModel run = m.run().orElseThrow();
+        run.poll();
+        assertEquals(GenerationStatus.State.STARTING, GenerationStatus.state(m), "no stage reported yet");
+        assertEquals(Phrase.of("gen.status.starting"), GenerationStatus.sentence(m));
+        assertEquals(0.0, GenerationStatus.fraction(m));
+
+        // Stage 1 of 2, half done, 640 million years before the end.
+        h.progress = new SimSession.Progress(SimSession.Progress.RUNNING, 0, 2, 500, 250, 640_000_000L, 2_500, 7_500,
+                1L << 20, 2L << 20, 1, 3);
+        run.poll();
+        assertEquals(GenerationStatus.State.RUNNING, GenerationStatus.state(m));
+        assertEquals(Phrase.of("gen.status.stage_at", Phrase.of("stage.dummy_drift"), Phrase.of("time.million.ago", "640")),
+                GenerationStatus.sentence(m));
+        assertEquals(0.25, GenerationStatus.fraction(m), 1e-9);
+        assertTrue(GenerationStatus.timeLeft(m).orElseThrow().key().startsWith("time.left."), () -> GenerationStatus.timeLeft(m).toString());
+        // The present reached: the stage alone.
+        h.progress = new SimSession.Progress(SimSession.Progress.RUNNING, 1, 2, 900, 950, 0, 9_000, 500, 1L << 20, 2L << 20, 2, 5);
+        run.poll();
+        assertEquals(Phrase.of("stage.dummy_erode"), GenerationStatus.sentence(m));
+        // The stages finished, the world data being written.
+        h.progress = new SimSession.Progress(SimSession.Progress.DONE, 1, 2, 1000, 1000, 0, 10_000, 0, 1L << 20, 2L << 20, 2, 5);
+        run.poll();
+        assertEquals(GenerationStatus.State.BAKING, GenerationStatus.state(m));
+        assertEquals(Phrase.of("gen.status.baking"), GenerationStatus.sentence(m));
+        h.completion.complete("{}");
+        run.poll();
+        assertEquals(GenerationStatus.State.DONE, GenerationStatus.state(m));
+        assertEquals(Phrase.of("gen.status.done"), GenerationStatus.sentence(m));
+        assertEquals(1.0, GenerationStatus.fraction(m));
+        assertTrue(GenerationStatus.timeLeft(m).isEmpty());
+
+        // Cancelled and failed.
+        EditorModel c = model();
+        c.generate();
+        c.refreshEstimate();
+        c.tickAutoStart();
+        c.cancelRun();
+        c.run().orElseThrow().poll();
+        assertEquals(GenerationStatus.State.CANCELLED, GenerationStatus.state(c));
+        EditorModel f = model();
+        f.generate();
+        f.refreshEstimate();
+        f.tickAutoStart();
+        launched.get(launched.size() - 1).completion.completeExceptionally(new IllegalStateException("boom"));
+        f.run().orElseThrow().poll();
+        assertEquals(GenerationStatus.State.FAILED, GenerationStatus.state(f));
+        assertEquals(Phrase.of("gen.status.failed"), GenerationStatus.sentence(f));
+
+        // Over the memory cap: nothing will start by itself.
+        EditorModel b = model();
+        peak = 64 * GIB;
+        b.generate();
+        b.refreshEstimate();
+        b.tickAutoStart();
+        assertEquals(GenerationStatus.State.BLOCKED, GenerationStatus.state(b));
+        assertEquals(Phrase.of("gen.status.blocked"), GenerationStatus.sentence(b));
     }
 
     /** A blocking problem other than the estimate ends Generate's wait (the page shows it). */
