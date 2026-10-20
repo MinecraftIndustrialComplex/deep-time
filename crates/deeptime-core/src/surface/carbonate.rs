@@ -12,6 +12,66 @@
 //! exp(−clastic / `clastic_m`) with the clastic sediment the cell received this step. Growth
 //! stops at sea level: a step adds at most the water depth (Landlab's explicit rate times Δt would
 //! overshoot at deep-time steps).
+//!
+//! **Pelagic carbonate** ([`pelagic`], 2026-10-19). Since the Mesozoic, planktic calcifiers
+//! (coccolithophores, planktic foraminifera) rain calcareous ooze on the open sea floor, and about
+//! as much carbonate accumulates there as on reefs, banks and shelves (Milliman and Droxler 1995,
+//! after Milliman 1993: deep sea 11 of 32 × 10¹² mol/yr, slopes 6, the neritic rest 14.5). The ooze
+//! survives only above the carbonate compensation depth (the CCD of the column builder,
+//! `structure::columns::CCD_M`, RCK-015); between the lysocline and the CCD it dissolves more and
+//! more. Before the calcifiers' clock (`deposits::clocks::Epoch::pelagic_calcifiers_at`) the deep
+//! sea gets none (the Neritan ocean of Ridgwell 2005).
+
+/// Pelagic carbonate above the lysocline once the calcifiers are in full swing, m/Myr of chalk:
+/// the deep sea's 11 × 10¹² mol CaCO₃/yr over 290 × 10⁶ km² (Milliman and Droxler 1995, table 1)
+/// is 1.4 m/Myr of calcite (2,710 kg/m³) over the whole deep floor, 3.1 m/Myr over the ~45 % of it
+/// that is calcareous (Dutkiewicz et al. 2015, supplement table DR1; Diesing 2020: 37 %), so
+/// 4.4 m/Myr of chalk at 30 % porosity (RCK-001: dry chalk 1,940 kg/m³, 28.8 %); rounded down
+/// because the taper above the CCD thins it further (calcareous ooze 0.3–5 cm/kyr wet).
+pub const PELAGIC_M_MYR: f64 = 4.0; // ledger: ERO-185
+/// The lysocline lies this far above the CCD: the ooze's dissolution grows linearly from none at
+/// the lysocline to all of it at the CCD.
+pub const LYSOCLINE_ABOVE_CCD_M: f64 = 1000.0; // ledger: ERO-186
+
+/// The share of the pelagic rain that survives at water depth `z` (m) over a CCD at `ccd_m`.
+pub fn pelagic_share(z: f64, ccd_m: f64) -> f64 {
+    if z <= 0.0 {
+        return 0.0;
+    }
+    ((ccd_m - z) / LYSOCLINE_ABOVE_CCD_M).clamp(0.0, 1.0)
+}
+
+/// Chalk laid over `dt` years at water depth `z` (m) when the calcifiers are at `calcifiers`
+/// (0–1) of their full rain, m (never more than the depth).
+pub fn pelagic(z: f64, calcifiers: f64, dt: f64, ccd_m: f64) -> f64 {
+    (PELAGIC_M_MYR * 1.0e-6 * dt * calcifiers.clamp(0.0, 1.0) * pelagic_share(z, ccd_m))
+        .min(z.max(0.0))
+}
+
+/// The photic zone the factory's limits are measured over ([`limits`]), m: Bosscher and
+/// Schlager's rate at 100 m is 2 × 10⁻⁴ of its surface value.
+pub const PHOTIC_M: f64 = 100.0;
+
+/// Whether a cell at depth `z` is in the photic zone, and its warmth and warmth × clarity factors
+/// (`produce`'s), each 0 outside it (measurement only).
+pub fn limits(z: f64, t_c: f64, clastic: f64, p: &CarbonateParams) -> [f64; 3] {
+    if !(z > 0.0 && z <= PHOTIC_M) {
+        return [0.0; 3];
+    }
+    let (warm, clear) = factors(t_c, clastic, p);
+    [1.0, warm, warm * clear]
+}
+
+/// `produce`'s warmth and clarity factors.
+fn factors(t_c: f64, clastic: f64, p: &CarbonateParams) -> (f64, f64) {
+    let warm = ((t_c - (p.min_temp_c - 6.0)) / 6.0).clamp(0.0, 1.0);
+    let clear = if p.clastic_m > 0.0 {
+        (-clastic.max(0.0) / p.clastic_m).exp()
+    } else {
+        1.0
+    };
+    (warm, clear)
+}
 
 /// Parameters of the producer.
 #[derive(Clone, Copy, Debug)]
@@ -54,15 +114,10 @@ pub fn produce(z: f64, t_c: f64, clastic: f64, dt: f64, p: &CarbonateParams) -> 
     if z <= 0.0 {
         return 0.0;
     }
-    let warm = ((t_c - (p.min_temp_c - 6.0)) / 6.0).clamp(0.0, 1.0);
+    let (warm, clear) = factors(t_c, clastic, p);
     if warm <= 0.0 {
         return 0.0;
     }
-    let clear = if p.clastic_m > 0.0 {
-        (-clastic.max(0.0) / p.clastic_m).exp()
-    } else {
-        1.0
-    };
     (rate(z, p) * warm * clear * dt).min(z)
 }
 
@@ -94,5 +149,20 @@ mod tests {
         assert!((produce(5.0, 26.0, 0.0, 2.0e6, &p) - 5.0).abs() < 1e-9);
         assert_eq!(produce(5.0, 5.0, 0.0, 2.0e6, &p), 0.0);
         assert!(produce(150.0, 26.0, 200.0, 1.0e4, &p) < 1e-3);
+    }
+
+    #[test]
+    fn pelagic_ooze_dissolves_between_the_lysocline_and_the_ccd() {
+        let ccd = 4500.0;
+        // Above the lysocline: the full rain, 4 m/Myr over 2 Myr.
+        assert!((pelagic(3000.0, 1.0, 2.0e6, ccd) - 8.0).abs() < 1e-9);
+        // Half way between the lysocline (3,500 m) and the CCD: half of it.
+        assert!((pelagic(4000.0, 1.0, 2.0e6, ccd) - 4.0).abs() < 1e-9);
+        // Below the CCD, on land, or before the calcifiers: none.
+        assert_eq!(pelagic(5000.0, 1.0, 2.0e6, ccd), 0.0);
+        assert_eq!(pelagic(-10.0, 1.0, 2.0e6, ccd), 0.0);
+        assert_eq!(pelagic(3000.0, 0.0, 2.0e6, ccd), 0.0);
+        // Never above the sea.
+        assert!((pelagic(3.0, 1.0, 2.0e6, ccd) - 3.0).abs() < 1e-9);
     }
 }

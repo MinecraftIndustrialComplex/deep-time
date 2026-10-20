@@ -7,9 +7,11 @@
 //! warm floodplains), dolostone (arid tidal flats), black shale (restricted deep water: the
 //! euxinic basins of the deposit engine), and splits evaporites into halite and gypsum by
 //! aridity. Every number below is a design value, documented here and tuned in P1-07.
+//! Pelagic chalk (2026-10-19): a deposit that is mostly the open sea's calcareous ooze
+//! (`carbonate::pelagic`) is chalk.
 //!
 //! A step's deposit takes one class: the process that laid down most of it decides (evaporite,
-//! carbonate, lake, sea or river), then the setting.
+//! carbonate, lake, sea, river or the pelagic rain), then the setting.
 
 use super::lithology::Classes;
 
@@ -18,6 +20,9 @@ use super::lithology::Classes;
 pub enum Kind {
     Clastic,
     Carbonate,
+    /// Pelagic chalk: carbonate, but no platform (the deposit engine's `carbonate_platform`
+    /// field leaves it out).
+    Pelagic,
     Evaporite,
     /// Organic-rich black shale in restricted deep water.
     Euxinic,
@@ -48,6 +53,8 @@ pub struct Setting {
     pub evaporite: f64,
     /// Till and glaciomarine diamict (`glacial.rs`), m.
     pub glacial: f64,
+    /// Pelagic carbonate ooze (`carbonate::pelagic`), m.
+    pub pelagic: f64,
     /// Net deposition rate, m/Myr.
     pub rate_m_myr: f64,
     /// Land plants exist (the atmosphere clock; coal needs them).
@@ -101,6 +108,7 @@ pub fn classify(s: &Setting, c: &Classes) -> (u16, Kind) {
         (s.marine_clastic, 3),
         (s.fluvial, 4),
         (s.glacial, 5),
+        (s.pelagic, 6),
     ];
     let total: f64 = parts.iter().map(|p| p.0.max(0.0)).sum();
     let main = parts
@@ -118,6 +126,7 @@ pub fn classify(s: &Setting, c: &Classes) -> (u16, Kind) {
     match main {
         0 if total > 0.0 => evaporite(s.aridity),
         5 => (c.till, Kind::Clastic),
+        6 => (c.chalk, Kind::Pelagic),
         1 => {
             if s.aridity < EVAPORITE_ARIDITY && s.depth_m < DOLOMITE_DEPTH_M {
                 (c.dolostone, Kind::Carbonate)
@@ -244,5 +253,19 @@ mod tests {
             ..base
         };
         assert_eq!(classify(&moraine, &c), (c.till, Kind::Clastic));
+        // The open sea floor: chalk where the ooze outweighs the mud, shale near the margin.
+        let ooze = Setting {
+            marine: true,
+            depth_m: 3000.0,
+            pelagic: 8.0,
+            marine_clastic: 1.0,
+            ..base
+        };
+        assert_eq!(classify(&ooze, &c), (c.chalk, Kind::Pelagic));
+        let rise = Setting {
+            marine_clastic: 20.0,
+            ..ooze
+        };
+        assert_eq!(classify(&rise, &c).0, c.shale);
     }
 }
