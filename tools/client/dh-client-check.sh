@@ -94,6 +94,10 @@ rcon "gamerule doDaylightCycle false" >/dev/null
 # 2. The client: the server's own mod jars, an offline profile, software GL.
 mkdir -p "$CL/game/mods"
 rm -f "$CL/game/mods/"*.jar
+# An empty client-side Distant Horizons database every time: one kept from an earlier check is
+# counted in step 5 as sent in this one (2026-10-20: a control whose client asked for nothing
+# showed 43,175 far sections, all rebuilt on the client from the previous check's data).
+rm -rf "$CL/game/Distant_Horizons_server_data" "$CL/dbcopy"
 cp "$SRV/mods/"*.jar "$CL/game/mods/"
 if [ -n "${DHCC_CLIENT_DROP:-}" ]; then
     for j in "$CL/game/mods/"$DHCC_CLIENT_DROP; do [ -f "$j" ] && { rm -f "$j"; say "client leaves out $(basename "$j")"; }; done
