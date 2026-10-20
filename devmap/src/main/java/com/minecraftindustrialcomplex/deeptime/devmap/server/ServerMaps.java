@@ -20,6 +20,8 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import com.minecraftindustrialcomplex.deeptime.worldgen.ActiveWorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataRef;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -29,6 +31,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.player.PermissionsChangedEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -39,6 +42,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -70,6 +75,7 @@ public final class ServerMaps {
     static final double EDGE_MARGIN = 4.0;
 
     private static int tick;
+    private static final Set<UUID> RESEND = ConcurrentHashMap.newKeySet();
 
     private ServerMaps() {}
 
@@ -79,7 +85,16 @@ public final class ServerMaps {
         NeoForge.EVENT_BUS.addListener(PlayerEvent.PlayerRespawnEvent.class, e -> sendInfo(e.getEntity()));
         NeoForge.EVENT_BUS.addListener(ServerStartedEvent.class, e -> e.getServer().getAllLevels().forEach(ServerMaps::image));
         NeoForge.EVENT_BUS.addListener(ServerStoppedEvent.class, e -> IMAGES.clear());
+        // Fired before the change: the new permission (the teleport flag) goes out on the next tick.
+        NeoForge.EVENT_BUS.addListener(PermissionsChangedEvent.class, e -> RESEND.add(e.getEntity().getUUID()));
         NeoForge.EVENT_BUS.addListener(ServerTickEvent.Post.class, e -> {
+            if (!RESEND.isEmpty())
+                for (UUID id : List.copyOf(RESEND)) {
+                    RESEND.remove(id);
+                    ServerPlayer sp = e.getServer().getPlayerList().getPlayer(id);
+                    if (sp != null)
+                        sendInfo(sp);
+                }
             if (++tick % 20 == 0)
                 sendPlayers(e.getServer());
         });
@@ -215,8 +230,29 @@ public final class ServerMaps {
         sp.resetFallDistance();
         double[] ll = PlanetGeometry.displayLatLon(p, bx + 0.5, bz + 0.5);
         String where = String.format(Locale.ROOT, "%d %d %d (%s)", bx, y, bz, PlanetGeometry.formatLatLon(ll[0], ll[1]));
-        DevMap.LOGGER.info("[devmap] teleported {} to {} (asked {}, {})", sp.getGameProfile().getName(), where, req.x(), req.z());
+        DevMap.LOGGER.info("[devmap] teleported {} to {} (asked {}, {}); {}", sp.getGameProfile().getName(), where, req.x(), req.z(),
+                geography(level, g.dataRef(), bx, y, bz));
         sp.sendSystemMessage(Component.literal("Dev map: teleported to " + where));
+    }
+
+    /**
+     * What the world data says about column (x, z) next to what the world has there: the base
+     * image is drawn from H and the water level, so the two agreeing is the image agreeing with the
+     * terrain the player sees.
+     */
+    static String geography(ServerLevel level, WorldDataRef ref, int x, int surfaceY, int z) {
+        BlockPos top = new BlockPos(x, surfaceY - 1, z);
+        String block = BuiltInRegistries.BLOCK.getKey(level.getBlockState(top).getBlock()).toString();
+        boolean wet = !level.getFluidState(top).isEmpty();
+        if (!ActiveWorldData.has(ref.folder()))
+            return String.format(Locale.ROOT, "surface y %d (%s%s), no world data", surfaceY, block, wet ? ", water" : "");
+        WorldData wd = ActiveWorldData.get(ref.folder());
+        double h = wd.height(x + 0.5, z + 0.5), wl = wd.waterLevel(x + 0.5, z + 0.5);
+        int sea = wd.manifest().seaLevelY();
+        boolean dataWet = h < sea || (!Double.isNaN(wl) && wl > h);
+        return String.format(Locale.ROOT, "surface y %d (%s%s); world data H %.1f, water level %s, sea level %d (%s); %s",
+                surfaceY, block, wet ? ", water" : "", h, Double.isNaN(wl) ? "none" : String.format(Locale.ROOT, "%.1f", wl), sea,
+                dataWet ? "water" : "land", wet == dataWet ? "AGREE" : "DIFFER");
     }
 
     /** Where a teleport to (x, z) lands, {x, z}: canonical, and inside the edge border or the pole stop. */
