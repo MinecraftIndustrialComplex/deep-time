@@ -123,7 +123,11 @@ def main():
             mvt = [x for x in sites if x["type"].endswith("mvt_zn_pb")]
             r["mvt"] = {"n": len(mvt), "on_carbonate": sum(x.get("stratum") in carb for x in mvt),
                         "oceanic": sum(bool(x.get("oceanic")) for x in mvt),
-                        "with_ore": sum((x.get("ore_total") or 0) > 0 for x in mvt)}
+                        "with_ore": sum((x.get("ore_total") or 0) > 0 for x in mvt),
+                        # Ore-body blocks in a host horizon (the audit's ore_in_host_share).
+                        "body_blocks": sum(x.get("ore_body_blocks") or 0 for x in mvt),
+                        "body_blocks_in_host": round(sum((x.get("ore_in_host_share") or 0.0)
+                                                         * (x.get("ore_body_blocks") or 0) for x in mvt))}
             pl = [x for x in sites if "placer" in x["type"]]
             r["placer"] = {"n": len(pl), "oceanic": sum(bool(x.get("oceanic")) for x in pl),
                            "below_shelf": sum((x.get("ground_m") or 0.0) < SHELF_M for x in pl)}
@@ -159,6 +163,9 @@ def main():
             for r in rs:
                 agg.update(r[k])
             print(f"  {k} (sums over runs): {dict(agg)}")
+            if agg.get("body_blocks"):
+                print(f"  {k} ore-body blocks in a host horizon: "
+                      f"{agg['body_blocks_in_host'] / agg['body_blocks']:.3f}")
         print()
 
 
