@@ -228,6 +228,12 @@ public final class ServerMaps {
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz);
         sp.teleportTo(level, bx + 0.5, y, bz + 0.5, sp.getYRot(), sp.getXRot());
         sp.resetFallDistance();
+        // A player who may fly (creative, spectator) stays at the landing height instead of sinking
+        // through deep water.
+        if (sp.getAbilities().mayfly && !sp.getAbilities().flying) {
+            sp.getAbilities().flying = true;
+            sp.onUpdateAbilities();
+        }
         double[] ll = PlanetGeometry.displayLatLon(p, bx + 0.5, bz + 0.5);
         String where = String.format(Locale.ROOT, "%d %d %d (%s)", bx, y, bz, PlanetGeometry.formatLatLon(ll[0], ll[1]));
         DevMap.LOGGER.info("[devmap] teleported {} to {} (asked {}, {}); {}", sp.getGameProfile().getName(), where, req.x(), req.z(),
