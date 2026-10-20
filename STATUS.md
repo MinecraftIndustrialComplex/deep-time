@@ -146,6 +146,88 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Gates** (VM, admitted, `gates.sh` through `tools/remote/detach.sh` on aae39085, the merge of master be17a7cf, and before it on the unmerged code with the same results): `cargo fmt --check` ok; `cargo clippy --workspace --all-targets -- -D warnings` clean; `cargo test --workspace`: 999 passed, 0 failed, 5 ignored (core lib 740); `cargo test -p deeptime-core --features gpu --lib the_gpu` on lavapipe: 6 passed (the cycle, the cycle's solve, the slope failure, the relink, the cells, the amplifier); `cargo deny check licenses bans` ok; `cargo metadata --locked` ok; `./gradlew build test`: 363 tests, 0 failures, 2 skipped. No GameTests (the coordinator's).
 - **Coordinator's calls (undoable).** The early stop not taken. Every slope failure pass over every cell on the device (no worklist), with the f32 round-off of matter accepted (1e-6 m over L1 in 100 Myr). Both ports from 2^17 cells at `auto`. `DEEPTIME_GPU_KERNELS` added for bisections (any prefix; unset runs every kernel). The CG stays on the CPU. The controls are parameter perturbations through `--set`, so no code switch; the third (f32-sized, on every cell) was added after the two slope controls disagreed. A second 1000 Myr pair, GPU first, to balance the order. The same-state harness stayed uncommitted. The laptop's power profile was left as Ben set it.
 - **Next.** Merge, then the coordinator's GameTest batch. On this APU the cycle only breaks even over 1000 Myr (the CG's per-iteration transfers and a shared memory bus); the gain is the slope failure's. Next by the profile: advection (111 s per 1000 Myr loaded) and the topography gather, then the relink's second-group search (2.5 s per 100 Myr of CPU cells). The land lean needs no more seeds; if its rest (+0.005 over the controls) matters, a CPU control that moves the worlds as far as the GPU does (larger noise on every cell) would tell the model's answer from a kernel bias. Any later port's whole-history check should carry a CPU control of its own.
+### 2026-10-19: The present-day nudge's cap: the 1000 Myr hothouse ends (10,011 ppm on master) were the temperate nudge multiplying the natural CO2 by up to x12.6, not the carbon cycle; a temperate present now raises CO2 by at most x1.75, and full 16k's 1000 Myr ends fall from a median 8,867 to 1,510 ppm (24.7 to 18.5 degC); the Köppen floors are tested by a 99 % Wilson bound (coordinator's task; agent worktree agent-ae6030c66af57f107, branch worktree-agent-ae6030c66af57f107 from master 26ce664e; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **The cause.**
+  - The end CO2 is the temperate present's factor times the natural CO2 (CLM-148 to CLM-151):
+    - master 26ce664e, `earthlike_full_16k`, 1000 Myr, scattered start, seeds 1 to 4: factor 6.86, 1.58, 9.73 and 12.65 on natural 1,460, 315, 794 and 932 ppm;
+    - seed 1's 10,011 ppm is the GPU agent's CPU run.
+  - The carbon cycle holds:
+    - weathering equals degassing within 0.2 % at every 100 Myr point before the last step;
+    - the natural CO2 falls from 3,800 to 4,600 ppm at -998 Myr (fainter sun) to 360 to 960 ppm at -100 Myr;
+    - T stays 9 to 16 degC throughout;
+    - over the last 500 Myr the natural CO2 is 267 to 3,209 ppm, inside the Phanerozoic's 1 to 25 PAL. It leaves that range only through the nudge, in the last 100 kyr.
+  - The nudge needed so much because of the ice sheets on high ground:
+    - land above 2 km grows from 0 to 0.20 to 0.41 of the land;
+    - 0.68 to 0.88 of the land above 3 km is under sheets in the natural end;
+    - x1.75 clears 5 to 14 % of it (`sheets_by_height`, new).
+  - A bisect of the merges 25ae6723..26ce664e (quick, 500 Myr, scattered, seeds 1 and 2):
+    - the worlds change only at 32589362, fb38204f and 7d60fc4a;
+    - each moves the factor, and none moves the natural CO2 out of the spread between seeds.
+    - The old master had the same hothouse on other seeds: scattered seed 4 x5.27, 7,832 ppm.
+  - The land share (0.12 to 0.23) and the high ground are the plates' output; the climate takes them as given.
+- **The fix.** `climate.present_co2_factor_max` = 1.75 (CLM-206), from Lüthi et al. 2008's 172 to 300 ppmv (abstract read on OSTI).
+  - It applies to temperate only, and is set in the default and the eight earthlike and pipeline presets.
+  - A present that needs more ends at the cap with `reached` false.
+  - `ice_age` and `snowball` are unlimited.
+  - The search is now a pure function, `present_search`; the bracket below the cap is unchanged, and the cap is its last step.
+  - With the cap at 10,000 the runs equal master's to every printed digit.
+  - The note gains `co2_factor_max`, `trial_rows` (every trial's factor, sheets, land ice, sea ice and T) and `sheets_by_height` / `sheets_by_latitude`.
+  - Tests:
+    - new `the_present_search_stops_at_its_cap` (pure: no cap, the cap, inside the cap, cap 0, cooling, a trivial target);
+    - `the_present_climate_setting_governs_only_the_present` extended with the new fields.
+- **Measured** (VM, `tools/review/co2-driver.sh 3 <tasks>` driving `tools/review/co2-ensemble.sh`, read with `tools/review/co2-table.py`; median [min, max]):
+
+  | | runs | end CO2, ppm | factor | natural CO2 | T, degC | land | above 2 km | under sheets | reached |
+  |---|---|---|---|---|---|---|---|---|---|
+  | old master 25ae6723, quick 500 Myr | 8 | 881 [477, 7,832] | 1.46 [1.00, 5.27] | 653 | 17.2 [14.8, 23.7] | 0.189 | 0.254 | 0.148 | 8 |
+  | master 26ce664e, quick 500 Myr | 8 | 2,030 [474, 15,463] | 1.67 [1.00, 8.91] | 1,019 | 19.2 [15.6, 28.2] | 0.180 | 0.274 | 0.148 | 8 |
+  | fixed, quick 500 Myr | 8 | 1,764 [474, 3,036] | 1.66 [1.00, 1.75] | 1,019 | 18.7 [15.6, 21.4] | 0.180 | 0.274 | 0.150 [0.117, 0.257] | 5 |
+  | master 26ce664e, full 1000 Myr | 4 | 8,867 [498, 11,790] | 8.29 [1.58, 12.65] | 863 | 24.7 [16.0, 25.9] | 0.206 | 0.333 | 0.148 | 4 |
+  | fixed, full 1000 Myr | 4 | 1,510 [502, 2,556] | 1.75 [1.60, 1.75] | 863 | 18.5 [16.0, 19.3] | 0.212 | 0.329 | 0.248 [0.150, 0.288] | 1 |
+
+  - The quick runs are `earthlike_quick_16k`, 2 threads, seeds 1 to 4, both starts. The full runs are `earthlike_full_16k`, 8 threads, scattered start, seeds 1 to 4.
+  - The fixed runs' clock series equal master's at every 100 Myr point.
+  - The fixed 1000 Myr ends are 1.8 to 9.1 PAL. Master's were 1.8 to 42, three of the four above the Phanerozoic's 25.
+  - The quick scattered seed 1 at 4 threads equals its 2-thread run.
+  - The test planet (`planet_world_4k`, seeds 11 to 14, on 26ce664e) has factor 1.00 with and without the cap.
+  - The GPU agent's 100 Myr runs (seeds 6 to 15, CPU and GPU) all have factor 1.000; its 1000 Myr GPU arm ends at 12,600 ppm (x9.73) against the CPU's 10,011 (x6.86), the factor's sensitivity to last bits that the cap now bounds.
+- **The Köppen floors.**
+  - The MIC `climateConsistent` failure (C 0.621 < 0.630 on 132 columns) is census noise: the standard error is 0.042, and the test planet's climate does not change with the fix.
+  - A family now fails only when its share's one-sided 99 % Wilson upper bound is under its floor (`ShareBound`, z = 2.326, BIO-072). The floors are unchanged.
+  - 0.621 on 132 columns has a bound of 0.713 and passes. A broken mapping at 0.3 still fails: 0.484 on 40 columns, 0.402 on 132.
+  - New `ShareBoundTest`.
+- **The independent review of Ben's laptop run** (quick, supercontinent, 1000 Myr, seed 1, 025676c8):
+  - Its last-step jump, 577 to 3,347 ppm, is this nudge: `co2_factor` 5.75, sheets 0.230 to 0.149. The cap holds it to at most 1,010 ppm.
+  - Its land ice from -760 Myr on, and the tropical ice at 4.1 km and -9 degC, are the natural climate, which the cap does not change.
+  - Candidates, not checked: the glaciers' extent rule (`glaciers.rs`), which glaciates any summer below -2.4 degC however dry; the high ground.
+- **Commands.**
+  - VM through `tools/remote/mac.sh -- tools/remote/detach.sh start <job> ...`:
+    - `tools/review/co2-bisect.sh`;
+    - `tools/review/co2-driver.sh 3 /data/ban/deeptime-runs/co2-hothouse/co2-tasks.txt`;
+    - `tools/review/fb-gates.sh rust`, then `tools/review/fb-gates.sh gradle`.
+  - Laptop, niced: `tools/review/claims_counts.py --write`.
+- **Gates.**
+  - fmt clean; clippy -D warnings clean; deny: bans ok, licenses ok.
+  - cargo test --workspace --no-fail-fast: 29 binaries, 995 passed, 0 failed, 5 ignored.
+  - `./gradlew build test`: 365 tests, 0 failures, 2 skipped.
+  - Again after merging master be17a7cf (conflicts only in the two logs): fmt, clippy and deny clean; cargo test 997 passed, 0 failed, 5 ignored; Gradle 365 tests, 0 failures, 2 skipped.
+  - No GameTest was run (the coordinator's batch).
+- **Science.**
+  - climate.md: "The present-day nudge's cap" and the ledger-ids table.
+  - biomes.md: "The floors against the census's noise".
+  - Ledger rows: CLM-151 (rewritten, now `game-choice`), CLM-206 (new; `verified` for the range), BIO-072.
+  - bibliography.md: Luthi2008, Wilson1927.
+  - claims.md recounted. Decisions log: two rows (the coordinator's calls).
+- **Choices** (the coordinator's calls, undoable):
+  - the cap at x1.75, temperate only, ending not reached;
+  - the Wilson bound at 99 % rather than 95 % (about 65 comparisons a batch);
+  - the cap as the bracket's last step.
+- **Known issue.** The natural planet is warm and icy at once:
+  - its natural CO2 at 1000 Myr is 1.1 to 5.2 PAL, and three of the four runs have 0.27 to 0.33 of the land under sheets on high ground;
+  - it ends with 0.24 to 0.29 of the land under sheets where the cap stops the nudge (Earth 0.10).
+  - The high ground and the small land share are for the plates (P4 relief); the dry-ice extent rule is for the climate.
+- **Next.** The coordinator merges this branch and runs the GameTest batch (`climateConsistent` with the bound). The scratch runs in `/data/ban/deeptime-runs/co2-hothouse/` can go when it lands.
+
 ### 2026-10-19: The GameTest planet had no active volcano because its 5,000-sample lattice is coarser than the arc band: no sample ever took the ARC flag. Each slab strip now flags its sample nearest the arc axis (PLT-043), the volcano stage is blind exactly at resamplings (VOL-011), and the volcano GameTests log what their filters leave and fail on a planet without volcanoes (coordinator's task; agent worktree agent-ac360b78dda6ccbf4, branch worktree-agent-ac360b78dda6ccbf4 from master dc9396ee, masters 26ce664e and 3e7edd49 merged; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Counts.** `deeptime run --preset tests/presets/planet_world_4k.json --threads 8` on the VM (scratch scripts under build/vz/, outputs in /data/ban/deeptime-runs/volcano-zero/, deleted after), active volcanoes in `volcanoes/active.json`: master 025676c8 0 in each of 6 runs (no arc flag ever set; 25 shields born, none alive at the end); fb38204f (before the solvers merge, the same code as 0b7eae42) 4 shields in each of 6 runs, arc flags 0; master 26ce664e with the old solvers (`surface.numerics.diffusion_solver=jacobi`, `flood=serial`) 4 shields again; master at `resolution.l0_samples=20000` 21 (19 arc, 2 shields). The arc rule alone, seeds 11 to 16: 6, 12, 8, 11, 9, 7. Both changes, seeds 11 to 16: 6 (3 arc / 3 shields), 12 (9/3), 5 (3/2), 11 (10/1), 9 (9/0), 6 (5/1). `earthlike_quick_16k` (100,000 samples), scattered continents, 150 Myr, seed 1: 49 (48/1) on master and on the branch, every volcano count the same (neither change fires there). Runs at a fixed thread count are identical.
 - **Cause.** The arc band (weight above 0.3) is d 134 to 266 km behind the slab front, 132 km wide; 5,000 samples on the plate model's Earth-radius sphere are about 320 km apart, so the distance field's first ring lies beyond it. Master's 4 to 0 is hotspot shields, not arcs: the solvers merge changed the surface and with it which hotspot volcanoes stood at the end (the old solvers on master give the 4 back). The volcano stage's old blind-step rule (a fifth of the last valid step's arc cells) also blinded real steps once the arcs existed, since its reference moved only on valid steps (24 blind of 75 steps on seed 16, 9 of them resamplings).
@@ -158,6 +240,16 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Choices** (mine, undoable): the strip rule rather than a wider band or a finer test lattice (keeps fine lattices byte-for-byte, keeps the test planet's cost); the exact resample test for the blind step; no hotspot change here; tests fail on an empty planet rather than skip; the 16k comparison at scattered continents, 150 Myr (the preset has no start of its own).
 - **Note.** The worktree was removed once mid-task (it had no commits) and recreated at the same path from master dc9396ee.
 - **Next.** The coordinator merges this branch and runs the batch; then a task for the hotspot population (above).
+
+### 2026-10-19: Ben's play world re-baked on master be17a7cf (coordinator's job; agent worktree play-rebake-be17a7cf, branch play-rebake-be17a7cf from origin/master be17a7cf; not merged)
+- **What was baked.** Master be17a7cf over the previous bake (0729e267), 124 commits: the natives' baseline and x86-64-v3 builds picked at runtime, the GPU compute path (auto/cpu/gpu), per-Myr plate rules and the climate snapshot every 20 Myr in the shipped presets, parallel plate and surface steps (the resampling turns the first lattice's triangulation, so worlds differ at bit level), the resampling lumps fix (PLT-289 to PLT-292), the polar-hole fix (ISO-074 to ISO-076), ice cover and class from one cell (BIO-158, BIO-159), arcs on coarse lattices (PLT-043). No script changed: `play-stage.sh`, `play-client-stage.sh`, `play-client-apply.py`, `play-check.sh` and `play-ping.py` were used as merged. **Master moved to abc76bf3 (the present-day nudge capped at x1.75, the CO2 hothouse fix) while this ran**; the binary, the run and the install had already started on be17a7cf, so on the coordinator's word they were kept and this world does not have that fix. The next re-bake should start from abc76bf3 or later.
+- **Workbench and world.** Release `deeptime` built from be17a7cf in a fresh worktree (`cargo build --release -p deeptime-cli` through `detach.sh --kind cargo:other`, 114 s: a cold target, the last bake's warm one took 59 s), sha256 bf864ec37dd4...; the workbench's installed binary was 7d80a45c78ec... before. Installed with `tools/viewer/mac-watch.sh --no-build` after `/api/runs` showed `"running":null` and an empty queue; the installed binary's sha256 equals the build's and so does the running service's `/proc/<pid>/exe`. The trap of `mac-watch.sh start` (it builds through `mac.sh -- 'cargo build ... | tail -2'`, whose status is `tail`'s, and then copies whatever `target/release/deeptime` holds) was not met here: `--no-build` skips that line, and the hash changed. Run `1a1578fa5d2`: earthlike_quick_16k, supercontinent, 1000 Myr, seed 1, 614.1 s, 503 frames, 12,651 events, label "play server world 4 (Ben, supercontinent 1000 Myr, master be17a7cf)". Started with `POST /api/preset {"preset":"earthlike_quick_16k","start":"supercontinent","length_myr":1000}` (its `json` is the effective preset, seed 1 is the preset's own) and then `POST /api/runs {"json": <that>, "label": ...}` on the laptop's tunnel (`localhost:8642`), `Content-Type: application/json`.
+- **Server.** `tools/smoke/install.sh mic --preset earthlike_quick_16k --start supercontinent --length-myr 1000` (`--kind install`, 246 s once admitted, after about 6 min in the admission queue; pack dc49fe7, Deep Time jar sha256 d479396af6c6 built from the clean source be17a7cf; 157 mods, 11 left out by mod id: Cobblemon and its 10 dependents). `mac.sh --pack` was not needed: an `rsync -n` of the laptop's pack and rock-tag datapack against the VM's copies showed no difference but `.git/index`; the pack's uncommitted `pack.toml` was not touched. `play-stage.sh --run 1a1578fa5d2 --hash be17a7cf` into `/data/ban/play/be17a7cf/` (2.7 GB world data without `epochs/`, 126 rock-tag JSON files in `planet/datapacks/deeptime-mic-rock-tags`, `ops.json` carried over from 0729e267: aflyingpumpkin). `/etc/default/deeptime-play` (`PLAY_DIR`; `PLAY_TOOLS_ENV` was already `/data/ban/play/tools.env`) and `/etc/default/deeptime-idle` repointed, `deeptime-idle` restarted as its file says, `deeptime-play` restarted after RCON `list` showed 0 players (twice, the second right before the restart). Both units active and enabled.
+- **play-check.sh** (all ok): Done in 10.5 s; natives OK (version 0.0.1, format 0.5); world data bound at `/data/ban/play/be17a7cf/planet/deeptime` (C = 13312), read and not regenerated; DH 3.3.1 API bound and far terrain from the world data (levels 0 to 12); no Deep Time or Toroidal World WARN/ERROR; RCON `list` 0 of 20; `file/deeptime-mic-rock-tags (world)` enabled; `Rock palette: 62 classes (25 member, 37 fallback, 0 vanilla_fallback, 0 unresolved)`; ironstone = `create:ochrum` (member). `play-ping.py` through `deeptime-play-tunnel` (active throughout): 1.21.1 (protocol 767), 0 of 20, motd "Deep Time play test (run 1a1578fa5d2)".
+- **Client.** `play-client-stage.sh --hash be17a7cf` (after the play folder existed, so it compared against it; 14 s), then `play-client-apply.py --hash be17a7cf` after a `--dry-run` (no Minecraft process had the instance open): only `deeptime-1.21.1-0.0.1.jar` changed; no pack file changed; Toroidal World 0.19.3 identical; 179 jars in the instance (153 in both, 26 client-side-only, 4 server-side-only, as before); the instance's Deep Time jar (sha256 d479396af6c6) and Toroidal World jar equal the server's; `instance.cfg`, `options.txt`, `servers.dat` and `saves/` untouched. Cobblemon and its 10 dependents stay out of client and server.
+- **Old folder.** `/data/ban/play/0729e267` and `0729e267-client` were deleted after play-check passed on the new one: `playerdata/`, `stats/` and `advancements/` empty and no "joined the game" in `latest.log`, `debug.log` or any archive (Ben never joined); no process used the folder. Only `be17a7cf`, `be17a7cf-client`, `jdk-root` and `tools.env` remain under `/data/ban/play/`.
+- **Coordinator's calls (undoable).** The folder is named for master be17a7cf. All commands ran from this branch's worktree, so the VM's copy is `/Volumes/Graphide/ban/mic/mods/play-rebake-be17a7cf` (it holds the release binary and the install's server set; `mac-gc.sh` removes it after the merge). Every job got an explicit `--kind` (`cargo:other`, `install`, `shell`). This entry is placed after the newest one and not above it so that the merge with abc76bf3, which also added an entry at the top, has no conflict. I did not inspect the new world's climate or geology beyond play-check. On the laptop a bare `ssh` is kitty's kitten (it refuses a piped stdin); the RCON checks used `/run/current-system/sw/bin/ssh`.
+- **Left.** No Minecraft client was started; the first join is Ben's (`flatpak run org.prismlauncher.PrismLauncher --launch "MIC Deep Time Test"`). Branch not pushed or merged.
 
 ### 2026-10-19: GPU compute phase 2: the plates' L1 relink and the climate snapshot's cells run on the GPU; `write_l1` 1.6 times faster and the cells 4 times on the laptop's Radeon; no lean in any layer or climate field from the same state; the ported kernels take 72 to 86 s off a 1000 Myr full 16k run on the laptop (3 to 3.6 %) (coordinator's Phase 2 task; agent worktree agent-a1265f3344b19b0c1, branch `gpu-phase2` from master b337fa73, the climate sub-agent's branch and masters fb38204f, 7d60fc4a and 26ce664e merged in; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Design note:** `docs/design/gpu-compute.md` sections 13 (the relink) and 14 (the cells), section 10's Phase 2 measurements, section 4's memory, section 12's order. Science pages: `docs/science/plates.md` "L1 sampling on a GPU" and `docs/science/per-cell-climate.md` "Down to L1 on a GPU", each with a whole-planet paragraph. No law, constant or threshold changed, so no ledger row.
