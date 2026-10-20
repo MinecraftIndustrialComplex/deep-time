@@ -16,6 +16,8 @@ pub mod epochs;
 pub mod deposits;
 
 pub mod keyframes;
+// The Create World screen's live map between keyframes.
+pub mod live;
 pub mod stage;
 pub mod world;
 

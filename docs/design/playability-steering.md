@@ -173,8 +173,8 @@ resumes from them (`POST /api/runs/<id>/resume {"stop_myr": N}`); the source run
 ## 6. Stop early
 
 **What a player does.** While the run goes, the scrubber can go back to any keyframe already drawn;
-**Stop here** stops the run and plays that frame's world. A player who likes the live frame stops at
-it.
+**Stop here** stops the run and plays that frame's world. A player who likes the newest kept frame
+stops at it.
 
 **How.** The running session is cancelled (it stops within one step), and an epoch pick at that
 frame starts in the same staging folder (the editor's launch gate waits for the cancelled session
@@ -183,7 +183,10 @@ not deleted on this cancel (the timelapse model is told the run was superseded).
 
 **Decided here: stopping is at keyframes.** Stopping at the very step the run is on would need a
 checkpoint τ before every step; keyframes are where the player looks, and each has its checkpoint.
-The frame interval is the preset's `keyframes.every_myr` (50 Myr on the quick presets).
+The frame interval is the preset's `keyframes.every_myr` (50 Myr on the quick presets). The live
+map (create-world-ux.md, 2026-10-20) does not change this: it shows the planet between keyframes
+while the run goes, but it has no checkpoint, so **Stop here** while it is shown stops at the
+newest keyframe, and the button's tooltip says so.
 
 Stop early runs the tail, so the world played is the world of a run planned to that length,
 steered at its end when steering is on (inside the targets, the nudges do nothing, so a planet the
