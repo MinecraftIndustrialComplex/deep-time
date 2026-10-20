@@ -498,8 +498,11 @@ fn sutures_and_initiations_keep_continents_whole() {
     let mut sutures = 0;
     let mut initiations = 0;
     // Seeds where the force balance welds a collision within 300 Myr on this small planet (a
-    // sweep of 32 runs, 2026-10-16, after the eclogite root and whole-column isostasy: 8 welded).
-    for (start, seed) in [("supercontinent", 6), ("scattered_continents", 9)] {
+    // sweep of 32 runs, 2026-10-16, after the eclogite root and whole-column isostasy: 8 welded;
+    // with PLT-293, ocean crust keeping its own rock, 2026-10-20: supercontinent 1, 4, 9 and 12 of
+    // seeds 1 to 12, scattered continents 12 of seeds 1 to 24, seed 19 three times, and neither
+    // supercontinent 6 nor scattered 9 any more).
+    for (start, seed) in [("supercontinent", 1), ("scattered_continents", 19)] {
         let p = preset(8000, 300.0, start, seed);
         let mut seen = 0usize;
         let world = run_stage(&p, |stage, world, st| {
@@ -760,8 +763,10 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // seeds 1 to 24 under the thickening limit, `rate.rs`, 2026-10-18; 7 of seeds 1 to 24 once
     // crossed crust stays under, PLT-289 to PLT-292, the same day: 3, 7, 8, 12, 15, 20 and 21;
     // 14 of seeds 3 to 24 with the lower-crustal flow and the settling, PLT-300 and ISO-078,
-    // 2026-10-20: 5 to 9, 11 to 14, 18 to 21 and 24, seed 14 three times, seed 3 no more).
-    let p = preset(8000, 300.0, "scattered_continents", 14);
+    // 2026-10-20: 5 to 9, 11 to 14, 18 to 21 and 24, seed 14 three times, seed 3 no more; 12 of
+    // seeds 1 to 24 with PLT-293, ocean crust keeping its own rock, the same day: 1, 4, 6, 8, 10
+    // to 13, 15, 16, 18 and 19, seed 19 three times, seed 14 no more).
+    let p = preset(8000, 300.0, "scattered_continents", 19);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -868,7 +873,7 @@ fn the_collision_footprint_lives_with_its_collision() {
 fn recording_does_not_change_the_world_and_matches_the_run() {
     // A seed with welds, so the collision record is tested (as in
     // `collisions_weld_on_stall_and_transfer_on_shortening`).
-    let p = preset(8000, 300.0, "scattered_continents", 14);
+    let p = preset(8000, 300.0, "scattered_continents", 19);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
