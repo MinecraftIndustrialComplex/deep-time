@@ -20,8 +20,9 @@ as the nearest look-alike (calcite for limestone, granite for granite, tuff for 
 Where plates collided, the buried sediments have been heated and turned into slate, schist, gneiss, marble and
 quartzite; on a 500 Myr planet two thirds of all columns hold some of this, and 98 % of the columns on land. Under
 volcanic arcs, bodies of granodiorite and granite stand as rounded masses 8 to 80 km long (27 to 270 blocks), 2 to 8
-km thick, which erosion exposes as granite country; round them lies a rim of hornfels, or of skarn where the roof was
-limestone.
+km thick, which erosion exposes as granite country; round them, and round the smaller stocks that rise from them,
+lies a rim of hornfels in shale, sandstone or volcanic rock, or of skarn in limestone and dolomite, a few hundred metres
+to about 2 km wide (tens of blocks deep, a few blocks wide at 16k scale). Rock laid down after the intrusion is not baked.
 
 ## The model in plain words
 
@@ -43,8 +44,14 @@ The structure stage runs each step after the surface stage has laid down or stri
    ellipsoid with a roof 2 to 6 km below the surface, a lognormal length (median 25 km), a width of 0.5 to 1 times that, and a
    thickness from the Cruden-McCaffrey power law. They ride their plate, are unroofed by erosion, and are lost if the oceanic
    crust carrying them is subducted (RCK-056 to RCK-067).
-6. **Aureoles.** The outer 15 % of a pluton's radius is its contact aureole: skarn if its host was a carbonate, hornfels if it
-   was other soft rock, none in crystalline host (RCK-053, RCK-054).
+6. **Aureoles.** Every pluton and every stock bakes a shell of its host rock: the contact aureole. Its width is 0.3 of the
+   intrusion's smallest dimension (a pluton's thickness; a stock's height or width, whichever is less), 1.5 times that where the
+   host at the roof is a carbonate (RCK-053, RCK-091). The shell is read band by band down the column at the intrusion's
+   centre: skarn where a band is a carbonate, hornfels where it is other soft rock, nothing in crystalline rock, and only rock
+   older than the intrusion is baked, so cover laid on an unroofed pluton stays as it was (RCK-054). Each aureole is a body of
+   its own in the world data (role `aureole`), written before the intrusions so the intrusion paints over it; a stock's
+   aureole is hollow, cut into slabs that stop at the stock's wall, so the stock itself stays intact. A typical 3 km thick
+   pluton has a 900 m aureole, about 26 blocks of height at 16k scale and 3 blocks of width.
 7. **Blocks.** Each class resolves to a block through the rock tags of the pack, else a vanilla stand-in (RCK-074 to RCK-084).
 
 ## Equations and constants
@@ -78,8 +85,9 @@ T = 0.6 D^0.6, with T in km, D = sqrt(L W) in km the diameter of the circle of t
 | RCK-044 | gneiss | 650 | degC | Baxter 2002: sillimanite zone 650-700 | `cited-unverified` |
 | RCK-045 | gypsum to anhydrite | 50 | degC | Orti 2012: about 50 degC at 450-500 m; Hardie 1967: 58 degC pure water | `verified` |
 | RCK-049 | diagenesis ends | 200 | degC | Nelson | `verified` |
-| RCK-053 | contact aureole | outer 15 % of radius | - | Annen 2017: a few % to 30 % | `game-choice` |
-| RCK-054 | skarn on carbonate, hornfels elsewhere | - | - | Meinert 1992; Nelson | `verified` |
+| RCK-053 | contact aureole width | 0.3 x smallest dimension | - | Annen 2017: linear in thickness; 0.02 to 0.5 in its examples | `game-choice` |
+| RCK-054 | skarn on carbonate, hornfels elsewhere, band by band | - | - | Meinert 1992; Nelson | `verified` |
+| RCK-091 | aureole in a carbonate host | x 1.5 | - | Alta (Cook and Bowman 1994 via Annen 2017); Brenner 2021 from-memory | `game-choice` |
 | RCK-056 | pluton rate | 1e-5 | per km2 per Myr | calibrated to the Coastal Batholith (secondary) | `calibrated` |
 | RCK-057 | volume exponent | V proportional to D^2.6 | - | Cruden 2008 (a = 0.6) | `verified` |
 | RCK-058 | collision granite rate | 0.3 of arc | - | design; Vigneresse and Burg 2003 | `game-choice` |
@@ -172,7 +180,14 @@ columns before folds are applied; a wider phyllite band (350 to 525) makes more 
 - **Pools have no burial history.** The basement is stepped along its path by today's geotherm, not by the heat it once had.
 - **One body per intrusive suite.** A pluton in the mod stands for a whole suite; real plutons grow in increments of
   sheets over millions of years (Glazner et al. 2004).
-- **Aureoles have no distance.** They are a fixed outer shell, not a temperature field, and exist only on soft hosts.
+- **Aureoles are a width, not a temperature field.** No isotherm is computed and no peak temperature is stored; the zone
+  is one class (skarn or hornfels) across its width, with no isograds inside it, and it exists only on soft hosts.
+- **Aureoles are read from the undeformed column at the intrusion's centre** and are not offset by younger faults; a host
+  that changes sideways within the aureole takes the class of the centre's host at that depth.
+- **Aureole and pluton bodies paint over younger dykes and stocks** that cut them, because the world data paints bodies over
+  every structural event. A stock rooted on its own pluton is repainted through that pluton's aureole by a `stock` body; a
+  dyke or a much younger stock is not. A format rule "a body with an age paints only older rock" would fix it; it is not
+  built (REV-2 follow-up).
 - **Plutons are rounder than the big real ones** (width over length 0.5 to 1 against 0.17 to 0.4), and sit shallower
   than the Sierra's 3.5 to 10 km.
 - **Nothing reads a class's density.** The 62 densities are loaded from the rock-class files into the Rust table and the
@@ -186,8 +201,8 @@ columns before folds are applied; a wider phyllite band (350 to 525) makes more 
 ## Game choices
 
 The vocabulary, families and groups (RCK-013, the MIC rock-tag README); the metamorphic grade index (RCK-047); continental crust
-only (RCK-036); forward-only metamorphism (RCK-038); every pool and path table (RCK-016 to RCK-023, RCK-046); aureole shell
-(RCK-053); pluton shares, length and width (RCK-058 to RCK-065); the stone and deepslate stand-ins (RCK-075 to RCK-079,
+only (RCK-036); forward-only metamorphism (RCK-038); every pool and path table (RCK-016 to RCK-023, RCK-046); aureole width and
+the carbonate factor (RCK-053, RCK-091); pluton shares, length and width (RCK-058 to RCK-065); the stone and deepslate stand-ins (RCK-075 to RCK-079,
 decisions log 2026-10-01, Ben), the block resolution order (RCK-080, plan section 7.5). The appearance claims in the
 generator comments ("dark grey", "banded") are descriptions, not data (RCK-089).
 
