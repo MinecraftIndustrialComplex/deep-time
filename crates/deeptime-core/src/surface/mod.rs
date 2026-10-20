@@ -1510,7 +1510,7 @@ impl SurfaceStage {
             }
             self.time("diffusion", started);
 
-            // Periplatform carbonate (ledger ERO-189): the carbonate the diffusion and the slope
+            // Periplatform carbonate (ledger ERO-195): the carbonate the diffusion and the slope
             // failure moved off platforms is carbonate where it lands, not marine clastic.
             let started = Instant::now();
             {
