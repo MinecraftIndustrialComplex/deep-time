@@ -263,7 +263,30 @@ struct Present {
     land_ice: f64,
     land_sheet: f64,
     sea_ice: f64,
+    /// Every trial in the order run: (ln factor, land under ice sheets, land under ice, sea ice,
+    /// global mean °C); the first is the natural end.
+    rows: Vec<[f64; 5]>,
+    /// Where the ice sheets lie, without and with the factor.
+    natural_profile: SheetProfile,
+    profile: SheetProfile,
 }
+
+/// Where the land's ice sheets lie: for each class of height above the sea (`HEIGHT_CLASSES_M`)
+/// and of latitude (`LAT_CLASSES_DEG`), the class's share of the land and the share of the class's
+/// land under the sheets (true-area weighted).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+struct SheetProfile {
+    height_land: Vec<f64>,
+    height_sheet: Vec<f64>,
+    lat_land: Vec<f64>,
+    lat_sheet: Vec<f64>,
+}
+
+/// The lower edges of the present's height classes above the sea, m (Earth: 0.102 of the land
+/// above 2 km, docs/science/plates.md).
+const HEIGHT_CLASSES_M: [f64; 4] = [0.0, 1000.0, 2000.0, 3000.0];
+/// The lower edges of the present's latitude classes, degrees from the equator.
+const LAT_CLASSES_DEG: [f64; 3] = [0.0, 30.0, 60.0];
 
 /// The ice a clock run carries from step to step inside one plate step.
 #[derive(Clone)]
@@ -291,10 +314,78 @@ struct Trial {
     land_sheet: f64,
     sea_ice: f64,
     snowball: bool,
+    profile: SheetProfile,
     clock: ClockState,
     ebm: EbmState,
     ir: IceRun,
     out: clock::Output,
+}
+
+/// The present's search (`present_climate`, CLM-151): from the natural end (`natural`, ln factor
+/// 0), ln(factor) is bracketed at 0.35, 0.7, 1.4, 2.8, 5.6 and 9.2 times `dir` (at most about
+/// ×10⁴), the bracket stopping at `cap` and trying the cap itself (CLM-206), then the bracket is
+/// halved four times. The bracket's trials are independent (each starts from the same state), so
+/// they run side by side and are read in order, as a serial search reads them: the first that
+/// reaches the state ends the bracket, and only the trials up to it count (P1-17). Returns the
+/// trial chosen, whether it reached the state (and `accept` took it; otherwise the chosen trial is
+/// the last one short of the state), and the trials counted (the natural end's included);
+/// `seen` gets every counted trial in order.
+#[allow(clippy::too_many_arguments)]
+fn present_search<T: Send>(
+    natural: T,
+    dir: f64,
+    cap: f64,
+    trial: &(dyn Fn(f64) -> T + Sync),
+    ln_of: &dyn Fn(&T) -> f64,
+    reach: &dyn Fn(&T) -> bool,
+    accept: &dyn Fn(&T) -> bool,
+    seen: &mut dyn FnMut(&T),
+) -> (T, bool, u32) {
+    let mut trials = 1u32;
+    if reach(&natural) {
+        return (natural, true, trials);
+    }
+    let mut chosen = natural;
+    let mut steps: Vec<f64> = [0.35, 0.7, 1.4, 2.8, 5.6, 9.2] // ledger: CLM-151
+        .into_iter()
+        .filter(|&m| m < cap)
+        .collect();
+    if cap > 0.0 && cap < 9.2 {
+        steps.push(cap);
+    }
+    let mut lo = 0.0;
+    let mut best: Option<T> = None;
+    let bracket: Vec<T> = steps.into_par_iter().map(|m| trial(dir * m)).collect();
+    for t in bracket {
+        trials += 1;
+        seen(&t);
+        if reach(&t) {
+            best = Some(t);
+            break;
+        }
+        lo = ln_of(&t).abs();
+        chosen = t;
+    }
+    let mut reached = false;
+    if let Some(mut b) = best {
+        for _ in 0..4 {
+            let mid = 0.5 * (lo + ln_of(&b).abs());
+            let t = trial(dir * mid);
+            trials += 1;
+            seen(&t);
+            if reach(&t) {
+                b = t;
+            } else {
+                lo = mid;
+                chosen = t;
+            }
+        }
+        if accept(&b) {
+            reached = true;
+            chosen = b;
+        }
+    }
+    (chosen, reached, trials)
 }
 
 /// The climate stage.
@@ -487,6 +578,55 @@ impl Geometry {
             }
         }
         sheet
+    }
+
+    /// Where the sheets lie (`SheetProfile`): the land's area in each height and latitude class
+    /// and the sheets' in it, rows side by side and added in row order.
+    fn sheet_profile(
+        &self,
+        sheet: &[bool],
+        land: &[bool],
+        above_sea: &(dyn Fn(usize) -> f64 + Sync),
+        lat: &[f64],
+    ) -> SheetProfile {
+        let (nh, nl) = (HEIGHT_CLASSES_M.len(), LAT_CLASSES_DEG.len());
+        let class = |edges: &[f64], x: f64| edges.iter().rposition(|&e| x >= e).unwrap_or(0);
+        let rows: Vec<Vec<f64>> = (0..self.h)
+            .into_par_iter()
+            .map(|j| {
+                // [height land, height sheet, latitude land, latitude sheet], cell counts.
+                let mut r = vec![0.0; 2 * (nh + nl)];
+                let lc = class(&LAT_CLASSES_DEG, lat[j].abs());
+                for c in j * self.w..(j + 1) * self.w {
+                    if !land[c] {
+                        continue;
+                    }
+                    let hc = class(&HEIGHT_CLASSES_M, above_sea(c));
+                    r[hc] += 1.0;
+                    r[2 * nh + lc] += 1.0;
+                    if sheet[c] {
+                        r[nh + hc] += 1.0;
+                        r[2 * nh + nl + lc] += 1.0;
+                    }
+                }
+                r.iter_mut().for_each(|x| *x *= self.area[j]);
+                r
+            })
+            .collect();
+        let mut t = vec![0.0; 2 * (nh + nl)];
+        for r in &rows {
+            t.iter_mut().zip(r).for_each(|(a, b)| *a += b);
+        }
+        let all: f64 = t[..nh].iter().sum();
+        let share = |n: f64, d: f64| if d > 0.0 { n / d } else { 0.0 };
+        SheetProfile {
+            height_land: (0..nh).map(|i| share(t[i], all)).collect(),
+            height_sheet: (0..nh).map(|i| share(t[nh + i], t[i])).collect(),
+            lat_land: (0..nl).map(|i| share(t[2 * nh + i], all)).collect(),
+            lat_sheet: (0..nl)
+                .map(|i| share(t[2 * nh + nl + i], t[2 * nh + i]))
+                .collect(),
+        }
     }
 
     /// Each band's share of `pick` among the cells `of` selects (0 where there are none).
@@ -1306,6 +1446,7 @@ impl ClimateStage {
                         land_sheet: land_share(&geo.band_share(&|k| sheet[k], &|k| land0[k])),
                         sea_ice: c.sea_ice,
                         snowball: c.snowball.is_some(),
+                        profile: geo.sheet_profile(&sheet, &land0, &|k| h[k] - sea_prev, &lat),
                         clock: c,
                         ebm: e,
                         ir: i,
@@ -1336,50 +1477,35 @@ impl ClimateStage {
                     natural.sea_ice,
                     natural.snowball,
                 );
-                let mut trials = 1u32;
-                let mut reached = reach(&natural);
-                let mut chosen = natural;
-                if !reached {
-                    // Bracket (a factor of 1.4 … 10⁴), then halve the bracket four times.
-                    let mut lo = 0.0;
-                    let mut best: Option<Trial> = None;
-                    // The bracket's trials are independent (each starts from `saved`), so they
-                    // run side by side and are read in order, as the serial search read them: the
-                    // first that reaches the state ends the bracket, and only the trials up to it
-                    // count (P1-17).
-                    let bracket: Vec<Trial> = [0.35, 0.7, 1.4, 2.8, 5.6, 9.2] // ledger: CLM-151
-                        .into_par_iter()
-                        .map(|m| trial(dir * m))
-                        .collect();
-                    for t in bracket {
-                        trials += 1;
-                        if reach(&t) {
-                            best = Some(t);
-                            break;
-                        }
-                        lo = t.ln_factor.abs();
-                        chosen = t;
-                    }
-                    if let Some(mut b) = best {
-                        for _ in 0..4 {
-                            let mid = 0.5 * (lo + b.ln_factor.abs());
-                            let t = trial(dir * mid);
-                            trials += 1;
-                            if reach(&t) {
-                                b = t;
-                            } else {
-                                lo = mid;
-                                chosen = t;
-                            }
-                        }
-                        // An ice age that could only be had as a snowball stays short of it.
-                        // (`chosen` is then the coldest trial without one.)
-                        if !(mode == PresentClimate::IceAge && b.snowball) {
-                            reached = true;
-                            chosen = b;
-                        }
-                    }
-                }
+                let nat_profile = natural.profile.clone();
+                let row = |t: &Trial| {
+                    [
+                        t.ln_factor,
+                        t.land_sheet,
+                        t.land_ice,
+                        t.sea_ice,
+                        t.clock.t_global,
+                    ]
+                };
+                let mut rows = vec![row(&natural)];
+                // A temperate present warms by at most `present_co2_factor_max`; the forced
+                // states are not limited.
+                let cap = if mode == PresentClimate::Temperate {
+                    p.present_co2_factor_max.max(1.0).ln() // ledger: CLM-206
+                } else {
+                    f64::INFINITY
+                };
+                let (chosen, reached, trials) = present_search(
+                    natural,
+                    dir,
+                    cap,
+                    &|x| trial(x),
+                    &|t| t.ln_factor,
+                    &reach,
+                    // An ice age that could only be had as a snowball stays short of it.
+                    &|t| !(mode == PresentClimate::IceAge && t.snowball),
+                    &mut |t| rows.push(row(t)),
+                );
                 self.s.present = Some(Present {
                     ln_factor: chosen.ln_factor,
                     reached,
@@ -1391,6 +1517,9 @@ impl ClimateStage {
                     land_ice: chosen.land_ice,
                     land_sheet: chosen.land_sheet,
                     sea_ice: chosen.sea_ice,
+                    rows,
+                    natural_profile: nat_profile,
+                    profile: chosen.profile.clone(),
                 });
                 self.s.clock = chosen.clock;
                 self.s.ebm = chosen.ebm;
@@ -2252,6 +2381,31 @@ impl ClimateStage {
                     "natural_land_ice_sheet_frac": x.natural_land_sheet,
                     "natural_sea_ice_frac": x.natural_sea_ice,
                     "natural_snowball": x.natural_snowball,
+                    "co2_factor_max": (self.p.present_climate == PresentClimate::Temperate)
+                        .then_some(self.p.present_co2_factor_max),
+                    "trial_rows": {
+                        "columns": ["co2_factor", "land_ice_sheet_frac", "land_ice_frac",
+                            "sea_ice_frac", "t_global_c"],
+                        "rows": x.rows.iter().map(|r| {
+                            let mut r = *r;
+                            r[0] = r[0].exp();
+                            r.map(|v| (v * 1.0e4).round() / 1.0e4)
+                        }).collect::<Vec<_>>(),
+                    },
+                    "sheets_by_height": {
+                        "lower_edges_m": HEIGHT_CLASSES_M,
+                        "natural_land_share": x.natural_profile.height_land,
+                        "natural_sheet_share": x.natural_profile.height_sheet,
+                        "land_share": x.profile.height_land,
+                        "sheet_share": x.profile.height_sheet,
+                    },
+                    "sheets_by_latitude": {
+                        "lower_edges_deg": LAT_CLASSES_DEG,
+                        "natural_land_share": x.natural_profile.lat_land,
+                        "natural_sheet_share": x.natural_profile.lat_sheet,
+                        "land_share": x.profile.lat_land,
+                        "sheet_share": x.profile.lat_sheet,
+                    },
                 }),
             ),
             "last": last,

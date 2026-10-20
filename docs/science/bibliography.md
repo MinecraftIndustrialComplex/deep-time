@@ -6725,3 +6725,25 @@ The methods behind the P1-19 changes to the surface stage's solvers (build log 2
 - Access: paywalled (Springer).
 - Library: not fetched.
 - Read so far (by the project): from memory (piecewise-constant aggregation makes the Galerkin coarse operator too stiff for smooth error, about twice for the Laplacian, remedied by over-weighting the coarse correction). The project uses the equivalent halving of the coarse couplings (`SCALE` 0.5) and measured the effect itself (ERO-183).
+
+## The present-day nudge's cap and the Köppen floors' noise (CLM-151, CLM-206, BIO-072), added 2026-10-19
+
+The temperate present's CO2 cap rests on the late Quaternary's glacial-to-interglacial range; the GameTest floors are compared with a share's confidence bound (build log 2026-10-19, "The present-day nudge's cap").
+
+### Luthi2008
+- Reference: Lüthi, D., Le Floch, M., Bereiter, B., Blunier, T., Barnola, J.-M., Siegenthaler, U., Raynaud, D., Jouzel, J., Fischer, H., Kawamura, K. and Stocker, T. F. (2008). High-resolution carbon dioxide concentration record 650,000-800,000 years before present. Nature 453(7193):379-382.
+- DOI or URL: 10.1038/nature06949; abstract on OSTI, https://www.osti.gov/etdeweb/biblio/21286198; data PANGAEA 10.1594/PANGAEA.710901.
+- Cited as: "Lüthi et al. 2008" (climate/params.rs, `present_co2_factor_max`: the late Quaternary's 172 to 300 ppm).
+- Ledger ids: CLM-206, CLM-151
+- Access: paywalled (Nature); the abstract is open.
+- Library: not kept (read through the web fetch tool, 2026-10-19).
+- Read so far (by the project): the abstract, 2026-10-19: "We report the lowest carbon dioxide concentration measured in an ice core, which extends the pre-industrial range of carbon dioxide concentrations during the late Quaternary by about 10 p.p.m.v. to 172-300 p.p.m.v."; the record reaches 800,000 yr before present over eight glacial cycles, and CO2 stayed below 180 p.p.m.v. for about 3,000 yr in Marine Isotope Stage 16. The paper itself was not read.
+
+### Wilson1927
+- Reference: Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. Journal of the American Statistical Association 22(158):209-212.
+- DOI or URL: 10.1080/01621459.1927.10502953 (from memory, not looked up).
+- Cited as: "Wilson's score interval, Wilson 1927, JASA 22: 209" (neoforge gametest/ShareBound.java).
+- Ledger ids: BIO-072
+- Access: paywalled (Taylor & Francis).
+- Library: not fetched.
+- Read so far (by the project): from memory. The interval's form was checked by deriving it, not against the paper: the bounds are the roots in p of (p̂ - p)² = z² p(1 - p) / n, (p̂ + z²/2n ± z sqrt(p̂(1 - p̂)/n + z²/4n²)) / (1 + z²/n). The one-sided 99 % quantile of the standard normal, 2.326, is from memory (the tables give 2.3263).
