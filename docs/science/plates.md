@@ -2335,6 +2335,14 @@ The full 16k pair (`earthlike_full_16k`, seed 1, 8 threads; the switch off / on)
 | natural CO₂, ppm | 375 / 1,112 | 810 / 2,075 |
 | plate checks met | 25 / 29 of 45 | 27 / 30 of 45 |
 
+**On the ocean crust branch's planets** (its rock pools kept within one crust kind, PLT-293;
+measured on this branch with that branch's head 45de0c9a merged, the same seeds; supercontinent /
+scattered): land 0.322 / 0.326, land above 2 km 0.335 / 0.306, coast p50 173 / 161 km, Köppen E
+0.34 / 0.32, natural CO₂ 764 / 731 ppm. With its transition switch on (PLT-294): land 0.274 /
+0.270, above 2 km 0.328 / 0.356, coast 149 / 168 km. With PLT-312 on: land 0.252 / 0.238, the
+continental crust 0.317 / 0.296 of the planet, above 2 km 0.343 / 0.352, island arcs 2.07 / 2.20
+km³ a year, plate checks 33 of 45 against 26. The high ground and the coast are where they were.
+
 **What is left, and for whom.**
 1. *The extent of young orogen* is the high ground. Its sources: subduction on about half the
    boundary (Earth's 20 %), the active share of the continental margin (0.47 against 0.25 to 0.40)
