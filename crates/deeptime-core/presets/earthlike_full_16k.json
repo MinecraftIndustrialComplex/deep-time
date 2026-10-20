@@ -336,6 +336,7 @@
     "present_ramp_kyr": 10.0,
     "present_interglacial_ice_frac": 0.15,
     "present_glacial_ice_frac": 0.25,
+    "present_co2_factor_max": 1.75,
     "ice_flow_a": 1e-16,
     "ice_accumulation_gradient": 0.005,
     "ice_ablation_gradient": 0.01,

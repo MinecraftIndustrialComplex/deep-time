@@ -427,6 +427,55 @@ fn with_the_sheets_off_the_sheet_settings_change_nothing() {
     );
 }
 
+/// The present's search with a cap (CLM-151, CLM-206), on a stand-in for the trials (the state is
+/// reached from ln factor 2.0, ×7.4): with no cap the bracket stops at 2.8 and the halvings close in
+/// on 2.0; with a cap of 1.75 no trial goes past it, the cap itself is the last tried, and the
+/// search ends there short of the state. The forced states (`dir` −1) take no cap.
+#[test]
+fn the_present_search_stops_at_its_cap() {
+    let run = |dir: f64, cap: f64, need: f64| {
+        let mut seen = Vec::new();
+        let (chosen, reached, trials) = present_search(
+            0.0f64,
+            dir,
+            cap,
+            &|x| x,
+            &|t| *t,
+            &|t| t.abs() >= need,
+            &|_| true,
+            &mut |t| seen.push(*t),
+        );
+        (chosen, reached, trials, seen)
+    };
+    // No cap: 0.35, 0.7, 1.4, 2.8 bracketed (2.8 reaches), then four halvings toward 2.0.
+    let (x, reached, trials, seen) = run(1.0, f64::INFINITY, 2.0);
+    assert!(reached);
+    assert_eq!(trials, 1 + 4 + 4);
+    assert_eq!(&seen[..4], &[0.35, 0.7, 1.4, 2.8]);
+    assert!((2.0..2.1).contains(&x), "{x}");
+    // A cap of 1.75: 0.35 and the cap, both short; the search ends at the cap.
+    let cap = 1.75f64.ln();
+    let (x, reached, trials, seen) = run(1.0, cap, 2.0);
+    assert!(!reached);
+    assert_eq!(seen, vec![0.35, cap]);
+    assert_eq!(trials, 3);
+    assert_eq!(x, cap);
+    assert!(seen.iter().all(|&t| t <= cap));
+    // Reached under the cap: the halvings stay between the last miss and the first reach.
+    let (x, reached, _, seen) = run(1.0, cap, 0.5);
+    assert!(reached && (0.5..=cap).contains(&x), "{x}");
+    assert!(seen.iter().all(|&t| t <= cap));
+    // A cap of 1 never warms: the natural end is all there is.
+    let (x, reached, trials, seen) = run(1.0, 0.0, 2.0);
+    assert!(!reached && x == 0.0 && trials == 1 && seen.is_empty());
+    // The forced states go the other way, uncapped, down to ×10⁻⁴.
+    let (x, reached, _, _) = run(-1.0, f64::INFINITY, 9.0);
+    assert!(reached && (-9.2..=-9.0).contains(&x), "{x}");
+    // Already there: nothing tried.
+    let (x, reached, trials, seen) = run(1.0, cap, 0.0);
+    assert!(reached && x == 0.0 && trials == 1 && seen.is_empty());
+}
+
 #[test]
 fn the_present_climate_setting_governs_only_the_present() {
     let run = |state: &str| -> crate::world::WorldState {
@@ -495,6 +544,30 @@ fn the_present_climate_setting_governs_only_the_present() {
     assert_eq!(nt["present"]["reached"], true, "{}", nt["present"]);
     assert!(nt["present"]["land_ice_frac"].as_f64().unwrap() <= 0.15);
     assert!(ocean_ice(&temperate) < 0.5);
+    // The present's report (2026-10-19): every trial's row, the natural end first, none past the
+    // temperate cap, and where the sheets lie, each class's land share adding up to 1.
+    let f = |x: &serde_json::Value| x.as_f64().unwrap();
+    let pt = &nt["present"];
+    let cap = f(&pt["co2_factor_max"]);
+    assert_eq!(cap, ClimateParams::default().present_co2_factor_max);
+    let rows = pt["trial_rows"]["rows"].as_array().unwrap();
+    assert_eq!(rows.len() as u64, pt["trials"].as_u64().unwrap());
+    assert_eq!(f(&rows[0][0]), 1.0);
+    assert!(rows.iter().all(|r| f(&r[0]) <= cap + 1e-4), "{pt}");
+    assert!(ns["present"]["co2_factor_max"].is_null());
+    for key in ["sheets_by_height", "sheets_by_latitude"] {
+        for part in ["natural_land_share", "land_share"] {
+            let sum: f64 = pt[key][part].as_array().unwrap().iter().map(f).sum();
+            assert!((sum - 1.0).abs() < 1e-9, "{key}.{part} adds to {sum}");
+        }
+        for part in ["natural_sheet_share", "sheet_share"] {
+            let all = pt[key][part].as_array().unwrap();
+            assert!(
+                all.iter().all(|x| (0.0..=1.0).contains(&f(x))),
+                "{key}.{part}"
+            );
+        }
+    }
 }
 
 #[test]
