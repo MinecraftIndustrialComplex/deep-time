@@ -310,6 +310,11 @@ public final class BiomeCensus {
             int[] c = forbidden.get(name);
             return c == null ? 0 : c[1];
         }
+
+        public int forbiddenHits(String name) {
+            int[] c = forbidden.get(name);
+            return c == null ? 0 : c[0];
+        }
     }
 
     /**
