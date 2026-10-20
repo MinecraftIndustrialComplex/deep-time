@@ -709,18 +709,34 @@ their own worlds (all of MIC's, 87 % of vanilla's corner).
 | same, after | 23.6 | 1.73 (5.3x) | 7.3 % | 19.0 % | 7.1 % |
 | same, vanilla, before | 23.5 | 3.66 (10.3x) | 15.6 % | 6.4 % | 15.3 % |
 | same, after | 23.6 | 0.84 (2.4x) | 3.5 % | 6.4 % | 3.4 % |
-ICE_SPIKES_MORE_WORLDS
+| 2026-10-20 master, scattered continents, MIC, before | 33.5 | 12.98 (39.5x) | 38.7 % | 71.1 % | 38.2 % |
+| same, after | 33.6 | 3.76 (11.4x) | 11.2 % | 20.7 % | 10.8 % |
+| same, vanilla, before | 33.5 | 8.99 (25.3x) | 26.8 % | 34.5 % | 26.5 % |
+| same, after | 33.6 | 6.57 (18.5x) | 19.5 % | 34.5 % | 19.3 % |
 
 The 2026-10-20 master's supercontinent is the play world's own preset (`earthlike_quick_16k`, supercontinent,
-1,000 Myr, seed 1) baked again by that master, with the default placement table as the workbench bakes it.
+1,000 Myr, seed 1) baked again by that master, with the default placement table as the workbench bakes it; its
+scattered continents are the same preset with `--start scattered_continents`. The GameTests' 4k planet
+(`planet_world_4k`, baked by the same master) was measured too and is left out: its frozen, driest land is 0.5 % of
+land and its ice cap 3 to 4 census columns, with no ice spikes before or after.
+
+Inside the ice cap, steep ground (erosion E0 and E1) and flats (E2 and up) tell before from after apart, where the
+whole ice cap does not (after the fix vanilla's share reaches 19.3 % on the scattered continents, more than MIC's
+18.3 % before it on the play world):
+
+| ice cap's ice spikes, three worlds | steep, before | steep, after | flats, before | flats, after |
+|---|---|---|---|---|
+| MIC | 0 | 0 | 64.8 to 70.6 % | 17.0 to 20.0 % |
+| vanilla | 17.5 to 21.2 % | 1.0 to 1.8 % | 5.9 to 34.3 % | 5.9 to 34.3 % |
 
 **Why there are so many.** Two things multiply.
 
-1. *The corner is 8 to 28 times the pack's.* No rarity is lost on the way to it: the planet's frozen land is
-   16.9 % of land on the play world and 29.5 % on the 2026-10-20 supercontinent, against 10.8 % (MIC) and 10.9 %
-   (vanilla) in the packs' own worlds; and the ice cap, 10.8 % and 23.6 % of land, is placed in the driest humidity
-   band on purpose (BIO-078, Ben's "Ice only where there's ice": the ice cap takes no taiga), so 63 % and 80 % of the
-   frozen land is in the corner against the packs' 7.6 to 12 %.
+1. *The corner is 8 to 40 times the pack's.* No rarity is lost on the way to it: the planet's frozen land is
+   16.9 % of land on the play world, 29.5 % on the 2026-10-20 supercontinent and 46.0 % on its scattered
+   continents, against 10.8 % (MIC) and 10.9 % (vanilla) in the packs' own worlds; and the ice cap, 10.8 %, 23.6 %
+   and 33.5 % of land, is placed in the driest humidity band on purpose (BIO-078, Ben's "Ice only where there's
+   ice": the ice cap takes no taiga), so 63 %, 80 % and 73 % of the frozen land is in the corner against the packs'
+   7.6 to 12 %.
 2. *Inside the corner, near-inland ground got ice spikes past the flats rule.* BIO-077 sends EF's flats to the
    negative branch of the variant noise but for about a fifth of them, so that ice spikes, a positive-weirdness
    variant in vanilla, come back on a share of the ice cap's flats. Both packs had a way past it, both near-inland,
@@ -728,31 +744,33 @@ The 2026-10-20 master's supercontinent is the play world's own preset (`earthlik
    packs' own worlds:
    - Terralith 2.6.2 draws `minecraft:ice_spikes` on every near-inland flat of the corner (continentalness -0.2 or
      -0.11 to 0.03, erosion -0.375 or -0.223 to 0.05) on both signs of weirdness, so the rule's negative branch is
-     ice spikes too: 66 to 67 % of the corner's flats against MIC's own 34.5 %. Mid- and far-inland its ice spikes
+     ice spikes too: 66 to 71 % of the corner's flats against MIC's own 34.5 %. Mid- and far-inland its ice spikes
      sit at erosion 0.05 to 0.33 only, again on both signs.
    - Vanilla's `OverworldBiomeBuilder` gives near-inland ground in its low weirdness slice at erosion below -0.375
      the middle biome, which in the corner is ice spikes on positive weirdness, and EF's own rule gives steep ground
      positive weirdness (`positive_below_erosion`), so 20 to 30 % of the ice cap's steep near-inland ground was ice
-     spikes, 74 to 81 % of all of them. Mid-inland that slot is snowy slopes.
+     spikes: 74 to 81 % of all of them on the play world and the supercontinent, 29 % on the scattered continents,
+     whose flats the rule's noise let through more. Mid-inland that slot is snowy slopes.
 
 **What "right" means here** (the coordinator's call, 2026-10-20). The target is a share of the parent, not an
 area: when the climate makes more frozen, dry land, more ice spikes are right. The parent is the corner's flats,
 not the whole corner, because ice spikes are a flats biome in both packs' own worlds and the planet's ice cap is
-steep (61 to 72 % of it at erosion E0 and E1, against 26 % of MIC's corner and 13 % of vanilla's): measured on the
+steep (46 to 72 % of it at erosion E0 and E1, against 26 % of MIC's corner and 13 % of vanilla's): measured on the
 whole corner, the planet's share follows how steep its ice cap happens to be (MIC before the fix: 19.1 % on the
-play world, 25.6 % on the 2026-10-20 supercontinent, whose ice cap is flatter), while on the flats it held at
-66 to 67 % before and 19 % after on both. The share is BIO-077's, about a fifth of the flats, which Ben's
+play world, 25.6 % on the 2026-10-20 supercontinent and 38.7 % on its scattered continents, whose ice caps are
+flatter), while on the flats it held at 66 to 71 % before and 19 to 21 % after on all three. The share is BIO-077's, about a fifth of the flats, which Ben's
 "Bring ice spikes back" decision put in place; it is below both packs' own shares (34.5 % for MIC, 46.8 % for
 vanilla), so the ice cap's flats are thinner in ice spikes than the pack's frozen, dry flats, never thicker. Taken
 on the whole corner instead, MIC's share before the fix matched its own on the 2026-10-20 supercontinent (25.6 %,
 an excess per flat offset by the steep ice cap) and the fix leaves 7.3 %: that reading would keep the bypass.
 
-**How much too cold** (not retuned here). Köppen E is 16.8 % of the play world's land and 29.2 % of the 2026-10-20
-supercontinent's, against 12.8 % of Earth's (Peel et al. 2007): 1.3 and 2.3 times. The ice cap is 10.8 % and 23.6 %
-of their land, against about 10 % of Earth's under Antarctica's and Greenland's ice (from memory, not checked).
-The frozen band (T0) holds 16.9 % and 29.5 % of their land against 10.8 to 10.9 % in the packs' own worlds. With
-the fix, the remaining ice spikes excess on these worlds (1.7 to 5.3 times the pack's area) is that cold, dry
-land's.
+**How much too cold** (not retuned here). Köppen E is 16.8 % of the play world's land, 29.2 % of the 2026-10-20
+supercontinent's and 44.9 % of its scattered continents', against 12.8 % of Earth's (Peel et al. 2007): 1.3, 2.3
+and 3.5 times. The ice cap is 10.8 %, 23.6 % and 33.5 % of their land, against about 10 % of Earth's under
+Antarctica's and Greenland's ice (from memory, not checked). The frozen band (T0) holds 16.9 %, 29.5 % and 46.0 %
+of their land against 10.8 to 10.9 % in the packs' own worlds. With the fix, the remaining ice spikes excess on
+these worlds (1.7 to 18.5 times the pack's area) is that cold, dry land's: the share of the parent is held, and
+the parent is what the climate gives.
 
 **The fix** (BIO-161, the coordinator's call). EF's land inland of the beach strip, ice cap and barren alike, is
 held mid-inland: `placement.json` `classes.EF.continentalness` `{"min": 0.1}`, the class clamp `map` already applies
@@ -763,23 +781,28 @@ pack:
 
 - With vanilla, the flats rule: its positive branch on the flats, plus a few valley columns (absolute weirdness
   under 0.05, which vanilla's builder gives the variant mid- and far-inland at erosion E0 and E1: up to 7 % of
-  those columns). The flats' share is what the noise lets through, 16.8 % on the play world and 6.4 % on the
-  2026-10-20 supercontinent: BIO-077's threshold is not a fifth on every world (see "Open questions").
+  those columns). The flats' share is what the noise lets through, 16.8 % on the play world, 6.4 % on the
+  2026-10-20 supercontinent and 34.5 % on its scattered continents: BIO-077's threshold is not a fifth on every
+  world (see "Open questions").
 - With MIC, Terralith's own mid-inland slot: erosion 0.05 to 0.33 (after the climate mapping) on both signs of
-  weirdness. 94 to 95 % of the ice cap's mid-inland E4 ground is ice spikes, and its other flats none, so the flats'
-  share is how much of them falls in that window: 19.3 % on the play world and 19.0 % on the 2026-10-20
-  supercontinent, near BIO-077's fifth by the erosion and not by the noise. The beach strip, which is not clamped,
-  keeps Terralith's coastal ice spikes (half to four fifths of its E3 columns).
+  weirdness. 94 to 100 % of the ice cap's mid-inland E4 ground is ice spikes, and its other flats none, so the
+  flats' share is how much of them falls in that window: 19.3 % on the play world, 19.0 % on the 2026-10-20
+  supercontinent and 20.7 % on its scattered continents, near BIO-077's fifth by the erosion and not by the noise.
+  The beach strip, which is not clamped, keeps Terralith's coastal ice spikes (half to four fifths of its E3
+  columns).
 
 Both stay under the pack's own share of the flats. What else moves on the ice cap: with MIC, snowy slopes 40 to 41 %, frozen peaks 14 to 28 %, snowy plains 8 to 18 %, gravel
 desert 16 to 5 % (play world); with vanilla, frozen peaks 7 to 28 % (the high slice's steepest mid-inland ground is
 frozen peaks, near-inland snowy slopes). With MIC, EF's barren ground (0.1 to 0.2 % of land) trades its ice
 spikes (11 % of it) for Terralith's cold shrubland. `bake::biomes::tests::ef_land_is_held_mid_inland_off_terraliths_near_inland_ice_spikes`
-checks the clamp against the same table without the key. The GameTest census bounds the ice cap's ice spikes
-(`EF:few_ice_spikes`, BIO-162): it fails when the share's one-sided 99 % lower bound is above 0.10, between the
-shares after the fix (0.034 to 0.071) and before it (0.153 to 0.254). On the GameTests' 4k planet the ice cap is 3
-census columns (0.2 % of its land), under the 40 a family needs, so there the bound is logged and not asserted; it
-bites on a planet with an ice cap.
+checks the clamp against the same table without the key. The GameTest census bounds the ice cap's ice spikes on
+its steep ground and on its flats apart (`EF:few_ice_spikes_on_steep` and `EF:few_ice_spikes_on_flats`, BIO-162):
+each fails when its share's one-sided 99 % lower bound is above its ceiling, 0.05 on the steep ground (after the
+fix 0.010 to 0.018, before it 0.175 to 0.212 with vanilla) and the pack's own share on the flats (0.345 with
+Terralith, 0.468 otherwise; MIC after 0.170 to 0.200, before 0.648 to 0.706). The steep bound catches vanilla's
+bypass, the flats bound Terralith's; a ceiling on the whole ice cap could not, since its shares before and after
+overlap. On the GameTests' 4k planet the ice cap is 3 census columns (0.2 % of its land), under the 40 a family
+needs, so there the bounds are logged and not asserted; they bite on a planet with an ice cap.
 
 **The rare variants.** The same emulation gives the other variants against the packs' own worlds (the play world,
 before the fix; the fix changes only frozen biomes):
@@ -898,9 +921,10 @@ pack's own share and not an area ("Ice spikes and the rare variants").
 - The vanilla reference distributions (BIO-025) were measured by the project's tool and not
   re-measured.
 - After the fix the ice cap's flats carry ice spikes below the packs' own shares (MIC 34.5 %, vanilla 46.8 % of
-  their frozen, driest flats). With MIC the share is set by Terralith's mid-inland erosion window (19 % on both
-  measured worlds); with vanilla by what BIO-077's noise lets through, which gave the positive branch to 20 % of the
-  play world's ice cap at erosion E3 and to 4 % of the 2026-10-20 supercontinent's (16.8 % and 6.4 % of the flats).
+  their frozen, driest flats). With MIC the share is set by Terralith's mid-inland erosion window (19 to 21 % on the
+  three measured worlds); with vanilla by what BIO-077's noise lets through, which gave the positive branch to 20 %
+  of the play world's ice cap at erosion E3, to 4 % of the 2026-10-20 supercontinent's and to 29 % of its scattered
+  continents' (16.8 %, 6.4 % and 34.5 % of the flats).
   Reaching a pack's own share would need a share of the ice cap kept near-inland by noise, or a weirdness threshold
   set per world, which the placement format cannot say (a new key: Ben's to decide).
 - The rare variants ("Ice spikes and the rare variants"): mushroom fields never appear (no land cell is below
