@@ -1850,8 +1850,105 @@ p4s2 scored lowest and went to the full runs (C20 and p4s2 only; the coordinator
 Shared by every 4-Myr setting: the event record and the strata log on 4-Myr ends, the per-step
 plate numbers (the rotation's change, the land one step gains, partings of 8 against 5.3 Myr and
 24 against 35 per 100 Myr) and the arcs read higher by the sampling effect above (continental
-arcs' median 1.19 to 1.41 km against 0.66). The full tables are `build/p4/out/screen/` on the
-branch's scratch (not committed); the review page carries them.
+arcs' median 1.19 to 1.41 km against 0.66). The screen's full tables are on the review page
+below.
+
+**The full runs** (full 16k, 2026-10-20). `earthlike_full_16k`, 1000 Myr, 8 threads, C20 and
+p4s2 on scattered seeds 1 to 6 and supercontinent seeds 1 to 3 (nine runs each, the same seeds),
+c20tw on scattered seeds 1 and 2, all on 0c368e27's build; each run baked (deposits, the young
+landscape, amplify) and measured twice, at the end of the coupled stages and in the baked world
+(`metrics.py`, 1,146 numbers a run), then compared by the same rule. The A/A row sets C20's nine
+runs on both starts against c20tw's two scattered ones, so its sides differ in their starts too;
+the last two rows set both settings against C20 on c20tw's two runs only, where only |d| ≥ 0.8 can
+flag a number.
+
+| | c20tw (A/A) | p4s2 |
+|---|---|---|
+| runs: C20, the setting, pairs | 9, 2, 2 | 9, 9, 9 |
+| headline numbers flagged (weighted) | 18 (18) | 29 (34) |
+| plate-check numbers flagged | 41 of 138 | 43 of 141 |
+| all numbers flagged | 293 of 1,146 | 461 of 1,157 |
+| on c20tw's two runs (2 v 2): headline (weighted), plate checks, all | 28 (28), 71 of 138, 483 of 1,146 | 42 (45), 95 of 136, 685 of 1,146 |
+
+Means over the nine runs (C20's range in brackets; * flagged, † outside C20's range; "baked" is
+the same number in the baked world):
+
+| | C20 | p4s2 |
+|---|---|---|
+| land | 0.208 [0.170, 0.268] | 0.215 |
+| land, baked | 0.194 [0.150, 0.259] | 0.200 |
+| land above 2 km (share of land) | 0.274 [0.134, 0.384] | 0.353* |
+| land above 2 km (share of land), baked | 0.227 [0.115, 0.320] | 0.284* |
+| highest cell, m | 6,754 [5,639, 7,484] | 9,071*† |
+| highest cell, m, baked | 6,411 [5,518, 7,075] | 7,556*† |
+| land median, m | 993 [644, 1,458] | 1,278* |
+| land median, m, baked | 857 [585, 1,165] | 1,048* |
+| mountain belts | 25.0 [15.0, 39.0] | 20.7 |
+| plates (run mean) | 20.6 [17.2, 23.6] | 21.1 |
+| size ranks' L1 to Bird 2003 | 0.284 [0.215, 0.430] | 0.279 |
+| plate speed p50, mm/yr | 19.8 [14.3, 25.5] | 19.4 |
+| plate checks met, of 45 | 26.8 [25.0, 30.0] | 25.7* |
+| ocean floor age mean, Myr | 95.9 [73.9, 117.1] | 90.9 |
+| collisions per 100 Myr | 2.50 [1.50, 3.90] | 2.07 |
+| Hack's exponent | 0.478 [0.403, 0.574] | 0.465 |
+| carbonate, km³ | 1,458,222 [1,129,000, 1,757,000] | 1,358,578 |
+| eroded, km³ | 310.5 M [239.6 M, 378.3 M] | 287.3 M* |
+| stratovolcanoes born | 34,551 [26,388, 41,028] | 26,846* |
+| T, °C | 19.7 [14.5, 26.1] | 20.6 |
+| natural CO₂, ppm | 673 [311, 1,460] | 1,167* |
+| distinct event times per 100 Myr | 47.8 [47.3, 48.8] | 24.3*† |
+| strata layer span p50, Myr | 2 [2, 2] | 4*† |
+| strata log layers per land column | 6.53 [5.22, 7.89] | 4.43*† |
+
+**Time** (the VM, paired, 2026-10-20: `build/p4/pair.sh`, `deeptime bench --preset
+earthlike_full_16k --start scattered_continents --length-myr 1000` with 8 threads, C20 and p4s2
+side by side on two pinned sets of 8 CPUs, then swapped, through `tools/review/bench-quiet.py`;
+other jobs kept 18 to 20 of the VM's CPUs busy on average). Wall, C20 against p4s2: 1,183
+against 868 s, then 1,269 against 953 s (p4s2 at 0.73 and 0.75 of C20). Stage means of the two
+rounds: plates 306 against 167 s, the surface 588 against 481, climate 134 against 104,
+volcanoes 28.6 against 12.6, structure 43 against 36, the bake (deposits to finalize) 117 against
+101. Largest resident set 4.44 and 4.48 GiB against 4.34 and 4.32 GiB.
+
+**The 2-Myr step, unchanged** (identity check, 2026-10-20, `build/p4/idcheck.sh`). The master
+side of the merge (3e7edd49: the same crates without this change, built as the shipped x86-64-v3
+binary) and the branch's build (0c368e27) ran the defaults: quick 16k, scattered seed 1, 100 Myr
+to the volcanoes stage, 2 threads. The 101 fields read back from the two checkpoints are
+byte-identical, the dynamics records are identical, and so is the plate-check report but for the
+checkpoint's own path in it. The stage lines differ in wall times and in the logged preset,
+which on the branch names the two new settings at 2 Myr. The checkpoint files differ in length by
+72 bytes: their JSON summaries are identical, and the body, which holds the preset, is longer on
+the branch.
+
+All of it, with the per-seed tables (every headline number, each run's value under both settings
+and c20tw's where it ran), the curves, the keyframes and bakes side by side and two BlueMap sites
+a world (the highest mountain box and the most coastline box, by a rule fixed before any picture
+was taken), is on the review page,
+[deeptime-p4-c20-review](https://spacesheep.dev/@benmac/deeptime-p4-c20-review) (private).
+
+**Measured before the continents' fix.** Every run above is on 0c368e27, before the
+lower-crustal flow and the settling ("Mountains eat the world: the continents drown", below; land
+0.16 to 0.22 before them, 0.31 to 0.32 after, on its runs), so none of these numbers says how a
+4-Myr step behaves with them. Their rules, read for the step and not run:
+
+- *The settling* (ISO-078) moves a column 1 − e^(−δt/τ) of the way to its height, with τ = 4
+  kyr: the whole way at 2 and at 4 Myr. The surface's flexure it adds is the surface stage's
+  last one, a plate step old.
+- *The flow's heights* (PLT-281) follow from each column's crust before and after the step, as
+  the collapse's do, and the settling then takes them to equilibrium.
+- *The flow's substeps* (PLT-300): explicit, as many as keep it stable, at most 64 a step, past
+  which the step moves less than the law. At the thickest channel (K = 8 K₀ = 12,000 km²/Myr) on
+  six edges and the preset's mean spacing taken as a hexagonal lattice's (about 77 km at quick
+  16k's 100,000 samples, 48 km at full 16k's 250,000), the cap holds the step to 3.1 Myr of the
+  law at quick 16k and 1.3 Myr at full 16k, whatever the step. So it binds at quick 16k only at 4
+  Myr (crust above about 78 km), and at full 16k at both (above about 76 km at 2 Myr, 70 km at 4
+  Myr). At the thickest channel a 4-Myr step then moves crust 0.79 as far per Myr as a 2-Myr
+  one at quick 16k, and half as far at full 16k. These are estimates from the constants; the substeps a step takes (`Flow::substeps`) are not logged, and
+  how much crust is that thick was not measured.
+- *The flow's reach.* Crust moves only among the channel columns and the two rings of their
+  plate's crust around them, found once a step, so a channel's front can move at most two rings
+  (about 150 km at quick 16k, 100 km at full 16k) a step, half as far per Myr at 4 Myr. K₀'s
+  length over 15 Myr is Rey, Teyssier & Whitney's 150 km, √(K₀ t) = 77 km over 4 Myr at K₀ and
+  220 km at 8 K₀; not measured here.
 
 ## L1 sampling on a GPU (2026-10-19)
 
