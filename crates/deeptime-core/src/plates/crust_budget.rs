@@ -599,6 +599,7 @@ mod tests {
             column(CONTINENTAL, 500.0),
             column(CONTINENTAL, 300.0),
             column(OCEANIC, -3000.0),
+            column(CONTINENTAL, 800.0),
         ];
         let mut b = CrustBudget::start(&samples, 525.0, 9.81);
         samples[1].elevation_m = -100.0;
@@ -614,7 +615,7 @@ mod tests {
         assert_eq!(b.parts[Part::Subduction as usize][CONT], -1.0);
         assert_eq!(b.parts[Part::Subduction as usize][CONT_HIDDEN], 1.0);
         assert_eq!(b.parts[Part::Erosion as usize][DRY], -1.0);
-        let pos = vec![DVec3::X, DVec3::Y, DVec3::Z];
+        let pos = vec![DVec3::X, DVec3::Y, DVec3::Z, -DVec3::X];
         b.snapshot(&samples, &pos, 2.0, 1.0, 0.0, &BTreeMap::new());
         let out = b.lines();
         assert!(out.contains("cb_t t=2"), "{out}");
