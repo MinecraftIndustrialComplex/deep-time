@@ -113,8 +113,10 @@ const MAX_SAMPLES_Z: usize = 64;
 /// and was averaged as a number until 2026-10-18: a class border's footprint mean named a class
 /// neither side had (BSk beside Cfa read Csa to Csc), which the census and the biome rules' Köppen
 /// conditions read (ledger SCL-090). `meta/crust_type` (2026-10-19) is a code: an average of 0 and
-/// 1 at a coast would be no crust at all.
-const CATEGORICAL: [&str; 7] = [
+/// 1 at a coast would be no crust at all. `strata/lift` (2026-10-20) is a number but travels with
+/// the horizon stacks, which are the nearest cell's ([`Kind::Stack`]): the deformed column rule
+/// takes it for how far that cell's stack rose, so it must be the same cell's (STR-055).
+const CATEGORICAL: [&str; 8] = [
     "climate/koppen",
     "climate/koppen_l2",
     "climate/wetland",
@@ -122,6 +124,7 @@ const CATEGORICAL: [&str; 7] = [
     "meta/plate_id",
     "meta/crust_type",
     "meta/province",
+    "strata/lift",
 ];
 
 /// How a layer is resampled.
@@ -853,7 +856,8 @@ fn band_anisotropy(
 
 /// Raises the first horizon of every world stack cell to the bake's top rule: at least the highest
 /// world elevation plus detail amplitude over the L3 cells of the 5 × 5 stack cells round it, plus
-/// `TOP_MARGIN_BLOCKS`, capped at `max_y` (`bake::strata::raise_tops` on the simulation's grid).
+/// `TOP_MARGIN_BLOCKS`, capped at `max_y` (`bake::strata::raise_tops` on the simulation's grid),
+/// the thickest rock unit near the surface taking up the raise (`bake::strata::raise_stack`).
 /// Beyond a turning edge the window reads the glued cells (row −k is row k at column w − i).
 /// Returns (cells raised, largest raise in blocks).
 fn raise_world_tops(
@@ -861,10 +865,13 @@ fn raise_world_tops(
     bytes: &mut [u8],
     elev: &LoadedLayer,
     amp: Option<&LoadedLayer>,
+    min_y: i32,
     max_y: i32,
 ) -> (u64, f64) {
-    use crate::bake::strata::TOP_MARGIN_BLOCKS;
-    use crate::structure::bake_horizons::NO_TOP;
+    use crate::bake::strata::{TOP_MARGIN_BLOCKS, raise_stack};
+    use crate::structure::bake_horizons::{NO_CLASS, NO_TOP};
+    let unconsolidated = crate::structure::columns::Tables::get().unconsolidated;
+    let k = desc.stack_depth.unwrap_or(0) as usize;
     let g1 = &desc.grid;
     let (w1, h1) = (g1.w as usize, g1.h as usize);
     let g3 = &elev.desc.grid;
@@ -944,13 +951,34 @@ fn raise_world_tops(
                 let need = ((me + ma).ceil() as i32 + TOP_MARGIN_BLOCKS).min(max_y) * 16;
                 let off = i * cb;
                 let top = i16::from_le_bytes([row[off], row[off + 1]]);
-                if top == NO_TOP || i32::from(top) >= need {
+                if top == NO_TOP || i32::from(top) >= need || k == 0 {
                     continue;
                 }
-                let new = need.clamp(i32::from(i16::MIN) + 1, i32::from(i16::MAX)) as i16;
-                row[off..off + 2].copy_from_slice(&new.to_le_bytes());
+                // The cell's stack: K tops (i16), K classes, K key tops, K key bases (u16), as
+                // `Horizons::to_layer` writes it.
+                let cell = &mut row[off..off + cb];
+                let classes: Vec<u8> = cell[2 * k..3 * k].to_vec();
+                let n = classes.iter().position(|&x| x == NO_CLASS).unwrap_or(k);
+                let u16_at = |c: &[u8], at: usize| u16::from_le_bytes([c[at], c[at + 1]]);
+                let keys: Vec<[u16; 2]> = (0..n)
+                    .map(|h| [u16_at(cell, 3 * k + 2 * h), u16_at(cell, 5 * k + 2 * h)])
+                    .collect();
+                let mut tops: Vec<i16> = (0..n)
+                    .map(|h| i16::from_le_bytes([cell[2 * h], cell[2 * h + 1]]))
+                    .collect();
+                let raise = raise_stack(
+                    &mut tops,
+                    &classes[..n],
+                    &keys,
+                    need,
+                    min_y * 16,
+                    &unconsolidated,
+                );
+                for (h, t) in tops.iter().enumerate() {
+                    cell[2 * h..2 * h + 2].copy_from_slice(&t.to_le_bytes());
+                }
                 raised += 1;
-                max_raise = max_raise.max(f64::from(need - i32::from(top)) / 16.0);
+                max_raise = max_raise.max(f64::from(raise) / 16.0);
             }
             (raised, max_raise)
         })
@@ -1127,8 +1155,14 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     if let Some((entry, desc, mut bytes)) = world_stack {
         let tl = Instant::now();
         if let Some(we) = &world_elev {
-            let (raised, max_raise) =
-                raise_world_tops(&desc, &mut bytes, we, world_amp.as_ref(), m.scale.max_y);
+            let (raised, max_raise) = raise_world_tops(
+                &desc,
+                &mut bytes,
+                we,
+                world_amp.as_ref(),
+                m.scale.min_y,
+                m.scale.max_y,
+            );
             tops_note = json!({"raised_cells": raised, "max_raise_blocks": max_raise});
         }
         let e = &mut m.layers[entry];
@@ -1997,6 +2031,7 @@ mod tests {
             "meta/crust_type",
             "meta/province",
             "surface/class_top",
+            "strata/lift",
         ] {
             assert_eq!(kind_of(&desc(name, "")), Kind::Categorical, "{name}");
         }

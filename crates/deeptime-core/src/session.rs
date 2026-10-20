@@ -1901,11 +1901,15 @@ impl Session {
         }
         // The L3 layers the amplify stage spilled into the folder (P1-06).
         crate::surface::amplify::register(world, &mut m)?;
-        // P1-08: a planet run's chunk-time layers (plan §5.3, §8.8).
+        // P1-08: a planet run's chunk-time layers (plan §5.3, §8.8). The bake lifts the strata
+        // where the final terrain stands above the history's surface; the bodies and sites
+        // written below rise with them.
+        let mut lift = None;
         if let crate::preset::PresetBody::Planet(p) = &self.preset.body {
-            let note = self
+            let (note, l) = self
                 .pool
                 .install(|| crate::bake::bake(world, p, dir, &mut m))?;
+            lift = l;
             self.log.push(Level::Info, crate::bake::summary_line(&note));
             m.notes.insert(crate::bake::NOTES_KEY.into(), note);
             // The last frame shows the rivers and lakes the bake wrote (before the frame files
@@ -1936,14 +1940,24 @@ impl Session {
         }
         files.push(FileEntry::of(dir, deeptime_format::events::INDEX_PATH)?);
 
-        let (bytes, crc32) = deeptime_format::bodies::write_bodies(dir, &world.bodies)?;
+        let lifted = lift.as_ref().map(|l| {
+            let bodies = l.bodies(&world.bodies);
+            let sites = l.sites(&world.sites, &bodies);
+            (bodies, sites)
+        });
+        let (bodies, sites) = lifted
+            .as_ref()
+            .map_or((&world.bodies[..], &world.sites[..]), |(b, s)| {
+                (&b[..], &s[..])
+            });
+        let (bytes, crc32) = deeptime_format::bodies::write_bodies(dir, bodies)?;
         files.push(FileEntry {
             path: deeptime_format::bodies::BODIES_PATH.into(),
             bytes,
             crc32,
         });
 
-        let w = write_sites(dir, world.circumference, &world.sites)?;
+        let w = write_sites(dir, world.circumference, sites)?;
         files.push(FileEntry {
             path: SITES_PATH.into(),
             bytes: w.sites_bytes,

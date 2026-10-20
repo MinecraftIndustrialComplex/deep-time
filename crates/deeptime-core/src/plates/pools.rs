@@ -128,7 +128,10 @@ pub fn continental_column() -> [f32; pool::COUNT] {
     p
 }
 
-/// Fresh oceanic crust at a ridge, metres: 2 km of basalt over 5 km of gabbro.
+/// Fresh oceanic crust at a ridge, metres: 2 km of seismic layer 2 (lavas over the sheeted dikes,
+/// `structure::columns::OCEAN_LAVA_SHARE`) over 5 km of gabbro. The igneous crust averages
+/// 7.1 ± 0.8 km (White et al. 1992), layer 2 1.84 km (Christeson et al. 2019).
+// ledger: PLT-104 (abstract-only)
 pub fn oceanic_column() -> [f32; pool::COUNT] {
     let mut p = [0.0; pool::COUNT];
     p[pool::MAFIC_VOLCANIC] = 2000.0;
