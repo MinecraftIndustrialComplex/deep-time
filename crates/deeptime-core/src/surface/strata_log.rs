@@ -20,6 +20,11 @@ use serde::{Deserialize, Serialize};
 /// Provenance of material formed in place (carbonate, evaporite, coal, regolith).
 pub const IN_SITU: u16 = 0;
 
+/// Provenance of the lava flows and tuffs of a large igneous province (the volcano stage's flood
+/// basalts from the plate model's `deeptime:large_igneous_province` events): what the geologic
+/// provinces count as one (`provinces`, rule 1).
+pub const LIP_FLOW: u16 = 1;
+
 /// Provenance code of clastic sediment whose largest source family is `family` (0–3) with
 /// `share` (0–1) of the flux: (family + 1) · 256 + share · 255.
 pub fn provenance(family: usize, share: f64) -> u16 {
@@ -72,6 +77,15 @@ impl StrataLog {
     pub fn column(&self, c: usize) -> &[Layer] {
         let k = self.k as usize;
         &self.layers[c * k..c * k + usize::from(self.count[c])]
+    }
+
+    /// Thickness of cell `c`'s layers of provenance `prov`, m.
+    pub fn thickness_of(&self, c: usize, prov: u16) -> f64 {
+        self.column(c)
+            .iter()
+            .filter(|l| l.provenance == prov)
+            .map(|l| f64::from(l.thickness_m))
+            .sum()
     }
 
     /// Total thickness of cell `c`'s log, m.
