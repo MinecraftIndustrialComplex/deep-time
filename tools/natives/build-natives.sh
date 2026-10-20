@@ -109,7 +109,9 @@ check_elf() { # file key triple
     esac
     needed="$("$READELF" -d --wide "$f" | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p' | tr '\n' ' ')"
     echo "  NEEDED: $needed"
-    case "$key" in
+    # On the triple, not the key: place() passes "<key>/<level dir>", which no *-musl or *-gnu
+    # pattern matched, so neither check ever ran (found by the mic-native copy, 2026-10-20).
+    case "$triple" in
         *-musl)
             [[ " $needed " != *" libc.so.6 "* ]] || fail "$key: NEEDED libc.so.6 (glibc) in a musl build"
             [[ "$needed" != *ld-linux* ]] || fail "$key: NEEDED ld-linux in a musl build"
