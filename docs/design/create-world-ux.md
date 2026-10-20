@@ -71,10 +71,18 @@ From top to bottom:
 - **One time convention everywhere** (`model.Phrase`): "N million years ago" (billion and thousand
   where they read better). The ticker's "t = 640 Myr" and "-360 Ma" are gone.
 - **The map**, with the time scrubber, play/pause and "● Newest map" under it. The status line says
-  where the run is; the scrubber says what the map shows ("Map: 250 million years ago"). The map is a
-  keyframe, so while the run goes it can be up to one keyframe behind the status line, and the
-  scrubber's tooltip says so. "Stop here" and "Pick this epoch" are optional and stay beside the
-  scrubber. Where the panel sits beside the map (a wide window), the map spans its column at the
+  where the run is; the scrubber says what the map shows ("Map: 250 million years ago"). While the
+  run goes and the scrubber is at its newest end, the map is the **live map** ("● Live map";
+  `deeptime_core::live`, 2026-10-20): the layer the player views, drawn from the planet as it is now
+  by the same code as a keyframe and redrawn every few seconds, so it follows the status line
+  instead of waiting up to one keyframe (50 Myr on the quick presets) behind it. It is paced to cost
+  at most 2 % of the run: the next frame waits 49 times the last one's drawing time, at least
+  250 ms. The live map is only a picture: it is not kept, not in the keyframe list, not on disk and
+  not on the scrubber, and the world is the same with or without it (`tests/live_map.rs`).
+  Scrubbing back shows the keyframes, a layer the stages running now do not draw stays at its
+  newest keyframe, and once the run ends the map is the newest keyframe. "Stop here" and "Pick this epoch" are
+  optional and stay beside the scrubber; both stay on keyframes, so "Stop here" while the live map
+  shows stops at the newest kept map, and its tooltip says so. Where the panel sits beside the map (a wide window), the map spans its column at the
   projection's π:1, top-aligned, and the band under the time row shows the layer's key (the same
   `model.Legend` as the Map tab, cut with "…" when it does not fit).
 - **A panel with three tabs**:

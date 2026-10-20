@@ -1158,6 +1158,8 @@ final class DeepTimeNative {                     // package-private; only SimSes
     static native int    keyframeCount(long session);
     static native String keyframeInfo(long session, int index);             // JSON: t, stage, w, h, layer names
     static native void   copyKeyframe(long session, int index, int layer, ByteBuffer dstRgba); // direct buffer, w*h*4
+    static native long   watchLive(long session, String layer);              // live map: draw this layer (null stops); newest frame's seq
+    static native String copyLiveFrame(long session, ByteBuffer dstRgba);   // newest live frame; JSON seq, t, stage, layer, w, h ("" if none)
     static native String eventsSince(long session, long cursor, int max);   // JSON array for the ticker
     static native String drainLog(long session);                            // native log lines → SLF4J
     static native String finalizeWrite(long session);                       // after DONE: flushes files, returns manifest JSON
@@ -1219,6 +1221,16 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
   written to `keyframes/` as they are produced, so the ring can drop old frames without losing them.
   `copyKeyframe` writes into a Java-allocated direct `ByteBuffer`
   (`get_direct_buffer_address`), which the render thread then copies into a `NativeImage`.
+- **The live map** (`deeptime_core::live`, 2026-10-20) is the picture between keyframes: while the
+  screen follows a run, `watchLive` asks for the layer the player views (a request lapses after 2 s
+  unless renewed, and the screen renews it on every poll), and the stepping thread draws that one
+  layer after a step, with the keyframes' own render code, into one reusable frame, which
+  `copyLiveFrame` copies out. It is not a keyframe: it is not kept, not in the keyframe list, not on
+  disk and not on the scrubber, it never settles the pending P1-19 follower, and it changes nothing
+  in the world (`tests/live_map.rs`: the same seed with and without it gives the same world and
+  keyframes, byte for byte). It is paced to its share: the next frame waits 49 times the last
+  frame's drawing time (at least 250 ms), so drawing takes at most 2 % of the run; its time is kept
+  out of the stage timings and logged on its own.
 
 ### 6.2 Threading
 
@@ -1967,7 +1979,8 @@ WorldCreationContext)` returns `PlanetEditorScreen`:
 2. **Run page (the timelapse).** Map/globe toggle, time scrubber, event ticker, layer toggles
    (elevation, plates, crust age, rock, climate, ore provinces), progress, Cancel. Keyframes are
    drawn from `copyKeyframe` into a `NativeImage` (ABGR pixel order) → `DynamicTexture.upload()` →
-   `GuiGraphics.blit`.
+   `GuiGraphics.blit`. While the scrubber is at its newest end and the run goes, the map is the
+   live map (`copyLiveFrame`, §6.1), the planet as it is now, newer than the newest keyframe.
 3. **Review page.** The final map with the pack's biome names (the pack's `MultiNoiseBiomeSource`
    plus the §7.2 mapping, computed here and staged), the spawn marker and ore-province hints (not
    exact deposits), then Accept.
@@ -1999,7 +2012,9 @@ disabled until a start configuration and a length are chosen, the estimate is in
 `SimSession.launch` creates the session on the `deeptime-sim` worker (plan §6.2), which also
 collects keyframe infos and events after every step and before it destroys the session; keyframe
 pixels come through `copyKeyframe` while the session lives and from `keyframes/kf-<n>.dtk`
-(pure-Java `worlddata/KeyframeFiles`) afterwards, decoded on a loader thread into a 64 MiB ring. The
+(pure-Java `worlddata/KeyframeFiles`) afterwards, decoded on a loader thread into a 64 MiB ring.
+Between keyframes, while it follows the run, the map shows the live map (`watchLive` and
+`copyLiveFrame`, §6.1; `TimelapseModel`); stops, epoch picks and the scrubber stay on keyframes. The
 globe is an orthographic projection drawn on the CPU into a 256² texture. The review page's map is
 the staged world data's `elevation` raster coloured with `ramps.json` (copied into the jar as
 `deeptime/ramps.json`); the spawn marker is the first `spawn/candidates.json` entry above sea
