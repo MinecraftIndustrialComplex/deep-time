@@ -209,18 +209,30 @@ impl Grid {
             .collect()
     }
 
+    /// The coarse columns either side of fine column `i` and the second's share, `fx` (x wraps):
+    /// [`corners`](Self::corners) along a row.
+    #[inline]
+    pub fn axis_x(&self, i: usize) -> (usize, usize, f64) {
+        let x = (i as f64 + 0.5) / self.k as f64 - 0.5;
+        let x0 = x.floor();
+        let i0 = (x0 as i64).rem_euclid(self.w as i64) as usize;
+        (i0, (i0 + 1) % self.w, x - x0)
+    }
+
+    /// The coarse rows either side of fine row `j` and the second's share, `fy` (rows clamp):
+    /// [`corners`](Self::corners) down a column.
+    #[inline]
+    pub fn axis_y(&self, j: usize) -> (usize, usize, f64) {
+        let y = ((j as f64 + 0.5) / self.k as f64 - 0.5).clamp(0.0, (self.h - 1) as f64);
+        let y0 = y.floor();
+        let j0 = y0 as usize;
+        (j0, (j0 + 1).min(self.h - 1), y - y0)
+    }
+
     /// The four coarse cells around fine cell `c` and their bilinear weights (x wraps; rows clamp).
     pub fn corners(&self, c: usize) -> [(usize, f64); 4] {
-        let k = self.k as f64;
-        let (i, j) = (c % self.fw, c / self.fw);
-        let x = (i as f64 + 0.5) / k - 0.5;
-        let y = ((j as f64 + 0.5) / k - 0.5).clamp(0.0, (self.h - 1) as f64);
-        let (x0, y0) = (x.floor(), y.floor());
-        let (fx, fy) = (x - x0, y - y0);
-        let i0 = (x0 as i64).rem_euclid(self.w as i64) as usize;
-        let i1 = (i0 + 1) % self.w;
-        let j0 = y0 as usize;
-        let j1 = (j0 + 1).min(self.h - 1);
+        let (i0, i1, fx) = self.axis_x(c % self.fw);
+        let (j0, j1, fy) = self.axis_y(c / self.fw);
         [
             (j0 * self.w + i0, (1.0 - fx) * (1.0 - fy)),
             (j0 * self.w + i1, fx * (1.0 - fy)),

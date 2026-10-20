@@ -1746,3 +1746,42 @@ P4C20 takes 0.746 of master's time over 200 Myr (both orders, geometric mean; th
 stages 0.63 and 0.68, the rest of the run fixed), and its ensemble stage sums are 0.59 and 0.58 of
 master's at 500 and 1000 Myr, so at the gate's length it would save about a third of the run. It
 stays out for the planet's sake (above).
+
+## L1 sampling on a GPU (2026-10-19)
+
+**What changes.** With a usable GPU (`compute` auto or gpu; `docs/design/gpu-compute.md`, section
+12) the relink that `plates/l1.rs` runs before every L1 sampling settles the covered cells on the
+device: for each cell, the nearest visible sample (from a latitude-band bucket grid, ties to the
+lower index), the walk to the lattice triangle holding the cell in
+that sample's rigid group, the test that all three corners are that group's and none is hidden, and
+the barycentric weights. Every other cell (boundary strips, gaps, a walk the device could not
+finish) goes to the CPU's code unchanged, and the layers (the barycentric fields, the nearest
+sample's categories, the gap crust) are written on the CPU from the links. No law, constant or
+threshold changes; no ledger row changes and none is added.
+
+**What that does to the crust.** The device works in f32 on unit vectors, about 1e-7 rad (under a
+metre on Earth's radius), where the CPU works in f64. A link can therefore differ only at a tie:
+two samples equidistant from the cell to that precision, or a cell on a triangle's edge. The
+weights differ by the rounding of f32 directions. The tolerance test
+`plates::l1::gpu::tests::the_gpu_relink_matches_the_cpu_but_at_ties` steps a 6,000-sample planet
+through 60 Myr from a supercontinent and compares six samplings on lavapipe (2026-10-19): of
+125,952 cells the device settled 88.4 % and left 11.6 % to the CPU; no link differed; the weights
+differed by at most 1.6e-5; and every layer value equalled the CPU's to 1e-4 of its layer's
+largest. A world made with a GPU is not byte-identical to one made on the CPU (Ben, 2026-10-18:
+worlds are shared as finished folders); the whole-history comparison of a full 16k planet is in
+the design note, section 10.
+
+**On a whole planet (2026-10-19).** A temporary switch (not committed) ran both relinks from the
+same state on every one of the 50 samplings of a full 16k planet's 100 Myr history (lavapipe,
+67.2 million cells in all): 0.015 % of the links fell on another triangle and the weights agreed
+to about 8e-4 where the triangle did; a few cells per sampling sat on an edge that the CPU's f64
+test put outside and the device's f32 test inside. Every layer's signed difference was as often
+up as down (elevation 27.29 million cells up and 27.28 million down, mean -4e-5 m; the land count
+off by 2 cells in 19.6 million; continental crust 29 cells up and 24 down), so the relink does
+not lean the crust any way. The world still differs, because the climate's carbon cycle carries
+a last-bit difference forward (`docs/science/per-cell-climate.md`, "Down to L1 on a GPU"): on
+five planets the GPU's land share ended 0 to 0.013 above the CPU's (a mean of +0.006, higher in
+four, equal in one), where one f32 ulp on one weight moved the CPU's own land share on the first
+planet by up to 0.004 and, before the cadence change, by 0.024. The same-state comparison above
+finds no lean, so the four in five is chance or an effect too indirect to show in a single
+sampling; a larger paired ensemble would tell.

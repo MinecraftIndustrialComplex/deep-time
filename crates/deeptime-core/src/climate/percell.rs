@@ -118,12 +118,18 @@ pub struct Coarse {
 }
 
 impl Coarse {
-    fn has_land(&self, cc: usize) -> bool {
+    pub(super) fn has_land(&self, cc: usize) -> bool {
         self.land[cc] > 0.0
     }
 
-    fn has_sea(&self, cc: usize) -> bool {
+    pub(super) fn has_sea(&self, cc: usize) -> bool {
         self.land[cc] < 1.0
+    }
+
+    /// The monthly land tiles, sea tiles and sea ice, [month][coarse cell] (the GPU's tables,
+    /// `gpu.rs`).
+    pub(super) fn monthly_tables(&self) -> [&[Vec<f64>]; 3] {
+        [&self.tl, &self.to, &self.ice]
     }
 
     /// The land and sea tiles' temperature of month `m` at L1 cell `c` (masked bilinear; a cell
@@ -278,6 +284,11 @@ impl Sharpen {
             l0: l(0.0),
             l1: l(1.0),
         }
+    }
+
+    /// The slope k, the logistic's a = 4k and its values at 0 and 1 (the GPU's copy, `gpu.rs`).
+    pub(super) fn parts(&self) -> [f64; 4] {
+        [self.k, self.a, self.l0, self.l1]
     }
 
     pub fn apply(&self, x: f64) -> f64 {

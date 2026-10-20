@@ -337,6 +337,63 @@ conveyor sinking 30 Sv on the inlet's two cells at 51° N, 258 °C and 3.5·10¹
 coupled-pipeline test, which now holds every step's land runoff under 15 m/yr and kernel under 100
 times Earth's.
 
+## Down to L1 on a GPU (2026-10-19)
+
+**What changes.** With a usable GPU (`compute` auto with a hardware adapter, or gpu;
+`docs/design/gpu-compute.md`) step 5 of each snapshot runs as one compute shader, one invocation
+per L1 cell with its twelve months (`climate/gpu.rs`): the belt rain and the mountain rain of
+each cell, the masked bilinear of the coarse tiles, the coast blend, the winter inversion, sea ice
+and its sharpened edge, aridity, the equilibrium line, Köppen and the glacier flag. The laws,
+constants and order of operations are the CPU's: no ledger row changes and none is added.
+
+**What stays on the CPU.** Everything the cells read is made on the CPU and uploaded: steps 1 to 3
+and the coarse tiles of each month, the distances to the sea and the basins, the sea's departure
+from its row, the air carried along the wind row by row, the mountain rain's regimes, and each
+row's insolation and onshore share. Everything that reads the cells stays there too: the anomaly
+fields, the ice cover, and the land terms that feed weathering, summed in f64 in the same order
+as before (a reordered sum alone moves a world's CO₂; design note, section 12). The device runs
+only the per-cell climate with the belts' rain: the banded climate, the moisture budget
+(`rain_model = budget`) and the upwind rain stay on the CPU, and after a device error the rest of
+the run's snapshots run on the CPU.
+
+**Precision.** A cell's months are f32 on the device where the CPU works in f64; both store f32.
+The tolerance test `climate::tests::the_gpu_cells_stay_within_their_error_budget_of_the_cpu`
+(lavapipe on the test VM) takes the terrain of a 20 Myr scattered-continents run (L1 256 × 82,
+5,990 land cells) under today's climate and a cold one (solar 0.97, 180 ppm, with glaciers and
+sea ice), and compares every output, also when the grid is cut into chunks (equal bit for bit to
+one dispatch). Its budgets are 0.01 K on temperatures, 10⁻⁴ relative on rain, aridity and the
+equilibrium line, 10⁻⁴ on sea ice, and Köppen and the glacier flag equal except at a threshold.
+Measured on both climates: temperatures at most 7.6·10⁻⁶ K apart (mean 8·10⁻⁷), rain at most
+1.2·10⁻⁶ relative in a month and 6·10⁻⁷ in the year, aridity 7·10⁻⁷, the equilibrium line
+1.5 mm (3·10⁻⁶ relative), sea ice 2.4·10⁻⁷, and no cell with another Köppen class or glacier
+flag (61 glacier cells in the cold climate). A last-bit difference can still cross a step in the
+model: the sign that swaps the mountain rain's regimes (5 land cells sit within 10⁻³ of it on that
+planet; their rain and equilibrium line are not compared), Thornthwaite's 26.5 °C and 0 °C (110 to
+390 cells within 0.01 K in some month; their aridity is not compared), the Köppen thresholds and
+the glacier's equilibrium line.
+
+**What that does to the world.** The cells differ in the sixth or seventh digit, and the
+weathering sums carry that into CO₂ and the next snapshot, so a world made with a GPU is not
+byte-identical to one made on the CPU, or on another GPU or driver (Ben, 2026-10-18: worlds are
+shared as finished folders). The whole-history comparison of the two (CO₂, temperature, sea level,
+hypsometry) is in the design note. The climate stage's `compute` note says which device ran the
+cells (`cells_device`, `cells_on_device`, `cells_on_cpu`, `cells_failed`).
+
+**On a whole planet (2026-10-19).** A temporary switch (not committed) ran every snapshot's cells
+twice from the same state, on the CPU and on the device, through a full 16k planet's 100 Myr
+history (lavapipe; 7 snapshots of 355,000 to 435,000 land cells): mean temperature differences
+of -1.3·10⁻⁷ to +5.5·10⁻⁹ K (at most 7.6·10⁻⁶ K in a cell), rain within 1.9·10⁻⁷ relative,
+aridity and the equilibrium line within 10⁻⁷, and sea ice, the glacier flags, the Köppen classes,
+the glaciated area and each band's ice sheet identical. The device's cells lean no way. Over a
+whole history the world nonetheless differs, as any last-bit change makes it differ: one f32 ulp
+in one barycentric weight of the plates' sampling, on the CPU alone, moved the same planet's
+100 Myr CO₂ between 546 and 633 ppm, its mean temperature between 14.0 and 15.1 °C and its
+glaciated land share between 0.060 and 0.106, as the carbon cycle and the ice settled into one
+of a few histories. Across five planets (seeds 1 to 5, 100 Myr, both ports on the GPU) the GPU's
+CO₂ ended 117 ppm lower, equal, 3 lower, 70 higher and 24 lower than the CPU's, the mean
+temperatures were equal (14.6 °C both), and the glaciated share and the sea level went both
+ways (design note, section 10).
+
 ## Simplifications and limits
 
 - **The conveyor is a compensating choice, not Earth's ocean.** Earth's Atlantic overturning is
