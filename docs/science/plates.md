@@ -1907,5 +1907,70 @@ settling of 10 Myr or less brings every thickness band to its Airy height. The f
 thickest crust down (the 55-70 km band's share) and the land above 2 km with it when the settling
 is off; with the settling on, the land above 2 km is set by the thickness distribution under the
 model's Airy line (z_0 = 525 m at 35.1 km, 1 km per 7.02 km of crust): 45 km of crust stands at
-1.9 km and 50 km at 2.6 km, and 0.3 to 0.4 of the continental crust is thicker than 45 km at the
-end of a run, where Earth's mean is 41.1 km and its orogens 46.3 km (Christensen & Mooney 1995).
+1.9 km and 50 km at 2.6 km. At the end of a run with the fix, 0.20 (supercontinent seed 1) and
+0.28 (scattered seed 1) of the continental crust is thicker than 45 km, 0.41 on master
+(supercontinent seed 2, the table above), where Earth's mean is 41.1 km and its orogens 46.3 km
+(Christensen & Mooney 1995).
+
+**The result.** Master (c88c2eb5 with the budget) against the fix, `earthlike_quick_16k`,
+1000 Myr, seeds 1 to 3, the end of the run, means of the three seeds; the full row is
+`earthlike_16k`, scattered seed 1, one run (`tools/review/force-balance-ensemble.sh` with
+`DEEPTIME_CRUST_BUDGET=1`, tables and figures by `tools/review/continent-budget.py`):
+
+| start | run | land | continental crust under the sea | land above 2 km, of land | coast p50, km | continental crust | mean thickness, km |
+|---|---|---|---|---|---|---|---|
+| supercontinent | master | 0.178 | 0.61 | 0.251 | 169 | 0.417 | 41.0 |
+| supercontinent | fix | 0.310 | 0.34 | 0.285 | 166 | 0.432 | 37.5 |
+| scattered | master | 0.155 | 0.68 | 0.282 | 162 | 0.426 | 41.0 |
+| scattered | fix | 0.305 | 0.33 | 0.354 | 148 | 0.408 | 39.0 |
+| scattered, full 16k | master | 0.221 | 0.46 | 0.400 | 163 | 0.386 | 42.8 |
+| scattered, full 16k | fix | 0.317 | 0.35 | 0.350 | 129 | 0.442 | 39.5 |
+| Earth | | 0.289 | 0.29 | 0.102 | 433 (409 at 250,000 points) | 0.41 | 41.1 |
+
+Halfway (500 Myr ago) the fix holds 0.28 and 0.31 of the planet as land where master has 0.19 and
+0.16, and the dry share of the continental crust stays at 0.59 to 0.67 through the whole run
+(master falls to 0.32 to 0.42). The continental area holds on both (0.39 to 0.48 at the end). The
+budget's parts (mean of the six quick runs): the settling raises 2.09 of the planet's worth of
+land over the run and the surface's flexure and erosion take back what is above the line (the
+plate surface -1.24, erosion -0.92 where master's are -0.40 and -0.25); the flow moves
+10.2 km³ a year, the collapse's own release falls from 4.3 to 2.0 km³ a year (likely because the
+flow has taken the thick crust first), and the foundering halves (2.1 to 1.1 km³ a year).
+
+*The climate.* More land weathers more: the end's global temperature is lower on six of the seven
+pairs, by 2.2 to 4.3 °C (supercontinent seed 3 is 1.5 °C warmer), and the natural CO2 is lower on
+five (full 16k: 1,461 to 810 ppm, 19.3 to 15.0 °C). The cold land grows: the Köppen E share of
+the land rises from 0.23 to 0.33 (supercontinent) and from 0.28 to 0.40 (scattered), and with
+nearly twice the land the area of E climate is 2.5 to 2.8 times master's on the quick runs; on the full
+run it falls from 0.41 to 0.33.
+
+*The sea floor.* The two rules touch only visible continental crust, never the ocean floor, but the
+sea floor changes through it: the drowned continental crust stands at its water-loaded Airy height,
+so its median depth goes from 1.2 to 1.9 km to 0.4 to 0.9 km (500 Myr ago and at the end; the
+shelves' share of the sea goes
+from 0.05 to 0.09 to 0.07 to 0.16), and the shallowest tenth of the ocean floor proper is
+shallower (its p90 -0.5 to -0.9 km against -1.3 to -1.9 km on master, the end of seed 1 of each
+start and the full run), likely through the resampling's blend at the margins (not traced). The
+median sea depth falls by about 0.3 km. The relief between neighbouring sea samples (the p90 of
+the height difference within 1.5 spacings) is 721, 1,084 and 722 m with the fix against 877, 706
+and 852 m on master: no consistent change, and the drowned continental crust is smoother (p90 444
+to 546 m against 554 to 717 m).
+
+**What it does not fix: the shape.** The continents keep their land and their freeboard, but not
+their shape. The median distance from land to the coast stays at 130 to 170 km on both, against
+Earth's 433 km (HYP-035), and the land at the end is still the belts and their forelands with
+island strings between them (the maps the budget writes, `maps-*.png`). The pieces of land holding 90 % of it at the end:
+6, 6 and 10 with the fix, 14, 13 and 1 on master (seed 1 of each start, the full run). Three leads,
+not yet measured one by one: the collisions turn area into thickness (the belts keep about
+18 km³ a year, so a continent shrinks where it meets another), the arcs build continental crust
+along thin strings (4.1 km³ a year of island-arc crust, where Earth's 14,500 km of
+intra-oceanic arcs grow about 1.5 km³ a year, Stern & Scholl 2010, PLT-045), and the resampling fills the gaps inside a continent with ocean
+floor (it turns 15.9 of the planet's worth of continental samples to ocean floor and 14.7 back
+over a run). The land above 2 km is also still too much (0.29 to 0.35 of land, Earth 0.10): the
+thickness distribution is wider than Earth's, and the model's Airy line puts 41 km of crust at
+1.4 km.
+
+The figures are not kept in the repo: `tools/review/continent-budget.py --out <dir> --group
+master=<summaries> --group fix=<summaries> --maps <name>=<maps dir>` makes them from the runs'
+summaries and maps (`series.png` the stocks over time per seed, `bands-*.png` the thickness bands,
+`maps-*.png` six snapshots of elevation and of the continental crust); the build log entry of
+2026-10-20 has the commands.
