@@ -128,7 +128,8 @@ final class ReviewPage implements PlanetEditorScreen.Page {
         lines.add(byType.isEmpty() ? Lang.tr("review.hints.none") : Lang.tr("review.hints.title"));
         for (var e : byType.entrySet())
             lines.add(Component.literal("■ ").withColor(ProvinceHints.colour(e.getKey()))
-                    .append(Component.literal(Formats.humanize(e.getKey()) + " (" + e.getValue() + ")").withColor(0xe0e0e0)));
+                    .append(Component.empty().append(Lang.dynamic(ProvinceHints.nameKey(e.getKey()), e.getKey()))
+                            .append(" (" + e.getValue() + ")").withColor(0xe0e0e0)));
         for (Component c : lines) {
             for (var seq : font.split(c, sideW)) {
                 g.drawString(font, seq, x, y, 0xffe0e0e0, false);
