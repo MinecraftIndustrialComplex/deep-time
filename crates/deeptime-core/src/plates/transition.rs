@@ -685,7 +685,11 @@ mod tests {
         for (i, s) in st.samples.iter().enumerate() {
             let b = &before[i];
             if s.kind == OCEANIC {
-                for p in [pool::FELSIC_PLUTONIC, pool::FELSIC_VOLCANIC, pool::METAMORPHIC] {
+                for p in [
+                    pool::FELSIC_PLUTONIC,
+                    pool::FELSIC_VOLCANIC,
+                    pool::METAMORPHIC,
+                ] {
                     assert_eq!(s.pools[p], b.pools[p], "sample {i}, pool {p}");
                 }
                 let mv = f64::from(s.pools[pool::MAFIC_VOLCANIC] - b.pools[pool::MAFIC_VOLCANIC]);
@@ -698,7 +702,10 @@ mod tests {
                 thinned += 1;
             }
         }
-        assert!(thickened > 20 && thinned > 20, "{thickened} thickened, {thinned} thinned");
+        assert!(
+            thickened > 20 && thinned > 20,
+            "{thickened} thickened, {thinned} thinned"
+        );
         // Off (the default), the ocean side takes the continent's own rock.
         let mut st = planet(&base.geo, 0.0);
         base.run(&mut st, 30);

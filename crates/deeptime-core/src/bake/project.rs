@@ -1150,15 +1150,14 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     if let Some((entry, desc, mut bytes)) = world_stack {
         let tl = Instant::now();
         if let Some(we) = &world_elev {
-            let (raised, max_raise) =
-                raise_world_tops(
-                    &desc,
-                    &mut bytes,
-                    we,
-                    world_amp.as_ref(),
-                    m.scale.min_y,
-                    m.scale.max_y,
-                );
+            let (raised, max_raise) = raise_world_tops(
+                &desc,
+                &mut bytes,
+                we,
+                world_amp.as_ref(),
+                m.scale.min_y,
+                m.scale.max_y,
+            );
             tops_note = json!({"raised_cells": raised, "max_raise_blocks": max_raise});
         }
         let e = &mut m.layers[entry];

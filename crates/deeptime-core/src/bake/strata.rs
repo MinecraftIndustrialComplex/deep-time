@@ -93,37 +93,40 @@ pub fn bake(
         deeptime_format::column::CLASSES_PATH,
         &Horizons::classes_json(),
     )?;
-    Ok((json!({
-        "grid": hz.grid,
-        "k": k,
-        "mean_horizons": mean,
-        "top_raised_cells": raised,
-        "top_raise_blocks_max": max_raise,
-        "lift": lift_note,
-        "mountain_fill": fill,
-        "build_limit": limit.note(p.scale.min_y, p.scale.max_y, p.scale.build_fit()),
-        "realism": {
-            "cells": census.columns,
-            "grade_inversion": census.share(census.with_inversion),
-            "metamorphic_sliver": census.share(census.with_sliver),
-            "plutonic_sheet": census.share(census.with_sheet),
-            "plutonic_with_a_floor": census.share(census.with_floored),
-            "stack_rules": stack_rules,
-            "rule": "share of the stored stacks with a horizon that was never as hot as one above it formed at, with a metamorphic horizon under 8 blocks inside the stack, with a plutonic horizon under 16 blocks between other rocks, with plutonic rock over rock of another family; stack_rules: every key span in one key domain and no metamorphic or plutonic sliver",
-        },
-        "top_rule": "after the lift, the first horizon's top is at least the highest elevation plus the highest detail amplitude over the L3 cells within two L1 cells, plus one block; the thickest rock unit beginning within 16 blocks of the rock surface takes up the difference and the horizons over it rise with the ground",
-        "smoothing": {
-            "sigma_cells": sp.strata_smoothing_cells,
-            "sample_step_cells": bake_horizons::smooth_stride(sp.strata_smoothing_cells),
-            "radius_samples": bake_horizons::SMOOTH_RADIUS_SAMPLES,
-            "tongue_band_keys": bake_horizons::tongue_params(&sp).0,
-            "tongue_minor_share": sp.strata_minor_share,
-            "rule": "each cell's stack is the Gaussian-weighted mean of its neighbours' height functions, cut at every key any of them has, each interval the class of the largest weighted thickness; the cell's own surface stays its first top",
-        },
-        // How long the horizons took, and whether they were the structure stage's (a run's
-        // timing, like the bake's own `millis`).
-        "millis": { "horizons": horizons_ms, "horizons_kept": kept },
-    }), lift))
+    Ok((
+        json!({
+            "grid": hz.grid,
+            "k": k,
+            "mean_horizons": mean,
+            "top_raised_cells": raised,
+            "top_raise_blocks_max": max_raise,
+            "lift": lift_note,
+            "mountain_fill": fill,
+            "build_limit": limit.note(p.scale.min_y, p.scale.max_y, p.scale.build_fit()),
+            "realism": {
+                "cells": census.columns,
+                "grade_inversion": census.share(census.with_inversion),
+                "metamorphic_sliver": census.share(census.with_sliver),
+                "plutonic_sheet": census.share(census.with_sheet),
+                "plutonic_with_a_floor": census.share(census.with_floored),
+                "stack_rules": stack_rules,
+                "rule": "share of the stored stacks with a horizon that was never as hot as one above it formed at, with a metamorphic horizon under 8 blocks inside the stack, with a plutonic horizon under 16 blocks between other rocks, with plutonic rock over rock of another family; stack_rules: every key span in one key domain and no metamorphic or plutonic sliver",
+            },
+            "top_rule": "after the lift, the first horizon's top is at least the highest elevation plus the highest detail amplitude over the L3 cells within two L1 cells, plus one block; the thickest rock unit beginning within 16 blocks of the rock surface takes up the difference and the horizons over it rise with the ground",
+            "smoothing": {
+                "sigma_cells": sp.strata_smoothing_cells,
+                "sample_step_cells": bake_horizons::smooth_stride(sp.strata_smoothing_cells),
+                "radius_samples": bake_horizons::SMOOTH_RADIUS_SAMPLES,
+                "tongue_band_keys": bake_horizons::tongue_params(&sp).0,
+                "tongue_minor_share": sp.strata_minor_share,
+                "rule": "each cell's stack is the Gaussian-weighted mean of its neighbours' height functions, cut at every key any of them has, each interval the class of the largest weighted thickness; the cell's own surface stays its first top",
+            },
+            // How long the horizons took, and whether they were the structure stage's (a run's
+            // timing, like the bake's own `millis`).
+            "millis": { "horizons": horizons_ms, "horizons_kept": kept },
+        }),
+        lift,
+    ))
 }
 
 /// How much of the baked `elevation` stands above the world's build limit (`scale.max_y`): the game
@@ -453,9 +456,16 @@ pub fn raise_stack(
         return 0;
     }
     let raise = need - i32::from(tops[0]);
-    let loose =
-        |h: usize| key::domain(keys[h][0]) == 0 || unconsolidated.get(usize::from(classes[h])) == Some(&true);
-    let base = |h: usize| if h + 1 < n { i32::from(tops[h + 1]) } else { floor };
+    let loose = |h: usize| {
+        key::domain(keys[h][0]) == 0 || unconsolidated.get(usize::from(classes[h])) == Some(&true)
+    };
+    let base = |h: usize| {
+        if h + 1 < n {
+            i32::from(tops[h + 1])
+        } else {
+            floor
+        }
+    };
     // The unit that fills the raise: the thickest rock unit (a run of horizons of one class in
     // one key domain) beginning within `RIDGE_SEARCH_BLOCKS` of rock under the rock surface, as
     // the smoothing's ridge rule picks it.
@@ -564,8 +574,16 @@ impl Lift {
                     ns.aabb[1][1] += dy;
                 } else {
                     // The bodies keep their own x and z; only y changes.
-                    ns.aabb[0][1] = mine.iter().map(|b| b.aabb[0][1]).min().unwrap_or(s.aabb[0][1]);
-                    ns.aabb[1][1] = mine.iter().map(|b| b.aabb[1][1]).max().unwrap_or(s.aabb[1][1]);
+                    ns.aabb[0][1] = mine
+                        .iter()
+                        .map(|b| b.aabb[0][1])
+                        .min()
+                        .unwrap_or(s.aabb[0][1]);
+                    ns.aabb[1][1] = mine
+                        .iter()
+                        .map(|b| b.aabb[1][1])
+                        .max()
+                        .unwrap_or(s.aabb[1][1]);
                 }
                 ns
             })

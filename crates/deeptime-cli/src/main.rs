@@ -1614,7 +1614,10 @@ fn inspect_points(
             .filter(|t| !t.is_empty())
             .map(str::parse::<f64>);
         let (Some(Ok(a)), Some(Ok(b))) = (it.next(), it.next()) else {
-            return Err(format!("points line {}: want two numbers, got {line:?}", n + 1));
+            return Err(format!(
+                "points line {}: want two numbers, got {line:?}",
+                n + 1
+            ));
         };
         let (x, z) = match &projection {
             Some(p) => p.block_of(a, b),

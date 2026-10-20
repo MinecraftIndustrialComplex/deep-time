@@ -426,7 +426,10 @@ pub(super) fn sample_with(
         let t = tris[l.tri as usize];
         let kind = samples[l.nearest as usize].kind;
         let mine = |kk: usize| samples[t[kk] as usize].kind == kind;
-        let sw: f64 = (0..3).filter(|&kk| mine(kk)).map(|kk| f64::from(l.w[kk])).sum();
+        let sw: f64 = (0..3)
+            .filter(|&kk| mine(kk))
+            .map(|kk| f64::from(l.w[kk]))
+            .sum();
         std::array::from_fn(|k| {
             use super::state::pool;
             let v = if k == pool::SEDIMENT || sw <= 1.0e-9 {
