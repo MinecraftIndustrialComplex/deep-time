@@ -606,6 +606,9 @@ pub const ARC_FRONT_OCEANIC_GLOBAL: &str = "plates/arc_front_oceanic_km_myr";
 /// with the full relative speed and with the convergence normal to the front ([`Pull`]).
 pub const FRONT_G_FULL_GLOBAL: &str = "plates/arc_front_g_full_km_myr";
 pub const FRONT_G_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_km_myr";
+/// The same two over the fronts under continental overriding crust, km × Myr.
+pub const FRONT_G_CONTINENTAL_FULL_GLOBAL: &str = "plates/arc_front_g_full_continental_km_myr";
+pub const FRONT_G_CONTINENTAL_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_continental_km_myr";
 /// World global: crust shortened into the arcs' cordilleras over the run, km³ (moved, not made).
 pub const CORDILLERA_GLOBAL: &str = "plates/cordillera_shortened_km3";
 
@@ -629,6 +632,9 @@ pub struct Pull {
     pub front_g_full_km_myr: f64,
     /// … and with v the convergence normal to the front (measurement, either rule).
     pub front_g_normal_km_myr: f64,
+    /// The same two over the fronts under continental overriding crust (the continental arcs and
+    /// their cordilleras), km × Myr.
+    pub front_g_continental_km_myr: [f64; 2],
 }
 
 /// One subducting-side sample's effect on its contact and on the crust budget.
@@ -877,6 +883,7 @@ pub fn fronts_finish(
     let by_normal = normal_convergence();
     let v0 = k.convergence_ref_mm_yr; // ledger: PLT-037
     let (mut g_full_km_myr, mut g_normal_km_myr) = (0.0_f64, 0.0_f64);
+    let mut g_continental_km_myr = [0.0_f64; 2];
     for (v, b) in boundary.iter().enumerate() {
         if let Some((u, c, rel, out)) = b.front {
             let su = state.samples[u as usize];
@@ -888,6 +895,10 @@ pub fn fronts_finish(
             if su.kind != CONTINENTAL {
                 g_full_km_myr += front_km * env.dt_myr * (speed / v0).min(1.0);
                 g_normal_km_myr += front_km * env.dt_myr * (across / v0).min(1.0);
+                if state.samples[v].kind == CONTINENTAL {
+                    g_continental_km_myr[0] += front_km * env.dt_myr * (speed / v0).min(1.0);
+                    g_continental_km_myr[1] += front_km * env.dt_myr * (across / v0).min(1.0);
+                }
             }
             let (conv, facing) = if by_normal {
                 (across, normal)
@@ -1231,6 +1242,7 @@ pub fn fronts_finish(
         cordillera_km3: cordillera_m * area / 1000.0,
         front_g_full_km_myr: g_full_km_myr,
         front_g_normal_km_myr: g_normal_km_myr,
+        front_g_continental_km_myr: g_continental_km_myr,
     }
 }
 
