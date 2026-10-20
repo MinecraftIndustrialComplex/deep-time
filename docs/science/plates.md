@@ -15,7 +15,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228, PLT-293 (20; PLT-293 ocean crust keeps its own rock at resamplings and in the L1 sampling, 2026-10-19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
-| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288, PLT-294 (44; PLT-294 the switch for the transition's ocean side, ocean crust or the continent's rock, 2026-10-19; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
+| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288, PLT-294 (44; PLT-294 the switch for the transition's ocean side, ocean crust or the continent's rock, 2026-10-19, on in the shipped presets since 2026-10-20; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265, PLT-310 to PLT-311 (43; PLT-310 and PLT-311 the boundary's normal and Bird's transform test, the land-shape task, 2026-10-20; PLT-265 Earth's passive margins, the transition's comparison) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
@@ -275,9 +275,10 @@ orogenic collapse and before the surface processes:
    zone belongs to the seed of its nearest boundary sample, through its own crust and plate), the
    share 1 − e^(−δt/τ) per step of what would bring the stretch to the profile (τ =
    `transition_myr`, 20 Myr, PLT-263), the sources thinned in proportion (pure shear), as their
-   own rock. A switch added on 2026-10-19, off by default (`transition_ocean_crust`, PLT-294,
-   "Ocean crust keeps its own rock" below), gives an oceanic sink the same volume as ocean crust
-   instead, lavas and gabbro in the ocean column's proportion. Volume is conserved, and crust types do not change: the thickened
+   own rock. A switch added on 2026-10-19 (`transition_ocean_crust`, PLT-294, "Ocean crust keeps
+   its own rock" below), on in every shipped preset since 2026-10-20 (decisions log 2026-10-20),
+   gives an oceanic sink the same volume as ocean crust instead, lavas and gabbro in the ocean
+   column's proportion. Volume is conserved, and crust types do not change: the thickened
    ocean-side samples stay oceanic, so the continental area and the crust share are not redefined
    by this rule.
 4. *Heights* (PLT-264). A metre of crust moved changes the height by 1/f, f = (T_n − T_o) / (z_0 −
@@ -2114,7 +2115,9 @@ The means: before 0.30 on both starts, after 0.32, switch on 0.27 on both, again
 0.131 and 0.139 against 0.165, 0.189 and 0.177.
 
 Ben weighed the transition's land cost on 2026-10-05 ("Keep 200 km, raise crust in 7-8"), so the
-switch is off by default and the choice is his. The physical fix is a continent that widens as it
+switch was off at first and the choice his; since 2026-10-20 it is on in every shipped preset, the
+coordinator's call under Ben's rule of 2026-10-16 once the cordillera at 1.7 mm/yr held the land at
+Earth's with it on ("The ocean crust switch, PLT-294" below; decisions log 2026-10-20). The physical fix is a continent that widens as it
 stretches, which the model's fixed boundary cannot do without the ratchet PLT-289 records.
 
 **What is left under the sea** (switch on, seed 1 supercontinent on master bc2e5472, the table
@@ -2637,7 +2640,12 @@ six runs' range):
 
 On the branch the switch takes the felsic rock off 0.30 of the ocean basins and moves the land to
 0.27, the high ground and coast within the seeds' spread, and the plate checks hold (27 to 28). It
-stays the coordinator's call (decisions log 2026-10-20, "off until the high-ground fix lands").
+was the coordinator's call (decisions log 2026-10-20, "off until the high-ground fix lands"), and
+on these numbers it went on in every shipped preset (`earthlike_*` and `pipeline_*`; decisions
+log 2026-10-20, the second PLT-294 entry; the plate pipeline's `plates_*` keep the code's default): the land holds near Earth's 0.29 on both starts
+and the ocean basins' felsic share falls from 0.76 to 0.46. The high ground does not move one way
+(better on the quick ensemble, worse on the single full run, seed 1: land above 2 km 0.299 / 0.314
+off, 0.380 / 0.455 on) and belongs to the high-ground work.
 
 **The collisions' end: a slab tear, tried and reverted.** Every collision the check counts ends by
 stalling into a weld (130 of 130 on the branch: convergence under 5 mm/yr for 10 Myr; at the end
