@@ -533,11 +533,12 @@ pub struct TectonicParams {
     pub transition_width_km: f64,
     /// … with this e-folding time towards the taper, Myr (0 = off) …
     pub transition_myr: f64,
-    /// … and what the ocean side is made of (PLT-294): `false` (the default) the continent's own
-    /// rock, kept under the oceanic label, so the continental crust budget is the transition's
-    /// as Ben weighed it on 2026-10-05; `true` ocean crust (lavas and gabbro), a volcanic
-    /// margin's, so no granite or gneiss reaches the sea floor, at a cost in land (about 0.04 of
-    /// the planet on supercontinent starts, build log 2026-10-19). Ben's to choose.
+    /// … and what the ocean side is made of (PLT-294): `true` ocean crust (lavas and gabbro), a
+    /// volcanic margin's, so no granite or gneiss reaches the sea floor; `false` the continent's
+    /// own rock, kept under the oceanic label. On in every shipped preset since 2026-10-20 (the
+    /// coordinator's call, decisions log 2026-10-20: with it the land held at Earth's 0.29 and the
+    /// ocean basins' felsic share fell from 0.76 to 0.46); `false` here, the struct's default,
+    /// keeps the test presets and any preset without the key on the continent's rock.
     pub transition_ocean_crust: bool,
     /// Plates at the start.
     pub initial_plates: u32,
@@ -746,7 +747,7 @@ impl Default for TectonicParams {
             uplift_max_mm_yr: 3.5,          // ledger: PLT-288
             transition_width_km: 200.0,     // ledger: PLT-262
             transition_myr: 20.0,           // ledger: PLT-263
-            transition_ocean_crust: false,  // ledger: PLT-294 (game-choice, Ben's to choose)
+            transition_ocean_crust: false,  // ledger: PLT-294 (game-choice; true in every shipped preset, decisions log 2026-10-20)
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
             continent_elevation_m: [150.0, 900.0],
