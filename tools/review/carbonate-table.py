@@ -12,8 +12,9 @@ blocks (strata-check); the surface stage's volumes
 10^6 km3) and the photic sea floor's mean area with its warm and warm-and-clear parts
 (10^6 km2); the natural CO2 (end CO2 over the present-day factor), the global temperature after
 the factor and before it (the clock's last row, with its degassing and weathering,
-10^12 mol C/yr); then the deposit sites by type with their strata, MVT on carbonate strata and on
-oceanic crust, placers on oceanic crust and below the shelf.
+10^12 mol C/yr); then the deposit sites by type with their strata and the median ore blocks per
+site (the audit's `ore_total`, over all the label's sites), MVT on carbonate strata, on oceanic
+crust and with ore, placers on oceanic crust and below the shelf.
 """
 import collections
 import glob
@@ -106,7 +107,7 @@ def main():
         if len(end) > 5:
             r["T_nat"], r["degas"], r["weath"] = end[2], end[4], end[5]
         aj = root / f"{stem}.audit.json"
-        r["types"], r["strata"], r["mvt"], r["placer"] = {}, {}, {}, {}
+        r["types"], r["strata"], r["mvt"], r["placer"], r["ore"] = {}, {}, {}, {}, {}
         if aj.exists():
             sites = json.load(open(aj)).get("sites", [])
             by = collections.Counter(x["type"].split(":")[-1] for x in sites)
@@ -115,9 +116,14 @@ def main():
             for x in sites:
                 st[x["type"].split(":")[-1]][x.get("stratum") or "-"] += 1
             r["strata"] = {k: dict(v) for k, v in st.items()}
+            ore = collections.defaultdict(list)
+            for x in sites:
+                ore[x["type"].split(":")[-1]].append(x.get("ore_total") or 0)
+            r["ore"] = dict(ore)
             mvt = [x for x in sites if x["type"].endswith("mvt_zn_pb")]
             r["mvt"] = {"n": len(mvt), "on_carbonate": sum(x.get("stratum") in carb for x in mvt),
-                        "oceanic": sum(bool(x.get("oceanic")) for x in mvt)}
+                        "oceanic": sum(bool(x.get("oceanic")) for x in mvt),
+                        "with_ore": sum((x.get("ore_total") or 0) > 0 for x in mvt)}
             pl = [x for x in sites if "placer" in x["type"]]
             r["placer"] = {"n": len(pl), "oceanic": sum(bool(x.get("oceanic")) for x in pl),
                            "below_shelf": sum((x.get("ground_m") or 0.0) < SHELF_M for x in pl)}
@@ -144,7 +150,10 @@ def main():
             for r in rs:
                 hosts.update(r["strata"].get(t, {}))
             top = ", ".join(f"{k} {n}" for k, n in hosts.most_common(5))
-            print(f"    {t:34s} {statistics.median(v):6.1f} [{v[0]}, {v[-1]}]  strata: {top}")
+            ore = [o for r in rs for o in r["ore"].get(t, [])]
+            op = statistics.median(ore) if ore else float("nan")
+            print(f"    {t:34s} {statistics.median(v):6.1f} [{v[0]}, {v[-1]}]  ore/site p50 {op:7.0f}"
+                  f"  strata: {top}")
         for k in ["mvt", "placer"]:
             agg = collections.Counter()
             for r in rs:
