@@ -47,10 +47,10 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 82 | 11 | 8 | 1 | 1 | 1 | 57 | 3 | 0 | 0 | 11 |
 | [SCL](ledger/SCL.md) | world scale, planet constants | 73 | 5 | 6 | 5 | 0 | 2 | 49 | 6 | 0 | 6 | 1 |
 | [STE](ledger/STE.md) |  | 15 | 0 | 1 | 3 | 0 | 0 | 10 | 1 | 0 | 0 | 0 |
-| [STR](ledger/STR.md) | strata, traps, hosts | 50 | 1 | 0 | 0 | 1 | 2 | 46 | 0 | 0 | 0 | 4 |
+| [STR](ledger/STR.md) | strata, traps, hosts | 53 | 1 | 0 | 0 | 1 | 2 | 49 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 74 | 0 | 0 | 0 | 1 | 2 | 47 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 21 | 0 | 0 | 0 | 0 | 1 | 10 | 10 | 0 | 0 | 2 |
-| **all** | | **2,587** | **300** | **327** | **53** | **105** | **86** | **1,203** | **513** | **332** | **14** | **230** |
+| **all** | | **2,590** | **300** | **327** | **53** | **105** | **86** | **1,206** | **513** | **332** | **14** | **230** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),

@@ -113,8 +113,10 @@ const MAX_SAMPLES_Z: usize = 64;
 /// and was averaged as a number until 2026-10-18: a class border's footprint mean named a class
 /// neither side had (BSk beside Cfa read Csa to Csc), which the census and the biome rules' Köppen
 /// conditions read (ledger SCL-090). `meta/crust_type` (2026-10-19) is a code: an average of 0 and
-/// 1 at a coast would be no crust at all.
-const CATEGORICAL: [&str; 7] = [
+/// 1 at a coast would be no crust at all. `strata/lift` (2026-10-20) is a number but travels with
+/// the horizon stacks, which are the nearest cell's ([`Kind::Stack`]): the deformed column rule
+/// takes it for how far that cell's stack rose, so it must be the same cell's (STR-055).
+const CATEGORICAL: [&str; 8] = [
     "climate/koppen",
     "climate/koppen_l2",
     "climate/wetland",
@@ -122,6 +124,7 @@ const CATEGORICAL: [&str; 7] = [
     "meta/plate_id",
     "meta/crust_type",
     "meta/province",
+    "strata/lift",
 ];
 
 /// How a layer is resampled.
@@ -2028,6 +2031,7 @@ mod tests {
             "meta/crust_type",
             "meta/province",
             "surface/class_top",
+            "strata/lift",
         ] {
             assert_eq!(kind_of(&desc(name, "")), Kind::Categorical, "{name}");
         }

@@ -78,6 +78,38 @@ public final class RasterSampler {
         return get((long) Math.floor(u + 0.5), (long) Math.floor(v + 0.5));
     }
 
+    /**
+     * The column rule's cubic B-spline of the physical values at block column (x, z) (FORMAT.md, "The lift"): the
+     * 4 × 4 cells and weights {@link Columns#stack} reads a column's horizon tops with, summed as an offset from cell
+     * (i0, j0)'s value as the tops are. Rust {@code RasterRead::column_spline}, the same operations.
+     */
+    public double columnSpline(long x, long z) {
+        long c = (long) grid.w() * grid.r();
+        long wx = Math.floorMod(x + c / 2, c) - c / 2;
+        double u = (double) (wx - grid.originBlockX()) / grid.r();
+        double v = (double) (z - grid.originBlockZ()) / grid.r();
+        long i0 = (long) Math.floor(u), j0 = (long) Math.floor(v);
+        double[] bu = Columns.bspline(u - i0), bv = Columns.bspline(v - j0);
+        double base = get(i0, j0);
+        double sum = 0.0;
+        for (int b = 0; b < 4; b++)
+            for (int a = 0; a < 4; a++) {
+                double w = bu[a] * bv[b];
+                sum += w * (get(i0 - 1 + a, j0 - 1 + b) - base);
+            }
+        return base + sum;
+    }
+
+    /**
+     * The physical value of the strata cell {@link FarColumn#cellStack} reads at block column (x, z): the nearest
+     * cell, x not folded first (the cell index wraps).
+     */
+    public double cellValue(long x, long z) {
+        long i = (long) Math.floor((double) (x - grid.originBlockX()) / grid.r() + 0.5);
+        long j = (long) Math.floor((double) (z - grid.originBlockZ()) / grid.r() + 0.5);
+        return get(i, j);
+    }
+
     /** Bilinear interpolation of physical values at block (bx, bz); NaN if a corner is nodata. */
     public double bilinear(double bx, double bz) {
         double u = (bx - (double) grid.originBlockX()) / (double) grid.r();

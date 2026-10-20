@@ -92,6 +92,8 @@ refused.
   rasters/meta/*.dtr            L1, u16 (meta/heat_flow_mw_m2: u16, 0.1 mW/m², "Geothermal features") ┘
   strata/horizons.dtr           L1, horizon_stack (7K bytes a cell), K = 3 in the synthetic worlds (8 with
                                 --strata every-class, 32 in a baked run)
+  strata/lift.dtr               L1, i16 1/16 block: how far each cell's stack rose after the history
+                                ("Structural events", "The lift"; a baked run with structural events)
   strata/classes.json           class index → rock class name
   spawn/candidates.json         land cells for spawn selection
   volcanoes/active.json         the volcanoes active at the present ("Lava")
@@ -182,6 +184,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `water_level` | L3 (L3h: L3 averaged 2 × 2 when L3 has more than 40 M cells, 32k full) | i16 | 1/16, block | −32768 | each lake's cells hold its surface, nodata elsewhere (P1-22, "Rivers"): its basin's rim when the lake is full, the level of its water balance, below the rim, when it is not (2026-10-01; a reader does not tell them apart); all nodata when `hydro.enabled` is false |
 | `playa` | as `water_level` | u8 | 1, block | — | blocks of salt on a playa's floor, 0 elsewhere ("Playas"); absent when `hydro.enabled` is false |
 | `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks with key spans, smoothed ("The 0.2 bake"), the first top raised ("The P1-08 bake") |
+| `strata/lift` | L1 (the grid of `strata/horizons`) | i16 | 1/16, blocks | — | how far every horizon of the cell's stack rose after the history (the bake's whole-stack lift, ledger STR-052; ≥ 0), which the structure file's heights do not include: the deformed column rule adds it ("Structural events", "The lift"; added 2026-10-20). A companion of the stacks: the projection pass takes the nearest cell, as it does theirs |
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
 | `climate/p_mm` | L1 | u16 | 1, mm/yr | — | annual precipitation |
 | `climate/koppen` | L1 | u8 | 1, code index | 255 | `notes.bake.climate.koppen_codes[i]` (31 = sea) |
@@ -1874,16 +1877,33 @@ undone in file order (youngest first). The margin is at least the furthest any c
 moves rock sideways in this world (the bake measures it), so every piece below meets every event
 that could touch it; it is part of the rule, not only a shortcut.
 
+**The lift** (added 2026-10-20). The bake raises every horizon of a strata cell by the cell's
+whole-stack lift after the history (the terrain's relief over the history's surface, ledger
+STR-052) and writes it as `strata/lift`; the events keep the history's heights. L(x′, z′), the
+lift of block column (x′, z′), is that layer's physical values through the column rule's
+B-spline: x′ folded as the column rule folds it, `u = (x′ − origin x) / r`, `v = (z′ − origin z) / r`,
+`i0 = ⌊u⌋`, `j0 = ⌊v⌋`, the weights `bspline(u − i0)` and `bspline(v − j0)` ("`horizon_stack`
+cells"), the 16 cells (i0 − 1 + a, j0 − 1 + b) row by row (b outer, a inner), and
+`L = V(i0, j0) + Σ (w_a · w_b) · (V(i0 − 1 + a, j0 − 1 + b) − V(i0, j0))`, so that a uniform lift is
+exact (Rust `RasterRead::column_spline`, Java `RasterSampler.columnSpline`). Far terrain's cell
+stacks (each the nearest strata cell's stored stack) take the nearest cell's value. A world
+without the layer has L = 0. A height y of the history at column (x′, z′) is y + L(x′, z′) in the
+column's stacks, so the rule below reads each source stack through its own lift and every column
+rises by its own: a fault's plane or an intrusion's body moves with the rock at each column it
+cuts, not with the rock at the event's centre.
+
 **The deformed column rule** for block column (x, z), with S(x′, z′) the 0.2 column rule's stack
-at a block column (integer tops T_h, classes, unit keys, top-down):
+at a block column (integer tops T_h, classes, unit keys, top-down) and L(x′, z′) its lift:
 
 1. S₀ = S(x, z). No candidates, or S₀ empty: the answer is S₀.
 2. One *piece* covers every height: `lo = −∞, hi = +∞`, source position (x, z) as doubles,
-   `dy = 0`, `key = 0`, not finished, source stack S₀. For each candidate e in order, for each
+   `dy = 0 − L(x, z)`, `key = 0`, not finished, source stack S₀ and its lift L_s = L(x, z). (A
+   piece's dy is the history's height at its source less the column's height, before the
+   source's lift.) For each candidate e in order, for each
    piece in order (bottom-up; pieces e itself creates are not revisited by e) that is not finished
    and at whose source position e's weight w is not 0:
    - **Cover.** h = the first horizon of the piece's source stack with unit key ≥ e's key. None:
-     the piece is finished. If h > 0: `cut = (T_h + 1) − dy`; if `cut ≤ lo` the piece is finished;
+     the piece is finished. If h > 0: `cut = (T_h + 1) − L_s − dy`; if `cut ≤ lo` the piece is finished;
      else if `cut < hi` the piece is split at `cut` and the upper part, [cut, hi), is finished.
      (Rock laid down after e is not moved by e, nor by anything older.)
    - **Fold:** `dy ← dy − w·(amplitude · profile(table, (b − offset)·TAU / wavelength))`,
@@ -1892,7 +1912,8 @@ at a block column (integer tops T_h, classes, unit keys, top-down):
      `plane = y − (dx′·pole x + dz′·pole z) / pole y`, `cut = plane − dy`. If `cut < hi`, the part
      [max(cut, lo), hi) (the whole piece when `cut ≤ lo`, else split off above the rest) becomes
      the hanging wall: source position `(sx − w·slip x, sz − w·slip z)`, `dy ← dy − w·slip y`,
-     `key ← e's key`, not finished, source stack S(⌊sx⌋, ⌊sz⌋) of the new position.
+     `key ← e's key`, not finished, source stack S(⌊sx⌋, ⌊sz⌋) of the new position and its lift
+     L_s = L(⌊sx⌋, ⌊sz⌋).
    - **Intrusion:** `r² = (a / half_along)² + (b / half_across)²`. If `r² < 1`:
      `hh = half_height · √(1 − r²)`, `l = max((y − hh) − dy, lo)`, `u = min((y + hh) − dy, hi)`;
      if `l < u` the part [l, u) of the piece is split off as the intrusion's rock (its class, unit
@@ -1901,7 +1922,7 @@ at a block column (integer tops T_h, classes, unit keys, top-down):
      folds younger than it have moved it with the rock, and it cuts the ones older than it.)
 3. The pieces top-down. A piece holds blocks `y_min … y_max`: `y_max = min(T₀ of S₀, ⌈hi − ½⌉ − 1)`
    (T₀ of S₀ for hi = +∞), `y_min = max(min_y, ⌈lo − ½⌉)` (min_y for lo = −∞); skipped when
-   `y_max < y_min`. With `d = ⌊dy + ½⌋` and the piece's source stack (an intrusion's piece is instead the one horizon
+   `y_max < y_min`. With `d = ⌊dy + L_s + ½⌋` (`(dy + L_s) + ½`) and the piece's source stack (an intrusion's piece is instead the one horizon
    `(y_max, its class, its key)`, appended unless the last appended has the same class): its horizon h covers
    `top = y_max` for h = 0, else `min(y_max, T_h − d)`, down to `bottom = max(y_min, T_{h+1} + 1 − d)`
    (y_min for the last); skipped when `top < bottom`. Its class and unit key are those of horizon
@@ -1924,7 +1945,8 @@ normal and strike-slip faults whose slip dies out along the trace and away from 
 (kind 2: stocks in orogens, dykes along rifts, plugs under extinct volcanoes), each dated to
 the plate step that made it; the key is `structure::columns::key::of_age(0, age, span)`, the
 unmetamorphosed strata log's key of that age, so basement and metamorphic units (larger keys) are
-deformed by every event; a fault's `y` is the ground at its centre; an intrusion's `y` is its
+deformed by every event; every height is the history's (the readers add the lift, "The lift"); a
+fault's `y` is the history's ground at its centre; an intrusion's `y` is its
 ellipsoid's centre: for dykes and plugs the world's floor (they are rooted there and narrow
 upwards to their top), for a stock the middle of its own thickness (Cruden & McCaffrey's law
 on its outline) or of its reach down into the roof of the pluton it rises from. `notes.bake.structure` records
