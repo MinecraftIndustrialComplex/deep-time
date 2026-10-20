@@ -126,6 +126,35 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-20: Mountains eat the world: the continents kept their area but drowned (land 0.30 to 0.16 to 0.18 in 1000 Myr, the dry share of the continental crust 0.71 to 0.32 to 0.39); a lower-crustal flow (PLT-300, PLT-301) and a settling of every continental column to its isostatic height on the mantle's 4 kyr (ISO-078) hold the land at 0.31 and the dry share at 0.66; the archipelago shape remains (coast p50 130 to 170 km against Earth's 433)
+- **The ask.** Ben, earthlike_quick_16k, supercontinent, 1000 Myr: "mountains will 'eat' the world and delete most of the continents and leave things as a stringy mess of 'islands.'"
+- **The budget** (`DEEPTIME_CRUST_BUDGET=1`, `plates/crust_budget.rs`, PLT-302; `DEEPTIME_CRUST_BUDGET_MAPS=<dir>` writes the visible samples; read with `tools/review/continent-budget.py`): the stocks every 50 Myr booked to the plate step's processes. Measurement only (test `the_crust_budget_changes_nothing`).
+  - The continental area holds (0.42 at the start, 0.39 to 0.47 at the end); the land and the freeboard go. Every thickness band stands 1.1 to 1.9 km under its Airy height.
+  - The cause, on master c88c2eb5: nothing returns a column to its isostatic height (`collapse::toward`, collapse.rs:205, and every process's own height line); arcs turn continental "whatever its height" at the ocean's line (`finish_samples`, mod.rs:1076: 0.58 of the planet over a run at -3,219 m on 19.6 km of crust); and thickened crust keeps its root, since the collapse releases only quiet crust (collapse.rs:241 to 252) into room thinner than normal (collapse.rs:328 to 351): 4.1 of 33 km³ a year moves.
+  - Earth: 0.41 continental, 0.71 of it dry (Cogley 1984, HYP-012); coast p50 433 km (HYP-035, new, `tools/review/earth-coast.py` on SRTM15+ 15', at the quick presets' 100,000 points).
+- **The fix.**
+  - `plates/flow.rs` (PLT-300, PLT-301): continental crust thicker than 50 km diffuses its thickness into the crust around it on its plate, K = K0 (h/15 km)^3, h = T - 50 km capped at 30 km, K0 `crust_channel_km2_myr` 1,500 km²/Myr (Rey, Teyssier & Whitney 2010's 150 km in 15 Myr). Volume kept to a millionth (test).
+  - `plates/settle.rs` (ISO-078): every visible continental column moves to z_A above the sea, s + (z_A - s) x 1.454 below it, plus the flexure, with `isostasy_relax_myr` 0.004 Myr (Wieczerkowski, Mitrovica & Wolf 1999, abstract, 3 to 5 kyr): complete each step. Tried and dropped: McKenzie 1978's 62.8 Myr (land 0.24), 10 Myr (0.27), 0.5 Myr (0.34; it and 4 kyr differ within a run's chaos).
+  - Both run after the collapse and before the rate limits; set in the default and the twelve earthlike, pipeline and plates presets.
+  - The settling's and the collapse's held sums are now in sample order: a parallel float sum changed the globals' last bits from run to run (test "the worlds differ").
+  - Tests: the weld tests' seed 3 no longer welds in 300 Myr; seed 14 does (14 of seeds 3 to 24 weld). New flow test.
+  - Ledger ids PLT-300 to PLT-302: renumbered from PLT-293 to PLT-295, which the ocean-crust agent took.
+- **Measured** (VM, `env T=8 tools/review/force-balance-ensemble.sh <out> <bin> 1000 <seeds> <start> hyps <label> +DEEPTIME_CRUST_BUDGET=1 [+DEEPTIME_CRUST_BUDGET_MAPS=<dir>]`, master = c88c2eb5 with the budget; end of run, mean of seeds 1 to 3):
+
+  | | land | continental crust under the sea | above 2 km, of land | coast p50 km | continental crust | T, degC |
+  |---|---|---|---|---|---|---|
+  | quick, supercontinent, master | 0.178 | 0.61 | 0.251 | 169 | 0.417 | 16.7 |
+  | quick, supercontinent, fix | 0.310 | 0.34 | 0.285 | 166 | 0.432 | 15.6 |
+  | quick, scattered, master | 0.155 | 0.68 | 0.282 | 162 | 0.426 | 19.5 |
+  | quick, scattered, fix | 0.305 | 0.33 | 0.354 | 148 | 0.408 | 16.6 |
+  | full 16k, scattered 1, master | 0.221 | 0.46 | 0.400 | 163 | 0.386 | 19.3 |
+  | full 16k, scattered 1, fix | 0.317 | 0.35 | 0.350 | 129 | 0.442 | 15.0 |
+  | Earth | 0.289 | 0.29 | 0.102 | 433 | 0.41 | |
+
+  - Climate: colder on six of seven pairs (2.2 to 4.3 degC), natural CO2 lower on five (full: 1,461 to 810 ppm). Köppen E share of land 0.23 to 0.33 (supercontinent), 0.28 to 0.40 (scattered), 0.41 to 0.33 (full).
+  - Sea floor: the drowned continental crust is shallower (median 1.2 to 0.4 to 0.6 km) and smoother; the shallowest tenth of the ocean floor rises (p90 -1.3 to -1.9 km to -0.5 to -0.9 km); neighbour relief between sea samples shows no consistent change.
+  - Gates (VM): fmt, clippy, `cargo test --workspace` (deeptime-core lib 743 passed), `cargo deny check licenses bans`, `./gradlew build test` (365 tests, 0 failures, 2 skipped). No fixture regenerated (the parity worlds come from `deeptime synth` at test time).
+- **Not done, and next.** The shape: the land is still belts and island strings, coast p50 130 to 170 km against 433 (409 at 250,000 points), and the land above 2 km is 0.29 to 0.35 of land against 0.10. Next: measure the three leads one by one (collisions turning area into thickness, 18 km³ a year kept; island-arc crust on thin strings, 4.1 km³ a year against Earth's 1.5; the resampling filling continental gaps with ocean floor, 15.9 of the planet's worth of samples over a run), then the width of the thickness distribution under the Airy line. The transition's width (PLT-262) is Ben's and was not changed. `editor_fields.json` does not list the two new parameters.
 ### 2026-10-19: The present-day nudge's cap: the 1000 Myr hothouse ends (10,011 ppm on master) were the temperate nudge multiplying the natural CO2 by up to x12.6, not the carbon cycle; a temperate present now raises CO2 by at most x1.75, and full 16k's 1000 Myr ends fall from a median 8,867 to 1,510 ppm (24.7 to 18.5 degC); the Köppen floors are tested by a 99 % Wilson bound (coordinator's task; agent worktree agent-ae6030c66af57f107, branch worktree-agent-ae6030c66af57f107 from master 26ce664e; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **The cause.**
   - The end CO2 is the temperate present's factor times the natural CO2 (CLM-148 to CLM-151):
