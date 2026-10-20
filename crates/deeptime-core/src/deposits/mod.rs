@@ -3976,7 +3976,8 @@ mod tests {
         let host = |c: u8| c == 1;
         // A neighbour whose limestone dips to 63..=58: the body keeps the shared 61 to 63.
         let dip = vec![(70, 63, 0u8), (63, 57, 1), (57, 40, 2), (40, -61, 1)];
-        let (mid, half) = host_horizon(&col, &[dip.clone()], host, 70.5, 64.0, -64).unwrap();
+        let (mid, half) =
+            host_horizon(&col, std::slice::from_ref(&dip), host, 70.5, 64.0, -64).unwrap();
         assert_eq!((mid, half), (62.5, 1.5));
         // A neighbour where the limestone passes into shale (a facies change): the shallow
         // horizon does not run through, so the body goes to the dolostone that does.
