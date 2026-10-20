@@ -879,6 +879,7 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     let mut life = CollisionLives::default();
     let (mut arc_cells_seen, mut mix_seen) = (0u64, 0.0f64);
     let (mut mix_fronts, mut recorded_fronts) = (0.0f64, 0.0f64);
+    let (mut worst_excess, mut worst_step) = (0.0f64, 0u64);
     let (mut balance_steps, mut longest_slab) = (0u64, 0.0f64);
     let mut deaths_before = 0;
     let mut prev_omega: BTreeMap<u32, glam::DVec3> = BTreeMap::new();
@@ -958,10 +959,14 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         assert!(step.pieces.first().copied().unwrap_or(0) <= loose.first().copied().unwrap_or(0));
         assert!(step.pieces.len() >= loose.len().min(dynamics::PIECES_KEPT));
         // The boundary mix: every kind is a length; the subducting fronts (the first two kinds,
-        // oceanic slabs) are the fronts whose lengths the plates record (a collision front pulls
-        // nothing since plate tasks 3 and 4), less their strike-slip stretches, which the mix
-        // counts as transform since 2026-10-20 (PLT-311): never more than the plates' fronts, to
-        // the rounding of a km a plate, and most of them over the run.
+        // oceanic slabs) are nearly the fronts whose lengths the plates record (a collision front
+        // pulls nothing since plate tasks 3 and 4). The two tests differ at the edges since
+        // 2026-10-20 (PLT-310, PLT-311): the mix judges the motion across the boundary's normal,
+        // so it counts a plate's strike-slip stretches as transform, and it counts as a front a
+        // sample whose boundary converges while each of its lattice edges parts, where the plates
+        // (`subduction::fronts_begin`, by single edges) have no front. So a step's mix can exceed
+        // the plates' fronts by a little, and over the run it holds fewer and most of them (this
+        // seed, 2026-10-20: one step of 138 over, by 1.0 % at step 16; 0.72 of them over the run).
         assert!(step.mix_km.iter().all(|&x| x.is_finite() && x >= 0.0));
         let fronts: f64 = step.mix_km[..2].iter().sum();
         let recorded: f64 = step.plates.iter().map(|q| q.front_km).sum();
@@ -969,11 +974,11 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         // in the mix only.)
         let tol = 0.5 * step.plates.len() as f64 + 1.0;
         if st.counters.plate_deaths == deaths_before {
-            assert!(
-                fronts <= recorded + tol,
-                "step {}: mix fronts {fronts} km, plates' fronts {recorded} km",
-                st.step
-            );
+            let excess = (fronts - recorded - tol).max(0.0) / recorded.max(1.0);
+            if excess > worst_excess {
+                worst_excess = excess;
+                worst_step = st.step;
+            }
             mix_fronts += fronts;
             recorded_fronts += recorded;
         }
@@ -1052,8 +1057,13 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     assert!(longest_slab > 0.0, "no slab grew in 300 Myr");
     assert!(mix_seen > 0.0, "no plate boundary recorded in 300 Myr");
     assert!(
-        mix_fronts > 0.5 * recorded_fronts,
+        mix_fronts > 0.5 * recorded_fronts && mix_fronts <= recorded_fronts,
         "the mix's fronts {mix_fronts} km against the plates' {recorded_fronts} km"
+    );
+    // A test bound, three times the measured worst (above).
+    assert!(
+        worst_excess <= 0.03,
+        "step {worst_step}: the mix's fronts exceed the plates' by {worst_excess} of them"
     );
     assert!(arc_cells_seen > 0, "no arc cell recorded in 300 Myr");
     let st = with.plates.as_ref().unwrap();
