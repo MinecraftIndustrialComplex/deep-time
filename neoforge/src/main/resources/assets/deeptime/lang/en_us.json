@@ -529,6 +529,8 @@
   "deeptime.customize.preset_value": "Preset: %s",
   "deeptime.customize.range": "%s to %s",
   "deeptime.customize.range.unit": "%s to %s %s",
+  "deeptime.customize.range.min": "%s or more",
+  "deeptime.customize.range.min.unit": "%s %s or more",
   "deeptime.customize.range.toggle": "on or off",
   "deeptime.customize.range.choices": "%s choices",
   "deeptime.customize.range.list": "from the pack's lists",

@@ -64,18 +64,28 @@ From top to bottom:
   million years ago", "Writing your world…", "Your planet's history is complete. Press Play to
   explore it."
 - **A real progress bar** with the time left, "expected to take 9 min" before it starts and "took 8
-  min" after it ends.
+  min" after it ends. The bar and the time left follow the estimate's stage seconds (`model.Estimate`:
+  the coupled plates group is about three quarters of a run, not one stage in nine), paced by the
+  run's own speed so far, and count the bake (writing the world, about 0.8 of amplify's time) after
+  the stages; the session's own equal-weight total is used only when no estimate matches the run.
 - **One time convention everywhere** (`model.Phrase`): "N million years ago" (billion and thousand
   where they read better). The ticker's "t = 640 Myr" and "-360 Ma" are gone.
-- **The map**, with the time scrubber, play/pause and "● Live" under it. "Stop here" and "Pick this
-  epoch" are optional and stay beside the scrubber.
+- **The map**, with the time scrubber, play/pause and "● Newest map" under it. The status line says
+  where the run is; the scrubber says what the map shows ("Map: 250 million years ago"). The map is a
+  keyframe, so while the run goes it can be up to one keyframe behind the status line, and the
+  scrubber's tooltip says so. "Stop here" and "Pick this epoch" are optional and stay beside the
+  scrubber. Where the panel sits beside the map (a wide window), the map spans its column at the
+  projection's π:1, top-aligned, and the band under the time row shows the layer's key (the same
+  `model.Legend` as the Map tab, cut with "…" when it does not fit).
 - **A panel with three tabs**:
   - **History**: the event log grouped and counted (`model.Milestones`). It is cut into time
     windows (a fiftieth of the run, at least 1 Myr), with one row per kind per window ("8 new
     ocean ridges formed"), newest first (by window, then by the row's newest event), so the time
     column reads in order. Each row has its kind's colour, the same as the map's markers, so the
     list is also the markers' legend. Event kinds from the Rust core are mapped to player text on
-    the Java side (`deeptime.milestone.<kind>`, `.many`); no Rust event was renamed.
+    the Java side (`deeptime.milestone.<kind>`, `.many`); no Rust event was renamed. A row's text
+    wraps to two lines (`model.TextWrap`), and every phrase fits two lines of the narrowest column
+    (100 px at 1920x1080, GUI scale auto) with a three-digit count (TextWrapTest).
   - **Map**: layer groups and layers, "Show as a globe" and "Show events on the map", and the shown
     layer's **legend** (`model.Legend`). The legend is read from the same `ramps.json` the picture is
     coloured with:
@@ -96,7 +106,8 @@ From top to bottom:
 
 On a tall window (2000x1500) the map spans the width and the panel sits below it, with History and
 Map side by side. On a wide one (1920x1080) the panel sits beside the map. Nothing is cut off at GUI
-scale 3. Long labels are trimmed with "…" and shown whole in their tooltip.
+scale 3. Text that can run long wraps to two lines; what still does not fit ends in "…" at a word
+and is shown whole in its tooltip.
 
 ## 3. Customize (power users)
 
@@ -108,7 +119,8 @@ settings in 18 sections today).
 ### Topics
 
 `model.CustomizeTopics` sorts the catalogue into six tabs. Inside a tab the everyday sections come
-first and the fine-tuning (`adv_*`) sections after them, each under its own heading.
+first and the fine-tuning (`adv_*`) sections after them, each under its own heading. The tab's own
+description (its button's tooltip) sits above the first heading.
 
 | Tab | Catalogue sections |
 |---|---|
@@ -124,9 +136,11 @@ first and the fine-tuning (`adv_*`) sections after them, each under its own head
 Every setting is one row:
 
 - its label;
-- on the second line, its one-line effect (the catalogue's hint, cut to fit; the whole hint is in the
-  tooltip);
-- its unit and range, right-aligned ("0.1 to 99.9 m/s²", "on or off", "3 choices");
+- on the next two lines, what it does: as many whole sentences of the catalogue's hint as fit
+  (`TextWrap.summary`), else its first sentence cut at a word with "…" (before an open bracket when
+  the cut would fall inside one); the whole hint is in the tooltip anywhere on the row but the control;
+- its unit and range, right-aligned at the right of the first of those lines, the description
+  running up to it ("0.1 to 99.9 m/s²", "on or off", "3 choices", "0 or more" for the seed);
 - its control:
   - a number box, red while the text is not valid;
   - an on/off button;
@@ -171,7 +185,11 @@ in catalogue order, each with its path on the second line, so a setting can be f
   - LegendTest: every ramp has a legend, units;
   - CustomizeTopicsTest: every setting in exactly one tab, everyday before fine-tuning, search,
     ranges, the slow warning;
-  - EditorModelTest: the one-click defaults, generate, changes and resets.
+  - EditorModelTest: the one-click defaults, generate, changes and resets;
+  - TimelapseModelTest: the bar and the time left against a real run's stage timings, the bake;
+  - TextWrapTest: wrapping and cutting, every History phrase in two lines of the narrowest column,
+    every setting's summary in its two lines (with a model of the font's widths that is never
+    narrower than the real one).
 - ScreenSourcesTest: every language key the screens name exists, including the run-time keys (event
   kinds, stages, legend codes, tabs, headings), and no en_us value has an em dash.
 - The client walk (`tools/client/vm-client.sh`, `ScreenshotDriver`) shoots each step on the test VM:

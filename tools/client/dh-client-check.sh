@@ -119,9 +119,18 @@ if [ -f "$DHC" ]; then
 else
     printf '[client]\n\t[client.advanced]\n\t\t[client.advanced.autoUpdater]\n\t\t\tenableAutoUpdater = false\n' > "$DHC"
 fi
-MESA=$(nix build --no-link --print-out-paths nixpkgs#mesa | head -1)
-GLVND=$(nix build --no-link --print-out-paths nixpkgs#libglvnd | head -1)
-XVFB=$(nix build --no-link --print-out-paths nixpkgs#xorg.xorgserver | head -1)/bin/Xvfb
+# The client's JVM, Mesa, libglvnd, Xvfb and PulseAudio come from the flake's own nixpkgs
+# (flake.lock), as in tools/client/vm-client.sh. Mesa's driver loads inside the JVM, which has
+# already loaded its own revision's libraries (libstdc++, zlib, ...) by soname; a Mesa from another
+# revision (the registry's, or smoke/tools.env's JDK against the pinned Mesa) then fails to load
+# there and GLFW sees "GLX: No GLXFBConfigs returned" while glxinfo on the same display works
+# (2026-10-19). The server keeps smoke/tools.env's JDK: it loads no GL. portablemc only launches
+# the JVM, so the registry's serves.
+pinned() { nix build --no-link --print-out-paths --inputs-from "$REPO" "nixpkgs#$1" | head -1; }
+CJAVA=$(pinned jdk21)/bin/java
+MESA=$(pinned mesa)
+GLVND=$(pinned libglvnd)
+XVFB=$(pinned xorg-server)/bin/Xvfb
 rm -f "$CL/xvfb.log"
 PMC=$(nix build --no-link --print-out-paths nixpkgs#portablemc | head -1)/bin/portablemc
 # The GL environment is exported before Xvfb starts: without it the X server has no GLX
@@ -132,7 +141,7 @@ export DISPLAY=$DISP LD_LIBRARY_PATH="$MESA/lib:$GLVND/lib" __GLX_VENDOR_LIBRARY
 # Sound goes to a PulseAudio server of the check's own with a null sink: with the session's
 # half-working PulseAudio the client JVM aborted while starting its sound engine (2026-10-03:
 # "Assertion 'p' failed at ../src/pulse/simple.c:273"), and without OpenAL Minecraft does not start.
-PA=$(nix build --no-link --print-out-paths nixpkgs#pulseaudio | head -1)/bin/pulseaudio
+PA=$(pinned pulseaudio)/bin/pulseaudio
 PADIR=$(mktemp -d /tmp/dhcc-pulse.XXXXXX)
 PULSE_RUNTIME_PATH="$PADIR" HOME="$PADIR" setsid "$PA" -n --daemonize=no --exit-idle-time=-1 --use-pid-file=no \
     --disable-shm=yes --load="module-native-protocol-unix socket=$PADIR/native auth-anonymous=1" \
@@ -152,7 +161,7 @@ joined=0
 for attempt in 1 2 3; do
     start_xvfb
     say "== client joins 127.0.0.1:$GAME (attempt $attempt)"
-    setsid "$PMC" --main-dir "$CL/pmc" start "neoforge::$NEO" --mc-dir "$CL/game" --jvm "$JAVA" \
+    setsid "$PMC" --main-dir "$CL/pmc" start "neoforge::$NEO" --mc-dir "$CL/game" --jvm "$CJAVA" \
         --jvm-arg=-Xmx6G --jvm-arg=-XX:ActiveProcessorCount=6 "${JVMX[@]}" \
         -u DeepTimeProbe --resolution 1280x720 \
         --join-server 127.0.0.1 --join-server-port "$GAME" > "$CL/client-$attempt.log" 2>&1 < /dev/null &
