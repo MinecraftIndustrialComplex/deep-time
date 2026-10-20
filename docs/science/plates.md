@@ -2641,8 +2641,8 @@ six runs' range):
 On the branch the switch takes the felsic rock off 0.30 of the ocean basins and moves the land to
 0.27, the high ground and coast within the seeds' spread, and the plate checks hold (27 to 28). It
 was the coordinator's call (decisions log 2026-10-20, "off until the high-ground fix lands"), and
-on these numbers it went on in every shipped preset (`earthlike_*`, `pipeline_*`, `plates_*`;
-decisions log 2026-10-20, the second PLT-294 entry): the land holds near Earth's 0.29 on both starts
+on these numbers it went on in every shipped preset (`earthlike_*` and `pipeline_*`; decisions
+log 2026-10-20, the second PLT-294 entry; the plate pipeline's `plates_*` keep the code's default): the land holds near Earth's 0.29 on both starts
 and the ocean basins' felsic share falls from 0.76 to 0.46. The high ground does not move one way
 (better on the quick ensemble, worse on the single full run, seed 1: land above 2 km 0.299 / 0.314
 off, 0.380 / 0.455 on) and belongs to the high-ground work.

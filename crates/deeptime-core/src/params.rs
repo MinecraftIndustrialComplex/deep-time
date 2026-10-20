@@ -747,7 +747,7 @@ impl Default for TectonicParams {
             uplift_max_mm_yr: 3.5,          // ledger: PLT-288
             transition_width_km: 200.0,     // ledger: PLT-262
             transition_myr: 20.0,           // ledger: PLT-263
-            transition_ocean_crust: false,  // ledger: PLT-294 (game-choice; true in every shipped preset, decisions log 2026-10-20)
+            transition_ocean_crust: false,  // ledger: PLT-294 (game-choice; presets set true)
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
             continent_elevation_m: [150.0, 900.0],
