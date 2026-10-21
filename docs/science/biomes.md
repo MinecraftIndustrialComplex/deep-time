@@ -341,7 +341,9 @@ game choices but the vanilla depth band of BIO-112):
   pond came from a hot-springs cell 17 blocks away. A lake feature carves up to 14 blocks east and south of
   its origin (vanilla 1.21.1's `LakeFeature`, whose box Biomes O' Plenty's `hot_spring_lake` inherits), a
   disk reaches 6 blocks, and a block takes its biome from a cell up to about 6 blocks off: 6 + 14. A spring
-  within the margin keeps its pool, rim and terraces but stands in the flat's biome. "Where the climate
+  within the margin keeps its pool, rim and terraces but stands in the flat's biome. The test planet after
+  the arc work (master 9c9c2012) has no playa, so the margin read is held by a unit test on a constructed
+  layer (`PlayaTest`) as well as by the GameTest on a planet that has one. "Where the climate
   allows" means the climate point
   lies inside that biome's own temperature and humidity ranges in the pack's parameter list (Terralith puts
   ashen savanna on the warm band at dry to middling humidity), so the rule follows whatever biome a pack
