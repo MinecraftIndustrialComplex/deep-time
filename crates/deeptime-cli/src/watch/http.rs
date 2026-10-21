@@ -331,7 +331,6 @@ fn frame_png(run: &Run, rest: &str) -> Response {
     }
 }
 
-
 /// Server-sent events until the page goes away or the run's stream ends (`bye`).
 fn stream_events(run: Arc<Run>) -> Reply {
     Reply::Stream(Box::new(move |w: &mut SseWriter<'_>| {
@@ -356,7 +355,12 @@ mod tests {
     #[test]
     fn loopback_names_and_the_tailnet_only_when_allowed() {
         use mic_viewer::http::host_allowed;
-        for ok in ["localhost", "localhost:8642", "127.0.0.1:8642", "[::1]:8642"] {
+        for ok in [
+            "localhost",
+            "localhost:8642",
+            "127.0.0.1:8642",
+            "[::1]:8642",
+        ] {
             assert!(host_allowed(ok, false), "{ok}");
         }
         for tail in [
@@ -368,7 +372,12 @@ mod tests {
             assert!(!host_allowed(tail, false), "{tail} without --allow-tailnet");
             assert!(host_allowed(tail, true), "{tail} with --allow-tailnet");
         }
-        for no in ["evil.example.com", "evil.example.com:8642", "", "m6.local.example:1"] {
+        for no in [
+            "evil.example.com",
+            "evil.example.com:8642",
+            "",
+            "m6.local.example:1",
+        ] {
             assert!(!host_allowed(no, true), "{no}");
         }
     }
