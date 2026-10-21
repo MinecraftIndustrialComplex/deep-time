@@ -130,19 +130,21 @@ def components(p, mask, spacing_km):
     return out
 
 
-def largest_high(p, z, spacing_km, level=3000.0, exclude=None):
+def largest_high(p, z, spacing_km, level=3000.0, exclude=None, mask=False):
     """The largest connected piece of ground above `level` m (a plateau's stand-in, Tibet's is the
-    ground above 3 km): its area (Mkm2, Earth-normalised by the points' share) and median height."""
+    ground above 3 km): its area (Mkm2, Earth-normalised by the points' share) and median height,
+    and with `mask` also its points (a boolean array over the points)."""
     m = z > level
     if exclude is not None:
         m &= ~exclude
     comp = components(p, m, spacing_km)
     if not m.any():
-        return 0.0, float("nan")
+        return (0.0, float("nan"), m) if mask else (0.0, float("nan"))
     c = np.bincount(comp[m])
     k = int(np.argmax(c))
-    sel = comp == k
-    return c[k] / z.size * EARTH_KM2 / 1e6, float(np.median(z[sel]))
+    sel = m & (comp == k)
+    out = (c[k] / z.size * EARTH_KM2 / 1e6, float(np.median(z[sel])))
+    return out + (sel,) if mask else out
 
 
 def coast_metrics(p, z, spacing_km, groups=None, gnames=(), exclude=None, prefix="  "):
@@ -333,7 +335,7 @@ def fields_report(d):
           f" white={white.sum() / max(land.sum(), 1):.4f} glacier={glacier.sum() / max(land.sum(), 1):.4f}"
           f" thick55_km2={(cont & (th >= 55)).sum() * cell_km2 / 1e6:.1f}M"
           f" thick55_z50={pct(z[cont & (th >= 55)], 50):.0f}")
-    a3, z3 = largest_high(xyz(lat[ok], lon[ok]), z[ok], np.sqrt(cell_km2))
+    a3, z3, sel3 = largest_high(xyz(lat[ok], lon[ok]), z[ok], np.sqrt(cell_km2), mask=True)
     age = f.get("plates/orogeny_age_myr")
     hi_age = age[land & (z > 2000)] if age is not None else np.array([])
     n_age = hi_age.size
@@ -341,6 +343,16 @@ def fields_report(d):
     print(f"  the largest ground above 3 km: {a3:.2f} Mkm2, median {z3:.0f} m; the land above 2 km's last"
           f" orogeny p10/50/90 {pct(hi_age, 10):.0f}/{pct(hi_age, 50):.0f}/{pct(hi_age, 90):.0f} Myr old"
           f" ({hi_age.size} of {n_age} with an age)")
+    # Its ice and summer (the plateau-warmth task, CLM-225: the mass-elevation effect should cut
+    # the largest plateau's ice, not remove it).
+    if sel3.any():
+        ice3 = ice[ok][sel3]
+        msg = f"  the largest ground above 3 km: glacier share {(ice3 >= ICE_MIN_M).mean():.3f}"
+        if tw is not None:
+            tw3 = tw[ok][sel3]
+            msg += (f"; warmest month p10/50/90 {pct(tw3, 10):.1f}/{pct(tw3, 50):.1f}/{pct(tw3, 90):.1f} C;"
+                    f" latitude p50 {pct(np.abs(lat[ok][sel3]), 50):.1f}")
+        print(msg)
     # The high plateaus' summer: the warmest month and the equilibrium line on land 3.5 to 5 km
     # high, by latitude band (Tibet's and the Altiplano's latitudes), against the ice there.
     if tw is not None and ela is not None:
