@@ -209,7 +209,7 @@ pub fn run(o: &Options) -> CliResult<()> {
     // The carbon cycle's and the sea level's Earth references (deep-time climate): the weathering
     // kernel Σ a·runoff·e^(k_T(T − 15 °C)) over the land (km²·m/yr, true Earth-normalized areas;
     // `climate::carbon::KERNEL_EARTH`) and the grounded ice of Nye's profile on the glaciated land
-    // (km³; `climate.ice_reference_km3`).
+    // (km³; the sea lacks its water, `sea_level.rs`).
     {
         use deeptime_core::climate::{carbon, ice};
         let es = planet.earth_scale;
@@ -260,10 +260,9 @@ pub fn run(o: &Options) -> CliResult<()> {
             .sum();
         println!(
             "deeptime climate-dem: weathering kernel {kernel:.4e} km²·m/yr over {land_a:.4e} km² of \
-             land (KERNEL_EARTH {:.4e}); grounded ice {vol:.4e} km³ (reference {:.4e}), {:.1} m of \
-             sea level, peak {:.0} m",
+             land (KERNEL_EARTH {:.4e}); grounded ice {vol:.4e} km³, {:.1} m of sea level, peak \
+             {:.0} m",
             carbon::KERNEL_EARTH,
-            p.ice_reference_km3,
             -ice::eustatic_m(vol, ocean),
             thick.iter().cloned().fold(0.0f32, f32::max)
         );

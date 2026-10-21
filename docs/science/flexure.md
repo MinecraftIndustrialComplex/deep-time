@@ -34,7 +34,10 @@ and the spreading of over-thick crust.
    added or removed since the start of the run. Each step it adds: the crust the plate model
    thickened (its uplift), crust moved by spreading, rock eroded or deposited, rock the volcano
    stage laid on top, the change of the sea's depth over the cell, and the land ice the climate
-   stage reports.
+   stage reports. On ocean floor that follows GDH1 (the shipped presets) the sea that fills the
+   floor's own cooling is left out: GDH1's depths are those of floor under water, so that water's
+   weight is in them already (ISO-088; before 2026-10-21 it was loaded again, and old floor sank
+   about 1.45 times GDH1).
 2. **The stiffness.** The effective elastic thickness `Te` says how thick the stiff part of the
    shell is. Ocean floor stiffens with age. Continental crust is weak just after mountain
    building and stiffens over a few hundred million years. Volcanic arcs and rifts are weak. The
@@ -100,6 +103,7 @@ The plate equation, as coded (ISO-040):
 | ISO-076 | Earth's fastest vertical rates | exhumation 9 to 13 mm/yr, rebound 11, subsidence 9 to 12; sustained over millions of years, below 1 mm/yr | mm/yr | Guevara et al. 2022, Govin et al. 2020, Lidberg et al. 2010, Brothers et al. 2009, Garzione et al. 2008, Xie & Heller 2009 and others (the ledger) | `verified` |
 | ISO-077 | Two more fast rates | denudation 8 to more than 30 mm/yr (Taiwan), rebound about 10 (Hudson Bay) | mm/yr | Deng et al. 2021, Sella et al. 2007 | `abstract-only` |
 | ISO-061 to ISO-064 | What counts as a load | see the ledger | | none | `uncited`, one `game-choice` |
+| ISO-088 | The sea over GDH1's own deepening | no load: GDH1 is depth under water | m | Stein & Stein 1992; Kominz et al. 1998 (PLT-353) | `cited-unverified` |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
 ISO-054 and ISO-057 to ISO-060, all `game-choice`.
@@ -129,7 +133,8 @@ the artifact fixes); the sea-depth row is from the final code (law 2.7, after th
 - Every plate boundary is a break, also where two plates slide past each other.
 - On the quick presets a flexural feature is 2 to 8 cells wide.
 - Trenches and the ocean floor's deepening with age are not flexure in the model; they are
-  prescribed by the plate model.
+  prescribed by the plate model, and under GDH1 the water that fills the deepening is no load
+  either (ISO-088).
 - Along active margins the ground still zigzags from cell to cell somewhat more than without
   flexure: narrow loads that are real at this resolution (marine fill of kilometres in trench
   cells) and the load a plate lets go where a plate boundary moves through cells (since

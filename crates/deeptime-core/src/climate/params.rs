@@ -409,16 +409,6 @@ pub struct ClimateParams {
     /// Deep time: the sheet runs this long at every plate step's end climate from the ice the
     /// plates carried, kyr (numerics).
     pub ice_relax_kyr: f64,
-    /// How much ice volume moves sea level (0: the surface section's curve alone; 1: full
-    /// glacio-eustasy, ~2.5 m per 10⁶ km³).
-    pub glacio_eustasy: f64,
-    /// The grounded ice volume the sea-level curve already assumes, Earth-normalized km³: the
-    /// present ice of the calibrated Earth-like 500-Myr runs (0.74–1.28·10⁷ km³ on
-    /// `pipeline_quick_16k`, 2026-09-29), so their calibrated present coastlines hold. (The model
-    /// puts 2.5·10⁷ km³, 61 m of sea level, on Earth's own relief, `deeptime climate-dem`;
-    /// Antarctica and Greenland hold ~3.0·10⁷ km³, 65 m, Fretwell et al. 2013, Morlighem et al.
-    /// 2017.)
-    pub ice_reference_km3: f64,
     /// World time at the run's end, years: not a preset key, set by the stage from the timeline
     /// (`PlanetPreset::t_end_years`). The ice-age window and the orbit are measured from it
     /// (docs/design/playability-steering.md §2); 0 for a run to its planned length.
@@ -547,8 +537,6 @@ impl Default for ClimateParams {
             ice_calving_m_yr: 20.0,                     // ledger: GLA-072
             ice_grid_cells: 256,                        // ledger: GLA-073
             ice_relax_kyr: 30.0,                        // ledger: GLA-074
-            glacio_eustasy: 1.0,
-            ice_reference_km3: 1.0e7,
             run_end_years: 0.0,
         }
     }
@@ -855,8 +843,6 @@ impl ClimateParams {
             (self.ice_isostasy_kyr, "ice_isostasy_kyr", 0.1, 100.0),
             (self.ice_calving_m_yr, "ice_calving_m_yr", 0.0, 1000.0),
             (self.ice_relax_kyr, "ice_relax_kyr", 0.0, 1000.0),
-            (self.glacio_eustasy, "glacio_eustasy", 0.0, 1.0),
-            (self.ice_reference_km3, "ice_reference_km3", 0.0, 1.0e9),
         ] {
             check(
                 v.is_finite() && (lo..=hi).contains(&v),
