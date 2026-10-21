@@ -1175,7 +1175,10 @@ impl ContinentAnchors {
     /// bottom, vanilla's ocean | coast edge), 2.585 at 200 m, 2 (the deep ocean's top) at 2,500 m,
     /// 1.084 at 6,000 m.
     pub fn sea(depth_m: f64) -> f64 {
-        piecewise(&[(0.0, 3.0), (200.0, 2.585), (2500.0, 2.0), (6000.0, 1.084)], depth_m)
+        piecewise(
+            &[(0.0, 3.0), (200.0, 2.585), (2500.0, 2.0), (6000.0, 1.084)],
+            depth_m,
+        )
     }
 }
 
@@ -1311,9 +1314,8 @@ pub fn settle_to_ground(
             }
         }
     }
-    let list = |flips: &[bool]| -> Vec<u32> {
-        (0..n).filter(|&k| flips[k]).map(|k| k as u32).collect()
-    };
+    let list =
+        |flips: &[bool]| -> Vec<u32> { (0..n).filter(|&k| flips[k]).map(|k| k as u32).collect() };
     Settled {
         to_sea: list(&to_sea),
         to_land: list(&to_land),
@@ -2808,10 +2810,16 @@ mod tests {
         // The pocket: the sea's side of the edge, by its depth (35 m: 3 - 0.415 * 35 / 200 = 2.93),
         // the sea's class, no wetland, a sea neighbour's temperature (the nearest sea node, x = 8).
         assert!(!is_land_continentalness(f64::from(c.continents[under_sea])));
-        assert!(f64::from(c.continents[under_sea]) > edge - 0.05, "shallow: near the edge");
+        assert!(
+            f64::from(c.continents[under_sea]) > edge - 0.05,
+            "shallow: near the edge"
+        );
         assert_eq!(c.class[under_sea], koppen::SEA);
         assert_eq!(c.wetland[under_sea], WETLAND_NONE);
-        assert!(c.temperature[under_sea] < 0.0, "the sea's temperature, not the land's");
+        assert!(
+            c.temperature[under_sea] < 0.0,
+            "the sea's temperature, not the land's"
+        );
         // The dry node: the land's side, a beach (one node from the world's sea is half a cell
         // from it), the nearest land node's class, temperature and erosion.
         assert!(is_land_continentalness(f64::from(c.continents[on_dry])));
