@@ -571,11 +571,19 @@ mod tests {
         let ts: Vec<f64> = frames.iter().map(|f| f["t"].as_f64().unwrap()).collect();
         assert!(ts.windows(2).all(|p| p[1] > p[0]), "{ts:?}");
         assert_eq!(*ts.last().unwrap(), 0.0);
-        let streamed: Vec<Value> = msgs
+        // An event sent again (a stage's finish added to it after it streamed) replaces the copy
+        // the page holds, as the page does.
+        let mut streamed: Vec<Value> = Vec::new();
+        for e in msgs
             .iter()
             .filter(|(k, _)| k == "events")
             .flat_map(|(_, v)| v["events"].as_array().unwrap().clone())
-            .collect();
+        {
+            match streamed.iter_mut().find(|s| s["id"] == e["id"]) {
+                Some(held) => *held = e,
+                None => streamed.push(e),
+            }
+        }
         // Both sides read through the same parser from the same text.
         let expected: Vec<Value> = batch_world
             .events

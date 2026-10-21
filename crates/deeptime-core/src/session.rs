@@ -478,6 +478,10 @@ pub struct Session {
     stepper: Mutex<Stepper>,
     /// Events visible to `events_since`, in emission order.
     published: Mutex<Vec<Event>>,
+    /// Indices into `published` of events a stage's finish changed after they were published
+    /// (the volcano stage counts a small arc segment on its subduction onset), in the order they
+    /// changed: `amended_since` hands them to readers that hold the old copy.
+    amended: Mutex<Vec<u64>>,
     events_total: AtomicU64,
     keyframes: KeyframeStore,
     policy: KeyframePolicy,
@@ -963,6 +967,7 @@ impl Session {
             created: Instant::now(),
             finished_ms: AtomicU64::new(NOT_FINISHED),
             published: Mutex::new(world.events.clone()),
+            amended: Mutex::new(Vec::new()),
             events_total: AtomicU64::new(events_total),
             stepper: Mutex::new(Stepper {
                 stages,
@@ -1507,6 +1512,25 @@ impl Session {
         }
     }
 
+    /// A stage's finish may add to events it emitted steps ago: the published copies take the
+    /// new content and their indices go on the `amended` list.
+    fn republish_amended(&self, world: &WorldState) {
+        let mut published = self.published.lock().unwrap_or_else(|e| e.into_inner());
+        let mut changed = Vec::new();
+        for (i, (old, new)) in published.iter_mut().zip(&world.events).enumerate() {
+            if old != new {
+                *old = new.clone();
+                changed.push(i as u64);
+            }
+        }
+        if !changed.is_empty() {
+            self.amended
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .extend(changed);
+        }
+    }
+
     fn take_keyframe(
         &self,
         s: &mut Stepper,
@@ -1654,6 +1678,7 @@ impl Session {
         let name = group_label(&s.stages, &group);
         self.log.push(Level::Info, format!("stage {name} finished"));
         let started = Instant::now();
+        self.republish_amended(&s.world);
         self.publish(&s.world);
         if self.policy.every_years.is_some() {
             let layers = group_layers(&s.stages, &group);
@@ -1827,6 +1852,20 @@ impl Session {
             .min(published.len());
         let to = from.saturating_add(max as usize).min(published.len());
         Value::Array(published[from..to].iter().map(Event::to_json).collect()).to_string()
+    }
+
+    /// The events changed after they were published, from position `cursor` of the amended list
+    /// on: (index in emission order, the event's JSON as `events_since` writes it now), and the
+    /// cursor after them. A reader that already received index `i` replaces its copy.
+    pub fn amended_since(&self, cursor: usize) -> (Vec<(u64, String)>, usize) {
+        let published = self.published.lock().unwrap_or_else(|e| e.into_inner());
+        let amended = self.amended.lock().unwrap_or_else(|e| e.into_inner());
+        let from = cursor.min(amended.len());
+        let out = amended[from..]
+            .iter()
+            .map(|&i| (i, published[i as usize].to_json().to_string()))
+            .collect();
+        (out, amended.len())
     }
 
     /// How long each stage has stepped in this session.

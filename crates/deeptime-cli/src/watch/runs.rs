@@ -772,14 +772,24 @@ impl Workbench {
             events.push(text.to_owned());
             p.events += 1;
         }
-        if !events.is_empty()
+        // Events a stage's finish added to after they streamed: the page replaces its copy (by
+        // id), and the file takes the new text after the old (`restore` keeps the last by id).
+        let (amended, next) = s.amended_since(p.amended);
+        p.amended = next;
+        let amended: Vec<(usize, String)> = amended
+            .into_iter()
+            .map(|(i, text)| (i as usize, text))
+            .filter(|&(i, _)| (i as u64) < p.events - events.len() as u64)
+            .collect();
+        if (!events.is_empty() || !amended.is_empty())
             && let Some(f) = lock(&run.events_file).as_mut()
         {
-            for e in &events {
+            for e in events.iter().chain(amended.iter().map(|(_, t)| t)) {
                 writeln!(f, "{e}")?;
             }
             f.flush()?;
         }
+        run.live.amend(amended);
         let due = force
             || !frames.is_empty()
             || !events.is_empty()
@@ -814,9 +824,33 @@ impl Workbench {
 struct Published {
     frames: u32,
     events: u64,
+    /// Position in the session's list of amended events (`Session::amended_since`).
+    amended: usize,
     progress_at: Option<Instant>,
     /// The deposit stage's sites have been taken for the page's overlay.
     deposits: bool,
+}
+
+/// The events file's lines in emission order, an event written again (amended after it streamed)
+/// in its first place with its last text.
+fn last_by_id(lines: impl Iterator<Item = String>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut at: std::collections::HashMap<u64, usize> = std::collections::HashMap::new();
+    for line in lines {
+        let id = serde_json::from_str::<Value>(&line)
+            .ok()
+            .and_then(|v| v["id"].as_u64());
+        match id.and_then(|id| at.get(&id).copied()) {
+            Some(i) => out[i] = line,
+            None => {
+                if let Some(id) = id {
+                    at.insert(id, out.len());
+                }
+                out.push(line);
+            }
+        }
+    }
+    out
 }
 
 /// A run read back from its folder.
@@ -841,11 +875,12 @@ fn restore(dir: &Path, ramps: &Ramps) -> CliResult<Run> {
         Err(_) => Vec::new(),
     };
     let events = match File::open(dir.join("events.jsonl")) {
-        Ok(f) => BufReader::new(f)
-            .lines()
-            .map_while(Result::ok)
-            .filter(|l| !l.trim().is_empty())
-            .collect(),
+        Ok(f) => last_by_id(
+            BufReader::new(f)
+                .lines()
+                .map_while(Result::ok)
+                .filter(|l| !l.trim().is_empty()),
+        ),
         Err(_) => Vec::new(),
     };
     let preset_json = v["preset_json"].as_str().unwrap_or("").to_owned();
