@@ -3399,6 +3399,26 @@ came with the crust budget's Earth rates and the arcs' basement and fronts (PLT-
 the bisect, `tools/review/out-free/continent-bisect.md`), and the island-arc share fell with it
 toward Earth's.
 
+### The continental area's swing
+
+The sea-level task found the sea swinging about a kilometre because the continental crust's area
+swings within a run (sea-level.md). On the same ensemble, after the first 100 Myr (the dynamics
+records' visible continental samples; `build/pg/swing.py` in the build log):
+
+| | master = branch | r1 | r3 | i1 | r3i |
+|---|---|---|---|---|---|
+| continental crust, lowest and highest step (mean of the runs) | 0.312, 0.489 | 0.271, 0.471 | 0.272, 0.486 | 0.303, 0.495 | 0.277, 0.487 |
+| the same, over all six runs | 0.276 to 0.523 | 0.256 to 0.520 | 0.225 to 0.525 | 0.268 to 0.533 | 0.241 to 0.528 |
+| at 100 Myr and at the end | 0.457, 0.381 | 0.447, 0.317 | 0.458, 0.298 | 0.459, 0.342 | 0.458, 0.328 |
+| trend, share of the planet per 100 Myr | −0.001 | −0.009 | −0.013 | −0.010 | −0.009 |
+| range about the trend | 0.176 | 0.164 | 0.139 | 0.149 | 0.169 |
+| the largest change within 50 Myr | 0.096 | 0.098 | 0.090 | 0.090 | 0.092 |
+| the sea floor's median age, lowest and highest step of any run, Myr | 40 to 108 | 34 to 105 | 41 to 101 | 42 to 104 | 40 to 101 |
+
+The continental crust's area moves by up to a tenth of the planet within 50 Myr in every arm. The
+branch does not change that (its runs are master's); the reversal arms add a downward trend, their
+collisions' losses, and keep the swing about it. The swing is not the plate geometry's to fix.
+
 ### What is left, and for whom
 
 1. *The boundaries' orientation* (Ben's: how plates are made and moved, big scope): the
