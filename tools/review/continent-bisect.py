@@ -26,6 +26,11 @@ the elevation above the climate stage's sea level (`climate/sea_level_m`):
   arc       the island-arc share of the land (the crust budget's `cb_origin`, DEEPTIME_CRUST_BUDGET=1,
             the L0 samples; only where the commit has it: 4b615b24 on)
 
+The sea level is `climate/sea_level_m` of `globals.json` where `dump-fields` writes one (a later
+commit), else the `sea_level_m=` of the stage's printed `surface_final` line (one decimal: under
+0.05 m, which moves no cell count past the printed `check`). A run's time is its printed `t_years`
+(0 at the end of the planned run, -500000000 for a stop at 500 Myr of 1000).
+
 A landmass is a set of land cells joined by an edge or a corner (8-neighbours), wrapped east-west
 across the seam. The cross-check against the stage's own printed `hypsometry` line (land_frac_area,
 continental_frac, continental_dry, land_above_2km) is reported as `check` (largest difference).
@@ -110,25 +115,40 @@ def hypsometry(text):
     return kv_line(m.group(0), "hypsometry") if m else {}
 
 
-def island_arc_share(text, t_target):
-    """The island-arc share of the land at the `cb_origin` snapshot nearest `t_target` Myr (the
-    last one when t_target is None); None when the commit has no such line."""
+def run_time_myr(text):
+    """The run's final time in Myr from the stage's `t_years=` (0: the end of the planned run)."""
+    m = re.search(r"stage volcanoes: steps=\d+ t_years=(-?[0-9.e+]+)", text)
+    return float(m.group(1)) / 1.0e6 if m else None
+
+
+def island_arc_share(text):
+    """The island-arc share of the land at the run's final time: the `cb_origin` snapshot at that
+    time (DEEPTIME_CRUST_BUDGET=1 writes one at the end); None when the commit has no such line."""
     snaps = {}
     for m in re.finditer(r"^cb_origin t=(-?[0-9.]+) island_arc=\[land=([0-9.]+)", text, re.M):
         snaps[float(m.group(1))] = float(m.group(2))
-    if not snaps:
+    t_end = run_time_myr(text)
+    if not snaps or t_end is None:
         return None
-    if t_target is None:
-        return snaps[max(snaps)]
-    t = min(snaps, key=lambda x: abs(x - t_target))
-    return snaps[t] if abs(t - t_target) <= 20 else None
+    t = min(snaps, key=lambda x: abs(x - t_end))
+    return snaps[t] if abs(t - t_end) <= 5 else None
 
 
-def measure(folder, txt, stop_myr):
+def printed_sea_level(text):
+    m = re.search(r"stage volcanoes: surface_final=\d+ .*?sea_level_m=(-?[0-9.]+)", text)
+    return float(m.group(1)) if m else None
+
+
+def measure(folder, txt):
     folder = Path(folder)
+    text = Path(txt).read_text(errors="replace") if Path(txt).exists() else ""
     index = json.loads((folder / "index.json").read_text())
-    globals_ = json.loads((folder / "globals.json").read_text())
-    sea = globals_["globals"]["climate/sea_level_m"]
+    if (folder / "globals.json").exists():
+        sea = json.loads((folder / "globals.json").read_text())["globals"]["climate/sea_level_m"]
+    else:
+        sea = printed_sea_level(text)
+        if sea is None:
+            raise ValueError(f"{folder}: no sea level (no globals.json, no surface_final line)")
     g = index["surface/elevation_m"]
     w, h, r = g["w"], g["h"], g["r"]
     elev = read_f32(folder / g["file"])
@@ -165,8 +185,7 @@ def measure(folder, txt, stop_myr):
         "pieces": float(len(sizes)),
         "sea_m": sea,
     }
-    text = Path(txt).read_text(errors="replace") if Path(txt).exists() else ""
-    arc = island_arc_share(text, stop_myr)
+    arc = island_arc_share(text)
     if arc is not None:
         out["arc"] = arc
     hyp = hypsometry(text)
@@ -227,9 +246,9 @@ def main():
                 for seed in seeds:
                     name = f"{start}-{seed}-{stop}"
                     fdir = root / "fields" / c / name
-                    if not (fdir / "globals.json").exists():
+                    if not (fdir / "index.json").exists():
                         continue
-                    res = measure(fdir, root / "runs" / c / f"{name}.txt", float(stop))
+                    res = measure(fdir, root / "runs" / c / f"{name}.txt")
                     results.append((seed, res))
                     rows_csv.append(
                         f"{c},{start},{seed},{stop},"
