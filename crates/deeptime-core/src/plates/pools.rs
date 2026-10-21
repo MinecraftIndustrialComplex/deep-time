@@ -29,8 +29,23 @@
 //! z −= (1 − z / z_t)·ε_o·δt, and sediment accretion in trenches z += ε_t·δt. Continental erosion
 //! removes rock ρ_m / (ρ_m − ρ_c) ≈ 5.5 times the surface lowering from the pools (Airy isostasy,
 //! mantle 3,300 and crust 2,700 kg/m³), since Cortial's z is the surface.
+//!
+//! # The ocean floor's age–depth law (`tectonics.ocean_depth`)
+//! Cortial's dampening relaxes every oceanic height towards one floor, so whatever stands on old
+//! floor (the sediment the surface lays, a margin's thicker crust) sinks back to it at the same
+//! rate as the floor's own cooling: on the quick planet's old enclosed floor about 48 m/Myr,
+//! where Earth's cooling gives about 2 (rivers-and-lakes.md, "Basins that outlast their
+//! sediment"). `ocean_depth: gdh1` (every shipped Earth-like preset) instead sinks each sample
+//! by what its age sinks bare ocean floor under water, Stein & Stein's GDH1 (1992):
+//! d(t) = 2,600 + 365·√t m up to 20 Myr and 5,651 − 2,473·e^(−0.0278·t) after, so the step
+//! takes d(t) − d(t − δt) whatever stands on the sample. Its load stays: the sediment and its
+//! water's flexure are the surface's (`surface/flexure.rs`), and the room they take raises the sea
+//! (`sea_level.rs`). Above the sea the cooling column sinks the dry share, d′/W with W the
+//! water-loaded factor ρ_m/(ρ_m − ρ_w) (`settle::WATER_LOADED`). New floor starts at the ridge's
+//! 2,600 m. ledger: PLT-129 (the old rule), PLT-352 (the law), PLT-353 (the dry share).
 
 use super::state::{OCEANIC, Sample, TRENCH, pool};
+use crate::params::{OceanDepth, TectonicParams};
 
 /// Density of sediment for lithification, kg/m³ (tectonics.js uses 1,500).
 const RHO_SEDIMENT: f64 = 1500.0;
@@ -201,6 +216,13 @@ pub struct SurfaceRates {
     pub z_floor: f64,
     pub trench_relax: f64,
     pub gravity: f64,
+    /// The ocean floor's law (`tectonics.ocean_depth`).
+    pub law: OceanDepth,
+    /// The step's end and length, Myr (the floor's age, under [`OceanDepth::Gdh1`]).
+    pub t_myr: f64,
+    pub dt_myr: f64,
+    /// The sea level the step starts under, m (the dry share, under [`OceanDepth::Gdh1`]).
+    pub sea_m: f64,
 }
 
 /// The share of the way to z_t a trench sample moves in a step of `dt_myr`: it closes half the
@@ -216,13 +238,27 @@ pub fn surface_step(s: &mut Sample, r: &SurfaceRates, held_floor: f32) -> f64 {
     let mut z = f64::from(s.elevation_m);
     let mut eroded = 0.0;
     if s.kind == OCEANIC {
-        // z −= (1 − z/z_f)·ε_o·δt, the relaxation towards z_f at the rate ε_o / |z_f|; towards
-        // the held floor at the same rate where the crust holds one.
-        if held_floor.is_finite() {
-            let floor = f64::from(held_floor).max(r.z_floor);
-            z -= (z - floor) / -r.z_floor * r.damping_m;
-        } else {
-            z -= (1.0 - z / r.z_floor) * r.damping_m;
+        match r.law {
+            OceanDepth::Dampening => {
+                // z −= (1 − z/z_f)·ε_o·δt, the relaxation towards z_f at the rate ε_o / |z_f|;
+                // towards the held floor at the same rate where the crust holds one.
+                if held_floor.is_finite() {
+                    let floor = f64::from(held_floor).max(r.z_floor);
+                    z -= (z - floor) / -r.z_floor * r.damping_m;
+                } else {
+                    z -= (1.0 - z / r.z_floor) * r.damping_m;
+                }
+            }
+            OceanDepth::Gdh1 => {
+                // What the step's cooling sinks bare floor of this age, whatever stands on it.
+                let age = s.age_myr(r.t_myr);
+                let sink = gdh1_depth_m(age) - gdh1_depth_m(age - r.dt_myr);
+                z -= if z > r.sea_m {
+                    sink / super::settle::WATER_LOADED // ledger: PLT-353
+                } else {
+                    sink
+                };
+            }
         }
         if !s.is_hidden() {
             s.pools[pool::SEDIMENT] += r.pelagic_m as f32;
@@ -244,9 +280,42 @@ pub fn surface_step(s: &mut Sample, r: &SurfaceRates, held_floor: f32) -> f64 {
     eroded
 }
 
+/// GDH1's depth of bare ocean floor `age_myr` old under water, m below the sea (Stein & Stein
+/// 1992): 2,600 + 365·√t up to 20 Myr, 5,651 − 2,473·e^(−0.0278·t) after (the two meet within
+/// 0.3 m). Ages below 0 are the ridge's. ledger: PLT-352
+pub fn gdh1_depth_m(age_myr: f64) -> f64 {
+    let t = age_myr.max(0.0);
+    if t < GDH1_KNEE_MYR {
+        GDH1_RIDGE_M + 365.0 * t.sqrt()
+    } else {
+        GDH1_FLOOR_M - 2473.0 * (-0.0278 * t).exp()
+    }
+}
+
+/// GDH1's ridge depth and the depth old floor flattens towards, m (Stein & Stein 1992).
+/// ledger: PLT-352
+pub const GDH1_RIDGE_M: f64 = 2600.0;
+pub const GDH1_FLOOR_M: f64 = 5651.0;
+/// GDH1's age where the √t branch hands over to the plate's, Myr. ledger: PLT-352
+const GDH1_KNEE_MYR: f64 = 20.0;
+
+/// The height of bare ocean floor `age_myr` old under the preset's law (`tectonics.ocean_depth`),
+/// m: GDH1's depth below the datum (Earth's sea today), or the dampening's closed form
+/// [`ocean_elevation`]. The floor a ridge, a gap or the first ocean is made at. ledger: PLT-351
+pub fn floor_at(k: &TectonicParams, age_myr: f64) -> f64 {
+    match k.ocean_depth {
+        OceanDepth::Gdh1 => -gdh1_depth_m(age_myr),
+        OceanDepth::Dampening => ocean_elevation(
+            age_myr,
+            k.ridge_elevation_m,
+            k.oceanic_floor_elevation_m,
+            k.oceanic_damping_mm_yr,
+        ),
+    }
+}
+
 /// Oceanic depth of crust `age_myr` old implied by the dampening from the ridge height towards
-/// the floor z_f: z(a) = z_f + (z_r − z_f)·exp(−a·ε_o / |z_f|). Cortial's z_f is the trench depth;
-/// the pipeline presets' (`oceanic_floor_elevation_m`) follows GDH1.
+/// the floor z_f: z(a) = z_f + (z_r − z_f)·exp(−a·ε_o / |z_f|). Cortial's z_f is the trench depth.
 pub fn ocean_elevation(age_myr: f64, z_r: f64, z_f: f64, damping_mm_yr: f64) -> f64 {
     let tau_myr = z_f.abs() / (damping_mm_yr * 1.0e-3) / 1.0e6;
     z_f + (z_r - z_f) * (-age_myr.max(0.0) / tau_myr).exp()
@@ -313,6 +382,10 @@ mod tests {
             z_floor: -10_000.0,
             trench_relax: 0.5,
             gravity: 9.81,
+            law: OceanDepth::Dampening,
+            t_myr: 0.0,
+            dt_myr: 1.0,
+            sea_m: 0.0,
         };
         let mut s = Sample::blank(0);
         s.elevation_m = -1000.0;
@@ -325,7 +398,7 @@ mod tests {
             "{} vs {expect}",
             s.elevation_m
         );
-        // A shallower floor (the pipeline presets' GDH1 fit): the steps follow the same closed form.
+        // A shallower floor (the old pipeline presets' fit to GDH1): the same closed form.
         let r = SurfaceRates {
             damping_m: 0.215e-3 * 1.0e6,
             z_floor: -5600.0,
@@ -345,32 +418,58 @@ mod tests {
         assert!(ocean_heat_flow(100.0) > 50.0 && ocean_heat_flow(0.0) == 300.0);
     }
 
-    /// The pipeline presets' floor (−5,600 m at 0.215 mm/yr from a −2,500 m ridge) against Stein &
-    /// Stein's GDH1 (1992): d = 2,600 + 365·√t m up to 20 Myr, 5,651 − 2,473·e^(−0.0278·t) after.
-    /// Cortial's law (towards the −10 km trench at 0.05 mm/yr) is 0.9 km too shallow at 10 Myr
-    /// and 1.6 km too deep at 200.
+    /// Stein & Stein's GDH1 (1992): d = 2,600 + 365·√t m up to 20 Myr, 5,651 − 2,473·e^(−0.0278·t)
+    /// after (their eqs. 2a and 2b). The rate form sinks a sample by what its age sinks bare
+    /// floor, so a bare sample follows the law exactly, a load on it rides down with it (the
+    /// dampening wore loads away, PLT-129), and ground above the sea sinks by 1/W of it.
     #[test]
     fn the_gdh1_floor_follows_stein_and_stein() {
-        let gdh1 = |t: f64| {
-            if t < 20.0 {
-                2600.0 + 365.0 * t.sqrt()
-            } else {
-                5651.0 - 2473.0 * (-0.0278 * t).exp()
-            }
+        assert_eq!(gdh1_depth_m(0.0), 2600.0);
+        assert_eq!(gdh1_depth_m(-3.0), 2600.0, "a ridge younger than 0");
+        assert!((gdh1_depth_m(10.0) - (2600.0 + 365.0 * 10f64.sqrt())).abs() < 1e-9);
+        // The two branches meet at 20 Myr within 0.3 m.
+        let below = 2600.0 + 365.0 * 20f64.sqrt();
+        assert!((gdh1_depth_m(20.0) - below).abs() < 0.3, "{}", gdh1_depth_m(20.0));
+        assert!((gdh1_depth_m(100.0) - (5651.0 - 2473.0 * (-2.78f64).exp())).abs() < 1e-9);
+        assert!(gdh1_depth_m(1000.0) < GDH1_FLOOR_M && gdh1_depth_m(1000.0) > GDH1_FLOOR_M - 1.0);
+        // Steps of a sample born at the ridge at 0 Myr.
+        let rates = |t: f64| SurfaceRates {
+            erosion_m: 0.0,
+            damping_m: 0.0,
+            accretion_m: 0.0,
+            pelagic_m: 0.0,
+            z_c: 10_000.0,
+            z_t: -10_000.0,
+            z_floor: -GDH1_FLOOR_M,
+            trench_relax: 0.0,
+            gravity: 9.81,
+            law: OceanDepth::Gdh1,
+            t_myr: t,
+            dt_myr: 1.0,
+            sea_m: 0.0,
         };
-        for t in [5.0, 10.0, 20.0, 35.0, 50.0, 80.0, 100.0, 150.0, 200.0] {
-            // The exponential cannot follow GDH1's √t near the ridge: within 0.4 km there, 0.12 km
-            // from 20 Myr on.
-            let tol = if t < 20.0 { 400.0 } else { 120.0 };
-            let z = ocean_elevation(t, -2500.0, -5600.0, 0.215);
-            assert!(
-                (-z - gdh1(t)).abs() < tol,
-                "{t} Myr: {z} vs GDH1 {}",
-                gdh1(t)
-            );
-        }
-        let cortial = |t: f64| -ocean_elevation(t, -2500.0, -10_000.0, 0.05);
-        assert!(gdh1(10.0) - cortial(10.0) > 800.0 && cortial(200.0) - gdh1(200.0) > 1500.0);
+        let run = |z0: f32, sea: f64| {
+            let mut s = Sample::blank(0);
+            s.elevation_m = z0;
+            for k in 1..=100 {
+                let r = SurfaceRates {
+                    sea_m: sea,
+                    ..rates(f64::from(k))
+                };
+                surface_step(&mut s, &r, f32::NAN);
+            }
+            f64::from(s.elevation_m)
+        };
+        let bare = run(-2600.0, 0.0);
+        assert!((bare + gdh1_depth_m(100.0)).abs() < 0.5, "{bare}");
+        // A seamount 1,600 m high keeps its height over the floor.
+        let mount = run(-1000.0, 0.0);
+        assert!((mount - bare - 1600.0).abs() < 0.5, "{mount} vs {bare}");
+        // The same seamount under a sea 6 km down stands dry the whole way and sinks by 1/W.
+        let dry = run(-1000.0, -6000.0);
+        let sink = gdh1_depth_m(100.0) - 2600.0;
+        let expect = -1000.0 - sink / super::super::settle::WATER_LOADED;
+        assert!((dry - expect).abs() < 0.5, "{dry} vs {expect}");
     }
 
     /// The eclogite root (PLT-278 to PLT-280): the normal column and any column whose mafic base

@@ -9,6 +9,7 @@
     "axial_tilt_deg": 23.4,
     "star_flux_rel": 1.0,
     "ocean_fraction": 0.7,
+    "surface_water_m": 2664.0,
     "regime": "mobile_lid"
   },
   "scale": {
@@ -67,7 +68,7 @@
   "tectonics": {
     "time_step_myr": 2.0,
     "model_radius_km": 6370.0,
-    "ridge_elevation_m": -2500.0,
+    "ridge_elevation_m": -2600.0,
     "abyssal_elevation_m": -6000.0,
     "trench_elevation_m": -10000.0,
     "max_elevation_m": 30000.0,
@@ -78,8 +79,8 @@
     "subduction_distance_km": 800.0,
     "max_plate_speed_mm_yr": 250.0,
     "convergence_ref_mm_yr": 100.0,
-    "oceanic_damping_mm_yr": 0.12,
-    "oceanic_floor_elevation_m": -5600.0,
+    "oceanic_floor_elevation_m": -5651.0,
+    "ocean_depth": "gdh1",
     "continental_erosion_mm_yr": 0.0,
     "sediment_accretion_mm_yr": 0.3,
     "subduction_uplift_mm_yr": 0.45,
@@ -194,22 +195,6 @@
     "weathering_decay_depth_m": 5.0,
     "isostasy": 0.8,
     "isostasy_radius_km": 50.0,
-    "sea_level": {
-      "base_m": 0.0,
-      "cycles": [
-        {
-          "amplitude_m": 80.0,
-          "period_myr": 250.0,
-          "phase_deg": 0.0
-        },
-        {
-          "amplitude_m": 25.0,
-          "period_myr": 36.0,
-          "phase_deg": 90.0
-        }
-      ],
-      "curve": []
-    },
     "log_layers": 32,
     "drama": 1.0,
     "substeps": 1,
@@ -347,9 +332,7 @@
     "ice_isostasy_kyr": 3.0,
     "ice_calving_m_yr": 20.0,
     "ice_grid_cells": 256,
-    "ice_relax_kyr": 30.0,
-    "glacio_eustasy": 1.0,
-    "ice_reference_km3": 10000000.0
+    "ice_relax_kyr": 30.0
   },
   "structure": {
     "pluton_rate_km2_myr": 1e-05,

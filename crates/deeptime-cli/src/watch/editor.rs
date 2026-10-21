@@ -839,7 +839,6 @@ mod tests {
             assert_eq!(value("erosion_strength"), 5e-9);
             assert_eq!(value("ridge_depth"), -3000.0);
             assert_eq!(value("pluton_size"), 40.0);
-            assert_eq!(value("sea_level_swing"), 120.0);
             assert_eq!(value("deposit_size"), 2.5);
             assert_eq!(value("deposit_richness"), 1.5);
             assert_eq!(value("feature_deposits"), 2.0);

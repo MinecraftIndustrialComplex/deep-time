@@ -741,6 +741,10 @@ mod tests {
             z_floor: fx.k.oceanic_floor_elevation_m,
             trench_relax: 0.0,
             gravity: 9.81,
+            law: crate::params::OceanDepth::Dampening,
+            t_myr: 0.0,
+            dt_myr: 2.0,
+            sea_m: 0.0,
         };
         let mut held = 0;
         for (i, s) in st.samples.iter().enumerate() {

@@ -550,7 +550,7 @@ impl PlatesStage {
         book(st, gap_budget::Part::Rate);
         add_limited(world, limited);
         lap(&mut clock, "rate");
-        surface(st, &cache.geo, &env, &taper.floor_m);
+        surface(st, &cache.geo, &env, &taper.floor_m, sea);
         book(st, gap_budget::Part::PlateSurface);
         finish_samples(st, &cache.geo, &z0, &env);
         book(st, gap_budget::Part::Finish);
@@ -1103,10 +1103,11 @@ fn note_dynamics(st: &PlateState, world: &mut WorldState) {
     world.notes.insert(STAGE_NAME.to_owned(), note.to_string());
 }
 
-/// Continental erosion, oceanic dampening, trench accretion and the rock pools (Cortial §4.5,
-/// `pools.rs`), then eroded rock moves one hop downhill as sediment (to the lowest lattice
-/// neighbour of the same rigid group).
-fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32]) {
+/// Continental erosion, the ocean floor's subsidence (Cortial's dampening or GDH1's age law),
+/// trench accretion and the rock pools (Cortial §4.5, `pools.rs`), then eroded rock moves one hop
+/// downhill as sediment (to the lowest lattice neighbour of the same rigid group). `sea` is the
+/// sea level the step starts under.
+fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32], sea: f64) {
     let k = env.k;
     let per_m = transition::crust_per_metre(env);
     let held_cap = 0.5 * (transition::continental_m() + transition::oceanic_m());
@@ -1120,7 +1121,12 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32]) {
         z_floor: k.oceanic_floor_elevation_m,
         trench_relax: pools::trench_share(env.dt_myr, k.trench_half_life_myr),
         gravity: env.gravity,
+        law: k.ocean_depth,
+        t_myr: env.t_myr,
+        dt_myr: env.dt_myr,
+        sea_m: sea,
     };
+    let dampening = k.ocean_depth == crate::params::OceanDepth::Dampening;
     let eroded: Vec<f64> = st
         .samples
         .par_iter_mut()
@@ -1132,7 +1138,7 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32]) {
             // 3: with arcs raised by their thickness, the bare floor would sink them).
             // ledger: PLT-264
             let mut held = held_floor.get(i).copied().unwrap_or(f32::NAN);
-            if !held.is_finite() && s.kind == OCEANIC {
+            if dampening && !held.is_finite() && s.kind == OCEANIC {
                 held = transition::held_floor_m(
                     transition::crystalline_m(&s.pools),
                     held_cap,
