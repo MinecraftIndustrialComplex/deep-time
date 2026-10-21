@@ -44,9 +44,10 @@
 //! Two more measures for `plate-check`, measurement only (nothing a plate rule reads):
 //! - `StepRec::mix_km`: the length of plate boundary by kind, km (one sample spacing per boundary
 //!   sample, see [`classify_boundary`]): [`mix`]`::OCEAN_OCEAN`, `OCEAN_CONTINENT` (an oceanic
-//!   slab going under an overriding plate's oceanic or continental crust), `COLLISION` (continental
-//!   crust at the subducting side), `RIDGE`, `RIFT` and `OTHER` (transform, or converging with no
-//!   contact yet). The subducting length is the first two. It is taken right after the step's
+//!   slab going under an overriding plate whose arc stands on oceanic or continental crust: the
+//!   front's own crust, or the plate's continental crust within `arc_distance_km` of it, PLT-370),
+//!   `COLLISION` (continental crust at the subducting side), `RIDGE`, `RIFT` and `OTHER`
+//!   (transform, or converging with no contact yet). The subducting length is the first two. It is taken right after the step's
 //!   fronts are found (`subduction::fronts_and_uplift`), because the sample flags are cleared by
 //!   a resampling; the motion is judged across the boundary's normal, with Bird's 20 degrees for
 //!   a transform (PLT-310, PLT-311).
@@ -819,9 +820,11 @@ fn quantile(sorted: &[f64], q: f64) -> f64 {
 
 /// Kinds of plate boundary in [`StepRec::mix_km`].
 pub mod mix {
-    /// An oceanic slab under an overriding plate's oceanic crust.
+    /// An oceanic slab under an overriding plate's oceanic crust, with none of that plate's
+    /// continental crust within the arc's distance of the front: an intra-oceanic arc.
     pub const OCEAN_OCEAN: usize = 0;
-    /// An oceanic slab under an overriding plate's continental crust.
+    /// An oceanic slab under an overriding plate's continental crust, at the front or within the
+    /// arc's distance behind it (PLT-370): a continental arc.
     pub const OCEAN_CONTINENT: usize = 1;
     /// Continental crust at the subducting side of a front (a collision or its approach).
     pub const COLLISION: usize = 2;
@@ -877,8 +880,10 @@ pub struct Neighbour {
 /// direction is no azimuth (plates sliding past each other converge along half the edges of a
 /// zigzag boundary and part along the rest). A sample on the overriding side of an active contact
 /// whose boundary converges is a front, its class named by the crust of its fastest-converging
-/// neighbour there; a sample with a neighbour across a parting boundary is divergent; transforms
-/// and converging boundaries with no contact are the rest. A front counts one sample spacing (one
+/// neighbour there (and, for an oceanic slab, by the front sample's own crust; the caller names an
+/// ocean-ocean front ocean-continent when its arc stands on continental crust, PLT-370); a sample
+/// with a neighbour across a parting boundary is divergent; transforms and converging boundaries
+/// with no contact are the rest. A front counts one sample spacing (one
 /// plate's side of the boundary, as `PlateStep::front_km` does); the others count half a spacing
 /// from each of their two sides.
 pub fn classify_boundary(v_kind: u8, nbrs: &[Neighbour]) -> Option<(usize, u32)> {
@@ -1118,8 +1123,10 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
     // of it, through that plate, builds its arc on that crust: a continental arc, the class
     // Stern & Scholl (2010) split the world's arcs by (the crust the arc stands on), so it counts
     // as ocean-continent. Lattice steps, so the distance is an upper bound. ledger: PLT-370
-    let arc_on_continent =
-        |v: usize| coast_steps[v] != u32::MAX && f64::from(coast_steps[v]) * spacing_km <= env.k.arc_distance_km;
+    let arc_on_continent = |v: usize| {
+        coast_steps[v] != u32::MAX
+            && f64::from(coast_steps[v]) * spacing_km <= env.k.arc_distance_km
+    };
     let units = (0..samples.len())
         .into_par_iter()
         .fold(MixUnits::default, |mut acc, v| {

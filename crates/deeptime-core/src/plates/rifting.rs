@@ -312,15 +312,7 @@ pub fn maybe_initiate_subduction(
         .collect();
     let trench_tree = (!trenches.is_empty()).then(|| Tree::over(&trenches, |_| true));
     let clearance = env.norm.rad(k.subduction_initiation_clearance_km);
-    let near = env.norm.rad(1500.0);
-    let near_mode = std::env::var("DEEPTIME_PG_INIT").is_ok_and(|v| v == "1");
     let clear = |i: usize| {
-        if near_mode {
-            return trench_tree.as_ref().is_some_and(|tr| {
-                tr.nearest(pos[i])
-                    .is_some_and(|(_, d2)| angle_of_chord2(d2) <= near)
-            });
-        }
         trench_tree.as_ref().is_none_or(|tr| {
             tr.nearest(pos[i])
                 .is_none_or(|(_, d2)| angle_of_chord2(d2) > clearance)
