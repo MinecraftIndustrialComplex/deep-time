@@ -60,7 +60,7 @@ use super::events::{self, SUBDUCTION_ONSET};
 use super::geometry::{Cover, Geo, Tree, cover, dijkstra_parts};
 use super::kinematics::{quat, tangent, to_group, to_world};
 use super::pools::isostatic_change_m;
-use super::shortening::boundary_normal;
+use super::shortening::{boundary_normal, is_transform};
 use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
@@ -261,7 +261,8 @@ pub fn resolve(
         for idx in [o.i, o.cover.major()] {
             let s = &mut state.samples[idx as usize];
             if s.kind != CONTINENTAL && crystalline_m(&s.pools) >= buoyant_m {
-                s.kind = CONTINENTAL;
+                // The floor's own crust stays under the crust on top (ledger: PLT-331).
+                s.make_continental();
                 state.counters.buoyant += 1;
             }
         }
@@ -738,6 +739,14 @@ pub struct FrontsBegun {
     key: Vec<u32>,
 }
 
+#[cfg(test)]
+impl FrontsBegun {
+    /// The step's front samples.
+    pub(super) fn front_count(&self) -> usize {
+        self.sources.len()
+    }
+}
+
 /// [`FrontsBegun::key`]'s mark of a hidden sample.
 const HIDDEN_KEY: u32 = 1 << 31;
 
@@ -762,7 +771,7 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
     }
 
     let samples = &state.samples;
-    let boundary: Vec<Boundary> = (0..n)
+    let mut boundary: Vec<Boundary> = (0..n)
         .into_par_iter()
         .map(|v| {
             let sv = &samples[v];
@@ -803,7 +812,7 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
         })
         .collect();
     // Each front's boundary normal (zero elsewhere). ledger: PLT-310
-    let normals: Vec<DVec3> = (0..n)
+    let mut normals: Vec<DVec3> = (0..n)
         .into_par_iter()
         .map(|v| match boundary[v].front {
             Some((u, ..)) => {
@@ -812,6 +821,22 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
             None => DVec3::ZERO,
         })
         .collect();
+    // A front is where the plates converge across their boundary, beyond Bird's 20 degrees of a
+    // transform, as the boundary mix judges it (`dynamics::classify_boundary`): a contact belongs
+    // to a pair of plates, not to a stretch of their boundary, and one lattice edge's direction
+    // is no azimuth (plates sliding past each other converge along half the edges of a zigzag
+    // boundary). Until 2026-10-20 every lattice edge converging on an active contact was a
+    // front, and the contacts' strike-slip stretches built arcs: 142,000 km of island-arc front
+    // a step against the mix's 82,000 km of ocean-ocean subduction (build log 2026-10-20, "The
+    // arc's basement and the arcs' fronts"). ledger: PLT-330
+    for (b, nrm) in boundary.iter_mut().zip(normals.iter_mut()) {
+        if let Some((_, _, rel, _)) = b.front
+            && (is_transform(rel, *nrm) || rel.dot(*nrm) >= 0.0)
+        {
+            b.front = None;
+            *nrm = DVec3::ZERO;
+        }
+    }
     let mut sources: Vec<(u32, f64, u32)> = Vec::new();
     for (v, b) in boundary.iter().enumerate() {
         if b.front.is_some() {
@@ -1149,6 +1174,7 @@ pub fn fronts_finish(
                 for p in s.pools.iter_mut() {
                     *p -= (f64::from(p.max(0.0)) * phi) as f32;
                 }
+                s.basement_m *= (1.0 - phi) as f32;
             }
             // Arc magma and the deposit accumulators.
             let m = plan.magma_m;

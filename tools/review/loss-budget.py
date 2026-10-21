@@ -23,9 +23,10 @@ The model's rows:
                      matures (PLT-047), with the ocean floor under it (row "ocean floor")
   continental arcs   arc magma on continental crust (`arc_c`; the cones counted inside)
   hotspots           the hotspots' own magma (`hotspot_magma`)
-  ocean floor        crust of ocean floor made continental, less the felsic rock it carried
-                     (made continental: `cb_moves` o2c x thickness, every part; the felsic rock
-                     on the ocean floor is in `felsic_ocean`)
+  ocean floor        the ocean floor's own crust (7 km a sample) made continental with the crust
+                     on it (`cb_moves` o2c, every part), less what stays under it as its basement
+                     and is not counted as continental crust (`o2c_b_km`, PLT-331, since
+                     2026-10-20; runs before it have none, so the whole 7 km)
   pelagic            felsic rock the plate step's surface makes (`cb_parts` felsic, part
                      `plate_surface`: the pelagic sediment, `pelagic_m_per_myr`)
   sediment subd.,    none: the conserved pools of subducted crust accrete to the column on top
@@ -87,13 +88,18 @@ def budget(run, length):
     per = lambda km3: km3 / yrs  # a global (km^3 over the run) in km^3/yr
     part = lambda stock, name: parts.get(stock, {}).get(name, 0.0) * 1.0e6 / yrs
     o2c_km3 = sum(m.get("o2c", 0.0) * PLANET_KM2 * m.get("o2c_t_km", 0.0) for m in moves.values())
-    o2c_floor = sum(m.get("o2c", 0.0) * PLANET_KM2 * OCEAN_CRUST_KM for m in moves.values())
+    o2c_floor = sum(
+        m.get("o2c", 0.0) * PLANET_KM2 * max(OCEAN_CRUST_KM - m.get("o2c_b_km", 0.0), 0.0)
+        for m in moves.values()
+    )
+    o2c_basement = sum(m.get("o2c", 0.0) * PLANET_KM2 * m.get("o2c_b_km", 0.0) for m in moves.values())
     out = {
         "island_arcs": per(g.get("arc_o", 0.0)),
         "continental_arcs": per(g.get("arc_c", 0.0)),
         "hotspots": per(g.get("hotspot_magma", 0.0)),
         "made_continental": o2c_km3 / yrs,
         "ocean_floor": o2c_floor / yrs,
+        "basement": o2c_basement / yrs,
         "pelagic": part("felsic", "plate_surface"),
         "accreted_ocean": per(g.get("accreted", 0.0) - g.get("accreted_continent", 0.0)),
         "collision": per(g.get("crossed", 0.0) - g.get("kept", 0.0)),
@@ -147,6 +153,7 @@ ROWS = [
     ("off the continents by the surface stage", "erosion_off", float("nan")),
     ("off the continents by the transition", "transition_off", float("nan")),
     ("crust made continental (o2c x thickness)", "made_continental", float("nan")),
+    ("ocean floor kept under it as basement, not counted (PLT-331)", "basement", float("nan")),
     ("crossed collision fronts", "crossed", float("nan")),
     ("shortened into cordilleras", "cordillera", float("nan")),
     ("net change of the continental volume", "net", 0.0),
