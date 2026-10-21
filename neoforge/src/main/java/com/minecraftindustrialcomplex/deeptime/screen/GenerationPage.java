@@ -67,6 +67,21 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         details = d;
     }
 
+    /** The epoch button ("Stop here" / "Pick this epoch"), for the dev walk that clicks it. */
+    Button epochButton() {
+        return epoch;
+    }
+
+    /** The time scrubber, for the dev walk that clicks it. */
+    AbstractSliderButton scrubberWidget() {
+        return scrubber;
+    }
+
+    /** Play, for the dev walk that clicks it. */
+    Button playButton() {
+        return primary;
+    }
+
     private static final int GAP = 8, TOP = 44, ROW_H = 20, TAB_H = 16;
     private static final int TEXT = 0xffe8e8e8, DIM = 0xff9aa3ad, WARN = 0xffffc060, ERROR = 0xffff7070;
 
