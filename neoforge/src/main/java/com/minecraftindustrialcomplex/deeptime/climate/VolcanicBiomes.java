@@ -2,6 +2,8 @@
 package com.minecraftindustrialcomplex.deeptime.climate;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.worlddata.Playa;
+import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worldgen.VolcanicZones;
 import com.minecraftindustrialcomplex.deeptime.worldgen.VolcanicZones.Role;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
@@ -37,7 +39,8 @@ import java.util.function.Consumer;
  *   <li><b>Put in.</b> Where a {@link VolcanicZones} disc of a {@link Role} holds the column, the role's biome
  *       answers: the first biome of the tag {@code #deeptime:volcanic/<role>} (in the tag's order) that the
  *       biome source can place. Surface roles answer at and above the ground (biome depth parameter under
- *       {@link #SURFACE_DEPTH}) on land, never on a river's channel; the climate-gated roles (fresh ash, young
+ *       {@link #SURFACE_DEPTH}) on land, never on a river's channel and never within {@link #PLAYA_MARGIN} blocks
+ *       of a playa; the climate-gated roles (fresh ash, young
  *       lava) only where the climate point lies inside that biome's own temperature and humidity ranges in the
  *       source's parameter list; the cave role from that biome's own lowest depth down. A role without a
  *       biome in the pack, or not allowed there, gives way to the next role whose disc holds the column, and
@@ -66,6 +69,15 @@ public final class VolcanicBiomes {
     public static final float SURFACE_DEPTH = 0.2f; // ledger: BIO-112 (vanilla OverworldBiomeBuilder, verified)
 
     private static final long SURFACE_DEPTH_Q = Climate.quantizeCoord(SURFACE_DEPTH);
+
+    /**
+     * No surface role within this many blocks of a playa, in x and in z, so that no role biome's features reach the
+     * salt: a lake feature carves up to 14 blocks east and south of its origin (vanilla 1.21.1's LakeFeature box, origin
+     * + 1 to + 14, which Biomes O' Plenty's {@code hot_spring_lake} inherits), a disk reaches 6 blocks from its water
+     * ({@code disk_hot_spring_basalt}), and a block takes its biome from a biome cell whose centre is up to about 6
+     * blocks off (the fuzzy zoom); 6 + 14.
+     */
+    public static final int PLAYA_MARGIN = 20; // ledger: BIO-165 (game-choice)
 
     /** The tag of a role's biomes, in order of preference. */
     public static TagKey<Biome> tag(Role role) {
@@ -172,6 +184,8 @@ public final class VolcanicBiomes {
         private final BiomeRules.LevelData rules;
         private volatile VolcanicZones zones;
         private volatile Resolved resolved;
+        private volatile RasterSampler playa;
+        private volatile boolean playaRead;
 
         public Level(WorldDataTerrain terrain, int cell, int minY, int seaLevel) {
             this.terrain = terrain;
@@ -208,6 +222,24 @@ public final class VolcanicBiomes {
 
         public int seaLevel() {
             return seaLevel;
+        }
+
+        /**
+         * Whether a playa cell (baked layer {@code playa} > 0) is the nearest cell of a block column within
+         * {@link #PLAYA_MARGIN} blocks of (x, z), in x and in z ({@link Playa#within}): no surface role answers there.
+         */
+        public boolean byPlaya(int x, int z) {
+            return Playa.within(playa(), x, z, PLAYA_MARGIN);
+        }
+
+        /** The level's playa layer, or null when the world has none. */
+        private RasterSampler playa() {
+            if (!playaRead) {
+                var wd = terrain.data();
+                playa = wd.has(Playa.LAYER) ? wd.layer(Playa.LAYER) : null;
+                playaRead = true;
+            }
+            return playa;
         }
 
         /**
@@ -394,6 +426,11 @@ public final class VolcanicBiomes {
             return roles;
         }
 
+        /** A playa lies within {@link #PLAYA_MARGIN} blocks of the query's column ({@link Level#byPlaya}). */
+        boolean byPlaya() {
+            return level.byPlaya(x, z);
+        }
+
         BiomeRules.Column facts() {
             if (facts == null)
                 facts = new BiomeRules.Column(level.rules, x, z, height(), level.seaLevel(), this::roles, this::plain, this::slot);
@@ -505,6 +542,11 @@ public final class VolcanicBiomes {
                 return null;
             if (!q.land())
                 return null;
+            // A playa keeps its salt flat's biome, as a river's channel keeps its river: the salt is the hydrology's surface
+            // (PlayaPass), and a role's biome decorates its ground with features that reach past the biome's edge (Biomes O'
+            // Plenty's hot springs dug ponds into a salt flat and ringed them with thermal calcite from 17 blocks away).
+            if (q.byPlaya())
+                continue;
             // The role's biome rules first: the climate picks among a pack's variants (an icy or a tropical volcano).
             for (BiomeRules.Bound rule : rules) {
                 if (!rule.rule().matches(q.facts()))

@@ -33,7 +33,9 @@ import java.util.Map;
  *   <li>{@code columns}: land columns sampled; {@code volcanic}: of them, in {@code #deeptime:volcanic};
  *       {@code far}: of those, more than {@link #FAR} blocks from every active volcano's summit and every
  *       hot-spring pool; {@code outside}: more than {@link #OUTSIDE} blocks outside every surface zone.</li>
- *   <li>{@code pools}: hot-spring pools on land, {@code pools_in_role}: of them, in the role's biome.</li>
+ *   <li>{@code pools}: hot-spring pools on land; {@code pools_by_playa}: of them, within
+ *       {@link VolcanicBiomes#PLAYA_MARGIN} of a playa, where no surface role holds; {@code pools_in_role}: of the
+ *       others, in the role's biome.</li>
  *   <li>{@code replaced}: columns whose plain biome is volcanic and whose biome now is not, by the biome now
  *       (what fills the place of a kept-out biome); {@code holes}: of them, an ocean, river or cave biome.</li>
  *   <li>{@code columns_changed}: columns whose biome differs from the plain search's (0 without volcanic biomes).</li>
@@ -80,7 +82,7 @@ public final class VolcanicCensus {
     }
 
     /** The census of one level. */
-    public record Result(Side now, Side plain, int pools, int differ, Map<String, Integer> replaced, int holes,
+    public record Result(Side now, Side plain, int pools, int poolsByPlaya, int differ, Map<String, Integer> replaced, int holes,
                          Map<String, int[]> zones, Map<String, String> roles, JsonObject json) {}
 
     private static double round(double v, int places) {
@@ -152,9 +154,14 @@ public final class VolcanicCensus {
                 }
             }
         }
-        // The pools' own biome.
+        // The pools' own biome; a pool by a playa takes the flat's (no surface role within PLAYA_MARGIN of one: BIO-165).
+        int byPlaya = 0;
         for (Geothermal.Site s : pools) {
             int qx = QuartPos.fromBlock(s.x()), qy = QuartPos.fromBlock(s.groundY()), qz = QuartPos.fromBlock(s.z());
+            if (marker.volcanic().byPlaya(QuartPos.toBlock(qx) + 2, QuartPos.toBlock(qz) + 2)) {
+                byPlaya++;
+                continue;
+            }
             Holder<Biome> b = biomes.getNoiseBiome(qx, qy, qz, sampler);
             Holder<Biome> p = VolcanicBiomes.plain(() -> biomes.getNoiseBiome(qx, qy, qz, sampler));
             if (b.is(VolcanicBiomes.tag(VolcanicZones.Role.HOT_SPRING_FIELD)))
@@ -179,6 +186,7 @@ public final class VolcanicCensus {
         o.addProperty("outside_blocks", OUTSIDE);
         o.addProperty("active_volcanoes", volcanoes.size());
         o.addProperty("pools", pools.size());
+        o.addProperty("pools_by_playa", byPlaya);
         o.addProperty("reach", t.volcanicBiomeRules().reach());
         JsonObject zj = new JsonObject();
         for (var e : byRole.entrySet()) {
@@ -206,7 +214,7 @@ public final class VolcanicCensus {
         o.addProperty("replaced_holes", holes);
         o.addProperty("columns_changed", differ);
         o.addProperty("active", marker.volcanic().active());
-        return new Result(now, plain, pools.size(), differ, replaced, holes, byRole, roles, o);
+        return new Result(now, plain, pools.size(), byPlaya, differ, replaced, holes, byRole, roles, o);
     }
 
     private static void tally(Side side, Holder<Biome> b, double near, double out, int x, int z) {
