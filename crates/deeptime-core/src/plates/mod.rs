@@ -338,7 +338,7 @@ impl PlatesStage {
         let overlaps = subduction::detect(st, &cache.geo, &pos, &tree);
         book(st, gap_budget::Part::Other);
         lap(&mut clock, "detect");
-        let resolved = subduction::resolve(st, world, &cache.geo, &overlaps, &pos, &env)?;
+        let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
         book(st, gap_budget::Part::Subduction);
         lap(&mut clock, "resolve");
         let (fronts, fired) =

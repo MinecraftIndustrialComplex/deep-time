@@ -213,9 +213,6 @@ struct Agg {
     cont: [u32; 2],
     locked: [u32; 2],
     age: [f64; 2],
-    /// … and ones with their plate's continental crust within the arc's distance
-    /// ([`continent_within`]).
-    near: [u32; 2],
 }
 
 /// What `resolve` found this step.
@@ -231,7 +228,6 @@ pub struct Resolved {
 pub fn resolve(
     state: &mut PlateState,
     world: &mut WorldState,
-    geo: &Geo,
     overlaps: &[Overlap],
     pos: &[DVec3],
     env: &Env,
@@ -282,8 +278,6 @@ pub fn resolve(
         })
         .collect();
     let mut aggs: BTreeMap<(u32, u32), Agg> = BTreeMap::new();
-    let mode = pg_reversal_mode();
-    let arc_steps = (env.k.arc_distance_km / env.norm.km(env.norm.spacing_rad())).floor() as u32;
     for o in overlaps {
         let a = state.plate_of(o.i as usize);
         let b = state.groups[o.group as usize].plate;
@@ -296,9 +290,6 @@ pub fn resolve(
         for (side, idx) in [(sa, o.i), (sb, o.cover.major())] {
             let s = &state.samples[idx as usize];
             e.seen[side] += 1;
-            if mode == 3 && continent_within(state, geo, idx, arc_steps) {
-                e.near[side] += 1;
-            }
             if s.kind == CONTINENTAL {
                 e.cont[side] += 1;
                 if locked_against(s, t_myr, env, own) {
@@ -321,23 +312,18 @@ pub fn resolve(
         // Polarity reversal: continental crust arriving on the subducting side of an oceanic
         // overriding plate stops that subduction and starts the opposite one (Cortial: "an oceanic
         // plate always plunges beneath a continental plate"; without it a continent at a junction
-        // of three trenches is handed round them for ever).
+        // of three trenches is handed round them for ever). ledger: PLT-056. It judges the
+        // overriding side by its crust in the overlap, often an oceanic fringe in front of its
+        // continent, and fires about 17 times per 100 Myr against Crameri et al. (2020)'s 4 in
+        // about 105 Myr; judged by the crust the arc stands on instead (Stern 2004) the collisions
+        // reach 2.2 per 100 Myr but the land falls, so it stays (ledger: PLT-371).
         if let Some(&k) = index.get(&(lo, hi)) {
             let c = &state.contacts[k];
             let under_side = usize::from(c.under != lo);
             let (u, o) = (under_side, 1 - under_side);
-            let near = |s: usize| f64::from(agg.near[s]) / f64::from(agg.seen[s].max(1));
-            let over_oceanic = if mode == 3 {
-                near(o) < REVERSAL_OVER
-            } else {
-                frac(o) < REVERSAL_OVER
-            };
-            let by_crust = frac(u) >= REVERSAL_UNDER
-                && over_oceanic
-                && (mode == 0 || mode == 3 || c.collision.is_none())
-                && (mode != 2 || env.t_myr - c.onset_myr < CONFIRM_MYR);
             if agg.count >= MIN_CONTACT
-                && (by_crust || (lock(u) >= REVERSAL_UNDER && lock(o) < REVERSAL_OVER))
+                && ((frac(u) >= REVERSAL_UNDER && frac(o) < REVERSAL_OVER)
+                    || (lock(u) >= REVERSAL_UNDER && lock(o) < REVERSAL_OVER))
             {
                 reverse(state, world, env, k)?;
             }
@@ -499,21 +485,12 @@ pub(super) fn locked_against(
     locked(s, t_myr, env) && own.is_none_or(|t0| f64::from(s.orogeny_myr) < t0 - 1e-6)
 }
 
-/// Plate-geometry task experiment (2026-10-21; removed before the merge): 0 the base, 1 no
-/// reversal by crust while the contact is in collision, 2 also none once the contact is a
-/// confirmed subduction zone.
-fn pg_reversal_mode() -> u8 {
-    static M: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
-    *M.get_or_init(|| {
-        std::env::var("DEEPTIME_PG_REVERSAL")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(0)
-    })
-}
-
-/// Whether continental crust of sample `i`'s plate lies within `steps` lattice steps of it through
-/// that plate (itself included): an arc behind a front there would stand on continental crust.
+/// Whether visible continental crust of sample `i`'s plate lies within `steps` lattice steps of it
+/// through that plate's visible samples (itself included): an arc behind a front there would stand
+/// on continental crust. The boundary mix measures the same distance (`dynamics`, PLT-370).
+/// Measurement only (the arc-front counters): the polarity reversal still judges the overriding
+/// side by the crust in the overlap, because judging it by this test raised the collisions and
+/// lost land (plates.md, "The plate geometry", 2026-10-21; ledger: PLT-371).
 fn continent_within(state: &PlateState, geo: &Geo, i: u32, steps: u32) -> bool {
     let p = state.plate_of(i as usize);
     let mut seen = vec![i];
@@ -521,14 +498,18 @@ fn continent_within(state: &PlateState, geo: &Geo, i: u32, steps: u32) -> bool {
     for depth in 0..=steps {
         let mut next = Vec::new();
         for &v in &frontier {
-            if state.samples[v as usize].kind == CONTINENTAL {
+            let s = &state.samples[v as usize];
+            if s.kind == CONTINENTAL && !s.is_hidden() {
                 return true;
             }
             if depth == steps {
                 continue;
             }
             for (u, _) in geo.edges(v) {
-                if !seen.contains(&u) && state.plate_of(u as usize) == p {
+                if !seen.contains(&u)
+                    && state.plate_of(u as usize) == p
+                    && !state.samples[u as usize].is_hidden()
+                {
                     seen.push(u);
                     next.push(u);
                 }
