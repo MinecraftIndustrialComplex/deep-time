@@ -3064,10 +3064,12 @@ Ben's keyframes (selected; the continental crust from the `crust_age` layer's gr
 | -300 | 0.277 | 0.363 | 0.299 (0.071, 0.228) | -152 | 420 | 7 |
 | -100 | 0.272 | 0.374 | 0.315 (0.077, 0.239) | -134 | 258 | 5 |
 | 0 | 0.237 | 0.362 | 0.395 (0.119, 0.276) | -38 | 162 | 7 |
-| Earth | 0.29 | 0.41 with shelves (CRUST1.0 ≥ 20 km 0.384, ≥ 25 km 0.357) | 0.248 (≥ 20 km), 0.195 (≥ 25 km) | 0 to 250 above today (Phanerozoic) | 220 | |
+| Earth | 0.29 | 0.41 with shelves (CRUST1.0 ≥ 20 km 0.384, ≥ 25 km 0.357) | 0.248 (0.110, 0.138) for ≥ 20 km, 0.195 (0.115, 0.080) for ≥ 25 km | 0 to 250 above today (Phanerozoic) | 220 | |
 
 freeboard41 is the median height above the sea of the planet's highest 41 % (Earth's share of
-continental crust with its shelves), the crust's stand against the sea.
+continental crust with its shelves), the crust's stand against the sea. The shelf share is
+Earth's (0.06 to 0.14 from -900 Myr on, against 0.11); the excess is the crust deeper than
+200 m, 0.19 to 0.36 of the continental crust against Earth's 0.08 to 0.14.
 
 **A mix, about 60 % drowned and 40 % lost.** From the first plate frame (-950 Myr) to the last the
 land falls by 0.158 of the planet: the continental crust under the sea grows from 0.043 to 0.143
