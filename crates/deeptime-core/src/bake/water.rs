@@ -27,6 +27,7 @@
 
 use std::path::Path;
 
+use deeptime_format::column::CLOSED_BASIN;
 use deeptime_format::rivers::{RIVERS_PATH, write_rivers};
 use deeptime_format::{DType, FileEntry, GridDesc, LoadedLayer, RasterRead};
 use rayon::prelude::*;
@@ -168,7 +169,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
             std::fs::remove_file(&rivers_path).map_err(|e| CoreError::io(&rivers_path, e))?;
         }
         out.m.files.retain(|f| f.path != RIVERS_PATH);
-        out.m.layers.retain(|l| l.name != PLAYA_LAYER);
+        out.m.layers.retain(|l| l.name != PLAYA_LAYER && l.name != CLOSED_BASIN);
         // An all-nodata `water_level` on the elevation grid (a re-run over a folder that had
         // lakes clears them).
         if let Some(e) = out.m.layer("elevation") {
@@ -321,6 +322,13 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     )?;
     drop(playa);
 
+    // closed_basin: 1 where the game puts no sea on ground below sea level (HYD-100, HYD-102;
+    // FORMAT.md, "Water columns", step 3).
+    out.layer(
+        desc(CLOSED_BASIN, DType::U8, &grid, 1.0, "flag", None),
+        &result.closed_basin,
+    )?;
+
     let (bytes, crc32) = write_rivers(out.dir, &result.rivers)?;
     out.m.files.retain(|f| f.path != RIVERS_PATH);
     out.m.files.push(FileEntry {
@@ -332,7 +340,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
 
     let note = json!({
         "enabled": true,
-        "method": "p1-22b",
+        "method": "hyd-100",
         "params": params,
         "width_scale": s.feature_scale.rivers,
         "grid": grid.name,
@@ -340,6 +348,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         "climate": if from_stage { "climate stage (L1, bilinear)" } else { "zonal stand-in" },
         "seasons": if seasonal { "the twelve monthly layers" } else { "mean ± 8 °C" },
         "playa": {"layer": PLAYA_LAYER, "rock_class": PLAYA_ROCK_CLASS, "blocks": salt},
+        "closed_basin": {"layer": CLOSED_BASIN, "reach_blocks": hydro::CLOSED_REACH_BLOCKS},
         "rivers_file": RIVERS_PATH,
         "rivers_bytes": bytes,
         "stats": stats,
@@ -357,7 +366,7 @@ pub fn summary_line(v: &Value) -> String {
     }
     let s = &v["stats"];
     format!(
-        "water grid={} lakes={} lake_km2={} share_of_land={} largest_km2={} below_rim={} frozen={} playas={} dry={} endorheic={} chains={} vertices={} river_km={} max_q={} widest={} bytes={}",
+        "water grid={} lakes={} lake_km2={} share_of_land={} largest_km2={} below_rim={} frozen={} playas={} dry={} endorheic={} below_sea_closed_km2={} below_sea_dry_km2={} below_sea_lakes={} chains={} vertices={} river_km={} max_q={} widest={} bytes={}",
         v["grid"].as_str().unwrap_or("?"),
         s["lakes"],
         s["lake_area_km2"],
@@ -368,6 +377,9 @@ pub fn summary_line(v: &Value) -> String {
         s["basins"]["playa"],
         s["basins"]["dry"],
         s["endorheic_lakes"],
+        s["below_sea"]["closed_km2"],
+        s["below_sea"]["dry_km2"],
+        s["below_sea"]["lakes_below_sea_level"],
         s["chains"],
         s["vertices"],
         s["river_length_km"],

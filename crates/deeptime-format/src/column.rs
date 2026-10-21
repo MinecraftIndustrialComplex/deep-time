@@ -29,6 +29,9 @@ use crate::water::{self, WaterColumn, WaterSource, WaterSpec};
 pub const ELEVATION: &str = "elevation";
 /// The water surface above the terrain (nodata = none).
 pub const WATER_LEVEL: &str = "water_level";
+/// 1 where no sea stands on ground below sea level: a closed basin (HYD-100; FORMAT.md, "Water
+/// columns", step 3).
+pub const CLOSED_BASIN: &str = "closed_basin";
 /// The horizon stacks.
 pub const HORIZONS: &str = "strata/horizons";
 /// The class index table of the horizon stacks.
@@ -45,6 +48,7 @@ pub struct ColumnWorld {
     elevation: LazyLayer,
     detail: Option<(DetailSpec, Noise, LazyLayer)>,
     water: Option<LazyLayer>,
+    closed_basin: Option<LazyLayer>,
     horizons: Option<LazyLayer>,
     /// `structure/events.dtst` (P2-01): the folds and faults the stacks are read through.
     structure: Option<Deformer>,
@@ -149,6 +153,7 @@ impl ColumnWorld {
         let mut bodies = read_bodies(dir)?.unwrap_or_default();
         bodies.sort_by_key(|b| b.id);
         let water = layer(WATER_LEVEL)?;
+        let closed_basin = layer(CLOSED_BASIN)?;
         let skip = [ELEVATION, WATER_LEVEL, HORIZONS];
         let mut others = Vec::new();
         for e in &manifest.layers {
@@ -170,6 +175,7 @@ impl ColumnWorld {
             elevation,
             detail,
             water,
+            closed_basin,
             horizons,
             classes,
             bodies,
@@ -646,6 +652,12 @@ impl WaterSource for ColumnWorld {
 
     fn rivers(&self) -> Option<&Rivers> {
         self.rivers.as_ref()
+    }
+
+    fn closed(&self, x: i64, z: i64) -> bool {
+        self.closed_basin
+            .as_ref()
+            .is_some_and(|l| l.nearest(x as f64, z as f64) == 1.0)
     }
 }
 
