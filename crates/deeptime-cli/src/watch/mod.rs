@@ -35,7 +35,6 @@ mod runs;
 mod sections;
 pub mod stage2;
 mod tiles;
-pub(crate) mod worldmap;
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
@@ -45,8 +44,6 @@ use deeptime_core::session::{Session, SessionState};
 use serde_json::{Value, json};
 
 use crate::run::{CliResult, Common, load_preset_with};
-
-pub use http::tailnet_or_loopback;
 
 /// The workbench's default port (tools/viewer/mac-watch.sh uses it too).
 pub const DEFAULT_PORT: u16 = 8642;
@@ -62,8 +59,12 @@ pub struct WatchOptions {
     pub preset: Option<String>,
     pub start: Option<String>,
     pub length_myr: Option<f64>,
-    /// Loopback or a Tailscale address (`tailnet_or_loopback`).
+    /// Loopback, or with `allow_tailnet` a Tailscale address (`mic_viewer::http::address_allowed`).
     pub bind: IpAddr,
+    /// `--allow-tailnet`: also bind and serve Tailscale addresses and answer tailnet `Host` names
+    /// (tools/viewer/mac-watch.sh behind `tailscale serve`); without it only loopback names, so the
+    /// page is reached through an ssh forward.
+    pub allow_tailnet: bool,
     /// 0 = any free port.
     pub port: u16,
     /// Where runs are kept (a folder per run).
@@ -139,12 +140,12 @@ fn progress_json(s: &Session) -> Value {
 /// A running workbench: its runs and its server.
 pub struct Served {
     pub wb: Arc<runs::Workbench>,
-    server: http::Server,
+    server: mic_viewer::http::Server,
 }
 
 impl Served {
     pub fn addr(&self) -> SocketAddr {
-        self.server.addr()
+        self.server.addr().expect("the workbench serves TCP")
     }
 
     /// Stops the runner (cancelling a running run) and the server.
@@ -156,12 +157,20 @@ impl Served {
 
 /// Opens the runs folder and starts serving.
 pub fn serve(o: &WatchOptions) -> CliResult<Served> {
-    if !tailnet_or_loopback(o.bind) {
-        return Err(format!(
-            "--bind {}: only loopback or a Tailscale address (100.64.0.0/10, fd7a:115c:a1e0::/48); \
-             the page is never served on the LAN",
-            o.bind
-        )
+    if !mic_viewer::http::address_allowed(o.bind, o.allow_tailnet) {
+        return Err(if o.allow_tailnet || !mic_viewer::http::tailnet(o.bind) {
+            format!(
+                "--bind {}: only loopback or, with --allow-tailnet, a Tailscale address \
+                 (100.64.0.0/10, fd7a:115c:a1e0::/48); the page is never served on the LAN",
+                o.bind
+            )
+        } else {
+            format!(
+                "--bind {}: a Tailscale address needs --allow-tailnet (without it the page is \
+                 loopback only, reached through an ssh forward); it is never served on the LAN",
+                o.bind
+            )
+        }
         .into());
     }
     if let Some(m) = o.every_myr
@@ -179,11 +188,17 @@ pub fn serve(o: &WatchOptions) -> CliResult<Served> {
             p.deeptime = std::env::current_exe().ok();
             p
         }),
+        allow_tailnet: o.allow_tailnet,
     });
-    let server = http::Server::start(SocketAddr::new(o.bind, o.port), app).map_err(|e| {
-        wb.close();
-        format!("cannot serve on {}:{}: {e}", o.bind, o.port)
-    })?;
+    let config = mic_viewer::http::Config {
+        allow_tailnet: o.allow_tailnet,
+        name: "deeptime-watch".into(),
+    };
+    let server = mic_viewer::http::Server::start(SocketAddr::new(o.bind, o.port), config, app)
+        .map_err(|e| {
+            wb.close();
+            format!("cannot serve on {}:{}: {e}", o.bind, o.port)
+        })?;
     Ok(Served { wb, server })
 }
 
@@ -261,6 +276,7 @@ mod tests {
             start: None,
             length_myr: None,
             bind,
+            allow_tailnet: false,
             port: 0,
             runs: runs.to_path_buf(),
             keep,
@@ -472,13 +488,95 @@ mod tests {
     #[test]
     fn never_binds_the_lan() {
         let dir = tmp("bind");
-        for addr in ["0.0.0.0", "10.0.0.217", "::"] {
-            let err = serve(&options(&dir, 2, addr.parse().unwrap()))
-                .err()
-                .unwrap()
-                .to_string();
-            assert!(err.contains("never served on the LAN"), "{addr}: {err}");
+        for allow_tailnet in [false, true] {
+            for addr in ["0.0.0.0", "10.0.0.217", "::"] {
+                let mut o = options(&dir, 2, addr.parse().unwrap());
+                o.allow_tailnet = allow_tailnet;
+                let err = serve(&o).err().unwrap().to_string();
+                assert!(err.contains("never served on the LAN"), "{addr}: {err}");
+            }
         }
+        // A Tailscale address only with --allow-tailnet.
+        let err = serve(&options(&dir, 2, "100.96.0.7".parse().unwrap()))
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(err.contains("needs --allow-tailnet"), "{err}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// One GET with this `Host`: the status.
+    fn get_as(addr: SocketAddr, path: &str, host: &str) -> u16 {
+        let mut s = TcpStream::connect(addr).unwrap();
+        write!(
+            s,
+            "GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"
+        )
+        .unwrap();
+        let mut all = Vec::new();
+        s.read_to_end(&mut all).unwrap();
+        String::from_utf8_lossy(&all[9..12]).parse().unwrap()
+    }
+
+    /// The `Host` check on every request, GET included (no DNS rebinding): a foreign name is
+    /// refused before any route; tailnet names only with --allow-tailnet; the ssh forward's
+    /// `localhost:<any port>` always.
+    #[test]
+    fn a_forged_host_is_refused_on_a_get() {
+        let dir = tmp("host");
+        for allow_tailnet in [false, true] {
+            let mut o = options(&dir.join(format!("runs-{allow_tailnet}")), 2, LOCAL);
+            o.allow_tailnet = allow_tailnet;
+            let served = serve(&o).unwrap();
+            let addr = served.addr();
+            for path in [
+                "/",
+                "/api/runs",
+                "/workbench.js",
+                "/mic-viewer/map.js",
+                "/api/catalog",
+            ] {
+                assert_eq!(get_as(addr, path, "evil.example.com"), 403, "{path}");
+                assert_eq!(get_as(addr, path, "evil.example.com:8642"), 403, "{path}");
+                assert_eq!(get_as(addr, path, "localhost:8642"), 200, "{path}");
+                assert_eq!(get_as(addr, path, "localhost:9000"), 200, "{path}");
+                assert_eq!(get_as(addr, path, "127.0.0.1"), 200, "{path}");
+                let tail = get_as(addr, path, "viewer.tail0000.ts.net:8642");
+                assert_eq!(tail, if allow_tailnet { 200 } else { 403 }, "{path}");
+            }
+            served.stop();
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The "Final world" view is mic-viewer's map core plus Deep Time's plug-in: the page loads the
+    /// core first, and both are served.
+    #[test]
+    fn the_world_view_loads_the_map_core_first() {
+        let dir = tmp("mapcore");
+        let served = serve(&options(&dir, 2, LOCAL)).unwrap();
+        let addr = served.addr();
+        let (st, page) = get(addr, "/");
+        assert_eq!(st, 200);
+        let page = String::from_utf8(page).unwrap();
+        let core = page
+            .find(r#"<script src="mic-viewer/map.js">"#)
+            .expect("the core");
+        let plug = page
+            .find(r#"<script src="worldmap.js">"#)
+            .expect("the plug-in");
+        assert!(core < plug, "the map core loads before worldmap.js");
+        let (st, js) = get(addr, "/mic-viewer/map.js");
+        assert_eq!(st, 200);
+        assert!(
+            String::from_utf8(js)
+                .unwrap()
+                .contains("function createMap(")
+        );
+        let (st, js) = get(addr, "/worldmap.js");
+        assert_eq!(st, 200);
+        assert!(String::from_utf8(js).unwrap().contains("MV.createMap("));
+        served.stop();
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

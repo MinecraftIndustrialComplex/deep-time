@@ -326,7 +326,9 @@ dependencies = [
  "clap",
  "deeptime-core",
  "deeptime-format",
+ "deeptime-tiles",
  "deeptime-viewer",
+ "mic-viewer",
  "serde_json",
 ]
 
@@ -409,6 +411,16 @@ dependencies = [
  "clap",
  "deeptime-format",
  "rayon",
+ "serde_json",
+]
+
+[[package]]
+name = "deeptime-tiles"
+version = "0.0.1"
+dependencies = [
+ "deeptime-core",
+ "deeptime-format",
+ "mic-viewer",
  "serde_json",
 ]
 
@@ -789,6 +801,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1219ed1b7f229ee7104d281dd01d6802fe28bb6e95d292942c4daacdeb798c0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "mic-viewer"
+version = "0.1.0"
+dependencies = [
+ "png",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
