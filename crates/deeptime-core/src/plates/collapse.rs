@@ -87,7 +87,7 @@ use super::geometry::{Geo, dijkstra_sparse};
 use super::pools::{
     COLUMN_ISOSTATIC_FACTOR, continental_column, eclogite_m, isostatic_change_m, root_drop_m,
 };
-use super::state::{CONTINENTAL, OCEANIC, PlateState, Sample, TRENCH, pool};
+use super::state::{CONTINENTAL, OCEANIC, OROGENY_NONE, PlateState, Sample, TRENCH, pool};
 
 /// `WorldState::globals`: crust moved by the collapse over the run, km³ …
 pub const MOVED_GLOBAL: &str = "plates/collapse_km3";
@@ -148,7 +148,11 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
         // The excess goes to continental crust thinner than the collapse thickness (crust
         // thicker than that does not stay, PLT-256: lower crust flows out of the thickened belt
         // but does not build a second one around it) and to ocean floor up to the normal column.
-        let to = (k.collapse_thickness_km * 1000.0).clamp(normal_thickness_m(), t_max);
+        let to = if founder_fills_normal() {
+            normal_thickness_m()
+        } else {
+            (k.collapse_thickness_km * 1000.0).clamp(normal_thickness_m(), t_max)
+        };
         if !by_plate.is_empty() {
             spread(state, geo, env, by_plate, to, out, None);
         }
@@ -169,6 +173,12 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
         s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
     }
     lost * env.norm.sample_area_km2()
+}
+
+/// HG experiment: the founder fills continental room to the normal column (`DEEPTIME_HG_FOUNDER_TN=1`).
+fn founder_fills_normal() -> bool {
+    static M: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *M.get_or_init(|| std::env::var("DEEPTIME_HG_FOUNDER_TN").is_ok_and(|v| v == "1"))
 }
 
 /// Takes `left` m of crust from the bottom of a column (mafic pools first, [`ROOT_ORDER`]) to the
@@ -254,6 +264,21 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
     // A sample raised by an orogeny carries the time of the step that raised it; it is held up
     // until no orogeny has raised it for `collapse_quiet_myr` (at least this step). ledger: PLT-259
     let quiet_before = (env.t_myr - k.collapse_quiet_myr.max(0.5 * env.dt_myr)) as f32;
+    // A column an orogeny raised after this is still hot: it thins towards the normal column, not
+    // only to T_c (post-orogenic collapse, ledger: PLT-390).
+    let hot_after = if k.collapse_hot_myr > 0.0 {
+        (env.t_myr - k.collapse_hot_myr) as f32
+    } else {
+        f32::INFINITY
+    };
+    // What a column thins towards: the normal column while it is hot, T_c otherwise.
+    let to = |s: &Sample| {
+        if s.orogeny != OROGENY_NONE && s.orogeny_myr > hot_after {
+            normal
+        } else {
+            t_c
+        }
+    };
 
     // Each plate's sources and what they would release this step, m of thickness.
     let mut by_plate: BTreeMap<u32, Vec<(usize, f64)>> = BTreeMap::new();
@@ -263,7 +288,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         .samples
         .par_iter()
         .filter(|s| s.kind == CONTINENTAL && !s.is_hidden() && s.orogeny_myr >= quiet_before)
-        .map(|s| (rate * (f64::from(s.thickness_m) - t_c)).max(0.0))
+        .map(|s| (rate * (f64::from(s.thickness_m) - to(s))).max(0.0))
         .collect::<Vec<f64>>()
         .iter()
         .sum();
@@ -275,8 +300,8 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
             if s.kind != CONTINENTAL || s.is_hidden() || s.orogeny_myr >= quiet_before {
                 return None;
             }
-            // ledger: PLT-254, PLT-255, PLT-256.
-            let q = rate * (f64::from(s.thickness_m) - t_c);
+            // ledger: PLT-254, PLT-255, PLT-256, PLT-390.
+            let q = rate * (f64::from(s.thickness_m) - to(s));
             (q > 0.0).then_some((i, q))
         })
         .collect();
