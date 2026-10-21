@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks). Feature page: [playability-steering.md](../playability-steering.md). Design: [docs/design/playability-steering.md](../../design/playability-steering.md).
 
-Rows: 15. Written on 2026-10-05 with the feature (Ben, decisions log 2026-10-05: "realism first, playability second, toggleable"; "end weighted nudges that players can choose"). The nudges' rates, bands and shape are game choices; the physical controls they act on (the ocean's water volume and hydro-isostasy, volcanic outgassing) are physics, and the Earth figures beside them are references for how gentle the nudges are, not targets the run is held to.
+Rows: 15 (`verified` 1, STE-009 since 2026-10-21; `from-memory` 3, `game-choice` 10, `uncited` 1). Written on 2026-10-05 with the feature (Ben, decisions log 2026-10-05: "realism first, playability second, toggleable"; "end weighted nudges that players can choose"). The nudges' rates, bands and shape are game choices; the physical controls they act on (the ocean's water volume and hydro-isostasy, volcanic outgassing) are physics, and the Earth figures beside them are references for how gentle the nudges are, not targets the run is held to.
 
 Paths are relative to the repository root; line numbers are left out on purpose. `steering.rs` is `crates/deeptime-core/src/steering.rs`.
 
