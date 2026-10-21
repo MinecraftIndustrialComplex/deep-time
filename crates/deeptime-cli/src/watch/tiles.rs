@@ -30,7 +30,7 @@ use std::time::{Duration, Instant};
 use deeptime_tiles::{BakeMap, Layer, RENDER_VERSION, TILE, blocks_per_px, pyramid_tiles};
 use mic_viewer::http::Response;
 use mic_viewer::tiles::{TileCache, parse_tile_path};
-use serde_json::{Value, json};
+use serde_json::json;
 
 const DEFAULT_CACHE_MIB: u64 = 384;
 const MAX_OPEN_MAPS: usize = 2;
@@ -301,6 +301,7 @@ fn tile(run_dir: &Path, rest: &str) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     fn tmp(name: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("dt-tiles-{name}-{}", std::process::id()));
