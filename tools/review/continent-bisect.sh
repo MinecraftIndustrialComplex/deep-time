@@ -16,6 +16,8 @@
 #                                                            build (once), then the runs
 #   ... continent-bisect.sh build <commit>                   only the build
 #   ... continent-bisect.sh runs <commit> <seeds,> <starts,> <stops,> [<length>]   only the runs
+#   ... continent-bisect.sh control <commit> <seeds,> <starts,> <stops,>   the runs without the crust
+#                                                            budget's env (into $ROOT/ctl, to cmp with runs/)
 #
 # A stop below the length is `--set timeline.stop_myr=<stop>` on the run planned for the length:
 # the world at that time of the longer run (docs/design/playability-steering.md: a run's world
@@ -100,6 +102,14 @@ runs)
   done
   for p in "${pids[@]}"; do wait "$p"; done
   echo "RUNS_DONE $c $SEEDS"
+  ;;
+
+control)
+  # The same runs with DEEPTIME_CRUST_BUDGET unset, in $ROOT/ctl (its bin/ is the main one): the
+  # measurement env must change no field.
+  c=$1; shift
+  mkdir -p "$ROOT/ctl" && ln -sfn ../bin "$ROOT/ctl/bin"
+  CB_ROOT=$ROOT/ctl CB_BUDGET=0 "$SELF" runs "$c" "$@"
   ;;
 
 all)
