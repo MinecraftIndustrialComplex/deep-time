@@ -508,7 +508,11 @@ fn a_closed_basin_below_sea_level_takes_its_balance() {
     let wet = run_on(&elev, Climate::steady(1500.0, 5.0));
     let level = wet.water_level[centre];
     assert!(level != NODATA && i32::from(level) > sea_raw);
-    assert!(wet.lakes.iter().any(|l| l.level == level && l.level == l.rim));
+    assert!(
+        wet.lakes
+            .iter()
+            .any(|l| l.level == level && l.level == l.rim)
+    );
 }
 
 #[test]
@@ -531,9 +535,19 @@ fn a_basin_open_to_the_sea_stands_at_sea_level_however_dry() {
         .expect("the open bowl holds the sea's water");
     // Its surface's top block is the sea's (it stands a step under its sill, a quarter block
     // under sea level).
-    assert_eq!((i32::from(lake.level) + 15).div_euclid(16) - 1, sea_raw / 16 - 1);
-    assert!(open.iter().all(|&c| dry.water_level[c] == lake.level && dry.closed_basin[c] == 0));
-    assert!(closed.iter().all(|&c| dry.water_level[c] == NODATA && dry.closed_basin[c] == 1));
+    assert_eq!(
+        (i32::from(lake.level) + 15).div_euclid(16) - 1,
+        sea_raw / 16 - 1
+    );
+    assert!(
+        open.iter()
+            .all(|&c| dry.water_level[c] == lake.level && dry.closed_basin[c] == 0)
+    );
+    assert!(
+        closed
+            .iter()
+            .all(|&c| dry.water_level[c] == NODATA && dry.closed_basin[c] == 1)
+    );
     let below = &dry.stats["below_sea"];
     assert!(below["open_km2"].as_f64().unwrap() > 0.0, "{below}");
     assert!(below["dry_km2"].as_f64().unwrap() > 0.0, "{below}");

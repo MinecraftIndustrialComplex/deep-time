@@ -245,9 +245,11 @@ impl Terrain for LakeTest {
     }
 
     fn closed_basin(&self, x: i64, z: i64) -> Option<bool> {
-        Some(Self::BOWLS.iter().any(|b| {
-            self.bowl_distance(b, x, z) <= Self::BOWL_FLOOR_RADIUS + Self::BOWL_SLOPE
-        }))
+        Some(
+            Self::BOWLS
+                .iter()
+                .any(|b| self.bowl_distance(b, x, z) <= Self::BOWL_FLOOR_RADIUS + Self::BOWL_SLOPE),
+        )
     }
 }
 

@@ -98,7 +98,12 @@ fn neighbour8(w: usize, h: usize, c: usize, k: usize) -> Option<usize> {
 
 /// The open sea of a `w` × `h` grid (x wraps): every cell where `deep` holds in an 8-connected body
 /// of at least `min_cells` (the hydrology's own rule, [`OPEN_SEA_KM2`]).
-pub fn open_sea_mask(w: usize, h: usize, deep: impl Fn(usize) -> bool, min_cells: usize) -> Vec<bool> {
+pub fn open_sea_mask(
+    w: usize,
+    h: usize,
+    deep: impl Fn(usize) -> bool,
+    min_cells: usize,
+) -> Vec<bool> {
     let n = w * h;
     let mut done = vec![false; n];
     let mut open = vec![false; n];

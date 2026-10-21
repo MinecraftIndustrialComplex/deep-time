@@ -169,7 +169,9 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
             std::fs::remove_file(&rivers_path).map_err(|e| CoreError::io(&rivers_path, e))?;
         }
         out.m.files.retain(|f| f.path != RIVERS_PATH);
-        out.m.layers.retain(|l| l.name != PLAYA_LAYER && l.name != CLOSED_BASIN);
+        out.m
+            .layers
+            .retain(|l| l.name != PLAYA_LAYER && l.name != CLOSED_BASIN);
         // An all-nodata `water_level` on the elevation grid (a re-run over a folder that had
         // lakes clears them).
         if let Some(e) = out.m.layer("elevation") {

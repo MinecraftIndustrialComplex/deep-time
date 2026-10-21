@@ -310,7 +310,9 @@ pub fn build_with(
         for j in 0..i64::from(l3.h) {
             let z = l3.block_z(j);
             for i in 0..i64::from(l3.w) {
-                flag.push(u8::from(terrain.closed_basin(l3.block_x(i), z) == Some(true)));
+                flag.push(u8::from(
+                    terrain.closed_basin(l3.block_x(i), z) == Some(true),
+                ));
             }
         }
         let mut d = LayerDesc::scalar(
