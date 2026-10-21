@@ -420,6 +420,37 @@ public final class SimSession implements AutoCloseable {
         }
     }
 
+    /**
+     * Asks for the live map of {@code layer} for the next two seconds (null stops; {@code watchLive})
+     * and returns the newest live frame's number: 0 before the first, and once the session is gone.
+     * Safe from any thread.
+     */
+    public long watchLive(String layer) {
+        synchronized (lifecycle) {
+            if (destroyed || id == 0)
+                return 0;
+            try {
+                return DeepTimeNative.watchLive(id, layer);
+            } catch (RuntimeException e) {
+                return 0; // poisoned: no live map
+            }
+        }
+    }
+
+    /**
+     * Copies the newest live frame as RGBA8 into a direct buffer of at least w·h·4 bytes and returns
+     * its JSON ({@code copyLiveFrame}); null before the first and once the session is gone. Safe from
+     * any thread.
+     */
+    public String copyLiveFrame(ByteBuffer dstRgba) {
+        synchronized (lifecycle) {
+            if (destroyed || id == 0)
+                return null;
+            String info = DeepTimeNative.copyLiveFrame(id, dstRgba);
+            return info == null || info.isEmpty() ? null : info;
+        }
+    }
+
     /** True while this launched session waits for an earlier one to stop (see {@code LAUNCH_GATE}). */
     public boolean waitingForPrevious() {
         return waitingForGate;

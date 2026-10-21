@@ -15,7 +15,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228, PLT-293 (20; PLT-293 ocean crust keeps its own rock at resamplings and in the L1 sampling, 2026-10-19) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
-| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288, PLT-294 (44; PLT-294 the switch for the transition's ocean side, ocean crust or the continent's rock, 2026-10-19; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
+| [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288, PLT-294 (44; PLT-294 the switch for the transition's ocean side, ocean crust or the continent's rock, 2026-10-19, on in the shipped presets since 2026-10-20; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265, PLT-310 to PLT-311 (43; PLT-310 and PLT-311 the boundary's normal and Bird's transform test, the land-shape task, 2026-10-20; PLT-265 Earth's passive margins, the transition's comparison) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
@@ -275,9 +275,10 @@ orogenic collapse and before the surface processes:
    zone belongs to the seed of its nearest boundary sample, through its own crust and plate), the
    share 1 − e^(−δt/τ) per step of what would bring the stretch to the profile (τ =
    `transition_myr`, 20 Myr, PLT-263), the sources thinned in proportion (pure shear), as their
-   own rock. A switch added on 2026-10-19, off by default (`transition_ocean_crust`, PLT-294,
-   "Ocean crust keeps its own rock" below), gives an oceanic sink the same volume as ocean crust
-   instead, lavas and gabbro in the ocean column's proportion. Volume is conserved, and crust types do not change: the thickened
+   own rock. A switch added on 2026-10-19 (`transition_ocean_crust`, PLT-294, "Ocean crust keeps
+   its own rock" below), on in every shipped preset since 2026-10-20 (decisions log 2026-10-20),
+   gives an oceanic sink the same volume as ocean crust instead, lavas and gabbro in the ocean
+   column's proportion. Volume is conserved, and crust types do not change: the thickened
    ocean-side samples stay oceanic, so the continental area and the crust share are not redefined
    by this rule.
 4. *Heights* (PLT-264). A metre of crust moved changes the height by 1/f, f = (T_n − T_o) / (z_0 −
@@ -2114,7 +2115,9 @@ The means: before 0.30 on both starts, after 0.32, switch on 0.27 on both, again
 0.131 and 0.139 against 0.165, 0.189 and 0.177.
 
 Ben weighed the transition's land cost on 2026-10-05 ("Keep 200 km, raise crust in 7-8"), so the
-switch is off by default and the choice is his. The physical fix is a continent that widens as it
+switch was off at first and the choice his; since 2026-10-20 it is on in every shipped preset, the
+coordinator's call under Ben's rule of 2026-10-16 once the cordillera at 1.7 mm/yr held the land at
+Earth's with it on ("The ocean crust switch, PLT-294" below; decisions log 2026-10-20). The physical fix is a continent that widens as it
 stretches, which the model's fixed boundary cannot do without the ratchet PLT-289 records.
 
 **What is left under the sea** (switch on, seed 1 supercontinent on master bc2e5472, the table
@@ -2637,7 +2640,12 @@ six runs' range):
 
 On the branch the switch takes the felsic rock off 0.30 of the ocean basins and moves the land to
 0.27, the high ground and coast within the seeds' spread, and the plate checks hold (27 to 28). It
-stays the coordinator's call (decisions log 2026-10-20, "off until the high-ground fix lands").
+was the coordinator's call (decisions log 2026-10-20, "off until the high-ground fix lands"), and
+on these numbers it went on in every shipped preset (`earthlike_*` and `pipeline_*`; decisions
+log 2026-10-20, the second PLT-294 entry; the plate pipeline's `plates_*` keep the code's default): the land holds near Earth's 0.29 on both starts
+and the ocean basins' felsic share falls from 0.76 to 0.46. The high ground does not move one way
+(better on the quick ensemble, worse on the single full run, seed 1: land above 2 km 0.299 / 0.314
+off, 0.380 / 0.455 on) and belongs to the high-ground work.
 
 **The collisions' end: a slab tear, tried and reverted.** Every collision the check counts ends by
 stalling into a weld (130 of 130 on the branch: convergence under 5 mm/yr for 10 Myr; at the end
@@ -2694,8 +2702,269 @@ adds no work per step, so the 900 s gate stands where master left it.
    most 120): the slab tear is not the tail's law; a plate reorganisation is the other candidate,
    a change to how plates split (Ben's).
 3. *The arc's ocean floor made continental* (4.67 km³ a year, no row in Table 1): a column holding
-   its arc's magma apart from its ocean crust is a crust data-model change (Ben's).
+   its arc's magma apart from its ocean crust is a crust data-model change (Ben's). Done
+   2026-10-20 by PLT-331 without one: the column keeps the ocean crust under its arc as a basement
+   tag on its mafic pools, out of the continental books ("The arc's basement and the arcs' fronts"
+   below).
 4. *The cordillera per front*: 0.09 of the upper plate's motion over the mantle (Heuret &
    Lallemand) once the force balance hands each arc its upper plate's motion.
 5. *Hotspots and rifted margins* (0.04 against 0.5): flood basalts and volcanic margins have no
    rule.
+
+
+## The arc's basement and the arcs' fronts (2026-10-20)
+
+The coordinator's task after "The crust budget against Stern & Scholl" above, on Ben's complaint
+that mountains eat the world and leave a stringy mess of islands: (1) the arc's ocean floor made
+continental (4.67 km³ a year with no row in Stern & Scholl's Table 1, item 3 of that section's
+"What is left"): keep the arc's own magma apart from the ocean crust under it, so only the arc's
+crust counts as continental, with arcs still accreting to continents in collisions; (2) the
+island-arc front (142,000 lattice km a step against Earth's 14,500; 31.6 % of the boundary
+subducting against 15 to 25): find why and fix it at its law, or report it if the cause is how
+plates split and reorganise. Ledger PLT-330 and PLT-331 (amended: PLT-047, PLT-163, PLT-221,
+PLT-247, PLT-248, PLT-277, PLT-289, PLT-302, PLT-312); sources in the bibliography, "The arc's
+basement and the arcs' fronts". Code: `plates/state.rs` (`Sample::basement_m`,
+`make_continental`, `basement`, `own_thickness_m`, `own_pools`), `plates/subduction.rs`
+(`fronts_begin`, the contact's resolve), `plates/mod.rs` (`finish_samples`), `plates/belts.rs`
+(`stack_front`), `plates/collapse.rs`, `plates/transition.rs`, `plates/ridges.rs`,
+`plates/crust_budget.rs`; `tools/review/loss-budget.py` books the basement. The build log entry
+of 2026-10-20 "The arc's basement and the arcs' fronts" has the commands.
+
+**What Stern & Scholl count** (Int. Geol. Rev. 52:1-31, read in full; read again for this task).
+Their intra-oceanic arc rate is the arc's crust. On p. 7: "The largest sources of error are as
+follows: (1) uncertainty about whether to include an original 6–7 km thickness of ‘trapped’
+oceanic crust"; "early concepts assumed that new arcs grew on a substrate of pre-existing oceanic
+crust that was trapped when the new subduction zone formed (Dickinson and Sealy 1979). More recent
+considerations indicate that the substrate for intra-oceanic arcs is produced when subduction
+begins (Stern and Bloomer 1992; Hall et al. 2003)". The caption of their Figure 6 (after Tatsumi et
+al. 2008): "Incipient arc magmatism replaces the pre-existing oceanic crust to create the initial
+mafic arc crust". So Table 1's 1.5 km³ a year holds the ocean crust under an arc at most once, as
+the arc's own first crust; the model's arc rate already adds that, and the ocean column the arc
+stands on is not new continental crust.
+
+**The basement** (PLT-331). A sample that turns continental from ocean floor records
+`basement_m` = min(the ocean column's 7 km, its mafic rock). That covers the three ways ocean floor
+turns: an island arc matured (PLT-047, the step's finish), ocean floor as thick as a continent at a
+contact (PLT-289) and ocean floor filled to the normal column by the collapse's spread (PLT-277).
+On master the arc's maturity was about 47 % of the old row (supercontinent seed 1: the finish 0.48
+of the turned area, the subduction step 0.20, the rate limit 0.21, the collapse 0.09, the founder
+0.03). The basement stays in the column's mafic pools: the column's rock, its kind and its height
+are as before. It is only a tag on how much of the mafic rock is the ocean's. Two readers leave it
+out:
+- the crust budget, so the continental volume counts the crust on top (PLT-302; `o2c_b` books the
+  basement apart, the loss budget's "ocean floor kept under it as basement" row);
+- a collision, which stacks the crust on top only (the belts' thickness and pools less the
+  basement, PLT-247 and PLT-248), so the basement goes down with the slab. Cloos 1993 (abstract):
+  "Oceanic island arc complexes built upon ocean crust" and buoyant crust over about 15 km jam a
+  trench; from memory, not read: Boutelier, Chemenda & Burg 2003 (EPSL 212:31-45), an arc at a
+  trench loses its lower part to the slab while its upper crust accretes.
+
+The basement thins with its column (the transition's and the collapse's sources), is never more
+than the column's mafic rock (what eroded, foundered or flowed took it with it), blends between
+same-kind corners at a resampling and is 0 on ocean floor and on the continents' own crust. A
+matured arc still turns continental, emerges and accretes to a continent at a collision (test
+`arcs_turn_continental_by_their_crust_not_their_height` keeps 7 km of basement under a converted
+arc; `a_basement_goes_down_with_the_slab` stacks only the crust on top). Every other reader of
+kind and thickness (isostasy and `settle.rs`, the kind's own readers: the regime, the L1 crust
+fields, strata and the plate checks' continental share) reads the whole column as before. The
+field lives in the plate state and the checkpoint, not in the world data: no format the Java side
+reads changes. Checkpoints written before it do not load (no compatibility before a release).
+
+**Why the height keeps the whole column.** Leaving the basement out of the arc's height too
+would be a mistake: water-loaded isostasy (`settle.rs`, ISO-078) already puts 7 km of ocean crust
+at old ocean floor's depth, 525 + (7,000 − 35,100) / 7 = −3,489 m dry, times 3,300 / 2,270 =
+−5.07 km under water, so an arc on old floor stands by its own crust's buoyancy above that.
+Dropping the basement's 7 km from the height would sink every arc on old floor by about
+1.5 km (1,000 m dry x 1.4537, the agent's arithmetic) below where its crust floats.
+
+**The fronts** (PLT-330). An arc's front was every lattice edge of an active contact along which
+the plates converged (`fronts_begin`). A contact belongs to a pair of plates, not to a stretch of
+their boundary, and one lattice edge's direction is no azimuth: plates sliding past each other
+converge along half the edges of a zigzag boundary. The boundary mix judges the motion along the
+boundary's normal (PLT-310) and calls it a transform within Bird's 20 degrees (PLT-311,
+`dynamics::classify_boundary`); the fronts did not. So the contacts' strike-slip and parting
+stretches built arcs (PLT-045, PLT-285), raised the subduction uplift, shortened cordilleras
+(PLT-048) and counted in each plate's front length (the dynamics record's `front_km`, which the
+slab-attached test PLT-163 reads). On master with PLT-294 on the island-arc front was 143,997
+lattice km a step against the mix's 84,800 km of ocean-ocean subduction (480,580 km of boundary,
+32.1 % subducting, 55.0 % of that ocean-ocean). A front is now where the plates converge across
+their boundary and the motion lies more than 20 degrees from it, the mix's own test (Bird 2003,
+paragraphs [126] and [127]). The island-arc front falls to 85,213 km, at the mix's 93,800 km of
+ocean-ocean subduction (476,671 km, 34.4 %, 57.2 %); the fronts' normal convergence is 0.80 of
+their full speed, against 0.47 before. Test `a_contact_whose_plates_slide_past_has_no_arc_front`:
+a contact converging head-on has more than 20 fronts, the same contact sliding past has none. The
+force balance's slab pull (`forces.rs`) finds its own fronts and still takes single lattice edges
+(left below).
+
+**Why the subducting boundary is long: the plates.** The rest of the excess is not short-lived,
+slow or shallow subduction that a law for where an arc forms could remove. Master's subducting
+boundary (the dynamics record's `front_bands`, commit 485858eb, on master's rules; ocean-ocean / ocean-continent):
+
+| | supercontinent | scattered |
+|---|---|---|
+| slab at least 600 km long | 67 % / 64 % | 72 % / 72 % |
+| normal convergence at least 20 mm/yr | 79 % / 80 % | 82 % / 83 % |
+| contact at least 24 Myr old | 74 % / 74 % | 77 % / 79 % |
+
+The subduction is long-lived, fast and deep. Its length is the plates' geometry: 24 plates alive at
+the median (p10 17, p90 29) against Earth's 52 (14 large; Bird 2003 Table 3), 476,671 lattice km of
+boundary a step, about 238,000 km surveyed with the lattice's factor of about 2 (Earth 260,487).
+The boundary is about Earth's; 34.4 % of it subducts against Bird's 19.7 % (51,310 km), and 57 % of
+that is ocean-ocean against Earth's 35 % (14,500 of Stern & Scholl's 42,000 km of arcs). The two
+shares together, 1.75 x 1.63, are the island-arc front's remaining excess (85,213 lattice km,
+about 42,600 surveyed, 2.9 times 14,500). How much of the boundary converges is the force balance's
+plate motions and how plates split and reorganise: Ben's scope, as the task said, and not changed.
+
+**Measured** (`tools/review/force-balance-ensemble.sh`, `earthlike_quick_16k`, 1000 Myr, seeds 1 to
+3, supercontinent / scattered, `DEEPTIME_CRUST_BUDGET=1`; `tools/review/land-shape.py`,
+`loss-budget.py`, `collision-ends.py`; km³ a year over the whole run). Master moved during the
+task: PLT-294 went on in the shipped presets (71103327); the sim is otherwise the branch point
+d9bd2b65's, so both sides ran with `--set tectonics.transition_ocean_crust=true` on that base.
+
+With PLT-294 on (supercontinent / scattered; "PLT-331 only" is the branch with PLT-330's test
+taken out, so the two fixes' parts show apart):
+
+| | master | PLT-331 only | the branch (PLT-330 and PLT-331) | the branch + PLT-312 | Earth |
+|---|---|---|---|---|---|
+| land | 0.271 / 0.272 | 0.267 / 0.273 | 0.234 / 0.242 | 0.210 / 0.203 | 0.29 |
+| land above 2 km | 0.348 / 0.297 | 0.315 / 0.313 | 0.312 / 0.324 | 0.335 / 0.362 | 0.05 by rock |
+| coast p50, km | 149 / 145 | 168 / 164 | 159 / 159 | 165 / 160 | 433 |
+| continental crust, share of the planet | 0.411 / 0.405 | 0.385 / 0.392 | 0.348 / 0.351 | 0.303 / 0.297 | 0.41 |
+| island-arc land, share of the planet | 0.139 / 0.156 | 0.136 / 0.139 | 0.103 / 0.107 | 0.089 / 0.097 | small |
+| other land (collision, Andean, the rest) | 0.132 / 0.116 | 0.131 / 0.134 | 0.131 / 0.135 | 0.121 / 0.106 | |
+| plate checks met (pooled) | 28 of 45 | 29 of 45 | 28 of 45 | 27 of 45 | |
+| island arcs | 4.25 | 4.31 | 3.24 | 2.81 | 1.5 |
+| continental arcs | 1.58 | 1.64 | 1.62 | 1.15 | 1.0 |
+| ocean floor made continental | 4.33 | 0.12 | 0.14 | 0.12 | none |
+| kept under it as basement (not counted) | | 4.09 | 3.71 | 3.06 | |
+| collisions lose | 1.85 | 1.83 | 1.83 | 2.13 | 0.7 |
+| foundering | 1.06 | 0.82 | 0.76 | 0.76 | not known |
+| net change of the continental volume | +0.21 | -0.91 | -1.57 | -2.25 | about 0 |
+| island-arc front, lattice km a step | 143,997 | 143,992 | 85,213 | 89,262 | 14,500 |
+| continental-arc front, lattice km a step | 99,201 | 98,738 | 59,909 | 55,814 | 27,500 |
+| boundary subducting (the mix) | 32.1 % | 32.5 % | 34.4 % | 35.4 % | 15 to 25 % |
+| collisions per 100 Myr | 2.15 | 2.12 | 1.58 | 1.55 | 2 to 6 |
+| collision length p50 / p90, Myr (pooled check) | 38 / 121 | 36 / 115 | 48 / 121 | 53 / 136 | 15 to 50 / at most 120 |
+
+(The island-arc land is the land times the share of land whose crust an island arc made, the
+crust budget's `cb_origin`; "other land" is the rest of the land.)
+
+**What each fix does.** PLT-331 alone holds the land (0.267 / 0.273), brings the coast nearer
+Earth's (168 / 164 km), moves the high ground within the seeds' spread (0.315 / 0.313), gains a
+plate check (29 of 45) and brings the collisions' p90 under 120 Myr (115): the basement that goes
+down with the slab no longer stacks into the belts. The ocean floor row falls from 4.33 to 0.12 km³
+a year (Table 1: none; the rest is ocean floor thinner than 7 km when it turned), and 4.09 stays
+under the arcs as basement. The continental crust's share falls a little (0.411 / 0.405 to 0.385 /
+0.392) and the budget's net to -0.91: the books no longer count the basement.
+
+PLT-330 on top takes the island arcs from 4.31 to 3.24 km³ a year, and the land it costs (0.267 /
+0.273 to 0.234 / 0.242) is island-arc land only: the island arcs' land falls from 0.136 / 0.139 of
+the planet to 0.103 / 0.107, the rest of the land holds at 0.131 / 0.134 to 0.131 / 0.135. The arcs
+the contacts' transform and parting stretches built were islands, the stringy mess Ben named, and
+island arcs still make 0.44 of the land (on Earth the intra-oceanic arcs hold a few per cent of the land:
+the agent's estimate from memory, not a measured row). The coast moves within the spread (159 / 159), a plate check
+goes (28 of 45) and the collisions' number falls under the target (2.12 to 1.58 per 100 Myr): fewer
+arcs reach continents. PLT-330 stays on (decisions log 2026-10-20, the arc-basement task): the
+front test is Bird's, and keeping the transform stretches' arcs would keep a source with no
+subduction under it to stand in for the losses the model has too much of (the collisions lose 1.83
+against 0.7).
+
+With PLT-294 off (the branch point's presets), for the record:
+
+| | master | branch | branch + PLT-312 | Earth |
+|---|---|---|---|---|
+| land | 0.284 / 0.256 | 0.278 / 0.251 | 0.228 / 0.249 | 0.29 |
+| land above 2 km | 0.320 / 0.359 | 0.414 / 0.374 | 0.445 / 0.386 | 0.05 by rock |
+| coast p50, km | 149 / 158 | 165 / 150 | 185 / 159 | 433 |
+| continental crust, share of the planet | 0.418 / 0.349 | 0.354 / 0.348 | 0.292 / 0.322 | 0.41 |
+| plate checks met (pooled) | 27 of 45 | 29 of 45 | 30 of 45 | |
+| island arcs | 4.20 | 2.99 | 2.90 | 1.5 |
+| continental arcs | 1.56 | 1.51 | 1.21 | 1.0 |
+| ocean floor made continental | 4.67 | 0.24 | | none |
+| kept under it as basement | | 3.74 | | |
+| collisions lose | 2.65 | 2.07 | 2.56 | 0.7 |
+| foundering | 1.23 | 0.89 | | not known |
+| net change of the continental volume | -0.12 | -1.00 | -1.67 | about 0 |
+| island-arc front, lattice km | 142,395 | 78,778 | | 14,500 |
+| continental-arc front, lattice km | 99,288 | 58,242 | | 27,500 |
+| boundary subducting | 31.6 % | 33.3 % | | 15 to 25 % |
+| collisions per 100 Myr | 2.17 | 1.98 | | 2 to 6 |
+
+**The ocean-basin felsic share** (the share of `ocean_basin` cells on oceanic crust holding more
+than 50 m of felsic plutonic rock, `tools/review/geo_template_fields.py` on the final checkpoint;
+the six runs' mean and range, or the one full run):
+
+| | master | PLT-331 only | the branch | Earth |
+|---|---|---|---|---|
+| quick, PLT-294 on | 0.46 (0.34 to 0.57) | 0.44 (0.39 to 0.52) | 0.26 (0.22 to 0.28) | near 0 |
+| quick, PLT-294 off | 0.76 (0.61 to 0.91) | | 0.64 (0.51 to 0.76) | near 0 |
+| full 16k, on / off | 0.45 / 0.79 | | 0.26 / 0.61 | near 0 |
+
+The fronts do it: the arcs the transform stretches built dropped their felsic rock onto the ocean
+floor next to them (the arcs' felsic rock onto the ocean floor falls from 4.02 to 3.09 km³ a year
+with PLT-294 on).
+
+**PLT-312 again** (`DEEPTIME_ARC_NORMAL=1`, the arcs on the normal convergence). With the fronts on
+the converging boundary the switch moves the arcs less than before (island arcs 3.24 to 2.81 km³ a
+year, continental 1.62 to 1.15, against 4.20 to 2.19 and 1.56 to 0.80 in the last section), and
+land falls further below Earth's, the land above 2 km rises and the plate checks lose one (28 to
+27 with PLT-294 on; with it off they gain one, 29 to 30, while land and high ground move the same
+way). Two or more of the four measures move away from Earth on both bases, so it stays off
+(decisions log 2026-10-20, the arc-basement task).
+
+**The full 16k planet** (`earthlike_full_16k`, scattered continents, seed 1, 8 threads, 1000 Myr;
+one seed, so within the spread the quick ensemble shows; master's run with PLT-294 on repeats the
+last section's "branch, on" column exactly):
+
+| | master, PLT-294 on | branch, on | master, off | branch, off | Earth |
+|---|---|---|---|---|---|
+| land | 0.268 | 0.236 | 0.330 | 0.264 | 0.29 |
+| island-arc land / other land, share of the planet | 0.146 / 0.122 | 0.111 / 0.125 | 0.176 / 0.154 | 0.129 / 0.135 | |
+| land above 2 km | 0.455 | 0.270 | 0.314 | 0.394 | 0.05 by rock |
+| coast p50, km | 210 | 159 | 146 | 141 | 433 |
+| continental crust | 0.383 | 0.359 | 0.409 | 0.355 | 0.41 |
+| plate checks met | 27 of 45 | 32 of 45 | 26 of 45 | 29 of 45 | |
+| island arcs | 5.17 | 3.89 | 4.47 | 3.51 | 1.5 |
+| continental arcs | 1.86 | 1.95 | 1.59 | 1.77 | 1.0 |
+| ocean floor made continental | 5.18 | 0.12 | 4.78 | 0.19 | none |
+| kept under it as basement | | 4.13 | | 4.01 | |
+| collisions lose | 2.41 | 2.42 | 2.28 | 2.79 | 0.7 |
+| foundering | 2.96 | 1.50 | | | not known |
+| net change of the continental volume | +0.45 | -1.38 | +0.96 | -0.85 | about 0 |
+| island-arc front, lattice km a step | 180,850 | 106,810 | 167,460 | 96,630 | 14,500 |
+| boundary subducting | 33.6 % | 35.2 % | 32.4 % | 35.8 % | 15 to 25 % |
+| collision length p50 / p90, Myr | 32 / 124 | 36 / 78 | 48 / 158 | 52 / 130 | 15 to 50 / at most 120 |
+| collisions per 100 Myr | 3.10 | 2.30 | 3.70 | 2.50 | 2 to 6 |
+
+On the full planet with PLT-294 on the branch gains five plate checks and its high ground falls
+from 0.455 to 0.270 of the land; the land falls with the island arcs as on the quick ensemble (the
+other land holds, 0.122 to 0.125) and the coast's 210 km falls to 159.
+
+**Stage times** (`tools/review/p1-19-pair.sh`, master d9bd2b65 against the branch side by side,
+`earthlike_full_16k`, scattered continents, 1000 Myr, 8 threads, the presets' PLT-294 off on both,
+pairs ab and ba; the VM loaded by other agents, 16 to 19 other CPUs busy on average): the plates
+stage 305.0 against 309.2 s and 348.3 against 328.8 s (the branch's over master's, 1.014 and
+0.944), the whole run 1,263.9 against 1,234.8 s and 1,421.4 against 1,350.6 s (0.977 and 0.950).
+The step does no new work: the fronts' test reads the normals `fronts_begin` already had, and the
+basement is one more float a sample. The rest of the difference is in the surface stage, which
+works on a different planet.
+
+**What is left, and for whom.**
+1. *The boundary's subducting share* (34 % against Bird's 19.7 %, 57 % of it ocean-ocean against
+   35 %): the plates' geometry and motions, how plates split and reorganise. Ben's.
+2. *The force balance's slab pull* takes its fronts from single lattice edges (`forces.rs`), as the
+   arcs did before PLT-330: a contact's transform stretches still pull. Giving it PLT-330's test is
+   a change to the plate forces, measured on its own (the plate speeds and the slab-attached checks
+   move with it).
+3. *Land and continental crust fall* below Earth's with the island arcs (land 0.234 / 0.242 against 0.29;
+   continental crust 0.348 / 0.351 against 0.41, and the check on its lowest step fails at 0.30
+   against at least 0.37). The budget's net is -1.57 km³ a year, against +0.21 on master, which
+   counted 4.33 of ocean floor as new crust. The continents' own land holds; what is short is island
+   arcs, and the arcs that remain still add twice Earth's (3.24 against 1.5) on a front 2.9 times
+   Earth's while the collisions lose 2.6 times Earth's. The levers are the plates' geometry (item 1)
+   and the losses (item 4), not the arcs' rule.
+4. *The collisions*: their number now fails (1.58 per 100 Myr on the quick ensemble with PLT-294
+   on, target 2 to 6), the p90 holds at 121 Myr (at most 120) and the loss at 1.83 km³ a year
+   (Earth 0.7); a plate reorganisation is the open law (Ben's, as in the last section).
+5. *The high ground* (0.31 to 0.39 of land above 2 km against 0.05 by rock) did not move toward
+   Earth with either fix and stays the high-ground work's.
