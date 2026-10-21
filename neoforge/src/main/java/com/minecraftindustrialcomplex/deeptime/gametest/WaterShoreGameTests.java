@@ -44,8 +44,12 @@ import java.util.List;
  *       grass, a bank raised by up to {@code WaterBodies.SOIL_BLOCKS} adds its soil, and a slope
  *       shows less of it).</li>
  * </ul>
- * No dirt face may remain; pits are allowed in at most one column in a hundred (vanilla's noodle
- * caves, which the shield does not touch, can break the surface).
+ * No dirt face may remain; pits are allowed in at most one column in a hundred (the shield closes
+ * the band's entrance term and, since 2026-10-21, vanilla's noodle caves within the band, HYD-078;
+ * a cave of the deep stack under the band can still reach up to the surface now and then). The
+ * gate batch on master f43d1e1a found 173 of 11,086 shore columns in a pit with only the entrances
+ * shut: noodle tubes 1 to 4 blocks under shallow sea floors, and an 8-block void under a river;
+ * with the noodles shut too, none.
  */
 @GameTestHolder(GameTestSupport.NS)
 @PrefixGameTestTemplate(false)

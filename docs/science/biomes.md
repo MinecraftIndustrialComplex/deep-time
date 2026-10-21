@@ -631,6 +631,16 @@ shrublands 0.017 → 0.782 (0.5); BSk mid and far inland on the steppe itself 0.
 0.100 → 0.022 (at most 0.1). Cold wetland (the subarctic classes' wet lowland) is the same in both: 40 columns, 30 on
 taiga, none on swamp (Terralith has no peatland biome).
 
+Since 2026-10-21 the checks count only the columns inside cells of their class (BIO-154). The game reads the biome
+inputs bilinear between L2 cells, so a column on a class border reads a blend of two classes' inputs, or of a class's
+and the sea's, and its biome says nothing of the table's rule for its class. The sea's side matters most in the
+tropics: a warm sea cell's temperature band is above 4 (BIO-036), so between an Am cell (at most 3.9) and the sea the
+blend crosses vanilla's T4 line, where every middle biome is desert, and Terralith puts its desert oasis there. On
+master f43d1e1a's MIC test planet that strip took Am's share over all its 52 columns to 0.596, under the bound: 13 of
+its 21 misses lay beside the sea (desert oasis 10, windswept forest 3), and inside Am cells 27 of 33 columns were on
+its jungles. The strip is real in the game (a desert oasis fringe on a monsoon coast, at most one L2 cell wide, since
+the blend reaches one cell) and is not the table's to fix; the census logs the border's columns and their biomes apart.
+
 The geology gate (the rule file `deeptime:rock_named`), the census's plain search (no gate, no volcanic layer)
 against the level's. Without the table 1,564 sampled land columns carried a rock-named biome and 844 of them stood
 off their ground: Shield 456 of 456 (this planet has no shield province), Granite Cliffs 173 of 173 (no granite
