@@ -78,6 +78,12 @@ def run_stats(path, skip, max_plates):
         r[f"mix_{n}"] = mix[k] / total
     r["mix_subducting"] = (mix[0] + mix[1]) / total
     r["oo_of_subducting"] = mix[0] / max(mix[0] + mix[1], 1e-9)
+    # Lengths, Earth-normalised km per step (Bird 2003: SUB 19.7 % of his boundary; Stern & Scholl
+    # 2010: 14,500 km of intra-oceanic arc, 27,500 km of continental).
+    steps_n = max(len(use), 1)
+    r["boundary_km"] = total / steps_n
+    for k, n in enumerate(NAMES[:3]):
+        r[f"km_{n}"] = mix[k] / steps_n
     conv_other = sum(s.get("front_bands", {}).get("other_converging", 0.0) for s in use)
     r["other_converging"] = conv_other / total
     # Fronts by band (0 ocean-ocean, 1 ocean-continent), shares of each setting's front.

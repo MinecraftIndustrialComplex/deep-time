@@ -213,6 +213,9 @@ struct Agg {
     cont: [u32; 2],
     locked: [u32; 2],
     age: [f64; 2],
+    /// … and ones with their plate's continental crust within the arc's distance
+    /// ([`continent_within`]).
+    near: [u32; 2],
 }
 
 /// What `resolve` found this step.
@@ -228,6 +231,7 @@ pub struct Resolved {
 pub fn resolve(
     state: &mut PlateState,
     world: &mut WorldState,
+    geo: &Geo,
     overlaps: &[Overlap],
     pos: &[DVec3],
     env: &Env,
@@ -278,6 +282,8 @@ pub fn resolve(
         })
         .collect();
     let mut aggs: BTreeMap<(u32, u32), Agg> = BTreeMap::new();
+    let mode = pg_reversal_mode();
+    let arc_steps = (env.k.arc_distance_km / env.norm.km(env.norm.spacing_rad())).floor() as u32;
     for o in overlaps {
         let a = state.plate_of(o.i as usize);
         let b = state.groups[o.group as usize].plate;
@@ -290,6 +296,9 @@ pub fn resolve(
         for (side, idx) in [(sa, o.i), (sb, o.cover.major())] {
             let s = &state.samples[idx as usize];
             e.seen[side] += 1;
+            if mode == 3 && continent_within(state, geo, idx, arc_steps) {
+                e.near[side] += 1;
+            }
             if s.kind == CONTINENTAL {
                 e.cont[side] += 1;
                 if locked_against(s, t_myr, env, own) {
@@ -317,11 +326,16 @@ pub fn resolve(
             let c = &state.contacts[k];
             let under_side = usize::from(c.under != lo);
             let (u, o) = (under_side, 1 - under_side);
-            let mode = pg_reversal_mode();
+            let near = |s: usize| f64::from(agg.near[s]) / f64::from(agg.seen[s].max(1));
+            let over_oceanic = if mode == 3 {
+                near(o) < REVERSAL_OVER
+            } else {
+                frac(o) < REVERSAL_OVER
+            };
             let by_crust = frac(u) >= REVERSAL_UNDER
-                && frac(o) < REVERSAL_OVER
-                && (mode == 0 || c.collision.is_none())
-                && (mode < 2 || env.t_myr - c.onset_myr < CONFIRM_MYR);
+                && over_oceanic
+                && (mode == 0 || mode == 3 || c.collision.is_none())
+                && (mode != 2 || env.t_myr - c.onset_myr < CONFIRM_MYR);
             if agg.count >= MIN_CONTACT
                 && (by_crust || (lock(u) >= REVERSAL_UNDER && lock(o) < REVERSAL_OVER))
             {
@@ -496,6 +510,33 @@ fn pg_reversal_mode() -> u8 {
             .and_then(|v| v.parse().ok())
             .unwrap_or(0)
     })
+}
+
+/// Whether continental crust of sample `i`'s plate lies within `steps` lattice steps of it through
+/// that plate (itself included): an arc behind a front there would stand on continental crust.
+fn continent_within(state: &PlateState, geo: &Geo, i: u32, steps: u32) -> bool {
+    let p = state.plate_of(i as usize);
+    let mut seen = vec![i];
+    let mut frontier = vec![i];
+    for depth in 0..=steps {
+        let mut next = Vec::new();
+        for &v in &frontier {
+            if state.samples[v as usize].kind == CONTINENTAL {
+                return true;
+            }
+            if depth == steps {
+                continue;
+            }
+            for (u, _) in geo.edges(v) {
+                if !seen.contains(&u) && state.plate_of(u as usize) == p {
+                    seen.push(u);
+                    next.push(u);
+                }
+            }
+        }
+        frontier = next;
+    }
+    false
 }
 
 /// A contact reverses when at least this fraction of its subducting side's crust in the overlap
