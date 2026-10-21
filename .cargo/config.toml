@@ -1,3 +1,10 @@
+# Git dependencies (mic-viewer, a private repository over SSH) are fetched by the git command, not
+# cargo's built-in client: the git command uses the SSH agent on the laptop, as mic-rtsim's
+# .cargo/config.toml found, and on the test VM it follows the `url.<mirror>.insteadOf` rewrite that
+# tools/remote/git-mirrors.sh sets there (decisions log 2026-10-21).
+[net]
+git-fetch-with-cli = true
+
 # Per-target flags for the eight native builds (plan §6.4).
 
 # rustc drops `cdylib` for musl unless the C runtime is dynamic (rust-lang/cargo#10143). The
