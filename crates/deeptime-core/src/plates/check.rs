@@ -147,7 +147,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "land_gain_max_pct",
-        "Most land gained in any step, per 2 Myr of step (after the first 10 Myr)",
+        "Most land gained in any step, per 2 Myr of step (the sea held; after the first 10 Myr)",
         "% of planet",
         None,
         Some(1.5),
@@ -1627,11 +1627,16 @@ pub fn measures_with(
     // Land and continental crust.
     let land: Vec<f64> = d.steps.iter().map(|s| f64::from(s.land) / n).collect();
     put("land_share_p50", median(&land));
+    // The gain with the sea held at the step before's (ledger: PLT-151): what the ground's motion
+    // made, not what a falling sea laid dry.
     let gains: Vec<f64> = d
         .steps
         .windows(2)
         .filter(|w| w[1].t >= first_t + 10.0)
-        .map(|w| (f64::from(w[1].land) - f64::from(w[0].land)) / n * per_target_step)
+        .map(|w| {
+            let now = w[1].land_held.unwrap_or(w[1].land);
+            (f64::from(now) - f64::from(w[0].land)) / n * per_target_step
+        })
         .collect();
     put(
         "land_gain_max_pct",
@@ -3091,6 +3096,22 @@ mod tests {
         assert!((get(&m, "continental_max") - 0.44).abs() < 1e-9);
         assert!((get(&m, "continental_end") - 0.44).abs() < 1e-9);
         assert!((get(&m, "land_share_p50") - 0.15).abs() < 1e-9);
+    }
+
+    #[test]
+    fn land_gain_holds_the_sea() {
+        // After the start-up the sea falls and lays 40 samples dry; the ground itself made 5
+        // (counted above the step before's sea): the gain is 0.5 %, not 4.5 %.
+        let mut fell = step(16.0, 195, 400, &[1000]);
+        fell.land_held = Some(155);
+        let d = dynamics(vec![
+            step(2.0, 100, 400, &[1000]),
+            step(4.0, 150, 400, &[1000]),
+            step(14.0, 150, 400, &[1000]),
+            fell,
+        ]);
+        let m = measures(&d, &[]);
+        assert!((get(&m, "land_gain_max_pct") - 0.5).abs() < 1e-9);
     }
 
     #[test]

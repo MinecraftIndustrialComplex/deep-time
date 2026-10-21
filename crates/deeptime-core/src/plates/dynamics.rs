@@ -175,6 +175,14 @@ pub struct StepRec {
     pub visible: u32,
     /// Visible samples above the sea the step stood under: the land.
     pub land: u32,
+    /// Visible samples above the sea the step before stood under (`None` on a record's first
+    /// step): the land with the sea held where it was, so the plate check's land gain counts what
+    /// the ground's motion made and not what a falling sea laid dry.
+    #[serde(default)]
+    pub land_held: Option<u32>,
+    /// The sea the step stood under, m (the plate model's frame).
+    #[serde(default)]
+    pub sea_m: f64,
     /// Visible continental samples: the continental crust.
     pub continental: u32,
     /// Collisions (terranes of at least `collision_min_frac` of an average plate) this step.
@@ -1363,6 +1371,7 @@ struct Tally {
     bnd: Vec<u32>,
     visible: u32,
     land: u32,
+    land_held: u32,
     continental: u32,
 }
 
@@ -1399,6 +1408,8 @@ pub fn record_step(
     let (samples, groups) = (&st.samples, &st.groups);
     let plate_of = |i: usize| groups[samples[i].group as usize].plate;
     let sea = seen.sea_m;
+    // The sea of the step before, for the land with the sea held (`StepRec::land_held`).
+    let held = d.steps.last().map(|s| s.sea_m);
     let tally = || Tally {
         nearest: NearestPlate::new(poles.clone()),
         vis: vec![0; np],
@@ -1406,6 +1417,7 @@ pub fn record_step(
         bnd: vec![0; np],
         visible: 0,
         land: 0,
+        land_held: 0,
         continental: 0,
     };
     let count = || {
@@ -1425,9 +1437,9 @@ pub fn record_step(
                     t.cont[p as usize] += 1;
                     t.continental += 1;
                 }
-                if f64::from(s.elevation_m) > sea {
-                    t.land += 1;
-                }
+                let z = f64::from(s.elevation_m);
+                t.land += u32::from(z > sea);
+                t.land_held += u32::from(held.is_some_and(|h| z > h));
                 // On the plate's boundary: a neighbour of another plate, or one hidden under
                 // another plate (the plate's own subducted crust: the trench side of a slab).
                 let edge = geo
@@ -1449,6 +1461,7 @@ pub fn record_step(
                 }
                 a.visible += b.visible;
                 a.land += b.land;
+                a.land_held += b.land_held;
                 a.continental += b.continental;
                 a
             })
@@ -1507,6 +1520,7 @@ pub fn record_step(
         bnd,
         visible,
         land,
+        land_held,
         continental,
     } = tally;
     let spacing_km = env.norm.km(env.norm.spacing_rad());
@@ -1598,6 +1612,8 @@ pub fn record_step(
         t,
         visible,
         land,
+        land_held: held.map(|_| land_held),
+        sea_m: sea,
         continental,
         collisions: big,
         transfers: small,
