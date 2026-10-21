@@ -134,9 +134,9 @@ class IceCoverTest {
 
     /**
      * Writes a one-tile raw u8 pack of {@code cells} (row-major, {@code w} × {@code h}, {@code r}-block cells, x wrapping,
-     * centred on block 0) as FORMAT.md lays a tile pack out, and opens it.
+     * centred on block 0) as FORMAT.md lays a tile pack out, and opens it. {@link PlayaTest} builds its layer with it too.
      */
-    private static RasterSampler rawU8Layer(Path path, int w, int h, int r, int[] cells) throws IOException {
+    static RasterSampler rawU8Layer(Path path, int w, int h, int r, int[] cells) throws IOException {
         String desc = "{\"name\": \"" + IceCover.LAYER + "\", \"dtype\": \"u8\", \"scale\": 1.0, \"offset\": 0.0, \"units\": \"blocks\","
                 + " \"grid\": {\"name\": \"L2\", \"w\": " + w + ", \"h\": " + h + ", \"r\": " + r + ", \"wraps_x\": true,"
                 + " \"origin_block_x\": " + (-w * r / 2) + ", \"origin_block_z\": " + (-h * r / 2) + "},"
