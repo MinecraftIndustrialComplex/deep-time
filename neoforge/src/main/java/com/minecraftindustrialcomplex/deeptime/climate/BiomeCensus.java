@@ -173,6 +173,11 @@ public final class BiomeCensus {
      * 2026-10-17: on P1-26's test planet 68 of Cs's 373 columns were coast and none could match. The columns under the
      * ice cover are left out since 2026-10-18 (the bake holds glaciated land in the frozen band whatever its class,
      * BIO-035, and the ice pass covers it): on the CLM-203 test planet 45 of Cs's 137 columns, 2 on the table's biomes.
+     * The class border's columns are left out since 2026-10-21 ({@link #classBorder}): the game reads the biome inputs
+     * bilinear, so between an Am cell and a warm sea cell (temperature band above 4, {@code thermal_sea}) the blend
+     * crosses vanilla's T4 line, where every middle biome is desert, and Terralith puts a desert oasis there. On master
+     * f43d1e1a's MIC test planet 19 of Am's 52 columns lay on a border and 4 of them on its jungles (13 of the 15 misses
+     * beside the sea); the 33 inside Am cells were on its jungles in 27. Cs's 64 misses were all on a border.
      */
     public record PackCheck(String name, String classes, IntPredicate koppen, java.util.Set<String> biomes, double bound,
                             boolean atMost, String requires, Double minErosion, Double minContinents) {}
@@ -386,11 +391,12 @@ public final class BiomeCensus {
             placeable.add(nameOf(b));
         Map<String, int[]> packs = new LinkedHashMap<>();
         // The biomes of each active pack check's counted columns that miss its biomes (an atMost check's: those on them).
-        Map<String, Map<String, Integer>> packMisses = new HashMap<>();
+        Map<String, Map<String, Integer>> packMisses = new HashMap<>(), packBorderMisses = new HashMap<>();
         for (PackCheck pc : PACK_CHECKS)
             if (placeable.contains(pc.requires())) {
                 packs.put(pc.name(), new int[6]);
                 packMisses.put(pc.name(), new TreeMap<>());
+                packBorderMisses.put(pc.name(), new TreeMap<>());
             }
         boolean cloudActive = placeable.contains(CLOUD_FOREST);
         // Candidates, of them on the cloud forest, cloud forest columns off the candidates, and the columns of the
@@ -567,17 +573,26 @@ public final class BiomeCensus {
                             n[3]++;
                             continue;
                         }
-                        n[1]++;
-                        if (pc.biomes().contains(nameOf(b)))
-                            n[0]++;
-                        String border = classBorder(kp, x, z, k);
-                        if (border == null) {
-                            n[5]++;
-                            if (pc.biomes().contains(nameOf(b)))
-                                n[4]++;
+                        boolean on = pc.biomes().contains(nameOf(b));
+                        // The class border (since 2026-10-21): where the four cells of the class layer that the game's
+                        // bilinear read blends are not all the column's class, its biome inputs mix two classes' values,
+                        // or the land's and the sea's, so its biome says nothing of the table's rule for its class
+                        // (BIO-154). Counted apart, with the biomes its misses are on. Read where the biome source samples
+                        // the inputs, the quart cell's corner.
+                        String border = classBorder(kp, QuartPos.toBlock(QuartPos.fromBlock(x)), QuartPos.toBlock(QuartPos.fromBlock(z)), k);
+                        if (border != null) {
+                            n[4]++;
+                            if (on)
+                                n[5]++;
+                            if (on == pc.atMost())
+                                packBorderMisses.get(pc.name()).merge(nameOf(b) + " @" + border, 1, Integer::sum);
+                            continue;
                         }
-                        if (pc.biomes().contains(nameOf(b)) == pc.atMost())
-                            packMisses.get(pc.name()).merge(nameOf(b) + (border == null ? "" : " @" + border), 1, Integer::sum);
+                        n[1]++;
+                        if (on)
+                            n[0]++;
+                        if (on == pc.atMost())
+                            packMisses.get(pc.name()).merge(nameOf(b), 1, Integer::sum);
                     }
                 if (!untagged && (k == 31 ? y < sea - 4 : land)) {
                     for (Check ch : CHECKS) {
@@ -673,14 +688,12 @@ public final class BiomeCensus {
                 e.addProperty("share", n[1] == 0 ? null : Math.round(n[0] * 1000.0 / n[1]) / 1000.0);
                 e.addProperty("left_out_coast", n[2]);
                 e.addProperty("left_out_glaciated", n[3]);
-                e.addProperty("interior_columns", n[5]);
-                e.addProperty("interior_matching", n[4]);
-                // The twelve biomes the most columns that fail the check are on ("biome columns", " @" and the other classes for a column on a class border, classBorder).
-                JsonArray miss = new JsonArray();
-                packMisses.get(pc.name()).entrySet().stream()
-                        .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
-                        .limit(12).forEach(en -> miss.add(en.getKey() + " " + en.getValue()));
-                e.add("misses", miss);
+                e.addProperty("left_out_border", n[4]);
+                e.addProperty("left_out_border_matching", n[5]);
+                // The six biomes the most columns that fail the check are on ("biome columns"), and those of the
+                // class border's columns with the other classes of their cells ("biome @classes columns", classBorder).
+                e.add("misses", topMisses(packMisses.get(pc.name())));
+                e.add("border_misses", topMisses(packBorderMisses.get(pc.name())));
             }
             e.addProperty(pc.atMost() ? "at_most" : "at_least", pc.bound());
             JsonArray names = new JsonArray();
@@ -808,10 +821,20 @@ public final class BiomeCensus {
         return b.unwrapKey().map(key -> key.location().toString()).orElse("?");
     }
 
+    /** The six entries with the most columns, "name columns", most first. */
+    private static JsonArray topMisses(Map<String, Integer> misses) {
+        JsonArray out = new JsonArray();
+        misses.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
+                .limit(6).forEach(en -> out.add(en.getKey() + " " + en.getValue()));
+        return out;
+    }
+
     /**
      * Null when the four cells of the class layer that a bilinear read at block (x, z) blends all hold class {@code k} (the
-     * column's biome inputs come from its class's cells alone); otherwise the other classes among them, sorted, joined by
-     * "+": the column lies on a class border, where the inputs the game reads bilinear mix two classes' values.
+     * column's biome inputs come from its class's cells alone: the climate layers lie on the same L2 grid); otherwise the
+     * other classes among them ("sea" for a sea cell), sorted, joined by "+": the column lies on a class border, where the
+     * inputs the game reads bilinear ({@code WorldData.raster}) mix two classes' values.
      */
     static String classBorder(RasterSampler kp, int x, int z, int k) {
         var grid = kp.desc().grid();
