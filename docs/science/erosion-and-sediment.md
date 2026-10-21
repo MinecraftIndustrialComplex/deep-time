@@ -785,6 +785,54 @@ tripled and the deep floor gained its chalk; the land's moved little, because th
 is unchanged (cause 3) and only the land the sea once covered can show it. Dolostone stays near
 zero (the rule is the sabkha path alone, see above).
 
+**After the review (2026-10-20).** An Opus review of the branch raised three points on this page,
+each checked against the code before it was fixed; the list above describes the fixed code, the
+table above was measured before them. The tracer read the diffusion's and the slope failure's
+change together, so the failure's debris took the carbonate share, and every substep read the
+column as the step began (A2, A3; ERO-195). A deposit led by chalk or periplatform ooze in
+euxinic water was chalk or limestone, so the deposit engine's euxinic-basin and source-rock fields
+lost the basin, and the periplatform limestone on a platform's slope counted as platform (A8;
+ERO-196, ERO-197).
+
+A8 alone, on the six quick planets (the preset, starts, seeds, threads and content bundle as
+above; b2f5c381 against f546d9bc, which differ by A8 alone; `tools/review/carbonate-ensemble.sh`
+on the VM, the surface totals in `surface_final` and the strata check; medians with the range):
+
+| measure | before A8 | A8 |
+|---|---|---|
+| black shale laid over the run (10^6 km3) | 2.68 [1.64, 4.56] | 2.42 [2.04, 2.96] |
+| euxinic-basin field, mean area (10^6 km2) | 0.025 [0.010, 0.040] | 0.025 [0.010, 0.032] |
+| carbonate-platform field, mean area (10^6 km2) | 1.24 [1.14, 1.31] | 1.20 [1.01, 1.34] |
+| source-rock TOC over the area (10^6 km2 x wt %) | 4.17 [4.03, 4.45] | 4.19 [4.00, 4.44] |
+| black shale in the sea floor's top blocks | 0.13 % [0.02, 0.24] | 0.07 % [0.01, 0.15] |
+| chalk in the sea floor's top blocks | 2.2 % [0.8, 3.5] | 2.0 % [1.6, 2.5] |
+| natural MVT sites a planet | 0 [0, 4] | 0 [0, 1] |
+
+Every change is inside the planets' spread. Planet by planet the black shale laid went to 0.51 to
+1.54 times what it was, both ways, and the euxinic setting's area with it (0.78 to 1.46 times),
+which A8 cannot move: the setting is the 150 km open-water test, the depth and the temperature
+(ERO-088), read from the heights and the climate. A8 changes a deposit's class, the class changes
+the strata log, and from there the two builds' planets part (their sea-level events and plate
+counters differ by the end). What A8 acts on is small, the euxinic field's area being 2 % of the
+platform field's; its rules are checked by two unit tests in `surface/facies.rs` (euxinic water
+makes black shale of chalk and periplatform ooze; periplatform limestone below the photic zone is
+no platform), not by the planets.
+
+Two later changes moved the sea floor's numbers, and neither is separated from the other. Between
+686a01cf and b2f5c381 the branch took master 5dc06974 and the tracer fixes: on the six planets the
+neritic factory now lays 0.77 x 10^6 km3 [0.70, 1.07] (1.52 above), the tracer 0.45 [0.39, 0.59]
+(1.02), the pelagic rain 2.09 [1.94, 2.21] (2.36), and the sea floor's top blocks hold 2.4 %
+carbonate [1.1, 3.6], 2.2 % of it chalk (5.9 and 4.5 % above). The ocean-crust merge (master
+c24ff793, merged at 45673a37) then changed what the world draws on top: on the same seeds the sea
+floor's top blocks hold 0.30 % carbonate (scattered continents 1, 869e65e7) and 0.38 %
+(supercontinent 2, 14e4ae7d) against 2.4 and 2.2 % on f546d9bc, chalk 0.23 and 0.34 % against 2.4
+and 2.1 %, while the stage lays as much chalk (2.18 and 2.05 x 10^6 km3 against 2.09 and 1.99)
+and the columns hold as much (0.03 % of supercontinent 2's sea-floor blocks on both). That merge
+draws the rock rising with the amplified relief instead of stretching the top unit over it
+(strata.md, STR-052, STR-055 to STR-057): the sea floor's loose mud fell from 36 % of its top
+blocks to 0.3 % and shale rose from 46 to 83 %, so the chalk lies under a shale top (inferred from
+the census, not traced column by column; open).
+
 **The chalk that P1-07 saw.** P1-07 counted 33 % of the sea floor as chalk; the review read about
 2 %. They are two metrics. P1-07's is the `strata/outcrop` view layer of `deeptime stage
 structure --preset pipeline_quick_16k --start scattered_continents --length-myr 500 --threads 8`
