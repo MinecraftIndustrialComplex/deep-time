@@ -243,6 +243,7 @@ def main():
     root = Path(args[0])
     commits, seeds, starts, stops = (a.split(",") for a in args[1:5])
     rows_csv = ["commit,start,seed,stop," + ",".join(KEYS + ["sea_m"])]
+    pooled = {}  # (stop, commit) -> every run's result over the starts and seeds
     for stop in stops:
         for start in starts:
             print(f"\n== {start}, t = {stop} Myr, seeds {','.join(seeds)} (mean over the runs present)")
@@ -259,6 +260,7 @@ def main():
                         continue
                     res = measure(fdir, root / "runs" / c / f"{name}.txt")
                     results.append((seed, res))
+                    pooled.setdefault((stop, c), []).append(res)
                     rows_csv.append(
                         f"{c},{start},{seed},{stop},"
                         + ",".join("" if res.get(k) is None else f"{res[k]:.6g}" for k in KEYS + ["sea_m"])
@@ -269,6 +271,18 @@ def main():
                 print(f"{c:10}{len(results):>5}{cells}")
                 md.append(f"| {c} | {len(results)} | "
                           + " | ".join(fmt(k, mean([r.get(k) for _, r in results])) for k in KEYS) + " |")
+    if len(starts) > 1:
+        for stop in stops:
+            title = f"both starts, t = {stop} Myr, seeds {','.join(seeds)} (mean over every run present)"
+            print(f"\n== {title}")
+            print(f"{'commit':10}{'runs':>5}" + "".join(f"{HEAD[k]:>9}" for k in KEYS))
+            md.append(f"\n### {title}\n")
+            md.append("| commit | runs | " + " | ".join(HEAD[k] for k in KEYS) + " |")
+            md.append("|---|---|" + "---|" * len(KEYS))
+            for c in commits:
+                rs = pooled.get((stop, c), [])
+                print(f"{c:10}{len(rs):>5}" + "".join(f"{fmt(k, mean([r.get(k) for r in rs])):>9}" for k in KEYS))
+                md.append(f"| {c} | {len(rs)} | " + " | ".join(fmt(k, mean([r.get(k) for r in rs])) for k in KEYS) + " |")
     if csv_path:
         Path(csv_path).write_text("\n".join(rows_csv) + "\n")
     if md_path:
