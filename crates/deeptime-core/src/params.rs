@@ -159,6 +159,19 @@ pub struct PlanetParams {
     /// Target ocean area fraction for the initial crust.
     pub ocean_fraction: f64,
     pub regime: TectonicRegime,
+    /// The planet's surface water, its oceans and land ice as water, as a layer over the whole
+    /// planet, m: the sea stands where this water, less what the land ice holds, fills the open
+    /// sea of the ground (`sea_level.rs`). Earth's: 2,664 m (ledger ISO-085).
+    #[serde(default = "d_surface_water_m")]
+    pub surface_water_m: f64,
+}
+
+fn d_surface_water_m() -> f64 {
+    // Earth's ocean, 1.332·10⁹ km³ (Charette & Smith 2010), and its land ice as water: Antarctica's
+    // grounded 26.5·10⁶ km³ (Fretwell et al. 2013) and Greenland's 2.99·10⁶ km³ (Morlighem et al.
+    // 2017) at ρ_i/ρ_w, and the glaciers' 0.41 m of sea level (IPCC AR5 Table 4.1), 2.65·10⁷ km³
+    // in all; over Earth's 5.10·10⁸ km². ledger: ISO-085
+    2664.0
 }
 
 fn d_m_per_block_h() -> f64 {
@@ -395,6 +408,21 @@ pub struct ResolutionParams {
     pub l3_r: u32,
 }
 
+/// The ocean floor's height law (`tectonics.ocean_depth`; `plates::pools`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OceanDepth {
+    /// Cortial et al. 2019 §4.5: every oceanic height relaxes towards
+    /// `oceanic_floor_elevation_m` at `oceanic_damping_mm_yr` (ledger PLT-129).
+    #[default]
+    Dampening,
+    /// Stein & Stein 1992's GDH1 depth–age law as the floor's subsidence: a sample sinks by what
+    /// its age sinks bare floor under water, from GDH1's ridge (2,600 m) and old floor (5,651 m),
+    /// which `ridge_elevation_m` and `oceanic_floor_elevation_m` must then be (ledger PLT-352;
+    /// the choice of law, PLT-350).
+    Gdh1,
+}
+
 /// Tectonic constants (plan §8.1). Cortial, Peytavie, Galin & Guérin 2019 ("Procedural Tectonic
 /// Planets", Appendix A, Table 3) give the first group; everything after `collision_threshold_km`
 /// is a design choice of this implementation (documented in `plates/mod.rs` and STATUS.md). The
@@ -458,8 +486,15 @@ pub struct TectonicParams {
     /// The pipeline presets use −5,600 m with ε_o 0.12 mm/yr (3.6 km at 20 Myr, 4.5 at 50, 5.2 at
     /// 100, 5.6 beyond): at GDH1's full rate the young floor is deep enough that island arcs rarely
     /// emerge and the continental crust shrinks from 0.39 to 0.29 of the planet in 500 Myr (P1-17
-    /// hypsometry recalibration, 2026-10-01; median sea depth 4.0 km, Earth 4.06).
+    /// hypsometry recalibration, 2026-10-01; median sea depth 4.0 km, Earth 4.06). Under
+    /// `ocean_depth: gdh1` it is GDH1's own old-floor depth, −5,651 m, and only the height line of
+    /// thicker ocean crust (`plates::transition`, PLT-264) and the column energy read it.
     pub oceanic_floor_elevation_m: f64,
+    /// The ocean floor's height law (`plates::pools`): Cortial's dampening towards
+    /// `oceanic_floor_elevation_m` (the default and the plate-only presets'), or GDH1's age–depth
+    /// law as a subsidence rate (every shipped Earth-like preset since 2026-10-21: the floor sinks
+    /// by what its age sinks bare floor, whatever its sediment; ledger PLT-352).
+    pub ocean_depth: OceanDepth,
     /// ε_c (0.03 mm/yr).
     pub continental_erosion_mm_yr: f64,
     /// ε_t (0.3 mm/yr).
@@ -726,6 +761,7 @@ impl Default for TectonicParams {
             convergence_ref_mm_yr: 100.0, // ledger: PLT-037
             oceanic_damping_mm_yr: 0.04,
             oceanic_floor_elevation_m: -10000.0,
+            ocean_depth: OceanDepth::Dampening,
             continental_erosion_mm_yr: 0.03,
             sediment_accretion_mm_yr: 0.3,
             subduction_uplift_mm_yr: 0.6,
@@ -978,6 +1014,11 @@ impl PlanetPreset {
             "$.planet.ocean_fraction",
             "must be in [0.05, 0.95]",
         )?;
+        check(
+            p.surface_water_m.is_finite() && (0.0..=20_000.0).contains(&p.surface_water_m),
+            "$.planet.surface_water_m",
+            "must be in [0, 20000] m",
+        )?;
         let s = &self.scale;
         check(
             s.m_per_block_h > 0.0,
@@ -1125,6 +1166,15 @@ impl PlanetPreset {
             "$.tectonics.oceanic_floor_elevation_m",
             "must be in [trench_elevation_m, ridge_elevation_m)",
         )?;
+        if k.ocean_depth == OceanDepth::Gdh1 {
+            use crate::plates::pools::{GDH1_FLOOR_M, GDH1_RIDGE_M};
+            check(
+                (k.ridge_elevation_m + GDH1_RIDGE_M).abs() < 0.5
+                    && (k.oceanic_floor_elevation_m + GDH1_FLOOR_M).abs() < 0.5,
+                "$.tectonics.ocean_depth",
+                "gdh1 needs ridge_elevation_m -2600 and oceanic_floor_elevation_m -5651 (GDH1's)",
+            )?;
+        }
         check(
             k.uplift_reference_m > 0.0 && k.uplift_ceiling_m >= 0.0,
             "$.tectonics.uplift_ceiling_m",

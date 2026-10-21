@@ -32,7 +32,7 @@ use rayon::prelude::*;
 use super::Env;
 use super::geometry::{Geo, Tree, cover};
 use super::kinematics::{azimuth_deg, quat, tangent, to_world};
-use super::pools::ocean_elevation;
+use super::pools::floor_at;
 use super::state::{CONTINENTAL, OCEANIC, OROGENY_NONE, PlateState, regime};
 use crate::params::ScaleParams;
 use crate::sphere::Coupling;
@@ -291,11 +291,10 @@ pub(super) fn sample_with(
     let k = env.k;
     let t = env.t_myr;
     let since = (t - state.resample_myr).max(env.dt_myr);
-    let (zr, zf) = (k.ridge_elevation_m, k.oceanic_floor_elevation_m);
     let edge_z = |v: u32| {
         let s = &samples[v as usize];
         if s.kind == CONTINENTAL {
-            ocean_elevation(since, zr, zf, k.oceanic_damping_mm_yr)
+            floor_at(k, since)
         } else {
             f64::from(s.elevation_m)
         }
@@ -315,7 +314,7 @@ pub(super) fn sample_with(
         };
         let age = alpha * since;
         (
-            alpha * zbar + (1.0 - alpha) * ocean_elevation(age, zr, zf, k.oceanic_damping_mm_yr),
+            alpha * zbar + (1.0 - alpha) * floor_at(k, age),
             age,
         )
     };

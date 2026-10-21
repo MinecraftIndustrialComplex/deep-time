@@ -26,8 +26,9 @@
 //!
 //! # One step (Δt = the plate step, `substeps` LEM steps inside it)
 //! 1. Carry the elevation, regolith and strata log; clear them on crust born this step.
-//! 2. h = carried elevation + the plate model's uplift; sea level from the preset (`params::SeaLevel`), or, with a
-//!    climate stage, its eustatic sea level (the curve plus glacio-eustasy); climate
+//! 2. h = carried elevation + the plate model's uplift; sea level from the climate stage when the
+//!    preset has one (the planet's water less its land ice's, over this ground), else the
+//!    planet's water alone over it (`sea_level.rs`); climate
 //!    (`climate.rs`: the climate stage's fields, which it wrote just before this step on the same
 //!    ground, when the preset has a `climate` section (P1-05), else the stand-in).
 //! 3. Per LEM step: the sea is the base level; priority-flood (`pflood.rs`), D8 routing and the
@@ -752,6 +753,27 @@ impl SurfaceStage {
         let pf = PlateFields::read(world, n)?;
         let cls = self.classes;
         let p = self.p.clone();
+        // The sea level the step stands under (`sea_level.rs`): the climate stage's, else the
+        // planet's water over the ground `h` with no land ice.
+        let rows = grid.row_weights();
+        let water_m = self.preset.planet.surface_water_m;
+        let sea_of = |world: &WorldState, h: &[f64]| -> f64 {
+            world
+                .globals
+                .get(crate::climate::SEA_LEVEL_GLOBAL)
+                .copied()
+                .filter(|z| z.is_finite())
+                .unwrap_or_else(|| {
+                    crate::sea_level::fill_level(
+                        &d,
+                        h,
+                        &rows,
+                        water_m,
+                        (n / 500).max(1),
+                        p.numerics.flood,
+                    )
+                })
+        };
         // The carry's blur is kept per Myr at the reference step (`advect::blur_owed`).
         let blur_ref = p.numerics.carry_blur_ref_myr * 1.0e6;
 
@@ -844,7 +866,10 @@ impl SurfaceStage {
                     },
                     events: events::EventState::default(),
                     totals: Totals::default(),
-                    sea_level_m: p.sea_level.at(t_end_myr - dt_myr),
+                    sea_level_m: sea_of(
+                        world,
+                        &pf.elevation.iter().map(|&z| f64::from(z)).collect::<Vec<f64>>(),
+                    ),
                     sea_history: Vec::new(),
                     flexure: None,
                     bif_basin: Vec::new(),
@@ -862,14 +887,9 @@ impl SurfaceStage {
         sc.h.par_iter_mut()
             .enumerate()
             .for_each(|(c, h)| *h = f64::from(pf.elevation[c]) + f64::from(st.offset_m[c]));
-        // Sea level: the climate stage's when it ran this step (the curve plus glacio-eustasy:
-        // ice sheets lower the sea and expose the shelves, `climate::ice`), else the curve.
-        let sea = world
-            .globals
-            .get(crate::climate::SEA_LEVEL_GLOBAL)
-            .copied()
-            .filter(|z| z.is_finite())
-            .unwrap_or_else(|| p.sea_level.at(t_end_myr));
+        // Sea level: the climate stage's when it ran this step (the planet's water less what its
+        // land ice holds, over this ground), else the planet's water alone (`sea_level.rs`).
+        let sea = sea_of(world, &sc.h);
         let cap_m = world
             .globals
             .get(crate::climate::CAP_CARBONATE_GLOBAL)

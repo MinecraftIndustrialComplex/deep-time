@@ -632,7 +632,7 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
         assert!(ice_max[c] >= ice[c] - 1e-3 && ice[c] >= 0.0 && ice[c] <= 4000.0);
         assert!((0.0..=1.0).contains(&share[c]) && (0.0..=1.0).contains(&sea_ice[c]));
     }
-    // The sea level the surface used is the climate's: the curve plus the ice's glacio-eustasy.
+    // The sea level the surface used is the climate's: the water, less the ice, over the ground.
     let sea = world.globals[SEA_LEVEL_GLOBAL];
     assert_eq!(world.surface.as_ref().unwrap().sea_level_m, sea);
     let t = &world.fields[field::T_MEAN].data;

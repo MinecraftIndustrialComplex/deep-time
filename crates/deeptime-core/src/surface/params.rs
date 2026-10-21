@@ -5,66 +5,12 @@
 //! meaning on a 4.8 km (16k quick) or 2.4 km (16k full) cell.
 //!
 //! ```json
-//! "surface": {"k_spl": 1.5e-9, "m_spl": 1.0, "n_spl": 2.0, "g_deposition": 1.0,
-//!             "sea_level": {"base_m": 0, "cycles": [{"amplitude_m": 80, "period_myr": 250}]}}
+//! "surface": {"k_spl": 1.5e-9, "m_spl": 1.0, "n_spl": 2.0, "g_deposition": 1.0}
 //! ```
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
-
-/// One sinusoidal sea-level cycle.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SeaCycle {
-    pub amplitude_m: f64,
-    pub period_myr: f64,
-    #[serde(default)]
-    pub phase_deg: f64,
-}
-
-/// Eustatic sea level (plan §8.3 item 7: "a curve from the preset"): `base_m` plus the cycles plus
-/// the piecewise-linear `curve` of `[t_myr, m]` points (t relative to world creation, negative in
-/// the past; held flat beyond its ends). Its cycles stand for the tectonic sea level (ridge volume,
-/// the supercontinent cycle); with a climate stage the ice's glacio-eustasy is added to it
-/// (`climate::ice`, `climate.glacio_eustasy`) and the surface takes the sum.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, default)]
-pub struct SeaLevel {
-    pub base_m: f64,
-    pub cycles: Vec<SeaCycle>,
-    pub curve: Vec<[f64; 2]>,
-}
-
-impl SeaLevel {
-    /// Sea level at `t_myr`, metres relative to the datum of the plate model's elevations.
-    pub fn at(&self, t_myr: f64) -> f64 {
-        let mut z = self.base_m;
-        for c in &self.cycles {
-            if c.period_myr > 0.0 {
-                z += c.amplitude_m
-                    * (std::f64::consts::TAU * t_myr / c.period_myr + c.phase_deg.to_radians())
-                        .sin();
-            }
-        }
-        if let (Some(first), Some(last)) = (self.curve.first(), self.curve.last()) {
-            z += if t_myr <= first[0] {
-                first[1]
-            } else if t_myr >= last[0] {
-                last[1]
-            } else {
-                self.curve
-                    .windows(2)
-                    .find(|w| t_myr <= w[1][0])
-                    .map_or(last[1], |w| {
-                        let f = (t_myr - w[0][0]) / (w[1][0] - w[0][0]).max(1e-12);
-                        w[0][1] + f * (w[1][1] - w[0][1])
-                    })
-            };
-        }
-        z
-    }
-}
 
 /// The surface section.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -147,8 +93,6 @@ pub struct SurfaceParams {
     pub isostasy: f64,
     /// Radius over which loads are spread before compensation (a flexural wavelength), km.
     pub isostasy_radius_km: f64,
-    /// Eustatic sea level.
-    pub sea_level: SeaLevel,
     /// K, layers per strata-log column (plan §5.7.4: 32).
     pub log_layers: u32,
     /// LEM steps per plate step.
@@ -294,7 +238,6 @@ impl Default for SurfaceParams {
             weathering_decay_depth_m: 5.0,
             isostasy: 0.8,
             isostasy_radius_km: 50.0,
-            sea_level: SeaLevel::default(),
             log_layers: 32,
             substeps: 1,
             frame_every_myr: 10.0,
@@ -400,21 +343,6 @@ impl SurfaceParams {
         self.glacial.validate()?;
         self.flexure.validate()?;
         self.numerics.validate()?;
-        for c in &self.sea_level.cycles {
-            check(
-                c.amplitude_m.is_finite() && c.period_myr > 0.0,
-                "sea_level.cycles",
-                "amplitude finite, period > 0",
-            )?;
-        }
-        check(
-            self.sea_level
-                .curve
-                .windows(2)
-                .all(|w| w[0][0] < w[1][0] && w[1][1].is_finite()),
-            "sea_level.curve",
-            "[t_myr, m] points with increasing t",
-        )?;
         Ok(())
     }
 }
@@ -424,21 +352,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sea_level_adds_cycles_and_the_curve() {
-        let s = SeaLevel {
-            base_m: 10.0,
-            cycles: vec![SeaCycle {
-                amplitude_m: 50.0,
-                period_myr: 100.0,
-                phase_deg: 0.0,
-            }],
-            curve: vec![[-100.0, 0.0], [0.0, 100.0]],
-        };
-        assert!((s.at(-100.0) - 10.0).abs() < 1e-9);
-        // sin(2π·(−75)/100) = sin(−1.5π) = 1; the curve is a quarter of the way up.
-        assert!((s.at(-75.0) - (10.0 + 50.0 + 25.0)).abs() < 1e-9);
-        // Held at the last point beyond the curve; sin(π) = 0.
-        assert!((s.at(50.0) - (10.0 + 100.0)).abs() < 1e-9);
+    fn the_defaults_validate_and_a_bad_share_does_not() {
         SurfaceParams::default().validate().unwrap();
         let bad = SurfaceParams {
             isostasy: 2.0,

@@ -28,7 +28,7 @@ use super::Env;
 use super::geometry::{Geo, connect_plates, dijkstra};
 use super::kinematics::{arr, random_motion};
 use super::noise::fbm;
-use super::pools::{continental_column, ocean_elevation, ocean_heat_flow, oceanic_column};
+use super::pools::{continental_column, floor_at, ocean_heat_flow, oceanic_column};
 use super::state::{
     CONTINENTAL, Counters, Group, Hotspot, OCEANIC, Plate, PlateState, Sample, SlabTrack, pool,
     regime,
@@ -329,7 +329,6 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         }
     }
 
-    let (zr, zf) = (k.ridge_elevation_m, k.oceanic_floor_elevation_m);
     let s4 = seed.wrapping_add(23);
     let samples: Vec<Sample> = (0..n)
         .into_par_iter()
@@ -360,7 +359,7 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
                 let age = (d_km / v).min(180.0);
                 s.kind = OCEANIC;
                 s.formed_myr = (t0 - age) as f32;
-                s.elevation_m = ocean_elevation(age, zr, zf, k.oceanic_damping_mm_yr) as f32;
+                s.elevation_m = floor_at(k, age) as f32;
                 s.pools = oceanic_column();
                 s.pools[pool::SEDIMENT] = (k.pelagic_m_per_myr * age) as f32;
                 s.heat_flow_mw_m2 = ocean_heat_flow(age) as f32;
