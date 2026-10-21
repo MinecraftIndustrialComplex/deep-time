@@ -1056,7 +1056,9 @@ fn essential_sources(
             ("essential", ess.region_blocks),
             ("fine", FINE_REGION_BLOCKS),
         ] {
-            let r = Regions::new(w.c as u32, size);
+            // The world's own grid (a Petroff–Guyou world's frame, DEP-220), as the playability
+            // pass counts it.
+            let r = Regions::in_frame(w.manifest.world_projection().index_frame(), size);
             let land = land_regions(&r);
             let with: HashSet<usize> = sources
                 .iter()
