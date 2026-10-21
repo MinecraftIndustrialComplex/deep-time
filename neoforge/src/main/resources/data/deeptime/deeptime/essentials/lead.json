@@ -1,0 +1,8 @@
+{
+  "material": "c:lead",
+  "min_sites_per_region": 1,
+  "region_blocks": 8192,
+  "exposed": false,
+  "primary_only": false,
+  "_comment": "Deep Time's vanilla essentials (plan §7.8): the deposit stage keeps at least min_sites_per_region sites of the material in every land region of region_blocks. Lead is a co-product of every type that makes it (MVT and SEDEX Zn-Pb), so primary_only is off: with it on, no deposit could ever count (ledger ORE-273). Skipped without a #c:ores/lead block (no lead mod). Initial values; packs ship their own list (decisions file, \"Playability overrides\")."
+}

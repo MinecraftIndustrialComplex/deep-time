@@ -77,6 +77,62 @@ pub struct Cover {
     sedimentary: Vec<bool>,
     /// The stacks were the ones the structure stage kept (`horizon_cache`), not baked again.
     pub kept: bool,
+    /// The world's folds and faults (`WorldState::structure`, the events the bake writes), which
+    /// the strata pass reads every stack through ([`Cover::drawn_horizons_at`]); `None` without
+    /// events.
+    deform: Option<deeptime_format::structure::Deformer>,
+    /// The strata log's present (Myr, the surface's end) and the span its keys are spread over
+    /// (Myr, as the columns key it: `CellSource::cell`'s `log_span_myr`); None without a
+    /// surface.
+    log_clock: Option<(f64, f64)>,
+}
+
+/// One horizon of a drawn column with its unit keys ([`Cover::drawn_units_at`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DrawnUnit {
+    /// Its top block; it fills the blocks from here down to `below` + 1.
+    pub top: i32,
+    /// The next horizon's top, or the floor.
+    pub below: i32,
+    pub class: u8,
+    /// The unit keys it holds, half-open: its top's key, to the next horizon's key when that is
+    /// deeper in the same key domain (`columns::key::domain`), to the domain's end when the next
+    /// horizon is another domain or there is none, and its own key alone when the next is
+    /// shallower (a section a fault repeats).
+    pub keys: [u32; 2],
+}
+
+impl DrawnUnit {
+    /// Whether `other` is the same unit in another column: the same key domain and keys in
+    /// common (the column rule matches the stored stacks' horizons by key,
+    /// `deeptime_format::strata`).
+    pub fn same_unit(&self, other: &DrawnUnit) -> bool {
+        let dom = |k: u32| columns::key::domain(k.min(u32::from(u16::MAX)) as u16);
+        dom(self.keys[0]) == dom(other.keys[0])
+            && self.keys[0] < other.keys[1]
+            && other.keys[0] < self.keys[1]
+    }
+}
+
+/// The first key past the key domain `k` lies in (`columns::key::domain`).
+fn key_domain_end(k: u16) -> u32 {
+    use columns::key;
+    let d = key::domain(k);
+    match d {
+        0 => u32::from(key::LOG_TOP),
+        1 => u32::from(key::POOL0),
+        2 => u32::from(key::META0),
+        15 => u32::from(u16::MAX) + 1,
+        _ => {
+            let band = usize::from((d - 1) / 2);
+            let [lo, hi] = key::log_range(band);
+            if (d - 1).is_multiple_of(2) {
+                u32::from(hi) + 1
+            } else {
+                (u32::from(lo) + u32::from(key::META_BAND)).min(u32::from(key::MANTLE[0]))
+            }
+        }
+    }
 }
 
 impl Cover {
@@ -94,23 +150,144 @@ impl Cover {
                 )
             })
             .collect();
+        let deform = world
+            .structure
+            .as_ref()
+            .filter(|s| !s.events.is_empty())
+            .map(|s| {
+                deeptime_format::structure::Deformer::new(
+                    s.clone(),
+                    preset.scale.circumference_blocks,
+                )
+            });
+        let log_clock = world
+            .surface
+            .as_ref()
+            .map(|s| (s.t_myr, (s.t_myr - preset.t_start_years() / 1.0e6).max(1.0)));
         Ok(Cover {
             hz,
             desc,
             sedimentary,
             kept,
+            deform,
+            log_clock,
         })
     }
 
-    /// Bytes the stacks hold (for the stage's memory reservation).
-    pub fn bytes(&self) -> u64 {
-        (self.hz.tops.len() * 7) as u64
+    /// The age of world time `t_years` on the strata log's clock: Myr before its present (None
+    /// without a surface).
+    pub fn age_ma(&self, t_years: f64) -> Option<f64> {
+        self.log_clock.map(|(now, _)| now - t_years / 1.0e6)
     }
 
-    /// Blocks of sedimentary rock under `surface_y` at block (x, z) by the column rule: down to
-    /// the top of the column's first horizon of another rock at least [`COVER_MIN_BLOCKS`] thick
-    /// (a thinner tongue does not end it), or to the floor.
-    pub fn blocks_at(&self, x: f64, z: f64, surface_y: f64) -> f64 {
+    /// The ages (Myr before the log's present) of a drawn unit's top and base when its keys are
+    /// strata log keys (`columns::key::log_range`, linear in age; any grade band): Some([0, 0])
+    /// for the regolith, None for a basement pool or the mantle (no age in the key) or without
+    /// a surface.
+    pub fn unit_ages_ma(&self, u: &DrawnUnit) -> Option<[f64; 2]> {
+        use columns::key;
+        let (_, span) = self.log_clock?;
+        let k0 = u.keys[0].min(u32::from(u16::MAX)) as u16;
+        let d = key::domain(k0);
+        match d {
+            0 => Some([0.0, 0.0]),
+            15 => None,
+            _ if !(d - 1).is_multiple_of(2) => None,
+            _ => {
+                let [lo, hi] = key::log_range(usize::from((d - 1) / 2));
+                let age = |k: u32| {
+                    ((f64::from(k) - f64::from(lo)) / f64::from(hi - lo)).clamp(0.0, 1.0) * span
+                };
+                Some([age(u.keys[0]), age(u.keys[1])])
+            }
+        }
+    }
+
+    /// Bytes the stacks hold, with the folds and faults (their records and about as much again
+    /// for the index; for the stage's memory reservation).
+    pub fn bytes(&self) -> u64 {
+        let events = self.deform.as_ref().map_or(0, |d| d.structure.events.len());
+        (self.hz.tops.len() * 7 + events * 2 * deeptime_format::structure::EVENT_BYTES) as u64
+    }
+
+    /// The column's horizons at block (x, z) by the column rule, top-down: (top, the next
+    /// horizon's top or the floor, class). A horizon fills the blocks from its top down to that
+    /// lower bound + 1 (the last one down to the floor).
+    pub fn horizons_at(&self, x: f64, z: f64) -> Vec<(i32, i32, u8)> {
+        let mut col = Vec::new();
+        self.plain_stack(x.floor() as i64, z.floor() as i64, &mut col);
+        Self::spans(&col, self.hz.min_y)
+    }
+
+    /// [`Cover::horizons_at`] as the strata pass paints the column: the stack read through the
+    /// world's folds and faults (`deeptime_format::column::ColumnWorld::stack`, Java's
+    /// `StrataPass.column`), so a horizon is where the player finds it.
+    pub fn drawn_horizons_at(&self, x: f64, z: f64) -> Vec<(i32, i32, u8)> {
+        self.drawn_units_at(
+            x,
+            z,
+            &mut deeptime_format::structure::DeformScratch::default(),
+        )
+        .into_iter()
+        .map(|u| (u.top, u.below, u.class))
+        .collect()
+    }
+
+    /// [`Cover::drawn_horizons_at`] with each horizon's unit keys ([`DrawnUnit`]), reading the
+    /// folds and faults with `scratch` (kept between calls, it saves their allocations).
+    pub fn drawn_units_at(
+        &self,
+        x: f64,
+        z: f64,
+        scratch: &mut deeptime_format::structure::DeformScratch,
+    ) -> Vec<DrawnUnit> {
+        let (bx, bz) = (x.floor() as i64, z.floor() as i64);
+        let mut col = Vec::new();
+        match &self.deform {
+            Some(d) => d.stack(
+                bx,
+                bz,
+                self.hz.min_y,
+                &mut |sx, sz, o| self.plain_stack(sx, sz, o),
+                scratch,
+                &mut col,
+            ),
+            None => self.plain_stack(bx, bz, &mut col),
+        }
+        (0..col.len())
+            .map(|h| {
+                let (top, class, key) = col[h];
+                let end = match col.get(h + 1) {
+                    Some(&(_, _, next))
+                        if columns::key::domain(next) == columns::key::domain(key) =>
+                    {
+                        if next > key {
+                            u32::from(next)
+                        } else {
+                            u32::from(key) + 1
+                        }
+                    }
+                    _ => key_domain_end(key),
+                };
+                DrawnUnit {
+                    top,
+                    below: col.get(h + 1).map_or(self.hz.min_y, |n| n.0),
+                    class,
+                    keys: [u32::from(key), end],
+                }
+            })
+            .collect()
+    }
+
+    /// (top, the next horizon's top or the floor, class) of a stack, top-down.
+    fn spans(col: &[deeptime_format::strata::ColumnHorizon], floor: i32) -> Vec<(i32, i32, u8)> {
+        (0..col.len())
+            .map(|h| (col[h].0, col.get(h + 1).map_or(floor, |n| n.0), col[h].1))
+            .collect()
+    }
+
+    /// The stack of block column (x, z) before any fold or fault (`deeptime_format::strata`).
+    fn plain_stack(&self, x: i64, z: i64, out: &mut Vec<deeptime_format::strata::ColumnHorizon>) {
         let k = self.hz.k as usize;
         let w = self.hz.grid.w as usize;
         let horizon = |i: u32, j: u32, h: u32| {
@@ -121,18 +298,25 @@ impl Cover {
                 key: self.hz.keys[at],
             }
         };
-        let mut col = Vec::new();
-        deeptime_format::strata::stack_at(
-            &self.desc,
-            self.hz.min_y,
-            horizon,
-            x.floor() as i64,
-            z.floor() as i64,
-            &mut col,
-        );
+        deeptime_format::strata::stack_at(&self.desc, self.hz.min_y, horizon, x, z, out);
+    }
+
+    /// The world's floor (block y).
+    pub fn min_y(&self) -> i32 {
+        self.hz.min_y
+    }
+
+    /// The stacks' cell size (blocks): the spacing of the stored stacks the column rule blends.
+    pub fn cell_blocks(&self) -> f64 {
+        f64::from(self.hz.grid.r)
+    }
+
+    /// Blocks of sedimentary rock under `surface_y` at block (x, z) by the column rule: down to
+    /// the top of the column's first horizon of another rock at least [`COVER_MIN_BLOCKS`] thick
+    /// (a thinner tongue does not end it), or to the floor.
+    pub fn blocks_at(&self, x: f64, z: f64, surface_y: f64) -> f64 {
         let floor = self.hz.min_y;
-        for (h, &(top, class, _)) in col.iter().enumerate() {
-            let bottom = col.get(h + 1).map_or(floor, |n| n.0);
+        for (top, bottom, class) in self.horizons_at(x, z) {
             let sed = self
                 .sedimentary
                 .get(usize::from(class))

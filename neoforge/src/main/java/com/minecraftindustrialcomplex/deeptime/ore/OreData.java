@@ -238,13 +238,24 @@ public final class OreData {
 
     /**
      * The content bundle the core reads (plan §5.4; {@code Preset::with_content}): today the
-     * essentials, in the core's field names.
+     * essentials, in the core's field names, without those whose material has no ore block here
+     * ({@link EssentialsBundle#placeable}: no {@code #ns:ores/<material>} block, so nothing of it
+     * could be placed; ledger ORE-273).
      */
     public static String contentJson(net.minecraft.server.MinecraftServer server) {
         return contentJson(server.registryAccess());
     }
 
     public static String contentJson(RegistryAccess access) {
+        var blocks = access.registry(net.minecraft.core.registries.Registries.BLOCK);
+        return contentJson(access, m -> blocks
+                .flatMap(r -> r.getTag(OreBlockResolver.oreTag(ResourceLocation.parse(m))))
+                .map(set -> set.size() > 0)
+                .orElse(false));
+    }
+
+    /** {@link #contentJson(RegistryAccess)} with the test for an ore block given. */
+    public static String contentJson(RegistryAccess access, java.util.function.Predicate<String> hasOreBlock) {
         var root = new com.google.gson.JsonObject();
         var list = new com.google.gson.JsonArray();
         for (var e : entries(access, ESSENTIALS)) {
@@ -257,7 +268,10 @@ public final class OreData {
             o.addProperty("primary_only", es.primaryOnly());
             list.add(o);
         }
-        root.add("essentials", list);
+        List<String> skipped = new ArrayList<>();
+        root.add("essentials", EssentialsBundle.placeable(list, hasOreBlock, skipped));
+        if (!skipped.isEmpty())
+            DeepTime.LOGGER.info("Essentials without an ore block in this game, not passed to the simulation: {}", skipped);
         return root.toString();
     }
 }

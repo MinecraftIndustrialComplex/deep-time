@@ -1,0 +1,20 @@
+{
+  "material": "c:lead",
+  "clusters_per_chunk": 0.5,
+  "size": 5,
+  "y_window": [
+    0.1,
+    0.7
+  ],
+  "host_bias": {
+    "limestone": 1.0,
+    "dolostone": 1.0,
+    "shale": 1.0,
+    "black_shale": 1.0,
+    "mudstone": 0.6,
+    "chalk": 0.6,
+    "unclassified_crust": 0.3,
+    "*": 0.2
+  },
+  "_comment": "Small galena pods, mostly in carbonate (Mississippi Valley-type) and shale (SEDEX) hosts; places nothing without a #c:ores/lead block. A supply floor beside the zinc and lead essentials (game-choice, ledger ORE-272, after the playability rows DEP-193 and DEP-206). Background scatter (plan §7.8): values are initial, judged against the deposit audit; packs override or add files under data/<ns>/deeptime/scatter/."
+}

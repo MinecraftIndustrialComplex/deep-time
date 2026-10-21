@@ -12,6 +12,14 @@
 //! | `land_plants` | 1 after [`LAND_PLANTS_GA`] | coal occurs by the Early Devonian (Nelsen et al. 2016, PNAS 113: 2442); the base of the Devonian is 419.2 ± 3.2 Ma (ICS chart 2023/09) |
 //! | `bif_acme` | 1 inside [`BIF_ACME_GA`] | Superior-type BIF first appears ca. 2.6 Ga and iron formations disappear at ca. 1.85 Ga (Bekker et al. 2010, Econ. Geol. 105: 467, abstract) |
 //!
+//! One more clock is the surface stage's, not a deposit-type switch: the pelagic calcifiers
+//! ([`Epoch::pelagic_calcifiers_at`], 0 before [`PELAGIC_CALCIFIERS_GA`].0, rising linearly to 1
+//! at its .1): "it is not until the Mesozoic that a marked proliferation in coccolithophore and
+//! planktic foraminiferal diversity and abundance is observed ... Only then would a substantive
+//! deep-sea sedimentary carbonate sink have been possible" (Ridgwell and Zeebe 2005, EPSL 234: 307),
+//! the Mid-Mesozoic Revolution of Ridgwell 2005; before it, carbonate was buried in shallow water
+//! only.
+//!
 //! A frame's clock is the share of its span inside the window (frames are time averages), so a
 //! frame that straddles a date carries a fraction. Before stage 2 (WP-9/10, 2026-10-02) the
 //! recorded pipeline published the fixed stand-ins 1, 1, 0 and never dated a frame: no BIF
@@ -34,6 +42,10 @@ pub const ZN_PB_GA: f64 = 2.02; // ledger: ORE-014
 pub const LAND_PLANTS_GA: f64 = 0.419; // ledger: ORE-015
 /// The banded-iron-formation acme, Ga (older, younger).
 pub const BIF_ACME_GA: (f64, f64) = (2.6, 1.85); // ledger: ORE-016
+
+/// Planktic calcifiers start raining carbonate on the deep sea at the first, in full at the second,
+/// Ga (the Mid-Mesozoic Revolution; the linear ramp between is a game choice inside it).
+pub const PELAGIC_CALCIFIERS_GA: (f64, f64) = (0.20, 0.10); // ledger: ORE-270
 
 /// Clock names, as `fields::CLOCKS` lists them.
 pub const OXYGENATED_OCEANS: &str = "deeptime:clock/oxygenated_oceans";
@@ -75,6 +87,13 @@ impl Epoch {
     /// Whether coal-forming land plants exist at `t_years`.
     pub fn land_plants_at(&self, t_years: f64) -> bool {
         self.ga(t_years) <= LAND_PLANTS_GA
+    }
+
+    /// How much of their full pelagic carbonate rain the planktic calcifiers make at `t_years`,
+    /// 0 to 1 ([`PELAGIC_CALCIFIERS_GA`]).
+    pub fn pelagic_calcifiers_at(&self, t_years: f64) -> f64 {
+        let (old, full) = PELAGIC_CALCIFIERS_GA;
+        ((old - self.ga(t_years)) / (old - full)).clamp(0.0, 1.0)
     }
 
     /// The three clocks over the frame [`t0_years`, `t1_years`]: each the share of the frame's
@@ -162,6 +181,15 @@ mod tests {
         // A frame straddling 1.85 Ga is in the acme for 3/5 of its span.
         assert!((clock(&e, -1880.0, -1830.0, BIF_ACME) - 0.6).abs() < 1e-6);
         assert!((clock(&e, -2040.0, -1990.0, OXYGENATED_OCEANS) - 0.6).abs() < 1e-6);
+    }
+
+    #[test]
+    fn pelagic_calcifiers_rise_through_the_mesozoic() {
+        let e = earth(1000.0);
+        assert_eq!(e.pelagic_calcifiers_at(-300.0e6), 0.0);
+        assert!((e.pelagic_calcifiers_at(-150.0e6) - 0.5).abs() < 1e-9);
+        assert_eq!(e.pelagic_calcifiers_at(-50.0e6), 1.0);
+        assert_eq!(e.pelagic_calcifiers_at(0.0), 1.0);
     }
 
     #[test]
