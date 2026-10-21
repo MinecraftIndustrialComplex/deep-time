@@ -226,23 +226,10 @@ public final class VolcanicBiomes {
 
         /**
          * Whether a playa cell (baked layer {@code playa} > 0) is the nearest cell of a block column within
-         * {@link #PLAYA_MARGIN} blocks of (x, z), in x and in z: no surface role answers there.
+         * {@link #PLAYA_MARGIN} blocks of (x, z), in x and in z ({@link Playa#within}): no surface role answers there.
          */
         public boolean byPlaya(int x, int z) {
-            RasterSampler p = playa();
-            if (p == null)
-                return false;
-            var grid = p.desc().grid();
-            double r = grid.r();
-            long i0 = (long) Math.floor((x - PLAYA_MARGIN - grid.originBlockX()) / r + 0.5);
-            long i1 = (long) Math.floor((x + PLAYA_MARGIN - grid.originBlockX()) / r + 0.5);
-            long j0 = (long) Math.floor((z - PLAYA_MARGIN - grid.originBlockZ()) / r + 0.5);
-            long j1 = (long) Math.floor((z + PLAYA_MARGIN - grid.originBlockZ()) / r + 0.5);
-            for (long j = j0; j <= j1; j++)
-                for (long i = i0; i <= i1; i++)
-                    if (p.get(i, j) > 0)
-                        return true;
-            return false;
+            return Playa.within(playa(), x, z, PLAYA_MARGIN);
         }
 
         /** The level's playa layer, or null when the world has none. */
