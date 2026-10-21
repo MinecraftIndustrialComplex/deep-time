@@ -444,6 +444,153 @@ fn a_craters_lens_is_seated_under_the_drawn_floor() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+/// The essentials guarantee in the world as generated (DEP-220, DEP-221, ORE-280): the projection
+/// chooses its own λc on the baked land (the deposit stage only forecasts it), every land region
+/// of the world holds a source of each essential with ore in its centre column (the anchor's
+/// top-up fills what the forecast missed), every guaranteed deposit but a placer (an in-stratum
+/// one too, a top-up copy too) holds ore in rock in its centre column of the world the game
+/// reads, an exposed one at the top rock block; the pass is settled (a second run moves and adds
+/// nothing).
+#[test]
+fn guaranteed_deposits_hold_ore_in_the_world() {
+    use crate::deposits::anchor;
+    use deeptime_format::SiteKind;
+
+    let dir = temp_dir("guaranteed");
+    let mut v: Value = serde_json::from_str(&small_planet(20.0)).unwrap();
+    v["deposits"]["essentials"] = json!([
+        {"material": "c:iron", "min_sites_per_region": 1, "region_blocks": 4096, "exposed": true},
+        {"material": "c:zinc", "min_sites_per_region": 1, "region_blocks": 8192},
+        {"material": "c:copper", "min_sites_per_region": 1, "region_blocks": 8192},
+    ]);
+    let json = v.to_string();
+    run_to_folder(&json, &dir);
+    let mut m = Manifest::read(&dir).unwrap();
+    m.verify(&dir).unwrap();
+    let wf = &m.notes[crate::deposits::STAGE_NAME]["world_frame"];
+    assert_eq!(wf["projection"], "petroff_guyou", "{wf}");
+    assert_eq!(wf["forecast"], true, "{wf}");
+    let proj = &m.notes["bake"]["projection"];
+    assert_eq!(proj["lambda_c"]["chosen"], true, "{proj}");
+    assert!(proj["lambda_c"].get("chosen_by").is_none(), "{proj}");
+    let note = m.notes["bake"]["guaranteed"].clone();
+    let n = note["guaranteed"].as_u64().unwrap();
+    assert!(n >= 3, "{note}");
+
+    let world = ColumnWorld::open(&dir).unwrap();
+    let log = deeptime_format::events::EventLog::load(&dir).unwrap();
+    let guaranteed = anchor::guaranteed_of(log.of_kind(anchor::GUARANTEED_KIND));
+    let (sites, _) = deeptime_format::sites::read_sites(&dir).unwrap().unwrap();
+    let bodies = deeptime_format::bodies::read_bodies(&dir).unwrap().unwrap();
+    let mut checked = 0;
+    for s in sites
+        .iter()
+        .filter(|s| guaranteed.contains_key(&s.forming_event))
+    {
+        if s.kind == SiteKind::Placer {
+            continue;
+        }
+        let col = world.sample(i64::from(s.center[0]), i64::from(s.center[2]));
+        let rock = anchor::rock_top(&col.hydro);
+        let ore_top = col
+            .bodies
+            .iter()
+            .filter(|(id, _, _)| {
+                bodies
+                    .iter()
+                    .any(|b| b.id == *id && b.site == Some(s.id) && anchor::bears_ore(b))
+            })
+            .filter(|&&(_, _, bottom)| bottom <= rock)
+            .map(|&(_, top, _)| top.min(rock))
+            .max();
+        assert!(
+            ore_top.is_some(),
+            "site {} ({}, {}) at ({}, {}): no ore at or under the top rock block {rock}: {:?}",
+            s.id,
+            s.deposit_type,
+            guaranteed[&s.forming_event],
+            s.center[0],
+            s.center[2],
+            col.bodies
+        );
+        if guaranteed[&s.forming_event] == "c:iron" {
+            // An exposed essential's ore tops out exactly at the top rock block in its centre
+            // column (DEP-221).
+            let mine: Vec<&deeptime_format::Body> =
+                bodies.iter().filter(|b| b.site == Some(s.id)).collect();
+            let top = anchor::ore_top_in_column(&mine, world.c as u32, s.center[0], s.center[2]);
+            assert_eq!(
+                top,
+                Some(rock),
+                "site {}: an exposed essential's ore tops out at {top:?}, the rock at {rock}",
+                s.id
+            );
+        }
+        checked += 1;
+    }
+    assert!(checked > 0, "{note}");
+    // No two guaranteed bodies share a place (DEP-222): the later would paint over the earlier
+    // one's ore.
+    let at: Vec<(i32, i32)> = sites
+        .iter()
+        .filter(|s| guaranteed.contains_key(&s.forming_event))
+        .map(|s| (s.center[0], s.center[2]))
+        .collect();
+    for (i, a) in at.iter().enumerate() {
+        assert!(
+            !at[i + 1..].contains(a),
+            "two guaranteed sites at {a:?}: {at:?}"
+        );
+    }
+    let p = match crate::preset::Preset::from_json(&json).unwrap().body {
+        crate::preset::PresetBody::Planet(p) => p,
+        _ => panic!("a planet preset"),
+    };
+    // Every land region of the world (a point of the top-up's lattice on dry land) holds a
+    // source of each essential with ore in its centre column.
+    let wp = m.world_projection();
+    let sea = f64::from(m.scale.sea_level_y);
+    let (zlo, zhi) = wp.z_range();
+    let step = anchor::TOP_UP_STEP_BLOCKS;
+    for ess in &p.deposits.as_ref().unwrap().essentials {
+        let r =
+            crate::deposits::playability::Regions::in_frame(wp.index_frame(), ess.region_blocks);
+        let mut land = std::collections::BTreeSet::new();
+        let mut z = zlo.ceil() as i64;
+        while z <= zhi.floor() as i64 {
+            let mut x = -world.c / 2;
+            while x < world.c / 2 {
+                if world.height(x, z) >= sea {
+                    land.insert(r.index(x as f64, z as f64));
+                }
+                x += step;
+            }
+            z += step;
+        }
+        let held: std::collections::BTreeSet<usize> = sites
+            .iter()
+            .filter(|s| ess.counts(&s.products))
+            .filter(|s| {
+                let mine: Vec<&deeptime_format::Body> =
+                    bodies.iter().filter(|b| b.site == Some(s.id)).collect();
+                anchor::ore_top_in_column(&mine, world.c as u32, s.center[0], s.center[2]).is_some()
+            })
+            .map(|s| r.index(f64::from(s.center[0]), f64::from(s.center[2])))
+            .collect();
+        let missing: Vec<&usize> = land.difference(&held).collect();
+        assert!(
+            missing.is_empty(),
+            "{}: land regions {missing:?} of {land:?} hold no source with ore: {note}",
+            ess.material
+        );
+        assert_eq!(note["top_up"][&ess.material]["short"], 0, "{note}");
+    }
+    let again = anchor::anchor_folder(&dir, &p, &mut m, None).unwrap();
+    assert_eq!(again["moved"], 0, "{again}");
+    assert_eq!(again["topped_up"], 0, "{again}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
 /// `scale.projection: "lambert"` keeps the cylinder (Ben may swap back, decisions log 2026-10-04):
 /// the folder is the simulation's Lambert grids, with a Lambert layout block and no border.
 #[test]

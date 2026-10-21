@@ -720,6 +720,183 @@ What it says:
   centres and the one SEDEX still lie above the ground (the SEDEX 61 blocks), and 3 of the 16 iron
   bodies hold ore: a body the bake lifted out of the ground is beyond the stage's reach.
 
+**The guaranteed deposits in the world as generated (2026-10-20).** The last two findings above
+are one problem: the guarantee promised a source of each essential in every land region of the
+world, and the world it reasoned about was the deposit stage's, not the one the player walks. A
+probe of master 3ecea5b9's quick planet (scattered continents seed 1) read every guaranteed site by its
+columns (`deeptime inspect-column` at the centre): of its 8 guaranteed iron bodies 6 lay under the
+world's sea and none held ore, and the SEDEX held none either. Three causes, three fixes, and no
+change to the world data format (the guaranteed sites are known from the event log, the rest are
+manifest notes):
+
+- **The regions were the simulation's** (DEP-220). A 16k world is 13,312 by 6,657 blocks, so its
+  4,096-block regions are 4 by 2 with the last column 1,024 wide and the rows split at z = 768, and
+  its 8,192-block regions 2 by 1; which land falls in which depends on λc, which the projection
+  chooses on the baked land (SCL-087: the four cone points as far from land as possible), after the
+  deposit stage. Two steps. The stage forecasts λc, with the same rule on its present L1 land at a
+  coarser resolution (candidates 1 degree apart, rings 0.5 degrees apart of 72 directions, against
+  the bake's 0.25, 0.1 and 360), and counts each essential's regions on that world. The projection
+  keeps master's choice untouched, so the cone points stay as far from land as before. Where the
+  forecast's regions are not the world's, a top-up after the projection fills the difference: it
+  counts the world's own land regions (a 64-block lattice on the generated terrain) against the
+  sources that hold ore in rock in their centre column as the game reads it, and gives each land
+  region without one a copy of a template source (the essential's first guaranteed site holding
+  ore, else its smallest natural source holding ore), at the region's inland point nearest the
+  spawn, anchored like the rest (below), with a `deeptime:guaranteed_occurrence` of its own caused
+  by the template's. The same top-up covers the natural sources the bake left without ore and the
+  CLI's `deeptime project`, which reruns the projection on a Lambert run's folder. A first version
+  (2026-10-20, never merged) had the stage choose λc and the projection draw the world with it;
+  since the young landscape and the amplifier redraw the land, that put the cone points 0.1 to 2.7
+  degrees nearer the final land on all seven planets measured, and the coordinator's review asked
+  for master's rule back.
+- **Ties went to the region's edge** (DEP-222). Where every cell of a region scored alike (no
+  favourability anywhere, common for iron), the first land cell in index order won: at the
+  region's top edge, often the pole or a coast, and the present L1 coast is not the world's, which
+  the young landscape and the amplifier redraw. Candidates now come from cells at least 128 blocks
+  (two L1 cells at 16k) from the present sea first, any land cell when a region has none, and a
+  tie goes to the cell nearest the spawn as the bake picks it (the land nearest the simulation's
+  (0, 0), drawn into the world). The 128 blocks are the world's: a Petroff-Guyou world stretches
+  the simulation's land near the equator and shrinks it toward the cone points, so each cell's
+  distance from the sea is scaled by its own world blocks per simulation block. Ties for several
+  essentials then want the same cell (a probe found a guaranteed SEDEX and a guaranteed iron body
+  on one centre, the later painting over the earlier's ore), so a guaranteed body also keeps clear
+  of every one placed before it, by the sum of their radii.
+- **The body was placed against the stage's ground** (DEP-221, ORE-280). The bake lifts the strata
+  and the bodies with them where the final terrain stands above the history's surface (STR-052,
+  STR-053, STR-056), and the projection moves each body with the change of the drawn height
+  between its Lambert and world columns, so a body set just under the stage's ground ends where
+  the bake's arithmetic puts it, most often above the world's ground. A pass after the projection
+  now reads the finished folder as the game does and moves each guaranteed site's bodies together,
+  by whole blocks, so the top of its ore lies at the top rock block over its centre (the world's
+  ground less 4 blocks of soil on dry land, the bed under water) for an exposed essential (iron,
+  coal), and no higher than it for the others (a body the history buried deeper stays). An
+  in-stratum body (MVT) stays in its host horizon, where the bake and the projection keep it
+  (ORE-271), while its ore tops out in rock in its centre column. Where the bake left the
+  horizon in the soil band, the projection's clip 4 blocks under the drawn ground (ORE-271)
+  leaves the body no block at all, and moving it whole would keep it empty; such a body is read
+  unclipped, its ore's top goes down to the top of a limestone or dolostone run under the top
+  rock block within 64 blocks (ORE-280, a design reach): the highest run as thick as the ore's
+  span in the centre column, else the thickest, so a one-block bed over shale does not take a
+  body a thicker bed below could hold; or to the top rock block in whatever rock is there when
+  none lies within reach; and it is clipped at the top rock block. An exposed essential's
+  in-stratum body is held to the top rock block like any exposed body: raised as well as lowered,
+  to a host run's top within the 8 blocks a player reaches, else to the top rock block. A placer stays where
+  `placer_channels` settled it; natural bodies keep their physics.
+  The top of the ore is the highest block of the site's centre column where one of its bodies
+  places ore (a zone with a material), not the top of the body's box: the box is padded a block or
+  two past the ore, and anchoring the box left the ore 1 to 2 blocks under the top rock block in
+  the first column check.
+
+Measured on the VM (2026-10-21), master 54c40df4 against the branch at 9583e4b6 (master 54c40df4
+merged in at 5c05a1ea, so the two builds differ by this task alone), with
+`tools/review/carbonate-ensemble.sh` (`deeptime run`, `strata-check` and `deeptime deposit-audit`
+with its access probe) and `tools/review/essentials-table.py --guaranteed`. The branch's audit read
+both builds' worlds, so master's regions are counted on the world's own frame too. "Guaranteed with
+ore": the guaranteed sources that place at least one ore block of the material in the world as
+generated (the audit's own count), of the guaranteed sources, the top-up's copies included; a SEDEX
+counts for both lead and zinc. "Regions": the world's land regions of the essential's size holding
+a source, and in brackets one holding ore. "Spawn": the distance from the first spawn candidate to
+the nearest source holding ore, median and range over the planets that have one. "Access p50": the
+access probe's median range from random land points to gather its need of the material from the
+top blocks under the ground.
+
+earthlike_quick_16k, 1,000 Myr, supercontinent and scattered continents seeds 1 to 3 (six planets
+a build, the two builds side by side):
+
+| essential | guaranteed with ore, master | branch | regions, master | branch | planets with every land region holding ore, master | branch | spawn, master | branch | access p50, master | branch |
+|---|---|---|---|---|---|---|---|---|---|---|
+| iron | 10 of 46 | 54 of 54 | 34 (13) of 44 | 44 (44) of 44 | 0 of 6 | 6 of 6 | 2,797 [1,182, 4,598] | 1,274 [840, 2,286] | 104 | 104 |
+| coal | 5 of 5 | 5 of 5 | 43 (43) of 44 | 44 (44) of 44 | 5 of 6 | 6 of 6 | 804 [280, 1,705] | 804 [280, 1,705] | 40 | 40 |
+| lead | 1 of 8 | 9 of 9 | 9 (5) of 12 | 12 (12) of 12 | 1 of 6 | 6 of 6 | 1,313 [485, 4,759], 4 planets | 1,641 [485, 4,098], 6 planets | 1,168 | 1,152 |
+| zinc | 1 of 8 | 9 of 9 | 9 (5) of 12 | 12 (12) of 12 | 1 of 6 | 6 of 6 | 1,313 [485, 4,759], 4 planets | 1,641 [485, 4,098], 6 planets | 968 | 896 |
+| copper | none | none | 12 (12) of 12 | 12 (12) of 12 | 6 of 6 | 6 of 6 | 1,682 [1,179, 2,380] | 1,682 [1,179, 2,380] | 96 | 96 |
+| gold | none | none | 12 (12) of 12 | 12 (12) of 12 | 6 of 6 | 6 of 6 | 513 [71, 1,520] | 513 [71, 1,520] | none | none |
+
+earthlike_full_16k, 1,000 Myr, scattered continents seed 1 (master, then the branch): iron's 10
+guaranteed bodies hold ore in all 10 (1 of 8 on master), every one of its 8 land regions holds iron
+with ore (5 with a source and 1 with ore on master), and the spawn's nearest iron with ore is 579
+blocks away (5,019 on master, whose nearest iron of any kind was 2,185). Lead and zinc: 2 of 2
+guaranteed with ore (0 of 1), both 8,192-block land regions hold them with ore (1 with a source
+and none with ore on master), the spawn's nearest 540 blocks away (none with ore on master, 1,167
+to the nearest without), access p50 lead 1,080 (1,112), zinc 840 (856). Coal held ore in every
+region on both builds (4 guaranteed seams on the branch, 1 on master; spawn 606, access p50 56);
+copper (spawn 1,985, access p50 104) and gold (1,379) needed no guarantee and did not change.
+
+- **Every guaranteed body holds ore**, 77 of 77 on the six quick planets (master 17 of 67; a lead and
+  zinc source counts for both) and 18 of 18 on the full one (master 2 of 11). The anchor moved
+  8 to 11 sites a planet, 16 to 140 blocks at most; 0 to 3 of a planet's guaranteed sites lie
+  under water, anchored at the bed (8 of the quick planets' 68, 3 of the full planet's 16). The
+  top-up added 0 to 3 sources a quick planet (10 in all) and 4 on the full one.
+- **The top-up fills what the stage could not see.** The stage's forecast λc is not the bake's
+  (it reads the present L1 land at a coarser step, and the young landscape and the amplifier then
+  redraw the land), and the bake can leave a source without ore, so a few of the world's regions
+  lack a source with ore after the stage. Master, which counted on the Lambert frame, left quick
+  supercontinent 1 with a 4,096-block region without coal, and 5 of the 6 quick planets with a
+  region without lead and zinc holding ore (3 without any source). On the branch every land
+  region of every essential holds a source with ore on all seven planets.
+- **An emptied MVT** (2026-10-21, after merging master f1632cf3). On the merged tree's quick
+  supercontinent seed 1, a guaranteed MVT (zinc and lead) at (2284, -401) held no block at all:
+  the bake left its limestone horizon 2 blocks under the ground, in the soil band, and the
+  projection clips an in-stratum body 4 blocks under the drawn ground (ORE-271), which removed
+  all of it; moving it whole kept it empty. The anchor now reads such a body unclipped, moves it
+  down and clips it at the top rock block. Rerun on the same planet: 11 of 11 guaranteed bodies
+  held ore (the MVT 32 zinc blocks and 1 lead block, its top in the one limestone block under the
+  soil, at 59 under ground 63, the rest in the shale beneath), both 8,192-block land regions held
+  lead and zinc with ore (1 of 2 before), and the anchor pass took 0.1 s. That rerun's one-block
+  limestone over shale is why the host search now prefers a run as thick as the ore's span
+  (ORE-280).
+- **The column check** (`deeptime inspect-column` at the centre of each of the full planet's 10
+  guaranteed sites, d6ba612a, before the host thickness and the top-up): on dry land the ore's top
+  block is the ground less 4 every time (the iron formation at 156 under ground 160, 75 under 79,
+  86 under 90, 94 under 98, 165 under 169, 123 under 127, 190 under 194; the coal seams' top beds
+  at 179 under 183 and 75 under 79), and the iron body under the sea at (6232, 1324) tops out at
+  the bed, 35, with the iron formation 35 to 33 over shale. The same check on e63eb159, before the
+  exact top, found the ore 1 to 2 blocks under the top rock block (an iron formation at 129 to 127
+  under rock 131).
+- **Natural sources are checked in the world now.** The top-up counts a region's sources by the
+  ore in their centre column after the bake, natural ones included, so a region whose only lead
+  was a natural body the bake emptied (master's quick supercontinent seed 3: a natural MVT whose
+  host horizon the projection's clip left with no block, and a natural SEDEX whose centre the
+  bake lifted 5 blocks above the ground) gets a copy; that planet's western region holds lead
+  with ore on the branch. What the guarantee still trusts: a source under the sea counts for its
+  region like one on land, and the top-up reads the centre column only.
+- **Spawn distances** are paired now: the λc is master's on both builds, so the spawn is the same
+  place. Iron's nearest source holding ore came nearer on four of seven planets (by 2.6 to 4.4
+  km: supercontinent 1, 4,600 to 855; supercontinent 3, 4,050 to 883; scattered 3, 3,460 to 840;
+  the full planet, 5,019 to 579), stayed at 1,670 on supercontinent 2 and went farther on two
+  (scattered 1, 2,140 to 2,290; scattered 2, 1,180 to 1,850), where the stage's picks moved with
+  the forecast's regions and the inland rule. Lead and zinc with ore exist within reach on all
+  six quick planets (four on master) and came nearer on scattered 3 (4,760 to 3,340); coal,
+  copper and gold did not move.
+- **λc and the cone points.** The projection keeps master's rule (SCL-087) on the baked land, so
+  λc and the cone points' least distance from land are master's on all seven planets: quick
+  supercontinent 1 to 3, 10.75 degrees (cones 3.50 degrees from land), 19.50 (5.10), 129.50
+  (4.60); quick scattered continents 1 to 3, 140.25 (0.10), 156.50 (4.50), 255.25 (6.30); full
+  scattered 1, 97.50 (6.60). The 4k GameTest planet (`planet_world_4k`) bakes to the same 20 files
+  on both builds; `deposits_world_4k` differs in its sites, bodies, events and keyframes, from the
+  guarantee's inland and spawn picks (DEP-222).
+- **The stage time (P1-19).** The forecast's `world_frame` lap reads 0.0 s on all seven planets.
+  The deposit stage summed over the six quick planets took 116.9 s on the branch against 113.6 s
+  on master, 4.4 % of the stages' sum on both (2,661 and 2,598 s): per planet the ratio swings
+  from 0.77 to 1.56 together with the young landscape and the amplifier, which this task does not
+  touch, so the VM's load (20 to 45 from other agents) sets it. Full planet: 60.6 s against 70.0 s,
+  5.2 and 5.0 % of the stages' sum (run one after the other). The projection's λc search is
+  master's (453 to 1,355 ms against 541 to 1,310 ms on the quick planets, 865 against 882 ms on
+  the full one). The anchor and the top-up run in the run's finish, 69 and 159 ms on quick
+  scattered 1. No measurable change to a planet's time.
+- **On master bd7c8f21 merged in** (04e12fa9, the branch's head but for docs; master's sea level
+  and plate changes move every planet, so the land and λc are not the table's): the same seven
+  planets, the branch alone. Every guaranteed body holds ore, 83 of 83 on the six quick planets
+  and 13 of 13 on the full one; every land region of every essential holds a source with ore on
+  all seven. The top-up added 0 to 5 sources a quick planet (19 in all) and 4 on the full one; 5
+  of the quick planets' 80 guaranteed sites and 3 of the full one's 12 lie under water. The
+  spawn's nearest iron with ore lies a median 1,000 blocks away on the quick planets (619 to
+  1,867) and 704 on the full one, lead and zinc 2,306 (1,345 to 3,193) and 1,249, coal 622 and
+  181. λc and the cones' distance from land: quick supercontinent 1 to 3, 73.25 degrees (5.00),
+  234.25 (3.80), 20.50 (6.70); scattered continents 1 to 3, 25.75 (5.70), 158.75 (1.90), 331.50
+  (5.10); full, 67.25 (9.60). The deposit stage took 3.1 % of the stages' sum on the quick
+  planets and 4.7 % on the full one, its forecast lap 0.0 s.
+
 ## Simplifications and limits
 
 - **One density per type, flat over the tract.** Singer et al. 2005 found porphyry density falls
@@ -760,6 +937,15 @@ What it says:
 - **The coal footprint.** The engine scales a field's three axes with the cube root of its
   tonnage, so the larger tonnage P10 of 2026-10-02 gives a footprint P10 of about 4,560 km², not
   the 6,000 km² of the area distribution.
+- **A guaranteed body is anchored at its centre column.** The anchor moves the whole body by one
+  vertical shift read over the site's centre; elsewhere the body keeps its shape, not the ground's,
+  so on a slope one edge of a wide sheet can lie in the soil and the other under more cover.
+- **Natural sources are judged at the stage's ground.** A natural site counts toward an exposed
+  essential when its top lies within 16 blocks of the deposit stage's surface, not the world's,
+  and only guaranteed bodies are moved; the audit's `_with_ore` counts say what the world holds.
+- **The world's regions are not all alike.** A 16k Petroff-Guyou world is 13,312 blocks round, so
+  its last column of 4,096-block regions is 1,024 blocks wide and its last 8,192-block column 5,120;
+  each still needs its own source.
 
 ## Game choices
 
@@ -786,6 +972,10 @@ What it says:
   origin (Chapman & Mortensen, found in a search, not read); no source gives a quantitative relation
   between a lode's eroded fraction and the placer below it, so the linear law is the project's.
 - No spawn selection by essentials (Ben, 2026-10-05; BAK-015).
+- The essentials guarantee in the world as generated: regions on the world's own frame with λc
+  chosen at the deposit stage (DEP-220), candidates 128 blocks inland first and nearest (0, 0) on a
+  tie (DEP-222), and guaranteed bodies anchored after the projection at the top rock block (DEP-221,
+  ORE-280) (coordinator's calls under Ben's rule of 2026-10-16, decisions log 2026-10-20).
 - Placer gold as panning in packs without Excavated Variants: suspicious gravel or sand holding
   2 to 5 gold nuggets rolled from a loot table, only gold, only over support (Ben, 2026-10-16:
   ORE-267 to ORE-269; the block is Ben's, the count and the rules around it are the agent's);
