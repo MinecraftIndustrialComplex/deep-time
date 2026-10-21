@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! Continentality and the lapse rate on the DEM (plan §8.3 item 3).
 //!
-//! **Lapse rate.** Surface temperature = the sea-level temperature − Γ·z (Γ = `lapse_c_per_km`,
-//! 6.5 °C/km by default, the standard atmosphere's) on land above sea level.
+//! **Lapse rate.** Surface temperature = the sea-level temperature + the plateau's warmth − Γ·z
+//! (Γ = `lapse_c_per_km`, 6.5 °C/km by default, the standard atmosphere's) on land above sea
+//! level. The plateau's warmth (the mass-elevation effect, [`mass_elevation_k`] ×
+//! [`mass_elevation_base`]) is how much warmer than the free air at the same height the air over
+//! broad high ground is: a few kelvin in the sunlit months over a plateau hundreds of kilometres
+//! wide, nothing over the sea and little over a lone peak.
 //!
 //! **Along the wind.** Each row is marched in the direction the air travels (east under
 //! westerlies, west under easterlies; the row wraps, so the march goes round twice from a sea cell
@@ -106,6 +110,41 @@ pub fn march(
         }
     }
     out
+}
+
+// --- The plateau's warmth (the mass-elevation effect; docs/science/mass-elevation-effect.md).
+
+/// Half-width of the box, run twice, over which the ground's height above the sea is averaged
+/// into the base height of [`mass_elevation_base`], Earth km (a fetch over which sunlit ground
+/// heats the boundary layer's air).
+pub const MEE_FOOTPRINT_KM: f64 = 150.0; // ledger: CLM-225
+/// The warmth per metre of base height per unit of the month's relative sunlight, K/m.
+pub const MEE_K_PER_M: f64 = 2.8e-3; // ledger: CLM-226
+/// The month's relative sunlight at which the warmth changes sign.
+pub const MEE_Q0: f64 = 0.864; // ledger: CLM-226
+/// The relative sunlight's range the law was fitted over; beyond it the law holds its ends.
+pub const MEE_Q_MIN: f64 = 0.63; // ledger: CLM-227
+pub const MEE_Q_MAX: f64 = 1.406; // ledger: CLM-227
+
+/// The plateau's warmth per metre of base height, K/m: how much warmer than the free air at the
+/// same height the air over a broad plateau is, in a month whose daily-mean sunlight at the top of
+/// the atmosphere is `q_rel` times the planet's mean (S₀/4). Negative in the dark months, when the
+/// high ground cools the air instead (Pepin & Seidel 2005).
+pub fn mass_elevation_k(q_rel: f64) -> f64 {
+    MEE_K_PER_M * (q_rel.clamp(MEE_Q_MIN, MEE_Q_MAX) - MEE_Q0)
+}
+
+/// The base height the plateau's warmth grows with, m: the ground's height above the sea averaged
+/// over the footprint (the sea counted at 0) and no higher than the ground itself, so a peak takes
+/// its surroundings' base, a lowland beside a plateau its own small height, and the sea 0. `z` is
+/// the ground above the sea (0 at sea), `r` the box's half-width in cells.
+pub fn mass_elevation_base(d: &crate::surface::grid::Dims, z: &[f64], r: usize) -> Vec<f64> {
+    let mut zb = z.to_vec();
+    crate::surface::grid::box_blur(d, &mut zb, r, 2);
+    for (b, &zc) in zb.iter_mut().zip(z) {
+        *b = b.min(zc).max(0.0);
+    }
+    zb
 }
 
 #[cfg(test)]
