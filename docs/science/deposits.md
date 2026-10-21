@@ -726,22 +726,38 @@ world, and the world it reasoned about was the deposit stage's, not the one the 
 probe of master 3ecea5b9's quick planet (scattered continents seed 1) read every guaranteed site by its
 columns (`deeptime inspect-column` at the centre): of its 8 guaranteed iron bodies 6 lay under the
 world's sea and none held ore, and the SEDEX held none either. Three causes, three fixes, and no
-change to the world data (the guaranteed sites are known from the event log, the rest are manifest
-notes):
+change to the world data format (the guaranteed sites are known from the event log, the rest are
+manifest notes):
 
-- **The regions were the simulation's** (DEP-220). The deposit stage now chooses the world's λc
-  itself, with the bake's rule (SCL-087: the four cone points as far from land as possible) on its
-  present L1 land, and counts each essential's regions on the world's own frame: a 16k world is
-  13,312 by 6,657 blocks, so its 4,096-block regions are 4 by 2 with the last column 1,024 wide and
-  the rows split at z = 768, and its 8,192-block regions 2 by 1. The projection draws the world
-  with the stage's λc (`notes.bake.projection.lambda_c.chosen_by` = `deposits`) when the preset
-  leaves λc to the run.
+- **The regions were the simulation's** (DEP-220). A 16k world is 13,312 by 6,657 blocks, so its
+  4,096-block regions are 4 by 2 with the last column 1,024 wide and the rows split at z = 768, and
+  its 8,192-block regions 2 by 1; which land falls in which depends on λc, which the projection
+  chooses on the baked land (SCL-087: the four cone points as far from land as possible), after the
+  deposit stage. Two steps. The stage forecasts λc, with the same rule on its present L1 land at a
+  coarser resolution (candidates 1 degree apart, rings 0.5 degrees apart of 72 directions, against
+  the bake's 0.25, 0.1 and 360), and counts each essential's regions on that world. The projection
+  keeps master's choice untouched, so the cone points stay as far from land as before. Where the
+  forecast's regions are not the world's, a top-up after the projection fills the difference: it
+  counts the world's own land regions (a 64-block lattice on the generated terrain) against the
+  sources that hold ore in rock in their centre column as the game reads it, and gives each land
+  region without one a copy of a template source (the essential's first guaranteed site holding
+  ore, else its smallest natural source holding ore), at the region's inland point nearest the
+  spawn, anchored like the rest (below), with a `deeptime:guaranteed_occurrence` of its own caused
+  by the template's. The same top-up covers the natural sources the bake left without ore and the
+  CLI's `deeptime project`, which reruns the projection on a Lambert run's folder. A first version
+  (2026-10-20, never merged) had the stage choose λc and the projection draw the world with it;
+  since the young landscape and the amplifier redraw the land, that put the cone points 0.1 to 2.7
+  degrees nearer the final land on all seven planets measured, and the coordinator's review asked
+  for master's rule back.
 - **Ties went to the region's edge** (DEP-222). Where every cell of a region scored alike (no
   favourability anywhere, common for iron), the first land cell in index order won: at the
   region's top edge, often the pole or a coast, and the present L1 coast is not the world's, which
   the young landscape and the amplifier redraw. Candidates now come from cells at least 128 blocks
   (two L1 cells at 16k) from the present sea first, any land cell when a region has none, and a
-  tie goes to the cell nearest (0, 0) in the world, where the player starts. Ties for several
+  tie goes to the cell nearest the spawn as the bake picks it (the land nearest the simulation's
+  (0, 0), drawn into the world). The 128 blocks are the world's: a Petroff-Guyou world stretches
+  the simulation's land near the equator and shrinks it toward the cone points, so each cell's
+  distance from the sea is scaled by its own world blocks per simulation block. Ties for several
   essentials then want the same cell (a probe found a guaranteed SEDEX and a guaranteed iron body
   on one centre, the later painting over the earlier's ore), so a guaranteed body also keeps clear
   of every one placed before it, by the sum of their radii.
@@ -758,9 +774,13 @@ notes):
   (ORE-271), while its ore tops out in rock in its centre column. Where the bake left the
   horizon in the soil band, the projection's clip 4 blocks under the drawn ground (ORE-271)
   leaves the body no block at all, and moving it whole would keep it empty; such a body is read
-  unclipped, its ore's top goes down to the highest limestone or dolostone block under the top
-  rock block within 64 blocks (ORE-280, a design reach), or to the top rock block in whatever
-  rock is there when none lies within reach, and it is clipped at the top rock block. A placer stays where
+  unclipped, its ore's top goes down to the top of a limestone or dolostone run under the top
+  rock block within 64 blocks (ORE-280, a design reach): the highest run as thick as the ore's
+  span in the centre column, else the thickest, so a one-block bed over shale does not take a
+  body a thicker bed below could hold; or to the top rock block in whatever rock is there when
+  none lies within reach; and it is clipped at the top rock block. An exposed essential's
+  in-stratum body is held to the top rock block like any exposed body: raised as well as lowered,
+  to a host run's top within the 8 blocks a player reaches, else to the top rock block. A placer stays where
   `placer_channels` settled it; natural bodies keep their physics.
   The top of the ore is the highest block of the site's centre column where one of its bodies
   places ore (a zone with a material), not the top of the body's box: the box is padded a block or

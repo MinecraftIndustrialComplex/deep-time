@@ -4124,7 +4124,8 @@ pub const INLAND_MARGIN_BLOCKS: f64 = 128.0;
 const ESSENTIAL_REGION_PROBE: u32 = 4096;
 
 /// The smallest world blocks per simulation block [`inland_cells_scaled`] reads distances with
-/// (the cone points of a Petroff–Guyou world shrink the land to nothing): it bounds the search.
+/// (the cone points of a Petroff–Guyou world shrink the land to nothing): it bounds the search
+/// (game-choice, DEP-222).
 const MIN_WORLD_SCALE: f64 = 0.25;
 
 /// Each cell's world blocks per simulation block on `grid`, from where its cells land in the
