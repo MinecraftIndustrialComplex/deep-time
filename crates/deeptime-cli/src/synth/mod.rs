@@ -231,7 +231,7 @@ mod tests {
         run(&opts).unwrap();
         let m = Manifest::read(&opts.out).unwrap();
         m.verify(&opts.out).unwrap();
-        assert_eq!(m.format_version, "0.5");
+        assert_eq!(m.format_version, "0.6");
         assert_eq!(m.layers.len(), 8);
         let e = TilePackReader::open(&opts.out.join("rasters/elevation.dtr"))
             .unwrap()
@@ -286,7 +286,8 @@ mod tests {
         assert!(w.nearest(0.0, 48.0).is_nan());
         assert_eq!(e.nearest(100.0, 0.0), 110.0);
         assert_eq!(w.nearest(100.0, 0.0), 120.0);
-        // Every water cell is ringed by terrain at least as high as the water before the nodata edge.
+        // Every water cell is ringed by terrain at least as high as the water before the nodata edge
+        // (the lake's 120, the closed bowl's 50).
         let g = &e.desc.grid;
         for j in 0..i64::from(g.h) {
             for i in 0..i64::from(g.w) {
@@ -295,7 +296,7 @@ mod tests {
                 }
                 for (di, dj) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
                     if w.get(i + di, j + dj).is_nan() {
-                        assert!(e.get(i + di, j + dj) >= 120.0, "leak at {i},{j}");
+                        assert!(e.get(i + di, j + dj) >= w.get(i, j), "leak at {i},{j}");
                     }
                 }
             }
