@@ -1996,7 +1996,7 @@ the playas of basins too dry for a lake as salt flats) and the rivers
 in the colours of the `rivers` ramp of `ramps.json`, whose stops run over log₁₀ of the discharge in
 m³/s, so a reader can read the discharge back from a pixel's colour. A river is drawn at its width
 in the game (since 2026-10-20): one narrower than a pixel is a thread blended over the base at its
-width in pixels (at least a quarter), so only a pixel at least half covered is hard-edged on the
+width in pixels (at least a tenth), so only a pixel at least half covered is hard-edged on the
 ramp and readable; a fainter one is a blend no reader should decode. The ramp's `keys` hold the land, sea, lake, frozen-lake and salt-flat colours, and the
 `satellite` ramp's `keys` the three the satellite view draws them in (`deeptime_core::water_view` has the
 rules). The water is **derived, not stored**: the bake's own hydrology (`hydro::network`, P1-22: the

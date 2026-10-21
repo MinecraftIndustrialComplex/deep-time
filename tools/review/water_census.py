@@ -137,7 +137,10 @@ def river_ink(riv: np.ndarray, river: np.ndarray, land_dry: np.ndarray) -> np.nd
     as a thread blended at its coverage over the land, so a pixel is `base (1 - a) + c a` with c
     on the ramp. The base is the mean of the dry land pixels within two pixels (LAND where there
     are none); a and c are the ramp colour that explains the pixel best. A hard-edged river pixel
-    (the drawing before 2026-10-20) is a = 1."""
+    (the drawing before 2026-10-20) is a = 1. It reads faint threads high: on the maps of
+    2026-10-20 it gave 5.4 % of the land where the rule's own sum was 2.8 % (the hill shade under a
+    thread varies more than the thread's tint), so for threads read water_view.rs's sum, which a
+    test pins to the channel's width (HYD-091), not this."""
     img = riv[..., :3].astype(np.float32)
     k = np.ones((5, 5), np.float32)
     wsum = ndimage.convolve(land_dry.astype(np.float32), k, mode="wrap")
