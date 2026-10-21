@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.climate;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.worldgen.Geothermal;
 import com.minecraftindustrialcomplex.deeptime.worldgen.VolcanicZones;
 import com.minecraftindustrialcomplex.deeptime.worldgen.VolcanicZones.Role;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
@@ -37,7 +38,8 @@ import java.util.function.Consumer;
  *   <li><b>Put in.</b> Where a {@link VolcanicZones} disc of a {@link Role} holds the column, the role's biome
  *       answers: the first biome of the tag {@code #deeptime:volcanic/<role>} (in the tag's order) that the
  *       biome source can place. Surface roles answer at and above the ground (biome depth parameter under
- *       {@link #SURFACE_DEPTH}) on land, never on a river's channel; the climate-gated roles (fresh ash, young
+ *       {@link #SURFACE_DEPTH}) on land, never on a river's channel, and on a playa only where a hot spring's own
+ *       pool, rim and terraces lie (the hot-spring field's role); the climate-gated roles (fresh ash, young
  *       lava) only where the climate point lies inside that biome's own temperature and humidity ranges in the
  *       source's parameter list; the cave role from that biome's own lowest depth down. A role without a
  *       biome in the pack, or not allowed there, gives way to the next role whose disc holds the column, and
@@ -208,6 +210,11 @@ public final class VolcanicBiomes {
 
         public int seaLevel() {
             return seaLevel;
+        }
+
+        /** The level's geothermal sites (the surface step's own, cached by the terrain). */
+        public Geothermal geothermal() {
+            return terrain.geothermal(cell, minY, seaLevel);
         }
 
         /**
@@ -394,6 +401,11 @@ public final class VolcanicBiomes {
             return roles;
         }
 
+        /** A geothermal site claims the column: its pool, rim, terraces or altered ground ({@link Geothermal#partAt}). */
+        boolean claimed() {
+            return level.geothermal().partAt(x, z) != Geothermal.Part.NONE;
+        }
+
         BiomeRules.Column facts() {
             if (facts == null)
                 facts = new BiomeRules.Column(level.rules, x, z, height(), level.seaLevel(), this::roles, this::plain, this::slot);
@@ -505,6 +517,13 @@ public final class VolcanicBiomes {
                 return null;
             if (!q.land())
                 return null;
+            // A playa keeps its salt flat's biome, as a river's channel keeps its river: the salt is the hydrology's surface
+            // (PlayaPass), and a role's biome decorates its own ground over it (Biomes O' Plenty's hot springs dug ponds into a
+            // salt flat and ringed them with thermal calcite). Only a hot spring's own columns (its pool, rim and terraces,
+            // which GeothermalPass paints over the salt) keep the spring's biome there.
+            // ledger: BIO-165 (game-choice)
+            if (q.facts().playa() && !(role == Role.HOT_SPRING_FIELD && q.claimed()))
+                continue;
             // The role's biome rules first: the climate picks among a pack's variants (an icy or a tropical volcano).
             for (BiomeRules.Bound rule : rules) {
                 if (!rule.rule().matches(q.facts()))
