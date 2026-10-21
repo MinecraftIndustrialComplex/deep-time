@@ -3538,3 +3538,77 @@ table (30c4d664 → fad59a5e on seeds 1 and 2: land 0.257 → 0.268, largest 0.1
    carries the mean (base: 558 Myr in one run of six; 126 Myr on seeds 1 to 3 against 46 on seeds
    4 to 6). Compare arms on twelve runs or more, and by the runs' median, before reading a change
    in them as the code's.
+
+## The sea off the datum (2026-10-21)
+
+Item 6 of "What is left, and for whom" above: a sea standing off elevation 0, above or below it,
+lost about 0.026 more of the planet's continental crust over 1,000 Myr than a sea at 0 and
+shortened the assembly period, which pointed at code that still took the datum for the sea. This
+section lists every such place in `deeptime-core`, feeds the step's sea to the ones that model
+something physical, and measures the change against master 44032ad9 on twelve runs an arm.
+
+### The two frames
+
+The plate model's heights stand in a datum frame: the ridge crest, GDH1's floor (PLT-351), the
+continents' Airy heights and the isostatic heights of the settling and the collapse are measured
+from elevation 0 on a planet without water. The sea S is a height in the same frame: the ocean's
+volume fills the ground's hypsometry once a step (sea-level.md), and the plates read the last
+step's (`plates/mod.rs` `sea_m`: the climate's `climate/sea_level_m`, else the surface's, else 0).
+The surface, the climate, the rivers, the bake, the strata and the deposits already took their
+heights from the sea (a sweep of those modules found no reader of 0 as the sea); the plate
+model's own readers did not.
+
+### Where the code took 0 for the sea
+
+| site | what it does | reached by the moving sea in the shipped Earth-like presets | change | ledger |
+|---|---|---|---|---|
+| `plates/forces.rs` `column_energy` (all its callers go through `Coeffs::energy` in `forces::step`: the edge energies and the collision's energy change) | the land's potential energy against the ridge: the ridge push and the collision's resistance | yes, every step, at every edge between land and ocean | h = z − S, the water switch at S, H = 35 km + 6 S (below) | FRC-013, FRC-014 |
+| `plates/belts.rs` `WEDGE_FLOOR_M` (`Reach::new`) | the lowest ground the orogenic wedge's distance field is followed down to, −500 m | yes, every collision | 500 m below the sea | PLT-380 (new) |
+| `plates/subduction.rs` `fronts_finish` (`andean`) | an oceanic sample raised at a front takes the Andean orogeny mark when it stands above 0 | yes, every subduction front | above the sea | PLT-060 |
+| `plates/belts.rs` `stack_front`, `plates/subduction.rs` `fronts_finish` (the `ceiling` of uplift) | the uplift's isostatic ceiling, 1 − z/z_c | no: `uplift_ceiling_m` is 0 (off) in the shipped presets | z − S | PLT-041 |
+| `plates/pools.rs` `surface_step` | Cortial's continental erosion, ε_c z/z_c | no: `continental_erosion_mm_yr` is 0 in the shipped presets (the surface stage erodes) | the height above the sea | PLT-127 |
+| `plates/dynamics.rs` (`arc_stats`, `arc_heights`, the step record's land), `plates/belts.rs` (`emerged`, the belt's `height_m`), `plates/check.rs` (the land gain) | measurement: the land share, the arcs' heights and emergence, the belts' heights, the plate check's land gain | yes, measurement only | from the sea; the land gain with the sea held (below) | PLT-151, PLT-215 to PLT-219, CHK-009 |
+| `provinces.rs` `cells()` | the province map's heights | output only | less the surface's sea, else the climate's, else 0 | PRV-012 |
+
+Left as they are:
+
+- `plates/crust_budget.rs` (`bits`, `stocks`): the dry bit and the dry stock at 0. The budget
+  prints the land at the datum (`land0`) beside the land above the sea (`land`, `dry`), so both
+  frames can be compared; it is a census, not a law.
+- `params.rs` (a preset's ridge must stand below 0 and its highest ground above): a validation of
+  the preset, in the datum frame.
+- The height cap `max_elevation_m`, the settling (`settle.rs`, which reads the sea for the water
+  it loads, ISO-078), the ocean–continent transition (`transition.rs`), the L1 resampling
+  (`l1.rs`) and the orogenic collapse (`collapse.rs`): heights of the solid column, in the datum
+  frame on purpose.
+- `surface/amplify.rs` `Config.sea`: already the step's sea; only its doc did not say the frame.
+
+### The column energy taken from the sea
+
+The force balance's column energy (design §3.2, FRC-014) is the vertical-stress integral of an
+Airy-compensated column against a reference, Turcotte & Schubert's lithostatic balance; the
+reference is a column whose top stands at the sea. Until now the code put that shore at 0: under
+a sea at +300 m a shelf at +100 m, under 200 m of water, was weighed as dry land 100 m high, and
+under a sea at −250 m a coastal plain at −100 m, 150 m above the water, was weighed as a shelf
+under water.
+
+Taken from the sea S: h = z − S, the water switch at h = 0, and the reference crust H thick enough
+to hold a dry column at S, H = 35 km + S ρ_m / (ρ_m − ρ_c) = 35 km + 6 S (ρ_m 3,300, ρ_c 2,750
+kg/m³). Then for a dry column U(z, S) = U(z, 0) − U(S, 0): the difference between two dry columns
+does not change with the sea (the rock is the same whatever water lies elsewhere), the reference
+shore moves with the sea, and at S = 0 the formula is the datum's, bit for bit. The ridge crest
+stays where the datum frame puts it (FRC-013). Against the ridge a sea at +300 m lowers every
+continent's energy by U(300 m, 0), about 2.9 × 10¹¹ N/m; one at −250 m raises it by about
+2.3 × 10¹¹ N/m (a belt 5 km high: 6.7 × 10¹² N/m). Not taken: h = z − S on a fixed 35 km crust
+(a high sea would weaken the push of every dry belt by ρ_c g S ρ_m / (ρ_m − ρ_c) per metre of
+relief though the columns are the same), and the water switch alone (the reference shore stays at
+0, the fault itself). Tested in `forces.rs` `the_land_s_column_energy_is_taken_from_the_sea`.
+
+### The land gain with the sea held
+
+Counting land above the sea made the plate check's land gain (CHK-009, PLT-151: the most land
+gained in one step after the first 10 Myr, target at most 1.5 % of the planet a 2 Myr step) count
+a falling sea's new shore as land made: on the first branch arm its median run rose from 0.84 to
+2.00 % and failed. The check is about land the ground's motion makes, so the step record now
+carries `land_held`, the step's land above the sea of the step before, and the gain is
+`land_held` less the step before's land (`check.rs`, test `land_gain_holds_the_sea`).
