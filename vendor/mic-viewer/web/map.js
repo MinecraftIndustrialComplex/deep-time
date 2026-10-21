@@ -135,7 +135,7 @@
 
     const V = { cx: 0, cz: 0, bpp: 1, w: 0, h: 0, dpr: 1 };
     let dirty = true, raf = 0, running = false, destroyed = false;
-    const tiles = new Map();   // url -> { img, state: 'queued' | 'loading' | 'ok' | 'empty' | 'err', t }
+    const tiles = new Map();   // url -> { img, state: 'queued' | 'loading' | 'ok' | 'empty' | 'missing' | 'err', t }
     let inflight = 0, clock = 0;
     const pointers = new Map();
     let pinch = null, moved = 0, cursor = null;
@@ -230,12 +230,13 @@
       fetch(t.url, { credentials: 'same-origin' })
         .then(r => {
           if (r.status === 204) return null;            // nothing there
+          if (r.status === 404) return false;           // no such tile: never asked again
           if (!r.ok) throw new Error(String(r.status));
           return r.blob().then(b => createImageBitmap(b));
         })
         .then(img => {
-          t.img = img;
-          t.state = img ? 'ok' : 'empty';
+          t.img = img || null;
+          t.state = img ? 'ok' : img === false ? 'missing' : 'empty';
         }, () => {
           t.state = 'err';
           setTimeout(() => { if (tiles.get(t.url) === t && t.state === 'err') tiles.delete(t.url); }, RETRY_MS);
@@ -291,7 +292,7 @@
           continue;
         }
         if (t.state === 'empty') continue;
-        want.push({ t, dist: Math.hypot(sx + px / 2 - V.w / 2, sy + px / 2 - V.h / 2) });
+        if (t.state === 'queued' || t.state === 'loading') want.push({ t, dist: Math.hypot(sx + px / 2 - V.w / 2, sy + px / 2 - V.h / 2) });
         // Meanwhile: the nearest ancestor that is in, cropped and magnified.
         for (let up = 1; up <= ANCESTORS && z - up >= pyr.minZoom; up++) {
           const a = tileAt(L.url(z - up, c.x >> up, c.y >> up), false);
@@ -317,7 +318,9 @@
       ctx.textAlign = 'right';
       ctx.textBaseline = 'bottom';
       const label = (n >= 1 ? fmtInt(n) : String(n)) + (n === 1 ? ' block' : ' blocks');
-      for (const [colour, width, off] of [['rgba(0,0,0,.55)', 4, 0.5], ['#ffffff', 2, 0]]) {
+      // White on a dark halo by default; a light page passes dark ink on a light halo.
+      const ink = scaleBar.ink || '#ffffff', halo = scaleBar.halo || 'rgba(0,0,0,.55)';
+      for (const [colour, width, off] of [[halo, 4, 0.5], [ink, 2, 0]]) {
         ctx.strokeStyle = colour;
         ctx.lineWidth = width;
         ctx.beginPath();
@@ -328,9 +331,10 @@
         ctx.stroke();
       }
       ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(0,0,0,.6)';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = halo;
       ctx.strokeText(label, x1, y - 5);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = ink;
       ctx.fillText(label, x1, y - 5);
       ctx.restore();
     }
@@ -413,7 +417,8 @@
 
     listen(canvas, 'pointerdown', ev => {
       if (ev.button !== undefined && ev.button > 0 && ev.pointerType === 'mouse') return;
-      canvas.focus({ preventScroll: true });
+      // Keys need the focus; a finger gets it natively on a tap, and a forced focus would ring the map.
+      if (ev.pointerType !== 'touch') canvas.focus({ preventScroll: true });
       try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* synthetic events */ }
       const [x, y] = rel(ev);
       pointers.set(ev.pointerId, { x, y, sx: x, sy: y });

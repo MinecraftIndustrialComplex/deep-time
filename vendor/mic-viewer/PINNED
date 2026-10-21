@@ -1,4 +1,4 @@
 # vendor/mic-viewer is MinecraftIndustrialComplex/mic-viewer's crates/mic-viewer at this commit
 # (MPL-2.0, LICENSE beside this file). Refresh with tools/dev/refresh-mic-viewer.sh; never edit here.
-commit = 704bad9091b3ee0f686a3cdb8dbf614d45e64f65
+commit = eb4af9c4a644c3e9ffa503ebfbd575ac1b55620a
 date = 2026-10-21
