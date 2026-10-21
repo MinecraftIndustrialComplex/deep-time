@@ -210,10 +210,15 @@ BAK-048, BAK-050 and BAK-065) are game choices about how far terrain stays the s
   why it matters: the planet put the seam in a warm ocean, and with MIC 39 columns were sandstone in
   the chunk where far terrain drew the table's sand, since Terralith 2.6.2 paints every warm ocean's
   floor below the shallow band sandstone behind `above_preliminary_surface`, and one deep warm
-  ocean column was gravel. RESULTS_PENDING A seam-free GameTest
-  (`farTerrainSeaBedsFollowTheSurfaceRule`) checks it: it reads sea-bed columns on rows from the
-  equator toward the edges, up to 48 in warm oceans and 48 in other seas, one per chunk, and asserts
-  that nine in ten have the same top block as the generated chunk before features.
+  ocean column was gravel. With the whole rule run, 63 of 64 columns a side have the same top
+  block; the one left on each side is a carver's cut 1 to 2 blocks into a deep warm ocean floor
+  (the chunk's gravel cut away to the stone under it), which far terrain does not draw. A seam-free
+  GameTest (`farTerrainSeaBedsFollowTheSurfaceRule`) checks it: it reads sea-bed columns on rows
+  from the equator toward the edges, up to 48 in warm oceans and 48 in other seas, one per chunk,
+  and asserts that nine in ten have the same top block as the generated chunk before features.
+  With MIC, before the change 32 of 48 warm-ocean columns had the same block (16 sand where the
+  chunk has sandstone) and 47 of 48 in other seas; after it 46 of 46 and 48 of 48 (two chunks
+  something else had generated further were not counted); standalone 48 of 48 in both.
 - **Toroidal World's guard** (Ben, 2026-10-02: "Mixin around TW's guard"). TW 0.19.3 (MIT) refuses
   every Distant Horizons world generator but DH's own on a level it wraps, from DH 3.3.1 on: TW
   makes the seam seamless by reshaping the level's chunk generator and folding DH's section keys,
