@@ -252,7 +252,15 @@ baked and gets a Lambert layout block.
   poles). The
   climate's band coordinates (`units` `vanilla_param`: `climate/temperature`, `vegetation`,
   `continents`, `erosion`, `ridges`), which the bake sets per Köppen class, are read bilinear at the
-  point, as the game read them on the Lambert world, so they stay with the class beside them. The two edge rows are made exactly self-glued (cell i = cell w − i). The first horizon of every stack cell is then raised to
+  point, as the game read them on the Lambert world, so they stay with the class beside them. The two edge rows are made exactly self-glued (cell i = cell w − i). The
+  `closed_basin` flag (nearest cell) is then drawn again on the world's ground (`hydro::
+  closed_basin_on_world`, HYD-105): the Lambert ground's narrow sills that held a pocket of sea floor
+  apart from the ocean can be averaged away in the world's, which would leave the pocket a dry hole
+  beside the sea. A world cell at or under sea level keeps the flag only where the world's open sea
+  does not reach it, the open sea being each 8-connected body (x wraps) of world cells a block or
+  more under sea level that holds at least 5,000 km² of cells the nearest Lambert cell left 0; the
+  8-block halo is drawn again on the world grid (`notes.bake.projection.closed_basin`:
+  `cleared_low_cells`, `flagged_cells_nearest`, `flagged_cells`, `min_open_cells`, `radius_cells`). The first horizon of every stack cell is then raised to
   the bake's top rule over the world's own terrain (`notes.bake.projection.top_raise`): the stacks
   come from the nearest cell and the terrain from the footprint mean.
 - **Vector data**: rivers (vertices through the projection, x continuous along a chain; a chain
@@ -1169,7 +1177,8 @@ not reach takes its balance whatever its height: a lake whose surface may stand 
 playa or dry ground. **`closed_basin`** is 1 on every cell at or under sea level that the sea does
 not reach and on the cells within 8 blocks (`hydro::CLOSED_REACH_BLOCKS`, HYD-102) of one, each
 taking the side of the nearest such low cell, ties to the open sea; 0 elsewhere (`hydro::
-closed_basin_layer`). The biome bake, which runs before the water bake, finds the same closed ground
+closed_basin_layer`). On a Petroff–Guyou world the projection pass draws the layer again on the
+world's own ground ("The bake's projection pass", HYD-105). The biome bake, which runs before the water bake, finds the same closed ground
 on its own grid (`hydro::closed_below_sea`) and maps it as land. Basins are solved in drainage order, so a lake that does not spill passes nothing downstream.
 With `lake_balance` false every basin is a full lake, as before 2026-10-01. River cells carry ≥
 `river_min_discharge_m3s` from ≥ `river_min_area_km2`, a lake cell less than a block deep counting

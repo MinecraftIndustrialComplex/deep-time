@@ -211,6 +211,79 @@ pub fn closed_basin_layer(
     side.iter().map(|&s| u8::from(s == CLOSED)).collect()
 }
 
+/// The `closed_basin` layer on the world's own grid (ledger: HYD-105). The bake's layer comes from
+/// the hydrology's grid (the simulation's Lambert grid) by the nearest cell, while the world's
+/// ground is a footprint mean of the Lambert ground: a narrow sill that held a pocket of sea floor
+/// apart from the ocean there can be gone here, and the game would leave the pocket a dry hole
+/// beside the sea. Here a low cell (`low`: ground at or below sea level) keeps the bake's closed
+/// flag only where the world's own open sea does not reach it. The open sea is every 8-connected
+/// body of `deep` cells (x wraps) holding at least `min_open` cells the bake left open (`flag` 0),
+/// so a closed basin's few edge cells that took an open neighbour's flag never open it, and the
+/// ocean opens every pocket it joins. The halo is drawn again on this grid ([`closed_basin_layer`],
+/// `radius` cells). Returns the layer and the number of low cells whose closed flag was cleared.
+pub fn closed_basin_on_world(
+    w: usize,
+    h: usize,
+    low: impl Fn(usize) -> bool,
+    deep: impl Fn(usize) -> bool,
+    flag: &[u8],
+    min_open: usize,
+    radius: usize,
+) -> (Vec<u8>, u64) {
+    let n = w * h;
+    assert_eq!(
+        flag.len(),
+        n,
+        "the closed_basin flags do not match the grid"
+    );
+    let mut done = vec![false; n];
+    let mut open = vec![false; n];
+    let mut members: Vec<usize> = Vec::new();
+    let mut stack: Vec<usize> = Vec::new();
+    for c0 in 0..n {
+        if done[c0] || !deep(c0) {
+            continue;
+        }
+        members.clear();
+        stack.push(c0);
+        done[c0] = true;
+        let mut open_cells = 0usize;
+        while let Some(c) = stack.pop() {
+            members.push(c);
+            open_cells += usize::from(flag[c] == 0);
+            for k in 0..8 {
+                if let Some(nb) = neighbour8(w, h, c, k)
+                    && !done[nb]
+                    && deep(nb)
+                {
+                    done[nb] = true;
+                    stack.push(nb);
+                }
+            }
+        }
+        if open_cells >= min_open {
+            for &c in &members {
+                open[c] = true;
+            }
+        }
+    }
+    drop(done);
+    let reached = sea_reached(w, h, &open, &low);
+    drop(open);
+    let mut cleared = 0u64;
+    // The side each low cell takes: closed only where the bake said so and this ground's sea does
+    // not reach it.
+    let not_closed: Vec<bool> = (0..n)
+        .map(|c| {
+            let closed = flag[c] == 1 && !reached[c];
+            cleared += u64::from(low(c) && flag[c] == 1 && reached[c]);
+            !closed
+        })
+        .collect();
+    drop(reached);
+    (closed_basin_layer(w, h, &low, &not_closed, radius), cleared)
+}
+
 /// The closed basins below sea level of an elevation field in metres (ledger: HYD-100): every
 /// cell at or below `sea_m` that the open sea does not reach, by the hydrology's rules
 /// ([`open_sea_mask`]: ground a block or more under sea level in a body of [`OPEN_SEA_KM2`];
