@@ -107,9 +107,10 @@ pub const LIP_YEARS: f64 = 1.0e6;
 /// CLM-061): 2.845·10⁷ under the banded climate (2026-09-29); 2.475·10⁷ over 1.473·10⁸ km² of land
 /// under the calibrated per-cell climate on Lambert's equal-area grid (P1-26 T9, 2026-10-03);
 /// 5.039·10⁷ over 1.481·10⁸ km² since the belts' rain is scaled to Earth's land rain
-/// (`belts_rain_scale` 1.42, CLM-201, 2026-10-16), a mean of 0.34 m/yr at the 15 °C reference.
+/// (`belts_rain_scale` 1.42, CLM-201, 2026-10-16), a mean of 0.34 m/yr at the 15 °C reference;
+/// 5.147·10⁷ since the plateaus' warmth (CLM-225 to CLM-228, 2026-10-21) warms Earth's high land.
 /// It changes whenever the climate's defaults change the rain or the temperature on Earth's land.
-pub const KERNEL_EARTH: f64 = 5.039e7;
+pub const KERNEL_EARTH: f64 = 5.147e7;
 /// Reference temperature of the kernel's Arrhenius term, °C.
 pub const KERNEL_T_REF_C: f64 = 15.0;
 
