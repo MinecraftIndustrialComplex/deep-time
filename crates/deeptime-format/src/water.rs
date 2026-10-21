@@ -436,20 +436,35 @@ mod tests {
         // 62 (a column whose top block is the sea's top) is dry.
         assert!(sea_covers(61, 63, || false));
         assert!(!sea_covers(62, 63, || false));
-        assert!(!sea_covers(61, 63, || true), "the closed basin keeps it off");
+        assert!(
+            !sea_covers(61, 63, || true),
+            "the closed basin keeps it off"
+        );
         // The closed flag is read only where the ground passes the first test.
-        assert!(!sea_covers(70, 63, || panic!("read where the ground is high")));
+        assert!(!sea_covers(70, 63, || panic!(
+            "read where the ground is high"
+        )));
         // Heights: H <= sea - 1 is sea (top block ceil(H) - 1 <= sea - 2), the band above it is not.
         assert!(sea_covers_height(62.0, 63, || false));
         assert!(sea_covers_height(61.5, 63, || false));
-        assert!(!sea_covers_height(62.01, 63, || false), "ceil(62.01) - 1 = 62");
+        assert!(
+            !sea_covers_height(62.01, 63, || false),
+            "ceil(62.01) - 1 = 62"
+        );
         assert!(!sea_covers_height(63.0, 63, || false));
         assert!(!sea_covers_height(62.0, 63, || true));
         // The evaluator and the rule name the same columns on the toy world, over every kind of
         // ground it has (plain, basin, closed bowl, sea), closed or not.
         let t = toy();
         let s = WaterSpec::planet(63, -352, 639);
-        for (x, z) in [(300, 300), (0, 300), (300, 100), (316, 100), (-100, 0), (60, 150)] {
+        for (x, z) in [
+            (300, 300),
+            (0, 300),
+            (300, 100),
+            (316, 100),
+            (-100, 0),
+            (60, 150),
+        ] {
             let c = core(&t, &s, 1024, x, z);
             let by_rule = sea_covers_height(t.height(x, z), 63, || t.closed(x, z));
             let lake = c.kind == WaterKind::Lake;

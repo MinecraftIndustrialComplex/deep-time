@@ -1300,7 +1300,12 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         }
         for held in held_biomes {
             let entry = &mut m.layers[held.entry];
-            let written = write_deferred(&mut flusher, &dir.join(&entry.path), &held.desc, &held.bytes)?;
+            let written = write_deferred(
+                &mut flusher,
+                &dir.join(&entry.path),
+                &held.desc,
+                &held.bytes,
+            )?;
             entry.bytes = written.bytes;
             entry.crc32 = written.crc32;
         }
@@ -1698,7 +1703,9 @@ struct Held {
 /// The L2 layers the biome bake's land call decides (BIO-170): the five biome inputs, the wetland
 /// flag and the Köppen class the inputs were placed by.
 fn is_biome_layer(name: &str) -> bool {
-    crate::synth::CLIMATE.contains(&name) || name == "climate/wetland" || name == "climate/koppen_l2"
+    crate::synth::CLIMATE.contains(&name)
+        || name == "climate/wetland"
+        || name == "climate/koppen_l2"
 }
 
 /// What the biome layers' land call reads: the world's ground.
@@ -2877,13 +2884,27 @@ mod tests {
                     ((f64::from(v) / 1e-4).round() as i16).to_le_bytes()
                 })
                 .collect();
-            Held { entry: 0, desc: d, bytes }
+            Held {
+                entry: 0,
+                desc: d,
+                bytes,
+            }
         };
         let u8_layer = |name: &str, land: u8, sea: u8| {
             let bytes = (0..n)
-                .map(|k| if continents_of(band(k)) < -0.19 { sea } else { land })
+                .map(|k| {
+                    if continents_of(band(k)) < -0.19 {
+                        sea
+                    } else {
+                        land
+                    }
+                })
                 .collect();
-            Held { entry: 0, desc: layer(name, DType::U8, 1.0, ""), bytes }
+            Held {
+                entry: 0,
+                desc: layer(name, DType::U8, 1.0, ""),
+                bytes,
+            }
         };
         let mut held = vec![
             i16_layer("climate/temperature", 0.1, 0.3),
@@ -2936,7 +2957,10 @@ mod tests {
             for j in 1..h - 1 {
                 for i in 0..w {
                     let k = j * w + i;
-                    let (a, b) = (&layer.bytes[k * cb..(k + 1) * cb], &was[k * cb..(k + 1) * cb]);
+                    let (a, b) = (
+                        &layer.bytes[k * cb..(k + 1) * cb],
+                        &was[k * cb..(k + 1) * cb],
+                    );
                     if matches!(band(k), 0 | 4 | 5) {
                         assert_eq!(a, b, "layer {li} band {} moved", band(k));
                     }
@@ -2949,7 +2973,8 @@ mod tests {
             let li = held.iter().position(|x| x.desc.name == name).unwrap();
             let l = &held[li];
             let cb = l.desc.cell_bytes();
-            l.desc.physical(l.desc.dtype.decode_scalar(&l.bytes[k * cb..(k + 1) * cb]))
+            l.desc
+                .physical(l.desc.dtype.decode_scalar(&l.bytes[k * cb..(k + 1) * cb]))
         };
         let k_of = |b: usize| (h / 2) * w + (0..w).find(|&i| band(i) == b).unwrap() + w / 24;
         assert_eq!(at("climate/koppen_l2", k_of(2)) as u8, koppen::SEA);
@@ -2957,7 +2982,10 @@ mod tests {
         for b in [1, 3] {
             assert_eq!(at("climate/koppen_l2", k_of(b)) as u8, 5, "band {b}");
             assert_eq!(at("climate/wetland", k_of(b)) as u8, 1, "band {b}");
-            assert!((at("climate/temperature", k_of(b)) - 0.1).abs() < 2e-4, "band {b}");
+            assert!(
+                (at("climate/temperature", k_of(b)) - 0.1).abs() < 2e-4,
+                "band {b}"
+            );
         }
     }
 
