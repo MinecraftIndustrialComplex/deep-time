@@ -53,6 +53,15 @@ public interface TerrainSource {
         return 0.0;
     }
 
+    /**
+     * Whether no sea stands on column (x, z) though its ground is below sea level: a closed basin that the open sea
+     * does not reach (the baked {@code closed_basin} layer, HYD-100). False in a level without it (the analytic
+     * terrains): the sea stands on all ground below sea level.
+     */
+    default boolean closedBasin(int x, int z) {
+        return false;
+    }
+
     /** Folds x into the canonical span [-C/2, C/2). */
     default int wrapX(int x) {
         int c = circumference();
