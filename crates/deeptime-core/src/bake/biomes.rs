@@ -1145,6 +1145,181 @@ fn shares(v: &[f32], mask: &[bool], edges: &[f64], abs: bool) -> Vec<f64> {
         .collect()
 }
 
+/// The continentalness band coordinates of the sea and the land (module documentation): land from
+/// the distance to the sea, the sea from its depth. One place for [`map`] (the simulation grid's
+/// call) and [`settle_to_ground`] (the world's).
+pub struct ContinentAnchors {
+    land: [(f64, f64); 5],
+}
+
+impl ContinentAnchors {
+    pub fn new(p: &BiomeParams) -> ContinentAnchors {
+        let beach = p.beach_blocks.min(0.95 * p.inland_mid_blocks);
+        ContinentAnchors {
+            land: [
+                (0.0, 3.0),
+                (beach.max(1e-3), 4.0),
+                (p.inland_mid_blocks, 5.0),
+                (p.inland_far_blocks, 6.0),
+                (p.inland_interior_blocks, 7.0),
+            ],
+        }
+    }
+
+    /// The band coordinate of land `blocks` from the sea.
+    pub fn land(&self, blocks: f64) -> f64 {
+        piecewise(&self.land, blocks)
+    }
+
+    /// The band coordinate of sea `depth_m` below sea level: 3 at the coast (the coast band's
+    /// bottom, vanilla's ocean | coast edge), 2.585 at 200 m, 2 (the deep ocean's top) at 2,500 m,
+    /// 1.084 at 6,000 m.
+    pub fn sea(depth_m: f64) -> f64 {
+        piecewise(&[(0.0, 3.0), (200.0, 2.585), (2500.0, 2.0), (6000.0, 1.084)], depth_m)
+    }
+}
+
+/// The layers' quantum: the biome inputs are stored as i16 in units of 1e-4.
+const PARAM_QUANTUM: f64 = 1e-4;
+
+/// Whether a stored continentalness is on the land side of the reference's ocean | coast edge
+/// (vanilla's -0.19), compared on the layer's own quantum so a value stored at the edge is land.
+pub fn is_land_continentalness(v: f64) -> bool {
+    let edge = reference().bands.continents[3];
+    (v / PARAM_QUANTUM).round() >= (edge / PARAM_QUANTUM).round()
+}
+
+/// The biome record of every L2 node, physical values (the layers `climate/temperature`,
+/// `vegetation`, `continents`, `erosion`, `ridges`, `wetland` and, where the bake has it,
+/// `koppen_l2`; empty `class` for none).
+#[derive(Clone)]
+pub struct BiomeCells {
+    pub temperature: Vec<f32>,
+    pub vegetation: Vec<f32>,
+    pub continents: Vec<f32>,
+    pub erosion: Vec<f32>,
+    pub ridges: Vec<f32>,
+    pub wetland: Vec<u8>,
+    pub class: Vec<u8>,
+}
+
+/// The nodes [`settle_to_ground`] changed.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Settled {
+    /// Nodes that took the sea's record (their biome was land, the world's ground holds the sea).
+    pub to_sea: Vec<u32>,
+    /// Nodes that took the land's (their biome was the sea's, the world's ground is dry).
+    pub to_land: Vec<u32>,
+}
+
+/// The biome bake's land call on the world's ground (ledger: BIO-170, BIO-171, BIO-172).
+///
+/// [`map`] decides land from the simulation grid (its height above sea level, its closed basins);
+/// the world is another grid (the Petroff–Guyou projection's, a footprint mean of the height with
+/// its own closed-basin flag, HYD-105) and the game puts the sea where the *world's* rule says
+/// (`deeptime_format::water::sea_covers`: top block under sea level − 1, not closed), so the two
+/// differ on some nodes. `sea[k]` is that rule at node k, read by the caller from the world's
+/// ground; a node whose continentalness is on the other side of the ocean | coast edge is settled:
+///
+/// - **continentalness** by [`map`]'s own law on the world's ground: the sea's by its depth
+///   (`depth_m[k]`, m below sea level), the land's by its distance to the world's sea, in cells of
+///   `blocks_per_cell` bake blocks (the anchors' unit), a land cell touching the sea half a cell
+///   from it; kept on its side of the edge by a quantum at least;
+/// - **the sea's record** (a node that took the sea): Köppen class [`koppen::SEA`], no wetland, the
+///   deep sea floor's erosion ([`map`]); the **land's** (a node that took the land): the record of
+///   the nearest node that was land and stays land, temperature, humidity, erosion, ridges,
+///   wetland and class alike (a node that took the sea takes the nearest sea node's in the same
+///   way, for the four that have no law of their own: temperature, humidity, erosion, ridges).
+///
+/// Nodes that already agree with the world are not touched. With no donor of a kind in the world
+/// (all land, all sea) the node keeps its record but for the continentalness.
+pub fn settle_to_ground(
+    c: &mut BiomeCells,
+    w: usize,
+    h: usize,
+    sea: &[bool],
+    depth_m: &[f32],
+    blocks_per_cell: f64,
+    p: &BiomeParams,
+) -> Settled {
+    let n = w * h;
+    let r = reference();
+    let edge = r.bands.continents[3];
+    let now_land: Vec<bool> = c
+        .continents
+        .iter()
+        .map(|&v| is_land_continentalness(f64::from(v)))
+        .collect();
+    let to_land: Vec<bool> = (0..n).map(|k| !sea[k] && !now_land[k]).collect();
+    let to_sea: Vec<bool> = (0..n).map(|k| sea[k] && now_land[k]).collect();
+    if !to_land.iter().any(|&f| f) && !to_sea.iter().any(|&f| f) {
+        return Settled::default();
+    }
+    // Donors: the nodes that agree, by medium.
+    let stable_land: Vec<bool> = (0..n).map(|k| !sea[k] && now_land[k]).collect();
+    let stable_sea: Vec<bool> = (0..n).map(|k| sea[k] && !now_land[k]).collect();
+    let take = |v: &mut [f32], flips: &[bool], donors: &[bool]| {
+        let mut filled = v.to_vec();
+        if fill_nearest(&mut filled, donors, w, h) {
+            for k in (0..n).filter(|&k| flips[k]) {
+                v[k] = filled[k];
+            }
+        }
+    };
+    for (flips, donors) in [(&to_land, &stable_land), (&to_sea, &stable_sea)] {
+        take(&mut c.temperature, flips, donors);
+        take(&mut c.vegetation, flips, donors);
+        take(&mut c.erosion, flips, donors);
+        take(&mut c.ridges, flips, donors);
+    }
+    // The land's own: wetland and class from the nearest stable land node.
+    let mut as_f32: Vec<f32> = c.wetland.iter().map(|&v| f32::from(v)).collect();
+    take(&mut as_f32, &to_land, &stable_land);
+    for k in (0..n).filter(|&k| to_land[k]) {
+        c.wetland[k] = as_f32[k] as u8;
+    }
+    if !c.class.is_empty() {
+        let mut cls: Vec<f32> = c.class.iter().map(|&v| f32::from(v)).collect();
+        take(&mut cls, &to_land, &stable_land);
+        for k in (0..n).filter(|&k| to_land[k]) {
+            c.class[k] = cls[k] as u8;
+        }
+    }
+    // The sea's: no wetland, the sea's class.
+    for k in (0..n).filter(|&k| to_sea[k]) {
+        c.wetland[k] = WETLAND_NONE;
+        if !c.class.is_empty() {
+            c.class[k] = koppen::SEA;
+        }
+    }
+    // Continentalness, and the deep sea floor's erosion, by `map`'s laws on the world's ground.
+    let anchors = ContinentAnchors::new(p);
+    let from_sea = distance_cells(&sea.iter().map(|&s| !s).collect::<Vec<_>>(), w, h, true);
+    let deep_sea_floor = (0.5 * (r.bands.erosion[4] + r.bands.erosion[5])) as f32;
+    let quantum = PARAM_QUANTUM as f32;
+    for k in 0..n {
+        if to_land[k] {
+            let b = anchors.land((f64::from(from_sea[k]) - 0.5).max(0.0) * blocks_per_cell);
+            let v = band_value(&r.bands.continents, b) as f32;
+            c.continents[k] = v.max(edge as f32);
+        } else if to_sea[k] {
+            let b = ContinentAnchors::sea(f64::from(depth_m[k]));
+            let v = band_value(&r.bands.continents, b) as f32;
+            c.continents[k] = v.min(edge as f32 - quantum);
+            if b < 2.0 {
+                c.erosion[k] = c.erosion[k].max(deep_sea_floor);
+            }
+        }
+    }
+    let list = |flips: &[bool]| -> Vec<u32> {
+        (0..n).filter(|&k| flips[k]).map(|k| k as u32).collect()
+    };
+    Settled {
+        to_sea: list(&to_sea),
+        to_land: list(&to_land),
+    }
+}
+
 /// The mapping (module documentation). `climate` is `None` without the climate stage: the
 /// temperature then follows latitude (28 − 0.55·|lat| °C) and humidity is middling.
 pub fn map(
@@ -1269,23 +1444,15 @@ pub fn map(
     // Continentalness.
     let r2 = f64::from(l2.r);
     let to_sea = distance_cells(&land, w, h, true);
-    let beach = p.beach_blocks.min(0.95 * p.inland_mid_blocks);
-    let land_anchors = [
-        (0.0, 3.0),
-        (beach.max(1e-3), 4.0),
-        (p.inland_mid_blocks, 5.0),
-        (p.inland_far_blocks, 6.0),
-        (p.inland_interior_blocks, 7.0),
-    ];
-    let sea_anchors = [(0.0, 3.0), (200.0, 2.585), (2500.0, 2.0), (6000.0, 1.084)];
+    let anchors = ContinentAnchors::new(p);
     let mut cont_band = vec![0f32; n];
     let mut continents = vec![0f32; n];
     for k in 0..n {
         let b = if land[k] {
             // Cell centres: a land cell touching the sea is half a cell from it.
-            piecewise(&land_anchors, (f64::from(to_sea[k]) - 0.5).max(0.0) * r2)
+            anchors.land((f64::from(to_sea[k]) - 0.5).max(0.0) * r2)
         } else {
-            piecewise(&sea_anchors, sea - f64::from(elev[k]))
+            ContinentAnchors::sea(sea - f64::from(elev[k]))
         };
         cont_band[k] = b as f32;
         continents[k] = band_value(&bands.continents, b) as f32;
@@ -2569,5 +2736,146 @@ mod tests {
             bad(&|p| p.wetland_low_m = f64::NAN),
             "$.biomes.wetland_low_m"
         );
+    }
+
+    /// A 16 x 6 world of land in the west half (continentalness 0.1, temperature 0.3, class 8,
+    /// swamp on one node) and sea in the east (continentalness -0.4, class 31), every other record
+    /// distinct per node so a copy shows where it came from.
+    fn two_media() -> (BiomeCells, Vec<bool>) {
+        let (w, h) = (16usize, 6usize);
+        let n = w * h;
+        let mut c = BiomeCells {
+            temperature: vec![0.0; n],
+            vegetation: vec![0.0; n],
+            continents: vec![0.0; n],
+            erosion: vec![0.0; n],
+            ridges: vec![0.0; n],
+            wetland: vec![WETLAND_NONE; n],
+            class: vec![0; n],
+        };
+        let mut sea = vec![false; n];
+        for j in 0..h {
+            for i in 0..w {
+                let k = j * w + i;
+                let land = i < 8;
+                sea[k] = !land;
+                c.continents[k] = if land { 0.1 } else { -0.4 };
+                c.temperature[k] = if land { 0.3 } else { -0.2 } + 0.001 * k as f32;
+                c.vegetation[k] = 0.05 + 0.001 * k as f32;
+                c.erosion[k] = if land { 0.2 } else { 0.7 };
+                c.ridges[k] = 0.4 + 0.001 * k as f32;
+                c.class[k] = if land { 8 } else { koppen::SEA };
+            }
+        }
+        c.wetland[2 * w + 2] = WETLAND_SWAMP;
+        (c, sea)
+    }
+
+    fn same(a: &BiomeCells, b: &BiomeCells, k: usize) -> bool {
+        a.temperature[k].to_bits() == b.temperature[k].to_bits()
+            && a.vegetation[k].to_bits() == b.vegetation[k].to_bits()
+            && a.continents[k].to_bits() == b.continents[k].to_bits()
+            && a.erosion[k].to_bits() == b.erosion[k].to_bits()
+            && a.ridges[k].to_bits() == b.ridges[k].to_bits()
+            && a.wetland[k] == b.wetland[k]
+            && a.class[k] == b.class[k]
+    }
+
+    #[test]
+    fn settling_to_the_world_s_ground_moves_only_the_mismatched_nodes() {
+        // BIO-170, BIO-171, BIO-172. A land node the world's sea covers (a pocket opened to the
+        // sea), an ocean node on dry ground (a closed basin kept dry, a node in the last block
+        // under sea level), the rest agreeing.
+        let (w, h) = (16usize, 6usize);
+        let (before, mut sea) = two_media();
+        let under_sea = 3 * w + 4; // land biome, the world's sea
+        let on_dry = 2 * w + 12; // ocean biome, dry ground
+        sea[under_sea] = true;
+        sea[on_dry] = false;
+        let mut depth = vec![0f32; w * h];
+        depth[under_sea] = 35.0;
+        let mut c = before.clone();
+        let p = BiomeParams::default();
+        let s = settle_to_ground(&mut c, w, h, &sea, &depth, 8.0, &p);
+        assert_eq!(s.to_sea, vec![under_sea as u32]);
+        assert_eq!(s.to_land, vec![on_dry as u32]);
+        for k in 0..w * h {
+            if k != under_sea && k != on_dry {
+                assert!(same(&before, &c, k), "node {k} moved");
+            }
+        }
+        let edge = reference().bands.continents[3];
+        // The pocket: the sea's side of the edge, by its depth (35 m: 3 - 0.415 * 35 / 200 = 2.93),
+        // the sea's class, no wetland, a sea neighbour's temperature (the nearest sea node, x = 8).
+        assert!(!is_land_continentalness(f64::from(c.continents[under_sea])));
+        assert!(f64::from(c.continents[under_sea]) > edge - 0.05, "shallow: near the edge");
+        assert_eq!(c.class[under_sea], koppen::SEA);
+        assert_eq!(c.wetland[under_sea], WETLAND_NONE);
+        assert!(c.temperature[under_sea] < 0.0, "the sea's temperature, not the land's");
+        // The dry node: the land's side, a beach (one node from the world's sea is half a cell
+        // from it), the nearest land node's class, temperature and erosion.
+        assert!(is_land_continentalness(f64::from(c.continents[on_dry])));
+        assert!(f64::from(c.continents[on_dry]) < 0.0, "a coast, not inland");
+        assert_eq!(c.class[on_dry], 8);
+        assert!(c.temperature[on_dry] > 0.0);
+        assert_eq!(c.erosion[on_dry], 0.2);
+        // Settling again changes nothing.
+        let again = settle_to_ground(&mut c, w, h, &sea, &depth, 8.0, &p);
+        assert_eq!(again, Settled::default());
+    }
+
+    #[test]
+    fn a_deep_pocket_takes_the_deep_sea_floor_and_a_far_basin_takes_inland_bands() {
+        let (w, h) = (16usize, 6usize);
+        let (mut c, mut sea) = two_media();
+        // A pocket 3,000 m down on the land side; a dry node far from any sea.
+        let pocket = 2 * w + 3;
+        sea[pocket] = true;
+        let mut depth = vec![0f32; w * h];
+        depth[pocket] = 3000.0;
+        let p = BiomeParams::default();
+        let s = settle_to_ground(&mut c, w, h, &sea, &depth, 8.0, &p);
+        assert_eq!(s.to_sea, vec![pocket as u32]);
+        let r = reference();
+        let floor = (0.5 * (r.bands.erosion[4] + r.bands.erosion[5])) as f32;
+        assert!(c.erosion[pocket] >= floor, "the deep sea keeps E4 or more");
+        assert!(band_coord(&r.bands.continents, f64::from(c.continents[pocket])) < 2.0);
+        // A world of dry ground with an ocean-biome node 100 cells (800 blocks) from the sea:
+        // the far-inland law (200 blocks mid, 1,000 far), whatever the Lambert call was.
+        let (w2, h2) = (256usize, 3usize);
+        let n2 = w2 * h2;
+        let mut sea2 = vec![false; n2];
+        for j in 0..h2 {
+            sea2[j * w2] = true;
+        }
+        let mut c2 = BiomeCells {
+            temperature: vec![0.1; n2],
+            vegetation: vec![0.1; n2],
+            continents: vec![0.2; n2],
+            erosion: vec![0.3; n2],
+            ridges: vec![0.1; n2],
+            wetland: vec![WETLAND_NONE; n2],
+            class: Vec::new(),
+        };
+        c2.continents[0] = -0.4;
+        c2.continents[h2 / 2 * w2 + 100] = -0.4;
+        for j in 0..h2 {
+            c2.continents[j * w2] = -0.4;
+        }
+        let k = (h2 / 2) * w2 + 100;
+        let s2 = settle_to_ground(&mut c2, w2, h2, &sea2, &vec![0.0; n2], 8.0, &p);
+        assert_eq!(s2.to_land, vec![k as u32]);
+        let band = band_coord(&r.bands.continents, f64::from(c2.continents[k]));
+        assert!((5.0..6.0).contains(&band), "mid to far inland, band {band}");
+    }
+
+    #[test]
+    fn the_stored_edge_is_land() {
+        // The layer's quantum decides: a value stored at the edge is land, one quantum under is not.
+        let edge = reference().bands.continents[3];
+        assert!(is_land_continentalness(edge));
+        assert!(is_land_continentalness(edge + 1e-4));
+        assert!(!is_land_continentalness(edge - 1e-4));
+        assert!(is_land_continentalness(f64::from(edge as f32)));
     }
 }
