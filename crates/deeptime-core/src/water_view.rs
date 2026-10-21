@@ -544,7 +544,7 @@ impl WaterView {
             } else if self.river[k] >= 0.5 && self.q[k] > 0.0 {
                 Self::river_rgb(ramp, self.q[k])
             } else {
-                // A closed basin below sea level is land (HYD-100).
+                // A closed basin below sea level is land (HYD-100; ledger: HYD-104).
                 let base = if z < 0.0 && self.closed[k] < 0.5 {
                     SEA
                 } else {

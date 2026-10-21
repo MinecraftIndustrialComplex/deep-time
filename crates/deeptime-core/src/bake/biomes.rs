@@ -1161,7 +1161,8 @@ pub fn map(
     let sea = g.sea_level_m;
     let elev = g.elevation_m;
     let closed = |k: usize| g.closed.is_some_and(|c| c[k]);
-    // A closed basin below sea level is land: dry ground, a playa or a lake (HYD-100).
+    // A closed basin below sea level is land: dry ground, a playa or a lake (HYD-100;
+    // ledger: HYD-104).
     let land: Vec<bool> = elev
         .iter()
         .enumerate()

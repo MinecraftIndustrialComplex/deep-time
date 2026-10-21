@@ -124,7 +124,7 @@ impl LakeTest {
     pub const CREST: f64 = 8.0;
     pub const SLOPE: f64 = 24.0;
     /// The closed bowls below sea level (HYD-100): a dry one and one with a lake at y 50, under
-    /// the sea's y 63.
+    /// the sea's y 63 (ledger: BAK-056, game-choice: agent, 2026-10-20, a test fixture).
     pub const BOWLS: [ClosedBowl; 2] = [
         ClosedBowl {
             centre: (-200.0, -70.0),
