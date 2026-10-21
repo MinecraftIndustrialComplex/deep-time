@@ -214,6 +214,9 @@ pub struct SurfaceRates {
     pub z_t: f64,
     /// The elevation oceanic crust subsides towards (`oceanic_floor_elevation_m`; Cortial: z_t).
     pub z_floor: f64,
+    /// The ridge crest (`ridge_elevation_m`): with `z_floor`, the depths GDH1's shape is drawn
+    /// between under [`OceanDepth::Gdh1`] ([`gdh1_scale`]).
+    pub z_ridge: f64,
     pub trench_relax: f64,
     pub gravity: f64,
     /// The ocean floor's law (`tectonics.ocean_depth`).
@@ -252,7 +255,8 @@ pub fn surface_step(s: &mut Sample, r: &SurfaceRates, held_floor: f32) -> f64 {
             OceanDepth::Gdh1 => {
                 // What the step's cooling sinks bare floor of this age, whatever stands on it.
                 let age = s.age_myr(r.t_myr);
-                let sink = gdh1_depth_m(age) - gdh1_depth_m(age - r.dt_myr);
+                let sink = gdh1_scale(r.z_ridge, r.z_floor)
+                    * (gdh1_depth_m(age) - gdh1_depth_m(age - r.dt_myr));
                 z -= if z > r.sea_m {
                     sink / super::settle::WATER_LOADED // ledger: PLT-353
                 } else {
@@ -299,12 +303,26 @@ pub const GDH1_FLOOR_M: f64 = 5651.0;
 /// GDH1's age where the √t branch hands over to the plate's, Myr. ledger: PLT-352
 const GDH1_KNEE_MYR: f64 = 20.0;
 
+/// The share of GDH1's subsidence a floor drawn between the ridge crest `z_ridge` and the old floor
+/// `z_floor` (elevations, m) takes: (z_r − z_f) / (5,651 − 2,600). GDH1's shape keeps its ages and
+/// its depth range is the preset's, so a player's ridge or abyssal depth moves the curve's ends;
+/// 1 at GDH1's own depths (every shipped preset), where the floor is GDH1 exactly.
+/// ledger: PLT-355
+pub fn gdh1_scale(z_ridge: f64, z_floor: f64) -> f64 {
+    (z_ridge - z_floor) / (GDH1_FLOOR_M - GDH1_RIDGE_M)
+}
+
 /// The height of bare ocean floor `age_myr` old under the preset's law (`tectonics.ocean_depth`),
-/// m: GDH1's depth below the datum (Earth's sea today), or the dampening's closed form
-/// [`ocean_elevation`]. The floor a ridge, a gap or the first ocean is made at. ledger: PLT-351
+/// m: GDH1's shape from the preset's ridge crest (GDH1's depth below the datum, Earth's sea
+/// today, at the shipped depths; PLT-355), or the dampening's closed form [`ocean_elevation`].
+/// The floor a ridge, a gap or the first ocean is made at. ledger: PLT-351
 pub fn floor_at(k: &TectonicParams, age_myr: f64) -> f64 {
     match k.ocean_depth {
-        OceanDepth::Gdh1 => -gdh1_depth_m(age_myr),
+        OceanDepth::Gdh1 => {
+            // z_r − s·(d − 2,600), written so that s = 1 at GDH1's depths gives −d to the bit.
+            let s = gdh1_scale(k.ridge_elevation_m, k.oceanic_floor_elevation_m);
+            -(s * gdh1_depth_m(age_myr) + (-k.ridge_elevation_m - s * GDH1_RIDGE_M))
+        }
         OceanDepth::Dampening => ocean_elevation(
             age_myr,
             k.ridge_elevation_m,
@@ -380,6 +398,7 @@ mod tests {
             z_c: 10_000.0,
             z_t: -10_000.0,
             z_floor: -10_000.0,
+            z_ridge: -1000.0,
             trench_relax: 0.5,
             gravity: 9.81,
             law: OceanDepth::Dampening,
@@ -429,7 +448,11 @@ mod tests {
         assert!((gdh1_depth_m(10.0) - (2600.0 + 365.0 * 10f64.sqrt())).abs() < 1e-9);
         // The two branches meet at 20 Myr within 0.3 m.
         let below = 2600.0 + 365.0 * 20f64.sqrt();
-        assert!((gdh1_depth_m(20.0) - below).abs() < 0.3, "{}", gdh1_depth_m(20.0));
+        assert!(
+            (gdh1_depth_m(20.0) - below).abs() < 0.3,
+            "{}",
+            gdh1_depth_m(20.0)
+        );
         assert!((gdh1_depth_m(100.0) - (5651.0 - 2473.0 * (-2.78f64).exp())).abs() < 1e-9);
         assert!(gdh1_depth_m(1000.0) < GDH1_FLOOR_M && gdh1_depth_m(1000.0) > GDH1_FLOOR_M - 1.0);
         // Steps of a sample born at the ridge at 0 Myr.
@@ -441,6 +464,7 @@ mod tests {
             z_c: 10_000.0,
             z_t: -10_000.0,
             z_floor: -GDH1_FLOOR_M,
+            z_ridge: -GDH1_RIDGE_M,
             trench_relax: 0.0,
             gravity: 9.81,
             law: OceanDepth::Gdh1,
@@ -470,6 +494,35 @@ mod tests {
         let sink = gdh1_depth_m(100.0) - 2600.0;
         let expect = -1000.0 - sink / super::super::settle::WATER_LOADED;
         assert!((dry - expect).abs() < 0.5, "{dry} vs {expect}");
+        // GDH1's shape between other depths (PLT-355): a ridge at -2,000 m and an old floor at
+        // -6,000 m keep GDH1's ages; at GDH1's own depths the floor is GDH1 exactly.
+        let k = TectonicParams {
+            ocean_depth: OceanDepth::Gdh1,
+            ridge_elevation_m: -GDH1_RIDGE_M,
+            oceanic_floor_elevation_m: -GDH1_FLOOR_M,
+            ..TectonicParams::default()
+        };
+        for t in [0.0, 10.0, 50.0, 300.0] {
+            assert_eq!(floor_at(&k, t), -gdh1_depth_m(t));
+        }
+        let k = TectonicParams {
+            ridge_elevation_m: -2000.0,
+            oceanic_floor_elevation_m: -6000.0,
+            ..k
+        };
+        assert_eq!(floor_at(&k, 0.0), -2000.0);
+        assert!((floor_at(&k, 2000.0) + 6000.0).abs() < 1.0);
+        let half = (gdh1_depth_m(30.0) - GDH1_RIDGE_M) / (GDH1_FLOOR_M - GDH1_RIDGE_M);
+        assert!((floor_at(&k, 30.0) - (-2000.0 - 4000.0 * half)).abs() < 1e-9);
+        let scaled = SurfaceRates {
+            z_ridge: -2000.0,
+            z_floor: -6000.0,
+            ..rates(30.0)
+        };
+        let mut s = Sample::blank(0);
+        s.elevation_m = floor_at(&k, 29.0) as f32;
+        surface_step(&mut s, &scaled, f32::NAN);
+        assert!((f64::from(s.elevation_m) - floor_at(&k, 30.0)).abs() < 0.01);
     }
 
     /// The eclogite root (PLT-278 to PLT-280): the normal column and any column whose mafic base

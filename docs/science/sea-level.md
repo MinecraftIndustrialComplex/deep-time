@@ -4,7 +4,7 @@ Status of this page: `stage 2 (constants checked against sources on 2026-10-21)`
 change that made the sea level follow the ocean's volume (Ben, decisions log 2026-10-21: "Its own
 task now", then "Don't follow that old idea" for the 2026-09-30 row "Keep calibrated coastlines").
 
-Ledger ids on this page: `ISO-085` to `ISO-087`, `PLT-350` to `PLT-354`, `CLM-210`, and the rows
+Ledger ids on this page: `ISO-085` to `ISO-087`, `PLT-350` to `PLT-355`, `CLM-210`, and the rows
 they replace or amend: `ISO-033` to `ISO-039`, `CLM-091`, `CLM-099`, `CLM-106` to `CLM-108`,
 `PLT-129`, `HNT-005`, `HNT-041`, `HNT-056` (see [claims.md](claims.md)).
 
@@ -120,7 +120,10 @@ The floor (`plates/pools.rs`, `surface_step`, `gdh1_depth_m`):
   Δz = −[d(t) − d(t − Δt)] / W        above it, W = ρ_m / (ρ_m − ρ_w),
 
 with t the sample's age at the step's end (Myr) and Δt the step. New ocean floor (ridges, gaps,
-the first ocean) is laid at −d(t) (PLT-351).
+the first ocean) is laid at −d(t) (PLT-351). With a ridge crest z_r and an old floor z_f other
+than GDH1's own −2,600 and −5,651 m (the editor's ridge and abyssal depths), the curve is
+stretched between them, z = z_r − s·(d(t) − 2,600) with s = (z_r − z_f)/3,051, and each step
+sinks s times as much (PLT-355); every shipped preset has s = 1.
 
 | Ledger id | Quantity | As coded | Units | Source | Status |
 |---|---|---|---|---|---|
@@ -133,6 +136,7 @@ the first ocean) is laid at −d(t) (PLT-351).
 | PLT-352 | GDH1 | 2,600, 365, 5,651, 2,473, 0.0278, knee 20 Myr | m, Myr | Stein & Stein 1992 (not read); 2,600 m and the 0.0278 decay read in Stein 1995; the rest on a secondary page | `cited-unverified` |
 | PLT-353 | Ground above the sea sinks by 1/W of the water-loaded subsidence | W = ρ_m/(ρ_m − ρ_w) (`settle::WATER_LOADED`) | dimensionless | Kominz et al. 1998 (the factor, read) | `verified` |
 | PLT-354 | The floor in a gap between plates is held in place, deepens with its age, keeps what lies on it; a cell entering a gap starts bare | `advect::hold_gaps`, `newborn`, `carried_elevation`; `plates/gap`, `surface/crust_gap` | - | none needed (the plate model's kinematics) | `game-choice` |
+| PLT-355 | GDH1's shape between the preset's ridge crest and old floor, so the editor's ridge and abyssal depths keep working; GDH1 exactly at its own depths | `pools::gdh1_scale`, `floor_at`, `surface_step`; s = (z_r − z_f)/3,051, 1 in every shipped preset | - | none (a stretch of PLT-352's curve) | `game-choice` |
 
 ## Earth against the mod
 

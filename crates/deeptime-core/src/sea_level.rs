@@ -75,8 +75,13 @@ pub fn fill_level(
             .total_cmp(&h[y as usize])
             .then_with(|| x.cmp(&y))
     });
-    let s0 = walk(order.iter().map(|&c| (h[c as usize], h[c as usize], a(c as usize))), water)
-        .unwrap_or(h[order[0] as usize]);
+    let s0 = walk(
+        order
+            .iter()
+            .map(|&c| (h[c as usize], h[c as usize], a(c as usize))),
+        water,
+    )
+    .unwrap_or(h[order[0] as usize]);
     // 2. The open sea at S₀ and every other cell's spill height.
     let mut kind = vec![pflood::LAND; n];
     pflood::open_sea_with(method, d, h, s0, min_cells, &mut kind);
