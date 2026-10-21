@@ -13,7 +13,8 @@ What it writes (plan §7.1, §7.12):
       from `deeptime:raster`, depth from `deeptime:depth`, and vanilla's final_density graph with
       `minecraft:overworld/sloped_cheese` replaced by `deeptime:terrain` and the slides
       re-anchored (bottom -512 -> -488, top 624 -> 640). The cave functions stay references
-      (`minecraft:overworld/caves/*`), so a pack's own caves still carve. Vanilla's large ore
+      (`minecraft:overworld/caves/*`), so a pack's own caves still carve; beside water the band's
+      entrance term and the noodle term are lifted shut (`deeptime:water_shield`, HYD-078). Vanilla's large ore
       veins are off (decisions file). The surface rule delegates to the pack's
       `minecraft:overworld` settings, resolved when applied (`deeptime:delegate`).
   data/deeptime/worldgen/noise_settings/planet_nocaves.json
@@ -81,6 +82,41 @@ def scale_entrances(node):
     return node
 
 
+def water_shield():
+    """16 times `deeptime:water_shield` (1 beside a river, a lake or a shallow sea, 0 from 16 blocks
+    away), flat-cached: the lift that keeps a cave term shut there (HYD-078)."""
+    return {"type": "minecraft:mul", "argument1": 16.0,
+            "argument2": {"type": "minecraft:flat_cache", "argument": {"type": "deeptime:water_shield"}}}
+
+
+def shield_water(final_density):
+    """Keep cave mouths shut beside water (HYD-078): in the terrain band the entrance term gets
+    + 16·shield, and the noodle term (outside the squeeze) gets + 16·shield where its cell corners lie
+    in the band (the band's mask interpolated, as the noodle's own terms are), so neither opens a dry
+    pit under or beside the water that the water pass would build its banks and beds up from."""
+    def walk(node):
+        if isinstance(node, dict):
+            if node.get("type") == "minecraft:range_choice" and node.get("input") == TERRAIN_FINAL:
+                band = node["when_in_range"]
+                assert band["type"] == "minecraft:min" and band["argument1"] == TERRAIN_FINAL, band
+                band["argument2"] = {"type": "minecraft:add", "argument1": band["argument2"], "argument2": water_shield()}
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(final_density)
+    assert final_density["type"] == "minecraft:min" and final_density["argument2"] == "minecraft:overworld/caves/noodle"
+    in_band = {"type": "minecraft:range_choice", "input": copy.deepcopy(TERRAIN_FINAL), "max_exclusive": 1.5625,
+               "min_inclusive": -1000000.0, "when_in_range": 1.0, "when_out_of_range": 0.0}
+    final_density["argument2"] = {
+        "type": "minecraft:add", "argument1": "minecraft:overworld/caves/noodle",
+        "argument2": {"type": "minecraft:mul", "argument1": water_shield(),
+                      "argument2": {"type": "minecraft:interpolated", "argument": in_band}}}
+    return final_density
+
+
 def without_caves(final_density):
     """min(squeeze(... range_choice(sloped_cheese, caves) ...), noodle) -> squeeze(... terrain ...)."""
     squeeze = copy.deepcopy(final_density["argument1"])  # drop the noodle branch
@@ -114,7 +150,7 @@ def main():
         normal = load(z, "data/minecraft/worldgen/world_preset/normal.json")
 
     vr = ow["noise_router"]
-    final = scale_entrances(transform(vr["final_density"]))
+    final = shield_water(scale_entrances(transform(vr["final_density"])))
     router = {
         # Aquifers as vanilla: sea level and local cave levels. (The lava floor, vanilla's y -54,
         # is not router data: GeologicChunkGenerator's fluid picker sets it, worldgen/LavaFluids.)

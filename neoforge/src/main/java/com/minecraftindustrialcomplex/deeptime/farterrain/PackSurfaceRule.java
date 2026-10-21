@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.farterrain;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.worldgen.DelegatingRuleSource;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -10,13 +11,18 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.DensityFunction;
+import net.minecraft.world.level.levelgen.NoiseSettings;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.SurfaceRules;
+import net.minecraft.world.level.levelgen.VerticalAnchor;
 import net.minecraft.world.level.levelgen.WorldGenerationContext;
 
 import java.util.ArrayList;
@@ -44,8 +50,17 @@ import java.util.Set;
  * biome manager gives a block, the quart cells blended by the seed's zoom, x folded into the lap.
  * A rule is run here only when everything in it reads the column, the block's height, its biome,
  * noise or the random state: {@code steep} (the chunk's heightmap), {@code above_preliminary_surface}
- * (the chunk's noise) and any rule or condition a mod adds end the part run here. Thread-safe: one
- * context per thread.
+ * (the chunk's noise) and any rule or condition a mod adds end the part run here.
+ *
+ * <p>A sea bed's top block runs the whole rule ({@link #top} with water over the block, ledger
+ * BAK-065), the two chunk reads answered as the chunk answers them there: {@code steep} reads the
+ * chunk's {@code WORLD_SURFACE_WG} heightmap, which over the sea is the water's top, so it is false;
+ * {@code above_preliminary_surface} compares the block with the noise's preliminary surface at the
+ * corners of its 16-block cell, which is computed here as {@code NoiseChunk} computes it, from the
+ * level's {@code initial_density_without_jaggedness}. Terralith 2.6.2 paints every warm ocean's floor
+ * below the shallow band sandstone that way, where the surface table has sand. A condition or rule a
+ * mod adds still ends the run where it is reached, and the table stands in. Thread-safe: one context
+ * per thread.
  */
 public final class PackSurfaceRule {
 
@@ -59,6 +74,16 @@ public final class PackSurfaceRule {
     private static final Set<ResourceLocation> CHUNK_FREE_RULES = Set.of(ResourceLocation.withDefaultNamespace("bandlands"));
 
     private static final BlockState STONE = Blocks.STONE.defaultBlockState();
+
+    /** What the sea-bed run gives where it reaches a rule or condition it cannot answer without a chunk (never placed). */
+    private static final BlockState UNDECIDED = Blocks.STRUCTURE_VOID.defaultBlockState();
+    /** A condition every block in the world meets (its y at or over the world's bottom), and its negation. */
+    private static final SurfaceRules.ConditionSource ALWAYS = SurfaceRules.yBlockCheck(VerticalAnchor.bottom(), 0);
+    private static final SurfaceRules.ConditionSource NEVER = SurfaceRules.not(ALWAYS);
+    private static final ResourceLocation ABOVE_PRELIMINARY_SURFACE = ResourceLocation.withDefaultNamespace("above_preliminary_surface");
+    private static final ResourceLocation STEEP = ResourceLocation.withDefaultNamespace("steep");
+    /** {@code NoiseChunk}'s preliminary surface: the highest cell boundary whose initial density exceeds this (vanilla's constant). */
+    private static final double PRELIMINARY_DENSITY = 0.390625;   // ledger: BAK-065
 
     /**
      * Vanilla's shallow band (ledger BAK-050): the overworld rule ({@code SurfaceRuleData.overworldLike})
@@ -74,6 +99,11 @@ public final class PackSurfaceRule {
     /** The leading chunk-free rules, or null when not even the first can run without a chunk. */
     private final SurfaceRules.RuleSource rule;
     private final boolean complete;
+    /** The whole rule for a sea bed's top block, the block above the preliminary surface or not (BAK-065); null with no rule. */
+    private final SurfaceRules.RuleSource seaAbove, seaBelow;
+    /** The level's noise, for its preliminary surface ({@code NoiseChunk.computePreliminarySurfaceLevel}). */
+    private final DensityFunction initial;
+    private final int noiseMinY, noiseTop, cellHeight;
     private final RandomState random;
     private final ChunkGenerator generator;
     private final ServerLevel level;
@@ -82,7 +112,8 @@ public final class PackSurfaceRule {
     private final ThreadLocal<Runner> runners;
 
     /** One thread's context and the rules applied to it (a SurfaceRule is bound to its context; {@code rule} null with no rule run here). */
-    private record Runner(SurfaceRules.Context context, SurfaceRules.SurfaceRule rule, SurfaceRules.SurfaceRule band) {}
+    private record Runner(SurfaceRules.Context context, SurfaceRules.SurfaceRule rule, SurfaceRules.SurfaceRule band,
+                          SurfaceRules.SurfaceRule seaAbove, SurfaceRules.SurfaceRule seaBelow, Long2IntOpenHashMap preliminary) {}
 
     /** The quart cells a thread read last (at most 4,096, then it starts again). */
     private static final class QuartCache implements BiomeManager.NoiseBiomeSource {
@@ -108,10 +139,16 @@ public final class PackSurfaceRule {
         }
     }
 
-    private PackSurfaceRule(SurfaceRules.RuleSource rule, boolean complete, ServerLevel level, ChunkGenerator generator,
-                            BiomeManager.NoiseBiomeSource quarts) {
+    private PackSurfaceRule(SurfaceRules.RuleSource rule, boolean complete, SurfaceRules.RuleSource whole, NoiseSettings noise,
+                            ServerLevel level, ChunkGenerator generator, BiomeManager.NoiseBiomeSource quarts) {
         this.rule = rule;
         this.complete = complete;
+        this.seaAbove = whole == null ? null : seaBed(whole, true);
+        this.seaBelow = whole == null ? null : seaBed(whole, false);
+        this.initial = level.getChunkSource().randomState().router().initialDensityWithoutJaggedness();
+        this.noiseMinY = noise.minY();
+        this.noiseTop = noise.minY() + noise.height();
+        this.cellHeight = noise.getCellHeight();
         this.level = level;
         this.generator = generator;
         this.random = level.getChunkSource().randomState();
@@ -126,7 +163,8 @@ public final class PackSurfaceRule {
     private Runner runner() {
         SurfaceRules.Context context = new SurfaceRules.Context(random.surfaceSystem(), random, null, null, biomes::getBiome,
                 level.registryAccess().registryOrThrow(Registries.BIOME), new WorldGenerationContext(generator, level));
-        return new Runner(context, rule == null ? null : rule.apply(context), SHALLOW_BAND.apply(context));
+        return new Runner(context, rule == null ? null : rule.apply(context), SHALLOW_BAND.apply(context),
+                seaAbove == null ? null : seaAbove.apply(context), seaBelow == null ? null : seaBelow.apply(context), new Long2IntOpenHashMap());
     }
 
     /**
@@ -134,7 +172,7 @@ public final class PackSurfaceRule {
      * without a chunk: {@link #top} is then null, and {@link #shallowFloor} still answers).
      * {@code quarts} gives the biome a chunk stores at a quart cell.
      */
-    public static PackSurfaceRule of(ServerLevel level, ChunkGenerator generator, SurfaceRules.RuleSource levelRule,
+    public static PackSurfaceRule of(ServerLevel level, ChunkGenerator generator, NoiseSettings noise, SurfaceRules.RuleSource levelRule,
                                      BiomeManager.NoiseBiomeSource quarts) {
         List<SurfaceRules.RuleSource> all = levelRule instanceof SurfaceRules.SequenceRuleSource seq ? seq.sequence() : List.of(levelRule);
         List<SurfaceRules.RuleSource> run = new ArrayList<>();
@@ -147,7 +185,7 @@ public final class PackSurfaceRule {
         DeepTime.LOGGER.info("[deeptime] far terrain: runs {} of the surface rule's {} top-level rules itself{}", run.size(), all.size(),
                 complete ? " (all of them)" : "; the surface table stands for the rest");
         SurfaceRules.RuleSource leading = run.isEmpty() ? null : SurfaceRules.sequence(run.toArray(SurfaceRules.RuleSource[]::new));
-        return new PackSurfaceRule(leading, complete && leading != null, level, generator, quarts);
+        return new PackSurfaceRule(leading, complete && leading != null, levelRule, noise.clampToHeightAccessor(level), level, generator, quarts);
     }
 
     /**
@@ -155,23 +193,98 @@ public final class PackSurfaceRule {
      * part run here decides it: a block; stone where the rule leaves the stone (the strata pass
      * paints it, so the rock shows), which only a rule run here in full can say; or null where
      * the rest of the rule decides (the surface table stands for it), or where the block the rule
-     * gives is air or a fluid (a cut far terrain does not draw).
+     * gives is air or a fluid (a cut far terrain does not draw). Under the sea the whole rule runs
+     * (BAK-065), and only a rule or condition a mod adds leaves the block to the table.
      *
-     * @param waterHeight the y just above the water standing over the block, or {@link Integer#MIN_VALUE} for none
-     *                    (SurfaceSystem's own convention)
+     * @param waterHeight the y just above the sea standing over the block, or {@link Integer#MIN_VALUE} for none
+     *                    (SurfaceSystem's own convention; a lake's bed is run dry, as the chunk's rule saw it)
      */
     public BlockState top(int x, int y, int z, int waterHeight) {
         Runner r = runners.get();
-        if (r.rule == null)
-            return null;
         r.context.updateXZ(x, z);
         r.context.updateY(1, y - minY + 1, waterHeight, x, y, z);
-        BlockState s = r.rule.tryApply(x, y, z);
+        BlockState s = r.rule == null ? null : r.rule.tryApply(x, y, z);
+        if (s == null && !complete && waterHeight != Integer.MIN_VALUE && r.seaAbove != null) {
+            // A sea bed: the whole rule, with the chunk's two answers there (BAK-065).
+            s = (abovePreliminarySurface(r, x, y, z) ? r.seaAbove : r.seaBelow).tryApply(x, y, z);
+            if (s == UNDECIDED)
+                return null;
+            if (s == null)
+                return STONE;
+        }
         if (s == null)
             return complete ? STONE : null;
         if (s.isAir() || !s.getFluidState().isEmpty())
             return null;
         return s;
+    }
+
+    /**
+     * Whether block (x, y, z) lies at or over the minimum surface a chunk's surface rules compare it
+     * with ({@code SurfaceRules.Context.getMinSurfaceLevel}, BAK-065): the preliminary surface at the
+     * four corners of its 16-block cell, blended to the column and floored, plus the column's
+     * surface depth, less 8. The context must be updated for the column.
+     */
+    private boolean abovePreliminarySurface(Runner r, int x, int y, int z) {
+        int cx = x >> 4 << 4, cz = z >> 4 << 4;
+        int p00 = preliminarySurface(r, cx, cz), p10 = preliminarySurface(r, cx + 16, cz);
+        int p01 = preliminarySurface(r, cx, cz + 16), p11 = preliminarySurface(r, cx + 16, cz + 16);
+        int level = Mth.floor(Mth.lerp2((double) ((float) (x & 15) / 16.0F), (double) ((float) (z & 15) / 16.0F), p00, p10, p01, p11));
+        return y >= level + r.context.surfaceDepth - 8;
+    }
+
+    /**
+     * {@code NoiseChunk.computePreliminarySurfaceLevel} at a cell corner: the highest cell boundary,
+     * counted down from the noise's top, whose initial density exceeds {@link #PRELIMINARY_DENSITY}.
+     */
+    private int preliminarySurface(Runner r, int x, int z) {
+        long key = ChunkPos.asLong(x, z);
+        if (r.preliminary.containsKey(key))
+            return r.preliminary.get(key);
+        int level = Integer.MAX_VALUE;
+        for (int y = noiseTop; y >= noiseMinY; y -= cellHeight) {
+            if (initial.compute(new DensityFunction.SinglePointContext(x, y, z)) > PRELIMINARY_DENSITY) {
+                level = y;
+                break;
+            }
+        }
+        if (r.preliminary.size() >= 4096)
+            r.preliminary.clear();
+        r.preliminary.put(key, level);
+        return level;
+    }
+
+    /**
+     * The level's rule for a sea bed's top block (BAK-065): {@code above_preliminary_surface} as
+     * given, {@code steep} false (it reads the {@code WORLD_SURFACE_WG} heightmap, the water's top
+     * over the sea), and a rule or condition that reads the chunk otherwise (any a mod adds) replaced
+     * by {@link #UNDECIDED} where it would be reached.
+     */
+    static SurfaceRules.RuleSource seaBed(SurfaceRules.RuleSource r, boolean above) {
+        if (r instanceof SurfaceRules.SequenceRuleSource s) {
+            if (s.sequence().isEmpty())
+                return r;
+            return SurfaceRules.sequence(s.sequence().stream().map(e -> seaBed(e, above)).toArray(SurfaceRules.RuleSource[]::new));
+        }
+        if (r instanceof SurfaceRules.TestRuleSource t) {
+            SurfaceRules.ConditionSource c = seaBed(t.ifTrue(), above);
+            return c == null ? SurfaceRules.state(UNDECIDED) : SurfaceRules.ifTrue(c, seaBed(t.thenRun(), above));
+        }
+        return chunkFree(r) ? r : SurfaceRules.state(UNDECIDED);
+    }
+
+    /** A sea bed's stand-in for condition {@code c} (see {@link #seaBed(SurfaceRules.RuleSource, boolean)}), or null where only the chunk can answer it. */
+    static SurfaceRules.ConditionSource seaBed(SurfaceRules.ConditionSource c, boolean above) {
+        if (c instanceof SurfaceRules.NotConditionSource n) {
+            SurfaceRules.ConditionSource inner = seaBed(n.target(), above);
+            return inner == null ? null : SurfaceRules.not(inner);
+        }
+        ResourceLocation key = BuiltInRegistries.MATERIAL_CONDITION.getKey(c.codec().codec());
+        if (ABOVE_PRELIMINARY_SURFACE.equals(key))
+            return above ? ALWAYS : NEVER;
+        if (STEEP.equals(key))
+            return NEVER;
+        return key != null && CHUNK_FREE_CONDITIONS.contains(key) ? c : null;
     }
 
     /**
