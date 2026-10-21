@@ -536,6 +536,11 @@ pub struct TectonicParams {
     pub collapse_quiet_myr: f64,
     /// … and how far from the collapsing crust the crust it loses may go, km (Earth-normalized).
     pub collapse_reach_km: f64,
+    /// Post-orogenic collapse: for this long after its last orogeny a quiet column's crust is
+    /// still hot and weak, and thins back towards the normal continental column (35.1 km,
+    /// `collapse::normal_thickness_m`) rather than only to `collapse_thickness_km`, Myr; older
+    /// crust, or crust no orogeny raised, keeps the threshold. 0 = never.
+    pub collapse_hot_myr: f64,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
     /// 0 = no limit.
@@ -774,6 +779,7 @@ impl Default for TectonicParams {
             collapse_thickness_km: 50.0,    // ledger: PLT-256
             collapse_quiet_myr: 10.0,       // ledger: PLT-259
             collapse_reach_km: 200.0,       // ledger: PLT-257
+            collapse_hot_myr: 0.0,          // ledger: PLT-390
             crust_max_km: 70.0,             // ledger: PLT-258
             crust_channel_km2_myr: 1500.0,  // ledger: PLT-300
             isostasy_relax_myr: 0.004,      // ledger: ISO-078
@@ -1110,6 +1116,7 @@ impl PlanetPreset {
             (k.collapse_thickness_km, "$.tectonics.collapse_thickness_km"),
             (k.collapse_quiet_myr, "$.tectonics.collapse_quiet_myr"),
             (k.collapse_reach_km, "$.tectonics.collapse_reach_km"),
+            (k.collapse_hot_myr, "$.tectonics.collapse_hot_myr"),
             (k.crust_max_km, "$.tectonics.crust_max_km"),
             (k.crust_channel_km2_myr, "$.tectonics.crust_channel_km2_myr"),
             (k.isostasy_relax_myr, "$.tectonics.isostasy_relax_myr"),
