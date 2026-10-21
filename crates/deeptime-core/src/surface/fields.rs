@@ -206,6 +206,10 @@ pub const KIND_CARBONATE: u8 = 1;
 pub const KIND_EVAPORITE: u8 = 2;
 pub const KIND_EUXINIC: u8 = 3;
 
+/// Plain shale's TOC in the source-rock field ([`column`]), wt %: black shale and coal give
+/// more (a design value of the rules, like the others there).
+pub const SHALE_TOC_WT: f64 = 1.0;
+
 /// The tags [`column`] asks about, as bits by class ([`tag_bits`]).
 const TAG_KARST: u8 = 1;
 const TAG_SOLUBLE: u8 = 2;
@@ -264,7 +268,7 @@ fn column(log: &StrataLog, c: usize, cls: &Classes, bits: &[u8], regolith: f64) 
         } else if l.class == cls.coal {
             3.0
         } else if l.class == cls.shale {
-            1.0
+            SHALE_TOC_WT
         } else if l.class == cls.mudstone {
             0.8
         } else {

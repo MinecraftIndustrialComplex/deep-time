@@ -24,6 +24,22 @@
     "combine": "product",
     "source": [
       {
+        "field": "deeptime:impact_melt_m",
+        "curve": [
+          [
+            10,
+            0
+          ],
+          [
+            200,
+            1
+          ]
+        ],
+        "note": "the metal and heat source: the melt sheet, whose heat drives the system and whose rock and the target under it are leached of base metals (Ames, Watkinson & Parrish 1998: the Onaping Formation's Zn-Cu-Pb above the Sudbury melt sheet); thresholds design (a few tens of metres of melt in an 8 km crater, hundreds in a 20 to 30 km one)"
+      }
+    ],
+    "driver": [
+      {
         "field": "deeptime:impact_hydrothermal",
         "curve": [
           [
@@ -35,12 +51,26 @@
             1
           ]
         ],
-        "note": "the heat of the melt and the uplift: systems last 10^4-10^6 yr and grow with the crater (Abramov & Kring 2004; Osinski et al. 2013). Thresholds are design: craters from about 8 km, full at about 25 km."
+        "note": "the fluid: the hydrothermal system of the melt and the uplift lasts 10^4-10^6 yr and grows with the crater (Abramov & Kring 2004; Osinski et al. 2013). Thresholds are design: craters from about 8 km, full at about 25 km."
       }
     ],
-    "driver": [],
     "pathway": [],
-    "trap": []
+    "trap": [
+      {
+        "field": "deeptime:trap_structure",
+        "curve": [
+          [
+            0,
+            0.3
+          ],
+          [
+            0.5,
+            1
+          ]
+        ],
+        "note": "the trap: the fractured central uplift and the rim's closure, where the impact stage adds structural closure (design)"
+      }
+    ]
   },
   "clock_gates": [],
   "integration_myr": 1,
@@ -54,6 +84,12 @@
   },
   "causes": {
     "source": [
+      "deeptime:impact_crater"
+    ],
+    "driver": [
+      "deeptime:impact_crater"
+    ],
+    "trap": [
       "deeptime:impact_crater"
     ],
     "preservation": [
@@ -92,9 +128,9 @@
     "correlations": [],
     "ore_density_t_m3": 3.2,
     "density_per_1e5km2": {
-      "p90": 30,
-      "p50": 100,
-      "p10": 300
+      "p90": 1.5,
+      "p50": 4,
+      "p10": 10
     },
     "density_basis": "estimate",
     "min_separation_m": 1000,
@@ -174,7 +210,9 @@
   "requires_fields": {},
   "notes": [
     "P2-08 (meteor impacts). Examples: the Errington and Vermilion Zn-Cu-Pb deposits in the crater fill of the Sudbury structure (Ames, Watkinson & Parrish 1998, Geology 26:447-450), the sulphide and carbonate veins of Haughton and the Ries (Osinski et al. 2013, Icarus 224:347-363); Grieve & Masaitis 1994 (The economic potential of terrestrial impact craters, Int. Geol. Rev. 36(2):105-151).",
-    "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, deposit density, separation, clustering, geometry and the curves' thresholds.",
+    "PLACEHOLDERS (design values, no USGS grade-tonnage or deposit-density model exists for impact deposits; crates/deeptime-core/data/usgs/impact_structures.json): tonnage, grades, ore density, separation, clustering, geometry and the curves' thresholds.",
+    "DENSITY (2026-10-19, coordinator's call, ledger IMP-143): 1.5 / 4 / 10 per 100,000 km2 of permissive crater, from Earth's inventory: the confirmed structures cover about 136,000 km2 (the Wikipedia list of impact structures, from the Earth Impact Database: 199 structures, pi/4 D^2 summed; 134,649 km2 for the 105 at least 8 km across), and 10 of 208 craters host major mineral resources (James et al. 2022 / LPSC 2023; Grieve & Masaitis 1994: about a quarter of craters have economic resources, 12 % are exploited), so about 2 to 3 craters per metal type with about 3 deposits each: about 4 per 100,000 km2. The old 50 and 100 were placeholders some 10 to 25 times that.",
+    "PATHWAY (2026-10-19, ledger IMP-142): source, fluid and trap as for any hydrothermal deposit: the melt sheet as metal and heat source, the hydrothermal system as the fluid, the uplift and rim as the trap (before: the hydrothermal system alone, so every crater over 8 km was permissive whatever it held).",
     "The hosts are the crater's own breccia and melt rock in the strata log, so the type forms in craters cut into the deep-time surface (at least two L1 cells across).",
     "minecraft.claims_scatter is false: impact deposits are too rare to be a world's only source of their products, so the game leaves the pack's own scatter of these materials in place (a material another type claims, such as copper, zinc or gold, stays claimed).",
     "VERTICAL SCALE (decisions log 2026-10-03, \"Keep today's block height\"): at 35 m per block the vertical multipliers are 1.75 times their 20 m values (balance.size_mult_v 4.0 -> 7.0), so a body keeps the height in blocks it had at 20 m per block; its size in metres is unchanged. game-choice, ledger IMP-115."

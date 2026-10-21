@@ -420,6 +420,10 @@ fn the_coupled_pipeline_runs_and_resumes() {
         "something was deposited"
     );
     assert!(st.totals.eroded_km3 > 0.0 && st.totals.marine_km3 > 0.0);
+    // The periplatform tracer lays no more carbonate than its diffusion took (ERO-195).
+    assert!(
+        st.totals.periplatform_km3 <= st.totals.periplatform_source_km3 * (1.0 + 1.0e-4) + 1.0e-9
+    );
     // Mass: the processes only add carbonate and evaporite (round-off aside).
     let moved = st.totals.eroded_km3.max(1.0);
     assert!(
@@ -627,5 +631,40 @@ fn a_planet_of_large_cells_keeps_its_surface_physical() {
         "the surface spans {:.0} to {:.0} m from the sea",
         lo - sea,
         hi - sea
+    );
+}
+
+/// A plate step of two substeps (the 4-Myr step, P1-19 #27): the periplatform tracer reads the
+/// column as each substep leaves it (`carbonate::StepTop`), and the carbonate it lays is never
+/// more than the carbonate its diffusion took off sea cells (ERO-195). Mass still balances.
+#[test]
+fn two_substeps_keep_the_periplatform_tracer_within_its_source() {
+    let mut v: serde_json::Value = serde_json::from_str(&pipeline_json(3000, 80.0, 5)).unwrap();
+    v["tectonics"]["time_step_myr"] = serde_json::json!(4.0);
+    v["surface"]["substeps"] = serde_json::json!(2);
+    v["surface"]["frame_every_myr"] = serde_json::json!(20.0);
+    let dir = temp_dir("two-substeps");
+    let s = session(&v.to_string(), &dir);
+    finish(&s);
+    let world = s.checkpoint().unwrap().world;
+    let _ = std::fs::remove_dir_all(dir);
+    let st = world.surface.as_ref().expect("the surface ran");
+    assert_eq!(st.totals.steps, 20);
+    let classes = crate::synth::EVERY_CLASS.len();
+    for c in 0..st.log.cells() {
+        st.log.check(c, classes).unwrap();
+    }
+    let t = &st.totals;
+    assert!(
+        t.periplatform_km3 <= t.periplatform_source_km3 * (1.0 + 1.0e-4) + 1.0e-9,
+        "periplatform {} km³ over its source {} km³",
+        t.periplatform_km3,
+        t.periplatform_source_km3
+    );
+    let moved = t.eroded_km3.max(1.0);
+    assert!(
+        t.mass_residual_km3.abs() < 1e-6 * moved,
+        "residual {} of {moved} km³",
+        t.mass_residual_km3
     );
 }
