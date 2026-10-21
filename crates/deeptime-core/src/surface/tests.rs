@@ -361,9 +361,15 @@ fn a_lake_settles_its_inflow_over_its_whole_floor() {
         let share = (z[lake[0]] - h[lake[0]]) / (filled[lake[0]] - h[lake[0]]);
         for &c in &lake {
             let s = (z[c] - h[c]) / (filled[c] - h[c]);
-            assert!((s - share).abs() < 1e-9, "kf {kf}: cell {c} share {s} vs {share}");
+            assert!(
+                (s - share).abs() < 1e-9,
+                "kf {kf}: cell {c} share {s} vs {share}"
+            );
         }
-        assert!(share > 0.0 && share <= 1.0 + 1e-12, "kf {kf}: share {share}");
+        assert!(
+            share > 0.0 && share <= 1.0 + 1e-12,
+            "kf {kf}: share {share}"
+        );
         let kept: f64 = lake.iter().map(|&c| z[c] - h[c]).sum();
         assert!((kept - share * room).abs() < 1e-9 * room);
         // Mass: the land's loss is what the sea got.
@@ -387,8 +393,14 @@ fn a_lake_settles_its_inflow_over_its_whole_floor() {
         }
         shares.push(share);
     }
-    assert!(shares[0] < 1.0 - 1e-6, "a small supply fills part of the lake: {shares:?}");
-    assert!((shares[1] - 1.0).abs() < 1e-12, "a large one fills it: {shares:?}");
+    assert!(
+        shares[0] < 1.0 - 1e-6,
+        "a small supply fills part of the lake: {shares:?}"
+    );
+    assert!(
+        (shares[1] - 1.0).abs() < 1e-12,
+        "a large one fills it: {shares:?}"
+    );
 }
 
 #[test]
