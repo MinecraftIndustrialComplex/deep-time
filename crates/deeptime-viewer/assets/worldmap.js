@@ -69,6 +69,7 @@
 .wv-bar .seg, .wv-bar .btn:not(.btn-primary) { background: rgba(10, 13, 19, .78); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .wv-bar .seg > button[aria-pressed="true"] { background: var(--bg-4); }
 .wv-bar .grow { flex: 1 1 auto; pointer-events: none; }
+.wv-bar .lbl-s { display: none; }
 .wv-readout { position: absolute; z-index: 3; left: 10px; bottom: 10px; max-width: calc(100% - 20px); padding: 6px 10px; border-radius: 8px; font: 500 12px/1.5 var(--mono, ui-monospace, monospace);
   background: rgba(10, 13, 19, .82); border: 1px solid var(--line-2, #2a3140); color: var(--fg-2, #aab); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wv-readout b { color: var(--fg-1, #eef); font-weight: 600; }
@@ -88,7 +89,7 @@
 .wv-info td:last-child { text-align: right; color: var(--fg-1, #eef); font-family: var(--mono, ui-monospace, monospace); }
 /* Phones: the stage is as tall as its content there, so the view (whose canvas is absolute) needs a
    height of its own or it collapses to nothing (it did before the map core moved too). */
-@media (max-width: 760px) { .worldview { flex: 0 0 auto; height: 72vh; height: 72dvh; min-height: 320px; margin: 6px 8px 8px; } .wv-bar .lbl { display: none; } }
+@media (max-width: 760px) { .worldview { flex: 0 0 auto; height: 72vh; height: 72dvh; min-height: 320px; margin: 6px 8px 8px; } .wv-bar .lbl { display: none; } .wv-bar .lbl-s { display: inline; } }
 `;
   document.head.appendChild(css);
 
@@ -96,8 +97,8 @@
 <canvas id="wv-canvas" tabindex="0" aria-label="Map of the finished world: drag to pan, wheel or pinch to zoom"></canvas>
 <div class="wv-bar">
   <div class="seg" role="group" aria-label="Layer" id="wv-layers"></div>
-  <button class="btn btn-sm" id="wv-ovl" aria-pressed="false" data-tip="Draw rivers and lakes over this layer"><span class="lbl">Rivers &amp; lakes</span></button>
-  <button class="btn btn-sm" id="wv-grid" aria-pressed="false" data-tip="Latitude and longitude lines, and the seam"><span class="lbl">Grid</span></button>
+  <button class="btn btn-sm" id="wv-ovl" aria-pressed="false" data-tip="Draw rivers and lakes over this layer"><span class="lbl">Rivers &amp; lakes</span><span class="lbl-s">Rivers</span></button>
+  <button class="btn btn-sm" id="wv-grid" aria-pressed="false" data-tip="Latitude and longitude lines, and the seam">Grid</button>
   <span class="grow"></span>
   <button class="btn btn-sm" id="wv-info-btn" aria-pressed="false" data-tip="What this map is made of, its cache and its speed">About</button>
   <div class="seg" role="group" aria-label="Zoom">
