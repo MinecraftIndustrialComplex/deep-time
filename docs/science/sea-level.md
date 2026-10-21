@@ -183,6 +183,59 @@ four lost targets are kinematic ones near their bounds (largest plate 0.15 again
 the speed-against-area correlation −0.40 against −0.40 to 0.20, the slab-speed ratio, the
 collision length).
 
+The same runs in the continents census's terms (`tools/review/continents_census.py keyframes`,
+master's tool from the diagnosis of 2026-10-21, plates.md), with a third set: the volume sea over
+the old dampening floor (this change with `tectonics.ocean_depth=dampening` at master's 0.12 mm/yr
+from −2,500 to −5,600 m; supercontinent seeds 1 and 3, scattered seed 1), to tell the volume law's part from GDH1's. Means
+over the runs, the final keyframe / the median over the plate frames (more than 100 Myr in):
+
+| Measure | Earth | before (6 runs) | after (6 runs) | volume sea, old floor (3 runs) |
+|---|---|---|---|---|
+| Land | 0.29 | 0.264 / 0.251 | 0.275 / 0.305 | 0.219 / 0.230 |
+| Continental crust, share of the planet | 0.41 (HYP-012) | 0.380 / 0.360 | 0.341 / 0.327 | 0.317 / 0.352 |
+| Its share under the sea: shelf (under 200 m), deeper | 0.195 in all, 0.115 on the shelf (CRUST1.0, crust of 25 km or more, PLT-361) | 0.368: 0.103, 0.265 / 0.338: 0.084, 0.254 | 0.366: 0.098, 0.268 / 0.264: 0.082, 0.183 | 0.376: 0.083, 0.293 / 0.367: 0.090, 0.279 |
+| The ocean's water under the sea, 10⁹ km³ | 1.33 (ISO-085) | 1.102 / 1.276 | 1.341 / 1.324 | 1.319 / 1.332 |
+| The sea that would hold Earth's water and ice (1.359·10⁹ km³), m against the run's | | +574 / +161 | −10 / +8 | +54 / +9 |
+| Land at that sea | 0.29 | 0.165 / 0.205 | 0.278 / 0.302 | 0.209 / 0.227 |
+
+The after runs hold Earth's water within one ramp step of the keyframes (the census's sea
+differs from the run's by −44 to +25 m at the end). At the end the curve held 0.81 of Earth's water
+(1.10·10⁹ km³), the diagnosis's 0.80 on Ben's run.
+
+The same change in the continent bisect's terms (`tools/review/out-free/continent-bisect.md`: the
+final frame at 1,000 Myr, seeds 1 and 2, both starts, 2 threads, the crust budget's env on, read
+after `deeptime stage volcanoes`), so it reads as one more row of that table. Before is the
+bisect's own 30c4d664 row (master's simulation is byte-identical from 30c4d664 to c790d1f3, this
+branch's base); after is this branch at dd2f3f9c (`continent-bisect.sh ship dd2f3f9c`, then
+`all dd2f3f9c 1,2 supercontinent,scattered_continents 1000` and `continent-bisect.py ... --runs`).
+
+| Run | land | continental crust | its share under the sea | largest landmass | second |
+|---|---|---|---|---|---|
+| Earth | 0.29 | 0.41 | about 0.19 | 0.167 | 0.083 |
+| sup 1 | 0.252 → 0.264 | 0.389 → 0.325 | 0.408 → 0.356 | 0.101 → 0.129 | 0.036 → 0.037 |
+| sup 2 | 0.278 → 0.255 | 0.399 → 0.343 | 0.354 → 0.424 | 0.159 → 0.060 | 0.049 → 0.055 |
+| sca 1 | 0.267 → 0.260 | 0.358 → 0.333 | 0.326 → 0.400 | 0.105 → 0.173 | 0.039 → 0.038 |
+| sca 2 | 0.229 → 0.300 | 0.350 → 0.351 | 0.408 → 0.328 | 0.083 → 0.184 | 0.057 → 0.055 |
+| mean of the four | 0.257 → 0.270 | 0.374 → 0.338 | 0.374 → 0.377 | 0.112 → 0.137 | 0.045 → 0.046 |
+
+The rest of the bisect's pooled row, before → after: land above 2 km 0.270 → 0.275 of the land,
+landmasses of 0.01 or more 5.0 → 3.8 holding 0.889 → 0.844 of the land, island arcs 0.412 →
+0.448 of the land, pieces 276 → 354; run-to-run sd of land 0.021 → 0.021 and of the largest
+landmass 0.033 → 0.057. By the bisect's own rule (a land step under 0.03 is not a finding) land and
+the largest landmass do not move, and the drowned share does not either: the volume sea leaves the
+end's flooding where the crust put it. The continental crust falls by 0.036, in three runs of four
+(the ensemble's p50, 0.369 → 0.332, the same).
+
+**The water amount.** Earth's, 2,664 m (ISO-085), is kept: the coordinator's call to this task
+(2026-10-21), made on Earth's numbers after the continents diagnosis found that a sea holding
+Earth's water would have drowned more land on master (0.12 to 0.22 on Ben's run). That holds over
+master's floor: the volume sea over the old dampening floor ends at land 0.219, as the census
+predicts from the before runs (0.165 to 0.205). Over GDH1's floor, deeper under old ocean, the
+basins hold Earth's ocean with land 0.275 at the end (0.256 to 0.299 by run; seeds 1, 2 and 3, the
+mean of both starts, 0.262, 0.278 and 0.285) and 0.305 over the plate frames, against Earth's 0.29.
+A planet with less water than Earth's would be a calibrated knob, and it would hide the drowned
+crust that the census measures; none is needed.
+
 What the numbers say:
 
 - **The Phanerozoic check fails.** Past the first 100 Myr the sea stands 570 to 1,090 m below the

@@ -446,10 +446,11 @@ mod tests {
         assert_eq!(gdh1_depth_m(0.0), 2600.0);
         assert_eq!(gdh1_depth_m(-3.0), 2600.0, "a ridge younger than 0");
         assert!((gdh1_depth_m(10.0) - (2600.0 + 365.0 * 10f64.sqrt())).abs() < 1e-9);
-        // The two branches meet at 20 Myr within 0.3 m.
+        // The two branches meet at 20 Myr within half a metre (4,232.30 and 4,232.74 m: the
+        // published coefficients' own step).
         let below = 2600.0 + 365.0 * 20f64.sqrt();
         assert!(
-            (gdh1_depth_m(20.0) - below).abs() < 0.3,
+            (gdh1_depth_m(20.0) - below).abs() < 0.5,
             "{}",
             gdh1_depth_m(20.0)
         );

@@ -420,14 +420,20 @@ fn the_nudges_reach_their_targets_gently() {
     // Targets above both: more land, warmer. The land band starts 0.05 above the plain end: on
     // this small planet the land share swings by 0.02 to 0.04 a step, and with the band 0.03 above
     // it (the scaled belts' rain, CLM-201, on plate task 7's crust) the land stayed in the band
-    // until 6 Myr before the end and the proportional nudge could not catch its last fall.
+    // until 6 Myr before the end and the proportional nudge could not catch its last fall. The
+    // temperature band starts 3.5 K above the plain end: with the sea from the ocean's volume
+    // (2026-10-21) this planet cools through its 60 Myr (its young first ocean ages, the sea falls
+    // from +500 to −180 m and CO₂ from 460 to 20 ppm), and its last step, the ice-age window,
+    // cools both runs by about 1.4 K, which the rate-limited nudge cannot answer within the step;
+    // with the band 2 K above the plain end the steered tail held 7.3 to 7.8 °C, just under it,
+    // and ended at +0.5 K.
     let (sea_rate, co2_rate) = (20.0, 0.5);
     let on = small_planet(
         60.0,
         Some(steering(json!({
             "target": "custom", "tail_fraction": 0.4,
             "land_min": land0 + 0.05, "land_max": land0 + 0.12,
-            "temp_min_c": temp0 + 2.0, "temp_max_c": temp0 + 6.0,
+            "temp_min_c": temp0 + 3.5, "temp_max_c": temp0 + 7.5,
             "sea_rate_m_myr": sea_rate, "sea_max_m": 400.0,
             "co2_rate_per_myr": co2_rate, "co2_factor_max": 4.0
         }))),
