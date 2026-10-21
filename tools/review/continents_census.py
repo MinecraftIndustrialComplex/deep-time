@@ -13,8 +13,8 @@ fields of its epoch checkpoints and from its keyframes (Ben's run of 2026-10-21,
     python3 -I tools/review/continents_census.py maps <ensemble out dir> <label> [t_Myr ...]
     python3 -I tools/review/continents_census.py earth crust1.bnds earth_relief_15m_p.grd [N ...]
 
-`fields`: per dump, (1) the white patches as the satellite view draws them (glacier ice of 1 m
-or more, perennial snow: warmest month under 1 C, ground above the snow line, Koppen EF), each
+`fields`: per dump, (1) the white patches as the satellite view draws them (any of: glacier ice
+of 1 m or more, ground above the snow line, warmest month under -1 C, Koppen EF), each
 connected patch over 0.5 Mkm2 with its area, latitude, ice share, the ground's height above sea
 level under the ice and of the ice surface (median, p90, max), the crust's thickness; (2) the
 land and the continental crust: land share, continental crust share, the continental crust under
@@ -57,8 +57,11 @@ SEA_Y = 63.0
 M_PER_BLOCK_V = 35.0
 KOPPEN_EF = 30
 ICE_MIN_M = 1.0
+# The measuring choices (shelf 200 m, high ground 2 km, coast 200 km, landmass 1 Mkm2, patch
+# 0.5 Mkm2, the white rule above): ledger: PLT-363 (game-choice).
 # Earth's water for the constant-volume sea level: the ocean, 1.332e9 km3 (Charette & Smith 2010),
 # and the ice sheets' 29.8 Mkm3 of ice (Antarctica 26.9, Greenland 2.9) at 0.917. from-memory.
+# ledger: PLT-362
 EARTH_WATER_KM3 = 1.332e9 + 0.917 * 29.8e6
 
 
@@ -561,6 +564,7 @@ def earth_report(bnds, relief, ns):
     shelf, thickness on land and under the sea) and, on N Fibonacci points of SRTM15+ 15', the land
     above 2 and 4 km, the coastal high ground (with and without Antarctica and Greenland, whose ice
     surfaces stand above 2 km), the median height of the highest 41 % and the highest 1,000 km box."""
+    # ledger: PLT-361 (CRUST1.0), PLT-360 (SRTM15+)
     import h5py
     b = np.loadtxt(bnds)
     lat = np.repeat(np.arange(89.5, -90, -1.0), 360)

@@ -19,6 +19,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265, PLT-310 to PLT-311 (43; PLT-310 and PLT-311 the boundary's normal and Bird's transform test, the land-shape task, 2026-10-20; PLT-265 Earth's passive margins, the transition's comparison) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
+| [PLT](ledger/PLT.md) | the continents census's Earth references and measuring choices (`tools/review/continents_census.py`, section "White patches, drowned continents and coastal high ground", 2026-10-21) | PLT-360 to PLT-363 (4) |
 
 Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 79, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
@@ -2968,3 +2969,212 @@ works on a different planet.
    (Earth 0.7); a plate reorganisation is the open law (Ben's, as in the last section).
 5. *The high ground* (0.31 to 0.39 of land above 2 km against 0.05 by rock) did not move toward
    Earth with either fix and stays the high-ground work's.
+
+## White patches, drowned continents and coastal high ground (2026-10-21)
+
+Ben ran build 0a7431e1 (`earthlike_quick_16k`, seed 1, supercontinent start, 1000 Myr, keyframes
+every 50 Myr) and asked three things: what the "absolutely massive patches that seem to have
+absurd elevation" 840 to 736 Myr ago are, "where did my continents go?", and why the mountains are
+"very prone to forming directly bordering oceans". Measured on his staging copy on the VM (the
+original under his Prism instance untouched): his ten epoch checkpoints (L1 fields through
+`deeptime dump-fields`, 332,800 cells of 1,533 km²) and his keyframes; master 30c4d664's quick
+ensemble (seeds 1 to 3, both starts, with the crust budget's maps, PLT-302) and one more
+supercontinent seed-1 run; and Earth on the same measures (CRUST1.0, Laske et al. 2013; SRTM15+
+15', Tozer et al. 2019, on 332,800 Fibonacci points, the L1 grid's count). Tool:
+`tools/review/continents_census.py` (`fields`, `keyframes`, `maps`, `earth`). Ledger PLT-360 to
+PLT-363 and CLM-220. No simulation code changed. This extends "Land shape and the high ground"
+above, whose findings all hold.
+
+### The white patches are ice on high plateaus
+
+They are both: glaciers and perennial snow on Himalayan-type plateaus 4 to 5 km high on 60 to 70 km
+of crust. The blocky edges are the L1 cells (about 39 km), the satellite view's resolution, not an
+artefact. The largest patches on Ben's run:
+
+| time | patch, Mkm² | latitude | ground above sea, p50 / p90 / max, m | ice p50, m | ELA p50, m | crust p50, km |
+|---|---|---|---|---|---|---|
+| -820 Myr | 0.95 | 14°S | 4,508 / 5,142 / 5,463 | 788 | 3,296 | 69.9 |
+| -730 Myr | 7.86 | 42°N | 4,069 / 5,025 / 5,785 | 897 | 3,050 | 65.7 |
+| -730 Myr | 3.88, 1.98, 1.65 | 34°N, 22.5°S, 46°S | | | | |
+
+They grow with the plateaus. The crust 55 km and thicker covers 0 (-910 Myr), 3.2 (-820) and 17.2
+Mkm² (-730), then 13 to 22 Mkm²; the land under ice is 0 (-950), 0.013 (-850), 0.05 (-800), 0.16
+(-750) and 0.19 to 0.30 of the land after. The high ground is young: its last orogeny is 0 / 6 /
+22 Myr old (p10 / p50 / p90) at -730 Myr and 2 to 18 Myr at the median later.
+
+**Against Earth.** The heights are Earth's; the extent is not:
+
+| | Ben's run, -910 / -820 / -730 Myr, then to -100 | 30c4d664, end (7 runs) | Earth (SRTM15+) |
+|---|---|---|---|
+| land above 2 km, share of land | 0.004 / 0.037 / 0.229, then 0.24 to 0.33 | 0.24 to 0.39 | 0.106 by surface, 0.055 without the two ice sheets, 0.047 by rock (HYP-041) |
+| land above 4 km, share of land | 0.0001 / 0.009 / 0.082, then 0.03 to 0.09 | 0.06 to 0.15 | 0.017 (0.019 without the ice sheets) |
+| largest ground above 3 km, Mkm² | 0.06 / 0.90 / 5.27, then 2.8 to 7.8 | 3.6 to 11.9 | 2.95 (Tibet; median 4,580 m) |
+| highest mean of a 1,000 km box, m | 1,056 / 3,014 / 4,517, then 4,180 to 4,923 | | 4,837 (Tibet, 32.6°N 88.1°E) |
+| white share of land | 0.001 / 0.03 / 0.22, then 0.20 to 0.35 | land under ice 0.20 to 0.29 | about 0.10 (the two ice sheets and the glaciers, from memory) |
+
+So the plateaus stand at Tibet's height, but the largest is up to 2.7 times Tibet's area on Ben's
+run and 4 times on 30c4d664, and the land above 2 km is four to seven times Earth's 0.055 without
+its ice sheets (two to three and a half times the 0.106 that counts them).
+
+**Why they carry ice: the plateaus' summers are cold.** The glaciers' rule (Ohmura et al. 1992,
+`glaciers.rs`) puts ice where the warmest month at the ground is below T_ELA, which is -2.35 °C
+with no snow and 1.2 °C with 1,000 mm a year. The plateaus' summers are far below either (land 3.5
+to 5 km high, Ben's checkpoints from -730 Myr on):
+
+| latitude | warmest month, p50 at the ground | ground p50 | glacier share |
+|---|---|---|---|
+| 10 to 25° | -6.8 to +0.9 °C (+5.1 °C at -100 Myr, the one ice-free frame) | 3.6 to 4.3 km | 0.00 to 0.90 |
+| 25 to 45° | -10.4 to -4.2 °C | 3.8 to 4.4 km | 0.48 to 0.99 |
+| 45 to 60° | -16.4 to -11.6 °C | 3.7 to 4.3 km | 0.99 to 1.00 |
+
+On Earth the Tibetan Plateau at 4.5 km has a July mean near 10 °C (Nagqu, 4,507 m, 31.5°N; 1991 to
+2020 normals, read in a secondary summary) and the Altiplano at 3.8 km near 10 °C (Puno, from
+memory), so neither glaciates below about 5.5 km. The model's surface temperature is the sea-level
+temperature less 6.5 K/km (`lapse.rs`) everywhere. Earth's large plateaus are warmer than the free
+air at the same height (the mass-elevation effect): 2 to 7 °C warmer than their surroundings at
+equal altitude, 3.6 to 6.6 °C at 4,500 m against the Sichuan Basin's air (Yao & Zhang 2015, read
+in search snippets only; Wiley refused the page), and Nagqu's July is about 11 °C above what a
+6.5 K/km lapse from a 28 °C lowland July at 31°N would give (from memory). The model has no such
+term (CLM-220). Adding 5 to 11 °C would bring the median plateau summer at 25 to 45° to about -5
+to +7 °C, around T_ELA: it would cut the plateau ice, not remove it, while the plateaus' extent
+stays three to five times Earth's. Once a plateau is white its albedo holds it.
+
+**Not an ice age.** Ben's run has no snowball: CO₂ 1,500 to 3,000 ppm from -850 to -730 Myr, the
+global mean 10.6 to 13.1 °C, the sun at 0.93 to 0.94 of today's. The land's mean temperature falls
+from 10.5 to 5.6 °C as the land above 2 km grows from 0.024 to 0.23 of the land: the ice follows the
+high ground, starting near -850 Myr, about 130 Myr before the Cryogenian's first glaciation (the
+Sturtian, about 717 to 660 Ma; the Marinoan about 650 to 635 Ma; from memory, Rooney et al. 2015 and
+Hoffman et al. 2017). The simulation has no clock tied to Earth's dates, so the overlap is chance.
+The ice is sound for its inputs (the snow line and its temperature rule); the inputs are the
+plateaus' extent and their missing warmth.
+
+### Where the continents went
+
+Ben's keyframes (selected; the continental crust from the `crust_age` layer's grey, the land from
+`elevation` at the manifest's sea level):
+
+| t, Myr | land | continental crust | its share under the sea (shelf < 200 m, deeper) | sea level, m | freeboard41, m | landmasses over 1 Mkm² |
+|---|---|---|---|---|---|---|
+| -998 | 0.426 | 0.424 | 0.000 | 30 | 497 | 1 |
+| -900 | 0.322 | 0.447 | 0.285 (0.097, 0.188) | 98 | 378 | 3 |
+| -800 | 0.272 | 0.449 | 0.404 (0.112, 0.292) | -61 | 229 | 5 |
+| -750 | 0.213 | 0.409 | 0.498 (0.139, 0.358) | 1 | 24 | 6 |
+| -600 | 0.228 | 0.346 | 0.383 (0.086, 0.296) | -122 | 109 | 8 |
+| -500 | 0.203 | 0.343 | 0.442 (0.106, 0.337) | -5 | -9 | 7 |
+| -300 | 0.277 | 0.363 | 0.299 (0.071, 0.228) | -152 | 420 | 7 |
+| -100 | 0.272 | 0.374 | 0.315 (0.077, 0.239) | -134 | 258 | 5 |
+| 0 | 0.237 | 0.362 | 0.395 (0.119, 0.276) | -38 | 162 | 7 |
+| Earth | 0.29 | 0.41 with shelves (CRUST1.0 ≥ 20 km 0.384, ≥ 25 km 0.357) | 0.248 (≥ 20 km), 0.195 (≥ 25 km) | 0 to 250 above today (Phanerozoic) | 220 | |
+
+freeboard41 is the median height above the sea of the planet's highest 41 % (Earth's share of
+continental crust with its shelves), the crust's stand against the sea.
+
+**A mix, about 60 % drowned and 40 % lost.** From the first plate frame (-950 Myr) to the last the
+land falls by 0.158 of the planet: the continental crust under the sea grows from 0.043 to 0.143
+of the planet (it is still there, under the sea), and the crust's area falls from 0.435 (peak
+0.459 at -850) to 0.362, which takes about 0.066 of the planet's land with it. The crust does not
+thin on land: the land's crust is CRUST1.0's at p10, at p50 it is 4 km thin at -730 Myr on Ben's
+run and Earth's at 30c4d664's end, and the isostatic settle gives back more than the erosion takes
+(below). The sea-level curve stays within -172 and +98 m,
+inside Earth's range; the drowning is the crust standing low, not the sea standing high:
+
+| | land, p10 / p50 / p90, km | under the sea, p10 / p50 / p90, km |
+|---|---|---|
+| Ben's run, -730 Myr | 31.9 / 34.4 / 63.6 | 20.9 / 28.6 / 31.8 |
+| 30c4d664, end (7 runs) | 31.7 to 32.8 / 37.8 to 42.5 / 56.5 to 66.0 | 19.7 to 22.0 / 27.7 to 29.4 / 31.3 to 32.2 |
+| CRUST1.0, crust ≥ 20 km | 32.0 / 38.6 / 45.8 | 21.6 / 28.8 / 35.8 |
+| CRUST1.0, crust ≥ 25 km | 32.0 / 38.7 / 45.8 | 26.4 / 29.9 / 37.0 |
+
+The drowned crust is Earth's drowned crust by thickness. What differs is how much of the crust
+sits in the 25 to 35 km band and where that band stands: on 30c4d664 (supercontinent seed 1, end)
+the 25 to 30 km band is 0.14 of the continental area at a median -654 m (0.09 dry) and the 30 to
+35 km band 0.34 at +19 m (0.57 dry), around the Airy line's sea-level crossing at 31.4 km. Earth's
+25 to 30 km crust is about 80 % under the sea as well.
+
+**The budget** (dry continental crust gained or lost by each process of the plate step, summed
+over the 1000 Myr, in shares of the planet; 30c4d664, supercontinent seeds 1 to 3 / scattered seeds
+1 to 3 / the extra supercontinent seed 1):
+
+| process | dry crust |
+|---|---|
+| erosion | -1.59 / -1.55 / -1.52 |
+| isostatic settle (ISO-078) | +1.94 / +1.88 / +1.87 |
+| margin transition (PLT-261 to PLT-265, PLT-294) | -0.76 / -0.73 / -0.74 |
+| subduction | -0.47 / -0.58 / -0.61 |
+| resampling | -0.06 / -0.05 / -0.12 |
+| lower-crustal flow (PLT-300, PLT-301) | +0.01 |
+| collision belts / arcs / collapse / rate | +0.35 / +0.27 / +0.08 / +0.13 (supercontinent) |
+| net | -0.04 / -0.07 / -0.09 |
+
+The margin transition is the largest net drowner; erosion without rebound is not the cause (the
+settle more than restores it), and the flow and the resampling are small. The 2026-10-20 ablation
+of the margin taper (24.5 km instead of 200) moved the land only from 0.310 to 0.323, so the
+transition is the channel, not the cause by itself.
+
+**For the sea-level task** (decisions log 2026-10-21; not built here). The ocean's water under the
+curve on Ben's keyframes runs 1.06 to 1.34 × 10⁹ km³ (Earth-normalised; the start holds 1.085,
+Earth 1.332 plus its ice). The sea level that would hold the start's water (ice returned at 0.917)
+is 37 to 840 m below the curve's after the start, with land 0.29 to 0.43; with Earth's water
+(PLT-362) it is 1 m below to 643 m above, with land 0.12 to 0.22 from -850 Myr on (0.28 and 0.39 in
+the first two plate frames). The first frame's water is 80 %
+of Earth's, so the choice of the planet's water decides whether a volume-balanced sea level
+restores the land or drowns more of it.
+
+### The coastal high ground
+
+Measured on the grid's cells: the share of the coast with land above 2 km within 200 km inland on
+the same landmass, and the share of the land above 2 km within 200 km of the sea, with the share
+of all land within 200 km of the sea beside it (narrow landmasses put more of everything near the
+coast).
+
+| | coast with high ground within 200 km | high ground within 200 km of the sea (all land) |
+|---|---|---|
+| Ben's run, -910 / -820 / -730 Myr | 0.065 / 0.198 / 0.423 | 0.559 (0.161) / 0.431 (0.296) / 0.538 (0.538) |
+| Ben's run, -640 to -100 Myr | 0.26 to 0.37 | 0.18 to 0.37 (0.45 to 0.56) |
+| Earth | 0.104 (0.076 without Antarctica and Greenland) | 0.070 (0.294); 0.110 (0.293) without them |
+
+Three to five times Earth's share of coast carries high ground (2.5 to 4 times the 0.104 that
+counts the ice sheets, 3.5 to 5.5 times the 0.076 without them). Two things make it: the land above 2 km is
+four to seven times Earth's share, and the model's landmasses are narrower (0.45 to 0.56 of the
+land within 200 km of the sea against 0.29). Even allowing for that, the high ground sits nearer
+the coast than Earth's: its coastal share is 0.4 to 1.0 of the land's, against 0.24 (0.38 without
+the ice sheets) on Earth.
+
+**By the crust's origin.** On Ben's run (the L1 `plates/orogeny_type`) the coast of Himalayan
+(collision) crust carries high ground on 0.35 to 0.64 of its length, Andean 0.17 to 0.32, none 0.20
+to 0.37. On 30c4d664's maps at the end (the budget's origin tag: island arc if its arc crust is
+1 km or more and mostly oceanic, then collision, Andean, other; the maps' samples are coarser
+than the L1 grid, so the shares sit higher, 0.45 to 0.63 overall):
+
+| origin | share of the land | its land above 2 km | share of the coast | its coast with high ground |
+|---|---|---|---|---|
+| island arc | 0.36 to 0.49 | 0.35 to 0.54 | 0.47 to 0.58 | 0.47 to 0.66 |
+| collision | 0.17 to 0.25 | 0.30 to 0.36 | 0.14 to 0.22 | 0.53 to 0.78 |
+| Andean | 0.24 to 0.37 | 0.14 to 0.31 | 0.19 to 0.27 | 0.23 to 0.45 |
+| other | 0.04 to 0.11 | 0.01 to 0.02 | 0.07 to 0.11 | 0.29 to 0.61 |
+
+**What the plate geometry explains.** The plates subduct on 34 % of the boundary (Bird 19.7 %), 57 %
+of it ocean-ocean (35 %), so ocean-ocean subduction is 0.196 of the boundary against Earth's 0.069
+(2.8 times; the island-arc front is 2.9 times Earth's 14,500 km). Cutting the island-arc coast by
+2.9 with its high ground lowers the coast with high ground by only 0.01 to 0.03 on the maps (0.45
+to 0.63 to 0.42 to 0.62), because the collision and Andean coasts carry high ground as often. So the geometry
+explains why a third to a half of the land is island arc (Earth's island arcs are a few per cent
+of its land, from memory), but little of the coastal mountains. Those come from too much young
+orogen on narrow landmasses. The 24 plates against Earth's 52 and the collisions at 1.58 per 100
+Myr (target 2 to 6) bear on the landmasses' size and on how often continents meet, which this
+measure cannot separate.
+
+### What is left, and for whom
+
+1. *The plate geometry* (Ben, decisions log 2026-10-21: its own task, next): the island-arc
+   share of the land and the collisions. It will not by itself move the coastal high ground.
+2. *The high ground's extent* (four to seven times Earth's ice-free land above 2 km, plateaus up to
+   four times Tibet's area on 60 to 70 km crust): the high-ground work, as in the sections above. This is
+   what puts both the ice and the coastal mountains on the map.
+3. *The plateaus' warmth* (CLM-220): a mass-elevation term in the surface temperature is a climate
+   law for every planet (it moves the ice, the albedo and the CO₂ the weathering draws down).
+   Recommended as its own climate task.
+4. *The sea level from the ocean's volume*: the numbers above are the sea-level task's test case;
+   the planet's water amount is the choice that decides its sign.
+5. *The margin crust* (28 to 30 km, below the 31.4 km crossing): the transition's share of the
+   drowning is the lead if the land is still short once 1 and 4 land.
