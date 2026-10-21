@@ -3172,7 +3172,8 @@ measure cannot separate.
    share of the land and the collisions. It will not by itself move the coastal high ground.
 2. *The high ground's extent* (four to seven times Earth's ice-free land above 2 km, plateaus up to
    four times Tibet's area on 60 to 70 km crust): the high-ground work, as in the sections above. This is
-   what puts both the ice and the coastal mountains on the map.
+   what puts both the ice and the coastal mountains on the map. Done as far as it goes without
+   the sea at the datum: "The high ground's extent: post-orogenic collapse (2026-10-21)" below.
 3. *The plateaus' warmth* (CLM-220): a mass-elevation term in the surface temperature is a climate
    law for every planet (it moves the ice, the albedo and the CO₂ the weathering draws down).
    Recommended as its own climate task.
@@ -3538,3 +3539,140 @@ table (30c4d664 → fad59a5e on seeds 1 and 2: land 0.257 → 0.268, largest 0.1
    carries the mean (base: 558 Myr in one run of six; 126 Myr on seeds 1 to 3 against 46 on seeds
    4 to 6). Compare arms on twelve runs or more, and by the runs' median, before reading a change
    in them as the code's.
+
+## The high ground's extent: post-orogenic collapse (2026-10-21)
+
+The coordinator's task after item 2 of "White patches, drowned continents and coastal high ground"
+above, on Ben's two complaints: "massive patches that seem to have absurd elevaiton appear to be
+forming which don't feel like normal mountain ranges" and "mountains seem very prone to forming
+directly bordering oceans". Targets on `earthlike_quick_16k` (1000 Myr, seeds 1 to 3, both starts,
+the final frame): land above 2 km at most 0.12 of the land (Earth 0.055 ice-free, about 0.10 with
+the ice sheets' tops, HYP-004 and HYP-041), coast with land above 2 km within 200 km at most 0.15
+(Earth 0.104, PLT-360 ff.), land under ice outside a glaciation at most 0.15; and not to break the
+land (0.26 to 0.32 of the planet), the largest landmass (at least 0.12), the continental crust
+under the sea (at most 0.25, failing before) and the collisions (2 to 6 per 100 Myr, the plates').
+Ledger PLT-390 and PLT-391. Code: `plates/collapse.rs` and `params.rs`; nothing in the plates'
+dynamics, subduction or checks. Both laws are measured and **not on** (below).
+
+### What the high ground is
+
+On the base (master d53cc6c4; final frame, mean of the six runs) the land above 2 km is 0.256 of
+the land and the coast with high ground within 200 km 0.387. Taken apart by the column's state on
+the budget's maps:
+
+- *Collapsed crust that stays high.* The collapse thins a quiet column only to T_c = 50 km
+  (PLT-256), and on the Airy line (525 m at 35.1 km, 142.9 m per km, PLT-278 ff.) 50 km stands at
+  2.65 km: a column the collapse has finished with is still high ground, and stays so for as long as
+  it is not eroded. Quiet crust thicker than 51 km is 0.27 to 0.44 of the base's land above 2 km.
+- *Active belts.* Crust raised by an orogeny within the last 10 Myr is most of the rest (0.50 to
+  0.74 of the high ground once the first is dealt with), on crust of 60 to 68 km at the median and
+  about 200 km from the sea at the median. The collisions lose crust at 2.5 to 3.8 times Earth's
+  0.7 km³ a year (the crust budget's sections above) because 3 to 4 times Earth's crust crosses
+  their fronts (the agent's estimate from the budget); 0.95 of what crosses stays and builds the
+  belts (PLT-242). How much crosses is the plates' motion (`plates/dynamics.rs`), outside this task.
+- *Plateau interiors with no room.* Quiet thick crust in a plateau's middle finds no thin crust
+  within the collapse's 200 km reach (PLT-257): its nearest room is 400 to 440 km away at the
+  median, so it does not collapse at all.
+
+Earth's collapsed orogens end far thinner than 50 km. The Variscan root of 55 to 70 km thinned from
+about 315 to 290 Ma, as its thickening ended (Hillenbrand & Williams 2022, abstract), "flattened by
+lateral crustal flow and gravitational collapse" to "a relatively flat Moho at ca 30-32 km depth"
+where it flattened, and the Bohemian Massif is "still fairly thick (ca. 35 km)" (Puziewicz et al.
+2025, abstract). The Basin and Range extended 46 % ± 8 % from 54 ± 6 km (Long 2019, abstract):
+about 37 km. The Cyclades are on 26 km (Jolivet & Brun 2010). What stays thick is old and cold: the
+Urals keep 50 to 56 km some 300 Myr after their collision (Carbonell et al. 2000, PLT-256's
+source). And it is the heat that decides: the locus of extension is set by the crust's thickness,
+"while its timing is governed by the thermal state of the lithosphere at the time of thickening"
+(Wernicke et al. 1987). The Caledonides went from collapse to rifting in 30 to 40 Myr
+(Peron-Pinvidic & Osmundsen 2020).
+
+### The laws
+
+**PLT-390, the hot window** (`collapse_hot_myr`). A quiet column whose last orogeny is younger than
+W thins towards the normal column T_n (35.1 km) instead of T_c, at the collapse's own rate
+(PLT-254, PLT-255); older crust, and crust no orogeny raised, keeps T_c. W = 40 Myr: the 10 Myr
+quiet time (PLT-259) and the Variscan's 25 Myr of thinning, rounded up within the Caledonides'
+30 to 40 Myr.
+
+**PLT-391, continental room first** (`collapse_continent_first`). The room the spread fills
+(the collapse's and the thickest crust's, PLT-277) is ordered continental before ocean floor,
+nearest first within each, so a plate's thinned continental crust is filled before its ocean floor
+turns continental. No source gives the order; it is the agent's (the lower crust flows within hot
+continental crust, a channel that "travels at most 150 km into the foreland", Rey et al. 2010).
+
+### What they do
+
+Final frame, mean of the six runs (pooled plate checks of 45):
+
+| | land | above 2 km | coast with high ground | under ice | continental crust under the sea | largest landmass | collisions per 100 Myr | plate checks |
+|---|---|---|---|---|---|---|---|---|
+| target | 0.26 to 0.32 | ≤ 0.12 | ≤ 0.15 | ≤ 0.15 | ≤ 0.25 | ≥ 0.12 | 2 to 6 | |
+| base | 0.269 | 0.256 | 0.387 | 0.183 | 0.358 | 0.159 | 1.72 | 28 |
+| PLT-390 (W 40) | 0.220 | 0.194 | 0.309 | 0.142 | 0.484 | 0.104 | 1.72 | 27 |
+| PLT-390 and PLT-391 | 0.256 | 0.185 | 0.303 | 0.166 | 0.415 | 0.100 | 1.65 | 27 |
+| the same, reach 600 km | 0.226 | 0.145 | 0.281 | 0.153 | 0.494 | 0.089 | 1.70 | 29 |
+
+One frame per run is noisy (the largest landmass runs from 0.04 to 0.26 between runs of one arm),
+so the arms were also averaged over the budget's maps of the last 500 Myr (every saved frame) and
+the crust budget's lines over the last 600 Myr:
+
+| | land | above 2 km | largest landmass | under the sea | continental crust, share of the planet | sea over the datum, m | mean continental crust, km | its volume, 10⁹ km³ |
+|---|---|---|---|---|---|---|---|---|
+| base | 0.299 | 0.288 | 0.165 | 0.321 | 0.346 | 281 | 36.3 | 6.04 |
+| PLT-390 | 0.263 | 0.181 | 0.126 | 0.421 | 0.403 | 497 | 34.2 | 6.68 |
+| PLT-390 and PLT-391 | 0.276 | 0.167 | 0.134 | 0.402 | 0.399 | 557 | 34.9 | 6.71 |
+
+The high ground falls by 0.06 to 0.07 of the land on the final frame and 0.11 to 0.12 over the
+frames, the coast with high ground by 0.08, the ice to 0.14 to 0.17, and the continents get their
+area back (0.35 to 0.40 of the planet; Earth 0.41,
+HYP-012) and keep more of their volume (less of it founders above 70 km, PLT-258). But the land
+falls by 0.01 to 0.05 (0.02 to 0.04 over the frames), the largest landmass by 0.03 to 0.06 and the drowned share rises by 0.06 to
+0.13. The cause is the sea: crust spread over ocean floor displaces the planet's water (the sea is
+the planet's water filling its hypsometry, ISO-085), which stands 200 to 280 m higher, and crust
+thinned to T_n stands at z_0 = 525 m over the datum, so with the sea 500 to 560 m over it the
+collapsed belts end at the shore. The model's continents are thin for their area (34 to 36 km on
+average against Earth's 41.1 km, Christensen & Mooney 1995 as in PLT-256), and the sea stands off
+the datum ("The plate geometry", "What is left, and for whom", item 6). Neither is this task's.
+
+PLT-391 on top of PLT-390 keeps 0.013 more land over the frames (under the 0.03 noise) and 0.014
+less high ground; a longer reach (400 or 600 km, PLT-257 unchanged, measured only) lowers the high
+ground further but floods more (final land 0.227 and 0.226).
+
+### What was tried and not kept
+
+| arm (final frame, mean of six) | land | above 2 km | coast with high ground | under the sea | largest | note |
+|---|---|---|---|---|---|---|
+| W 50 Myr | 0.217 | 0.159 | 0.272 | 0.520 | 0.119 | more of the same |
+| W 50, reach 600, the thickest crust filling only to T_n | 0.224 | 0.188 | 0.299 | 0.482 | 0.107 | the founder's fill (PLT-277) to T_n took land |
+| the cordillera's ceiling 1800 m (PLT-050, from 3000) | 0.241 | 0.231 | 0.334 | 0.422 | 0.094 | the high ground 0.03 lower, the land too |
+| W 40 and the ceiling 1800 m | 0.222 | 0.164 | 0.286 | 0.504 | 0.092 | |
+
+The reach at 600 km alone, over the last 600 Myr: land 0.298, above 2 km 0.256 (base 0.296 and
+0.286). The cordillera's 3000 m (PLT-050, `calibrated`, uncited) is a lead, not a fix: Profeta et
+al. 2015's eight continental arcs stand on 34.6 to 65 km of crust, 44.2 km on average and 40 km at
+the median (about 1,800 m and 1,200 m on the Airy line).
+
+### Why it is not on
+
+Both laws are in the code with W = 0 and the order off in the default and every built-in preset,
+so the planets are the same bit for bit. On, they trade Ben's high ground for his drowned continents
+(the drowned share was already over its target). They are ready for the sea at the datum: once the
+sea stands at 0 (or the crust's budget is Earth's), run the PLT-390 and PLT-391 arm again on the
+same seeds and switch it on if the land holds. Ben's call when.
+
+### What is left, and for whom
+
+1. *The sea off the datum* (the sea level's; a peer task is on it): it decides whether the hot
+   window can go on.
+2. *The active belts* (the plates'): 0.95 of the crust that crosses a collision front stays in
+   the crust (PLT-242, `plates/belts.rs`, on Stern & Scholl 2010), where the India-Asia balance has
+   about half of the colliding crust gone into the mantle (Ingalls et al. 2016, abstract; disputed by van Hinsbergen et al.
+   2017, and Yakovlev & Clark 2014 conserve it if the crust before the collision was 23 to 29 km).
+   A lower share alone would lose still more crust (the losses are already over Earth's because
+   too much crosses); less crossing, from fewer or shorter collisions, is the plates' work on
+   `plates/dynamics.rs`, and the share is worth a second look after it.
+3. *The cordillera's height* (PLT-050): a sourced value from Profeta et al. 2015 in place of the
+   calibrated 3000 m; measured above, it does not move the high ground by itself.
+4. *Plateau interiors*: thick crust with no room within reach does not collapse. A lower-crustal
+   flow that carries crust farther than the nearest room (PLT-300's flow does not reach) would
+   be a flow solve, not a constant.
