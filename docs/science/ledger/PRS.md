@@ -2,7 +2,7 @@
 
 Part of the claims ledger ([claims.md](../claims.md): how to read the columns and the status marks).
 
-Rows: 71 (3 further rows `merged`, retired with plate tasks 3 and 4, 2026-10-02, and not counted). By status: `cited-unverified` 8, `calibrated` 2, `game-choice` 53, `uncited` 8.
+Rows: 71 (3 further rows `merged`, retired with plate tasks 3 and 4, 2026-10-02, and not counted). By status: `verified` 2, `cited-unverified` 8, `abstract-only` 1, `calibrated` 2, `game-choice` 51, `uncited` 7 (recounted 2026-10-21 by `tools/review/claims_counts.py`).
 
 Added in stage 2, package WP-0 (2026-10-02), by reading the code as it stood on master 1aa0579 (stage 1 had not
 covered it). Nothing here has been checked against its source. Paths are relative to the repository root; line
