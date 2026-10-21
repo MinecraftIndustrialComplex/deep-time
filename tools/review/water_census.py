@@ -117,14 +117,18 @@ def label_wrap(mask: np.ndarray) -> np.ndarray:
 
 
 def below_sea(el_blocks: np.ndarray, wet: np.ndarray, salt: np.ndarray | None, sea_y: float,
-              cell_km2: float, land_km2: float) -> dict:
+              cell_km2: float, land_km2: float, flag: np.ndarray | None = None) -> dict:
     """Closed ground below sea level by the hydrology's rule (`hydro::closed_below_sea`, HYD-100):
     the open sea is every cell a block or more under sea level in an 8-connected body (x wraps)
     of at least 5,000 km2; a cell at or under sea level is reached when its 8-connected body of
     such cells holds open sea; closed is low and not reached. Shares are of the bake's land
     (`stats.land_km2`, the hydrology's non-sea cells, closed ground included). The `deep_*` keys
     count only closed ground a block or more under sea level, where the column rule would stand
-    the sea (the bake's own `stats.below_sea` counts the same ground)."""
+    the sea (the bake's own `stats.below_sea` counts the same ground). With the baked `closed_basin`
+    layer (`flag`, BAK-055) the `game_*` keys count the ground a block or more under sea level that the
+    game keeps the sea off (the layer, not this rule), `sea_on_closed_km2` the ground this rule calls
+    closed where the layer is 0 (the game stands the sea there) and `flag_reached_km2` the low ground
+    the layer flags that this rule's sea reaches (a dry hole beside the sea; HYD-105)."""
     low = el_blocks <= sea_y
     deep = el_blocks <= sea_y - 1.0
     dl = label_wrap(deep)
@@ -144,7 +148,18 @@ def below_sea(el_blocks: np.ndarray, wet: np.ndarray, salt: np.ndarray | None, s
     dry = closed & ~lake & ~playa
     km2 = lambda m: float(m.sum()) * cell_km2  # noqa: E731
     share = lambda m: km2(m) / land_km2 if land_km2 else None  # noqa: E731
-    return {
+    game = {}
+    if flag is not None:
+        fl = flag > 0
+        game = {
+            "game_deep_closed_share_of_land": share(fl & deep),
+            "game_deep_lake_share_of_land": share(fl & deep & wet),
+            "game_deep_playa_km2": km2(fl & deep & ~wet & salt) if salt is not None else 0.0,
+            "game_deep_dry_share_of_land": share(fl & deep & ~wet & (~salt if salt is not None else True)),
+            "sea_on_closed_km2": km2(closed & deep & ~fl),
+            "flag_reached_km2": km2(fl & reached),
+        }
+    return game | {
         "open_low_km2": km2(reached & ~open_),
         "closed_km2": km2(closed),
         "closed_share_of_land": share(closed),
@@ -415,7 +430,12 @@ def bake_stats(world: Path) -> dict:
             if pp.exists():
                 pl, _ = read_dtr(pp)
                 salt = pl > 0
-            out["below_sea"] = below_sea(e_blocks, wet, salt, sea_y, cell_km2, st["land_km2"])
+            flag = None
+            fp = world / "rasters" / "closed_basin.dtr"
+            if fp.exists():
+                fb, _ = read_dtr(fp)
+                flag = fb if fb.shape == el.shape else None
+            out["below_sea"] = below_sea(e_blocks, wet, salt, sea_y, cell_km2, st["land_km2"], flag)
         if "below_sea" in st:
             out["below_sea_stats"] = st["below_sea"]
     except (FileNotFoundError, KeyError) as e:
