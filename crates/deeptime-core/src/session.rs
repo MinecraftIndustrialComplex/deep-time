@@ -304,7 +304,8 @@ pub fn estimate_for(
         .collect();
     // The bake after the last stage (`finalize_write`): the finished world, which stays in memory
     // beside it, and the projection pass's working set (the Lambert bake itself has stayed inside
-    // the stages' peak so far; `tests/memory_estimate.rs` checks the run's peak).
+    // the stages' peak so far; `tests/memory_estimate.rs` checks the run's peak). The session
+    // holds the allocator's kept blocks under this figure while it bakes (`Stepper::bake_allowed`).
     let (bake_base, bake_hist, projection) = bake_set(&preset, &list);
     let bake_bytes = if bake_base > 0 {
         bake_base + bake_hist.min(cap.saturating_sub(bake_base))
@@ -407,6 +408,10 @@ struct Stepper {
     /// start + the stage's working set + the history the cap leaves in memory), for
     /// `MemoryGauge::keep_below`.
     allowed: Vec<u64>,
+    /// What the bake's estimate allows the run to hold (the count at the session's start + the
+    /// estimate's `bake_bytes`), for `MemoryGauge::keep_below` while the folder is written; `None`
+    /// for a preset without the amplify stage.
+    bake_allowed: Option<u64>,
     /// Per stage: the process's count at the session's start + the stage's estimated working set
     /// without the history. Before a stage steps, the history's frames in memory give way until
     /// they fit beside it under the cap.
@@ -888,6 +893,10 @@ impl Session {
             .map(|&(b, h)| at_start + b + h.min(mem_cap.saturating_sub(b)))
             .collect();
         let base = sets.iter().map(|&(b, _)| at_start + b).collect();
+        let bake_allowed = match bake_set(&preset, &stages) {
+            (0, _, _) => None,
+            (b, h, _) => Some(at_start + b + h.min(mem_cap.saturating_sub(b))),
+        };
         if next_stage < stages.len() && !groups.iter().any(|g| g.start == next_stage) {
             return Err(CoreError::InvalidState(format!(
                 "the checkpoint stops inside a group of coupled stages (at {})",
@@ -979,6 +988,7 @@ impl Session {
                 last_kf_t: None,
                 working: vec![0; timings.len()],
                 allowed,
+                bake_allowed,
                 base,
                 timings,
                 epochs: None,
@@ -1964,6 +1974,13 @@ impl Session {
                     "finalizeWrite after the run failed".into(),
                 ));
             }
+        }
+        // The bake keeps the allocator's blocks under its own estimate, not the last stage's: under
+        // the amplification's bound the blocks the strata and water parts freed and the allocator
+        // kept filled the count to that bound, and one fresh block passed it (tests/memory_estimate.rs,
+        // 2026-10-21: 99.7 against 99.5 MiB, 41.6 MiB of it kept blocks).
+        if let Some(a) = s.bake_allowed {
+            self.gauge.keep_below(a.min(self.mem_cap));
         }
         let dir = &self.out_dir;
         let manifest_path = dir.join(MANIFEST);
