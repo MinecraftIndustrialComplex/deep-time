@@ -59,6 +59,14 @@ import java.util.List;
  * adds, after the in-world shot, one screenshot per viewpoint: the player is put there in spectator
  * mode, the render distance raised to 16 chunks, and the shot taken once the terrain around has had
  * time to generate and draw ({@code 11-vista-<n>}).
+ *
+ * <p>{@code epochclick=true} walks the epoch button instead of the tabs and layers
+ * (docs/design/playability-steering.md §4 and §6). The scrubber and the button are clicked through
+ * the game's own mouse handler in three phases of one run: (a) "Stop here" on a past keyframe while
+ * the plates still run, (b) "Stop here" while the world is being written, (c) "Pick this epoch"
+ * once the run is done. Each click must start a run picked up at that frame's stop
+ * ({@code 12a..12c-epoch-click-*}), else the walk logs FAILED; the world is then created with the
+ * Play button and its manifest must carry the last pick's stop ({@code 12d-epoch-final}).
  */
 final class ScreenshotDriver {
 
@@ -67,7 +75,7 @@ final class ScreenshotDriver {
 
     private enum Step {
         TITLE, CREATE_SCREEN, CUSTOMIZE, ADVANCED, PRESS_CREATE, GENERATING, CANCEL, RUNNING, LIVE, TABS, LAYERS, GLOBE, DONE, EPOCH,
-        CONTINUE, REVIEW, ACCEPTED, CREATING, IN_WORLD, VISTA, QUIT
+        CONTINUE, CLICK, CLICK_END, REVIEW, ACCEPTED, CREATING, IN_WORLD, VISTA, QUIT
     }
 
     /** Layers shot mid-run ({@code .layers=a,b,…}; those the run has). */
@@ -83,6 +91,14 @@ final class ScreenshotDriver {
     private static final int LIVE_WAIT_TICKS = 20 * 150;
     private static boolean cancelled;
     private static String cancelledId;
+    /** The epoch-click walk ({@code .epochclick}): the case (0 a, 1 b, 2 c), its phase and what it expects. */
+    private static final String[] CLICK_CASES = {"a-running", "b-writing", "c-done"};
+    private static int clickCase;
+    private static int clickPhase;
+    private static int clickAt;
+    private static int clickFrame;
+    private static double clickExpect = Double.NaN;
+    private static TimelapseModel clickBefore;
     private static TimelapseModel cancelledRun;
 
     /** A vista waits until the chunk 160 blocks ahead is loaded, then this long for it to draw … */
@@ -147,13 +163,96 @@ final class ScreenshotDriver {
      */
     private static void parkPointer(Minecraft mc) {
         try {
-            for (String name : new String[]{"xpos", "ypos"}) {
-                java.lang.reflect.Field f = net.minecraft.client.MouseHandler.class.getDeclaredField(name);
-                f.setAccessible(true);
-                f.setDouble(mc.mouseHandler, 1.0);
-            }
+            setPointer(mc, 1.0, 1.0);
         } catch (ReflectiveOperationException | RuntimeException e) {
             DeepTime.LOGGER.warn("[deeptime-shot] could not park the pointer ({}); tooltips may show in the shots", e.toString());
+        }
+    }
+
+    /** The handler's pointer, in window pixels. */
+    private static void setPointer(Minecraft mc, double x, double y) throws ReflectiveOperationException {
+        for (String name : new String[]{"xpos", "ypos"}) {
+            java.lang.reflect.Field f = net.minecraft.client.MouseHandler.class.getDeclaredField(name);
+            f.setAccessible(true);
+            f.setDouble(mc.mouseHandler, name.equals("xpos") ? x : y);
+        }
+    }
+
+    /** Moves the pointer to a point in the screen's GUI coordinates (hovering: tooltips show). */
+    private static void pointer(Minecraft mc, double guiX, double guiY) {
+        var w = mc.getWindow();
+        try {
+            setPointer(mc, guiX * w.getScreenWidth() / w.getGuiScaledWidth(), guiY * w.getScreenHeight() / w.getGuiScaledHeight());
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            DeepTime.LOGGER.error("[deeptime-shot] FAILED: could not move the pointer ({})", e.toString());
+        }
+    }
+
+    /**
+     * A left click at a point in the screen's GUI coordinates, the way a player's click arrives: the
+     * pointer moved there, then the game's own {@code MouseHandler.onPress} for the press and the
+     * release (NeoForge's screen events, the screen's children in order, the widget's bounds and
+     * active flag), not the widget's {@code onPress} called directly.
+     */
+    private static void click(Minecraft mc, double guiX, double guiY) {
+        pointer(mc, guiX, guiY);
+        try {
+            java.lang.reflect.Method m = net.minecraft.client.MouseHandler.class.getDeclaredMethod("onPress", long.class, int.class, int.class,
+                    int.class);
+            m.setAccessible(true);
+            long window = mc.getWindow().getWindow();
+            m.invoke(mc.mouseHandler, window, org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT, org.lwjgl.glfw.GLFW.GLFW_PRESS, 0);
+            m.invoke(mc.mouseHandler, window, org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT, org.lwjgl.glfw.GLFW.GLFW_RELEASE, 0);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            DeepTime.LOGGER.error("[deeptime-shot] FAILED: could not click through the mouse handler", e);
+        }
+    }
+
+    /** A widget's tooltip as plain text ("" without one). */
+    private static String tooltip(Minecraft mc, net.minecraft.client.gui.components.AbstractWidget w) {
+        var t = w.getTooltip();
+        if (t == null)
+            return "";
+        StringBuilder sb = new StringBuilder();
+        for (var line : t.toCharSequence(mc)) {
+            if (!sb.isEmpty())
+                sb.append(' ');
+            line.accept((i, style, cp) -> {
+                sb.appendCodePoint(cp);
+                return true;
+            });
+        }
+        return sb.toString();
+    }
+
+    /** The keyframes the run can be stopped or baked at, in order (their indices). */
+    private static List<Integer> pickable(TimelapseModel run) {
+        List<Integer> out = new java.util.ArrayList<>();
+        for (int i = 0; i < run.frameCount(); i++)
+            if (model.epochStopMyr(run.frames().get(i)).isPresent())
+                out.add(i);
+        return out;
+    }
+
+    /** The created world's manifest must carry the last pick's stop (its run's timeline). */
+    private static void checkWorldStop(Minecraft mc) {
+        var server = mc.getSingleplayerServer();
+        if (server == null) {
+            DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch walk: no integrated server to read the world from");
+            return;
+        }
+        Path manifest = server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT).resolve("deeptime").resolve("manifest.json");
+        try {
+            var tl = com.google.gson.JsonParser.parseString(Files.readString(manifest)).getAsJsonObject()
+                    .getAsJsonObject("notes").getAsJsonObject("run").getAsJsonObject("timeline");
+            double stop = tl.has("stop_myr") ? tl.get("stop_myr").getAsDouble() : Double.NaN;
+            if (Math.abs(stop - clickExpect) < 1e-6)
+                DeepTime.LOGGER.info("[deeptime-shot] epoch walk: the world's manifest has timeline {} (the last pick's stop {} Myr)", tl, clickExpect);
+            else
+                DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch walk: the world's manifest has timeline {}, not the last pick's stop {} Myr", tl,
+                        clickExpect);
+        } catch (IOException | RuntimeException e) {
+            DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch walk: could not read {}", manifest, e);
         }
     }
 
@@ -310,7 +409,8 @@ final class ScreenshotDriver {
                         DeepTime.LOGGER.info("[deeptime-shot] run {} started after {} ticks: estimate {}, cap {} MiB, {} threads",
                                 run.get().stagingId(), stepTicks, model.estimate().orElse(null), model.capBytes() >> 20,
                                 model.deps().machine().clientThreads());
-                        go(Boolean.parseBoolean(System.getProperty(PROP + ".cancel", "true")) && !cancelled ? Step.CANCEL : Step.RUNNING);
+                        go(Boolean.parseBoolean(System.getProperty(PROP + ".cancel", "true")) && !cancelled ? Step.CANCEL
+                                : Boolean.getBoolean(PROP + ".epochclick") ? Step.CLICK : Step.RUNNING);
                     } else if (stepTicks == 600) {
                         DeepTime.LOGGER.error("[deeptime-shot] FAILED: no run started: {}", model.problems());
                         shot("zz-generation-did-not-start");
@@ -563,6 +663,141 @@ final class ScreenshotDriver {
                         }
                     }
                 }
+                case CLICK -> {
+                    // The epoch button pressed with the mouse in three phases of one run (.epochclick).
+                    if (!(screen instanceof PlanetEditorScreen ed) || !(ed.page().orElse(null) instanceof GenerationPage gp))
+                        return;
+                    TimelapseModel run = model.run().orElseThrow();
+                    GenerationStatus.State st = GenerationStatus.state(model);
+                    String name = CLICK_CASES[clickCase];
+                    String shotName = "12" + (char) ('a' + clickCase) + "-epoch-click-" + name;
+                    if (clickPhase == 0) {
+                        if (st == GenerationStatus.State.FAILED || st == GenerationStatus.State.CANCELLED) {
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch click {}: the run ended {} {}", name, run.state(),
+                                    run.failure().orElse(""));
+                            shot("zz-" + shotName);
+                            go(Step.QUIT);
+                            return;
+                        }
+                        if (clickCase == 1 && st == GenerationStatus.State.DONE) {
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch click {}: the walk missed the writing (the run is done); case c goes on",
+                                    name);
+                            clickCase = 2;
+                            stepTicks = 0;
+                            return;
+                        }
+                        List<Integer> pickable = pickable(run);
+                        boolean ready = switch (clickCase) {
+                            case 0 -> st == GenerationStatus.State.RUNNING && run.frameCount() >= 5 && pickable.size() >= 3;
+                            case 1 -> st == GenerationStatus.State.BAKING && !pickable.isEmpty();
+                            default -> st == GenerationStatus.State.DONE && !pickable.isEmpty() && stepTicks >= 20;
+                        };
+                        if (!ready) {
+                            if (st != GenerationStatus.State.DONE)
+                                stepTicks = 0; // a run takes as long as it takes
+                            return;
+                        }
+                        // (a) a past keyframe, not the newest; (b) and (c) the newest frame before the run's end.
+                        int target = clickCase == 0 ? pickable.get(pickable.size() - 2) : pickable.get(pickable.size() - 1);
+                        var f = run.frames().get(target);
+                        clickFrame = f.n();
+                        clickExpect = model.epochStopMyr(f).orElseThrow();
+                        var sc = gp.scrubberWidget();
+                        int n = run.frameCount();
+                        double x = sc.getX() + 4 + (sc.getWidth() - 8) * (target / (double) (n - 1));
+                        DeepTime.LOGGER.info("[deeptime-shot] epoch click {}: status {} ({}), {} keyframes, run stop {} Myr; the scrubber pressed at frame {} ({}, stop {} Myr)",
+                                name, st, GenerationStatus.sentence(model).key(), n, model.runStopMyr().orElse(Double.NaN), f.n(),
+                                Lang.phrase(Phrase.yearsAgo(f.t())).getString(), clickExpect);
+                        click(mc, x, sc.getY() + sc.getHeight() / 2.0);
+                        clickPhase = 1;
+                        clickAt = stepTicks;
+                    } else if (clickPhase == 1) {
+                        // The pointer rests on the button (its tooltip shows in the shot), then it is pressed.
+                        var b = gp.epochButton();
+                        double cx = b.getX() + b.getWidth() / 2.0, cy = b.getY() + b.getHeight() / 2.0;
+                        if (stepTicks - clickAt == 1)
+                            pointer(mc, cx, cy);
+                        if (stepTicks - clickAt < 8)
+                            return;
+                        var f = run.current().orElse(null);
+                        DeepTime.LOGGER.info("[deeptime-shot] epoch click {}: status {}, the map at {} (frame {}), the button '{}' active={}, tooltip '{}'",
+                                name, GenerationStatus.state(model), f == null ? "nothing" : Lang.phrase(Phrase.yearsAgo(f.t())).getString(),
+                                f == null ? -1 : f.n(), b.getMessage().getString(), b.active, tooltip(mc, b));
+                        shot(shotName);
+                        if (f == null || f.n() != clickFrame)
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch click {}: the scrubber shows frame {}, not {}", name,
+                                    f == null ? -1 : f.n(), clickFrame);
+                        // "Stop here" while the simulation goes, "Pick this epoch" once it writes the world or is done.
+                        String want = Lang.tr(clickCase == 0 ? "gen.stop_here" : "gen.epoch").getString();
+                        if (!b.active || !want.equals(b.getMessage().getString()))
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch click {}: the button reads '{}' active={}, expected '{}' active",
+                                    name, b.getMessage().getString(), b.active, want);
+                        clickBefore = run;
+                        click(mc, cx, cy);
+                        clickPhase = 2;
+                        clickAt = stepTicks;
+                    } else if (clickPhase == 2) {
+                        boolean relaunched = model.run().orElse(null) != clickBefore;
+                        if (!relaunched && stepTicks - clickAt < 60)
+                            return;
+                        double stop = model.runStopMyr().orElse(Double.NaN);
+                        if (relaunched && Math.abs(stop - clickExpect) < 1e-6)
+                            DeepTime.LOGGER.info("[deeptime-shot] epoch click {}: a run picked up at {} Myr started {} ticks after the press (status {}: {})",
+                                    name, stop, stepTicks - clickAt, GenerationStatus.state(model), GenerationStatus.sentence(model).key());
+                        else
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch click {}: {} {} ticks after the press (run stop {} Myr, expected {}; old run {}); problems {}",
+                                    name, relaunched ? "a run with the wrong stop" : "no new run", stepTicks - clickAt, stop, clickExpect,
+                                    clickBefore.state(), model.problems());
+                        parkPointer(mc);
+                        clickPhase = 3;
+                        clickAt = stepTicks;
+                    } else if (stepTicks - clickAt >= 10) {
+                        shot(shotName + "-after");
+                        status("epoch click " + name + " after");
+                        // The page says what the press did.
+                        var notice = model.epochNotice();
+                        if (notice.isEmpty() || model.epochNoticeIsError())
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch click {}: the page's notice is {}", name,
+                                    notice.map(p -> Lang.phrase(p).getString()).orElse("missing"));
+                        else
+                            DeepTime.LOGGER.info("[deeptime-shot] epoch click {}: the page says '{}'", name, Lang.phrase(notice.get()).getString());
+                        clickCase++;
+                        clickPhase = 0;
+                        stepTicks = 0;
+                        if (clickCase == CLICK_CASES.length)
+                            go(Step.CLICK_END);
+                    }
+                }
+                case CLICK_END -> {
+                    // The last pick's run done: the world is created with the Play button, as a player would.
+                    if (!(screen instanceof PlanetEditorScreen ed) || !(ed.page().orElse(null) instanceof GenerationPage gp))
+                        return;
+                    TimelapseModel run = model.run().orElseThrow();
+                    if (run.state() == TimelapseModel.State.RUNNING) {
+                        stepTicks = 0;
+                        return;
+                    }
+                    if (stepTicks == 40) {
+                        DeepTime.LOGGER.info("[deeptime-shot] epoch walk: the last run {}: stop {} Myr (the last pick's {}), {} keyframes, {} s",
+                                run.state(), model.runStopMyr().orElse(Double.NaN), clickExpect, run.frameCount(), run.progress().elapsedMs() / 1000);
+                        shot("12d-epoch-final");
+                        if (run.state() != TimelapseModel.State.DONE) {
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: the last pick's run ended {} {}", run.state(), run.failure().orElse(""));
+                            go(Step.QUIT);
+                            return;
+                        }
+                        if (Boolean.getBoolean(PROP + ".create")) {
+                            var play = gp.playButton();
+                            DeepTime.LOGGER.info("[deeptime-shot] Play (the button, active={})", play.active);
+                            click(mc, play.getX() + play.getWidth() / 2.0, play.getY() + play.getHeight() / 2.0);
+                            parkPointer(mc);
+                            go(Step.CREATING);
+                        } else {
+                            ed.accept();
+                            go(Step.ACCEPTED);
+                        }
+                    }
+                }
                 case REVIEW -> {
                     if (screen instanceof PlanetEditorScreen ed && model.review().map(r -> r.ready()).orElse(false) && stepTicks > 20) {
                         shot("08-review");
@@ -622,6 +857,8 @@ final class ScreenshotDriver {
                         shot("10-in-world");
                         DeepTime.LOGGER.info("[deeptime-shot] in world at {}, generator {}", mc.player == null ? "?" : mc.player.blockPosition(),
                                 mc.getSingleplayerServer() == null ? "?" : mc.getSingleplayerServer().overworld().getChunkSource().getGenerator().getClass().getSimpleName());
+                        if (Boolean.getBoolean(PROP + ".epochclick"))
+                            checkWorldStop(mc);
                         go(vistas().isEmpty() ? Step.QUIT : Step.VISTA);
                     }
                 }

@@ -868,22 +868,119 @@ public final class EditorModel {
      * Frames of the first plate step have none (nothing to stop at yet).
      */
     public OptionalDouble epochStopMyr(KeyframeInfo f) {
-        if (run == null || f == null || (run.state() != TimelapseModel.State.RUNNING && run.state() != TimelapseModel.State.DONE))
-            return OptionalDouble.empty();
-        double length = runLengthMyr();
+        return epochUnavailable(f).isPresent() ? OptionalDouble.empty() : OptionalDouble.of(epochStop(f));
+    }
+
+    /**
+     * Why keyframe {@code f} has no epoch to pick ({@link #epochStopMyr} is empty), in words for the
+     * epoch button's tooltip; empty when it has one. The button is never inactive without one of
+     * these, and a press it refuses shows it.
+     */
+    public Optional<Phrase> epochUnavailable(KeyframeInfo f) {
+        if (run == null || f == null)
+            return Optional.of(Phrase.of("gen.epoch.why.no_map"));
+        if (run.state() != TimelapseModel.State.RUNNING && run.state() != TimelapseModel.State.DONE)
+            return Optional.of(Phrase.of("gen.epoch.why.stopped"));
+        double stop = epochStop(f);
         OptionalDouble end = runStopMyr();
-        if (!Double.isFinite(length) || end.isEmpty())
-            return OptionalDouble.empty();
-        // The frame's world time is −length + stop (Myr); rounded to the kyr, as the core rounds
-        // the stop to whole plate steps.
-        double stop = Math.round((f.t() / 1e6 + length) * 1e3) / 1e3;
-        if (!(stop >= MIN_EPOCH_MYR) || stop >= end.getAsDouble() - 1e-6)
-            return OptionalDouble.empty();
-        return OptionalDouble.of(stop);
+        if (!Double.isFinite(stop) || end.isEmpty())
+            return Optional.of(Phrase.of("gen.epoch.why.no_timeline"));
+        if (stop >= end.getAsDouble() - 1e-6)
+            return Optional.of(Phrase.of(run.state() == TimelapseModel.State.DONE ? "gen.epoch.why.end_done" : "gen.epoch.why.end_running"));
+        if (!(stop >= MIN_EPOCH_MYR))
+            return Optional.of(Phrase.of("gen.epoch.why.too_early"));
+        return Optional.empty();
+    }
+
+    /**
+     * Keyframe {@code f}'s stop, Myr after the start: the frame's world time is −length + stop;
+     * rounded to the kyr, as the core rounds the stop to whole plate steps. NaN without a timeline.
+     */
+    private double epochStop(KeyframeInfo f) {
+        double length = runLengthMyr();
+        return Double.isFinite(length) ? Math.round((f.t() / 1e6 + length) * 1e3) / 1e3 : Double.NaN;
     }
 
     /** The shortest stop worth baking, Myr (one plate step of the built-ins). */
     public static final double MIN_EPOCH_MYR = 2.0;
+
+    /**
+     * What a press of the epoch button did.
+     *
+     * @param run    the new run, empty when the press was refused or the launch failed
+     * @param message what happened, for the page and the log
+     * @param stopMyr the stop asked for, Myr after the start (NaN when the frame had none)
+     */
+    public record EpochPress(Optional<TimelapseModel> run, Phrase message, double stopMyr) {
+
+        public boolean started() {
+            return run.isPresent();
+        }
+    }
+
+    /**
+     * The epoch button ("Stop here" while the run goes, "Pick this epoch" once it is writing the
+     * world or done): picks keyframe {@code f}'s epoch ({@link #pickEpoch}) when it has one, else
+     * says why not. It never throws and never does nothing silently: the message says what
+     * happened, and stays as {@link #epochNotice()} while the run it is about is the current one.
+     */
+    public EpochPress pressEpoch(KeyframeInfo f) {
+        Optional<Phrase> why = epochUnavailable(f);
+        if (why.isPresent()) {
+            setEpochNotice(why.get(), Notice.REFUSED, f);
+            return new EpochPress(Optional.empty(), why.get(), Double.NaN);
+        }
+        double stop = epochStop(f);
+        Optional<TimelapseModel> r = pickEpoch(f);
+        Phrase msg = r.isPresent()
+                ? Phrase.of("gen.epoch.picked", Phrase.yearsAgo(f.t()))
+                : Phrase.of("gen.epoch.failed", Phrase.yearsAgo(f.t()), launchError == null ? "?" : launchError);
+        setEpochNotice(msg, r.isPresent() ? Notice.PICKED : Notice.FAILED, f);
+        return new EpochPress(r, msg, stop);
+    }
+
+    /** What the last epoch press's notice says. */
+    private enum Notice { PICKED, REFUSED, FAILED }
+
+    private Phrase epochNotice;
+    private Notice epochNoticeKind;
+    private KeyframeInfo epochNoticeFrame;
+    private TimelapseModel epochNoticeRun;
+
+    private void setEpochNotice(Phrase msg, Notice kind, KeyframeInfo f) {
+        epochNotice = msg;
+        epochNoticeKind = kind;
+        epochNoticeFrame = f;
+        epochNoticeRun = run;
+    }
+
+    /**
+     * The last epoch press's message, while the run it is about is the current one: the run it
+     * started is going back to the epoch (and, once done, Play makes it), or the run could not
+     * start (until another starts), or why the press did nothing (while the map it was pressed at
+     * still shows).
+     */
+    public Optional<Phrase> epochNotice() {
+        if (epochNotice == null || run == null || run != epochNoticeRun)
+            return Optional.empty();
+        return switch (epochNoticeKind) {
+            case PICKED -> Optional.of(run.state() == TimelapseModel.State.DONE
+                    ? Phrase.of("gen.epoch.picked_done", Phrase.yearsAgo(epochNoticeFrame.t())) : epochNotice);
+            case FAILED -> Optional.of(epochNotice);
+            case REFUSED -> run.current().map(c -> c.equals(epochNoticeFrame)).orElse(epochNoticeFrame == null)
+                    ? Optional.of(epochNotice) : Optional.empty();
+        };
+    }
+
+    /** True when {@link #epochNotice()} says a run could not start. */
+    public boolean epochNoticeIsError() {
+        return epochNoticeKind == Notice.FAILED && epochNotice().isPresent();
+    }
+
+    /** Why the last run (or picked-up run) could not be launched, until one launches. */
+    public Optional<String> launchError() {
+        return Optional.ofNullable(launchError);
+    }
 
     /**
      * Plays the world of keyframe {@code f}: a running run is stopped there, a finished one is
@@ -922,16 +1019,13 @@ public final class EditorModel {
         return relaunch(Presets.withStop(run.presetJson(), stopMyr));
     }
 
-    /** A run that picks up the current one's folder with {@code json}'s stop. */
+    /**
+     * A run that picks up the current one's folder with {@code json}'s stop. It is launched before
+     * the current run is cancelled (its worker waits until the current one's natives let go,
+     * {@code SimSession}'s launch gate), so a launch that fails leaves the current run as it was.
+     */
     private Optional<TimelapseModel> relaunch(String json) {
         TimelapseModel old = run;
-        old.supersede();
-        if (old.state() == TimelapseModel.State.RUNNING)
-            old.cancel();
-        review = null;
-        // The accepted run's folder is about to change: it must be accepted again.
-        if (accepted != null && accepted.stagingId().equals(old.stagingId()))
-            accepted = null;
         RunHandle h;
         try {
             h = deps.launcher().launch(json, old.run().outDir(), deps.machine().clientThreads(), capBytes(), true);
@@ -939,6 +1033,13 @@ public final class EditorModel {
             launchError = e.getMessage() == null ? e.toString() : e.getMessage();
             return Optional.empty();
         }
+        old.supersede();
+        if (old.state() == TimelapseModel.State.RUNNING)
+            old.cancel();
+        review = null;
+        // The accepted run's folder is about to change: it must be accepted again.
+        if (accepted != null && accepted.stagingId().equals(old.stagingId()))
+            accepted = null;
         launchError = null;
         run = new TimelapseModel(h, old.stagingId(), json, old.circumference(), old.stageNames(), deps.loader(), deps.io());
         old.estimate().ifPresent(run::setEstimate);
@@ -982,8 +1083,14 @@ public final class EditorModel {
         if (!canAccept())
             throw new IllegalStateException("no finished run to accept");
         Presets.Info i = Presets.info(Presets.parseObject(run.presetJson()));
+        // A run stopped early (an epoch picked) or continued says where it stopped.
+        OptionalDouble stop = runStopMyr();
+        String stopped = stop.isPresent() && i.timeline().isPresent() && Math.abs(stop.getAsDouble() - i.timeline().get().lengthMyr()) > 1e-6
+                ? ", stop_myr " + Formats.number(stop.getAsDouble()) + " (" + Phrase.myrAgo((stop.getAsDouble() - i.timeline().get().lengthMyr()) * 1e6)
+                        + " Myr ago)"
+                : "";
         String label = i.name().orElse(presetName()) + " · " + run.circumference() + " blocks"
-                + i.timeline().map(t -> " · " + t).orElse("");
+                + i.timeline().map(t -> " · " + t + stopped).orElse("");
         int worldC;
         String projection;
         try {
