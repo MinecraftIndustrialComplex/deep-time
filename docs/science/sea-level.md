@@ -446,7 +446,9 @@ sixteenth of the planet's width of the seam 0.026 → 0.053 of that band.
 
 - GDH1's coefficients 365, 5,651 and 2,473 and its 20-Myr knee are not yet read in Stein & Stein
   1992 itself (paywalled); 2,600 m and the 0.0278 decay are read in Stein 1995.
-- For Ben: the sea swings about a kilometre (450 to 1,380 m below the end at its lowest), past
+- Decided (the coordinator's call, decisions log 2026-10-21: the volume law stays undamped and
+  the swing is measured again once the continents keep their crust): the sea swings about a
+  kilometre (450 to 1,380 m below the end at its lowest), past
   Earth's Phanerozoic range (ISO-087), because the plate model's continental area (0.27 to 0.48
   of the planet within a run) and ocean age (a median of 41 to 105 Myr within one run) vary much
   more than Earth's. Recommended: keep the volume law with no calibrated damping of the sea, and
@@ -462,15 +464,17 @@ sixteenth of the planet's width of the seam 0.026 → 0.053 of that band.
   (`settle.rs`, ISO-078) and in GDH1's dry share (PLT-353), and gets it back through the surface's
   erosion and deposition on its samples; the force balance's column energy reads the samples'
   height, deeper at every age under GDH1 (about 600 m at 5 to 20 Myr, 250 m at 100 against the
-  dampening). Which of these moves the plates is not traced. Recommended: the plate task traces
-  it; the sea stays where the volume puts it.
+  dampening). Which of these moves the plates is not traced. Decided (the coordinator's call,
+  decisions log 2026-10-21): the plate-geometry task traces it; the sea stays where the volume
+  puts it.
 - For Ben: with the flexure's GDH1 water left out (ISO-088) the Earth-like planets hold Earth's
   water with land 0.268 of the planet and 0.373 of the continental crust under the sea, against
   Earth's 0.29 and about 0.19 ("The flexure's water over GDH1's floor"). The water amount stays
   the coordinator's call (Earth's, 2,664 m); the drowned crust is the crust's, which stands too
   low ("What the numbers say"), not a reason for less water.
-- For Ben: the editor's "Ocean water" (`planet.surface_water_m`, 0 to 8,000 m, Earth 2,664) is a
-  new outward-facing setting. Recommended: keep it.
+- The editor's "Ocean water" (`planet.surface_water_m`, 0 to 8,000 m, Earth 2,664) is a new
+  outward-facing setting. Decided (the coordinator's call, decisions log 2026-10-21): it stays;
+  Ben was told it is player-visible and his to veto.
 - The plate era's closed basins on oceanic crust grew (124 to 156 per snapshot): they stand on
   island arcs and stacked crust above the sea, which the lower sea lays dry; they belong with the
   arcs' rate (the plate-geometry task), not with the sea.
