@@ -376,9 +376,11 @@
     message('');
     buildLayers();
     $('wv-info').innerHTML = infoHTML();
+    // The view this run was left at, read before the new frame re-clamps the current view (which
+    // reports through onView and would overwrite it).
+    const v = S.views.get(run.id);
     const f = frameOf(S.info);
     map.setProjection(f.projection, f.pyramid, null);
-    const v = S.views.get(run.id);
     if (!v && deepPending) { S.layer = deepPending.layer; buildLayers(); }
     setTiles();
     if (v) map.setView(v.cx, v.cz, v.bpp);
