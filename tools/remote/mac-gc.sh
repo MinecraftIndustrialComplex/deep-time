@@ -5,7 +5,10 @@
 #   - delete the Mac copy (/Volumes/Graphide/ban/mic/mods/<checkout name>) of every worktree of this
 #     repo whose branch is merged into master;
 #   - drop target/*/incremental from the copies that stay (mac.sh builds with CARGO_INCREMENTAL=0,
-#     so those caches are dead weight left from older builds).
+#     so those caches are dead weight left from older builds);
+#   - drop the whole target/ of a copy that stays but was not synced for 7 days and is not in use
+#     (an unmerged or abandoned branch, or a copy whose worktree is gone; Ben 2026-10-21: "get a
+#     decent garbage collection system up and running"). Only build outputs go; mac.sh rebuilds.
 #
 #   tools/remote/mac-gc.sh [--dry-run]
 #
@@ -23,6 +26,7 @@ set -euo pipefail
 HOST="${DEEPTIME_MAC:-ban@deeptime-test-ban.westus2.cloudapp.azure.com}"
 MODS=/Volumes/Graphide/ban/mic/mods
 DRY=0; [ "${1:-}" = --dry-run ] && DRY=1
+IDLE_TARGET=$(( 7 * 86400 ))  # a kept copy idle this long loses its target/
 SSH=(ssh -o BatchMode=yes -o ConnectTimeout=15 "$HOST")
 # The VM's firewall follows the laptop's address (vm-access.sh): repair it before the first call.
 . "$(dirname "${BASH_SOURCE[0]}")/vm-access.sh"
@@ -60,7 +64,14 @@ while read -r _ name age; do
     busy=0; grep -Eq "$MODS/$name(/|[[:space:]]|\$)" <<<"$procs" && busy=1
     why=""
     if [ "$name" = "$MAIN_NAME" ]; then why="main checkout"
-    elif [ -z "$b" ] && [ -z "$wt" ]; then echo "skip $name: not a worktree or branch of this repo"; continue
+    elif [ -z "$b" ] && [ -z "$wt" ]; then
+        if [ "$age" -ge "$IDLE_TARGET" ] && [ "$busy" = 0 ]; then
+            echo "keep $name: not a worktree or branch of this repo; its target/ goes (idle $(( age / 86400 )) d)"
+            OPS+=("target:$name")
+        else
+            echo "skip $name: not a worktree or branch of this repo"
+        fi
+        continue
     elif [ -z "$b" ]; then why="detached worktree"
     elif ! git merge-base --is-ancestor "$b" master; then why="$b not merged"
     elif [ -n "$wt" ] && [ -n "$(git -C "$wt" status --porcelain 2>/dev/null)" ]; then why="uncommitted changes in $wt"
@@ -70,8 +81,13 @@ while read -r _ name age; do
     if [ -z "$why" ]; then
         OPS+=("del:$name")
     else
-        echo "keep $name: $why"
-        [ "$busy" = 0 ] && OPS+=("prune:$name")
+        if [ "$busy" = 0 ] && [ "$name" != "$MAIN_NAME" ] && [ "$age" -ge "$IDLE_TARGET" ]; then
+            echo "keep $name: $why; its target/ goes (idle $(( age / 86400 )) d)"
+            OPS+=("target:$name")
+        else
+            echo "keep $name: $why"
+            [ "$busy" = 0 ] && OPS+=("prune:$name")
+        fi
     fi
 done < <(grep '^copy ' <<<"$listing")
 
@@ -89,6 +105,10 @@ for a in "$@"; do
     if [ "$op" = del ]; then
         echo "$verb $d ($(du -sh "$d" | cut -f1))"
         [ "$dry" = 1 ] || rm -rf "$d"
+    elif [ "$op" = target ]; then
+        [ -d "$d/target" ] || continue
+        echo "$verb $d/target ($(du -sh "$d/target" | cut -f1))"
+        [ "$dry" = 1 ] || rm -rf "$d/target"
     else
         for i in "$d"/target/*/incremental; do
             [ -d "$i" ] || continue
