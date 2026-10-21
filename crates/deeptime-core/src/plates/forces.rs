@@ -1278,7 +1278,10 @@ mod tests {
             let (lo, hi) = (sea.max(0.0) + 200.0, 4000.0);
             let at_datum = u(hi, true, 0.0) - u(lo, true, 0.0);
             let here = u(hi, true, sea) - u(lo, true, sea);
-            assert!(((here - at_datum) / at_datum).abs() < 1e-9, "{sea}: {here:e} {at_datum:e}");
+            assert!(
+                ((here - at_datum) / at_datum).abs() < 1e-9,
+                "{sea}: {here:e} {at_datum:e}"
+            );
             // The sea floor's energy is the ridge's, whatever the sea.
             assert_eq!(u(-4000.0, false, sea), u(-4000.0, false, 0.0));
         }
