@@ -850,7 +850,7 @@ pub const MEASURES: &[MeasureDef] = &[
     ),
     m(
         "boundary_oo_of_subduction_pct",
-        "Subducting boundary that is ocean-ocean, share of the subducting length (after the first 100 Myr)",
+        "Subducting boundary that is ocean-ocean (an intra-oceanic arc), share of the subducting length (after the first 100 Myr; Earth: about 35 %, 14,500 of 42,000 km of arc, Stern & Scholl 2010)",
         "% of subduction",
         None,
         None,
