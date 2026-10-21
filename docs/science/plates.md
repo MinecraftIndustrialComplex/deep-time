@@ -2702,7 +2702,10 @@ adds no work per step, so the 900 s gate stands where master left it.
    most 120): the slab tear is not the tail's law; a plate reorganisation is the other candidate,
    a change to how plates split (Ben's).
 3. *The arc's ocean floor made continental* (4.67 km³ a year, no row in Table 1): a column holding
-   its arc's magma apart from its ocean crust is a crust data-model change (Ben's).
+   its arc's magma apart from its ocean crust is a crust data-model change (Ben's). Done
+   2026-10-20 by PLT-331 without one: the column keeps the ocean crust under its arc as a basement
+   tag on its mafic pools, out of the continental books ("The arc's basement and the arcs' fronts"
+   below).
 4. *The cordillera per front*: 0.09 of the upper plate's motion over the mantle (Heuret &
    Lallemand) once the force balance hands each arc its upper plate's motion.
 5. *Hotspots and rifted margins* (0.04 against 0.5): flood basalts and volcanic margins have no
