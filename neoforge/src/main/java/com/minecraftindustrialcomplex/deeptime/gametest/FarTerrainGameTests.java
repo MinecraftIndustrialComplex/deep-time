@@ -471,10 +471,12 @@ public final class FarTerrainGameTests {
     }
 
     /**
-     * A section is cheap and threads agree: sections built on four threads at once equal the ones
-     * built alone, and the time a section takes is logged ({@code ms/section}) for full and coarse
-     * detail. The only time asserted is a generous ceiling a real chunk generator could not meet
-     * (a section is 16 chunks).
+     * A section is cheap and threads agree: sections built on four threads at once, each in its own
+     * order, equal the ones built alone column for column, and the time a section takes is logged
+     * ({@code ms/section}) for full and coarse detail. The only time asserted is a generous ceiling a
+     * real chunk generator could not meet (a section is 16 chunks). The agreement caught vanilla's
+     * warm-started climate search settling a tie by the thread's history (see
+     * {@code ColdBiomeSearch}); a differing column is logged with its ground and biome on both sides.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
     public static void farTerrainSectionsAreCheapAndThreadSafe(GameTestHelper helper) {
@@ -493,30 +495,11 @@ public final class FarTerrainGameTests {
         int[][] jobs = new int[24][];
         for (int k = 0; k < jobs.length; k++)
             jobs[k] = new int[]{-c / 2 + (k * 7 % 24) * (c / 24) / 64 * 64, ((k * 5) % 12 - 6) * ((int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c) / 8) / 64 * 64, k % 3 == 0 ? 8 : 1};
-        // TEMPORARY experiment: the biome searches warm first (as before), counted, not asserted.
-        FarTerrain.coldSearch = false;
-        int warm = threadMismatches(far, jobs);
-        FarTerrain.coldSearch = true;
-        int cold = threadMismatches(far, jobs);
-        DeepTime.LOGGER.info("[gametest] threadsafeDiag warm mismatches={} cold mismatches={}", warm, cold);
-        helper.assertTrue(cold == 0, cold + " sections differ on another thread (see threadsafeDiag)");
-        // TEMPORARY experiment: the section cost with warm and with cold searches, passes alternating.
-        double[][] ab = {{Double.MAX_VALUE, Double.MAX_VALUE}, {Double.MAX_VALUE, Double.MAX_VALUE}};
-        for (int pass = 0; pass < 6; pass++) {
-            int mode = pass % 2;
-            FarTerrain.coldSearch = mode == 1;
-            for (int d = 0; d < 2; d++) {
-                int step = d == 0 ? 1 : 8;
-                long t0 = System.nanoTime();
-                for (int[] job : jobs)
-                    hash(far, new int[]{job[0], job[1], step});
-                ab[mode][d] = Math.min(ab[mode][d], (System.nanoTime() - t0) / 1e6 / jobs.length);
-            }
-        }
-        FarTerrain.coldSearch = true;
-        DeepTime.LOGGER.info("[gametest] threadsafeDiag ms/section warm: detail 0 {} detail 3 {}; cold: detail 0 {} detail 3 {}",
-                String.format(java.util.Locale.ROOT, "%.3f", ab[0][0]), String.format(java.util.Locale.ROOT, "%.3f", ab[0][1]),
-                String.format(java.util.Locale.ROOT, "%.3f", ab[1][0]), String.format(java.util.Locale.ROOT, "%.3f", ab[1][1]));
+        SectionColumn[][] alone = new SectionColumn[jobs.length][];
+        for (int k = 0; k < jobs.length; k++)
+            alone[k] = sectionColumns(far, jobs[k]);
+        int mismatches = threadMismatches(far, jobs, alone);
+        helper.assertTrue(mismatches == 0, mismatches + " sections differ on another thread (columns in the log, threadsafeDiag)");
         double[] ms = new double[2];
         for (int d = 0; d < 2; d++) {
             int step = d == 0 ? 1 : 8;
@@ -558,24 +541,12 @@ public final class FarTerrainGameTests {
     }
 
     /**
-     * Builds every section alone on a fresh thread, then on four fresh threads at once, each in its
-     * own order; the number of (thread, section) pairs that differ from the lone build. The first
-     * differing columns are logged ({@code threadsafeDiag}).
+     * Builds every section on four fresh threads at once, each in its own order; the number of
+     * (thread, section) pairs that differ from {@code alone}. The first differing columns are logged
+     * ({@code threadsafeDiag}): where, and the ground, its block and the biome on both sides.
      */
-    private static int threadMismatches(FarTerrain far, int[][] jobs)
+    private static int threadMismatches(FarTerrain far, int[][] jobs, SectionColumn[][] alone)
             throws java.util.concurrent.ExecutionException, java.util.concurrent.TimeoutException, InterruptedException {
-        java.util.concurrent.ExecutorService one = java.util.concurrent.Executors.newSingleThreadExecutor();
-        SectionColumn[][] alone;
-        try {
-            alone = one.submit(() -> {
-                SectionColumn[][] out = new SectionColumn[jobs.length][];
-                for (int k = 0; k < jobs.length; k++)
-                    out[k] = sectionColumns(far, jobs[k]);
-                return out;
-            }).get(120, java.util.concurrent.TimeUnit.SECONDS);
-        } finally {
-            one.shutdownNow();
-        }
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(4);
         int mismatches = 0, logged = 0;
         try {
@@ -602,15 +573,15 @@ public final class FarTerrainGameTests {
                         differ++;
                         if (logged++ < 16) {
                             int step = jobs[k][2], x = jobs[k][0] + (q % 64) * step + step / 2, z = jobs[k][1] + (q / 64) * step + step / 2;
-                            DeepTime.LOGGER.info("[gametest] threadsafeDiag search {} thread {} section {} column ({}, {}): alone ground {} {} biome {}; thread ground {} {} biome {}",
-                                    FarTerrain.coldSearch ? "cold" : "warm", t, java.util.Arrays.toString(jobs[k]), x, z,
+                            DeepTime.LOGGER.info("[gametest] threadsafeDiag thread {} section {} column ({}, {}): alone ground {} {} biome {}; thread ground {} {} biome {}",
+                                    t, java.util.Arrays.toString(jobs[k]), x, z,
                                     a.ground(), a.block(), a.biome().getRegisteredName(), b.ground(), b.block(), b.biome().getRegisteredName());
                         }
                     }
                     if (differ > 0) {
                         mismatches++;
-                        DeepTime.LOGGER.info("[gametest] threadsafeDiag search {} thread {} section {} differs in {} columns",
-                                FarTerrain.coldSearch ? "cold" : "warm", t, java.util.Arrays.toString(jobs[k]), differ);
+                        DeepTime.LOGGER.info("[gametest] threadsafeDiag thread {} section {} differs in {} columns",
+                                t, java.util.Arrays.toString(jobs[k]), differ);
                     }
                 }
             }
