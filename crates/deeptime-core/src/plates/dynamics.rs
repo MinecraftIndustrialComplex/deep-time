@@ -51,8 +51,8 @@
 //!   fronts are found (`subduction::fronts_and_uplift`), because the sample flags are cleared by
 //!   a resampling; the motion is judged across the boundary's normal, with Bird's 20 degrees for
 //!   a transform (PLT-310, PLT-311).
-//! - `StepRec::arc_oceanic` and `arc_continental` ([`ArcStat`]): the elevation, m above the plate
-//!   model's sea datum, of the samples that received arc magma this step (flag `ARC`, the code's
+//! - `StepRec::arc_oceanic` and `arc_continental` ([`ArcStat`]): the elevation, m above the sea
+//!   the step stood under, of the samples that received arc magma this step (flag `ARC`, the code's
 //!   own arc cells: within `arc_width_km` of the arc distance from a front). An *oceanic arc* is
 //!   one whose arc crust was oceanic when the magma came ([`is_island_arc`]); an island arc that
 //!   emerged and matured into continental crust (`finish_samples`) is still an oceanic arc here.
@@ -73,7 +73,7 @@
 //! `belt` the extent of everything it raised (its width from where the belt and wedge rose across
 //! the front, weighted by the uplift; its length the front's: `belts::footprint`),
 //! and `lifted10`, `lifted100` and `emerged` the most samples one step raised by more than 10 m,
-//! by more than 100 m and from below the sea datum to above it (their extents are not kept). A
+//! by more than 100 m and from below the sea to above it (their extents are not kept). A
 //! collision state that ends without a transfer or weld (the plates part, the contact reverses or
 //! closes, the run ends) is a [`PartingRec`].
 //!
@@ -173,7 +173,7 @@ pub struct StepRec {
     pub t: f64,
     /// Visible samples.
     pub visible: u32,
-    /// Visible samples above the plate model's sea datum (0 m): the land.
+    /// Visible samples above the sea the step stood under: the land.
     pub land: u32,
     /// Visible continental samples: the continental crust.
     pub continental: u32,
@@ -1245,9 +1245,9 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
     }
 }
 
-/// The elevations of the arc cells of one kind in one step: how many, how many stand above the
-/// model's sea datum, and the median, 90th percentile and highest, m. Serialised as the array
-/// `[cells, emergent, p50, p90, max]`.
+/// The elevations of the arc cells of one kind in one step, m above the sea the step stood under:
+/// how many, how many stand above it, and the median, 90th percentile and highest. Serialised as
+/// the array `[cells, emergent, p50, p90, max]`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(from = "[f64; 5]", into = "[f64; 5]")]
 pub struct ArcStat {
@@ -1298,7 +1298,7 @@ impl ArcStat {
         }
     }
 
-    /// Share of the cells above the sea datum (0 of none).
+    /// Share of the cells above the sea (0 of none).
     pub fn emergent_share(&self) -> f64 {
         f64::from(self.emergent) / f64::from(self.cells.max(1))
     }
@@ -1311,14 +1311,15 @@ pub fn is_island_arc(s: &Sample) -> bool {
     s.kind == OCEANIC || s.arc_oceanic_m > s.arc_continental_m
 }
 
-/// The oceanic and the continental arcs' elevations ([`ArcStat`]) among `samples`.
-pub fn arc_stats(samples: &[Sample]) -> [ArcStat; 2] {
+/// The oceanic and the continental arcs' elevations above the sea at `sea_m` ([`ArcStat`]) among
+/// `samples`.
+pub fn arc_stats(samples: &[Sample], sea_m: f64) -> [ArcStat; 2] {
     let (mut oc, mut cont) = (Vec::new(), Vec::new());
     for s in samples {
         if s.is_hidden() || s.flags & ARC == 0 {
             continue;
         }
-        let z = f64::from(s.elevation_m);
+        let z = f64::from(s.elevation_m) - sea_m;
         if is_island_arc(s) {
             oc.push(z);
         } else {
@@ -1328,12 +1329,12 @@ pub fn arc_stats(samples: &[Sample]) -> [ArcStat; 2] {
     [ArcStat::of(oc), ArcStat::of(cont)]
 }
 
-/// The arcs of the step ([`arc_stats`]); empty when the record is off.
-pub fn arc_heights(st: &PlateState) -> [ArcStat; 2] {
+/// The arcs of the step above its sea ([`arc_stats`]); empty when the record is off.
+pub fn arc_heights(st: &PlateState, sea_m: f64) -> [ArcStat; 2] {
     if st.dynamics.is_none() {
         return [ArcStat::default(); 2];
     }
-    arc_stats(&st.samples)
+    arc_stats(&st.samples, sea_m)
 }
 
 /// What a step measured before `record_step` sees its end state: the fronts' lengths, the boundary
@@ -1350,6 +1351,8 @@ pub struct Observed<'a> {
     pub forces: Option<&'a super::forces::Recorded>,
     /// The plates the speed guard held this step (`kinematics::guard_speed`).
     pub guarded: &'a [u32],
+    /// The sea the step stood under, m (the land is the ground above it).
+    pub sea_m: f64,
 }
 
 /// What [`record_step`] counts over the samples (P1-19: per run of samples, then merged).
@@ -1395,6 +1398,7 @@ pub fn record_step(
     // order), with the continental pieces and the sea floor's ages beside them.
     let (samples, groups) = (&st.samples, &st.groups);
     let plate_of = |i: usize| groups[samples[i].group as usize].plate;
+    let sea = seen.sea_m;
     let tally = || Tally {
         nearest: NearestPlate::new(poles.clone()),
         vis: vec![0; np],
@@ -1421,7 +1425,7 @@ pub fn record_step(
                     t.cont[p as usize] += 1;
                     t.continental += 1;
                 }
-                if s.elevation_m > 0.0 {
+                if f64::from(s.elevation_m) > sea {
                     t.land += 1;
                 }
                 // On the plate's boundary: a neighbour of another plate, or one hidden under
@@ -1877,7 +1881,7 @@ mod tests {
         cells.push(arc_cell(OCEANIC, 3000.0, 0.0, 0.0, 0));
         cells.push(arc_cell(CONTINENTAL, 3000.0, 0.0, 9.0, ARC | HIDDEN));
         cells.push(arc_cell(CONTINENTAL, 3000.0, 0.0, 9.0, TRENCH));
-        let [oc, cont] = arc_stats(&cells);
+        let [oc, cont] = arc_stats(&cells, 0.0);
         assert_eq!((oc.cells, oc.emergent), (14, 4));
         assert!((oc.emergent_share() - 4.0 / 14.0).abs() < 1e-12);
         assert_eq!(oc.max_m, 1200.0);
@@ -1890,11 +1894,16 @@ mod tests {
             (3500.0, 5500.0, 5500.0)
         );
         // No arc cells: an empty summary, not a NaN.
-        let none = arc_stats(&[arc_cell(OCEANIC, 5.0, 0.0, 0.0, 0)]);
+        let none = arc_stats(&[arc_cell(OCEANIC, 5.0, 0.0, 0.0, 0)], 0.0);
         assert_eq!(none[0], ArcStat::default());
         assert_eq!(none[0].emergent_share(), 0.0);
         // A sea-level cell is not emergent.
         assert_eq!(ArcStat::of(vec![0.0, 0.0, 1.0]).emergent, 1);
+        // Under a sea 450 m above the datum the heights are the sea's: the cells at 50 and 400 m
+        // are under water, and every height is 450 m lower.
+        let [high_sea, _] = arc_stats(&cells, 450.0);
+        assert_eq!((high_sea.cells, high_sea.emergent), (14, 2));
+        assert_eq!(high_sea.max_m, 750.0);
     }
 
     #[test]

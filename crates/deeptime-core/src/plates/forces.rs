@@ -154,25 +154,38 @@ pub fn ridge_coefficient(gravity: f64) -> f64 {
         * (1.0 + 2.0 * rm * a / (std::f64::consts::PI * (rm - rw)))
 }
 
-/// The gravitational potential energy of a column standing at `z_m`, N/m, relative to a ridge
-/// crest (`ridge_m`) and to continental crust at sea level, which are taken to be equal (ledger
-/// FRC-013).
+/// The gravitational potential energy of a column standing at `z_m` under a sea at `sea_m` (both
+/// in the plate model's frame, m), N/m, relative to a ridge crest (`ridge_m`) and to continental
+/// crust standing at the sea, which are taken to be equal (ledger FRC-013).
 /// - Sea floor: `−C d²`, `d` its depth below the crest, at most the old floor's (`floor_m`):
 ///   deeper ground (a trench) is held down by the slab and by flexure, not by its own column.
 /// - Continental crust (ledger FRC-014): `ρ g h (H + h (1 + ρ/(ρ_m − ρ_c))/2)` for an
-///   Airy-compensated column `h` above sea level on crust `H` thick; `ρ` is the crust's density
-///   above the sea and the crust's less the water's below it. A 5 km belt on 35 km crust:
-///   6.7 × 10¹² N/m (Tibet is quoted at 6–7 × 10¹²).
-pub fn column_energy(z_m: f64, continental: bool, ridge_m: f64, floor_m: f64, g: f64) -> f64 {
+///   Airy-compensated column `h = z − sea` above the sea on the crust that stands at the sea,
+///   `H` thick; `ρ` is the crust's density above the sea and the crust's less the water's below
+///   it. `H` is [`CRUST_KM`] at the datum and `sea · ρ_m / (ρ_m − ρ_c)` more under a sea off it
+///   (the Airy thickness of a dry column standing there), so two dry columns differ by the same
+///   energy wherever the sea stands. A 5 km belt on 35 km crust: 6.7 × 10¹² N/m (Tibet is quoted
+///   at 6–7 × 10¹²). Under a sea at 0 it is the datum's formula, bit for bit.
+pub fn column_energy(
+    z_m: f64,
+    continental: bool,
+    ridge_m: f64,
+    floor_m: f64,
+    sea_m: f64,
+    g: f64,
+) -> f64 {
     if continental {
-        let rho = if z_m >= 0.0 {
+        // ledger: FRC-014 (the height and the water from the sea, the crust standing at the sea)
+        let h = z_m - sea_m;
+        let rho = if h >= 0.0 {
             // ledger: FRC-006, FRC-014
             RHO_CRUST
         } else {
             RHO_CRUST - RHO_WATER
         };
+        let crust_m = CRUST_KM * 1000.0 + sea_m * RHO_MANTLE / (RHO_MANTLE - RHO_CRUST); // ledger: FRC-014
         let root = 1.0 + rho / (RHO_MANTLE - RHO_CRUST);
-        rho * g * z_m * (CRUST_KM * 1000.0 + 0.5 * z_m * root)
+        rho * g * h * (crust_m + 0.5 * h * root)
     } else {
         let d = (ridge_m - z_m).clamp(0.0, (ridge_m - floor_m).max(0.0)); // ledger: FRC-012, FRC-021
         -ridge_coefficient(g) * d * d
@@ -223,10 +236,13 @@ pub struct Coeffs {
     /// The sea floor's crest and old-floor elevations, m (the column energy's reference).
     pub ridge_m: f64,
     pub floor_m: f64,
+    /// The sea the step stands under, m: the land's column energy is taken from it.
+    pub sea_m: f64,
 }
 
 impl Coeffs {
-    /// From the settings. `a0_km2` is the average starting plate's area (the reference plate).
+    /// From the settings. `a0_km2` is the average starting plate's area (the reference plate),
+    /// `sea_m` the sea the step stands under.
     /// The basal drag coefficient follows from the reference plate: its area `A`, a straight
     /// trench of [`REF_TRENCH_KM`] of full-length 80-Myr slab, its neighbours at rest; then
     /// `(1 + slab_resistance + boundary_resistance) c_b A v = F_sp L` with `v` the speed scale
@@ -238,6 +254,7 @@ impl Coeffs {
         gravity: f64,
         a0_km2: f64,
         flow_axis: DVec3,
+        sea_m: f64,
     ) -> Coeffs {
         let radius_m = norm.model_km * 1000.0;
         let sample_m2 = norm.sample_area_km2() * 1.0e6;
@@ -267,12 +284,20 @@ impl Coeffs {
             gravity,
             ridge_m: k.ridge_elevation_m,
             floor_m: k.oceanic_floor_elevation_m,
+            sea_m,
         }
     }
 
     /// The column energy of a sample ([`column_energy`]).
     pub fn energy(&self, z_m: f64, continental: bool) -> f64 {
-        column_energy(z_m, continental, self.ridge_m, self.floor_m, self.gravity)
+        column_energy(
+            z_m,
+            continental,
+            self.ridge_m,
+            self.floor_m,
+            self.sea_m,
+            self.gravity,
+        )
     }
 }
 
@@ -770,10 +795,18 @@ pub fn relax(omega: DVec3, target: DVec3, dt_myr: f64, tau_myr: f64) -> DVec3 {
 /// fronts were found with (call it after `subduction::fronts_and_uplift`, before the motion is
 /// updated). Updates the slabs (`PlateState::slabs`) and, when the dynamics record is on, its
 /// memory of the last answers; returns each plate's balance rotation, which the plates step
-/// relaxes the plates' motion towards.
-pub fn step(st: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>, flow: DVec3) -> Answer {
+/// relaxes the plates' motion towards. `sea_m` is the sea the step stands under (the land's
+/// column energy is taken from it, [`column_energy`]).
+pub fn step(
+    st: &mut PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    env: &Env<'_>,
+    flow: DVec3,
+    sea_m: f64,
+) -> Answer {
     let mut slabs = std::mem::take(&mut st.slabs);
-    let (omega, solved, out) = balance_step(st, geo, pos, env, flow, &mut slabs);
+    let (omega, solved, out) = balance_step(st, geo, pos, env, flow, sea_m, &mut slabs);
     st.slabs = slabs;
     let recorded = st.dynamics.as_mut().map(|d| {
         let last: BTreeMap<u32, DVec3> = d
@@ -808,6 +841,7 @@ fn balance_step(
     pos: &[DVec3],
     env: &Env<'_>,
     flow: DVec3,
+    sea_m: f64,
     slabs: &mut Vec<SlabTrack>,
 ) -> (Vec<Option<DVec3>>, bool, Recorded) {
     let k = env.k;
@@ -964,7 +998,7 @@ fn balance_step(
 
     // The system.
     let a0 = st.a0_km2;
-    let c = Coeffs::new(k, &norm, env.gravity, a0, flow);
+    let c = Coeffs::new(k, &norm, env.gravity, a0, flow, sea_m);
     let centroids: Vec<DVec3> = st
         .plates
         .iter()
@@ -1161,7 +1195,7 @@ mod tests {
         let norm = Norm::new(6370.0, 782.0, 100_000);
         // 14 starting plates.
         let a0 = 4.0 * std::f64::consts::PI * 6370.0f64.powi(2) / 14.0;
-        Coeffs::new(k, &norm, 9.81, a0, DVec3::Z)
+        Coeffs::new(k, &norm, 9.81, a0, DVec3::Z, 0.0)
     }
 
     /// A spherical cap of angular radius `r_deg` about the north pole, sampled on a lattice of
@@ -1213,23 +1247,48 @@ mod tests {
         let g = 9.81;
         // Ridge push between a crest at -2.5 km and 100-Myr floor 3.5 km lower: about 4e12 N/m
         // (Turcotte & Schubert's formula at 100 Myr; 2-3.5e12 quoted, design §3.2).
-        let push = column_energy(-2500.0, false, -2500.0, -6000.0, g)
-            - column_energy(-6000.0, false, -2500.0, -6000.0, g);
+        let push = column_energy(-2500.0, false, -2500.0, -6000.0, 0.0, g)
+            - column_energy(-6000.0, false, -2500.0, -6000.0, 0.0, g);
         assert!((3.5e12..4.5e12).contains(&push), "{push:e}");
         // A trench is no deeper in energy than the old floor.
         assert_eq!(
-            column_energy(-9000.0, false, -2500.0, -6000.0, g),
-            column_energy(-6000.0, false, -2500.0, -6000.0, g)
+            column_energy(-9000.0, false, -2500.0, -6000.0, 0.0, g),
+            column_energy(-6000.0, false, -2500.0, -6000.0, 0.0, g)
         );
         // A 5 km belt: 6.7e12 N/m (design §3.2).
-        let belt = column_energy(5000.0, true, -2500.0, -6000.0, g);
+        let belt = column_energy(5000.0, true, -2500.0, -6000.0, 0.0, g);
         assert!((6.6e12..6.8e12).contains(&belt), "{belt:e}");
         // Sea level, the ridge crest: the shared reference.
-        assert_eq!(column_energy(0.0, true, -2500.0, -6000.0, g), 0.0);
-        assert_eq!(column_energy(-2500.0, false, -2500.0, -6000.0, g), 0.0);
+        assert_eq!(column_energy(0.0, true, -2500.0, -6000.0, 0.0, g), 0.0);
+        assert_eq!(column_energy(-2500.0, false, -2500.0, -6000.0, 0.0, g), 0.0);
         // Everything scales with gravity.
-        let mars = column_energy(5000.0, true, -2500.0, -6000.0, 3.71);
+        let mars = column_energy(5000.0, true, -2500.0, -6000.0, 0.0, 3.71);
         assert!((mars / belt - 3.71 / 9.81).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_land_s_column_energy_is_taken_from_the_sea() {
+        let g = 9.81;
+        let u = |z: f64, cont: bool, sea: f64| column_energy(z, cont, -2600.0, -5651.0, sea, g);
+        for sea in [-800.0, -250.0, 300.0, 450.0] {
+            // Crust standing at the sea is the reference, as the ridge crest is.
+            assert_eq!(u(sea, true, sea), 0.0);
+            // Two dry columns differ by the same energy wherever the sea stands (the crust that
+            // stands at the sea is the Airy thickness of a column there).
+            let (lo, hi) = (sea.max(0.0) + 200.0, 4000.0);
+            let at_datum = u(hi, true, 0.0) - u(lo, true, 0.0);
+            let here = u(hi, true, sea) - u(lo, true, sea);
+            assert!(((here - at_datum) / at_datum).abs() < 1e-9, "{sea}: {here:e} {at_datum:e}");
+            // The sea floor's energy is the ridge's, whatever the sea.
+            assert_eq!(u(-4000.0, false, sea), u(-4000.0, false, 0.0));
+        }
+        // Ground between the datum and a higher sea is under water: it weighs less than the crust
+        // standing at the sea, where the datum's formula had it above.
+        assert!(u(100.0, true, 300.0) < 0.0);
+        assert!(u(100.0, true, 0.0) > 0.0);
+        // Ground between a lower sea and the datum is dry land above the sea.
+        assert!(u(-100.0, true, -250.0) > 0.0);
+        assert!(u(-100.0, true, 0.0) < 0.0);
     }
 
     #[test]
