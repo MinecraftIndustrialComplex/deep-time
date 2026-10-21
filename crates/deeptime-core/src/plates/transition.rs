@@ -739,6 +739,7 @@ mod tests {
             z_c: fx.k.max_elevation_m,
             z_t: fx.k.trench_elevation_m,
             z_floor: fx.k.oceanic_floor_elevation_m,
+            z_ridge: fx.k.ridge_elevation_m,
             trench_relax: 0.0,
             gravity: 9.81,
             law: crate::params::OceanDepth::Dampening,

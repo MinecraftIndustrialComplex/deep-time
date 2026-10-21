@@ -417,9 +417,10 @@ pub enum OceanDepth {
     #[default]
     Dampening,
     /// Stein & Stein 1992's GDH1 depth–age law as the floor's subsidence: a sample sinks by what
-    /// its age sinks bare floor under water, from GDH1's ridge (2,600 m) and old floor (5,651 m),
-    /// which `ridge_elevation_m` and `oceanic_floor_elevation_m` must then be (ledger PLT-352;
-    /// the choice of law, PLT-350).
+    /// its age sinks bare floor under water. GDH1's shape is drawn between `ridge_elevation_m`
+    /// and `oceanic_floor_elevation_m`, GDH1's own −2,600 and −5,651 m in every shipped preset,
+    /// where the floor is GDH1 exactly (ledger PLT-352; the depths, PLT-355; the choice of law,
+    /// PLT-350).
     Gdh1,
 }
 
@@ -487,8 +488,8 @@ pub struct TectonicParams {
     /// 100, 5.6 beyond): at GDH1's full rate the young floor is deep enough that island arcs rarely
     /// emerge and the continental crust shrinks from 0.39 to 0.29 of the planet in 500 Myr (P1-17
     /// hypsometry recalibration, 2026-10-01; median sea depth 4.0 km, Earth 4.06). Under
-    /// `ocean_depth: gdh1` it is GDH1's own old-floor depth, −5,651 m, and only the height line of
-    /// thicker ocean crust (`plates::transition`, PLT-264) and the column energy read it.
+    /// `ocean_depth: gdh1` it is the depth GDH1's curve flattens towards (GDH1's own −5,651 m in
+    /// every shipped preset; PLT-355).
     pub oceanic_floor_elevation_m: f64,
     /// The ocean floor's height law (`plates::pools`): Cortial's dampening towards
     /// `oceanic_floor_elevation_m` (the default and the plate-only presets'), or GDH1's age–depth
@@ -1166,15 +1167,6 @@ impl PlanetPreset {
             "$.tectonics.oceanic_floor_elevation_m",
             "must be in [trench_elevation_m, ridge_elevation_m)",
         )?;
-        if k.ocean_depth == OceanDepth::Gdh1 {
-            use crate::plates::pools::{GDH1_FLOOR_M, GDH1_RIDGE_M};
-            check(
-                (k.ridge_elevation_m + GDH1_RIDGE_M).abs() < 0.5
-                    && (k.oceanic_floor_elevation_m + GDH1_FLOOR_M).abs() < 0.5,
-                "$.tectonics.ocean_depth",
-                "gdh1 needs ridge_elevation_m -2600 and oceanic_floor_elevation_m -5651 (GDH1's)",
-            )?;
-        }
         check(
             k.uplift_reference_m > 0.0 && k.uplift_ceiling_m >= 0.0,
             "$.tectonics.uplift_ceiling_m",
