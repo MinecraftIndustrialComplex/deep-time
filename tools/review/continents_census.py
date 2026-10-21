@@ -517,7 +517,8 @@ def maps_report(out_dir, label, times):
     import re
     out_dir = Path(out_dir)
     for md in sorted((out_dir / "maps").glob(f"{label}-*")):
-        txt = next(iter(sorted(out_dir.glob(f"{md.name}-*.txt"))), None)
+        txt = next(iter(sorted(f for f in out_dir.glob(f"{md.name}-*.txt")
+                               if re.fullmatch(re.escape(md.name) + r"-[0-9]+\.txt", f.name))), None)
         seas = {}
         if txt is not None:
             for line in txt.read_text(errors="replace").splitlines():
