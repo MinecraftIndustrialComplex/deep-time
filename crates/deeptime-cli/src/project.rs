@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! `deeptime project --world-data <lambert dir> --out <dir> [--set scale.KEY=V]…` (SW-1): copies a
 //! baked Lambert world folder and runs the bake's projection pass on the copy
-//! (`deeptime_core::bake::project::project_folder`), as `Session::finalize_write` does at the end
-//! of a run whose preset says `scale.projection` `petroff_guyou`. The pass reads only the finished
-//! folder, so the copy holds the bytes the run would have written; it is how the pass's settings
-//! (λc, the footprint) are tuned without re-running the history.
+//! (`deeptime_core::bake::project::project_folder`), then the guaranteed deposits' anchor and its
+//! top-up (`deeptime_core::deposits::anchor::anchor_folder`), as `Session::finalize_write` does at
+//! the end of a run whose preset says `scale.projection` `petroff_guyou`. It is how the pass's
+//! settings (λc, the footprint) are tuned without re-running the history. The copy is not the
+//! folder such a run writes: the Lambert run's deposit stage counted the essentials' regions, and
+//! measured its inland margin, on the Lambert frame (DEP-220, DEP-222), so its guaranteed
+//! deposits lie where a Lambert world wants them; the anchor moves them under the projected
+//! world's ground, and the top-up adds a source to each land region of the projected world that
+//! lacks one.
 
 use std::path::Path;
 

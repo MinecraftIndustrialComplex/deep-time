@@ -445,10 +445,12 @@ fn a_craters_lens_is_seated_under_the_drawn_floor() {
 }
 
 /// The essentials guarantee in the world as generated (DEP-220, DEP-221, ORE-280): the projection
-/// draws the world with the λc the playability pass counted its regions in, and every guaranteed
-/// deposit but a placer (an in-stratum one too) holds ore in rock in its centre column of the
-/// world the game reads, an exposed one within reach of the ground; the pass is settled (a second
-/// run moves nothing).
+/// chooses its own λc on the baked land (the deposit stage only forecasts it), every land region
+/// of the world holds a source of each essential with ore in its centre column (the anchor's
+/// top-up fills what the forecast missed), every guaranteed deposit but a placer (an in-stratum
+/// one too, a top-up copy too) holds ore in rock in its centre column of the world the game
+/// reads, an exposed one at the top rock block; the pass is settled (a second run moves and adds
+/// nothing).
 #[test]
 fn guaranteed_deposits_hold_ore_in_the_world() {
     use crate::deposits::anchor;
@@ -467,9 +469,10 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
     m.verify(&dir).unwrap();
     let wf = &m.notes[crate::deposits::STAGE_NAME]["world_frame"];
     assert_eq!(wf["projection"], "petroff_guyou", "{wf}");
+    assert_eq!(wf["forecast"], true, "{wf}");
     let proj = &m.notes["bake"]["projection"];
-    assert_eq!(proj["lambda_c"]["chosen_by"], "deposits", "{proj}");
-    assert_eq!(proj["lambda_c_deg"], wf["lambda_c_deg"]);
+    assert_eq!(proj["lambda_c"]["chosen"], true, "{proj}");
+    assert!(proj["lambda_c"].get("chosen_by").is_none(), "{proj}");
     let note = m.notes["bake"]["guaranteed"].clone();
     let n = note["guaranteed"].as_u64().unwrap();
     assert!(n >= 3, "{note}");
@@ -543,8 +546,47 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
         crate::preset::PresetBody::Planet(p) => p,
         _ => panic!("a planet preset"),
     };
+    // Every land region of the world (a point of the top-up's lattice on dry land) holds a
+    // source of each essential with ore in its centre column.
+    let wp = m.world_projection();
+    let sea = f64::from(m.scale.sea_level_y);
+    let (zlo, zhi) = wp.z_range();
+    let step = anchor::TOP_UP_STEP_BLOCKS;
+    for ess in &p.deposits.as_ref().unwrap().essentials {
+        let r = crate::deposits::playability::Regions::in_frame(wp.index_frame(), ess.region_blocks);
+        let mut land = std::collections::BTreeSet::new();
+        let mut z = zlo.ceil() as i64;
+        while z <= zhi.floor() as i64 {
+            let mut x = -world.c / 2;
+            while x < world.c / 2 {
+                if world.height(x, z) >= sea {
+                    land.insert(r.index(x as f64, z as f64));
+                }
+                x += step;
+            }
+            z += step;
+        }
+        let held: std::collections::BTreeSet<usize> = sites
+            .iter()
+            .filter(|s| ess.counts(&s.products))
+            .filter(|s| {
+                let mine: Vec<&deeptime_format::Body> =
+                    bodies.iter().filter(|b| b.site == Some(s.id)).collect();
+                anchor::ore_top_in_column(&mine, world.c as u32, s.center[0], s.center[2]).is_some()
+            })
+            .map(|s| r.index(f64::from(s.center[0]), f64::from(s.center[2])))
+            .collect();
+        let missing: Vec<&usize> = land.difference(&held).collect();
+        assert!(
+            missing.is_empty(),
+            "{}: land regions {missing:?} of {land:?} hold no source with ore: {note}",
+            ess.material
+        );
+        assert_eq!(note["top_up"][&ess.material]["short"], 0, "{note}");
+    }
     let again = anchor::anchor_folder(&dir, &p, &mut m, None).unwrap();
     assert_eq!(again["moved"], 0, "{again}");
+    assert_eq!(again["topped_up"], 0, "{again}");
     std::fs::remove_dir_all(&dir).unwrap();
 }
 

@@ -2186,15 +2186,18 @@ impl Session {
             // written again.
             if baked {
                 let guaranteed = crate::deposits::anchor::guaranteed_of(&world.events);
-                let note =
-                    crate::deposits::anchor::anchor_folder(dir, p, &mut m, Some(&guaranteed))?;
-                if note["guaranteed"].as_u64().unwrap_or(0) > 0 {
+                let note = self.pool.install(|| {
+                    crate::deposits::anchor::anchor_folder(dir, p, &mut m, Some(&guaranteed))
+                })?;
+                if note["guaranteed"].as_u64().unwrap_or(0) > 0
+                    || note["topped_up"].as_u64().unwrap_or(0) > 0
+                {
                     self.log.push(
                         Level::Info,
                         format!(
-                            "guaranteed deposits: {} under the world's ground, {} moved (largest {} blocks), {} with ore in rock at the centre, {} under water",
+                            "guaranteed deposits: {} under the world's ground, {} moved (largest {} blocks), {} with ore in rock at the centre, {} under water; {} added where the world's regions lacked a source",
                             note["guaranteed"], note["moved"], note["largest_move_blocks"],
-                            note["centre_holds_ore"], note["under_water"]
+                            note["centre_holds_ore"], note["under_water"], note["topped_up"]
                         ),
                     );
                 }

@@ -447,6 +447,23 @@ pub struct LambdaChoice {
     pub share_3deg: f64,
 }
 
+/// The resolution of a λc search: the candidates' step, and the rings (`ring_deg` apart, each of
+/// `directions` points) the distance to land is read on.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct LambdaSearch {
+    pub step_deg: f64,
+    pub ring_deg: f64,
+    pub directions: u32,
+}
+
+/// The projection's search (SCL-087): λc in [`LAMBDA_STEP_DEG`] steps, rings 0.1° apart of 360
+/// directions.
+pub const BAKE_SEARCH: LambdaSearch = LambdaSearch {
+    step_deg: LAMBDA_STEP_DEG,
+    ring_deg: 0.1,
+    directions: 360,
+};
+
 /// The four cone points of a world of hemisphere `b` at λc = 0, (latitude, longitude) degrees.
 fn cone_points(b: u32) -> Vec<(f64, f64)> {
     PetroffGuyou::new(b, 0.0)
@@ -457,20 +474,26 @@ fn cone_points(b: u32) -> Vec<(f64, f64)> {
         .collect()
 }
 
-/// The distance to land from (lat, lon), degrees: the first ring (0.1° apart, 360 directions)
-/// holding land, [`LAND_SEARCH_DEG`] when none within it does.
-fn distance_to_land(lat: f64, lon: f64, land: &(dyn Fn([f64; 3]) -> bool + Sync)) -> f64 {
+/// The distance to land from (lat, lon), degrees: the first ring of `search` holding land,
+/// [`LAND_SEARCH_DEG`] when none within it does.
+fn distance_to_land(
+    lat: f64,
+    lon: f64,
+    land: &(dyn Fn([f64; 3]) -> bool + Sync),
+    search: LambdaSearch,
+) -> f64 {
     let c = deeptime_format::projection::unit_of_lat_lon(lat, lon);
     if land(c) {
         return 0.0;
     }
     let (e, nn) = deeptime_format::projection::local_frame(c);
-    let rings = (LAND_SEARCH_DEG / 0.1).round() as usize;
+    let rings = (LAND_SEARCH_DEG / search.ring_deg).round() as usize;
+    let turn = 360.0 / f64::from(search.directions.max(1));
     for k in 1..=rings {
-        let a = (k as f64 * 0.1).to_radians();
+        let a = (k as f64 * search.ring_deg).to_radians();
         let (sa, ca) = a.sin_cos();
-        for d in 0..360 {
-            let t = (d as f64).to_radians();
+        for d in 0..search.directions {
+            let t = (f64::from(d) * turn).to_radians();
             let (st, ct) = t.sin_cos();
             let v = [
                 c[0] * ca + (e[0] * ct + nn[0] * st) * sa,
@@ -478,35 +501,30 @@ fn distance_to_land(lat: f64, lon: f64, land: &(dyn Fn([f64; 3]) -> bool + Sync)
                 c[2] * ca + (e[2] * ct + nn[2] * st) * sa,
             ];
             if land(v) {
-                return k as f64 * 0.1;
+                return k as f64 * search.ring_deg;
             }
         }
     }
     LAND_SEARCH_DEG
 }
 
-/// Each cone point's distance to land (degrees, the layout's order) for a world of hemisphere `b`
-/// at λc `lambda_c_deg`: how a λc chosen on one land does on another.
-pub fn cone_distances(
-    b: u32,
-    lambda_c_deg: f64,
-    land: &(dyn Fn([f64; 3]) -> bool + Sync),
-) -> [f64; 4] {
-    let cones = cone_points(b);
-    let ds: Vec<f64> = cones
-        .par_iter()
-        .map(|&(lat, lon)| distance_to_land(lat, lon + lambda_c_deg, land))
-        .collect();
-    std::array::from_fn(|i| ds.get(i).copied().unwrap_or(LAND_SEARCH_DEG))
-}
-
 /// Chooses λc (`LAMBDA_STEP_DEG` steps) for a world of hemisphere `b` so the four cone points lie
 /// as far from land as possible: the largest least distance to land, then the largest sum, then
 /// the smallest λc. `land(v)` says whether the unit vector v is land.
 pub fn choose_lambda_c(b: u32, land: &(dyn Fn([f64; 3]) -> bool + Sync)) -> LambdaChoice {
+    choose_lambda_c_at(b, land, BAKE_SEARCH)
+}
+
+/// [`choose_lambda_c`] at the resolution `search`.
+pub fn choose_lambda_c_at(
+    b: u32,
+    land: &(dyn Fn([f64; 3]) -> bool + Sync),
+    search: LambdaSearch,
+) -> LambdaChoice {
     let cones = cone_points(b);
-    let n = (360.0 / LAMBDA_STEP_DEG).round() as usize;
-    let dist = |lat: f64, lon: f64| distance_to_land(lat, lon, land);
+    let step = search.step_deg;
+    let n = (360.0 / step).round() as usize;
+    let dist = |lat: f64, lon: f64| distance_to_land(lat, lon, land, search);
     // Every cone point sits at ±45° latitude; its distance to land as a function of longitude
     // is tabled once per latitude (the candidates' longitudes are a lattice).
     let lats: Vec<f64> = {
@@ -520,7 +538,7 @@ pub fn choose_lambda_c(b: u32, land: &(dyn Fn([f64; 3]) -> bool + Sync)) -> Lamb
         .map(|&lat| {
             (0..n)
                 .into_par_iter()
-                .map(|k| dist(lat, k as f64 * LAMBDA_STEP_DEG))
+                .map(|k| dist(lat, k as f64 * step))
                 .collect()
         })
         .collect();
@@ -529,14 +547,13 @@ pub fn choose_lambda_c(b: u32, land: &(dyn Fn([f64; 3]) -> bool + Sync)) -> Lamb
             .iter()
             .position(|&l| (l - lat).abs() < 1e-6)
             .unwrap_or(0);
-        let k =
-            ((deeptime_format::projection::wrap_deg(lon) / LAMBDA_STEP_DEG).round() as usize) % n;
+        let k = ((deeptime_format::projection::wrap_deg(lon) / step).round() as usize) % n;
         tables[t][k]
     };
     let mut best: Option<(f64, f64, f64, [f64; 4])> = None;
     let (mut at_sea, mut at_3) = (0usize, 0usize);
     for k in 0..n {
-        let lc = k as f64 * LAMBDA_STEP_DEG;
+        let lc = k as f64 * step;
         let ds: [f64; 4] = std::array::from_fn(|i| lookup(cones[i].0, cones[i].1 + lc));
         let mn = ds.iter().cloned().fold(f64::INFINITY, f64::min);
         let sum: f64 = ds.iter().sum();
@@ -565,27 +582,38 @@ pub fn choose_lambda_c(b: u32, land: &(dyn Fn([f64; 3]) -> bool + Sync)) -> Lamb
 }
 
 /// The world's hemisphere and λc for preset `p`, given the land test (the auto choice when the
-/// preset says −1).
-pub fn world_of(
+/// preset says −1, at the resolution `search`).
+pub fn world_of_at(
     p: &PlanetPreset,
     land: &(dyn Fn([f64; 3]) -> bool + Sync),
+    search: LambdaSearch,
 ) -> (PetroffGuyou, Option<LambdaChoice>) {
     let b = PetroffGuyou::hemisphere_for(p.scale.circumference_blocks);
     if p.scale.lambda_c_deg == LAMBDA_C_AUTO {
-        let ch = choose_lambda_c(b, land);
+        let ch = choose_lambda_c_at(b, land, search);
         (PetroffGuyou::new(b, ch.lambda_c_deg), Some(ch))
     } else {
         (PetroffGuyou::new(b, p.scale.lambda_c_deg), None)
     }
 }
 
-/// The record of a λc choice (`notes.bake.projection.lambda_c`, the deposit census's
-/// `world_frame.lambda_c`): what [`choose_lambda_c`] found, or that the preset set λc.
-pub fn lambda_note(choice: Option<&LambdaChoice>) -> Value {
+/// The world's hemisphere and λc for preset `p`, given the land test (the auto choice when the
+/// preset says −1).
+pub fn world_of(
+    p: &PlanetPreset,
+    land: &(dyn Fn([f64; 3]) -> bool + Sync),
+) -> (PetroffGuyou, Option<LambdaChoice>) {
+    world_of_at(p, land, BAKE_SEARCH)
+}
+
+/// The record of a λc choice at the resolution `search` (`notes.bake.projection.lambda_c`, the
+/// deposit census's `world_frame.lambda_c`): what [`choose_lambda_c_at`] found, or that the
+/// preset set λc.
+pub fn lambda_note(choice: Option<&LambdaChoice>, search: LambdaSearch) -> Value {
     match choice {
         Some(ch) => json!({
             "chosen": true,
-            "step_deg": LAMBDA_STEP_DEG,
+            "step_deg": search.step_deg,
             "min_distance_to_land_deg": ch.min_distance_deg,
             "cone_distances_deg": ch.distances_deg,
             "share_all_at_sea": ch.share_at_sea,
@@ -593,22 +621,6 @@ pub fn lambda_note(choice: Option<&LambdaChoice>) -> Value {
         }),
         None => json!({"chosen": false, "set_by": "scale.lambda_c_deg"}),
     }
-}
-
-/// The λc the deposit stage chose for this world (`notes.deposits.world_frame`, DEP-220), when it
-/// chose one: the playability pass counted its regions in the world drawn with it, so the
-/// projection draws the world with it.
-pub fn recorded_lambda_c(m: &Manifest) -> Option<f64> {
-    let wf = m
-        .notes
-        .get(crate::deposits::STAGE_NAME)?
-        .get("world_frame")?;
-    if wf["projection"] != json!("petroff_guyou") || wf["lambda_c"]["chosen"] != json!(true) {
-        return None;
-    }
-    wf["lambda_c_deg"]
-        .as_f64()
-        .filter(|l| l.is_finite() && (0.0..360.0).contains(l))
 }
 
 /// Bytes per cell of the layers the bake writes on each grid (level, name, bytes), summed over the
@@ -1161,39 +1173,8 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         raw * elev_src.desc.scale + elev_src.desc.offset >= sea
     };
     let t = Instant::now();
-    // The λc the deposit stage chose and counted the essentials' regions in (DEP-220), when the
-    // preset leaves λc to the run; else the choice on the baked land.
-    let b_world = PetroffGuyou::hemisphere_for(c_sim);
-    let recorded = (p.scale.lambda_c_deg == LAMBDA_C_AUTO)
-        .then(|| recorded_lambda_c(m))
-        .flatten()
-        .filter(|_| {
-            m.notes[crate::deposits::STAGE_NAME]["world_frame"]["hemisphere_blocks"]
-                == json!(b_world)
-        });
-    let (g, lambda_c_note) = match recorded {
-        Some(lc) => {
-            // How the deposit stage's λc does on the baked land, beside its record of the
-            // choice on its own.
-            let ds = cone_distances(b_world, lc, &land);
-            let chosen = &m.notes[crate::deposits::STAGE_NAME]["world_frame"]["lambda_c"];
-            let note = json!({
-                "chosen": true,
-                "chosen_by": "deposits",
-                "step_deg": LAMBDA_STEP_DEG,
-                "min_distance_to_land_deg": ds.iter().cloned().fold(f64::INFINITY, f64::min),
-                "cone_distances_deg": ds,
-                "share_all_at_sea": chosen["share_all_at_sea"],
-                "share_all_3deg_from_land": chosen["share_all_3deg_from_land"],
-                "at_deposits": chosen,
-            });
-            (PetroffGuyou::new(b_world, lc), note)
-        }
-        None => {
-            let (g, choice) = world_of(p, &land);
-            (g, lambda_note(choice.as_ref()))
-        }
-    };
+    let (g, choice) = world_of(p, &land);
+    let lambda_c_note = lambda_note(choice.as_ref(), BAKE_SEARCH);
     let lambda_ms = ms(t);
     let b = g.hemisphere();
     let stretch_r = m.grids.get("L1").map_or(16, |g| g.r);

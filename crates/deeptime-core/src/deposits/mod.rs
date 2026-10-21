@@ -2338,8 +2338,8 @@ impl DepositStage {
             // continental interiors at the first step.
             "bif_basins": world.globals.get(crate::surface::BIF_BASINS_GLOBAL),
             "bif_basin_share": world.globals.get(crate::surface::BIF_BASIN_SHARE_GLOBAL),
-            // The world the playability pass counted regions in; a Petroff–Guyou world's λc is
-            // chosen here and kept by the projection (`bake::project::recorded_lambda_c`).
+            // The world the playability pass counted regions in: for a Petroff–Guyou world the
+            // stage's forecast of the λc the projection chooses (DEP-220).
             "world_frame": frame_note,
             "province": self.params.province.name(),
             "province_km": self.params.province_km,
@@ -3600,14 +3600,21 @@ impl DepositStage {
     }
 
     /// The world the playability pass counts its regions in ([`WorldFrame`]): the simulation's
-    /// own frame for a Lambert planet (and a synthetic history), else the Petroff–Guyou world
-    /// with the λc the world will be drawn with. The λc is chosen here, by the bake's own rule
-    /// (`bake::project::world_of`: the cone points as far from land as possible) on the present
-    /// L1 land, and the projection keeps it (`bake::project::recorded_lambda_c`): chosen there
-    /// on the baked L3 land it moved with small coastal changes, and the regions the pass filled
-    /// were not the world's (DEP-220). Returns the frame and its record for the census.
+    /// own frame for a Lambert planet (and a synthetic history, or no essentials to place), else
+    /// the Petroff–Guyou world as the stage forecasts it. The projection chooses λc on the baked
+    /// land (`bake::project::world_of`, SCL-087), which the young landscape and the amplifier have
+    /// yet to draw, so the stage applies the same rule to its present L1 land at a coarser
+    /// resolution ([`FORECAST_SEARCH`]); where the forecast misses, the anchor's top-up adds the
+    /// sources the world's own regions lack (`anchor::top_up`, DEP-220). Returns the frame and
+    /// its record for the census.
     fn world_frame(&self, f: &Finish, ctx: &StageContext<'_>) -> (WorldFrame, Value) {
         let src = deeptime_format::Projection::new(f.c as u32);
+        if self.params.essentials.is_empty() {
+            return (
+                WorldFrame::Lambert(src),
+                json!({"projection": "lambert", "why": "no essentials"}),
+            );
+        }
         let Some(p) = self.planet.as_deref().filter(|p| {
             p.scale.projection == deeptime_format::projection::ProjectionKind::PetroffGuyou
         }) else {
@@ -3622,13 +3629,14 @@ impl DepositStage {
         };
         let (g, choice) = ctx
             .pool
-            .install(|| crate::bake::project::world_of(p, &land));
+            .install(|| crate::bake::project::world_of_at(p, &land, FORECAST_SEARCH));
         let note = json!({
             "projection": "petroff_guyou",
             "hemisphere_blocks": g.hemisphere(),
             "lambda_c_deg": g.lambda_c_deg(),
             "land": "present L1 elevation at or above sea level, nearest cell",
-            "lambda_c": crate::bake::project::lambda_note(choice.as_ref()),
+            "forecast": true,
+            "lambda_c": crate::bake::project::lambda_note(choice.as_ref(), FORECAST_SEARCH),
         });
         (WorldFrame::PetroffGuyou { g, src }, note)
     }
@@ -3649,33 +3657,45 @@ impl DepositStage {
         let mut fits: BTreeMap<(usize, bool, u32), HostFit> = BTreeMap::new();
         let mut scratch = deeptime_format::structure::DeformScratch::default();
         let t_world = world.t_years;
-        // The land cells at least INLAND_MARGIN_BLOCKS from the sea: the present L1 coast is
-        // not the world's (the young landscape and the amplifier redraw it), and where every
-        // cell of a region scored alike the first land cell in index order won, at the coast
-        // or the pole; 6 of a planet's 8 guaranteed iron deposits lay under the world's sea.
-        let inland = if self.params.essentials.is_empty() {
-            Vec::new()
-        } else {
-            inland_cells(&f.grid, &f.elev, INLAND_MARGIN_BLOCKS)
-        };
+        if self.params.essentials.is_empty() {
+            return Ok(());
+        }
         // Where each land cell lands in the world (NaN at sea), once for every essential.
-        let world_xz: Vec<(f64, f64)> = if self.params.essentials.is_empty() {
-            Vec::new()
-        } else {
-            ctx.pool.install(|| {
-                (0..f.grid.cells())
-                    .into_par_iter()
-                    .map(|cell| {
-                        if f.elev[cell] < 0.0 {
-                            (f64::NAN, f64::NAN)
-                        } else {
-                            let (x, z) = cluster::cell_xz(&f.grid, cell as u32);
-                            frame.to_world(x, z)
-                        }
-                    })
-                    .collect()
+        let world_xz: Vec<(f64, f64)> = ctx.pool.install(|| {
+            (0..f.grid.cells())
+                .into_par_iter()
+                .map(|cell| {
+                    if f.elev[cell] < 0.0 {
+                        (f64::NAN, f64::NAN)
+                    } else {
+                        let (x, z) = cluster::cell_xz(&f.grid, cell as u32);
+                        frame.to_world(x, z)
+                    }
+                })
+                .collect()
+        });
+        // The world's x period, blocks.
+        let world_c = frame.regions(ESSENTIAL_REGION_PROBE).c;
+        // The land cells at least INLAND_MARGIN_BLOCKS of the world from the sea (DEP-222): the
+        // present L1 coast is not the world's (the young landscape and the amplifier redraw
+        // it), and where every cell of a region scored alike the first land cell in index order
+        // won, at the coast or the pole; 6 of a planet's 8 guaranteed iron deposits lay under
+        // the world's sea. A Petroff–Guyou world's blocks per simulation block vary with the
+        // place, so each cell's distance is scaled by its own.
+        let scale = world_scale(&f.grid, &world_xz, world_c);
+        let inland = inland_cells_scaled(&f.grid, &f.elev, INLAND_MARGIN_BLOCKS, &scale);
+        // Where the player starts, as the bake picks it (`synth::spawn_candidates`): the land
+        // nearest the simulation's (0, 0), drawn into the world (DEP-222).
+        let spawn = (0..f.grid.cells())
+            .filter(|&cell| f.elev[cell] >= 0.0)
+            .min_by(|&a, &b| {
+                let d = |cell: usize| {
+                    let (x, z) = cluster::cell_xz(&f.grid, cell as u32);
+                    x * x + z * z
+                };
+                d(a).total_cmp(&d(b)).then(a.cmp(&b))
             })
-        };
+            .map_or_else(|| frame.to_world(0.0, 0.0), |cell| world_xz[cell]);
         // The guaranteed bodies placed so far, every essential's: (x, z, radius), blocks.
         let mut taken: Vec<(f64, f64, f64)> = Vec::new();
         for ess in &self.params.essentials {
@@ -3731,7 +3751,7 @@ impl DepositStage {
                 let mut short = ess.min_sites_per_region.saturating_sub(count);
                 while short > 0 {
                     // The best (type, land cell) in the region, with its host fit: the highest
-                    // score, then the cell nearest the world's centre, where the player starts
+                    // score, then the cell nearest the world's spawn, where the player starts
                     // (DEP-222; the first cell in index order broke ties before, at the region's
                     // edge or the pole). Inland cells first (`inland`), any land cell when the
                     // region has none. The candidates are ranked first so the separation and
@@ -3749,8 +3769,8 @@ impl DepositStage {
                                     continue;
                                 }
                                 let score = a.favourability() + 1.0e-3 * f64::from(a.f_max);
-                                let from_centre = cluster::wrap_x(regions.c, wx).hypot(wz);
-                                ranked.push((score, from_centre, k, cell as u32));
+                                let from_spawn = cluster::distance(regions.c, (wx, wz), spawn);
+                                ranked.push((score, from_spawn, k, cell as u32));
                             }
                         }
                         // Stable: full ties keep the producer and index order.
@@ -4083,17 +4103,87 @@ fn union_aabb(bodies: &[Body]) -> [[i32; 3]; 2] {
     [lo, hi]
 }
 
+/// The resolution of the stage's forecast of the projection's λc ([`DepositStage::world_frame`]):
+/// candidates 1° apart, rings 0.5° apart of 72 directions (game-choice, DEP-220: the forecast is
+/// read on land the young landscape and the amplifier redraw, and the bake's 0.25°, 0.1° and 360
+/// directions cost the stage 0.8 s on a full planet).
+pub const FORECAST_SEARCH: crate::bake::project::LambdaSearch = crate::bake::project::LambdaSearch {
+    step_deg: 1.0,
+    ring_deg: 0.5,
+    directions: 72,
+};
+
 /// How far inland (blocks, simulation frame) the playability pass looks first for a guaranteed
 /// deposit's cell. game-choice (coordinator, 2026-10-20, DEP-222): two L1 cells at 16k, the
 /// distance the young landscape and the amplifier move a coast; a region with no such cell
 /// takes any land cell.
 pub const INLAND_MARGIN_BLOCKS: f64 = 128.0;
 
+/// A region size the playability pass reads the world's x period from ([`WorldFrame::regions`]).
+const ESSENTIAL_REGION_PROBE: u32 = 4096;
+
+/// The smallest world blocks per simulation block [`inland_cells_scaled`] reads distances with
+/// (the cone points of a Petroff–Guyou world shrink the land to nothing): it bounds the search.
+const MIN_WORLD_SCALE: f64 = 0.25;
+
+/// Each cell's world blocks per simulation block on `grid`, from where its cells land in the
+/// world (`world_xz`, NaN at sea; x wrapping with the world's period `world_c`): the least of
+/// the distances to its land neighbours over the cells' spacing (the least, as two neighbours
+/// can fall on two sides of a cut of the world), 1 for a cell with no land neighbour.
+pub fn world_scale(grid: &GridDesc, world_xz: &[(f64, f64)], world_c: f64) -> Vec<f64> {
+    let (w, h) = (grid.w as i64, grid.h as i64);
+    let r = f64::from(grid.r.max(1));
+    (0..world_xz.len())
+        .into_par_iter()
+        .map(|i| {
+            let a = world_xz[i];
+            if !a.0.is_finite() {
+                return 1.0;
+            }
+            let (x, z) = (i as i64 % w, i as i64 / w);
+            let mut best = f64::INFINITY;
+            for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let nz = z + dz;
+                if nz < 0 || nz >= h {
+                    continue;
+                }
+                let nx = if grid.wraps_x {
+                    (x + dx).rem_euclid(w)
+                } else if x + dx < 0 || x + dx >= w {
+                    continue;
+                } else {
+                    x + dx
+                };
+                let b = world_xz[(nz * w + nx) as usize];
+                if b.0.is_finite() {
+                    best = best.min(cluster::distance(world_c, a, b) / r);
+                }
+            }
+            if best.is_finite() { best } else { 1.0 }
+        })
+        .collect()
+}
+
 /// The land cells (elevation at or above sea level) at least `margin` blocks from every sea cell
 /// on `grid` (Chebyshev distance in cells, x wrapping, z clamping).
 pub fn inland_cells(grid: &GridDesc, elev: &[f32], margin: f64) -> Vec<bool> {
+    inland_cells_scaled(grid, elev, margin, &vec![1.0; elev.len()])
+}
+
+/// The land cells at least `margin` world blocks from every sea cell on `grid`: a cell's
+/// Chebyshev distance in cells to the sea, times the cells' spacing and its own world blocks per
+/// simulation block (`scale`, [`world_scale`]), at least `margin`. The search stops past the
+/// distance [`MIN_WORLD_SCALE`] needs; a cell farther than that is inland.
+pub fn inland_cells_scaled(grid: &GridDesc, elev: &[f32], margin: f64, scale: &[f64]) -> Vec<bool> {
     let (w, h) = (grid.w as usize, grid.h as usize);
-    let k = (margin / f64::from(grid.r.max(1))).ceil().max(0.0) as u32;
+    let r = f64::from(grid.r.max(1));
+    let least = scale
+        .iter()
+        .copied()
+        .filter(|s| s.is_finite() && *s > 0.0)
+        .fold(f64::INFINITY, f64::min)
+        .clamp(MIN_WORLD_SCALE, 1.0);
+    let k = (margin / (r * least)).ceil().max(0.0) as u32;
     let mut dist = vec![u32::MAX; w * h];
     let mut queue = std::collections::VecDeque::new();
     for (i, &e) in elev.iter().enumerate().take(w * h) {
@@ -4130,7 +4220,10 @@ pub fn inland_cells(grid: &GridDesc, elev: &[f32], margin: f64) -> Vec<bool> {
             }
         }
     }
-    dist.into_iter().map(|d| d >= k && d != 0).collect()
+    dist.into_iter()
+        .enumerate()
+        .map(|(i, d)| d != 0 && (d == u32::MAX || f64::from(d) * r * scale[i] >= margin))
+        .collect()
 }
 
 /// The sites of a type in a world (tests and the CLI).
