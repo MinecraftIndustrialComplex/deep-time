@@ -756,8 +756,79 @@ notes):
   coal), and no higher than it for the others (a body the history buried deeper stays). An
   in-stratum body (MVT) stays in its host horizon, where the bake and the projection keep it
   (ORE-271), and a placer where `placer_channels` settled it; natural bodies keep their physics.
+  The top of the ore is the highest block of the site's centre column where one of its bodies
+  places ore (a zone with a material), not the top of the body's box: the box is padded a block or
+  two past the ore, and anchoring the box left the ore 1 to 2 blocks under the top rock block in
+  the first column check.
 
-GUARANTEED_MEASUREMENTS
+Measured on the VM (2026-10-21), master 3ecea5b9 against the branch at d6ba612a (the same
+simulation and bake but for this task: the master merged in between, f58eb30d, touched only the
+viewer's water view), with `tools/review/carbonate-ensemble.sh` (`deeptime run`, `strata-check`
+and `deeptime deposit-audit` with its access probe) and `tools/review/essentials-table.py
+--guaranteed`. The branch's audit read both builds' worlds, so master's regions are counted on the
+world's own frame too. "Guaranteed with ore": the guaranteed sources that place at least one ore
+block of the material in the world as generated (the audit's own count), of the guaranteed
+sources; a SEDEX counts for both lead and zinc. "Regions": the world's land regions of the
+essential's size holding a source, and in brackets one holding ore. "Spawn": the distance from the
+first spawn candidate to the nearest source holding ore, median and range over the planets.
+"Access p50": the access probe's median range from random land points to gather its need of the
+material from the top blocks under the ground.
+
+earthlike_quick_16k, 1,000 Myr, supercontinent and scattered continents seeds 1 to 3 (six planets
+a build):
+
+| essential | guaranteed with ore, master | branch | regions, master | branch | planets with every land region holding ore, master | branch | spawn, master | branch | access p50, master | branch |
+|---|---|---|---|---|---|---|---|---|---|---|
+| iron | 8 of 48 | 48 of 48 | 30 (7) of 43 | 44 (44) of 44 | 0 of 6 | 6 of 6 | 3,817 [1,313, 6,350] | 1,234 [180, 1,628] | 104 | 104 |
+| coal | 11 of 12 | 10 of 10 | 41 (41) of 43 | 44 (44) of 44 | 4 of 6 | 6 of 6 | 322 [133, 1,029] | 478 [174, 2,179] | 48 | 48 |
+| lead | 0 of 5 | 6 of 6 | 11 (5) of 12 | 12 (11) of 12 | 1 of 6 | 5 of 6 | 4,155 [1,571, 6,716] | 3,071 [2,224, 4,140] | 1,168 | 1,152 |
+| zinc | 0 of 5 | 6 of 6 | 11 (7) of 12 | 12 (12) of 12 | 2 of 6 | 6 of 6 | 3,335 [1,571, 5,472] | 3,071 [2,224, 4,140] | 992 | 1,000 |
+| copper | 1 of 1 | 1 of 1 | 12 (12) of 12 | 12 (12) of 12 | 6 of 6 | 6 of 6 | 1,934 [579, 3,231] | 2,032 [584, 3,230] | 104 | 104 |
+| gold | none | none | 12 (12) of 12 | 12 (12) of 12 | 6 of 6 | 6 of 6 | 823 [260, 2,308] | 930 [263, 2,315] | none | none |
+
+earthlike_full_16k, 1,000 Myr, scattered continents seed 1 (the two builds side by side): iron's 8
+guaranteed bodies hold ore in all 8 (2 on master), every one of its 7 land regions holds iron with
+ore (5 with a source and 2 with ore on master), and the spawn's nearest iron with ore is 1,393
+blocks away (4,580 on master, whose nearest iron of any kind was 2,348). Its 2 guaranteed coal
+seams held ore on both builds; lead, zinc, copper and gold needed no guarantee there (natural
+sources hold ore in both 8,192-block regions), so they did not change: spawn 499 blocks to lead
+and zinc, 1,376 to copper, 1,459 to gold, access p50 coal 56, iron and copper 104, lead 1,224
+(1,208 on master), zinc 824.
+
+- **Every guaranteed body holds ore**, 65 of 65 on the six quick planets (master 20 of 66) and 10
+  of 10 on the full one (master 4 of 10). The pass moved 9 to 13 a planet, 31 to 73 blocks at
+  most; one or two a planet lie under water, anchored at the bed.
+- **The column check** (`deeptime inspect-column` at the centre of each of the full planet's 10
+  guaranteed sites, d6ba612a): on dry land the ore's top block is the ground less 4 every time
+  (the iron formation at 156 under ground 160, 75 under 79, 86 under 90, 94 under 98, 165 under
+  169, 123 under 127, 190 under 194; the coal seams' top beds at 179 under 183 and 75 under 79),
+  and the iron body under the sea at (6232, 1324) tops out at the bed, 35, with the iron
+  formation 35 to 33 over shale. The same check on e63eb159, before the exact top, found the ore
+  1 to 2 blocks under the top rock block (an iron formation at 129 to 127 under rock 131).
+- **What the guarantee still trusts**: natural sources. It counts them at the deposit stage, and
+  the bake moves them afterwards like the guaranteed ones. On one quick planet of six
+  (supercontinent seed 3) the western 8,192-block region's lead sources were a natural MVT body
+  whose host horizon the bake left at the sea floor (no host rock in its zone, no ore) and a
+  natural SEDEX whose centre the bake lifted 5 blocks above the ground (6 zinc blocks, no lead),
+  so the region counted as covered and holds no lead a player can mine. Natural bodies keep their
+  physics in this task; checking natural sources in the world would need the guarantee to run
+  after the bake.
+- **Spawn distances** move with λc as much as with the guarantee (the world's spawn is not the
+  same place when the world turns), so per planet they are not a paired comparison. Iron's and
+  lead's nearest source holding ore came closer on the median; coal's median went from 322 to 478
+  blocks (one planet whose λc turned by 183 degrees has its nearest coal 2,179 blocks away).
+- **The stage time (P1-19).** On the full planet, master and the branch run side by side on the
+  loaded VM: the projection's λc search fell from 825 to 7 ms (on the quick planets from 649 to
+  1,354 ms to 4 to 8 ms), the deposit stage rose from 47.0 to 48.1 s (its `world_frame` lap 0.8
+  s), the stages' sum went from 1,012 to 1,009 s, and the anchor pass reads 10 centre columns and
+  rewrites two files, well under a second. No measurable change to the full planet's time.
+- **λc and the cone points.** The stage chooses λc on its present L1 land, which the young
+  landscape and the amplifier then redraw, so the bake's measure of the cone points' distance
+  from the final land fell on all seven planets: full 131.25 to 131.00 degrees, 0.70 to 0.60
+  degrees from land; quick supercontinent 124.25 to 124.75 (4.0 to 3.8), 108.00 to 134.75 (9.6 to
+  6.9), 33.00 to 34.25 (11.8 to 11.0); scattered continents 57.50 to 56.75 (5.8 to 5.3), 25.50 to
+  26.75 (6.1 to 5.4), 71.25 to 254.25 (7.1 to 5.8). That is the price of counting regions in the
+  world before the world exists; a preset's own λc serves both.
 
 ## Simplifications and limits
 
