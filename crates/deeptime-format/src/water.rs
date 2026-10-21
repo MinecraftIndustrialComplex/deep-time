@@ -144,6 +144,25 @@ pub fn top_block(h: f64) -> i32 {
     (h.ceil() as i64 - 1).clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
 }
 
+/// Step 3's test, the one place the sea's rule is written (ledger: HYD-106): the open sea stands on
+/// a column whose top block `ground` is under sea level − 1 (a column whose top block is the
+/// block under the sea's top is dry, so the water has at least one block to be: the 35 m band of
+/// HYD-107) unless the `closed_basin` layer keeps it off (`closed`, read only where the first test
+/// passes).
+///
+/// The game's column evaluator ([`core_with_surface`]), the bake's projection pass (the biome
+/// layers' land call: `bake::project`, via [`sea_covers_height`]) and Java's `Water.seaCovers` all
+/// read this one rule, so the sea, the far terrain and the biomes cannot name different columns.
+pub fn sea_covers(ground: i32, sea_level_y: i32, closed: impl FnOnce() -> bool) -> bool {
+    ground < sea_level_y - 1 && !closed()
+}
+
+/// [`sea_covers`] for a terrain height `h` (blocks) at a column: its top block is
+/// [`top_block`]`(h)`.
+pub fn sea_covers_height(h: f64, sea_level_y: i32, closed: impl FnOnce() -> bool) -> bool {
+    sea_covers(top_block(h), sea_level_y, closed)
+}
+
 /// H bilinear between the corners of the noise cell holding column (wx, z).
 pub fn cell_surface(src: &dyn WaterSource, spec: &WaterSpec, wx: i64, z: i64) -> f64 {
     let c = spec.cell;
@@ -193,10 +212,9 @@ pub fn core_with_surface(
             return out;
         }
     }
-    let sea_top = spec.sea_level_y - 1;
-    if ground < sea_top && !src.closed(wx, z) {
+    if sea_covers(ground, spec.sea_level_y, || src.closed(wx, z)) {
         out.kind = WaterKind::Sea;
-        out.top = sea_top;
+        out.top = spec.sea_level_y - 1;
         out.bed = ground;
         return out;
     }
@@ -411,6 +429,52 @@ mod tests {
         // Outside the layer the old rule holds: ground below sea level is sea.
         let sea = column(&t, &s, 1024, 300, 300);
         assert_eq!((sea.kind, sea.top), (WaterKind::Sea, Some(62)));
+    }
+
+    #[test]
+    fn the_sea_rule_is_one_function_and_the_column_evaluator_reads_it() {
+        // HYD-106: the top block under sea level - 1, not closed. Sea level 63: ground 61 is sea,
+        // 62 (a column whose top block is the sea's top) is dry.
+        assert!(sea_covers(61, 63, || false));
+        assert!(!sea_covers(62, 63, || false));
+        assert!(
+            !sea_covers(61, 63, || true),
+            "the closed basin keeps it off"
+        );
+        // The closed flag is read only where the ground passes the first test.
+        assert!(!sea_covers(70, 63, || panic!(
+            "read where the ground is high"
+        )));
+        // Heights: H <= sea - 1 is sea (top block ceil(H) - 1 <= sea - 2), the band above it is not.
+        assert!(sea_covers_height(62.0, 63, || false));
+        assert!(sea_covers_height(61.5, 63, || false));
+        assert!(
+            !sea_covers_height(62.01, 63, || false),
+            "ceil(62.01) - 1 = 62"
+        );
+        assert!(!sea_covers_height(63.0, 63, || false));
+        assert!(!sea_covers_height(62.0, 63, || true));
+        // The evaluator and the rule name the same columns on the toy world, over every kind of
+        // ground it has (plain, basin, closed bowl, sea), closed or not.
+        let t = toy();
+        let s = WaterSpec::planet(63, -352, 639);
+        for (x, z) in [
+            (300, 300),
+            (0, 300),
+            (300, 100),
+            (316, 100),
+            (-100, 0),
+            (60, 150),
+        ] {
+            let c = core(&t, &s, 1024, x, z);
+            let by_rule = sea_covers_height(t.height(x, z), 63, || t.closed(x, z));
+            let lake = c.kind == WaterKind::Lake;
+            assert!(
+                lake || (c.kind == WaterKind::Sea) == by_rule,
+                "({x}, {z}): {:?} vs the rule {by_rule}",
+                c.kind
+            );
+        }
     }
 
     #[test]

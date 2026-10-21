@@ -78,6 +78,16 @@ public final class Water {
         return (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, t));
     }
 
+    /**
+     * Step 3's test, the one place the sea's rule is written (Rust {@code water::sea_covers}, ledger
+     * HYD-106): the open sea stands on a column whose top block {@code ground} is under sea level - 1,
+     * unless the {@code closed_basin} layer keeps it off ({@code closed}, read only where the first
+     * test passes). {@link #core} reads it; the bake's biome layers read the Rust twin.
+     */
+    public static boolean seaCovers(int ground, int seaLevel, java.util.function.BooleanSupplier closed) {
+        return ground < seaLevel - 1 && !closed.getAsBoolean();
+    }
+
     static long wrap(WorldData wd, long x) {
         long c = wd.circumference();
         return Math.floorMod(x + c / 2, c) - c / 2;
@@ -145,10 +155,9 @@ public final class Water {
             if (ground < t)
                 return new Core(Kind.LAKE, surface, ground, level, t, ground, rivers);
         }
-        int seaTop = spec.seaLevel() - 1;
         // No sea in a closed basin below sea level (HYD-100; Rust WaterSource::closed).
-        if (ground < seaTop && !wd.closedBasin(wx, z))
-            return new Core(Kind.SEA, surface, ground, level, seaTop, ground, rivers);
+        if (seaCovers(ground, spec.seaLevel(), () -> wd.closedBasin(wx, z)))
+            return new Core(Kind.SEA, surface, ground, level, spec.seaLevel() - 1, ground, rivers);
         Rivers.Hit h = rivers.hit();
         if (h != null) {
             int t = topBlock(h.w());

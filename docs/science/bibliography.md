@@ -1162,7 +1162,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Charette, M. A. and Smith, W. H. F. (2010). The volume of Earth's ocean. Oceanography 23(2):112-114.
 - DOI or URL: (ERO, ISO, HYP) 10.5670/oceanog.2010.51; open PDF https://tos.org/oceanography/assets/docs/23-2_charette.pdf. (PLT) 10.5670/oceanog.2010.51.
 - Cited as: (ERO, ISO, HYP) "Charette & Smith 2010, Oceanography 23(2):112-114 (ocean volume and mean depth on SRTM30_PLUS)". (PLT) "Charette & Smith 2010, Oceanography 23(2):112-114" (sea mean 3,682 m; 361.84 million km2 = 70.9 percent).
-- Ledger ids: HYP-007, PLT-097, PLT-169, PLT-170
+- Ledger ids: HYP-007, PLT-097, PLT-169, PLT-170, PLT-362 (2026-10-21: Earth's water for the volume-balanced sea level's test numbers; the ocean's 1.332e9 km3 cited, not re-read)
 - Access: open access. [other sections: open access (Oceanography Society).]
 - Library (the project's source library, not distributed): fetched (PDF, 3 pages, text layer, 10,430 characters). From: https://tos.org/oceanography/assets/docs/23-2_charette.pdf. Text file: CharetteSmith2010.txt.
 - Merged keys: Charette2010
@@ -1218,7 +1218,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Tozer, B., Sandwell, D. T., Smith, W. H. F., Olson, C., Beale, J. R. and Wessel, P. (2019). Global bathymetry and topography at 15 arc sec: SRTM15+. Earth and Space Science 6(10):1847-1864.
 - DOI or URL: (ERO, ISO, HYP) 10.1029/2019EA000658 (gold open access; DOAJ record https://doaj.org/article/95db1757cac2402aaa9c72408bdc82ed). (MOI, BIO) https://doi.org/10.1029/2019EA000658 (gold open access) (PLT) 10.1029/2019EA000658 (open access in Wiley). (CLM) 10.1029/2019EA000658
 - Cited as: (ERO, ISO, HYP) "Tozer et al. 2019" (SRTM15+) in build log 2026-10-01. (MOI, BIO) "GMT earth_relief (SRTM15+, Tozer et al. 2019)" (PLT) "Tozer et al. 2019 (SRTM15+, GMT earth_relief 30 arc-minute)".
-- Ledger ids: HYP-001 to HYP-011, HYP-032, PLT-168, PLT-170; none (relief used in the Earth comparisons); notes: as the dataset behind GMT earth_relief; relief used in the Earth comparisons; HYP-035 (2026-10-20: the median distance from land to the coast on the model's sampling, computed on earth_relief_15m_p)
+- Ledger ids: HYP-001 to HYP-011, HYP-032, PLT-168, PLT-170; none (relief used in the Earth comparisons); notes: as the dataset behind GMT earth_relief; relief used in the Earth comparisons; HYP-035 (2026-10-20: the median distance from land to the coast on the model's sampling, computed on earth_relief_15m_p); PLT-360 (2026-10-21: the coastal high ground, the hypsometry and the highest 1,000 km box, computed on earth_relief_15m_p by tools/review/continents_census.py)
 - Access: open access. [other sections: open access (Wiley/AGU). / not checked (journal is open access)]
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): (ERO, ISO, HYP) no record. (MOI, BIO) used as data (PLT) numbers computed by the project from the GMT grid. (CLM) data used
@@ -3787,8 +3787,8 @@ Vanilla's OverworldBiomeBuilder, Terralith, Tectonic (game and mod data), rustff
 ### Laske2013 (CRUST1.0)
 - Reference: Laske, G., Masters, G., Ma, Z., Pasyanos, M., 2013. Update on CRUST1.0: A 1-degree Global Model of Earth's Crust. Geophysical Research Abstracts 15, EGU2013-2658 (EGU General Assembly abstract). Model: CRUST1.0, 1 x 1 degree, eight layers (water, ice, three sediment layers, upper, middle and lower crystalline crust) over the mantle.
 - DOI or URL: https://igppweb.ucsd.edu/~gabi/crust1.html ; data http://igppweb.ucsd.edu/~gabi/crust1/crust1.0.tar.gz (crust1.bnds: the top of each layer, km)
-- Cited as: "CRUST1.0 (Laske, Masters, Ma & Pasyanos 2013)" (tools/review/earth-crust.py)
-- Ledger ids: HYP-040, HYP-041
+- Cited as: "CRUST1.0 (Laske, Masters, Ma & Pasyanos 2013)" (tools/review/earth-crust.py, tools/review/continents_census.py)
+- Ledger ids: HYP-040, HYP-041, PLT-361 (2026-10-21: the continental crust's drowned share, shelf and thickness by cut)
 - Access: open (data files)
 - Library (the project's source library, not distributed): the model's data, fetched 2026-10-20 to the land-shape task's scratch folder on the test VM; the abstract was not fetched.
 - Read so far (by the project): the data read and measured (tools/review/earth-crust.py); the abstract is cited from the model's own page, not read (from-memory).
@@ -4658,6 +4658,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Reference check: matches. The paper's CO2 range for termination is 10^4 to 10^5 ppm, and the ~1 km of sea level is stated as an assumption (see Part 2).
 
 - Read in WP-14a (2026-10-02): Read WP-14a: terminations at 10^4 to 10^5 ppm (p. 3 of 43); cloud radiative forcing >= 10 W/m2 and cloud-free FOAM never deglaciating (p. 10 of 43) (CLM-166).
+- 2026-10-21 (plates.md, "White patches, drowned continents and coastal high ground"): the Cryogenian's two glaciations' dates (Sturtian about 717 to 660 Ma, Marinoan about 650 to 635 Ma) are cited beside it from memory; not read in it (the library copy was not found on the rebuilt VM).
 ### Nye1952
 - Reference: Nye, J. F. (1952). The mechanics of glacier flow. Journal of Glaciology 2(12): 82-93.
 - DOI or URL: 10.3189/S0022143000033967
@@ -7176,3 +7177,23 @@ The sources named for a lake's sediment trap (HYD-110) and for the sediment-load
 - Ledger ids: PLT-129 (the 2026-10-21 note)
 - Access: not fetched.
 - Read so far (by the project): nothing. The claim taken from it, that a sediment column under water stands up by its load's isostatic correction (the backstripping relation), is from memory and unchecked.
+
+## White patches, drowned continents and coastal high ground, added 2026-10-21
+
+The sources named for the plateaus' summer warmth (CLM-220) and the Cryogenian's dates in plates.md's section of 2026-10-21. None was fetched in full.
+
+### YaoZhang2015
+- Reference: Yao, Y. and Zhang, B. (2015). The mass elevation effect of the Tibetan Plateau and its implications for Alpine treelines. International Journal of Climatology 35(8):1833-1846.
+- DOI or URL: 10.1002/joc.4123
+- Cited as: "Yao & Zhang 2015 (search snippets only)".
+- Ledger ids: CLM-220
+- Access: paywalled; the publisher refused the page to scripted access (HTTP 403, 2026-10-21).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): search-result snippets of the abstract only (2026-10-21): the plateau 2 to 7 degC warmer than the surrounding areas at the same altitude; at 4,500 m 3.58 (April) to 6.63 degC (June) warmer than the Sichuan Basin's air; treelines 500 to 1,000 m higher. The abstract itself was not opened.
+
+### Rooney2015
+- Reference: Rooney, A. D., Strauss, J. V., Brandon, A. D. and Macdonald, F. A. (2015). A Cryogenian chronology: two long-lasting synchronous Neoproterozoic glaciations. Geology 43(5):459-462 (from memory; not checked).
+- Cited as: "Rooney et al. 2015 (from memory, not read)".
+- Ledger ids: none (plates.md, 2026-10-21: the Cryogenian's dates beside Ben's run)
+- Access: not fetched.
+- Read so far (by the project): nothing. The dates taken from it (Sturtian about 717 to 660 Ma, Marinoan ending about 635 Ma) are from memory and unchecked.
