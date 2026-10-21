@@ -177,6 +177,10 @@ pub(super) fn sink(s: &mut Sample, mut left: f64) -> f64 {
     for &p in &ROOT_ORDER {
         let take = f64::from(s.pools[p]).min(left);
         s.pools[p] = (f64::from(s.pools[p]) - take) as f32;
+        if p == pool::MAFIC_PLUTONIC || p == pool::MAFIC_VOLCANIC {
+            // A basement (ocean crust under crust made continental) is the column's bottom.
+            s.basement_m = (f64::from(s.basement_m) - take).max(0.0) as f32;
+        }
         left -= take;
         if left <= 0.0 {
             break;
@@ -415,6 +419,7 @@ pub(super) fn spread(
                 *x = (before * keep) as f32;
                 *m += before - f64::from(*x);
             }
+            s.basement_m *= keep as f32;
             s.thickness_m = s.pools.iter().sum();
             // Isostasy (PLT-281, PLT-278): down by take / 7.0 less the root's change, not below
             // the height the crust kept holds up (or the floor).
@@ -447,7 +452,8 @@ pub(super) fn spread(
             let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
             s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
             if s.kind == OCEANIC && f64::from(s.thickness_m) >= normal - 1.0 {
-                s.kind = CONTINENTAL;
+                // The floor's own crust stays under the crust spread onto it (ledger: PLT-331).
+                s.make_continental();
                 out.converted += 1;
             }
         }
