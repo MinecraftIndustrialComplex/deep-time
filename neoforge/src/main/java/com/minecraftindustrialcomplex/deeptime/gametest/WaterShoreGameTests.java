@@ -115,6 +115,28 @@ public final class WaterShoreGameTests {
         return s.isAir() || !s.getFluidState().isEmpty() || s.is(BlockTags.ICE) || s.is(BlockTags.SNOW) || s.is(Blocks.SNOW_BLOCK);
     }
 
+    static String diag(ServerLevel level, WorldDataTerrain w, LevelChunk chunk, int x, int y, int z, Water.Column col) {
+        StringBuilder b = new StringBuilder();
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        b.append("col(").append(x).append(',').append(z).append(") y=").append(y).append(" H=").append(String.format("%.2f", w.height(x, z)))
+                .append(" shield=").append(String.format("%.3f", w.waterShield(x, z))).append(" kind=").append(col.kind().id)
+                .append(" ground=").append(col.ground()).append(" bed=").append(col.bed()).append(" top=").append(col.top()).append(" blocks:");
+        for (int yy = y + 2; yy >= y - 14; yy--) {
+            BlockState s = chunk.getBlockState(p.set(x, yy, z));
+            b.append(' ').append(yy).append('=').append(s.isAir() ? "air" : s.is(Blocks.WATER) ? "water" : net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath());
+        }
+        var fd = level.getChunkSource().randomState().router().finalDensity();
+        int cx = x & ~3, cz = z & ~3;
+        for (int[] c : new int[][]{{cx, cz}, {cx + 4, cz}, {cx, cz + 4}, {cx + 4, cz + 4}}) {
+            b.append(" | corner(").append(c[0]).append(',').append(c[1]).append(") H=").append(String.format("%.2f", w.height(c[0], c[1])))
+                    .append(" sh=").append(String.format("%.3f", w.waterShield(c[0], c[1])))
+                    .append(" scale=").append(String.format("%.2f", com.minecraftindustrialcomplex.deeptime.worldgen.TerrainScale.at(w, c[0], c[1], w.height(c[0], c[1]), 8.0)));
+            for (int cy = 40; cy <= 72; cy += 8)
+                b.append(' ').append(cy).append(':').append(String.format("%.3f", fd.compute(new net.minecraft.world.level.levelgen.DensityFunction.SinglePointContext(c[0], cy, c[1]))));
+        }
+        return b.toString();
+    }
+
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 3600)
     public static void shoresHaveNoDirtWalls(GameTestHelper helper) {
         ServerLevel level = helper.getLevel().getServer().getLevel(GameTestSupport.TEST_PLANET_CAVES);
@@ -177,6 +199,8 @@ public final class WaterShoreGameTests {
                     for (int k = 1; k <= PIT_TOLERANCE && !hangs; k++)
                         hangs = chunk.getBlockState(pos.set(x, y - k, z)).isAir();
                     if (y < want - PIT_TOLERANCE || hangs) {
+                        if (pits < 6 || (pits % 25 == 0 && pits < 200))
+                            DeepTime.LOGGER.info("[gametest] DIAG {}", diag(level, w, chunk, x, y, z, col));
                         pits++;
                         if (detail.length() < 2400)
                             detail.append(" pit(").append(x).append(',').append(y).append(',').append(z).append(" want ").append(want)
