@@ -10,6 +10,7 @@
     "PlacedFeatureLavaMixin",
     "BiomeFreezeMixin",
     "VolcanicBiomeSourceMixin",
+    "ClimateRTreeMixin",
     "ChunkBiomesSpawnTargetMixin",
     "compat.excavated_variants.OreReplacerMixin",
     "compat.createoreexcavation.OreVeinGeneratorMixin",

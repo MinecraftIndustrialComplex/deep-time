@@ -493,31 +493,13 @@ public final class FarTerrainGameTests {
         int[][] jobs = new int[24][];
         for (int k = 0; k < jobs.length; k++)
             jobs[k] = new int[]{-c / 2 + (k * 7 % 24) * (c / 24) / 64 * 64, ((k * 5) % 12 - 6) * ((int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c) / 8) / 64 * 64, k % 3 == 0 ? 8 : 1};
-        long[] alone = new long[jobs.length];
-        for (int k = 0; k < jobs.length; k++)
-            alone[k] = hash(far, jobs[k]);
-        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(4);
-        try {
-            List<java.util.concurrent.Future<long[]>> runs = new ArrayList<>();
-            for (int t = 0; t < 4; t++) {
-                int offset = t;
-                runs.add(pool.submit(() -> {
-                    long[] out = new long[jobs.length];
-                    for (int n = 0; n < jobs.length; n++) {
-                        int k = (n + offset * 7) % jobs.length;
-                        out[k] = hash(far, jobs[k]);
-                    }
-                    return out;
-                }));
-            }
-            for (var run : runs) {
-                long[] got = run.get(120, java.util.concurrent.TimeUnit.SECONDS);
-                for (int k = 0; k < jobs.length; k++)
-                    helper.assertTrue(got[k] == alone[k], "section " + java.util.Arrays.toString(jobs[k]) + " differs on another thread");
-            }
-        } finally {
-            pool.shutdownNow();
-        }
+        // TEMPORARY experiment: the biome searches warm first (as before), counted, not asserted.
+        FarTerrain.coldSearch = false;
+        int warm = threadMismatches(far, jobs);
+        FarTerrain.coldSearch = true;
+        int cold = threadMismatches(far, jobs);
+        DeepTime.LOGGER.info("[gametest] threadsafeDiag warm mismatches={} cold mismatches={}", warm, cold);
+        helper.assertTrue(cold == 0, cold + " sections differ on another thread (see threadsafeDiag)");
         double[] ms = new double[2];
         for (int d = 0; d < 2; d++) {
             int step = d == 0 ? 1 : 8;
@@ -534,6 +516,91 @@ public final class FarTerrainGameTests {
                 jobs.length, String.format(java.util.Locale.ROOT, "%.3f", ms[0]), String.format(java.util.Locale.ROOT, "%.3f", ms[1]));
         helper.assertTrue(ms[0] < 250.0 && ms[1] < 250.0, "a section takes " + ms[0] + " ms at full detail, " + ms[1] + " ms at detail 3");
         helper.succeed();
+    }
+
+    /** One column of a section, for comparing threads: its own hash, its ground and that block, its biome. */
+    private record SectionColumn(long hash, int ground, BlockState block, Holder<Biome> biome) {}
+
+    private static SectionColumn[] sectionColumns(FarTerrain far, int[] job) {
+        SectionColumn[] out = new SectionColumn[64 * 64];
+        far.build(job[0], job[1], job[2], 64, (relX, relZ, count, bottom, top, block, material, light, biome) -> {
+            long v = 1125899906842597L;
+            int ground = Integer.MIN_VALUE;
+            BlockState g = null;
+            for (int k = 0; k < count; k++) {
+                v = 31 * (31 * (31 * (31 * v + bottom[k]) + top[k]) + block[k].hashCode()) + light[k];
+                if (material[k] != FarColumn.AIR && material[k] != FarColumn.WATER && material[k] != FarColumn.WATER_ICE
+                        && material[k] != FarColumn.SNOW_LAYER) {
+                    ground = top[k] - 1;
+                    g = block[k];
+                }
+            }
+            out[relZ * 64 + relX] = new SectionColumn(31 * v + biome.hashCode(), ground, g, biome);
+        });
+        return out;
+    }
+
+    /**
+     * Builds every section alone on a fresh thread, then on four fresh threads at once, each in its
+     * own order; the number of (thread, section) pairs that differ from the lone build. The first
+     * differing columns are logged ({@code threadsafeDiag}).
+     */
+    private static int threadMismatches(FarTerrain far, int[][] jobs)
+            throws java.util.concurrent.ExecutionException, java.util.concurrent.TimeoutException, InterruptedException {
+        java.util.concurrent.ExecutorService one = java.util.concurrent.Executors.newSingleThreadExecutor();
+        SectionColumn[][] alone;
+        try {
+            alone = one.submit(() -> {
+                SectionColumn[][] out = new SectionColumn[jobs.length][];
+                for (int k = 0; k < jobs.length; k++)
+                    out[k] = sectionColumns(far, jobs[k]);
+                return out;
+            }).get(120, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            one.shutdownNow();
+        }
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(4);
+        int mismatches = 0, logged = 0;
+        try {
+            List<java.util.concurrent.Future<SectionColumn[][]>> runs = new ArrayList<>();
+            for (int t = 0; t < 4; t++) {
+                int offset = t;
+                runs.add(pool.submit(() -> {
+                    SectionColumn[][] out = new SectionColumn[jobs.length][];
+                    for (int n = 0; n < jobs.length; n++) {
+                        int k = (n + offset * 7) % jobs.length;
+                        out[k] = sectionColumns(far, jobs[k]);
+                    }
+                    return out;
+                }));
+            }
+            for (int t = 0; t < runs.size(); t++) {
+                SectionColumn[][] got = runs.get(t).get(120, java.util.concurrent.TimeUnit.SECONDS);
+                for (int k = 0; k < jobs.length; k++) {
+                    int differ = 0;
+                    for (int q = 0; q < got[k].length; q++) {
+                        SectionColumn a = alone[k][q], b = got[k][q];
+                        if (a.hash() == b.hash())
+                            continue;
+                        differ++;
+                        if (logged++ < 16) {
+                            int step = jobs[k][2], x = jobs[k][0] + (q % 64) * step + step / 2, z = jobs[k][1] + (q / 64) * step + step / 2;
+                            DeepTime.LOGGER.info("[gametest] threadsafeDiag search {} thread {} section {} column ({}, {}): alone ground {} {} biome {}; thread ground {} {} biome {}",
+                                    FarTerrain.coldSearch ? "cold" : "warm", t, java.util.Arrays.toString(jobs[k]), x, z,
+                                    a.ground(), a.block(), a.biome().getRegisteredName(), b.ground(), b.block(), b.biome().getRegisteredName());
+                        }
+                    }
+                    if (differ > 0) {
+                        mismatches++;
+                        DeepTime.LOGGER.info("[gametest] threadsafeDiag search {} thread {} section {} differs in {} columns",
+                                FarTerrain.coldSearch ? "cold" : "warm", t, java.util.Arrays.toString(jobs[k]), differ);
+                    }
+                }
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        return mismatches;
     }
 
     private static long hash(FarTerrain far, int[] job) {
