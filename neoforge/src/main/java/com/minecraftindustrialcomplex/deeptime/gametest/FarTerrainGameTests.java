@@ -500,6 +500,23 @@ public final class FarTerrainGameTests {
         int cold = threadMismatches(far, jobs);
         DeepTime.LOGGER.info("[gametest] threadsafeDiag warm mismatches={} cold mismatches={}", warm, cold);
         helper.assertTrue(cold == 0, cold + " sections differ on another thread (see threadsafeDiag)");
+        // TEMPORARY experiment: the section cost with warm and with cold searches, passes alternating.
+        double[][] ab = {{Double.MAX_VALUE, Double.MAX_VALUE}, {Double.MAX_VALUE, Double.MAX_VALUE}};
+        for (int pass = 0; pass < 6; pass++) {
+            int mode = pass % 2;
+            FarTerrain.coldSearch = mode == 1;
+            for (int d = 0; d < 2; d++) {
+                int step = d == 0 ? 1 : 8;
+                long t0 = System.nanoTime();
+                for (int[] job : jobs)
+                    hash(far, new int[]{job[0], job[1], step});
+                ab[mode][d] = Math.min(ab[mode][d], (System.nanoTime() - t0) / 1e6 / jobs.length);
+            }
+        }
+        FarTerrain.coldSearch = true;
+        DeepTime.LOGGER.info("[gametest] threadsafeDiag ms/section warm: detail 0 {} detail 3 {}; cold: detail 0 {} detail 3 {}",
+                String.format(java.util.Locale.ROOT, "%.3f", ab[0][0]), String.format(java.util.Locale.ROOT, "%.3f", ab[0][1]),
+                String.format(java.util.Locale.ROOT, "%.3f", ab[1][0]), String.format(java.util.Locale.ROOT, "%.3f", ab[1][1]));
         double[] ms = new double[2];
         for (int d = 0; d < 2; d++) {
             int step = d == 0 ? 1 : 8;
