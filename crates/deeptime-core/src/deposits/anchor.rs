@@ -16,8 +16,10 @@
 //! less the [`SOIL_BLOCKS`] of soil on dry land) for an exposed essential, and no higher than it
 //! for the others (a body the history buried deeper stays there). Natural deposits keep their
 //! physics and are not touched. An in-stratum body (MVT, `hosts.in_stratum`) is left in its host
-//! horizon, where the bake and the projection keep it (ORE-271): moving it would take it out of
-//! its host. A placer is left where `placer_channels` settled it (in a channel or on the ground).
+//! horizon, where the bake and the projection keep it (ORE-271), unless its ore lies above the
+//! top rock block; then it goes down into the nearest block of a host class under that block
+//! ([`in_stratum_shift`]). A placer is left where `placer_channels` settled it (in a channel or
+//! on the ground).
 //!
 //! The guaranteed sites are the ones whose forming event is a `deeptime:guaranteed_occurrence`
 //! (the event log; the run passes them from memory), so the pass needs no flag in the world data.
@@ -123,6 +125,46 @@ pub fn anchor_shift(bodies: &[&Body], c: u32, x: i32, z: i32, rock_top: i32, exp
     if exposed { dy } else { dy.min(0) }
 }
 
+/// How far below the top rock block a guaranteed in-stratum body looks for its host class when
+/// its ore lies above that block (ledger: ORE-280, game-choice: a reach a player can dig to, the
+/// coordinator's call; no source read for it): 64 blocks, about 2.2 km at 35 m a block. Past it
+/// the body goes to the top rock block in whatever rock is there.
+pub const HOST_SEARCH_BLOCKS: i32 = 64;
+
+/// How far (whole blocks, never up) a guaranteed in-stratum body moves. It stays in its host
+/// horizon, where the bake and the projection keep it (ORE-271), while the top of its ore in the
+/// centre column lies at or under `rock_top`. Where the bake left the horizon in the soil or
+/// above the ground (a quick planet's guaranteed MVT lay 2 blocks under its ground, in the
+/// soil), the ore's top goes to the highest block of a host class in `rock` (the centre column's
+/// rock runs, top first: (top, bottom, class)) at or under `rock_top` and within
+/// [`HOST_SEARCH_BLOCKS`] of it, and to `rock_top` itself when there is none. Returns the move and
+/// whether the body ended in a host class.
+pub fn in_stratum_shift(
+    bodies: &[&Body],
+    c: u32,
+    x: i32,
+    z: i32,
+    rock_top: i32,
+    rock: &[(i32, i32, Option<String>)],
+    hosts: &HashSet<String>,
+) -> (i32, bool) {
+    let dy = anchor_shift(bodies, c, x, z, rock_top, false);
+    if dy == 0 {
+        return (0, true);
+    }
+    let floor = rock_top - HOST_SEARCH_BLOCKS;
+    let host_top = rock
+        .iter()
+        .filter(|(_, _, k)| k.as_ref().is_some_and(|k| hosts.contains(k)))
+        .filter(|&&(top, bottom, _)| bottom <= rock_top && top >= floor)
+        .map(|&(top, _, _)| top.min(rock_top))
+        .max();
+    match host_top {
+        Some(t) => (dy - (rock_top - t), true),
+        None => (dy, false),
+    }
+}
+
 /// Moves a body up by `dy` whole blocks (centre, clip, box).
 fn shift_body(b: &mut Body, dy: i32) {
     if dy == 0 {
@@ -155,8 +197,12 @@ pub struct Anchored {
     pub largest_move: i32,
     pub moved_up: usize,
     pub moved_down: usize,
-    /// In-stratum sites left in their host horizon, and placers left where they settled.
+    /// In-stratum sites left in their host horizon; those moved under the top rock block, into a
+    /// host class or (none within reach) into whatever rock is there; placers left where they
+    /// settled.
     pub in_stratum_kept: usize,
+    pub in_stratum_to_host: usize,
+    pub in_stratum_out_of_host: usize,
     pub placers_kept: usize,
     /// Guaranteed sites whose centre column holds ore in rock after the pass, and those whose
     /// centre lies under water.
@@ -165,14 +211,15 @@ pub struct Anchored {
 }
 
 /// Anchors the guaranteed `sites` (forming event in `guaranteed`, material → whether its
-/// essential is `exposed`) in `world`, moving their `bodies`; `in_stratum` the in-stratum sites.
+/// essential is `exposed`) in `world`, moving their `bodies`; `in_stratum` the in-stratum sites
+/// and their type's host classes.
 pub fn anchor_sites(
     world: &ColumnWorld,
     sites: &mut [Site],
     bodies: &mut [Body],
     guaranteed: &BTreeMap<EventId, String>,
     exposed: &dyn Fn(&str) -> bool,
-    in_stratum: &HashSet<u32>,
+    in_stratum: &BTreeMap<u32, HashSet<String>>,
 ) -> Anchored {
     let mut out = Anchored::default();
     let c = world.c as u32;
@@ -194,11 +241,23 @@ pub fn anchor_sites(
         let idx = of_site.get(&s.id).cloned().unwrap_or_default();
         if s.kind == SiteKind::Placer {
             out.placers_kept += 1;
-        } else if in_stratum.contains(&s.id) {
-            out.in_stratum_kept += 1;
         } else {
             let mine: Vec<&Body> = idx.iter().map(|&i| &bodies[i]).collect();
-            let dy = anchor_shift(&mine, c, cx, cz, top, exposed(material));
+            let dy = match in_stratum.get(&s.id) {
+                Some(hosts) => {
+                    let rock = world.sample(i64::from(cx), i64::from(cz)).rock;
+                    let (dy, in_host) = in_stratum_shift(&mine, c, cx, cz, top, &rock, hosts);
+                    if dy == 0 {
+                        out.in_stratum_kept += 1;
+                    } else if in_host {
+                        out.in_stratum_to_host += 1;
+                    } else {
+                        out.in_stratum_out_of_host += 1;
+                    }
+                    dy
+                }
+                None => anchor_shift(&mine, c, cx, cz, top, exposed(material)),
+            };
             if dy != 0 {
                 for &i in &idx {
                     shift_body(&mut bodies[i], dy);
@@ -265,14 +324,24 @@ pub fn anchor_folder(
     };
     let world = ColumnWorld::open(dir)?;
     let types = super::types::builtin()?;
-    let in_stratum: HashSet<u32> = sites
+    // The guaranteed in-stratum sites and their type's host classes (weight above 0).
+    let in_stratum: BTreeMap<u32, HashSet<String>> = sites
         .iter()
-        .filter(|s| {
-            types
+        .filter(|s| guaranteed.contains_key(&s.forming_event))
+        .filter_map(|s| {
+            let t = types
                 .iter()
-                .any(|t| t.id == s.deposit_type && t.hosts.in_stratum)
+                .find(|t| t.id == s.deposit_type && t.hosts.in_stratum)?;
+            let hosts = t.hosts.weights().unwrap_or_default();
+            Some((
+                s.id,
+                hosts
+                    .into_iter()
+                    .filter(|&(_, w)| w > 0.0)
+                    .map(|(k, _)| k)
+                    .collect(),
+            ))
         })
-        .map(|s| s.id)
         .collect();
     let essentials = p
         .deposits
@@ -325,6 +394,8 @@ pub fn anchor_folder(
         "moved_down": a.moved_down,
         "largest_move_blocks": a.largest_move,
         "in_stratum_kept": a.in_stratum_kept,
+        "in_stratum_to_host": a.in_stratum_to_host,
+        "in_stratum_out_of_host": a.in_stratum_out_of_host,
         "placers_kept": a.placers_kept,
         "centre_holds_ore": a.centre_holds_ore,
         "under_water": a.under_water,
@@ -398,6 +469,42 @@ mod tests {
             60 - body_top(&ore)
         );
         assert_eq!(shift(&[], 70, true), 0);
+    }
+
+    /// An in-stratum body stays where its ore is in rock; above the top rock block it goes down
+    /// into the nearest host class under that block within reach, and to the block itself when
+    /// there is none (a host run in the soil does not count).
+    #[test]
+    fn an_in_stratum_body_goes_down_into_its_host() {
+        let ore = body(1, 80.0, 3.0, true, NO_CLIP);
+        let top = ore_top_in_column(&[&ore], C, 0, 0).unwrap();
+        let hosts: HashSet<String> = ["limestone", "dolostone"].map(String::from).into();
+        let run = |t: i32, b: i32, k: &str| (t, b, Some(k.to_owned()));
+        let shift = |rock: &[(i32, i32, Option<String>)], rock_top: i32| {
+            in_stratum_shift(&[&ore], C, 0, 0, rock_top, rock, &hosts)
+        };
+        let column = [
+            run(74, 71, "sandstone"),
+            run(70, 66, "shale"),
+            run(65, 50, "limestone"),
+            run(49, 0, "sandstone"),
+        ];
+        assert_eq!(shift(&column, 70), (65 - top, true));
+        // A horizon across the top rock block: to that block.
+        assert_eq!(shift(&[run(72, 60, "dolostone")], 70), (70 - top, true));
+        // Its ore already in rock: kept.
+        assert_eq!(shift(&column, top + 3), (0, true));
+        // Host only in the soil band, or deeper than the reach: the top rock block, out of host.
+        assert_eq!(shift(&[run(74, 71, "limestone")], 70), (70 - top, false));
+        let deep = 70 - HOST_SEARCH_BLOCKS - 1;
+        assert_eq!(
+            shift(&[run(70, deep + 1, "shale"), run(deep, 0, "limestone")], 70),
+            (70 - top, false)
+        );
+        // The moved ore tops out at the host's top block.
+        let mut b = ore.clone();
+        shift_body(&mut b, shift(&column, 70).0);
+        assert_eq!(ore_top_in_column(&[&b], C, 0, 0), Some(65));
     }
 
     /// The move is rigid and whole: centre, clip and box go together, and the moved body's ore

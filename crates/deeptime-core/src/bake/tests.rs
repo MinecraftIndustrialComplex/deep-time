@@ -446,9 +446,9 @@ fn a_craters_lens_is_seated_under_the_drawn_floor() {
 
 /// The essentials guarantee in the world as generated (DEP-220, DEP-221, ORE-280): the projection
 /// draws the world with the λc the playability pass counted its regions in, and every guaranteed
-/// deposit outside a stratum or a placer holds ore in rock in its centre column of the world the
-/// game reads, an exposed one within reach of the ground; the pass is settled (a second run moves
-/// nothing).
+/// deposit but a placer (an in-stratum one too) holds ore in rock in its centre column of the
+/// world the game reads, an exposed one within reach of the ground; the pass is settled (a second
+/// run moves nothing).
 #[test]
 fn guaranteed_deposits_hold_ore_in_the_world() {
     use crate::deposits::anchor;
@@ -479,16 +479,12 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
     let guaranteed = anchor::guaranteed_of(log.of_kind(anchor::GUARANTEED_KIND));
     let (sites, _) = deeptime_format::sites::read_sites(&dir).unwrap().unwrap();
     let bodies = deeptime_format::bodies::read_bodies(&dir).unwrap().unwrap();
-    let types = crate::deposits::types::builtin().unwrap();
     let mut checked = 0;
     for s in sites
         .iter()
         .filter(|s| guaranteed.contains_key(&s.forming_event))
     {
-        let in_stratum = types
-            .iter()
-            .any(|t| t.id == s.deposit_type && t.hosts.in_stratum);
-        if in_stratum || s.kind == SiteKind::Placer {
+        if s.kind == SiteKind::Placer {
             continue;
         }
         let col = world.sample(i64::from(s.center[0]), i64::from(s.center[2]));
