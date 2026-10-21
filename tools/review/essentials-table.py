@@ -5,6 +5,7 @@ ore-deposit task, 2026-10-20): one row per run of tools/review/carbonate-ensembl
 label's median and range.
 
     python3 tools/review/essentials-table.py <run dir> [label ...]
+    python3 tools/review/essentials-table.py --guaranteed <run dir> [label ...]
 
 Per run, from `deposit-audit`'s JSON: zinc and lead ore blocks per land chunk (the deposits, the
 guaranteed deposits among them, the scatter, all), the land regions holding a source of each
@@ -17,6 +18,13 @@ carbonate-platform and euxinic-basin fields and of source rock richer than plain
 (10^6 km2), the source-rock TOC summed over the planet's area (`toc_area`, 10^6 km2 x wt %; the
 log holds no planet area to make it a mean), and black shale's share of the sea
 floor's and the land's top blocks.
+
+`--guaranteed` (the guaranteed deposits in the world as generated, 2026-10-20): per essential the
+audit ships, the guaranteed sources holding ore of the material in the world's columns among the
+guaranteed sources, the world's land regions (the essential's region size, on the world's own
+frame) with a source and with a source holding ore, the spawn's nearest source and nearest source
+holding ore, and the access probe's median (deposits and scatter). Needs a build whose audit writes
+the `_with_ore` fields (AUDIT_BIN on an older build's worlds).
 """
 import collections
 import json
@@ -97,6 +105,76 @@ def run_row(root, stem):
     return r
 
 
+def guaranteed_rows(root, labels):
+    """One row per (run, essential)."""
+    rows = []
+    for aj in sorted(root.glob("*.audit.json")):
+        stem = aj.name[: -len(".audit.json")]
+        label = stem.split("-")[0]
+        if labels and label not in labels:
+            continue
+        a = json.load(open(aj))
+        ess = a.get("essentials", {}).get("by_material", {})
+        access = (a.get("access") or {}).get("by_material") or {}
+        for m, e in sorted(ess.items()):
+            g = e.get("regions", {}).get("essential", {})
+            acc = access.get(m, {}).get("deposits_and_scatter", {})
+
+            def first(k):
+                return (e.get(k) or [None])[0]
+
+            rows.append({
+                "run": stem, "label": label, "material": m.split(":")[-1],
+                "g": e.get("guaranteed_sources", 0),
+                "g_ore": e.get("guaranteed_sources_with_ore"),
+                "land": g.get("land_regions"),
+                "with": g.get("land_regions_with_a_source"),
+                "with_ore": g.get("land_regions_with_a_source_with_ore"),
+                "spawn": num(first("spawn_to_nearest_source")),
+                "spawn_ore": num(first("spawn_to_nearest_source_with_ore")),
+                "p50": num(acc.get("p50")),
+                "beyond": acc.get("beyond_radius"),
+            })
+    return rows
+
+
+def guaranteed_main(root, labels):
+    rows = guaranteed_rows(root, labels)
+    keys = ["run", "material", "g_ore/g", "regions (ore)/land", "spawn (ore)", "access p50 (beyond)"]
+    print("| " + " | ".join(keys) + " |")
+    print("|" + "---|" * len(keys))
+    for r in rows:
+        print(f"| {r['run']} | {r['material']} | {r['g_ore']}/{r['g']} | "
+              f"{r['with']} ({r['with_ore']})/{r['land']} | {fmt(r['spawn'])} ({fmt(r['spawn_ore'])}) | "
+              f"{fmt(r['p50'])} ({r['beyond']}) |")
+    print()
+    by = collections.defaultdict(list)
+    for r in rows:
+        by[(r["label"], r["material"])].append(r)
+    print("| label | material | runs | guaranteed with ore / guaranteed | runs with every land region "
+          "holding a source (with ore) | land regions with a source (with ore) / land regions | "
+          "spawn to the nearest source, median [range] | the same, holding ore | access p50, median [range] |")
+    print("|---|---|---|---|---|---|---|---|---|")
+
+    def med(vals):
+        vals = [v for v in vals if v == v]
+        if not vals:
+            return "-"
+        return f"{statistics.median(vals):.4g} [{min(vals):.4g}, {max(vals):.4g}]"
+
+    for (label, m), rs in by.items():
+        g = sum(r["g"] or 0 for r in rs)
+        go = sum(r["g_ore"] or 0 for r in rs)
+        full = sum(r["with"] == r["land"] for r in rs)
+        full_ore = sum(r["with_ore"] == r["land"] for r in rs)
+        land = sum(r["land"] or 0 for r in rs)
+        w = sum(r["with"] or 0 for r in rs)
+        wo = sum(r["with_ore"] or 0 for r in rs)
+        print(f"| {label} | {m} | {len(rs)} | {go}/{g} | {full} ({full_ore}) of {len(rs)} | "
+              f"{w} ({wo})/{land} | {med([r['spawn'] for r in rs])} | "
+              f"{med([r['spawn_ore'] for r in rs])} | {med([r['p50'] for r in rs])} |")
+
+
 def fmt(v):
     if isinstance(v, float):
         if v != v:
@@ -106,6 +184,9 @@ def fmt(v):
 
 
 def main():
+    if sys.argv[1] == "--guaranteed":
+        guaranteed_main(pathlib.Path(sys.argv[2]), sys.argv[3:])
+        return
     root = pathlib.Path(sys.argv[1])
     labels = sys.argv[2:]
     rows = []

@@ -2237,6 +2237,34 @@ impl Session {
             }
             bytes = m.to_json_bytes()?;
             write_atomic(&dir.join(MANIFEST), &bytes)?;
+            // The playability pass's deposits under the world's own ground (DEP-221): the pass
+            // reads the finished folder as the game does, so it runs last and the manifest is
+            // written again.
+            if baked {
+                let guaranteed = crate::deposits::anchor::guaranteed_of(&world.events);
+                let note = self.pool.install(|| {
+                    crate::deposits::anchor::anchor_folder(dir, p, &mut m, Some(&guaranteed))
+                })?;
+                if note["guaranteed"].as_u64().unwrap_or(0) > 0
+                    || note["topped_up"].as_u64().unwrap_or(0) > 0
+                {
+                    self.log.push(
+                        Level::Info,
+                        format!(
+                            "guaranteed deposits: {} under the world's ground, {} moved (largest {} blocks), {} with ore in rock at the centre, {} under water; {} added where the world's regions lacked a source",
+                            note["guaranteed"], note["moved"], note["largest_move_blocks"],
+                            note["centre_holds_ore"], note["under_water"], note["topped_up"]
+                        ),
+                    );
+                }
+                if let Some(b) = m.notes.get_mut(crate::bake::NOTES_KEY)
+                    && b.is_object()
+                {
+                    b["guaranteed"] = note;
+                }
+                bytes = m.to_json_bytes()?;
+                write_atomic(&dir.join(MANIFEST), &bytes)?;
+            }
         }
         self.state
             .store(SessionState::Finalized as u8, Ordering::Release);
