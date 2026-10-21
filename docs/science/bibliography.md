@@ -7151,3 +7151,28 @@ The sources of the ocean crust kept under crust made continental and of the arcs
 - Access: paywalled; OpenAlex (2026-10-20) has the record but no abstract.
 - Library (the project's source library, not distributed): none.
 - Read so far (by the project): nothing. The claim taken from it, that an intra-oceanic arc reaching a trench loses its lower part to the slab while its upper crust is scraped off and accretes, is from memory and unchecked.
+
+## Basins that outlast their sediment (HYD-110, PLT-129), added 2026-10-21
+
+The sources named for a lake's sediment trap (HYD-110) and for the sediment-loaded ocean floor measured and taken back out (PLT-129's note), build log 2026-10-21 "Basins that outlast their sediment". None was fetched; every claim taken from them is from memory.
+
+### Brune1953
+- Reference: Brune, G. M. (1953). Trap efficiency of reservoirs. Transactions, American Geophysical Union 34(3):407-418 (from memory; DOI not checked).
+- Cited as: "Brune 1953 (from memory, not read)".
+- Ledger ids: HYD-110
+- Access: not fetched.
+- Read so far (by the project): nothing. The claim taken from it, that a reservoir whose capacity is large against its yearly inflow traps nearly all of the sediment that reaches it, is from memory and unchecked.
+
+### Lehman1975
+- Reference: Lehman, J. T. (1975). Reconstructing the rate of accumulation of lake sediment: the effect of sediment focusing. Quaternary Research 5(4):541-550 (from memory; not checked).
+- Cited as: "Lehman 1975 (from memory, not read)".
+- Ledger ids: HYD-110
+- Access: not fetched.
+- Read so far (by the project): nothing. The claim taken from it, that a lake's sediment accumulates fastest in its deep basin (sediment focusing), is from memory and unchecked.
+
+### StecklerWatts1978
+- Reference: Steckler, M. S. and Watts, A. B. (1978). Subsidence of the Atlantic-type continental margin off New York. Earth and Planetary Science Letters 41(1):1-13 (from memory; not checked).
+- Cited as: "Steckler & Watts 1978 (from memory, not read)".
+- Ledger ids: PLT-129 (the 2026-10-21 note)
+- Access: not fetched.
+- Read so far (by the project): nothing. The claim taken from it, that a sediment column under water stands up by its load's isostatic correction (the backstripping relation), is from memory and unchecked.
