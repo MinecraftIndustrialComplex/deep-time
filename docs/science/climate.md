@@ -20,7 +20,9 @@ The constants of the per-cell design were checked against their sources before t
 | [CLM](ledger/CLM.md) | the belts' rain amount (`belts_rain_scale`); the upwind rain is on [upwind-rain.md](upwind-rain.md) | CLM-201 (1) |
 | [CLM](ledger/CLM.md) | ice branch: the flowing-sheet switch, present-day climate, supply-limited and seafloor weathering (merged 2026-10-02) | CLM-147 to CLM-162 (16) |
 | [CLM](ledger/CLM.md) | the present-day climate since 2026-10-18: the target counts ice sheets (CLM-203) and the temperate present's cap on its CO₂ factor (CLM-206, 2026-10-19) | CLM-203, CLM-206 (2) |
-| [CLM](ledger/CLM.md) | Earth's plateau summers against the model's: the mass-elevation effect the code lacks (an Earth reference, not coded; plates.md "White patches, drowned continents and coastal high ground", 2026-10-21) | CLM-220 (1) |
+| [CLM](ledger/CLM.md) | Earth's plateau summers against the model's: the Earth reference that asked for the mass-elevation effect (plates.md "White patches, drowned continents and coastal high ground", 2026-10-21) | CLM-220 (1) |
+| [CLM](ledger/CLM.md) | the plateau's warmth (the mass-elevation effect, coded 2026-10-21; its own page: [mass-elevation-effect.md](mass-elevation-effect.md)) | CLM-225 to CLM-231 (7) |
+| [MOI](ledger/MOI.md) | what the land's monthly sea-level temperatures hold since the plateau's warmth | MOI-085 (1) |
 | [GLA](ledger/GLA.md) | the flowing ice sheet (`climate/sheet.rs`, off by default) and the ice mass balance for the hydrology; on the glacial page | GLA-067 to GLA-076 (10) |
 | [MOI](ledger/MOI.md) | wind and rain belts | MOI-001 to MOI-033 (33) |
 | [MOI](ledger/MOI.md) | orographic rain | MOI-034 to MOI-050 (17) |
@@ -390,6 +392,14 @@ seed 1, built from 025676c8, 2026-10-19) found two things:
   7 °C warmer than the free air at the same height (Yao & Zhang 2015, search snippets only), and
   Tibet's July about 11 °C (CLM-220). The term would cut the plateau ice, not remove it, while the
   plateaus' extent stays four to seven times Earth's. Recommended as its own climate task.
+
+  **Built 2026-10-21** (the plateau-warmth task; [mass-elevation-effect.md](mass-elevation-effect.md),
+  CLM-225 to CLM-231): land's month temperature at sea level gains k·Ẑ, Ẑ the height of the broad,
+  bare high ground around the cell (150 km footprint, ice and sea at 0) and k = 2.43·10⁻³ K/m ×
+  (the month's relative sunlight − 0.792), fitted to twelve plateau stations against the
+  reanalysis's free air (rms 1.28 K). On Earth's relief Tibet's July rises from −3.5 to 6.0 °C and
+  its ice cap goes; the global mean rises from 14.41 to 14.56 °C and the kernel (CLM-061) to
+  5.147·10⁷. The plateaus stay too cold, now mostly from the 6.5 K/km lapse rate (CLM-231).
 
 The present's report in the climate note now carries:
 - `co2_factor_max` (temperate only);

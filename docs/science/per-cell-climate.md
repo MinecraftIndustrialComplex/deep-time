@@ -130,7 +130,7 @@ defaults are in `ClimateParams::default()` and the presets.
 | CLM-168 | its scale m so that 2 × CO₂ at 288.15 K gives 5.35 ln 2 | 0.903 | – | Myhre et al. 1998 via IPCC 2001 (CLM-069) | `calibrated` |
 | CLM-170 | the forcing below the table (about 100 ppm) | logarithm, the table's 100–200 ppm slope | W/m² | none | `game-choice` |
 | CLM-172 | `snowball_cloud_w_m2`: extra cloud greenhouse on frozen surfaces | 0 (setting, 0–20) | W/m² | Ben 2026-10-02; Hoffman 2017, Abbot 2012, Hu 2011, Pierrehumbert 2011 | `game-choice` |
-| CLM-061 | `KERNEL_EARTH`, the weathering kernel on Earth's 0.5° relief | 5.039·10⁷ with the belts' rain scaled (2026-10-16; 2.475·10⁷ at factor 1.0, banded 2.845·10⁷) | km² m/yr | re-measured, `deeptime climate-dem` | `calibrated` |
+| CLM-061 | `KERNEL_EARTH`, the weathering kernel on Earth's 0.5° relief | 5.147·10⁷ with the plateau's warmth ([mass-elevation-effect.md](mass-elevation-effect.md), 2026-10-21; 5.039·10⁷ with the belts' rain scaled, 2026-10-16; 2.475·10⁷ at factor 1.0, banded 2.845·10⁷) | km² m/yr | re-measured, `deeptime climate-dem` | `calibrated` |
 | CLM-100 | gravity of the ice | the planet's | m/s² | – | `uncited` |
 | CLM-178 | `rain_model` | `belts`; `budget` and `upwind` are built | – | Ben, decisions log 2026-10-01 (Q2), 2026-10-06 | `game-choice` |
 | CLM-201 | `belts_rain_scale`: one factor on the belts' rain | 1.42 (Earth's relief rains 773 mm over land, Beck 773) | – | Beck et al. 2023 (calibration on Earth's own inputs) | `calibrated` |
@@ -194,6 +194,13 @@ not re-measured at 1.42 and gives the factor 1.0 value and the banded one.
 Earth's temperature and spread figures are the design's section 7.1 table: Beck et al. 2023's
 monthly temperatures (1961–1990, 0.5 degrees), brought to sea level with 6.5 K/km; the grid
 itself is read by the design's scratch script only, and no observed data are in the repository.
+
+Since 2026-10-21 the plateau's warmth (the mass-elevation effect, CLM-225 to CLM-228,
+[mass-elevation-effect.md](mass-elevation-effect.md)) is on, and the same run gives: global mean
+14.56 °C (0.06 K above the target band, from Tibet's lost ice cap), land 9.24 °C, glaciated land
+0.081, cities in the right group 21 (23 at station heights), Köppen A / B / C / D / E 0.18 / 0.17 /
+0.23 / 0.25 / 0.18, the along-row spread 4.38 K in winter and 1.73 K in the year, Brest −
+Vladivostok 19.8 K, Yakutsk −27.6 °C. The table below keeps the values from before it.
 
 | Quantity | Earth | Source of the Earth figure | Design target | The mod, 1.42 (1.0; banded) |
 |---|---|---|---|---|

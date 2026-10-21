@@ -25,10 +25,10 @@
 //! budget.
 //!
 //! # Residency and sizes
-//! Per call: the row table (34 words a row), the column table (16 a column) and the coarse
+//! Per call: the row table (46 words a row), the column table (16 a column) and the coarse
 //! tables (37 words a coarse cell: the land tile, the sea tile and the sea ice of every month,
 //! and the land/sea flags) once; then per chunk of rows (about [`CHUNK_CELLS`] cells) the cells'
-//! inputs (13 planes plus one per wind regime with an orographic field, f32), one dispatch per
+//! inputs (14 planes plus one per wind regime with an orographic field, f32), one dispatch per
 //! band, and the results back (10 planes, plus 24 when the months are kept). A chunk's arrays are
 //! on the device at once, so the device memory is bounded by the chunk, not the planet.
 
@@ -46,13 +46,13 @@ use super::snapshot::{Cells, CellsDevice, CellsInput, CellsStats};
 /// Cells in a chunk of rows (whole rows, a multiple of 16): 1 MiB a plane.
 pub const CHUNK_CELLS: usize = 1 << 18;
 /// The cells' input planes before the orographic ones: z, sea share, interior share, ΔSST,
-/// basin, and the air's eight fields.
-const CELL_PLANES: usize = 13;
+/// basin, the air's eight fields, and the plateau's base height.
+const CELL_PLANES: usize = 14;
 /// t_mean, t_warm, t_cold, precip, aridity, ela, the three sea-ice covers, the class.
 const OUT_PLANES: usize = 10;
 /// The twelve months' sea-level temperatures and precipitation rates.
 const MONTH_PLANES: usize = 24;
-const ROW_W: usize = 34;
+const ROW_W: usize = 46;
 const COL_W: usize = 16;
 /// The coarse tables: land tile, sea tile and sea ice of each month, then the flags.
 const COARSE_PLANES: usize = 37;
@@ -84,7 +84,7 @@ struct Band { row0: u32, row1: u32, pad0: u32, pad1: u32 }
 
 const NONE: u32 = 0xffffffffu;
 const BIG: f32 = 3.40282347e38;
-const ROW_W: u32 = 34u;
+const ROW_W: u32 = 46u;
 const COL_W: u32 = 16u;
 
 // belts.rs `belt_precip`: the belts' rain by belt latitude, mm/yr.
@@ -326,10 +326,12 @@ fn cells(@builtin(global_invocation_id) id: vec3<u32>) {
     let basin = cin[4u * s + cl];
     var air: array<f32, 8>;
     for (var k = 0u; k < 8u; k++) { air[k] = cin[(5u + k) * s + cl]; }
+    // The plateau's base height (0 at sea; snapshot.rs `mee_z`).
+    let zb = cin[13u * s + cl];
     var oro: array<f32, 8>;
     for (var r = 0u; r < 8u; r++) {
         if ((p.oro_mask & (1u << r)) != 0u) {
-            oro[r] = cin[(13u + countOneBits(p.oro_mask & ((1u << r) - 1u))) * s + cl];
+            oro[r] = cin[(14u + countOneBits(p.oro_mask & ((1u << r) - 1u))) * s + cl];
         }
     }
     let rb = j * ROW_W;
@@ -410,8 +412,11 @@ fn cells(@builtin(global_invocation_id) id: vec3<u32>) {
                 tsl = l_at.x;
             }
         }
-        tsl_m[m] = tsl;
-        tm[m] = tsl - p.gamma * z;
+        // The plateau's warmth (snapshot.rs; ledger: CLM-225): the row's warmth per metre of base
+        // height this month times the base height. The rain's moisture stays the lowland air's.
+        let tg = tsl + rf(rb + 34u + m) * zb;
+        tsl_m[m] = tg;
+        tm[m] = tg - p.gamma * z;
         // snapshot.rs `circ_at`.
         let fe = wr[2] + wr[3] + wr[6] + wr[7];
         let fw = 1.0 - fe;
@@ -610,7 +615,8 @@ fn params(ci: &CellsInput<'_>, stride: usize, row0: usize, oro_mask: u32) -> [u3
 }
 
 /// Per row: φ, the shift's t and f, φ ≥ 0, the crossed trades' share, the insolation and onshore
-/// share of each month, the coarse rows j0, j1, fy and the row's coarse row.
+/// share of each month, the coarse rows j0, j1, fy and the row's coarse row, then (from word 34)
+/// the plateau's warmth per metre of base height of each month.
 fn row_table(ci: &CellsInput<'_>) -> Vec<u32> {
     let g = &ci.pc.grid;
     let mut v = vec![0u32; ci.h * ROW_W];
@@ -631,6 +637,9 @@ fn row_table(ci: &CellsInput<'_>) -> Vec<u32> {
         r[30] = j1 as u32;
         r[31] = bits(fy);
         r[32] = (j / g.k) as u32;
+        for m in 0..12 {
+            r[34 + m] = bits(ci.mee_k[j][m]);
+        }
     }
     v
 }
@@ -673,8 +682,8 @@ fn coarse_table(ci: &CellsInput<'_>) -> Vec<u32> {
 }
 
 /// The input planes of rows `r0..r1` into `buf` (one plane per `r1 − r0` rows): z (−1 at sea),
-/// the sea and interior shares, ΔSST, the basin, the air's eight fields, then the orographic rate
-/// of each regime in `slots`.
+/// the sea and interior shares, ΔSST, the basin, the air's eight fields, the plateau's base
+/// height, then the orographic rate of each regime in `slots`.
 fn pack(ci: &CellsInput<'_>, slots: &[usize], r0: usize, r1: usize, m: usize, buf: &mut [f32]) {
     let (a, b) = (r0 * ci.w, r1 * ci.w);
     debug_assert_eq!(b - a, m);
@@ -695,7 +704,8 @@ fn pack(ci: &CellsInput<'_>, slots: &[usize], r0: usize, r1: usize, m: usize, bu
             2 => narrow(plane, ci.interior),
             3 => narrow(plane, ci.dsst),
             4 => narrow(plane, ci.basin),
-            5..CELL_PLANES => narrow(plane, &ci.air[k - 5]),
+            5..13 => narrow(plane, &ci.air[k - 5]),
+            13 => narrow(plane, ci.mee_z),
             _ => plane.copy_from_slice(&ci.oro[slots[k - CELL_PLANES]][a..b]),
         });
 }

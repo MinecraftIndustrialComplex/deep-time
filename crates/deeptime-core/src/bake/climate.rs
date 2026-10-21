@@ -7,7 +7,8 @@
 //!
 //! **The twelve months on L1** (format 0.2, P1-25: what Deep Time's climate API reads):
 //! `climate/month/t_sl_c_{01..12}` (i16, 0.01 °C, each month's temperature *at sea level*, so a
-//! reader applies the lapse rate at its own block height) and `climate/month/p_share_{01..12}`
+//! reader applies the lapse rate at its own block height; on land it holds the cell's plateau
+//! warmth, `climate::lapse::mass_elevation_*`, MOI-085) and `climate/month/p_share_{01..12}`
 //! (u8, 1/40: each month's precipitation rate over the annual, 0–6.375; a month's precipitation is
 //! `p_mm` × share / 12 after the twelve are normalised to sum 12), from the climate stage's last
 //! snapshot. Month 01 starts at solar longitude 280°, about 1 January on Earth.

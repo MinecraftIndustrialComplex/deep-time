@@ -134,7 +134,8 @@ pub mod field {
     /// the published ELA is this plus its band's shift since.
     pub const ELA_ALL: &str = "climate/anomaly/ela_m";
 
-    /// Month `m`'s (0–11) sea-level temperature, °C (the lapse rate not applied), written at the
+    /// Month `m`'s (0–11) sea-level temperature, °C (the lapse rate not applied; on land the
+    /// ground's temperature brought to sea level, the plateau's warmth included), written at the
     /// last step only (the bake stores it, P1-25). Month 0 starts at solar longitude 280°
     /// (`insolation::YEAR_START_RAD`, about 1 January on Earth).
     pub fn t_sl_month(m: usize) -> String {
