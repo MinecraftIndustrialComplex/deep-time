@@ -840,11 +840,17 @@ pub(in crate::plates) mod tests {
         hot.k.collapse_hot_myr = 40.0;
         let mut st = stamped(&hot);
         let (lo, hi) = span(&hot, &mut st, 1, 19);
-        assert!(lo >= normal_thickness_m() - 1.0 && hi < t_c - 2000.0, "{lo} {hi}");
+        assert!(
+            lo >= normal_thickness_m() - 1.0 && hi < t_c - 2000.0,
+            "{lo} {hi}"
+        );
         // The window has passed: nothing thinner than T_c moves.
         let before = st.samples.clone();
         let (lo2, hi2) = span(&hot, &mut st, 20, 30);
-        assert!((lo2 - lo).abs() < 1e-3 && (hi2 - hi).abs() < 1e-3, "{lo2} {hi2}");
+        assert!(
+            (lo2 - lo).abs() < 1e-3 && (hi2 - hi).abs() < 1e-3,
+            "{lo2} {hi2}"
+        );
         assert_eq!(st.samples, before);
         // No window: the same belt stops at T_c.
         let cold = Fx::new();
