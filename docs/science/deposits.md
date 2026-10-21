@@ -804,6 +804,18 @@ and zinc, 1,376 to copper, 1,459 to gold, access p50 coal 56, iron and copper 10
 - **Every guaranteed body holds ore**, 65 of 65 on the six quick planets (master 20 of 66) and 10
   of 10 on the full one (master 4 of 10). The pass moved 9 to 13 a planet, 31 to 73 blocks at
   most; one or two a planet lie under water, anchored at the bed.
+- **An emptied MVT** (2026-10-21, after merging master f1632cf3). On the merged tree's quick
+  supercontinent seed 1, a guaranteed MVT (zinc and lead) at (2284, -401) held no block at all:
+  the bake left its limestone horizon 2 blocks under the ground, in the soil band, and the
+  projection clips an in-stratum body 4 blocks under the drawn ground (ORE-271), which removed
+  all of it; moving it whole kept it empty. The anchor now reads such a body unclipped, moves it
+  down and clips it at the top rock block. Rerun on the same planet: 11 of 11 guaranteed bodies
+  hold ore (the MVT 32 zinc blocks and 1 lead block, its top in the one limestone block under the
+  soil, at 59 under ground 63, the rest in the shale beneath: no thicker host lay within 64
+  blocks), both 8,192-block land regions hold lead and zinc with ore (1 of 2 before), the spawn's
+  nearest lead and zinc holding ore came from 2,916 to 2,206 blocks, and the anchor pass took
+  0.1 s. The same clip had emptied the one natural MVT on the six quick planets (the next
+  bullet's); the full planet's three MVTs kept their blocks.
 - **The column check** (`deeptime inspect-column` at the centre of each of the full planet's 10
   guaranteed sites, d6ba612a): on dry land the ore's top block is the ground less 4 every time
   (the iron formation at 156 under ground 160, 75 under 79, 86 under 90, 94 under 98, 165 under
@@ -814,9 +826,10 @@ and zinc, 1,376 to copper, 1,459 to gold, access p50 coal 56, iron and copper 10
 - **What the guarantee still trusts**: natural sources. It counts them at the deposit stage, and
   the bake moves them afterwards like the guaranteed ones. On one quick planet of six
   (supercontinent seed 3) the western 8,192-block region's lead sources were a natural MVT body
-  whose host horizon the bake left at the sea floor (no host rock in its zone, no ore) and a
-  natural SEDEX whose centre the bake lifted 5 blocks above the ground (6 zinc blocks, no lead),
-  so the region counted as covered and holds no lead a player can mine. Natural bodies keep their
+  whose host horizon the bake left at the sea floor (the projection's clip under the drawn
+  ground, ORE-271, left it no block) and a natural SEDEX whose centre the bake lifted 5 blocks
+  above the ground (6 zinc blocks, no lead), so the region counted as covered and holds no lead
+  a player can mine. Natural bodies keep their
   physics in this task; checking natural sources in the world would need the guarantee to run
   after the bake.
 - **Spawn distances** move with λc as much as with the guarantee (the world's spawn is not the
