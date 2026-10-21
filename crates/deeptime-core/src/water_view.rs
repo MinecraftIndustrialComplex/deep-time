@@ -109,8 +109,9 @@ pub struct Look {
     /// The narrowest line a river is drawn as, pixels: a river narrower than this in the game is
     /// a line this wide whose coverage is its width over it …
     pub hairline_px: f32,
-    /// … and never less than this (game-choice: a stream two blocks wide is a sixth of a pixel
-    /// on a 1,024-pixel map, and would not show at all; HYD-091).
+    /// … and never less than this (game-choice, HYD-091: under the narrowest channel the bake
+    /// makes, 1.4 blocks or a ninth of a pixel on the quick planet's 1,024-pixel map, so the ink
+    /// is the bake's channel area there; it only keeps a narrower line from vanishing).
     pub ink_min: f32,
     /// How opaque a stream and the largest river are on the satellite view, and the decades of
     /// discharge over which one grows into the other.
@@ -130,7 +131,7 @@ impl Default for Look {
     fn default() -> Look {
         Look {
             hairline_px: 1.0,
-            ink_min: 0.25,
+            ink_min: 0.1,
             alpha_min: 0.6,
             alpha_max: 0.92,
             alpha_decades: 2.5,
