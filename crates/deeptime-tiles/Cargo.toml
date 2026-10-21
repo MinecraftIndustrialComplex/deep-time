@@ -1,0 +1,15 @@
+[package]
+name = "deeptime-tiles"
+description = "The workbench's Final world map: a bake drawn as a deep-zoom tile pyramid, behind mic-viewer's TileSource"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+
+[dependencies]
+deeptime-core.workspace = true
+deeptime-format.workspace = true
+mic-viewer.workspace = true
+serde_json = "1.0.151"
