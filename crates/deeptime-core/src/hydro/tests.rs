@@ -590,6 +590,30 @@ fn the_closed_basin_layer_takes_the_nearest_low_grounds_side() {
     );
 }
 
+#[test]
+fn the_world_grid_opens_a_closed_pocket_its_own_sea_reaches() {
+    // HYD-105. One row of 16 cells, x wrapping. The bake (on its own grid) called the pocket at
+    // 6 to 8 closed, behind a sill that the world's ground no longer has: here 0 to 8 are one
+    // deep body, so the ocean (0 to 5, open in the bake) reaches the pocket and it opens. The
+    // basin at 11 to 14 is closed in both; its edge cell 14 took an open flag from the bake's
+    // nearest cell, too few open cells to make its body the sea, and keeps it. Radius 1.
+    let (w, h) = (16usize, 1usize);
+    let deep = |c: usize| c <= 8 || (11..=14).contains(&c);
+    let low = |c: usize| deep(c);
+    let mut flag = vec![0u8; w];
+    for c in [6, 7, 8, 11, 12, 13] {
+        flag[c] = 1;
+    }
+    let (layer, cleared) = super::closed_basin_on_world(w, h, low, deep, &flag, 3, 1);
+    assert_eq!(cleared, 3, "6, 7 and 8 open");
+    // 9 and 15: a step from open low ground; 10: a step from the closed 11; 11 to 13 closed.
+    assert_eq!(layer, vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0]);
+    // With too high a floor for the open cells the ocean is not the sea: nothing opens.
+    let (kept, none) = super::closed_basin_on_world(w, h, low, deep, &flag, 7, 1);
+    assert_eq!(none, 0);
+    assert!((6..=8).all(|c| kept[c] == 1));
+}
+
 /// A rough planet: hash noise in four octaves on the 512 × 192 grid of 2-block cells, sea beyond
 /// the last rows, with basins of every size, some inside others.
 fn rough() -> (GridDesc, Vec<i16>) {
