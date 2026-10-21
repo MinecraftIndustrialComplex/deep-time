@@ -281,7 +281,8 @@ finished folder of either projection (`deeptime_core::deposits::anchor::anchor_f
 `deeptime project`), the sites whose forming event is a `deeptime:guaranteed_occurrence` (the event
 log; no flag in the sites) are read against the world as the game reads it (`ColumnWorld`): each
 one's bodies move together by whole blocks (centre, `clip_top_y` and box; the site's centre y and
-box follow) so the top of its ore lies at the **top rock block** over the site's centre (the
+box follow) so the top of its ore (the highest block of the site's centre column where a zone with
+a material applies, not the padded box's top) lies at the **top rock block** over the site's centre (the
 `WaterColumn` ground less the 4 blocks of soil on dry land, the bed under water) for an exposed
 essential, and no higher than it for the others. In-stratum sites (MVT) stay in their host horizon
 and placers where `placer_channels` settled them; natural sites are not touched.
