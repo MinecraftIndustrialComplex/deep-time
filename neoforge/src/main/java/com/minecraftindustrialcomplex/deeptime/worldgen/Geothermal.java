@@ -5,7 +5,9 @@ import com.minecraftindustrialcomplex.deeptime.rock.PaletteRules;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.SplittableRandom;
 
 /**
@@ -51,6 +53,11 @@ import java.util.SplittableRandom;
  * is lower the rim and bed are built up to the water (the dam of a travertine terrace), so the
  * water has a solid block on every side whatever the slope. A footprint never touches another
  * site's pool, rim or vent, and a vent's magma block never touches water.
+ *
+ * <p><b>Open water.</b> A hot spring's water is hot: {@link #poolSurface} says which block of the world is
+ * the surface of a pool's water, and {@code LakeFreeze} (through {@code BiomeFreezeMixin}) never lets
+ * vanilla's freezing, at generation or in weather, turn that block to ice, whatever the biome's temperature.
+ * The ground round a pool may still take snow.
  */
 public final class Geothermal {
 
@@ -60,8 +67,11 @@ public final class Geothermal {
     public static final int MIN_ABOVE_SEA = 3; // ledger: GEO-017 (game-choice)
     /**
      * A field whose annual mean temperature is under this, °C, has no pools. Not physics: real hot
-     * springs do not freeze at a 3 °C mean. It is a game rule, because vanilla's top-layer freezing
-     * would put ice on a hot pool (ledger: GEO-020, game-choice).
+     * springs do not freeze at a 3 °C mean. It is a game rule (ledger: GEO-020, game-choice). It began as a
+     * guard against vanilla's top-layer freezing putting ice on a hot pool; since 2026-10-20 a pool's
+     * water stays open whatever the biome's temperature ({@link #poolSurface}, GEO-062; a pack's
+     * hot-spring biome can be colder than the field's climate), so the threshold no longer keeps
+     * ice off the pools and stays only because Ben confirmed it as a game choice on 2026-10-02.
      */
     public static final double POOL_MIN_C = 3.0;
     /**
@@ -307,10 +317,17 @@ public final class Geothermal {
 
     private final List<Site> sites;
     private final int circumference;
+    /** The water levels of the pools (a pool's surface block is at its site's level), so most heights are refused at once. */
+    private final Set<Integer> poolLevels;
 
     private Geothermal(List<Site> sites, int circumference) {
         this.sites = List.copyOf(sites);
         this.circumference = circumference;
+        Set<Integer> levels = new HashSet<>();
+        for (Site s : this.sites)
+            if (s.kind == Kind.POOL)
+                levels.add(s.level);
+        this.poolLevels = Set.copyOf(levels);
     }
 
     public List<Site> sites() {
@@ -367,6 +384,22 @@ public final class Geothermal {
     public Part partAt(int x, int z) {
         Site s = claim(x, z);
         return s == null ? Part.NONE : s.part(dx(x, s), z - s.z);
+    }
+
+    /**
+     * Whether block (x, y, z) is the surface block of a hot-spring pool's water: the column is a pool column of the
+     * site that wins it ({@link #claim}) and {@code y} is that site's water level, where {@link GeothermalPass} puts
+     * the top block of the water. The water of a hot spring is hot, so it never freezes whatever the biome's
+     * temperature (ledger: GEO-062, game-choice); {@code LakeFreeze} asks this before vanilla's top-layer freezing
+     * and snowfall may ice the block. Only the surface block: a pool is one or two blocks deep, and the second
+     * block of water under it is not reached by the cold. False for every other block, rim and apron included
+     * (snow may lie on the dry ground).
+     */
+    public boolean poolSurface(int x, int y, int z) {
+        if (!poolLevels.contains(y))
+            return false;
+        Site s = claim(x, z);
+        return s != null && s.kind == Kind.POOL && s.level == y && s.part(dx(x, s), z - s.z).pool();
     }
 
     /**
