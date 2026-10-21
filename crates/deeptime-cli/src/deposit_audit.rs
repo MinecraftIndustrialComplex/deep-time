@@ -719,6 +719,9 @@ pub fn run(o: &Options) -> CliResult<Value> {
     }
     let mut rows: Vec<Value> = Vec::new();
     let mut shallow: Shallow = HashMap::new();
+    // Each site's ore blocks by material, as the game places them (the essentials' sources that
+    // hold ore).
+    let mut ore_of: HashMap<u32, BTreeMap<String, u64>> = HashMap::new();
     struct Row {
         ty: String,
         volume: f64,
@@ -774,6 +777,7 @@ pub fn run(o: &Options) -> CliResult<Value> {
             tot.chunks.extend(n.chunks);
         }
         m.forget();
+        ore_of.insert(s.id, tot.ore.clone());
         let primary = primary_of(s);
         let ore_total: u64 = tot.ore.values().sum();
         let raw_total: u64 = tot.raw.values().sum();
@@ -979,7 +983,7 @@ pub fn run(o: &Options) -> CliResult<Value> {
         Value::Null
     };
 
-    let essentials = essential_sources(o, &w, &sites, &guaranteed)?;
+    let essentials = essential_sources(o, &w, &sites, &guaranteed, &ore_of)?;
 
     let report = json!({
         "planet": {"land_chunks_estimate": land_chunks.round(), "ore_by_source": totals},
@@ -1003,12 +1007,16 @@ pub fn run(o: &Options) -> CliResult<Value> {
 /// Each shipped essential's sources (the sites that count toward it, `Essential::counts`): how
 /// many land regions of its grid, and of a finer one, hold one, and how far each spawn candidate
 /// (`spawn/candidates.json`, the first is the world's spawn) is from the nearest (blocks, across
-/// the x seam); the same distance to any site with the material among its products.
+/// the x seam); the same distance to any site with the material among its products. A source
+/// "with ore" places at least one ore block of the material in the world as generated (`ore_of`,
+/// the audit's own count): a site whose bodies all lie in the air or the soil counts for nothing
+/// in the game.
 fn essential_sources(
     o: &Options,
     w: &ColumnWorld,
     sites: &[Site],
     guaranteed: &HashSet<deeptime_format::events::EventId>,
+    ore_of: &HashMap<u32, BTreeMap<String, u64>>,
 ) -> CliResult<Value> {
     let c = w.c as f64;
     let sea = f64::from(w.manifest.scale.sea_level_y);
@@ -1047,6 +1055,13 @@ fn essential_sources(
     let mut out = serde_json::Map::new();
     for ess in shipped_essentials()? {
         let sources: Vec<&Site> = sites.iter().filter(|s| ess.counts(&s.products)).collect();
+        let holds = |s: &&Site| {
+            ore_of
+                .get(&s.id)
+                .and_then(|o| o.get(&ess.material))
+                .is_some_and(|&n| n > 0)
+        };
+        let with_ore: Vec<&Site> = sources.iter().copied().filter(holds).collect();
         let any: Vec<&Site> = sites
             .iter()
             .filter(|s| s.products.iter().any(|p| p.material == ess.material))
@@ -1060,18 +1075,22 @@ fn essential_sources(
             // pass counts it.
             let r = Regions::in_frame(w.manifest.world_projection().index_frame(), size);
             let land = land_regions(&r);
-            let with: HashSet<usize> = sources
-                .iter()
-                .map(|s| {
-                    let (x, z) = at(s);
-                    r.index(x, z)
-                })
-                .collect();
+            let regions_of = |list: &[&Site]| -> HashSet<usize> {
+                list.iter()
+                    .map(|s| {
+                        let (x, z) = at(s);
+                        r.index(x, z)
+                    })
+                    .collect()
+            };
+            let with = regions_of(&sources);
+            let with_ore_regions = regions_of(&with_ore);
             grids.insert(
                 name.into(),
                 json!({
                     "region_blocks": size, "regions": r.count(), "land_regions": land.len(),
                     "land_regions_with_a_source": land.intersection(&with).count(),
+                    "land_regions_with_a_source_with_ore": land.intersection(&with_ore_regions).count(),
                     "regions_with_a_source": with.len(),
                 }),
             );
@@ -1093,9 +1112,12 @@ fn essential_sources(
                 "primary_only": ess.primary_only,
                 "sources": sources.len(),
                 "guaranteed_sources": sources.iter().filter(|s| guaranteed.contains(&s.forming_event)).count(),
+                "sources_with_ore": with_ore.len(),
+                "guaranteed_sources_with_ore": with_ore.iter().filter(|s| guaranteed.contains(&s.forming_event)).count(),
                 "sites_with_the_material": any.len(),
                 "regions": grids,
                 "spawn_to_nearest_source": nearest(&sources),
+                "spawn_to_nearest_source_with_ore": nearest(&with_ore),
                 "spawn_to_nearest_site_with_the_material": nearest(&any),
             }),
         );
@@ -1335,7 +1357,7 @@ pub fn table(report: &Value) -> String {
     }
     if let Some(by) = report["essentials"]["by_material"].as_object() {
         out.push_str(&format!(
-            "\nEssentials' sources (shipped list; {} spawn candidates).\n\n| material | sources (guaranteed) | sites with it | land regions with a source | fine | spawn to nearest source | to nearest site with it |\n|---|---|---|---|---|---|---|\n",
+            "\nEssentials' sources (shipped list; {} spawn candidates).\n\n| material | sources (guaranteed) | with ore (guaranteed) | sites with it | land regions with a source | with ore | fine | spawn to nearest source | with ore | to nearest site with it |\n|---|---|---|---|---|---|---|---|---|---|\n",
             report["essentials"]["spawn_candidates"]
         ));
         for (k, v) in by {
@@ -1347,15 +1369,20 @@ pub fn table(report: &Value) -> String {
                 )
             };
             let first = |key: &str| f(&v[key][0]);
+            let ore = &v["regions"]["essential"]["land_regions_with_a_source_with_ore"];
             out.push_str(&format!(
-                "| {} | {} ({}) | {} | {} | {} | {} | {} |\n",
+                "| {} | {} ({}) | {} ({}) | {} | {} | {} | {} | {} | {} | {} |\n",
                 k,
                 v["sources"],
                 v["guaranteed_sources"],
+                v["sources_with_ore"],
+                v["guaranteed_sources_with_ore"],
                 v["sites_with_the_material"],
                 g("essential"),
+                ore,
                 g("fine"),
                 first("spawn_to_nearest_source"),
+                first("spawn_to_nearest_source_with_ore"),
                 first("spawn_to_nearest_site_with_the_material"),
             ));
         }
