@@ -153,11 +153,36 @@ def run_stats(path, skip, max_plates):
     r["welds_per_100myr"] = 100.0 * sum(1 for c in cols if c.get("sutured")) / span
     r["accretions_per_100myr"] = 100.0 * sum(1 for c in d.get("collisions", []) if not c.get("collision")) / span
     r["partings_per_100myr"] = 100.0 * len(d.get("partings", [])) / span
+    for p in d.get("partings", []):
+        key = f"parting_{p.get('reason', '?')}"
+        r[key] = r.get(key, 0.0) + 100.0 / span
+    # Collision terranes by size (A/A0) and ends.
+    for c in d.get("collisions", []):
+        f = c.get("frac", 0.0)
+        band = "ge0.5" if f >= 0.5 else "ge0.1" if f >= 0.1 else "ge0.02" if f >= 0.02 else "lt0.02"
+        key = f"terrane_{band}{'_weld' if c.get('sutured') else ''}"
+        r[key] = r.get(key, 0.0) + 100.0 / span
     # Land.
     r["land"] = mean([s["land"] / max(1, s["visible"]) for s in use])
     r["continental"] = mean([s["continental"] / max(1, s["visible"]) for s in use])
     r["piece1"] = mean([(s["pieces"][0] if s.get("pieces") else 0) / max(1, s["visible"]) for s in use])
     r["land_end"] = steps[-1]["land"] / max(1, steps[-1]["visible"])
+    # The run summary's counters (the stage's printed `plates_final=` line), per 100 Myr.
+    txt = path[: -len(".rec.json")] + ".txt" if path.endswith(".rec.json") else None
+    if txt:
+        try:
+            for line in open(txt, errors="replace"):
+                at = line.find("plates_final=")
+                if at < 0:
+                    continue
+                for kv in line[at:].split():
+                    k, _, v = kv.partition("=")
+                    if k in ("rifts", "initiations", "reversals", "subductions", "collisions",
+                             "sutures", "healed", "accretions", "births", "deaths", "buoyant"):
+                        r[f"n_{k}_per_100myr"] = 100.0 * float(v) / span
+                break
+        except OSError:
+            pass
     return r
 
 
