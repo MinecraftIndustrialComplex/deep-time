@@ -6,6 +6,7 @@ import com.minecraftindustrialcomplex.deeptime.climate.VolcanicBiomes;
 import com.minecraftindustrialcomplex.deeptime.climate.VolcanicCensus;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.Geothermal;
+import com.minecraftindustrialcomplex.deeptime.worldgen.LakeFreeze;
 import com.minecraftindustrialcomplex.deeptime.worldgen.RegionSpawnTarget;
 import com.minecraftindustrialcomplex.deeptime.worldgen.VolcanicZones;
 import net.minecraft.core.BlockPos;
@@ -19,6 +20,7 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -95,7 +97,9 @@ public final class VolcanicBiomeGameTests {
      * whatever the biome, no pool's water is frozen: the surface block of every pool column is water, not ice, and a
      * cold biome's freezing rule (vanilla's {@code Biome.shouldFreeze} of snowy plains, asked at the surface of each
      * pool column) does not ice it (a hot spring's water stays open: GEO-062; before it, Biomes O' Plenty's hot springs,
-     * temperature 0.17, froze a pool over at generation). The test planet always has pools (its preset's heat-flow
+     * temperature 0.17, froze a pool over at generation); the mod's own rule ({@link LakeFreeze#keepsOpen}) says
+     * so at every pool surface. A pack whose seasons mod stops vanilla's freezing everywhere (Serene Seasons) makes
+     * the cold-biome probe inconclusive, which the direct assertion covers. The test planet always has pools (its preset's heat-flow
      * fields), so a planet without any fails; a pack without such a biome has nothing to check of the first and
      * passes it with a line saying so, and the second runs in every profile.
      */
@@ -133,8 +137,9 @@ public final class VolcanicBiomeGameTests {
         int c = t.circumference();
         // 0 columns read; 1 of them water, 2 ice, 3 something else; 4 columns (any of these) in a biome cold enough to snow there; 5, 6 water
         // surfaces the cold biome's freezing rule was asked about and said yes to (must be none); 7, 8 the same rule one block
-        // under a surface that is also water, and its yeses (must be some: the probe can say yes).
-        int[] n = new int[9];
+        // under a surface that is also water, and its yeses (must be some where the probe can say yes at all); 9, 10 the mod's own
+        // rule (LakeFreeze.keepsOpen, what the Biome mixin asks) at each water surface (must say yes) and at the control (no).
+        int[] n = new int[11];
         StringBuilder detail = new StringBuilder();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         ChunkSampling.forEach(helper, pools.size(), i -> {
@@ -158,11 +163,15 @@ public final class VolcanicBiomeGameTests {
                         n[5]++;
                         if (cold.shouldFreeze(level, pos, false))
                             n[6]++;
+                        if (LakeFreeze.keepsOpen(level, pos))
+                            n[9]++;
                         BlockPos under = pos.below();
                         if (level.getFluidState(under).is(FluidTags.WATER)) {
                             n[7]++;
                             if (cold.shouldFreeze(level, under, false))
                                 n[8]++;
+                            if (LakeFreeze.keepsOpen(level, under))
+                                n[10]++;
                         }
                     } else {
                         n[3]++;
@@ -174,13 +183,27 @@ public final class VolcanicBiomeGameTests {
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome pool water: pools={} columns={} (inColdBiome={}) water={} iced={} other={} "
-                    + "coldBiomeFreezes={} of {} surfaces; control one block under: {} of {}{}", pools.size(), n[0], n[4], n[1], n[2], n[3], n[6], n[5],
-                    n[8], n[7], detail);
+                    + "coldBiomeFreezes={} of {} surfaces; control one block under: {} of {}; LakeFreeze.keepsOpen: {} of {} surfaces, {} of {} "
+                    + "controls{}", pools.size(), n[0], n[4], n[1], n[2], n[3], n[6], n[5], n[8], n[7], n[9], n[1], n[10], n[7], detail);
             helper.assertTrue(n[0] > 0 && n[1] > 0, "no pool water was read: " + n[0] + " pool columns, " + n[1] + " of water");
             helper.assertTrue(n[2] == 0, n[2] + " of " + n[0] + " pool columns have ice on the water:" + detail);
             helper.assertTrue(n[6] == 0, n[6] + " of " + n[5] + " pool water surfaces freeze in a cold biome (snowy plains' rule): a hot "
                     + "spring's water stays open");
-            helper.assertTrue(n[8] > 0, "the cold biome froze none of " + n[7] + " control blocks of water, so the probe cannot say yes");
+            // The mod's own rule is what keeps the water open (the Biome mixin asks it before vanilla's), so it is asserted directly: yes at
+            // every surface, no one block under (the rule is the surface block's alone), whatever the pack's climate mods do to vanilla's.
+            helper.assertTrue(n[9] == n[1], (n[1] - n[9]) + " of " + n[1] + " pool water surfaces are not kept open by LakeFreeze.keepsOpen");
+            helper.assertTrue(n[10] == 0, n[10] + " of " + n[7] + " blocks of water under a pool's surface are kept open: the rule is the surface's alone");
+            // The probe above is only worth something if vanilla's rule can say yes at all. A seasons mod can stop it everywhere (Serene
+            // Seasons redirects Biome.warmEnoughToRain inside shouldFreeze to a seasonal temperature, so snowy plains does not freeze in
+            // the season the test runs in): then it is inconclusive, which the direct assertions above cover; anywhere else it must say yes.
+            if (n[8] > 0)
+                DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome: the cold-biome probe is live (control froze {} of {})", n[8], n[7]);
+            else {
+                helper.assertTrue(ModList.get().isLoaded("sereneseasons"), "the cold biome froze none of " + n[7] + " control blocks of water, "
+                        + "so the probe cannot say yes, and no seasons mod is loaded to explain it");
+                DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome: the cold-biome probe is inconclusive here (Serene Seasons is "
+                        + "loaded: its seasonal warmEnoughToRain stops vanilla's freezing); LakeFreeze.keepsOpen is asserted directly");
+            }
             helper.succeed();
         });
     }
