@@ -755,10 +755,13 @@ pub struct BakeMap {
     elev: LayerStore,
     amp: Option<LayerStore>,
     lakes: Option<LayerStore>,
+    /// The `closed_basin` layer (HYD-100): ground below sea level the sea does not reach.
+    closed: Option<LayerStore>,
     noise: Option<(DetailSpec, Noise)>,
     elev_mips: Mips,
     lake_frac: Option<Mips>,
     lake_level: Option<Mips>,
+    closed_frac: Option<Mips>,
     climate: Option<ClimateMaps>,
     rivers: Option<RiverSet>,
     pal: Palette,
@@ -782,6 +785,9 @@ struct Heights {
     /// Share of the pixel that is lake (coarse tiles); empty on fine tiles, where a lake is a
     /// pixel whose terrain is under its level.
     lake_frac: Vec<f32>,
+    /// Share of the pixel in a closed basin (`closed_basin`, HYD-100: no sea there); empty
+    /// without the layer.
+    closed: Vec<f32>,
 }
 
 fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
@@ -854,6 +860,18 @@ impl BakeMap {
             lake_level = m.pop();
             lake_frac = m.pop();
         }
+        let closed = match layer(deeptime_format::column::CLOSED_BASIN) {
+            Some(p) => Some(LayerStore::open(&p)?),
+            None => None,
+        };
+        let closed_frac = match &closed {
+            Some(l) => {
+                let r = f64::from(l.desc().grid.r);
+                let last = ((s0 / r).log2().ceil().max(0.0) as u32).max(MIP_MIN);
+                build_mips(l, MIP_MIN, last, &[|v| (f32::from(v == 1.0), 1.0)])?.pop()
+            }
+            None => None,
+        };
         let rivers = read_rivers(dir)
             .map_err(|e| e.to_string())?
             .filter(|r| r.vertices.len() >= 2)
@@ -907,10 +925,12 @@ impl BakeMap {
             elev,
             amp,
             lakes,
+            closed,
             noise,
             elev_mips,
             lake_frac,
             lake_level,
+            closed_frac,
             climate,
             rivers,
             light: Light::new(&look),
@@ -1201,6 +1221,7 @@ impl BakeMap {
     fn heights(&self, g: &TileGeom) -> Result<Heights, String> {
         let mut h = vec![0f32; N * N];
         let (mut lake_level, mut lake_frac) = (Vec::new(), Vec::new());
+        let closed = self.closed_cover(g)?;
         let pos =
             |a: usize, b: usize| (g.x0 + (a as f64 - 1.0) * g.s, g.z0 + (b as f64 - 1.0) * g.s);
         let span_x = (g.x0 - 2.0 * g.s, g.x0 + (TILE as f64 + 1.5) * g.s);
@@ -1241,6 +1262,7 @@ impl BakeMap {
                 h,
                 lake_level,
                 lake_frac,
+                closed,
             });
         }
         // Fine tiles: the L3 cells, bilinear, a box of k × k samples under each pixel when a pixel
@@ -1299,7 +1321,49 @@ impl BakeMap {
             h,
             lake_level,
             lake_frac,
+            closed,
         })
+    }
+
+    /// The share of each pixel of tile `g` (bordered, `N × N`) in a closed basin below sea level
+    /// (HYD-100): the mip's mean on coarse tiles, the nearest cell on fine ones; empty without the
+    /// layer.
+    fn closed_cover(&self, g: &TileGeom) -> Result<Vec<f32>, String> {
+        let Some(store) = &self.closed else {
+            return Ok(Vec::new());
+        };
+        let pos =
+            |a: usize, b: usize| (g.x0 + (a as f64 - 1.0) * g.s, g.z0 + (b as f64 - 1.0) * g.s);
+        let mut out = vec![0f32; N * N];
+        let r = f64::from(store.desc().grid.r);
+        if let (Some(_), Some(frac)) = (self.mip_level(g.s), &self.closed_frac) {
+            let last = frac.first + frac.levels.len() as u32 - 1;
+            let ml = ((g.s / r).log2().floor().max(0.0) as u32).clamp(frac.first, last);
+            let fg = frac.level(ml).expect("level");
+            for b in 0..N {
+                for a in 0..N {
+                    let (bx, bz) = pos(a, b);
+                    out[b * N + a] = fg.at(&fg.stencil(bx, bz)).clamp(0.0, 1.0);
+                }
+            }
+        } else {
+            let span_x = (g.x0 - 2.0 * g.s, g.x0 + (TILE as f64 + 1.5) * g.s);
+            let span_z = (g.z0 - 2.0 * g.s, g.z0 + (TILE as f64 + 1.5) * g.s);
+            let w = window_for(store, span_x, span_z)?;
+            for b in 0..N {
+                for a in 0..N {
+                    let (bx, bz) = pos(a, b);
+                    out[b * N + a] = f32::from(w.nearest(bx, bz) == 1.0);
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// Whether pixel `k` (in the bordered tile) lies mostly in a closed basin, where no sea stands.
+    #[inline]
+    fn closed_at(hg: &Heights, k: usize) -> bool {
+        hg.closed.get(k).is_some_and(|&c| c >= 0.5)
     }
 
     /// The share of pixel `(a, b)` (in the bordered tile) that is lake and its surface.
@@ -1448,7 +1512,10 @@ impl BakeMap {
                 let k = (j + 1) * N + i + 1;
                 let q = j * TILE + i;
                 let hh = f64::from(hg.h[k]);
-                let z_m = ((hh - sea) * mv) as f32;
+                let mut z_m = ((hh - sea) * mv) as f32;
+                if Self::closed_at(hg, k) {
+                    z_m = z_m.max(0.0); // no sea in a closed basin (HYD-100)
+                }
                 let cell = self.cell(bx, bz, z_m);
                 let (mut rgb, mut strength) = satellite::colour(&cell, &self.pal, &self.look);
                 let (lake, lvl) = self.lake_at(hg, k);
@@ -1490,8 +1557,10 @@ impl BakeMap {
                 let k = (j + 1) * N + i + 1;
                 let q = j * TILE + i;
                 let hh = f64::from(hg.h[k]);
-                let mut rgb = self.ramp_colour(hh);
-                let mut strength = if hh < sea { 0.4 } else { 0.8 };
+                // No sea in a closed basin (HYD-100): its ground below sea level is the lowest land.
+                let seen = if Self::closed_at(hg, k) { hh.max(sea + 0.01) } else { hh };
+                let mut rgb = self.ramp_colour(seen);
+                let mut strength = if seen < sea { 0.4 } else { 0.8 };
                 let (lake, lvl) = self.lake_at(hg, k);
                 if lake > 0.0 {
                     let depth = (f64::from(lvl) - hh).max(0.0);
@@ -1519,7 +1588,10 @@ impl BakeMap {
                 let k = (j + 1) * N + i + 1;
                 let q = j * TILE + i;
                 let hh = f64::from(hg.h[k]);
-                let z_m = ((hh - sea) * mv) as f32;
+                let mut z_m = ((hh - sea) * mv) as f32;
+                if Self::closed_at(hg, k) {
+                    z_m = z_m.max(0.0); // no sea in a closed basin (HYD-100)
+                }
                 let (mut rgb, mut strength) = if z_m < 0.0 {
                     (
                         mix3(SEA_SHALLOW, SEA_DEEP, smoothstep(0.0, 4500.0, -z_m)),
@@ -1617,9 +1689,13 @@ impl BakeMap {
             .rivers
             .as_ref()
             .and_then(|r| r.rivers.sample(wx, z).hit);
+        let closed = match &self.closed {
+            Some(c) => at(c)?.nearest(bx, bz) == 1.0,
+            None => false,
+        };
         let (kind, water_y) = if let Some(l) = lake {
             ("lake", Some(l))
-        } else if h < sea - 1.0 {
+        } else if h < sea - 1.0 && !closed {
             ("sea", Some(sea))
         } else if let Some(hit) = &river {
             ("river", Some(hit.w))
@@ -1860,6 +1936,10 @@ mod tests {
         assert_eq!(a["surface"], "lake");
         assert_eq!(a["terrain_y"], b["terrain_y"]);
         assert_eq!(map.sample(300, 300).unwrap()["surface"], "land");
+        // The closed bowls below sea level (HYD-100): dry ground and a lake at y 50, no sea.
+        assert_eq!(map.sample(-200, -70).unwrap()["surface"], "land");
+        let low = map.sample(-200, 70).unwrap();
+        assert_eq!((&low["surface"], &low["water_y"]), (&json!("lake"), &json!(50.0)));
         // The border column of the tile west of the seam's neighbour is the next tile's first.
         let west = map.heights(&TileGeom::new(2048, 2, 3, 2).unwrap()).unwrap();
         let east = map.heights(&g).unwrap();
