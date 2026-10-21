@@ -3676,6 +3676,8 @@ impl DepositStage {
                     .collect()
             })
         };
+        // The guaranteed bodies placed so far, every essential's: (x, z, radius), blocks.
+        let mut taken: Vec<(f64, f64, f64)> = Vec::new();
         for ess in &self.params.essentials {
             let regions = frame.regions(ess.region_blocks);
             let mut have = vec![0u32; regions.count()];
@@ -3764,6 +3766,14 @@ impl DepositStage {
                             }) {
                                 continue;
                             }
+                            // Nor over another essential's guaranteed body (DEP-222): where every
+                            // cell scores alike they all want the cell nearest the centre, and the
+                            // later body paints over the earlier one's ore.
+                            if taken.iter().any(|&(qx, qz, qr)| {
+                                cluster::distance(f.c, (x, z), (qx, qz)) < r + qr
+                            }) {
+                                continue;
+                            }
                             // An in-stratum type only where the column holds its host.
                             let fit = if t.hosts.in_stratum {
                                 let key = (ti, ess.exposed, cell);
@@ -3799,6 +3809,12 @@ impl DepositStage {
                     let Some((score, ti, cell, fit)) = best else {
                         break;
                     };
+                    let (x, z) = cluster::cell_xz(&f.grid, cell);
+                    let r = producers
+                        .iter()
+                        .position(|&p| p == ti)
+                        .map_or(0.0, |k| spacing[k].1);
+                    taken.push((x, z, r));
                     let path = ctx.pool.install(|| trace(hist, self.frames, &[cell]))?;
                     f.paths
                         .insert(cell, path.into_iter().next().unwrap_or_default());
