@@ -385,9 +385,13 @@ public final class BiomeCensus {
         for (Holder<Biome> b : g.getBiomeSource().possibleBiomes())
             placeable.add(nameOf(b));
         Map<String, int[]> packs = new LinkedHashMap<>();
+        // The biomes of each active pack check's counted columns that miss its biomes (an atMost check's: those on them).
+        Map<String, Map<String, Integer>> packMisses = new HashMap<>();
         for (PackCheck pc : PACK_CHECKS)
-            if (placeable.contains(pc.requires()))
+            if (placeable.contains(pc.requires())) {
                 packs.put(pc.name(), new int[4]);
+                packMisses.put(pc.name(), new TreeMap<>());
+            }
         boolean cloudActive = placeable.contains(CLOUD_FOREST);
         // Candidates, of them on the cloud forest, cloud forest columns off the candidates, and the columns of the
         // rule's class, latitude and height left out: on a volcanic role's biome, dry (P/PET at most the rule's cut), or in
@@ -566,6 +570,8 @@ public final class BiomeCensus {
                         n[1]++;
                         if (pc.biomes().contains(nameOf(b)))
                             n[0]++;
+                        if (pc.biomes().contains(nameOf(b)) == pc.atMost())
+                            packMisses.get(pc.name()).merge(nameOf(b), 1, Integer::sum);
                     }
                 if (!untagged && (k == 31 ? y < sea - 4 : land)) {
                     for (Check ch : CHECKS) {
@@ -661,6 +667,12 @@ public final class BiomeCensus {
                 e.addProperty("share", n[1] == 0 ? null : Math.round(n[0] * 1000.0 / n[1]) / 1000.0);
                 e.addProperty("left_out_coast", n[2]);
                 e.addProperty("left_out_glaciated", n[3]);
+                // The six biomes the most columns that fail the check are on ("biome columns").
+                JsonArray miss = new JsonArray();
+                packMisses.get(pc.name()).entrySet().stream()
+                        .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
+                        .limit(6).forEach(en -> miss.add(en.getKey() + " " + en.getValue()));
+                e.add("misses", miss);
             }
             e.addProperty(pc.atMost() ? "at_most" : "at_least", pc.bound());
             JsonArray names = new JsonArray();

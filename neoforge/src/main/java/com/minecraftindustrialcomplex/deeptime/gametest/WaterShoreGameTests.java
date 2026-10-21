@@ -134,6 +134,15 @@ public final class WaterShoreGameTests {
             for (int cy = 40; cy <= 72; cy += 8)
                 b.append(' ').append(cy).append(':').append(String.format("%.3f", fd.compute(new net.minecraft.world.level.levelgen.DensityFunction.SinglePointContext(c[0], cy, c[1]))));
         }
+        if (fd instanceof net.minecraft.world.level.levelgen.DensityFunctions.TwoArgumentSimpleFunction t) {
+            b.append(" | main/noodle at col:");
+            for (int yy = y + 1; yy >= y - 10; yy--) {
+                var ctx = new net.minecraft.world.level.levelgen.DensityFunction.SinglePointContext(x, yy, z);
+                b.append(' ').append(yy).append(':').append(String.format("%.3f/%.3f", t.argument1().compute(ctx), t.argument2().compute(ctx)));
+            }
+        } else {
+            b.append(" | fd is ").append(fd.getClass().getName());
+        }
         return b.toString();
     }
 
