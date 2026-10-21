@@ -146,7 +146,8 @@ public final class Water {
                 return new Core(Kind.LAKE, surface, ground, level, t, ground, rivers);
         }
         int seaTop = spec.seaLevel() - 1;
-        if (ground < seaTop)
+        // No sea in a closed basin below sea level (HYD-100; Rust WaterSource::closed).
+        if (ground < seaTop && !wd.closedBasin(wx, z))
             return new Core(Kind.SEA, surface, ground, level, seaTop, ground, rivers);
         Rivers.Hit h = rivers.hit();
         if (h != null) {

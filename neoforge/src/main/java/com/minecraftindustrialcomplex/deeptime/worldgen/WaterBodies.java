@@ -38,6 +38,12 @@ import net.minecraft.world.level.material.Fluids;
  *       a coastal flat a block below sea level can stay land) are filled to the sea's top, so the
  *       coast is where the terrain puts it and rivers reaching it meet water. The pass therefore
  *       also runs in every chunk with elevation cells within 17 blocks of sea level.</li>
+ *   <li><b>Closed basins</b> below sea level ({@code closed_basin}, HYD-100) hold no sea: the
+ *       column rule gives them none and the fluid picker none ({@link LavaFluids}), but the
+ *       aquifer also reads the picker at columns up to three chunks away and can bring a nearby
+ *       sea's water in near the coast. In such a column the open water over the ground and above
+ *       the column's own water (a lake's or a river's top) is drained up to the sea's top
+ *       ({@link #drain}).</li>
  *   <li><b>Bank</b> columns are raised to their {@code minGround} (the neighbouring water's top,
  *       +1 beside a river), lowered to their {@code maxGround} (a 1:1 slope from the channel), and
  *       air between the neighbours' beds and {@code minGround} is sealed, so no water finds a way
@@ -234,7 +240,7 @@ public final class WaterBodies {
     private static final java.util.concurrent.atomic.LongAdder CHUNKS = new java.util.concurrent.atomic.LongAdder(),
             WORKED = new java.util.concurrent.atomic.LongAdder(), NANOS = new java.util.concurrent.atomic.LongAdder(),
             WORKED_NANOS = new java.util.concurrent.atomic.LongAdder(), SHIELDED = new java.util.concurrent.atomic.LongAdder(),
-            WOKEN = new java.util.concurrent.atomic.LongAdder();
+            WOKEN = new java.util.concurrent.atomic.LongAdder(), DRAINED = new java.util.concurrent.atomic.LongAdder();
     static final long LOG_EVERY = 512;
 
     /** Applies the pass to {@code chunk} with the generator's noise cell width. */
@@ -253,9 +259,9 @@ public final class WaterBodies {
             long n = CHUNKS.sum(), w = WORKED.sum();
             com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(
                     "[deeptime] water pass: {} chunks, {} with water or coast, {} µs a chunk on average ({} µs where it worked); "
-                            + "{} water blocks kept from the carvers, {} columns woken over carved beds",
+                            + "{} water blocks kept from the carvers, {} columns woken over carved beds, {} sea blocks drained from closed basins",
                     n, w, String.format("%.1f", NANOS.sum() / 1000.0 / n), String.format("%.1f", w == 0 ? 0.0 : WORKED_NANOS.sum() / 1000.0 / w),
-                    SHIELDED.sum(), WOKEN.sum());
+                    SHIELDED.sum(), WOKEN.sum(), DRAINED.sum());
         }
         return s;
     }
@@ -277,13 +283,19 @@ public final class WaterBodies {
         CarvingMask[] masks = carvingMasks(chunk, wd);
         LakeIce lakeIce = LakeIce.of(wd);
         Water.Column[] cols = new Water.Column[256];
+        // A closed basin below sea level in or next to the chunk (HYD-100): its columns are drained.
+        boolean closed = wd.has(WorldData.CLOSED_BASIN)
+                && PlayaPass.anySalt(wd.layer(WorldData.CLOSED_BASIN), x0, z0, x0 + 15, z0 + 15);
+        int seaTop = spec.seaLevel() - 1, drained = 0;
         for (int lz = 0; lz < 16; lz++) {
             for (int lx = 0; lx < 16; lx++) {
                 Water.Column col = reg.column(lx + 1, lz + 1);
                 cols[lz * 16 + lx] = col;
+                int x = x0 + lx, z = z0 + lz;
+                if (closed && col.kind() != Water.Kind.SEA && wd.closedBasin(x, z))   // the cell lookup wraps x
+                    drained += drain(chunk, pos, x, z, col.kind().isWater() ? col.top() : Integer.MIN_VALUE, Math.min(seaTop, maxY), minY);
                 if (col.kind() == Water.Kind.NONE)
                     continue;
-                int x = x0 + lx, z = z0 + lz;
                 if (col.kind() == Water.Kind.SEA) {
                     // The aquifer's sea, where it left the column dry: a flat a little below sea level
                     // (the aquifer decides from its own noise near the surface, not from the sea's
@@ -467,6 +479,26 @@ public final class WaterBodies {
                     }
             }
         }
-        return new Stats(water, cut, filled, flowing, shielded);
+        DRAINED.add(drained);
+        return new Stats(water, cut + drained, filled, flowing, shielded);
+    }
+
+    /**
+     * Drains the open water over column (x, z) from {@code from} down to the ground, above {@code keep} (the column's
+     * own water's top, else {@link Integer#MIN_VALUE}): the sea's water the aquifer brought into a closed basin
+     * (HYD-100). Stops at the first block that is neither air nor water. Returns the blocks drained.
+     */
+    static int drain(ChunkAccess chunk, BlockPos.MutableBlockPos pos, int x, int z, int keep, int from, int minY) {
+        int n = 0;
+        for (int y = from; y > keep && y >= minY; y--) {
+            BlockState s = chunk.getBlockState(pos.set(x, y, z));
+            if (s.isAir())
+                continue;
+            if (!s.is(Blocks.WATER))
+                break;
+            chunk.setBlockState(pos, AIR, false);
+            n++;
+        }
+        return n;
     }
 }

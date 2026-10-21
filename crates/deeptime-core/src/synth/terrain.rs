@@ -19,6 +19,13 @@ pub trait Terrain: Sync {
         None
     }
 
+    /// Whether no sea stands on block (x, z) though its ground may lie below sea level (the
+    /// `closed_basin` layer, HYD-100); `None` where the terrain writes no such layer (it is then
+    /// asked at (0, 0) only).
+    fn closed_basin(&self, _x: i64, _z: i64) -> Option<bool> {
+        None
+    }
+
     /// Latitude φ = asin(z/R), R = C/2π (the Lambert projection, `deeptime_format::projection`;
     /// south positive here), clamped to ±π/2 beyond the poles (`AnalyticTestTerrain.latitude`;
     /// its own formula, twinned in Java).
@@ -87,8 +94,21 @@ impl Terrain for WrapTest {
 /// footprint is the union of a disc and a capsule; `d` is the signed distance to it (negative
 /// inside). Profile by `d`: floor y 110 for d ≤ 0, a wall rising to y 125 over 4 blocks, a rim
 /// crest at y 125 for 4 < d ≤ 12, an outer slope down to the plain at d = 36.
+///
+/// West of it, two closed bowls below sea level (HYD-100, [`LakeTest::BOWLS`]): round floors of
+/// radius [`LakeTest::BOWL_FLOOR_RADIUS`] rising straight to the plain over
+/// [`LakeTest::BOWL_SLOPE`] blocks, the whole bowl `closed_basin`. One is dry, the other holds a
+/// lake whose surface stands below sea level.
 pub struct LakeTest {
     pub c: u32,
+}
+
+/// One of the lake test's closed bowls below sea level.
+pub struct ClosedBowl {
+    pub centre: (f64, f64),
+    pub floor_y: f64,
+    /// The lake's surface, blocks; `None`: dry.
+    pub lake_y: Option<f64>,
 }
 
 impl LakeTest {
@@ -103,6 +123,44 @@ impl LakeTest {
     pub const WALL: f64 = 4.0;
     pub const CREST: f64 = 8.0;
     pub const SLOPE: f64 = 24.0;
+    /// The closed bowls below sea level (HYD-100): a dry one and one with a lake at y 50, under
+    /// the sea's y 63.
+    pub const BOWLS: [ClosedBowl; 2] = [
+        ClosedBowl {
+            centre: (-200.0, -70.0),
+            floor_y: 40.0,
+            lake_y: None,
+        },
+        ClosedBowl {
+            centre: (-200.0, 70.0),
+            floor_y: 30.0,
+            lake_y: Some(50.0),
+        },
+    ];
+    pub const BOWL_FLOOR_RADIUS: f64 = 12.0;
+    /// The bowl's wall, floor to plain, blocks.
+    pub const BOWL_SLOPE: f64 = 30.0;
+    /// A lake bowl's `water_level` cells lie within this distance of its centre (its water's
+    /// edge is at about 20.6, where the wall reaches y 50).
+    pub const BOWL_WATER_RADIUS: f64 = 24.0;
+
+    /// Distance (blocks) from block (x, z) to bowl `b`'s centre, periodic in x.
+    pub fn bowl_distance(&self, b: &ClosedBowl, x: i64, z: i64) -> f64 {
+        let c = f64::from(self.c);
+        let mut px = x as f64 - b.centre.0;
+        px -= c * (px / c).round_ties_even();
+        let pz = z as f64 - b.centre.1;
+        (px * px + pz * pz).sqrt()
+    }
+
+    fn bowl_height(b: &ClosedBowl, r: f64) -> f64 {
+        let r = (r - Self::BOWL_FLOOR_RADIUS).max(0.0);
+        if r >= Self::BOWL_SLOPE {
+            Self::PLAIN_Y
+        } else {
+            b.floor_y + (Self::PLAIN_Y - b.floor_y) * r / Self::BOWL_SLOPE
+        }
+    }
 
     /// Signed distance (blocks) to the water footprint.
     pub fn footprint_distance(&self, x: i64, z: i64) -> f64 {
@@ -133,7 +191,16 @@ impl LakeTest {
             "water_level_y": LAKE_WATER_Y,
             "plain_y": Self::PLAIN_Y,
             "profile": "d = signed distance to the footprint (disc ∪ channel capsule); y = 110 for d ≤ 0, rises linearly to 125 at d = 4, 125 until d = 12, falls linearly to 100 at d = 36, 100 beyond",
-            "water": "water_level = 120 on every cell with d ≤ 4 (inside the rim crest), nodata elsewhere; water belongs only where it is above the terrain (d < 2.67)"
+            "water": "water_level = 120 on every cell with d ≤ 4 (inside the rim crest), nodata elsewhere; water belongs only where it is above the terrain (d < 2.67)",
+            "closed_bowls": Self::BOWLS.iter().map(|b| serde_json::json!({
+                "centre_block": [b.centre.0, b.centre.1],
+                "floor_y": b.floor_y,
+                "floor_radius": Self::BOWL_FLOOR_RADIUS,
+                "slope_blocks": Self::BOWL_SLOPE,
+                "lake_level_y": b.lake_y,
+                "water_radius": b.lake_y.map(|_| Self::BOWL_WATER_RADIUS),
+            })).collect::<Vec<_>>(),
+            "closed_basin": "1 within floor_radius + slope_blocks of a closed bowl's centre (HYD-100: no sea stands there), 0 elsewhere; a bowl's profile is floor_y out to floor_radius, then straight up to plain_y over slope_blocks"
         })
     }
 }
@@ -144,6 +211,13 @@ impl Terrain for LakeTest {
     }
 
     fn height(&self, x: i64, z: i64) -> f64 {
+        let bowl = Self::BOWLS
+            .iter()
+            .map(|b| Self::bowl_height(b, self.bowl_distance(b, x, z)))
+            .fold(Self::PLAIN_Y, f64::min);
+        if bowl < Self::PLAIN_Y {
+            return bowl;
+        }
         let d = self.footprint_distance(x, z);
         let (w, cr, s) = (Self::WALL, Self::CREST, Self::SLOPE);
         if d <= 0.0 {
@@ -160,7 +234,20 @@ impl Terrain for LakeTest {
     }
 
     fn water_level(&self, x: i64, z: i64) -> Option<f64> {
+        for b in &Self::BOWLS {
+            if let Some(y) = b.lake_y
+                && self.bowl_distance(b, x, z) <= Self::BOWL_WATER_RADIUS
+            {
+                return Some(y);
+            }
+        }
         (self.footprint_distance(x, z) <= Self::WALL).then_some(LAKE_WATER_Y)
+    }
+
+    fn closed_basin(&self, x: i64, z: i64) -> Option<bool> {
+        Some(Self::BOWLS.iter().any(|b| {
+            self.bowl_distance(b, x, z) <= Self::BOWL_FLOOR_RADIUS + Self::BOWL_SLOPE
+        }))
     }
 }
 
@@ -211,6 +298,17 @@ mod tests {
         assert_eq!(t.height(170, 0), 125.0); // closed end of the channel (d = 6)
         assert_eq!(t.water_level(0, 0), Some(120.0));
         assert_eq!(t.water_level(0, 50), None);
+        // The closed bowls below sea level (HYD-100): floors 40 and 30, a lake at 50 in the second.
+        assert_eq!(t.height(-200, -70), 40.0);
+        assert_eq!(t.height(-200, 70), 30.0);
+        assert_eq!(t.height(-200, -70 + 27), 40.0 + 60.0 * 15.0 / 30.0);
+        assert_eq!(t.height(-200, -20), 100.0);
+        assert_eq!(t.water_level(-200, -70), None);
+        assert_eq!(t.water_level(-200, 70), Some(50.0));
+        assert_eq!(t.closed_basin(-200, -70), Some(true));
+        assert_eq!(t.closed_basin(-200, 70 + 41), Some(true));
+        assert_eq!(t.closed_basin(0, 0), Some(false));
+        assert_eq!(t.height(-200 + 1024, 70), 30.0);
         // Periodic in x.
         assert_eq!(t.height(1024, 0), 110.0);
     }

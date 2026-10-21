@@ -26,6 +26,11 @@ public final class WorldData {
 
     public static final String ELEVATION = "elevation";
     public static final String WATER_LEVEL = "water_level";
+    /**
+     * 1 where no sea stands on ground below sea level: a closed basin that the open sea does not reach (FORMAT.md,
+     * "Water columns", step 3; HYD-100). Absent in a world without hydrology: the sea stands on all such ground.
+     */
+    public static final String CLOSED_BASIN = "closed_basin";
     public static final String HORIZONS = "strata/horizons";
     /** How far each strata cell's stack rose after the history (FORMAT.md, "The lift"); the structure's heights do not include it. */
     public static final String LIFT = "strata/lift";
@@ -283,6 +288,15 @@ public final class WorldData {
      */
     public double raster(String layer, double x, double z) {
         return layer(layer).bilinear(x, z);
+    }
+
+    /**
+     * Whether the {@link #CLOSED_BASIN} layer keeps the sea off block (x, z) (its nearest cell is 1; x folded); false
+     * without the layer. The column rule's sea step, the fluid picker and every reader that asks whether the sea
+     * stands on a column read this (HYD-100).
+     */
+    public boolean closedBasin(double x, double z) {
+        return has(CLOSED_BASIN) && layer(CLOSED_BASIN).nearest(x, z) == 1.0;
     }
 
     /** Water surface above the terrain at block (x, z), NaN where there is none (nearest cell). */

@@ -304,6 +304,25 @@ pub fn build_with(
         )?);
     }
 
+    // Closed basins below sea level (HYD-100), where the terrain has them: a u8 flag on L3.
+    if terrain.closed_basin(0, 0).is_some() {
+        let mut flag = Vec::with_capacity(l3.cells());
+        for j in 0..i64::from(l3.h) {
+            let z = l3.block_z(j);
+            for i in 0..i64::from(l3.w) {
+                flag.push(u8::from(terrain.closed_basin(l3.block_x(i), z) == Some(true)));
+            }
+        }
+        let mut d = LayerDesc::scalar(
+            deeptime_format::column::CLOSED_BASIN,
+            DType::U8,
+            l3.clone(),
+            codec,
+        );
+        d.units = "flag".into();
+        layers.push(LoadedLayer::new(d, flag)?);
+    }
+
     let strata_kind = strata;
     let strata = strata_layer(&l1, &layers[0], strata_kind, codec)?;
     let spawn = spawn_candidates(&layers[0], &layers[1], Scale::default_for(c).sea_level_y);

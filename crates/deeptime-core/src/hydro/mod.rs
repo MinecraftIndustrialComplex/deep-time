@@ -64,6 +64,7 @@ pub mod network;
 #[cfg(test)]
 mod tests;
 
+use deeptime_format::GridDesc;
 use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
@@ -203,6 +204,28 @@ pub fn closed_basin_layer(
         }
     }
     side.iter().map(|&s| u8::from(s == CLOSED)).collect()
+}
+
+/// The closed basins below sea level of an elevation field in metres (ledger: HYD-100): every
+/// cell at or below `sea_m` that the open sea does not reach, by the hydrology's rules
+/// ([`open_sea_mask`]: ground a block or more under sea level in a body of [`OPEN_SEA_KM2`];
+/// [`sea_reached`]). The biome bake reads it on L2, where the water bake's own (on L3) is not
+/// made yet: such ground is land to the biomes, as it is dry ground, a playa or a lake in the game.
+pub fn closed_below_sea(
+    grid: &GridDesc,
+    elevation_m: &[f32],
+    sea_m: f64,
+    m_per_block_v: f64,
+    m_per_block_h: f64,
+) -> Vec<bool> {
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    let low = |c: usize| f64::from(elevation_m[c]) <= sea_m;
+    let deep = |c: usize| f64::from(elevation_m[c]) <= sea_m - m_per_block_v;
+    let cell_km = f64::from(grid.r) * m_per_block_h / 1000.0;
+    let min_cells = ((OPEN_SEA_KM2 / (cell_km * cell_km)).ceil() as usize).max(1);
+    let open = open_sea_mask(w, h, deep, min_cells);
+    let reached = sea_reached(w, h, &open, low);
+    (0..w * h).map(|c| low(c) && !reached[c]).collect()
 }
 
 /// Potential evapotranspiration per degree of mean temperature above freezing, mm/yr/°C (the
