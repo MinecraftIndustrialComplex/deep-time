@@ -270,11 +270,17 @@ impl PlatesStage {
         // The continental crust budget (`crust_budget.rs`, measurement only), taken out of the
         // stage for the step; its first snapshot is the run's start.
         let mut cb = self.crust_budget.take();
+        // The sea the last step stood under: the climate stage's, else the one the surface
+        // filled itself (`sea_level.rs`; without a climate stage), else the datum (the first
+        // step, or the plates alone). One sea for both stages (ledger: ISO-086).
         let sea_m = |world: &WorldState| {
             world
                 .globals
                 .get(crate::climate::SEA_LEVEL_GLOBAL)
                 .copied()
+                .filter(|z| z.is_finite())
+                .or_else(|| world.surface.as_ref().map(|s| s.sea_level_m))
+                .filter(|z| z.is_finite())
                 .unwrap_or(0.0)
         };
         if self.record_crust_budget && cb.is_none() {

@@ -108,6 +108,11 @@ pub const CAP_CARBONATE_GLOBAL: &str = "climate/cap_carbonate_m";
 /// surface fills the ground itself.
 pub const SEA_LEVEL_GLOBAL: &str = "climate/sea_level_m";
 
+/// The water the step's land ice holds beyond the planet's (`planet.surface_water_m`), m as a
+/// layer over the planet, in `WorldState::globals`: 0, or the shortfall of a planet whose ice
+/// would need more water than it has (the sea is then empty and the ice is kept whole).
+pub const ICE_WATER_SHORT_GLOBAL: &str = "climate/ice_water_short_m";
+
 /// Fields the stage writes every step.
 pub mod field {
     /// Mean annual surface temperature, °C (the surface stage reads it).
@@ -407,6 +412,9 @@ pub struct ClimateStage {
     s: Saved,
     timings: BTreeMap<&'static str, f64>,
     cells: CellsAccel,
+    /// The run's log has said that the ice holds more water than the planet (not saved: a
+    /// resumed run says it again).
+    warned_ice_short: bool,
 }
 
 /// Where the snapshots' cells loop runs (`gpu.rs`; `docs/design/gpu-compute.md`): the device is
@@ -978,6 +986,7 @@ impl ClimateStage {
             s: Saved::default(),
             timings: BTreeMap::new(),
             cells: CellsAccel::default(),
+            warned_ice_short: false,
         }
     }
 
@@ -991,8 +1000,10 @@ impl ClimateStage {
     }
 
     /// The sea level the planet's water (`planet.surface_water_m`), less `ice_km3` of land ice
-    /// (Earth-normalized), gives on the ground `h` (`sea_level.rs`).
-    fn sea_from_water(&self, geo: &Geometry, h: &[f64], ice_km3: f64) -> f64 {
+    /// (Earth-normalized), gives on the ground `h` (`sea_level.rs`), and the water the ice holds
+    /// beyond the planet's, m as a layer (0 unless the ice holds more than there is: the sea is
+    /// then empty, and the climate's ice is not cut back to the water; [`ICE_WATER_SHORT_GLOBAL`]).
+    fn sea_from_water(&self, geo: &Geometry, h: &[f64], ice_km3: f64) -> (f64, f64) {
         let d = Dims::new(geo.w, geo.h, 1.0, true);
         let planet_km2 = geo.area.iter().sum::<f64>() * geo.w as f64;
         let layer =
@@ -1002,7 +1013,9 @@ impl ClimateStage {
             |s| s.numerics.flood,
         );
         let n = geo.w * geo.h;
-        crate::sea_level::fill_level(&d, h, &geo.area, layer, (n / 500).max(1), flood)
+        // The open sea's minimum size, the surface's rule (ledger: ISO-086, ERO-055).
+        let sea = crate::sea_level::fill_level(&d, h, &geo.area, layer, (n / 500).max(1), flood);
+        (sea, (-layer).max(0.0))
     }
 
     fn earth_scale(&self) -> f64 {
@@ -1258,7 +1271,7 @@ impl ClimateStage {
         let ice_max_prev = carry(world, field::ICE_MAX_THICKNESS);
         let sea_prev = self.s.sea_level_m.unwrap_or_else(|| {
             let ice = ice_prev.as_ref().map_or(0.0, |v| geo.volume_km3(v));
-            self.sea_from_water(&geo, &h, ice)
+            self.sea_from_water(&geo, &h, ice).0
         });
         self.time("topography", started);
 
@@ -1760,12 +1773,28 @@ impl ClimateStage {
         // The planet's water less what the step's land ice holds, over the ground the surface
         // starts from (`sea_level.rs`).
         let v_pre = geo.volume_km3(&ice_end_pre);
-        let mut sea = self.sea_from_water(&geo, &h, v_pre);
+        let (mut sea, short_m) = self.sea_from_water(&geo, &h, v_pre);
         if self.steering().is_some() && self.s.steer.sea_m != 0.0 {
             // The nudge on the ocean's water volume (`steering`), as the sea level it moves.
             sea += self.s.steer.sea_m;
         }
         world.globals.insert(SEA_LEVEL_GLOBAL.into(), sea);
+        // Ice that holds more water than the planet has (a snowball on a dry planet): the sea is
+        // empty and the ice is not cut back to the water. Said in the globals every step and in
+        // the run's log the first time.
+        world.globals.insert(ICE_WATER_SHORT_GLOBAL.into(), short_m);
+        if short_m > 0.0 && !self.warned_ice_short {
+            self.warned_ice_short = true;
+            ctx.log.push(
+                crate::log::Level::Warn,
+                format!(
+                    "climate: the land ice holds {short_m:.0} m more water than the planet's \
+                     {:.0} m (planet.surface_water_m): the sea is empty and the ice is kept \
+                     whole ({ICE_WATER_SHORT_GLOBAL})",
+                    self.preset.planet.surface_water_m
+                ),
+            );
+        }
         let land = land_at(sea);
         // The weathering's drawdown beyond the degassing precipitates as carbonate (after a
         // snowball: the cap carbonate), spread evenly over the sea floor above the compensation

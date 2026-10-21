@@ -1163,6 +1163,34 @@ pub struct StepIn<'a> {
     /// [`StepOut::released_m`]). Measurement only (the gap budget,
     /// `plates::gap_budget`): the step's own solve and result do not change.
     pub parts: bool,
+    /// The share of GDH1's subsidence the plate model's ocean floor takes
+    /// (`plates::pools::gdh1_scale`) when it follows GDH1 (`tectonics.ocean_depth` = `gdh1`),
+    /// else None. GDH1 is the depth of floor under water, its water load in it: the sea that
+    /// fills the floor's cooling is no new load ([`cooled_under_sea`]).
+    pub gdh1_scale: Option<f64>,
+}
+
+/// The sea water, m, that the plate model's cooling of the ocean floor let over a cell this step
+/// under GDH1 ([`StepIn::gdh1_scale`]): the step's GDH1 sinking for the cell's age, as far as it
+/// lies under the sea. GDH1 is fitted to the depth of floor under water, so that water's load is
+/// in the law already, and the flexure leaves it out of the step's load (else old floor sank
+/// 1/(1 − ρ_w/ρ_m) of GDH1 under a strong plate; ledger: ISO-088). 0 on crust new at the place,
+/// on continental crust and without GDH1.
+fn cooled_under_sea(x: &StepIn<'_>, c: usize, fresh: bool) -> f64 {
+    let Some(s) = x.gdh1_scale else {
+        return 0.0;
+    };
+    if fresh || x.crust_type[c] as u8 != OCEANIC {
+        return 0.0;
+    }
+    let age = f64::from(x.crust_age_myr[c]);
+    if age.is_nan() || age < 0.0 {
+        return 0.0;
+    }
+    let sink = s
+        * (crate::plates::pools::gdh1_depth_m(age)
+            - crate::plates::pools::gdh1_depth_m(age - x.dt_myr));
+    (x.sea_level_m - x.h_start[c]).clamp(0.0, sink.max(0.0))
 }
 
 /// What a step did.
@@ -1230,7 +1258,10 @@ pub fn local_answers(
             let fresh = st.is_none_or(|st| st.water_m[c].is_nan())
                 || (age >= 0.0 && f64::from(age) < x.dt_myr);
             let (water_ref, ice_prev) = match st {
-                Some(st) if !fresh => (f64::from(st.water_m[c]), f64::from(st.ice_m[c])),
+                Some(st) if !fresh => (
+                    f64::from(st.water_m[c]) + cooled_under_sea(x, c, fresh),
+                    f64::from(st.ice_m[c]),
+                ),
                 _ => ((sea - x.h_start[c]).max(0.0), 0.0),
             };
             let (h0, h1) = (x.h_start[c], x.h_eroded[c]);
@@ -1324,6 +1355,8 @@ pub fn step(
                     f64::from(st.ice_m[c]),
                 )
             };
+            // The sea over the floor's GDH1 cooling is in GDH1 already: no load (ISO-088).
+            let water = water + cooled_under_sea(x, c, fresh);
             let mut load = prev;
             let mut root = 0.0;
             let mut plate_root = 0.0;
@@ -1997,6 +2030,7 @@ mod tests {
         regime: Vec<f32>,
         plate: Vec<f32>,
         ice: Vec<f32>,
+        gdh1: Option<f64>,
     }
 
     impl World {
@@ -2015,6 +2049,7 @@ mod tests {
                 regime: vec![f32::from(regime::CRATON); n],
                 plate: vec![0.0; n],
                 ice: vec![0.0; n],
+                gdh1: None,
             }
         }
 
@@ -2076,6 +2111,7 @@ mod tests {
                     ice_m: Some(&self.ice),
                     rock_share: 0.8,
                     parts: true,
+                    gdh1_scale: self.gdh1,
                 },
                 &mut h,
             )
@@ -2165,6 +2201,41 @@ mod tests {
         wd.ice = vec![0.0; n];
         wd.step(&p, &mut sv, &mut st, &vec![0.0; n], 0.0);
         assert!((wd.h[under] - bare[under]).abs() < 0.5, "rebound");
+    }
+
+    /// Old ocean floor under the sea, sinking by GDH1's cooling (the plate model's uplift): GDH1
+    /// is the depth of floor under water, so the sea that fills the sinking is no new load, and
+    /// the floor sinks by GDH1 alone (ISO-088). Without GDH1 (the dampening) the same water is a
+    /// load, and the floor sinks by ρ_w/(ρ_m − ρ_w) of it more.
+    #[test]
+    fn the_sea_over_gdh1_cooling_is_no_new_load() {
+        let p = FlexureParams {
+            te_craton_km: 0.001,
+            te_min_km: 0.001,
+            te_ocean_max_km: 0.001,
+            ..on()
+        };
+        let (w, h) = (32usize, 16usize);
+        let n = w * h;
+        let sink =
+            crate::plates::pools::gdh1_depth_m(60.0) - crate::plates::pools::gdh1_depth_m(58.0);
+        let run = |gdh1: Option<f64>| -> f64 {
+            let mut wd = World::new(w, h, -5000.0);
+            wd.crust = vec![f32::from(OCEANIC); n];
+            wd.age = vec![60.0; n];
+            wd.regime = vec![f32::from(regime::RIDGE); n];
+            wd.gdh1 = gdh1;
+            let (mut sv, mut st) = started(&mut wd, &p, 0.0);
+            let before = wd.h[8 * w + 16];
+            wd.uplift = vec![(-sink / 2.0e3) as f32; n];
+            wd.step(&p, &mut sv, &mut st, &vec![0.0; n], 0.0);
+            before - wd.h[8 * w + 16]
+        };
+        let with = run(Some(1.0));
+        assert!((with - sink).abs() < 0.05, "{with} vs {sink}");
+        let without = run(None);
+        let loaded = sink * RHO_MANTLE / (RHO_MANTLE - RHO_WATER);
+        assert!((without - loaded).abs() < 0.1, "{without} vs {loaded}");
     }
 
     /// A collision as the plate model builds it (`plates/belts.rs`, tasks 3 and 4): a belt on the
@@ -2641,6 +2712,7 @@ mod tests {
                     ice_m: None,
                     rock_share: 0.8,
                     parts: false,
+                    gdh1_scale: None,
                 },
                 &mut hh,
             )
