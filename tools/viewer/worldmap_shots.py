@@ -15,7 +15,7 @@ the canvas's pixels:
   - a drag across the seam wraps x onto the planet and both sides of the seam are drawn;
   - a link opens at its layer and view, and a reload keeps it;
   - Escape closes the view; at phone width the view fits with no sideways scroll, has room (300 px
-    or more) and draws the planet;
+    or more), draws the planet and no button in its bar is blank;
   - no script errors.
 Prints PASS/FAIL lines, writes PNGs to DIR, and exits 1 when a check failed.
 """
@@ -231,6 +231,8 @@ def main():
         check(wait(ready, 60, "the world view at phone width"), "the view opens at phone width")
         s = settled()
         check(0 < s["w"] <= 390 and s["scrollW"] <= s["innerW"], f"at 390 px it fits with no sideways scroll (canvas {s['w']:.0f} px, page {s['scrollW']} of {s['innerW']})")
+        blank = ev("[...document.querySelectorAll('.wv-bar button')].filter(b => b.offsetParent && !b.innerText.trim()).map(b => b.id)")
+        check(not blank, f"at 390 px every button in the bar says what it is (blank: {blank})")
         check(s["h"] >= 300 and sum(s["ink"]) > 0, f"at 390 px the map has room and draws the planet (canvas {s['w']:.0f} x {s['h']:.0f} px, ink {s['ink']})")
         shot("05-phone.png")
         errs += s["errs"]
