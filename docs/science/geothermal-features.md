@@ -51,8 +51,9 @@ ground adds 97 (11 pools, 51 vents, 35 patches): 267 together.
 Where the pack has a hot-spring biome (Terralith's yellowstone, Biomes O' Plenty's hot springs), every
 hot-spring field lies in it, and the pack's other volcanic biomes sit on the active volcanoes, their craters
 and calderas instead of wherever their climate falls (decisions log 2026-10-03; see
-[biomes.md](biomes.md), "Volcanic biomes"). On a playa the field's biome covers only the spring's own pool,
-rim, terraces and altered ground, and the salt flat round it keeps the flat's biome (BIO-165).
+[biomes.md](biomes.md), "Volcanic biomes"). A pool within 20 blocks of a playa is the exception: it keeps its
+rim and terraces but stands in the flat's biome, so that the pack's hot-spring features stay off the salt
+(BIO-165).
 
 There are no geysers. The water does not steam, boil or erupt, and no temperature is stored. A
 separate warm-ground signal lets another mod treat the ground in and beside a site as a few kelvin
