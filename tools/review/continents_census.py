@@ -572,7 +572,8 @@ def earth_report(bnds, relief, ns):
     for lim in (20.0, 25.0, 30.0):
         c = thick >= lim
         wet = c & ~land
-        shelf = wet & (top > -200.0)
+        # The water's depth, not the surface (CRUST1.0's top is the sea surface, 0, at sea).
+        shelf = wet & (water < 200.0)
 
         def q(sel):
             o = np.argsort(thick[sel])
