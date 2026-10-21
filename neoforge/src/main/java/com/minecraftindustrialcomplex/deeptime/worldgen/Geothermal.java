@@ -5,7 +5,9 @@ import com.minecraftindustrialcomplex.deeptime.rock.PaletteRules;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.SplittableRandom;
 
 /**
@@ -307,10 +309,17 @@ public final class Geothermal {
 
     private final List<Site> sites;
     private final int circumference;
+    /** The water levels of the pools (a pool's surface block is at its site's level), so most heights are refused at once. */
+    private final Set<Integer> poolLevels;
 
     private Geothermal(List<Site> sites, int circumference) {
         this.sites = List.copyOf(sites);
         this.circumference = circumference;
+        Set<Integer> levels = new HashSet<>();
+        for (Site s : this.sites)
+            if (s.kind == Kind.POOL)
+                levels.add(s.level);
+        this.poolLevels = Set.copyOf(levels);
     }
 
     public List<Site> sites() {
@@ -367,6 +376,22 @@ public final class Geothermal {
     public Part partAt(int x, int z) {
         Site s = claim(x, z);
         return s == null ? Part.NONE : s.part(dx(x, s), z - s.z);
+    }
+
+    /**
+     * Whether block (x, y, z) is the surface block of a hot-spring pool's water: the column is a pool column of the
+     * site that wins it ({@link #claim}) and {@code y} is that site's water level, where {@link GeothermalPass} puts
+     * the top block of the water. The water of a hot spring is hot, so it never freezes whatever the biome's
+     * temperature (ledger: GEO-062, game-choice); {@code LakeFreeze} asks this before vanilla's top-layer freezing
+     * and snowfall may ice the block. Only the surface block: a pool is one or two blocks deep, and the second
+     * block of water under it is not reached by the cold. False for every other block, rim and apron included
+     * (snow may lie on the dry ground).
+     */
+    public boolean poolSurface(int x, int y, int z) {
+        if (!poolLevels.contains(y))
+            return false;
+        Site s = claim(x, z);
+        return s != null && s.kind == Kind.POOL && s.level == y && s.part(dx(x, s), z - s.z).pool();
     }
 
     /**

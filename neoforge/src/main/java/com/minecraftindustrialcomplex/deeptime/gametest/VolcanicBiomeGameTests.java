@@ -5,16 +5,24 @@ import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.climate.VolcanicBiomes;
 import com.minecraftindustrialcomplex.deeptime.climate.VolcanicCensus;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.Geothermal;
 import com.minecraftindustrialcomplex.deeptime.worldgen.RegionSpawnTarget;
 import com.minecraftindustrialcomplex.deeptime.worldgen.VolcanicZones;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
+
+import java.util.List;
 
 /**
  * The pack's volcanic biomes keep to real volcanoes (Ben, decisions log 2026-10-03, "Tie them to real
@@ -83,9 +91,13 @@ public final class VolcanicBiomeGameTests {
     /**
      * Every hot-spring pool's centre lies in the hot-spring field's biome when the pack has one
      * ({@code #deeptime:volcanic/hot_spring_field}: Terralith's yellowstone, Biomes O' Plenty's hot springs), but a
-     * pool within {@link VolcanicBiomes#PLAYA_MARGIN} of a playa, which stands in the flat's biome (BIO-165). The
-     * test planet always has pools (its preset's heat-flow fields), so a planet without any fails; a pack without
-     * such a biome has nothing to check and passes with a line saying so.
+     * pool within {@link VolcanicBiomes#PLAYA_MARGIN} of a playa, which stands in the flat's biome (BIO-165); and
+     * whatever the biome, no pool's water is frozen: the surface block of every pool column is water, not ice, and a
+     * cold biome's freezing rule (vanilla's {@code Biome.shouldFreeze} of snowy plains, asked at the surface of each
+     * pool column) does not ice it (a hot spring's water stays open: GEO-062; before it, Biomes O' Plenty's hot springs,
+     * temperature 0.17, froze a pool over at generation). The test planet always has pools (its preset's heat-flow
+     * fields), so a planet without any fails; a pack without such a biome has nothing to check of the first and
+     * passes it with a line saying so, and the second runs in every profile.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void hotSpringPoolsSitInTheirBiome(GameTestHelper helper) {
@@ -97,15 +109,80 @@ public final class VolcanicBiomeGameTests {
         helper.assertTrue(r.pools() > 0, "the test planet has no hot-spring pool: its preset's heat-flow fields should always "
                 + "place some");
         if ("-".equals(role)) {
-            DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome: the pack has no hot-spring biome; nothing to check");
-            helper.succeed();
-            return;
+            DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome: the pack has no hot-spring biome; no biome to check");
+        } else {
+            // A pool by a playa stands in the flat's biome (BIO-165: no surface role within PLAYA_MARGIN of a playa).
+            int away = r.pools() - r.poolsByPlaya();
+            helper.assertTrue(r.now().poolsInRole == away, (away - r.now().poolsInRole) + " of " + away
+                    + " hot-spring pools away from playas are not in " + role);
         }
-        // A pool by a playa stands in the flat's biome (BIO-165: no surface role within PLAYA_MARGIN of a playa).
-        int away = r.pools() - r.poolsByPlaya();
-        helper.assertTrue(r.now().poolsInRole == away, (away - r.now().poolsInRole) + " of " + away
-                + " hot-spring pools away from playas are not in " + role);
-        helper.succeed();
+        poolWaterStaysOpen(helper, level);
+    }
+
+    /**
+     * Reads the surface of every pool's water, a few pools a tick ({@link ChunkSampling}): never ice, and never frozen
+     * by a cold biome's rule. Ends the test.
+     */
+    private static void poolWaterStaysOpen(GameTestHelper helper, ServerLevel level) {
+        var t = RealPlanetGameTests.terrain(helper, level);
+        var g = (GeologicChunkGenerator) level.getChunkSource().getGenerator();
+        var settings = g.generatorSettings().value();
+        Geothermal geo = t.geothermal(g.waterReach(), settings.noiseSettings().minY(), settings.seaLevel());
+        List<Geothermal.Site> pools = geo.sites().stream().filter(s -> s.kind() == Geothermal.Kind.POOL).toList();
+        Biome cold = level.registryAccess().registryOrThrow(Registries.BIOME).getOrThrow(Biomes.SNOWY_PLAINS).value();
+        int c = t.circumference();
+        // 0 columns read; 1 of them water, 2 ice, 3 something else; 4 water in a biome that is cold enough to snow; 5, 6 water
+        // surfaces the cold biome's freezing rule was asked about and said yes to (must be none); 7, 8 the same rule one block
+        // under a surface that is also water, and its yeses (must be some: the probe can say yes).
+        int[] n = new int[9];
+        StringBuilder detail = new StringBuilder();
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        ChunkSampling.forEach(helper, pools.size(), i -> {
+            Geothermal.Site s = pools.get(i);
+            for (int dz = -s.reach(); dz <= s.reach(); dz++)
+                for (int dx = -s.reach(); dx <= s.reach(); dx++) {
+                    int x = Math.floorMod(s.x() + dx + c / 2, c) - c / 2, z = s.z() + dz;
+                    if (geo.claim(x, z) != s || !s.part(geo.dx(x, s), z - s.z()).pool())
+                        continue;
+                    BlockState top = level.getChunk(x >> 4, z >> 4).getBlockState(pos.set(x, s.level(), z));
+                    n[0]++;
+                    if (top.is(BlockTags.ICE)) {
+                        n[2]++;
+                        if (detail.length() < 600)
+                            detail.append(" iced(").append(x).append(',').append(s.level()).append(',').append(z).append(' ')
+                                    .append(level.getBiome(pos).unwrapKey().map(k -> k.location().toString()).orElse("?")).append(')');
+                    } else if (top.getFluidState().is(FluidTags.WATER)) {
+                        n[1]++;
+                        if (level.getBiome(pos).value().coldEnoughToSnow(pos))
+                            n[4]++;
+                        n[5]++;
+                        if (cold.shouldFreeze(level, pos, false))
+                            n[6]++;
+                        BlockPos under = pos.below();
+                        if (level.getFluidState(under).is(FluidTags.WATER)) {
+                            n[7]++;
+                            if (cold.shouldFreeze(level, under, false))
+                                n[8]++;
+                        }
+                    } else {
+                        n[3]++;
+                        if (detail.length() < 600)
+                            detail.append(" not-water(").append(x).append(',').append(s.level()).append(',').append(z).append(' ')
+                                    .append(top.getBlock().getDescriptionId()).append(')');
+                    }
+                }
+            return true;
+        }, () -> {
+            DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome pool water: pools={} columns={} water={} (inColdBiome={}) iced={} other={} "
+                    + "coldBiomeFreezes={} of {} surfaces; control one block under: {} of {}{}", pools.size(), n[0], n[1], n[4], n[2], n[3], n[6], n[5],
+                    n[8], n[7], detail);
+            helper.assertTrue(n[0] > 0 && n[1] > 0, "no pool water was read: " + n[0] + " pool columns, " + n[1] + " of water");
+            helper.assertTrue(n[2] == 0, n[2] + " of " + n[0] + " pool columns have ice on the water:" + detail);
+            helper.assertTrue(n[6] == 0, n[6] + " of " + n[5] + " pool water surfaces freeze in a cold biome (snowy plains' rule): a hot "
+                    + "spring's water stays open");
+            helper.assertTrue(n[8] > 0, "the cold biome froze none of " + n[7] + " control blocks of water, so the probe cannot say yes");
+            helper.succeed();
+        });
     }
 
     /**
