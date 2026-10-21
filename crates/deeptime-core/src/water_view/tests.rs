@@ -459,7 +459,13 @@ fn a_river_is_inked_at_its_width_in_the_game() {
     // Across the river (picture column 64, x = 0) the coverage sums to the channel's width in
     // pixels, 2 hw / 16 on this map: the ink is the game's water. A thread under a tenth of a pixel
     // is kept at a tenth so it still shows (HYD-091).
-    for (hw, want) in [(0.5, 0.1), (1.0, 0.125), (3.0, 0.375), (10.0, 1.25), (16.0, 2.0)] {
+    for (hw, want) in [
+        (0.5, 0.1),
+        (1.0, 0.125),
+        (3.0, 0.375),
+        (10.0, 1.25),
+        (16.0, 2.0),
+    ] {
         let v = straight_river(hw);
         let column: Vec<f32> = (0..v.h).map(|y| v.river[at(&v, 64, y)]).collect();
         let sum: f32 = column.iter().sum();

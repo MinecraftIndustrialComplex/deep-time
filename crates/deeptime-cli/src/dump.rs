@@ -128,7 +128,11 @@ pub fn chain_of(ckpt: &Path) -> Result<Vec<std::path::PathBuf>, String> {
     let Some(index) = EpochIndex::read(run).map_err(|e| e.to_string())? else {
         return one();
     };
-    let Some(entry) = index.entries.iter().find(|e| Path::new(&e.file) == Path::new(name)) else {
+    let Some(entry) = index
+        .entries
+        .iter()
+        .find(|e| Path::new(&e.file) == Path::new(name))
+    else {
         return one();
     };
     let chain = index
