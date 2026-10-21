@@ -405,53 +405,213 @@ fn the_thaw_and_the_budget_follow_the_seasons() {
     assert_eq!(Climate::of(100.0, -20.0, -2.0, -38.0).aridity(), 10.0);
 }
 
-#[test]
-fn a_basin_below_sea_level_stands_at_sea_level_however_dry() {
-    // The bowl dug to 8 blocks below sea level (the game floods such ground with the sea's water
-    // whatever the bake says), its rim well above.
+/// The synthetic planet with the bowl at (300, 75) dug to 8 blocks below sea level, its rim well
+/// above (a closed basin), and, when `open` holds, a second bowl at (300, 138) as deep, joined to
+/// the sea by a channel whose floor is a quarter block under sea level (open to the sea).
+fn below_sea(open: bool) -> Vec<i16> {
     let g = grid();
     let (w, h) = (g.w as usize, g.h as usize);
-    let elev: Vec<i16> = (0..w * h)
+    (0..w * h)
         .map(|c| {
             let (i, j) = ((c % w) as f64, (c / w) as f64);
             let d2 = (i - 300.0).powi(2) + (j - 75.0).powi(2);
+            let e2 = (i - 300.0).powi(2) + (j - 138.0).powi(2);
             let y = if d2 < 144.0 {
                 SEA - 8.0 + 20.0 * d2 / 144.0
+            } else if open && e2 < 64.0 {
+                SEA - 8.0 + 7.75 * e2 / 64.0
+            } else if open && (i - 300.0).abs() < 2.0 && j > 138.0 && j < 150.0 {
+                SEA - 0.25
             } else {
                 height(c % w, c / w)
             };
             (y * 16.0).round() as i16
         })
-        .collect();
-    let sea_raw = (SEA * 16.0) as i32;
-    let run = |climate: Climate| {
-        network::run(&network::Input {
-            grid: &g,
-            elev: &elev,
-            sea_raw,
-            m_per_block_h: 300.0,
-            climate: &move |_, _| climate,
-            params: &HydroParams::default(),
-            width_scale: 1.0,
+        .collect()
+}
+
+fn run_on(elev: &[i16], climate: Climate) -> Output {
+    let g = grid();
+    network::run(&network::Input {
+        grid: &g,
+        elev,
+        sea_raw: (SEA * 16.0) as i32,
+        m_per_block_h: 300.0,
+        climate: &move |_, _| climate,
+        params: &HydroParams::default(),
+        width_scale: 1.0,
+    })
+}
+
+/// The cells of the bowl at (300, `j0`) whose ground is a block or more below sea level.
+fn bowl_floor(elev: &[i16], j0: f64) -> Vec<usize> {
+    let g = grid();
+    let w = g.w as usize;
+    let floor = (SEA * 16.0) as i16 - 16;
+    (0..elev.len())
+        .filter(|&c| {
+            let (i, j) = ((c % w) as f64, (c / w) as f64);
+            (i - 300.0).powi(2) + (j - j0).powi(2) < 144.0 && elev[c] <= floor
         })
-    };
-    // No rain at all: the bowl is still a lake, at sea level, below its rim.
-    let dry = run(Climate::steady(0.0, 30.0));
+        .collect()
+}
+
+#[test]
+fn a_closed_basin_below_sea_level_takes_its_balance() {
+    // HYD-100: the bowl lies below sea level behind a rim above it, so the sea does not reach it
+    // and its water balance alone decides (before 2026-10-20 it stood at sea level however dry,
+    // HYD-052).
+    let g = grid();
+    let elev = below_sea(false);
+    let sea_raw = (SEA * 16.0) as i32;
+    let floor = bowl_floor(&elev, 75.0);
+    let centre = 75 * g.w as usize + 300;
+    assert!(floor.len() > 50 && floor.contains(&centre));
+    // No rain at all: dry ground below sea level, where the sea may not stand.
+    let dry = run_on(&elev, Climate::steady(0.0, 30.0));
     check_holds(&dry, &elev, &g);
-    assert_eq!(dry.lakes.len(), 1);
-    let lake = &dry.lakes[0];
-    assert_eq!(i32::from(lake.level), sea_raw);
-    assert!(lake.level < lake.rim && lake.endorheic && lake.outlet == u32::MAX);
-    assert_eq!(lake.depth, 8 * 16);
-    assert!(dry.rivers.chains.is_empty());
-    // A little rain: still sea level (the balance alone would stand lower).
-    let arid = run(Climate::steady(150.0, 30.0));
-    assert!(arid.lakes.iter().any(|l| i32::from(l.level) == sea_raw));
+    assert!(dry.lakes.is_empty() && dry.rivers.chains.is_empty());
+    assert!(floor.iter().all(|&c| dry.kind[c] == kind::NONE
+        && dry.water_level[c] == NODATA
+        && dry.closed_basin[c] == 1));
+    let below = &dry.stats["below_sea"];
+    assert!(below["dry_km2"].as_f64().unwrap() > 0.0, "{below}");
+    assert_eq!(below["closed_km2"], below["dry_km2"], "{below}");
+    assert_eq!(below["open_km2"].as_f64(), Some(0.0), "{below}");
+    // As the rain grows the bowl holds a lake whose surface stands below sea level, then one
+    // that fills it.
+    let mut last = 0;
+    let mut seen = Vec::new();
+    for rain in [60.0, 150.0, 300.0, 600.0, 1200.0, 2500.0] {
+        let out = run_on(&elev, Climate::steady(rain, 25.0));
+        check_holds(&out, &elev, &g);
+        assert!(floor.iter().all(|&c| out.closed_basin[c] == 1));
+        let cells = floor
+            .iter()
+            .filter(|&&c| out.water_level[c] != NODATA)
+            .count();
+        assert!(cells >= last, "{rain} mm: {cells} cells after {last}");
+        last = cells;
+        let level = i32::from(out.water_level[centre]);
+        let low = out.water_level[centre] != NODATA && level < sea_raw;
+        if low {
+            let n = out.stats["below_sea"]["lakes_below_sea_level"].as_u64();
+            assert!(n >= Some(1), "{}", out.stats["below_sea"]);
+        }
+        seen.push((rain, cells, low));
+    }
+    assert!(
+        seen.iter().any(|&(_, cells, low)| cells > 0 && low),
+        "a lake below sea level: {seen:?}"
+    );
     // Wet: it fills to its rim, above sea level.
-    let wet = run(Climate::steady(1500.0, 5.0));
-    let full = wet.lakes.iter().max_by_key(|l| l.cells).unwrap();
-    assert!(full.level == full.rim && i32::from(full.level) > sea_raw);
-    assert!(full.cells > lake.cells);
+    let wet = run_on(&elev, Climate::steady(1500.0, 5.0));
+    let level = wet.water_level[centre];
+    assert!(level != NODATA && i32::from(level) > sea_raw);
+    assert!(
+        wet.lakes
+            .iter()
+            .any(|l| l.level == level && l.level == l.rim)
+    );
+}
+
+#[test]
+fn a_basin_open_to_the_sea_stands_at_sea_level_however_dry() {
+    // The second bowl spills to the sea under sea level: the sea reaches it at its own level, so
+    // with no rain it still holds water up to the sea's top block, and the game may put the sea
+    // over it; the closed bowl beside it is dry.
+    let g = grid();
+    let elev = below_sea(true);
+    let sea_raw = (SEA * 16.0) as i32;
+    let open = bowl_floor(&elev, 138.0);
+    let closed = bowl_floor(&elev, 75.0);
+    assert!(open.len() > 20 && closed.len() > 50);
+    let dry = run_on(&elev, Climate::steady(0.0, 30.0));
+    check_holds(&dry, &elev, &g);
+    let lake = dry
+        .lakes
+        .iter()
+        .find(|l| open.contains(&(l.cell as usize)))
+        .expect("the open bowl holds the sea's water");
+    // Its surface's top block is the sea's (it stands a step under its sill, a quarter block
+    // under sea level).
+    assert_eq!(
+        (i32::from(lake.level) + 15).div_euclid(16) - 1,
+        sea_raw / 16 - 1
+    );
+    assert!(
+        open.iter()
+            .all(|&c| dry.water_level[c] == lake.level && dry.closed_basin[c] == 0)
+    );
+    assert!(
+        closed
+            .iter()
+            .all(|&c| dry.water_level[c] == NODATA && dry.closed_basin[c] == 1)
+    );
+    let below = &dry.stats["below_sea"];
+    assert!(below["open_km2"].as_f64().unwrap() > 0.0, "{below}");
+    assert!(below["dry_km2"].as_f64().unwrap() > 0.0, "{below}");
+}
+
+#[test]
+fn the_closed_basin_layer_takes_the_nearest_low_grounds_side() {
+    // One row of 12 cells, x wrapping: open sea at 0 and 1, closed low ground at 6 and 7, high
+    // ground elsewhere; radius 2.
+    let (w, h) = (12usize, 1usize);
+    let low = |c: usize| matches!(c, 0 | 1 | 6 | 7);
+    let mut seed = vec![false; w];
+    seed[0] = true;
+    seed[1] = true;
+    let reached = super::sea_reached(w, h, &seed, low);
+    assert_eq!(
+        (0..w).filter(|&i| reached[i]).collect::<Vec<_>>(),
+        vec![0, 1],
+        "the closed low ground is not reached"
+    );
+    let layer = super::closed_basin_layer(w, h, low, &reached, 2);
+    // 2, 3: nearer the sea; 4, 5: nearer the closed ground; 8, 9: the closed ground's; 10, 11:
+    // the sea's across the seam.
+    assert_eq!(layer, vec![0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0]);
+    // A tie goes to the sea: closed ground at 5 and 6, cell 3 two steps from each.
+    let low2 = |c: usize| matches!(c, 0 | 1 | 5 | 6);
+    let reached2 = super::sea_reached(w, h, &seed, low2);
+    let layer2 = super::closed_basin_layer(w, h, low2, &reached2, 3);
+    assert_eq!(layer2[3], 0);
+    assert_eq!(layer2[4], 1);
+    // Beyond the radius from any low ground the old rule holds (0); closed low ground alone.
+    let low3 = |c: usize| c == 0;
+    let layer3 = super::closed_basin_layer(w, h, low3, &[false; 12], 2);
+    assert_eq!(layer3, vec![1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1]);
+    // The open sea of a body under the size floor is not open.
+    let deep = |c: usize| matches!(c, 0 | 1 | 6);
+    assert_eq!(
+        super::open_sea_mask(w, h, deep, 2),
+        (0..w).map(|i| i < 2).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn the_world_grid_opens_a_closed_pocket_its_own_sea_reaches() {
+    // HYD-105. One row of 16 cells, x wrapping. The bake (on its own grid) called the pocket at
+    // 6 to 8 closed, behind a sill that the world's ground no longer has: here 0 to 8 are one
+    // deep body, so the ocean (0 to 5, open in the bake) reaches the pocket and it opens. The
+    // basin at 11 to 14 is closed in both; its edge cell 14 took an open flag from the bake's
+    // nearest cell, too few open cells to make its body the sea, and keeps it. Radius 1.
+    let (w, h) = (16usize, 1usize);
+    let deep = |c: usize| c <= 8 || (11..=14).contains(&c);
+    let low = |c: usize| deep(c);
+    let mut flag = vec![0u8; w];
+    for c in [6, 7, 8, 11, 12, 13] {
+        flag[c] = 1;
+    }
+    let (layer, cleared) = super::closed_basin_on_world(w, h, low, deep, &flag, 3, 1);
+    assert_eq!(cleared, 3, "6, 7 and 8 open");
+    // 9 and 15: a step from open low ground; 10: a step from the closed 11; 11 to 13 closed.
+    assert_eq!(layer, vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0]);
+    // With too high a floor for the open cells the ocean is not the sea: nothing opens.
+    let (kept, none) = super::closed_basin_on_world(w, h, low, deep, &flag, 7, 1);
+    assert_eq!(none, 0);
+    assert!((6..=8).all(|c| kept[c] == 1));
 }
 
 /// A rough planet: hash noise in four octaves on the 512 × 192 grid of 2-block cells, sea beyond

@@ -285,6 +285,11 @@ public final class WorldDataTerrain implements TerrainSource {
         return data().height(wrapX(x), z);
     }
 
+    @Override
+    public boolean closedBasin(int x, int z) {
+        return data().closedBasin(wrapX(x), z);
+    }
+
     /** The cave-entrance shield beside the world's water (HYD-078), with the planet's 4-block noise cell as the shore reach. */
     @Override
     public double waterShield(int x, int z) {
