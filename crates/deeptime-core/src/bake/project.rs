@@ -34,11 +34,12 @@ use rayon::prelude::*;
 use serde_json::{Value, json};
 
 use deeptime_format::bodies::{read_bodies, write_bodies};
+use deeptime_format::column::CLOSED_BASIN;
 use deeptime_format::fsutil::Flusher;
 use deeptime_format::projection::{
     BorderSpec, PetroffGuyou, Projection, ProjectionKind, WorldProjection, lat_lon_of_unit,
 };
-use deeptime_format::raster::{bilinear_weights, cover_of};
+use deeptime_format::raster::{RasterRead, bilinear_weights, cover_of};
 use deeptime_format::rivers::{Chain, Mouth, RiverVertex, Rivers, read_rivers, write_rivers};
 use deeptime_format::sites::{read_sites, write_sites_in};
 use deeptime_format::structure::{Shape, read_structure, write_structure};
@@ -48,6 +49,7 @@ use deeptime_format::{DType, FileEntry, GridDesc, LayerDesc, LoadedLayer, Manife
 use crate::bake::strata::{Moved, key_shift};
 use crate::bake::{load_layer, stored_tiles};
 use crate::error::CoreError;
+use crate::hydro;
 use crate::params::{EdgeBorder, LAMBDA_C_AUTO, PlanetPreset};
 use crate::structure::bake_horizons::Horizons;
 
@@ -1226,6 +1228,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     // The world's horizon stacks (entry, descriptor, cells), raised over the world's terrain below.
     let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
     let mut shares = serde_json::Map::new();
+    let mut closed_note = json!(null);
     for (gname, entries) in &by_grid {
         let src_grid = m
             .grids
@@ -1263,8 +1266,49 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             .collect::<Result<_, _>>()?;
         load_ms += ms(tl);
         let tl = Instant::now();
-        let outs = resample_grid(&map, &srcs, &wg);
+        let mut outs = resample_grid(&map, &srcs, &wg);
         resample_ms += ms(tl);
+        // The closed basins on the world's own ground (HYD-105).
+        if let Some(ci) = srcs.iter().position(|s| s.layer.desc.name == CLOSED_BASIN) {
+            let tl = Instant::now();
+            let here = srcs.iter().position(|s| s.entry == elev_entry);
+            if let Some(e) = world_ground(
+                &wg,
+                here.map(|k| (&srcs[k].layer.desc, &outs[k][..])),
+                world_elev.as_ref(),
+            ) {
+                let m_h = f64::from(c_sim) * p.scale.m_per_block_h / std::f64::consts::TAU
+                    * (2.0 * std::f64::consts::PI).sqrt()
+                    / b as f64;
+                let cell_km = f64::from(wg.r) * m_h / 1000.0;
+                let min_open = ((hydro::OPEN_SEA_KM2 / (cell_km * cell_km)).ceil() as usize).max(1);
+                let radius = (hydro::CLOSED_REACH_BLOCKS / f64::from(wg.r))
+                    .ceil()
+                    .max(1.0) as usize;
+                let (w, h) = (wg.w as usize, wg.h as usize);
+                let before = outs[ci].iter().filter(|&&v| v == 1).count();
+                let (layer, cleared) = hydro::closed_basin_on_world(
+                    w,
+                    h,
+                    |c| e[c] <= sea,
+                    |c| e[c] <= sea - 1.0,
+                    &outs[ci],
+                    min_open,
+                    radius,
+                );
+                let after = layer.iter().filter(|&&v| v == 1).count();
+                outs[ci] = layer;
+                closed_note = json!({
+                    "grid": gname,
+                    "min_open_cells": min_open,
+                    "radius_cells": radius,
+                    "cleared_low_cells": cleared,
+                    "flagged_cells_nearest": before,
+                    "flagged_cells": after,
+                    "millis": ms(tl),
+                });
+            }
+        }
 
         let tl = Instant::now();
         for (s, bytes) in srcs.iter().zip(outs) {
@@ -1637,6 +1681,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         "shares": Value::Object(shares),
         "pole_anisotropy": aniso,
         "top_raise": tops_note,
+        "closed_basin": closed_note,
         "vector": Value::Object(vec_note),
         "millis": {
             "lambda_c": lambda_ms, "stretch": stretch_ms, "rasters": raster_ms,
@@ -1648,6 +1693,40 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         note["border"] = json!("none");
     }
     Ok(note)
+}
+
+/// The world's ground on grid `wg`, blocks: the elevation layer's own resampled cells when it is
+/// on this grid (`here`), else the nearest cell of the world's elevation written before (the
+/// water grid `L3h` of a world too large for the hydrology at L3). None without either.
+fn world_ground(
+    wg: &GridDesc,
+    here: Option<(&LayerDesc, &[u8])>,
+    world_elev: Option<&LoadedLayer>,
+) -> Option<Vec<f64>> {
+    let n = wg.w as usize * wg.h as usize;
+    if let Some((desc, bytes)) = here {
+        let cb = desc.cell_bytes();
+        return Some(
+            (0..n)
+                .into_par_iter()
+                .map(|c| desc.physical(desc.dtype.decode_scalar(&bytes[c * cb..(c + 1) * cb])))
+                .collect(),
+        );
+    }
+    let we = world_elev?;
+    let (w, r) = (wg.w as usize, i64::from(wg.r));
+    Some(
+        (0..n)
+            .into_par_iter()
+            .map(|c| {
+                let (i, j) = ((c % w) as i64, (c / w) as i64);
+                we.nearest(
+                    (wg.origin_block_x + i * r) as f64,
+                    (wg.origin_block_z + j * r) as f64,
+                )
+            })
+            .collect(),
+    )
 }
 
 /// The terrain height the game draws at block (x, z): the elevation plus the detail term
@@ -1678,7 +1757,6 @@ fn drawn_detail(
 
 impl Drawn<'_> {
     fn height(&self, x: f64, z: f64) -> f64 {
-        use deeptime_format::RasterRead;
         let (x, z) = (x.round(), z.round());
         let wx = x - (x / self.c + 0.5).floor() * self.c;
         let e = self.elev.bilinear(wx, z);

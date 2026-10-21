@@ -63,7 +63,12 @@ to the slope's toe and the rise, in the deep-time surface stage after each step'
 Only sediment fails (the strata log and loose sediment), only between open-sea cells; the plate model's crystalline
 margin does not slump. Changing the dampening to subside oceanic crust at its age's rate was tried and withdrawn: it
 kept every load and the oceans filled (land 0.23 to 0.62 on one planet); it needs the sediment budget recalibrated
-with it.
+with it. A narrower change, a floor raised by the sediment fill's own isostatic rise (Steckler and Watts 1978, from
+memory), was measured on six runs on 2026-10-21 and also taken back out: it lifted the sea-floor pockets that hold a
+third of the plate era's lakes but did not cut the lakes, and raised the land 0.242 to 0.297, because the sea level
+is a prescribed curve and not the ocean's water over its basins (rivers-and-lakes.md, "Basins that outlast their
+sediment"; PLT-129). The surface's lake rule, which built a causeway across every lake and left the rest of it empty,
+was the law that kept the game's lakes (HYD-110).
 
 **Measured** (quick 16k, seed 2; planet A supercontinent 1,000 Myr, planet B scattered 500 Myr; before = master
 f545c0bc, after = this change on it; medians of the transects on the baked terrain, metres):

@@ -123,6 +123,32 @@ class MapModelTest {
         assertEquals(lakeC, f.sample(px, 1050, 1050));
     }
 
+    @Test
+    void aClosedBasinBelowSeaLevelIsDrawnAsLandOrItsLake() {
+        // Sea everywhere (height 20 under sea level 63) but a closed box (HYD-100): its dry ground
+        // is drawn as the land ramp at sea level, its lake (water at 40 over 30) by the lake ramp.
+        MapFrame f = MapFrame.of(PG, 256);
+        double sea = 63;
+        Ramps.Ramp land = new Ramps.Ramp(new double[]{0, 200}, new int[]{0x000000, 0xffffff});
+        Ramps.Ramp lake = new Ramps.Ramp(new double[]{0, 200}, new int[]{0x0000ff, 0x00ffff});
+        int[] px = BaseImage.render(f, PG,
+                (x, z) -> inLake(x, z) ? 30 : 20,
+                (x, z) -> inLake(x, z) && x < 1050 ? 40 : Double.NaN,
+                (x, z) -> inLake(x, z) ? 1.0 : 0.0, sea, land, lake);
+        int lakes = 0, dry = 0, wrong = 0;
+        for (int j = 0; j < f.h(); j++)
+            for (int i = 0; i < f.w(); i++) {
+                double x = f.blockX(i + 0.5), z = f.blockZ(j + 0.5);
+                int want = !inLake(x, z) ? land.abgr(20) : x < 1050 ? lake.abgr(40) : land.abgr(sea);
+                lakes += want == lake.abgr(40) ? 1 : 0;
+                dry += want == land.abgr(sea) ? 1 : 0;
+                if (px[j * f.w() + i] != want)
+                    wrong++;
+            }
+        assertEquals(0, wrong);
+        assertTrue(lakes > 0 && dry > 0, lakes + " lake and " + dry + " dry pixels");
+    }
+
     private static boolean inLake(double x, double z) {
         return x > 1000 && x < 1100 && z > 1000 && z < 1100;
     }

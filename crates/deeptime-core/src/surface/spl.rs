@@ -29,9 +29,13 @@
 //! # Lakes, the base level and deposition limits
 //! - A cell whose receiver is a base-level cell (the sea) erodes towards the base level
 //!   (`base_z`, sea level), not towards the sea floor.
-//! - Lake cells (filled by the priority flood by more than [`LAKE_TOL_M`]) do not incise: they
-//!   trap the sediment that reaches them, up to the lake level, and pass the rest on. A cell that
-//!   drains into a lake erodes towards the lake surface.
+//! - Lake cells (filled by the priority flood by more than [`LAKE_TOL_M`]) do not incise. A lake
+//!   traps the sediment that reaches it, up to its room (the volume under its level), and passes
+//!   the rest on at its exit; what it keeps settles over the whole lake, every cell raised by the
+//!   same share of its depth (HYD-110: a lake is a still basin whose floor takes the load, not a
+//!   channel through it; before, only the cells on the flow path filled, a causeway that left the
+//!   rest of the lake empty for good). A cell that drains into a lake erodes towards the lake
+//!   surface.
 //! - Deposition never exceeds the supply: a cell that would take more than flows into it takes
 //!   exactly its inflow (the flux leaving it is then zero).
 //! - Sinks (land nothing drains) keep everything that reaches them.
@@ -46,7 +50,7 @@
 use rayon::prelude::*;
 
 use super::grid::Dims;
-use super::pflood::{BASE, SINK};
+use super::pflood::{BASE, LAND, SINK};
 use super::routing::Routing;
 use super::routing::forest::{NONE, SharedF64};
 
@@ -92,6 +96,49 @@ pub struct SplReport {
     pub iterations: usize,
     /// Largest elevation change of the last iteration, m.
     pub residual_m: f64,
+}
+
+/// [`lake_links`]: not a lake cell (or a sink).
+const NOT_LAKE: u8 = 0;
+/// A lake cell draining into another cell of the same lake.
+const LAKE_CHAIN: u8 = 1;
+/// A lake cell draining out of its lake into the sea, a sink or another lake: the lake upstream
+/// of it settles here.
+const LAKE_EXIT: u8 = 2;
+/// A lake cell draining out of its lake over its spill, a land cell: the lake settles at the
+/// spill, with every other cell of the lake that drains over the same spill.
+const LAKE_SPILL: u8 = 3;
+
+/// Every cell's place in its lake, in stack order: a lake cell (filled more than [`LAKE_TOL_M`],
+/// not a sink) drains along the lake's surface to the cell where its water leaves the lake. A
+/// receiver is in the same lake when it is a lake cell within [`LAKE_TOL_M`] of the same level
+/// (the flood raises a lake's cells by ε steps towards its spill, `pflood.rs`, so several of them
+/// can drain over the spill itself).
+fn lake_links(r: &Routing, input: &SplInput<'_>) -> Vec<u8> {
+    let lake = |c: usize| input.kind[c] != SINK && input.filled[c] - input.h0[c] > LAKE_TOL_M;
+    r.stack
+        .par_iter()
+        .zip(r.forest.rpos.par_iter())
+        .map(|(&c, &rp)| {
+            let c = c as usize;
+            if !lake(c) {
+                return NOT_LAKE;
+            }
+            let rc = r.rcv[c] as usize;
+            if rp != NONE
+                && rc != c
+                && input.kind[rc] != BASE
+                && lake(rc)
+                && (input.filled[c] - input.filled[rc]).abs() <= LAKE_TOL_M
+            {
+                LAKE_CHAIN
+            } else if rp != NONE && rc != c && input.kind[rc] == LAND && !lake(rc) {
+                LAKE_SPILL
+            } else {
+                LAKE_EXIT
+            }
+        })
+        .collect()
 }
 
 pub(super) fn incise(b: f64, base: f64, f: f64, n: f64) -> f64 {
@@ -142,7 +189,6 @@ struct Cell {
     rmode: u8,
     /// Not a sink and not a lake: the cell incises (or aggrades).
     solved: bool,
-    lake: bool,
     sink: bool,
 }
 
@@ -211,15 +257,18 @@ pub fn solve_cut(
                 rfix,
                 rmode,
                 solved: kind[c] != SINK && input.filled[c] - h0 <= LAKE_TOL_M,
-                lake: input.filled[c] - h0 > LAKE_TOL_M,
                 sink: kind[c] == SINK,
             }
         })
         .collect();
+    let links = lake_links(r, input);
     let hs = SharedF64::new(l, 0.0);
     (0..l).into_par_iter().for_each(|i| hs.set(i, cells[i].h0));
     let qs = SharedF64::new(l, 0.0);
     let out = SharedF64::new(l, 0.0);
+    // A lake's room upstream of each of its cells (m × cells), and the share of it its exit fills.
+    let room = SharedF64::new(l, 0.0);
+    let share = SharedF64::new(l, 0.0);
     let delta = SharedF64::new(l, 0.0);
     let cuts = cut.as_ref().map(|_| SharedF64::new(l, 0.0));
     let mut report = SplReport::default();
@@ -253,12 +302,31 @@ pub fn solve_cut(
         // The change is the largest one of a cell that was solved, as in the serial loop (cells
         // that were not keep h, whose change is 0).
         let change = delta.max().max(0.0);
-        // Upstream first: the fluxes of this solution; sinks keep all they get, lakes fill up to
-        // their level, and deposition is capped by the supply.
+        // Upstream first: the fluxes of this solution; sinks keep all they get, a lake keeps what
+        // reaches it up to its room (its exit settles it over the whole lake, below), and
+        // deposition is capped by the supply.
         f.up(UP_CHUNK, |i| {
             let mut inflow = 0.0;
+            let mut upstream = 0.0;
+            let (mut lake_in, mut lake_room) = (0.0, 0.0);
             for &dp in &f.dpos[f.dptr[i] as usize..f.dptr[i + 1] as usize] {
-                inflow += out.get(dp as usize);
+                let o = out.get(dp as usize);
+                inflow += o;
+                match links[dp as usize] {
+                    LAKE_CHAIN => upstream += room.get(dp as usize),
+                    LAKE_SPILL => {
+                        lake_in += o;
+                        lake_room += room.get(dp as usize);
+                    }
+                    _ => {}
+                }
+            }
+            if lake_room > 0.0 {
+                // The spill of a lake: the lake keeps what reaches it up to its room.
+                // ledger: HYD-110
+                let dep = (lake_in * p.dt / a).min(lake_room);
+                share.set(i, dep / lake_room);
+                inflow = (inflow - dep * a / p.dt).max(0.0);
             }
             qs.set(i, inflow);
             let c = &cells[i];
@@ -266,9 +334,14 @@ pub fn solve_cut(
             let o = if c.sink {
                 hs.set(i, c.h0 + supply);
                 0.0
-            } else if c.lake {
-                let dep = supply.min(c.filled - c.h0);
-                hs.set(i, c.h0 + dep);
+            } else if links[i] == LAKE_CHAIN || links[i] == LAKE_SPILL {
+                // ledger: HYD-110
+                room.set(i, upstream + (c.filled - c.h0));
+                inflow
+            } else if links[i] == LAKE_EXIT {
+                let v = upstream + (c.filled - c.h0);
+                let dep = supply.min(v);
+                share.set(i, if v > 0.0 { dep / v } else { 0.0 });
                 (inflow - dep * a / p.dt).max(0.0)
             } else {
                 let o = inflow + (c.h0 - hs.get(i)) * a / p.dt;
@@ -292,6 +365,20 @@ pub fn solve_cut(
             break;
         }
     }
+    // Each lake's exit settles what the lake kept over all of it, every cell raised by the same
+    // share of its depth (the deep parts take the most: sediment focusing). ledger: HYD-110
+    f.down(DOWN_GRAIN, |i| {
+        let c = &cells[i];
+        match links[i] {
+            LAKE_CHAIN | LAKE_SPILL => {
+                let s = share.get(f.rpos[i] as usize);
+                share.set(i, s);
+                hs.set(i, c.h0 + s * (c.filled - c.h0));
+            }
+            LAKE_EXIT => hs.set(i, c.h0 + share.get(i) * (c.filled - c.h0)),
+            _ => {}
+        }
+    });
     for (i, &c) in r.stack.iter().enumerate() {
         h[c as usize] = hs.get(i);
         qin[c as usize] = qs.get(i);
@@ -318,8 +405,9 @@ pub fn solve_cut(
 
 /// The source-rock mix of the sediment flux: for every cell, the flux entering it split by the
 /// family of the rock it came from (`fam[c]` of each eroding cell), m³/yr, after a [`solve`].
-/// Deposition takes from the entering flux in proportion. Parallel over the drainage forest and
-/// bit-identical to the serial reverse-stack loop, like [`solve`].
+/// Deposition takes from the entering flux in proportion; a lake's cells all take the mix that
+/// enters the lake, and its exit takes what the whole lake kept (HYD-110). Parallel over the
+/// drainage forest and bit-identical to the serial reverse-stack loop, like [`solve`].
 pub fn families(
     d: &Dims,
     r: &Routing,
@@ -343,20 +431,43 @@ pub fn families(
         .par_iter()
         .map(|&c| usize::from(fam[c as usize]).min(FAMILIES - 1))
         .collect();
+    let links = lake_links(r, input);
     let out = SharedF64::new(l * FAMILIES, 0.0);
     let fin = SharedF64::new(l * FAMILIES, 0.0);
+    // What a lake kept upstream of each of its cells, m³/yr.
+    let kept = SharedF64::new(l, 0.0);
     f.up(UP_CHUNK, |i| {
         let mut inflow = [0.0f64; FAMILIES];
+        let mut upstream = 0.0;
+        let mut spilled = 0.0;
         for &dp in &f.dpos[f.dptr[i] as usize..f.dptr[i + 1] as usize] {
             for (k, x) in inflow.iter_mut().enumerate() {
                 *x += out.get(dp as usize * FAMILIES + k);
+            }
+            match links[dp as usize] {
+                LAKE_CHAIN => upstream += kept.get(dp as usize),
+                LAKE_SPILL => spilled += kept.get(dp as usize),
+                _ => {}
             }
         }
         for (k, &x) in inflow.iter().enumerate() {
             fin.set(i * FAMILIES + k, x);
         }
-        let qin: f64 = inflow.iter().sum();
-        let e = ev[i];
+        let mut qin: f64 = inflow.iter().sum();
+        if spilled > 0.0 && qin > 0.0 {
+            // The lakes spilling here kept their share of what entered them.
+            let keep = ((qin - spilled) / qin).clamp(0.0, 1.0);
+            inflow.iter_mut().for_each(|x| *x *= keep);
+            qin = inflow.iter().sum();
+        }
+        let e = match links[i] {
+            LAKE_CHAIN | LAKE_SPILL => {
+                kept.set(i, upstream + (-ev[i]).max(0.0));
+                0.0
+            }
+            LAKE_EXIT => ev[i].min(0.0) - upstream,
+            _ => ev[i],
+        };
         let mut o = inflow;
         if e > 0.0 {
             o[fv[i]] += e;
@@ -366,6 +477,15 @@ pub fn families(
         }
         for (k, &x) in o.iter().enumerate() {
             out.set(i * FAMILIES + k, x);
+        }
+    });
+    // A lake's cells take the mix entering it at its exit (or its spill).
+    f.down(DOWN_GRAIN, |i| {
+        if links[i] == LAKE_CHAIN || links[i] == LAKE_SPILL {
+            let rp = f.rpos[i] as usize;
+            for k in 0..FAMILIES {
+                fin.set(i * FAMILIES + k, fin.get(rp * FAMILIES + k));
+            }
         }
     });
     mix.clear();

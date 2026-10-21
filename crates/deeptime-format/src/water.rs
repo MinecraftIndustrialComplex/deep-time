@@ -12,8 +12,12 @@
 //! 2. **Lake.** `level` is the `water_level` layer by the shore rule (its nearest cell, else the
 //!    nearest wet cell within `reach` blocks; Java `WaterLevels.levelAt`). Where
 //!    `ground` < `top` = ⌈level⌉ − 1 the column holds lake water from `ground` + 1 to `top`.
-//! 3. **Sea.** Otherwise, where `ground` < sea level − 1, the sea covers it (`top` = sea level − 1):
-//!    the aquifer's water, which the game's pass tops up where the aquifer left the column dry.
+//! 3. **Sea.** Otherwise, where `ground` < sea level − 1 and the `closed_basin` layer's nearest
+//!    cell is not 1, the sea covers it (`top` = sea level − 1): the aquifer's water, which the
+//!    game's pass tops up where the aquifer left the column dry. Where `closed_basin` is 1 (a basin
+//!    below sea level that the open sea does not reach, behind a rim above it: HYD-100) no sea
+//!    stands; the column is a lake by step 2, a river, a bank or dry ground. A world without the
+//!    layer has the sea on all ground below sea level (FORMAT.md 0.5 and before).
 //! 4. **River.** Otherwise, where a channel covers the column ([`crate::rivers::Rivers::sample`]),
 //!    the water surface w gives `top` = ⌈w⌉ − 1 and the bed is cut (or filled) to
 //!    `bed` = min(top − 1, ⌊w − max(1, depth · (1 − (d / hw)²))⌋): a parabolic cross-section, at
@@ -90,6 +94,11 @@ pub trait WaterSource {
     fn level(&self, x: i64, z: i64, reach: i64) -> f64;
     /// The river network, if the world has one.
     fn rivers(&self) -> Option<&Rivers>;
+    /// Whether the `closed_basin` layer keeps the sea off block (x, z) (its nearest cell is 1).
+    /// A world without the layer has none.
+    fn closed(&self, _x: i64, _z: i64) -> bool {
+        false
+    }
 }
 
 /// One column's water (FORMAT.md, "Water columns").
@@ -185,7 +194,7 @@ pub fn core_with_surface(
         }
     }
     let sea_top = spec.sea_level_y - 1;
-    if ground < sea_top {
+    if ground < sea_top && !src.closed(wx, z) {
         out.kind = WaterKind::Sea;
         out.top = sea_top;
         out.bed = ground;
@@ -296,25 +305,38 @@ mod tests {
     use super::*;
     use crate::rivers::{Chain, Mouth, RiverVertex};
 
-    /// A plain at y 80 with a basin (level 90 over a floor at 70 for |x| < 20, |z| < 20) and a
-    /// channel along z = 100 from x = −50 (w 79) to x = 50 (w 75).
+    /// A plain at y 80 with a basin (level 90 over a floor at 70 for |x| < 20, |z| < 20), a
+    /// channel along z = 100 from x = −50 (w 79) to x = 50 (w 75), the sea from z = 200, and a
+    /// closed basin below sea level, its floor at 50, round (300, 100) (|dx|, |dz| < 24) with a
+    /// lake at 55 in its middle (|dx|, |dz| < 8).
     struct Toy {
         rivers: Rivers,
+    }
+
+    fn in_closed(x: i64, z: i64, half: i64) -> bool {
+        (x - 300).abs() < half && (z - 100).abs() < half
     }
 
     impl WaterSource for Toy {
         fn height(&self, x: i64, z: i64) -> f64 {
             if x.abs() < 24 && z.abs() < 24 {
                 70.0
+            } else if in_closed(x, z, 24) {
+                50.0
             } else if z > 200 {
                 40.0
             } else {
                 80.0
             }
         }
+        fn closed(&self, x: i64, z: i64) -> bool {
+            in_closed(x, z, 32)
+        }
         fn level(&self, x: i64, z: i64, _reach: i64) -> f64 {
             if x.abs() < 20 && z.abs() < 20 {
                 90.0
+            } else if in_closed(x, z, 8) {
+                55.0
             } else {
                 f64::NAN
             }
@@ -369,6 +391,26 @@ mod tests {
         assert_eq!(sea.top, Some(62));
         let dry = column(&t, &s, 1024, 300, 0);
         assert_eq!(dry.kind, WaterKind::None);
+    }
+
+    #[test]
+    fn no_sea_stands_in_a_closed_basin() {
+        // HYD-100: the floor at 50 lies below sea level, but the closed basin layer keeps the sea
+        // off it: dry ground, and a lake whose top (54) stands below the sea's (62).
+        let t = toy();
+        let s = WaterSpec::planet(63, -352, 639);
+        let lake = column(&t, &s, 1024, 300, 100);
+        assert_eq!(lake.kind, WaterKind::Lake);
+        assert_eq!((lake.top, lake.bed), (Some(54), Some(49)));
+        let dry = column(&t, &s, 1024, 316, 100);
+        assert_eq!((dry.kind, dry.top), (WaterKind::None, None));
+        // The lake's shore: a bank up to the lake's top only, not the sea's.
+        let shore = column(&t, &s, 1024, 308, 100);
+        assert_eq!(shore.kind, WaterKind::Bank);
+        assert_eq!(shore.min_ground, Some(54));
+        // Outside the layer the old rule holds: ground below sea level is sea.
+        let sea = column(&t, &s, 1024, 300, 300);
+        assert_eq!((sea.kind, sea.top), (WaterKind::Sea, Some(62)));
     }
 
     #[test]

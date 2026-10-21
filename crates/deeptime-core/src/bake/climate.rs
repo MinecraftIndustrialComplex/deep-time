@@ -187,6 +187,14 @@ pub fn bake(
         _ => None,
     };
     let params = p.biomes.clone().unwrap_or_default();
+    // Closed basins below sea level are land to the biomes (HYD-100; ledger: HYD-104).
+    let closed = crate::hydro::closed_below_sea(
+        &l2,
+        &elev,
+        sea,
+        p.scale.m_per_block_v,
+        p.scale.m_per_block_h,
+    );
     let mapped = biomes::map(
         climate_in.as_ref(),
         &Ground {
@@ -196,6 +204,7 @@ pub fn bake(
             l2: &l2,
             seed: p.seed,
             circumference: p.scale.circumference_blocks,
+            closed: Some(&closed),
         },
         &params,
         table,
