@@ -466,7 +466,12 @@ sixteenth of the planet's width of the seam 0.026 → 0.053 of that band.
   height, deeper at every age under GDH1 (about 600 m at 5 to 20 Myr, 250 m at 100 against the
   dampening). Which of these moves the plates is not traced. Decided (the coordinator's call,
   decisions log 2026-10-21): the plate-geometry task traces it; the sea stays where the volume
-  puts it.
+  puts it. Traced (plates.md, "The plates under the sea from the ocean's volume", twelve runs per
+  arm and more): neither the motion nor GDH1. A sea pinned off 0, at −250 m or +300 m, loses as
+  much crust as the moving one, and a sea pinned at 0 loses what master does with GDH1 on or off:
+  about 0.026 of the planet more over 1,000 Myr off the datum, in either direction, which points
+  at code that still reads 0 as the sea. The tenure's fall is inside master's own spread between
+  seeds (126 Myr on seeds 1 to 3, 46 on seeds 4 to 6).
 - For Ben: with the flexure's GDH1 water left out (ISO-088) the Earth-like planets hold Earth's
   water with land 0.268 of the planet and 0.373 of the continental crust under the sea, against
   Earth's 0.29 and about 0.19 ("The flexure's water over GDH1's floor"). The water amount stays

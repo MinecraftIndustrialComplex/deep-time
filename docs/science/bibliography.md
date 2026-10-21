@@ -3713,7 +3713,8 @@ Vanilla's OverworldBiomeBuilder, Terralith, Tectonic (game and mod data), rustff
 - Reference: Mallard, C., Coltice, N., Seton, M., Mueller, R. D., Tackley, P. J., 2016. Subduction controls the distribution and fragmentation of Earth's tectonic plates. Nature 535(7610): 140-143. Published 14 June 2016.
 - DOI or URL: (SCL, PRV, POL, BAK) 10.1038/nature17992 ; https://www.nature.com/articles/nature17992 ; PubMed 27309815 ; submitted version on HAL hal-01355818 (page blocked for the tool by an Anubis challenge) (PLT) 10.1038/nature17992.
 - Cited as: (SCL, PRV, POL, BAK) "Mallard et al. 2016" (plan §8.1), "Mallard et al. 2016, Nature 535:140-143" (plate-collisions doc) (PLT) "Mallard et al. 2016, Nature 535:140-143".
-- Ledger ids: PLT-145, SCL-030
+- Ledger ids: PLT-145, SCL-030, PLT-372 (2026-10-21)
+- Read in the plate-geometry task (2026-10-21): full text (the Caltech course copy, now in the library as `Mallard2016/nature17992-Mallard.pdf`, `mallard.txt`). Abstract: "seven large plates of similar sizes and a population of smaller plates whose areas follow a fractal distribution"; "subduction geometry drives the tectonic fragmentation that generates plates. The spacing between the slabs controls the layout of large plates, and the stresses caused by the bending of trenches break plates into smaller fragments". Main text: "an interlocking mosaic of 52 tectonic plates", "a group of seven large plates of similar area covering up to 94% of the planet". PLT-372.
 - Access: paywalled (abstract only); HAL submitted version exists but was not reachable; the research note links a Caltech course copy (https://web.gps.caltech.edu/~jstock/161/PapersToRead/nature17992-Mallard.pdf, certificate error from this tool) [other sections: paywalled in Nature (a Caltech-hosted copy was used by the research note; not located here).]
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://www.nature.com/articles/nature17992. File: Mallard2016.txt.
 - Read so far (by the project): (SCL, PRV, POL, BAK) not stated (PLT) research note Q2 says the PDF was read from web.gps.caltech.edu.
@@ -3898,11 +3899,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Stern, R. J. (2004). Subduction initiation: spontaneous and induced. Earth and Planetary Science Letters 226(3-4):275-292.
 - DOI or URL: 10.1016/S0012-821X(04)00498-4 (OpenAlex lists 10.1016/j.epsl.2004.08.007).
 - Cited as: "Stern 2004, EPSL 226:275".
-- Ledger ids: PLT-062, PLT-067, PLT-207
-- Access: paywalled (no abstract available in OpenAlex).
-- Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
-- Substitute: none found.
-- Read so far (by the project): not stated.
+- Ledger ids: PLT-062, PLT-067, PLT-207, PLT-056 and PLT-371 (2026-10-21: polarity reversal against transference)
+- Access: paywalled (no abstract available in OpenAlex); an author copy is open (2026-10-21).
+- Library (the project's source library, not distributed): fetched 2026-10-21 (author copy and the author's encyclopedia chapter "Subduction initiation"). Files: `Stern2004/SternEPSL04.pdf`, `SternEPSL04.txt`, `SubInitEoG221.pdf`.
+- Substitute: none needed.
+- Read so far (by the project): full text, 2026-10-21 (the plate-geometry task). Abstract: induced nucleation (INSZ) has "Two subclasses ... transference and polarity reversal"; "Transference INSZ moves the new subduction zone outboard of the failed one"; polarity reversal "also follows collision, but continued convergence in this case results in a new subduction zone forming behind the magmatic arc; the response of the Solomon convergent margin following collision with the Ontong Java Plateau is the best example". p. 279: "Like transference, polarity reversal is triggered by buoyant crust entering the trench, but differs from transference, in that the new subduction zone nucleates in the originally overriding plate"; the back-arc lithosphere "should be relatively thin and weak. Consequently, polarity reversal INSZ should require less compression than transference INSZ", "supported by the fact that subduction on the south side of the Solomons began almost immediately upon arrival of" the plateau; of India: "It takes less work to deform large parts of continental Asia than it does to start a new subduction zone in the Indian Plate". The OJP crust "averaging 36 km thick", against "the ~20 km expected to result in subduction zone failure". PLT-056, PLT-371.
 - Read in this pass: metadata only.
 - Reference check: correct.
 
@@ -3983,7 +3984,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Bird, P. (2003). An updated digital model of plate boundaries. Geochemistry, Geophysics, Geosystems 4(3):1027.
 - DOI or URL: (PLT) 10.1029/2001GC000252 (open access at AGU/Wiley; blocked to WebFetch with 403). (CLM) 10.1029/2001GC000252
 - Cited as: (PLT) "Bird 2003, G3 4(3):1027" (52 plates; Pacific 103.3 million km2; seven largest about 92 percent); editor hint "Earth: about 14". (CLM) "Bird 2003" (no title or journal in the code; I assigned this paper because the claim concerns subduction-zone length and rate)
-- Ledger ids: CLM-054, PLT-143, PLT-145, PLT-203, PLT-311, PLT-330 (2026-10-20: the transform test the arcs' fronts take)
+- Ledger ids: CLM-054, PLT-143, PLT-145, PLT-203, PLT-311, PLT-330 (2026-10-20: the transform test the arcs' fronts take), PLT-372 (2026-10-21: Table 1, the plate count by area)
 - Access: open access (G3 is open), not fetched as full text here. [other sections: paywalled (Unpaywall closed)]
 - Library (the project's source library, not distributed): fetched in WP-13a (full text PDF, author's site). From: http://peterbird.name/publications/2003_PB2002/2001GC000252.pdf. Text file: Bird2003.txt.
 - Read so far (by the project): (PLT) "confirmed from abstract or secondary pages"; areas from Wikipedia. (CLM) not stated; no title or journal given
@@ -3991,16 +3992,17 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference check: (PLT) correct. The abstract gives "14 large plates ... plus 38 small plates ... for a total of 52 plates". The area numbers and "seven largest 92 percent" are not in the abstract. (CLM) IDENTIFICATION UNCERTAIN. Bird 2003 is the PB2002 plate-boundary model; a total subduction length of 51,000 km at 62 mm/yr is plausible from it but I could not confirm it is in that paper.
 - Read in WP-13a (2026-10-02): Table 1 (areas in steradians): Pacific 2.57685 sr, 20.5 % of the sphere; seven plates above 5 %, together 81 % (not 92 %); Table 3 re-read: subduction 51,310 of 260,487 km (19.7 %). PLT-143, PLT-145, PLT-213, CHK-001, CHK-003.
 - Read in the land-shape task (2026-10-20): the PDF fetched again from the author's site into the source library (`Bird2003/`, the VM's library had lost it in the 2026-10-16 rebuild), text extracted; paragraphs [126] and [127]: a subduction zone is a step "with a convergent (component of) velocity and a Benioff zone ... and/or a parallel volcanic arc with Quaternary activity"; other steps are "strike-slip if the computed relative velocity ... has an azimuth within ±20 of the azimuth of the plate boundary step". PLT-311.
+- Read in the plate-geometry task (2026-10-21): Table 1's 52 areas in steradians copied into `tools/review/plate-geometry.py` (BIRD_SR); the counts above 1, 0.3, 0.1, 0.0377 and 0.01 sr are 7, 10, 14, 19 and 31. PLT-372.
 
 ### Morra2013
 - Reference: Morra, G., Seton, M., Quevedo, L., Müller, R. D. (2013). Organization of the tectonic plates in the last 200 Myr. Earth and Planetary Science Letters 373:93-101.
 - DOI or URL: 10.1016/j.epsl.2013.04.020.
 - Cited as: "Morra et al. 2013, EPSL 373:93-101".
-- Ledger ids: PLT-145
-- Access: paywalled.
-- Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
-- Substitute: none found.
-- Read so far (by the project): abstract or secondary.
+- Ledger ids: PLT-145, PLT-372 (2026-10-21)
+- Access: paywalled; an author copy is open (2026-10-21).
+- Library (the project's source library, not distributed): fetched 2026-10-21 (author copy). Files: `Morra2013/Morra_etal_Plates200Ma_EPSL_2013.pdf`, `morra.txt`.
+- Substitute: none needed.
+- Read so far (by the project): full text, 2026-10-21 (the plate-geometry task). Abstract: plate sizes follow "either one (Sornette and Pisarenko, 2003) or two (Bird, 2003) statistically distinct groups"; "two distributions indicate distinct evolutionary laws for large and small plates, the first tied to mantle flow, the second determined by a hierarchical fragmentation process"; over the last 200 Myr "(i) large and small plates display distinct statistical distributions, (ii) the small plates display little organisational change since 60 Ma and (iii) the large plates oscillate between heterogeneous (200–170 Myr and 65–50 Ma) and homogeneous (120–100 Ma) plate tessellations on a timescale of about 100 Myr". Fig. 2 caption: below log(Size) about 7.5 (km²) "the small plates follow a power-law with an exponent α∼3–5", "the largest 6–7 plates follow a steeper slope". PLT-372.
 - Read in this pass: metadata only.
 - Reference check: correct.
 
@@ -4432,7 +4434,8 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Syracuse, E. M., Abers, G. A. (2006). Global compilation of variations in slab depth beneath arc volcanoes and implications. Geochemistry, Geophysics, Geosystems 7(5):Q05017.
 - DOI or URL: 10.1029/2005GC001045.
 - Cited as: not cited; candidate source for arc-slab depth (flag 10; PLT-042).
-- Ledger ids: (supports 042, 061, 164); notes: supports 042, 061, 164
+- Ledger ids: (supports 042, 061, 164); notes: supports 042, 061, 164; PLT-042 (2026-10-21 note)
+- Read in the plate-geometry task (2026-10-21): abstract (OpenAlex; in the library as `Syracuse2006/abstract_openalex.txt`): "33,000 km of the global arc system at 839 volcanic centers"; the depth to the slab's top under the volcanoes, "averaged over 500-km-long arc segments, H ranges from 72 to 173 km with a global average of 105 km". A depth, not the arc's distance from the trench (PLT-042); the distance needs the slab's dip, which the abstract does not give per arc.
 - Access: open (G3).
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): not read.
@@ -5916,10 +5919,11 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Reference: Stern, R. J. and Scholl, D. W. (2010). Yin and yang of continental crust creation and destruction by plate tectonic processes. International Geology Review 52(1):1-31.
 - DOI or URL: 10.1080/00206810903332322; author copy https://personal.utdallas.edu/~rjstern/pdfs/YinyangIGR10.pdf
 - Cited as: "Stern & Scholl 2010".
-- Ledger ids: PLT-045 (since 2026-10-17 the value), PLT-046, PLT-285, PLT-286, HNT-125, HNT-126, PLT-331 (2026-10-20: what the intra-oceanic arc rate counts), PLT-258 (2026-10-03: "the bulk of the approximately 40 km-thick crust that must have originally existed is missing" at UHP terranes; continental crust lost at all collision zones "approximately 0.7 km3/year", Scholl & von Huene 2009 as cited)
+- Ledger ids: PLT-045 (since 2026-10-17 the value), PLT-046, PLT-285, PLT-286, HNT-125, HNT-126, PLT-331 (2026-10-20: what the intra-oceanic arc rate counts), PLT-258 (2026-10-03: "the bulk of the approximately 40 km-thick crust that must have originally existed is missing" at UHP terranes; continental crust lost at all collision zones "approximately 0.7 km3/year", Scholl & von Huene 2009 as cited), PLT-370 (2026-10-21: the arcs split by the crust they stand on; 14,500 and 27,500 km)
 - Access: paywalled at the publisher; author copy open.
 - Library (the project's source library, not distributed): fetched 2026-10-02 (author copy). Text file: `SternScholl2010/SternScholl2010.txt`.
 - Read so far (by the project): full text, 2026-10-02. Abstract: creation and destruction of continental crust "is either in balance (~3.2 km3/year, or 3.2 AU) or more crust is being destroyed than created"; p. 9: the Aleutian and Izu-Bonin-Mariana arcs, "which have evolved since 45-50 Ma", give "crustal growth estimates of 90-180 km3/km-million years"; growth is front-loaded (several hundred km3/km/Myr in the first few Myr, "a few tens or less" for mature arcs); about 2.7 AU of growth at convergent margins (Table 1). Read again 2026-10-17 (plate task 8; the copy at `SternScholl2010/SternScholl2010.txt`): p. 11, intra-oceanic arcs "approximately 100 km3/km-million years (500 km3/million years for first 10 million years plus 30 km3/million years for 60 million years thereafter). At this rate, crustal growth at the present 14,500 km of intra-oceanic arcs" gives 1.5 AU; p. 12, continental arcs after Haschke & Günther 2003: "The 35 km3/km-million years rate is essentially the rate of Reymer and Schubert (1984). It implies a reasonable intrusive : extrusive ratio of approximately 7:1 and is adopted as a useful long-term rate estimate for continental margin arc productivity. The combined length of continental margin arcs is approximately 27,500 km (Scholl and von Huene 2007). The corresponding global addition rate is thus approximately 1.0 AU"; Table 1 (p. 12): oceanic arcs 1.5, continental arcs 1.0, collision zones 0.2, rifts and hotspots 0.5 AU of additions; losses at sutures about 0.7 AU; p. 24, new arcs 300 to 500 km3/km/Myr, mature ones 30 to 35. Read again 2026-10-20 (the arc-basement task, PLT-331; the copy at `SternScholl2010/SternScholl2010.txt`): p. 7, of the geophysical arc growth rates, "The largest sources of error are as follows: (1) uncertainty about whether to include an original 6–7 km thickness of ‘trapped’ oceanic crust"; "early concepts assumed that new arcs grew on a substrate of pre-existing oceanic crust that was trapped when the new subduction zone formed (Dickinson and Sealy 1979). More recent considerations indicate that the substrate for intra-oceanic arcs is produced when subduction begins (Stern and Bloomer 1992; Hall et al. 2003)"; Figure 6 caption, after Tatsumi et al. (2008): "Incipient arc magmatism replaces the pre-existing oceanic crust to create the initial mafic arc crust"; Introduction: "thinner (∼7 km), denser (∼2.90 g/cc) oceanic crust".
+- Read in the plate-geometry task (2026-10-21), the library text again: p. 11-12, intra-oceanic arc growth at "the present 14,500 km of intra-oceanic arcs alone (principally the Aleutian, South Sandwich, Kermadec, Tonga, Vanuatu, Solomon, New Britain, Izu–Bonin–Mariana, Indonesia east of Java or Banda, and the Lesser Antilles arcs)" gives 1.5 AU; "The combined length of continental margin arcs is approximately 27,500 km (Scholl and von Huene 2007)", 1.0 AU; so 14,500 of 42,000 km (35 %) of the arcs stand on ocean floor. PLT-370.
 
 ### TetreaultBuiter2014
 - Reference: Tetreault, J. L. and Buiter, S. J. H. (2014). Future accreted terranes: a compilation of island arcs, oceanic plateaus, submarine ridges, seamounts, and continental fragments. Solid Earth 5:1243-1275.
@@ -7274,6 +7278,55 @@ The sources named for the plateaus' summer warmth (CLM-220) and the Cryogenian's
 - Ledger ids: none (plates.md, 2026-10-21: the Cryogenian's dates beside Ben's run)
 - Access: not fetched.
 - Read so far (by the project): nothing. The dates taken from it (Sturtian about 717 to 660 Ma, Marinoan ending about 635 Ma) are from memory and unchecked.
+
+## The plate geometry: arcs, reversals and where subduction starts (PLT-370 to PLT-372; notes on PLT-042, PLT-056, PLT-062, PLT-064), added 2026-10-21
+
+The sources of the plate-geometry task (build log 2026-10-21 "The plate geometry"; plates.md, the section of that name). Above and read again or for the first time in full this time: Stern 2004 (polarity reversal against transference), Stern & Scholl 2010 (the arcs' lengths by the crust they stand on), Bird 2003 (Table 1), Morra et al. 2013 and Mallard et al. 2016 (the plate sizes), Syracuse & Abers 2006 (abstract). Texts in the project's source library on the test VM (`/data/ban/deeptime-sources/<key>/`), not distributed.
+
+### Crameri2020
+- Reference: Crameri, F., Magni, V., Domeier, M., Shephard, G. E., Chotalia, K., Cooper, G., Eakin, C. M., Grima, A. G., Gürer, D., Király, Á., Mulyukova, E., Peters, K., Robert, B. and Thielmann, M. (2020). A transdisciplinary and community-driven database to unravel subduction zone initiation. Nature Communications 11:3750.
+- DOI or URL: 10.1038/s41467-020-17522-9 (open access).
+- Cited as: "Crameri et al. 2020".
+- Ledger ids: PLT-062, PLT-064 (2026-10-21 notes), PLT-371 (the polarity reversals' rate)
+- Access: open.
+- Library (the project's source library, not distributed): fetched 2026-10-21 with Supplementary Information and Supplementary Data 1. Files: `Crameri2020/crameri2020.pdf`, `crameri2020.txt`, `41467_2020_17522_MOESM1_ESM.pdf` to `MOESM3_ESM.xlsx`, `Supplementary_Data1_Analysis_sheet.txt` (the xlsx's analysis sheet as text).
+- Read so far (by the project): full text and Supplementary Data 1's analysis sheet, 2026-10-21. Table 1: 13 subduction-zone initiation (SZI) events from 6 ± 1 to 104 ± 1 Ma, four of them polarity reversals (Aleutian 53 ± 2, Tonga-Kermadec 50 ± 5, New Hebrides-New Britain 10 ± 2, Philippine 9 ± 3 Ma); some candidates were "deemed too unclear to be included", so 13 is a floor. "All SZI events start less than 1500 km away from other active subduction zones and, in most cases, less than 500 km"; "At least nine of all thirteen events ... occur at or near a pre-existing convergent plate boundary"; "collision events along pre-existing subduction trenches are often precursors of SZI events"; "subduction breeds subduction"; "horizontally forced subduction zone initiation is dominant over the last 100 Ma". Supplementary Data 1: the subducting plates' mean ages at initiation, Aleutian 31.7, Izu-Bonin 40.7, Sunda-Java 44.8, Lesser Antilles 49, Tonga-Kermadec 54.4, South Sandwich 61.2, New Hebrides-New Britain 62.5, Philippine 66.2, Halmahera 117.4 Myr.
+
+### GurnisHallLavier2004
+- Reference: Gurnis, M., Hall, C. and Lavier, L. (2004). Evolving force balance during incipient subduction. Geochemistry, Geophysics, Geosystems 5(7):Q07001.
+- DOI or URL: 10.1029/2003GC000681 (open, the author's site).
+- Cited as: "Gurnis et al. 2004".
+- Ledger ids: PLT-062, PLT-064 (2026-10-21 notes)
+- Access: open.
+- Library (the project's source library, not distributed): fetched 2026-10-21. Files: `Gurnis2004/GURggg04.pdf`, `GURggg04.txt`.
+- Read so far (by the project): full text, 2026-10-21. Abstract: "Nearly half of all active subduction zones initiated during the Cenozoic"; "Subduction initiation is known to have occurred in a variety of tectonic settings: old fracture zones, transform faults, and extinct spreading centers and through polarity reversal behind active subduction zones" ("Izu-Bonin-Mariana (IBM) along a fracture zone, Tonga-Kermadec along an extinct subduction boundary, New Hebrides within a back arc, and Puysegur-Fiordland along a spreading center"); "The large initial bending resistance can be entirely eliminated in ridge models, explaining the propensity for new subduction zones to form through polarity reversals"; "A FZ must be underthrust by the older plate for 100–150 km before a transition from forced to self-sustaining" subduction. Table 1 "Cenozoic Subduction Initiation": eleven zones, their heritage fracture zone, transform, spreading centre, extinct subduction zone or polarity reversal (New Britain-San Cristobal, New Hebrides); none from old floor far from a plate boundary.
+
+### HallGurnis2003
+- Reference: Hall, C. E., Gurnis, M., Sdrolias, M., Lavier, L. L. and Müller, R. D. (2003). Catastrophic initiation of subduction following forced convergence across fracture zones. Earth and Planetary Science Letters 212(1-2):15-30.
+- DOI or URL: 10.1016/S0012-821X(03)00242-5 (the record in CaltechAUTHORS).
+- Cited as: "Hall et al. 2003".
+- Ledger ids: PLT-062 (2026-10-21 note)
+- Access: paywalled; the abstract is open.
+- Library (the project's source library, not distributed): the CaltechAUTHORS record with the abstract, 2026-10-21. File: `Hall2003/abstract.txt`.
+- Read so far (by the project): abstract, 2026-10-21: "a fracture zone could be converted into a self-sustaining subduction zone after approximately 100 km of convergence"; "Using global plate reconstructions, we suggest that IBM nucleation was associated with a change in plate motion between 55 and 45 Ma".
+
+### SornettePisarenko2003
+- Reference: Sornette, D. and Pisarenko, V. (2003). Fractal plate tectonics. Geophysical Research Letters 30(3):1105 (venue and article number as Mallard et al. 2016 cite it; the issue and DOI 10.1029/2002GL015043 from memory).
+- DOI or URL: arXiv cond-mat/0202320 (the preprint read).
+- Cited as: "Sornette & Pisarenko 2003".
+- Ledger ids: PLT-372
+- Access: the preprint is open.
+- Library (the project's source library, not distributed): fetched 2026-10-21 (arXiv preprint). Files: `SornettePisarenko2003/arxiv.pdf`, `arxiv.txt`.
+- Read so far (by the project): the preprint's abstract and text, 2026-10-21: Bird's plate areas follow "the power law with exponent 0.25±0.05", "the most robust and parsimonious model for all plates, including the very largest plates, when taking into account the constraint that the plates areas must sum up to 4π steradians".
+
+### EnglandEngdahlThatcher2004
+- Reference: England, P., Engdahl, R. and Thatcher, W. (2004). Systematic variation in the depths of slabs beneath arc volcanoes. Geophysical Journal International 156(2):377-408 (from memory; the abstract was fetched without its record's metadata).
+- DOI or URL: 10.1111/j.1365-246X.2003.02132.x (from memory).
+- Cited as: "England et al. 2004 (abstract)".
+- Ledger ids: PLT-042 (2026-10-21 note)
+- Access: open at the publisher (from memory); only the abstract was fetched.
+- Library (the project's source library, not distributed): the abstract from OpenAlex, 2026-10-21. File: `England2004/abstract_openalex.txt`.
+- Read so far (by the project): abstract, 2026-10-21: the depths to the tops of the intermediate-depth seismicity under arc volcanoes are "constant, to within a few kilometres, within individual arc segments, but differ by tens of kilometres from one arc segment to another. The range in depths is from 65 km to 130 km"; they correlate inversely "with the descent speed of the subducting plate". A depth, not a distance from the trench.
 
 ## The plateau's warmth (CLM-225 to CLM-231, MOI-085), added 2026-10-21
 
