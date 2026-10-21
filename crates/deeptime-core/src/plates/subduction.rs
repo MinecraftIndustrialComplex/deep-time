@@ -317,9 +317,13 @@ pub fn resolve(
             let c = &state.contacts[k];
             let under_side = usize::from(c.under != lo);
             let (u, o) = (under_side, 1 - under_side);
+            let mode = pg_reversal_mode();
+            let by_crust = frac(u) >= REVERSAL_UNDER
+                && frac(o) < REVERSAL_OVER
+                && (mode == 0 || c.collision.is_none())
+                && (mode < 2 || env.t_myr - c.onset_myr < CONFIRM_MYR);
             if agg.count >= MIN_CONTACT
-                && ((frac(u) >= REVERSAL_UNDER && frac(o) < REVERSAL_OVER)
-                    || (lock(u) >= REVERSAL_UNDER && lock(o) < REVERSAL_OVER))
+                && (by_crust || (lock(u) >= REVERSAL_UNDER && lock(o) < REVERSAL_OVER))
             {
                 reverse(state, world, env, k)?;
             }
@@ -479,6 +483,19 @@ pub(super) fn locked_against(
     own: Option<f64>,
 ) -> bool {
     locked(s, t_myr, env) && own.is_none_or(|t0| f64::from(s.orogeny_myr) < t0 - 1e-6)
+}
+
+/// Plate-geometry task experiment (2026-10-21; removed before the merge): 0 the base, 1 no
+/// reversal by crust while the contact is in collision, 2 also none once the contact is a
+/// confirmed subduction zone.
+fn pg_reversal_mode() -> u8 {
+    static M: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+    *M.get_or_init(|| {
+        std::env::var("DEEPTIME_PG_REVERSAL")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0)
+    })
 }
 
 /// A contact reverses when at least this fraction of its subducting side's crust in the overlap

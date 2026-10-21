@@ -1114,6 +1114,12 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
         d
     };
     let spacing_km = norm.km(norm.spacing_rad());
+    // An ocean-ocean front whose overriding plate has continental crust within the arc's distance
+    // of it, through that plate, builds its arc on that crust: a continental arc, the class
+    // Stern & Scholl (2010) split the world's arcs by (the crust the arc stands on), so it counts
+    // as ocean-continent. Lattice steps, so the distance is an upper bound. ledger: PLT-370
+    let arc_on_continent =
+        |v: usize| coast_steps[v] != u32::MAX && f64::from(coast_steps[v]) * spacing_km <= env.k.arc_distance_km;
     let units = (0..samples.len())
         .into_par_iter()
         .fold(MixUnits::default, |mut acc, v| {
@@ -1173,6 +1179,11 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
                 n += 1;
             }
             if let Some((class, half)) = classify_boundary(sv.kind, &buf[..n]) {
+                let class = if class == mix::OCEAN_OCEAN && arc_on_continent(v) {
+                    mix::OCEAN_CONTINENT
+                } else {
+                    class
+                };
                 acc.km[class] += u64::from(half);
                 let setting = match class {
                     mix::OCEAN_OCEAN => Some(0),
