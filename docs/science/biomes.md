@@ -331,7 +331,15 @@ game choices but the vanilla depth band of BIO-112):
 | thermal caves (underground) | terralith:cave/thermal_caves | 1.5 chamber radii round the magma, from the biome's own depth down |
 
   A surface role holds only on land and above the cave band (biome depth under 0.2, vanilla's cave biomes
-  start there: BIO-112), and never on a river's channel. "Where the climate allows" means the climate point
+  start there: BIO-112), and never on a river's channel. On a playa it holds only on a hot spring's own pool,
+  rim, terraces and altered ground, and only as the hot-spring field (BIO-165): the salt flat is the
+  hydrology's surface as the channel is, and keeps the biome the flat would have without the volcano (Expanded
+  Ecosphere's salt lakes, BIO-120, or the climate's). The geothermal siting keeps springs off water, not off
+  salt flats, so a spring may stand on one; its biome is then the spring's, not the flat's. On the 4k test planet
+  of 2026-10-20 a pool from hot ground stood beside a playa, and Biomes O' Plenty's hot springs, which covered the
+  field's whole disc, dug its random hot-spring ponds into the salt and ringed them, and the pool, with thermal
+  calcite (its `disk_hot_spring_thermal_calcite` targets calcite, the salt's vanilla block). "Where the climate
+  allows" means the climate point
   lies inside that biome's own temperature and humidity ranges in the pack's parameter list (Terralith puts
   ashen savanna on the warm band at dry to middling humidity), so the rule follows whatever biome a pack
   lists. A role without a biome in the pack, or not allowed at the spot, gives way to the next role whose
