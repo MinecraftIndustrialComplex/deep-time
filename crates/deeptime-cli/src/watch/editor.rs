@@ -621,8 +621,8 @@ mod tests {
         assert!(text.contains("\"timeline\":{\"length_myr\":300.0,\"start\":\"supercontinent\"}"));
         assert!(r["estimate"]["peak_bytes"].as_u64().unwrap() > 0);
         // The tuning knobs (settings audit): each lands at the key the core reads, whether an object's
-        // (incision_cap), an integer (plate_count), an array's element (pluton_length_km.0, the
-        // sea-level cycle) or a choice (province).
+        // (incision_cap), an integer (plate_count), an array's element (pluton_length_km.0) or a
+        // choice (province); the planet's water (ocean_water) replaced the sea-level cycle.
         assert!(text.contains("\"incision_cap\":5.125"), "{text}");
         assert!(
             text.contains("\"initial_plates\":22,"),
@@ -632,12 +632,8 @@ mod tests {
             text.contains("\"pluton_length_km\":[44.0,8.0,80.0]"),
             "{text}"
         );
-        assert!(
-            text.contains(
-                "\"cycles\":[{\"amplitude_m\":100.0,\"period_myr\":250.0,\"phase_deg\":0.0},"
-            ),
-            "{text}"
-        );
+        assert!(text.contains("\"surface_water_m\":4000.0"), "{text}");
+        assert!(!text.contains("\"cycles\""), "no sea-level curve: {text}");
         assert!(text.contains("\"province\":\"weak\""));
         assert!(
             text.contains("\"count_mult\":5.0"),
@@ -839,7 +835,6 @@ mod tests {
             assert_eq!(value("erosion_strength"), 5e-9);
             assert_eq!(value("ridge_depth"), -3000.0);
             assert_eq!(value("pluton_size"), 40.0);
-            assert_eq!(value("sea_level_swing"), 120.0);
             assert_eq!(value("deposit_size"), 2.5);
             assert_eq!(value("deposit_richness"), 1.5);
             assert_eq!(value("feature_deposits"), 2.0);

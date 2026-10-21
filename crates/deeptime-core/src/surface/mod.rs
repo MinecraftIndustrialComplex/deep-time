@@ -26,8 +26,9 @@
 //!
 //! # One step (Δt = the plate step, `substeps` LEM steps inside it)
 //! 1. Carry the elevation, regolith and strata log; clear them on crust born this step.
-//! 2. h = carried elevation + the plate model's uplift; sea level from the preset (`params::SeaLevel`), or, with a
-//!    climate stage, its eustatic sea level (the curve plus glacio-eustasy); climate
+//! 2. h = carried elevation + the plate model's uplift; sea level from the climate stage when the
+//!    preset has one (the planet's water less its land ice's, over this ground), else the
+//!    planet's water alone over it (`sea_level.rs`); climate
 //!    (`climate.rs`: the climate stage's fields, which it wrote just before this step on the same
 //!    ground, when the preset has a `climate` section (P1-05), else the stand-in).
 //! 3. Per LEM step: the sea is the base level; priority-flood (`pflood.rs`), D8 routing and the
@@ -130,6 +131,9 @@ pub mod field {
     /// from cells that held the same crust (`advect::bilinear_same`).
     pub const CRUST_PLATE: &str = "surface/crust_plate";
     pub const CRUST_GROUP: &str = "surface/crust_group";
+    /// `plates/gap` as the stage saw it after the last step: the cells that lay in a gap between
+    /// plates, which the next step holds in place (`advect::hold_gaps`). ledger: PLT-354
+    pub const CRUST_GAP: &str = "surface/crust_gap";
     /// The surface rock class (index into `synth::EVERY_CLASS`).
     pub const CLASS: &str = "surface/class";
     /// log₁₀ of the drainage area in km² (land; NaN at sea).
@@ -332,6 +336,8 @@ impl Scratch {
 struct Moved {
     src: Vec<[f64; 2]>,
     prev_elevation: Vec<f32>,
+    /// The offset over the plate model after the last step, which a cell in a gap keeps.
+    prev_offset: Vec<f32>,
     newborn: Vec<bool>,
     known_plates: usize,
 }
@@ -365,6 +371,9 @@ impl Moved {
             group: pf.group_id.as_deref(),
             plate_elevation: &pf.elevation,
             uplift_mm_yr: &pf.uplift,
+            gap: pf.gap.as_deref(),
+            prev_gap: prev_ids(field::CRUST_GAP),
+            prev_offset: Some(&self.prev_offset),
             parents,
             known_plates: self.known_plates,
             dt_yr,
@@ -508,6 +517,8 @@ struct PlateFields {
     slab_age: Vec<f32>,
     heat_flow: Vec<f32>,
     thickness: Vec<f32>,
+    /// `plates/gap` (`plates::l1::GAP_FIELD`); absent in worlds built without the L1 sampling.
+    gap: Option<Vec<f32>>,
 }
 
 impl PlateFields {
@@ -543,6 +554,7 @@ impl PlateFields {
             slab_age: get("plates/slab_age_myr")?,
             heat_flow: get("plates/heat_flow_mw_m2")?,
             thickness: get("plates/thickness_m")?,
+            gap: get(crate::plates::l1::GAP_FIELD).ok(),
         })
     }
 }
@@ -752,6 +764,27 @@ impl SurfaceStage {
         let pf = PlateFields::read(world, n)?;
         let cls = self.classes;
         let p = self.p.clone();
+        // The sea level the step stands under (`sea_level.rs`): the climate stage's, else the
+        // planet's water over the ground `h` with no land ice.
+        let rows = grid.row_weights();
+        let water_m = self.preset.planet.surface_water_m;
+        let sea_of = |world: &WorldState, h: &[f64]| -> f64 {
+            world
+                .globals
+                .get(crate::climate::SEA_LEVEL_GLOBAL)
+                .copied()
+                .filter(|z| z.is_finite())
+                .unwrap_or_else(|| {
+                    crate::sea_level::fill_level(
+                        &d,
+                        h,
+                        &rows,
+                        water_m,
+                        (n / 500).max(1), // ledger: ISO-086, ERO-055
+                        p.numerics.flood,
+                    )
+                })
+        };
         // The carry's blur is kept per Myr at the reference step (`advect::blur_owed`).
         let blur_ref = p.numerics.carry_blur_ref_myr * 1.0e6;
 
@@ -789,10 +822,18 @@ impl SurfaceStage {
                         [0.0; 3]
                     })
                     .collect();
+                let prev_gap = world
+                    .fields
+                    .get(field::CRUST_GAP)
+                    .filter(|f| f.data.len() == n)
+                    .map(|f| f.data.as_slice());
+                let mut src = advect::sources(&grid, &pf.plate_id, &omega, dt);
+                advect::hold_gaps(w, &mut src, prev_gap);
                 let mut m = Moved {
-                    src: advect::sources(&grid, &pf.plate_id, &omega, dt),
+                    src,
                     // Back in the state once the flexure carry has read it (below).
                     prev_elevation: std::mem::take(&mut st.elevation_m),
+                    prev_offset: crate::alloc::copied(&st.offset_m),
                     newborn: Vec::new(),
                     known_plates: st.omega.len(),
                 };
@@ -808,12 +849,18 @@ impl SurfaceStage {
                     blur_ref,
                 ));
                 foreign_cells = foreign;
-                // Crust born this step starts bare.
-                m.newborn = pf
-                    .crust_age
-                    .par_iter()
-                    .map(|&age| age >= 0.0 && age < dt_myr as f32)
-                    .collect();
+                // Crust born this step starts bare, and so does the floor of a cell that entered a
+                // gap between plates (`advect::newborn`). ledger: PLT-354
+                m.newborn = advect::newborn(
+                    &pf.crust_age,
+                    dt_myr,
+                    pf.gap.as_deref(),
+                    world
+                        .fields
+                        .get(field::CRUST_GAP)
+                        .filter(|f| f.data.len() == n)
+                        .map(|f| f.data.as_slice()),
+                );
                 st.offset_m = carried
                     .par_iter()
                     .zip(pf.elevation.par_iter())
@@ -844,7 +891,13 @@ impl SurfaceStage {
                     },
                     events: events::EventState::default(),
                     totals: Totals::default(),
-                    sea_level_m: p.sea_level.at(t_end_myr - dt_myr),
+                    sea_level_m: sea_of(
+                        world,
+                        &pf.elevation
+                            .iter()
+                            .map(|&z| f64::from(z))
+                            .collect::<Vec<f64>>(),
+                    ),
                     sea_history: Vec::new(),
                     flexure: None,
                     bif_basin: Vec::new(),
@@ -862,14 +915,9 @@ impl SurfaceStage {
         sc.h.par_iter_mut()
             .enumerate()
             .for_each(|(c, h)| *h = f64::from(pf.elevation[c]) + f64::from(st.offset_m[c]));
-        // Sea level: the climate stage's when it ran this step (the curve plus glacio-eustasy:
-        // ice sheets lower the sea and expose the shelves, `climate::ice`), else the curve.
-        let sea = world
-            .globals
-            .get(crate::climate::SEA_LEVEL_GLOBAL)
-            .copied()
-            .filter(|z| z.is_finite())
-            .unwrap_or_else(|| p.sea_level.at(t_end_myr));
+        // Sea level: the climate stage's when it ran this step (the planet's water less what its
+        // land ice holds, over this ground), else the planet's water alone (`sea_level.rs`).
+        let sea = sea_of(world, &sc.h);
         let cap_m = world
             .globals
             .get(crate::climate::CAP_CARBONATE_GLOBAL)
@@ -1918,6 +1966,15 @@ impl SurfaceStage {
                 ice_m: ice,
                 rock_share: p.isostasy,
                 parts: budget,
+                gdh1_scale: {
+                    let k = &self.preset.tectonics;
+                    (k.ocean_depth == crate::params::OceanDepth::Gdh1).then(|| {
+                        crate::plates::pools::gdh1_scale(
+                            k.ridge_elevation_m,
+                            k.oceanic_floor_elevation_m,
+                        )
+                    })
+                },
             };
             if budget {
                 answers = Some(flexure::local_answers(
@@ -2171,6 +2228,12 @@ impl SurfaceStage {
             Some(g) => put(world, field::CRUST_GROUP, crate::alloc::copied(g)),
             None => {
                 world.fields.remove(field::CRUST_GROUP);
+            }
+        }
+        match &pf.gap {
+            Some(g) => put(world, field::CRUST_GAP, crate::alloc::copied(g)),
+            None => {
+                world.fields.remove(field::CRUST_GAP);
             }
         }
         put(world, field::GLACIAL_EROSION, g_rate);

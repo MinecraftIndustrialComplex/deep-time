@@ -159,6 +159,19 @@ pub struct PlanetParams {
     /// Target ocean area fraction for the initial crust.
     pub ocean_fraction: f64,
     pub regime: TectonicRegime,
+    /// The planet's surface water, its oceans and land ice as water, as a layer over the whole
+    /// planet, m: the sea stands where this water, less what the land ice holds, fills the open
+    /// sea of the ground (`sea_level.rs`). Earth's: 2,664 m (ledger ISO-085).
+    #[serde(default = "d_surface_water_m")]
+    pub surface_water_m: f64,
+}
+
+fn d_surface_water_m() -> f64 {
+    // Earth's ocean, 1.332·10⁹ km³ (Charette & Smith 2010), and its land ice as water: Antarctica's
+    // grounded 26.5·10⁶ km³ (Fretwell et al. 2013) and Greenland's 2.99·10⁶ km³ (Morlighem et al.
+    // 2017) at ρ_i/ρ_w, and the glaciers' 0.41 m of sea level (IPCC AR5 Table 4.1), 2.65·10⁷ km³
+    // in all; over Earth's 5.10·10⁸ km². ledger: ISO-085
+    2664.0
 }
 
 fn d_m_per_block_h() -> f64 {
@@ -395,6 +408,22 @@ pub struct ResolutionParams {
     pub l3_r: u32,
 }
 
+/// The ocean floor's height law (`tectonics.ocean_depth`; `plates::pools`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OceanDepth {
+    /// Cortial et al. 2019 §4.5: every oceanic height relaxes towards
+    /// `oceanic_floor_elevation_m` at `oceanic_damping_mm_yr` (ledger PLT-129).
+    #[default]
+    Dampening,
+    /// Stein & Stein 1992's GDH1 depth–age law as the floor's subsidence: a sample sinks by what
+    /// its age sinks bare floor under water. GDH1's shape is drawn between `ridge_elevation_m`
+    /// and `oceanic_floor_elevation_m`, GDH1's own −2,600 and −5,651 m in every shipped preset,
+    /// where the floor is GDH1 exactly (ledger PLT-352; the depths, PLT-355; the choice of law,
+    /// PLT-350).
+    Gdh1, // ledger: PLT-350, PLT-352
+}
+
 /// Tectonic constants (plan §8.1). Cortial, Peytavie, Galin & Guérin 2019 ("Procedural Tectonic
 /// Planets", Appendix A, Table 3) give the first group; everything after `collision_threshold_km`
 /// is a design choice of this implementation (documented in `plates/mod.rs` and STATUS.md). The
@@ -408,7 +437,7 @@ pub struct TectonicParams {
     /// R of the plate model (Cortial: 6,370 km). Earth-normalized by default; set it to the
     /// planet's own radius for true-scale tectonics.
     pub model_radius_km: f64,
-    /// z_r, highest oceanic ridge (−1 km).
+    /// z_r, highest oceanic ridge (−1 km; GDH1's −2,600 m in the shipped presets, ledger ISO-014).
     pub ridge_elevation_m: f64,
     /// z_a, abyssal plains (−6 km).
     pub abyssal_elevation_m: f64,
@@ -448,18 +477,22 @@ pub struct TectonicParams {
     /// arcs and arc magma run at their full rate (g(v) = min(1, v / v_0)). Until the switch to the
     /// force balance it was also the speed cap. Ledger PLT-037.
     pub convergence_ref_mm_yr: f64,
-    /// ε_o (0.04 mm/yr).
+    /// ε_o (0.04 mm/yr), the dampening law's rate (ledger ISO-013); unused under
+    /// `ocean_depth: gdh1`, the shipped presets' law, which carry no rate.
     pub oceanic_damping_mm_yr: f64,
-    /// The elevation ageing ocean floor subsides towards, m: z(a) = z_f + (z_r − z_f)·
-    /// exp(−a·ε_o/|z_f|). Cortial's model subsides towards the trench depth (−10 km, the default
-    /// and the plate-only presets'), which leaves floor older than ~120 Myr deeper than any abyssal
-    /// plain. −5,600 m is GDH1's old-floor depth (Stein & Stein 1992, Nature 359:123–129); with
-    /// ε_o 0.215 mm/yr from a −2,500 m ridge the law follows GDH1 within 0.12 km from 20 Myr on.
-    /// The pipeline presets use −5,600 m with ε_o 0.12 mm/yr (3.6 km at 20 Myr, 4.5 at 50, 5.2 at
-    /// 100, 5.6 beyond): at GDH1's full rate the young floor is deep enough that island arcs rarely
-    /// emerge and the continental crust shrinks from 0.39 to 0.29 of the planet in 500 Myr (P1-17
-    /// hypsometry recalibration, 2026-10-01; median sea depth 4.0 km, Earth 4.06).
+    /// The elevation ageing ocean floor subsides towards, m. Under the dampening law (the default
+    /// and the plate-only presets') z(a) = z_f + (z_r − z_f)·exp(−a·ε_o/|z_f|) towards Cortial's
+    /// trench depth (−10 km), which leaves floor older than ~120 Myr deeper than any abyssal
+    /// plain. Under `ocean_depth: gdh1` it is the depth GDH1's curve flattens towards: GDH1's own
+    /// −5,651 m (Stein & Stein 1992, Nature 359:123–129) in every shipped preset (ledger ISO-012,
+    /// PLT-355). The shipped presets ran the dampening at −5,600 m and ε_o 0.12 mm/yr until
+    /// 2026-10-21, when the sea came to follow the ocean's volume (ISO-085).
     pub oceanic_floor_elevation_m: f64,
+    /// The ocean floor's height law (`plates::pools`): Cortial's dampening towards
+    /// `oceanic_floor_elevation_m` (the default and the plate-only presets'), or GDH1's age–depth
+    /// law as a subsidence rate (every shipped Earth-like preset since 2026-10-21: the floor sinks
+    /// by what its age sinks bare floor, whatever its sediment; ledger PLT-352).
+    pub ocean_depth: OceanDepth,
     /// ε_c (0.03 mm/yr).
     pub continental_erosion_mm_yr: f64,
     /// ε_t (0.3 mm/yr).
@@ -713,7 +746,7 @@ impl Default for TectonicParams {
         TectonicParams {
             time_step_myr: 2.0,
             model_radius_km: 6370.0,
-            ridge_elevation_m: -1000.0,
+            ridge_elevation_m: -1000.0, // ledger: ISO-014
             abyssal_elevation_m: -6000.0,
             trench_elevation_m: -10000.0,
             max_elevation_m: 10000.0,
@@ -722,10 +755,11 @@ impl Default for TectonicParams {
             crust_strength_mpa: 140.0,
             crust_flow_km2_myr: 0.0,
             subduction_distance_km: 1800.0,
-            max_plate_speed_mm_yr: 250.0, // ledger: PLT-022
-            convergence_ref_mm_yr: 100.0, // ledger: PLT-037
-            oceanic_damping_mm_yr: 0.04,
-            oceanic_floor_elevation_m: -10000.0,
+            max_plate_speed_mm_yr: 250.0,        // ledger: PLT-022
+            convergence_ref_mm_yr: 100.0,        // ledger: PLT-037
+            oceanic_damping_mm_yr: 0.04,         // ledger: ISO-013
+            oceanic_floor_elevation_m: -10000.0, // ledger: ISO-012
+            ocean_depth: OceanDepth::Dampening,  // ledger: PLT-350
             continental_erosion_mm_yr: 0.03,
             sediment_accretion_mm_yr: 0.3,
             subduction_uplift_mm_yr: 0.6,
@@ -977,6 +1011,11 @@ impl PlanetPreset {
             (0.05..=0.95).contains(&p.ocean_fraction),
             "$.planet.ocean_fraction",
             "must be in [0.05, 0.95]",
+        )?;
+        check(
+            p.surface_water_m.is_finite() && (0.0..=20_000.0).contains(&p.surface_water_m),
+            "$.planet.surface_water_m",
+            "must be in [0, 20000] m",
         )?;
         let s = &self.scale;
         check(

@@ -13,7 +13,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252, PLT-285 to PLT-286, PLT-289, PLT-312, PLT-320 (49; PLT-320 the cordillera at Earth's typical arc, with no convergence factor, the crust budget against Stern & Scholl, 2026-10-20; PLT-312 the arcs on the convergence normal to the front, an experiment kept off, the land-shape task, 2026-10-20; PLT-289 ocean floor as thick as a continent turns continental, the resampling lumps, 2026-10-18; PLT-285 and PLT-286 the continental arcs and the cones as rock, plate task 8, 2026-10-17) |
 | [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250, PLT-253, PLT-290 to PLT-292 (34; PLT-290 to PLT-292 the crust a collision took counted once, the resampling lumps, 2026-10-18; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
-| [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228, PLT-293 (20; PLT-293 ocean crust keeps its own rock at resamplings and in the L1 sampling, 2026-10-19) |
+| [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228, PLT-293, PLT-350 to PLT-355 (26; PLT-293 ocean crust keeps its own rock at resamplings and in the L1 sampling, 2026-10-19; PLT-350 to PLT-353 the floor's GDH1 rate with the sea from the ocean's volume, 2026-10-21, PLT-354 the gap's floor held in place and PLT-355 GDH1's curve between other ridge and abyssal depths, on [sea-level.md](sea-level.md)) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
 | [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288, PLT-294 (44; PLT-294 the switch for the transition's ocean side, ocean crust or the continent's rock, 2026-10-19, on in the shipped presets since 2026-10-20; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265, PLT-310 to PLT-311 (43; PLT-310 and PLT-311 the boundary's normal and Bird's transform test, the land-shape task, 2026-10-20; PLT-265 Earth's passive margins, the transition's comparison) |
@@ -3180,3 +3180,361 @@ measure cannot separate.
    the planet's water amount is the choice that decides its sign.
 5. *The margin crust* (28 to 30 km, below the 31.4 km crossing): the transition's share of the
    drowning is the lead if the land is still short once 1 and 4 land.
+
+## The plate geometry: arcs, reversals and where subduction starts (2026-10-21)
+
+Ben (2026-10-21): "mountains seem very prone to forming directly bordering oceans, I don't believe
+this is realistic. (I usually expect mountains to form at continent - continent intersetcions
+though I might be wrong.)" and "I've noticed a lack of proper continents across most of my recent
+runs in the past ~2 days". The section above handed this task the plates' part: the boundary mix
+(34 % subducting against Bird's 19.7 %, 57 % of it ocean-ocean against Stern & Scholl's 35 %), 24
+plates against 52, 1.6 collisions per 100 Myr (target 2 to 6) and a third to a half of the land
+built as island arc. Ledger PLT-370 to PLT-372 (notes on PLT-042, PLT-056, PLT-062, PLT-064,
+PLT-221, PLT-330); sources in the bibliography, "The plate geometry". Code: `plates/dynamics.rs`
+(the boundary mix's classes, the `FrontBands` diagnostics), `plates/subduction.rs` (the arc-front
+counters, `continent_within`), `plates/check.rs` (a label); `tools/review/plate-geometry.py`.
+The build log entry of 2026-10-21 "The plate geometry" has the commands.
+
+Measured on master c790d1f3 (`earthlike_quick_16k`, 1000 Myr, seeds 1 to 3, both starts, the
+crust budget's maps on; `tools/review/plate-geometry.py` on the dynamics records, means over the
+steps after the first 100 Myr):
+
+| measure | model | Earth |
+|---|---|---|
+| boundary: subducting (ocean-ocean + ocean-continent) | 0.347 (0.197 + 0.150) | 0.197 (Bird 2003 Table 3, SUB) |
+| boundary: collision | 0.068 | 0.088 (CCB) |
+| boundary: spreading (ridge + rift) | 0.353 | 0.363 (OSR + CRB) |
+| boundary: transform / converging without a contact | 0.210 / 0.022 | 0.283 (OTF + CTF) / 0.067 (OCB) |
+| ocean-ocean share of the subducting boundary | 0.567 | 0.35 (14,500 of 42,000 km of arc, Stern & Scholl 2010) |
+| plates alive | 23.7 | 52 |
+| plates over 1 / 0.3 / 0.1 / 0.0377 / 0.01 sr | 3.4 / 12.4 / 19.4 / 22.7 / 23.5 | 7 / 10 / 14 / 19 / 31 (Bird Table 1) |
+| collisions (terrane at least 0.1 A0) per 100 Myr | 1.63 | 2 to 6 (CHK-015) |
+| polarity reversals per 100 Myr | 17.0 | 4 since 104 Ma (Crameri et al. 2020, Table 1) |
+| subduction initiations per 100 Myr | 7.0 | 13 since 104 Ma, all within 1,500 km of an active subduction zone (Crameri) |
+
+The model's boundary is 480,054 lattice km a step against Bird's 260,487 km: a boundary on the
+lattice zigzags, so its lattice length is 1.84 times the geodesic one, and Earth's 14,500 km of
+island arc is about 26,700 lattice km.
+
+### What makes the gap
+
+**The ocean-ocean excess was mostly a classification.** The mix named a front by the crust of the
+front sample itself. The overriding plate's oceanic samples at its edge are often a thin fringe in
+front of its continent: on seed 1 (both starts), 48 % of the ocean-ocean front had the overriding
+plate's continental crust within 150 km of it through that plate, 70 % within 300 km, and only 12 %
+lay 1,200 km or more from it. The arc stands 200 km behind the front (`arc_distance_km`, PLT-042),
+so most of these arcs stand on continental crust: continental arcs in Stern & Scholl's sense, who
+split the world's arcs by the crust the arc is built on ("the present 14,500 km of intra-oceanic
+arcs", "The combined length of continental margin arcs is approximately 27,500 km"). The arc
+builder already did this right (it books the crust by the kind of the sample the arc lands on); the
+mix and the arc-front counters did not.
+
+**The subducting share is the boundaries' orientation, not where subduction starts.** The model's
+boundary is 43.7 % converging, 35.3 % parting and 21.0 % transform; boundaries at random to the
+motion, with Bird's 20 degree transform window (PLT-311), would be 39 / 39 / 22; Earth's are 35.2 /
+36.3 / 28.3. Switching off subduction initiation (seeds 1 and 2, both starts) leaves the
+subducting share at 0.340 (0.347 with it), and switching off the oceanic share of rifting
+(`rift_ocean_weight` 0) at 0.341: neither makes it. Earth's spreading boundaries are segmented
+into ridges square to the spreading and transforms along it, and its trenches face their
+convergence; the model's plates are cut by warped Voronoi splits and keep those boundaries
+whatever the motion becomes. That is a property of how plates are made and moved, not a constant
+to tune.
+
+**Collisions are few because polarity reversal ends most of them.** Of the collision states the
+base runs began, 483 ended by reversal against 98 counted collisions (and 1,312 small terranes
+parted). The reversed ones lasted 6 Myr at the median, after 145 km of shortening (p90 868 km);
+82 % had 0.1 A0 or more of continental crust on the subducting plate (median 0.32 A0), while the
+overriding plate held a median 0.06 A0 of continental crust on 0.49 A0 of area. Reversals ran at
+17 per 100 Myr against Crameri's 4 polarity-reversal initiations since 104 Ma. The reversal
+(PLT-056) judges the overriding side by the crust of its samples in the overlap, the same fringe:
+a continent arriving at an overriding plate whose own continent stands 100 km behind its oceanic
+edge reads as arriving at an intra-oceanic arc and flips the trench.
+
+Stern (2004) separates the two cases. Polarity reversal "is triggered by buoyant crust entering the
+trench" where "the new subduction zone nucleates in the originally overriding plate", whose back
+arc is "relatively thin and weak" (the Solomon arc after the Ontong Java Plateau arrived;
+"subduction on the south side of the Solomons began almost immediately"). Where the overriding
+plate is a continent, the jam goes on as a collision ("It takes less work to deform large parts of
+continental Asia than it does to start a new subduction zone in the Indian Plate"), and any new
+zone forms outboard (transference). So the test the reversal needs is the crust the arc stands
+on, not the crust at the plate's edge.
+
+**The plate count is the lattice's floor.** At 100,000 samples the smallest plate the model keeps
+(PLT-091, 300 samples) is 0.0377 sr. Above that the model has 22.7 plates against Bird's 19; it is
+short of large plates (3.4 over 1 sr against 7) and has too many middle-sized ones (19.4 over 0.1
+sr against 14). Bird's 52 count 33 plates under 0.0377 sr (21 under 0.01 sr), below what this
+resolution holds; Morra et al. (2013) and Mallard et al. (2016) treat Earth's small plates as a
+second population, set by "a hierarchical fragmentation process" and broken off by "the stresses
+caused by the bending of trenches", for which the model has no law. The count is not a target
+this task can move without a finer lattice.
+
+**Subduction starts in the wrong place.** The model starts subduction at floor older than 150 Myr
+farther than 1,000 km from every trench (PLT-062, PLT-064, neither sourced). Crameri et al. (2020)
+compiled the 13 initiation events since 104 Ma: "All SZI events start less than 1500 km away
+from other active subduction zones and, in most cases, less than 500 km"; "At least nine of all
+thirteen events ... occur at or near a pre-existing convergent plate boundary"; the subducting
+plates' mean ages at initiation are 32 to 117 Myr (Supplementary Data 1); "collision events along
+pre-existing subduction trenches are often precursors of SZI events"; and "subduction breeds
+subduction". Gurnis et al. (2004, Table 1) list eleven Cenozoic initiations, each at a fracture
+zone, a transform, a spreading centre, an extinct subduction zone or by polarity reversal; none in
+old floor far from a boundary.
+
+### What changed: an arc on continental crust is a continental arc (PLT-370)
+
+The boundary mix and the arc-front counters (`plates/arc_front_continental_km_myr`,
+`arc_front_oceanic_km_myr`, which `tools/review/crust-budget.py` divides the arcs' crust by) now
+name an ocean-ocean front by the crust its arc stands on: a front whose overriding plate has
+visible continental crust within `arc_distance_km` of it, through that plate's own visible
+samples, counts as ocean-continent. The test is the one the arc builder's booking implies (the arc
+lands 200 km behind the front). It is measurement only: the branch's runs repeat master's
+exactly (land, crust, plates, collisions and every scored plate check are identical; the census
+at the end too).
+
+| | master c790d1f3 | branch | Earth |
+|---|---|---|---|
+| ocean-ocean share of the subducting boundary | 0.567 | 0.295 | 0.35 |
+| ocean-ocean share of the boundary | 0.197 | 0.103 | 0.069 (35 % of 19.7 %) |
+| ocean-continent share of the boundary | 0.150 | 0.245 | 0.128 |
+| subducting share of the boundary | 0.347 | 0.347 | 0.197 |
+| island-arc front (the counters), lattice km a step | 85,095 | 45,275 | 14,500 km, about 26,700 lattice km |
+| continental-arc front, lattice km a step | 61,088 | 100,913 | 27,500 km, about 50,700 lattice km |
+| island arcs' crust per km of island-arc front per Myr | 70 km³ | 131 km³ | 100 km³ (90 to 180 at Izu-Bonin-Mariana and the Aleutians) |
+| continental arcs' crust per km of continental-arc front per Myr | 49 km³ | 30 km³ | 35 km³ |
+
+(The rates per km take the counters' lattice km over the boundary's 1.84. The arcs added 3.22 km³
+a year to ocean floor and 1.62 to continents on both, against Earth's 1.5 and 1.0.)
+
+By the crust the arc stands on, the model's island-arc front is 1.7 times Earth's, not 2.9 or 3.2
+times, and its continental-arc front 2.0 times: both near the subducting share's 1.76 times
+(0.347 against 0.197). The rates per km of each kind of arc now sit near Stern & Scholl's. So the
+island arcs' crust (3.22 km³ a year against 1.5) is 1.7 times from the front's length and 1.3
+times from the rate, and the front's length is the orientation above. On the plate-check table the
+reported share of ocean-ocean subduction moves from 56.7 % to 29.5 % (after the first 100 Myr) and
+from 65.6 % to 50.2 % (the first 50 Myr).
+
+### What was tried and not kept
+
+Each arm is the branch plus one change, the same ensemble (`earthlike_quick_16k`, 1000 Myr, seeds
+1 to 3, both starts); land, drowned share, land above 2 km, the largest landmass and the island-arc
+share of the land by `tools/review/continent-bisect.py` at the end (Earth's: 0.29, about 0.19, the
+largest 0.167); the coast with high ground within 200 km by `tools/review/continents_census.py
+maps` (Earth 0.104); the rest by `plate-geometry.py` and `deeptime plate-check`.
+
+- *r1*: a contact with a collision on it no longer reverses by its crust (PLT-056's crust test only
+  before the collision; the test on locked crust kept).
+- *r3*: the reversal judges the overriding side by the crust its arc stands on: its overlap
+  samples with continental crust within `arc_distance_km` through their plate, under a quarter
+  (Stern 2004; PLT-371).
+- *i1*: subduction initiation within 1,500 km of a trench instead of beyond 1,000 km (Crameri et
+  al. 2020; PLT-062, PLT-064).
+- *r3i*: r3 and i1.
+
+| | master = branch | r1 | r3 | i1 | r3i | Earth |
+|---|---|---|---|---|---|---|
+| subducting share of the boundary | 0.347 | 0.343 | 0.339 | 0.344 | 0.345 | 0.197 |
+| plates alive / over 0.0377 sr | 23.7 / 22.7 | 25.2 / 24.3 | 23.5 / 22.7 | 26.8 / 25.3 | 28.8 / 27.2 | 52 / 19 |
+| collisions per 100 Myr | 1.63 | 2.83 | 2.22 | 1.73 | 2.05 | 2 to 6 |
+| polarity reversals per 100 Myr | 17.0 | 12.4 | 11.6 | 19.1 | 16.3 | 4 since 104 Ma |
+| initiations per 100 Myr | 7.0 | 7.3 | 7.1 | 12.7 | 13.7 | 13 since 104 Ma |
+| median plate life, Myr | 129 | 121 | 121 | 81 | 75 | |
+| land | 0.264 | 0.218 | 0.208 | 0.235 | 0.230 | 0.29 |
+| drowned share of the continental crust | 0.368 | 0.376 | 0.370 | 0.371 | 0.373 | about 0.19 |
+| largest landmass | 0.127 | 0.082 | 0.060 | 0.119 | 0.084 | 0.167 |
+| land above 2 km, share of land | 0.273 | 0.305 | 0.335 | 0.324 | 0.314 | |
+| island-arc share of the land | 0.429 | 0.509 | 0.491 | 0.465 | 0.522 | |
+| coast with high ground within 200 km | 0.478 | 0.518 | 0.560 | 0.491 | 0.530 | 0.104 |
+| continental volume, 10⁹ km³ | 6.60 | 5.50 | 5.26 | | 5.74 | |
+| collisions lose, km³ a year | 1.72 | 2.35 | 2.00 | | 2.35 | 0.7 |
+| plate checks met, of 45 | 31 | 32 | 30 | 26 | 26 | |
+
+**The reversals (r1, r3).** Both raise the collisions into Earth's range (2.83 and 2.22 per 100
+Myr) and cut the reversals by a third, and both lose land: 0.264 to 0.218 and 0.208, the largest
+landmass 0.127 to 0.082 and 0.060, the continental volume 6.60 to 5.50 and 5.26 × 10⁹ km³. Per run
+over 1000 Myr, r3 against master (the crust budget's channels, 10⁶ km³): erosion takes 923 more
+(the belts stand higher: land above 2 km 0.273 to 0.335), resampling gives 658 less, and
+subduction (2,087 more lost) and the belts (2,075 more stacked) cancel. The collision fronts lose
+2.00 km³ a year (r1 2.35) against master's 1.72 and Earth's 0.7 (Scholl & von Huene 2009 as
+Stern & Scholl 2010 give it): every collision the model adds costs land at 2.5 to 3.4 times
+Earth's rate and builds high ground that erodes. The coastal high ground rises too (0.478 to 0.518
+and 0.560): more collisions put more young orogen on more coasts. Raising the collision rate
+toward Earth's is right; doing it before the collisions' losses and the high ground are on Earth's
+rates loses the largest landmass, which is the gap Ben sees. Not kept: the reversal stays
+PLT-056's, and PLT-371 records r3 as the law to switch on once those land.
+
+**Initiation near trenches (i1).** The initiation rate reaches Crameri's (12.7 per 100 Myr against
+13 since 104 Ma), but the new trenches split off slivers that the next resampling absorbs (plates
+absorbed 7.7 to 12.4 per 100 Myr, median life 129 to 81 Myr, 16.3 % dead within 20 Myr against at
+most 15), the old interior floor that the far rule consumed stays (floor older than 250 Myr 3.2 to
+4.4 %, against at most 3), the supercontinent tenure falls from 126 to 39 Myr and the assembly
+period from 431 to 185 Myr, and the plate checks fall from 31 to 26. The model has no law for a
+trench to propagate along a margin or for a slab to roll back into old floor; with the
+far-from-trench start removed, nothing recycles old floor away from the trenches. Not kept.
+
+### PLT-330 and the arcs' fronts
+
+PLT-330's convergence test (a front only where the plates converge across the boundary) is
+neither redundant nor wrong. PLT-370 changes how a front is named, not which samples are fronts:
+the counters' total (about 146,200 lattice km a step) and the subducting share (0.347) are the
+same on master and the branch. What the arc-front task measured as an island-arc front 2.9 times
+Earth's was 85,095 lattice km named by the front sample's crust; by the arc's crust it is 45,275,
+1.7 times Earth's 14,500 km on the lattice's 1.84. The remaining excess is the subducting
+share's, which PLT-330 could not move either (32.1 to 34.4 % there).
+
+### Against c24ff793 and master
+
+The coordinator's figures from the continent bisect (c24ff793, seeds 1 and 2, the land's peak)
+against master c790d1f3 and the branch (seeds 1 to 3, both starts, the same reader):
+
+| | c24ff793 | master c790d1f3 | branch | Earth |
+|---|---|---|---|---|
+| land | 0.323 | 0.264 | 0.264 | 0.29 |
+| drowned share of the continental crust | 0.31 | 0.368 | 0.368 | about 0.19 |
+| largest landmass | 0.166 | 0.127 | 0.127 | 0.167 |
+| island-arc share of the land | 0.55 | 0.429 | 0.429 | |
+
+The branch moves no land: its change is a measurement. None of the plate-geometry changes
+measured here brings the land or the largest landmass back toward c24ff793's: each one that
+raises the collisions or the initiations lowers both (the table above). The fall since c24ff793
+came with the crust budget's Earth rates and the arcs' basement and fronts (PLT-330, PLT-331;
+the bisect, `tools/review/out-free/continent-bisect.md`), and the island-arc share fell with it
+toward Earth's.
+
+### The continental area's swing
+
+The sea-level task found the sea swinging about a kilometre because the continental crust's area
+swings within a run (sea-level.md). On the same ensemble, after the first 100 Myr (the dynamics
+records' visible continental samples; `build/pg/swing.py` in the build log):
+
+| | master = branch | r1 | r3 | i1 | r3i |
+|---|---|---|---|---|---|
+| continental crust, lowest and highest step (mean of the runs) | 0.312, 0.489 | 0.271, 0.471 | 0.272, 0.486 | 0.303, 0.495 | 0.277, 0.487 |
+| the same, over all six runs | 0.276 to 0.523 | 0.256 to 0.520 | 0.225 to 0.525 | 0.268 to 0.533 | 0.241 to 0.528 |
+| at 100 Myr and at the end | 0.457, 0.381 | 0.447, 0.317 | 0.458, 0.298 | 0.459, 0.342 | 0.458, 0.328 |
+| trend, share of the planet per 100 Myr | −0.001 | −0.009 | −0.013 | −0.010 | −0.009 |
+| range about the trend | 0.176 | 0.164 | 0.139 | 0.149 | 0.169 |
+| the largest change within 50 Myr | 0.096 | 0.098 | 0.090 | 0.090 | 0.092 |
+| the sea floor's median age, lowest and highest step of any run, Myr | 40 to 108 | 34 to 105 | 41 to 101 | 42 to 104 | 40 to 101 |
+
+The continental crust's area moves by up to a tenth of the planet within 50 Myr in every arm. The
+branch does not change that (its runs are master's); the reversal arms add a downward trend, their
+collisions' losses, and keep the swing about it. The swing is not the plate geometry's to fix.
+
+### The plates under the sea from the ocean's volume (after the sea-level merge)
+
+The sea-level task (sea-level.md, open questions) reported that the plates answer its moving sea:
+the crust budget's net loss −0.049 → −0.074 of the planet over 1,000 Myr, more collisions, the
+supercontinent's tenure 231 → 21 Myr and the plate checks 29 → 27 and 31 → 26 of 45. Traced here on
+the merged code (this branch with the sea-level branch at 975dd57e; master d53cc6c4's simulation is
+the same code), the same ensemble as above, with scratch environment switches (never committed)
+that pin the sea at one height for the whole run: for every reader (the climate's global), only for
+the plate stage's reading (its settling and GDH1's dry share, PLT-353) or only for the surface's
+(erosion, deposition and the carry, which come back to the plates' samples); and the old dampening
+floor (`tectonics.ocean_depth=dampening`) under the moving sea and under a sea pinned at 0. Base is
+master c790d1f3 (the old sea curve within about 150 m of the datum, the dampening floor), run on
+seeds 4 to 6 as well to see its own spread.
+
+| arm | the sea the plates read after 100 Myr, mean (first → last), m | crust budget's net, share of the planet | continental crust into contacts (lost there), 10⁹ km³ | collisions per 100 Myr | tenure: check (mean of runs) / median run, Myr | assembly period (check), Myr | plate checks of 45 |
+|---|---|---|---|---|---|---|---|
+| base, seeds 1 to 3 | −35 (74 → −34) | −0.042 | 16.2 (1.72) | 1.63 | 126 / 50 | 431 | 31 |
+| base, seeds 4 to 6 | −36 (61 → −27) | −0.082 | 18.7 (2.11) | 1.50 | 46 / 37 | 255 | 28 |
+| merged, seeds 1 to 3 (volume sea, GDH1) | +259 (97 → 394) | −0.087 | 18.6 (1.97) | 1.72 | 25 / 18 | 144 | 28 |
+| merged, seeds 4 to 6 | +273 (144 → 462) | −0.100 | 19.1 (2.37) | 1.67 | 19 / 10 | 289 | 29 |
+| volume sea over the old floor | +468 (612 → 548) | −0.095 | 18.2 (2.13) | 1.83 | 16 / 18 | 125 | 28 |
+| both changes off: the old floor, the sea pinned at 0 | 0 | −0.061 | 17.0 (2.12) | 1.75 | 41 / 23 | 309 | 30 |
+| sea pinned at −250 m (every reader) | −250 | −0.101 | 17.8 (1.94) | 1.65 | 84 / 45 | 341 | 30 |
+| sea pinned at 0 | 0 | −0.069 | 18.5 (2.02) | 1.62 | 37 / 12 | 258 | 29 |
+| sea pinned at +300 m | +300 | −0.089 | 19.5 (2.30) | 1.45 | 20 / 19 | 216 | 30 |
+| only the plates' reading at −250 m | −250 | −0.090 | 19.6 (2.31) | 1.75 | 20 / 16 | 103 | 28 |
+| only the surface's reading at −250 m | +409 (201 → 837) | −0.085 | 18.7 (2.02) | 1.82 | 57 / 63 | 340 | 28 |
+
+What it says:
+
+1. *Most of the response is base's own spread.* Base on seeds 4 to 6 loses as much crust (−0.082),
+   moves as much of it into contacts (18.7 against 16.2), holds its supercontinents as briefly
+   (46 Myr; 37 at the median run) and meets as few checks (28) as the merged code on seeds 1 to 3.
+   Seeds 1 to 3 were a kind draw for base: one run (supercontinent, seed 1) held its first
+   supercontinent 558 Myr and carries the check's mean. The tenure is a mean of one figure per
+   run, each from a handful of assemblies, between 4 and 558 Myr.
+2. *What is left after twelve runs each.* The crust's net loss: −0.062 (base) against −0.093
+   (merged), 10 of the 12 seed-and-start pairs losing more. The tenure's fall (a median run of
+   50 Myr against 13, one-sided Mann-Whitney p about 0.04) does not hold up: the twelve runs
+   with the sea at the datum (below) give 17.5, the 35 with the sea off it 24, and neither differs
+   from base's twelve beyond z 1.3. The collisions (1.6 → 1.7 per 100 Myr) do not move beyond the
+   runs' spread.
+3. *Not the sea's motion and not GDH1, but the sea standing off the datum.* The merged code with
+   both of its changes off (the old floor, the sea pinned at 0) loses −0.061 and meets 30 checks;
+   with GDH1 on and the sea still at 0 it loses −0.069 and meets 29. Those twelve runs (−0.065)
+   are base's twelve (−0.062; Mann-Whitney z +0.12). Every arm whose sea stands away from 0,
+   below it (−250 m) or above it (+300 m, or the volume sea's +259 to +468 m), moving or pinned,
+   under either floor, and whichever reader is moved off 0 (the plates' settling and dry share,
+   or the surface's base level), loses more: −0.085 to −0.101, −0.091 over its 36 runs (against
+   the twelve at the datum, one-sided z +2.65, p about 0.004; in four of the six seed-and-start
+   pairs five or six of the six arms lose more than the datum arms' mean). Its assembly period is
+   shorter too (median run 145 Myr against 236 at the datum, z +2.31). The volume sea over the
+   old floor (−0.095) is no better than with GDH1 (−0.087), so the sea-level task's reading ("the
+   moving sea, not GDH1") holds for GDH1 and not for the motion. That the sign of the offset does
+   not matter says the loss is not more or less water over the margins but a mismatch: code that
+   still takes the datum for the sea while the rest reads the sea. One candidate, not tested
+   here: the force balance's column energy (`forces::column_energy`, FRC-006 and FRC-014), which
+   loads a continental column with water below 0, not below the sea.
+4. *Where the crust goes.* In every arm with the sea-level code more continental crust crosses
+   into contacts (17.0 to 19.6 against 16.2 × 10⁹ km³ over the run) and more of it is lost there
+   (1.94 to 2.37 against 1.72); the crust budget's subduction part takes 0.69 to 0.80 of the
+   planet against 0.62. Base on seeds 4 to 6 does the same (18.7, 2.11, 0.72), and the arms at
+   the datum sit inside that range (17.0 and 18.5; 0.69 and 0.75), so these totals do not show
+   the split the net loss shows.
+
+The continental crust's swing under the merged code, after the first 100 Myr (the crust budget's `cb_t` lines, one per step, in the run's report):
+lowest and highest step 0.290 and 0.475 of the planet (base 0.312 and 0.489), the largest change in
+50 Myr 0.089 (0.096), a trend of −0.008 per 100 Myr (−0.001); pinned at 0 0.292 and 0.491 (0.089
+in 50 Myr), at +300 m 0.296 and 0.487 (0.096), at −250 m 0.303 and 0.480 (0.087); both changes off 0.293 and 0.475 (0.085, −0.005 per 100 Myr);
+the volume sea over the old floor 0.299 and 0.471 (0.095, −0.009); on seeds 4 to 6 base 0.302 and
+0.484 (0.093, −0.0075) and the merged code 0.283 and 0.483 (0.098, −0.006). The swing is the plate
+model's, whatever the sea does, and the downward trend is the crust's net loss, as steep in base on
+seeds 4 to 6 as under the merged code.
+
+The continent table under the merged code (seeds 1 to 3, both starts, the bisect's reader, as
+"Against c24ff793 and master" above):
+
+| | c24ff793 | master c790d1f3 = this branch before the merge | merged (master d53cc6c4's simulation) | Earth |
+|---|---|---|---|---|
+| land | 0.323 | 0.264 | 0.269 | 0.29 |
+| drowned share of the continental crust | 0.31 | 0.368 | 0.357 | about 0.19 |
+| largest landmass | 0.166 | 0.127 | 0.159 | 0.167 |
+| island-arc share of the land | 0.55 | 0.429 | 0.423 | |
+| continental crust, share of the planet | | 0.381 | 0.336 | 0.37 to 0.45 (the plate check) |
+
+The merge adds land and the largest landmass with less continental crust: the sea from the
+ocean's volume stands where the crust leaves room, as sea-level.md says. The sea-level task's own
+table (30c4d664 → fad59a5e on seeds 1 and 2: land 0.257 → 0.268, largest 0.112 → 0.163, drowned
+0.374 → 0.373) agrees.
+
+### What is left, and for whom
+
+1. *The boundaries' orientation* (Ben's: how plates are made and moved, big scope): the
+   subducting share (0.347 against 0.197) and with it the island-arc front (1.7 times Earth's)
+   and the island arcs' crust (3.22 against 1.5 km³ a year). It needs spreading boundaries that
+   segment into ridges and transforms and trenches that face their convergence.
+2. *The collision rate* (1.63 per 100 Myr, target 2 to 6): PLT-371's reversal is sourced and
+   measured (2.22 per 100 Myr) and waits on the collisions' losses (1.72 km³ a year against 0.7)
+   and the high ground (the high-ground work). Switch it on after those, and measure the land
+   again.
+3. *Where subduction starts* (Crameri): needs a law for trenches to propagate and slabs to roll
+   back before initiation can move near trenches; a plate reorganisation is the open law (Ben's,
+   as in the sections above).
+4. *The plate count*: the lattice's floor (0.0377 sr at 100,000 samples); a finer lattice or a
+   small-plate law, not a constant.
+5. *The island-arc share of the land* (0.43): "a few per cent" (the section above, from memory)
+   is not a figure Earth's sources give. By Stern & Scholl 1.5 of the 2.7 AU of crust grown at
+   convergent margins is intra-oceanic arc, and the census tags any land with 1 km or more of
+   island-arc crust as island arc. A share of the crust's volume against Stern & Scholl's
+   Table 1 would be the measure with a source behind it.
+6. *The sea off the datum* (the sea level's): a sea standing away from 0, above or below, loses
+   about 0.026 more of the planet's continental crust over 1,000 Myr than a sea at 0 and shortens
+   the assembly period (the section above). Find the code that still takes the datum for the
+   sea; `forces::column_energy` (FRC-014: "h above sea level", computed from 0) is the first to
+   test, by an arm that feeds it the sea.
+7. *Plate checks that are a mean of runs* (the supercontinent's tenure above all): one long run
+   carries the mean (base: 558 Myr in one run of six; 126 Myr on seeds 1 to 3 against 46 on seeds
+   4 to 6). Compare arms on twelve runs or more, and by the runs' median, before reading a change
+   in them as the code's.
