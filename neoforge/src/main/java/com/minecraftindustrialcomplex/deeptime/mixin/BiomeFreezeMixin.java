@@ -12,8 +12,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * An open Deep Time lake does not freeze in a cold biome (see {@link LakeFreeze}): the climate's
- * rule decides which lakes are iced, not the biome. Only the answer "does not freeze" is ever
- * forced, and only for a lake's surface block; everything else is vanilla's.
+ * rule decides which lakes are iced, not the biome. Nor does a hot-spring pool's water, whose heat
+ * the biome's temperature knows nothing of (GEO-062). Only the answer "does not freeze" is ever
+ * forced, and only for a lake's or a pool's surface block; everything else is vanilla's.
  */
 @Mixin(Biome.class)
 abstract class BiomeFreezeMixin {

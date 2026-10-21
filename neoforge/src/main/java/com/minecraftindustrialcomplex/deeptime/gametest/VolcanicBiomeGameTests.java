@@ -131,7 +131,7 @@ public final class VolcanicBiomeGameTests {
         List<Geothermal.Site> pools = geo.sites().stream().filter(s -> s.kind() == Geothermal.Kind.POOL).toList();
         Biome cold = level.registryAccess().registryOrThrow(Registries.BIOME).getOrThrow(Biomes.SNOWY_PLAINS);
         int c = t.circumference();
-        // 0 columns read; 1 of them water, 2 ice, 3 something else; 4 water in a biome that is cold enough to snow; 5, 6 water
+        // 0 columns read; 1 of them water, 2 ice, 3 something else; 4 columns (any of these) in a biome cold enough to snow there; 5, 6 water
         // surfaces the cold biome's freezing rule was asked about and said yes to (must be none); 7, 8 the same rule one block
         // under a surface that is also water, and its yeses (must be some: the probe can say yes).
         int[] n = new int[9];
@@ -146,6 +146,8 @@ public final class VolcanicBiomeGameTests {
                         continue;
                     BlockState top = level.getChunk(x >> 4, z >> 4).getBlockState(pos.set(x, s.level(), z));
                     n[0]++;
+                    if (level.getBiome(pos).value().coldEnoughToSnow(pos))
+                        n[4]++;
                     if (top.is(BlockTags.ICE)) {
                         n[2]++;
                         if (detail.length() < 600)
@@ -153,8 +155,6 @@ public final class VolcanicBiomeGameTests {
                                     .append(level.getBiome(pos).unwrapKey().map(k -> k.location().toString()).orElse("?")).append(')');
                     } else if (top.getFluidState().is(FluidTags.WATER)) {
                         n[1]++;
-                        if (level.getBiome(pos).value().coldEnoughToSnow(pos))
-                            n[4]++;
                         n[5]++;
                         if (cold.shouldFreeze(level, pos, false))
                             n[6]++;
@@ -173,8 +173,8 @@ public final class VolcanicBiomeGameTests {
                 }
             return true;
         }, () -> {
-            DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome pool water: pools={} columns={} water={} (inColdBiome={}) iced={} other={} "
-                    + "coldBiomeFreezes={} of {} surfaces; control one block under: {} of {}{}", pools.size(), n[0], n[1], n[4], n[2], n[3], n[6], n[5],
+            DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome pool water: pools={} columns={} (inColdBiome={}) water={} iced={} other={} "
+                    + "coldBiomeFreezes={} of {} surfaces; control one block under: {} of {}{}", pools.size(), n[0], n[4], n[1], n[2], n[3], n[6], n[5],
                     n[8], n[7], detail);
             helper.assertTrue(n[0] > 0 && n[1] > 0, "no pool water was read: " + n[0] + " pool columns, " + n[1] + " of water");
             helper.assertTrue(n[2] == 0, n[2] + " of " + n[0] + " pool columns have ice on the water:" + detail);

@@ -53,6 +53,11 @@ import java.util.SplittableRandom;
  * is lower the rim and bed are built up to the water (the dam of a travertine terrace), so the
  * water has a solid block on every side whatever the slope. A footprint never touches another
  * site's pool, rim or vent, and a vent's magma block never touches water.
+ *
+ * <p><b>Open water.</b> A hot spring's water is hot: {@link #poolSurface} says which block of the world is
+ * the surface of a pool's water, and {@code LakeFreeze} (through {@code BiomeFreezeMixin}) never lets
+ * vanilla's freezing, at generation or in weather, turn that block to ice, whatever the biome's temperature.
+ * The ground round a pool may still take snow.
  */
 public final class Geothermal {
 
@@ -62,8 +67,11 @@ public final class Geothermal {
     public static final int MIN_ABOVE_SEA = 3; // ledger: GEO-017 (game-choice)
     /**
      * A field whose annual mean temperature is under this, °C, has no pools. Not physics: real hot
-     * springs do not freeze at a 3 °C mean. It is a game rule, because vanilla's top-layer freezing
-     * would put ice on a hot pool (ledger: GEO-020, game-choice).
+     * springs do not freeze at a 3 °C mean. It is a game rule (ledger: GEO-020, game-choice). It began as a
+     * guard against vanilla's top-layer freezing putting ice on a hot pool; since 2026-10-20 a pool's
+     * water stays open whatever the biome's temperature ({@link #poolSurface}, GEO-062; a pack's
+     * hot-spring biome can be colder than the field's climate), so the threshold no longer keeps
+     * ice off the pools and stays only because Ben confirmed it as a game choice on 2026-10-02.
      */
     public static final double POOL_MIN_C = 3.0;
     /**
