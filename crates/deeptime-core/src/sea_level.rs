@@ -145,9 +145,10 @@ mod tests {
             .collect();
         let s = fill_level(&d, &h, &rows, 400.0, 1, FloodMethod::Serial);
         assert!((s - -200.0).abs() < 1e-9, "{s}");
-        // Above the land it spreads over everything.
+        // Above the land it spreads over everything: 1,000 m fills the deep half to +500 m (750 m
+        // of it) and the other 250 m stand over the whole planet, at +750 m.
         let s = fill_level(&d, &h, &rows, 1000.0, 1, FloodMethod::Serial);
-        assert!((s - 1250.0).abs() < 1e-9, "{s}");
+        assert!((s - 750.0).abs() < 1e-9, "{s}");
     }
 
     #[test]
@@ -191,8 +192,10 @@ mod tests {
         assert!(s > -1500.0 + 1e-6);
         // The ocean and the channel up to the pass hold 97,950; the hollow takes 48,640 more.
         let (to_pass, with_hollow) = (48.0 * 2040.0 + 3.0 * 10.0, 146_590.0);
-        // Anything between the two leaves the sea at the pass (the water pours into the hollow).
-        assert_eq!(level(0.5 * (to_pass + with_hollow)), 40.0);
+        // Anything between the two leaves the sea at the pass (the water pours into the hollow):
+        // at the pass's 40 m plus the flood's ε (`next_up` a cell, pflood's module docs).
+        let s = level(0.5 * (to_pass + with_hollow));
+        assert!((40.0..40.0 + 1e-9).contains(&s), "{s}");
         // Past the hollow's room, the 68 cells rise together.
         let s = level(with_hollow + 10.0 * 68.0);
         assert!((s - 50.0).abs() < 1e-6, "{s}");
