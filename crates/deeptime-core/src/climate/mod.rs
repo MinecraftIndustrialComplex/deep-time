@@ -994,8 +994,8 @@ impl ClimateStage {
     fn sea_from_water(&self, geo: &Geometry, h: &[f64], ice_km3: f64) -> f64 {
         let d = Dims::new(geo.w, geo.h, 1.0, true);
         let planet_km2 = geo.area.iter().sum::<f64>() * geo.w as f64;
-        let layer = self.preset.planet.surface_water_m
-            - crate::sea_level::ice_layer_m(ice_km3, planet_km2);
+        let layer =
+            self.preset.planet.surface_water_m - crate::sea_level::ice_layer_m(ice_km3, planet_km2);
         let flood = self.preset.surface.as_ref().map_or_else(
             || crate::surface::params::Numerics::default().flood,
             |s| s.numerics.flood,
@@ -1175,10 +1175,20 @@ impl ClimateStage {
         // Where the crust went this plate step, and the ground the surface will erode.
         let started = Instant::now();
         let pid = need("plates/plate_id")?;
-        let src =
-            self.s.omega.as_ref().map(|prev| {
-                advect::sources(&grid, pid, &omega_for(prev, &parents), dt_myr * 1.0e6)
-            });
+        let src = self.s.omega.as_ref().map(|prev| {
+            let mut src = advect::sources(&grid, pid, &omega_for(prev, &parents), dt_myr * 1.0e6);
+            // The floor in a gap between plates stays where it is (ledger: PLT-354).
+            advect::hold_gaps(
+                w,
+                &mut src,
+                world
+                    .fields
+                    .get(crate::surface::field::CRUST_GAP)
+                    .filter(|f| f.data.len() == n)
+                    .map(|f| f.data.as_slice()),
+            );
+            src
+        });
         // The surface's carry blur, kept per Myr at its reference step (`advect::blur_owed`).
         let blur_ref = self.preset.surface.as_ref().map_or_else(
             || crate::surface::params::Numerics::default().carry_blur_ref_myr,
@@ -1213,6 +1223,9 @@ impl ClimateStage {
                 group: ids("plates/group_id"),
                 plate_elevation: need("plates/elevation_m")?,
                 uplift_mm_yr: need("plates/uplift_mm_yr")?,
+                gap: ids(crate::plates::l1::GAP_FIELD),
+                prev_gap: ids(crate::surface::field::CRUST_GAP),
+                prev_offset: Some(&st.offset_m),
                 parents: &parents,
                 known_plates: prev.len(),
                 dt_yr: dt_myr * 1.0e6,
