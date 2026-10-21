@@ -187,7 +187,7 @@ pub fn bake(
         _ => None,
     };
     let params = p.biomes.clone().unwrap_or_default();
-    // Closed basins below sea level are land to the biomes (HYD-100).
+    // Closed basins below sea level are land to the biomes (HYD-100; ledger: HYD-104).
     let closed = crate::hydro::closed_below_sea(
         &l2,
         &elev,

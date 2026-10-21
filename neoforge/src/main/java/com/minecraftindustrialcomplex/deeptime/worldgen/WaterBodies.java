@@ -283,7 +283,7 @@ public final class WaterBodies {
         CarvingMask[] masks = carvingMasks(chunk, wd);
         LakeIce lakeIce = LakeIce.of(wd);
         Water.Column[] cols = new Water.Column[256];
-        // A closed basin below sea level in or next to the chunk (HYD-100): its columns are drained.
+        // A closed basin below sea level in or next to the chunk (HYD-100; ledger: HYD-103): its columns are drained.
         boolean closed = wd.has(WorldData.CLOSED_BASIN)
                 && PlayaPass.anySalt(wd.layer(WorldData.CLOSED_BASIN), x0, z0, x0 + 15, z0 + 15);
         int seaTop = spec.seaLevel() - 1, drained = 0;
@@ -486,7 +486,7 @@ public final class WaterBodies {
     /**
      * Drains the open water over column (x, z) from {@code from} down to the ground, above {@code keep} (the column's
      * own water's top, else {@link Integer#MIN_VALUE}): the sea's water the aquifer brought into a closed basin
-     * (HYD-100). Stops at the first block that is neither air nor water. Returns the blocks drained.
+     * (HYD-100; ledger: HYD-103). Stops at the first block that is neither air nor water. Returns the blocks drained.
      */
     static int drain(ChunkAccess chunk, BlockPos.MutableBlockPos pos, int x, int z, int keep, int from, int minY) {
         int n = 0;

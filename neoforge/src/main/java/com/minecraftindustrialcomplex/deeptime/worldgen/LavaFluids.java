@@ -14,7 +14,7 @@ import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
  *   <li>At and above the lava floor ({@link LavaRules#floodY}, y −342 by default): the sea, as
  *       vanilla. Sea water therefore reaches any sea bed above the floor.</li>
  *   <li>Except in a closed basin below sea level ({@link TerrainSource#closedBasin}, the baked
- *       {@code closed_basin} layer; HYD-100): no sea there. The status is water at the lava floor's
+ *       {@code closed_basin} layer; HYD-100, ledger: HYD-103): no sea there. The status is water at the lava floor's
  *       level, so the aquifer's own local water tables under the basin stay water (its randomized
  *       levels take the global status's fluid), but nothing floods to sea level: neither the
  *       basin's open air (the aquifer reads the picker at the column's surface) nor its caves

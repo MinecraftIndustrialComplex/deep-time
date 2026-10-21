@@ -322,8 +322,8 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     )?;
     drop(playa);
 
-    // closed_basin: 1 where the game puts no sea on ground below sea level (HYD-100, HYD-102;
-    // FORMAT.md, "Water columns", step 3).
+    // closed_basin (ledger: BAK-055): 1 where the game puts no sea on ground below sea level
+    // (HYD-100, HYD-102; FORMAT.md, "Water columns", step 3).
     out.layer(
         desc(CLOSED_BASIN, DType::U8, &grid, 1.0, "flag", None),
         &result.closed_basin,

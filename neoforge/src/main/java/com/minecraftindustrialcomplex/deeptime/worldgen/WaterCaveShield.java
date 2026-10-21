@@ -40,7 +40,7 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
  *       top and fades out by {@value #SHALLOW_NONE_BLOCKS}: under deeper water vanilla's aquifer
  *       floods the cave mouths (its sea wherever a sampled preliminary surface, the highest
  *       8-block cell under H, lies 9 or more blocks under sea level), as on vanilla's ocean
- *       floors. A cell in a closed basin below sea level ({@code closed_basin}, HYD-100) is not
+ *       floors. A cell in a closed basin below sea level ({@code closed_basin}, HYD-100; ledger: HYD-103) is not
  *       sea: no sea stands there, and the basin's own lake, if any, counts as a lake.</li>
  * </ul>
  * Ledger HYD-078. Plain Java, no Minecraft, thread-safe.

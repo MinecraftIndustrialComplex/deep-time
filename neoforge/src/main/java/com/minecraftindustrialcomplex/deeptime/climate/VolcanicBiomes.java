@@ -399,7 +399,7 @@ public final class VolcanicBiomes {
             return height;
         }
 
-        /** At or above sea level, or in a closed basin below it (no sea there, HYD-100). */
+        /** At or above sea level, or in a closed basin below it (no sea there, HYD-100; ledger: HYD-104). */
         boolean land() {
             return height() >= level.seaLevel() || level.terrain().closedBasin(x, z);
         }

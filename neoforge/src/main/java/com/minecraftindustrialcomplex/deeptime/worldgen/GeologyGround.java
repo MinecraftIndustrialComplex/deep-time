@@ -238,7 +238,7 @@ public final class GeologyGround {
 
     /**
      * The sea within {@link #COAST_BLOCKS} of the column (eight directions, at half and full reach). Ground below sea
-     * level in a closed basin is not sea (HYD-100).
+     * level in a closed basin is not sea (HYD-100; ledger: HYD-104).
      */
     public boolean coastal(int x, int z) {
         if (sea(x, z))
