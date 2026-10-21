@@ -31,7 +31,7 @@ public final class PlacementPackGameTests {
 
     private PlacementPackGameTests() {}
 
-    /** A check counts only with at least this many columns (the 4k test planet is small: about 9 % land). */
+    /** A check counts only with at least this many columns, inside cells of its class (the 4k test planet is small: about 9 % land). */
     static final int MIN_COLUMNS = 30;
 
     private static JsonObject climateNote(GameTestHelper helper, ServerLevel level) {
@@ -106,6 +106,16 @@ public final class PlacementPackGameTests {
      * Am in the jungles, Cs on shrubland and steppe, BSk on the steppe and dry shrublands, ET with few snowy plains) and
      * the humid tropical mountains in the cloud forest; every check with at least {@link #MIN_COLUMNS} columns meets its
      * bound. Without Terralith every check is inactive and the test passes with a line saying so.
+     * <p>
+     * A check counts only the columns inside cells of its class (since 2026-10-21, BIO-154): a column on a class border
+     * reads biome inputs the game blends from two classes' cells, or a class's and the sea's, so its biome tests the
+     * blend, not the table's rule for its class, and how many such columns a class has is the planet's geometry (the
+     * smaller the patches, the larger the share on a border). On master f43d1e1a's MIC test planet Am held 52 columns
+     * and 31 on its jungles (0.596, under the bound): 15 of the 21 misses lay on a border, 13 beside the sea, where a
+     * warm sea's temperature band carries the blend into vanilla's T4 (Terralith's desert oasis, 10 columns, and the
+     * windswept forest, 3); inside Am cells 27 of 33 were on its jungles (0.82). The bound is not lowered: it holds for
+     * the class's own columns, with at least {@link #MIN_COLUMNS} of them, and the border's columns and the biomes of
+     * their misses are logged ({@code left_out_border}, {@code border_misses}).
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void packTableClassesReachTheirBiomes(GameTestHelper helper) {

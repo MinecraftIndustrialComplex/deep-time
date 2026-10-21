@@ -102,7 +102,7 @@ public final class FarTerrain {
         this.cell = generator.waterReach();
         // The rule SurfaceSystem paints this level's chunks with (NoiseBasedChunkGenerator.buildSurface
         // reads the registry settings), seeing the biomes the chunks store: x folded into the lap.
-        this.packRule = PackSurfaceRule.of(level, generator, DelegatingRuleSource.levelRule(generator.sourceSettings().value().surfaceRule()),
+        this.packRule = PackSurfaceRule.of(level, generator, generator.sourceSettings().value().noiseSettings(), DelegatingRuleSource.levelRule(generator.sourceSettings().value().surfaceRule()),
                 (qx, qy, qz) -> source.getNoiseBiome(QuartPos.fromBlock(terrain.wrapX(QuartPos.toBlock(qx))), qy, qz, climate));
     }
 
