@@ -957,6 +957,7 @@ pub fn fronts_finish(
     let mut front_len = vec![0.0; state.plates.len()];
     let (mut front_continental, mut front_oceanic) = (0.0_f64, 0.0_f64);
     let front_km = norm.km(norm.spacing_rad());
+    let arc_steps = (k.arc_distance_km / front_km).floor() as u32;
     for (v, b) in boundary.iter().enumerate() {
         let s = &mut state.samples[v];
         if b.divergent {
@@ -1015,7 +1016,9 @@ pub fn fronts_finish(
             if su.kind != CONTINENTAL {
                 let under = state.contacts[c].under as usize;
                 front_len[under] += front_km;
-                if state.samples[v].kind == CONTINENTAL {
+                // Measurement only: by the crust the arc stands on, as the boundary mix counts it
+                // (ledger: PLT-370).
+                if continent_within(state, geo, v as u32, arc_steps) {
                     front_continental += front_km * env.dt_myr;
                 } else {
                     front_oceanic += front_km * env.dt_myr;
