@@ -1852,8 +1852,8 @@ dropped_separation`, plus `province`, `provinces`, `count_mult`, `max_formed_per
 `brine_flow_km`, `sites`, `bodies`, `richness_mult`, `scatter_mult` (the game multiplies every background-scatter rule by it), `inherited_bif_share`, `bif_basin_km2`, and `bif_basins`, `bif_basin_share` (the inherited iron-formation basins the surface stage dealt). A forming event's `p_survive` is its cell's survival chance.
 `world_frame` (DEP-220) is the world the playability pass counted the essentials' regions in:
 `{"projection": "lambert"}`, or `{"projection": "petroff_guyou", "hemisphere_blocks", "lambda_c_deg",
-"land", "lambda_c" (the λc search, as notes.bake.projection.lambda_c), "millis"}`, whose λc the
-bake's projection draws the world with.
+"land", "lambda_c" (the λc search, as notes.bake.projection.lambda_c)}`, whose λc the bake's
+projection draws the world with (the search's time is the stage's `world_frame` lap).
 
 ## Structural events (`structure/events.dtst`, P2-01, format 0.3)
 
