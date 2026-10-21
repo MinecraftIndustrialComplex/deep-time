@@ -553,7 +553,8 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
     let (zlo, zhi) = wp.z_range();
     let step = anchor::TOP_UP_STEP_BLOCKS;
     for ess in &p.deposits.as_ref().unwrap().essentials {
-        let r = crate::deposits::playability::Regions::in_frame(wp.index_frame(), ess.region_blocks);
+        let r =
+            crate::deposits::playability::Regions::in_frame(wp.index_frame(), ess.region_blocks);
         let mut land = std::collections::BTreeSet::new();
         let mut z = zlo.ceil() as i64;
         while z <= zhi.floor() as i64 {

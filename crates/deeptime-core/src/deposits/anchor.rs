@@ -240,7 +240,8 @@ pub fn settle_in_stratum(
     exposed: bool,
 ) -> InStratum {
     let refs: Vec<&Body> = bodies.iter().collect();
-    if ore_top_in_column(&refs, c, x, z).is_some_and(|t| t <= rock_top && (!exposed || t == rock_top))
+    if ore_top_in_column(&refs, c, x, z)
+        .is_some_and(|t| t <= rock_top && (!exposed || t == rock_top))
     {
         return InStratum::Kept;
     }
@@ -546,7 +547,7 @@ pub fn top_up(
         .collect();
     // Inland: every lattice point within two steps (128 blocks) is dry land too (x wrapping;
     // past the world's top and bottom edges nothing counts against it).
-    let reach = (INLAND_TOP_UP_BLOCKS / step) as i64;
+    let reach = INLAND_TOP_UP_BLOCKS / step;
     let inland: Vec<bool> = (0..nx * nz)
         .map(|k| {
             let (i, j) = ((k % nx) as i64, (k / nx) as i64);
@@ -555,8 +556,9 @@ pub fn top_up(
                     let jj = j + dj;
                     jj < 0
                         || jj >= nz as i64
-                        || (-reach..=reach)
-                            .all(|di| dry[jj as usize * nx + (i + di).rem_euclid(nx as i64) as usize])
+                        || (-reach..=reach).all(|di| {
+                            dry[jj as usize * nx + (i + di).rem_euclid(nx as i64) as usize]
+                        })
                 })
         })
         .collect();
@@ -757,16 +759,25 @@ pub fn top_up(
             }
             rec.short += need as usize;
             for (copy, x, z, inland_point) in placed {
-                let site_id = deposits.sites.iter().map(|s| s.id).max().map_or(0, |m| m + 1);
-                let mut next_body = deposits.bodies.iter().map(|b| b.id).max().map_or(0, |m| m + 1);
+                let site_id = deposits
+                    .sites
+                    .iter()
+                    .map(|s| s.id)
+                    .max()
+                    .map_or(0, |m| m + 1);
+                let next_body = deposits
+                    .bodies
+                    .iter()
+                    .map(|b| b.id)
+                    .max()
+                    .map_or(0, |m| m + 1);
                 let ev = event_id();
                 let mut first_body = None;
                 let mut lo = [i32::MAX; 3];
                 let mut hi = [i32::MIN; 3];
-                for mut b in copy {
-                    b.id = next_body;
+                for (id, mut b) in (next_body..).zip(copy) {
+                    b.id = id;
                     b.site = Some(site_id);
-                    next_body += 1;
                     first_body.get_or_insert((b.id, b.center[1]));
                     for k in 0..3 {
                         lo[k] = lo[k].min(b.aabb[0][k]);
@@ -784,7 +795,11 @@ pub fn top_up(
                         lat as f32,
                         deeptime_format::projection::wrap_deg(lon) as f32,
                     ],
-                    aabb: if first_body.is_some() { [lo, hi] } else { tsite.aabb },
+                    aabb: if first_body.is_some() {
+                        [lo, hi]
+                    } else {
+                        tsite.aabb
+                    },
                     body: first_body.map(|(id, _)| id),
                     forming_event: ev,
                     parent: None,
@@ -847,9 +862,10 @@ fn overlaps_point(c: i64, a: (i64, i64), b: (i64, i64), half: [i32; 2]) -> bool 
 fn event_times(dir: &Path, id: EventId) -> (f64, f64) {
     let found = || -> Option<(f64, f64)> {
         let index = EventIndex::read(dir).ok()?;
-        let seg = index.segments.iter().find(|s| {
-            s.writer == id.writer() && (s.first_seq..=s.last_seq).contains(&id.seq())
-        })?;
+        let seg = index
+            .segments
+            .iter()
+            .find(|s| s.writer == id.writer() && (s.first_seq..=s.last_seq).contains(&id.seq()))?;
         let path = dir.join(&seg.path);
         let bytes = std::fs::read(&path).ok()?;
         let e = decode_segment(&path, &bytes)
@@ -987,7 +1003,9 @@ pub fn anchor_folder(
                     }
                 }
             }
-            writer.as_mut().map_or(EventId::new(GEOLOGY_WRITER, MAX_SEQ), |w| w.next_id())
+            writer
+                .as_mut()
+                .map_or(EventId::new(GEOLOGY_WRITER, MAX_SEQ), |w| w.next_id())
         };
         top_up(
             &world,
@@ -1015,12 +1033,7 @@ pub fn anchor_folder(
     if a.moved > 0 || added > 0 {
         let (bytes, crc32) = write_bodies(dir, &bodies)?;
         set_file(m, BODIES_PATH, bytes, crc32);
-        let w = write_sites_in(
-            dir,
-            m.scale.circumference_blocks,
-            wp.index_frame(),
-            &sites,
-        )?;
+        let w = write_sites_in(dir, m.scale.circumference_blocks, wp.index_frame(), &sites)?;
         set_file(m, SITES_PATH, w.sites_bytes, w.sites_crc32);
         set_file(m, INDEX_PATH, w.index_bytes, w.index_crc32);
     }
@@ -1286,7 +1299,11 @@ mod tests {
             (x + 1024).rem_euclid(2048) >= 1024
         }
         fn rock_top(&self, x: i64, z: i64) -> (i32, bool) {
-            if self.dry(x, z) { (66, false) } else { (30, true) }
+            if self.dry(x, z) {
+                (66, false)
+            } else {
+                (30, true)
+            }
         }
         fn rock(&self, _x: i64, _z: i64) -> Vec<(i32, i32, Option<String>)> {
             vec![
@@ -1342,28 +1359,27 @@ mod tests {
         let mut seq = 100;
         let spawn = (700.0, 0.0);
         let regions = Regions::in_frame(wp.index_frame(), 512);
-        let mut run = |sites: &mut Vec<Site>,
-                       bodies: &mut Vec<Body>,
-                       g: &mut BTreeMap<EventId, String>| {
-            let mut d = Deposits {
-                sites,
-                bodies,
-                guaranteed: g,
-                in_stratum: &in_stratum,
+        let mut run =
+            |sites: &mut Vec<Site>, bodies: &mut Vec<Body>, g: &mut BTreeMap<EventId, String>| {
+                let mut d = Deposits {
+                    sites,
+                    bodies,
+                    guaranteed: g,
+                    in_stratum: &in_stratum,
+                };
+                top_up(
+                    &world,
+                    &wp,
+                    &mut d,
+                    std::slice::from_ref(&ess),
+                    spawn,
+                    &mut |_| (-1.0e9, -1.0e9),
+                    &mut || {
+                        seq += 1;
+                        EventId::new(1, seq)
+                    },
+                )
             };
-            top_up(
-                &world,
-                &wp,
-                &mut d,
-                std::slice::from_ref(&ess),
-                spawn,
-                &mut |_| (-1.0e9, -1.0e9),
-                &mut || {
-                    seq += 1;
-                    EventId::new(1, seq)
-                },
-            )
-        };
         let (rec, events) = run(&mut sites, &mut bodies, &mut guaranteed);
         let r = &rec["c:iron"];
         // Land in two of the four columns of regions, on every row.
@@ -1382,7 +1398,12 @@ mod tests {
             let mine: Vec<&Body> = bodies.iter().filter(|b| b.site == Some(s.id)).collect();
             assert_eq!(mine.len(), 1);
             assert_eq!(s.body, Some(mine[0].id));
-            assert_eq!(ore_top_in_column(&mine, 2048, x, z), Some(66), "site {}", s.id);
+            assert_eq!(
+                ore_top_in_column(&mine, 2048, x, z),
+                Some(66),
+                "site {}",
+                s.id
+            );
             let e = events.iter().find(|e| e.id == s.forming_event).unwrap();
             assert_eq!(e.kind, GUARANTEED_KIND);
             assert_eq!(e.causes, vec![e1]);
@@ -1392,7 +1413,13 @@ mod tests {
         // The spawn's own region gets the inland point nearest it.
         let near = sites[1..]
             .iter()
-            .map(|s| super::super::cluster::distance(2048.0, (f64::from(s.center[0]), f64::from(s.center[2])), spawn))
+            .map(|s| {
+                super::super::cluster::distance(
+                    2048.0,
+                    (f64::from(s.center[0]), f64::from(s.center[2])),
+                    spawn,
+                )
+            })
             .fold(f64::INFINITY, f64::min);
         assert!(near < 46.0, "{near}");
         let ids: HashSet<u32> = bodies.iter().map(|b| b.id).collect();

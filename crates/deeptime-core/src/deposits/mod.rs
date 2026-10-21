@@ -4107,11 +4107,12 @@ fn union_aabb(bodies: &[Body]) -> [[i32; 3]; 2] {
 /// candidates 1° apart, rings 0.5° apart of 72 directions (game-choice, DEP-220: the forecast is
 /// read on land the young landscape and the amplifier redraw, and the bake's 0.25°, 0.1° and 360
 /// directions cost the stage 0.8 s on a full planet).
-pub const FORECAST_SEARCH: crate::bake::project::LambdaSearch = crate::bake::project::LambdaSearch {
-    step_deg: 1.0,
-    ring_deg: 0.5,
-    directions: 72,
-};
+pub const FORECAST_SEARCH: crate::bake::project::LambdaSearch =
+    crate::bake::project::LambdaSearch {
+        step_deg: 1.0,
+        ring_deg: 0.5,
+        directions: 72,
+    };
 
 /// How far inland (blocks, simulation frame) the playability pass looks first for a guaranteed
 /// deposit's cell. game-choice (coordinator, 2026-10-20, DEP-222): two L1 cells at 16k, the
