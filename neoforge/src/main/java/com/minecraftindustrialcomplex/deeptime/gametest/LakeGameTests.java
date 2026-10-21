@@ -155,6 +155,7 @@ public final class LakeGameTests {
                 wrong++;
                 detail.append(" not-salt(").append(s.x()).append(',').append(y).append(',').append(s.z()).append(' ')
                         .append(BuiltInRegistries.BLOCK.getKey(b.getBlock())).append(')');
+                DeepTime.LOGGER.info("[gametest] lakeIceAndSaltFollowTheClimate not-salt {}", DIAG.why(level, g, w, wd, spec, s.x(), y, s.z()));
             }
         }
         DeepTime.LOGGER.info("[gametest] lakeIceAndSaltFollowTheClimate lakeCells={} playaCells={} frozenLakeColumns={} (iceRead={} inWarmBiome={}) "
