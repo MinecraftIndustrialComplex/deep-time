@@ -338,6 +338,17 @@ def fields_report(d):
     print(f"  the largest ground above 3 km: {a3:.2f} Mkm2, median {z3:.0f} m; the land above 2 km's last"
           f" orogeny p10/50/90 {pct(hi_age, 10):.0f}/{pct(hi_age, 50):.0f}/{pct(hi_age, 90):.0f} Myr old"
           f" ({hi_age.size} of {n_age} with an age)")
+    # The high plateaus' summer: the warmest month and the equilibrium line on land 3.5 to 5 km
+    # high, by latitude band (Tibet's and the Altiplano's latitudes), against the ice there.
+    if tw is not None and ela is not None:
+        for lo_, hi_ in ((10.0, 25.0), (25.0, 45.0), (45.0, 60.0)):
+            sel = land & (z > 3500) & (z < 5000) & (np.abs(lat) >= lo_) & (np.abs(lat) < hi_)
+            if sel.sum() < 20:
+                continue
+            print(f"  land 3.5 to 5 km at |lat| {lo_:.0f} to {hi_:.0f}: {sel.sum() * cell_km2 / 1e6:.2f} Mkm2,"
+                  f" ground p50 {pct(z[sel], 50):.0f} m; warmest month p10/50/90 {pct(tw[sel], 10):.1f}/"
+                  f"{pct(tw[sel], 50):.1f}/{pct(tw[sel], 90):.1f} C; ELA p50 {pct(ela[sel][np.isfinite(ela[sel])], 50):.0f} m;"
+                  f" glacier share {(ice[sel] >= ICE_MIN_M).mean():.2f}")
     print("  coastal high ground on the grid's cells, by plates/orogeny_type:")
     coast_metrics(xyz(lat[ok], lon[ok]), z[ok], np.sqrt(cell_km2), np.round(oro[ok]).astype(int),
                   ("none", "Andean", "Himalayan"))
