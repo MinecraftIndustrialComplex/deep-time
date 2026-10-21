@@ -348,8 +348,6 @@ fn stream_events(run: Arc<Run>) -> Reply {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     /// The workbench's `Host` policy: loopback names always, tailnet names only with
     /// `--allow-tailnet`, foreign names never (the server applies it to every request).
     #[test]
