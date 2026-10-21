@@ -2783,6 +2783,7 @@ mod tests {
             && a.class[k] == b.class[k]
     }
 
+    /// Ledger: BAK-059, BIO-171.
     #[test]
     fn settling_to_the_world_s_ground_moves_only_the_mismatched_nodes() {
         // BIO-170, BIO-171, BIO-172. A land node the world's sea covers (a pocket opened to the

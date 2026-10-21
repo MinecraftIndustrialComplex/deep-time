@@ -146,8 +146,9 @@ pub fn top_block(h: f64) -> i32 {
 
 /// Step 3's test, the one place the sea's rule is written (ledger: HYD-106): the open sea stands on
 /// a column whose top block `ground` is under sea level − 1 (a column whose top block is the
-/// block under the sea's top is dry, so the water has at least one block to be) unless the
-/// `closed_basin` layer keeps it off (`closed`, read only where the first test passes).
+/// block under the sea's top is dry, so the water has at least one block to be: the 35 m band of
+/// HYD-107) unless the `closed_basin` layer keeps it off (`closed`, read only where the first test
+/// passes).
 ///
 /// The game's column evaluator ([`core_with_surface`]), the bake's projection pass (the biome
 /// layers' land call: `bake::project`, via [`sea_covers_height`]) and Java's `Water.seaCovers` all

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""Does the biome map agree with the world's sea? (BIO-170 to BIO-174)
+"""Does the biome map agree with the world's sea? (ledger: BAK-058; BIO-170 to BIO-174)
 
 The biome inputs (`climate/continents`, L2) say land or ocean; the world's column rule
 (`deeptime_format::water::sea_covers`, Java `Water.core`, step 3) says whether the sea stands on a

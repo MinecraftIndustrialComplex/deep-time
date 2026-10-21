@@ -250,6 +250,7 @@ public final class GeologyGround {
         return false;
     }
 
+    /** The coast's sea test: its own threshold, not {@code Water.seaCovers} (HYD-109). */
     private boolean sea(int x, int z) {
         return terrain.height(x, z) < seaLevel && !terrain.closedBasin(x, z);
     }
