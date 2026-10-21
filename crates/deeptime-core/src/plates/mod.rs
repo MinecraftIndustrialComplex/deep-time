@@ -1376,11 +1376,7 @@ impl Stage for PlatesStage {
                 let k = self.preset.tectonics.clone();
                 let env = self.env(&k, st.step);
                 let z_0 = 0.5 * (env.k.continent_elevation_m[0] + env.k.continent_elevation_m[1]);
-                st.gap_budget = Some(gap_budget::GapBudget::start(
-                    &st.samples,
-                    z_0,
-                    env.gravity,
-                ));
+                st.gap_budget = Some(gap_budget::GapBudget::start(&st.samples, z_0, env.gravity));
             }
             let result = self.advance(&mut st, world);
             world.plates = Some(st);
