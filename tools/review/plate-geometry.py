@@ -26,7 +26,7 @@ import json
 import math
 import sys
 
-# Bird 2003, Table 1 (G3 4(3):1027): the 52 plates' areas, steradians (read 2026-10-21).
+# Bird 2003, Table 1 (G3 4(3):1027): the 52 plates' areas, steradians (read 2026-10-21). ledger: PLT-372
 BIRD_SR = [
     1.44065, 0.13066, 1.43268, 0.02050, 0.12082, 0.00793, 0.01418, 1.13294, 0.01295, 0.00481,
     0.01715, 0.01270, 0.07304, 0.03765, 0.07223, 0.00356, 0.00411, 1.19630, 0.00079, 0.00036,
@@ -35,6 +35,8 @@ BIRD_SR = [
     1.03045, 0.00762, 0.04190, 0.00178, 0.47192, 0.00317, 0.21967, 0.00454, 0.00870, 0.00625,
     0.01116, 0.05425,
 ]
+# Measuring areas, sr; 0.0377 is the smallest plate the quick planets keep (PLT-091: 300 of
+# 100,000 samples of 4 pi sr). ledger: PLT-372
 AREAS_SR = [1.0, 0.3, 0.1, 0.0377, 0.01]
 NAMES = ["ocean_ocean", "ocean_continent", "collision", "ridge", "rift", "other"]
 SLAB_BANDS = ["0", "50", "100", "150", "300", "600"]
@@ -79,7 +81,7 @@ def run_stats(path, skip, max_plates):
     r["mix_subducting"] = (mix[0] + mix[1]) / total
     r["oo_of_subducting"] = mix[0] / max(mix[0] + mix[1], 1e-9)
     # Lengths, Earth-normalised km per step (Bird 2003: SUB 19.7 % of his boundary; Stern & Scholl
-    # 2010: 14,500 km of intra-oceanic arc, 27,500 km of continental).
+    # 2010: 14,500 km of intra-oceanic arc, 27,500 km of continental). ledger: PLT-213, PLT-370
     steps_n = max(len(use), 1)
     r["boundary_km"] = total / steps_n
     for k, n in enumerate(NAMES[:3]):

@@ -638,10 +638,13 @@ pub const ARC_CONTINENTAL_GLOBAL: &str = "plates/arc_continental_km3";
 pub const ARC_OCEANIC_GLOBAL: &str = "plates/arc_oceanic_km3";
 /// World global: the visible continental crust's volume after the last step, km³ (Earth-normalized).
 pub const CONTINENTAL_VOLUME_GLOBAL: &str = "plates/continental_volume_km3";
-/// World global: oceanic subduction fronts over the run, km × Myr, where the overriding crust at
-/// the front is continental (a continental arc; measurement: the arcs' rate per km of arc).
+/// World global: oceanic subduction fronts over the run, km × Myr, whose arc stands on continental
+/// crust: the overriding plate's visible continental crust lies within `arc_distance_km` of the
+/// front (a continental arc; measurement: the arcs' rate per km of arc). Until 2026-10-21 the
+/// crust of the front sample itself, often an oceanic fringe in front of the continent.
+/// ledger: PLT-370
 pub const ARC_FRONT_CONTINENTAL_GLOBAL: &str = "plates/arc_front_continental_km_myr";
-/// … and where it is oceanic (an island arc), km × Myr.
+/// … and the rest, whose arc stands on ocean floor (an island arc), km × Myr.
 pub const ARC_FRONT_OCEANIC_GLOBAL: &str = "plates/arc_front_oceanic_km_myr";
 /// World globals: oceanic fronts over the run weighted by the arcs' convergence factor, km × Myr,
 /// with the full relative speed and with the convergence normal to the front ([`Pull`]).

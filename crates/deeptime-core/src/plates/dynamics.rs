@@ -968,7 +968,8 @@ pub struct FrontBands {
 }
 
 /// The lower edges of [`FrontBands::oo_over_cont`]'s and `oo_under_cont`'s bands: a plate's
-/// continental share.
+/// continental share. These bands and the two below are measurement bins, not physics
+/// (game-choice, the plate-geometry task 2026-10-21; ledger: PLT-370).
 pub const CONT_SHARE_BANDS: [f64; BANDS] = [0.0, 0.01, 0.05, 0.15, 0.3, 0.5];
 /// The lower edges of [`FrontBands::oo_coast`]'s bands, km.
 pub const COAST_BANDS_KM: [f64; BANDS] = [0.0, 150.0, 300.0, 600.0, 1200.0, 2400.0];
