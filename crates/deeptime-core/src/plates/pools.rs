@@ -269,7 +269,7 @@ pub fn surface_step(s: &mut Sample, r: &SurfaceRates, held_floor: f32) -> f64 {
             s.pools[pool::SEDIMENT] += r.pelagic_m as f32;
         }
     } else if z > r.sea_m {
-        // Cortial's ε_c·(z/z_c)·δt on the height above the sea (ledger: PLT-128).
+        // Cortial's ε_c·(z/z_c)·δt on the height above the sea (ledger: PLT-127, PLT-128).
         let lower = (z - r.sea_m) / r.z_c * r.erosion_m;
         z -= lower;
         eroded = strip(&mut s.pools, lower * ISOSTATIC_FACTOR);
