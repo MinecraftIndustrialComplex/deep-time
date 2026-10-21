@@ -32,7 +32,7 @@ use rayon::prelude::*;
 use super::Env;
 use super::geometry::{Geo, Tree, cover};
 use super::kinematics::{azimuth_deg, quat, tangent, to_world};
-use super::pools::ocean_elevation;
+use super::pools::floor_at;
 use super::state::{CONTINENTAL, OCEANIC, OROGENY_NONE, PlateState, regime};
 use crate::params::ScaleParams;
 use crate::sphere::Coupling;
@@ -281,6 +281,51 @@ pub(super) fn sample_with(
             },
         }
     });
+    // A gap wider than the 32 nearest samples reach (a fast plate opens one over the 20 Myr or
+    // more between resamplings): its cells find their far side here, the nearest sample of each
+    // other plate, as the resampling's graph search does at any distance. Within the 32 alone
+    // they took the near edge's depth and the gap's whole age, deeper and older than the floor
+    // the next resampling makes there, and the sea jumped at each resampling. ledger: PLT-354
+    let mut info = info;
+    let far: Vec<usize> = (0..info.len())
+        .filter(|&c| info[c].mode == GAP && info[c].j2 == u32::MAX && info[c].d1.is_finite())
+        .collect();
+    if !far.is_empty() {
+        let mut ids: Vec<u32> = (0..samples.len() as u32)
+            .filter(|&v| !samples[v as usize].is_hidden())
+            .map(plate_of)
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        let trees: Vec<(u32, Tree)> = ids
+            .into_iter()
+            .map(|p| {
+                let keep = |i: usize| !samples[i].is_hidden() && plate_of(i as u32) == p;
+                (p, Tree::over(pos, keep))
+            })
+            .collect();
+        let w = coupling.grid().w as usize;
+        let links = coupling.links();
+        let found: Vec<Option<(u32, f64)>> = far
+            .par_iter()
+            .map(|&c| {
+                let q = coupling.cell_unit((c % w) as i64, (c / w) as i64);
+                let p1 = plate_of(links[c].nearest);
+                trees
+                    .iter()
+                    .filter(|(p, _)| *p != p1)
+                    .filter_map(|(_, tree)| tree.nearest(q))
+                    .min_by(|a, b| a.1.total_cmp(&b.1))
+            })
+            .collect();
+        for (&c, f) in far.iter().zip(found) {
+            if let Some((v, dv)) = f {
+                info[c].d2 = angle_of_chord2(dv) as f32;
+                info[c].j2 = v;
+            }
+        }
+        crate::compute::add("l1_far_gap_cells_n", far.len() as f64);
+    }
     crate::compute::lap("l1_relink", relinked);
     if let Some(d) = &from_device {
         crate::compute::add("l1_cpu_cells_n", d.left() as f64);
@@ -291,11 +336,10 @@ pub(super) fn sample_with(
     let k = env.k;
     let t = env.t_myr;
     let since = (t - state.resample_myr).max(env.dt_myr);
-    let (zr, zf) = (k.ridge_elevation_m, k.oceanic_floor_elevation_m);
     let edge_z = |v: u32| {
         let s = &samples[v as usize];
         if s.kind == CONTINENTAL {
-            ocean_elevation(since, zr, zf, k.oceanic_damping_mm_yr)
+            floor_at(k, since)
         } else {
             f64::from(s.elevation_m)
         }
@@ -314,10 +358,7 @@ pub(super) fn sample_with(
             (1.0, z1)
         };
         let age = alpha * since;
-        (
-            alpha * zbar + (1.0 - alpha) * ocean_elevation(age, zr, zf, k.oceanic_damping_mm_yr),
-            age,
-        )
+        (alpha * zbar + (1.0 - alpha) * floor_at(k, age), age)
     };
 
     let links = coupling.links();
@@ -368,7 +409,7 @@ pub(super) fn sample_with(
     let cells = links.len();
     // The deposit engine's inputs and the surface's basement (P1-04): the nearest sample's flags,
     // top rock pool and trench values; the rest interpolated.
-    let extra = |c: usize, interp: &[f64; INTERP]| -> [f32; 12] {
+    let extra = |c: usize, interp: &[f64; INTERP]| -> [f32; 13] {
         let s = &samples[links[c].nearest as usize];
         if info[c].mode == GAP {
             let age = gap_of(&info[c], links[c].nearest).1;
@@ -385,6 +426,7 @@ pub(super) fn sample_with(
                 f32::NAN,
                 0.0,
                 0.0,
+                1.0,
             ];
         }
         let top = TOP_ORDER
@@ -409,6 +451,7 @@ pub(super) fn sample_with(
             },
             s.collision_mm_yr,
             s.shortening_km,
+            0.0,
         ]
     };
     // The rock pools, interpolated like the other thicknesses (P1-07's basement columns,
@@ -522,7 +565,7 @@ pub(super) fn sample_with(
         "plates/fold_trend_deg",
         "plates/plate_id",
     ];
-    let extra_names: [&'static str; 12] = [
+    let extra_names: [&'static str; 13] = [
         "plates/flags",
         "plates/top_pool",
         "plates/oxidation",
@@ -543,11 +586,15 @@ pub(super) fn sample_with(
         // reads them (`belts.rs`, `structure::deform::emplace`).
         "plates/collision_mm_yr",
         "plates/shortening",
+        // 1 where the cell lies in a gap between plates (the floor a ridge is making, which the
+        // next resampling turns into samples), 0 elsewhere: the surface takes the gap's floor
+        // there as crust new at the place (`surface::advect::carried_elevation`). ledger: PLT-354
+        GAP_FIELD,
     ];
     // Every layer written in one pass over the cells, each block of cells on one thread (P1-19:
     // the cells' values were collected per group, then each layer drawn out of them in a pass of
     // its own, 30 passes over the L1 every step).
-    const FIELDS: usize = 11 + 12 + POOL_FIELDS.len();
+    const FIELDS: usize = 11 + 13 + POOL_FIELDS.len();
     const BLOCK: usize = 1 << 12;
     let mut layers: Vec<Vec<f32>> = (0..FIELDS).map(|_| vec![0.0; cells]).collect();
     let mut blocks: Vec<Vec<&mut [f32]>> = (0..cells.div_ceil(BLOCK))
@@ -583,6 +630,9 @@ pub(super) fn sample_with(
         .zip(layers)
         .collect()
 }
+
+/// The L1 field that marks the cells in a gap between plates (1 there, 0 elsewhere).
+pub const GAP_FIELD: &str = "plates/gap";
 
 /// The L1 fields holding the rock pools (interpolated), metres, in [`pool`] order
 /// (`plates/pool/<name>_m`; P1-07 builds the basement below the strata log from them).

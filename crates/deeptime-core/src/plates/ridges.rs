@@ -32,7 +32,7 @@
 //!   the nearest plate. With d_P the distance to the nearest plate and d_Γ to the ridge (midway
 //!   to the second nearest plate), α = d_Γ/(d_Γ + d_P) and the elevation is Cortial's
 //!   z = α·z̄ + (1 − α)·z_Γ, z̄ interpolated between the two plates' edges and z_Γ the ridge
-//!   profile at the sample's age (the dampening's own age–depth curve, `pools::ocean_elevation`).
+//!   profile at the sample's age (the preset's age–depth law, `pools::floor_at`).
 //!   The crust's age is α times the time since the last resampling, and its ridge direction is
 //!   r = p × (s_i − s_j) normalised (parallel to the ridge, perpendicular to spreading).
 //! - The first crust made between two plates emits a ridge_birth event (caused by the rift that
@@ -54,7 +54,7 @@ use super::geometry::{Cover, Geo, Tree, dijkstra_two};
 use super::init::random_rotation;
 use super::kinematics::{arr, quat, to_world};
 use super::pools::{
-    accrete, isostatic_change_m, ocean_elevation, ocean_heat_flow, oceanic_column, thickness,
+    accrete, floor_at, isostatic_change_m, ocean_heat_flow, oceanic_column, thickness,
 };
 use super::state::{
     CONTINENTAL, FORELAND, Group, OCEANIC, PlateState, Ridge, Sample, pool, regime,
@@ -473,8 +473,7 @@ pub fn resample(
         std::f64::consts::PI,
     );
     let since = (t - state.resample_myr).max(env.dt_myr);
-    let (zr, zf) = (k.ridge_elevation_m, k.oceanic_floor_elevation_m);
-    let damping = k.oceanic_damping_mm_yr;
+    let zr = k.ridge_elevation_m;
     let omega: Vec<DVec3> = state
         .plates
         .iter()
@@ -482,7 +481,7 @@ pub fn resample(
         .collect();
     let edge_z = |s: &Sample| -> f64 {
         if s.kind == CONTINENTAL {
-            ocean_elevation(since, zr, zf, damping)
+            floor_at(k, since)
         } else {
             f64::from(s.elevation_m)
         }
@@ -513,7 +512,7 @@ pub fn resample(
         };
         let age = alpha * since;
         let p = new_pts[i];
-        let z = alpha * zbar + (1.0 - alpha) * ocean_elevation(age, zr, zf, damping);
+        let z = alpha * zbar + (1.0 - alpha) * floor_at(k, age);
         let mut s = Sample::blank(0);
         s.kind = OCEANIC;
         s.regime = regime::RIDGE;

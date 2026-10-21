@@ -417,17 +417,35 @@ fn the_nudges_reach_their_targets_gently() {
             .unwrap()
     };
     let (land0, temp0) = (col("land_frac"), col("t_global_c"));
-    // Targets above both: more land, warmer. The land band starts 0.05 above the plain end: on
-    // this small planet the land share swings by 0.02 to 0.04 a step, and with the band 0.03 above
-    // it (the scaled belts' rain, CLM-201, on plate task 7's crust) the land stayed in the band
-    // until 6 Myr before the end and the proportional nudge could not catch its last fall.
+    // Targets above both: more land, warmer, and above everything the plain planet reached in the
+    // steered tail (the last 0.4 of the run), so the nudges act from the tail's start. On this
+    // small planet the land share swings by 0.02 to 0.04 a step and the last step (the ice-age
+    // window) moves land and temperature more than a step's nudge can answer: bands set just above
+    // the plain end alone left the steered land in its band until the last steps (with the sea
+    // from the ocean's volume, 2026-10-21: in the band to 6 Myr before the end, then a fall of
+    // 0.04 in the last step, the sea only 44 m lower). The temperature band starts 3.5 K above
+    // the tail's warmest: the nudge is proportional, so with the band 0.5 K above it the steered
+    // tail sat on the band's lower edge (14.2 to 14.8 °C), the lower sea's extra land cooling it
+    // as fast as the outgassing warmed it, and the run ended 0.16 K above the plain one.
+    let tail = |name: &str| {
+        let i = cols.iter().position(|c| c == name).unwrap();
+        let t = cols.iter().position(|c| c == "t_myr").unwrap();
+        rows["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|r| r[t].as_f64().unwrap() >= -0.4 * 60.0)
+            .map(|r| r[i].as_f64().unwrap())
+            .fold(f64::NEG_INFINITY, f64::max)
+    };
+    let (land_top, temp_top) = (tail("land_frac"), tail("t_global_c"));
     let (sea_rate, co2_rate) = (20.0, 0.5);
     let on = small_planet(
         60.0,
         Some(steering(json!({
             "target": "custom", "tail_fraction": 0.4,
-            "land_min": land0 + 0.05, "land_max": land0 + 0.12,
-            "temp_min_c": temp0 + 2.0, "temp_max_c": temp0 + 6.0,
+            "land_min": land_top + 0.02, "land_max": land_top + 0.09,
+            "temp_min_c": temp_top + 3.5, "temp_max_c": temp_top + 7.5,
             "sea_rate_m_myr": sea_rate, "sea_max_m": 400.0,
             "co2_rate_per_myr": co2_rate, "co2_factor_max": 4.0
         }))),

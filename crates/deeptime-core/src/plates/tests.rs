@@ -1932,7 +1932,7 @@ fn thick_ocean_crust_cools_towards_the_floor_it_holds_up() {
         s.flags = 0;
     }
     for _ in 0..800 {
-        surface(&mut st, &geo, &env, &[]);
+        surface(&mut st, &geo, &env, &[], 0.0);
     }
     let per_m = transition::crust_per_metre(&env);
     let cap = 0.5 * (transition::continental_m() + transition::oceanic_m());
