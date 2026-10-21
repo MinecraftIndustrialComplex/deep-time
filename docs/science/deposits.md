@@ -755,10 +755,12 @@ notes):
   ground less 4 blocks of soil on dry land, the bed under water) for an exposed essential (iron,
   coal), and no higher than it for the others (a body the history buried deeper stays). An
   in-stratum body (MVT) stays in its host horizon, where the bake and the projection keep it
-  (ORE-271), while its ore lies at or under the top rock block; where the bake left the horizon
-  in the soil or above the ground, the ore's top goes down to the highest limestone or dolostone
-  block under the top rock block within 64 blocks (ORE-280, a design reach), or to the top rock
-  block in whatever rock is there when none lies within reach. A placer stays where
+  (ORE-271), while its ore tops out in rock in its centre column. Where the bake left the
+  horizon in the soil band, the projection's clip 4 blocks under the drawn ground (ORE-271)
+  leaves the body no block at all, and moving it whole would keep it empty; such a body is read
+  unclipped, its ore's top goes down to the highest limestone or dolostone block under the top
+  rock block within 64 blocks (ORE-280, a design reach), or to the top rock block in whatever
+  rock is there when none lies within reach, and it is clipped at the top rock block. A placer stays where
   `placer_channels` settled it; natural bodies keep their physics.
   The top of the ore is the highest block of the site's centre column where one of its bodies
   places ore (a zone with a material), not the top of the body's box: the box is padded a block or
