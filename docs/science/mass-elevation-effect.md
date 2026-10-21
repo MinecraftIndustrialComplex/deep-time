@@ -95,16 +95,18 @@ Pikes Peak (a lone summit with low-confidence normals) are left out. Script:
 | Tingri (28.6° N) | 4,300 | 3,805 | 6.9 / 4.25 / 1.45 | 5.7 |
 | Shiquanhe (32.5° N) | 4,279 | 4,633 | 9.15 / 2.2 / – | 7.0 |
 | Madoi (34.9° N) | 4,272 | 4,131 | 4.2 / 3.15 / – | 6.3 |
-| El Alto (16.5° S) | 4,058 | 2,970 | 4.85 / 3.4 / 0.9 | – |
-| Puno (15.8° S) | 3,825 | 3,107 | 5.2 / 3.9 / 1.5 | – |
-| Juliaca (15.5° S) | 3,838 | – | 4.9 / 3.05 / – | – |
-| Oruro (18.0° S) | 3,735 | 3,059 | 5.8 / 3.35 / – | – |
-| Leadville (39.3° N) | 3,095 | 2,278 | 1.5 / −1.1 / – | – |
-| Climax (39.4° N) | 3,457 | – | 3.0 / −0.25 / – | – |
-| Alamosa (37.4° N) | 2,299 | 2,220 | 2.2 / −0.75 / – | – |
-| Addis Ababa (9.0° N) | 2,355 | 1,872 | 2.25 / 2.05 / – | – |
+| El Alto (16.5° S) | 4,058 | 2,970 | 4.85 / 3.4 / 0.9 | 4.1 |
+| Puno (15.8° S) | 3,825 | 3,107 | 5.2 / 3.9 / 1.5 | 4.2 |
+| Juliaca (15.5° S) | 3,838 | 3,107 | 4.9 / 3.05 / – | 4.2 |
+| Oruro (18.0° S) | 3,735 | 3,059 | 5.8 / 3.35 / – | 4.3 |
+| Leadville (39.3° N) | 3,095 | 2,278 | 1.5 / −1.1 / – | 3.5 |
+| Climax (39.4° N) | 3,457 | 2,278 | 3.0 / −0.25 / – | 3.5 |
+| Alamosa (37.4° N) | 2,299 | 2,220 | 2.2 / −0.75 / – | 3.4 |
+| Addis Ababa (9.0° N) | 2,355 | 1,872 | 2.25 / 2.05 / – | 2.3 |
 
-The fitted column is k·Ẑ for Tibet's July (q̂ 1.41 to 1.42). Mean residuals, model minus observed:
+The fitted column is k·Ẑ in each station's warmest month (q̂ 1.41 to 1.42 in Tibet's and the
+Rockies' July, 1.35 to 1.37 in the Altiplano's January, 1.29 in Addis Ababa's August). Puno and
+Juliaca share one cell, as do Leadville and Climax. Mean residuals, model minus observed:
 Tibet −0.10 K (10 station-months), the Altiplano −0.63 K (10), the Rockies +1.51 K (6), Addis Ababa
 about −0.1 K (2). The footprint was swept with the fit redone each time: 56, 111, 150, 222, 333 and
 500 km give rms 1.19, 1.20, 1.28, 1.37, 1.52 and 1.63 K.
@@ -162,7 +164,62 @@ D group like Earth's Dwb, which is the extra city at station heights.
 
 ### On generated planets
 
-QUICK_PLANETS_PENDING
+Runs: `earthlike_quick_16k`, 1000 Myr, seeds 1 to 3 from the supercontinent and from scattered
+continents (`stage volcanoes`, 2 threads, CPU), before (master c790d1f3) and after (this branch,
+whose later master merge brought only viewer changes);
+scored with `tools/review/continents_census.py fields` on `dump-fields` and the climate note's
+`--climate-json`; 2026-10-21. "Plateau" is the census's largest ground above 3 km; its warmth is the
+median of its cells' warmest month at the ground (the ice surface where there is ice). The runs'
+plate histories part within a few hundred Myr, so each pair is two different planets; the means
+are what to read.
+
+| Quantity (mean of 6 runs) | Earth | Before | After |
+|---|---|---|---|
+| Land share of the planet | 0.29 | 0.264 | 0.245 |
+| Land under ice (census glacier share of the land) | about 0.10 | 0.231 | 0.156 |
+| Largest plateau: ice share | Tibet: small | 0.81 | 0.49 |
+| Largest plateau: warmest month, median | Nagqu 10.0 °C | −4.6 °C | 2.4 °C |
+| Land 3.5 to 5 km at 25 to 45°: area, Mkm² (sum of 6); ice share | – | 24.2; 0.86 | 7.5; 0.63 |
+| Global mean temperature at the end | – | 17.6 °C | 16.5 °C |
+| CO₂ at the end, median (the natural cycle's: the end ÷ the present nudge's factor) | – | 1,429 (817) ppm | 822 (622) ppm |
+| CO₂ over the last 500 Myr, mean of the series | – | 1,313 ppm | 1,791 ppm |
+| Present-day target reached (CLM-203) | – | 0 of 6 (factor 1.75, the cap) | 5 of 6 |
+| Sea level at the end | – | −22.7 m | −3.3 m |
+
+Per run, before → after:
+
+| Run | Land | Under ice | Plateau ice; warmest month | CO₂ end, ppm | Present reached |
+|---|---|---|---|---|---|
+| supercontinent 1 | 0.251 → 0.225 | 0.220 → 0.163 | 0.78; −1.8 °C → 0.21; 9.1 °C | 1,520 → 825 | no → yes |
+| supercontinent 2 | 0.277 → 0.273 | 0.197 → 0.143 | 0.93; −8.2 °C → 0.09; 10.2 °C | 1,045 → 856 | no → yes |
+| supercontinent 3 | 0.312 → 0.230 | 0.201 → 0.139 | 0.37; 1.9 °C → 0.91; −4.5 °C | 1,040 → 415 | no → yes |
+| scattered 1 | 0.268 → 0.237 | 0.290 → 0.156 | 1.00; −13.1 °C → 0.88; −6.6 °C | 3,218 → 691 | no → yes |
+| scattered 2 | 0.230 → 0.239 | 0.230 → 0.176 | 0.95; −6.3 °C → 0.11; 8.7 °C | 1,439 → 819 | no → no |
+| scattered 3 | 0.245 → 0.268 | 0.248 → 0.157 | 0.84; 0.2 °C → 0.71; −2.4 °C | 1,419 → 1,694 | no → yes |
+
+What it says. Land under ice falls in every run, by a third on the mean, still above Earth's 0.10.
+The largest plateau clears in three runs of six; in the other three it stays mostly iced: once ice
+stands on a plateau the law gives it no warmth (the ice counts at 0 in the base height, CLM-228;
+"Ice and warmth feed each other" below), as on Ben's run below. With less ice the present-day
+target is now met in five runs where it was met in none, and the end needs less of the nudge, so the
+end's CO₂ and global temperature fall. The CO₂ over the late history rose instead (1,313 to 1,791
+ppm), with 9 % more degassing and more land above 2 km (0.26 to 0.33 of the land) over that span
+in the after runs: those are the plate histories parting, and with 6 runs neither the rise nor
+the end's fall can be put on the law alone. The land share falls by 0.019 on the mean: the sea
+stands 19 m higher with less water in ice, and the continental crust's area is 0.381 against
+0.359 of the planet (the plate histories again).
+
+**Ben's run at −730 Myr** (seed 1, supercontinent, `stage plates --max-steps 135`). From scratch
+each binary gives a different planet by then: before, the largest plateau 6.4 Mkm² at 19° with
+0.95 of it iced and a warmest month of −8.1 °C, land under ice 0.081; after, 4.6 Mkm² at 24°,
+0.62 iced, −4.3 °C, but land under ice 0.212 (5.2 Mkm² of land at 3.5 to 5 km lies at 25 to 45°,
+against 1.5 before). Run on from master's own state at −740 Myr, the law changes nothing: after 5
+steps the plateau's ice is 0.945 against 0.948 and its warmest month −8.0 against −8.1 °C, after
+30 steps 0.91 against 0.94. There the plateaus are 4.1 to 4.5 km high and the ELA at 25 to 45° is
+3.3 km: the ice gets no warmth from the law, and bare ground there would stand at about the ELA
+even with it (the law's 6 K in July lifts the ELA about 0.9 km, to about 4.2 km; an estimate, not
+a run), which is the lapse rate's cold (CLM-231). So the law prevents much of
+the plateau ice from forming but does not remove an ice cap that already stands.
 
 ## Simplifications and limits
 
@@ -187,7 +244,8 @@ QUICK_PLANETS_PENDING
   a cold spell gets no warmth until its ice has gone, and the climate must warm further to clear
   it than to keep it clear (hysteresis). The ice mask is the previous step's. Without the mask the
   law shrank Earth's ice sheets (Greenland 0.497 → 0.437, Antarctica 0.883 → 0.870), which is the
-  wrong sign.
+  wrong sign. On Ben's run, resumed at −740 Myr from master's iced plateaus, the law left their ice
+  as it was for 60 Myr ("On generated planets").
 - **The bake carries the cell's warmth to every block of the cell** (MOI-085). The snapshot caps Ẑ
   at the cell's own height; the Java side lapses `t_sl_c` at each block's height but cannot cap,
   since Ẑ is not in the bake. A valley floor well below its cell's Ẑ is therefore a little warm
@@ -220,7 +278,8 @@ QUICK_PLANETS_PENDING
   `atmosphere_diffusivity_scale` (CLM-176) would bring it back, at the cost of moving every
   planet's climate again and re-measuring the kernel; left for the coordinator and Ben.
 - **The lapse rate** (CLM-231) is the larger remaining error on plateaus and mountains and is
-  recommended as its own task.
+  recommended as its own task. It is also what keeps an iced plateau iced: with it, bare ground at
+  4 to 4.5 km stands near the ELA in a cool epoch even with the plateau's warmth.
 - **The winter sign.** Against R1 Nagqu's January is 2.2 K colder than the free air (and Pepin &
   Seidel 2005 find surface sites cool against R1 in winter); against the Sichuan Basin's air at
   4,500 m Yao & Zhang 2013 find the plateau 1 to 2 °C warmer in the cold months. The law follows
