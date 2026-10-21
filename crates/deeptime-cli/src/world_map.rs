@@ -3,7 +3,7 @@
 //! block space (on a Petroff–Guyou world, format 0.5, the 2b × b rectangle itself), for reviewing a
 //! bake without the workbench:
 //!
-//! - `satellite.png`: the workbench's "Final world" satellite look (`watch::worldmap`), its tile
+//! - `satellite.png`: the workbench's "Final world" satellite look (`deeptime_tiles`), its tile
 //!   pyramid at `--zoom` stitched (2^(z+1) × 2^z tiles of 256 pixels);
 //! - `provinces.png`: the geologic provinces (`meta/province`, each id its own colour), the sea
 //!   darkened, the cone points (red) and the poles (white) of the world's layout marked;
@@ -14,7 +14,7 @@ use std::path::Path;
 use deeptime_format::{Manifest, RasterRead, TilePackReader};
 use serde_json::{Value, json};
 
-use crate::watch::worldmap::{BakeMap, Layer, TILE, TileGeom};
+use deeptime_tiles::{BakeMap, Layer, TILE, TileGeom};
 
 /// A colour of its own for each id (splitmix64 of the id).
 fn colour(id: u64) -> [u8; 3] {
