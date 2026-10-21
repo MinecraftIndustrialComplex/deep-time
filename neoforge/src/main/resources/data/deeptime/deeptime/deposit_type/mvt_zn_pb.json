@@ -28,9 +28,10 @@
   "integration_myr": 5,
   "formation_time": "peak",
   "hosts": {
-    "any_of": ["#deeptime:rock/carbonate"],
+    "any_of": ["limestone", "dolostone"],
     "host_bias": {"dolostone": 1.5},
-    "full_at": 0.05
+    "full_at": 0.05,
+    "in_stratum": true
   },
   "causes": {
     "source": ["deeptime:basin_subsidence", "deeptime:marine_transgression"],
@@ -62,7 +63,6 @@
     "shape": "lens",
     "aspect": [1.0, 0.1, 1.0],
     "dip_deg": [0, 5],
-    "rock_class": "dolostone",
     "zoning": [
       {"zone": "core_zn", "d": [0.0, 0.55], "material": "c:zinc", "grade_mult": 1.2, "density": 0.65, "raw_share": 0.04},
       {"zone": "core_pb", "d": [0.0, 0.55], "material": "c:lead", "grade_mult": 1.0, "density": 0.15},
@@ -90,7 +90,8 @@
     "Sizing: USGS OFR 2009-1252 (Singer, Berger & Moring 2009), model CAam (carbonate-hosted, amagmatic), n = 132, Table 2 p. 9: tonnage 0.93 / 10 / 86 Mt, Zn 1.7 / 5.1 / 12 %, Pb 0.19 / 1.5 / 5.0 %, Ag 0 / 0 / 37 g/t (unreported grades counted as zero); correlations from the text p. 8; the 2 km same-deposit rule p. 2. The report has no MVT model as such: 93 of its 132 CAam deposits are labelled MVT and 93 of the 105 MVT-labelled deposits fall in CAam. presence = n_reported / 132 counted in the report's database SedZn-PbTX.txt. The MVT-only table of SIR 2010-5070-A (Table 1) is in data/usgs/mvt_zn_pb.json extra. Cu and Au (9 and 3 of 132) are left out.",
     "PLACEHOLDERS (not found in any USGS source): ore_density_t_m3 2.9 (dolostone with sulfides), density_per_1e5km2 1 / 5 / 20 (no USGS MVT deposit density exists; SIR 2010-5070-A gives district areas of 1,600–10,000 km² and Pine Point's 60 ore bodies in 1,600 km², which local densities far exceed), formation_depth_m 1000.",
     "Design values: the curves' thresholds, integration_myr 5 (brine flushes are short: 0.5–5 Myr at Pine Point, Garven 1985), clustering, zoning, aspect, size multipliers.",
-    "Create stones (decisions file): dolostone (asurine → zinc) is the preferred host at 1.5, and the ore body turns its host to dolostone (hydrothermal dolomite).",
+    "Create stones (decisions file): dolostone (asurine → zinc) is the preferred host at 1.5.",
+    "HOST (2026-10-19, coordinator's call, decisions log): the body lies in a platform carbonate horizon the column really holds (hosts.in_stratum, deposits::host_stratum): the limestone or dolostone horizon of the drawn column nearest the ledger's depth, the body no thicker than it and bedded with it (dip 0), on crust that is continental now; a site without one is dropped (census no_host, oceanic). MVT hosts are dolostone and limestone of platform sequences (Leach et al. 2010), so chalk (pelagic, deep-water) and marble are not hosts. The body no longer paints its host as dolostone: the old rock_class drew a dolostone lens wherever the site fell, carbonate or not (external review 2026-10-19). Ledger ORE-271.",
     "Counts (survivor formula, decisions log 2026-09-29, plan §8.6 as built): the density counts deposits that survive to the present, as USGS does; the engine forms more (deposits/survival.rs) so that the expected survivors are ρ_p50 · permissive area · count_mult. balance.count_mult stays 1: a pack lever, not a calibration. Driver reworked 2026-09-29 (Ben: 'Rework its driver'): basin-scale flow — a hot basin and a rising orogen within brine_flow_km (600 km, the USGS MVT tract criterion) feed brine to carbonate the site holds (deposits/regional.rs); hosts.full_at 0.05 lets a ~100 m carbonate unit in the 2 km host window count fully.",
     "VERTICAL SCALE (decisions log 2026-10-03, \"Keep today's block height\"): at 35 m per block the vertical multipliers are 1.75 times their 20 m values (balance.size_mult_v 3.0 -> 5.25), so a body keeps the height in blocks it had at 20 m per block; its size in metres is unchanged. game-choice, ledger ORE-055."
   ]

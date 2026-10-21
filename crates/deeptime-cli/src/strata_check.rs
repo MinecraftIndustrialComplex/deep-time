@@ -89,7 +89,8 @@ fn world_data(dir: &Path, o: &Options<'_>) -> CliResult<Value> {
         }
         return Ok(json!({ "columns": out }));
     }
-    let (mut all, mut land) = (Census::default(), Census::default());
+    let (mut all, mut land, mut sea_cols) =
+        (Census::default(), Census::default(), Census::default());
     let mut rng = SplitMix(o.seed);
     let mut picks = Vec::with_capacity(o.columns);
     let zp = w.manifest.world_projection().z_range().1 as i64;
@@ -101,6 +102,8 @@ fn world_data(dir: &Path, o: &Options<'_>) -> CliResult<Value> {
         all.add(&col, &f, &rules);
         if ground >= sea {
             land.add(&col, &f, &rules);
+        } else {
+            sea_cols.add(&col, &f, &rules);
         }
     }
     let structure = structure_census(&w, &picks, &rules, &o.limits);
@@ -136,6 +139,8 @@ fn world_data(dir: &Path, o: &Options<'_>) -> CliResult<Value> {
         "seed": o.seed,
         "columns": all.to_json(),
         "land_columns": land.to_json(),
+        // The sea floor's columns (ground under the sea level): what the sea floor is made of.
+        "sea_columns": sea_cols.to_json(),
         "stored_cells": cells.to_json(),
         "structure": structure,
     }))

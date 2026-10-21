@@ -115,7 +115,10 @@ host rock in the top 2 km) and three global clocks.
    expected counted survivors equal N\*.
 5. **Positions.** Within a tract, deposits are drawn in clusters (a Thomas process: camps of
    deposits) at least the USGS same-deposit distance apart (2 km for porphyry). Coal fields instead
-   tile a basin, touching but not overlapping.
+   tile a basin, touching but not overlapping. A type that lies in a bed (MVT, since 2026-10-19) is
+   placed only where the column holds a horizon of its host rock, inside that horizon, and never
+   on oceanic crust; a placer only on land or on a shelf the sea has drowned since it formed
+   (see "Hosts, crust and placers").
 6. **Sizes and grades.** Tonnage is a lognormal through the USGS grade-tonnage percentiles
    (P90, P50, P10); grades are drawn with the published correlations (a Gaussian copula).
 7. **Bodies.** Each deposit becomes zoned bodies (porphyry: ore core, phyllic and propylitic halo,
@@ -130,7 +133,10 @@ host rock in the top 2 km) and three global clocks.
    deposit of the best type; placer gold is moved, at the bake, into the nearest real river channel
    within 30 km as gravel bars. A site counts toward an essential only when the material is its
    primary product (DEP-206): on the real planet of 2026-10-04 a 0.07 Mt impact deposit with copper
-   as a co-product had satisfied the copper essential. The spawn is no longer drawn toward
+   as a co-product had satisfied the copper essential; lead, a co-product of every type that makes
+   it, is the one essential that counts co-products (ORE-273). An essential whose material has no
+   ore block in the running game (zinc without Create, lead without a lead mod) is left out of the
+   world's content and forces nothing. The spawn is no longer drawn toward
    essentials (Ben, 2026-10-05, "I don't believe we need spawn selectoin since we have some passive
    iron gen like vanilla"): it is the dry, flat land nearest (0, 0) (BAK-015).
 
@@ -447,8 +453,10 @@ one porphyry before and after, about 2,200 blocks; iron none before and none aft
 iron-formation site is under the sea; at a basin share of 0.05, 6 land deposits, about 900
 blocks). The measured runs carry no essentials (the built-in presets list none; a world made in
 the game takes `deeptime:essentials`: a site of iron and of coal in every 4,096-block land
-region, of copper in every 8,192-block one), so a game world's nearest iron and copper deposit is closer
-than these figures; that was not measured.
+region, of copper in every 8,192-block one, and since 2026-10-20 of zinc and lead in every
+8,192-block one, ORE-273), so a game world's nearest iron and copper deposit is closer
+than these figures; that was not measured. Zinc and lead were measured with their essentials:
+see "The zinc and lead floor" below.
 
 ## Placer gold as panning
 
@@ -503,6 +511,214 @@ The rules (ORE-269):
   overrides `data/deeptime/loot_table/archaeology/placer_gold.json` to change the count (for
   chunks generated after the change: the nuggets are in the block once it is placed). The
   `deeptime-inspect` tool counts ore blocks and does not count suspicious blocks as ore.
+
+## Hosts, crust and placers (carbonate and ore-deposit task, 2026-10-19)
+
+**What was wrong.** The review of run 1a156f22b66 and six planets of master b438d47a
+(`earthlike_quick_16k`, 1,000 Myr, supercontinent and scattered continents, seeds 1 to 3,
+`deposit-audit`) found three kinds of misplaced deposit:
+
+- **MVT with no carbonate.** Of 1,003 MVT sites, none had limestone or dolostone at its centre
+  in the drawn column (630 sat in shale, 157 in sandstone) and 308 lay on oceanic crust. The host
+  score read the history's host fields (`deeptime:host/<class>`, the share of the top 2 km at each frame,
+  `deposits/rules.rs:222` on master), a time average that a carbonate long since eroded or thinned
+  below a block still satisfied; the body was then painted dolostone wherever it formed
+  (`geometry.rock_class` in `mvt_zn_pb.json:65`, applied at `geometry.rs:181` and `:485`), and the
+  crust test was a thickness curve (20 to 30 km, `mvt_zn_pb.json:21`) that thick oceanic crust passes.
+- **Placers at sea.** Of 452 placers, 102 lay on oceanic crust and 190 deeper than the shelf
+  (200 m): a placer was spawned where its eroded parent stood, with no test of where that is now
+  (`spawn_placer`, `deposits/mod.rs:3051` on master).
+- **Impact ore everywhere a crater was.** A median 153 impact-basin uranium sites per planet
+  (62 to 359) and 75 hydrothermal Cu-Zn-Au sites (43 to 541). Basin uranium had no uranium
+  source: its source term was the crater basin itself (`impact_basin_u.json` on master: source `impact_basin`, driver
+  deposition, trap reservoir quality), so a crater on oceanic basalt made uranium as readily as
+  one in granite; the hydrothermal type's source was the hydrothermal strength alone. Their
+  densities (50 and 100 per 100,000 km² of crater, p50) were placeholders about 10 to 25 times
+  Earth's inventory (IMP-143).
+
+**What changed.**
+
+- **In-stratum hosts** (ORE-271, DEP-088, DEP-089). A type with `hosts.in_stratum` lies in a host
+  horizon the column really holds. Of the units the world draws (`structure::Cover`, the same
+  smoothed stacks as the bake, read through the world's folds and faults as the strata pass reads
+  them), those of a host class are candidates, each cut to its blocks under the column's top four
+  solid blocks (the soil, which hosts no ore in the game; the first ensemble without this cut put
+  most bodies there, a median 0 ore blocks per MVT site), above the floor's last four, and to its
+  part at least as old as the ore. MVT ore is epigenetic: its brines replace a carbonate that is
+  already there, so a unit laid after the ore formed cannot hold it. The strata log's keys date a
+  unit (the log is age-linear), and a unit the ore's age falls inside keeps its blocks below that
+  age. Nearest the type's formation depth first, the first candidate is taken that overlaps the
+  same unit, in a host class, in each column within two strata cells (32 blocks) of the site,
+  each column on its own, so a dipping unit passes. The lateral test is there because the column
+  rule interfingers a facies change block by block: a one-block limestone stringer that holds in
+  the site's column alone is gone a few blocks away, and a body wider than that sits mostly in
+  shale. The body's centre is the unit's middle, its half height at most the unit's (a body the
+  cap thins spreads along the unit and keeps its volume, so the ore it draws matches the site's
+  tonnage), its dip 0, and no erosion cut is applied to it. The site's centre is the block
+  holding the body's centre (rounding had put the centre of a one-block horizon in the block
+  above it, and x and z a column off the one the host was read in), projected through that
+  block's centre. The bake raises it with the rock at its centre, as it raises every body
+  (`key_shift`, STR-056). The projection to Petroff-Guyou moves it with its host horizon instead
+  of with the drawn ground: the world's stacks are raised to the drawn ground by the bake's rule
+  (the thickest rock unit near the surface takes up the raise and the beds over it rise whole),
+  and the body rises by the same `key_shift` on those stacks. It is clipped four blocks under
+  the world's final ground (the young landscape and the amplifier run after the
+  deposit stage, so that ground can lie lower than the one the stage kept the body under). A
+  site with no such horizon places nothing, nor does one on crust that is oceanic now
+  (`plates/crust_type`); `survives()` decides the same way as `materialise()`, and the guarantee
+  step that forces one deposit of a type skips such cells (an exposed essential's body must still
+  reach the exposed band). MVT is the one such type: its hosts are limestone and dolostone
+  (dolostone weighted 1.5, after Leach et al. 2010: "More MVT deposits are hosted in dolostone
+  rather than limestone"), not chalk (pelagic, no platform) or marble, and the body keeps its host
+  rock (no `rock_class`). The census counts the drops (`no_host`, `oceanic`).
+- **Placers stay on land and the shelf** (DEP-214). A placer is not placed on oceanic crust, nor
+  where the ground lies deeper under the present sea than the sea's lowest stand since the placer
+  formed (the surface stage now keeps its sea level per step, `SurfaceState.sea_history`). A bench
+  drowned by a later rise, as the gold of the Bering shelf off Nome (to about 18 m of water, ARDF
+  NM253; the Last Glacial Maximum's fall was about 130 m, Clark et al. 2009), is kept within that
+  range. The parent link is unchanged; the census counts the drops as `offshore`.
+- **Impact metals need a source, a fluid and a trap** (IMP-142, IMP-143, ORE-039, ORE-040,
+  ORE-042). See [impacts.md](impacts.md#impact-deposits-need-a-source).
+
+**Measured.** The six quick planets of erosion-and-sediment.md "Carbonate on the sea floor"
+(master b438d47a against the branch at 686a01cf, `deeptime deposit-audit` with `--soil 4`,
+`tools/review/carbonate-table.py`); sites per planet are medians with the range, the rest sums
+over the six:
+
+| measure | master | branch |
+|---|---|---|
+| MVT sites per planet | 159.5 [91, 253] | 5 [0, 23] |
+| MVT centred in limestone or dolostone | 0 of 1,003 | 50 of 51 (limestone; one centre block reads shale) |
+| MVT on oceanic crust | 308 | 0 |
+| MVT ore-body blocks in a host horizon | 0 % | 99.9 % |
+| placer gold sites per planet | 75.5 [61, 90] | 65 [41, 90] |
+| placers on crust the bake marks oceanic | 102 | 13 |
+| placers deeper than the shelf (200 m) | 190 | 3 |
+| porphyry Cu-Mo-Au sites per planet | 15 [2, 28] | 24.5 [8, 56] |
+| coal seam fields per planet | 71 [62, 94] | 94 [68, 115] |
+| petroleum traps per planet | 17 [10, 29] | 15.5 [9, 28] |
+
+MVT now forms only where a limestone horizon runs through the ground about the site, and the
+planets have little of it (carbonate is 0.7 % of the land's top blocks), so the count fell about
+thirtyfold; no dolostone host was found, because the planets lay almost none. On the full 16k
+planet (`earthlike_full_16k`, scattered continents, seed 1) MVT went from 168 sites to 7, all in
+limestone, and the deposits' share of the world's zinc from 0.80 to 0.07 (lead from 14,636 ore
+blocks to 281): zinc now comes mostly from the pack's scatter. The 13 placers the audit counts on
+oceanic crust read the bake's crust-age layer at its nearest sample; 10 of them stand on land
+(rivers and lakes 46 to 1,293 m above the sea) and 3 at the coast within 85 m under it, where the
+simulation's crust, which the rule reads, is continental. The 3 below the shelf lie on
+continental crust where the drawn ground is 7 to 28 blocks under the sea; the rule reads the
+simulation cell's height, not the drawn column. Porphyry, coal and petroleum move within the
+planets' spread; their rules did not change.
+
+**After the review (2026-10-20).** An Opus review of the branch raised these; each was checked
+against the code before it was fixed.
+
+- The placer's depth counted the sea level twice. `deeptime:elevation_m` is already relative to
+  the sea of its time, so the depth under the present sea is minus the present elevation
+  (DEP-214). A NaN crust type had read as oceanic (`as u8` gives 0); it is now no crust type.
+- The lateral host test cut the candidate to the blocks every column of the reach held at once,
+  which a dipping unit fails; each column is now asked on its own for the same unit. A host
+  younger than the ore was accepted; a unit is now cut to its part at least as old as the ore.
+- The projection kept a stratabound body at its y but not under the final ground; it now clips it
+  there. A site was projected through its block's corner, which could land a block off; now
+  through the block's centre.
+- Keeping the body's y through the projection was itself wrong once the ocean crust branch
+  (master c24ff793) moved bodies by `key_shift` in the bake: the projection raises the world's
+  stacks again to the drawn ground, and where that raise lifted the host the body stayed under
+  it. The body now rises by `key_shift` on the raised world stacks (no double lift: the bake's
+  lift is applied once, and the projection's shift is only its own raise). A test carries 300
+  bodies set in a 6 to 10 block limestone through the bake's lift and crest raise and then the
+  projection's raise, and finds every one still in limestone; keeping the y leaves some out.
+- The guarantee pass read a candidate's host fit for each essential, with a new deform scratch
+  each time; the fits are now cached per type, exposure and cell, with one scratch. An exposed
+  essential's fit whose body top lies below the exposed band is no fit, so it stays exposed.
+- The vertical cap took volume from a body without taking tonnage from its site; the body now
+  widens to keep its volume.
+- `stratabound_sites` in the projection asks only the built-in types. Not a defect: the core has
+  only built-in types, and the filter reads their `hosts.in_stratum`.
+
+**The zinc and lead floor (2026-10-20).** Once MVT formed only in a real limestone horizon, the
+deposits held little of the world's zinc and lead, and a world without SEDEX had no lead at all
+(the pack's scatter had zinc, no lead). The coordinator's call was a floor of two parts: a galena
+scatter shaped like the zinc scatter (ORE-272: 0.5 clusters of 5 blocks per chunk, mostly in
+carbonate and shale), and zinc and lead essentials (ORE-273: a site of each in every 8,192-block
+land region, copper's region, not necessarily exposed). Zinc counts primary products only (MVT,
+SEDEX, the impact hydrothermal Cu-Zn-Au); lead counts co-products too, because every type that
+makes lead makes it as a co-product. The guarantee places the smallest plausible deposit of the
+region's most favourable producer, an in-stratum type only where its column holds a host horizon
+(ORE-271). A game without Create (zinc) or without a lead mod leaves the essential out of the
+world's content (`EssentialsBundle.placeable`, logged), so nothing is forced that could not be
+placed.
+
+Measured with the essentials and scatter each build ships (`tools/review/carbonate-ensemble.sh`
+on the VM with each build's content bundle, `deeptime deposit-audit` per world,
+`tools/review/essentials-table.py <dir> master branch`): master 5dc06974 against the branch at
+f546d9bc, six quick planets (`earthlike_quick_16k`, 1,000 Myr, supercontinent and scattered
+continents, seeds 1 to 3; medians with the range) and the full 16k planet (scattered continents,
+seed 1). Master carries no zinc or lead essential and no lead scatter.
+
+| measure | master, quick | branch, quick | master, full | branch, full |
+|---|---|---|---|---|
+| zinc ore blocks per land chunk: deposits | 3.35 [2.38, 7.26] | 0.29 [0.001, 1.67] | 4.41 | 0.43 |
+| zinc: scatter | 1.09 [1.04, 1.12] | 1.07 [1.04, 1.13] | 1.06 | 1.09 |
+| zinc: all | 4.46 [3.42, 8.34] | 1.35 [1.12, 2.80] | 5.47 | 1.51 |
+| lead ore blocks per land chunk: deposits | 0.17 [0.09, 0.40] | 0.021 [0, 0.125] | 0.25 | 0.031 |
+| lead: scatter | 0 | 0.26 [0.25, 0.30] | 0 | 0.27 |
+| lead: all | 0.17 [0.09, 0.40] | 0.30 [0.26, 0.39] | 0.25 | 0.30 |
+| sites counting toward zinc (guaranteed) | 330 [146, 607] (0) | 5 [2, 9] (0 to 2) | 299 (0) | 3 (1) |
+| sites counting toward lead (guaranteed) | 128 [89, 233] (0) | 3 [2, 9] (0 to 2) | 197 (0) | 2 (1) |
+| 8,192-block land regions with a zinc source | 2 of 2 on all six | 2 of 2 on four, 1 of 2 on two | 2 of 2 | 2 of 2 |
+| 2,048-block land regions with a zinc source | 11 to 20 of 19 to 21 | 2 to 4 of 20 or 21 | 14 of 19 | 3 of 21 |
+| spawn to the nearest zinc source (blocks) | 657 [98, 1,070] | 1,610 [548, 3,310] | 399 | 3,420 |
+| spawn to the nearest lead source (blocks) | 776 [98, 1,500] | 1,800 [548, 3,540] | 399 | 3,420 |
+| access p50, zinc (blocks; points of 150 beyond 1,536) | 624 [472, 712] (0 to 10) | 1,220 [1,130, 1,290] (11 to 46) | 520 | 1,130 |
+| access p50, lead | 816 [696, 1,180] (13 to 53) | 1,340 [1,300, 1,510] (45 to 77) | 776 | 1,530 |
+| MVT sites, natural + guaranteed | 133 [98, 242] + 0 | 0 or 1 + 0 or 1 | 206 + 0 | 0 + 1 |
+| SEDEX sites, natural + guaranteed | 3 [1, 8] + 0 | 1.5 [0, 9] + 0 or 1 | 1 + 0 | 1 + 0 |
+
+What it says:
+
+- **The deposits' zinc fell about tenfold and their lead about eightfold**, because MVT, which
+  made most of both, now forms only in a real limestone horizon (ORE-271) and almost none does on
+  these planets: 0 or 1 natural MVT site on the branch against 98 to 242 on master. It is not the
+  facies change A8 (f546d9bc): the build before it (b2f5c381) had 0 [0, 4] natural sites on the
+  same six planets. Nor is it the review's host rules (A4, A5, 160b5389): built just before them
+  (34e7e88e), whose simulation is b2f5c381's to the drawn count (364 and 327 MVT drawn), the
+  pairwise overlap and the host age move single sites both ways, supercontinent 2 from 1 site to
+  0 and scattered continents 1 from 0 to 1 (the pairwise test passes a dipping unit, the age test
+  drops a younger host). The host rule made the fall (159.5 to 5 sites a planet at 686a01cf,
+  above); the rest came with master 5dc06974 and the tracer's fixes, which left the planets about
+  half the neritic and periplatform carbonate (erosion-and-sediment.md "After the review"), and
+  the two are not separated.
+- **The floor holds the totals, not the sources.** The scatter is now most of the world's zinc
+  (1.07 of 1.35 blocks per land chunk) and nearly all of its lead (0.26 of 0.30); lead per land chunk rose
+  (0.17 to 0.30), since the galena scatter outweighs what the deposits lost, and zinc fell to
+  about a third. But the sources thinned from hundreds to a handful, so the spawn's nearest zinc
+  source went from 657 to 1,610 blocks (the full planet's from 399 to 3,420, its sources from 299
+  to 3) and the access probe's median doubled, with up to a third of its points finding no
+  zinc's need, and up to half no lead's, within 1,536 blocks.
+- **The regions are the simulation's.** The guarantee forced 0 to 2 deposits a planet and left
+  every region of its grid with a source, but two of the six quick planets show one of the two
+  8,192-block world regions without one. The guarantee counts regions in the simulation's
+  Lambert frame; the world is Petroff-Guyou, whose orientation the bake picks later from the final
+  land, so a region of the simulation is not a region of the world. Iron shows it too, on master
+  as on the branch: its 8 guaranteed sites, one in each of the simulation's 4,096-block regions,
+  land in 4 or 5 of the world's 8.
+- **A guaranteed SEDEX held no ore** on 3 of the 4 quick planets that forced one, and most
+  guaranteed iron bodies held none either (17 of 48 held ore on the branch, 20 of 46 on master). Two
+  causes. A guaranteed body was placed against the deposit stage's ground, and the soil's top 4
+  blocks hold no ore: SEDEX's 100 m formation depth is under 3 blocks at 35 m a block, and an
+  exposed body's top was at the ground, so a thin body lay wholly in the soil. Since 14e4ae7d its
+  top lies under the soil (ORE-076). The other cause is outside the deposit stage, and it is the
+  larger: the world's ground is not the stage's (the drawn and amplified terrain, and since the
+  ocean-crust merge the bake's lift and crest raise, which move every body with its stratigraphic
+  key, STR-056), and 31 of the branch's 48 guaranteed iron centres lie above the world's ground.
+  On the merged build 869e65e7's quick planet (scattered continents seed 1) all 8 guaranteed iron
+  centres lie 2 to 47 blocks above it and the SEDEX 64, and none of the 9 holds ore. With the soil
+  floor (14e4ae7d, supercontinent 2 and scattered continents 1), 13 of the 16 guaranteed iron
+  centres and the one SEDEX still lie above the ground (the SEDEX 61 blocks), and 3 of the 16 iron
+  bodies hold ore: a body the bake lifted out of the ground is beyond the stage's reach.
 
 ## Simplifications and limits
 
