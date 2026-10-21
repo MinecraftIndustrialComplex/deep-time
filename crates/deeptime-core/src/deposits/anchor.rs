@@ -30,12 +30,18 @@ use std::path::Path;
 use std::time::Instant;
 
 use deeptime_format::bodies::{BODIES_PATH, NO_CLIP, read_bodies, write_bodies};
-use deeptime_format::events::{EventId, EventLog, ParamValue};
+use deeptime_format::events::{
+    Event, EventId, EventIndex, EventLog, EventWriter, GEOLOGY_WRITER, MAX_SEQ, ParamValue, Place,
+    decode_segment,
+};
+use deeptime_format::projection::WorldProjection;
 use deeptime_format::sites::{INDEX_PATH, SITES_PATH, read_sites, write_sites_in};
 use deeptime_format::{Body, ColumnWorld, FileEntry, Manifest, Site, SiteKind};
+use rayon::prelude::*;
 use serde_json::{Value, json};
 
 use super::SOIL_BLOCKS;
+use super::playability::{EXPOSED_BLOCKS, Essential, Regions};
 use crate::error::CoreError;
 use crate::params::PlanetPreset;
 
@@ -132,14 +138,30 @@ pub fn anchor_shift(bodies: &[&Body], c: u32, x: i32, z: i32, rock_top: i32, exp
 /// the body goes to the top rock block in whatever rock is there.
 pub const HOST_SEARCH_BLOCKS: i32 = 64;
 
-/// How far (whole blocks, never up) a guaranteed in-stratum body moves. It stays in its host
-/// horizon, where the bake and the projection keep it (ORE-271), while the top of its ore in the
-/// centre column lies at or under `rock_top`. Where the bake left the horizon in the soil or
-/// above the ground (a quick planet's guaranteed MVT lay 2 blocks under its ground, in the
-/// soil), the ore's top goes to the highest block of a host class in `rock` (the centre column's
-/// rock runs, top first: (top, bottom, class)) at or under `rock_top` and within
-/// [`HOST_SEARCH_BLOCKS`] of it, and to `rock_top` itself when there is none. Returns the move and
-/// whether the body ended in a host class.
+/// The highest and lowest blocks of column (x, z) where one of `bodies` places ore.
+pub fn ore_span_in_column(bodies: &[&Body], c: u32, x: i32, z: i32) -> Option<(i32, i32)> {
+    let mut span: Option<(i32, i32)> = None;
+    for b in bodies.iter().filter(|b| bears_ore(b)) {
+        for y in b.aabb[0][1]..=body_top(b) {
+            if places_ore(b, c, x, y, z) {
+                span = Some(span.map_or((y, y), |(t, lo)| (t.max(y), lo.min(y))));
+            }
+        }
+    }
+    span
+}
+
+/// How far (whole blocks) a guaranteed in-stratum body moves. It stays in its host horizon,
+/// where the bake and the projection keep it (ORE-271), while the top of its ore in the centre
+/// column lies at or under `rock_top` (at it, for an `exposed` essential). Otherwise (a quick
+/// planet's guaranteed MVT lay 2 blocks under its ground, in the soil) the ore's top goes to the
+/// top of a run of a host class in `rock` (the centre column's rock runs, top first: (top,
+/// bottom, class), as the game paints them, other bodies' classes included) at or under
+/// `rock_top` and within [`HOST_SEARCH_BLOCKS`] of it ([`EXPOSED_BLOCKS`] when `exposed`): the
+/// highest run as thick as the ore's span in the column, else the thickest (ORE-280); and to
+/// `rock_top` itself when there is none. Returns the move and whether the body ended in a host
+/// class.
+#[allow(clippy::too_many_arguments)]
 pub fn in_stratum_shift(
     bodies: &[&Body],
     c: u32,
@@ -148,18 +170,39 @@ pub fn in_stratum_shift(
     rock_top: i32,
     rock: &[(i32, i32, Option<String>)],
     hosts: &HashSet<String>,
+    exposed: bool,
 ) -> (i32, bool) {
-    let dy = anchor_shift(bodies, c, x, z, rock_top, false);
+    let dy = anchor_shift(bodies, c, x, z, rock_top, exposed);
     if dy == 0 {
         return (0, true);
     }
-    let floor = rock_top - HOST_SEARCH_BLOCKS;
-    let host_top = rock
+    let need = ore_span_in_column(bodies, c, x, z).map_or(1, |(t, lo)| t - lo + 1);
+    let reach = if exposed {
+        EXPOSED_BLOCKS as i32
+    } else {
+        HOST_SEARCH_BLOCKS
+    };
+    let floor = rock_top - reach;
+    // The host runs within reach: (top under the rock top, thickness under it).
+    let runs: Vec<(i32, i32)> = rock
         .iter()
         .filter(|(_, _, k)| k.as_ref().is_some_and(|k| hosts.contains(k)))
         .filter(|&&(top, bottom, _)| bottom <= rock_top && top >= floor)
-        .map(|&(top, _, _)| top.min(rock_top))
-        .max();
+        .map(|&(top, bottom, _)| {
+            let t = top.min(rock_top);
+            (t, t - bottom + 1)
+        })
+        .collect();
+    let host_top = runs
+        .iter()
+        .filter(|r| r.1 >= need)
+        .map(|r| r.0)
+        .max()
+        .or_else(|| {
+            runs.iter()
+                .max_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)))
+                .map(|r| r.0)
+        });
     match host_top {
         Some(t) => (dy - (rock_top - t), true),
         None => (dy, false),
@@ -181,9 +224,11 @@ pub enum InStratum {
 /// (x, z). The projection clips such a body [`SOIL_BLOCKS`] under the world's drawn ground
 /// (ORE-271), so one whose horizon the bake left in the soil band comes out of it empty (a quick
 /// planet's guaranteed MVT, 2026-10-21: no block at all), and a rigid move would keep it empty.
-/// A site whose ore tops out in rock in its centre column is kept as it is. Any other is read
-/// unclipped and moved by [`in_stratum_shift`], and every body is then clipped at `rock_top`, so
-/// nothing of it lies in the soil.
+/// A site whose ore tops out in rock in its centre column (at the top rock block, for an
+/// `exposed` essential) is kept as it is. Any other is read unclipped and moved by
+/// [`in_stratum_shift`], up as well as down when `exposed`, and every body is then clipped at
+/// `rock_top`, so nothing of it lies in the soil.
+#[allow(clippy::too_many_arguments)]
 pub fn settle_in_stratum(
     bodies: &mut [Body],
     c: u32,
@@ -192,9 +237,11 @@ pub fn settle_in_stratum(
     rock_top: i32,
     rock: &[(i32, i32, Option<String>)],
     hosts: &HashSet<String>,
+    exposed: bool,
 ) -> InStratum {
     let refs: Vec<&Body> = bodies.iter().collect();
-    if ore_top_in_column(&refs, c, x, z).is_some_and(|t| t <= rock_top) {
+    if ore_top_in_column(&refs, c, x, z).is_some_and(|t| t <= rock_top && (!exposed || t == rock_top))
+    {
         return InStratum::Kept;
     }
     let unclipped: Vec<Body> = bodies
@@ -207,7 +254,7 @@ pub fn settle_in_stratum(
         })
         .collect();
     let refs: Vec<&Body> = unclipped.iter().collect();
-    let (dy, in_host) = in_stratum_shift(&refs, c, x, z, rock_top, rock, hosts);
+    let (dy, in_host) = in_stratum_shift(&refs, c, x, z, rock_top, rock, hosts, exposed);
     for (b, mut u) in bodies.iter_mut().zip(unclipped) {
         shift_body(&mut u, dy);
         // ledger: ORE-271 (no ore in the soil)
@@ -305,7 +352,16 @@ pub fn anchor_sites(
                 Some(hosts) => {
                     let rock = world.sample(i64::from(cx), i64::from(cz)).rock;
                     let mut own: Vec<Body> = idx.iter().map(|&i| bodies[i].clone()).collect();
-                    let r = settle_in_stratum(&mut own, c, cx, cz, top, &rock, hosts);
+                    let r = settle_in_stratum(
+                        &mut own,
+                        c,
+                        cx,
+                        cz,
+                        top,
+                        &rock,
+                        hosts,
+                        exposed(material),
+                    );
                     let dy = match r {
                         InStratum::Kept => None,
                         InStratum::ToHost(dy) | InStratum::OutOfHost(dy) => Some(dy),
@@ -360,10 +416,485 @@ pub fn anchor_sites(
     out
 }
 
+/// The world as the top-up reads it: which columns are dry land, their top rock block and rock.
+/// [`ColumnWorld`] is the one the run uses; tests give a small one.
+pub trait Columns: Sync {
+    /// The x period (blocks) and the z range of the world.
+    fn period(&self) -> i64;
+    fn z_range(&self) -> (i64, i64);
+    /// Whether the terrain at (x, z) stands at or above sea level.
+    fn dry(&self, x: i64, z: i64) -> bool;
+    /// The top rock block of (x, z) ([`rock_top`]) and whether water covers it.
+    fn rock_top(&self, x: i64, z: i64) -> (i32, bool);
+    /// The rock runs of (x, z), top first: (top, bottom, class).
+    fn rock(&self, x: i64, z: i64) -> Vec<(i32, i32, Option<String>)>;
+}
+
+impl Columns for ColumnWorld {
+    fn period(&self) -> i64 {
+        self.c
+    }
+    fn z_range(&self) -> (i64, i64) {
+        let (lo, hi) = self.manifest.world_projection().z_range();
+        (lo.ceil() as i64, hi.floor() as i64)
+    }
+    fn dry(&self, x: i64, z: i64) -> bool {
+        self.height(x, z) >= f64::from(self.manifest.scale.sea_level_y)
+    }
+    fn rock_top(&self, x: i64, z: i64) -> (i32, bool) {
+        let h = self.hydro(x, z);
+        (rock_top(&h), h.kind.is_water())
+    }
+    fn rock(&self, x: i64, z: i64) -> Vec<(i32, i32, Option<String>)> {
+        self.sample(x, z).rock
+    }
+}
+
+/// The spacing (blocks) of the lattice the top-up reads the world's land on and places from
+/// (ledger: DEP-220, game-choice: four chunks; a region of 4,096 blocks holds 4,096 points, and
+/// the 128-block inland margin is two steps).
+pub const TOP_UP_STEP_BLOCKS: i64 = 64;
+
+/// How many inland points the top-up tries for an in-stratum copy before it takes the first one
+/// whose column holds no host within reach (game-choice, DEP-220).
+pub const TOP_UP_HOST_TRIES: usize = 48;
+
+/// What [`top_up`] found and did for one essential.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct TopUp {
+    /// The world's land regions of the essential's size, and those that held a source with ore
+    /// before the top-up.
+    pub land_regions: usize,
+    pub with_source: usize,
+    /// Copies placed, of them at an inland point, and land regions still short (no template, or
+    /// no dry point clear of the guaranteed bodies).
+    pub added: usize,
+    pub inland: usize,
+    pub short: usize,
+}
+
+/// The world's guaranteed sources of a run, for [`top_up`]: the sites, their bodies, which
+/// sites' forming events are guaranteed occurrences, and the in-stratum types' host classes.
+pub struct Deposits<'a> {
+    pub sites: &'a mut Vec<Site>,
+    pub bodies: &'a mut Vec<Body>,
+    pub guaranteed: &'a mut BTreeMap<EventId, String>,
+    /// Deposit type → its host classes, for the in-stratum types.
+    pub in_stratum: &'a BTreeMap<String, HashSet<String>>,
+}
+
+/// Whether a site holds ore of its own in rock in its centre column as the game draws it: within
+/// [`EXPOSED_BLOCKS`] of the top rock block for an `exposed` essential, anywhere under it for
+/// another; a placer anywhere in the column (its gravel lies on the ground or in a channel).
+fn site_holds_ore(world: &dyn Columns, s: &Site, own: &[&Body], c: u32, exposed: bool) -> bool {
+    let (cx, cz) = (s.center[0], s.center[2]);
+    if s.kind == SiteKind::Placer {
+        return ore_top_in_column(own, c, cx, cz).is_some();
+    }
+    let (top, _) = world.rock_top(i64::from(cx), i64::from(cz));
+    let reach = if exposed {
+        EXPOSED_BLOCKS as i32
+    } else {
+        i32::MAX / 4
+    };
+    ore_in_column(own, c, cx, cz, top, reach)
+}
+
+/// The top-up (DEP-220): the deposit stage counted each essential's regions on its forecast of
+/// the world, and the projection chooses λc on the baked land, so a region of the world as
+/// generated can lack the source the stage placed in its own (and the CLI's `project` runs the
+/// stage on the Lambert frame altogether). For every essential, each land region of the world
+/// (a point of a [`TOP_UP_STEP_BLOCKS`] lattice on dry land) that holds fewer than
+/// `min_sites_per_region` sources with ore ([`Essential::counts`], [`site_holds_ore`]) gets a
+/// copy of a template source: the essential's first guaranteed site with ore, else its smallest
+/// natural source with ore (never a placer). The copy goes to the region's dry lattice point
+/// nearest `spawn` (the world's spawn) whose lattice neighbours within 128 blocks are dry land
+/// too, any dry point when none is, clear of every guaranteed body; it is anchored as
+/// [`anchor_sites`] anchors (an in-stratum copy where its host lies within reach, tried at up to
+/// [`TOP_UP_HOST_TRIES`] points). Each copy gets its own `deeptime:guaranteed_occurrence`
+/// (`event_id`), at its template's forming time (`times`), caused by the template's event.
+/// Returns each essential's record and the new events.
+#[allow(clippy::too_many_arguments)]
+pub fn top_up(
+    world: &dyn Columns,
+    wp: &WorldProjection,
+    deposits: &mut Deposits<'_>,
+    essentials: &[Essential],
+    spawn: (f64, f64),
+    times: &mut dyn FnMut(EventId) -> (f64, f64),
+    event_id: &mut dyn FnMut() -> EventId,
+) -> (BTreeMap<String, TopUp>, Vec<Event>) {
+    let mut out = BTreeMap::new();
+    let mut events = Vec::new();
+    if essentials.is_empty() {
+        return (out, events);
+    }
+    let c = world.period();
+    let cu = c as u32;
+    let (zlo, zhi) = world.z_range();
+    let step = TOP_UP_STEP_BLOCKS;
+    // The lattice: x from the canonical span's start, z from the world's top edge.
+    let nx = (c / step).max(1) as usize;
+    let nz = ((zhi - zlo) / step + 1).max(1) as usize;
+    let at = |i: usize, j: usize| (-c / 2 + i as i64 * step, zlo + j as i64 * step);
+    let dry: Vec<bool> = (0..nx * nz)
+        .into_par_iter()
+        .map(|k| {
+            let (x, z) = at(k % nx, k / nx);
+            world.dry(x, z)
+        })
+        .collect();
+    // Inland: every lattice point within two steps (128 blocks) is dry land too (x wrapping;
+    // past the world's top and bottom edges nothing counts against it).
+    let reach = (INLAND_TOP_UP_BLOCKS / step) as i64;
+    let inland: Vec<bool> = (0..nx * nz)
+        .map(|k| {
+            let (i, j) = ((k % nx) as i64, (k / nx) as i64);
+            dry[k]
+                && (-reach..=reach).all(|dj| {
+                    let jj = j + dj;
+                    jj < 0
+                        || jj >= nz as i64
+                        || (-reach..=reach)
+                            .all(|di| dry[jj as usize * nx + (i + di).rem_euclid(nx as i64) as usize])
+                })
+        })
+        .collect();
+    for ess in essentials {
+        let regions = Regions::in_frame(wp.index_frame(), ess.region_blocks);
+        let mut land = vec![false; regions.count()];
+        for (k, &d) in dry.iter().enumerate() {
+            if d {
+                let (x, z) = at(k % nx, k / nx);
+                land[regions.index(x as f64, z as f64)] = true;
+            }
+        }
+        let of_site = |bodies: &[Body]| {
+            let mut m: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
+            for (i, b) in bodies.iter().enumerate() {
+                if let Some(s) = b.site {
+                    m.entry(s).or_default().push(i);
+                }
+            }
+            m
+        };
+        let idx = of_site(deposits.bodies);
+        let own = |s: &Site| -> Vec<&Body> {
+            idx.get(&s.id)
+                .map(|v| v.iter().map(|&i| &deposits.bodies[i]).collect())
+                .unwrap_or_default()
+        };
+        // The sources with ore, by region.
+        let mut have = vec![0u32; regions.count()];
+        let mut holding: Vec<usize> = Vec::new();
+        for (k, s) in deposits.sites.iter().enumerate() {
+            if ess.counts(&s.products) && site_holds_ore(world, s, &own(s), cu, ess.exposed) {
+                have[regions.index(f64::from(s.center[0]), f64::from(s.center[2]))] += 1;
+                holding.push(k);
+            }
+        }
+        let mut rec = TopUp {
+            land_regions: land.iter().filter(|&&l| l).count(),
+            with_source: (0..regions.count())
+                .filter(|&r| land[r] && have[r] >= ess.min_sites_per_region.max(1))
+                .count(),
+            ..TopUp::default()
+        };
+        let short: Vec<(usize, u32)> = (0..regions.count())
+            .filter(|&r| land[r] && have[r] < ess.min_sites_per_region)
+            .map(|r| (r, ess.min_sites_per_region - have[r]))
+            .collect();
+        if short.is_empty() {
+            out.insert(ess.material.clone(), rec);
+            continue;
+        }
+        // The template: the first guaranteed source of this essential with ore, else the
+        // natural source with ore of the smallest footprint.
+        let usable = |s: &Site| s.kind != SiteKind::Placer && s.parent.is_none();
+        let footprint = |s: &Site| {
+            i64::from(s.aabb[1][0] - s.aabb[0][0] + 1) * i64::from(s.aabb[1][2] - s.aabb[0][2] + 1)
+        };
+        let template = holding
+            .iter()
+            .copied()
+            .filter(|&k| usable(&deposits.sites[k]))
+            .filter(|&k| {
+                deposits
+                    .guaranteed
+                    .get(&deposits.sites[k].forming_event)
+                    .is_some_and(|m| *m == ess.material)
+            })
+            .min_by_key(|&k| deposits.sites[k].id)
+            .or_else(|| {
+                holding
+                    .iter()
+                    .copied()
+                    .filter(|&k| usable(&deposits.sites[k]))
+                    .min_by_key(|&k| (footprint(&deposits.sites[k]), deposits.sites[k].id))
+            });
+        let Some(tk) = template else {
+            rec.short = short.iter().map(|&(_, n)| n as usize).sum();
+            out.insert(ess.material.clone(), rec);
+            continue;
+        };
+        let tsite = deposits.sites[tk].clone();
+        let tbodies: Vec<Body> = own(&tsite).into_iter().cloned().collect();
+        let hosts = deposits.in_stratum.get(&tsite.deposit_type).cloned();
+        let (t0, t1) = times(tsite.forming_event);
+        let (template_top, _) =
+            world.rock_top(i64::from(tsite.center[0]), i64::from(tsite.center[2]));
+        // The template's half footprint about its centre, blocks.
+        let half = [
+            (tsite.aabb[1][0] - tsite.aabb[0][0] + 1) / 2,
+            (tsite.aabb[1][2] - tsite.aabb[0][2] + 1) / 2,
+        ];
+        for (region, mut need) in short {
+            // The region's dry points, inland ones first, each nearest the spawn first.
+            let mut points: Vec<(bool, f64, i64, i64)> = (0..nx * nz)
+                .filter(|&k| dry[k])
+                .filter_map(|k| {
+                    let (x, z) = at(k % nx, k / nx);
+                    (regions.index(x as f64, z as f64) == region).then(|| {
+                        let d = super::cluster::distance(c as f64, (x as f64, z as f64), spawn);
+                        (!inland[k], d, z, x)
+                    })
+                })
+                .collect();
+            points.sort_by(|a, b| {
+                a.0.cmp(&b.0)
+                    .then(a.1.total_cmp(&b.1))
+                    .then(a.2.cmp(&b.2))
+                    .then(a.3.cmp(&b.3))
+            });
+            let mut tries = 0usize;
+            let mut fallback: Option<(Vec<Body>, i64, i64, bool)> = None;
+            let mut placed: Vec<(Vec<Body>, i64, i64, bool)> = Vec::new();
+            for &(coastal, _, z, x) in &points {
+                if need == 0 {
+                    break;
+                }
+                let (top, water) = world.rock_top(x, z);
+                if water {
+                    continue;
+                }
+                // Clear of every guaranteed body (DEP-222), the copies already placed included.
+                let clear = deposits.sites.iter().all(|s| {
+                    !deposits.guaranteed.contains_key(&s.forming_event)
+                        || !overlaps(c, (x, z), half, s.aabb)
+                }) && placed
+                    .iter()
+                    .all(|(_, px, pz, _)| !overlaps_point(c, (x, z), (*px, *pz), half));
+                if !clear {
+                    continue;
+                }
+                let mut copy: Vec<Body> = tbodies
+                    .iter()
+                    .map(|b| {
+                        let mut b = b.clone();
+                        let dx = (x - i64::from(tsite.center[0])) as f64;
+                        let dz = (z - i64::from(tsite.center[2])) as f64;
+                        b.center[0] = super::cluster::wrap_x(c as f64, b.center[0] + dx);
+                        b.center[2] += dz;
+                        b.aabb = b.computed_aabb();
+                        b
+                    })
+                    .collect();
+                let (xi, zi) = (x as i32, z as i32);
+                let in_host = match &hosts {
+                    Some(h) => {
+                        // Read unclipped, its ore's top just over the top rock block, then
+                        // settled down into the highest host run that holds it (ORE-280).
+                        tries += 1;
+                        for b in &mut copy {
+                            b.clip_top_y = NO_CLIP;
+                            b.aabb = b.computed_aabb();
+                        }
+                        let refs: Vec<&Body> = copy.iter().collect();
+                        let dy = anchor_shift(&refs, cu, xi, zi, top + 1, true);
+                        for b in &mut copy {
+                            shift_body(b, dy);
+                        }
+                        let rock = world.rock(x, z);
+                        !matches!(
+                            settle_in_stratum(&mut copy, cu, xi, zi, top, &rock, h, ess.exposed),
+                            InStratum::OutOfHost(_)
+                        )
+                    }
+                    None => {
+                        // As deep under the top rock block as the template, then anchored.
+                        for b in &mut copy {
+                            shift_body(b, top - template_top);
+                        }
+                        let refs: Vec<&Body> = copy.iter().collect();
+                        let dy = anchor_shift(&refs, cu, xi, zi, top, ess.exposed);
+                        for b in &mut copy {
+                            shift_body(b, dy);
+                        }
+                        true
+                    }
+                };
+                let refs: Vec<&Body> = copy.iter().collect();
+                if !ore_in_column(&refs, cu, xi, zi, top, i32::MAX / 4) {
+                    continue;
+                }
+                if !in_host {
+                    if fallback.is_none() {
+                        fallback = Some((copy, x, z, !coastal));
+                    }
+                    if tries >= TOP_UP_HOST_TRIES {
+                        break;
+                    }
+                    continue;
+                }
+                placed.push((copy, x, z, !coastal));
+                need -= 1;
+            }
+            if need > 0
+                && let Some(f) = fallback
+            {
+                placed.push(f);
+                need -= 1;
+            }
+            rec.short += need as usize;
+            for (copy, x, z, inland_point) in placed {
+                let site_id = deposits.sites.iter().map(|s| s.id).max().map_or(0, |m| m + 1);
+                let mut next_body = deposits.bodies.iter().map(|b| b.id).max().map_or(0, |m| m + 1);
+                let ev = event_id();
+                let mut first_body = None;
+                let mut lo = [i32::MAX; 3];
+                let mut hi = [i32::MIN; 3];
+                for mut b in copy {
+                    b.id = next_body;
+                    b.site = Some(site_id);
+                    next_body += 1;
+                    first_body.get_or_insert((b.id, b.center[1]));
+                    for k in 0..3 {
+                        lo[k] = lo[k].min(b.aabb[0][k]);
+                        hi[k] = hi[k].max(b.aabb[1][k]);
+                    }
+                    deposits.bodies.push(b);
+                }
+                let (lat, lon) = wp.lat_lon(x as f64, z as f64);
+                let (col, row) = regions.of(x as f64, z as f64);
+                let y = first_body.map_or(tsite.center[1], |(_, y)| y.floor() as i32);
+                deposits.sites.push(Site {
+                    id: site_id,
+                    center: [x as i32, y, z as i32],
+                    lat_lon: [
+                        lat as f32,
+                        deeptime_format::projection::wrap_deg(lon) as f32,
+                    ],
+                    aabb: if first_body.is_some() { [lo, hi] } else { tsite.aabb },
+                    body: first_body.map(|(id, _)| id),
+                    forming_event: ev,
+                    parent: None,
+                    ..tsite.clone()
+                });
+                deposits.guaranteed.insert(ev, ess.material.clone());
+                events.push(
+                    Event::new(ev, t0, GUARANTEED_KIND, super::SOURCE)
+                        .until(t1)
+                        .at(Place::Site { site: site_id })
+                        .param("deposit_type", tsite.deposit_type.as_str())
+                        .param("site", i64::from(site_id))
+                        .param("material", ess.material.as_str())
+                        .param("region", format!("{col},{row}"))
+                        .param("copy_of", i64::from(tsite.id))
+                        .param(
+                            "reason",
+                            "playability minimum in the world as generated (DEP-220)",
+                        )
+                        .magnitude(0.0)
+                        .caused_by(tsite.forming_event),
+                );
+                rec.added += 1;
+                rec.inland += usize::from(inland_point);
+            }
+        }
+        out.insert(ess.material.clone(), rec);
+    }
+    (out, events)
+}
+
+/// How far inland (world blocks) the top-up looks first: the deposit stage's margin
+/// (`INLAND_MARGIN_BLOCKS`, DEP-222), read on the world's own lattice.
+const INLAND_TOP_UP_BLOCKS: i64 = super::INLAND_MARGIN_BLOCKS as i64;
+
+/// Whether a footprint of half size `half` about (x, z) overlaps box `aabb`'s footprint (x
+/// wrapping with period `c`).
+fn overlaps(c: i64, (x, z): (i64, i64), half: [i32; 2], aabb: [[i32; 3]; 2]) -> bool {
+    let (h0, h2) = (i64::from(half[0]), i64::from(half[1]));
+    let (lo_z, hi_z) = (i64::from(aabb[0][2]), i64::from(aabb[1][2]));
+    if z + h2 < lo_z || z - h2 > hi_z {
+        return false;
+    }
+    let (lo_x, hi_x) = (i64::from(aabb[0][0]), i64::from(aabb[1][0]));
+    let span = hi_x - lo_x;
+    if span + 2 * h0 >= c - 1 {
+        return true;
+    }
+    (x + h0 - lo_x).rem_euclid(c) <= span + 2 * h0
+}
+
+/// Whether two footprints of half size `half` about `a` and `b` overlap (x wrapping).
+fn overlaps_point(c: i64, a: (i64, i64), b: (i64, i64), half: [i32; 2]) -> bool {
+    let dx = (a.0 - b.0 + c / 2).rem_euclid(c) - c / 2;
+    dx.abs() <= 2 * i64::from(half[0]) && (a.1 - b.1).abs() <= 2 * i64::from(half[1])
+}
+
+/// The time span of event `id` in the folder `dir`'s log, read from its one segment (the top-up
+/// dates a copy with its template's event); (0, 0) when the log does not hold it.
+fn event_times(dir: &Path, id: EventId) -> (f64, f64) {
+    let found = || -> Option<(f64, f64)> {
+        let index = EventIndex::read(dir).ok()?;
+        let seg = index.segments.iter().find(|s| {
+            s.writer == id.writer() && (s.first_seq..=s.last_seq).contains(&id.seq())
+        })?;
+        let path = dir.join(&seg.path);
+        let bytes = std::fs::read(&path).ok()?;
+        let e = decode_segment(&path, &bytes)
+            .ok()?
+            .events
+            .into_iter()
+            .find(|e| e.id == id)?;
+        Some((e.t_start, e.t_end))
+    };
+    found().unwrap_or((0.0, 0.0))
+}
+
+/// The world's spawn (`spawn/candidates.json`, the first candidate), (0, 0) without one.
+fn spawn_of(dir: &Path) -> (f64, f64) {
+    std::fs::read_to_string(dir.join("spawn/candidates.json"))
+        .ok()
+        .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+        .and_then(|v| {
+            let p = v["candidates"].get(0)?.clone();
+            Some((p["x"].as_f64()?, p["z"].as_f64()?))
+        })
+        .unwrap_or((0.0, 0.0))
+}
+
+/// Records `path` (its size and CRC32) in the manifest's file list.
+fn set_file(m: &mut Manifest, path: &str, bytes: u64, crc32: u32) {
+    match m.files.iter_mut().find(|f| f.path == path) {
+        Some(f) => {
+            f.bytes = bytes;
+            f.crc32 = crc32;
+        }
+        None => m.files.push(FileEntry {
+            path: path.into(),
+            bytes,
+            crc32,
+        }),
+    }
+}
+
 /// Anchors the guaranteed deposits of the finished world folder `dir` (its manifest `m`, written
-/// to disk) in the world as generated; `guaranteed` the run's guaranteed forming events (read
-/// from the folder's event log when None). Rewrites the bodies and sites when any moved; returns
-/// the pass's record (`notes.bake.guaranteed`).
+/// to disk) in the world as generated, and tops up the essentials' regions of that world
+/// ([`top_up`]); `guaranteed` the run's guaranteed forming events (read from the folder's event
+/// log when None). Rewrites the event log (a new segment, when it added a copy), the bodies and
+/// the sites when anything changed, and records them in `m`; the caller writes the manifest
+/// last. Returns the pass's record (`notes.bake.guaranteed`).
 pub fn anchor_folder(
     dir: &Path,
     p: &PlanetPreset,
@@ -374,20 +905,22 @@ pub fn anchor_folder(
     let Some((mut sites, _)) = read_sites(dir)? else {
         return Ok(json!({"guaranteed": 0, "why": "no sites"}));
     };
-    let loaded;
-    let guaranteed = match guaranteed {
-        Some(g) => g,
-        None => {
-            loaded = match EventLog::load(dir) {
-                Ok(log) => guaranteed_of(log.of_kind(GUARANTEED_KIND)),
-                Err(_) => BTreeMap::new(),
-            };
-            &loaded
-        }
+    let mut guaranteed: BTreeMap<EventId, String> = match guaranteed {
+        Some(g) => g.clone(),
+        None => match EventLog::load(dir) {
+            Ok(log) => guaranteed_of(log.of_kind(GUARANTEED_KIND)),
+            Err(_) => BTreeMap::new(),
+        },
     };
-    if !sites
-        .iter()
-        .any(|s| guaranteed.contains_key(&s.forming_event))
+    let essentials = p
+        .deposits
+        .as_ref()
+        .map(|d| d.essentials.clone())
+        .unwrap_or_default();
+    if essentials.is_empty()
+        && !sites
+            .iter()
+            .any(|s| guaranteed.contains_key(&s.forming_event))
     {
         return Ok(json!({"guaranteed": 0}));
     }
@@ -396,30 +929,27 @@ pub fn anchor_folder(
     };
     let world = ColumnWorld::open(dir)?;
     let types = super::types::builtin()?;
-    // The guaranteed in-stratum sites and their type's host classes (weight above 0).
-    let in_stratum: BTreeMap<u32, HashSet<String>> = sites
+    // The in-stratum types' host classes (weight above 0), and the guaranteed in-stratum sites'.
+    let type_hosts: BTreeMap<String, HashSet<String>> = types
         .iter()
-        .filter(|s| guaranteed.contains_key(&s.forming_event))
-        .filter_map(|s| {
-            let t = types
-                .iter()
-                .find(|t| t.id == s.deposit_type && t.hosts.in_stratum)?;
+        .filter(|t| t.hosts.in_stratum)
+        .map(|t| {
             let hosts = t.hosts.weights().unwrap_or_default();
-            Some((
-                s.id,
+            (
+                t.id.clone(),
                 hosts
                     .into_iter()
                     .filter(|&(_, w)| w > 0.0)
                     .map(|(k, _)| k)
                     .collect(),
-            ))
+            )
         })
         .collect();
-    let essentials = p
-        .deposits
-        .as_ref()
-        .map(|d| d.essentials.clone())
-        .unwrap_or_default();
+    let in_stratum: BTreeMap<u32, HashSet<String>> = sites
+        .iter()
+        .filter(|s| guaranteed.contains_key(&s.forming_event))
+        .filter_map(|s| Some((s.id, type_hosts.get(&s.deposit_type)?.clone())))
+        .collect();
     let exposed = |material: &str| {
         essentials
             .iter()
@@ -429,36 +959,86 @@ pub fn anchor_folder(
         &world,
         &mut sites,
         &mut bodies,
-        guaranteed,
+        &guaranteed,
         &exposed,
         &in_stratum,
     );
-    if a.moved > 0 {
+    let anchor_ms = started.elapsed().as_secs_f64() * 1000.0;
+    // The top-up, in the world's own regions (DEP-220).
+    let t = Instant::now();
+    let wp = m.world_projection();
+    let mut writer: Option<EventWriter> = None;
+    let mut open_error: Option<CoreError> = None;
+    let (topped, events) = {
+        let mut deposits = Deposits {
+            sites: &mut sites,
+            bodies: &mut bodies,
+            guaranteed: &mut guaranteed,
+            in_stratum: &type_hosts,
+        };
+        let mut times = |id: EventId| event_times(dir, id);
+        let mut next_id = || -> EventId {
+            if writer.is_none() {
+                match EventWriter::open(dir, GEOLOGY_WRITER, crate::session::GEOLOGY_WRITER_NAME) {
+                    Ok(w) => writer = Some(w),
+                    Err(e) => {
+                        open_error.get_or_insert(e.into());
+                        return EventId::new(GEOLOGY_WRITER, MAX_SEQ);
+                    }
+                }
+            }
+            writer.as_mut().map_or(EventId::new(GEOLOGY_WRITER, MAX_SEQ), |w| w.next_id())
+        };
+        top_up(
+            &world,
+            &wp,
+            &mut deposits,
+            &essentials,
+            spawn_of(dir),
+            &mut times,
+            &mut next_id,
+        )
+    };
+    if let Some(e) = open_error {
+        return Err(e);
+    }
+    let added: usize = topped.values().map(|r| r.added).sum();
+    // The new events first, then the bodies and sites that name them; the manifest (the
+    // caller's) last.
+    if let Some(w) = writer.as_mut()
+        && let Some(seg) = w.append(&events)?
+    {
+        set_file(m, &seg.path, seg.bytes, seg.crc32);
+        let index = FileEntry::of(dir, deeptime_format::events::INDEX_PATH)?;
+        set_file(m, &index.path, index.bytes, index.crc32);
+    }
+    if a.moved > 0 || added > 0 {
         let (bytes, crc32) = write_bodies(dir, &bodies)?;
+        set_file(m, BODIES_PATH, bytes, crc32);
         let w = write_sites_in(
             dir,
             m.scale.circumference_blocks,
-            m.world_projection().index_frame(),
+            wp.index_frame(),
             &sites,
         )?;
-        for (path, bytes, crc32) in [
-            (BODIES_PATH, bytes, crc32),
-            (SITES_PATH, w.sites_bytes, w.sites_crc32),
-            (INDEX_PATH, w.index_bytes, w.index_crc32),
-        ] {
-            match m.files.iter_mut().find(|f| f.path == path) {
-                Some(f) => {
-                    f.bytes = bytes;
-                    f.crc32 = crc32;
-                }
-                None => m.files.push(FileEntry {
-                    path: path.into(),
-                    bytes,
-                    crc32,
-                }),
-            }
-        }
+        set_file(m, SITES_PATH, w.sites_bytes, w.sites_crc32);
+        set_file(m, INDEX_PATH, w.index_bytes, w.index_crc32);
     }
+    let regions: serde_json::Map<String, Value> = topped
+        .iter()
+        .map(|(k, r)| {
+            (
+                k.clone(),
+                json!({
+                    "land_regions": r.land_regions,
+                    "with_source": r.with_source,
+                    "added": r.added,
+                    "added_inland": r.inland,
+                    "short": r.short,
+                }),
+            )
+        })
+        .collect();
     Ok(json!({
         "guaranteed": a.guaranteed,
         "moved": a.moved,
@@ -471,7 +1051,10 @@ pub fn anchor_folder(
         "placers_kept": a.placers_kept,
         "centre_holds_ore": a.centre_holds_ore,
         "under_water": a.under_water,
-        "millis": started.elapsed().as_secs_f64() * 1000.0,
+        "topped_up": added,
+        "top_up": regions,
+        "millis": anchor_ms,
+        "top_up_millis": t.elapsed().as_secs_f64() * 1000.0,
     }))
 }
 
@@ -553,7 +1136,7 @@ mod tests {
         let hosts: HashSet<String> = ["limestone", "dolostone"].map(String::from).into();
         let run = |t: i32, b: i32, k: &str| (t, b, Some(k.to_owned()));
         let shift = |rock: &[(i32, i32, Option<String>)], rock_top: i32| {
-            in_stratum_shift(&[&ore], C, 0, 0, rock_top, rock, &hosts)
+            in_stratum_shift(&[&ore], C, 0, 0, rock_top, rock, &hosts, false)
         };
         let column = [
             run(74, 71, "sandstone"),
@@ -579,6 +1162,48 @@ mod tests {
         assert_eq!(ore_top_in_column(&[&b], C, 0, 0), Some(65));
     }
 
+    /// The host run an in-stratum body goes into is the highest as thick as the ore's span in its
+    /// centre column, else the thickest within reach (ORE-280); an exposed essential's buried body
+    /// comes up to its host's top at the top rock block, another stays where it lies.
+    #[test]
+    fn an_in_stratum_body_takes_a_host_that_holds_it() {
+        let hosts: HashSet<String> = ["limestone"].map(String::from).into();
+        let run = |t: i32, b: i32, k: &str| (t, b, Some(k.to_owned()));
+        let ore = body(1, 80.0, 3.0, true, NO_CLIP);
+        let (top, lo) = ore_span_in_column(&[&ore], C, 0, 0).unwrap();
+        assert_eq!((top, lo), (82, 77));
+        let shift = |b: &Body, rock: &[(i32, i32, Option<String>)], exposed: bool| {
+            in_stratum_shift(&[b], C, 0, 0, 70, rock, &hosts, exposed)
+        };
+        // A run too thin above a thick one: the thick one.
+        let column = [
+            run(70, 66, "limestone"),
+            run(65, 56, "shale"),
+            run(55, 20, "limestone"),
+        ];
+        assert_eq!(shift(&ore, &column, false), (55 - top, true));
+        // Only thin runs: the thickest.
+        let thin = [
+            run(70, 69, "limestone"),
+            run(68, 61, "shale"),
+            run(60, 57, "limestone"),
+        ];
+        assert_eq!(shift(&ore, &thin, false), (60 - top, true));
+        // Buried under the top rock block, in its host.
+        let deep = body(1, 40.0, 3.0, true, NO_CLIP);
+        let dtop = ore_top_in_column(&[&deep], C, 0, 0).unwrap();
+        let lime = [run(70, 30, "limestone")];
+        assert_eq!(shift(&deep, &lime, true), (70 - dtop, true));
+        assert_eq!(shift(&deep, &lime, false), (0, true));
+        let mut bs = vec![deep.clone()];
+        let r = settle_in_stratum(&mut bs, C, 0, 0, 70, &lime, &hosts, true);
+        assert_eq!(r, InStratum::ToHost(70 - dtop));
+        assert_eq!(ore_top_in_column(&[&bs[0]], C, 0, 0), Some(70));
+        let mut bs = vec![deep.clone()];
+        let r = settle_in_stratum(&mut bs, C, 0, 0, 70, &lime, &hosts, false);
+        assert_eq!((r, &bs[0]), (InStratum::Kept, &deep));
+    }
+
     /// The projection clips an in-stratum body under the drawn ground (ORE-271), which empties
     /// one whose horizon lies in the soil band. Settled, it is read unclipped, moved into its host
     /// under the top rock block and clipped there, and holds ore; one whose ore is in rock is
@@ -593,7 +1218,7 @@ mod tests {
         assert_eq!(ore_top_in_column(&[&emptied], C, 0, 0), None);
         let settle = |b: &Body, rock: &[(i32, i32, Option<String>)]| {
             let mut bs = vec![b.clone()];
-            let r = settle_in_stratum(&mut bs, C, 0, 0, 70, rock, &hosts);
+            let r = settle_in_stratum(&mut bs, C, 0, 0, 70, rock, &hosts, false);
             (r, bs.remove(0))
         };
         let lime = |t: i32, b: i32| (t, b, Some("limestone".to_owned()));
@@ -641,5 +1266,139 @@ mod tests {
             // The block above the top rock holds none of it.
             assert!(!places_ore(&b, C, 0, rock + 1, 0));
         }
+    }
+
+    /// A Lambert world of 2,048 blocks: land east of x = 0 (ground 70, rock top 66, limestone
+    /// from 60 down), sea to the west.
+    struct HalfLand {
+        wp: WorldProjection,
+    }
+
+    impl Columns for HalfLand {
+        fn period(&self) -> i64 {
+            2048
+        }
+        fn z_range(&self) -> (i64, i64) {
+            let (lo, hi) = self.wp.z_range();
+            (lo.ceil() as i64, hi.floor() as i64)
+        }
+        fn dry(&self, x: i64, _z: i64) -> bool {
+            (x + 1024).rem_euclid(2048) >= 1024
+        }
+        fn rock_top(&self, x: i64, z: i64) -> (i32, bool) {
+            if self.dry(x, z) { (66, false) } else { (30, true) }
+        }
+        fn rock(&self, _x: i64, _z: i64) -> Vec<(i32, i32, Option<String>)> {
+            vec![
+                (66, 61, Some("sandstone".into())),
+                (60, 0, Some("limestone".into())),
+            ]
+        }
+    }
+
+    /// The top-up (DEP-220) gives every land region of the world that lacks a source with ore a
+    /// copy of the essential's guaranteed site, at the region's inland point nearest the spawn,
+    /// anchored with its ore at the top rock block, with its own guaranteed-occurrence event; sea
+    /// regions get none, and a second top-up adds nothing.
+    #[test]
+    fn the_top_up_fills_every_land_region_of_the_world() {
+        let wp = WorldProjection::Lambert(deeptime_format::Projection::new(2048));
+        let world = HalfLand { wp };
+        let ess: Essential = serde_json::from_str(
+            r#"{"material": "c:iron", "min_sites_per_region": 1, "region_blocks": 512, "exposed": true}"#,
+        )
+        .unwrap();
+        let mut b = body(7, 66.0, 2.0, true, NO_CLIP);
+        b.center[0] = 256.5;
+        b.center[2] = -100.5;
+        b.aabb = b.computed_aabb();
+        b.site = Some(3);
+        let refs = [&b];
+        let dy = anchor_shift(&refs, 2048, 256, -101, 66, true);
+        shift_body(&mut b, dy);
+        let e1 = EventId::new(1, 5);
+        let site = Site {
+            id: 3,
+            kind: SiteKind::Deposit,
+            deposit_type: "deeptime:bif".into(),
+            center: [256, 66, -101],
+            lat_lon: [0.0, 0.0],
+            aabb: b.aabb,
+            body: Some(7),
+            products: vec![deeptime_format::Product {
+                material: "c:iron".into(),
+                grade: 0.3,
+                tonnage_t: 1.0e6,
+                role: "primary".into(),
+            }],
+            forming_event: e1,
+            parent: None,
+            extraction: deeptime_format::sites::Extraction::default(),
+        };
+        let mut sites = vec![site];
+        let mut bodies = vec![b];
+        let mut guaranteed: BTreeMap<EventId, String> = [(e1, "c:iron".to_owned())].into();
+        let in_stratum = BTreeMap::new();
+        let mut seq = 100;
+        let spawn = (700.0, 0.0);
+        let regions = Regions::in_frame(wp.index_frame(), 512);
+        let mut run = |sites: &mut Vec<Site>,
+                       bodies: &mut Vec<Body>,
+                       g: &mut BTreeMap<EventId, String>| {
+            let mut d = Deposits {
+                sites,
+                bodies,
+                guaranteed: g,
+                in_stratum: &in_stratum,
+            };
+            top_up(
+                &world,
+                &wp,
+                &mut d,
+                std::slice::from_ref(&ess),
+                spawn,
+                &mut |_| (-1.0e9, -1.0e9),
+                &mut || {
+                    seq += 1;
+                    EventId::new(1, seq)
+                },
+            )
+        };
+        let (rec, events) = run(&mut sites, &mut bodies, &mut guaranteed);
+        let r = &rec["c:iron"];
+        // Land in two of the four columns of regions, on every row.
+        assert!(r.land_regions >= 2, "{r:?}");
+        assert_eq!(r.with_source, 1);
+        assert_eq!(r.added, r.land_regions - 1, "{r:?}");
+        assert_eq!((r.inland, r.short), (r.added, 0), "{r:?}");
+        assert_eq!(events.len(), r.added);
+        let mut filled = vec![regions.index(256.0, -101.0)];
+        for s in &sites[1..] {
+            let (x, z) = (s.center[0], s.center[2]);
+            assert!((128..=1024 - 128).contains(&x), "inland: {x}");
+            let region = regions.index(f64::from(x), f64::from(z));
+            assert!(!filled.contains(&region), "one copy a region");
+            filled.push(region);
+            let mine: Vec<&Body> = bodies.iter().filter(|b| b.site == Some(s.id)).collect();
+            assert_eq!(mine.len(), 1);
+            assert_eq!(s.body, Some(mine[0].id));
+            assert_eq!(ore_top_in_column(&mine, 2048, x, z), Some(66), "site {}", s.id);
+            let e = events.iter().find(|e| e.id == s.forming_event).unwrap();
+            assert_eq!(e.kind, GUARANTEED_KIND);
+            assert_eq!(e.causes, vec![e1]);
+            assert_eq!(e.t_start, -1.0e9);
+            assert_eq!(guaranteed[&s.forming_event], "c:iron");
+        }
+        // The spawn's own region gets the inland point nearest it.
+        let near = sites[1..]
+            .iter()
+            .map(|s| super::super::cluster::distance(2048.0, (f64::from(s.center[0]), f64::from(s.center[2])), spawn))
+            .fold(f64::INFINITY, f64::min);
+        assert!(near < 46.0, "{near}");
+        let ids: HashSet<u32> = bodies.iter().map(|b| b.id).collect();
+        assert_eq!(ids.len(), bodies.len(), "body ids stay unique");
+        // Settled.
+        let (again, events) = run(&mut sites, &mut bodies, &mut guaranteed);
+        assert_eq!((again["c:iron"].added, events.len()), (0, 0));
     }
 }
