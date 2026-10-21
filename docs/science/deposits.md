@@ -133,7 +133,10 @@ host rock in the top 2 km) and three global clocks.
    deposit of the best type; placer gold is moved, at the bake, into the nearest real river channel
    within 30 km as gravel bars. A site counts toward an essential only when the material is its
    primary product (DEP-206): on the real planet of 2026-10-04 a 0.07 Mt impact deposit with copper
-   as a co-product had satisfied the copper essential. The spawn is no longer drawn toward
+   as a co-product had satisfied the copper essential; lead, a co-product of every type that makes
+   it, is the one essential that counts co-products (ORE-273). An essential whose material has no
+   ore block in the running game (zinc without Create, lead without a lead mod) is left out of the
+   world's content and forces nothing. The spawn is no longer drawn toward
    essentials (Ben, 2026-10-05, "I don't believe we need spawn selectoin since we have some passive
    iron gen like vanilla"): it is the dry, flat land nearest (0, 0) (BAK-015).
 
@@ -450,8 +453,10 @@ one porphyry before and after, about 2,200 blocks; iron none before and none aft
 iron-formation site is under the sea; at a basin share of 0.05, 6 land deposits, about 900
 blocks). The measured runs carry no essentials (the built-in presets list none; a world made in
 the game takes `deeptime:essentials`: a site of iron and of coal in every 4,096-block land
-region, of copper in every 8,192-block one), so a game world's nearest iron and copper deposit is closer
-than these figures; that was not measured.
+region, of copper in every 8,192-block one, and since 2026-10-20 of zinc and lead in every
+8,192-block one, ORE-273), so a game world's nearest iron and copper deposit is closer
+than these figures; that was not measured. Zinc and lead were measured with their essentials:
+see "The zinc and lead floor" below.
 
 ## Placer gold as panning
 
@@ -632,6 +637,79 @@ against the code before it was fixed.
   widens to keep its volume.
 - `stratabound_sites` in the projection asks only the built-in types. Not a defect: the core has
   only built-in types, and the filter reads their `hosts.in_stratum`.
+
+**The zinc and lead floor (2026-10-20).** Once MVT formed only in a real limestone horizon, the
+deposits held little of the world's zinc and lead, and a world without SEDEX had no lead at all
+(the pack's scatter had zinc, no lead). The coordinator's call was a floor of two parts: a galena
+scatter shaped like the zinc scatter (ORE-272: 0.5 clusters of 5 blocks per chunk, mostly in
+carbonate and shale), and zinc and lead essentials (ORE-273: a site of each in every 8,192-block
+land region, copper's region, not necessarily exposed). Zinc counts primary products only (MVT,
+SEDEX, the impact hydrothermal Cu-Zn-Au); lead counts co-products too, because every type that
+makes lead makes it as a co-product. The guarantee places the smallest plausible deposit of the
+region's most favourable producer, an in-stratum type only where its column holds a host horizon
+(ORE-271). A game without Create (zinc) or without a lead mod leaves the essential out of the
+world's content (`EssentialsBundle.placeable`, logged), so nothing is forced that could not be
+placed.
+
+Measured with the essentials and scatter each build ships (`tools/review/carbonate-ensemble.sh`
+on the VM with each build's content bundle, `deeptime deposit-audit` per world,
+`tools/review/essentials-table.py <dir> master branch`): master 5dc06974 against the branch at
+f546d9bc, six quick planets (`earthlike_quick_16k`, 1,000 Myr, supercontinent and scattered
+continents, seeds 1 to 3; medians with the range) and the full 16k planet (scattered continents,
+seed 1). Master carries no zinc or lead essential and no lead scatter.
+
+| measure | master, quick | branch, quick | master, full | branch, full |
+|---|---|---|---|---|
+| zinc ore blocks per land chunk: deposits | 3.35 [2.38, 7.26] | 0.29 [0.001, 1.67] | 4.41 | 0.43 |
+| zinc: scatter | 1.09 [1.04, 1.12] | 1.07 [1.04, 1.13] | 1.06 | 1.09 |
+| zinc: all | 4.46 [3.42, 8.34] | 1.35 [1.12, 2.80] | 5.47 | 1.51 |
+| lead ore blocks per land chunk: deposits | 0.17 [0.09, 0.40] | 0.021 [0, 0.125] | 0.25 | 0.031 |
+| lead: scatter | 0 | 0.26 [0.25, 0.30] | 0 | 0.27 |
+| lead: all | 0.17 [0.09, 0.40] | 0.30 [0.26, 0.39] | 0.25 | 0.30 |
+| sites counting toward zinc (guaranteed) | 330 [146, 607] (0) | 5 [2, 9] (0 to 2) | 299 (0) | 3 (1) |
+| sites counting toward lead (guaranteed) | 128 [89, 233] (0) | 3 [2, 9] (0 to 2) | 197 (0) | 2 (1) |
+| 8,192-block land regions with a zinc source | 2 of 2 on all six | 2 of 2 on four, 1 of 2 on two | 2 of 2 | 2 of 2 |
+| 2,048-block land regions with a zinc source | 11 to 20 of 19 to 21 | 2 to 4 of 20 or 21 | 14 of 19 | 3 of 21 |
+| spawn to the nearest zinc source (blocks) | 657 [98, 1,070] | 1,610 [548, 3,310] | 399 | 3,420 |
+| spawn to the nearest lead source (blocks) | 776 [98, 1,500] | 1,800 [548, 3,540] | 399 | 3,420 |
+| access p50, zinc (blocks; points of 150 beyond 1,536) | 624 [472, 712] (0 to 10) | 1,220 [1,130, 1,290] (11 to 46) | 520 | 1,130 |
+| access p50, lead | 816 [696, 1,180] (13 to 53) | 1,340 [1,300, 1,510] (45 to 77) | 776 | 1,530 |
+| MVT sites, natural + guaranteed | 133 [98, 242] + 0 | 0 or 1 + 0 or 1 | 206 + 0 | 0 + 1 |
+| SEDEX sites, natural + guaranteed | 3 [1, 8] + 0 | 1.5 [0, 9] + 0 or 1 | 1 + 0 | 1 + 0 |
+
+What it says:
+
+- **The deposits' zinc fell about tenfold and their lead about eightfold**, because MVT, which
+  made most of both, now forms only in a real limestone horizon (ORE-271) and almost none does on
+  these planets: 0 or 1 natural MVT site on the branch against 98 to 242 on master. PREA8_PENDING
+- **The floor holds the totals, not the sources.** The scatter is now most of the world's zinc
+  (1.07 of 1.35 blocks per land chunk) and nearly all of its lead (0.26 of 0.30); lead per land chunk rose
+  (0.17 to 0.30), since the galena scatter outweighs what the deposits lost, and zinc fell to
+  about a third. But the sources thinned from hundreds to a handful, so the spawn's nearest zinc
+  source went from 657 to 1,610 blocks (the full planet's from 399 to 3,420, its sources from 299
+  to 3) and the access probe's median doubled, with up to a third of its points finding no
+  zinc's need, and up to half no lead's, within 1,536 blocks.
+- **The regions are the simulation's.** The guarantee forced 0 to 2 deposits a planet and left
+  every region of its grid with a source, but two of the six quick planets show one of the two
+  8,192-block world regions without one. The guarantee counts regions in the simulation's
+  Lambert frame; the world is Petroff-Guyou, whose orientation the bake picks later from the final
+  land, so a region of the simulation is not a region of the world. Iron shows it too, on master
+  as on the branch: its 8 guaranteed sites, one in each of the simulation's 4,096-block regions,
+  land in 4 or 5 of the world's 8.
+- **A guaranteed SEDEX held no ore** on 3 of the 4 quick planets that forced one, and most
+  guaranteed iron bodies held none either (17 of 48 held ore on the branch, 20 of 46 on master). Two
+  causes. A guaranteed body was placed against the deposit stage's ground, and the soil's top 4
+  blocks hold no ore: SEDEX's 100 m formation depth is under 3 blocks at 35 m a block, and an
+  exposed body's top was at the ground, so a thin body lay wholly in the soil. Since 14e4ae7d its
+  top lies under the soil (ORE-076). The other cause is outside the deposit stage, and it is the
+  larger: the world's ground is not the stage's (the drawn and amplified terrain, and since the
+  ocean-crust merge the bake's lift and crest raise, which move every body with its stratigraphic
+  key, STR-056), and 31 of the branch's 48 guaranteed iron centres lie above the world's ground.
+  On the merged build 869e65e7's quick planet (scattered continents seed 1) all 8 guaranteed iron
+  centres lie 2 to 47 blocks above it and the SEDEX 64, and none of the 9 holds ore. With the soil
+  floor (14e4ae7d, supercontinent 2 and scattered continents 1), 13 of the 16 guaranteed iron
+  centres and the one SEDEX still lie above the ground (the SEDEX 61 blocks), and 3 of the 16 iron
+  bodies hold ore: a body the bake lifted out of the ground is beyond the stage's reach.
 
 ## Simplifications and limits
 
