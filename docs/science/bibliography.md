@@ -1274,8 +1274,8 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Fernandes, N. F. and Dietrich, W. E. (1997). Hillslope evolution by diffusive processes: The timescale for equilibrium adjustments. Water Resources Research 33(6):1307-1318. DOI 10.1029/97WR00534 (Crossref confirmed). Paywalled; not fetched.
 - Amante, C. and Eakins, B. W. (2009). ETOPO1 1 arc-minute global relief model: procedures, data sources and analysis. NOAA Technical Memorandum NESDIS NGDC-24. Dataset DOI 10.7289/V5C8276M (DataCite: "ETOPO1 1 Arc-Minute Global Relief Model", NOAA NCEI, 2009). Open.
 - Eakins, B. W. and Sharman, G. F. (2012). Hypsographic curve of Earth's surface from ETOPO1. NOAA National Geophysical Data Center, Boulder, CO. PDF https://www.ncei.noaa.gov/sites/default/files/2023-01/Hypsographic%20Curve%20of%20Earth%E2%80%99s%20Surface%20from%20ETOPO1.pdf (full text read; Table 1 is an image and was not readable). Companion: "World Ocean Volumes" https://www.ncei.noaa.gov/sites/default/files/2023-01/World%20Ocean%20Volumes.pdf (table read).
-- Athy, L. F. (1930). Density, porosity, and compaction of sedimentary rocks. AAPG Bulletin 14(1):1-24. DOI 10.1306/3D93289E-16B1-11D7-8645000102C1865D. The surface stage has no porosity or compaction (ERO-028); since 2026-10-20 (the lakes task) the plate model's isostatic height counts the cover's pore water by Athy's exponential law (ISO-082). Not read.
-- Sclater, J. G. and Christie, P. A. F. (1980). Continental stretching: an explanation of the post-mid-Cretaceous subsidence of the central North Sea basin. Journal of Geophysical Research 85(B7):3711-3739. DOI 10.1029/JB085iB07p03711. Coded since 2026-10-20 (the lakes task): its shaly sandstone's surface porosity, compaction coefficient and grain density are the plate model's sedimentary cover (ISO-080 to ISO-082). Paywalled, not read; the values were read at second hand in pyBacktrack's lithology table (below, pyBacktrack_lithologies).
+- Athy, L. F. (1930). Density, porosity, and compaction of sedimentary rocks. AAPG Bulletin 14(1):1-24. DOI 10.1306/3D93289E-16B1-11D7-8645000102C1865D. Not coded: the surface stage has no porosity or compaction (ERO-028). Its exponential law was tried in the plate model's column on 2026-10-20 and reverted (isostasy-and-height-limit.md, "Known before the page is written"). Not read.
+- Sclater, J. G. and Christie, P. A. F. (1980). Continental stretching: an explanation of the post-mid-Cretaceous subsidence of the central North Sea basin. Journal of Geophysical Research 85(B7):3711-3739. DOI 10.1029/JB085iB07p03711. Not coded, as above; its shaly sandstone was the 2026-10-20 trial's cover (paywalled, not read; the values read at second hand in pyBacktrack's lithology table, below, pyBacktrack_lithologies).
 
 ### Not bibliographic
 RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on); docs/research/notes/surface_processes_climate.md; docs/deeptime-implementation-plan.md; docs/deeptime-design-decisions.md; STATUS.md build-log entries; rock_class JSON files; tools/review/p1-17-hyps.py and companions; the decisions of Ben (Tectonics scaling, Build range, Vertical scale, Sub-grid detail, squeeze, general flexure).
@@ -1451,8 +1451,8 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 
 ### pyBacktrack_lithologies
 - Reference: EarthByte group, pyBacktrack (software), bundled lithology table `pybacktrack/bundle_data/lithologies/primary.txt`. https://github.com/EarthByte/pyBacktrack
-- Cited as: the secondary source of Sclater & Christie 1980's porosity-depth parameters (ISO-080, ISO-081)
-- Ledger ids: ISO-080, ISO-081
+- Cited as: the secondary source of Sclater & Christie 1980's porosity-depth parameters, for the porous cover tried in the plate model's column on 2026-10-20 and reverted (isostasy-and-height-limit.md)
+- Ledger ids: none (the trial was reverted)
 - Access: open (software, GitHub)
 - Library: no saved copy (read through raw.githubusercontent.com on 2026-10-20).
 - Read in the lakes task (2026-10-20): the header "# name density porosity decay / # kg/m3 (%/100) m" and the four rows "# Sclater and Christie [1980]": "Shaley_sand 2680 0.56 2564", "Shale 2700 0.63 1960", "Sand 2650 0.49 3704", "Chalk 2710 0.7 1408".
