@@ -122,7 +122,9 @@ def below_sea(el_blocks: np.ndarray, wet: np.ndarray, salt: np.ndarray | None, s
     the open sea is every cell a block or more under sea level in an 8-connected body (x wraps)
     of at least 5,000 km2; a cell at or under sea level is reached when its 8-connected body of
     such cells holds open sea; closed is low and not reached. Shares are of the bake's land
-    (`stats.land_km2`, the hydrology's non-sea cells, closed ground included)."""
+    (`stats.land_km2`, the hydrology's non-sea cells, closed ground included). The `deep_*` keys
+    count only closed ground a block or more under sea level, where the column rule would stand
+    the sea (the bake's own `stats.below_sea` counts the same ground)."""
     low = el_blocks <= sea_y
     deep = el_blocks <= sea_y - 1.0
     dl = label_wrap(deep)
@@ -152,6 +154,11 @@ def below_sea(el_blocks: np.ndarray, wet: np.ndarray, salt: np.ndarray | None, s
         "dry_km2": km2(dry),
         "dry_share_of_land": share(dry),
         "lake_cells_below_sea_level": int((wet & low).sum()),
+        "deep_closed_km2": km2(closed & deep),
+        "deep_closed_share_of_land": share(closed & deep),
+        "deep_lake_share_of_land": share(lake & deep),
+        "deep_playa_km2": km2(playa & deep),
+        "deep_dry_share_of_land": share(dry & deep),
     }
 
 
