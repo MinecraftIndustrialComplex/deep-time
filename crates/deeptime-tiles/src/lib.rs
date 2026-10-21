@@ -4,6 +4,12 @@
 //! and writes nothing into it, adds nothing to the simulation or the bake, and renders each tile
 //! when a page asks.
 //!
+//! Its own crate (it was `deeptime-cli`'s `watch::worldmap`) so another viewer can draw a Deep Time
+//! world without the command line tool: [`BakeMap`] is a [`mic_viewer::tiles::TileSource`]
+//! (the shared viewer core, decisions log 2026-10-21), layers `sat`, `elev`, `water` and `overlay`
+//! on the pyramid below. The workbench's routes and per-run cache are `deeptime-cli`'s
+//! `watch::tiles`.
+//!
 //! # The pyramid
 //! Equirectangular, 256-pixel tiles, XYZ-style with the geodetic 2:1 layout: zoom `z` is
 //! `2^(z+1) × 2^z` tiles, `x` east from the seam, `y` south from the north edge, so a pixel is
@@ -48,6 +54,7 @@ use deeptime_format::rivers::read_rivers;
 use deeptime_format::{
     DetailSpec, GridDesc, LayerDesc, Manifest, Noise, Ramps, Rivers, TilePackReader,
 };
+use mic_viewer::tiles::{Rendered, TileError, TileSource};
 use serde_json::{Value, json};
 
 /// Tile edge, pixels.
@@ -1763,6 +1770,39 @@ impl BakeMap {
     }
 }
 
+/// The bake as the shared viewer's base map: layer ids as [`Layer::id`], zoom and indices as
+/// [`TileGeom::new`] (zoom 0 to [`Meta::max_zoom`], `x` below `2^(z+1)`, `y` below `2^z`).
+impl TileSource for BakeMap {
+    fn render(&self, layer: &str, z: i32, x: i64, y: i64) -> Result<Rendered, TileError> {
+        let Some(l) = Layer::parse(layer) else {
+            return Err(TileError::Missing(format!(
+                "no layer {layer}: sat, elev, water or overlay"
+            )));
+        };
+        let geom = match (u32::try_from(z), u32::try_from(x), u32::try_from(y)) {
+            (Ok(z), Ok(x), Ok(y)) => TileGeom::new(self.meta.c, z, x, y),
+            _ => None,
+        };
+        let Some(geom) = geom else {
+            return Err(TileError::Missing(format!(
+                "no tile {z}/{x}/{y}: zoom 0 to {}, x below 2^(z+1), y below 2^z",
+                self.meta.max_zoom
+            )));
+        };
+        BakeMap::render(self, l, &geom)
+            .map(Rendered::Rgba)
+            .map_err(TileError::Failed)
+    }
+
+    fn opaque(&self, layer: &str) -> bool {
+        Layer::parse(layer).is_some_and(Layer::opaque)
+    }
+
+    fn version(&self) -> u32 {
+        RENDER_VERSION
+    }
+}
+
 const RIVER_RGB: [f32; 3] = [38.0, 112.0, 214.0];
 const SEA_SHALLOW: [f32; 3] = [136.0, 186.0, 226.0];
 const SEA_DEEP: [f32; 3] = [42.0, 84.0, 152.0];
@@ -1792,20 +1832,48 @@ mod tests {
         d
     }
 
-    /// The synthetic lake world (a lake of radius 40 at the origin) at circumference `c`.
+    /// The synthetic lake world (a lake of radius 40 at the origin) at circumference `c`, written
+    /// as `deeptime synth --kind lake-test` writes it (deeptime-cli's `synth::run`).
     fn lake_world(c: u32, tag: &str) -> std::path::PathBuf {
+        use deeptime_core::synth::{Kind, Strata, build};
         let dir = tmp(&format!("lake{c}-{tag}"));
-        crate::synth::run(&crate::synth::Options {
-            kind: crate::synth::Kind::LakeTest,
-            strata: crate::synth::Strata::Placeholder,
-            size: c,
-            out: dir.clone(),
-            viewer: None,
-            dump_samples: None,
-            codec: Codec::Lz4Block,
-        })
-        .unwrap();
+        let world = build(Kind::LakeTest, Strata::Placeholder, c, Codec::Lz4Block).unwrap();
+        let mut manifest = Manifest::new(
+            &format!("synth:{}", Kind::LakeTest.name()),
+            deeptime_format::Writer::this("deeptime-tiles"),
+            deeptime_format::Scale::default_for(c),
+        );
+        world.write_into(&dir, &mut manifest).unwrap();
+        manifest.write(&dir).unwrap();
         dir
+    }
+
+    /// The map as the shared viewer's tile source: every layer answers a PNG; an index outside
+    /// the pyramid or an unknown layer is 404, and only drawn tiles are cached.
+    #[test]
+    fn the_map_serves_as_a_tile_source() {
+        use mic_viewer::tiles::{TileCache, serve};
+        let dir = lake_world(2048, "source");
+        let map = BakeMap::open(&dir).unwrap();
+        let cache = TileCache::in_memory(64 << 20);
+        for layer in Layer::ALL {
+            let r = serve(&map, &cache, true, &format!("{}/1/2/1.png", layer.id()));
+            assert_eq!(r.status, 200, "{}", layer.id());
+            assert_eq!(&r.body[1..4], b"PNG");
+        }
+        for bad in [
+            "sat/3/0/0.png",
+            "sat/0/2/0.png",
+            "sat/0/0/1.png",
+            "sat/-1/0/0.png",
+            "rock/0/0/0.png",
+        ] {
+            assert_eq!(serve(&map, &cache, true, bad).status, 404, "{bad}");
+        }
+        assert_eq!(cache.stats().1, Layer::ALL.len());
+        assert!(TileSource::opaque(&map, "sat") && !TileSource::opaque(&map, "overlay"));
+        assert_eq!(TileSource::version(&map), RENDER_VERSION);
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
