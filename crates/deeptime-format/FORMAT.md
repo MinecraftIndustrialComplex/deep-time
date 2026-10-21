@@ -303,9 +303,11 @@ box follow) so the top of its ore (the highest block of the site's centre column
 a material applies, not the padded box's top) lies at the **top rock block** over the site's centre (the
 `WaterColumn` ground less the 4 blocks of soil on dry land, the bed under water) for an exposed
 essential, and no higher than it for the others. In-stratum sites (MVT) stay in their host horizon
-while their ore lies at or under the top rock block; above it, the ore's top goes down to the
-highest block of one of the type's host classes at or under that block within 64 blocks of it, or
-to the block itself when there is none. Placers stay where `placer_channels` settled them; natural
+while their ore tops out in rock in the centre column; otherwise (the projection's clip under the
+drawn ground empties a body whose horizon lies in the soil band) the body is read unclipped, the
+ore's top goes down to the highest block of one of the type's host classes at or under the top
+rock block within 64 blocks of it (to the block itself when there is none), and its `clip_top_y`
+becomes the top rock block. Placers stay where `placer_channels` settled them; natural
 sites are not touched.
 `bodies/bodies.dtb`, `sites/sites.dtsr` and `sites/index.dtsi` are rewritten when any moved. `notes.bake.guaranteed`:
 `guaranteed`, `moved`, `moved_up`, `moved_down`, `largest_move_blocks`, `in_stratum_kept`,

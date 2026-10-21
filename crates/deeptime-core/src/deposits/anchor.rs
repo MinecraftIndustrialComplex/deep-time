@@ -16,10 +16,11 @@
 //! less the [`SOIL_BLOCKS`] of soil on dry land) for an exposed essential, and no higher than it
 //! for the others (a body the history buried deeper stays there). Natural deposits keep their
 //! physics and are not touched. An in-stratum body (MVT, `hosts.in_stratum`) is left in its host
-//! horizon, where the bake and the projection keep it (ORE-271), unless its ore lies above the
-//! top rock block; then it goes down into the nearest block of a host class under that block
-//! ([`in_stratum_shift`]). A placer is left where `placer_channels` settled it (in a channel or
-//! on the ground).
+//! horizon, where the bake and the projection keep it (ORE-271), while its ore lies in rock in
+//! its centre column; otherwise (its horizon left in the soil, where the projection's clip under
+//! the drawn ground empties it) it is read unclipped, goes down into the nearest block of a host
+//! class under the top rock block and is clipped there ([`settle_in_stratum`]). A placer is left
+//! where `placer_channels` settled it (in a channel or on the ground).
 //!
 //! The guaranteed sites are the ones whose forming event is a `deeptime:guaranteed_occurrence`
 //! (the event log; the run passes them from memory), so the pass needs no flag in the world data.
@@ -165,6 +166,62 @@ pub fn in_stratum_shift(
     }
 }
 
+/// What [`settle_in_stratum`] did to a guaranteed in-stratum site, with its move (blocks).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InStratum {
+    /// Its ore lies in rock in its centre column: left in its horizon.
+    Kept,
+    /// Moved into a host class.
+    ToHost(i32),
+    /// No host class within reach: moved into whatever rock is there.
+    OutOfHost(i32),
+}
+
+/// Settles a guaranteed in-stratum site's `bodies` (changed in place) over centre column
+/// (x, z). The projection clips such a body [`SOIL_BLOCKS`] under the world's drawn ground
+/// (ORE-271), so one whose horizon the bake left in the soil band comes out of it empty (a quick
+/// planet's guaranteed MVT, 2026-10-21: no block at all), and a rigid move would keep it empty.
+/// A site whose ore tops out in rock in its centre column is kept as it is. Any other is read
+/// unclipped and moved by [`in_stratum_shift`], and every body is then clipped at `rock_top`, so
+/// nothing of it lies in the soil.
+pub fn settle_in_stratum(
+    bodies: &mut [Body],
+    c: u32,
+    x: i32,
+    z: i32,
+    rock_top: i32,
+    rock: &[(i32, i32, Option<String>)],
+    hosts: &HashSet<String>,
+) -> InStratum {
+    let refs: Vec<&Body> = bodies.iter().collect();
+    if ore_top_in_column(&refs, c, x, z).is_some_and(|t| t <= rock_top) {
+        return InStratum::Kept;
+    }
+    let unclipped: Vec<Body> = bodies
+        .iter()
+        .map(|b| {
+            let mut b = b.clone();
+            b.clip_top_y = NO_CLIP;
+            b.aabb = b.computed_aabb();
+            b
+        })
+        .collect();
+    let refs: Vec<&Body> = unclipped.iter().collect();
+    let (dy, in_host) = in_stratum_shift(&refs, c, x, z, rock_top, rock, hosts);
+    for (b, mut u) in bodies.iter_mut().zip(unclipped) {
+        shift_body(&mut u, dy);
+        // ledger: ORE-271 (no ore in the soil)
+        u.clip_top_y = rock_top;
+        u.aabb = u.computed_aabb();
+        *b = u;
+    }
+    if in_host {
+        InStratum::ToHost(dy)
+    } else {
+        InStratum::OutOfHost(dy)
+    }
+}
+
 /// Moves a body up by `dy` whole blocks (centre, clip, box).
 fn shift_body(b: &mut Body, dy: i32) {
     if dy == 0 {
@@ -192,7 +249,8 @@ fn ore_in_column(bodies: &[&Body], c: u32, x: i32, z: i32, rock_top: i32, reach:
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Anchored {
     pub guaranteed: usize,
-    /// Sites whose bodies moved, and the largest move (blocks).
+    /// Sites whose bodies moved (an in-stratum one also when only re-clipped), and the largest
+    /// move (blocks).
     pub moved: usize,
     pub largest_move: i32,
     pub moved_up: usize,
@@ -242,26 +300,40 @@ pub fn anchor_sites(
         if s.kind == SiteKind::Placer {
             out.placers_kept += 1;
         } else {
-            let mine: Vec<&Body> = idx.iter().map(|&i| &bodies[i]).collect();
-            let dy = match in_stratum.get(&s.id) {
+            // The move, None when the site's bodies are left as they are.
+            let moved_by = match in_stratum.get(&s.id) {
                 Some(hosts) => {
                     let rock = world.sample(i64::from(cx), i64::from(cz)).rock;
-                    let (dy, in_host) = in_stratum_shift(&mine, c, cx, cz, top, &rock, hosts);
-                    if dy == 0 {
-                        out.in_stratum_kept += 1;
-                    } else if in_host {
-                        out.in_stratum_to_host += 1;
-                    } else {
-                        out.in_stratum_out_of_host += 1;
+                    let mut own: Vec<Body> = idx.iter().map(|&i| bodies[i].clone()).collect();
+                    let r = settle_in_stratum(&mut own, c, cx, cz, top, &rock, hosts);
+                    let dy = match r {
+                        InStratum::Kept => None,
+                        InStratum::ToHost(dy) | InStratum::OutOfHost(dy) => Some(dy),
+                    };
+                    match r {
+                        InStratum::Kept => out.in_stratum_kept += 1,
+                        InStratum::ToHost(_) => out.in_stratum_to_host += 1,
+                        InStratum::OutOfHost(_) => out.in_stratum_out_of_host += 1,
+                    }
+                    if dy.is_some() {
+                        for (&i, b) in idx.iter().zip(own) {
+                            bodies[i] = b;
+                        }
                     }
                     dy
                 }
-                None => anchor_shift(&mine, c, cx, cz, top, exposed(material)),
-            };
-            if dy != 0 {
-                for &i in &idx {
-                    shift_body(&mut bodies[i], dy);
+                None => {
+                    let mine: Vec<&Body> = idx.iter().map(|&i| &bodies[i]).collect();
+                    let dy = anchor_shift(&mine, c, cx, cz, top, exposed(material));
+                    if dy != 0 {
+                        for &i in &idx {
+                            shift_body(&mut bodies[i], dy);
+                        }
+                    }
+                    (dy != 0).then_some(dy)
                 }
+            };
+            if let Some(dy) = moved_by {
                 out.moved += 1;
                 out.moved_up += usize::from(dy > 0);
                 out.moved_down += usize::from(dy < 0);
@@ -505,6 +577,42 @@ mod tests {
         let mut b = ore.clone();
         shift_body(&mut b, shift(&column, 70).0);
         assert_eq!(ore_top_in_column(&[&b], C, 0, 0), Some(65));
+    }
+
+    /// The projection clips an in-stratum body under the drawn ground (ORE-271), which empties
+    /// one whose horizon lies in the soil band. Settled, it is read unclipped, moved into its host
+    /// under the top rock block and clipped there, and holds ore; one whose ore is in rock is
+    /// kept as it is.
+    #[test]
+    fn an_emptied_in_stratum_body_is_settled_into_rock() {
+        let hosts: HashSet<String> = ["limestone"].map(String::from).into();
+        let open = body(1, 72.0, 1.0, true, NO_CLIP);
+        let top = ore_top_in_column(&[&open], C, 0, 0).unwrap();
+        assert!(top > 70, "{top}");
+        let emptied = body(1, 72.0, 1.0, true, 70);
+        assert_eq!(ore_top_in_column(&[&emptied], C, 0, 0), None);
+        let settle = |b: &Body, rock: &[(i32, i32, Option<String>)]| {
+            let mut bs = vec![b.clone()];
+            let r = settle_in_stratum(&mut bs, C, 0, 0, 70, rock, &hosts);
+            (r, bs.remove(0))
+        };
+        let lime = |t: i32, b: i32| (t, b, Some("limestone".to_owned()));
+        let sand = |t: i32, b: i32| (t, b, Some("sandstone".to_owned()));
+        let (r, b) = settle(&emptied, &[lime(74, 40)]);
+        assert_eq!(r, InStratum::ToHost(70 - top));
+        assert_eq!(b.clip_top_y, 70);
+        assert_eq!(ore_top_in_column(&[&b], C, 0, 0), Some(70));
+        let (r, b) = settle(&emptied, &[sand(74, 69), lime(68, 40)]);
+        assert_eq!(r, InStratum::ToHost(68 - top));
+        assert_eq!(ore_top_in_column(&[&b], C, 0, 0), Some(68));
+        let (r, b) = settle(&emptied, &[sand(74, 0)]);
+        assert_eq!(r, InStratum::OutOfHost(70 - top));
+        assert_eq!(ore_top_in_column(&[&b], C, 0, 0), Some(70));
+        // Its ore in rock already: kept, clip and all.
+        let deep = body(1, 60.0, 1.0, true, 70);
+        let (r, b) = settle(&deep, &[lime(74, 40)]);
+        assert_eq!(r, InStratum::Kept);
+        assert_eq!(b, deep);
     }
 
     /// The move is rigid and whole: centre, clip and box go together, and the moved body's ore
