@@ -44,9 +44,10 @@
 //! Two more measures for `plate-check`, measurement only (nothing a plate rule reads):
 //! - `StepRec::mix_km`: the length of plate boundary by kind, km (one sample spacing per boundary
 //!   sample, see [`classify_boundary`]): [`mix`]`::OCEAN_OCEAN`, `OCEAN_CONTINENT` (an oceanic
-//!   slab going under an overriding plate's oceanic or continental crust), `COLLISION` (continental
-//!   crust at the subducting side), `RIDGE`, `RIFT` and `OTHER` (transform, or converging with no
-//!   contact yet). The subducting length is the first two. It is taken right after the step's
+//!   slab going under an overriding plate whose arc stands on oceanic or continental crust: the
+//!   front's own crust, or the plate's continental crust within `arc_distance_km` of it, PLT-370),
+//!   `COLLISION` (continental crust at the subducting side), `RIDGE`, `RIFT` and `OTHER`
+//!   (transform, or converging with no contact yet). The subducting length is the first two. It is taken right after the step's
 //!   fronts are found (`subduction::fronts_and_uplift`), because the sample flags are cleared by
 //!   a resampling; the motion is judged across the boundary's normal, with Bird's 20 degrees for
 //!   a transform (PLT-310, PLT-311).
@@ -819,9 +820,11 @@ fn quantile(sorted: &[f64], q: f64) -> f64 {
 
 /// Kinds of plate boundary in [`StepRec::mix_km`].
 pub mod mix {
-    /// An oceanic slab under an overriding plate's oceanic crust.
+    /// An oceanic slab under an overriding plate's oceanic crust, with none of that plate's
+    /// continental crust within the arc's distance of the front: an intra-oceanic arc.
     pub const OCEAN_OCEAN: usize = 0;
-    /// An oceanic slab under an overriding plate's continental crust.
+    /// An oceanic slab under an overriding plate's continental crust, at the front or within the
+    /// arc's distance behind it (PLT-370): a continental arc.
     pub const OCEAN_CONTINENT: usize = 1;
     /// Continental crust at the subducting side of a front (a collision or its approach).
     pub const COLLISION: usize = 2;
@@ -877,8 +880,10 @@ pub struct Neighbour {
 /// direction is no azimuth (plates sliding past each other converge along half the edges of a
 /// zigzag boundary and part along the rest). A sample on the overriding side of an active contact
 /// whose boundary converges is a front, its class named by the crust of its fastest-converging
-/// neighbour there; a sample with a neighbour across a parting boundary is divergent; transforms
-/// and converging boundaries with no contact are the rest. A front counts one sample spacing (one
+/// neighbour there (and, for an oceanic slab, by the front sample's own crust; the caller names an
+/// ocean-ocean front ocean-continent when its arc stands on continental crust, PLT-370); a sample
+/// with a neighbour across a parting boundary is divergent; transforms and converging boundaries
+/// with no contact are the rest. A front counts one sample spacing (one
 /// plate's side of the boundary, as `PlateStep::front_km` does); the others count half a spacing
 /// from each of their two sides.
 pub fn classify_boundary(v_kind: u8, nbrs: &[Neighbour]) -> Option<(usize, u32)> {
@@ -946,7 +951,34 @@ pub struct FrontBands {
     pub normal: [[f64; BANDS]; 2],
     pub age: [[f64; BANDS]; 2],
     pub other_converging: f64,
+    /// Measurement only (the plate-geometry task, 2026-10-21): the ocean-ocean front, km, by the
+    /// overriding plate's continental share and the subducting plate's (bands of
+    /// [`CONT_SHARE_BANDS`]), by the distance from the front to the overriding plate's nearest
+    /// continental crust through that plate (bands of [`COAST_BANDS_KM`], Earth-normalised; the
+    /// last band also holds a plate with none), and by how the contact's two plates are related
+    /// ([`PAIR_INITIATION`], [`PAIR_RIFT`], [`PAIR_OTHER`]).
+    #[serde(default)]
+    pub oo_over_cont: [f64; BANDS],
+    #[serde(default)]
+    pub oo_under_cont: [f64; BANDS],
+    #[serde(default)]
+    pub oo_coast: [f64; BANDS],
+    #[serde(default)]
+    pub oo_pair: [f64; 3],
 }
+
+/// The lower edges of [`FrontBands::oo_over_cont`]'s and `oo_under_cont`'s bands: a plate's
+/// continental share. These bands and the two below are measurement bins, not physics
+/// (game-choice, the plate-geometry task 2026-10-21; ledger: PLT-370).
+pub const CONT_SHARE_BANDS: [f64; BANDS] = [0.0, 0.01, 0.05, 0.15, 0.3, 0.5];
+/// The lower edges of [`FrontBands::oo_coast`]'s bands, km.
+pub const COAST_BANDS_KM: [f64; BANDS] = [0.0, 150.0, 300.0, 600.0, 1200.0, 2400.0];
+/// [`FrontBands::oo_pair`]: one plate was split off the other by a subduction initiation.
+pub const PAIR_INITIATION: usize = 0;
+/// … one rifted off the other, or both off the same parent.
+pub const PAIR_RIFT: usize = 1;
+/// … neither.
+pub const PAIR_OTHER: usize = 2;
 
 /// [`boundary_mix`]'s answer: the length by kind and the subducting length's bands.
 #[derive(Clone, Copy, Debug, Default)]
@@ -963,11 +995,21 @@ struct MixUnits {
     normal: [[u64; BANDS]; 2],
     age: [[u64; BANDS]; 2],
     other_converging: u64,
+    oo: [[u64; BANDS]; 3],
+    oo_pair: [u64; 3],
 }
 
 impl MixUnits {
     fn add(mut self, b: MixUnits) -> MixUnits {
         for (x, y) in self.km.iter_mut().zip(b.km) {
+            *x += y;
+        }
+        for (row, other) in self.oo.iter_mut().zip(b.oo) {
+            for (x, y) in row.iter_mut().zip(other) {
+                *x += y;
+            }
+        }
+        for (x, y) in self.oo_pair.iter_mut().zip(b.oo_pair) {
             *x += y;
         }
         for (mine, theirs) in [
@@ -1022,6 +1064,70 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
         })
         .collect();
     let norm = env.norm;
+    // Measurement only (the ocean-ocean front's diagnostics, FrontBands::oo_*): how each active
+    // contact's plates are related, and each visible sample's lattice steps to its plate's
+    // nearest visible continental crust through that plate.
+    let lives: BTreeMap<u32, (Option<u32>, &str)> = st
+        .dynamics
+        .as_ref()
+        .map(|d| {
+            d.plates
+                .iter()
+                .map(|p| (p.id, (p.parent, p.origin.as_str())))
+                .collect()
+        })
+        .unwrap_or_default();
+    let pair_of = |a: u32, b: u32| -> usize {
+        let la = lives.get(&a).copied().unwrap_or((None, ""));
+        let lb = lives.get(&b).copied().unwrap_or((None, ""));
+        let child = |(parent, origin): (Option<u32>, &str), of: u32, how: &str| {
+            parent == Some(of) && origin == how
+        };
+        if child(la, b, "subduction_initiation") || child(lb, a, "subduction_initiation") {
+            PAIR_INITIATION
+        } else if child(la, b, "rift")
+            || child(lb, a, "rift")
+            || (la.1 == "rift" && lb.1 == "rift" && la.0.is_some() && la.0 == lb.0)
+        {
+            PAIR_RIFT
+        } else {
+            PAIR_OTHER
+        }
+    };
+    let pairs: BTreeMap<(u32, u32), usize> = active
+        .iter()
+        .map(|&(u, o)| ((u, o), pair_of(u, o)))
+        .collect();
+    let coast_steps: Vec<u32> = {
+        let mut d = vec![u32::MAX; samples.len()];
+        let mut queue = std::collections::VecDeque::new();
+        for (i, s) in samples.iter().enumerate() {
+            if !s.is_hidden() && s.kind == CONTINENTAL {
+                d[i] = 0;
+                queue.push_back(i as u32);
+            }
+        }
+        while let Some(v) = queue.pop_front() {
+            let pv = plate_of[v as usize];
+            for (u, _) in geo.edges(v) {
+                let ui = u as usize;
+                if d[ui] == u32::MAX && !samples[ui].is_hidden() && plate_of[ui] == pv {
+                    d[ui] = d[v as usize] + 1;
+                    queue.push_back(u);
+                }
+            }
+        }
+        d
+    };
+    let spacing_km = norm.km(norm.spacing_rad());
+    // An ocean-ocean front whose overriding plate has continental crust within the arc's distance
+    // of it, through that plate, builds its arc on that crust: a continental arc, the class
+    // Stern & Scholl (2010) split the world's arcs by (the crust the arc stands on), so it counts
+    // as ocean-continent. Lattice steps, so the distance is an upper bound. ledger: PLT-370
+    let arc_on_continent = |v: usize| {
+        coast_steps[v] != u32::MAX
+            && f64::from(coast_steps[v]) * spacing_km <= env.k.arc_distance_km
+    };
     let units = (0..samples.len())
         .into_par_iter()
         .fold(MixUnits::default, |mut acc, v| {
@@ -1081,6 +1187,11 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
                 n += 1;
             }
             if let Some((class, half)) = classify_boundary(sv.kind, &buf[..n]) {
+                let class = if class == mix::OCEAN_OCEAN && arc_on_continent(v) {
+                    mix::OCEAN_CONTINENT
+                } else {
+                    class
+                };
                 acc.km[class] += u64::from(half);
                 let setting = match class {
                     mix::OCEAN_OCEAN => Some(0),
@@ -1095,6 +1206,20 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
                     acc.slab[k][band_of(km, &SLAB_BANDS_KM)] += u64::from(half);
                     acc.normal[k][band_of(-buf[f].normal, &NORMAL_BANDS_MM_YR)] += u64::from(half);
                     acc.age[k][band_of(age, &AGE_BANDS_MYR)] += u64::from(half);
+                    if k == 0 {
+                        let under = plate_buf[f];
+                        let share = |p: u32| st.plates[p as usize].continental_frac;
+                        acc.oo[0][band_of(share(pv), &CONT_SHARE_BANDS)] += u64::from(half);
+                        acc.oo[1][band_of(share(under), &CONT_SHARE_BANDS)] += u64::from(half);
+                        let km = if coast_steps[v] == u32::MAX {
+                            f64::INFINITY
+                        } else {
+                            f64::from(coast_steps[v]) * spacing_km
+                        };
+                        acc.oo[2][band_of(km, &COAST_BANDS_KM)] += u64::from(half);
+                        let pair = pairs.get(&(under, pv)).copied().unwrap_or(PAIR_OTHER);
+                        acc.oo_pair[pair] += u64::from(half);
+                    }
                 }
                 if class == mix::OTHER && buf[..n].iter().any(|b| b.normal < 0.0) {
                     acc.other_converging += u64::from(half);
@@ -1103,7 +1228,6 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
             acc
         })
         .reduce(MixUnits::default, MixUnits::add);
-    let spacing_km = norm.km(norm.spacing_rad());
     let km = |u: u64| (u as f64 * 0.5 * spacing_km).round();
     let bands = |b: [[u64; BANDS]; 2]| b.map(|row| row.map(km));
     Mix {
@@ -1113,6 +1237,10 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
             normal: bands(units.normal),
             age: bands(units.age),
             other_converging: km(units.other_converging),
+            oo_over_cont: units.oo[0].map(km),
+            oo_under_cont: units.oo[1].map(km),
+            oo_coast: units.oo[2].map(km),
+            oo_pair: units.oo_pair.map(km),
         },
     }
 }

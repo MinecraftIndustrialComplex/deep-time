@@ -312,7 +312,11 @@ pub fn resolve(
         // Polarity reversal: continental crust arriving on the subducting side of an oceanic
         // overriding plate stops that subduction and starts the opposite one (Cortial: "an oceanic
         // plate always plunges beneath a continental plate"; without it a continent at a junction
-        // of three trenches is handed round them for ever).
+        // of three trenches is handed round them for ever). ledger: PLT-056. It judges the
+        // overriding side by its crust in the overlap, often an oceanic fringe in front of its
+        // continent, and fires about 17 times per 100 Myr against Crameri et al. (2020)'s 4 in
+        // about 105 Myr; judged by the crust the arc stands on instead (Stern 2004) the collisions
+        // reach 2.2 per 100 Myr but the land falls, so it stays (ledger: PLT-371).
         if let Some(&k) = index.get(&(lo, hi)) {
             let c = &state.contacts[k];
             let under_side = usize::from(c.under != lo);
@@ -481,6 +485,41 @@ pub(super) fn locked_against(
     locked(s, t_myr, env) && own.is_none_or(|t0| f64::from(s.orogeny_myr) < t0 - 1e-6)
 }
 
+/// Whether visible continental crust of sample `i`'s plate lies within `steps` lattice steps of it
+/// through that plate's visible samples (itself included): an arc behind a front there would stand
+/// on continental crust. The boundary mix measures the same distance (`dynamics`, PLT-370).
+/// Measurement only (the arc-front counters): the polarity reversal still judges the overriding
+/// side by the crust in the overlap, because judging it by this test raised the collisions and
+/// lost land (plates.md, "The plate geometry", 2026-10-21; ledger: PLT-371).
+fn continent_within(state: &PlateState, geo: &Geo, i: u32, steps: u32) -> bool {
+    let p = state.plate_of(i as usize);
+    let mut seen = vec![i];
+    let mut frontier = vec![i];
+    for depth in 0..=steps {
+        let mut next = Vec::new();
+        for &v in &frontier {
+            let s = &state.samples[v as usize];
+            if s.kind == CONTINENTAL && !s.is_hidden() {
+                return true;
+            }
+            if depth == steps {
+                continue;
+            }
+            for (u, _) in geo.edges(v) {
+                if !seen.contains(&u)
+                    && state.plate_of(u as usize) == p
+                    && !state.samples[u as usize].is_hidden()
+                {
+                    seen.push(u);
+                    next.push(u);
+                }
+            }
+        }
+        frontier = next;
+    }
+    false
+}
+
 /// A contact reverses when at least this fraction of its subducting side's crust in the overlap
 /// is continental (or freshly sutured) …
 const REVERSAL_UNDER: f64 = 0.5;
@@ -599,10 +638,13 @@ pub const ARC_CONTINENTAL_GLOBAL: &str = "plates/arc_continental_km3";
 pub const ARC_OCEANIC_GLOBAL: &str = "plates/arc_oceanic_km3";
 /// World global: the visible continental crust's volume after the last step, km³ (Earth-normalized).
 pub const CONTINENTAL_VOLUME_GLOBAL: &str = "plates/continental_volume_km3";
-/// World global: oceanic subduction fronts over the run, km × Myr, where the overriding crust at
-/// the front is continental (a continental arc; measurement: the arcs' rate per km of arc).
+/// World global: oceanic subduction fronts over the run, km × Myr, whose arc stands on continental
+/// crust: the overriding plate's visible continental crust lies within `arc_distance_km` of the
+/// front (a continental arc; measurement: the arcs' rate per km of arc). Until 2026-10-21 the
+/// crust of the front sample itself, often an oceanic fringe in front of the continent.
+/// ledger: PLT-370
 pub const ARC_FRONT_CONTINENTAL_GLOBAL: &str = "plates/arc_front_continental_km_myr";
-/// … and where it is oceanic (an island arc), km × Myr.
+/// … and the rest, whose arc stands on ocean floor (an island arc), km × Myr.
 pub const ARC_FRONT_OCEANIC_GLOBAL: &str = "plates/arc_front_oceanic_km_myr";
 /// World globals: oceanic fronts over the run weighted by the arcs' convergence factor, km × Myr,
 /// with the full relative speed and with the convergence normal to the front ([`Pull`]).
@@ -899,6 +941,7 @@ pub fn fronts_finish(
     let mut front_len = vec![0.0; state.plates.len()];
     let (mut front_continental, mut front_oceanic) = (0.0_f64, 0.0_f64);
     let front_km = norm.km(norm.spacing_rad());
+    let arc_steps = (k.arc_distance_km / front_km).floor() as u32;
     for (v, b) in boundary.iter().enumerate() {
         let s = &mut state.samples[v];
         if b.divergent {
@@ -957,7 +1000,9 @@ pub fn fronts_finish(
             if su.kind != CONTINENTAL {
                 let under = state.contacts[c].under as usize;
                 front_len[under] += front_km;
-                if state.samples[v].kind == CONTINENTAL {
+                // Measurement only: by the crust the arc stands on, as the boundary mix counts it
+                // (ledger: PLT-370).
+                if continent_within(state, geo, v as u32, arc_steps) {
                     front_continental += front_km * env.dt_myr;
                 } else {
                     front_oceanic += front_km * env.dt_myr;
