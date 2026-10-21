@@ -25,7 +25,32 @@ fn accumulate_serial(d: &Dims, r: &Routing, weight: &[f32], area: &mut Vec<f64>)
     }
 }
 
-/// The serial `spl::solve` of P1-04.
+/// Each cell's place in its lake (`spl::lake_links`, HYD-110), by cell: 0 not a lake cell, 1 a
+/// lake cell draining into the same lake, 2 one draining out into the sea, a sink or another lake,
+/// 3 one draining over its spill (a land cell).
+fn lake_links_serial(r: &Routing, input: &SplInput<'_>) -> Vec<u8> {
+    let lake = |c: usize| input.kind[c] != SINK && input.filled[c] - input.h0[c] > LAKE_TOL_M;
+    let mut links = vec![0u8; input.kind.len()];
+    for &c in &r.stack {
+        let c = c as usize;
+        if !lake(c) {
+            continue;
+        }
+        let rc = r.rcv[c] as usize;
+        let inside = rc != c && input.kind[rc] != BASE;
+        links[c] = if inside && lake(rc) && (input.filled[c] - input.filled[rc]).abs() <= LAKE_TOL_M
+        {
+            1
+        } else if inside && input.kind[rc] == LAND && !lake(rc) {
+            3
+        } else {
+            2
+        };
+    }
+    links
+}
+
+/// The serial `spl::solve` of P1-04, with the lakes of HYD-110.
 fn solve_serial(
     d: &Dims,
     r: &Routing,
@@ -40,6 +65,8 @@ fn solve_serial(
     qin.iter_mut().for_each(|q| *q = 0.0);
     let mut report = SplReport::default();
     let kind = input.kind;
+    let links = lake_links_serial(r, input);
+    let mut share = vec![0.0f64; n];
     for it in 0..p.max_iter.max(1) {
         let mut change: f64 = 0.0;
         // Downstream first: every receiver is solved before its donors.
@@ -69,19 +96,32 @@ fn solve_serial(
             }
             change = change.max((h[c] - before).abs());
         }
-        // Upstream first: the fluxes of this solution; sinks keep all they get, lakes fill up to
-        // their level, and deposition is capped by the supply.
+        // Upstream first: the fluxes of this solution; sinks keep all they get, a lake keeps what
+        // reaches it up to its room, and deposition is capped by the supply.
         qin.iter_mut().for_each(|q| *q = 0.0);
+        let mut room = vec![0.0f64; n];
+        let mut upstream = vec![0.0f64; n];
+        let mut lake_in = vec![0.0f64; n];
+        let mut lake_room = vec![0.0f64; n];
         for &c in r.stack.iter().rev() {
             let c = c as usize;
             let h0 = input.h0[c];
+            if lake_room[c] > 0.0 {
+                let dep = (lake_in[c] * p.dt / a).min(lake_room[c]);
+                share[c] = dep / lake_room[c];
+                qin[c] = (qin[c] - dep * a / p.dt).max(0.0);
+            }
             let supply = qin[c] * p.dt / a;
             let out = if kind[c] == SINK {
                 h[c] = h0 + supply;
                 0.0
-            } else if input.filled[c] - h0 > LAKE_TOL_M {
-                let dep = supply.min(input.filled[c] - h0);
-                h[c] = h0 + dep;
+            } else if links[c] == 1 || links[c] == 3 {
+                room[c] = upstream[c] + (input.filled[c] - h0);
+                qin[c]
+            } else if links[c] == 2 {
+                let v = upstream[c] + (input.filled[c] - h0);
+                let dep = supply.min(v);
+                share[c] = if v > 0.0 { dep / v } else { 0.0 };
                 (qin[c] - dep * a / p.dt).max(0.0)
             } else {
                 let out = qin[c] + (h0 - h[c]) * a / p.dt;
@@ -95,6 +135,14 @@ fn solve_serial(
             let rc = r.rcv[c] as usize;
             if rc != c {
                 qin[rc] += out;
+                match links[c] {
+                    1 => upstream[rc] += room[c],
+                    3 => {
+                        lake_in[rc] += out;
+                        lake_room[rc] += room[c];
+                    }
+                    _ => {}
+                }
             }
         }
         report.iterations = it + 1;
@@ -108,11 +156,24 @@ fn solve_serial(
             break;
         }
     }
+    // Each lake settles what it kept over all of it.
+    for &c in &r.stack {
+        let c = c as usize;
+        let depth = input.filled[c] - input.h0[c];
+        match links[c] {
+            1 | 3 => {
+                share[c] = share[r.rcv[c] as usize];
+                h[c] = input.h0[c] + share[c] * depth;
+            }
+            2 => h[c] = input.h0[c] + share[c] * depth,
+            _ => {}
+        }
+    }
     debug_assert_eq!(h.len(), n);
     report
 }
 
-/// The serial `spl::families` of P1-04.
+/// The serial `spl::families` of P1-04, with the lakes of HYD-110.
 fn families_serial(
     d: &Dims,
     r: &Routing,
@@ -123,13 +184,31 @@ fn families_serial(
     mix: &mut Vec<[f64; FAMILIES]>,
 ) {
     let a = d.cell_area();
+    let n = d.cells();
     mix.clear();
-    mix.resize(d.cells(), [0.0; FAMILIES]);
+    mix.resize(n, [0.0; FAMILIES]);
+    let links = lake_links_serial(r, input);
+    let mut kept = vec![0.0f64; n];
+    let mut upstream = vec![0.0f64; n];
+    let mut spilled = vec![0.0f64; n];
     for &c in r.stack.iter().rev() {
         let c = c as usize;
-        let fin = mix[c];
-        let qin: f64 = fin.iter().sum();
-        let e = (input.h0[c] - h[c]) * a / dt;
+        let mut fin = mix[c];
+        let mut qin: f64 = fin.iter().sum();
+        if spilled[c] > 0.0 && qin > 0.0 {
+            let keep = ((qin - spilled[c]) / qin).clamp(0.0, 1.0);
+            fin.iter_mut().for_each(|x| *x *= keep);
+            qin = fin.iter().sum();
+        }
+        let ev = (input.h0[c] - h[c]) * a / dt;
+        let e = match links[c] {
+            1 | 3 => {
+                kept[c] = upstream[c] + (-ev).max(0.0);
+                0.0
+            }
+            2 => ev.min(0.0) - upstream[c],
+            _ => ev,
+        };
         let mut out = fin;
         if e > 0.0 {
             out[usize::from(fam[c]).min(FAMILIES - 1)] += e;
@@ -142,6 +221,18 @@ fn families_serial(
             for k in 0..FAMILIES {
                 mix[rc][k] += out[k];
             }
+            match links[c] {
+                1 => upstream[rc] += kept[c],
+                3 => spilled[rc] += kept[c],
+                _ => {}
+            }
+        }
+    }
+    // A lake's cells take the mix entering it at its exit (or its spill).
+    for &c in &r.stack {
+        let c = c as usize;
+        if links[c] == 1 || links[c] == 3 {
+            mix[c] = mix[r.rcv[c] as usize];
         }
     }
 }
