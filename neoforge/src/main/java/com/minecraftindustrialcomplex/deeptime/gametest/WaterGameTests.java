@@ -29,7 +29,9 @@ import java.util.List;
  * synthetic lake-test world ({@code deeptime synth --kind lake-test --size 1024}): a plain at y 100,
  * a round basin (floor 110, rim crest 125) and a closed channel, with {@code water_level} 120 inside
  * the rim. Its biome, {@code deeptime:test_bare}, has no carvers and no features, so only the
- * generator's passes touch the basin.
+ * generator's passes touch the basin. West of it lie two closed bowls below sea level
+ * ({@code notes.lake.closed_bowls}, the {@code closed_basin} layer; HYD-100), one dry and one with
+ * a lake at y 50: {@link #closedBowlsHoldNoSea} checks that no sea stands in either.
  */
 @GameTestHolder(GameTestSupport.NS)
 @PrefixGameTestTemplate(false)
@@ -148,6 +150,116 @@ public final class WaterGameTests {
             helper.assertTrue(centre[2] == wantTop, "water top at the lake centre is y " + centre[2] + ", want " + wantTop);
             helper.succeed();
         });
+    }
+
+    /**
+     * No sea in a closed basin below sea level (HYD-100), on the lake-test world's two closed bowls, without the
+     * aquifer ({@code test_lake}, {@code planet_nocaves}: the fluid picker alone) and with it ({@code test_lake_caves},
+     * {@code planet}: noise caves and vanilla's aquifer). In every column of a bowl the first block under the open air
+     * is not water in the dry bowl (with caves: not water from {@value #SEA_BAND_ABOVE_FLOOR} blocks over its floor up,
+     * since a cave mouth may hold the aquifer's own water) and no higher than the lake's top block in the other; on
+     * each bowl's floor no water
+     * stands from {@value #SEA_BAND_ABOVE_FLOOR} blocks over the dry floor (over the lake's top) up to the sea's top
+     * block, where the sea would stand (the aquifer's own water tables lie under the lowest ground around); the lake's
+     * water top at its centre is its level's.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
+    public static void closedBowlsHoldNoSea(GameTestHelper helper) {
+        closedBowls(helper, GameTestSupport.TEST_LAKE);
+    }
+
+    /** {@link #closedBowlsHoldNoSea} with noise caves and vanilla's aquifer (the full router). */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
+    public static void closedBowlsHoldNoSeaWithTheAquifer(GameTestHelper helper) {
+        closedBowls(helper, GameTestSupport.TEST_LAKE_CAVES);
+    }
+
+    /** Blocks over a dry bowl's floor from which no water may stand (the sea's band, see {@link #closedBowlsHoldNoSea}). */
+    static final int SEA_BAND_ABOVE_FLOOR = 10;
+
+    static void closedBowls(GameTestHelper helper, net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> key) {
+        ServerLevel level = helper.getLevel().getServer().getLevel(key);
+        if (level == null) {
+            helper.fail("level " + key.location() + " does not exist");
+            return;
+        }
+        if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g && g.terrain() instanceof WorldDataTerrain t)) {
+            helper.fail(key.location() + " is not generating from world data");
+            return;
+        }
+        WorldData wd = t.data();
+        JsonObject lake = wd.manifest().notes().getAsJsonObject("lake");
+        if (lake == null || !lake.has("closed_bowls")) {
+            helper.fail("world data " + wd.folder() + " has no notes.lake.closed_bowls (an old lake-test world?)");
+            return;
+        }
+        helper.assertTrue(wd.has(WorldData.CLOSED_BASIN), "the lake-test world has no closed_basin layer");
+        int seaTop = g.getSeaLevel() - 1;
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        StringBuilder detail = new StringBuilder();
+        int bowls = 0;
+        boolean caves = key != GameTestSupport.TEST_LAKE;
+        for (var e : lake.getAsJsonArray("closed_bowls")) {
+            JsonObject b = e.getAsJsonObject();
+            int cx = (int) Math.round(b.getAsJsonArray("centre_block").get(0).getAsDouble());
+            int cz = (int) Math.round(b.getAsJsonArray("centre_block").get(1).getAsDouble());
+            double floorY = b.get("floor_y").getAsDouble();
+            double floorR = b.get("floor_radius").getAsDouble();
+            double outer = floorR + b.get("slope_blocks").getAsDouble() - 2;
+            boolean wet = b.has("lake_level_y") && !b.get("lake_level_y").isJsonNull();
+            int lakeTop = wet ? WaterLevels.topWaterBlock(b.get("lake_level_y").getAsDouble()) : Integer.MIN_VALUE;
+            int bandFrom = wet ? lakeTop + 1 : (int) Math.ceil(floorY) - 1 + SEA_BAND_ABOVE_FLOOR;
+            helper.assertTrue(wd.closedBasin(cx, cz), "bowl at (" + cx + ", " + cz + ") is not in the closed_basin layer");
+            int columns = 0, surfaceWater = 0, overLake = 0, seaBand = 0, r = (int) Math.ceil(outer);
+            for (int x = cx - r; x <= cx + r; x++)
+                for (int z = cz - r; z <= cz + r; z++) {
+                    double d = Math.hypot(x - cx, z - cz);
+                    if (d > outer)
+                        continue;
+                    columns++;
+                    LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
+                    int y = (int) Math.ceil(lake.get("plain_y").getAsDouble()) + 8;
+                    while (y > level.getMinBuildHeight() && chunk.getBlockState(pos.set(x, y, z)).isAir())
+                        y--;
+                    if (chunk.getBlockState(pos.set(x, y, z)).getFluidState().is(FluidTags.WATER)) {
+                        boolean bad = wet ? y > lakeTop : !caves || y >= bandFrom;
+                        if (bad && wet)
+                            overLake++;
+                        else if (bad)
+                            surfaceWater++;
+                        if (bad && detail.length() < 600)
+                            detail.append(String.format(" open water at (%d,%d,%d);", x, y, z));
+                    }
+                    if (d <= floorR)
+                        for (int yy = bandFrom; yy <= seaTop; yy++)
+                            if (chunk.getBlockState(pos.set(x, yy, z)).getFluidState().is(FluidTags.WATER)) {
+                                seaBand++;
+                                if (detail.length() < 600)
+                                    detail.append(String.format(" sea band water at (%d,%d,%d);", x, yy, z));
+                            }
+                }
+            int[] centre = centreColumn(level, b);
+            DeepTime.LOGGER.info("[gametest] closedBowlsHoldNoSea level={} bowl=({}, {}) floor_y={} lake_top_block={} columns={} "
+                            + "surfaceWater={} overLake={} seaBand={} (y {} to {}) centre water_top_y={} floor_y={}",
+                    key.location(), cx, cz, floorY, wet ? lakeTop : "-", columns, surfaceWater, overLake, seaBand, bandFrom, seaTop,
+                    centre[2] == Integer.MIN_VALUE ? "-" : centre[2], centre[3]);
+            helper.assertTrue(columns > 0, "no columns in the bowl at (" + cx + ", " + cz + ")");
+            helper.assertTrue(surfaceWater == 0, surfaceWater + " columns of the dry bowl at (" + cx + ", " + cz
+                    + ") hold open water (the sea would stand to y " + seaTop + "):" + detail);
+            helper.assertTrue(overLake == 0, overLake + " columns of the lake bowl at (" + cx + ", " + cz
+                    + ") hold water above the lake's top block y " + lakeTop + ":" + detail);
+            helper.assertTrue(seaBand == 0, seaBand + " water blocks on the floor of the bowl at (" + cx + ", " + cz
+                    + ") between y " + bandFrom + " and the sea's top block " + seaTop + ":" + detail);
+            if (wet)
+                helper.assertTrue(centre[2] == lakeTop + 1, "the lake below sea level at (" + cx + ", " + cz
+                        + ") has its water top at y " + centre[2] + ", want " + (lakeTop + 1));
+            else
+                helper.assertTrue(centre[2] == Integer.MIN_VALUE || (caves && centre[2] <= bandFrom),
+                        "the dry bowl's centre holds water to y " + centre[2]);
+            bowls++;
+        }
+        helper.assertTrue(bowls == 2, bowls + " closed bowls in notes.lake, want 2");
+        helper.succeed();
     }
 
     static Box box(JsonObject lake) {

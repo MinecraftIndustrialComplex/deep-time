@@ -12,7 +12,10 @@ import java.util.function.DoubleBinaryOperator;
  * ({@code screen.model.ReviewModel.elevationMap}): the terrain height H = E + A·N
  * ({@code WorldData.height}) through the shared {@code elevation} colour ramp
  * ({@code deeptime/ramps.json}, the ramp the keyframes, the viewer and the Create World screen use),
- * and lakes above sea level through the {@code water} ramp of their surface. Only the sampling grid
+ * and lakes above sea level through the {@code water} ramp of their surface. A closed basin below
+ * sea level (the {@code closed_basin} layer, HYD-100) holds no sea: its lakes are drawn by their
+ * surface like any lake, and its dry ground as the lowest land, the ramp's colour at sea level.
+ * Only the sampling grid
  * differs: block space, one sample at each pixel's centre, rather than the review map's
  * latitude/longitude picture.
  */
@@ -30,6 +33,15 @@ public final class BaseImage {
      */
     public static int[] render(MapFrame f, WorldProjection p, DoubleBinaryOperator height, DoubleBinaryOperator water,
                                double seaLevel, Ramps.Ramp land, Ramps.Ramp lake) {
+        return render(f, p, height, water, (x, z) -> 0.0, seaLevel, land, lake);
+    }
+
+    /**
+     * As {@link #render(MapFrame, WorldProjection, DoubleBinaryOperator, DoubleBinaryOperator, double, Ramps.Ramp,
+     * Ramps.Ramp)}, with {@code closed} 1 at block (x, z) where no sea stands on ground below sea level (HYD-100).
+     */
+    public static int[] render(MapFrame f, WorldProjection p, DoubleBinaryOperator height, DoubleBinaryOperator water,
+                               DoubleBinaryOperator closed, double seaLevel, Ramps.Ramp land, Ramps.Ramp lake) {
         int[] px = new int[f.w() * f.h()];
         for (int j = 0; j < f.h(); j++) {
             double z = f.blockZ(j + 0.5);
@@ -37,7 +49,13 @@ public final class BaseImage {
                 double[] c = p.canonical(f.blockX(i + 0.5), z);
                 double h = height.applyAsDouble(c[0], c[1]);
                 double wl = water.applyAsDouble(c[0], c[1]);
-                px[j * f.w() + i] = !Double.isNaN(wl) && wl > h && wl > seaLevel + 0.5 ? lake.abgr(wl) : land.abgr(h);
+                boolean lakeHere = !Double.isNaN(wl) && wl > h;
+                int colour;
+                if (h < seaLevel && closed.applyAsDouble(c[0], c[1]) == 1.0)
+                    colour = lakeHere ? lake.abgr(wl) : land.abgr(seaLevel);
+                else
+                    colour = lakeHere && wl > seaLevel + 0.5 ? lake.abgr(wl) : land.abgr(h);
+                px[j * f.w() + i] = colour;
             }
         }
         return px;

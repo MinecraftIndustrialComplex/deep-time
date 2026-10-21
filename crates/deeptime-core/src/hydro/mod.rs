@@ -30,9 +30,13 @@
 //!      lake rises over becomes part of it.
 //!    - *It is too thin.* A balance lake under the lake thresholds is a **playa** (a salt flat:
 //!      water that reaches it evaporates off the floor); with no inflow at all the basin is dry.
-//!    - *It lies below sea level.* Ground a block or more below sea level holds the sea's water
-//!      in the game whatever the climate (the column rule's sea), so a terminal basin's lake
-//!      stands at sea level at least: a basin below sea level is never dry.
+//!    - *It lies below sea level.* A basin whose spill level is at most sea level is open to the
+//!      sea: the sea reaches it at its own level ([`sea_reached`]), so a terminal one stands at
+//!      sea level at least, as the column rule's sea does in the game. A closed basin, behind a
+//!      rim above sea level, takes its balance like any other (HYD-100, 2026-10-20; before it
+//!      every basin below sea level was raised to sea level, HYD-052): a lake whose surface may
+//!      stand below sea level, a playa, or dry ground. The `closed_basin` layer tells the game where
+//!      the sea does not stand ([`closed_basin_layer`]).
 //!
 //!    An upstream lake that does not spill passes nothing on, so a chain of lakes is solved in
 //!    order. `lake_balance` false keeps every lake full, as before.
@@ -60,6 +64,7 @@ pub mod network;
 #[cfg(test)]
 mod tests;
 
+use deeptime_format::GridDesc;
 use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
@@ -70,6 +75,236 @@ pub const OPEN_SEA_KM2: f64 = 5_000.0;
 
 /// The largest hydrology grid, cells; a larger L3 is averaged down by 2 in each direction.
 pub const MAX_CELLS: usize = 40_000_000;
+
+/// How far the `closed_basin` layer carries past a closed basin's low ground, blocks (ledger:
+/// HYD-102, game-choice: agent, 2026-10-20). The game's ground is H = E + A·N, bilinear over 4-block
+/// noise cells, so beside low ground it can dip under sea level where the bake's E stands above
+/// it: such a column takes the side of the nearest ground at or below sea level within this
+/// distance (two noise cells), the open sea's on a tie.
+pub const CLOSED_REACH_BLOCKS: f64 = 8.0;
+
+/// The 8 neighbours of cell `c` on a `w` × `h` grid that wraps in x (rows do not).
+#[inline]
+fn neighbour8(w: usize, h: usize, c: usize, k: usize) -> Option<usize> {
+    const DX: [i64; 8] = [1, -1, 0, 0, 1, -1, 1, -1];
+    const DZ: [i64; 8] = [0, 0, 1, -1, 1, 1, -1, -1];
+    let (i, j) = ((c % w) as i64, (c / w) as i64);
+    let nj = j + DZ[k];
+    if nj < 0 || nj >= h as i64 {
+        return None;
+    }
+    Some(nj as usize * w + (i + DX[k]).rem_euclid(w as i64) as usize)
+}
+
+/// The open sea of a `w` × `h` grid (x wraps): every cell where `deep` holds in an 8-connected body
+/// of at least `min_cells` (the hydrology's own rule, [`OPEN_SEA_KM2`]).
+pub fn open_sea_mask(
+    w: usize,
+    h: usize,
+    deep: impl Fn(usize) -> bool,
+    min_cells: usize,
+) -> Vec<bool> {
+    let n = w * h;
+    let mut done = vec![false; n];
+    let mut open = vec![false; n];
+    let mut members: Vec<usize> = Vec::new();
+    let mut stack: Vec<usize> = Vec::new();
+    for c0 in 0..n {
+        if done[c0] || !deep(c0) {
+            continue;
+        }
+        members.clear();
+        stack.push(c0);
+        done[c0] = true;
+        while let Some(c) = stack.pop() {
+            members.push(c);
+            for k in 0..8 {
+                if let Some(nb) = neighbour8(w, h, c, k)
+                    && !done[nb]
+                    && deep(nb)
+                {
+                    done[nb] = true;
+                    stack.push(nb);
+                }
+            }
+        }
+        if members.len() >= min_cells {
+            for &c in &members {
+                open[c] = true;
+            }
+        }
+    }
+    open
+}
+
+/// The ground the open sea reaches at its own level (ledger: HYD-100): the `open` cells and every
+/// cell joined to them, 8-connected (x wraps), through cells where `low` holds (ground at or below
+/// sea level). It is the ground whose spill level towards the sea is at most sea level; a closed
+/// basin's floor below sea level, behind a rim above it, is not reached, and no sea stands there.
+pub fn sea_reached(w: usize, h: usize, open: &[bool], low: impl Fn(usize) -> bool) -> Vec<bool> {
+    let n = w * h;
+    let mut reached = open.to_vec();
+    let mut stack: Vec<usize> = (0..n).filter(|&c| open[c]).collect();
+    while let Some(c) = stack.pop() {
+        for k in 0..8 {
+            if let Some(nb) = neighbour8(w, h, c, k)
+                && !reached[nb]
+                && low(nb)
+            {
+                reached[nb] = true;
+                stack.push(nb);
+            }
+        }
+    }
+    reached
+}
+
+/// The `closed_basin` layer (ledger: HYD-100, HYD-102): 1 where the game's column rule puts no sea
+/// (ground under sea level that the open sea does not reach, and ground within `radius` cells
+/// nearer to it than to the open sea's), 0 elsewhere, where the old rule holds (the sea stands on
+/// any ground under sea level). `low` is ground at or below sea level, `reached` what
+/// [`sea_reached`] gave. A cell takes the side of the nearest low cell (8-connected steps), the
+/// open sea's on a tie; a cell with none within `radius` gets 0.
+pub fn closed_basin_layer(
+    w: usize,
+    h: usize,
+    low: impl Fn(usize) -> bool,
+    reached: &[bool],
+    radius: usize,
+) -> Vec<u8> {
+    use std::collections::VecDeque;
+    const OPEN: u8 = 1;
+    const CLOSED: u8 = 2;
+    let n = w * h;
+    let mut side = vec![0u8; n];
+    for c in 0..n {
+        if low(c) {
+            side[c] = if reached[c] { OPEN } else { CLOSED };
+        }
+    }
+    // From the edges of the low ground only, the sea's first: a breadth-first search keeps that
+    // order within each distance, so a tie goes to the sea.
+    let mut queue: VecDeque<(u32, u16)> = VecDeque::new();
+    for want in [OPEN, CLOSED] {
+        for c in 0..n {
+            if side[c] == want
+                && (0..8).any(|k| neighbour8(w, h, c, k).is_some_and(|nb| side[nb] == 0))
+            {
+                queue.push_back((c as u32, 0));
+            }
+        }
+    }
+    while let Some((c, d)) = queue.pop_front() {
+        if usize::from(d) >= radius {
+            continue;
+        }
+        let s = side[c as usize];
+        for k in 0..8 {
+            if let Some(nb) = neighbour8(w, h, c as usize, k)
+                && side[nb] == 0
+            {
+                side[nb] = s;
+                queue.push_back((nb as u32, d + 1));
+            }
+        }
+    }
+    side.iter().map(|&s| u8::from(s == CLOSED)).collect()
+}
+
+/// The `closed_basin` layer on the world's own grid (ledger: HYD-105). The bake's layer comes from
+/// the hydrology's grid (the simulation's Lambert grid) by the nearest cell, while the world's
+/// ground is a footprint mean of the Lambert ground: a narrow sill that held a pocket of sea floor
+/// apart from the ocean there can be gone here, and the game would leave the pocket a dry hole
+/// beside the sea. Here a low cell (`low`: ground at or below sea level) keeps the bake's closed
+/// flag only where the world's own open sea does not reach it. The open sea is every 8-connected
+/// body of `deep` cells (x wraps) holding at least `min_open` cells the bake left open (`flag` 0),
+/// so a closed basin's few edge cells that took an open neighbour's flag never open it, and the
+/// ocean opens every pocket it joins. The halo is drawn again on this grid ([`closed_basin_layer`],
+/// `radius` cells). Returns the layer and the number of low cells whose closed flag was cleared.
+pub fn closed_basin_on_world(
+    w: usize,
+    h: usize,
+    low: impl Fn(usize) -> bool,
+    deep: impl Fn(usize) -> bool,
+    flag: &[u8],
+    min_open: usize,
+    radius: usize,
+) -> (Vec<u8>, u64) {
+    let n = w * h;
+    assert_eq!(
+        flag.len(),
+        n,
+        "the closed_basin flags do not match the grid"
+    );
+    let mut done = vec![false; n];
+    let mut open = vec![false; n];
+    let mut members: Vec<usize> = Vec::new();
+    let mut stack: Vec<usize> = Vec::new();
+    for c0 in 0..n {
+        if done[c0] || !deep(c0) {
+            continue;
+        }
+        members.clear();
+        stack.push(c0);
+        done[c0] = true;
+        let mut open_cells = 0usize;
+        while let Some(c) = stack.pop() {
+            members.push(c);
+            open_cells += usize::from(flag[c] == 0);
+            for k in 0..8 {
+                if let Some(nb) = neighbour8(w, h, c, k)
+                    && !done[nb]
+                    && deep(nb)
+                {
+                    done[nb] = true;
+                    stack.push(nb);
+                }
+            }
+        }
+        if open_cells >= min_open {
+            for &c in &members {
+                open[c] = true;
+            }
+        }
+    }
+    drop(done);
+    let reached = sea_reached(w, h, &open, &low);
+    drop(open);
+    let mut cleared = 0u64;
+    // The side each low cell takes: closed only where the bake said so and this ground's sea does
+    // not reach it.
+    let not_closed: Vec<bool> = (0..n)
+        .map(|c| {
+            let closed = flag[c] == 1 && !reached[c];
+            cleared += u64::from(low(c) && flag[c] == 1 && reached[c]);
+            !closed
+        })
+        .collect();
+    drop(reached);
+    (closed_basin_layer(w, h, &low, &not_closed, radius), cleared)
+}
+
+/// The closed basins below sea level of an elevation field in metres (ledger: HYD-100): every
+/// cell at or below `sea_m` that the open sea does not reach, by the hydrology's rules
+/// ([`open_sea_mask`]: ground a block or more under sea level in a body of [`OPEN_SEA_KM2`];
+/// [`sea_reached`]). The biome bake reads it on L2, where the water bake's own (on L3) is not
+/// made yet: such ground is land to the biomes, as it is dry ground, a playa or a lake in the game.
+pub fn closed_below_sea(
+    grid: &GridDesc,
+    elevation_m: &[f32],
+    sea_m: f64,
+    m_per_block_v: f64,
+    m_per_block_h: f64,
+) -> Vec<bool> {
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    let low = |c: usize| f64::from(elevation_m[c]) <= sea_m;
+    let deep = |c: usize| f64::from(elevation_m[c]) <= sea_m - m_per_block_v;
+    let cell_km = f64::from(grid.r) * m_per_block_h / 1000.0;
+    let min_cells = ((OPEN_SEA_KM2 / (cell_km * cell_km)).ceil() as usize).max(1);
+    let open = open_sea_mask(w, h, deep, min_cells);
+    let reached = sea_reached(w, h, &open, low);
+    (0..w * h).map(|c| low(c) && !reached[c]).collect()
+}
 
 /// Potential evapotranspiration per degree of mean temperature above freezing, mm/yr/°C (the
 /// surface stage's stand-in, `surface::climate`).

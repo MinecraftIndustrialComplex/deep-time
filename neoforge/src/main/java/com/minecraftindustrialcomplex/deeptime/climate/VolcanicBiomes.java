@@ -399,8 +399,9 @@ public final class VolcanicBiomes {
             return height;
         }
 
+        /** At or above sea level, or in a closed basin below it (no sea there, HYD-100; ledger: HYD-104). */
         boolean land() {
-            return height() >= level.seaLevel();
+            return height() >= level.seaLevel() || level.terrain().closedBasin(x, z);
         }
 
         /**
@@ -415,7 +416,7 @@ public final class VolcanicBiomes {
             int sea = level.seaLevel();
             for (int dz = -2; dz <= 1; dz += 3)
                 for (int dx = -2; dx <= 1; dx += 3)
-                    if (terrain.height(x + dx, z + dz) >= sea)
+                    if (terrain.height(x + dx, z + dz) >= sea || terrain.closedBasin(x + dx, z + dz))
                         return true;
             return false;
         }

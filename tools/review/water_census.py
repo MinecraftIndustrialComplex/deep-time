@@ -19,7 +19,12 @@ and shares are pixel counts.
 With --bake it also reads the bake's own water (what the game places): `notes.bake.water.stats`
 of manifest.json, the `water_level` and `elevation` rasters (L3), the land ice (`climate/ice_cover`)
 and `rivers/rivers.dtrv` (each segment's length times its channel width, `2 hw`), so the
-in-game lake share, largest lake and river share sit beside the map's.
+in-game lake share, largest lake and river share sit beside the map's. It also finds the closed
+ground below sea level (HYD-100) on the bake's grid by the hydrology's own rule
+(`hydro::closed_below_sea`), so bakes from before format 0.6 (which flooded it to sea level,
+HYD-052) and after can be compared: its share of the land, and how much of it is lake, playa
+and dry ground (`below_sea`; `stats.below_sea` of a 0.6 bake beside it), and the playas and the
+land as shares.
 
     python3 tools/review/water_census.py --world <world-data> [--bake] [--every N] [--json out.json]
 
@@ -84,6 +89,92 @@ def is_land_shade(img: np.ndarray) -> np.ndarray:
     for c in (1, 2):
         ok &= np.abs(img[..., c].astype(np.float32) - LAND[c] * f) <= 1.5
     return ok
+
+
+def label_wrap(mask: np.ndarray) -> np.ndarray:
+    """8-connected components of `mask`, joined across the east-west seam: a label per cell (0
+    off the mask), equal for cells of one component."""
+    lab, nlab = ndimage.label(mask, structure=np.ones((3, 3), bool))
+    parent = np.arange(nlab + 1)
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    h = mask.shape[0]
+    left, right = lab[:, 0], lab[:, -1]
+    for y in np.nonzero(left)[0]:
+        for dy in (-1, 0, 1):
+            yy = y + dy
+            if 0 <= yy < h and right[yy]:
+                a, b = find(int(left[y])), find(int(right[yy]))
+                if a != b:
+                    parent[a] = b
+    roots = np.array([find(k) for k in range(nlab + 1)])
+    return roots[lab]
+
+
+def below_sea(el_blocks: np.ndarray, wet: np.ndarray, salt: np.ndarray | None, sea_y: float,
+              cell_km2: float, land_km2: float, flag: np.ndarray | None = None) -> dict:
+    """Closed ground below sea level by the hydrology's rule (`hydro::closed_below_sea`, HYD-100):
+    the open sea is every cell a block or more under sea level in an 8-connected body (x wraps)
+    of at least 5,000 km2; a cell at or under sea level is reached when its 8-connected body of
+    such cells holds open sea; closed is low and not reached. Shares are of the bake's land
+    (`stats.land_km2`, the hydrology's non-sea cells, closed ground included). The `deep_*` keys
+    count only closed ground a block or more under sea level, where the column rule would stand
+    the sea (the bake's own `stats.below_sea` counts the same ground). With the baked `closed_basin`
+    layer (`flag`, BAK-055) the `game_*` keys count the ground a block or more under sea level that the
+    game keeps the sea off (the layer, not this rule), `sea_on_closed_km2` the ground this rule calls
+    closed where the layer is 0 (the game stands the sea there) and `flag_reached_km2` the low ground
+    the layer flags that this rule's sea reaches (a dry hole beside the sea; HYD-105)."""
+    low = el_blocks <= sea_y
+    deep = el_blocks <= sea_y - 1.0
+    dl = label_wrap(deep)
+    sizes = np.bincount(dl.ravel())
+    sizes[0] = 0
+    min_cells = int(np.ceil(5000.0 / cell_km2))
+    open_ = sizes[dl] >= min_cells
+    open_ &= dl > 0
+    ll = label_wrap(low)
+    hit = np.zeros(int(ll.max()) + 1, bool)
+    hit[np.unique(ll[open_])] = True
+    hit[0] = False
+    reached = hit[ll]
+    closed = low & ~reached
+    lake = closed & wet
+    playa = closed & salt if salt is not None else np.zeros_like(closed)
+    dry = closed & ~lake & ~playa
+    km2 = lambda m: float(m.sum()) * cell_km2  # noqa: E731
+    share = lambda m: km2(m) / land_km2 if land_km2 else None  # noqa: E731
+    game = {}
+    if flag is not None:
+        fl = flag > 0
+        game = {
+            "game_deep_closed_share_of_land": share(fl & deep),
+            "game_deep_lake_share_of_land": share(fl & deep & wet),
+            "game_deep_playa_km2": km2(fl & deep & ~wet & salt) if salt is not None else 0.0,
+            "game_deep_dry_share_of_land": share(fl & deep & ~wet & (~salt if salt is not None else True)),
+            "sea_on_closed_km2": km2(closed & deep & ~fl),
+            "flag_reached_km2": km2(fl & reached),
+        }
+    return game | {
+        "open_low_km2": km2(reached & ~open_),
+        "closed_km2": km2(closed),
+        "closed_share_of_land": share(closed),
+        "lake_km2": km2(lake),
+        "lake_share_of_land": share(lake),
+        "playa_km2": km2(playa),
+        "dry_km2": km2(dry),
+        "dry_share_of_land": share(dry),
+        "lake_cells_below_sea_level": int((wet & low).sum()),
+        "deep_closed_km2": km2(closed & deep),
+        "deep_closed_share_of_land": share(closed & deep),
+        "deep_lake_share_of_land": share(lake & deep),
+        "deep_playa_km2": km2(playa & deep),
+        "deep_dry_share_of_land": share(dry & deep),
+    }
 
 
 def largest_component(mask: np.ndarray) -> int:
@@ -329,6 +420,24 @@ def bake_stats(world: Path) -> dict:
         out["raster_lake_cells"] = int((wet & land).sum())
         out["raster_lake_share_of_land"] = int((wet & land).sum()) / max(int(land.sum()), 1)
         del sea_raw
+        out["playa_share_of_land"] = st.get("playa_km2", 0.0) / st["land_km2"]
+        out["land_share_of_planet"] = st["land_km2"] / planet_km2
+        if el.shape == wl.shape:
+            g = wdesc["grid"]
+            cell_km2 = (g["r"] * m_h / 1000.0) ** 2
+            salt = None
+            pp = world / "rasters" / "playa.dtr"
+            if pp.exists():
+                pl, _ = read_dtr(pp)
+                salt = pl > 0
+            flag = None
+            fp = world / "rasters" / "closed_basin.dtr"
+            if fp.exists():
+                fb, _ = read_dtr(fp)
+                flag = fb if fb.shape == el.shape else None
+            out["below_sea"] = below_sea(e_blocks, wet, salt, sea_y, cell_km2, st["land_km2"], flag)
+        if "below_sea" in st:
+            out["below_sea_stats"] = st["below_sea"]
     except (FileNotFoundError, KeyError) as e:
         out["raster_error"] = str(e)
     for name in ("climate/ice_cover", "rasters/climate/ice_cover.dtr"):
@@ -376,7 +485,7 @@ def main() -> int:
                 "max": float(v.max()), "n": int(len(v))}
 
     plate = [r for r in rows if r["stage"].startswith("plates")]
-    keys = ["lake_share_of_land", "lake_share_of_ice_free_land", "largest_lake_share_of_planet",
+    keys = ["lake_share_of_land", "lake_share_of_ice_free_land", "playa_share_of_land", "largest_lake_share_of_planet",
             "river_share_of_land", "river_ink_share_of_land", "river_share_of_ice_free_land", "ice_share_of_land",
             "land_share_of_planet", "coast_p50_km"]
     summ = {"all_plate_frames": {k: summary(k, plate) for k in keys},

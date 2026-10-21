@@ -1,0 +1,9 @@
+{
+  "type": "deeptime:planet_overworld",
+  "generator": {
+    "type": "deeptime:geologic",
+    "biome_source": {"type": "minecraft:fixed", "biome": "deeptime:test_bare"},
+    "settings": "deeptime:planet",
+    "world_data": {"folder": "deeptime-lake", "circumference_blocks": 1024}
+  }
+}

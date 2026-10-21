@@ -55,7 +55,8 @@
 //!   (`climate/ice_thickness_m`, gone from 60 m of it) none show, as the ice is drawn white over
 //!   the ground.
 //! - **As a layer** ([`WaterView::render`]): a quiet base (land in a pale neutral with a soft hill
-//!   shade, the sea in slate) with the lakes, playas and rivers on it. Lakes, playas and a river
+//!   shade, the sea in slate; a closed basin below sea level, which the sea does not reach, is
+//!   land: HYD-100) with the lakes, playas and rivers on it. Lakes, playas and a river
 //!   pixel at least half covered are hard-edged, so the workbench can read the colour back under
 //!   the pointer; a river under half a pixel is blended at its coverage over the base (a faint
 //!   thread the pointer does not read). A pixel on the ramp is "river (~N m³/s)", one of
@@ -189,6 +190,8 @@ pub struct WaterView {
     lake: Vec<f32>,
     frozen: Vec<f32>,
     playa: Vec<f32>,
+    /// Coverage of closed basins below sea level, 0–1 (HYD-100): drawn as land, not sea.
+    closed: Vec<f32>,
     /// How much of each pixel's water the land ice hides on the satellite view, 0–1: the
     /// glacier ice (`climate/ice_thickness_m`) is drawn white over rivers and lakes, so under
     /// [`Look::ice_full_m`] of it none show. The `rivers` layer shows the terrain's water as it is.
@@ -326,6 +329,7 @@ impl WaterView {
             lake: vec![0.0; w * h],
             frozen: vec![0.0; w * h],
             playa: vec![0.0; w * h],
+            closed: vec![0.0; w * h],
             ice,
             info: Info {
                 source: Source::Derived,
@@ -540,7 +544,8 @@ impl WaterView {
             } else if self.river[k] >= 0.5 && self.q[k] > 0.0 {
                 Self::river_rgb(ramp, self.q[k])
             } else {
-                let base = if z < 0.0 {
+                // A closed basin below sea level is land (HYD-100; ledger: HYD-104).
+                let base = if z < 0.0 && self.closed[k] < 0.5 {
                     SEA
                 } else {
                     let f = (1.0 + look.relief * (shade - 1.0)).clamp(0.6, 1.2);
@@ -608,6 +613,12 @@ fn derive_with_rivers(
     out.lake = lake_cover(&grid, &|c| net.kind[c] == kind::LAKE && deep(c), size_px);
     out.frozen = lake_cover(&grid, &|c| net.kind[c] == kind::FROZEN && deep(c), size_px);
     out.playa = lake_cover(&grid, &|c| net.kind[c] == kind::PLAYA, size_px);
+    // Ground below sea level that the sea does not reach (HYD-100): land on the map.
+    out.closed = lake_cover(
+        &grid,
+        &|c| net.closed_basin[c] == 1 && i32::from(elev[c]) <= sea_raw,
+        size_px,
+    );
     let look = Look::default();
     out.draw_rivers(&net.rivers, view, &look);
     out.finish(&net.rivers, Source::Derived, started);
@@ -649,6 +660,7 @@ pub fn from_bake(
         // The bake stores no playas (they hold no water): the frame's own.
         if let Some(derived) = derive(world, view, size) {
             out.playa = derived.playa;
+            out.closed = derived.closed;
             for (p, (&a, &b)) in out.playa.iter_mut().zip(out.lake.iter().zip(&out.frozen)) {
                 *p = p.min(1.0 - a - b).max(0.0);
             }
