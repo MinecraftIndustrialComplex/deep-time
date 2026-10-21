@@ -1572,7 +1572,7 @@ mod tests {
         sites: &mut Vec<Site>,
         bodies: &mut Vec<Body>,
         guaranteed: &mut BTreeMap<EventId, String>,
-        seq: &mut u32,
+        seq: &mut u64,
     ) -> (TopUp, Vec<Event>) {
         let in_stratum = BTreeMap::new();
         let mut d = Deposits {
@@ -1619,7 +1619,11 @@ mod tests {
         let mut seq = 100;
         let (rec, events) = run_top_up(&world, &mut sites, &mut bodies, &mut guaranteed, &mut seq);
         // One counted, one left out, and the region it alone covered is now short for the sea.
-        assert_eq!((rec.counted, rec.sub_sea, rec.short_by_sea), (1, 1, 1), "{rec:?}");
+        assert_eq!(
+            (rec.counted, rec.sub_sea, rec.short_by_sea),
+            (1, 1, 1),
+            "{rec:?}"
+        );
         assert_eq!(rec.short, 0, "{rec:?}");
         assert_eq!(events.len(), rec.added);
         let copies = &sites[2..];
@@ -1629,20 +1633,36 @@ mod tests {
                 .filter(|s| regions.index(f64::from(s.center[0]), f64::from(s.center[2])) == r)
                 .count()
         };
-        assert_eq!(in_region(wet_region), 1, "the sea source's region gets one copy");
-        assert_eq!(in_region(dry_region), 0, "a region with a dry source gets none");
+        assert_eq!(
+            in_region(wet_region),
+            1,
+            "the sea source's region gets one copy"
+        );
+        assert_eq!(
+            in_region(dry_region),
+            0,
+            "a region with a dry source gets none"
+        );
         for s in copies {
             let (x, z) = (i64::from(s.center[0]), i64::from(s.center[2]));
             assert!(world.dry(x, z) && !world.rock_top(x, z).1, "{x} {z}");
             let mine: Vec<&Body> = bodies.iter().filter(|b| b.site == Some(s.id)).collect();
-            assert_eq!(ore_top_in_column(&mine, 2048, s.center[0], s.center[2]), Some(66));
+            assert_eq!(
+                ore_top_in_column(&mine, 2048, s.center[0], s.center[2]),
+                Some(66)
+            );
             // The template is the dry source (id 4), not the sea one (id 3, the lower id).
             let e = events.iter().find(|e| e.id == s.forming_event).unwrap();
             assert_eq!(e.causes, vec![dry_ev], "site {}", s.id);
         }
         // Settled: every land region now holds a counted source.
-        let (again, events) = run_top_up(&world, &mut sites, &mut bodies, &mut guaranteed, &mut seq);
-        assert_eq!((again.added, events.len(), again.short_by_sea), (0, 0, 0), "{again:?}");
+        let (again, events) =
+            run_top_up(&world, &mut sites, &mut bodies, &mut guaranteed, &mut seq);
+        assert_eq!(
+            (again.added, events.len(), again.short_by_sea),
+            (0, 0, 0),
+            "{again:?}"
+        );
         assert_eq!((again.counted, again.sub_sea), (1 + rec.added, 1));
     }
 
@@ -1660,18 +1680,20 @@ mod tests {
         let mut guaranteed: BTreeMap<EventId, String> = [(ev, "c:iron".to_owned())].into();
         let mut seq = 100;
         let (rec, events) = run_top_up(&world, &mut sites, &mut bodies, &mut guaranteed, &mut seq);
-        assert_eq!((rec.counted, rec.sub_sea, rec.with_source), (0, 1, 0), "{rec:?}");
+        assert_eq!(
+            (rec.counted, rec.sub_sea, rec.with_source),
+            (0, 1, 0),
+            "{rec:?}"
+        );
         assert_eq!(rec.added, rec.land_regions, "{rec:?}");
         assert_eq!(rec.short, 0, "{rec:?}");
         assert!(sites[1..].iter().all(|s| centre_is_dry(&world, s)));
         assert!(events.iter().all(|e| e.causes == vec![ev]));
         // The sea source's own region (land in its east part) got its copy there.
-        assert!(
-            sites[1..]
-                .iter()
-                .any(|s| regions.index(f64::from(s.center[0]), f64::from(s.center[2]))
-                    == regions.index(100.0, -100.0))
-        );
+        assert!(sites[1..].iter().any(|s| {
+            regions.index(f64::from(s.center[0]), f64::from(s.center[2]))
+                == regions.index(100.0, -100.0)
+        }));
     }
 
     /// A centre is dry when the ground stands at or above sea level with no water over it: the
