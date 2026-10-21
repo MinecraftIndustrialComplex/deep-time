@@ -1,13 +1,13 @@
 # Geothermal features
 
 Status of this page: `stage 2 (written 2026-10-02, WP-16), extended the same day with the heat-flow
-fields`. Of the 61 rows, `verified` ones are the sinter and travertine rule (GEO-022), the Earth
+fields, and on 2026-10-20 with the rule that a pool's water never freezes (GEO-062)`. Of the 62 rows, `verified` ones are the sinter and travertine rule (GEO-022), the Earth
 heat-flow figures (GEO-059), the model-against-Earth arithmetic (GEO-060) and the threshold hint
 (GEO-057); the rest are `game-choice` or `uncited`. Almost nothing in the feature's numbers comes from
 a source: the sources checked below support the kinds of feature and the order in which they occur,
 and (for the heat-flow threshold) the level of young extended crust, not a size or a count.
 
-Ledger ids on this page: `GEO-001` to `GEO-061` ([ledger/GEO.md](ledger/GEO.md)). The editor hints
+Ledger ids on this page: `GEO-001` to `GEO-062` ([ledger/GEO.md](ledger/GEO.md)). The editor hints
 that describe these settings are rows GEO-047 to GEO-051. The geothermal gradient (the rise of
 temperature with depth that drives metamorphism and the oil window) is a different thing and is
 ledgered under rock and metamorphism and under deposits.
@@ -51,7 +51,16 @@ ground adds 97 (11 pools, 51 vents, 35 patches): 267 together.
 Where the pack has a hot-spring biome (Terralith's yellowstone, Biomes O' Plenty's hot springs), every
 hot-spring field lies in it, and the pack's other volcanic biomes sit on the active volcanoes, their craters
 and calderas instead of wherever their climate falls (decisions log 2026-10-03; see
-[biomes.md](biomes.md), "Volcanic biomes").
+[biomes.md](biomes.md), "Volcanic biomes"). A pool within 20 blocks of a playa is the exception: it keeps its
+rim and terraces but stands in the flat's biome, so that the pack's hot-spring features stay off the salt
+(BIO-165).
+
+A pool's water never freezes, whatever the temperature of the biome it stands in: a pack's hot-spring biome
+can be much colder than the field's own climate (Biomes O' Plenty's hot springs have a temperature of 0.17,
+cold enough at height for vanilla to ice a lake), and a real hot spring stays open through the winter because
+its water is hot. The surface block of every pool column is exempt from vanilla's top-layer freezing when the
+chunk is generated and from freezing in the weather afterwards (GEO-062); snow may still lie on the dry
+apron and rim round it.
 
 There are no geysers. The water does not steam, boil or erupt, and no temperature is stored. A
 separate warm-ground signal lets another mod treat the ground in and beside a site as a few kelvin
@@ -93,7 +102,11 @@ features.
    solid at the water's level and one block below it. Terraces, vents and altered ground repaint the
    top one or two ground blocks. Where two sites claim a column the one with the higher part priority
    wins. All blocks are vanilla ones behind tags (`deeptime:geothermal/<role>`), so a pack can swap
-   them. (GEO-033, GEO-035, GEO-037 to GEO-040, GEO-043)
+   them. (GEO-033, GEO-035, GEO-037 to GEO-040, GEO-043) The water's top block, at the pool's level,
+   is kept open: the lake rule that stops vanilla's freezing on a lake the climate keeps open
+   (`LakeFreeze`, through `BiomeFreezeMixin` on `Biome.shouldFreeze`, which both the generation
+   feature `freeze_top_layer` and the weather call) also answers "does not freeze" for the column
+   `Geothermal.poolSurface` names, whatever the biome. (GEO-062)
 7. **Fields on hot ground** (2026-10-02; GEO-052 to GEO-056). Beyond the volcanoes, the world is cut
    into cells of 10,000 km2 (100 km across at the default density); each cell tries up to six random
    points and puts one field at the first where the baked heat flow is at least 100 mW/m2 (the setting)
@@ -123,7 +136,8 @@ section.
 | GEO-017 | Height above the sea | field centre at least 5 blocks, site column at least 3 | blocks | none | `game-choice` |
 | GEO-018 | Summit zone (always fumaroles) | 0.35 | share of R | pattern: Paulson and Ingebritsen 1991; number none | `game-choice` |
 | GEO-019 | Hot-spring rule | share >= 0.35, rain >= setting, mean >= 3 degC | - | qualitative: NPS | `game-choice` |
-| GEO-020 | Coldest mean temperature with pools | 3.0 | degC | none (a vanilla freezing rule) | `game-choice` |
+| GEO-020 | Coldest mean temperature with pools | 3.0 | degC | none (a game rule; began as a guard against vanilla's freezing, which GEO-062 now does itself) | `game-choice` |
+| GEO-062 | Pool water never frozen | the surface block of a pool column (y = the site's level) is exempt from `Biome.shouldFreeze`, at generation and in weather, in any biome | - | none read (a hot spring's water is hot) | `game-choice` |
 | GEO-022 | Terrace rock | travertine over carbonate rock, else sinter | - | NPS; USGS | `verified` (the rule, qualitatively) |
 | GEO-023, GEO-024 | Carbonate search | 150 blocks below the ground; five rock classes | blocks | none | `game-choice` |
 | GEO-027, GEO-028 | Pool radius | main round((2.4 + 2.2 u) x size) clamped 2 to 9; smaller round((1.6 + 1.4 u) x size) clamped 2 to 6 | blocks | none | `game-choice` |
@@ -181,8 +195,14 @@ no geothermal behaviour was changed.
   anywhere upstream in the aquifer, so a dry place can have springs; the baked annual rain at the
   field is only a stand-in.
 - **No ice-covered fields and no cold pools** (GEO-020). A mean temperature under 3 degC gives
-  fumaroles only. This is vanilla's freezing rule, not geology: Yellowstone and Iceland have hot
-  springs in cold climates (not sourced here).
+  fumaroles only. This is not geology: Yellowstone and Iceland have hot springs in cold climates
+  (not sourced here). The rule began as a guard against vanilla's freezing, which would put ice on a
+  hot pool; since 2026-10-20 a pool's water stays open whatever the biome (GEO-062), so the guard
+  is no longer needed and the rule stands only as the game choice Ben confirmed on 2026-10-02.
+  Dropping it would let hot springs stand in cold climates; that is his call.
+- **Open water is a game rule, not a model** (GEO-062). The pool's water is not hot in the game
+  (there is no temperature, GEO-026); it is only exempt from freezing. The warm-ground signal
+  (GEO-044 to GEO-046) is separate, and the dry ground round a pool takes snow as the biome says.
 - **Chemistry is reduced to two terrace rocks** (GEO-022). Real springs also deposit other
   minerals; acid-sulfate ground (opal, kaolinite, alunite) is shown only as white and yellow
   terracotta.
@@ -197,7 +217,9 @@ log P2-14, 2026-10-01) unless stated. Ben accepted the feature (decisions log 20
 features"; and "Feel free to start now", on its own branch, GEO-011) but was not asked about any
 number at the time. On 2026-10-02 he confirmed three of the rules as game choices (decisions log,
 "Keep all three (Recommended)"): the 400 mm rain test for springs (GEO-007, GEO-019), no pools
-under a 3 degC mean (GEO-020) and pools 4 to 10 blocks across (GEO-027). The default density and
+under a 3 degC mean (GEO-020) and pools 4 to 10 blocks across (GEO-027). On 2026-10-20 the coordinator
+took the rule that a pool's water is never frozen by its biome (GEO-062) under Ben's rule of
+2026-10-16 (it can be undone by removing one line from `LakeFreeze.keepsOpen`). The default density and
 the use of the warm-ground signal are open questions in `STATUS.md` (Pending). The block stand-ins (calcite for sinter, yellow concrete for sulfur, red
 terracotta for cinnabar) are vanilla choices; Deep Time adds no block.
 

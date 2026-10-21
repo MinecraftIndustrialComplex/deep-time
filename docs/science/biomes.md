@@ -331,7 +331,20 @@ game choices but the vanilla depth band of BIO-112):
 | thermal caves (underground) | terralith:cave/thermal_caves | 1.5 chamber radii round the magma, from the biome's own depth down |
 
   A surface role holds only on land and above the cave band (biome depth under 0.2, vanilla's cave biomes
-  start there: BIO-112), and never on a river's channel. "Where the climate allows" means the climate point
+  start there: BIO-112), never on a river's channel, and never within 20 blocks of a playa (BIO-165): the salt
+  flat is the hydrology's surface as the channel is, and it and its edge keep the biome they would have without
+  the volcano (Expanded Ecosphere's salt lakes on the flat, BIO-120, or the climate's). The margin is there
+  because a biome's features reach past its edge: on the 4k test planet of 2026-10-20 a pool from hot ground
+  stood beside a playa, and Biomes O' Plenty's hot springs dug a pond into the salt and ringed it, and the
+  pool, with thermal calcite and smooth basalt (`disk_hot_spring_thermal_calcite` and `disk_hot_spring_basalt`
+  target calcite, the salt's vanilla block). Keeping the role off the flat itself only moved the damage: the
+  pond came from a hot-springs cell 17 blocks away. A lake feature carves up to 14 blocks east and south of
+  its origin (vanilla 1.21.1's `LakeFeature`, whose box Biomes O' Plenty's `hot_spring_lake` inherits), a
+  disk reaches 6 blocks, and a block takes its biome from a cell up to about 6 blocks off: 6 + 14. A spring
+  within the margin keeps its pool, rim and terraces but stands in the flat's biome. The test planet after
+  the arc work (master 9c9c2012) has no playa, so the margin read is held by a unit test on a constructed
+  layer (`PlayaTest`) as well as by the GameTest on a planet that has one. "Where the climate
+  allows" means the climate point
   lies inside that biome's own temperature and humidity ranges in the pack's parameter list (Terralith puts
   ashen savanna on the warm band at dry to middling humidity), so the rule follows whatever biome a pack
   lists. A role without a biome in the pack, or not allowed at the spot, gives way to the next role whose

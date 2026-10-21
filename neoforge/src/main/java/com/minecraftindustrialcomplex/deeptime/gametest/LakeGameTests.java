@@ -10,6 +10,7 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.Geothermal;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -48,7 +49,55 @@ public final class LakeGameTests {
 
     private LakeGameTests() {}
 
+    /**
+     * The flat checked round a geothermal site: its claim's reach and this many blocks (the field's role biome reached 4
+     * beyond the claim, BIO-110, and its lake features 14 and more beyond that).
+     */
+    static final int RING = 20;
+
     private record Spot(int x, int z, int top) {}
+
+    /**
+     * A column's ground: its top block under air, plants, a snow layer and any tree (leaves and logs: a neighbour's
+     * canopy overhangs a column it does not stand in, and the salt is what lies under it), and the block on it.
+     */
+    private record Ground(int y, BlockState top, BlockState above, boolean canopy) {
+        /**
+         * What is wrong with this column of a salt flat: null when water or the ice cover lies on it (not the flat's
+         * surface), "" when it is salt, else what is there instead. A trunk standing on the flat is a tree growing on
+         * salt, a violation of its own (a playa grows no trees).
+         */
+        String wrong(BlockState salt) {
+            if (!top.getFluidState().isEmpty() || top.is(Blocks.SNOW_BLOCK) || top.is(Blocks.PACKED_ICE) || top.is(Blocks.BLUE_ICE))
+                return null;
+            if (above.is(BlockTags.LOGS))
+                return "tree-on-salt:" + BuiltInRegistries.BLOCK.getKey(above.getBlock());
+            if (salt == null || top != salt)
+                return "not-salt:" + BuiltInRegistries.BLOCK.getKey(top.getBlock());
+            return "";
+        }
+    }
+
+    private static Ground ground(ServerLevel level, int x, int z) {
+        LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        int y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, x & 15, z & 15);
+        BlockState b = chunk.getBlockState(pos.set(x, y, z));
+        BlockState above = Blocks.AIR.defaultBlockState();
+        boolean canopy = false;
+        while (y > level.getMinBuildHeight() && b.getFluidState().isEmpty()
+                && (b.isAir() || !b.isCollisionShapeFullBlock(level, pos) || b.is(BlockTags.LEAVES) || b.is(BlockTags.LOGS))) {
+            above = b;
+            canopy |= b.is(BlockTags.LEAVES);
+            b = chunk.getBlockState(pos.set(x, --y, z));
+        }
+        return new Ground(y, b, above, canopy);
+    }
+
+    /** The biome on a column's ground, for the failure's detail. */
+    private static String biome(ServerLevel level, int x, int y, int z) {
+        return level.getBiome(new BlockPos(x, y + 1, z)).unwrapKey().map(k -> k.location().toString()).orElse("?");
+    }
 
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
     public static void lakeIceAndSaltFollowTheClimate(GameTestHelper helper) {
@@ -68,11 +117,14 @@ public final class LakeGameTests {
             return;
         }
         Water.Spec spec = Water.Spec.of(wd, g.waterReach());
+        var settings = g.generatorSettings().value();
+        Geothermal geo = w.geothermal(g.waterReach(), settings.noiseSettings().minY(), settings.seaLevel());
         // Lake columns a block or more deep, frozen and open, and playa cells, spread over the planet.
         List<Spot> frozen = new ArrayList<>(), open = new ArrayList<>(), salt = new ArrayList<>();
         RasterSampler levels = wd.layer(WorldData.WATER_LEVEL), playa = wd.layer(Playa.LAYER);
         var grid = levels.desc().grid();
         long lakeCells = 0, playaCells = 0;
+        int onSpring = 0;
         for (int j = 0; j < grid.h(); j++) {
             for (int i = 0; i < grid.w(); i++) {
                 boolean lake = !Double.isNaN(levels.get(i, j)), flat = playa.get(i, j) > 0;
@@ -84,7 +136,13 @@ public final class LakeGameTests {
                     continue;
                 int x = (int) (grid.originBlockX() + (long) i * grid.r()), z = (int) (grid.originBlockZ() + (long) j * grid.r());
                 if (flat && salt.size() < MOST) {
-                    salt.add(new Spot(x, z, 0));
+                    // A hot spring's own pool, rim and terraces are not the flat: GeothermalPass paints them over the salt
+                    // (sinter or travertine; the old rule passed there only because their vanilla stand-in, calcite, is
+                    // also halite's).
+                    if (geo.partAt(x, z) != Geothermal.Part.NONE)
+                        onSpring++;
+                    else
+                        salt.add(new Spot(x, z, 0));
                     continue;
                 }
                 if (!lake)
@@ -127,40 +185,58 @@ public final class LakeGameTests {
         PaletteRules.Result<BlockState>[] found = RockPalette.get().forClasses(List.of(Playa.rockClass(wd.manifest().notes())));
         BlockState saltBlock = found.length == 0 || found[0] == null ? null : found[0].pick(0L);
         for (Spot s : salt) {
-            LevelChunk chunk = level.getChunk(s.x() >> 4, s.z() >> 4);
-            // The ground's top block: under air, plants, a snow layer and any tree (leaves and logs: a neighbour's
-            // canopy overhangs a column it does not stand in, and the salt is what lies under it). A trunk standing
-            // on the flat is a tree growing on salt, which is a violation of its own (a playa grows no trees).
-            int y = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, s.x() & 15, s.z() & 15);
-            BlockState b = chunk.getBlockState(pos.set(s.x(), y, s.z()));
-            BlockState above = Blocks.AIR.defaultBlockState();
-            boolean canopy = false;
-            while (y > level.getMinBuildHeight() && b.getFluidState().isEmpty()
-                    && (b.isAir() || !b.isCollisionShapeFullBlock(level, pos) || b.is(BlockTags.LEAVES) || b.is(BlockTags.LOGS))) {
-                above = b;
-                canopy |= b.is(BlockTags.LEAVES);
-                b = chunk.getBlockState(pos.set(s.x(), --y, s.z()));
-            }
-            if (canopy)
+            Ground gr = ground(level, s.x(), s.z());
+            if (gr.canopy())
                 overhung++;
-            if (above.is(BlockTags.LOGS)) {
-                wrong++;
-                detail.append(" tree-on-salt(").append(s.x()).append(',').append(y + 1).append(',').append(s.z()).append(' ')
-                        .append(BuiltInRegistries.BLOCK.getKey(above.getBlock())).append(')');
-            }
-            if (!b.getFluidState().isEmpty() || b.is(Blocks.SNOW_BLOCK) || b.is(Blocks.PACKED_ICE) || b.is(Blocks.BLUE_ICE))
+            String bad = gr.wrong(saltBlock);
+            if (bad == null)
                 continue;   // under water or under the ice cover: not this pass's surface
             saltRead++;
-            if (saltBlock == null || b != saltBlock) {
+            if (!bad.isEmpty()) {
                 wrong++;
-                detail.append(" not-salt(").append(s.x()).append(',').append(y).append(',').append(s.z()).append(' ')
-                        .append(BuiltInRegistries.BLOCK.getKey(b.getBlock())).append(')');
+                detail.append(' ').append(bad).append('(').append(s.x()).append(',').append(gr.y()).append(',').append(s.z()).append(' ')
+                        .append(biome(level, s.x(), gr.y(), s.z())).append(')');
             }
         }
+        // Round every hot spring by a playa, the flat it does not claim is salt too: no role biome comes within
+        // VolcanicBiomes.PLAYA_MARGIN of a playa (BIO-165; before it, Biomes O' Plenty's hot springs dug ponds into the
+        // flat and ringed them with thermal calcite, which the sparse grid above found only where it happened to fall).
+        int springs = 0, ringRead = 0, ringWrong = 0;
+        for (Geothermal.Site site : geo.sites()) {
+            if (springs >= MOST)
+                break;
+            int reach = site.reach() + RING;
+            List<int[]> flat = new ArrayList<>();
+            for (int dz = -reach; dz <= reach; dz++)
+                for (int dx = -reach; dx <= reach; dx++) {
+                    int x = site.x() + dx, z = site.z() + dz;
+                    if (playa.nearest(x, z) > 0 && geo.partAt(x, z) == Geothermal.Part.NONE)
+                        flat.add(new int[]{x, z});
+                }
+            if (flat.isEmpty())
+                continue;
+            springs++;
+            for (int[] c : flat) {
+                Ground gr = ground(level, c[0], c[1]);
+                String bad = gr.wrong(saltBlock);
+                if (bad == null)
+                    continue;
+                ringRead++;
+                if (bad.isEmpty())
+                    continue;
+                if (ringWrong++ < 12)
+                    detail.append(" spring-ring:").append(bad).append('(').append(c[0]).append(',').append(gr.y()).append(',').append(c[1])
+                            .append(' ').append(biome(level, c[0], gr.y(), c[1])).append(" spring ").append(site.kind()).append('@')
+                            .append(site.x()).append(',').append(site.z()).append(')');
+            }
+        }
+        wrong += ringWrong;
         DeepTime.LOGGER.info("[gametest] lakeIceAndSaltFollowTheClimate lakeCells={} playaCells={} frozenLakeColumns={} (iceRead={} inWarmBiome={}) "
-                        + "openLakeColumns={} (waterRead={} inColdBiome={}) playaColumns={} (saltRead={} underCanopy={} salt={}) threshold={} wrong={}{}",
-                lakeCells, playaCells, frozen.size(), frozenRead, frozenWarm, open.size(), openRead, openCold, salt.size(), saltRead, overhung,
-                saltBlock == null ? "none" : BuiltInRegistries.BLOCK.getKey(saltBlock.getBlock()), ice.threshold(), wrong, detail);
+                        + "openLakeColumns={} (waterRead={} inColdBiome={}) playaColumns={} (saltRead={} underCanopy={} onSpring={} salt={}) "
+                        + "springsOnPlaya={} (ringRead={} ringWrong={}) threshold={} wrong={}{}",
+                lakeCells, playaCells, frozen.size(), frozenRead, frozenWarm, open.size(), openRead, openCold, salt.size(), saltRead, overhung, onSpring,
+                saltBlock == null ? "none" : BuiltInRegistries.BLOCK.getKey(saltBlock.getBlock()), springs, ringRead, ringWrong, ice.threshold(), wrong,
+                detail);
         helper.assertTrue(wrong == 0, wrong + " columns break the lake-ice or salt rule:" + detail);
         helper.succeed();
     }
