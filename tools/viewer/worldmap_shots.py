@@ -14,7 +14,8 @@ the canvas's pixels:
     limit (4 screen pixels a block);
   - a drag across the seam wraps x onto the planet and both sides of the seam are drawn;
   - a link opens at its layer and view, and a reload keeps it;
-  - Escape closes the view; at phone width the view fits with no sideways scroll;
+  - Escape closes the view; at phone width the view fits with no sideways scroll, has room (300 px
+    or more) and draws the planet;
   - no script errors.
 Prints PASS/FAIL lines, writes PNGs to DIR, and exits 1 when a check failed.
 """
@@ -53,7 +54,7 @@ STATE = """(() => {
   const q = new URLSearchParams(location.search).get('world');
   const r = c ? c.getBoundingClientRect() : { width: 0, height: 0 };
   let ink = [0, 0];
-  if (c && c.width > 8) {
+  if (c && c.width > 8 && c.height > 8) {
     const g = c.getContext('2d'), w = c.width, h = c.height;
     const lit = (x0) => { const d = g.getImageData(x0, Math.floor(h * 0.3), Math.floor(w / 3), Math.floor(h * 0.4)).data;
       let n = 0; for (let i = 0; i < d.length; i += 16) if (d[i] + d[i + 1] + d[i + 2] > 60) n++; return n; };
@@ -230,6 +231,7 @@ def main():
         check(wait(ready, 60, "the world view at phone width"), "the view opens at phone width")
         s = settled()
         check(0 < s["w"] <= 390 and s["scrollW"] <= s["innerW"], f"at 390 px it fits with no sideways scroll (canvas {s['w']:.0f} px, page {s['scrollW']} of {s['innerW']})")
+        check(s["h"] >= 300 and sum(s["ink"]) > 0, f"at 390 px the map has room and draws the planet (canvas {s['w']:.0f} x {s['h']:.0f} px, ink {s['ink']})")
         shot("05-phone.png")
         errs += s["errs"]
         check(not errs, f"no script errors ({errs[:3]})")
