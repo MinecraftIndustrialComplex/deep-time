@@ -219,16 +219,17 @@ public final class BiomeGameTests {
     /** The largest share of cold wetland columns that may land on a swamp that is not a peatland (BIO-133). */
     static final double COLD_WETLAND_SWAMP_CEILING = 0.05;
     /**
-     * The largest share of the columns the sea rule leaves dry ({@code Water.seaCovers}, HYD-106) that may carry an
-     * ocean biome, and the largest share of the columns it puts under the sea that may carry a biome of the land
-     * (BIO-170). The biome bake settles its land call to the world's own ground in the projection pass; what is
-     * left is the coast between two nodes, where the game reads the layers bilinearly between nodes 8 blocks apart,
-     * and the detail term the bake's ground does not carry. Before the settle 5.1 to 10.5 % of the dry land of
-     * the 16k planets carried an ocean biome and an area of 0.5 to 1.2 % of the land a land biome under the sea (4
-     * measured planets, census tool tools/review/biome_land_census.py); this is a ceiling for a broken rule, not a
-     * measurement (the 4k test planet's own share is logged, first run, the coordinator's batch).
+     * The largest share of the columns inland of the coast (the sea rule the same 8 blocks away on all four sides) that
+     * the sea rule leaves dry ({@code Water.seaCovers}, HYD-106, on the world's elevation layer) which may carry an ocean
+     * biome, and of those it puts under the sea which may carry a biome of the land (BIO-173). The biome bake settles
+     * its land call to the world's own ground in the projection pass (BIO-170); what is left is the coast between two
+     * biome nodes, where the game reads the layers bilinear between nodes 8 blocks apart, and the census leaves that
+     * strip out. Before the settle 5.1 to 10.5 % of the dry land of the 16k planets carried an ocean biome on the
+     * bake's nodes and an area of 0.5 to 1.2 % of the land a land biome under the sea; after it none of the nodes, and
+     * 0 to 2 columns in about 60,000 more than a node from the coast (tools/review/biome_land_census.py). The 4k test
+     * planet's own count is logged; this is a ceiling for a broken rule, not a measurement.
      */
-    static final double SEA_CALL_CEILING = 0.03;
+    static final double SEA_CALL_CEILING = 0.01;
     /** The most EF columns that may land on the red badlands or scarlet mountains (the peaks of negative weirdness keep Terralith's). */
     static final double FORBIDDEN_CEILING = 0.10;
     /**
@@ -351,11 +352,12 @@ public final class BiomeGameTests {
         var sea = r.json().getAsJsonObject("sea_call");
         int seaColumns = sea.get("sea_columns").getAsInt(), seaOnLand = sea.get("sea_on_land_biome").getAsInt();
         int dryColumns = sea.get("dry_columns").getAsInt(), dryOnOcean = sea.get("dry_on_ocean_biome").getAsInt();
-        DeepTime.LOGGER.info("[gametest] climateConsistent sea call {}: {} of {} dry columns on an ocean biome, {} of {} sea columns on a land biome",
+        DeepTime.LOGGER.info("[gametest] climateConsistent sea call {}: {} of {} dry columns inland of the coast on an ocean biome, {} of {} sea columns on a land biome",
                 sea, dryOnOcean, dryColumns, seaOnLand, seaColumns);
-        helper.assertTrue(dryColumns > 0 && seaColumns > 0, "the planet has both dry and sea columns: " + sea);
+        helper.assertTrue(dryColumns >= MIN_COLUMNS && seaColumns >= MIN_COLUMNS, "the planet has dry and sea columns inland of its coast: " + sea);
         helper.assertTrue(dryOnOcean <= SEA_CALL_CEILING * dryColumns,
-                dryOnOcean + " of " + dryColumns + " columns the sea rule leaves dry carry an ocean biome, more than " + SEA_CALL_CEILING);
+                dryOnOcean + " of " + dryColumns + " columns inland of the coast that the sea rule leaves dry carry an ocean biome, more than "
+                        + SEA_CALL_CEILING);
         helper.assertTrue(seaOnLand <= SEA_CALL_CEILING * seaColumns,
                 seaOnLand + " of " + seaColumns + " columns the sea rule puts under the sea carry a land biome, more than " + SEA_CALL_CEILING);
         helper.succeed();

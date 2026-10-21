@@ -2918,7 +2918,8 @@ mod tests {
         );
         // The rule each node ends on is the format's own, on the world's elevation and flag.
         let continents = LoadedLayer::new(held[2].desc.clone(), held[2].bytes.clone()).unwrap();
-        for k in 0..n {
+        // (Rows 0 and h − 1 are glued onto themselves, which mixes this x-banded pattern: left out.)
+        for k in w..n - w {
             let b = band(k);
             let sea = deeptime_format::water::sea_covers_height(
                 f64::from(elevation_of(b)),

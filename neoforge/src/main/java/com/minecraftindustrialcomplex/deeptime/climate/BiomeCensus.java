@@ -416,10 +416,13 @@ public final class BiomeCensus {
                 ? m.volcanic() : null;
         RasterSampler wetFlag = wd.has(BiomeRules.WETLAND_LAYER) ? wd.layer(BiomeRules.WETLAND_LAYER) : null;
         RuleCensus ruleCensus = null;
-        // The land call (BIO-170): the sea rule of the column evaluator (Water.seaCovers, HYD-106) against the
-        // biome: columns it puts under the sea, of them on a biome that is not of the water; the columns it
-        // leaves dry, of them on an ocean biome.
-        int seaColumns = 0, seaOnLandBiome = 0, dryColumns = 0, dryOnOceanBiome = 0;
+        // The land call (BIO-170): the sea rule of the column evaluator (Water.seaCovers, HYD-106) on the world's
+        // elevation layer (the ground the bake's land call reads: the projected height, no detail term) against the
+        // biome. Counted where the rule is the same 8 blocks away on all four sides, so the coast
+        // between two biome nodes, which the game reads bilinear, is left out: columns it puts under the sea, of
+        // them on a biome that is not of the water; columns it leaves dry, of them on an ocean biome.
+        RasterSampler elevation = wd.layer(WorldData.ELEVATION);
+        int seaColumns = 0, seaOnLandBiome = 0, dryColumns = 0, dryOnOceanBiome = 0, seaCoastStrip = 0;
         for (int j = 0; j < h; j++) {
             int z = -zp + step / 2 + j * step;
             for (int i = 0; i < w; i++) {
@@ -446,16 +449,22 @@ public final class BiomeCensus {
                 height[cell] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(y)));
                 if (Math.abs(z) > zp - poleMargin)
                     continue;
-                final int wx = x, wz = z;
-                if (Water.seaCovers(Water.topBlock(y), sea, () -> wd.closedBasin(wx, wz))) {
-                    seaColumns++;
-                    if (!(b.is(c("is_ocean")) || b.is(c("is_deep_ocean")) || b.is(c("is_aquatic")) || b.is(c("is_river"))
-                            || b.is(c("is_beach")) || b.is(c("is_stony_shores"))))
-                        seaOnLandBiome++;
-                } else {
-                    dryColumns++;
-                    if (b.is(c("is_ocean")) || b.is(c("is_deep_ocean")))
-                        dryOnOceanBiome++;
+                int call = seaCall(wd, elevation, sea, x, z);
+                if (call >= 0) {
+                    boolean interior = seaCall(wd, elevation, sea, x + 8, z) == call && seaCall(wd, elevation, sea, x - 8, z) == call
+                            && seaCall(wd, elevation, sea, x, z + 8) == call && seaCall(wd, elevation, sea, x, z - 8) == call;
+                    if (!interior)
+                        seaCoastStrip++;
+                    else if (call == 1) {
+                        seaColumns++;
+                        if (!(b.is(c("is_ocean")) || b.is(c("is_deep_ocean")) || b.is(c("is_aquatic")) || b.is(c("is_river"))
+                                || b.is(c("is_beach")) || b.is(c("is_stony_shores"))))
+                            seaOnLandBiome++;
+                    } else {
+                        dryColumns++;
+                        if (b.is(c("is_ocean")) || b.is(c("is_deep_ocean")))
+                            dryOnOceanBiome++;
+                    }
                 }
                 if (land && wetlandLayer != null && Math.round(wetlandLayer.nearest(x, z)) == Peatland.COLD_WETLAND) {
                     coldWet++;
@@ -717,6 +726,7 @@ public final class BiomeCensus {
         sc.addProperty("sea_on_land_biome", seaOnLandBiome);
         sc.addProperty("dry_columns", dryColumns);
         sc.addProperty("dry_on_ocean_biome", dryOnOceanBiome);
+        sc.addProperty("coast_left_out", seaCoastStrip);
         o.add("sea_call", sc);
         // The volcanic biomes against the real volcanoes, now and as the plain climate search placed them
         // (decisions log 2026-10-03).
@@ -759,6 +769,18 @@ public final class BiomeCensus {
             o.addProperty("file", mapFile.toString());
         }
         return new Result(checks, forbidden, packs, cloud, o, ruleCensus != null && !rules.rules().isEmpty() ? ruleCensus : null);
+    }
+
+    /**
+     * The world's sea rule at block (x, z) on the elevation layer (1 the sea stands there, 0 dry ground, -1 where the
+     * layer has no ground): {@link Water#seaCovers} on the top block of the projected height with the
+     * {@code closed_basin} flag, the call the biome bake settles its land call to (BIO-170).
+     */
+    static int seaCall(WorldData wd, RasterSampler elevation, int sea, int x, int z) {
+        double height = elevation.nearest(x, z);
+        if (Double.isNaN(height))
+            return -1;
+        return Water.seaCovers(Water.topBlock(height), sea, () -> wd.closedBasin(x, z)) ? 1 : 0;
     }
 
     static String nameOf(Holder<Biome> b) {
