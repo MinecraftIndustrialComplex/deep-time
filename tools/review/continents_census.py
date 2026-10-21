@@ -127,6 +127,21 @@ def components(p, mask, spacing_km):
     return out
 
 
+def largest_high(p, z, spacing_km, level=3000.0, exclude=None):
+    """The largest connected piece of ground above `level` m (a plateau's stand-in, Tibet's is the
+    ground above 3 km): its area (Mkm2, Earth-normalised by the points' share) and median height."""
+    m = z > level
+    if exclude is not None:
+        m &= ~exclude
+    comp = components(p, m, spacing_km)
+    if not m.any():
+        return 0.0, float("nan")
+    c = np.bincount(comp[m])
+    k = int(np.argmax(c))
+    sel = comp == k
+    return c[k] / z.size * EARTH_KM2 / 1e6, float(np.median(z[sel]))
+
+
 def coast_metrics(p, z, spacing_km, groups=None, gnames=(), exclude=None, prefix="  "):
     """The high ground by the coast, on points (unit vectors p, heights above the sea z in m, about
     `spacing_km` apart): the land above 2 km within 200 km of the sea (great circle to the nearest
@@ -150,10 +165,11 @@ def coast_metrics(p, z, spacing_km, groups=None, gnames=(), exclude=None, prefix
     near = d_sea <= 200.0
     L, H, C = land & keep, hi & keep, coast & keep
     res = {"land": L.sum() / max(keep.sum(), 1), "hi_of_land": H.sum() / max(L.sum(), 1),
-           "hi_near_coast": (H & near).sum() / max(H.sum(), 1), "coast_with_hi": (C & has).sum() / max(C.sum(), 1)}
+           "hi_near_coast": (H & near).sum() / max(H.sum(), 1), "coast_with_hi": (C & has).sum() / max(C.sum(), 1),
+           "land_near_coast": (L & near).sum() / max(L.sum(), 1)}
     print(f"{prefix}land {res['land']:.4f}; above 2 km {res['hi_of_land']:.4f} of the land, of it within 200 km of"
-          f" the sea {res['hi_near_coast']:.3f}; coast points {C.sum()}, with land above 2 km within 200 km on"
-          f" the same landmass {res['coast_with_hi']:.3f}")
+          f" the sea {res['hi_near_coast']:.3f} (all land {res['land_near_coast']:.3f}); coast points {C.sum()},"
+          f" with land above 2 km within 200 km on the same landmass {res['coast_with_hi']:.3f}")
     if groups is not None:
         for k, nm in enumerate(gnames):
             g = groups == k
@@ -161,7 +177,8 @@ def coast_metrics(p, z, spacing_km, groups=None, gnames=(), exclude=None, prefix
                 continue
             print(f"{prefix}  {nm:11s}: land {(L & g).sum() / max(L.sum(), 1):.3f}; high ground"
                   f" {(H & g).sum() / max(H.sum(), 1):.3f} of it, its own within 200 km of the sea"
-                  f" {(H & g & near).sum() / max((H & g).sum(), 1):.3f}; coast {(C & g).sum() / max(C.sum(), 1):.3f},"
+                  f" {(H & g & near).sum() / max((H & g).sum(), 1):.3f} (its land"
+                  f" {(L & g & near).sum() / max((L & g).sum(), 1):.3f}); coast {(C & g).sum() / max(C.sum(), 1):.3f},"
                   f" with high ground within 200 km {(C & g & has).sum() / max((C & g).sum(), 1):.3f}")
     return res
 
@@ -313,6 +330,14 @@ def fields_report(d):
           f" white={white.sum() / max(land.sum(), 1):.4f} glacier={glacier.sum() / max(land.sum(), 1):.4f}"
           f" thick55_km2={(cont & (th >= 55)).sum() * cell_km2 / 1e6:.1f}M"
           f" thick55_z50={pct(z[cont & (th >= 55)], 50):.0f}")
+    a3, z3 = largest_high(xyz(lat[ok], lon[ok]), z[ok], np.sqrt(cell_km2))
+    age = f.get("plates/orogeny_age_myr")
+    hi_age = age[land & (z > 2000)] if age is not None else np.array([])
+    n_age = hi_age.size
+    hi_age = hi_age[np.isfinite(hi_age)]
+    print(f"  the largest ground above 3 km: {a3:.2f} Mkm2, median {z3:.0f} m; the land above 2 km's last"
+          f" orogeny p10/50/90 {pct(hi_age, 10):.0f}/{pct(hi_age, 50):.0f}/{pct(hi_age, 90):.0f} Myr old"
+          f" ({hi_age.size} of {n_age} with an age)")
     print("  coastal high ground on the grid's cells, by plates/orogeny_type:")
     coast_metrics(xyz(lat[ok], lon[ok]), z[ok], np.sqrt(cell_km2), np.round(oro[ok]).astype(int),
                   ("none", "Andean", "Himalayan"))
@@ -510,10 +535,13 @@ def maps_report(out_dir, label, times):
                     f" t_wet_p10/50/90={pct(th[wet], 10):.1f}/{pct(th[wet], 50):.1f}/{pct(th[wet], 90):.1f}"
                     f" t25_dry={((th >= 25) & land).sum() / max((th >= 25).sum(), 1):.3f}"
                     f" hi2={(z[land] > 2000).mean():.4f} hi4={(z[land] > 4000).mean():.4f}")
-            print(line)
             if any(abs(tm - x) < 1 for x in times):
                 p = xyz(m[:, 0], m[:, 1])
+                a3, z3 = largest_high(p, z, np.sqrt(cell))
+                print(line + f" plateau3_Mkm2={a3:.2f} plateau3_z50={z3:.0f}")
                 coast_metrics(p, z, np.sqrt(cell), map_origin(m), ORIGINS, prefix=f"  t={tm:.0f} ")
+            else:
+                print(line)
 
 
 def earth_report(bnds, relief, ns):
@@ -580,6 +608,8 @@ def earth_report(bnds, relief, ns):
               f"{np.mean(z[(z > 0) & ~sheets] > 4000):.4f}; freeboard41 {np.quantile(z, 1 - 0.205):.0f} m")
         p = xyz(plat, plon)
         sp = np.sqrt(EARTH_KM2 / n)
+        a3, z3 = largest_high(p, z, sp, exclude=sheets)
+        print(f"  Earth N={n}: the largest ground above 3 km, without the ice sheets: {a3:.2f} Mkm2, median {z3:.0f} m")
         coast_metrics(p, z, sp, prefix=f"  Earth N={n} all: ")
         coast_metrics(p, z, sp, exclude=sheets, prefix=f"  Earth N={n} without Antarctica and Greenland: ")
 
