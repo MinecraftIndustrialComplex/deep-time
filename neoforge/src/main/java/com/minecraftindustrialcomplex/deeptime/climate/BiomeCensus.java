@@ -389,7 +389,7 @@ public final class BiomeCensus {
         Map<String, Map<String, Integer>> packMisses = new HashMap<>();
         for (PackCheck pc : PACK_CHECKS)
             if (placeable.contains(pc.requires())) {
-                packs.put(pc.name(), new int[4]);
+                packs.put(pc.name(), new int[6]);
                 packMisses.put(pc.name(), new TreeMap<>());
             }
         boolean cloudActive = placeable.contains(CLOUD_FOREST);
@@ -570,8 +570,14 @@ public final class BiomeCensus {
                         n[1]++;
                         if (pc.biomes().contains(nameOf(b)))
                             n[0]++;
+                        String border = classBorder(kp, x, z, k);
+                        if (border == null) {
+                            n[5]++;
+                            if (pc.biomes().contains(nameOf(b)))
+                                n[4]++;
+                        }
                         if (pc.biomes().contains(nameOf(b)) == pc.atMost())
-                            packMisses.get(pc.name()).merge(nameOf(b), 1, Integer::sum);
+                            packMisses.get(pc.name()).merge(nameOf(b) + (border == null ? "" : " @" + border), 1, Integer::sum);
                     }
                 if (!untagged && (k == 31 ? y < sea - 4 : land)) {
                     for (Check ch : CHECKS) {
@@ -667,11 +673,13 @@ public final class BiomeCensus {
                 e.addProperty("share", n[1] == 0 ? null : Math.round(n[0] * 1000.0 / n[1]) / 1000.0);
                 e.addProperty("left_out_coast", n[2]);
                 e.addProperty("left_out_glaciated", n[3]);
-                // The six biomes the most columns that fail the check are on ("biome columns").
+                e.addProperty("interior_columns", n[5]);
+                e.addProperty("interior_matching", n[4]);
+                // The twelve biomes the most columns that fail the check are on ("biome columns", " @" and the other classes for a column on a class border, classBorder).
                 JsonArray miss = new JsonArray();
                 packMisses.get(pc.name()).entrySet().stream()
                         .sorted(Map.Entry.<String, Integer>comparingByValue().reversed().thenComparing(Map.Entry.comparingByKey()))
-                        .limit(6).forEach(en -> miss.add(en.getKey() + " " + en.getValue()));
+                        .limit(12).forEach(en -> miss.add(en.getKey() + " " + en.getValue()));
                 e.add("misses", miss);
             }
             e.addProperty(pc.atMost() ? "at_most" : "at_least", pc.bound());
@@ -798,6 +806,25 @@ public final class BiomeCensus {
 
     static String nameOf(Holder<Biome> b) {
         return b.unwrapKey().map(key -> key.location().toString()).orElse("?");
+    }
+
+    /**
+     * Null when the four cells of the class layer that a bilinear read at block (x, z) blends all hold class {@code k} (the
+     * column's biome inputs come from its class's cells alone); otherwise the other classes among them, sorted, joined by
+     * "+": the column lies on a class border, where the inputs the game reads bilinear mix two classes' values.
+     */
+    static String classBorder(RasterSampler kp, int x, int z, int k) {
+        var grid = kp.desc().grid();
+        double u = (x - (double) grid.originBlockX()) / grid.r(), v = (z - (double) grid.originBlockZ()) / grid.r();
+        long i0 = (long) Math.floor(u), j0 = (long) Math.floor(v);
+        java.util.TreeSet<String> other = new java.util.TreeSet<>();
+        for (int d = 0; d < 4; d++) {
+            double cv = kp.get(i0 + (d & 1), j0 + (d >> 1));
+            int ck = Double.isNaN(cv) ? 31 : (int) Math.round(cv);
+            if (ck != k)
+                other.add(ck >= 0 && ck < KOPPEN.length ? KOPPEN[ck] : "?" + ck);
+        }
+        return other.isEmpty() ? null : String.join("+", other);
     }
 
     private static String b64(short[] v) {

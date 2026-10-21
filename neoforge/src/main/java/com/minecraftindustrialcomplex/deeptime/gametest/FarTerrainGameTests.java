@@ -197,7 +197,8 @@ public final class FarTerrainGameTests {
             into.add(column, real, chunk);
             if (!features && !column.water() && into.carved == carved)
                 farDry[eastSide ? 1 : 0]++;   // a carver's cut is set aside, so it is not a dry column the side must compare
-            if (Math.abs(column.ground() - real.ground()) > 2 || column.water() != real.water())
+            if (Math.abs(column.ground() - real.ground()) > 2 || column.water() != real.water()
+                    || !features && column.groundBlock().getBlock() != real.groundBlock().getBlock())
                 DeepTime.LOGGER.info("[gametest] seamDiag {} {}", features ? "after features" : "before features", diag(chunk, column, real, x, row));
             return true;
         }, () -> {
