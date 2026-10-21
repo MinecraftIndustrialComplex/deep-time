@@ -1,6 +1,9 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# The vendored viewer core (tools/dev/refresh-mic-viewer.sh) is a dependency, not a member: its
+# tests, lints and format live in its own repository.
+exclude = ["vendor"]
 
 [workspace.package]
 # The one version: gradle.properties `mod_version` must equal it (Gradle task checkVersions).
@@ -25,6 +28,12 @@ deeptime-noddy = { path = "crates/deeptime-noddy" }
 # The GPU compute path (docs/design/gpu-compute.md), behind deeptime-core's `gpu` feature.
 deeptime-gpu = { path = "crates/deeptime-gpu" }
 deeptime-viewer = { path = "crates/deeptime-viewer" }
+# The workbench's "Final world" map renderer behind mic-viewer's TileSource (VWD-18).
+deeptime-tiles = { path = "crates/deeptime-tiles" }
+# The shared viewer core of Deep Time and mic-rtsim (decisions log 2026-10-21, VW3 and BR-VWD):
+# the HTTP server, server-sent events, the tile cache and the slippy map. MPL-2.0. Vendored at the
+# commit in vendor/mic-viewer/PINNED (the test VM cannot fetch the private repository).
+mic-viewer = { path = "vendor/mic-viewer" }
 # The JNI binding (plan §6.1); only deeptime-jni uses it. MIT OR Apache-2.0.
 jni = "=0.22.4"
 # Data parallelism inside native calls, one private pool per session (plan §6.2). MIT OR Apache-2.0.

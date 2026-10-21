@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.screen;
 
+import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.screen.model.EditorModel;
 import com.minecraftindustrialcomplex.deeptime.screen.model.Formats;
 import com.minecraftindustrialcomplex.deeptime.screen.model.GenerationStatus;
@@ -65,6 +66,21 @@ final class GenerationPage implements PlanetEditorScreen.Page {
 
     static void setDetails(boolean d) {
         details = d;
+    }
+
+    /** The epoch button ("Stop here" / "Pick this epoch"), for the dev walk that clicks it. */
+    Button epochButton() {
+        return epoch;
+    }
+
+    /** The time scrubber, for the dev walk that clicks it. */
+    AbstractSliderButton scrubberWidget() {
+        return scrubber;
+    }
+
+    /** Play, for the dev walk that clicks it. */
+    Button playButton() {
+        return primary;
     }
 
     private static final int GAP = 8, TOP = 44, ROW_H = 20, TAB_H = 16;
@@ -388,15 +404,26 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         return model != null && model.state() == TimelapseModel.State.DONE;
     }
 
+    /**
+     * The epoch button: picks the shown keyframe's epoch, or says on the page why it cannot
+     * ({@link EditorModel#pressEpoch}); every press is logged with what it did.
+     */
     private void pickEpoch() {
-        if (model == null)
-            return;
-        model.current().ifPresent(f -> {
-            if (em.epochStopMyr(f).isPresent()) {
-                em.pickEpoch(f);
-                screen.refresh();
-            }
-        });
+        KeyframeInfo f = model == null ? null : model.current().orElse(null);
+        String run = model == null ? "none" : model.stagingId();
+        GenerationStatus.State state = GenerationStatus.state(em);
+        String when = f == null ? "no map" : Phrase.myrAgo(f.t()) + " Myr ago";
+        EditorModel.EpochPress p = em.pressEpoch(f);
+        String said = Lang.phrase(p.message()).getString();
+        if (p.started())
+            DeepTime.LOGGER.info("Deep Time: epoch picked at {} (stop_myr {}) in run {} while {}: the run picks up its folder again",
+                    when, Formats.number(p.stopMyr()), run, state);
+        else if (Double.isFinite(p.stopMyr()))
+            DeepTime.LOGGER.warn("Deep Time: epoch at {} (stop_myr {}) in run {} while {} could not start: {}", when,
+                    Formats.number(p.stopMyr()), run, state, said);
+        else
+            DeepTime.LOGGER.info("Deep Time: epoch button pressed at {} in run {} while {}: nothing to pick ({})", when, run, state, said);
+        screen.refresh();
     }
 
     @Override
@@ -419,18 +446,10 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         if (globeWidget != null)
             globeWidget.tick();
         refreshLists();
-        boolean running = model != null && model.state() == TimelapseModel.State.RUNNING;
         playPause.setMessage(Component.literal(model != null && model.playing() ? "❚❚" : "▶"));
         playPause.active = model != null && model.frameCount() > 1;
         playPause.setTooltip(Tooltip.create(Lang.tr("gen.play_back.hint")));
-        Optional<KeyframeInfo> f = model == null ? Optional.empty() : model.current();
-        OptionalDouble stop = f.map(em::epochStopMyr).orElse(OptionalDouble.empty());
-        epoch.active = stop.isPresent();
-        // While the live map shows, the stop is still at the newest keyframe: the tooltip says so.
-        String stopHint = !running ? "gen.epoch.hint" : model.showingLive() ? "gen.stop_here.hint_live" : "gen.stop_here.hint";
-        epoch.setTooltip(Tooltip.create(stop.isPresent()
-                ? Lang.tr(stopHint, Lang.phrase(Phrase.yearsAgo(f.get().t())))
-                : Lang.tr(running ? "gen.stop_here.none" : "gen.epoch.none")));
+        syncEpoch();
         if (keepGoing != null) {
             OptionalDouble end = em.runStopMyr();
             double more = Formats.parse(moreText);
@@ -442,9 +461,45 @@ final class GenerationPage implements PlanetEditorScreen.Page {
                 || builtState == GenerationStatus.State.FAILED;
         if (!retry) {
             primary.active = em.canAccept();
-            primary.setTooltip(Tooltip.create(Lang.tr(primary.active ? "gen.play.hint" : "gen.play.waiting")));
+            primary.setTooltip(Tooltip.create(playHint()));
         }
         scrubber.sync();
+    }
+
+    /**
+     * The epoch button's label, state and tooltip, every tick: "Stop here" while the simulation
+     * goes, "Pick this epoch" once it writes the world or is done; inactive only with a tooltip
+     * that says why ({@link EditorModel#epochUnavailable}).
+     */
+    private void syncEpoch() {
+        GenerationStatus.State state = GenerationStatus.state(em);
+        boolean going = state == GenerationStatus.State.RUNNING;
+        epoch.setMessage(Lang.tr(going ? "gen.stop_here" : "gen.epoch"));
+        KeyframeInfo f = model == null ? null : model.current().orElse(null);
+        Optional<Phrase> why = em.epochUnavailable(f);
+        epoch.active = why.isEmpty();
+        if (why.isPresent()) {
+            epoch.setTooltip(Tooltip.create(Lang.phrase(why.get())));
+            return;
+        }
+        // While the live map shows, the stop is still at the newest keyframe: the tooltip says so.
+        String hint = going ? model.showingLive() ? "gen.stop_here.hint_live" : "gen.stop_here.hint"
+                : state == GenerationStatus.State.BAKING ? "gen.epoch.hint_writing" : "gen.epoch.hint";
+        epoch.setTooltip(Tooltip.create(Lang.tr(hint, Lang.phrase(Phrase.yearsAgo(f.t())))));
+    }
+
+    /**
+     * Play's tooltip: what it makes. Once done with an older map shown, it says Play makes the
+     * run's end, not the map shown, and how to play that one (Pick this epoch).
+     */
+    private Component playHint() {
+        if (!em.canAccept())
+            return Lang.tr("gen.play.waiting");
+        KeyframeInfo f = model.current().orElse(null);
+        if (f == null || em.epochStopMyr(f).isEmpty() || model.frameCount() == 0)
+            return Lang.tr("gen.play.hint");
+        double end = model.frames().get(model.frameCount() - 1).t();
+        return Lang.tr("gen.play.hint_older", Lang.phrase(Phrase.yearsAgo(end)), Lang.phrase(Phrase.yearsAgo(f.t())));
     }
 
     // ------------------------------------------------------------------------------------------
@@ -494,8 +549,22 @@ final class GenerationPage implements PlanetEditorScreen.Page {
             }
             if (keyH >= 10)
                 drawKey(g, font, viewX, keyY, viewW, keyH);
+            // At the foot of the map: what the epoch button did, a launch that failed, a failure.
+            List<Notice> notices = notices(state);
+            int y = viewY + viewH - 3;
+            for (int i = notices.size() - 1; i >= 0; i--) {
+                Notice n = notices.get(i);
+                List<net.minecraft.util.FormattedCharSequence> seqs = font.split(n.text(), viewW - 10);
+                for (int j = seqs.size() - 1; j >= 0; j--) {
+                    y -= 11;
+                    g.fill(viewX + 1, y - 2, viewX + 7 + font.width(seqs.get(j)), y + 9, 0xc0000000);
+                    g.drawString(font, seqs.get(j), viewX + 4, y, n.colour(), false);
+                }
+            }
         } else {
             List<Component> lines = new ArrayList<>();
+            List<Integer> colours = new ArrayList<>();
+            int base = state == GenerationStatus.State.BLOCKED ? WARN : DIM;
             switch (state) {
                 case BLOCKED -> {
                     lines.add(Lang.tr("gen.blocked.why"));
@@ -509,10 +578,18 @@ final class GenerationPage implements PlanetEditorScreen.Page {
                     lines.add(Lang.tr("gen.waiting.hint"));
                 }
             }
+            while (colours.size() < lines.size())
+                colours.add(base);
+            for (Notice n : notices(state)) {
+                if (state == GenerationStatus.State.BLOCKED && n.launch())
+                    continue; // the blocker's lines say it already
+                lines.add(n.text());
+                colours.add(n.colour());
+            }
             int y = viewY + viewH / 2 - lines.size() * 6;
-            for (Component c : lines) {
-                for (var seq : font.split(c, viewW - 16)) {
-                    g.drawCenteredString(font, seq, viewX + viewW / 2, y, state == GenerationStatus.State.BLOCKED ? WARN : DIM);
+            for (int i = 0; i < lines.size(); i++) {
+                for (var seq : font.split(lines.get(i), viewW - 16)) {
+                    g.drawCenteredString(font, seq, viewX + viewW / 2, y, colours.get(i));
                     y += 11;
                 }
             }
@@ -654,6 +731,25 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         }
         for (KeyOp o : ops)
             o.draw().draw(g, x + o.x(), y + 12 + o.line() * 10);
+    }
+
+    /** A line the page shows about what happened; {@code launch} when it is a launch that failed. */
+    private record Notice(Component text, int colour, boolean launch) {}
+
+    /**
+     * What the page says about what happened, in every state: the epoch button's last press (a
+     * pick under way, a failed launch, why it did nothing), a launch that failed otherwise, and,
+     * over a map ({@code withFailure}), why the run failed.
+     */
+    private List<Notice> notices(GenerationStatus.State state) {
+        List<Notice> out = new ArrayList<>();
+        em.epochNotice().ifPresent(p -> out.add(new Notice(Lang.phrase(p), em.epochNoticeIsError() ? ERROR : 0xffcfe6ff,
+                em.epochNoticeIsError())));
+        if (!em.epochNoticeIsError())
+            em.launchError().ifPresent(e -> out.add(new Notice(Lang.tr("editor.warning.launch_failed", e), ERROR, true)));
+        if (state == GenerationStatus.State.FAILED && model != null && model.frameCount() > 0)
+            model.failure().ifPresent(msg -> out.add(new Notice(Component.literal(msg), ERROR, false)));
+        return out;
     }
 
     /** "42% · about 3 min left" while going, "Took 4 min" when done. */

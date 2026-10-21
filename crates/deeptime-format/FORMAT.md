@@ -265,7 +265,17 @@ baked and gets a Lambert layout block.
   does not reach it, the open sea being each 8-connected body (x wraps) of world cells a block or
   more under sea level that holds at least 5,000 km² of cells the nearest Lambert cell left 0; the
   8-block halo is drawn again on the world grid (`notes.bake.projection.closed_basin`:
-  `cleared_low_cells`, `flagged_cells_nearest`, `flagged_cells`, `min_open_cells`, `radius_cells`). The first horizon of every stack cell is then raised to
+  `cleared_low_cells`, `flagged_cells_nearest`, `flagged_cells`, `min_open_cells`, `radius_cells`). The five
+  band coordinates and the two categories of the L2 biome inputs (`climate/koppen_l2`,
+  `climate/wetland`) are held back until the world's `elevation` and `closed_basin` exist and then
+  **settled to the world's ground** (BIO-170, BIO-171, BAK-057): at each L2 node's block the world's
+  sea rule (`water::sea_covers_height`, the column evaluator's own, HYD-106: the top block under sea
+  level − 1 and the node's `closed_basin` not 1) says sea or land; a node whose continentalness lies on
+  the other side of the ocean | coast edge (−0.19) takes the other medium's record (the sea's:
+  continentalness from the depth, Köppen class 31, no wetland; the land's: continentalness from the
+  distance to the sea and the nearest agreeing land node's other fields), and every other node is
+  left as the resampling wrote it (`notes.bake.projection.biome_land`: `land_biome_under_sea` and
+  `ocean_biome_on_dry_ground`, each `nodes` and `km2`). The first horizon of every stack cell is then raised to
   the bake's top rule over the world's own terrain (`notes.bake.projection.top_raise`): the stacks
   come from the nearest cell and the terrain from the footprint mean.
 - **Vector data**: rivers (vertices through the projection, x continuous along a chain; a chain
@@ -1247,7 +1257,10 @@ width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore
    ground.
 3. Else **sea** when ground < sea level − 1 and the column is not in a closed basin (the
    `closed_basin` layer's nearest cell is not 1; absent layer: never; Rust `WaterSource::closed`,
-   Java `WorldData.closedBasin`; HYD-100, format 0.6): top = sea level − 1, bed = ground. The
+   Java `WorldData.closedBasin`; HYD-100, format 0.6): top = sea level − 1, bed = ground. The test is
+   one function in each language, `water::sea_covers` (Java `Water.seaCovers`; HYD-106), which the
+   bake's biome layers read too (`sea_covers_height`, BIO-170): a column whose height H lies in
+   (sea level − 1, sea level] has top block sea level − 1 and is dry. The
    aquifer's water, which the pass tops up where the aquifer left such a column dry (it decides from
    its own noise near the surface, and leaves coastal flats a block below sea level dry). In a
    closed basin a column below sea level goes on to steps 4 and 5: dry ground unless a lake, a river

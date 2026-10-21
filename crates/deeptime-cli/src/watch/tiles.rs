@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The workbench's "Final world" tiles: the server side of the deep-zoom map of a finished run's
-//! bake ([`super::worldmap`] draws them). Routes under `/api/runs/<id>/`, answered by [`route`]:
+//! bake (`deeptime_tiles` draws them). Routes under `/api/runs/<id>/`, answered by [`route`]:
 //!
 //! - `world.json`: whether the run has a world to show (`available`), and if so the pyramid
 //!   (`tile_px`, `min_zoom`, `max_zoom`, `circumference`), the layers, the world's scale, what the
 //!   finest zoom is made of, the tile cache and the render times so far;
 //! - `tiles/<layer>/<z>/<x>/<y>.png`: one 256-pixel tile (`sat`, `elev`, `water`, or `overlay`, a
 //!   transparent rivers-and-lakes layer), XYZ-style: `x` east from the seam, `y` south from the
-//!   north edge, zoom 0 two tiles wide ([`super::worldmap`] has the geometry);
+//!   north edge, zoom 0 two tiles wide (`deeptime_tiles` has the geometry);
 //! - `world/sample?x=&z=`: what the bake says at a block (terrain height, water, climate).
 //!
 //! **View only.** Nothing here writes into a run's world data or touches a simulation; a tile is
@@ -17,7 +17,9 @@
 //! least-recently-asked eviction when the folder passes the cap, 384 MiB, `DEEPTIME_TILE_CACHE_MIB`
 //! sets another). A folder of another render version is deleted when the cache is first opened. The
 //! folder goes with the run when the workbench prunes it. At most two runs' maps (the mips and the
-//! smoothed fields, about 60 MiB each at the 16k size) are held in memory.
+//! smoothed fields, about 60 MiB each at the 16k size) are held in memory. The cache and the tile
+//! answer are the shared viewer core's (`mic_viewer::tiles`, which took them from here); a run's
+//! [`BakeMap`] is its `TileSource`.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -25,22 +27,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::time::{Duration, Instant};
 
-use serde_json::{Value, json};
+use deeptime_tiles::{BakeMap, Layer, RENDER_VERSION, TILE, blocks_per_px, pyramid_tiles};
+use mic_viewer::http::Response;
+use mic_viewer::tiles::{TileCache, parse_tile_path};
+use serde_json::json;
 
-use super::worldmap::{
-    BakeMap, Layer, RENDER_VERSION, TILE, TileGeom, blocks_per_px, pyramid_tiles,
-};
-
-/// A reply for the HTTP layer to wrap.
-pub struct Answer {
-    pub status: u16,
-    pub content_type: &'static str,
-    pub cache: &'static str,
-    pub body: Vec<u8>,
-}
-
-/// Tiles never change for a finished run, and the URL names the run.
-const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 const DEFAULT_CACHE_MIB: u64 = 384;
 const MAX_OPEN_MAPS: usize = 2;
 /// A map that failed to open is not tried again for this long.
@@ -50,188 +41,9 @@ fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-fn json_answer(status: u16, v: &Value) -> Answer {
-    Answer {
-        status,
-        content_type: "application/json",
-        cache: "no-store",
-        body: v.to_string().into_bytes(),
-    }
-}
-
-fn error(status: u16, message: impl Into<String>) -> Answer {
-    json_answer(status, &json!({ "error": message.into() }))
-}
-
-// ---------------------------------------------------------------------------------------------
-// The cache
-// ---------------------------------------------------------------------------------------------
-
-/// A run's tile folder with a size bound.
-pub struct TileCache {
-    /// `<run>/tiles/v<N>`.
-    root: PathBuf,
-    cap: u64,
-    state: Mutex<CacheState>,
-}
-
-#[derive(Default)]
-struct CacheState {
-    scanned: bool,
-    /// `layer/z/x/y.png` → (bytes, last asked).
-    files: HashMap<String, (u64, u64)>,
-    bytes: u64,
-    clock: u64,
-}
-
-static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
-
-impl TileCache {
-    pub fn new(run_dir: &Path, cap: u64) -> TileCache {
-        TileCache {
-            root: run_dir.join("tiles").join(format!("v{RENDER_VERSION}")),
-            cap,
-            state: Mutex::new(CacheState::default()),
-        }
-    }
-
-    /// Reads the folder once: what is on disk counts against the cap, the oldest files (by
-    /// modification time) are the first to go, and folders of other render versions are removed.
-    fn scan(&self, s: &mut CacheState) {
-        if s.scanned {
-            return;
-        }
-        s.scanned = true;
-        if let Some(parent) = self.root.parent()
-            && let Ok(rd) = std::fs::read_dir(parent)
-        {
-            for e in rd.flatten() {
-                if e.path() != self.root {
-                    let _ = std::fs::remove_dir_all(e.path());
-                }
-            }
-        }
-        let mut found: Vec<(std::time::SystemTime, String, u64)> = Vec::new();
-        let walk = |dir: &Path, rel: &str, out: &mut Vec<(std::time::SystemTime, String, u64)>| {
-            fn go(
-                dir: &Path,
-                rel: &str,
-                out: &mut Vec<(std::time::SystemTime, String, u64)>,
-                depth: u32,
-            ) {
-                let Ok(rd) = std::fs::read_dir(dir) else {
-                    return;
-                };
-                for e in rd.flatten() {
-                    let name = e.file_name().to_string_lossy().into_owned();
-                    let path = e.path();
-                    let rel_name = if rel.is_empty() {
-                        name
-                    } else {
-                        format!("{rel}/{name}")
-                    };
-                    if path.is_dir() && depth < 4 {
-                        go(&path, &rel_name, out, depth + 1);
-                    } else if let Ok(md) = e.metadata()
-                        && md.is_file()
-                        && rel_name.ends_with(".png")
-                    {
-                        out.push((
-                            md.modified().unwrap_or(std::time::UNIX_EPOCH),
-                            rel_name,
-                            md.len(),
-                        ));
-                    } else if rel_name.ends_with(".tmp") {
-                        let _ = std::fs::remove_file(&path);
-                    }
-                }
-            }
-            go(dir, rel, out, 0);
-        };
-        walk(&self.root, "", &mut found);
-        found.sort();
-        for (_, key, size) in found {
-            s.clock += 1;
-            s.bytes += size;
-            s.files.insert(key, (size, s.clock));
-        }
-    }
-
-    /// The tile `key` (`layer/z/x/y.png`) if it is cached.
-    pub fn get(&self, key: &str) -> Option<Vec<u8>> {
-        {
-            let mut s = lock(&self.state);
-            self.scan(&mut s);
-            s.clock += 1;
-            let clock = s.clock;
-            s.files.get_mut(key)?.1 = clock;
-        }
-        match std::fs::read(self.root.join(key)) {
-            Ok(b) => Some(b),
-            Err(_) => {
-                // Gone behind our back: forget it.
-                let mut s = lock(&self.state);
-                if let Some((size, _)) = s.files.remove(key) {
-                    s.bytes -= size;
-                }
-                None
-            }
-        }
-    }
-
-    /// Stores a tile (written aside and renamed in) and evicts the least recently asked files
-    /// while the folder is over the cap.
-    pub fn put(&self, key: &str, data: &[u8]) {
-        let path = self.root.join(key);
-        if let Some(dir) = path.parent()
-            && std::fs::create_dir_all(dir).is_err()
-        {
-            return;
-        }
-        let tmp = path.with_extension(format!(
-            "png.{}.tmp",
-            TMP_SEQ.fetch_add(1, Ordering::Relaxed)
-        ));
-        if std::fs::write(&tmp, data).is_err() || std::fs::rename(&tmp, &path).is_err() {
-            let _ = std::fs::remove_file(&tmp);
-            return;
-        }
-        let mut s = lock(&self.state);
-        self.scan(&mut s);
-        s.clock += 1;
-        let clock = s.clock;
-        if let Some((old, _)) = s.files.insert(key.to_owned(), (data.len() as u64, clock)) {
-            s.bytes -= old;
-        }
-        s.bytes += data.len() as u64;
-        if s.bytes > self.cap {
-            // Down to nine tenths, so the next tile does not evict again.
-            let target = self.cap / 10 * 9;
-            let mut order: Vec<(u64, String)> = s
-                .files
-                .iter()
-                .filter(|(k, _)| k.as_str() != key)
-                .map(|(k, v)| (v.1, k.clone()))
-                .collect();
-            order.sort_unstable();
-            for (_, k) in order {
-                if s.bytes <= target {
-                    break;
-                }
-                if let Some((size, _)) = s.files.remove(&k) {
-                    s.bytes -= size;
-                    let _ = std::fs::remove_file(self.root.join(&k));
-                }
-            }
-        }
-    }
-
-    /// (bytes, files, cap).
-    pub fn stats(&self) -> (u64, usize, u64) {
-        let mut s = lock(&self.state);
-        self.scan(&mut s);
-        (s.bytes, s.files.len(), self.cap)
-    }
+/// A run's tile cache: `<run>/tiles/v<RENDER_VERSION>`.
+fn run_cache(run_dir: &Path, cap: u64) -> TileCache {
+    TileCache::on_disk(&run_dir.join("tiles"), RENDER_VERSION, cap)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -283,7 +95,7 @@ impl Service {
         Arc::clone(runs.entry(run_dir.to_owned()).or_insert_with(|| {
             Arc::new(RunTiles {
                 world: run_dir.join("world"),
-                cache: TileCache::new(run_dir, self.cap),
+                cache: run_cache(run_dir, self.cap),
                 map: Mutex::new(Slot::Empty),
                 used: AtomicU64::new(0),
             })
@@ -350,7 +162,7 @@ impl Service {
 
 /// Answers `tail` (what follows `/api/runs/<id>/`) of the run in `run_dir` if it is one of the
 /// map's routes; `None` for any other.
-pub fn route(run_dir: &Path, tail: &str, query: &str) -> Option<Answer> {
+pub fn route(run_dir: &Path, tail: &str, query: &str) -> Option<Response> {
     match tail {
         "world.json" => Some(world_json(run_dir)),
         "world/sample" => Some(sample(run_dir, query)),
@@ -358,13 +170,13 @@ pub fn route(run_dir: &Path, tail: &str, query: &str) -> Option<Answer> {
     }
 }
 
-fn world_json(run_dir: &Path) -> Answer {
+fn world_json(run_dir: &Path) -> Response {
     let svc = service();
     let rt = svc.run(run_dir);
     let map = match svc.map(&rt) {
         Ok(m) => m,
         Err((_, reason)) => {
-            return json_answer(200, &json!({ "available": false, "reason": reason }));
+            return Response::json(200, &json!({ "available": false, "reason": reason }));
         }
     };
     let m = &map.meta;
@@ -385,7 +197,7 @@ fn world_json(run_dir: &Path) -> Answer {
             "applies_to_blocks_per_px_at_most": 4,
         })
     });
-    json_answer(
+    Response::json(
         200,
         &json!({
             "available": true,
@@ -441,93 +253,55 @@ fn query_f64(query: &str, key: &str) -> Option<f64> {
         .filter(|v| v.is_finite())
 }
 
-fn sample(run_dir: &Path, query: &str) -> Answer {
+fn sample(run_dir: &Path, query: &str) -> Response {
     let (Some(x), Some(z)) = (query_f64(query, "x"), query_f64(query, "z")) else {
-        return error(400, "give x and z (blocks)");
+        return Response::error(400, "give x and z (blocks)");
     };
     let svc = service();
     let rt = svc.run(run_dir);
     let map = match svc.map(&rt) {
         Ok(m) => m,
-        Err((st, e)) => return error(st, e),
+        Err((st, e)) => return Response::error(st, e),
     };
     match map.sample(x.floor() as i64, z.floor() as i64) {
-        Ok(v) => json_answer(200, &v),
-        Err(e) => error(500, e),
+        Ok(v) => Response::json(200, &v),
+        Err(e) => Response::error(500, e),
     }
 }
 
-/// `<layer>/<z>/<x>/<y>.png`.
+/// `<layer>/<z>/<x>/<y>.png` of a known layer (the shared path rule, then the bake's layers).
 fn parse_tile(rest: &str) -> Option<(Layer, u32, u32, u32)> {
-    let mut it = rest.split('/');
-    let layer = Layer::parse(it.next()?)?;
-    let z = it.next()?.parse().ok()?;
-    let x = it.next()?.parse().ok()?;
-    let y = it.next()?.strip_suffix(".png")?.parse().ok()?;
-    it.next().is_none().then_some((layer, z, x, y))
+    let (layer, z, x, y) = parse_tile_path(rest)?;
+    Some((
+        Layer::parse(layer)?,
+        z.try_into().ok()?,
+        x.try_into().ok()?,
+        y.try_into().ok()?,
+    ))
 }
 
-fn tile(run_dir: &Path, rest: &str) -> Answer {
-    let Some((layer, z, x, y)) = parse_tile(rest) else {
-        return error(
+fn tile(run_dir: &Path, rest: &str) -> Response {
+    if parse_tile(rest).is_none() {
+        return Response::error(
             404,
             "tiles are <layer>/<z>/<x>/<y>.png, the layer sat, elev, water or overlay",
         );
-    };
+    }
     let svc = service();
     let rt = svc.run(run_dir);
     let map = match svc.map(&rt) {
         Ok(m) => m,
-        Err((st, e)) => return error(st, e),
+        Err((st, e)) => return Response::error(st, e),
     };
-    let Some(geom) = TileGeom::new(map.meta.c, z, x, y) else {
-        return error(
-            404,
-            format!(
-                "no tile {z}/{x}/{y}: zoom 0 to {}, x below 2^(z+1), y below 2^z",
-                map.meta.max_zoom
-            ),
-        );
-    };
-    let key = format!("{}/{z}/{x}/{y}.png", layer.id());
-    let png = match rt.cache.get(&key) {
-        Some(bytes) => bytes,
-        None => {
-            let rgba = match map.render(layer, &geom) {
-                Ok(r) => r,
-                Err(e) => return error(500, format!("tile {key}: {e}")),
-            };
-            let encoded = if layer.opaque() {
-                let rgb: Vec<u8> = rgba
-                    .as_chunks::<4>()
-                    .0
-                    .iter()
-                    .flat_map(|p| [p[0], p[1], p[2]])
-                    .collect();
-                deeptime_viewer::encode_png_rgb(TILE as u32, TILE as u32, &rgb)
-            } else {
-                deeptime_viewer::encode_png(TILE as u32, TILE as u32, &rgba)
-            };
-            match encoded {
-                Ok(b) => {
-                    rt.cache.put(&key, &b);
-                    b
-                }
-                Err(e) => return error(500, format!("tile {key}: {e}")),
-            }
-        }
-    };
-    Answer {
-        status: 200,
-        content_type: "image/png",
-        cache: IMMUTABLE,
-        body: png,
-    }
+    // Cached, or drawn by the run's map (its `TileSource`: an index outside the pyramid is 404, a
+    // failed read 500) and kept; tiles never change for a finished run.
+    mic_viewer::tiles::serve(&*map, &rt.cache, true, rest)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     fn tmp(name: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("dt-tiles-{name}-{}", std::process::id()));
@@ -560,13 +334,15 @@ mod tests {
         }
     }
 
+    /// The shared cache (mic_viewer::tiles, tested there) in a run's folder: `<run>/tiles/v<N>`,
+    /// counted against its cap from the disk, other render versions dropped.
     #[test]
     fn the_cache_stays_under_its_cap_and_drops_the_least_recently_asked() {
         let run = tmp("cap");
-        let cache = TileCache::new(&run, 1000);
-        let blob = vec![7u8; 100];
+        let cache = run_cache(&run, 1000);
+        let blob = Arc::new(vec![7u8; 100]);
         for k in 0..14 {
-            cache.put(&format!("sat/0/{k}/0.png"), &blob);
+            cache.put(&format!("sat/0/{k}/0.png"), Arc::clone(&blob));
             // Ask for tile 0 all along, so it is never the oldest.
             assert!(cache.get("sat/0/0/0.png").is_some());
         }
@@ -576,13 +352,17 @@ mod tests {
         assert!((8..=10).contains(&files), "{files}");
         assert!(cache.get("sat/0/0/0.png").is_some(), "the favourite stays");
         assert!(cache.get("sat/0/1/0.png").is_none(), "the oldest went");
+        assert!(
+            run.join(format!("tiles/v{RENDER_VERSION}/sat/0/0/0.png"))
+                .is_file()
+        );
         // The counts match the disk.
         let on_disk: u64 = walk_bytes(&run.join("tiles"));
         assert_eq!(on_disk, bytes);
         // A new cache over the same folder counts what is there, and drops other versions.
         std::fs::create_dir_all(run.join("tiles/v0/sat")).unwrap();
         std::fs::write(run.join("tiles/v0/sat/old.png"), b"x").unwrap();
-        let again = TileCache::new(&run, 1000);
+        let again = run_cache(&run, 1000);
         assert_eq!(again.stats().0, bytes);
         assert!(!run.join("tiles/v0").exists());
         std::fs::remove_dir_all(&run).unwrap();

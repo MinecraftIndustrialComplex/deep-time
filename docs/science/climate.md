@@ -20,6 +20,7 @@ The constants of the per-cell design were checked against their sources before t
 | [CLM](ledger/CLM.md) | the belts' rain amount (`belts_rain_scale`); the upwind rain is on [upwind-rain.md](upwind-rain.md) | CLM-201 (1) |
 | [CLM](ledger/CLM.md) | ice branch: the flowing-sheet switch, present-day climate, supply-limited and seafloor weathering (merged 2026-10-02) | CLM-147 to CLM-162 (16) |
 | [CLM](ledger/CLM.md) | the present-day climate since 2026-10-18: the target counts ice sheets (CLM-203) and the temperate present's cap on its CO₂ factor (CLM-206, 2026-10-19) | CLM-203, CLM-206 (2) |
+| [CLM](ledger/CLM.md) | Earth's plateau summers against the model's: the mass-elevation effect the code lacks (an Earth reference, not coded; plates.md "White patches, drowned continents and coastal high ground", 2026-10-21) | CLM-220 (1) |
 | [GLA](ledger/GLA.md) | the flowing ice sheet (`climate/sheet.rs`, off by default) and the ice mass balance for the hydrology; on the glacial page | GLA-067 to GLA-076 (10) |
 | [MOI](ledger/MOI.md) | wind and rain belts | MOI-001 to MOI-033 (33) |
 | [MOI](ledger/MOI.md) | orographic rain | MOI-034 to MOI-050 (17) |
@@ -379,6 +380,16 @@ seed 1, built from 025676c8, 2026-10-19) found two things:
     (`ice.rs`, `surface_balance`).
   - The hypsometry (plates.md) puts 0.2 to 0.4 of the land above 2 km, where Earth has about
     0.1.
+
+  Both were measured on 2026-10-21 (plates.md, "White patches, drowned continents and coastal
+  high ground"): the white patches on Ben's run of that day are glaciers on 4 to 5 km plateaus,
+  and the dry rule is not what glaciates them. Their warmest month at the ground is -10.4 to
+  -4.2 °C at 25 to 45° and -16 to -12 °C at 45 to 60°, below T_ELA even with no snow (-2.35 °C).
+  Earth's Tibetan Plateau at 4.5 km has a July near +10 °C. The model's surface temperature is
+  the sea level's less 6.5 K/km, with no mass-elevation effect: Earth's large plateaus stand 2 to
+  7 °C warmer than the free air at the same height (Yao & Zhang 2015, search snippets only), and
+  Tibet's July about 11 °C (CLM-220). The term would cut the plateau ice, not remove it, while the
+  plateaus' extent stays four to seven times Earth's. Recommended as its own climate task.
 
 The present's report in the climate note now carries:
 - `co2_factor_max` (temperate only);
