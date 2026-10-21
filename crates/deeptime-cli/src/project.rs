@@ -71,7 +71,10 @@ pub fn run(world_data: &Path, out: &Path, set: &[String]) -> CliResult<Value> {
     // The guaranteed deposits under the projected world's ground, as a run's finish does
     // (`Session::finalize_write`): the pass reads the written folder.
     let anchored = deeptime_core::deposits::anchor::anchor_folder(out, p, &mut m, None)?;
-    if p.deposits.as_ref().is_some_and(|d| !d.essentials.is_empty()) {
+    if p.deposits
+        .as_ref()
+        .is_some_and(|d| !d.essentials.is_empty())
+    {
         eprintln!(
             "deeptime project: the Lambert run's deposit stage placed the essentials on the Lambert \
              world's regions and coasts (DEP-220, DEP-222), not this world's; the top-up added {} \
