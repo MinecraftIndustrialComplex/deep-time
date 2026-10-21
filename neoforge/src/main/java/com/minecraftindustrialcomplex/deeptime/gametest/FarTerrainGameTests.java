@@ -214,6 +214,78 @@ public final class FarTerrainGameTests {
         });
     }
 
+    /** Sea-bed columns the sea-bed test takes of each kind (warm oceans, all other seas), at most one per chunk. */
+    static final int SEA_BED_COLUMNS = 48;
+
+    /** Whether a biome is a warm ocean (vanilla's name; Terralith paints both sandstone below its shallow band). */
+    static boolean warmOcean(Holder<Biome> b) {
+        String path = b.unwrapKey().map(k -> k.location().getPath()).orElse("");
+        return path.equals("warm_ocean") || path.equals("deep_warm_ocean");
+    }
+
+    /**
+     * Far terrain's sea beds against the chunk's, wherever the planet's seas are (BAK-065): the
+     * level's whole surface rule paints a sea bed's top block, so the two agree, warm oceans
+     * included (Terralith paints their floors sandstone below the shallow band, where the surface
+     * table has sand: on the planet of 2026-10-21 the seam test, whose columns lie where the seam
+     * falls, met 39 such columns). Up to {@link #SEA_BED_COLUMNS} sea columns in warm oceans and as
+     * many in other seas, one per chunk, found by far terrain alone on rows over the planet; each
+     * chunk is read at the carvers, before any feature (coral, disks), as the seam test reads them,
+     * and one something else had taken further is not counted. Both sets must agree on the ground
+     * block in nine of ten columns; the warm set only when the planet has at least 8 such columns.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
+    public static void farTerrainSeaBedsFollowTheSurfaceRule(GameTestHelper helper) {   // ledger: BAK-065
+        FarTerrain far = far(helper);
+        ServerLevel level = far.level();
+        int c = far.data().circumference();
+        int minY = level.getMinBuildHeight() + 32;
+        int zMax = (int) (0.75 * far.data().projection().zMax());
+        List<FarTerrain.Column> warm = new ArrayList<>(), other = new ArrayList<>();
+        java.util.Set<Long> chunks = new java.util.HashSet<>();
+        // Rows 64 blocks apart from the equator out, alternating north and south; columns 97 apart
+        // (prime, so the rows do not line up), offset per row.
+        for (int r = 0; 64 * (r / 2) <= zMax && (warm.size() < SEA_BED_COLUMNS || other.size() < SEA_BED_COLUMNS); r++) {
+            int z = (r % 2 == 0 ? 1 : -1) * 64 * ((r + 1) / 2) + 7;
+            for (int x = -c / 2 + 5 + 13 * r; x < c / 2; x += 97) {
+                FarTerrain.Column col = far.column(x, z);
+                if (!col.water() || col.ground() < minY || col.waterTop() <= col.ground())
+                    continue;
+                List<FarTerrain.Column> into = warmOcean(col.biome()) ? warm : other;
+                if (into.size() >= SEA_BED_COLUMNS || !chunks.add(net.minecraft.world.level.ChunkPos.asLong(x >> 4, z >> 4)))
+                    continue;
+                into.add(col);
+            }
+        }
+        List<FarTerrain.Column> all = new ArrayList<>(warm);
+        all.addAll(other);
+        FarTerrainCheck.Tally warmTally = new FarTerrainCheck.Tally(), otherTally = new FarTerrainCheck.Tally();
+        int[] taken = {0};
+        ChunkSampling.forEach(helper, all.size(), i -> {
+            FarTerrain.Column column = all.get(i);
+            ChunkAccess chunk = level.getChunkSource().getChunk(column.x() >> 4, column.z() >> 4, ChunkStatus.CARVERS, true);
+            if (chunk.getPersistedStatus() != ChunkStatus.CARVERS) {
+                taken[0]++;
+                return true;
+            }
+            FarTerrainCheck.RealColumn real = FarTerrainCheck.real(chunk, column.x(), column.z());
+            (i < warm.size() ? warmTally : otherTally).add(column, real, chunk);
+            if (column.groundBlock().getBlock() != real.groundBlock().getBlock())
+                DeepTime.LOGGER.info("[gametest] seaBedDiag {}", diag(chunk, column, real, column.x(), column.z()));
+            return true;
+        }, () -> {
+            DeepTime.LOGGER.info("[gametest] farTerrainSeaBedsFollowTheSurfaceRule found warm {} other {} takenFurtherAlready={} warm {} other {}",
+                    warm.size(), other.size(), taken[0], warmTally.toJson(), otherTally.toJson());
+            helper.assertTrue(otherTally.columns >= 16, "only " + otherTally.columns + " sea-bed columns outside warm oceans compared");
+            helper.assertTrue(otherTally.share(otherTally.groundBlockSame) >= 0.9, "the sea bed's block agrees in only "
+                    + otherTally.groundBlockSame + " of " + otherTally.columns + " columns outside warm oceans: " + otherTally.toJson().get("ground_block_differences"));
+            if (warmTally.columns >= 8)
+                helper.assertTrue(warmTally.share(warmTally.groundBlockSame) >= 0.9, "the sea bed's block agrees in only "
+                        + warmTally.groundBlockSame + " of " + warmTally.columns + " warm-ocean columns: " + warmTally.toJson().get("ground_block_differences"));
+            helper.succeed();
+        });
+    }
+
     /** Column k (0 to 15) of a side of the seam: 4 blocks apart, west of x = C/2 or east of x = −C/2. */
     static int seamX(int c, boolean eastSide, int k) {
         return eastSide ? -c / 2 + 4 * k + 1 : c / 2 - 64 + 4 * k + 2;
