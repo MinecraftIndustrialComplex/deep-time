@@ -1202,6 +1202,18 @@ fn rock_shares(rock_share: f64) -> (f64, f64) {
     )
 }
 
+/// How far the surface stands up per metre of rock deposited on it once the mantle has made room
+/// for the load (Airy, no strength), on land and under the sea (m per m): 1 − `rock_share` on
+/// land; under the sea the load is the rock less the water it pushed aside, held up by the mantle
+/// less the water that fills the room (1 − 0.7·`rock_share`, 0.44 at 0.8: the sediment-loading
+/// correction (ρ_m − ρ_s)/(ρ_m − ρ_w) at the ρ_s ≈ 2,300 kg/m³ ISO-047 implies). The plate
+/// model's ocean floor stands its sediment up by the same share (`plates::pools`, PLT-340).
+pub fn rise_per_m_of_fill(rock_share: f64) -> (f64, f64) {
+    let water_share = RHO_WATER / RHO_MANTLE;
+    let (land, sea) = rock_shares(rock_share);
+    (1.0 - land, 1.0 - (sea - water_share) / (1.0 - water_share))
+}
+
 /// The local (Airy) answers to the loads [`step`] adds, per cell, m: what a plate with no
 /// strength would give them. `.0` for the step's erosion and deposition (the rock, and the sea
 /// water that takes or gives up its room as the surface moves); `.1` for the rest of the change
