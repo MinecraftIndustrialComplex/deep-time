@@ -4,6 +4,7 @@ package com.minecraftindustrialcomplex.deeptime.screen.model;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -12,6 +13,7 @@ import com.minecraftindustrialcomplex.deeptime.nativebridge.SimSession;
 import com.minecraftindustrialcomplex.deeptime.preset.Presets;
 import com.minecraftindustrialcomplex.deeptime.preset.ShareCode;
 import com.minecraftindustrialcomplex.deeptime.server.Staging;
+import com.minecraftindustrialcomplex.deeptime.worlddata.KeyframeInfo;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -646,6 +648,141 @@ class EditorModelTest {
         assertEquals(700.0, stopOf(cont));
         assertEquals(h.out, launched.get(2).out);
         assertThrows(IllegalStateException.class, () -> m.continueTo(900), "the continued run is not done yet");
+    }
+
+    /**
+     * The epoch button (Ben, 2026-10-21: "I tried to choose the checkpoint from ~50 mil years back
+     * and it didn't seem to work"): a press picks the shown map's epoch while the plates run, while
+     * the world is being written and once the run is done, each time in a run that picks up the
+     * same folder at that stop; a press it refuses, or a launch that fails, says why, and nothing
+     * is ever done silently.
+     */
+    @Test
+    void epochButtonPicksInEveryPhaseOrSaysWhy() throws Exception {
+        EditorModel m = ready(); // 1,000 Myr from a supercontinent
+        assertEquals(Optional.of(Phrase.of("gen.epoch.why.no_map")), m.epochUnavailable(null), "no run yet");
+        TimelapseModel run = m.startRun().orElseThrow();
+        FakeRunHandle h = launched.get(0);
+        h.progress = new SimSession.Progress(SimSession.Progress.RUNNING, 0, 2, 500, 250, 500_000_000L, 2_500, 7_500,
+                1L << 20, 2L << 20, 1, 3);
+        KeyframeInfo early = h.frame(-999e6, 8, 4, "elevation");
+        KeyframeInfo f800 = h.frame(-800e6, 8, 4, "elevation");
+        KeyframeInfo f500 = h.frame(-500e6, 8, 4, "elevation");
+        run.poll();
+        assertEquals(GenerationStatus.State.RUNNING, GenerationStatus.state(m));
+        assertEquals(Optional.of(Phrase.of("gen.epoch.why.no_map")), m.epochUnavailable(null));
+
+        // Refused: too early. Nothing launches, the press says why while that map shows.
+        run.scrubTo(0);
+        EditorModel.EpochPress refused = m.pressEpoch(early);
+        assertFalse(refused.started());
+        assertEquals(Phrase.of("gen.epoch.why.too_early"), refused.message());
+        assertEquals(1, launched.size());
+        assertFalse(h.cancelled);
+        assertEquals(Optional.of(Phrase.of("gen.epoch.why.too_early")), m.epochNotice());
+        assertFalse(m.epochNoticeIsError());
+        run.scrubTo(1);
+        assertTrue(m.epochNotice().isEmpty(), "another map shows: the refusal is no longer about it");
+
+        // (a) Stop here while the plates run: the run stops, a run picks up its folder at 200 Myr.
+        assertTrue(m.epochUnavailable(f800).isEmpty());
+        EditorModel.EpochPress a = m.pressEpoch(f800);
+        assertTrue(a.started());
+        assertEquals(200.0, a.stopMyr());
+        assertEquals(Phrase.of("gen.epoch.picked", Phrase.yearsAgo(-800e6)), a.message());
+        assertSame(a.run().orElseThrow(), m.run().orElseThrow());
+        assertTrue(h.cancelled);
+        assertTrue(run.superseded());
+        assertEquals(List.of(false, true), resumes);
+        assertEquals(h.out, launched.get(1).out, "the same staging folder");
+        assertEquals(200.0, stopOf(m.run().orElseThrow()));
+        assertEquals(Optional.of(Phrase.of("gen.epoch.picked", Phrase.yearsAgo(-800e6))), m.epochNotice());
+
+        // (b) Writing the world: the plates are done, the bake runs. Pick this epoch still picks.
+        TimelapseModel runA = m.run().orElseThrow();
+        FakeRunHandle h2 = launched.get(1);
+        KeyframeInfo b900 = h2.frame(-900e6, 8, 4, "elevation");
+        KeyframeInfo bEnd = h2.frame(-800e6, 8, 4, "elevation");
+        h2.progress = new SimSession.Progress(SimSession.Progress.DONE, 1, 2, 1000, 1000, 0, 10_000, 0, 1L << 20, 2L << 20, 2, 5);
+        runA.poll();
+        assertEquals(GenerationStatus.State.BAKING, GenerationStatus.state(m));
+        assertEquals(Optional.of(Phrase.of("gen.epoch.why.end_running")), m.epochUnavailable(bEnd), "the end needs no pick");
+        EditorModel.EpochPress b = m.pressEpoch(b900);
+        assertTrue(b.started(), () -> b.message().toString());
+        assertEquals(100.0, b.stopMyr());
+        assertTrue(h2.cancelled, "the bake in progress stops");
+        assertEquals(List.of(false, true, true), resumes);
+        assertEquals(100.0, stopOf(m.run().orElseThrow()));
+
+        // (c) Done: Pick this epoch bakes the earlier world again; the finished run is not cancelled.
+        TimelapseModel runB = m.run().orElseThrow();
+        FakeRunHandle h3 = launched.get(2);
+        KeyframeInfo c950 = h3.frame(-950e6, 8, 4, "elevation");
+        KeyframeInfo cEnd = h3.frame(-900e6, 8, 4, "elevation");
+        h3.completion.complete("{}");
+        runB.poll();
+        assertEquals(GenerationStatus.State.DONE, GenerationStatus.state(m));
+        assertEquals(Optional.of(Phrase.of("gen.epoch.picked_done", Phrase.yearsAgo(-900e6))), m.epochNotice(),
+                "the picked run is done: Play makes it");
+        assertEquals(Optional.of(Phrase.of("gen.epoch.why.end_done")), m.epochUnavailable(cEnd));
+        EditorModel.EpochPress c = m.pressEpoch(c950);
+        assertTrue(c.started());
+        assertEquals(50.0, c.stopMyr());
+        assertFalse(h3.cancelled);
+        assertEquals(List.of(false, true, true, true), resumes);
+
+        // That run done and accepted: the accepted line names the stop.
+        launched.get(3).frame(-950e6, 8, 4, "elevation");
+        Files.writeString(h.out.resolve("manifest.json"), "{}");
+        launched.get(3).completion.complete("{}");
+        m.run().orElseThrow().poll();
+        assertTrue(m.canAccept());
+        String label = m.accept().label();
+        assertTrue(label.endsWith("supercontinent, 1000 Myr, stop_myr 50 (950 Myr ago)"), label);
+
+        // Stopped runs have nothing to pick.
+        EditorModel s = ready();
+        TimelapseModel sr = s.startRun().orElseThrow();
+        KeyframeInfo s500 = launched.get(launched.size() - 1).frame(-500e6, 8, 4, "elevation");
+        sr.poll();
+        s.cancelRun();
+        sr.poll();
+        assertEquals(Optional.of(Phrase.of("gen.epoch.why.stopped")), s.epochUnavailable(s500));
+        assertFalse(s.pressEpoch(s500).started());
+    }
+
+    /** A pick whose run cannot launch says so on the page and leaves the run it came from going. */
+    @Test
+    void epochPickThatCannotLaunchSaysWhyAndKeepsTheRun() {
+        EditorModel.Deps d = deps();
+        EditorModel m = new EditorModel(new EditorModel.Deps(d.estimator(), (json, out, t, cap, resume) -> {
+            if (resume)
+                throw new IllegalStateException("no checkpoint chain");
+            return d.launcher().launch(json, out, t, cap, false);
+        }, d.gameDir(), d.machine(), d.loader(), d.io(), d.nativesLinked(), d.essentials()));
+        m.setStart("supercontinent");
+        m.setLengthText("1000");
+        m.refreshEstimate();
+        TimelapseModel run = m.startRun().orElseThrow();
+        FakeRunHandle h = launched.get(0);
+        KeyframeInfo f50 = h.frame(-50e6, 8, 4, "elevation");
+        h.frame(0, 8, 4, "elevation");
+        run.poll();
+        EditorModel.EpochPress p = m.pressEpoch(f50);
+        assertFalse(p.started());
+        assertEquals(950.0, p.stopMyr());
+        assertEquals(Phrase.of("gen.epoch.failed", Phrase.yearsAgo(-50e6), "no checkpoint chain"), p.message());
+        assertSame(run, m.run().orElseThrow(), "the run it came from stays");
+        assertFalse(h.cancelled, "and keeps going");
+        assertFalse(run.superseded());
+        assertEquals(Optional.of(p.message()), m.epochNotice());
+        assertTrue(m.epochNoticeIsError());
+        assertEquals(Optional.of("no checkpoint chain"), m.launchError());
+        assertTrue(has(m.problems(), "editor.warning.launch_failed"));
+        // Done, it can still be played as it is.
+        h.completion.complete("{}");
+        run.poll();
+        assertEquals(TimelapseModel.State.DONE, run.state());
     }
 
     @Test

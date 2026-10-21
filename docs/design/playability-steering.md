@@ -122,8 +122,37 @@ on demand (`Record::File`). Every frame is stored once.
 
 ## 4. Pick the epoch
 
-**What a player does.** On the run page, scrub to a keyframe and press **Play this epoch** (shown
-"Stop here" while the run is going). The world is baked as it stands at that frame's time.
+**What a player does.** On the run page, scrub to a keyframe and press **Pick this epoch** (shown
+"Stop here" while the plates run). A short stretch runs again, then **Play** creates the world as it
+stands at that frame's time. Play on its own always makes the world at the end of the run, whatever
+the map shows; when the map is scrubbed back on a finished run, Play's tooltip says so and points to
+Pick this epoch.
+
+**The button in each phase** (2026-10-21; Ben's pick at 50 Mya did not take, see below):
+
+| Phase (`GenerationStatus`) | Label | Pressable on | Tooltip |
+|---|---|---|---|
+| plates running (`RUNNING`) | Stop here | every kept map from 2 Myr after the start to before the run's stop | stop and play that map's world (at the newest kept map while the live map shows) |
+| end stages and writing (`BAKING`) | Pick this epoch | the same | play that map's world instead of the one being written, which stops |
+| done (`DONE`) | Pick this epoch | the same | play that map's world instead of the one at the end of the run |
+| failed or cancelled | Pick this epoch | none | the run stopped: Try again |
+
+On a map it cannot pick (none yet, the run's own end, the first 2 Myr, a run with no timeline) the
+button is greyed out and its tooltip gives the reason (`EditorModel.epochUnavailable`); the label,
+state and tooltip are recomputed every tick. Every press is logged at INFO (`Deep Time: epoch
+picked at … (stop_myr …) in run … while …`, or `… nothing to pick (…)`), and the page says under the
+map what it did: going back to that time, then, once the picked run is done, that Play makes that
+epoch's world. The new session is launched before the old one is cancelled: if the launch fails,
+the old run stays as it was, and the error shows on the page and in the log (WARN). The accepted-run
+log line carries the stop (`… 1000 Myr, stop_myr 950 (50 Myr ago)`), and the world's manifest has it
+in `notes.run.timeline.stop_myr`.
+
+Ben's report (2026-10-21, the client of master 0a7431e1): "I tried to choose the checkpoint from
+~50 mil years back and it didn't seem to work." His log has one native session, no resume and an
+accepted run without a stop, and his manifest has no `stop_myr`: no press reached the button's
+handler, and the world was the end of the run. Before the fix the handler also returned without a
+word when the frame was refused, a failed launch showed only on the blocked page, and the label was
+set only when the page was built.
 
 **How.** The editor starts a new session in the same staging folder with the effective preset and
 `timeline.stop_myr` = the frame's time after the start (`Session::resume_epoch`, JNI
@@ -176,9 +205,11 @@ resumes from them (`POST /api/runs/<id>/resume {"stop_myr": N}`); the source run
 **Stop here** stops the run and plays that frame's world. A player who likes the newest kept frame
 stops at it.
 
-**How.** The running session is cancelled (it stops within one step), and an epoch pick at that
-frame starts in the same staging folder (the editor's launch gate waits for the cancelled session
-to let go of its memory). Its checkpoint was written when the run passed it. The staging folder is
+**How.** An epoch pick at that frame starts in the same staging folder and the running session is
+then cancelled (it stops within one step; the editor's launch gate holds the new session until the
+cancelled one lets go of its memory). The same holds while the end stages run and the world is
+written: the button then reads Pick this epoch, the writing stops, and the pick's run writes the
+picked world instead. Its checkpoint was written when the run passed it. The staging folder is
 not deleted on this cancel (the timelapse model is told the run was superseded).
 
 **Decided here: stopping is at keyframes.** Stopping at the very step the run is on would need a
@@ -408,8 +439,14 @@ the bake: as in a run of that length). A continue reruns the old tail (50 Myr wi
 - The nudges meet their targets within tolerance on a planet that starts outside them, with no
   sea-level step larger than r · dt and no sign flip-flop of the controls.
 - Checkpoint selection: keys, stricter steering falling back, none found (starts over).
-- Java: the editor's Continue, Stop here and Play this epoch launch a resume in the same staging
+- Java: the editor's Continue, Stop here and Pick this epoch launch a resume in the same staging
   folder; a superseded run's folder survives; the steering fields are editable with their defaults.
+  EditorModelTest presses the epoch button while the plates run, while the world is written and
+  when the run is done (each picks the frame's stop, resumes in the same folder and says so), on
+  maps it cannot pick (nothing launches, the reason is given), and with a launch that fails (the
+  old run is kept and the error shown); the accepted label carries the stop.
+- The client walk with `--prop epochclick=true` (create-world-ux.md §4) presses the button with the
+  mouse in the three phases and checks each relaunch's stop and the created world's manifest.
 
 ## 10. Questions for Ben
 
