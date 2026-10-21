@@ -681,7 +681,12 @@ What it says:
 
 - **The deposits' zinc fell about tenfold and their lead about eightfold**, because MVT, which
   made most of both, now forms only in a real limestone horizon (ORE-271) and almost none does on
-  these planets: 0 or 1 natural MVT site on the branch against 98 to 242 on master. PREA8_PENDING
+  these planets: 0 or 1 natural MVT site on the branch against 98 to 242 on master. It is not the
+  facies change A8 (f546d9bc): the build before it (b2f5c381) had 0 [0, 4] natural sites on the
+  same six planets. The host rule made the fall (159.5 to 5 sites a planet at 686a01cf, above),
+  and the review's pairwise overlap and host age (A4, A5, 160b5389) took most of what was left:
+  built just before them (34e7e88e), supercontinent 2, whose simulation runs to the same 364
+  drawn MVT sites on both builds, kept 1 site where b2f5c381 kept 0. PREHOST_SC1
 - **The floor holds the totals, not the sources.** The scatter is now most of the world's zinc
   (1.07 of 1.35 blocks per land chunk) and nearly all of its lead (0.26 of 0.30); lead per land chunk rose
   (0.17 to 0.30), since the galena scatter outweighs what the deposits lost, and zinc fell to
