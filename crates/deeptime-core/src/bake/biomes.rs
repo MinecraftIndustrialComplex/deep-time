@@ -717,6 +717,9 @@ pub struct Ground<'a> {
     pub l2: &'a GridDesc,
     pub seed: u64,
     pub circumference: u32,
+    /// The L2 cells of closed basins below sea level (`hydro::closed_below_sea`, HYD-100): land,
+    /// though under sea level. `None`: every cell below sea level is sea.
+    pub closed: Option<&'a [bool]>,
 }
 
 /// The five layers (router order: temperature, vegetation, continents, erosion, ridges) in
@@ -1157,7 +1160,13 @@ pub fn map(
     let n = w * h;
     let sea = g.sea_level_m;
     let elev = g.elevation_m;
-    let land: Vec<bool> = elev.iter().map(|&z| f64::from(z) > sea).collect();
+    let closed = |k: usize| g.closed.is_some_and(|c| c[k]);
+    // A closed basin below sea level is land: dry ground, a playa or a lake (HYD-100).
+    let land: Vec<bool> = elev
+        .iter()
+        .enumerate()
+        .map(|(k, &z)| f64::from(z) > sea || closed(k))
+        .collect();
 
     // Temperature and humidity.
     let mut class_l2 = Vec::new();
@@ -1286,8 +1295,13 @@ pub fn map(
         }
     }
 
-    // Relief and the ridge/valley index on the ground (the sea surface counted as ground).
-    let ground: Vec<f32> = elev.iter().map(|&z| z.max(sea as f32)).collect();
+    // Relief and the ridge/valley index on the ground (the sea surface counted as ground; a closed
+    // basin's floor is ground, below sea level).
+    let ground: Vec<f32> = elev
+        .iter()
+        .enumerate()
+        .map(|(k, &z)| if closed(k) { z } else { z.max(sea as f32) })
+        .collect();
     let k = ((p.terrain_window_blocks / (2.0 * r2)).round() as usize).max(1);
     let relief = box_mean(&local_range(&ground, w, h, k), w, h, k);
     let mean = box_mean(&ground, w, h, k);
@@ -1785,6 +1799,7 @@ mod tests {
             l2: &l2,
             seed: 3,
             circumference: c,
+            closed: None,
         };
         let m = map(Some(&climate), &g, params, table);
         (m, w2)
@@ -1843,6 +1858,7 @@ mod tests {
             l2: &l2,
             seed: 3,
             circumference: c,
+            closed: None,
         };
         let m = map(
             Some(&climate),
@@ -1941,6 +1957,7 @@ mod tests {
             l2: &l2,
             seed: 3,
             circumference: c,
+            closed: None,
         };
         let m = map(
             Some(&climate),

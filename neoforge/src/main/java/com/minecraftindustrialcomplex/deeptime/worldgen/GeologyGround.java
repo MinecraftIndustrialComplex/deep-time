@@ -236,15 +236,22 @@ public final class GeologyGround {
 
     private static final int[][] DIRS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
 
-    /** The sea within {@link #COAST_BLOCKS} of the column (eight directions, at half and full reach). */
+    /**
+     * The sea within {@link #COAST_BLOCKS} of the column (eight directions, at half and full reach). Ground below sea
+     * level in a closed basin is not sea (HYD-100).
+     */
     public boolean coastal(int x, int z) {
-        if (terrain.height(x, z) < seaLevel)
+        if (sea(x, z))
             return true;
         for (int[] d : DIRS)
             for (int r : new int[]{COAST_BLOCKS / 2, COAST_BLOCKS})
-                if (terrain.height(x + d[0] * r, z + d[1] * r) < seaLevel)
+                if (sea(x + d[0] * r, z + d[1] * r))
                     return true;
         return false;
+    }
+
+    private boolean sea(int x, int z) {
+        return terrain.height(x, z) < seaLevel && !terrain.closedBasin(x, z);
     }
 
     /** The groups of the coast's bedrock: the column's rock, or the first consolidated rock round it. */

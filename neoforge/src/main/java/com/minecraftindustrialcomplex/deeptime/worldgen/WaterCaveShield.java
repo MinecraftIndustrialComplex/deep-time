@@ -40,7 +40,8 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
  *       top and fades out by {@value #SHALLOW_NONE_BLOCKS}: under deeper water vanilla's aquifer
  *       floods the cave mouths (its sea wherever a sampled preliminary surface, the highest
  *       8-block cell under H, lies 9 or more blocks under sea level), as on vanilla's ocean
- *       floors.</li>
+ *       floors. A cell in a closed basin below sea level ({@code closed_basin}, HYD-100) is not
+ *       sea: no sea stands there, and the basin's own lake, if any, counts as a lake.</li>
  * </ul>
  * Ledger HYD-078. Plain Java, no Minecraft, thread-safe.
  */
@@ -69,7 +70,7 @@ public final class WaterCaveShield {
     private final int seaTop;
     private final int reach;
     private final Rivers rivers;
-    private final RasterSampler levels, elevation, amplitude;
+    private final RasterSampler levels, elevation, amplitude, closed;
     /** Whether the amplitude layer shares the elevation layer's grid (both L3), so a cell's A is read by index. */
     private final boolean sameGrid;
 
@@ -81,6 +82,7 @@ public final class WaterCaveShield {
         this.levels = wd.has(WorldData.WATER_LEVEL) ? wd.layer(WorldData.WATER_LEVEL) : null;
         this.elevation = wd.has(WorldData.ELEVATION) ? wd.layer(WorldData.ELEVATION) : null;
         this.amplitude = wd.amplitudeLayer();
+        this.closed = wd.has(WorldData.CLOSED_BASIN) ? wd.layer(WorldData.CLOSED_BASIN) : null;
         this.sameGrid = elevation != null && amplitude != null && sameGrid(elevation.desc().grid(), amplitude.desc().grid());
     }
 
@@ -176,7 +178,8 @@ public final class WaterCaveShield {
                     } else {
                         double a = amplitude == null ? 0.0 : sameGrid ? amplitude.get(i, j)
                                 : amplitude.nearest(g.originBlockX() + i * (double) r, g.originBlockZ() + j * (double) r);
-                        hit = v - (Double.isNaN(a) ? 0.0 : a) <= seaTop;
+                        hit = v - (Double.isNaN(a) ? 0.0 : a) <= seaTop
+                                && (closed == null || closed.nearest(g.originBlockX() + i * (double) r, g.originBlockZ() + j * (double) r) != 1.0);
                     }
                 } else {
                     hit = !Double.isNaN(v);
