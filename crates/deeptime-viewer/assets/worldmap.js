@@ -86,7 +86,9 @@
 .wv-info table { border-collapse: collapse; width: 100%; font-size: 12px; }
 .wv-info td { padding: 1px 6px 1px 0; vertical-align: top; }
 .wv-info td:last-child { text-align: right; color: var(--fg-1, #eef); font-family: var(--mono, ui-monospace, monospace); }
-@media (max-width: 760px) { .worldview { margin: 6px 8px 8px; } .wv-bar .lbl { display: none; } }
+/* Phones: the stage is as tall as its content there, so the view (whose canvas is absolute) needs a
+   height of its own or it collapses to nothing (it did before the map core moved too). */
+@media (max-width: 760px) { .worldview { flex: 0 0 auto; height: 72vh; height: 72dvh; min-height: 320px; margin: 6px 8px 8px; } .wv-bar .lbl { display: none; } }
 `;
   document.head.appendChild(css);
 
