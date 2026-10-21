@@ -419,7 +419,7 @@ impl PlatesStage {
         lap(&mut clock, "fronts");
         // The boundary mix (measurement only) on the same samples as the fronts, before the
         // collapse below turns any crust over.
-        let mix_km = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
+        let mix = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
         book(st, gap_budget::Part::Other);
         lap(&mut clock, "boundary_mix");
         // Crust beyond the thickest column goes down; thickened crust that nothing raises any
@@ -679,7 +679,7 @@ impl PlatesStage {
             final_step,
             dynamics::Observed {
                 front_km: &pull.front_km,
-                mix_km,
+                mix,
                 arcs,
                 forces: balance.recorded.as_ref(),
                 guarded: &guarded,
@@ -1216,7 +1216,8 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
             && s.arc_oceanic_m > 0.0
             && s.arc_oceanic_m >= mature_m
         {
-            s.kind = CONTINENTAL;
+            // The ocean crust under the arc stays under it, as its basement (ledger: PLT-331).
+            s.make_continental();
             s.flags |= EMERGED;
             if s.orogeny != OROGENY_HIMALAYAN {
                 s.orogeny = OROGENY_ANDEAN;
@@ -1271,6 +1272,9 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
             regime::CRATON
         };
         s.thickness_m = s.pools.iter().sum();
+        // No more basement than the column's mafic rock, none on ocean floor (what eroded,
+        // foundered or flowed took it). ledger: PLT-331
+        s.basement_m = s.basement();
     });
     st.counters.emerged += st.samples.iter().filter(|s| s.flags & EMERGED != 0).count() as u32;
 }
