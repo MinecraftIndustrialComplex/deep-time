@@ -1124,6 +1124,13 @@ struct TypeCensus {
     /// cut short.
     no_cover: usize,
     cover_capped: usize,
+    /// In-stratum types (`hosts.in_stratum`): deposits dropped because the site's column holds
+    /// no horizon of a host class, and because the site lies on oceanic crust now.
+    no_host: usize,
+    oceanic: usize,
+    /// Placers dropped because their bench lies on oceanic crust, or deeper under the sea than
+    /// the lowest sea level since they formed (a drowned bench is kept only within that range).
+    offshore: usize,
     /// The most favourable cell of the planet: where, how favourable, and the component that
     /// limits it (the answer to "why so few?" for a type with an empty map).
     best_cell: Option<Value>,
@@ -1184,6 +1191,146 @@ impl Stage for DepositStage {
     }
 }
 
+/// How far below the present sea (the history's last level) the sea stood at its lowest since
+/// `t_years` (m, ≥ 0), from a sea-level history of (years, m): the depth a bench drowned since
+/// then can lie at. 0 without a history.
+fn lowstand_m(history: &[(f64, f64)], t_years: f64) -> f64 {
+    let Some(&(_, now)) = history.last() else {
+        return 0.0;
+    };
+    let lowest = history
+        .iter()
+        .filter(|(t, _)| *t >= t_years)
+        .map(|(_, m)| *m)
+        .fold(now, f64::min);
+    (now - lowest).max(0.0)
+}
+
+/// Whether a `plates/crust_type` value is oceanic crust: a finite value that is the oceanic
+/// type (a NaN, no crust type, is not; `as u8` would read it as 0, oceanic).
+fn crust_is_oceanic(k: f32) -> bool {
+    k.is_finite() && k as u8 == crate::plates::state::OCEANIC
+}
+
+/// Whether a placer at ground `elev_m` (m above the present sea: `deeptime:elevation_m` is
+/// relative to the sea of its time) over crust that is `oceanic` now is offshore: on oceanic
+/// crust, or under the present sea deeper than the sea's lowest stand since `t_years` ([`lowstand_m`]).
+fn placer_offshore(elev_m: f64, oceanic: bool, history: &[(f64, f64)], t_years: f64) -> bool {
+    oceanic || -elev_m > lowstand_m(history, t_years)
+}
+
+/// The top solid blocks of a column that hold no in-stratum body: a dry column's soil, which the
+/// game's deposit feature leaves without ore (an unconsolidated block hosts only a loose body)
+/// and the deposit audit counts as soil (`--soil`, 4); a sea or river bed's top blocks are kept
+/// clear the same way (its loose sediment, and one rule for both).
+pub const SOIL_BLOCKS: i32 = 4; // ledger: ORE-271
+
+/// How far round a site its host horizon must run (strata cells; the columns checked are the
+/// 5 × 5 square of cells about the site). The world's projection pass gives each world strata
+/// cell the stack of the nearest simulation cell (`bake::project`) and the column rule then
+/// blends the 4 × 4 cells about a block, so the stack the game paints at a site blends simulation
+/// cells up to about two cells away, not the simulation's own blend there; a facies change or a
+/// pinch-out inside that reach moves the host off the body. A unit that every column of that
+/// reach holds, in a host class and overlapping the body's blocks (each column on its own, so a
+/// dipping unit passes), is where the game paints it. MVT ore lies in regional platform
+/// carbonate (Leach et al. 2010), which runs far beyond two cells (about 10 km at 300 m a block).
+const HOST_REACH_CELLS: i32 = 2; // ledger: ORE-271 (game-choice: the projection's reach)
+
+/// The host horizon of a site for a body wanted at block `want_y` (the ledger's depth), read
+/// from `centre`, the site column's drawn units (top-down, `ages` their top and base ages in Myr
+/// before the log's present where their keys hold one, `structure::Cover::unit_ages_ma`), and
+/// `around`, the columns about it.
+///
+/// The candidates are the centre's units whose class `is_host`, each cut to its blocks under the
+/// top [`SOIL_BLOCKS`] solid blocks of the column whose ground is `surf` and above the floor's
+/// last 4 blocks (`min_y` the floor), and to its part at least as old as the ore (`ore_ma`; None
+/// for no age test): a unit wholly younger is no host, one the ore's age falls inside keeps its
+/// blocks below that age, its age taken linear through it; a unit whose keys hold no age (a
+/// basement pool) is older than the ore under a log unit that is (superposition), and otherwise
+/// keeps only its blocks at or below `want_y`. Taken nearest `want_y` first, the first that
+/// overlaps, in every column of `around`, the same unit there (`DrawnUnit::same_unit`) of a host
+/// class: (middle y, half thickness in blocks).
+fn host_horizon(
+    (centre, ages): (&[crate::structure::DrawnUnit], &[Option<[f64; 2]>]),
+    around: &[Vec<crate::structure::DrawnUnit>],
+    is_host: impl Fn(u8) -> bool,
+    (surf, want_y, min_y): (f64, f64, i32),
+    ore_ma: Option<f64>,
+) -> Option<(f64, f64)> {
+    let hi_max = surf.floor() as i32 - SOIL_BLOCKS;
+    let lo_min = min_y + 4; // ledger: ORE-271
+    let mid = |(hi, lo): (i32, i32)| f64::from(lo + hi + 1) / 2.0;
+    // The centre's candidates as block spans (highest, lowest) with their unit; a unit's blocks
+    // run from its top down to the next horizon's top + 1.
+    let mut candidates = Vec::new();
+    let mut older_above = false;
+    for (u, age) in centre.iter().zip(ages) {
+        let (mut hi, lo) = (u.top.min(hi_max), (u.below + 1).max(lo_min));
+        if is_host(u.class) && hi >= lo {
+            // ledger: ORE-271 (the host is at least as old as the ore)
+            let keep = match (ore_ma, age) {
+                (None, _) => true,
+                (Some(ore), Some([top_ma, base_ma])) => {
+                    if *base_ma < ore {
+                        false
+                    } else {
+                        if *top_ma < ore {
+                            let f = (ore - top_ma) / (base_ma - top_ma);
+                            let blocks = f64::from((u.top - u.below).max(1));
+                            hi = hi.min(u.top - (f * blocks).ceil() as i32);
+                        }
+                        hi >= lo
+                    }
+                }
+                (Some(_), None) => {
+                    if !older_above {
+                        hi = hi.min(want_y.floor() as i32);
+                    }
+                    hi >= lo
+                }
+            };
+            if keep {
+                candidates.push((hi, lo, u));
+            }
+        }
+        if let (Some(ore), Some([_, base_ma])) = (ore_ma, age) {
+            older_above |= *base_ma >= ore;
+        }
+    }
+    // Nearest the wanted depth first; a stable sort keeps the higher of two as near.
+    candidates.sort_by(|a, b| {
+        (mid((a.0, a.1)) - want_y)
+            .abs()
+            .total_cmp(&(mid((b.0, b.1)) - want_y).abs())
+    });
+    candidates
+        .into_iter()
+        .find(|&(hi, lo, u)| {
+            around.iter().all(|col| {
+                col.iter()
+                    .any(|v| is_host(v.class) && u.same_unit(v) && v.top >= lo && v.below < hi)
+            })
+        })
+        .map(|(hi, lo, _)| (mid((hi, lo)), f64::from(hi - lo + 1) / 2.0))
+}
+
+/// Where a body of an in-stratum type sits (`hosts.in_stratum`, [`DepositStage::host_stratum`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum HostFit {
+    /// The type is not in-stratum, or there are no columns to read (a synthetic history).
+    Free,
+    /// The site lies on oceanic crust now.
+    Oceanic,
+    /// The column holds no horizon of a host class between the ground and the floor.
+    NoHost,
+    /// In a host horizon: the body's centre depth under the ground (m) and its largest vertical
+    /// semi-axis (blocks, half the horizon).
+    In {
+        centre_depth_m: f64,
+        max_half_v_blocks: f64,
+    },
+}
+
 /// Everything the placement step shares.
 struct Finish {
     grid: GridDesc,
@@ -1202,6 +1349,12 @@ struct Finish {
     /// The sedimentary cover a coal stack must lie in, as the world will draw it; None without a
     /// planet's columns (a synthetic history).
     cover: Option<crate::structure::Cover>,
+    /// Whether each cell's crust is oceanic now (`plates/crust_type`, [`crust_is_oceanic`]); None
+    /// without the field.
+    oceanic: Option<Vec<bool>>,
+    /// The surface's sea level step by step, (years, m), oldest first (`SurfaceState::
+    /// sea_history`); empty without it.
+    sea_history: Vec<(f64, f64)>,
 }
 
 /// Where the crust now at each of `cells` was at the end of every frame: `[i][k]`, [`NO_ORIGIN`]
@@ -1308,6 +1461,15 @@ pub fn bilinear_cells(grid: &GridDesc, values: &[f32], x: f64, z: f64) -> f64 {
 }
 
 impl Finish {
+    /// Whether the crust at `cell` is oceanic now (false without the plates' field, and where
+    /// the field holds no crust type: a NaN is not oceanic).
+    fn oceanic(&self, cell: u32) -> bool {
+        self.oceanic
+            .as_ref()
+            .and_then(|c| c.get(cell as usize))
+            .is_some_and(|&o| o)
+    }
+
     /// The present surface (block y) at block (x, z): the L1 elevation sampled bilinearly, the
     /// same surface a synthetic deposit world's baked terrain follows
     /// ([`synthetic::HistoryTerrain`]), so a body's clip and depth match the ground it is in.
@@ -1515,6 +1677,17 @@ impl DepositStage {
             placed: vec![Vec::new(); self.types.len()],
             present,
             paths: BTreeMap::new(),
+            oceanic: world
+                .fields
+                .get("plates/crust_type")
+                .filter(|fl| fl.data.len() == n)
+                .map(|fl| fl.data.iter().map(|&k| crust_is_oceanic(k)).collect()),
+            sea_history: world.surface.as_ref().map_or_else(Vec::new, |st| {
+                st.sea_history
+                    .iter()
+                    .map(|&[t, m]| (f64::from(t) * 1.0e6, f64::from(m)))
+                    .collect()
+            }),
             cover: self.planet.as_deref().and_then(|p| {
                 // In the session's pool: the horizon bake is parallel, and outside an `install`
                 // it ran on Rayon's global pool, every core of the machine whatever the session's
@@ -2362,6 +2535,79 @@ impl DepositStage {
         (t_form, rng)
     }
 
+    /// Where a body of in-stratum type `ti` at (x, z), formed at `t_form` (years), sits: in the
+    /// column's unit of a host class (`hosts.weights` above 0) whose middle is nearest the
+    /// ledger's depth `want_depth_m`, read from the horizons the world draws (`structure::Cover`),
+    /// each kept under the soil and above the floor's last 4 blocks and to its part at least as
+    /// old as the ore, that overlaps the same unit of a host class in every column within
+    /// [`HOST_REACH_CELLS`] strata cells ([`host_horizon`]). A stratabound ore lies in its host
+    /// unit (MVT: replacement and open-space fill of platform carbonate older than the ore,
+    /// Leach et al. 2010), so a column without one has no deposit, nor does crust that is oceanic
+    /// now (no platform; Leach et al. 2010). `scratch` is kept between calls (the folds' and
+    /// faults' reads).
+    #[allow(clippy::too_many_arguments)]
+    fn host_stratum(
+        &self,
+        f: &Finish,
+        ti: usize,
+        (cell, x, z): (u32, f64, f64),
+        surf: f64,
+        want_depth_m: f64,
+        t_form: f64,
+        scratch: &mut deeptime_format::structure::DeformScratch,
+    ) -> HostFit {
+        let t = &self.types[ti];
+        if !t.hosts.in_stratum {
+            return HostFit::Free;
+        }
+        // ledger: ORE-271
+        if f.oceanic(cell) {
+            return HostFit::Oceanic;
+        }
+        let Some(cover) = &f.cover else {
+            return HostFit::Free;
+        };
+        let weights = t.hosts.weights().unwrap_or_default();
+        let table = crate::surface::lithology::table();
+        let is_host = |class: u8| {
+            table
+                .get(usize::from(class))
+                .and_then(|c| weights.get(c.name))
+                .is_some_and(|&w| w > 0.0)
+        };
+        let want_y = surf - want_depth_m / f.sc.m_per_block_v;
+        let centre = cover.drawn_units_at(x, z, scratch);
+        if !centre.iter().any(|u| is_host(u.class)) {
+            return HostFit::NoHost;
+        }
+        let ages: Vec<_> = centre.iter().map(|u| cover.unit_ages_ma(u)).collect();
+        let (span, ore_ma) = ((surf, want_y, cover.min_y()), cover.age_ma(t_form));
+        // No candidate in the site's own column: no need to read the columns about it.
+        if host_horizon((&centre, &ages), &[], is_host, span, ore_ma).is_none() {
+            return HostFit::NoHost;
+        }
+        let (r, step) = (HOST_REACH_CELLS, cover.cell_blocks());
+        let mut around = Vec::with_capacity(((2 * r + 1) * (2 * r + 1) - 1) as usize);
+        for j in -r..=r {
+            for i in -r..=r {
+                if (i, j) != (0, 0) {
+                    around.push(cover.drawn_units_at(
+                        x + f64::from(i) * step,
+                        z + f64::from(j) * step,
+                        scratch,
+                    ));
+                }
+            }
+        }
+        match host_horizon((&centre, &ages), &around, is_host, span, ore_ma) {
+            None => HostFit::NoHost,
+            Some((mid, half)) => HostFit::In {
+                centre_depth_m: (surf - mid) * f.sc.m_per_block_v,
+                max_half_v_blocks: half,
+            },
+        }
+    }
+
     /// A stacked deposit's seams and where its centre lies (coal measures: their number from the
     /// sediment the history laid down under the site while it was coal-forming; the top seam
     /// half the measures above the centre), held in the site's sedimentary cover
@@ -2473,6 +2719,21 @@ impl DepositStage {
         if fit == Some(geometry::StackFit::NoCover) {
             return false;
         }
+        // The same host horizon `materialise` puts the body in (only stacks are built below,
+        // and no stacked type is in-stratum).
+        let centre_depth = match self.host_stratum(
+            f,
+            ti,
+            (cell, x, z),
+            surf,
+            centre_depth,
+            t_form,
+            &mut Default::default(),
+        ) {
+            HostFit::Oceanic | HostFit::NoHost => return false,
+            HostFit::In { centre_depth_m, .. } => centre_depth_m,
+            HostFit::Free => centre_depth,
+        };
         let centre_y = surf - centre_depth / sc.m_per_block_v;
         let top_y = seams.as_ref().map_or(centre_y, |p| {
             surf - (centre_depth - p.measures_m / 2.0) / sc.m_per_block_v
@@ -2503,6 +2764,7 @@ impl DepositStage {
             dip: dip as f32,
             truncated: matches!(fate, Fate::Truncated { .. }),
             water_table_m: children::present_water_table_m(col),
+            max_half_v_blocks: f64::INFINITY,
         };
         let mut n = 0;
         !geometry::stack_bodies(
@@ -2704,6 +2966,31 @@ impl DepositStage {
             }
             Some(geometry::StackFit::Capped { .. }) => f.census[ti].cover_capped += 1,
         }
+        // An in-stratum body sits whole in its host horizon, at that horizon's depth under the
+        // present ground, no thicker than the horizon and parallel to it.
+        let (centre_depth, hosted) = match self.host_stratum(
+            f,
+            ti,
+            (cell, x, z),
+            surf,
+            centre_depth,
+            t_form,
+            &mut Default::default(),
+        ) {
+            HostFit::Oceanic => {
+                f.census[ti].oceanic += 1;
+                return Ok(());
+            }
+            HostFit::NoHost => {
+                f.census[ti].no_host += 1;
+                return Ok(());
+            }
+            HostFit::In {
+                centre_depth_m,
+                max_half_v_blocks,
+            } => (centre_depth_m, Some(max_half_v_blocks)),
+            HostFit::Free => (centre_depth, None),
+        };
         let centre_y = surf - centre_depth / sc.m_per_block_v;
         let top_y = seams.as_ref().map_or(centre_y, |p| {
             surf - (centre_depth - p.measures_m / 2.0) / sc.m_per_block_v
@@ -2730,17 +3017,24 @@ impl DepositStage {
             t.geometry.dip_deg[0].to_radians()
         };
         let yaw_draw = rng.uniform() * std::f64::consts::PI;
+        // A truncated body buried again is placed under the surface that cut it; a hosted one
+        // lies in the horizon the present column holds.
+        let cut_m = if hosted.is_some() {
+            0.0
+        } else {
+            fate.cut_depth_m()
+        };
         let placement = Placement {
             x,
             z,
-            // A truncated body buried again is placed under the surface that cut it.
-            surface_y: surf - fate.cut_depth_m() / sc.m_per_block_v,
-            centre_depth_m: centre_depth - fate.cut_depth_m(),
+            surface_y: surf - cut_m / sc.m_per_block_v,
+            centre_depth_m: centre_depth - cut_m,
             // An adjoining deposit's footprint was placed with its yaw.
             yaw: cand.point.ellipse.map_or(yaw_draw, |e| e[2]) as f32,
-            dip: dip as f32,
+            dip: if hosted.is_some() { 0.0 } else { dip as f32 },
             truncated,
             water_table_m: children::present_water_table_m(col),
+            max_half_v_blocks: hosted.unwrap_or(f64::INFINITY),
         };
         let mut left = fate.fraction_left();
         let mut grades = Grades::new();
@@ -2923,13 +3217,7 @@ impl DepositStage {
             id: site_id,
             kind: t.site_kind.site_kind(),
             deposit_type: t.id.clone(),
-            center: [
-                x.round() as i32,
-                centre_y
-                    .round()
-                    .clamp(f64::from(sc.min_y), f64::from(sc.max_y)) as i32,
-                z.round() as i32,
-            ],
+            center: centre_block(x, centre_y, z, &sc),
             lat_lon: ll,
             aabb,
             body: bodies.first().map(|b| b.id),
@@ -2963,6 +3251,7 @@ impl DepositStage {
                 dip: 0.0,
                 truncated: false,
                 water_table_m: 0.0,
+                max_half_v_blocks: f64::INFINITY,
             };
             let cgrades: Grades = [("c:copper".to_string(), bg)].into_iter().collect();
             let cbodies =
@@ -2998,11 +3287,7 @@ impl DepositStage {
                 id: child_id,
                 kind: ctype.site_kind.site_kind(),
                 deposit_type: ctype.id.clone(),
-                center: [
-                    x.round() as i32,
-                    (surf - depth / sc.m_per_block_v).round() as i32,
-                    z.round() as i32,
-                ],
+                center: centre_block(x, surf - depth / sc.m_per_block_v, z, &sc),
                 lat_lon: ll,
                 aabb: union_aabb(&cbodies),
                 body: cbodies.first().map(|b| b.id),
@@ -3133,6 +3418,15 @@ impl DepositStage {
         if shed.eroded_fraction < 1.0 && size.tonnage_mt < child.sizing.tonnage_mt.p90 {
             return Ok(());
         }
+        // A placer is a river or beach bench: none on oceanic crust, nor under the sea deeper
+        // than the lowest sea level since it formed (a bench drowned by the rise after a
+        // lowstand, as the gold of the Bering shelf off Nome, keeps within that range).
+        let elev_m = bilinear_cells(&f.grid, &f.elev, x, z);
+        // ledger: DEP-214
+        if placer_offshore(elev_m, f.oceanic(cell), &f.sea_history, t_gone) {
+            f.census[ct].offshore += 1;
+            return Ok(());
+        }
         let tonnage_t = size.tonnage_mt * 1.0e6;
         let radius = geometry::radius_blocks(child, tonnage_t, &sc);
         let min_sep = (child.sizing.min_separation_m / sc.m_per_block_h).max(0.0);
@@ -3171,6 +3465,7 @@ impl DepositStage {
             dip: 0.0,
             truncated: false,
             water_table_m: 0.0,
+            max_half_v_blocks: f64::INFINITY,
         };
         let mut grades = Grades::new();
         for p in &child.products {
@@ -3211,11 +3506,12 @@ impl DepositStage {
             id: site_id,
             kind: child.site_kind.site_kind(),
             deposit_type: child.id.clone(),
-            center: [
-                x.round() as i32,
-                (surf - half_m * child.balance.size_mult_v / sc.m_per_block_v).round() as i32,
-                z.round() as i32,
-            ],
+            center: centre_block(
+                x,
+                surf - half_m * child.balance.size_mult_v / sc.m_per_block_v,
+                z,
+                &sc,
+            ),
             lat_lon: ll,
             aabb: union_aabb(&bodies),
             body: bodies.first().map(|b| b.id),
@@ -3306,6 +3602,11 @@ impl DepositStage {
         ctx: &StageContext<'_>,
     ) -> Result<(), CoreError> {
         let sc = f.sc;
+        // The host fits of in-stratum producers by (type, exposed, cell), each read once (25
+        // drawn columns, ORE-271) whatever the region, the essential and the shortfall.
+        let mut fits: BTreeMap<(usize, bool, u32), HostFit> = BTreeMap::new();
+        let mut scratch = deeptime_format::structure::DeformScratch::default();
+        let t_world = world.t_years;
         for ess in &self.params.essentials {
             let regions = Regions::new(world.circumference, ess.region_blocks);
             let mut have = vec![0u32; regions.count()];
@@ -3321,7 +3622,9 @@ impl DepositStage {
                 }
                 have[regions.index(f64::from(s.center[0]), f64::from(s.center[2]))] += 1;
             }
-            // Candidate types: primary producers of the material with favourability maps.
+            // Candidate types: producers of the material whose sites count toward the essential
+            // (`Essential::counts`: primary producers when `primary_only`), with favourability
+            // maps.
             let producers: Vec<usize> = self
                 .types
                 .iter()
@@ -3332,7 +3635,7 @@ impl DepositStage {
                         && !self.state.acc[*k].is_empty()
                         && t.products
                             .iter()
-                            .any(|p| p.material == ess.material && p.role == "primary")
+                            .any(|p| ess.produced_as(&p.material, &p.role))
                 })
                 .map(|(k, _)| k)
                 .collect();
@@ -3342,11 +3645,16 @@ impl DepositStage {
             for (region, &count) in have.iter().enumerate() {
                 let mut short = ess.min_sites_per_region.saturating_sub(count);
                 while short > 0 {
-                    // The best (type, land cell) in the region.
-                    let mut best: Option<(f64, usize, u32)> = None;
+                    // The best (type, land cell) in the region, with its host fit.
+                    let mut best: Option<(f64, usize, u32, HostFit)> = None;
                     for &ti in &producers {
                         let t = &self.types[ti];
                         let min_sep = t.sizing.min_separation_m / sc.m_per_block_h;
+                        let r = geometry::radius_blocks(
+                            t,
+                            SizeModel::new(&t.sizing).smallest_plausible().tonnage_mt * 1.0e6,
+                            &sc,
+                        );
                         for (cell, a) in self.state.acc[ti].iter().enumerate() {
                             if f.elev[cell] < 0.0 {
                                 continue;
@@ -3359,25 +3667,47 @@ impl DepositStage {
                             if best.is_some_and(|b| b.0 >= score) {
                                 continue;
                             }
-                            let r = geometry::radius_blocks(
-                                t,
-                                SizeModel::new(&t.sizing).smallest_plausible().tonnage_mt * 1.0e6,
-                                &sc,
-                            );
                             if f.placed[ti].iter().any(|q| {
                                 cluster::distance(f.c, (x, z), (q.x, q.z))
                                     < min_sep.max(r + q.radius)
                             }) {
                                 continue;
                             }
-                            best = Some((score, ti, cell as u32));
+                            // An in-stratum type only where the column holds its host.
+                            let fit = if t.hosts.in_stratum {
+                                let key = (ti, ess.exposed, cell as u32);
+                                let fit = match fits.get(&key) {
+                                    Some(&fit) => fit,
+                                    None => {
+                                        let fit = self.guaranteed_fit(
+                                            f,
+                                            ti,
+                                            cell as u32,
+                                            ess,
+                                            t_world,
+                                            &mut scratch,
+                                        );
+                                        fits.insert(key, fit);
+                                        fit
+                                    }
+                                };
+                                if matches!(fit, HostFit::Oceanic | HostFit::NoHost) {
+                                    continue;
+                                }
+                                fit
+                            } else {
+                                HostFit::Free
+                            };
+                            best = Some((score, ti, cell as u32, fit));
                         }
                     }
-                    let Some((score, ti, cell)) = best else { break };
+                    let Some((score, ti, cell, fit)) = best else {
+                        break;
+                    };
                     let path = ctx.pool.install(|| trace(hist, self.frames, &[cell]))?;
                     f.paths
                         .insert(cell, path.into_iter().next().unwrap_or_default());
-                    self.place_guaranteed(f, world, ti, cell, score, ess, region, &regions)?;
+                    self.place_guaranteed(f, world, (ti, cell, fit), score, ess, region, &regions)?;
                     short -= 1;
                 }
             }
@@ -3385,13 +3715,82 @@ impl DepositStage {
         Ok(())
     }
 
+    /// A guaranteed body's centre depth (m) and vertical half-height (blocks) at ground `surf`
+    /// before any host fit. Its top lies under the column's [`SOIL_BLOCKS`], which hold no ore:
+    /// just under them for an exposed essential (the half-height scaled by `size_mult_v` about
+    /// its centre), else at the type's formation depth or under the soil if that is shallower (a
+    /// SEDEX sheet's 100 m is under 3 blocks), kept 16 blocks above the floor.
+    fn guaranteed_depth(&self, ti: usize, ess: &Essential, surf: f64, sc: &Scales) -> (f64, f64) {
+        let t = &self.types[ti];
+        let tonnage_t = SizeModel::new(&t.sizing).smallest_plausible().tonnage_mt * 1.0e6;
+        let half_m = geometry::half_height_m(t, tonnage_t);
+        let half_blocks = half_m / sc.m_per_block_v * t.balance.size_mult_v;
+        let under_soil_m = (f64::from(SOIL_BLOCKS) + half_blocks) * sc.m_per_block_v; // ledger: ORE-076
+        let depth = if ess.exposed {
+            under_soil_m
+        } else {
+            t.preservation
+                .formation_depth_m
+                .max(under_soil_m)
+                .min((surf - f64::from(sc.min_y + 16)) * sc.m_per_block_v)
+        };
+        (depth, half_blocks)
+    }
+
+    /// The time a guaranteed deposit of type `ti` at `cell` formed: its best frame's, or the
+    /// last frame's (`t_world` without frames).
+    fn guaranteed_time(&self, ti: usize, cell: u32, t_world: f64) -> f64 {
+        let acc = self.state.acc[ti][cell as usize];
+        if acc.k_best != u16::MAX {
+            self.state.frame_times[acc.k_best as usize].0
+        } else {
+            self.state.frame_times.last().map_or(t_world, |(t, _)| *t)
+        }
+    }
+
+    /// Where a guaranteed body of type `ti` at `cell` sits ([`Self::host_stratum`] at its
+    /// [`Self::guaranteed_depth`] and [`Self::guaranteed_time`]). An exposed essential stays
+    /// exposed: a host unit where the body would not reach within [`EXPOSED_BLOCKS`] of the
+    /// ground is no host for it.
+    fn guaranteed_fit(
+        &self,
+        f: &Finish,
+        ti: usize,
+        cell: u32,
+        ess: &Essential,
+        t_world: f64,
+        scratch: &mut deeptime_format::structure::DeformScratch,
+    ) -> HostFit {
+        let (x, z) = cluster::cell_xz(&f.grid, cell);
+        let surf = f.surface_at(x, z);
+        let (depth, half_blocks) = self.guaranteed_depth(ti, ess, surf, &f.sc);
+        let t_form = self.guaranteed_time(ti, cell, t_world);
+        let fit = self.host_stratum(f, ti, (cell, x, z), surf, depth, t_form, scratch);
+        match fit {
+            HostFit::In {
+                centre_depth_m,
+                max_half_v_blocks,
+            } if ess.exposed => {
+                let top =
+                    surf - centre_depth_m / f.sc.m_per_block_v + half_blocks.min(max_half_v_blocks);
+                if top < surf - EXPOSED_BLOCKS {
+                    HostFit::NoHost
+                } else {
+                    fit
+                }
+            }
+            _ => fit,
+        }
+    }
+
+    /// Places the guaranteed deposit of type `ti` at `cell` in its host `fit`
+    /// ([`Self::guaranteed_fit`]; [`HostFit::Free`] for a type that is not in-stratum).
     #[allow(clippy::too_many_arguments)]
     fn place_guaranteed(
         &self,
         f: &mut Finish,
         world: &mut WorldState,
-        ti: usize,
-        cell: u32,
+        (ti, cell, fit): (usize, u32, HostFit),
         score: f64,
         ess: &Essential,
         region: usize,
@@ -3412,24 +3811,9 @@ impl DepositStage {
         });
         let half_m = geometry::half_height_m(t, tonnage_t);
         let surf = f.surface_at(x, z);
-        let depth = if ess.exposed {
-            // Top at the surface: the body's vertical half-height in blocks is scaled by
-            // size_mult_v about its centre.
-            half_m * t.balance.size_mult_v
-        } else {
-            t.preservation
-                .formation_depth_m
-                .min((surf - f64::from(sc.min_y + 16)) * sc.m_per_block_v)
-        };
+        let (depth, _) = self.guaranteed_depth(ti, ess, surf, &sc);
         let acc = self.state.acc[ti][cell as usize];
-        let t_ev = if acc.k_best != u16::MAX {
-            self.state.frame_times[acc.k_best as usize].0
-        } else {
-            self.state
-                .frame_times
-                .last()
-                .map_or(world.t_years, |(t, _)| *t)
-        };
+        let t_ev = self.guaranteed_time(ti, cell, world.t_years);
         let slack = self.state.frame_times.first().map_or(1.0e7, |(_, dt)| *dt);
         let (xf, zf) = self.xz_at(f, cell, (x, z), t_ev);
         let causes = f.cause_ids(t, xf, zf, t_ev, slack);
@@ -3446,6 +3830,13 @@ impl DepositStage {
                 }
             }
         }
+        let (depth, max_half_v_blocks) = match fit {
+            HostFit::In {
+                centre_depth_m,
+                max_half_v_blocks,
+            } => (centre_depth_m, max_half_v_blocks),
+            _ => (depth, f64::INFINITY),
+        };
         let site_id = world.next_site_id();
         let placement = Placement {
             x,
@@ -3456,6 +3847,7 @@ impl DepositStage {
             dip: 0.0,
             truncated: false,
             water_table_m: 0.0,
+            max_half_v_blocks,
         };
         let stacked = if let Some(k) = &t.geometry.stack {
             // No column history here: a typical stack, six seams' worth of measures, its top
@@ -3535,11 +3927,7 @@ impl DepositStage {
             id: site_id,
             kind: t.site_kind.site_kind(),
             deposit_type: t.id.clone(),
-            center: [
-                x.round() as i32,
-                (surf - depth / sc.m_per_block_v).round() as i32,
-                z.round() as i32,
-            ],
+            center: centre_block(x, surf - depth / sc.m_per_block_v, z, &sc),
             lat_lon: lat_lon_of(f.c, x, z),
             aabb: union_aabb(&bodies),
             body: bodies.first().map(|b| b.id),
@@ -3556,6 +3944,17 @@ impl DepositStage {
         f.census[ti].sites += 1;
         Ok(())
     }
+}
+
+/// The block holding point (x, y, z), y kept inside the world: a site's centre. Rounding put the
+/// centre of a one-block host horizon (its middle half a block above the block's floor) in the
+/// block above it, and x and z a column off the one the host was read in (`Cover`, floor).
+fn centre_block(x: f64, y: f64, z: f64, sc: &Scales) -> [i32; 3] {
+    [
+        x.floor() as i32,
+        y.floor().clamp(f64::from(sc.min_y), f64::from(sc.max_y)) as i32,
+        z.floor() as i32,
+    ]
 }
 
 fn union_aabb(bodies: &[Body]) -> [[i32; 3]; 2] {
@@ -3693,6 +4092,173 @@ mod tests {
         );
     }
 
+    fn unit(top: i32, below: i32, class: u8, keys: [u32; 2]) -> crate::structure::DrawnUnit {
+        crate::structure::DrawnUnit {
+            top,
+            below,
+            class,
+            keys,
+        }
+    }
+
+    /// Top-down: soil 70..=66, limestone 65..=61, shale 60..=41, dolostone 40..=-60, with the
+    /// keys of the strata log (limestone youngest).
+    fn site_column() -> Vec<crate::structure::DrawnUnit> {
+        vec![
+            unit(70, 65, 0, [100, 4096]),
+            unit(65, 60, 1, [5000, 6000]),
+            unit(60, 40, 2, [6000, 7000]),
+            unit(40, -61, 1, [7000, 32768]),
+        ]
+    }
+
+    #[test]
+    fn a_host_horizon_is_the_nearest_host_under_the_ground() {
+        let col = site_column();
+        let none = vec![None; col.len()];
+        let host = |c: u8| c == 1;
+        let fit =
+            |surf: f64, want: f64| host_horizon((&col, &none), &[], host, (surf, want, -64), None);
+        // Wanted shallow: the limestone, its 5 blocks well under the soil of a ground at 70.5.
+        assert_eq!(fit(70.5, 64.0), Some((63.5, 2.5)));
+        // Wanted deep: the dolostone, cut above the floor's last 4 blocks (-60).
+        assert_eq!(fit(70.5, 0.0), Some((-9.5, 50.5)));
+        // Ground at block 66: its soil is blocks 63 to 66, so only the limestone's 61 and 62
+        // count (the span 61 to 63).
+        assert_eq!(fit(66.2, 64.0), Some((62.0, 1.0)));
+        // Ground at block 64: the limestone lies all in the soil, so the dolostone is the host.
+        assert_eq!(fit(64.5, 64.0).unwrap().0, -9.5);
+        // No host class: none.
+        assert!(host_horizon((&col, &none), &[], |c| c == 9, (70.5, 64.0, -64), None).is_none());
+    }
+
+    /// The columns about a site must each hold the site's host unit (the same keys, a host
+    /// class) overlapping the body's blocks, each on its own: a unit that dips one way to one
+    /// side and the other way to the other still holds the body (a running intersection of all
+    /// of them had left it nothing).
+    #[test]
+    fn a_host_horizon_must_run_through_the_columns_about_the_site() {
+        let col = site_column();
+        let none = vec![None; col.len()];
+        let host = |c: u8| c == 1;
+        let fit = |around: &[Vec<crate::structure::DrawnUnit>]| {
+            host_horizon((&col, &none), around, host, (70.5, 64.0, -64), None)
+        };
+        let with_limestone = |top: i32, below: i32| {
+            vec![
+                unit(70, top, 0, [100, 4096]),
+                unit(top, below, 1, [5000, 6000]),
+                unit(below, 40, 2, [6000, 7000]),
+                unit(40, -61, 1, [7000, 32768]),
+            ]
+        };
+        // Up on one side (63..=65), down on the other (60..=62): each overlaps the body's 61 to
+        // 65, the two share no block. The body keeps the site's whole horizon.
+        let up = with_limestone(65, 62);
+        let down = with_limestone(62, 59);
+        assert_eq!(fit(&[up.clone(), down.clone()]), Some((63.5, 2.5)));
+        // Dipping clear of the body (55..=58): the shallow horizon does not run through, so the
+        // body goes to the dolostone that does.
+        let deep = with_limestone(58, 54);
+        assert_eq!(fit(&[up.clone(), deep]).unwrap().0, -9.5);
+        // Where the limestone passes into shale (a facies change of the same unit): the same.
+        let shale = vec![
+            unit(70, 65, 0, [100, 4096]),
+            unit(65, 40, 2, [5000, 7000]),
+            unit(40, -61, 1, [7000, 32768]),
+        ];
+        assert_eq!(fit(&[up.clone(), shale.clone()]).unwrap().0, -9.5);
+        // A limestone at the body's blocks that is another unit (other keys) is not the host
+        // running through.
+        let other = vec![
+            unit(70, 65, 0, [100, 4096]),
+            unit(65, 60, 1, [9000, 9500]),
+            unit(60, 40, 2, [9500, 10000]),
+            unit(40, -61, 1, [10000, 32768]),
+        ];
+        assert_eq!(fit(&[up, other]).unwrap().0, -9.5);
+        // No host anywhere in a neighbour: none.
+        let barren = vec![unit(70, -61, 2, [100, 32768])];
+        assert!(fit(&[shale, barren]).is_none());
+    }
+
+    /// The host is at least as old as the ore (MVT ore replaces and fills a carbonate older than
+    /// it, Leach et al. 2010): a unit wholly younger is no host, one the ore's age falls inside
+    /// keeps the blocks below that age, and a unit whose keys hold no age (a basement pool) is
+    /// older under a log unit that is older, and otherwise is taken only at or below the
+    /// ledger's depth.
+    #[test]
+    fn a_host_horizon_is_at_least_as_old_as_the_ore() {
+        let col = site_column();
+        let host = |c: u8| c == 1;
+        let ages = vec![
+            Some([0.0, 0.0]),
+            Some([10.0, 20.0]),
+            Some([20.0, 30.0]),
+            Some([30.0, 1000.0]),
+        ];
+        let fit = |ages: &[Option<[f64; 2]>], want: f64, ore: f64| {
+            host_horizon((&col, ages), &[], host, (70.5, want, -64), Some(ore))
+        };
+        // Ore at 15 Ma, half way through the limestone's 10 to 20: its lower half, 61 and 62.
+        assert_eq!(fit(&ages, 64.0, 15.0), Some((62.0, 1.0)));
+        // Ore at 25 Ma: the limestone is younger, the dolostone (30 Ma and older) hosts it.
+        assert_eq!(fit(&ages, 64.0, 25.0).unwrap().0, -9.5);
+        // Ore older than every unit: none.
+        assert!(fit(&ages, 64.0, 2000.0).is_none());
+        // The dolostone a basement pool (no age): under the shale, older than a 25 Ma ore, it is
+        // taken whole...
+        let pool = vec![ages[0], ages[1], ages[2], None];
+        assert_eq!(fit(&pool, 0.0, 25.0), Some((-9.5, 50.5)));
+        // ...but under units all younger than a 35 Ma ore, only its blocks at or below the
+        // ledger's depth (block 0).
+        assert_eq!(fit(&pool, 0.0, 35.0), Some((-29.5, 30.5)));
+    }
+
+    #[test]
+    fn lowstand_is_the_lowest_sea_since_a_time() {
+        let h = [
+            (-3.0e8, -150.0),
+            (-2.0e7, -40.0),
+            (-1.0e6, -120.0),
+            (0.0, 0.0),
+        ];
+        assert_eq!(lowstand_m(&h, -5.0e6), 120.0);
+        assert_eq!(lowstand_m(&h, -1.0e9), 150.0);
+        assert_eq!(lowstand_m(&h, 0.0), 0.0);
+        assert_eq!(lowstand_m(&[], -1.0e9), 0.0);
+        // A sea higher than now in the past drowns nothing.
+        assert_eq!(lowstand_m(&[(-1.0e6, 50.0), (0.0, 0.0)], -2.0e6), 0.0);
+    }
+
+    /// The ground's elevation is already relative to the present sea (`deeptime:elevation_m`),
+    /// so a present sea above the datum does not deepen the water a second time.
+    #[test]
+    fn a_placer_is_offshore_by_its_depth_under_the_present_sea() {
+        // The sea rose from 0 to 50 m over the last 10 Myr: a bench formed before is drowned
+        // within 50 m of the present sea.
+        let h = [(-1.0e7, 0.0), (-5.0e6, 20.0), (0.0, 50.0)];
+        let t = -1.0e7;
+        // 30 m under the present sea: a drowned bench, kept (sea now − ground would read 80 m).
+        assert!(!placer_offshore(-30.0, false, &h, t));
+        // On land, kept; deeper than the lowstand, offshore.
+        assert!(!placer_offshore(20.0, false, &h, t));
+        assert!(placer_offshore(-60.0, false, &h, t));
+        // A bench formed after the rise drowned nothing: any water is too deep.
+        assert!(placer_offshore(-1.0, false, &h, -1.0e6));
+        assert!(!placer_offshore(0.0, false, &h, -1.0e6));
+        // Oceanic crust: never.
+        assert!(placer_offshore(20.0, true, &h, t));
+    }
+
+    #[test]
+    fn a_nan_crust_type_is_not_oceanic() {
+        assert!(crust_is_oceanic(0.0));
+        assert!(!crust_is_oceanic(1.0));
+        assert!(!crust_is_oceanic(f32::NAN));
+        assert!(!crust_is_oceanic(f32::INFINITY));
+    }
+
     /// The surface's block y follows the world's sea level and vertical scale (2026-10-02: it read
     /// sea level 63 whatever the world said).
     #[test]
@@ -3822,6 +4388,82 @@ mod tests {
         let ck = s.checkpoint().unwrap();
         s.finalize_write().unwrap();
         (ck.world, dir)
+    }
+
+    /// A guaranteed body lies under the soil, which holds no ore (ORE-076): a SEDEX sheet, whose
+    /// 100 m formation depth is under 3 blocks, sits below the top 4 blocks instead of in them;
+    /// an exposed iron body's top is just under the soil, still exposed; MVT keeps its formation
+    /// depth; and near the floor the floor cap still wins.
+    #[test]
+    fn a_guaranteed_body_lies_under_the_soil() {
+        let sp = super::synthetic::SyntheticParams {
+            seed: 1,
+            circumference: 4096,
+            grid_r: 16,
+            t_start_years: -5.0e8,
+            t_end_years: 0.0,
+            snapshot_every_years: 2.5e7,
+        };
+        let stage = DepositStage::synthetic(sp, DepositParams::default()).unwrap();
+        let sc = Scales::default();
+        let ti = |id: &str| {
+            stage
+                .types
+                .iter()
+                .position(|t| t.short() == id)
+                .unwrap_or_else(|| panic!("{id} is a built-in type"))
+        };
+        let ess = |material: &str, exposed: bool| Essential {
+            material: material.to_string(),
+            min_sites_per_region: 1,
+            region_blocks: 8192,
+            exposed,
+            primary_only: true,
+        };
+        let surf = 70.0;
+        let top = |(depth, half): (f64, f64)| surf - depth / sc.m_per_block_v + half;
+        let soil_top = surf - f64::from(SOIL_BLOCKS);
+        for (id, e) in [
+            ("sedex_zn_pb", ess("c:zinc", false)),
+            ("mvt_zn_pb", ess("c:zinc", false)),
+            ("bif_fe", ess("c:iron", true)),
+        ] {
+            let k = ti(id);
+            let (depth, half) = stage.guaranteed_depth(k, &e, surf, &sc);
+            assert!(half > 0.0, "{id}: a body has height");
+            assert!(
+                top((depth, half)) <= soil_top + 1.0e-9,
+                "{id}: top {} is under the soil ({soil_top})",
+                top((depth, half))
+            );
+            if e.exposed {
+                assert!(
+                    (top((depth, half)) - soil_top).abs() < 1.0e-9,
+                    "{id}: an exposed body's top is just under the soil"
+                );
+                assert!(top((depth, half)) >= surf - EXPOSED_BLOCKS);
+            } else {
+                let formation = stage.types[k].preservation.formation_depth_m;
+                assert!(
+                    depth >= formation,
+                    "{id}: never shallower than its formation depth"
+                );
+            }
+        }
+        let mvt = ti("mvt_zn_pb");
+        assert_eq!(
+            stage
+                .guaranteed_depth(mvt, &ess("c:zinc", false), surf, &sc)
+                .0,
+            stage.types[mvt].preservation.formation_depth_m,
+            "MVT's 1,000 m is already under the soil"
+        );
+        let low = f64::from(sc.min_y + 18);
+        let (depth, _) = stage.guaranteed_depth(mvt, &ess("c:zinc", false), low, &sc);
+        assert!(
+            (depth - 2.0 * sc.m_per_block_v).abs() < 1.0e-9,
+            "the floor cap wins"
+        );
     }
 
     /// Acceptance: a synthetic run places sites of several families, every site has a forming

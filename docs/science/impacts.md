@@ -269,6 +269,62 @@ build log of 2026-10-01; flexure alone changed the buried count from 33 to 69.
 | Ocean's share of craters removed | two thirds under 1 km, a third near 30 km, little over 100 km | Davison & Collins 2007 abstract | not reproduced; the planet's own sea floor decides |
 | Gravity: transition to complex craters | Earth 3.1 km, Moon 18.7 km, Mars 6 km, Mercury 16 km | Pike 1980 | 3.2, 19.4, 8.4, 8.5 km |
 
+## Impact deposits need a source (carbonate and ore-deposit task, 2026-10-19)
+
+**What was wrong.** On master b438d47a a quick 16k planet carried a median 153 sites of basin
+uranium (62 to 359) and 75 of hydrothermal Cu-Zn-Au (43 to 541; six planets, supercontinent and
+scattered continents, seeds 1 to 3), most of both in shale. Basin
+uranium had no uranium source: its source term was the crater basin itself, its driver the basin's
+filling and its trap the fill's porosity, so a crater in oceanic basalt made uranium as readily as
+one in granite. The hydrothermal type had the hydrothermal strength as its only source. Their
+densities, 50 and 100 per 100,000 km² of permissive crater at p50, were placeholders.
+
+**Source, fluid, trap** (IMP-142; ledger ORE-039, ORE-040, ORE-042). Each metal type now asks
+for all three, as an ore system does:
+
+| Type | Source (the metal) | Fluid or driver | Trap |
+|---|---|---|---|
+| Basin uranium | a felsic continental target: crust 15 km (0) to 30 km (1) thick (upper continental crust holds about 2.7 ppm U, mid-ocean-ridge basalt about 0.07, from memory) | the basin filling with sediment (0 to 5 m/Myr), and oxidised groundwater through porous fill (reservoir quality 0.3 at 0 to 1 at 0.5) | a closed basin (inside the rim of a structure at least 5 km across) with a reductant to fix the uranium (source-rock organic carbon, 0.3 at 0 to 1 at 1 wt %) |
+| Hydrothermal Cu-Zn-Au | the melt sheet, its heat and the base metals it leaches (10 m of melt 0, 200 m 1) | the hydrothermal system (strength 0.1 to 0.6, craters of about 8 to 25 km) | the fractured central uplift and the rim (trap structure 0.3 at 0 to 1 at 0.5) |
+| Diamond | shock on a carbon-bearing target (unchanged, IMP-119) | none | none |
+| Ni-Cu-PGE | a thick melt sheet that differentiates (unchanged, IMP-105) | none | continental crust (unchanged) |
+
+Grieve and Masaitis (1994, abstract) name the impact uranium of Ternovka and Carswell as
+progenetic: ore in the target, exploitable "because of uplift in the center of complex impact
+structures". The model's basin uranium is the epigenetic case, uranium leached from a granitic
+target and fixed in the basin's fill; it needs the granitic target either way.
+
+**Densities from Earth's inventory** (IMP-143). The Earth Impact Database (through the Wikipedia
+list, read 2026-10-19) holds 199 structures with a diameter, 135,890 km² of crater in all (the 105
+at least 8 km across hold 134,649 km²). Grieve and Masaitis (1994) find about 25 % of known
+structures associated with an economic resource; James et al. (2022) count 60 of 208, of which
+hydrocarbons 19 and major minerals 10 (their LPSC 2023 abstract). Ten metal-bearing structures
+spread over three metal types, two or three structures each with about three deposits, is about
+4 deposits per 100,000 km² of crater: basin uranium and hydrothermal Cu-Zn-Au are now 1.5 / 4 / 10
+per 100,000 km² (were 15 / 50 / 150 and 30 / 100 / 300), diamond 1 / 3 / 8 (was 6 / 20 / 60:
+Popigai's two fields and Kara, from memory). Ni-Cu-PGE keeps 30 / 100 / 300: its whole
+permissive area is the melt sheet of the largest craters, and Sudbury alone holds some ninety
+deposits in one structure of 200 to 250 km. The step from ten structures to a density per metal
+type is the project's estimate, so the rows are `calibrated`, not `verified`.
+
+**Measured.** Six quick planets (`earthlike_quick_16k`, 1,000 Myr, supercontinent and scattered
+continents, seeds 1 to 3; master b438d47a against the branch at 686a01cf; `deeptime
+deposit-audit`, `tools/review/carbonate-table.py`), sites per planet, median [range]:
+
+| type | master | branch |
+|---|---|---|
+| basin uranium | 153 [62, 359] | 7 [1, 13] |
+| hydrothermal Cu-Zn-Au | 74.5 [43, 541] | 1 [0, 2] |
+| Ni-Cu-PGE | 5.5 [0, 193] | 6 [0, 51] |
+| diamond | 0 [0, 0] | 0 [0, 1] |
+
+The branch's basin uranium sits in the basin's fill (shale 25 and sandstone 9 of its 40 sites) over
+granitic or felsic targets. On the full 16k planet (`earthlike_full_16k`, scattered continents,
+seed 1) basin uranium went from 31 sites to 4 and hydrothermal Cu-Zn-Au from 33 to 3; the
+uranium in deposits from 7,800 ore blocks to 583. Ni-Cu-PGE, unchanged, swings with whether a
+crater large enough for a thick melt sheet survives on the planet (0 to 193 on master; 0 and 62
+on the full 16k planet's two runs).
+
 ## Simplifications and limits
 
 - **One kind of impactor.** Every body is rocky, arrives at 20 km/s and strikes at 45 degrees.
@@ -298,8 +354,10 @@ build log of 2026-10-01; flexure alone changed the buried count from 33 to 69.
   not deformed by later folding.
 - **Small craters make no ore.** Impact deposits form only where the breccia is in the coarse rock
   record, so not in craters under 9.6 km on the default planet.
-- **Impact ore is invented.** No published grade and tonnage model exists for impact deposits. The
-  sizes, grades and numbers are placeholders.
+- **Impact ore is sized by hand.** No published grade and tonnage model exists for impact
+  deposits, so the sizes and grades are placeholders. The numbers are not: since 2026-10-19 the
+  metal types need a source, a fluid and a trap, and their densities follow Earth's inventory of
+  impact structures (IMP-142, IMP-143; "Impact deposits need a source").
 
 ## Game choices
 
@@ -315,7 +373,7 @@ build log of 2026-10-01; flexure alone changed the buried count from 33 to 69.
 | "Fresh" means 75 % of depth left; "shows" means 40 m of relief, two blocks (IMP-080, IMP-081) | thresholds for the catalogue and the map | agent |
 | Stand-in blocks: cobblestone and smooth basalt (IMP-092) | no impact rock blocks exist yet | agent; **an open question for Ben** |
 | Impact deposits do not replace the pack's scattered diamond, nickel, platinum and uranium ore (IMP-126) | impact deposits are too rare to be the only source | agent; **an open question for Ben** |
-| All tonnages, grades and densities of impact deposits (IMP-105 to IMP-125) | no model exists | agent, marked as placeholders in the data |
+| All tonnages and grades of impact deposits (IMP-105 to IMP-125); the step from Earth's ten metal-bearing structures to a density per type (IMP-143) | no model exists | agent, marked as placeholders in the data; the densities calibrated 2026-10-19 |
 | The GameTest planet's rate: 700 times Earth's, craters up to 40 km (IMP-139) | so a 4,096-block planet has craters to test; was 40 times until the rate correction made craters 17 times rarer | agent, build log 2026-10-01 and 2026-10-02 |
 
 ## Open questions

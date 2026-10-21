@@ -230,6 +230,13 @@ pub struct Hosts {
     /// 100 m of carbonate in a 2 km window).
     #[serde(default = "one", skip_serializing_if = "is_one")]
     pub full_at: f64,
+    /// The body sits inside one host horizon of the column the world draws (the smoothed
+    /// strata at the site), not at the ledger's depth: the horizon of a host class nearest that
+    /// depth, the body no thicker than the horizon, on continental crust. A site whose column
+    /// holds no host horizon, or that lies on oceanic crust, is dropped. For stratabound types
+    /// whose host is one unit (MVT: the platform carbonate, Leach et al. 2010).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub in_stratum: bool,
 }
 
 fn is_one(x: &f64) -> bool {
@@ -242,6 +249,7 @@ impl Default for Hosts {
             any_of: Vec::new(),
             host_bias: BTreeMap::new(),
             full_at: 1.0,
+            in_stratum: false,
         }
     }
 }
@@ -1034,6 +1042,12 @@ impl DepositType {
         if !(self.hosts.full_at > 0.0 && self.hosts.full_at <= 1.0) {
             return Err("hosts.full_at must be in (0, 1]".into());
         }
+        if self.hosts.in_stratum && self.geometry.stack.is_some() {
+            return Err("hosts.in_stratum: a stacked type lies in its sedimentary cover".into());
+        }
+        if self.hosts.in_stratum && self.geometry.rock_class.is_some() {
+            return Err("hosts.in_stratum: the body keeps its host, no geometry.rock_class".into());
+        }
         let s = &self.sizing;
         let ordered = |p: &Percentiles| p.p90 > 0.0 && p.p90 <= p.p50 && p.p50 <= p.p10;
         if !ordered(&s.tonnage_mt) {
@@ -1281,6 +1295,7 @@ mod tests {
             .into_iter()
             .collect(),
             full_at: 1.0,
+            in_stratum: false,
         };
         let w = h.weights().unwrap();
         assert_eq!(w["limestone"], 1.0);

@@ -1,0 +1,8 @@
+{
+  "material": "c:zinc",
+  "min_sites_per_region": 1,
+  "region_blocks": 8192,
+  "exposed": false,
+  "primary_only": true,
+  "_comment": "Deep Time's vanilla essentials (plan §7.8): the deposit stage keeps at least min_sites_per_region sites of the material in every land region of region_blocks. Zinc's producers (MVT, SEDEX, impact hydrothermal) are as rare as copper's, so it takes copper's region (ledger ORE-273). Skipped without a #c:ores/zinc block (Create). Initial values; packs ship their own list (decisions file, \"Playability overrides\")."
+}
