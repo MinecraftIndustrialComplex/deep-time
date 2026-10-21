@@ -44,6 +44,8 @@ public final class PlanetEditorScreen extends Screen {
     private final EditorModel model;
     private Page page;
     private Object shown;
+    /** The last run whose failure was logged. */
+    private Object reportedFailure;
 
     /** One of the editor's pages. */
     interface Page {
@@ -206,7 +208,14 @@ public final class PlanetEditorScreen extends Screen {
                 model.acceptEstimate(json, null, e.getMessage() == null ? e.toString() : e.getMessage());
             }
         }));
-        model.run().ifPresent(r -> r.poll());
+        model.run().ifPresent(r -> {
+            r.poll();
+            // A run that failed says why in the log too (the page shows it), once per run.
+            if (r.state() == com.minecraftindustrialcomplex.deeptime.screen.model.TimelapseModel.State.FAILED && r != reportedFailure) {
+                reportedFailure = r;
+                DeepTime.LOGGER.warn("Deep Time: run {} failed: {}", r.stagingId(), r.failure().orElse("?"));
+            }
+        });
         if (model.tickAutoStart().isPresent())
             DeepTime.LOGGER.info("Deep Time: generating {} ({}, {} blocks)", model.run().map(r -> r.stagingId()).orElse("?"),
                     model.presetName(), model.circumference());
