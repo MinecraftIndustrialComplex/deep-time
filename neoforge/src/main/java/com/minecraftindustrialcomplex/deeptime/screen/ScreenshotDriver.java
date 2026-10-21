@@ -727,6 +727,11 @@ final class ScreenshotDriver {
                         if (f == null || f.n() != clickFrame)
                             DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch click {}: the scrubber shows frame {}, not {}", name,
                                     f == null ? -1 : f.n(), clickFrame);
+                        // "Stop here" while the simulation goes, "Pick this epoch" once it writes the world or is done.
+                        String want = Lang.tr(clickCase == 0 ? "gen.stop_here" : "gen.epoch").getString();
+                        if (!b.active || !want.equals(b.getMessage().getString()))
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch click {}: the button reads '{}' active={}, expected '{}' active",
+                                    name, b.getMessage().getString(), b.active, want);
                         clickBefore = run;
                         click(mc, cx, cy);
                         clickPhase = 2;
@@ -749,6 +754,13 @@ final class ScreenshotDriver {
                     } else if (stepTicks - clickAt >= 10) {
                         shot(shotName + "-after");
                         status("epoch click " + name + " after");
+                        // The page says what the press did.
+                        var notice = model.epochNotice();
+                        if (notice.isEmpty() || model.epochNoticeIsError())
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: epoch click {}: the page's notice is {}", name,
+                                    notice.map(p -> Lang.phrase(p).getString()).orElse("missing"));
+                        else
+                            DeepTime.LOGGER.info("[deeptime-shot] epoch click {}: the page says '{}'", name, Lang.phrase(notice.get()).getString());
                         clickCase++;
                         clickPhase = 0;
                         stepTicks = 0;
