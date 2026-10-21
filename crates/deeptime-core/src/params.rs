@@ -536,6 +536,18 @@ pub struct TectonicParams {
     pub collapse_quiet_myr: f64,
     /// … and how far from the collapsing crust the crust it loses may go, km (Earth-normalized).
     pub collapse_reach_km: f64,
+    /// Post-orogenic collapse: for this long after its last orogeny a quiet column's crust is
+    /// still hot and weak, and thins back towards the normal continental column (35.1 km,
+    /// `collapse::normal_thickness_m`) rather than only to `collapse_thickness_km`, Myr; older
+    /// crust, or crust no orogeny raised, keeps the threshold. 0 = never (the default and every
+    /// built-in preset: measured and not on, it costs land while the sea stands off the datum;
+    /// ledger PLT-390).
+    pub collapse_hot_myr: f64,
+    /// Where the crust a collapse (or the thickest crust's spreading, `crust_max_km`) releases
+    /// goes first: `true` the thin continental crust within
+    /// reach, nearest first, and the ocean floor only after it; `false` (the default and every
+    /// built-in preset) the nearest room of either kind (ledger PLT-391).
+    pub collapse_continent_first: bool,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
     /// 0 = no limit.
@@ -765,23 +777,25 @@ impl Default for TectonicParams {
             subduction_uplift_mm_yr: 0.6,
             collision_threshold_km: 100.0, // ledger: PLT-068
             subduction_peak_km: 300.0,
-            collision_belt_km: 400.0,       // ledger: PLT-241
-            collision_stacking_share: 0.95, // ledger: PLT-242
-            wedge_slope_deg: 1.5,           // ledger: PLT-192
-            weld_speed_mm_yr: 5.0,          // ledger: PLT-246
-            weld_after_myr: 10.0,           // ledger: PLT-246
-            collapse_myr: 15.0,             // ledger: PLT-255
-            collapse_thickness_km: 50.0,    // ledger: PLT-256
-            collapse_quiet_myr: 10.0,       // ledger: PLT-259
-            collapse_reach_km: 200.0,       // ledger: PLT-257
-            crust_max_km: 70.0,             // ledger: PLT-258
-            crust_channel_km2_myr: 1500.0,  // ledger: PLT-300
-            isostasy_relax_myr: 0.004,      // ledger: ISO-078
-            thickening_max_mm_yr: 5.0,      // ledger: PLT-287
-            uplift_max_mm_yr: 3.5,          // ledger: PLT-288
-            transition_width_km: 200.0,     // ledger: PLT-262
-            transition_myr: 20.0,           // ledger: PLT-263
-            transition_ocean_crust: false,  // ledger: PLT-294 (game-choice; presets set true)
+            collision_belt_km: 400.0,        // ledger: PLT-241
+            collision_stacking_share: 0.95,  // ledger: PLT-242
+            wedge_slope_deg: 1.5,            // ledger: PLT-192
+            weld_speed_mm_yr: 5.0,           // ledger: PLT-246
+            weld_after_myr: 10.0,            // ledger: PLT-246
+            collapse_myr: 15.0,              // ledger: PLT-255
+            collapse_thickness_km: 50.0,     // ledger: PLT-256
+            collapse_quiet_myr: 10.0,        // ledger: PLT-259
+            collapse_reach_km: 200.0,        // ledger: PLT-257
+            collapse_hot_myr: 0.0,           // ledger: PLT-390
+            collapse_continent_first: false, // ledger: PLT-391
+            crust_max_km: 70.0,              // ledger: PLT-258
+            crust_channel_km2_myr: 1500.0,   // ledger: PLT-300
+            isostasy_relax_myr: 0.004,       // ledger: ISO-078
+            thickening_max_mm_yr: 5.0,       // ledger: PLT-287
+            uplift_max_mm_yr: 3.5,           // ledger: PLT-288
+            transition_width_km: 200.0,      // ledger: PLT-262
+            transition_myr: 20.0,            // ledger: PLT-263
+            transition_ocean_crust: false,   // ledger: PLT-294 (game-choice; presets set true)
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
             continent_elevation_m: [150.0, 900.0],
@@ -1110,6 +1124,7 @@ impl PlanetPreset {
             (k.collapse_thickness_km, "$.tectonics.collapse_thickness_km"),
             (k.collapse_quiet_myr, "$.tectonics.collapse_quiet_myr"),
             (k.collapse_reach_km, "$.tectonics.collapse_reach_km"),
+            (k.collapse_hot_myr, "$.tectonics.collapse_hot_myr"),
             (k.crust_max_km, "$.tectonics.crust_max_km"),
             (k.crust_channel_km2_myr, "$.tectonics.crust_channel_km2_myr"),
             (k.isostasy_relax_myr, "$.tectonics.isostasy_relax_myr"),
