@@ -103,7 +103,10 @@ impl Regions {
     /// The region (col, row) of block (x, z).
     pub fn of(&self, x: f64, z: f64) -> (u32, u32) {
         let (ox, oz) = self.origin;
-        let col = (((x - ox) / self.size).floor() as i64).rem_euclid(i64::from(self.cols));
+        // x wraps with the frame's period, which need not be a whole number of regions (the
+        // last column of a Petroff–Guyou world's is narrower).
+        let col = (((x - ox).rem_euclid(self.c) / self.size).floor() as i64)
+            .clamp(0, i64::from(self.cols) - 1);
         let row = ((z - oz) / self.size)
             .floor()
             .clamp(0.0, f64::from(self.rows - 1));

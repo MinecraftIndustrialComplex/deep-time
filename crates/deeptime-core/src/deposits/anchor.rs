@@ -66,7 +66,7 @@ pub fn rock_top(hydro: &deeptime_format::WaterColumn) -> i32 {
 }
 
 /// Whether a body places ore (a zone with a material).
-fn bears_ore(b: &Body) -> bool {
+pub fn bears_ore(b: &Body) -> bool {
     b.zones
         .iter()
         .any(|z| z.material.is_some() && z.density > 0.0)
@@ -302,4 +302,80 @@ pub fn anchor_folder(
         "under_water": a.under_water,
         "millis": started.elapsed().as_secs_f64() * 1000.0,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use deeptime_format::Zone;
+    use deeptime_format::bodies::Shape;
+
+    use super::*;
+
+    fn body(id: u32, y: f64, half: f32, ore: bool, clip: i32) -> Body {
+        let mut b = Body::new(
+            id,
+            Some(1),
+            Shape::Sheet,
+            if ore { "ore" } else { "halo" },
+            [0.5, y, 0.5],
+            [12.0, half, 12.0],
+            0.0,
+            0.0,
+            clip,
+        );
+        b.zones.push(Zone {
+            name: "core".into(),
+            material: ore.then(|| "c:iron".to_owned()),
+            rock_class: None,
+            d: [0.0, 1.0],
+            v: [0.0, 1.0],
+            grade: 0.3,
+            density: if ore { 0.5 } else { 0.0 },
+            raw: 0.0,
+        });
+        b
+    }
+
+    /// An exposed essential's ore tops out at the top rock block, from above or below; another
+    /// only moves down, so a body the history buried deeper stays there. The top is the ore's,
+    /// not a barren halo's, and a clip lowers it.
+    #[test]
+    fn a_guaranteed_body_moves_its_ore_top_to_the_top_rock_block() {
+        let ore = body(1, 80.0, 3.0, true, NO_CLIP);
+        let halo = body(2, 90.0, 3.0, false, NO_CLIP);
+        let top = body_top(&ore);
+        assert!(top > 60, "{top}");
+        // Above the rock: down for either kind.
+        assert_eq!(anchor_shift(&[&ore, &halo], 60, true), 60 - top);
+        assert_eq!(anchor_shift(&[&ore, &halo], 60, false), 60 - top);
+        // Below it: up only when exposed.
+        assert_eq!(anchor_shift(&[&ore], top + 9, true), 9);
+        assert_eq!(anchor_shift(&[&ore], top + 9, false), 0);
+        // A barren body alone goes by its own top; a clip is the top when lower.
+        assert_eq!(anchor_shift(&[&halo], 60, true), 60 - body_top(&halo));
+        let clipped = body(3, 80.0, 3.0, true, 78);
+        assert_eq!(body_top(&clipped), 78.min(clipped.aabb[1][1]));
+        assert_eq!(anchor_shift(&[&clipped], 70, true), 70 - body_top(&clipped));
+        assert_eq!(anchor_shift(&[], 70, true), 0);
+    }
+
+    /// The move is rigid and whole: centre, clip and box go up together, and the moved body's
+    /// ore lies at the top rock block in its centre column.
+    #[test]
+    fn a_moved_body_holds_ore_at_the_top_rock_block() {
+        let mut b = body(1, 100.4, 2.0, true, 101);
+        let before = (b.center[1], b.clip_top_y, b.aabb);
+        let rock = 64;
+        let dy = anchor_shift(&[&b], rock, true);
+        assert!(!ore_in_column(&[&b], 4096, 0, 0, rock, 256));
+        shift_body(&mut b, dy);
+        assert_eq!(b.center[1], before.0 + f64::from(dy));
+        assert_eq!(b.clip_top_y, before.1 + dy);
+        assert_eq!(b.aabb[1][1], before.2[1][1] + dy);
+        assert_eq!(b.aabb[0][0], before.2[0][0], "x and z stay");
+        assert_eq!(body_top(&b), rock);
+        assert!(ore_in_column(&[&b], 4096, 0, 0, rock, 256));
+        // The block above the top rock holds none of it.
+        assert!(b.locate(4096, 0, rock + 1, 0).is_none());
+    }
 }
