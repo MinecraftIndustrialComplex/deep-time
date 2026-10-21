@@ -140,7 +140,88 @@ sinks s times as much (PLT-355); every shipped preset has s = 1.
 
 ## Earth against the mod
 
-MEASURED_TABLE
+Measured 2026-10-21 on the six-run ensemble: `earthlike_quick_16k`, 1,000 Myr, 8 threads, seeds 1
+to 3, supercontinent (sup) and scattered (sca) starts. Before is master f1632cf3 (the curve with
+glacio-eustasy, Cortial's dampening at 0.12 mm/yr towards −5,600 m from a −2,500 m ridge); after
+is this change at 08f68dc0 (PLT-355 changes nothing at s = 1). Each cell is before → after. The map
+is the keyframes (p50 over the plate frames, or the last frame where it says final); the bake is the
+baked world (`tools/review/water_census.py --bake`); lake basins are `tools/review/lake_basins.py`
+on four epoch checkpoints per run (Earth-equivalent areas, the planet's times 66.3); the sea, ice,
+continental crust and ocean age are the runs' own records (`notes.climate.series`,
+`notes.plates.dynamics`). "Under the sea" is the share of the continental crust (the `crust_age`
+layer's continental colour) that the `rivers` layer draws as sea; a landmass is an 8-connected body
+of land on the keyframe.
+
+| Measure | Earth | sup 1 | sup 2 | sup 3 | sca 1 | sca 2 | sca 3 | mean |
+|---|---|---|---|---|---|---|---|---|
+| Sea at the start, m | | 30 → 328 | 30 → 366 | 30 → 374 | 29 → 450 | 26 → 367 | 28 → 442 | 29 → 388 |
+| Sea at the end, m | | 0 → −140 | −13 → 191 | −26 → 287 | −55 → 78 | −23 → 36 | −19 → −26 | −23 → 71 |
+| Sea against the end after the first 100 Myr, min / p50 / max, m | −100 to +250 (ISO-087) | −147/−20/101 → −896/−314/39 | −174/−33/103 → −668/−326/25 | −157/−19/122 → −1014/−705/36 | −118/6/155 → −1037/−554/75 | −157/−30/102 → −1088/−492/54 | −163/−10/127 → −574/−317/65 | −153/−18/118 → −880/−451/49 |
+| Land ice at the end, 10⁶ km³ | 29.7 (ISO-085's sources) | 21 → 20 | 26 → 18 | 30 → 27 | 44 → 22 | 22 → 29 | 29 → 24 | 28 → 23 |
+| Continental crust, share of the planet, p50 over the steps | 0.41 (HYP-012) | 0.403 → 0.317 | 0.395 → 0.343 | 0.385 → 0.346 | 0.341 → 0.332 | 0.347 → 0.310 | 0.343 → 0.344 | 0.369 → 0.332 |
+| Continental crust under the sea, final | about 0.19 (from memory) | 0.384 → 0.346 | 0.344 → 0.409 | 0.314 → 0.368 | 0.317 → 0.388 | 0.391 → 0.314 | 0.369 → 0.287 | 0.353 → 0.352 |
+| Continental crust under the sea, p50 of the plate frames | about 0.19 | 0.358 → 0.203 | 0.297 → 0.312 | 0.311 → 0.216 | 0.319 → 0.213 | 0.319 → 0.251 | 0.313 → 0.216 | 0.320 → 0.235 |
+| Land, share of the planet (map p50) | 0.29 | 0.274 → 0.332 | 0.287 → 0.296 | 0.292 → 0.333 | 0.246 → 0.316 | 0.252 → 0.311 | 0.254 → 0.337 | 0.267 → 0.321 |
+| Land (bake) | 0.29 | 0.257 → 0.262 | 0.280 → 0.249 | 0.318 → 0.286 | 0.261 → 0.267 | 0.236 → 0.297 | 0.244 → 0.279 | 0.266 → 0.273 |
+| Land above 2 km, % of the land (bake) | 10.2 (HYP-004; rock 4.7, HYP-041) | 14.0 → 21.6 | 14.8 → 13.9 | 18.5 → 20.0 | 22.7 → 25.8 | 19.3 → 18.2 | 18.6 → 22.2 | 18.0 → 20.3 |
+| Largest landmass, final, share of the planet | 0.167, Afro-Eurasia (from memory) | 0.052 → 0.134 | 0.165 → 0.063 | 0.267 → 0.132 | 0.109 → 0.187 | 0.089 → 0.193 | 0.041 → 0.060 | 0.120 → 0.128 |
+| Second landmass, final | 0.083, the Americas (from memory) | 0.052 → 0.038 | 0.050 → 0.057 | 0.022 → 0.079 | 0.041 → 0.040 | 0.060 → 0.090 | 0.036 → 0.055 | 0.043 → 0.060 |
+| Land in landmasses of 0.01 of the planet or more, final | about 0.95 (from memory) | 0.845 → 0.823 | 0.921 → 0.785 | 0.878 → 0.885 | 0.925 → 0.874 | 0.877 → 0.912 | 0.897 → 0.796 | 0.891 → 0.846 |
+| Coast p50, km (map; final) | 433 (HYP-035) | 327 → 377; 197 → 322 | 448 → 333; 349 → 230 | 285 → 449; 290 → 273 | 297 → 354; 251 → 423 | 262 → 376; 303 → 421 | 249 → 440; 225 → 296 | 311 → 388; 269 → 328 |
+| Lakes, % of the land (map p50) | under 1.8 (HYD-090) | 3.07 → 4.83 | 3.86 → 4.14 | 4.47 → 4.07 | 3.15 → 4.05 | 4.79 → 4.13 | 3.73 → 3.73 | 3.85 → 4.16 |
+| Lakes, % of the land (bake) | under 1.8 | 0.88 → 2.00 | 1.16 → 1.90 | 2.05 → 2.45 | 1.47 → 2.13 | 3.00 → 2.33 | 1.54 → 1.13 | 1.69 → 1.99 |
+| Lake area on oceanic crust, % (epochs) | | 33.9 → 57.0 | 28.3 → 33.0 | 29.3 → 38.9 | 32.2 → 34.9 | 41.6 → 45.2 | 37.3 → 33.5 | 33.8 → 40.4 |
+| Lakes of the Caspian's size or more per snapshot, all (on sea floor) | 1 (1) | 3.0 (0.5) → 3.75 (1.75) | 4.75 (1.75) → 4.5 (0.75) | 4.0 (0.25) → 7.75 (2.5) | 3.75 (0.75) → 4.5 (1.0) | 3.75 (1.0) → 3.5 (2.0) | 3.0 (1.0) → 7.0 (1.75) | 3.71 (0.88) → 5.17 (1.62) |
+| Closed ground below sea level, % of the land (bake) | | 0.17 → 0.44 | 0.14 → 0.57 | 0.66 → 0.37 | 0.13 → 0.05 | 0.20 → 0.33 | 0.22 → 0.24 | 0.25 → 0.33 |
+
+Closed basins on sea floor per snapshot (the 24 epoch checkpoints), by Earth-equivalent area:
+under 10⁴ km² 71.9 → 103.0, 10⁴ to 10⁵ 45.4 → 64.7, 10⁵ to 4·10⁵ 6.2 → 10.5, 4·10⁵ to 10⁶ 0.75 →
+1.25, 10⁶ and more 0.12 → 0.38; in all 124 → 180 basins, 3.4 → 5.9 million km² (Earth's natural
+lakes 2.67 million, HYD-090). The plate checks (`deeptime plate-check`, per start over the three
+seeds) meet 29 → 29 (supercontinent) and 31 → 27 (scattered) of 45 targets; the scattered start's
+four lost targets are kinematic ones near their bounds (largest plate 0.15 against 0.15 to 0.35,
+the speed-against-area correlation −0.40 against −0.40 to 0.20, the slab-speed ratio, the
+collision length).
+
+What the numbers say:
+
+- **The Phanerozoic check fails.** Past the first 100 Myr the sea stands 570 to 1,090 m below the
+  end at its lowest, against Earth's 100 m. The first 100 Myr are a spin-up: the first ocean is
+  laid young (median age 19 to 22 Myr at the start, 47 to 70 Myr 100 Myr later), so the sea starts 330 to
+  450 m high and falls as that floor ages.
+- **What moves it is the plate model's own variability, passed on as the volume law should.** The
+  continental crust's share wanders from 0.42 at the start to 0.26 at its lowest and back to 0.33
+  to 0.36 (the plate check's 0.37 to 0.45 already failed before, 0.32 and 0.30 at their lowest),
+  and the ocean floor's median age by a standard deviation of 9 to 12 Myr. By the fill's arithmetic,
+  turning 0.01 of the planet from continent to ocean floor about 4.5 km deep makes room for about
+  65 m of sea, and ten Myr more median age about 150 m under GDH1; the land ice, up to 60 to 87·10⁶ km³ in the
+  runs' cold spells against 20 to 29 at the end, about 2.6 m per 10⁶ km³ (the land ice's share
+  put back, the lowest stands rise by 30 to 160 m). Per run, a fit of the sea against the three
+  explains a quarter to two thirds of its variance; the rest is not traced (sediment, the
+  continents' heights).
+- **The end stands high.** In all six runs the floor is younger at the end (median 45 to 55 Myr,
+  against about 60 over the run) and the continental share at or above its median in five, so the
+  sea at the end is near its high stand: on Earth the present is near a low stand (ice). The steering
+  nudge (STE-006) did nothing in these runs (offsets under 0.02 m).
+- **The flooding of the continents is mostly the crust, not the sea level.** Before this change
+  the sea stood within 153 m of today all the time, and still 0.32 (p50 of the frames) to 0.35
+  (final) of the continental crust lay under it, against Earth's 0.19. To lay it as dry as
+  Earth's, the sea would have had to stand at the continental crust's 19th height percentile,
+  220 to 1,240 m below the sea on the 24 epoch checkpoints: the continental crust stands too
+  low, not the sea too high. After the change, the share under the sea at the end is the same
+  (0.352); over the plate frames it falls to 0.235 only because the sea stands 300 to 700 m lower
+  for most of the run, which a crust that stood higher would not need.
+- **Land and its shape hold.** Land rises (map 0.267 → 0.321, bake 0.266 → 0.273), the land above
+  2 km and the coast distance with it; the largest landmass over the plate frames is 0.128 →
+  0.167 of the planet (p50; Earth's Afro-Eurasia 0.167) and the second 0.056 → 0.069 (the
+  Americas 0.083); at the end both are below Earth's.
+- **The sea-floor lakes grow.** The plate era's closed basins on oceanic crust rise from 124 to 180
+  per snapshot and from 34 to 40 % of the lake area. They stand on oceanic crust above the sea
+  (their level p50 552 m over the datum; island arcs and the stacked crust the plate model keeps
+  under the oceanic label, whose arc crests stand 1,360 to 1,410 m high at p90, 1,140 to 1,160 before, against the plate
+  check's 1,000), and a sea 300 to 700 m lower lays more of that ground dry. The volume law was expected
+  to fill them through the floor's kept sediment (rivers-and-lakes.md, "What keeps the plate
+  era's lakes"); it does not, because the pockets are not under the sea.
 
 ## Simplifications and limits
 
@@ -167,7 +248,19 @@ MEASURED_TABLE
 
 - GDH1's coefficients 365, 5,651 and 2,473 and its 20-Myr knee are not yet read in Stein & Stein
   1992 itself (paywalled); 2,600 m and the 0.0278 decay are read in Stein 1995.
-- OPEN_QUESTIONS
+- For Ben: the sea swings about a kilometre, past Earth's Phanerozoic range (ISO-087), because
+  the plate model's continental area (0.26 to 0.46 of the planet) and ocean age vary much more
+  than Earth's. Recommended: keep the volume law with no calibrated damping of the sea, and
+  measure it again once the continent check conserves the continental crust; a knob that held the
+  sea near a curve would hide the crust's losses, as the curve did.
+- For Ben: the first ocean is laid young (median 19 to 22 Myr), so every run starts with the sea
+  330 to 450 m high and drains it over 100 Myr. Recommended: lay the first ocean with a
+  steady-state spread of ages, as Earth's floor has (from memory), in the plate-geometry task.
+- For Ben: the editor's "Ocean water" (`planet.surface_water_m`, 0 to 8,000 m, Earth 2,664) is a
+  new outward-facing setting. Recommended: keep it.
+- The plate era's closed basins on oceanic crust grew (124 to 180 per snapshot): they stand on
+  island arcs and stacked crust above the sea, which the lower sea lays dry; they belong with the
+  arcs' rate (the plate-geometry task), not with the sea.
 
 ## Sources
 
