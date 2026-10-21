@@ -218,8 +218,13 @@ baked and gets a Lambert layout block.
 
 - **The world**: b from the simulation's C ("The world's layout"); λc chosen per planet when
   `scale.lambda_c_deg` is −1 (the default): candidates 0.25° apart, each cone point's distance to the
-  nearest land (the baked elevation at or above sea level) measured up to 20°, the best by the
-  largest least distance, then the largest sum, then the smallest λc; or the value the preset sets.
+  nearest land measured up to 20°, the best by the largest least distance, then the largest sum,
+  then the smallest λc; or the value the preset sets. Since 2026-10-20 (DEP-220) the deposit stage
+  makes the choice, on its present L1 land (the nearest cell's elevation at or above sea level),
+  because the playability pass counts the essentials' regions in the world drawn with it; it is
+  recorded in `notes.deposits.world_frame` and the projection draws the world with that λc. A
+  folder without the record (no deposit stage) has λc chosen here on the baked land (the baked
+  elevation at or above sea level).
 - **Rasters**: every layer is rewritten on the world grid of its own cell size (`L1`, `L2`, `L3`,
   `L3h` keep their names and r; "Grids"). A world cell is the point sample at its block; the block's
   sphere point is found through the projection and the layer is read at the matching Lambert block.
@@ -263,11 +268,27 @@ baked and gets a Lambert layout block.
   true size √(4πR²/2b²) (`planet.radius_m` unchanged), `projection` (the layout block, with the
   border the preset's `scale.edge_border` asks for), and `notes.bake.projection`: `hemisphere_blocks`,
   `world_blocks`, `lambda_c_deg`, `lambda_c` (the search: least and per-cone distances to land, the
-  share of candidates with all four cone points at sea and 3° from land), `layers` (each layer's
+  share of candidates with all four cone points at sea and 3° from land; with `chosen_by`
+  `"deposits"` the distances are the recorded λc's on the baked land, the shares and the stage's
+  own record under `at_deposits` are the deposit stage's search), `layers` (each layer's
   sampling), `shares` (`land_map` / `land_true`, `ice_cover_map` / `ice_cover_true`: the share of the
   world's cells, edge rows at half weight, against the simulation's true area share), `pole_anisotropy`
   (mean squared tangential over radial elevation slope 80°–88° from the equator, and at 30°–60° for
   reference, for the world and for point sampling), `vector` and `millis`.
+
+**The guaranteed deposits under the world's ground** (DEP-221, ORE-280; 2026-10-20). Last, on the
+finished folder of either projection (`deeptime_core::deposits::anchor::anchor_folder`, also run by
+`deeptime project`), the sites whose forming event is a `deeptime:guaranteed_occurrence` (the event
+log; no flag in the sites) are read against the world as the game reads it (`ColumnWorld`): each
+one's bodies move together by whole blocks (centre, `clip_top_y` and box; the site's centre y and
+box follow) so the top of its ore lies at the **top rock block** over the site's centre (the
+`WaterColumn` ground less the 4 blocks of soil on dry land, the bed under water) for an exposed
+essential, and no higher than it for the others. In-stratum sites (MVT) stay in their host horizon
+and placers where `placer_channels` settled them; natural sites are not touched.
+`bodies/bodies.dtb`, `sites/sites.dtsr` and `sites/index.dtsi` are rewritten when any moved. `notes.bake.guaranteed`:
+`guaranteed`, `moved`, `moved_up`, `moved_down`, `largest_move_blocks`, `in_stratum_kept`,
+`placers_kept`, `centre_holds_ore` (the sites whose centre column holds ore of theirs at or under
+the top rock block), `under_water`, `millis`.
 
 ### The climate at a block (0.2, P1-25)
 
@@ -1829,6 +1850,10 @@ expected_formed, expected (the survivors expected; = target unless capped), draw
 formed), tracts, permissive_km2, mean_f, buried, truncated, eroded, too_deep, children, guaranteed,
 dropped_separation`, plus `province`, `provinces`, `count_mult`, `max_formed_per_survivor`,
 `brine_flow_km`, `sites`, `bodies`, `richness_mult`, `scatter_mult` (the game multiplies every background-scatter rule by it), `inherited_bif_share`, `bif_basin_km2`, and `bif_basins`, `bif_basin_share` (the inherited iron-formation basins the surface stage dealt). A forming event's `p_survive` is its cell's survival chance.
+`world_frame` (DEP-220) is the world the playability pass counted the essentials' regions in:
+`{"projection": "lambert"}`, or `{"projection": "petroff_guyou", "hemisphere_blocks", "lambda_c_deg",
+"land", "lambda_c" (the λc search, as notes.bake.projection.lambda_c), "millis"}`, whose λc the
+bake's projection draws the world with.
 
 ## Structural events (`structure/events.dtst`, P2-01, format 0.3)
 

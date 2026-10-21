@@ -403,7 +403,7 @@ that erosion destroyed (point place, `site` −1).
 | `supergene_enrichment` | start of the stable window (to the present) | k / 3 | the parent's formation and exhumation events (+ preservation events) | `deposit_type`, `site`, `parent` i64 (site), `grade_mult` f64 (k), `stable_myr` f64, `water_table_m` f64, `leached_t` f64 (parent ore leached into the blanket) |
 | `petroleum_generation` (point place, a kitchen's centre) | the kitchen's earliest oil-window onset (to its last generating frame) | min(TTI_max / TTI_peak, 4) / 4 | the kitchen's `causes.source` events (subsidence, rifting) | `deposit_type` str, `kitchen` i64, `tti_max` f64, `area_km2` f64, `toc_mean` f64 |
 | `trap_charge` (a reservoir's forming event) | the charge time: max(trap formation, kitchen onset) | tonnage quantile | the kitchen's `petroleum_generation` + component events | as `deposit_formation`, plus `kitchen` i64, `migration_km` f64, `trap_formed_years` f64 |
-| `guaranteed_occurrence` | the cell's most favourable frame | 0 | component events as for a natural deposit | `deposit_type`, `site`, `material` str, `region` str (`col,row` of the essentials grid), `favourability` f64, `limiting` str, `score` f64, `reason` str |
+| `guaranteed_occurrence` | the cell's most favourable frame | 0 | component events as for a natural deposit | `deposit_type`, `site`, `material` str, `region` str (`col,row` of the essential's region grid on the world's own index frame, a Petroff–Guyou world's since 2026-10-20, DEP-220), `favourability` f64, `limiting` str, `score` f64, `reason` str |
 
 ### The synthetic history's events (source `deeptime:synthetic`, P1-14)
 

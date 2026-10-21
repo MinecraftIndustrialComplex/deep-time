@@ -720,6 +720,42 @@ What it says:
   centres and the one SEDEX still lie above the ground (the SEDEX 61 blocks), and 3 of the 16 iron
   bodies hold ore: a body the bake lifted out of the ground is beyond the stage's reach.
 
+**The guaranteed deposits in the world as generated (2026-10-20).** The last two findings above
+are one problem: the guarantee promised a source of each essential in every land region of the
+world, and the world it reasoned about was the deposit stage's, not the one the player walks. A
+probe of master 3ecea5b9's quick planet (scattered continents seed 1) read every guaranteed site by its
+columns (`deeptime inspect-column` at the centre): of its 8 guaranteed iron bodies 6 lay under the
+world's sea and none held ore, and the SEDEX held none either. Three causes, three fixes, and no
+change to the world data (the guaranteed sites are known from the event log, the rest are manifest
+notes):
+
+- **The regions were the simulation's** (DEP-220). The deposit stage now chooses the world's λc
+  itself, with the bake's rule (SCL-087: the four cone points as far from land as possible) on its
+  present L1 land, and counts each essential's regions on the world's own frame: a 16k world is
+  13,312 by 6,657 blocks, so its 4,096-block regions are 4 by 2 with the last column 1,024 wide and
+  the rows split at z = 768, and its 8,192-block regions 2 by 1. The projection draws the world
+  with the stage's λc (`notes.bake.projection.lambda_c.chosen_by` = `deposits`) when the preset
+  leaves λc to the run.
+- **Ties went to the region's edge** (DEP-222). Where every cell of a region scored alike (no
+  favourability anywhere, common for iron), the first land cell in index order won: at the
+  region's top edge, often the pole or a coast, and the present L1 coast is not the world's, which
+  the young landscape and the amplifier redraw. Candidates now come from cells at least 128 blocks
+  (two L1 cells at 16k) from the present sea first, any land cell when a region has none, and a
+  tie goes to the cell nearest (0, 0) in the world, where the player starts.
+- **The body was placed against the stage's ground** (DEP-221, ORE-280). The bake lifts the strata
+  and the bodies with them where the final terrain stands above the history's surface (STR-052,
+  STR-053, STR-056), and the projection moves each body with the change of the drawn height
+  between its Lambert and world columns, so a body set just under the stage's ground ends where
+  the bake's arithmetic puts it, most often above the world's ground. A pass after the projection
+  now reads the finished folder as the game does and moves each guaranteed site's bodies together,
+  by whole blocks, so the top of its ore lies at the top rock block over its centre (the world's
+  ground less 4 blocks of soil on dry land, the bed under water) for an exposed essential (iron,
+  coal), and no higher than it for the others (a body the history buried deeper stays). An
+  in-stratum body (MVT) stays in its host horizon, where the bake and the projection keep it
+  (ORE-271), and a placer where `placer_channels` settled it; natural bodies keep their physics.
+
+GUARANTEED_MEASUREMENTS
+
 ## Simplifications and limits
 
 - **One density per type, flat over the tract.** Singer et al. 2005 found porphyry density falls
@@ -760,6 +796,15 @@ What it says:
 - **The coal footprint.** The engine scales a field's three axes with the cube root of its
   tonnage, so the larger tonnage P10 of 2026-10-02 gives a footprint P10 of about 4,560 km², not
   the 6,000 km² of the area distribution.
+- **A guaranteed body is anchored at its centre column.** The anchor moves the whole body by one
+  vertical shift read over the site's centre; elsewhere the body keeps its shape, not the ground's,
+  so on a slope one edge of a wide sheet can lie in the soil and the other under more cover.
+- **Natural sources are judged at the stage's ground.** A natural site counts toward an exposed
+  essential when its top lies within 16 blocks of the deposit stage's surface, not the world's,
+  and only guaranteed bodies are moved; the audit's `_with_ore` counts say what the world holds.
+- **The world's regions are not all alike.** A 16k Petroff-Guyou world is 13,312 blocks round, so
+  its last column of 4,096-block regions is 1,024 blocks wide and its last 8,192-block column 5,120;
+  each still needs its own source.
 
 ## Game choices
 
@@ -786,6 +831,10 @@ What it says:
   origin (Chapman & Mortensen, found in a search, not read); no source gives a quantitative relation
   between a lode's eroded fraction and the placer below it, so the linear law is the project's.
 - No spawn selection by essentials (Ben, 2026-10-05; BAK-015).
+- The essentials guarantee in the world as generated: regions on the world's own frame with λc
+  chosen at the deposit stage (DEP-220), candidates 128 blocks inland first and nearest (0, 0) on a
+  tie (DEP-222), and guaranteed bodies anchored after the projection at the top rock block (DEP-221,
+  ORE-280) (coordinator's calls under Ben's rule of 2026-10-16, decisions log 2026-10-20).
 - Placer gold as panning in packs without Excavated Variants: suspicious gravel or sand holding
   2 to 5 gold nuggets rolled from a loot table, only gold, only over support (Ben, 2026-10-16:
   ORE-267 to ORE-269; the block is Ben's, the count and the rules around it are the agent's);
