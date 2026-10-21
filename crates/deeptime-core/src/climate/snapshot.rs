@@ -424,12 +424,8 @@ pub fn compute_on(
         // The plateau's warmth (CLM-225 to CLM-228): each land cell's base height (bare ground
         // only: the last step's land ice heats no air), and each row's warmth per metre of it in
         // each month, from the month's sunlight against the planet's mean (S₀/4).
-        let mee_z = lapse::mass_elevation_base(
-            &inp.d,
-            &z,
-            inp.ice_prev,
-            cells(lapse::MEE_FOOTPRINT_KM),
-        );
+        let mee_z =
+            lapse::mass_elevation_base(&inp.d, &z, inp.ice_prev, cells(lapse::MEE_FOOTPRINT_KM));
         let q_mean = ep.s0 / 4.0;
         let mee_k: Vec<[f64; 12]> = q_month
             .iter()

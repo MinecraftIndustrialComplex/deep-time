@@ -253,9 +253,16 @@ mod tests {
         z[62 * w + 62] = 4000.0;
         let zb = mass_elevation_base(&d, &z, None, r);
         let at = |v: &[f64], j: usize, i: usize| v[j * w + i];
-        assert!((at(&zb, 25, 25) - 4500.0).abs() < 1e-6, "the plateau's interior");
+        assert!(
+            (at(&zb, 25, 25) - 4500.0).abs() < 1e-6,
+            "the plateau's interior"
+        );
         assert_eq!(at(&zb, 5, 5), 0.0, "the sea");
-        assert!(at(&zb, 10, 25) < 0.75 * 4500.0, "the plateau's edge: {}", at(&zb, 10, 25));
+        assert!(
+            at(&zb, 10, 25) < 0.75 * 4500.0,
+            "the plateau's edge: {}",
+            at(&zb, 10, 25)
+        );
         let peak = at(&zb, 62, 62);
         assert!(peak < 300.0, "a lone peak takes its lowland's base: {peak}");
         assert!(at(&zb, 62, 55) <= 200.0, "no lowland above its own ground");
@@ -269,8 +276,16 @@ mod tests {
         }
         ice[25 * w + 33] = 200.0;
         let zi = mass_elevation_base(&d, &z, Some(&ice), r);
-        assert!(at(&zi, 25, 14) < 1.0, "an ice sheet's interior: {}", at(&zi, 25, 14));
-        assert!(at(&zi, 25, 33) > 0.9 * 4500.0, "a glacier on bare ground: {}", at(&zi, 25, 33));
+        assert!(
+            at(&zi, 25, 14) < 1.0,
+            "an ice sheet's interior: {}",
+            at(&zi, 25, 14)
+        );
+        assert!(
+            at(&zi, 25, 33) > 0.9 * 4500.0,
+            "a glacier on bare ground: {}",
+            at(&zi, 25, 33)
+        );
         // A thin dusting (under a metre) is bare ground.
         let thin = vec![0.5f32; w * h];
         assert_eq!(mass_elevation_base(&d, &z, Some(&thin), r), zb);
@@ -289,6 +304,9 @@ mod tests {
         // (observed 5 to 6); its January (q about 0.67): about 1.4 K under it (observed 1.5 to 3).
         let jul = mass_elevation_k(1.41) * 4780.0;
         let jan = mass_elevation_k(0.67) * 4780.0;
-        assert!((6.0..8.0).contains(&jul) && (-2.0..-1.0).contains(&jan), "{jul} {jan}");
+        assert!(
+            (6.0..8.0).contains(&jul) && (-2.0..-1.0).contains(&jan),
+            "{jul} {jan}"
+        );
     }
 }
