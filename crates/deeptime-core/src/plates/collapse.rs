@@ -53,6 +53,23 @@
 //! The area gained is the volume released over T_n: a column of thickness T gives back
 //! (T − T_c) / T_n of a sample's area.
 //!
+//! # While the orogen is still hot (off by default)
+//! T_c is what an old, cold root keeps (the Urals, 50-56 km some 300 Myr after their collision).
+//! A young orogen thins further: the Variscan root of 55-70 km thinned from about 315 to 290 Ma,
+//! as its thickening ended, to a Moho at 30-32 km where it flattened; the Basin and Range went
+//! from 54 ± 6 km by 46 % extension (about 37 km); the Aegean is 26 km. Whether a thick crust
+//! collapses that far is set by its heat when it was thickened (Wernicke et al. 1987). With
+//! `collapse_hot_myr` W > 0 a column whose last orogeny is younger than W thins towards T_n
+//! instead of T_c; older crust, and crust no orogeny raised, keeps T_c. W = 40 Myr is the 10 Myr
+//! quiet time and the Variscan's 25 to 30 Myr of thinning (ledger PLT-390). Measured and not on
+//! (2026-10-21): it lowers the land above 2 km from 0.29 to 0.18 of the land, but the crust it
+//! spreads over the ocean floor lifts the sea (the planet's water is fixed), so the land falls by
+//! 0.02 to 0.04 and the drowned continental share rises by 0.08 to 0.10.
+//!
+//! `collapse_continent_first` (PLT-391, off by default) fills the plate's thin continental
+//! crust within reach, nearest first, before any ocean floor, so less of the collapse becomes new
+//! continent below the sea.
+//!
 //! # The thickest crust
 //! No continental crust on Earth is much thicker than Tibet's or the Altiplano's. Continental
 //! crust that a collision carries down further goes into the mantle with the slab (continental
@@ -76,7 +93,7 @@
 //! above the strength height; this moves crust, and only on the plate model's samples. Where the
 //! orogen spreads is the plate's nearest room, not a flow field.
 // ledger: PLT-254 (the rule), PLT-255 (τ), PLT-256 (the threshold thickness), PLT-257 (the
-// reach), PLT-258 (the thickest crust).
+// reach), PLT-258 (the thickest crust), PLT-390 (the hot window), PLT-391 (continental room first).
 
 use std::collections::BTreeMap;
 
@@ -148,11 +165,7 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
         // The excess goes to continental crust thinner than the collapse thickness (crust
         // thicker than that does not stay, PLT-256: lower crust flows out of the thickened belt
         // but does not build a second one around it) and to ocean floor up to the normal column.
-        let to = if founder_fills_normal() {
-            normal_thickness_m()
-        } else {
-            (k.collapse_thickness_km * 1000.0).clamp(normal_thickness_m(), t_max)
-        };
+        let to = (k.collapse_thickness_km * 1000.0).clamp(normal_thickness_m(), t_max);
         if !by_plate.is_empty() {
             spread(state, geo, env, by_plate, to, out, None);
         }
@@ -173,12 +186,6 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
         s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
     }
     lost * env.norm.sample_area_km2()
-}
-
-/// HG experiment: the founder fills continental room to the normal column (`DEEPTIME_HG_FOUNDER_TN=1`).
-fn founder_fills_normal() -> bool {
-    static M: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *M.get_or_init(|| std::env::var("DEEPTIME_HG_FOUNDER_TN").is_ok_and(|v| v == "1"))
 }
 
 /// Takes `left` m of crust from the bottom of a column (mafic pools first, [`ROOT_ORDER`]) to the
@@ -405,7 +412,18 @@ pub(super) fn spread(
                     (r > 0.0 && s.flags & TRENCH == 0).then_some((d, j, r))
                 })
                 .collect();
-            room.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+            // Continental room before ocean floor when the crust spreads within its continent
+            // first (ledger: PLT-391), else the nearest first.
+            if k.collapse_continent_first {
+                room.sort_by(|a, b| {
+                    (samples[a.1].kind != CONTINENTAL)
+                        .cmp(&(samples[b.1].kind != CONTINENTAL))
+                        .then(a.0.total_cmp(&b.0))
+                        .then(a.1.cmp(&b.1))
+                });
+            } else {
+                room.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
+            }
             let mut left = budget;
             let mut given: Vec<(usize, f64)> = Vec::new();
             for (_, j, r) in room {
@@ -784,6 +802,98 @@ pub(in crate::plates) mod tests {
         fx.k.collapse_myr = 0.0;
         let mut st = planet(&fx.geo, belt, 26_000.0);
         assert_eq!(step_once(&fx, &mut st, 1), Collapse::default());
+    }
+
+    /// A belt whose last orogeny is younger than `collapse_hot_myr` thins past the collapse
+    /// thickness towards the normal column; with no window, or with no orogeny stamp, it stops at
+    /// the collapse thickness; once the window has passed, crust thinner than the collapse
+    /// thickness keeps what it has (ledger: PLT-390).
+    #[test]
+    fn a_hot_belt_thins_to_the_normal_column() {
+        let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
+        let t_c = Fx::new().k.collapse_thickness_km * 1000.0;
+        // The belt's thinnest and thickest columns after `steps` steps from `first`.
+        let span = |fx: &Fx, st: &mut PlateState, first: u64, last: u64| {
+            let crust0 = crust_m(st);
+            for step in first..=last {
+                step_once(fx, st, step);
+            }
+            assert!((crust_m(st) - crust0).abs() < 1e-6 * crust0, "volume kept");
+            let t: Vec<f64> = (0..st.samples.len())
+                .filter(|&i| belt(fx.geo.points()[i]))
+                .map(|i| f64::from(st.samples[i].thickness_m))
+                .collect();
+            let lo = t.iter().copied().fold(f64::MAX, f64::min);
+            let hi = t.iter().copied().fold(f64::MIN, f64::max);
+            (lo, hi)
+        };
+        let stamped = |fx: &Fx| {
+            let mut st = planet(&fx.geo, belt, 26_000.0);
+            for s in st.samples.iter_mut().filter(|s| s.thickness_m > 40_000.0) {
+                s.orogeny = OROGENY_HIMALAYAN;
+                s.orogeny_myr = 0.0;
+            }
+            st
+        };
+        // Hot: 19 steps of 2 Myr after an orogeny at 0 are all inside a 40 Myr window.
+        let mut hot = Fx::new();
+        hot.k.collapse_hot_myr = 40.0;
+        let mut st = stamped(&hot);
+        let (lo, hi) = span(&hot, &mut st, 1, 19);
+        assert!(lo >= normal_thickness_m() - 1.0 && hi < t_c - 2000.0, "{lo} {hi}");
+        // The window has passed: nothing thinner than T_c moves.
+        let before = st.samples.clone();
+        let (lo2, hi2) = span(&hot, &mut st, 20, 30);
+        assert!((lo2 - lo).abs() < 1e-3 && (hi2 - hi).abs() < 1e-3, "{lo2} {hi2}");
+        assert_eq!(st.samples, before);
+        // No window: the same belt stops at T_c.
+        let cold = Fx::new();
+        let (lo, _) = span(&cold, &mut stamped(&cold), 1, 19);
+        assert!(lo >= t_c - 1.0, "{lo}");
+        // A window but no orogeny stamp (a stack under ground no orogeny raised): T_c as well.
+        let (lo, _) = span(&hot, &mut planet(&hot.geo, belt, 26_000.0), 1, 19);
+        assert!(lo >= t_c - 1.0, "{lo}");
+    }
+
+    /// With `collapse_continent_first` the crust a belt at the continent's edge releases goes to
+    /// the plate's thinned continental crust within reach before the ocean floor beside it, so no
+    /// ocean turns continental while that room lasts; nearest first, the ocean beside the belt
+    /// takes it (ledger: PLT-391).
+    #[test]
+    fn continental_room_first_fills_the_continent_before_the_ocean() {
+        let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
+        // Continental crust thinned to 30 km in the continent's interior on plate 0.
+        let thin = |p: DVec3| p.x < 0.0 && p.y > 0.9;
+        let run = |first: bool| {
+            let mut fx = Fx::new();
+            fx.k.collapse_continent_first = first;
+            let mut st = planet(&fx.geo, belt, 26_000.0);
+            for (i, s) in st.samples.iter_mut().enumerate() {
+                if thin(fx.geo.points()[i]) {
+                    let f = 30_000.0 / s.thickness_m;
+                    for x in &mut s.pools {
+                        *x *= f;
+                    }
+                    s.thickness_m = s.pools.iter().sum();
+                }
+            }
+            let before = st.samples.clone();
+            let c = step_once(&fx, &mut st, 1);
+            let filled = (0..st.samples.len())
+                .filter(|&i| {
+                    thin(fx.geo.points()[i])
+                        && st.samples[i].thickness_m > before[i].thickness_m + 1.0
+                })
+                .count();
+            (c, filled)
+        };
+        let (c, filled) = run(true);
+        assert!(
+            c.sources > 0 && c.converted == 0 && filled > 20,
+            "{c:?} {filled}"
+        );
+        let (c, filled) = run(false);
+        assert!(c.converted > 0 && filled == 0, "{c:?} {filled}");
     }
 
     /// With nowhere to spread (the collapse off), a column thicker than `crust_max_km` loses the
