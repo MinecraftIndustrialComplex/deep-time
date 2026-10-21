@@ -229,12 +229,11 @@ baked and gets a Lambert layout block.
 - **The world**: b from the simulation's C ("The world's layout"); λc chosen per planet when
   `scale.lambda_c_deg` is −1 (the default): candidates 0.25° apart, each cone point's distance to the
   nearest land measured up to 20°, the best by the largest least distance, then the largest sum,
-  then the smallest λc; or the value the preset sets. Since 2026-10-20 (DEP-220) the deposit stage
-  makes the choice, on its present L1 land (the nearest cell's elevation at or above sea level),
-  because the playability pass counts the essentials' regions in the world drawn with it; it is
-  recorded in `notes.deposits.world_frame` and the projection draws the world with that λc. A
-  folder without the record (no deposit stage) has λc chosen here on the baked land (the baked
-  elevation at or above sea level).
+  then the smallest λc; or the value the preset sets. The land is the baked elevation at or above
+  sea level. The deposit stage forecasts the same choice on its present L1 land at a coarser
+  resolution (`notes.deposits.world_frame`, DEP-220) to count the essentials' regions in; the
+  projection does not read the forecast, and the anchor's top-up (below) adds what the world's own
+  regions lack.
 - **Rasters**: every layer is rewritten on the world grid of its own cell size (`L1`, `L2`, `L3`,
   `L3h` keep their names and r; "Grids"). A world cell is the point sample at its block; the block's
   sphere point is found through the projection and the layer is read at the matching Lambert block.
@@ -296,9 +295,7 @@ baked and gets a Lambert layout block.
   true size √(4πR²/2b²) (`planet.radius_m` unchanged), `projection` (the layout block, with the
   border the preset's `scale.edge_border` asks for), and `notes.bake.projection`: `hemisphere_blocks`,
   `world_blocks`, `lambda_c_deg`, `lambda_c` (the search: least and per-cone distances to land, the
-  share of candidates with all four cone points at sea and 3° from land; with `chosen_by`
-  `"deposits"` the distances are the recorded λc's on the baked land, the shares and the stage's
-  own record under `at_deposits` are the deposit stage's search), `layers` (each layer's
+  share of candidates with all four cone points at sea and 3° from land, the search's `step_deg`), `layers` (each layer's
   sampling), `shares` (`land_map` / `land_true`, `ice_cover_map` / `ice_cover_true`: the share of the
   world's cells, edge rows at half weight, against the simulation's true area share), `pole_anisotropy`
   (mean squared tangential over radial elevation slope 80°–88° from the equator, and at 30°–60° for
@@ -317,13 +314,39 @@ while their ore tops out in rock in the centre column; otherwise (the projection
 drawn ground empties a body whose horizon lies in the soil band) the body is read unclipped, the
 ore's top goes down to the highest block of one of the type's host classes at or under the top
 rock block within 64 blocks of it (to the block itself when there is none), and its `clip_top_y`
-becomes the top rock block. Placers stay where `placer_channels` settled them; natural
-sites are not touched.
-`bodies/bodies.dtb`, `sites/sites.dtsr` and `sites/index.dtsi` are rewritten when any moved. `notes.bake.guaranteed`:
+becomes the top rock block. The host run is the highest one as thick as the ore's span in the
+centre column, else the thickest within reach (ORE-280). An exposed essential's in-stratum body
+stays only when its ore tops out at the top rock block; otherwise (buried deeper, or above it)
+its ore's top goes to a host run's top within 8 blocks under the top rock block
+(`EXPOSED_BLOCKS`), or to the top rock block when none lies there.
+Placers stay where `placer_channels` settled them; natural sites are not touched.
+
+**The top-up in the world's own regions** (DEP-220; 2026-10-21). Then, for each essential of the
+preset, the world's land regions (the world's index frame, squares of `region_blocks`; a region is
+land when a point of a 64-block lattice in it, x from −C/2 and z from the world's top edge, stands
+at or above sea level) are counted again, now with the sources that hold ore in rock in their
+centre column as the game reads it (within 8 blocks of the top rock block for an exposed
+essential). A land region with fewer than `min_sites_per_region` gets a copy of a template source:
+the essential's first guaranteed site holding ore, else its natural source holding ore with the
+smallest footprint (never a placer or a child site). The copy goes to the region's dry lattice
+point nearest the world's spawn (`spawn/candidates.json`, the first candidate) whose lattice
+neighbours within 128 blocks are dry too (any dry point when none is), clear of every guaranteed
+site's footprint, and is anchored as above (an in-stratum copy at a point whose host lies within
+reach, tried at up to 48 points). Its site and bodies take the next free ids, and its forming event
+is a new `deeptime:guaranteed_occurrence` (writer `deeptime:geology`, appended as a new segment of
+the event log) at the template's forming time, caused by the template's event, with the params of
+the stage's guarantee events (`region` the world's region `"col,row"`) plus `copy_of` (the
+template site's id). The top-up does nothing on a preset without essentials (the 4k GameTest
+planet), and a second run adds nothing.
+
+The event log's new segment and `events/index.json`, then `bodies/bodies.dtb`, `sites/sites.dtsr` and `sites/index.dtsi` are rewritten when any site moved or was added; the caller writes the manifest last. `notes.bake.guaranteed`:
 `guaranteed`, `moved`, `moved_up`, `moved_down`, `largest_move_blocks`, `in_stratum_kept`,
 `in_stratum_to_host` and `in_stratum_out_of_host` (in-stratum sites moved down into a host class,
 or into other rock when none lay within reach), `placers_kept`, `centre_holds_ore` (the sites whose centre column holds ore of theirs at or under
-the top rock block), `under_water`, `millis`.
+the top rock block), `under_water`, `millis` (the anchor), `topped_up` (copies added),
+`top_up` (per essential: `land_regions`, `with_source` (land regions holding enough sources with
+ore before the top-up), `added`, `added_inland`, `short` (land regions still short: no template or
+no dry point)), `top_up_millis`.
 
 ### The climate at a block (0.2, P1-25)
 
@@ -1915,9 +1938,13 @@ formed), tracts, permissive_km2, mean_f, buried, truncated, eroded, too_deep, ch
 dropped_separation`, plus `province`, `provinces`, `count_mult`, `max_formed_per_survivor`,
 `brine_flow_km`, `sites`, `bodies`, `richness_mult`, `scatter_mult` (the game multiplies every background-scatter rule by it), `inherited_bif_share`, `bif_basin_km2`, and `bif_basins`, `bif_basin_share` (the inherited iron-formation basins the surface stage dealt). A forming event's `p_survive` is its cell's survival chance.
 `world_frame` (DEP-220) is the world the playability pass counted the essentials' regions in:
-`{"projection": "lambert"}`, or `{"projection": "petroff_guyou", "hemisphere_blocks", "lambda_c_deg",
-"land", "lambda_c" (the λc search, as notes.bake.projection.lambda_c)}`, whose λc the bake's
-projection draws the world with (the search's time is the stage's `world_frame` lap).
+`{"projection": "lambert"}` (with `"why": "no essentials"` when the preset has none), or
+`{"projection": "petroff_guyou", "hemisphere_blocks", "lambda_c_deg", "land", "forecast": true,
+"lambda_c" (the λc search, as notes.bake.projection.lambda_c)}`: the stage's forecast of the
+projection's λc, with the bake's rule on the stage's present L1 land, candidates 1° apart and
+rings 0.5° apart of 72 directions (the search's time is the stage's `world_frame` lap). The
+projection chooses its own λc on the baked land; the anchor's top-up fills the world's regions the
+forecast missed.
 
 ## Structural events (`structure/events.dtst`, P2-01, format 0.3)
 

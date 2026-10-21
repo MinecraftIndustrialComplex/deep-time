@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! The playability pass's deposits in the world as generated (DEP-221, ORE-280).
+//! The playability pass's deposits in the world as generated (DEP-220, DEP-221, ORE-280).
 //!
 //! The playability pass (`playability`, plan §7.8) places a guaranteed deposit against the deposit
 //! stage's ground: the present L1 surface, an exposed one with its top just under the soil
@@ -18,9 +18,14 @@
 //! physics and are not touched. An in-stratum body (MVT, `hosts.in_stratum`) is left in its host
 //! horizon, where the bake and the projection keep it (ORE-271), while its ore lies in rock in
 //! its centre column; otherwise (its horizon left in the soil, where the projection's clip under
-//! the drawn ground empties it) it is read unclipped, goes down into the nearest block of a host
-//! class under the top rock block and is clipped there ([`settle_in_stratum`]). A placer is left
+//! the drawn ground empties it) it is read unclipped, goes into a run of a host class under the
+//! top rock block that holds it and is clipped there ([`settle_in_stratum`]). A placer is left
 //! where `placer_channels` settled it (in a channel or on the ground).
+//!
+//! The deposit stage counted each essential's regions on its forecast of the world's λc; the
+//! projection chooses its own on the baked land. [`top_up`] then counts the world's own land
+//! regions against the sources that hold ore, and gives each one short a copy of a template
+//! source, anchored the same way, with an event of its own.
 //!
 //! The guaranteed sites are the ones whose forming event is a `deeptime:guaranteed_occurrence`
 //! (the event log; the run passes them from memory), so the pass needs no flag in the world data.
