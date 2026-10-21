@@ -9,7 +9,7 @@
 //!   Land: T_ocean + c·(T_land − T_ocean) + m_air·ΔSST_carried, where the continentality
 //!   c = 1 − max(m_air, sea share within `coast_km`) and m_air is the maritime influence the wind
 //!   brought (`lapse.rs`). On land the plateau's warmth is added (the mass-elevation effect:
-//!   `lapse::mass_elevation_k` × `lapse::mass_elevation_base`, CLM-225 to CLM-227); the result is
+//!   `lapse::mass_elevation_k` × `lapse::mass_elevation_base`, CLM-225 to CLM-228); the result is
 //!   the ground's temperature brought to sea level. Then the lapse rate on the ground's height.
 //! - **Precipitation**, mm/yr: max(`precip_min_mm`, base + orographic) where the orographic rate
 //!   is positive, base × max(`oro_lee_floor`, 1 + orographic/base) in the lee, with
@@ -421,10 +421,15 @@ pub fn compute_on(
                 })
             })
             .collect();
-        // The plateau's warmth (CLM-225 to CLM-227): each land cell's base height, and each
-        // row's warmth per metre of it in each month, from the month's sunlight against the
-        // planet's mean (S₀/4).
-        let mee_z = lapse::mass_elevation_base(&inp.d, &z, cells(lapse::MEE_FOOTPRINT_KM));
+        // The plateau's warmth (CLM-225 to CLM-228): each land cell's base height (bare ground
+        // only: the last step's land ice heats no air), and each row's warmth per metre of it in
+        // each month, from the month's sunlight against the planet's mean (S₀/4).
+        let mee_z = lapse::mass_elevation_base(
+            &inp.d,
+            &z,
+            inp.ice_prev,
+            cells(lapse::MEE_FOOTPRINT_KM),
+        );
         let q_mean = ep.s0 / 4.0;
         let mee_k: Vec<[f64; 12]> = q_month
             .iter()
