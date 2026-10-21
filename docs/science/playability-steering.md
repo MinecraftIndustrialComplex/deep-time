@@ -107,6 +107,8 @@ artefact counters, the cost) is in the design note's §8 and STATUS.md's build l
 - A continued run's star keeps brightening by Gough's law past the present; nothing else about
   the future (the Sun's evolution, the mantle's cooling) is modelled differently from the past.
 - Stopping is at keyframes (50 Myr apart on the quick presets), where the epoch checkpoints are.
+  The live map between keyframes (a picture of the run as it goes, docs/design/create-world-ux.md)
+  is not a stop: Stop here while it shows stops at the newest keyframe.
 
 ## Game choices
 

@@ -82,6 +82,20 @@ final class DeepTimeNative {
     static native void copyKeyframe(long session, int index, int layer, ByteBuffer dstRgba);
 
     /**
+     * Asks for the live map of {@code layer} (the Create World map while it follows the run;
+     * {@code deeptime_core::live}) for the next two seconds; null or "" stops. Returns the newest live
+     * frame's number, 0 before the first. Any thread; never blocks on a running {@link #advance}.
+     */
+    static native long watchLive(long session, String layer);
+
+    /**
+     * Copies the newest live frame as RGBA8 into a direct buffer of at least w·h·4 bytes (the
+     * keyframes' size) and returns its JSON {@code {"h","layer","seq","stage","t","w"}}; "" before
+     * the first. Any thread; never blocks on a running {@link #advance}.
+     */
+    static native String copyLiveFrame(long session, ByteBuffer dstRgba);
+
+    /**
      * JSON array of at most {@code max} events after {@code cursor}, which counts events in emission
      * order (pass the number already received). The event JSON is specified in {@code EVENTS.md}.
      */

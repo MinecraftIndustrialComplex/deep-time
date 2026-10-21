@@ -501,8 +501,12 @@ fn sutures_and_initiations_keep_continents_whole() {
     // sweep of 32 runs, 2026-10-16, after the eclogite root and whole-column isostasy: 8 welded;
     // with PLT-293, ocean crust keeping its own rock, 2026-10-20: supercontinent 1, 4, 9 and 12 of
     // seeds 1 to 12, scattered continents 12 of seeds 1 to 24, seed 19 three times, and neither
-    // supercontinent 6 nor scattered 9 any more).
-    for (start, seed) in [("supercontinent", 1), ("scattered_continents", 19)] {
+    // supercontinent 6 nor scattered 9 any more; with PLT-330 and PLT-331, the arcs' fronts on
+    // the converging boundary and the arc's basement down with the slab, the same day: one weld
+    // each on supercontinent 3, 4, 9, 12, 14, 16, 19 and 23 of seeds 1 to 24, scattered as in
+    // `collisions_weld_on_stall_and_transfer_on_shortening`, and neither supercontinent 1 nor
+    // scattered 19 any more; every run of the 48 initiated subduction).
+    for (start, seed) in [("supercontinent", 4), ("scattered_continents", 1)] {
         let p = preset(8000, 300.0, start, seed);
         let mut seen = 0usize;
         let world = run_stage(&p, |stage, world, st| {
@@ -765,8 +769,11 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 14 of seeds 3 to 24 with the lower-crustal flow and the settling, PLT-300 and ISO-078,
     // 2026-10-20: 5 to 9, 11 to 14, 18 to 21 and 24, seed 14 three times, seed 3 no more; 12 of
     // seeds 1 to 24 with PLT-293, ocean crust keeping its own rock, the same day: 1, 4, 6, 8, 10
-    // to 13, 15, 16, 18 and 19, seed 19 three times, seed 14 no more).
-    let p = preset(8000, 300.0, "scattered_continents", 19);
+    // to 13, 15, 16, 18 and 19, seed 19 three times, seed 14 no more; 7 of seeds 1 to 24 with the
+    // arcs' fronts on the converging boundary and the arc's basement down with the slab, PLT-330
+    // and PLT-331, the same day: 1, 2, 8, 14, 21, 22 and 24, seed 1 three times, seed 19 no more:
+    // fewer arcs reach a continent).
+    let p = preset(8000, 300.0, "scattered_continents", 1);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -872,8 +879,8 @@ fn the_collision_footprint_lives_with_its_collision() {
 #[test]
 fn recording_does_not_change_the_world_and_matches_the_run() {
     // A seed with welds, so the collision record is tested (as in
-    // `collisions_weld_on_stall_and_transfer_on_shortening`).
-    let p = preset(8000, 300.0, "scattered_continents", 19);
+    // `collisions_weld_on_stall_and_transfer_on_shortening`, which says why seed 1).
+    let p = preset(8000, 300.0, "scattered_continents", 1);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -960,13 +967,16 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         assert!(step.pieces.len() >= loose.len().min(dynamics::PIECES_KEPT));
         // The boundary mix: every kind is a length; the subducting fronts (the first two kinds,
         // oceanic slabs) are nearly the fronts whose lengths the plates record (a collision front
-        // pulls nothing since plate tasks 3 and 4). The two tests differ at the edges since
-        // 2026-10-20 (PLT-310, PLT-311): the mix judges the motion across the boundary's normal,
-        // so it counts a plate's strike-slip stretches as transform, and it counts as a front a
-        // sample whose boundary converges while each of its lattice edges parts, where the plates
-        // (`subduction::fronts_begin`, by single edges) have no front. So a step's mix can exceed
-        // the plates' fronts by a little, and over the run it holds fewer and most of them (this
-        // seed, 2026-10-20: one step of 138 over, by 1.0 % at step 16; 0.72 of them over the run).
+        // pulls nothing since plate tasks 3 and 4). Both judge the motion across the boundary's
+        // normal and call it a transform within Bird's 20 degrees (PLT-310, PLT-311; the plates'
+        // fronts since PLT-330, 2026-10-20), and the plates (`subduction::fronts_begin`) also
+        // need the front's lattice edge to converge. So the plates' fronts lie within the mix's,
+        // and the mix holds a little more: the samples whose boundary converges while each of
+        // their lattice edges parts. Measured (2026-10-20, PLT-330 and PLT-331, 48 runs of seeds
+        // 1 to 24 from both starts at this size): no step in any run where the plates' fronts
+        // exceed the mix's beyond the tolerance; the mix above the plates' by 3.8 to 6.6 % over a
+        // run (this seed 5.4 %) and by at most 8 to 32 % in a step (this seed 10.3 %). Until
+        // PLT-330 the plates also counted their contacts' transform stretches and held more.
         assert!(step.mix_km.iter().all(|&x| x.is_finite() && x >= 0.0));
         let fronts: f64 = step.mix_km[..2].iter().sum();
         let recorded: f64 = step.plates.iter().map(|q| q.front_km).sum();
@@ -974,6 +984,12 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         // in the mix only.)
         let tol = 0.5 * step.plates.len() as f64 + 1.0;
         if st.counters.plate_deaths == deaths_before {
+            // (0.0000 of the mix to four places in every run measured; a test bound of 0.001.)
+            assert!(
+                recorded <= fronts * 1.001 + tol,
+                "step {}: the plates' fronts {recorded} km exceed the mix's {fronts} km",
+                st.step
+            );
             let excess = (fronts - recorded - tol).max(0.0) / recorded.max(1.0);
             if excess > worst_excess {
                 worst_excess = excess;
@@ -1056,13 +1072,13 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     }
     assert!(longest_slab > 0.0, "no slab grew in 300 Myr");
     assert!(mix_seen > 0.0, "no plate boundary recorded in 300 Myr");
+    // Test bounds, three times the measured excess over the run and in the worst step (above).
     assert!(
-        mix_fronts > 0.5 * recorded_fronts && mix_fronts <= recorded_fronts,
+        mix_fronts >= recorded_fronts && mix_fronts <= 1.165 * recorded_fronts,
         "the mix's fronts {mix_fronts} km against the plates' {recorded_fronts} km"
     );
-    // A test bound, three times the measured worst (above).
     assert!(
-        worst_excess <= 0.03,
+        worst_excess <= 0.31,
         "step {worst_step}: the mix's fronts exceed the plates' by {worst_excess} of them"
     );
     assert!(arc_cells_seen > 0, "no arc cell recorded in 300 Myr");
@@ -1584,12 +1600,25 @@ fn arcs_turn_continental_by_their_crust_not_their_height() {
     }
     let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
     finish_samples(&mut st, &geo, &z0, &env);
+    let ocean = super::transition::oceanic_m() as f32;
     for (&i, &(arc, z, hidden, turns)) in oceanic.iter().zip(&cases) {
+        let s = &st.samples[i];
         assert_eq!(
-            st.samples[i].kind == CONTINENTAL,
+            s.kind == CONTINENTAL,
             turns,
             "arc magma {arc} m (mature at {mature} m), elevation {z} m, hidden {hidden}"
         );
+        // The ocean crust under the arc stays in the column, as its basement, and is no
+        // continental crust (PLT-331).
+        if turns {
+            assert!((s.basement() - ocean).abs() < 1.0, "{s:?}");
+            assert!((s.own_thickness_m() - (s.thickness_m - ocean)).abs() < 1.0);
+            let own: f32 = s.own_pools().iter().sum();
+            assert!((own - s.own_thickness_m()).abs() < 1.0, "{own} {s:?}");
+        } else {
+            assert_eq!(s.basement(), 0.0);
+            assert_eq!(s.own_thickness_m(), s.thickness_m);
+        }
     }
 }
 
@@ -1654,6 +1683,28 @@ fn converging_plates(p: &PlanetPreset, env: &Env<'_>) -> (PlateState, Geo, Vec<D
     let (mut st, geo, pos) = two_plates(p, env, 0.1);
     st.plates[1].omega = (DVec3::X * env.norm.omega_of_speed(50.0)).to_array();
     (st, geo, pos)
+}
+
+/// An arc's front is where the plates converge across their boundary (PLT-330): a contact whose
+/// plates slide past each other has no front, however its lattice edges zigzag, and the same
+/// contact converging head-on has one along its length.
+#[test]
+fn a_contact_whose_plates_slide_past_has_no_arc_front() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let fronts = |axis: DVec3| {
+        let (mut st, geo, pos) = two_plates(&p, &env, 0.1);
+        assert!(!st.contacts.is_empty());
+        st.plates[1].omega = (axis * env.norm.omega_of_speed(50.0)).to_array();
+        subduction::fronts_begin(&st, &geo, &pos, &env).front_count()
+    };
+    // About x: the ocean moves north across the equator, towards the continent where y > 0.
+    let head_on = fronts(DVec3::X);
+    // About z: along the equator, east-west.
+    let sliding = fronts(DVec3::Z);
+    assert!(head_on > 20, "{head_on}");
+    assert_eq!(sliding, 0);
 }
 
 /// Plate task 8: the volcano stage's felsic cones over an arc (already in the pools as volcanic

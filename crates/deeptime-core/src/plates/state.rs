@@ -136,6 +136,14 @@ pub struct Sample {
     pub arc_continental_m: f32,
     /// … and oceanic (island) arcs.
     pub arc_oceanic_m: f32,
+    /// Continental crust made from ocean floor (an island arc matured, crust stacked onto the
+    /// floor; [`Sample::make_continental`]): the ocean's own crust under it, m. It stays in the
+    /// column's mafic pools (it is there, and the column's height counts it: `settle.rs`), but it
+    /// is no continental crust: the crust budget leaves it out, and a collision sends it down
+    /// with the slab instead of stacking it into the belt (`belts.rs`). 0 on ocean floor and on
+    /// the continents' own crust (ledger: PLT-331).
+    #[serde(default)]
+    pub basement_m: f32,
     /// Flux-weighted magma oxidation proxy in [0, 1] (older, sediment-laden slabs → more oxidised).
     pub oxidation: f32,
     /// At the nearest trench within the subduction distance, when last inside it: convergence
@@ -183,6 +191,7 @@ impl Sample {
             pools: [0.0; pool::COUNT],
             arc_continental_m: 0.0,
             arc_oceanic_m: 0.0,
+            basement_m: 0.0,
             oxidation: 0.0,
             convergence_mm_yr: 0.0,
             obliquity_deg: 0.0,
@@ -201,6 +210,57 @@ impl Sample {
 
     pub fn is_continental(&self) -> bool {
         self.kind == CONTINENTAL
+    }
+
+    /// Ocean floor becomes continental crust (an island arc matured, `finish_samples`; crust
+    /// stacked onto it, `subduction::resolve` and `collapse::spread`): its own ocean crust, the
+    /// ocean column's 7 km or the mafic rock it has, stays under the crust on top as its
+    /// [`basement_m`](Sample::basement_m). ledger: PLT-331
+    pub fn make_continental(&mut self) {
+        if self.kind == CONTINENTAL {
+            return;
+        }
+        self.kind = CONTINENTAL;
+        let ocean = super::pools::oceanic_column();
+        let own = ocean[pool::MAFIC_VOLCANIC] + ocean[pool::MAFIC_PLUTONIC];
+        self.basement_m = own.min(self.mafic_m());
+    }
+
+    /// The column's mafic rock, m.
+    fn mafic_m(&self) -> f32 {
+        self.pools[pool::MAFIC_VOLCANIC].max(0.0) + self.pools[pool::MAFIC_PLUTONIC].max(0.0)
+    }
+
+    /// The ocean crust under continental crust made from ocean floor, m: its
+    /// [`basement_m`](Sample::basement_m), no more than the column's mafic rock; 0 on ocean floor.
+    pub fn basement(&self) -> f32 {
+        if self.kind == CONTINENTAL {
+            self.basement_m.min(self.mafic_m()).max(0.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// The continental crust's own thickness, m: the column less its [`basement`](Sample::basement).
+    pub fn own_thickness_m(&self) -> f32 {
+        (self.thickness_m - self.basement()).max(0.0)
+    }
+
+    /// The column's pools less its [`basement`](Sample::basement), taken from the mafic pools in
+    /// the ocean column's proportion (lavas 2 : gabbro 5) as far as each holds.
+    pub fn own_pools(&self) -> [f32; pool::COUNT] {
+        let mut p = self.pools;
+        let b = self.basement();
+        if b > 0.0 {
+            let (v, g) = (pool::MAFIC_VOLCANIC, pool::MAFIC_PLUTONIC);
+            let ocean = super::pools::oceanic_column();
+            let gabbro = (b * ocean[g] / (ocean[v] + ocean[g])).min(p[g].max(0.0));
+            let lava = (b - gabbro).min(p[v].max(0.0));
+            let gabbro = (b - lava).min(p[g].max(0.0));
+            p[v] -= lava;
+            p[g] -= gabbro;
+        }
+        p
     }
 
     /// Oceanic crust age at `t_myr` (0 for continental crust).

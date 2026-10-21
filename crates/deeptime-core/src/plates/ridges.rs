@@ -131,6 +131,16 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
     }
     s.arc_continental_m = lerp(&|x| x.arc_continental_m);
     s.arc_oceanic_m = lerp(&|x| x.arc_oceanic_m);
+    // A basement is the continental crust's own (ocean floor's is 0), blended as its pools are.
+    s.basement_m = if s.kind == CONTINENTAL && same_kind > 0.0 {
+        ((0..3)
+            .filter(|&k| corners[k].kind == s.kind)
+            .map(|k| w[k] * f64::from(corners[k].basement()))
+            .sum::<f64>()
+            / same_kind) as f32
+    } else {
+        0.0
+    };
     s.oxidation = lerp(&|x| x.oxidation);
     s.uplift_mm_yr = lerp(&|x| x.uplift_mm_yr);
     // Heat flow belongs to the kind of crust (the sea floor's age law against the continental
