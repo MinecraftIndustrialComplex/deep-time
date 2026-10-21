@@ -1,6 +1,12 @@
 # Continuous integration (plan §4.5). The organisation is on GitHub's free plan: 2,000 Actions
 # minutes a month for private repositories, so documentation-only pushes (STATUS.md updates,
 # plan edits) do not trigger a run, and a newer push cancels an older run on the same ref.
+#
+# Both jobs build the Rust workspace, which depends on the private repository
+# MinecraftIndustrialComplex/mic-viewer over SSH (Cargo.toml; decisions log 2026-10-21). The
+# workflow's token reads only this repository, so cargo cannot fetch it here until CI is given read
+# access to mic-viewer (a deploy key or a token as a secret: Ben's to decide). On 2026-10-21 GitHub was
+# not starting this workflow's jobs at all (billing).
 name: ci
 
 on:

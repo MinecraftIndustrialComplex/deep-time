@@ -14,7 +14,18 @@ const assert = require('assert');
 const path = require('path');
 const fs = require('fs'), vm = require('vm');
 const assets = path.join(__dirname, '../../crates/deeptime-viewer/assets');
-const core = path.join(__dirname, '../../vendor/mic-viewer/web/map.js');
+// The core's map.js in cargo's checkout of the pinned mic-viewer (Cargo.toml's git dependency), so
+// the check runs against the commit the workbench embeds; MIC_VIEWER_MAP_JS names another file.
+function coreMapJs() {
+  if (process.env.MIC_VIEWER_MAP_JS) return process.env.MIC_VIEWER_MAP_JS;
+  const out = require('child_process').execFileSync('cargo', ['metadata', '--format-version', '1', '--locked'],
+    { cwd: path.join(__dirname, '../..'), maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'inherit'] });
+  const pkg = JSON.parse(out).packages.find(p => p.name === 'mic-viewer');
+  if (!pkg) throw new Error('worldmap-check: cargo metadata lists no mic-viewer package');
+  return path.join(path.dirname(pkg.manifest_path), 'web/map.js');
+}
+const core = coreMapJs();
+console.log(`worldmap-check: the core is ${core}`);
 // The page's scripts at least compile.
 for (const f of [path.join(assets, 'worldmap.js'), core]) new vm.Script(fs.readFileSync(f, 'utf8'), { filename: f });
 require(path.join(assets, 'projection.js'));
