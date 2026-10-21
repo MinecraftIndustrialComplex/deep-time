@@ -772,14 +772,20 @@ impl Workbench {
             events.push(text.to_owned());
             p.events += 1;
         }
-        if !events.is_empty()
+        // Events a stage's finish added to after they streamed: the page replaces its copy (by
+        // id), and the file takes the new text after the old (`restore` keeps the last by id).
+        let (amended_now, next) = s.amended_since(p.amended);
+        p.amended = next;
+        let amended = sort_amended(amended_now, p.events, &mut events);
+        if (!events.is_empty() || !amended.is_empty())
             && let Some(f) = lock(&run.events_file).as_mut()
         {
-            for e in &events {
+            for e in events.iter().chain(amended.iter().map(|(_, t)| t)) {
                 writeln!(f, "{e}")?;
             }
             f.flush()?;
         }
+        run.live.amend(amended);
         let due = force
             || !frames.is_empty()
             || !events.is_empty()
@@ -814,9 +820,56 @@ impl Workbench {
 struct Published {
     frames: u32,
     events: u64,
+    /// Position in the session's list of amended events (`Session::amended_since`).
+    amended: usize,
     progress_at: Option<Instant>,
     /// The deposit stage's sites have been taken for the page's overlay.
     deposits: bool,
+}
+
+/// The session's amended events (`Session::amended_since`: index in emission order, the new
+/// text) against a poll that has just read `events`, the last of them at index `end − 1`. The
+/// session can amend an event at any time, also one this poll read (before or after its read) or
+/// one appended after it: an event streamed before this poll comes back as an amendment, one read
+/// in this poll takes the new text in place (its text in `events` may be the older one), and one
+/// not read yet is dropped (it streams with its new text at the next poll).
+fn sort_amended(
+    amended: Vec<(u64, String)>,
+    end: u64,
+    events: &mut [String],
+) -> Vec<(usize, String)> {
+    let base = end - events.len() as u64;
+    let mut out = Vec::new();
+    for (i, text) in amended {
+        if i < base {
+            out.push((i as usize, text));
+        } else if i < end {
+            events[(i - base) as usize] = text;
+        }
+    }
+    out
+}
+
+/// The events file's lines in emission order, an event written again (amended after it streamed)
+/// in its first place with its last text.
+fn last_by_id(lines: impl Iterator<Item = String>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut at: std::collections::HashMap<u64, usize> = std::collections::HashMap::new();
+    for line in lines {
+        let id = serde_json::from_str::<Value>(&line)
+            .ok()
+            .and_then(|v| v["id"].as_u64());
+        match id.and_then(|id| at.get(&id).copied()) {
+            Some(i) => out[i] = line,
+            None => {
+                if let Some(id) = id {
+                    at.insert(id, out.len());
+                }
+                out.push(line);
+            }
+        }
+    }
+    out
 }
 
 /// A run read back from its folder.
@@ -841,11 +894,12 @@ fn restore(dir: &Path, ramps: &Ramps) -> CliResult<Run> {
         Err(_) => Vec::new(),
     };
     let events = match File::open(dir.join("events.jsonl")) {
-        Ok(f) => BufReader::new(f)
-            .lines()
-            .map_while(Result::ok)
-            .filter(|l| !l.trim().is_empty())
-            .collect(),
+        Ok(f) => last_by_id(
+            BufReader::new(f)
+                .lines()
+                .map_while(Result::ok)
+                .filter(|l| !l.trim().is_empty()),
+        ),
         Err(_) => Vec::new(),
     };
     let preset_json = v["preset_json"].as_str().unwrap_or("").to_owned();
@@ -890,4 +944,25 @@ fn restore(dir: &Path, ramps: &Ramps) -> CliResult<Run> {
         run.persist();
     }
     Ok(run)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sort_amended;
+
+    #[test]
+    fn an_amendment_in_the_same_poll_is_not_lost() {
+        // Events 0 to 4 streamed before; this poll read 5 and 6 (cursor now 7). The session
+        // amended 2 (streamed before), 6 (read in this poll, maybe before the amendment) and 8
+        // (appended after the poll's read).
+        let mut events = vec!["e5".to_owned(), "e6 old".to_owned()];
+        let amended = vec![
+            (2, "e2 new".to_owned()),
+            (6, "e6 new".to_owned()),
+            (8, "e8 new".to_owned()),
+        ];
+        let out = sort_amended(amended, 7, &mut events);
+        assert_eq!(out, vec![(2, "e2 new".to_owned())]);
+        assert_eq!(events, vec!["e5".to_owned(), "e6 new".to_owned()]);
+    }
 }

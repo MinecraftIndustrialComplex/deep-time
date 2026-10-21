@@ -2,7 +2,9 @@
 //! What the live page sees of a run: frames, events, progress and status. The driving thread
 //! publishes after every step; each stream connection keeps a [`Cursor`] and waits for news.
 //! Everything published stays (frames by number, events in emission order), so a page that
-//! connects late, reconnects or rewinds gets all of it.
+//! connects late, reconnects or rewinds gets all of it. An event a stage's finish changed after
+//! it was published comes again in an `events` message at its index (`from`); the page replaces
+//! the event with that id.
 //!
 //! Events stay the session's own JSON text (`events_since`, one object each): parsing and
 //! printing them again would move the last digit of some floats (serde_json's default float
@@ -36,6 +38,9 @@ struct Inner {
     sizes: Vec<FrameSize>,
     /// One JSON object per event, as the session wrote it.
     events: Vec<String>,
+    /// Indices into `events` replaced after they were published, in order (a stage's finish
+    /// adds to an event it emitted steps before: `Session::amended_since`).
+    amended: Vec<usize>,
     progress: Value,
     progress_seq: u64,
     status: Value,
@@ -48,6 +53,7 @@ struct Inner {
 pub struct Cursor {
     frames: usize,
     events: usize,
+    amended: usize,
     progress: u64,
     status: u64,
 }
@@ -55,6 +61,7 @@ pub struct Cursor {
 fn has_news(g: &Inner, c: &Cursor) -> bool {
     g.frames.len() > c.frames
         || g.events.len() > c.events
+        || g.amended.len() > c.amended
         || g.progress_seq != c.progress
         || g.status_seq != c.status
 }
@@ -75,6 +82,7 @@ impl Live {
                 frames: Vec::new(),
                 sizes: Vec::new(),
                 events: Vec::new(),
+                amended: Vec::new(),
                 progress: Value::Null,
                 progress_seq: 0,
                 status: json!({ "state": "running" }),
@@ -151,6 +159,24 @@ impl Live {
         self.changed.notify_all();
     }
 
+    /// Replaces published events (index in emission order, new JSON text) and wakes the
+    /// streams: a connection that already has one gets it again in an `events` message whose
+    /// `from` is its index (the page replaces the event with that id).
+    pub fn amend(&self, amended: Vec<(usize, String)>) {
+        if amended.is_empty() {
+            return;
+        }
+        let mut g = self.lock();
+        for (i, text) in amended {
+            if let Some(e) = g.events.get_mut(i) {
+                *e = text;
+                g.amended.push(i);
+            }
+        }
+        drop(g);
+        self.changed.notify_all();
+    }
+
     /// `{"state": "running" | "finalizing" | "done" | "failed", …}`.
     pub fn set_status(&self, status: Value) {
         let mut g = self.lock();
@@ -186,6 +212,7 @@ impl Live {
         let c = Cursor {
             frames: g.frames.len(),
             events: g.events.len(),
+            amended: g.amended.len(),
             progress: g.progress_seq,
             status: g.status_seq,
         };
@@ -203,6 +230,16 @@ impl Live {
             .wait_timeout_while(g, wait, |g| !g.closing && !has_news(g, cur))
             .unwrap_or_else(|e| e.into_inner());
         let mut out = Vec::new();
+        // Events this connection holds an older copy of, then the new ones.
+        for &i in &g.amended[cur.amended..] {
+            if i < cur.events {
+                out.push((
+                    "events",
+                    format!("{{\"from\":{i},\"events\":[{}]}}", g.events[i]),
+                ));
+            }
+        }
+        cur.amended = g.amended.len();
         let mut from = cur.events;
         for chunk in g.events[cur.events..].chunks(EVENTS_PER_MESSAGE) {
             out.push((
@@ -274,6 +311,17 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+        // An event changed after it streamed: a connection that has it gets it again at its
+        // index; one that connects later reads the new text in its hello.
+        live.amend(vec![(1, "{\"x\":2}".into())]);
+        let c = live.next(&mut early, Duration::ZERO).unwrap();
+        assert_eq!(
+            c,
+            [("events", "{\"from\":1,\"events\":[{\"x\":2}]}".to_owned())]
+        );
+        let (hello, _) = live.snapshot();
+        let hello: Value = serde_json::from_str(&hello).unwrap();
+        assert_eq!(hello["events"][1], json!({"x": 2}));
         live.close();
         assert!(live.next(&mut early, Duration::from_secs(5)).is_none());
         assert_eq!(live.frame_size(1), Some(size));

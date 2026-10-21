@@ -23,10 +23,10 @@
 //!   Imbrie & Imbrie (1980, "Modeling the climatic response to orbital variations", Science 207:
 //!   943–953): dH/dt = (H_eq − H)/τ with τ = τ_m/(1 − b) while the ice grows and τ_m/(1 + b) while
 //!   it shrinks (τ_m = `ice_response_kyr`, 17 kyr; b = 0.6): slow build-up, fast terminations.
-//! - **Glacio-eustasy.** Grounded ice lowers the sea by (ρ_i/ρ_w)·ΔV / A_ocean — about 2.5 m per
-//!   10⁶ km³ of ice on Earth's 3.61·10⁸ km² of ocean — measured from `ice_reference_km3`, the ice
-//!   the preset's sea-level curve already assumes (the present ice of the calibrated Earth-like
-//!   runs, so an Earth-like present keeps its calibrated coastline).
+//! - **Glacio-eustasy.** Grounded ice holds (ρ_i/ρ_w)·V of the planet's water out of the sea
+//!   (`crate::sea_level`): the sea level is where the rest fills the ocean basins, so more ice
+//!   lowers it by about 2.5 m per 10⁶ km³ on Earth's 3.61·10⁸ km² of ocean ([`eustatic_m`], the
+//!   first-order estimate the climate DEM tool prints).
 
 use rayon::prelude::*;
 
@@ -242,8 +242,8 @@ pub fn relax(h: f64, eq: f64, dt_kyr: f64, tau_kyr: f64) -> f64 {
     h + (eq - h) * (1.0 - (-dt_kyr / tau.max(1e-9)).exp())
 }
 
-/// Sea level change, m, of `dv_km3` more grounded ice than the reference on `ocean_km2` of sea
-/// (both Earth-normalized): −(ρ_i/ρ_w)·ΔV/A.
+/// Sea level change, m, of `dv_km3` more grounded ice on `ocean_km2` of sea (both
+/// Earth-normalized), to first order (the sea's area held fixed): −(ρ_i/ρ_w)·ΔV/A.
 pub fn eustatic_m(dv_km3: f64, ocean_km2: f64) -> f64 {
     if ocean_km2 <= 0.0 {
         return 0.0;
