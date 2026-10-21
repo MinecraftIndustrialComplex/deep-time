@@ -14,7 +14,7 @@ The constants of the per-cell design were checked against their sources before t
 | [CLM](ledger/CLM.md) | insolation and orbit | CLM-027 to CLM-044 (18) |
 | [CLM](ledger/CLM.md) | carbon cycle (CLM-069 to CLM-073 are the CO₂ forcing's old law and its anchors; the law is CLM-167) | CLM-045 to CLM-080, CLM-167, CLM-168, CLM-170 (39) |
 | [CLM](ledger/CLM.md) | deep-time clock | CLM-081 to CLM-091, CLM-136, CLM-137, CLM-166, CLM-179 (15) |
-| [CLM](ledger/CLM.md) | land ice and sea ice | CLM-092 to CLM-112, CLM-135 (22) |
+| [CLM](ledger/CLM.md) | land ice and sea ice (CLM-107 and CLM-108 retired 2026-10-21; CLM-210, the ice's water out of the sea, on [sea-level.md](sea-level.md)) | CLM-092 to CLM-106, CLM-109 to CLM-112, CLM-135, CLM-210 (21) |
 | [CLM](ledger/CLM.md) | mountain glaciers | CLM-113 to CLM-118 (6) |
 | [CLM](ledger/CLM.md) | moisture budget (built behind `rain_model = budget`, not the default) | CLM-139 to CLM-146 (8) |
 | [CLM](ledger/CLM.md) | the belts' rain amount (`belts_rain_scale`); the upwind rain is on [upwind-rain.md](upwind-rain.md) | CLM-201 (1) |
@@ -397,6 +397,15 @@ sheets. Master's later arc change to that planet (d54c7f0f, PLT-043) was not mea
 MIC GameTest's `climateConsistent` failure on master ("C 0.621 < 0.630 (132 columns)") is
 therefore not a climate fault. It is the census's sampling noise, and the floors now allow for
 it (biomes.md, "The floors against the census's noise").
+
+## Sea level from the ocean's water (2026-10-21)
+
+The climate stage still sets each step's sea level, but no longer from a curve: it fills the ground
+the surface starts the step from with the planet's water (`planet.surface_water_m`, Earth's 2,664 m
+as a layer over the planet, ISO-085), less the water the land ice holds, (ρ_i/ρ_w) of its volume
+(CLM-210), and adds the steering nudge (STE-006). The glacio-eustasy weight and the reference ice
+(`glacio_eustasy`, `ice_reference_km3`, CLM-107 and CLM-108) are gone with the curve; the ice's
+water always counts. [sea-level.md](sea-level.md) has the rule, its solve and the measurements.
 
 ## Material for the stage 2 writer
 
