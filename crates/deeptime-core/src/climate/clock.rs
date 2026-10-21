@@ -675,7 +675,7 @@ mod tests {
     /// A zonal planet for the clock: land fraction per band, a weathering kernel from the EBM's
     /// present climate (runoff on all land 1.8 times the mean behind `KERNEL_EARTH`, so the
     /// planet weathers the same against today's degassing whatever Earth's kernel is
-    /// re-measured to: 0.30 m/yr at 2.475·10⁷, 0.61 at 5.039·10⁷), and an ice callback that puts ice on the
+    /// re-measured to: 0.30 m/yr at 2.475·10⁷, 0.62 at 5.147·10⁷), and an ice callback that puts ice on the
     /// share of each band's land (ground uniform between 0 and 1 km) above its equilibrium line
     /// (summer temperature at the ELA 1 °C, lapse 6.5 °C/km).
     struct Planet {
