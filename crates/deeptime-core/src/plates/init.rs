@@ -34,7 +34,7 @@ use super::state::{
     regime,
 };
 use crate::error::CoreError;
-use crate::params::PlanetPreset;
+use crate::params::{OceanDepth, PlanetPreset};
 use crate::preset::StartConfig;
 use crate::sphere::SplitMix64;
 
@@ -48,6 +48,30 @@ pub fn random_rotation(rng: &mut SplitMix64) -> DQuat {
     let (a, b) = ((1.0 - u1).sqrt(), u1.sqrt());
     let (t2, t3) = (std::f64::consts::TAU * u2, std::f64::consts::TAU * u3);
     DQuat::from_xyzw(a * t2.sin(), a * t2.cos(), b * t3.sin(), b * t3.cos()).normalize()
+}
+
+/// The starting ocean floor's oldest age, Myr: Earth's oldest ocean floor in place is about 180 Myr
+/// (from memory), the cap the earlier motion's ages always had. ledger: PLT-356
+const START_OCEAN_MAX_AGE_MYR: f64 = 180.0;
+
+/// The starting ocean's ages spread over the steady-state age–area distribution of an ocean made
+/// at a constant rate and consumed evenly at every age, dA/dt = C₀(1 − t/t_m) (Parsons 1982), in
+/// the order the earlier motion gave them (`raw`: young where it diverged): the share F of the
+/// floor younger than t is 1 − (1 − t/t_m)², so the sample of rank F (the samples are equal-area)
+/// takes t_m(1 − √(1 − F)), a mean of t_m/3. NaN (no ocean floor) stays NaN. ledger: PLT-356
+fn steady_state_ages(raw: &[f64]) -> Vec<f64> {
+    let mut order: Vec<u32> = (0..raw.len() as u32)
+        .filter(|&i| !raw[i as usize].is_nan())
+        .collect();
+    order
+        .par_sort_unstable_by(|&a, &b| raw[a as usize].total_cmp(&raw[b as usize]).then(a.cmp(&b)));
+    let m = order.len() as f64;
+    let mut out = raw.to_vec();
+    for (r, &i) in order.iter().enumerate() {
+        let f = (r as f64 + 0.5) / m;
+        out[i as usize] = START_OCEAN_MAX_AGE_MYR * (1.0 - (1.0 - f).sqrt());
+    }
+    out
 }
 
 /// Indices of the `count` smallest scores (ties by index).
@@ -289,6 +313,33 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         |a, b| plate[a as usize] == plate[b as usize],
         std::f64::consts::PI,
     );
+    let raw_age: Vec<f64> = (0..n)
+        .into_par_iter()
+        .map(|i| {
+            if continental[i] {
+                return f64::NAN;
+            }
+            let pl = plate[i] as usize;
+            let v = norm
+                .speed_mm_yr(omega[pl], DVec3::from_array(plates[pl].centroid))
+                .max(10.0);
+            let d_km = if dist[i].is_finite() {
+                norm.km(dist[i])
+            } else {
+                0.0
+            };
+            (d_km / v).min(START_OCEAN_MAX_AGE_MYR)
+        })
+        .collect();
+    // Under the earlier motion alone the floor is young (median about 20 Myr against Earth's
+    // 50 to 60): with the sea from the ocean's volume such a floor has too little room and the
+    // planet starts with its sea 300 to 600 m high. Under GDH1 (the volume sea's floor, PLT-350)
+    // the ages keep the motion's order and take the steady state's spread; the dampening's
+    // plate-only presets keep their start. ledger: PLT-356
+    let start_age = match k.ocean_depth {
+        OceanDepth::Gdh1 => steady_state_ages(&raw_age),
+        OceanDepth::Dampening => raw_age,
+    };
 
     // The continental shelf: the continental crust nearest the ocean beyond the dry share starts
     // under the sea, from 0 m at the coast to `SHELF_BREAK_M` at the ocean's edge (continents are
@@ -334,7 +385,6 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         .into_par_iter()
         .map(|i| {
             let p = pts[i];
-            let pl = plate[i] as usize;
             let mut s = Sample::blank(plate[i]);
             if continental[i] {
                 let f = 0.5 + 0.5 * fbm(p, 4.0, 4, s4);
@@ -348,15 +398,7 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
                 s.regime = regime::CRATON;
                 s.heat_flow_mw_m2 = 60.0;
             } else {
-                let v = norm
-                    .speed_mm_yr(omega[pl], DVec3::from_array(plates[pl].centroid))
-                    .max(10.0);
-                let d_km = if dist[i].is_finite() {
-                    norm.km(dist[i])
-                } else {
-                    0.0
-                };
-                let age = (d_km / v).min(180.0);
+                let age = start_age[i];
                 s.kind = OCEANIC;
                 s.formed_myr = (t0 - age) as f32;
                 s.elevation_m = floor_at(k, age) as f32;
@@ -508,4 +550,36 @@ fn earlier_slabs(
         });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_starting_ocean_takes_the_steady_state_ages() {
+        // Ten thousand ocean samples, aged 0 to 40 Myr in a shuffled order, and a continent.
+        let mut raw: Vec<f64> = (0..10_000u64)
+            .map(|i| (i.wrapping_mul(7919) % 10_000) as f64 * 0.004)
+            .collect();
+        raw.push(f64::NAN);
+        let a = steady_state_ages(&raw);
+        assert!(a[10_000].is_nan());
+        // The order is kept: an older raw age is never younger after.
+        let mut by_raw: Vec<usize> = (0..10_000).collect();
+        by_raw.sort_by(|&x, &y| raw[x].total_cmp(&raw[y]));
+        assert!(by_raw.windows(2).all(|w| a[w[0]] <= a[w[1]]));
+        // Parsons's triangle with t_m = 180 Myr: mean t_m/3 = 60 Myr, median t_m(1 − √½) = 52.7,
+        // all within 0 to t_m.
+        let mean = a[..10_000].iter().sum::<f64>() / 1e4;
+        assert!((mean - 60.0).abs() < 0.05, "{mean}");
+        let mut s = a[..10_000].to_vec();
+        s.sort_by(f64::total_cmp);
+        assert!(
+            (s[5_000] - 180.0 * (1.0 - 0.5f64.sqrt())).abs() < 0.05,
+            "{}",
+            s[5_000]
+        );
+        assert!(s[0] >= 0.0 && s[9_999] < 180.0);
+    }
 }

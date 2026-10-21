@@ -706,7 +706,7 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
         "degassing {d:e}, weathering {w:e}"
     );
     // The note's series keeps four significant figures (the notes' `round`): half a unit of the
-    // fourth is at most 5·10⁻⁴ of the value (0.07 m at the −134 m this planet ends at).
+    // fourth is at most 5·10⁻⁴ of the value (0.07 m at the −143 m this planet ends at).
     let noted = last[col("sea_level_m")].as_f64().unwrap();
     assert!(
         (noted - sea).abs() <= 5e-4 * sea.abs().max(1.0),
