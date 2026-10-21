@@ -296,6 +296,113 @@ fn erosion_and_deposition_conserve_mass() {
     assert!((end - start).abs() < 1e-9 * start.abs().max(1.0) * n as f64);
 }
 
+/// HYD-110: a lake keeps what its rivers bring up to its room and settles it over all of its
+/// floor, every cell raised by the same share of its depth (not a causeway along the flow path);
+/// a small supply fills part of the room and passes nothing on, a large one fills it all.
+#[test]
+fn a_lake_settles_its_inflow_over_its_whole_floor() {
+    let (w, rows) = (20, 30);
+    let d = Dims::new(w, rows, 1000.0, true);
+    let n = d.cells();
+    let a = d.cell_area();
+    // A ramp up from a sea along the first rows, with a bowl 200 m deep across rows 10 to 15 of
+    // columns 5 to 14: its downstream rim (row 9) is the spill, so rows 10 to 12 hold a lake.
+    let mut kind = vec![LAND; n];
+    let mut h = vec![0.0; n];
+    for c in 0..n {
+        let (i, j) = (c % w, c / w);
+        if j < 3 {
+            kind[c] = BASE;
+            h[c] = -100.0;
+        } else {
+            h[c] = j as f64 * 50.0 + (i as f64 * 0.37).sin();
+            if (10..16).contains(&j) && (5..15).contains(&i) {
+                h[c] -= 200.0;
+            }
+        }
+    }
+    let base_z = vec![0.0; n];
+    let mut filled = vec![0.0; n];
+    pflood::flood(&d, &h, &base_z, &mut kind, &mut filled);
+    let lake: Vec<usize> = (0..n)
+        .filter(|&c| kind[c] == LAND && filled[c] - h[c] > pflood::LAKE_TOL_M)
+        .collect();
+    assert!(lake.len() >= 20, "{} lake cells", lake.len());
+    let room: f64 = lake.iter().map(|&c| filled[c] - h[c]).sum();
+    let mut r = routing::Routing::default();
+    routing::receivers(&d, &filled, &kind, &mut r);
+    routing::stack(&d, &kind, &mut r);
+    let mut area = Vec::new();
+    routing::accumulate(&d, &r, &vec![1.0; n], &mut area);
+    let mut shares = Vec::new();
+    for kf in [2.0e-9, 1.0e-6] {
+        let p = spl::SplParams {
+            m: 0.5,
+            n: 1.0,
+            g: 0.0,
+            dt: 1.0e6,
+            sc: f64::INFINITY,
+            max_iter: 4,
+            tol_m: 0.01,
+        };
+        let kfv = vec![kf; n];
+        let input = spl::SplInput {
+            kind: &kind,
+            h0: &h,
+            filled: &filled,
+            base_z: &base_z,
+            area: &area,
+            kf: &kfv,
+        };
+        let mut z = vec![0.0; n];
+        let mut qin = vec![0.0; n];
+        spl::solve(&d, &r, &input, &p, &mut z, &mut qin);
+        // One share of its depth over the whole lake, off the flow path too.
+        let share = (z[lake[0]] - h[lake[0]]) / (filled[lake[0]] - h[lake[0]]);
+        for &c in &lake {
+            let s = (z[c] - h[c]) / (filled[c] - h[c]);
+            assert!(
+                (s - share).abs() < 1e-9,
+                "kf {kf}: cell {c} share {s} vs {share}"
+            );
+        }
+        assert!(
+            share > 0.0 && share <= 1.0 + 1e-12,
+            "kf {kf}: share {share}"
+        );
+        let kept: f64 = lake.iter().map(|&c| z[c] - h[c]).sum();
+        assert!((kept - share * room).abs() < 1e-9 * room);
+        // Mass: the land's loss is what the sea got.
+        let land_loss: f64 = (0..n)
+            .filter(|&c| kind[c] != BASE)
+            .map(|c| (h[c] - z[c]) * a)
+            .sum();
+        let delivered: f64 = (0..n)
+            .filter(|&c| kind[c] == BASE)
+            .map(|c| qin[c] * p.dt)
+            .sum();
+        assert!(
+            (land_loss - delivered).abs() < 1e-9 * land_loss.abs().max(a),
+            "kf {kf}: {land_loss} vs {delivered}"
+        );
+        // The provenance mix: every lake cell takes the mix entering the lake.
+        let mut mix = Vec::new();
+        spl::families(&d, &r, &input, &vec![0u8; n], p.dt, &z, &mut mix);
+        for &c in &lake {
+            assert!(mix[c][0] > 0.0, "kf {kf}: cell {c} has no mix");
+        }
+        shares.push(share);
+    }
+    assert!(
+        shares[0] < 1.0 - 1e-6,
+        "a small supply fills part of the lake: {shares:?}"
+    );
+    assert!(
+        (shares[1] - 1.0).abs() < 1e-12,
+        "a large one fills it: {shares:?}"
+    );
+}
+
 #[test]
 fn strata_log_keeps_its_invariants() {
     let classes = crate::synth::EVERY_CLASS.len();
