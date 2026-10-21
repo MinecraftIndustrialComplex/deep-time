@@ -533,7 +533,10 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
         .map(|s| (s.center[0], s.center[2]))
         .collect();
     for (i, a) in at.iter().enumerate() {
-        assert!(!at[i + 1..].contains(a), "two guaranteed sites at {a:?}: {at:?}");
+        assert!(
+            !at[i + 1..].contains(a),
+            "two guaranteed sites at {a:?}: {at:?}"
+        );
     }
     let p = match crate::preset::Preset::from_json(&json).unwrap().body {
         crate::preset::PresetBody::Planet(p) => p,

@@ -3613,7 +3613,8 @@ impl DepositStage {
         }) else {
             return (WorldFrame::Lambert(src), json!({"projection": "lambert"}));
         };
-        let started = std::time::Instant::now();
+        // No wall-clock time in the note: the census must not differ between two runs (the
+        // stage's `world_frame` lap times it).
         let land = |v: [f64; 3]| -> bool {
             let (lat, lon) = deeptime_format::projection::lat_lon_of_unit(v);
             let (x, z) = src.block_of(lat, lon);
@@ -3628,7 +3629,6 @@ impl DepositStage {
             "lambda_c_deg": g.lambda_c_deg(),
             "land": "present L1 elevation at or above sea level, nearest cell",
             "lambda_c": crate::bake::project::lambda_note(choice.as_ref()),
-            "millis": started.elapsed().as_secs_f64() * 1000.0,
         });
         (WorldFrame::PetroffGuyou { g, src }, note)
     }
