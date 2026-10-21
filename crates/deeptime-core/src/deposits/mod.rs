@@ -4535,6 +4535,34 @@ mod tests {
         (ck.world, dir)
     }
 
+    /// The playability pass looks inland first (DEP-222): a land cell counts when every sea cell
+    /// is at least the margin away (Chebyshev, in cells), x wrapping at the seam.
+    #[test]
+    fn inland_cells_keep_the_margin_from_every_sea_cell() {
+        let grid = GridDesc::for_planet("L1", 1024, 64).unwrap();
+        let (w, h) = (grid.w as usize, grid.h as usize);
+        // Sea in column 0, land everywhere else.
+        let elev: Vec<f32> = (0..w * h)
+            .map(|i| if i % w == 0 { -100.0 } else { 50.0 })
+            .collect();
+        let inland = inland_cells(&grid, &elev, 128.0);
+        for j in 0..h {
+            for i in 0..w {
+                let from_sea = i.min(w - i);
+                assert_eq!(
+                    inland[j * w + i],
+                    from_sea >= 2,
+                    "cell ({i}, {j}), {from_sea} cells from the sea"
+                );
+            }
+        }
+        // No margin: every land cell; no sea: every cell.
+        let all = inland_cells(&grid, &elev, 0.0);
+        assert!((0..w * h).all(|i| all[i] == (i % w != 0)));
+        let dry = vec![1.0f32; w * h];
+        assert!(inland_cells(&grid, &dry, 1.0e6).iter().all(|&b| b));
+    }
+
     /// A guaranteed body lies under the soil, which holds no ore (ORE-076): a SEDEX sheet, whose
     /// 100 m formation depth is under 3 blocks, sits below the top 4 blocks instead of in them;
     /// an exposed iron body's top is just under the soil, still exposed; MVT keeps its formation
