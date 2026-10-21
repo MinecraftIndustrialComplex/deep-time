@@ -60,16 +60,23 @@ the surface stage runs (`climate/mod.rs`, `sea_from_water`; `sea_level.rs`, `fil
 1. The planet holds a fixed amount of surface water, `planet.surface_water_m`, written as a layer
    over its whole area: Earth's ocean and land ice as water, 2,664 m (ISO-085).
 2. The land ice at the step's start (the climate's ice sheets, Earth-normalized km³) takes
-   ρ_i/ρ_w of its volume out of that water (CLM-210).
+   ρ_i/ρ_w of its volume out of that water (CLM-210). Ice that holds more water than the planet
+   has (a snowball on a dry preset) leaves the sea empty and is not cut back; the shortfall is
+   the global `climate/ice_water_short_m` (m of water over the planet) and a warning in the run's
+   log the first time.
 3. The rest stands in the sea: the level S at which the open sea holds it over the ground the
    surface stage starts the step from. The open sea at S is what the surface itself calls sea, a
    connected body of ground below S at least a 500th of the grid (ERO-055); a closed hollow below S
-   that no channel joins to the ocean stays dry until the sea tops its rim (ISO-086).
+   that no channel joins to the ocean stays dry until the sea tops its rim (ISO-086). The open
+   sea is taken again at the level found: a hollow that grew to that size on the way up without
+   reaching the ocean is sea there, as the surface counts it, and the level is then found by
+   halving on the open sea's own water, so the climate's level and the surface's sea agree.
 4. The steering nudge, if any, is added (STE-006), and the result goes into the same global as
    before; every reader above takes it unchanged.
 
 Without the climate stage (the surface-only pipelines) the surface stage fills its own ground the
-same way with the whole water (no ice).
+same way with the whole water (no ice), and the plate model takes that level for its land test
+(PLT-353), so both stages use one sea.
 
 Because the level follows the ground, everything that changes the ocean basins' room moves it:
 
@@ -105,6 +112,9 @@ Because the level follows the ground, everything that changes the ocean basins' 
 - **Isostasy of the water**: the surface flexure loads the sea floor with the water over it (ISO-044,
   ISO-046), so a sea that rises presses its floor down and makes some of its own room, the
   hydro-isostatic share Earth's backstripping writes as (ρ_m − ρ_w)/ρ_m (Kominz et al. 1998).
+  The water that fills GDH1's own deepening is no new load (ISO-088): GDH1 is the depth of floor
+  under water, that water's weight in it. Until the review of 2026-10-21 the flexure loaded it
+  again, and the floor sank about 1.45 times GDH1 ("The flexure's water over GDH1's floor").
 
 ## Equations and constants
 
@@ -120,7 +130,10 @@ the land ice at the step's start. Over the cells sorted by the level at which th
 linear, A the area and B the area-weighted ground of the cells reached; it jumps where the sea tops
 a pass. The solve walks that list and stops where V reaches the water: S = (V + B)/A between two
 passes, or the pass itself when the hollow behind it takes the rest. It is exact for the ground
-given; one priority flood and two sorts per step.
+given; one priority flood and two sorts per step. Where the open sea at that level holds a body
+the flood from S₀'s sea did not reach (one that grew to n/500 cells between S₀ and S without
+touching the ocean), S is found instead by halving on V_open(S) = Σ over the open sea at S of
+(S − h)·a to 1 mm: V_open only grows with S, and V_open(S₀) ≤ the water ≤ V_open(S).
 
 The floor (`plates/pools.rs`, `surface_step`, `gdh1_depth_m`):
 
@@ -133,6 +146,13 @@ the first ocean) is laid at −d(t) (PLT-351). With a ridge crest z_r and an old
 than GDH1's own −2,600 and −5,651 m (the editor's ridge and abyssal depths), the curve is
 stretched between them, z = z_r − s·(d(t) − 2,600) with s = (z_r − z_f)/3,051, and each step
 sinks s times as much (PLT-355); every shipped preset has s = 1.
+
+The flexure's water over that floor (`surface/flexure.rs`, `cooled_under_sea`): of the step's
+change of the sea's depth over an oceanic cell that is not new at the place, the part
+
+  min(max(S − h_start, 0), s·[d(t) − d(t − Δt)])
+
+is no load (ISO-088), with h_start the cell's ground after the plate model's sinking.
 
 The first ocean's ages (`plates/init.rs`, `steady_state_ages`): with ocean floor made at a
 constant rate C₀ and consumed evenly at every age up to t_m, the area of each age is
@@ -149,6 +169,7 @@ a mean of t_m/3 = 60 Myr (Earth's floor today 64.2, Seton et al. 2020) and a med
 | ISO-085 | The planet's surface water, a layer over the whole planet | `planet.surface_water_m` 2,664 (default and every shipped preset) | m | Charette & Smith 2010 (ocean 1.33238·10⁹ km³), Fretwell et al. 2013 (Antarctica 26.54·10⁶ km³ grounded), Morlighem et al. 2017 (Greenland 2.99·10⁶ km³), IPCC AR5 Table 4.1 (glaciers 0.41 m); Earth's area from memory | `verified` |
 | ISO-086 | The sea at S is the open sea: a connected body of ground below S of at least n/500 cells; closed hollows take no water until the sea tops their rim | `fill_level` with the surface's `open_sea` rule (ERO-055) | m | none needed (mass balance); the size rule is ERO-055's | `game-choice` |
 | ISO-087 | The sea level series' check against Earth's Phanerozoic range | −100 to +250 m against today | m | Müller et al. 2008 (Late Cretaceous 170 m, 85 to 270), Miller et al. 2005 (Cretaceous peak 100 ± 50 m), both abstracts; Haq et al. 1987's 250 m at second hand (Miller et al. 2011) | `abstract-only` |
+| ISO-088 | The sea over GDH1's own deepening is no new load on the floor | `flexure::cooled_under_sea` | m | Stein & Stein 1992 (GDH1 is depth below the sea); Kominz et al. 1998's relation (PLT-353) | `cited-unverified` |
 | CLM-210 | Land ice holds (ρ_i/ρ_w) of its volume of the planet's water out of the sea | `sea_level::ice_layer_m`, 917/1028 (CLM-099) | m | IPCC AR5 Table 4.1 note b (917 and 1028 kg/m³, read) | `verified` |
 | PLT-350 | The ocean floor's law | `tectonics.ocean_depth`: `gdh1` in every shipped Earth-like preset, `dampening` (PLT-129) the default and the plate-only presets' | - | the brief: PLT-129's dampening fixed at an age–depth law | `game-choice` |
 | PLT-351 | New ocean floor at the law's depth for its age | `pools::floor_at` (init, ridges, L1 gaps) | m | as PLT-352 | `cited-unverified` |
@@ -333,6 +354,70 @@ What the numbers say:
   sediment (rivers-and-lakes.md, "What keeps the plate era's lakes"); it does not, because the
   pockets are not under the sea.
 
+### The flexure's water over GDH1's floor (review, 2026-10-21)
+
+The review of this branch found the surface flexure loading a second time the sea that fills
+GDH1's own deepening. GDH1 is the depth of ocean floor under water (Stein & Stein fit the depth
+below the sea), so that water's weight is in its depths already; the flexure loads the change of
+the sea's depth over each cell (ISO-061 to ISO-064), and on floor that follows GDH1 most of that
+change is GDH1's own sinking. At strength 1 (the Earth-like presets) the floor then sank about
+ρ_w/(ρ_m − ρ_w) = 0.45 of GDH1's subsidence more than GDH1, 1.45 times GDH1 in all. Since then the
+flexure leaves the sea over each step's GDH1 sinking out of the water load on oceanic crust that
+is not new at the place (ISO-088); the sea's own change, the water that erosion and deposition
+displace and the water that thickened crust pushes aside still load the floor.
+
+Measured on the continent bisect's four runs (`earthlike_quick_16k`, seeds 1 and 2, both starts,
+1,000 Myr, 2 threads, the final frame) at the merged head bcf8cd8e (before) and at 975dd57e (after),
+with `build/sl/floor.py` (scratch): area-weighted medians over the ocean-basin and ridge floor under
+the sea of the depth below the datum less GDH1's for the cell's age, in m, positive deeper.
+
+| Floor age | 0.45·(d − 2,600) | sca 1 | sca 2 | sup 1 | sup 2 |
+|---|---|---|---|---|---|
+| 0 to 20 Myr | about 490 (mean over the bin) | 370 → 47 | 337 → −141 | 308 → −118 | 146 → −168 |
+| 20 to 50 Myr | about 950 (at 35 Myr) | 955 → −113 | 860 → −377 | 983 → −378 | 6 → −632 |
+
+Before the fix three runs of four stood as deep as the double count predicts (sup 2's 6 m is not
+traced). After it the floor older than 20 Myr stands above GDH1, and the rest is the floor's
+sediment: on seed 1's two runs rerun with the sediment written out (`surface/sediment_m`;
+`build/sl/basement.py`), the basement under the sediment stands deeper than GDH1 by
+
+| Floor age | sca 1 | sup 1 | sediment after, mean (median), sca 1 and sup 1 |
+|---|---|---|---|
+| 0 to 20 Myr | 699 → 240 | 625 → 206 | 790 (19), 1,026 (17) |
+| 20 to 50 Myr | 1,438 → 744 | 1,373 → 342 | 1,741 (138), 1,705 (142) |
+| 50 to 100 Myr | 1,762 → 713 | 1,699 → 226 | 2,355 (502), 2,488 (785) |
+| 100 to 150 Myr | 2,651 → 429 | 2,241 → 222 | 2,375 (972), 4,313 (1,991) |
+
+What is left, 200 to 750 m, is what the flexure is there to carry (the sediment's weight, the
+sea's change, the margins' loads beside the floor); it is not split further here. The ocean at the
+end (`build/sl/odepth.py`): before, the sea −68 to 382 m over the datum, the ocean 0.667 to 0.753 of
+the planet and 3,490 to 3,939 m deep on average; after, the sea 65 to 819 m, the ocean 0.698 to
+0.776 and 3,350 to 3,742 m deep. Earth's is 3,682 m deep over 0.709 of the planet (Charette &
+Smith 2010).
+
+The basins hold less, so the same water stands higher, by a mean of 125 → 475 m at the end. In
+the bisect's terms (the pooled rows, the means of the four runs):
+
+| Commit | land | continental crust | under the sea | land above 2 km | largest | second | landmasses of 0.01 or more | their land | island arcs, of the land | pieces |
+|---|---|---|---|---|---|---|---|---|---|---|
+| bcf8cd8e (the merged head) | 0.294 | 0.334 | 0.296 | 0.308 | 0.165 | 0.062 | 3.8 | 0.882 | 0.399 | 272 |
+| 975dd57e (ISO-088) | 0.268 | 0.345 | 0.373 | 0.255 | 0.163 | 0.038 | 3.0 | 0.858 | 0.431 | 311 |
+
+By run, land and the continental crust under the sea: sup 1 0.307 and 0.292 → 0.224 and 0.506,
+sup 2 0.247 and 0.384 → 0.258 and 0.401, sca 1 0.333 and 0.222 → 0.287 and 0.305, sca 2 0.288 and
+0.288 → 0.302 and 0.281. By the bisect's rule (a land step under 0.03 is not a finding) the land's
+−0.026 is not one (the run-to-run sd of land is 0.036 → 0.035); the drowned share's +0.077 is, and
+sup 1 carries most of it (its sea ends 819 m over the datum). Earth: land 0.29, about 0.19 of the
+continental crust under the sea.
+
+The GameTests' 4k planet (`tests/presets/planet_world_4k.json`) has no flexure section, so its
+flexure is off (ISO-065) and its bake is the same at bcf8cd8e and 975dd57e. Against master
+593f3c58 (one bake each, `deeptime run`, the last checkpoint read by `build/sl/k4.py`): the sea
+42.8 → 535.1 m, land 0.076 → 0.072 of the planet, the continental crust 0.383 → 0.400 and 0.848 →
+0.857 of it under the sea, the largest landmass 0.061 → 0.027, coast land (land cells with a sea
+neighbour) 0.0144 → 0.0231, sea within 100 m of the level 0.0574 → 0.0539, and land within a
+sixteenth of the planet's width of the seam 0.026 → 0.053 of that band.
+
 ## Simplifications and limits
 
 - The fill uses the ground at the step's start; the floor's answer to the new water load comes in
@@ -379,6 +464,11 @@ What the numbers say:
   height, deeper at every age under GDH1 (about 600 m at 5 to 20 Myr, 250 m at 100 against the
   dampening). Which of these moves the plates is not traced. Recommended: the plate task traces
   it; the sea stays where the volume puts it.
+- For Ben: with the flexure's GDH1 water left out (ISO-088) the Earth-like planets hold Earth's
+  water with land 0.268 of the planet and 0.373 of the continental crust under the sea, against
+  Earth's 0.29 and about 0.19 ("The flexure's water over GDH1's floor"). The water amount stays
+  the coordinator's call (Earth's, 2,664 m); the drowned crust is the crust's, which stands too
+  low ("What the numbers say"), not a reason for less water.
 - For Ben: the editor's "Ocean water" (`planet.surface_water_m`, 0 to 8,000 m, Earth 2,664) is a
   new outward-facing setting. Recommended: keep it.
 - The plate era's closed basins on oceanic crust grew (124 to 156 per snapshot): they stand on
