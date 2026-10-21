@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The playability pass (plan §7.8, §8.6 step 8; decisions file "Playability overrides"):
-//! regional minimums for the essentials. The planet is cut into square regions of
-//! `region_blocks`; in every region with land, each essential material needs
+//! regional minimums for the essentials. The world the game plays is cut into square regions of
+//! `region_blocks` on its own index frame ([`WorldFrame`]: a Petroff–Guyou world's, not the
+//! simulation's Lambert one); in every region with land, each essential material needs
 //! `min_sites_per_region` sites (exposed ones — top within [`EXPOSED_BLOCKS`] of the surface — when
 //! `exposed`). Where natural placement fell short, the engine adds the smallest plausible deposit
 //! (P90 tonnage, median grades) of the most favourable type producing the material, at that
@@ -21,7 +22,8 @@
 //! (P1-15) in the content bundle (`{"essentials": [...]}`), which replaces the preset's list
 //! (`crate::preset::Preset::with_content`); runs without a bundle (the CLI) use the preset's.
 
-use deeptime_format::Product;
+use deeptime_format::projection::{IndexFrame, PetroffGuyou, WorldProjection};
+use deeptime_format::{Product, Projection};
 use serde::{Deserialize, Serialize};
 
 /// A site counts as exposed when its top is at most this many blocks below the surface.
@@ -63,31 +65,44 @@ impl Essential {
     }
 }
 
-/// The region grid of an essential.
+/// The region grid of an essential: squares of `size` blocks on the index frame of the world the
+/// game plays (`deeptime_format::projection::IndexFrame`: its origin and span), x wrapping with
+/// the frame's period. A Petroff–Guyou world's frame is not the simulation's Lambert one, so the
+/// playability pass counts its regions in the world's frame ([`WorldFrame`]), as the player meets
+/// them (ledger: DEP-220).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Regions {
+    /// The x period, blocks.
     pub c: f64,
     pub size: f64,
     pub cols: u32,
     pub rows: u32,
+    /// The frame's origin, blocks.
+    pub origin: (f64, f64),
 }
 
 impl Regions {
+    /// The regions of a Lambert planet of circumference `c` (the simulation's frame).
     pub fn new(c: u32, region_blocks: u32) -> Regions {
+        Regions::in_frame(IndexFrame::lambert(c), region_blocks)
+    }
+
+    /// The regions of a world laid out in index frame `frame` (`WorldProjection::index_frame`).
+    pub fn in_frame(frame: IndexFrame, region_blocks: u32) -> Regions {
         let rb = region_blocks.max(64);
-        let (span_x, span_z) = deeptime_format::Projection::new(c).index_span_blocks();
+        let (span_x, span_z) = frame.span;
         Regions {
-            c: f64::from(c),
+            c: span_x as f64,
             size: f64::from(rb),
-            // The regions' frame is the projection's index frame.
-            cols: (span_x as u32).div_ceil(rb),
-            rows: (span_z as u32).div_ceil(rb),
+            cols: (span_x.max(1) as u32).div_ceil(rb),
+            rows: (span_z.max(1) as u32).div_ceil(rb),
+            origin: (frame.origin.0 as f64, frame.origin.1 as f64),
         }
     }
 
     /// The region (col, row) of block (x, z).
     pub fn of(&self, x: f64, z: f64) -> (u32, u32) {
-        let (ox, oz) = deeptime_format::Projection::of(self.c).index_origin();
+        let (ox, oz) = self.origin;
         let col = (((x - ox) / self.size).floor() as i64).rem_euclid(i64::from(self.cols));
         let row = ((z - oz) / self.size)
             .floor()
@@ -102,6 +117,41 @@ impl Regions {
 
     pub fn count(&self) -> usize {
         (self.cols * self.rows) as usize
+    }
+}
+
+/// The world a planet's simulation becomes, as the playability pass needs it: where a simulation
+/// block lands in the world the game plays, and that world's region grid. A Lambert world is the
+/// simulation's own frame; a Petroff–Guyou world is the projection with the λc the world will be
+/// drawn with (`bake::project`), so an essential's regions are the ones the player walks.
+// Copy on purpose, as `WorldProjection`: made once per run.
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Copy, Debug)]
+pub enum WorldFrame {
+    Lambert(Projection),
+    PetroffGuyou { g: PetroffGuyou, src: Projection },
+}
+
+impl WorldFrame {
+    /// The world block of simulation block (x, z).
+    pub fn to_world(&self, x: f64, z: f64) -> (f64, f64) {
+        match self {
+            WorldFrame::Lambert(_) => (x, z),
+            WorldFrame::PetroffGuyou { g, src } => g.point_of_unit(src.unit(x, z)),
+        }
+    }
+
+    /// The world's projection.
+    pub fn projection(&self) -> WorldProjection {
+        match self {
+            WorldFrame::Lambert(p) => WorldProjection::Lambert(*p),
+            WorldFrame::PetroffGuyou { g, .. } => WorldProjection::PetroffGuyou(*g),
+        }
+    }
+
+    /// The world's region grid of `region_blocks`.
+    pub fn regions(&self, region_blocks: u32) -> Regions {
+        Regions::in_frame(self.projection().index_frame(), region_blocks)
     }
 }
 
@@ -154,5 +204,37 @@ mod tests {
         assert_eq!(r.of(8192.0 + 10.0, 2000.0), (0, 1), "x wraps");
         assert_eq!(r.index(0.0, -1.0), 2);
         assert_eq!(r.count(), 8);
+    }
+
+    #[test]
+    fn a_petroff_guyou_world_has_regions_of_its_own() {
+        // A 16k planet's world: b = 6,656, 13,312 × 6,656 blocks from (−6,656, −3,328).
+        let g = PetroffGuyou::new(PetroffGuyou::hemisphere_for(16_384), 30.0);
+        let w = WorldFrame::PetroffGuyou {
+            g,
+            src: Projection::new(16_384),
+        };
+        let r = w.regions(4096);
+        assert_eq!((r.cols, r.rows), (4, 2));
+        assert_eq!(r.of(-6656.0, -3328.0), (0, 0));
+        assert_eq!(r.of(6655.0, 3328.0), (3, 1));
+        // The rows split at z = −3,328 + 4,096 = 768, not at the Lambert frame's −2,624 + 4,096
+        // = 1,472.
+        assert_eq!(r.of(0.0, 767.0).1, 0);
+        assert_eq!(r.of(0.0, 769.0).1, 1);
+        assert_eq!(r.of(0.0, 1000.0).1, 1);
+        assert_eq!(Regions::new(16_384, 4096).of(0.0, 1000.0).1, 0);
+        // x wraps with the world's period, 2b.
+        assert_eq!(r.of(6656.0 + 10.0, 0.0), r.of(-6656.0 + 10.0, 0.0));
+        // A simulation block lands where the projection puts it.
+        let (x, z) = w.to_world(0.0, 0.0);
+        assert_eq!(
+            (x, z),
+            g.point_of_unit(Projection::new(16_384).unit(0.0, 0.0))
+        );
+        assert_eq!(
+            WorldFrame::Lambert(Projection::new(16_384)).to_world(5.0, 7.0),
+            (5.0, 7.0)
+        );
     }
 }

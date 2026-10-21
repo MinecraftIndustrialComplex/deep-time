@@ -63,5 +63,12 @@ pub fn run(world_data: &Path, out: &Path, set: &[String]) -> CliResult<Value> {
     m.files.retain(|f| f.path != "preset.json");
     m.files.push(entry);
     m.write(out)?;
+    // The guaranteed deposits under the projected world's ground, as a run's finish does
+    // (`Session::finalize_write`): the pass reads the written folder.
+    let anchored = deeptime_core::deposits::anchor::anchor_folder(out, p, &mut m, None)?;
+    if let Some(b) = m.notes.get_mut(deeptime_core::bake::NOTES_KEY) {
+        b["guaranteed"] = anchored;
+    }
+    m.write(out)?;
     Ok(note)
 }
