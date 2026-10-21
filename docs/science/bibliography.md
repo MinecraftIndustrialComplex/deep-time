@@ -6014,7 +6014,7 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### HillenbrandWilliams2022
 - Reference: Hillenbrand, I. W. and Williams, M. L. (2022). Geochemical evidence for diachronous uplift and synchronous collapse of the high elevation Variscan hinterland. Geophysical Research Letters 49(21):e2022GL100435.
 - DOI or URL: 10.1029/2022GL100435 (USGS record https://pubs.usgs.gov/publication/70238122).
-- Ledger ids: PLT-255, PLT-256
+- Ledger ids: PLT-255, PLT-256, PLT-390 (2026-10-21: the hot window)
 - Access: open record of the abstract; full text not read.
 - Library: not fetched.
 - Read so far (by the project): abstract, 2026-10-03: "thick crust (55–70 km) capable of supporting 3–5 km elevations developed diachronously from east to west between ca. 350 and 315 Ma. Crustal thinning occurred from ca. 315 to 290 Ma across the orogen."
@@ -6030,7 +6030,7 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### Carbonell2000
 - Reference: Carbonell, R. and others (2000). [Wide-angle seismic study of the Urals crustal root; title not recorded by the sub-agent.] Journal of Geophysical Research 105(B6):13755-13777. Co-authors and title to be taken from the DOI before quoting.
 - DOI or URL: 10.1029/2000JB900048
-- Ledger ids: PLT-256, PLT-282 (2026-10-06: the Urals' crust, against the eclogite root)
+- Ledger ids: PLT-256, PLT-282 (2026-10-06: the Urals' crust, against the eclogite root), PLT-390 (2026-10-21: the cold root that keeps T_c)
 - Access: paywalled; abstract read.
 - Library: not fetched.
 - Read so far (by the project): abstract, 2026-10-03: "a 50–56 km crustal thickness beneath the central part of the orogen in contrast to Moho depths of ≈ 45 km documented at the edges of the transect". The IGCP 559 transect page (earthscrust.org.au, Urals) adds that the root "is consistent with the preservation of the Urals as an intact, unextended orogen".
@@ -6038,7 +6038,7 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### ReyTeyssierWhitney2010
 - Reference: Rey, P. F., Teyssier, C. and Whitney, D. L. (2010). Limit of channel flow in orogenic plateaux. Lithosphere 2(5):328-332.
 - DOI or URL: 10.1130/L114.1 (author copy https://www.earthbyte.org/Resources/Pdf/rey_L114_v1.pdf)
-- Ledger ids: PLT-257, PLT-300 (2026-10-20: K₀ = 150² / 15 km²/Myr, the lower-crustal flow `plates/flow.rs`)
+- Ledger ids: PLT-257, PLT-300 (2026-10-20: K₀ = 150² / 15 km²/Myr, the lower-crustal flow `plates/flow.rs`), PLT-391 (2026-10-21: the reason for the order)
 - Access: open author copy; full text read.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03: "Over 15 m.y., the length scale of channel-flow extrusion is 150 km rather than 1500 km"; a channel "travels at most 150 km into the foreland after 12 m.y. of gravitational collapse"; flow "1 cm yr–1 or less".
@@ -6046,7 +6046,7 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### WernickeEtAl1987
 - Reference: Wernicke, B. P., Christiansen, R. L., England, P. C. and Sonder, L. J. (1987). Tectonomagmatic evolution of Cenozoic extension in the North American Cordillera. Geological Society, London, Special Publications 28:203-221.
 - DOI or URL: 10.1144/GSL.SP.1987.028.01.15
-- Ledger ids: PLT-254, PLT-257
+- Ledger ids: PLT-254, PLT-257, PLT-390 (2026-10-21: the timing set by the heat)
 - Access: read in full by the sub-agent.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03: "We conclude that the locus of extension is controlled principally by crustal thickness, while its timing is governed by the thermal state of the lithosphere at the time of thickening"; the extended area "widened to several hundred kilometres".
@@ -6054,7 +6054,7 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### PeronPinvidicOsmundsen2020
 - Reference: Peron-Pinvidic, G. and Osmundsen, P. T. (2020). From orogeny to rifting: insights from the Norwegian 'reactivation phase'. Scientific Reports 10:14860.
 - DOI or URL: 10.1038/s41598-020-71893-z (open access)
-- Ledger ids: PLT-255, PLT-257
+- Ledger ids: PLT-255, PLT-257, PLT-390 (2026-10-21: collapse to rifting in 30-40 Myr)
 - Access: open; full text read.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03: "Fossen constrained the onset of the orogenic collapse to about 405 Ma"; "the Høybakken detachment zone was mostly active between 400 and 365 Ma"; "cumulative displacements ... on the order of 40–100 km".
@@ -6062,7 +6062,7 @@ USGS publication records; no copy was saved to the library. Bird 1991 and Christ
 ### JolivetBrun2010
 - Reference: Jolivet, L. and Brun, J.-P. (2010). Cenozoic geodynamic evolution of the Aegean. International Journal of Earth Sciences 99:109-138.
 - DOI or URL: 10.1007/s00531-008-0366-4
-- Ledger ids: PLT-254
+- Ledger ids: PLT-254, PLT-390 (2026-10-21: where a hot orogen thins to)
 - Access: author PDF; full text read.
 - Library: not fetched.
 - Read so far (by the project): full text, 2026-10-03: "The Cyclades archipelago is underlain by a thinned crust with a very constant thickness around 26 km"; "The extended domain is superposed to a collapsed Early Cenozoic mountain belts".
@@ -7448,3 +7448,52 @@ The sources of the mass-elevation effect (docs/science/mass-elevation-effect.md)
 - Access: open; copies of the national services' tables, not the services' own.
 - Library (the project's source library, not distributed): none.
 - Read so far (by the project): a sub-agent read the boxes on 2026-10-21 (CLM-229's values). El Alto's box is labelled 1991-2020 but cites DWD's 1961-1990 source; Pikes Peak's normals are of low confidence and it was left out of the fit, as was Lhasa (a valley station). The latitudes of Shiquanhe, Tingri, Madoi, Puno, Juliaca and Oruro are from memory.
+
+## The high ground's extent: post-orogenic collapse (PLT-390, PLT-391; leads for PLT-050 and PLT-242), added 2026-10-21
+
+The sources of the high-ground task (build log 2026-10-21 "The high ground"; plates.md, "The high ground's extent: post-orogenic collapse (2026-10-21)"). Read by a research sub-agent of the task through publisher pages, OpenAlex and Crossref; no copy was saved to the library. Above and read again this time: Hillenbrand & Williams 2022 (abstract), Jolivet & Brun 2010 (full text), Peron-Pinvidic & Osmundsen 2020 (full text), Carbonell et al. 2000 (abstract). Titles marked "as the agent recalls it" were not read in the source and must be checked against the DOI before quoting.
+
+### Puziewicz2025
+- Reference: Puziewicz, J., Aulbach, S., Vanderhaeghe, O., Grégoire, M. and Ziobro-Mikrut, M. (2025). [Title not recorded by the sub-agent.] EGU General Assembly 2025, abstract EGU25-2372.
+- DOI or URL: 10.5194/egusphere-egu25-2372
+- Cited as: "Puziewicz et al. 2025".
+- Ledger ids: PLT-390
+- Access: open; the full abstract read (a conference abstract, not peer reviewed).
+- Library: not fetched.
+- Read so far (by the project): the full abstract, 2026-10-21: "the thickened orogenic root (Moho depth ca 55-60 km) flattened by lateral crustal flow and gravitational collapse"; "In the Bohemian Massif, the crust is still fairly thick (ca. 35 km)"; "Where flattening occurred, it produced a relatively flat Moho at ca 30-32 km depth [3]" (its [3] is Artemieva & Meissner 2012, Tectonophysics 530-531:18-49, not read); "the lithospheric and asthenospheric mantle underlying the orogen must have been exhumed by 20-30 km".
+
+### Long2019
+- Reference: Long, S. P. (2019). Geometry and magnitude of extension in the Basin and Range Province (39°N), Utah, Nevada, and California, USA: constraints from a province-scale cross section (title as the agent recalls it). Geological Society of America Bulletin 131(1-2):99-119.
+- DOI or URL: 10.1130/B31974.1
+- Cited as: "Long 2019".
+- Ledger ids: PLT-390
+- Access: paywalled; the abstract read.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-21: "230 ± 42 km of cumulative extension (46% ± 8%), and an average pre-extensional thickness of 54 ± 6 km"; the eastern domain "restores to a 60 ± 11 km thickness" and the western "66 ± 5 km"; "The eastern domain underwent a protracted, Late Cretaceous-Miocene transition to an extensional regime, while widespread extension in the western domain did not start until the Miocene". The modern 37 ± 1 km came only through a search tool's summary (not read); 54 / 1.46 = 37 km is the agent's arithmetic.
+
+### Profeta2015
+- Reference: Profeta, L. and others (2015). Quantifying crustal thickness over time in magmatic arcs (title as the agent recalls it). Scientific Reports 5:17786.
+- DOI or URL: 10.1038/srep17786 (open access)
+- Cited as: "Profeta et al. 2015".
+- Ledger ids: none (a lead for PLT-050, the cordillera's height; plates.md, "The high ground's extent")
+- Access: open; the full text and the supplementary tables read.
+- Library: not fetched.
+- Read so far (by the project): the full text and the supplement, 2026-10-21. The present crustal thickness (depth to Moho) of the arcs in the global fit: Central Andes 65 ± 0.7 km, Northern Andes 54.4 ± 4.7, Southern Andes 40 ± 5, Guatemala 44 ± 3, NE Aleutian 40 ± 3, Cascades 38 ± 1.9, Mexico 37.2 ± 9, Kamchatka 34.6 ± 4.8 (the continental arcs); Luzon 30.8, Honshu 30.2, Central America 28 ± 7, Sunda 27.8, Izu-Bonin 20.5, Tonga 20, Aleutian 18.9, Mariana 14.5, South Sandwich 11.8. Other geochemical correlations "break down where crustal thicknesses exceed 45 km"; delamination follows thickening "cyclically in long-lived arcs". The eight continental arcs' mean is 44.15 km and their median 40 km (the agent's arithmetic).
+
+### Ingalls2016
+- Reference: Ingalls, M., Rowley, D. B., Currie, B. S. and Colman, A. S. (2016). Large-scale subduction of continental crust implied by India-Asia mass-balance calculation (title as the agent recalls it). Nature Geoscience 9(11):848-853. Addendum: Nature Geoscience 10:393 (2017). Comment: van Hinsbergen, D. J. J., Lippert, P. C. and Huang, W. (2017). Unfeasible subduction? Nature Geoscience 10:878-879 (10.1038/s41561-017-0017-0). Reply: Rowley, D. B. and Ingalls, M. (2017). Nature Geoscience 10:879-880 (10.1038/s41561-017-0016-1).
+- DOI or URL: 10.1038/ngeo2806
+- Cited as: "Ingalls et al. 2016".
+- Ledger ids: none (a lead for PLT-242, the share of the colliding crust that crosses the front; plates.md, "The high ground's extent")
+- Access: paywalled; the abstract, the addendum's full text and the first pages of the comment and the reply read.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-21. Abstract: "about 50% of the pre-collisional continental crustal mass cannot be accounted for in the crustal reservoir preserved at Earth's surface today", "a mass equivalent to about 15% of the total oceanic crustal subduction flux since 56 million years ago"; no uncertainty on the 50 % was read. The addendum changes no number and adds Replumaz et al. 2010 ("about 40 to 50% of Indian crust is missing", not read). The comment: the Himalaya holds accreted upper crust of "less than about 1,000 km" restored, so "at least 1,400 km of Greater Indian continental crust ... subducted ... at reconstructed subduction rates of up to 18 cm per year". The reply: tomography shows "a thick (about 19 km, approximately half the thickness of the incoming Indian crust) layer of eclogitized lower crust" subducted "during only the last 10 million years or less"; "The fraction of exhumed relative to subducted upper crustal eclogite is unknown".
+
+### YakovlevClark2014
+- Reference: Yakovlev, P. V. and Clark, M. K. (2014). Conservation and redistribution of crust during the Indo-Asian collision (title as the agent recalls it). Tectonics 33(6):1016-1027.
+- DOI or URL: 10.1002/2013TC003469
+- Cited as: "Yakovlev & Clark 2014".
+- Ledger ids: none (a lead for PLT-242, with Ingalls et al. 2016)
+- Access: paywalled; the abstract read (OpenAlex).
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-21: "a ~30% deficit between original and modern orogen volumes if the average global crustal thickness of 41 km is assumed prior to collision, even once eastward extrusion and crustal flow are considered"; "recycling of a magnitude that is greater than one half of the modern orogenic mass"; "this discrepancy can be eliminated with a 23-29 km thick crust within the orogen prior to collision along with a thick southern Tibet margin".
