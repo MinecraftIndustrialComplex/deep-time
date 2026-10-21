@@ -40,3 +40,6 @@ ignore = []
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+# The shared viewer core, the author's own MPL-2.0 repository, at a pinned commit (Cargo.toml;
+# decisions log 2026-10-21).
+allow-git = ["ssh://git@github.com/MinecraftIndustrialComplex/mic-viewer.git"]
