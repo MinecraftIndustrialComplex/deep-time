@@ -223,6 +223,14 @@ def mean(vals):
     return sum(ok) / len(ok) if ok else None
 
 
+def sd(vals):
+    ok = [v for v in vals if v is not None and v == v]
+    if len(ok) < 2:
+        return None
+    m = sum(ok) / len(ok)
+    return math.sqrt(sum((v - m) ** 2 for v in ok) / (len(ok) - 1))
+
+
 def main():
     args = sys.argv[1:]
     csv_path = None
@@ -275,14 +283,17 @@ def main():
         for stop in stops:
             title = f"both starts, t = {stop} Myr, seeds {','.join(seeds)} (mean over every run present)"
             print(f"\n== {title}")
-            print(f"{'commit':10}{'runs':>5}" + "".join(f"{HEAD[k]:>9}" for k in KEYS))
+            print(f"{'commit':10}{'runs':>5}" + "".join(f"{HEAD[k]:>9}" for k in KEYS) + f"{'sd land':>9}{'sd L1':>9}{'sd n':>9}")
             md.append(f"\n### {title}\n")
-            md.append("| commit | runs | " + " | ".join(HEAD[k] for k in KEYS) + " |")
-            md.append("|---|---|" + "---|" * len(KEYS))
+            md.append("| commit | runs | " + " | ".join(HEAD[k] for k in KEYS) + " | sd land | sd L1 | sd n>=.01 |")
+            md.append("|---|---|" + "---|" * (len(KEYS) + 3))
             for c in commits:
                 rs = pooled.get((stop, c), [])
-                print(f"{c:10}{len(rs):>5}" + "".join(f"{fmt(k, mean([r.get(k) for r in rs])):>9}" for k in KEYS))
-                md.append(f"| {c} | {len(rs)} | " + " | ".join(fmt(k, mean([r.get(k) for r in rs])) for k in KEYS) + " |")
+                spread = [fmt(k, sd([r.get(k) for r in rs])) for k in ("land", "L1", "n1")]
+                print(f"{c:10}{len(rs):>5}" + "".join(f"{fmt(k, mean([r.get(k) for r in rs])):>9}" for k in KEYS)
+                      + "".join(f"{x:>9}" for x in spread))
+                md.append(f"| {c} | {len(rs)} | " + " | ".join(fmt(k, mean([r.get(k) for r in rs])) for k in KEYS)
+                          + " | " + " | ".join(spread) + " |")
     if csv_path:
         Path(csv_path).write_text("\n".join(rows_csv) + "\n")
     if md_path:
