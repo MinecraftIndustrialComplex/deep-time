@@ -118,9 +118,9 @@ enum Command {
     },
     /// The browser workbench (P1-20): serve the editor, the runs and a live view of each run (map,
     /// globe, layers and events every step; pause, step, rewind, speed, follow live, compare two
-    /// runs). Runs go one at a time; finished ones are kept under --runs. Serves loopback or a
-    /// Tailscale address only, never the LAN; tools/viewer/mac-watch.sh runs it on the Mac and
-    /// puts it on the tailnet. --mem-cap is the default memory cap of its runs (the page's Memory
+    /// runs). Runs go one at a time; finished ones are kept under --runs. Serves loopback only
+    /// (reach it with an ssh forward), or with --allow-tailnet a Tailscale address too, never the
+    /// LAN; tools/viewer/mac-watch.sh runs it on the Mac and puts it on the tailnet. --mem-cap is the default memory cap of its runs (the page's Memory
     /// field sets another for one run); a run whose estimate is over its cap is refused before
     /// it starts.
     Watch {
@@ -135,9 +135,15 @@ enum Command {
         /// Timeline length for --preset, in millions of years.
         #[arg(long)]
         length_myr: Option<f64>,
-        /// Address to serve on: loopback (default) or the machine's Tailscale address.
+        /// Address to serve on: loopback (default), or with --allow-tailnet the machine's Tailscale
+        /// address.
         #[arg(long, default_value = "127.0.0.1")]
         bind: IpAddr,
+        /// Also serve the tailnet: bind a Tailscale address and answer requests that name a tailnet
+        /// host (MagicDNS, *.ts.net, 100.x), as behind `tailscale serve`. Without it only loopback
+        /// names are answered (no DNS rebinding).
+        #[arg(long)]
+        allow_tailnet: bool,
         /// Port to serve on.
         #[arg(long, default_value_t = watch::DEFAULT_PORT)]
         port: u16,
@@ -848,6 +854,7 @@ fn main() -> ExitCode {
             start,
             length_myr,
             bind,
+            allow_tailnet,
             port,
             runs,
             keep,
@@ -863,6 +870,7 @@ fn main() -> ExitCode {
                 start,
                 length_myr,
                 bind,
+                allow_tailnet,
                 port,
                 runs: runs.unwrap_or_else(|| std::env::temp_dir().join("deeptime-watch-runs")),
                 keep,
