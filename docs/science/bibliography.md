@@ -5120,9 +5120,10 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 ### Kalnay1996
 - Reference: Kalnay, E., et al. (1996). The NCEP/NCAR 40-year reanalysis project. Bulletin of the American Meteorological Society 77: 437-471. Data: NOAA PSL, NCEP/NCAR Reanalysis 1 monthly long-term means 1991-2020.
 - DOI or URL: 10.1175/1520-0477(1996)077<0437:TNYRP>2.0.CO;2; data https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/Monthlies/
-- Ledger ids: CLM-164, CLM-165
+- Ledger ids: CLM-164, CLM-165, CLM-229, CLM-231
 - Library: the data files (uwnd, vwnd, air at pressure levels and sigma 0.995) and the two scripts that read them, folder NCEP_R1_ltm/. The paper itself was not fetched. Public-domain US government data, used for validation only.
 - Read in WP-14a: computed zonal-mean winds and January inversions (see the rows).
+- Read 2026-10-21 (the plateau-warmth task): a sub-agent fetched the 1991-2020 long-term means of air temperature and geopotential height at pressure levels (https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis.derived/pressure/air.mon.ltm.nc.ascii and hgt.mon.ltm.nc.ascii; the files' climo_period "1991/01/01 - 2020/12/31") and interpolated the free air's temperature linearly in height to plateau stations' heights over lowland columns near Tibet, the Altiplano, the Rockies and Ethiopia (CLM-229, CLM-231); NCEP-DOE R2 monthly means agreed within 0.3 K. The files were not kept.
 
 ### Stull2017
 - Reference: Stull, R. (2017). Practical Meteorology: An Algebra-based Survey of Atmospheric Science, version 1.02b. University of British Columbia. Chapter 2.
@@ -7185,11 +7186,11 @@ The sources named for the plateaus' summer warmth (CLM-220) and the Cryogenian's
 ### YaoZhang2015
 - Reference: Yao, Y. and Zhang, B. (2015). The mass elevation effect of the Tibetan Plateau and its implications for Alpine treelines. International Journal of Climatology 35(8):1833-1846.
 - DOI or URL: 10.1002/joc.4123
-- Cited as: "Yao & Zhang 2015 (search snippets only)".
-- Ledger ids: CLM-220
-- Access: paywalled; the publisher refused the page to scripted access (HTTP 403, 2026-10-21).
+- Cited as: "Yao & Zhang 2015 (abstract)".
+- Ledger ids: CLM-220, CLM-230
+- Access: paywalled; the publisher refused the page to scripted access (HTTP 403, 2026-10-21). The abstract is on NASA's MODIS science-team publications page, https://modis.gsfc.nasa.gov/sci_team/pubs/abstract.php?id=19238 (read 2026-10-21).
 - Library (the project's source library, not distributed): none.
-- Read so far (by the project): search-result snippets of the abstract only (2026-10-21): the plateau 2 to 7 degC warmer than the surrounding areas at the same altitude; at 4,500 m 3.58 (April) to 6.63 degC (June) warmer than the Sichuan Basin's air; treelines 500 to 1,000 m higher. The abstract itself was not opened.
+- Read so far (by the project): the abstract, verbatim (2026-10-21, the plateau-warmth task): "The monthly mean air temperature in the interior main plateau is approximately 2-7 degrees C higher than in the surrounding mountains and adjacent lowland areas"; "At an elevation of 4500m ... the monthly mean temperature differences between the plateau and the Sichuan Basin range from 3.58 degrees C (April) to 6.63 degrees C (June); the monthly temperature differences between the plateau and the Qilian Mts. range from 1.6 degrees C (July) to 7.7 degrees C (March)"; the plateau's air from MODIS land-surface temperature, the Sichuan Basin's free air from the lapse rate measured on Mt. Emei; the warmest month's 10 degC isotherm pushed up to 4,600-4,700 m, the interior's treeline 500-1,000 m higher than the eastern edge's. The monthly table was not read.
 
 ### Rooney2015
 - Reference: Rooney, A. D., Strauss, J. V., Brandon, A. D. and Macdonald, F. A. (2015). A Cryogenian chronology: two long-lasting synchronous Neoproterozoic glaciations. Geology 43(5):459-462 (from memory; not checked).
@@ -7197,3 +7198,124 @@ The sources named for the plateaus' summer warmth (CLM-220) and the Cryogenian's
 - Ledger ids: none (plates.md, 2026-10-21: the Cryogenian's dates beside Ben's run)
 - Access: not fetched.
 - Read so far (by the project): nothing. The dates taken from it (Sturtian about 717 to 660 Ma, Marinoan ending about 635 Ma) are from memory and unchecked.
+
+## The plateau's warmth (CLM-225 to CLM-231, MOI-085), added 2026-10-21
+
+The sources of the mass-elevation effect (docs/science/mass-elevation-effect.md). A sub-agent of the plateau-warmth task fetched and read them on 2026-10-21; the quotes below are from that reading. Its downloads were not kept. Yao & Zhang 2015 (the abstract) and Kalnay et al. 1996 (the R1 long-term means) are in the sections above.
+
+### Han2018MEE
+- Reference: Han, F. et al. (2018). Characterizing the Mass Elevation Effect across the Tibetan Plateau. Journal of Mountain Science 15(12):2651-2665 (the co-authors not recorded).
+- DOI or URL: 10.1007/s11629-018-4978-2; read at https://jms.imde.ac.cn/en/article/pdf/preview/10.1007/s11629-018-4978-2.pdf
+- Cited as: "Han et al. 2018".
+- Ledger ids: CLM-230
+- Access: open (the journal's own PDF).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21). Fig. 4: "y = 0.0019x + 0.584 ... R² = 0.6775", x the mountain base elevation (MBE, m), y the annual mean MEE (degC), over 57 MBE plots; Table 3: Core I MBE 4,708 to 4,934 m, MEE 11.44 to 11.59 degC; Qaidam Basin 2,889 m, 5.65 degC. "MEE is obviously higher in the interior than in the exterior of the plateau even with similar mountain base elevation (MBE)"; "MEE may be low in areas with high mountain peaks and relatively low MBE, especially in some high isolated peaks" (the Pamir and Karakoram 4.13 to 6.37 degC). Its baseline: 17 lowland stations around the plateau extrapolated with NCEP-derived lapse rates; the plateau's air from a MODIS land-surface-temperature regression. The magnitudes are not used (CLM-230).
+
+### Han2018bMEE
+- Reference: Han, F. et al. (2018). Journal of Mountain Science 15(7):1510-1519 (the title and co-authors not recorded; a study of the Tibetan Plateau's monthly MEE).
+- DOI or URL: 10.1007/s11629-018-4865-x; read at https://jms.imde.ac.cn/en/article/pdf/preview/10.1007/s11629-018-4865-x.pdf
+- Cited as: "Han et al. 2018b".
+- Ledger ids: CLM-230
+- Access: open (the journal's own PDF).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21). The interior's "monthly MEEs fall between 6.5647°C-13.8246°C, with the highest MEE mostly in August and the minimum mostly in January and February"; the periphery's "monthly MEEs are high in cold season and low in warm season ... from 1.5020°C (July) to 9.7750°C (December)". The monthly MEE-against-MBE R² 0.43 (May) to 0.77 (October); the monthly slopes are in a figure only and were not read.
+
+### Han2020MEE
+- Reference: Han, F. et al. (2020). What factors determine the mass elevation effect of the Tibetan Plateau? Journal of Mountain Science 17(11):2742-2749 (the co-authors not recorded).
+- DOI or URL: 10.1007/s11629-020-6011-9; read at https://jms.imde.ac.cn/en/article/pdf/preview/10.1007/s11629-020-6011-9.pdf
+- Cited as: "Han et al. 2020".
+- Ledger ids: CLM-230
+- Access: open (the journal's own PDF).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21). Table 2's seven-factor model (R² 0.877); the explained variance: MBE 39.77 %, the distance to the massif's edges 23.02 %, continentality 14.48 %, the maximum elevation 11.41 %, the plot's area 2.92 %; "When only MBE is left, R2 can even amount to 0.677"; "AREA and NDVI can simply be neglected" (the area of each of the 57 plots, not of the whole massif).
+
+### Han2012MBE
+- Reference: Han, F. et al. (2012). Journal of Geographical Sciences 22(4):609-616 (the title and co-authors not recorded; mountain base elevation as the measure of the MEE, against the timberline).
+- DOI or URL: 10.1007/s11442-012-0950-1; https://www.geogsci.com/EN/10.1007/s11442-012-0950-1
+- Cited as: "Han et al. 2012 (abstract)".
+- Ledger ids: none (background for CLM-230 on mass-elevation-effect.md)
+- Access: the abstract on the journal's page (in its embedded JSON); the journal's PDF came back empty.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the abstract (2026-10-21): "the more extensive the land mass and especially the higher the mountain base in the interior of land mass, the greater the mass elevation effect, this paper takes mountain base elevation (MBE) as the magnitude of MEE"; latitude, longitude and MBE explain 25.11, 29.43 and 45.46 % of the timberline's height. No regression coefficients.
+
+### Zhao2014MEE
+- Reference: Zhao, F. et al. (2014). Journal of Geographical Sciences 24(2):226-236 (the title and co-authors not recorded; the MEE's share in the Northern Hemisphere's treelines).
+- DOI or URL: 10.1007/s11442-014-1084-4; https://www.geogsci.com/EN/10.1007/s11442-014-1084-4
+- Cited as: "Zhao et al. 2014 (abstract)".
+- Ledger ids: none (background for CLM-230 on mass-elevation-effect.md)
+- Access: the abstract on the journal's page.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the abstract (2026-10-21): 516 Northern Hemisphere treeline sites, R² 0.904; latitude 45.02 %, continentality 6.04 %, the MEE 48.94 % of the explained variance.
+
+### Zhao2015Treeline
+- Reference: Zhao, F. et al. (2015). Contribution of mass elevation effect to the altitudinal distribution of global treelines. Journal of Mountain Science 12(2):289-297 (the co-authors not recorded).
+- DOI or URL: 10.1007/s11629-014-3223-x; read at https://jms.imde.ac.cn/en/article/pdf/preview/10.1007/s11629-014-3223-x.pdf
+- Cited as: "Zhao et al. 2015".
+- Ledger ids: none (background for CLM-230 on mass-elevation-effect.md)
+- Access: open (the journal's own PDF).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21). TL = a Lat + b K + c IMBE + d over 594 sites, R² 0.92; Table 1's global coefficients: constant 3,223, latitude -47.1, continentality 5.63, IMBE 0.80: "it is elevated by 80m for 100m increase in IMBE" (Northern Hemisphere 74 m, Southern 61 m). The sub-agent's own reading, not the paper's: at 0.6 to 0.65 K per 100 m that is about 0.5 K per 100 m of base height, about 2.5 times Han et al. 2018's slope.
+
+### YaoZhang2013
+- Reference: Yao, Y. and Zhang, B. (2013). PLoS ONE 8(7):e68750 (the title not recorded; station-based monthly temperature against altitude over the Tibetan Plateau, 109 stations, 2001-2007).
+- DOI or URL: 10.1371/journal.pone.0068750; read at https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0068750
+- Cited as: "Yao & Zhang 2013".
+- Ledger ids: CLM-230
+- Access: open access.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21; its tables are images and were not read). At 4,500 m against the Sichuan Basin: "The difference is large (4-6°C) in warm months from April to October, and small (1-2°C) in other cold months"; against the Qilian Mountains "small (5.9-7.0°C) in warm months, and large (6.1-10.7°C) in other cold months"; "temperature lapse rates are steeper on isolated mountains near the sea than on extensive mountain ranges that provide their own heating". Its Sichuan free air is built from station regressions and MODIS points, not soundings.
+
+### He2016Andes
+- Reference: He, Y., Zhang, B. et al. (2016). The Mass Elevation Effect of the Central Andes and Its Implications for the Southern Hemisphere's Highest Treeline. Mountain Research and Development 36(2):213-221 (the title's end and the co-authors' initials from the publisher's URL and from memory; not checked).
+- DOI or URL: 10.1659/MRD-JOURNAL-D-15-00027
+- Cited as: "He et al. 2016 (abstract)".
+- Ledger ids: CLM-230
+- Access: BioOne refused scripted access (an Incapsula block); the abstract read through the OpenAlex API, the full text only as a WebFetch summary.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the abstract (2026-10-21): "The mean air temperature in the Altiplano in summer is approximately 5 K higher than it is above the adjacent lowlands at the same mean elevation, averaging about 3700 m above sea level"; the effect "increased from the outer Andean east-facing slope to the interior of the Altiplano in summer". Its baseline is NCEP/NCAR R1's free air, as here (CLM-229). The summary of the full text (January -1.8 to 7.1 K, above 5 K at stations over 3,700 m) is not counted as read.
+
+### PepinSeidel2005
+- Reference: Pepin, N. and Seidel, D. (2005). A global comparison of surface and free-air temperatures at high elevations. Journal of Geophysical Research 110:D03104.
+- DOI or URL: 10.1029/2004JD005047; read at https://arl.noaa.gov/wp_arl/wp-content/uploads/documents/JournalPDFs/PepinAndSeidel.JGR2005.pdf
+- Cited as: "Pepin & Seidel 2005".
+- Ledger ids: CLM-230
+- Access: Wiley refused scripted access (403); NOAA ARL's copy read.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21). Surface minus R1 free air at 1,084 sites above 500 m: "surface sites being relatively warm in comparison with the reanalysis in summer and cool in winter, especially in continental areas"; "Mountaintop sites nearly always show regime type 2 (a small summer/winter contrast)"; a weak rise of the difference with elevation (Asia r 0.42). Only 17 sites above 4,000 m, most of them Tibetan valley stations. No mean by terrain type and no plateau-against-summit contrast.
+
+### Yanai1992
+- Reference: Yanai, M., Li, C. and Song, Z. (1992). Seasonal heating of the Tibetan Plateau and its effects on the evolution of the Asian summer monsoon. Journal of the Meteorological Society of Japan 70(1B):319-351 (the title from memory).
+- DOI or URL: https://www.jstage.jst.go.jp/article/jmsj1965/70/1B/70_1B_319/_pdf
+- Cited as: "Yanai, Li & Song 1992".
+- Ledger ids: CLM-230
+- Access: open (J-STAGE).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21): "when compared at the same level, the air immediately above the Plateau surface is warmer than the air of surrounding areas even in winter. An 'explosive' growth of this warm boundary layer air occurs in May, and warm anomalies of 8° to 9℃ occupy the whole tropospheric air column above the Plateau by August" (anomalies from the domain's nine-month mean along 32.5 N, not a surface-against-free-air difference); "During winter the Plateau is a heat sink, but it is surrounded by regions of more intense cooling".
+
+### Flohn1968
+- Reference: Flohn, H. (1968). Contributions to a meteorology of the Tibetan Highlands. Atmospheric Science Paper 130, Colorado State University (the title from memory).
+- DOI or URL: https://mountainscholar.org/bitstream/handle/10217/225/0130_Bluebook.pdf
+- Cited as: "Flohn 1968".
+- Ledger ids: CLM-230
+- Access: open (the university's repository).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21): "At least during the warm season, the surface temperatures are definitely higher than the latitudinal average in the free atmosphere at similar heights". No number taken.
+
+### Pan2021
+- Reference: Pan et al. (2021). PLoS ONE 16(10):e0258549 (the authors and the title not recorded; the Tibetan Plateau's air against the Loess Plateau's and Jinji Mountain's).
+- DOI or URL: 10.1371/journal.pone.0258549; read at https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8530289/
+- Cited as: "Pan et al. 2021".
+- Ledger ids: none (a cross-check on mass-elevation-effect.md)
+- Access: open access (PubMed Central).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21): at 5,000 m "the temperature of the Tibetan Plateau was approximately 0-3°C higher than that of the Loess Plateau and approximately 3-7°C higher than that of Jinji Mountain"; Tibet minus the Loess Plateau in July 2.62 degC.
+
+### StationNormals2026
+- Reference: the 1991-2020 monthly normals of the plateau stations (Nagqu, Tingri, Shiquanhe, Madoi and Lhasa: the China Meteorological Administration; El Alto and Oruro: Bolivia's SENAMHI; Puno and Juliaca: Peru's SENAMHI; Leadville, Climax, Alamosa and Pikes Peak: NOAA NCEI; Addis Ababa: the service its box names not recorded) and of the lowland stations used for the lapse (Chengdu, Wuhan, Shanghai, Delhi, Santa Cruz, Cuiaba), as the climate boxes of the towns' English Wikipedia articles give them.
+- DOI or URL: the towns' articles on en.wikipedia.org, read as raw wikitext.
+- Cited as: "the stations' 1991-2020 normals (Wikipedia's climate boxes)".
+- Ledger ids: CLM-220, CLM-229, CLM-231
+- Access: open; copies of the national services' tables, not the services' own.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): a sub-agent read the boxes on 2026-10-21 (CLM-229's values). El Alto's box is labelled 1991-2020 but cites DWD's 1961-1990 source; Pikes Peak's normals are of low confidence and it was left out of the fit, as was Lhasa (a valley station). The latitudes of Shiquanhe, Tingri, Madoi, Puno, Juliaca and Oruro are from memory.

@@ -8,7 +8,9 @@
 //! - **Temperature at sea level.** Sea: T_ocean(φ, m) + the gyre anomaly of its basin position.
 //!   Land: T_ocean + c·(T_land − T_ocean) + m_air·ΔSST_carried, where the continentality
 //!   c = 1 − max(m_air, sea share within `coast_km`) and m_air is the maritime influence the wind
-//!   brought (`lapse.rs`). Then the lapse rate on the ground's height.
+//!   brought (`lapse.rs`). On land the plateau's warmth is added (the mass-elevation effect:
+//!   `lapse::mass_elevation_k` × `lapse::mass_elevation_base`, CLM-225 to CLM-228); the result is
+//!   the ground's temperature brought to sea level. Then the lapse rate on the ground's height.
 //! - **Precipitation**, mm/yr: max(`precip_min_mm`, base + orographic) where the orographic rate
 //!   is positive, base × max(`oro_lee_floor`, 1 + orographic/base) in the lee, with
 //!   base = P_belt(φ′) × subsidence(basin, φ′) × q × e^(0.07·ΔSST) × plateau(z) (0.07/K: the
@@ -116,7 +118,8 @@ pub struct Snapshot {
     pub ela: Vec<f32>,
     pub koppen: Vec<u8>,
     pub glacier: Vec<u8>,
-    /// Each month's sea-level temperature, °C (the lapse rate not applied), and precipitation
+    /// Each month's sea-level temperature, °C (the lapse rate not applied; on land the ground's
+    /// temperature brought to sea level, the plateau's warmth included), and precipitation
     /// rate, mm/yr (a month's share is the rate / 12): twelve per-cell fields, only when
     /// `Input::monthly` (empty otherwise).
     pub t_sl_month: Vec<Vec<f32>>,
@@ -182,6 +185,10 @@ pub struct CellsInput<'a> {
     pub hemi: [f64; 12],
     /// Each row's monthly insolation, W/m².
     pub q_month: &'a [[f64; 12]],
+    /// The plateau's warmth: each cell's base height, m (0 at sea; `lapse::mass_elevation_base`),
+    /// and each row's warmth per metre of it in each month, K/m (`lapse::mass_elevation_k`).
+    pub mee_z: &'a [f64],
+    pub mee_k: &'a [[f64; 12]],
     /// Each row's onshore share in each month.
     pub onshore: Vec<[f64; 12]>,
     pub pc: &'a super::percell::Coarse,
@@ -414,12 +421,23 @@ pub fn compute_on(
                 })
             })
             .collect();
+        // The plateau's warmth (CLM-225 to CLM-228): each land cell's base height (bare ground
+        // only: the last step's land ice heats no air), and each row's warmth per metre of it in
+        // each month, from the month's sunlight against the planet's mean (S₀/4).
+        let mee_z =
+            lapse::mass_elevation_base(&inp.d, &z, inp.ice_prev, cells(lapse::MEE_FOOTPRINT_KM));
+        let q_mean = ep.s0 / 4.0;
+        let mee_k: Vec<[f64; 12]> = q_month
+            .iter()
+            .map(|q| std::array::from_fn(|m| lapse::mass_elevation_k(q[m] / q_mean)))
+            .collect();
         (
             land_near,
             sea_near,
             basin,
             interior,
             q_month,
+            (mee_z, mee_k),
             started.elapsed().as_secs_f64() * 1000.0,
         )
     };
@@ -459,8 +477,10 @@ pub fn compute_on(
         ms.push(("flux_fit", started.elapsed().as_secs_f64() * 1000.0));
         (Some(c), Some(f), Some(e), ms)
     };
-    let ((land_near, sea_near, basin, interior, q_month, belts_ms), (mut pc, fit, fitted, pc_ms)) =
-        rayon::join(land_fields, per_cell_climate);
+    let (
+        (land_near, sea_near, basin, interior, q_month, (mee_z, mee_k), belts_ms),
+        (mut pc, fit, fitted, pc_ms),
+    ) = rayon::join(land_fields, per_cell_climate);
     for (what, ms) in pc_ms {
         *millis.entry(what).or_insert(0.0) += ms;
     }
@@ -890,6 +910,8 @@ pub fn compute_on(
             itcz: &itcz,
             hemi,
             q_month: &q_month,
+            mee_z: &mee_z,
+            mee_k: &mee_k,
             onshore: inp
                 .lat
                 .iter()
@@ -978,8 +1000,11 @@ pub fn compute_on(
                             _ => t_o[j][m] + dsst[c],
                         }
                     };
-                    t_sl[m] = tsl;
-                    t[m] = tsl - gamma * zr[i];
+                    // The ground's temperature brought to sea level: the lowland air's, plus the
+                    // plateau's warmth (0 at sea; ledger: CLM-225); the rain's moisture below
+                    // stays the lowland air's.
+                    t_sl[m] = tsl + mee_k[j][m] * mee_z[c];
+                    t[m] = t_sl[m] - gamma * zr[i];
                     let cy = match &pc {
                         Some(pc) if upwind_mode && land[c] => {
                             Some(carry_at(&pc.grid, &carry, c, m).unwrap_or((0.0, 0.0)))
