@@ -1276,8 +1276,8 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Fernandes, N. F. and Dietrich, W. E. (1997). Hillslope evolution by diffusive processes: The timescale for equilibrium adjustments. Water Resources Research 33(6):1307-1318. DOI 10.1029/97WR00534 (Crossref confirmed). Paywalled; not fetched.
 - Amante, C. and Eakins, B. W. (2009). ETOPO1 1 arc-minute global relief model: procedures, data sources and analysis. NOAA Technical Memorandum NESDIS NGDC-24. Dataset DOI 10.7289/V5C8276M (DataCite: "ETOPO1 1 Arc-Minute Global Relief Model", NOAA NCEI, 2009). Open.
 - Eakins, B. W. and Sharman, G. F. (2012). Hypsographic curve of Earth's surface from ETOPO1. NOAA National Geophysical Data Center, Boulder, CO. PDF https://www.ncei.noaa.gov/sites/default/files/2023-01/Hypsographic%20Curve%20of%20Earth%E2%80%99s%20Surface%20from%20ETOPO1.pdf (full text read; Table 1 is an image and was not readable). Companion: "World Ocean Volumes" https://www.ncei.noaa.gov/sites/default/files/2023-01/World%20Ocean%20Volumes.pdf (table read).
-- Athy, L. F. (1930). Density, porosity, and compaction of sedimentary rocks. AAPG Bulletin 14(1):1-24. DOI 10.1306/3D93289E-16B1-11D7-8645000102C1865D. Not coded: the surface stage has no porosity or compaction (ERO-028).
-- Sclater, J. G. and Christie, P. A. F. (1980). Continental stretching: an explanation of the post-mid-Cretaceous subsidence of the central North Sea basin. Journal of Geophysical Research 85(B7):3711-3739. DOI 10.1029/JB085iB07p03711. Not coded, as above.
+- Athy, L. F. (1930). Density, porosity, and compaction of sedimentary rocks. AAPG Bulletin 14(1):1-24. DOI 10.1306/3D93289E-16B1-11D7-8645000102C1865D. Not coded: the surface stage has no porosity or compaction (ERO-028). Its exponential law was tried in the plate model's column on 2026-10-20 and reverted (isostasy-and-height-limit.md, "Known before the page is written"). Not read.
+- Sclater, J. G. and Christie, P. A. F. (1980). Continental stretching: an explanation of the post-mid-Cretaceous subsidence of the central North Sea basin. Journal of Geophysical Research 85(B7):3711-3739. DOI 10.1029/JB085iB07p03711. Not coded, as above; its shaly sandstone was the 2026-10-20 trial's cover (paywalled, not read; the values read at second hand in pyBacktrack's lithology table, below, pyBacktrack_lithologies).
 
 ### Not bibliographic
 RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on); docs/research/notes/surface_processes_climate.md; docs/deeptime-implementation-plan.md; docs/deeptime-design-decisions.md; STATUS.md build-log entries; rock_class JSON files; tools/review/p1-17-hyps.py and companions; the decisions of Ben (Tectonics scaling, Build range, Vertical scale, Sub-grid detail, squeeze, general flexure).
@@ -1424,10 +1424,10 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Messager, Mathis L.; Lehner, Bernhard; Grill, Gunther; Nedeva, Irena; Schmitt, Oliver. 2016. Estimating the volume and age of water stored in global lakes using a geo-statistical approach. Nature Communications 7:13603.
 - DOI or URL: https://doi.org/10.1038/ncomms13603 ; PMC https://pmc.ncbi.nlm.nih.gov/articles/PMC5171767/
 - Cited as: "Messager et al. 2016, Nat. Commun. 7:13603 (HydroLAKES: 1.42 million lakes of 10 ha and more, 2.67 million km2, 1.8 % of land)"
-- Ledger ids: HYD-063
+- Ledger ids: HYD-063, HYD-090
 - Access: open access
 - Library (the project's source library, not distributed): fetched (PDF, 11 pages, text layer, 59,360 characters). From: https://www.nature.com/articles/ncomms13603.pdf. Text file: Messager2016.txt.
-- Read so far (by the project): nothing stated
+- Read so far (by the project): 2026-10-20, the lakes task: the full text (PMC) for the lake count, area and land share, quoted in HYD-063; also "21.2 million natural lakes with a surface area of at least 0.01 km2 (1 ha)", "3.23 × 10^6 km2 or 2.2% of global land area". "Global land area" is not defined further in the text read.
 - Read in this pass: full text fetched (PMC, summariser: lake count, area, land share, comparison with Verpoorter)
 - Reference check: matches. Note HydroLAKES has 1.43 million polygons, of which 1.42 million are natural lakes (the 1.42 million is natural lakes only).
 
@@ -1435,12 +1435,29 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Verpoorter, Charles; Kutser, Tiit; Seekell, David A.; Tranvik, Lars J. 2014. A global inventory of lakes based on high-resolution satellite imagery. Geophysical Research Letters 41(18):6396-6402.
 - DOI or URL: https://doi.org/10.1002/2014GL060641 (hybrid open access per OpenAlex); HAL record https://insu.hal.science/hal-01066344
 - Cited as: "Verpoorter et al. 2014, GRL 41:6396 (117 million lakes over 0.002 km2, 5.0 million km2, 3.7 % of non-glaciated land)"
-- Ledger ids: HYD-062, HYD-063
+- Ledger ids: HYD-062, HYD-063, HYD-090
 - Access: open access (hybrid)
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
-- Read so far (by the project): the run review lists it among linked sources; nothing says the paper was read
+- Read so far (by the project): the abstract, 2026-10-20 (the lakes task, through Semantic Scholar; the publisher answered 403): about 117 million lakes over 0.002 km2, about 5 x 10^6 km2, about 3.7 % of the nonglaciated land. The paper itself is not read.
 - Read in this pass: abstract fetched (OpenAlex)
 - Reference check: matches (authors, year, journal, volume, pages, DOI).
+
+### AllenPavelsky2018
+- Reference: Allen, George H. and Pavelsky, Tamlin M. 2018. Global extent of rivers and streams. Science 361(6402):585-588.
+- DOI or URL: https://doi.org/10.1126/science.aat0636 ; author copy https://cdr.lib.unc.edu/downloads/w6634d23t (UNC Carolina Digital Repository)
+- Cited as: "Allen & Pavelsky 2018, Science 361:585 (rivers and streams 773,000 km2, 0.58 % of nonglaciated land; GRWL)"
+- Ledger ids: HYD-092
+- Access: paywalled (publisher); open copy (the authors' accepted manuscript in the UNC repository)
+- Library (the project's source library, not distributed): fetched 2026-10-20 (PDF, UNC repository copy, text layer). Text file: AllenPavelsky2018.txt.
+- Read in the lakes task (2026-10-20): full text, the abstract and the results: "the global surface area of rivers and streams at mean annual discharge is 773,000 ± 79,000 km2, or 0.58 ± 0.06% of Earth's nonglaciated land surface"; "the total observed area of rivers measured by the GRWL Database is 468,000 km2, or 0.35% of Earth's nonglaciated land surface"; rivers wider than 90 m 404,000 km2.
+
+### pyBacktrack_lithologies
+- Reference: EarthByte group, pyBacktrack (software), bundled lithology table `pybacktrack/bundle_data/lithologies/primary.txt`. https://github.com/EarthByte/pyBacktrack
+- Cited as: the secondary source of Sclater & Christie 1980's porosity-depth parameters, for the porous cover tried in the plate model's column on 2026-10-20 and reverted (isostasy-and-height-limit.md)
+- Ledger ids: none (the trial was reverted)
+- Access: open (software, GitHub)
+- Library: no saved copy (read through raw.githubusercontent.com on 2026-10-20).
+- Read in the lakes task (2026-10-20): the header "# name density porosity decay / # kg/m3 (%/100) m" and the four rows "# Sclater and Christie [1980]": "Shaley_sand 2680 0.56 2564", "Shale 2700 0.63 1960", "Sand 2650 0.49 3704", "Chalk 2710 0.7 1408".
 
 ### Downing2006
 - Reference: Downing, John A.; Prairie, Yves T.; Cole, Jonathan J.; Duarte, Carlos M.; Tranvik, Lars J.; Striegl, Robert G.; McDowell, William H.; Kortelainen, Pirkko; Caraco, Nina F.; Melack, John M.; Middelburg, Jack J. 2006. The global abundance and size distribution of lakes, ponds, and impoundments. Limnology and Oceanography 51(5):2388-2397.

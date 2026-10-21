@@ -113,10 +113,40 @@ pub fn run(world: &Path, out: &Path) -> Result<(usize, usize, usize), FormatErro
     Ok((sites.len(), bodies.len(), inside_total))
 }
 
+/// The files a checkpoint is read from: an epoch checkpoint (`<run>/epochs/step-N.dtcp`) holds
+/// only its own history frames, so it is read with the epochs before it (`EpochIndex::chain`);
+/// any other checkpoint is one file.
+pub fn chain_of(ckpt: &Path) -> Result<Vec<std::path::PathBuf>, String> {
+    use deeptime_core::epochs::EpochIndex;
+    let one = || Ok(vec![ckpt.to_owned()]);
+    let (Some(dir), Some(name)) = (ckpt.parent(), ckpt.file_name()) else {
+        return one();
+    };
+    let Some(run) = dir.parent().filter(|run| EpochIndex::dir(run) == dir) else {
+        return one();
+    };
+    let Some(index) = EpochIndex::read(run).map_err(|e| e.to_string())? else {
+        return one();
+    };
+    let Some(entry) = index
+        .entries
+        .iter()
+        .find(|e| Path::new(&e.file) == Path::new(name))
+    else {
+        return one();
+    };
+    let chain = index
+        .chain(entry)
+        .ok_or_else(|| format!("{}: a link of its epoch chain is missing", ckpt.display()))?;
+    Ok(chain.iter().map(|e| dir.join(&e.file)).collect())
+}
+
 /// `deeptime dump-fields`: the named fields of a checkpoint's world (every field when `names` is
-/// empty) as raw little-endian f32 files with an `index.json` of their grids.
+/// empty) as raw little-endian f32 files with an `index.json` of their grids, and the world's time
+/// and globals in `globals.json`.
 pub fn fields(ckpt: &Path, out: &Path, names: &[String]) -> Result<usize, String> {
-    let ck = deeptime_core::checkpoint::Checkpoint::read(ckpt).map_err(|e| e.to_string())?;
+    let ck = deeptime_core::checkpoint::Checkpoint::read_chain(&chain_of(ckpt)?)
+        .map_err(|e| e.to_string())?;
     std::fs::create_dir_all(out).map_err(|e| e.to_string())?;
     let mut index = serde_json::Map::new();
     for (name, f) in &ck.world.fields {
@@ -134,5 +164,9 @@ pub fn fields(ckpt: &Path, out: &Path, names: &[String]) -> Result<usize, String
     let n = index.len();
     let text = serde_json::to_vec_pretty(&Value::Object(index)).expect("JSON");
     write_atomic(&out.join("index.json"), &text).map_err(|e| e.to_string())?;
+    // The world's globals (the sea level, the run's totals), which a field alone does not say.
+    let globals = json!({ "t_years": ck.world.t_years, "globals": ck.world.globals });
+    let text = serde_json::to_vec_pretty(&globals).expect("JSON");
+    write_atomic(&out.join("globals.json"), &text).map_err(|e| e.to_string())?;
     Ok(n)
 }
