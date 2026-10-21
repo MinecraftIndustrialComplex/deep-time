@@ -81,15 +81,43 @@ fn body_top(b: &Body) -> i32 {
     }
 }
 
-/// How far (whole blocks, up positive) a guaranteed site's bodies move: the top of its ore to
-/// `rock_top` for an exposed essential, else down to it at most.
-pub fn anchor_shift(bodies: &[&Body], rock_top: i32, exposed: bool) -> i32 {
+/// Whether `b` places ore at block (x, y, z): a zone with a material applies at the block's
+/// centre (the game draws each such block as ore with the zone's density).
+fn places_ore(b: &Body, c: u32, x: i32, y: i32, z: i32) -> bool {
+    b.locate(c, x, y, z).is_some_and(|at| {
+        b.zones_at(at)
+            .any(|zn| zn.material.is_some() && zn.density > 0.0)
+    })
+}
+
+/// The highest block of column (x, z) where one of `bodies` places ore, or None when none
+/// does there. A body's box is padded past its ore (a block or two over a sheet's top), so the
+/// box's top is not the ore's.
+pub fn ore_top_in_column(bodies: &[&Body], c: u32, x: i32, z: i32) -> Option<i32> {
+    bodies
+        .iter()
+        .filter(|b| bears_ore(b))
+        .filter_map(|b| {
+            (b.aabb[0][1]..=body_top(b))
+                .rev()
+                .find(|&y| places_ore(b, c, x, y, z))
+        })
+        .max()
+}
+
+/// How far (whole blocks, up positive) a guaranteed site's bodies move: the top of its ore in
+/// the centre column (x, z) to `rock_top` for an exposed essential, else down to it at most.
+/// When that column holds none of its ore, the ore-bearing bodies' tops stand in (every body's
+/// when none bears ore).
+pub fn anchor_shift(bodies: &[&Body], c: u32, x: i32, z: i32, rock_top: i32, exposed: bool) -> i32 {
     let ore: Vec<&&Body> = bodies.iter().filter(|b| bears_ore(b)).collect();
-    let top = if ore.is_empty() {
-        bodies.iter().map(|b| body_top(b)).max()
-    } else {
-        ore.iter().map(|b| body_top(b)).max()
-    };
+    let top = ore_top_in_column(bodies, c, x, z).or_else(|| {
+        if ore.is_empty() {
+            bodies.iter().map(|b| body_top(b)).max()
+        } else {
+            ore.iter().map(|b| body_top(b)).max()
+        }
+    });
     let Some(top) = top else { return 0 };
     let dy = rock_top - top;
     if exposed { dy } else { dy.min(0) }
@@ -114,7 +142,7 @@ fn ore_in_column(bodies: &[&Body], c: u32, x: i32, z: i32, rock_top: i32, reach:
         let lo = b.aabb[0][1].max(rock_top - reach);
         (lo..=rock_top.min(body_top(b)))
             .rev()
-            .any(|y| b.locate(c, x, y, z).is_some())
+            .any(|y| places_ore(b, c, x, y, z))
     })
 }
 
@@ -170,7 +198,7 @@ pub fn anchor_sites(
             out.in_stratum_kept += 1;
         } else {
             let mine: Vec<&Body> = idx.iter().map(|&i| &bodies[i]).collect();
-            let dy = anchor_shift(&mine, top, exposed(material));
+            let dy = anchor_shift(&mine, c, cx, cz, top, exposed(material));
             if dy != 0 {
                 for &i in &idx {
                     shift_body(&mut bodies[i], dy);
@@ -336,46 +364,67 @@ mod tests {
         b
     }
 
+    const C: u32 = 4096;
+
     /// An exposed essential's ore tops out at the top rock block, from above or below; another
-    /// only moves down, so a body the history buried deeper stays there. The top is the ore's,
-    /// not a barren halo's, and a clip lowers it.
+    /// only moves down, so a body the history buried deeper stays there. The top is the ore's
+    /// highest block in the centre column, not its padded box's nor a barren halo's, and a clip
+    /// lowers it.
     #[test]
     fn a_guaranteed_body_moves_its_ore_top_to_the_top_rock_block() {
         let ore = body(1, 80.0, 3.0, true, NO_CLIP);
         let halo = body(2, 90.0, 3.0, false, NO_CLIP);
-        let top = body_top(&ore);
-        assert!(top > 60, "{top}");
+        let shift =
+            |bs: &[&Body], rock: i32, exposed: bool| anchor_shift(bs, C, 0, 0, rock, exposed);
+        // The ore's top block: its centre (y + 0.5) within 3 blocks of 80, under its box's 83.
+        let top = ore_top_in_column(&[&ore, &halo], C, 0, 0).unwrap();
+        assert_eq!(top, 82);
+        assert_eq!(body_top(&ore), 83);
         // Above the rock: down for either kind.
-        assert_eq!(anchor_shift(&[&ore, &halo], 60, true), 60 - top);
-        assert_eq!(anchor_shift(&[&ore, &halo], 60, false), 60 - top);
+        assert_eq!(shift(&[&ore, &halo], 60, true), 60 - top);
+        assert_eq!(shift(&[&ore, &halo], 60, false), 60 - top);
         // Below it: up only when exposed.
-        assert_eq!(anchor_shift(&[&ore], top + 9, true), 9);
-        assert_eq!(anchor_shift(&[&ore], top + 9, false), 0);
-        // A barren body alone goes by its own top; a clip is the top when lower.
-        assert_eq!(anchor_shift(&[&halo], 60, true), 60 - body_top(&halo));
+        assert_eq!(shift(&[&ore], top + 9, true), 9);
+        assert_eq!(shift(&[&ore], top + 9, false), 0);
+        // A barren body alone goes by its box's top; a clip lowers the ore's top.
+        assert_eq!(shift(&[&halo], 60, true), 60 - body_top(&halo));
         let clipped = body(3, 80.0, 3.0, true, 78);
-        assert_eq!(body_top(&clipped), 78.min(clipped.aabb[1][1]));
-        assert_eq!(anchor_shift(&[&clipped], 70, true), 70 - body_top(&clipped));
-        assert_eq!(anchor_shift(&[], 70, true), 0);
+        assert_eq!(ore_top_in_column(&[&clipped], C, 0, 0), Some(78));
+        assert_eq!(shift(&[&clipped], 70, true), 70 - 78);
+        // A centre column the ore misses: the box's top stands in.
+        assert_eq!(ore_top_in_column(&[&ore], C, 40, 0), None);
+        assert_eq!(
+            anchor_shift(&[&ore], C, 40, 0, 60, true),
+            60 - body_top(&ore)
+        );
+        assert_eq!(shift(&[], 70, true), 0);
     }
 
-    /// The move is rigid and whole: centre, clip and box go up together, and the moved body's
-    /// ore lies at the top rock block in its centre column.
+    /// The move is rigid and whole: centre, clip and box go together, and the moved body's ore
+    /// tops out exactly at the top rock block in its centre column.
     #[test]
     fn a_moved_body_holds_ore_at_the_top_rock_block() {
-        let mut b = body(1, 100.4, 2.0, true, 101);
-        let before = (b.center[1], b.clip_top_y, b.aabb);
-        let rock = 64;
-        let dy = anchor_shift(&[&b], rock, true);
-        assert!(!ore_in_column(&[&b], 4096, 0, 0, rock, 256));
-        shift_body(&mut b, dy);
-        assert_eq!(b.center[1], before.0 + f64::from(dy));
-        assert_eq!(b.clip_top_y, before.1 + dy);
-        assert_eq!(b.aabb[1][1], before.2[1][1] + dy);
-        assert_eq!(b.aabb[0][0], before.2[0][0], "x and z stay");
-        assert_eq!(body_top(&b), rock);
-        assert!(ore_in_column(&[&b], 4096, 0, 0, rock, 256));
-        // The block above the top rock holds none of it.
-        assert!(b.locate(4096, 0, rock + 1, 0).is_none());
+        for (y, half, clip) in [
+            (100.4, 2.0, 101),
+            (80.0, 3.0, NO_CLIP),
+            (91.7, 1.4, NO_CLIP),
+        ] {
+            let mut b = body(1, y, half, true, clip);
+            let before = (b.center[1], b.clip_top_y, b.aabb);
+            let rock = 64;
+            let dy = anchor_shift(&[&b], C, 0, 0, rock, true);
+            assert!(!ore_in_column(&[&b], C, 0, 0, rock, 256));
+            shift_body(&mut b, dy);
+            assert_eq!(b.center[1], before.0 + f64::from(dy));
+            if clip != NO_CLIP {
+                assert_eq!(b.clip_top_y, before.1 + dy);
+            }
+            assert_eq!(b.aabb[1][1], before.2[1][1] + dy);
+            assert_eq!(b.aabb[0][0], before.2[0][0], "x and z stay");
+            assert_eq!(ore_top_in_column(&[&b], C, 0, 0), Some(rock), "{y} {half}");
+            assert!(ore_in_column(&[&b], C, 0, 0, rock, 256));
+            // The block above the top rock holds none of it.
+            assert!(!places_ore(&b, C, 0, rock + 1, 0));
+        }
     }
 }

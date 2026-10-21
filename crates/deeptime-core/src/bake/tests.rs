@@ -516,9 +516,15 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
             );
         };
         if guaranteed[&s.forming_event] == "c:iron" {
-            assert!(
-                ore_top >= rock - crate::deposits::playability::EXPOSED_BLOCKS as i32,
-                "site {}: an exposed essential's ore tops out at {ore_top}, the rock at {rock}",
+            // An exposed essential's ore tops out exactly at the top rock block in its centre
+            // column (DEP-221).
+            let mine: Vec<&deeptime_format::Body> =
+                bodies.iter().filter(|b| b.site == Some(s.id)).collect();
+            let top = anchor::ore_top_in_column(&mine, world.c as u32, s.center[0], s.center[2]);
+            assert_eq!(
+                top,
+                Some(rock),
+                "site {}: an exposed essential's ore tops out at {top:?}, the rock at {rock}",
                 s.id
             );
         }
