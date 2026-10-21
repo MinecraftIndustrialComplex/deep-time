@@ -184,6 +184,9 @@ if [ "$BUILD" = 1 ]; then
 fi
 stop_remote >/dev/null
 ARGS=(watch --bind 127.0.0.1 --port "$PORT" --runs "$WB/runs" --keep "$KEEP" --threads "$THREADS" --mem-cap "$MEM_CAP")
+# `tailscale serve` hands requests on with the tailnet name as their Host; the workbench answers
+# only loopback names unless told the tailnet may reach it (mic-viewer's Host check, VWD-7).
+ARGS+=(--allow-tailnet)
 # Stage 2 (P1-20): the preview runner of the checkout this script synced; the Mac's own Python 3.9
 # runs it (stdlib-only), and it enters the dev shell itself for cargo.
 [ "${PREVIEW:-1}" = 1 ] && ARGS+=(--preview "$REMOTE/tools/workbench/preview.py" --python /usr/bin/python3)
