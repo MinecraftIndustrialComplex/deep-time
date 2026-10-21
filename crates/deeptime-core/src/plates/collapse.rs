@@ -42,8 +42,7 @@
 //! proportion, as pure-shear extension does.
 //!
 //! The surface follows by Airy (`pools::COLUMN_ISOSTATIC_FACTOR`, 7.0 m of crust per m of height,
-//! less the pull of an eclogite root, with the cover's pore water, `pools::isostatic_change_m`;
-//! PLT-278 to PLT-281, ISO-082),
+//! less the pull of an eclogite root, `pools::isostatic_change_m`; PLT-278 to PLT-281),
 //! within the Airy height of the column, z_A(T) = z_0 + (T − T_n) / 7.0 (z_0 the middle of
 //! `continent_elevation_m`): a source sinks by q / 7.0 but not below z_A of the crust it keeps,
 //! so a root that never raised its surface (an overlap stack) does not drag it down as it
@@ -86,7 +85,7 @@ use rayon::prelude::*;
 use super::Env;
 use super::geometry::{Geo, dijkstra_sparse};
 use super::pools::{
-    COLUMN_ISOSTATIC_FACTOR, column_height_m, continental_column, isostatic_change_m,
+    COLUMN_ISOSTATIC_FACTOR, continental_column, eclogite_m, isostatic_change_m, root_drop_m,
 };
 use super::state::{CONTINENTAL, OCEANIC, PlateState, Sample, TRENCH, pool};
 
@@ -197,11 +196,12 @@ pub(super) fn held(z: f64, change: f64, floor: f64) -> f64 {
 }
 
 /// A continental column's isostatic height, m: the middle of `continent_elevation_m` (`z_0`) for
-/// the normal column, plus the height its pools hold it at beyond it (`pools::column_height_m`:
-/// the Airy height of the thickness beyond it, PLT-281, and its cover's pore water, ISO-082, less
-/// its eclogite root's pull, PLT-278).
+/// the normal column, plus the Airy height of the thickness beyond it, less its eclogite root's
+/// pull (PLT-281, PLT-278).
 pub fn iso_height(pools: &[f32; pool::COUNT], z_0: f64, gravity: f64) -> f64 {
-    z_0 + column_height_m(pools, gravity)
+    let t: f64 = pools.iter().map(|&x| f64::from(x.max(0.0))).sum();
+    z_0 + (t - normal_thickness_m()) / COLUMN_ISOSTATIC_FACTOR
+        - root_drop_m(eclogite_m(pools, gravity))
 }
 
 /// Moves a surface at `z` by `change` towards the column's isostatic height `iso`, never past it:
