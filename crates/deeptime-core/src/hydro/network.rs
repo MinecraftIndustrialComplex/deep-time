@@ -117,6 +117,8 @@ pub struct Output {
     pub water_level: Vec<i16>,
     /// What stands on each cell ([`kind`]): open or frozen lake water, a playa, nothing.
     pub kind: Vec<u8>,
+    /// The `closed_basin` layer ([`super::closed_basin_layer`]): 1 where the game puts no sea.
+    pub closed_basin: Vec<u8>,
     pub lakes: Vec<Lake>,
     pub rivers: Rivers,
     /// Counts and timings for `notes.bake.water`.
@@ -193,6 +195,9 @@ struct Net<'a> {
     lake_of: HashMap<u32, u32>,
     playa: Vec<u32>,
     tally: Tally,
+    /// Cells the open sea reaches at its own level ([`super::sea_reached`]): a basin among them
+    /// is open to the sea.
+    reached: Vec<bool>,
 }
 
 impl Net<'_> {
@@ -387,15 +392,20 @@ impl Net<'_> {
             self.tally.full += 1;
             return;
         }
-        // Ground a block or more below sea level holds the sea's water in the game whatever
-        // reaches it (the column rule's sea, and the aquifer), so such a basin is never dry.
+        // A basin the open sea reaches at its own level (its spill level is at most sea level)
+        // holds the sea's water in the game wherever its ground is a block or more under sea
+        // level (the column rule's sea), so it is never dry there (HYD-052, now for these basins
+        // only). A closed basin, behind a rim above sea level, takes its balance however deep it
+        // lies (ledger: HYD-100): a lake, a playa or dry ground, below sea level or not.
         let sea = self.inp.sea_raw;
+        let open = self.reached[members[0] as usize];
         let lowest = members
             .iter()
             .map(|&m| i32::from(elev[m as usize]))
             .min()
             .unwrap_or(i32::MAX);
-        if inflow <= 0.0 && lowest > sea - 16 {
+        let flooded = open && lowest <= sea - 16;
+        if inflow <= 0.0 && !flooded {
             self.tally.dry += 1;
             return;
         }
@@ -438,9 +448,9 @@ impl Net<'_> {
             evaporation += evap[k];
             k += 1;
         }
-        // Below sea level the water stands at sea level at least (see above): the lake is what
-        // the sea's level floods of the basin, however little reaches it.
-        if floor <= sea - 16 {
+        // Open to the sea and below sea level, the water stands at sea level at least (see
+        // above): the lake is what the sea's level floods of the basin, however little reaches it.
+        if open && floor <= sea - 16 {
             let sea_k = ((sea - floor) as usize).min(bins - 1);
             while k < sea_k {
                 cells += count[k] as usize;
@@ -612,6 +622,11 @@ pub fn run(inp: &Input<'_>) -> Output {
     let min_sea = ((OPEN_SEA_KM2 / cell_km2).ceil() as usize).max(1);
     let sea_floor = inp.sea_raw - 16;
     open_sea(&g, inp.elev, sea_floor, min_sea, &mut state);
+    // The ground the open sea reaches at its own level (HYD-100).
+    let low = |c: usize| i32::from(inp.elev[c]) <= inp.sea_raw;
+    let open: Vec<bool> = state.iter().map(|&s| s & SEA != 0).collect();
+    let reached = super::sea_reached(g.w, g.h, &open, low);
+    drop(open);
     millis.insert("sea".into(), json!(ms(t)));
 
     // 2. Priority-Flood: spill levels, the cell each land cell was reached from, the order.
@@ -725,6 +740,7 @@ pub fn run(inp: &Input<'_>) -> Output {
         lake_of: HashMap::new(),
         playa: Vec::new(),
         tally: Tally::default(),
+        reached,
     };
     net.label(&order);
     let own: Vec<f64> = order
@@ -753,6 +769,7 @@ pub fn run(inp: &Input<'_>) -> Output {
         merged,
         mut lake_of,
         playa,
+        reached,
         ..
     } = net;
     // The lakes that stand (one a terminal lake rose over is part of it), numbered again.
@@ -1098,6 +1115,55 @@ pub fn run(inp: &Input<'_>) -> Output {
     rivers.build_index();
     millis.insert("rivers".into(), json!(ms(t)));
 
+    // 8. Where the game puts no sea (HYD-100, HYD-102), and what the ground a block or more below
+    // sea level holds.
+    let t = std::time::Instant::now();
+    let radius = (super::CLOSED_REACH_BLOCKS / g.r).ceil().max(1.0) as usize;
+    let closed_basin = super::closed_basin_layer(g.w, g.h, low, &reached, radius);
+    let below = |c: usize| i32::from(inp.elev[c]) <= sea_floor;
+    let (mut open_low, mut closed, mut wet, mut salt) = (0u64, 0u64, 0u64, 0u64);
+    for c in 0..n {
+        if state[c] & SEA != 0 || !below(c) {
+            continue;
+        }
+        if reached[c] {
+            open_low += 1;
+            continue;
+        }
+        closed += 1;
+        match kinds[c] {
+            kind::LAKE | kind::FROZEN => wet += 1,
+            kind::PLAYA => salt += 1,
+            _ => {}
+        }
+    }
+    drop(reached);
+    let under_sea: Vec<&Lake> = lakes
+        .iter()
+        .filter(|l| i32::from(l.level) < inp.sea_raw)
+        .collect();
+    let share = |cells: u64| {
+        if land > 0 {
+            (cells as f64 / land as f64 * 1e5).round() / 1e5
+        } else {
+            0.0
+        }
+    };
+    let km2 = |cells: u64| (cells as f64 * cell_km2).round();
+    let below_sea = json!({
+        "open_km2": km2(open_low),
+        "closed_km2": km2(closed),
+        "closed_share_of_land": share(closed),
+        "lake_km2": km2(wet),
+        "playa_km2": km2(salt),
+        "dry_km2": km2(closed - wet - salt),
+        "dry_share_of_land": share(closed - wet - salt),
+        "lakes_below_sea_level": under_sea.len(),
+        "lakes_below_sea_level_km2": km2(under_sea.iter().map(|l| u64::from(l.cells)).sum()),
+        "closed_basin_radius_cells": radius,
+    });
+    millis.insert("closed_basin".into(), json!(ms(t)));
+
     let stats = statistics(
         inp,
         &g,
@@ -1117,12 +1183,14 @@ pub fn run(inp: &Input<'_>) -> Output {
             "river_length_km": (length_blocks * inp.m_per_block_h / 1000.0).round(),
             "max_discharge_m3s": (q_max * 10.0).round() / 10.0,
             "widest_blocks": (w_max * 10.0).round() / 10.0,
+            "below_sea": below_sea,
             "millis": Value::Object(millis),
         }),
     );
     Output {
         water_level,
         kind: kinds,
+        closed_basin,
         lakes,
         rivers,
         stats,
