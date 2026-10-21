@@ -3419,6 +3419,96 @@ The continental crust's area moves by up to a tenth of the planet within 50 Myr 
 branch does not change that (its runs are master's); the reversal arms add a downward trend, their
 collisions' losses, and keep the swing about it. The swing is not the plate geometry's to fix.
 
+### The plates under the sea from the ocean's volume (after the sea-level merge)
+
+The sea-level task (sea-level.md, open questions) reported that the plates answer its moving sea:
+the crust budget's net loss −0.049 → −0.074 of the planet over 1,000 Myr, more collisions, the
+supercontinent's tenure 231 → 21 Myr and the plate checks 29 → 27 and 31 → 26 of 45. Traced here on
+the merged code (this branch with the sea-level branch at 975dd57e; master d53cc6c4's simulation is
+the same code), the same ensemble as above, with scratch environment switches (never committed)
+that pin the sea at one height for the whole run: for every reader (the climate's global), only for
+the plate stage's reading (its settling and GDH1's dry share, PLT-353) or only for the surface's
+(erosion, deposition and the carry, which come back to the plates' samples); and the old dampening
+floor (`tectonics.ocean_depth=dampening`) under the moving sea and under a sea pinned at 0. Base is
+master c790d1f3 (the old sea curve within about 150 m of the datum, the dampening floor), run on
+seeds 4 to 6 as well to see its own spread.
+
+| arm | the sea the plates read after 100 Myr, mean (first → last), m | crust budget's net, share of the planet | continental crust into contacts (lost there), 10⁹ km³ | collisions per 100 Myr | tenure: check (mean of runs) / median run, Myr | assembly period (check), Myr | plate checks of 45 |
+|---|---|---|---|---|---|---|---|
+| base, seeds 1 to 3 | −35 (74 → −34) | −0.042 | 16.2 (1.72) | 1.63 | 126 / 50 | 431 | 31 |
+| base, seeds 4 to 6 | −36 (61 → −27) | −0.082 | 18.7 (2.11) | 1.50 | 46 / 37 | 255 | 28 |
+| merged, seeds 1 to 3 (volume sea, GDH1) | +259 (97 → 394) | −0.087 | 18.6 (1.97) | 1.72 | 25 / 18 | 144 | 28 |
+| merged, seeds 4 to 6 | +273 (144 → 462) | −0.100 | 19.1 (2.37) | 1.67 | 19 / 10 | 289 | 29 |
+| volume sea over the old floor | +468 (612 → 548) | −0.095 | 18.2 (2.13) | 1.83 | 16 / 18 | 125 | 28 |
+| both changes off: the old floor, the sea pinned at 0 | 0 | −0.061 | 17.0 (2.12) | 1.75 | 41 / 23 | 309 | 30 |
+| sea pinned at −250 m (every reader) | −250 | −0.101 | 17.8 (1.94) | 1.65 | 84 / 45 | 341 | 30 |
+| sea pinned at 0 | 0 | −0.069 | 18.5 (2.02) | 1.62 | 37 / 12 | 258 | 29 |
+| sea pinned at +300 m | +300 | −0.089 | 19.5 (2.30) | 1.45 | 20 / 19 | 216 | 30 |
+| only the plates' reading at −250 m | −250 | −0.090 | 19.6 (2.31) | 1.75 | 20 / 16 | 103 | 28 |
+| only the surface's reading at −250 m | +409 (201 → 837) | −0.085 | 18.7 (2.02) | 1.82 | 57 / 63 | 340 | 28 |
+
+What it says:
+
+1. *Most of the response is base's own spread.* Base on seeds 4 to 6 loses as much crust (−0.082),
+   moves as much of it into contacts (18.7 against 16.2), holds its supercontinents as briefly
+   (46 Myr; 37 at the median run) and meets as few checks (28) as the merged code on seeds 1 to 3.
+   Seeds 1 to 3 were a kind draw for base: one run (supercontinent, seed 1) held its first
+   supercontinent 558 Myr and carries the check's mean. The tenure is a mean of one figure per
+   run, each from a handful of assemblies, between 4 and 558 Myr.
+2. *What is left after twelve runs each.* The crust's net loss: −0.062 (base) against −0.093
+   (merged), 10 of the 12 seed-and-start pairs losing more. The tenure's fall (a median run of
+   50 Myr against 13, one-sided Mann-Whitney p about 0.04) does not hold up: the twelve runs
+   with the sea at the datum (below) give 17.5, the 35 with the sea off it 24, and neither differs
+   from base's twelve beyond z 1.3. The collisions (1.6 → 1.7 per 100 Myr) do not move beyond the
+   runs' spread.
+3. *Not the sea's motion and not GDH1, but the sea standing off the datum.* The merged code with
+   both of its changes off (the old floor, the sea pinned at 0) loses −0.061 and meets 30 checks;
+   with GDH1 on and the sea still at 0 it loses −0.069 and meets 29. Those twelve runs (−0.065)
+   are base's twelve (−0.062; Mann-Whitney z +0.12). Every arm whose sea stands away from 0,
+   below it (−250 m) or above it (+300 m, or the volume sea's +259 to +468 m), moving or pinned,
+   under either floor, and whichever reader is moved off 0 (the plates' settling and dry share,
+   or the surface's base level), loses more: −0.085 to −0.101, −0.091 over its 36 runs (against
+   the twelve at the datum, one-sided z +2.65, p about 0.004; in four of the six seed-and-start
+   pairs five or six of the six arms lose more than the datum arms' mean). Its assembly period is
+   shorter too (median run 145 Myr against 236 at the datum, z +2.31). The volume sea over the
+   old floor (−0.095) is no better than with GDH1 (−0.087), so the sea-level task's reading ("the
+   moving sea, not GDH1") holds for GDH1 and not for the motion. That the sign of the offset does
+   not matter says the loss is not more or less water over the margins but a mismatch: code that
+   still takes the datum for the sea while the rest reads the sea. One candidate, not tested
+   here: the force balance's column energy (`forces::column_energy`, FRC-006 and FRC-014), which
+   loads a continental column with water below 0, not below the sea.
+4. *Where the crust goes.* In every arm with the sea-level code more continental crust crosses
+   into contacts (17.0 to 19.6 against 16.2 × 10⁹ km³ over the run) and more of it is lost there
+   (1.94 to 2.37 against 1.72); the crust budget's subduction part takes 0.69 to 0.80 of the
+   planet against 0.62. Base on seeds 4 to 6 does the same (18.7, 2.11, 0.72), and the arms at
+   the datum sit inside that range (17.0 and 18.5; 0.69 and 0.75), so these totals do not show
+   the split the net loss shows.
+
+The continental crust's swing under the merged code, after the first 100 Myr (the crust budget's `cb_t` lines, one per step, in the run's report):
+lowest and highest step 0.290 and 0.475 of the planet (base 0.312 and 0.489), the largest change in
+50 Myr 0.089 (0.096), a trend of −0.008 per 100 Myr (−0.001); pinned at 0 0.292 and 0.491 (0.089
+in 50 Myr), at +300 m 0.296 and 0.487 (0.096), at −250 m 0.303 and 0.480 (0.087); both changes off 0.293 and 0.475 (0.085, −0.005 per 100 Myr);
+the volume sea over the old floor 0.299 and 0.471 (0.095, −0.009); on seeds 4 to 6 base 0.302 and
+0.484 (0.093, −0.0075) and the merged code 0.283 and 0.483 (0.098, −0.006). The swing is the plate
+model's, whatever the sea does, and the downward trend is the crust's net loss, as steep in base on
+seeds 4 to 6 as under the merged code.
+
+The continent table under the merged code (seeds 1 to 3, both starts, the bisect's reader, as
+"Against c24ff793 and master" above):
+
+| | c24ff793 | master c790d1f3 = this branch before the merge | merged (master d53cc6c4's simulation) | Earth |
+|---|---|---|---|---|
+| land | 0.323 | 0.264 | 0.269 | 0.29 |
+| drowned share of the continental crust | 0.31 | 0.368 | 0.357 | about 0.19 |
+| largest landmass | 0.166 | 0.127 | 0.159 | 0.167 |
+| island-arc share of the land | 0.55 | 0.429 | 0.423 | |
+| continental crust, share of the planet | | 0.381 | 0.336 | 0.37 to 0.45 (the plate check) |
+
+The merge adds land and the largest landmass with less continental crust: the sea from the
+ocean's volume stands where the crust leaves room, as sea-level.md says. The sea-level task's own
+table (30c4d664 → fad59a5e on seeds 1 and 2: land 0.257 → 0.268, largest 0.112 → 0.163, drowned
+0.374 → 0.373) agrees.
+
 ### What is left, and for whom
 
 1. *The boundaries' orientation* (Ben's: how plates are made and moved, big scope): the
@@ -3439,3 +3529,12 @@ collisions' losses, and keep the swing about it. The swing is not the plate geom
    convergent margins is intra-oceanic arc, and the census tags any land with 1 km or more of
    island-arc crust as island arc. A share of the crust's volume against Stern & Scholl's
    Table 1 would be the measure with a source behind it.
+6. *The sea off the datum* (the sea level's): a sea standing away from 0, above or below, loses
+   about 0.026 more of the planet's continental crust over 1,000 Myr than a sea at 0 and shortens
+   the assembly period (the section above). Find the code that still takes the datum for the
+   sea; `forces::column_energy` (FRC-014: "h above sea level", computed from 0) is the first to
+   test, by an arm that feeds it the sea.
+7. *Plate checks that are a mean of runs* (the supercontinent's tenure above all): one long run
+   carries the mean (base: 558 Myr in one run of six; 126 Myr on seeds 1 to 3 against 46 on seeds
+   4 to 6). Compare arms on twelve runs or more, and by the runs' median, before reading a change
+   in them as the code's.
