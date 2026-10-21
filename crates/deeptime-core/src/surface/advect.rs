@@ -236,6 +236,13 @@ pub struct Carry<'a> {
     pub group: Option<&'a [f32]>,
     pub plate_elevation: &'a [f32],
     pub uplift_mm_yr: &'a [f32],
+    /// `plates/gap` now and after the last step (`surface/crust_gap`): 1 in a gap between plates
+    /// (`plates::l1::GAP_FIELD`). `None`: no cell is or was in a gap.
+    pub gap: Option<&'a [f32]>,
+    pub prev_gap: Option<&'a [f32]>,
+    /// The surface's offset over the plate model's elevation after the last step
+    /// (`SurfaceState::offset_m`), which a cell that lay in a gap keeps.
+    pub prev_offset: Option<&'a [f32]>,
     /// Each plate's parent, and how many plates existed before the step (a plate past that count
     /// was born in it, and its crust was its parent's).
     pub parents: &'a [Option<u32>],
@@ -337,33 +344,92 @@ pub fn carried_fields<const K: usize>(x: &Carry<'_>, v: [&[f32]; K]) -> Vec<Opti
         .collect()
 }
 
+/// Whether cell `c` is flagged in an optional 0/1 field.
+fn flagged(f: Option<&[f32]>, c: usize) -> bool {
+    f.is_some_and(|g| g.get(c).is_some_and(|&v| v > 0.5))
+}
+
+/// Holds in place the cells that lay in a gap between plates after the last step
+/// (`surface/crust_gap`): the floor a ridge makes there belongs to no plate until the next
+/// resampling, so it does not move with one, and neither does what lies on it. ledger: PLT-354
+pub fn hold_gaps(w: usize, src: &mut [[f64; 2]], prev_gap: Option<&[f32]>) {
+    let Some(g) = prev_gap.filter(|g| g.len() == src.len()) else {
+        return;
+    };
+    src.par_iter_mut().enumerate().for_each(|(c, s)| {
+        if g[c] > 0.5 {
+            *s = [(c % w) as f64, (c / w) as f64];
+        }
+    });
+}
+
+/// Crust new at the place this step, which starts bare: crust younger than the step, and a cell
+/// that entered a gap between plates; never a cell that lay in a gap already (its floor and what
+/// lies on it stay, [`carried_elevation`]). ledger: PLT-354
+pub fn newborn(
+    crust_age: &[f32],
+    dt_myr: f64,
+    gap: Option<&[f32]>,
+    prev_gap: Option<&[f32]>,
+) -> Vec<bool> {
+    crust_age
+        .par_iter()
+        .enumerate()
+        .map(|(c, &age)| {
+            !flagged(prev_gap, c) && ((age >= 0.0 && age < dt_myr as f32) || flagged(gap, c))
+        })
+        .collect()
+}
+
 /// The surface's elevation at the start of a step, m, and the number of cells where another
 /// plate's crust arrived: the last elevation of the same crust at its source (the corners that
 /// held the same rigid group, the same plate, or the parent of a plate born this step), plus the
 /// plate model's uplift of that crust over the step; where no corner held it (another plate's
 /// edge arrived over a trench, a small plate was absorbed), the plate model's elevation: what the
 /// surface had built there belongs to the crust that left. A group keeps its number when a
-/// collision hands it to another plate, so a sutured terrane keeps its surface. A step longer than
+/// collision hands it to another plate, so a sutured terrane keeps its surface.
+///
+/// The floor a ridge makes in a gap between plates (`plates/gap`, [`hold_gaps`]) belongs to no
+/// plate until the next resampling: a cell that enters a gap takes the plate model's elevation
+/// there (new crust, bare), and a cell that lay in a gap after the last step stays where it is
+/// and keeps what the surface added over the plate model's floor there (`prev_offset`), while the
+/// floor under it deepens as the plate model's gap does, with its age (`plates::l1`), and through
+/// the resampling that turns the gap into samples of that age. Carried with the nearest plate and
+/// its zero uplift, the gap kept the edge it was pulled from (the crest of the last resampling, a
+/// rifted continent's margin) and never sank under GDH1's rate form, which sinks only samples:
+/// the young floor stood 200 to 450 m too high, for good (ledger: PLT-354). A step longer than
 /// `blur_ref_yr` has the blur it owes ([`blur_owed`]) spread into the carried surface before the
 /// uplift, over the same crust only.
 pub fn carried_elevation(x: &Carry<'_>) -> (Vec<f32>, u64) {
     let same = |c: usize, s: usize| x.same(c, s);
     let lift = x.dt_yr * 1.0e-3;
-    // NaN where the crust is new at the place.
+    let was_gap = |c: usize| flagged(x.prev_gap, c);
+    let in_gap = |c: usize| flagged(x.gap, c);
+    // NaN where the crust is new at the place (and where the gap's own rule sets it, below).
     let mut h: Vec<f32> = x
         .src
         .par_iter()
         .enumerate()
         .map(|(c, &[fi, fj])| {
+            if was_gap(c) || in_gap(c) {
+                return f32::NAN;
+            }
             bilinear_same(x.w, x.h, x.prev_elevation, fi, fj, |s| same(c, s)).unwrap_or(f32::NAN)
         })
         .collect();
     if let Some(var) = blur_owed(x.w, x.src, x.dt_yr, x.blur_ref_yr) {
         blur(x.w, x.h, &var, &mut h, |c, n| x.same_now(c, n));
     }
-    let foreign = h.par_iter().filter(|z| z.is_nan()).count() as u64;
+    let foreign = h
+        .par_iter()
+        .enumerate()
+        .filter(|&(c, z)| z.is_nan() && !was_gap(c) && !in_gap(c))
+        .count() as u64;
     h.par_iter_mut().enumerate().for_each(|(c, z)| {
-        *z = if z.is_nan() {
+        *z = if was_gap(c) {
+            let kept = x.prev_offset.map_or(0.0, |o| o[c]);
+            x.plate_elevation[c] + kept
+        } else if z.is_nan() {
             x.plate_elevation[c]
         } else {
             (f64::from(*z) + f64::from(x.uplift_mm_yr[c]) * lift) as f32
@@ -586,6 +652,9 @@ mod tests {
                 group: Some(group),
                 plate_elevation: &plate_elevation,
                 uplift_mm_yr: &uplift,
+                gap: None,
+                prev_gap: None,
+                prev_offset: None,
                 parents,
                 known_plates: 2,
                 dt_yr: 2.0e6,
@@ -618,5 +687,84 @@ mod tests {
         // An unrelated plate 2 there instead: its crust is new at the place.
         let (z, foreign) = carry(&rifted, &rifted, &[None, None, None]);
         assert_eq!((foreign, z[1]), (4 * h as u64, -6000.0));
+    }
+    /// The floor of a gap between plates (PLT-354): a cell that lay in a gap stays where it is
+    /// and keeps what the surface added over the gap's floor, on the floor as it deepened; a
+    /// cell that enters a gap is bare new floor; a cell that lay in one is not new crust again.
+    #[test]
+    fn a_gap_holds_its_floor_in_place() {
+        let (w, h) = (8usize, 2usize);
+        let n = w * h;
+        let col = |c: usize| c % w;
+        // Plate 0 west of column 4, plate 1 east; columns 3 and 4 were a gap after the last
+        // step, and column 5 opens into it this step.
+        let prev_gap: Vec<f32> = (0..n).map(|c| f32::from(matches!(col(c), 3 | 4))).collect();
+        let gap: Vec<f32> = (0..n).map(|c| f32::from(matches!(col(c), 3..=5))).collect();
+        // The plates moved a column apart: every source is one column west (east of the
+        // gap: east), which a held gap cell does not follow.
+        let mut src: Vec<[f64; 2]> = (0..n)
+            .map(|c| {
+                let i = col(c) as f64;
+                [if col(c) < 4 { i + 1.0 } else { i - 1.0 }, (c / w) as f64]
+            })
+            .collect();
+        hold_gaps(w, &mut src, Some(&prev_gap));
+        assert_eq!(src[3], [3.0, 0.0]);
+        assert_eq!(src[w + 4], [4.0, 1.0]);
+        assert_eq!(src[6], [5.0, 0.0], "plate crust still moves");
+        let plate: Vec<f32> = (0..n).map(|c| if col(c) < 4 { 0.0 } else { 1.0 }).collect();
+        // The surface stood 30 m of sediment above the gap's floor; the floor sank 100 m.
+        let prev_elevation: Vec<f32> = (0..n)
+            .map(|c| match col(c) {
+                3 | 4 => -2970.0,
+                _ => -4000.0,
+            })
+            .collect();
+        let prev_offset: Vec<f32> = (0..n)
+            .map(|c| if matches!(col(c), 3 | 4) { 30.0 } else { 0.0 })
+            .collect();
+        let plate_elevation: Vec<f32> = (0..n)
+            .map(|c| match col(c) {
+                3 | 4 => -3100.0,
+                5 => -2600.0,
+                _ => -4000.0,
+            })
+            .collect();
+        let uplift = vec![0.0f32; n];
+        let (z, foreign) = carried_elevation(&Carry {
+            w,
+            h,
+            src: &src,
+            prev_elevation: &prev_elevation,
+            prev_plate: Some(&plate),
+            prev_group: Some(&plate),
+            plate: &plate,
+            group: Some(&plate),
+            plate_elevation: &plate_elevation,
+            uplift_mm_yr: &uplift,
+            gap: Some(&gap),
+            prev_gap: Some(&prev_gap),
+            prev_offset: Some(&prev_offset),
+            parents: &[None, None],
+            known_plates: 2,
+            dt_yr: 2.0e6,
+            blur_ref_yr: 2.0e6,
+        });
+        assert_eq!(z[3], -3070.0, "the deepened floor and the 30 m on it");
+        assert_eq!(z[w + 4], -3070.0);
+        assert_eq!(z[5], -2600.0, "a cell entering the gap is bare new floor");
+        assert_eq!(z[0], -4000.0);
+        assert_eq!(foreign, 0, "gap floor is not another plate's crust");
+        // Ages: the gap's floor is 1 Myr old, the plates' 50 Myr.
+        let age: Vec<f32> = (0..n)
+            .map(|c| if gap[c] > 0.5 { 1.0 } else { 50.0 })
+            .collect();
+        let fresh = newborn(&age, 2.0, Some(&gap), Some(&prev_gap));
+        assert!(fresh[5] && fresh[w + 5], "entering a gap");
+        assert!(
+            !fresh[3] && !fresh[4],
+            "already in the gap: what lies on it stays"
+        );
+        assert!(!fresh[0] && !fresh[7]);
     }
 }

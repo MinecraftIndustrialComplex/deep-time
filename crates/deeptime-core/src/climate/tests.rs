@@ -632,7 +632,7 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
         assert!(ice_max[c] >= ice[c] - 1e-3 && ice[c] >= 0.0 && ice[c] <= 4000.0);
         assert!((0.0..=1.0).contains(&share[c]) && (0.0..=1.0).contains(&sea_ice[c]));
     }
-    // The sea level the surface used is the climate's: the curve plus the ice's glacio-eustasy.
+    // The sea level the surface used is the climate's: the water, less the ice, over the ground.
     let sea = world.globals[SEA_LEVEL_GLOBAL];
     assert_eq!(world.surface.as_ref().unwrap().sea_level_m, sea);
     let t = &world.fields[field::T_MEAN].data;
@@ -705,7 +705,13 @@ fn the_climate_runs_in_the_coupled_pipeline_and_resumes() {
         (w / d - 1.0).abs() < 0.2,
         "degassing {d:e}, weathering {w:e}"
     );
-    assert!((last[col("sea_level_m")].as_f64().unwrap() - sea).abs() < 0.01);
+    // The note's series keeps four significant figures (the notes' `round`): half a unit of the
+    // fourth is at most 5·10⁻⁴ of the value (0.07 m at the −143 m this planet ends at).
+    let noted = last[col("sea_level_m")].as_f64().unwrap();
+    assert!(
+        (noted - sea).abs() <= 5e-4 * sea.abs().max(1.0),
+        "{noted} vs {sea}"
+    );
     // Every step's land runoff and weathering kernel (snapshots and the steps carried between
     // them) stay physical: the mean under the wettest place's rain, the kernel within a hundred
     // times Earth's (2026-10-18: a conveyor sinking in one coarse cell took them to 3,710 m/yr and

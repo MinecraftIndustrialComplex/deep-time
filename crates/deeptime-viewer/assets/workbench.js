@@ -337,7 +337,10 @@
     }
     addEvents(list, quiet) {
       for (const e of list) {
-        if (this.byId.has(e.id)) continue;
+        // An event sent again was amended after it streamed (the volcano stage counts a small
+        // arc segment on its subduction onset at the end): the copy the page holds takes it.
+        const held = this.byId.get(e.id);
+        if (held) { Object.assign(held, e); continue; }
         this.events.push(e);
         this.byId.set(e.id, e);
         for (const c of e.causes || []) {

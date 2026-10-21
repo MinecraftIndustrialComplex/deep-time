@@ -254,20 +254,22 @@ class AdvancedSettingsTest {
         assertFalse(m.fieldValid(size), "below the shortest body (8 km)");
         assertTrue(m.effectivePresetJson().contains("\"pluton_length_km\":[25.0,8.0,80.0]"), "an invalid value is not used");
 
-        EditorFields.Field swing = EditorFields.byId("sea_level_swing");
-        assertEquals("80", m.fieldText(swing), "the first sea-level cycle");
-        m.setFieldText(swing, "120");
+        EditorFields.Field arc = EditorFields.byId("arc_height_high");
+        assertEquals("2", m.fieldText(arc), "the second element of [0.6, 2]");
+        m.setFieldText(arc, "3");
         String json = m.effectivePresetJson();
-        assertTrue(json.contains("\"cycles\":[{\"amplitude_m\":120.0,\"period_myr\":250.0,\"phase_deg\":0.0},{\"amplitude_m\":25.0,"), json);
+        assertTrue(json.contains("\"arc_height_km\":[0.6,3.0]"), json);
 
         // A preset without the element leaves the field unavailable, and an edit is ignored.
         JsonObject bare = Presets.parseObject(pipelineText("pipeline_quick_16k"));
-        bare.getAsJsonObject("surface").getAsJsonObject("sea_level").add("cycles", new com.google.gson.JsonArray());
+        com.google.gson.JsonArray one = new com.google.gson.JsonArray();
+        one.add(0.6);
+        bare.getAsJsonObject("volcanoes").add("arc_height_km", one);
         EditorModel n = model();
         assertTrue(n.importShareCode(ShareCode.encode(bare.toString())).isEmpty());
-        assertFalse(n.available(swing));
-        n.setFieldText(swing, "120");
-        assertFalse(n.effectivePresetJson().contains("\"amplitude_m\":120"), "no element, no edit");
+        assertFalse(n.available(arc));
+        n.setFieldText(arc, "3");
+        assertFalse(n.effectivePresetJson().contains("\"arc_height_km\":[0.6,3"), "no element, no edit");
     }
 
     /** Integers are written as JSON integers (the core reads u32), the other numbers as doubles. */
@@ -386,7 +388,6 @@ class AdvancedSettingsTest {
             assertEquals("5e-9", m.fieldText(EditorFields.byId("erosion_strength")));
             assertEquals("-3000", m.fieldText(EditorFields.byId("ridge_depth")));
             assertEquals("40", m.fieldText(EditorFields.byId("pluton_size")));
-            assertEquals("120", m.fieldText(EditorFields.byId("sea_level_swing")));
             assertEquals("2.5", m.fieldText(EditorFields.byId("deposit_size")));
             assertEquals("1.5", m.fieldText(EditorFields.byId("deposit_richness")));
             assertEquals("2", m.fieldText(EditorFields.byId("feature_deposits")));

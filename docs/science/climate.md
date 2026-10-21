@@ -14,13 +14,15 @@ The constants of the per-cell design were checked against their sources before t
 | [CLM](ledger/CLM.md) | insolation and orbit | CLM-027 to CLM-044 (18) |
 | [CLM](ledger/CLM.md) | carbon cycle (CLM-069 to CLM-073 are the CO₂ forcing's old law and its anchors; the law is CLM-167) | CLM-045 to CLM-080, CLM-167, CLM-168, CLM-170 (39) |
 | [CLM](ledger/CLM.md) | deep-time clock | CLM-081 to CLM-091, CLM-136, CLM-137, CLM-166, CLM-179 (15) |
-| [CLM](ledger/CLM.md) | land ice and sea ice | CLM-092 to CLM-112, CLM-135 (22) |
+| [CLM](ledger/CLM.md) | land ice and sea ice (CLM-107 and CLM-108 retired 2026-10-21; CLM-210, the ice's water out of the sea, on [sea-level.md](sea-level.md)) | CLM-092 to CLM-106, CLM-109 to CLM-112, CLM-135, CLM-210 (21) |
 | [CLM](ledger/CLM.md) | mountain glaciers | CLM-113 to CLM-118 (6) |
 | [CLM](ledger/CLM.md) | moisture budget (built behind `rain_model = budget`, not the default) | CLM-139 to CLM-146 (8) |
 | [CLM](ledger/CLM.md) | the belts' rain amount (`belts_rain_scale`); the upwind rain is on [upwind-rain.md](upwind-rain.md) | CLM-201 (1) |
 | [CLM](ledger/CLM.md) | ice branch: the flowing-sheet switch, present-day climate, supply-limited and seafloor weathering (merged 2026-10-02) | CLM-147 to CLM-162 (16) |
 | [CLM](ledger/CLM.md) | the present-day climate since 2026-10-18: the target counts ice sheets (CLM-203) and the temperate present's cap on its CO₂ factor (CLM-206, 2026-10-19) | CLM-203, CLM-206 (2) |
-| [CLM](ledger/CLM.md) | Earth's plateau summers against the model's: the mass-elevation effect the code lacks (an Earth reference, not coded; plates.md "White patches, drowned continents and coastal high ground", 2026-10-21) | CLM-220 (1) |
+| [CLM](ledger/CLM.md) | Earth's plateau summers against the model's: the Earth reference that asked for the mass-elevation effect (plates.md "White patches, drowned continents and coastal high ground", 2026-10-21) | CLM-220 (1) |
+| [CLM](ledger/CLM.md) | the plateau's warmth (the mass-elevation effect, coded 2026-10-21; its own page: [mass-elevation-effect.md](mass-elevation-effect.md)) | CLM-225 to CLM-231 (7) |
+| [MOI](ledger/MOI.md) | what the land's monthly sea-level temperatures hold since the plateau's warmth | MOI-085 (1) |
 | [GLA](ledger/GLA.md) | the flowing ice sheet (`climate/sheet.rs`, off by default) and the ice mass balance for the hydrology; on the glacial page | GLA-067 to GLA-076 (10) |
 | [MOI](ledger/MOI.md) | wind and rain belts | MOI-001 to MOI-033 (33) |
 | [MOI](ledger/MOI.md) | orographic rain | MOI-034 to MOI-050 (17) |
@@ -391,6 +393,14 @@ seed 1, built from 025676c8, 2026-10-19) found two things:
   Tibet's July about 11 °C (CLM-220). The term would cut the plateau ice, not remove it, while the
   plateaus' extent stays four to seven times Earth's. Recommended as its own climate task.
 
+  **Built 2026-10-21** (the plateau-warmth task; [mass-elevation-effect.md](mass-elevation-effect.md),
+  CLM-225 to CLM-231): land's month temperature at sea level gains k·Ẑ, Ẑ the height of the broad,
+  bare high ground around the cell (150 km footprint, ice and sea at 0) and k = 2.43·10⁻³ K/m ×
+  (the month's relative sunlight − 0.792), fitted to twelve plateau stations against the
+  reanalysis's free air (rms 1.28 K). On Earth's relief Tibet's July rises from −3.5 to 6.0 °C and
+  its ice cap goes; the global mean rises from 14.41 to 14.56 °C and the kernel (CLM-061) to
+  5.147·10⁷. The plateaus stay too cold, now mostly from the 6.5 K/km lapse rate (CLM-231).
+
 The present's report in the climate note now carries:
 - `co2_factor_max` (temperate only);
 - `trial_rows`: every trial's factor, land under sheets, land under ice, sea ice and global
@@ -408,6 +418,15 @@ sheets. Master's later arc change to that planet (d54c7f0f, PLT-043) was not mea
 MIC GameTest's `climateConsistent` failure on master ("C 0.621 < 0.630 (132 columns)") is
 therefore not a climate fault. It is the census's sampling noise, and the floors now allow for
 it (biomes.md, "The floors against the census's noise").
+
+## Sea level from the ocean's water (2026-10-21)
+
+The climate stage still sets each step's sea level, but no longer from a curve: it fills the ground
+the surface starts the step from with the planet's water (`planet.surface_water_m`, Earth's 2,664 m
+as a layer over the planet, ISO-085), less the water the land ice holds, (ρ_i/ρ_w) of its volume
+(CLM-210), and adds the steering nudge (STE-006). The glacio-eustasy weight and the reference ice
+(`glacio_eustasy`, `ice_reference_km3`, CLM-107 and CLM-108) are gone with the curve; the ice's
+water always counts. [sea-level.md](sea-level.md) has the rule, its solve and the measurements.
 
 ## Material for the stage 2 writer
 

@@ -12,7 +12,9 @@
 //! carbon, the EBM and the ice every 200 kyr inside each plate step, so snowball Earths can start
 //! and end on their own (events `deeptime:snowball`, `deeptime:hothouse`); the last 3 Myr run
 //! Milankovitch forcing (`orbit.rs`) with lagged ice sheets; the land ice has a thickness and a
-//! volume that lowers the sea (`ice.rs`), which the surface stage takes as its sea level.
+//! volume (`ice.rs`) whose water the sea lacks: the sea stands where the planet's water, less the
+//! ice's, fills the open sea of the ground (`sea_level.rs`), which the surface stage takes as its
+//! sea level.
 //!
 //! # In the pipeline
 //! The stage is interleaved with the plates like the surface (`Stage::coupled_to`) and sits
@@ -23,7 +25,8 @@
 //! "The climate's ice fields" (`climate/ice_thickness_m`, `ice_max_thickness_m`,
 //! `ice_max_extent`, `ice_time_share`, `sea_ice`), on the topography the surface step is about to
 //! erode: the plate model's elevation after this plate step plus the surface's offset carried with
-//! the plates exactly as the surface carries it. The step's eustatic sea level goes to
+//! the plates exactly as the surface carries it. The step's sea level, the planet's water less its
+//! land ice over that ground (`sea_level.rs`), goes to
 //! `WorldState::globals["climate/sea_level_m"]` (`SEA_LEVEL_GLOBAL`), which the surface uses.
 //!
 //! **Snapshots** (plan §8.3: every 10 Myr, plus the present; 20 Myr in the pipeline presets since
@@ -99,9 +102,16 @@ pub const STAGE_NAME: &str = "climate";
 /// `WorldState::globals`: the surface stage deposits it (after a snowball: the cap carbonate).
 pub const CAP_CARBONATE_GLOBAL: &str = "climate/cap_carbonate_m";
 
-/// The step's eustatic sea level (the surface section's curve plus glacio-eustasy), m, in
-/// `WorldState::globals`: the surface stage takes it instead of its curve.
+/// The step's eustatic sea level, m, in `WorldState::globals`: where the planet's water, less its
+/// land ice, fills the ground the step starts from (`crate::sea_level`), plus any steering
+/// nudge. The surface stage and the next plate step take it; without the climate stage the
+/// surface fills the ground itself.
 pub const SEA_LEVEL_GLOBAL: &str = "climate/sea_level_m";
+
+/// The water the step's land ice holds beyond the planet's (`planet.surface_water_m`), m as a
+/// layer over the planet, in `WorldState::globals`: 0, or the shortfall of a planet whose ice
+/// would need more water than it has (the sea is then empty and the ice is kept whole).
+pub const ICE_WATER_SHORT_GLOBAL: &str = "climate/ice_water_short_m";
 
 /// Fields the stage writes every step.
 pub mod field {
@@ -129,7 +139,8 @@ pub mod field {
     /// the published ELA is this plus its band's shift since.
     pub const ELA_ALL: &str = "climate/anomaly/ela_m";
 
-    /// Month `m`'s (0–11) sea-level temperature, °C (the lapse rate not applied), written at the
+    /// Month `m`'s (0–11) sea-level temperature, °C (the lapse rate not applied; on land the
+    /// ground's temperature brought to sea level, the plateau's warmth included), written at the
     /// last step only (the bake stores it, P1-25). Month 0 starts at solar longitude 280°
     /// (`insolation::YEAR_START_RAD`, about 1 January on Earth).
     pub fn t_sl_month(m: usize) -> String {
@@ -401,6 +412,9 @@ pub struct ClimateStage {
     s: Saved,
     timings: BTreeMap<&'static str, f64>,
     cells: CellsAccel,
+    /// The run's log has said that the ice holds more water than the planet (not saved: a
+    /// resumed run says it again).
+    warned_ice_short: bool,
 }
 
 /// Where the snapshots' cells loop runs (`gpu.rs`; `docs/design/gpu-compute.md`): the device is
@@ -972,6 +986,7 @@ impl ClimateStage {
             s: Saved::default(),
             timings: BTreeMap::new(),
             cells: CellsAccel::default(),
+            warned_ice_short: false,
         }
     }
 
@@ -984,12 +999,23 @@ impl ClimateStage {
         self.preset.steering.filter(|s| s.enabled)
     }
 
-    /// The surface section's sea-level curve at `t_myr`.
-    fn curve_sea_level(&self, t_myr: f64) -> f64 {
-        self.preset
-            .surface
-            .as_ref()
-            .map_or(0.0, |s| s.sea_level.at(t_myr))
+    /// The sea level the planet's water (`planet.surface_water_m`), less `ice_km3` of land ice
+    /// (Earth-normalized), gives on the ground `h` (`sea_level.rs`), and the water the ice holds
+    /// beyond the planet's, m as a layer (0 unless the ice holds more than there is: the sea is
+    /// then empty, and the climate's ice is not cut back to the water; [`ICE_WATER_SHORT_GLOBAL`]).
+    fn sea_from_water(&self, geo: &Geometry, h: &[f64], ice_km3: f64) -> (f64, f64) {
+        let d = Dims::new(geo.w, geo.h, 1.0, true);
+        let planet_km2 = geo.area.iter().sum::<f64>() * geo.w as f64;
+        let layer =
+            self.preset.planet.surface_water_m - crate::sea_level::ice_layer_m(ice_km3, planet_km2);
+        let flood = self.preset.surface.as_ref().map_or_else(
+            || crate::surface::params::Numerics::default().flood,
+            |s| s.numerics.flood,
+        );
+        let n = geo.w * geo.h;
+        // The open sea's minimum size, the surface's rule (ledger: ISO-086, ERO-055).
+        let sea = crate::sea_level::fill_level(&d, h, &geo.area, layer, (n / 500).max(1), flood);
+        (sea, (-layer).max(0.0))
     }
 
     fn earth_scale(&self) -> f64 {
@@ -1163,10 +1189,20 @@ impl ClimateStage {
         // Where the crust went this plate step, and the ground the surface will erode.
         let started = Instant::now();
         let pid = need("plates/plate_id")?;
-        let src =
-            self.s.omega.as_ref().map(|prev| {
-                advect::sources(&grid, pid, &omega_for(prev, &parents), dt_myr * 1.0e6)
-            });
+        let src = self.s.omega.as_ref().map(|prev| {
+            let mut src = advect::sources(&grid, pid, &omega_for(prev, &parents), dt_myr * 1.0e6);
+            // The floor in a gap between plates stays where it is (ledger: PLT-354).
+            advect::hold_gaps(
+                w,
+                &mut src,
+                world
+                    .fields
+                    .get(crate::surface::field::CRUST_GAP)
+                    .filter(|f| f.data.len() == n)
+                    .map(|f| f.data.as_slice()),
+            );
+            src
+        });
         // The surface's carry blur, kept per Myr at its reference step (`advect::blur_owed`).
         let blur_ref = self.preset.surface.as_ref().map_or_else(
             || crate::surface::params::Numerics::default().carry_blur_ref_myr,
@@ -1201,6 +1237,9 @@ impl ClimateStage {
                 group: ids("plates/group_id"),
                 plate_elevation: need("plates/elevation_m")?,
                 uplift_mm_yr: need("plates/uplift_mm_yr")?,
+                gap: ids(crate::plates::l1::GAP_FIELD),
+                prev_gap: ids(crate::surface::field::CRUST_GAP),
+                prev_offset: Some(&st.offset_m),
                 parents: &parents,
                 known_plates: prev.len(),
                 dt_yr: dt_myr * 1.0e6,
@@ -1230,10 +1269,10 @@ impl ClimateStage {
         let mut ela_all = carry(world, field::ELA_ALL);
         let ice_prev = carry(world, field::ICE_THICKNESS);
         let ice_max_prev = carry(world, field::ICE_MAX_THICKNESS);
-        let sea_prev = self
-            .s
-            .sea_level_m
-            .unwrap_or_else(|| self.curve_sea_level(t0 / 1.0e6));
+        let sea_prev = self.s.sea_level_m.unwrap_or_else(|| {
+            let ice = ice_prev.as_ref().map_or(0.0, |v| geo.volume_km3(v));
+            self.sea_from_water(&geo, &h, ice).0
+        });
         self.time("topography", started);
 
         let k = self.s.done + 1;
@@ -1731,16 +1770,31 @@ impl ClimateStage {
                 .collect();
             ice::thickness(w, hgt, &mask_pre, &geo.sx, &geo.sy, tau, cap, grav)
         };
-        let curve = self.curve_sea_level(t_end_myr);
-        let ocean_km2 = geo.area_where(&|c| h[c] <= curve);
+        // The planet's water less what the step's land ice holds, over the ground the surface
+        // starts from (`sea_level.rs`).
         let v_pre = geo.volume_km3(&ice_end_pre);
-        let mut sea =
-            curve + p.glacio_eustasy * ice::eustatic_m(v_pre - p.ice_reference_km3, ocean_km2);
+        let (mut sea, short_m) = self.sea_from_water(&geo, &h, v_pre);
         if self.steering().is_some() && self.s.steer.sea_m != 0.0 {
             // The nudge on the ocean's water volume (`steering`), as the sea level it moves.
             sea += self.s.steer.sea_m;
         }
         world.globals.insert(SEA_LEVEL_GLOBAL.into(), sea);
+        // Ice that holds more water than the planet has (a snowball on a dry planet): the sea is
+        // empty and the ice is not cut back to the water. Said in the globals every step and in
+        // the run's log the first time.
+        world.globals.insert(ICE_WATER_SHORT_GLOBAL.into(), short_m);
+        if short_m > 0.0 && !self.warned_ice_short {
+            self.warned_ice_short = true;
+            ctx.log.push(
+                crate::log::Level::Warn,
+                format!(
+                    "climate: the land ice holds {short_m:.0} m more water than the planet's \
+                     {:.0} m (planet.surface_water_m): the sea is empty and the ice is kept \
+                     whole ({ICE_WATER_SHORT_GLOBAL})",
+                    self.preset.planet.surface_water_m
+                ),
+            );
+        }
         let land = land_at(sea);
         // The weathering's drawdown beyond the degassing precipitates as carbonate (after a
         // snowball: the cap carbonate), spread evenly over the sea floor above the compensation

@@ -1106,6 +1106,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) not stated; the 4.2 / 5.0 / 5.5 km depths are quoted without a source. (PLT) not stated; formulas appear in a test comment.
 - Read in this pass: (ERO, ISO, HYP) abstract fetched in part (first sentence only). (PLT) metadata only (Crossref, OpenAlex, Semantic Scholar). Equations not read.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, authors, volume 359, issue 6391, pages 123-129. The model name GDH1 is not in the part of the abstract that was reachable. (PLT) citation correct (authors Carol A. Stein and Seth Stein). The depth equations in the test comment could not be confirmed against the paper.
+- Read 2026-10-21 (sea level from the ocean's volume; ledger PLT-351, PLT-352): the paper still not read (paywalled). A research sub-agent read Stein 1995 (below) for the ridge depth 2,600 m and the heat-flow law's decay 0.0278; the depth law's 365, 5,651, 2,473 and its 20-Myr knee were found only on a secondary page that cites the paper (github.com/Elkhan-Isayev/pangaea-drift).
 
 ### ParsonsSclater1977
 - Reference: Parsons, B. and Sclater, J. G. (1977). An analysis of the variation of ocean floor bathymetry and heat flow with age. Journal of Geophysical Research 82(5):803-827.
@@ -1119,6 +1120,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) no record. (PLT) not stated.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) not fetched itself; its formulas were read as reproduced in King & Adam 2014 (a secondary open copy) and Wikipedia "Seafloor spreading".
 - Reference check: (ERO, ISO, HYP) Crossref matches the title, volume 82, issue 5, pages 803-827. The sources file gives no year-title pair; the 1977 paper is the correct identification. (PLT) now identifiable. Identification only; the "2.5 km" is the intercept of the square-root law (see Part 2).
+- Read 2026-10-21 (ledger PLT-352, as the cross-check): the scanned first page at https://topex.ucsd.edu/geodynamics/parsons_sclater77.pdf, by OCR: "Between 0 and 70 m.y. B.P. the depth can be represented by the relation d(t) = 2500 + 350 t^1/2 m ... and for regions older than 20 m.y. B.P. by the relation d(t) = 6400 - 3200 exp(-t/62.8) m" (OCR gave 6400 as "6L00"; Wikipedia's secondary copy resolves it).
 
 ### Cogley1984
 - Reference: Cogley, J. G. (1984). Continental margins and the extent and number of the continents. Reviews of Geophysics 22(2):101-122.
@@ -1169,6 +1171,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) no record. (PLT) not stated.
 - Read in this pass: (ERO, ISO, HYP) full text fetched (text of the 3-page article including Tables 1 and 2). (PLT) metadata only (OpenAlex abstract is only a copyright line).
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 23, issue 2, pages 112-114. The article says: "For this effort, we relied on the SRTM30PLUS V5 bathymetry database (Becker et al., 2009)", so the project's "on SRTM30_PLUS" is right. (PLT) correct. Numbers not read.
+- Read 2026-10-21 (ledger ISO-085, CLM-106): the PDF, Table 2: "Mean or Total 3682.22 m, 361.841 (10^6 km2), 1.33238 (10^9 km3)", 1-sigma 1.2 % on depth and volume, 0.14 % on area.
 
 ### Tzathas2024
 - Reference: Tzathas, P., Gailleton, B., Steer, P. and Cordonnier, G. (2024). Physically-based analytical erosion for fast terrain generation. Computer Graphics Forum 43(2) (Eurographics 2024).
@@ -3710,7 +3713,8 @@ Vanilla's OverworldBiomeBuilder, Terralith, Tectonic (game and mod data), rustff
 - Reference: Mallard, C., Coltice, N., Seton, M., Mueller, R. D., Tackley, P. J., 2016. Subduction controls the distribution and fragmentation of Earth's tectonic plates. Nature 535(7610): 140-143. Published 14 June 2016.
 - DOI or URL: (SCL, PRV, POL, BAK) 10.1038/nature17992 ; https://www.nature.com/articles/nature17992 ; PubMed 27309815 ; submitted version on HAL hal-01355818 (page blocked for the tool by an Anubis challenge) (PLT) 10.1038/nature17992.
 - Cited as: (SCL, PRV, POL, BAK) "Mallard et al. 2016" (plan §8.1), "Mallard et al. 2016, Nature 535:140-143" (plate-collisions doc) (PLT) "Mallard et al. 2016, Nature 535:140-143".
-- Ledger ids: PLT-145, SCL-030
+- Ledger ids: PLT-145, SCL-030, PLT-372 (2026-10-21)
+- Read in the plate-geometry task (2026-10-21): full text (the Caltech course copy, now in the library as `Mallard2016/nature17992-Mallard.pdf`, `mallard.txt`). Abstract: "seven large plates of similar sizes and a population of smaller plates whose areas follow a fractal distribution"; "subduction geometry drives the tectonic fragmentation that generates plates. The spacing between the slabs controls the layout of large plates, and the stresses caused by the bending of trenches break plates into smaller fragments". Main text: "an interlocking mosaic of 52 tectonic plates", "a group of seven large plates of similar area covering up to 94% of the planet". PLT-372.
 - Access: paywalled (abstract only); HAL submitted version exists but was not reachable; the research note links a Caltech course copy (https://web.gps.caltech.edu/~jstock/161/PapersToRead/nature17992-Mallard.pdf, certificate error from this tool) [other sections: paywalled in Nature (a Caltech-hosted copy was used by the research note; not located here).]
 - Library (the project's source library, not distributed): only the landing page was saved (abstract or a page shell; no full text). From: https://www.nature.com/articles/nature17992. File: Mallard2016.txt.
 - Read so far (by the project): (SCL, PRV, POL, BAK) not stated (PLT) research note Q2 says the PDF was read from web.gps.caltech.edu.
@@ -3895,11 +3899,11 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Stern, R. J. (2004). Subduction initiation: spontaneous and induced. Earth and Planetary Science Letters 226(3-4):275-292.
 - DOI or URL: 10.1016/S0012-821X(04)00498-4 (OpenAlex lists 10.1016/j.epsl.2004.08.007).
 - Cited as: "Stern 2004, EPSL 226:275".
-- Ledger ids: PLT-062, PLT-067, PLT-207
-- Access: paywalled (no abstract available in OpenAlex).
-- Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
-- Substitute: none found.
-- Read so far (by the project): not stated.
+- Ledger ids: PLT-062, PLT-067, PLT-207, PLT-056 and PLT-371 (2026-10-21: polarity reversal against transference)
+- Access: paywalled (no abstract available in OpenAlex); an author copy is open (2026-10-21).
+- Library (the project's source library, not distributed): fetched 2026-10-21 (author copy and the author's encyclopedia chapter "Subduction initiation"). Files: `Stern2004/SternEPSL04.pdf`, `SternEPSL04.txt`, `SubInitEoG221.pdf`.
+- Substitute: none needed.
+- Read so far (by the project): full text, 2026-10-21 (the plate-geometry task). Abstract: induced nucleation (INSZ) has "Two subclasses ... transference and polarity reversal"; "Transference INSZ moves the new subduction zone outboard of the failed one"; polarity reversal "also follows collision, but continued convergence in this case results in a new subduction zone forming behind the magmatic arc; the response of the Solomon convergent margin following collision with the Ontong Java Plateau is the best example". p. 279: "Like transference, polarity reversal is triggered by buoyant crust entering the trench, but differs from transference, in that the new subduction zone nucleates in the originally overriding plate"; the back-arc lithosphere "should be relatively thin and weak. Consequently, polarity reversal INSZ should require less compression than transference INSZ", "supported by the fact that subduction on the south side of the Solomons began almost immediately upon arrival of" the plateau; of India: "It takes less work to deform large parts of continental Asia than it does to start a new subduction zone in the Indian Plate". The OJP crust "averaging 36 km thick", against "the ~20 km expected to result in subduction zone failure". PLT-056, PLT-371.
 - Read in this pass: metadata only.
 - Reference check: correct.
 
@@ -3980,7 +3984,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Bird, P. (2003). An updated digital model of plate boundaries. Geochemistry, Geophysics, Geosystems 4(3):1027.
 - DOI or URL: (PLT) 10.1029/2001GC000252 (open access at AGU/Wiley; blocked to WebFetch with 403). (CLM) 10.1029/2001GC000252
 - Cited as: (PLT) "Bird 2003, G3 4(3):1027" (52 plates; Pacific 103.3 million km2; seven largest about 92 percent); editor hint "Earth: about 14". (CLM) "Bird 2003" (no title or journal in the code; I assigned this paper because the claim concerns subduction-zone length and rate)
-- Ledger ids: CLM-054, PLT-143, PLT-145, PLT-203, PLT-311, PLT-330 (2026-10-20: the transform test the arcs' fronts take)
+- Ledger ids: CLM-054, PLT-143, PLT-145, PLT-203, PLT-311, PLT-330 (2026-10-20: the transform test the arcs' fronts take), PLT-372 (2026-10-21: Table 1, the plate count by area)
 - Access: open access (G3 is open), not fetched as full text here. [other sections: paywalled (Unpaywall closed)]
 - Library (the project's source library, not distributed): fetched in WP-13a (full text PDF, author's site). From: http://peterbird.name/publications/2003_PB2002/2001GC000252.pdf. Text file: Bird2003.txt.
 - Read so far (by the project): (PLT) "confirmed from abstract or secondary pages"; areas from Wikipedia. (CLM) not stated; no title or journal given
@@ -3988,16 +3992,17 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference check: (PLT) correct. The abstract gives "14 large plates ... plus 38 small plates ... for a total of 52 plates". The area numbers and "seven largest 92 percent" are not in the abstract. (CLM) IDENTIFICATION UNCERTAIN. Bird 2003 is the PB2002 plate-boundary model; a total subduction length of 51,000 km at 62 mm/yr is plausible from it but I could not confirm it is in that paper.
 - Read in WP-13a (2026-10-02): Table 1 (areas in steradians): Pacific 2.57685 sr, 20.5 % of the sphere; seven plates above 5 %, together 81 % (not 92 %); Table 3 re-read: subduction 51,310 of 260,487 km (19.7 %). PLT-143, PLT-145, PLT-213, CHK-001, CHK-003.
 - Read in the land-shape task (2026-10-20): the PDF fetched again from the author's site into the source library (`Bird2003/`, the VM's library had lost it in the 2026-10-16 rebuild), text extracted; paragraphs [126] and [127]: a subduction zone is a step "with a convergent (component of) velocity and a Benioff zone ... and/or a parallel volcanic arc with Quaternary activity"; other steps are "strike-slip if the computed relative velocity ... has an azimuth within ±20 of the azimuth of the plate boundary step". PLT-311.
+- Read in the plate-geometry task (2026-10-21): Table 1's 52 areas in steradians copied into `tools/review/plate-geometry.py` (BIRD_SR); the counts above 1, 0.3, 0.1, 0.0377 and 0.01 sr are 7, 10, 14, 19 and 31. PLT-372.
 
 ### Morra2013
 - Reference: Morra, G., Seton, M., Quevedo, L., Müller, R. D. (2013). Organization of the tectonic plates in the last 200 Myr. Earth and Planetary Science Letters 373:93-101.
 - DOI or URL: 10.1016/j.epsl.2013.04.020.
 - Cited as: "Morra et al. 2013, EPSL 373:93-101".
-- Ledger ids: PLT-145
-- Access: paywalled.
-- Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
-- Substitute: none found.
-- Read so far (by the project): abstract or secondary.
+- Ledger ids: PLT-145, PLT-372 (2026-10-21)
+- Access: paywalled; an author copy is open (2026-10-21).
+- Library (the project's source library, not distributed): fetched 2026-10-21 (author copy). Files: `Morra2013/Morra_etal_Plates200Ma_EPSL_2013.pdf`, `morra.txt`.
+- Substitute: none needed.
+- Read so far (by the project): full text, 2026-10-21 (the plate-geometry task). Abstract: plate sizes follow "either one (Sornette and Pisarenko, 2003) or two (Bird, 2003) statistically distinct groups"; "two distributions indicate distinct evolutionary laws for large and small plates, the first tied to mantle flow, the second determined by a hierarchical fragmentation process"; over the last 200 Myr "(i) large and small plates display distinct statistical distributions, (ii) the small plates display little organisational change since 60 Ma and (iii) the large plates oscillate between heterogeneous (200–170 Myr and 65–50 Ma) and homogeneous (120–100 Ma) plate tessellations on a timescale of about 100 Myr". Fig. 2 caption: below log(Size) about 7.5 (km²) "the small plates follow a power-law with an exponent α∼3–5", "the largest 6–7 plates follow a steeper slope". PLT-372.
 - Read in this pass: metadata only.
 - Reference check: correct.
 
@@ -4423,12 +4428,14 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read in this pass: abstract fetched (Crossref, full).
 - Reference check: n/a.
 - Read in WP-13a (2026-10-02): the grid, area-weighted by cos(latitude) over the 58 % of the sphere it covers (computed): median 55.4 Myr, mean 64.1, 90th percentile 133, 99th 173, oldest 339 Myr; 0.61 % older than 180 Myr and 0.06 % older than 250. Ledger: PLT-161, PLT-201, CHK-019, CHK-032 to CHK-034. The paper itself was not read.
+- Read 2026-10-21: the abstract on EarthByte's page: "We find the mean age of oceanic crust is 64.2 Myrs, slightly older than previous estimates".
 
 ### SyracuseAbers2006
 - Reference: Syracuse, E. M., Abers, G. A. (2006). Global compilation of variations in slab depth beneath arc volcanoes and implications. Geochemistry, Geophysics, Geosystems 7(5):Q05017.
 - DOI or URL: 10.1029/2005GC001045.
 - Cited as: not cited; candidate source for arc-slab depth (flag 10; PLT-042).
-- Ledger ids: (supports 042, 061, 164); notes: supports 042, 061, 164
+- Ledger ids: (supports 042, 061, 164); notes: supports 042, 061, 164; PLT-042 (2026-10-21 note)
+- Read in the plate-geometry task (2026-10-21): abstract (OpenAlex; in the library as `Syracuse2006/abstract_openalex.txt`): "33,000 km of the global arc system at 839 volcanic centers"; the depth to the slab's top under the volcanoes, "averaged over 500-km-long arc segments, H ranges from 72 to 173 km with a global average of 105 km". A depth, not the arc's distance from the trench (PLT-042); the distance needs the slab's dip, which the abstract does not give per arc.
 - Access: open (G3).
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): not read.
@@ -4693,6 +4700,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read so far (by the project): not stated
 - Read in this pass: full text fetched (abstract and discussion passages on ice volume and sea-level potential)
 - Reference check: matches. It covers Antarctica only; Greenland comes from Morlighem2017.
+- Read 2026-10-21 (ledger ISO-085): Table 7, "Volume excluding ice shelves (10^6 km3) 25.34 [Bedmap1], 26.54 [Bedmap2]", 26.92 with the shelves; Table 8, "Total potential contribution 58.3" m.
 
 ### Morlighem2017
 - Reference: Morlighem, M., Williams, C. N., Rignot, E., An, L., Arndt, J. E., Bamber, J. L., et al. (2017). BedMachine v3: Complete bed topography and ocean bathymetry mapping of Greenland from multibeam echo sounding combined with mass conservation. Geophysical Research Letters 44(21): 11051-11061.
@@ -4704,6 +4712,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read so far (by the project): not stated
 - Read in this pass: full text fetched (key points, abstract, results text)
 - Reference check: matches. Page range 11051-11061 is from my memory of the article number format, not from Crossref (Crossref returned no page); treat as unverified.
+- Ledger ids since 2026-10-21: ISO-085 (Greenland's 2.99e6 km3, as read for CLM-108).
 
 ### Abbot2010
 - Reference: Abbot, D. S., & Pierrehumbert, R. T. (2010). Mudball: Surface dust and Snowball Earth deglaciation. Journal of Geophysical Research: Atmospheres 115(D3): D03104.
@@ -5120,9 +5129,10 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 ### Kalnay1996
 - Reference: Kalnay, E., et al. (1996). The NCEP/NCAR 40-year reanalysis project. Bulletin of the American Meteorological Society 77: 437-471. Data: NOAA PSL, NCEP/NCAR Reanalysis 1 monthly long-term means 1991-2020.
 - DOI or URL: 10.1175/1520-0477(1996)077<0437:TNYRP>2.0.CO;2; data https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/Monthlies/
-- Ledger ids: CLM-164, CLM-165
+- Ledger ids: CLM-164, CLM-165, CLM-229, CLM-231
 - Library: the data files (uwnd, vwnd, air at pressure levels and sigma 0.995) and the two scripts that read them, folder NCEP_R1_ltm/. The paper itself was not fetched. Public-domain US government data, used for validation only.
 - Read in WP-14a: computed zonal-mean winds and January inversions (see the rows).
+- Read 2026-10-21 (the plateau-warmth task): a sub-agent fetched the 1991-2020 long-term means of air temperature and geopotential height at pressure levels (https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis.derived/pressure/air.mon.ltm.nc.ascii and hgt.mon.ltm.nc.ascii; the files' climo_period "1991/01/01 - 2020/12/31") and interpolated the free air's temperature linearly in height to plateau stations' heights over lowland columns near Tibet, the Altiplano, the Rockies and Ethiopia (CLM-229, CLM-231); NCEP-DOE R2 monthly means agreed within 0.3 K. The files were not kept.
 
 ### Stull2017
 - Reference: Stull, R. (2017). Practical Meteorology: An Algebra-based Survey of Atmospheric Science, version 1.02b. University of British Columbia. Chapter 2.
@@ -5909,10 +5919,11 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Reference: Stern, R. J. and Scholl, D. W. (2010). Yin and yang of continental crust creation and destruction by plate tectonic processes. International Geology Review 52(1):1-31.
 - DOI or URL: 10.1080/00206810903332322; author copy https://personal.utdallas.edu/~rjstern/pdfs/YinyangIGR10.pdf
 - Cited as: "Stern & Scholl 2010".
-- Ledger ids: PLT-045 (since 2026-10-17 the value), PLT-046, PLT-285, PLT-286, HNT-125, HNT-126, PLT-331 (2026-10-20: what the intra-oceanic arc rate counts), PLT-258 (2026-10-03: "the bulk of the approximately 40 km-thick crust that must have originally existed is missing" at UHP terranes; continental crust lost at all collision zones "approximately 0.7 km3/year", Scholl & von Huene 2009 as cited)
+- Ledger ids: PLT-045 (since 2026-10-17 the value), PLT-046, PLT-285, PLT-286, HNT-125, HNT-126, PLT-331 (2026-10-20: what the intra-oceanic arc rate counts), PLT-258 (2026-10-03: "the bulk of the approximately 40 km-thick crust that must have originally existed is missing" at UHP terranes; continental crust lost at all collision zones "approximately 0.7 km3/year", Scholl & von Huene 2009 as cited), PLT-370 (2026-10-21: the arcs split by the crust they stand on; 14,500 and 27,500 km)
 - Access: paywalled at the publisher; author copy open.
 - Library (the project's source library, not distributed): fetched 2026-10-02 (author copy). Text file: `SternScholl2010/SternScholl2010.txt`.
 - Read so far (by the project): full text, 2026-10-02. Abstract: creation and destruction of continental crust "is either in balance (~3.2 km3/year, or 3.2 AU) or more crust is being destroyed than created"; p. 9: the Aleutian and Izu-Bonin-Mariana arcs, "which have evolved since 45-50 Ma", give "crustal growth estimates of 90-180 km3/km-million years"; growth is front-loaded (several hundred km3/km/Myr in the first few Myr, "a few tens or less" for mature arcs); about 2.7 AU of growth at convergent margins (Table 1). Read again 2026-10-17 (plate task 8; the copy at `SternScholl2010/SternScholl2010.txt`): p. 11, intra-oceanic arcs "approximately 100 km3/km-million years (500 km3/million years for first 10 million years plus 30 km3/million years for 60 million years thereafter). At this rate, crustal growth at the present 14,500 km of intra-oceanic arcs" gives 1.5 AU; p. 12, continental arcs after Haschke & Günther 2003: "The 35 km3/km-million years rate is essentially the rate of Reymer and Schubert (1984). It implies a reasonable intrusive : extrusive ratio of approximately 7:1 and is adopted as a useful long-term rate estimate for continental margin arc productivity. The combined length of continental margin arcs is approximately 27,500 km (Scholl and von Huene 2007). The corresponding global addition rate is thus approximately 1.0 AU"; Table 1 (p. 12): oceanic arcs 1.5, continental arcs 1.0, collision zones 0.2, rifts and hotspots 0.5 AU of additions; losses at sutures about 0.7 AU; p. 24, new arcs 300 to 500 km3/km/Myr, mature ones 30 to 35. Read again 2026-10-20 (the arc-basement task, PLT-331; the copy at `SternScholl2010/SternScholl2010.txt`): p. 7, of the geophysical arc growth rates, "The largest sources of error are as follows: (1) uncertainty about whether to include an original 6–7 km thickness of ‘trapped’ oceanic crust"; "early concepts assumed that new arcs grew on a substrate of pre-existing oceanic crust that was trapped when the new subduction zone formed (Dickinson and Sealy 1979). More recent considerations indicate that the substrate for intra-oceanic arcs is produced when subduction begins (Stern and Bloomer 1992; Hall et al. 2003)"; Figure 6 caption, after Tatsumi et al. (2008): "Incipient arc magmatism replaces the pre-existing oceanic crust to create the initial mafic arc crust"; Introduction: "thinner (∼7 km), denser (∼2.90 g/cc) oceanic crust".
+- Read in the plate-geometry task (2026-10-21), the library text again: p. 11-12, intra-oceanic arc growth at "the present 14,500 km of intra-oceanic arcs alone (principally the Aleutian, South Sandwich, Kermadec, Tonga, Vanuatu, Solomon, New Britain, Izu–Bonin–Mariana, Indonesia east of Java or Banda, and the Lesser Antilles arcs)" gives 1.5 AU; "The combined length of continental margin arcs is approximately 27,500 km (Scholl and von Huene 2007)", 1.0 AU; so 14,500 of 42,000 km (35 %) of the arcs stand on ocean floor. PLT-370.
 
 ### TetreaultBuiter2014
 - Reference: Tetreault, J. L. and Buiter, S. J. H. (2014). Future accreted terranes: a compilation of island arcs, oceanic plateaus, submarine ridges, seamounts, and continental fragments. Solid Earth 5:1243-1275.
@@ -6589,18 +6600,21 @@ Stern & Scholl 2010 (the rates, PLT-045 and PLT-285) and Cloos 1993 (the arcs' m
 - Ledger ids: STE-009
 - Access: open (the journal page shows the abstract; the numbers are in the PDF).
 - Read so far (by the project): 2026-10-05, the WHOI release only: "1.332 billion cubic kilometers", mean depth "3,682.2 meters". The paper itself was not opened.
+- Read 2026-10-21: the paper itself (Table 2, as in the entry above), so STE-009 is `verified`.
 
 ### HaqSchutter2008
 - Reference: Haq, B. U. and Schutter, S. R. (2008). A chronology of Paleozoic sea-level changes. Science 322:64-68.
 - Cited as: "Haq & Schutter 2008" (the size of long-term sea-level change, a reference for the steering's sea rate).
 - Ledger ids: STE-013
 - Access: paywalled. Read so far (by the project): from memory.
+- Read 2026-10-21: the abstract: "172 eustatic events ... varying in magnitude from a few tens of meters to approximately 125 meters"; no level against today.
 
 ### Miller2005
 - Reference: Miller, K. G. et al. (2005). The Phanerozoic record of global sea-level change. Science 310:1293-1298.
 - Cited as: "Miller et al. 2005" (as above).
 - Ledger ids: STE-013
 - Access: paywalled. Read so far (by the project): from memory.
+- Read 2026-10-21 (ledger ISO-087): the abstract (Europe PMC, PMID 16311326): "Long-term sea level peaked at 100 +/- 50 meters during the Cretaceous".
 
 ### Berner2004
 - Reference: Berner, R. A. (2004). The Phanerozoic Carbon Cycle: CO2 and O2. Oxford University Press.
@@ -7178,6 +7192,73 @@ The sources named for a lake's sediment trap (HYD-110) and for the sediment-load
 - Access: not fetched.
 - Read so far (by the project): nothing. The claim taken from it, that a sediment column under water stands up by its load's isostatic correction (the backstripping relation), is from memory and unchecked.
 
+## Sea level from the ocean's volume (ISO-085 to ISO-087, PLT-350 to PLT-353, CLM-210), added 2026-10-21
+
+The sources of the planet's water, the floor's age-depth law and the check on the sea-level curve, build log 2026-10-21 "Sea level from the ocean's volume". Read by a research sub-agent on 2026-10-21 as each entry says; numbers seen only in search-engine summaries were not used.
+
+### EakinsSharman2010
+- Reference: Eakins, B. W. and Sharman, G. F. (2010). Volumes of the World's Oceans from ETOPO1. NOAA National Geophysical Data Center, Boulder, CO.
+- DOI or URL: a mirror at https://climatechange.usf.edu/documents/Thermal%20Expansion/ocean_volumes.pdf (the NOAA page itself not read).
+- Cited as: "Eakins & Sharman 2010" (the ocean volume beside Charette & Smith 2010).
+- Ledger ids: ISO-085
+- Access: open.
+- Read so far (by the project): the mirror, 2026-10-21: "Total: 361,900,000 ... 1,335,000,000 ... 3688 ... 10,803" (km2, km3, mean and greatest depth m); 0.1 % on the area, 1 % on the volume.
+
+### VaughanEtAl2013_AR5Ch4
+- Reference: Vaughan, D. G., Comiso, J. C., et al. (2013). Observations: Cryosphere. In: Climate Change 2013: The Physical Science Basis. Contribution of Working Group I to the Fifth Assessment Report of the IPCC, chapter 4. Cambridge University Press.
+- DOI or URL: https://www.ipcc.ch/site/assets/uploads/2018/02/WG1AR5_Chapter04_FINAL.pdf
+- Cited as: "IPCC AR5 WG1 Ch. 4, Table 4.1".
+- Ledger ids: ISO-085, CLM-099, CLM-210
+- Access: open.
+- Read so far (by the project): Table 4.1, 2026-10-21: sea-level equivalents Antarctic ice sheet 58.3 m, Greenland 7.36 m, glaciers 0.41 m (total about 66.1 m); note b: "ice density of 917 kg m-3, a seawater density of 1028 kg m-3, with seawater replacing ice currently below sea level".
+
+### Stein1995
+- Reference: Stein, C. A. (1995). Heat flow of the Earth. In: Ahrens, T. J. (ed.), Global Earth Physics: A Handbook of Physical Constants, AGU Reference Shelf 1, pp. 144-158 (pages from memory).
+- DOI or URL: an open copy at https://unicamp.br/fea/ortega/extensao/Stein.pdf
+- Cited as: "Stein 1995" (GDH1's ridge depth and decay constant, read in place of the paywalled Stein & Stein 1992).
+- Ledger ids: PLT-352
+- Access: open copy (OCR text, garbled but legible).
+- Read so far (by the project): 2026-10-21: "q(t) = 510 t^-1/2 for ages less than or equal to 55 Ma and 48 + 96 exp(-0.0278 t) for ages greater than 55 Ma"; Table 2: GDH1 ridge depth 2600 m, plate thickness 95 km, basal temperature 1450 C, expansion coefficient 3.1e-5. The depth law's coefficients are not in what was read.
+
+### Muller2008
+- Reference: Müller, R. D., Sdrolias, M., Gaina, C., Steinberger, B. and Heine, C. (2008). Long-term sea-level fluctuations driven by ocean basin dynamics. Science 319(5868):1357-1362 (authors after the first and pages from memory).
+- DOI or URL: 10.1126/science.1151540 (from memory); abstract via Europe PMC, PMID 18323446.
+- Cited as: "Müller et al. 2008".
+- Ledger ids: ISO-087
+- Access: paywalled; abstract read.
+- Read so far (by the project): the abstract, 2026-10-21: "we model a Late Cretaceous sea level that is 170 (85 to 270) meters higher than it is today"; published estimates "differ ... from approximately 40 to approximately 250 meters". The figure and the supplement were not opened.
+
+### Haq1987
+- Reference: Haq, B. U., Hardenbol, J. and Vail, P. R. (1987). Chronology of fluctuating sea levels since the Triassic. Science 235(4793):1156-1167 (from memory).
+- Cited as: "Haq et al. 1987" (the 250-m Cretaceous high stand).
+- Ledger ids: ISO-087
+- Access: paywalled; abstract read (no numbers).
+- Read so far (by the project): the abstract, 2026-10-21, gives no levels; the 250 m is read at second hand in Miller et al. 2011 (below).
+
+### Miller2011
+- Reference: Miller, K. G., Mountain, G. S., Wright, J. D. and Browning, J. V. (2011). A 180-million-year record of sea level and ice volume variations from continental margin and deep-sea isotopic records. Oceanography 24(2):40-53 (authors after the first and pages from memory).
+- DOI or URL: https://tos.org/oceanography/assets/docs/24-2_miller.pdf
+- Cited as: "Miller et al. 2011".
+- Ledger ids: ISO-087
+- Access: open.
+- Read so far (by the project): 2026-10-21, the Fig. 5 caption: "in the range of 100-200 m for the peak at ca. 80 million years (versus the 250 m of Haq et al., 1987)"; and the hydro-isostatic share: a 120 m water addition gives "about two-thirds of this figure due to isostatic adjustment (i.e., 80 m ...)".
+
+### Kominz1998
+- Reference: Kominz, M. A., Miller, K. G. and Browning, J. V. (1998). Long-term and short-term global Cenozoic sea-level estimates. Geology 26(4):311-314 (authors after the first and pages from memory).
+- DOI or URL: https://eps.rutgers.edu/images/stories/faculty/miller_kenneth_g/kgmpdf/98-Kominz.Geology.pdf
+- Cited as: "Kominz et al. 1998" (the backstripping relation, the water-loaded share).
+- Ledger ids: PLT-353
+- Access: open copy.
+- Read so far (by the project): 2026-10-21: the method "assumes an Airy isostatic response to loads", with "R2 = [R1 - TS] [(ρa - ρw)/ρa]" (a the asthenosphere, w water; the minus signs lost in the text extraction and restored).
+
+### Parsons1982
+- Reference: Parsons, B. (1982). Causes and consequences of the relation between area and age of the ocean floor. Journal of Geophysical Research 87(B1):289-302.
+- DOI or URL: https://www.osti.gov/biblio/5545743 (the abstract)
+- Cited as: "Parsons 1982" (the starting ocean's steady-state age–area distribution).
+- Ledger ids: PLT-356
+- Access: paywalled; abstract read.
+- Read so far (by the project): the abstract on OSTI, 2026-10-21: the area of ocean floor with age "is approximately described by dA/dt = C0(1-(t/tm)), where C0 is the rate of crustal generation and tm the maximum age", explained by "a balance between crustal generation and consumption where consumption is uniformly distributed with age"; the consumption per unit age scatters about "a mean value equal to C0/tm (approx. 1.7 x 10^-8 km2/yr2)". The abstract gives neither C0 nor t_m.
+
 ## White patches, drowned continents and coastal high ground, added 2026-10-21
 
 The sources named for the plateaus' summer warmth (CLM-220) and the Cryogenian's dates in plates.md's section of 2026-10-21. None was fetched in full.
@@ -7185,11 +7266,11 @@ The sources named for the plateaus' summer warmth (CLM-220) and the Cryogenian's
 ### YaoZhang2015
 - Reference: Yao, Y. and Zhang, B. (2015). The mass elevation effect of the Tibetan Plateau and its implications for Alpine treelines. International Journal of Climatology 35(8):1833-1846.
 - DOI or URL: 10.1002/joc.4123
-- Cited as: "Yao & Zhang 2015 (search snippets only)".
-- Ledger ids: CLM-220
-- Access: paywalled; the publisher refused the page to scripted access (HTTP 403, 2026-10-21).
+- Cited as: "Yao & Zhang 2015 (abstract)".
+- Ledger ids: CLM-220, CLM-230
+- Access: paywalled; the publisher refused the page to scripted access (HTTP 403, 2026-10-21). The abstract is on NASA's MODIS science-team publications page, https://modis.gsfc.nasa.gov/sci_team/pubs/abstract.php?id=19238 (read 2026-10-21).
 - Library (the project's source library, not distributed): none.
-- Read so far (by the project): search-result snippets of the abstract only (2026-10-21): the plateau 2 to 7 degC warmer than the surrounding areas at the same altitude; at 4,500 m 3.58 (April) to 6.63 degC (June) warmer than the Sichuan Basin's air; treelines 500 to 1,000 m higher. The abstract itself was not opened.
+- Read so far (by the project): the abstract, verbatim (2026-10-21, the plateau-warmth task): "The monthly mean air temperature in the interior main plateau is approximately 2-7 degrees C higher than in the surrounding mountains and adjacent lowland areas"; "At an elevation of 4500m ... the monthly mean temperature differences between the plateau and the Sichuan Basin range from 3.58 degrees C (April) to 6.63 degrees C (June); the monthly temperature differences between the plateau and the Qilian Mts. range from 1.6 degrees C (July) to 7.7 degrees C (March)"; the plateau's air from MODIS land-surface temperature, the Sichuan Basin's free air from the lapse rate measured on Mt. Emei; the warmest month's 10 degC isotherm pushed up to 4,600-4,700 m, the interior's treeline 500-1,000 m higher than the eastern edge's. The monthly table was not read.
 
 ### Rooney2015
 - Reference: Rooney, A. D., Strauss, J. V., Brandon, A. D. and Macdonald, F. A. (2015). A Cryogenian chronology: two long-lasting synchronous Neoproterozoic glaciations. Geology 43(5):459-462 (from memory; not checked).
@@ -7197,3 +7278,173 @@ The sources named for the plateaus' summer warmth (CLM-220) and the Cryogenian's
 - Ledger ids: none (plates.md, 2026-10-21: the Cryogenian's dates beside Ben's run)
 - Access: not fetched.
 - Read so far (by the project): nothing. The dates taken from it (Sturtian about 717 to 660 Ma, Marinoan ending about 635 Ma) are from memory and unchecked.
+
+## The plate geometry: arcs, reversals and where subduction starts (PLT-370 to PLT-372; notes on PLT-042, PLT-056, PLT-062, PLT-064), added 2026-10-21
+
+The sources of the plate-geometry task (build log 2026-10-21 "The plate geometry"; plates.md, the section of that name). Above and read again or for the first time in full this time: Stern 2004 (polarity reversal against transference), Stern & Scholl 2010 (the arcs' lengths by the crust they stand on), Bird 2003 (Table 1), Morra et al. 2013 and Mallard et al. 2016 (the plate sizes), Syracuse & Abers 2006 (abstract). Texts in the project's source library on the test VM (`/data/ban/deeptime-sources/<key>/`), not distributed.
+
+### Crameri2020
+- Reference: Crameri, F., Magni, V., Domeier, M., Shephard, G. E., Chotalia, K., Cooper, G., Eakin, C. M., Grima, A. G., Gürer, D., Király, Á., Mulyukova, E., Peters, K., Robert, B. and Thielmann, M. (2020). A transdisciplinary and community-driven database to unravel subduction zone initiation. Nature Communications 11:3750.
+- DOI or URL: 10.1038/s41467-020-17522-9 (open access).
+- Cited as: "Crameri et al. 2020".
+- Ledger ids: PLT-062, PLT-064 (2026-10-21 notes), PLT-371 (the polarity reversals' rate)
+- Access: open.
+- Library (the project's source library, not distributed): fetched 2026-10-21 with Supplementary Information and Supplementary Data 1. Files: `Crameri2020/crameri2020.pdf`, `crameri2020.txt`, `41467_2020_17522_MOESM1_ESM.pdf` to `MOESM3_ESM.xlsx`, `Supplementary_Data1_Analysis_sheet.txt` (the xlsx's analysis sheet as text).
+- Read so far (by the project): full text and Supplementary Data 1's analysis sheet, 2026-10-21. Table 1: 13 subduction-zone initiation (SZI) events from 6 ± 1 to 104 ± 1 Ma, four of them polarity reversals (Aleutian 53 ± 2, Tonga-Kermadec 50 ± 5, New Hebrides-New Britain 10 ± 2, Philippine 9 ± 3 Ma); some candidates were "deemed too unclear to be included", so 13 is a floor. "All SZI events start less than 1500 km away from other active subduction zones and, in most cases, less than 500 km"; "At least nine of all thirteen events ... occur at or near a pre-existing convergent plate boundary"; "collision events along pre-existing subduction trenches are often precursors of SZI events"; "subduction breeds subduction"; "horizontally forced subduction zone initiation is dominant over the last 100 Ma". Supplementary Data 1: the subducting plates' mean ages at initiation, Aleutian 31.7, Izu-Bonin 40.7, Sunda-Java 44.8, Lesser Antilles 49, Tonga-Kermadec 54.4, South Sandwich 61.2, New Hebrides-New Britain 62.5, Philippine 66.2, Halmahera 117.4 Myr.
+
+### GurnisHallLavier2004
+- Reference: Gurnis, M., Hall, C. and Lavier, L. (2004). Evolving force balance during incipient subduction. Geochemistry, Geophysics, Geosystems 5(7):Q07001.
+- DOI or URL: 10.1029/2003GC000681 (open, the author's site).
+- Cited as: "Gurnis et al. 2004".
+- Ledger ids: PLT-062, PLT-064 (2026-10-21 notes)
+- Access: open.
+- Library (the project's source library, not distributed): fetched 2026-10-21. Files: `Gurnis2004/GURggg04.pdf`, `GURggg04.txt`.
+- Read so far (by the project): full text, 2026-10-21. Abstract: "Nearly half of all active subduction zones initiated during the Cenozoic"; "Subduction initiation is known to have occurred in a variety of tectonic settings: old fracture zones, transform faults, and extinct spreading centers and through polarity reversal behind active subduction zones" ("Izu-Bonin-Mariana (IBM) along a fracture zone, Tonga-Kermadec along an extinct subduction boundary, New Hebrides within a back arc, and Puysegur-Fiordland along a spreading center"); "The large initial bending resistance can be entirely eliminated in ridge models, explaining the propensity for new subduction zones to form through polarity reversals"; "A FZ must be underthrust by the older plate for 100–150 km before a transition from forced to self-sustaining" subduction. Table 1 "Cenozoic Subduction Initiation": eleven zones, their heritage fracture zone, transform, spreading centre, extinct subduction zone or polarity reversal (New Britain-San Cristobal, New Hebrides); none from old floor far from a plate boundary.
+
+### HallGurnis2003
+- Reference: Hall, C. E., Gurnis, M., Sdrolias, M., Lavier, L. L. and Müller, R. D. (2003). Catastrophic initiation of subduction following forced convergence across fracture zones. Earth and Planetary Science Letters 212(1-2):15-30.
+- DOI or URL: 10.1016/S0012-821X(03)00242-5 (the record in CaltechAUTHORS).
+- Cited as: "Hall et al. 2003".
+- Ledger ids: PLT-062 (2026-10-21 note)
+- Access: paywalled; the abstract is open.
+- Library (the project's source library, not distributed): the CaltechAUTHORS record with the abstract, 2026-10-21. File: `Hall2003/abstract.txt`.
+- Read so far (by the project): abstract, 2026-10-21: "a fracture zone could be converted into a self-sustaining subduction zone after approximately 100 km of convergence"; "Using global plate reconstructions, we suggest that IBM nucleation was associated with a change in plate motion between 55 and 45 Ma".
+
+### SornettePisarenko2003
+- Reference: Sornette, D. and Pisarenko, V. (2003). Fractal plate tectonics. Geophysical Research Letters 30(3):1105 (venue and article number as Mallard et al. 2016 cite it; the issue and DOI 10.1029/2002GL015043 from memory).
+- DOI or URL: arXiv cond-mat/0202320 (the preprint read).
+- Cited as: "Sornette & Pisarenko 2003".
+- Ledger ids: PLT-372
+- Access: the preprint is open.
+- Library (the project's source library, not distributed): fetched 2026-10-21 (arXiv preprint). Files: `SornettePisarenko2003/arxiv.pdf`, `arxiv.txt`.
+- Read so far (by the project): the preprint's abstract and text, 2026-10-21: Bird's plate areas follow "the power law with exponent 0.25±0.05", "the most robust and parsimonious model for all plates, including the very largest plates, when taking into account the constraint that the plates areas must sum up to 4π steradians".
+
+### EnglandEngdahlThatcher2004
+- Reference: England, P., Engdahl, R. and Thatcher, W. (2004). Systematic variation in the depths of slabs beneath arc volcanoes. Geophysical Journal International 156(2):377-408 (from memory; the abstract was fetched without its record's metadata).
+- DOI or URL: 10.1111/j.1365-246X.2003.02132.x (from memory).
+- Cited as: "England et al. 2004 (abstract)".
+- Ledger ids: PLT-042 (2026-10-21 note)
+- Access: open at the publisher (from memory); only the abstract was fetched.
+- Library (the project's source library, not distributed): the abstract from OpenAlex, 2026-10-21. File: `England2004/abstract_openalex.txt`.
+- Read so far (by the project): abstract, 2026-10-21: the depths to the tops of the intermediate-depth seismicity under arc volcanoes are "constant, to within a few kilometres, within individual arc segments, but differ by tens of kilometres from one arc segment to another. The range in depths is from 65 km to 130 km"; they correlate inversely "with the descent speed of the subducting plate". A depth, not a distance from the trench.
+
+## The plateau's warmth (CLM-225 to CLM-231, MOI-085), added 2026-10-21
+
+The sources of the mass-elevation effect (docs/science/mass-elevation-effect.md). A sub-agent of the plateau-warmth task fetched and read them on 2026-10-21; the quotes below are from that reading. Its downloads were not kept. Yao & Zhang 2015 (the abstract) and Kalnay et al. 1996 (the R1 long-term means) are in the sections above.
+
+### Han2018MEE
+- Reference: Han, F. et al. (2018). Characterizing the Mass Elevation Effect across the Tibetan Plateau. Journal of Mountain Science 15(12):2651-2665 (the co-authors not recorded).
+- DOI or URL: 10.1007/s11629-018-4978-2; read at https://jms.imde.ac.cn/en/article/pdf/preview/10.1007/s11629-018-4978-2.pdf
+- Cited as: "Han et al. 2018".
+- Ledger ids: CLM-230
+- Access: open (the journal's own PDF).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21). Fig. 4: "y = 0.0019x + 0.584 ... R² = 0.6775", x the mountain base elevation (MBE, m), y the annual mean MEE (degC), over 57 MBE plots; Table 3: Core I MBE 4,708 to 4,934 m, MEE 11.44 to 11.59 degC; Qaidam Basin 2,889 m, 5.65 degC. "MEE is obviously higher in the interior than in the exterior of the plateau even with similar mountain base elevation (MBE)"; "MEE may be low in areas with high mountain peaks and relatively low MBE, especially in some high isolated peaks" (the Pamir and Karakoram 4.13 to 6.37 degC). Its baseline: 17 lowland stations around the plateau extrapolated with NCEP-derived lapse rates; the plateau's air from a MODIS land-surface-temperature regression. The magnitudes are not used (CLM-230).
+
+### Han2018bMEE
+- Reference: Han, F. et al. (2018). Journal of Mountain Science 15(7):1510-1519 (the title and co-authors not recorded; a study of the Tibetan Plateau's monthly MEE).
+- DOI or URL: 10.1007/s11629-018-4865-x; read at https://jms.imde.ac.cn/en/article/pdf/preview/10.1007/s11629-018-4865-x.pdf
+- Cited as: "Han et al. 2018b".
+- Ledger ids: CLM-230
+- Access: open (the journal's own PDF).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21). The interior's "monthly MEEs fall between 6.5647°C-13.8246°C, with the highest MEE mostly in August and the minimum mostly in January and February"; the periphery's "monthly MEEs are high in cold season and low in warm season ... from 1.5020°C (July) to 9.7750°C (December)". The monthly MEE-against-MBE R² 0.43 (May) to 0.77 (October); the monthly slopes are in a figure only and were not read.
+
+### Han2020MEE
+- Reference: Han, F. et al. (2020). What factors determine the mass elevation effect of the Tibetan Plateau? Journal of Mountain Science 17(11):2742-2749 (the co-authors not recorded).
+- DOI or URL: 10.1007/s11629-020-6011-9; read at https://jms.imde.ac.cn/en/article/pdf/preview/10.1007/s11629-020-6011-9.pdf
+- Cited as: "Han et al. 2020".
+- Ledger ids: CLM-230
+- Access: open (the journal's own PDF).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21). Table 2's seven-factor model (R² 0.877); the explained variance: MBE 39.77 %, the distance to the massif's edges 23.02 %, continentality 14.48 %, the maximum elevation 11.41 %, the plot's area 2.92 %; "When only MBE is left, R2 can even amount to 0.677"; "AREA and NDVI can simply be neglected" (the area of each of the 57 plots, not of the whole massif).
+
+### Han2012MBE
+- Reference: Han, F. et al. (2012). Journal of Geographical Sciences 22(4):609-616 (the title and co-authors not recorded; mountain base elevation as the measure of the MEE, against the timberline).
+- DOI or URL: 10.1007/s11442-012-0950-1; https://www.geogsci.com/EN/10.1007/s11442-012-0950-1
+- Cited as: "Han et al. 2012 (abstract)".
+- Ledger ids: none (background for CLM-230 on mass-elevation-effect.md)
+- Access: the abstract on the journal's page (in its embedded JSON); the journal's PDF came back empty.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the abstract (2026-10-21): "the more extensive the land mass and especially the higher the mountain base in the interior of land mass, the greater the mass elevation effect, this paper takes mountain base elevation (MBE) as the magnitude of MEE"; latitude, longitude and MBE explain 25.11, 29.43 and 45.46 % of the timberline's height. No regression coefficients.
+
+### Zhao2014MEE
+- Reference: Zhao, F. et al. (2014). Journal of Geographical Sciences 24(2):226-236 (the title and co-authors not recorded; the MEE's share in the Northern Hemisphere's treelines).
+- DOI or URL: 10.1007/s11442-014-1084-4; https://www.geogsci.com/EN/10.1007/s11442-014-1084-4
+- Cited as: "Zhao et al. 2014 (abstract)".
+- Ledger ids: none (background for CLM-230 on mass-elevation-effect.md)
+- Access: the abstract on the journal's page.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the abstract (2026-10-21): 516 Northern Hemisphere treeline sites, R² 0.904; latitude 45.02 %, continentality 6.04 %, the MEE 48.94 % of the explained variance.
+
+### Zhao2015Treeline
+- Reference: Zhao, F. et al. (2015). Contribution of mass elevation effect to the altitudinal distribution of global treelines. Journal of Mountain Science 12(2):289-297 (the co-authors not recorded).
+- DOI or URL: 10.1007/s11629-014-3223-x; read at https://jms.imde.ac.cn/en/article/pdf/preview/10.1007/s11629-014-3223-x.pdf
+- Cited as: "Zhao et al. 2015".
+- Ledger ids: none (background for CLM-230 on mass-elevation-effect.md)
+- Access: open (the journal's own PDF).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21). TL = a Lat + b K + c IMBE + d over 594 sites, R² 0.92; Table 1's global coefficients: constant 3,223, latitude -47.1, continentality 5.63, IMBE 0.80: "it is elevated by 80m for 100m increase in IMBE" (Northern Hemisphere 74 m, Southern 61 m). The sub-agent's own reading, not the paper's: at 0.6 to 0.65 K per 100 m that is about 0.5 K per 100 m of base height, about 2.5 times Han et al. 2018's slope.
+
+### YaoZhang2013
+- Reference: Yao, Y. and Zhang, B. (2013). PLoS ONE 8(7):e68750 (the title not recorded; station-based monthly temperature against altitude over the Tibetan Plateau, 109 stations, 2001-2007).
+- DOI or URL: 10.1371/journal.pone.0068750; read at https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0068750
+- Cited as: "Yao & Zhang 2013".
+- Ledger ids: CLM-230
+- Access: open access.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21; its tables are images and were not read). At 4,500 m against the Sichuan Basin: "The difference is large (4-6°C) in warm months from April to October, and small (1-2°C) in other cold months"; against the Qilian Mountains "small (5.9-7.0°C) in warm months, and large (6.1-10.7°C) in other cold months"; "temperature lapse rates are steeper on isolated mountains near the sea than on extensive mountain ranges that provide their own heating". Its Sichuan free air is built from station regressions and MODIS points, not soundings.
+
+### He2016Andes
+- Reference: He, Y., Zhang, B. et al. (2016). The Mass Elevation Effect of the Central Andes and Its Implications for the Southern Hemisphere's Highest Treeline. Mountain Research and Development 36(2):213-221 (the title's end and the co-authors' initials from the publisher's URL and from memory; not checked).
+- DOI or URL: 10.1659/MRD-JOURNAL-D-15-00027
+- Cited as: "He et al. 2016 (abstract)".
+- Ledger ids: CLM-230
+- Access: BioOne refused scripted access (an Incapsula block); the abstract read through the OpenAlex API, the full text only as a WebFetch summary.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the abstract (2026-10-21): "The mean air temperature in the Altiplano in summer is approximately 5 K higher than it is above the adjacent lowlands at the same mean elevation, averaging about 3700 m above sea level"; the effect "increased from the outer Andean east-facing slope to the interior of the Altiplano in summer". Its baseline is NCEP/NCAR R1's free air, as here (CLM-229). The summary of the full text (January -1.8 to 7.1 K, above 5 K at stations over 3,700 m) is not counted as read.
+
+### PepinSeidel2005
+- Reference: Pepin, N. and Seidel, D. (2005). A global comparison of surface and free-air temperatures at high elevations. Journal of Geophysical Research 110:D03104.
+- DOI or URL: 10.1029/2004JD005047; read at https://arl.noaa.gov/wp_arl/wp-content/uploads/documents/JournalPDFs/PepinAndSeidel.JGR2005.pdf
+- Cited as: "Pepin & Seidel 2005".
+- Ledger ids: CLM-230
+- Access: Wiley refused scripted access (403); NOAA ARL's copy read.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21). Surface minus R1 free air at 1,084 sites above 500 m: "surface sites being relatively warm in comparison with the reanalysis in summer and cool in winter, especially in continental areas"; "Mountaintop sites nearly always show regime type 2 (a small summer/winter contrast)"; a weak rise of the difference with elevation (Asia r 0.42). Only 17 sites above 4,000 m, most of them Tibetan valley stations. No mean by terrain type and no plateau-against-summit contrast.
+
+### Yanai1992
+- Reference: Yanai, M., Li, C. and Song, Z. (1992). Seasonal heating of the Tibetan Plateau and its effects on the evolution of the Asian summer monsoon. Journal of the Meteorological Society of Japan 70(1B):319-351 (the title from memory).
+- DOI or URL: https://www.jstage.jst.go.jp/article/jmsj1965/70/1B/70_1B_319/_pdf
+- Cited as: "Yanai, Li & Song 1992".
+- Ledger ids: CLM-230
+- Access: open (J-STAGE).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21): "when compared at the same level, the air immediately above the Plateau surface is warmer than the air of surrounding areas even in winter. An 'explosive' growth of this warm boundary layer air occurs in May, and warm anomalies of 8° to 9℃ occupy the whole tropospheric air column above the Plateau by August" (anomalies from the domain's nine-month mean along 32.5 N, not a surface-against-free-air difference); "During winter the Plateau is a heat sink, but it is surrounded by regions of more intense cooling".
+
+### Flohn1968
+- Reference: Flohn, H. (1968). Contributions to a meteorology of the Tibetan Highlands. Atmospheric Science Paper 130, Colorado State University (the title from memory).
+- DOI or URL: https://mountainscholar.org/bitstream/handle/10217/225/0130_Bluebook.pdf
+- Cited as: "Flohn 1968".
+- Ledger ids: CLM-230
+- Access: open (the university's repository).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21): "At least during the warm season, the surface temperatures are definitely higher than the latitudinal average in the free atmosphere at similar heights". No number taken.
+
+### Pan2021
+- Reference: Pan et al. (2021). PLoS ONE 16(10):e0258549 (the authors and the title not recorded; the Tibetan Plateau's air against the Loess Plateau's and Jinji Mountain's).
+- DOI or URL: 10.1371/journal.pone.0258549; read at https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8530289/
+- Cited as: "Pan et al. 2021".
+- Ledger ids: none (a cross-check on mass-elevation-effect.md)
+- Access: open access (PubMed Central).
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): the full text (2026-10-21): at 5,000 m "the temperature of the Tibetan Plateau was approximately 0-3°C higher than that of the Loess Plateau and approximately 3-7°C higher than that of Jinji Mountain"; Tibet minus the Loess Plateau in July 2.62 degC.
+
+### StationNormals2026
+- Reference: the 1991-2020 monthly normals of the plateau stations (Nagqu, Tingri, Shiquanhe, Madoi and Lhasa: the China Meteorological Administration; El Alto and Oruro: Bolivia's SENAMHI; Puno and Juliaca: Peru's SENAMHI; Leadville, Climax, Alamosa and Pikes Peak: NOAA NCEI; Addis Ababa: the service its box names not recorded) and of the lowland stations used for the lapse (Chengdu, Wuhan, Shanghai, Delhi, Santa Cruz, Cuiaba), as the climate boxes of the towns' English Wikipedia articles give them.
+- DOI or URL: the towns' articles on en.wikipedia.org, read as raw wikitext.
+- Cited as: "the stations' 1991-2020 normals (Wikipedia's climate boxes)".
+- Ledger ids: CLM-220, CLM-229, CLM-231
+- Access: open; copies of the national services' tables, not the services' own.
+- Library (the project's source library, not distributed): none.
+- Read so far (by the project): a sub-agent read the boxes on 2026-10-21 (CLM-229's values). El Alto's box is labelled 1991-2020 but cites DWD's 1961-1990 source; Pikes Peak's normals are of low confidence and it was left out of the fit, as was Lhasa (a valley station). The latitudes of Shiquanhe, Tingri, Madoi, Puno, Juliaca and Oruro are from memory.

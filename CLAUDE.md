@@ -53,6 +53,7 @@ tools/remote/mac.sh -- tools/remote/detach.sh start <job> --kind client:editor t
 tools/review/publish.sh <name> <folder>                 # private spacesheep page (plan §2.6)
 tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | status   # workbench on the Mac → http://m6-mac-mini:8642/ (tailnet only)
 tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete merged worktrees' Mac copies
+python3 ../../pack/tools/gc/pack-gc.py [report|--dry-run]  # the laptop side: Rust targets and spent agent worktrees of every pack repo (daily timer)
 tools/remote/mac.sh --no-sync -- deeptime-admit status  # the VM's admission tool: what runs, what waits and why, the estimates
 
 ## Rules
