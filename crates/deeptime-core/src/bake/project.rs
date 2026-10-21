@@ -2828,6 +2828,138 @@ mod tests {
         );
     }
 
+    /// The biome layers' land call is the column evaluator's rule on the world's ground
+    /// (BIO-170, BAK-057): a node of the 35 m band under sea level, or on closed ground below it,
+    /// is land and takes a land record; open ground under sea level is sea and takes the sea's;
+    /// every node the rule agrees with is left as it was.
+    #[test]
+    fn the_biome_layers_settle_to_the_worlds_sea_rule() {
+        use crate::climate::koppen;
+        let grid = GridDesc::for_planet("L2", 1024, 8).unwrap();
+        let (w, h) = (grid.w as usize, grid.h as usize);
+        let n = w * h;
+        let sea_level_y = 64;
+        // Six bands of columns: dry land (the only land donor), the band H in (sea - 1, sea]
+        // that the biome bake called ocean, open ground under the sea that it called land, closed
+        // ground below sea level that it called ocean, deep sea, and shallow sea (both agree).
+        let band = |k: usize| (k % w) * 6 / w;
+        let elevation_of = |b: usize| [100.0f32, 63.5, 40.0, 40.0, -300.0, 40.0][b];
+        let closed_of = |b: usize| u8::from(b == 3);
+        let continents_of = |b: usize| [0.3f32, -0.25, 0.1, -0.3, -0.5, -0.3][b];
+        let layer = |name: &str, dtype: DType, scale: f64, units: &str| {
+            crate::bake::desc(name, dtype, &grid, scale, units, None)
+        };
+        let f32_bytes = |f: &dyn Fn(usize) -> f32| -> Vec<u8> {
+            (0..n).flat_map(|k| f(k).to_le_bytes()).collect()
+        };
+        let elevation = LoadedLayer::new(
+            layer("elevation", DType::F32, 1.0, "block"),
+            f32_bytes(&|k| elevation_of(band(k))),
+        )
+        .unwrap();
+        let closed = LoadedLayer::new(
+            layer(CLOSED_BASIN, DType::U8, 1.0, "flag"),
+            (0..n).map(|k| closed_of(band(k))).collect(),
+        )
+        .unwrap();
+        // A sea node's record differs from a land node's in every layer.
+        let i16_layer = |name: &str, land: f32, sea: f32| {
+            let d = layer(name, DType::I16, 1e-4, "vanilla_param");
+            let bytes = (0..n)
+                .flat_map(|k| {
+                    let v = if name == "climate/continents" {
+                        continents_of(band(k))
+                    } else if continents_of(band(k)) < -0.19 {
+                        sea
+                    } else {
+                        land
+                    };
+                    ((f64::from(v) / 1e-4).round() as i16).to_le_bytes()
+                })
+                .collect();
+            Held { entry: 0, desc: d, bytes }
+        };
+        let u8_layer = |name: &str, land: u8, sea: u8| {
+            let bytes = (0..n)
+                .map(|k| if continents_of(band(k)) < -0.19 { sea } else { land })
+                .collect();
+            Held { entry: 0, desc: layer(name, DType::U8, 1.0, ""), bytes }
+        };
+        let mut held = vec![
+            i16_layer("climate/temperature", 0.1, 0.3),
+            i16_layer("climate/vegetation", -0.2, 0.0),
+            i16_layer("climate/continents", 0.0, 0.0),
+            i16_layer("climate/erosion", 0.25, 0.5),
+            i16_layer("climate/ridges", 0.4, 0.0),
+            u8_layer("climate/wetland", 1, 0),
+            u8_layer("climate/koppen_l2", 5, koppen::SEA),
+        ];
+        let before: Vec<Vec<u8>> = held.iter().map(|x| x.bytes.clone()).collect();
+        let ground = BiomeGround {
+            sea_level_y,
+            m_per_block_v: 1.0,
+            world_m_per_block_h: 8.0,
+            bake_blocks_per_world_block: 1.0,
+            elevation: &elevation,
+            closed: Some(&closed),
+        };
+        let note = settle_biome_layers(&mut held, &ground, &biomes::BiomeParams::default());
+        let in_band = |b: usize| (0..n).filter(|&k| band(k) == b).count() as u64;
+        // The record counts the nodes of the three mismatched bands, and nothing else.
+        assert_eq!(
+            note["land_biome_under_sea"]["nodes"].as_u64(),
+            Some(in_band(2)),
+            "{note}"
+        );
+        assert_eq!(
+            note["ocean_biome_on_dry_ground"]["nodes"].as_u64(),
+            Some(in_band(1) + in_band(3)),
+            "{note}"
+        );
+        // The rule each node ends on is the format's own, on the world's elevation and flag.
+        let continents = LoadedLayer::new(held[2].desc.clone(), held[2].bytes.clone()).unwrap();
+        for k in 0..n {
+            let b = band(k);
+            let sea = deeptime_format::water::sea_covers_height(
+                f64::from(elevation_of(b)),
+                sea_level_y,
+                || closed_of(b) == 1,
+            );
+            let v = continents.raw_cell((k % w) as u32, (k / w) as u32) * 1e-4;
+            assert_eq!(biomes::is_land_continentalness(v), !sea, "band {b}: {v}");
+        }
+        // Only the mismatched bands changed (the two edge rows are glued onto themselves, which
+        // moves the cells of this x-banded pattern, so rows 1 to h − 2 are compared).
+        for (li, (layer, was)) in held.iter().zip(&before).enumerate() {
+            let cb = layer.desc.cell_bytes();
+            for j in 1..h - 1 {
+                for i in 0..w {
+                    let k = j * w + i;
+                    let (a, b) = (&layer.bytes[k * cb..(k + 1) * cb], &was[k * cb..(k + 1) * cb]);
+                    if matches!(band(k), 0 | 4 | 5) {
+                        assert_eq!(a, b, "layer {li} band {} moved", band(k));
+                    }
+                }
+            }
+        }
+        // The nodes that took the sea's record have the sea's class and no wetland; the nodes
+        // that took the land's have the land donor's.
+        let at = |name: &str, k: usize| -> f64 {
+            let li = held.iter().position(|x| x.desc.name == name).unwrap();
+            let l = &held[li];
+            let cb = l.desc.cell_bytes();
+            l.desc.physical(l.desc.dtype.decode_scalar(&l.bytes[k * cb..(k + 1) * cb]))
+        };
+        let k_of = |b: usize| (h / 2) * w + (0..w).find(|&i| band(i) == b).unwrap() + w / 24;
+        assert_eq!(at("climate/koppen_l2", k_of(2)) as u8, koppen::SEA);
+        assert_eq!(at("climate/wetland", k_of(2)) as u8, biomes::WETLAND_NONE);
+        for b in [1, 3] {
+            assert_eq!(at("climate/koppen_l2", k_of(b)) as u8, 5, "band {b}");
+            assert_eq!(at("climate/wetland", k_of(b)) as u8, 1, "band {b}");
+            assert!((at("climate/temperature", k_of(b)) - 0.1).abs() < 2e-4, "band {b}");
+        }
+    }
+
     /// Flags and codes take the nearest cell: the wetland flag (0 none, 1 swamp, 2 cold) must not
     /// be averaged into swamp between cold wetland and dry land.
     #[test]

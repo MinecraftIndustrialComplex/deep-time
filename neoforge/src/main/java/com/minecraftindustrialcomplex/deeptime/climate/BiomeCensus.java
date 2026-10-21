@@ -7,6 +7,7 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.ClimateLayers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.IceCover;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
+import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
@@ -415,6 +416,10 @@ public final class BiomeCensus {
                 ? m.volcanic() : null;
         RasterSampler wetFlag = wd.has(BiomeRules.WETLAND_LAYER) ? wd.layer(BiomeRules.WETLAND_LAYER) : null;
         RuleCensus ruleCensus = null;
+        // The land call (BIO-170): the sea rule of the column evaluator (Water.seaCovers, HYD-106) against the
+        // biome: columns it puts under the sea, of them on a biome that is not of the water; the columns it
+        // leaves dry, of them on an ocean biome.
+        int seaColumns = 0, seaOnLandBiome = 0, dryColumns = 0, dryOnOceanBiome = 0;
         for (int j = 0; j < h; j++) {
             int z = -zp + step / 2 + j * step;
             for (int i = 0; i < w; i++) {
@@ -441,6 +446,17 @@ public final class BiomeCensus {
                 height[cell] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(y)));
                 if (Math.abs(z) > zp - poleMargin)
                     continue;
+                final int wx = x, wz = z;
+                if (Water.seaCovers(Water.topBlock(y), sea, () -> wd.closedBasin(wx, wz))) {
+                    seaColumns++;
+                    if (!(b.is(c("is_ocean")) || b.is(c("is_deep_ocean")) || b.is(c("is_aquatic")) || b.is(c("is_river"))
+                            || b.is(c("is_beach")) || b.is(c("is_stony_shores"))))
+                        seaOnLandBiome++;
+                } else {
+                    dryColumns++;
+                    if (b.is(c("is_ocean")) || b.is(c("is_deep_ocean")))
+                        dryOnOceanBiome++;
+                }
                 if (land && wetlandLayer != null && Math.round(wetlandLayer.nearest(x, z)) == Peatland.COLD_WETLAND) {
                     coldWet++;
                     coldBiomes.merge(nameOf(b), 1, Integer::sum);
@@ -696,6 +712,12 @@ public final class BiomeCensus {
                 .forEach(e -> cb.addProperty(e.getKey(), e.getValue()));
         cw.add("top_biomes", cb);
         o.add("cold_wetland", cw);
+        JsonObject sc = new JsonObject();
+        sc.addProperty("sea_columns", seaColumns);
+        sc.addProperty("sea_on_land_biome", seaOnLandBiome);
+        sc.addProperty("dry_columns", dryColumns);
+        sc.addProperty("dry_on_ocean_biome", dryOnOceanBiome);
+        o.add("sea_call", sc);
         // The volcanic biomes against the real volcanoes, now and as the plain climate search placed them
         // (decisions log 2026-10-03).
         o.add("volcanic", VolcanicCensus.run(level, step, poleMargin).json());
