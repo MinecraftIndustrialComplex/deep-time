@@ -107,17 +107,15 @@ public final class FarTerrain {
                 (qx, qy, qz) -> noiseBiome(QuartPos.fromBlock(terrain.wrapX(QuartPos.toBlock(qx))), qy, qz));
     }
 
-    /** TEMPORARY experiment switch: false runs the biome searches warm, as before. */
-    public static volatile boolean coldSearch = true;
-
     /**
      * The biome source at quart cell (qx, qy, qz), x already folded, searched cold
      * ({@link ColdBiomeSearch}): the answer at a tie between equally near climate entries is the
-     * same on every thread, whatever the thread built before.
+     * same on every thread, whatever the thread built before. A warm search let a section depend on
+     * its thread: the sea-bed rule reads biomes through a per-thread cache, so threads asked in
+     * different orders, and at a tie (deep lukewarm ocean against deep ocean at block (844, 396) on
+     * the test planet) each kept the entry it had found last.
      */
     private Holder<Biome> noiseBiome(int qx, int qy, int qz) {
-        if (!coldSearch)
-            return biomes.getNoiseBiome(qx, qy, qz, sampler);
         ColdBiomeSearch.begin();
         try {
             return biomes.getNoiseBiome(qx, qy, qz, sampler);
