@@ -49,7 +49,10 @@ public final class LakeGameTests {
 
     private LakeGameTests() {}
 
-    /** The flat round a hot spring that the spring's own biome could reach: its claim's reach and this, blocks. */
+    /**
+     * The flat checked round a geothermal site: its claim's reach and this many blocks (the field's role biome reached 4
+     * beyond the claim, BIO-110, and its lake features 14 and more beyond that).
+     */
     static final int RING = 20;
 
     private record Spot(int x, int z, int top) {}
@@ -195,9 +198,9 @@ public final class LakeGameTests {
                         .append(biome(level, s.x(), gr.y(), s.z())).append(')');
             }
         }
-        // Round every hot spring on a playa, the flat it does not claim is salt too: a spring's biome stays on its own
-        // columns (BIO-165; before it, Biomes O' Plenty's hot springs ringed their ponds with thermal calcite across the
-        // flat, which the sparse grid above found only where it happened to fall).
+        // Round every hot spring by a playa, the flat it does not claim is salt too: no role biome comes within
+        // VolcanicBiomes.PLAYA_MARGIN of a playa (BIO-165; before it, Biomes O' Plenty's hot springs dug ponds into the
+        // flat and ringed them with thermal calcite, which the sparse grid above found only where it happened to fall).
         int springs = 0, ringRead = 0, ringWrong = 0;
         for (Geothermal.Site site : geo.sites()) {
             if (springs >= MOST)

@@ -82,7 +82,8 @@ public final class VolcanicBiomeGameTests {
 
     /**
      * Every hot-spring pool's centre lies in the hot-spring field's biome when the pack has one
-     * ({@code #deeptime:volcanic/hot_spring_field}: Terralith's yellowstone, Biomes O' Plenty's hot springs). The
+     * ({@code #deeptime:volcanic/hot_spring_field}: Terralith's yellowstone, Biomes O' Plenty's hot springs), but a
+     * pool within {@link VolcanicBiomes#PLAYA_MARGIN} of a playa, which stands in the flat's biome (BIO-165). The
      * test planet always has pools (its preset's heat-flow fields), so a planet without any fails; a pack without
      * such a biome has nothing to check and passes with a line saying so.
      */
@@ -91,8 +92,8 @@ public final class VolcanicBiomeGameTests {
         ServerLevel level = RealPlanetGameTests.level(helper);
         VolcanicCensus.Result r = census(helper, level);
         String role = r.roles().get(VolcanicZones.Role.HOT_SPRING_FIELD.id);
-        DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome pools={} inRole={} (plain search: {}) role={} roles={}", r.pools(),
-                r.now().poolsInRole, r.plain().poolsInRole, role, r.roles());
+        DeepTime.LOGGER.info("[gametest] hotSpringPoolsSitInTheirBiome pools={} byPlaya={} inRole={} (plain search: {}) role={} roles={}", r.pools(),
+                r.poolsByPlaya(), r.now().poolsInRole, r.plain().poolsInRole, role, r.roles());
         helper.assertTrue(r.pools() > 0, "the test planet has no hot-spring pool: its preset's heat-flow fields should always "
                 + "place some");
         if ("-".equals(role)) {
@@ -100,8 +101,10 @@ public final class VolcanicBiomeGameTests {
             helper.succeed();
             return;
         }
-        helper.assertTrue(r.now().poolsInRole == r.pools(), (r.pools() - r.now().poolsInRole) + " of " + r.pools()
-                + " hot-spring pools are not in " + role);
+        // A pool by a playa stands in the flat's biome (BIO-165: no surface role within PLAYA_MARGIN of a playa).
+        int away = r.pools() - r.poolsByPlaya();
+        helper.assertTrue(r.now().poolsInRole == away, (away - r.now().poolsInRole) + " of " + away
+                + " hot-spring pools away from playas are not in " + role);
         helper.succeed();
     }
 
