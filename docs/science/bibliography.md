@@ -1106,6 +1106,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) not stated; the 4.2 / 5.0 / 5.5 km depths are quoted without a source. (PLT) not stated; formulas appear in a test comment.
 - Read in this pass: (ERO, ISO, HYP) abstract fetched in part (first sentence only). (PLT) metadata only (Crossref, OpenAlex, Semantic Scholar). Equations not read.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, authors, volume 359, issue 6391, pages 123-129. The model name GDH1 is not in the part of the abstract that was reachable. (PLT) citation correct (authors Carol A. Stein and Seth Stein). The depth equations in the test comment could not be confirmed against the paper.
+- Read 2026-10-21 (sea level from the ocean's volume; ledger PLT-351, PLT-352): the paper still not read (paywalled). A research sub-agent read Stein 1995 (below) for the ridge depth 2,600 m and the heat-flow law's decay 0.0278; the depth law's 365, 5,651, 2,473 and its 20-Myr knee were found only on a secondary page that cites the paper (github.com/Elkhan-Isayev/pangaea-drift).
 
 ### ParsonsSclater1977
 - Reference: Parsons, B. and Sclater, J. G. (1977). An analysis of the variation of ocean floor bathymetry and heat flow with age. Journal of Geophysical Research 82(5):803-827.
@@ -1119,6 +1120,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) no record. (PLT) not stated.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) not fetched itself; its formulas were read as reproduced in King & Adam 2014 (a secondary open copy) and Wikipedia "Seafloor spreading".
 - Reference check: (ERO, ISO, HYP) Crossref matches the title, volume 82, issue 5, pages 803-827. The sources file gives no year-title pair; the 1977 paper is the correct identification. (PLT) now identifiable. Identification only; the "2.5 km" is the intercept of the square-root law (see Part 2).
+- Read 2026-10-21 (ledger PLT-352, as the cross-check): the scanned first page at https://topex.ucsd.edu/geodynamics/parsons_sclater77.pdf, by OCR: "Between 0 and 70 m.y. B.P. the depth can be represented by the relation d(t) = 2500 + 350 t^1/2 m ... and for regions older than 20 m.y. B.P. by the relation d(t) = 6400 - 3200 exp(-t/62.8) m" (OCR gave 6400 as "6L00"; Wikipedia's secondary copy resolves it).
 
 ### Cogley1984
 - Reference: Cogley, J. G. (1984). Continental margins and the extent and number of the continents. Reviews of Geophysics 22(2):101-122.
@@ -1169,6 +1171,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) no record. (PLT) not stated.
 - Read in this pass: (ERO, ISO, HYP) full text fetched (text of the 3-page article including Tables 1 and 2). (PLT) metadata only (OpenAlex abstract is only a copyright line).
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 23, issue 2, pages 112-114. The article says: "For this effort, we relied on the SRTM30PLUS V5 bathymetry database (Becker et al., 2009)", so the project's "on SRTM30_PLUS" is right. (PLT) correct. Numbers not read.
+- Read 2026-10-21 (ledger ISO-085, CLM-106): the PDF, Table 2: "Mean or Total 3682.22 m, 361.841 (10^6 km2), 1.33238 (10^9 km3)", 1-sigma 1.2 % on depth and volume, 0.14 % on area.
 
 ### Tzathas2024
 - Reference: Tzathas, P., Gailleton, B., Steer, P. and Cordonnier, G. (2024). Physically-based analytical erosion for fast terrain generation. Computer Graphics Forum 43(2) (Eurographics 2024).
@@ -4425,6 +4428,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read in this pass: abstract fetched (Crossref, full).
 - Reference check: n/a.
 - Read in WP-13a (2026-10-02): the grid, area-weighted by cos(latitude) over the 58 % of the sphere it covers (computed): median 55.4 Myr, mean 64.1, 90th percentile 133, 99th 173, oldest 339 Myr; 0.61 % older than 180 Myr and 0.06 % older than 250. Ledger: PLT-161, PLT-201, CHK-019, CHK-032 to CHK-034. The paper itself was not read.
+- Read 2026-10-21: the abstract on EarthByte's page: "We find the mean age of oceanic crust is 64.2 Myrs, slightly older than previous estimates".
 
 ### SyracuseAbers2006
 - Reference: Syracuse, E. M., Abers, G. A. (2006). Global compilation of variations in slab depth beneath arc volcanoes and implications. Geochemistry, Geophysics, Geosystems 7(5):Q05017.
@@ -4696,6 +4700,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read so far (by the project): not stated
 - Read in this pass: full text fetched (abstract and discussion passages on ice volume and sea-level potential)
 - Reference check: matches. It covers Antarctica only; Greenland comes from Morlighem2017.
+- Read 2026-10-21 (ledger ISO-085): Table 7, "Volume excluding ice shelves (10^6 km3) 25.34 [Bedmap1], 26.54 [Bedmap2]", 26.92 with the shelves; Table 8, "Total potential contribution 58.3" m.
 
 ### Morlighem2017
 - Reference: Morlighem, M., Williams, C. N., Rignot, E., An, L., Arndt, J. E., Bamber, J. L., et al. (2017). BedMachine v3: Complete bed topography and ocean bathymetry mapping of Greenland from multibeam echo sounding combined with mass conservation. Geophysical Research Letters 44(21): 11051-11061.
@@ -4707,6 +4712,7 @@ GPlates/pyGPlates (software, GPL-2.0), the community ports of Cortial (robertoos
 - Read so far (by the project): not stated
 - Read in this pass: full text fetched (key points, abstract, results text)
 - Reference check: matches. Page range 11051-11061 is from my memory of the article number format, not from Crossref (Crossref returned no page); treat as unverified.
+- Ledger ids since 2026-10-21: ISO-085 (Greenland's 2.99e6 km3, as read for CLM-108).
 
 ### Abbot2010
 - Reference: Abbot, D. S., & Pierrehumbert, R. T. (2010). Mudball: Surface dust and Snowball Earth deglaciation. Journal of Geophysical Research: Atmospheres 115(D3): D03104.
@@ -6594,18 +6600,21 @@ Stern & Scholl 2010 (the rates, PLT-045 and PLT-285) and Cloos 1993 (the arcs' m
 - Ledger ids: STE-009
 - Access: open (the journal page shows the abstract; the numbers are in the PDF).
 - Read so far (by the project): 2026-10-05, the WHOI release only: "1.332 billion cubic kilometers", mean depth "3,682.2 meters". The paper itself was not opened.
+- Read 2026-10-21: the paper itself (Table 2, as in the entry above), so STE-009 is `verified`.
 
 ### HaqSchutter2008
 - Reference: Haq, B. U. and Schutter, S. R. (2008). A chronology of Paleozoic sea-level changes. Science 322:64-68.
 - Cited as: "Haq & Schutter 2008" (the size of long-term sea-level change, a reference for the steering's sea rate).
 - Ledger ids: STE-013
 - Access: paywalled. Read so far (by the project): from memory.
+- Read 2026-10-21: the abstract: "172 eustatic events ... varying in magnitude from a few tens of meters to approximately 125 meters"; no level against today.
 
 ### Miller2005
 - Reference: Miller, K. G. et al. (2005). The Phanerozoic record of global sea-level change. Science 310:1293-1298.
 - Cited as: "Miller et al. 2005" (as above).
 - Ledger ids: STE-013
 - Access: paywalled. Read so far (by the project): from memory.
+- Read 2026-10-21 (ledger ISO-087): the abstract (Europe PMC, PMID 16311326): "Long-term sea level peaked at 100 +/- 50 meters during the Cretaceous".
 
 ### Berner2004
 - Reference: Berner, R. A. (2004). The Phanerozoic Carbon Cycle: CO2 and O2. Oxford University Press.
@@ -7182,6 +7191,73 @@ The sources named for a lake's sediment trap (HYD-110) and for the sediment-load
 - Ledger ids: PLT-129 (the 2026-10-21 note)
 - Access: not fetched.
 - Read so far (by the project): nothing. The claim taken from it, that a sediment column under water stands up by its load's isostatic correction (the backstripping relation), is from memory and unchecked.
+
+## Sea level from the ocean's volume (ISO-085 to ISO-087, PLT-350 to PLT-353, CLM-210), added 2026-10-21
+
+The sources of the planet's water, the floor's age-depth law and the check on the sea-level curve, build log 2026-10-21 "Sea level from the ocean's volume". Read by a research sub-agent on 2026-10-21 as each entry says; numbers seen only in search-engine summaries were not used.
+
+### EakinsSharman2010
+- Reference: Eakins, B. W. and Sharman, G. F. (2010). Volumes of the World's Oceans from ETOPO1. NOAA National Geophysical Data Center, Boulder, CO.
+- DOI or URL: a mirror at https://climatechange.usf.edu/documents/Thermal%20Expansion/ocean_volumes.pdf (the NOAA page itself not read).
+- Cited as: "Eakins & Sharman 2010" (the ocean volume beside Charette & Smith 2010).
+- Ledger ids: ISO-085
+- Access: open.
+- Read so far (by the project): the mirror, 2026-10-21: "Total: 361,900,000 ... 1,335,000,000 ... 3688 ... 10,803" (km2, km3, mean and greatest depth m); 0.1 % on the area, 1 % on the volume.
+
+### VaughanEtAl2013_AR5Ch4
+- Reference: Vaughan, D. G., Comiso, J. C., et al. (2013). Observations: Cryosphere. In: Climate Change 2013: The Physical Science Basis. Contribution of Working Group I to the Fifth Assessment Report of the IPCC, chapter 4. Cambridge University Press.
+- DOI or URL: https://www.ipcc.ch/site/assets/uploads/2018/02/WG1AR5_Chapter04_FINAL.pdf
+- Cited as: "IPCC AR5 WG1 Ch. 4, Table 4.1".
+- Ledger ids: ISO-085, CLM-099, CLM-210
+- Access: open.
+- Read so far (by the project): Table 4.1, 2026-10-21: sea-level equivalents Antarctic ice sheet 58.3 m, Greenland 7.36 m, glaciers 0.41 m (total about 66.1 m); note b: "ice density of 917 kg m-3, a seawater density of 1028 kg m-3, with seawater replacing ice currently below sea level".
+
+### Stein1995
+- Reference: Stein, C. A. (1995). Heat flow of the Earth. In: Ahrens, T. J. (ed.), Global Earth Physics: A Handbook of Physical Constants, AGU Reference Shelf 1, pp. 144-158 (pages from memory).
+- DOI or URL: an open copy at https://unicamp.br/fea/ortega/extensao/Stein.pdf
+- Cited as: "Stein 1995" (GDH1's ridge depth and decay constant, read in place of the paywalled Stein & Stein 1992).
+- Ledger ids: PLT-352
+- Access: open copy (OCR text, garbled but legible).
+- Read so far (by the project): 2026-10-21: "q(t) = 510 t^-1/2 for ages less than or equal to 55 Ma and 48 + 96 exp(-0.0278 t) for ages greater than 55 Ma"; Table 2: GDH1 ridge depth 2600 m, plate thickness 95 km, basal temperature 1450 C, expansion coefficient 3.1e-5. The depth law's coefficients are not in what was read.
+
+### Muller2008
+- Reference: Müller, R. D., Sdrolias, M., Gaina, C., Steinberger, B. and Heine, C. (2008). Long-term sea-level fluctuations driven by ocean basin dynamics. Science 319(5868):1357-1362 (authors after the first and pages from memory).
+- DOI or URL: 10.1126/science.1151540 (from memory); abstract via Europe PMC, PMID 18323446.
+- Cited as: "Müller et al. 2008".
+- Ledger ids: ISO-087
+- Access: paywalled; abstract read.
+- Read so far (by the project): the abstract, 2026-10-21: "we model a Late Cretaceous sea level that is 170 (85 to 270) meters higher than it is today"; published estimates "differ ... from approximately 40 to approximately 250 meters". The figure and the supplement were not opened.
+
+### Haq1987
+- Reference: Haq, B. U., Hardenbol, J. and Vail, P. R. (1987). Chronology of fluctuating sea levels since the Triassic. Science 235(4793):1156-1167 (from memory).
+- Cited as: "Haq et al. 1987" (the 250-m Cretaceous high stand).
+- Ledger ids: ISO-087
+- Access: paywalled; abstract read (no numbers).
+- Read so far (by the project): the abstract, 2026-10-21, gives no levels; the 250 m is read at second hand in Miller et al. 2011 (below).
+
+### Miller2011
+- Reference: Miller, K. G., Mountain, G. S., Wright, J. D. and Browning, J. V. (2011). A 180-million-year record of sea level and ice volume variations from continental margin and deep-sea isotopic records. Oceanography 24(2):40-53 (authors after the first and pages from memory).
+- DOI or URL: https://tos.org/oceanography/assets/docs/24-2_miller.pdf
+- Cited as: "Miller et al. 2011".
+- Ledger ids: ISO-087
+- Access: open.
+- Read so far (by the project): 2026-10-21, the Fig. 5 caption: "in the range of 100-200 m for the peak at ca. 80 million years (versus the 250 m of Haq et al., 1987)"; and the hydro-isostatic share: a 120 m water addition gives "about two-thirds of this figure due to isostatic adjustment (i.e., 80 m ...)".
+
+### Kominz1998
+- Reference: Kominz, M. A., Miller, K. G. and Browning, J. V. (1998). Long-term and short-term global Cenozoic sea-level estimates. Geology 26(4):311-314 (authors after the first and pages from memory).
+- DOI or URL: https://eps.rutgers.edu/images/stories/faculty/miller_kenneth_g/kgmpdf/98-Kominz.Geology.pdf
+- Cited as: "Kominz et al. 1998" (the backstripping relation, the water-loaded share).
+- Ledger ids: PLT-353
+- Access: open copy.
+- Read so far (by the project): 2026-10-21: the method "assumes an Airy isostatic response to loads", with "R2 = [R1 - TS] [(ρa - ρw)/ρa]" (a the asthenosphere, w water; the minus signs lost in the text extraction and restored).
+
+### Parsons1982
+- Reference: Parsons, B. (1982). Causes and consequences of the relation between area and age of the ocean floor. Journal of Geophysical Research 87(B1):289-302.
+- DOI or URL: https://www.osti.gov/biblio/5545743 (the abstract)
+- Cited as: "Parsons 1982" (the starting ocean's steady-state age–area distribution).
+- Ledger ids: PLT-356
+- Access: paywalled; abstract read.
+- Read so far (by the project): the abstract on OSTI, 2026-10-21: the area of ocean floor with age "is approximately described by dA/dt = C0(1-(t/tm)), where C0 is the rate of crustal generation and tm the maximum age", explained by "a balance between crustal generation and consumption where consumption is uniformly distributed with age"; the consumption per unit age scatters about "a mean value equal to C0/tm (approx. 1.7 x 10^-8 km2/yr2)". The abstract gives neither C0 nor t_m.
 
 ## White patches, drowned continents and coastal high ground, added 2026-10-21
 
