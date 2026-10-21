@@ -1558,7 +1558,11 @@ impl BakeMap {
                 let q = j * TILE + i;
                 let hh = f64::from(hg.h[k]);
                 // No sea in a closed basin (HYD-100): its ground below sea level is the lowest land.
-                let seen = if Self::closed_at(hg, k) { hh.max(sea + 0.01) } else { hh };
+                let seen = if Self::closed_at(hg, k) {
+                    hh.max(sea + 0.01)
+                } else {
+                    hh
+                };
                 let mut rgb = self.ramp_colour(seen);
                 let mut strength = if seen < sea { 0.4 } else { 0.8 };
                 let (lake, lvl) = self.lake_at(hg, k);
@@ -1939,7 +1943,10 @@ mod tests {
         // The closed bowls below sea level (HYD-100): dry ground and a lake at y 50, no sea.
         assert_eq!(map.sample(-200, -70).unwrap()["surface"], "land");
         let low = map.sample(-200, 70).unwrap();
-        assert_eq!((&low["surface"], &low["water_y"]), (&json!("lake"), &json!(50.0)));
+        assert_eq!(
+            (&low["surface"], &low["water_y"]),
+            (&json!("lake"), &json!(50.0))
+        );
         // The border column of the tile west of the seam's neighbour is the next tile's first.
         let west = map.heights(&TileGeom::new(2048, 2, 3, 2).unwrap()).unwrap();
         let east = map.heights(&g).unwrap();
