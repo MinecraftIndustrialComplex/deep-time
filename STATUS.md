@@ -155,6 +155,62 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Gates.** None needed: no Rust, Java or preset changed (a review tool and docs only).
 - **For Ben.** (1) The plate geometry task (his call of today) will not by itself move the coastal mountains; the high ground's extent will. (2) A mass-elevation term for the surface temperature (CLM-220) is a climate law for every planet: recommended as its own task. (3) The sea-level task's sign depends on the planet's water: the start holds 80 % of Earth's.
 - **Next step.** The coordinator merges; the plate-geometry task starts from plates.md's section.
+### 2026-10-21: The continent bisect: the same earthlike_quick_16k runs on ten master commits (25ae6723 to 30c4d664), each commit's own binary and shipped preset; land and landmasses, one reading (measurement task, no simulation code changed; coordinator's task after Ben's "I've noticed a lack of proper continents across most of my recent runs in the past ~2 days"; agent worktree agent-a0ff5f535996fe907, branch worktree-agent-a0ff5f535996fe907 from master 30c4d664; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Question.** Is the lack of continents a regression from an earlier better state, or has the model been short of them throughout? Ben's run (seed 1, supercontinent, 1000 Myr, master 0a7431e1) ended at land 0.215 against Earth's 0.29, the right half an archipelago.
+- **Method.** Each commit's release `deeptime` built on the VM from its own `git archive` (`tools/review/continent-bisect.sh ship` then `build`, scratch under `/data/ban/deeptime-runs/continent-bisect/`, a seeded `target/` and `tar -x -m` so the workspace crates rebuild). Per commit: `earthlike_quick_16k` as that commit ships it, no overrides, 1000 Myr, seeds 1 and 2, starts supercontinent and scattered_continents, 2 threads, CPU compute, `DEEPTIME_CRUST_BUDGET=1` (for the island-arc share); each also stopped at 500 Myr with `--set timeline.stop_myr=500` (the world at that time of the 1000 Myr plan, with its own tail; the stage prints `steps=250 t_years=-500000000`). `deeptime stage volcanoes` (plates, climate, surface, volcanoes, impacts, structure; the checkpoint's next stage is deposits) then `deeptime dump-fields` of `surface/elevation_m`, `plates/crust_type`, `elevation`; `tools/review/continent-bisect.py` (stdlib) reads every commit's own output the same way: land above `climate/sea_level_m` (or the printed `sea_level_m` where an older `dump-fields` has no globals.json) on the L1 equal-area grid, true-area weighted; landmasses are 8-connected land cells wrapped across the seam. Its land, continental share, drowned share and land above 2 km agree with the stage's printed `hypsometry` line to 0.0005 in all 81 runs. 80 runs plus the controls, every one admitted (`sim:earthlike_quick_16k:2t`, `cargo:build`).
+- **Controls.** 4b615b24 ("default planets bit-identical") against bc2e5472, supercontinent seed 1, 1000 Myr: land, crust and elevation rasters byte-identical, so it is left out of the table. 30c4d664 against 3768c05b: byte-identical rasters (the biome bake's land call does not touch the simulation). HEAD with `DEEPTIME_CRUST_BUDGET` unset (`continent-bisect.sh control`): byte-identical rasters, so the budget env is measurement only.
+- **Measured** (final frame, mean of seeds 1 and 2; the full tables for both starts and both stops, the per-run CSV and the commands are in `tools/review/out-free/continent-bisect.md`, `.csv`, `.txt`). Columns: land share of the planet (Earth 0.29); cont continental crust's share of the planet; drown share of it under the sea (Earth about 0.19); hi2 land above 2 km, share of land; L1, L2 the largest landmasses (Earth 0.167, 0.083); n landmasses of at least 0.01 of the planet (4); in the share of land in them (0.95); arc island-arc share of the land.
+
+Supercontinent start, 1000 Myr:
+
+| commit | land | cont | drown | hi2 | L1 | L2 | n | in | arc |
+|---|---|---|---|---|---|---|---|---|---|
+| 25ae6723 | 0.146 | 0.468 | 0.688 | 0.180 | 0.032 | 0.025 | 4.5 | 0.642 | - |
+| fb38204f | 0.184 | 0.458 | 0.606 | 0.202 | 0.109 | 0.034 | 3.0 | 0.827 | - |
+| 3e7edd49 | 0.158 | 0.424 | 0.635 | 0.196 | 0.051 | 0.036 | 4.0 | 0.701 | - |
+| bc2e5472 | 0.295 | 0.446 | 0.405 | 0.222 | 0.142 | 0.064 | 4.5 | 0.872 | - |
+| c24ff793 | 0.308 | 0.419 | 0.327 | 0.301 | 0.130 | 0.078 | 5.0 | 0.852 | 0.539 |
+| 3bf532d1 | 0.292 | 0.411 | 0.349 | 0.330 | 0.129 | 0.045 | 5.0 | 0.819 | 0.587 |
+| 9c21cee3 | 0.276 | 0.423 | 0.398 | 0.303 | 0.089 | 0.055 | 5.0 | 0.843 | 0.468 |
+| 9c9c2012 | 0.236 | 0.344 | 0.371 | 0.305 | 0.090 | 0.055 | 3.5 | 0.858 | 0.456 |
+| 3768c05b | 0.265 | 0.394 | 0.381 | 0.224 | 0.130 | 0.043 | 4.5 | 0.881 | 0.376 |
+| 30c4d664 | 0.265 | 0.394 | 0.381 | 0.224 | 0.130 | 0.043 | 4.5 | 0.881 | 0.376 |
+
+Scattered-continents start, 1000 Myr:
+
+| commit | land | cont | drown | hi2 | L1 | L2 | n | in | arc |
+|---|---|---|---|---|---|---|---|---|---|
+| 25ae6723 | 0.181 | 0.383 | 0.548 | 0.313 | 0.063 | 0.046 | 3.5 | 0.827 | - |
+| fb38204f | 0.183 | 0.416 | 0.577 | 0.280 | 0.099 | 0.035 | 3.0 | 0.829 | - |
+| 3e7edd49 | 0.177 | 0.445 | 0.612 | 0.211 | 0.055 | 0.029 | 4.5 | 0.722 | - |
+| bc2e5472 | 0.316 | 0.415 | 0.323 | 0.316 | 0.208 | 0.048 | 2.0 | 0.844 | - |
+| c24ff793 | 0.337 | 0.439 | 0.293 | 0.290 | 0.201 | 0.035 | 4.0 | 0.897 | 0.564 |
+| 3bf532d1 | 0.277 | 0.366 | 0.317 | 0.320 | 0.140 | 0.067 | 4.0 | 0.875 | 0.591 |
+| 9c21cee3 | 0.261 | 0.400 | 0.418 | 0.234 | 0.092 | 0.035 | 5.5 | 0.756 | 0.568 |
+| 9c9c2012 | 0.251 | 0.353 | 0.354 | 0.276 | 0.086 | 0.074 | 4.5 | 0.817 | 0.431 |
+| 3768c05b | 0.248 | 0.354 | 0.367 | 0.316 | 0.094 | 0.048 | 5.5 | 0.896 | 0.449 |
+| 30c4d664 | 0.248 | 0.354 | 0.367 | 0.316 | 0.094 | 0.048 | 5.5 | 0.896 | 0.449 |
+
+Both starts and both seeds (four runs a commit), 500 Myr (the 500 Myr per-start tables are in the file):
+
+| commit | land | cont | drown | hi2 | L1 | L2 | n | in | arc |
+|---|---|---|---|---|---|---|---|---|---|
+| 25ae6723 | 0.183 | 0.377 | 0.528 | 0.267 | 0.087 | 0.038 | 3.0 | 0.836 | - |
+| fb38204f | 0.178 | 0.394 | 0.562 | 0.273 | 0.074 | 0.035 | 3.8 | 0.795 | - |
+| 3e7edd49 | 0.167 | 0.383 | 0.579 | 0.242 | 0.070 | 0.035 | 3.2 | 0.741 | - |
+| bc2e5472 | 0.301 | 0.432 | 0.357 | 0.260 | 0.129 | 0.069 | 4.0 | 0.858 | - |
+| c24ff793 | 0.266 | 0.367 | 0.324 | 0.374 | 0.117 | 0.068 | 3.8 | 0.860 | 0.424 |
+| 3bf532d1 | 0.263 | 0.381 | 0.358 | 0.349 | 0.120 | 0.050 | 4.5 | 0.872 | 0.395 |
+| 9c21cee3 | 0.279 | 0.382 | 0.323 | 0.323 | 0.194 | 0.036 | 2.8 | 0.884 | 0.361 |
+| 9c9c2012 | 0.230 | 0.335 | 0.361 | 0.335 | 0.080 | 0.058 | 5.2 | 0.866 | 0.311 |
+| 3768c05b | 0.234 | 0.348 | 0.369 | 0.271 | 0.115 | 0.046 | 3.5 | 0.851 | 0.288 |
+| 30c4d664 | 0.234 | 0.348 | 0.369 | 0.271 | 0.115 | 0.046 | 3.5 | 0.851 | 0.288 |
+
+- **Findings.** (1) The largest step is bc2e5472 (continents keep their land): land 0.168 to 0.305, drowned continental crust 0.62 to 0.36, largest landmass 0.053 to 0.175 (all four runs, final); before it the model sat at land 0.16 to 0.18 with 0.59 to 0.62 of its continental crust under the sea, which is the lack of continents Ben describes (master from 10-18 to 10-20 02:48). (2) c24ff793 is the best state measured: land 0.323, drowned 0.31, largest landmass 0.166. (3) From there a slide to 9c9c2012 (10-20 11:37 to 18:19): land 0.323, 0.284, 0.269, 0.244, largest landmass 0.166, 0.134, 0.090, 0.088, continental crust 0.429, 0.388, 0.411, 0.349; 3bf532d1 -0.039 land, 9c21cee3 -0.015 (largest landmass 0.134 to 0.090), 9c9c2012 -0.025 land and -0.062 continental crust. A step under 0.03 is inside the noise (single-run sd 0.01 to 0.04, so a four-run mean carries +-0.01 to +-0.02); the whole fall, -0.079, is not. (4) 3768c05b gives back +0.013 land, inside the noise. (5) Now: land 0.257, drowned 0.374, largest landmass 0.112, 5.0 landmasses of at least 0.01, 89 % of the land in them: landmass count is not the shortfall, the area of the largest ones and the drowned share are. The island-arc share of the land falls over the same commits (0.552 at c24ff793, 0.589 at 3bf532d1, 0.412 now). (6) Regression or throughout: both. The model was worst before bc2e5472, was Earth-like in land and largest landmass for about half a day (10-20 02:48 to 14:10), and has since lost about 0.065 land and 0.054 of the largest landmass, to a state still far above the one before bc2e5472 but short of Earth's drowned share and largest landmass. Not measured: anything before 25ae6723 (it is already in the trough), seeds beyond two.
+- **Choices** (mine, undoable): 500 Myr as `timeline.stop_myr` on the 1000 Myr plan (not a short run, not the long run's frame at 500 Myr); CPU compute on every run (the VM has no GPU, and a GPU world differs: Ben's 0.215 on 0a7431e1 is not directly comparable, the nearest commit here, 9c9c2012, reads 0.227 on supercontinent seed 1); the "final frame" is the end of the coupled pipeline (`stage volcanoes`), not the bake's; `DEEPTIME_CRUST_BUDGET=1` throughout; 4b615b24 skipped after its identity check.
+- **Commands.** `tools/review/continent-bisect.sh ship <commits>` (laptop), `tools/remote/mac.sh -- tools/remote/detach.sh start cb-<c> tools/review/continent-bisect.sh all <c> 1 supercontinent,scattered_continents 1000,500` (build, then seed 1), the same with `runs <c> 2 ...` for seed 2, `... continent-bisect.sh control 30c4d664 1 supercontinent 1000`, and `tools/remote/mac.sh -- python3 -I tools/review/continent-bisect.py /data/ban/deeptime-runs/continent-bisect 25ae6723,fb38204f,3e7edd49,bc2e5472,c24ff793,3bf532d1,9c21cee3,9c9c2012,3768c05b,30c4d664 1,2 supercontinent,scattered_continents 1000,500 --csv F --md F --runs`. About 2.5 hours on the shared VM (24 to 32 sims side by side at 2 threads, 8 to 16 minutes each under load).
+- **Next.** The coordinator decides whether the slide from c24ff793 (the commits in it are the crust budget's cordillera, PLT-294 and the arc fronts; this bisect does not separate which of them is responsible, and the island-arc share of the land fell from 0.59 to 0.41 over them) is the model's intent or wants a closer look, for instance a larger ensemble on 3bf532d1, 9c21cee3 and 9c9c2012 with each switch alone. VM scratch (`/data/ban/deeptime-runs/continent-bisect`) deleted.
+
 ### 2026-10-21: The biome bake's land call on the world's ground: the projection pass re-decides every L2 biome node with the column evaluator's own sea rule, so no node keeps a land biome under the sea or an ocean biome on dry ground (BIO-170 to BIO-174, BAK-057 to BAK-059, HYD-106 to HYD-109) (coordinator's task, loose end (1) of the HYD-100 entry below; agent worktree agent-a7e8aa9425fbce4eb, branch worktree-agent-a7e8aa9425fbce4eb from master f1632cf3; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Where the call was.** `bake/biomes.rs` `map` decided land from the simulation's Lambert L2 grid, `elevation > sea level || closed_below_sea` (HYD-104). The game's sea is `ground < sea level - 1 && !closed` on the world's own projected height (step 3 of the column evaluator). Two differences: the last block under sea level (H in (sea - 1, sea], a 35 m band) is dry in the game and ocean in the bake (HYD-107), and the Lambert L2 cell and the world's footprint mean disagree on some nodes, plus HYD-105 opens pockets to the sea that the Lambert hydrology called closed (HYD-108).
 - **Change.**
