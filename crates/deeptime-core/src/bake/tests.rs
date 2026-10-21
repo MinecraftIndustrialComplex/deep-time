@@ -504,17 +504,16 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
             .filter(|&&(_, _, bottom)| bottom <= rock)
             .map(|&(_, top, _)| top.min(rock))
             .max();
-        let Some(ore_top) = ore_top else {
-            panic!(
-                "site {} ({}, {}) at ({}, {}): no ore at or under the top rock block {rock}: {:?}",
-                s.id,
-                s.deposit_type,
-                guaranteed[&s.forming_event],
-                s.center[0],
-                s.center[2],
-                col.bodies
-            );
-        };
+        assert!(
+            ore_top.is_some(),
+            "site {} ({}, {}) at ({}, {}): no ore at or under the top rock block {rock}: {:?}",
+            s.id,
+            s.deposit_type,
+            guaranteed[&s.forming_event],
+            s.center[0],
+            s.center[2],
+            col.bodies
+        );
         if guaranteed[&s.forming_event] == "c:iron" {
             // An exposed essential's ore tops out exactly at the top rock block in its centre
             // column (DEP-221).
