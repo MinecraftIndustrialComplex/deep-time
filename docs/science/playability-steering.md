@@ -69,7 +69,7 @@ the number of times either control reversed).
 | STE-006 | sea rate, largest offset | 2; 200 | m/Myr; m | | `game-choice` |
 | STE-007 | outgassing rate, largest factor | 0.2; 2 | ln/Myr; × | | `game-choice` |
 | STE-008 | hydro-isostatic share | 1 − 1030/3300 = 0.688 | | Airy isostasy | `from-memory` |
-| STE-009 | Earth's ocean volume | 1.332 × 10⁹ | km³ | Charette & Smith 2010 | `cited-unverified` |
+| STE-009 | Earth's ocean volume | 1.332 × 10⁹ | km³ | Charette & Smith 2010 | `verified` (Table 2, 2026-10-21) |
 | STE-010 | errors at full rate | 0.05; 5 | share; K | | `game-choice` |
 
 Sea controller, each plate step of length Δt (Myr) in the tail, land share L, band [L_lo, L_hi]:
@@ -77,7 +77,7 @@ Sea controller, each plate step of length Δt (Myr) in the tail, land share L, b
   e = L_lo − L if L < L_lo; L_hi − L if L > L_hi; else 0
   Δh = −w · r_sea · Δt · clamp(e / 0.05, −1, 1);  h ← clamp(h + Δh, −h_max, h_max)
 
-and the eustatic sea level becomes curve + glacio-eustasy + h. The CO₂ controller is the same on
+and the eustatic sea level becomes the ocean's water over its basins (less the land ice's, [sea-level.md](sea-level.md); until 2026-10-21 the curve plus glacio-eustasy) + h. The CO₂ controller is the same on
 x = ln(degassing factor) with the global mean temperature, 5 K and r_co2, x within ±ln F.
 
 ## Earth against the mod
