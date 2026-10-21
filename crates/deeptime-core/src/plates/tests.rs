@@ -1931,14 +1931,8 @@ fn thick_ocean_crust_cools_towards_the_floor_it_holds_up() {
         s.elevation_m = -3000.0;
         s.flags = 0;
     }
-    // The steps' clock runs, so the pelagic cover they lay stays the cover of the crust's age
-    // (no basin fill, PLT-340).
-    let fill = Fill {
-        sea_m: 0.0,
-        rise: crate::surface::flexure::rise_per_m_of_fill(0.8),
-    };
-    for step in 1..=800 {
-        surface(&mut st, &geo, &stage.env(&p.tectonics, step), &[], fill);
+    for _ in 0..800 {
+        surface(&mut st, &geo, &env, &[]);
     }
     let per_m = transition::crust_per_metre(&env);
     let cap = 0.5 * (transition::continental_m() + transition::oceanic_m());

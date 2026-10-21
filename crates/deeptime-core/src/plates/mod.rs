@@ -550,18 +550,7 @@ impl PlatesStage {
         book(st, gap_budget::Part::Rate);
         add_limited(world, limited);
         lap(&mut clock, "rate");
-        let fill = Fill {
-            sea_m: sea,
-            rise: crate::surface::flexure::rise_per_m_of_fill(
-                self.preset
-                    .surface
-                    .as_ref()
-                    .map_or(crate::surface::SurfaceParams::default().isostasy, |p| {
-                        p.isostasy
-                    }),
-            ),
-        };
-        surface(st, &cache.geo, &env, &taper.floor_m, fill);
+        surface(st, &cache.geo, &env, &taper.floor_m);
         book(st, gap_budget::Part::PlateSurface);
         finish_samples(st, &cache.geo, &z0, &env);
         book(st, gap_budget::Part::Finish);
@@ -1114,18 +1103,10 @@ fn note_dynamics(st: &PlateState, world: &mut WorldState) {
     world.notes.insert(STAGE_NAME.to_owned(), note.to_string());
 }
 
-/// What an oceanic column's sediment fill stands up by (`pools::filled_floor_m`, PLT-340): the
-/// sea level and the surface's rise per metre of fill on land and under the sea.
-#[derive(Clone, Copy, Debug)]
-struct Fill {
-    sea_m: f64,
-    rise: (f64, f64),
-}
-
 /// Continental erosion, oceanic dampening, trench accretion and the rock pools (Cortial §4.5,
 /// `pools.rs`), then eroded rock moves one hop downhill as sediment (to the lowest lattice
 /// neighbour of the same rigid group).
-fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32], fill: Fill) {
+fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32]) {
     let k = env.k;
     let per_m = transition::crust_per_metre(env);
     let held_cap = 0.5 * (transition::continental_m() + transition::oceanic_m());
@@ -1158,15 +1139,6 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32], fi
                     k.oceanic_floor_elevation_m,
                     per_m,
                 ) as f32;
-            }
-            // The floor stands the sediment a basin, a fan or a delta laid on it up (a trench's
-            // is the slab's: it goes under or into the wedge). ledger: PLT-340
-            if s.kind == OCEANIC && s.flags & TRENCH == 0 {
-                let f = pools::ocean_fill_m(&s.pools, s.age_myr(env.t_myr), k.pelagic_m_per_myr);
-                if f > 0.0 {
-                    let floor = f64::from(held).max(k.oceanic_floor_elevation_m);
-                    held = pools::filled_floor_m(floor, f, fill.sea_m, fill.rise) as f32;
-                }
             }
             surface_step(s, &rates, held)
         })
