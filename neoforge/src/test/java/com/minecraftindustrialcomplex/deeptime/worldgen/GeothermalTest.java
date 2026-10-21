@@ -170,6 +170,54 @@ class GeothermalTest {
         assertTrue(pools >= 10, "pools: " + pools);
     }
 
+    /**
+     * A hot spring's water is hot, so it is not frozen by the biome's cold (GEO-062; {@code LakeFreeze} asks
+     * {@link Geothermal#poolSurface} before vanilla's top-layer freezing and snowfall). Exactly the top block of
+     * a pool's water, in every pool column and across the seam, is kept open; the block under it, the one above
+     * it, the rim and apron at the water's level, and every column of a vent or a patch are not.
+     */
+    @Test
+    void aPoolsSurfaceWaterIsKeptOpenWhateverTheBiomeAndNothingElseIs() {
+        var vs = volcanoes(40, false);
+        Geothermal g = build(vs, WET_WARM);
+        int pools = 0, poolColumns = 0, others = 0;
+        for (Geothermal.Site s : g.sites()) {
+            if (s.kind() == Geothermal.Kind.POOL)
+                pools++;
+            for (int dx = -s.reach(); dx <= s.reach(); dx++)
+                for (int dz = -s.reach(); dz <= s.reach(); dz++) {
+                    int x = s.x() + dx, z = s.z() + dz;
+                    Geothermal.Part p = g.partAt(x, z);
+                    Geothermal.Site winner = g.claim(x, z);
+                    if (p.pool()) {
+                        // The column's water is its winner's (another site's box may reach this site's pool).
+                        assertEquals(Geothermal.Kind.POOL, winner.kind());
+                        poolColumns++;
+                        int lv = winner.level();
+                        assertTrue(g.poolSurface(x, lv, z), "the surface of pool " + winner.id() + " at (" + x + "," + z + ") " + p);
+                        assertTrue(g.poolSurface(x + C, lv, z) && g.poolSurface(x - C, lv, z), "and a world apart across the seam");
+                        assertFalse(g.poolSurface(x, lv + 1, z), "not the air over it");
+                        assertFalse(g.poolSurface(x, lv - 1, z), "not the block under the surface");
+                        assertFalse(g.poolSurface(x, lv - 2, z) || g.poolSurface(x, lv + 12, z), "nor any other height");
+                    } else {
+                        // Rim and apron at the water's level, a vent or a patch at its ground's: snow may lie there.
+                        for (int y = Math.min(s.level(), s.groundY()) - 2; y <= Math.max(s.level(), s.groundY()) + 2; y++)
+                            assertFalse(g.poolSurface(x, y, z), "column (" + x + "," + z + ") is " + p + " of site " + s.id() + ", not water");
+                        others++;
+                    }
+                }
+        }
+        assertTrue(pools >= 10 && poolColumns >= 3 * pools && others > 0, "pools " + pools + ", pool columns " + poolColumns + ", others " + others);
+        // Far from every site, in a world without one and with the feature off: nothing is kept open.
+        assertFalse(g.poolSurface(0, 80, 5000));
+        assertFalse(Geothermal.NONE.poolSurface(0, 75, 0));
+        assertFalse(build(vs, new GeothermalRules(0.0, 1.0, 1.0, 400.0, 100.0, 1.0), WET_WARM, DRY).poolSurface(0, 75, 0));
+        // A cold field has no pools (GEO-020), so nothing there is kept open either.
+        Geothermal cold = build(vs, WET_COLD);
+        assertTrue(cold.sites().stream().noneMatch(s -> s.kind() == Geothermal.Kind.POOL));
+        assertTrue(cold.sites().stream().noneMatch(s -> cold.poolSurface(s.x(), s.groundY(), s.z()) || cold.poolSurface(s.x(), s.level(), s.z())));
+    }
+
     /** On a 35-degree-steep world (a block of rise per block across) a pool is dammed downhill and cut into the slope uphill. */
     @Test
     void poolsSitOnSlopesByCuttingAndDamming() {
