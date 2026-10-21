@@ -244,34 +244,6 @@ pub fn surface_step(s: &mut Sample, r: &SurfaceRates, held_floor: f32) -> f64 {
     eroded
 }
 
-/// The floor an oceanic column cools towards once its sediment is counted: the age–depth floor
-/// `floor` (bare or held, `transition.rs`) is the sea floor with its pelagic cover, and the rest of
-/// the column's sediment, `fill_m` (rivers' and slopes' rock a basin, a fan or a delta took on),
-/// stands up by its isostatic share, `rise.1` per metre under the sea and `rise.0` above it
-/// (`surface::flexure::rise_per_m_of_fill`, the surface's own shares). The sinking of old sea floor
-/// is the cooling of the plate under the sediment, not the sediment's (Steckler and Watts 1978's
-/// sediment-loading correction, from memory). ledger: PLT-340
-pub fn filled_floor_m(floor: f64, fill_m: f64, sea_m: f64, rise: (f64, f64)) -> f64 {
-    let fill = fill_m.max(0.0);
-    let (land, sea) = rise;
-    if floor >= sea_m {
-        return floor + fill * land;
-    }
-    let to_sea = (sea_m - floor) / sea;
-    if fill <= to_sea {
-        floor + fill * sea
-    } else {
-        sea_m + (fill - to_sea) * land
-    }
-}
-
-/// The sediment of an oceanic column beyond the pelagic cover its age has laid on it (m, ≥ 0): the
-/// fill [`filled_floor_m`] stands up. ledger: PLT-340
-pub fn ocean_fill_m(pools: &[f32; pool::COUNT], age_myr: f64, pelagic_m_per_myr: f64) -> f64 {
-    let sediment = f64::from(pools[pool::SEDIMENT]) + f64::from(pools[pool::SEDIMENTARY]);
-    (sediment - pelagic_m_per_myr * age_myr.max(0.0)).max(0.0)
-}
-
 /// Oceanic depth of crust `age_myr` old implied by the dampening from the ridge height towards
 /// the floor z_f: z(a) = z_f + (z_r − z_f)·exp(−a·ε_o / |z_f|). Cortial's z_f is the trench depth;
 /// the pipeline presets' (`oceanic_floor_elevation_m`) follows GDH1.
@@ -371,49 +343,6 @@ mod tests {
             s.elevation_m
         );
         assert!(ocean_heat_flow(100.0) > 50.0 && ocean_heat_flow(0.0) == 300.0);
-    }
-
-    /// PLT-340: a basin's fill on old sea floor stays (its isostatic share), while bare sea floor
-    /// with only its pelagic cover follows the closed form as before.
-    #[test]
-    fn sediment_fill_holds_the_ocean_floor_up() {
-        let rise = crate::surface::flexure::rise_per_m_of_fill(0.8);
-        assert!((rise.0 - 0.2).abs() < 1e-9 && (rise.1 - 0.44).abs() < 1e-9, "{rise:?}");
-        let r = SurfaceRates {
-            erosion_m: 60.0,
-            damping_m: 0.12e-3 * 2.0e6,
-            accretion_m: 600.0,
-            pelagic_m: 10.0,
-            z_c: 10_000.0,
-            z_t: -10_000.0,
-            z_floor: -5600.0,
-            trench_relax: 0.5,
-            gravity: 9.81,
-        };
-        // Pelagic cover alone: no fill, the same floor as the bare law.
-        let mut bare = Sample::blank(0);
-        bare.elevation_m = -2500.0;
-        let age = 100.0;
-        bare.pools[pool::SEDIMENT] = (5.0 * age) as f32;
-        assert_eq!(ocean_fill_m(&bare.pools, age, 5.0), 0.0);
-        assert_eq!(filled_floor_m(-5600.0, 0.0, 0.0, rise), -5600.0);
-        // 3 km of basin fill on 160-Myr floor: it stands 1,320 m above the floor, and the column
-        // sitting there no longer sinks.
-        let mut filled = Sample::blank(0);
-        filled.pools[pool::SEDIMENT] = 150.0;
-        filled.pools[pool::SEDIMENTARY] = (5.0 * 160.0 + 3000.0 - 150.0) as f32;
-        let fill = ocean_fill_m(&filled.pools, 160.0, 5.0);
-        assert!((fill - 3000.0).abs() < 1e-3, "{fill}");
-        let floor = filled_floor_m(-5600.0, fill, 0.0, rise);
-        assert!((floor - (-5600.0 + 1320.0)).abs() < 1e-6, "{floor}");
-        filled.elevation_m = floor as f32;
-        surface_step(&mut filled, &r, floor as f32);
-        assert!((f64::from(filled.elevation_m) - floor).abs() < 1e-3);
-        // Fill past the sea: the rest stands up by the land share.
-        let floor = filled_floor_m(-2000.0, 6000.0, 0.0, rise);
-        let to_sea = 2000.0 / 0.44;
-        assert!((floor - (6000.0 - to_sea) * 0.2).abs() < 1e-6, "{floor}");
-        assert_eq!(filled_floor_m(100.0, 50.0, 0.0, rise), 110.0);
     }
 
     /// The pipeline presets' floor (−5,600 m at 0.215 mm/yr from a −2,500 m ridge) against Stein &
