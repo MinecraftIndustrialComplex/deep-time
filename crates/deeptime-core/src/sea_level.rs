@@ -26,7 +26,10 @@
 //! area and B the area-weighted ground of the cells with c ≤ S, and it jumps where the sea tops a
 //! pass and floods the hollow behind it. The walk up that list stops where V reaches the water:
 //! between two passes S = (V + B)/A; at a pass whose hollow takes the rest, S is the pass.
-//! Exact for the ground given, and one flood and one sort of the cells a step.
+//! Exact for the ground given, and one flood and one sort of the cells a step. The open sea at
+//! that level is taken once more: where a body grew to `min_cells` on the way up without
+//! reaching the ocean (the seeds at S₀ missed it), the level is bisected to 1 mm on the open
+//! sea's own water instead (ledger ISO-086).
 
 use rayon::prelude::*;
 
@@ -96,15 +99,52 @@ pub fn fill_level(
             .total_cmp(&spill[y as usize])
             .then_with(|| x.cmp(&y))
     });
-    walk(
+    let s1 = walk(
         order.iter().map(|&c| {
             let c = c as usize;
             (spill[c].max(h[c]), h[c], a(c))
         }),
         water,
     )
-    .unwrap_or(s0)
+    .unwrap_or(s0);
+    // 4. The open sea at S₁ itself (ledger: ISO-086). The seeds at S₀ miss a body of water that
+    // grows to `min_cells` between S₀ and S₁ without reaching the ocean: the surface calls it
+    // sea at S₁, and the walk counted it as a lake. Then the level is where the open sea's own
+    // water, V(S) = Σ over the open sea at S of (S − h)·a, reaches the planet's: V only grows
+    // with S (the bodies only grow), V(S₀) ≤ the water ≤ V(S₁), and where a body's turn to be
+    // sea makes V jump past the water, the level stays at that turn, as at a pass.
+    let mut at = vec![pflood::LAND; n];
+    pflood::open_sea_with(method, d, h, s1, min_cells, &mut at);
+    let missed = (0..n).any(|c| at[c] == pflood::BASE && spill[c].max(h[c]) > s1);
+    if !missed {
+        return s1;
+    }
+    let volume = |s: f64, at: &mut [u8]| -> f64 {
+        at.fill(pflood::LAND);
+        pflood::open_sea_with(method, d, h, s, min_cells, at);
+        // In cell order: the same sum whatever the thread count.
+        (0..n)
+            .filter(|&c| at[c] == pflood::BASE)
+            .map(|c| (s - h[c]).max(0.0) * a(c))
+            .sum::<f64>()
+    };
+    let (mut lo, mut hi) = (s0, s1);
+    // To a millimetre (FILL_TOLERANCE_M): 2⁻ᵏ of S₁ − S₀, the closed hollows' water over the
+    // sea's area.
+    while hi - lo > FILL_TOLERANCE_M {
+        let mid = 0.5 * (lo + hi);
+        if volume(mid, &mut at) >= water {
+            hi = mid;
+        } else {
+            lo = mid;
+        }
+    }
+    hi
 }
+
+/// How close the level found by halving comes to the open sea's own (`fill_level`, step 4), m
+/// (game-choice: numerical, agent 2026-10-21).
+const FILL_TOLERANCE_M: f64 = 1.0e-3;
 
 /// The level at which `water` fills the cells `(reached at, ground, area)`, sorted by the level
 /// each is reached at; None for no cells.
@@ -199,6 +239,42 @@ mod tests {
         // Past the hollow's room, the 68 cells rise together.
         let s = level(with_hollow + 10.0 * 68.0);
         assert!((s - 50.0).abs() < 1e-6, "{s}");
+    }
+
+    #[test]
+    fn a_hollow_that_turns_sea_on_the_way_up_is_sea_at_the_level() {
+        // An ocean (columns 0 to 5, 48 cells at −2,000 m) and, behind land at +100 m, a closed
+        // hollow of 24 cells: 8 at −2,500 m (columns 9 to 12, rows 2 and 3) and 16 at −1,600 m
+        // (the rest of columns 9 to 14, rows 2 to 5). The open sea's rule takes 20 cells.
+        let (d, rows) = flat(16, 8);
+        let mut h = vec![100.0; d.cells()];
+        for j in 0..8 {
+            for i in 0..6 {
+                h[j * 16 + i] = -2000.0;
+            }
+        }
+        for j in 2..6 {
+            for i in 9..15 {
+                h[j * 16 + i] = if j < 4 && i < 13 { -2500.0 } else { -1600.0 };
+            }
+        }
+        // 20,800 area·m of water. Plain hypsometry puts it at −1,700 m (the 8 deep cells are
+        // too few to be sea there); the ocean alone would hold it at −1,566.7 m, where the whole
+        // hollow is under the level and 24 cells: sea by the rule. With the hollow as sea, the
+        // water stands below −1,600 m, where the hollow is not sea: the level stays at the turn.
+        let s = fill_level(&d, &h, &rows, 20_800.0 / 128.0, 20, FloodMethod::Serial);
+        assert!((-1600.0..-1600.0 + 2.0e-3).contains(&s), "{s}");
+        // With water enough for both, the hollow fills with the ocean: 26,400 at −1,600 m, and
+        // 72 cells rise together after.
+        let s = fill_level(
+            &d,
+            &h,
+            &rows,
+            (26_400.0 + 72.0 * 50.0) / 128.0,
+            20,
+            FloodMethod::Serial,
+        );
+        assert!((s - -1550.0).abs() < 2.0e-3, "{s}");
     }
 
     #[test]

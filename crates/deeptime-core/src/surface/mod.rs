@@ -780,7 +780,7 @@ impl SurfaceStage {
                         h,
                         &rows,
                         water_m,
-                        (n / 500).max(1),
+                        (n / 500).max(1), // ledger: ISO-086, ERO-055
                         p.numerics.flood,
                     )
                 })
@@ -1966,6 +1966,15 @@ impl SurfaceStage {
                 ice_m: ice,
                 rock_share: p.isostasy,
                 parts: budget,
+                gdh1_scale: {
+                    let k = &self.preset.tectonics;
+                    (k.ocean_depth == crate::params::OceanDepth::Gdh1).then(|| {
+                        crate::plates::pools::gdh1_scale(
+                            k.ridge_elevation_m,
+                            k.oceanic_floor_elevation_m,
+                        )
+                    })
+                },
             };
             if budget {
                 answers = Some(flexure::local_answers(
