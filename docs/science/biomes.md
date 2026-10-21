@@ -6,7 +6,7 @@ fixed. The band edges of Minecraft's biome builder were read in its source. The 
 biome is a game choice throughout and is labelled so. The climate that feeds the classifier (monthly
 temperature and rain) is being rewritten and is not checked here.
 
-Ledger ids on this page: `BIO-001` to `BIO-137`, and `BIO-170` to `BIO-174` ("The land call on the world's ground", 2026-10-21) (see [ledger/BIO.md](ledger/BIO.md)).
+Ledger ids on this page: `BIO-001` to `BIO-137`, and `BIO-170` to `BIO-174` ("The land call on the world's ground", 2026-10-21) (see [ledger/BIO.md](ledger/BIO.md)); the same section's `BAK-057` to `BAK-059` are in [ledger/BAK.md](ledger/BAK.md) and `HYD-106` to `HYD-109` in [ledger/HYD.md](ledger/HYD.md) (rivers-and-lakes.md "The sea's one rule").
 
 ## What you see in the world
 

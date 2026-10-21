@@ -433,6 +433,7 @@ public final class BiomeCensus {
                 if (k < 0 || k > 31)
                     k = 31;
                 double y = t.height(x, z);
+                // Its own threshold, not Water.seaCovers (HYD-109); the rule's count is `sea_call`.
                 boolean land = k != 31 && y > sea;
                 Holder<Biome> b = g.getBiomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock((int) Math.floor(y)),
                         QuartPos.fromBlock(z), sampler);

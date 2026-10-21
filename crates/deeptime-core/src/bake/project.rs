@@ -1722,7 +1722,7 @@ struct BiomeGround<'a> {
     closed: Option<&'a LoadedLayer>,
 }
 
-/// The land call of the biome layers on the world's ground (ledger: BIO-170, BIO-171, BAK-057):
+/// The land call of the biome layers on the world's ground (ledger: BIO-170, BIO-171, BAK-057, HYD-108):
 /// the rule is the column evaluator's own ([`deeptime_format::water::sea_covers_height`]) on the
 /// world's elevation and `closed_basin` layers at each L2 node's block; the nodes whose biome inputs
 /// say the other medium take the other's record ([`biomes::settle_to_ground`]); the rest are not
@@ -2836,7 +2836,8 @@ mod tests {
     }
 
     /// The biome layers' land call is the column evaluator's rule on the world's ground
-    /// (BIO-170, BAK-057): a node of the 35 m band under sea level, or on closed ground below it,
+    /// (BIO-170, BAK-057, BAK-059, HYD-107): a node of the 35 m band under sea level, or on closed
+    /// ground below it,
     /// is land and takes a land record; open ground under sea level is sea and takes the sea's;
     /// every node the rule agrees with is left as it was.
     #[test]
