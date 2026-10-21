@@ -176,8 +176,7 @@ def compare(a: Path, b: Path) -> dict:
     bz2 = cga["origin_block_z"] + np.arange(cga["h"], dtype=np.int64) * cga["r"]
     sea_a = sea_covers(at_blocks(ha, hga, bx2, bz2),
                        at_blocks(cba, cbga, bx2, bz2) if cba is not None else None, sea_y)
-    mism_a = (ca < edge) != (~sea_a) ^ True  # placeholder, replaced below
-    mism_a = ((ca >= edge) & sea_a) | ((ca < edge) & ~sea_a)
+    mism_a =((ca >= edge) & sea_a) | ((ca < edge) & ~sea_a)
     out = {"layers": {}}
     changed_any = np.zeros(ca.shape, bool)
     names = [f"climate/{n}" for n in INPUTS] + ["climate/wetland", "climate/koppen_l2"]

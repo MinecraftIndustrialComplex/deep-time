@@ -6,7 +6,7 @@ fixed. The band edges of Minecraft's biome builder were read in its source. The 
 biome is a game choice throughout and is labelled so. The climate that feeds the classifier (monthly
 temperature and rain) is being rewritten and is not checked here.
 
-Ledger ids on this page: `BIO-001` to `BIO-137` (see [ledger/BIO.md](ledger/BIO.md)).
+Ledger ids on this page: `BIO-001` to `BIO-137`, and `BIO-170` to `BIO-174` ("The land call on the world's ground", 2026-10-21) (see [ledger/BIO.md](ledger/BIO.md)).
 
 ## What you see in the world
 
@@ -865,6 +865,96 @@ fix (the coast's ring); the game's own census was run on the play world before t
 emulation reads the bake every 16 blocks, as the census does; Terralith's surface rules and features (the ice
 spikes themselves) were not looked at. The packs' own shares are one MIC and one vanilla server set (MIC's pins of
 2026-10-20), 4 seeds each.
+
+## The land call on the world's ground (2026-10-21, BIO-170 to BIO-174)
+
+The biome layers say, for every L2 node, whether it is land or sea: its continentalness is on one side of
+vanilla's ocean | coast edge (-0.19) or the other, and the Koppen class, the wetland flag and the other four inputs
+follow. The game puts the sea where the **column rule** says (`water::sea_covers`, Java `Water.seaCovers`, HYD-106):
+the top block of the ground, ceil(H) - 1, is under sea level - 1 and the `closed_basin` flag (HYD-105) is not 1. Until
+2026-10-21 the biome bake decided from another ground and another rule: the *simulation's* L2 grid, land where
+`elevation > sea level || closed ground below sea level` (HYD-104). The world is another grid (Petroff-Guyou, a
+footprint mean of the height with its own closed-basin flag), and the two rules differ in the last block under sea
+level, so the biomes and the water disagreed on some columns:
+
+- **ocean biome on dry ground**: the game keeps the ground dry (a column with H in (sea level - 1, sea level] has top
+  block sea level - 1, not under it: a 35 m band at 35 m per block of height, HYD-107) and the biome is an ocean one;
+- **land biome under sea water**: the world's ground is under sea level - 1 where the simulation's L2 ground was
+  above sea level, or HYD-105 opened a pocket to the world's sea that the Lambert hydrology called closed.
+
+**Measured** (the census `tools/review/biome_land_census.py`; `earthlike_quick_16k`, 1000 Myr, 8 threads,
+supercontinent and scattered continents, seeds 1 and 2; master f1632cf3 against this branch, the same simulation:
+the world folders differ in 7 layers of 49, the seven this pass settles; the rule is read on each world's own
+`elevation` and `closed_basin` rasters). Shares are of the world's land (the columns the rule leaves dry).
+
+| run | L2 nodes before: land biome under sea | L2 before: ocean biome on dry | L2 after | L3 columns before: land under sea | L3 before: ocean on dry | L3 after: land under sea | L3 after: ocean on dry |
+|---|---|---|---|---|---|---|---|
+| supercontinent 1 | 4,110 nodes, 22,830 km2, 1.15 % | 37,475, 208,160 km2, 10.51 % | 0, 0 | 52,753, 18,314 km2, 0.93 % | 589,318, 204,591 km2, 10.34 % | 21,522, 7,472 km2, 0.38 % | 60,833, 21,119 km2, 1.07 % |
+| supercontinent 2 | 2,361, 13,115 km2, 0.61 % | 21,676, 120,402 km2, 5.58 % | 0, 0 | 29,553, 10,260 km2, 0.48 % | 342,374, 118,860 km2, 5.51 % | 15,403, 5,347 km2, 0.25 % | 48,974, 17,002 km2, 0.79 % |
+| scattered 1 | 4,135, 22,968 km2, 1.15 % | 18,307, 101,689 km2, 5.07 % | 0, 0 | 51,570, 17,903 km2, 0.89 % | 298,339, 103,573 km2, 5.16 % | 22,160, 7,693 km2, 0.38 % | 62,747, 21,784 km2, 1.09 % |
+| scattered 2 | 2,080, 11,554 km2, 0.64 % | 22,590, 125,479 km2, 6.90 % | 0, 0 | 26,757, 9,289 km2, 0.51 % | 355,368, 123,371 km2, 6.79 % | 14,447, 5,015 km2, 0.28 % | 43,887, 15,236 km2, 0.84 % |
+
+- **Where the mismatch was.** Of the 37,475 nodes of supercontinent 1 that had an ocean biome on dry ground, 34,560
+  (92 %) lay in the last block under sea level (H in (sea level - 1, sea level)), 2,914 above sea level (the world's
+  footprint mean put them above, the simulation's L2 cell below), and none on closed ground below sea level (6 on
+  scattered 2); 20,544 (55 %) were more than two nodes from the sea: coastal plains and low interior ground, not a
+  rim. Of the 4,110 with a land biome under the sea, 2,790 were more than a block under sea level.
+- **What moved.** Every node the bake called wrongly was changed, and no other: the nodes whose continentalness, any
+  other input, the wetland flag or the Koppen class differ between before and after are exactly the mismatched ones
+  (supercontinent 1: 41,585 changed nodes = 4,110 + 37,475; collateral 0, and 0 mismatched nodes left unchanged;
+  likewise in the other three runs: 24,037, 22,442 and 24,670 changed nodes). A mismatched node changes its
+  continentalness; of the others temperature changes on 41,566 of them, ridges on 36,977, erosion on 36,469,
+  vegetation on 21,791, the Koppen class on 21,638 and the wetland flag on 7,700 (a donor often has the node's own
+  value).
+- **The remainder at the 8-block columns.** The game reads the layers bilinear between nodes 8 blocks apart, so a
+  column between a land node and a sea node takes the coast where the two values cross, not where the rule puts
+  it. On the L3 columns 0.25 to 0.38 % of the land has a land biome under the sea and 0.79 to 1.09 % an ocean biome on
+  dry ground (BIO-174). These columns lie at a median of 2 blocks and a 90th percentile of 2.8 to 4 blocks from the
+  rule's coast, at most 6.3 to 10 blocks; the number beyond one node (8 blocks) is 0 for the land biomes under the sea and 0, 0, 2 (0.7 km2)
+  and 0 for the ocean biomes on dry ground (of 43,887 to 62,747). They are the sub-node coast, not a region.
+
+**The rule, from one place** (BIO-170, HYD-106). `water::sea_covers(ground, sea_level_y, closed)` is the whole of
+step 3 of the column evaluator in Rust, and `Water.seaCovers` its twin in Java (a test reads the Rust function and the
+evaluator on the same columns). The bake's projection pass calls `water::sea_covers_height` on the world's
+`elevation` raster and `closed_basin` flag at each L2 node's block, the same two layers the far terrain and the
+column evaluator read, so a change to the rule changes all of them.
+
+**What the pass does** (BIO-171, BIO-172, BAK-057). The biome bake itself still runs on the simulation's grids; the
+projection pass resamples the L2 biome layers like every other layer, and holds the seven (`climate/temperature`,
+`vegetation`, `continents`, `erosion`, `ridges`, `wetland`, `koppen_l2`) back until the world's elevation and
+`closed_basin` exist (the L3 grid is processed after L2). Then, node by node:
+
+- a node whose continentalness is on the land side (>= the stored edge, compared on the layer's 1e-4 quantum, so a
+  value stored at the edge is land) where the rule says sea, or on the sea side where it says dry, is **settled**;
+  every other node is left exactly as the resampling wrote it;
+- a node settled to **sea** takes the continentalness of the bake's sea law at its depth below sea level (band 3 at
+  the coast, 2.585 at 200 m, 2 at 2,500 m, 1.084 at 6,000 m: the same piecewise law `map` uses, now one object,
+  `ContinentAnchors`), at least a quantum under the edge; the sea's Koppen class (31) and no wetland; and the
+  deep sea floor's erosion (the mean of the fifth and sixth erosion band edges) where its band is under 2 (the deep
+  ocean). Its temperature, humidity, erosion and ridges are those of the nearest node that is sea and stays sea;
+- a node settled to **land** takes the continentalness of the land law at its distance to the world's sea (band 3 at
+  the shore, 4 at the 16-block beach strip, 5 at 200, 6 at 1,000, 7 at 5,000 blocks; a node touching the sea half a
+  node from it; distances in the bake's blocks, a world block being `m_per_block_h(world) / m_per_block_h(bake)` of
+  one), not under the edge, and the record of the nearest node that is land and stays land (Koppen class,
+  temperature, humidity, erosion, ridges and wetland): a coastal plain the simulation's L2 ground called sea takes its
+  neighbour's climate, as the ground beside it has;
+- a world with no land donor or no sea donor (all land, all sea) keeps the node's own record but for its
+  continentalness.
+
+`notes.bake.projection.biome_land` records the rule, the number of land nodes, and the settled nodes and their
+area in both directions.
+
+**Not done here.** The game's ground is the elevation plus a detail term; the bake's call, as HYD-105's, reads the
+elevation layer alone, so a column whose detail carries it across the rule's line is not settled (the coast strip of
+BIO-174 can widen by the detail amplitude on gentle ground). Lambert presets have no projection pass and keep the
+simulation grid's call. Four other places have a land threshold of their own that is not `sea_covers`
+(`VolcanicBiomes` `height >= sea level`, `GeologyGround.sea` `height < sea level`, `LavaFluids` `y < sea`, and the
+census' own `land` test, `y > sea`): flagged in HYD-109, not changed.
+
+The GameTest `climateConsistent` counts it on the real planet (BIO-173): for the columns inland of the coast (the rule
+the same 8 blocks away on all four sides), the share of dry columns with an ocean biome and of sea columns with a
+land biome, each at most 1 %; the 4k planet's own count is logged, and was not run on this branch (the
+coordinator's batch).
 
 ## Simplifications and limits
 
