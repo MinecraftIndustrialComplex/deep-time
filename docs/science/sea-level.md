@@ -4,7 +4,7 @@ Status of this page: `stage 2 (constants checked against sources on 2026-10-21)`
 change that made the sea level follow the ocean's volume (Ben, decisions log 2026-10-21: "Its own
 task now", then "Don't follow that old idea" for the 2026-09-30 row "Keep calibrated coastlines").
 
-Ledger ids on this page: `ISO-085` to `ISO-087`, `PLT-350` to `PLT-353`, `CLM-210`, and the rows
+Ledger ids on this page: `ISO-085` to `ISO-087`, `PLT-350` to `PLT-354`, `CLM-210`, and the rows
 they replace or amend: `ISO-033` to `ISO-039`, `CLM-091`, `CLM-099`, `CLM-106` to `CLM-108`,
 `PLT-129`, `HNT-005`, `HNT-041`, `HNT-056` (see [claims.md](claims.md)).
 
@@ -76,6 +76,17 @@ Because the level follows the ground, everything that changes the ocean basins' 
 - **The ocean floor's age** (PLT-350 to PLT-353): the shipped Earth-like presets now sink the floor
   by Stein & Stein's GDH1 age–depth law instead of Cortial's dampening (PLT-129). Young floor is
   shallow, so a planet with more young floor has less room and a higher sea.
+- **The floor between diverging plates** (PLT-354): between two resamplings the plate model
+  covers the widening gap between diverging plates with no samples; its cells take the floor the
+  next resampling will make there, deepening with its age (PLT-351). The surface holds those
+  cells in place, keeps what it laid on them, and starts a cell that enters a gap bare. Before
+  this, the surface carried a gap cell with the nearest plate and its zero uplift: the gap kept
+  the height of the edge it was pulled from (the last resampling's ridge crest, a rifted
+  continent's margin), and since GDH1's rate form sinks samples only, that young floor stood 200
+  to 450 m too high until it was subducted, with the sea that much higher. The gap's far side is
+  found at any distance (the nearest sample of each other plate), as the resampling finds it;
+  within a cell's 32 nearest samples alone, a wide gap's cells took the near edge's depth, and
+  the sea jumped 40 to 50 m at each resampling.
 - **Continents**: their area and height (more continental crust, less ocean; a collision that
   thickens crust frees ocean area).
 - **Ice**: step 2.
@@ -121,6 +132,7 @@ the first ocean) is laid at −d(t) (PLT-351).
 | PLT-351 | New ocean floor at the law's depth for its age | `pools::floor_at` (init, ridges, L1 gaps) | m | as PLT-352 | `cited-unverified` |
 | PLT-352 | GDH1 | 2,600, 365, 5,651, 2,473, 0.0278, knee 20 Myr | m, Myr | Stein & Stein 1992 (not read); 2,600 m and the 0.0278 decay read in Stein 1995; the rest on a secondary page | `cited-unverified` |
 | PLT-353 | Ground above the sea sinks by 1/W of the water-loaded subsidence | W = ρ_m/(ρ_m − ρ_w) (`settle::WATER_LOADED`) | dimensionless | Kominz et al. 1998 (the factor, read) | `verified` |
+| PLT-354 | The floor in a gap between plates is held in place, deepens with its age, keeps what lies on it; a cell entering a gap starts bare | `advect::hold_gaps`, `newborn`, `carried_elevation`; `plates/gap`, `surface/crust_gap` | - | none needed (the plate model's kinematics) | `game-choice` |
 
 ## Earth against the mod
 
