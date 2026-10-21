@@ -825,7 +825,7 @@ copper (spawn 1,985, access p50 104) and gold (1,379) needed no guarantee and di
 - **Every guaranteed body holds ore**, 77 of 77 on the six quick planets (master 17 of 67; a lead and
   zinc source counts for both) and 18 of 18 on the full one (master 2 of 11). The anchor moved
   8 to 11 sites a planet, 16 to 140 blocks at most; 0 to 3 of a planet's guaranteed sites lie
-  under water, anchored at the bed (8 of the quick planets' 58, 3 of the full planet's 12). The
+  under water, anchored at the bed (8 of the quick planets' 68, 3 of the full planet's 16). The
   top-up added 0 to 3 sources a quick planet (10 in all) and 4 on the full one.
 - **The top-up fills what the stage could not see.** The stage's forecast λc is not the bake's
   (it reads the present L1 land at a coarser step, and the young landscape and the amplifier then
@@ -884,6 +884,18 @@ copper (spawn 1,985, access p50 104) and gold (1,379) needed no guarantee and di
   master's (453 to 1,355 ms against 541 to 1,310 ms on the quick planets, 865 against 882 ms on
   the full one). The anchor and the top-up run in the run's finish, 69 and 159 ms on quick
   scattered 1. No measurable change to a planet's time.
+- **On master bd7c8f21 merged in** (04e12fa9, the branch's head but for docs; master's sea level
+  and plate changes move every planet, so the land and λc are not the table's): the same seven
+  planets, the branch alone. Every guaranteed body holds ore, 83 of 83 on the six quick planets
+  and 13 of 13 on the full one; every land region of every essential holds a source with ore on
+  all seven. The top-up added 0 to 5 sources a quick planet (19 in all) and 4 on the full one; 5
+  of the quick planets' 80 guaranteed sites and 3 of the full one's 12 lie under water. The
+  spawn's nearest iron with ore lies a median 1,000 blocks away on the quick planets (619 to
+  1,867) and 704 on the full one, lead and zinc 2,306 (1,345 to 3,193) and 1,249, coal 622 and
+  181. λc and the cones' distance from land: quick supercontinent 1 to 3, 73.25 degrees (5.00),
+  234.25 (3.80), 20.50 (6.70); scattered continents 1 to 3, 25.75 (5.70), 158.75 (1.90), 331.50
+  (5.10); full, 67.25 (9.60). The deposit stage took 3.1 % of the stages' sum on the quick
+  planets and 4.7 % on the full one, its forecast lap 0.0 s.
 
 ## Simplifications and limits
 
