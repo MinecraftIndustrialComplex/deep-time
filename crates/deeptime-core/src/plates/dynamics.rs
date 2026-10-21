@@ -989,12 +989,7 @@ impl MixUnits {
 /// The length of plate boundary by kind, km ([`mix`]), at the plates' positions `pos` and the
 /// motion the step's fronts were found with (call it after `fronts_and_uplift`, before the
 /// motion is updated). All zeros when the record is off.
-pub fn boundary_mix(
-    st: &PlateState,
-    geo: &Geo,
-    pos: &[DVec3],
-    env: &Env<'_>,
-) -> Mix {
+pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) -> Mix {
     if st.dynamics.is_none() {
         return Mix::default();
     }
@@ -1029,88 +1024,84 @@ pub fn boundary_mix(
     let norm = env.norm;
     let units = (0..samples.len())
         .into_par_iter()
-        .fold(
-            MixUnits::default,
-            |mut acc, v| {
-                let sv = &samples[v];
-                if sv.is_hidden() {
-                    return acc;
+        .fold(MixUnits::default, |mut acc, v| {
+            let sv = &samples[v];
+            if sv.is_hidden() {
+                return acc;
+            }
+            let pv = plate_of[v];
+            let x = pos[v];
+            let rot = rots[sv.group as usize];
+            let mut buf = [Neighbour {
+                along: 0.0,
+                normal: 0.0,
+                kind: OCEANIC,
+                side: Side::None,
+            }; 16];
+            let mut plate_buf = [0u32; 16];
+            let mut n = 0;
+            // The boundary's normal towards each plate met, found once per plate.
+            let mut normals: [(u32, DVec3); 4] = [(u32::MAX, DVec3::ZERO); 4];
+            for (u, _) in geo.edges(v as u32) {
+                let pu = plate_of[u as usize];
+                if pu == pv || n == buf.len() {
+                    continue;
                 }
-                let pv = plate_of[v];
-                let x = pos[v];
-                let rot = rots[sv.group as usize];
-                let mut buf = [Neighbour {
-                    along: 0.0,
-                    normal: 0.0,
-                    kind: OCEANIC,
-                    side: Side::None,
-                }; 16];
-                let mut plate_buf = [0u32; 16];
-                let mut n = 0;
-                // The boundary's normal towards each plate met, found once per plate.
-                let mut normals: [(u32, DVec3); 4] = [(u32::MAX, DVec3::ZERO); 4];
-                for (u, _) in geo.edges(v as u32) {
-                    let pu = plate_of[u as usize];
-                    if pu == pv || n == buf.len() {
-                        continue;
-                    }
-                    let out = tangent(x, rot * (pts[u as usize] - pts[v])).normalize_or_zero();
-                    let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
-                    let slot = normals
-                        .iter()
-                        .position(|&(p, _)| p == pu || p == u32::MAX)
-                        .unwrap_or(normals.len() - 1);
-                    if normals[slot].0 != pu {
-                        let nrm =
-                            shortening::boundary_normal(geo, pos, &rots, samples, &plate_of, v, pu);
-                        normals[slot] = (pu, nrm);
-                    }
-                    let nrm = normals[slot].1;
-                    // ledger: PLT-311 (Bird's transforms: within 20 degrees of the boundary)
-                    let across = if shortening::is_transform(rel, nrm) {
-                        0.0
+                let out = tangent(x, rot * (pts[u as usize] - pts[v])).normalize_or_zero();
+                let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
+                let slot = normals
+                    .iter()
+                    .position(|&(p, _)| p == pu || p == u32::MAX)
+                    .unwrap_or(normals.len() - 1);
+                if normals[slot].0 != pu {
+                    let nrm =
+                        shortening::boundary_normal(geo, pos, &rots, samples, &plate_of, v, pu);
+                    normals[slot] = (pu, nrm);
+                }
+                let nrm = normals[slot].1;
+                // ledger: PLT-311 (Bird's transforms: within 20 degrees of the boundary)
+                let across = if shortening::is_transform(rel, nrm) {
+                    0.0
+                } else {
+                    rel.dot(nrm)
+                };
+                buf[n] = Neighbour {
+                    along: rel.dot(out),
+                    normal: across,
+                    kind: samples[u as usize].kind,
+                    side: if active.contains(&(pu, pv)) {
+                        Side::Over
+                    } else if active.contains(&(pv, pu)) {
+                        Side::Under
                     } else {
-                        rel.dot(nrm)
-                    };
-                    buf[n] = Neighbour {
-                        along: rel.dot(out),
-                        normal: across,
-                        kind: samples[u as usize].kind,
-                        side: if active.contains(&(pu, pv)) {
-                            Side::Over
-                        } else if active.contains(&(pv, pu)) {
-                            Side::Under
-                        } else {
-                            Side::None
-                        },
-                    };
-                    plate_buf[n] = pu;
-                    n += 1;
+                        Side::None
+                    },
+                };
+                plate_buf[n] = pu;
+                n += 1;
+            }
+            if let Some((class, half)) = classify_boundary(sv.kind, &buf[..n]) {
+                acc.km[class] += u64::from(half);
+                let setting = match class {
+                    mix::OCEAN_OCEAN => Some(0),
+                    mix::OCEAN_CONTINENT => Some(1),
+                    _ => None,
+                };
+                if let (Some(k), Some(f)) = (setting, front_index(&buf[..n])) {
+                    let (km, age) = contact_of
+                        .get(&(plate_buf[f], pv))
+                        .copied()
+                        .unwrap_or((0.0, 0.0));
+                    acc.slab[k][band_of(km, &SLAB_BANDS_KM)] += u64::from(half);
+                    acc.normal[k][band_of(-buf[f].normal, &NORMAL_BANDS_MM_YR)] += u64::from(half);
+                    acc.age[k][band_of(age, &AGE_BANDS_MYR)] += u64::from(half);
                 }
-                if let Some((class, half)) = classify_boundary(sv.kind, &buf[..n]) {
-                    acc.km[class] += u64::from(half);
-                    let setting = match class {
-                        mix::OCEAN_OCEAN => Some(0),
-                        mix::OCEAN_CONTINENT => Some(1),
-                        _ => None,
-                    };
-                    if let (Some(k), Some(f)) = (setting, front_index(&buf[..n])) {
-                        let (km, age) = contact_of
-                            .get(&(plate_buf[f], pv))
-                            .copied()
-                            .unwrap_or((0.0, 0.0));
-                        acc.slab[k][band_of(km, &SLAB_BANDS_KM)] += u64::from(half);
-                        acc.normal[k][band_of(-buf[f].normal, &NORMAL_BANDS_MM_YR)] +=
-                            u64::from(half);
-                        acc.age[k][band_of(age, &AGE_BANDS_MYR)] += u64::from(half);
-                    }
-                    if class == mix::OTHER && buf[..n].iter().any(|b| b.normal < 0.0) {
-                        acc.other_converging += u64::from(half);
-                    }
+                if class == mix::OTHER && buf[..n].iter().any(|b| b.normal < 0.0) {
+                    acc.other_converging += u64::from(half);
                 }
-                acc
-            },
-        )
+            }
+            acc
+        })
         .reduce(MixUnits::default, MixUnits::add);
     let spacing_km = norm.km(norm.spacing_rad());
     let km = |u: u64| (u as f64 * 0.5 * spacing_km).round();
