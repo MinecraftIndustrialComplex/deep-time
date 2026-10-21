@@ -5120,9 +5120,10 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 ### Kalnay1996
 - Reference: Kalnay, E., et al. (1996). The NCEP/NCAR 40-year reanalysis project. Bulletin of the American Meteorological Society 77: 437-471. Data: NOAA PSL, NCEP/NCAR Reanalysis 1 monthly long-term means 1991-2020.
 - DOI or URL: 10.1175/1520-0477(1996)077<0437:TNYRP>2.0.CO;2; data https://downloads.psl.noaa.gov/Datasets/ncep.reanalysis/Monthlies/
-- Ledger ids: CLM-164, CLM-165
+- Ledger ids: CLM-164, CLM-165, CLM-229, CLM-231
 - Library: the data files (uwnd, vwnd, air at pressure levels and sigma 0.995) and the two scripts that read them, folder NCEP_R1_ltm/. The paper itself was not fetched. Public-domain US government data, used for validation only.
 - Read in WP-14a: computed zonal-mean winds and January inversions (see the rows).
+- Read 2026-10-21 (the plateau-warmth task): a sub-agent fetched the 1991-2020 long-term means of air temperature and geopotential height at pressure levels (https://psl.noaa.gov/thredds/dodsC/Datasets/ncep.reanalysis.derived/pressure/air.mon.ltm.nc.ascii and hgt.mon.ltm.nc.ascii; the files' climo_period "1991/01/01 - 2020/12/31") and interpolated the free air's temperature linearly in height to plateau stations' heights over lowland columns near Tibet, the Altiplano, the Rockies and Ethiopia (CLM-229, CLM-231); NCEP-DOE R2 monthly means agreed within 0.3 K. The files were not kept.
 
 ### Stull2017
 - Reference: Stull, R. (2017). Practical Meteorology: An Algebra-based Survey of Atmospheric Science, version 1.02b. University of British Columbia. Chapter 2.
@@ -7185,11 +7186,11 @@ The sources named for the plateaus' summer warmth (CLM-220) and the Cryogenian's
 ### YaoZhang2015
 - Reference: Yao, Y. and Zhang, B. (2015). The mass elevation effect of the Tibetan Plateau and its implications for Alpine treelines. International Journal of Climatology 35(8):1833-1846.
 - DOI or URL: 10.1002/joc.4123
-- Cited as: "Yao & Zhang 2015 (search snippets only)".
-- Ledger ids: CLM-220
-- Access: paywalled; the publisher refused the page to scripted access (HTTP 403, 2026-10-21).
+- Cited as: "Yao & Zhang 2015 (abstract)".
+- Ledger ids: CLM-220, CLM-230
+- Access: paywalled; the publisher refused the page to scripted access (HTTP 403, 2026-10-21). The abstract is on NASA's MODIS science-team publications page, https://modis.gsfc.nasa.gov/sci_team/pubs/abstract.php?id=19238 (read 2026-10-21).
 - Library (the project's source library, not distributed): none.
-- Read so far (by the project): search-result snippets of the abstract only (2026-10-21): the plateau 2 to 7 degC warmer than the surrounding areas at the same altitude; at 4,500 m 3.58 (April) to 6.63 degC (June) warmer than the Sichuan Basin's air; treelines 500 to 1,000 m higher. The abstract itself was not opened.
+- Read so far (by the project): the abstract, verbatim (2026-10-21, the plateau-warmth task): "The monthly mean air temperature in the interior main plateau is approximately 2-7 degrees C higher than in the surrounding mountains and adjacent lowland areas"; "At an elevation of 4500m ... the monthly mean temperature differences between the plateau and the Sichuan Basin range from 3.58 degrees C (April) to 6.63 degrees C (June); the monthly temperature differences between the plateau and the Qilian Mts. range from 1.6 degrees C (July) to 7.7 degrees C (March)"; the plateau's air from MODIS land-surface temperature, the Sichuan Basin's free air from the lapse rate measured on Mt. Emei; the warmest month's 10 degC isotherm pushed up to 4,600-4,700 m, the interior's treeline 500-1,000 m higher than the eastern edge's. The monthly table was not read.
 
 ### Rooney2015
 - Reference: Rooney, A. D., Strauss, J. V., Brandon, A. D. and Macdonald, F. A. (2015). A Cryogenian chronology: two long-lasting synchronous Neoproterozoic glaciations. Geology 43(5):459-462 (from memory; not checked).
