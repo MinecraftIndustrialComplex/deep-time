@@ -52,7 +52,8 @@ pub fn enabled() -> bool {
 }
 
 /// The stocks, in order: visible continental samples, hidden continental samples, their volumes
-/// (Σ thickness, m), visible samples above 0 m, visible continental samples above 0 m, Σ
+/// (Σ thickness less the ocean crust under crust made continental, `Sample::own_thickness_m`, m;
+/// ledger PLT-331), visible samples above 0 m, visible continental samples above 0 m, Σ
 /// elevation of the visible continental samples (m), visible samples, and the felsic rock (the
 /// conserved pools, `pool::CONSERVED`) of every sample, visible and hidden, and of the oceanic
 /// ones alone (m): a part's change of the first is felsic rock made or destroyed, of the second
@@ -81,9 +82,11 @@ const FELSIC: usize = 8;
 const FELSIC_OCEAN: usize = 9;
 
 /// The changes of state counted per sample: ocean floor made continental (count, Σ elevation,
-/// Σ thickness, m), continental crust made oceanic, hidden, surfacing, drowned, emerging.
-const MOVES: [&str; 8] = [
-    "o2c", "o2c_z", "o2c_t", "c2o", "hide", "surface", "drown", "emerge",
+/// Σ thickness of the continental crust made, m), continental crust made oceanic, hidden,
+/// surfacing, drowned, emerging; and the ocean floor's own crust kept under the crust made
+/// continental (Σ `Sample::basement`, m).
+const MOVES: [&str; 9] = [
+    "o2c", "o2c_z", "o2c_t", "c2o", "hide", "surface", "drown", "emerge", "o2c_b",
 ];
 const NX: usize = MOVES.len();
 
@@ -196,7 +199,7 @@ fn stocks(samples: &[Sample]) -> [f64; NT] {
         .fold(
             || [0.0f64; NT],
             |mut a, s| {
-                let t = f64::from(s.thickness_m);
+                let t = f64::from(s.own_thickness_m());
                 let dry = s.elevation_m > 0.0;
                 match (s.is_continental(), s.is_hidden()) {
                     (true, false) => {
@@ -322,7 +325,8 @@ impl CrustBudget {
                     if !c0 && c1 {
                         m[0] += 1.0;
                         m[1] += f64::from(s.elevation_m);
-                        m[2] += f64::from(s.thickness_m);
+                        m[2] += f64::from(s.own_thickness_m());
+                        m[8] += f64::from(s.basement());
                     }
                     if c0 && !c1 {
                         m[3] += 1.0;
@@ -518,11 +522,12 @@ impl CrustBudget {
             }
             let _ = write!(
                 line,
-                " {}=[o2c={:.5} o2c_z={:.0} o2c_t_km={:.1} c2o={:.5} hide={:.5} surface={:.5} drown={:.5} emerge={:.5}]",
+                " {}=[o2c={:.5} o2c_z={:.0} o2c_t_km={:.1} o2c_b_km={:.2} c2o={:.5} hide={:.5} surface={:.5} drown={:.5} emerge={:.5}]",
                 name,
                 m[0] / vis,
                 m[1] / m[0].max(1.0),
                 m[2] / m[0].max(1.0) / 1000.0,
+                m[8] / m[0].max(1.0) / 1000.0,
                 m[3] / vis,
                 m[4] / vis,
                 m[5] / vis,

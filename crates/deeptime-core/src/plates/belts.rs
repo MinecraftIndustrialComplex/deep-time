@@ -407,12 +407,15 @@ fn stack_front(
     // The step's crust: what crossed the front, its thickness and the share that stays.
     let shortened_km = side.conv.max(0.0) * env.dt_myr;
     let crossed_km2 = shortened_km * f.length_km();
+    // Continental crust made from ocean floor keeps the floor's own crust under it (its
+    // basement, `Sample::basement_m`): that goes down with the slab, only the crust on top
+    // stacks (ledger: PLT-331).
     let thickness_m = if f.crust.is_empty() {
         0.0
     } else {
         f.crust
             .iter()
-            .map(|&j| f64::from(samples[j as usize].thickness_m))
+            .map(|&j| f64::from(samples[j as usize].own_thickness_m()))
             .sum::<f64>()
             / f.crust.len() as f64
     };
@@ -452,7 +455,7 @@ fn stack_front(
     // ledger: PLT-248.
     let mut mix = [0.0f64; pool::COUNT];
     for &j in &f.crust {
-        for (m, &x) in mix.iter_mut().zip(samples[j as usize].pools.iter()) {
+        for (m, &x) in mix.iter_mut().zip(samples[j as usize].own_pools().iter()) {
             *m += f64::from(x.max(0.0));
         }
     }
@@ -1111,6 +1114,26 @@ mod tests {
             in_belt > 3 && in_foreland > 10,
             "{in_belt} {in_wedge} {in_foreland}"
         );
+    }
+
+    /// Continental crust made from ocean floor keeps the floor's own crust under it as its
+    /// basement (PLT-331): at a collision only the crust on top stacks, and the basement goes
+    /// down with the slab.
+    #[test]
+    fn a_basement_goes_down_with_the_slab() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        fx.preset.tectonics.collision_stacking_share = 1.0;
+        fx.preset.tectonics.crust_strength_mpa = 2000.0;
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(40.0));
+        for s in st.samples.iter_mut().filter(|s| s.kind == CONTINENTAL) {
+            s.basement_m = 4000.0;
+        }
+        let (stacked, _) = fx.step(&mut st, 1, None);
+        let s = &stacked[&0];
+        // The continent's 35.1 km less the 4 km of basement.
+        assert!(s.crossed_km2 > 0.0, "{s:?}");
+        assert!((s.thickness_m - 31_100.0).abs() < 1.0, "{s:?}");
     }
 
     /// The crust that stacks is the crust that crossed the front: the volume added is the
