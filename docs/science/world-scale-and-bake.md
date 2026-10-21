@@ -16,7 +16,7 @@ A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and o
 | [BAK](ledger/BAK.md) | spawn placement | BAK-014 to BAK-016 (3) |
 | [BAK](ledger/BAK.md) | satellite view | BAK-017 to BAK-032 (16) |
 | [BAK](ledger/BAK.md) | synthetic worlds | BAK-033 to BAK-038 (6) |
-| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042, BAK-048, BAK-050 (6) |
+| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042, BAK-048, BAK-050, BAK-065 (7) |
 | [BAK](ledger/BAK.md) | Distant Horizons curvature | BAK-043 to BAK-047 (5) |
 
 Rows by status: `verified` 2, `cited-unverified` 6, `calibrated` 2, `game-choice` 77, `uncited` 12.
@@ -151,7 +151,7 @@ carries plutonic rock to the world's floor where a pluton's layer is the lowest 
 
 Far terrain (P3-04) gives Distant Horizons its distant LODs from the baked world data instead of
 from chunks generated far away. Nothing physical is decided here; the rows (BAK-039 to BAK-042,
-BAK-048 and BAK-050) are game choices about how far terrain stays the same terrain as the chunks.
+BAK-048, BAK-050 and BAK-065) are game choices about how far terrain stays the same terrain as the chunks.
 
 - **The seam.** Every far column folds x into the planet's lap [-C/2, C/2), the period at which
   the world data wraps and at which Toroidal World loops the level, so a section west of x = C/2,
@@ -171,7 +171,8 @@ BAK-048 and BAK-050) are game choices about how far terrain stays the same terra
   it, grass turned to dirt (`WaterBodies.underWater`, which the table's lake beds share); a river's
   bed is the pass's own sand or gravel. The first rule that reads the chunk ends that part:
   vanilla's second rule, `above_preliminary_surface`, reads the chunk's noise, so a vanilla world
-  runs only its bedrock floor there and its top blocks are the table's. Expanded Ecosphere paints
+  runs only its bedrock floor there and its top blocks are the table's (on dry ground and lake
+  beds; a sea bed runs the whole rule since 2026-10-21, below). Expanded Ecosphere paints
   before that rule: dead brain coral on every warm ocean floor from y 58 to 62 and sand on lukewarm
   ones, which the seam test met when the planet of 2026-10-18 put the seam in warm ocean (43 of 64
   columns west of it and 44 east were coral where far terrain drew sand). Run on the sea bed, the
@@ -198,6 +199,21 @@ BAK-048 and BAK-050) are game choices about how far terrain stays the same terra
   past `above_preliminary_surface`. After features vanilla's sand, clay and gravel disks cover part
   of those dirt floors (83 and 55 of 112 the same, logged only): they are features, which far
   terrain does not draw. Only a floor on the top block's agreement is asserted.
+- **The sea bed** (BAK-065). Under the sea far terrain has since 2026-10-21 run the level's whole
+  surface rule, not only its leading part, because a sea bed is where the two chunk reads that
+  stopped the run can be answered without the chunk. `steep` reads the chunk's `WORLD_SURFACE_WG`
+  heightmap, which over the sea is the water's top, so a sea bed is never steep.
+  `above_preliminary_surface` compares the block with the noise's preliminary surface, which
+  `NoiseChunk` computes from the router's `initial_density_without_jaggedness` alone (the highest
+  8-block cell boundary where it exceeds 0.390625) at the corners of the block's 16-block cell, and
+  far terrain computes it the same way from the same router. The gate batch on master f43d1e1a found
+  why it matters: the planet put the seam in a warm ocean, and with MIC 39 columns were sandstone in
+  the chunk where far terrain drew the table's sand, since Terralith 2.6.2 paints every warm ocean's
+  floor below the shallow band sandstone behind `above_preliminary_surface`, and one deep warm
+  ocean column was gravel. RESULTS_PENDING A seam-free GameTest
+  (`farTerrainSeaBedsFollowTheSurfaceRule`) checks it: it reads sea-bed columns on rows from the
+  equator toward the edges, up to 48 in warm oceans and 48 in other seas, one per chunk, and asserts
+  that nine in ten have the same top block as the generated chunk before features.
 - **Toroidal World's guard** (Ben, 2026-10-02: "Mixin around TW's guard"). TW 0.19.3 (MIT) refuses
   every Distant Horizons world generator but DH's own on a level it wraps, from DH 3.3.1 on: TW
   makes the seam seamless by reshaping the level's chunk generator and folding DH's section keys,
