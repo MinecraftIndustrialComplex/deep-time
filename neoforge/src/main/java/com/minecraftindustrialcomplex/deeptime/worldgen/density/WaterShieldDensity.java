@@ -12,7 +12,7 @@ import java.lang.ref.WeakReference;
 /**
  * {@code deeptime:water_shield}: how near column (x, z) lies to Deep Time's water, 1 at and beside
  * it, 0 from {@link WaterCaveShield#FADE_BLOCKS} away ({@link TerrainSource#waterShield}). The
- * {@code deeptime:planet} router lifts its near-surface cave entrances by
+ * {@code deeptime:planet} router lifts its near-surface cave entrances and noodle caves by
  * {@value WaterCaveShield#LIFT} times it, so no cave mouth opens a pit beside a river, a lake or a
  * shallow sea (HYD-078). A 2D function: wrap it in {@code minecraft:flat_cache}.
  */

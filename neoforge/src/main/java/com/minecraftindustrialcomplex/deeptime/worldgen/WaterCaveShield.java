@@ -23,7 +23,11 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
  * {@value #FULL_BLOCKS} blocks of the water's edge and falls to 0 at {@value #FADE_BLOCKS}
  * (smoothstep), and the router adds {@value #LIFT} · shield to the entrance term, which closes
  * every cave mouth where the shield is 1 (5 · entrances is never below −{@value #LIFT} + 1.5625)
- * and lets them back in gradually. The ground there stays at H, so the water lies in its channel
+ * and lets them back in gradually. It adds the same lift to vanilla's noodle term (the final
+ * density's outer min, outside the band's squeeze) where the column's cell lies in the band, since
+ * the noodle tubes run from the surface down too: with only the entrances shut, the shore GameTest
+ * of 2026-10-21 found 173 of 11,086 shore columns over a noodle tube 1 to 4 blocks under a shallow
+ * sea floor or a river's bank. The ground there stays at H, so the water lies in its channel
  * and on its bed as the column rule says. Caves deeper than the band still run under the water
  * (Ben, decisions log 2026-09-30, "Allow caves under water"), and the carvers still cut under it.
  * The water counted is
@@ -51,7 +55,7 @@ public final class WaterCaveShield {
     public static final double FULL_BLOCKS = 8.0;
     /** No shield beyond this distance, blocks (game-choice, HYD-078). */
     public static final double FADE_BLOCKS = 16.0;
-    /** The router's lift of the entrance term at shield 1 (planet.json; HYD-078). */
+    /** The router's lift of the band's entrance term and of the noodle term within the band at shield 1 (planet.json; HYD-078). */
     public static final double LIFT = 16.0;
     /**
      * Ground at most this far under the sea's top block counts the sea fully, blocks (game-choice,
