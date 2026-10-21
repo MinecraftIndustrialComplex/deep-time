@@ -129,7 +129,7 @@ public final class VolcanicBiomeGameTests {
         var settings = g.generatorSettings().value();
         Geothermal geo = t.geothermal(g.waterReach(), settings.noiseSettings().minY(), settings.seaLevel());
         List<Geothermal.Site> pools = geo.sites().stream().filter(s -> s.kind() == Geothermal.Kind.POOL).toList();
-        Biome cold = level.registryAccess().registryOrThrow(Registries.BIOME).getOrThrow(Biomes.SNOWY_PLAINS).value();
+        Biome cold = level.registryAccess().registryOrThrow(Registries.BIOME).getOrThrow(Biomes.SNOWY_PLAINS);
         int c = t.circumference();
         // 0 columns read; 1 of them water, 2 ice, 3 something else; 4 water in a biome that is cold enough to snow; 5, 6 water
         // surfaces the cold biome's freezing rule was asked about and said yes to (must be none); 7, 8 the same rule one block
