@@ -50,7 +50,8 @@ pub const DEPOSITS_JS: &str = include_str!("../assets/deposits.js");
 /// `workbench.js`; it reads `/api/runs/<id>/rock…`).
 pub const SECTIONS_JS: &str = include_str!("../assets/sections.js");
 /// The workbench's "Final world" view (a zoomable map of a finished run's bake; `deeptime watch`
-/// serves it as `worldmap.js`, loaded after `workbench.js`, which it hooks into).
+/// serves it as `worldmap.js`, loaded after `workbench.js`, which it hooks into, and after
+/// mic-viewer's map core, served as `mic-viewer/map.js`, which draws the map).
 pub const WORLDMAP_JS: &str = include_str!("../assets/worldmap.js");
 /// The planet editor's field catalogue, shared with the game (Gradle ships it in the jar as
 /// `deeptime/editor_fields.json` for `screen/model/EditorFields`); the workbench's form is built

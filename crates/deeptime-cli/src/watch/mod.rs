@@ -194,13 +194,11 @@ pub fn serve(o: &WatchOptions) -> CliResult<Served> {
         allow_tailnet: o.allow_tailnet,
         name: "deeptime-watch".into(),
     };
-    let server =
-        mic_viewer::http::Server::start(SocketAddr::new(o.bind, o.port), config, app).map_err(
-            |e| {
-                wb.close();
-                format!("cannot serve on {}:{}: {e}", o.bind, o.port)
-            },
-        )?;
+    let server = mic_viewer::http::Server::start(SocketAddr::new(o.bind, o.port), config, app)
+        .map_err(|e| {
+            wb.close();
+            format!("cannot serve on {}:{}: {e}", o.bind, o.port)
+        })?;
     Ok(Served { wb, server })
 }
 
@@ -531,7 +529,13 @@ mod tests {
             o.allow_tailnet = allow_tailnet;
             let served = serve(&o).unwrap();
             let addr = served.addr();
-            for path in ["/", "/api/runs", "/workbench.js", "/api/catalog"] {
+            for path in [
+                "/",
+                "/api/runs",
+                "/workbench.js",
+                "/mic-viewer/map.js",
+                "/api/catalog",
+            ] {
                 assert_eq!(get_as(addr, path, "evil.example.com"), 403, "{path}");
                 assert_eq!(get_as(addr, path, "evil.example.com:8642"), 403, "{path}");
                 assert_eq!(get_as(addr, path, "localhost:8642"), 200, "{path}");
@@ -542,6 +546,37 @@ mod tests {
             }
             served.stop();
         }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The "Final world" view is mic-viewer's map core plus Deep Time's plug-in: the page loads the
+    /// core first, and both are served.
+    #[test]
+    fn the_world_view_loads_the_map_core_first() {
+        let dir = tmp("mapcore");
+        let served = serve(&options(&dir, 2, LOCAL)).unwrap();
+        let addr = served.addr();
+        let (st, page) = get(addr, "/");
+        assert_eq!(st, 200);
+        let page = String::from_utf8(page).unwrap();
+        let core = page
+            .find(r#"<script src="mic-viewer/map.js">"#)
+            .expect("the core");
+        let plug = page
+            .find(r#"<script src="worldmap.js">"#)
+            .expect("the plug-in");
+        assert!(core < plug, "the map core loads before worldmap.js");
+        let (st, js) = get(addr, "/mic-viewer/map.js");
+        assert_eq!(st, 200);
+        assert!(
+            String::from_utf8(js)
+                .unwrap()
+                .contains("function createMap(")
+        );
+        let (st, js) = get(addr, "/worldmap.js");
+        assert_eq!(st, 200);
+        assert!(String::from_utf8(js).unwrap().contains("MV.createMap("));
+        served.stop();
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

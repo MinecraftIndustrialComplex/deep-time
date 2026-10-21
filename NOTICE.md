@@ -16,6 +16,19 @@ and contribute no code.
 | [Noddy](https://github.com/Loop3D/noddyverse) as published in Loop3D/noddyverse (Jessell & Valenta 1996; Jessell et al. 2022, Earth Syst. Sci. Data 14:381–392) — `src/unEvents.c`, `src/taste.c`, `src/matrix.c`, and the helpers those three call: `src/utils.c` (`convrt`, `rotset`, `irotate`, `matmlt`, `paxis`, `plane`, `polcar`), `src/ellFault.c`, `src/proflib.c` (`calcProfile`), `src/which.c` (`whichRock`, `whichLayer`), the orientation set-up of each event in `src/getEvent.c` and the constants of `src/nodStruc.h` (commit 6a21b2374516f8506c19cabcbe3ead00be9cc45d) | [MIT](https://github.com/Loop3D/noddyverse/blob/main/LICENSE), Copyright (c) 2021 Loop3D (the code is Mark Jessell's, Imperial College 1981–82, Monash University 1994, UWA; `matrix.c` (c) Ewen Christopher and Monash University 1994) | The fold-and-fault engine (P2-01): the inverse kinematics of folds, faults (translation, rotation, elliptical, curved, ring), shear zones, kinks, unconformities, dykes, plugs, tilts and homogeneous strain, the sequence codes and `taste`, the layer lookup, and the 4 × 4 transformation matrices (ported function by function with the original's arithmetic and constants, checked bit for bit against the C by `tools/validation/noddy/`; adapted: no global state, an exact sine beside the sampled profile, `rotset`'s out-of-range `acos` clamped, `rotateX` fixed; not ported: DXF surfaces, imported blocks, Biot folds, alteration zones, geophysics) | `crates/deeptime-noddy/src/*.rs` (the reference fixture `crates/deeptime-noddy/tests/data/reference.txt` is the original's output) |
 | Petroff, "A Square Equal-area Map Projection with Low Angular Distortion, Minimal Cusps, and Closed-form Solutions" (ACM TSAS 7(4):18, 2021), supplement `new_projection.py` (`new_projection`, `new_projection_inverse`), Zenodo [10.5281/zenodo.4661351](https://doi.org/10.5281/zenodo.4661351), downloaded 2026-10-04 | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) in the file's header (the archive's record says CC BY 4.0; credit is given either way), Matthew A. Petroff | The seamless world's projection: Petroff's square equal-area map, forward and inverse, as scalar code (adapted: the inverse's quadrant rule gives each boundary ray to one side; 0/0 cases as branches; arguments clamped to their functions' domains; on Deep Time's portable trigonometry so Rust, Java and JS agree bit for bit) | `crates/deeptime-format/src/petroff.rs`, `neoforge/src/main/java/com/minecraftindustrialcomplex/deeptime/worlddata/Petroff.java`, `crates/deeptime-viewer/assets/projection.js` |
 
+## Vendored code
+
+- **mic-viewer** (MinecraftIndustrialComplex/mic-viewer, private), MPL-2.0, by the same author as
+  Deep Time: the shared world viewer's core (an HTTP server that answers loopback names only, the
+  tile cache, the slippy map, the marks and their budget), shared with mic-rtsim's world viewer
+  (mic-rtsim VIEWER.md; decisions log 2026-10-21). It is copied unmodified into
+  `vendor/mic-viewer/` at the commit named in `vendor/mic-viewer/PINNED`, with its licence
+  (`vendor/mic-viewer/LICENSE`), by `tools/dev/refresh-mic-viewer.sh`; its files keep their
+  MPL-2.0 headers. Its server, tile cache and map core began as Deep Time's own workbench code
+  (`watch/http.rs`, `watch/tiles.rs`, `deeptime-viewer`'s PNG encoder and `assets/worldmap.js`),
+  which the author relicensed under MPL-2.0 for it. Deep Time links it as a path dependency
+  (`crates/deeptime-cli`, `crates/deeptime-tiles`) and the workbench serves its `map.js`.
+
 ## APIs called (nothing ported, nothing shipped)
 
 - **Create** 6.0.10 by the Create Team / the Creators of Create
