@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: LGPL-3.0-or-later -->
-# Deep Time world-data format 0.5
+# Deep Time world-data format 0.6
 
 The contract between the Rust writer (`crates/deeptime-format`) and the Java reader
 (`neoforge/src/main/java/com/minecraftindustrialcomplex/deeptime/worlddata`). Plan §5.3 and §5.7
@@ -68,6 +68,15 @@ edge and fold through the north and south edges' half-turns (`z_edges`, "Grids")
 the simulation on the sphere for every world cell ("The bake's projection pass"); events and
 keyframes stay in the simulation's frame (latitude and longitude; Lambert pictures). 0.4 worlds are
 refused.
+
+**0.6** over 0.5 (closed ground below sea level by its water balance, HYD-100; the lakes follow-up,
+decisions log 2026-10-20): every header's minor is 6. Ground below sea level that the open sea does
+not reach is no longer flooded to sea level: the bake gives such a closed basin the water balance's
+lake (whose surface may stand below sea level), a playa or nothing, and the new layer
+**`closed_basin`** (u8 flag on the `water_level` grid) marks it with an 8-block halo. The column
+rule's sea step ("Water columns", step 3) holds only where the layer is 0 or absent; the game's
+fluid picker, its water pass, the cave shield and the coast tests read the same layer. Water
+`method` is "hyd-100" and `stats.below_sea` is new ("Rivers"). 0.5 worlds are refused.
 
 ## Folder layout
 
@@ -183,6 +192,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `detail/amplitude` | L3 | u8 | 1/16, block | — | the detail term's A (P1-06; absent without the amplify stage) |
 | `water_level` | L3 (L3h: L3 averaged 2 × 2 when L3 has more than 40 M cells, 32k full) | i16 | 1/16, block | −32768 | each lake's cells hold its surface, nodata elsewhere (P1-22, "Rivers"): its basin's rim when the lake is full, the level of its water balance, below the rim, when it is not (2026-10-01; a reader does not tell them apart); all nodata when `hydro.enabled` is false |
 | `playa` | as `water_level` | u8 | 1, block | — | blocks of salt on a playa's floor, 0 elsewhere ("Playas"); absent when `hydro.enabled` is false |
+| `closed_basin` | as `water_level` | u8 | 1, flag | - | 1 where no sea stands on ground below sea level: a closed basin the open sea does not reach, with an 8-block halo ("Rivers", "Water columns" step 3; HYD-100, HYD-102), 0 elsewhere; absent when `hydro.enabled` is false (the sea then stands on all ground below sea level) |
 | `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks with key spans, smoothed ("The 0.2 bake"), the first top raised ("The P1-08 bake") |
 | `strata/lift` | L1 (the grid of `strata/horizons`) | i16 | 1/16, blocks | none | how far every horizon of the cell's stack rose after the history (the bake's whole-stack lift, ledger STR-052; ≥ 0), which the structure file's heights do not include: the deformed column rule adds it ("Structural events", "The lift"; added 2026-10-20). A companion of the stacks: the projection pass takes the nearest cell, as it does theirs |
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
@@ -242,7 +252,15 @@ baked and gets a Lambert layout block.
   poles). The
   climate's band coordinates (`units` `vanilla_param`: `climate/temperature`, `vegetation`,
   `continents`, `erosion`, `ridges`), which the bake sets per Köppen class, are read bilinear at the
-  point, as the game read them on the Lambert world, so they stay with the class beside them. The two edge rows are made exactly self-glued (cell i = cell w − i). The first horizon of every stack cell is then raised to
+  point, as the game read them on the Lambert world, so they stay with the class beside them. The two edge rows are made exactly self-glued (cell i = cell w − i). The
+  `closed_basin` flag (nearest cell) is then drawn again on the world's ground (`hydro::
+  closed_basin_on_world`, HYD-105): the Lambert ground's narrow sills that held a pocket of sea floor
+  apart from the ocean can be averaged away in the world's, which would leave the pocket a dry hole
+  beside the sea. A world cell at or under sea level keeps the flag only where the world's open sea
+  does not reach it, the open sea being each 8-connected body (x wraps) of world cells a block or
+  more under sea level that holds at least 5,000 km² of cells the nearest Lambert cell left 0; the
+  8-block halo is drawn again on the world grid (`notes.bake.projection.closed_basin`:
+  `cleared_low_cells`, `flagged_cells_nearest`, `flagged_cells`, `min_open_cells`, `radius_cells`). The first horizon of every stack cell is then raised to
   the bake's top rule over the world's own terrain (`notes.bake.projection.top_raise`): the stacks
   come from the nearest cell and the terrain from the footprint mean.
 - **Vector data**: rivers (vertices through the projection, x continuous along a chain; a chain
@@ -755,7 +773,7 @@ Java `PortableMath`, JS `DTMath`):
 offset        size  field
 0             4     magic "DTR1" (0x44 0x54 0x52 0x31)
 4             4     u32 header_len = 16 + json_len (bytes from file start to the end of the JSON)
-8             2     u16 format_minor (5 for "0.5")
+8             2     u16 format_minor (6 for "0.6")
 10            2     u16 flags, reserved, 0
 12            4     u32 CRC32 of bytes 0..12 followed by the JSON bytes
 16            json  LayerDesc, UTF-8 JSON, no BOM
@@ -1148,11 +1166,20 @@ sink, a Priority-Flood of the basin alone from that cell drains its floor to it 
 spill levels of the exposed floor; the basins inside it are solved the same way first, up to 8
 deep), and the lake stands at the highest 1/16-block step of the basin's hypsometry (cells counted
 by their spill level towards the sink) whose losses the inflow at the sink still covers, at most
-one step below the rim, and at sea level at least where the basin's floor lies a block or more
-below sea level (the column rule floods such ground with the sea's water whatever the bake says, so
-the bake says the same); a lake inside the basin that this level covers becomes part of it. A
+one step below the rim; a lake inside the basin that this level covers becomes part of it. A
 balance lake under the lake thresholds is a playa (the `playa` layer), and a basin no water reaches is
-dry. Basins are solved in drainage order, so a lake that does not spill passes nothing downstream.
+dry. **Below sea level** (HYD-100, format 0.6): the **open sea** is every cell a block or more under
+sea level in an 8-connected body (x wraps) of at least 5,000 km², and the ground it **reaches** is
+every cell at or under sea level connected to it through such cells. A basin whose lowest cell the
+sea reaches stands at sea level at least where its floor lies a block or more under sea level, and
+is never dry there, as before (the column rule floods it with the sea's water). A basin the sea does
+not reach takes its balance whatever its height: a lake whose surface may stand below sea level, a
+playa or dry ground. **`closed_basin`** is 1 on every cell at or under sea level that the sea does
+not reach and on the cells within 8 blocks (`hydro::CLOSED_REACH_BLOCKS`, HYD-102) of one, each
+taking the side of the nearest such low cell, ties to the open sea; 0 elsewhere (`hydro::
+closed_basin_layer`). On a Petroff–Guyou world the projection pass draws the layer again on the
+world's own ground ("The bake's projection pass", HYD-105). The biome bake, which runs before the water bake, finds the same closed ground
+on its own grid (`hydro::closed_below_sea`) and maps it as land. Basins are solved in drainage order, so a lake that does not spill passes nothing downstream.
 With `lake_balance` false every basin is a full lake, as before 2026-10-01. River cells carry ≥
 `river_min_discharge_m3s` from ≥ `river_min_area_km2`, a lake cell less than a block deep counting
 as ground a river crosses; chains follow the largest donor; w = max(F − `freeboard_blocks`, the
@@ -1167,9 +1194,12 @@ on the smoothed vertex it joins). `notes.bake.water`: `enabled`, `method`, `para
 `lake_freeze_mean_c`), `arid` (P/PET < 0.2), `polar` (warmest month < 10 °C) as counts, km² and
 shares of the lake area, the five `largest` lakes, and `frozen_in_frozen_band` /
 `open_in_frozen_band`: the share of the frozen and of the open lake cells whose biome temperature
-input `climate/temperature` lies in the frozen band, below −0.45, where the game ices the water).
-`method` is "p1-22" in a folder baked before the water balance and "p1-22b" since; the game does
-not read it.
+input `climate/temperature` lies in the frozen band, below −0.45, where the game ices the water;
+since "hyd-100" also `below_sea`: `open_km2` (ground at or under sea level the sea reaches),
+`closed_km2`, `closed_share_of_land`, the closed ground's `lake_km2`, `playa_km2`, `dry_km2` and
+`dry_share_of_land`, `lakes_below_sea_level` and their km², and `closed_basin_radius_cells`).
+`method` is "p1-22" in a folder baked before the water balance, "p1-22b" since and "hyd-100" since
+format 0.6; the game does not read it. `notes.bake.water.closed_basin` is `{layer, reach_blocks}`.
 
 ## Water columns (P1-22)
 
@@ -1187,9 +1217,13 @@ width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore
    within `reach` blocks (cells visited by column then row, first at the smallest squared distance;
    Java `WaterLevels.levelAt`). **Lake** when level is finite and ground < top = ⌈level⌉ − 1; bed =
    ground.
-3. Else **sea** when ground < sea level − 1 (top = sea level − 1, bed = ground): the aquifer's
-   water, which the pass tops up where the aquifer left such a column dry (it decides from its own
-   noise near the surface, and leaves coastal flats a block below sea level dry).
+3. Else **sea** when ground < sea level − 1 and the column is not in a closed basin (the
+   `closed_basin` layer's nearest cell is not 1; absent layer: never; Rust `WaterSource::closed`,
+   Java `WorldData.closedBasin`; HYD-100, format 0.6): top = sea level − 1, bed = ground. The
+   aquifer's water, which the pass tops up where the aquifer left such a column dry (it decides from
+   its own noise near the surface, and leaves coastal flats a block below sea level dry). In a
+   closed basin a column below sea level goes on to steps 4 and 5: dry ground unless a lake, a river
+   or a bank holds it.
 4. Else **river** when a segment covers the column (the hit of "Rivers"): top = ⌈w⌉ − 1, bed =
    min(top − 1, ⌊w − max(1, depth · (1 − (d/hw')²))⌋).
 5. Else, visiting the neighbours (x+1, z), (x−1, z), (x, z+1), (x, z−1) evaluated by 1–4: for each
@@ -1197,6 +1231,16 @@ width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore
    `seal_from` = min(bed + 1, or for the sea max(bed + 1, top − 3): only its waterline); `max_ground` = the column's bank cap. The column is a **bank** when
    either `min_ground` or `max_ground` is set, else **none**. `river_biome` and `river` (the hit)
    are kept whatever the kind.
+
+**The sea's status in a closed basin (game side).** The fluid picker of `deeptime:planet` and
+`deeptime:planet_nocaves` (`worldgen/LavaFluids`) answers, for a block under sea level and at or
+above the lava floor in a column whose `closed_basin` is 1, water at the lava floor's level instead
+of the sea: nothing floods to sea level there, while the aquifer's own water tables under the basin
+stay water (vanilla's local aquifers take the global status's fluid). Vanilla's aquifer also reads
+the picker at 12 columns up to three chunks away and can bring a nearby sea's status into a closed
+basin by the coast, so the pass drains a closed column: from the sea's top block down to its
+ground, the open water above the column's own (a lake's or a river's top; none for other kinds) is
+removed. Caves and aquifers under a closed basin are kept as elsewhere; only the sea is kept out.
 
 The pass: a sea column the aquifer left dry is filled from the sea's top down to the ground (the
 pass runs in every chunk with elevation cells within 17 blocks of sea level for this); a river column is cut or filled to `bed` (gravel on the bed of a channel under 6 blocks
@@ -2097,6 +2141,9 @@ survives in, the finished folder. The manifest's `notes.run.history` reports wha
   continents from H, erosion 0.2, ridges 0.35, vegetation 0).
 - `lake-test` — a plain at y 100 with a round basin and a closed channel; its geometry is in
   `manifest.json` `notes.lake`. Floor y 110, rim crest y 125, `water_level` 120 inside the rim.
+  West of it (format 0.6) two closed bowls below sea level (`notes.lake.closed_bowls`): a dry one
+  with its floor at y 40 round (−200, −70) and one with its floor at y 30 round (−200, 70) holding
+  `water_level` 50, both 1 in a `closed_basin` layer (HYD-100).
 - `deposit-history` (P1-15) — not a `synth --kind`: a `deposits_synthetic` preset with
   `"terrain": {"strata": "placeholder" | "every-class"}` bakes it at `finalize_write` next to the run's
   sites, bodies and events. `elevation` = round(16·(63 + h/20)) of the synthetic history's present

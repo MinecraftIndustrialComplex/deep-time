@@ -133,7 +133,8 @@ public final class ServerMaps {
             WorldProjection p = wd.projection();
             MapFrame f = MapFrame.of(p, MapFrame.DEFAULT_WIDTH);
             Ramps ramps = Ramps.builtin();
-            int[] px = BaseImage.render(f, p, wd::height, wd::waterLevel, wd.manifest().seaLevelY(),
+            int[] px = BaseImage.render(f, p, wd::height, wd::waterLevel, (x, z) -> wd.closedBasin(x, z) ? 1.0 : 0.0,
+                    wd.manifest().seaLevelY(),
                     ramps.forLayer(WorldData.ELEVATION), ramps.forLayer(WorldData.WATER_LEVEL));
             List<byte[]> parts = ImageCodec.encode(px);
             long bytes = parts.stream().mapToLong(b -> b.length).sum();
@@ -255,7 +256,8 @@ public final class ServerMaps {
         WorldData wd = ActiveWorldData.get(ref.folder());
         double h = wd.height(x + 0.5, z + 0.5), wl = wd.waterLevel(x + 0.5, z + 0.5);
         int sea = wd.manifest().seaLevelY();
-        boolean dataWet = h < sea || (!Double.isNaN(wl) && wl > h);
+        // The sea stands below sea level unless the column is in a closed basin (HYD-100).
+        boolean dataWet = (h < sea && !wd.closedBasin(x + 0.5, z + 0.5)) || (!Double.isNaN(wl) && wl > h);
         return String.format(Locale.ROOT, "surface y %d (%s%s); world data H %.1f, water level %s, sea level %d (%s); %s",
                 surfaceY, block, wet ? ", water" : "", h, Double.isNaN(wl) ? "none" : String.format(Locale.ROOT, "%.1f", wl), sea,
                 dataWet ? "water" : "land", wet == dataWet ? "AGREE" : "DIFFER");
