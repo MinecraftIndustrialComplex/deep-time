@@ -9,7 +9,7 @@ Runs are written by tools/review/continent-bisect.sh into <root>/runs/<commit>/<
 (`dump-fields`: index.json, globals.json, <field>.f32 raw little-endian). Stdlib only (it reads
 f32 arrays with `array`), so any python3 runs it.
 
-    python3 -I tools/review/continent-bisect.py <root> <commit,...> <seeds,> <starts,> <stops,> [--csv F] [--runs]
+    python3 -I tools/review/continent-bisect.py <root> <commit,...> <seeds,> <starts,> <stops,> [--csv F] [--md F] [--runs]
 
 Metrics per run, on the L1 grid (a Lambert cylindrical equal-area raster: every cell the same
 area except the rows that reach past a pole; `GridDesc::area_share`), true-area weighted; land is
@@ -226,10 +226,16 @@ def mean(vals):
 def main():
     args = sys.argv[1:]
     csv_path = None
+    md_path = None
+    md = []
     per_run = False
     if "--csv" in args:
         k = args.index("--csv")
         csv_path = args[k + 1]
+        del args[k : k + 2]
+    if "--md" in args:
+        k = args.index("--md")
+        md_path = args[k + 1]
         del args[k : k + 2]
     if "--runs" in args:
         args.remove("--runs")
@@ -241,6 +247,9 @@ def main():
         for start in starts:
             print(f"\n== {start}, t = {stop} Myr, seeds {','.join(seeds)} (mean over the runs present)")
             print(f"{'commit':10}{'runs':>5}" + "".join(f"{HEAD[k]:>9}" for k in KEYS))
+            md.append(f"\n### {start}, {stop} Myr (mean over seeds {','.join(seeds)})\n")
+            md.append("| commit | runs | " + " | ".join(HEAD[k] for k in KEYS) + " |")
+            md.append("|---|---|" + "---|" * len(KEYS))
             for c in commits:
                 results = []
                 for seed in seeds:
@@ -258,8 +267,12 @@ def main():
                         print(f"  {c:8}s{seed:>3}" + "".join(f"{fmt(k, res.get(k)):>9}" for k in KEYS))
                 cells = "".join(f"{fmt(k, mean([r.get(k) for _, r in results])):>9}" for k in KEYS)
                 print(f"{c:10}{len(results):>5}{cells}")
+                md.append(f"| {c} | {len(results)} | "
+                          + " | ".join(fmt(k, mean([r.get(k) for _, r in results])) for k in KEYS) + " |")
     if csv_path:
         Path(csv_path).write_text("\n".join(rows_csv) + "\n")
+    if md_path:
+        Path(md_path).write_text("\n".join(md) + "\n")
 
 
 if __name__ == "__main__":
