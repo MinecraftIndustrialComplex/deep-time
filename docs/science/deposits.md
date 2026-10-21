@@ -741,7 +741,10 @@ notes):
   region's top edge, often the pole or a coast, and the present L1 coast is not the world's, which
   the young landscape and the amplifier redraw. Candidates now come from cells at least 128 blocks
   (two L1 cells at 16k) from the present sea first, any land cell when a region has none, and a
-  tie goes to the cell nearest (0, 0) in the world, where the player starts.
+  tie goes to the cell nearest (0, 0) in the world, where the player starts. Ties for several
+  essentials then want the same cell (a probe found a guaranteed SEDEX and a guaranteed iron body
+  on one centre, the later painting over the earlier's ore), so a guaranteed body also keeps clear
+  of every one placed before it, by the sum of their radii.
 - **The body was placed against the stage's ground** (DEP-221, ORE-280). The bake lifts the strata
   and the bodies with them where the final terrain stands above the history's surface (STR-052,
   STR-053, STR-056), and the projection moves each body with the change of the drawn height

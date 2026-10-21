@@ -525,6 +525,16 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
         checked += 1;
     }
     assert!(checked > 0, "{note}");
+    // No two guaranteed bodies share a place (DEP-222): the later would paint over the earlier
+    // one's ore.
+    let at: Vec<(i32, i32)> = sites
+        .iter()
+        .filter(|s| guaranteed.contains_key(&s.forming_event))
+        .map(|s| (s.center[0], s.center[2]))
+        .collect();
+    for (i, a) in at.iter().enumerate() {
+        assert!(!at[i + 1..].contains(a), "two guaranteed sites at {a:?}: {at:?}");
+    }
     let p = match crate::preset::Preset::from_json(&json).unwrap().body {
         crate::preset::PresetBody::Planet(p) => p,
         _ => panic!("a planet preset"),
