@@ -3581,6 +3581,11 @@ Left as they are:
   it loads, ISO-078), the ocean–continent transition (`transition.rs`), the L1 resampling
   (`l1.rs`) and the orogenic collapse (`collapse.rs`): heights of the solid column, in the datum
   frame on purpose.
+- The hotspot uplift's taper (`hotspots.rs`, PLT-114: the swell fades to nothing at 3 km on
+  oceanic crust and 1.5 km on continents, the room counted from 0): the moving sea reaches it, but
+  it is a cap on the swell and its edifice, a height of the solid column (a volcano's height is
+  set by its edifice and the plate under it, not by the shore), and it is uncited; left in the
+  datum frame.
 - `surface/amplify.rs` `Config.sea`: already the step's sea; only its doc did not say the frame.
 
 ### The column energy taken from the sea
