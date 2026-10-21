@@ -1370,6 +1370,18 @@ impl Stage for PlatesStage {
                 });
             }
             let mut st = world.plates.take().expect("initialised above");
+            // A run resumed from a checkpoint (`deeptime stage --in`) starts its gap budget at the
+            // resume: the parts count from there.
+            if self.record_gap_budget && st.gap_budget.is_none() {
+                let k = self.preset.tectonics.clone();
+                let env = self.env(&k, st.step);
+                let z_0 = 0.5 * (env.k.continent_elevation_m[0] + env.k.continent_elevation_m[1]);
+                st.gap_budget = Some(gap_budget::GapBudget::start(
+                    &st.samples,
+                    z_0,
+                    env.gravity,
+                ));
+            }
             let result = self.advance(&mut st, world);
             world.plates = Some(st);
             result
