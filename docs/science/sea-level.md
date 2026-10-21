@@ -4,7 +4,7 @@ Status of this page: `stage 2 (constants checked against sources on 2026-10-21)`
 change that made the sea level follow the ocean's volume (Ben, decisions log 2026-10-21: "Its own
 task now", then "Don't follow that old idea" for the 2026-09-30 row "Keep calibrated coastlines").
 
-Ledger ids on this page: `ISO-085` to `ISO-087`, `PLT-350` to `PLT-355`, `CLM-210`, and the rows
+Ledger ids on this page: `ISO-085` to `ISO-087`, `PLT-350` to `PLT-356`, `CLM-210`, and the rows
 they replace or amend: `ISO-033` to `ISO-039`, `CLM-091`, `CLM-099`, `CLM-106` to `CLM-108`,
 `PLT-129`, `HNT-005`, `HNT-041`, `HNT-056` (see [claims.md](claims.md)).
 
@@ -76,6 +76,14 @@ Because the level follows the ground, everything that changes the ocean basins' 
 - **The ocean floor's age** (PLT-350 to PLT-353): the shipped Earth-like presets now sink the floor
   by Stein & Stein's GDH1 age–depth law instead of Cortial's dampening (PLT-129). Young floor is
   shallow, so a planet with more young floor has less room and a higher sea.
+- **The first ocean** (PLT-356): the plate model ages the starting ocean floor by its distance
+  from the boundaries that an earlier, invented motion pulled apart (PLT-273), which made it young
+  (median 19 to 22 Myr against Earth's 50 to 60). Under GDH1 the distance now only orders the
+  floor, young where it diverged, and the ages follow the spread of an ocean in steady state,
+  made at a constant rate and consumed evenly at every age (Parsons 1982): a mean of 60 Myr and a
+  median of 53. Without it every run started with the sea 330 to 450 m high and drained it over
+  100 Myr as that floor aged; on the climate test's small planet the sea started 605 m high,
+  drowned all the land, and with no weathering the CO₂ rose to a bar and the planet to 76 °C.
 - **The floor between diverging plates** (PLT-354): between two resamplings the plate model
   covers the widening gap between diverging plates with no samples; its cells take the floor the
   next resampling will make there, deepening with its age (PLT-351). The surface holds those
@@ -125,6 +133,16 @@ than GDH1's own −2,600 and −5,651 m (the editor's ridge and abyssal depths),
 stretched between them, z = z_r − s·(d(t) − 2,600) with s = (z_r − z_f)/3,051, and each step
 sinks s times as much (PLT-355); every shipped preset has s = 1.
 
+The first ocean's ages (`plates/init.rs`, `steady_state_ages`): with ocean floor made at a
+constant rate C₀ and consumed evenly at every age up to t_m, the area of each age is
+dA/dt = C₀(1 − t/t_m) (Parsons 1982), so the share of the floor younger than t is
+F(t) = 1 − (1 − t/t_m)². The L0 samples are equal-area: the sample of rank F among the ocean
+floor's samples, ordered by the earlier motion's ages, takes
+
+  t = t_m (1 − √(1 − F)),  t_m = 180 Myr,
+
+a mean of t_m/3 = 60 Myr (Earth's floor today 64.2, Seton et al. 2020) and a median of 52.7.
+
 | Ledger id | Quantity | As coded | Units | Source | Status |
 |---|---|---|---|---|---|
 | ISO-085 | The planet's surface water, a layer over the whole planet | `planet.surface_water_m` 2,664 (default and every shipped preset) | m | Charette & Smith 2010 (ocean 1.33238·10⁹ km³), Fretwell et al. 2013 (Antarctica 26.54·10⁶ km³ grounded), Morlighem et al. 2017 (Greenland 2.99·10⁶ km³), IPCC AR5 Table 4.1 (glaciers 0.41 m); Earth's area from memory | `verified` |
@@ -137,6 +155,7 @@ sinks s times as much (PLT-355); every shipped preset has s = 1.
 | PLT-353 | Ground above the sea sinks by 1/W of the water-loaded subsidence | W = ρ_m/(ρ_m − ρ_w) (`settle::WATER_LOADED`) | dimensionless | Kominz et al. 1998 (the factor, read) | `verified` |
 | PLT-354 | The floor in a gap between plates is held in place, deepens with its age, keeps what lies on it; a cell entering a gap starts bare | `advect::hold_gaps`, `newborn`, `carried_elevation`; `plates/gap`, `surface/crust_gap` | - | none needed (the plate model's kinematics) | `game-choice` |
 | PLT-355 | GDH1's shape between the preset's ridge crest and old floor, so the editor's ridge and abyssal depths keep working; GDH1 exactly at its own depths | `pools::gdh1_scale`, `floor_at`, `surface_step`; s = (z_r − z_f)/3,051, 1 in every shipped preset | - | none (a stretch of PLT-352's curve) | `game-choice` |
+| PLT-356 | Under GDH1 the first ocean's ages take the steady-state age–area spread in the earlier motion's order | `init::steady_state_ages`, t_m = 180 | Myr | Parsons 1982 (the law, abstract read); t_m from memory (Earth's oldest floor in place) | `abstract-only` |
 
 ## Earth against the mod
 
@@ -329,4 +348,5 @@ What the numbers say:
 - Miller2011: the Fig. 5 caption (Haq et al. 1987's 250 m), 2026-10-21.
 - Haq1987: the abstract (no numbers), 2026-10-21.
 - Kominz1998: the backstripping relation, 2026-10-21.
+- Parsons1982: the abstract on OSTI (the age–area law, the consumption rate C₀/t_m), 2026-10-21.
 - Seton2020: the abstract (mean age 64.2 Myr), 2026-10-21; the grid earlier (WP-13a).

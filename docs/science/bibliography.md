@@ -7246,6 +7246,14 @@ The sources of the planet's water, the floor's age-depth law and the check on th
 - Access: open copy.
 - Read so far (by the project): 2026-10-21: the method "assumes an Airy isostatic response to loads", with "R2 = [R1 - TS] [(ρa - ρw)/ρa]" (a the asthenosphere, w water; the minus signs lost in the text extraction and restored).
 
+### Parsons1982
+- Reference: Parsons, B. (1982). Causes and consequences of the relation between area and age of the ocean floor. Journal of Geophysical Research 87(B1):289-302.
+- DOI or URL: https://www.osti.gov/biblio/5545743 (the abstract)
+- Cited as: "Parsons 1982" (the starting ocean's steady-state age–area distribution).
+- Ledger ids: PLT-356
+- Access: paywalled; abstract read.
+- Read so far (by the project): the abstract on OSTI, 2026-10-21: the area of ocean floor with age "is approximately described by dA/dt = C0(1-(t/tm)), where C0 is the rate of crustal generation and tm the maximum age", explained by "a balance between crustal generation and consumption where consumption is uniformly distributed with age"; the consumption per unit age scatters about "a mean value equal to C0/tm (approx. 1.7 x 10^-8 km2/yr2)". The abstract gives neither C0 nor t_m.
+
 ## White patches, drowned continents and coastal high ground, added 2026-10-21
 
 The sources named for the plateaus' summer warmth (CLM-220) and the Cryogenian's dates in plates.md's section of 2026-10-21. None was fetched in full.
