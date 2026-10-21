@@ -84,7 +84,21 @@ From top to bottom:
   shows the keyframes, a layer the stages running now do not draw stays at its newest keyframe,
   and once the run ends the map is the newest keyframe. "Stop here" and "Pick this epoch" are
   optional and stay beside the scrubber; both stay on keyframes, so "Stop here" while the live map
-  shows stops at the newest kept map, and its tooltip says so. Where the panel sits beside the map
+  shows stops at the newest kept map, and its tooltip says so. **The epoch button in every phase**
+  (2026-10-21, after Ben's "I tried to choose the checkpoint from ~50 mil years back and it didn't
+  seem to work"): it reads "Stop here" while the plates run and "Pick this epoch" from then on (the
+  end stages, the writing and the finished run), and its label, state and tooltip follow the page
+  every tick, not only when the page is built. It is pressable on every kept map that can be a
+  world (`EditorModel.epochUnavailable` is empty); on any other map it is greyed out and its
+  tooltip says why: no map yet, the end of the run (Play makes it), too early in the history, or a
+  run that stopped. Every press is logged (`Deep Time: epoch picked at … (stop_myr …)`, or why
+  nothing was picked), and the page says what it did, at the foot of the map: "Going back to 50
+  million years ago: a short stretch runs again, then press Play", and once that run is done
+  "Play makes the world as it stood 50 million years ago, the epoch you picked". A relaunch that
+  cannot start leaves the old run as it was and puts its error there and in the log. When the run
+  is done and the map is scrubbed back to an older keyframe, Play's tooltip says that Play makes
+  the world at the end of the run and that Pick this epoch comes first (Ben's world came out at
+  the end of the run although the map showed 50 Mya). Where the panel sits beside the map
   (a wide window), the map spans its column at the projection's π:1, top-aligned, and the band
   under the time row shows the layer's key (the same `model.Legend` as the Map tab, cut with "…"
   when it does not fit).
@@ -198,7 +212,9 @@ in catalogue order, each with its path on the second line, so a setting can be f
   - LegendTest: every ramp has a legend, units;
   - CustomizeTopicsTest: every setting in exactly one tab, everyday before fine-tuning, search,
     ranges, the slow warning;
-  - EditorModelTest: the one-click defaults, generate, changes and resets;
+  - EditorModelTest: the one-click defaults, generate, changes and resets; the epoch button in
+    each phase (plates running, world being written, done) picks the frame's stop or says why it
+    cannot, and a pick whose launch fails keeps the old run and shows the error;
   - TimelapseModelTest: the bar and the time left against a real run's stage timings, the bake;
   - TextWrapTest: wrapping and cutting, every History phrase in two lines of the narrowest column,
     every setting's summary in its two lines (with a model of the font's widths that is never
@@ -212,4 +228,10 @@ in catalogue order, each with its path on the second line, so a setting can be f
   - Customize (Planet, Climate, Rocks, search);
   - Play into the world.
 
-  It takes `--gui-scale` and `--size`, and `--mods mic` for the MIC jar set.
+  It takes `--gui-scale` and `--size`, and `--mods mic` for the MIC jar set. With
+  `--prop epochclick=true` it walks the epoch button instead of the tabs: real mouse clicks
+  (through Minecraft's `MouseHandler`) on a past keyframe in three phases of one run, (a) "Stop
+  here" while the plates run, (b) "Pick this epoch" while the world is written, (c) "Pick this
+  epoch" once it is done, and it fails unless each press relaunches with that frame's
+  `timeline.stop_myr`, the page shows the pick, and the created world's manifest has the last
+  pick's stop.
