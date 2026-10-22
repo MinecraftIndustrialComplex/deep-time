@@ -469,12 +469,13 @@ pub fn resolve(
     Ok(Resolved { seeds })
 }
 
-/// The isostatic ceiling on uplift (design choice): crust at height z above sea level rises by
-/// (1 − z/z_c) of the tectonic forcing, so repeated uplift approaches z_c slowly instead of
-/// saturating it (thickened crust spreads and collapses; Cortial's erosion alone is too slow to
-/// balance repeated collisions). `tectonics.uplift_ceiling_m`; 0 (the pipeline presets) is no
-/// ceiling: there the surface stage spreads over-thick crust itself (`surface::spread`), and the
-/// height of a range is not a number in the plate model.
+/// The isostatic ceiling on uplift (design choice): crust at height z above the sea (the callers
+/// pass the elevation less the step's sea) rises by (1 − z/z_c) of the tectonic forcing, so
+/// repeated uplift approaches z_c slowly instead of saturating it (thickened crust spreads and
+/// collapses; Cortial's erosion alone is too slow to balance repeated collisions).
+/// `tectonics.uplift_ceiling_m`; 0 (the pipeline presets) is no ceiling: there the surface stage
+/// spreads over-thick crust itself (`surface::spread`), and the height of a range is not a number
+/// in the plate model. ledger: PLT-041
 pub fn ceiling(z: f64, zc: f64) -> f64 {
     if z <= 0.0 || zc <= 0.0 {
         1.0
@@ -748,17 +749,19 @@ struct Budget {
 ///
 /// `cones` (per sample, felsic and mafic volcanic rock, m) is the rock the volcano stage's cones
 /// handed to the pools at this step's feedback: an arc counts its felsic cones inside its own
-/// rate and clears them (`hotspots::step` counts what is left).
+/// rate and clears them (`hotspots::step` counts what is left). `sea_m` is the sea the step stands
+/// under (the uplift's ceiling and an island arc's emergence are taken from it).
 pub fn fronts_and_uplift(
     state: &mut PlateState,
     geo: &Geo,
     pos: &[DVec3],
     env: &Env,
     cones: &mut [[f64; 2]],
+    sea_m: f64,
 ) -> Pull {
     let begun = fronts_begin(state, geo, pos, env);
     let reach = fronts_reach(geo, &begun, env);
-    fronts_finish(state, geo, env, cones, begun, reach)
+    fronts_finish(state, geo, env, cones, begun, reach, sea_m)
 }
 
 /// Per sample: divergence, trench, and at most one front (the fastest-converging neighbour).
@@ -942,6 +945,7 @@ pub fn fronts_finish(
     cones: &mut [[f64; 2]],
     begun: FrontsBegun,
     reach: (Vec<f64>, Vec<u32>, Vec<u32>),
+    sea_m: f64,
 ) -> Pull {
     let t_myr = env.t_myr;
     let k = env.k;
@@ -1216,7 +1220,7 @@ pub fn fronts_finish(
             // Cortial's h(z̃) uplift is the oceanic slab's: where continental crust comes in, the
             // collision belt (`belts.rs`) builds the relief from the crust shortened.
             let lifted = if src.oceanic_slab {
-                z + u0_m * f * g * h * ceiling(z, z_ceiling)
+                z + u0_m * f * g * h * ceiling(z - sea_m, z_ceiling)
             } else {
                 z
             };
@@ -1302,7 +1306,9 @@ pub fn fronts_finish(
             let p = rot * pts[i];
             let fold = to_world(rot, s.fold) + tangent(p, src.rel).normalize_or_zero() * (f * g);
             s.fold = to_group(rot, tangent(p, fold));
-            let andean = dz >= orogeny_m && (continental || s.elevation_m > 0.0);
+            // An island arc's uplift marks an Andean orogeny where it stands above the sea.
+            // ledger: PLT-060
+            let andean = dz >= orogeny_m && (continental || f64::from(s.elevation_m) > sea_m);
             if andean
                 && (s.orogeny != OROGENY_HIMALAYAN
                     || t_myr - f64::from(s.orogeny_myr) > collision_myr)

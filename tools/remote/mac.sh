@@ -28,11 +28,12 @@
 #   /Volumes/Graphide/ban/mic/pack                   the MIC pack (--pack)
 #   /Volumes/Graphide/ban/deeptime-cache/{gradle,cargo,xwin,tmp}   GRADLE_USER_HOME, CARGO_HOME, …
 #
-# The Mac has no GitHub access, so the checkout is rsynced (tracked + untracked, minus build
-# outputs and runtimes) and a Mac-side git index is refreshed with `git add -A`: a Nix flake only
+# The VM has no GitHub credentials, so the checkout is rsynced (tracked + untracked, minus build
+# outputs and runtimes) and a VM-side git index is refreshed with `git add -A`: a Nix flake only
 # sees files git tracks. That index is never committed or pushed; commits happen on the laptop.
-# The private git dependencies' pinned commits (mic-viewer) reach the VM's cargo the same way, pushed
-# by the laptop to bare mirrors there on each sync (tools/remote/git-mirrors.sh).
+# A private git dependency's pinned commit would reach the VM's cargo the same way, pushed by the
+# laptop to a bare mirror there on each sync (tools/remote/git-mirrors.sh). Today there is none:
+# mic-viewer is public since 2026-10-21 and the VM's cargo fetches it from GitHub over https.
 # Output that matters (reports, logs) comes back with --pull. Exit status is the command's.
 #
 # Every command runs through the VM's admission tool (/usr/local/lib/deeptime/admit.py; Ben,

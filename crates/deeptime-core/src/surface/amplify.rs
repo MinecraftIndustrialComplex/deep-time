@@ -411,7 +411,8 @@ pub struct Config {
     pub drama: f64,
     pub seed: u64,
     pub circumference: u32,
-    /// Sea level, m (the plate model's datum), block y of the sea, metres per block, vertically.
+    /// Sea level, m (the step's sea, measured from the plate model's datum), block y of the sea,
+    /// metres per block, vertically.
     pub sea: f64,
     pub sea_y: f64,
     pub mv: f64,
