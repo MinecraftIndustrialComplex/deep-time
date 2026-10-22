@@ -3765,3 +3765,94 @@ master's count and the shore are the same line, the median run gains 1.02 % (aga
 p 0.05). The surface planes land down to its base level, so more ground stands near the shore
 than near a datum 200 to 450 m below it, and the same motion carries more of it across. Counted
 at the shore is what the check means.
+
+### Against master on twelve runs
+
+**Measured** (VM, admitted): `earthlike_quick_16k`, 1000 Myr, seeds 1 to 6, the supercontinent and
+scattered_continents starts, 2 threads, the crust budget on (`DEEPTIME_CRUST_BUDGET=1`), by
+`tools/review/force-balance-ensemble.sh`; per run `deeptime plate-check` and
+`tools/review/continents_census.py fields` on the final frame's dumped fields (a scratch driver,
+not committed). Twelve runs an arm, compared by the runs' median and a two-sided Mann-Whitney test
+over the runs. The arms:
+
+- *master*: 44032ad9. Master 49492ce3 (the high ground's laws, off) gives the same crust budget
+  on supercontinent seed 1, line for line.
+- *branch*: this branch. After the merge of 49492ce3 it gives the same budget on supercontinent
+  seed 1, line for line.
+- *pin0*: the branch with the climate's sea pinned at 0 for every reader (a scratch switch, not
+  committed). The Earth-like presets' steering still nudges it: 0 to 93 m, median 0 after the
+  first 100 Myr.
+- *rest*: the branch with the column energy back on the datum (a scratch switch): the wedge
+  floor, the Andean mark and the measurement at the sea.
+- *master + W 40* and *branch + W 40*: `--set tectonics.collapse_hot_myr=40` (PLT-390, the high
+  ground's hot window), the coordinator's follow-up.
+
+V1 item 1's seven measures on the final frame (the census; collisions from the plate check),
+median of twelve runs, the p against master in brackets:
+
+| arm | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | continental crust's net change over 1,000 Myr | criteria met per run: median, mean | sea over the datum, median after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| target | 0.26 to 0.32 | ≥ 0.12 | ≤ 0.25 | ≤ 0.12 | ≤ 0.15 | ≤ 0.15 | 2 to 6 | | of 7 | |
+| master | 0.257 | 0.133 | 0.348 | 0.277 | 0.381 | 0.172 | 1.60 | −0.095 | 1, 1.58 | 292 / 455 |
+| branch | 0.247 (0.19) | 0.104 (0.18) | 0.414 (0.053) | 0.248 (0.58) | 0.369 (0.53) | 0.170 (0.58) | 1.65 (1.0) | −0.085 (0.60) | 1, 1.25 (0.38) | 210 / 474 |
+| pin0 | 0.353 (< 0.001) | 0.233 (0.007) | 0.235 (< 0.001) | 0.259 (0.80) | 0.387 (0.69) | 0.180 (0.84) | 1.80 (0.60) | −0.099 (0.69) | 2, 2.42 (0.016) | 0 / 8 |
+| rest | 0.248 (0.31) | 0.124 (0.54) | 0.419 (0.13) | 0.234 (0.061) | 0.339 (0.028) | 0.156 (0.13) | 1.55 (0.60) | −0.081 (0.13) | 2, 1.33 (0.76) | 325 / 608 |
+| master + W 40 | 0.192 (0.002) | 0.065 (0.035) | 0.589 (0.001) | 0.170 (0.001) | 0.285 (0.001) | 0.143 (0.012) | 1.70 (0.43) | −0.011 (< 0.001) | 2, 1.42 (0.95) | 460 / 734 |
+| branch + W 40 | 0.209 (0.017) | 0.099 (0.11) | 0.510 (0.007) | 0.163 (< 0.001) | 0.285 (0.002) | 0.128 (0.006) | 1.55 (0.77) | −0.032 (0.001) | 2, 1.75 (0.67) | 361 / 584 |
+
+Per run, master / branch (supercontinent seeds 1 to 6, then scattered_continents seeds 1 to 6):
+
+| run | land | largest | under the sea | above 2 km | coast with high ground | under ice | collisions | crust, net |
+|---|---|---|---|---|---|---|---|---|
+| super-1 | 0.223 / 0.260 | 0.136 / 0.091 | 0.508 / 0.387 | 0.281 / 0.235 | 0.358 / 0.399 | 0.272 / 0.103 | 1.1 / 1.8 | −0.042 / −0.082 |
+| super-2 | 0.257 / 0.244 | 0.080 / 0.120 | 0.403 / 0.445 | 0.225 / 0.135 | 0.386 / 0.353 | 0.140 / 0.152 | 1.5 / 2.4 | −0.070 / −0.076 |
+| super-3 | 0.295 / 0.269 | 0.212 / 0.109 | 0.306 / 0.324 | 0.212 / 0.295 | 0.374 / 0.380 | 0.140 / 0.217 | 2.4 / 1.4 | −0.092 / −0.101 |
+| super-4 | 0.227 / 0.263 | 0.058 / 0.152 | 0.437 / 0.418 | 0.178 / 0.159 | 0.296 / 0.284 | 0.120 / 0.093 | 1.6 / 2.0 | −0.074 / −0.061 |
+| super-5 | 0.278 / 0.260 | 0.130 / 0.164 | 0.353 / 0.322 | 0.312 / 0.351 | 0.278 / 0.465 | 0.204 / 0.182 | 1.8 / 1.5 | −0.058 / −0.104 |
+| super-6 | 0.253 / 0.250 | 0.093 / 0.055 | 0.396 / 0.412 | 0.248 / 0.184 | 0.384 / 0.292 | 0.163 / 0.129 | 1.5 / 2.1 | −0.077 / −0.079 |
+| scatt-1 | 0.287 / 0.249 | 0.257 / 0.127 | 0.306 / 0.428 | 0.312 / 0.261 | 0.432 / 0.359 | 0.194 / 0.174 | 1.6 / 1.4 | −0.101 / −0.069 |
+| scatt-2 | 0.301 / 0.222 | 0.175 / 0.061 | 0.282 / 0.417 | 0.194 / 0.372 | 0.374 / 0.417 | 0.172 / 0.242 | 1.2 / 1.4 | −0.097 / −0.107 |
+| scatt-3 | 0.249 / 0.225 | 0.091 / 0.040 | 0.343 / 0.527 | 0.313 / 0.065 | 0.399 / 0.209 | 0.177 / 0.167 | 2.5 / 1.9 | −0.119 / +0.007 |
+| scatt-4 | 0.258 / 0.240 | 0.186 / 0.144 | 0.283 / 0.394 | 0.363 / 0.308 | 0.476 / 0.308 | 0.206 / 0.190 | 1.3 / 1.4 | −0.152 / −0.106 |
+| scatt-5 | 0.280 / 0.243 | 0.148 / 0.099 | 0.287 / 0.420 | 0.287 / 0.208 | 0.402 / 0.381 | 0.171 / 0.106 | 2.1 / 1.1 | −0.124 / −0.088 |
+| scatt-6 | 0.233 / 0.246 | 0.097 / 0.090 | 0.375 / 0.361 | 0.273 / 0.335 | 0.377 / 0.409 | 0.132 / 0.174 | 1.7 / 1.9 | −0.115 / −0.106 |
+
+The plate checks: master 29 of 45 at the median, the branch 29 (pin0 29, rest 27, p 0.029; the two
+W 40 arms 29 and 28). The supercontinent's tenure 13 and 24 Myr (p 0.40), the assembly period 196
+and 142 Myr (p 0.53; two branch runs make no second assembly), pin0 22 and 264 Myr (p 0.46 and
+0.27).
+
+**What moved.** Only what measures from the sea: the plate check's land (its median 0.330 of the
+planet above 0 m, 0.270 above the sea, p < 0.001), its land gain (0.84 to 1.08 % a step, p 0.04,
+above), and the arcs' heights (the island arcs' 90th percentile −2,498 to −2,289 m, p 0.035; the
+continental arcs' median 2,048 to 1,675 m and the island arcs' emergence 23.7 to 22.0 %, p < 0.001). None of
+the seven measures, the crust or the plates' timing moved at p < 0.05.
+
+**What did not.** The crust: master loses 0.095 of the planet's continental crust over the 1,000
+Myr at the median run, the branch 0.085 (p 0.60), and a sea held at the datum 0.099 (pin0, p
+0.69). The 0.026 the section above found was a draw of seeds 1 to 3: there, mean of six runs,
+master loses 0.087 and pin0 0.070; on seeds 4 to 6 master 0.100 and pin0 0.099. Runs of one arm
+spread by 0.03 to 0.04, so twelve runs against twelve resolve about 0.04, and 0.026 would need
+about thirty an arm. The column energy is not measurable either: the branch against rest differs
+in nothing at p < 0.19 but the plate checks met (29 against 27, p 0.048).
+
+**The drowned crust is the sea's height.** Under the sea at the datum (pin0) the continental crust
+under the sea is 0.235 (target ≤ 0.25, met; master 0.348), the largest landmass 0.233 and the land
+0.353 (over its 0.32 ceiling), with the crust lost the same. The plate model's own count at the sea
+agrees (the crust budget's thickness bands, Σ a × dry, the branch's `dry_sl`): master 0.313 on the
+final frame, pin0 0.231. The sea stands 200 to 450 m over the datum because the planet's water
+fills a hypsometry whose continents are thin for their area (sea-level.md, the high ground's
+section above), not because code reads 0 as the sea. The branch's final-frame rise (0.348 to
+0.414, p 0.053) is shared by rest (0.419), so it is not the column energy; over the frames it is
+small (the plate model's mean of the 19 frames after the first 100 Myr 0.335 to 0.362, p 0.44;
+the last 500 Myr 0.324 to 0.348, p 0.47).
+
+**The hot window (PLT-390) on both.** W 40 keeps the crust (net −0.011 and −0.032 against −0.095
+and −0.085) and lowers the high ground (above 2 km 0.170 and 0.163, the coast 0.285, the ice 0.143
+and 0.128), as the high ground's section found; and it drowns the continents on both: under the sea
+0.589 and 0.510, the land 0.192 and 0.209 under its floor, the largest landmass 0.065 and 0.099
+under its floor, the sea 460 and 361 m over the datum at the median. Branch + W 40 against master +
+W 40 differs in none of the seven measures (p ≥ 0.25) nor the crust (p 0.37). It meets the most
+criteria per run on the mean (1.75 against 1.58, 1.42 and 1.25: the ice, and a collision rate or a
+land share in some runs; p 0.67 against master and 0.21 against the branch), but with the
+continents drowned, so PLT-390 stays off.
