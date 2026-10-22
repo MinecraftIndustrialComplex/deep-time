@@ -609,6 +609,7 @@ impl Cube {
 
     /// The radius of the sphere the six faces stand for at equal area, blocks: 6s² = 4πR².
     pub fn radius(&self) -> f64 {
+        // ledger: SCL-078 (6 s² = 4π R²)
         self.s as f64 * (1.5 / std::f64::consts::PI).sqrt()
     }
 
@@ -722,6 +723,7 @@ impl Cube {
         }
         let mut best: Option<(usize, i64)> = None;
         for (k, e) in self.edges.iter().enumerate().skip(2) {
+            // Bands a face width deep, the nearer edge first (ledger: SCL-108).
             if let Some(d) = e.depth(xw, z)
                 && d < self.s
                 && best.is_none_or(|(_, bd)| d < bd)

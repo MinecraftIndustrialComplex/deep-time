@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""The cube world's map table (docs/plans/cube-world-plan.md M1; ledger SCL-080, SCL-081, SCL-101).
+"""The cube world's map table (docs/plans/cube-world-plan.md M1; ledger SCL-080 the conformal map,
+SCL-081 Moser's flow, SCL-101 and SCL-102 the two tables, SCL-104 to SCL-106 the patch, the
+bicubic and its ghosts, the blend).
 
 The production copy of the mountains study's cube_table.py, which builds on the projection
 survey's moser.py and conformal.py (tools/research/projection-survey/, this repository). The pieces
@@ -323,7 +325,7 @@ def build(m, tau, steps=400):
 
 def padded(A, B):
     """The node array over [-1, m + 1]^2 (index offset 1), from the triangle by the ghost rules of
-    FORMAT.md "The cube map table"."""
+    FORMAT.md "The cube map table" (ledger SCL-105)."""
     m = A.shape[0] - 1
     P = np.full((m + 3, m + 3, 2), np.nan)
     I, J = np.meshgrid(np.arange(m + 1), np.arange(m + 1), indexing="ij")
@@ -464,7 +466,7 @@ def tri_eval_raw(T, u, v):
     fv, fdu, fdv = grid_eval(T.Q, (u - u0) * mf, (v - u0) * mf, n)
     fdu, fdv = fdu * mf, fdv * mf
     w = ((v - u0) * m)[..., None]  # coarse cells inward from the patch's edge (v is the smaller)
-    s = w * w * (3.0 - 2.0 * w)
+    s = w * w * (3.0 - 2.0 * w)  # ledger SCL-106
     ds = 6.0 * w * (1.0 - w) * m
     rv = val + s * (fv - val)
     rdu = du + s * (fdu - du)
@@ -628,7 +630,8 @@ def read_table(path):
 
 def generate(m, q, tau, name, commit, out, steps=400, K=None, F=16):
     if K is None:
-        K = 4 if tau == 0 else 0  # the corner patch is for the conformal cube's singular corner
+        # The corner patch is for the conformal cube's singular corner (ledger SCL-104: K 4, F 16).
+        K = 4 if tau == 0 else 0
     if K and tau != 0:
         raise ValueError("the corner patch holds the exact conformal map: tau must be 0")
     A, B, info = build(m, tau, steps)
