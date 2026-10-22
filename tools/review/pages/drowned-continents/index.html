@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drowned Continents: The Transition's Width</title>
+<meta name="description" content="Why 0.414 of Deep Time's continental crust ends under the sea against a 0.25 target: mostly the ocean-continent transition's width, your choice of 5 October. One decision for you, D6.">
+<style>
+:root {
+  --bg: #ffffff;
+  --ink: #1a1a1f;
+  --muted: #52514a;
+  --line: #e5e5ea;
+  --card: #f7f7f8;
+  --accent: #8f620f;
+  --earth: #2f6f9f;
+  --dt: #a0701a;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 18px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow-wrap: anywhere;
+}
+main, .top, footer {
+  max-width: 960px;
+  margin: 0 auto;
+  padding-left: clamp(16px, 4vw, 32px);
+  padding-right: clamp(16px, 4vw, 32px);
+}
+.top {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: 15px;
+}
+.top a { color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.top a:hover, .top a:focus { color: var(--accent); text-decoration: underline; }
+.top .home { color: var(--ink); font-weight: 600; margin-right: auto; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.25; }
+h1 { font-size: clamp(30px, 5vw, 42px); margin: 36px 0 10px; letter-spacing: -0.01em; max-width: 22em; }
+h2 { font-size: clamp(22px, 3vw, 27px); margin: 0 0 12px; max-width: 30em; }
+h3 { font-size: 19px; margin: 26px 0 8px; }
+p, li { max-width: 38em; }
+p { margin: 0 0 14px; }
+ul, ol { padding-left: 1.2em; margin: 0 0 14px; }
+li { margin-bottom: 6px; }
+a { color: var(--accent); }
+strong { font-weight: 600; }
+.dek { color: var(--muted); font-size: 16px; margin-bottom: 18px; }
+.ask { color: var(--muted); font-size: 16.5px; margin: 0 0 16px; }
+.ask strong { color: var(--ink); }
+.lead { font-size: 20px; line-height: 1.55; }
+section { padding: 34px 0 10px; border-top: 1px solid var(--line); margin-top: 26px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 20px 0 8px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 14px 14px 12px; }
+.tile .n { font-size: 30px; font-weight: 650; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tile .t { font-size: 15px; color: var(--muted); line-height: 1.4; margin-top: 6px; }
+.box { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px 6px; margin: 16px 0; }
+.box p { max-width: none; font-size: 16.5px; }
+.cap { font-size: 15px; color: var(--muted); margin: 8px 0 16px; max-width: 46em; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+
+/* findings */
+.why { list-style: none; padding: 0; margin: 10px 0 0; }
+.why > li { max-width: none; margin: 0 0 8px; padding: 6px 0 14px; border-bottom: 1px solid var(--line); }
+.why > li:last-child { border-bottom: 0; }
+.why h3 { margin: 10px 0 8px; font-size: 21px; }
+.why h3 .n { color: var(--accent); margin-right: 6px; }
+
+/* chart: one bar per case, the target as a dashed line in the bar area */
+figure { margin: 18px 0 8px; }
+.legend { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 14.5px; }
+.legend li { margin: 0; display: inline-flex; align-items: center; gap: 6px; max-width: none; }
+.sw { width: 14px; height: 14px; border-radius: 3px; flex: none; }
+.sw.earth { background: var(--earth); }
+.sw.dt { background: var(--dt); }
+.tgt { width: 0; height: 18px; border-left: 2px dashed var(--ink); flex: none; margin: 0 4px; }
+.bars { display: grid; gap: 12px; max-width: 46em; }
+.grp { font-size: 14px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 6px; }
+.bar { display: grid; grid-template-columns: 15em 1fr; gap: 4px 14px; align-items: center; font-size: 15.5px; }
+.bar .lb { line-height: 1.35; font-weight: 600; }
+.bar .lb small { display: block; font-weight: 400; color: var(--muted); font-size: 14px; }
+.bar .track { display: grid; grid-template-columns: 1fr 3.2em; gap: 10px; align-items: center; }
+.bar .area { position: relative; height: 22px; display: flex; align-items: center; }
+.bar .area::after { content: ""; position: absolute; left: 55.56%; top: 0; bottom: 0; border-left: 2px dashed var(--ink); }
+.bar .fill { height: 14px; border-radius: 0 4px 4px 0; width: calc(100% * var(--w)); }
+.bar .fill.earth { background: var(--earth); }
+.bar .fill.dt { background: var(--dt); }
+.bar .val { font-variant-numeric: tabular-nums; font-size: 15px; text-align: right; }
+.bar.rec .lb { color: var(--ink); }
+.axis { display: grid; grid-template-columns: 15em 1fr; gap: 4px 14px; font-size: 15.5px; }
+.axis .scale { display: grid; grid-template-columns: 1fr 3.2em; gap: 10px; }
+.axis .ticks { position: relative; height: 22px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.axis .ticks span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; overflow-wrap: normal; }
+@media (max-width: 560px) {
+  .bar, .axis { grid-template-columns: 1fr; }
+  .axis .lbx { display: none; }
+}
+
+/* tables */
+table { overflow-wrap: break-word; border-collapse: collapse; width: 100%; font-size: 15.5px; line-height: 1.45; margin: 10px 0 8px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; color: var(--muted); font-size: 14.5px; border-bottom-color: #c9c9d1; }
+td:first-child { font-weight: 600; }
+td .sub, th .sub { display: block; color: var(--muted); font-size: 14px; margin-top: 2px; font-weight: 400; }
+table.nums { font-variant-numeric: tabular-nums; }
+table.nums td.num, table.nums th.num { text-align: right; padding-right: 14px; }
+table.nums td.num b { font-weight: 700; }
+@media (max-width: 600px) {
+  table.nums { font-size: 14px; }
+  table.nums th, table.nums td { padding: 8px 8px 8px 0; }
+  table.nums th { white-space: normal; }
+  table.nums td .sub, table.nums th .sub { font-size: 13.5px; }
+}
+
+/* decision */
+.decision { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 18px 18px 8px; margin: 0 0 14px; }
+.decision h3 { margin-top: 0; }
+.decision p, .decision li { max-width: none; }
+.opts { list-style: none; padding: 0; margin: 6px 0 12px; }
+.opts li { padding: 8px 0 8px 2.2em; text-indent: -2.2em; border-top: 1px solid var(--line); margin: 0; font-size: 16.5px; }
+.opts li:first-child { border-top: 0; }
+.opts .l { display: inline-block; width: 2.2em; text-indent: 0; font-weight: 700; color: var(--muted); }
+.opts .rec .l { color: var(--accent); }
+.opts .tagrec { display: inline-block; text-indent: 0; font-size: 13.5px; font-weight: 650; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 6px; margin-right: 6px; }
+.decision .ctx { font-size: 16.5px; }
+.how { font-size: 16.5px; }
+
+details { border-top: 1px solid var(--line); margin-top: 30px; padding: 14px 0; }
+summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::before { content: "\25B8"; margin-right: 8px; color: var(--muted); }
+details[open] summary::before { content: "\25BE"; }
+details ul { font-size: 15.5px; color: var(--muted); }
+footer { color: var(--muted); font-size: 14px; padding-top: 20px; padding-bottom: 40px; }
+</style>
+</head>
+<body>
+<nav class="top" data-ss-react="off">
+  <a class="home" href="https://spacesheep.dev/@benmac/rtsim-hub">All pages</a>
+  <a href="#findings">Findings</a>
+  <a href="#runs">Runs</a>
+  <a href="#decide">Decide (1)</a>
+  <a href="#open">Still open</a>
+</nav>
+<main>
+
+<header data-ss-id="header">
+  <h1 data-ss-id="title">Drowned continents: the transition's width</h1>
+  <p class="dek" data-ss-id="dek">Deep Time master d3e8ade9, 22 October 2026. Measured only: nothing in the code changed.</p>
+  <p class="ask" data-ss-id="ask"><strong>The question:</strong> one V1 criterion asks that at most 0.25 of the continental crust lie under the sea. Master's median is 0.414. Why?</p>
+  <p class="lead" data-ss-id="verdict" data-ss-thumb><strong>Mostly one setting, and it is yours.</strong> The ocean-continent transition is 200 km wide on the planet, which the plate model sees as 1,632 km. Making it 200 km wide on the model's own sphere cuts the drowned share to 0.279 and brings land and the largest landmass into their bands. That is <a href="#decide">D6</a>.</p>
+  <div class="tiles" data-ss-id="tiles">
+    <div class="tile" data-ss-id="tile-master"><div class="n">0.414</div><div class="t">drowned on master, median of 12 runs</div></div>
+    <div class="tile" data-ss-id="tile-earth"><div class="n">0.248</div><div class="t">Earth, counted the way the model counts</div></div>
+    <div class="tile" data-ss-id="tile-wsph"><div class="n">0.279</div><div class="t">with the width set on the model sphere</div></div>
+    <div class="tile" data-ss-id="tile-8x"><div class="n">8x</div><div class="t">the width the plate model sees, against the 200 km meant</div></div>
+  </div>
+</header>
+
+<section id="findings" data-ss-id="findings" data-ss-section>
+  <h2 data-ss-id="findings-h">Three findings</h2>
+  <ol class="why" data-ss-id="findings-list">
+    <li data-ss-id="f1">
+      <h3><span class="n">1.</span>The target is Earth's, with no margin</h3>
+      <p>The model calls crust continental from where its transition is 20 km thick. Earth's crust at least 20 km thick lies 0.248 under the sea by water depth and 0.237 by rock height (CRUST1.0). Counted by Cogley's continent-ocean boundaries instead, Earth itself is 0.306 and would fail.</p>
+      <figure data-ss-id="chart">
+        <ul class="legend" aria-hidden="true">
+          <li><span class="sw earth"></span>Earth</li>
+          <li><span class="sw dt"></span>Deep Time, median of 12 runs</li>
+          <li><span class="tgt"></span>V1 target, at most 0.25</li>
+        </ul>
+        <div class="bars">
+          <div class="grp">Earth</div>
+          <div class="bar" title="Earth, crust at least 20 km thick, by water depth (CRUST1.0): 0.248"><div class="lb">Counted the model's way<small>crust at least 20 km thick, by water depth</small></div><div class="track"><div class="area"><span class="fill earth" style="--w:0.5511"></span></div><span class="val">0.248</span></div></div>
+          <div class="bar" title="Earth, the same crust, by rock height: 0.237"><div class="lb">By rock height<small>the same crust</small></div><div class="track"><div class="area"><span class="fill earth" style="--w:0.5267"></span></div><span class="val">0.237</span></div></div>
+          <div class="bar" title="Earth, by Cogley's continent-ocean boundaries: 0.306"><div class="lb">By Cogley's boundaries<small>continent-ocean contacts</small></div><div class="track"><div class="area"><span class="fill earth" style="--w:0.68"></span></div><span class="val">0.306</span></div></div>
+          <div class="grp">Deep Time</div>
+          <div class="bar" title="Master, W 200 km on the planet: 0.414"><div class="lb">Master<small>W 200 km on the planet</small></div><div class="track"><div class="area"><span class="fill dt" style="--w:0.92"></span></div><span class="val">0.414</span></div></div>
+          <div class="bar" title="w70, W 70 km on the planet: 0.384 (p 0.40)"><div class="lb">w70<small>W 70 km on the planet</small></div><div class="track"><div class="area"><span class="fill dt" style="--w:0.8533"></span></div><span class="val">0.384</span></div></div>
+          <div class="bar rec" title="wsph, W 200 km on the model sphere: 0.279 (p 0.002)"><div class="lb">wsph, recommended<small>W 200 km on the model sphere</small></div><div class="track"><div class="area"><span class="fill dt" style="--w:0.62"></span></div><span class="val">0.279</span></div></div>
+          <div class="axis" aria-hidden="true"><span class="lbx"></span><div class="scale"><div class="ticks"><span style="left:0">0</span><span style="left:33.333%">0.15</span><span style="left:66.667%">0.30</span><span style="left:100%">0.45</span></div><span></span></div></div>
+        </div>
+        <figcaption class="cap">Share of the continental crust under the sea. Earth from CRUST1.0 and Cogley 1984; Deep Time from <code>earthlike_quick_16k</code>, final frame. The numbers are in the table below.</figcaption>
+      </figure>
+      <p>Suggested beside the target: the share of crust at least 25 km thick that stands above the sea, which does not depend on where the model draws the edge. Earth is about 0.81, master 0.572.</p>
+    </li>
+    <li data-ss-id="f2">
+      <h3><span class="n">2.</span>The main cause: the plate model sees the transition 8 times too wide</h3>
+      <p>W, the width of the ocean-continent transition (PLT-262), is 200 km on the planet: your choice of 5 October, to keep Earth's slopes in the game's metres. The quick planet is 8.16 times smaller than the Earth-sized sphere the plate model runs on, so the model sees 1,632 km.</p>
+      <ul>
+        <li>97 to 100% of the continental crust lies within 100 km of ocean, inside the taper's continental half.</li>
+        <li>That half thins the crust to 20 to 33 km, all under the 35.1 km at which the surface reaches sea level, so it stays drowned unless something thickens it.</li>
+        <li>Passive margins have no shelf: the median shelf is 0 km wide (Earth's passive margins 84 to 88 km), and the 200 m isobath is 5 km from the shore (Earth 25).</li>
+      </ul>
+      <div class="box" data-ss-id="correction">
+        <p><strong>A correction to the record.</strong> When you chose 200 km, the cost weighed against a narrower W was 4.5° slopes. That was the figure for W = 0, with the transition off. A narrower W costs much less: 3.2° instead of 2.5° at 200 km on the model sphere (Earth 2.1°).</p>
+      </div>
+    </li>
+    <li data-ss-id="f3">
+      <h3><span class="n">3.</span>Secondary: the ocean keeps all its sediment, and the sea ends high</h3>
+      <ul>
+        <li>The ocean holds 5 to 6 times Earth's sediment (GlobSed). Two to three times Earth's inflow arrives, and none of it subducts: it rides into a trench and comes back on the overriding plate.</li>
+        <li>Sending 80% of it to the mantle lowers the sea by about 720 m but leaves the share drowned (0.412). The continents shrink with the sea, because arcs add no new crust; on Earth they add about as much as subduction takes.</li>
+        <li>The sea's final height reads high: the forced last resampling adds 48 to 118 m over the last step's sea, in all 12 runs.</li>
+      </ul>
+    </li>
+  </ol>
+</section>
+
+<section id="runs" data-ss-id="runs" data-ss-section>
+  <h2 data-ss-id="runs-h">The runs: on the model sphere, land and the largest landmass reach their bands</h2>
+  <p data-ss-id="runs-how"><code>earthlike_quick_16k</code>, 1,000 Myr, seeds 1 to 6 from both starts: 12 runs per arm. Medians, with the Mann-Whitney p against master. Many measures were compared, so one p near 0.03 to 0.05 is expected by chance.</p>
+  <table class="nums" data-ss-id="ab">
+    <thead>
+      <tr><th>Median of 12</th><th class="num">Master<span class="sub">W 200 km on the planet</span></th><th class="num">wsph<span class="sub">200 km on the model sphere</span></th><th class="num">w70<span class="sub">70 km on the planet</span></th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Drowned<span class="sub">at most 0.25</span></td><td class="num">0.414</td><td class="num">0.279<span class="sub">p 0.002</span></td><td class="num">0.384<span class="sub">p 0.40</span></td></tr>
+      <tr><td>Land<span class="sub">0.26 to 0.32</span></td><td class="num">0.247</td><td class="num"><b>0.274</b><span class="sub">p 0.002</span></td><td class="num">0.253<span class="sub">p 0.51</span></td></tr>
+      <tr><td>Largest landmass<span class="sub">at least 0.12</span></td><td class="num">0.104</td><td class="num"><b>0.125</b><span class="sub">p 0.073</span></td><td class="num">0.080<span class="sub">p 0.84</span></td></tr>
+      <tr><td>Passive slope<span class="sub">500 to 2,000 m deep; Earth 2.1°</span></td><td class="num">2.5°</td><td class="num">3.2°</td><td class="num">2.8°</td></tr>
+      <tr><td>Crust 25 km+ above the sea<span class="sub">Earth about 0.81</span></td><td class="num">0.572</td><td class="num">0.683<span class="sub">p 0.014</span></td><td class="num">0.578<span class="sub">p 0.98</span></td></tr>
+      <tr><td>V1 criteria met per run</td><td class="num">1</td><td class="num">2<span class="sub">p 0.035</span></td><td class="num">2<span class="sub">p 0.25</span></td></tr>
+    </tbody>
+  </table>
+  <p class="cap">Bold: inside its band. wsph is 24.5 km on the quick planet.</p>
+  <p data-ss-id="runs-byrun">wsph is lower than master in 10 of the 12 runs, and 2 of its runs meet the target (0.210 and 0.230); no master run does. W at 70 km helps over the run but not in the final frame: its sea climbs to 741 m over the datum in the last 100 Myr, because higher continents shed more sediment and none of it leaves.</p>
+</section>
+
+<section id="decide" data-ss-id="decide" data-ss-section>
+  <h2 data-ss-id="decide-h">1 decision for you</h2>
+  <p class="how" data-ss-id="decide-how">The recommended option is first. Answer "D6 a", or together with the volcano page's, like "D1 to D6 as recommended".</p>
+  <div class="decision" data-ss-id="dec-6">
+    <h3>D6. The transition's width</h3>
+    <p class="ctx">Your choice of 5 October: 200 km on the planet, to keep Earth's slopes in the game's metres.</p>
+    <ul class="opts">
+      <li class="rec"><span class="l">a</span><span class="tagrec">Recommended</span>W = 200 km on the model sphere. The drowned share falls from 0.414 to 0.279, and land and the largest landmass come into their bands. The cost is passive slopes of 3.2° instead of 2.5°. It changes the planet, so test worlds get regenerated.</li>
+      <li><span class="l">b</span>Keep W at 200 km on the planet.</li>
+      <li><span class="l">c</span>The bigger change, if the slope matters more: the crust tapers in the model's frame, and the map and the surface draw the margin wider, in the planet's.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="open" data-ss-id="open" data-ss-section>
+  <h2 data-ss-id="open-h">Still open, not decisions</h2>
+  <p>Even with D6 (a) the drowned share stays at 0.279, above 0.25. Still to fix:</p>
+  <ul data-ss-id="open-list">
+    <li>The sediment loop: sediment can subduct only once arcs grow new crust.</li>
+    <li>The end bias: the last resampling lifts the final sea.</li>
+    <li>Passive margins with no shelf.</li>
+    <li>Land above 2 km and coasts with high ground, at about twice their bands.</li>
+    <li>Collisions, under 2 per 100 Myr (the band is 2 to 6).</li>
+  </ul>
+</section>
+
+<details data-ss-react="off" data-ss-id="sources">
+  <summary>Sources</summary>
+  <ul>
+    <li>Deep Time master d3e8ade9: <code>docs/science/sea-level.md</code>, "The continents under the sea and the sea's height at the end", and <code>docs/science/plates.md</code>, "The transition's width and the drowned continents".</li>
+    <li>Ledger rows HYP-042 to HYP-046 (Earth's references), PLT-262 (W) and PLT-261 (the boundary at 20 km).</li>
+    <li>Runs: <code>earthlike_quick_16k</code> on base master df40ce80, 12 runs an arm on the test VM; the arms set from the command line (<code>tectonics.transition_width_km</code> 24.5 and 70); the 80% sediment arm a scratch patch, not committed.</li>
+    <li>Earth: CRUST1.0 (Laske et al. 2013); Cogley 1984 (abstract); GlobSed (Straume et al. 2019); Harris et al. 2014 (shelves); ETOPO 2022 (slopes, the 200 m isobath); Conrad 2013 and Dutkiewicz et al. 2017 (the sea held up by sediment); von Huene and Scholl 1991 (abstract); Stern and Scholl 2010 (arc growth).</li>
+  </ul>
+</details>
+
+</main>
+<footer data-ss-react="off">
+  Private page for Ben, built from the Deep Time drowned-continents measurement, 22 October 2026. <a href="https://spacesheep.dev/@benmac/rtsim-hub">Back to all pages</a>.
+</footer>
+</body>
+</html>
