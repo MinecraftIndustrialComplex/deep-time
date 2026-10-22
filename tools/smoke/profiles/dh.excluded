@@ -1,2 +1,11 @@
 # Jars (glob patterns) moved to server/mods-excluded/ for the dh profile, one per line.
 # Every exclusion is recorded in the smoke report.
+#
+# Chunky 1.4.23 with Distant Horizons 3.3.3 (the pin since pack 62dd14e): the server crashes while it
+# prepares the spawn chunks, "IllegalStateException: Chunky is not loaded" from
+# org.popcraft.chunky.ChunkyProvider.get, called by Distant Horizons' ChunkyAccessor.bindOnGenerationProgressEvent
+# in its chunk-load listener (2026-10-22, smoke dh; the same as dh-next.excluded says). Chunky registers
+# itself in ServerStartingEvent, and DH binds on the first chunk load with no guard. A client that joins
+# a dedicated server is cut off the same way ("Network Protocol Error": the first chunk packet fires the
+# listener and Chunky never starts on a client); the MIC pack ships Chunky side = both.
+Chunky-*.jar
