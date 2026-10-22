@@ -3676,3 +3676,121 @@ same seeds and switch it on if the land holds. Ben's call when.
 4. *Plateau interiors*: thick crust with no room within reach does not collapse. A lower-crustal
    flow that carries crust farther than the nearest room (PLT-300's flow does not reach) would
    be a flow solve, not a constant.
+
+## The crust flux into collision fronts (2026-10-21)
+
+The coordinator's task CF-1, V1 item 1 (decisions log 2026-10-21): the crust flux into collision
+fronts, the collisions' losses, then the collision rate. "The high ground's extent" above had the
+collisions losing 2.5 to 3.8 times Earth's 0.7 km³ a year because "3 to 4 times Earth's crust
+crosses their fronts", an estimate from the budget. This section measures the flux term by term
+against Earth's sources. Ledger PLT-400 and PLT-401, with notes on PLT-242, PLT-246 and PLT-371;
+sources in the bibliography, "The crust flux into collision fronts". Code: `plates/belts.rs` (the
+crossing's parts as crust-budget globals, PLT-400's switch), `plates/mod.rs`,
+`plates/crust_budget.rs`, `plates/subduction.rs` (PLT-371's switch) and `params.rs`. Both switches
+are off in the default and every built-in preset, so the planets are the same bit for bit.
+
+Measured on `earthlike_quick_16k`, 1000 Myr, seeds 1 to 6, both starts (12 runs per arm), with the
+crust budget on (`DEEPTIME_CRUST_BUDGET=1`): the flux over the whole run, the criteria on the final
+frame (`tools/review/continents_census.py fields`) and the plate checks of each run. Each value is
+the median of the 12 runs; p is a two-sided Mann-Whitney U test on the runs against the base. The
+base is master 49492ce3 as it runs (this branch with both switches off). The build log entry of
+2026-10-21 "The crust flux into collision fronts" has the commands.
+
+### The flux and Earth's
+
+| term | the model (base) | Earth | source |
+|---|---|---|---|
+| front in collision at any time (each step's front, averaged over the run) | 28,800 km | 6,000 km of active suture on average, 12,000 km today, 1,000 to 20,000 km over geologic time; 23,003 km of continental convergent boundary (CCB) | Stern & Scholl 2010, p. 18-19 (after Hildebrand & Bowring 1999, as cited); Bird 2003, Table 3 |
+| convergence across it | 17.1 mm/yr | 18.7 mm/yr across the CCB (its area flux over its length; 26.2 mm/yr mean relative speed) | Bird 2003, Table 3 |
+| crust crossing (the incoming crust's own thickness) | 38.3 km | 35.1 km the normal column, 41.1 km the continents' mean; India's margin 23 to 29 km if its crust was conserved | PLT-278; Christensen & Mooney 1995 (PLT-256); Yakovlev & Clark 2014 |
+| area crossing | 0.49 km² a year | 0.43 km² a year (0.013616 m²/s, 12.6 % of all boundaries' area flux) | Bird 2003, Table 3 |
+| volume crossing | 18.9 km³ a year; 655 km³ per km of front and Myr | about 15 to 18 km³ a year (0.43 km² a year on 35 to 41 km) | the agent's arithmetic |
+| kept: PLT-242's share, then room in the wedge and the belt | 0.881 of it | | |
+| lost: the share's 5 % | 0.94 km³ a year (32 per km and Myr) | | |
+| lost: no room, left over after the belt's six passes with room somewhere in it | 1.15 | | |
+| lost: no room, the belt full at the strength height (PLT-253) | 0.25 | | |
+| lost at the fronts in all | 2.33 km³ a year; 75 per km and Myr | 0.7 km³ a year at suture zones, about 115 per km and Myr (15 sediment, 50 eroded upper plate, 50 deeply subducted lower plate); Table 1: 0.3 deep subduction, 0.1 sediment, 0.3 erosion; India 0.24 km³ a year at a 10 % minimum; 0.43 (up to 0.65) km³ a year from 16,000 km of rifted margin 18 km thick since 65 Ma | Stern & Scholl 2010, p. 12 and 18-19; Clift et al. 2009, §5.1 |
+| a collision's front at its longest, weighted by the area it crossed: median (p25 to p75) | 6,200 km (2,900 to 10,300); the counted collisions 9,800 | the Himalaya about 2,400 km long | the collisions design, from Wikipedia (this page's first table) |
+| a collision's life, the same weighting | 82 Myr (30 to 140); counted 158 | India against Asia about 50 Myr so far | Stern & Scholl 2010, p. 19 |
+| a collision's shortening, the same weighting | 1,750 km (570 to 2,700); counted 2,160 | India against Asia: more than 4,000 km of convergence; 1,000 to 1,200 km of it Tibet's shortening, 600 to 900 km the Himalaya's, up to 1,000 km of continental subduction | van Hinsbergen 2022 |
+
+(The front's length is its straight extent with the lattice's jags taken out, `Front::length_km`.
+The weighted figures are over each run's collision records, `deeptime plate-check --record`,
+counted collisions and the smaller terranes' transfers together, pooled over the 12 runs.)
+
+### Which term is 3 to 4 times Earth's
+
+Per km of front the model is Earth's: it converges at 17.1 mm/yr against 18.7, on 38 km of crust,
+and loses 75 km³ per km and Myr against Stern & Scholl's 115 (65 without the upper plate's
+erosion, which the model does not take at a front). The area crossing is Bird's too: 0.49 against
+0.43 km² a year. **What is 3 to 4 times Earth's is the length of front that loses crust as a
+suture**: 28,800 km at any time against Stern & Scholl's 6,000 km on average (4.8 times) and
+12,000 km today (2.4 times); 2.33 km³ a year against 0.7 is 3.3 times.
+
+The two references agree once read together. Bird's CCB counts every convergent step that is not
+oceanic, transitional ones included (paragraph 127), 23,003 km of it; Stern & Scholl's suture
+losses come from 6,000 to 12,000 km of active suturing. The rest of Earth's continental
+convergence shortens and thickens the plates, Tibet's 1,000 to 1,200 km, with no suture's losses
+booked. The model's fronts suture along all their length for all their life. A collision's front
+is 2.6 times the Himalaya's at the weighted median and its life is long (82 Myr; a quarter of the
+crossing is in collisions longer than 140 Myr; the plate check's collision length p90 is 139 Myr
+against at most 120), while its shortening is India's (1,750 km). About 4.6 such fronts run at once
+(28,800 over 6,200).
+
+Neither is the collisions' code. The front's length is how the plates meet: 24 plates against
+Bird's 52 (the lattice's floor, "The plate geometry", item 4 of its list), so continents meet along
+whole margins. The collision's life is how it ends: the force balance (`plates/forces.rs`) does not
+stall it, and the weld (PLT-246) needs the convergence under 5 mm/yr for 10 Myr. The boundaries'
+orientation (Ben's scope) is not needed for either.
+
+### PLT-242 against its sources
+
+The share (0.95) came from Stern & Scholl's 50 km³ per km and Myr of deep loss over an assumed
+crossing of 1,600 km³ per km and Myr (40 km of crust at 40 mm/yr). The model crosses 655 (17.1
+mm/yr on 38.3 km), so Stern & Scholl's 50 is 7.6 % of it and 65, with the sediment, 9.9 %; the
+model loses 5 % by the share and 6.6 % for want of room, 11.9 % in all. In line: the share stays
+at 0.95, and the row is now `verified` (Stern & Scholl read again in the library, p. 18-19).
+
+Ingalls et al. 2016 (the abstract; not in the library) find about half of India's crust missing
+from the India-Asia mass balance; van Hinsbergen et al. 2017 dispute it, Yakovlev & Clark 2014
+conserve the crust if the margin was 23 to 29 km thick, and Stern & Scholl take 10 % for India as a
+minimum. Half of every collision's crust lost is 6.5 times Stern & Scholl's deep loss per km at
+the model's crossing (327 against 50 km³ per km and Myr); as a global share it is not supported. It was measured anyway (arm rs50 below).
+
+### What changed: the wedge's crust crosses whole (PLT-400)
+
+Crust a collision stacked on the incoming plate (its wedge, PLT-244) is carried by that plate to
+the front and crosses it: 0.14 of the crossing at the base's median. Since every crossing took the
+share, that crust paid the 5 % twice. With `collision_restack_whole` (PLT-400) the part of a
+crossing sample's crust above the normal column that this collision stacked crosses whole. It is
+bookkeeping, and small: the share's loss falls from 0.94 to 0.79 km³ a year (p = 0.002), the
+belt's no-room takes most of it back (1.35 to 1.42), and the fronts' loss goes from 2.33 to 2.17
+(p = 0.80).
+
+The rest is measurement (PLT-401): the crust budget writes the crossing's area, its front length
+times the step, the crust above the normal column, the part of it raised by a collision within 30
+Myr, the part this collision stacked, the wedge's share of what stays, and the no-room loss split
+three ways (left over with room in the belt, the belt full at the strength height, clipped by the
+ceilings); `tools/review/loss-budget.py` reads them.
+
+### The arms
+
+| arm | settings |
+|---|---|
+| base | master's behaviour |
+| rs | PLT-400 on |
+| rsrev | PLT-400 and PLT-371 on |
+| rs50 | PLT-400 on, `collision_stacking_share` 0.5 (Ingalls) |
+| rsw10 | PLT-400 on, `weld_speed_mm_yr` 10 (PLT-246, a game choice) |
+
+Medians of 12 runs (p against the base):
+
+@@ARMS_TABLE@@
+
+### PLT-371's reversal on top
+
+@@REV_TEXT@@
+
+### What is left, and for whom
+
+@@LEFT_TEXT@@

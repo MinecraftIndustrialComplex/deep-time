@@ -326,8 +326,8 @@ pub fn resolve(
         // overriding side by its crust in the overlap, often an oceanic fringe in front of its
         // continent, and fires about 17 times per 100 Myr against Crameri et al. (2020)'s 4 in
         // about 105 Myr; judged by the crust the arc stands on instead (Stern 2004,
-        // `reversal_by_arc_crust`, off by default) the collisions reach 2.2 per 100 Myr but the
-        // land falls (ledger: PLT-371).
+        // `reversal_by_arc_crust`, off by default) the collisions reach 2 to 2.2 per 100 Myr and
+        // the reversals 5 (ledger: PLT-371, which has what it does to the land).
         if let Some(&k) = index.get(&(lo, hi)) {
             let c = &state.contacts[k];
             let under_side = usize::from(c.under != lo);
@@ -506,8 +506,8 @@ pub(super) fn locked_against(
 /// through that plate's visible samples (itself included): an arc behind a front there would stand
 /// on continental crust. The boundary mix measures the same distance (`dynamics`, PLT-370).
 /// The arc-front counters measure with it, and the polarity reversal judges the overriding side
-/// by it with `reversal_by_arc_crust` (off by default: it raised the collisions and lost land,
-/// plates.md, "The plate geometry", 2026-10-21; ledger: PLT-371).
+/// by it with `reversal_by_arc_crust` (off by default; plates.md, "The plate geometry" and "The
+/// crust flux into collision fronts", 2026-10-21; ledger: PLT-371).
 fn continent_within(state: &PlateState, geo: &Geo, i: u32, steps: u32) -> bool {
     let p = state.plate_of(i as usize);
     let mut seen = vec![i];
