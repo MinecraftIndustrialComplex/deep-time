@@ -219,6 +219,22 @@ BAK-048, BAK-050 and BAK-065) are game choices about how far terrain stays the s
   With MIC, before the change 32 of 48 warm-ocean columns had the same block (16 sand where the
   chunk has sandstone) and 47 of 48 in other seas; after it 46 of 46 and 48 of 48 (two chunks
   something else had generated further were not counted); standalone 48 of 48 in both.
+- **Ties in the biome search** (2026-10-21, a game choice). Vanilla's climate search
+  (`Climate.RTree.search`) starts from the entry the thread found last and replaces it only with a
+  strictly nearer one, so where a climate point is equally near two entries the thread's history
+  picks the biome. Since the sea bed runs the whole rule, the rule reads biomes through a per-thread
+  cache, so threads ask in different orders, and the gate batch on master 44032ad9 found a section
+  that differed by thread (`farTerrainSectionsAreCheapAndThreadSafe`, standalone, MIC, EV and
+  TerraBlender; Expanded Ecosphere's biome set has no tie there): section [384, 128, 8] at block
+  (844, 396), sand at y -7 under deep lukewarm ocean alone and deep ocean on another thread. Far
+  terrain's searches now start cold (`ColdBiomeSearch`, a mixin on the search that forgets the
+  thread's last answer inside it), so a tie goes to the first entry in the tree's order on every
+  thread; real chunks keep vanilla's search, so at a tie a chunk may still hold the other entry.
+  Measured in one GameTest run on the test planet with a warm or cold switch (branch commit
+  614bde8e, since removed; the VM loaded with an ensemble): warm
+  1 section of 24 differs, cold none, standalone and with MIC; a section costs 9.1 and 24.9 ms warm,
+  9.3 and 28.0 ms cold at detail 0 and 3 standalone, 9.0 and 26.9 against 9.3 and 30.4 with MIC.
+  The sea-bed test still passes with MIC.
 - **Toroidal World's guard** (Ben, 2026-10-02: "Mixin around TW's guard"). TW 0.19.3 (MIT) refuses
   every Distant Horizons world generator but DH's own on a level it wraps, from DH 3.3.1 on: TW
   makes the seam seamless by reshaping the level's chunk generator and folding DH's section keys,

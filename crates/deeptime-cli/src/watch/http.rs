@@ -3,8 +3,8 @@
 //! images. Requests only choose inputs (a new run's preset) or cancel a run; nothing a page sends
 //! changes a running simulation.
 //!
-//! The server itself is the shared viewer core's (`mic_viewer::http`, vendor/mic-viewer; decisions
-//! log 2026-10-21): HTTP/1.1 on std's `TcpListener` (GET, HEAD and JSON POSTs, keep-alive, a thread
+//! The server itself is the shared viewer core's (`mic_viewer::http`, a pinned git dependency;
+//! decisions log 2026-10-21): HTTP/1.1 on std's `TcpListener` (GET, HEAD and JSON POSTs, keep-alive, a thread
 //! per connection, at most 64), born here and moved there with the slippy map so mic-rtsim's
 //! viewer shares it. [`App`] is its `Handler`.
 //!

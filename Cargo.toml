@@ -1,9 +1,6 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-# The vendored viewer core (tools/dev/refresh-mic-viewer.sh) is a dependency, not a member: its
-# tests, lints and format live in its own repository.
-exclude = ["vendor"]
 
 [workspace.package]
 # The one version: gradle.properties `mod_version` must equal it (Gradle task checkVersions).
@@ -31,9 +28,12 @@ deeptime-viewer = { path = "crates/deeptime-viewer" }
 # The workbench's "Final world" map renderer behind mic-viewer's TileSource (VWD-18).
 deeptime-tiles = { path = "crates/deeptime-tiles" }
 # The shared viewer core of Deep Time and mic-rtsim (decisions log 2026-10-21, VW3 and BR-VWD):
-# the HTTP server, server-sent events, the tile cache and the slippy map. MPL-2.0. Vendored at the
-# commit in vendor/mic-viewer/PINNED (the test VM cannot fetch the private repository).
-mic-viewer = { path = "vendor/mic-viewer" }
+# the HTTP server, server-sent events, the tile cache and the slippy map. MPL-2.0. A git dependency
+# on the private repository at a pinned commit, as mic-rtsim has it (decisions log 2026-10-21,
+# "vendor mic-viewer or depend on it?"). Pin a full commit hash, never a branch: the test VM has no
+# GitHub access, and tools/remote/git-mirrors.sh pushes this commit to a mirror there on every
+# tools/remote/mac.sh sync.
+mic-viewer = { git = "ssh://git@github.com/MinecraftIndustrialComplex/mic-viewer.git", rev = "212f3605dc04c4df0e2beb9da29813434927842f" }
 # The JNI binding (plan §6.1); only deeptime-jni uses it. MIT OR Apache-2.0.
 jni = "=0.22.4"
 # Data parallelism inside native calls, one private pool per session (plan §6.2). MIT OR Apache-2.0.
