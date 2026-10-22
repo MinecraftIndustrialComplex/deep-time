@@ -1073,13 +1073,12 @@ impl VolcanoStage {
                     .filter(|(over, _, _)| *over == plate)
                     .min_by(|a, b| a.1.angle_between(here).total_cmp(&b.1.angle_between(here)))
                     .map(|&(_, _, e)| e);
-                // A summit crater at least 2 km across, about 7 blocks at 300 m per block, so it
-                // shows: a game choice (VOL-026). Real summit craters are mostly under 1 km across
-                // (Fuji's 780 m); the large craters and calderas Grosse et al. (2014) could
-                // measure on composite volcanoes are 0.6–11 km across, median 2.2 km, and 240 m
-                // deep (median). The 0.07 of the doubled basal radius gives 2.8 km across at a
-                // 2-km cone.
-                let crater_rho = (1000.0 * p.size).max(0.07 * radius) / radius; // ledger: VOL-026
+                // A summit crater at least 2 km across, about 7 blocks, so it shows: a game
+                // choice (VOL-091). Typical stratocone craters are about 0.5 km across (Pike &
+                // Clow 1981); the large ones Grosse et al. (2014) could measure are 0.6–11 km
+                // across, median 2.2 km. The 0.07 of the doubled basal radius gives 2.8 km
+                // across at a 2-km cone.
+                let crater_rho = (1000.0 * p.size).max(0.07 * radius) / radius; // ledger: VOL-091
                 st.volcanoes.push(Volcano {
                     id: st.next_id,
                     kind: Kind::Strato,
@@ -1106,7 +1105,8 @@ impl VolcanoStage {
                     active_myr: 0.0,
                     depression: Some(Depression {
                         rho: crater_rho,
-                        depth: 0.06, // ledger: VOL-026
+                        // A crater's depth is absolute (shape::CRATER_DEPTH_M; ledger: VOL-026).
+                        depth: 0.0,
                         caldera: false,
                     }),
                     caldera: None,
