@@ -59,6 +59,7 @@ use glam::DVec3;
 use rayon::prelude::*;
 
 use super::Env;
+use super::collapse::normal_thickness_m;
 use super::geometry::{Geo, dijkstra_sorted};
 use super::kinematics::{quat, tangent, to_group};
 use super::pools::{COLUMN_ISOSTATIC_FACTOR, isostatic_change_m};
@@ -84,6 +85,33 @@ pub const CROSSED_GLOBAL: &str = "plates/collision_crossed_km3";
 /// … and what the belts and wedges kept of it (`collision_stacking_share`, less what found no
 /// room under the strength height, PLT-253), km³ (Earth-normalized).
 pub const KEPT_GLOBAL: &str = "plates/collision_kept_km3";
+/// The crossing's parts, for the crust flux into collision fronts (measurement only, CF-1; ledger:
+/// PLT-401): the area that crossed, km² (shortening × the front's length) …
+pub const CROSSED_AREA_GLOBAL: &str = "plates/collision_crossed_km2";
+/// … the fronts' length times the step, km·Myr (the mean convergence is the area over it) …
+pub const FRONT_GLOBAL: &str = "plates/collision_front_km_myr";
+/// … the crossed crust above the normal column (`collapse::normal_thickness_m`, 35.1 km), km³ …
+pub const ABOVE_GLOBAL: &str = "plates/collision_crossed_above_km3";
+/// … the part of that on crust a collision raised within [`RECENT_MYR`] (its wedge, or a belt the
+/// plate carried in), km³ …
+pub const RECENT_GLOBAL: &str = "plates/collision_crossed_recent_km3";
+/// … what the wedges kept, km³ (the belts kept the rest of [`KEPT_GLOBAL`]) …
+pub const WEDGE_GLOBAL: &str = "plates/collision_wedge_km3";
+/// … and the crossed crust this collision had stacked on the incoming plate (above the normal
+/// column on crust it stamped since its onset), km³ (PLT-400).
+pub const RESTACK_GLOBAL: &str = "plates/collision_crossed_restack_km3";
+/// What of the share found no room, km³ of crust (measurement only, CF-1; ledger: PLT-401): the
+/// belt's part left over after `fill_belt`'s passes while some of its samples still had room (a
+/// belt narrower than half a full one, or one mostly at the strength height that the passes did
+/// not finish) …
+pub const SLIVER_GLOBAL: &str = "plates/collision_noroom_sliver_km3";
+/// … the belt's part left over with every sample at the strength height …
+pub const CAPPED_GLOBAL: &str = "plates/collision_noroom_capped_km3";
+/// … and what the ceiling and the highest elevation clipped off the rises.
+pub const CLIPPED_GLOBAL: &str = "plates/collision_noroom_clipped_km3";
+/// How young a collision orogeny on the incoming crust counts as raised by this collision's
+/// wedge, Myr (measurement only; the agent's window, ledger: PLT-401).
+const RECENT_MYR: f64 = 30.0;
 /// The lowest ground the wedge's profile is followed down to, m below the sea (the reach of its
 /// distance field; ground lower than this is not continental lowland). ledger: PLT-380
 const WEDGE_FLOOR_M: f64 = -500.0;
@@ -105,6 +133,20 @@ pub struct Stacked {
     /// mean thickness, m.
     pub crossed_km2: f64,
     pub thickness_m: f64,
+    /// The front's length, km, the mean of the crossing crust's thickness above the normal
+    /// column, m, and the same on crust a collision raised within [`RECENT_MYR`], m (measurement
+    /// only).
+    pub length_km: f64,
+    pub above_m: f64,
+    pub recent_above_m: f64,
+    /// The part of `thickness_m` this collision stacked on the incoming crust before it crossed
+    /// (its excess over the normal column where this collision stamped it), m (PLT-400).
+    pub restack_m: f64,
+    /// What of the share found no room, km² × m of crust (measurement only): the belt's part
+    /// left over with room still in it, with none, and what the ceilings clipped.
+    pub sliver_km2_m: f64,
+    pub capped_km2_m: f64,
+    pub clipped_km2_m: f64,
     /// Crust added to the belt and to the wedge, km² × m: Σ added thickness × a sample's area.
     pub belt_km2_m: f64,
     pub wedge_km2_m: f64,
@@ -189,6 +231,7 @@ pub fn stack(
                 conv,
                 normal,
                 shortening_km: col.shortening_km,
+                onset_myr: col.onset_myr,
             },
             f,
             flexure,
@@ -321,6 +364,8 @@ struct Side {
     normal: DVec3,
     /// The collision's shortening so far, km.
     shortening_km: f64,
+    /// When the collision began, Myr.
+    onset_myr: f64,
 }
 
 /// One front's stacking, and what the belt's record gains.
@@ -424,9 +469,37 @@ fn stack_front(
             .sum::<f64>()
             / f.crust.len() as f64
     };
-    // ledger: PLT-242 (the share), PLT-281 (Airy with the crust's mean density).
-    let rise_km2_m =
-        k.collision_stacking_share * crossed_km2 * thickness_m / COLUMN_ISOSTATIC_FACTOR;
+    // The crossing crust above the normal column (PLT-278's 35.1 km), the part of it a collision
+    // raised lately (measurement only), and the part this collision stacked on it (its wedge:
+    // the incoming plate carries the wedge's crust to the front and under it; PLT-400).
+    let normal_m = normal_thickness_m();
+    let (above_m, recent_above_m, restack_m) = if f.crust.is_empty() {
+        (0.0, 0.0, 0.0)
+    } else {
+        let (a, r, w) = f.crust.iter().fold((0.0, 0.0, 0.0), |(a, r, w), &j| {
+            let s = &samples[j as usize];
+            let x = (f64::from(s.own_thickness_m()) - normal_m).max(0.0);
+            let stamped = s.orogeny == OROGENY_HIMALAYAN;
+            let recent = stamped && env.t_myr - f64::from(s.orogeny_myr) <= RECENT_MYR;
+            let ours = stamped && f64::from(s.orogeny_myr) >= side.onset_myr - 0.5 * env.dt_myr;
+            (
+                a + x,
+                r + if recent { x } else { 0.0 },
+                w + if ours { x } else { 0.0 },
+            )
+        });
+        let n = f.crust.len() as f64;
+        (a / n, r / n, w / n)
+    };
+    // ledger: PLT-242 (the share), PLT-281 (Airy with the crust's mean density). With
+    // `collision_restack_whole` the crust this collision stacked crosses whole: it took the share
+    // when it first crossed (ledger: PLT-400).
+    let rise_km2_m = if k.collision_restack_whole {
+        crossed_km2 * (k.collision_stacking_share * (thickness_m - restack_m) + restack_m)
+            / COLUMN_ISOSTATIC_FACTOR
+    } else {
+        k.collision_stacking_share * crossed_km2 * thickness_m / COLUMN_ISOSTATIC_FACTOR
+    };
     let fill = if deficit_km2_m > 0.0 {
         (rise_km2_m / deficit_km2_m).min(1.0)
     } else {
@@ -486,6 +559,7 @@ fn stack_front(
     let across = |d: f64, in_wedge: bool| {
         if in_wedge { norm.km(d) } else { -norm.km(d) }
     };
+    let (mut sliver_km2_m, mut capped_km2_m) = (0.0, 0.0);
     if belt_weight > 0.0 && belt_rise_km2_m > 0.0 {
         let cap_m = k.strength_height_m(env.gravity);
         let z_of: Vec<f64> = belt
@@ -493,6 +567,15 @@ fn stack_front(
             .map(|&(i, _)| f64::from(samples[i].elevation_m))
             .collect();
         let given = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
+        // What was left over, and whether any sample still had room (measurement only).
+        let left =
+            (belt_rise_km2_m - given.iter().sum::<f64>() * area).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
+        let room = cap_m <= 0.0 || z_of.iter().zip(&given).any(|(z, g)| cap_m - z - g > 1e-6);
+        if room {
+            sliver_km2_m = left;
+        } else {
+            capped_km2_m = left;
+        }
         rises.extend(
             belt_d
                 .iter()
@@ -505,6 +588,12 @@ fn stack_front(
         stacked: Stacked {
             crossed_km2,
             thickness_m,
+            length_km: f.length_km(),
+            above_m,
+            recent_above_m,
+            restack_m,
+            sliver_km2_m,
+            capped_km2_m,
             wedge_km,
             ..Default::default()
         },
@@ -522,6 +611,8 @@ fn stack_front(
         let z = f64::from(s.elevation_m);
         let z1 = (z + raw * ceiling(z - sea_m, k.uplift_ceiling_m)).min(k.max_elevation_m); // ledger: PLT-041
         let airy_dz = z1 - z;
+        out.stacked.clipped_km2_m +=
+            (raw - airy_dz.max(0.0)).max(0.0) * COLUMN_ISOSTATIC_FACTOR * area;
         if airy_dz <= 0.0 {
             continue;
         }
@@ -1049,6 +1140,49 @@ mod tests {
             .filter(|s| s.orogeny == OROGENY_HIMALAYAN)
             .count();
         assert!(stamped > 50, "{stamped}");
+    }
+
+    /// PLT-400: with `collision_restack_whole` the crust this collision stacked on the incoming
+    /// plate (its wedge, carried to the front) crosses whole and only the rest takes the share;
+    /// off, every crossing takes the share. Either way the crust kept in the wedge and the belt,
+    /// what found no room and what the ceilings clipped add up to what stays.
+    #[test]
+    fn a_collisions_own_wedge_crosses_whole_with_the_switch() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        let share = 0.5;
+        fx.preset.tectonics.collision_stacking_share = share;
+        let mut restacked = false;
+        for whole in [false, true] {
+            fx.preset.tectonics.collision_restack_whole = whole;
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+            for step in 1..=6 {
+                let (stacked, _) = fx.step(&mut st, step, None);
+                let s = &stacked[&0];
+                if step == 1 {
+                    // Nothing this collision stacked has reached the front yet.
+                    assert_eq!(s.restack_m, 0.0, "{s:?}");
+                }
+                assert!(s.restack_m <= s.above_m + 1e-6, "{s:?}");
+                let stays_m = if whole {
+                    share * (s.thickness_m - s.restack_m) + s.restack_m
+                } else {
+                    share * s.thickness_m
+                };
+                let want = s.crossed_km2 * stays_m;
+                let booked = s.wedge_km2_m
+                    + s.belt_km2_m
+                    + s.sliver_km2_m
+                    + s.capped_km2_m
+                    + s.clipped_km2_m;
+                assert!(
+                    (booked - want).abs() <= 1e-6 * want,
+                    "whole {whole}, step {step}: booked {booked}, want {want}, {s:?}"
+                );
+                restacked |= whole && s.restack_m > 0.0;
+            }
+        }
+        assert!(restacked, "the wedge's crust never reached the front");
     }
 
     /// The collision's footprint is marked for the structure stage (plate task 6): the belt
