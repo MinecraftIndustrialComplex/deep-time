@@ -35,6 +35,7 @@ use crate::sphere::cube::{CubeGrid, NO_CELL};
 /// two neighbours' centres (1.1 sides along a face's edge, 1.6 across a skewed corner cell's long
 /// diagonal), so every cell within the reach is reached through cells within reach + margin.
 /// game-choice: a search bound (no physics), Claude 2026-10-22.
+// ledger: SCL-152
 const WALK_MARGIN: f64 = 2.5;
 
 #[inline]
@@ -120,6 +121,7 @@ pub fn cell_weight(
     radius_m: f64,
     prof: &dyn Fn(f64) -> f64,
 ) -> f64 {
+    // ledger: SCL-152 (game-choice: 4 × 4 points, as Lambert's shape::cell_weight samples)
     let mut s = 0.0;
     for b in 0..4 {
         for a in 0..4 {
@@ -181,7 +183,7 @@ pub fn centre_weight(
 }
 
 /// The ground round a foot (`L1::base` on the cube): the lower quartile of `level(cell)` over the
-/// ring from 1.05 R to 1.05 R + 1.5 cells of the holding cell's size (ledger VOL-033's ring, as on
+/// ring from 1.05 R to 1.05 R + 1.5 cells of the holding cell's size (ledger VOL-051's ring, as on
 /// Lambert), or `level` at the holding cell when the ring holds no cell.
 pub fn ring_base(
     g: &CubeGrid,
@@ -190,6 +192,7 @@ pub fn ring_base(
     level: impl Fn(usize) -> f64,
 ) -> f64 {
     let c0 = g.cell_of(centre);
+    // ledger: VOL-051 (the ring's 1.05 R and 1.5 cells, as on Lambert)
     let (inner, outer) = (1.05 * radius_m, 1.05 * radius_m + 1.5 * cell_m(g, c0));
     let mut ring: Vec<f64> = cells_within(g, centre, outer)
         .into_iter()

@@ -54,6 +54,7 @@ pub fn slope_failure(
                     }
                     let m = m as usize;
                     let ck = p.critical_slope * g.dists(c)[k];
+                    // ledger: SCL-148 (game-choice: the pair's volume on its mean area)
                     give += p.rate * (hh[c] - hh[m] - ck).max(0.0) * (0.5 * (a[c] + a[m])) / a[c];
                 }
                 if give > 0.0 {

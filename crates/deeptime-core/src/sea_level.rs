@@ -79,6 +79,7 @@ pub fn fill_level_on<G: SurfaceGrid>(
     min_cells: usize,
     method: FloodMethod,
 ) -> f64 {
+    // ledger: SCL-150 (game-choice: true areas, summed in cell order)
     let total: f64 = (0..d.cells()).map(|c| d.area(c)).sum();
     fill_level_with(d, h, |c| d.area(c), total, layer_m, min_cells, method)
 }
