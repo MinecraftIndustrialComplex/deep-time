@@ -9,6 +9,7 @@ pub mod bodies;
 pub mod climate;
 pub mod column;
 pub mod container;
+pub mod cube;
 pub mod detail;
 pub mod error;
 pub mod events;
