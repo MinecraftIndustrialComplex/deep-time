@@ -327,8 +327,8 @@ pub fn resolve(
         // continent, and fires about 17 times per 100 Myr against Crameri et al. (2020)'s 4 in
         // about 105 Myr; judged by the crust the arc stands on instead (Stern 2004,
         // `reversal_by_arc_crust`, off by default) it fires about 12 times, the collisions it ends
-        // fall from 8 to 5 per 100 Myr and the collisions reach 2 to 2.2 per 100 Myr (ledger:
-        // PLT-371, which has what it does to the land).
+        // fall from 8 to 5 per 100 Myr and the collisions rise to 1.85 to 2.2 per 100 Myr, by
+        // longer fronts in collision (ledger: PLT-371, which has what it does to the land).
         if let Some(&k) = index.get(&(lo, hi)) {
             let c = &state.contacts[k];
             let under_side = usize::from(c.under != lo);
