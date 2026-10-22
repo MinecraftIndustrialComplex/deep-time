@@ -183,6 +183,34 @@ class LavaFlowsTest {
     }
 
     @Test
+    void aFlowThatStartsOnLevelGroundRunsOutFromTheVent() {
+        // A shield with no crater whose top is a level plateau 9 blocks in radius (as where the elevation raster
+        // holds a level patch over a gentle summit): its summit flows start on level ground.
+        Volcanoes.Volcano v = new Volcanoes.Volcano(1, "shield", 0, 0, 45_000, 2_000, 1.0, true, false, 0, 0, false);
+        Cones env = new Cones(List.of(v)) {
+            @Override
+            public double height(double x, double z) {
+                return Math.min(super.height(x, z), BASE + 2_000 / MV - 6.0);
+            }
+        };
+        LavaFlows f = flows(env);
+        int out = 0, summit = 0;
+        for (LavaFlows.Flow fl : f.flows(0)) {
+            if (fl.flank())
+                continue;
+            summit++;
+            double r = Math.hypot(fl.endX(), fl.endZ());
+            assertTrue(fl.stop().equals("length") || r > 9.0, "stopped on the plateau: " + fl);
+            if (r > 9.5)
+                out++;
+            List<double[]> p = fl.path();
+            for (int k = 1; k < p.size(); k++)
+                assertTrue(p.get(k)[2] <= p.get(k - 1)[2] + 1e-9, "a step climbs: " + fl);
+        }
+        assertTrue(summit > 20 && out > summit / 2, "summit flows " + summit + ", off the plateau " + out);
+    }
+
+    @Test
     void summitFlowsStartPastTheCratersRim() {
         Cones env = new Cones(List.of(shield(1, 0, 0, 1.0), strato(2, 1_200, 0, 1.0)));   // apart: no valley between
         LavaFlows f = flows(env);
