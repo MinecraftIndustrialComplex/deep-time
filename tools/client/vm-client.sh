@@ -28,6 +28,9 @@
 #                  /data/ban/play/<hash>-client-lite/minecraft) and copy its kubejs/ into the game dir, so the
 #                  walk runs the player's set with the files the pack gives a new world (the lite set's rock
 #                  tags come as kubejs/data/deeptime); implies --mods (the Gradle link step runs)
+#   --rock-tags DIR  the MIC rock-tag datapack (e.g. /data/ban/mic/Docs/datapacks/deeptime-mic-rock-tags): its
+#                  data/deeptime/ is copied into the game dir's kubejs/data/deeptime unless that already holds
+#                  files (a stage's own), as tools/remote/play-client-apply.py does for Ben's full instance
 #   --timeout S    per client pass (default 7200: a 1,000-Myr quick planet's ETA was ~2 h on the
 #                  loaded VM; --prop length=300 takes a fraction of that)
 #   --threads N    processors the client JVM sees (-XX:ActiveProcessorCount; default 8): the editor
@@ -46,7 +49,7 @@ REPO="$PWD"
 ADMIT="${DEEPTIME_ADMIT:-/usr/local/lib/deeptime/admit.py}"
 
 NAME=vm-client; BUILD=1; GUIDANCE=1; CREATE=true; WSIZE=1280x720; TIMEOUT=7200; THREADS=8; PROPS=()
-GUISCALE=2; RUNSET=""; GRADLE_SET=(); STAGE_DIR=""
+GUISCALE=2; RUNSET=""; GRADLE_SET=(); STAGE_DIR=""; ROCK_TAGS=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -58,6 +61,7 @@ while [ $# -gt 0 ]; do
         --gui-scale) GUISCALE="$2"; shift 2 ;;
         --mods) RUNSET="$2"; shift 2 ;;
         --stage) STAGE_DIR="$2"; shift 2 ;;
+        --rock-tags) ROCK_TAGS="$2"; shift 2 ;;
         --timeout) TIMEOUT="$2"; shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --prop) [[ "$2" =~ ^[a-z]+=[-0-9.,\;a-z_/]+$ ]] || { echo "vm-client: bad --prop $2" >&2; exit 2; }
@@ -69,6 +73,7 @@ done
 [[ "$NAME" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "vm-client: --name must be one plain word" >&2; exit 2; }
 [[ "$WSIZE" =~ ^[0-9]+x[0-9]+$ ]] || { echo "vm-client: --size is WxH" >&2; exit 2; }
 [[ "$GUISCALE" =~ ^[0-9]$ ]] || { echo "vm-client: --gui-scale is 0 (auto) to 9" >&2; exit 2; }
+[ -z "$ROCK_TAGS" ] || [ -d "$ROCK_TAGS/data/deeptime" ] || { echo "vm-client: --rock-tags $ROCK_TAGS has no data/deeptime/" >&2; exit 2; }
 if [ -n "$STAGE_DIR" ]; then
     [ -d "$STAGE_DIR/mods" ] || { echo "vm-client: --stage $STAGE_DIR has no mods/" >&2; exit 2; }
     # DEEPTIME_RUN_MODS replaces smoke/<set>/server/mods in the Gradle link step (neoforge/build.gradle);
@@ -124,6 +129,15 @@ if [ -n "$STAGE_DIR" ]; then
     # single-player world its rock tags: KubeJS adds kubejs/data as a global datapack.
     rm -rf "$GAMEDIR/kubejs"
     if [ -d "$STAGE_DIR/kubejs" ]; then cp -R "$STAGE_DIR/kubejs" "$GAMEDIR/kubejs"; say "kubejs/ from $STAGE_DIR: $(find "$GAMEDIR/kubejs" -type f | wc -l) files"; fi
+fi
+if [ -n "$ROCK_TAGS" ]; then
+    if [ -n "$(find "$GAMEDIR/kubejs/data/deeptime" -name '*.json' 2>/dev/null | head -1)" ]; then
+        say "rock tags: kubejs/data/deeptime already has files (the stage's own); $ROCK_TAGS not copied"
+    else
+        mkdir -p "$GAMEDIR/kubejs/data/deeptime"
+        cp -R "$ROCK_TAGS/data/deeptime/." "$GAMEDIR/kubejs/data/deeptime/"
+        say "rock tags: $(find "$GAMEDIR/kubejs/data/deeptime" -name '*.json' | wc -l) files from $ROCK_TAGS into kubejs/data/deeptime"
+    fi
 fi
 
 # --- the display: Xvfb + Mesa llvmpipe, sound to a private null sink ---------------------------------
