@@ -277,10 +277,12 @@ pub fn active_volcanoes(st: &VolcanoState) -> Value {
     let volcanoes: Vec<Value> = list
         .iter()
         .map(|v| {
+            let shape = v.shape();
             let crater = v.depression.map(|d| {
                 json!({
                     "radius_m": (d.rho * v.radius_m).round(),
-                    "depth_m": (d.depth * v.height_m).round(),
+                    // A crater's depth is absolute, a caldera's a share of the height (VOL-026).
+                    "depth_m": shape.depression_depth_m(v.height_m).round(),
                     "caldera": d.caldera,
                 })
             });
@@ -381,12 +383,13 @@ mod tests {
         assert_eq!(list[0]["activity"], 0.75);
         assert!(list[0]["crater"].is_null());
         assert_eq!(list[0]["oceanic"], true);
-        // The arc volcano: its last flux, and its crater in metres (7 % of 20 km, 6 % of 2 km).
+        // The arc volcano: its last flux, and its crater in metres (7 % of 20 km; Earth's median
+        // depth, 240 m, whatever the share of height its depression says).
         assert_eq!(list[1]["kind"], "stratovolcano");
         assert_eq!(list[1]["activity"], 0.6);
         assert_eq!(list[1]["x"], -100.5);
         assert_eq!(list[1]["crater"]["radius_m"], 1400.0);
-        assert_eq!(list[1]["crater"]["depth_m"], 120.0);
+        assert_eq!(list[1]["crater"]["depth_m"], 240.0);
         assert_eq!(list[1]["age_myr"], 4.0);
     }
 
