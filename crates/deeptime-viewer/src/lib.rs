@@ -39,6 +39,10 @@ const VIEWER_JS: &str = include_str!("../assets/viewer.js");
 /// The pages' map projection (`window.DTProj`, the twin of `deeptime_format::projection`), loaded
 /// before every other script of the viewer bundle and the workbench.
 pub const PROJECTION_JS: &str = include_str!("../assets/projection.js");
+/// The world's cube map table (`deeptime_format::cube_map::WORLD_MAP`, ledger: SCL-101) as the
+/// pages fetch it: written beside `projection.js` by every bundle and served at the same relative
+/// path by the workbench. `DTCubeMap.fetch` checks it against the hash the page names.
+pub const CUBE_MAP_WORLD_FILE: &str = "cube-map-conformal-n513.bin";
 const BENCH_HTML: &str = include_str!("../assets/bench.html");
 const WORKBENCH_HTML: &str = include_str!("../assets/workbench.html");
 /// The workbench page's script (`deeptime watch` serves it as `workbench.js`).
@@ -107,6 +111,13 @@ pub fn slug(name: &str) -> String {
         .collect()
 }
 
+/// The bytes of the world's cube map table, the file [`CUBE_MAP_WORLD_FILE`] holds (what the
+/// format crate ships, `CubeMap::builtin_bytes`).
+pub fn cube_map_world_bytes() -> &'static [u8] {
+    deeptime_format::cube_map::CubeMap::builtin_bytes(deeptime_format::cube_map::WORLD_MAP)
+        .expect("the format crate ships the world's cube map")
+}
+
 fn stride_for(w: u32, max: u32) -> u32 {
     w.div_ceil(max).max(1)
 }
@@ -137,6 +148,7 @@ pub fn write_bundle_with(
     )?;
     fs::write(dir.join("viewer.js"), VIEWER_JS)?;
     fs::write(dir.join("projection.js"), PROJECTION_JS)?;
+    fs::write(dir.join(CUBE_MAP_WORLD_FILE), cube_map_world_bytes())?;
     fs::write(dir.join("ramps.json"), RAMPS_JSON)?;
 
     let mut entries = Vec::new();
@@ -647,6 +659,36 @@ mod tests {
         );
         write_bench_page(&dir.join("bench"), &json!({ "runs": [] })).unwrap();
         assert!(dir.join("bench/bench.js").is_file());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_bundle_carries_the_worlds_cube_map_beside_projection_js() {
+        use deeptime_format::cube_map::{CubeMap, WORLD_MAP};
+        // The pages fetch `cube-map-<name>.bin` next to projection.js (DTCubeMap.fileName).
+        assert_eq!(CUBE_MAP_WORLD_FILE, format!("cube-map-{WORLD_MAP}.bin"));
+        assert!(PROJECTION_JS.contains("cube-map-"));
+        let dir = std::env::temp_dir().join(format!("dt-viewer-cube-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let info = BundleInfo {
+            title: "cube".into(),
+            source: "test".into(),
+            circumference: 64,
+            sea_level_y: 63,
+            format_version: "0.0".into(),
+            created_utc: "2026-10-22T00:00:00Z".into(),
+        };
+        write_bundle(&dir, &info, &[], None).unwrap();
+        let written = fs::read(dir.join(CUBE_MAP_WORLD_FILE)).unwrap();
+        assert_eq!(written, cube_map_world_bytes());
+        assert!(dir.join("projection.js").is_file());
+        // The bytes the pages hash are the table the format crate loads and checks.
+        let map = CubeMap::builtin(WORLD_MAP).unwrap();
+        assert_eq!(
+            deeptime_format::sha256::hex(&deeptime_format::sha256::sha256(&written)),
+            map.sha256_hex()
+        );
+        assert_eq!(map.name(), WORLD_MAP);
         fs::remove_dir_all(&dir).unwrap();
     }
 
