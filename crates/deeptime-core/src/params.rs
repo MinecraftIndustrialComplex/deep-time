@@ -515,6 +515,12 @@ pub struct TectonicParams {
     /// crust, thickening the belt and its wedge; the rest goes down with the slab or is lost
     /// from the lower crust (`plates/belts.rs`).
     pub collision_stacking_share: f64,
+    /// `true`: crust this collision stacked on the incoming plate (its wedge, which that plate
+    /// carries to the front and under it) crosses the front again whole, as the orogen's own
+    /// rock; only the crust the incoming plate brought takes `collision_stacking_share`. `false`
+    /// (the default and every built-in preset): every crossing takes the share again (ledger
+    /// PLT-400).
+    pub collision_restack_whole: bool,
     /// Surface slope of the orogenic wedge on the incoming plate, degrees: the wedge rises
     /// towards the front at this slope up to the belt's height there (a critical wedge keeps
     /// its shape as it grows; the Lesser Himalayan wedge's surface slope is 1–1.6°).
@@ -784,6 +790,7 @@ impl Default for TectonicParams {
             subduction_peak_km: 300.0,
             collision_belt_km: 400.0,        // ledger: PLT-241
             collision_stacking_share: 0.95,  // ledger: PLT-242
+            collision_restack_whole: false,  // ledger: PLT-400
             wedge_slope_deg: 1.5,            // ledger: PLT-192
             weld_speed_mm_yr: 5.0,           // ledger: PLT-246
             weld_after_myr: 10.0,            // ledger: PLT-246
