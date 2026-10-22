@@ -383,10 +383,7 @@ public final class FarTerrainGameTests {
      * set by neoforge/build.gradle from the server set and its GameTest exclusions), and then far
      * terrain is bound to it: the API resolves and the real test planet's override registered. A
      * run that expects it and lacks it fails here, rather than every far-terrain test passing
-     * without Distant Horizons. Today no GameTest-server run has it: Distant Horizons 3.3.1 (as
-     * 3.3.0) casts the server to {@code DedicatedServer} at start, which NeoForge's GameTest server is
-     * not (tools/smoke/profiles/mic.gametest-excluded), so its path is the smoke check's
-     * ({@code tools/smoke/run.py --dh}) on a dedicated server.
+     * without Distant Horizons. XXDHNOTE
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 200)
     public static void farTerrainHasDistantHorizonsWhenExpected(GameTestHelper helper) {
