@@ -1126,7 +1126,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Cogley, J. G. (1984). Continental margins and the extent and number of the continents. Reviews of Geophysics 22(2):101-122.
 - DOI or URL: 10.1029/RG022i002p00101.
 - Cited as: (ERO, ISO, HYP) "Cogley 1984 (continental crust 41 % of the surface)". (PLT) "Cogley 1984, Rev. Geophys. 22:101-122" (29 percent land on 41 percent continental crust).
-- Ledger ids: HYP-012, HYP-013, PLT-158, PLT-159, PLT-205; HYP-035 (2026-10-20: the 41 % share as the stand-in contour for the continental edge)
+- Ledger ids: HYP-012, HYP-013, PLT-158, PLT-159, PLT-205; HYP-035 (2026-10-20: the 41 % share as the stand-in contour for the continental edge); HYP-042 (2026-10-22: the 30.6 % submerged against the drowned-crust target)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -3792,7 +3792,7 @@ Vanilla's OverworldBiomeBuilder, Terralith, Tectonic (game and mod data), rustff
 - Reference: Laske, G., Masters, G., Ma, Z., Pasyanos, M., 2013. Update on CRUST1.0: A 1-degree Global Model of Earth's Crust. Geophysical Research Abstracts 15, EGU2013-2658 (EGU General Assembly abstract). Model: CRUST1.0, 1 x 1 degree, eight layers (water, ice, three sediment layers, upper, middle and lower crystalline crust) over the mantle.
 - DOI or URL: https://igppweb.ucsd.edu/~gabi/crust1.html ; data http://igppweb.ucsd.edu/~gabi/crust1/crust1.0.tar.gz (crust1.bnds: the top of each layer, km)
 - Cited as: "CRUST1.0 (Laske, Masters, Ma & Pasyanos 2013)" (tools/review/earth-crust.py, tools/review/continents_census.py)
-- Ledger ids: HYP-040, HYP-041, PLT-361 (2026-10-21: the continental crust's drowned share, shelf and thickness by cut)
+- Ledger ids: HYP-040, HYP-041, PLT-361 (2026-10-21: the continental crust's drowned share, shelf and thickness by cut); HYP-042, HYP-043 (2026-10-22: the drowned share by the rock's height, the hypsometry of crust at least 20 km thick, the crossing thickness, the area by thickness class)
 - Access: open (data files)
 - Library (the project's source library, not distributed): the model's data, fetched 2026-10-20 to the land-shape task's scratch folder on the test VM; the abstract was not fetched.
 - Read so far (by the project): the data read and measured (tools/review/earth-crust.py); the abstract is cited from the model's own page, not read (from-memory).
@@ -6833,9 +6833,9 @@ The sources behind the ocean crust's own column (build log 2026-10-19 "Crust tem
 - Reference: Straume, E. O., Gaina, C. and others (2019). GlobSed: updated total sediment thickness in the world's oceans. Geochemistry, Geophysics, Geosystems 20(4):1756-1772.
 - DOI or URL: 10.1029/2018GC008115; author copy https://epic.awi.de/49326/
 - Cited as: "GlobSed (Straume et al. 2019)" (strata.md, the census of the ocean crust's sediment by age).
-- Ledger ids: none (the comparison in strata.md; no constant rests on it).
+- Ledger ids: HYP-044 (2026-10-22: the ocean's sediment against the model's conserved pools; strata.md's comparison rests on it too).
 - Access: open author copy.
-- Library: not kept (read 2026-10-19 from the author-accepted PDF, text-extracted).
+- Library: not kept (read 2026-10-19 from the author-accepted PDF, text-extracted; again 2026-10-22 by a research sub-agent, Table 3: "This study" about 3.37 x 10^8 km3 over about 3.63 x 10^8 km2, mean 927 m; margins 1.43 x 10^8 km3 over 4.69 x 10^7 km2; beyond 200 km of the continent-ocean boundary 1.13 x 10^8 km3 over 2.79 x 10^8 km2).
 - Read so far (by the project): 2026-10-19 (crust templates agent): abstract, "sediment thickness increases with age of the oceanic crust, towards high southern and northern latitudes, and towards the equator"; Table 3, the mean over the whole grid 927 m, continental margins 3044 m, the deep ocean more than 200 km from the continent-ocean boundary 404 m; section 3, the ocean younger than 82 Myr within 72 degS to 72 degN "is characterized by an average sediment thickness of 267 m".
 
 ### WhiteMcKenzie1989
@@ -6994,10 +6994,10 @@ The carbonate and ore-deposit task (build log 2026-10-19): pelagic chalk above t
 - Reference: Rudnick, R. L. and Gao, S. (2003). Composition of the continental crust. In: Rudnick, R. L. (ed.), Treatise on Geochemistry vol. 3, The Crust, Elsevier, pp. 1-64.
 - DOI or URL: 10.1016/B0-08-043751-6/03016-4 (from memory, not looked up)
 - Cited as: "Rudnick & Gao 2003, from-memory" (impact_basin_u.json source note).
-- Ledger ids: ORE-039
-- Access: paywalled (book chapter).
+- Ledger ids: ORE-039; HYP-042 (2026-10-22)
+- Access: paywalled (book chapter); an open copy at web.archive.org/web/2020/http://www.i2massociates.com/downloads/4.1RudnickGaoCrustcomposition.pdf.
 - Library: not fetched.
-- Read so far (by the project): from memory (upper continental crust about 2.7 ppm U); not read in this work.
+- Read so far (by the project): from memory (upper continental crust about 2.7 ppm U); not read in this work. Read 2026-10-22 (the drowned continents task; a research sub-agent, the open copy, full text): "The lateral extent of the continents is marked by the break in slope on the continental shelf. Using this definition, 31% of continental area is submerged beneath the oceans (Figure 1; Cogley, 1984)".
 
 ### Hofmann1988
 - Reference: Hofmann, A. W. (1988). Chemical differentiation of the Earth: the relationship between mantle, continental crust, and oceanic crust. Earth and Planetary Science Letters 90(3):297-314.
@@ -7514,3 +7514,71 @@ YakovlevClark2014.
 - Access: open (PubMed Central).
 - Library: not fetched.
 - Read so far (by the project): the first 100,000 characters of the PMC text, 2026-10-21, through a fetch tool's excerpts: "after which >4000 km of India–Asia plate convergence occurred"; "3500 and 4500 km of post-60-Ma convergence at the longitude of the western and eastern Himalayan syntaxis"; "∼1000–1200 km of Cenozoic convergence was accommodated by shortening and extrusion in the overriding plate of Tibet"; the "Himalaya fold-thrust belt give somewhat smaller numbers, between 600 and 900 km"; in the model with an intra-oceanic arc, "large amounts (≤1000 km at the longitude of Bhutan) of continental subduction prior to horizontal underthrusting"; a fully continental Greater India needs "thousands of kilometers of continental subduction".
+
+## The drowned continents (HYP-042 to HYP-046), added 2026-10-22
+
+Read again for this task, entries above: Cogley1984 (abstract), RudnickGao2003, Laske2013,
+Straume2019, Harris2014, SternScholl2010.
+
+### Harrison1983
+- Reference: Harrison, C. G. A., Miskell, K. J., Brass, G. W., Saltzman, E. S. and Sloan, J. L. (1983). Continental hypsography. Tectonics 2(4):357-377 (authors after the first, volume and pages from memory; not checked against Crossref here).
+- DOI or URL: 10.1029/TC002i004p00357 (from memory); read in a Wayback copy of the eScholarship PDF.
+- Cited as: "Harrison et al. 1983".
+- Ledger ids: HYP-042
+- Access: open copy (eScholarship).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-22, a research sub-agent, the Wayback copy through pdftotext (Table 2 lost in the OCR, so the continents' mean heights are not read): "We have included within each continent the area of shelf out to a depth of 0.2 km. This is roughly the position of the shelf edge break and thus serves as a convenient boundary for the continental areas"; Table 5: continental area 170.895 x 10^6 km^2 (33.51 %), oceanic 339.113 x 10^6 km^2 (66.49 %).
+
+### Conrad2013
+- Reference: Conrad, C. P. (2013). The solid Earth's influence on sea level. Geological Society of America Bulletin 125(7-8):1027-1052 (the issue and pages from memory).
+- DOI or URL: https://www.clintconrad.no/papers/Conrad_GSAB2013.pdf (the author's copy).
+- Cited as: "Conrad 2013".
+- Ledger ids: HYP-044
+- Access: open (author's copy).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-22, a research sub-agent, the "Marine Sedimentation" section: today's ocean sediment raises the sea by 166 m, 107 m at 65 Ma; the thicknesses isostatically compensated "following Sykes (1996)"; Pacific sediment about four times thinner than the Atlantic's or Indian's.
+
+### Dutkiewicz2017
+- Reference: Dutkiewicz, A., Müller, R. D., Wang, X., O'Callaghan, S., Cannon, J. and Wright, N. M. (2017). Predicting sediment thickness on vanished ocean crust since 200 Ma. Geochemistry, Geophysics, Geosystems 18 (authors after the first two and the title from memory).
+- DOI or URL: https://www.earthbyte.org/webdav/ftp/Data_Collections/Dutkiewicz_etal_2017_G3/Dutkiewicz_Muller_et_al_sediment_thickness_G3_2017.pdf
+- Cited as: "Dutkiewicz et al. 2017".
+- Ledger ids: HYP-044
+- Access: open (EarthByte copy).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-22, a research sub-agent, the abstract and sections 4 and 5: the sea would be 210 m lower without the ocean's sediment (the Sykes method; about 150 m by their variant of Conrad's); the contribution rose from 80 m to 210 m since 120 Ma; modelled global mean thickness 365 m now.
+
+### Syvitski2005
+- Reference: Syvitski, J. P. M., Vörösmarty, C. J., Kettner, A. J. and Green, P. (2005). Impact of humans on the flux of terrestrial sediment to the global coastal ocean. Science 308(5720):376-380.
+- DOI or URL: 10.1126/science.1109454
+- Cited as: "Syvitski et al. 2005 (via Walling 2006)".
+- Ledger ids: HYP-045
+- Access: paywalled; not fetched.
+- Library: not fetched.
+- Read so far (by the project): at second hand only, 2026-10-22: Walling 2006 quotes the pre-human flux to the coast as 14 Gt a year and the modern as 12.6 Gt a year.
+
+### Walling2006
+- Reference: Walling, D. E. (2006). Human impact on land-ocean sediment transfer by the world's rivers. Geomorphology 79(3-4):192-216 (the title from memory).
+- DOI or URL: a PDF at https://www.rmpcecologia.com/disciplinas/impactos/literatura/art57_hu2018.pdf
+- Cited as: "Walling 2006".
+- Ledger ids: HYP-045
+- Access: an open copy.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-22, a research sub-agent, for Syvitski et al. 2005's 14 and 12.6 Gt a year.
+
+### vonHueneScholl1991
+- Reference: von Huene, R. and Scholl, D. W. (1991). Observations at convergent margins concerning sediment subduction, subduction erosion, and the growth of continental crust. Reviews of Geophysics 29(3):279-316.
+- DOI or URL: 10.1029/91RG00969 (from memory); abstract at https://www.usgs.gov/publications/observations-convergent-margins-concerning-sediment-subduction-subduction-erosion-and
+- Cited as: "von Huene & Scholl 1991".
+- Ledger ids: HYP-045
+- Access: paywalled; the abstract open (USGS).
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (a research sub-agent): sediment subduction at 43,500 km of margin about 1.5 km^3 a year of solid, 1.0 over the long term; about 20 % of the incoming sediment accreted at margins with small to medium prisms, about 70 % subducted at margins with large prisms; subduction erosion about 1.1 km^3 a year.
+
+### SimpsonSimpson2018
+- Reference: Simpson and Simpson (2018), arXiv:1810.08658 (the authors' initials and the title not recorded by the sub-agent).
+- DOI or URL: https://arxiv.org/pdf/1810.08658
+- Cited as: "Simpson & Simpson 2018".
+- Ledger ids: HYP-046
+- Access: open (arXiv).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-22, a research sub-agent, full text: "Reported mean land elevations by date are 700m (1895), 840m (1921), 871m (1931), and 797m (2012)"; the land fraction "is 0.292 and 0.2905 for the 1931 and 2012 estimates".
