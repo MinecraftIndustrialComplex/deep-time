@@ -109,7 +109,7 @@ fi
 JVMX=(); for a in ${DHCC_CLIENT_JVM_ARGS:-}; do JVMX+=("--jvm-arg=$a"); done
 [ ${#JVMX[@]} -gt 0 ] && say "client JVM arguments: ${DHCC_CLIENT_JVM_ARGS}"
 # Distant Horizons' update check opens an "update available" screen at the title screen, which
-# holds the client there instead of joining (seen 2026-10-03 with 3.3.1: 3.3.3 is out).
+# holds the client there instead of joining (seen 2026-10-03 with 3.3.1; the pack pins 3.3.3 since pack 62dd14e).
 # Minecraft's first-launch accessibility screen holds it the same way; the options file skips it.
 [ -f "$CL/game/options.txt" ] || printf 'onboardAccessibility:false\nskipMultiplayerWarning:true\njoinedFirstServer:true\nsoundCategory_master:0.0\n' > "$CL/game/options.txt"
 DHC="$CL/game/config/DistantHorizons.toml"

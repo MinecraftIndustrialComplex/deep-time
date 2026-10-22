@@ -130,10 +130,16 @@ configurations {
         canBeResolved = true
         transitive = false
     }
+    dhPrevJar {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = false
+    }
 }
 dependencies {
     dhPinJar "maven.modrinth:distanthorizons:${dh_version}"
     dhNextJar "maven.modrinth:distanthorizons:${dh_next_version}"
+    dhPrevJar "maven.modrinth:distanthorizons:${dh_prev_version}"
 }
 
 dependencies {
@@ -748,11 +754,12 @@ tasks.named('test', Test) {
     // NativeVariantTest: the jar carries the x86-64-v3 build and the CPU probe.
     systemProperty 'deeptime.test.v3Native', buildV3Native
     // DhApiBindingTest: "<Modrinth version id>=<jar>" per Distant Horizons jar (P3-04).
-    inputs.files(configurations.dhPinJar, configurations.dhNextJar)
+    inputs.files(configurations.dhPinJar, configurations.dhNextJar, configurations.dhPrevJar)
     doFirst {
         systemProperty 'deeptime.test.dhJars',
                 ["pin-${dh_version}=${configurations.dhPinJar.singleFile.absolutePath}",
-                 "next-${dh_next_version}=${configurations.dhNextJar.singleFile.absolutePath}"].join(File.pathSeparator)
+                 "next-${dh_next_version}=${configurations.dhNextJar.singleFile.absolutePath}",
+                 "prev-${dh_prev_version}=${configurations.dhPrevJar.singleFile.absolutePath}"].join(File.pathSeparator)
     }
     testLogging { events 'passed', 'failed'; exceptionFormat 'full' }
 }

@@ -284,7 +284,7 @@ Ben, decisions log 2026-10-03: "btw, DH has world curvature settings, can you ma
 default to values that make sense for the given world a player is in (dependent upon the world
 size generated using our mod.)" In a Deep Time level the client's Distant Horizons (DH) curvature
 is the planet's own; elsewhere DH's value is its own. The geometry is BAK-043 and BAK-044, the
-choices BAK-045 to BAK-047. Sources: the DH 3.3.1 jar (the MIC pack's pin), read on the test VM
+choices BAK-045 to BAK-047. Sources: the DH 3.3.1 jar (the MIC pack's pin when this was read; the pin is 3.3.3 since pack 62dd14e and `DhApiBindingTest` finds the same members there), read on the test VM
 with `javap` and by opening its shaders and lang file; DH is LGPL-3.0 (the jar's `LICENSE.LESSER.txt`
 and `neoforge.mods.toml`), so reading it and calling its API is fine and nothing was copied.
 
