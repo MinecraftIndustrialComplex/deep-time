@@ -3707,12 +3707,15 @@ model's own readers did not.
 | `plates/pools.rs` `surface_step` | Cortial's continental erosion, ε_c z/z_c | no: `continental_erosion_mm_yr` is 0 in the shipped presets (the surface stage erodes) | the height above the sea | PLT-127 |
 | `plates/dynamics.rs` (`arc_stats`, `arc_heights`, the step record's land), `plates/belts.rs` (`emerged`, the belt's `height_m`), `plates/check.rs` (the land gain) | measurement: the land share, the arcs' heights and emergence, the belts' heights, the plate check's land gain | yes, measurement only | from the sea; the land gain with the sea held (below) | PLT-151, PLT-215 to PLT-219, CHK-009 |
 | `provinces.rs` `cells()` | the province map's heights | output only | less the surface's sea, else the climate's, else 0 | PRV-012 |
+| `plates/crust_budget.rs` snapshot (`cb_t`'s `dry`), `tools/review/continent-budget.py` | the continental crust's dry share, which the tool drew against Earth's 0.71 above the sea (HYP-012) | measurement only, with `DEEPTIME_CRUST_BUDGET` | `dry_sl` at the sea beside `dry` at the datum; the tool draws `dry_sl` against Earth | PLT-302 |
 
 Left as they are:
 
-- `plates/crust_budget.rs` (`bits`, `stocks`): the dry bit and the dry stock at 0. The budget
-  prints the land at the datum (`land0`) beside the land above the sea (`land`, `dry`), so both
-  frames can be compared; it is a census, not a law.
+- `plates/crust_budget.rs` (`bits`, `stocks`): the dry bit and the dry stock at 0, which the
+  parts and the moves (`drown`, `emerge`) book. The budget prints the land at the datum (`land0`)
+  beside the land above the sea (`land`), and now the dry share at both; the bookings stay in the
+  datum frame, a census of the solid column's moves, not a law. The thickness bands' `dry` was
+  already at the sea.
 - `params.rs` (a preset's ridge must stand below 0 and its highest ground above): a validation of
   the preset, in the datum frame.
 - The height cap `max_elevation_m`, the settling (`settle.rs`, which reads the sea for the water
@@ -3755,3 +3758,10 @@ a falling sea's new shore as land made: on the first branch arm its median run r
 2.00 % and failed. The check is about land the ground's motion makes, so the step record now
 carries `land_held`, the step's land above the sea of the step before, and the gain is
 `land_held` less the step before's land (`check.rs`, test `land_gain_holds_the_sea`).
+With the sea held the branch's median run gains 1.08 % (master 0.84; two-sided Mann-Whitney p
+0.04), and two of its twelve runs are over the target (1.71 and 1.80; master none). The rest of
+the rise is where the line is drawn: with the sea pinned at the datum (the pin0 arm below), where
+master's count and the shore are the same line, the median run gains 1.02 % (against master 0.84,
+p 0.05). The surface planes land down to its base level, so more ground stands near the shore
+than near a datum 200 to 450 m below it, and the same motion carries more of it across. Counted
+at the shore is what the check means.
