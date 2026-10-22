@@ -31,7 +31,8 @@ chains. A cone is planned at 0.6 to 2 km tall (30 to 100 blocks; 1.2 to 3 km unt
 measured, live cones stood a median 1.0 km and all standing cones 0.87 km (Earth's median: 1.0 km). It has a concave
 profile that steepens toward the top. At the default setting it is 7.6 to 20 km in radius (25 to 67
 blocks), twice as wide as its physical shape, so that it does not read as a spike. It has a summit
-crater at least 2 km (7 blocks) across. Its rock is andesite over tuff (volcanic ash turned to
+crater at least 2 km (7 blocks) across and 240 m (7 blocks) deep, Earth's median depth (since
+2026-10-22; before it 6 % of the cone's height, a block or two in the game). Its rock is andesite over tuff (volcanic ash turned to
 rock), or rhyolite over tuff where the crust is thick.
 
 **Shield volcanoes and island chains.** Over a hotspot (a fixed plume of hot mantle) under ocean
@@ -166,7 +167,8 @@ fraction of the full height `H` at that distance.
 | VOL-022 | Shield radius | 40 × (H / 6.5 km)^0.8 ÷ flank steepness | km | none | `uncited` |
 | VOL-023 | Continental hotspot centre | 0.9 tall, 35 radius | km | none; Christiansen 2001 for Yellowstone | `uncited` |
 | VOL-024 | Flank steepness | 0.5 (radius doubled) | – | Ben, decisions log 2026-09-30 | `game-choice` |
-| VOL-026 | Summit crater | radius max(1 km, 0.07 R); depth 0.06 H | km | agent, for visibility; Grosse et al. 2014 compared | `game-choice` |
+| VOL-026 | Summit crater depth | 240 m, at most 0.37 H (VOL-090); 0.06 H until 2026-10-22 | m | Grosse et al. 2014 (Earth's median); Ben, 2026-10-22; Pike & Clow 1981 for the cap | `verified` |
+| VOL-091 | Summit crater radius | max(1 km, 0.07 R) | km | agent, for visibility; Grosse et al. 2014 and Pike & Clow 1981 compared | `game-choice` |
 | VOL-029 | Caldera radius | uniform 3 to 9, at most 0.6 R | km | none; Christiansen 2001, USGS compared | `uncited` |
 | VOL-030 | Caldera depth | min(0.5 H, 400 m + 0.05 × radius) | m | none; Grosse et al. 2014 compared | `uncited` |
 | VOL-031 | Shield summit caldera | radius 0.08 R, depth min(0.04 H, 250 m), on shields over 4 km | m | none | `uncited` |
@@ -221,7 +223,7 @@ Earth, from the sources read in stage 2:
 | Basal width of stratovolcanoes | median 7.9 km, range 2–66 km | Grosse et al. 2014, table 1 | 7.6–20 km physical, 15–40 km at the default (13–28 and 27–56 km until 2026-10-02) |
 | Flank slopes of stratovolcanoes | mean flank 17.7°, steepest average 27.7° at 0.79 of the height (medians) | Grosse et al. 2014, table 1 | 9° mean and 17° at the summit for 2 km over 10 km; half that at the default |
 | Shield flanks | lava flows dip 2°–10°; subaerial shields' mean flank 8.1° (median of 89) | Clague & Sherrod 2014, p. 114; Grosse et al. 2014, table 1 | 14° at the steepest for the tallest physical shield, 7° at the default |
-| Large summit craters and calderas on composite volcanoes | 0.6–11 km across, median 2.2 km; depth under 100 to 860 m, median 240 m (smaller craters not measurable) | Grosse et al. 2014, p. 8 | craters at least 2 km across, 2.8 km on a 2-km cone, 36–120 m deep; calderas 6–18 km across (smaller on a small cone), up to 550–850 m deep |
+| Large summit craters and calderas on composite volcanoes | 0.6–11 km across, median 2.2 km; depth under 100 to 860 m, median 240 m (smaller craters not measurable) | Grosse et al. 2014, p. 8 | craters at least 2 km across, 2.8 km on a 2-km cone, 240 m deep (36–120 m until 2026-10-22); calderas 6–18 km across (smaller on a small cone), up to 550–850 m deep |
 | Spacing of arc volcanoes | no characteristic spacing: spacings follow a Gamma distribution, as random points do | de Bremond d'Ars et al. 1995, abstract only | a least distance of 60 km, so cones stand evenly |
 | Mean spacing of large arc centres | 27 km (Alaska Peninsula), 42 km (Cascades, Andean Southern Volcanic Zone); 87 km between the 17 largest Cascade centres | Hildreth 2007, tables 4 and 10, full text | 60 km least (the mean spacing a run makes was not measured) |
 | Lifespan of large arc centres | mostly 0.1–1 Myr | Hildreth 2007, p. 64 | 2–8 Myr (a game choice: one cone stands for a centre over a 2-Myr step) |
@@ -409,7 +411,7 @@ What these runs show:
 | Vanilla's cave carvers are kept 6 blocks from the underwater face of a sea cliff (MAG-057) | the carvers cut arches into the underwater base of the sea cliffs beside a volcano; the arches are an artefact of the carvers, not geology | Ben's report, 2026-10-02 (the setting is `sea_cliff_skin_blocks`; 0 gives vanilla's carving) |
 | Lava is sealed in smooth basalt and never touches water (MAG-010, MAG-011, MAG-041) | lava pools were found overlapping the ocean | agent, build log 2026-10-01, after Ben's report |
 | Arc volcanoes at least 60 km apart (VOL-039) | keeps the doubled cones apart; one cone stands for a large long-lived centre | agent, build log 2026-09-30; reviewed WP-2 2026-10-02 |
-| Summit crater at least 2 km across (VOL-026) | a real crater would be under three blocks wide | agent, build log 2026-09-30 |
+| Summit crater at least 2 km across (VOL-091) | a typical real crater (0.5 km, Pike & Clow 1981) would be under two blocks wide; the drawn one is of Grosse et al. 2014's size class, so it takes their median depth, 240 m (VOL-026) | agent, build log 2026-09-30; the depth Ben, 2026-10-22 |
 | A cone is laid on the ground from its vent: the vent's ground level inside 0.4 of its radius, fading to its foot (VOL-080, VOL-081) | a cone is built by eruptions from its vent, so its summit is the vent; how far a real cone's onlap reaches down a slope was not read in a source | agent, coordinator's call, 2026-10-22, after Ben's volcano 27476 |
 | Stratovolcano lifetime 2 to 8 Myr (VOL-038) | one step is 2 Myr | agent, build log 2026-09-30 |
 | Eight flows in a flood basalt pile (VOL-052), terraces 80 m high (VOL-036) | visible layering and steps | agent, build log 2026-09-30 |
@@ -465,7 +467,7 @@ Not yet settled, for a later package or a geologist:
    summit region (at 0.79 of the height, Grosse et al. 2014); the code's cone is steepest at the
    summit. The amplifier and the crater already flatten the top, so the difference in blocks is
    small; not measured.
-6. **Crater and summit caldera sizes scale with the doubled radius** (VOL-026, VOL-031): a 3-km
+6. **Crater and summit caldera sizes scale with the doubled radius** (VOL-091, VOL-031): a 3-km
    cone has a 4-km crater, the tallest shield a 13-km summit caldera, two to four times Earth's.
    Whether the flank setting should widen craters too was never decided.
 7. **The arc flux law** (VOL-003) has no source, and the same law is coded three times (here,
@@ -496,7 +498,8 @@ Keys refer to [bibliography.md](bibliography.md).
 
 | Key | Used for | How it has been read |
 |---|---|---|
-| Grosse2014 | stratovolcano and shield heights, widths, slopes; crater and caldera sizes (VOL-016 to VOL-020, VOL-026, VOL-029, VOL-030) | in full (repository copy of the submitted version), WP-2 |
+| Grosse2014 | stratovolcano and shield heights, widths, slopes; crater and caldera sizes (VOL-016 to VOL-020, VOL-026, VOL-029, VOL-030, VOL-091) | in full (repository copy of the submitted version), WP-2; p. 8 again 2026-10-22 |
+| PikeClow1981 | typical stratocone craters: depth, width, depth over the cone's height (VOL-026, VOL-090, VOL-091) | table 2 read by a script from the library text, 2026-10-22 |
 | Hildreth2007 | arc volcano spacing, the volcanic front, lifespans (VOL-004, VOL-038, VOL-039) | in full, WP-2 |
 | ClagueSherrod2014 | Hawaiian growth, subsidence, shield slopes, reservoir depths (VOL-007, VOL-009, VOL-017, VOL-041, VOL-048, MAG-002) | in full, WP-2 |
 | Christiansen2001 | Yellowstone: plateau height, caldera size, caldera-forming eruptions (VOL-006, VOL-023, VOL-029, VOL-045, VOL-046) | the summary, physiography and chronology sections, WP-2 |

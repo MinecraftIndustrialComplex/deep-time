@@ -820,7 +820,8 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Grosse, P., Euillades, P. A., Euillades, L. D. and van Wyk de Vries, B. (2014). A global database of composite volcano morphometry. Bulletin of Volcanology 76: 784 (16 pages; online 2013).
 - DOI or URL: 10.1007/s00445-013-0784-4
 - Cited as: "Grosse et al. 2014" (added by WP-2 in comments of `volcanoes/params.rs`, `volcanoes/shape.rs` and `volcanoes/mod.rs`)
-- Ledger ids: VOL-016, VOL-017, VOL-019, VOL-020, VOL-026, VOL-029, VOL-030; HNT-016, HNT-085, HNT-086
+- Ledger ids: VOL-016, VOL-017, VOL-019, VOL-020, VOL-026, VOL-029, VOL-030, VOL-091; HNT-016, HNT-085, HNT-086
+- Also used 2026-10-22 (crater depth, D7): p. 8 read again: crater depths under 100 to 860 m, median 240 m, no correlation between crater depth and edifice height, depth to width 0.01 to 0.29, median 0.11; crater widths 0.6 to 11 km, median 2.2 km, correlated with the basal and summit widths. A copy of the submitted version is in the VM's library again (`Grosse2014/`).
 - Also used 2026-10-02 (volcano decisions): table 1 re-read for the target of VOL-019 (stratovolcano height median 1.02 km, mean 1.13, s.d. 0.55, range 0.17-4.57) and VOL-020 (height/basal width median 0.13, range 0.02-0.30; basal width median 7.9 km).
 - Access: free to read at the publisher (bronze); the publisher returned a page, not the PDF; the authors' submitted version is in the CONICET repository
 - Library (the project's source library, not distributed): fetched WP-2 2026-10-02 (PDF, 23 pages, text layer). From: https://ri.conicet.gov.ar/handle/11336/7280 (submitted version; the pages carry the journal's running heads). Text file: Grosse2014.txt.
@@ -7582,3 +7583,27 @@ Straume2019, Harris2014, SternScholl2010.
 - Access: open (arXiv).
 - Library: not fetched.
 - Read so far (by the project): 2026-10-22, a research sub-agent, full text: "Reported mean land elevations by date are 700m (1895), 840m (1921), 871m (1931), and 797m (2012)"; the land fraction "is 0.292 and 0.2905 for the 1931 and 2012 estimates".
+
+## Volcano craters, cone gullies and steep ground (VOL-026, VOL-090 onwards), added 2026-10-22
+
+Read again for this task, entries above: Grosse2014 (p. 8, the craters: VOL-026, VOL-091).
+Texts in the project's source library on the test VM (`/data/ban/deeptime-sources/<key>/`), not
+distributed.
+
+### PikeClow1981
+- Reference: Pike, R. J. and Clow, G. D. (1981). Revised classification of terrestrial volcanoes and catalog of topographic dimensions, with new results on edifice volume. U.S. Geological Survey Open-File Report 81-1038.
+- DOI or URL: 10.3133/ofr811038 (the USGS series pattern; not resolved here).
+- Cited as: "Pike & Clow 1981"
+- Ledger ids: VOL-026, VOL-090, VOL-091
+- Access: open (USGS).
+- Library: fetched (PDF with a text layer, a typed report; the text has OCR-like slips such as "BOO." for 800). Text file: PikeClow1981.txt.
+- Read so far (by the project): 2026-10-22, the volcano-realism research and this task: table 2, "Topographic dimensions of 697 terrestrial volcanoes, by class": DIAM the rim crest's average diameter, DEPTH the crater floor's average depth below the rim crest, HEIGHT the rim crest's average height above the pre-volcano ground, WIDTH the flank's width from rim crest to the edifice's edge. A script over classes SC and SA (stratocones with a summit crater only; 103 rows the text kept whole): crater depth median 150 m (10th to 90th percentile 50 to 345 m), diameter median 500 m (250 to 1,375 m), height median 1,630 m; depth over height median 0.09, 90th percentile 0.26, largest 0.37; depth over diameter median 0.26.
+
+### OHara2024
+- Reference: O'Hara, D., Goren, L., van Wees, R. M. J., Campforts, B., Grosse, P., Lahitte, P., Kereszturi, G. and Kervyn, M. (2024). Time-varying drainage basin development and erosion on volcanic edifices. Earth Surface Dynamics 12:709-726.
+- DOI or URL: 10.5194/esurf-12-709-2024
+- Cited as: "O'Hara et al. 2024"
+- Ledger ids: VOL-068, VOL-092 onwards (the cone gullies)
+- Access: open access (CC BY 4.0).
+- Library: fetched (PDF, text layer). Text file: OHara2024.txt.
+- Read so far (by the project): 2026-10-22, full text. Stratovolcanoes in Indonesia, Papua New Guinea, New Zealand and Guatemala on the 30 m SRTM model, ages from the present to the early Pleistocene, lifespans of activity 100 to 1,000 kyr. §4.1: at about 10 % eroded volume "narrow (∼20° normalized width angle) and uniform ... drainages form that extend from the summit region to the lower flanks (i.e., 'parasol ribbing'; Ollier, 1988), giving a high drainage density (∼1 km−1)"; at 30 to 40 % eroded volume, on 10 to 100 kyr, summit basins widen to 40 to 60°, the network becomes dendritic, drainage density about 0.5 km−1; over more than 1 Myr the edifice loses its single-peaked cone (citing Karátson et al. 2012, Dibacto et al. 2020, Ollier 1988). §4.3: "the number of basins that reach the summit on most edifices is greater than 10" (summit basins: those in the upper 30 % of the height), with a weak trend in time; the ratio of the edifice's effective radius to the spacing of summit-basin outlets along its perimeter is about 1 to 3; younger edifices have more basins at every distance from the peak. Channels counted from 1.0 km² of drainage area.
