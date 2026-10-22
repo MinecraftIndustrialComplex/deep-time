@@ -100,6 +100,13 @@ pub const WEDGE_GLOBAL: &str = "plates/collision_wedge_km3";
 /// … and the crossed crust this collision had stacked on the incoming plate (above the normal
 /// column on crust it stamped since its onset), km³ (PLT-400).
 pub const RESTACK_GLOBAL: &str = "plates/collision_crossed_restack_km3";
+/// What of the share found no room, km³ of crust (measurement only, CF-1): the belt's part left
+/// over while some of its samples still had room (a belt narrower than half a full one) …
+pub const SLIVER_GLOBAL: &str = "plates/collision_noroom_sliver_km3";
+/// … the belt's part left over with every sample at the strength height …
+pub const CAPPED_GLOBAL: &str = "plates/collision_noroom_capped_km3";
+/// … and what the ceiling and the highest elevation clipped off the rises.
+pub const CLIPPED_GLOBAL: &str = "plates/collision_noroom_clipped_km3";
 /// How young a collision orogeny on the incoming crust counts as raised by this collision's
 /// wedge, Myr (measurement only).
 const RECENT_MYR: f64 = 30.0;
@@ -133,6 +140,11 @@ pub struct Stacked {
     /// The part of `thickness_m` this collision stacked on the incoming crust before it crossed
     /// (its excess over the normal column where this collision stamped it), m (PLT-400).
     pub restack_m: f64,
+    /// What of the share found no room, km² × m of crust (measurement only): the belt's part
+    /// left over with room still in it, with none, and what the ceilings clipped.
+    pub sliver_km2_m: f64,
+    pub capped_km2_m: f64,
+    pub clipped_km2_m: f64,
     /// Crust added to the belt and to the wedge, km² × m: Σ added thickness × a sample's area.
     pub belt_km2_m: f64,
     pub wedge_km2_m: f64,
@@ -540,6 +552,7 @@ fn stack_front(
     let across = |d: f64, in_wedge: bool| {
         if in_wedge { norm.km(d) } else { -norm.km(d) }
     };
+    let (mut sliver_km2_m, mut capped_km2_m) = (0.0, 0.0);
     if belt_weight > 0.0 && belt_rise_km2_m > 0.0 {
         let cap_m = k.strength_height_m(env.gravity);
         let z_of: Vec<f64> = belt
@@ -547,6 +560,15 @@ fn stack_front(
             .map(|&(i, _)| f64::from(samples[i].elevation_m))
             .collect();
         let given = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
+        // What was left over, and whether any sample still had room (measurement only).
+        let left = (belt_rise_km2_m - given.iter().sum::<f64>() * area).max(0.0)
+            * COLUMN_ISOSTATIC_FACTOR;
+        let room = cap_m <= 0.0 || z_of.iter().zip(&given).any(|(z, g)| cap_m - z - g > 1e-6);
+        if room {
+            sliver_km2_m = left;
+        } else {
+            capped_km2_m = left;
+        }
         rises.extend(
             belt_d
                 .iter()
@@ -563,6 +585,8 @@ fn stack_front(
             above_m,
             recent_above_m,
             restack_m,
+            sliver_km2_m,
+            capped_km2_m,
             wedge_km,
             ..Default::default()
         },
@@ -580,6 +604,8 @@ fn stack_front(
         let z = f64::from(s.elevation_m);
         let z1 = (z + raw * ceiling(z, k.uplift_ceiling_m)).min(k.max_elevation_m);
         let airy_dz = z1 - z;
+        out.stacked.clipped_km2_m +=
+            (raw - airy_dz.max(0.0)).max(0.0) * COLUMN_ISOSTATIC_FACTOR * area;
         if airy_dz <= 0.0 {
             continue;
         }
