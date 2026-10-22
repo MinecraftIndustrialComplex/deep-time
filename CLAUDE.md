@@ -138,10 +138,12 @@ tools/remote/mac.sh --no-sync -- deeptime-admit status  # the VM's admission too
   `tools/remote/mac.sh [--pack] [--pull <path>]... -- '<command>'`, which rsyncs this checkout to the
   Mac's external SSD (`/Volumes/Graphide/ban/mic/…`; /nix, Gradle and cargo caches are there too)
   and runs the command in a login shell there, through the VM's admission tool (above). The laptop
-  edits, commits and pushes. The VM has no GitHub access: the private git dependency mic-viewer
-  (Cargo.toml, a full commit hash, never a branch) reaches its cargo through a bare mirror there that
-  each mac.sh sync fills from the laptop (`tools/remote/git-mirrors.sh`; decisions log 2026-10-21), so
-  sync a checkout with mac.sh before any cargo runs on its copy. Jobs from several agents run side by side as their load allows;
+  edits, commits and pushes. The VM has no GitHub credentials and needs none today: the git
+  dependency mic-viewer (Cargo.toml, over https at a full commit hash, never a branch) is public since
+  2026-10-21, and the VM's cargo fetches it from GitHub directly (decisions log 2026-10-21). A future
+  PRIVATE git dependency (an `ssh://git@github.com/...` URL) would reach the VM's cargo through a bare
+  mirror there that each mac.sh sync fills from the laptop (`tools/remote/git-mirrors.sh`, kept for
+  that), so sync a checkout with mac.sh before any cargo runs on its copy. Jobs from several agents run side by side as their load allows;
   anything that boots Minecraft goes through the repo's launchers (gametest.sh, gametest-planet.sh,
   smoke run.py, preview.py, dh-client-check.sh), which take a server slot themselves, or passes
   `--server`.
