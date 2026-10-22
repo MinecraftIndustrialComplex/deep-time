@@ -44,7 +44,7 @@ The table file (crates/deeptime-format/data/cube-map-<name>.bin), little-endian:
        8     4  u32 m: forward cells along the triangle's side (the face has n = 2 m + 1 nodes a side)
       12     4  u32 q: inverse cells along the gnomonic triangle's side
       16     8  f64 tau
-      24     4  u32 flow steps (the RK4 steps of the whole flow, t from 0 to 1)
+      24     4  u32 flow steps (the RK4 steps of the whole flow, t from 0 to 1; 0 for tau 0, no flow)
       28     4  u32 K: corner patch, coarse cells from the corner it covers (0: no patch)
       32     4  u32 F: corner patch, fine cells to a coarse cell (0 when K is 0)
       36     4  u32 reserved (0)
@@ -629,7 +629,8 @@ def generate(m, q, tau, name, commit, out, steps=400, K=None, F=16):
     U, V, res = inverse_table(T, q)
     os.makedirs(out, exist_ok=True)
     path = os.path.join(out, f"cube-map-{name}.bin")
-    digest, size = write_table(path, name, commit, m, q, tau, steps, A, B, U, V, K, t["F"], t["Q"])
+    # tau 0 runs no flow: the header says 0 steps
+    digest, size = write_table(path, name, commit, m, q, tau, steps if tau else 0, A, B, U, V, K, t["F"], t["Q"])
     print(f"{path}: m {m} (n {2 * m + 1}), q {q}, tau {tau}, corner patch K {K} F {t['F']}, {size} bytes, "
           f"sha256 {digest}, schwarz newton {max(info['newton_err'], perr):.2e}, "
           f"inverse-table newton residual {res:.2e}", flush=True)
