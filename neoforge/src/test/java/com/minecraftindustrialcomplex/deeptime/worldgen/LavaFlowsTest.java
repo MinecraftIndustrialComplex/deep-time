@@ -91,6 +91,12 @@ class LavaFlowsTest {
         }
     }
 
+    private static Cones cones(List<Volcanoes.Volcano> vs, double precipMm) {
+        Cones c = new Cones(vs);
+        c.precip = precipMm;
+        return c;
+    }
+
     private static LavaFlows flows(LavaFlows.Env env, List<Volcanoes.Volcano> vs) {
         return new LavaFlows(vs, env, C, Z_MIN, Z_MAX, MH, MV, null, true);
     }
@@ -441,26 +447,26 @@ class LavaFlowsTest {
     void theAnswerIsTheSameWhateverAsksAndInWhateverOrder() {
         List<Volcanoes.Volcano> vs = List.of(shield(1, 0, 0, 1.0), strato(2, 150, 40, 0.8));
         int x0 = -280, z0 = -280, x1 = 320, z1 = 300, w = x1 - x0 + 1, n = w * (z1 - z0 + 1);
-        int[] rows = box(flows(new Cones(vs)), x0, z0, x1, z1);
+        int[] rows = box(flows(cones(vs, 300.0)), x0, z0, x1, z1);
 
         List<Integer> order = new ArrayList<>();
         for (int i = 0; i < n; i++)
             order.add(i);
         Collections.shuffle(order, new Random(7));
-        LavaFlows shuffled = flows(new Cones(vs));
+        LavaFlows shuffled = flows(cones(vs, 300.0));
         int[] s = new int[n];
         for (int i : order)
             s[i] = shuffled.code(x0 + i % w, z0 + i / w);
         assertArrayEquals(rows, s);
 
-        LavaFlows parallel = flows(new Cones(vs));
+        LavaFlows parallel = flows(cones(vs, 300.0));
         int[] p = new int[n];
         IntStream.range(0, n).parallel().forEach(i -> p[i] = parallel.code(x0 + i % w, z0 + i / w));
         assertArrayEquals(rows, p);
 
         // Where both volcanoes' flows lie, the answer is one of theirs.
-        int[] a = box(flows(new Cones(vs), List.of(vs.get(0))), x0, z0, x1, z1);
-        int[] b = box(flows(new Cones(vs), List.of(vs.get(1))), x0, z0, x1, z1);
+        int[] a = box(flows(cones(vs, 300.0), List.of(vs.get(0))), x0, z0, x1, z1);
+        int[] b = box(flows(cones(vs, 300.0), List.of(vs.get(1))), x0, z0, x1, z1);
         int both = 0;
         for (int i = 0; i < n; i++) {
             if (a[i] < 0 && b[i] < 0)
