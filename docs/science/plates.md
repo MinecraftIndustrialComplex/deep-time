@@ -3790,6 +3790,8 @@ over the runs. The arms:
   first 100 Myr.
 - *rest*: the branch with the column energy back on the datum (a scratch switch): the wedge
   floor, the Andean mark and the measurement at the sea.
+- *wd*: the branch with the wedge floor back on the datum (a scratch switch): the column energy,
+  the Andean mark and the measurement at the sea.
 - *master + W 40* and *branch + W 40*: `--set tectonics.collapse_hot_myr=40` (PLT-390, the high
   ground's hot window), the coordinator's follow-up.
 
@@ -3803,6 +3805,7 @@ median of twelve runs, the p against master in brackets:
 | branch | 0.247 (0.19) | 0.104 (0.18) | 0.414 (0.053) | 0.248 (0.58) | 0.369 (0.53) | 0.170 (0.58) | 1.65 (1.0) | −0.085 (0.60) | 1, 1.25 (0.38) | 210 / 474 |
 | pin0 | 0.353 (< 0.001) | 0.233 (0.007) | 0.235 (< 0.001) | 0.259 (0.80) | 0.387 (0.69) | 0.180 (0.84) | 1.80 (0.60) | −0.099 (0.69) | 2, 2.42 (0.016) | 0 / 8 |
 | rest | 0.248 (0.31) | 0.124 (0.54) | 0.419 (0.13) | 0.234 (0.061) | 0.339 (0.028) | 0.156 (0.13) | 1.55 (0.60) | −0.081 (0.13) | 2, 1.33 (0.76) | 325 / 608 |
+| wd | 0.234 (0.10) | 0.095 (0.17) | 0.466 (0.004) | 0.185 (0.007) | 0.314 (0.026) | 0.143 (0.18) | 1.60 (0.93) | −0.066 (0.026) | 1, 1.50 (0.90) | 320 / 763 |
 | master + W 40 | 0.192 (0.002) | 0.065 (0.035) | 0.589 (0.001) | 0.170 (0.001) | 0.285 (0.001) | 0.143 (0.012) | 1.70 (0.43) | −0.011 (< 0.001) | 2, 1.42 (0.95) | 460 / 734 |
 | branch + W 40 | 0.209 (0.017) | 0.099 (0.11) | 0.510 (0.007) | 0.163 (< 0.001) | 0.285 (0.002) | 0.128 (0.006) | 1.55 (0.77) | −0.032 (0.001) | 2, 1.75 (0.67) | 361 / 584 |
 
@@ -3851,7 +3854,20 @@ fills a hypsometry whose continents are thin for their area (sea-level.md, the h
 section above), not because code reads 0 as the sea. The branch's final-frame rise (0.348 to
 0.414, p 0.053) is shared by rest (0.419), so it is not the column energy; over the frames it is
 small (the plate model's mean of the 19 frames after the first 100 Myr 0.335 to 0.362, p 0.44;
-the last 500 Myr 0.324 to 0.348, p 0.47).
+the last 500 Myr 0.324 to 0.348, p 0.47). Nor is it the wedge floor: with the floor back on the
+datum (wd) the share is 0.466. The Andean mark, the one site left, was not tried alone; with the
+hot window on, the branch drowns less than master does (0.510 against 0.589, p 0.54), so the
+branch's own effect on the share is not established either way. Many measures and arms were
+compared here, so single p near 0.03 to 0.05 are expected by chance.
+
+**Drowned with the crust kept.** Run by run the drowned share follows the continental crust a run
+keeps: over the 72 runs of the six arms whose sea moves (pin0 left out), Spearman's ρ of the
+census's share under the sea against the continental crust's area at the end is +0.84, and against
+the sea's height at the end +0.75; within each arm alone ρ is +0.66 to +0.84. A run that keeps
+more of its continents keeps them thin for their area, the planet's water stands higher on them,
+and more of them are under it: the hot window keeps the most (0.39 to 0.41 of the planet against
+master's 0.33) and drowns the most. With these continents the crust's loss target and the drowned
+target pull against each other; thicker continents for their area would serve both.
 
 **The hot window (PLT-390) on both.** W 40 keeps the crust (net −0.011 and −0.032 against −0.095
 and −0.085) and lowers the high ground (above 2 km 0.170 and 0.163, the coast 0.285, the ice 0.143
