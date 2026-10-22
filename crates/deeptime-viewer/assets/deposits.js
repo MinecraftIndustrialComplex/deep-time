@@ -40,6 +40,10 @@
     star: 'M0 -1.35L.34 -.34L1.35 0L.34 .34L0 1.35L-.34 .34L-1.35 0L-.34 -.34Z',
     drop: 'M0 -1.25C.5 -.5 .95 .05 .95 .5A.95 .95 0 0 1 -.95 .5C-.95 .05 -.5 -.5 0 -1.25Z',
     area: 'M1.2 0A1.2 .8 0 1 1 -1.2 0A1.2 .8 0 1 1 1.2 0Z',
+    pentagon: 'M0 -1.15L1.09 -.36L.68 .93L-.68 .93L-1.09 -.36Z',
+    plus: 'M-.35 -1.1H.35V-.35H1.1V.35H.35V1.1H-.35V.35H-1.1V-.35H-.35Z',
+    bowtie: 'M-1.1 -.9L0 0L-1.1 .9ZM1.1 -.9L0 0L1.1 .9Z',
+    octagon: 'M.42 -1.02L1.02 -.42L1.02 .42L.42 1.02L-.42 1.02L-1.02 .42L-1.02 -.42L-.42 -1.02Z',
   };
   // `key` is the deposit type's id without its namespace. Order is the legend's.
   const FAMILIES = [
@@ -51,10 +55,10 @@
     { key: 'mvt_zn_pb', label: 'MVT Zn-Pb', plural: 'MVT Zn-Pb', colour: '#3987e5', shape: 'hexagon' },
     { key: 'sedex_zn_pb', label: 'SEDEX Zn-Pb', plural: 'SEDEX Zn-Pb', colour: '#d55181', shape: 'square' },
     { key: 'bif_fe', label: 'Banded iron formation', plural: 'Banded iron formations', colour: '#e66767', shape: 'diamond' },
-    { key: 'impact_ni_cu_pge', label: 'Impact Ni-Cu-PGE', plural: 'Impact Ni-Cu-PGE', colour: '#7a9a3a', shape: 'up' },
-    { key: 'impact_hydrothermal_cu_zn_au', label: 'Impact hydrothermal Cu-Zn-Au', plural: 'Impact hydrothermal Cu-Zn-Au', colour: '#2aa7b8', shape: 'hexagon' },
-    { key: 'impact_diamond', label: 'Impact diamonds', plural: 'Impact diamonds', colour: '#7df9ff', shape: 'diamond' },
-    { key: 'impact_basin_u', label: 'Crater-basin uranium', plural: 'Crater-basin uranium', colour: '#a4d233', shape: 'square' },
+    { key: 'impact_ni_cu_pge', label: 'Impact Ni-Cu-PGE', plural: 'Impact Ni-Cu-PGE', colour: '#7a9a3a', shape: 'pentagon' },
+    { key: 'impact_hydrothermal_cu_zn_au', label: 'Impact hydrothermal Cu-Zn-Au', plural: 'Impact hydrothermal Cu-Zn-Au', colour: '#2aa7b8', shape: 'plus' },
+    { key: 'impact_diamond', label: 'Impact diamonds', plural: 'Impact diamonds', colour: '#7df9ff', shape: 'bowtie' },
+    { key: 'impact_basin_u', label: 'Crater-basin uranium', plural: 'Crater-basin uranium', colour: '#a4d233', shape: 'octagon' },
   ];
   const BY_KEY = new Map(FAMILIES.map(f => [f.key, f]));
   const extra = new Map();   // a datapack's own types: a colour from the name, a circle
