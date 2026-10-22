@@ -143,6 +143,19 @@ public final class VolcanicBiomes {
         return LAST.get();
     }
 
+    /**
+     * Whether a biome query's decision ({@link #lastDecision()}) was one of the ordinary rules of {@code rules} (the snow
+     * line, peatland, the geology gate), not a volcanic role's rule: the columns a level changes without its volcanic layer.
+     */
+    public static boolean byOrdinaryRule(String decision, BiomeRules.Set_ rules) {
+        if (decision == null || !decision.startsWith("rule:"))
+            return false;
+        for (BiomeRules.Bound b : rules.ordinary())
+            if (decision.equals("rule:" + b.file() + "/" + b.rule().id()))
+                return true;
+        return false;
+    }
+
     /** One entry of a biome source's parameter list: the ranges a biome answers in. */
     public record Entry(Climate.Parameter temperature, Climate.Parameter humidity, Climate.Parameter depth, Holder<Biome> biome) {}
 
@@ -171,7 +184,7 @@ public final class VolcanicBiomes {
     }
 
     /** What one level resolved against one parameter list. */
-    private record Resolved(Object key, int tags, boolean active, boolean keepOut, Holder<Biome>[] byRole,
+    private record Resolved(Object key, int tags, boolean active, boolean volcanic, boolean keepOut, Holder<Biome>[] byRole,
                             Map<Holder<Biome>, List<Entry>> entries, BiomeRules.Set_ rules, Climate.DistanceMetric<Holder<Biome>> keptMetric) {}
 
     /**
@@ -251,10 +264,24 @@ public final class VolcanicBiomes {
             return r == null ? Optional.empty() : Optional.ofNullable(r.byRole[role.ordinal()]);
         }
 
-        /** Whether the last resolution found anything to keep out or to place, or a biome rule (false: every query is vanilla's). */
+        /**
+         * Whether the last resolution found anything to keep out or to place, or a biome rule (false: every query is vanilla's).
+         * The snow line's rules bind wherever the pack has a snowless mountain biome, vanilla included, so this is true in
+         * vanilla too; {@link #volcanicActive()} is the volcanic layer's own answer.
+         */
         public boolean active() {
             Resolved r = resolved;
             return r != null && r.active;
+        }
+
+        /**
+         * Whether the volcanic layer itself acts at this level: the pack has a volcanic biome to keep out of the climate
+         * search or to place in a zone, or a volcanic role's biome rule binds. False without a volcanic biome in the pack
+         * (vanilla), whatever the other biome rules (the snow line, peatland, the geology gate) do.
+         */
+        public boolean volcanicActive() {
+            Resolved r = resolved;
+            return r != null && r.volcanic;
         }
 
         private Resolved resolve(Source source) {
@@ -282,9 +309,12 @@ public final class VolcanicBiomes {
         var server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
         if (registry.isPresent() && server != null)
             rules = BiomeRules.bind(BiomeRules.load(server.getResourceManager()), possible, registry.get());
-        int kept = 0;
+        int kept = 0, keptVolcanic = 0;
         for (Holder<Biome> b : possible)
-            if (b.is(KEEP_OUT) || rules.exclusive().contains(b))
+            if (b.is(KEEP_OUT)) {
+                kept++;
+                keptVolcanic++;
+            } else if (rules.exclusive().contains(b))
                 kept++;
         // Keep-out never empties the search (a tree of nothing but volcanic biomes would answer null).
         boolean keepOut = kept > 0 && kept < possible.size();
@@ -325,8 +355,11 @@ public final class VolcanicBiomes {
                         rules.ordinary().size(), rules.byRole().keySet(), rules.exclusive().size());
         }
         // Without a registry the roles are retried on the next query.
-        return new Resolved(source.key(), registry.isPresent() ? tags : -1, keepOut || any || !rules.isEmpty(), keepOut, byRole, entries,
-                rules, nearestKept(rules.exclusive()));
+        // The volcanic layer acts only where the pack has a volcanic biome; the biome rules (the snow line binds in vanilla)
+        // make the level active without it.
+        boolean volcanic = keepOut && keptVolcanic > 0 || any || !rules.byRole().isEmpty();
+        return new Resolved(source.key(), registry.isPresent() ? tags : -1, volcanic || keepOut || !rules.isEmpty(), volcanic, keepOut,
+                byRole, entries, rules, nearestKept(rules.exclusive()));
     }
 
     private static Optional<Registry<Biome>> biomeRegistry() {
