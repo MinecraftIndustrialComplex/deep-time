@@ -103,7 +103,8 @@
 //! (its warmest month, at the cell's own height, 10 °C or more, and not under ice) is moved off those
 //! slots ([`snowy_slot`]): its erosion goes up to the middle of E2, where vanilla draws its middle and
 //! plateau biomes at the cell's own temperature and humidity (meadow, forest, taiga on the plateaus).
-//! A class's own erosion limit still holds. The polar classes and land above the tree line keep them.
+//! A class's own erosion limit still holds. Land whose warmest month at its own height is below
+//! 10 °C (Köppen's polar line, so the E classes and the coldest dry ones), or under ice, keeps them.
 
 use std::sync::OnceLock;
 
@@ -141,8 +142,8 @@ pub const WETLAND_SWAMP: u8 = 1;
 pub const WETLAND_COLD: u8 = 2;
 
 /// Only a cold climate keeps vanilla's snowy peaks and slopes: its warmest month, at the cell's own
-/// height, is below this (Köppen's E, polar; above the tree line), or it is under ice. ledger:
-/// BIO-003, BIO-180
+/// height, is below this (Köppen's E, polar, on the cell's lapsed months), or it is under ice. ledger:
+/// BIO-002, BIO-180
 const COLD_WARMEST_C: f64 = 10.0;
 /// Where other land is moved off a snowy slot: the middle of erosion band E2 (a band coordinate),
 /// where vanilla draws its middle and plateau biomes. ledger: BIO-181 (game-choice)
