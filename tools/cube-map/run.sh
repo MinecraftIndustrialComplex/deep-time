@@ -4,12 +4,14 @@
 # The cube world's map table (cube_map.py) and its checks (check.py), on the test VM:
 #
 #   tools/remote/mac.sh --kind shell:python --pull crates/deeptime-format/data --pull review/out/cube-map -- \
-#       env CM_COMMIT=$(git rev-parse --short=12 HEAD) CM_TAU=1 bash tools/cube-map/run.sh all
+#       env CM_COMMIT=$(git rev-parse --short=12 HEAD) CM_TAU=0 bash tools/cube-map/run.sh all
 #
 # Verbs: generate (the committed table, m 256 = n 513, into crates/deeptime-format/data/, and the
 # n 257 and n 1,025 tables for the convergence check into the scratch folder), check (check.py over
-# the three, review/out/cube-map/check-<name>.json), all. CM_TAU picks tau (default 1, the
-# equal-area Moser cube); CM_COMMIT is the generator's commit written into the header.
+# the three, review/out/cube-map/check-<name>.json), all. CM_TAU picks tau: 0 the conformal cube
+# (the world's map, conformal-n513, with its corner patch), 1 (the default) the equal-area Moser
+# cube (the simulation's, moser-t1-n513). CM_COMMIT is the generator's commit written into the
+# header.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 REPO="$(pwd)"
@@ -23,7 +25,8 @@ mkdir -p "$WORK" "$OUT" "$DATA"
 admit() { if command -v deeptime-admit >/dev/null; then deeptime-admit run --kind "$1" -- "${@:2}"; else "${@:2}"; fi; }
 PYENV='(builtins.getFlake "nixpkgs").legacyPackages.${builtins.currentSystem}.python3.withPackages (p: [p.numpy p.scipy])'
 py() { admit "$1" nix shell --impure --expr "$PYENV" -c nice -n 10 python3 "${@:2}"; }
-name() { printf 'moser-t%s-n%s' "$TAU" "$((2 * $1 + 1))"; }
+# tau 0 is the conformal cube (the world's map), tau 1 Moser's equal-area cube (the simulation's).
+name() { if [ "$TAU" = 0 ]; then printf 'conformal-n%s' "$((2 * $1 + 1))"; else printf 'moser-t%s-n%s' "$TAU" "$((2 * $1 + 1))"; fi; }
 
 generate() {
     py shell:python "$HERE/cube_map.py" generate --m 256 --q 128 --tau "$TAU" --name "$(name 256)" --commit "$COMMIT" --out "$DATA"
