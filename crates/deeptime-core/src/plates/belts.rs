@@ -85,8 +85,8 @@ pub const CROSSED_GLOBAL: &str = "plates/collision_crossed_km3";
 /// … and what the belts and wedges kept of it (`collision_stacking_share`, less what found no
 /// room under the strength height, PLT-253), km³ (Earth-normalized).
 pub const KEPT_GLOBAL: &str = "plates/collision_kept_km3";
-/// The crossing's parts, for the crust flux into collision fronts (measurement only, CF-1): the
-/// area that crossed, km² (shortening × the front's length) …
+/// The crossing's parts, for the crust flux into collision fronts (measurement only, CF-1; ledger:
+/// PLT-401): the area that crossed, km² (shortening × the front's length) …
 pub const CROSSED_AREA_GLOBAL: &str = "plates/collision_crossed_km2";
 /// … the fronts' length times the step, km·Myr (the mean convergence is the area over it) …
 pub const FRONT_GLOBAL: &str = "plates/collision_front_km_myr";
@@ -100,15 +100,17 @@ pub const WEDGE_GLOBAL: &str = "plates/collision_wedge_km3";
 /// … and the crossed crust this collision had stacked on the incoming plate (above the normal
 /// column on crust it stamped since its onset), km³ (PLT-400).
 pub const RESTACK_GLOBAL: &str = "plates/collision_crossed_restack_km3";
-/// What of the share found no room, km³ of crust (measurement only, CF-1): the belt's part left
-/// over while some of its samples still had room (a belt narrower than half a full one) …
+/// What of the share found no room, km³ of crust (measurement only, CF-1; ledger: PLT-401): the
+/// belt's part left over after `fill_belt`'s passes while some of its samples still had room (a
+/// belt narrower than half a full one, or one mostly at the strength height that the passes did
+/// not finish) …
 pub const SLIVER_GLOBAL: &str = "plates/collision_noroom_sliver_km3";
 /// … the belt's part left over with every sample at the strength height …
 pub const CAPPED_GLOBAL: &str = "plates/collision_noroom_capped_km3";
 /// … and what the ceiling and the highest elevation clipped off the rises.
 pub const CLIPPED_GLOBAL: &str = "plates/collision_noroom_clipped_km3";
 /// How young a collision orogeny on the incoming crust counts as raised by this collision's
-/// wedge, Myr (measurement only).
+/// wedge, Myr (measurement only; the agent's window, ledger: PLT-401).
 const RECENT_MYR: f64 = 30.0;
 /// The lowest ground the wedge's profile is followed down to, m (the reach of its distance
 /// field; ground lower than this is not continental lowland).
