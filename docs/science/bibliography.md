@@ -6138,8 +6138,8 @@ The prototype crate `crates/deeptime-quincuncial` (not shipped) rests on these. 
 ### Lee1976
 - Reference: Lee, L. P. (1976). Conformal Projections Based on Elliptic Functions. Cartographica Monograph 16 (supplement to Canadian Cartographer 13).
 - Cited as: "Lee 1976".
-- Ledger ids: SCL-070, SCL-080 (the conformal cube, seamless-projection survey)
-- Access: not fetched. Read so far: catalogue entry only (via world-projection-options.md).
+- Ledger ids: SCL-070, SCL-080 (the conformal cube, seamless-projection survey), SCL-101 (the cube world's conformal table, 2026-10-22)
+- Access: not fetched. Read so far: catalogue entry only (via world-projection-options.md). 2026-10-22 (cube world phase 0): still not fetched; the table's map is the survey's Schwarz-triangle construction written from memory (SCL-080), and nothing in it is taken from Lee.
 
 ### AbramowitzStegun1964
 - Reference: Abramowitz, M. and Stegun, I. A. (eds.) (1964). Handbook of Mathematical Functions. National Bureau of Standards Applied Mathematics Series 55. Chapter 16 (Jacobian elliptic functions, L. M. Milne-Thomson) and 17 (elliptic integrals).
@@ -6193,14 +6193,20 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 ### Rancic1996
 - Reference: Rančić, M., Purser, R. J. and Mesinger, F. (1996). A global shallow-water model using an expanded spherical cube: gnomonic versus conformal coordinates. Quarterly Journal of the Royal Meteorological Society 122(532):959-982. doi:10.1002/qj.49712253209.
 - Cited as: "Rancic, Purser & Mesinger 1996".
-- Ledger ids: SCL-080
-- Access: paywalled; not read (a sub-agent tried, 2026-10-03). The only open implementation found (CSIRO CCAM `jimcc_m.f90`) is GPL-3 and was not used.
+- Ledger ids: SCL-080, SCL-101 (the cube world's conformal table, 2026-10-22)
+- Access: paywalled; not read (a sub-agent tried, 2026-10-03). The only open implementation found (CSIRO CCAM `jimcc_m.f90`) is GPL-3 and was not used. 2026-10-22 (cube world phase 0): not read; cited only as the conformal cubic grid the world's map is an instance of.
 
 ### Moser1965
 - Reference: Moser, J. (1965). On the volume elements on a manifold. Transactions of the American Mathematical Society 120(2):286-294.
 - Cited as: "Moser 1965".
-- Ledger ids: SCL-081
-- Access: not fetched. Read so far: from memory (the flow dx/dt = -grad u / rho_t with Lap u = rho - 1 is the standard textbook form of Moser's argument).
+- Ledger ids: SCL-081, SCL-102 (the cube world's simulation table, 2026-10-22)
+- Access: not fetched. Read so far: from memory (the flow dx/dt = -grad u / rho_t with Lap u = rho - 1 is the standard textbook form of Moser's argument). 2026-10-22: still not fetched; the simulation's table was generated with that form and measured (SCL-081), not checked against the paper.
+
+### DacorognaMoser1990
+- Reference: Dacorogna, B. and Moser, J. (1990). On a partial differential equation involving the Jacobian determinant. Annales de l'Institut Henri Poincaré C, Analyse non linéaire 7(1):1-26 (journal, volume and pages from memory, not checked).
+- Cited as: "Dacorogna & Moser 1990".
+- Ledger ids: none (cited with Moser 1965 for the flow behind SCL-081 and SCL-102: a prescribed Jacobian determinant on a domain with boundary, which is the face-by-face problem the generator solves with zero normal flux)
+- Access: not fetched. Read so far: from memory (added 2026-10-22, cube world phase 0, at the plan's D6).
 
 ### Thurston1998
 - Reference: Thurston, W. P. (1998). Shapes of polyhedra and triangulations of the sphere. Geometry & Topology Monographs 1:511-549. arXiv:math/9801088.
@@ -6249,8 +6255,8 @@ The research note `docs/research/notes/sphere-native-grids.md` and its benchmark
 
 ### PutmanLin2007
 - Reference: Putman, W. M. and Lin, S.-J. (2007). Finite-volume transport on various cubed-sphere grids. Journal of Computational Physics 227(1):55-78. doi:10.1016/j.jcp.2007.07.022.
-- Ledger ids: none (the note's §2.2: gnomonic against conformal and elliptic cubed spheres; conformal min/mean cell 0.16 at c360)
-- Access: author copy open. Read so far: full text read by a sub-agent as extracted text, 2026-10-04 (a web summariser's version was discarded after it invented content).
+- Ledger ids: none (the note's §2.2: gnomonic against conformal and elliptic cubed spheres; conformal min/mean cell 0.16 at c360). Cited 2026-10-22 on seamless-world.md's cube section as background for the conformal cube's small corner cells; no ledger value comes from it.
+- Access: author copy open. Read so far: full text read by a sub-agent as extracted text, 2026-10-04 (a web summariser's version was discarded after it invented content); not re-read for the cube world.
 
 ### Harris2021FV3
 - Reference: Harris, L., Chen, X., Putman, W., Zhou, L. and Chen, J.-H. (2021). A scientific description of the GFDL finite-volume cubed-sphere dynamical core. NOAA Technical Memorandum OAR GFDL 2021-001 (authors from memory of the memo; the sub-agent recorded the memo number).
@@ -6259,8 +6265,14 @@ The research note `docs/research/notes/sphere-native-grids.md` and its benchmark
 
 ### Ronchi1996
 - Reference: Ronchi, C., Iacono, R. and Paolucci, P. S. (1996). The "cubed sphere": a new method for the solution of partial differential equations in spherical geometry. Journal of Computational Physics 124(1):93-114.
-- Ledger ids: none
+- Ledger ids: none (background for the cube world's gnomonic face coordinates, in which the cube map tables store their nodes; seamless-world.md, 2026-10-22)
 - Access: paywalled. Read so far: abstract only (reference checked on Crossref by a sub-agent).
+
+### Sadourny1972
+- Reference: Sadourny, R. (1972). Conservative finite-difference approximations of the primitive equations on quasi-uniform spherical grids. Monthly Weather Review 100(2):136-144 (issue from memory; volume and pages as the sphere-native grids note lists them).
+- Cited as: "Sadourny 1972".
+- Ledger ids: none (background: the first cubed-sphere grid, cited on seamless-world.md's cube section, 2026-10-22)
+- Access: not fetched. Read so far: the reference only (sphere-native-grids.md §13; added here 2026-10-22 at the plan's D6).
 
 ### StaniforthThuburn2012
 - Reference: Staniforth, A. and Thuburn, J. (2012). Horizontal grids for global weather and climate prediction models: a review. Quarterly Journal of the Royal Meteorological Society 138(662):1-26. doi:10.1002/qj.958.
