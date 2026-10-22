@@ -1,0 +1,348 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: LGPL-3.0-or-later
+"""The map table's checks (docs/plans/cube-world-plan.md M1), on the bicubic the game reads:
+
+  - convergence: tables at n = 257, 513 and 1,025 (m = 128, 256, 512) agree to the bound printed,
+    as planet angle and as blocks at the 16k and 32k face sizes;
+  - positivity: the bicubic's Jacobian determinant is positive at 8 x 8 points in every cell of
+    the triangle (and of the corner patch, at its own resolution) and on a 400 x 400 grid within
+    one block of the corner at 32k (no fold-overs);
+  - the conformal table against the exact Schwarz map, by distance from the corner;
+  - the readers' inverse (the inverse table's bilinear start, then 2, 3, 4 or 6 Newton steps)
+    against the forward, on the triangle and within 100 blocks of the corner at 32k;
+  - statistics: area and shape on 300 x 300 cells of a face, weighted by planet area as the
+    projection survey's distortion() (seamless-projection-survey.md §3.1), to compare with its
+    numbers for the chosen tau;
+  - slope jumps across a face edge (the survey's crease measure) and the exact edge values;
+  - the area error next to a corner, where the flow's singular point is resolved to one cell.
+
+    check.py --tables T257.bin T513.bin T1025.bin [--committed T513.bin] --out check.json
+
+Runs on the test VM (tools/cube-map/run.sh check).
+"""
+
+import argparse
+import json
+import math
+import sys
+
+import numpy as np
+
+import cube_map as cm
+
+# The face sides at 16k and 32k (ledger SCL-078, SCL-100) and the world radius in blocks they draw
+# (6 s^2 = 4 pi R^2).
+FACE = {"16k": 3840, "32k": 7424}
+
+
+def radius_blocks(s):
+    return s * math.sqrt(6.0 / (4.0 * math.pi))
+
+
+def face_forward(P, u, v):
+    """Unit vectors (components along the face centre, e_u, e_v) at face points (u, v) in
+    [-1, 1]^2, as deeptime_format::cube_map::CubeMap::forward."""
+    u = np.asarray(u, dtype=float)
+    v = np.asarray(v, dtype=float)
+    au, av = np.abs(u), np.abs(v)
+    swap = av > au
+    x = np.where(swap, av, au)
+    y = np.where(swap, au, av)
+    val = cm.tri_eval(P, x, y)
+    a, b = val[..., 0], val[..., 1]
+    r = np.sqrt((1.0 + a * a) + b * b)
+    A = np.where(swap, b, a)
+    B = np.where(swap, a, b)
+    A = np.where(u < 0, -A, A)
+    B = np.where(v < 0, -B, B)
+    return np.stack([1.0 / r, A / r, B / r], -1)
+
+
+def angle(p, q):
+    return 2.0 * np.arcsin(np.clip(np.linalg.norm(p - q, axis=-1) / 2.0, 0, 1))
+
+
+def sample_points():
+    g = np.linspace(-1, 1, 401)
+    U, V = np.meshgrid(g, g, indexing="ij")
+    pts = [np.stack([U.ravel(), V.ravel()], -1)]
+    t = np.linspace(-1, 1, 2001)
+    for e in (-1.0, 1.0):
+        pts.append(np.stack([np.full_like(t, e), t], -1))
+        pts.append(np.stack([t, np.full_like(t, e)], -1))
+    c = 1.0 - np.linspace(0, 2.0 / 3712, 41)  # within one block of the corner at 32k
+    CU, CV = np.meshgrid(c, c, indexing="ij")
+    pts.append(np.stack([CU.ravel(), CV.ravel()], -1))
+    return np.concatenate(pts)
+
+
+def convergence(tables):
+    pts = sample_points()
+    ps = {}
+    for t in tables:
+        P = cm.Map(t)
+        ps[t["m"]] = face_forward(P, pts[:, 0], pts[:, 1])
+    ms = sorted(ps)
+    out = {}
+    for lo in ms[:-1]:
+        hi = ms[-1]
+        ang = angle(ps[lo], ps[hi])
+        key = f"n{2 * lo + 1}_vs_n{2 * hi + 1}"
+        out[key] = {"max_rad": float(ang.max()), "rms_rad": float(np.sqrt(np.mean(ang ** 2)))}
+        for k, s in FACE.items():
+            out[key][f"max_blocks_{k}"] = float(ang.max() * radius_blocks(s))
+    if len(ms) >= 3:
+        a = angle(ps[ms[0]], ps[ms[-1]]).max()
+        b = angle(ps[ms[1]], ps[ms[-1]]).max()
+        out["observed_order"] = float(math.log2(a / b)) if b > 0 else None
+    return out
+
+
+def positivity(t, s32=FACE["32k"]):
+    P = cm.Map(t)
+    m = t["m"]
+    sub = (np.arange(8) + 0.0) / 7.0  # cell corners and six points between
+    out = {}
+    worst = (math.inf, None)
+    total = 0
+    for i0 in range(m):
+        uu = (i0 + sub) / m
+        U, V = np.meshgrid(uu, np.concatenate([(j + sub) / m for j in range(i0 + 1)]), indexing="ij")
+        keep = V <= U + 1e-15
+        u, v = U[keep], np.minimum(V[keep], U[keep])
+        _, du, dv = cm.tri_eval(P, u, v, derivs=True)
+        det = du[:, 0] * dv[:, 1] - dv[:, 0] * du[:, 1]
+        total += det.size
+        k = int(np.argmin(det))
+        if det[k] < worst[0]:
+            worst = (float(det[k]), [float(u[k]), float(v[k])])
+    if t["K"]:
+        # the corner patch at its own resolution: 8 x 8 points in every fine cell of its triangle
+        n = t["K"] * t["F"]
+        u0 = 1.0 - t["K"] / m
+        hf = 1.0 / (m * t["F"])
+        for i0 in range(n):
+            uu = u0 + (i0 + sub) * hf
+            U, V = np.meshgrid(uu, np.concatenate([u0 + (j + sub) * hf for j in range(i0 + 1)]), indexing="ij")
+            keep = V <= U + 1e-15
+            u, v = U[keep], np.minimum(V[keep], U[keep])
+            _, du, dv = cm.tri_eval(P, u, v, derivs=True)
+            det = du[:, 0] * dv[:, 1] - dv[:, 0] * du[:, 1]
+            total += det.size
+            k = int(np.argmin(det))
+            if det[k] < worst[0]:
+                worst = (float(det[k]), [float(u[k]), float(v[k])])
+    out["cells_min_det"] = worst[0]
+    out["cells_min_det_at"] = worst[1]
+    out["cells_points"] = total
+    one = 2.0 / s32  # one block at 32k in face units
+    c = 1.0 - np.linspace(0, one, 400)
+    U, V = np.meshgrid(c, c, indexing="ij")
+    keep = V <= U
+    _, du, dv = cm.tri_eval(P, U[keep], V[keep], derivs=True)
+    det = du[:, 0] * dv[:, 1] - dv[:, 0] * du[:, 1]
+    out["corner_32k_min_det"] = float(det.min())
+    out["corner_32k_points"] = int(det.size)
+    _, du, dv = cm.tri_eval(P, np.array([0.0]), np.array([0.0]), derivs=True)
+    out["centre_det"] = float(du[0, 0] * dv[0, 1] - dv[0, 0] * du[0, 1])
+    out["positive"] = bool(out["cells_min_det"] > 0 and out["corner_32k_min_det"] > 0)
+    return out
+
+
+QS = [0.0, 0.01, 0.5, 0.9, 0.99, 0.999, 1.0]
+
+
+def wquant(vals, w, qs):
+    o = np.argsort(vals)
+    v, ww = vals[o], w[o]
+    c = np.cumsum(ww)
+    c /= c[-1]
+    return [float(v[min(np.searchsorted(c, q), len(v) - 1)]) for q in qs]
+
+
+def stats(t, n=300, h=1e-7):
+    P = cm.Map(t)
+    c = -1 + (np.arange(n) + 0.5) * (2.0 / n)
+    U, V = np.meshgrid(c, c, indexing="ij")
+    u, v = U.ravel(), V.ravel()
+    pu = (face_forward(P, u + h, v) - face_forward(P, u - h, v)) / (2 * h)
+    pv = (face_forward(P, u, v + h) - face_forward(P, u, v - h)) / (2 * h)
+    E = np.einsum("ij,ij->i", pu, pu)
+    F = np.einsum("ij,ij->i", pu, pv)
+    G = np.einsum("ij,ij->i", pv, pv)
+    area = np.sqrt(E * G - F * F)
+    disc = np.sqrt((E - G) ** 2 + 4 * F * F)
+    s1 = np.sqrt((E + G + disc) / 2)
+    s2 = np.sqrt(np.maximum((E + G - disc) / 2, 0))
+    mean = area.mean()
+    rel = area / mean
+    bpa = 1 / rel
+    shape = s1 / s2
+    w = area
+    face_area = float(area.sum() * (2.0 / n) ** 2)
+    return {
+        "planet_area_of_face_over_4pi_6": face_area / (4 * math.pi / 6),
+        "blocks_per_planet_area_rel_q": dict(zip([str(q) for q in QS], wquant(bpa, w, QS))),
+        "area_cv": float(np.sqrt(np.mean((rel - 1) ** 2))),
+        "shape_ratio_q": dict(zip([str(q) for q in QS], wquant(shape, w, QS))),
+        "two_omega_max_deg": float(np.degrees(2 * np.arcsin((s1 - s2) / (s1 + s2))).max()),
+        "samples": int(u.size),
+    }
+
+
+def edge_jump(t, d=1e-5, k=2001):
+    """The survey's crease measure across the edge u = 1: the derivative across the edge from
+    this face against the neighbour's (the reflection of this face across the edge's plane,
+    (x, y, z) -> (y, x, z) in the frame (centre, e_u, e_v))."""
+    P = cm.Map(t)
+    v = np.linspace(-1, 1, k)[1:-1]
+    p1 = face_forward(P, np.ones_like(v), v)
+    p0 = face_forward(P, np.full_like(v, 1 - d), v)
+    refl = p0[:, [1, 0, 2]]
+    da = (p1 - p0) / d
+    db = (refl - p1) / d
+    jump = np.linalg.norm(da - db, axis=-1) / np.linalg.norm(da, axis=-1)
+    gap = angle(p1, p1[:, [1, 0, 2]])  # the edge point and its own reflection: one point
+    out = {"slope_jump_max": float(jump.max()), "slope_jump_median": float(np.median(jump)),
+           "slope_jump_max_at_v": float(v[int(np.argmax(jump))]), "edge_self_gap_rad": float(gap.max())}
+    for cells in (1, 4):
+        keep = np.abs(v) < 1.0 - cells / t["m"]
+        out[f"slope_jump_max_beyond_{cells}_cells_of_corner"] = float(jump[keep].max())
+    return out
+
+
+def tri_area(p, q, r):
+    num = np.abs(np.einsum("...i,...i->...", p, np.cross(q, r)))
+    den = 1 + np.einsum("...i,...i->...", p, q) + np.einsum("...i,...i->...", q, r) + np.einsum("...i,...i->...", r, p)
+    return 2 * np.arctan2(num, den)
+
+
+def corner(t, n=40, h=1e-7):
+    """The area error next to a corner (the singular point the flow resolves to one cell): the
+    node quads' planet areas (the table itself) and the bicubic's planet area per face area (what
+    the game reads), relative to the mean, on a fine grid over the last two cells."""
+    m = t["m"]
+    P = cm.Map(t)
+    Q = P.P[1:m + 2, 1:m + 2]
+    a, b = Q[..., 0], Q[..., 1]
+    r = np.sqrt((1.0 + a * a) + b * b)
+    U = np.stack([1.0 / r, a / r, b / r], -1)
+    area = tri_area(U[:-1, :-1], U[1:, :-1], U[1:, 1:]) + tri_area(U[:-1, :-1], U[1:, 1:], U[:-1, 1:])
+    rel = area / area.mean()
+    out = {"quad_corner_cell": float(rel[m - 1, m - 1]), "quad_rms": float(np.sqrt(np.mean((rel - 1) ** 2))),
+           "quad_total_over_quarter_face": float(area.sum() / (4 * math.pi / 24))}
+    for k in (1, 2, 4, 8):
+        keep = np.ones_like(rel, dtype=bool)
+        keep[m - k:, m - k:] = False
+        out[f"quad_range_beyond_{k}_cells"] = [float(rel[keep].min()), float(rel[keep].max())]
+    g = 1.0 - (np.arange(n) + 0.5) * (2.0 / m) / n
+    GU, GV = np.meshgrid(g, g, indexing="ij")
+    u, v = GU.ravel(), GV.ravel()
+    pu = (face_forward(P, u + h, v) - face_forward(P, u - h, v)) / (2 * h)
+    pv = (face_forward(P, u, v + h) - face_forward(P, u, v - h)) / (2 * h)
+    E = np.einsum("ij,ij->i", pu, pu)
+    F = np.einsum("ij,ij->i", pu, pv)
+    G = np.einsum("ij,ij->i", pv, pv)
+    dens = np.sqrt(E * G - F * F) / ((4 * math.pi / 6) / 4.0)
+    out["bicubic_last_two_cells"] = [float(dens.min()), float(dens.max())]
+    far = np.maximum(1 - u, 1 - v) > 1.0 / m
+    out["bicubic_second_cell"] = [float(dens[far].min()), float(dens[far].max())]
+    return out
+
+
+def exact_error(t, n=4000, seed=7):
+    """The bicubic against the exact map, by Chebyshev distance from the corner in coarse cells
+    (the conformal cube only: the exact map is the Schwarz map)."""
+    m = t["m"]
+    P = cm.Map(t)
+    rng = np.random.default_rng(seed)
+    rows = []
+    for lo, hi in [(0, 0.0625), (0.0625, 0.25), (0.25, 1), (1, 2), (2, 3), (3, 4), (4, 6), (6, 8), (8, 16),
+                   (16, 64), (64, 256)]:
+        d = (lo + (hi - lo) * rng.random(n)) / m
+        x = 1 - d * rng.random(n)
+        y = 1 - d
+        x, y = np.maximum(x, y), np.minimum(x, y)
+        zt, _, err = cm.conformal_triangle(x, y)
+        a, b = cm.gnomonic_of_zeta(zt)
+        r = np.sqrt(1 + a * a + b * b)
+        ex = np.stack([1 / r, a / r, b / r], -1)
+        bi = face_forward(P, x, y)
+        ang = angle(bi, ex)
+        rows.append({"cells": [lo, hi], "max_rad": float(ang.max()),
+                     "max_blocks_32k": float(ang.max() * radius_blocks(FACE["32k"])), "schwarz_err": err})
+    return rows
+
+
+def roundtrip(t, n=200000, seed=11, steps=(2, 3, 4, 6)):
+    """The readers' inverse (the inverse table's bilinear start, then a fixed number of Newton
+    steps) against the forward, on random triangle points and points near the corner: the worst
+    miss in blocks at 32k for each step count."""
+    m = t["m"]
+    P = cm.Map(t)
+    rng = np.random.default_rng(seed)
+    x = rng.random(n)
+    y = rng.random(n) * x
+    d = (2.0 / FACE["32k"]) * 10 ** (rng.random(n) * 4 - 2)  # 0.01 to 100 blocks from the corner
+    cx = 1 - d * rng.random(n)
+    cy = 1 - d
+    out = {}
+    for label, (u, v) in {"triangle": (x, y), "corner": (np.maximum(cx, cy), np.minimum(cx, cy))}.items():
+        val = cm.tri_eval(P, u, v)
+        a, b = val[:, 0], val[:, 1]
+        su, sv = cm.inverse_start(P, a, b)
+        res = {"start_max_blocks_32k": float(np.max(np.maximum(np.abs(su - u), np.abs(sv - v))) * FACE["32k"] / 2)}
+        uu, vv = su, sv
+        done = 0
+        for k in sorted(steps):
+            while done < k:
+                uu, vv = cm.newton_step(P, a, b, uu, vv)
+                done += 1
+            miss = np.maximum(np.abs(uu - u), np.abs(vv - v)) * FACE["32k"] / 2
+            res[f"steps_{k}_max_blocks_32k"] = float(np.nanmax(miss))
+            res[f"steps_{k}_nonfinite"] = int(np.sum(~np.isfinite(miss)))
+        out[label] = res
+    return out
+
+
+def exactness(t):
+    A, B = t["A"], t["B"]
+    m = t["m"]
+    return {
+        "edge_a_is_1": bool(np.all(A[m, : m + 1] == 1.0)),
+        "axis_b_is_0": bool(np.all(B[:, 0] == 0.0)),
+        "diagonal_a_eq_b": bool(np.all(np.diag(A) == np.diag(B))),
+        "corner": [float(A[m, m]), float(B[m, m])],
+    }
+
+
+def main(argv):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--tables", nargs="+", required=True)
+    ap.add_argument("--committed", default=None)
+    ap.add_argument("--out", required=True)
+    args = ap.parse_args(argv[1:])
+    tables = [cm.read_table(p) for p in args.tables]
+    res = {"tables": [{k: t[k] for k in ("name", "m", "q", "tau", "commit", "sha256", "bytes")} for t in tables]}
+    res["convergence"] = convergence(tables)
+    print(json.dumps({"convergence": res["convergence"]}, indent=1), flush=True)
+    main_t = cm.read_table(args.committed) if args.committed else tables[len(tables) // 2]
+    res["checked"] = main_t["name"]
+    res["exact"] = exactness(main_t)
+    res["positivity"] = positivity(main_t)
+    print(json.dumps({"positivity": res["positivity"]}, indent=1), flush=True)
+    res["stats"] = stats(main_t)
+    res["edge"] = edge_jump(main_t)
+    res["corner"] = corner(main_t)
+    res["positivity_all"] = {t["name"]: positivity(t)["positive"] for t in tables}
+    res["roundtrip"] = roundtrip(main_t)
+    if main_t["tau"] == 0:
+        res["exact_error_by_corner_distance"] = exact_error(main_t)
+    keys = ("exact", "stats", "edge", "corner", "positivity_all", "roundtrip", "exact_error_by_corner_distance")
+    print(json.dumps({k: res[k] for k in keys if k in res}, indent=1), flush=True)
+    with open(args.out, "w") as f:
+        json.dump(res, f, indent=1)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

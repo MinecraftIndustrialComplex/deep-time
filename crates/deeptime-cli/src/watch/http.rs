@@ -144,6 +144,13 @@ fn get(app: &App, req: &Request) -> Response {
             NO_CACHE,
             deeptime_viewer::PROJECTION_JS.as_bytes().to_vec(),
         ),
+        // The world's cube map table, beside projection.js at the path DTCubeMap.fetch reads
+        // (the bundles write the same file there).
+        "/cube-map-conformal-n513.bin" => Response::ok(
+            "application/octet-stream",
+            NO_CACHE,
+            deeptime_viewer::cube_map_world_bytes().to_vec(),
+        ),
         "/deposits.js" => Response::ok(
             "text/javascript; charset=utf-8",
             NO_CACHE,
@@ -348,6 +355,15 @@ fn stream_events(run: Arc<Run>) -> Reply {
 
 #[cfg(test)]
 mod tests {
+    /// The cube map route is the file the viewer bundles write beside projection.js.
+    #[test]
+    fn the_cube_map_route_is_the_bundles_file_name() {
+        assert_eq!(
+            format!("/{}", deeptime_viewer::CUBE_MAP_WORLD_FILE),
+            "/cube-map-conformal-n513.bin"
+        );
+    }
+
     /// The workbench's `Host` policy: loopback names always, tailnet names only with
     /// `--allow-tailnet`, foreign names never (the server applies it to every request).
     #[test]

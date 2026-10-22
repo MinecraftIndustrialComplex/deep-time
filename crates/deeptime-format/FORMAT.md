@@ -78,6 +78,11 @@ rule's sea step ("Water columns", step 3) holds only where the layer is 0 or abs
 fluid picker, its water pass, the cave shield and the coast tests read the same layer. Water
 `method` is "hyd-100" and `stats.below_sea` is new ("Rivers"). 0.5 worlds are refused.
 
+**0.7, coming (the cube world; Ben, decisions log 2026-10-22: "Fuck it, remove equal are
+restriction and move to a cube"):** not written yet. The writer writes 0.6 and every reader accepts
+only 0.6 until the bake's cube items land. The schema is fixed ahead of them: "The cube world's
+layout" (manifest `projection` with `layout_version` 2) and "The cube map table" below.
+
 ## Folder layout
 
 ```text
@@ -854,6 +859,251 @@ Java `PortableMath`, JS `DTMath`):
   planet (2b² = 4πR², R = b/√(2π)); glued edge points are one planet point to 10⁻¹² rad; the map
   continues smoothly through every seam; round trips to 10⁻⁸ rad and 10⁻⁶ blocks; the equator is the
   line z = 0, north is −z along it, east +x.
+
+## The cube world's layout (coming in 0.7, `layout_version` 2)
+
+**Schema only.** No writer emits it yet and no reader accepts it: format 0.7 ships when the bake's
+cube items do (docs/plans/cube-world-plan.md B1 to B10). It follows the plan's question Q1, answer
+(a), which is recommended and **still open** (Ben has not answered): rasters face by face with no
+void cells, the map table shipped in the code, and the manifest naming the table and its sha256. If
+Q1 is answered otherwise, this section changes before 0.7 ships. The geometry is coded and tested
+in all three languages: Rust `deeptime_format::cube` (the net) and `deeptime_format::cube_map` (the
+map, the turn, `CubeWorld`), Java `worlddata/CubeLayout` and `worlddata/CubeMap`, JS `DTCube`,
+`DTCubeMap` and `DTCubeWorld` in `projection.js`, all checked against the parity fixture's `cube`
+section (`tests/data/projection_parity.json`).
+
+A cube world is six square faces of side s blocks laid out as a cross: four in a band (F3, F0, F1,
+F2 from west to east, x wrapping with period 4s through Toroidal World), N above F0 and S below it.
+Each face is drawn on the planet through the **map** (a table, "The cube map table") and the whole
+cube is placed on the planet by a free **rotation**, so the poles lie wherever the rotation puts
+them (usually inside N and S, not at their centres): latitude does not run along the net and −z is
+not north. Here the 16k world (s = 3,840) with a turn taken from the parity fixture's free-turn
+world:
+
+```json
+"projection": {
+  "kind": "cube",
+  "layout_version": 2,
+  "face_blocks": 3840,
+  "map": {"name": "conformal-n513",
+          "sha256": "c9dd9fd493ac905237678150c332fd580ed05bf0967af9519a85b889e279b9e1"},
+  "rotation": [[ 0.465740957, -0.875614377, 0.128003218],
+               [ 0.664987828,  0.441743093, 0.602207795],
+               [-0.583846341, -0.195352253, 0.788010754]],
+  "domain": {"x_min": -5760.0, "x_max": 9600.0, "z_min": -5760.0, "z_max": 5760.0, "period_x": 15360},
+  "faces": [
+    {"id": "F0", "index": 0, "origin": [-1920, -1920], "frame": ["+X", "+Y", "-Z"], "centre_lat_deg": 7.3542,   "centre_lon_deg": 298.0086},
+    {"id": "F1", "index": 1, "origin": [1920, -1920],  "frame": ["+Y", "-X", "-Z"], "centre_lat_deg": 37.0282,  "centre_lon_deg": 33.5956},
+    {"id": "F2", "index": 2, "origin": [5760, -1920],  "frame": ["-X", "-Y", "-Z"], "centre_lat_deg": -7.3542,  "centre_lon_deg": 118.0086},
+    {"id": "F3", "index": 3, "origin": [-5760, -1920], "frame": ["-Y", "+X", "-Z"], "centre_lat_deg": -37.0282, "centre_lon_deg": 213.5956},
+    {"id": "N",  "index": 4, "origin": [-1920, -5760], "frame": ["+Z", "+Y", "+X"], "centre_lat_deg": 52.0,     "centre_lon_deg": 198.5},
+    {"id": "S",  "index": 5, "origin": [-1920, 1920],  "frame": ["-Z", "+Y", "-X"], "centre_lat_deg": -52.0,    "centre_lon_deg": 18.5}
+  ],
+  "edges": [
+    {"name": "F3-west",   "seam": "east_west", "kind": "slide",        "axis": "x", "side": "min", "coord": -5760, "span": [-1920, 1920], "iso": [0, 15360, 0],      "partner": "F2-east",   "owner": "toroidal_world"},
+    {"name": "F2-east",   "seam": "east_west", "kind": "slide",        "axis": "x", "side": "max", "coord": 9600,  "span": [-1920, 1920], "iso": [0, -15360, 0],     "partner": "F3-west",   "owner": "toroidal_world"},
+    {"name": "N-east",    "seam": "ne", "kind": "quarter_turn", "axis": "x", "side": "max", "coord": 1920,  "span": [-5760, -1920], "iso": [1, 0, -3840],    "pivot": [1920, -1920],  "partner": "F1-top",    "owner": "wrap_engine"},
+    {"name": "F1-top",    "seam": "ne", "kind": "quarter_turn", "axis": "z", "side": "min", "coord": -1920, "span": [1920, 5760],   "iso": [3, 3840, 0],     "pivot": [1920, -1920],  "partner": "N-east",    "owner": "wrap_engine"},
+    {"name": "N-west",    "seam": "nw", "kind": "quarter_turn", "axis": "x", "side": "min", "coord": -1920, "span": [-5760, -1920], "iso": [3, 0, -3840],    "pivot": [-1920, -1920], "partner": "F3-top",    "owner": "wrap_engine"},
+    {"name": "F3-top",    "seam": "nw", "kind": "quarter_turn", "axis": "z", "side": "min", "coord": -1920, "span": [-5760, -1920], "iso": [1, -3840, 0],    "pivot": [-1920, -1920], "partner": "N-west",    "owner": "wrap_engine"},
+    {"name": "N-top",     "seam": "nn", "kind": "half_turn",    "axis": "z", "side": "min", "coord": -5760, "span": [-1920, 1920],  "iso": [2, 7680, -7680], "pivot": [3840, -3840],  "partner": "F2-top",    "owner": "wrap_engine"},
+    {"name": "F2-top",    "seam": "nn", "kind": "half_turn",    "axis": "z", "side": "min", "coord": -1920, "span": [5760, 9600],   "iso": [2, 7680, -7680], "pivot": [3840, -3840],  "partner": "N-top",     "owner": "wrap_engine"},
+    {"name": "S-east",    "seam": "se", "kind": "quarter_turn", "axis": "x", "side": "max", "coord": 1920,  "span": [1920, 5760],   "iso": [3, 0, 3840],     "pivot": [1920, 1920],   "partner": "F1-bottom", "owner": "wrap_engine"},
+    {"name": "F1-bottom", "seam": "se", "kind": "quarter_turn", "axis": "z", "side": "max", "coord": 1920,  "span": [1920, 5760],   "iso": [1, 3840, 0],     "pivot": [1920, 1920],   "partner": "S-east",    "owner": "wrap_engine"},
+    {"name": "S-west",    "seam": "sw", "kind": "quarter_turn", "axis": "x", "side": "min", "coord": -1920, "span": [1920, 5760],   "iso": [1, 0, 3840],     "pivot": [-1920, 1920],  "partner": "F3-bottom", "owner": "wrap_engine"},
+    {"name": "F3-bottom", "seam": "sw", "kind": "quarter_turn", "axis": "z", "side": "max", "coord": 1920,  "span": [-5760, -1920], "iso": [3, -3840, 0],    "pivot": [-1920, 1920],  "partner": "S-west",    "owner": "wrap_engine"},
+    {"name": "S-bottom",  "seam": "ss", "kind": "half_turn",    "axis": "z", "side": "max", "coord": 5760,  "span": [-1920, 1920],  "iso": [2, 7680, 7680],  "pivot": [3840, 3840],   "partner": "F2-bottom", "owner": "wrap_engine"},
+    {"name": "F2-bottom", "seam": "ss", "kind": "half_turn",    "axis": "z", "side": "max", "coord": 1920,  "span": [5760, 9600],   "iso": [2, 7680, 7680],  "pivot": [3840, 3840],   "partner": "S-bottom",  "owner": "wrap_engine"}
+  ],
+  "cone_points": [
+    {"name": "n0", "cone_deg": 270.0, "faces": ["F0", "F1", "N"], "cube": [1, 1, 1],    "lat_deg": 61.2284,  "lon_deg": 310.9952, "land_distance_deg": 7.1,  "reachable": true,  "images": [[1920, -1920]]},
+    {"name": "n1", "cone_deg": 270.0, "faces": ["F1", "F2", "N"], "cube": [-1, 1, 1],   "lat_deg": 46.7809,  "lon_deg": 108.9206, "land_distance_deg": 9.4,  "reachable": false, "images": [[1920, -5760], [5760, -1920]]},
+    {"name": "n2", "cone_deg": 270.0, "faces": ["F2", "F3", "N"], "cube": [-1, -1, 1],  "lat_deg": 1.9124,   "lon_deg": 172.0803, "land_distance_deg": 6.4,  "reachable": false, "images": [[-1920, -5760], [-5760, -1920], [9600, -1920]]},
+    {"name": "n3", "cone_deg": 270.0, "faces": ["F3", "F0", "N"], "cube": [1, -1, 1],   "lat_deg": 10.4383,  "lon_deg": 242.6305, "land_distance_deg": 12.0, "reachable": true,  "images": [[-1920, -1920]]},
+    {"name": "s0", "cone_deg": 270.0, "faces": ["F0", "F1", "S"], "cube": [1, 1, -1],   "lat_deg": -1.9124,  "lon_deg": 352.0803, "land_distance_deg": 8.2,  "reachable": true,  "images": [[1920, 1920]]},
+    {"name": "s1", "cone_deg": 270.0, "faces": ["F1", "F2", "S"], "cube": [-1, 1, -1],  "lat_deg": -10.4383, "lon_deg": 62.6305,  "land_distance_deg": 6.9,  "reachable": false, "images": [[1920, 5760], [5760, 1920]]},
+    {"name": "s2", "cone_deg": 270.0, "faces": ["F2", "F3", "S"], "cube": [-1, -1, -1], "lat_deg": -61.2284, "lon_deg": 130.9952, "land_distance_deg": 15.3, "reachable": false, "images": [[-1920, 5760], [-5760, 1920], [9600, 1920]]},
+    {"name": "s3", "cone_deg": 270.0, "faces": ["F3", "F0", "S"], "cube": [1, -1, -1],  "lat_deg": -46.7809, "lon_deg": 288.9206, "land_distance_deg": 7.7,  "reachable": true,  "images": [[-1920, 1920]]}
+  ],
+  "poles": [
+    {"name": "north", "face": "N", "u": 0.823877, "v": 0.169330,  "images": [[1581.8, -3514.9]]},
+    {"name": "south", "face": "S", "u": -0.823877, "v": 0.169330, "images": [[-1581.8, 4165.1]]}
+  ],
+  "border": {"kind": "edge_stop", "inset_blocks": 1.0, "temporary": true,
+             "segments": ["N-east", "F1-top", "N-west", "F3-top", "N-top", "F2-top",
+                          "S-east", "F1-bottom", "S-west", "F3-bottom", "S-bottom", "F2-bottom"]}
+}
+```
+
+The rotation, the corners' and the face centres' latitudes and longitudes and the poles are the
+fixture's turn (Rz(−71.5°)·Rx(38°)·Rz(12°)) computed by the code; the corners' `land_distance_deg`
+in the example are made up, since no planet stands behind it. A real manifest writes every number at
+full f64 precision.
+
+- **`kind`** `cube`. **`layout_version`** 2 (the 0.5 layouts are version 1).
+- **`face_blocks`** s, the face side in blocks: the planet's equal-area face C/√(6π) for the
+  simulation's circumference C, rounded to the nearest multiple of 256 (`face_for`, ledger SCL-078
+  and SCL-100): **1,024 at 4k, 3,840 at 16k, 7,424 at 32k**. Every grid's r divides s, every pivot
+  is a chunk corner, and the period 4s is whole region files.
+- **`map`**: the table that draws a face on the sphere, by `name` and the `sha256` of its file
+  ("The cube map table"). A reader that does not ship a table of that name with that hash refuses
+  the world (`world data needs cube map <name> (sha256 <hash>); this Deep Time has <names>`); it
+  never falls back to another table. The world's map is `conformal-n513` (the conformal cube, τ = 0,
+  ledger SCL-101). The simulation runs on its own cube (`moser-t1-n513`, Moser's equal-area cube,
+  τ = 1, ledger SCL-102, on the identity turn), which the layout does not name: the simulation's
+  files carry latitude and longitude, never cube coordinates.
+- **`rotation`**: the turn that places the cube on the planet, a 3 × 3 rotation written as its
+  three rows (row-major), **planet frame to cube frame**: a planet unit vector p (the format's frame,
+  +x the point (0°, 0°), +y (0°, 90° E), +z the north pole) is the cube-frame vector Q·p, and a cube
+  vector c is the planet's Qᵀ·c. It replaces the polar layout's `lambda0_deg` (a turn about the axis
+  only; `CubeTurn::polar(λ0)` is the special case). The bake chooses it per planet by the corner
+  search (docs/research/notes/mountains-and-the-projection.md §5.4: the corners as far out at sea as
+  possible, then the cube's 24 symmetries fix it with the north pole in N and the most land on F0).
+  A reader checks it is a rotation (rows orthonormal to 10⁻¹², determinant positive;
+  `CubeTurn::from_rows`) and refuses the world otherwise. In the three languages the products are
+  summed in one order, `(m0·p0 + m1·p1) + m2·p2`.
+- **`domain`**: the net window, x in [x_min, x_max) = [−3s/2, 5s/2), z in [z_min, z_max] =
+  [−3s/2, 3s/2], and **`period_x`** 4s, Toroidal World's loop. Half the window is void (the six
+  s × s squares above and below F1, F2 and F3); no block of the void is stored.
+- **`faces`**: the six faces in the format's order (F0, F1, F2, F3, N, S; `index` is the order
+  rasters store them in). `origin` is the net block of the face's local cell (0, 0), its north-west
+  corner; the face covers [origin, origin + s) in x and z. Every face is drawn in the net without a
+  turn, so its local axes are the net's: u east (+x), v south (+z). `frame` gives the cube-frame
+  directions of the face's centre, of local +u and of local +v (each frame has e_u × e_v = −centre,
+  so the turns between faces are rotations). `centre_lat_deg`, `centre_lon_deg`: the planet point at
+  the face's centre through the rotation (longitude in [0°, 360°)), for tools and pages.
+- **`edges`**: the 14 net edges that face the void or the window's ends, in the order of
+  `Cube::edges` and the wrap engine's `WrapLayouts.cubeCross`. Each is as in layout version 1
+  (`axis`, `side`, `coord`, `span`, `iso`, `pivot`, `owner`; "The world's layout"), and adds `seam`
+  (`east_west`, `ne`, `nw`, `se`, `sw`, `nn`, `ss`) and `partner`, the other net edge of the same
+  cube edge. `kind` is `slide` (k = 0), `quarter_turn` (k = 1 or 3, about `pivot`, one of F0's
+  corners) or `half_turn` (k = 2, about `pivot`, the centre of the void square above or below F1).
+  The `iso` on
+  cells: k = 1 is (−z − 1 + tx, x + tz), k = 3 is (z + tx, −x − 1 + tz), k = 2 as before; on points
+  (entities) k = 1 is (−z + tx, x + tz) and k = 3 (z + tx, −x + tz). So N-east's `[1, 0, −s]`
+  takes the point (s/2 + d, z) beyond N's east edge to (−z, s/2 + d − s) on F1, a heading turned a
+  quarter clockwise. A block beyond two bands at once (the void squares by F0's corners) takes the
+  nearer edge's motion, ties to the earlier edge in the list, so each such square splits on its
+  diagonal through F0's corner (plan §1.4); a block in no band, or more than s out, is past the net's
+  corners and the game draws deep ocean there (`CubeFold::Ocean`).
+- **`cone_points`**: the cube's 8 corners, where three faces meet and the world covers 270° round
+  the point (`cone_deg`). `n0` to `n3` are face N's corners counter-clockwise from cube (+1, +1, +1),
+  `s0` to `s3` face S's; `faces` the three faces, `cube` the corner's cube-frame direction
+  (±1, ±1, ±1). `lat_deg`, `lon_deg`: the planet point there through the rotation.
+  **`land_distance_deg`**: the signed great-circle distance from the corner to the nearest land of
+  the final keyframe (positive at sea, minus the distance to the sea on land, clamped to ±20°, the
+  corner search's score; study §5.4 items 2 and 7). `reachable`: whether a player can stand on it
+  (F0's four corners, inside the world, each with one image) or not (the other four lie on bordered
+  edges, with two images, and a third at x = 5s/2 where the window's closure repeats F3's west
+  corner). `images`: every block corner of the window's closure that is the corner.
+- **`poles`**: where the rotation puts the two poles: the `face` and its local (u, v) ∈ [−1, 1]²
+  (`CubeWorld::north_pole`, the map's inverse of the planet vector), and `images`, the net points
+  (f64, not block corners any more) that are the pole: one inside a face, two when the pole lies on a
+  net edge. On the identity turn (the simulation's cube) they are the centres of N and S.
+- **`border`**: as in layout version 1, on **segments**: the 12 turning net edges by name (all but
+  the slide), each `inset_blocks` (SCL-088) inside its edge line, `temporary` until the wrap engine
+  joins the edges. A position beyond two segments (inside a void square by F0's corner) is pushed
+  back to the nearest point of the planet, not segment by segment (plan W3). There is no pole cap.
+
+**Scale.** `scale.circumference_blocks` is the loop period 4s (15,360 at 16k), as Toroidal World's
+loop reads it. `scale.m_per_block_h` is the nominal size, √(4πR²/6s²) for the planet's radius R in
+metres (`planet.radius_m`): 294.82 m at 16k. The true size varies with the map: every
+metres-to-blocks conversion uses the local scale σ (planet metres per block) from the map's
+Jacobian (`CubeWorld::jacobian`, which also gives the 2 × 2 matrix and the local angle).
+
+**Rasters (Q1 (a)).** A grid of cell size r is stored face by face: six planes of n × n cells,
+n = s / r, in the faces' order, each in its own net orientation (cell (i, j) is the r × r square
+of net blocks from `origin` + (i·r, j·r), row j outer and column i inner), so a reader never turns a
+cell. There are no void cells. The grid descriptor gives way to `{"name": "L3", "kind": "cube",
+"n": 1920, "r": 2}` (w = n, h = 6n for the tile pack: the six planes stacked F0 to S down the
+rows, with a tile size that divides n so no tile holds two faces), and its one `cell(face, i, j)`
+resolves an index off a face through the face adjacency (`cube::ADJACENCY`, `cube::cell_on`): one
+side out, the neighbour's cell with the quarter turns between the two frames; beyond two sides at
+once (the 270° corners) the diagonal ghost copies the neighbour along the adjacent strip (the FV3
+rule). Where a cell's value sits (its centre or its corner) and the bilinear rule on faces are the
+bake's choice (B1), written here when made. The spatial indexes (sites, rivers, structure) and the
+bake's notes (`notes.bake.stats`: the land's largest and 99.9th-percentile blocks per planet area
+and the land share within 5° of a corner, study §5.4 item 7) move with the bake items.
+
+## The cube map table (`crates/deeptime-format/data/cube-map-<name>.bin`)
+
+The table a cube world's `projection.map` names, shipped in the code, never in a world: Rust
+embeds it (`CubeMap::builtin`, `CubeMap::builtin_bytes`), the jar carries it as the resource
+`deeptime/cube-map/cube-map-<name>.bin` (Java `CubeMap.builtin`), and each viewer bundle carries the
+world's table as `cube-map-<name>.bin` beside `projection.js` (`DTCubeMap.load` on its bytes). Each
+file has `<file>.sha256` beside it (sha256sum format); a reader checks the hash before use.
+`tools/cube-map/cube_map.py` writes them (plan M1); nobody has to regenerate one bit for bit, since
+the hash pins the world.
+
+| name | τ | m | q | patch K, F | flow steps | bytes | sha256 |
+|---|---|---|---|---|---|---|---|
+| `conformal-n513` (the world's, SCL-101) | 0 | 256 | 128 | 4, 16 | 0 | 701,168 | `c9dd9fd493ac905237678150c332fd580ed05bf0967af9519a85b889e279b9e1` |
+| `moser-t1-n513` (the simulation's, SCL-102) | 1 | 256 | 128 | 0, 0 | 400 | 664,720 | `000e6532b89d84de287fbf9694fa080a3845261483e195b254d3b5a42a34f9d9` |
+
+What it holds is one eighth of a face, the triangle 0 ≤ v ≤ u ≤ 1 of the face's local coordinates
+(u, v); the cube's symmetry gives the rest by sign flips and a swap. Each forward node stores the
+planet point in **gnomonic coordinates of the face frame**, (a, b) = (y/x, z/x) with x along the
+face's centre and y, z along e_u and e_v, so a node is the point (1, a, b)/√(1 + a² + b²) of the
+face frame. Nodes on the edge u = 1 hold a = 1 exactly, on the axis b = 0, on the diagonal a = b,
+and the corner (1, 1).
+
+```text
+offset  size  field (little-endian)
+     0     4  magic "DTCM"
+     4     4  u32 layout version (1)
+     8     4  u32 m: forward cells along the triangle's side (the face has n = 2m + 1 nodes a side)
+    12     4  u32 q: inverse cells along the gnomonic triangle's side
+    16     8  f64 τ
+    24     4  u32 flow steps (Moser's flow, RK4, t from 0 to 1; 0 for τ = 0, no flow)
+    28     4  u32 K: the corner patch's extent, coarse cells from the corner (0: no patch)
+    32     4  u32 F: the corner patch's fine cells to a coarse cell (0 when K is 0)
+    36     4  u32 reserved (0)
+    40    32  name, ASCII, NUL padded
+    72    40  generator commit, ASCII hex, NUL padded
+   112        forward nodes: for i in 0..=m, for j in 0..=i: a, b (f64); node (i, j) at u = i/m, v = j/m
+              inverse nodes: for k in 0..=q, for l in 0..=k: u, v (f64); node (k, l) at a = k/q, b = l/q
+              patch nodes, n = K·F: for i in −1..=n+1, for j in −1..=i: a, b (f64); node (i, j) at
+              u = 1 − K/m + i/(m·F), v likewise; i = n + 1 and (n + 1, n) are ghosts
+```
+
+The file's length is exactly what the header implies; a reader refuses any other length, magic or
+layout version.
+
+**Evaluation** (Rust `deeptime_format::cube_map`, Java `worlddata/CubeMap`, JS `DTCubeMap`; the
+same bits in all three, pinned by the parity fixture; only +, −, ×, IEEE division and square root
+in a fixed order, no fused multiply-add):
+
+- **Forward** (face, u, v) → unit vector: fold to the triangle (|u|, |v|, swapped when |v| > |u|),
+  evaluate (a, b) there, undo the swap and the signs, then n = (1, a, b)/√((1 + a²) + b²) in the
+  face frame, turned to the cube frame by the face's `frame`.
+- **The bicubic.** A Catmull-Rom bicubic over the forward nodes, rows along u first, then v, with
+  the cell index found by a clamped floor (truncation, then minus one where it overshoots). The
+  nodes cover the quadrant [0, 1]² (the triangle and its swap, (a, b) → (b, a)) and one ring of
+  ghosts: beyond u = 1 the mirror of node (m − 1, j) across the edge's plane, (a, b) → (1/a, b/a);
+  beyond v = 1 its swap; past the corner a linear extrapolation along the edge, its swap, and along
+  the diagonal; beyond u = 0 and v = 0 the sign flips.
+- **The corner patch** (`conformal-n513` only; ledger SCL-104). The conformal map behaves like
+  (z − z_c)^(4/3) at a cube corner, so a finer table of the same kind covers the last K coarse cells
+  at the corner, F fine cells to a coarse cell, with its ghosts stored. Within K − 1 coarse cells of
+  the corner the fine bicubic is used, beyond K the coarse one, and between them
+  coarse + w²(3 − 2w)·(fine − coarse), w the Chebyshev distance inward from K cells in coarse cells:
+  continuous, with a continuous Jacobian.
+- **Jacobian**: the derivatives of the same bicubic, d n = (d g − n·k)/√((1 + a²) + b²) with
+  k = (a d a + b d b)/√((1 + a²) + b²), per face axis. `CubeWorld::jacobian` turns it into planet
+  metres per block east and north (the 2 × 2 matrix), σ = √|det| and the angle.
+- **Inverse** unit vector → (face, u, v): the face is the vector's largest component (ties to x,
+  then y, then z; a zero component counts as positive), (a, b) from the face frame, folded to the
+  gnomonic triangle; a bilinear start from the inverse nodes (over the square [0, 1]², the triangle
+  and its swap), then 4 Newton steps on the forward bicubic (ledger SCL-103), then, in this order:
+  u above 1 becomes 1, u below 0 becomes 0, v above u becomes u, v below 0 becomes 0, and a = 1 sets
+  u = 1, b = 0 sets v = 0, a = b sets v = u.
+
+Measured (plan M1 and M2, on the test VM): the conformal table against one of twice the
+resolution 7.0·10⁻⁷ rad (0.0036 blocks at 32k), the Moser one 5.5·10⁻⁵ rad (0.28 blocks); the
+bicubic's determinant d(a, b)/d(u, v) positive everywhere, also within one block of every corner at
+32k (conformal smallest 0.0072, Moser 0.52); round trips on 10⁶ random points within 6.7·10⁻¹⁰ (conformal) and
+4.5·10⁻¹² blocks (Moser) at 32k; the two faces' values on an edge within 2.8·10⁻¹⁶; about 30 ns a
+forward. The science page is `docs/science/seamless-world.md`.
 
 ## Tile pack (`.dtr`)
 
