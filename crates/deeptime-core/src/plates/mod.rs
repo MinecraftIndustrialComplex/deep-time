@@ -426,15 +426,24 @@ impl PlatesStage {
             ),
             (
                 belts::SLIVER_GLOBAL,
-                stacked.values().map(|s| s.sliver_km2_m / 1000.0).sum::<f64>(),
+                stacked
+                    .values()
+                    .map(|s| s.sliver_km2_m / 1000.0)
+                    .sum::<f64>(),
             ),
             (
                 belts::CAPPED_GLOBAL,
-                stacked.values().map(|s| s.capped_km2_m / 1000.0).sum::<f64>(),
+                stacked
+                    .values()
+                    .map(|s| s.capped_km2_m / 1000.0)
+                    .sum::<f64>(),
             ),
             (
                 belts::CLIPPED_GLOBAL,
-                stacked.values().map(|s| s.clipped_km2_m / 1000.0).sum::<f64>(),
+                stacked
+                    .values()
+                    .map(|s| s.clipped_km2_m / 1000.0)
+                    .sum::<f64>(),
             ),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;

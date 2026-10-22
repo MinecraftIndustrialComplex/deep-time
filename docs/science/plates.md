@@ -3520,12 +3520,18 @@ table (30c4d664 → fad59a5e on seeds 1 and 2: land 0.257 → 0.268, largest 0.1
 2. *The collision rate* (1.63 per 100 Myr, target 2 to 6): PLT-371's reversal is sourced and
    measured (2.22 per 100 Myr) and waits on the collisions' losses (1.72 km³ a year against 0.7)
    and the high ground (the high-ground work). Switch it on after those, and measure the land
-   again.
+   again. Measured again in "The crust flux into collision fronts (2026-10-21)" below: the
+   collisions' losses per km of front are Earth's (their excess is the length of front in
+   collision, the plates'), PLT-371 is in the code as a switch, and on top of PLT-400 it lifts the
+   collisions to 2.00 per 100 Myr at the median of 12 runs (p = 0.09) and loses no land (0.257 to
+   0.270). Switching both on is the coordinator's call.
 3. *Where subduction starts* (Crameri): needs a law for trenches to propagate and slabs to roll
    back before initiation can move near trenches; a plate reorganisation is the open law (Ben's,
    as in the sections above).
 4. *The plate count*: the lattice's floor (0.0377 sr at 100,000 samples); a finer lattice or a
-   small-plate law, not a constant.
+   small-plate law, not a constant. It is also behind the collision fronts' length ("The crust
+   flux into collision fronts" below): with 24 plates against Bird's 52, continents meet along
+   whole margins, 28,800 km of front in collision against Earth's 6,000 to 12,000 km of suture.
 5. *The island-arc share of the land* (0.43): "a few per cent" (the section above, from memory)
    is not a figure Earth's sources give. By Stern & Scholl 1.5 of the 2.7 AU of crust grown at
    convergent margins is intra-oceanic arc, and the census tags any land with 1 km or more of
@@ -3569,7 +3575,9 @@ the budget's maps:
   0.74 of the high ground once the first is dealt with), on crust of 60 to 68 km at the median and
   about 200 km from the sea at the median. The collisions lose crust at 2.5 to 3.8 times Earth's
   0.7 km³ a year (the crust budget's sections above) because 3 to 4 times Earth's crust crosses
-  their fronts (the agent's estimate from the budget); 0.95 of what crosses stays and builds the
+  their fronts (the agent's estimate from the budget; measured in "The crust flux into collision
+  fronts" below, the crossing per km of front is Earth's, and what is 2.4 to 4.8 times Earth's is
+  the length of front in collision); 0.95 of what crosses stays and builds the
   belts (PLT-242). How much crosses is the plates' motion (`plates/dynamics.rs`), outside this task.
 - *Plateau interiors with no room.* Quiet thick crust in a plateau's middle finds no thin crust
   within the collapse's 200 km reach (PLT-257): its nearest room is 400 to 440 km away at the
