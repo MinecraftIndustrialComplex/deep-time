@@ -59,9 +59,9 @@ use glam::DVec3;
 use rayon::prelude::*;
 
 use super::Env;
+use super::collapse::normal_thickness_m;
 use super::geometry::{Geo, dijkstra_sorted};
 use super::kinematics::{quat, tangent, to_group};
-use super::collapse::normal_thickness_m;
 use super::pools::{COLUMN_ISOSTATIC_FACTOR, isostatic_change_m};
 use super::shortening::Front;
 use super::state::{Belt, CONTINENTAL, FORELAND, OROGENY_HIMALAYAN, PlateState, pool};
@@ -563,8 +563,8 @@ fn stack_front(
             .collect();
         let given = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
         // What was left over, and whether any sample still had room (measurement only).
-        let left = (belt_rise_km2_m - given.iter().sum::<f64>() * area).max(0.0)
-            * COLUMN_ISOSTATIC_FACTOR;
+        let left =
+            (belt_rise_km2_m - given.iter().sum::<f64>() * area).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
         let room = cap_m <= 0.0 || z_of.iter().zip(&given).any(|(z, g)| cap_m - z - g > 1e-6);
         if room {
             sliver_km2_m = left;
