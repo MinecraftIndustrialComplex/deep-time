@@ -1136,6 +1136,49 @@ mod tests {
         assert!(stamped > 50, "{stamped}");
     }
 
+    /// PLT-400: with `collision_restack_whole` the crust this collision stacked on the incoming
+    /// plate (its wedge, carried to the front) crosses whole and only the rest takes the share;
+    /// off, every crossing takes the share. Either way the crust kept in the wedge and the belt,
+    /// what found no room and what the ceilings clipped add up to what stays.
+    #[test]
+    fn a_collisions_own_wedge_crosses_whole_with_the_switch() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        let share = 0.5;
+        fx.preset.tectonics.collision_stacking_share = share;
+        let mut restacked = false;
+        for whole in [false, true] {
+            fx.preset.tectonics.collision_restack_whole = whole;
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+            for step in 1..=6 {
+                let (stacked, _) = fx.step(&mut st, step, None);
+                let s = &stacked[&0];
+                if step == 1 {
+                    // Nothing this collision stacked has reached the front yet.
+                    assert_eq!(s.restack_m, 0.0, "{s:?}");
+                }
+                assert!(s.restack_m <= s.above_m + 1e-6, "{s:?}");
+                let stays_m = if whole {
+                    share * (s.thickness_m - s.restack_m) + s.restack_m
+                } else {
+                    share * s.thickness_m
+                };
+                let want = s.crossed_km2 * stays_m;
+                let booked = s.wedge_km2_m
+                    + s.belt_km2_m
+                    + s.sliver_km2_m
+                    + s.capped_km2_m
+                    + s.clipped_km2_m;
+                assert!(
+                    (booked - want).abs() <= 1e-6 * want,
+                    "whole {whole}, step {step}: booked {booked}, want {want}, {s:?}"
+                );
+                restacked |= whole && s.restack_m > 0.0;
+            }
+        }
+        assert!(restacked, "the wedge's crust never reached the front");
+    }
+
     /// The collision's footprint is marked for the structure stage (plate task 6): the belt
     /// behind the front, the wedge and the foreland on the incoming plate carry the convergence
     /// across the front and the collision's shortening so far; the incoming plate beyond the
