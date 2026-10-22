@@ -1513,9 +1513,9 @@ vertices of 24 bytes, 1 K chains of 16 bytes, 2 `tiles_x · tiles_z + 1` u32 off
 vertex                                         chain
 0   4  f32 x (block; continuous along a chain)  0   4  u32 first vertex
 4   4  f32 z (block)                            4   4  u32 vertex count (≥ 2)
-8   4  f32 w: water surface (fills y < w)       8   1  u8 mouth: 0 sea (or the polar edge row), 1 lake, 2 river
+8   4  f32 w: water surface (fills y < w)       8   1  u8 mouth: 0 sea (or the polar edge row), 1 lake, 2 river, 3 seam
 12  4  f32 hw: half-width, blocks (> 0)         9   3  reserved, 0
-16  4  f32 depth at the centre, blocks (≥ 1)    12  4  u32 into: the lake (mouth 1) or chain (2), else u32::MAX
+16  4  f32 depth at the centre, blocks (≥ 1)    12  4  u32 into: the lake (mouth 1) or chain (2, 3), else u32::MAX
 20  4  f32 q: discharge, m³/s
 ```
 
@@ -1523,6 +1523,12 @@ Chains are consecutive in the vertex array; **segment s** is vertices (s, s + 1)
 one chain. A chain runs downstream from a spring or a lake's outlet (whose first vertex is the lake
 cell feeding it) to its mouth: its last vertex lies in the sea, in lake `into`, or on a vertex of
 chain `into` (a confluence, where the tributary keeps its own width). w never rises along a chain.
+**On a cube world** (format 0.7, mouth 3, SCL-126) a chain that crosses a turning seam of the net
+("The cube world's layout") is cut there into two chains: the first ends with mouth 3 on the seam,
+`into` the second, whose first vertex is the same planet point on the partner edge (the image of the
+crossing under the edge's isometry), with the same w, hw, depth and q. A chain crossing a sliding
+seam (F3|F0, F0|F1, F1|F2, N|F0, S|F0, and F2|F3 across the period) is never cut: its x and z stay
+continuous across it. `tiles_z` is then `3s / tile` from z = −3s/2 and the x fold is the period 4s.
 **The index**: tile (tx, tz) covers x ∈ [−C/2 + tx·tile, …), z ∈ [−Zo + tz·tile, …) ("Grids"); entries
 `offsets[t] … offsets[t+1]` of tile t = tz·tiles_x + tx are the segments, ascending, whose box grown
 by `max(hw_a, hw_b, 0.71) + bank_zone + bank_ratio · max(hw_a, hw_b) + 1` touches it (x folded).
