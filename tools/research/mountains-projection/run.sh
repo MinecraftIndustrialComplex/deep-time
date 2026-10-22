@@ -4,7 +4,7 @@
 # Mountains and the projection (docs/research/notes/mountains-and-the-projection.md): one quick 16k
 # planet simulated once, baked as the Lambert world (the simulation's own frame) and projected to
 # the Petroff-Guyou world the game plays (`deeptime project`), whole-world heightmaps of both, the
-# Moser cube's table, then the measurements and the renders. Research tool, not shipped. Run on the
+# cube maps' tables, then the measurements and the renders. Research tool, not shipped. Run on the
 # test VM, detached; each heavy step goes through the admission tool:
 #
 #   tools/remote/mac.sh -- tools/remote/detach.sh start mp-planet --kind shell:mountains \
@@ -13,8 +13,9 @@
 #       bash tools/research/mountains-projection/run.sh analyse
 #   tools/remote/mac.sh --no-sync --pull review/out/mountains-projection -- true
 #
-# Verbs: planet (build, run, project, heightmaps), cube (the Moser table), analyse (measurements),
-# render (pictures), lem (the metric experiment), all.
+# Verbs: planet (build, run, project, heightmaps), cube (the cube maps' tables), analyse (measurements;
+# MP_OTHERS=dir,dir adds other planets' land for the corner shares, MP_PARTS picks parts), render
+# (pictures; MP_TAUS=0.000,0.500,1.000 picks the cube maps), all. Pass the variables with env.
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 REPO="$(pwd)"
@@ -30,7 +31,7 @@ BIN="$REPO/target/release/deeptime"
 planet() {
     admit cargo:build cargo build --release -q -p deeptime-cli
     rm -rf "$WORK/lambert" "$WORK/pg"
-    admit "sim:earthlike_quick_16k:8t" "$BIN" run --preset earthlike_quick_16k --set scale.projection=lambert \
+    admit "sim:earthlike_quick_16k:8t" "$BIN" run --preset earthlike_quick_16k --start supercontinent --length-myr 1000 --set scale.projection=lambert \
         --threads 8 --out "$WORK/lambert" > "$WORK/lambert.log" 2>&1
     admit shell:project "$BIN" project --world-data "$WORK/lambert" --out "$WORK/pg" > "$WORK/pg.log" 2>&1
     heightmaps
@@ -47,21 +48,16 @@ heightmaps() {
 }
 
 cube() {
-    # The survey's Moser-equalized conformal cube (seamless-projection-survey.md §4) as a 513^2 table.
-    py shell:python "$HERE/cube_table.py" "$WORK/moser-cube-512.npz"
+    # The conformal cube, the Moser cube and the maps between them (cube_table.py), 513^2 tables.
+    py shell:python "$HERE/cube_table.py" "$WORK/cube" 512
 }
 
 analyse() {
-    py shell:python "$HERE/analyse.py" --work "$WORK" --out "$OUT"
+    py shell:python "$HERE/analyse.py" --work "$WORK" --out "$OUT" --bin "$BIN" --others "${MP_OTHERS:-}" ${MP_PARTS:+--parts "$MP_PARTS"}
 }
 
 render() {
-    py shell:python "$HERE/render.py" --work "$WORK" --out "$OUT" --bin "$BIN"
-}
-
-lem() {
-    admit cargo:build cargo build --release -q -p deeptime-cli
-    py shell:python "$HERE/lem.py" --work "$WORK/lem" --out "$OUT" --bin "$BIN"
+    py shell:python "$HERE/render.py" --work "$WORK" --out "$OUT" --bin "$BIN" ${MP_TAUS:+--taus "$MP_TAUS"}
 }
 
 case "${1:-all}" in
@@ -70,7 +66,6 @@ case "${1:-all}" in
     cube) cube ;;
     analyse) analyse ;;
     render) render ;;
-    lem) lem ;;
-    all) planet; cube; analyse; render; lem ;;
+    all) planet; cube; analyse; render ;;
     *) echo "unknown verb $1" >&2; exit 2 ;;
 esac
