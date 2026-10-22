@@ -16,10 +16,10 @@ A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and o
 | [BAK](ledger/BAK.md) | spawn placement | BAK-014 to BAK-016 (3) |
 | [BAK](ledger/BAK.md) | satellite view | BAK-017 to BAK-032 (16) |
 | [BAK](ledger/BAK.md) | synthetic worlds | BAK-033 to BAK-038 (6) |
-| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042, BAK-048, BAK-050, BAK-065 (7) |
+| [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042, BAK-048, BAK-050, BAK-065, BAK-067 (8) |
 | [BAK](ledger/BAK.md) | Distant Horizons curvature | BAK-043 to BAK-047 (5) |
 
-Rows by status: `verified` 2, `cited-unverified` 6, `calibrated` 2, `game-choice` 77, `uncited` 12.
+Rows by status: `verified` 2, `cited-unverified` 6, `calibrated` 2, `game-choice` 78, `uncited` 12.
 
 ## Material for the stage 2 writer
 
@@ -151,7 +151,7 @@ carries plutonic rock to the world's floor where a pluton's layer is the lowest 
 
 Far terrain (P3-04) gives Distant Horizons its distant LODs from the baked world data instead of
 from chunks generated far away. Nothing physical is decided here; the rows (BAK-039 to BAK-042,
-BAK-048, BAK-050 and BAK-065) are game choices about how far terrain stays the same terrain as the chunks.
+BAK-048, BAK-050, BAK-065 and BAK-067) are game choices about how far terrain stays the same terrain as the chunks.
 
 - **The seam.** Every far column folds x into the planet's lap [-C/2, C/2), the period at which
   the world data wraps and at which Toroidal World loops the level, so a section west of x = C/2,
@@ -219,6 +219,30 @@ BAK-048, BAK-050 and BAK-065) are game choices about how far terrain stays the s
   With MIC, before the change 32 of 48 warm-ocean columns had the same block (16 sand where the
   chunk has sandstone) and 47 of 48 in other seas; after it 46 of 46 and 48 of 48 (two chunks
   something else had generated further were not counted); standalone 48 of 48 in both.
+- **Water the rule paints** (BAK-067). A surface rule can paint water in place of the top block:
+  vanilla's paints a swamp's floor water at y 62 (a mangrove swamp's from y 60 to 62) where the
+  `surface_swamp` noise is 0 or more, behind `above_preliminary_surface`, so a swamp at sea level is
+  dotted with one-block pools; Expanded Ecosphere does the same in its swamps, fens, bogs and
+  flooded forests. Far terrain ran only the rule's leading part on dry ground and dropped a fluid it
+  gave, so it drew grass there. The gate batch on master fe61452b met it with Expanded Ecosphere:
+  the planet put the seam in `wythers:flooded_rainforest`, and 7 columns east of it were water at
+  y 62 over dirt in the chunk where far terrain drew dry grass at y 62 (water agreeing in 85 of 92
+  columns, under the test's 95 %). Since 2026-10-22 far terrain asks the level's whole rule, on dry
+  ground and a lake's bed, whether it paints water at the top block: `above_preliminary_surface`
+  as on the sea bed, and `steep` (which on dry ground reads the chunk's heightmap round the column)
+  both ways, the water drawn only where the rule paints it either way. A probe built from the rule's
+  paths to water, with only the conditions on them that read no chunk and the cheapest asked first,
+  keeps the whole rule off every other column. The block is drawn as water with the soil under it
+  one lower, no ice cover (the ice pass leaves a fluid surface alone) and an ice top where the
+  biome freezes, as a lake's; the water a leading rule or the sea bed's run gives is drawn the same
+  way. One exception came out of the sea-bed test: a bank standing at the water beside it is
+  raised again by the bank pass, which reads the painted water as open ground and fills it with the
+  block under it, so there far terrain draws the under-soil on top. With Expanded Ecosphere the
+  seam's east side now agrees on water in 92 of 92 columns and on the top block in 89 (82 before),
+  and after features 96 of 96 on water (89 before); standalone and with MIC no compared column
+  changed. The one flooded-forest column east of the seam that is still dirt in the chunk where far
+  terrain draws grass (y 63) was so before the change. The probe and the rule it lets through cost
+  about 0.25 ms of a 42 ms section at detail 3 and next to nothing at full detail.
 - **Ties in the biome search** (2026-10-21, a game choice). Vanilla's climate search
   (`Climate.RTree.search`) starts from the entry the thread found last and replaces it only with a
   strictly nearer one, so where a climate point is equally near two entries the thread's history

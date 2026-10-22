@@ -288,11 +288,29 @@ public final class PackSurfaceRule {
             if (kept)
                 on.remove(on.size() - 1);
         } else if (r instanceof SurfaceRules.BlockRuleSource b && b.resultState().is(Blocks.WATER)) {
+            // The conditions of a path all hold or the path gives nothing, so they are asked cheapest
+            // first: a biome read through the zoom costs a climate search a column at low detail.
+            List<SurfaceRules.ConditionSource> sorted = new ArrayList<>(on);
+            sorted.sort(java.util.Comparator.comparingInt(PackSurfaceRule::probeCost));
             SurfaceRules.RuleSource path = SurfaceRules.state(WATER);
-            for (int i = on.size() - 1; i >= 0; i--)
-                path = SurfaceRules.ifTrue(on.get(i), path);
+            for (int i = sorted.size() - 1; i >= 0; i--)
+                path = SurfaceRules.ifTrue(sorted.get(i), path);
             out.add(path);
         }
+    }
+
+    /** How dear a chunk-free condition is to ask: the block's height and depth, then noise, then the biome. */
+    private static int probeCost(SurfaceRules.ConditionSource c) {
+        if (c instanceof SurfaceRules.NotConditionSource n)
+            return probeCost(n.target());
+        ResourceLocation key = BuiltInRegistries.MATERIAL_CONDITION.getKey(c.codec().codec());
+        if (key == null)
+            return 3;
+        return switch (key.getPath()) {
+            case "y_above", "stone_depth", "water", "hole" -> 0;
+            case "noise_threshold", "vertical_gradient" -> 1;
+            default -> 2;   // biome, temperature
+        };
     }
 
     /**
