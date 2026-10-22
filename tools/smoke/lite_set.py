@@ -35,6 +35,13 @@ Time's data changes. A jar is kept when one of these names it, and every keep ca
                every kept jar, closed transitively; the client set counts side BOTH and CLIENT, the
                server set BOTH and SERVER.
 
+One veto: profiles/mic-lite.refused names mods the lite set never keeps, each with its reason. A mod that
+hard-depends on another mod without declaring it (Create: Propulsion calls Create Simulated's registrate;
+a boot of the lite set crashes without the Aeronautics bundle) cannot be found by reading
+neoforge.mods.toml, so the boot check that every lite set must pass (tools/smoke/run.py --profile
+mic-lite) is what finds one, and the file is where its answer goes: the mod, and everything only it needed,
+leaves the set, and the output says which ores or biomes that costs.
+
 Everything else is left out, even when it adds its own overworld features. `derive` prints the table
 (and the namespaces that are named but that no jar of this set provides); `apply` moves the jars that
 are not kept to <set dir>/mods-excluded (as tools/smoke/exclude_mods.py does) and records them; with
@@ -58,6 +65,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 PROFILES = os.path.join(HERE, "profiles")
 CORE_FILE = os.path.join(PROFILES, "mic-lite.core")
+REFUSED_FILE = os.path.join(PROFILES, "mic-lite.refused")
 
 # Namespaces whose content every set has (or that are Deep Time's own): never a reason to keep a jar.
 SKIP_NS = {"minecraft", "deeptime", "c", "neoforge", "forge", "fabric", "kubejs"}
@@ -307,6 +315,7 @@ def compat_ids():
 
 
 def read_core(path=CORE_FILE):
+    """One mod id per line, then why; '#' starts a comment. Used for the core and the refused lists."""
     core = OrderedDict()
     if os.path.isfile(path):
         for line in open(path, encoding="utf-8"):
@@ -325,13 +334,24 @@ def dep_applies(side_of_dep, set_side):
     return side_of_dep in ("BOTH", set_side.upper())
 
 
-def derive(mods_dir, side, roots=None, core_path=CORE_FILE):
+def derive(mods_dir, side, roots=None, core_path=CORE_FILE, refused_path=REFUSED_FILE):
     ix = Index(mods_dir)
     why = defaultdict(list)       # jar name -> [(category, text)]
     absent = defaultdict(list)    # namespace -> files that name it, no jar provides it
     warnings = []
+    refused_ids = read_core(refused_path)
+    refused = defaultdict(list)   # jar name -> [what would have kept it]; the jar's reason is in refused_why
+    refused_why = {}
+    for n, j in ix.jars.items():
+        for i in j.own_ids:
+            if i in refused_ids:
+                refused_why[n] = f"{i}: {refused_ids[i]}"
 
     def keep(jar, cat, text):
+        if jar in refused_why:
+            if (cat, text) not in refused[jar]:
+                refused[jar].append((cat, text))
+            return
         if (cat, text) not in why[jar]:
             why[jar].append((cat, text))
 
@@ -411,10 +431,14 @@ def derive(mods_dir, side, roots=None, core_path=CORE_FILE):
                 warnings.append(f"{name} requires {dep}, which no jar of this set provides")
                 continue
             for p in ix.jars_for_id(dep, kept):
+                if p in refused_why:
+                    warnings.append(f"{name} requires {dep}, which {refused_why[p]} (refused; the set may not boot)")
+                    continue
                 if p not in kept:
                     kept.add(p)
                     queue.append(p)
                 keep(p, "requires", f"required by {name} ({owner} -> {dep})")
+    ix.refused = {n: (refused_why[n], refused[n]) for n in refused_why}
     return ix, why, kept, absent, warnings
 
 
@@ -435,6 +459,10 @@ def render(ix, why, kept, absent, warnings, side):
             out.append(f"       {cat}: {text}")
         if len(reasons) > 4:
             out.append(f"       (+{len(reasons) - 4} more reasons)")
+    for name, (reason, wanted) in sorted(getattr(ix, "refused", {}).items()):
+        out.append(f"REFUSED {name}  [{reason}]")
+        for cat, text in wanted[:3]:
+            out.append(f"       it would have been kept: {cat}: {text}")
     if absent:
         out.append("== named but provided by no jar of this set (fine when the pack does not have the mod):")
         for ns, files in sorted(absent.items()):
