@@ -4252,3 +4252,28 @@ planets are changed anyway (the coordinator's call). Both switches are off on th
    surface guard (a cell at -238,024 m against the bound of 237,286 m; flexure.md "The surface
    guard"), so its medians are of 11. No run of the other arms stopped. It happens only with half
    of the crossing crust going down, a setting no preset uses, and was not followed further.
+
+## The transition's width and the drowned continents (2026-10-22)
+
+The full measurement is in sea-level.md, "The continents under the sea and the sea's height at
+the end". For the plate model: the ocean-continent transition's width W (PLT-262) is 200 km on
+the planet, which on the quick 16k planet is 1,632 km on the Earth-sized model sphere the plate
+model runs on, eight times Earth's margins. The taper's continental half (target thickness 20 to
+33 km, `plates/transition.rs`) lies under the 35.1 km at which the median surface crosses the sea,
+so it is under the sea wherever nothing thickened it, and 97 to 100 % of the continental crust
+lies within 100 km (on the planet) of oceanic crust. Twelve runs an arm (`earthlike_quick_16k`,
+seeds 1 to 6, both starts, master df40ce80, `--set tectonics.transition_width_km=...`), medians:
+
+| Median of 12 | W 200 km (master) | W 70 km | W 24.5 km (200 on the model sphere) |
+|---|---|---|---|
+| Continental crust under the sea, final frame (≤ 0.25) | 0.414 | 0.384 (p 0.40) | 0.279 (p 0.002) |
+| The same, the plate model's mean over the frames after the first 100 Myr | 0.362 | 0.281 (p 0.001) | 0.243 (p < 0.001) |
+| Land, final frame (0.26 to 0.32) | 0.247 | 0.253 (p 0.51) | 0.274 (p 0.002) |
+| Largest landmass (≥ 0.12) | 0.104 | 0.080 (p 0.84) | 0.125 (p 0.073) |
+| Continental crust's mean thickness, km | 39.5 | 41.3 (p 0.002) | 42.9 (p < 0.001) |
+| Passive margins: slope between 500 and 2,000 m, median | 2.5° | 2.8° | 3.2° |
+
+W at 70 km falls short on the final frame because its sea climbs through the run (to 741 m over
+the datum over the last 100 Myr): the higher continents shed more sediment, and none subducts. W
+is Ben's decision of 2026-10-05 and was not changed; the recommendation to him is W on the model
+sphere, or the taper in the model's frame and the drawn margin in the planet's.
