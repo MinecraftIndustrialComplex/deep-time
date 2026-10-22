@@ -257,7 +257,7 @@ public final class WorldDataTerrain implements TerrainSource {
                     Magma m = magma(cell, minY, seaLevel);
                     Geothermal g = geothermal(cell, minY, seaLevel);
                     volcanicZones = VolcanicZones.build(wd.volcanoes().list(), g.sites(), m.bodies(), volcanicBiomeRules(),
-                            wd.manifest().mPerBlockH(), wd.circumference());
+                            wd.manifest().mPerBlockH(), wd.circumference(), wd.projection());
                     java.util.Map<VolcanicZones.Role, Long> byRole = new java.util.EnumMap<>(VolcanicZones.Role.class);
                     for (VolcanicZones.Zone zn : volcanicZones.zones())
                         byRole.merge(zn.role(), 1L, Long::sum);
