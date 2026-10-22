@@ -893,6 +893,41 @@ impl CubeTurn {
         }
     }
 
+    /// A free turn: R_z(spin) · R_x(tilt) · R_z(azimuth), planet to cube, on the portable
+    /// functions (the parity fixture's free turn is `from_angles(−71.5, 38, 12)`). Readers take a
+    /// world's rows from its manifest and never recompute them.
+    pub fn from_angles(azimuth_deg: f64, tilt_deg: f64, spin_deg: f64) -> CubeTurn {
+        use crate::portable_math as pm;
+        let rz = |d: f64| {
+            let r = pm::to_radians(d);
+            let (s, c) = (pm::sin(r), pm::cos(r));
+            CubeTurn {
+                m: [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]],
+            }
+        };
+        let rx = |d: f64| {
+            let r = pm::to_radians(d);
+            let (s, c) = (pm::sin(r), pm::cos(r));
+            CubeTurn {
+                m: [[1.0, 0.0, 0.0], [0.0, c, s], [0.0, -s, c]],
+            }
+        };
+        rz(spin_deg).then_after(&rx(tilt_deg).then_after(&rz(azimuth_deg)))
+    }
+
+    /// The product self · first: the turn that applies `first`, then this one (rows planet to
+    /// cube, so `self.then_after(f).to_cube(p)` is `self.to_cube(f.to_cube(p))`).
+    pub fn then_after(&self, first: &CubeTurn) -> CubeTurn {
+        let (a, b) = (&self.m, &first.m);
+        let mut m = [[0.0; 3]; 3];
+        for (i, row) in m.iter_mut().enumerate() {
+            for (j, x) in row.iter_mut().enumerate() {
+                *x = (a[i][0] * b[0][j] + a[i][1] * b[1][j]) + a[i][2] * b[2][j];
+            }
+        }
+        CubeTurn { m }
+    }
+
     /// The rows, planet to cube.
     #[inline]
     pub fn rows(&self) -> [[f64; 3]; 3] {
