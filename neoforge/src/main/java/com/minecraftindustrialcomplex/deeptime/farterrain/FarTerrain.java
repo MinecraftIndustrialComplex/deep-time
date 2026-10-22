@@ -254,15 +254,16 @@ public final class FarTerrain {
                 // a dry floor's top: the lake's bed, grass as dirt (BAK-050); the table's sea bed is deeper.
                 BlockState seaBed = soil.seaBed();
                 // Where the rule paints water in place of the top block (vanilla's swamp water at y 62),
-                // that block is water and the soil under it shows (BAK-067).
+                // that block is water and the soil under it shows (BAK-067); on a bank at the water
+                // beside it the bank pass fills that water with the block under it.
                 boolean painted = false;
                 if (shape.ground >= levelMinY && shape.ground <= levelMaxY
                         && (!shape.water() || shape.kind == Water.Kind.SEA || shape.kind == Water.Kind.LAKE)) {
                     int waterHeight = shape.water() && shape.kind == Water.Kind.SEA ? shape.waterTop + 1 : Integer.MIN_VALUE;
                     packTop = packRule.top(wx, shape.ground, z, waterHeight);
                     if (packTop != null && packTop.is(Blocks.WATER)) {
-                        painted = true;
-                        packTop = null;
+                        painted = !shape.sealed;
+                        packTop = shape.sealed ? soil.under() : null;
                     } else if (packTop == null && waterHeight != Integer.MIN_VALUE && packRule.shallowFloor(wx, shape.ground, z, waterHeight)) {
                         seaBed = soil.lakeBed();
                     }

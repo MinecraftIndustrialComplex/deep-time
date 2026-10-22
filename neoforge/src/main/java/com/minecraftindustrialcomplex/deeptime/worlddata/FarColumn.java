@@ -76,6 +76,12 @@ public final class FarColumn {
         public boolean wideRiver;
         /** Blocks of ice cover ({@link IceCover#blocks}); 0 for none, and never laid under water. */
         public int ice;
+        /**
+         * A bank whose ground is the water's beside it ({@code minGround}): the bank pass fills
+         * whatever is open up to there, so water a surface rule paints in place of its top block
+         * becomes the block under it (WaterBodies, BAK-067).
+         */
+        public boolean sealed;
 
         public boolean water() {
             return kind.isWater() && waterTop > ground;
@@ -160,6 +166,7 @@ public final class FarColumn {
     public static void shape(Water.Column col, int iceBlocks, int minY, int maxY, Shape out) {
         out.kind = col.kind();
         out.wideRiver = false;
+        out.sealed = false;
         int ground = col.ground();
         if (col.kind().isWater()) {
             out.waterTop = col.top();
@@ -174,6 +181,9 @@ public final class FarColumn {
                 ground = col.maxGround();
             if (col.minGround() != null && ground < col.minGround() && col.minGround() <= maxY)
                 ground = col.minGround();
+            // Water painted on the top block leaves the ground one lower when the pass reads it,
+            // below minGround wherever the ground stands at minGround: the pass raises it again.
+            out.sealed = col.minGround() != null && ground == col.minGround() && ground <= maxY;
         }
         out.ground = clampGround(ground, minY, maxY);
         out.ice = out.water() ? 0 : Math.max(0, iceBlocks);
@@ -186,6 +196,7 @@ public final class FarColumn {
     public static void shape(Water.Core core, int iceBlocks, int minY, int maxY, Shape out) {
         out.kind = core.kind();
         out.wideRiver = false;
+        out.sealed = false;
         int ground = core.ground();
         if (core.kind().isWater()) {
             out.waterTop = core.top();
