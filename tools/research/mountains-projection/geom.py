@@ -98,11 +98,14 @@ FACES += [(0, 1.0, survey.N_FRAME), (0, -1.0, survey.S_FRAME)]
 
 
 class Cube:
-    def __init__(self, table_npz, lambda0_deg=0.0):
+    def __init__(self, table_npz, lambda0_deg=0.0, Q=None):
+        """Q, when given, is the rotation planet -> canonical cube frame (any orientation);
+        otherwise the polar aspect turned by lambda0 about the axis."""
         t = np.load(table_npz)
         s, G = t["s"], t["G"]
         self.sps = [RectBivariateSpline(s, s, G[..., i], kx=3, ky=3) for i in range(3)]
         self.lambda0 = lambda0_deg
+        self.Q = np.asarray(Q, float) if Q is not None else rot_z(-lambda0_deg)
         self._ab_tree = None
 
     # --- the face map
@@ -156,8 +159,8 @@ class Cube:
         return k, loc
 
     def canonical(self, p):
-        """Planet unit vectors into the cube's canonical frame (the turn lambda0 about the axis)."""
-        return p @ rot_z(-self.lambda0).T
+        """Planet unit vectors into the cube's canonical frame."""
+        return p @ self.Q.T
 
     # --- the world in face units
     def _tiles(self, X, Y):
@@ -181,28 +184,36 @@ class Cube:
         X = np.where(band, np.mod(X, 4.0), X)
         out = self._tiles(X, Y)
         rem = np.isnan(out[..., 0])
-        for (p0, p1, nn, g) in survey.CUBE_SEAMS:
-            if not rem.any():
-                break
-            p0, p1, nn = np.array(p0, float), np.array(p1, float), np.array(nn, float)
-            t = p1 - p0
-            dX, dY = X - p0[0], Y - p0[1]
-            d = dX * nn[0] + dY * nn[1]
-            tt = (dX * t[0] + dY * t[1]) / (t @ t)
-            m = rem & (d > 0) & (d < 0.5) & (tt >= 0) & (tt <= 1)
-            if m.any():
-                X2, Y2 = g(X[m], Y[m])
+        if rem.any():
+            # A point outside the net goes through the NEAREST seam it lies past (the band wraps,
+            # so X - 4, X and X + 4 are all tried). Taking the first seam whose strip holds the
+            # point sent points beside a cube corner through the wrong edge (a 37 degree jump).
+            Xr, Yr = X[rem], Y[rem]
+            best = np.full(Xr.shape, np.inf)
+            pick = np.full(Xr.shape, -1)
+            shift = np.zeros(Xr.shape)
+            for si, (p0, p1, nn, g) in enumerate(survey.CUBE_SEAMS):
+                p0, p1, nn = np.array(p0, float), np.array(p1, float), np.array(nn, float)
+                t = p1 - p0
+                for sh in (-4.0, 0.0, 4.0):
+                    dX, dY = Xr + sh - p0[0], Yr - p0[1]
+                    d = dX * nn[0] + dY * nn[1]
+                    tt = (dX * t[0] + dY * t[1]) / (t @ t)
+                    m = (d > 0) & (d < 0.5) & (tt >= 0) & (tt <= 1) & (d < best)
+                    best[m], pick[m], shift[m] = d[m], si, sh
+            sub = out[rem]
+            for si, (p0, p1, nn, g) in enumerate(survey.CUBE_SEAMS):
+                m = pick == si
+                if not m.any():
+                    continue
+                X2, Y2 = g(Xr[m] + shift[m], Yr[m])
                 X2 = np.asarray(X2, float)
                 Y2 = np.asarray(Y2, float)
                 b2 = (Y2 >= 0) & (Y2 <= 1)
                 X2 = np.where(b2, np.mod(X2, 4.0), X2)
-                v = self._tiles(X2, Y2)
-                sub = out[m]
-                ok = np.isnan(sub[..., 0])
-                sub[ok] = v[ok]
-                out[m] = sub
-                rem = np.isnan(out[..., 0])
-        return out @ rot_z(self.lambda0).T
+                sub[m] = self._tiles(X2, Y2)
+            out[rem] = sub
+        return out @ self.Q
 
     def forward(self, p):
         """Planet unit vector(s) to world (X, Y) in face units (Newton on the face table)."""

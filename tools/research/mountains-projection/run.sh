@@ -14,7 +14,8 @@
 #   tools/remote/mac.sh --no-sync --pull review/out/mountains-projection -- true
 #
 # Verbs: planet (build, run, project, heightmaps), cube (the cube maps' tables), analyse (measurements;
-# MP_OTHERS=dir,dir adds other planets' land for the corner shares, MP_PARTS picks parts), render
+# MP_OTHERS=dir,dir adds other planets' land for the corner shares, MP_OLD_BIN a binary that reads
+# older worlds, MP_PARTS picks parts), render
 # (pictures; MP_TAUS=0.000,0.500,1.000 picks the cube maps), all. Pass the variables with env.
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
@@ -53,7 +54,7 @@ cube() {
 }
 
 analyse() {
-    py shell:python "$HERE/analyse.py" --work "$WORK" --out "$OUT" --bin "$BIN" --others "${MP_OTHERS:-}" ${MP_PARTS:+--parts "$MP_PARTS"}
+    py shell:python "$HERE/analyse.py" --work "$WORK" --out "$OUT" --bin "$BIN" --others "${MP_OTHERS:-}" --old-bin "${MP_OLD_BIN:-}" ${MP_PARTS:+--parts "$MP_PARTS"}
 }
 
 render() {

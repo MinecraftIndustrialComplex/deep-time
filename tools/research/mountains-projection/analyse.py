@@ -149,6 +149,12 @@ def part_today(L, Lc, P, Pc, sea, mv, r_m, classes, res, out):
                                      "petroff_alone_q50_q90": [round(float(x), 3) for x in np.quantile(srA[m], [0.5, 0.9])],
                                      "lambert_alone_q50": round(float(np.quantile(srL[m], 0.5)), 3),
                                      "sim_texture_q50_q90": [round(float(x), 3) for x in np.quantile(srM[m], [0.5, 0.9])]}
+    m = masks["mountain_1km"]
+    t["exaggeration_mountain_1km"] = {
+        "exaggeration_steepest_direction_q": q(s1[m] / mv, [0.0, 0.05, 0.5, 0.95, 1.0]),
+        "exaggeration_gentlest_direction_q": q(s2[m] / mv, [0.0, 0.05, 0.5, 0.95, 1.0]),
+        "within_place_directions_q": q(srA[m], [0.5, 0.9, 0.99, 1.0]),
+        "all_directions_all_places_max_over_min": round(float(s1[m].max() / s2[m].min()), 4)}
     t["mountain_1km_by_abs_lat"] = bands
     res["today"] = t
     res["mountain_lat_share"] = {f"{lo_}-{hi_}": round(float((m1 & (alat >= lo_) & (alat < hi_)).sum() / max(1, m1.sum())), 4)
@@ -179,39 +185,84 @@ def part_today(L, Lc, P, Pc, sea, mv, r_m, classes, res, out):
 # Part 3: the cube maps
 # ----------------------------------------------------------------------------------------------
 
-def corner_distances(Q, land_tree):
-    """Each canonical corner's angular distance to land (degrees, capped) for rotations Q[n,3,3]
+class Coast:
+    """Land and sea samples of a planet (unit vectors, roughly equal-area). A point's signed
+    distance to the coast, degrees: positive at sea (the distance to the nearest land sample),
+    negative on land (minus the distance to the nearest sea sample); a point is at sea when its
+    nearest sample is sea. Capped at LAND_CAP_DEG as the bake's lambda-c search."""
+
+    def __init__(self, p, land):
+        self.land = cKDTree(p[land])
+        self.sea = cKDTree(p[~land]) if (~land).any() else None
+
+    def signed(self, pts):
+        dl, _ = self.land.query(pts, workers=-1)
+        if self.sea is None:
+            return -np.zeros(len(pts))
+        ds, _ = self.sea.query(pts, workers=-1)
+        return np.minimum(np.where(dl > ds, ang_deg(dl), -ang_deg(ds)), LAND_CAP_DEG)
+
+
+def corner_distances(Q, coast):
+    """Each canonical corner's signed distance to the coast (degrees) for rotations Q[n,3,3]
     planet -> canonical; corner in the planet frame = Q^T c."""
     pts = np.einsum("nji,kj->nki", Q, CORNERS)  # (n, 8, 3): Q^T c
-    d, _ = land_tree.query(pts.reshape(-1, 3), workers=-1)
-    return np.minimum(ang_deg(d), LAND_CAP_DEG).reshape(pts.shape[:2])
+    return coast.signed(pts.reshape(-1, 3)).reshape(pts.shape[:2])
 
 
-def polar_search(land_tree):
+def shares(mn):
+    return {"share_at_sea": round(float((mn > 0).mean()), 4),
+            "share_3deg": round(float((mn >= 3).mean()), 4),
+            "share_5deg": round(float((mn >= 5).mean()), 4),
+            "share_10deg": round(float((mn >= 10).mean()), 4)}
+
+
+def polar_search(coast):
+    """The cube with its north and south faces centred on the poles, turned by lambda0 about the
+    axis (0.25 degree steps over the 90 degree period): as the bake's lambda-c search, maximise the
+    least corner distance, then the sum."""
     lam = np.arange(0, 90, STEP_DEG)
     Q = np.stack([geom.rot_z(-x) for x in lam])
-    D = corner_distances(Q, land_tree)
+    D = corner_distances(Q, coast)
     mn = D.min(1)
     sm = D.sum(1)
     best = int(np.lexsort((-sm, -mn))[0])
     return lam, D, {"lambda0_deg": float(lam[best]), "min_distance_deg": round(float(mn[best]), 2),
-                    "distances_deg": [round(float(x), 2) for x in D[best]],
-                    "share_at_sea": round(float((mn > 0).mean()), 4),
-                    "share_3deg": round(float((mn >= 3).mean()), 4),
-                    "share_5deg": round(float((mn >= 5).mean()), 4),
-                    "share_10deg": round(float((mn >= 10).mean()), 4)}
+                    "distances_deg": [round(float(x), 2) for x in D[best]], **shares(mn)}
 
 
-def free_search(land_tree, n=60000, seed=7):
+def free_search(coast, n=60000, seed=7, keep=24, rounds=120, extra=None):
+    """Any orientation: n random rotations (their shares say how easy it is), then the best `keep`
+    refined by a shrinking random walk (accept a turn that raises the least corner distance)."""
+    rng = np.random.default_rng(seed)
     Q = Rotation.random(n, random_state=seed).as_matrix()
-    D = corner_distances(Q, land_tree)
+    D = corner_distances(Q, coast)
     mn = D.min(1)
-    best = int(np.argmax(mn + 1e-3 * D.sum(1)))
-    return Q[best], {"rotations": n, "best_min_distance_deg": round(float(mn[best]), 2),
-                     "share_at_sea": round(float((mn > 0).mean()), 4),
-                     "share_3deg": round(float((mn >= 3).mean()), 4),
-                     "share_5deg": round(float((mn >= 5).mean()), 4),
-                     "share_10deg": round(float((mn >= 10).mean()), 4)}
+    random_best = float(mn.max())
+    if extra is not None:  # seed the walk with the polar aspect's best too, so free >= polar
+        De = corner_distances(extra[None], coast)
+        Q, D = np.concatenate([extra[None], Q]), np.concatenate([De, D])
+        mn = np.concatenate([De.min(1), mn])
+    top = np.argsort(-(mn + 1e-3 * D.sum(1)))[:keep]
+    Qs, score = Q[top], (mn + 1e-3 * D.sum(1))[top]
+    for r in range(rounds):
+        sig = math.radians(4.0 * (0.03 / 4.0) ** (r / max(1, rounds - 1)))  # 4 degrees down to 0.03
+        tries = 32
+        R = Rotation.from_rotvec(rng.normal(scale=sig, size=(keep * tries, 3))).as_matrix()
+        Qn = np.einsum("nij,njk->nik", np.repeat(Qs, tries, axis=0), R)
+        Dn = corner_distances(Qn, coast)
+        sn = (Dn.min(1) + 1e-3 * Dn.sum(1)).reshape(keep, tries)
+        j = np.argmax(sn, axis=1)
+        better = sn[np.arange(keep), j] > score
+        Qs[better] = Qn.reshape(keep, tries, 3, 3)[np.arange(keep), j][better]
+        score[better] = sn[np.arange(keep), j][better]
+    b = int(np.argmax(score))
+    Db = corner_distances(Qs[b:b + 1], coast)[0]
+    return Qs[b], {"rotations": n, "random_best_min_distance_deg": round(random_best, 2),
+                   "best_min_distance_deg": round(float(Db.min()), 2),
+                   "distances_deg": [round(float(x), 2) for x in Db],
+                   "rotation_planet_to_canonical": [[round(float(x), 6) for x in row] for row in Qs[b]],
+                   **{"random_" + k: v for k, v in shares(mn).items()}}
 
 
 def cube_fields(cube, p, Q=None, block_m=294.6):
@@ -250,19 +301,23 @@ def part_cube(L, Lc, sea, mv, r_m, classes, tables, res, out, others):
     masks = {"planet": np.ones_like(land), "land": land, "mountain_1km": E >= sea + 1000 / mv,
              "mountain_2km": E >= sea + 2000 / mv,
              "orogen_land": land & np.isin(prov, [k for k, v in (classes or {}).items() if v == "Orogen"])}
-    land_tree = cKDTree(p[land])
-    lam, D, polar = polar_search(land_tree)
-    Qfree, free = free_search(land_tree)
+    coast = Coast(p, land)
+    lam, D, polar = polar_search(coast)
+    Qfree, free = free_search(coast, extra=geom.rot_z(-polar["lambda0_deg"]))
     res["corners_this_planet"] = {"polar_aspect": polar, "free_rotation": free}
     np.save(os.path.join(out, "polar-corner-distances.npy"), D)
 
     # Other planets: the same two searches on their land.
     op = {}
-    for name, (lat_o, lon_o, land_o) in others.items():
-        tr = cKDTree(geom.ll2xyz(lat_o[land_o], lon_o[land_o]))
+    other_land = {}
+    for name, (lat_o, lon_o, land_o, chk) in others.items():
+        tr = Coast(geom.ll2xyz(lat_o, lon_o), land_o)
         _, _, pol = polar_search(tr)
-        _, fr = free_search(tr, n=30000)
-        op[name] = {"land_share": round(float(land_o.mean()), 3), "polar_aspect": pol, "free_rotation": fr}
+        Qo, fr = free_search(tr, n=30000, extra=geom.rot_z(-pol["lambda0_deg"]))
+        other_land[name] = (geom.ll2xyz(lat_o[land_o], lon_o[land_o]), Qo)
+        op[name] = {"land_share": round(float(land_o.mean()), 3), "polar_aspect": pol, "free_rotation": fr,
+                    "petroff_cone_check": chk}
+        print("other", name, json.dumps(op[name]), flush=True)
     res["corners_other_planets"] = op
 
     Qpolar = geom.rot_z(-polar["lambda0_deg"])
@@ -293,13 +348,23 @@ def part_cube(L, Lc, sea, mv, r_m, classes, tables, res, out, others):
                 "within_place_directions_q": q(f["shape"][m], [0.5, 0.9, 0.99, 1.0]),
                 "all_directions_all_places_max_over_min": round(float(f["m_hi"][m].max() / f["m_lo"][m].min()), 4),
             }
-            if aspect == "polar":
+            if True:  # how fast the scale changes as a player walks (both placements)
                 idx = np.flatnonzero(m)
                 idx = rng.choice(idx, size=min(40000, idx.size), replace=False)
                 for dist in (256, 1024, 4096):
                     vc = view_change(cube, p[idx], f["k"][idx], Q, r_m, dist)
                     a["exaggeration_mountain_1km"][f"change_within_{dist}_blocks_q"] = q(vc, [0.5, 0.9, 0.99, 1.0])
             entry[aspect] = a
+        # Other planets' land, each with its own best free orientation.
+        ol = {}
+        for name, (pl, Qo) in other_land.items():
+            b = cube_fields(cube, pl, Qo)["bpa"]
+            ol[name] = {"bpa_min": round(float(b.min()), 4), "bpa_p99": round(float(np.quantile(b, 0.99)), 4),
+                        "bpa_max": round(float(b.max()), 4),
+                        "relaxed_factor_max": round(float(max(b.max(), 1 / b.min())), 4)}
+        if ol:
+            entry["other_planets_land_free"] = ol
+            entry["other_planets_land_free_worst_factor"] = max(v["relaxed_factor_max"] for v in ol.values())
         # The whole planet with no placement (the map's own figures; survey §3.1 check).
         fp = cube_fields(cube, p, geom.rot_z(0.0))
         entry["planet_check"] = {"bpa": q(fp["bpa"]), "shape": q(fp["shape"]),
@@ -307,7 +372,8 @@ def part_cube(L, Lc, sea, mv, r_m, classes, tables, res, out, others):
                                  "within_1.5": round(float(((fp["bpa"] <= 1.5) & (fp["bpa"] >= 1 / 1.5)).mean()), 4)}
         # How the worst land bpa grows as the nearest corner comes closer to land (any aspect).
         cube_res[key] = entry
-        print(key, json.dumps(entry["polar"]["mountain_1km"]["bpa"]), flush=True)
+        print(key, "polar", json.dumps(entry["polar"]["mountain_1km"]["bpa"]), flush=True)
+        print(key, "free", json.dumps(entry["free"]["mountain_1km"]["bpa"]), flush=True)
     res["cube_maps"] = cube_res
 
     # bpa and shape as a function of the distance from the nearest corner, per map.
@@ -321,13 +387,16 @@ def part_cube(L, Lc, sea, mv, r_m, classes, tables, res, out, others):
         bpa = (math.pi / 6) / (s1[ok2] * s2[ok2])
         sh = s1[ok2] / s2[ok2]
         rows = {}
+        pa = s1[ok2] * s2[ok2]  # planet area per node (the nodes are equal world areas)
         for lo_ in (0, 2, 3, 5, 8, 10, 15, 20, 30):
             sel = dc >= lo_
             rows[f">={lo_}deg"] = {"bpa_max": round(float(bpa[sel].max()), 4), "bpa_min": round(float(bpa[sel].min()), 4),
-                                   "shape_max": round(float(sh[sel].max()), 4)}
+                                   "shape_max": round(float(sh[sel].max()), 4),
+                                   "world_share_nearer": round(float((~sel).mean()), 4),
+                                   "planet_share_nearer": round(float(pa[~sel].sum() / pa.sum()), 4)}
         prof[f"tau={tau:.3f}"] = rows
     res["cube_by_corner_distance"] = prof
-    return p, land, masks, polar, Qpolar
+    return p, land, masks, {"polar": Qpolar, "free": Qfree}
 
 
 # ----------------------------------------------------------------------------------------------
@@ -396,7 +465,7 @@ def part_other(L, Lc, P, Pc, sea, mv, r_m, manifest, res):
 # Charts
 # ----------------------------------------------------------------------------------------------
 
-def charts(res, out):
+def charts(res, out, aspect="free"):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -404,19 +473,19 @@ def charts(res, out):
     taus = sorted(float(k.split("=")[1]) for k in cm)
     fig, axs = plt.subplots(1, 3, figsize=(15, 4.2))
     for mk, col in (("land", "#4a7"), ("mountain_1km", "#a54")):
-        hi = [cm[f"tau={t:.3f}"]["polar"][mk]["bpa"]["1.0"] for t in taus]
-        lo = [cm[f"tau={t:.3f}"]["polar"][mk]["bpa"]["0.0"] for t in taus]
+        hi = [cm[f"tau={t:.3f}"][aspect][mk]["bpa"]["1.0"] for t in taus]
+        lo = [cm[f"tau={t:.3f}"][aspect][mk]["bpa"]["0.0"] for t in taus]
         axs[0].plot(taus, hi, "-o", color=col, label=f"{mk}: max")
         axs[0].plot(taus, lo, "--o", color=col, label=f"{mk}: min")
-        sh = [cm[f"tau={t:.3f}"]["polar"][mk]["shape"]["1.0"] for t in taus]
-        sm = [cm[f"tau={t:.3f}"]["polar"][mk]["shape"]["0.5"] for t in taus]
+        sh = [cm[f"tau={t:.3f}"][aspect][mk]["shape"]["1.0"] for t in taus]
+        sm = [cm[f"tau={t:.3f}"][aspect][mk]["shape"]["0.5"] for t in taus]
         axs[1].plot(taus, sh, "-o", color=col, label=f"{mk}: max")
         axs[1].plot(taus, sm, "--o", color=col, label=f"{mk}: median")
-        ex = [cm[f"tau={t:.3f}"]["polar"]["exaggeration_mountain_1km"]["between_places_max_over_min"] for t in taus]
-        ew = [cm[f"tau={t:.3f}"]["polar"]["exaggeration_mountain_1km"]["within_place_directions_q"]["0.9"] for t in taus]
+        ex = [cm[f"tau={t:.3f}"][aspect]["exaggeration_mountain_1km"]["between_places_max_over_min"] for t in taus]
+        ew = [cm[f"tau={t:.3f}"][aspect]["exaggeration_mountain_1km"]["within_place_directions_q"]["0.9"] for t in taus]
     axs[2].plot(taus, ex, "-o", color="#a54", label="between places, max/min")
     axs[2].plot(taus, ew, "--o", color="#47a", label="within a place, directions, p90")
-    axs[0].set_title("Blocks per planet area on land (corners at sea)")
+    axs[0].set_title(f"Blocks per planet area on land ({aspect} corners)")
     axs[1].set_title("Shape ratio on land")
     axs[2].set_title("Slope spread on mountain land")
     for ax in axs:
@@ -428,7 +497,7 @@ def charts(res, out):
     plt.close(fig)
 
 
-def net_images(tables, sea, L, Lc, polar, out):
+def net_images(tables, sea, L, Lc, Q, aspect, out):
     """The cube world's cross net for a few maps: land and the blocks-per-planet-area contours."""
     import matplotlib
     matplotlib.use("Agg")
@@ -444,7 +513,7 @@ def net_images(tables, sea, L, Lc, polar, out):
     fig, axs = plt.subplots(1, len(picks), figsize=(6 * len(picks), 4.8))
     axs = np.atleast_1d(axs)
     for ax, path in zip(axs, picks):
-        cube = geom.Cube(path, lambda0_deg=polar["lambda0_deg"])
+        cube = geom.Cube(path, Q=Q)
         tau = float(np.load(path)["tau"])
         Xs = (np.arange(4 * n) + 0.5) / n
         Ys = 2 - (np.arange(3 * n) + 0.5) / n
@@ -459,25 +528,30 @@ def net_images(tables, sea, L, Lc, polar, out):
         col = np.where((e >= sea)[:, None], np.array([0.55, 0.62, 0.42]), np.array([0.62, 0.74, 0.86]))
         col = np.where((e >= sea + 1000 / 35)[:, None], np.array([0.55, 0.45, 0.35]), col)
         img[good] = col
-        f = cube_fields(cube, U[good], None)
+        f = cube_fields(cube, U[good], Q)
         B = np.full(X.shape, np.nan)
         B[good] = f["bpa"]
         ax.imshow(img, extent=(0, 4, -1, 2), origin="upper")
         cs = ax.contour(Xs, Ys, B, levels=[0.8, 0.9, 1.1, 1.25, 1.5, 2.0], colors="k", linewidths=0.6)
         ax.clabel(cs, fontsize=6)
-        ax.set_title(f"tau = {tau:g}: blocks per planet area")
+        ax.set_title(f"tau = {tau:g} ({aspect} corners): blocks per planet area")
         ax.set_xlim(0, 4)
         ax.set_ylim(-1, 2)
         ax.set_aspect("equal")
         ax.axis("off")
     fig.tight_layout()
-    fig.savefig(os.path.join(out, "cube-nets.png"), dpi=110)
+    fig.savefig(os.path.join(out, f"cube-nets-{aspect}.png"), dpi=110)
     plt.close(fig)
 
 
 # ----------------------------------------------------------------------------------------------
 
-def other_planets(dirs, work, bin_):
+def other_planets(dirs, work, bin_, old_bin=None, pg=None):
+    """Land masks (lat, lon, land) of other world-data folders, every 16 blocks. A world this
+    binary cannot read (an older format) is read with old_bin without --scale, when it is a
+    Petroff-Guyou world of this study's hemisphere side: its blocks' lat/lon are this study's
+    Petroff-Guyou world's (pg = (P, Pc, b, lambda_c)) turned by the difference in lambda_c, since
+    lambda_c only turns the planet about its axis (projection.rs PetroffGuyou::new)."""
     out = {}
     for d in dirs:
         d = d.strip()
@@ -498,6 +572,10 @@ def other_planets(dirs, work, bin_):
                 box = f"{-c // 2},{-zr},{c // 2},{zr}"
             r = subprocess.run([bin_, "heightmap", "--world-data", d, f"--box={box}", "--step", "16", "--scale",
                                 "--out", dst], capture_output=True, text=True)
+            if r.returncode != 0 and old_bin and pg and pr.get("kind") == "petroff_guyou" \
+                    and int(pr.get("hemisphere_blocks", 0)) == pg[2] and dom:
+                r = subprocess.run([old_bin, "heightmap", "--world-data", d, f"--box={box}", "--step", "16",
+                                    "--out", dst], capture_output=True, text=True)
             if r.returncode != 0:
                 print(f"other planet {d}: heightmap failed: {r.stderr.strip()[-300:]}", flush=True)
                 continue
@@ -505,11 +583,32 @@ def other_planets(dirs, work, bin_):
         meta = json.load(open(dst + ".json"))
         ch = {n: i for i, n in enumerate(meta["channels"])}
         sea = m["scale"]["sea_level_y"]
-        lat = a[:, :, ch["lat_deg"]].astype(np.float64)
-        lon = a[:, :, ch["lon_deg"]].astype(np.float64)
         E = a[:, :, ch["elevation"]].astype(np.float64)
+        if "lat_deg" in ch:
+            lat = a[:, :, ch["lat_deg"]].astype(np.float64)
+            lon = a[:, :, ch["lon_deg"]].astype(np.float64)
+        else:
+            P, Pc, _, lc0 = pg
+            lat = np.asarray(P[::8, ::8, Pc["lat_deg"]], np.float64)[:E.shape[0], :E.shape[1]]
+            lon = np.asarray(P[::8, ::8, Pc["lon_deg"]], np.float64)[:E.shape[0], :E.shape[1]]
+            lon = lon + (float((m.get("projection") or {})["lambda_c_deg"]) - lc0)
+            if lat.shape != E.shape:
+                print(f"other planet {d}: grid {E.shape} against {lat.shape}, skipped", flush=True)
+                continue
         ok = np.isfinite(lat) & np.isfinite(E)
-        out[name] = (lat[ok], lon[ok], E[ok] >= sea)
+        land = E[ok] >= sea
+        # Check of the lat/lon: Petroff-Guyou's four cone points (lat +-45, lon lambda_c +-90)
+        # against the distances to land the bake recorded for them.
+        chk = None
+        pr = m.get("projection") or {}
+        if pr.get("kind") == "petroff_guyou" and land.any():
+            lc = float(pr["lambda_c_deg"])
+            cones = geom.ll2xyz(np.array([45.0, -45.0, 45.0, -45.0]), np.array([lc + 90, lc + 90, lc - 90, lc - 90]))
+            dd = Coast(geom.ll2xyz(lat[ok], lon[ok]), land).signed(cones)
+            rec = find_key(m.get("notes", {}), "cone_distances_deg")
+            chk = {"ours_deg": sorted(round(float(x), 2) for x in dd),
+                   "bake_recorded_deg": sorted(rec) if rec else None}
+        out[name] = (lat[ok], lon[ok], land, chk)
     return out
 
 
@@ -519,6 +618,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--bin", default="deeptime")
     ap.add_argument("--others", default="")
+    ap.add_argument("--old-bin", default="", help="a deeptime binary that reads older worlds (no --scale needed)")
     ap.add_argument("--parts", default="today,cube,other,charts")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
@@ -541,10 +641,13 @@ def main():
         json.dump(res, open(res_path, "w"), indent=1)
     tables = sorted(glob.glob(os.path.join(a.work, "cube", "cube-tau*.npz")))
     if "cube" in parts:
-        others = other_planets(a.others.split(","), a.work, a.bin) if a.others else {}
-        _, _, _, polar, _ = part_cube(L, Lc, sea, mv, r_m, classes, tables, res, a.out, others)
+        pgp = pgm.get("projection") or {}
+        pg = (P, Pc, int(pgp.get("hemisphere_blocks", 0)), float(pgp.get("lambda_c_deg") or 0.0))
+        others = other_planets(a.others.split(","), a.work, a.bin, a.old_bin, pg) if a.others else {}
+        _, _, _, aspects = part_cube(L, Lc, sea, mv, r_m, classes, tables, res, a.out, others)
         json.dump(res, open(res_path, "w"), indent=1)
-        net_images(tables, sea, L, Lc, polar, a.out)
+        for name, Q in aspects.items():
+            net_images(tables, sea, L, Lc, Q, name, a.out)
     if "other" in parts:
         part_other(L, Lc, P, Pc, sea, mv, r_m, manifest, res)
         json.dump(res, open(res_path, "w"), indent=1)
