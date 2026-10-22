@@ -26,7 +26,9 @@
 #               $DEEPTIME_ROCK_TAGS). The pack on master does not ship these tags (only its deep-time branch
 #               does), so without them every rock class shows its vanilla fallback (ironstone as red
 #               sandstone instead of Create's ochrum). Missing datapack = error, never a silent fallback.
-#   --no-rock-tags    skip it (a pack that ships the tags itself)
+#   --no-rock-tags    skip it (a pack that ships the tags itself). The lite set does: its server folder has
+#               kubejs/data/deeptime (tools/smoke/lite_set.py, rule 3b: KubeJS loads the tags on the server and
+#               in a single-player world alike), so --set lite adds no world datapack unless that folder is missing.
 #   --ops-from DIR    the folder whose ops.json is carried over (default: the folder /etc/default/deeptime-play
 #               serves now), so the operators (Ben) stay operators across a rebuild; --ops-from none skips it
 #   --devmap    also put the internal developer map (devmap/, mod id deeptime_devmap; never in the pack) in
@@ -107,6 +109,8 @@ DEST="$PLAY/$HASH$SUFFIX"
 [ -f "$SET/server/eula.txt" ] && [ -d "$SET/server/mods" ] || { echo "play-stage.sh: no server set at $SET/server (run tools/smoke/install.sh $SMOKE_SET first)" >&2; exit 1; }
 [ -f "$WORLD/deeptime/manifest.json" ] || [ -f "$WORLD/manifest.json" ] || { echo "play-stage.sh: no world data in $WORLD (is the run finished?)" >&2; exit 1; }
 [ ! -e "$DEST" ] || { echo "play-stage.sh: $DEST exists; remove it or pick another --hash" >&2; exit 1; }
+TAGS_BY=""
+if [ "$NO_TAGS" = 0 ] && [ "$SUFFIX" = -lite ] && [ -d "$SET/server/kubejs/data/deeptime/tags" ]; then NO_TAGS=1; TAGS_BY=kubejs; fi
 if [ "$NO_TAGS" = 0 ] && [ ! -f "$TAGS/pack.mcmeta" ]; then
     echo "play-stage.sh: no MIC rock-tag datapack at $TAGS (sync it with 'tools/remote/mac.sh --pack -- true', or pass --rock-tags DIR / --no-rock-tags)" >&2
     exit 1
@@ -180,6 +184,8 @@ if [ "$NO_TAGS" = 0 ]; then
     mkdir -p "$DEST/planet/datapacks"
     cp -R "$TAGS" "$DEST/planet/datapacks/$(basename "$TAGS")"
     echo "== rock tags: $(find "$DEST/planet/datapacks/$(basename "$TAGS")/data" -name '*.json' | wc -l) JSON files from $TAGS in planet/datapacks/$(basename "$TAGS")"
+elif [ "$TAGS_BY" = kubejs ]; then
+    echo "== rock tags: $(find "$DEST/kubejs/data/deeptime" -name '*.json' | wc -l) JSON files in kubejs/data/deeptime (KubeJS loads them; no world datapack)"
 else
     echo "== rock tags: skipped (--no-rock-tags)"
 fi

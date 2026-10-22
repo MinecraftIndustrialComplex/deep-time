@@ -37,7 +37,7 @@ core in tools/smoke/profiles/mic-lite.core) into a SECOND instance, "MIC Deep Ti
 "MIC Deep Time Test", which it never writes. The lite server it must join is /data/ban/play/<hash>-lite
 (play-stage.sh --set lite; the play unit serves one folder at a time, see that script). When the instance does
 not exist yet it is created: instance.cfg (the template's Java and memory settings, a new name and uuid, no
-play time), mmc-pack.json (the same NeoForge), the stage's mods and pack files, and from the template instance
+play time, and JoinServerOnLaunch=false: no lite play server runs by default), mmc-pack.json (the same NeoForge), the stage's mods and pack files, and from the template instance
 Ben's options.txt and config/DistantHorizons.toml. No saves, screenshots or logs. The new folder is built next
 to the instances (a hidden folder with no instance.cfg until the end) and renamed into place, so Prism never
 sees half an instance; nothing else of Prism's is touched. Run again later to update it like the full one.
@@ -61,6 +61,10 @@ TEMPLATE_NAME = "MIC Deep Time Test"
 TEMPLATE_FILES = ("options.txt", "config/DistantHorizons.toml")
 # instance.cfg keys a new instance does not inherit (play time and launch history) and its UI section.
 CFG_RESET = ("lastLaunchTime", "lastTimePlayed", "totalTimePlayed", "name", "uuid")
+# instance.cfg keys a new LITE instance gets instead of the template's (Ben's coordinator, 2026-10-22: no lite
+# play server exists, so the full instance's join-on-launch would show a failed join on every launch). Only a
+# new instance is seeded with them: a later apply never rewrites instance.cfg, so a change of Ben's stays.
+LITE_CFG = {"JoinServerOnLaunch": "false"}
 # Files of the instance that the pack also ships as defaults (the pack's options.txt) and the player owns.
 KEEP = {"options.txt", "servers.dat", "optionsof.txt", "optionsshaders.txt"}
 SSH = "/run/current-system/sw/bin/ssh"
@@ -76,9 +80,9 @@ def rsync(args, dry):
     subprocess.run(cmd, check=True)
 
 
-def new_instance_cfg(template_cfg, name):
+def new_instance_cfg(template_cfg, name, overrides=None):
     """instance.cfg text for a new instance: the template's [General] keys (Java, memory, join-on-launch), a
-    new name and uuid, no launch history, no [UI] section."""
+    new name and uuid, no launch history, no [UI] section; overrides (key -> value) replace or add keys."""
     out, section = [], None
     for line in open(template_cfg).read().splitlines():
         if line.startswith("["):
@@ -88,9 +92,11 @@ def new_instance_cfg(template_cfg, name):
             continue
         if section != "[General]" or not line.strip():
             continue
-        if line.split("=", 1)[0] in CFG_RESET:
+        key = line.split("=", 1)[0]
+        if key in CFG_RESET or key in (overrides or {}):
             continue
         out.append(line)
+    out += [f"{k}={v}" for k, v in (overrides or {}).items()]
     out += [f"name={name}", f"uuid={uuid.uuid4().hex}"]
     return "\n".join(out) + "\n"
 
@@ -101,7 +107,7 @@ def seed_instance(root, template_root, name):
     mc = os.path.join(root, "minecraft")
     os.makedirs(mc)
     with open(os.path.join(root, "instance.cfg"), "w") as f:
-        f.write(new_instance_cfg(os.path.join(template_root, "instance.cfg"), name))
+        f.write(new_instance_cfg(os.path.join(template_root, "instance.cfg"), name, LITE_CFG))
     shutil.copy2(os.path.join(template_root, "mmc-pack.json"), os.path.join(root, "mmc-pack.json"))
     with open(os.path.join(mc, "packwiz.json"), "w") as f:
         json.dump({"cachedFiles": {}}, f)

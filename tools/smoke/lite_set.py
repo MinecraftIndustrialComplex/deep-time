@@ -24,6 +24,11 @@ Time's data changes. A jar is kept when one of these names it, and every keep ca
                add (data/<ns>/tags/<kind>/**), followed through nested tags, name their jars too.
   3. jar-data  a jar that ships Deep Time data of its own (data/deeptime/** or data/<ns>/deeptime/**), or
                a pack extension of its tables.
+  3b. loader   KubeJS, when the MIC rock-tag datapack is in play: the pack gives a new single-player world
+               its rock tags through KubeJS (kubejs/data/deeptime is a global datapack on the client and the
+               server), and a world has no datapack of its own. KubeJS, Rhino and Architectury (the
+               requires rule) stay, and `apply` ships only the datapack's data/deeptime/ as
+               kubejs/data/deeptime (the pack's own copy when it has one), none of the pack's scripts.
   4. compat    Deep Time gates generation on a mod: the packages under mixin/compat/ of the mod
                (createoreexcavation, createdieselgenerators, ...) are named by mod id.
   5. router    a jar that overrides vanilla's overworld router or biome list (data/minecraft/worldgen/
@@ -55,6 +60,7 @@ namespaces and Deep Time hooks (a development aid for this rule set).
 Nothing here is heavy but it reads every jar: run it on the test VM (tools/remote/mac.sh), not the laptop.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -82,6 +88,10 @@ RESOURCE = re.compile(r"^(#?)([a-z0-9_.-]+):([a-z0-9_./-]+)$")
 PLATFORM = {"minecraft", "neoforge", "forge", "fml", "javafml", "lowcodefml", "java"}
 TAG_KINDS = ("block", "worldgen/biome", "fluid", "item", "entity_type")
 ROUTER_DIRS = ("noise_settings", "density_function", "noise", "multi_noise_biome_source_parameter_list")
+# The MIC rock-tag datapack's label in the roots, and the mod that loads its data/deeptime/ from kubejs/data.
+TAGS_LABEL = "MIC rock tags"
+LOADER_ID = "kubejs"
+LOADER_KEEP = "kubejs/data/deeptime/"
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +310,7 @@ def default_roots():
     tags = os.environ.get("DEEPTIME_ROCK_TAGS") or os.path.join(REPO, "../../Docs/datapacks/deeptime-mic-rock-tags")
     tags = os.path.normpath(tags)
     if os.path.isdir(tags):
-        roots.append(("MIC rock tags", tags))
+        roots.append((TAGS_LABEL, tags))
     elif os.environ.get("DEEPTIME_LITE_NO_ROCK_TAGS") == "1":
         print(f"   lite_set: no MIC rock-tag datapack at {tags}; DEEPTIME_LITE_NO_ROCK_TAGS=1, so the mods "
               "its blocks name are not counted", file=sys.stderr)
@@ -360,7 +370,10 @@ def derive(mods_dir, side, roots=None, core_path=CORE_FILE, refused_path=REFUSED
 
     # 1 and 2: names and tag members.
     refs = defaultdict(list)
+    ix.tag_pack, ix.loader_jars = None, []
     for label, root in (roots if roots is not None else default_roots()):
+        if label == TAGS_LABEL:
+            ix.tag_pack = root
         for k, files in scan_root(root, label).items():
             refs[k].extend(files)
     tag_requests = defaultdict(list)   # (ns, path) -> files
@@ -403,6 +416,15 @@ def derive(mods_dir, side, roots=None, core_path=CORE_FILE, refused_path=REFUSED
     for j in ix.jars.values():
         if j.deeptime_data:
             keep(j.name, "jar-data", f"ships Deep Time data ({j.deeptime_data[0]}" + (f", +{len(j.deeptime_data) - 1}" if len(j.deeptime_data) > 1 else "") + ")")
+    # 3b: the loader of the rock tags (see the module docstring).
+    tag_dir = os.path.join(ix.tag_pack, "data", "deeptime") if ix.tag_pack else None
+    if tag_dir and os.path.isdir(tag_dir):
+        n_tags = sum(f.endswith(".json") for _, _, fs in os.walk(tag_dir) for f in fs)
+        for jar in ix.jars_for_id(LOADER_ID):
+            ix.loader_jars.append(jar)
+            keep(jar, "loader", f"loads the MIC rock tags: the datapack's data/deeptime/ ({n_tags} files) ships as "
+                 "kubejs/data/deeptime, a global datapack, so a new single-player world gets the tags a world datapack "
+                 "gives a server world")
     # 4: compat mixin packages.
     for mod in compat_ids():
         for jar in ix.jars_for_id(mod):
@@ -449,7 +471,7 @@ def derive(mods_dir, side, roots=None, core_path=CORE_FILE, refused_path=REFUSED
     return ix, why, kept, absent, warnings
 
 
-CATEGORY_ORDER = ["named", "tag-member", "jar-data", "compat", "router", "core", "requires"]
+CATEGORY_ORDER = ["named", "tag-member", "jar-data", "loader", "compat", "router", "core", "requires"]
 
 
 def render(ix, why, kept, absent, warnings, side):
@@ -497,8 +519,9 @@ def keep_file_text(ix, why, kept, side):
 # apply
 # ---------------------------------------------------------------------------
 # Pack files a lite client stage carries: root files and the pack's config of mods that stay. Everything
-# under kubejs/, scripts/ and resourcepacks/ belongs to mods the lite set leaves out (KubeJS itself,
-# the radio and weather packs), so those folders go. A config file is attributed to the mod whose id is
+# under kubejs/, scripts/ and resourcepacks/ belongs to mods the lite set leaves out (the pack's KubeJS
+# scripts, the radio and weather packs), so those folders go; the one exception is kubejs/data/deeptime/,
+# the rock tags, when KubeJS stays as their loader (rule 3b). A config file is attributed to the mod whose id is
 # its longest prefix (create-client.toml: create, createbigcannons-client.toml: createbigcannons);
 # it goes when that mod is left out or no mod claims it (the config of a server-only or already excluded
 # mod: gravestone, rctmod), and stays when a kept mod claims it; NeoForge's own files stay.
@@ -524,6 +547,57 @@ def claimed_by(rel, all_ids):
     return best
 
 
+def rmtree_except(base, keep):
+    """Removes everything under base except the folder keep (inside it) and the folders leading to it."""
+    keep = os.path.abspath(keep)
+    inside = keep + os.sep
+    for root, dirs, files in os.walk(base, topdown=False):
+        for f in files:
+            p = os.path.abspath(os.path.join(root, f))
+            if not p.startswith(inside):
+                os.remove(p)
+        for d in dirs:
+            p = os.path.abspath(os.path.join(root, d))
+            if p != keep and not keep.startswith(p + os.sep) and not p.startswith(inside):
+                shutil.rmtree(p, ignore_errors=True)
+
+
+def ship_rock_tags(set_dir, ix, kept):
+    """Rule 3b: the rock-tag datapack's data/deeptime/ becomes <set>/kubejs/data/deeptime (unless the stage has
+    the pack's own copy there) and is recorded in packwiz.json, so a client apply carries it. Returns a
+    sentence for the log, or None when KubeJS is not a kept loader."""
+    if not any(n in kept for n in ix.loader_jars):
+        return None
+    src = os.path.join(ix.tag_pack, "data", "deeptime")
+    dest = os.path.join(set_dir, LOADER_KEEP.rstrip("/"))
+    own = [f for _, _, fs in os.walk(dest) for f in fs if f.endswith(".json")] if os.path.isdir(dest) else []
+    if own:
+        text = f"kubejs/data/deeptime: the pack's own {len(own)} files stay"
+    else:
+        for root, _, fs in os.walk(src):
+            for f in fs:
+                if f.endswith(".json"):
+                    to = os.path.join(dest, os.path.relpath(os.path.join(root, f), src))
+                    os.makedirs(os.path.dirname(to), exist_ok=True)
+                    shutil.copy2(os.path.join(root, f), to)
+        text = f"kubejs/data/deeptime: the rock tags of {ix.tag_pack} (the pack ships none there)"
+    pw = os.path.join(set_dir, "packwiz.json")
+    if os.path.isfile(pw):
+        doc = json.load(open(pw))
+        cached = doc.setdefault("cachedFiles", {})
+        n = 0
+        for root, _, fs in os.walk(dest):
+            for f in fs:
+                path = os.path.join(root, f)
+                rel = os.path.relpath(path, set_dir).replace(os.sep, "/")
+                digest = hashlib.sha256(open(path, "rb").read()).hexdigest()
+                cached[rel] = {"hash": {"type": "sha256", "value": digest}, "cachedLocation": rel, "optionValue": True}
+                n += 1
+        json.dump(doc, open(pw, "w"))
+        text += f"; {n} files recorded in packwiz.json"
+    return text
+
+
 def prune_files(set_dir, ix, kept):
     kept_ids = {i for n in kept for i in ix.jars[n].mod_ids}
     all_ids = {i for j in ix.jars.values() for i in j.mod_ids}
@@ -538,11 +612,13 @@ def prune_files(set_dir, ix, kept):
         cached = doc.get("cachedFiles", {})
     else:
         doc = None
+    loader = bool(ix.loader_jars) and any(n in kept for n in ix.loader_jars)
+    keep_prefix = (LOADER_KEEP,) if loader else ()
     for key in list(cached):
         loc = cached[key].get("cachedLocation") or key
         if loc.startswith("mods/"):
             continue
-        drop = loc.startswith(PRUNE_DIRS)
+        drop = loc.startswith(PRUNE_DIRS) and not loc.startswith(keep_prefix)
         if loc.startswith(CONFIG_DIRS):
             owner = claimed_by(loc, all_ids)
             keeps = owner in kept_ids or loc.split("/", 1)[1].lower().startswith(CONFIG_ALWAYS)
@@ -555,7 +631,11 @@ def prune_files(set_dir, ix, kept):
         if os.path.isfile(p):
             os.remove(p)
     for top in PRUNE_DIRS:
-        shutil.rmtree(os.path.join(set_dir, top.rstrip("/")), ignore_errors=True)
+        base = os.path.join(set_dir, top.rstrip("/"))
+        if loader and top == "kubejs/":
+            rmtree_except(base, os.path.join(set_dir, LOADER_KEEP.rstrip("/")))
+        else:
+            shutil.rmtree(base, ignore_errors=True)
     if doc is not None:
         doc["cachedFiles"] = cached
         recorded = len(cached)
@@ -587,7 +667,10 @@ def apply(set_dir, side, excluded_txt, why_txt, prune, core_path=CORE_FILE):
     print(f"== moved {len(drop)} jar(s) to {out}; {len(kept)} stay in {mods}")
     if prune:
         removed, left = prune_files(set_dir, ix, kept)
-        print(f"== pack files: {len(removed)} dropped (kubejs/, scripts/, resourcepacks/ and the config of left-out mods), {left} recorded in packwiz.json")
+        print(f"== pack files: {len(removed)} dropped (kubejs/ but its rock tags, scripts/, resourcepacks/ and the config of left-out mods), {left} recorded in packwiz.json")
+    shipped = ship_rock_tags(set_dir, ix, kept)
+    if shipped:
+        print(f"== rock tags (KubeJS loads them): {shipped}")
 
 
 def compare(full_dir, lite_dir, side):
