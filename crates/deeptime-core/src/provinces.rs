@@ -515,6 +515,21 @@ fn cells(world: &WorldState, r: &Rules) -> Option<(Vec<Option<Cell>>, Option<f32
     let orogeny = get("plates/orogeny_type");
     let orogeny_age = get("plates/orogeny_age_myr");
     let elevation = get("surface/elevation_m").or_else(|| get("plates/elevation_m"));
+    // The elevations are the model's frame; a cell's height is above the sea: the surface's (the
+    // bake's), else the climate's, else the plate model's datum (a plates-only run has no other).
+    let sea = world
+        .surface
+        .as_ref()
+        .map(|s| s.sea_level_m)
+        .filter(|z| z.is_finite())
+        .or_else(|| {
+            world
+                .globals
+                .get(crate::climate::SEA_LEVEL_GLOBAL)
+                .copied()
+                .filter(|z| z.is_finite())
+        })
+        .unwrap_or(0.0) as f32;
     let thick = get("plates/thickness_m");
     let uplift = get("plates/uplift_mm_yr");
     let sediment_pool = get("plates/pool/sediment_m");
@@ -548,7 +563,7 @@ fn cells(world: &WorldState, r: &Rules) -> Option<(Vec<Option<Cell>>, Option<f32
                 age_myr: age[c],
                 orogeny: at(orogeny, c).round().max(0.0) as u8,
                 orogeny_age_myr: at(orogeny_age, c),
-                elevation_m: at(elevation, c),
+                elevation_m: at(elevation, c) - sea,
                 thickness_m: at(thick, c),
                 cover_m: cover,
                 subsidence_mm_yr: -at(uplift, c),

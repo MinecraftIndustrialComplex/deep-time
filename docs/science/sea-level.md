@@ -471,7 +471,13 @@ sixteenth of the planet's width of the seam 0.026 → 0.053 of that band.
   much crust as the moving one, and a sea pinned at 0 loses what master does with GDH1 on or off:
   about 0.026 of the planet more over 1,000 Myr off the datum, in either direction, which points
   at code that still reads 0 as the sea. The tenure's fall is inside master's own spread between
-  seeds (126 Myr on seeds 1 to 3, 46 on seeds 4 to 6).
+  seeds (126 Myr on seeds 1 to 3, 46 on seeds 4 to 6). Followed up (plates.md, "The sea off the
+  datum", twelve runs an arm on seeds 1 to 6): the plate model's readers of 0 as the sea now read
+  the sea (the column energy, the wedge floor, the Andean mark, the measurement), and none moves
+  the crust; a sea held at the datum loses as much as the moving one (net −0.099 of the planet
+  against −0.095, p 0.69), so the 0.026 was seeds 1 to 3's draw. What the sea's height does is
+  drown the continents: held at the datum, 0.235 of the continental crust is under it, against
+  0.348 under the moving sea.
 - For Ben: with the flexure's GDH1 water left out (ISO-088) the Earth-like planets hold Earth's
   water with land 0.268 of the planet and 0.373 of the continental crust under the sea, against
   Earth's 0.29 and about 0.19 ("The flexure's water over GDH1's floor"). The water amount stays

@@ -1720,7 +1720,7 @@ fn arc_cones_are_counted_inside_the_arc_rate() {
     let run = |cone_m: f64| {
         let mut s2 = st.clone();
         let mut cones = vec![[cone_m, 0.0]; n];
-        let pull = subduction::fronts_and_uplift(&mut s2, &geo, &pos, &env, &mut cones);
+        let pull = subduction::fronts_and_uplift(&mut s2, &geo, &pos, &env, &mut cones, 0.0);
         (pull, cones)
     };
     let (bare, _) = run(0.0);
@@ -1795,7 +1795,7 @@ fn a_cordillera_takes_its_crust_from_behind_the_range() {
     let (st, geo, pos) = converging_plates(&p, &env0);
     let mut flat = st.clone();
     let mut cones = vec![[0.0; 2]; st.samples.len()];
-    subduction::fronts_and_uplift(&mut flat, &geo, &pos, &env0, &mut cones);
+    subduction::fronts_and_uplift(&mut flat, &geo, &pos, &env0, &mut cones, 0.0);
     p.tectonics.cordillera_shortening_mm_yr = 6.0;
     let env = stage.env(&p.tectonics, 1);
     let total = |st: &PlateState| -> f64 {
@@ -1805,7 +1805,7 @@ fn a_cordillera_takes_its_crust_from_behind_the_range() {
             .sum()
     };
     let mut s2 = st.clone();
-    let pull = subduction::fronts_and_uplift(&mut s2, &geo, &pos, &env, &mut cones);
+    let pull = subduction::fronts_and_uplift(&mut s2, &geo, &pos, &env, &mut cones, 0.0);
     assert!(pull.cordillera_km3 > 0.0, "no cordillera");
     let area = env.norm.sample_area_km2();
     let added = (total(&s2) - total(&st)) * area / 1000.0;
