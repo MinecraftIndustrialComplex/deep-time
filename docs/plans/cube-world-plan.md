@@ -820,6 +820,14 @@ Petroff-Guyou kind. Each line below is a place to change, grouped into work item
     `synth`.
 
   Check: `./gametest.sh` and `./gametest.sh -PwithMic` pass in the coordinator's merge batch.
+- **G16. Lava flows across seams** (fix 8's `worldgen/LavaFlows.java`). A flow's step to the next
+  column, its reach box and its grid keys go through the cube's fold (W2) in place of the x-only
+  `wrap`/`delta`, so a flow that reaches a seam carries on onto the partner face, turned. The metric
+  comes from the map slot's Jacobian (M3) through `WorldProjection`.
+
+  Check: `LavaFlowsTest` gains a flow started a few blocks from each kind of seam (slide, quarter
+  turn, half turn) whose painted columns match on both sides; far terrain paints what the chunks
+  paint across a seam.
 
 ## 5. The wrap engine
 
@@ -974,7 +982,7 @@ part of done"):
 2. **Phase 1: the bake on the cube from today's simulation.** B1 to B10.
    Gate: earthlike_quick_16k and `planet_world_4k` baked to cubes on the VM. B1 to B8's checks pass,
    and D10's review page is published.
-3. **Phase 2: the game on the cube.** G1 to G15, W3 to W5, and the deletions of section 7.4.
+3. **Phase 2: the game on the cube.** G1 to G16, W3 to W5, and the deletions of section 7.4.
    Gate:
    - cargo and Gradle pass;
    - the coordinator's GameTest batch (standalone and `-PwithMic`) passes;
@@ -1078,10 +1086,12 @@ Each lane takes its own ledger id range so concurrent agents do not collide.
   `surface/amplify/volcano.rs`, `volcanoes/shape.rs` and `underground.rs`, on the simulation's
   raster. The bake resamples it like everything else, so phases 0 to 3 do not touch it. In phase 4
   its shape code takes the cube's metric (cone radius in metres per cell, not block metric).
-- **Fix 8, lava-flow paint** (`worktree-agent-a221f5181dfc5a4b5`). It has only a STATUS line so far,
-  with VOL-090 onward reserved. Recommendation for the coordinator: paint on the simulation's
-  raster, not in `bake/project.rs`. Then it carries over through the resample and phase 1 does not
-  have to redo it.
+- **Fix 8, lava-flow paint** (`worktree-agent-a221f5181dfc5a4b5`). This plan first recommended
+  painting on the simulation's raster. By the time it was read, fix 8 was built in the game instead:
+  `worldgen/LavaFlows.java` traces flows downhill on the drawn heightfield at chunk time, steps in
+  true metres through `WorldProjection`'s metric, and wraps x in one `wrap`/`delta` pair. The
+  coordinator's call (2026-10-22): it lands as built and ships on the D5 world, and G16 ports its walk
+  to the cube.
 - **The projection study** (`worktree-agent-a996493d601a564e5`). It picks τ. Its `cube_table.py`
   becomes M1, and its numbers fill SCL-080 and SCL-081, D1 and the table in section 1.6. Phase 0
   does not wait for it (see phase 0).
