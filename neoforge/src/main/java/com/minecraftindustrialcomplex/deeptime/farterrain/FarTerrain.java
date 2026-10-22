@@ -47,7 +47,8 @@ import java.util.Optional;
  *       ground, as vanilla's {@code freeze_top_layer} lays them); the top block of dry ground, of
  *       the sea bed and of a lake's bed from the level's own surface rule wherever the part of it
  *       that reads no chunk decides it ({@link PackSurfaceRule}: Expanded Ecosphere's coral and sand
- *       at y 58 to 62), and a sea bed in vanilla's shallow band drawn as a lake's bed (BAK-050);</li>
+ *       at y 58 to 62), a sea bed in vanilla's shallow band drawn as a lake's bed (BAK-050), and water
+ *       in place of the top block where the whole rule paints it there (vanilla's swamp water, BAK-067);</li>
  *   <li><b>the blocks</b>: rock classes through the {@link RockPalette} with the strata pass's
  *       member choice ({@link StrataPass#horizonKey}), so a bed is the same block far and near.</li>
  * </ul>
@@ -252,12 +253,19 @@ public final class FarTerrain {
                 // Where the table stands in, a sea bed in vanilla's shallow band is painted as under
                 // a dry floor's top: the lake's bed, grass as dirt (BAK-050); the table's sea bed is deeper.
                 BlockState seaBed = soil.seaBed();
+                // Where the rule paints water in place of the top block (vanilla's swamp water at y 62),
+                // that block is water and the soil under it shows (BAK-067).
+                boolean painted = false;
                 if (shape.ground >= levelMinY && shape.ground <= levelMaxY
                         && (!shape.water() || shape.kind == Water.Kind.SEA || shape.kind == Water.Kind.LAKE)) {
                     int waterHeight = shape.water() && shape.kind == Water.Kind.SEA ? shape.waterTop + 1 : Integer.MIN_VALUE;
                     packTop = packRule.top(wx, shape.ground, z, waterHeight);
-                    if (packTop == null && waterHeight != Integer.MIN_VALUE && packRule.shallowFloor(wx, shape.ground, z, waterHeight))
+                    if (packTop != null && packTop.is(Blocks.WATER)) {
+                        painted = true;
+                        packTop = null;
+                    } else if (packTop == null && waterHeight != Integer.MIN_VALUE && packRule.shallowFloor(wx, shape.ground, z, waterHeight)) {
                         seaBed = soil.lakeBed();
+                    }
                 }
                 boolean bare = soil.bare();
                 int depth = soil.depth();
@@ -271,6 +279,7 @@ public final class FarTerrain {
                 s.soil.depth = depth;
                 s.soil.bare = bare;
                 s.soil.frozen = topY < spec.maxY() && biome.value().coldEnoughToSnow(s.pos.set(wx, topY + 1, z));
+                s.soil.paintedWater = painted;
 
                 int exposure = FarColumn.exposure(s.shapes, n, i, j);
                 int rockDepth = Math.min(MAX_ROCK_DEPTH, exposure + ROCK_MARGIN);
@@ -290,7 +299,8 @@ public final class FarTerrain {
                 // exposed side counts as open (the renderer lights a side from the air beside it).
                 int topSolid = layers.topSolid();
                 int openFrom = shape.ground - exposure;
-                int waterDepth = shape.water() ? Math.min(shape.waterTop, spec.maxY()) - shape.ground : 0;
+                int waterDepth = (shape.water() ? Math.min(shape.waterTop, spec.maxY()) - shape.ground : 0)
+                        + (painted ? 1 : 0);
                 for (int k = 0; k < layers.count; k++) {
                     s.blocks[k] = block(layers, k, soil, packTop, seaBed, cover, rocks);
                     int light;
