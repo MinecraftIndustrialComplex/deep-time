@@ -27,6 +27,15 @@ Each node stores the planet point in gnomonic coordinates of the face frame (a, 
 z / x) with x along the face centre. A second table over the gnomonic triangle 0 <= b <= a <= 1
 holds the (u, v) whose bicubic forward is that point: the inverse's start.
 
+The corner patch (the conformal cube only; ledger SCL-104). The conformal map behaves like
+(z - z_corner)^(4/3) at a cube corner, so the bicubic is only O(h^(4/3)) accurate in the cells
+next to it (3.3e-5 rad, 0.17 blocks at 32k, at m = 256, against 1e-8 rad elsewhere). A finer table
+of the same kind covers the square of the last K coarse cells at the corner, F fine cells to a
+coarse cell, with its ghost nodes stored (the edge mirror and the corner extrapolation, the coarse
+table's rules). The forward is the fine bicubic within K - 1 coarse cells of the corner, the
+coarse one beyond K, and between them coarse + s (fine - coarse) with s = w^2 (3 - 2 w), w the
+Chebyshev distance inward from K cells, in coarse cells: continuous with a continuous Jacobian.
+
 The table file (crates/deeptime-format/data/cube-map-<name>.bin), little-endian:
 
   offset  size  field
@@ -36,15 +45,20 @@ The table file (crates/deeptime-format/data/cube-map-<name>.bin), little-endian:
       12     4  u32 q: inverse cells along the gnomonic triangle's side
       16     8  f64 tau
       24     4  u32 flow steps (the RK4 steps of the whole flow, t from 0 to 1)
-      28     4  u32 reserved (0)
-      32    32  name, ASCII, NUL padded
-      64    40  generator commit, ASCII hex, NUL padded
-     104        forward nodes: for i in 0..=m, for j in 0..=i: a, b (f64)
+      28     4  u32 K: corner patch, coarse cells from the corner it covers (0: no patch)
+      32     4  u32 F: corner patch, fine cells to a coarse cell (0 when K is 0)
+      36     4  u32 reserved (0)
+      40    32  name, ASCII, NUL padded
+      72    40  generator commit, ASCII hex, NUL padded
+     112        forward nodes: for i in 0..=m, for j in 0..=i: a, b (f64)
                 inverse nodes: for k in 0..=q, for l in 0..=k: u, v (f64)
+                patch nodes (n = K F): for i in -1..=n+1, for j in -1..=i: a, b (f64), node (i, j)
+                at u = 1 - K / m + i / (m F), v likewise; i = n + 1 and (n + 1, n) are ghosts
 
 and <file>.sha256 beside it (sha256sum format). Readers: Rust deeptime_format::cube_map, Java
 worlddata/CubeMap, JS DTCubeMap in projection.js; FORMAT.md "The cube map table".
 
+    cube_map.py generate --m 256 --q 128 --tau 0 --name conformal-n513 --commit <hash> --out DIR
     cube_map.py generate --m 256 --q 128 --tau 1 --name moser-t1-n513 --commit <hash> --out DIR
 """
 
@@ -63,7 +77,7 @@ from scipy.spatial import cKDTree
 
 MAGIC = b"DTCM"
 LAYOUT_VERSION = 1
-HEADER_BYTES = 104
+HEADER_BYTES = 112
 
 # ---------------------------------------------------------------------------------------------
 # The conformal cube by Schwarz triangle functions (copied from the survey's conformal.py, the
@@ -153,11 +167,14 @@ def conformal_triangle(x, y):
     sig, zt = S.scale(t)
     zt = zt.reshape(x.shape)
     sig = sig.reshape(x.shape)
+    # the edge midpoint (t = 1, the other singular point of the hypergeometric) likewise
+    midpoint = (np.abs(x - 1) < 1e-9) & (y == 0)
     zt = np.where(corner, math.tan(CUBE_D02 / 2) * np.exp(1j * math.pi * CUBE_SPHERE[0]), zt)
+    zt = np.where(midpoint, math.tan(CUBE_D01 / 2) + 0j, zt)
     zt = np.where((x == 0) & (y == 0), 0j, zt)
     if not np.all(np.isfinite(zt)):
         raise RuntimeError("conformal_triangle: non-finite points")
-    err = np.where(corner.ravel(), 0.0, err)  # the corner is placed, not inverted
+    err = np.where((corner | midpoint).ravel(), 0.0, err)  # placed, not inverted
     if os.environ.get("CM_DEBUG"):
         o = np.argsort(-np.nan_to_num(err, nan=np.inf))[:5]
         print("conformal_triangle worst:", [(float(x.ravel()[k]), float(y.ravel()[k]), float(err[k])) for k in o],
@@ -211,12 +228,9 @@ def quadrant_from_triangle(q):
     return out
 
 
-def build(m, tau, steps=400):
-    """The forward table on the triangle: a, b at nodes (i / m, j / m), 0 <= j <= i <= m, as two
-    (m + 1) x (m + 1) arrays (entries with j > i unused)."""
-    k_stop = round(tau * steps)
-    if abs(k_stop - tau * steps) > 1e-9:
-        raise ValueError(f"tau {tau} is not a whole number of the {steps} flow steps")
+def flow_field(m):
+    """Moser's flow on the face: the velocity (X, Y, t) -> (dX, dY) and the Schwarz Newton error of
+    the density it was built from."""
     n = 2 * m  # cells across the face for the Neumann solve (the study's n)
     h = 2.0 / n
     # rho on the triangle cells of the quadrant x, y > 0; cell centre (k + 0.5) h
@@ -252,6 +266,17 @@ def build(m, tau, steps=400):
         r = (1 - t) + t * interp(rho, X, Y)
         return -interp(gx, X, Y) / r, -interp(gy, X, Y) / r
 
+    return vel, err
+
+
+def build(m, tau, steps=400):
+    """The forward table on the triangle: a, b at nodes (i / m, j / m), 0 <= j <= i <= m, as two
+    (m + 1) x (m + 1) arrays (entries with j > i unused). tau = 0 (the conformal cube) skips the
+    flow: its nodes are the Schwarz map at the nodes themselves."""
+    k_stop = round(tau * steps)
+    if abs(k_stop - tau * steps) > 1e-9:
+        raise ValueError(f"tau {tau} is not a whole number of the {steps} flow steps")
+    vel, err = flow_field(m) if k_stop > 0 else (None, 0.0)
     Ni, Nj = np.meshgrid(np.arange(m + 1), np.arange(m + 1), indexing="ij")
     node = Nj <= Ni
     ii, jj = Ni[node], Nj[node]
@@ -288,12 +313,12 @@ def build(m, tau, steps=400):
     A = np.full((m + 1, m + 1), np.nan)
     B = np.full((m + 1, m + 1), np.nan)
     A[ii, jj], B[ii, jj] = a, b
-    return A, B, {"newton_err": max(err, err2), "steps": steps, "solve_cells": n}
+    return A, B, {"newton_err": max(err, err2), "steps": steps}
 
 
 # ---------------------------------------------------------------------------------------------
 # The bicubic evaluator: the Python twin of deeptime_format::cube_map (same ghost rules, same
-# Catmull-Rom form). Used for the inverse table and the checks.
+# Catmull-Rom form, same corner patch and blend). Used for the inverse table and the checks.
 
 
 def padded(A, B):
@@ -328,6 +353,43 @@ def padded(A, B):
     return P
 
 
+def patch_nodes(m, K, F):
+    """The corner patch: nodes (i, j), i, j in [-1, n + 1] (n = K F, index offset 1) at
+    u = 1 - K / m + i / (m F), from the exact conformal map inside the face and the coarse table's
+    ghost rules beyond it (the edge mirror, the swap, the corner extrapolation)."""
+    n = K * F
+    u0 = 1.0 - K / m
+    hf = 1.0 / (m * F)
+    idx = np.arange(-1, n + 1)
+    I, J = np.meshgrid(idx, idx, indexing="ij")
+    low = J <= I
+    ii, jj = I[low], J[low]
+    zt, _, err = conformal_triangle(u0 + ii * hf, u0 + jj * hf)
+    a, b = gnomonic_of_zeta(zt)
+    edge, diag = ii == n, ii == jj
+    a = np.where(edge, 1.0, a)
+    mid = 0.5 * (a + b)
+    a = np.where(diag, mid, a)
+    b = np.where(diag, mid, b)
+    a = np.where(edge & diag, 1.0, a)
+    b = np.where(edge & diag, 1.0, b)
+    Q = np.full((n + 3, n + 3, 2), np.nan)
+    Q[ii + 1, jj + 1, 0], Q[ii + 1, jj + 1, 1] = a, b
+    Q[jj + 1, ii + 1, 0], Q[jj + 1, ii + 1, 1] = b, a
+    # beyond u = 1 (j = -1 .. n - 1): the mirror of node (n - 1, j); beyond v = 1 its swap
+    ar, br = Q[n, 0:n + 1, 0].copy(), Q[n, 0:n + 1, 1].copy()
+    Q[n + 2, 0:n + 1, 0] = 1.0 / ar
+    Q[n + 2, 0:n + 1, 1] = br / ar
+    Q[0:n + 1, n + 2, 0] = Q[n + 2, 0:n + 1, 1]
+    Q[0:n + 1, n + 2, 1] = Q[n + 2, 0:n + 1, 0]
+    pnn, pn1 = Q[n + 1, n + 1].copy(), Q[n + 1, n].copy()  # (n, n), (n, n - 1)
+    Q[n + 1, n + 2] = 2.0 * pnn - pn1  # (n, n + 1)
+    Q[n + 2, n + 1] = Q[n + 1, n + 2][::-1]  # (n + 1, n)
+    Q[n + 2, n + 2] = 2.0 * pnn - Q[n, n]  # (n + 1, n + 1) from (n - 1, n - 1)
+    assert np.all(np.isfinite(Q)), "patch has holes"
+    return Q, err
+
+
 def cr(p0, p1, p2, p3, t):
     c1 = p2 - p0
     c2 = ((2.0 * p0 - 5.0 * p1) + 4.0 * p2) - p3
@@ -342,15 +404,83 @@ def dcr(p0, p1, p2, p3, t):
     return 0.5 * (c1 + t * (2.0 * c2 + t * (3.0 * c3)))
 
 
-def tri_eval(P, u, v, derivs=False):
+def grid_eval(P, x, y, n):
+    """The Catmull-Rom bicubic of the padded node array P (index offset 1, n cells a side) at grid
+    coordinates (x, y) in node units, the cell from x, y clamped to [0, n - 1] and the cubic
+    evaluated at the point itself; with its derivatives per node unit."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    i0 = np.clip(np.floor(x), 0, n - 1).astype(int)
+    j0 = np.clip(np.floor(y), 0, n - 1).astype(int)
+    tu, tv = x - i0, y - j0
+    rows, drows = [], []
+    for dj in range(-1, 3):
+        p = [P[i0 + di + 1, j0 + dj + 1] for di in range(-1, 3)]
+        rows.append(np.stack([cr(*[q[..., c] for q in p], tu) for c in (0, 1)], -1))
+        drows.append(np.stack([dcr(*[q[..., c] for q in p], tu) for c in (0, 1)], -1))
+    val = np.stack([cr(*[r[..., c] for r in rows], tv) for c in (0, 1)], -1)
+    dx = np.stack([cr(*[r[..., c] for r in drows], tv) for c in (0, 1)], -1)
+    dy = np.stack([dcr(*[r[..., c] for r in rows], tv) for c in (0, 1)], -1)
+    return val, dx, dy
+
+
+class Map:
+    """A table ready to evaluate (the readers' CubeMap): the padded coarse nodes, the corner patch
+    and the inverse table."""
+
+    def __init__(self, t):
+        self.m, self.q, self.K, self.F = t["m"], t["q"], t["K"], t["F"]
+        self.P = padded(t["A"], t["B"])
+        self.Q = t.get("Q")
+        self.U, self.V = t.get("U"), t.get("V")
+        self.t = t
+
+
+def tri_eval_raw(T, u, v):
+    """(a, b) of the triangle's bicubic at (u, v) and its derivatives along u and v (per unit of
+    u), the corner patch blended in; without the edge's a = 1 (a Newton iterate may step a hair
+    outside the triangle)."""
+    m = T.m
+    u = np.asarray(u, dtype=float)
+    v = np.asarray(v, dtype=float)
+    val, du, dv = grid_eval(T.P, u * m, v * m, m)
+    du, dv = du * m, dv * m
+    if not T.K:
+        return val, du, dv
+    n = T.K * T.F
+    mf = float(m * T.F)
+    u0 = 1.0 - T.K / m
+    fv, fdu, fdv = grid_eval(T.Q, (u - u0) * mf, (v - u0) * mf, n)
+    fdu, fdv = fdu * mf, fdv * mf
+    w = ((v - u0) * m)[..., None]  # coarse cells inward from the patch's edge (v is the smaller)
+    s = w * w * (3.0 - 2.0 * w)
+    ds = 6.0 * w * (1.0 - w) * m
+    rv = val + s * (fv - val)
+    rdu = du + s * (fdu - du)
+    rdv = (dv + s * (fdv - dv)) + (fv - val) * ds
+    inner, ring = w >= 1.0, (w > 0.0) & (w < 1.0)
+    val = np.where(inner, fv, np.where(ring, rv, val))
+    du = np.where(inner, fdu, np.where(ring, rdu, du))
+    dv = np.where(inner, fdv, np.where(ring, rdv, dv))
+    return val, du, dv
+
+
+def tri_eval(T, u, v, derivs=False):
     """(a, b) of the triangle's bicubic at (u, v) in [0, 1]^2 (arrays), and with derivs the
     derivatives along u and v (per unit of u). On the edge u = 1, a is exactly 1."""
-    val, du, dv = tri_eval_raw(P, u, v)
+    val, du, dv = tri_eval_raw(T, u, v)
     val[..., 0] = np.where(np.asarray(u) == 1.0, 1.0, val[..., 0])
     return (val, du, dv) if derivs else val
 
 
-def tri_inverse(P, a, b, start=None, iters=60):
+def newton_step(T, a, b, u, v):
+    val, du, dv = tri_eval_raw(T, u, v)
+    ra, rb = a - val[..., 0], b - val[..., 1]
+    det = du[..., 0] * dv[..., 1] - dv[..., 0] * du[..., 1]
+    return u + (dv[..., 1] * ra - dv[..., 0] * rb) / det, v + (du[..., 0] * rb - du[..., 1] * ra) / det
+
+
+def tri_inverse(T, a, b, start=None, iters=60):
     """(u, v) on the triangle whose bicubic is (a, b), by Newton to convergence."""
     a = np.asarray(a, dtype=float)
     b = np.asarray(b, dtype=float)
@@ -360,44 +490,43 @@ def tri_inverse(P, a, b, start=None, iters=60):
     else:
         u, v = start
     for _ in range(iters):
-        val, du, dv = tri_eval_raw(P, u, v)
-        ra, rb = a - val[..., 0], b - val[..., 1]
-        det = du[..., 0] * dv[..., 1] - dv[..., 0] * du[..., 1]
-        u = u + (dv[..., 1] * ra - dv[..., 0] * rb) / det
-        v = v + (du[..., 0] * rb - du[..., 1] * ra) / det
-    val = tri_eval_raw(P, u, v)[0]
+        u, v = newton_step(T, a, b, u, v)
+    val = tri_eval_raw(T, u, v)[0]
     res = np.maximum(np.abs(val[..., 0] - a), np.abs(val[..., 1] - b))
     return u, v, res
 
 
-def tri_eval_raw(P, u, v):
-    """As tri_eval with derivatives, but the cell is chosen from the point clamped to [0, 1]^2
-    and the cubic is evaluated at the point itself (a Newton iterate may step a hair outside)."""
-    m = P.shape[0] - 3
-    u = np.asarray(u, dtype=float)
-    v = np.asarray(v, dtype=float)
-    x, y = u * m, v * m
-    i0 = np.clip(np.floor(x), 0, m - 1).astype(int)
-    j0 = np.clip(np.floor(y), 0, m - 1).astype(int)
-    tu, tv = x - i0, y - j0
-    rows, drows = [], []
-    for dj in range(-1, 3):
-        p = [P[i0 + di + 1, j0 + dj + 1] for di in range(-1, 3)]
-        rows.append(np.stack([cr(*[q[..., c] for q in p], tu) for c in (0, 1)], -1))
-        drows.append(np.stack([dcr(*[q[..., c] for q in p], tu) for c in (0, 1)], -1))
-    val = np.stack([cr(*[r[..., c] for r in rows], tv) for c in (0, 1)], -1)
-    du = np.stack([cr(*[r[..., c] for r in drows], tv) for c in (0, 1)], -1) * m
-    dv = np.stack([dcr(*[r[..., c] for r in rows], tv) for c in (0, 1)], -1) * m
-    return val, du, dv
+def inverse_start(T, a, b):
+    """The inverse table's bilinear start at (a, b) on the gnomonic triangle (the readers' start)."""
+    q = T.q
+    x, y = a * q, b * q
+    k = np.clip(np.floor(x), 0, q - 1).astype(int)
+    l = np.clip(np.floor(y), 0, q - 1).astype(int)
+    tx, ty = x - k, y - l
+
+    def node(i, j):
+        lo = j <= i
+        return (np.where(lo, T.U[np.maximum(i, j), np.minimum(i, j)], T.V[np.maximum(i, j), np.minimum(i, j)]),
+                np.where(lo, T.V[np.maximum(i, j), np.minimum(i, j)], T.U[np.maximum(i, j), np.minimum(i, j)]))
+
+    u00, v00 = node(k, l)
+    u10, v10 = node(k + 1, l)
+    u01, v01 = node(k, l + 1)
+    u11, v11 = node(k + 1, l + 1)
+    u0 = u00 + tx * (u10 - u00)
+    u1 = u01 + tx * (u11 - u01)
+    w0 = v00 + tx * (v10 - v00)
+    w1 = v01 + tx * (v11 - v01)
+    return u0 + ty * (u1 - u0), w0 + ty * (w1 - w0)
 
 
-def inverse_table(P, q):
+def inverse_table(T, q):
     """(u, v) at the gnomonic triangle's nodes (k / q, l / q), 0 <= l <= k <= q."""
     K, L = np.meshgrid(np.arange(q + 1), np.arange(q + 1), indexing="ij")
     node = L <= K
     kk, ll = K[node], L[node]
     a, b = kk / q, ll / q
-    u, v, res = tri_inverse(P, a, b)
+    u, v, res = tri_inverse(T, a, b)
     u = np.where(kk == q, 1.0, u)
     v = np.where(ll == 0, 0.0, v)
     mid = 0.5 * (u + v)
@@ -415,22 +544,25 @@ def inverse_table(P, q):
 # The file.
 
 
-def triangle_values(A, B):
-    m = A.shape[0] - 1
+def triangle_values(A, B, lo=0):
+    """The triangle's values in file order: for i, for j <= i (from index lo), a then b."""
+    n = A.shape[0]
     out = []
-    for i in range(m + 1):
+    for i in range(n):
         for j in range(i + 1):
             out.append((A[i, j], B[i, j]))
     return np.array(out, dtype="<f8")
 
 
-def write_table(path, name, commit, m, q, tau, steps, A, B, U, V):
+def write_table(path, name, commit, m, q, tau, steps, A, B, U, V, K=0, F=0, Q=None):
     if len(name.encode()) > 32 or len(commit.encode()) > 40:
         raise ValueError("name or commit too long")
-    head = MAGIC + struct.pack("<IIIdII", LAYOUT_VERSION, m, q, tau, steps, 0)
+    head = MAGIC + struct.pack("<IIIdIIII", LAYOUT_VERSION, m, q, tau, steps, K, F, 0)
     head += name.encode().ljust(32, b"\0") + commit.encode().ljust(40, b"\0")
     assert len(head) == HEADER_BYTES
     body = triangle_values(A, B).tobytes() + triangle_values(U, V).tobytes()
+    if K:
+        body += triangle_values(Q[..., 0], Q[..., 1]).tobytes()  # i, j from -1 (index offset 1)
     data = head + body
     with open(path, "wb") as f:
         f.write(data)
@@ -440,48 +572,67 @@ def write_table(path, name, commit, m, q, tau, steps, A, B, U, V):
     return digest, len(data)
 
 
+def _triangle(vals, n):
+    A = np.full((n, n), np.nan)
+    B = np.full((n, n), np.nan)
+    k = 0
+    for i in range(n):
+        A[i, : i + 1], B[i, : i + 1] = vals[k:k + i + 1, 0], vals[k:k + i + 1, 1]
+        k += i + 1
+    return A, B
+
+
 def read_table(path):
     with open(path, "rb") as f:
         data = f.read()
     if data[:4] != MAGIC:
         raise ValueError(f"{path}: not a cube map table")
-    version, m, q, tau, steps, _ = struct.unpack_from("<IIIdII", data, 4)
+    version, m, q, tau, steps, K, F, _ = struct.unpack_from("<IIIdIIII", data, 4)
     if version != LAYOUT_VERSION:
         raise ValueError(f"{path}: layout version {version}")
-    name = data[32:64].rstrip(b"\0").decode()
-    commit = data[64:104].rstrip(b"\0").decode()
+    name = data[40:72].rstrip(b"\0").decode()
+    commit = data[72:112].rstrip(b"\0").decode()
     nf = (m + 1) * (m + 2) // 2
     ni = (q + 1) * (q + 2) // 2
+    side = K * F + 3 if K else 0
+    npch = side * (side + 1) // 2
     vals = np.frombuffer(data, dtype="<f8", offset=HEADER_BYTES)
-    if vals.size != 2 * (nf + ni):
-        raise ValueError(f"{path}: {vals.size} values, want {2 * (nf + ni)}")
-    fw = vals[: 2 * nf].reshape(-1, 2)
-    iv = vals[2 * nf:].reshape(-1, 2)
-    A = np.full((m + 1, m + 1), np.nan)
-    B = np.full((m + 1, m + 1), np.nan)
-    k = 0
-    for i in range(m + 1):
-        A[i, : i + 1], B[i, : i + 1] = fw[k:k + i + 1, 0], fw[k:k + i + 1, 1]
-        k += i + 1
-    U = np.full((q + 1, q + 1), np.nan)
-    V = np.full((q + 1, q + 1), np.nan)
-    k = 0
-    for i in range(q + 1):
-        U[i, : i + 1], V[i, : i + 1] = iv[k:k + i + 1, 0], iv[k:k + i + 1, 1]
-        k += i + 1
-    return {"name": name, "commit": commit, "m": m, "q": q, "tau": tau, "steps": steps,
-            "A": A, "B": B, "U": U, "V": V, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+    if vals.size != 2 * (nf + ni + npch):
+        raise ValueError(f"{path}: {vals.size} values, want {2 * (nf + ni + npch)}")
+    vals = vals.reshape(-1, 2)
+    A, B = _triangle(vals[:nf], m + 1)
+    U, V = _triangle(vals[nf:nf + ni], q + 1)
+    t = {"name": name, "commit": commit, "m": m, "q": q, "tau": tau, "steps": steps, "K": K, "F": F,
+         "A": A, "B": B, "U": U, "V": V, "Q": None,
+         "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+    if K:
+        QA, QB = _triangle(vals[nf + ni:], side)
+        low = np.tril(np.ones((side, side), dtype=bool))
+        Q = np.empty((side, side, 2))
+        Q[..., 0] = np.where(low, QA, QB.T)
+        Q[..., 1] = np.where(low, QB, QA.T)
+        t["Q"] = Q
+    return t
 
 
-def generate(m, q, tau, name, commit, out, steps=400):
+def generate(m, q, tau, name, commit, out, steps=400, K=None, F=16):
+    if K is None:
+        K = 4 if tau == 0 else 0  # the corner patch is for the conformal cube's singular corner
+    if K and tau != 0:
+        raise ValueError("the corner patch holds the exact conformal map: tau must be 0")
     A, B, info = build(m, tau, steps)
-    P = padded(A, B)
-    U, V, res = inverse_table(P, q)
+    t = {"m": m, "q": q, "K": K, "F": F if K else 0, "A": A, "B": B, "Q": None}
+    perr = 0.0
+    if K:
+        t["Q"], perr = patch_nodes(m, K, F)
+    T = Map(t)
+    U, V, res = inverse_table(T, q)
     os.makedirs(out, exist_ok=True)
     path = os.path.join(out, f"cube-map-{name}.bin")
-    digest, size = write_table(path, name, commit, m, q, tau, steps, A, B, U, V)
-    print(f"{path}: m {m} (n {2 * m + 1}), q {q}, tau {tau}, {size} bytes, sha256 {digest}, "
-          f"schwarz newton {info['newton_err']:.2e}, inverse-table newton residual {res:.2e}", flush=True)
+    digest, size = write_table(path, name, commit, m, q, tau, steps, A, B, U, V, K, t["F"], t["Q"])
+    print(f"{path}: m {m} (n {2 * m + 1}), q {q}, tau {tau}, corner patch K {K} F {t['F']}, {size} bytes, "
+          f"sha256 {digest}, schwarz newton {max(info['newton_err'], perr):.2e}, "
+          f"inverse-table newton residual {res:.2e}", flush=True)
     return path
 
 
@@ -493,12 +644,15 @@ def main(argv):
     g.add_argument("--q", type=int, default=128)
     g.add_argument("--tau", type=float, default=1.0)
     g.add_argument("--steps", type=int, default=400)
+    g.add_argument("--patch-cells", type=int, default=None, help="K (default 4 for tau 0, else 0)")
+    g.add_argument("--patch-fine", type=int, default=16, help="F")
     g.add_argument("--name", required=True)
     g.add_argument("--commit", required=True)
     g.add_argument("--out", required=True)
     args = ap.parse_args(argv[1:])
     if args.cmd == "generate":
-        generate(args.m, args.q, args.tau, args.name, args.commit, args.out, args.steps)
+        generate(args.m, args.q, args.tau, args.name, args.commit, args.out, args.steps,
+                 args.patch_cells, args.patch_fine)
 
 
 if __name__ == "__main__":

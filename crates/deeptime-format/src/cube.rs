@@ -10,14 +10,16 @@
 //! +x is east and −z north, as everywhere in Minecraft. The window is x ∈ [−3s/2, 5s/2),
 //! z ∈ [−3s/2, 3s/2); x wraps with period 4s (Toroidal World's slide).
 //!
-//! | Face | x range | z range | centre | planet point at the centre |
+//! | Face | x range | z range | centre | centre in the cube frame |
 //! |---|---|---|---|---|
-//! | F3 | [−3s/2, −s/2) | [−s/2, s/2) | (−s, 0) | equator, λ0 − 90° |
-//! | F0 | [−s/2, s/2) | [−s/2, s/2) | (0, 0) | equator, λ0 |
-//! | F1 | [s/2, 3s/2) | [−s/2, s/2) | (s, 0) | equator, λ0 + 90° |
-//! | F2 | [3s/2, 5s/2) | [−s/2, s/2) | (2s, 0) | equator, λ0 + 180° |
-//! | N | [−s/2, s/2) | [−3s/2, −s/2) | (0, −s) | north pole |
-//! | S | [−s/2, s/2) | [s/2, 3s/2) | (0, s) | south pole |
+//! | F3 | [−3s/2, −s/2) | [−s/2, s/2) | (−s, 0) | −Y |
+//! | F0 | [−s/2, s/2) | [−s/2, s/2) | (0, 0) | +X |
+//! | F1 | [s/2, 3s/2) | [−s/2, s/2) | (s, 0) | +Y |
+//! | F2 | [3s/2, 5s/2) | [−s/2, s/2) | (2s, 0) | −X |
+//! | N | [−s/2, s/2) | [−3s/2, −s/2) | (0, −s) | +Z |
+//! | S | [−s/2, s/2) | [s/2, 3s/2) | (0, s) | −Z |
+//!
+//! N and S name the net's top and bottom faces, not the poles (see "Cube frame").
 //!
 //! # Local coordinates
 //! Every face is drawn in the net without a turn, so its local axes are the net's: block cell
@@ -34,9 +36,15 @@
 //! shows.
 //!
 //! # Cube frame
-//! The faces' frames in the cube frame (λ0 = 0: +X the point (0°, 0°), +Z the north pole) are
-//! [`Face::frame`]; the world turns the cube by λ0 about the polar axis. Every frame has
-//! e_u × e_v = −centre, so the turns between faces are rotations, never reflections.
+//! The faces' frames in the cube frame are [`Face::frame`]. Every frame has e_u × e_v = −centre,
+//! so the turns between faces are rotations, never reflections. The cube frame is not the
+//! planet's: a [`CubeTurn`] (the manifest's `projection.rotation`, 3 × 3, row-major, planet to
+//! cube) places the cube on the planet. The world's turn is free (the corner search,
+//! docs/research/notes/mountains-and-the-projection.md §5.4): its poles sit anywhere, usually
+//! inside N and S but not at their centres, so nothing here knows latitude. Latitude comes from
+//! the map ([`crate::cube_map`]) and the turn together ([`crate::cube_map::CubeWorld`]). The
+//! identity turn is the polar-axis cube at λ0 = 0 (the simulation's cube): +X the planet point
+//! (0°, 0°), +Z the north pole.
 
 use crate::projection::{Axis, Domain, FACE_QUANTUM, Side, face_for};
 
@@ -77,8 +85,8 @@ impl Face {
         [(0, 0), (1, 0), (2, 0), (-1, 0), (0, -1), (0, 1)][self.index()]
     }
 
-    /// The face's frame in the cube frame (λ0 = 0): the unit vector of its centre, then e_u and
-    /// e_v, the planet directions of local +u (net +x) and +v (net +z) at the centre.
+    /// The face's frame in the cube frame: the unit vector of its centre, then e_u and e_v, the
+    /// cube-frame directions of local +u (net +x) and +v (net +z) at the centre.
     pub fn frame(self) -> [[f64; 3]; 3] {
         const X: [f64; 3] = [1.0, 0.0, 0.0];
         const Y: [f64; 3] = [0.0, 1.0, 0.0];
@@ -130,7 +138,12 @@ pub enum FaceSide {
 }
 
 impl FaceSide {
-    pub const ALL: [FaceSide; 4] = [FaceSide::East, FaceSide::South, FaceSide::West, FaceSide::North];
+    pub const ALL: [FaceSide; 4] = [
+        FaceSide::East,
+        FaceSide::South,
+        FaceSide::West,
+        FaceSide::North,
+    ];
 
     #[inline]
     pub fn index(self) -> usize {
@@ -160,7 +173,11 @@ impl Iso {
 
     /// The motion `[k, tx, tz]` (k taken mod 4).
     pub fn new(k: i64, tx: i64, tz: i64) -> Iso {
-        Iso { k: k.rem_euclid(4) as u8, tx, tz }
+        Iso {
+            k: k.rem_euclid(4) as u8,
+            tx,
+            tz,
+        }
     }
 
     pub fn translation(dx: i64, dz: i64) -> Iso {
@@ -211,7 +228,11 @@ impl Iso {
     /// `self ∘ other`: first `other`, then `self`.
     pub fn compose(&self, other: &Iso) -> Iso {
         let (rx, rz) = turn_i(self.k, other.tx, other.tz);
-        Iso::new(i64::from(self.k) + i64::from(other.k), rx + self.tx, rz + self.tz)
+        Iso::new(
+            i64::from(self.k) + i64::from(other.k),
+            rx + self.tx,
+            rz + self.tz,
+        )
     }
 
     /// The inverse motion.
@@ -495,11 +516,12 @@ impl NetEdge {
 /// A cube corner: a cone point of 270° where three faces meet.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Corner {
-    /// `n0` .. `n3` round the north at λ0 + 45° + k·90°, then `s0` .. `s3`.
+    /// `n0` .. `n3`, the corners of face N (cube +Z) counter-clockwise from (+1, +1, +1), then
+    /// `s0` .. `s3`, face S's. Net names: where a corner lies on the planet is the turn's.
     pub name: String,
     /// The three faces that meet there.
     pub faces: [Face; 3],
-    /// The corner's direction in the cube frame (λ0 = 0), (±1, ±1, ±1) unnormalised.
+    /// The corner's direction in the cube frame, (±1, ±1, ±1) unnormalised.
     pub cube: [i8; 3],
     /// Every block corner of the closed window that is this corner (the domain's closure:
     /// x ∈ [−3s/2, 5s/2], so the F2/F3 corners have a third image at x = 5s/2).
@@ -514,7 +536,12 @@ pub enum CubeFold {
     /// Beyond a net edge, in its band: the edge (an index into [`Cube::edges`]), the planet block
     /// it shows (in the window) and the motion from the queried block to it (its `k` is the
     /// quarter turns a block state read there is turned back by).
-    Outside { edge: usize, x: i64, z: i64, iso: Iso },
+    Outside {
+        edge: usize,
+        x: i64,
+        z: i64,
+        iso: Iso,
+    },
     /// In no band, or more than a face width out: past the corners of the net (the missing
     /// quarter round an outer cube corner). The game draws deep ocean there (plan §1.4).
     Ocean,
@@ -537,41 +564,33 @@ pub struct PointOnFace {
 }
 
 /// The cube world's net for face side s (a multiple of [`FACE_QUANTUM`] in real worlds; any even
-/// side in tests) and the cube's turn λ0 about the polar axis.
+/// side in tests). Net geometry only: where the cube sits on the planet is a [`CubeTurn`].
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cube {
     s: i64,
-    lambda0_deg: f64,
     edges: Vec<NetEdge>,
 }
 
 impl Cube {
-    /// The net of face side `s` (even) with the cube turned by `lambda0_deg`.
-    pub fn new(s: u32, lambda0_deg: f64) -> Cube {
+    /// The net of face side `s` (even).
+    pub fn new(s: u32) -> Cube {
         assert!(s >= 2 && s % 2 == 0, "cube face side {s} must be even");
         let s = i64::from(s);
         Cube {
             s,
-            lambda0_deg,
             edges: net_edges(s),
         }
     }
 
     /// The net for a planet `circumference` blocks round ([`face_for`]).
-    pub fn for_circumference(circumference: u32, lambda0_deg: f64) -> Cube {
-        Cube::new(face_for(circumference), lambda0_deg)
+    pub fn for_circumference(circumference: u32) -> Cube {
+        Cube::new(face_for(circumference))
     }
 
     /// s, blocks.
     #[inline]
     pub fn side(&self) -> i64 {
         self.s
-    }
-
-    /// λ0, degrees.
-    #[inline]
-    pub fn lambda0_deg(&self) -> f64 {
-        self.lambda0_deg
     }
 
     /// Whether s is a multiple of [`FACE_QUANTUM`] (a real world's face).
@@ -710,9 +729,7 @@ impl Cube {
         let Some((k, _)) = best else {
             return CubeFold::Ocean;
         };
-        let iso = self.edges[k]
-            .iso
-            .compose(&Iso::translation(xw - x, 0));
+        let iso = self.edges[k].iso.compose(&Iso::translation(xw - x, 0));
         let (px, pz) = iso.cell(x, z);
         match self.face_of_block(px, pz) {
             Some(_) if px == self.wrap_x(px) => CubeFold::Outside {
@@ -766,8 +783,8 @@ impl Cube {
         })
     }
 
-    /// The eight cube corners: `n0` .. `n3` at latitude +35.26° and longitude
-    /// λ0 + 45° + k·90°, then `s0` .. `s3` at −35.26°.
+    /// The eight cube corners: `n0` .. `n3` round face N, then `s0` .. `s3` round face S, each
+    /// with its cube-frame direction and its images in the net.
     pub fn corners(&self) -> Vec<Corner> {
         let h = self.s / 2;
         let c = |name: &str, faces: [Face; 3], cube: [i8; 3], images: Vec<[i64; 2]>| Corner {
@@ -779,7 +796,12 @@ impl Cube {
         use Face::*;
         vec![
             c("n0", [F0, F1, N], [1, 1, 1], vec![[h, -h]]),
-            c("n1", [F1, F2, N], [-1, 1, 1], vec![[h, -3 * h], [3 * h, -h]]),
+            c(
+                "n1",
+                [F1, F2, N],
+                [-1, 1, 1],
+                vec![[h, -3 * h], [3 * h, -h]],
+            ),
             c(
                 "n2",
                 [F2, F3, N],
@@ -798,11 +820,81 @@ impl Cube {
             c("s3", [F3, F0, S], [1, -1, -1], vec![[-h, h]]),
         ]
     }
+}
 
-    /// The poles' images, block corners: the north pole at N's centre (0, −s), the south at S's
-    /// (0, s).
-    pub fn poles(&self) -> [[i64; 2]; 2] {
-        [[0, -self.s], [0, self.s]]
+/// Where the cube sits on the planet: a rotation, planet frame to cube frame (the manifest's
+/// `projection.rotation`, 3 × 3, row-major). The planet frame is the format's: +x the point
+/// (0°, 0°), +y (0°, 90° E), +z the north pole ([`crate::projection::unit_of_lat_lon`]). The
+/// world's turn is free (the corner search); the simulation's cube takes the identity (its poles
+/// at the centres of N and S, λ0 = 0).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CubeTurn {
+    m: [[f64; 3]; 3],
+}
+
+impl CubeTurn {
+    /// The identity: the polar-axis cube.
+    pub const IDENTITY: CubeTurn = CubeTurn {
+        m: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+    };
+
+    /// A turn from its rows (planet to cube), checked to be a rotation: orthonormal to 1e-12 and
+    /// of determinant +1.
+    pub fn from_rows(m: [[f64; 3]; 3]) -> Result<CubeTurn, String> {
+        for (i, a) in m.iter().enumerate() {
+            for (j, b) in m.iter().enumerate() {
+                let d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+                let want = if i == j { 1.0 } else { 0.0 };
+                if (d - want).abs() > 1e-12 || !d.is_finite() {
+                    return Err(format!("cube rotation rows {i}, {j}: dot {d}, want {want}"));
+                }
+            }
+        }
+        let det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+            - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+            + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        if det < 0.0 {
+            return Err(format!("cube rotation has determinant {det}: a reflection"));
+        }
+        Ok(CubeTurn { m })
+    }
+
+    /// The polar-axis turn by λ0 (the old layout's): the planet point (0°, λ0) at F0's centre,
+    /// the north pole at N's.
+    pub fn polar(lambda0_deg: f64) -> CubeTurn {
+        let l = crate::portable_math::to_radians(lambda0_deg);
+        let (s, c) = (crate::portable_math::sin(l), crate::portable_math::cos(l));
+        CubeTurn {
+            m: [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]],
+        }
+    }
+
+    /// The rows, planet to cube.
+    #[inline]
+    pub fn rows(&self) -> [[f64; 3]; 3] {
+        self.m
+    }
+
+    /// A planet-frame vector in the cube frame (Q·p).
+    #[inline]
+    pub fn to_cube(&self, p: [f64; 3]) -> [f64; 3] {
+        let m = &self.m;
+        [
+            (m[0][0] * p[0] + m[0][1] * p[1]) + m[0][2] * p[2],
+            (m[1][0] * p[0] + m[1][1] * p[1]) + m[1][2] * p[2],
+            (m[2][0] * p[0] + m[2][1] * p[1]) + m[2][2] * p[2],
+        ]
+    }
+
+    /// A cube-frame vector in the planet frame (Qᵀ·c).
+    #[inline]
+    pub fn to_planet(&self, c: [f64; 3]) -> [f64; 3] {
+        let m = &self.m;
+        [
+            (m[0][0] * c[0] + m[1][0] * c[1]) + m[2][0] * c[2],
+            (m[0][1] * c[0] + m[1][1] * c[1]) + m[2][1] * c[2],
+            (m[0][2] * c[0] + m[1][2] * c[1]) + m[2][2] * c[2],
+        ]
     }
 }
 
@@ -858,26 +950,166 @@ fn net_edges(s: i64) -> Vec<NetEdge> {
     let half_s = Iso::half_turn_about(s, s);
     vec![
         // 0, 1: the slide.
-        e(F3, West, Seam::EastWest, EdgeMotion::Slide, -3 * h, [-h, h], Iso::translation(4 * s, 0), None, 1),
-        e(F2, East, Seam::EastWest, EdgeMotion::Slide, 5 * h, [-h, h], Iso::translation(-4 * s, 0), None, 0),
+        e(
+            F3,
+            West,
+            Seam::EastWest,
+            EdgeMotion::Slide,
+            -3 * h,
+            [-h, h],
+            Iso::translation(4 * s, 0),
+            None,
+            1,
+        ),
+        e(
+            F2,
+            East,
+            Seam::EastWest,
+            EdgeMotion::Slide,
+            5 * h,
+            [-h, h],
+            Iso::translation(-4 * s, 0),
+            None,
+            0,
+        ),
         // 2, 3: NE, a quarter turn about (s/2, −s/2), clockwise from N to F1.
-        e(N, East, Seam::NorthEast, q, h, [-3 * h, -h], Iso::quarter_turn_about(1, h, -h), Some([h, -h]), 3),
-        e(F1, North, Seam::NorthEast, q, -h, [h, 3 * h], Iso::quarter_turn_about(3, h, -h), Some([h, -h]), 2),
+        e(
+            N,
+            East,
+            Seam::NorthEast,
+            q,
+            h,
+            [-3 * h, -h],
+            Iso::quarter_turn_about(1, h, -h),
+            Some([h, -h]),
+            3,
+        ),
+        e(
+            F1,
+            North,
+            Seam::NorthEast,
+            q,
+            -h,
+            [h, 3 * h],
+            Iso::quarter_turn_about(3, h, -h),
+            Some([h, -h]),
+            2,
+        ),
         // 4, 5: NW, about (−s/2, −s/2), counter-clockwise from N to F3.
-        e(N, West, Seam::NorthWest, q, -h, [-3 * h, -h], Iso::quarter_turn_about(3, -h, -h), Some([-h, -h]), 5),
-        e(F3, North, Seam::NorthWest, q, -h, [-3 * h, -h], Iso::quarter_turn_about(1, -h, -h), Some([-h, -h]), 4),
+        e(
+            N,
+            West,
+            Seam::NorthWest,
+            q,
+            -h,
+            [-3 * h, -h],
+            Iso::quarter_turn_about(3, -h, -h),
+            Some([-h, -h]),
+            5,
+        ),
+        e(
+            F3,
+            North,
+            Seam::NorthWest,
+            q,
+            -h,
+            [-3 * h, -h],
+            Iso::quarter_turn_about(1, -h, -h),
+            Some([-h, -h]),
+            4,
+        ),
         // 6, 7: NN, the half turn about (s, −s).
-        e(N, North, Seam::NorthNorth, ht, -3 * h, [-h, h], half_n, Some([s, -s]), 7),
-        e(F2, North, Seam::NorthNorth, ht, -h, [3 * h, 5 * h], half_n, Some([s, -s]), 6),
+        e(
+            N,
+            North,
+            Seam::NorthNorth,
+            ht,
+            -3 * h,
+            [-h, h],
+            half_n,
+            Some([s, -s]),
+            7,
+        ),
+        e(
+            F2,
+            North,
+            Seam::NorthNorth,
+            ht,
+            -h,
+            [3 * h, 5 * h],
+            half_n,
+            Some([s, -s]),
+            6,
+        ),
         // 8, 9: SE, about (s/2, s/2), counter-clockwise from S to F1.
-        e(S, East, Seam::SouthEast, q, h, [h, 3 * h], Iso::quarter_turn_about(3, h, h), Some([h, h]), 9),
-        e(F1, South, Seam::SouthEast, q, h, [h, 3 * h], Iso::quarter_turn_about(1, h, h), Some([h, h]), 8),
+        e(
+            S,
+            East,
+            Seam::SouthEast,
+            q,
+            h,
+            [h, 3 * h],
+            Iso::quarter_turn_about(3, h, h),
+            Some([h, h]),
+            9,
+        ),
+        e(
+            F1,
+            South,
+            Seam::SouthEast,
+            q,
+            h,
+            [h, 3 * h],
+            Iso::quarter_turn_about(1, h, h),
+            Some([h, h]),
+            8,
+        ),
         // 10, 11: SW, about (−s/2, s/2), clockwise from S to F3.
-        e(S, West, Seam::SouthWest, q, -h, [h, 3 * h], Iso::quarter_turn_about(1, -h, h), Some([-h, h]), 11),
-        e(F3, South, Seam::SouthWest, q, h, [-3 * h, -h], Iso::quarter_turn_about(3, -h, h), Some([-h, h]), 10),
+        e(
+            S,
+            West,
+            Seam::SouthWest,
+            q,
+            -h,
+            [h, 3 * h],
+            Iso::quarter_turn_about(1, -h, h),
+            Some([-h, h]),
+            11,
+        ),
+        e(
+            F3,
+            South,
+            Seam::SouthWest,
+            q,
+            h,
+            [-3 * h, -h],
+            Iso::quarter_turn_about(3, -h, h),
+            Some([-h, h]),
+            10,
+        ),
         // 12, 13: SS, the half turn about (s, s).
-        e(S, South, Seam::SouthSouth, ht, 3 * h, [-h, h], half_s, Some([s, s]), 13),
-        e(F2, South, Seam::SouthSouth, ht, h, [3 * h, 5 * h], half_s, Some([s, s]), 12),
+        e(
+            S,
+            South,
+            Seam::SouthSouth,
+            ht,
+            3 * h,
+            [-h, h],
+            half_s,
+            Some([s, s]),
+            13,
+        ),
+        e(
+            F2,
+            South,
+            Seam::SouthSouth,
+            ht,
+            h,
+            [3 * h, 5 * h],
+            half_s,
+            Some([s, s]),
+            12,
+        ),
     ]
 }
 
@@ -925,7 +1157,7 @@ mod tests {
     #[test]
     fn faces_tile_the_net() {
         for s in SIDES {
-            let cube = Cube::new(s, 0.0);
+            let cube = Cube::new(s);
             let s = i64::from(s);
             let mut count = [0i64; 6];
             let step = (s / 64).max(1);
@@ -991,7 +1223,10 @@ mod tests {
                     let (u2, v2) = a.local(u, v);
                     let q = gnomonic(a.face, u2, v2);
                     for k in 0..3 {
-                        assert!((p[k] - q[k]).abs() < 1e-12, "{f:?} {side:?} t {t}: {p:?} vs {q:?}");
+                        assert!(
+                            (p[k] - q[k]).abs() < 1e-12,
+                            "{f:?} {side:?} t {t}: {p:?} vs {q:?}"
+                        );
                     }
                     let (gu, gv) = gnomonic_of(a.face, p);
                     assert!((gu - u2).abs() < 1e-12 && (gv - v2).abs() < 1e-12);
@@ -1004,7 +1239,10 @@ mod tests {
                     FaceSide::North => (0.3, -1.01),
                 };
                 let (u2, v2) = a.local(u, v);
-                assert!(u2.abs() < 1.0 && v2.abs() < 1.0, "{f:?} {side:?}: ({u2}, {v2})");
+                assert!(
+                    u2.abs() < 1.0 && v2.abs() < 1.0,
+                    "{f:?} {side:?}: ({u2}, {v2})"
+                );
                 let near = match a.side {
                     FaceSide::East => u2 > 0.98,
                     FaceSide::West => u2 < -0.98,
@@ -1027,7 +1265,7 @@ mod tests {
         // With n = s the face grid is the net's blocks: a cell one step (or up to a face width)
         // beyond a side is the block the fold gives.
         for s in SIDES {
-            let cube = Cube::new(s, 0.0);
+            let cube = Cube::new(s);
             let n = i64::from(s);
             for f in Face::ALL {
                 for side in FaceSide::ALL {
@@ -1070,7 +1308,7 @@ mod tests {
     #[test]
     fn seams_map_edge_onto_edge_and_close() {
         for s in SIDES {
-            let cube = Cube::new(s, 0.0);
+            let cube = Cube::new(s);
             let s = i64::from(s);
             let edges = cube.edges();
             assert_eq!(edges.len(), 14);
@@ -1096,13 +1334,20 @@ mod tests {
                         (Axis::Z, Side::Max) => pz == p.coord - 1,
                         (Axis::Z, Side::Min) => pz == p.coord,
                     };
-                    assert!(inner, "{}: ({x}, {z}) -> ({px}, {pz}) not on {}", e.name, p.name);
+                    assert!(
+                        inner,
+                        "{}: ({x}, {z}) -> ({px}, {pz}) not on {}",
+                        e.name, p.name
+                    );
                     let along = match p.axis {
                         Axis::X => pz,
                         Axis::Z => px,
                     };
                     assert!((p.span[0]..p.span[1]).contains(&along));
-                    assert!(cube.face_of_block(px, pz).is_some_and(|(f, _, _)| f == p.face));
+                    assert!(
+                        cube.face_of_block(px, pz)
+                            .is_some_and(|(f, _, _)| f == p.face)
+                    );
                 }
                 // The partner's motion is this one's inverse; turns close up.
                 assert_eq!(p.iso, e.iso.inverse(), "{} / {}", e.name, p.name);
@@ -1132,7 +1377,7 @@ mod tests {
         // Plan W2: fold(partner) is the identity on 10,000 random outside blocks within s of the
         // planet: the partner is a planet block, and the motion's inverse brings it back.
         for s in SIDES {
-            let cube = Cube::new(s, 0.0);
+            let cube = Cube::new(s);
             let s = i64::from(s);
             let mut rng = Rng(0x0DE5_7001 ^ s as u64);
             let (mut outside, mut ocean, mut tries) = (0, 0, 0);
@@ -1145,20 +1390,30 @@ mod tests {
                     continue;
                 }
                 match cube.fold(x, z) {
-                    CubeFold::Outside { edge, x: px, z: pz, iso } => {
+                    CubeFold::Outside {
+                        edge,
+                        x: px,
+                        z: pz,
+                        iso,
+                    } => {
                         outside += 1;
                         assert_eq!(iso.cell(x, z), (px, pz));
                         assert!(matches!(cube.fold(px, pz), CubeFold::Face { .. }));
                         assert_eq!(iso.inverse().cell(px, pz), (x, z));
                         let e = &cube.edges()[edge];
                         assert!(e.depth(cube.wrap_x(x), z).is_some());
-                        assert_eq!(cube.face_of_block(px, pz).unwrap().0, cube.edges()[e.partner].face);
+                        assert_eq!(
+                            cube.face_of_block(px, pz).unwrap().0,
+                            cube.edges()[e.partner].face
+                        );
                     }
                     CubeFold::Ocean => ocean += 1,
                     CubeFold::Face { .. } => panic!("({x}, {z}) is off the planet"),
                 }
             }
-            eprintln!("s {s}: 10,000 outside blocks round-trip, {ocean} ocean (past the net's corners)");
+            eprintln!(
+                "s {s}: 10,000 outside blocks round-trip, {ocean} ocean (past the net's corners)"
+            );
         }
     }
 
@@ -1179,7 +1434,7 @@ mod tests {
     #[test]
     fn corners_and_their_images_agree() {
         for s in SIDES {
-            let cube = Cube::new(s, 0.0);
+            let cube = Cube::new(s);
             let corners = cube.corners();
             assert_eq!(corners.len(), 8);
             let h = s as f64 / 2.0;
@@ -1230,7 +1485,7 @@ mod tests {
     fn the_void_squares_split_on_the_diagonal() {
         // Plan §1.4: the void square above F1 splits on the diagonal through F0's corner, each
         // half folding through its own edge.
-        let cube = Cube::new(1_024, 0.0);
+        let cube = Cube::new(1_024);
         let h = 512;
         for a in [0i64, 3, 100, 500] {
             for b in [0i64, 3, 100, 500] {
@@ -1251,12 +1506,15 @@ mod tests {
             panic!()
         };
         assert_eq!(iso.k, 2);
-        assert!(matches!(cube.fold(x, z), CubeFold::Face { face: Face::N, .. }));
+        assert!(matches!(
+            cube.fold(x, z),
+            CubeFold::Face { face: Face::N, .. }
+        ));
     }
 
     #[test]
     fn points_fold_like_blocks() {
-        let cube = Cube::new(1_024, 0.0);
+        let cube = Cube::new(1_024);
         let mut rng = Rng(7);
         for _ in 0..20_000 {
             let x = rng.range(-4_000, 4_000);
@@ -1271,7 +1529,12 @@ mod tests {
                     let (bx, bz) = cube.block_of_cell(face, i, j);
                     assert_eq!((p.x, p.z), (bx as f64 + 0.5, bz as f64 + 0.5));
                 }
-                CubeFold::Outside { edge, x: px, z: pz, iso } => {
+                CubeFold::Outside {
+                    edge,
+                    x: px,
+                    z: pz,
+                    iso,
+                } => {
                     let p = pf.unwrap();
                     assert_eq!(p.iso, iso);
                     assert_eq!(p.edge, Some(edge));
@@ -1280,5 +1543,36 @@ mod tests {
                 CubeFold::Ocean => assert!(pf.is_none()),
             }
         }
+    }
+
+    #[test]
+    fn turns_are_rotations_and_invert() {
+        let polar = CubeTurn::polar(30.0);
+        // the planet point (0°, 30°) at F0's centre, the north pole at N's
+        let p = crate::projection::unit_of_lat_lon(0.0, 30.0);
+        let c = polar.to_cube(p);
+        assert!((c[0] - 1.0).abs() < 1e-15 && c[1].abs() < 1e-15 && c[2].abs() < 1e-15);
+        assert_eq!(polar.to_cube([0.0, 0.0, 1.0]), [0.0, 0.0, 1.0]);
+        assert!(CubeTurn::from_rows(polar.rows()).is_ok());
+        // a free turn: the inverse is the transpose
+        let r = 1.0 / 3.0_f64.sqrt();
+        let s = 1.0 / 2.0_f64.sqrt();
+        let t = 1.0 / 6.0_f64.sqrt();
+        let free = CubeTurn::from_rows([[r, r, r], [s, -s, 0.0], [t, t, -2.0 * t]]).unwrap();
+        let mut rng = Rng(3);
+        for _ in 0..1_000 {
+            let q = [
+                rng.range(-1000, 1000) as f64,
+                rng.range(-1000, 1000) as f64,
+                rng.range(-1000, 1000) as f64,
+            ];
+            let back = free.to_planet(free.to_cube(q));
+            for k in 0..3 {
+                assert!((back[k] - q[k]).abs() < 1e-12, "{q:?} {back:?}");
+            }
+        }
+        // reflections and non-orthonormal rows are refused
+        assert!(CubeTurn::from_rows([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]]).is_err());
+        assert!(CubeTurn::from_rows([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.1, 1.0]]).is_err());
     }
 }

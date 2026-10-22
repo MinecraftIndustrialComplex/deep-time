@@ -1650,7 +1650,10 @@ mod petroff_guyou_tests {
             assert_eq!((4 * s) % 512, 0, "the x period is whole region files");
             assert_eq!((s / 2) % 16, 0, "the turn pivots sit on chunk corners");
             let exact = f64::from(c) / (6.0 * std::f64::consts::PI).sqrt();
-            assert!((f64::from(s) - exact).abs() <= 128.0, "C {c}: s {s} vs {exact}");
+            assert!(
+                (f64::from(s) - exact).abs() <= 128.0,
+                "C {c}: s {s} vs {exact}"
+            );
         }
     }
 
