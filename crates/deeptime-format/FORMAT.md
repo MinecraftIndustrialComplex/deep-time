@@ -1580,7 +1580,10 @@ TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
   slot surrounded by sea (Biomes O' Plenty: mushroom fields) leaves land, not ocean. Other levels are not
   touched.
 - **Roles**, in priority order, each a disc in blocks around its centre (R the basal radius
-  `radius_m` / `m_per_block_h`, at least 6; r = `volcanic_biome_reach`); no disc is under 8 blocks in radius:
+  `radius_m` / `m_per_block_h`, at least 6; r = `volcanic_biome_reach`); no disc is under 8 blocks in radius.
+  On a Petroff-Guyou world a volcano's crater, caldera, cone and field zones are instead the ellipse the
+  projection makes of that circle in the simulation's frame at the vent (semi-axes from the projection's
+  Jacobian there, each at least 8 blocks; ledger BIO-182); hot-spring fields and thermal caves stay discs:
   `hot_spring_field` (every hot-spring pool, from a volcano or hot ground: its reach + 4),
   `caldera` (a crater with `caldera: true`: 0.9 of its rim radius), `crater` (any other crater: its rim
   radius + 4), `cone` (stratovolcanoes and shields: 0.45 R · r), `ash_field` (stratovolcanoes and caldera
@@ -1588,7 +1591,7 @@ TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
   with a chamber: 1.5 chamber radii). An ash or lava field narrower than 8 blocks beyond the zone inside it
   is left out.
 - **The biome of a role** is the first biome of `#deeptime:volcanic/<role>` (the tag's order) that the
-  level's biome source can place; with none, the role gives way to the next role whose disc holds the
+  level's biome source can place; with none, the role gives way to the next role whose zone holds the
   column, and in the end to the climate search. Surface roles answer where the biome depth parameter is
   under 0.2 (vanilla's cave biomes start at 0.2), on land (terrain height at the cell's centre at or
   above the sea level) and not on a river channel (variant input exactly 0); `ash_field` and
