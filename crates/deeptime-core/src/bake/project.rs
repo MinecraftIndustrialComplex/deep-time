@@ -260,7 +260,7 @@ impl Src {
 
 /// Writes raw value `v` of `dtype` into `out` (integers rounded half away from zero and clamped
 /// to the type's range).
-fn put_raw(dtype: DType, v: f64, out: &mut [u8]) {
+pub(crate) fn put_raw(dtype: DType, v: f64, out: &mut [u8]) {
     let r = |lo: f64, hi: f64| v.round().clamp(lo, hi);
     match dtype {
         DType::U8 => out[0] = r(0.0, 255.0) as u8,
@@ -1212,6 +1212,15 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
     let mut shares = serde_json::Map::new();
     let mut closed_note = json!(null);
+    // The block-scale relief (`bake::relief`) reads the world's ice cover (L2, resampled before the
+    // elevation's L3) and the simulation's rivers and standing volcanoes.
+    let mut world_ice: Option<LoadedLayer> = None;
+    let mut world_class: Option<LoadedLayer> = None;
+    let rivers_sim = read_rivers(dir)?;
+    let standing = crate::bake::relief::read_standing(dir)?;
+    let relief_noise = spec_seed.map(|s| deeptime_format::Noise::for_world(s, period, &wp));
+    let m_per_block_v = m.scale.m_per_block_v;
+    let mut relief_note = json!(null);
     for (gname, entries) in &by_grid {
         let src_grid = m
             .grids
@@ -1289,6 +1298,27 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 });
             }
         }
+        // The block-scale relief on the world's own ground, before anything reads it: the sea and
+        // land and the closed basins stay as they are (`bake::relief`).
+        if let Some(k) = srcs.iter().position(|s| s.entry == elev_entry) {
+            let water = srcs.iter().position(|s| s.layer.desc.name == "water_level");
+            let mut elev = std::mem::take(&mut outs[k]);
+            let on = crate::bake::relief::OnWorld {
+                map: &map,
+                grid: &wg,
+                water: water.map(|w| (&srcs[w].layer.desc, &outs[w][..])),
+                ice: world_ice.as_ref(),
+                class_top: world_class.as_ref(),
+                rivers: rivers_sim.as_ref(),
+                standing: standing.as_ref(),
+                noise: relief_noise,
+                sea_y: sea,
+                planet_r_m: f64::from(c_sim) * p.scale.m_per_block_h / std::f64::consts::TAU,
+                m_per_block_v,
+            };
+            relief_note = on.draw(&srcs[k].layer.desc, &mut elev);
+            outs[k] = elev;
+        }
 
         let tl = Instant::now();
         for (s, bytes) in srcs.iter().zip(outs) {
@@ -1329,6 +1359,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 "detail/amplitude" => world_amp = Some(world),
                 "water_level" => world_water = Some(world),
                 CLOSED_BASIN => world_closed = Some(world),
+                "surface/class_top" => world_class = Some(world),
                 "climate/ice_cover" => {
                     shares.insert(
                         "ice_cover_map".into(),
@@ -1338,6 +1369,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                         "ice_cover_true".into(),
                         json!(area_share(&s.layer, false, |v| v > 0.0)),
                     );
+                    world_ice = Some(world);
                 }
                 _ => {}
             }
@@ -1527,8 +1559,8 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             crc32,
         });
     };
-    if let Some(r) = read_rivers(dir)? {
-        let (out, splits) = project_rivers(&map, &r, frame);
+    if let Some(r) = &rivers_sim {
+        let (out, splits) = project_rivers(&map, r, frame);
         let (bytes, crc) = write_rivers(dir, &out)?;
         set_file(m, deeptime_format::rivers::RIVERS_PATH, bytes, crc);
         vec_note.insert(
@@ -1628,6 +1660,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     }
     for rel in [
         crate::underground::VOLCANOES_PATH,
+        crate::bake::relief::STANDING_PATH,
         crate::surface::impacts::CRATERS_PATH,
     ] {
         let path = dir.join(rel);
@@ -1638,10 +1671,10 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             &std::fs::read(&path).map_err(|e| CoreError::io(path.clone(), e))?,
         )
         .map_err(|e| err(format!("{rel}: {e}")))?;
-        let key = if rel == crate::underground::VOLCANOES_PATH {
-            "volcanoes"
-        } else {
+        let key = if rel == crate::surface::impacts::CRATERS_PATH {
             "craters"
+        } else {
+            "volcanoes"
         };
         if let Some(list) = v[key].as_array_mut() {
             for o in list {
@@ -1697,6 +1730,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         "lambda_c": lambda_c_note,
         "m_per_block_h": m.scale.m_per_block_h,
         "layers": layer_notes,
+        "relief": relief_note,
         "shares": Value::Object(shares),
         "pole_anisotropy": aniso,
         "top_raise": tops_note,
