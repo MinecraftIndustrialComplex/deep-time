@@ -7,6 +7,9 @@ Ledger ids on this page: `SCL-140` to `SCL-152` (see [claims.md](claims.md), led
 [SCL](ledger/SCL.md)). The rules the solvers keep are ledgered with the raster's solvers:
 `ERO-169` (slope failure), `ERO-183` (multigrid), `ERO-184` (the parallel flood).
 
+The code's interface, and what the later items (climate, flexure, plates and ice, the GPU, the
+bake's resample) need from it, is in [the design note](../design/cube-simulation-grid.md).
+
 ## What you see in the world
 
 Nothing yet. The cube grid is opt-in: no stage, preset or bake uses it, and every world is still
