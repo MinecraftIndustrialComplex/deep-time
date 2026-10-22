@@ -691,8 +691,9 @@ mod tests {
         assert!(left.abs() < 0.01 * h, "{} vs {}", level.z[up], plane[up]);
         let far = crate::surface::volcanoes::cell_of(&g2, 3.0 * r / mh, 0.0);
         assert_eq!(level.z[far], young.data[far]);
-        for c in 0..n {
-            assert!(f64::from(level.z[c] - plane[c]) <= 2.0 * h + 1.0);
+        assert_eq!(level.z.len(), n);
+        for (&z, &p) in level.z.iter().zip(&plane) {
+            assert!(f64::from(z - p) <= 2.0 * h + 1.0);
         }
     }
 
