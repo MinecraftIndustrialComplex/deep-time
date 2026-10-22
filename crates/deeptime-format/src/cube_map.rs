@@ -454,6 +454,17 @@ impl CubeMap {
         )
     }
 
+    /// A shipped table by name, borrowed for the process's life (as [`CubeMap::builtin`]).
+    pub fn builtin_static(name: &str) -> Option<&'static CubeMap> {
+        static LOADED: [OnceLock<Arc<CubeMap>>; 2] = [OnceLock::new(), OnceLock::new()];
+        let i = BUILTIN.iter().position(|b| b.0 == name)?;
+        Some(
+            LOADED[i]
+                .get_or_init(|| CubeMap::builtin(name).expect("a builtin name"))
+                .as_ref(),
+        )
+    }
+
     /// The world's map ([`WORLD_MAP`]).
     pub fn world() -> Arc<CubeMap> {
         CubeMap::builtin(WORLD_MAP).expect("the world's table ships with the crate")
@@ -778,7 +789,8 @@ pub struct WorldJacobian {
 
 /// A cube world: the net, the map table, the turn that places the cube on the planet and the
 /// planet's size. Latitude, the poles and every metres-per-block figure come from here, never from
-/// the net alone (coordinator, 2026-10-22: the world's turn is free).
+/// the net alone (coordinator, 2026-10-22: the world's turn is free). Owns its parts; its methods
+/// are [`CubeView`]'s.
 #[derive(Clone, Debug)]
 pub struct CubeWorld {
     cube: Cube,
@@ -801,6 +813,17 @@ impl CubeWorld {
         }
     }
 
+    /// The world borrowed as a [`CubeView`] (Copy), whose methods these are.
+    #[inline]
+    pub fn view(&self) -> CubeView<'_> {
+        CubeView {
+            cube: &self.cube,
+            map: &self.map,
+            turn: self.turn,
+            radius_m: self.radius_m,
+        }
+    }
+
     pub fn cube(&self) -> &Cube {
         &self.cube
     }
@@ -818,6 +841,107 @@ impl CubeWorld {
         self.radius_m
     }
 
+    /// See [`CubeView::unit_on_face`].
+    #[inline]
+    pub fn unit_on_face(&self, face: Face, u: f64, v: f64) -> [f64; 3] {
+        self.view().unit_on_face(face, u, v)
+    }
+
+    /// See [`CubeView::unit`].
+    pub fn unit(&self, x: f64, z: f64) -> Option<[f64; 3]> {
+        self.view().unit(x, z)
+    }
+
+    /// See [`CubeView::local_of_unit`].
+    pub fn local_of_unit(&self, p: [f64; 3]) -> (Face, f64, f64) {
+        self.view().local_of_unit(p)
+    }
+
+    /// See [`CubeView::point_of_unit`].
+    pub fn point_of_unit(&self, p: [f64; 3]) -> (f64, f64) {
+        self.view().point_of_unit(p)
+    }
+
+    /// See [`CubeView::lat_lon`].
+    pub fn lat_lon(&self, x: f64, z: f64) -> Option<(f64, f64)> {
+        self.view().lat_lon(x, z)
+    }
+
+    /// See [`CubeView::point_of_lat_lon`].
+    pub fn point_of_lat_lon(&self, lat_deg: f64, lon_deg: f64) -> (f64, f64) {
+        self.view().point_of_lat_lon(lat_deg, lon_deg)
+    }
+
+    /// See [`CubeView::jacobian_on_face`].
+    pub fn jacobian_on_face(&self, face: Face, u: f64, v: f64) -> WorldJacobian {
+        self.view().jacobian_on_face(face, u, v)
+    }
+
+    /// See [`CubeView::jacobian`].
+    pub fn jacobian(&self, x: f64, z: f64) -> Option<WorldJacobian> {
+        self.view().jacobian(x, z)
+    }
+
+    /// See [`CubeView::north`].
+    pub fn north(&self, x: f64, z: f64) -> Option<(f64, f64)> {
+        self.view().north(x, z)
+    }
+
+    /// See [`CubeView::north_pole`].
+    pub fn north_pole(&self) -> (Face, f64, f64) {
+        self.view().north_pole()
+    }
+
+    /// See [`CubeView::south_pole`].
+    pub fn south_pole(&self) -> (Face, f64, f64) {
+        self.view().south_pole()
+    }
+
+    /// See [`CubeView::corner_unit`].
+    pub fn corner_unit(&self, cube: [i8; 3]) -> [f64; 3] {
+        self.view().corner_unit(cube)
+    }
+
+    /// See [`CubeView::corner_lat_lon`].
+    pub fn corner_lat_lon(&self, cube: [i8; 3]) -> (f64, f64) {
+        self.view().corner_lat_lon(cube)
+    }
+}
+
+/// A cube world borrowed: the net, the map, the turn and the planet's radius in the unit its
+/// Jacobians are given in (metres for [`CubeWorld::view`]; blocks of the equal-area sphere for a
+/// world read from its manifest, [`crate::projection::WorldProjection::Cube`]). Copy, so a world's
+/// projection can be passed by value as the other projections are.
+#[derive(Clone, Copy)]
+pub struct CubeView<'a> {
+    pub cube: &'a Cube,
+    pub map: &'a CubeMap,
+    pub turn: CubeTurn,
+    /// The planet's radius in the Jacobians' unit.
+    pub radius_m: f64,
+}
+
+impl std::fmt::Debug for CubeView<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CubeView")
+            .field("s", &self.cube.side())
+            .field("map", &self.map.name())
+            .field("turn", &self.turn)
+            .field("radius", &self.radius_m)
+            .finish()
+    }
+}
+
+impl PartialEq for CubeView<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cube.side() == other.cube.side()
+            && self.map.sha256() == other.map.sha256()
+            && self.turn == other.turn
+            && self.radius_m == other.radius_m
+    }
+}
+
+impl<'a> CubeView<'a> {
     /// The planet unit vector of a face's local point.
     #[inline]
     pub fn unit_on_face(&self, face: Face, u: f64, v: f64) -> [f64; 3] {
