@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.farterrain;
 
+import com.minecraftindustrialcomplex.deeptime.climate.ColdBiomeSearch;
 import com.minecraftindustrialcomplex.deeptime.rock.PaletteRules;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Columns;
@@ -103,7 +104,24 @@ public final class FarTerrain {
         // The rule SurfaceSystem paints this level's chunks with (NoiseBasedChunkGenerator.buildSurface
         // reads the registry settings), seeing the biomes the chunks store: x folded into the lap.
         this.packRule = PackSurfaceRule.of(level, generator, generator.sourceSettings().value().noiseSettings(), DelegatingRuleSource.levelRule(generator.sourceSettings().value().surfaceRule()),
-                (qx, qy, qz) -> source.getNoiseBiome(QuartPos.fromBlock(terrain.wrapX(QuartPos.toBlock(qx))), qy, qz, climate));
+                (qx, qy, qz) -> noiseBiome(QuartPos.fromBlock(terrain.wrapX(QuartPos.toBlock(qx))), qy, qz));
+    }
+
+    /**
+     * The biome source at quart cell (qx, qy, qz), x already folded, searched cold
+     * ({@link ColdBiomeSearch}): the answer at a tie between equally near climate entries is the
+     * same on every thread, whatever the thread built before. A warm search let a section depend on
+     * its thread: the sea-bed rule reads biomes through a per-thread cache, so threads asked in
+     * different orders, and at a tie (deep lukewarm ocean against deep ocean at block (844, 396) on
+     * the test planet) each kept the entry it had found last.
+     */
+    private Holder<Biome> noiseBiome(int qx, int qy, int qz) {
+        ColdBiomeSearch.begin();
+        try {
+            return biomes.getNoiseBiome(qx, qy, qz, sampler);
+        } finally {
+            ColdBiomeSearch.end();
+        }
     }
 
     /** Far terrain for {@code level}, when it is a Deep Time level generating from world data. */
@@ -181,7 +199,7 @@ public final class FarTerrain {
 
     /** The biome a real chunk stores for block (x, y, z): the biome source at its quart cell, x folded. */
     public Holder<Biome> biomeAt(int x, int y, int z) {
-        return biomes.getNoiseBiome(QuartPos.fromBlock(terrain.wrapX(x)), QuartPos.fromBlock(y), QuartPos.fromBlock(z), sampler);
+        return noiseBiome(QuartPos.fromBlock(terrain.wrapX(x)), QuartPos.fromBlock(y), QuartPos.fromBlock(z));
     }
 
     /**
