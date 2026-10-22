@@ -2,8 +2,10 @@
 
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02, package WP-2)`.
 
-Ledger ids on this page: `VOL-001` to `VOL-074` ([ledger/VOL.md](ledger/VOL.md)) and `MAG-001` to
-`MAG-057` ([ledger/MAG.md](ledger/MAG.md)). Of these 131 rows (the 15 rows MAG-043 to MAG-057 of 2026-10-02 are all `game-choice`; the tallies in the next sentence are those of the first 116), 84 are `game-choice`, 25 `uncited`,
+Ledger ids on this page: `VOL-001` to `VOL-074`, `VOL-080` to `VOL-082` and `VOL-100` to `VOL-123`
+([ledger/VOL.md](ledger/VOL.md)) and `MAG-001` to `MAG-057` ([ledger/MAG.md](ledger/MAG.md)). The 24
+lava-flow rows of 2026-10-22 (VOL-100 to VOL-123) are 16 `game-choice`, 3 `verified`, 3
+`from-memory` and 2 `abstract-only`. Of the 131 rows VOL-001 to VOL-074 and MAG-001 to MAG-057 (the 15 rows MAG-043 to MAG-057 of 2026-10-02 are all `game-choice`; the tallies in the next sentence are those of the first 116), 84 are `game-choice`, 25 `uncited`,
 2 `verified`, 2 `abstract-only`, 1 `cited-unverified` and 2 `calibrated` (after stage 2: 81 `game-choice`, 28
 `uncited`, 1 `calibrated`; stage 1: 47 `game-choice`, 63 `uncited`, 4 `cited-unverified`, 1 `calibrated`).
 Ben's decisions of 2026-10-02 changed three defaults and added one setting (see "Decisions of 2026-10-02").
@@ -73,6 +75,23 @@ the lake's floor, whatever the cave, walled in by its basalt sleeve (MAG-018; si
 a cave entrance in the crater of the test planet's shield, open to the sky down to y 46, 41 blocks
 under the lake's floor, left the column an open shaft with the lake's lava hanging over it).
 Extinct volcanoes have no magma.
+
+**Lava flows** (since 2026-10-22, review fix 8; VOL-100 to VOL-123). The ground of each active
+volcano carries the lava flows of its recent eruptions, as paint on the top block: lines one block
+wide, two on gentle ground, that run downhill from just past the crater's rim (on a shield, half of
+them from flank vents on two opposite rift zones), follow gullies, pool briefly in hollows, stop at
+water and end in a small lobe. A shield's flows are 1.2 to 51 km long (about 4 to 173 blocks on the
+q1 quick planet, 294.6 m a block), an arc or silicic cone's 0.5 to 12 km (about 2 to 41 blocks). A
+fresh shield flow is blackstone (aa) or smooth basalt (pahoehoe), a fresh flow of a viscous cone
+blackstone (blocky lava); older flows turn to tuff (grey with lichen), then to patches of coarse dirt
+(brown, oxidised, with the first soil), then vanish under the biome's own ground. How long that
+takes follows the rain: on a desert cone a flow stays black for about 15,000 years and shows for
+250,000; on Hawaii's wet side it greys in about 12 years and is under forest in 150. So a dry cone
+shows hundreds of flows and a wet one few or none. Measured on the q1 planet: the dry shield 12754
+(44 mm of rain a year at its driest) shows 256 flows on 10,224 columns, 5 % of its base; cones at
+about 280 mm show 100 to 150 flows on 3 to 6 %. The pack's own dark stripes in the volcanic biomes
+(Terralith draws them as contours of a noise) are left out of Deep Time levels, so the dark lines on
+a cone are its flows. Ice and snow lie over flows. The paint changes no block's height.
 
 **Lava elsewhere.** The random lava lakes and springs of vanilla Minecraft and of Terralith are
 removed. The only other lava is a layer at the very bottom of the world (below y -502 in the default
@@ -149,6 +168,31 @@ catalogue of individual volcanoes that ride on their plates.
     Lens radius is the chamber's radius times `magma_lens_width` (1.5) times a kind share: shields 1.4, arc cones 1.0, silicic centres 0.9 (their
     shallow chamber is 1.6 times larger), and quiet volcanoes' lenses are down to 0.7 of an active one's.
     The column's bottom comes from the level's own `min_y`, not from a number.
+11. **Lava flows in the game** (VOL-100 to VOL-123; the Minecraft side only, from the baked world
+    data, nothing in the simulation). For each active volcano the game draws its eruptions back
+    from the present as a Poisson process: 0.19 a year at full activity for a shield (Mauna Loa's
+    34 eruptions since 1843, VOL-105), 0.01 for an arc or silicic cone (VOL-106, from memory), times
+    the volcano's activity. Each eruption leaves one flow whose length is drawn log-uniform between
+    bounds read from Earth's flows: basalt 1.2 to 51 km, viscous lava 0.5 to 12 km, so that the
+    medians stand in Walker's ratio of 3.2 (VOL-100 to VOL-104). Drawing stops when the flows are
+    older than a flow stays visible at the driest point on the cone, when the visible flows cover
+    35 % of the basal disc (Mauna Loa's share in 1,000 years, VOL-112), or at 256 flows (VOL-113).
+    A flow starts a block past the crest of the crater's rim (VOL-115) or, on a shield, half the
+    time at a flank vent (VOL-114), and steps half a block at a time down the steepest descent of
+    the height the generator draws, so it follows the gullies and the crater the amplifier carves.
+    A smooth per-flow wander turns it up to 35° either side while the way still goes down. Where the
+    way down turns back on itself it follows a gully's floor, or fills a closed hollow up to its
+    own thickness (5 m for basalt, 40 m for viscous lava, VOL-117) and stops at the brim; it also
+    stops at water and when its length is used up (VOL-116). Lengths, slopes and the descent are
+    measured on the ground through the world's metric (from the projection's sphere, VOL-120), so
+    the flows do not depend on the projection's frame. A long basaltic flow (one fed fast) is aa
+    from its vent; a short one is pahoehoe until it crosses ground steeper than 8° (VOL-118, from
+    memory). Each painted column then shows the flow's stage by its age against the rain there
+    (VOL-107 to VOL-111): fresh, weathered, oxidised in patches, then covered. Younger flows lie
+    over older ones. A volcano's flows are traced once, when any column within their reach is
+    first asked for, from the volcano list, the drawn height, the water and the rain, so chunks and
+    far terrain (Distant Horizons) show the same flows. In the volcanic biomes the pack's noise
+    stripes of blackstone and smooth basalt are left out (VOL-123).
 
 ## Equations and constants
 
@@ -208,6 +252,36 @@ Magma and lava.
 | MAG-028, MAG-029 | Vanilla's lava rules the mod replaces | lava below y −54; cave lakes at y −10 or lower may be lava | blocks | Minecraft 1.21.1 source, read | `verified` |
 | MAG-034 | Random lava lakes and springs | removed | – | Ben, decisions log 2026-10-01 | `game-choice` |
 
+Lava flows (paint). `a` is a flow's age, `f` and `v` the times a flow stays fresh and stays
+visible at the column's rain.
+
+| Ledger id | Quantity | As coded | Units | Source | Status |
+|---|---|---|---|---|---|
+| VOL-100 | Longest basaltic flow | 51 | km | Riker et al. 2009 (abstract): Mauna Loa 1859 | `abstract-only` |
+| VOL-101 | Longest viscous flow | 12 | km | USGS Medicine Lake page (andesite under 12 km); USGS VHP (rarely over 8 km) | `verified` |
+| VOL-102 | Shortest viscous flow | 0.5 | km | agent | `game-choice` |
+| VOL-103 | Median basaltic flow length over a viscous one | 3.2 | – | Walker 1973 (abstract) | `abstract-only` |
+| VOL-104 | Shortest basaltic flow, lengths log-uniform | 3.2² × 0.5 × 12 / 51 = 1.2 (medians 7.8 and 2.4 km) | km | derived from the rows above | `game-choice` |
+| VOL-105 | A shield's flows at activity 1 | 34 / 179 = 0.19 | per yr | USGS Mauna Loa FAQ: 34 eruptions since 1843 | `verified` |
+| VOL-106 | A viscous cone's flows at activity 1 | 0.01 | per yr | none read | `from-memory` |
+| VOL-107 | Arid anchor (150 mm of rain or less) | f 15,000; v 250,000 | yr | Cima volcanic field, at second hand (Wikipedia; Wells et al. 1985 not read) | `from-memory` |
+| VOL-108 | Kona anchor (380 mm) | f 1,500; v 3,000 | yr | HVO Volcano Watch 1996; Kinney et al. 2015 | `game-choice` |
+| VOL-109 | Hilo anchor (3,800 mm or more) | f 12; v 150 | yr | HVO Volcano Watch 1996, 1999 | `game-choice` |
+| VOL-110 | Between anchors; no climate | ln t linear in ln P; 1,000 mm where the world has no rain layer | – | agent | `game-choice` |
+| VOL-111 | Stages | fresh for a < f; weathered for a < √(f v); oxidised, a column kept with chance 1 − 0.75 ln(a / √(f v)) / ln(v / √(f v)); covered for a ≥ v | – | HVO Volcano Watch 2006 (black, grey, brown) | `game-choice` |
+| VOL-112 | Cover cap | 0.35 of π R² | share | USGS Mauna Loa FAQ: 35 to 40 % in 1,000 years | `game-choice` |
+| VOL-113 | Flows a volcano | at most 256 | – | agent (a cost bound) | `game-choice` |
+| VOL-114 | Flank vents of a shield | half its flows, on two opposite rift zones, ±25°, out to 0.5 R | – | agent | `game-choice` |
+| VOL-115 | Summit start | 1 block past the crest of the crater's rim | blocks | agent | `game-choice` |
+| VOL-116 | Path | half-block steps of steepest descent through the metric; wander ±35° on a 3-block lattice; gully floors followed; closed hollows filled | – | agent; DOWNFLOW (Favalli et al. 2005, Chevrel et al. 2021) compared | `game-choice` |
+| VOL-117 | Fill depth of a hollow | basalt 5; viscous 40 | m | USGS FS 144-02 (aa 3 to 5 m); NPS (Trident andesite 25 to 60 m) | `verified` |
+| VOL-118 | Pahoehoe to aa | long basaltic flows aa from the vent; others aa after ground over 8° | degrees | Peterson & Tilling 1980 (abstract); Rowland & Walker 1990 (search summary) | `from-memory` |
+| VOL-119 | Width | 1 column; 2 on ground under 5°; toe lobe 1.25 blocks in radius | blocks | none found | `game-choice` |
+| VOL-120 | Metric | G = JᵀJ from the projection's sphere, at the vent, scales within 4 times the nominal block | – | agent | `game-choice` |
+| VOL-121 | Lava of a volcano | shields basaltic; arc and silicic cones viscous | – | agent | `game-choice` |
+| VOL-122 | Blocks | aa and blocky blackstone; pahoehoe smooth basalt; weathered tuff; oxidised coarse dirt; a pack's tags may replace them | – | HVO Volcano Watch 2006 for the order of colours | `game-choice` |
+| VOL-123 | The pack's stripes | in `#deeptime:volcanic` biomes, noise bands within ±1.5 that paint blackstone or smooth basalt are dropped | – | agent | `game-choice` |
+
 The full tables, with file and symbol for each row, are in the ledger files.
 
 ## Earth against the mod
@@ -237,6 +311,15 @@ Earth, from the sources read in stage 2:
 | Highest volcano | Ojos del Salado, 6,893 m | Wikipedia citing the Global Volcanism Program (secondary) | ceiling 6.8 km |
 | Deccan Traps | section 2,500 m thick; bulk erupted within about 1 Myr | Courtillot & Renne 2003, library text | pile 1,500 m; 8 flows |
 | Flood basalt provinces | 16 over about 345 Myr, about one per 22 Myr | Courtillot & Renne 2003, abstract (stage 1); the division is ours | one per 59 Myr in a 1,000 Myr run |
+| Longest lava flows | basalt: Mauna Loa 1859, 51 km; Giant Crater (Medicine Lake), 45 km; andesite under 12 km (Medicine Lake), rarely over 8 km (VHP); Trident andesite 2.5 to 4 km | Riker et al. 2009, abstract; USGS and NPS pages, fetched 2026-10-22 | basalt 1.2 to 51 km, viscous 0.5 to 12 km, log-uniform |
+| Basaltic against viscous flow lengths | median 3.2 times | Walker 1973, abstract (Malin 1980, abstract: length goes better with volume than with effusion rate) | 3.2 by construction |
+| Eruptions of a shield | Mauna Loa 34 since 1843, one in about 5 years | USGS Mauna Loa FAQ, fetched | 0.19 a year at activity 1 (0.12 on the q1 shield, activity 0.63) |
+| Share of a shield under young flows | Mauna Loa 35 to 40 % under 1,000 years, 14 % under 150; Kilauea 90 % under 1,100 years | USGS Mauna Loa FAQ; USGS, Volcanoes of the United States; fetched | at most 35 %; measured 5.4 % on the q1 shield over 250,000 years (flows 1 or 2 blocks wide) |
+| How fast flows weather | Kona (10 to 20 in a year): flows of 137, about 200 and over 1,500 years still bare and black; Hilo (100 to 200 in): a 115-year flow under large trees, lichen in 12 years, forest in under 150; dry land: flows under 300 years 94 to 96 % barren, tree height peaks at 1.5 to 3 kyr on aa | HVO Volcano Watch 1996 and 1999; Kinney et al. 2015; fetched | fresh 1,500 and visible 3,000 years at 380 mm; 12 and 150 at 3,800 mm |
+| Desert flows | Cima (Mojave): Black Tank, 12 to 15 ka, still crisp; older flows mantled, the mantle most extensive at 0.25 to 0.75 Myr | Wikipedia and a search summary of Wells et al. 1985 (not read); Miller & Buesch 2022, abstract | fresh 15,000 and visible 250,000 years at 150 mm |
+| Flow thickness | aa 3 to 5 m (Pu'u 'O'o); Trident andesite 25 to 60 m | USGS FS 144-02; NPS; fetched | 5 and 40 m, used only to fill hollows |
+| Pahoehoe and aa | nearly all Hawaiian lava erupts as pahoehoe and some turns to aa with shear; aa above about 5 to 10 m³/s; either at any distance from the vent | Peterson & Tilling 1980, abstract; Rowland & Walker 1990, search summary; Oregon State Volcano World | long flows aa from the vent, others after ground over 8° |
+| Flow widths | Pu'u 'O'o's channels 5 to 25 m | Heliker et al., search summary only | 1 or 2 blocks, 0.3 to 0.6 km |
 
 Measured in the mod. The first rows are from the build log; the stage 2 rows are from the runs
 described under them.
@@ -339,6 +422,49 @@ What these runs show:
 - **Standing shields**: 4.5 on average (0-9) against 7.2 (4-14), not separable from run-to-run
   scatter and from the changed hypsometry.
 
+Lava flows on the q1 quick planet (review fix 8, 2026-10-22). The planet: Petroff-Guyou projection,
+circumference 13,312 blocks, 294.6 m a block across and 35 m up, sea at y 63, 181 active volcanoes.
+Two previews of five boxes under the MIC set, one level seed (20261022) for both, on the test VM:
+`tools/workbench/preview.py run --profile=mic --size=13312 --world-data=<q1> --y=20,280
+--seed=20261022 --box=...`, before from master 7787c857 and after from this branch (commit
+94f5c445). The flows' own counts are the game's log lines (one a volcano); block counts are the top
+block of the ground under plants and snow layers, from the exported areas.
+
+| Volcano | Kind | Flows | Window (driest rain on the cone) | Columns showing | Share of the basal disc | How the flows ended |
+|---|---|---|---|---|---|---|
+| 12754 | shield, activity 0.63 | 256 | 250,000 yr (44 mm) | 10,224: aa 8,648, pahoehoe 994, weathered 329, oxidised 253 | 5.4 % | length 237, water 11, loop 4, hollow 4 |
+| 13650 | stratovolcano | 256 | 250,000 yr (55 mm) | 1,729 | 11.9 % | length 256 |
+| 13601 | stratovolcano, under the ice | 256 | 250,000 yr (23 mm) | 1,168 (under snow blocks in the world) | 8.1 % | length 255, hollow 1 |
+| 13594 | stratovolcano | 145 | 13,410 yr (277 mm) | 807: blocky 420, weathered 252, oxidised 135 | 5.6 % | length 136, hollow 5, loop 2, water 2 |
+| 13617 | stratovolcano | 103 | 12,102 yr (283 mm) | 463: blocky 204, weathered 174, oxidised 85 | 3.2 % | length 101, hollow 2 |
+| 13597 | stratovolcano | 53 | 5,746 yr (331 mm) | 243: blocky 115, weathered 77, oxidised 51 | 1.7 % | length 53 |
+| 13610, 13609, 13749 | stratovolcanoes | 18, 6, 2 | 1,889, 648, 986 yr (542 to 1,234 mm) | 102, 62, 13 | 0.4 to 0.7 % | |
+| 13620, 13699, 13745 | stratovolcanoes | 30, 3, 1 | | 0 | 0 | every vent under water |
+
+| Area (ground blocks) | blackstone | smooth basalt | tuff | coarse dirt | basalt |
+|---|---|---|---|---|---|
+| Shield 12754, 256 by 256 around the summit, before | 8,922 | 10,379 | 1,108 | 85 | 9,004 |
+| the same, after | 4,530 | 1,560 | 1,239 | 255 | 24,016 |
+| Stratovolcano 13594, 128 by 128 around the vent, before | 427 | 465 | 0 | 1,419 | 865 |
+| the same, after | 483 | 298 | 206 | 1,504 | 994 |
+| Stratovolcano 13617, before | 712 | 902 | 575 | 810 | 1,370 |
+| the same, after | 291 | 154 | 756 | 877 | 2,302 |
+| Stratovolcano 13597, before | 678 | 738 | 0 | 1,642 | 1,079 |
+| the same, after | 282 | 157 | 66 | 1,669 | 1,974 |
+
+What the previews show:
+
+- **The stripes are gone and the flows run downhill.** Before, the summit of the shield was a mesh
+  of blackstone and smooth basalt contours of Terralith's noise; after, it is the pack's basalt
+  ground with dark lines that leave the summit and run down the flanks, bundled along the drainage
+  and out onto the plain beyond the cone. On the stratovolcanoes short spokes of blackstone, tuff
+  and coarse dirt leave the vent.
+- **The paint is a small share of the cone**, 2 to 12 %, because a flow is one or two blocks wide;
+  on the dry cones the 256-flow bound ends the count, not the 35 % cover cap.
+- **A level start.** Before the flows ran out from the vent on level ground (commit 0f337c3c), 92 of
+  the shield's 256 flows stopped at their first step: the elevation raster is quantised, so a gentle
+  summit holds level patches.
+
 ## Simplifications and limits
 
 - **Three kinds only.** There are no cinder cones, no volcanoes at mid-ocean ridges or in rifts,
@@ -388,6 +514,37 @@ What these runs show:
 - **Hardwired couplings.** The hotspot strength scale (VOL-008) mirrors the plate model's random
   plume strength range in another file, and the ceiling's normalisation (VOL-034) repeats the plate
   model's default crust strength. If either changes alone, volcano heights shift silently.
+- **Lava flows are paint, not eruptions.** They are drawn when the world is generated, from rates
+  and lengths; the simulation knows nothing of them, and they change no heights (no levees, no
+  flow fronts, no thickness on the ground).
+- **Only active volcanoes have flows.** The bake exports only the volcanoes active at the present,
+  so a young extinct cone, which on Earth would show flows for thousands of years in a dry climate,
+  shows none. Giving it flows needs the bake to export it: a world-data format change.
+- **Flows are narrow and cover little.** One or two blocks is 0.3 to 0.6 km at 294.6 m a block,
+  broad for a real flow but a thin line in the world, so the flows cover 2 to 12 % of a cone where
+  Mauna Loa's young flows cover 35 to 40 % in 1,000 years. On dry cones the bound of 256 flows ends
+  the count well before the 35 % cap.
+- **The cone and its flows are measured differently.** The amplifier draws a cone in the
+  simulation's frame, so the projection can stretch it; the flows measure length and slope on the
+  ground through the world's metric, read once at each vent. Until volcanoes are drawn round in
+  world blocks (on hold with the projection), a flow is the right length on a stretched cone. Flows
+  stop at the world's z edge.
+- **Ice hides flows.** The ice pass runs after the flows, so on an ice-capped cone (13601 on the q1
+  planet) they lie under snow blocks.
+- **Far away a flow is a broken line.** At a level of detail coarser than a block, far terrain
+  takes the paint of the one column it samples in each cell.
+- **Every arc cone is viscous.** Etna and Fuji erupt basalt; the catalogue holds no composition, so
+  their flows would be drawn short and blocky.
+- **Pahoehoe and aa by slope and length.** The real control is the flow rate and the shear in the
+  flow (Peterson & Tilling 1980; Rowland & Walker 1990); the game has neither per flow, so a long
+  flow is aa from its vent and a short one turns to aa on steep ground.
+- **The rain is the bake's mean annual precipitation**, read bilinear at each column; the arid
+  anchor rests on second-hand reading, and the time a flow shows is set by the driest point of the
+  cone.
+- **Only band stripes are recognised.** The filter drops a pack rule in a volcanic biome that paints
+  blackstone or smooth basalt on a band of a noise (both ends within ±1.5); a one-sided threshold
+  stays, so Terralith's Yellowstone keeps its calcite patches, and a pack that drew stripes some
+  other way would keep them.
 
 ## Game choices
 
@@ -414,6 +571,12 @@ What these runs show:
 | Stratovolcano lifetime 2 to 8 Myr (VOL-038) | one step is 2 Myr | agent, build log 2026-09-30 |
 | Eight flows in a flood basalt pile (VOL-052), terraces 80 m high (VOL-036) | visible layering and steps | agent, build log 2026-09-30 |
 | Implementation rules: the volcanic front, the flux threshold, merging, the blind step, retirement, rendering and fading (VOL-002, VOL-004, VOL-008 to VOL-011, VOL-027, VOL-028, VOL-040, VOL-042, VOL-043, VOL-047, VOL-049 to VOL-051, VOL-053 to VOL-055, VOL-061 to VOL-073) | how the stage turns plate data into cones and cones into blocks; no Earth counterpart | agent, build log 2026-09-30 and 2026-10-01; labelled WP-2 2026-10-02 |
+| Lava flows painted at active volcanoes, downhill from the rim, one or two blocks wide, paint only; the pack's noise stripes left out of the volcanic biomes (VOL-100 to VOL-123) | Terralith's stripes are contours of a noise: they neither start at a vent nor run downhill | the review of 2026-10-22 (fix 8 on the volcanoes review page), built by an agent under the coordinator |
+| A viscous cone makes a lava flow once a century at full activity (VOL-106) | no source read gives how often an arc cone makes a lava flow | agent, 2026-10-22 (from memory) |
+| Lengths log-uniform between Earth's bounds, the basaltic minimum set by Walker's ratio (VOL-102, VOL-104) | the sources give longest flows and a ratio of medians, not a distribution | agent, 2026-10-22 |
+| Three rain anchors for the weathering clock (VOL-107 to VOL-111) | the sources give Kona, Hilo and desert examples, not a law | agent, 2026-10-22 |
+| At most 256 flows, cover at most 35 % (VOL-112, VOL-113) | a cost bound and Mauna Loa's share | agent, 2026-10-22 |
+| Terralith's Yellowstone calcite patches kept (VOL-123) | they are patches, not lines, and Yellowstone is not a lava cone | agent, coordinator's call, 2026-10-22 |
 
 ## Decisions of 2026-10-02
 
@@ -489,6 +652,18 @@ Not yet settled, for a later package or a geologist:
     2026-10-19). With so few plumes most planets end with 0 to 3 active shields.
 14. **Where the lava floor goes** is undecided, and so is whether a median 658 blocks to the
     nearest volcano is acceptable for players (STATUS.md, pending questions).
+15. **Flows on extinct volcanoes** need the bake to export the recently extinct volcanoes, a
+    world-data format change and so Ben's to decide. Without it, a cone that died at the last step
+    shows bare ground where Earth's young dead cones (Cima, the Chaîne des Puys) show flows.
+16. **How often an arc cone makes a lava flow** (VOL-106) is from memory; Siebert et al. 2010
+    (Volcanoes of the World) may tabulate it.
+17. **The slope at which pahoehoe turns to aa** (VOL-118): no source read gives one; the sources
+    give a flow rate (about 5 to 10 m³/s, Rowland & Walker 1990, search summary only).
+18. **Flow widths** (VOL-119): no source read gives typical widths; whether a broad flow should be
+    drawn wider than two blocks is open.
+19. **Basaltic arc cones** (VOL-121): Etna and Fuji make long basaltic flows; the catalogue would
+    need a composition per volcano.
+20. **The desert anchor** (VOL-107): Wells et al. 1985 was not read, nor the Mojave's rain.
 
 ## Sources
 
@@ -513,9 +688,19 @@ Keys refer to [bibliography.md](bibliography.md).
 | Szabo1986 | subsidence of Hawaii | abstract only (stage 1); superseded by Clague & Sherrod 2014 |
 | Scaillet2008, Przeor2022 | magma storage depths | abstracts only (stage 1); no longer cited in code comments |
 | Wikipedia pages on named volcanoes | Crater Lake, Ojos del Salado, Fuji, lava lakes | secondary (stage 1) |
+| Riker2009, Walker1973, Malin1980 | flow lengths (VOL-100, VOL-103, VOL-104) | abstracts only, 2026-10-22 |
+| USGS-MedicineLake, USGS-VHP-LavaFlows, NPS-LavaFlows, OregonState-VolcanoWorld | flow lengths, thicknesses, pahoehoe and aa (VOL-101, VOL-102, VOL-117, VOL-118) | fetched, 2026-10-22 |
+| USGS-MaunaLoaFAQ, USGS-VolcanoesUS | Mauna Loa's eruptions and the share of young flows (VOL-105, VOL-112) | fetched, 2026-10-22 |
+| USGS-FS144-02 | aa thickness (VOL-117) | fetched, 2026-10-22 |
+| PetersonTilling1980, RowlandWalker1990 | pahoehoe and aa (VOL-118) | abstract; search summary only |
+| HVO-VW1996, HVO-VW1999, HVO-VW2006, Kinney2015 | weathering and plant cover with age and rain; colours (VOL-108, VOL-109, VOL-111, VOL-122) | fetched, 2026-10-22 |
+| Wells1985, MillerBuesch2022 | desert flows (VOL-107) | not read (Wikipedia and a search summary); an abstract |
+| Favalli2005, Chevrel2021 | DOWNFLOW, compared with the path (VOL-116) | metadata only; fetched |
+| Papale2018, Heliker2003, Siebert2010, Wikipedia-Etna | eruption sizes, channel widths, flank eruptions (VOL-106, VOL-119) | fetched; search summary; not read; secondary |
 
 Session note: [`../research/notes/session-lava-realism.md`](../research/notes/session-lava-realism.md).
 Extraction notes, with 21 flags: [extraction-notes/VOL.md](extraction-notes/VOL.md) (flags 1 to 5
 are settled in the ledger rows; flag 4 rested on reading radii as widths).
 Build log: STATUS.md, "P1-21 volcanoes as landforms" (2026-09-30), "Magma under active volcanoes"
-and "Lava floods" (2026-10-01), "Science stage 2, WP-2: volcanoes and magma" (2026-10-02).
+and "Lava floods" (2026-10-01), "Science stage 2, WP-2: volcanoes and magma" (2026-10-02),
+"Review fix 8: lava flows" (2026-10-22).
