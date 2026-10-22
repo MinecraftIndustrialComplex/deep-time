@@ -20,6 +20,7 @@ mod strata_check;
 mod structure_sections;
 mod structure_view;
 mod synth;
+mod volcano_census;
 mod volcano_view;
 mod watch;
 mod world_map;
@@ -510,6 +511,17 @@ enum Command {
         #[arg(long)]
         world_data: PathBuf,
         /// Folder to write the pictures, `volcanoes.json` and `index.html` into.
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// How the active volcanoes of a world-data folder stand on the ground the game reads: the
+    /// summit's offset from the vent, the tilt of the ground under the cone and whether the
+    /// crater shows (VOL-080's acceptance measure), as JSON.
+    VolcanoCensus {
+        /// World-data folder.
+        #[arg(long)]
+        world_data: PathBuf,
+        /// The JSON report to write.
         #[arg(long)]
         out: PathBuf,
     },
@@ -1264,6 +1276,18 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some(Command::VolcanoCensus { world_data, out }) => {
+            match volcano_census::run(&world_data, &out) {
+                Ok(s) => {
+                    println!("deeptime volcano-census: {s} -> {}", out.display());
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("deeptime volcano-census: {e}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         Some(Command::Heightmap {
             world_data,
             area,

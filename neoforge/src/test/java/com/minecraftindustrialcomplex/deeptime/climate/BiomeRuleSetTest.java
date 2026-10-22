@@ -127,6 +127,32 @@ class BiomeRuleSetTest {
         assertEquals("mud_pools", first(ee, land("BWh"), "hot_spring_field"));
     }
 
+    /** The snow line (BIO-180): vanilla's snowy slots stand only on cold ground at the column's own height. */
+    @Test
+    void theSnowLineKeepsSnowToColdGround() throws IOException {
+        BiomeRuleSet.File snow = shipped("snow_line");
+        assertTrue(snow.requires().isEmpty(), "active with any pack");
+        String slopes = "minecraft:snowy_slopes", field = "#deeptime:snow_line/snowfield";
+        // A mild mountain (Csb at its own height) loses its snowy slopes and peaks; tundra and ice keep them.
+        assertEquals("above_the_tree_line", first(snow, new F("Csb", 9, 17, 3, 700, 1500, Wetland.NONE, false, false, false, "",
+                slopes, field), null));
+        assertEquals("above_the_tree_line", first(snow, new F("BSk", 6, 19, -6, 350, 1200, Wetland.NONE, false, false, false, "",
+                "minecraft:frozen_peaks", field), null));
+        assertEquals(null, first(snow, new F("ET", -6, 7, -20, 400, 2500, Wetland.NONE, false, false, false, "", slopes, field), null));
+        assertEquals(null, first(snow, new F("Csb", 9, 17, 3, 700, 1500, Wetland.NONE, true, false, false, "", slopes, field), null));
+        // The warmest month at exactly 10 degC is above the polar line (Koppen's E is under 10).
+        assertEquals("above_the_tree_line", first(snow, new F("Dfc", -2, 10, -14, 500, 900, Wetland.NONE, false, false, false, "",
+                slopes, field), null));
+        // A grove (snowy conifers) stands wherever the winter freezes, the boreal forest included; not in a mild winter.
+        assertEquals(null, first(snow, new F("Dfc", -2, 15, -14, 500, 900, Wetland.NONE, false, false, false, "", "minecraft:grove"), null));
+        assertEquals("freezing_winter", first(snow, new F("Cfb", 8, 15, 2, 1200, 900, Wetland.NONE, false, false, false, "",
+                "minecraft:grove"), null));
+        // Anything else is the pack's own.
+        assertEquals(null, first(snow, land("Csb"), null));
+        for (Rule r : snow.rules())
+            assertEquals(List.of("#deeptime:snow_line/snowless"), r.biomes(), r.id());
+    }
+
     @Test
     void peatlandTakesColdWetlandOnly() throws IOException {
         Rule peat = shipped("peatland").rules().get(0);

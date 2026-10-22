@@ -2,7 +2,9 @@
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
 import com.google.gson.JsonParser;
+import com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import com.minecraftindustrialcomplex.deeptime.worldgen.VolcanicZones.Role;
 import org.junit.jupiter.api.Test;
 
@@ -135,6 +137,101 @@ class VolcanicZonesTest {
                 C);
         assertTrue(none.zones().isEmpty());
         assertEquals(0, none.rolesAt(0, 0));
+    }
+
+    /**
+     * On a Petroff–Guyou world a cone's zones are its circle in the simulation's frame (east–west the
+     * radius times the longitude difference, north–south the radius times the unit vector's z difference),
+     * which the projection stretches into an ellipse; measured against that frame along 72 rays. The old
+     * discs fail it: at 55° the frame's circle is about three times (1/cos²) longer one way than the other.
+     */
+    @Test
+    void onAPetroffGuyouWorldTheZonesAreTheConesCircleInTheSimulationFrame() {
+        var pg = new PetroffGuyou(6656, 100.5);
+        double[] at = pg.blockOf(55.0, 150.0);
+        // The rays stop past 1.1 R (88 simulation blocks, a few hundred world blocks at most): clear of the z edge.
+        assertTrue(Math.abs(at[1]) < pg.zMax() - 500, "the test point is well inside the world's z range: " + at[1]);
+        var v = volcano(1, "stratovolcano", at[0], at[1], 80, 0.8, 6, false);
+        var z = VolcanicZones.build(List.of(v), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, (int) pg.period(), pg);
+        VolcanicZones.Zone cone = z.zones().stream().filter(zn -> zn.role() == Role.CONE).findFirst().orElseThrow();
+        assertTrue(cone.radius() > 2.0 * cone.minor(), cone.toString());
+        int vx = (int) Math.round(at[0]), vz = (int) Math.round(at[1]);
+        double rr = pg.radius();
+        double[] u0 = pg.unit(vx, vz);
+        double lon0 = Math.atan2(u0[1], u0[0]);
+        int[] seen = new int[3];
+        for (int k = 0; k < 72; k++) {
+            double th = k * Math.PI / 36.0;
+            for (int d = 1; d < 5000; d++) {
+                int x = vx + (int) Math.round(d * Math.cos(th)), zz = vz + (int) Math.round(d * Math.sin(th));
+                double[] u = pg.unit(x, zz);
+                double f = Math.hypot(rr * Math.IEEEremainder(Math.atan2(u[1], u[0]) - lon0, 2.0 * Math.PI), rr * (u[2] - u0[2]));
+                Role r = first(z, x, zz);
+                String where = "ray " + k + ", " + d + " blocks out, " + f + " simulation blocks; " + cone;
+                if (f < 0.9 * 36) {                                    // 0.45 R = 36
+                    assertTrue(r == Role.CRATER || r == Role.CONE, where + ": " + r);
+                    seen[0]++;
+                } else if (f > 1.1 * 36 && f < 0.9 * 80) {             // out to R = 80
+                    assertEquals(Role.ASH_FIELD, r, where);
+                    seen[1]++;
+                } else if (f > 1.1 * 80) {
+                    assertEquals(null, r, where);
+                    assertTrue(z.outsideSurfaceZones(x, zz) > 0.0, where);
+                    seen[2]++;
+                    break;
+                }
+            }
+        }
+        assertTrue(seen[0] > 100 && seen[1] > 100 && seen[2] == 72, java.util.Arrays.toString(seen));
+    }
+
+    @Test
+    void onALambertWorldTheZonesAreTheDiscsOfAWorldWithoutAProjection() {
+        var v = volcano(1, "stratovolcano", 1000, 2000, 80, 0.8, 6, false);
+        var c = volcano(2, "caldera_complex", -1000, -2500, 60, 0.9, 20, true);
+        var plain = VolcanicZones.build(List.of(v, c), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C);
+        var lambert = VolcanicZones.build(List.of(v, c), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C, WorldProjection.of(null, C));
+        assertEquals(plain.zones(), lambert.zones());
+        for (VolcanicZones.Zone zn : lambert.zones())
+            assertEquals(zn.radius(), zn.minor(), zn.toString());
+    }
+
+    /**
+     * An elongated zone's {@code outside} is the distance to its nearest edge point: checked against the edge sampled
+     * at 20,000 points, all round a 3:1 ellipse at 30 degrees, outside and inside.
+     */
+    @Test
+    void anEllipsesOutsideIsTheDistanceToItsNearestEdgePoint() {
+        double a = 60, b = 20, ax = Math.cos(Math.PI / 6), az = Math.sin(Math.PI / 6);
+        var zn = new VolcanicZones.Zone(Role.CONE, 1, 0, 0, a, b, ax, az);
+        int n = 20000;
+        double[][] edge = new double[n][];
+        for (int i = 0; i < n; i++) {
+            double th = 2 * Math.PI * i / n, p = a * Math.cos(th), q = b * Math.sin(th);
+            edge[i] = new double[]{p * ax - q * az, p * az + q * ax};
+        }
+        int outsideChecked = 0;
+        for (int k = 0; k < 48; k++) {
+            double th = k * Math.PI / 24;
+            for (double r : new double[]{5, 15, 25, 40, 70, 90, 150}) {
+                double dx = r * Math.cos(th), dz = r * Math.sin(th);
+                double d = zn.outside(dx, dz);
+                if (!zn.holds(dx, dz)) {
+                    double best = Double.POSITIVE_INFINITY;
+                    for (double[] e : edge)
+                        best = Math.min(best, Math.hypot(dx - e[0], dz - e[1]));
+                    assertEquals(best, d, 0.05, "offset " + dx + ", " + dz);
+                    assertTrue(d >= Math.hypot(dx, dz) - a - 1e-9);
+                    outsideChecked++;
+                } else {
+                    assertTrue(d <= 0.0, "inside at " + dx + ", " + dz + ": " + d);
+                }
+            }
+        }
+        assertTrue(outsideChecked > 150, "points outside: " + outsideChecked);
+        // On the axes the old measure (along the line from the centre) was already exact.
+        assertEquals(10.0, zn.outside((a + 10) * ax, (a + 10) * az), 1e-6);
+        assertEquals(10.0, zn.outside(-(b + 10) * az, (b + 10) * ax), 1e-6);
     }
 
     @Test

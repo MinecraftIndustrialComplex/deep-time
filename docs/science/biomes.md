@@ -6,7 +6,7 @@ fixed. The band edges of Minecraft's biome builder were read in its source. The 
 biome is a game choice throughout and is labelled so. The climate that feeds the classifier (monthly
 temperature and rain) is being rewritten and is not checked here.
 
-Ledger ids on this page: `BIO-001` to `BIO-137`, and `BIO-170` to `BIO-174` ("The land call on the world's ground", 2026-10-21) (see [ledger/BIO.md](ledger/BIO.md)); the same section's `BAK-057` to `BAK-059` are in [ledger/BAK.md](ledger/BAK.md) and `HYD-106` to `HYD-109` in [ledger/HYD.md](ledger/HYD.md) (rivers-and-lakes.md "The sea's one rule").
+Ledger ids on this page: `BIO-001` to `BIO-137`, `BIO-170` to `BIO-174` ("The land call on the world's ground", 2026-10-21), `BIO-180` and `BIO-181` ("The snow line", 2026-10-22) and `BIO-182` (the volcanic zones on a Petroff-Guyou world, 2026-10-22) (see [ledger/BIO.md](ledger/BIO.md)); the same section's `BAK-057` to `BAK-059` are in [ledger/BAK.md](ledger/BAK.md) and `HYD-106` to `HYD-109` in [ledger/HYD.md](ledger/HYD.md) (rivers-and-lakes.md "The sea's one rule").
 
 ## What you see in the world
 
@@ -26,7 +26,10 @@ whatever its class, as in vanilla (BIO-066); "wet" is the cell's own rainfall ag
 subarctic Dfc cell counted as wet because its class sits in vanilla's taiga humidity). Land under the climate's ice gets a snow and ice cover whatever the biome and is of class EF (BIO-158), the
 cover lying only as far as each ice body's balance can feed it (BIO-157); frozen lakes follow the
 mean annual temperature, and other mods can read the monthly climate of any block through
-`DeepTimeClimate`.
+`DeepTimeClimate`. Vanilla's snowy peaks and slopes stand only on cold ground: frozen peaks, jagged peaks and
+snowy slopes above the tree line (the warmest month under 10 °C at the column's own height) or on the ice, the
+grove where the winter freezes; a mild mountain gets the pack's snowless mountain biomes instead, stony peaks,
+meadow or Terralith's highlands ("The snow line", 2026-10-22).
 
 ## The model in plain words
 
@@ -317,8 +320,10 @@ game choices but the vanilla depth band of BIO-112):
   Plenty puts its volcanic plains in vanilla's mushroom-fields slot (land surrounded by deep sea), and the
   next-nearest biome of its region there is the lukewarm ocean; with TerraBlender such a slot takes the
   vanilla region's biome instead (measured below).
-- **Put in.** Zones are discs around the active volcanoes of the baked list, their craters and calderas,
-  their hot-spring pools and their magma (FORMAT.md, "Volcanic biomes"). In priority order:
+- **Put in.** Zones are circles in the simulation's frame around the active volcanoes of the baked list, their
+  craters and calderas, their hot-spring pools and their magma (FORMAT.md, "Volcanic biomes"): discs on a Lambert
+  world, and on a Petroff-Guyou world the ellipse the projection makes of each circle at the vent (BIO-182, since
+  2026-10-22; the hot-spring fields and thermal caves stay discs). In priority order:
 
 | Role | Shipped tag order (first the pack has) | Where |
 |---|---|---|
@@ -348,8 +353,8 @@ game choices but the vanilla depth band of BIO-112):
   lies inside that biome's own temperature and humidity ranges in the pack's parameter list (Terralith puts
   ashen savanna on the warm band at dry to middling humidity), so the rule follows whatever biome a pack
   lists. A role without a biome in the pack, or not allowed at the spot, gives way to the next role whose
-  disc holds the place and in the end to the climate search. Every disc is at least 8 blocks in radius, two
-  biome cells, and a field ring narrower than 8 blocks is dropped, so the edges blend into areas, not specks.
+  zone holds the place and in the end to the climate search. Every zone is at least 8 blocks in radius along each
+  axis, two biome cells, and a field ring narrower than 8 blocks is dropped, so the edges blend into areas, not specks.
   The setting `volcanic_biome_reach` (1, 0 to 3) scales the cone and the fields; 0 places none.
 - **Datapacks.** Both lists are tags: a pack adds a biome to a role tag (and it is kept out elsewhere too) or
   to `#deeptime:volcanic` alone (kept out, never placed), or reorders a role tag with `"replace": true`.
@@ -378,6 +383,30 @@ changed no column. The zones on that planet: 50 hot-spring discs (mean 81 km², 
 blocks), 110 crater discs (20 km²), 109 cone discs (187 km²), 64 fresh-ash discs (1,180 km², of which the climate gate let 53
 sampled columns become ashen savanna) and 110 thermal-cave discs (38 km²). These sizes are the game's choices; no real
 landscape was measured for them.
+
+**On a Petroff-Guyou world** (BIO-182, 2026-10-22). The terrain lays a cone on its circle in the simulation's frame,
+and a Petroff-Guyou world draws that circle stretched: the frame's east-west and north-south scales differ by a
+factor of 1/cos² of the latitude, an axis ratio of 2 at 45° and 4 at 60°. Discs of the frame radius left
+the far ends of the crater and the flanks in the next zone out and painted plain ground on the near sides (Ben's
+volcano 27476 lies on a 2.3:1 stretch). The crater, caldera, cone and field zones are now the ellipse the
+projection makes of the circle at the vent. Measured on the snow line's census planet (above; the branch's bake,
+`/deeptime probe biomes 16` with MIC, 84,968 land columns), the same world read by the jar with discs and with
+ellipses:
+
+| | discs | ellipses |
+|---|---|---|
+| crater zones (180): area, blocks; mean | 40,200; 19.4 km² | 60,925; 29.4 km² |
+| cone zones (181): area; mean | 444,388; 213 km² | 519,615; 249 km² |
+| ash-field zones: count; area | 115; 1,590,512 | 110; 1,519,113 |
+| land columns in a volcanic biome | 1,127 | 1,141 |
+| volcanic peaks; volcanic crater; ashen savanna; yellowstone | 617; 56; 102; 352 | 612; 67; 110; 352 |
+| more than 256 blocks from every source; more than 8 blocks outside every zone | 0; 0 | 0; 0 |
+| volcanic surface cells with no neighbour of their biome | 38 | 37 |
+
+A zone's area changes by the projection's areal scale at its vent (the cones by a sixth here), and a crater's
+more (by half) because each axis is held to at least 8 blocks and given the 4-block margin; five ash fields fall
+out as rings under 8 blocks wide along an axis.
+The hot-spring fields and thermal caves are unchanged (discs: the terrain draws no cone there).
 
 ## Expanded Ecosphere and the biome rules
 
@@ -619,8 +648,8 @@ table only the five biome inputs differ).
 |---|---|---|
 | Am (719) | brushland 32.5, jungle 28.5, beach 8.9, sparse jungle 7.5, tropical jungle 7.1, mangrove swamp 4.7 | tropical jungle 33.1, jungle 27.3, bamboo jungle 10.3, brushland 9.5, beach 7.2, mangrove swamp 4.7 |
 | Csa (367) | plains 71.4, forest 7.9, gravel beach 6.3, beach 5.4, highlands 2.7 | shrubland 77.4, gravel beach 6.3, beach 5.4, steppe 4.6, savanna 2.5 |
-| Csb (1,764) | plains 54.0, forest 9.1, old-growth birch forest 6.4, birch taiga 4.8, brushland 3.9 | shrubland 68.5, snowy slopes 3.7, brushland 3.6, forest 3.3, frozen peaks 3.3 |
-| BSk (4,650) | plains 50.8, snowy slopes 7.6, frozen peaks 5.2, rocky mountains 4.6, forest 3.8, highlands 3.7 | shrubland 55.8, steppe 12.3, plains 7.1, beach 3.3, frozen peaks 2.5 |
+| Csb (1,764) | plains 54.0, forest 9.1, old-growth birch forest 6.4, birch taiga 4.8, brushland 3.9 | shrubland 68.5, snowy slopes 3.7, brushland 3.6, forest 3.3, frozen peaks 3.3 (since 2026-10-22 the snow line takes Csb off the snowy slots: 4.7 % to 0.1 % on the 2026-10-22 census planet, "The snow line") |
+| BSk (4,650) | plains 50.8, snowy slopes 7.6, frozen peaks 5.2, rocky mountains 4.6, forest 3.8, highlands 3.7 | shrubland 55.8, steppe 12.3, plains 7.1, beach 3.3, frozen peaks 2.5 (since 2026-10-22 the snow line: BSk's snowy slots 0.1 % to 0.04 % on the 2026-10-22 census planet, "The snow line") |
 | ET (5,588) | cold shrubland 21.7, gravel desert 15.6, snowy slopes 14.0, snowy plains 9.8, taiga 5.9, frozen peaks 3.0 | gravel desert 23.4, cold shrubland 21.6, snowy slopes 13.7, taiga 5.9, frozen peaks 5.7, snowy plains 2.0 |
 | Cfb (5,322), Cwb (499) | cloud forest 0 | cloud forest 6.4 and 8.8 |
 
@@ -966,6 +995,80 @@ the same 8 blocks away on all four sides), the share of dry columns with an ocea
 land biome, each at most 1 %; the 4k planet's own count is logged, and was not run on this branch (the
 coordinator's batch).
 
+## The snow line (2026-10-22, BIO-180, BIO-181)
+
+**What was wrong.** A temperate mountain carried snow in its own mild climate: frozen peaks, jagged peaks or snowy
+slopes over a Csb or BSk lowland, on volcanoes as on fold belts (Ben's report on volcano 27476). The cause is
+vanilla's slot table, not the climate. Vanilla 1.21.1 picks a peak biome from the temperature index alone
+(`OverworldBiomeBuilder.pickPeakBiome`: index at most 2 gives jagged peaks where the weirdness is negative, else frozen
+peaks; index 3 stony peaks) and a slope biome likewise (`pickSlopeBiome`: index under 3 gives snowy slopes at humidity
+index at most 1, else grove); read in the NeoForge 21.1.249 decompiled sources. Index 2 is the temperature band
+-0.15 to 0.2, the band that holds the temperate classes (BIO-026 to BIO-034), so every mountain slot of a temperate
+cell is a snowy one. Terralith 2.6.2's snowy entries reach temperature 0.2 the same way (its
+`data/minecraft/dimension/overworld.json`), and its own entries beside them in the same inland mountain erosion
+slots (E0 and E1, temperature bands 1 and 2) are rocky mountains and the highlands.
+
+**The rule** (BIO-180). The biome rule file `deeptime:snow_line` (shipped, always active; FORMAT.md "Biome rules")
+holds two rules, read on the climate at the column's own surface (the bake's monthly temperatures lapsed to the
+column's height, BIO-018):
+
+- `above_the_tree_line`: where the pack's plain search names frozen peaks, jagged peaks or snowy slopes (the tag
+  `deeptime:snow_line/snowfield`) and the warmest month is at least 10 °C and the column is not under the ice
+  cover (BIO-159), the biome is replaced. 10 °C is Köppen's polar line (BIO-002), the line where trees stop, and
+  these three biomes have no trees.
+- `freezing_winter`: where it names the grove and the coldest month is at least 0 °C (Köppen's C/D line, BIO-011)
+  and not under ice, it is replaced. The grove is a snowy conifer forest, so it keeps every freezing winter
+  (Dfc, Dsc, a high Dfb).
+
+**What stands instead** (BIO-181). The pack's own climate search over the snowless mountain biomes alone (the tag
+`deeptime:snow_line/snowless`: vanilla's stony peaks, meadow, windswept hills, windswept gravelly hills and
+windswept forest; Terralith's rocky mountains, alpine highlands, highlands, forested highlands and temperate
+highlands, each optional) picks the one nearest the column's climate point. The rule tests the *plain* answer (the
+search with the exclusive and volcanic biomes kept out, the level's own fallback), and tests it before the
+temperatures, so it fires only where the pack itself would put a snowy biome; it adds no mountain biome where the
+pack puts none, and a datapack can add its own biomes to either tag.
+
+**Why a game-side rule and not the bake.** The first attempt moved the bake's mountain erosion off the snowy
+slots in the reference bands. It changed nothing in MIC: the game maps the baked erosion and weirdness
+quantiles onto the pack's own land distribution (`ClimateMapping`, an erosion shift of up to 0.451 on the census
+planet), so Terralith's snowy slots took the same columns again. The bake move was backed out. The rule reads
+what the pack actually answered, so it holds for any pack and any mapping.
+
+**Measured.** The census planet (`earthlike_quick_16k`, scattered continents, 500 Myr, seed 1, Terralith's table;
+baked on master fe61452b), `/deeptime probe biomes 16` with MIC, 83,683 sampled land columns, read twice by this
+branch's jar, without the rule and with it (test machine, 2026-10-22). Columns on frozen peaks, jagged peaks or
+snowy slopes, and on grove:
+
+| Class (land columns) | snowy peaks and slopes before | after | grove before | after |
+|---|---|---|---|---|
+| Csb (2,990) | 142 (4.7 %) | 3 (0.1 %) | 0 | 0 |
+| Csc (33) | 16 (48.5 %) | 4 (12.1 %) | 0 | 0 |
+| Csa (1,370) | 4 (0.3 %) | 0 | 0 | 0 |
+| BSk (9,206) | 6 (0.07 %) | 4 (0.04 %) | 0 | 0 |
+| BSh (4,223) | 7 (0.2 %) | 0 | 0 | 0 |
+| BWk (6,565) | 770 (11.7 %) | 433 (6.6 %) | 0 | 0 |
+| Cfb (9,383) | 18 (0.2 %) | 0 | 3 | 0 |
+| Cwb (1,943) | 3 (0.2 %) | 0 | 4 | 0 |
+| Dfc (2,610) | 4 (0.2 %) | 0 | 98 (3.8 %) | 97 (3.7 %) |
+| Dsc (1,362) | 2 (0.1 %) | 1 (0.1 %) | 69 (5.1 %) | 69 (5.1 %) |
+| ET (5,809) | 1,487 (25.6 %) | 1,319 (22.7 %) | 122 (2.1 %) | 107 (1.8 %) |
+| EF (12,464) | 6,654 (53.4 %) | 6,654 (53.4 %) | 0 | 0 |
+| all land (83,683) | 9,116 | 8,419 | 330 | 305 |
+
+- **What replaced them**: alpine highlands +259 columns, temperate highlands +191, rocky mountains +180, meadow +44,
+  forested highlands +44, stony peaks +4 (snowy slopes -453, jagged peaks -150, frozen peaks -94, grove -25). Csb
+  after: shrubland 57.1 %, steppe 22.7, alpine highlands 4.8 (2.4 before), windswept savanna 2.4, temperate
+  highlands 2.0; no snowy biome in its top eight. Csc's 33 columns: meadow 18.2 %, alpine highlands 12.1.
+- **The probe's own count**: `above_the_tree_line` answered 697 columns and `freezing_winter` 25 (the drops above,
+  697 = 9,116 - 8,419 and 25 = 330 - 305); no column got a biome outside the rule's candidates, from the wrong
+  class or from the exclusive list. The volcanic census is the same with and without the rule.
+- **What keeps its snow**: EF untouched; ET loses 11 % of its snowy columns (the low ET ground whose lapsed
+  warmest month reaches 10 °C); BWk keeps 433, the high cold deserts above the tree line at their own height. The
+  3 Csb and 4 Csc columns left are columns above the tree line at their height: a Köppen class is the ground
+  cell's, the rule reads the column's own months (limits below). The grove stays in Dfc, Dsc and the high Dfb.
+- **The branch's own bake** of the same simulation (onlap, BIO-182): 9,093 to 8,353 snowy columns; Csb 139 to 3,
+  BWk 750 to 420.
+
 ## Simplifications and limits
 
 - Peel classifies station records of many years. The mod classifies the monthly means of one
@@ -986,7 +1089,7 @@ coordinator's batch).
 - The volcanic biomes follow the baked list of active volcanoes, their craters and calderas, the hot-spring
   pools and the magma. Dead volcanoes, flood-basalt plateaus and young lava outside a shield are not exported
   by the bake, so they get no volcanic biome; nor do fumarole fields (only hot-spring pools mark a field). The
-  zones are discs, not ash plumes downwind; their sizes are game choices (BIO-104 to BIO-111), not measured
+  zones are circles round the vent (ellipses as a Petroff-Guyou world draws them), not ash plumes downwind; their sizes are game choices (BIO-104 to BIO-111), not measured
   areas of real volcanic landscapes.
 - A volcanic role's biome ignores TerraBlender's regions: a volcano in a province whose region is vanilla's
   still gets Biomes O' Plenty's volcanic biome when the pack has it.
@@ -995,6 +1098,11 @@ coordinator's batch).
   use the default table, so they draw MIC's biomes as a world baked without Terralith's table.
 - Terralith's table is tuned to Terralith 2.6.2 and to MIC's climate mapping (Tectonic's router stretches erosion);
   a Terralith update that moves its slots needs the table measured again (`tools/review/terralith_emulate.py`).
+- The snow line (BIO-180) is a line of a climate classification laid on biome slots: 10 °C in the warmest month for
+  the treeless snowy biomes, 0 °C in the coldest for the grove. Real snow lines lie higher than tree lines and
+  vary with aspect, wind and snowfall; vanilla's snowy biomes are its own picture of high mountains. The rule
+  reads the column's lapsed months, so a Csb ground cell's summit above the tree line keeps its snow while the
+  class still says Csb.
 - The geology gate only takes biomes away: a rock-named biome whose slot the climate never reaches on its ground
   (Yosemite) stays rare or absent. The ground tests read the baked rock and provinces, not the blocks a pack's
   surface rule paints. Off land (below sea level) and below the surface layer the gate's biomes are always kept
@@ -1037,7 +1145,9 @@ gate (BIO-140 to BIO-154) are Ben's in kind (decisions log 2026-10-04, "Deep Tim
 agent's in every number, but the cloud forest's height (BIO-145, read in Scatena et al. 2010). EF's continentalness
 floor (BIO-161) and the census's bound on the ice cap's ice spikes (BIO-162) are the coordinator's calls (2026-10-20,
 on Ben's ice spikes report), and so is the target they serve: BIO-077's share of the frozen, driest flats, not the
-pack's own share and not an area ("Ice spikes and the rare variants").
+pack's own share and not an area ("Ice spikes and the rare variants"). The snow line (BIO-180, BIO-181: its two
+lines, its two tags and the choice of a game-side rule) and the volcanic zones drawn as ellipses on a Petroff-Guyou
+world (BIO-182) are the coordinator's calls (2026-10-22, after Ben's report on volcano 27476).
 
 ## Open questions
 

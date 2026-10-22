@@ -11,7 +11,10 @@
 //!    1.5 L1 cells wide, scaled to the relief measured over its foot, never more than the volcano
 //!    built) is taken away and the true profile put in its place, scaled by the share of that
 //!    relief kept; the amplifier's erosion then cuts radial gullies into a real cone and its
-//!    thermal pass slumps it to the rock's angle.
+//!    thermal pass slumps it to the rock's angle. The cone is laid on the ground from its vent
+//!    (`onlap`, VOL-080): near the vent it buries the ground up to the vent's level plus its
+//!    profile, so on a slope its summit is still the vent, blending back to lying on the ground
+//!    towards its foot.
 //! 2. **After the last flood**, on the finest grid (L3, in the sink the tiles pass through): the
 //!    part of the profile L2 cannot hold (the sharp summit, the body less its L2 blur,
 //!    `shape::blurred`) and the depression — a summit crater, or a caldera's flat floor inside a
@@ -46,8 +49,14 @@ struct Item {
     x: f64,
     z: f64,
     radius_m: f64,
-    /// Metres at ρ, for the young grid (before erosion) …
-    l2: Radial,
+    /// Metres at ρ, for the young grid (before erosion): the cone put in (`tp`) and the young
+    /// landscape's coarse bump of it taken out (`rem`) …
+    tp: Radial,
+    rem: Radial,
+    /// … the relief kept (m: the cone's height, the most its onlap fills) and the ground at the
+    /// vent without the volcano (m; read from the young landscape when there is one) …
+    at: f64,
+    vent_ground: Option<f64>,
     /// … and for the finest grid (after the flood).
     l3: Radial,
     /// A caldera: its rim radius (ρ), the level of its flat floor (m) and the phases of its rim's
@@ -102,8 +111,8 @@ impl Shaper {
                 let coarse = shape::blurred(&body, 1.5 * dx1 / r); // ledger: VOL-063
                 let e0 = coarse.at(0.0).max(1e-3);
                 let expected = a * e0;
-                let held = young.map_or(expected, |f| {
-                    let top = sample(f, v.x, v.z);
+                let top = young.map(|f| sample(f, v.x, v.z));
+                let held = young.zip(top).map_or(expected, |(f, top)| {
                     let rr = 1.1 * r / mh;
                     let ring: f64 = (0..24)
                         .map(|k| {
@@ -115,15 +124,18 @@ impl Shaper {
                     top - ring
                 });
                 let removed = held.clamp(0.0, expected);
+                // The ground the vent stands on: the young landscape there less the bump it holds
+                // of the edifice.
+                let vent_ground = top.map(|t| t - removed);
                 // The cone it becomes: the relief kept, the true profile (a dead one keeps more of
                 // the blurred shape as it ages).
                 let at = a * (removed / expected);
                 let fine = shape::blurred(&body, dx2 / r);
                 let reach = coarse.reach().max(fine.reach()).max(1.05);
-                let l2 = table(reach, |rho| {
-                    let target = at * (sharp * body(rho) + (1.0 - sharp) * coarse.at(rho));
-                    target - removed * coarse.at(rho) / e0
+                let tp = table(reach, |rho| {
+                    at * (sharp * body(rho) + (1.0 - sharp) * coarse.at(rho))
                 });
+                let rem = table(reach, |rho| removed * coarse.at(rho) / e0);
                 let is_caldera = s.depression.is_some_and(|d| d.caldera);
                 let l3 = table(reach, |rho| {
                     let bowl = if is_caldera { 0.0 } else { s.bowl(rho) };
@@ -138,9 +150,10 @@ impl Shaper {
                     for k in 0..32 {
                         let th = std::f64::consts::TAU * f64::from(k) / 32.0;
                         let bx = frame.wrap_x(v.x + rim_m * th.cos() / mh);
-                        sum += sample(f, bx, v.z + rim_m * th.sin() / mh);
+                        let z = sample(f, bx, v.z + rim_m * th.sin() / mh);
+                        sum += onlap(z, d.rho, tp.at(d.rho), rem.at(d.rho), at, vent_ground);
                     }
-                    let rim = sum / 32.0 + l2.at(d.rho);
+                    let rim = sum / 32.0;
                     let h = (v.id as f64 * 0.618_033_988_7).fract() * std::f64::consts::TAU;
                     Some((d.rho, rim - d.depth * at * sharp, h, 2.3 * h + 1.0))
                 });
@@ -148,7 +161,10 @@ impl Shaper {
                     x: v.x,
                     z: v.z,
                     radius_m: r,
-                    l2,
+                    tp,
+                    rem,
+                    at,
+                    vent_ground,
                     l3,
                     caldera,
                     young: dep,
@@ -209,21 +225,38 @@ impl Shaper {
         keep
     }
 
-    /// Adds the young-grid band to the ladder's first level (the L2 terrain). Returns the cells
-    /// changed.
+    /// Puts the cones into the ladder's first level (the L2 terrain), on the ground as [`onlap`]
+    /// lays them. Returns the cells changed.
     pub fn sharpen_level(&self, level: &mut Level, grid: &GridDesc) -> usize {
+        // Every vent's ground is read before any cone goes in, so where two overlap the result
+        // does not depend on their order.
+        let vents: Vec<f64> = self
+            .items
+            .iter()
+            .map(|it| {
+                it.vent_ground.unwrap_or_else(|| {
+                    let r = f64::from(grid.r);
+                    let fi = (it.x - grid.origin_block_x as f64) / r;
+                    let fj = (it.z - grid.origin_block_z as f64) / r;
+                    let z = crate::surface::advect::bilinear(level.w, level.h, &level.z, fi, fj);
+                    f64::from(z) - it.rem.at(0.0)
+                })
+            })
+            .collect();
         let mut changed = 0;
-        for it in &self.items {
+        for (it, &gv) in self.items.iter().zip(&vents) {
             vol::for_cells(
                 grid,
                 self.mh,
                 it.x,
                 it.z,
-                it.l2.reach() * it.radius_m,
+                it.tp.reach() * it.radius_m,
                 |c, dx, dz| {
-                    let v = it.l2.at(dx.hypot(dz) / it.radius_m);
-                    if v != 0.0 {
-                        level.z[c] += v as f32;
+                    let rho = dx.hypot(dz) / it.radius_m;
+                    let z = f64::from(level.z[c]);
+                    let v = onlap(z, rho, it.tp.at(rho), it.rem.at(rho), it.at, Some(gv)) as f32;
+                    if v != level.z[c] {
+                        level.z[c] = v;
                         changed += 1;
                     }
                 },
@@ -355,6 +388,31 @@ fn sample(f: &crate::world::Field, x: f64, z: f64) -> f64 {
     ))
 }
 
+/// Inside this ρ a cone lies wholly on its vent's ground level; from here to its foot it blends
+/// back to lying on the ground beneath it.
+const ONLAP_INNER: f64 = 0.4; // ledger: VOL-080 (game-choice)
+
+/// The young-grid terrain at ρ after a cone is put in: `z` is the young landscape there (m),
+/// holding `rem` of the edifice as a coarse bump; `tp` the cone's profile there (m); `at` its
+/// height; `vent` the ground at its vent without it (m; `None`: the cone simply added, as before
+/// VOL-080).
+///
+/// The cone is built from its vent, so near the vent it buries the ground up to the vent's
+/// ground level plus its profile, and its summit is the vent wherever it stands: on a slope it
+/// fills the downhill side and the uphill ground shows through above its flank. Towards the foot
+/// it blends back to lying on the ground (no wall where the ground falls away), and the fill is
+/// never more than the cone's own height (a cone on a cliff edge does not pave the sea). On level
+/// ground it is the cone added to the ground, as before.
+fn onlap(z: f64, rho: f64, tp: f64, rem: f64, at: f64, vent: Option<f64>) -> f64 {
+    let g = z - rem;
+    let Some(gv) = vent else {
+        return g + tp;
+    };
+    let w = 1.0 - smooth(ONLAP_INNER, 1.0, rho); // ledger: VOL-080 (game-choice)
+    let fill = (w * (gv - g)).min(at); // ledger: VOL-081 (game-choice)
+    g + (tp + fill).max(0.0)
+}
+
 /// A radial table of `f` out to ρ = `reach`.
 fn table(reach: f64, f: impl Fn(f64) -> f64) -> Radial {
     const N: usize = 128;
@@ -461,7 +519,8 @@ mod tests {
         let (world, preset) = world_with(vec![strato(0.0, 0.0, None)]);
         let sh = Shaper::from_world(&world, &preset).unwrap();
         assert_eq!(sh.len(), 1);
-        // L2 (8 blocks, 2.4 km): the band raises the summit and lowers the skirt a little; far
+        // L2 (8 blocks, 2.4 km): level ground at 100 m holding the deep-time edifice (as the
+        // young landscape does); the band raises the summit and lowers the skirt a little; far
         // away nothing changes; the volume stays about the same.
         let g2 = GridDesc::for_planet("L2", 16_384, 8).unwrap();
         let n = g2.cells();
@@ -476,14 +535,32 @@ mod tests {
             lake: vec![0; n],
             zs: Vec::new(),
         };
+        let it = &sh.items[0];
+        let mh = preset.scale.m_per_block_h;
+        vol::for_cells(
+            &g2,
+            mh,
+            it.x,
+            it.z,
+            it.rem.reach() * it.radius_m,
+            |c, dx, dz| {
+                level.z[c] += it.rem.at(dx.hypot(dz) / it.radius_m) as f32;
+            },
+        );
+        let before = level.z.clone();
         assert!(sh.sharpen_level(&mut level, &g2) > 0);
         let at = |g: &GridDesc, z: &[f32], bx: f64, bz: f64| {
             z[crate::surface::volcanoes::cell_of(g, bx, bz)]
         };
         let top = at(&g2, &level.z, 0.0, 0.0);
-        assert!(top > 150.0, "{top}");
+        assert!(top > at(&g2, &before, 0.0, 0.0) + 50.0, "{top}");
         assert_eq!(at(&g2, &level.z, 1000.0, 0.0), 100.0);
-        let dv: f64 = level.z.iter().map(|&z| f64::from(z) - 100.0).sum();
+        let dv: f64 = level
+            .z
+            .iter()
+            .zip(&before)
+            .map(|(&z, &b)| f64::from(z) - f64::from(b))
+            .sum();
         assert!(dv.abs() < 0.2 * 2500.0, "volume change {dv} m·cells");
         // L3 (2 blocks, 600 m): the crater: the centre below the rim; the summit sharper.
         let g3 = GridDesc::for_planet("L3", 16_384, 2).unwrap();
@@ -502,6 +579,122 @@ mod tests {
             "crater floor {centre} not below the rim {rim}"
         );
         assert!(rim > 0.0, "the sharp summit adds height");
+    }
+
+    #[test]
+    fn onlap_is_the_old_sum_on_level_ground_and_lets_high_ground_show() {
+        // Level ground: the cone added, at every ρ.
+        for rho in [0.0f64, 0.3, 0.7, 1.0, 1.2] {
+            let (tp, rem) = (1000.0 * (1.0 - rho).max(0.0), 50.0);
+            let added = 300.0 - rem + tp;
+            let v = onlap(300.0, rho, tp, rem, 2000.0, Some(250.0));
+            assert!((v - added).abs() < 1e-9, "ρ {rho}: {v} vs {added}");
+            assert_eq!(onlap(300.0, rho, tp, rem, 2000.0, None), added);
+        }
+        // Near the vent the cone stands on the vent's ground: 400 m lower ground is filled …
+        assert!((onlap(-400.0, 0.2, 900.0, 0.0, 2000.0, Some(0.0)) - 900.0).abs() < 1e-9);
+        // … higher ground than its envelope shows through …
+        assert_eq!(onlap(1500.0, 0.3, 700.0, 0.0, 2000.0, Some(0.0)), 1500.0);
+        // … and the fill is never more than the cone's height.
+        assert_eq!(onlap(-5000.0, 0.0, 1000.0, 0.0, 1000.0, Some(0.0)), -3000.0);
+        // At the foot it lies on the ground again.
+        assert_eq!(onlap(-400.0, 1.0, 0.0, 0.0, 2000.0, Some(0.0)), -400.0);
+    }
+
+    #[test]
+    fn a_cone_on_a_steep_slope_has_its_summit_at_the_vent() {
+        // A cone 2.5 km high, 14 km in radius, on ground rising 1.5 times its height across its
+        // radius (east is up), as Ben's volcano 27476 stands on its range's flank.
+        let v = strato(0.0, 0.0, None);
+        let (h, r) = (v.height_m, v.radius_m);
+        let slope = 1.5 * h / r;
+        let (mut world, preset) = world_with(vec![v.clone()]);
+        let mh = preset.scale.m_per_block_h;
+        let g2 = GridDesc::for_planet("L2", 16_384, preset.resolution.l2_r).unwrap();
+        // The young landscape holds the plane and the edifice blurred by the deep-time grid.
+        let dx1 = f64::from(preset.resolution.l1_r) * mh;
+        let s = v.shape();
+        let coarse = shape::blurred(&|q| s.body(q), 1.5 * dx1 / r);
+        let frame = crate::sphere::BlockFrame::new(16_384);
+        let rr = f64::from(g2.r);
+        let mut young = Field::filled(g2.clone(), 0.0);
+        let mut plane = vec![0.0f32; g2.cells()];
+        for j in 0..g2.h as usize {
+            for i in 0..g2.w as usize {
+                let bx = frame.wrap_x(g2.origin_block_x as f64 + i as f64 * rr);
+                let bz = g2.origin_block_z as f64 + j as f64 * rr;
+                let (xm, zm) = (bx * mh, bz * mh);
+                let base = 500.0 + slope * xm.clamp(-3.0 * r, 3.0 * r);
+                let c = j * g2.w as usize + i;
+                plane[c] = base as f32;
+                young.data[c] = (base + h * coarse.at(xm.hypot(zm) / r)) as f32;
+            }
+        }
+        world.fields.insert(
+            crate::surface::young::field::ELEVATION_M.to_owned(),
+            young.clone(),
+        );
+        let sh = Shaper::from_world(&world, &preset).unwrap();
+        let n = g2.cells();
+        let mut level = Level {
+            w: g2.w as usize,
+            h: g2.h as usize,
+            dx: rr * mh,
+            z: young.data.clone(),
+            area: vec![1.0; n],
+            wgt: vec![1.0; n],
+            kfac: vec![1.0; n],
+            lake: vec![0; n],
+            zs: Vec::new(),
+        };
+        sh.sharpen_level(&mut level, &g2);
+        let vent = crate::surface::volcanoes::cell_of(&g2, 0.0, 0.0);
+        // The highest cell within 0.4 radii is the vent's (the old sum put it up the slope).
+        let mut best = (f32::MIN, usize::MAX, 0.0);
+        let mut old_best = (f64::MIN, 0.0);
+        let it = &sh.items[0];
+        vol::for_cells(&g2, mh, 0.0, 0.0, 0.4 * r, |c, dx, dz| {
+            let rho = dx.hypot(dz) / r;
+            if level.z[c] > best.0 {
+                best = (level.z[c], c, rho);
+            }
+            let old = onlap(
+                f64::from(young.data[c]),
+                rho,
+                it.tp.at(rho),
+                it.rem.at(rho),
+                it.at,
+                None,
+            );
+            if old > old_best.0 {
+                old_best = (old, rho);
+            }
+        });
+        assert_eq!(best.1, vent, "summit at ρ {:.2}, not the vent", best.2);
+        assert!(
+            old_best.1 > 0.2,
+            "the old sum's summit at ρ {:.2}",
+            old_best.1
+        );
+        // The summit stands the cone's kept height above the vent's ground.
+        let top = f64::from(level.z[vent]) - f64::from(plane[vent]);
+        assert!(
+            top > 0.5 * h && top < 1.05 * h,
+            "summit {top} m above the ground"
+        );
+        // Uphill beyond the envelope the ground is the plane (no cone on it, and of the coarse
+        // bump only the share the ring at 1.1 radii holds, which the held edifice leaves out:
+        // about half a percent of the height here); far away nothing changes; the fill is never
+        // more than the cone's height.
+        let up = crate::surface::volcanoes::cell_of(&g2, 0.7 * r / mh, 0.0);
+        let left = f64::from(level.z[up] - plane[up]);
+        assert!(left.abs() < 0.01 * h, "{} vs {}", level.z[up], plane[up]);
+        let far = crate::surface::volcanoes::cell_of(&g2, 3.0 * r / mh, 0.0);
+        assert_eq!(level.z[far], young.data[far]);
+        assert_eq!(level.z.len(), n);
+        for (&z, &p) in level.z.iter().zip(&plane) {
+            assert!(f64::from(z - p) <= 2.0 * h + 1.0);
+        }
     }
 
     #[test]
