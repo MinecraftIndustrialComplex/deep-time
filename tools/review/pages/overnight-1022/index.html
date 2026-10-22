@@ -116,8 +116,8 @@ footer { color: var(--muted); font-size: 14px; padding-top: 20px; padding-bottom
   <p class="dek" data-ss-id="dek">Deep Time and the pack, the night of 21 to 22 October 2026. Newest first.</p>
   <div class="box" data-ss-id="now" data-ss-thumb>
     <ul class="status">
-      <li data-ss-id="now-tests"><span class="d">Tests</span><span><span class="st wait">Fixing</span>a5d13f7e, with the volcano fixes, failed 2 volcanic biome GameTests in packs with no volcanic biomes. Being fixed now. e26a3677 passed everything.</span></li>
-      <li data-ss-id="now-prism"><span class="d">Your Prism</span><span><span class="st wait">Held</span>Both instances stay on the 831b3847 build until a fixed build passes, then move to it with DH 3.3.3.</span></li>
+      <li data-ss-id="now-tests"><span class="d">Tests</span><span><span class="st go">Passed</span>Master c0931067, with the volcano fixes and a fix for packs without volcanic biomes, passed every gate.</span></li>
+      <li data-ss-id="now-prism"><span class="d">Your Prism</span><span><span class="st go">Updated</span>Both instances are on c0931067, with DH 3.3.3. Your saves were not touched.</span></li>
       <li data-ss-id="now-waiting"><span class="d">Waiting on you</span><span><a href="#decide">7 decisions, D1 to D7</a>, and 2 optional items.</span></li>
     </ul>
   </div>
@@ -191,18 +191,25 @@ footer { color: var(--muted); font-size: 14px; padding-top: 20px; padding-bottom
     </div></li>
 
     <li data-ss-id="it-tests"><span class="n">10</span><div>
-      <h3>Tests: one batch passed, the volcano batch is being fixed</h3>
-      <p data-ss-id="it-tests-p"><span class="st wait">Fixing</span>One batch passed, the next failed two tests.</p>
+      <h3>Tests: all passed, after one fix</h3>
+      <p data-ss-id="it-tests-p"><span class="st go">Passed</span>Master c0931067 passed every gate.</p>
       <ul data-ss-id="it-tests-list">
         <li>e26a3677 passed everything: Rust clean, Java 427 tests with 0 failures, and 95 of 95 GameTests in all five setups.</li>
-        <li>a5d13f7e, with the volcano fixes, failed two volcanic biome GameTests, in the standalone and Expanded Variety setups only. MIC, TerraBlender and EE all passed; Java ran 431 tests with 0 failures.</li>
-        <li>The cause: the volcanic biome layer turns on in a pack that has no volcanic biomes. The volcano agent is fixing it now.</li>
+        <li>a5d13f7e, with the volcano fixes, failed two volcanic biome GameTests, in the standalone and Expanded Variety setups. The volcanic layer had been turning on without volcanic biomes.</li>
+        <li>The fix is merged at master c0931067. It passed <code>./gradlew build test</code> (431 tests, 0 failures) and all five GameTest setups, 95 of 95 each. Rust has not changed since a5d13f7e, whose cargo gates passed.</li>
+        <li>One choice made on your behalf, easy to undo: the snow line also applies in a pack without volcanic biomes, plain Minecraft included. There, temperate peaks get vanilla's stony peaks or meadow instead of snow. It changes 350 of 10,037 sampled columns.</li>
       </ul>
     </div></li>
 
     <li data-ss-id="it-prism"><span class="n">11</span><div>
-      <h3>Your Prism instances</h3>
-      <p data-ss-id="it-prism-p"><span class="st wait">Held</span>Both stay on the 831b3847 build until a fixed build passes, and then move to it with DH 3.3.3. The stages are built and checked.</p>
+      <h3>Your Prism instances, updated</h3>
+      <p data-ss-id="it-prism-p"><span class="st go">Updated</span>Both instances are on master c0931067.</p>
+      <ul data-ss-id="it-prism-list">
+        <li>Both now have the dev map and Distant Horizons 3.3.3.</li>
+        <li>Chunky is gone from both, as in the pack, where it is now server-only.</li>
+        <li>Kept as they were: both DH pause rules off, the MIC rock tags, and the lite instance's auto-join off.</li>
+        <li>Your saves were not touched. New chunks in your existing worlds use the new volcano, snow and zone rules; old chunks keep the old ones.</li>
+      </ul>
     </div></li>
 
   </ol>
