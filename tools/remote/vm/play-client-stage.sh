@@ -22,8 +22,9 @@
 # Deep Time's own data names, their required dependencies and a fixed core (tools/smoke/lite_set.py, core
 # list tools/smoke/profiles/mic-lite.core), in /data/ban/play/<hash>-client-lite/minecraft/. The server set
 # it must match is the lite play folder <hash>-lite (play-stage.sh --set lite), or smoke/mic-lite/server
-# (tools/smoke/install.sh mic-lite). The pack's kubejs/, scripts/, resourcepacks/ and the config of the
-# left-out mods are not staged; <hash>-client-lite/lite-why.txt says why each jar stays or goes. Without
+# (tools/smoke/install.sh mic-lite). The pack's kubejs/ (but kubejs/data/deeptime: the MIC rock tags, which
+# KubeJS loads into a new single-player world; lite_set.py rule 3b), scripts/, resourcepacks/ and the config
+# of the left-out mods are not staged; <hash>-client-lite/lite-why.txt says why each jar stays or goes. Without
 # --set the stage is the full one, exactly as before.
 #
 # Opt-in extras (dev play tests only; never the pack's):
