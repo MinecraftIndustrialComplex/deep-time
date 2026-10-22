@@ -809,7 +809,7 @@
     /** Whether s is a multiple of FACE_QUANTUM (a real world's face). */
     quantised() { return this.s % FACE_QUANTUM === 0; }
     /** The radius of the sphere the six faces stand for at equal area, blocks: 6s² = 4πR². */
-    radius() { return this.s * sqrt(1.5 / Math.PI); }
+    radius() { return this.s * sqrt(1.5 / Math.PI); } // ledger: SCL-078 (6 s^2 = 4 pi R^2)
     /** The window: x in [-3s/2, 5s/2), z in [-3s/2, 3s/2]. */
     window() {
       const h = this.s / 2.0;
@@ -888,6 +888,7 @@
       if (fb !== null) return { kind: 'face', face: fb[0], i: fb[1], j: fb[2] };
       let best = -1, bestD = 0;
       for (let k = 2; k < this.edges.length; k++) {
+        // Bands a face width deep, the nearer edge first (ledger: SCL-108).
         const d = this.edges[k].depth(xw, z);
         if (d !== null && d < this.s && (best < 0 || d < bestD)) { best = k; bestD = d; }
       }
@@ -1028,7 +1029,7 @@
     return (i < 0 ? 0 : (i > last ? last : i)) + 0;
   };
   /** The Catmull-Rom weights of four nodes at t in [0, 1]: exactly (0, 1, 0, 0) at t = 0 and
-   *  (0, 0, 1, 0) at t = 1, so the bicubic is exact at its nodes. */
+   *  (0, 0, 1, 0) at t = 1, so the bicubic is exact at its nodes (ledger: SCL-105). */
   const weights = t => {
     const t2 = t * t;
     const t3 = t2 * t;
@@ -1101,7 +1102,8 @@
     }
   }
 
-  /** The ghosts beyond u = 1 and v = 1 and past the corner (cube_map.py `padded`, in its order). */
+  /** The ghosts beyond u = 1 and v = 1 and past the corner (cube_map.py `padded`, in its order;
+   *  ledger: SCL-105). */
   const padEdgeAndCorner = (g, m) => {
     // Beyond u = 1 (j < m): the mirror of node (m - 1, j) across the edge's plane.
     for (let j = 0; j < m; j++) {
@@ -1305,7 +1307,7 @@
       const fv = p.grid.value((u - p.u0) * p.mf, (v - p.u0) * p.mf);
       if (w >= 1.0) return fv;
       const c = this.coarse.value(u * this.mf, v * this.mf);
-      const s = w * w * (3.0 - 2.0 * w);
+      const s = w * w * (3.0 - 2.0 * w); // ledger: SCL-106
       return [c[0] + s * (fv[0] - c[0]), c[1] + s * (fv[1] - c[1])];
     }
 
@@ -1325,7 +1327,7 @@
       const fe = scaled(p.grid.valueD((u - p.u0) * p.mf, (v - p.u0) * p.mf), p.mf);
       if (w >= 1.0) return fe;
       const ce = coarse();
-      const s = w * w * (3.0 - 2.0 * w);
+      const s = w * w * (3.0 - 2.0 * w); // ledger: SCL-106
       const ds = 6.0 * w * (1.0 - w) * this.mf;
       const blend = (c, f) => c + s * (f - c);
       return {
@@ -1497,7 +1499,7 @@
       this.map = map;
       this.turn = turn;
       /** The planet's radius, metres. */
-      this.radiusM = mPerBlockH * cube.radius();
+      this.radiusM = mPerBlockH * cube.radius(); // ledger: SCL-107
     }
     /** The planet unit vector of a face's local point. */
     unitOnFace(face, u, v) { return this.turn.toPlanet(this.map.forward(face, u, v)); }
