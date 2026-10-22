@@ -1286,7 +1286,7 @@ fn two_plates(p: &PlanetPreset, env: &Env<'_>, turn: f64) -> (PlateState, Geo, V
     let tree = Tree::over(&pos, |_| true);
     let overlaps = subduction::detect(&st, &geo, &pos, &tree);
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
-    subduction::resolve(&mut st, &mut world, &overlaps, &pos, env).unwrap();
+    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, env).unwrap();
     (st, geo, pos)
 }
 
@@ -1551,7 +1551,7 @@ fn ocean_floor_as_thick_as_a_continent_turns_continental_at_a_contact() {
     let tree = Tree::over(&pos, |_| true);
     let overlaps = subduction::detect(&st, &geo, &pos, &tree);
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
-    subduction::resolve(&mut st, &mut world, &overlaps, &pos, &env).unwrap();
+    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
     for &(i, crust, turns) in &cases {
         let place = if i == far {
             "away from any contact"
