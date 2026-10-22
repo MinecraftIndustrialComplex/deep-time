@@ -326,9 +326,13 @@ preset, the world's land regions (the world's index frame, squares of `region_bl
 land when a point of a 64-block lattice in it, x from −C/2 and z from the world's top edge, stands
 at or above sea level) are counted again, now with the sources that hold ore in rock in their
 centre column as the game reads it (within 8 blocks of the top rock block for an exposed
-essential). A land region with fewer than `min_sites_per_region` gets a copy of a template source:
-the essential's first guaranteed site holding ore, else its natural source holding ore with the
-smallest footprint (never a placer or a child site). The copy goes to the region's dry lattice
+essential) and whose centre column is dry land (2026-10-21, Ben's rule of 2026-10-16: the ground
+at the centre stands at or above sea level, the test that picks the lattice's land, with no water
+over its top rock block, the test that picks a copy's point; a source whose centre lies under the
+sea counts for no region, since reaching its ore means diving). A land region with fewer than
+`min_sites_per_region` gets a copy of a template source: the essential's first guaranteed site
+holding ore, else its natural source holding ore with the smallest footprint (never a placer or a
+child site), a source whose centre is under the sea skipped while another exists. The copy goes to the region's dry lattice
 point nearest the world's spawn (`spawn/candidates.json`, the first candidate) whose lattice
 neighbours within 128 blocks are dry too (any dry point when none is), clear of every guaranteed
 site's footprint, and is anchored as above (an in-stratum copy at a point whose host lies within
@@ -345,8 +349,10 @@ The event log's new segment and `events/index.json`, then `bodies/bodies.dtb`, `
 or into other rock when none lay within reach), `placers_kept`, `centre_holds_ore` (the sites whose centre column holds ore of theirs at or under
 the top rock block), `under_water`, `millis` (the anchor), `topped_up` (copies added),
 `top_up` (per essential: `land_regions`, `with_source` (land regions holding enough sources with
-ore before the top-up), `added`, `added_inland`, `short` (land regions still short: no template or
-no dry point)), `top_up_millis`.
+ore and a dry centre before the top-up), `counted` (the sources with ore and a dry centre), `sub_sea`
+(the sources with ore left out because their centre lies under the sea), `short_by_sea` (land
+regions short only for that: they would hold enough with the sea sources counted), `added`,
+`added_inland`, `short` (land regions still short: no template or no dry point)), `top_up_millis`.
 
 ### The climate at a block (0.2, P1-25)
 

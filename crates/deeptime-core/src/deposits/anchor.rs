@@ -24,8 +24,9 @@
 //!
 //! The deposit stage counted each essential's regions on its forecast of the world's λc; the
 //! projection chooses its own on the baked land. [`top_up`] then counts the world's own land
-//! regions against the sources that hold ore, and gives each one short a copy of a template
-//! source, anchored the same way, with an event of its own.
+//! regions against the sources that hold ore and have a dry centre ([`centre_is_dry`]: a source
+//! whose centre lies under the sea is a dive and counts for no region), and gives each one short
+//! a copy of a template source, anchored the same way, with an event of its own.
 //!
 //! The guaranteed sites are the ones whose forming event is a `deeptime:guaranteed_occurrence`
 //! (the event log; the run passes them from memory), so the pass needs no flag in the world data.
@@ -472,6 +473,12 @@ pub struct TopUp {
     /// before the top-up.
     pub land_regions: usize,
     pub with_source: usize,
+    /// The sources with ore that counted (a dry centre), the ones with ore left out because
+    /// their centre lies under the sea, and the land regions that held enough with those
+    /// included but too few without them (each of them got a dry copy).
+    pub counted: usize,
+    pub sub_sea: usize,
+    pub short_by_sea: usize,
     /// Copies placed, of them at an inland point, and land regions still short (no template, or
     /// no dry point clear of the guaranteed bodies).
     pub added: usize,
@@ -506,14 +513,26 @@ fn site_holds_ore(world: &dyn Columns, s: &Site, own: &[&Body], c: u32, exposed:
     ore_in_column(own, c, cx, cz, top, reach)
 }
 
+/// Whether a site's centre column is dry land as the game draws it: the ground there stands at or
+/// above sea level ([`Columns::dry`], the test the top-up picks its lattice's land by) with no
+/// water over its top rock block ([`Columns::rock_top`]'s flag, the test it picks a copy's point
+/// by). A source whose centre is not dry asks the player to dive (Ben's rule of 2026-10-16,
+/// decisions log 2026-10-21), so the top-up does not count it for its region.
+pub fn centre_is_dry(world: &dyn Columns, s: &Site) -> bool {
+    let (x, z) = (i64::from(s.center[0]), i64::from(s.center[2]));
+    world.dry(x, z) && !world.rock_top(x, z).1
+}
+
 /// The top-up (DEP-220): the deposit stage counted each essential's regions on its forecast of
 /// the world, and the projection chooses λc on the baked land, so a region of the world as
 /// generated can lack the source the stage placed in its own (and the CLI's `project` runs the
 /// stage on the Lambert frame altogether). For every essential, each land region of the world
 /// (a point of a [`TOP_UP_STEP_BLOCKS`] lattice on dry land) that holds fewer than
-/// `min_sites_per_region` sources with ore ([`Essential::counts`], [`site_holds_ore`]) gets a
-/// copy of a template source: the essential's first guaranteed site with ore, else its smallest
-/// natural source with ore (never a placer). The copy goes to the region's dry lattice point
+/// `min_sites_per_region` sources with ore and a dry centre ([`Essential::counts`],
+/// [`site_holds_ore`], [`centre_is_dry`]: one under the sea counts for no region) gets a copy of
+/// a template source: the essential's first guaranteed site with ore, else its smallest natural
+/// source with ore (never a placer), a source whose centre is under the sea skipped while another
+/// exists. The copy goes to the region's dry lattice point
 /// nearest `spawn` (the world's spawn) whose lattice neighbours within 128 blocks are dry land
 /// too, any dry point when none is, clear of every guaranteed body; it is anchored as
 /// [`anchor_sites`] anchors (an in-stratum copy where its host lies within reach, tried at up to
@@ -591,19 +610,34 @@ pub fn top_up(
                 .map(|v| v.iter().map(|&i| &deposits.bodies[i]).collect())
                 .unwrap_or_default()
         };
-        // The sources with ore, by region.
+        // The sources with ore, by region: those with a dry centre count; one under the sea is
+        // kept as a template candidate only.
         let mut have = vec![0u32; regions.count()];
+        let mut wet = vec![0u32; regions.count()];
         let mut holding: Vec<usize> = Vec::new();
+        let mut dry_holding: Vec<usize> = Vec::new();
         for (k, s) in deposits.sites.iter().enumerate() {
             if ess.counts(&s.products) && site_holds_ore(world, s, &own(s), cu, ess.exposed) {
-                have[regions.index(f64::from(s.center[0]), f64::from(s.center[2]))] += 1;
+                let r = regions.index(f64::from(s.center[0]), f64::from(s.center[2]));
                 holding.push(k);
+                if centre_is_dry(world, s) {
+                    have[r] += 1;
+                    dry_holding.push(k);
+                } else {
+                    wet[r] += 1;
+                }
             }
         }
+        let need_one = ess.min_sites_per_region.max(1);
         let mut rec = TopUp {
             land_regions: land.iter().filter(|&&l| l).count(),
             with_source: (0..regions.count())
-                .filter(|&r| land[r] && have[r] >= ess.min_sites_per_region.max(1))
+                .filter(|&r| land[r] && have[r] >= need_one)
+                .count(),
+            counted: dry_holding.len(),
+            sub_sea: holding.len() - dry_holding.len(),
+            short_by_sea: (0..regions.count())
+                .filter(|&r| land[r] && have[r] < need_one && have[r] + wet[r] >= need_one)
                 .count(),
             ..TopUp::default()
         };
@@ -621,10 +655,25 @@ pub fn top_up(
         let footprint = |s: &Site| {
             i64::from(s.aabb[1][0] - s.aabb[0][0] + 1) * i64::from(s.aabb[1][2] - s.aabb[0][2] + 1)
         };
-        let template = holding
+        // A template whose centre is under the sea is skipped while another exists.
+        let usable_dry = || {
+            dry_holding
+                .iter()
+                .copied()
+                .filter(|&k| usable(&deposits.sites[k]))
+        };
+        let candidates: Vec<usize> = if usable_dry().next().is_some() {
+            usable_dry().collect()
+        } else {
+            holding
+                .iter()
+                .copied()
+                .filter(|&k| usable(&deposits.sites[k]))
+                .collect()
+        };
+        let template = candidates
             .iter()
             .copied()
-            .filter(|&k| usable(&deposits.sites[k]))
             .filter(|&k| {
                 deposits
                     .guaranteed
@@ -633,10 +682,9 @@ pub fn top_up(
             })
             .min_by_key(|&k| deposits.sites[k].id)
             .or_else(|| {
-                holding
+                candidates
                     .iter()
                     .copied()
-                    .filter(|&k| usable(&deposits.sites[k]))
                     .min_by_key(|&k| (footprint(&deposits.sites[k]), deposits.sites[k].id))
             });
         let Some(tk) = template else {
@@ -1050,6 +1098,9 @@ pub fn anchor_folder(
                 json!({
                     "land_regions": r.land_regions,
                     "with_source": r.with_source,
+                    "counted": r.counted,
+                    "sub_sea": r.sub_sea,
+                    "short_by_sea": r.short_by_sea,
                     "added": r.added,
                     "added_inland": r.inland,
                     "short": r.short,
@@ -1432,5 +1483,228 @@ mod tests {
         // Settled.
         let (again, events) = run(&mut sites, &mut bodies, &mut guaranteed);
         assert_eq!((again["c:iron"].added, events.len()), (0, 0));
+    }
+
+    /// A Lambert world of 2,048 blocks with land east of x = `edge` (rock top 66, limestone from
+    /// 60 down) and the sea to its west (the bed's rock top 30, water over it); the columns of
+    /// `lake` stand above the sea with water over them (rock top 60).
+    struct Coast {
+        wp: WorldProjection,
+        edge: i64,
+        lake: std::ops::Range<i64>,
+    }
+
+    impl Columns for Coast {
+        fn period(&self) -> i64 {
+            2048
+        }
+        fn z_range(&self) -> (i64, i64) {
+            let (lo, hi) = self.wp.z_range();
+            (lo.ceil() as i64, hi.floor() as i64)
+        }
+        fn dry(&self, x: i64, _z: i64) -> bool {
+            (x + 1024).rem_euclid(2048) - 1024 >= self.edge
+        }
+        fn rock_top(&self, x: i64, z: i64) -> (i32, bool) {
+            if self.lake.contains(&x) {
+                (60, true)
+            } else if self.dry(x, z) {
+                (66, false)
+            } else {
+                (30, true)
+            }
+        }
+        fn rock(&self, _x: i64, _z: i64) -> Vec<(i32, i32, Option<String>)> {
+            vec![(60, 0, Some("limestone".into()))]
+        }
+    }
+
+    fn coast(edge: i64, lake: std::ops::Range<i64>) -> Coast {
+        Coast {
+            wp: WorldProjection::Lambert(deeptime_format::Projection::new(2048)),
+            edge,
+            lake,
+        }
+    }
+
+    /// A guaranteed iron site with one body, anchored with its ore at the top rock block over
+    /// (x, z), as the playability pass leaves it.
+    fn iron_site(world: &Coast, id: u32, forming: EventId, x: i32, z: i32) -> (Site, Body) {
+        let (top, _) = world.rock_top(i64::from(x), i64::from(z));
+        let mut b = body(100 + id, f64::from(top), 2.0, true, NO_CLIP);
+        b.center[0] = f64::from(x) + 0.5;
+        b.center[2] = f64::from(z) + 0.5;
+        b.aabb = b.computed_aabb();
+        b.site = Some(id);
+        let dy = anchor_shift(&[&b], 2048, x, z, top, true);
+        shift_body(&mut b, dy);
+        let site = Site {
+            id,
+            kind: SiteKind::Deposit,
+            deposit_type: "deeptime:bif".into(),
+            center: [x, top, z],
+            lat_lon: [0.0, 0.0],
+            aabb: b.aabb,
+            body: Some(b.id),
+            products: vec![deeptime_format::Product {
+                material: "c:iron".into(),
+                grade: 0.3,
+                tonnage_t: 1.0e6,
+                role: "primary".into(),
+            }],
+            forming_event: forming,
+            parent: None,
+            extraction: deeptime_format::sites::Extraction::default(),
+        };
+        (site, b)
+    }
+
+    fn iron() -> Essential {
+        serde_json::from_str(
+            r#"{"material": "c:iron", "min_sites_per_region": 1, "region_blocks": 512, "exposed": true}"#,
+        )
+        .unwrap()
+    }
+
+    /// One top-up of `world` over `sites` (ids 1.. of writer 1 are theirs), the spawn at (700, 0).
+    fn run_top_up(
+        world: &Coast,
+        sites: &mut Vec<Site>,
+        bodies: &mut Vec<Body>,
+        guaranteed: &mut BTreeMap<EventId, String>,
+        seq: &mut u64,
+    ) -> (TopUp, Vec<Event>) {
+        let in_stratum = BTreeMap::new();
+        let mut d = Deposits {
+            sites,
+            bodies,
+            guaranteed,
+            in_stratum: &in_stratum,
+        };
+        let (mut rec, events) = top_up(
+            world,
+            &world.wp,
+            &mut d,
+            &[iron()],
+            (700.0, 0.0),
+            &mut |_| (-1.0e9, -1.0e9),
+            &mut || {
+                *seq += 1;
+                EventId::new(1, *seq)
+            },
+        );
+        (rec.remove("c:iron").unwrap(), events)
+    }
+
+    /// A source whose centre is under the sea counts for no region (Ben's rule of 2026-10-16): a
+    /// land region whose only source with ore lies in the sea gets a copy at a dry point (ore at
+    /// the top rock block), one with a dry source gets none, and the copy's template is the dry
+    /// source though the sea one forms first. The copies are dry, so a second top-up adds none.
+    #[test]
+    fn the_top_up_does_not_count_a_source_under_the_sea() {
+        // Land from x = 300: the region of columns [0, 512) is land in its east part, its
+        // source at x = 100 lies under the sea.
+        let world = coast(300, 0..0);
+        let regions = Regions::in_frame(world.wp.index_frame(), 512);
+        let (wet_ev, dry_ev) = (EventId::new(1, 5), EventId::new(1, 6));
+        let (wet, wet_body) = iron_site(&world, 3, wet_ev, 100, -100);
+        let (dry, dry_body) = iron_site(&world, 4, dry_ev, 700, -100);
+        let (wet_region, dry_region) = (regions.index(100.0, -100.0), regions.index(700.0, -100.0));
+        assert_ne!(wet_region, dry_region);
+        assert!(!centre_is_dry(&world, &wet) && centre_is_dry(&world, &dry));
+        let mut sites = vec![wet, dry];
+        let mut bodies = vec![wet_body, dry_body];
+        let mut guaranteed: BTreeMap<EventId, String> =
+            [(wet_ev, "c:iron".to_owned()), (dry_ev, "c:iron".to_owned())].into();
+        let mut seq = 100;
+        let (rec, events) = run_top_up(&world, &mut sites, &mut bodies, &mut guaranteed, &mut seq);
+        // One counted, one left out, and the region it alone covered is now short for the sea.
+        assert_eq!(
+            (rec.counted, rec.sub_sea, rec.short_by_sea),
+            (1, 1, 1),
+            "{rec:?}"
+        );
+        assert_eq!(rec.short, 0, "{rec:?}");
+        assert_eq!(events.len(), rec.added);
+        let copies = &sites[2..];
+        let in_region = |r: usize| {
+            copies
+                .iter()
+                .filter(|s| regions.index(f64::from(s.center[0]), f64::from(s.center[2])) == r)
+                .count()
+        };
+        assert_eq!(
+            in_region(wet_region),
+            1,
+            "the sea source's region gets one copy"
+        );
+        assert_eq!(
+            in_region(dry_region),
+            0,
+            "a region with a dry source gets none"
+        );
+        for s in copies {
+            let (x, z) = (i64::from(s.center[0]), i64::from(s.center[2]));
+            assert!(world.dry(x, z) && !world.rock_top(x, z).1, "{x} {z}");
+            let mine: Vec<&Body> = bodies.iter().filter(|b| b.site == Some(s.id)).collect();
+            assert_eq!(
+                ore_top_in_column(&mine, 2048, s.center[0], s.center[2]),
+                Some(66)
+            );
+            // The template is the dry source (id 4), not the sea one (id 3, the lower id).
+            let e = events.iter().find(|e| e.id == s.forming_event).unwrap();
+            assert_eq!(e.causes, vec![dry_ev], "site {}", s.id);
+        }
+        // Settled: every land region now holds a counted source.
+        let (again, events) =
+            run_top_up(&world, &mut sites, &mut bodies, &mut guaranteed, &mut seq);
+        assert_eq!(
+            (again.added, events.len(), again.short_by_sea),
+            (0, 0, 0),
+            "{again:?}"
+        );
+        assert_eq!((again.counted, again.sub_sea), (1 + rec.added, 1));
+    }
+
+    /// With no source of a dry centre anywhere the sea one is the template (a template under the
+    /// sea is skipped only while another exists), every land region gets a dry copy of it, and the
+    /// sea source itself still counts for nothing.
+    #[test]
+    fn a_sea_source_is_the_template_when_it_is_the_only_one() {
+        let world = coast(300, 0..0);
+        let regions = Regions::in_frame(world.wp.index_frame(), 512);
+        let ev = EventId::new(1, 5);
+        let (wet, wet_body) = iron_site(&world, 3, ev, 100, -100);
+        let mut sites = vec![wet];
+        let mut bodies = vec![wet_body];
+        let mut guaranteed: BTreeMap<EventId, String> = [(ev, "c:iron".to_owned())].into();
+        let mut seq = 100;
+        let (rec, events) = run_top_up(&world, &mut sites, &mut bodies, &mut guaranteed, &mut seq);
+        assert_eq!(
+            (rec.counted, rec.sub_sea, rec.with_source),
+            (0, 1, 0),
+            "{rec:?}"
+        );
+        assert_eq!(rec.added, rec.land_regions, "{rec:?}");
+        assert_eq!(rec.short, 0, "{rec:?}");
+        assert!(sites[1..].iter().all(|s| centre_is_dry(&world, s)));
+        assert!(events.iter().all(|e| e.causes == vec![ev]));
+        // The sea source's own region (land in its east part) got its copy there.
+        assert!(sites[1..].iter().any(|s| {
+            regions.index(f64::from(s.center[0]), f64::from(s.center[2]))
+                == regions.index(100.0, -100.0)
+        }));
+    }
+
+    /// A centre is dry when the ground stands at or above sea level with no water over it: the
+    /// sea's bed and a lake above the sea both fail it.
+    #[test]
+    fn a_dry_centre_is_ground_at_sea_level_with_no_water_over_it() {
+        let world = coast(300, 500..600);
+        let at = |x: i32| iron_site(&world, 1, EventId::new(1, 1), x, 0).0;
+        assert!(centre_is_dry(&world, &at(320)), "land");
+        assert!(!centre_is_dry(&world, &at(100)), "the sea's bed");
+        assert!(!centre_is_dry(&world, &at(550)), "a lake above sea level");
+        assert!(centre_is_dry(&world, &at(700)), "land past the lake");
     }
 }

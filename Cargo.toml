@@ -32,7 +32,7 @@ deeptime-tiles = { path = "crates/deeptime-tiles" }
 # at a pinned commit, as mic-rtsim has it (decisions log 2026-10-21, "vendor mic-viewer or depend on
 # it?"). The repository is public since 2026-10-21, so it is fetched over https with no credentials
 # (the test VM and CI included). Pin a full commit hash, never a branch.
-mic-viewer = { git = "https://github.com/MinecraftIndustrialComplex/mic-viewer.git", rev = "335ae9cf23d2b35ef34fb265d50de0d8788f3c07" }
+mic-viewer = { git = "https://github.com/MinecraftIndustrialComplex/mic-viewer.git", rev = "af334960e3b88318dd16040a9684ccd0d8ae4f25" }
 # The JNI binding (plan §6.1); only deeptime-jni uses it. MIT OR Apache-2.0.
 jni = "=0.22.4"
 # Data parallelism inside native calls, one private pool per session (plan §6.2). MIT OR Apache-2.0.

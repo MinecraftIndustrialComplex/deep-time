@@ -31,13 +31,27 @@ The model's rows:
                      `plate_surface`: the pelagic sediment, `pelagic_m_per_myr`)
   sediment subd.,    none: the conserved pools of subducted crust accrete to the column on top
   subd. erosion      at a resampling (`accreted`, of it ocean floor's: accreted - accreted_continent)
-  collision          crust a collision took across its front less the share stacked (crossed - kept)
+  collision          crust a collision took across its front less the share stacked (crossed - kept),
+                     split (since 2026-10-21, PLT-401) into the crust found no room (`noroom_sliver`:
+                     left over in a belt with room in it; `noroom_capped`: the belt at the strength
+                     height; `noroom_clipped`: the ceilings) and the rest, PLT-242's share's part
+                     (whatever the share and PLT-400, the parts add up to crossed - kept)
   foundering         crust beyond `crust_max_km` sunk from the column's bottom (`foundered`)
   rate cap           crust over the thickening ceiling with no room, sent down (`rate_lost`)
   dropped            crust a resampling drops (`dropped` + `mafic_dropped`)
 and the felsic rock made or destroyed per part (`cb_parts` felsic), the flows between the
 continental and oceanic labels (`cb_parts` vol by part) and the net change of the continental
 volume (visible and hidden) over the run.
+
+The collision fronts' lengths and rates (PLT-401; runs from 2026-10-21 on, NaN before): the front
+in collision at any time (`front_km_myr` over the run's length), the convergence across it
+(`crossed_km2` / `front_km_myr`), the crust crossing (`crossed` / `crossed_km2`), the area crossing
+a year, the loss per km of front and Myr, the share kept, and the crossing crust above the normal
+column (`crossed_above`), raised by a collision within 30 Myr (`crossed_recent`) and stacked by the
+same collision (`crossed_restack`, PLT-400). Earth (plates.md "The crust flux into collision
+fronts"): 6,000 km of active suture on average and 12,000 km today, 115 km^3/km/Myr (Stern &
+Scholl 2010, p. 18-19); the continental convergent boundary 23,003 km at 18.7 mm/yr across, 0.43
+km^2 a year (Bird 2003, Table 3).
 """
 import re
 import sys
@@ -117,6 +131,23 @@ def budget(run, length):
         "g_full": g.get("front_g_full", 0.0) / max(g.get("front_o", 0.0) + g.get("front_c", 0.0), 1e-9),
         "g_normal": g.get("front_g_normal", 0.0) / max(g.get("front_o", 0.0) + g.get("front_c", 0.0), 1e-9),
     }
+    # The collision fronts (PLT-401): NaN for runs from before the globals existed.
+    nan = float("nan")
+    crossed, kept = g.get("crossed", 0.0), g.get("kept", 0.0)
+    area, fkm = g.get("crossed_km2", nan), g.get("front_km_myr", nan)
+    noroom = [g.get(f"noroom_{k}", nan) for k in ("sliver", "capped", "clipped")]
+    out["noroom_sliver"], out["noroom_capped"], out["noroom_clipped"] = (per(x) for x in noroom)
+    out["coll_share"] = per(crossed - kept - sum(noroom))
+    out["front_coll_km"] = fkm / length
+    out["conv_coll"] = area / fkm if fkm > 0 else nan
+    out["h_coll"] = crossed / area if area > 0 else nan
+    out["area_coll"] = area / yrs
+    out["coll_per_km"] = (crossed - kept) / fkm if fkm > 0 else nan
+    out["kept_frac"] = kept / crossed if crossed > 0 else nan
+    for key, name in (("above_frac", "crossed_above"), ("recent_frac", "crossed_recent"),
+                      ("restack_frac", "crossed_restack")):
+        out[key] = g.get(name, nan) / crossed if crossed > 0 else nan
+    out["wedge_frac"] = g.get("kept_wedge", nan) / kept if kept > 0 else nan
     out["arc_o_per_km"] = g.get("arc_o", 0.0) / max(g.get("front_o", 0.0), 1e-9)
     out["arc_c_per_km"] = g.get("arc_c", 0.0) / max(g.get("front_c", 0.0), 1e-9)
     out["cord_per_km"] = g.get("cordillera", 0.0) / max(g.get("front_c", 0.0), 1e-9)
@@ -145,6 +176,10 @@ ROWS = [
     ("ocean margins: sediment subduction", None, 1.1),
     ("ocean margins: subduction erosion", None, 1.4),
     ("crust-suturing zones (all three)", "collision", 0.7),
+    ("  of it PLT-242's share", "coll_share", float("nan")),
+    ("  of it no room: left over in a belt with room", "noroom_sliver", float("nan")),
+    ("  of it no room: the belt at the strength height", "noroom_capped", float("nan")),
+    ("  of it no room: clipped by the ceilings", "noroom_clipped", float("nan")),
     ("foundering", "foundering", float("nan")),
     ("model only: rate cap sent down", "rate_cap", 0.0),
     ("model only: resampling drops", "dropped", 0.0),
@@ -169,6 +204,16 @@ LENGTHS = [
     ("mean g, all oceanic fronts, normal", "g_normal", "{:.3f}"),
     ("mean g, continental fronts, full speed", "g_c_full", "{:.3f}"),
     ("mean g, continental fronts, normal", "g_c_normal", "{:.3f}"),
+    ("collision front at any time, km (Earth 6,000 to 12,000 of suture)", "front_coll_km", "{:.0f}"),
+    ("convergence across it, mm/yr (Bird's CCB 18.7)", "conv_coll", "{:.1f}"),
+    ("crust crossing it, km", "h_coll", "{:.1f}"),
+    ("area crossing, km2/yr (Bird's CCB 0.43)", "area_coll", "{:.3f}"),
+    ("collision loss per km of front, km3/km/Myr (Earth ~115)", "coll_per_km", "{:.0f}"),
+    ("kept / crossed", "kept_frac", "{:.3f}"),
+    ("crossing crust above the normal column, share", "above_frac", "{:.3f}"),
+    ("  raised by a collision within 30 Myr, share", "recent_frac", "{:.3f}"),
+    ("  stacked by the same collision (PLT-400), share", "restack_frac", "{:.3f}"),
+    ("wedge / kept", "wedge_frac", "{:.3f}"),
     ("continental crust at the end, share of the planet", "cont_end", "{:.3f}"),
 ]
 
