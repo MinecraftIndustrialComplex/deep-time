@@ -6,8 +6,9 @@
 //!
 //! - **Cone gullies** (Ben, decisions log 2026-10-22, D2: "cones get a smooth fresh summit with
 //!   radially gullied older flanks", O'Hara et al. 2024). A standing stratovolcano
-//!   (`volcanoes/standing.json`, written by the bake) gets radial V-shaped gullies cut into its
-//!   flanks, none in its summit zone (the upper 30 % of its height over its foot, O'Hara's summit
+//!   (`volcanoes/standing.json`, written by the bake) gets radial gullies cut into its flanks,
+//!   basins tiling the cone divide to divide (V-cuts when young, broad valleys when old), none in
+//!   its summit zone (the upper 30 % of its height over its foot, O'Hara's summit
 //!   region) or its crater. Their depth follows O'Hara's eroded volume against the cone's age (the
 //!   log-mean of the times since its first and its last activity): each cone's cuts take that share
 //!   of its volume over its foot. Wider and fewer gullies as it ages, and a dead cone's fade on the
@@ -41,19 +42,16 @@ pub const STANDING_VERSION: u32 = 1;
 /// A volcano under this height is not drawn (the shaper's floor, VOL-064).
 const MIN_HEIGHT_M: f64 = 30.0; // ledger: VOL-064
 
-/// `volcanoes/standing.json`: the stratovolcanoes still standing at the present (alive or dead,
-/// at least [`MIN_HEIGHT_M`] high), in id order, with the times the cone gullies' age needs.
+/// `volcanoes/standing.json`: the volcanoes still standing at the present (alive or dead, every
+/// kind, at least [`MIN_HEIGHT_M`] high), in id order, with the times the cone gullies' age needs.
+/// Only the stratovolcanoes are gullied; every kind holds the steep-ground texture back over its
+/// body (VOL-068).
 pub fn standing_json(st: &VolcanoState) -> Value {
     let r3 = |v: f64| (v * 1000.0).round() / 1000.0;
     let mut list: Vec<_> = st
         .volcanoes
         .iter()
-        .filter(|v| {
-            v.kind == Kind::Strato
-                && v.gone.is_none()
-                && v.radius_m > 0.0
-                && v.height_m >= MIN_HEIGHT_M
-        })
+        .filter(|v| v.gone.is_none() && v.radius_m > 0.0 && v.height_m >= MIN_HEIGHT_M)
         .collect();
     list.sort_by_key(|v| v.id);
     let volcanoes: Vec<Value> = list
@@ -200,7 +198,7 @@ const MIN_SPAN_BLOCKS: f64 = 4.0; // ledger: VOL-104 (game-choice)
 /// The gullies come in as their spacing round the cone grows from the first to the second (world
 /// blocks): the game draws the terrain from corners 4 blocks apart, so nothing finer than 8 blocks
 /// shows.
-const ONSET_SPACING: (f64, f64) = (8.0, 12.0); // ledger: VOL-103 (game-choice)
+const ONSET_SPACING: (f64, f64) = (8.0, 12.0); // ledger: VOL-104 (game-choice)
 /// The deepest a gully's axis cuts, as a share of the cone's height over its foot there.
 const MAX_CUT_SHARE: f64 = 0.8; // ledger: VOL-104 (game-choice)
 
@@ -242,13 +240,15 @@ pub fn gully_count(deg: f64) -> u32 {
 /// rounded interfluves) to 0.7 on an old one (wide valleys between sharp divides), for eroded
 /// share `e`. Its mean across the basin is 1/(1 + p).
 pub fn profile_power(e: f64) -> f64 {
-    1.5 - 0.8 * smooth(0.10, 0.35, e) // ledger: VOL-103 (game-choice)
+    1.5 - 0.8 * smooth(0.10, 0.35, e) // ledger: VOL-104 (game-choice)
 }
 
-/// A standing stratovolcano as the cone gullies draw it.
+/// A standing volcano as the relief draws it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cone {
     pub id: u32,
+    /// A stratovolcano (gullied); a shield or a caldera complex only calms the ground over it.
+    pub strato: bool,
     /// Its vent on the sphere.
     pub unit: [f64; 3],
     pub radius_m: f64,
@@ -276,6 +276,7 @@ pub fn cones_of(v: &Value, unit_of: impl Fn(f64, f64) -> [f64; 3]) -> Vec<Cone> 
             let dead = extinct.map_or(0.0, |e| (t - e).max(0.0));
             Some(Cone {
                 id: o["id"].as_u64().unwrap_or(0) as u32,
+                strato: o["kind"].as_str() == Some(Kind::Strato.name()),
                 unit: unit_of(x, z),
                 radius_m,
                 crater_rho: o["crater_rho"].as_f64().unwrap_or(0.0).max(0.0),
@@ -323,6 +324,8 @@ pub struct ConeRecord {
     pub capped: bool,
     pub span_blocks: f64,
     pub deepest_blocks: f64,
+    /// 1 while active, less once dead ([`Cone::young`]).
+    pub young: f64,
     pub skipped: Option<&'static str>,
 }
 
@@ -338,6 +341,7 @@ fn one_cone(
     let grid = g.grid;
     let mut rec = ConeRecord {
         id: k.id,
+        young: k.young,
         ..ConeRecord::default()
     };
     let vw = frame.point(k.unit);
@@ -433,14 +437,24 @@ fn one_cone(
             (v > 0.004).then_some((a.c, v as f32))
         })
         .collect();
+    if !k.strato {
+        rec.skipped = Some("not_strato");
+        return (Vec::new(), calm, rec);
+    }
     if fn_ == 0 || !top.is_finite() {
         rec.skipped = Some("no_ground");
         return (Vec::new(), calm, rec);
     }
-    let foot = fs / fn_ as f64;
+    if top < g.sea_y + 1.0 {
+        rec.skipped = Some("sea");
+        return (Vec::new(), calm, rec);
+    }
+    // The cone over its ground, or over the sea for an island: nothing is cut under a block over
+    // the sea, so O'Hara's share is of the cone above it (their cones are subaerial).
+    let foot = (fs / fn_ as f64).max(g.sea_y + 1.0); // ledger: VOL-101
     let span = top - foot;
     rec.span_blocks = (span * 100.0).round() / 100.0;
-    if span < MIN_SPAN_BLOCKS || top < g.sea_y + 1.0 {
+    if span < MIN_SPAN_BLOCKS {
         rec.skipped = Some("low");
         return (Vec::new(), calm, rec);
     }
@@ -479,7 +493,7 @@ fn one_cone(
                 + 0.08 * (8.0 * a.theta - TAU * 2.3 * a.rho + ph[2]).sin();
             let u = (nf * a.theta / TAU + wig + ph[0]).rem_euclid(1.0);
             // The basins tile the flank divide to divide: deepest on the axis, nothing on the
-            // divide, sharp-floored V when young, a broad U when old. ledger: VOL-103
+            // divide, sharp-floored V when young, a broad U when old. ledger: VOL-104 (game-choice)
             let off = u.min(1.0 - u);
             let profile = (1.0 - 2.0 * off).max(0.0).powf(pw);
             let depth = 1.0 + 0.2 * (4.0 * a.theta + ph[3]).sin();
@@ -580,30 +594,50 @@ pub fn cone_gullies(
             }
         }
     }
-    let drawn: Vec<&ConeRecord> = records.iter().filter(|r| r.skipped.is_none()).collect();
-    let med = |f: &dyn Fn(&ConeRecord) -> f64| -> Value {
-        let mut v: Vec<f64> = drawn.iter().map(|r| f(r)).collect();
-        if v.is_empty() {
-            return Value::Null;
-        }
-        v.sort_by(f64::total_cmp);
-        json!(v[v.len() / 2])
+    // The active cones and the dead ones apart: a dead cone's gullies are faded (VOL-105).
+    let group = |active: bool| -> Value {
+        let mine: Vec<&ConeRecord> = records
+            .iter()
+            .filter(|r| (r.young >= 1.0) == active && r.skipped != Some("not_strato"))
+            .collect();
+        let drawn: Vec<&ConeRecord> = mine
+            .iter()
+            .copied()
+            .filter(|r| r.skipped.is_none())
+            .collect();
+        let med = |f: &dyn Fn(&ConeRecord) -> f64| -> Value {
+            let mut v: Vec<f64> = drawn.iter().map(|r| f(r)).collect();
+            if v.is_empty() {
+                return Value::Null;
+            }
+            v.sort_by(f64::total_cmp);
+            json!(v[v.len() / 2])
+        };
+        let skipped = |why: &str| mine.iter().filter(|r| r.skipped == Some(why)).count();
+        json!({
+            "cones": mine.len(),
+            "gullied": drawn.len(),
+            "skipped_sea": skipped("sea"),
+            "skipped_low": skipped("low"),
+            "skipped_no_flank": skipped("no_flank"),
+            "skipped_other": skipped("no_ground") + skipped("too_large"),
+            "capped": drawn.iter().filter(|r| r.capped).count(),
+            "target_share_median": med(&|r| r.target),
+            "removed_share_median": med(&|r| r.removed),
+            "gullies_median": med(&|r| f64::from(r.gullies)),
+            "span_blocks_median": med(&|r| r.span_blocks),
+            "deepest_blocks_median": med(&|r| r.deepest_blocks),
+            "deepest_blocks_max": drawn.iter().map(|r| r.deepest_blocks).fold(0.0, f64::max),
+            "first": drawn.iter().take(6).map(|r| json!([r.id, r.gullies, r.target, r.removed, r.span_blocks, r.deepest_blocks])).collect::<Vec<_>>(),
+        })
     };
-    let skipped = |why: &str| records.iter().filter(|r| r.skipped == Some(why)).count();
     let note = json!({
         "cones": cones.len(),
-        "gullied": drawn.len(),
-        "skipped_low": skipped("low"),
-        "skipped_no_flank": skipped("no_flank"),
-        "skipped_other": skipped("no_ground") + skipped("too_large"),
-        "capped": drawn.iter().filter(|r| r.capped).count(),
+        "not_strato": records.iter().filter(|r| r.skipped == Some("not_strato")).count(),
+        "gullied": records.iter().filter(|r| r.skipped.is_none()).count(),
         "cells_cut": cuts.len(),
-        "target_share_median": med(&|r| r.target),
-        "removed_share_median": med(&|r| r.removed),
-        "gullies_median": med(&|r| f64::from(r.gullies)),
-        "deepest_blocks_median": med(&|r| r.deepest_blocks),
-        "deepest_blocks_max": drawn.iter().map(|r| r.deepest_blocks).fold(0.0, f64::max),
-        "first": drawn.iter().take(6).map(|r| json!([r.id, r.gullies, r.target, r.removed, r.span_blocks, r.deepest_blocks])).collect::<Vec<_>>(),
+        "active": group(true),
+        "dead": group(false),
     });
     (calm, note)
 }
@@ -776,6 +810,7 @@ mod tests {
         let extinct = dead_myr.map(|d| -d);
         Cone {
             id: 41,
+            strato: true,
             unit: frame.unit(v.0, v.1),
             radius_m: RADIUS_BLOCKS * MH,
             crater_rho: 0.1,
@@ -1016,9 +1051,12 @@ mod tests {
             {"id": 3, "kind": "stratovolcano", "x": 10.0, "z": -20.0, "radius_m": 14000.0,
              "height_m": 2400.0, "crater_rho": 0.07, "born_myr": 498.0, "extinct_myr": null},
             {"id": 9, "kind": "stratovolcano", "x": 50.0, "z": 5.0, "radius_m": 9000.0,
-             "height_m": 900.0, "crater_rho": null, "born_myr": 480.0, "extinct_myr": 495.0}]});
+             "height_m": 900.0, "crater_rho": null, "born_myr": 480.0, "extinct_myr": 495.0},
+            {"id": 12, "kind": "shield", "x": -40.0, "z": 5.0, "radius_m": 60000.0,
+             "height_m": 4000.0, "crater_rho": 0.05, "born_myr": 499.0, "extinct_myr": null}]});
         let cones = cones_of(&v, |x, z| [x, z, 0.0]);
-        assert_eq!(cones.len(), 2);
+        assert_eq!(cones.len(), 3);
+        assert!(cones[0].strato && cones[1].strato && !cones[2].strato);
         assert_eq!(
             (cones[0].id, cones[0].young, cones[0].crater_rho),
             (3, 1.0, 0.07)

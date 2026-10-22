@@ -35,6 +35,16 @@ crater at least 2 km (7 blocks) across and 240 m (7 blocks) deep, Earth's median
 2026-10-22; before it 6 % of the cone's height, a block or two in the game). Its rock is andesite over tuff (volcanic ash turned to
 rock), or rhyolite over tuff where the crust is thick.
 
+**Gullied flanks** (since 2026-10-22, Ben's D2). A stratovolcano's summit stays smooth, but its
+flanks are cut into radial gullies that run from below the summit down to its foot. A young cone
+has many narrow ones (16 round it), sharp V-cuts between rounded ribs; an older one has fewer and
+wider ones (8), broad valleys between sharp divides, cut deeper, as on Earth (O'Hara et al. 2024).
+How much of the cone they take follows its age: about 16 % of its volume on a cone a few thousand
+years old, 23 % on an active cone 2 Myr old, up to 40 % on old ones. Once the volcano is dead
+they fade on the crater's clock while the mountains' own rugged texture takes the cone over. The
+gullies are 8 or more blocks apart round the cone (the game cannot draw finer ones), wider than
+Earth's 1 to 2 km.
+
 **Shield volcanoes and island chains.** Over a hotspot (a fixed plume of hot mantle) under ocean
 floor, a broad, gently sloping basalt shield rises 3.5 to 6.5 km above the sea floor, 49 to 80 km in
 radius. Because the plate moves over the plume, a new shield starts about every 70 km and the older
@@ -139,6 +149,16 @@ catalogue of individual volcanoes that ride on their plates.
    rises above the cone shows through. Before, the profile was added to sloping ground, so the
    highest point of a cone on a range's flank sat up the slope from its vent (Ben's volcano 27476,
    2026-10-22: 35 blocks up the slope and 30 blocks above the vent column).
+   **Gullies.** After the world map is drawn, the bake cuts each standing stratovolcano's flanks
+   into radial gullies on the world's own grid, in world blocks (VOL-100 to VOL-105). It reads the
+   cone from the drawn terrain: its foot is the mean height of the ring 1.0 to 1.3 radii out, its
+   top the highest point within 0.2. The upper 30 % of its height over the foot and its crater keep
+   no gullies. Below, 8 to 16 basins tile the cone divide to divide, each cut deepest on its axis;
+   the cut's depth is scaled so the cuts take O'Hara's eroded share of the cone's volume over its
+   foot for its age (the log-mean of the times since its first and its last activity; an active
+   cone last erupted 1 kyr ago). Dead cones' cuts fade by e^(−dead / 5 Myr). Nothing is cut below
+   one block over the sea, at a lake or a river, or under ice, so the coast and the closed basins
+   do not change.
 10. **Magma in the game.** The bake lists the volcanoes that are still active. The Minecraft side
     gives each a chamber (an ellipsoid whose radius is a tenth of the volcano's, between 1.2 and
     4.5 km), a conduit and a plug, and gives the most active quarter of those that can hold one a
@@ -169,6 +189,12 @@ fraction of the full height `H` at that distance.
 | VOL-024 | Flank steepness | 0.5 (radius doubled) | – | Ben, decisions log 2026-09-30 | `game-choice` |
 | VOL-026 | Summit crater depth | 240 m, at most 0.37 H (VOL-090); 0.06 H until 2026-10-22 | m | Grosse et al. 2014 (Earth's median); Ben, 2026-10-22; Pike & Clow 1981 for the cap | `verified` |
 | VOL-091 | Summit crater radius | max(1 km, 0.07 R) | km | agent, for visibility; Grosse et al. 2014 and Pike & Clow 1981 compared | `game-choice` |
+| VOL-100 | Gullies' summit zone | none above 0.70 of the cone's height over its foot, full below 0.55; none in the crater | share of height | O'Hara et al. 2024 (summit region the upper 30 %); Ben, 2026-10-22 (D2) | `game-choice` |
+| VOL-101 | Eroded share of a cone's volume | 5.36 log10(age, yr) − 1.56 %, kept within 5 to 40 %; age the log-mean of first and last activity | % | O'Hara et al. 2024, Fig. 4h | `verified` |
+| VOL-102 | Last eruption of an active cone | 1 | kyr | agent | `game-choice` |
+| VOL-103 | Gully width angle and count | 20° at 10 % eroded to 50° at 35 %; 360° over it in fours, 8 to 16 | degrees, count | O'Hara et al. 2024, §4.1, §4.3 | `verified` |
+| VOL-104 | Gully cross-profile and drawing rules | (1 − 2d)^p, p 1.5 young to 0.7 old; onset at 8 to 12 blocks' spacing; axis at most 0.8 of the height; masks | – | agent | `game-choice` |
+| VOL-105 | A dead cone's gullies | × e^(−dead / 5 Myr) | – | agent, after the 2026-09-30 decision | `game-choice` |
 | VOL-029 | Caldera radius | uniform 3 to 9, at most 0.6 R | km | none; Christiansen 2001, USGS compared | `uncited` |
 | VOL-030 | Caldera depth | min(0.5 H, 400 m + 0.05 × radius) | m | none; Grosse et al. 2014 compared | `uncited` |
 | VOL-031 | Shield summit caldera | radius 0.08 R, depth min(0.04 H, 250 m), on shields over 4 km | m | none | `uncited` |
@@ -344,6 +370,14 @@ What these runs show:
 
 ## Simplifications and limits
 
+- **Gullies are drawn, not eroded.** The flank gullies (VOL-100 to VOL-105) are a pattern sized
+  by O'Hara et al. 2024's eroded volume against age, not a drainage network: no channel follows
+  the ground's flow, the basins are even round the cone, and the eroded rock goes nowhere (no
+  fans at the foot). Only stratovolcanoes get them (O'Hara's sample): shields and silicic centres
+  are left as they were. They are at least 8 blocks (2.4 km) apart, since the game draws the
+  terrain from corners 4 blocks apart; Earth's young cones carry channels about 1 km apart
+  (drainage density about 1 km⁻¹), which the game cannot show. A Lambert world (no projection
+  pass) gets none.
 - **Three kinds only.** There are no cinder cones, no volcanoes at mid-ocean ridges or in rifts,
   and no fissure eruptions. The code's own comment notes that ridges and rifts are where lava is
   common on Earth (MAG-038); they are not exported to the game at all.
@@ -401,7 +435,8 @@ What these runs show:
 | Extra island subsidence 0 by default (VOL-048) | flexure and the plate model's ocean floor already sink old islands; the setting stays | Ben, decisions log 2026-10-02 ("Set it to 0, keep the setting") |
 | Continental hotspot centres collapse at about 1 per Myr (VOL-074) | Yellowstone had three caldera-forming eruptions in about 1.5 Myr (Christiansen 2001); the rate is a new setting | Ben, decisions log 2026-10-02 ("About 1 per Myr") |
 | Flank steepness 0.5: every volcano twice as wide as its physical profile (VOL-024) | at 15 times vertical exaggeration a physical cone is a spike | Ben, decisions log 2026-09-30 ("Setting, gentler default") |
-| Young volcanoes are smooth; old ones regain rugged ground (VOL-068) | looks | Ben, decisions log 2026-09-30 |
+| Young volcanoes are smooth; old ones regain rugged ground (VOL-068) | looks | Ben, decisions log 2026-09-30; for cone flanks changed 2026-10-22 (next row) |
+| A smooth fresh summit with radially gullied older flanks (VOL-100 to VOL-105) | looks: a cone reads as a volcano its age, as O'Hara et al. 2024 measured them | Ben, decisions log 2026-10-22 (D2); the drawing rules, the 1 kyr last eruption and the stratovolcanoes-only scope the agent's |
 | Small arc segments counted on their subduction event (VOL-015) | event volume | Ben, decisions log 2026-09-30 ("Count small ones") |
 | Volcano density 1 (VOL-012) | kept although it raises the land | Ben, decisions log 2026-10-01 |
 | Lava only at active volcanoes; random lava lakes and springs removed (MAG-001, MAG-034) | "only at active volcanoes, ridges and hotspots" is where lava is on Earth | Ben, decisions log 2026-10-01 |
