@@ -52,8 +52,10 @@ import java.util.function.Function;
  *
  * <p>Less the pack's <b>lava stripes</b> in its volcanic biomes (review fix 8, 2026-10-22; ledger VOL-123): under a
  * biome condition whose every biome is one of Deep Time's volcanic biomes ({@code #deeptime:volcanic}, the biomes that
- * stand only at real volcanoes), a rule that paints blackstone or smooth basalt where a noise lies within a band is left
- * out. Terralith draws a volcano's dark lines so, as contours of its {@code volcano_surface} noise; in a Deep Time
+ * stand only at real volcanoes), a rule that paints blackstone or smooth basalt where a noise lies within a band about a
+ * level (both ends inside the noise's range, {@link #STRIPE_BAND_MAX}) is left out; a one-sided threshold, which paints
+ * patches (Terralith's Yellowstone), stays. Terralith draws a volcano's dark lines so, as contours of its
+ * {@code volcano_surface} noise; in a Deep Time
  * level the lines are the volcano's own lava flows, which run downhill from its vents ({@link LavaFlows},
  * {@link LavaFlowPass}). The rest of those biomes' rules stay (Terralith's basalt and gravel ground, its crater's magma
  * blocks), and so does the same noise's paint in any other biome (its tropical jungle's). Without a server (no
@@ -158,15 +160,24 @@ public record DelegatingRuleSource(Holder<NoiseGeneratorSettings> settings) impl
         return r;
     }
 
+    /**
+     * Both ends of a stripe's band lie within this of zero: inside a noise's range, so the band is a contour line. A
+     * threshold with no upper end of its own (Terralith's Yellowstone puts 100 there) paints patches, not lines, and stays.
+     */
+    static final double STRIPE_BAND_MAX = 1.5;   // ledger: VOL-123 (game-choice)
+
     /** A description of {@code r} if it is a lava stripe (a noise band painting blackstone or smooth basalt), else null. */
     static String stripe(SurfaceRules.RuleSource r) {
         if (r instanceof SurfaceRules.TestRuleSource t && t.thenRun() instanceof SurfaceRules.BlockRuleSource b
                 && (b.resultState().is(Blocks.BLACKSTONE) || b.resultState().is(Blocks.SMOOTH_BASALT))
                 && isType(t.ifTrue(), "minecraft:noise_threshold")) {
             JsonObject c = encode(t.ifTrue());
-            if (c != null && "minecraft:noise_threshold".equals(type(c)))
-                return BuiltInRegistries.BLOCK.getKey(b.resultState().getBlock()) + " where " + c.get("noise").getAsString() + " is in ["
-                        + c.get("min_threshold").getAsDouble() + ", " + c.get("max_threshold").getAsDouble() + "]";
+            if (c != null && "minecraft:noise_threshold".equals(type(c)) && c.has("min_threshold") && c.has("max_threshold")) {
+                double lo = c.get("min_threshold").getAsDouble(), hi = c.get("max_threshold").getAsDouble();
+                if (Math.abs(lo) <= STRIPE_BAND_MAX && Math.abs(hi) <= STRIPE_BAND_MAX)
+                    return BuiltInRegistries.BLOCK.getKey(b.resultState().getBlock()) + " where " + c.get("noise").getAsString()
+                            + " is in [" + lo + ", " + hi + "]";
+            }
         }
         return null;
     }
