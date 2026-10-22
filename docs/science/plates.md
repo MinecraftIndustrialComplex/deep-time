@@ -266,7 +266,9 @@ orogenic collapse and before the surface processes:
    35 km and the thickest is 240 km), and that is not
    the ocean floor beside a rifted margin.
 2. *The taper* (PLT-261). Every sample within W/2 of the boundary (W = `transition_width_km`,
-   200 km measured **on the planet**, PLT-262) gets a signed distance d from it (inland positive)
+   200 km measured **on the model sphere**, PLT-262; on the planet until 2026-10-22, see "The
+   transition's width and the drowned continents" at the end of this page) gets a signed distance
+   d from it (inland positive)
    and a target crystalline thickness (the crust less its sediment and sedimentary rock)
    T*(d) = T_o + (T_n − T_o) · clamp(1/2 + d/W, 0, 1), with T_n = 33.0 km (the normal continental
    column's) and T_o = 7 km (the ocean's). The profile is linear in thickness: β = T_n / T* runs
@@ -295,7 +297,10 @@ The plate model's height change is its uplift for the surface stage, which carri
 own elevation and flexure; the shelf comes from the sediment the surface brings onto the thinned
 crust, and its slope failure keeps that sediment at most 2.5° steep.
 
-**Earth against the model.** Measured 2026-10-04 on `earthlike_quick_16k`
+**Earth against the model.** Measured 2026-10-04, with W then measured on the planet (200 km
+there was 1,632 km on the model sphere of the quick 16k planet, so every figure in this table and
+the paragraph after it is for that width; the figures for 200 km on the model sphere are in "The
+transition's width and the drowned continents" at the end of this page), on `earthlike_quick_16k`
 (coupled pipeline to the volcano stage, `structure.deformation.density=0`; master = the same build with
 `tectonics.transition_width_km=0`, which returns before touching anything; `tools/review/margin-runs.sh`,
 transects by `tools/review/margins.py` with the margins study's definitions, so the ETOPO 2022 figures
@@ -335,9 +340,13 @@ course.
 - The profile is linear in thickness and the same on every margin; Earth's margins have a necking
   zone where the crust thins fastest, and volcanic and magma-poor margins differ in width by a
   factor of two to three. One width (200 km, inside the sources' 50–300 km) stands for all.
-- The width is in metres on the planet, so a small planet's margins are as wide as Earth's in
-  metres and take a larger share of its continents; on the quick 16k planet the zone is 23 samples
-  across.
+- The width was in metres on the planet until 2026-10-22, so a small planet's margins were as wide
+  as Earth's in metres and took eight times the share of its continents (23 samples across on the
+  quick 16k planet). It is now in kilometres on the model sphere (Ben, decisions log 2026-10-22,
+  D6): the plates see Earth's width in their own Earth-sized frame, and the planet draws the margin
+  R/R_model of that (24.6 km on the quick 16k planet, five L1 cells), with the heights unscaled.
+  The ramp is then coarse on the quick planet: its 100,000 L0 samples are 71 km apart on the model
+  sphere, so W is 2.8 samples across (the full planet's 250,000, 45 km apart, 4.4).
 - τ (20 Myr) is a game choice: the sources give the duration of rifting (tens of Myr) and the
   thermal subsidence's time constant (62.8 Myr, carried by the ocean's age–depth law), not a time
   for the crust to take the taper's shape.
@@ -2039,7 +2048,7 @@ own, on master d54c7f0f, it barely moved where the rock lay. The final checkpoin
 `deeptime dump-fields` (`tools/review/geo_template_fields.py`), show why: the share of ocean L1
 cells holding more than 50 m of felsic plutonic rock falls with the distance (L1 cells, 4.8 km
 each on the planet) from the nearest continental cell over about the transition's half-width
-(W/2 = 100 km = 21 cells), and switching the transition off (`transition_width_km` = 0) takes
+(W/2 = 100 km on the planet = 21 cells, W then on the planet), and switching the transition off (`transition_width_km` = 0) takes
 most of it away (master d54c7f0f, 2026-10-19):
 
 | cells to land | ocean cells (master) | master | PLT-293 | PLT-293, no transition | PLT-293 and PLT-294 on |
@@ -2214,7 +2223,8 @@ thickness ends near its isostatic height and spreads when it is thick and hot.
    room, and of the about 33 km³ a year its rule would release, 4.1 moves.
 
 The transition's width (PLT-262) is Ben's (decisions log 2026-10-05, "Keep 200 km, raise crust in
-7–8") and is not changed here.
+7–8") and is not changed here (he moved it to the model sphere on 2026-10-22, decisions log D6;
+"The transition's width and the drowned continents" at the end of this page).
 
 **The fix.** Two rules on the plate model's samples, each with its own parameter and its own
 ledger row, run each plate step after the collapse and before the rate limits:
@@ -2383,7 +2393,7 @@ is thin and its tail is orogen.
 | no island arcs (`island_arc_km3_per_km_myr` 0) | 0.154 / 0.129 | 0.398 / 0.366 | 187 / 155 | 0.22 / 0.28 | 1,398 / 1,710 |
 | no collision stacking (`collision_stacking_share` 0) | 0.161 / 0.134 | 0.155 / 0.200 | 101 / 97 | 0.23 / 0.26 | 615 / 718 |
 | no cordillera, no continental arcs | 0.289 / 0.260 | 0.306 / 0.326 | 190 / 146 | 0.33 / 0.35 | 616 / 995 |
-| margin taper 24.5 km instead of 200 (`transition_width_km`) | 0.323 / 0.315 | 0.346 / 0.329 | 155 / 149 | 0.39 / 0.33 | 726 / 917 |
+| margin taper 24.5 km instead of 200 (`transition_width_km`; W then on the planet, so 24.5 km is 200 km on the model sphere, the shipped width since 2026-10-22) | 0.323 / 0.315 | 0.346 / 0.329 | 155 / 149 | 0.39 / 0.33 | 726 / 917 |
 
 By the origin of the crust under it (the budget's tag), the land above 2 km is 0.49 to 0.51
 island-arc crust, 0.27 to 0.33 collision crust, 0.16 to 0.21 Andean and 0.02 other; the land is
