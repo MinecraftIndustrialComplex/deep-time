@@ -34,7 +34,8 @@
 # mic-lite is the mic set cut down to the mods Deep Time's own data names, their required dependencies and a
 # fixed core (Deep Time, Toroidal World, Distant Horizons, Tectonic, the client performance mods): the
 # derivation is tools/smoke/lite_set.py, the core profiles/mic-lite.core, the reasons smoke/mic-lite/server/lite-why.txt.
-# It is for Deep Time test play on a small client (play-client-stage.sh --set lite), not a pack check.
+# It is for Deep Time test play on a small client (play-client-stage.sh --set lite), not a pack check. It
+# carries the MIC rock tags itself (KubeJS loads kubejs/data/deeptime): a world needs no --datapack.
 #
 # mic-ev is the mic set plus Excavated Variants and Dynamic Asset Generator (profiles/ev.txt's pins),
 # for the plan Q10 comparison; ev-client is the ev set plus Create, the smallest set a client needs to
@@ -334,7 +335,8 @@ if [ -f "$PROFILES/$PROFILE.excluded-mods" ]; then
 fi
 # The lite set keeps only what Deep Time's data names, those mods' required dependencies and the core
 # (profiles/mic-lite.core); everything else moves to mods-excluded/ with its reason recorded, and the pack's
-# kubejs/, scripts/, resourcepacks/ and the config of the left-out mods go from the folder.
+# kubejs/ (but the rock tags: KubeJS stays as their loader, kubejs/data/deeptime comes from the MIC rock-tag
+# datapack, so no --datapack is needed), scripts/, resourcepacks/ and the config of the left-out mods go.
 if [ "$PROFILE" = mic-lite ]; then
     say "the Deep Time lite set (tools/smoke/lite_set.py)"
     python3 -I "$REPO/tools/smoke/lite_set.py" apply "$SERVER" --side server --excluded "$SMOKE/excluded.txt" --excluded-why "$SMOKE/excluded-why.txt" --prune-files
