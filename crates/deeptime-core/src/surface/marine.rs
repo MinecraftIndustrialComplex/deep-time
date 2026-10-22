@@ -22,7 +22,7 @@
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
-use super::grid::Dims;
+use super::grid::{Dims, SurfaceGrid};
 
 #[cfg(feature = "gpu")]
 mod gpu;
@@ -91,8 +91,8 @@ pub struct FillParams {
 /// Spreads `volume` m³ from the mouth `mouth` over sea cells (`sea[c]`), raising `h` and adding
 /// the thickness to `dep`. Returns the number of cells that received sediment.
 #[allow(clippy::too_many_arguments)]
-pub fn fill(
-    d: &Dims,
+pub fn fill<G: SurfaceGrid>(
+    d: &G,
     sea: &[bool],
     mouth: usize,
     volume: f64,
@@ -101,7 +101,6 @@ pub fn fill(
     dep: &mut [f32],
     s: &mut FillScratch,
 ) -> usize {
-    let a = d.cell_area();
     if s.stamp.len() != d.cells() {
         s.stamp = vec![0; d.cells()];
         s.generation = 0;
@@ -131,6 +130,7 @@ pub fn fill(
         s.visited.push(c as u32);
         let level = p.sea_level - p.fill_depth_m - p.shelf_slope * f64::from(it.dist);
         if h[c] < level {
+            let a = d.area(c);
             let take = ((level - h[c]) * a).min(left);
             let dz = take / a;
             h[c] += dz;
@@ -156,8 +156,16 @@ pub fn fill(
     if left > 0.0 {
         // A closed sea is full (or the mouth ran out of cells): the rest spreads evenly over
         // what it reached, so a load never makes a tower.
-        let cells = s.visited.len().max(1) as f64;
-        let dz = left / (cells * a);
+        let dz = match d.uniform_area() {
+            Some(a) => {
+                let cells = s.visited.len().max(1) as f64;
+                left / (cells * a)
+            }
+            None => {
+                let area: f64 = s.visited.iter().map(|&c| d.area(c as usize)).sum();
+                left / area.max(f64::MIN_POSITIVE)
+            }
+        };
         for &c in &s.visited {
             let c = c as usize;
             h[c] += dz;

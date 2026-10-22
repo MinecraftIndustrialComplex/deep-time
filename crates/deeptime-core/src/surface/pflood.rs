@@ -35,7 +35,7 @@
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 
-use super::grid::Dims;
+use super::grid::SurfaceGrid;
 use super::params::FloodMethod;
 
 pub mod parallel;
@@ -75,7 +75,7 @@ impl PartialOrd for Entry {
 /// body of at least `min_cells` cells are [`BASE`]; everything else is [`LAND`] — a small closed
 /// basin below sea level (a rift floor, a Dead Sea) is a depression the flood fills as a lake, not
 /// a sea that river loads could never leave.
-pub fn open_sea(d: &Dims, h: &[f64], sea_level: f64, min_cells: usize, kind: &mut [u8]) {
+pub fn open_sea<G: SurfaceGrid>(d: &G, h: &[f64], sea_level: f64, min_cells: usize, kind: &mut [u8]) {
     let n = d.cells();
     let mut label = vec![u32::MAX; n];
     let mut todo: Vec<u32> = Vec::new();
@@ -109,7 +109,8 @@ pub fn open_sea(d: &Dims, h: &[f64], sea_level: f64, min_cells: usize, kind: &mu
 /// Fills `filled` with the ε-filled surface of `h`. `kind[c]` is [`BASE`] for base-level cells on
 /// entry (their filled level is `base_z[c]`); on return, land cells that had to become sinks are
 /// marked [`SINK`]. Returns the number of sinks made.
-pub fn flood(d: &Dims, h: &[f64], base_z: &[f64], kind: &mut [u8], filled: &mut [f64]) -> usize {
+pub fn flood<G: SurfaceGrid>(
+    d: &G, h: &[f64], base_z: &[f64], kind: &mut [u8], filled: &mut [f64]) -> usize {
     let n = d.cells();
     let mut closed = vec![false; n];
     let mut open: BinaryHeap<Entry> = BinaryHeap::new();
@@ -181,9 +182,9 @@ pub fn flood(d: &Dims, h: &[f64], base_z: &[f64], kind: &mut [u8], filled: &mut 
 }
 
 /// [`open_sea`] or its parallel form ([`parallel::open_sea`]; the same cells either way).
-pub fn open_sea_with(
+pub fn open_sea_with<G: SurfaceGrid>(
     m: FloodMethod,
-    d: &Dims,
+    d: &G,
     h: &[f64],
     sea_level: f64,
     min_cells: usize,
@@ -196,9 +197,9 @@ pub fn open_sea_with(
 }
 
 /// [`flood`] or the order-independent parallel flood ([`parallel::flood`]).
-pub fn flood_with(
+pub fn flood_with<G: SurfaceGrid>(
     m: FloodMethod,
-    d: &Dims,
+    d: &G,
     h: &[f64],
     base_z: &[f64],
     kind: &mut [u8],
@@ -212,6 +213,7 @@ pub fn flood_with(
 
 #[cfg(test)]
 mod tests {
+    use super::super::grid::Dims;
     use super::*;
 
     #[test]
