@@ -24,6 +24,10 @@
 #   --gui-scale N  Minecraft's GUI scale (default 2; 0 is the game's "Auto", the largest that fits)
 #   --mods SET     link smoke/<SET>/server/mods into the client too (Gradle -PrunSet=SET; e.g. mic for
 #                  the MIC pack's worldgen mods); DEEPTIME_RUN_MODS=<dir> points at another copy's set
+#   --stage DIR    link the mods of a play-client-stage.sh stage (DIR is its minecraft/ folder, e.g.
+#                  /data/ban/play/<hash>-client-lite/minecraft) and copy its kubejs/ into the game dir, so the
+#                  walk runs the player's set with the files the pack gives a new world (the lite set's rock
+#                  tags come as kubejs/data/deeptime); implies --mods (the Gradle link step runs)
 #   --timeout S    per client pass (default 7200: a 1,000-Myr quick planet's ETA was ~2 h on the
 #                  loaded VM; --prop length=300 takes a fraction of that)
 #   --threads N    processors the client JVM sees (-XX:ActiveProcessorCount; default 8): the editor
@@ -42,7 +46,7 @@ REPO="$PWD"
 ADMIT="${DEEPTIME_ADMIT:-/usr/local/lib/deeptime/admit.py}"
 
 NAME=vm-client; BUILD=1; GUIDANCE=1; CREATE=true; WSIZE=1280x720; TIMEOUT=7200; THREADS=8; PROPS=()
-GUISCALE=2; RUNSET=""; GRADLE_SET=()
+GUISCALE=2; RUNSET=""; GRADLE_SET=(); STAGE_DIR=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -53,6 +57,7 @@ while [ $# -gt 0 ]; do
         --size) WSIZE="$2"; shift 2 ;;
         --gui-scale) GUISCALE="$2"; shift 2 ;;
         --mods) RUNSET="$2"; shift 2 ;;
+        --stage) STAGE_DIR="$2"; shift 2 ;;
         --timeout) TIMEOUT="$2"; shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --prop) [[ "$2" =~ ^[a-z]+=[-0-9.,\;a-z_/]+$ ]] || { echo "vm-client: bad --prop $2" >&2; exit 2; }
@@ -64,6 +69,13 @@ done
 [[ "$NAME" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "vm-client: --name must be one plain word" >&2; exit 2; }
 [[ "$WSIZE" =~ ^[0-9]+x[0-9]+$ ]] || { echo "vm-client: --size is WxH" >&2; exit 2; }
 [[ "$GUISCALE" =~ ^[0-9]$ ]] || { echo "vm-client: --gui-scale is 0 (auto) to 9" >&2; exit 2; }
+if [ -n "$STAGE_DIR" ]; then
+    [ -d "$STAGE_DIR/mods" ] || { echo "vm-client: --stage $STAGE_DIR has no mods/" >&2; exit 2; }
+    # DEEPTIME_RUN_MODS replaces smoke/<set>/server/mods in the Gradle link step (neoforge/build.gradle);
+    # the set's name only has to exist. Exported before the admitted re-run below, which inherits it.
+    export DEEPTIME_RUN_MODS="$STAGE_DIR/mods"
+    [ -n "$RUNSET" ] || RUNSET=stage
+fi
 if [ -n "$RUNSET" ]; then
     [[ "$RUNSET" =~ ^[a-z0-9-]+$ ]] || { echo "vm-client: --mods is a server set name" >&2; exit 2; }
     GRADLE_SET=("-PrunSet=$RUNSET")
@@ -107,6 +119,12 @@ eval "set -- $words"
 JAVA="$1"; shift
 DEV_ARGS=("$@")
 [ -d "$GAMEDIR/mods" ] || { say "no $GAMEDIR/mods (./gradlew linkRunModsClient)"; exit 1; }
+if [ -n "$STAGE_DIR" ]; then
+    # The stage's kubejs/ (only data/deeptime in the lite set) is the pack's own way of giving a new
+    # single-player world its rock tags: KubeJS adds kubejs/data as a global datapack.
+    rm -rf "$GAMEDIR/kubejs"
+    if [ -d "$STAGE_DIR/kubejs" ]; then cp -R "$STAGE_DIR/kubejs" "$GAMEDIR/kubejs"; say "kubejs/ from $STAGE_DIR: $(find "$GAMEDIR/kubejs" -type f | wc -l) files"; fi
+fi
 
 # --- the display: Xvfb + Mesa llvmpipe, sound to a private null sink ---------------------------------
 # Mesa, libglvnd and Xvfb come from the flake's own nixpkgs (flake.lock), the revision the client's

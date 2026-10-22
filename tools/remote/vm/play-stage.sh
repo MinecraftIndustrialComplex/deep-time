@@ -11,15 +11,24 @@
 # Then point /etc/default/deeptime-play at the folder and restart the unit (see STATUS.md, build log
 # 2026-10-18):  PLAY_DIR=/data/ban/play/<hash>  PLAY_TOOLS_ENV=/data/ban/play/tools.env
 #
+#   --set lite  the Deep Time lite set instead of the full pack set: copies smoke/mic-lite/server (tools/smoke/install.sh
+#               mic-lite: only the mods Deep Time's data names, their required dependencies and the core in
+#               tools/smoke/profiles/mic-lite.core) into /data/ban/play/<hash>-lite/. Its client is
+#               play-client-stage.sh --set lite --hash <hash> (a client with a different mod set is refused at the
+#               handshake, so the full play server cannot serve it). Both folders use port 25765: to play the lite
+#               set, point /etc/default/deeptime-play at it (PLAY_DIR=/data/ban/play/<hash>-lite) and restart the
+#               unit; point it back for the full set. Nothing here touches the unit.
 #   --run ID    the workbench run whose world becomes planet/deeptime (<workbench runs>/<ID>/world)
-#   --hash H    the folder's name (default: the first 8 characters of the commit in .sync-rev)
+#   --hash H    the folder's name (default: the first 8 characters of the commit in .sync-rev; --set lite adds "-lite")
 #   --label S   the motd's text after "Deep Time play test" (default "run <ID>")
 #   --rock-tags DIR   the MIC rock-tag datapack copied into planet/datapacks/ (default: mic/Docs/datapacks/
 #               deeptime-mic-rock-tags next to the checkout's pack, which `mac.sh --pack` syncs; override with
 #               $DEEPTIME_ROCK_TAGS). The pack on master does not ship these tags (only its deep-time branch
 #               does), so without them every rock class shows its vanilla fallback (ironstone as red
 #               sandstone instead of Create's ochrum). Missing datapack = error, never a silent fallback.
-#   --no-rock-tags    skip it (a pack that ships the tags itself)
+#   --no-rock-tags    skip it (a pack that ships the tags itself). The lite set does: its server folder has
+#               kubejs/data/deeptime (tools/smoke/lite_set.py, rule 3b: KubeJS loads the tags on the server and
+#               in a single-player world alike), so --set lite adds no world datapack unless that folder is missing.
 #   --ops-from DIR    the folder whose ops.json is carried over (default: the folder /etc/default/deeptime-play
 #               serves now), so the operators (Ben) stay operators across a rebuild; --ops-from none skips it
 #   --devmap    also put the internal developer map (devmap/, mod id deeptime_devmap; never in the pack) in
@@ -40,7 +49,7 @@ REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 RUNS="${DEEPTIME_WORKBENCH_RUNS:-/data/ban/deeptime-cache/workbench/runs}"
 PLAY=/data/ban/play
 RUN=""; HASH=""; LABEL=""; TAGS="${DEEPTIME_ROCK_TAGS:-$(cd "$REPO/../.." && pwd)/Docs/datapacks/deeptime-mic-rock-tags}"; NO_TAGS=0
-EXTRA=(); MODS_ONLY=0
+EXTRA=(); MODS_ONLY=0; SETNAME=full
 OPS_FROM="$(sed -n 's/^PLAY_DIR=//p' /etc/default/deeptime-play 2>/dev/null || true)"
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -59,10 +68,16 @@ while [ $# -gt 0 ]; do
             EXTRA+=("$DM"); shift ;;
         --extra-mod) [ -f "$2" ] || { echo "play-stage.sh: no jar at $2" >&2; exit 1; }; EXTRA+=("$2"); shift 2 ;;
         --mods-only) MODS_ONLY=1; shift ;;
-        *) echo "usage: play-stage.sh --run <id> [--hash H] [--label S] [--rock-tags DIR | --no-rock-tags] [--ops-from DIR|none] [--devmap] [--extra-mod JAR]..." >&2
+        --set) SETNAME="$2"; shift 2 ;;
+        *) echo "usage: play-stage.sh --run <id> [--set full|lite] [--hash H] [--label S] [--rock-tags DIR | --no-rock-tags] [--ops-from DIR|none] [--devmap] [--extra-mod JAR]..." >&2
            echo "       play-stage.sh --mods-only --hash H (--devmap | --extra-mod JAR)..." >&2; exit 2 ;;
     esac
 done
+case "$SETNAME" in
+    full) SUFFIX=""; SMOKE_SET=mic ;;
+    lite) SUFFIX="-lite"; SMOKE_SET=mic-lite ;;
+    *) echo "play-stage.sh: --set must be full or lite" >&2; exit 2 ;;
+esac
 # Adds the opt-in jars (the dev map) to a play folder's mods/, replacing an older build of the same mod.
 add_extra_mods() {
     local dest="$1" j base stem
@@ -74,11 +89,11 @@ add_extra_mods() {
     done
 }
 if [ "$MODS_ONLY" = 1 ]; then
-    { [[ "$HASH" =~ ^[0-9A-Za-z._-]+$ ]] && [ -d "$PLAY/$HASH/mods" ]; } || { echo "play-stage.sh: --mods-only needs --hash <an existing play folder>" >&2; exit 2; }
+    { [[ "$HASH" =~ ^[0-9A-Za-z._-]+$ ]] && [ -d "$PLAY/$HASH$SUFFIX/mods" ]; } || { echo "play-stage.sh: --mods-only needs --hash <an existing play folder>" >&2; exit 2; }
     [ ${#EXTRA[@]} -gt 0 ] || { echo "play-stage.sh: --mods-only without --devmap or --extra-mod does nothing" >&2; exit 2; }
-    echo "== extra mods into $PLAY/$HASH/mods"
-    add_extra_mods "$PLAY/$HASH"
-    echo "ready: $PLAY/$HASH (restart the play unit to load them: sudo systemctl restart deeptime-play)"
+    echo "== extra mods into $PLAY/$HASH$SUFFIX/mods"
+    add_extra_mods "$PLAY/$HASH$SUFFIX"
+    echo "ready: $PLAY/$HASH$SUFFIX (restart the play unit to load them: sudo systemctl restart deeptime-play)"
     exit 0
 fi
 [ -n "$RUN" ] || { echo "play-stage.sh: --run <workbench run id> is required" >&2; exit 2; }
@@ -87,13 +102,15 @@ if [ -z "$HASH" ]; then
     HASH="$(sed -n 's/.*"commit": *"\([0-9a-f]\{8\}\).*/\1/p' "$REPO/.sync-rev")"
 fi
 [[ "$HASH" =~ ^[0-9A-Za-z._-]+$ ]] || { echo "play-stage.sh: cannot name the folder (no --hash, no .sync-rev commit)" >&2; exit 2; }
-[ -n "$LABEL" ] || LABEL="run $RUN"
-SET="$REPO/smoke/mic"
+[ -n "$LABEL" ] || LABEL="run $RUN${SUFFIX:+, lite set}"
+SET="$REPO/smoke/$SMOKE_SET"
 WORLD="$RUNS/$RUN/world"
-DEST="$PLAY/$HASH"
-[ -f "$SET/server/eula.txt" ] && [ -d "$SET/server/mods" ] || { echo "play-stage.sh: no server set at $SET/server (run tools/smoke/install.sh mic first)" >&2; exit 1; }
+DEST="$PLAY/$HASH$SUFFIX"
+[ -f "$SET/server/eula.txt" ] && [ -d "$SET/server/mods" ] || { echo "play-stage.sh: no server set at $SET/server (run tools/smoke/install.sh $SMOKE_SET first)" >&2; exit 1; }
 [ -f "$WORLD/deeptime/manifest.json" ] || [ -f "$WORLD/manifest.json" ] || { echo "play-stage.sh: no world data in $WORLD (is the run finished?)" >&2; exit 1; }
 [ ! -e "$DEST" ] || { echo "play-stage.sh: $DEST exists; remove it or pick another --hash" >&2; exit 1; }
+TAGS_BY=""
+if [ "$NO_TAGS" = 0 ] && [ "$SUFFIX" = -lite ] && [ -d "$SET/server/kubejs/data/deeptime/tags" ]; then NO_TAGS=1; TAGS_BY=kubejs; fi
 if [ "$NO_TAGS" = 0 ] && [ ! -f "$TAGS/pack.mcmeta" ]; then
     echo "play-stage.sh: no MIC rock-tag datapack at $TAGS (sync it with 'tools/remote/mac.sh --pack -- true', or pass --rock-tags DIR / --no-rock-tags)" >&2
     exit 1
@@ -167,6 +184,8 @@ if [ "$NO_TAGS" = 0 ]; then
     mkdir -p "$DEST/planet/datapacks"
     cp -R "$TAGS" "$DEST/planet/datapacks/$(basename "$TAGS")"
     echo "== rock tags: $(find "$DEST/planet/datapacks/$(basename "$TAGS")/data" -name '*.json' | wc -l) JSON files from $TAGS in planet/datapacks/$(basename "$TAGS")"
+elif [ "$TAGS_BY" = kubejs ]; then
+    echo "== rock tags: $(find "$DEST/kubejs/data/deeptime" -name '*.json' | wc -l) JSON files in kubejs/data/deeptime (KubeJS loads them; no world datapack)"
 else
     echo "== rock tags: skipped (--no-rock-tags)"
 fi
