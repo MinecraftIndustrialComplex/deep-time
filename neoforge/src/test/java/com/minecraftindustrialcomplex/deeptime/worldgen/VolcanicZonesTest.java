@@ -196,6 +196,44 @@ class VolcanicZonesTest {
             assertEquals(zn.radius(), zn.minor(), zn.toString());
     }
 
+    /**
+     * An elongated zone's {@code outside} is the distance to its nearest edge point: checked against the edge sampled
+     * at 20,000 points, all round a 3:1 ellipse at 30 degrees, outside and inside.
+     */
+    @Test
+    void anEllipsesOutsideIsTheDistanceToItsNearestEdgePoint() {
+        double a = 60, b = 20, ax = Math.cos(Math.PI / 6), az = Math.sin(Math.PI / 6);
+        var zn = new VolcanicZones.Zone(Role.CONE, 1, 0, 0, a, b, ax, az);
+        int n = 20000;
+        double[][] edge = new double[n][];
+        for (int i = 0; i < n; i++) {
+            double th = 2 * Math.PI * i / n, p = a * Math.cos(th), q = b * Math.sin(th);
+            edge[i] = new double[]{p * ax - q * az, p * az + q * ax};
+        }
+        int outsideChecked = 0;
+        for (int k = 0; k < 48; k++) {
+            double th = k * Math.PI / 24;
+            for (double r : new double[]{5, 15, 25, 40, 70, 90, 150}) {
+                double dx = r * Math.cos(th), dz = r * Math.sin(th);
+                double d = zn.outside(dx, dz);
+                if (!zn.holds(dx, dz)) {
+                    double best = Double.POSITIVE_INFINITY;
+                    for (double[] e : edge)
+                        best = Math.min(best, Math.hypot(dx - e[0], dz - e[1]));
+                    assertEquals(best, d, 0.05, "offset " + dx + ", " + dz);
+                    assertTrue(d >= Math.hypot(dx, dz) - a - 1e-9);
+                    outsideChecked++;
+                } else {
+                    assertTrue(d <= 0.0, "inside at " + dx + ", " + dz + ": " + d);
+                }
+            }
+        }
+        assertTrue(outsideChecked > 150, "points outside: " + outsideChecked);
+        // On the axes the old measure (along the line from the centre) was already exact.
+        assertEquals(10.0, zn.outside((a + 10) * ax, (a + 10) * az), 1e-6);
+        assertEquals(10.0, zn.outside(-(b + 10) * az, (b + 10) * ax), 1e-6);
+    }
+
     @Test
     void theSettingIsReadFromTheBakeNotes() {
         var notes = JsonParser.parseString("{\"bake\": {\"underground\": {\"params\": {\"volcanic_biome_reach\": 1.5}}}}").getAsJsonObject();
