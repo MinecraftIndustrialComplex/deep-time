@@ -135,6 +135,9 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-22: Volcano 27476: the vent as the summit, temperate peaks off the snowy slots, volcanic zones as drawn (doing; coordinator's task from the diagnosis of Ben's volcano 27476; agent worktree agent-a3094942d1cbfa7d7, branch worktree-agent-a3094942d1cbfa7d7 from master fe61452b; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+
+In progress: a census of vent-to-summit offsets, then the shaping law, the biome slot rule and the zones.
 ### 2026-10-22: mic-viewer re-pinned after its history rewrite (coordinator; branch viewer-repin)
 
 Ben had mic-viewer's history rewritten to drop private host names, so 335ae9cf became af334960. The trees differ only in one test line (crates/mic-viewer/src/http.rs, tailnet sample addresses); Cargo.toml and Cargo.lock now pin af334960 (decisions log 2026-10-21, the last row). Old mic-viewer hashes in earlier entries refer to the pre-rewrite history.
