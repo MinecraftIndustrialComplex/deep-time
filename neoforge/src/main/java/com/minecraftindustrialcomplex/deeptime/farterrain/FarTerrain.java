@@ -54,6 +54,10 @@ import java.util.Optional;
  *   <li><b>the blocks</b>: rock classes through the {@link RockPalette} with the strata pass's
  *       member choice ({@link StrataPass#horizonKey}), so a bed is the same block far and near.</li>
  * </ul>
+ * Over that, the active volcanoes' <b>lava flows</b> ({@link LavaFlows}, from the world data alone) top
+ * dry ground where one shows, as {@code LavaFlowPass} paints them in a chunk. At a level of detail
+ * coarser than a block a cell shows the flow of the one column it samples, so far away a flow one or two
+ * blocks wide reads as a broken line.
  *
  * <p><b>Wrapping.</b> Every sample folds x into the canonical lap first, as Toroidal World folds
  * the chunks it generates, so an area on any lap, or across the seam, is the planet's terrain.
