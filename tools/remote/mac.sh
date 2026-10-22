@@ -31,6 +31,8 @@
 # The Mac has no GitHub access, so the checkout is rsynced (tracked + untracked, minus build
 # outputs and runtimes) and a Mac-side git index is refreshed with `git add -A`: a Nix flake only
 # sees files git tracks. That index is never committed or pushed; commits happen on the laptop.
+# The private git dependencies' pinned commits (mic-viewer) reach the VM's cargo the same way, pushed
+# by the laptop to bare mirrors there on each sync (tools/remote/git-mirrors.sh).
 # Output that matters (reports, logs) comes back with --pull. Exit status is the command's.
 #
 # Every command runs through the VM's admission tool (/usr/local/lib/deeptime/admit.py; Ben,
@@ -68,6 +70,7 @@ SSH=(ssh -n -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=30 "$HO
 # The VM's firewall follows the laptop's address (vm-access.sh): repair it before the first call.
 . "$(dirname "${BASH_SOURCE[0]}")/vm-access.sh"
 vm_access_ensure "$HOST" || { echo "$(basename "$0"): cannot reach $HOST" >&2; exit 1; }
+. "$(dirname "${BASH_SOURCE[0]}")/git-mirrors.sh"
 
 # The SSD must be mounted, or everything would silently land on the small internal disk.
 # The Mac is shared with graphide's agents: respect their "keep off Nix" markers.
@@ -99,7 +102,12 @@ if [ "$SYNC" = 1 ]; then
     # from the newer version, and Cargo kept the stale artifact (2026-09-30: release deeptime-cli
     # failed with "no field min_y" while the sources were correct). Unchanged files keep their time.
     rsync -rlpD --checksum --no-times --delete "${EXCLUDES[@]}" -e "ssh -o BatchMode=yes" "$REPO/" "$HOST:$REMOTE/"
-    "${SSH[@]}" "cd '$REMOTE' && { [ -d .git ] || '$GIT' init -q -b master; } && '$GIT' add -A"
+    # The same call checks the VM's git mirrors for this checkout's pinned private commits (and
+    # sets their insteadOf); only a missing commit costs a fetch and a push (git-mirrors.sh).
+    MIRRORS_MISSING="$("${SSH[@]}" "cd '$REMOTE' && { [ -d .git ] || '$GIT' init -q -b master; } && '$GIT' add -A || exit 1
+$(git_mirror_vm_script "$CACHE" "$GIT" "$(git_mirror_pins "$REPO")")")"
+    [ -z "$MIRRORS_MISSING" ] || git_mirror_push "$HOST" "$CACHE" "$GIT" "$MIRRORS_MISSING" \
+        || echo "mac.sh: a pinned git dependency is missing on $HOST; cargo there will fail to fetch it" >&2
     # Which laptop revision this copy is (the Mac's .git has no commits, and Apple's git there is a
     # stub): tools/smoke/jarstate.py reads it into smoke/<profile>/install.json. Written after
     # `git add -A`, so it stays untracked and invisible to Nix flakes; rsync --delete removes it on

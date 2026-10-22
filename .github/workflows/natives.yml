@@ -13,6 +13,9 @@
 #           it in eclipse-temurin:21-jdk-alpine (JavaScript actions do not run in Alpine
 #           containers on arm64 runners, so the container runs only the test).
 #
+# The build job fetches the private git dependency mic-viewer (Cargo.toml) and needs read access to
+# it, which CI does not have yet (see ci.yml).
+#
 # Run by hand: gh workflow run natives.yml -R MinecraftIndustrialComplex/deep-time [--ref <branch>]
 #              id=$(gh run list -R MinecraftIndustrialComplex/deep-time -w natives.yml -L 1 --json databaseId -q '.[0].databaseId')
 #              gh run watch "$id" -R MinecraftIndustrialComplex/deep-time --exit-status
