@@ -25,9 +25,10 @@
 #   --mods SET     link smoke/<SET>/server/mods into the client too (Gradle -PrunSet=SET; e.g. mic for
 #                  the MIC pack's worldgen mods); DEEPTIME_RUN_MODS=<dir> points at another copy's set
 #   --stage DIR    link the mods of a play-client-stage.sh stage (DIR is its minecraft/ folder, e.g.
-#                  /data/ban/play/<hash>-client-lite/minecraft) and copy its kubejs/ into the game dir, so the
-#                  walk runs the player's set with the files the pack gives a new world (the lite set's rock
-#                  tags come as kubejs/data/deeptime); implies --mods (the Gradle link step runs)
+#                  /data/ban/play/<hash>-client-lite/minecraft) and copy its kubejs/, config/ and
+#                  defaultconfigs/ into the game dir (replacing the game dir's own), so the walk runs the
+#                  player's set with the files the pack gives a new world (the lite set's rock tags come as
+#                  kubejs/data/deeptime) and the pack's mod settings; implies --mods (the Gradle link step runs)
 #   --rock-tags DIR  the MIC rock-tag datapack (e.g. /data/ban/mic/Docs/datapacks/deeptime-mic-rock-tags): its
 #                  data/deeptime/ is copied into the game dir's kubejs/data/deeptime unless that already holds
 #                  files (a stage's own), as tools/remote/play-client-apply.py does for Ben's full instance
@@ -129,6 +130,16 @@ if [ -n "$STAGE_DIR" ]; then
     # single-player world its rock tags: KubeJS adds kubejs/data as a global datapack.
     rm -rf "$GAMEDIR/kubejs"
     if [ -d "$STAGE_DIR/kubejs" ]; then cp -R "$STAGE_DIR/kubejs" "$GAMEDIR/kubejs"; say "kubejs/ from $STAGE_DIR: $(find "$GAMEDIR/kubejs" -type f | wc -l) files"; fi
+    # The pack's config/ and defaultconfigs/ too, as a player's new instance has them (the mods write
+    # the rest of config/ at launch). Without them every mod ran on its own defaults: Remove Reloading
+    # Screen's hideOverlays = "ALL" (the pack sets "RELOADING") ended the start-up load early, Project
+    # Atmosphere's client setup then failed on the already-loaded language map, mod loading stopped,
+    # and Create World hung on its data reload (2026-10-22, the full MIC set).
+    for d in config defaultconfigs; do
+        rm -rf "${GAMEDIR:?}/$d"
+        [ -d "$STAGE_DIR/$d" ] && cp -R "$STAGE_DIR/$d" "$GAMEDIR/$d"
+    done
+    say "config/ ($(find "$GAMEDIR/config" -type f 2>/dev/null | wc -l) files) and defaultconfigs/ ($(find "$GAMEDIR/defaultconfigs" -type f 2>/dev/null | wc -l)) from $STAGE_DIR"
 fi
 if [ -n "$ROCK_TAGS" ]; then
     if [ -n "$(find "$GAMEDIR/kubejs/data/deeptime" -name '*.json' 2>/dev/null | head -1)" ]; then
@@ -201,6 +212,17 @@ EOF
     else
         printf '[client]\n\t[client.advanced]\n\t\t[client.advanced.autoUpdater]\n\t\t\tenableAutoUpdater = false\n' > "$dhc"
     fi
+    # KubeJS (in MIC) starts a local web server unless kubejs/config/web_server.json says otherwise
+    # (Ben's instance has it off); it takes port 61423 or the next free one and the walk needs none.
+    if [ -n "$RUNSET" ]; then
+        local kws="$GAMEDIR/kubejs/config/web_server.json"
+        mkdir -p "$GAMEDIR/kubejs/config"
+        if [ -f "$kws" ]; then
+            sed -i 's/"enabled"[[:space:]]*:[[:space:]]*true/"enabled": false/' "$kws"
+        else
+            printf '{\n  "enabled": false\n}\n' > "$kws"
+        fi
+    fi
 }
 
 # run_pass <pass> <-D...>: one client, start to quit; returns its exit status (124 on timeout).
@@ -222,8 +244,10 @@ run_pass() {
             kill "$CPID" 2>/dev/null; sleep 10; kill -9 "$CPID" 2>/dev/null
             st=124; break
         fi
-        if grep -a -q -e 'Preparing crash report' -e 'Failed to find a valid GLFW profile' "$log" 2>/dev/null; then
-            say "pass $pass: the client crashed ($(grep -a -m1 -e 'crash report' -e 'GLFW' "$log"))"
+        # NeoForge's "Failed to wait for future" is a mod loading error: the client may go on (no
+        # error screen when a mod ended the load early), but the walk would not test the player's game.
+        if grep -a -q -e 'Preparing crash report' -e 'Failed to find a valid GLFW profile' -e 'Failed to wait for future' "$log" 2>/dev/null; then
+            say "pass $pass: the client crashed or a mod failed to load ($(grep -a -m1 -e 'crash report' -e 'GLFW' -e 'Failed to wait for future' "$log" | cut -c1-200))"
             sleep 10; kill "$CPID" 2>/dev/null; st=1; break
         fi
         if [ $((now - last)) -ge 60 ]; then
