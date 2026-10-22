@@ -132,6 +132,12 @@ rm -f "$CL/game/mods/"*.jar
 # showed 43,175 far sections, all rebuilt on the client from the previous check's data).
 rm -rf "$CL/game/Distant_Horizons_server_data" "$CL/dbcopy"
 cp "$SRV/mods/"*.jar "$CL/game/mods/"
+# KubeJS registers items, blocks and fluids in startup scripts: a client without the set's scripts is refused
+# at login ("The server sent registries with unknown keys", 2026-10-22, the full MIC set).
+if [ -d "$SRV/kubejs" ]; then
+    rm -rf "$CL/game/kubejs"; mkdir -p "$CL/game/kubejs"
+    for d in startup_scripts client_scripts assets config; do [ -d "$SRV/kubejs/$d" ] && cp -r "$SRV/kubejs/$d" "$CL/game/kubejs/$d"; done
+fi
 if [ -n "${DHCC_CLIENT_DROP:-}" ]; then
     for j in "$CL/game/mods/"$DHCC_CLIENT_DROP; do [ -f "$j" ] && { rm -f "$j"; say "client leaves out $(basename "$j")"; }; done
 fi
@@ -216,6 +222,8 @@ for attempt in 1 2 3; do
         grep -a -q 'DeepTimeProbe joined the game' "$SRV/console.log" && { joined=1; break; }
         kill -0 $CPID 2>/dev/null || { why="client exited"; break; }
         [ -n "$XPID" ] && ! kill -0 "$XPID" 2>/dev/null && { why="Xvfb $DISP went away"; break; }
+        grep -a -q -e 'registries with unknown keys' -e 'Failed to connect to the server' "$CL/game/logs/latest.log" 2>/dev/null && {
+            why="the server refused the client: $(grep -a -m1 -e 'registries with unknown keys' -e 'Failed to connect' "$CL/game/logs/latest.log" | cut -c1-200)"; break; }
         grep -a -q -e 'X connection to .* broken' "$CL/client-$attempt.log" && { why="the client lost the X display"; break; }
         grep -a -q -e 'Failed to find a valid GLFW profile' -e 'Preparing crash report' "$CL/client-$attempt.log" && {
             why="client failed to start: $(grep -a -m1 -e 'GLFW error' -e 'crash report' "$CL/client-$attempt.log")"; break; }
