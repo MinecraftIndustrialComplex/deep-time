@@ -67,14 +67,12 @@ impl Op {
 
     /// out = A·p.
     pub(super) fn apply(&self, p: &[f64], out: &mut [f64]) {
-        out.par_chunks_mut(CHUNK)
-            .enumerate()
-            .for_each(|(q, o)| {
-                let i0 = q * CHUNK;
-                for (d, y) in o.iter_mut().enumerate() {
-                    *y = self.row(i0 + d, p);
-                }
-            });
+        out.par_chunks_mut(CHUNK).enumerate().for_each(|(q, o)| {
+            let i0 = q * CHUNK;
+            for (d, y) in o.iter_mut().enumerate() {
+                *y = self.row(i0 + d, p);
+            }
+        });
     }
 
     #[inline(always)]
@@ -288,9 +286,7 @@ fn run(ws: &mut Workspace, g: &CubeGrid, h: &mut [f64], tol_m: f64, mg: bool) ->
     }
     let iterations = cg(ws, g.topology().cells(), tol_m, mg);
     // Σ μx = Σ μb − Σ r: the residual's sum back to the cells, in proportion to their coupling.
-    let Workspace {
-        op, rhs, x, ap, ..
-    } = ws;
+    let Workspace { op, rhs, x, ap, .. } = ws;
     op.apply(x, ap);
     let lost = ordered_sum(l, |r| r.map(|i| rhs[i] - ap[i]).sum());
     let weight = ordered_sum(l, |r| op.s[r].iter().sum());
@@ -400,7 +396,13 @@ fn cg(ws: &mut Workspace, cells: usize, tol_m: f64, mg: bool) -> usize {
         // The direction pn = z + β po, A·pn and pn·A·pn.
         let pap = {
             let Workspace {
-                op, r, po, pn, ap, z, ..
+                op,
+                r,
+                po,
+                pn,
+                ap,
+                z,
+                ..
             } = &mut *ws;
             let (r, po, z): (&[f64], &[f64], &[f64]) = (r, po, z);
             let dir = |j: usize| -> f64 {
