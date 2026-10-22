@@ -1,4 +1,5 @@
-# As dh, with the newest Distant Horizons checked instead of the pack's pin (P3-04): from 3.3.1 the
+# As dh, with the newest Distant Horizons checked instead of the pack's pin (P3-04). Since pack 62dd14e
+# the pin is the newest release (3.3.3), so this profile equals dh until DH publishes another; from 3.3.1 the
 # API has its published names, Toroidal World 0.19.3's Distant Horizons mixins apply, and one of
 # them refuses every world generator that is not Distant Horizons' own on a wrapped level;
 # Deep Time's patch to that guard (compat/dh/TwDhGuard) lets Deep Time's through. Keep the id equal to
