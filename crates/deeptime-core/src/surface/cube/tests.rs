@@ -635,16 +635,20 @@ fn planet(g: &CubeGrid, seed: u64) -> Vec<f64> {
         .collect()
 }
 
-/// 1,000 steps of a closed planet's surface: the open sea, the flood, the routing, the
-/// stream-power solve, the mouth fill, the diffusion, the slope failure and the spreading. Water
-/// reaches the roots in full every step, and Σ a·h does not drift.
-#[test]
-fn a_closed_planet_keeps_its_water_and_sediment() {
-    let g = CubeGrid::new(32, R);
+/// What [`closed_steps`] saw: the worst error of the water at the roots and of a step's Σ a·h
+/// (relative to Σ a·|h| at the start), the lake cell-steps and the sinks.
+struct Closed {
+    worst_water: f64,
+    worst_step: f64,
+    lakes: usize,
+    sinks: usize,
+}
+
+/// `steps` steps of a closed planet's surface on `h`: the open sea, the flood, the routing, the
+/// stream-power solve, the mouth fill, the diffusion, the slope failure and the spreading.
+fn closed_steps(g: &CubeGrid, h: &mut [f64], steps: usize) -> Closed {
     let n = g.topology().cells();
-    let mut h = planet(&g, 7);
-    let v0 = volume(&g, &h);
-    let scale = volume(&g, &h.iter().map(|v| v.abs()).collect::<Vec<_>>());
+    let scale = volume(g, &h.iter().map(|v| v.abs()).collect::<Vec<_>>());
     let dt = 2.0e4;
     let sp = SplParams {
         m: 0.5,
@@ -677,19 +681,13 @@ fn a_closed_planet_keeps_its_water_and_sediment() {
     let mut dep = vec![0.0f32; n];
     let mut avail = vec![1.0e9; n];
     let (mut worst_water, mut worst_step, mut lakes, mut sinks) = (0.0f64, 0.0f64, 0usize, 0usize);
-    for _ in 0..1000 {
-        pflood::open_sea_with(FloodMethod::Parallel, &g, &h, 0.0, 20, &mut kind);
-        sinks += pflood::flood_with(
-            FloodMethod::Parallel,
-            &g,
-            &h,
-            &base_z,
-            &mut kind,
-            &mut filled,
-        );
-        routing::receivers(&g, &filled, &kind, &mut r);
-        routing::stack(&g, &kind, &mut r);
-        routing::accumulate(&g, &r, &weight, &mut area);
+    let fm = FloodMethod::Parallel;
+    for _ in 0..steps {
+        pflood::open_sea_with(fm, g, h, 0.0, 20, &mut kind);
+        sinks += pflood::flood_with(fm, g, h, &base_z, &mut kind, &mut filled);
+        routing::receivers(g, &filled, &kind, &mut r);
+        routing::stack(g, &kind, &mut r);
+        routing::accumulate(g, &r, &weight, &mut area);
         let roots: f64 = (0..n)
             .filter(|&c| r.rcv[c] as usize == c)
             .map(|c| area[c])
@@ -698,16 +696,16 @@ fn a_closed_planet_keeps_its_water_and_sediment() {
         lakes += (0..n)
             .filter(|&c| filled[c] - h[c] > spl::LAKE_TOL_M)
             .count();
-        let before = volume(&g, &h);
+        let before = volume(g, h);
         let input = SplInput {
             kind: &kind,
-            h0: &h,
+            h0: h,
             filled: &filled,
             base_z: &base_z,
             area: &area,
             kf: &kf,
         };
-        spl::solve(&g, &r, &input, &sp, &mut out, &mut qin);
+        spl::solve(g, &r, &input, &sp, &mut out, &mut qin);
         for c in 0..n {
             if kind[c] != BASE {
                 h[c] = out[c];
@@ -717,26 +715,40 @@ fn a_closed_planet_keeps_its_water_and_sediment() {
         for m in 0..n {
             if kind[m] == BASE && qin[m] > 0.0 {
                 let vol = qin[m] * dt;
-                marine::fill(&g, &sea, m, vol, &fp, &mut h, &mut dep, &mut scratch);
+                marine::fill(g, &sea, m, vol, &fp, h, &mut dep, &mut scratch);
             }
         }
-        let after = volume(&g, &h);
+        let after = volume(g, h);
         worst_step = worst_step.max(((after - before) / scale).abs());
         let kd: Vec<f64> = (0..n)
             .map(|c| if h[c] >= 0.0 { 0.05 } else { 0.5 })
             .collect();
-        solve(
-            &mut ws,
-            &g,
-            &mut h,
-            &kd,
-            dt,
-            DiffusionSolver::Multigrid,
-            1e-4,
-        );
-        failure::slope_failure(&g, &sea, 0.0, &fail, &mut h, &mut avail);
-        spread::step_in(&mut ws, &g, &mut h, 0.0, 2500.0, 10.0, dt);
+        solve(&mut ws, g, h, &kd, dt, DiffusionSolver::Multigrid, 1e-4);
+        failure::slope_failure(g, &sea, 0.0, &fail, h, &mut avail);
+        spread::step_in(&mut ws, g, h, 0.0, 2500.0, 10.0, dt);
     }
+    Closed {
+        worst_water,
+        worst_step,
+        lakes,
+        sinks,
+    }
+}
+
+/// 1,000 steps of a closed planet's surface ([`closed_steps`]): water reaches the roots in full
+/// every step, and Σ a·h does not drift.
+#[test]
+fn a_closed_planet_keeps_its_water_and_sediment() {
+    let g = CubeGrid::new(32, R);
+    let mut h = planet(&g, 7);
+    let v0 = volume(&g, &h);
+    let scale = volume(&g, &h.iter().map(|v| v.abs()).collect::<Vec<_>>());
+    let Closed {
+        worst_water,
+        worst_step,
+        lakes,
+        sinks,
+    } = closed_steps(&g, &mut h, 1000);
     let v1 = volume(&g, &h);
     let drift = ((v1 - v0) / scale).abs();
     eprintln!(
@@ -746,4 +758,28 @@ fn a_closed_planet_keeps_its_water_and_sediment() {
     );
     assert!(worst_water < 1e-12, "water {worst_water}");
     assert!(drift < 1e-9, "Σ a·h drifted by {drift:.3e}");
+}
+
+/// The cube's solvers give the same bits on any thread count (plan §3 S7: no rayon float sums):
+/// 30 steps of the closed planet on 1, 3 and 8 threads.
+#[test]
+fn the_closed_planet_is_the_same_on_any_thread_count() {
+    let g = CubeGrid::new(24, R);
+    let run = |threads: usize| -> Vec<u64> {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build()
+            .expect("a thread pool");
+        pool.install(|| {
+            let mut h = planet(&g, 11);
+            closed_steps(&g, &mut h, 30);
+            h.iter().map(|v| v.to_bits()).collect()
+        })
+    };
+    let one = run(1);
+    for threads in [3, 8] {
+        let other = run(threads);
+        let differ = one.iter().zip(&other).filter(|(a, b)| a != b).count();
+        assert_eq!(differ, 0, "{threads} threads: {differ} cells differ");
+    }
 }
