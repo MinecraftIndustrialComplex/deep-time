@@ -8,7 +8,8 @@ the continents' area and volume go and why their land drowns (build log 2026-10-
 
 Prints, per run and as the mean over the runs given:
   series   every snapshot: continental crust's share of the planet (visible, hidden), its volume
-           (10^9 km^3), land at the climate's sea level, the dry share of the continental crust,
+           (10^9 km^3), land at the climate's sea level, the dry share of the continental crust (at the
+           sea, dry; at the datum, dry0; runs before 2026-10-21 have only dry0),
            the land's share above 2 km, the median distance from land to the coast (km), the mean
            thickness of the continental crust (km)
   bands    at the last snapshot: the thickness bands' share of the continental area, median
@@ -16,7 +17,8 @@ Prints, per run and as the mean over the runs given:
   parts    each process's change of the stocks over the run (area and land as shares of the
            planet, volume in 10^6 km^3)
   moves    each process's single-sample moves over the run (ocean made continental, with the mean
-           elevation and thickness it had then; hidden; surfacing; drowned; emerging)
+           elevation and thickness it had then; hidden; surfacing; drowned and emerging, both at
+           the datum)
 With --out (needs numpy and matplotlib; on the VM: nix shell --impure --expr '(builtins.getFlake
 "nixpkgs").legacyPackages.${builtins.currentSystem}.python3.withPackages (p: [p.numpy
 p.matplotlib])'), also draws series.png (area, land, volume over time), bands.png (thickness
@@ -80,7 +82,8 @@ SERIES = [
     ("vol", "vol_km3", "{:.2f}"),
     ("land", "land", "{:.3f}"),
     ("land0", "land0", "{:.3f}"),
-    ("dry", "dry", "{:.2f}"),
+    ("dry0", "dry", "{:.2f}"),
+    ("dry", "dry_sl", "{:.2f}"),
     (">2km", "above_2km", "{:.3f}"),
     ("coast", "coast_p50_km", "{:.0f}"),
     ("T", "mean_t_km", "{:.1f}"),
@@ -191,7 +194,7 @@ def plots(out, groups, maps):
     panels = [
         ("cont", "continental crust, share of planet", 0.41, "Earth incl. shelves 0.41 (Cogley 1984)"),
         ("land", "land at sea level, share of planet", 0.289, "Earth 0.289 (HYP-001)"),
-        ("dry", "dry share of continental crust", 0.71, "Earth 0.71 (HYP-012)"),
+        ("dry_sl", "dry share of continental crust (at the sea)", 0.71, "Earth 0.71 (HYP-012)"),
         ("vol_km3", "continental volume, 10^9 km^3", None, None),
         ("above_2km", "land above 2 km, share of land", 0.102, "Earth 0.102 (HYP-004)"),
         ("coast_p50_km", "median distance from land to the coast, km", 433, "Earth 433 (HYP-035)"),

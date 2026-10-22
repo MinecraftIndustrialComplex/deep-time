@@ -112,8 +112,8 @@ pub const CLIPPED_GLOBAL: &str = "plates/collision_noroom_clipped_km3";
 /// How young a collision orogeny on the incoming crust counts as raised by this collision's
 /// wedge, Myr (measurement only; the agent's window, ledger: PLT-401).
 const RECENT_MYR: f64 = 30.0;
-/// The lowest ground the wedge's profile is followed down to, m (the reach of its distance
-/// field; ground lower than this is not continental lowland).
+/// The lowest ground the wedge's profile is followed down to, m below the sea (the reach of its
+/// distance field; ground lower than this is not continental lowland). ledger: PLT-380
 const WEDGE_FLOOR_M: f64 = -500.0;
 
 /// The foreland basin in front of a wedge, read from the surface's flexure.
@@ -164,7 +164,8 @@ pub struct Stacked {
 
 /// Stacks this step's shortened crust of every collision with a front (see the module docs) and
 /// updates each collision's [`Belt`]. `fronts` are this step's (`shortening::advance`); `flexure`
-/// is `surface/flexure_m` per sample (NaN where unknown), when the surface stage has one.
+/// is `surface/flexure_m` per sample (NaN where unknown), when the surface stage has one; `sea_m`
+/// the sea the step stands under (the wedge's floor, the belt's height and what emerged).
 pub fn stack(
     state: &mut PlateState,
     geo: &Geo,
@@ -172,6 +173,7 @@ pub fn stack(
     env: &Env,
     fronts: &BTreeMap<usize, Front>,
     flexure: Option<&[f64]>,
+    sea_m: f64,
 ) -> BTreeMap<usize, Stacked> {
     let mut out = BTreeMap::new();
     if state.contacts.iter().all(|c| c.collision.is_none()) {
@@ -195,7 +197,7 @@ pub fn stack(
         .par_iter()
         .map(|&(c, f)| {
             let (under, over) = (state.contacts[c].under, state.contacts[c].over);
-            let reach = Reach::new(state, env, &plate_of, over, under, f);
+            let reach = Reach::new(state, env, &plate_of, over, under, f, sea_m);
             Fields {
                 over: dijkstra_sorted(
                     geo,
@@ -234,6 +236,7 @@ pub fn stack(
             f,
             flexure,
             fields,
+            sea_m,
         );
         let applied = step.stacked;
         let col = state.contacts[c].collision.as_mut().expect("in collision");
@@ -296,6 +299,7 @@ impl<'a> Reach<'a> {
         over: u32,
         under: u32,
         f: &Front,
+        sea_m: f64,
     ) -> Reach<'a> {
         let k = env.k;
         let norm = env.norm;
@@ -327,7 +331,7 @@ impl<'a> Reach<'a> {
         };
         // ledger: PLT-192 (the wedge's surface slope), PLT-244 (the wedge's rule).
         let tan = k.wedge_slope_deg.to_radians().tan();
-        r.wedge_reach_km = ((r.z_front - WEDGE_FLOOR_M).max(0.0) / (1000.0 * tan)).min(
+        r.wedge_reach_km = ((r.z_front - (sea_m + WEDGE_FLOOR_M)).max(0.0) / (1000.0 * tan)).min(
             // A guard for gentle slopes: the profile never runs out further than the belt is
             // wide beyond the basin's reach.
             k.collision_belt_km + FOREDEEP_REACH_KM,
@@ -386,6 +390,7 @@ fn stack_front(
     f: &Front,
     flexure: Option<&[f64]>,
     fields: Fields,
+    sea_m: f64,
 ) -> FrontStep {
     let k = env.k;
     let norm = env.norm;
@@ -396,7 +401,7 @@ fn stack_front(
     // The fields `stack` ran (P1-19): behind the front as they are; in front of it cut back to the
     // reach of the front's height now (a front stacked before this one may have raised its edge),
     // or run again when that reach is the longer.
-    let reach = Reach::new(state, env, plate_of, side.over, side.under, f);
+    let reach = Reach::new(state, env, plate_of, side.over, side.under, f, sea_m);
     let z_front = reach.z_front;
     let wedge_reach_km = reach.wedge_reach_km;
     let d_over = fields.over;
@@ -604,7 +609,7 @@ fn stack_front(
         let rot = quat(state.groups[state.samples[i].group as usize].rot);
         let s = &mut state.samples[i];
         let z = f64::from(s.elevation_m);
-        let z1 = (z + raw * ceiling(z, k.uplift_ceiling_m)).min(k.max_elevation_m);
+        let z1 = (z + raw * ceiling(z - sea_m, k.uplift_ceiling_m)).min(k.max_elevation_m); // ledger: PLT-041
         let airy_dz = z1 - z;
         out.stacked.clipped_km2_m +=
             (raw - airy_dz.max(0.0)).max(0.0) * COLUMN_ISOSTATIC_FACTOR * area;
@@ -629,7 +634,7 @@ fn stack_front(
         out.stacked.max_dz_m = out.stacked.max_dz_m.max(dz);
         out.lifted10 += u32::from(dz > 10.0);
         out.lifted100 += u32::from(dz > 100.0);
-        out.emerged += u32::from(z <= 0.0 && z + dz > 0.0);
+        out.emerged += u32::from(z <= sea_m && z + dz > sea_m);
         // ledger: PLT-247 (the stamp), PLT-079 (the regime it makes). The crust stacked, not the
         // surface's rise, marks the orogeny (a belt whose root turns to eclogite is still one).
         if airy_dz >= stamp_m {
@@ -690,7 +695,8 @@ fn stack_front(
     // The belt's height after the step: its mean above the sea within half its width, and its
     // mean elevation there.
     let samples = &state.samples;
-    out.stacked.height_m = mean_of(&|i| f64::from(samples[i].elevation_m).max(0.0)).max(0.0);
+    out.stacked.height_m =
+        mean_of(&|i| (f64::from(samples[i].elevation_m) - sea_m).max(0.0)).max(0.0);
     out.stacked.mean_m = mean_of(&|i| f64::from(samples[i].elevation_m));
     out.stacked.mean_before_m = mean_before_m;
     out.stacked.foredeep = flexure.map(|fl| foredeep(&d_under, fl, wedge_km, &norm_km(env)));
@@ -1029,7 +1035,7 @@ mod tests {
             let env = self.env(step);
             let (fronts, fired) =
                 shortening::advance(st, &self.geo, &pos, &tree, &env, BTreeMap::new());
-            let stacked = stack(st, &self.geo, &pos, &env, &fronts, flexure);
+            let stacked = stack(st, &self.geo, &pos, &env, &fronts, flexure, 0.0);
             (stacked, fired)
         }
     }
@@ -1389,7 +1395,7 @@ mod tests {
             }
             let pos = positions(&st, &fx.geo);
             let env = fx.env(step);
-            let ans = crate::plates::forces::step(&mut st, &fx.geo, &pos, &env, DVec3::Z);
+            let ans = crate::plates::forces::step(&mut st, &fx.geo, &pos, &env, DVec3::Z, 0.0);
             assert!(ans.solved);
             slab_km.push(
                 st.slabs

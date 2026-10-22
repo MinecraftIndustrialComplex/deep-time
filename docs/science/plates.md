@@ -3542,7 +3542,11 @@ table (30c4d664 → fad59a5e on seeds 1 and 2: land 0.257 → 0.268, largest 0.1
    about 0.026 more of the planet's continental crust over 1,000 Myr than a sea at 0 and shortens
    the assembly period (the section above). Find the code that still takes the datum for the
    sea; `forces::column_energy` (FRC-014: "h above sea level", computed from 0) is the first to
-   test, by an arm that feeds it the sea.
+   test, by an arm that feeds it the sea. Done ("The sea off the datum" below): the column
+   energy, the wedge floor (PLT-380) and the Andean mark now take the sea, and the measurement
+   counts from it. On seeds 1 to 6 none of it moves the crust (net −0.085 against master's −0.095
+   over 1,000 Myr, p 0.60), and a sea held at the datum loses as much (−0.099): the 0.026 was
+   seeds 1 to 3's draw. The drowned crust is the sea's height (0.235 with the sea at the datum).
 7. *Plate checks that are a mean of runs* (the supercontinent's tenure above all): one long run
    carries the mean (base: 558 Myr in one run of six; 126 Myr on seeds 1 to 3 against 46 on seeds
    4 to 6). Compare arms on twelve runs or more, and by the runs' median, before reading a change
@@ -3673,7 +3677,9 @@ same seeds and switch it on if the land holds. Ben's call when.
 ### What is left, and for whom
 
 1. *The sea off the datum* (the sea level's; a peer task is on it): it decides whether the hot
-   window can go on.
+   window can go on. Measured ("The sea off the datum" below): with the plate model reading the
+   sea, W 40 still drowns the continents (0.510 under the sea, land 0.209), so it stays off until
+   the sea stands lower against the continents (more continental crust, or Earth's crust budget).
 2. *The active belts* (the plates'): 0.95 of the crust that crosses a collision front stays in
    the crust (PLT-242, `plates/belts.rs`, on Stern & Scholl 2010), where the India-Asia balance has
    about half of the colliding crust gone into the mantle (Ingalls et al. 2016, abstract; disputed by van Hinsbergen et al.
@@ -3693,6 +3699,216 @@ same seeds and switch it on if the land holds. Ben's call when.
 4. *Plateau interiors*: thick crust with no room within reach does not collapse. A lower-crustal
    flow that carries crust farther than the nearest room (PLT-300's flow does not reach) would
    be a flow solve, not a constant.
+
+## The sea off the datum (2026-10-21)
+
+Item 6 of the plate geometry's "What is left, and for whom" above: a sea standing off elevation 0, above or below it,
+lost about 0.026 more of the planet's continental crust over 1,000 Myr than a sea at 0 and
+shortened the assembly period, which pointed at code that still took the datum for the sea. This
+section lists every such place in `deeptime-core`, feeds the step's sea to the ones that model
+something physical, and measures the change against master 44032ad9 on twelve runs an arm.
+
+### The two frames
+
+The plate model's heights stand in a datum frame: the ridge crest, GDH1's floor (PLT-351), the
+continents' Airy heights and the isostatic heights of the settling and the collapse are measured
+from elevation 0 on a planet without water. The sea S is a height in the same frame: the ocean's
+volume fills the ground's hypsometry once a step (sea-level.md), and the plates read the last
+step's (`plates/mod.rs` `sea_m`: the climate's `climate/sea_level_m`, else the surface's, else 0).
+The surface, the climate, the rivers, the bake, the strata and the deposits already took their
+heights from the sea (a sweep of those modules found no reader of 0 as the sea); the plate
+model's own readers did not.
+
+### Where the code took 0 for the sea
+
+| site | what it does | reached by the moving sea in the shipped Earth-like presets | change | ledger |
+|---|---|---|---|---|
+| `plates/forces.rs` `column_energy` (all its callers go through `Coeffs::energy` in `forces::step`: the edge energies and the collision's energy change) | the land's potential energy against the ridge: the ridge push and the collision's resistance | yes, every step, at every edge between land and ocean | h = z − S, the water switch at S, H = 35 km + 6 S (below) | FRC-013, FRC-014 |
+| `plates/belts.rs` `WEDGE_FLOOR_M` (`Reach::new`) | the lowest ground the orogenic wedge's distance field is followed down to, −500 m | yes, every collision | 500 m below the sea | PLT-380 (new) |
+| `plates/subduction.rs` `fronts_finish` (`andean`) | an oceanic sample raised at a front takes the Andean orogeny mark when it stands above 0 | yes, every subduction front | above the sea | PLT-060 |
+| `plates/belts.rs` `stack_front`, `plates/subduction.rs` `fronts_finish` (the `ceiling` of uplift) | the uplift's isostatic ceiling, 1 − z/z_c | no: `uplift_ceiling_m` is 0 (off) in the shipped presets | z − S | PLT-041 |
+| `plates/pools.rs` `surface_step` | Cortial's continental erosion, ε_c z/z_c | no: `continental_erosion_mm_yr` is 0 in the shipped presets (the surface stage erodes) | the height above the sea | PLT-127 |
+| `plates/dynamics.rs` (`arc_stats`, `arc_heights`, the step record's land), `plates/belts.rs` (`emerged`, the belt's `height_m`), `plates/check.rs` (the land gain) | measurement: the land share, the arcs' heights and emergence, the belts' heights, the plate check's land gain | yes, measurement only | from the sea; the land gain with the sea held (below) | PLT-151, PLT-215 to PLT-219, CHK-009 |
+| `provinces.rs` `cells()` | the province map's heights | output only | less the surface's sea, else the climate's, else 0 | PRV-012 |
+| `plates/crust_budget.rs` snapshot (`cb_t`'s `dry`), `tools/review/continent-budget.py` | the continental crust's dry share, which the tool drew against Earth's 0.71 above the sea (HYP-012) | measurement only, with `DEEPTIME_CRUST_BUDGET` | `dry_sl` at the sea beside `dry` at the datum; the tool draws `dry_sl` against Earth | PLT-302 |
+
+Left as they are:
+
+- `plates/crust_budget.rs` (`bits`, `stocks`): the dry bit and the dry stock at 0, which the
+  parts and the moves (`drown`, `emerge`) book. The budget prints the land at the datum (`land0`)
+  beside the land above the sea (`land`), and now the dry share at both; the bookings stay in the
+  datum frame, a census of the solid column's moves, not a law. The thickness bands' `dry` was
+  already at the sea.
+- `params.rs` (a preset's ridge must stand below 0 and its highest ground above): a validation of
+  the preset, in the datum frame.
+- The height cap `max_elevation_m`, the settling (`settle.rs`, which reads the sea for the water
+  it loads, ISO-078), the ocean–continent transition (`transition.rs`), the L1 resampling
+  (`l1.rs`) and the orogenic collapse (`collapse.rs`): heights of the solid column, in the datum
+  frame on purpose.
+- The hotspot uplift's taper (`hotspots.rs`, PLT-114: the swell fades to nothing at 3 km on
+  oceanic crust and 1.5 km on continents, the room counted from 0): the moving sea reaches it, but
+  it is a cap on the swell and its edifice, a height of the solid column (a volcano's height is
+  set by its edifice and the plate under it, not by the shore), and it is uncited; left in the
+  datum frame.
+- `surface/amplify.rs` `Config.sea`: already the step's sea; only its doc did not say the frame.
+
+### The column energy taken from the sea
+
+The force balance's column energy (design §3.2, FRC-014) is the vertical-stress integral of an
+Airy-compensated column against a reference, Turcotte & Schubert's lithostatic balance; the
+reference is a column whose top stands at the sea. Until now the code put that shore at 0: under
+a sea at +300 m a shelf at +100 m, under 200 m of water, was weighed as dry land 100 m high, and
+under a sea at −250 m a coastal plain at −100 m, 150 m above the water, was weighed as a shelf
+under water.
+
+Taken from the sea S: h = z − S, the water switch at h = 0, and the reference crust H thick enough
+to hold a dry column at S, H = 35 km + S ρ_m / (ρ_m − ρ_c) = 35 km + 6 S (ρ_m 3,300, ρ_c 2,750
+kg/m³). Then for a dry column U(z, S) = U(z, 0) − U(S, 0): the difference between two dry columns
+does not change with the sea (the rock is the same whatever water lies elsewhere), the reference
+shore moves with the sea, and at S = 0 the formula is the datum's, bit for bit. The ridge crest
+stays where the datum frame puts it (FRC-013). Against the ridge a sea at +300 m lowers every
+continent's energy by U(300 m, 0), about 2.9 × 10¹¹ N/m; one at −250 m raises it by about
+2.3 × 10¹¹ N/m (a belt 5 km high: 6.7 × 10¹² N/m). Not taken: h = z − S on a fixed 35 km crust
+(a high sea would weaken the push of every dry belt by ρ_c g S ρ_m / (ρ_m − ρ_c) per metre of
+relief though the columns are the same), and the water switch alone (the reference shore stays at
+0, the fault itself). Tested in `forces.rs` `the_land_s_column_energy_is_taken_from_the_sea`.
+
+### The land gain with the sea held
+
+Counting land above the sea made the plate check's land gain (CHK-009, PLT-151: the most land
+gained in one step after the first 10 Myr, target at most 1.5 % of the planet a 2 Myr step) count
+a falling sea's new shore as land made: on the first branch arm its median run rose from 0.84 to
+2.00 % and failed. The check is about land the ground's motion makes, so the step record now
+carries `land_held`, the step's land above the sea of the step before, and the gain is
+`land_held` less the step before's land (`check.rs`, test `land_gain_holds_the_sea`).
+With the sea held the branch's median run gains 1.08 % (master 0.84; two-sided Mann-Whitney p
+0.04), and two of its twelve runs are over the target (1.71 and 1.80; master none). The rest of
+the rise is where the line is drawn: with the sea pinned at the datum (the pin0 arm below), where
+master's count and the shore are the same line, the median run gains 1.02 % (against master 0.84,
+p 0.05). The surface planes land down to its base level, so more ground stands near the shore
+than near a datum 200 to 450 m below it, and the same motion carries more of it across. Counted
+at the shore is what the check means.
+
+### Against master on twelve runs
+
+**Measured** (VM, admitted): `earthlike_quick_16k`, 1000 Myr, seeds 1 to 6, the supercontinent and
+scattered_continents starts, 2 threads, the crust budget on (`DEEPTIME_CRUST_BUDGET=1`), by
+`tools/review/force-balance-ensemble.sh`; per run `deeptime plate-check` and
+`tools/review/continents_census.py fields` on the final frame's dumped fields (a scratch driver,
+not committed). Twelve runs an arm, compared by the runs' median and a two-sided Mann-Whitney test
+over the runs. The arms:
+
+- *master*: 44032ad9. Master 49492ce3 (the high ground's laws, off) gives the same crust budget
+  on supercontinent seed 1, line for line.
+- *branch*: this branch. After the merge of 49492ce3 it gives the same budget on supercontinent
+  seed 1, line for line.
+- *pin0*: the branch with the climate's sea pinned at 0 for every reader (a scratch switch, not
+  committed). The Earth-like presets' steering still nudges it: 0 to 93 m, median 0 after the
+  first 100 Myr.
+- *rest*: the branch with the column energy back on the datum (a scratch switch): the wedge
+  floor, the Andean mark and the measurement at the sea.
+- *wd*: the branch with the wedge floor back on the datum (a scratch switch): the column energy,
+  the Andean mark and the measurement at the sea.
+- *master + W 40* and *branch + W 40*: `--set tectonics.collapse_hot_myr=40` (PLT-390, the high
+  ground's hot window), the coordinator's follow-up.
+
+V1 item 1's seven measures on the final frame (the census; collisions from the plate check),
+median of twelve runs, the p against master in brackets:
+
+| arm | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | continental crust's net change over 1,000 Myr | criteria met per run: median, mean | sea over the datum, median after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| target | 0.26 to 0.32 | ≥ 0.12 | ≤ 0.25 | ≤ 0.12 | ≤ 0.15 | ≤ 0.15 | 2 to 6 | | of 7 | |
+| master | 0.257 | 0.133 | 0.348 | 0.277 | 0.381 | 0.172 | 1.60 | −0.095 | 1, 1.58 | 292 / 455 |
+| branch | 0.247 (0.19) | 0.104 (0.18) | 0.414 (0.053) | 0.248 (0.58) | 0.369 (0.53) | 0.170 (0.58) | 1.65 (1.0) | −0.085 (0.60) | 1, 1.25 (0.38) | 210 / 474 |
+| pin0 | 0.353 (< 0.001) | 0.233 (0.007) | 0.235 (< 0.001) | 0.259 (0.80) | 0.387 (0.69) | 0.180 (0.84) | 1.80 (0.60) | −0.099 (0.69) | 2, 2.42 (0.016) | 0 / 8 |
+| rest | 0.248 (0.31) | 0.124 (0.54) | 0.419 (0.13) | 0.234 (0.061) | 0.339 (0.028) | 0.156 (0.13) | 1.55 (0.60) | −0.081 (0.13) | 2, 1.33 (0.76) | 325 / 608 |
+| wd | 0.234 (0.10) | 0.095 (0.17) | 0.466 (0.004) | 0.185 (0.007) | 0.314 (0.026) | 0.143 (0.18) | 1.60 (0.93) | −0.066 (0.026) | 1, 1.50 (0.90) | 320 / 763 |
+| master + W 40 | 0.192 (0.002) | 0.065 (0.035) | 0.589 (0.001) | 0.170 (0.001) | 0.285 (0.001) | 0.143 (0.012) | 1.70 (0.43) | −0.011 (< 0.001) | 2, 1.42 (0.95) | 460 / 734 |
+| branch + W 40 | 0.209 (0.017) | 0.099 (0.11) | 0.510 (0.007) | 0.163 (< 0.001) | 0.285 (0.002) | 0.128 (0.006) | 1.55 (0.77) | −0.032 (0.001) | 2, 1.75 (0.67) | 361 / 584 |
+
+Per run, master / branch (supercontinent seeds 1 to 6, then scattered_continents seeds 1 to 6):
+
+| run | land | largest | under the sea | above 2 km | coast with high ground | under ice | collisions | crust, net |
+|---|---|---|---|---|---|---|---|---|
+| super-1 | 0.223 / 0.260 | 0.136 / 0.091 | 0.508 / 0.387 | 0.281 / 0.235 | 0.358 / 0.399 | 0.272 / 0.103 | 1.1 / 1.8 | −0.042 / −0.082 |
+| super-2 | 0.257 / 0.244 | 0.080 / 0.120 | 0.403 / 0.445 | 0.225 / 0.135 | 0.386 / 0.353 | 0.140 / 0.152 | 1.5 / 2.4 | −0.070 / −0.076 |
+| super-3 | 0.295 / 0.269 | 0.212 / 0.109 | 0.306 / 0.324 | 0.212 / 0.295 | 0.374 / 0.380 | 0.140 / 0.217 | 2.4 / 1.4 | −0.092 / −0.101 |
+| super-4 | 0.227 / 0.263 | 0.058 / 0.152 | 0.437 / 0.418 | 0.178 / 0.159 | 0.296 / 0.284 | 0.120 / 0.093 | 1.6 / 2.0 | −0.074 / −0.061 |
+| super-5 | 0.278 / 0.260 | 0.130 / 0.164 | 0.353 / 0.322 | 0.312 / 0.351 | 0.278 / 0.465 | 0.204 / 0.182 | 1.8 / 1.5 | −0.058 / −0.104 |
+| super-6 | 0.253 / 0.250 | 0.093 / 0.055 | 0.396 / 0.412 | 0.248 / 0.184 | 0.384 / 0.292 | 0.163 / 0.129 | 1.5 / 2.1 | −0.077 / −0.079 |
+| scatt-1 | 0.287 / 0.249 | 0.257 / 0.127 | 0.306 / 0.428 | 0.312 / 0.261 | 0.432 / 0.359 | 0.194 / 0.174 | 1.6 / 1.4 | −0.101 / −0.069 |
+| scatt-2 | 0.301 / 0.222 | 0.175 / 0.061 | 0.282 / 0.417 | 0.194 / 0.372 | 0.374 / 0.417 | 0.172 / 0.242 | 1.2 / 1.4 | −0.097 / −0.107 |
+| scatt-3 | 0.249 / 0.225 | 0.091 / 0.040 | 0.343 / 0.527 | 0.313 / 0.065 | 0.399 / 0.209 | 0.177 / 0.167 | 2.5 / 1.9 | −0.119 / +0.007 |
+| scatt-4 | 0.258 / 0.240 | 0.186 / 0.144 | 0.283 / 0.394 | 0.363 / 0.308 | 0.476 / 0.308 | 0.206 / 0.190 | 1.3 / 1.4 | −0.152 / −0.106 |
+| scatt-5 | 0.280 / 0.243 | 0.148 / 0.099 | 0.287 / 0.420 | 0.287 / 0.208 | 0.402 / 0.381 | 0.171 / 0.106 | 2.1 / 1.1 | −0.124 / −0.088 |
+| scatt-6 | 0.233 / 0.246 | 0.097 / 0.090 | 0.375 / 0.361 | 0.273 / 0.335 | 0.377 / 0.409 | 0.132 / 0.174 | 1.7 / 1.9 | −0.115 / −0.106 |
+
+The plate checks: master 29 of 45 at the median, the branch 29 (pin0 29, rest 27, p 0.029; the two
+W 40 arms 29 and 28). The supercontinent's tenure 13 and 24 Myr (p 0.40), the assembly period 196
+and 142 Myr (p 0.53; two branch runs make no second assembly), pin0 22 and 264 Myr (p 0.46 and
+0.27).
+
+**What moved.** Only what measures from the sea: the plate check's land (its median 0.330 of the
+planet above 0 m, 0.270 above the sea, p < 0.001), its land gain (0.84 to 1.08 % a step, p 0.04,
+above), and the arcs' heights (the island arcs' 90th percentile −2,498 to −2,289 m, p 0.035; the
+continental arcs' median 2,048 to 1,675 m and the island arcs' emergence 23.7 to 22.0 %, p < 0.001). None of
+the seven measures, the crust or the plates' timing moved at p < 0.05.
+
+**What did not.** The crust: master loses 0.095 of the planet's continental crust over the 1,000
+Myr at the median run, the branch 0.085 (p 0.60), and a sea held at the datum 0.099 (pin0, p
+0.69). The 0.026 the section above found was a draw of seeds 1 to 3: there, mean of six runs,
+master loses 0.087 and pin0 0.070; on seeds 4 to 6 master 0.100 and pin0 0.099. Runs of one arm
+spread by 0.03 to 0.04, so twelve runs against twelve resolve about 0.04, and 0.026 would need
+about thirty an arm. The column energy is not measurable either: the branch against rest differs
+in nothing at p < 0.19 but the plate checks met (29 against 27, p 0.048).
+
+**The drowned crust is the sea's height.** Under the sea at the datum (pin0) the continental crust
+under the sea is 0.235 (target ≤ 0.25, met; master 0.348), the largest landmass 0.233 and the land
+0.353 (over its 0.32 ceiling), with the crust lost the same. The plate model's own count at the sea
+agrees (the crust budget's thickness bands, Σ a × dry, the branch's `dry_sl`): master 0.313 on the
+final frame, pin0 0.231. The sea stands 200 to 450 m over the datum because the planet's water
+fills a hypsometry whose continents are thin for their area (sea-level.md, the high ground's
+section above), not because code reads 0 as the sea. The branch's final-frame rise (0.348 to
+0.414, p 0.053) is shared by rest (0.419), so it is not the column energy; over the frames it is
+small (the plate model's mean of the 19 frames after the first 100 Myr 0.335 to 0.362, p 0.44;
+the last 500 Myr 0.324 to 0.348, p 0.47). Nor is it the wedge floor: with the floor back on the
+datum (wd) the share is 0.466. The Andean mark, the one site left, was not tried alone; with the
+hot window on, the branch drowns less than master does (0.510 against 0.589, p 0.54), so the
+branch's own effect on the share is not established either way. Many measures and arms were
+compared here, so single p near 0.03 to 0.05 are expected by chance.
+
+**Drowned with the crust kept.** Run by run the drowned share follows the continental crust a run
+keeps: over the 72 runs of the six arms whose sea moves (pin0 left out), Spearman's ρ of the
+census's share under the sea against the continental crust's area at the end is +0.84, and against
+the sea's height at the end +0.75; within each arm alone ρ is +0.66 to +0.84. A run that keeps
+more of its continents keeps them thin for their area, the planet's water stands higher on them,
+and more of them are under it: the hot window keeps the most (0.39 to 0.41 of the planet against
+master's 0.33) and drowns the most. With these continents the crust's loss target and the drowned
+target pull against each other; thicker continents for their area would serve both.
+
+**The hot window (PLT-390) on both.** W 40 keeps the crust (net −0.011 and −0.032 against −0.095
+and −0.085) and lowers the high ground (above 2 km 0.170 and 0.163, the coast 0.285, the ice 0.143
+and 0.128), as the high ground's section found; and it drowns the continents on both: under the sea
+0.589 and 0.510, the land 0.192 and 0.209 under its floor, the largest landmass 0.065 and 0.099
+under its floor, the sea 460 and 361 m over the datum at the median. Branch + W 40 against master +
+W 40 differs in none of the seven measures (p ≥ 0.25) nor the crust (p 0.37). It meets the most
+criteria per run on the mean (1.75 against 1.58, 1.42 and 1.25: the ice, and a collision rate or a
+land share in some runs; p 0.67 against master and 0.21 against the branch), but with the
+continents drowned, so PLT-390 stays off.
+
+### What is left, and for whom
+
+1. *The drowned continents* (V1 item 1; the plates' and the sea level's): the share under the sea
+   follows the sea's height over the continents, not a datum in the code. With the sea at the
+   datum it meets its target and the land overshoots, so the gap is the continents' volume for
+   their area (34 to 36 km on average against Earth's 41.1 km): the crust budget's losses
+   (collisions at 2.5 to 3.8 times Earth's, the high ground's section) and the boundaries'
+   orientation (item 1 of the plate geometry's list) are where to work.
+2. *The land gain* (CHK-009, PLT-151): counted at the sea it runs 1.08 % at the median run, two
+   runs of twelve over the 1.5 % target. If a run fails it, look at the steps where the surface
+   planes ground to its base level near the shore, not at the sea.
+3. *The hotspot taper* (PLT-114, uncited) and the other solid-column heights in the datum frame
+   ("Left as they are" above): leave them unless a source puts them at the shore.
 
 ## The crust flux into collision fronts (2026-10-21)
 

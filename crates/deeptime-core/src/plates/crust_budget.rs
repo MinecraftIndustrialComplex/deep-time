@@ -7,8 +7,10 @@
 //! The stock of continental crust over a run: its area (visible continental samples, as a share
 //! of the planet) and its volume (Σ thickness, visible and hidden crust apart, km³
 //! Earth-normalized); the land (visible samples above the plate datum, 0 m, and above the
-//! climate's sea level); the dry share of the continental crust; its thickness distribution, each
-//! band with its elevation (the freeboard) and its Airy height ([`super::collapse::iso_height`]);
+//! climate's sea level); the dry share of the continental crust (above the datum, `dry`, the
+//! stock the parts and the moves book, and above the sea, `dry_sl`); its thickness distribution,
+//! each band with its elevation (the freeboard), its Airy height
+//! ([`super::collapse::iso_height`]) and its share above the sea;
 //! the hypsometry (the land's share above 2 km) and the median distance from land to the coast.
 //!
 //! # How
@@ -397,6 +399,12 @@ impl CrustBudget {
         let ocean_land = (0..samples.len())
             .filter(|&i| land(i) && !samples[i].is_continental())
             .count() as f64;
+        // The dry share of the continental crust at the sea (`dry_sl`), beside the stock's `dry`
+        // at the datum (the sea off the datum, plates.md 2026-10-21): the share Earth's 0.71
+        // (HYP-012) is counted at.
+        let cont_land = (0..samples.len())
+            .filter(|&i| land(i) && samples[i].is_continental())
+            .count() as f64;
         // The distance from each piece of land to the nearest visible sea floor.
         let coast_p50 = if pos.len() == samples.len() && n_land_sl > 0.0 {
             let sea_tree = Tree::over(pos, |i| visible(i) && samples[i].elevation_m <= sea);
@@ -446,7 +454,7 @@ impl CrustBudget {
         };
         let mut line = format!(
             "\ncb_t t={t_myr:.0} vis={:.0} cont={:.4} cont_hidden={:.4} vol_km3={:.4e} \
-             vol_hidden_km3={:.4e} land0={:.4} land={:.4} sea_m={sea_m:.0} dry={:.4} \
+             vol_hidden_km3={:.4e} land0={:.4} land={:.4} sea_m={sea_m:.0} dry={:.4} dry_sl={:.4} \
              above_2km={:.4} ocean_land={:.4} coast_p50_km={coast_p50:.0} mean_t_km={:.2} \
              felsic_km3={:.4e} felsic_ocean_km3={:.4e}",
             s[7],
@@ -457,6 +465,7 @@ impl CrustBudget {
             s[LAND] / vis,
             n_land_sl / vis,
             s[DRY] / s[CONT].max(1.0),
+            cont_land / s[CONT].max(1.0),
             above_2km / n_land_sl.max(1.0),
             ocean_land / n_land_sl.max(1.0),
             s[VOL] / s[CONT].max(1.0) / 1000.0,

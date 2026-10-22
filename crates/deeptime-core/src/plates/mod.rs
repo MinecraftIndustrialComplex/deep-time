@@ -364,6 +364,7 @@ impl PlatesStage {
                     &env,
                     &fronts,
                     flexure.as_deref().filter(|_| collisions),
+                    sea,
                 )
             },
             || subduction::fronts_reach(geo, &begun, &env),
@@ -449,7 +450,7 @@ impl PlatesStage {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
         lap(&mut clock, "belts");
-        let pull = subduction::fronts_finish(st, &cache.geo, &env, &mut cones, begun, arcs);
+        let pull = subduction::fronts_finish(st, &cache.geo, &env, &mut cones, begun, arcs, sea);
         book(st, gap_budget::Part::Arcs);
         *world
             .globals
@@ -559,13 +560,15 @@ impl PlatesStage {
             subduction::CONTINENTAL_VOLUME_GLOBAL.to_owned(),
             volume_m * env.norm.sample_area_km2() / 1000.0,
         );
-        // The force balance (`forces.rs`): the rotation each plate's motion relaxes towards.
+        // The force balance (`forces.rs`): the rotation each plate's motion relaxes towards. The
+        // land's column energy is taken from the step's sea (ledger: FRC-014).
         let balance = forces::step(
             st,
             &cache.geo,
             &pos,
             &env,
             forces::flow_axis(self.preset.seed),
+            sea,
         );
         book(st, gap_budget::Part::Other);
         if !balance.solved {
@@ -623,7 +626,7 @@ impl PlatesStage {
         book(st, gap_budget::Part::PlateSurface);
         finish_samples(st, &cache.geo, &z0, &env);
         book(st, gap_budget::Part::Finish);
-        let arcs = dynamics::arc_heights(st);
+        let arcs = dynamics::arc_heights(st, sea);
         lap(&mut clock, "surface_finish");
 
         // Motion for the next step: each plate's rotation relaxes towards the balance's
@@ -752,6 +755,7 @@ impl PlatesStage {
                 arcs,
                 forces: balance.recorded.as_ref(),
                 guarded: &guarded,
+                sea_m: sea,
             },
         );
         lap(&mut clock, "record");

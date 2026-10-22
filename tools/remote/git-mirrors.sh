@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
-# Serves the workspace's private git dependencies to the test VM's cargo (sourced by mac.sh;
-# decisions log 2026-10-21, "vendor mic-viewer or depend on it?"). Today that is mic-viewer, pinned
-# by a full commit hash in Cargo.toml.
+# Serves the workspace's PRIVATE git dependencies to the test VM's cargo (sourced by mac.sh;
+# decisions log 2026-10-21, "vendor mic-viewer or depend on it?"). TODAY THERE IS NONE: mic-viewer,
+# the one dependency this was written for, became public on 2026-10-21 (decisions log) and Cargo.toml
+# fetches it over https, which the VM, the laptop and CI do with no credentials. The script finds no
+# pins (it matches only ssh://git@github.com URLs), so a sync does nothing here. It stays for the next
+# private git dependency: give that one an ssh://git@github.com/<org>/<repo>.git URL and a full
+# commit hash as `rev`, and every mac.sh sync will mirror it to the VM as described below.
 #
 # The VM has no GitHub credentials, and none are given to it: no deploy key, no forwarded agent (the
 # VM is shared by every agent, and a forwarded agent would expose Ben's GitHub key). Instead:
