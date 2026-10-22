@@ -18,7 +18,7 @@ and contribute no code.
 
 ## Shared code from another repository
 
-- **mic-viewer** (MinecraftIndustrialComplex/mic-viewer, private), MPL-2.0, by the same author as
+- **mic-viewer** (MinecraftIndustrialComplex/mic-viewer, public since 2026-10-21), MPL-2.0, by the same author as
   Deep Time: the shared world viewer's core (an HTTP server that answers loopback names only, the
   tile cache, the slippy map, the marks and their budget), shared with mic-rtsim's world viewer
   (mic-rtsim VIEWER.md; decisions log 2026-10-21). Deep Time depends on it unmodified, as a git
