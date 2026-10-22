@@ -540,6 +540,18 @@ class FarColumnTest {
         assertEquals(l.at(60), l.at(62), "one body of water from the painted block up");
         assertEquals(63, l.top[l.at(62)]);
         assertEquals(59, l.top[l.topSolid()] - 1);
+
+        // A bank at the water beside it is sealed (the bank pass fills painted water); one above it, or land, is not.
+        FarColumn.Shape bank = new FarColumn.Shape();
+        FarColumn.shape(new Water.Column(Water.Kind.BANK, 61.5, 61, null, null, null, 62, null, null, false, null), 0, -64, 319, bank);
+        assertEquals(62, bank.ground);
+        assertTrue(bank.sealed, "raised to minGround");
+        FarColumn.shape(new Water.Column(Water.Kind.BANK, 62.5, 62, null, null, null, 62, null, null, false, null), 0, -64, 319, bank);
+        assertTrue(bank.sealed, "standing at minGround");
+        FarColumn.shape(new Water.Column(Water.Kind.BANK, 63.5, 63, null, null, null, 62, null, null, false, null), 0, -64, 319, bank);
+        assertFalse(bank.sealed, "above minGround");
+        FarColumn.shape(new Water.Column(Water.Kind.NONE, 62.5, 62, null, null, null, null, null, null, false, null), 0, -64, 319, bank);
+        assertFalse(bank.sealed, "land");
     }
 
     // ---- Threads and time ----
