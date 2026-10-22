@@ -3,6 +3,7 @@
 """Carries the VM's client stage into Ben's Prism instance (run on the laptop).
 
     tools/remote/play-client-apply.py --hash 8f2b7e79 [--set lite] [--instance <minecraft dir>] [--dry-run] [--devmap] [--extra-mod JAR]...
+                                      [--rock-tags DIR | --no-rock-tags] [--rock-tags-only]
 
 The stage is /data/ban/play/<hash>-client/minecraft/ on the test VM, built by
 tools/remote/vm/play-client-stage.sh: the MIC pack's last commit installed with packwiz-installer
@@ -18,6 +19,16 @@ in minecraft/ at all). What changes:
     the pack did not change is left alone, so local edits to it survive.
   * a file the old install had and the new pack no longer ships is removed.
   * packwiz.json is replaced by the stage's, so the instance's record is the pack commit now installed.
+  * the MIC rock tags (Ben's coordinator, 2026-10-22): a new single-player world has no world datapack, so
+    its rock classes fall back to vanilla blocks unless KubeJS (which the pack has) adds the tags as the global
+    datapack kubejs/data/deeptime. The pack on master does not ship them yet (its deep-time branch does), so
+    this copies the datapack's data/deeptime/ (Docs/datapacks/deeptime-mic-rock-tags, or --rock-tags DIR or
+    $DEEPTIME_ROCK_TAGS) into <instance>/kubejs/data/deeptime, only the files that are missing or differ, and
+    removes nothing. A stage that ships files there itself (the lite stage always does; the pack will) keeps its
+    own: nothing is copied then. --no-rock-tags skips the step; a missing datapack is an error, never a
+    silent skip. The copied files are not entered in packwiz.json, so a later apply never removes them.
+  * --rock-tags-only does only that step on the instance (no mods mirror, no other pack file, packwiz.json
+    untouched); the stage is read for its packwiz.json alone.
 
 Nothing here is heavy: one rsync of the changed jars. It refuses to run while a Minecraft process
 has the instance open.
@@ -43,6 +54,7 @@ to the instances (a hidden folder with no instance.cfg until the end) and rename
 sees half an instance; nothing else of Prism's is touched. Run again later to update it like the full one.
 """
 import argparse
+import filecmp
 import json
 import os
 import shutil
@@ -67,6 +79,9 @@ CFG_RESET = ("lastLaunchTime", "lastTimePlayed", "totalTimePlayed", "name", "uui
 LITE_CFG = {"JoinServerOnLaunch": "false"}
 # Files of the instance that the pack also ships as defaults (the pack's options.txt) and the player owns.
 KEEP = {"options.txt", "servers.dat", "optionsof.txt", "optionsshaders.txt"}
+# Where KubeJS reads Deep Time's rock tags in a game folder (the pack's own path for them).
+TAGS_REL = "kubejs/data/deeptime"
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SSH = "/run/current-system/sw/bin/ssh"
 if not os.path.exists(SSH):
     SSH = "ssh"
@@ -125,6 +140,69 @@ def copy_template_files(root, template_root):
             print(f"   (the template has no {rel})")
 
 
+def default_rock_tags():
+    """The MIC rock-tag datapack: $DEEPTIME_ROCK_TAGS, else Docs/datapacks/deeptime-mic-rock-tags next to the
+    pack (two folders above this checkout, or Ben's usual place when this is an agent worktree), or None."""
+    env = os.environ.get("DEEPTIME_ROCK_TAGS")
+    cands = [env] if env else [os.path.join(REPO, "../../Docs/datapacks/deeptime-mic-rock-tags"),
+                               os.path.expanduser("~/Projects/mic/Docs/datapacks/deeptime-mic-rock-tags")]
+    for c in cands:
+        if os.path.isdir(os.path.join(c, "data", "deeptime")):
+            return os.path.normpath(c)
+    return None
+
+
+def ship_rock_tags(a, inst, stage_cache):
+    """Copies the rock-tag datapack's data/deeptime/ to <inst>/kubejs/data/deeptime unless the stage ships its
+    own files there (stage_cache: the stage's packwiz.json cachedFiles). Only missing or different files are
+    written, nothing is removed. Prints what it did."""
+    if a.no_rock_tags:
+        print("rock tags: skipped (--no-rock-tags)")
+        return
+    own = [e.get("cachedLocation") or k for k, e in stage_cache.items()
+           if (e.get("cachedLocation") or k).startswith(TAGS_REL + "/")]
+    if own:
+        print(f"rock tags: the stage ships its own {len(own)} files in {TAGS_REL}/ (kept as the pack gives them)")
+        return
+    tags = a.rock_tags or default_rock_tags()
+    if not tags or not os.path.isdir(os.path.join(tags, "data", "deeptime")):
+        sys.exit("play-client-apply: no MIC rock-tag datapack (Docs/datapacks/deeptime-mic-rock-tags; --rock-tags DIR, "
+                 "$DEEPTIME_ROCK_TAGS, or --no-rock-tags to skip it knowingly)")
+    src = os.path.join(tags, "data", "deeptime")
+    todo, same = [], 0
+    for root, _, files in os.walk(src):
+        for f in sorted(files):
+            if not f.endswith(".json"):
+                continue
+            path = os.path.join(root, f)
+            dest = os.path.join(inst, TAGS_REL, os.path.relpath(path, src))
+            if os.path.isfile(dest) and filecmp.cmp(path, dest, shallow=False):
+                same += 1
+            else:
+                todo.append((path, dest))
+    print(f"rock tags: {len(todo)} files to copy from {tags}/data/deeptime into {TAGS_REL}/ ({same} already there)")
+    if not a.dry_run:
+        for path, dest in todo:
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            shutil.copyfile(path, dest)
+
+
+def refuse_if_running(inst):
+    ps = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True).stdout
+    if any(inst in line and "java" in line for line in ps.splitlines()):
+        sys.exit("play-client-apply: a Minecraft process has this instance open; close the game first")
+
+
+def run_rock_tags_only(a, inst, stage):
+    if not os.path.isfile(os.path.join(inst, "packwiz.json")):
+        sys.exit(f"play-client-apply: {inst} has no packwiz.json (not the instance's minecraft folder?)")
+    refuse_if_running(inst)
+    with tempfile.TemporaryDirectory(prefix="dt-play-apply-") as tmp:
+        subprocess.run(["rsync", "-e", f"{SSH} -o BatchMode=yes", stage + "packwiz.json", tmp + "/"], check=True)
+        ship_rock_tags(a, inst, cached(os.path.join(tmp, "packwiz.json")))
+    print("done" if not a.dry_run else "dry run: nothing changed")
+
+
 def cached(path):
     with open(path) as f:
         return json.load(f).get("cachedFiles", {})
@@ -150,7 +228,15 @@ def main():
                     help="also install the play folder's deeptime_devmap jar (the internal dev map; opt-in)")
     ap.add_argument("--extra-mod", action="append", default=[], metavar="JAR",
                     help="also copy this local jar into mods/ (repeatable; opt-in)")
+    ap.add_argument("--rock-tags", default=None, metavar="DIR",
+                    help="the MIC rock-tag datapack (default: $DEEPTIME_ROCK_TAGS, else Docs/datapacks/deeptime-mic-rock-tags); "
+                         "its data/deeptime/ is copied into the instance's kubejs/data/deeptime unless the stage ships its own")
+    ap.add_argument("--no-rock-tags", action="store_true", help="do not copy the rock tags")
+    ap.add_argument("--rock-tags-only", action="store_true",
+                    help="only the rock-tag step on an existing instance: no mods mirror, no other pack file, packwiz.json untouched")
     a = ap.parse_args()
+    if a.rock_tags_only and a.no_rock_tags:
+        sys.exit("play-client-apply: --rock-tags-only and --no-rock-tags together do nothing")
     for j in a.extra_mod:
         if not (os.path.isfile(j) and j.endswith(".jar")):
             sys.exit(f"play-client-apply: --extra-mod {j}: not a jar file")
@@ -162,6 +248,11 @@ def main():
     stage = f"{HOST}:/data/ban/play/{a.hash}-client{suffix}/minecraft/"
     play_folder = f"/data/ban/play/{a.hash}{suffix}"
     root = os.path.dirname(inst)
+    if a.rock_tags_only:
+        if not os.path.isdir(inst):
+            sys.exit(f"play-client-apply: --rock-tags-only: no instance at {inst}")
+        run_rock_tags_only(a, inst, stage)
+        return
     if lite and not os.path.exists(root):
         create_lite(a, inst, root, stage, play_folder)
         return
@@ -209,9 +300,7 @@ def create_lite(a, inst, root, stage, play_folder):
 def run_apply(a, inst, stage, play_folder):
     if not os.path.isfile(os.path.join(inst, "packwiz.json")):
         sys.exit(f"play-client-apply: {inst} has no packwiz.json (not the instance's minecraft folder?)")
-    ps = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True).stdout
-    if any(inst in line and "java" in line for line in ps.splitlines()):
-        sys.exit("play-client-apply: a Minecraft process has this instance open; close the game first")
+    refuse_if_running(inst)
 
     with tempfile.TemporaryDirectory(prefix="dt-play-apply-") as tmp:
         subprocess.run(["rsync", "-e", f"{SSH} -o BatchMode=yes", stage + "packwiz.json", tmp + "/"], check=True)
@@ -268,6 +357,7 @@ def run_apply(a, inst, stage, play_folder):
             for loc in remove:
                 os.remove(os.path.join(inst, loc))
             subprocess.run(["rsync", "-e", f"{SSH} -o BatchMode=yes", stage + "packwiz.json", inst + "/"], check=True)
+        ship_rock_tags(a, inst, new)
     print("done" if not a.dry_run else "dry run: nothing changed")
 
 
