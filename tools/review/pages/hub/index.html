@@ -21,26 +21,43 @@
   a.card:hover, a.card:focus-visible { border-color: var(--accent); transform: translateY(-1px); outline: none; }
   .card h3 { margin:0 0 6px; font-size:1.08rem; }
   .card p { margin:0; color:var(--muted); font-size:.94rem; }
-  .tag { display:inline-block; font-size:.75rem; background:var(--pill); border-radius:999px; padding:1px 9px; margin-top:10px; color:var(--muted); }
+  .tag { display:inline-block; font-size:.85rem; background:var(--pill); border-radius:999px; padding:1px 9px; margin-top:10px; color:var(--muted); }
   .soon { opacity:.7; border-style:dashed; }
   footer { margin-top:40px; color:var(--muted); font-size:.85rem; }
   code { font-size:.9em; }
+  .lede a { color: var(--accent); }
+  .rtsim { margin: -12px 0 28px; max-width: 70ch; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+  .rtsim a { color: var(--accent); font-weight: 600; }
 </style>
 </head>
 <body>
 <main>
   <h1>Deep Time</h1>
-  <p class="lede">Every review page built so far, in one place. Deep Time simulates a planet's geologic history in Rust and plays it as a Minecraft world that wraps east–west. All pages are private to you. Updated 2026-09-29.</p>
+  <p class="lede">Every review page built so far, in one place. Deep Time simulates a planet's geologic history in Rust and plays it as a Minecraft world that wraps east-west. All pages are private to you. Updated 2026-10-22.</p>
+  <p class="rtsim">Decisions waiting on you, Deep Time's included, are collected on the <a href="https://spacesheep.dev/@benmac/rtsim-hub#waiting">mic-rtsim hub</a>. Five are open now, all from the volcano page.</p>
+
+  <h2>Newest</h2>
+  <div class="grid">
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-volcanoes"><h3>Volcanoes: realism or us?</h3><p>Why your volcano reads worse than Terralith and Tectonic: mostly fixable bugs, partly the honest cost of scale. Fixes are under way.</p><span class="tag">5 decisions for you</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-seafloor-spikes"><h3>Sea-floor walls</h3><p>Is the spiky sea bed realistic? Measured against ETOPO 2022: the body yes, the tail no. The sea floor now fails to 15 degrees; before and after, with renders.</p><span class="tag">2026-10-20</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p4-c20-review"><h3>C20 and p4s2 compared</h3><p>The shipped 2-Myr plate step and the 4-Myr candidate side by side on full 16k runs, with the chaos twin as the noise floor. C20 stays the default; p4s2 is an opt-in switch.</p><span class="tag">2026-10-20</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-live-map-walk"><h3>Create World walk, live map</h3><p>The Create World walk on the test VM with the live map: two shots 5 s apart between the same keyframes.</p><span class="tag">2026-10-20</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-sim-time"><h3>Full 16k run profile</h3><p>Where the 1,000 Myr full 16k run spends its time on eight cores: every system measured, the core-use timeline, thread scaling and the ranked speed-ups.</p><span class="tag">2026-10-18</span></a>
+  </div>
 
   <h2>How the world wraps</h2>
   <div class="grid">
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-seamless-world"><h3>The seamless world</h3><p>The Petroff-Guyou world in the format, the bake and the game: one quick 16k planet as the new world and as the Lambert world, the layout the wrap engine reads, and the gates.</p><span class="tag">SW-1</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-world-shape"><h3>World shape: Petroff-Guyou or the cube</h3><p>The two candidate maps for the seamless world, worked through for gameplay with real-planet maps and diagrams of what happens round a corner.</p><span class="tag">decided: Petroff-Guyou</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-wrap"><h3>How the wrap works</h3><p>3D planet with the glowing seam, a crossing seen by the server and by your game side by side, two players across the seam, a full lap, the Nether's 1:8 loop.</p><span class="tag">graphics</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-seams"><h3>The seams, in detail</h3><p>Where the seam is, a step-by-step crossing, what F3 and commands do, the poles, Nether and End, and what is verified.</p><span class="tag">checked against Toroidal World's code</span></a>
   </div>
 
   <h2>The simulation</h2>
   <div class="grid">
-    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-mountains"><h3>Mountains, before and after</h3><p>Block-scale mountain character from the simulation: ridgelines, gullies following drainage, cliffs on hard rock, sharp young peaks and rounded old ranges, next to vanilla and Terralith mountains.</p><span class="tag">newest</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p1-26-rain"><h3>Rain, calibrated</h3><p>The upwind moisture budget calibrated to Earth's land rain, against the climate belts and Beck et al.'s observations.</p><span class="tag">P1-26</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-climate-ice"><h3>Climate: the ice branch</h3><p>Flowing ice sheets, supply-limited weathering, how often snowballs happen and the present-day climate setting, measured on three planets.</p><span class="tag">climate</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-mountains"><h3>Mountains, before and after</h3><p>Block-scale mountain character from the simulation: ridgelines, gullies following drainage, cliffs on hard rock, sharp young peaks and rounded old ranges, next to vanilla and Terralith mountains.</p><span class="tag">2026-09-29</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p1-biomes"><h3>Biomes from the climate</h3><p>The simulated climate zones beside the Minecraft biomes they produce on a real planet, standalone and in MIC: deserts in the dry belts, jungle at the equator, taiga and tundra up north.</p><span class="tag">P1-09</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p1-calib"><h3>Recalibrated planet, 500 Myr</h3><p>The whole pipeline with real climate after recalibration: Earth-like heights, climate zones, ice, rock and ore deposits. Starts from scattered continents; a supercontinent run is <span style="white-space:nowrap">linked below</span>.</p><span class="tag">P1-17</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p1-calib-super"><h3>Recalibrated, from a supercontinent</h3><p>The same calibrated pipeline starting from one supercontinent.</p><span class="tag">P1-17</span></a>
@@ -53,6 +70,7 @@
 
   <h2>In the game</h2>
   <div class="grid">
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p1-24"><h3>Faster Create World</h3><p>What each faster quick-mode candidate costs in planet quality, on a mid-range PC profile.</p><span class="tag">P1-24</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p1-editor"><h3>Create World editor</h3><p>Real-client screenshots: setup page, history timelapse (map and globe), review, Accept, and the world it makes. Presets are still placeholders.</p><span class="tag">P1-11</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p0-bluemap"><h3>3D render on MIC blocks</h3><p>A BlueMap render of a Deep Time world generated by a real MIC server.</p><span class="tag">P0-14</span></a>
   </div>
@@ -63,12 +81,6 @@
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-q10-map-plain"><h3>Q10 map: without EV</h3><p>BlueMap of three deposit sites in MIC, surface and cut views.</p><span class="tag">linked from Q10</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-q10-map-ev"><h3>Q10 map: with EV</h3><p>The same sites with Excavated Variants and the bridge fix.</p><span class="tag">linked from Q10</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-phase0"><h3>Phase 0 exit</h3><p>Every Phase 0 check with its evidence: terrain, water, seams, Sable ships, MIC servers at 16k and 32k, natives on 8 platforms.</p><span class="tag">11 / 11 passed</span></a>
-  </div>
-
-  <h2>Coming</h2>
-  <div class="grid">
-    <div class="card soon"><h3>Workbench on the Mac</h3><p>Editor controls in the browser, live runs with pause, rewind and speed, side-by-side runs, then click-to-inspect and a 3D block preview of any area. Served from the Mac on your tailnet.</p><span class="tag">P1-20 · in progress</span></div>
-    <div class="card soon"><h3>Climate</h3><p>Köppen, temperature and precipitation through time.</p><span class="tag">P1-05 · in progress</span></div>
   </div>
 
   <footer>Source: <code>tools/review/pages/hub/</code> in the Deep Time repo; the page list is <code>tools/review/spaces.json</code> and STATUS.md's "Review pages".</footer>
