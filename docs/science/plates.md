@@ -3699,7 +3699,7 @@ crossing's parts as crust-budget globals, PLT-400's switch), `plates/mod.rs`,
 are off in the default and every built-in preset, so the planets are the same bit for bit.
 
 Measured on `earthlike_quick_16k`, 1000 Myr, seeds 1 to 6, both starts (12 runs per arm), with the
-crust budget on (`DEEPTIME_CRUST_BUDGET=1`): the flux over the whole run, the criteria on the final
+crust budget on (`DEEPTIME_CRUST_BUDGET=1`): the flux over the whole run (`tools/review/loss-budget.py`), the criteria on the final
 frame (`tools/review/continents_census.py fields`) and the plate checks of each run. Each value is
 the median of the 12 runs; p is a two-sided Mann-Whitney U test on the runs against the base. The
 base is master 49492ce3 as it runs (this branch with both switches off). The build log entry of
@@ -3798,7 +3798,31 @@ Medians of 12 runs (p against the base):
 
 ### PLT-371's reversal on top
 
-@@REV_TEXT@@
+PLT-371 (the plate-geometry task's reversal judged by the crust the arc stands on, now the switch
+`reversal_by_arc_crust`) on top of PLT-400, arm rsrev. Against the base:
+
+- the collisions go from 1.60 to 2.00 per 100 Myr at the median (p = 0.09); 7 of 12 runs reach 2,
+  against 3 of 12. Pooled over the runs the plate check passes (2.00 on the scattered start, 2.18
+  on the supercontinent), where the base fails at 1.69;
+- the collision states a reversal ended (the plate check's `partings_reversed_per_100myr`) fall from
+  8.4 to 5.2 per 100 Myr (p < 0.001);
+- the land holds: 0.257 to 0.270 (p = 0.93), the largest landmass 0.133 to 0.132, continental crust
+  under the sea 0.348 to 0.375 (p = 0.73), above 2 km 0.277 to 0.273, coast with high ground 0.381
+  to 0.370, under ice 0.172 to 0.176;
+- the fronts' loss is the same (2.33 to 2.31 km³ a year), on a longer front in collision (28,800 to
+  31,800 km, p = 0.08).
+
+Against rs (PLT-400 alone) it puts back what PLT-400 moved: land 0.250 to 0.270 (p = 0.39), the
+largest landmass 0.102 to 0.132 (p = 0.29), above 2 km 0.207 to 0.273 (p = 0.06), coast with high
+ground 0.329 to 0.370 (p = 0.06); the collisions last longer (the plate check's median length 40 to
+49 Myr, p = 0.05). The plate-geometry task's loss of land (0.264 to 0.208 on seeds 1 to 3) was
+PLT-371 alone on master c790d1f3; on seeds 1 to 3 here, with PLT-400, the land goes 0.269 to 0.258
+(mean of six), inside the runs' spread.
+
+So PLT-371 lifts the collisions to the bottom of their target without losing land, and moves
+neither the high ground, the ice nor the drowning. Both switches stay off on this branch (the
+planets the same bit for bit, no test changed); switching PLT-400 and PLT-371 on together is
+recommended, and is the coordinator's call, since it changes every planet.
 
 ### What is left, and for whom
 
