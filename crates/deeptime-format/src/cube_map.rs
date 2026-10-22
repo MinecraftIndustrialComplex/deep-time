@@ -101,7 +101,7 @@ struct Grid {
 
 /// The Catmull-Rom weights of four nodes p0 .. p3 at t ∈ [0, 1] (the cubic through p1 at t = 0
 /// and p2 at t = 1, slopes (p2 − p0)/2 and (p3 − p1)/2): exactly (0, 1, 0, 0) at t = 0 and
-/// (0, 0, 1, 0) at t = 1, so the bicubic is exact at its nodes.
+/// (0, 0, 1, 0) at t = 1, so the bicubic is exact at its nodes (ledger: SCL-105).
 #[inline(always)]
 fn weights(t: f64) -> [f64; 4] {
     let t2 = t * t;
@@ -527,7 +527,7 @@ impl CubeMap {
             return fv;
         }
         let c = val(self);
-        let s = w * w * (3.0 - 2.0 * w);
+        let s = w * w * (3.0 - 2.0 * w); // ledger: SCL-106
         [c[0] + s * (fv[0] - c[0]), c[1] + s * (fv[1] - c[1])]
     }
 
@@ -552,7 +552,7 @@ impl CubeMap {
             return fe;
         }
         let ce = coarse(self);
-        let s = w * w * (3.0 - 2.0 * w);
+        let s = w * w * (3.0 - 2.0 * w); // ledger: SCL-106
         let ds = 6.0 * w * (1.0 - w) * self.mf;
         let blend = |c: f64, f: f64| c + s * (f - c);
         Eval {
@@ -724,7 +724,8 @@ impl CubeMap {
     }
 }
 
-/// The ghosts beyond u = 1 and v = 1 and past the corner (cube_map.py `padded`, in its order).
+/// The ghosts beyond u = 1 and v = 1 and past the corner (cube_map.py `padded`, in its order;
+/// ledger: SCL-105).
 fn pad_edge_and_corner(g: &mut Grid, m: isize) {
     // Beyond u = 1 (j < m): the mirror of node (m − 1, j) across the edge's plane.
     for j in 0..m {
@@ -791,7 +792,7 @@ impl CubeWorld {
     /// block: the planet's radius in metres is m_per_block_h × [`Cube::radius`] (the six faces'
     /// area is the sphere's).
     pub fn new(cube: Cube, map: Arc<CubeMap>, turn: CubeTurn, m_per_block_h: f64) -> CubeWorld {
-        let radius_m = m_per_block_h * cube.radius();
+        let radius_m = m_per_block_h * cube.radius(); // ledger: SCL-107
         CubeWorld {
             cube,
             map,
