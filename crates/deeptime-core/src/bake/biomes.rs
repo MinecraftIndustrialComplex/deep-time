@@ -95,16 +95,6 @@
 //! variants such as the cherry grove, except a fifth of them at low |weirdness|, where vanilla's ice
 //! spikes are. PV stays above the valley slice: no river biomes
 //! until rivers exist (Phase 2).
-//!
-//! **Snowy peaks and slopes only where it is cold** (BIO-180, BIO-181; Ben's issue of 2026-10-22,
-//! frozen peaks and snowy slopes in Csb and BSk): vanilla's builder draws frozen or jagged peaks,
-//! snowy slopes and groves wherever high, rough ground (erosion E0 or E1, high weirdness) meets
-//! temperature bands 0 to 2, which takes in temperate and continental land. Land that is not cold
-//! (its warmest month, at the cell's own height, 10 °C or more, and not under ice) is moved off those
-//! slots ([`snowy_slot`]): its erosion goes up to the middle of E2, where vanilla draws its middle and
-//! plateau biomes at the cell's own temperature and humidity (meadow, forest, taiga on the plateaus).
-//! A class's own erosion limit still holds. Land whose warmest month at its own height is below
-//! 10 °C (Köppen's polar line, so the E classes and the coldest dry ones), or under ice, keeps them.
 
 use std::sync::OnceLock;
 
@@ -140,61 +130,6 @@ pub const WETLAND_SWAMP: u8 = 1;
 /// `climate/wetland`: cold wetland (boreal peatland): the climate's ordinary biome (taiga in vanilla),
 /// and the pack's peatland biome where it has one (the game swaps it in).
 pub const WETLAND_COLD: u8 = 2;
-
-/// Only a cold climate keeps vanilla's snowy peaks and slopes: its warmest month, at the cell's own
-/// height, is below this (Köppen's E, polar, on the cell's lapsed months), or it is under ice. ledger:
-/// BIO-002, BIO-180
-const COLD_WARMEST_C: f64 = 10.0;
-/// Where other land is moved off a snowy slot: the middle of erosion band E2 (a band coordinate),
-/// where vanilla draws its middle and plateau biomes. ledger: BIO-181 (game-choice)
-const WARM_SLOT_EROSION_BAND: f64 = 2.5;
-
-/// Whether vanilla's builder (1.21.1 `OverworldBiomeBuilder`: `addPeaks`, `addHighSlice`,
-/// `addMidSlice`, `addLowSlice`) draws a snowy biome at these parameter values: frozen or jagged
-/// peaks in a peak slot at temperature bands 0 to 2, snowy slopes or a grove in a slope slot at
-/// bands 0 to 2, the slope of a "slope if cold" slot at band 0. Weirdness is read as |w| (Deep
-/// Time's stays below the peak slice's end). ledger: BIO-180
-pub fn snowy_slot(b: &Bands, t: f32, c: f32, e: f32, w: f32) -> bool {
-    let idx = |edges: &[f64], v: f32| {
-        (band_coord(edges, f64::from(v)).floor().max(0.0) as usize).min(edges.len() - 2)
-    };
-    let (ti, ci, ei, wi) = (
-        idx(&b.temperature, t),
-        idx(&b.continents, c),
-        idx(&b.erosion, e),
-        idx(&b.weirdness, w.abs()),
-    );
-    // Continentalness 3 coast, 4 near, 5 mid, 6 far inland; weirdness 1 low, 2 mid, 3 high, 4 peaks.
-    if ci < 3 || ei > 1 {
-        return false;
-    }
-    #[derive(PartialEq)]
-    enum Slot {
-        Peak,
-        Slope,
-        SlopeIfCold,
-        Other,
-    }
-    let slot = match (wi, ei, ci) {
-        (4, 0, _) => Slot::Peak,
-        (4, 1, 3 | 4) => Slot::SlopeIfCold,
-        (4, 1, _) => Slot::Peak,
-        (3, 0, 4) => Slot::Slope,
-        (3, 0, 5 | 6) => Slot::Peak,
-        (3, 1, 4) => Slot::SlopeIfCold,
-        (3, 1, 5 | 6) => Slot::Slope,
-        (2, 0, 4..=6) => Slot::Slope,
-        // Near and mid inland "slope if cold"; far inland "a slope at band 0, else plateau".
-        (2, 1, 4..=6) => Slot::SlopeIfCold,
-        (1, _, 5 | 6) => Slot::SlopeIfCold,
-        _ => Slot::Other,
-    };
-    match slot {
-        Slot::Peak | Slot::Slope => ti <= 2,
-        Slot::SlopeIfCold => ti == 0,
-        Slot::Other => false,
-    }
-}
 
 /// The preset's `biomes` section: the knobs of the mapping (every key optional).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -828,10 +763,6 @@ struct Coords {
     /// largest |weirdness| they take ([`NO_CAP`] = none); NaN / [`NO_CAP`] otherwise.
     w_noise: Vec<f32>,
     w_cap: Vec<f32>,
-    /// 1 where the climate is cold (warmest month below [`COLD_WARMEST_C`], or ice), 0 where it is
-    /// not: only cold land keeps vanilla's snowy peaks and slopes (BIO-180). Nearest-filled across
-    /// the sea.
-    cold: Vec<f32>,
     by_class: Value,
 }
 
@@ -856,7 +787,6 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     let mut w_thr = vec![f32::NAN; n];
     let mut w_noise = vec![1.0f32; n];
     let mut w_cap = vec![NO_CAP; n];
-    let mut cold = vec![f32::NAN; n];
     let mut land = vec![false; n];
     let mut stats = [(0u64, 0f64, 0f64); 32];
     for k in 0..n {
@@ -876,7 +806,6 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         let tc = at(c.t_cold, k).unwrap_or(tm - 8.0);
         let ai = at(c.aridity, k).unwrap_or(1.0);
         let glacier = at(c.glacier, k).is_some_and(|g| g >= 0.5);
-        cold[k] = f32::from(u8::from(tw < COLD_WARMEST_C || glacier));
         // L1 has no ground height here: a class rule on height_m does not hold on this path.
         let site = Site {
             abs_lat_deg: l1.band_lat_deg((k / w) as u32).abs(),
@@ -941,9 +870,6 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
     if !fill_nearest(&mut t_sea, &sea, w, h) {
         t_sea = t_land.clone();
     }
-    if !fill_nearest(&mut cold, &land, w, h) {
-        cold = vec![1.0; n];
-    }
     let by_class: serde_json::Map<String, Value> = stats
         .iter()
         .enumerate()
@@ -973,7 +899,6 @@ fn coords(c: &Climate<'_>, l1: &GridDesc, placement: &Placement) -> Coords {
         w_thr,
         w_noise,
         w_cap,
-        cold,
         by_class: Value::Object(by_class),
     }
 }
@@ -1015,7 +940,6 @@ fn coords_l2(
         c: (f32, f32),
         rule: Option<usize>,
         w: (f32, f32, f32),
-        cold: f32,
         th: f64,
         hu: f64,
     }
@@ -1042,7 +966,6 @@ fn coords_l2(
                             c: (-2.0, 2.0),
                             rule: None,
                             w: (f32::NAN, 1.0, NO_CAP),
-                            cold: f32::NAN,
                             th: 0.0,
                             hu: 0.0,
                         };
@@ -1115,8 +1038,6 @@ fn coords_l2(
                         ),
                         rule: placed.rule,
                         w: (thr, wn, wc),
-                        // At the cell's own height, as its class.
-                        cold: f32::from(u8::from(tw < COLD_WARMEST_C || glacier)),
                         th,
                         hu,
                     }
@@ -1138,7 +1059,6 @@ fn coords_l2(
         w_thr: Vec::with_capacity(n),
         w_noise: Vec::with_capacity(n),
         w_cap: Vec::with_capacity(n),
-        cold: Vec::with_capacity(n),
         by_class: Value::Null,
     };
     let mut class = Vec::with_capacity(n);
@@ -1173,7 +1093,6 @@ fn coords_l2(
             co.w_thr.push(x.w.0);
             co.w_noise.push(x.w.1);
             co.w_cap.push(x.w.2);
-            co.cold.push(x.cold);
         }
     }
     if !fill_nearest(&mut co.h_land, land, w, h) {
@@ -1433,15 +1352,12 @@ pub fn map(
     // Empty: no continentalness limits (the default table), else filled per L2 cell below.
     let mut c_lo = Vec::new();
     let mut c_hi = Vec::new();
-    // Empty without a climate: nothing is moved off the snowy slots then.
-    let mut cold: Vec<f32> = Vec::new();
     let (t_land, h_land, (h_wet, class), t_sea, (e_lo, e_hi, w_thr, w_noise, w_cap), by_class) =
         match climate {
             Some(c) if c.months.is_some() => {
                 let mo = c.months.as_ref().expect("checked");
-                let (mut co, cl) = coords_l2(c, mo, g, &land, placement);
+                let (co, cl) = coords_l2(c, mo, g, &land, placement);
                 class_l2 = cl;
-                cold = std::mem::take(&mut co.cold);
                 (c_lo, c_hi, rule_cells) = (co.c_lo, co.c_hi, co.rule_cells);
                 (
                     co.t_land,
@@ -1453,7 +1369,7 @@ pub fn map(
                 )
             }
             Some(c) => {
-                let mut co = coords(c, g.l1, placement);
+                let co = coords(c, g.l1, placement);
                 let up = |v: Vec<f32>| {
                     super::resample(
                         &Field {
@@ -1478,7 +1394,6 @@ pub fn map(
                 if !co.c_lo.is_empty() {
                     (c_lo, c_hi) = (near(co.c_lo), near(co.c_hi));
                 }
-                cold = near(std::mem::take(&mut co.cold));
                 rule_cells = co.rule_cells;
                 (
                     up(co.t_land),
@@ -1664,36 +1579,6 @@ pub fn map(
         }
     });
 
-    // Snowy slots (BIO-180): land whose climate is not cold at its own height is moved off vanilla's
-    // frozen and jagged peaks, snowy slopes and groves. Its erosion goes up to the middle of E2,
-    // where vanilla draws its middle and plateau biomes at the cell's own temperature and humidity
-    // (BIO-181); the class's erosion limit still holds (a class held below E2 stays where it is).
-    // The ridges are kept: a moved cell is high ground, which keeps the positive branch.
-    let mut warm_moved = 0u64;
-    let mut warm_by_class = [0u64; 32];
-    let mut warm_held = 0u64;
-    if !cold.is_empty() {
-        let to = band_value(&bands.erosion, WARM_SLOT_EROSION_BAND) as f32;
-        for k in 0..n {
-            if !land[k] || cold[k] != 0.0 {
-                continue;
-            }
-            if !snowy_slot(bands, temperature[k], continents[k], erosion[k], ridges[k]) {
-                continue;
-            }
-            let e = to.max(erosion[k]).min(e_hi[k].max(e_lo[k]));
-            if snowy_slot(bands, temperature[k], continents[k], e, ridges[k]) {
-                warm_held += 1;
-                continue;
-            }
-            erosion[k] = e;
-            warm_moved += 1;
-            if class[k].is_finite() {
-                warm_by_class[(class[k] as usize).min(31)] += 1;
-            }
-        }
-    }
-
     let land_cells = land.iter().filter(|&&l| l).count();
     let note = json!({
         "mapping": MAPPING,
@@ -1717,12 +1602,6 @@ pub fn map(
         "wetland_cells_by_class": by_class_map(&wet_by_class),
         "cold_wetland_cells": cold_cells,
         "cold_wetland_cells_by_class": by_class_map(&cold_by_class),
-        "warm_snowy_slots": {
-            "rule": "land whose warmest month at its own height is 10 C or more and not under ice moves off vanilla's snowy peak and slope slots to erosion band 2.5 (BIO-180, BIO-181)",
-            "moved_cells": warm_moved,
-            "moved_cells_by_class": by_class_map(&warm_by_class),
-            "held_by_class_limit_cells": warm_held,
-        },
         "land_cells_l2": land_cells,
         "land_shares": {
             "temperature": shares(&temperature, &land, &bands.temperature, false),
@@ -2997,115 +2876,6 @@ mod tests {
         assert_eq!(s2.to_land, vec![k as u32]);
         let band = band_coord(&r.bands.continents, f64::from(c2.continents[k]));
         assert!((5.0..6.0).contains(&band), "mid to far inland, band {band}");
-    }
-
-    /// The snowy slots of vanilla 1.21.1's builder (`addPeaks`, `addHighSlice`, `addMidSlice`,
-    /// `addLowSlice`; BIO-180), at band centres.
-    #[test]
-    fn snowy_slots_follow_vanilla_s_builder() {
-        let b = &reference().bands;
-        let at = |edges: &[f64], band: usize| band_value(edges, band as f64 + 0.5) as f32;
-        // (temperature band, continentalness band, erosion band, weirdness band) -> snowy?
-        let slot = |t: usize, c: usize, e: usize, w: usize| {
-            let w = at(&b.weirdness, w);
-            let one = snowy_slot(
-                b,
-                at(&b.temperature, t),
-                at(&b.continents, c),
-                at(&b.erosion, e),
-                w,
-            );
-            // The sign of the weirdness does not matter.
-            assert_eq!(
-                one,
-                snowy_slot(
-                    b,
-                    at(&b.temperature, t),
-                    at(&b.continents, c),
-                    at(&b.erosion, e),
-                    -w
-                )
-            );
-            one
-        };
-        // Peaks: E0 is a peak from the coast inland, frozen or jagged at bands 0 to 2, stony at 3.
-        for c in 3..7 {
-            assert!(slot(2, c, 0, 4) && !slot(3, c, 0, 4), "peak slice E0, c {c}");
-        }
-        // E1 near the coast is a slope only at band 0; mid and far inland a peak.
-        assert!(slot(0, 4, 1, 4) && !slot(1, 4, 1, 4));
-        assert!(slot(2, 5, 1, 4) && !slot(3, 6, 1, 4));
-        // High: the coast is a middle biome; near inland E0 a slope; mid inland E1 a slope.
-        assert!(!slot(0, 3, 0, 3));
-        assert!(slot(1, 4, 0, 3) && !slot(3, 4, 0, 3));
-        assert!(slot(2, 5, 1, 3));
-        assert!(slot(0, 4, 1, 3) && !slot(1, 4, 1, 3));
-        // Mid: E0 inland a slope; E1 far inland a slope at band 0, else a plateau.
-        assert!(slot(2, 4, 0, 2) && !slot(0, 3, 0, 2));
-        assert!(slot(0, 6, 1, 2) && !slot(1, 6, 1, 2));
-        // Low: mid and far inland a slope at band 0; near inland a middle biome.
-        assert!(slot(0, 5, 0, 1) && !slot(1, 5, 0, 1) && !slot(0, 4, 0, 1));
-        // Valleys, E2 and above, the sea: never.
-        for t in 0..5 {
-            for c in 0..7 {
-                assert!(!slot(t, c, 0, 0), "valley t {t} c {c}");
-                for e in 2..7 {
-                    for w in 0..5 {
-                        assert!(!slot(t, c, e, w), "t {t} c {c} e {e} w {w}");
-                    }
-                }
-                if c < 3 {
-                    for w in 0..5 {
-                        assert!(!slot(t, c, 0, w), "sea t {t} c {c} w {w}");
-                    }
-                }
-            }
-        }
-    }
-
-    /// Ben's issue of 2026-10-22 (snowy peaks in mild climates; BIO-180, BIO-181): land whose
-    /// warmest month is 10 °C or more leaves vanilla's snowy slots for erosion E2; the polar
-    /// classes keep them. The fixture's Dfc quarter (warmest month 16 °C) has a 1.5 km ridge.
-    #[test]
-    fn warm_land_leaves_the_snowy_slots_and_cold_land_keeps_them() {
-        let b = &reference().bands;
-        let (m, w2) = fixture(&BiomeParams::default(), placement::builtin());
-        let [t, _, c, e, wr] = &m.layers;
-        let snowy = |k: usize| snowy_slot(b, t[k], c[k], e[k], wr[k]);
-        let (mut warm, mut cold) = (0usize, 0usize);
-        for k in (16 * w2)..(48 * w2) {
-            match (k % w2) * 4 / w2 {
-                0..=2 => warm += usize::from(snowy(k)),
-                _ => cold += usize::from(snowy(k)),
-            }
-        }
-        assert_eq!(warm, 0, "warm land on a snowy slot");
-        assert!(cold > 0, "the ET ridge keeps its snowy slots");
-        let note = &m.note["warm_snowy_slots"];
-        assert!(note["moved_cells_by_class"]["Dfc"].as_u64().unwrap() > 0);
-        assert!(note["moved_cells_by_class"].get("ET").is_none());
-        // A moved cell sits in E2.
-        let e2 = band_value(&b.erosion, WARM_SLOT_EROSION_BAND) as f32;
-        assert!(e.iter().filter(|&&v| v == e2).count() > 0);
-    }
-
-    /// A class's erosion limit still holds: a Dfc held in E0 stays there, on its snowy slots.
-    #[test]
-    fn a_class_held_below_e2_keeps_its_slots() {
-        let mut v: serde_json::Value = serde_json::from_str(placement::PLACEMENT_JSON).unwrap();
-        v["classes"]["Dfc"]["erosion"] = json!({"max": -0.9});
-        let table = Placement::from_value(&v).unwrap();
-        let (m, w2) = fixture(&BiomeParams::default(), &table);
-        let note = &m.note["warm_snowy_slots"];
-        assert!(note["held_by_class_limit_cells"].as_u64().unwrap() > 0);
-        assert!(note["moved_cells_by_class"].get("Dfc").is_none());
-        // Inside the quarter (its edge cells may read the neighbour's limit).
-        for j in 16..48 {
-            for i in (w2 / 2 + 2)..(3 * w2 / 4 - 2) {
-                let e = m.layers[3][j * w2 + i];
-                assert!(e <= -0.9, "Dfc erosion {e} at ({i}, {j})");
-            }
-        }
     }
 
     #[test]
