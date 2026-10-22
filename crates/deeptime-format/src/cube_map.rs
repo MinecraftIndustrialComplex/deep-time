@@ -429,6 +429,12 @@ impl CubeMap {
         [BUILTIN[0].0, BUILTIN[1].0]
     }
 
+    /// A shipped table's file bytes, by name (what the viewer's bundles write beside
+    /// projection.js, and what [`CubeMap::builtin`] loads).
+    pub fn builtin_bytes(name: &str) -> Option<&'static [u8]> {
+        BUILTIN.iter().find(|b| b.0 == name).map(|b| b.1)
+    }
+
     /// A table that ships with the crate, by name ([`WORLD_MAP`], [`SIMULATION_MAP`]), loaded once
     /// and checked against its `.sha256` file. `None` for another name.
     pub fn builtin(name: &str) -> Option<Arc<CubeMap>> {
