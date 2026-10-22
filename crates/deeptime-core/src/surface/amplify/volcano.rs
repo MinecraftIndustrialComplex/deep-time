@@ -137,9 +137,11 @@ impl Shaper {
                 });
                 let rem = table(reach, |rho| removed * coarse.at(rho) / e0);
                 let is_caldera = s.depression.is_some_and(|d| d.caldera);
+                // A crater's depth is absolute (240 m, at most 0.37 of the kept cone: VOL-026,
+                // VOL-090), faded with the crater's clock once dead.
                 let l3 = table(reach, |rho| {
-                    let bowl = if is_caldera { 0.0 } else { s.bowl(rho) };
-                    at * sharp * (body(rho) - fine.at(rho)) - bowl * at * dep
+                    let bowl = if is_caldera { 0.0 } else { s.bowl_m(rho, at) };
+                    at * sharp * (body(rho) - fine.at(rho)) - bowl * dep
                 });
                 // A caldera's floor: flat, its depth below the mean level of its rim, the rim read
                 // from the young landscape with the young-grid change (the same for every tile).
@@ -155,7 +157,7 @@ impl Shaper {
                     }
                     let rim = sum / 32.0;
                     let h = (v.id as f64 * 0.618_033_988_7).fract() * std::f64::consts::TAU;
-                    Some((d.rho, rim - d.depth * at * sharp, h, 2.3 * h + 1.0))
+                    Some((d.rho, rim - s.depression_depth_m(at) * sharp, h, 2.3 * h + 1.0))
                 });
                 Item {
                     x: v.x,
@@ -579,6 +581,33 @@ mod tests {
             "crater floor {centre} not below the rim {rim}"
         );
         assert!(rim > 0.0, "the sharp summit adds height");
+    }
+
+    #[test]
+    fn a_crater_is_cut_earths_median_below_its_rim_on_a_tall_and_a_low_cone() {
+        // The last-grid table at the vent less the table at the rim: the crater's depth (the body
+        // is flat inside the rim, so only the bowl and the blur's small difference remain).
+        for h in [2500.0, 1200.0] {
+            let mut v = strato(0.0, 0.0, None);
+            v.height_m = h;
+            v.target_m = h;
+            let (world, preset) = world_with(vec![v]);
+            let sh = Shaper::from_world(&world, &preset).unwrap();
+            let it = &sh.items[0];
+            let rc = 0.05;
+            let depth = it.l3.at(rc) - it.l3.at(0.0);
+            assert!(
+                (238.0..260.0).contains(&depth),
+                "a {h}-m cone's crater is {depth} m deep"
+            );
+        }
+        // A dead one's crater fades on the crater's clock (fade_myr 5): after 5 Myr, 1/e of it.
+        let (world, preset) = world_with(vec![strato(0.0, 0.0, Some(-5.0))]);
+        let sh = Shaper::from_world(&world, &preset).unwrap();
+        let it = &sh.items[0];
+        let depth = it.l3.at(0.05) - it.l3.at(0.0);
+        let want = 240.0 / std::f64::consts::E;
+        assert!((depth - want).abs() < 15.0, "{depth} vs {want}");
     }
 
     #[test]
