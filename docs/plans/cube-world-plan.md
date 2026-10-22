@@ -21,6 +21,34 @@ with the world, and the climate grid uses the same cube map.
 - Fix 6 (D1, volcanoes drawn round) is dropped if the chosen map draws shapes true or nearly so.
 - The D5 multiplayer world goes ahead on Petroff-Guyou, and another fresh world comes with the cube.
 
+**Revision, 2026-10-22: the study's pick** (`docs/research/notes/mountains-and-the-projection.md`
+§5, merged c6a20ce8; taken as the coordinator's call until Ben answers, see section 8's Q4). Where
+this block and the text below disagree, this block wins:
+
+- **The world: the conformal cube (τ = 0), turned freely.** Shapes on land are true (stretch at most
+  1.02). Land is drawn 0.79 to 1.92 times its true area on the worst of 15 planets. The corners lie
+  5.28° to 9.57° out at sea. Fix 6 (D1) is dropped.
+- **The simulation: its own cube, the equal-area Moser map (τ = 1) on the polar axis.** The
+  simulation's corners cannot be kept at sea, because continents cross every point in 1,000 Myr. On
+  the conformal map a corner cell at n = 240 has 0.044 of the mean area (§1.6's "0.16" is a length
+  ratio), so explicit steps would be 31 times shorter. Moser's corner cell is 0.91 of the mean. The
+  bake composes world block, face (u, v), conformal map, the rotation, the Moser inverse, and then
+  the simulation cell.
+- **B3 is replaced by the study's §5.4.** A free rotation search (seeded random rotations, then a
+  shrinking refinement) maximises the smallest signed distance from the 8 corners to land. The cube's
+  24 symmetries then fix the rotation, with the north pole in face N and the most land on F0. The
+  manifest carries the rotation as a 3 × 3 matrix in place of `lambda0_deg`. The poles are no longer
+  at the face centres: latitude does not run along the net, and -z is not north. The fallback is a
+  tilt limit (pole at most 30° from face N's centre: land × 2.05, corners 4.58° out at worst).
+- **Phase 0 commits two tables**, the conformal table for the world and the Moser table for the
+  simulation, with the conformal corner cells handled (study §5.2: the map behaves like a 4/3 power
+  there, and the bicubic may fold).
+- **Metres to blocks uses the local σ everywhere.** Land runs from 213 to 331 m per block on the
+  worst planet, and the median is about 310 m per block at s = 3,840. The face size stays.
+- **Detail noise** is sampled at the world block, not the planet point (study §6). The seamless
+  projection survey's line 249 says otherwise and is wrong. G3 picks either a partition of unity
+  across turning seams or 3D noise at the planet point.
+
 **How to read this plan.** Each work item has an id (W, M, B, S, G, T, E, D) and a "Check" line,
 the acceptance check that closes it. Section 7 orders the items into phases and lanes, and section 8
 holds the questions only Ben can answer. Nothing here estimates how long anything takes: scope is
@@ -429,7 +457,8 @@ a trait, so both sources work.
 
   Check: on a synthetic checkerboard planet at the simulation's resolution, the world shows no
   aliasing beats (the spectral peak beyond the world cell's Nyquist is below 1% of the input's).
-- **B3. The corner search.** It replaces `choose_lambda_c` (SCL-087).
+- **B3. The corner search** (superseded by the study's §5.4, a free rotation: see the revision block
+  at the top). It replaces `choose_lambda_c` (SCL-087).
   - The axis stays, so the band stays on the equator and the poles stay at the face centres. That
     is the coordinator's call: it keeps latitude and the net aligned.
   - It searches λ0 in 0.25° steps over 90°. The corner set repeats every 90°.
@@ -541,7 +570,8 @@ What exists today:
   - diffusion 1.0 to 1.3 times;
   - a true-metric conjugate gradient needed 138 iterations against 785.
 
-**One map, two cubes.** Following the 2026-10-22 log, the simulation's faces use the same map as
+**One map, two cubes** (superseded: see the revision block at the top; the simulation takes Moser on the
+polar axis, the world the conformal map turned freely). Following the 2026-10-22 log, the simulation's faces use the same map as
 the world, from the same table.
 
 The solvers get their metric from the cells' corner points on the sphere (finite volume, the Putman
@@ -1146,6 +1176,17 @@ coordinator's call.
    - (a) **Recommended.** After V1 ships on borders: every point is reachable without it.
    - (b) Now, in parallel with V1.
    - (c) After the public release.
+
+4. **The map and the turn (asked because it moves the poles off the face centres).**
+   - (a) **Recommended (the study).** The conformal cube turned freely: shapes true, land × 1.92 at
+     worst, corners 5.3° or more out at sea. North turns across the world and the band faces do not
+     hold the equator.
+   - (b) The conformal cube with the pole within 30° of face N's centre: land × 2.05 at worst, north
+     near -z on the polar face.
+   - (c) The equal-area Moser cube on the polar axis: areas exact, poles at the face centres,
+     mountains stretched 1.26 times one way (median, up to 1.42), fix 6 kept.
+
+   In every case the simulation runs on its own Moser cube on the polar axis.
 
 ## 9. Sources
 
