@@ -121,8 +121,8 @@ fn measure(w: &ColumnWorld, v: &Entry, m_per_rad: f64, mv: f64, sea_y: f64) -> O
     // Simulation-frame metres of world point (x, z) from the vent.
     let frame = |x: f64, z: f64| -> (f64, f64) {
         let u = proj.unit(x, z);
-        let dl = (u[1].atan2(u[0]) - lon0 + std::f64::consts::PI).rem_euclid(tau)
-            - std::f64::consts::PI;
+        let dl =
+            (u[1].atan2(u[0]) - lon0 + std::f64::consts::PI).rem_euclid(tau) - std::f64::consts::PI;
         (m_per_rad * dl, -m_per_rad * (u[2] - u0[2]))
     };
     // The box: the smallest scale of the local Jacobian reaches past the ring.

@@ -151,14 +151,7 @@ impl Shaper {
                         let th = std::f64::consts::TAU * f64::from(k) / 32.0;
                         let bx = frame.wrap_x(v.x + rim_m * th.cos() / mh);
                         let z = sample(f, bx, v.z + rim_m * th.sin() / mh);
-                        sum += onlap(
-                            z,
-                            d.rho,
-                            tp.at(d.rho),
-                            rem.at(d.rho),
-                            at,
-                            vent_ground,
-                        );
+                        sum += onlap(z, d.rho, tp.at(d.rho), rem.at(d.rho), at, vent_ground);
                     }
                     let rim = sum / 32.0;
                     let h = (v.id as f64 * 0.618_033_988_7).fract() * std::f64::consts::TAU;
@@ -544,9 +537,16 @@ mod tests {
         };
         let it = &sh.items[0];
         let mh = preset.scale.m_per_block_h;
-        vol::for_cells(&g2, mh, it.x, it.z, it.rem.reach() * it.radius_m, |c, dx, dz| {
-            level.z[c] += it.rem.at(dx.hypot(dz) / it.radius_m) as f32;
-        });
+        vol::for_cells(
+            &g2,
+            mh,
+            it.x,
+            it.z,
+            it.rem.reach() * it.radius_m,
+            |c, dx, dz| {
+                level.z[c] += it.rem.at(dx.hypot(dz) / it.radius_m) as f32;
+            },
+        );
         let before = level.z.clone();
         assert!(sh.sharpen_level(&mut level, &g2) > 0);
         let at = |g: &GridDesc, z: &[f32], bx: f64, bz: f64| {
@@ -630,9 +630,10 @@ mod tests {
                 young.data[c] = (base + h * coarse.at(xm.hypot(zm) / r)) as f32;
             }
         }
-        world
-            .fields
-            .insert(crate::surface::young::field::ELEVATION_M.to_owned(), young.clone());
+        world.fields.insert(
+            crate::surface::young::field::ELEVATION_M.to_owned(),
+            young.clone(),
+        );
         let sh = Shaper::from_world(&world, &preset).unwrap();
         let n = g2.cells();
         let mut level = Level {
@@ -657,16 +658,30 @@ mod tests {
             if level.z[c] > best.0 {
                 best = (level.z[c], c, rho);
             }
-            let old = onlap(f64::from(young.data[c]), rho, it.tp.at(rho), it.rem.at(rho), it.at, None);
+            let old = onlap(
+                f64::from(young.data[c]),
+                rho,
+                it.tp.at(rho),
+                it.rem.at(rho),
+                it.at,
+                None,
+            );
             if old > old_best.0 {
                 old_best = (old, rho);
             }
         });
         assert_eq!(best.1, vent, "summit at ρ {:.2}, not the vent", best.2);
-        assert!(old_best.1 > 0.2, "the old sum's summit at ρ {:.2}", old_best.1);
+        assert!(
+            old_best.1 > 0.2,
+            "the old sum's summit at ρ {:.2}",
+            old_best.1
+        );
         // The summit stands the cone's kept height above the vent's ground.
         let top = f64::from(level.z[vent]) - f64::from(plane[vent]);
-        assert!(top > 0.5 * h && top < 1.05 * h, "summit {top} m above the ground");
+        assert!(
+            top > 0.5 * h && top < 1.05 * h,
+            "summit {top} m above the ground"
+        );
         // Uphill beyond the envelope the ground is the plane (no cone on it, and of the coarse
         // bump only the share the ring at 1.1 radii holds, which the held edifice leaves out:
         // about half a percent of the height here); far away nothing changes; the fill is never
