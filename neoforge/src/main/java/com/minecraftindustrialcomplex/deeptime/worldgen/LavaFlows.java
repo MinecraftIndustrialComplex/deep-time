@@ -123,11 +123,11 @@ public final class LavaFlows {
 
     // ---- how long a flow shows, against the rain (VOL-107 to VOL-110) ----
     /** Mean annual precipitation of the three anchors, mm: arid, Hawaii's dry Kona side, its wet Hilo side. */
-    static final double[] ANCHOR_P_MM = {150.0, 380.0, 3_800.0};      // ledger: VOL-107, VOL-108, VOL-109
+    static final double[] ANCHOR_P_MM = {150.0, 380.0, 3_800.0};      // ledger: VOL-107 (from-memory), VOL-108, VOL-109 (game-choice on USGS HVO)
     /** How long a flow stays fresh, black and bare, at each anchor, years. */
-    static final double[] FRESH_YR = {15_000.0, 1_500.0, 12.0};       // ledger: VOL-107, VOL-108, VOL-109
+    static final double[] FRESH_YR = {15_000.0, 1_500.0, 12.0};       // ledger: VOL-107 (from-memory), VOL-108, VOL-109 (game-choice on USGS HVO)
     /** How long a flow shows at all before vegetation and soil hide it, at each anchor, years. */
-    static final double[] VISIBLE_YR = {250_000.0, 3_000.0, 150.0};   // ledger: VOL-107, VOL-108, VOL-109
+    static final double[] VISIBLE_YR = {250_000.0, 3_000.0, 150.0};   // ledger: VOL-107 (from-memory), VOL-108, VOL-109 (game-choice on USGS HVO, Kinney et al. 2015)
     /** The rain assumed where the world has no climate, mm. */
     static final double DEFAULT_P_MM = 1_000.0;                       // ledger: VOL-110 (game-choice)
     /** The share of an oxidised flow's columns still showing when it reaches the end of its visible time. */
