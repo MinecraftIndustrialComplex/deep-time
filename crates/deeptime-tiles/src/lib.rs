@@ -1409,10 +1409,12 @@ impl BakeMap {
         let mut out = vec![1f32; TILE * TILE];
         let lambert = match self.meta.projection {
             deeptime_format::projection::WorldProjection::Lambert(p) => Some(p),
-            deeptime_format::projection::WorldProjection::PetroffGuyou(_) => None,
+            deeptime_format::projection::WorldProjection::PetroffGuyou(_)
+            | deeptime_format::projection::WorldProjection::Cube(_) => None,
         };
-        // A Petroff–Guyou world's blocks are what a player walks: slopes in its own block metric,
-        // a block `m_per_block_h` wide.
+        // A Petroff–Guyou or cube world's blocks are what a player walks: slopes in its own block
+        // metric, a block `m_per_block_h` wide (the cube's nominal width; its local σ is within
+        // a few percent of it).
         let metres_px = if lambert.is_some() {
             metres_px
         } else {

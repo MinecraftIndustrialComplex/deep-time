@@ -244,13 +244,18 @@ impl<'de> Deserialize<'de> for GridDesc {
                 }
                 GridDesc::for_cube(&g.name, n * g.r, g.r).map_err(D::Error::custom)
             }
-            Some(k) => Err(D::Error::custom(format!("grid {}: unknown kind {k}", g.name))),
+            Some(k) => Err(D::Error::custom(format!(
+                "grid {}: unknown kind {k}",
+                g.name
+            ))),
             None => Ok(GridDesc {
                 name: g.name,
                 w: g.w.ok_or_else(|| D::Error::missing_field("w"))?,
                 h: g.h.ok_or_else(|| D::Error::missing_field("h"))?,
                 r: g.r,
-                wraps_x: g.wraps_x.ok_or_else(|| D::Error::missing_field("wraps_x"))?,
+                wraps_x: g
+                    .wraps_x
+                    .ok_or_else(|| D::Error::missing_field("wraps_x"))?,
                 origin_block_x: g
                     .origin_block_x
                     .ok_or_else(|| D::Error::missing_field("origin_block_x"))?,
@@ -975,8 +980,7 @@ pub trait RasterRead {
             for (b, &wv) in bv.iter().enumerate() {
                 for (a, &wu) in bu.iter().enumerate() {
                     let w = wu * wv;
-                    sum += w
-                        * (self.get_face(s.face, i0 - 1 + a as i64, j0 - 1 + b as i64) - base);
+                    sum += w * (self.get_face(s.face, i0 - 1 + a as i64, j0 - 1 + b as i64) - base);
                 }
             }
             return base + sum;
@@ -1281,5 +1285,67 @@ mod tests {
         assert_eq!(d.tile_rect(0), (0, 0, 100, 100));
         assert_eq!(d.tile_rect(5), (500, 0, 12, 100));
         assert_eq!(d.tile_rect(11), (500, 100, 12, 64));
+    }
+
+    #[test]
+    fn a_cube_grid_is_written_by_its_side_and_read_back() {
+        let g = GridDesc::for_cube("L3", 1024, 2).unwrap();
+        assert_eq!((g.w, g.h, g.tile()), (512, 3072, 256));
+        assert_eq!(GridDesc::for_cube("L1", 1024, 16).unwrap().tile(), 64);
+        assert_eq!(GridDesc::for_cube("L3", 3840, 2).unwrap().tile(), 128);
+        let s = serde_json::to_string(&g).unwrap();
+        assert_eq!(s, r#"{"name":"L3","kind":"cube","n":512,"r":2}"#);
+        let back: GridDesc = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, g);
+        let odd = r#"{"name":"L3","kind":"cube","n":3,"r":1}"#;
+        assert!(serde_json::from_str::<GridDesc>(odd).is_err());
+        let hex = r#"{"name":"L3","kind":"hex","n":4,"r":1}"#;
+        assert!(serde_json::from_str::<GridDesc>(hex).is_err());
+        // A layer's descriptor carries it too.
+        let d = LayerDesc::scalar("x", DType::F32, g, Codec::Raw);
+        let back: LayerDesc = serde_json::from_str(&serde_json::to_string(&d).unwrap()).unwrap();
+        assert_eq!(back, d);
+    }
+
+    /// A field that is smooth on the planet, stored at the cube grid's cell centres, reads back
+    /// bilinearly within a couple of cells' change of itself everywhere on the net, across every
+    /// seam and fold: a wrong face or a wrong quarter turn would read cells far away.
+    #[test]
+    fn cube_bilinear_reads_are_continuous_across_every_seam() {
+        use crate::cube::CubeTurn;
+        use crate::cube_map::{CubeMap, CubeWorld};
+        let s = 256u32;
+        let world = CubeWorld::new(Cube::new(s), CubeMap::world(), CubeTurn::IDENTITY, 1.0);
+        let view = world.view();
+        let f = |p: [f64; 3]| 1000.0 * (0.6 * p[0] - 0.48 * p[1] + 0.64 * p[2]);
+        let grid = GridDesc::for_cube("L", s, 4).unwrap();
+        let mut bytes = Vec::with_capacity(grid.cells() * 4);
+        for j in 0..grid.h {
+            for i in 0..grid.w {
+                let (x, z) = grid.cube_point(i, j);
+                bytes.extend_from_slice(&(f(view.unit(x, z).unwrap()) as f32).to_le_bytes());
+            }
+        }
+        let d = LayerDesc::scalar("f", DType::F32, grid, Codec::Raw);
+        let l = LoadedLayer::new(d, bytes).unwrap();
+        // The field changes at most 1000 / R per planet block, R = 2s/π blocks of the equal-area
+        // sphere, and a block of the net spans at most about 1.3 of those.
+        let per_block = 1000.0 / (2.0 * f64::from(s) / std::f64::consts::PI) * 1.3;
+        let bound = 2.0 * 4.0 * per_block;
+        let mut worst = 0.0f64;
+        let h = i64::from(s);
+        for bz in (-3 * h / 2..3 * h / 2).step_by(3) {
+            for bx in (-3 * h / 2..5 * h / 2).step_by(3) {
+                let read = l.bilinear(bx as f64, bz as f64);
+                let Some(p) = view.unit(bx as f64 + 0.5, bz as f64 + 0.5) else {
+                    assert!(read.is_nan(), "({bx}, {bz}) past the net read {read}");
+                    continue;
+                };
+                let e = (read - f(p)).abs();
+                worst = worst.max(e);
+                assert!(e < bound, "({bx}, {bz}): read {read} for {}", f(p));
+            }
+        }
+        assert!(worst > 0.0);
     }
 }

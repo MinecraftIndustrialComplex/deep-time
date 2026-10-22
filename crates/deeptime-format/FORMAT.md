@@ -83,7 +83,7 @@ move to a cube"):** written by the Rust side for cube worlds only, while the pol
 ("Polar and cube worlds side by side"). A cube world's manifest has `projection.kind` `cube` with
 `layout_version` 2 ("The cube world's layout"), names its map table ("The cube map table") and
 stores its grids face by face ("Cube grids"). `deeptime synth --kind cube` writes one; a planet
-bakes to one with `scale.projection` `cube` in its preset or `deeptime run --projection cube`.
+bakes to one with `scale.projection` `cube` in its preset or `deeptime run --set scale.projection=cube`.
 
 ### Polar and cube worlds side by side (until cube plan phase 2)
 

@@ -1485,8 +1485,12 @@ pub fn cube_spec(
         let (x, z) = images[0];
         for e in cube.edges() {
             let on_line = match e.axis {
-                Axis::X => x == e.coord as f64 && (e.span[0] as f64..=e.span[1] as f64).contains(&z),
-                Axis::Z => z == e.coord as f64 && (e.span[0] as f64..=e.span[1] as f64).contains(&x),
+                Axis::X => {
+                    x == e.coord as f64 && (e.span[0] as f64..=e.span[1] as f64).contains(&z)
+                }
+                Axis::Z => {
+                    z == e.coord as f64 && (e.span[0] as f64..=e.span[1] as f64).contains(&x)
+                }
             };
             if on_line {
                 let p = cube.edges()[e.partner].iso.point(x, z);
@@ -1565,7 +1569,10 @@ pub fn lambert_spec(p: &Projection) -> ProjectionSpec {
             slide("east", Side::Max, c / 2, -c),
         ],
         cone_points: Vec::new(),
-        poles: vec![PoleSpec::corners("north", &[]), PoleSpec::corners("south", &[])],
+        poles: vec![
+            PoleSpec::corners("north", &[]),
+            PoleSpec::corners("south", &[]),
+        ],
         border: None,
     }
 }
@@ -2330,7 +2337,7 @@ mod petroff_guyou_tests {
             }
             for p in &spec.poles {
                 for im in &p.images {
-                    let lat = g.lat_lon(im[0] as f64, im[1] as f64).0;
+                    let lat = g.lat_lon(im[0], im[1]).0;
                     assert!(
                         (lat.abs() - 90.0).abs() < 1e-9,
                         "{} at {im:?}: {lat}",

@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 use crate::error::{FormatError, Result};
 use crate::fsutil::write_atomic;
 use crate::projection::{ProjectionKind, ProjectionSpec, WorldProjection};
-use crate::{CUBE_FORMAT_VERSION, FORMAT_VERSION, READS_VERSIONS};
 use crate::raster::{Codec, DType, GridDesc};
+use crate::{CUBE_FORMAT_VERSION, FORMAT_VERSION, READS_VERSIONS};
 
 /// The manifest's file name.
 pub const MANIFEST: &str = "manifest.json";
