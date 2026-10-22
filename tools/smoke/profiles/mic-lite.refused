@@ -1,0 +1,12 @@
+# Mods the Deep Time lite set never keeps (tools/smoke/lite_set.py), one mod id per line, then why. The jar,
+# and every dependency only it needed, leaves the set; the derivation's output says what that costs.
+# A mod belongs here when a boot of the lite set (tools/smoke/run.py --profile mic-lite) shows it needs a mod it
+# does not declare in neoforge.mods.toml, so the dependency closure cannot find it.
+#
+# createpropulsion: its code calls dev.simulated_team.simulated.registrate.SimulatedRegistrate (Create
+# Simulated, nested in create-aeronautics-bundled), which its mods.toml does not declare (it declares sable and
+# sablecompanion), so the mod fails to construct without the Aeronautics bundle (NoClassDefFoundError in the
+# mic-lite boot, 2026-10-22). Keeping the bundle for one ore is the wrong trade. Cost: platinum ore
+# (#c:ores/platinum, named by deposit_type/impact_ni_cu_pge.json) is not placed in a lite world, and Sable
+# (required only by it) goes with it.
+createpropulsion  hard-needs Create Simulated (the Aeronautics bundle) without declaring it

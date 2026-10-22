@@ -1,0 +1,4 @@
+# The Deep Time lite set: the mic set (the current MIC pack, server side, plus the pinned Toroidal World
+# bundle) cut down by tools/smoke/lite_set.py to the mods Deep Time's own data names, their required
+# dependencies and the fixed core in mic-lite.core. install.sh runs the cut after the exclusions.
+@include mic
