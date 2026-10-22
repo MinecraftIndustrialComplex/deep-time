@@ -61,6 +61,7 @@ use rayon::prelude::*;
 use super::Env;
 use super::geometry::{Geo, dijkstra_sorted};
 use super::kinematics::{quat, tangent, to_group};
+use super::collapse::normal_thickness_m;
 use super::pools::{COLUMN_ISOSTATIC_FACTOR, isostatic_change_m};
 use super::shortening::Front;
 use super::state::{Belt, CONTINENTAL, FORELAND, OROGENY_HIMALAYAN, PlateState, pool};
@@ -89,16 +90,16 @@ pub const KEPT_GLOBAL: &str = "plates/collision_kept_km3";
 pub const CROSSED_AREA_GLOBAL: &str = "plates/collision_crossed_km2";
 /// … the fronts' length times the step, km·Myr (the mean convergence is the area over it) …
 pub const FRONT_GLOBAL: &str = "plates/collision_front_km_myr";
-/// … the crossed crust above the normal column ([`NORMAL_COLUMN_M`]), km³ …
+/// … the crossed crust above the normal column (`collapse::normal_thickness_m`, 35.1 km), km³ …
 pub const ABOVE_GLOBAL: &str = "plates/collision_crossed_above_km3";
 /// … the part of that on crust a collision raised within [`RECENT_MYR`] (its wedge, or a belt the
 /// plate carried in), km³ …
 pub const RECENT_GLOBAL: &str = "plates/collision_crossed_recent_km3";
-/// … and what the wedges kept, km³ (the belts kept the rest of [`KEPT_GLOBAL`]).
+/// … what the wedges kept, km³ (the belts kept the rest of [`KEPT_GLOBAL`]) …
 pub const WEDGE_GLOBAL: &str = "plates/collision_wedge_km3";
-/// The normal continental column the crossing is measured against, m (the Airy line's 35.1 km,
-/// PLT-278; measurement only).
-const NORMAL_COLUMN_M: f64 = 35_100.0;
+/// … and the crossed crust this collision had stacked on the incoming plate (above the normal
+/// column on crust it stamped since its onset), km³ (PLT-400).
+pub const RESTACK_GLOBAL: &str = "plates/collision_crossed_restack_km3";
 /// How young a collision orogeny on the incoming crust counts as raised by this collision's
 /// wedge, Myr (measurement only).
 const RECENT_MYR: f64 = 30.0;
@@ -129,6 +130,9 @@ pub struct Stacked {
     pub length_km: f64,
     pub above_m: f64,
     pub recent_above_m: f64,
+    /// The part of `thickness_m` this collision stacked on the incoming crust before it crossed
+    /// (its excess over the normal column where this collision stamped it), m (PLT-400).
+    pub restack_m: f64,
     /// Crust added to the belt and to the wedge, km² × m: Σ added thickness × a sample's area.
     pub belt_km2_m: f64,
     pub wedge_km2_m: f64,
@@ -211,6 +215,7 @@ pub fn stack(
                 conv,
                 normal,
                 shortening_km: col.shortening_km,
+                onset_myr: col.onset_myr,
             },
             f,
             flexure,
@@ -341,6 +346,8 @@ struct Side {
     normal: DVec3,
     /// The collision's shortening so far, km.
     shortening_km: f64,
+    /// When the collision began, Myr.
+    onset_myr: f64,
 }
 
 /// One front's stacking, and what the belt's record gains.
@@ -443,24 +450,37 @@ fn stack_front(
             .sum::<f64>()
             / f.crust.len() as f64
     };
-    // The crossing crust above the normal column, and the part of it a collision raised lately
-    // (measurement only).
-    let (above_m, recent_above_m) = if f.crust.is_empty() {
-        (0.0, 0.0)
+    // The crossing crust above the normal column (PLT-278's 35.1 km), the part of it a collision
+    // raised lately (measurement only), and the part this collision stacked on it (its wedge:
+    // the incoming plate carries the wedge's crust to the front and under it; PLT-400).
+    let normal_m = normal_thickness_m();
+    let (above_m, recent_above_m, restack_m) = if f.crust.is_empty() {
+        (0.0, 0.0, 0.0)
     } else {
-        let (a, r) = f.crust.iter().fold((0.0, 0.0), |(a, r), &j| {
+        let (a, r, w) = f.crust.iter().fold((0.0, 0.0, 0.0), |(a, r, w), &j| {
             let s = &samples[j as usize];
-            let x = (f64::from(s.own_thickness_m()) - NORMAL_COLUMN_M).max(0.0);
-            let recent = s.orogeny == OROGENY_HIMALAYAN
-                && env.t_myr - f64::from(s.orogeny_myr) <= RECENT_MYR;
-            (a + x, r + if recent { x } else { 0.0 })
+            let x = (f64::from(s.own_thickness_m()) - normal_m).max(0.0);
+            let stamped = s.orogeny == OROGENY_HIMALAYAN;
+            let recent = stamped && env.t_myr - f64::from(s.orogeny_myr) <= RECENT_MYR;
+            let ours = stamped && f64::from(s.orogeny_myr) >= side.onset_myr - 0.5 * env.dt_myr;
+            (
+                a + x,
+                r + if recent { x } else { 0.0 },
+                w + if ours { x } else { 0.0 },
+            )
         });
         let n = f.crust.len() as f64;
-        (a / n, r / n)
+        (a / n, r / n, w / n)
     };
-    // ledger: PLT-242 (the share), PLT-281 (Airy with the crust's mean density).
-    let rise_km2_m =
-        k.collision_stacking_share * crossed_km2 * thickness_m / COLUMN_ISOSTATIC_FACTOR;
+    // ledger: PLT-242 (the share), PLT-281 (Airy with the crust's mean density). With
+    // `collision_restack_whole` the crust this collision stacked crosses whole: it took the share
+    // when it first crossed (ledger: PLT-400).
+    let rise_km2_m = if k.collision_restack_whole {
+        crossed_km2 * (k.collision_stacking_share * (thickness_m - restack_m) + restack_m)
+            / COLUMN_ISOSTATIC_FACTOR
+    } else {
+        k.collision_stacking_share * crossed_km2 * thickness_m / COLUMN_ISOSTATIC_FACTOR
+    };
     let fill = if deficit_km2_m > 0.0 {
         (rise_km2_m / deficit_km2_m).min(1.0)
     } else {
@@ -542,6 +562,7 @@ fn stack_front(
             length_km: f.length_km(),
             above_m,
             recent_above_m,
+            restack_m,
             wedge_km,
             ..Default::default()
         },
