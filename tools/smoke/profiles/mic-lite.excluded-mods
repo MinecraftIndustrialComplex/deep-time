@@ -1,0 +1,5 @@
+# Mod ids left out of the mic-lite set before the lite derivation runs, one per line (as mic.excluded-mods).
+# Nothing in the lite set requires Cobblemon, so the derivation leaves it out anyway; it is listed so that a
+# future dependency can never bring it back (its event lists crash NeoForge's parallel mod construction,
+# decisions log 2026-10-02).
+cobblemon

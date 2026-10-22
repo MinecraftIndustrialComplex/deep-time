@@ -290,9 +290,13 @@ def default_roots():
     tags = os.path.normpath(tags)
     if os.path.isdir(tags):
         roots.append(("MIC rock tags", tags))
+    elif os.environ.get("DEEPTIME_LITE_NO_ROCK_TAGS") == "1":
+        print(f"   lite_set: no MIC rock-tag datapack at {tags}; DEEPTIME_LITE_NO_ROCK_TAGS=1, so the mods "
+              "its blocks name are not counted", file=sys.stderr)
     else:
-        print(f"   lite_set: WARNING no MIC rock-tag datapack at {tags} (DEEPTIME_ROCK_TAGS; mac.sh --pack syncs it): "
-              "the mods its blocks name are not counted", file=sys.stderr)
+        # A silent skip would leave out Create's rock blocks, Born in Chaos' argillite and the like.
+        sys.exit(f"lite_set: no MIC rock-tag datapack at {tags} (DEEPTIME_ROCK_TAGS names it; "
+                 "tools/remote/mac.sh --pack syncs it; DEEPTIME_LITE_NO_ROCK_TAGS=1 skips it knowingly)")
     return roots
 
 
