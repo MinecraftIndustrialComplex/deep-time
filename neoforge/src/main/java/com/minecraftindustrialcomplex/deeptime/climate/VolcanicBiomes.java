@@ -91,6 +91,11 @@ public final class VolcanicBiomes {
         TAGS.incrementAndGet();
     }
 
+    /** How many times tags were (re)loaded: what is cached from the volcanic tags is stale when this moves. */
+    public static int tagGeneration() {
+        return TAGS.get();
+    }
+
     /**
      * The census asks for the biome as master placed it (no keep-out, no roles) on this thread while
      * this is set; see {@link #plain(java.util.function.Supplier)}.
