@@ -524,6 +524,11 @@ pub struct TectonicParams {
     pub weld_speed_mm_yr: f64,
     /// … for this long, Myr. The larger plate keeps its id.
     pub weld_after_myr: f64,
+    /// Polarity reversal (`plates/subduction.rs`, PLT-056): `true` judges the overriding side by
+    /// the crust its arc stands on (its plate's continental crust within `arc_distance_km` of the
+    /// overlap, PLT-370) rather than by its crust in the overlap; `false` (the default and every
+    /// built-in preset) by the overlap (ledger PLT-371).
+    pub reversal_by_arc_crust: bool,
     /// Orogenic collapse (`plates/collapse.rs`): continental crust thicker than
     /// `collapse_thickness_km` that no orogeny is raising any more thins by spreading, with this
     /// e-folding time of its excess thickness, Myr; the crust it loses fills the nearest thin
@@ -782,6 +787,7 @@ impl Default for TectonicParams {
             wedge_slope_deg: 1.5,            // ledger: PLT-192
             weld_speed_mm_yr: 5.0,           // ledger: PLT-246
             weld_after_myr: 10.0,            // ledger: PLT-246
+            reversal_by_arc_crust: false,    // ledger: PLT-371
             collapse_myr: 15.0,              // ledger: PLT-255
             collapse_thickness_km: 50.0,     // ledger: PLT-256
             collapse_quiet_myr: 10.0,        // ledger: PLT-259
