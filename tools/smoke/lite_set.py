@@ -32,6 +32,8 @@ Time's data changes. A jar is kept when one of these names it, and every keep ca
                start, so a pack that rewrites it makes a different climate mapping.
   6. core      profiles/mic-lite.core: Deep Time, Toroidal World, Distant Horizons, the dev map, the
                client performance mods, and any mod the router rule cannot see (Tectonic works by mixin).
+               "mod@client" or "mod@server" keeps a mod in that side's set only (JEI: Destroy loads its
+               API on the client without declaring it).
   7. requires  the required dependencies (neoforge.mods.toml type "required", or mandatory = true) of
                every kept jar, closed transitively; the client set counts side BOTH and CLIENT, the
                server set BOTH and SERVER.
@@ -412,6 +414,9 @@ def derive(mods_dir, side, roots=None, core_path=CORE_FILE, refused_path=REFUSED
     # 6: the core.
     core = read_core(core_path)
     for mod, text in core.items():
+        mod, _, only = mod.partition("@")
+        if only and only != side:
+            continue
         if mod not in ix.by_id:
             warnings.append(f"core mod {mod} is not in this set (fine: only those present are kept)")
             continue
@@ -495,9 +500,11 @@ def keep_file_text(ix, why, kept, side):
 # under kubejs/, scripts/ and resourcepacks/ belongs to mods the lite set leaves out (KubeJS itself,
 # the radio and weather packs), so those folders go. A config file is attributed to the mod whose id is
 # its longest prefix (create-client.toml: create, createbigcannons-client.toml: createbigcannons);
-# it goes when that mod is left out, and stays when its mod is kept or no mod claims it.
+# it goes when that mod is left out or no mod claims it (the config of a server-only or already excluded
+# mod: gravestone, rctmod), and stays when a kept mod claims it; NeoForge's own files stay.
 PRUNE_DIRS = ("kubejs/", "scripts/", "resourcepacks/")
 CONFIG_DIRS = ("config/", "defaultconfigs/")
+CONFIG_ALWAYS = ("neoforge", "fml", "forge")
 
 
 def claimed_by(rel, all_ids):
@@ -520,6 +527,9 @@ def claimed_by(rel, all_ids):
 def prune_files(set_dir, ix, kept):
     kept_ids = {i for n in kept for i in ix.jars[n].mod_ids}
     all_ids = {i for j in ix.jars.values() for i in j.mod_ids}
+    gone = os.path.join(set_dir, "mods-excluded")       # jars left out before this run, by the stage's own lists
+    if os.path.isdir(gone):
+        all_ids |= {i for j in Index(gone).jars.values() for i in j.mod_ids}
     pw = os.path.join(set_dir, "packwiz.json")
     removed, recorded = [], 0
     cached = {}
@@ -535,7 +545,8 @@ def prune_files(set_dir, ix, kept):
         drop = loc.startswith(PRUNE_DIRS)
         if loc.startswith(CONFIG_DIRS):
             owner = claimed_by(loc, all_ids)
-            drop = owner is not None and owner not in kept_ids
+            keeps = owner in kept_ids or loc.split("/", 1)[1].lower().startswith(CONFIG_ALWAYS)
+            drop = not keeps
         if drop:
             removed.append(loc)
             del cached[key]
