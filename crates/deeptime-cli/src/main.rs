@@ -583,7 +583,8 @@ enum Command {
         set: Vec<String>,
     },
     /// Whole-world pictures of a baked world-data folder in the world's own block space
-    /// (satellite.png, provinces.png with the layout's cone points and poles, world-map.json).
+    /// (satellite.png, provinces.png with the layout's cone points and poles, world-map.json); a
+    /// cube world is drawn as its net, with the face outlines and the border edges too.
     WorldMap {
         /// World-data folder.
         #[arg(long)]
