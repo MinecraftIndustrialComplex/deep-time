@@ -1,0 +1,3 @@
+# Jars (glob patterns) moved to server/mods-excluded/ for the mic-lite profile, one per line. Empty: the
+# lite derivation (tools/smoke/lite_set.py, run by install.sh) decides what stays, and writes its reasons to
+# smoke/mic-lite/server/lite-why.txt.

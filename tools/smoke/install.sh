@@ -4,7 +4,7 @@
 # Installs one of Deep Time's server sets into smoke/<profile>/server/ (plan §9.5).
 # Adapted from mic-climate's smoke/install.sh.
 #
-#   tools/smoke/install.sh <standalone|mic|mic-ev|terrablender|ee|ev|ev-client|dh|dh-next>
+#   tools/smoke/install.sh <standalone|mic|mic-ev|mic-lite|terrablender|ee|ev|ev-client|dh|dh-next>
 #       [--size 16384|32768]      the planet's circumference -> level-type deeptime:planet[_32k] (a
 #                                 Petroff-Guyou world 13,312 / 26,112 blocks round, format 0.5) for a
 #                                 --preset run, deeptime:planet_lambert[_32k] (C itself) for synthetic
@@ -30,6 +30,11 @@
 #
 # DEEPTIME_PACK=<dir> installs mic/mic-ev from that pack checkout instead of ../../pack (a git
 # checkout with a .git directory: its HEAD, or its working tree with --pack-worktree).
+#
+# mic-lite is the mic set cut down to the mods Deep Time's own data names, their required dependencies and a
+# fixed core (Deep Time, Toroidal World, Distant Horizons, Tectonic, the client performance mods): the
+# derivation is tools/smoke/lite_set.py, the core profiles/mic-lite.core, the reasons smoke/mic-lite/server/lite-why.txt.
+# It is for Deep Time test play on a small client (play-client-stage.sh --set lite), not a pack check.
 #
 # mic-ev is the mic set plus Excavated Variants and Dynamic Asset Generator (profiles/ev.txt's pins),
 # for the plan Q10 comparison; ev-client is the ev set plus Create, the smallest set a client needs to
@@ -91,11 +96,11 @@ while [ $# -gt 0 ]; do
     esac
 done
 case "$PROFILE" in
-    standalone|mic|mic-ev|terrablender|ee|ev|ev-client|dh|dh-next) ;;
-    *) echo "usage: install.sh <standalone|mic|mic-ev|terrablender|ee|ev|ev-client|dh|dh-next> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--seed N] [--clean]" >&2; exit 2 ;;
+    standalone|mic|mic-ev|mic-lite|terrablender|ee|ev|ev-client|dh|dh-next) ;;
+    *) echo "usage: install.sh <standalone|mic|mic-ev|mic-lite|terrablender|ee|ev|ev-client|dh|dh-next> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--seed N] [--clean]" >&2; exit 2 ;;
 esac
 # The sets installed from the MIC pack (packwiz-installer); the others are their pin files alone.
-case "$PROFILE" in mic|mic-ev) FROM_PACK=1 ;; *) FROM_PACK=0 ;; esac
+case "$PROFILE" in mic|mic-ev|mic-lite) FROM_PACK=1 ;; *) FROM_PACK=0 ;; esac
 case "$SEED" in ''|-[0-9]*|[0-9]*) ;; *) echo "install.sh: --seed must be a number" >&2; exit 2 ;; esac
 # A planet preset's world is Petroff-Guyou (the default since format 0.5) unless the preset says
 # lambert; synthetic worlds and test terrains are Lambert. Their level types differ in circumference.
@@ -326,6 +331,13 @@ done < "$PROFILES/$PROFILE.excluded"
 if [ -f "$PROFILES/$PROFILE.excluded-mods" ]; then
     say "excluding mods by id (profiles/$PROFILE.excluded-mods) and their dependants"
     python3 "$REPO/tools/smoke/exclude_mods.py" "$SERVER" "$PROFILES/$PROFILE.excluded-mods" "$SMOKE/excluded.txt" "$SMOKE/excluded-why.txt"
+fi
+# The lite set keeps only what Deep Time's data names, those mods' required dependencies and the core
+# (profiles/mic-lite.core); everything else moves to mods-excluded/ with its reason recorded, and the pack's
+# kubejs/, scripts/, resourcepacks/ and the config of the left-out mods go from the folder.
+if [ "$PROFILE" = mic-lite ]; then
+    say "the Deep Time lite set (tools/smoke/lite_set.py)"
+    python3 -I "$REPO/tools/smoke/lite_set.py" apply "$SERVER" --side server --excluded "$SMOKE/excluded.txt" --excluded-why "$SMOKE/excluded-why.txt" --prune-files
 fi
 
 # ---------------------------------------------------------------------------
