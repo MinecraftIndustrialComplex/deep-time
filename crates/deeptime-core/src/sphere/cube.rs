@@ -509,8 +509,8 @@ impl GhostTable {
                 for (q, slot) in out.iter_mut().enumerate() {
                     let (i, j) = ((q % side) as i64 - g as i64, (q / side) as i64 - g as i64);
                     let (si, sj) = corner_source(ni, i, j);
-                    let (sf, a, b, _) =
-                        cell_on(face, ni, si, sj).expect("a ghost's source is one side out at most");
+                    let (sf, a, b, _) = cell_on(face, ni, si, sj)
+                        .expect("a ghost's source is one side out at most");
                     *slot = topo.index(sf, a as usize, b as usize) as u32;
                 }
             });
