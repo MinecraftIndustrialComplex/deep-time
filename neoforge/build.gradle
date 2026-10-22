@@ -734,6 +734,15 @@ tasks.named('processResources', ProcessResources) {
         include 'packs/*.json'
         into 'data/deeptime/deeptime/climate_mapping'
     }
+    // The cube world's map tables (plan §1.6, M3): crates/deeptime-format/data/cube-map-<name>.bin
+    // and its .sha256, read by worlddata/CubeMap.builtin as deeptime/cube-map/cube-map-<name>.bin
+    // (the .sha256 is checked against the table at first use; the same files the Rust crate
+    // include_bytes!s, so one source for both readers).
+    from(new File(repoRoot, 'crates/deeptime-format/data')) {
+        include '*.bin'
+        include '*.sha256'
+        into 'deeptime/cube-map'
+    }
     if (project.hasProperty('release')) {
         dependsOn checkReleaseNatives
         from(nativesDistDir) { into 'natives/deeptime' }

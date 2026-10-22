@@ -28,19 +28,37 @@
   .lede a { color: var(--accent); }
   .rtsim { margin: -12px 0 28px; max-width: 70ch; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
   .rtsim a { color: var(--accent); font-weight: 600; }
+  .waiting { margin: -12px 0 28px; max-width: 70ch; background: var(--card); border: 1px solid var(--accent); border-radius: 12px; padding: 14px 18px; }
+  .waiting h2 { margin: 0 0 8px; color: var(--accent); }
+  .waiting ol { margin: 0 0 8px; padding-left: 1.4em; }
+  .waiting li { margin: 0 0 6px; }
+  .waiting li a { color: var(--accent); font-weight: 600; }
+  .waiting .rec { color: var(--muted); }
+  .waiting p { margin: 0; color: var(--muted); font-size: .94rem; }
+  .waiting p a { color: var(--accent); }
 </style>
 </head>
 <body>
 <main>
   <h1>Deep Time</h1>
   <p class="lede">Every review page built so far, in one place. Deep Time simulates a planet's geologic history in Rust and plays it as a Minecraft world that wraps east-west. All pages are private to you. Updated 2026-10-22.</p>
-  <p class="rtsim">Decisions waiting on you, Deep Time's included, are collected on the <a href="https://spacesheep.dev/@benmac/rtsim-hub#waiting">mic-rtsim hub</a>. Seven are open now, plus two optional items: D1 to D5 and D7 from the volcano page, D6 from the drowned continents page. The <a href="https://spacesheep.dev/@benmac/deeptime-overnight-1022">overnight summary</a> lists them all.</p>
+  <section class="waiting" id="waiting" data-ss-id="waiting" data-ss-section="Waiting on you">
+    <h2>Waiting on you: 4 decisions</h2>
+    <ol>
+      <li><a href="https://spacesheep.dev/@benmac/deeptime-cube-world#q4">Q4. The map and the turn</a> <span class="rec">Recommended: the conformal cube, turned freely.</span></li>
+      <li><a href="https://spacesheep.dev/@benmac/deeptime-cube-world#q1">Q1. The world-data format 0.7</a> <span class="rec">Recommended: rasters face by face, the map's table in the code.</span></li>
+      <li><a href="https://spacesheep.dev/@benmac/deeptime-cube-world#q2">Q2. Climate API 5</a> <span class="rec">Recommended: keep the four calls and add two.</span></li>
+      <li><a href="https://spacesheep.dev/@benmac/deeptime-cube-world#q3">Q3. When to build the wrap engine</a> <span class="rec">Recommended: after V1 ships on borders.</span></li>
+    </ol>
+    <p>All four are on the <a href="https://spacesheep.dev/@benmac/deeptime-cube-world">cube world page</a>. Answer in the terminal. D1 to D7 were answered on 22 October. Other MIC projects' decisions are on the <a href="https://spacesheep.dev/@benmac/rtsim-hub#waiting">mic-rtsim hub</a>.</p>
+  </section>
 
   <h2>Newest</h2>
   <div class="grid">
-    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-overnight-1022"><h3>Overnight: 22 October</h3><p>The night in 11 items, newest first: the volcano fixes, drowned continents, the rock tags in single-player, the lite instance, distant terrain, tests and your Prism instances.</p><span class="tag">7 decisions, 2 optional</span></a>
-    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-drowned-continents"><h3>Drowned continents: the transition's width</h3><p>Why 0.414 of the continental crust ends under the sea against a 0.25 target: mostly the transition's width, which the plate model sees 8 times too wide. Set on the model sphere, it falls to 0.279.</p><span class="tag">1 decision for you (D6)</span></a>
-    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-volcanoes"><h3>Volcanoes: realism or us?</h3><p>Why your volcano reads worse than Terralith and Tectonic: mostly fixable bugs, partly the honest cost of scale. The vent as the summit, the snow line and zones as drawn have landed.</p><span class="tag">6 decisions (D1 to D5, D7)</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-cube-world" data-ss-id="card-cube-world"><h3>Cube world: four decisions</h3><p>The map and the turn, the format, the climate interface and the wrap engine. What the coordinator took meanwhile, three mountain ranges drawn four ways, the corner and slope numbers, and the state of play.</p><span class="tag">4 decisions for you (Q1 to Q4)</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-overnight-1022"><h3>Overnight: 22 October</h3><p>The night in 11 items, newest first: the volcano fixes, drowned continents, the rock tags in single-player, the lite instance, distant terrain, tests and your Prism instances.</p><span class="tag">D1 to D7 answered, 2 optional</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-drowned-continents"><h3>Drowned continents: the transition's width</h3><p>Why 0.414 of the continental crust ends under the sea against a 0.25 target: mostly the transition's width, which the plate model sees 8 times too wide. Set on the model sphere, it fell to 0.278 when merged.</p><span class="tag">D6 answered, merged</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-volcanoes"><h3>Volcanoes: realism or us?</h3><p>Why your volcano reads worse than Terralith and Tectonic: mostly fixable bugs, partly the honest cost of scale. The vent as the summit, the snow line and zones as drawn have landed.</p><span class="tag">D1 to D5, D7 answered</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-seafloor-spikes"><h3>Sea-floor walls</h3><p>Is the spiky sea bed realistic? Measured against ETOPO 2022: the body yes, the tail no. The sea floor now fails to 15 degrees; before and after, with renders.</p><span class="tag">2026-10-20</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-p4-c20-review"><h3>C20 and p4s2 compared</h3><p>The shipped 2-Myr plate step and the 4-Myr candidate side by side on full 16k runs, with the chaos twin as the noise floor. C20 stays the default; p4s2 is an opt-in switch.</p><span class="tag">2026-10-20</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-live-map-walk"><h3>Create World walk, live map</h3><p>The Create World walk on the test VM with the live map: two shots 5 s apart between the same keyframes.</p><span class="tag">2026-10-20</span></a>
@@ -50,7 +68,7 @@
   <h2>How the world wraps</h2>
   <div class="grid">
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-seamless-world"><h3>The seamless world</h3><p>The Petroff-Guyou world in the format, the bake and the game: one quick 16k planet as the new world and as the Lambert world, the layout the wrap engine reads, and the gates.</p><span class="tag">SW-1</span></a>
-    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-world-shape"><h3>World shape: Petroff-Guyou or the cube</h3><p>The two candidate maps for the seamless world, worked through for gameplay with real-planet maps and diagrams of what happens round a corner.</p><span class="tag">decided: Petroff-Guyou</span></a>
+    <a class="card" href="https://spacesheep.dev/@benmac/deeptime-world-shape"><h3>World shape: Petroff-Guyou or the cube</h3><p>The two candidate maps for the seamless world, worked through for gameplay with real-planet maps and diagrams of what happens round a corner.</p><span class="tag">now the cube (22 October)</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-wrap"><h3>How the wrap works</h3><p>3D planet with the glowing seam, a crossing seen by the server and by your game side by side, two players across the seam, a full lap, the Nether's 1:8 loop.</p><span class="tag">graphics</span></a>
     <a class="card" href="https://spacesheep.dev/@benmac/deeptime-seams"><h3>The seams, in detail</h3><p>Where the seam is, a step-by-step crossing, what F3 and commands do, the poles, Nether and End, and what is verified.</p><span class="tag">checked against Toroidal World's code</span></a>
   </div>
