@@ -70,6 +70,11 @@ PER_TICK=$(python3 -c "print(f'{$SPEED/20:.3f}')")
 { echo "gamemode spectator @a"; [ "$SPEED" != 0 ] && echo "execute as @a at @s run tp @s ~$PER_TICK ~ ~"; } > "$DP/data/dhmove/function/tick.mcfunction"
 printf '{"values":["dhmove:tick"]}\n' > "$DP/data/minecraft/tags/function/tick.json"
 cp "$SET_SRV/mods/"*.jar "$CL/game/mods/"
+rm -rf "$CL/game/kubejs"
+if [ -d "$SET_SRV/kubejs" ]; then   # the set's KubeJS startup scripts register its items and blocks
+    mkdir -p "$CL/game/kubejs"
+    for d in startup_scripts client_scripts assets config; do [ -d "$SET_SRV/kubejs/$d" ] && cp -r "$SET_SRV/kubejs/$d" "$CL/game/kubejs/$d"; done
+fi
 
 # Distant Horizons' config (afresh): Ben's plan, progress to the log, updater off; the pause rules on
 # (their default) unless DHSP_NO_PAUSE.
