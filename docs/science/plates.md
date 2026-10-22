@@ -3522,10 +3522,12 @@ table (30c4d664 → fad59a5e on seeds 1 and 2: land 0.257 → 0.268, largest 0.1
    and the high ground (the high-ground work). Switch it on after those, and measure the land
    again. Measured again in "The crust flux into collision fronts (2026-10-21)" below: the
    collisions' losses per km of front are Earth's (their excess is the length of front in
-   collision, the plates'), PLT-371 is in the code as a switch, and on top of PLT-400 it lifts the
-   collisions to 2.00 per 100 Myr at the median of 12 runs (p = 0.09) and loses no land (0.257 to
-   0.270). Switching both on is the coordinator's call. Welding collisions sooner (the weld at
-   10 mm/yr) reaches 3.00 but drowns the continents (land 0.190).
+   collision, the plates'), PLT-371 is in the code as a switch, and on top of PLT-400 it keeps the
+   land but does not reliably reach 2: 2.00 per 100 Myr at the median of 12 runs (p = 0.09) on
+   master 49492ce3, 1.85 (p = 0.32) on master df40ce80, by longer fronts in collision and at a
+   cost in crust, so it stays off. Welding collisions sooner (the weld at 10 mm/yr) reaches 3.00
+   but drowns the continents (land 0.190). The rate waits on the length of front in collision
+   (item 4) and on what the check counts as a collision (that section's list, item 3).
 3. *Where subduction starts* (Crameri): needs a law for trenches to propagate and slabs to roll
    back before initiation can move near trenches; a plate reorganisation is the open law (Ben's,
    as in the sections above).
@@ -3926,7 +3928,9 @@ Measured on `earthlike_quick_16k`, 1000 Myr, seeds 1 to 6, both starts (12 runs 
 crust budget on (`DEEPTIME_CRUST_BUDGET=1`): the flux over the whole run (`tools/review/loss-budget.py`), the criteria on the final
 frame (`tools/review/continents_census.py fields`) and the plate checks of each run. Each value is
 the median of the 12 runs; p is a two-sided Mann-Whitney U test on the runs against the base. The
-base is master 49492ce3 as it runs (this branch with both switches off). The build log entry of
+base is master 49492ce3 (with ee5ef027, which moves no planet) as it runs: this branch with both
+switches off. Master df40ce80 (the sea off the datum) came in after and changes every planet; the
+base and PLT-371's arm ran again on it ("Again on master df40ce80" below). The build log entry of
 2026-10-21 "The crust flux into collision fronts" has the commands.
 
 ### The flux and Earth's
@@ -4010,7 +4014,7 @@ ceilings); `tools/review/loss-budget.py` reads them.
 
 | arm | settings |
 |---|---|
-| base | master's behaviour |
+| base | master 49492ce3's behaviour (both switches off) |
 | rs | PLT-400 on |
 | rsrev | PLT-400 and PLT-371 on |
 | rs50 | PLT-400 on, `collision_stacking_share` 0.5 (Ingalls) |
@@ -4154,10 +4158,58 @@ ground 0.329 to 0.370 (p = 0.06); the collisions last longer (the plate check's 
 PLT-371 alone on master c790d1f3; on seeds 1 to 3 here, with PLT-400, the land goes 0.269 to 0.258
 (mean of six), inside the runs' spread.
 
-So PLT-371 lifts the collisions to the bottom of their target without losing land, and moves
-neither the high ground, the ice nor the drowning. Both switches stay off on this branch (the
-planets the same bit for bit, no test changed); switching PLT-400 and PLT-371 on together is
-recommended, and is the coordinator's call, since it changes every planet.
+### Again on master df40ce80 (the sea off the datum)
+
+The arms above ran on this branch before master's sea off the datum (df40ce80) was merged in; that
+merge changes every planet. The base and rsrev ran again on the merged branch (arms m2base and
+m2rsrev, 12 runs each, the same seeds and starts). Medians, p against m2base:
+
+| arm | land | largest landmass | continental crust under the sea | above 2 km | coast with high ground | under ice | collisions per 100 Myr | plate checks (per run) | plate checks pooled |
+|---|---|---|---|---|---|---|---|---|---|
+| m2base | 0.247 | 0.104 | 0.414 | 0.248 | 0.369 | 0.170 | 1.65 | 29 | 30 of 45 |
+| m2rsrev | 0.244 (0.80) | 0.097 (0.58) | 0.365 (0.44) | 0.282 (0.37) | 0.389 (0.40) | 0.179 (0.44) | 1.85 (0.32) | 28 (0.43) | 26 of 45 |
+
+| arm | crust lost to the mantle, 10⁹ km³ per 1000 Myr | net change, 10⁹ km³ per 1000 Myr | fronts' loss, km³ a year | front in collision, km | collision length p90, Myr | collision states a reversal ended, per 100 Myr | continental crust at the end |
+|---|---|---|---|---|---|---|---|
+| m2base | 4.25 | -1.27 | 2.43 | 27,554 | 112 | 9.5 | 0.338 |
+| m2rsrev | 4.24 (0.80) | -1.61 (0.01) | 2.30 (1.00) | 33,741 (<0.01) | 135 (0.26) | 5.1 (<0.01) | 0.317 (0.04) |
+
+Per run, seeds 1 to 6 on the scattered start, then on the supercontinent:
+
+| measure | arm | sca-1 | sca-2 | sca-3 | sca-4 | sca-5 | sca-6 | sup-1 | sup-2 | sup-3 | sup-4 | sup-5 | sup-6 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| land | m2base | 0.249 | 0.222 | 0.225 | 0.240 | 0.243 | 0.246 | 0.260 | 0.244 | 0.269 | 0.263 | 0.260 | 0.250 |
+| land | m2rsrev | 0.224 | 0.256 | 0.238 | 0.206 | 0.251 | 0.223 | 0.223 | 0.270 | 0.250 | 0.274 | 0.300 | 0.228 |
+| largest landmass | m2base | 0.127 | 0.061 | 0.040 | 0.144 | 0.099 | 0.090 | 0.091 | 0.120 | 0.109 | 0.152 | 0.164 | 0.055 |
+| largest landmass | m2rsrev | 0.073 | 0.097 | 0.097 | 0.057 | 0.075 | 0.078 | 0.055 | 0.188 | 0.164 | 0.216 | 0.215 | 0.174 |
+| under the sea | m2base | 0.428 | 0.417 | 0.527 | 0.394 | 0.420 | 0.361 | 0.387 | 0.445 | 0.325 | 0.418 | 0.322 | 0.412 |
+| under the sea | m2rsrev | 0.461 | 0.356 | 0.391 | 0.487 | 0.331 | 0.432 | 0.352 | 0.339 | 0.374 | 0.283 | 0.221 | 0.475 |
+| above 2 km | m2base | 0.261 | 0.372 | 0.065 | 0.308 | 0.208 | 0.335 | 0.235 | 0.135 | 0.295 | 0.159 | 0.351 | 0.184 |
+| above 2 km | m2rsrev | 0.269 | 0.294 | 0.227 | 0.299 | 0.328 | 0.279 | 0.274 | 0.281 | 0.283 | 0.370 | 0.353 | 0.151 |
+| coast with high ground | m2base | 0.359 | 0.417 | 0.209 | 0.308 | 0.381 | 0.409 | 0.399 | 0.353 | 0.380 | 0.284 | 0.465 | 0.292 |
+| coast with high ground | m2rsrev | 0.349 | 0.269 | 0.354 | 0.426 | 0.338 | 0.384 | 0.448 | 0.513 | 0.435 | 0.393 | 0.398 | 0.334 |
+| under ice | m2base | 0.174 | 0.242 | 0.167 | 0.190 | 0.106 | 0.174 | 0.103 | 0.152 | 0.217 | 0.093 | 0.182 | 0.129 |
+| under ice | m2rsrev | 0.191 | 0.189 | 0.179 | 0.174 | 0.219 | 0.189 | 0.179 | 0.172 | 0.072 | 0.182 | 0.175 | 0.096 |
+| collisions per 100 Myr | m2base | 1.4 | 1.4 | 1.9 | 1.4 | 1.1 | 1.9 | 1.8 | 2.4 | 1.4 | 2.0 | 1.5 | 2.1 |
+| collisions per 100 Myr | m2rsrev | 1.9 | 1.9 | 1.7 | 2.0 | 1.8 | 1.6 | 3.0 | 1.4 | 1.6 | 1.1 | 2.5 | 2.8 |
+| plate checks | m2base | 28 | 27 | 27 | 27 | 29 | 29 | 29 | 31 | 28 | 30 | 30 | 29 |
+| plate checks | m2rsrev | 27 | 25 | 26 | 30 | 30 | 28 | 27 | 31 | 29 | 27 | 29 | 28 |
+| crust lost, 10⁹ km³ per 1000 Myr | m2base | 4.34 | 4.70 | 3.53 | 4.72 | 5.13 | 4.29 | 2.97 | 4.72 | 3.75 | 3.57 | 4.21 | 3.74 |
+| crust lost, 10⁹ km³ per 1000 Myr | m2rsrev | 4.22 | 4.18 | 3.67 | 5.25 | 4.93 | 4.19 | 3.34 | 4.67 | 4.16 | 4.34 | 4.26 | 4.46 |
+
+On the merged master the collisions rise less: 1.65 to 1.85 at the median (p = 0.32), 4 of 12
+runs at 2 or more against 3, and pooled over the runs 1.69 to 1.94, so the plate check still
+fails. The land holds again (0.247 to 0.244). What it costs shows on both bases: the continental
+volume's net change goes from -1.27 to -1.61 × 10⁹ km³ per 1000 Myr (p = 0.01; -1.26 to -1.60
+before the merge), the front in collision lengthens by 10 to 22 % (28,800 to 31,800 km, p = 0.08;
+27,600 to 33,700 km, p < 0.01), and the pooled plate checks fall by 2 to 4 (29 to 27; 30 to 26:
+the collision length's p50 and p90, the speed guard on one step, the ocean older than 180 Myr).
+
+So PLT-371 does not reliably lift the collisions into 2 to 6: it reaches the floor on one base
+(2.00, p = 0.09) and not on the other (1.85, p = 0.32). It does so by more and longer collisions,
+which lengthens the term that is already 3 to 4 times Earth's, and it costs continental crust. It
+stays off. PLT-400 is bookkeeping with no criterion moved past p = 0.1; it can go on whenever the
+planets are changed anyway (the coordinator's call). Both switches are off on this branch.
 
 ### What is left, and for whom
 
@@ -4167,11 +4219,12 @@ recommended, and is the coordinator's call, since it changes every planet.
    continents meet along whole margins. The collisions' life: the plate check's collision length
    p90 is 139 Myr against at most 120, since the force balance (`plates/forces.rs`, outside this
    task) does not stall a collision and the weld (PLT-246) waits for the convergence to stay under
-   5 mm/yr for 10 Myr. Ending collisions sooner by the weld alone (arm rsw10, 10 mm/yr) brings the front to 16,300 km
-   and the collisions to 3.00 per 100 Myr but drowns the continents (land 0.190, continental
-   crust under the sea 0.585): the long collisions are what thickens the crust, so a shorter
-   life needs the crust thickened, or the continents' area held, some other way. A collision stalled by its own thickened crust is a force
-   law in `plates/forces.rs`; it was not touched here.
+   5 mm/yr for 10 Myr. Ending collisions sooner by the weld alone (arm rsw10, 10 mm/yr) brings
+   the front to 16,300 km and the collisions to 3.00 per 100 Myr but drowns the continents (land
+   0.190, continental crust under the sea 0.585): the long collisions are what thickens the
+   crust, so a shorter life needs the crust thickened, or the continents' area held, some other
+   way. A collision stalled by its own thickened crust is a force law in `plates/forces.rs`; it
+   was not touched here.
 2. *The no-room loss* (the belts'): 1.15 km³ a year, half the fronts' loss, is crust left over
    after the belt's passes with room still somewhere in the belt (`fill_belt`), and 0.25 more
    finds the belt full at the strength height (PLT-253). With it the fronts lose 75 km³ per km and
@@ -4183,14 +4236,17 @@ recommended, and is the coordinator's call, since it changes every planet.
    (P1-27's figure), and the check counts a collision only when the terrane is a continent
    (PLT-078). Counting also the smaller transfers behind which continental crust of at least 0.1 of
    a continent's area went under gives 4.05 per 100 Myr at the base's median and 4.65 with
-   PLT-400 and PLT-371 (p = 0.03), an upper bound since a record's `cont_in` counts the
+   PLT-400 and PLT-371 (p = 0.03; on master df40ce80 4.05 and 4.70, p = 0.01), an upper bound
+   since a record's `cont_in` counts the
    continental crust that went under before the fronts met. Which count Earth's figure means
    (sutures that close an ocean, or every accretion of continental crust) decides how far the
    model is below it.
-4. *Switching PLT-400 and PLT-371 on* (the coordinator's): recommended on the measurement above
-   (collisions 1.60 to 2.00, p = 0.09, the land kept). Both are off on this branch, so the planets
-   are the same bit for bit and no test changed; switching them on changes every planet, and the
-   seed-specific tests' expected values need the new planets, explained by the switches.
+4. *The switches* (the coordinator's): PLT-371 stays off (it lifts the collisions on one base and
+   not the other, by longer fronts in collision, at a cost in crust and plate checks); PLT-400 is
+   bookkeeping that moves no criterion and can go on with the next planet change. Both are off on
+   this branch, so the planets are the same bit for bit and no expected value changed; switching
+   either on changes every planet, and the seed-specific tests' expected values then need the new
+   planets.
 5. *Ingalls' half and the surface guard*: the share at 0.5 (arm rs50) loses the land and is
    rejected (PLT-242). One of its 12 runs (supercontinent, seed 2) stopped at -400 Myr on the
    surface guard (a cell at -238,024 m against the bound of 237,286 m; flexure.md "The surface
