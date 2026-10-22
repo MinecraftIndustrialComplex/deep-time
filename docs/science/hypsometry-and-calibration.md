@@ -9,9 +9,9 @@ Hypsometry is the distribution of a planet's surface over height: how much is la
 | Ledger | Feature | Ids (count) |
 |---|---|---|
 | [HYP](ledger/HYP.md) | hypsometry targets | HYP-001 to HYP-021 (21) |
-| [HYP](ledger/HYP.md) | other calibration targets | HYP-022 to HYP-034 (13) |
+| [HYP](ledger/HYP.md) | other calibration targets | HYP-022 to HYP-035, HYP-040 to HYP-046 (21) |
 
-Rows by status: `cited-unverified` 10, `abstract-only` 1, `calibrated` 18, `game-choice` 1, `uncited` 4.
+Rows by status (the ledger's header): `verified` 1, `cited-unverified` 16, `abstract-only` 2, `calibrated` 16, `game-choice` 1, `uncited` 4.
 
 ## Material for the stage 2 writer
 
@@ -25,3 +25,28 @@ Rows by status: `cited-unverified` 10, `abstract-only` 1, `calibrated` 18, `game
 - The accepted band for median land height (430 to 640 m) reaches about 50 % above Earth's 427 m.
 - Volcano volume is a known contributor to land that stands too high; it was kept as a game choice.
 - Since the erosion recalibration of 2026-10-18 the erosion law (K, m, n, κ and S_c: ERO-004 to ERO-007, ERO-013, ERO-023) is set against measured erosion rates (Portenga & Bierman 2011 and Montgomery & Brandon 2002: ERO-171, ERO-172, ERO-179 to ERO-181; n from Ruetenik et al. 2023, ERO-182), no longer against the hypsometry. HYP-001 to HYP-004 stay the reference lines the runs are reported against, as the erosion rates were before; see [erosion-and-sediment.md](erosion-and-sediment.md), "The erosion law against measured rates".
+
+## The continents' hypsometry against Earth's (2026-10-22)
+
+Measured for V1 item 1's third criterion (continental crust under the sea, at most 0.25) on
+twelve runs of `earthlike_quick_16k` at master df40ce80; the full account, the arms and the
+sources are in [sea-level.md](sea-level.md), "The continents under the sea and the sea's height
+at the end". Earth's figures are HYP-042 to HYP-046 (CRUST1.0's crust at least 20 km thick, the
+model's own continent-ocean boundary).
+
+| Final frame, median of 12 | master | Earth |
+|---|---|---|
+| Continental crust under the sea | 0.414 | 0.237 to 0.248 at 20 km (0.195 at 25 km; 0.306 by Cogley 1984's contacts) |
+| Its surface over the sea, mean / median, m | 381 / 260 | 311 / 220 |
+| Share 0 to 200 m / 200 to 2,000 m / deeper than 2,000 m under the sea | 0.104 / 0.200 / 0.089 | 0.112 / 0.148 / 0.010 |
+| Crust at least 25 km thick above the sea | 0.572 | 0.805 to 0.817 |
+| Thickness at which the median surface crosses the sea, km | 35.1 (31.2 at the datum) | 31.0 |
+| Land's mean height, m | 1,284 | 797 |
+| The sea over the datum, m | 538 | 0 |
+
+In the datum's frame the continents stand where Earth's do; the sea stands high on them because
+the ocean basins are shallow (oceanic-labelled crust at least 10 km thick over 0.325 of the
+planet, mostly sedimentary rock: no sediment subducts). The extra drowned crust is on the slope
+and below it, in the transition's continental half: W is 200 km on the planet, eight times
+Earth's margins on the model sphere. With W at 200 km on the model sphere the share under the
+sea falls to 0.279 (Ben's decision of 2026-10-05 to weigh; sea-level.md's open questions).
