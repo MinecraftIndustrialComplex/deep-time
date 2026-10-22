@@ -12,6 +12,8 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.DelegatingRuleSource;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.LavaFlowPalette;
+import com.minecraftindustrialcomplex.deeptime.worldgen.LavaFlows;
 import com.minecraftindustrialcomplex.deeptime.worldgen.StrataPass;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WaterBodies;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
@@ -52,6 +54,10 @@ import java.util.Optional;
  *   <li><b>the blocks</b>: rock classes through the {@link RockPalette} with the strata pass's
  *       member choice ({@link StrataPass#horizonKey}), so a bed is the same block far and near.</li>
  * </ul>
+ * Over that, the active volcanoes' <b>lava flows</b> ({@link LavaFlows}, from the world data alone) top
+ * dry ground where one shows, as {@code LavaFlowPass} paints them in a chunk. At a level of detail
+ * coarser than a block a cell shows the flow of the one column it samples, so far away a flow one or two
+ * blocks wide reads as a broken line.
  *
  * <p><b>Wrapping.</b> Every sample folds x into the canonical lap first, as Toroidal World folds
  * the chunks it generates, so an area on any lap, or across the seam, is the planet's terrain.
@@ -90,6 +96,8 @@ public final class FarTerrain {
     private final PackSurfaceRule packRule;
     private final int levelMinY, levelMaxY;
     private final int cell;
+    /** The active volcanoes' lava flows, which top dry ground as {@code LavaFlowPass} paints them near. */
+    private final LavaFlows flows;
 
     private FarTerrain(ServerLevel level, GeologicChunkGenerator generator, WorldDataTerrain terrain, FarSurface surface) {
         this.level = level;
@@ -102,6 +110,7 @@ public final class FarTerrain {
         this.levelMinY = level.getMinBuildHeight();
         this.levelMaxY = level.getMaxBuildHeight() - 1;
         this.cell = generator.waterReach();
+        this.flows = terrain.lavaFlows(cell);
         // The rule SurfaceSystem paints this level's chunks with (NoiseBasedChunkGenerator.buildSurface
         // reads the registry settings), seeing the biomes the chunks store: x folded into the lap.
         this.packRule = PackSurfaceRule.of(level, generator, generator.sourceSettings().value().noiseSettings(), DelegatingRuleSource.levelRule(generator.sourceSettings().value().surfaceRule()),
@@ -224,6 +233,7 @@ public final class FarTerrain {
         RasterSampler strata = wd.has(WorldData.HORIZONS) ? wd.layer(WorldData.HORIZONS) : null;
         PaletteRules.Result<BlockState>[] rocks = strata == null ? null : RockPalette.get().forClasses(wd.classes());
         Cover cover = Cover.of(wd);
+        LavaFlowPalette flowPalette = LavaFlowPalette.get();
         int half = step / 2;
         FarColumn.Layers layers = s.layers;
         for (int j = 0; j < n; j++) {
@@ -267,6 +277,13 @@ public final class FarTerrain {
                     } else if (packTop == null && waterHeight != Integer.MIN_VALUE && packRule.shallowFloor(wx, shape.ground, z, waterHeight)) {
                         seaBed = soil.lakeBed();
                     }
+                }
+                // A lava flow's block tops dry ground where one shows, as LavaFlowPass paints it in a chunk
+                // after the surface rule (ledger VOL-140 on; the flows come from the world data alone).
+                if (!shape.water() && !painted && shape.ground >= levelMinY && shape.ground <= levelMaxY) {
+                    BlockState flow = flowPalette.block(flows.code(wx, z), LavaFlowPalette.key(wx, z));
+                    if (flow != null)
+                        packTop = flow;
                 }
                 boolean bare = soil.bare();
                 int depth = soil.depth();
