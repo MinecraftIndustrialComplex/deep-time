@@ -418,6 +418,218 @@ flexure is off (ISO-065) and its bake is the same at bcf8cd8e and 975dd57e. Agai
 neighbour) 0.0144 → 0.0231, sea within 100 m of the level 0.0574 → 0.0539, and land within a
 sixteenth of the planet's width of the seam 0.026 → 0.053 of that band.
 
+### The continents under the sea and the sea's height at the end (2026-10-22)
+
+V1 item 1's third criterion asks that at most 0.25 of the continental crust lie under the sea in
+the final frame; master df40ce80 has a median of 0.414 on twelve runs (the plate model's own
+count, averaged over the last 500 Myr, 0.348). This section asks whether the measure
+and the target are Earth's, why the sea ends about 450 to 540 m over the datum, and whether the
+continents' hypsometry is Earth's. Nothing in the code changed; the arms below are scratch
+switches and presets set from the command line.
+
+**Runs.** `earthlike_quick_16k`, 1,000 Myr, seeds 1 to 6, both starts (twelve runs an arm), 2
+threads, the crust budget on (`DEEPTIME_CRUST_BUDGET=1`), on the test VM through admission
+(`tools/review/force-balance-ensemble.sh` and the continents census on the final frame, a
+scratch driver in `build/dr`, not committed). The base binary is master df40ce80 built from a
+`git archive`. Arms:
+
+- *master*: the base.
+- *nosteer*: `--set steering.enabled=false` (no end-weighted nudges; the present climate natural).
+- *sub80*: a scratch patch to `plates/ridges.rs` (not committed): at a resampling, 80 % of the
+  conserved pools (sediment, sedimentary, metamorphic and felsic rock) of an overridden oceanic
+  column go to the mantle instead of accreting onto the column on top, when the top is oceanic
+  and the overridden column is hidden or on another plate (ocean-ocean subduction); continental
+  tops still take everything. After von Huene & Scholl 1991 (abstract): most sediment that
+  reaches a trench is subducted.
+- *wsph*: `--set tectonics.transition_width_km=24.5`, the transition's width W at 200 km on the
+  Earth-sized model sphere instead of on the planet (PLT-262; the quick planet is 8.16 times
+  smaller).
+- *w70*: `--set tectonics.transition_width_km=70`, between the two.
+
+The analysis is a scratch script (`build/dr/an.py`) on the census, the dumped fields and the
+runs' records: medians of twelve runs and a two-sided Mann-Whitney U over the runs. Many measures
+were compared, so a single p near 0.03 to 0.05 is expected by chance.
+
+#### Is the measure Earth's?
+
+The census counts a cell as continental where `plates/crust_type` on the L1 map is over 0.5 and
+as under the sea where its height is below the climate's final sea. The kind flag is the plate
+model's, and at a rifted margin the model puts the boundary where the transition's target
+thickness is 20 km (T* = T_o + (T_n − T_o)/2, `plates/transition.rs`, PLT-261): the taper is
+centred on the boundary. Earth's like-for-like share is therefore the crust at least 20 km thick
+(sediment to Moho) under the sea. On CRUST1.0 (PLT-361) that crust covers 0.384 of the planet and
+0.248 of it is under the sea; at 25 km 0.195 (the "about 0.19" of the decisions log), at 30 km
+0.101. A second pass that reads the rock's height instead of the water (`build/dr/earth.py`)
+gives 0.237, 0.183 and 0.090. Cogley 1984 (abstract read) puts the continents at 210.4 million
+km², 41 % of the surface, with 30.6 % of them submerged; Rudnick & Gao 2003 read him as 31 % to
+the shelf break; Harrison et al. 1983 count the continents to the 200 m isobath, 33.5 % of the
+planet.
+
+So the target is consistent with Earth only at the model's own boundary, and with no margin:
+an Earth drawn with the model's boundary scores 0.237 to 0.248, and by Cogley's
+continent-ocean contacts Earth itself would fail it (0.306). The target is not changed (the
+coordinator's and Ben's). Recommended beside it: the share of crust at least 25 km thick that
+stands above the sea (`t25_dry` here), which does not depend on where the kind flag sits: Earth
+0.805 to 0.817, master 0.572.
+
+#### Why the sea stands about 500 m over the datum at the end
+
+The water is Earth's (2,664 m as a layer, less the land ice: ISO-085, ISO-086), and the datum is
+calibrated: Earth's water over a bare GDH1 floor stands 280 to 375 m below it (the first ocean's
+start, "Earth against the mod"), and Earth's ocean sediment alone lifts its sea by 166 m (Conrad
+2013) to 210 m (Dutkiewicz et al. 2017), with its plateaus, seamounts and margins on top, so an
+Earth-like ocean puts the sea within a couple of hundred metres of the datum. The model's sea is
+high because its ocean basins are shallow.
+
+| Master, final frame, median of 12 | Value | Earth |
+|---|---|---|
+| The census's sea over the datum, m | 538 | 0 |
+| The plates' step sea, median over the run, m | 210 | |
+| Oceanic-labelled crust at least 10 km thick, share of the planet | 0.325 | crust 10 to 20 km thick of any kind: 0.074 (CRUST1.0) |
+| The sea with that crust at GDH1's floor for its age, change, m | −1,445 | |
+| The sea with the normal floor (under 10 km) at GDH1, change, m | −62 | |
+| The sea without the surface's loose ocean sediment, change, m | −63 | |
+| The sea with the floor's ages scaled to a 64 Myr mean, change, m | −167 | mean age 64.2 Myr (Seton et al. 2020) |
+| Conserved pools in the ocean (felsic, sedimentary and sediment), Earth-normalized km³ | 1.6 to 2.1 × 10⁹ (steady after −600 Myr) | 3.37 × 10⁸ (GlobSed, Straume et al. 2019) |
+| Sediment delivered to the sea, km³ a year (Earth-normalized) | 12.5 | about 5 of rock (14 Gt a year, Syvitski et al. 2005 via Walling 2006) |
+| Sediment subducted at trenches | none | 1.0 to 1.5 km³ a year (von Huene & Scholl 1991, abstract) |
+
+The thick oceanic-labelled crust is mostly sedimentary rock: on supercontinent seed 1, columns 15
+to 20 km thick hold 4.9 km of sedimentary rock, 0.8 km of metamorphic and 1.1 km of felsic
+plutonic rock on 10 km of mafic crust, columns 20 to 25 km 6.6, 1.9 and 2.0 km; they are 93 to 163
+Myr old, within about 100 to 300 km (on the model sphere) of a continent, 0.6 of them in the
+ocean-basin regime and 0.2 to 0.3 back-arc. The ocean holds five to six times GlobSed's
+sediment because two to three times Earth's inflow arrives and none of it leaves: at every
+resampling the conserved pools of every overridden column accrete onto the column on top
+(`plates/ridges.rs`), so sediment rides the floor into a trench and comes back on the overriding
+plate, and stays in the ocean when that plate is oceanic.
+
+In the datum's frame the continents stand where Earth's do: the median surface crosses the sea
+at 35.1 km of crust, 137 m per km, so it would cross the datum at 35.1 − 538/137 ≈ 31.2 km,
+against Earth's 31.0 km (CRUST1.0, the median rock height against the crust's thickness).
+
+**The sea at the end against the run.** The final sea stands over the run's median in 11 of 12
+runs (sign test p about 0.006); the medians of the 100 Myr windows run 180 to 290 m from −900 to
+−200 Myr and 456 to 506 m over the last 100 Myr, and the per-run trend over the last 800 Myr is
++28 m per 100 Myr at the median (positive in 9 of 12, weak). Part of the end height is the
+frame the census reads: the plate model resamples "once at the end so the final crust has no gaps
+or hidden slabs" (`plates/mod.rs`), and the climate computes the final sea after it. In all 12
+runs that sea stands 48 to 118 m (about 80 at the median) over the plates' last-step sea, and the
+floor's median age drops at the last step in 12 of 12 (to 49 Myr, against about 61 over the
+run). Between resamplings the step sea is a saw: about 90 m up the step after a resampling, about
+10 m down a step after it. With 80 % of the ocean-ocean accretion gone (sub80) the jump stays
+(the medians of the final sea and the last step's 74 m apart), so it is not that accretion; which state
+of the saw is the truer one is not settled, and the criterion is the final frame's, so nothing
+was changed.
+
+**Not the steering.** Without the end-weighted nudges (nosteer) the share under the sea is 0.402
+against 0.414 (p 0.89) and the census's sea 598 m against 538 (p 0.75); nothing in V1 item 1
+moves at p < 0.6.
+
+**Sediment subduction (sub80).** Taking 80 % of the ocean-ocean overrides' pools to the mantle
+lowers the sea by about 720 m and leaves the continents as drowned:
+
+| Median of 12 | master | sub80 | p |
+|---|---|---|---|
+| The census's sea over the datum, m | 538 | −181 | < 0.001 |
+| The plates' step sea, median over the run, m | 210 | −156 | < 0.001 |
+| Continental crust under the sea | 0.414 | 0.412 | 0.56 |
+| Land | 0.247 | 0.216 | 0.001 |
+| Continental crust's net change over 1,000 Myr, share of the planet | −0.085 | −0.132 | < 0.001 |
+| Continental crust's area at the end | 0.338 | 0.290 | < 0.001 |
+| Continental crust's mean thickness, km | 39.5 | 34.6 | < 0.001 |
+| Where the median surface crosses the sea, km of crust | 35.1 | 30.0 | < 0.001 |
+
+The continents lose a quarter of their volume and sink about as far as the sea falls (5 km of
+crust at 137 m per km is about 680 m). The sediment that erosion takes off the continents comes
+back to them only through the ocean: by accretion at resamplings and by stacked ocean crust
+turning continental (PLT-289). Take most of it to the mantle and nothing in the model makes it
+back; on Earth arc magmatism adds about as much crust as subduction takes, about 3.2 km³ a year
+(Stern & Scholl 2010). So the high sea and the drowned continents are one budget, and sediment
+subduction alone is not a fix: it needs the continents' growth from arcs first (the plate and
+crust-budget tasks). The variant with continental tops subducting too was not run, since it can
+only lose more crust.
+
+#### The continents' hypsometry
+
+Master's continental crust against Earth's crust at least 20 km thick (CRUST1.0; the census's
+final frame, medians of 12, heights over the sea):
+
+| Measure | master | Earth |
+|---|---|---|
+| Surface over the sea, mean / median, m | 381 / 260 | 311 / 220 |
+| Land's mean height, m | 1,284 | 797 (the 2012 ETOPO1 estimate, via Simpson & Simpson 2018) |
+| Share 0 to 200 m under the sea (the shelf) | 0.104 | 0.112 |
+| Share 200 to 2,000 m under (the slope) | 0.200 | 0.148 |
+| Share deeper than 2,000 m | 0.089 | 0.010 |
+| Passive margins: the slope between 500 and 2,000 m, median | 2.5° | 2.1° (ETOPO 2022, PLT-265) |
+| Passive margins: shelf width, median | 0 km | 57 km, passive 84 to 88 km (Harris et al. 2014) |
+| Passive margins: shore to the 200 m isobath, median | 5.0 km | 25 km (ETOPO 2022, PLT-265) |
+| Passive margins: the shelf break | 187 m | about 130 to 140 m (secondary sources; Harris et al. 2014 give none) |
+
+The shelf is about Earth's; what is extra is the crust on the slope and below it, 0.29 of the
+continental crust against Earth's 0.16, and nearly none of it is far from the sea: 97 to 100 % of
+the continental crust lies within 100 km (on the planet) of oceanic crust. That is the
+transition's continental half. W is 200 km on the planet (PLT-262, Ben's answer of 2026-10-05),
+which is 1,632 km on the Earth-sized model sphere the plate model runs on, eight times Earth's
+margins (Harris et al. 2014: passive shelf and slope 134 km). Over the continental half of the
+taper the target thickness runs from 20 km at the boundary to 33 km at W/2 (100 km on the
+planet), all of it under the 35.1 km at which the surface crosses the sea, so the taper's
+continental half is under the sea wherever nothing thickened it. With W at 200 km on the model
+sphere (wsph):
+
+| Median of 12 | master | wsph | p | w70 | p |
+|---|---|---|---|---|---|
+| Land (0.26 to 0.32) | 0.247 | 0.274 | 0.002 | 0.253 | 0.51 |
+| Largest landmass (≥ 0.12) | 0.104 | 0.125 | 0.073 | 0.080 | 0.84 |
+| Continental crust under the sea (≤ 0.25) | 0.414 | 0.279 | 0.002 | 0.384 | 0.40 |
+| Land above 2 km, of the land (≤ 0.12) | 0.248 | 0.277 | 0.40 | 0.222 | 0.80 |
+| Coast with high ground (≤ 0.15) | 0.369 | 0.403 | 0.39 | 0.328 | 0.77 |
+| Land under ice (≤ 0.15) | 0.170 | 0.159 | 0.89 | 0.143 | 0.93 |
+| Collisions per 100 Myr (2 to 6) | 1.65 | 1.85 | 0.43 | 1.70 | 1.0 |
+| Continental crust's net change over 1,000 Myr | −0.085 | −0.064 | 0.13 | −0.060 | 0.11 |
+| Criteria met per run | 1 | 2 | 0.035 | 2 | 0.25 |
+| Under the sea, the plate model's mean over the last 500 Myr | 0.348 | 0.236 | < 0.001 | 0.308 | 0.14 |
+| Under the sea, the plate model's mean over the frames after the first 100 Myr | 0.362 | 0.243 | < 0.001 | 0.281 | 0.001 |
+| Land, the plate model's mean over the same frames | 0.282 | 0.320 | < 0.001 | 0.306 | < 0.001 |
+| The plates' step sea, median over the run, m | 210 | 413 | 0.24 | 210 | 0.98 |
+| Crust at least 25 km thick above the sea (Earth 0.81) | 0.572 | 0.683 | 0.014 | 0.578 | 0.98 |
+| The census's sea over the datum, m | 538 | 826 | 0.069 | 900 | 0.053 |
+| Continental crust's mean thickness, km | 39.5 | 42.9 | < 0.001 | 41.3 | 0.002 |
+| Slope share (200 to 2,000 m under) | 0.200 | 0.126 | < 0.001 | 0.183 | 0.089 |
+| Deeper than 2,000 m | 0.089 | 0.073 | 0.017 | 0.080 | 0.24 |
+| Passive margins: slope between 500 and 2,000 m, median | 2.5° | 3.2° | | 2.8° |  |
+| Passive margins: shelf break, m | 187 | 213 | | 189 |  |
+
+The narrower taper keeps the continents' crust in their cores: they are thicker for their area
+and stand higher (the continental crust's mean height over the sea 381 to 822 m), the sea rises
+with them by less, and the share under it falls to 0.279. The slope share falls to below Earth's;
+the slope steepens by 0.7°, not the 1.9° the decision of 2026-10-05 weighed: that 4.5° was the
+one-sample step with the transition off (W = 0), not a narrower one, and the surface's slope
+failure and sediment now shape the slope too.
+
+W at 70 km sits between on the frames' mean (0.281, p 0.001) but not on the final frame (0.384,
+p 0.40): its sea climbs through the run (the medians of the 100 Myr windows from about 0 m at
+−900 Myr to 741 m over the last 100 Myr, against master's 180 to 290 m and then 456 to 506 m),
+and the final frame catches it at its highest. The higher, thicker continents shed more
+sediment, and none of it leaves the ocean (above), so the basins fill faster the narrower the
+taper, and the final frame's share rewards a narrower taper less than the run's mean does. Its
+passive slopes are 2.8° (the steepest 4.5°), its shelf 0.5 km wide at the median and the 200 m
+isobath 6.0 km from the shore.
+
+By run, under the sea, master / wsph / w70: super-1 0.387 / 0.379 / 0.371, super-2 0.445 /
+0.210 / 0.275, super-3 0.324 / 0.230 / 0.444, super-4 0.418 / 0.405 / 0.375, super-5 0.322 /
+0.409 / 0.393, super-6 0.412 / 0.269 / 0.190, scatt-1 0.428 / 0.261 / 0.424, scatt-2 0.417 /
+0.273 / 0.393, scatt-3 0.527 / 0.270 / 0.333, scatt-4 0.394 / 0.324 / 0.448, scatt-5 0.420 /
+0.285 / 0.245, scatt-6 0.361 / 0.364 / 0.492.
+
+W is Ben's: he chose 200 km on the planet to keep Earth's slopes in the game's metres. The
+measurement says the plate model needs Earth's width in its own frame to keep Earth's share of
+continental crust above the sea, and that the game's slopes pay less for it than was thought.
+Recommended to Ben: W at 200 km on the model sphere (24.5 km on the quick planet), or the taper
+in the model's frame and the drawn margin in the planet's, if the slope matters more (a larger
+change: the L1 map and the surface would draw the margin wider than the crust's taper).
+
 ## Simplifications and limits
 
 - The fill uses the ground at the step's start; the floor's answer to the new water load comes in
@@ -489,6 +701,23 @@ sixteenth of the planet's width of the seam 0.026 → 0.053 of that band.
 - The plate era's closed basins on oceanic crust grew (124 to 156 per snapshot): they stand on
   island arcs and stacked crust above the sea, which the lower sea lays dry; they belong with the
   arcs' rate (the plate-geometry task), not with the sea.
+- For Ben (2026-10-22, "The continents under the sea and the sea's height at the end"): the
+  transition's width W is 200 km on the planet, eight times Earth's margins in the plate model's
+  own frame, and it is what puts most of the drowned crust under the sea. At 200 km on the model
+  sphere (24.5 km on the quick planet) the share under the sea falls 0.414 to 0.279 and land and
+  the largest landmass come into their bands, for 0.7° of slope. Recommended: W on the model
+  sphere. Not changed: W is his decision of 2026-10-05.
+- For the coordinator: the 0.25 target equals Earth's share at the model's boundary (0.237 to
+  0.248, CRUST1.0 at 20 km) with no margin, and Earth fails it by Cogley's continent-ocean
+  contacts (0.306). Recommended: report the share of crust at least 25 km thick above the sea
+  beside it (Earth 0.81).
+- For the plate and crust-budget tasks: the ocean holds five to six times Earth's sediment, since
+  none subducts, and that is what holds the sea 500 m over the datum; but the continents get
+  their eroded crust back only through it (sub80), so sediment subduction waits on the arcs'
+  growth of continental crust.
+- Not settled: the final frame is always read right after the plate model's forced last
+  resampling, 48 to 118 m of sea over the last step's; whether the saw's top or its run is the
+  truer state.
 
 ## Sources
 
@@ -506,3 +735,10 @@ sixteenth of the planet's width of the seam 0.026 → 0.053 of that band.
 - Kominz1998: the backstripping relation, 2026-10-21.
 - Parsons1982: the abstract on OSTI (the age–area law, the consumption rate C₀/t_m), 2026-10-21.
 - Seton2020: the abstract (mean age 64.2 Myr), 2026-10-21; the grid earlier (WP-13a).
+- For "The continents under the sea and the sea's height at the end" (2026-10-22): Cogley1984
+  (the abstract), RudnickGao2003 (full text, the 31 %), Harrison1983 (full text, Table 5),
+  Laske2013 (the CRUST1.0 data, measured), Straume2019 (the accepted manuscript, Table 3),
+  Conrad2013 (the "Marine Sedimentation" section), Dutkiewicz2017 (sections 4 and 5),
+  Syvitski2005 (at second hand, Walling 2006), vonHueneScholl1991 (the abstract), SternScholl2010
+  (read earlier), Harris2014 (read earlier) and SimpsonSimpson2018 (full text, the land's mean
+  heights).
