@@ -27,8 +27,8 @@ import java.util.Optional;
  * </ul>
  * {@link #find} takes the suffixed API when the jar has one, else the plain one. The members used
  * are the same in 3.3.0 (API 7.1.0), 3.3.1 (7.1.0) and 3.3.3 (7.2.0), verified with {@code javap}
- * on the three jars; {@code DhApiBindingTest} loads the real 3.3.0 and 3.3.3 jars and drives a
- * generator through them.
+ * on the three jars; {@code DhApiBindingTest} loads the real 3.3.3 (the MIC pack's pin since pack
+ * 62dd14e) and 3.3.1 jars and drives a generator through them.
  *
  * <p>Verified surface (package {@code com.seibel.distanthorizons.api}):
  * <pre>

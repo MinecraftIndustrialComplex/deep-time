@@ -198,6 +198,11 @@ public final class FarTerrainCommand {
         o.add("spawn", spawn);   // the smoke harness checks an area beside the spawn chunks
         o.addProperty("installed", DhFarTerrain.installed());
         o.addProperty("enabled", DhFarTerrain.enabled());
+        // Real chunks built since the process started (vanilla's loading around players, or Distant
+        // Horizons' chunk phase): next to the sections the generator override made, it shows whether
+        // Distant Horizons still asks the server for chunks beyond the view.
+        o.addProperty("chunks_surfaced", com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator.chunksSurfaced());
+        o.addProperty("chunk_x_extent", com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator.chunkXExtent());
         // Deep Time's patch to Toroidal World's guard: applied, pending, skipped (and why) or failed
         // (TwDhGuardMixinPlugin sets it; a class of the mixin package cannot be read from here).
         o.addProperty("tw_guard_patch", System.getProperty("deeptime.twDhGuard", "not configured"));

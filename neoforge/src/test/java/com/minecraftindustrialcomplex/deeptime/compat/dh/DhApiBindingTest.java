@@ -29,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The run-time binding against the real Distant Horizons jars (plan §10.5 P3-04: "the exact DH
  * version matters"). Gradle resolves the jars from Modrinth ({@code dh_version}, the MIC pack's
- * pin, and {@code dh_next_version}) and names them in {@code deeptime.test.dhJars}; each is opened
+ * pin, {@code dh_next_version}, the newest release checked, and {@code dh_prev_version}, the previous
+ * pin on the older API 7.1.0) and names them in {@code deeptime.test.dhJars}; each is opened
  * in its own class loader, with no Minecraft on it, which the API classes do not need.
  *
  * <p>For every jar: the binding resolves under the naming the jar really has; a

@@ -322,7 +322,7 @@ def main():
     i.add_argument("--work", required=True, help="scratch folder, e.g. /Volumes/Graphide/ban/deeptime-runs/ew1-dh-repro/work")
     i.add_argument("--set", required=True)
     i.add_argument("--tw", help="Modrinth version id of the Toroidal World / Exotic Worlds jar (default: the standalone profile's 0.19.3)")
-    i.add_argument("--dh", help="Modrinth version id of Distant Horizons (default: the dh profile's pin, 3.3.1)")
+    i.add_argument("--dh", help="Modrinth version id of Distant Horizons (default: the dh profile's pin, 3.3.3 since pack 62dd14e)")
     i.add_argument("--jars", choices=["dh-set", "two-mod"], default="dh-set",
                    help="dh-set: every jar of the dh profile (without Deep Time); two-mod: Toroidal World / Exotic Worlds and Distant Horizons only")
     i.add_argument("--deeptime-jar", help="add this Deep Time jar (to show it cannot load next to Exotic Worlds 1.0.0)")

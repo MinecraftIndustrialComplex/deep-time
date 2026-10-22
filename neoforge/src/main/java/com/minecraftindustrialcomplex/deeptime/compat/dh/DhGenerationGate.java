@@ -7,7 +7,7 @@ package com.minecraftindustrialcomplex.deeptime.compat.dh;
  * Minecraft and no Distant Horizons type appears here; {@link DhApiBinding#generationEnabled} reaches
  * the setting and {@code client/DhGenerationClient} feeds this the level the player is in.
  *
- * <p><b>Why.</b> Distant Horizons 3.3.1's client start ({@code AbstractModInitializer.
+ * <p><b>Why.</b> Distant Horizons 3.3.1's (and 3.3.2's) client start ({@code AbstractModInitializer.
  * logIncompatibilityWarnings}, run from {@code onInitializeClient} only) puts
  * {@code generatorPlan = DISABLED} on the API override layer of every client that has Chunky
  * installed ({@code org.popcraft.chunky.api.ChunkyAPI} on the class path), whatever the player's
