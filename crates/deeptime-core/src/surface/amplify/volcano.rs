@@ -526,7 +526,8 @@ mod tests {
         let (world, preset) = world_with(vec![strato(0.0, 0.0, None)]);
         let sh = Shaper::from_world(&world, &preset).unwrap();
         assert_eq!(sh.len(), 1);
-        // L2 (8 blocks, 2.4 km): the band raises the summit and lowers the skirt a little; far
+        // L2 (8 blocks, 2.4 km): level ground at 100 m holding the deep-time edifice (as the
+        // young landscape does); the band raises the summit and lowers the skirt a little; far
         // away nothing changes; the volume stays about the same.
         let g2 = GridDesc::for_planet("L2", 16_384, 8).unwrap();
         let n = g2.cells();
@@ -541,14 +542,25 @@ mod tests {
             lake: vec![0; n],
             zs: Vec::new(),
         };
+        let it = &sh.items[0];
+        let mh = preset.scale.m_per_block_h;
+        vol::for_cells(&g2, mh, it.x, it.z, it.rem.reach() * it.radius_m, |c, dx, dz| {
+            level.z[c] += it.rem.at(dx.hypot(dz) / it.radius_m) as f32;
+        });
+        let before = level.z.clone();
         assert!(sh.sharpen_level(&mut level, &g2) > 0);
         let at = |g: &GridDesc, z: &[f32], bx: f64, bz: f64| {
             z[crate::surface::volcanoes::cell_of(g, bx, bz)]
         };
         let top = at(&g2, &level.z, 0.0, 0.0);
-        assert!(top > 150.0, "{top}");
+        assert!(top > at(&g2, &before, 0.0, 0.0) + 50.0, "{top}");
         assert_eq!(at(&g2, &level.z, 1000.0, 0.0), 100.0);
-        let dv: f64 = level.z.iter().map(|&z| f64::from(z) - 100.0).sum();
+        let dv: f64 = level
+            .z
+            .iter()
+            .zip(&before)
+            .map(|(&z, &b)| f64::from(z) - f64::from(b))
+            .sum();
         assert!(dv.abs() < 0.2 * 2500.0, "volume change {dv} m·cells");
         // L3 (2 blocks, 600 m): the crater: the centre below the rim; the summit sharper.
         let g3 = GridDesc::for_planet("L3", 16_384, 2).unwrap();
@@ -572,7 +584,7 @@ mod tests {
     #[test]
     fn onlap_is_the_old_sum_on_level_ground_and_lets_high_ground_show() {
         // Level ground: the cone added, at every ρ.
-        for rho in [0.0, 0.3, 0.7, 1.0, 1.2] {
+        for rho in [0.0f64, 0.3, 0.7, 1.0, 1.2] {
             let (tp, rem) = (1000.0 * (1.0 - rho).max(0.0), 50.0);
             let added = 300.0 - rem + tp;
             let v = onlap(300.0, rho, tp, rem, 2000.0, Some(250.0));
@@ -655,10 +667,13 @@ mod tests {
         // The summit stands the cone's kept height above the vent's ground.
         let top = f64::from(level.z[vent]) - f64::from(plane[vent]);
         assert!(top > 0.5 * h && top < 1.05 * h, "summit {top} m above the ground");
-        // Uphill beyond the envelope the ground is the plane (no coarse bump left, no cone on
-        // it); far away nothing changes; the fill is never more than the cone's height.
+        // Uphill beyond the envelope the ground is the plane (no cone on it, and of the coarse
+        // bump only the share the ring at 1.1 radii holds, which the held edifice leaves out:
+        // about half a percent of the height here); far away nothing changes; the fill is never
+        // more than the cone's height.
         let up = crate::surface::volcanoes::cell_of(&g2, 0.7 * r / mh, 0.0);
-        assert!((level.z[up] - plane[up]).abs() < 1.0, "{} vs {}", level.z[up], plane[up]);
+        let left = f64::from(level.z[up] - plane[up]);
+        assert!(left.abs() < 0.01 * h, "{} vs {}", level.z[up], plane[up]);
         let far = crate::surface::volcanoes::cell_of(&g2, 3.0 * r / mh, 0.0);
         assert_eq!(level.z[far], young.data[far]);
         for c in 0..n {
