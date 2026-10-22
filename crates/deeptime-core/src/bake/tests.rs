@@ -446,8 +446,9 @@ fn a_craters_lens_is_seated_under_the_drawn_floor() {
 
 /// The essentials guarantee in the world as generated (DEP-220, DEP-221, ORE-280): the projection
 /// chooses its own λc on the baked land (the deposit stage only forecasts it), every land region
-/// of the world holds a source of each essential with ore in its centre column (the anchor's
-/// top-up fills what the forecast missed), every guaranteed deposit but a placer (an in-stratum
+/// of the world holds a source of each essential with ore in its centre column and a dry centre
+/// (the anchor's top-up fills what the forecast missed, and counts none lying under the sea),
+/// every guaranteed deposit but a placer (an in-stratum
 /// one too, a top-up copy too) holds ore in rock in its centre column of the world the game
 /// reads, an exposed one at the top rock block; the pass is settled (a second run moves and adds
 /// nothing).
@@ -567,9 +568,11 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
             }
             z += step;
         }
+        // A source under the sea counts for no region (the top-up's rule): its centre is dry.
         let held: std::collections::BTreeSet<usize> = sites
             .iter()
             .filter(|s| ess.counts(&s.products))
+            .filter(|s| anchor::centre_is_dry(&world, s))
             .filter(|s| {
                 let mine: Vec<&deeptime_format::Body> =
                     bodies.iter().filter(|b| b.site == Some(s.id)).collect();

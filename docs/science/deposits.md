@@ -739,11 +739,14 @@ manifest notes):
   keeps master's choice untouched, so the cone points stay as far from land as before. Where the
   forecast's regions are not the world's, a top-up after the projection fills the difference: it
   counts the world's own land regions (a 64-block lattice on the generated terrain) against the
-  sources that hold ore in rock in their centre column as the game reads it, and gives each land
-  region without one a copy of a template source (the essential's first guaranteed site holding
-  ore, else its smallest natural source holding ore), at the region's inland point nearest the
-  spawn, anchored like the rest (below), with a `deeptime:guaranteed_occurrence` of its own caused
-  by the template's. The same top-up covers the natural sources the bake left without ore and the
+  sources that hold ore in rock in their centre column as the game reads it and whose centre
+  column is dry land (the ground there at or above sea level, with no water over it; a source
+  under the sea counts for no region, see "A source under the sea does not count" below), and
+  gives each land region without one a copy of a template source (the essential's first
+  guaranteed site holding ore, else its smallest natural source holding ore, one whose centre is
+  under the sea skipped while another exists), at the region's inland point nearest the spawn,
+  anchored like the rest (below), with a `deeptime:guaranteed_occurrence` of its own caused by the
+  template's. The same top-up covers the natural sources the bake left without ore and the
   CLI's `deeptime project`, which reruns the projection on a Lambert run's folder. A first version
   (2026-10-20, never merged) had the stage choose λc and the projection draw the world with it;
   since the young landscape and the amplifier redraw the land, that put the cone points 0.1 to 2.7
@@ -858,8 +861,8 @@ copper (spawn 1,985, access p50 104) and gold (1,379) needed no guarantee and di
   was a natural body the bake emptied (master's quick supercontinent seed 3: a natural MVT whose
   host horizon the projection's clip left with no block, and a natural SEDEX whose centre the
   bake lifted 5 blocks above the ground) gets a copy; that planet's western region holds lead
-  with ore on the branch. What the guarantee still trusts: a source under the sea counts for its
-  region like one on land, and the top-up reads the centre column only.
+  with ore on the branch. What the guarantee still trusts: the top-up reads the centre column only
+  (a source counts when its centre column holds ore, whatever the rest of its footprint does).
 - **Spawn distances** are paired now: the λc is master's on both builds, so the spawn is the same
   place. Iron's nearest source holding ore came nearer on four of seven planets (by 2.6 to 4.4
   km: supercontinent 1, 4,600 to 855; supercontinent 3, 4,050 to 883; scattered 3, 3,460 to 840;
@@ -896,6 +899,68 @@ copper (spawn 1,985, access p50 104) and gold (1,379) needed no guarantee and di
   234.25 (3.80), 20.50 (6.70); scattered continents 1 to 3, 25.75 (5.70), 158.75 (1.90), 331.50
   (5.10); full, 67.25 (9.60). The deposit stage took 3.1 % of the stages' sum on the quick
   planets and 4.7 % on the full one, its forecast lap 0.0 s.
+- **A source under the sea does not count** (2026-10-21, the coordinator's call under Ben's rule
+  of 2026-10-16, DEP-220). The top-up counted any source holding ore in its centre column, under
+  the sea or not, though ore a player must dive for is no iron within reach. A source now counts
+  for a region only when its centre column is dry land (`anchor::centre_is_dry`: the ground there
+  at or above sea level, `Columns::dry`, and no water over the top rock block,
+  `Columns::rock_top`, the two tests the top-up already uses to pick a dry lattice point for a
+  copy). A land region whose only sources with ore lie under the sea gets a dry copy; the template
+  choice is unchanged, but a template whose centre is under the sea is skipped while another
+  exists; natural sites are never moved. `notes.bake.guaranteed.top_up` gains `counted`,
+  `sub_sea` (sources with ore left out) and `short_by_sea` (land regions that only the sea kept
+  short), and the audit's per-essential and top-level keys gain the dry counts. Measured on the
+  VM, master 20130faa against the branch (the same content file and run flags, both worlds read by
+  the branch's audit, `tools/review/essentials-table.py --dry`). "Regions" are the top-up's own
+  64-block-lattice land regions of the essential's size; "counted" is sources with ore in them
+  (master: any centre; branch: dry centre); a SEDEX counts for lead and zinc.
+
+earthlike_quick_16k, 1,000 Myr, supercontinent and scattered continents seeds 1 to 3 (six planets
+a build, the two builds side by side):
+
+| essential | land regions | sources counted, master | branch | per land region, master | branch | regions with a dry source with ore, master | branch | copies added, master | branch |
+|---|---|---|---|---|---|---|---|---|---|
+| iron | 47 | 60 | 58 | 1.28 | 1.23 | 42 | 46 | 12 | 16 |
+| coal | 47 | 621 | 301 | 13.2 | 6.4 | 43 | 47 | 7 | 14 |
+| lead | 12 | 64 | 15 | 5.33 | 1.25 | 10 | 12 | 0 | 2 |
+| zinc | 12 | 71 | 16 | 5.92 | 1.33 | 10 | 12 | 0 | 0 |
+| copper | 12 | 110 | 49 | 9.17 | 4.08 | 12 | 12 | 0 | 1 |
+| gold | 12 | 509 | 117 | 42.4 | 9.75 | 12 | 12 | 0 | 0 |
+
+earthlike_full_16k, 1,000 Myr, scattered continents seed 1:
+
+| essential | land regions | sources counted, master | branch | per land region, master | branch | regions with a dry source with ore, master | branch | copies added, master | branch |
+|---|---|---|---|---|---|---|---|---|---|
+| iron | 8 | 10 | 10 | 1.25 | 1.25 | 5 | 8 | 2 | 5 |
+| coal | 8 | 175 | 44 | 21.9 | 5.5 | 8 | 8 | 1 | 2 |
+| lead | 2 | 39 | 7 | 19.5 | 3.5 | 2 | 2 | 1 | 1 |
+| zinc | 2 | 44 | 7 | 22.0 | 3.5 | 2 | 2 | 0 | 0 |
+| copper | 2 | 20 | 8 | 10.0 | 4.0 | 2 | 2 | 0 | 0 |
+| gold | 2 | 127 | 14 | 63.5 | 7.0 | 2 | 2 | 0 | 0 |
+
+- The count fell where the sea held the sources (gold 509 to 117, coal 621 to 301, lead 64 to 15
+  on the quick planets): most of master's sources per region were under water. Iron barely moved
+  (60 to 58): only 6 of its sources with ore in the six worlds have a centre that is not dry
+  (DEP-222 puts its guaranteed bodies inland first).
+- Copies added: 19 to 33 on the six quick planets (iron 12 to 16, coal 7 to 14, lead 0 to 2,
+  copper 0 to 1), 4 to 8 on the full one. Guaranteed sites: 80 to 94 and 12 to 16, the 14 and 4
+  more being those copies; every copy has a dry centre by construction.
+- Guaranteed sites with a centre that is not dry: 7 of 80 (7 of 94) on the quick planets and 3 of
+  12 (3 of 16) on the full one, the same sites on both builds: natural guaranteed sites the
+  deposit stage placed, never moved (the ground at every one lies below sea level; the anchor
+  pass counts 5 of the quick planets' 7 and all 3 of the full one's as under water).
+- Land regions with a dry source with ore: every one but one on the six quick planets (iron 42 of
+  47 to 46 of 47, coal 43 to 47, lead and zinc 10 to 12 of 12) and every one on the full planet
+  (iron 5 of 8 to 8 of 8). Planets with every land region of every essential covered: 5 of 6
+  (master: iron 2 of 6, coal 3 of 6, lead and zinc 4 of 6) and 1 of 1. The one region left,
+  iron's seventh on quick scattered continents 3, is short on master too: it holds a single dry
+  lattice point (one 64-block step of land), and a copy there would overlap a guaranteed body,
+  which DEP-222 keeps clear of; the top-up places nothing and records it as `short` 1.
+- The top-up's time (`top_up_millis`, the two builds running side by side on a VM at load 20 to
+  45): quick planets median 153 ms on master (sum 894, range 96 to 178), 179 ms on the branch
+  (sum 1,077, range 149 to 214); full planet 262 ms against 274 ms. The extra work is the dry test
+  per source with ore and 14 more copies' host searches; a difference of tens of milliseconds is
+  inside the load's noise. The anchor pass: median 95 and 109 ms (quick), 95 and 94 ms (full).
 
 ## Simplifications and limits
 
