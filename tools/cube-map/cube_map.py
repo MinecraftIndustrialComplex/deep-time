@@ -390,38 +390,49 @@ def patch_nodes(m, K, F):
     return Q, err
 
 
-def cr(p0, p1, p2, p3, t):
-    c1 = p2 - p0
-    c2 = ((2.0 * p0 - 5.0 * p1) + 4.0 * p2) - p3
-    c3 = (3.0 * (p1 - p2) + p3) - p0
-    return p1 + 0.5 * (t * (c1 + t * (c2 + t * c3)))
+def weights(t):
+    """The Catmull-Rom weights of the four nodes at t in [0, 1] (the readers' form and order:
+    crates/deeptime-format/src/cube_map.rs weights)."""
+    t2 = t * t
+    t3 = t2 * t
+    return (0.5 * ((2.0 * t2 - t) - t3),
+            0.5 * ((2.0 - 5.0 * t2) + 3.0 * t3),
+            0.5 * ((t + 4.0 * t2) - 3.0 * t3),
+            0.5 * (t3 - t2))
 
 
-def dcr(p0, p1, p2, p3, t):
-    c1 = p2 - p0
-    c2 = ((2.0 * p0 - 5.0 * p1) + 4.0 * p2) - p3
-    c3 = (3.0 * (p1 - p2) + p3) - p0
-    return 0.5 * (c1 + t * (2.0 * c2 + t * (3.0 * c3)))
+def dweights(t):
+    """The weights' derivatives along t."""
+    t2 = t * t
+    return (0.5 * ((4.0 * t - 1.0) - 3.0 * t2),
+            0.5 * (9.0 * t2 - 10.0 * t),
+            0.5 * ((1.0 + 8.0 * t) - 9.0 * t2),
+            0.5 * (3.0 * t2 - 2.0 * t))
+
+
+def mix(w, p):
+    """Sum of w_k p_k, summed from k = 0 (the readers' order)."""
+    return ((w[0] * p[0] + w[1] * p[1]) + w[2] * p[2]) + w[3] * p[3]
 
 
 def grid_eval(P, x, y, n):
     """The Catmull-Rom bicubic of the padded node array P (index offset 1, n cells a side) at grid
     coordinates (x, y) in node units, the cell from x, y clamped to [0, n - 1] and the cubic
-    evaluated at the point itself; with its derivatives per node unit."""
+    evaluated at the point itself; with its derivatives per node unit. The cubic along x on each
+    of the four rows, then along y, as the readers do it."""
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     i0 = np.clip(np.floor(x), 0, n - 1).astype(int)
     j0 = np.clip(np.floor(y), 0, n - 1).astype(int)
     tu, tv = x - i0, y - j0
+    wu, dwu = [w[..., None] for w in weights(tu)], [w[..., None] for w in dweights(tu)]
+    wv, dwv = [w[..., None] for w in weights(tv)], [w[..., None] for w in dweights(tv)]
     rows, drows = [], []
     for dj in range(-1, 3):
         p = [P[i0 + di + 1, j0 + dj + 1] for di in range(-1, 3)]
-        rows.append(np.stack([cr(*[q[..., c] for q in p], tu) for c in (0, 1)], -1))
-        drows.append(np.stack([dcr(*[q[..., c] for q in p], tu) for c in (0, 1)], -1))
-    val = np.stack([cr(*[r[..., c] for r in rows], tv) for c in (0, 1)], -1)
-    dx = np.stack([cr(*[r[..., c] for r in drows], tv) for c in (0, 1)], -1)
-    dy = np.stack([dcr(*[r[..., c] for r in rows], tv) for c in (0, 1)], -1)
-    return val, dx, dy
+        rows.append(mix(wu, p))
+        drows.append(mix(dwu, p))
+    return mix(wv, rows), mix(wv, drows), mix(dwv, rows)
 
 
 class Map:
