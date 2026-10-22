@@ -1654,7 +1654,9 @@ game-side pieces, no world-data layer of their own:
   `replaces` and `keeps` (ids and `#tags`: the rule holds only where the biome the climate search would
   give is, respectively is not, among them); `exclusive` (true: the candidates are kept out of the climate
   search, like `#deeptime:volcanic`, and appear only where a rule places them). Ordinary rules apply at
-  the surface (biome depth under 0.2), on land, off river channels. The first rule whose conditions hold
+  the surface (biome depth under 0.2), on land, off river channels. `replaces` and `keeps` are tested before
+  the climate conditions (their search is the level's own answer when no rule holds, so it is made anyway),
+  so a rule that replaces a few biomes samples the climate only where the search gives one of them. The first rule whose conditions hold
   and whose search finds a candidate decides: the source's own climate search runs over the rule's
   candidates alone (every other leaf infinitely far, as for the volcanic keep-out), so the pack's
   parameter ranges choose among them, out-of-range biomes included.
@@ -1662,8 +1664,13 @@ game-side pieces, no world-data layer of their own:
   tag `#deeptime:peatland`: wythers:fen, wythers:berry_bog, wythers:snowy_bog, wythers:snowy_fen,
   biomesoplenty:bog, biomesoplenty:muskeg, regions_unexplored:fen, clifftree:bog, all optional) and
   `deeptime:expanded_ecosphere` (requires wythers:ice_cap or wythers:fen; 19 rules, docs/science/biomes.md,
-  "Expanded Ecosphere and the biome rules") and `deeptime:rock_named` (requires `#deeptime:geology`; the geology
-  gate below). A datapack adds a file, or replaces one by its id.
+  "Expanded Ecosphere and the biome rules"), `deeptime:rock_named` (requires `#deeptime:geology`; the geology
+  gate below) and `deeptime:snow_line` (always active; two rules: where the climate search gives a biome of
+  `#deeptime:snow_line/snowfield` (frozen and jagged peaks, snowy slopes) on a column whose warmest month at its
+  own height is 10 °C or more, or `minecraft:grove` where the coldest month is 0 °C or more, and the column is
+  not under ice, a member of `#deeptime:snow_line/snowless` (vanilla's stony peaks, meadow and windswept hills,
+  Terralith's rocky mountains and highlands, optional) answers; docs/science/biomes.md, "The snow line"). A
+  datapack adds a file, or replaces one by its id.
 - `/deeptime probe biomes` reports what decided each sampled land column (`census.rules`: per rule, per
   role and the climate search; candidates seen and absent; the checks the GameTests read).
 
