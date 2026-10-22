@@ -157,6 +157,11 @@ def conformal_triangle(x, y):
     zt = np.where((x == 0) & (y == 0), 0j, zt)
     if not np.all(np.isfinite(zt)):
         raise RuntimeError("conformal_triangle: non-finite points")
+    err = np.where(corner.ravel(), 0.0, err)  # the corner is placed, not inverted
+    if os.environ.get("CM_DEBUG"):
+        o = np.argsort(-np.nan_to_num(err, nan=np.inf))[:5]
+        print("conformal_triangle worst:", [(float(x.ravel()[k]), float(y.ravel()[k]), float(err[k])) for k in o],
+              file=sys.stderr)
     return zt, sig, float(np.max(err[np.isfinite(err)]))
 
 
