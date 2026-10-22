@@ -1,0 +1,25 @@
+# The fixed core of the Deep Time lite mod set (tools/smoke/lite_set.py): one mod id per line, then why.
+# A mod id that no jar of the set provides is skipped with a note (a client-only mod is not on the
+# server, a mod the pack dropped is gone). Everything else of the lite set is derived from Deep Time's
+# data, never listed here: see lite_set.py's header for the rules.
+
+# Deep Time and its world
+deeptime            the mod under test
+toroidal_world      the planet wraps through Toroidal World (a required dependency of Deep Time; the pinned bundle of profiles/mic.txt)
+distanthorizons     far terrain comes from Deep Time's world data (compat/dh); the pack's pin
+deeptime_devmap     the internal developer map (play-client-stage.sh --devmap; never the pack's)
+
+# The pack's router. ClimateMappingBuilder samples the pack's own minecraft:overworld noise settings at a
+# world's first start, and MIC's router is Tectonic's (a mixin mod, so lite_set.py's router rule, which
+# looks for data overrides, cannot see it). Without it the climate mapping would be vanilla's.
+tectonic            Deep Time's climate mapping samples the pack's overworld router (Tectonic's)
+
+# Client performance mods the pack already has (Ben, 2026-10-22: a lighter client). Their required
+# companions come from the dependency closure.
+sodium              client performance: renderer
+lithium             performance: game logic
+c2me                performance: chunk loading and generation
+modernfix           performance: start-up and memory
+ferritecore         performance: memory
+immediatelyfast     client performance: immediate-mode rendering
+entityculling       client performance: entity culling
