@@ -1106,7 +1106,8 @@ impl VolcanoStage {
                     active_myr: 0.0,
                     depression: Some(Depression {
                         rho: crater_rho,
-                        depth: 0.06, // ledger: VOL-026
+                        // A crater's depth is absolute (shape::CRATER_DEPTH_M; ledger: VOL-026).
+                        depth: 0.0,
                         caldera: false,
                     }),
                     caldera: None,

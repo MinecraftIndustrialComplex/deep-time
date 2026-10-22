@@ -22,7 +22,10 @@
 //! at the rim level (the body becomes flat-topped inside the rim) and is subtracted as a bowl:
 //! steep-sided for a crater, flat-floored with steep walls for a caldera. The deep-time surface on
 //! L1 sees only the body; the bowl is cut at the finest grid (`amplify/volcano.rs`), after the
-//! amplifier's flood, which would fill it.
+//! amplifier's flood, which would fill it. A crater's depth is absolute, Earth's median
+//! ([`CRATER_DEPTH_M`]; Grosse et al. 2014 find no correlation between a crater's depth and its
+//! edifice's height), at most [`CRATER_DEPTH_MAX_SHARE`] of the cone; a caldera's is a share of
+//! the height.
 //!
 //! **Residuals.** A grid of cell size dx represents a shape S about as S convolved with a tent of
 //! half-width dx (point samples, then linear interpolation, averaged over where the shape falls
@@ -58,7 +61,8 @@ impl Kind {
 pub struct Depression {
     /// Rim radius / basal radius.
     pub rho: f64,
-    /// Depth below the rim, as a share of the edifice's height.
+    /// A caldera's depth below its rim, as a share of the edifice's height. A crater's depth is
+    /// absolute ([`CRATER_DEPTH_M`], [`Shape::depression_depth_m`]); its value here is unused.
     pub depth: f64,
     /// A caldera (flat floor), else a crater (a bowl).
     pub caldera: bool,
@@ -98,8 +102,19 @@ impl Shape {
         }
     }
 
-    /// The depression's depth below the body at ρ (≥ 0), as a share of the height.
-    pub fn bowl(&self, rho: f64) -> f64 {
+    /// The depression's depth below its rim, m, on an edifice standing `height_m`: a crater's is
+    /// Earth's median whatever the height, at most [`CRATER_DEPTH_MAX_SHARE`] of it; a caldera's is
+    /// its share of the height.
+    pub fn depression_depth_m(&self, height_m: f64) -> f64 {
+        match self.depression {
+            None => 0.0,
+            Some(d) if d.caldera => d.depth * height_m,
+            Some(_) => CRATER_DEPTH_M.min(CRATER_DEPTH_MAX_SHARE * height_m).max(0.0),
+        }
+    }
+
+    /// The depression's depth below the body at ρ (≥ 0), m, on an edifice standing `height_m`.
+    pub fn bowl_m(&self, rho: f64, height_m: f64) -> f64 {
         let Some(d) = self.depression else {
             return 0.0;
         };
@@ -107,20 +122,30 @@ impl Shape {
             return 0.0;
         }
         let x = rho / d.rho;
+        let depth = self.depression_depth_m(height_m);
         if d.caldera {
             // ledger: VOL-027
-            d.depth * (1.0 - smoothstep(0.78, 1.0, x))
+            depth * (1.0 - smoothstep(0.78, 1.0, x))
         } else {
             // ledger: VOL-027
-            d.depth * (1.0 - x * x).sqrt()
+            depth * (1.0 - x * x).sqrt()
         }
     }
 
-    /// The full shape at ρ: body less the bowl.
-    pub fn full(&self, rho: f64) -> f64 {
-        self.body(rho) - self.bowl(rho)
+    /// The full shape at ρ, m, on an edifice standing `height_m`: the body less the bowl.
+    pub fn full_m(&self, rho: f64, height_m: f64) -> f64 {
+        height_m * self.body(rho) - self.bowl_m(rho, height_m)
     }
 }
+
+/// A summit crater's depth below its rim, m: Earth's median, 240 m (Grosse et al. 2014, 104 large
+/// craters and calderas on composite volcanoes, under 100 to 860 m deep). Ben, decisions log
+/// 2026-10-22 (D7).
+pub const CRATER_DEPTH_M: f64 = 240.0; // ledger: VOL-026
+
+/// … at most this share of the cone's height: the deepest summit crater of Pike & Clow 1981's 103
+/// stratocones with a summit crater only is 0.37 of the cone's height (median 0.09).
+pub const CRATER_DEPTH_MAX_SHARE: f64 = 0.37; // ledger: VOL-090
 
 /// A radial table: values at ρ = k · step, zero beyond the last.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -253,10 +278,41 @@ mod tests {
         };
         let rim = Shape::profile(Kind::Strato, 0.3);
         assert!((s.body(0.0) - rim).abs() < 1e-12);
-        assert!((s.full(0.0) - (rim - 0.2)).abs() < 1e-12);
-        assert!((s.full(0.1) - (rim - 0.2)).abs() < 1e-12, "flat floor");
-        assert!((s.full(0.3) - rim).abs() < 1e-12, "the rim");
-        assert!(s.full(0.5) < rim);
+        assert!((s.full_m(0.0, 1.0) - (rim - 0.2)).abs() < 1e-12);
+        assert!((s.full_m(0.1, 1.0) - (rim - 0.2)).abs() < 1e-12, "flat floor");
+        assert!((s.full_m(0.3, 1.0) - rim).abs() < 1e-12, "the rim");
+        assert!(s.full_m(0.5, 1.0) < rim);
+        // A caldera's depth is a share of the height.
+        assert!((s.depression_depth_m(2000.0) - 400.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_crater_is_earths_median_deep_whatever_the_cone() {
+        let s = Shape {
+            kind: Kind::Strato,
+            depression: Some(Depression {
+                rho: 0.07,
+                depth: 0.06,
+                caldera: false,
+            }),
+        };
+        // 240 m below the rim on a 2-km cone and on a 1-km one: the share of height is unused.
+        for h in [1000.0, 2000.0] {
+            assert!((s.depression_depth_m(h) - CRATER_DEPTH_M).abs() < 1e-9);
+            assert!((s.bowl_m(0.0, h) - 240.0).abs() < 1e-9);
+            let rim = h * Shape::profile(Kind::Strato, 0.07);
+            assert!((s.full_m(0.0, h) - (rim - 240.0)).abs() < 1e-9);
+            assert!((s.full_m(0.07, h) - rim).abs() < 1e-9, "the rim");
+        }
+        // A low cone's crater is at most 0.37 of it.
+        assert!((s.depression_depth_m(300.0) - 0.37 * 300.0).abs() < 1e-9);
+        assert_eq!(s.depression_depth_m(-5.0), 0.0);
+        let none = Shape {
+            kind: Kind::Strato,
+            depression: None,
+        };
+        assert_eq!(none.depression_depth_m(2000.0), 0.0);
+        assert_eq!(none.bowl_m(0.0, 2000.0), 0.0);
     }
 
     #[test]
