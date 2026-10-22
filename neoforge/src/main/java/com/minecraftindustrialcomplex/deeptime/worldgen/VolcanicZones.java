@@ -112,14 +112,31 @@ public final class VolcanicZones {
         }
 
         /**
-         * How far the offset (dx, dz) lies outside the zone, blocks, along the line from its centre (a disc's
-         * edge distance exactly); 0 or less inside, scaled there by the semi-minor axis.
+         * How far the offset (dx, dz) lies outside the zone, blocks: the distance to its nearest edge point (a
+         * disc's edge distance exactly); 0 or less inside, scaled there by the semi-minor axis. Never less than
+         * {@code hypot(dx, dz) − radius}, since the zone lies within its semi-major disc.
          */
         public double outside(double dx, double dz) {
             if (radius == minor)
                 return Math.hypot(dx, dz) - radius;
-            double s = Math.sqrt(reach2(dx, dz));
-            return s <= 1.0 ? (s - 1.0) * minor : Math.hypot(dx, dz) * (1.0 - 1.0 / s);
+            double u = Math.abs(dx * ax + dz * az), v = Math.abs(dz * ax - dx * az), a = radius, b = minor;
+            double s2 = (u / a) * (u / a) + (v / b) * (v / b);
+            if (s2 <= 1.0)
+                return (Math.sqrt(s2) - 1.0) * b;
+            // The nearest edge point is (a²u/(t + a²), b²v/(t + b²)) for the root t > 0 of
+            // (au/(t + a²))² + (bv/(t + b²))² = 1, which falls from s2 − 1 at t = 0 to below 0 at √(a²u² + b²v²):
+            // bisection. (The distance along the line from the centre, the old measure, overstates it between the
+            // axes, by up to about 2x on a 3:1 zone.)
+            double lo = 0.0, hi = Math.sqrt(a * a * u * u + b * b * v * v);
+            for (int i = 0; i < 60; i++) {
+                double t = 0.5 * (lo + hi), p = a * u / (t + a * a), q = b * v / (t + b * b);
+                if (p * p + q * q > 1.0)
+                    lo = t;
+                else
+                    hi = t;
+            }
+            double t = 0.5 * (lo + hi);
+            return Math.hypot(u - a * a * u / (t + a * a), v - b * b * v / (t + b * b));
         }
 
         /** Its area, blocks². */
@@ -214,7 +231,10 @@ public final class VolcanicZones {
         for (Zone zn : zones) {
             if (zn.role.cave)
                 continue;
-            double d = zn.outside(dx(x, zn.x), z - zn.z);
+            double ox = dx(x, zn.x), oz = z - zn.z;
+            if (Math.hypot(ox, oz) - zn.radius >= best)   // a lower bound of its distance: no nearer
+                continue;
+            double d = zn.outside(ox, oz);
             if (d < best)
                 best = d;
         }
