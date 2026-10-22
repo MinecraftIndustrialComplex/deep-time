@@ -25,7 +25,10 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.neoforged.fml.ModLoader;
+import net.neoforged.fml.ModLoadingIssue;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.loading.ClientModLoader;
 import net.neoforged.neoforge.common.NeoForge;
 
 import javax.imageio.ImageIO;
@@ -111,6 +114,8 @@ final class ScreenshotDriver {
     private static Step step = Step.TITLE;
     private static int ticks;
     private static int stepTicks;
+    /** Ticks the title screen has been up with mod loading over and no overlay (TITLE). */
+    private static int titleReadyTicks;
     /** Ticks a screen has stayed open over the world (IN_WORLD). */
     private static int screenTicks;
     private static CreateWorldScreen createScreen;
@@ -275,7 +280,21 @@ final class ScreenshotDriver {
         try {
             switch (step) {
                 case TITLE -> {
-                    if (screen instanceof TitleScreen && stepTicks > 40) {
+                    // The title screen can be up before the client has finished loading: Remove
+                    // Reloading Screen with hideOverlays = "ALL" ends the start-up load at once and
+                    // shows the title screen while mod setup still runs. Create World opened then
+                    // waited forever for its data reload (2026-10-22, the full MIC set). So the walk
+                    // starts only once mod loading is over, the overlay is gone and the title screen
+                    // has been up for two seconds, and stops at once on a mod loading error.
+                    boolean loaded = !ClientModLoader.isLoading() && mc.getOverlay() == null;
+                    titleReadyTicks = loaded && screen instanceof TitleScreen ? titleReadyTicks + 1 : 0;
+                    if (ModLoader.hasErrors()) {
+                        DeepTime.LOGGER.error("[deeptime-shot] FAILED: mod loading failed ({}); the walk stops",
+                                ModLoader.getLoadingIssues().stream().filter(i -> i.severity() == ModLoadingIssue.Severity.ERROR)
+                                        .map(i -> i.translationKey() + (i.cause() == null ? "" : " " + i.cause())).toList());
+                        shot("zz-mod-loading-failed");
+                        go(Step.QUIT);
+                    } else if (titleReadyTicks > 40) {
                         parkPointer(mc);
                         CreateWorldScreen.openFresh(mc, screen);
                         go(Step.CREATE_SCREEN);
