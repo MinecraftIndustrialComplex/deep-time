@@ -585,29 +585,35 @@ mod tests {
 
     #[test]
     fn a_crater_is_cut_earths_median_below_its_rim_on_a_tall_and_a_low_cone() {
-        // The last-grid table at the vent less the table at the rim: the crater's depth (the body
-        // is flat inside the rim, so only the bowl and the blur's small difference remain).
+        // The last-grid table at the vent less the table at the rim is the crater's depth plus the
+        // sharp summit's share there (the body is flat inside the rim, so that share is the L2
+        // blur's own fall from the vent to the rim): taking the latter away leaves the bowl.
+        let bowl_at_vent = |v: Volcano, sharp: f64| {
+            let (world, preset) = world_with(vec![v.clone()]);
+            let sh = Shaper::from_world(&world, &preset).unwrap();
+            let it = &sh.items[0];
+            let s = v.shape();
+            let dx2 = f64::from(preset.resolution.l2_r) * preset.scale.m_per_block_h;
+            let fine = shape::blurred(&|r: f64| s.body(r), dx2 / v.radius_m);
+            let rc = 0.05;
+            let summit = it.at * sharp * (fine.at(0.0) - fine.at(rc));
+            it.l3.at(rc) - it.l3.at(0.0) - summit
+        };
         for h in [2500.0, 1200.0] {
             let mut v = strato(0.0, 0.0, None);
             v.height_m = h;
             v.target_m = h;
-            let (world, preset) = world_with(vec![v]);
-            let sh = Shaper::from_world(&world, &preset).unwrap();
-            let it = &sh.items[0];
-            let rc = 0.05;
-            let depth = it.l3.at(rc) - it.l3.at(0.0);
+            let depth = bowl_at_vent(v, 1.0);
             assert!(
-                (238.0..260.0).contains(&depth),
+                (depth - 240.0).abs() < 2.0,
                 "a {h}-m cone's crater is {depth} m deep"
             );
         }
-        // A dead one's crater fades on the crater's clock (fade_myr 5): after 5 Myr, 1/e of it.
-        let (world, preset) = world_with(vec![strato(0.0, 0.0, Some(-5.0))]);
-        let sh = Shaper::from_world(&world, &preset).unwrap();
-        let it = &sh.items[0];
-        let depth = it.l3.at(0.05) - it.l3.at(0.0);
+        // A dead one's crater fades on the crater's clock (fade_myr 5): after 5 Myr, 1/e of it;
+        // its sharp summit on three times that.
+        let depth = bowl_at_vent(strato(0.0, 0.0, Some(-5.0)), (-5.0f64 / 15.0).exp());
         let want = 240.0 / std::f64::consts::E;
-        assert!((depth - want).abs() < 15.0, "{depth} vs {want}");
+        assert!((depth - want).abs() < 2.0, "{depth} vs {want}");
     }
 
     #[test]
