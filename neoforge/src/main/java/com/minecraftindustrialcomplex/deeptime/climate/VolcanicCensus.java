@@ -175,7 +175,7 @@ public final class VolcanicCensus {
         for (VolcanicZones.Zone zn : zones.zones()) {
             int[] n = byRole.computeIfAbsent(zn.role().id, k -> new int[2]);
             n[0]++;
-            n[1] += (int) Math.round(Math.PI * zn.radius() * zn.radius());
+            n[1] += (int) Math.round(zn.area());
         }
         Map<String, String> roles = new java.util.LinkedHashMap<>();
         double mH = t.data().manifest().mPerBlockH();

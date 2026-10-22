@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
+import com.minecraftindustrialcomplex.deeptime.worlddata.PortableMath;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,11 +18,14 @@ import java.util.Map;
  * the magma bodies ({@link Magma}); the biome a role puts there is the pack's business
  * ({@code climate.VolcanicBiomes}, the tags {@code #deeptime:volcanic/<role>}).
  *
- * <p>Every zone is a disc in blocks, at least {@link #MIN_RADIUS} in radius (two of the biome
- * grid's 4-block cells), so a role never makes a speck of one or two biome cells; a ring (the
- * ash and lava fields round a cone) is a disc of lower priority than the cone's, and is left out when
- * it would be narrower than {@link #MIN_RING}. Where discs overlap, {@link Role}'s order decides.
- * Every number here is a game choice (ledger BIO-104 to BIO-113).
+ * <p>Every zone is an ellipse in blocks (a disc on a Lambert world), each semi-axis at least
+ * {@link #MIN_RADIUS} (two of the biome grid's 4-block cells), so a role never makes a speck of one or
+ * two biome cells; a ring (the ash and lava fields round a cone) is a zone of lower priority than the
+ * cone's, and is left out when it would be narrower than {@link #MIN_RING}. Where zones overlap,
+ * {@link Role}'s order decides. The simulation draws a cone as a circle in its own frame, which a
+ * Petroff–Guyou world shows stretched; a volcano's zones take the projection's local stretch at the
+ * vent ({@link #stretch}), so they lie on the cone, its crater and its flanks as the terrain draws them.
+ * Every number here is a game choice (ledger BIO-104 to BIO-113, BIO-182).
  */
 public final class VolcanicZones {
 
@@ -80,12 +85,65 @@ public final class VolcanicZones {
     public static final double CAVE_SHARE = 1.5; // ledger: BIO-111 (game-choice)
 
     /**
-     * One disc.
+     * One zone: an ellipse in blocks, a disc when its semi-axes are equal.
      *
      * @param source the volcano's id; for a hot-spring field, the pool site's id
      * @param x      its centre (x canonical, in [−C/2, C/2))
+     * @param radius its semi-major axis, blocks (a disc's radius; the zone lies within it)
+     * @param minor  its semi-minor axis, blocks
+     * @param ax     with {@code az}, the unit vector of the semi-major axis in block space
      */
-    public record Zone(Role role, int source, int x, int z, double radius) {}
+    public record Zone(Role role, int source, int x, int z, double radius, double minor, double ax, double az) {
+
+        /** A disc. */
+        public Zone(Role role, int source, int x, int z, double radius) {
+            this(role, source, x, z, radius, radius, 1.0, 0.0);
+        }
+
+        /** The squared reach of the offset (dx, dz) from the centre in units of the zone: at most 1 inside. */
+        public double reach2(double dx, double dz) {
+            double p = (dx * ax + dz * az) / radius, q = (dz * ax - dx * az) / minor;
+            return p * p + q * q;
+        }
+
+        /** Whether the offset (dx, dz) from the centre lies in the zone (a disc's test exactly as before ellipses). */
+        public boolean holds(double dx, double dz) {
+            return radius == minor ? dx * dx + dz * dz <= radius * radius : reach2(dx, dz) <= 1.0;
+        }
+
+        /**
+         * How far the offset (dx, dz) lies outside the zone, blocks: the distance to its nearest edge point (a
+         * disc's edge distance exactly); 0 or less inside, scaled there by the semi-minor axis. Never less than
+         * {@code hypot(dx, dz) − radius}, since the zone lies within its semi-major disc.
+         */
+        public double outside(double dx, double dz) {
+            if (radius == minor)
+                return Math.hypot(dx, dz) - radius;
+            double u = Math.abs(dx * ax + dz * az), v = Math.abs(dz * ax - dx * az), a = radius, b = minor;
+            double s2 = (u / a) * (u / a) + (v / b) * (v / b);
+            if (s2 <= 1.0)
+                return (Math.sqrt(s2) - 1.0) * b;
+            // The nearest edge point is (a²u/(t + a²), b²v/(t + b²)) for the root t > 0 of
+            // (au/(t + a²))² + (bv/(t + b²))² = 1, which falls from s2 − 1 at t = 0 to below 0 at √(a²u² + b²v²):
+            // bisection. (The distance along the line from the centre, the old measure, overstates it between the
+            // axes, by up to about 2x on a 3:1 zone.)
+            double lo = 0.0, hi = Math.sqrt(a * a * u * u + b * b * v * v);
+            for (int i = 0; i < 60; i++) {
+                double t = 0.5 * (lo + hi), p = a * u / (t + a * a), q = b * v / (t + b * b);
+                if (p * p + q * q > 1.0)
+                    lo = t;
+                else
+                    hi = t;
+            }
+            double t = 0.5 * (lo + hi);
+            return Math.hypot(u - a * a * u / (t + a * a), v - b * b * v / (t + b * b));
+        }
+
+        /** Its area, blocks². */
+        public double area() {
+            return Math.PI * radius * minor;
+        }
+    }
 
     public static final VolcanicZones NONE = new VolcanicZones(List.of(), 0);
 
@@ -158,27 +216,35 @@ public final class VolcanicZones {
             Zone zn = zones.get(i);
             if ((bits & (1 << zn.role.ordinal())) != 0)
                 continue;
-            double ddx = dx(x, zn.x), ddz = z - zn.z;
-            if (ddx * ddx + ddz * ddz <= zn.radius * zn.radius)
+            if (zn.holds(dx(x, zn.x), z - zn.z))
                 bits |= 1 << zn.role.ordinal();
         }
         return bits;
     }
 
     /**
-     * How far block column (x, z) lies outside every zone of a surface role, in blocks (the distance to
-     * the nearest disc's edge); 0 or less inside one. {@code Double.POSITIVE_INFINITY} with no zone.
+     * How far block column (x, z) lies outside every zone of a surface role, in blocks ({@link Zone#outside});
+     * 0 or less inside one. {@code Double.POSITIVE_INFINITY} with no zone.
      */
     public double outsideSurfaceZones(int x, int z) {
         double best = Double.POSITIVE_INFINITY;
         for (Zone zn : zones) {
             if (zn.role.cave)
                 continue;
-            double d = Math.hypot(dx(x, zn.x), z - zn.z) - zn.radius;
+            double ox = dx(x, zn.x), oz = z - zn.z;
+            if (Math.hypot(ox, oz) - zn.radius >= best)   // a lower bound of its distance: no nearer
+                continue;
+            double d = zn.outside(ox, oz);
             if (d < best)
                 best = d;
         }
         return best;
+    }
+
+    /** The world's zones as on a Lambert world (discs): {@link #build(List, List, List, VolcanicBiomeRules, double, int, WorldProjection)} without a projection. */
+    public static VolcanicZones build(List<Volcanoes.Volcano> volcanoes, List<Geothermal.Site> sites, List<Magma.Body> bodies,
+                                      VolcanicBiomeRules rules, double mH, int circumference) {
+        return build(volcanoes, sites, bodies, rules, mH, circumference, null);
     }
 
     /**
@@ -189,9 +255,11 @@ public final class VolcanicZones {
      * @param bodies        the volcanoes' magma (a body with a chamber gets thermal caves)
      * @param mH            metres per block across
      * @param circumference blocks round the world (x wraps); 0: no wrap
+     * @param projection    the world's projection: a volcano's zones take its local stretch at the vent
+     *                      ({@link #stretch}); null or Lambert: discs
      */
     public static VolcanicZones build(List<Volcanoes.Volcano> volcanoes, List<Geothermal.Site> sites, List<Magma.Body> bodies,
-                                      VolcanicBiomeRules rules, double mH, int circumference) {
+                                      VolcanicBiomeRules rules, double mH, int circumference, WorldProjection projection) {
         if (rules.off())
             return new VolcanicZones(List.of(), circumference);
         double reach = rules.reach();
@@ -200,33 +268,41 @@ public final class VolcanicZones {
             int x = circumference <= 0 ? (int) Math.round(v.x())
                     : Math.floorMod((int) Math.round(v.x()) + circumference / 2, circumference) - circumference / 2;
             int z = (int) Math.round(v.z());
+            // World blocks per simulation block along the stretch's two axes (1 and 1 on Lambert: discs).
+            Stretch st = stretch(projection, v.x(), v.z()); // ledger: BIO-182 (game-choice)
             double basal = Math.max(6.0, v.radiusM() / mH);
             double crater = v.craterRadiusM() / mH;
             String kind = v.kind();
             boolean shield = "shield".equals(kind);
             boolean cone = shield || "stratovolcano".equals(kind);
-            double inner = 0.0;
+            double innerA = 0.0, innerB = 0.0;
             if (crater > 0.0 && v.caldera()) {
-                double r = Math.max(MIN_RADIUS, CALDERA_FLOOR_SHARE * crater);
-                out.add(new Zone(Role.CALDERA, v.id(), x, z, r));
-                inner = r;
+                double a = Math.max(MIN_RADIUS, CALDERA_FLOOR_SHARE * crater * st.major);
+                double b = Math.max(MIN_RADIUS, CALDERA_FLOOR_SHARE * crater * st.minor);
+                out.add(st.zone(Role.CALDERA, v.id(), x, z, a, b));
+                innerA = a;
+                innerB = b;
             } else if (crater > 0.0) {
-                double r = Math.max(MIN_RADIUS, crater + CRATER_MARGIN);
-                out.add(new Zone(Role.CRATER, v.id(), x, z, r));
-                inner = r;
+                double a = Math.max(MIN_RADIUS, crater * st.major + CRATER_MARGIN);
+                double b = Math.max(MIN_RADIUS, crater * st.minor + CRATER_MARGIN);
+                out.add(st.zone(Role.CRATER, v.id(), x, z, a, b));
+                innerA = a;
+                innerB = b;
             }
             if (cone) {
-                double r = Math.max(MIN_RADIUS, CONE_SHARE * basal * reach);
-                if (r > inner)
-                    out.add(new Zone(Role.CONE, v.id(), x, z, r));
-                inner = Math.max(inner, r);
+                double a = Math.max(MIN_RADIUS, CONE_SHARE * basal * reach * st.major);
+                double b = Math.max(MIN_RADIUS, CONE_SHARE * basal * reach * st.minor);
+                if (a > innerA || b > innerB)
+                    out.add(st.zone(Role.CONE, v.id(), x, z, Math.max(a, innerA), Math.max(b, innerB)));
+                innerA = Math.max(innerA, a);
+                innerB = Math.max(innerB, b);
             }
-            double field = FIELD_SHARE * basal * reach;
-            if (field - inner >= MIN_RING && field >= MIN_RADIUS) {
+            double fieldA = FIELD_SHARE * basal * reach * st.major, fieldB = FIELD_SHARE * basal * reach * st.minor;
+            if (Math.min(fieldA - innerA, fieldB - innerB) >= MIN_RING && fieldB >= MIN_RADIUS) {
                 if (shield)
-                    out.add(new Zone(Role.LAVA_FIELD, v.id(), x, z, field));
+                    out.add(st.zone(Role.LAVA_FIELD, v.id(), x, z, fieldA, fieldB));
                 else if (v.activity() >= ASH_MIN_ACTIVITY)
-                    out.add(new Zone(Role.ASH_FIELD, v.id(), x, z, field));
+                    out.add(st.zone(Role.ASH_FIELD, v.id(), x, z, fieldA, fieldB));
             }
         }
         for (Geothermal.Site s : sites)
@@ -236,5 +312,65 @@ public final class VolcanicZones {
             if (b.chamberRh() > 0)
                 out.add(new Zone(Role.THERMAL_CAVES, b.id(), b.x(), b.z(), Math.max(MIN_RADIUS, CAVE_SHARE * b.chamberRh())));
         return new VolcanicZones(out, circumference);
+    }
+
+    /**
+     * A projection's local stretch at a point: the world blocks one simulation block spans along the
+     * semi-major axis ({@code major}, unit direction {@code ax, az} in block space) and across it
+     * ({@code minor}).
+     */
+    record Stretch(double major, double minor, double ax, double az) {
+
+        static final Stretch NONE = new Stretch(1.0, 1.0, 1.0, 0.0);
+
+        /** A zone of semi-axes a (along the stretch) and b (across it), blocks. */
+        Zone zone(Role role, int source, int x, int z, double a, double b) {
+            return new Zone(role, source, x, z, a, b, ax, az);
+        }
+    }
+
+    /**
+     * The stretch at world point (x, z) (ledger: BIO-182, game-choice). The simulation draws a cone as a
+     * circle in its own frame: east–west the sphere's radius times the longitude difference, north–south
+     * the radius times the difference of the unit vector's z (Lambert's blocks; {@code deeptime
+     * volcano-census} measures in the same frame), which a Petroff–Guyou world shows as an ellipse. The
+     * local Jacobian J of the map from world blocks to that frame (central differences over one block,
+     * in {@code radius()} blocks a radian) gives it: a frame circle of radius s is the world ellipse of
+     * semi-axes s/σ, σ the singular values of J, its semi-major axis along the eigenvector of JᵀJ's
+     * smaller eigenvalue. {@link Stretch#NONE} (a disc) with no projection, on Lambert (whose blocks are
+     * the frame) and where J is not finite or is degenerate.
+     */
+    static Stretch stretch(WorldProjection p, double x, double z) {
+        if (p == null || p.kind() == WorldProjection.Kind.LAMBERT)
+            return Stretch.NONE;
+        double rr = p.radius();
+        double[] u0 = p.unit(x, z);
+        double lon0 = PortableMath.atan2(u0[1], u0[0]);
+        double[][] at = {{x + 1.0, z}, {x - 1.0, z}, {x, z + 1.0}, {x, z - 1.0}};
+        double[] east = new double[4], south = new double[4];
+        for (int i = 0; i < 4; i++) {
+            double[] u = p.unit(at[i][0], at[i][1]);
+            east[i] = rr * Math.IEEEremainder(PortableMath.atan2(u[1], u[0]) - lon0, 2.0 * Math.PI);
+            south[i] = -rr * (u[2] - u0[2]);
+        }
+        // J = [[a, b], [c, d]]: its columns are the frame's (east, south) change per block of x and of z.
+        double a = 0.5 * (east[0] - east[1]), c = 0.5 * (south[0] - south[1]);
+        double b = 0.5 * (east[2] - east[3]), d = 0.5 * (south[2] - south[3]);
+        double sxx = a * a + c * c, sxz = a * b + c * d, szz = b * b + d * d;
+        double half = 0.5 * (sxx + szz), root = Math.sqrt(0.25 * (sxx - szz) * (sxx - szz) + sxz * sxz);
+        double lmax = half + root, lmin = half - root;
+        if (!Double.isFinite(lmax) || !(lmin > 1e-9 * lmax))
+            return Stretch.NONE;
+        // The eigenvector of the smaller eigenvalue: the way one simulation block spans the most world blocks.
+        double vx, vz;
+        if (Math.abs(sxz) <= 1e-12 * lmax) {
+            vx = sxx <= szz ? 1.0 : 0.0;
+            vz = sxx <= szz ? 0.0 : 1.0;
+        } else {
+            vx = sxz;
+            vz = lmin - sxx;
+        }
+        double n = Math.hypot(vx, vz);
+        return new Stretch(1.0 / Math.sqrt(lmin), 1.0 / Math.sqrt(lmax), vx / n, vz / n);
     }
 }

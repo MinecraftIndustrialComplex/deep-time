@@ -1580,7 +1580,10 @@ TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
   slot surrounded by sea (Biomes O' Plenty: mushroom fields) leaves land, not ocean. Other levels are not
   touched.
 - **Roles**, in priority order, each a disc in blocks around its centre (R the basal radius
-  `radius_m` / `m_per_block_h`, at least 6; r = `volcanic_biome_reach`); no disc is under 8 blocks in radius:
+  `radius_m` / `m_per_block_h`, at least 6; r = `volcanic_biome_reach`); no disc is under 8 blocks in radius.
+  On a Petroff-Guyou world a volcano's crater, caldera, cone and field zones are instead the ellipse the
+  projection makes of that circle in the simulation's frame at the vent (semi-axes from the projection's
+  Jacobian there, each at least 8 blocks; ledger BIO-182); hot-spring fields and thermal caves stay discs:
   `hot_spring_field` (every hot-spring pool, from a volcano or hot ground: its reach + 4),
   `caldera` (a crater with `caldera: true`: 0.9 of its rim radius), `crater` (any other crater: its rim
   radius + 4), `cone` (stratovolcanoes and shields: 0.45 R · r), `ash_field` (stratovolcanoes and caldera
@@ -1588,7 +1591,7 @@ TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
   with a chamber: 1.5 chamber radii). An ash or lava field narrower than 8 blocks beyond the zone inside it
   is left out.
 - **The biome of a role** is the first biome of `#deeptime:volcanic/<role>` (the tag's order) that the
-  level's biome source can place; with none, the role gives way to the next role whose disc holds the
+  level's biome source can place; with none, the role gives way to the next role whose zone holds the
   column, and in the end to the climate search. Surface roles answer where the biome depth parameter is
   under 0.2 (vanilla's cave biomes start at 0.2), on land (terrain height at the cell's centre at or
   above the sea level) and not on a river channel (variant input exactly 0); `ash_field` and
@@ -1654,7 +1657,9 @@ game-side pieces, no world-data layer of their own:
   `replaces` and `keeps` (ids and `#tags`: the rule holds only where the biome the climate search would
   give is, respectively is not, among them); `exclusive` (true: the candidates are kept out of the climate
   search, like `#deeptime:volcanic`, and appear only where a rule places them). Ordinary rules apply at
-  the surface (biome depth under 0.2), on land, off river channels. The first rule whose conditions hold
+  the surface (biome depth under 0.2), on land, off river channels. `replaces` and `keeps` are tested before
+  the climate conditions (their search is the level's own answer when no rule holds, so it is made anyway),
+  so a rule that replaces a few biomes samples the climate only where the search gives one of them. The first rule whose conditions hold
   and whose search finds a candidate decides: the source's own climate search runs over the rule's
   candidates alone (every other leaf infinitely far, as for the volcanic keep-out), so the pack's
   parameter ranges choose among them, out-of-range biomes included.
@@ -1662,8 +1667,13 @@ game-side pieces, no world-data layer of their own:
   tag `#deeptime:peatland`: wythers:fen, wythers:berry_bog, wythers:snowy_bog, wythers:snowy_fen,
   biomesoplenty:bog, biomesoplenty:muskeg, regions_unexplored:fen, clifftree:bog, all optional) and
   `deeptime:expanded_ecosphere` (requires wythers:ice_cap or wythers:fen; 19 rules, docs/science/biomes.md,
-  "Expanded Ecosphere and the biome rules") and `deeptime:rock_named` (requires `#deeptime:geology`; the geology
-  gate below). A datapack adds a file, or replaces one by its id.
+  "Expanded Ecosphere and the biome rules"), `deeptime:rock_named` (requires `#deeptime:geology`; the geology
+  gate below) and `deeptime:snow_line` (always active; two rules: where the climate search gives a biome of
+  `#deeptime:snow_line/snowfield` (frozen and jagged peaks, snowy slopes) on a column whose warmest month at its
+  own height is 10 °C or more, or `minecraft:grove` where the coldest month is 0 °C or more, and the column is
+  not under ice, a member of `#deeptime:snow_line/snowless` (vanilla's stony peaks, meadow and windswept hills,
+  Terralith's rocky mountains and highlands, optional) answers; docs/science/biomes.md, "The snow line"). A
+  datapack adds a file, or replaces one by its id.
 - `/deeptime probe biomes` reports what decided each sampled land column (`census.rules`: per rule, per
   role and the climate search; candidates seen and absent; the checks the GameTests read).
 
