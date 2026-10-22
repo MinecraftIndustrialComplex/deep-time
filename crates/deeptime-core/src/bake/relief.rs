@@ -657,10 +657,10 @@ pub fn cone_gullies(
 
 /// The jag comes in as the ground's slope (blocks per block, read over [`SLOPE_REACH_CELLS`])
 /// grows from the first to the second.
-pub const JAG_SLOPE: (f64, f64) = (0.4, 1.5); // ledger: AMP-080 (game-choice)
+pub const JAG_SLOPE: (f64, f64) = (0.3, 1.2); // ledger: AMP-080 (game-choice)
 /// The jag's amplitude per unit of slope, blocks, and its most.
-pub const JAG_GAIN: f64 = 2.5; // ledger: AMP-080 (game-choice)
-pub const JAG_MAX_BLOCKS: f64 = 6.0; // ledger: AMP-080 (game-choice)
+pub const JAG_GAIN: f64 = 4.0; // ledger: AMP-080 (game-choice)
+pub const JAG_MAX_BLOCKS: f64 = 8.0; // ledger: AMP-080 (game-choice)
 /// The rock's hardness (AMP-048) over which the jag comes in: none on shale or mudstone, about
 /// 0.6 of it on sandstone, all of it on granite, gneiss, quartzite or basalt.
 pub const JAG_HARDNESS: (f64, f64) = (0.2, 0.9); // ledger: AMP-080 (game-choice)
@@ -675,13 +675,14 @@ const JAG_MEAN: f64 = 0.58; // ledger: AMP-081 (game-choice)
 /// The cliff bands come in on lava as the slope grows from the first to the second.
 pub const BAND_SLOPE: (f64, f64) = (0.15, 0.4); // ledger: AMP-082 (game-choice)
 /// A band spans about this many blocks of run down the slope it is cut into (its height is the
-/// run times the slope, read over [`REGION_REACH_CELLS`]), so its bench is wide enough to show
-/// between the game's noise corners.
-pub const BAND_RUN_BLOCKS: f64 = 10.0; // ledger: AMP-082 (game-choice)
+/// run times the slope, read over [`REGION_REACH_CELLS`]), so its cliff (a [`CLIFF_SHARE`] of it,
+/// about 7 blocks) spans two of the game's 4-block noise corners and its bench four: thinner
+/// bands draw as a zigzag of single corners.
+pub const BAND_RUN_BLOCKS: f64 = 24.0; // ledger: AMP-082 (game-choice)
 /// The thinnest band, metres: three flows of the Columbia River basalts' mean thickness, 30 to
 /// 40 m (USGS Circular 838). The bands come in this height times 1, 2, 4, … (so their levels nest
 /// and stay level wherever the slope changes), the two nearest the slope's blended.
-pub const BAND_MIN_M: f64 = 105.0; // ledger: AMP-082
+pub const BAND_MIN_M: f64 = 105.0; // ledger: AMP-084
 /// The thickest band, blocks.
 pub const BAND_MAX_BLOCKS: f64 = 24.0; // ledger: AMP-082 (game-choice)
 /// The share of a band's run its cliff takes; the bench, flat at the band's top, takes the rest.
@@ -773,7 +774,7 @@ pub fn steep_texture(e: &mut Elev, g: &Ground, rock: &Rock, calm: &[u8]) -> Valu
     let jag_spec = deeptime_format::DetailSpec::new(0, JAG_SALT, JAG_OCTAVES, JAG_WAVELENGTH);
     let level_spec = deeptime_format::DetailSpec::new(0, BAND_LEVEL_SALT, 1, BAND_WAVELENGTH);
     // The bands come in the thinnest's height times 1, 2, 4, …, the thickest under
-    // BAND_MAX_BLOCKS (ledger: AMP-082).
+    // BAND_MAX_BLOCKS (ledger: AMP-082, AMP-084).
     let band_min = BAND_MIN_M / rock.m_per_block_v;
     let band_doublings = (BAND_MAX_BLOCKS / band_min).log2().floor().max(0.0);
     let band_top = band_min * band_doublings.exp2();
@@ -1501,8 +1502,8 @@ mod tests {
         let (grid, _, _) = flat();
         let noise = deeptime_format::Noise::new(SEED, grid.w * grid.r);
         let g = ground(&grid);
-        // Lava that takes no jag, on a slope of 0.5 blocks per block: bands 5 blocks high wanted
-        // (10 blocks of run), so 6 (twice the thinnest, 105 m at 35 m a block).
+        // Lava that takes no jag, on a slope of 0.5 blocks per block: bands 12 blocks high (24
+        // blocks of run; four times the thinnest, 105 m at 35 m a block).
         let rock = |_: f64, _: f64| (0.0, 1.0);
         let (desc, bytes) = elevation(&grid, |_, z| 300.0 + 0.5 * z);
         let (after, note) = textured(&g, &noise, &rock, &[], &desc, &bytes);
@@ -1511,7 +1512,8 @@ mod tests {
         for c in 0..grid.cells() {
             let d = read(&desc, &after, c) - read(&desc, &bytes, c);
             assert!(d >= 0.0, "the bands only raise: cell {c} by {d}");
-            assert!(d <= 0.7 * 6.0 + 0.1, "cell {c}: {d}");
+            // At most 0.709 of a band (the cliff's smoothstep runs a little ahead of the slope).
+            assert!(d <= 0.709 * 12.0 + 0.1, "cell {c}: {d}");
             let j = c / w;
             if (40..160).contains(&j) {
                 // The rise to the next cell down the slope (2 blocks; 1 block before).
