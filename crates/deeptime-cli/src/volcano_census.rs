@@ -30,11 +30,11 @@ use serde_json::{Value, json};
 
 /// The summit search radius, in ρ: inside it a summit belongs to the cone (beyond it ground the
 /// cone stands against may rise higher, as a range uphill does).
-const SUMMIT_RHO: f64 = 0.35;
+const SUMMIT_RHO: f64 = 0.35; // ledger: VOL-082 (game-choice, diagnostic)
 /// The ring the ground plane is fitted on, in ρ.
-const RING: (f64, f64) = (1.0, 1.3);
+const RING: (f64, f64) = (1.0, 1.3); // ledger: VOL-082 (game-choice, diagnostic)
 /// Crater rim sectors.
-const SECTORS: usize = 8;
+const SECTORS: usize = 8; // ledger: VOL-082 (game-choice, diagnostic)
 
 /// One volcano of `active.json`.
 struct Entry {
@@ -193,7 +193,7 @@ fn measure(w: &ColumnWorld, v: &Entry, m_per_rad: f64, mv: f64, sea_y: f64) -> O
         None => (f64::NAN, f64::NAN, f64::NAN, f64::NAN),
     };
     let offset = ((summit.2 as f64 - v.x).hypot(summit.3 as f64 - v.z) * 10.0).round() / 10.0;
-    let centred = summit.1 <= (1.6 * crater_rho).max(0.06) || offset <= 2.0;
+    let centred = summit.1 <= (1.6 * crater_rho).max(0.06) || offset <= 2.0; // ledger: VOL-082
     let crater = v.crater.map(|(_, depth_m, caldera)| {
         let floor = if floor.is_finite() { floor } else { vent_y };
         let got: Vec<f64> = rims.iter().copied().filter(|r| r.is_finite()).collect();
@@ -203,7 +203,7 @@ fn measure(w: &ColumnWorld, v: &Entry, m_per_rad: f64, mv: f64, sea_y: f64) -> O
             "rho": (crater_rho * 1000.0).round() / 1000.0,
             "caldera": caldera,
             "sectors": got.len(),
-            "visible": got.len() >= SECTORS / 2 && rim_min - floor >= 1.0,
+            "visible": got.len() >= SECTORS / 2 && rim_min - floor >= 1.0, // ledger: VOL-082
             "depth_blocks": r2(rim_mean - floor),
             "lowest_rim_over_floor_blocks": r2(rim_min - floor),
             "catalogue_depth_blocks": r2(depth_m / mv),
