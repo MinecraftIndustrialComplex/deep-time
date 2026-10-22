@@ -132,10 +132,28 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
                 s.oreVeinsEnabled(), s.useLegacyRandomSource());
     }
 
+    /** Chunks whose surface this process built (all levels; the {@code deeptime probe dh} line reports it: real chunks Distant Horizons or the player caused). */
+    private static final java.util.concurrent.atomic.LongAdder CHUNKS_SURFACED = new java.util.concurrent.atomic.LongAdder();
+    private static final java.util.concurrent.atomic.AtomicLong CHUNK_X_MIN = new java.util.concurrent.atomic.AtomicLong(Long.MAX_VALUE),
+            CHUNK_X_MAX = new java.util.concurrent.atomic.AtomicLong(Long.MIN_VALUE);
+
+    public static long chunksSurfaced() {
+        return CHUNKS_SURFACED.sum();
+    }
+
+    /** "min..max" chunk x of the chunks built so far, or "none". */
+    public static String chunkXExtent() {
+        long lo = CHUNK_X_MIN.get(), hi = CHUNK_X_MAX.get();
+        return lo > hi ? "none" : lo + ".." + hi;
+    }
+
     @Override
     public void buildSurface(net.minecraft.server.level.WorldGenRegion region, net.minecraft.world.level.StructureManager structures,
                              net.minecraft.world.level.levelgen.RandomState random, net.minecraft.world.level.chunk.ChunkAccess chunk) {
         super.buildSurface(region, structures, random, chunk);   // the pack's surface rules repaint the default block
+        CHUNKS_SURFACED.increment();
+        CHUNK_X_MIN.accumulateAndGet(chunk.getPos().x, Math::min);
+        CHUNK_X_MAX.accumulateAndGet(chunk.getPos().x, Math::max);
         if (terrain() instanceof WorldDataTerrain w) {
             // No cave of any kind reaches the underwater face of a sea cliff: a wall of rock is kept (before the strata).
             SeaCliffPass.apply(chunk, w::height, sourceSettings.value().seaLevel(), w.cliffRules());
