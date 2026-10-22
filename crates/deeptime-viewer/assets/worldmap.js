@@ -6,8 +6,8 @@
 // an XYZ pyramid of 256-pixel tiles (zoom 0 is two tiles; each zoom doubles both ways; x runs east
 // from the seam, y south from the north edge).
 //
-// The slippy map itself is mic-viewer's map core (`mic-viewer/map.js`, vendor/mic-viewer, MPL-2.0,
-// NOTICE.md; decisions log 2026-10-21), loaded before this file: pan and zoom with the mouse (drag,
+// The slippy map itself is mic-viewer's map core (`mic-viewer/map.js`, a pinned git dependency,
+// MPL-2.0, NOTICE.md; decisions log 2026-10-21), loaded before this file: pan and zoom with the mouse (drag,
 // wheel, double click) or touch (drag, pinch), the world wrapping east-west like the planet, the
 // tile cache and the scale bar. This file is Deep Time's plug-in on it, loaded after workbench.js,
 // which hands it `window.DTWB`: the projection and the 2 : 1 tile pyramid, the layers, the grid,
