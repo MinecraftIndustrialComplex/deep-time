@@ -116,8 +116,8 @@ footer { color: var(--muted); font-size: 14px; padding-top: 20px; padding-bottom
   <p class="dek" data-ss-id="dek">Deep Time and the pack, the night of 21 to 22 October 2026. Newest first.</p>
   <div class="box" data-ss-id="now" data-ss-thumb>
     <ul class="status">
-      <li data-ss-id="now-tests"><span class="d">Tests</span><span><span class="st wait">Running</span>The batch on a5d13f7e, with the volcano fixes. Master e26a3677 passed every gate.</span></li>
-      <li data-ss-id="now-prism"><span class="d">Your Prism</span><span><span class="st wait">Pending</span>Both instances move to the gated build, with DH 3.3.3, once that batch passes.</span></li>
+      <li data-ss-id="now-tests"><span class="d">Tests</span><span><span class="st wait">Fixing</span>a5d13f7e, with the volcano fixes, failed 2 volcanic biome GameTests in packs with no volcanic biomes. Being fixed now. e26a3677 passed everything.</span></li>
+      <li data-ss-id="now-prism"><span class="d">Your Prism</span><span><span class="st wait">Held</span>Both instances stay on the 831b3847 build until a fixed build passes, then move to it with DH 3.3.3.</span></li>
       <li data-ss-id="now-waiting"><span class="d">Waiting on you</span><span><a href="#decide">7 decisions, D1 to D7</a>, and 2 optional items.</span></li>
     </ul>
   </div>
@@ -191,13 +191,18 @@ footer { color: var(--muted); font-size: 14px; padding-top: 20px; padding-bottom
     </div></li>
 
     <li data-ss-id="it-tests"><span class="n">10</span><div>
-      <h3>Tests</h3>
-      <p data-ss-id="it-tests-p"><span class="st wait">Running</span>The batch on a5d13f7e, with the volcano fixes, is running. The one before it, master e26a3677, passed every gate: Rust, Java (427 tests) and 95 of 95 GameTests in all five setups.</p>
+      <h3>Tests: one batch passed, the volcano batch is being fixed</h3>
+      <p data-ss-id="it-tests-p"><span class="st wait">Fixing</span>One batch passed, the next failed two tests.</p>
+      <ul data-ss-id="it-tests-list">
+        <li>e26a3677 passed everything: Rust clean, Java 427 tests with 0 failures, and 95 of 95 GameTests in all five setups.</li>
+        <li>a5d13f7e, with the volcano fixes, failed two volcanic biome GameTests, in the standalone and Expanded Variety setups only. MIC, TerraBlender and EE all passed; Java ran 431 tests with 0 failures.</li>
+        <li>The cause: the volcanic biome layer turns on in a pack that has no volcanic biomes. The volcano agent is fixing it now.</li>
+      </ul>
     </div></li>
 
     <li data-ss-id="it-prism"><span class="n">11</span><div>
       <h3>Your Prism instances</h3>
-      <p data-ss-id="it-prism-p"><span class="st wait">Pending</span>Both move to the gated build, with DH 3.3.3, once that batch passes.</p>
+      <p data-ss-id="it-prism-p"><span class="st wait">Held</span>Both stay on the 831b3847 build until a fixed build passes, and then move to it with DH 3.3.3. The stages are built and checked.</p>
     </div></li>
 
   </ol>
