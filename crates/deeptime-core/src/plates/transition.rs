@@ -9,7 +9,9 @@
 //! sample is 71 km across on the Earth-sized model sphere but 8.7 km on the planet, and heights are
 //! not scaled: the margin is drawn 8.1 times narrower than Earth's, and the surface stage inherits
 //! a wall (build log 2026-10-03, "Margins and spires": the plate model's own L1 elevation dropped
-//! from +715 m 20 km inland to −1,790 m 10 km out).
+//! from +715 m 20 km inland to −1,790 m 10 km out). The taper replaces the step with Earth's width
+//! in the model's own frame (the next section); the planet draws it as narrow as it draws every
+//! tectonic length (R/R_model of it), with the heights unscaled.
 //!
 //! # What happens on Earth
 //! A passive margin is a rift that broke up. Before break-up the continent was stretched by a
@@ -27,27 +29,30 @@
 //! in a subduction zone, on an arc or, for continental crust, raised by an orogeny within
 //! `collapse_quiet_myr`; oceanic crust thicker than T_n, which the plate model stacks at
 //! resamplings and accretes from slabs under the oceanic label, takes no part) get a signed
-//! distance d from that boundary on the planet (positive inland;
+//! distance d from that boundary on the model sphere (positive inland;
 //! the boundary lies half a sample spacing beyond each boundary sample), and a target crystalline
 //! thickness (the crust less its sediment and sedimentary rock)
 //!
 //!   T*(d) = T_o + (T_n − T_o) · clamp(1/2 + d / W, 0, 1),
 //!
 //! T_n the normal continental column (33.0 km of crystalline crust in [`continental_column`]),
-//! T_o the ocean's (7 km, [`oceanic_column`]) and W = `transition_width_km` on the planet. The
-//! taper is linear in thickness (β = T_n / T rises from 1 at the hinge, d = W/2, to T_n / T_o at
-//! the toe, d = −W/2) and centred on the model's boundary: stretching a step from T_n to T_o into
-//! this ramp keeps the crust's volume. Crust moves from the samples thicker than T* to the samples
-//! thinner than T* within each stretch of margin (a catchment about W/2 long, below), the share
-//! 1 − e^(−δt/τ) of what would bring the stretch to the profile (τ = `transition_myr`). The
-//! sources thin in proportion (pure shear) and the sinks take their rock. With
-//! `transition_ocean_crust` (PLT-294; on in every shipped preset since 2026-10-20, the coordinator's
-//! call in the decisions log, off in `TectonicParams::default`) an oceanic sink takes the
-//! same volume as ocean crust instead (lavas and gabbro in the ocean column's proportion), as the
+//! T_o the ocean's (7 km, [`oceanic_column`]) and W = `transition_width_km`, km on the model
+//! sphere (Earth-normalized like the other plate lengths; Ben, decisions log 2026-10-22: "200 km
+//! on sphere"). The taper is linear in thickness (β = T_n / T rises from 1 at the hinge, d = W/2,
+//! to T_n / T_o at the toe, d = −W/2) and centred on the model's boundary: stretching a step from
+//! T_n to T_o into this ramp keeps the crust's volume. Crust moves from the samples thicker than
+//! T* to the samples thinner than T* within each stretch of margin (a catchment about W/2 long,
+//! below), the share 1 − e^(−δt/τ) of what would bring the stretch to the profile
+//! (τ = `transition_myr`). The sources thin in proportion (pure shear) and the sinks take their
+//! rock. With `transition_ocean_crust` (PLT-294; on in every shipped preset since 2026-10-20, the
+//! coordinator's call in the decisions log, off in `TectonicParams::default`) an oceanic sink
+//! takes the same volume as ocean crust instead (lavas and gabbro in the ocean column's
+//! proportion), as the
 //! thick igneous crust of a volcanic margin (from-memory: White & McKenzie 1989, not read), the
 //! commoner kind (Franke 2013, read; ledger PLT-294, a game-choice): the crust-template
-//! review of 2026-10-19 found the sources' rock is the main source of granite and gneiss under
-//! the sea on the quick planet, whose oceans lie mostly within W/2 of a margin, but the
+//! review of 2026-10-19 (W then 200 km on the planet, 1,632 km on the model sphere of the quick
+//! planet) found the sources' rock is the main source of granite and gneiss under
+//! the sea on the quick planet, whose oceans lay mostly within W/2 of a margin, but the
 //! continental rock the switch stops parking on the ocean side is then lost, and with it some land
 //! (about 0.04 of the planet on supercontinent starts on master d54c7f0f; with the cordillera at
 //! 1.7 mm/yr, 2026-10-20, the quick ensemble's land 0.27 on both starts, Earth's 0.29). Crust
@@ -145,12 +150,11 @@ pub struct Transition {
     pub floor_m: Vec<f32>,
 }
 
-/// The transition's width W as an angle on the model sphere: `transition_width_km` is on the
-/// planet, so it is scaled by R_model / R_planet.
+/// The transition's width W as an angle on the unit sphere: `transition_width_km` is a length on
+/// the model sphere (R_model, `tectonics.model_radius_km`), so the planet's radius does not enter.
 pub fn width_rad(env: &Env) -> f64 {
-    let n = env.norm;
     // ledger: PLT-262.
-    env.k.transition_width_km / n.planet_km.max(1e-9)
+    env.norm.rad(env.k.transition_width_km)
 }
 
 /// The seeds near a point (P1-19): seed numbers hashed by the cube of side `cell` they fall in,
@@ -438,6 +442,11 @@ mod tests {
     const N: usize = 16_000;
     /// The quick 16k planet's radius, km (16,384 blocks of 300 m round).
     const PLANET_KM: f64 = 16_384.0 * 0.3 / std::f64::consts::TAU;
+    /// The test sphere's radius, km: the size of the quick 16k planet, so that the shipped 200 km
+    /// margin spans the 9 samples it did when W was measured on the planet (N = 16,000). On
+    /// Earth's 6,370 km sphere a sample is 178 km across at this N and a 200 km margin is a
+    /// sample wide, too coarse for a test of the taper's shape.
+    const MODEL_KM: f64 = PLANET_KM;
     /// cos 40°: the continent is the cap within 40° of +y.
     const COAST_Y: f64 = 0.766;
 
@@ -530,7 +539,7 @@ mod tests {
     }
 
     impl Fx {
-        fn new(planet_km: f64) -> Fx {
+        fn new(model_km: f64) -> Fx {
             let k = TectonicParams {
                 transition_width_km: 200.0,
                 transition_myr: 2.0,
@@ -543,14 +552,14 @@ mod tests {
             Fx {
                 k,
                 geo: Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap(),
-                norm: Norm::new(6370.0, planet_km, N),
+                norm: Norm::new(model_km, PLANET_KM, N),
             }
         }
 
         fn with(k: TectonicParams) -> Fx {
             Fx {
                 k,
-                ..Fx::new(PLANET_KM)
+                ..Fx::new(MODEL_KM)
             }
         }
 
@@ -577,9 +586,9 @@ mod tests {
         }
     }
 
-    /// Signed distance from the coast on the planet, km (positive inland).
+    /// Signed distance from the coast on the test sphere (`MODEL_KM`), km (positive inland).
     fn inland_km(p: DVec3) -> f64 {
-        (COAST_Y.acos() - p.y.clamp(-1.0, 1.0).acos()) * PLANET_KM
+        (COAST_Y.acos() - p.y.clamp(-1.0, 1.0).acos()) * MODEL_KM
     }
 
     /// Mean of `f` over plate `plate`'s samples away from the plates' edges, in bins of `bin_km`
@@ -626,7 +635,7 @@ mod tests {
     /// between two neighbouring bins.
     #[test]
     fn a_rifted_margin_tapers_over_its_width_and_keeps_its_crust() {
-        let fx = Fx::new(PLANET_KM);
+        let fx = Fx::new(MODEL_KM);
         let mut st = planet(&fx.geo, 0.0);
         let before = st.samples.clone();
         let vol0 = crystalline_total(&st, 0);
@@ -675,7 +684,7 @@ mod tests {
     /// grow in the ocean column's proportion, and the continent side still loses its own rock.
     #[test]
     fn the_ocean_side_thickens_with_ocean_crust_not_the_continents_rock() {
-        let base = Fx::new(PLANET_KM);
+        let base = Fx::new(MODEL_KM);
         let fx = Fx::with(TectonicParams {
             transition_ocean_crust: true,
             ..base.k.clone()
@@ -727,7 +736,7 @@ mod tests {
     /// floor, not the bare one; ocean floor beyond the taper cools as before.
     #[test]
     fn the_ocean_side_cools_towards_the_floor_its_crust_holds_up() {
-        let fx = Fx::new(PLANET_KM);
+        let fx = Fx::new(MODEL_KM);
         let mut st = planet(&fx.geo, 0.0);
         let last = fx.run(&mut st, 30);
         let f = crust_per_metre(&fx.env(1));
@@ -802,7 +811,7 @@ mod tests {
     /// what the taper's thickest ocean-side crust holds up (ridge depth, near −2.5 km).
     #[test]
     fn stacked_crust_under_the_ocean_label_is_not_a_margin() {
-        let fx = Fx::new(PLANET_KM);
+        let fx = Fx::new(MODEL_KM);
         let mut st = planet(&fx.geo, 0.0);
         let mut stacked = Vec::new();
         for (i, s) in st.samples.iter_mut().enumerate() {
@@ -836,11 +845,11 @@ mod tests {
     }
 
     /// An active margin (in a subduction zone) keeps its step; with the width or the time at 0
-    /// nothing moves; the width is on the planet, so a planet twice as large has a zone half as
-    /// wide on the model sphere.
+    /// nothing moves; the width is on the model sphere (PLT-262), so the planet's size does not
+    /// enter and a model sphere twice as large has a zone half as wide as an angle.
     #[test]
     fn active_margins_and_switched_off_rules_keep_their_step() {
-        let fx = Fx::new(PLANET_KM);
+        let fx = Fx::new(MODEL_KM);
         let mut st = planet(&fx.geo, 0.4);
         let before = st.samples.clone();
         fx.run(&mut st, 5);
@@ -866,7 +875,16 @@ mod tests {
             off.run(&mut st, 3);
             assert_eq!(st.samples, before);
         }
-        let big = Fx::new(2.0 * PLANET_KM);
+        let big = Fx::new(2.0 * MODEL_KM);
         assert!((width_rad(&fx.env(1)) - 2.0 * width_rad(&big.env(1))).abs() < 1e-12);
+        // The planet's radius does not enter: the shipped 200 km on Earth's 6,370 km sphere is
+        // 200/6370 of a radian on the 16k planet and on one twice its size.
+        for planet_km in [PLANET_KM, 2.0 * PLANET_KM] {
+            let env = Env {
+                norm: Norm::new(6370.0, planet_km, N),
+                ..fx.env(1)
+            };
+            assert_eq!(width_rad(&env), 200.0 / 6370.0);
+        }
     }
 }

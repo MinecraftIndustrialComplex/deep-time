@@ -29,24 +29,29 @@ Rows by status (the ledger's header): `verified` 1, `cited-unverified` 16, `abst
 ## The continents' hypsometry against Earth's (2026-10-22)
 
 Measured for V1 item 1's third criterion (continental crust under the sea, at most 0.25) on
-twelve runs of `earthlike_quick_16k` at master df40ce80; the full account, the arms and the
-sources are in [sea-level.md](sea-level.md), "The continents under the sea and the sea's height
-at the end". Earth's figures are HYP-042 to HYP-046 (CRUST1.0's crust at least 20 km thick, the
+twelve runs of `earthlike_quick_16k`: master df40ce80 (the "master" column) and, after Ben moved W
+to the model sphere on 2026-10-22 (D6), master 10bafdae against the branch that did it (the
+"W on the model sphere" column; PLT-400 on in the same change). The full account, the arms and the
+sources are in [sea-level.md](sea-level.md), "The continents under the sea and the sea's height at
+the end". Earth's figures are HYP-042 to HYP-046 (CRUST1.0's crust at least 20 km thick, the
 model's own continent-ocean boundary).
 
-| Final frame, median of 12 | master | Earth |
-|---|---|---|
-| Continental crust under the sea | 0.414 | 0.237 to 0.248 at 20 km (0.195 at 25 km; 0.306 by Cogley 1984's contacts) |
-| Its surface over the sea, mean / median, m | 381 / 260 | 311 / 220 |
-| Share 0 to 200 m / 200 to 2,000 m / deeper than 2,000 m under the sea | 0.104 / 0.200 / 0.089 | 0.112 / 0.148 / 0.010 |
-| Crust at least 25 km thick above the sea | 0.572 | 0.805 to 0.817 |
-| Thickness at which the median surface crosses the sea, km | 35.1 (31.2 at the datum) | 31.0 |
-| Land's mean height, m | 1,284 | 797 |
-| The sea over the datum, m | 538 | 0 |
+| Final frame, median of 12 | master | W on the model sphere | Earth |
+|---|---|---|---|
+| Continental crust under the sea | 0.414 | 0.278 | 0.237 to 0.248 at 20 km (0.195 at 25 km; 0.306 by Cogley 1984's contacts) |
+| Its surface over the sea, mean / median, m | 381 / 260 | 737 / 572 | 311 / 220 |
+| Share 0 to 200 m / 200 to 2,000 m / deeper than 2,000 m under the sea | 0.104 / 0.200 / 0.089 | 0.087 / 0.115 / 0.069 | 0.112 / 0.148 / 0.010 |
+| Crust at least 25 km thick above the sea | 0.572 | 0.677 | 0.805 to 0.817 |
+| Thickness at which the median surface crosses the sea, km | 35.1 (31.2 at the datum) | 37.0 | 31.0 |
+| Land's mean height, m | 1,284 | 1,374 | 797 |
+| The sea over the datum, m | 538 | 820 | 0 |
 
-In the datum's frame the continents stand where Earth's do; the sea stands high on them because
+In the datum's frame the continents stood where Earth's do; the sea stands high on them because
 the ocean basins are shallow (oceanic-labelled crust at least 10 km thick over 0.325 of the
-planet, mostly sedimentary rock: no sediment subducts). The extra drowned crust is on the slope
-and below it, in the transition's continental half: W is 200 km on the planet, eight times
-Earth's margins on the model sphere. With W at 200 km on the model sphere the share under the
-sea falls to 0.279 (Ben's decision of 2026-10-05 to weigh; sea-level.md's open questions).
+planet, mostly sedimentary rock: no sediment subducts). The extra drowned crust was on the slope
+and below it, in the transition's continental half: W was 200 km on the planet, eight times
+Earth's margins on the model sphere. With W at 200 km on the model sphere (the shipped meaning
+since 2026-10-22) the share under the sea falls to 0.278 (p < 0.001), the slope share to 0.115,
+below Earth's 0.148, and the shelf's to 0.087 (Earth 0.112). The continents are thicker and stand
+higher (mean height over the sea 737 m against Earth's 311), and the sea rises with them (820 m
+over the datum): the sediment they shed still has no way out of the ocean (sea-level.md).
