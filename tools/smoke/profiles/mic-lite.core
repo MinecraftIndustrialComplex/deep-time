@@ -23,3 +23,7 @@ modernfix           performance: start-up and memory
 ferritecore         performance: memory
 immediatelyfast     client performance: immediate-mode rendering
 entityculling       client performance: entity culling
+
+# Undeclared client dependencies, found by booting the lite client (tools/client/vm-client.sh --mods
+# mic-lite). "mod@client" keeps a mod in the client set only; the server boots without it.
+jei@client          Destroy's DestroyMysteriousItemConversions loads JEI's API on the client and Destroy does not declare JEI (the pack always has it)
