@@ -163,6 +163,7 @@ def main():
     ap.add_argument("--bin", default="deeptime")
     ap.add_argument("--taus", default="0.000,0.500,1.000")
     ap.add_argument("--size", type=int, default=1024)
+    ap.add_argument("--aspect", default="free", help="corner placement: free (any orientation) or polar")
     a = ap.parse_args()
     import matplotlib
     matplotlib.use("Agg")
@@ -178,6 +179,9 @@ def main():
     r_m = sc["circumference_blocks"] * sc["m_per_block_h"] / (2 * math.pi)
     nums = json.load(open(os.path.join(a.out, "numbers.json")))
     lam0 = nums["corners_this_planet"]["polar_aspect"]["lambda0_deg"]
+    Qc = geom.rot_z(-lam0)
+    if a.aspect == "free":
+        Qc = np.array(nums["corners_this_planet"]["free_rotation"]["rotation_planet_to_canonical"], float)
     s_blocks = r_m * math.sqrt(4 * math.pi / 6) / BLOCK_M  # cube face side, blocks
     field = LambertField(L, Lc)
     ranges = pick_ranges(L, Lc, sea, mv)
@@ -185,9 +189,10 @@ def main():
     for t in a.taus.split(","):
         path = os.path.join(a.work, "cube", f"cube-tau{float(t):.3f}.npz")
         if os.path.exists(path):
-            cubes.append((float(t), geom.Cube(path, lambda0_deg=lam0)))
+            cubes.append((float(t), geom.Cube(path, Q=Qc)))
     label = {0.0: "conformal cube", 1.0: "equal-area (Moser) cube"}
-    info = {"ranges": ranges, "cube_face_blocks": s_blocks, "lambda0_deg": lam0, "panels": []}
+    info = {"ranges": ranges, "cube_face_blocks": s_blocks, "aspect": a.aspect,
+            "rotation_planet_to_canonical": Qc.tolist(), "panels": []}
     for rg in ranges:
         p0 = geom.ll2xyz(rg["lat"], rg["lon"])
         panels = []
