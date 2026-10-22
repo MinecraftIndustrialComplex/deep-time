@@ -1713,6 +1713,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         EdgeBorder::Stop => Some(BorderSpec {
             kind: "edge_stop".into(),
             edges: vec!["north".into(), "south".into()],
+            segments: Vec::new(),
             inset_blocks: BORDER_INSET_BLOCKS,
             temporary: true,
         }),

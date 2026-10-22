@@ -365,8 +365,7 @@ impl SynthWorld {
             // planet (FORMAT.md "The cube world's layout", Scale). ledger: SCL-107
             let s = view.cube.side() as f64;
             manifest.scale.circumference_blocks = view.cube.period() as u32;
-            manifest.scale.m_per_block_h =
-                radius_m * (4.0 * std::f64::consts::PI / 6.0).sqrt() / s;
+            manifest.scale.m_per_block_h = radius_m * (4.0 * std::f64::consts::PI / 6.0).sqrt() / s;
             let border = cube_border(view.cube, crate::bake::project::BORDER_INSET_BLOCKS);
             manifest.set_projection(Some(cube_spec(&view, Some(border), None)));
         }

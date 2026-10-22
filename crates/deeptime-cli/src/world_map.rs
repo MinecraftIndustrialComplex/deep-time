@@ -95,9 +95,9 @@ pub fn run(dir: &Path, zoom: u32, out: &Path) -> Result<Value, String> {
     // The layout's marks: cone points red, poles white (a small square each).
     let mut marks = Vec::new();
     if let Some(spec) = &manifest.projection {
-        let mut put = |bx: i64, bz: i64, col: [u8; 3], what: &str| {
-            let pi = ((bx as f64 - x0) / s).round() as i64;
-            let pj = ((bz as f64 - z0) / s).round() as i64;
+        let mut put = |bx: f64, bz: f64, col: [u8; 3], what: &str| {
+            let pi = ((bx - x0) / s).round() as i64;
+            let pj = ((bz - z0) / s).round() as i64;
             for dj in -3..=3 {
                 for di in -3..=3 {
                     let (ii, jj) = (pi + di, pj + dj);
@@ -107,11 +107,19 @@ pub fn run(dir: &Path, zoom: u32, out: &Path) -> Result<Value, String> {
                     }
                 }
             }
-            marks.push(json!({"what": what, "x": bx, "z": bz, "px": [pi, pj]}));
+            // Block corners (the polar layouts) as integers, other net points as written.
+            let num = |v: f64| {
+                if v.fract() == 0.0 {
+                    json!(v as i64)
+                } else {
+                    json!(v)
+                }
+            };
+            marks.push(json!({"what": what, "x": num(bx), "z": num(bz), "px": [pi, pj]}));
         };
         for cp in &spec.cone_points {
             for im in &cp.images {
-                put(im[0], im[1], [230, 40, 40], &cp.name);
+                put(im[0] as f64, im[1] as f64, [230, 40, 40], &cp.name);
             }
         }
         for p in &spec.poles {

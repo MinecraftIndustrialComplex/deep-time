@@ -358,7 +358,6 @@ fn map_section(g: &mut Rng, map: &CubeMap) -> String {
     )
 }
 
-
 fn world_section(g: &mut Rng, w: &CubeWorld, m_per_block_h: f64) -> String {
     let s = w.cube().side();
     let h = s as f64 / 2.0;

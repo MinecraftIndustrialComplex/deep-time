@@ -348,14 +348,20 @@ mod tests {
         assert_eq!(spec.edges.len(), 14);
         assert_eq!(spec.cone_points.len(), 8);
         assert_eq!(spec.border.as_ref().unwrap().segments.len(), 12);
-        assert_eq!(m.grids["L3"], deeptime_format::GridDesc::for_cube("L3", 1024, 2).unwrap());
+        assert_eq!(
+            m.grids["L3"],
+            deeptime_format::GridDesc::for_cube("L3", 1024, 2).unwrap()
+        );
         let text = std::fs::read_to_string(opts.out.join(MANIFEST)).unwrap();
         assert!(text.contains("\"kind\": \"cube\""), "{text}");
         let e = deeptime_format::TilePackReader::open(&opts.out.join("rasters/elevation.dtr"))
             .unwrap()
             .load()
             .unwrap();
-        assert_eq!((e.desc.grid.w, e.desc.grid.h, e.desc.tile), (512, 3072, 256));
+        assert_eq!(
+            (e.desc.grid.w, e.desc.grid.h, e.desc.tile),
+            (512, 3072, 256)
+        );
         // The world's own projection reads it back.
         let wp = m.world_projection();
         assert_eq!(wp.period(), 4096.0);
@@ -376,7 +382,10 @@ mod tests {
         )
         .unwrap();
         let err = Manifest::read(&opts.out).unwrap_err().to_string();
-        assert!(err.contains("world data needs cube map conformal-n999"), "{err}");
+        assert!(
+            err.contains("world data needs cube map conformal-n999"),
+            "{err}"
+        );
         let dump: Value =
             serde_json::from_slice(&std::fs::read(dir.join("s.json")).unwrap()).unwrap();
         assert_eq!(dump["format_version"], "0.7");
