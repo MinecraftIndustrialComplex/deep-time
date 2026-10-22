@@ -3679,7 +3679,14 @@ same seeds and switch it on if the land holds. Ben's call when.
    2017, and Yakovlev & Clark 2014 conserve it if the crust before the collision was 23 to 29 km).
    A lower share alone would lose still more crust (the losses are already over Earth's because
    too much crosses); less crossing, from fewer or shorter collisions, is the plates' work on
-   `plates/dynamics.rs`, and the share is worth a second look after it.
+   `plates/dynamics.rs`, and the share is worth a second look after it. Measured in "The crust
+   flux into collision fronts (2026-10-21)" below: per km of front the crossing and the losses are
+   Earth's, and 0.95 is in line with Stern & Scholl at the model's crossing (PLT-242 now
+   `verified`); the excess is the length of front in collision (28,800 km against 6,000 to 12,000).
+   Ingalls' half as the share (arm rs50, with PLT-400) takes land above 2 km from 0.277 to 0.142
+   but the land from 0.257 to 0.204, the largest landmass from 0.133 to 0.052 and the drowned
+   continental crust from 0.348 to 0.514: rejected. The belts' height is left to the front's
+   length and the collisions' life.
 3. *The cordillera's height* (PLT-050): a sourced value from Profeta et al. 2015 in place of the
    calibrated 3000 m; measured above, it does not move the high ground by itself.
 4. *Plateau interiors*: thick crust with no room within reach does not collapse. A lower-crustal
