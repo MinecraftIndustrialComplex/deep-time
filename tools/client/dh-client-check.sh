@@ -211,6 +211,7 @@ start_xvfb() {
 joined=0
 for attempt in 1 2 3; do
     start_xvfb
+    rm -f "$CL/game/logs/latest.log"   # the refusal check below reads it: no line of an earlier attempt
     say "== client joins 127.0.0.1:$GAME (attempt $attempt)"
     setsid "$PMC" --main-dir "$CL/pmc" start "neoforge::$NEO" --mc-dir "$CL/game" --jvm "$CJAVA" \
         --jvm-arg=-Xmx6G --jvm-arg=-XX:ActiveProcessorCount=6 "${JVMX[@]}" \
