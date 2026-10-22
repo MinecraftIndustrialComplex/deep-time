@@ -358,8 +358,11 @@ game choices but the vanilla depth band of BIO-112):
   The setting `volcanic_biome_reach` (1, 0 to 3) scales the cone and the fields; 0 places none.
 - **Datapacks.** Both lists are tags: a pack adds a biome to a role tag (and it is kept out elsewhere too) or
   to `#deeptime:volcanic` alone (kept out, never placed), or reorders a role tag with `"replace": true`.
-- Without such a biome in the pack nothing changes: the level's biome queries skip the whole layer (the
-  GameTest `volcanicBiomesChangeNothingWithoutThem` checks every sampled column on the vanilla profile).
+- Without such a biome in the pack the layer changes nothing: it reports itself off (`volcanic_active` false in
+  the census) and no query reaches a role or a kept-out biome. The GameTest `volcanicBiomesChangeNothingWithoutThem`
+  checks on the vanilla profile that every sampled column is the plain search's but where an ordinary biome rule
+  decided it (`columns_changed_by_rules`): the snow line (below) binds in vanilla, since its snowless biomes are
+  vanilla's, and acts without the volcanic layer.
 
 Measured on one `earthlike_quick_16k` planet (scattered continents, 500 Myr, test machine, 2026-10-03; 110 active
 stratovolcanoes, 45 of them oceanic, no shield and no caldera; 50 hot-spring pools), `/deeptime probe biomes 16`, whose
@@ -1068,6 +1071,13 @@ snowy slopes, and on grove:
   cell's, the rule reads the column's own months (limits below). The grove stays in Dfc, Dsc and the high Dfb.
 - **The branch's own bake** of the same simulation (onlap, BIO-182): 9,093 to 8,353 snowy columns; Csb 139 to 3,
   BWk 750 to 420.
+- **In vanilla too.** The rule binds wherever the pack can place a snowless mountain biome, so vanilla's own stony
+  peaks, meadow and windswept hills answer on the standalone profile as well. It is a biome rule, not part of the
+  volcanic layer: a level without a volcanic biome keeps that layer off, and the censuses count the rules'
+  columns apart (`columns_changed_by_rules`), so the GameTests that check vanilla changes nothing
+  (`volcanicBiomesChangeNothingWithoutThem`, `geologyGateChangesNothingWithoutThem`) hold the volcanic layer
+  and the geology gate to zero changed columns of their own (the first gate batch after the merge failed two
+  of them, which had read any bound rule as the volcanic layer being on).
 
 ## Simplifications and limits
 
