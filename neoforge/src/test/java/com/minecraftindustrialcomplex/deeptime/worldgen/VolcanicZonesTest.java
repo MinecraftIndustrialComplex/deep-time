@@ -143,13 +143,14 @@ class VolcanicZonesTest {
      * On a Petroff–Guyou world a cone's zones are its circle in the simulation's frame (east–west the
      * radius times the longitude difference, north–south the radius times the unit vector's z difference),
      * which the projection stretches into an ellipse; measured against that frame along 72 rays. The old
-     * discs fail it: at 60° the frame's circle is about four times longer one way than the other.
+     * discs fail it: at 55° the frame's circle is about three times (1/cos²) longer one way than the other.
      */
     @Test
     void onAPetroffGuyouWorldTheZonesAreTheConesCircleInTheSimulationFrame() {
         var pg = new PetroffGuyou(6656, 100.5);
-        double[] at = pg.blockOf(60.0, 150.0);
-        assertTrue(Math.abs(at[1]) < pg.zMax() - 1500, "the test point is well inside the world's z range: " + at[1]);
+        double[] at = pg.blockOf(55.0, 150.0);
+        // The rays stop past 1.1 R (88 simulation blocks, a few hundred world blocks at most): clear of the z edge.
+        assertTrue(Math.abs(at[1]) < pg.zMax() - 500, "the test point is well inside the world's z range: " + at[1]);
         var v = volcano(1, "stratovolcano", at[0], at[1], 80, 0.8, 6, false);
         var z = VolcanicZones.build(List.of(v), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, (int) pg.period(), pg);
         VolcanicZones.Zone cone = z.zones().stream().filter(zn -> zn.role() == Role.CONE).findFirst().orElseThrow();
