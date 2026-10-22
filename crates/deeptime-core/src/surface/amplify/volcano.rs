@@ -585,9 +585,8 @@ mod tests {
 
     #[test]
     fn a_crater_is_cut_earths_median_below_its_rim_on_a_tall_and_a_low_cone() {
-        // The last-grid table at the vent less the table at the rim is the crater's depth plus the
-        // sharp summit's share there (the body is flat inside the rim, so that share is the L2
-        // blur's own fall from the vent to the rim): taking the latter away leaves the bowl.
+        // At the vent the last-grid table is the sharp summit's share (the body less its L2 blur)
+        // less the bowl: taking the table from that share leaves the crater's depth there.
         let bowl_at_vent = |v: Volcano, sharp: f64| {
             let (world, preset) = world_with(vec![v.clone()]);
             let sh = Shaper::from_world(&world, &preset).unwrap();
@@ -595,9 +594,8 @@ mod tests {
             let s = v.shape();
             let dx2 = f64::from(preset.resolution.l2_r) * preset.scale.m_per_block_h;
             let fine = shape::blurred(&|r: f64| s.body(r), dx2 / v.radius_m);
-            let rc = 0.05;
-            let summit = it.at * sharp * (fine.at(0.0) - fine.at(rc));
-            it.l3.at(rc) - it.l3.at(0.0) - summit
+            let summit = it.at * sharp * (s.body(0.0) - fine.at(0.0));
+            summit - it.l3.at(0.0)
         };
         for h in [2500.0, 1200.0] {
             let mut v = strato(0.0, 0.0, None);
