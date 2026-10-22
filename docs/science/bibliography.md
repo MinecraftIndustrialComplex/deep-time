@@ -7583,7 +7583,7 @@ Straume2019, Harris2014, SternScholl2010.
 - Library: not fetched.
 - Read so far (by the project): 2026-10-22, a research sub-agent, full text: "Reported mean land elevations by date are 700m (1895), 840m (1921), 871m (1931), and 797m (2012)"; the land fraction "is 0.292 and 0.2905 for the 1931 and 2012 estimates".
 
-## Lava flows (VOL-100 to VOL-123), added 2026-10-22
+## Lava flows (VOL-140 to VOL-163), added 2026-10-22
 
 Read for review fix 8 (the lava flows' paint) by a research sub-agent on 2026-10-22, through a page
 fetch whose summary quotes at most about 125 characters. "Search summary" means the fact was seen
@@ -7595,7 +7595,7 @@ Nothing was saved to the library.
 - Reference: Riker, J. M., Cashman, K. V., Kauahikaua, J. P. and Montierth, C. M. (2009). The length of channelized lava flows: insight from the 1859 eruption of Mauna Loa Volcano, Hawai'i. Journal of Volcanology and Geothermal Research 183(3-4):139-156 (the pages from a search summary).
 - DOI or URL: 10.1016/j.jvolgeores.2009.03.002; abstract at https://pubs.usgs.gov/publication/70198250
 - Cited as: "Riker et al. 2009".
-- Ledger ids: VOL-100
+- Ledger ids: VOL-140
 - Access: paywalled; the abstract open (USGS).
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22: "paired 'a'ā and pāhoehoe flows of exceptional length (51 km)". The abstract does not call it the longest flow; that wording was only in a search summary.
@@ -7604,7 +7604,7 @@ Nothing was saved to the library.
 - Reference: Oregon State University, Volcano World pages "How far can lava flow?" (https://volcano.oregonstate.edu/faq/how-far-can-lava-flow) and on aa (https://volcano.oregonstate.edu/a039a).
 - DOI or URL: as above.
 - Cited as: "Oregon State Volcano World".
-- Ledger ids: VOL-100, VOL-118
+- Ledger ids: VOL-140, VOL-158
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: the 1859 Mauna Loa flow "about 51 kilometers long from the vent to the ocean"; aa "range in thickness from 1-10 meters" (proximal 1 to 3 m, distal up to 10 m, clinker usually 1 to 2 m); pahoehoe and aa separate at about 6 m³/s, the 1859 aa erupted at 208 m³/s; "Each can be found at any distance from the vent although the names imply otherwise."
@@ -7613,7 +7613,7 @@ Nothing was saved to the library.
 - Reference: Walker, G. P. L. (1973). Lengths of lava flows. Philosophical Transactions of the Royal Society of London A 274(1238):107-118 (Crossref: "Mount Etna and the 1971 eruption - Lengths of lava flows").
 - DOI or URL: 10.1098/rsta.1973.0030
 - Cited as: "Walker 1973".
-- Ledger ids: VOL-103, VOL-104
+- Ledger ids: VOL-143, VOL-144
 - Access: paywalled (refused); the abstract through Crossref and OpenAlex.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22: the rate of effusion is "the principal factor influencing the length of a lava flow"; basaltic extrusions have a median length "3.2 times that of high-viscosity andesite, trachyte and rhyolite ones". A search summary adds that Walker's effusion rate is a mean output rate (volume over duration).
@@ -7622,7 +7622,7 @@ Nothing was saved to the library.
 - Reference: Malin, M. C. (1980). Lengths of Hawaiian lava flows. Geology 8(7):306-308.
 - DOI or URL: 10.1130/0091-7613(1980)8<306:LOHLF>2.0.CO;2
 - Cited as: "Malin 1980".
-- Ledger ids: VOL-103
+- Ledger ids: VOL-143
 - Access: paywalled; the abstract through OpenAlex.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22: 87 historic Hawaiian flows give "little support for a direct relationship between flow length and effusion rate"; length goes better with erupted volume; "no single factor appears most important"; tube-fed flows travel farther. Pinkerton and Wilson 1994 (Bull. Volcanol.), seen only in a search summary, find the data agree with Walker once short and tube-fed flows are set aside.
@@ -7631,7 +7631,7 @@ Nothing was saved to the library.
 - Reference: U.S. Geological Survey, Hawaiian Volcano Observatory, "Frequently asked questions about Mauna Loa volcano".
 - DOI or URL: https://www.usgs.gov/volcanoes/mauna-loa/frequently-asked-questions-about-mauna-loa-volcano
 - Cited as: "USGS HVO, Mauna Loa FAQ".
-- Ledger ids: VOL-105, VOL-112
+- Ledger ids: VOL-145, VOL-152
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: "Since 1843, Mauna Loa has erupted 34 times" (2022 the latest; 1984 to 2022 its longest quiet spell); "As much as 35 percent to 40 percent (695 to 795 square miles)" of the volcano covered in the past 1,000 years, 14 percent in the past 150 years. The USGS geology page gives about 90 percent within the past 4,000 years; a share of 98 percent under 10,000 years (Lockwood and Lipman 1987) was seen only in a search summary.
@@ -7640,7 +7640,7 @@ Nothing was saved to the library.
 - Reference: U.S. Geological Survey, "Volcanoes of the United States" (general interest publication).
 - DOI or URL: https://pubs.usgs.gov/gip/volcus/ustext.html
 - Cited as: "USGS, Volcanoes of the United States".
-- Ledger ids: VOL-112
+- Ledger ids: VOL-152
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: "about 90 percent of Kilauea's surface is covered with lava flows that are less than 1,100 years old".
@@ -7649,7 +7649,7 @@ Nothing was saved to the library.
 - Reference: U.S. Geological Survey, "Lava flows and domes of Medicine Lake Volcano".
 - DOI or URL: https://www.usgs.gov/volcanoes/medicine-lake/science/lava-flows-and-domes-medicine-lake-volcano
 - Cited as: "USGS, Medicine Lake".
-- Ledger ids: VOL-101
+- Ledger ids: VOL-141
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: andesite and basaltic andesite flows "typically limited in length to less than 12 km", under 25 km²; basalt flows can cover more than 300 km²; the Giant Crater basalt flow 45 km long, about 200 km².
@@ -7658,7 +7658,7 @@ Nothing was saved to the library.
 - Reference: U.S. Geological Survey, Volcano Hazards Program, "Lava flows destroy everything in their path".
 - DOI or URL: https://www.usgs.gov/programs/VHP/lava-flows-destroy-everything-their-path
 - Cited as: "USGS VHP".
-- Ledger ids: VOL-101
+- Ledger ids: VOL-141
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: "Fluid basalt flows can extend tens of kilometers from an erupting vent"; andesite flows "rarely extend more than 8 km (5 mi) from their vents"; dacite and rhyolite domes from "many individual flows >30 m (100 ft) thick".
@@ -7667,7 +7667,7 @@ Nothing was saved to the library.
 - Reference: U.S. National Park Service, "Lava flows" (volcanoes subject page).
 - DOI or URL: https://www.nps.gov/subjects/volcanoes/lava-flows.htm
 - Cited as: "NPS, Lava flows".
-- Ledger ids: VOL-102, VOL-117
+- Ledger ids: VOL-142, VOL-157
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: Trident Volcano's andesite block flows "each about 1.5-2.5 mi (2.5-4 km) long and 80-200 ft (25-60 m) thick"; intermediate flows "thicker than basaltic ones and have very steep flow fronts"; lava tubes "usually only found in pāhoehoe flows". Its rhyolite thickness conversion is inconsistent and was not used.
@@ -7676,7 +7676,7 @@ Nothing was saved to the library.
 - Reference: U.S. Geological Survey Fact Sheet 144-02 (2002), on Kilauea's Pu'u 'O'o eruption.
 - DOI or URL: https://pubs.usgs.gov/fs/2002/fs144-02/
 - Cited as: "USGS FS 144-02".
-- Ledger ids: VOL-117
+- Ledger ids: VOL-157
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: Pu'u 'O'o aa flows "typically 10 to 15 feet (3-5 m) thick"; tube-fed pahoehoe built a coastal plain 10 to 35 m thick; the flow field 15 km wide along the coast.
@@ -7685,7 +7685,7 @@ Nothing was saved to the library.
 - Reference: Peterson, D. W. and Tilling, R. I. (1980). Transition of basaltic lava from pahoehoe to aa, Kilauea Volcano, Hawaii: field observations and key factors. Journal of Volcanology and Geothermal Research 7(3-4):271-293 (the title from memory).
 - DOI or URL: 10.1016/0377-0273(80)90033-5; abstract at https://pubs.usgs.gov/publication/70012218
 - Cited as: "Peterson & Tilling 1980".
-- Ledger ids: VOL-118
+- Ledger ids: VOL-158
 - Access: paywalled; the abstract open (USGS).
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22: "Nearly all Hawaiian basaltic lava erupts as pahoehoe, and some changes to aa during flowage and cooling"; "if viscosity is low, a high rate of shear is required to begin the transition to aa"; slope and flow rate act through the flow's mechanics.
@@ -7694,7 +7694,7 @@ Nothing was saved to the library.
 - Reference: Rowland, S. K. and Walker, G. P. L. (1990). Pahoehoe and aa in Hawaii: volumetric flow rate controls the lava structure. Bulletin of Volcanology 52:615-628 (the title from memory).
 - DOI or URL: 10.1007/BF00301212
 - Cited as: "Rowland & Walker 1990".
-- Ledger ids: VOL-118
+- Ledger ids: VOL-158
 - Access: paywalled (refused).
 - Library: not fetched.
 - Read so far (by the project): a search summary of the abstract only, 2026-10-22: aa forms above a volumetric flow rate of about 5 to 10 m³/s, pahoehoe below, aa by "rapid and concentrated flow in open channels"; pahoehoe units usually under 1 m thick.
@@ -7703,7 +7703,7 @@ Nothing was saved to the library.
 - Reference: USGS Hawaiian Volcano Observatory, Volcano Watch, 5 April 1996, "Age and appearance of lava flows".
 - DOI or URL: https://www.usgs.gov/news/volcano-watch-age-and-appearance-lava-flows
 - Cited as: "HVO Volcano Watch 1996".
-- Ledger ids: VOL-108, VOL-109
+- Ledger ids: VOL-148, VOL-149
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: the dry Kona coast has 10 to 20 in/yr of rain, and its flows of 137 years, about 200 years and over 1,500 years are "bare, black, glistening" and "appear to have erupted yesterday"; wet Hilo has 100 to 200 in/yr, and a flow only 115 years old has "large 'ohi'a trees ... throughout"; the 1984 flows already carry lichen, ferns and small ohia.
@@ -7712,7 +7712,7 @@ Nothing was saved to the library.
 - Reference: USGS Hawaiian Volcano Observatory, Volcano Watch, 21 January 1999, on lava-flow forests and primary succession.
 - DOI or URL: https://www.usgs.gov/news/volcano-watch-lava-flow-forest-primary-succession
 - Cited as: "HVO Volcano Watch 1999".
-- Ledger ids: VOL-109
+- Ledger ids: VOL-149
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: "A forest can develop in wet regions in less than 150 years"; no figure for dry areas. Its "20 and 40 percent a century" for Hualalai and Mauna Loa is probably loose wording for a thousand years and was not used.
@@ -7721,7 +7721,7 @@ Nothing was saved to the library.
 - Reference: USGS Hawaiian Volcano Observatory, Volcano Watch, 7 December 2006, on the colour of weathering lava flows; and 15 October 2015, on dating flows by their look.
 - DOI or URL: the USGS Volcano Watch archive (https://www.usgs.gov/observatories/hvo/news), the two articles by date.
 - Cited as: "HVO Volcano Watch 2006".
-- Ledger ids: VOL-111, VOL-122
+- Ledger ids: VOL-151, VOL-162
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: a flow weathers "from black to gray, to brown, and tan, then orange, and finally red"; the 2015 article: how useful a flow's look is for its age "is influenced by elevation, rainfall, and shielding by forest and tephra deposits". Neither gives years per colour.
@@ -7730,7 +7730,7 @@ Nothing was saved to the library.
 - Reference: Kinney, K. M. and co-authors (2015). PLoS ONE 10(6):e0123995 (dryland vegetation on Hawaiian lava flows of known age; the authors after the first and the title not recorded).
 - DOI or URL: https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0123995
 - Cited as: "Kinney et al. 2015".
-- Ledger ids: VOL-108
+- Ledger ids: VOL-148
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: dryland flows under 300 years "96.1% barren on pāhoehoe and 94.1% on aʻa"; tree height peaks at 0.75 to 1.5 ky on pahoehoe and 1.5 to 3 ky on aa.
@@ -7739,7 +7739,7 @@ Nothing was saved to the library.
 - Reference: Wells, S. G., Dohrenwend, J. C., McFadden, L. D., Turrin, B. D. and Mahrer, K. D. (1985). Late Cenozoic landscape evolution on lava flow surfaces of the Cima volcanic field, Mojave Desert, California. GSA Bulletin 96(12):1518-1529 (the title from memory).
 - DOI or URL: 10.1130/0016-7606(1985)96<1518:LCLEOL>2.0.CO;2
 - Cited as: "Wells et al. 1985".
-- Ledger ids: VOL-107
+- Ledger ids: VOL-147
 - Access: paywalled (refused).
 - Library: not fetched.
 - Read so far (by the project): not read. Through Wikipedia's Cima page (fetched, secondary): "Younger flows often show crisp lava flow features", older ones "mantled with younger material" with desert varnish; a search summary: the eolian mantle is most extensive on flows 0.25 to 0.75 Myr old and erodes above about 0.7 Myr. The youngest Cima flow, Black Tank, is 15,000 ± 5,000 years old (Wikipedia, fetched) or about 12 ka (MillerBuesch2022).
@@ -7748,7 +7748,7 @@ Nothing was saved to the library.
 - Reference: Miller, D. M. and Buesch, D. C. (2022), an abstract on the age of the Black Tank flow, Cima volcanic field (the full reference not recorded by the sub-agent).
 - DOI or URL: not recorded.
 - Cited as: "Miller & Buesch 2022".
-- Ledger ids: VOL-107
+- Ledger ids: VOL-147
 - Access: the abstract open.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22: Black Tank about 12 ka.
@@ -7757,7 +7757,7 @@ Nothing was saved to the library.
 - Reference: Favalli, M., Pareschi, M. T., Neri, A. and Isola, I. (2005). Forecasting lava flow paths by a stochastic approach. Geophysical Research Letters 32(3), L03305 (the title from memory; the article number from a search summary).
 - DOI or URL: 10.1029/2004GL021718
 - Cited as: "Favalli et al. 2005".
-- Ledger ids: VOL-116
+- Ledger ids: VOL-156
 - Access: paywalled (refused); Crossref metadata and an abstract summary only.
 - Library: not fetched.
 - Read so far (by the project): metadata and an abstract summary, 2026-10-22: DOWNFLOW traces many steepest-descent paths over randomly perturbed topography. Its own Δh and path count were not read (Etna h = 3 m, n = 10,000 only in search summaries).
@@ -7766,7 +7766,7 @@ Nothing was saved to the library.
 - Reference: Chevrel, M. O. and co-authors (2021). Natural Hazards and Earth System Sciences 21:2355 (a lava-flow hazard study using DOWNFLOW; the authors after the first and the title not recorded).
 - DOI or URL: https://nhess.copernicus.org/articles/21/2355/2021/
 - Cited as: "Chevrel et al. 2021".
-- Ledger ids: VOL-116
+- Ledger ids: VOL-156
 - Access: open.
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: each pixel perturbed "in the range of ±Δh", Δh "the characteristic vertical height of an obstacle"; Δh 0 to 5 m and N 100 to 10,000 tested, N = 10,000 chosen.
@@ -7775,7 +7775,7 @@ Nothing was saved to the library.
 - Reference: Papale, P. (2018). Global time-size distribution of volcanic eruptions on Earth. Scientific Reports 8:6838 (the title from memory).
 - DOI or URL: 10.1038/s41598-018-25286-y
 - Cited as: "Papale 2018".
-- Ledger ids: VOL-106
+- Ledger ids: VOL-146
 - Access: open (PMC).
 - Library: not fetched.
 - Read so far (by the project): fetched 2026-10-22: about 50 % of eruptions are VEI 1 or lower, and "very low VEI eruptions are mostly associated with the formation of lava flows".
@@ -7784,7 +7784,7 @@ Nothing was saved to the library.
 - Reference: Heliker, C. and co-authors, USGS Professional Paper 1676 (Pu'u 'O'o); Siebert, L., Simkin, T. and Kimberly, P. (2010), Volcanoes of the World, 3rd edition; Wikipedia, "Mount Etna" (secondary).
 - DOI or URL: https://pubs.usgs.gov/pp/1676/ (from memory); none; https://en.wikipedia.org/wiki/Mount_Etna
 - Cited as: "Heliker et al.", "Siebert et al. 2010", "Wikipedia, Mount Etna".
-- Ledger ids: VOL-106, VOL-119
+- Ledger ids: VOL-146, VOL-159
 - Access: open; a book; open.
 - Library: not fetched.
 - Read so far (by the project): Heliker et al. only in a search summary (Pu'u 'O'o's open channels 2 to 5 m deep and 5 to 25 m wide, tubes 3 to 5 m wide); Siebert et al. not read (it may tabulate how often arc eruptions make lava flows); Etna's page fetched 2026-10-22: "Since the year AD 1600, at least 60 flank eruptions", nearly half since 1900.

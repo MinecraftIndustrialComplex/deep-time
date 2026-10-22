@@ -50,7 +50,7 @@ import java.util.function.Function;
  * world data, does not have (on the 2026-10-17 test planet a black beach east of the seam, its ground at y 65 to
  * 67, was cut to 62).
  *
- * <p>Less the pack's <b>lava stripes</b> in its volcanic biomes (review fix 8, 2026-10-22; ledger VOL-123): under a
+ * <p>Less the pack's <b>lava stripes</b> in its volcanic biomes (review fix 8, 2026-10-22; ledger VOL-163): under a
  * biome condition whose every biome is one of Deep Time's volcanic biomes ({@code #deeptime:volcanic}, the biomes that
  * stand only at real volcanoes), a rule that paints blackstone or smooth basalt where a noise lies within a band about a
  * level (both ends inside the noise's range, {@link #STRIPE_BAND_MAX}) is left out; a one-sided threshold, which paints
@@ -164,7 +164,7 @@ public record DelegatingRuleSource(Holder<NoiseGeneratorSettings> settings) impl
      * Both ends of a stripe's band lie within this of zero: inside a noise's range, so the band is a contour line. A
      * threshold with no upper end of its own (Terralith's Yellowstone puts 100 there) paints patches, not lines, and stays.
      */
-    static final double STRIPE_BAND_MAX = 1.5;   // ledger: VOL-123 (game-choice)
+    static final double STRIPE_BAND_MAX = 1.5;   // ledger: VOL-163 (game-choice)
 
     /** A description of {@code r} if it is a lava stripe (a noise band painting blackstone or smooth basalt), else null. */
     static String stripe(SurfaceRules.RuleSource r) {

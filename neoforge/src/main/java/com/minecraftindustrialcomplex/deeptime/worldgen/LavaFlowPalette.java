@@ -26,7 +26,7 @@ import java.util.Map;
  * The blocks of the lava flows ({@link LavaFlows}), resolved as {@link MagmaPalette} resolves the mush's:
  * the blocks of {@code #deeptime:lava_flow/<paint>} if there are any (several are chosen among by a hash of
  * the column), else the first installed entry of {@code #deeptime:lava_flow_fallback/<paint>}, else the
- * paint's vanilla block. Deep Time ships no such tags and adds no block (ledger VOL-122, game-choice).
+ * paint's vanilla block. Deep Time ships no such tags and adds no block (ledger VOL-162, game-choice).
  *
  * <table>
  *   <caption>The paints and their vanilla blocks</caption>
