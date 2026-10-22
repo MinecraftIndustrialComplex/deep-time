@@ -249,7 +249,7 @@ public final class VolcanicZones {
                     : Math.floorMod((int) Math.round(v.x()) + circumference / 2, circumference) - circumference / 2;
             int z = (int) Math.round(v.z());
             // World blocks per simulation block along the stretch's two axes (1 and 1 on Lambert: discs).
-            Stretch st = stretch(projection, v.x(), v.z());
+            Stretch st = stretch(projection, v.x(), v.z()); // ledger: BIO-182 (game-choice)
             double basal = Math.max(6.0, v.radiusM() / mH);
             double crater = v.craterRadiusM() / mH;
             String kind = v.kind();

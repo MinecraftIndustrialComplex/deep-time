@@ -131,7 +131,13 @@ catalogue of individual volcanoes that ride on their plates.
    igneous province by them alone (PRV-006).
 9. **Block scale.** The amplifier restores each volcano's true profile, which the coarse grids
    blur, and adds the crater or caldera floor. Sharp detail on an extinct volcano fades with a time
-   constant of 5 Myr (VOL-063 to VOL-072).
+   constant of 5 Myr (VOL-063 to VOL-072). Since 2026-10-22 the cone is laid on the ground from
+   its vent (onlap, VOL-080, VOL-081): within 0.4 of its radius it stands on the level of the
+   ground at its vent, burying lower ground, so its summit is the vent even on a mountainside; from
+   there to its foot the fill fades and the cone lies on the ground beneath it, and ground that
+   rises above the cone shows through. Before, the profile was added to sloping ground, so the
+   highest point of a cone on a range's flank sat up the slope from its vent (Ben's volcano 27476,
+   2026-10-22: 35 blocks up the slope and 30 blocks above the vent column).
 10. **Magma in the game.** The bake lists the volcanoes that are still active. The Minecraft side
     gives each a chamber (an ellipsoid whose radius is a tenth of the volcano's, between 1.2 and
     4.5 km), a conduit and a plug, and gives the most active quarter of those that can hold one a
@@ -246,6 +252,8 @@ described under them.
 | Active volcanoes at the present | 123: 119 arc, 3 caldera complexes, 1 shield; 100 on land; 16 with a crater lava lake | `earthlike_quick_16k`, supercontinent, 500 Myr, 2026-10-01 |
 | Distance from a land point to the nearest active volcano on land | median 658 blocks (10th percentile 169, 90th 1,309) | same; 4,000 points |
 | Effect on land height | with volcanoes off, land above 2 km falls from 0.307 to 0.170 of the land (Earth: 0.102) | hypsometry runs, `earthlike_quick_16k`, 500 Myr, 2026-10-01 (before flexure) |
+| Active volcanoes on dry land whose highest column within 0.35 radii is at the vent (within 1.6 crater radii or 2 blocks of it; VOL-082) | 0.19 → 0.68 (Ben's preset); earthlike seeds 1 to 3: 0.14 → 0.55, 0.18 → 0.43, 0.10 → 0.57. Median offset of that column from the vent 17.2 → 5.3 blocks (Ben's preset), 19.5 → 7.0, 25.4 → 21.6, 18.7 → 6.2; median height of it over the vent column 10.3 → 2.3 blocks (Ben's preset) | `deeptime volcano-census` on Ben's preset (λc pinned at 10.5) and `earthlike_quick_16k` seeds 1 to 3, scattered continents, 500 Myr, 2026-10-22, master fe61452b against the onlap (VOL-080); the simulation byte-identical, only the bake differs |
+| Visible summit craters on dry land (VOL-082: the lowest of 8 sector rims at least a block above the crater floor) | 0.00 to 0.08 of them, before and after the onlap; measured crater depth (mean sector rim over the floor) a median 1.0 to 2.2 blocks after it, against the catalogue's 2.2 to 3.0 (VOL-026: 0.06 H) | same |
 | Active volcanoes at the end, the GameTest planet | 0 on master (every run; 4 hotspot shields before the solvers merge); since the arc fix 5 to 12 (3 to 10 arc stratovolcanoes, 0 to 3 shields) over seeds 11 to 16 | `planet_world_4k`, 150 Myr, 2026-10-19 ([plates.md](plates.md), "Arcs on a lattice coarser than the arc band") |
 
 Stage 2 runs (WP-2, 2026-10-02): `earthlike_quick_16k`, 500 Myr, seed 1, both starts (scattered
@@ -402,6 +410,7 @@ What these runs show:
 | Lava is sealed in smooth basalt and never touches water (MAG-010, MAG-011, MAG-041) | lava pools were found overlapping the ocean | agent, build log 2026-10-01, after Ben's report |
 | Arc volcanoes at least 60 km apart (VOL-039) | keeps the doubled cones apart; one cone stands for a large long-lived centre | agent, build log 2026-09-30; reviewed WP-2 2026-10-02 |
 | Summit crater at least 2 km across (VOL-026) | a real crater would be under three blocks wide | agent, build log 2026-09-30 |
+| A cone is laid on the ground from its vent: the vent's ground level inside 0.4 of its radius, fading to its foot (VOL-080, VOL-081) | a cone is built by eruptions from its vent, so its summit is the vent; how far a real cone's onlap reaches down a slope was not read in a source | agent, coordinator's call, 2026-10-22, after Ben's volcano 27476 |
 | Stratovolcano lifetime 2 to 8 Myr (VOL-038) | one step is 2 Myr | agent, build log 2026-09-30 |
 | Eight flows in a flood basalt pile (VOL-052), terraces 80 m high (VOL-036) | visible layering and steps | agent, build log 2026-09-30 |
 | Implementation rules: the volcanic front, the flux threshold, merging, the blind step, retirement, rendering and fading (VOL-002, VOL-004, VOL-008 to VOL-011, VOL-027, VOL-028, VOL-040, VOL-042, VOL-043, VOL-047, VOL-049 to VOL-051, VOL-053 to VOL-055, VOL-061 to VOL-073) | how the stage turns plate data into cones and cones into blocks; no Earth counterpart | agent, build log 2026-09-30 and 2026-10-01; labelled WP-2 2026-10-02 |
