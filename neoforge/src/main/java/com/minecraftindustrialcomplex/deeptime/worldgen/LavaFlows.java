@@ -100,76 +100,76 @@ public final class LavaFlows {
         VISCOUS
     }
 
-    // ---- lengths (ledger VOL-100 to VOL-104) ----
+    // ---- lengths (ledger VOL-140 to VOL-144) ----
     /** The longest basaltic flow, m: Mauna Loa's 1859 flow. */
-    static final double BASALT_MAX_M = 51_000.0;  // ledger: VOL-100 (abstract-only: Riker et al. 2009)
+    static final double BASALT_MAX_M = 51_000.0;  // ledger: VOL-140 (abstract-only: Riker et al. 2009)
     /** The longest viscous flow, m: andesite flows are typically under 12 km. */
-    static final double VISCOUS_MAX_M = 12_000.0; // ledger: VOL-101 (verified: USGS VHP, Medicine Lake)
+    static final double VISCOUS_MAX_M = 12_000.0; // ledger: VOL-141 (verified: USGS VHP, Medicine Lake)
     /** The shortest viscous flow, m. */
-    static final double VISCOUS_MIN_M = 500.0;    // ledger: VOL-102 (game-choice)
+    static final double VISCOUS_MIN_M = 500.0;    // ledger: VOL-142 (game-choice)
     /** Basaltic flows' median length over that of andesite, trachyte and rhyolite flows. */
-    static final double WALKER_RATIO = 3.2;       // ledger: VOL-103 (abstract-only: Walker 1973)
+    static final double WALKER_RATIO = 3.2;       // ledger: VOL-143 (abstract-only: Walker 1973)
     /**
      * The shortest basaltic flow, m: lengths are log-uniform (median the geometric mean of the bounds), so
      * the medians' ratio is {@link #WALKER_RATIO} when this is 3.2² × 0.5 × 12 / 51 km = 1.2 km.
      */
-    static final double BASALT_MIN_M = WALKER_RATIO * WALKER_RATIO * VISCOUS_MIN_M * VISCOUS_MAX_M / BASALT_MAX_M; // ledger: VOL-104 (game-choice)
+    static final double BASALT_MIN_M = WALKER_RATIO * WALKER_RATIO * VISCOUS_MIN_M * VISCOUS_MAX_M / BASALT_MAX_M; // ledger: VOL-144 (game-choice)
 
-    // ---- how often (VOL-105, VOL-106) ----
+    // ---- how often (VOL-145, VOL-146) ----
     /** A basaltic shield's flows a year at activity 1: Mauna Loa's 34 eruptions from 1843 to 2022. */
-    static final double BASALT_RATE_PER_YR = 34.0 / 179.0; // ledger: VOL-105 (verified: USGS HVO, Mauna Loa FAQ)
+    static final double BASALT_RATE_PER_YR = 34.0 / 179.0; // ledger: VOL-145 (verified: USGS HVO, Mauna Loa FAQ)
     /** A viscous cone's lava flows a year at activity 1. */
-    static final double VISCOUS_RATE_PER_YR = 0.01;        // ledger: VOL-106 (from-memory, game-choice)
+    static final double VISCOUS_RATE_PER_YR = 0.01;        // ledger: VOL-146 (from-memory, game-choice)
 
-    // ---- how long a flow shows, against the rain (VOL-107 to VOL-110) ----
+    // ---- how long a flow shows, against the rain (VOL-147 to VOL-150) ----
     /** Mean annual precipitation of the three anchors, mm: arid, Hawaii's dry Kona side, its wet Hilo side. */
-    static final double[] ANCHOR_P_MM = {150.0, 380.0, 3_800.0};      // ledger: VOL-107 (from-memory), VOL-108, VOL-109 (game-choice on USGS HVO)
+    static final double[] ANCHOR_P_MM = {150.0, 380.0, 3_800.0};      // ledger: VOL-147 (from-memory), VOL-148, VOL-149 (game-choice on USGS HVO)
     /** How long a flow stays fresh, black and bare, at each anchor, years. */
-    static final double[] FRESH_YR = {15_000.0, 1_500.0, 12.0};       // ledger: VOL-107 (from-memory), VOL-108, VOL-109 (game-choice on USGS HVO)
+    static final double[] FRESH_YR = {15_000.0, 1_500.0, 12.0};       // ledger: VOL-147 (from-memory), VOL-148, VOL-149 (game-choice on USGS HVO)
     /** How long a flow shows at all before vegetation and soil hide it, at each anchor, years. */
-    static final double[] VISIBLE_YR = {250_000.0, 3_000.0, 150.0};   // ledger: VOL-107 (from-memory), VOL-108, VOL-109 (game-choice on USGS HVO, Kinney et al. 2015)
+    static final double[] VISIBLE_YR = {250_000.0, 3_000.0, 150.0};   // ledger: VOL-147 (from-memory), VOL-148, VOL-149 (game-choice on USGS HVO, Kinney et al. 2015)
     /** The rain assumed where the world has no climate, mm. */
-    static final double DEFAULT_P_MM = 1_000.0;                       // ledger: VOL-110 (game-choice)
+    static final double DEFAULT_P_MM = 1_000.0;                       // ledger: VOL-150 (game-choice)
     /** The share of an oxidised flow's columns still showing when it reaches the end of its visible time. */
-    static final double OXIDIZED_KEEP_END = 0.25;                     // ledger: VOL-111 (game-choice)
+    static final double OXIDIZED_KEEP_END = 0.25;                     // ledger: VOL-151 (game-choice)
 
-    // ---- how many (VOL-112, VOL-113) ----
+    // ---- how many (VOL-152, VOL-153) ----
     /** The flows stop when the visible ones cover this share of the cone's basal disc. */
-    static final double COVER_CAP = 0.35; // ledger: VOL-112 (game-choice on USGS HVO: 35 to 40 % of Mauna Loa in 1,000 yr)
+    static final double COVER_CAP = 0.35; // ledger: VOL-152 (game-choice on USGS HVO: 35 to 40 % of Mauna Loa in 1,000 yr)
     /** At most this many flows a volcano. */
-    static final int MAX_FLOWS = 256;     // ledger: VOL-113 (game-choice)
+    static final int MAX_FLOWS = 256;     // ledger: VOL-153 (game-choice)
 
-    // ---- vents (VOL-114, VOL-115) ----
+    // ---- vents (VOL-154, VOL-155) ----
     /** The share of a shield's flows that start from a flank vent on its rift zones. */
-    static final double FLANK_SHARE = 0.5;                          // ledger: VOL-114 (game-choice)
+    static final double FLANK_SHARE = 0.5;                          // ledger: VOL-154 (game-choice)
     /** A rift zone's flank vents lie within this angle of its axis (two axes, opposite). */
-    static final double RIFT_SPREAD_RAD = Math.toRadians(25.0);     // ledger: VOL-114 (game-choice)
+    static final double RIFT_SPREAD_RAD = Math.toRadians(25.0);     // ledger: VOL-154 (game-choice)
     /** Flank vents lie out to this share of the basal radius. */
-    static final double FLANK_MAX_SHARE = 0.5;                      // ledger: VOL-114 (game-choice)
+    static final double FLANK_MAX_SHARE = 0.5;                      // ledger: VOL-154 (game-choice)
     /** A summit flow starts this many blocks past the crest of its crater's rim. */
-    static final double RIM_PAST = 1.0;                             // ledger: VOL-115 (game-choice)
+    static final double RIM_PAST = 1.0;                             // ledger: VOL-155 (game-choice)
 
-    // ---- the path (VOL-116 to VOL-119) ----
+    // ---- the path (VOL-156 to VOL-159) ----
     /** The step of a path, blocks. */
-    static final double STEP = 0.5;                                 // ledger: VOL-116 (game-choice)
+    static final double STEP = 0.5;                                 // ledger: VOL-156 (game-choice)
     /** A path turns up to this far either side of steepest descent, smoothly with distance. */
-    static final double WANDER_MAX_RAD = Math.toRadians(35.0);      // ledger: VOL-116 (game-choice)
+    static final double WANDER_MAX_RAD = Math.toRadians(35.0);      // ledger: VOL-156 (game-choice)
     /** The wander's lattice, blocks. */
-    static final double WANDER_CELL = 3.0;                          // ledger: VOL-116 (game-choice)
+    static final double WANDER_CELL = 3.0;                          // ledger: VOL-156 (game-choice)
     /** Ground flatter than this, m/m, has no direction of its own: the path keeps its last one (at its start, out from the vent). */
-    static final double FLAT_SLOPE = 1e-4;                          // ledger: VOL-116 (game-choice)
+    static final double FLAT_SLOPE = 1e-4;                          // ledger: VOL-156 (game-choice)
     /** How deep a flow fills a hollow before it stops there, m: aa 3 to 5 m; andesite 25 to 60 m. */
-    static final double BASALT_THICK_M = 5.0, VISCOUS_THICK_M = 40.0; // ledger: VOL-117 (verified: USGS FS 144-02; NPS Yellowstone)
+    static final double BASALT_THICK_M = 5.0, VISCOUS_THICK_M = 40.0; // ledger: VOL-157 (verified: USGS FS 144-02; NPS Yellowstone)
     /** Pahoehoe turns to aa for good on ground steeper than this. */
-    static final double PAHOEHOE_TO_AA_DEG = 8.0;                   // ledger: VOL-118 (from-memory, game-choice)
+    static final double PAHOEHOE_TO_AA_DEG = 8.0;                   // ledger: VOL-158 (from-memory, game-choice)
     /** A flow paints two columns side by side on ground gentler than this. */
-    static final double WIDE_BELOW_DEG = 5.0;                       // ledger: VOL-119 (game-choice)
+    static final double WIDE_BELOW_DEG = 5.0;                       // ledger: VOL-159 (game-choice)
     /** The second column lies this far to one side of the path, blocks. */
-    static final double SIDE_OFFSET = 0.8;                          // ledger: VOL-119 (game-choice)
+    static final double SIDE_OFFSET = 0.8;                          // ledger: VOL-159 (game-choice)
     /** The toe lobe: every column whose centre is this near the flow's end, blocks. */
-    static final double LOBE_RADIUS = 1.25;                         // ledger: VOL-119 (game-choice)
+    static final double LOBE_RADIUS = 1.25;                         // ledger: VOL-159 (game-choice)
     /** A metric's principal scales are kept within this factor of the world's nominal block. */
-    static final double MAX_STRETCH = 4.0;                          // ledger: VOL-120 (game-choice)
+    static final double MAX_STRETCH = 4.0;                          // ledger: VOL-160 (game-choice)
 
     /** The spatial index's cell, blocks. */
     private static final int GRID = 256;
@@ -416,7 +416,7 @@ public final class LavaFlows {
         boolean flank = basaltic && fr.nextDouble() < FLANK_SHARE;
         double lo = basaltic ? BASALT_MIN_M : VISCOUS_MIN_M, hi = basaltic ? BASALT_MAX_M : VISCOUS_MAX_M;
         double length = lo * StrictMath.exp(fr.nextDouble() * StrictMath.log(hi / lo));
-        // A long flow is one fed fast, and a flow fed fast is aa from its vent (ledger VOL-118).
+        // A long flow is one fed fast, and a flow fed fast is aa from its vent (ledger VOL-158).
         boolean aaFromVent = basaltic && length > Math.sqrt(lo * hi);
         int side = fr.nextBoolean() ? 1 : -1;
         double az = flank ? c.riftAz + (fr.nextBoolean() ? Math.PI : 0.0) + (2.0 * fr.nextDouble() - 1.0) * RIFT_SPREAD_RAD
@@ -612,7 +612,7 @@ public final class LavaFlows {
             c.visible++;
     }
 
-    /** What a flow of this age shows at column (x, z), by the rain there (ledger VOL-107 to VOL-111). */
+    /** What a flow of this age shows at column (x, z), by the rain there (ledger VOL-147 to VOL-151). */
     private int paint(Ctx c, boolean aa, double age, long seed, int x, int z) {
         double p = precip(x + 0.5, z + 0.5);
         double fresh = interpolate(FRESH_YR, p), visible = interpolate(VISIBLE_YR, p);
@@ -646,7 +646,7 @@ public final class LavaFlows {
 
     /**
      * A time against the rain: linear in log time against log rain between the anchors
-     * ({@link #ANCHOR_P_MM}), the end anchors' times outside them (ledger VOL-110).
+     * ({@link #ANCHOR_P_MM}), the end anchors' times outside them (ledger VOL-150).
      */
     static double interpolate(double[] years, double precipMm) {
         double[] p = ANCHOR_P_MM;
@@ -697,7 +697,7 @@ public final class LavaFlows {
     // ---- the volcano's numbers ----
 
     static Group group(Volcanoes.Volcano v) {
-        return "shield".equals(v.kind()) ? Group.BASALTIC : Group.VISCOUS;  // ledger: VOL-121 (game-choice)
+        return "shield".equals(v.kind()) ? Group.BASALTIC : Group.VISCOUS;  // ledger: VOL-161 (game-choice)
     }
 
     static double rate(Group g) {
@@ -714,7 +714,7 @@ public final class LavaFlows {
     /**
      * The ground's metric at world point (x, z) from the projection's unit sphere: the Jacobian J of the map from
      * world blocks to the sphere (central differences over a block, the sphere's radius in metres
-     * {@code radius() × mH}), G = JᵀJ. With no projection, the nominal block: G = mH² I (ledger VOL-120).
+     * {@code radius() × mH}), G = JᵀJ. With no projection, the nominal block: G = mH² I (ledger VOL-160).
      */
     public static double[] sphereMetric(WorldProjection p, double x, double z, double mH) {
         if (p == null)

@@ -279,7 +279,7 @@ public final class FarTerrain {
                     }
                 }
                 // A lava flow's block tops dry ground where one shows, as LavaFlowPass paints it in a chunk
-                // after the surface rule (ledger VOL-100 on; the flows come from the world data alone).
+                // after the surface rule (ledger VOL-140 on; the flows come from the world data alone).
                 if (!shape.water() && !painted && shape.ground >= levelMinY && shape.ground <= levelMaxY) {
                     BlockState flow = flowPalette.block(flows.code(wx, z), LavaFlowPalette.key(wx, z));
                     if (flow != null)
