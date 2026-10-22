@@ -848,14 +848,22 @@ mod tests {
     #[test]
     fn counts_a_large_allocation_by_its_pages() {
         let _serial = serial();
-        let before = in_use();
-        let v = vec![0u8; (64 << 20) + 1];
+        // The count less the kept blocks: a block that takes a kept one (other tests keep
+        // grid-sized blocks) was counted already, and only the kept bytes move.
+        let live = || in_use().saturating_sub(kept_bytes());
+        // Other test threads allocate and free concurrently, so only check the order of magnitude,
+        // and measure again, holding each block, until one pair of reads sees the growth: a free
+        // of over 8 MiB between them hid it (the gate batch on d74c74aa).
+        let mut held = Vec::new();
+        let grown = (0..5).any(|_| {
+            let before = live();
+            held.push(vec![0u8; (64 << 20) + 1]);
+            live() >= before + (64 << 20) - (8 << 20)
+        });
+        assert!(grown, "in_use did not grow");
+        let v = held.pop().unwrap();
+        drop(held);
         assert!(v.iter().step_by(4096).all(|&b| b == 0), "not zeroed");
-        // Other test threads allocate concurrently, so only check the order of magnitude.
-        assert!(
-            in_use() >= before + (64 << 20) - (8 << 20),
-            "in_use did not grow"
-        );
         assert!(peak() >= 64 << 20);
         let addr = v.as_ptr() as usize;
         let kept_here = || {
