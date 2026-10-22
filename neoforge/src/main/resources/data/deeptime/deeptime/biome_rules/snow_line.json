@@ -1,0 +1,19 @@
+{
+ "_comment": "The snow line (the coordinator's call, 2026-10-22, after Ben's report of snowy peaks and slopes on a temperate volcano; BIO-180, BIO-181). Two rules, on the climate at the column's own surface (lapsed to its height): vanilla's treeless snow biomes (the tag deeptime:snow_line/snowfield: frozen and jagged peaks, snowy slopes) stand only above the tree line, where even the warmest month is under 10 C (Koppen's polar line, BIO-002), or under the ice cover; vanilla's snowy conifer slope (grove) stands only where the winter freezes, the coldest month at or under 0 C (Koppen's C/D line, BIO-011), or under ice. Where the pack's climate search answers one of them anywhere else, the pack's own search over the snowless mountain biomes (the tag deeptime:snow_line/snowless: vanilla's stony peaks, meadow and windswept hills, Terralith's rocky mountains and highlands, optional) chooses the biome. A rule on the game side, not in the bake, because the game maps the baked erosion and weirdness onto the pack's own land distribution (ClimateMapping), so only the game knows where a pack's snowy slots are. The rules need the plain answer to be snowy (replaces); the rules of the other shipped files that could fire on those columns keep mountain biomes (keeps) or need another answer, so this file's place in the order (its id sorts last) changes nothing. FORMAT.md 'Biome rules'.",
+ "rules": [
+  {
+   "id": "above_the_tree_line",
+   "replaces": ["#deeptime:snow_line/snowfield"],
+   "t_warm_c": {"min": 10.0},
+   "ice": false,
+   "biomes": ["#deeptime:snow_line/snowless"]
+  },
+  {
+   "id": "freezing_winter",
+   "replaces": ["minecraft:grove"],
+   "t_cold_c": {"min": 0.0},
+   "ice": false,
+   "biomes": ["#deeptime:snow_line/snowless"]
+  }
+ ]
+}
