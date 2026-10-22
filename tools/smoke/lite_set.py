@@ -4,6 +4,7 @@
 
     lite_set.py derive --mods <mods dir> --side client|server [--json F] [--write-keep F] [--check-keep F] [--quiet]
     lite_set.py apply  <set dir> --side client|server [--excluded F --excluded-why F] [--prune-files]
+    lite_set.py compare --full <full mods dir> --lite <lite mods dir> --side client|server
     lite_set.py survey --mods <mods dir>
 
 Why (Ben: "strip down the pack when I'm doing a deeptime test to just the blocks that are used for the
@@ -371,6 +372,7 @@ def derive(mods_dir, side, roots=None, core_path=CORE_FILE, refused_path=REFUSED
         if ns in SKIP_NS:
             continue
         by_ns[ns].extend((("#" if is_tag else "") + f"{ns}:{path}", f) for f in files)
+    ix.named, ix.tag_requests = by_ns, tag_requests
     for ns, items in sorted(by_ns.items()):
         jars, how = ix.provider(ns)
         if not jars:
@@ -577,6 +579,38 @@ def apply(set_dir, side, excluded_txt, why_txt, prune, core_path=CORE_FILE):
         print(f"== pack files: {len(removed)} dropped (kubejs/, scripts/, resourcepacks/ and the config of left-out mods), {left} recorded in packwiz.json")
 
 
+def compare(full_dir, lite_dir, side):
+    """What the lite set loses of what Deep Time's data names, against the full set: namespaces that a jar
+    of the full set provides and no jar of the lite set does, and members of every tag the data names (a
+    material's #c:ores/<name> too) that the lite set no longer has. Static, from the jars."""
+    fix, _, fkept, _, _ = derive(full_dir, side)
+    lix = Index(lite_dir)
+    lost_ns = []
+    for ns in sorted(fix.named):
+        fj, _ = fix.provider(ns)
+        lj, _ = lix.provider(ns)
+        if fj and not lj:
+            lost_ns.append((ns, fix.named[ns][0][0], fix.named[ns][0][1], fj))
+    print(f"== namespaces named by Deep Time's data that the full set provides and the lite set does not: {len(lost_ns)}")
+    for ns, ident, where, jars in lost_ns:
+        print(f"   {ns}  (e.g. {ident} in {where}; jar {', '.join(jars)})")
+    lost_tags = []
+    for (ns, path) in sorted(fix.tag_requests):
+        have_f, have_l = set(), set()
+        for kind in TAG_KINDS:
+            have_f.update(m for m, _ in fix.tag_members(kind, ns, path))
+            have_l.update(m for m, _ in lix.tag_members(kind, ns, path))
+        # a member also needs its namespace's jar in the lite set (a tag file can list blocks of left-out mods)
+        have_l = {m for m in have_l if m.split(":", 1)[0] in SKIP_NS or lix.provider(m.split(":", 1)[0])[0]}
+        gone = sorted(have_f - have_l)
+        if gone:
+            lost_tags.append((ns, path, gone, len(have_f)))
+    print(f"== tags Deep Time's data names (materials as #c:ores/<name>) that lose members in the lite set: {len(lost_tags)}")
+    for ns, path, gone, total in lost_tags:
+        print(f"   #{ns}:{path}: {len(gone)} of {total} members gone: {', '.join(gone[:6])}{' ...' if len(gone) > 6 else ''}")
+    print(f"   (the lite folder holds {len(lix.jars)} jars; the full folder {len(fix.jars)}, of which the derivation keeps {len(fkept)})")
+
+
 def survey(mods_dir):
     ix = Index(mods_dir)
     for j in ix.jars.values():
@@ -602,6 +636,10 @@ def main():
     a.add_argument("--excluded")
     a.add_argument("--excluded-why")
     a.add_argument("--prune-files", action="store_true")
+    c = sub.add_parser("compare")
+    c.add_argument("--full", required=True)
+    c.add_argument("--lite", required=True)
+    c.add_argument("--side", choices=("client", "server"), required=True)
     s = sub.add_parser("survey")
     s.add_argument("--mods", required=True)
     args = ap.parse_args()
@@ -623,6 +661,8 @@ def main():
                 sys.exit(3)
     elif args.cmd == "apply":
         apply(args.set_dir, args.side, args.excluded, args.excluded_why, args.prune_files)
+    elif args.cmd == "compare":
+        compare(args.full, args.lite, args.side)
     else:
         survey(args.mods)
 
