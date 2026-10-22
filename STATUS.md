@@ -74,7 +74,7 @@ MIC pack tested against: d31abf3 (pack master on 2026-10-22: Chunky server-only 
 ## Review pages
 | Name | URL | Version label | Date |
 |---|---|---|---|
-| hub (every review page in one place; update it when a page is added) | https://spacesheep.dev/@benmac/deeptime-hub | hub 2026-09-28 | 2026-09-28 |
+| hub (every review page in one place; update it when a page is added) | https://spacesheep.dev/@benmac/deeptime-hub | hub: cube world, four decisions waiting 2026-10-22 | 2026-10-22 |
 | seams (where the wrap is, what crossing does, checked against TW 0.19.3 code; links the wrap graphics page) | https://spacesheep.dev/@benmac/deeptime-seams | wrap explainer 2026-09-28 | 2026-09-28 |
 | wrap (how the east–west wrap works: 3D planet, server vs client views of a crossing, two players, a lap, Nether 1:8) | https://spacesheep.dev/@benmac/deeptime-wrap | how the wrap works 2026-09-28 | 2026-09-28 |
 | phase0 (Phase 0 exit: every check, evidence, links) | https://spacesheep.dev/@benmac/deeptime-phase0 | Phase 0 exit 2026-09-28 | 2026-09-28 |
@@ -99,6 +99,7 @@ MIC pack tested against: d31abf3 (pack master on 2026-10-22: Chunky server-only 
 | volcanoes (Volcanoes: realism or us? The diagnosis of Ben's volcano 27476, fixes 1 to 9, D1 to D5 and D7) | https://spacesheep.dev/@benmac/deeptime-volcanoes | volcano diagnosis and what landed 2026-10-22 | 2026-10-22 |
 | drowned-continents (the transition's width: why 0.414 of the continental crust is under the sea; D6) | https://spacesheep.dev/@benmac/deeptime-drowned-continents | drowned continents 2026-10-22 | 2026-10-22 |
 | overnight-1022 (what landed overnight on 22 October, tests, Prism, the seven decisions) | https://spacesheep.dev/@benmac/deeptime-overnight-1022 | overnight summary final fill (c0931067) | 2026-10-22 |
+| cube-world (Cube world: four decisions: Q4 the map and the turn, Q1 format 0.7, Q2 climate API 5, Q3 when the wrap engine; the coordinator's calls; the projection study's renders and tables; state of play) | https://spacesheep.dev/@benmac/deeptime-cube-world | cube world: four decisions 2026-10-22 | 2026-10-22 |
 
 ## Pending questions
 Questions asked of Ben and not yet answered. Answers go into the decisions file's log
