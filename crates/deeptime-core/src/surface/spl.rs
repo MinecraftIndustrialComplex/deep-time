@@ -230,7 +230,7 @@ pub fn solve_cut<G: SurfaceGrid>(
     qin: &mut [f64],
     cut: Option<&mut [f64]>,
 ) -> SplReport {
-    // The unit of a lake's room (the raster's one cell area, the cube's mean).
+    // The unit of a lake's room (the raster's one cell area, the cube's mean). ledger: SCL-149
     let a = d.ref_area();
     let n = d.cells();
     let f = &r.forest;

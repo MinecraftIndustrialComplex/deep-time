@@ -44,6 +44,7 @@ use std::ops::Range;
 
 /// Cells per task and per partial sum. It sets the grain of the work and the order of every sum;
 /// no result depends on the thread count.
+// ledger: SCL-147 (game-choice: a work grain, no physics; Claude 2026-10-22)
 pub(crate) const CHUNK: usize = 4096;
 
 /// Σ f(chunk) over the fixed chunks of `0..len`, the chunks in parallel and their sums added in

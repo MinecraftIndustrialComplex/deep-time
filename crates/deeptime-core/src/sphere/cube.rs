@@ -181,6 +181,7 @@ fn norm(a: [f64; 3]) -> f64 {
 /// tan(Ω/2) = |a·(b×c)| / (1 + a·b + b·c + c·a)).
 #[inline]
 fn solid_angle(a: [f64; 3], b: [f64; 3], c: [f64; 3]) -> f64 {
+    // ledger: SCL-140 (from-memory; checked by the areas' sum)
     let num = dot(a, cross(b, c)).abs();
     let den = 1.0 + dot(a, b) + dot(b, c) + dot(c, a);
     2.0 * num.atan2(den)
@@ -274,6 +275,8 @@ impl CubeGrid {
                         dist[k] = radius_m * arc(unit[c], p(k));
                     }
                 }
+                // ledger: SCL-141 (from-memory): ½ cot of the opposite angle per triangle, the
+                // quad's two cuts averaged (¼ each); checked by the harmonics.
                 let mut lap = [0.0; 8];
                 let pc = unit[c];
                 for k in [1usize, 3, 5, 7] {
@@ -432,6 +435,7 @@ impl CubeGrid {
 /// the rows of a face in order, then the six faces in the format's order (F0, F1, F2, F3, N, S).
 /// The order the cube's reductions keep, so a sum does not depend on the thread count.
 pub fn face_sum(n: usize, v: &[f64]) -> f64 {
+    // ledger: SCL-147 (game-choice: a fixed order of sums)
     let rows: Vec<f64> = v.par_chunks(n).map(|r| r.iter().sum::<f64>()).collect();
     let mut total = 0.0;
     for face in rows.chunks(n) {
@@ -584,6 +588,7 @@ impl GhostTable {
 /// cell inside the face or one side out is its own source.
 #[inline]
 fn corner_source(n: i64, i: i64, j: i64) -> (i64, i64) {
+    // ledger: SCL-142 (from-memory)
     let lo_i = i < 0;
     let hi_i = i >= n;
     let lo_j = j < 0;
@@ -609,6 +614,7 @@ fn corner_source(n: i64, i: i64, j: i64) -> (i64, i64) {
 /// cell's distance along the Hilbert curve of the face's square of side 2^⌈log₂ n⌉ (the curve's
 /// standard construction: per bit level, the quadrant, then the turn that keeps the curve whole).
 pub fn hilbert_key(n: usize, face: Face, i: usize, j: usize) -> u64 {
+    // ledger: SCL-143 (game-choice: a tiling order, no physics)
     let side = n.next_power_of_two() as u64;
     let (mut x, mut y) = (i as u64, j as u64);
     let mut d = 0u64;

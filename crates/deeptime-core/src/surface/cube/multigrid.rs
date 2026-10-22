@@ -245,6 +245,7 @@ pub(super) fn prepare(hier: &mut Option<Hierarchy>, g: &CubeGrid, op: &Op) {
             for &f in &p.src[p.src_ptr[e] as usize..p.src_ptr[e + 1] as usize] {
                 s += fl.val[f as usize];
             }
+            // ledger: SCL-146, ERO-183 (the raster's constants on 2 × 2 face blocks)
             *v = SCALE * s;
         });
         let val = &cl.val;

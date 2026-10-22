@@ -162,6 +162,7 @@ pub fn fill<G: SurfaceGrid>(
                 left / (cells * a)
             }
             None => {
+                // ledger: SCL-151 (game-choice: the rest over the visited area)
                 let area: f64 = s.visited.iter().map(|&c| d.area(c as usize)).sum();
                 left / area.max(f64::MIN_POSITIVE)
             }

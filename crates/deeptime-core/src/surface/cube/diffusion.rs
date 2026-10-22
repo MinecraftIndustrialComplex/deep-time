@@ -94,6 +94,7 @@ impl Op {
 fn couplings(g: &CubeGrid, kd: &[f64], scale: f64, c: usize) -> [f64; 8] {
     let s = g.topology().slots(c);
     let lap = g.lap(c);
+    // ledger: SCL-144 (game-choice): the side pair's mean, the diagonal's least side mean.
     let mean = |x: usize, y: usize| 0.5 * (kd[x] + kd[y]);
     let mut k = [0.0; 8];
     for slot in 0..8 {
@@ -286,6 +287,7 @@ fn run(ws: &mut Workspace, g: &CubeGrid, h: &mut [f64], tol_m: f64, mg: bool) ->
     }
     let iterations = cg(ws, g.topology().cells(), tol_m, mg);
     // Σ μx = Σ μb − Σ r: the residual's sum back to the cells, in proportion to their coupling.
+    // ledger: SCL-145 (game-choice)
     let Workspace { op, rhs, x, ap, .. } = ws;
     op.apply(x, ap);
     let lost = ordered_sum(l, |r| r.map(|i| rhs[i] - ap[i]).sum());
@@ -306,6 +308,7 @@ fn run(ws: &mut Workspace, g: &CubeGrid, h: &mut [f64], tol_m: f64, mg: bool) ->
 /// a tridiagonal system (μ + K) y = μ b divided through by μ; couplings across a face's edge
 /// take the old value of the cell beyond it.
 fn lod(g: &CubeGrid, op: &Op, b: &[f64], x: &mut [f64], tmp: &mut [f64]) {
+    // ledger: SCL-145 (game-choice: the raster's splitting, per face)
     let n = g.n();
     let nn = n * n;
     let t = g.topology();
