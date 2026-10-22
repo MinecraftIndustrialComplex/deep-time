@@ -11,7 +11,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | plate setup | PLT-001 to PLT-021, PLT-203, PLT-205, PLT-209 to PLT-211 (26) |
 | [PLT](ledger/PLT.md) | plate motion | PLT-022 to PLT-028 (7) |
 | [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252, PLT-285 to PLT-286, PLT-289, PLT-312, PLT-320 (49; PLT-320 the cordillera at Earth's typical arc, with no convergence factor, the crust budget against Stern & Scholl, 2026-10-20; PLT-312 the arcs on the convergence normal to the front, an experiment kept off, the land-shape task, 2026-10-20; PLT-289 ocean floor as thick as a continent turns continental, the resampling lumps, 2026-10-18; PLT-285 and PLT-286 the continental arcs and the cones as rock, plate task 8, 2026-10-17) |
-| [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250, PLT-253, PLT-290 to PLT-292 (34; PLT-290 to PLT-292 the crust a collision took counted once, the resampling lumps, 2026-10-18; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
+| [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250, PLT-253, PLT-290 to PLT-292, PLT-400 (35; PLT-400 the wedge's crust crosses whole, a switch kept off, the crust flux into collision fronts, 2026-10-21; PLT-290 to PLT-292 the crust a collision took counted once, the resampling lumps, 2026-10-18; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228, PLT-293, PLT-350 to PLT-355 (26; PLT-293 ocean crust keeps its own rock at resamplings and in the L1 sampling, 2026-10-19; PLT-350 to PLT-353 the floor's GDH1 rate with the sea from the ocean's volume, 2026-10-21, PLT-354 the gap's floor held in place and PLT-355 GDH1's curve between other ridge and abyssal depths, on [sea-level.md](sea-level.md)) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
@@ -20,6 +20,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
 | [PLT](ledger/PLT.md) | the continents census's Earth references and measuring choices (`tools/review/continents_census.py`, section "White patches, drowned continents and coastal high ground", 2026-10-21) | PLT-360 to PLT-363 (4) |
+| [PLT](ledger/PLT.md) | the crust flux into collision fronts: the crust budget's measures and Earth's references (section "The crust flux into collision fronts", 2026-10-21) | PLT-401 (1) |
 
 Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 79, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
@@ -3519,12 +3520,21 @@ table (30c4d664 → fad59a5e on seeds 1 and 2: land 0.257 → 0.268, largest 0.1
 2. *The collision rate* (1.63 per 100 Myr, target 2 to 6): PLT-371's reversal is sourced and
    measured (2.22 per 100 Myr) and waits on the collisions' losses (1.72 km³ a year against 0.7)
    and the high ground (the high-ground work). Switch it on after those, and measure the land
-   again.
+   again. Measured again in "The crust flux into collision fronts (2026-10-21)" below: the
+   collisions' losses per km of front are Earth's (their excess is the length of front in
+   collision, the plates'), PLT-371 is in the code as a switch, and on top of PLT-400 it keeps the
+   land but does not reliably reach 2: 2.00 per 100 Myr at the median of 12 runs (p = 0.09) on
+   master 49492ce3, 1.85 (p = 0.32) on master df40ce80, by longer fronts in collision and at a
+   cost in crust, so it stays off. Welding collisions sooner (the weld at 10 mm/yr) reaches 3.00
+   but drowns the continents (land 0.190). The rate waits on the length of front in collision
+   (item 4) and on what the check counts as a collision (that section's list, item 3).
 3. *Where subduction starts* (Crameri): needs a law for trenches to propagate and slabs to roll
    back before initiation can move near trenches; a plate reorganisation is the open law (Ben's,
    as in the sections above).
 4. *The plate count*: the lattice's floor (0.0377 sr at 100,000 samples); a finer lattice or a
-   small-plate law, not a constant.
+   small-plate law, not a constant. It is also behind the collision fronts' length ("The crust
+   flux into collision fronts" below): with 24 plates against Bird's 52, continents meet along
+   whole margins, 28,800 km of front in collision against Earth's 6,000 to 12,000 km of suture.
 5. *The island-arc share of the land* (0.43): "a few per cent" (the section above, from memory)
    is not a figure Earth's sources give. By Stern & Scholl 1.5 of the 2.7 AU of crust grown at
    convergent margins is intra-oceanic arc, and the census tags any land with 1 km or more of
@@ -3572,7 +3582,9 @@ the budget's maps:
   0.74 of the high ground once the first is dealt with), on crust of 60 to 68 km at the median and
   about 200 km from the sea at the median. The collisions lose crust at 2.5 to 3.8 times Earth's
   0.7 km³ a year (the crust budget's sections above) because 3 to 4 times Earth's crust crosses
-  their fronts (the agent's estimate from the budget); 0.95 of what crosses stays and builds the
+  their fronts (the agent's estimate from the budget; measured in "The crust flux into collision
+  fronts" below, the crossing per km of front is Earth's, and what is 2.4 to 4.8 times Earth's is
+  the length of front in collision); 0.95 of what crosses stays and builds the
   belts (PLT-242). How much crosses is the plates' motion (`plates/dynamics.rs`), outside this task.
 - *Plateau interiors with no room.* Quiet thick crust in a plateau's middle finds no thin crust
   within the collapse's 200 km reach (PLT-257): its nearest room is 400 to 440 km away at the
@@ -3676,7 +3688,14 @@ same seeds and switch it on if the land holds. Ben's call when.
    2017, and Yakovlev & Clark 2014 conserve it if the crust before the collision was 23 to 29 km).
    A lower share alone would lose still more crust (the losses are already over Earth's because
    too much crosses); less crossing, from fewer or shorter collisions, is the plates' work on
-   `plates/dynamics.rs`, and the share is worth a second look after it.
+   `plates/dynamics.rs`, and the share is worth a second look after it. Measured in "The crust
+   flux into collision fronts (2026-10-21)" below: per km of front the crossing and the losses are
+   Earth's, and 0.95 is in line with Stern & Scholl at the model's crossing (PLT-242 now
+   `verified`); the excess is the length of front in collision (28,800 km against 6,000 to 12,000).
+   Ingalls' half as the share (arm rs50, with PLT-400) takes land above 2 km from 0.277 to 0.142
+   but the land from 0.257 to 0.204, the largest landmass from 0.133 to 0.052 and the drowned
+   continental crust from 0.348 to 0.514: rejected. The belts' height is left to the front's
+   length and the collisions' life.
 3. *The cordillera's height* (PLT-050): a sourced value from Profeta et al. 2015 in place of the
    calibrated 3000 m; measured above, it does not move the high ground by itself.
 4. *Plateau interiors*: thick crust with no room within reach does not collapse. A lower-crustal
@@ -3892,3 +3911,344 @@ continents drowned, so PLT-390 stays off.
    planes ground to its base level near the shore, not at the sea.
 3. *The hotspot taper* (PLT-114, uncited) and the other solid-column heights in the datum frame
    ("Left as they are" above): leave them unless a source puts them at the shore.
+
+## The crust flux into collision fronts (2026-10-21)
+
+The coordinator's task CF-1, V1 item 1 (decisions log 2026-10-21): the crust flux into collision
+fronts, the collisions' losses, then the collision rate. "The high ground's extent" above had the
+collisions losing 2.5 to 3.8 times Earth's 0.7 km³ a year because "3 to 4 times Earth's crust
+crosses their fronts", an estimate from the budget. This section measures the flux term by term
+against Earth's sources. Ledger PLT-400 and PLT-401, with notes on PLT-242, PLT-246 and PLT-371;
+sources in the bibliography, "The crust flux into collision fronts". Code: `plates/belts.rs` (the
+crossing's parts as crust-budget globals, PLT-400's switch), `plates/mod.rs`,
+`plates/crust_budget.rs`, `plates/subduction.rs` (PLT-371's switch) and `params.rs`. Both switches
+are off in the default and every built-in preset, so the planets are the same bit for bit.
+
+Measured on `earthlike_quick_16k`, 1000 Myr, seeds 1 to 6, both starts (12 runs per arm), with the
+crust budget on (`DEEPTIME_CRUST_BUDGET=1`): the flux over the whole run (`tools/review/loss-budget.py`), the criteria on the final
+frame (`tools/review/continents_census.py fields`) and the plate checks of each run. Each value is
+the median of the 12 runs; p is a two-sided Mann-Whitney U test on the runs against the base. The
+base is master 49492ce3 (with ee5ef027, which moves no planet) as it runs: this branch with both
+switches off. Master df40ce80 (the sea off the datum) came in after and changes every planet; the
+base and PLT-371's arm ran again on it ("Again on master df40ce80" below). The build log entry of
+2026-10-21 "The crust flux into collision fronts" has the commands.
+
+### The flux and Earth's
+
+| term | the model (base) | Earth | source |
+|---|---|---|---|
+| front in collision at any time (each step's front, averaged over the run) | 28,800 km | 6,000 km of active suture on average, 12,000 km today, 1,000 to 20,000 km over geologic time; 23,003 km of continental convergent boundary (CCB) | Stern & Scholl 2010, p. 18-19 (after Hildebrand & Bowring 1999, as cited); Bird 2003, Table 3 |
+| convergence across it | 17.1 mm/yr | 18.7 mm/yr across the CCB (its area flux over its length; 26.2 mm/yr mean relative speed) | Bird 2003, Table 3 |
+| crust crossing (the incoming crust's own thickness) | 38.3 km | 35.1 km the normal column, 41.1 km the continents' mean; India's margin 23 to 29 km if its crust was conserved | PLT-278; Christensen & Mooney 1995 (PLT-256); Yakovlev & Clark 2014 |
+| area crossing | 0.49 km² a year | 0.43 km² a year (0.013616 m²/s, 12.6 % of all boundaries' area flux) | Bird 2003, Table 3 |
+| volume crossing | 18.9 km³ a year; 655 km³ per km of front and Myr | about 15 to 18 km³ a year (0.43 km² a year on 35 to 41 km) | the agent's arithmetic |
+| kept: PLT-242's share, then room in the wedge and the belt | 0.881 of it | | |
+| lost: the share's 5 % | 0.94 km³ a year (32 per km and Myr) | | |
+| lost: no room, left over after the belt's six passes with room somewhere in it | 1.15 | | |
+| lost: no room, the belt full at the strength height (PLT-253) | 0.25 | | |
+| lost at the fronts in all | 2.33 km³ a year; 75 per km and Myr | 0.7 km³ a year at suture zones, about 115 per km and Myr (15 sediment, 50 eroded upper plate, 50 deeply subducted lower plate); Table 1: 0.3 deep subduction, 0.1 sediment, 0.3 erosion; India 0.24 km³ a year at a 10 % minimum; 0.43 (up to 0.65) km³ a year from 16,000 km of rifted margin 18 km thick since 65 Ma | Stern & Scholl 2010, p. 12 and 18-19; Clift et al. 2009, §5.1 |
+| a collision's front at its longest, weighted by the area it crossed: median (p25 to p75) | 6,200 km (2,900 to 10,300); the counted collisions 9,800 | the Himalaya about 2,400 km long | the collisions design, from Wikipedia (this page's first table) |
+| a collision's life, the same weighting | 82 Myr (30 to 140); counted 158 | India against Asia about 50 Myr so far | Stern & Scholl 2010, p. 19 |
+| a collision's shortening, the same weighting | 1,750 km (570 to 2,700); counted 2,160 | India against Asia: more than 4,000 km of convergence; 1,000 to 1,200 km of it Tibet's shortening, 600 to 900 km the Himalaya's, up to 1,000 km of continental subduction | van Hinsbergen 2022 |
+
+(The front's length is its straight extent with the lattice's jags taken out, `Front::length_km`.
+The weighted figures are over each run's collision records, `deeptime plate-check --record`,
+counted collisions and the smaller terranes' transfers together, pooled over the 12 runs.)
+
+### Which term is 3 to 4 times Earth's
+
+Per km of front the model is Earth's: it converges at 17.1 mm/yr against 18.7, on 38 km of crust,
+and loses 75 km³ per km and Myr against Stern & Scholl's 115 (65 without the upper plate's
+erosion, which the model does not take at a front). The area crossing is Bird's too: 0.49 against
+0.43 km² a year. **What is 3 to 4 times Earth's is the length of front that loses crust as a
+suture**: 28,800 km at any time against Stern & Scholl's 6,000 km on average (4.8 times) and
+12,000 km today (2.4 times); 2.33 km³ a year against 0.7 is 3.3 times.
+
+The two references agree once read together. Bird's CCB counts every convergent step that is not
+oceanic, transitional ones included (paragraph 127), 23,003 km of it; Stern & Scholl's suture
+losses come from 6,000 to 12,000 km of active suturing. The rest of Earth's continental
+convergence shortens and thickens the plates, Tibet's 1,000 to 1,200 km, with no suture's losses
+booked. The model's fronts suture along all their length for all their life. A collision's front
+is 2.6 times the Himalaya's at the weighted median and its life is long (82 Myr; a quarter of the
+crossing is in collisions longer than 140 Myr; the plate check's collision length p90 is 139 Myr
+against at most 120), while its shortening is India's (1,750 km). About 4.6 such fronts run at once
+(28,800 over 6,200).
+
+Neither is the collisions' code. The front's length is how the plates meet: 24 plates against
+Bird's 52 (the lattice's floor, "The plate geometry", item 4 of its list), so continents meet along
+whole margins. The collision's life is how it ends: the force balance (`plates/forces.rs`) does not
+stall it, and the weld (PLT-246) needs the convergence under 5 mm/yr for 10 Myr. The boundaries'
+orientation (Ben's scope) is not needed for either.
+
+### PLT-242 against its sources
+
+The share (0.95) came from Stern & Scholl's 50 km³ per km and Myr of deep loss over an assumed
+crossing of 1,600 km³ per km and Myr (40 km of crust at 40 mm/yr). The model crosses 655 (17.1
+mm/yr on 38.3 km), so Stern & Scholl's 50 is 7.6 % of it and 65, with the sediment, 9.9 %; the
+model loses 5 % by the share and 6.6 % for want of room, 11.9 % in all. In line: the share stays
+at 0.95, and the row is now `verified` (Stern & Scholl read again in the library, p. 18-19).
+
+Ingalls et al. 2016 (the abstract; not in the library) find about half of India's crust missing
+from the India-Asia mass balance; van Hinsbergen et al. 2017 dispute it, Yakovlev & Clark 2014
+conserve the crust if the margin was 23 to 29 km thick, and Stern & Scholl take 10 % for India as a
+minimum. Half of every collision's crust lost is 6.5 times Stern & Scholl's deep loss per km at
+the model's crossing (327 against 50 km³ per km and Myr); as a global share it is not supported. It was measured anyway (arm rs50 below).
+
+### What changed: the wedge's crust crosses whole (PLT-400)
+
+Crust a collision stacked on the incoming plate (its wedge, PLT-244) is carried by that plate to
+the front and crosses it: 0.14 of the crossing at the base's median. Since every crossing took the
+share, that crust paid the 5 % twice. With `collision_restack_whole` (PLT-400) the part of a
+crossing sample's crust above the normal column that this collision stacked crosses whole. It is
+bookkeeping, and small: the share's loss falls from 0.94 to 0.79 km³ a year (p = 0.002), the
+belt's no-room takes most of it back (1.35 to 1.42), and the fronts' loss goes from 2.33 to 2.17
+(p = 0.80).
+
+The rest is measurement (PLT-401): the crust budget writes the crossing's area, its front length
+times the step, the crust above the normal column, the part of it raised by a collision within 30
+Myr, the part this collision stacked, the wedge's share of what stays, and the no-room loss split
+three ways (left over with room in the belt, the belt full at the strength height, clipped by the
+ceilings); `tools/review/loss-budget.py` reads them.
+
+### The arms
+
+| arm | settings |
+|---|---|
+| base | master 49492ce3's behaviour (both switches off) |
+| rs | PLT-400 on |
+| rsrev | PLT-400 and PLT-371 on |
+| rs50 | PLT-400 on, `collision_stacking_share` 0.5 (Ingalls) |
+| rsw10 | PLT-400 on, `weld_speed_mm_yr` 10 (PLT-246, a game choice) |
+
+Medians of 12 runs (p against the base):
+
+| arm | land | largest landmass | continental crust under the sea | above 2 km | coast with high ground | under ice | collisions per 100 Myr | plate checks (per run) |
+|---|---|---|---|---|---|---|---|---|
+| base | 0.257 | 0.133 | 0.348 | 0.277 | 0.381 | 0.172 | 1.60 | 29 |
+| rs | 0.250 (0.45) | 0.102 (0.40) | 0.423 (0.13) | 0.207 (0.17) | 0.329 (0.12) | 0.161 (0.58) | 1.50 (0.66) | 29 (0.81) |
+| rsrev | 0.270 (0.93) | 0.132 (1.00) | 0.375 (0.73) | 0.273 (0.40) | 0.370 (0.93) | 0.176 (0.75) | 2.00 (0.09) | 29 (0.57) |
+| rs50 | 0.204 (<0.01) | 0.052 (<0.01) | 0.514 (<0.01) | 0.142 (<0.01) | 0.272 (<0.01) | 0.143 (0.15) | 1.60 (0.73) | 29 (0.82) |
+| rsw10 | 0.190 (<0.01) | 0.059 (<0.01) | 0.585 (<0.01) | 0.100 (<0.01) | 0.234 (<0.01) | 0.121 (<0.01) | 3.00 (<0.01) | 27 (<0.01) |
+
+rs50 is of 11 runs: its supercontinent run of seed 2 stopped at -400 Myr on the surface guard
+(item 5 below). The plate checks pooled over each arm's runs (`deeptime plate-check` on all of
+them at once) pass 29 (base), 30 (rs), 27 (rsrev), 30 (rs50) and 25 (rsw10) of 45. The flux:
+
+| arm | crust lost to the mantle, 10⁹ km³ per 1000 Myr | net change, 10⁹ km³ per 1000 Myr | fronts' loss, km³ a year | of it the share's | of it no room | front in collision, km | collision length p90, Myr | collision states a reversal ended, per 100 Myr | supercontinent tenure, Myr | continental crust at the end |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base | 4.10 | -1.26 | 2.33 | 0.94 | 1.35 | 28,845 | 139 | 8.4 | 13 | 0.328 |
+| rs | 4.08 (0.98) | -1.00 (0.07) | 2.17 (0.80) | 0.79 (<0.01) | 1.42 (0.17) | 26,402 (0.13) | 116 (0.20) | 8.7 (0.58) | 26 (0.11) | 0.349 (0.07) |
+| rsrev | 4.21 (0.93) | -1.60 (0.62) | 2.31 (0.80) | 0.87 (0.01) | 1.46 (0.62) | 31,778 (0.08) | 119 (0.37) | 5.2 (<0.01) | 31 (0.66) | 0.316 (0.54) |
+| rs50 | 6.80 (<0.01) | -2.37 (<0.01) | 6.09 (<0.01) | 5.95 (<0.01) | 0.19 (<0.01) | 22,551 (<0.01) | 102 (0.02) | 9.0 (0.06) | 30 (0.14) | 0.333 (0.83) |
+| rsw10 | 2.81 (<0.01) | -0.70 (0.05) | 1.25 (<0.01) | 0.51 (<0.01) | 0.80 (0.02) | 16,253 (<0.01) | 63 (<0.01) | 6.3 (<0.01) | 32 (0.09) | 0.384 (<0.01) |
+
+The continents under the sea (the census's SERIES line of the final frame; the sea from the
+ocean's volume, sea-level.md):
+
+| arm | sea level, m | continental crust's volume, 10⁹ km³ | its mean thickness, km |
+|---|---|---|---|
+| base | 522 | 6.80 | 40.4 |
+| rs | 798 (0.06) | 7.12 (0.09) | 39.9 (0.62) |
+| rsrev | 426 (0.67) | 6.47 (0.54) | 40.1 (0.91) |
+| rs50 | 269 (<0.01) | 5.87 (<0.01) | 34.2 (<0.01) |
+| rsw10 | 821 (<0.01) | 7.38 (0.13) | 36.2 (<0.01) |
+
+The p values are two-sided Mann-Whitney U over the runs. The runs:
+
+<details><summary>Per run (sca: scattered_continents, sup: supercontinent; seeds 1 to 6)</summary>
+
+| measure | arm | sca-1 | sca-2 | sca-3 | sca-4 | sca-5 | sca-6 | sup-1 | sup-2 | sup-3 | sup-4 | sup-5 | sup-6 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| land | base | 0.287 | 0.301 | 0.249 | 0.258 | 0.280 | 0.233 | 0.223 | 0.257 | 0.295 | 0.227 | 0.278 | 0.253 |
+| land | rs | 0.266 | 0.258 | 0.302 | 0.189 | 0.273 | 0.237 | 0.264 | 0.291 | 0.242 | 0.214 | 0.224 | 0.229 |
+| land | rsrev | 0.281 | 0.237 | 0.278 | 0.282 | 0.213 | 0.284 | 0.258 | 0.263 | 0.231 | 0.278 | 0.235 | 0.284 |
+| land | rs50 | 0.229 | 0.232 | 0.193 | 0.221 | 0.174 | 0.198 | 0.203 | - | 0.194 | 0.227 | 0.214 | 0.204 |
+| land | rsw10 | 0.149 | 0.217 | 0.222 | 0.115 | 0.177 | 0.170 | 0.126 | 0.202 | 0.142 | 0.216 | 0.222 | 0.245 |
+| largest landmass | base | 0.257 | 0.175 | 0.091 | 0.186 | 0.148 | 0.097 | 0.136 | 0.080 | 0.212 | 0.058 | 0.130 | 0.093 |
+| largest landmass | rs | 0.094 | 0.128 | 0.222 | 0.051 | 0.152 | 0.072 | 0.105 | 0.197 | 0.109 | 0.099 | 0.075 | 0.084 |
+| largest landmass | rsrev | 0.144 | 0.048 | 0.101 | 0.104 | 0.100 | 0.127 | 0.184 | 0.183 | 0.145 | 0.153 | 0.112 | 0.136 |
+| largest landmass | rs50 | 0.088 | 0.069 | 0.050 | 0.049 | 0.035 | 0.063 | 0.085 | - | 0.050 | 0.090 | 0.046 | 0.052 |
+| largest landmass | rsw10 | 0.039 | 0.084 | 0.079 | 0.015 | 0.043 | 0.026 | 0.023 | 0.072 | 0.059 | 0.059 | 0.104 | 0.117 |
+| under the sea | base | 0.306 | 0.282 | 0.343 | 0.283 | 0.287 | 0.375 | 0.508 | 0.403 | 0.306 | 0.437 | 0.353 | 0.396 |
+| under the sea | rs | 0.406 | 0.343 | 0.323 | 0.580 | 0.338 | 0.484 | 0.370 | 0.239 | 0.462 | 0.482 | 0.503 | 0.440 |
+| under the sea | rsrev | 0.293 | 0.443 | 0.230 | 0.326 | 0.467 | 0.306 | 0.381 | 0.381 | 0.447 | 0.369 | 0.410 | 0.270 |
+| under the sea | rs50 | 0.335 | 0.416 | 0.538 | 0.492 | 0.603 | 0.541 | 0.532 | - | 0.550 | 0.411 | 0.477 | 0.514 |
+| under the sea | rsw10 | 0.716 | 0.514 | 0.537 | 0.779 | 0.629 | 0.631 | 0.741 | 0.540 | 0.671 | 0.495 | 0.502 | 0.410 |
+| above 2 km | base | 0.312 | 0.194 | 0.313 | 0.363 | 0.287 | 0.273 | 0.281 | 0.225 | 0.212 | 0.178 | 0.312 | 0.248 |
+| above 2 km | rs | 0.180 | 0.368 | 0.234 | 0.210 | 0.298 | 0.168 | 0.203 | 0.353 | 0.204 | 0.188 | 0.148 | 0.271 |
+| above 2 km | rsrev | 0.375 | 0.183 | 0.362 | 0.282 | 0.316 | 0.251 | 0.236 | 0.325 | 0.236 | 0.251 | 0.264 | 0.330 |
+| above 2 km | rs50 | 0.240 | 0.205 | 0.134 | 0.132 | 0.123 | 0.142 | 0.142 | - | 0.166 | 0.161 | 0.171 | 0.137 |
+| above 2 km | rsw10 | 0.092 | 0.148 | 0.096 | 0.040 | 0.062 | 0.095 | 0.055 | 0.170 | 0.103 | 0.178 | 0.117 | 0.146 |
+| coast with high ground | base | 0.432 | 0.374 | 0.399 | 0.476 | 0.402 | 0.377 | 0.358 | 0.386 | 0.374 | 0.296 | 0.278 | 0.384 |
+| coast with high ground | rs | 0.301 | 0.327 | 0.436 | 0.359 | 0.303 | 0.276 | 0.331 | 0.567 | 0.396 | 0.261 | 0.276 | 0.358 |
+| coast with high ground | rsrev | 0.469 | 0.319 | 0.511 | 0.488 | 0.472 | 0.365 | 0.361 | 0.348 | 0.365 | 0.298 | 0.397 | 0.376 |
+| coast with high ground | rs50 | 0.350 | 0.365 | 0.187 | 0.240 | 0.218 | 0.267 | 0.230 | - | 0.353 | 0.272 | 0.355 | 0.288 |
+| coast with high ground | rsw10 | 0.193 | 0.316 | 0.201 | 0.175 | 0.240 | 0.333 | 0.198 | 0.229 | 0.265 | 0.250 | 0.192 | 0.317 |
+| under ice | base | 0.194 | 0.172 | 0.177 | 0.206 | 0.171 | 0.132 | 0.272 | 0.140 | 0.140 | 0.120 | 0.204 | 0.163 |
+| under ice | rs | 0.162 | 0.204 | 0.141 | 0.157 | 0.190 | 0.159 | 0.138 | 0.174 | 0.166 | 0.106 | 0.157 | 0.216 |
+| under ice | rsrev | 0.224 | 0.158 | 0.170 | 0.200 | 0.178 | 0.175 | 0.176 | 0.176 | 0.090 | 0.181 | 0.155 | 0.183 |
+| under ice | rs50 | 0.212 | 0.157 | 0.128 | 0.091 | 0.179 | 0.139 | 0.115 | - | 0.188 | 0.106 | 0.148 | 0.143 |
+| under ice | rsw10 | 0.097 | 0.136 | 0.110 | 0.082 | 0.082 | 0.151 | 0.052 | 0.114 | 0.132 | 0.129 | 0.160 | 0.159 |
+| collisions per 100 Myr | base | 1.6 | 1.2 | 2.5 | 1.3 | 2.1 | 1.7 | 1.1 | 1.5 | 2.4 | 1.6 | 1.8 | 1.5 |
+| collisions per 100 Myr | rs | 0.9 | 1.2 | 1.4 | 1.5 | 1.5 | 1.6 | 2.4 | 1.2 | 1.0 | 2.7 | 2.5 | 2.3 |
+| collisions per 100 Myr | rsrev | 1.9 | 2.2 | 2.3 | 1.3 | 2.8 | 1.5 | 2.0 | 1.5 | 3.2 | 2.5 | 2.0 | 1.9 |
+| collisions per 100 Myr | rs50 | 1.0 | 1.2 | 1.6 | 1.4 | 1.7 | 2.1 | 1.3 | - | 1.4 | 2.1 | 1.8 | 1.9 |
+| collisions per 100 Myr | rsw10 | 3.3 | 3.8 | 3.0 | 2.9 | 2.5 | 2.7 | 2.1 | 3.1 | 3.1 | 2.7 | 3.0 | 4.0 |
+| plate checks | base | 29 | 30 | 29 | 29 | 32 | 28 | 28 | 28 | 29 | 24 | 31 | 29 |
+| plate checks | rs | 29 | 32 | 28 | 27 | 29 | 29 | 31 | 31 | 28 | 28 | 29 | 30 |
+| plate checks | rsrev | 30 | 29 | 28 | 28 | 29 | 25 | 29 | 31 | 29 | 28 | 29 | 26 |
+| plate checks | rs50 | 31 | 29 | 30 | 29 | 27 | 31 | 29 | - | 26 | 27 | 29 | 28 |
+| plate checks | rsw10 | 27 | 29 | 27 | 24 | 27 | 26 | 25 | 26 | 28 | 27 | 27 | 25 |
+| crust lost, 10⁹ km³ per 1000 Myr | base | 4.86 | 4.05 | 3.26 | 4.66 | 4.77 | 4.14 | 3.83 | 3.83 | 3.27 | 2.63 | 4.48 | 4.70 |
+| crust lost, 10⁹ km³ per 1000 Myr | rs | 4.51 | 4.53 | 3.65 | 4.28 | 4.81 | 4.08 | 2.82 | 5.26 | 3.53 | 3.06 | 4.09 | 3.89 |
+| crust lost, 10⁹ km³ per 1000 Myr | rsrev | 4.81 | 4.15 | 3.87 | 3.99 | 4.28 | 4.45 | 2.92 | 4.36 | 2.87 | 2.74 | 4.49 | 4.73 |
+| crust lost, 10⁹ km³ per 1000 Myr | rs50 | 8.51 | 7.67 | 5.62 | 7.79 | 6.80 | 6.68 | 8.11 | - | 6.94 | 6.53 | 6.74 | 6.03 |
+| crust lost, 10⁹ km³ per 1000 Myr | rsw10 | 2.18 | 3.22 | 2.74 | 2.17 | 2.39 | 2.91 | 1.88 | 2.80 | 2.89 | 3.21 | 2.83 | 3.05 |
+
+</details>
+
+### The weld at 10 mm/yr (arm rsw10)
+
+The length of front in collision is the term out of line, and the weld (PLT-246, a game choice)
+is the one constant that sets a collision's life inside the collisions' code. At 10 mm/yr, with
+PLT-400:
+
+- the front in collision falls from 28,800 to 16,300 km, toward Earth's 6,000 to 12,000; the
+  collision length p90 from 139 to 63 Myr (the target at most 120); the fronts' loss from 2.33 to
+  1.25 km³ a year (Earth 0.7), still 83 km³ per km and Myr; the crust lost to the mantle from 4.10
+  to 2.81 × 10⁹ km³ per 1000 Myr;
+- the collisions rise from 1.60 to 3.00 per 100 Myr, the land above 2 km falls to 0.100, the
+  coast with high ground to 0.234 and the land under ice to 0.121 (all p < 0.01);
+- but the land falls from 0.257 to 0.190, the largest landmass from 0.133 to 0.059, and the
+  continental crust under the sea rises from 0.348 to 0.585 (all p < 0.01). The continents keep
+  their volume (7.38 against 6.80 × 10⁹ km³, p = 0.13) but spread it over 0.384 of the planet
+  against 0.328, 36.2 km thick against 40.4, under a sea 300 m higher (822 against 522 m, since
+  the ocean basins are smaller). Less crust crosses (0.32 against 0.49 km² a year), so less of the
+  continents' area is turned into thickness;
+- the plate checks pooled fall from 29 to 25 of 45: the collision length, the collision rate and
+  the slab's speed over the free plates' now pass, while the largest plate over half the planet,
+  plates dead within 20 Myr, rifts alive and welded back at 50 Myr, the continental share's
+  maximum, the speed's rank against area and the ocean older than 180 Myr now fail.
+
+So shortening the collisions alone drowns the continents: in the model their long life is what
+thickens the crust enough to stand above the sea. The weld stays at 5 mm/yr. Bringing the front's
+length to Earth's needs the crust thickened, or the continents' area held, by something other
+than collisions that last too long (item 1 below).
+
+### PLT-371's reversal on top
+
+PLT-371 (the plate-geometry task's reversal judged by the crust the arc stands on, now the switch
+`reversal_by_arc_crust`) on top of PLT-400, arm rsrev. Against the base:
+
+- the collisions go from 1.60 to 2.00 per 100 Myr at the median (p = 0.09); 7 of 12 runs reach 2,
+  against 3 of 12. Pooled over the runs the plate check passes (2.00 on the scattered start, 2.18
+  on the supercontinent), where the base fails at 1.69;
+- the collision states a reversal ended (the plate check's `partings_reversed_per_100myr`) fall from
+  8.4 to 5.2 per 100 Myr (p < 0.001);
+- the land holds: 0.257 to 0.270 (p = 0.93), the largest landmass 0.133 to 0.132, continental crust
+  under the sea 0.348 to 0.375 (p = 0.73), above 2 km 0.277 to 0.273, coast with high ground 0.381
+  to 0.370, under ice 0.172 to 0.176;
+- the fronts' loss is the same (2.33 to 2.31 km³ a year), on a longer front in collision (28,800 to
+  31,800 km, p = 0.08).
+
+Against rs (PLT-400 alone) it puts back what PLT-400 moved: land 0.250 to 0.270 (p = 0.39), the
+largest landmass 0.102 to 0.132 (p = 0.29), above 2 km 0.207 to 0.273 (p = 0.06), coast with high
+ground 0.329 to 0.370 (p = 0.06); the collisions last longer (the plate check's median length 40 to
+49 Myr, p = 0.05). The plate-geometry task's loss of land (0.264 to 0.208 on seeds 1 to 3) was
+PLT-371 alone on master c790d1f3; on seeds 1 to 3 here, with PLT-400, the land goes 0.269 to 0.258
+(mean of six), inside the runs' spread.
+
+### Again on master df40ce80 (the sea off the datum)
+
+The arms above ran on this branch before master's sea off the datum (df40ce80) was merged in; that
+merge changes every planet. The base and rsrev ran again on the merged branch (arms m2base and
+m2rsrev, 12 runs each, the same seeds and starts). Medians, p against m2base:
+
+| arm | land | largest landmass | continental crust under the sea | above 2 km | coast with high ground | under ice | collisions per 100 Myr | plate checks (per run) | plate checks pooled |
+|---|---|---|---|---|---|---|---|---|---|
+| m2base | 0.247 | 0.104 | 0.414 | 0.248 | 0.369 | 0.170 | 1.65 | 29 | 30 of 45 |
+| m2rsrev | 0.244 (0.80) | 0.097 (0.58) | 0.365 (0.44) | 0.282 (0.37) | 0.389 (0.40) | 0.179 (0.44) | 1.85 (0.32) | 28 (0.43) | 26 of 45 |
+
+| arm | crust lost to the mantle, 10⁹ km³ per 1000 Myr | net change, 10⁹ km³ per 1000 Myr | fronts' loss, km³ a year | front in collision, km | collision length p90, Myr | collision states a reversal ended, per 100 Myr | continental crust at the end |
+|---|---|---|---|---|---|---|---|
+| m2base | 4.25 | -1.27 | 2.43 | 27,554 | 112 | 9.5 | 0.338 |
+| m2rsrev | 4.24 (0.80) | -1.61 (0.01) | 2.30 (1.00) | 33,741 (<0.01) | 135 (0.26) | 5.1 (<0.01) | 0.317 (0.04) |
+
+Per run, seeds 1 to 6 on the scattered start, then on the supercontinent:
+
+| measure | arm | sca-1 | sca-2 | sca-3 | sca-4 | sca-5 | sca-6 | sup-1 | sup-2 | sup-3 | sup-4 | sup-5 | sup-6 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| land | m2base | 0.249 | 0.222 | 0.225 | 0.240 | 0.243 | 0.246 | 0.260 | 0.244 | 0.269 | 0.263 | 0.260 | 0.250 |
+| land | m2rsrev | 0.224 | 0.256 | 0.238 | 0.206 | 0.251 | 0.223 | 0.223 | 0.270 | 0.250 | 0.274 | 0.300 | 0.228 |
+| largest landmass | m2base | 0.127 | 0.061 | 0.040 | 0.144 | 0.099 | 0.090 | 0.091 | 0.120 | 0.109 | 0.152 | 0.164 | 0.055 |
+| largest landmass | m2rsrev | 0.073 | 0.097 | 0.097 | 0.057 | 0.075 | 0.078 | 0.055 | 0.188 | 0.164 | 0.216 | 0.215 | 0.174 |
+| under the sea | m2base | 0.428 | 0.417 | 0.527 | 0.394 | 0.420 | 0.361 | 0.387 | 0.445 | 0.325 | 0.418 | 0.322 | 0.412 |
+| under the sea | m2rsrev | 0.461 | 0.356 | 0.391 | 0.487 | 0.331 | 0.432 | 0.352 | 0.339 | 0.374 | 0.283 | 0.221 | 0.475 |
+| above 2 km | m2base | 0.261 | 0.372 | 0.065 | 0.308 | 0.208 | 0.335 | 0.235 | 0.135 | 0.295 | 0.159 | 0.351 | 0.184 |
+| above 2 km | m2rsrev | 0.269 | 0.294 | 0.227 | 0.299 | 0.328 | 0.279 | 0.274 | 0.281 | 0.283 | 0.370 | 0.353 | 0.151 |
+| coast with high ground | m2base | 0.359 | 0.417 | 0.209 | 0.308 | 0.381 | 0.409 | 0.399 | 0.353 | 0.380 | 0.284 | 0.465 | 0.292 |
+| coast with high ground | m2rsrev | 0.349 | 0.269 | 0.354 | 0.426 | 0.338 | 0.384 | 0.448 | 0.513 | 0.435 | 0.393 | 0.398 | 0.334 |
+| under ice | m2base | 0.174 | 0.242 | 0.167 | 0.190 | 0.106 | 0.174 | 0.103 | 0.152 | 0.217 | 0.093 | 0.182 | 0.129 |
+| under ice | m2rsrev | 0.191 | 0.189 | 0.179 | 0.174 | 0.219 | 0.189 | 0.179 | 0.172 | 0.072 | 0.182 | 0.175 | 0.096 |
+| collisions per 100 Myr | m2base | 1.4 | 1.4 | 1.9 | 1.4 | 1.1 | 1.9 | 1.8 | 2.4 | 1.4 | 2.0 | 1.5 | 2.1 |
+| collisions per 100 Myr | m2rsrev | 1.9 | 1.9 | 1.7 | 2.0 | 1.8 | 1.6 | 3.0 | 1.4 | 1.6 | 1.1 | 2.5 | 2.8 |
+| plate checks | m2base | 28 | 27 | 27 | 27 | 29 | 29 | 29 | 31 | 28 | 30 | 30 | 29 |
+| plate checks | m2rsrev | 27 | 25 | 26 | 30 | 30 | 28 | 27 | 31 | 29 | 27 | 29 | 28 |
+| crust lost, 10⁹ km³ per 1000 Myr | m2base | 4.34 | 4.70 | 3.53 | 4.72 | 5.13 | 4.29 | 2.97 | 4.72 | 3.75 | 3.57 | 4.21 | 3.74 |
+| crust lost, 10⁹ km³ per 1000 Myr | m2rsrev | 4.22 | 4.18 | 3.67 | 5.25 | 4.93 | 4.19 | 3.34 | 4.67 | 4.16 | 4.34 | 4.26 | 4.46 |
+
+On the merged master the collisions rise less: 1.65 to 1.85 at the median (p = 0.32), 4 of 12
+runs at 2 or more against 3, and pooled over the runs 1.69 to 1.94, so the plate check still
+fails. The land holds again (0.247 to 0.244). What it costs shows on both bases: the continental
+volume's net change goes from -1.27 to -1.61 × 10⁹ km³ per 1000 Myr (p = 0.01; -1.26 to -1.60
+before the merge), the front in collision lengthens by 10 to 22 % (28,800 to 31,800 km, p = 0.08;
+27,600 to 33,700 km, p < 0.01), and the pooled plate checks fall by 2 to 4 (29 to 27; 30 to 26:
+the collision length's p50 and p90, the speed guard on one step, the ocean older than 180 Myr).
+
+So PLT-371 does not reliably lift the collisions into 2 to 6: it reaches the floor on one base
+(2.00, p = 0.09) and not on the other (1.85, p = 0.32). It does so by more and longer collisions,
+which lengthens the term that is already 3 to 4 times Earth's, and it costs continental crust. It
+stays off. PLT-400 is bookkeeping with no criterion moved past p = 0.1; it can go on whenever the
+planets are changed anyway (the coordinator's call). Both switches are off on this branch.
+
+### What is left, and for whom
+
+1. *The length of front in collision* (the plates'): 28,800 km against Earth's 6,000 to 12,000
+   km of suture, the term that is 3 to 4 times Earth's. Two causes, neither in the collisions'
+   code. The plate count: 24 plates against Bird's 52 ("The plate geometry", item 4), so
+   continents meet along whole margins. The collisions' life: the plate check's collision length
+   p90 is 139 Myr against at most 120, since the force balance (`plates/forces.rs`, outside this
+   task) does not stall a collision and the weld (PLT-246) waits for the convergence to stay under
+   5 mm/yr for 10 Myr. Ending collisions sooner by the weld alone (arm rsw10, 10 mm/yr) brings
+   the front to 16,300 km and the collisions to 3.00 per 100 Myr but drowns the continents (land
+   0.190, continental crust under the sea 0.585): the long collisions are what thickens the
+   crust, so a shorter life needs the crust thickened, or the continents' area held, some other
+   way. A collision stalled by its own thickened crust is a force law in `plates/forces.rs`; it
+   was not touched here.
+2. *The no-room loss* (the belts'): 1.15 km³ a year, half the fronts' loss, is crust left over
+   after the belt's passes with room still somewhere in the belt (`fill_belt`), and 0.25 more
+   finds the belt full at the strength height (PLT-253). With it the fronts lose 75 km³ per km and
+   Myr, under Stern & Scholl's 115, so it is not an excess per km; but it is a loss for want of a
+   place, not a process. Placing it in the belt would raise the belts, against the high-ground
+   criteria; a belt that widens as it fills (its foreland, PLT-244's wedge reaching farther) would
+   put it on the land without raising it.
+3. *What a collision is* (the plate check's): PLT-157's target of 2 to 6 per 100 Myr has no source
+   (P1-27's figure), and the check counts a collision only when the terrane is a continent
+   (PLT-078). Counting also the smaller transfers behind which continental crust of at least 0.1 of
+   a continent's area went under gives 4.05 per 100 Myr at the base's median and 4.65 with
+   PLT-400 and PLT-371 (p = 0.03; on master df40ce80 4.05 and 4.70, p = 0.01), an upper bound
+   since a record's `cont_in` counts the
+   continental crust that went under before the fronts met. Which count Earth's figure means
+   (sutures that close an ocean, or every accretion of continental crust) decides how far the
+   model is below it.
+4. *The switches* (the coordinator's): PLT-371 stays off (it lifts the collisions on one base and
+   not the other, by longer fronts in collision, at a cost in crust and plate checks); PLT-400 is
+   bookkeeping that moves no criterion and can go on with the next planet change. Both are off on
+   this branch, so the planets are the same bit for bit and no expected value changed; switching
+   either on changes every planet, and the seed-specific tests' expected values then need the new
+   planets.
+5. *Ingalls' half and the surface guard*: the share at 0.5 (arm rs50) loses the land and is
+   rejected (PLT-242). One of its 12 runs (supercontinent, seed 2) stopped at -400 Myr on the
+   surface guard (a cell at -238,024 m against the bound of 237,286 m; flexure.md "The surface
+   guard"), so its medians are of 11. No run of the other arms stopped. It happens only with half
+   of the crossing crust going down, a setting no preset uses, and was not followed further.

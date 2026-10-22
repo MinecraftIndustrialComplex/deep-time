@@ -344,7 +344,7 @@ impl PlatesStage {
         let overlaps = subduction::detect(st, &cache.geo, &pos, &tree);
         book(st, gap_budget::Part::Other);
         lap(&mut clock, "detect");
-        let resolved = subduction::resolve(st, world, &overlaps, &pos, &env)?;
+        let resolved = subduction::resolve(st, world, &cache.geo, &overlaps, &pos, &env)?;
         book(st, gap_budget::Part::Subduction);
         lap(&mut clock, "resolve");
         let (fronts, fired) =
@@ -386,6 +386,69 @@ impl PlatesStage {
             .globals
             .entry(belts::KEPT_GLOBAL.to_owned())
             .or_insert(0.0) += kept;
+        // The crossing's parts (measurement only, CF-1).
+        let dt = env.dt_myr;
+        for (name, x) in [
+            (
+                belts::CROSSED_AREA_GLOBAL,
+                stacked.values().map(|s| s.crossed_km2).sum::<f64>(),
+            ),
+            (
+                belts::FRONT_GLOBAL,
+                stacked.values().map(|s| s.length_km * dt).sum::<f64>(),
+            ),
+            (
+                belts::ABOVE_GLOBAL,
+                stacked
+                    .values()
+                    .map(|s| s.crossed_km2 * s.above_m / 1000.0)
+                    .sum::<f64>(),
+            ),
+            (
+                belts::RECENT_GLOBAL,
+                stacked
+                    .values()
+                    .map(|s| s.crossed_km2 * s.recent_above_m / 1000.0)
+                    .sum::<f64>(),
+            ),
+            (
+                belts::WEDGE_GLOBAL,
+                stacked
+                    .values()
+                    .map(|s| s.wedge_km2_m / 1000.0)
+                    .sum::<f64>(),
+            ),
+            (
+                belts::RESTACK_GLOBAL,
+                stacked
+                    .values()
+                    .map(|s| s.crossed_km2 * s.restack_m / 1000.0)
+                    .sum::<f64>(),
+            ),
+            (
+                belts::SLIVER_GLOBAL,
+                stacked
+                    .values()
+                    .map(|s| s.sliver_km2_m / 1000.0)
+                    .sum::<f64>(),
+            ),
+            (
+                belts::CAPPED_GLOBAL,
+                stacked
+                    .values()
+                    .map(|s| s.capped_km2_m / 1000.0)
+                    .sum::<f64>(),
+            ),
+            (
+                belts::CLIPPED_GLOBAL,
+                stacked
+                    .values()
+                    .map(|s| s.clipped_km2_m / 1000.0)
+                    .sum::<f64>(),
+            ),
+        ] {
+            *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
+        }
         lap(&mut clock, "belts");
         let pull = subduction::fronts_finish(st, &cache.geo, &env, &mut cones, begun, arcs, sea);
         book(st, gap_budget::Part::Arcs);
