@@ -1089,7 +1089,8 @@ pub fn run(inp: &Input<'_>) -> Output {
         let into = match wk.mouth {
             Mouth::River => chain_of.get(&wk.into).copied().unwrap_or(u32::MAX),
             Mouth::Lake => wk.into,
-            Mouth::Sea => u32::MAX,
+            // The simulation's network has no seams (a cube world's bake splits its rivers).
+            Mouth::Sea | Mouth::Seam => u32::MAX,
         };
         rivers.chains.push(Chain {
             first,
