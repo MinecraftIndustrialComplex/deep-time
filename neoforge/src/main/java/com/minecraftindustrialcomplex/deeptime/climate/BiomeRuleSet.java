@@ -141,7 +141,12 @@ public final class BiomeRuleSet {
             keeps = keeps == null ? List.of() : List.copyOf(keeps);
         }
 
-        /** Whether every condition holds for the column (the cheap ones first). */
+        /**
+         * Whether every condition holds for the column (the cheap ones first). {@code replaces} and {@code keeps} come
+         * before the climate: their plain search is the level's own answer when no rule holds, so it is made anyway,
+         * while the climate is sampled only for the rules that read it (the snow line's rules replace a few biomes
+         * on every surface column).
+         */
         public boolean matches(Facts f) {
             if (!koppen.isEmpty()) {
                 String k = f.koppen();
@@ -161,6 +166,10 @@ public final class BiomeRuleSet {
                 return false;
             if (elevationM != null && !elevationM.has(f.elevationM()))
                 return false;
+            if (!replaces.isEmpty() && !f.plainIn(replaces))
+                return false;
+            if (!keeps.isEmpty() && f.plainIn(keeps))
+                return false;
             if (tMean != null && !tMean.has(f.tMean()))
                 return false;
             if (tWarm != null && !tWarm.has(f.tWarm()))
@@ -173,11 +182,7 @@ public final class BiomeRuleSet {
                 return false;
             if (inSlot && !f.slotIn(biomes))
                 return false;
-            if (ground != 0 && (f.ground() & ground) == 0)
-                return false;
-            if (!replaces.isEmpty() && !f.plainIn(replaces))
-                return false;
-            return keeps.isEmpty() || !f.plainIn(keeps);
+            return ground == 0 || (f.ground() & ground) != 0;
         }
     }
 
