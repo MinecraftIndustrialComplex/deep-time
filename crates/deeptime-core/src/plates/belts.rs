@@ -1279,13 +1279,17 @@ mod tests {
     /// The crust that stacks is the crust that crossed the front: the volume added is the
     /// volume consumed times `collision_stacking_share` (all of it at 1), with the consumed
     /// crust's rock (its sediments metamorphosed). Nothing changes kind, so the continental area
-    /// is untouched by the stacking.
+    /// is untouched by the stacking. This is PLT-242's share alone, so `collision_restack_whole`
+    /// (PLT-400, on by default since 2026-10-22: the collision's own wedge crosses whole and the
+    /// volume added is more than the share of what crossed) is off here; the switch has its own
+    /// test, `a_collisions_own_wedge_crosses_whole_with_the_switch`.
     #[test]
     fn stacking_moves_crust_and_creates_none() {
         for share in [1.0, 0.5] {
             let mut fx = Fixture::new();
             fx.preset.tectonics.collision_threshold_km = 1.0e9;
             fx.preset.tectonics.collision_stacking_share = share;
+            fx.preset.tectonics.collision_restack_whole = false;
             // A crust strong enough that the strength height (PLT-253) never binds here.
             fx.preset.tectonics.crust_strength_mpa = 2000.0;
             let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(40.0));

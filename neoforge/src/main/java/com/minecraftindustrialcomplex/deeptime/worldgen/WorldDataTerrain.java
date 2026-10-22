@@ -30,6 +30,7 @@ public final class WorldDataTerrain implements TerrainSource {
     private volatile VolcanicBiomeRules volcanicBiomeRules;
     private volatile VolcanicZones volcanicZones;
     private volatile WaterCaveShield waterCaveShield;
+    private volatile LavaFlows lavaFlows;
 
     public WorldDataTerrain(WorldDataRef ref) {
         this.ref = ref;
@@ -123,6 +124,62 @@ public final class WorldDataTerrain implements TerrainSource {
             }
         }
         return m;
+    }
+
+    /**
+     * The lava flows on the world's active volcanoes ({@link LavaFlows}), indexed on first use from the baked
+     * list; each volcano's flows are traced from the terrain height, the water columns and the rain the first
+     * time a column within its reach is asked about, so every chunk and far terrain see the same flows.
+     *
+     * @param cell the generator's noise cell width (the water rule's reach)
+     */
+    public LavaFlows lavaFlows(int cell) {
+        LavaFlows f = lavaFlows;
+        if (f == null) {
+            synchronized (this) {
+                if (lavaFlows == null) {
+                    WorldData wd = data();
+                    var spec = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Spec.of(wd, cell);
+                    var none = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Kind.NONE;
+                    var projection = wd.projection();
+                    var precip = wd.has(GeothermalEnv.PRECIP) ? wd.layer(GeothermalEnv.PRECIP) : null;
+                    double mH = wd.manifest().mPerBlockH();
+                    int c = wd.circumference();
+                    LavaFlows.Env env = new LavaFlows.Env() {
+                        /** x folded into [−C/2, C/2) as {@link #wrapX(int)} folds a block's. */
+                        private double fold(double x) {
+                            return x - c * Math.floor((x + c / 2) / (double) c);
+                        }
+
+                        @Override
+                        public double height(double x, double z) {
+                            return wd.height(fold(x), z);
+                        }
+
+                        @Override
+                        public boolean wet(int x, int z) {
+                            return com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, wrapX(x), z).kind() != none;
+                        }
+
+                        @Override
+                        public double precipMm(double x, double z) {
+                            return precip == null ? Double.NaN : precip.bilinear(fold(x), z);
+                        }
+
+                        @Override
+                        public double[] metric(double x, double z) {
+                            return LavaFlows.sphereMetric(projection, x, z, mH);
+                        }
+                    };
+                    lavaFlows = new LavaFlows(wd.volcanoes().list(), env, wd.circumference(), projection.zMin(), projection.zMax(), mH,
+                            wd.manifest().mPerBlockV(), line -> DeepTime.LOGGER.info("[deeptime] lava flows: {}", line));
+                    DeepTime.LOGGER.info("[deeptime] lava flows: {} active volcanoes indexed ({} climate); each traces its flows on first use",
+                            lavaFlows.size(), precip == null ? "no" : "the baked");
+                }
+                f = lavaFlows;
+            }
+        }
+        return f;
     }
 
     /**
