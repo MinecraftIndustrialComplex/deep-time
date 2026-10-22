@@ -6,9 +6,7 @@
 # heavy step admits itself (deeptime-admit; Ben 2026-10-03), so the GameTest sets run side by side,
 # each in its own server copy and ports. Start it detached, once (two batches double the load):
 #
-#   tools/remote/mac.sh --pack -- true    # sync master and the MIC pack first (the sync also pushes
-#                                         # mic-viewer's pinned commit to the VM's git mirror, which
-#                                         # this batch's cargo reads: tools/remote/git-mirrors.sh)
+#   tools/remote/mac.sh --pack -- true    # sync master and the MIC pack first
 #   ssh ban@<vm> 'pgrep -f "^zsh .*gate-batch.sh" >/dev/null && echo ALREADY || { setsid nohup \
 #       /data/ban/mic/mods/deep-time/tools/remote/vm/gate-batch.sh > /data/ban/deeptime-cache/batch.log 2>&1 < /dev/null & }'
 #
