@@ -43,6 +43,8 @@ use std::f64::consts::{PI, TAU};
 
 use serde::{Deserialize, Serialize};
 
+use crate::cube::{Cube, CubeTurn, EdgeMotion, Face};
+use crate::cube_map::{CubeMap, CubeView};
 use crate::petroff::Petroff;
 use crate::portable_math as pm;
 
@@ -394,6 +396,9 @@ pub enum ProjectionKind {
     /// edges (Ben, decisions log 2026-10-04: "We'll proceed w/ Petroff–Guyou").
     #[default]
     PetroffGuyou,
+    /// The cube world: six faces in a cross, drawn through a map table and turned freely onto the
+    /// planet (Ben, decisions log 2026-10-22; format 0.7, FORMAT.md "The cube world's layout").
+    Cube,
 }
 
 impl ProjectionKind {
@@ -402,6 +407,7 @@ impl ProjectionKind {
         match self {
             ProjectionKind::Lambert => "lambert",
             ProjectionKind::PetroffGuyou => "petroff_guyou",
+            ProjectionKind::Cube => "cube",
         }
     }
 
@@ -410,6 +416,7 @@ impl ProjectionKind {
         match s {
             "lambert" => Some(ProjectionKind::Lambert),
             "petroff_guyou" => Some(ProjectionKind::PetroffGuyou),
+            "cube" => Some(ProjectionKind::Cube),
             _ => None,
         }
     }
@@ -417,6 +424,9 @@ impl ProjectionKind {
 
 /// The version of the layout block's schema (`projection.layout_version`).
 pub const LAYOUT_VERSION: u32 = 1;
+
+/// The cube world's layout block version (`projection.layout_version` of a `cube` world).
+pub const CUBE_LAYOUT_VERSION: u32 = 2;
 
 /// The hemisphere square's side is a multiple of this many blocks: the world's x period 2b is
 /// then a multiple of 512 (a region file, what `WorldDataRef` and Toroidal World's loop take),
@@ -445,8 +455,11 @@ pub fn face_for(circumference: u32) -> u32 {
 pub enum EdgeKind {
     /// A translation (the east–west wrap).
     Slide,
-    /// A half-turn about a point of the edge (the edge is glued onto itself).
+    /// A half-turn about a point of the edge (the edge is glued onto itself), or on a cube world
+    /// about the centre of a void square (the edge is glued onto its partner).
     HalfTurn,
+    /// A quarter turn about one of F0's corners (cube worlds: k = 1 or 3).
+    QuarterTurn,
 }
 
 /// The axis an edge's normal runs along (`edges[].axis`): `x` for an east or west edge.
@@ -471,8 +484,12 @@ pub enum Side {
 /// back inside (FORMAT.md "The world's layout"; the wrap engine's `WrapEdge`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EdgeSpec {
-    /// `west`, `east`, `north`, `south`.
+    /// `west`, `east`, `north`, `south`; a cube world's `F3-west`, `N-east`, ...
     pub name: String,
+    /// The cube edge the net edge is half of (`east_west`, `ne`, `nw`, `se`, `sw`, `nn`, `ss`);
+    /// cube worlds only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seam: Option<String>,
     pub kind: EdgeKind,
     pub axis: Axis,
     pub side: Side,
@@ -487,6 +504,9 @@ pub struct EdgeSpec {
     /// The half-turn's centre (a block corner), for `half_turn` edges.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pivot: Option<[i64; 2]>,
+    /// The other net edge of the same cube edge (cube worlds only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub partner: Option<String>,
     /// Who joins the edge in the game: `toroidal_world` (the slides, Ben 2026-10-03: "TW
     /// slides, engine turns") or `wrap_engine`.
     pub owner: String,
@@ -497,10 +517,24 @@ pub struct EdgeSpec {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ConePoint {
     pub name: String,
-    /// The world's angle round the point, degrees (180: half a turn missing).
+    /// The world's angle round the point, degrees (180: half a turn missing; 270 at a cube's
+    /// corner).
     pub cone_deg: f64,
+    /// The three faces that meet there (cube worlds only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faces: Option<Vec<String>>,
+    /// The corner's cube-frame direction, (±1, ±1, ±1) (cube worlds only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cube: Option<[i8; 3]>,
     pub lat_deg: f64,
     pub lon_deg: f64,
+    /// The signed great-circle distance to the nearest land of the final keyframe, degrees
+    /// (positive at sea, clamped to ±20°; the corner search's score). Cube worlds a bake wrote.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub land_distance_deg: Option<f64>,
+    /// Whether a player can stand on it (cube worlds only: F0's four corners).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reachable: Option<bool>,
     /// Every block corner in the domain's closure that is this point.
     pub images: Vec<[i64; 2]>,
 }
@@ -510,8 +544,57 @@ pub struct ConePoint {
 pub struct PoleSpec {
     /// `north` or `south`.
     pub name: String,
-    /// Block corners (points) that are the pole; empty when the pole is outside the world (Lambert).
-    pub images: Vec<[i64; 2]>,
+    /// The face the pole lies on and its local (u, v) (cube worlds only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub face: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub u: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub v: Option<f64>,
+    /// The points that are the pole: block corners on the polar layouts (written as integers),
+    /// any net point on a cube world; empty when the pole is outside the world (Lambert).
+    #[serde(serialize_with = "points_as_written")]
+    pub images: Vec<[f64; 2]>,
+}
+
+impl PoleSpec {
+    /// A pole of a polar layout: its images are block corners.
+    pub fn corners(name: &str, images: &[[i64; 2]]) -> PoleSpec {
+        PoleSpec {
+            name: name.into(),
+            face: None,
+            u: None,
+            v: None,
+            images: images.iter().map(|p| [p[0] as f64, p[1] as f64]).collect(),
+        }
+    }
+}
+
+/// Writes whole coordinates as integers (the polar layouts' block corners, as format 0.5 wrote
+/// them) and the rest as floats.
+fn points_as_written<S: serde::Serializer>(
+    points: &[[f64; 2]],
+    ser: S,
+) -> std::result::Result<S::Ok, S::Error> {
+    use serde::ser::SerializeSeq;
+    #[derive(Serialize)]
+    #[serde(untagged)]
+    enum Coord {
+        Int(i64),
+        Float(f64),
+    }
+    let coord = |v: f64| {
+        if v.is_finite() && v == v.trunc() && v.abs() < 9.0e15 {
+            Coord::Int(v as i64)
+        } else {
+            Coord::Float(v)
+        }
+    };
+    let mut seq = ser.serialize_seq(Some(points.len()))?;
+    for p in points {
+        seq.serialize_element(&[coord(p[0]), coord(p[1])])?;
+    }
+    seq.end()
 }
 
 /// The temporary safe border at edges nothing joins yet (FORMAT.md "The world's layout").
@@ -520,10 +603,15 @@ pub struct BorderSpec {
     /// `edge_stop`: players, their vehicles and Sable ships are stopped `inset_blocks` inside
     /// the named edges until the wrap engine joins them.
     pub kind: String,
+    /// The polar layouts' bordered edges (empty on a cube world, which names `segments`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub edges: Vec<String>,
     pub inset_blocks: f64,
     /// Always true: the border goes when the wrap engine installs the layout's topology.
     pub temporary: bool,
+    /// A cube world's bordered net edges, by name: the 12 turning edges.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub segments: Vec<String>,
 }
 
 /// The fundamental domain, blocks: x in [x_min, x_max), z in [z_min, z_max].
@@ -533,6 +621,9 @@ pub struct Domain {
     pub x_max: f64,
     pub z_min: f64,
     pub z_max: f64,
+    /// The east-west period, blocks (cube worlds only: 4s, Toroidal World's loop).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub period_x: Option<i64>,
 }
 
 /// `manifest.json` `projection`: the world's projection and layout (FORMAT.md "The world's
@@ -548,12 +639,47 @@ pub struct ProjectionSpec {
     /// (petroff_guyou).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lambda_c_deg: Option<f64>,
+    /// s, the face side in blocks (cube).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub face_blocks: Option<u32>,
+    /// The map table that draws a face on the sphere, by name and sha256 (cube).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub map: Option<MapSpec>,
+    /// The turn that places the cube on the planet, planet frame to cube frame, row-major (cube).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rotation: Option<[[f64; 3]; 3]>,
     pub domain: Domain,
+    /// The six faces in the format's order (cube).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faces: Option<Vec<FaceSpec>>,
     pub edges: Vec<EdgeSpec>,
     pub cone_points: Vec<ConePoint>,
     pub poles: Vec<PoleSpec>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub border: Option<BorderSpec>,
+}
+
+/// A cube world's map table (`projection.map`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MapSpec {
+    pub name: String,
+    pub sha256: String,
+}
+
+/// One face of a cube world (`projection.faces[]`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FaceSpec {
+    /// `F0` .. `F3`, `N`, `S`.
+    pub id: String,
+    /// The face's place in the format's order (rasters store the faces in this order).
+    pub index: u32,
+    /// The net block of the face's local cell (0, 0), its north-west corner.
+    pub origin: [i64; 2],
+    /// The cube-frame directions of the face's centre, local +u and local +v (`+X`, `-Z`, ...).
+    pub frame: [String; 3],
+    /// The planet point at the face's centre through the rotation, degrees.
+    pub centre_lat_deg: f64,
+    pub centre_lon_deg: f64,
 }
 
 /// Where a point landed after [`PetroffGuyou::fold`]: the canonical point and the number of
@@ -683,6 +809,7 @@ impl PetroffGuyou {
             x_max: b,
             z_min: -b / 2.0,
             z_max: b / 2.0,
+            period_x: None,
         }
     }
 
@@ -840,6 +967,7 @@ impl PetroffGuyou {
                     pivot: Option<[i64; 2]>,
                     owner: &str| EdgeSpec {
             name: name.into(),
+            seam: None,
             kind,
             axis,
             side,
@@ -847,6 +975,7 @@ impl PetroffGuyou {
             span,
             iso,
             pivot,
+            partner: None,
             owner: owner.into(),
         };
         let edges = vec![
@@ -900,8 +1029,12 @@ impl PetroffGuyou {
             ConePoint {
                 name: name.into(),
                 cone_deg: 180.0,
+                faces: None,
+                cube: None,
                 lat_deg: lat,
                 lon_deg: lon,
+                land_distance_deg: None,
+                reachable: None,
                 images,
             }
         };
@@ -910,7 +1043,11 @@ impl PetroffGuyou {
             layout_version: LAYOUT_VERSION,
             hemisphere_blocks: Some(b as u32),
             lambda_c_deg: Some(self.lambda_c_deg),
+            face_blocks: None,
+            map: None,
+            rotation: None,
             domain: self.domain(),
+            faces: None,
             edges,
             cone_points: vec![
                 cone("north-midpoint", vec![[0, -h]]),
@@ -919,14 +1056,8 @@ impl PetroffGuyou {
                 cone("south-corner", vec![[-b, h], [b, h]]),
             ],
             poles: vec![
-                PoleSpec {
-                    name: "north".into(),
-                    images: vec![[-h, -h], [h, -h]],
-                },
-                PoleSpec {
-                    name: "south".into(),
-                    images: vec![[-h, h], [h, h]],
-                },
+                PoleSpec::corners("north", &[[-h, -h], [h, -h]]),
+                PoleSpec::corners("south", &[[-h, h], [h, h]]),
             ],
             border,
         }
@@ -1041,31 +1172,75 @@ impl IndexFrame {
 
 /// A world's projection: what its world data is laid out in (manifest `projection`).
 // Copy on purpose (it is passed by value everywhere); the Petroff–Guyou variant's constants make it
-// a few hundred bytes, which is fine for a value made once per world.
+// a few hundred bytes, which is fine for a value made once per world. The cube's net and map table
+// are shared for the process's life ([`Cube::shared`], [`CubeMap::builtin_static`]), so its view is
+// Copy too.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum WorldProjection {
     Lambert(Projection),
     PetroffGuyou(PetroffGuyou),
+    /// A cube world (format 0.7). Its view's radius is in blocks of the equal-area sphere
+    /// ([`Cube::radius`]), so its Jacobians are planet blocks per net block: times
+    /// `scale.m_per_block_h` for metres.
+    Cube(CubeView<'static>),
 }
 
 impl WorldProjection {
     /// The projection a layout block describes; `None` (a manifest without one) is Lambert on
-    /// circumference `c`.
+    /// circumference `c`. Panics on a cube layout [`WorldProjection::try_from_spec`] refuses
+    /// ([`crate::Manifest::read`] has refused those already).
     pub fn from_spec(spec: Option<&ProjectionSpec>, c: u32) -> WorldProjection {
-        match spec {
+        WorldProjection::try_from_spec(spec, c).unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// [`WorldProjection::from_spec`], refusing a cube layout whose map this crate does not ship
+    /// (by name and sha256), whose rotation is not one, or whose face side is not even.
+    pub fn try_from_spec(spec: Option<&ProjectionSpec>, c: u32) -> crate::Result<WorldProjection> {
+        Ok(match spec {
             Some(s) if s.kind == ProjectionKind::PetroffGuyou => {
                 let b = s.hemisphere_blocks.unwrap_or(c / 2);
                 WorldProjection::PetroffGuyou(PetroffGuyou::new(b, s.lambda_c_deg.unwrap_or(0.0)))
             }
+            Some(s) if s.kind == ProjectionKind::Cube => {
+                let bad = |m: String| crate::FormatError::Invalid(m);
+                let face = s
+                    .face_blocks
+                    .ok_or_else(|| bad("cube layout without face_blocks".into()))?;
+                if face < 2 || !face.is_multiple_of(2) {
+                    return Err(bad(format!("cube face_blocks {face} is not even")));
+                }
+                let map = s
+                    .map
+                    .as_ref()
+                    .ok_or_else(|| bad("cube layout without map".into()))?;
+                let table = cube_map_named(&map.name, &map.sha256)?;
+                let rows = s
+                    .rotation
+                    .ok_or_else(|| bad("cube layout without rotation".into()))?;
+                let turn = CubeTurn::from_rows(rows).map_err(bad)?;
+                WorldProjection::cube(face, table, turn)
+            }
             _ => WorldProjection::Lambert(Projection::new(c)),
-        }
+        })
+    }
+
+    /// The cube world of face side `s` drawn through `map` and placed by `turn`.
+    pub fn cube(s: u32, map: &'static CubeMap, turn: CubeTurn) -> WorldProjection {
+        let cube = Cube::shared(s);
+        WorldProjection::Cube(CubeView {
+            cube,
+            map,
+            turn,
+            radius_m: cube.radius(),
+        })
     }
 
     pub fn kind(&self) -> ProjectionKind {
         match self {
             WorldProjection::Lambert(_) => ProjectionKind::Lambert,
             WorldProjection::PetroffGuyou(_) => ProjectionKind::PetroffGuyou,
+            WorldProjection::Cube(_) => ProjectionKind::Cube,
         }
     }
 
@@ -1074,6 +1249,7 @@ impl WorldProjection {
         match self {
             WorldProjection::Lambert(p) => p.circumference(),
             WorldProjection::PetroffGuyou(g) => g.period() as f64,
+            WorldProjection::Cube(c) => c.cube.period() as f64,
         }
     }
 
@@ -1082,22 +1258,25 @@ impl WorldProjection {
         match self {
             WorldProjection::Lambert(p) => p.radius(),
             WorldProjection::PetroffGuyou(g) => g.radius(),
+            WorldProjection::Cube(c) => c.cube.radius(),
         }
     }
 
-    /// The unit vector of the point (x, z).
+    /// The unit vector of the point (x, z) (NaN past a cube's net corners).
     pub fn unit(&self, x: f64, z: f64) -> [f64; 3] {
         match self {
             WorldProjection::Lambert(p) => p.unit(x, z),
             WorldProjection::PetroffGuyou(g) => g.unit(x, z),
+            WorldProjection::Cube(c) => c.unit(x, z).unwrap_or([f64::NAN; 3]),
         }
     }
 
-    /// (latitude, longitude) of the point (x, z), degrees.
+    /// (latitude, longitude) of the point (x, z), degrees (NaN past a cube's net corners).
     pub fn lat_lon(&self, x: f64, z: f64) -> (f64, f64) {
         match self {
             WorldProjection::Lambert(p) => p.lat_lon(x, z),
             WorldProjection::PetroffGuyou(g) => g.lat_lon(x, z),
+            WorldProjection::Cube(c) => c.lat_lon(x, z).unwrap_or((f64::NAN, f64::NAN)),
         }
     }
 
@@ -1106,10 +1285,12 @@ impl WorldProjection {
         match self {
             WorldProjection::Lambert(p) => p.block_of(lat_deg, lon_deg),
             WorldProjection::PetroffGuyou(g) => g.block_of(lat_deg, lon_deg),
+            WorldProjection::Cube(c) => c.point_of_lat_lon(lat_deg, lon_deg),
         }
     }
 
-    /// The canonical point of any point (x wrapped; Lambert clamps z to the poles).
+    /// The canonical point of any point (x wrapped; Lambert clamps z to the poles; a cube folds
+    /// through its net edges, NaN past the net's corners).
     pub fn canonical(&self, x: f64, z: f64) -> (f64, f64) {
         match self {
             WorldProjection::Lambert(p) => (p.wrap_x(x), p.clamp_z(z)),
@@ -1117,18 +1298,22 @@ impl WorldProjection {
                 let f = g.fold(x, z);
                 (f.x, f.z)
             }
+            WorldProjection::Cube(c) => match c.cube.fold_point(x, z) {
+                Some(p) => (p.x, p.z),
+                None => (f64::NAN, f64::NAN),
+            },
         }
     }
 
-    /// The world's z range on the planet: [−R, R] (Lambert) or [−b/2, b/2].
+    /// The world's z range on the planet: [−R, R] (Lambert), [−b/2, b/2] (Petroff–Guyou) or
+    /// the cube's window [−3s/2, 3s/2].
     pub fn z_range(&self) -> (f64, f64) {
-        match self {
-            WorldProjection::Lambert(p) => (-p.pole_z(), p.pole_z()),
-            WorldProjection::PetroffGuyou(g) => {
-                let d = g.domain();
-                (d.z_min, d.z_max)
-            }
-        }
+        let d = match self {
+            WorldProjection::Lambert(p) => return (-p.pole_z(), p.pole_z()),
+            WorldProjection::PetroffGuyou(g) => g.domain(),
+            WorldProjection::Cube(c) => c.cube.window(),
+        };
+        (d.z_min, d.z_max)
     }
 
     /// The world grid of `r` blocks a cell.
@@ -1138,23 +1323,26 @@ impl WorldProjection {
                 crate::GridDesc::for_planet(name, p.circumference() as u32, r)
             }
             WorldProjection::PetroffGuyou(g) => g.grid(name, r),
+            WorldProjection::Cube(c) => crate::GridDesc::for_cube(name, c.cube.side() as u32, r),
         }
     }
 
     /// Block (x, z) of the first cell of the world data's spatial indexes (river tiles, structure
-    /// buckets, site index): the grids' origin.
+    /// buckets, site index): the grids' origin; a cube's window corner (−3s/2, −3s/2).
     pub fn index_origin_blocks(&self) -> (i64, i64) {
         match self {
             WorldProjection::Lambert(p) => p.index_origin_blocks(),
             WorldProjection::PetroffGuyou(g) => (-g.hemisphere(), -g.hemisphere() / 2),
+            WorldProjection::Cube(c) => (-3 * c.cube.side() / 2, -3 * c.cube.side() / 2),
         }
     }
 
-    /// Blocks the spatial indexes span: (east–west, north–south).
+    /// Blocks the spatial indexes span: (east–west, north–south); a cube's window (4s, 3s).
     pub fn index_span_blocks(&self) -> (i64, i64) {
         match self {
             WorldProjection::Lambert(p) => p.index_span_blocks(),
             WorldProjection::PetroffGuyou(g) => (g.period(), g.hemisphere() + 1),
+            WorldProjection::Cube(c) => (c.cube.period(), 3 * c.cube.side()),
         }
     }
 
@@ -1166,12 +1354,175 @@ impl WorldProjection {
         }
     }
 
-    /// The layout block (`manifest.json` `projection`).
+    /// The layout block (`manifest.json` `projection`); a cube's corners carry no land distance
+    /// (the bake adds them, [`cube_spec`]).
     pub fn spec(&self, border: Option<BorderSpec>) -> ProjectionSpec {
         match self {
             WorldProjection::Lambert(p) => lambert_spec(p),
             WorldProjection::PetroffGuyou(g) => g.spec(border),
+            WorldProjection::Cube(c) => cube_spec(c, border, None),
         }
+    }
+}
+
+/// The shipped cube map table `name`, checked against `sha256` (lowercase hex). The refusal is
+/// FORMAT.md's: `world data needs cube map <name> (sha256 <hash>); this Deep Time has <names>`.
+pub fn cube_map_named(name: &str, sha256: &str) -> crate::Result<&'static CubeMap> {
+    match CubeMap::builtin_static(name) {
+        Some(m) if m.sha256_hex() == sha256.to_ascii_lowercase() => Ok(m),
+        _ => Err(crate::FormatError::Invalid(format!(
+            "world data needs cube map {name} (sha256 {sha256}); this Deep Time has {}",
+            CubeMap::builtin_names()
+                .iter()
+                .map(|n| {
+                    let m = CubeMap::builtin_static(n).expect("a builtin name");
+                    format!("{n} (sha256 {})", m.sha256_hex())
+                })
+                .collect::<Vec<_>>()
+                .join(", ")
+        ))),
+    }
+}
+
+/// The border of a cube world: every turning net edge stopped `inset_blocks` inside its line
+/// (FORMAT.md "The cube world's layout", `border`).
+pub fn cube_border(cube: &Cube, inset_blocks: f64) -> BorderSpec {
+    BorderSpec {
+        kind: "edge_stop".into(),
+        edges: Vec::new(),
+        inset_blocks,
+        temporary: true,
+        segments: cube
+            .edges()
+            .iter()
+            .filter(|e| e.motion != EdgeMotion::Slide)
+            .map(|e| e.name.clone())
+            .collect(),
+    }
+}
+
+/// The cube-frame direction of a frame vector (`+X`, `-Z`, ...).
+fn axis_name(v: [f64; 3]) -> String {
+    let k = (0..3)
+        .max_by(|&a, &b| v[a].abs().total_cmp(&v[b].abs()))
+        .unwrap_or(0);
+    format!(
+        "{}{}",
+        if v[k] < 0.0 { '-' } else { '+' },
+        ['X', 'Y', 'Z'][k]
+    )
+}
+
+/// The layout block of the cube world `view` (FORMAT.md "The cube world's layout"): the net, its
+/// map and turn, the faces, the 14 edges, the 8 corners (with `land_distance_deg[k]` in corner
+/// order when given) and the two poles, and `border`.
+pub fn cube_spec(
+    view: &CubeView,
+    border: Option<BorderSpec>,
+    land_distance_deg: Option<[f64; 8]>,
+) -> ProjectionSpec {
+    let cube = view.cube;
+    let s = cube.side();
+    let faces = Face::ALL
+        .iter()
+        .map(|&f| {
+            let (ox, oz) = cube.face_origin(f);
+            let (lat, lon) = lat_lon_of_unit(view.unit_on_face(f, 0.0, 0.0));
+            let fr = f.frame();
+            FaceSpec {
+                id: f.name().into(),
+                index: f.index() as u32,
+                origin: [ox, oz],
+                frame: [axis_name(fr[0]), axis_name(fr[1]), axis_name(fr[2])],
+                centre_lat_deg: lat,
+                centre_lon_deg: lon,
+            }
+        })
+        .collect();
+    let edges = cube
+        .edges()
+        .iter()
+        .map(|e| EdgeSpec {
+            name: e.name.clone(),
+            seam: Some(e.seam.name().into()),
+            kind: match e.motion {
+                EdgeMotion::Slide => EdgeKind::Slide,
+                EdgeMotion::QuarterTurn => EdgeKind::QuarterTurn,
+                EdgeMotion::HalfTurn => EdgeKind::HalfTurn,
+            },
+            axis: e.axis,
+            side: e.beyond,
+            coord: e.coord,
+            span: e.span,
+            iso: e.iso.as_array(),
+            pivot: e.pivot,
+            partner: Some(cube.edges()[e.partner].name.clone()),
+            owner: e.owner.into(),
+        })
+        .collect();
+    let cone_points = cube
+        .corners()
+        .into_iter()
+        .enumerate()
+        .map(|(k, c)| {
+            let (lat, lon) = view.corner_lat_lon(c.cube);
+            ConePoint {
+                name: c.name.clone(),
+                cone_deg: 270.0,
+                faces: Some(c.faces.iter().map(|f| f.name().to_owned()).collect()),
+                cube: Some(c.cube),
+                lat_deg: lat,
+                lon_deg: lon,
+                land_distance_deg: land_distance_deg.map(|d| d[k]),
+                reachable: Some(c.images.len() == 1),
+                images: c.images,
+            }
+        })
+        .collect();
+    let pole = |name: &str, (face, u, v): (Face, f64, f64)| {
+        let mut images = vec![cube.point_of_local(face, u, v)];
+        // A pole on a net edge has the partner edge's image too.
+        let (x, z) = images[0];
+        for e in cube.edges() {
+            let on_line = match e.axis {
+                Axis::X => x == e.coord as f64 && (e.span[0] as f64..=e.span[1] as f64).contains(&z),
+                Axis::Z => z == e.coord as f64 && (e.span[0] as f64..=e.span[1] as f64).contains(&x),
+            };
+            if on_line {
+                let p = cube.edges()[e.partner].iso.point(x, z);
+                if !images.contains(&p) {
+                    images.push(p);
+                }
+            }
+        }
+        PoleSpec {
+            name: name.into(),
+            face: Some(face.name().into()),
+            u: Some(u),
+            v: Some(v),
+            images: images.into_iter().map(|(x, z)| [x, z]).collect(),
+        }
+    };
+    ProjectionSpec {
+        kind: ProjectionKind::Cube,
+        layout_version: CUBE_LAYOUT_VERSION,
+        hemisphere_blocks: None,
+        lambda_c_deg: None,
+        face_blocks: Some(s as u32),
+        map: Some(MapSpec {
+            name: view.map.name().into(),
+            sha256: view.map.sha256_hex(),
+        }),
+        rotation: Some(view.turn.rows()),
+        domain: cube.window(),
+        faces: Some(faces),
+        edges,
+        cone_points,
+        poles: vec![
+            pole("north", view.north_pole()),
+            pole("south", view.south_pole()),
+        ],
+        border,
     }
 }
 
@@ -1182,6 +1533,7 @@ pub fn lambert_spec(p: &Projection) -> ProjectionSpec {
     let zo = p.grid_half_extent(1);
     let slide = |name: &str, side: Side, coord: i64, tx: i64| EdgeSpec {
         name: name.into(),
+        seam: None,
         kind: EdgeKind::Slide,
         axis: Axis::X,
         side,
@@ -1189,6 +1541,7 @@ pub fn lambert_spec(p: &Projection) -> ProjectionSpec {
         span: [-zo, zo],
         iso: [0, tx, 0],
         pivot: None,
+        partner: None,
         owner: "toroidal_world".into(),
     };
     ProjectionSpec {
@@ -1196,27 +1549,23 @@ pub fn lambert_spec(p: &Projection) -> ProjectionSpec {
         layout_version: LAYOUT_VERSION,
         hemisphere_blocks: None,
         lambda_c_deg: None,
+        face_blocks: None,
+        map: None,
+        rotation: None,
         domain: Domain {
             x_min: -(c / 2) as f64,
             x_max: (c / 2) as f64,
             z_min: -p.pole_z(),
             z_max: p.pole_z(),
+            period_x: None,
         },
+        faces: None,
         edges: vec![
             slide("west", Side::Min, -(c / 2), c),
             slide("east", Side::Max, c / 2, -c),
         ],
         cone_points: Vec::new(),
-        poles: vec![
-            PoleSpec {
-                name: "north".into(),
-                images: Vec::new(),
-            },
-            PoleSpec {
-                name: "south".into(),
-                images: Vec::new(),
-            },
-        ],
+        poles: vec![PoleSpec::corners("north", &[]), PoleSpec::corners("south", &[])],
         border: None,
     }
 }

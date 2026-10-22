@@ -590,6 +590,24 @@ impl Cube {
         Cube::new(face_for(circumference))
     }
 
+    /// The net of face side `s`, made once per process and shared: a world's readers (rasters,
+    /// [`crate::projection::WorldProjection`]) fold through it without building the edge list
+    /// each time. A process meets a handful of sides, so the nets are kept for its life.
+    pub fn shared(s: u32) -> &'static Cube {
+        use std::sync::{Mutex, OnceLock};
+        static NETS: OnceLock<Mutex<Vec<&'static Cube>>> = OnceLock::new();
+        let mut nets = NETS
+            .get_or_init(|| Mutex::new(Vec::new()))
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(c) = nets.iter().find(|c| c.s == i64::from(s)) {
+            return c;
+        }
+        let c: &'static Cube = Box::leak(Box::new(Cube::new(s)));
+        nets.push(c);
+        c
+    }
+
     /// s, blocks.
     #[inline]
     pub fn side(&self) -> i64 {
@@ -621,6 +639,7 @@ impl Cube {
             x_max: 5.0 * h,
             z_min: -3.0 * h,
             z_max: 3.0 * h,
+            period_x: Some(4 * self.s),
         }
     }
 
