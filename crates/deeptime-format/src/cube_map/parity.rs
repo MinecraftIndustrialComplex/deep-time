@@ -358,30 +358,6 @@ fn map_section(g: &mut Rng, map: &CubeMap) -> String {
     )
 }
 
-/// A free turn: rows of R_z(spin) · R_x(tilt) · R_z(azimuth), planet to cube, on the portable
-/// functions (the readers take the rows from the fixture, never recompute them).
-fn turn_rows(azimuth_deg: f64, tilt_deg: f64, spin_deg: f64) -> [[f64; 3]; 3] {
-    let rz = |d: f64| {
-        let r = pm::to_radians(d);
-        let (s, c) = (pm::sin(r), pm::cos(r));
-        [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]]
-    };
-    let rx = |d: f64| {
-        let r = pm::to_radians(d);
-        let (s, c) = (pm::sin(r), pm::cos(r));
-        [[1.0, 0.0, 0.0], [0.0, c, s], [0.0, -s, c]]
-    };
-    let mul = |a: [[f64; 3]; 3], b: [[f64; 3]; 3]| {
-        let mut m = [[0.0; 3]; 3];
-        for (i, row) in m.iter_mut().enumerate() {
-            for (j, x) in row.iter_mut().enumerate() {
-                *x = (a[i][0] * b[0][j] + a[i][1] * b[1][j]) + a[i][2] * b[2][j];
-            }
-        }
-        m
-    };
-    mul(rz(spin_deg), mul(rx(tilt_deg), rz(azimuth_deg)))
-}
 
 fn world_section(g: &mut Rng, w: &CubeWorld, m_per_block_h: f64) -> String {
     let s = w.cube().side();
@@ -518,7 +494,8 @@ pub(crate) fn section() -> String {
     let sections: Vec<String> = maps.iter().map(|m| map_section(&mut g, m)).collect();
     out.push_str(&sections.join(",\n"));
     out.push_str("\n    ],\n    \"worlds\": [\n");
-    let free = CubeTurn::from_rows(turn_rows(-71.5, 38.0, 12.0)).expect("a rotation");
+    // The readers take the rows from the fixture, never recompute them.
+    let free = CubeTurn::from_angles(-71.5, 38.0, 12.0);
     let worlds = [
         (
             CubeWorld::new(Cube::new(7424), CubeMap::world(), free, 300.0),

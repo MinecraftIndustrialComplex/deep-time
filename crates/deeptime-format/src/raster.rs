@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::cube::{Cube, Face, cell_on};
 use crate::error::{FormatError, Result};
 use crate::projection::Projection;
 use crate::strata::{ColumnHorizon, StoredHorizon};
@@ -89,6 +90,10 @@ pub enum ZEdges {
     /// half-turn about its midpoint (block x = 0, which is column W/2): row −k is row k and
     /// row H − 1 + k is row H − 1 − k, both at column W − i (Petroff–Guyou worlds).
     HalfTurn,
+    /// A cube world's six faces, n × n cells each, stacked F0 to S down the rows (W = n, H = 6n):
+    /// an index off a face resolves through the face adjacency, and beyond two sides at once
+    /// through the side it is further out of ([`GridDesc::face_cell`]; FORMAT.md "Cube grids").
+    Cube,
 }
 
 /// A raster in block space (plan §5.2), laid out by the world's projection
@@ -99,7 +104,14 @@ pub enum ZEdges {
 /// clamp in z to [0, H−1]. On a Petroff–Guyou world ([`crate::projection::PetroffGuyou::grid`])
 /// column 0 sits on x = −b, row 0 on the north edge and row H − 1 on the south edge, and a row
 /// past either folds through the edge's half-turn ([`ZEdges::HalfTurn`], [`GridDesc::cell`]).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// A cube world's grid ([`GridDesc::for_cube`], [`ZEdges::Cube`]) is different: six planes of
+/// n × n cells, one per face in the format's order, stacked down the rows; cell (i, j) of a face
+/// is the **r × r square** of net blocks from the face's origin + (i·r, j·r), and its value sits
+/// at the square's centre ([`GridDesc::cube_point`]). Its JSON form is
+/// `{"name": "L3", "kind": "cube", "n": 1920, "r": 2}`; in memory W = n, H = 6n, no x wrap, and
+/// the origin is F0's north-west corner (−s/2, −s/2).
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GridDesc {
     /// The grid's role: `L1`, `L2`, `L3` (plan §5.2).
     pub name: String,
@@ -117,11 +129,285 @@ pub struct GridDesc {
     pub origin_block_z: i64,
     /// What a row past the first or the last means (absent: clamp). Always written: the
     /// checkpoints encode grids with postcard, which cannot skip a field.
-    #[serde(default)]
     pub z_edges: ZEdges,
 }
 
+/// A grid as every grid but a cube's is written (and as postcard writes every grid): the fields
+/// in their order, `z_edges` always written.
+#[derive(Serialize)]
+struct PlainGridOut<'a> {
+    name: &'a str,
+    w: u32,
+    h: u32,
+    r: u32,
+    wraps_x: bool,
+    origin_block_x: i64,
+    origin_block_z: i64,
+    z_edges: ZEdges,
+}
+
+#[derive(Deserialize)]
+struct PlainGridIn {
+    name: String,
+    w: u32,
+    h: u32,
+    r: u32,
+    wraps_x: bool,
+    origin_block_x: i64,
+    origin_block_z: i64,
+    #[serde(default)]
+    z_edges: ZEdges,
+}
+
+/// A cube grid's JSON form.
+#[derive(Serialize)]
+struct CubeGridOut<'a> {
+    name: &'a str,
+    kind: &'a str,
+    n: u32,
+    r: u32,
+}
+
+/// Either JSON form, read.
+#[derive(Deserialize)]
+struct AnyGridIn {
+    name: String,
+    #[serde(default)]
+    kind: Option<String>,
+    #[serde(default)]
+    n: Option<u32>,
+    #[serde(default)]
+    w: Option<u32>,
+    #[serde(default)]
+    h: Option<u32>,
+    r: u32,
+    #[serde(default)]
+    wraps_x: Option<bool>,
+    #[serde(default)]
+    origin_block_x: Option<i64>,
+    #[serde(default)]
+    origin_block_z: Option<i64>,
+    #[serde(default)]
+    z_edges: ZEdges,
+}
+
+impl Serialize for GridDesc {
+    fn serialize<S: serde::Serializer>(&self, ser: S) -> std::result::Result<S::Ok, S::Error> {
+        if ser.is_human_readable() && self.z_edges == ZEdges::Cube {
+            return CubeGridOut {
+                name: &self.name,
+                kind: "cube",
+                n: self.w,
+                r: self.r,
+            }
+            .serialize(ser);
+        }
+        PlainGridOut {
+            name: &self.name,
+            w: self.w,
+            h: self.h,
+            r: self.r,
+            wraps_x: self.wraps_x,
+            origin_block_x: self.origin_block_x,
+            origin_block_z: self.origin_block_z,
+            z_edges: self.z_edges,
+        }
+        .serialize(ser)
+    }
+}
+
+impl<'de> Deserialize<'de> for GridDesc {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> std::result::Result<Self, D::Error> {
+        use serde::de::Error;
+        if !de.is_human_readable() {
+            let g = PlainGridIn::deserialize(de)?;
+            return Ok(GridDesc {
+                name: g.name,
+                w: g.w,
+                h: g.h,
+                r: g.r,
+                wraps_x: g.wraps_x,
+                origin_block_x: g.origin_block_x,
+                origin_block_z: g.origin_block_z,
+                z_edges: g.z_edges,
+            });
+        }
+        let g = AnyGridIn::deserialize(de)?;
+        match g.kind.as_deref() {
+            Some("cube") => {
+                let n = g.n.ok_or_else(|| D::Error::missing_field("n"))?;
+                if n == 0 || g.r == 0 || !(u64::from(n) * u64::from(g.r)).is_multiple_of(2) {
+                    return Err(D::Error::custom(format!(
+                        "cube grid {}: n {n} × r {} is not an even face side",
+                        g.name, g.r
+                    )));
+                }
+                GridDesc::for_cube(&g.name, n * g.r, g.r).map_err(D::Error::custom)
+            }
+            Some(k) => Err(D::Error::custom(format!("grid {}: unknown kind {k}", g.name))),
+            None => Ok(GridDesc {
+                name: g.name,
+                w: g.w.ok_or_else(|| D::Error::missing_field("w"))?,
+                h: g.h.ok_or_else(|| D::Error::missing_field("h"))?,
+                r: g.r,
+                wraps_x: g.wraps_x.ok_or_else(|| D::Error::missing_field("wraps_x"))?,
+                origin_block_x: g
+                    .origin_block_x
+                    .ok_or_else(|| D::Error::missing_field("origin_block_x"))?,
+                origin_block_z: g
+                    .origin_block_z
+                    .ok_or_else(|| D::Error::missing_field("origin_block_z"))?,
+                z_edges: g.z_edges,
+            }),
+        }
+    }
+}
+
+/// Where a reader of a cube grid stands: the face, and the fractional local cell (a, b) of the
+/// point (cell (i, j)'s centre is at (i, j)), or nothing past the net's corners.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CubeSpot {
+    pub face: Face,
+    pub a: f64,
+    pub b: f64,
+}
+
+/// The cell a face's local cell (i, j) of an n × n face grid is: itself on the face; the
+/// neighbour's beyond one side ([`cell_on`]); beyond two sides at once (the corner squares where
+/// three faces meet) the neighbour across the side it is further out of, ties east or west, with
+/// the other index clamped onto the face, so the corner square repeats the strip along that
+/// neighbour's edge (the diagonal ghost of FV3); more than a face out, clamped to a face out.
+pub fn resolve_face_cell(face: Face, n: i64, i: i64, j: i64) -> (Face, i64, i64) {
+    let (i, j) = (i.clamp(-n, 2 * n - 1), j.clamp(-n, 2 * n - 1));
+    let out = |k: i64| {
+        if k < 0 {
+            -k
+        } else if k >= n {
+            k - n + 1
+        } else {
+            0
+        }
+    };
+    let (oi, oj) = (out(i), out(j));
+    let (i, j) = if oi > 0 && oj > 0 {
+        if oi >= oj {
+            (i, j.clamp(0, n - 1))
+        } else {
+            (i.clamp(0, n - 1), j)
+        }
+    } else {
+        (i, j)
+    };
+    match cell_on(face, n, i, j) {
+        Some((f, a, b, _)) => (f, a.clamp(0, n - 1), b.clamp(0, n - 1)),
+        None => (face, i.clamp(0, n - 1), j.clamp(0, n - 1)),
+    }
+}
+
 impl GridDesc {
+    /// The grid of a cube world of face side `s` blocks at `r` blocks per cell (n = s / r cells
+    /// a face side; [`ZEdges::Cube`]).
+    pub fn for_cube(name: &str, s: u32, r: u32) -> Result<GridDesc> {
+        if r == 0 || s < 2 || !s.is_multiple_of(2) || !s.is_multiple_of(r) {
+            return Err(FormatError::Invalid(format!(
+                "cube face side {s} is not even or not a multiple of r = {r}"
+            )));
+        }
+        let n = s / r;
+        Ok(GridDesc {
+            name: name.to_owned(),
+            w: n,
+            h: 6 * n,
+            r,
+            wraps_x: false,
+            origin_block_x: -i64::from(s / 2),
+            origin_block_z: -i64::from(s / 2),
+            z_edges: ZEdges::Cube,
+        })
+    }
+
+    /// Whether this is a cube world's grid.
+    #[inline]
+    pub fn is_cube(&self) -> bool {
+        self.z_edges == ZEdges::Cube
+    }
+
+    /// A cube grid's face side in blocks, s = n·r.
+    pub fn face_blocks(&self) -> u32 {
+        self.w * self.r
+    }
+
+    /// A cube grid's net ([`Cube::shared`]).
+    pub fn cube(&self) -> &'static Cube {
+        Cube::shared(self.face_blocks())
+    }
+
+    /// The stored cell of a cube grid's face `face`, local cell (i, j), resolved off the face
+    /// ([`resolve_face_cell`]): (column, row) in the stacked planes.
+    #[inline]
+    pub fn face_cell(&self, face: Face, i: i64, j: i64) -> (u32, u32) {
+        let n = i64::from(self.w);
+        let (f, a, b) = resolve_face_cell(face, n, i, j);
+        (a as u32, (f.index() as i64 * n + b) as u32)
+    }
+
+    /// The face and local cell of a cube grid's stacked cell (i, j) (in range).
+    #[inline]
+    pub fn face_of_cell(&self, i: u32, j: u32) -> (Face, u32, u32) {
+        let k = j / self.w;
+        (
+            Face::from_index(k as usize).expect("a row of the six planes"),
+            i,
+            j - k * self.w,
+        )
+    }
+
+    /// The net point at the centre of a cube grid's stacked cell (i, j) (in range): the face's
+    /// origin + ((i + ½)·r, (j + ½)·r).
+    pub fn cube_point(&self, i: u32, j: u32) -> (f64, f64) {
+        let (face, a, b) = self.face_of_cell(i, j);
+        let (ox, oz) = self.cube().face_origin(face);
+        let r = f64::from(self.r);
+        (
+            ox as f64 + (f64::from(a) + 0.5) * r,
+            oz as f64 + (f64::from(b) + 0.5) * r,
+        )
+    }
+
+    /// Where the net point (x, z) (any point: folded onto the planet) lies on a cube grid: its face
+    /// and fractional local cell; `None` past the net's corners.
+    pub fn cube_spot(&self, x: f64, z: f64) -> Option<CubeSpot> {
+        let cube = self.cube();
+        let p = cube.fold_point(x, z)?;
+        let (ox, oz) = cube.face_origin(p.face);
+        let r = f64::from(self.r);
+        Some(CubeSpot {
+            face: p.face,
+            a: (p.x - ox as f64) / r - 0.5,
+            b: (p.z - oz as f64) / r - 0.5,
+        })
+    }
+
+    /// Where block (bx, bz) of a reader lies on a cube grid: the block's centre (bx + ½, bz + ½)
+    /// ([`GridDesc::cube_spot`]). Every [`RasterRead`] method takes blocks this way on a cube.
+    #[inline]
+    pub fn cube_spot_of_block(&self, bx: f64, bz: f64) -> Option<CubeSpot> {
+        self.cube_spot(bx + 0.5, bz + 0.5)
+    }
+
+    /// The tile edge of a layer on this grid: [`TILE`], or on a cube grid the largest divisor of n
+    /// that divides [`TILE`] too, so no tile holds two faces.
+    pub fn tile(&self) -> u32 {
+        if self.is_cube() {
+            let (mut a, mut b) = (self.w, TILE);
+            while b != 0 {
+                (a, b) = (b, a % b);
+            }
+            a
+        } else {
+            TILE
+        }
+    }
     /// The grid of a planet with circumference `c` blocks at `r` blocks per cell: W = C/r,
     /// H = 2·Zo/r, origin (−C/2, −Zo), Zo = [`Projection::grid_half_extent`] (the smallest
     /// multiple of the planet's quantum, 64 blocks, at or past the pole R = C/2π).
@@ -149,6 +435,17 @@ impl GridDesc {
     /// r·s blocks a cell, the same origin), as thinned copies and previews are taken.
     pub fn thinned(&self, name: &str, s: u32) -> GridDesc {
         let s = s.max(1);
+        if self.is_cube() {
+            // Whole faces: n/s cells a side, rounded up.
+            let n = self.w.div_ceil(s);
+            return GridDesc {
+                name: name.to_owned(),
+                w: n,
+                h: 6 * n,
+                r: self.r * s,
+                ..self.clone()
+            };
+        }
         GridDesc {
             name: name.to_owned(),
             w: self.w.div_ceil(s),
@@ -248,9 +545,13 @@ impl GridDesc {
         )
     }
 
-    /// The circumference C = W·r in blocks.
+    /// The circumference C = W·r in blocks (a cube grid's loop, 4s).
     pub fn circumference(&self) -> u64 {
-        u64::from(self.w) * u64::from(self.r)
+        if self.is_cube() {
+            4 * u64::from(self.w) * u64::from(self.r)
+        } else {
+            u64::from(self.w) * u64::from(self.r)
+        }
     }
 
     /// Block x of cell column `i`.
@@ -280,6 +581,13 @@ impl GridDesc {
     pub fn cell(&self, i: i64, j: i64) -> (u32, u32) {
         match self.z_edges {
             ZEdges::Clamp => (self.wrap_i(i), self.clamp_j(j)),
+            ZEdges::Cube => {
+                // The row's plane (clamped to the six), then the face's local cell resolved off it.
+                let n = i64::from(self.w);
+                let k = j.div_euclid(n.max(1)).clamp(0, 5);
+                let face = Face::from_index(k as usize).expect("a face index");
+                self.face_cell(face, i, j - k * n)
+            }
             ZEdges::HalfTurn => {
                 let last = i64::from(self.h) - 1;
                 let w = i64::from(self.w);
@@ -346,7 +654,7 @@ pub struct LayerDesc {
 }
 
 impl LayerDesc {
-    /// A scalar layer with the default tile size.
+    /// A scalar layer with the grid's tile size ([`GridDesc::tile`]).
     pub fn scalar(name: &str, dtype: DType, grid: GridDesc, codec: Codec) -> LayerDesc {
         LayerDesc {
             name: name.to_owned(),
@@ -354,8 +662,8 @@ impl LayerDesc {
             scale: 1.0,
             offset: 0.0,
             units: String::new(),
+            tile: grid.tile(),
             grid,
-            tile: TILE,
             codec,
             nodata: None,
             stack_depth: None,
@@ -414,6 +722,16 @@ impl LayerDesc {
         }
         if self.tile == 0 {
             return bad("tile edge 0".into());
+        }
+        if self.grid.is_cube()
+            && (self.grid.h != 6 * self.grid.w
+                || self.grid.wraps_x
+                || !self.grid.w.is_multiple_of(self.tile))
+        {
+            return bad(format!(
+                "cube grid {:?} needs H = 6W, no x wrap and a tile edge dividing W",
+                self.grid
+            ));
         }
         match (self.dtype, self.stack_depth) {
             (DType::HorizonStack, Some(k)) if (1..=255).contains(&k) => {}
@@ -529,18 +847,52 @@ pub trait RasterRead {
         self.desc().physical(self.raw(i, j))
     }
 
-    /// The physical value of the cell nearest block (bx, bz).
+    /// The physical value of a cube grid's face `face`, local cell (i, j) resolved off the face.
+    fn get_face(&self, face: Face, i: i64, j: i64) -> f64 {
+        let (ci, cj) = self.desc().grid.face_cell(face, i, j);
+        self.desc().physical(self.raw_cell(ci, cj))
+    }
+
+    /// The physical value of the cell nearest block (bx, bz). On a cube grid: the cell under the
+    /// block's centre (NaN past the net's corners).
     fn nearest(&self, bx: f64, bz: f64) -> f64 {
         let g = &self.desc().grid;
+        if g.is_cube() {
+            return match g.cube_spot_of_block(bx, bz) {
+                Some(s) => self.get_face(
+                    s.face,
+                    (s.a + 0.5).floor() as i64,
+                    (s.b + 0.5).floor() as i64,
+                ),
+                None => f64::NAN,
+            };
+        }
         let u = (bx - g.origin_block_x as f64) / f64::from(g.r);
         let v = (bz - g.origin_block_z as f64) / f64::from(g.r);
         self.get((u + 0.5).floor() as i64, (v + 0.5).floor() as i64)
     }
 
     /// Bilinear interpolation of the physical values at block (bx, bz). NaN if any of the four
-    /// cells is nodata.
+    /// cells is nodata. On a cube grid: between the centres of the four cells round the block's
+    /// centre on its face, cells off the face read through [`GridDesc::face_cell`] (NaN past the
+    /// net's corners).
     fn bilinear(&self, bx: f64, bz: f64) -> f64 {
         let g = &self.desc().grid;
+        if g.is_cube() {
+            let Some(s) = g.cube_spot_of_block(bx, bz) else {
+                return f64::NAN;
+            };
+            let (fi, fj) = (s.a.floor(), s.b.floor());
+            let (fu, fv) = (s.a - fi, s.b - fj);
+            let (i0, j0) = (fi as i64, fj as i64);
+            let v00 = self.get_face(s.face, i0, j0);
+            let v10 = self.get_face(s.face, i0 + 1, j0);
+            let v01 = self.get_face(s.face, i0, j0 + 1);
+            let v11 = self.get_face(s.face, i0 + 1, j0 + 1);
+            let a = v00 + (v10 - v00) * fu;
+            let b = v01 + (v11 - v01) * fu;
+            return a + (b - a) * fv;
+        }
         let u = (bx - g.origin_block_x as f64) / f64::from(g.r);
         let v = (bz - g.origin_block_z as f64) / f64::from(g.r);
         let fi = u.floor();
@@ -565,6 +917,23 @@ pub trait RasterRead {
     /// margin's cover most of a cell past it.
     fn cover(&self, bx: f64, bz: f64) -> f64 {
         let g = &self.desc().grid;
+        if g.is_cube() {
+            let Some(s) = g.cube_spot_of_block(bx, bz) else {
+                return 0.0;
+            };
+            let (fi, fj) = (s.a.floor(), s.b.floor());
+            let (i0, j0) = (fi as i64, fj as i64);
+            let w = bilinear_weights(s.a - fi, s.b - fj);
+            return cover_of(
+                self.nearest(bx, bz),
+                [
+                    (self.get_face(s.face, i0, j0), w[0]),
+                    (self.get_face(s.face, i0 + 1, j0), w[1]),
+                    (self.get_face(s.face, i0, j0 + 1), w[2]),
+                    (self.get_face(s.face, i0 + 1, j0 + 1), w[3]),
+                ],
+            );
+        }
         let u = (bx - g.origin_block_x as f64) / f64::from(g.r);
         let v = (bz - g.origin_block_z as f64) / f64::from(g.r);
         let fi = u.floor();
@@ -592,6 +961,26 @@ pub trait RasterRead {
     /// interpolated tops of the column by this much.
     fn column_spline(&self, x: i64, z: i64) -> f64 {
         let g = &self.desc().grid;
+        if g.is_cube() {
+            let Some(s) = g.cube_spot_of_block(x as f64, z as f64) else {
+                return f64::NAN;
+            };
+            let (i0, j0) = (s.a.floor() as i64, s.b.floor() as i64);
+            let (bu, bv) = (
+                crate::strata::bspline(s.a - i0 as f64),
+                crate::strata::bspline(s.b - j0 as f64),
+            );
+            let base = self.get_face(s.face, i0, j0);
+            let mut sum = 0.0f64;
+            for (b, &wv) in bv.iter().enumerate() {
+                for (a, &wu) in bu.iter().enumerate() {
+                    let w = wu * wv;
+                    sum += w
+                        * (self.get_face(s.face, i0 - 1 + a as i64, j0 - 1 + b as i64) - base);
+                }
+            }
+            return base + sum;
+        }
         let c = i64::from(g.w) * i64::from(g.r);
         let wx = (x + c / 2).rem_euclid(c) - c / 2;
         let u = (wx - g.origin_block_x) as f64 / f64::from(g.r);

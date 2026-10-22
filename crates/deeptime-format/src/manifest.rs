@@ -8,10 +8,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-use crate::FORMAT_VERSION;
 use crate::error::{FormatError, Result};
 use crate::fsutil::write_atomic;
-use crate::projection::{ProjectionSpec, WorldProjection};
+use crate::projection::{ProjectionKind, ProjectionSpec, WorldProjection};
+use crate::{CUBE_FORMAT_VERSION, FORMAT_VERSION, READS_VERSIONS};
 use crate::raster::{Codec, DType, GridDesc};
 
 /// The manifest's file name.
@@ -106,6 +106,16 @@ impl FileEntry {
     }
 }
 
+/// The format version of a world of projection `kind` (`None`: Lambert): [`CUBE_FORMAT_VERSION`]
+/// for a cube world, [`FORMAT_VERSION`] otherwise.
+pub fn version_for(kind: Option<ProjectionKind>) -> &'static str {
+    if kind == Some(ProjectionKind::Cube) {
+        CUBE_FORMAT_VERSION
+    } else {
+        FORMAT_VERSION
+    }
+}
+
 /// `manifest.json`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Manifest {
@@ -161,6 +171,14 @@ impl Manifest {
         WorldProjection::from_spec(self.projection.as_ref(), self.scale.circumference_blocks)
     }
 
+    /// Sets the layout block and the format version that goes with it: [`CUBE_FORMAT_VERSION`]
+    /// for a cube world, [`FORMAT_VERSION`] for the rest (FORMAT.md "Polar and cube worlds side by
+    /// side").
+    pub fn set_projection(&mut self, spec: Option<ProjectionSpec>) {
+        self.format_version = version_for(spec.as_ref().map(|s| s.kind)).to_owned();
+        self.projection = spec;
+    }
+
     /// The entry of layer `name`.
     pub fn layer(&self, name: &str) -> Option<&LayerEntry> {
         self.layers.iter().find(|l| l.name == name)
@@ -180,16 +198,34 @@ impl Manifest {
             .get("format_version")
             .and_then(|v| v.as_str())
             .ok_or_else(|| FormatError::corrupt(&path, "no format_version"))?;
-        if found != FORMAT_VERSION {
+        if found != FORMAT_VERSION && found != CUBE_FORMAT_VERSION {
             return Err(FormatError::Version {
                 found: found.to_owned(),
-                supported: FORMAT_VERSION.to_owned(),
+                supported: READS_VERSIONS.to_owned(),
             });
         }
-        serde_json::from_value(value).map_err(|source| FormatError::Json {
+        let found = found.to_owned();
+        let m: Manifest = serde_json::from_value(value).map_err(|source| FormatError::Json {
             what: what(),
             source,
-        })
+        })?;
+        // A cube world is 0.7 and only a cube world is (FORMAT.md "Polar and cube worlds side by
+        // side"); its map table and rotation must be ones this crate can draw.
+        let kind = m.projection.as_ref().map(|s| s.kind);
+        let want = version_for(kind);
+        if found != want {
+            return Err(FormatError::corrupt(
+                &path,
+                format!(
+                    "format_version {found} on a {} world, which is {want}",
+                    kind.unwrap_or(ProjectionKind::Lambert).name()
+                ),
+            ));
+        }
+        if kind == Some(ProjectionKind::Cube) {
+            WorldProjection::try_from_spec(m.projection.as_ref(), m.scale.circumference_blocks)?;
+        }
+        Ok(m)
     }
 
     /// The exact bytes [`Manifest::write`] puts on disk: pretty JSON and a final newline.
@@ -359,7 +395,7 @@ mod tests {
         assert_eq!(
             err,
             format!(
-                "world data 0.9, this Deep Time reads {FORMAT_VERSION}; before 1.0 worlds are not migrated"
+                "world data 0.9, this Deep Time reads {READS_VERSIONS}; before 1.0 worlds are not migrated"
             )
         );
 
