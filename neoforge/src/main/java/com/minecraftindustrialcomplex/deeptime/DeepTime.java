@@ -48,6 +48,7 @@ public final class DeepTime {
         RockPalette.init();
         com.minecraftindustrialcomplex.deeptime.worldgen.GeothermalPalette.init();
         com.minecraftindustrialcomplex.deeptime.worldgen.MagmaPalette.init();
+        com.minecraftindustrialcomplex.deeptime.worldgen.LavaFlowPalette.init();
         // The volcanic biomes' role lists are tags: resolve them again after a reload (decisions log 2026-10-03).
         NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.TagsUpdatedEvent.class,
                 e -> com.minecraftindustrialcomplex.deeptime.climate.VolcanicBiomes.tagsUpdated());
