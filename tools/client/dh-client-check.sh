@@ -43,6 +43,8 @@
 #                       script teleports the spectating player along x at that many blocks per second (once a
 #                       second): the "camera moving quickly" case of pauseIfMovingQuickly (it fires above 20)
 #   DHCC_WAIT1, DHCC_WAIT2  the two waits in seconds (default 180 and 300)
+#   DHCC_JOIN_SECS=<s>  how long one attempt waits for the client to join (default 900; the full MIC client
+#                       on a loaded VM needs more)
 set -uo pipefail
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$(dirname "$0")/../.."
@@ -210,7 +212,7 @@ for attempt in 1 2 3; do
         --join-server 127.0.0.1 --join-server-port "$GAME" > "$CL/client-$attempt.log" 2>&1 < /dev/null &
     CPID=$!
     why=""
-    for i in $(seq 180); do
+    for i in $(seq $(( ${DHCC_JOIN_SECS:-900} / 5 ))); do
         grep -a -q 'DeepTimeProbe joined the game' "$SRV/console.log" && { joined=1; break; }
         kill -0 $CPID 2>/dev/null || { why="client exited"; break; }
         [ -n "$XPID" ] && ! kill -0 "$XPID" 2>/dev/null && { why="Xvfb $DISP went away"; break; }
@@ -220,7 +222,7 @@ for attempt in 1 2 3; do
         sleep 5
     done
     [ $joined = 1 ] && break
-    say "   attempt $attempt: ${why:-did not join in 15 min} (smoke/$P/client/client-$attempt.log)"
+    say "   attempt $attempt: ${why:-did not join in $(( ${DHCC_JOIN_SECS:-900} / 60 )) min} (smoke/$P/client/client-$attempt.log)"
     kill "$CPID" 2>/dev/null; pkill -f -- "$(basename "$REPO")/smoke/$P/client/pmc/libraries" 2>/dev/null; sleep 5
 done
 [ $joined = 1 ] || { say "the client did not join"; exit 1; }
