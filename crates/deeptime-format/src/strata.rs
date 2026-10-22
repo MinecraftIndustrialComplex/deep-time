@@ -150,6 +150,43 @@ pub struct StackScratch {
     entries: Vec<(u32, u8, u16, f64)>,
 }
 
+/// The column rule's cell (i0, j0) at block (x, z) and the fractions the B-spline weights take
+/// (step 1 of the column rule): on the polar grids x folded into [−C/2, C/2), u = (x − origin)/r;
+/// on a cube grid the block's centre on its face (FORMAT.md "Cube grids": a = (x − ox)/r − ½, the
+/// cells read on that face across its seams), with the face. `None` past a cube net's corners.
+pub fn spline_cell(
+    g: &crate::GridDesc,
+    x: i64,
+    z: i64,
+) -> Option<(Option<crate::cube::Face>, i64, i64, f64, f64)> {
+    if g.is_cube() {
+        let s = g.cube_spot_of_block(x as f64, z as f64)?;
+        let (i0, j0) = (s.a.floor() as i64, s.b.floor() as i64);
+        return Some((Some(s.face), i0, j0, s.a - i0 as f64, s.b - j0 as f64));
+    }
+    let c = i64::from(g.w) * i64::from(g.r);
+    let wx = (x + c / 2).rem_euclid(c) - c / 2;
+    let u = (wx - g.origin_block_x) as f64 / f64::from(g.r);
+    let v = (z - g.origin_block_z) as f64 / f64::from(g.r);
+    let (i0, j0) = (u.floor() as i64, v.floor() as i64);
+    Some((None, i0, j0, u - i0 as f64, v - j0 as f64))
+}
+
+/// The stored cell of index (i, j) of [`spline_cell`]: on `face` of a cube grid resolved across its
+/// seams ([`crate::GridDesc::face_cell`]), else [`crate::GridDesc::cell`].
+#[inline]
+pub fn spline_cell_at(
+    g: &crate::GridDesc,
+    face: Option<crate::cube::Face>,
+    i: i64,
+    j: i64,
+) -> (u32, u32) {
+    match face {
+        Some(f) => g.face_cell(f, i, j),
+        None => g.cell(i, j),
+    }
+}
+
 /// [`stack_at`] with the working memory given: the same answer, bit for bit.
 pub fn stack_at_with(
     scratch: &mut StackScratch,
@@ -169,19 +206,17 @@ pub fn stack_at_with(
     } = scratch;
     let g = &d.grid;
     let k = d.stack_depth.unwrap_or(0);
-    let c = i64::from(g.w) * i64::from(g.r);
-    let wx = (x + c / 2).rem_euclid(c) - c / 2;
-    let u = (wx - g.origin_block_x) as f64 / f64::from(g.r);
-    let v = (z - g.origin_block_z) as f64 / f64::from(g.r);
-    let (i0, j0) = (u.floor() as i64, v.floor() as i64);
-    let (bu, bv) = (bspline(u - i0 as f64), bspline(v - j0 as f64));
+    let Some((face, i0, j0, fu, fv)) = spline_cell(g, x, z) else {
+        return;
+    };
+    let (bu, bv) = (bspline(fu), bspline(fv));
     // The 4 × 4 cells i0 − 1 … i0 + 2, j0 − 1 … j0 + 2, row by row; weight bu[a]·bv[b].
     let mut w = [0.0f64; CELLS];
     for (b, &wv) in bv.iter().enumerate() {
         for (a, &wu) in bu.iter().enumerate() {
             let n = b * 4 + a;
             w[n] = wu * wv;
-            let (ci, cj) = g.cell(i0 - 1 + a as i64, j0 - 1 + b as i64);
+            let (ci, cj) = spline_cell_at(g, face, i0 - 1 + a as i64, j0 - 1 + b as i64);
             corners[n].clear();
             corners[n].extend(
                 (0..k)
