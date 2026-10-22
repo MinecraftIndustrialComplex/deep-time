@@ -3534,7 +3534,11 @@ table (30c4d664 → fad59a5e on seeds 1 and 2: land 0.257 → 0.268, largest 0.1
    about 0.026 more of the planet's continental crust over 1,000 Myr than a sea at 0 and shortens
    the assembly period (the section above). Find the code that still takes the datum for the
    sea; `forces::column_energy` (FRC-014: "h above sea level", computed from 0) is the first to
-   test, by an arm that feeds it the sea.
+   test, by an arm that feeds it the sea. Done ("The sea off the datum" below): the column
+   energy, the wedge floor (PLT-380) and the Andean mark now take the sea, and the measurement
+   counts from it. On seeds 1 to 6 none of it moves the crust (net −0.085 against master's −0.095
+   over 1,000 Myr, p 0.60), and a sea held at the datum loses as much (−0.099): the 0.026 was
+   seeds 1 to 3's draw. The drowned crust is the sea's height (0.235 with the sea at the datum).
 7. *Plate checks that are a mean of runs* (the supercontinent's tenure above all): one long run
    carries the mean (base: 558 Myr in one run of six; 126 Myr on seeds 1 to 3 against 46 on seeds
    4 to 6). Compare arms on twelve runs or more, and by the runs' median, before reading a change
@@ -3663,7 +3667,9 @@ same seeds and switch it on if the land holds. Ben's call when.
 ### What is left, and for whom
 
 1. *The sea off the datum* (the sea level's; a peer task is on it): it decides whether the hot
-   window can go on.
+   window can go on. Measured ("The sea off the datum" below): with the plate model reading the
+   sea, W 40 still drowns the continents (0.510 under the sea, land 0.209), so it stays off until
+   the sea stands lower against the continents (more continental crust, or Earth's crust budget).
 2. *The active belts* (the plates'): 0.95 of the crust that crosses a collision front stays in
    the crust (PLT-242, `plates/belts.rs`, on Stern & Scholl 2010), where the India-Asia balance has
    about half of the colliding crust gone into the mantle (Ingalls et al. 2016, abstract; disputed by van Hinsbergen et al.
@@ -3856,3 +3862,17 @@ W 40 differs in none of the seven measures (p ≥ 0.25) nor the crust (p 0.37). 
 criteria per run on the mean (1.75 against 1.58, 1.42 and 1.25: the ice, and a collision rate or a
 land share in some runs; p 0.67 against master and 0.21 against the branch), but with the
 continents drowned, so PLT-390 stays off.
+
+### What is left, and for whom
+
+1. *The drowned continents* (V1 item 1; the plates' and the sea level's): the share under the sea
+   follows the sea's height over the continents, not a datum in the code. With the sea at the
+   datum it meets its target and the land overshoots, so the gap is the continents' volume for
+   their area (34 to 36 km on average against Earth's 41.1 km): the crust budget's losses
+   (collisions at 2.5 to 3.8 times Earth's, the high ground's section) and the boundaries'
+   orientation (item 1 of the plate geometry's list) are where to work.
+2. *The land gain* (CHK-009, PLT-151): counted at the sea it runs 1.08 % at the median run, two
+   runs of twelve over the 1.5 % target. If a run fails it, look at the steps where the surface
+   planes ground to its base level near the shore, not at the sea.
+3. *The hotspot taper* (PLT-114, uncited) and the other solid-column heights in the datum frame
+   ("Left as they are" above): leave them unless a source puts them at the shore.
