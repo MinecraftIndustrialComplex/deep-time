@@ -33,6 +33,9 @@ import java.util.Map;
  *   <li>{@code replaced}: columns whose plain biome is rock-named and off its ground, by the biome now;
  *       {@code holes}: of them, an ocean, river or cave biome (land turned to water by the gate).</li>
  *   <li>{@code ground}: land columns with each role's ground.</li>
+ *   <li>{@code columns_changed}: columns whose biome differs from the plain search's (every Deep Time biome layer
+ *       off); {@code columns_changed_by_rules}: of them, decided by an ordinary biome rule (the snow line, peatland,
+ *       the gate's own rules).</li>
  * </ul>
  */
 public final class GeologyCensus {
@@ -66,7 +69,8 @@ public final class GeologyCensus {
     }
 
     /** The census of one level. */
-    public record Result(Side now, Side plain, Map<String, Integer> replaced, int holes, int differ, int gatedBiomes, JsonObject json) {}
+    public record Result(Side now, Side plain, Map<String, Integer> replaced, int holes, int differ, int differByRules, int gatedBiomes,
+                         JsonObject json) {}
 
     static TagKey<Biome> c(String path) {
         return TagKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath("c", path));
@@ -92,7 +96,7 @@ public final class GeologyCensus {
         int c = t.circumference(), zp = (int) Projection.poleZ(c);
         Side now = new Side(), plain = new Side();
         Map<String, Integer> replaced = new HashMap<>();
-        int holes = 0, differ = 0;
+        int holes = 0, differ = 0, differByRules = 0;
         int[] groundCount = new int[GeologyGround.Role.values().length];
         TagKey<Biome> ocean = c("is_ocean"), river = c("is_river"), cave = c("is_cave"), underground = c("is_underground");
         for (int z = -zp + step / 2; z < zp; z += step) {
@@ -119,8 +123,11 @@ public final class GeologyCensus {
                     now.columns++;
                 else
                     tally(now, b, gated, roles, x, z);
-                if (b != p)
+                if (b != p) {
                     differ++;
+                    if (VolcanicBiomes.byOrdinaryRule(why, marker.volcanic().rules()))
+                        differByRules++;
+                }
                 if (pOff && b != p) {
                     replaced.merge(name(b), 1, Integer::sum);
                     if (b.is(ocean) || b.is(river) || b.is(cave) || b.is(underground))
@@ -146,7 +153,8 @@ public final class GeologyCensus {
         o.add("replaced_by", rep);
         o.addProperty("replaced_holes", holes);
         o.addProperty("columns_changed", differ);
-        return new Result(now, plain, replaced, holes, differ, gated.size(), o);
+        o.addProperty("columns_changed_by_rules", differByRules);
+        return new Result(now, plain, replaced, holes, differ, differByRules, gated.size(), o);
     }
 
     /** Counts one column; true when its biome is rock-named and off its ground. */
