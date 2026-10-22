@@ -70,6 +70,19 @@
 //! crust within reach, nearest first, before any ocean floor, so less of the collapse becomes new
 //! continent below the sea.
 //!
+//! # Measured from the sea (off by default)
+//! T_n stands at z_0 over the datum, a continent's height when the sea stands at the datum. The
+//! sea is the planet's water filling the hypsometry (ISO-085) and stands 500 to 1,200 m over the
+//! datum on the Earth-like presets, so T_n crust stands at or under it: a hot orogen thinned to
+//! T_n, and ocean floor filled to it, are continent under the sea, and continental crust between
+//! T_n and the old lowland's 40 to 42 km (Christensen & Mooney 1995: the continents' mean 41.1 km)
+//! is no room for the collapse though it stands lower than the orogen. With
+//! `collapse_sea_column` ([`room_column_m`], PLT-412) the collapse's normal column is the one
+//! that stands as high over the step's sea as T_n over the datum, T_n + 7.0 S: what a hot orogen
+//! thins towards, what its room is filled up to, and the column at which ocean floor turns
+//! continental (also for the thickest crust's spreading). Heights still follow Airy in the
+//! datum frame: only the column the collapse aims at moves with the sea.
+//!
 //! # The thickest crust
 //! No continental crust on Earth is much thicker than Tibet's or the Altiplano's. Continental
 //! crust that a collision carries down further goes into the mantle with the slab (continental
@@ -93,7 +106,8 @@
 //! above the strength height; this moves crust, and only on the plate model's samples. Where the
 //! orogen spreads is the plate's nearest room, not a flow field.
 // ledger: PLT-254 (the rule), PLT-255 (τ), PLT-256 (the threshold thickness), PLT-257 (the
-// reach), PLT-258 (the thickest crust), PLT-390 (the hot window), PLT-391 (continental room first).
+// reach), PLT-258 (the thickest crust), PLT-390 (the hot window), PLT-391 (continental room first),
+// PLT-412 (the normal column from the sea).
 
 use std::collections::BTreeMap;
 
@@ -136,8 +150,15 @@ const ROOT_ORDER: [usize; pool::COUNT] = [
 /// plate at once (as the collapse moves crust, [`spread`], whether or not an orogeny holds it
 /// up), and what finds no room goes to the mantle from the bottom of its column (see the module
 /// docs, "The thickest crust"); returns the crust lost, km² × m, and adds what spread to `out`.
-/// Runs every step, before [`step`].
-pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse) -> f64 {
+/// `sea_m` is the step's sea (m over the datum), read only with `collapse_sea_column` (the ocean
+/// floor's fill, [`room_column_m`]). Runs every step, before [`step`].
+pub fn founder(
+    state: &mut PlateState,
+    geo: &Geo,
+    env: &Env,
+    out: &mut Collapse,
+    sea_m: f64,
+) -> f64 {
     let k = env.k;
     if k.crust_max_km.is_nan() || k.crust_max_km <= 0.0 {
         return 0.0;
@@ -164,10 +185,12 @@ pub fn founder(state: &mut PlateState, geo: &Geo, env: &Env, out: &mut Collapse)
         }
         // The excess goes to continental crust thinner than the collapse thickness (crust
         // thicker than that does not stay, PLT-256: lower crust flows out of the thickened belt
-        // but does not build a second one around it) and to ocean floor up to the normal column.
+        // but does not build a second one around it) and to ocean floor up to the normal column
+        // (from the datum or from the sea, PLT-412).
         let to = (k.collapse_thickness_km * 1000.0).clamp(normal_thickness_m(), t_max);
         if !by_plate.is_empty() {
-            spread(state, geo, env, by_plate, to, out, None);
+            let ocean_to = room_column_m(k, sea_m).min(to);
+            spread(state, geo, env, by_plate, to, ocean_to, out, None);
         }
     }
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
@@ -242,6 +265,21 @@ pub fn normal_thickness_m() -> f64 {
     continental_column().iter().map(|&x| f64::from(x)).sum()
 }
 
+/// The normal column the collapse uses under a sea `sea_m` over the datum, m: with
+/// `collapse_sea_column` the column whose Airy height stands as high over the sea as the normal
+/// column's stands over the datum, T_n + 7.0 S, kept within [T_n / 2, T_c]; else T_n (see the
+/// module docs, "Measured from the sea"). ledger: PLT-412
+pub fn room_column_m(k: &crate::params::TectonicParams, sea_m: f64) -> f64 {
+    let normal = normal_thickness_m();
+    if !k.collapse_sea_column || !sea_m.is_finite() {
+        return normal;
+    }
+    let t_c = (k.collapse_thickness_km * 1000.0).max(normal);
+    // game-choice: the bounds are guards (a sea 2.1 km over the datum or 2.5 km under it), not
+    // reached by the shipped presets' seas (about −300 to +1,200 m).
+    (normal + COLUMN_ISOSTATIC_FACTOR * sea_m).clamp(0.5 * normal, t_c)
+}
+
 /// What one step did.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Collapse {
@@ -258,15 +296,17 @@ pub struct Collapse {
     pub unplaced_km2_m: f64,
 }
 
-/// One step of the collapse on `state` (see the module docs). Runs after the step's uplift
+/// One step of the collapse on `state` (see the module docs) under the step's sea `sea_m` (m
+/// over the datum; read only with `collapse_sea_column`). Runs after the step's uplift
 /// (collision belts and subduction), so a sample raised this step is known.
-pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
+pub fn step(state: &mut PlateState, geo: &Geo, env: &Env, sea_m: f64) -> Collapse {
     let k = env.k;
     if !spreads(k) {
         return Collapse::default();
     }
     let rate = 1.0 - (-env.dt_myr / k.collapse_myr).exp();
-    let normal = normal_thickness_m();
+    // The normal column, from the datum or from the sea (ledger: PLT-412).
+    let normal = room_column_m(k, sea_m);
     let t_c = (k.collapse_thickness_km * 1000.0).max(normal);
     // A sample raised by an orogeny carries the time of the step that raised it; it is held up
     // until no orogeny has raised it for `collapse_quiet_myr` (at least this step). ledger: PLT-259
@@ -323,7 +363,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env) -> Collapse {
         held_km2_m: held * area,
         ..Collapse::default()
     };
-    let shares = spread(state, geo, env, by_plate, normal, &mut out, None);
+    let shares = spread(state, geo, env, by_plate, normal, normal, &mut out, None);
     out.unplaced_km2_m = budgets
         .iter()
         .map(|(p, b)| b * (1.0 - shares.get(p).copied().unwrap_or(0.0)))
@@ -345,8 +385,9 @@ fn spreads(k: &crate::params::TectonicParams) -> bool {
 
 /// Moves crust from each plate's `sources` (sample, m of thickness to release) to the nearest
 /// room on the same plate within `collapse_reach_km` (see the module docs, "The rule": continental
-/// crust thinner than `continental_to_m`, filled up to it, and ocean floor, filled up to the
-/// normal column; during a plate step never above a receiver's thickening ceiling, `rate.rs`),
+/// crust thinner than `continental_to_m`, filled up to it, and ocean floor, filled up to
+/// `ocean_to_m`, the normal column, and continental once filled; during a plate step never above
+/// a receiver's thickening ceiling, `rate.rs`),
 /// thinning the sources in proportion to what found room; returns the share of each plate's
 /// release that was placed (sources of a plate whose release found no room keep their crust).
 /// A source's surface sinks by Airy towards its column's height, or, given `floor`, as
@@ -357,11 +398,11 @@ pub(super) fn spread(
     env: &Env,
     by_plate: BTreeMap<u32, Vec<(usize, f64)>>,
     continental_to_m: f64,
+    ocean_to_m: f64,
     out: &mut Collapse,
     floor: Option<&[f32]>,
 ) -> BTreeMap<u32, f64> {
     let k = env.k;
-    let normal = normal_thickness_m();
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
     let mut shares = BTreeMap::new();
     // At least to the next ring of samples: on a coarse lattice the reach may be shorter than a
@@ -393,7 +434,7 @@ pub(super) fn spread(
             };
             let reached = dijkstra_sparse(geo, &src, |_, b| on_plate(b), reach);
             // The room, nearest first, not at a trench: continental crust thinner than
-            // `continental_to_m`, ocean floor up to the normal column, neither above its ceiling.
+            // `continental_to_m`, ocean floor up to `ocean_to_m`, neither above its ceiling.
             let mut room: Vec<(f64, usize, f64)> = reached
                 .iter()
                 .filter(|&&(j, _, _)| on_plate(j))
@@ -403,7 +444,7 @@ pub(super) fn spread(
                     let to = if s.kind == CONTINENTAL {
                         continental_to_m
                     } else {
-                        normal
+                        ocean_to_m
                     };
                     let cap = ceiling
                         .and_then(|c| c.get(j))
@@ -481,7 +522,8 @@ pub(super) fn spread(
         for m in &mut mix {
             *m /= total;
         }
-        // Fill the receivers; an ocean sample filled to the normal column is continent now.
+        // Fill the receivers; an ocean sample filled to the normal column (`ocean_to_m`) is
+        // continent now.
         for (j, g) in given {
             let s = &mut state.samples[j];
             let pools_before = s.pools;
@@ -494,7 +536,7 @@ pub(super) fn spread(
             let z = f64::from(s.elevation_m);
             let change = isostatic_change_m(&pools_before, &s.pools, env.gravity);
             s.elevation_m = toward(z, change, iso_height(&s.pools, z_0, env.gravity)) as f32;
-            if s.kind == OCEANIC && f64::from(s.thickness_m) >= normal - 1.0 {
+            if s.kind == OCEANIC && f64::from(s.thickness_m) >= ocean_to_m - 1.0 {
                 // The floor's own crust stays under the crust spread onto it (ledger: PLT-331).
                 s.make_continental();
                 out.converted += 1;
@@ -720,10 +762,15 @@ pub(in crate::plates) mod tests {
         }
     }
 
-    /// One collapse step on fixed positions.
+    /// One collapse step on fixed positions, under a sea at the datum.
     fn step_once(fx: &Fx, st: &mut PlateState, n: u64) -> Collapse {
+        step_under(fx, st, n, 0.0)
+    }
+
+    /// One collapse step on fixed positions under a sea `sea_m` over the datum.
+    fn step_under(fx: &Fx, st: &mut PlateState, n: u64, sea_m: f64) -> Collapse {
         let env = fx.env(n);
-        step(st, &fx.geo, &env)
+        step(st, &fx.geo, &env, sea_m)
     }
 
     /// A belt raised by an orogeny this step is held up by the convergence; a root that never
@@ -861,6 +908,77 @@ pub(in crate::plates) mod tests {
         assert!(lo >= t_c - 1.0, "{lo}");
     }
 
+    /// The normal column from the sea (PLT-412): off, T_n whatever the sea; on, T_n + 7.0 S, within
+    /// [T_n / 2, T_c], and T_n when the sea is unknown.
+    #[test]
+    fn the_room_column_stands_over_the_sea_with_the_switch() {
+        let mut k = TectonicParams::default();
+        let t_n = normal_thickness_m();
+        let t_c = k.collapse_thickness_km * 1000.0;
+        for sea in [-300.0, 0.0, 956.0, 5000.0] {
+            assert_eq!(room_column_m(&k, sea), t_n);
+        }
+        k.collapse_sea_column = true;
+        assert_eq!(room_column_m(&k, 0.0), t_n);
+        assert!((room_column_m(&k, 956.0) - (t_n + 6692.0)).abs() < 1e-6);
+        assert!((room_column_m(&k, -300.0) - (t_n - 2100.0)).abs() < 1e-6);
+        assert_eq!(room_column_m(&k, 5000.0), t_c);
+        assert_eq!(room_column_m(&k, -5000.0), 0.5 * t_n);
+        assert_eq!(room_column_m(&k, f64::NAN), t_n);
+    }
+
+    /// With `collapse_sea_column` under a sea 956 m over the datum, a hot belt thins towards the
+    /// column that stands over the sea as T_n stands over the datum (41.8 km), not to T_n, and the
+    /// ocean floor it fills turns continental only at that column; the volume is kept. Off, the
+    /// sea is not read: the run is the datum's, bit for bit (ledger: PLT-412).
+    #[test]
+    fn a_hot_belt_thins_to_the_column_over_the_sea() {
+        let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
+        let sea = 956.0;
+        let run = |on: bool, sea_m: f64| {
+            let mut fx = Fx::new();
+            fx.k.collapse_hot_myr = 40.0;
+            fx.k.collapse_sea_column = on;
+            let mut st = planet(&fx.geo, belt, 26_000.0);
+            for s in st.samples.iter_mut().filter(|s| s.thickness_m > 40_000.0) {
+                s.orogeny = OROGENY_HIMALAYAN;
+                s.orogeny_myr = 0.0;
+            }
+            let kind0: Vec<u8> = st.samples.iter().map(|s| s.kind).collect();
+            let crust0 = crust_m(&st);
+            let mut converted = 0;
+            for step in 1..=19 {
+                converted += step_under(&fx, &mut st, step, sea_m).converted;
+            }
+            assert!((crust_m(&st) - crust0).abs() < 1e-6 * crust0, "volume kept");
+            let column = room_column_m(&fx.k, sea_m);
+            let lo = (0..st.samples.len())
+                .filter(|&i| belt(fx.geo.points()[i]))
+                .map(|i| f64::from(st.samples[i].thickness_m))
+                .fold(f64::MAX, f64::min);
+            // Every ocean sample turned continental carries the column it was filled to.
+            let thinnest_new = (0..st.samples.len())
+                .filter(|&i| kind0[i] == OCEANIC && st.samples[i].kind == CONTINENTAL)
+                .map(|i| f64::from(st.samples[i].thickness_m))
+                .fold(f64::MAX, f64::min);
+            (st, column, lo, thinnest_new, converted)
+        };
+        let (_, column, lo, thinnest_new, converted) = run(true, sea);
+        let t_n = normal_thickness_m();
+        assert!(column > t_n + 6000.0, "{column}");
+        assert!(lo >= column - 1.0, "{lo} vs {column}");
+        assert!(converted > 0 && thinnest_new >= column - 1.0, "{converted} {thinnest_new}");
+        // On, under a sea at the datum: T_n, as with the switch off. In 38 Myr (τ 25) the belt
+        // loses 78 % of its excess either way, so it ends about 0.78 × 7.0 S thicker under the sea.
+        let (_, column0, lo0, _, _) = run(true, 0.0);
+        assert!((column0 - t_n).abs() < 1e-9 && lo0 >= t_n - 1.0, "{lo0}");
+        assert!(lo - lo0 > 4000.0, "{lo} {lo0}");
+        // Off: the sea is not read.
+        let (a, ..) = run(false, sea);
+        let (b, ..) = run(false, 0.0);
+        assert_eq!(a.samples, b.samples);
+    }
+
     /// With `collapse_continent_first` the crust a belt at the continent's edge releases goes to
     /// the plate's thinned continental crust within reach before the ocean floor beside it, so no
     /// ocean turns continental while that room lasts; nearest first, the ocean beside the belt
@@ -919,7 +1037,7 @@ pub(in crate::plates) mod tests {
             }
         }
         let before = st.samples.clone();
-        let lost = founder(&mut st, &fx.geo, &fx.env(1), &mut Collapse::default());
+        let lost = founder(&mut st, &fx.geo, &fx.env(1), &mut Collapse::default(), 0.0);
         let t_max = fx.k.crust_max_km * 1000.0;
         let mut n = 0;
         for (i, s) in st.samples.iter().enumerate() {
@@ -961,7 +1079,7 @@ pub(in crate::plates) mod tests {
         let crust0 = crust_m(&st);
         let c0 = continental(&st, 0);
         let mut out = Collapse::default();
-        let lost = founder(&mut st, &fx.geo, &fx.env(1), &mut out);
+        let lost = founder(&mut st, &fx.geo, &fx.env(1), &mut out, 0.0);
         let area = fx.norm.sample_area_km2();
         let t_max = fx.k.crust_max_km * 1000.0;
         for (i, s) in st.samples.iter().enumerate() {
