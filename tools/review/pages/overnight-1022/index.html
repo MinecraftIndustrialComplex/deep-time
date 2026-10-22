@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overnight: 22 October</title>
+<meta name="description" content="What happened overnight on Deep Time and the pack, 21 to 22 October 2026, newest first: the volcano fixes, drowned continents, the rock tags in single-player, the lite instance, distant terrain, tests. 7 decisions and 2 optional items for you.">
+<style>
+:root {
+  --bg: #ffffff;
+  --ink: #1a1a1f;
+  --muted: #52514a;
+  --line: #e5e5ea;
+  --card: #f7f7f8;
+  --accent: #8f620f;
+  --ok-bg: #e2f0e8;
+  --ok-ink: #1d5a3b;
+  --ok-line: #93c4aa;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 18px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow-wrap: anywhere;
+}
+main, .top, footer {
+  max-width: 960px;
+  margin: 0 auto;
+  padding-left: clamp(16px, 4vw, 32px);
+  padding-right: clamp(16px, 4vw, 32px);
+}
+.top {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: 15px;
+}
+.top a { color: var(--muted); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.top a:hover, .top a:focus { color: var(--accent); text-decoration: underline; }
+.top .home { color: var(--ink); font-weight: 600; margin-right: auto; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.25; }
+h1 { font-size: clamp(30px, 5vw, 42px); margin: 36px 0 10px; letter-spacing: -0.01em; max-width: 22em; }
+h2 { font-size: clamp(22px, 3vw, 27px); margin: 0 0 12px; max-width: 30em; }
+h3 { font-size: 19px; margin: 26px 0 8px; }
+p, li { max-width: 40em; }
+p { margin: 0 0 14px; }
+ul, ol { padding-left: 1.2em; margin: 0 0 14px; }
+li { margin-bottom: 6px; }
+a { color: var(--accent); }
+strong { font-weight: 600; }
+.dek { color: var(--muted); font-size: 16px; margin-bottom: 18px; }
+section { padding: 34px 0 10px; border-top: 1px solid var(--line); margin-top: 26px; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+
+/* now box */
+.box { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px 6px; margin: 16px 0; }
+.status { list-style: none; padding: 0; margin: 0 0 8px; }
+.status li { display: grid; grid-template-columns: 9em 1fr; gap: 2px 14px; padding: 8px 0; border-bottom: 1px solid var(--line); max-width: none; margin: 0; font-size: 16.5px; }
+.status li:last-child { border-bottom: 0; }
+.status .d { font-weight: 650; }
+@media (max-width: 520px) { .status li { grid-template-columns: 1fr; } }
+
+/* status pills */
+.st { display: inline-block; font-weight: 650; font-size: 13.5px; line-height: 1.35; padding: 1px 7px; border-radius: 4px; border: 1px solid; margin-right: 8px; white-space: nowrap; vertical-align: 2px; }
+.st.go { background: var(--ok-bg); color: var(--ok-ink); border-color: var(--ok-line); }
+.st.wait { background: #fff; color: var(--accent); border-color: var(--accent); }
+.st.later { background: #fff; color: var(--muted); border-color: #b9b9c1; }
+
+/* the night's items */
+.items { list-style: none; padding: 0; margin: 10px 0 0; }
+.items > li { display: grid; grid-template-columns: 2.2em 1fr; gap: 10px; padding: 14px 0 6px; border-bottom: 1px solid var(--line); max-width: 52em; margin: 0; }
+.items > li:last-child { border-bottom: 0; }
+.items .n { font-weight: 700; font-size: 21px; color: var(--accent); line-height: 1.3; font-variant-numeric: tabular-nums; }
+.items h3 { margin: 0 0 6px; font-size: 19px; }
+.items p { font-size: 17px; margin-bottom: 8px; max-width: none; }
+.items ul { font-size: 17px; margin-bottom: 8px; }
+.items ul li { max-width: none; margin-bottom: 4px; }
+.items .go-link { font-size: 16px; font-weight: 600; }
+
+/* decisions */
+.how { font-size: 16.5px; }
+.decision { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px 6px; margin: 0 0 12px; }
+.decision h3 { margin: 0 0 6px; font-size: 18px; }
+.decision h3 .where { font-weight: 400; font-size: 15px; color: var(--muted); }
+.decision p, .decision li { max-width: none; }
+.decision .ctx { font-size: 16px; color: var(--muted); margin-bottom: 6px; }
+.opts { list-style: none; padding: 0; margin: 4px 0 10px; }
+.opts li { padding: 7px 0 7px 2.2em; text-indent: -2.2em; border-top: 1px solid var(--line); margin: 0; font-size: 16px; }
+.opts li:first-child { border-top: 0; }
+.opts .l { display: inline-block; width: 2.2em; text-indent: 0; font-weight: 700; color: var(--muted); }
+.opts .rec .l { color: var(--accent); }
+.opts .tagrec { display: inline-block; text-indent: 0; font-size: 13.5px; font-weight: 650; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 6px; margin-right: 6px; }
+.optional { border-style: dashed; background: #fff; }
+.optional .tagopt { display: inline-block; font-size: 13.5px; font-weight: 650; color: var(--muted); border: 1px solid #b9b9c1; border-radius: 4px; padding: 0 6px; margin-right: 6px; vertical-align: 2px; }
+
+footer { color: var(--muted); font-size: 14px; padding-top: 20px; padding-bottom: 40px; border-top: 1px solid var(--line); margin-top: 30px; }
+</style>
+</head>
+<body>
+<nav class="top" data-ss-react="off">
+  <a class="home" href="https://spacesheep.dev/@benmac/rtsim-hub">All pages</a>
+  <a href="#night">The night</a>
+  <a href="#decide">Decide (7 + 2)</a>
+</nav>
+<main>
+
+<header data-ss-id="header">
+  <h1 data-ss-id="title">Overnight: 22 October</h1>
+  <p class="dek" data-ss-id="dek">Deep Time and the pack, the night of 21 to 22 October 2026. Newest first.</p>
+  <div class="box" data-ss-id="now" data-ss-thumb>
+    <ul class="status">
+      <li data-ss-id="now-tests"><span class="d">Tests</span><span><span class="st wait">Running</span>The batch on a5d13f7e, with the volcano fixes. Master e26a3677 passed every gate.</span></li>
+      <li data-ss-id="now-prism"><span class="d">Your Prism</span><span><span class="st wait">Pending</span>Both instances move to the gated build, with DH 3.3.3, once that batch passes.</span></li>
+      <li data-ss-id="now-waiting"><span class="d">Waiting on you</span><span><a href="#decide">7 decisions, D1 to D7</a>, and 2 optional items.</span></li>
+    </ul>
+  </div>
+</header>
+
+<section id="night" data-ss-id="night" data-ss-section>
+  <h2 data-ss-id="night-h">The night, in 11 items</h2>
+  <ol class="items" data-ss-id="items">
+
+    <li data-ss-id="it-volcanoes"><span class="n">1</span><div>
+      <h3>Volcanoes: the diagnosis, and the first fixes landed</h3>
+      <p><span class="st go">Landed</span>Your volcano 27476 failed to read as one for three reasons: the projection squashes it into a slab, the vent was not the summit, and the paint on it is Terralith's.</p>
+      <ul>
+        <li>Landed, for new chunks and new planets: the vent is now the summit (on your preset, volcanoes with the summit at the vent went from 0.19 to 0.68), temperate mountains leave vanilla's snowy biomes, and volcanic zones follow the cone as drawn.</li>
+        <li>The cones are still modest. The bigger levers are D1 to D3.</li>
+      </ul>
+      <p class="go-link"><a href="https://spacesheep.dev/@benmac/deeptime-volcanoes">Volcanoes: realism or us?</a> D1 to D5 and D7 are there.</p>
+    </div></li>
+
+    <li data-ss-id="it-drowned"><span class="n">2</span><div>
+      <h3>Drowned continents: the transition's width</h3>
+      <p><span class="st later">Measured</span>0.414 of the continental crust ends under the sea, against a 0.25 target. Mostly one setting, yours: the ocean-continent transition is 200 km wide on the planet, which the plate model sees as 1,632 km. Nothing in the code changed.</p>
+      <p class="go-link"><a href="https://spacesheep.dev/@benmac/deeptime-drowned-continents">Drowned continents: the transition's width</a>. D6 is there.</p>
+    </div></li>
+
+    <li data-ss-id="it-tags"><span class="n">3</span><div>
+      <h3>Your single-player worlds never had the MIC rock tags</h3>
+      <p><span class="st go">Fixed</span>In single-player, 46 of 62 rock classes were vanilla blocks; only the multiplayer server had the tags. Both Prism instances now load the tags through KubeJS. Only new chunks get them.</p>
+    </div></li>
+
+    <li data-ss-id="it-lite"><span class="n">4</span><div>
+      <h3>A lite instance, "MIC Deep Time Lite"</h3>
+      <p><span class="st go">New</span>It sits next to the full instance in Prism.</p>
+      <ul>
+        <li>30 client mods instead of 181: the mods Deep Time's data names, their dependencies and the performance mods.</li>
+        <li>No platinum ore: Create Propulsion needs a mod it does not declare, and crashed the lite boot.</li>
+        <li>Auto-join is off. Single-player and Create World work.</li>
+      </ul>
+    </div></li>
+
+    <li data-ss-id="it-dh"><span class="n">5</span><div>
+      <h3>Distant terrain</h3>
+      <ul>
+        <li>Deep Time pins Distant Horizons 3.3.3.</li>
+        <li>DH 3.3.3 with Chunky on a client drops it from a multiplayer server about 10 s after joining. The pack made Chunky server-only (pack d31abf3).</li>
+        <li>In your two instances, both of DH's pause rules are off: pause while moving fast, and slow down when the server is behind.</li>
+        <li>Single-player far fill measured about 43 chunks/s: roughly 2 hours for the full 256-chunk radius on an idle machine. While you fly fast, DH still builds slowly, by its own design.</li>
+        <li>The pack-wide setting is left to mic-rtsim, which will raise it with you.</li>
+      </ul>
+    </div></li>
+
+    <li data-ss-id="it-seam"><span class="n">6</span><div>
+      <h3>The far and near terrain seam</h3>
+      <p><span class="st go">Fixed</span>Far terrain now draws the shallow water that Expanded Ecosphere's flooded forests and swamps put at sea level. The seam test passes again.</p>
+    </div></li>
+
+    <li data-ss-id="it-freeze"><span class="n">7</span><div>
+      <h3>The test client's Create World freeze</h3>
+      <p><span class="st go">Fixed</span>A bug in our test harness on the VM: its client was not copying the pack's config. You cannot hit it with the pack as shipped.</p>
+      <p>Underneath: Project Atmosphere fails to load if Remove Reloading Screen is set to hide all overlays. The pack's own setting avoids it. Reporting it to Project Atmosphere is <a href="#opt-1">optional item 1</a>.</p>
+    </div></li>
+
+    <li data-ss-id="it-lag"><span class="n">8</span><div>
+      <h3>Lag on your laptop</h3>
+      <p><span class="st go">Done</span>Background agents now get a fifth of the CPU weight they had, until the next reboot. Making it permanent is <a href="#opt-2">optional item 2</a>.</p>
+    </div></li>
+
+    <li data-ss-id="it-server"><span class="n">9</span><div>
+      <h3>The multiplayer server</h3>
+      <p><span class="st later">Unchanged</span>Still on the old build. Which world it moves to is <a href="#dec-5">D5</a>.</p>
+    </div></li>
+
+    <li data-ss-id="it-tests"><span class="n">10</span><div>
+      <h3>Tests</h3>
+      <p data-ss-id="it-tests-p"><span class="st wait">Running</span>The batch on a5d13f7e, with the volcano fixes, is running. The one before it, master e26a3677, passed every gate: Rust, Java (427 tests) and 95 of 95 GameTests in all five setups.</p>
+    </div></li>
+
+    <li data-ss-id="it-prism"><span class="n">11</span><div>
+      <h3>Your Prism instances</h3>
+      <p data-ss-id="it-prism-p"><span class="st wait">Pending</span>Both move to the gated build, with DH 3.3.3, once that batch passes.</p>
+    </div></li>
+
+  </ol>
+</section>
+
+<section id="decide" data-ss-id="decide" data-ss-section>
+  <h2 data-ss-id="decide-h">7 decisions and 2 optional items</h2>
+  <p class="how" data-ss-id="decide-how">The recommended option is first. Answer with letters, like "D1 a, D6 a", or say "all as recommended". Each page has the full story.</p>
+
+  <div class="decision" id="dec-1" data-ss-id="dec-1">
+    <h3>D1. Draw volcanoes and craters round? <span class="where"><a href="https://spacesheep.dev/@benmac/deeptime-volcanoes#decide">Volcanoes</a></span></h3>
+    <ul class="opts">
+      <li class="rec"><span class="l">a</span><span class="tagrec">Recommended</span>Round in world blocks, while the planet stays Petroff-Guyou.</li>
+      <li><span class="l">b</span>Keep the stretch.</li>
+      <li><span class="l">c</span>Move the whole planet to the cube layout.</li>
+    </ul>
+  </div>
+
+  <div class="decision" id="dec-2" data-ss-id="dec-2">
+    <h3>D2. Gullies on young cones? <span class="where"><a href="https://spacesheep.dev/@benmac/deeptime-volcanoes#decide">Volcanoes</a></span></h3>
+    <ul class="opts">
+      <li class="rec"><span class="l">a</span><span class="tagrec">Recommended</span>A smooth fresh summit with gullied older flanks.</li>
+      <li><span class="l">b</span>Keep young cones smooth, as now.</li>
+    </ul>
+  </div>
+
+  <div class="decision" id="dec-3" data-ss-id="dec-3">
+    <h3>D3. Texture on steep ground? <span class="where"><a href="https://spacesheep.dev/@benmac/deeptime-volcanoes#decide">Volcanoes</a></span></h3>
+    <ul class="opts">
+      <li class="rec"><span class="l">a</span><span class="tagrec">Recommended</span>Jagged detail and cliff bands in the heightfield. Far terrain keeps matching.</li>
+      <li><span class="l">b</span>Also 3D overhangs. Far terrain stops matching exactly.</li>
+      <li><span class="l">c</span>Leave it as it is.</li>
+    </ul>
+  </div>
+
+  <div class="decision" id="dec-4" data-ss-id="dec-4">
+    <h3>D4. Keep your cone size, a 20 km radius? <span class="where"><a href="https://spacesheep.dev/@benmac/deeptime-volcanoes#decide">Volcanoes</a></span></h3>
+    <ul class="opts">
+      <li class="rec"><span class="l">a</span><span class="tagrec">Recommended</span>Keep it, for visibility.</li>
+      <li><span class="l">b</span>Move toward Earth's median.</li>
+    </ul>
+  </div>
+
+  <div class="decision" id="dec-5" data-ss-id="dec-5">
+    <h3>D5. Which multiplayer world? <span class="where"><a href="https://spacesheep.dev/@benmac/deeptime-volcanoes#decide">Volcanoes</a></span></h3>
+    <p class="ctx">The new build cannot open the current world, whose planet data is an older format.</p>
+    <ul class="opts">
+      <li class="rec"><span class="l">a</span><span class="tagrec">Recommended</span>A fresh multiplayer world on the new build, keeping the old world's folder on the VM.</li>
+      <li><span class="l">b</span>Stay on the old build.</li>
+    </ul>
+  </div>
+
+  <div class="decision" id="dec-6" data-ss-id="dec-6">
+    <h3>D6. The transition's width? <span class="where"><a href="https://spacesheep.dev/@benmac/deeptime-drowned-continents#decide">Drowned continents</a></span></h3>
+    <ul class="opts">
+      <li class="rec"><span class="l">a</span><span class="tagrec">Recommended</span>200 km on the model sphere. The drowned share falls from 0.414 to 0.279. Test worlds get regenerated.</li>
+      <li><span class="l">b</span>Keep 200 km on the planet.</li>
+      <li><span class="l">c</span>Taper the crust in the model's frame and draw the margin wider in the planet's.</li>
+    </ul>
+  </div>
+
+  <div class="decision" id="dec-7" data-ss-id="dec-7">
+    <h3>D7. Crater depth? <span class="where"><a href="https://spacesheep.dev/@benmac/deeptime-volcanoes#decide">Volcanoes</a></span></h3>
+    <p class="ctx">Today's depth is your answer of 3 October; craters show on only 0 to 8% of volcanoes.</p>
+    <ul class="opts">
+      <li class="rec"><span class="l">a</span><span class="tagrec">Recommended</span>Earth's median, about 240 m (Grosse 2014), so craters show.</li>
+      <li><span class="l">b</span>Keep it as it is.</li>
+    </ul>
+  </div>
+
+  <div class="decision optional" id="opt-1" data-ss-id="opt-1">
+    <h3><span class="tagopt">Optional 1</span>Report the load failure to Project Atmosphere?</h3>
+    <p>Project Atmosphere fails to load if Remove Reloading Screen is set to hide all overlays. The pack's setting avoids it, so nothing is broken for you. A report would come from you.</p>
+  </div>
+
+  <div class="decision optional" id="opt-2" data-ss-id="opt-2">
+    <h3><span class="tagopt">Optional 2</span>Keep the agents' lower CPU weight after a reboot?</h3>
+    <p>Background agents get a fifth of the CPU weight they had until the next reboot. Keeping it means a change to your NixOS config.</p>
+  </div>
+</section>
+
+</main>
+<footer data-ss-react="off">
+  Private page for Ben, 22 October 2026. <a href="https://spacesheep.dev/@benmac/rtsim-hub">All pages</a> &#183; <a href="https://spacesheep.dev/@benmac/deeptime-hub">Deep Time hub</a>.
+</footer>
+</body>
+</html>
