@@ -266,7 +266,9 @@ orogenic collapse and before the surface processes:
    35 km and the thickest is 240 km), and that is not
    the ocean floor beside a rifted margin.
 2. *The taper* (PLT-261). Every sample within W/2 of the boundary (W = `transition_width_km`,
-   200 km measured **on the planet**, PLT-262) gets a signed distance d from it (inland positive)
+   200 km measured **on the model sphere**, PLT-262; on the planet until 2026-10-22, see "The
+   transition's width and the drowned continents" at the end of this page) gets a signed distance
+   d from it (inland positive)
    and a target crystalline thickness (the crust less its sediment and sedimentary rock)
    T*(d) = T_o + (T_n − T_o) · clamp(1/2 + d/W, 0, 1), with T_n = 33.0 km (the normal continental
    column's) and T_o = 7 km (the ocean's). The profile is linear in thickness: β = T_n / T* runs
@@ -295,7 +297,10 @@ The plate model's height change is its uplift for the surface stage, which carri
 own elevation and flexure; the shelf comes from the sediment the surface brings onto the thinned
 crust, and its slope failure keeps that sediment at most 2.5° steep.
 
-**Earth against the model.** Measured 2026-10-04 on `earthlike_quick_16k`
+**Earth against the model.** Measured 2026-10-04, with W then measured on the planet (200 km
+there was 1,632 km on the model sphere of the quick 16k planet, so every figure in this table and
+the paragraph after it is for that width; the figures for 200 km on the model sphere are in "The
+transition's width and the drowned continents" at the end of this page), on `earthlike_quick_16k`
 (coupled pipeline to the volcano stage, `structure.deformation.density=0`; master = the same build with
 `tectonics.transition_width_km=0`, which returns before touching anything; `tools/review/margin-runs.sh`,
 transects by `tools/review/margins.py` with the margins study's definitions, so the ETOPO 2022 figures
@@ -335,9 +340,13 @@ course.
 - The profile is linear in thickness and the same on every margin; Earth's margins have a necking
   zone where the crust thins fastest, and volcanic and magma-poor margins differ in width by a
   factor of two to three. One width (200 km, inside the sources' 50–300 km) stands for all.
-- The width is in metres on the planet, so a small planet's margins are as wide as Earth's in
-  metres and take a larger share of its continents; on the quick 16k planet the zone is 23 samples
-  across.
+- The width was in metres on the planet until 2026-10-22, so a small planet's margins were as wide
+  as Earth's in metres and took eight times the share of its continents (23 samples across on the
+  quick 16k planet). It is now in kilometres on the model sphere (Ben, decisions log 2026-10-22,
+  D6): the plates see Earth's width in their own Earth-sized frame, and the planet draws the margin
+  R/R_model of that (24.6 km on the quick 16k planet, five L1 cells), with the heights unscaled.
+  The ramp is then coarse on the quick planet: its 100,000 L0 samples are 71 km apart on the model
+  sphere, so W is 2.8 samples across (the full planet's 250,000, 45 km apart, 4.4).
 - τ (20 Myr) is a game choice: the sources give the duration of rifting (tens of Myr) and the
   thermal subsidence's time constant (62.8 Myr, carried by the ocean's age–depth law), not a time
   for the crust to take the taper's shape.
@@ -2039,7 +2048,7 @@ own, on master d54c7f0f, it barely moved where the rock lay. The final checkpoin
 `deeptime dump-fields` (`tools/review/geo_template_fields.py`), show why: the share of ocean L1
 cells holding more than 50 m of felsic plutonic rock falls with the distance (L1 cells, 4.8 km
 each on the planet) from the nearest continental cell over about the transition's half-width
-(W/2 = 100 km = 21 cells), and switching the transition off (`transition_width_km` = 0) takes
+(W/2 = 100 km on the planet = 21 cells, W then on the planet), and switching the transition off (`transition_width_km` = 0) takes
 most of it away (master d54c7f0f, 2026-10-19):
 
 | cells to land | ocean cells (master) | master | PLT-293 | PLT-293, no transition | PLT-293 and PLT-294 on |
@@ -2214,7 +2223,8 @@ thickness ends near its isostatic height and spreads when it is thick and hot.
    room, and of the about 33 km³ a year its rule would release, 4.1 moves.
 
 The transition's width (PLT-262) is Ben's (decisions log 2026-10-05, "Keep 200 km, raise crust in
-7–8") and is not changed here.
+7–8") and is not changed here (he moved it to the model sphere on 2026-10-22, decisions log D6;
+"The transition's width and the drowned continents" at the end of this page).
 
 **The fix.** Two rules on the plate model's samples, each with its own parameter and its own
 ledger row, run each plate step after the collapse and before the rate limits:
@@ -2383,7 +2393,7 @@ is thin and its tail is orogen.
 | no island arcs (`island_arc_km3_per_km_myr` 0) | 0.154 / 0.129 | 0.398 / 0.366 | 187 / 155 | 0.22 / 0.28 | 1,398 / 1,710 |
 | no collision stacking (`collision_stacking_share` 0) | 0.161 / 0.134 | 0.155 / 0.200 | 101 / 97 | 0.23 / 0.26 | 615 / 718 |
 | no cordillera, no continental arcs | 0.289 / 0.260 | 0.306 / 0.326 | 190 / 146 | 0.33 / 0.35 | 616 / 995 |
-| margin taper 24.5 km instead of 200 (`transition_width_km`) | 0.323 / 0.315 | 0.346 / 0.329 | 155 / 149 | 0.39 / 0.33 | 726 / 917 |
+| margin taper 24.5 km instead of 200 (`transition_width_km`; W then on the planet, so 24.5 km is 200 km on the model sphere, the shipped width since 2026-10-22) | 0.323 / 0.315 | 0.346 / 0.329 | 155 / 149 | 0.39 / 0.33 | 726 / 917 |
 
 By the origin of the crust under it (the budget's tag), the land above 2 km is 0.49 to 0.51
 island-arc crust, 0.27 to 0.33 collision crust, 0.16 to 0.21 Andean and 0.02 other; the land is
@@ -4246,7 +4256,8 @@ planets are changed anyway (the coordinator's call). Both switches are off on th
    bookkeeping that moves no criterion and can go on with the next planet change. Both are off on
    this branch, so the planets are the same bit for bit and no expected value changed; switching
    either on changes every planet, and the seed-specific tests' expected values then need the new
-   planets.
+   planets. (PLT-400 went on 2026-10-22, in the change that put the transition's width on the
+   model sphere: the last section of this page.)
 5. *Ingalls' half and the surface guard*: the share at 0.5 (arm rs50) loses the land and is
    rejected (PLT-242). One of its 12 runs (supercontinent, seed 2) stopped at -400 Myr on the
    surface guard (a cell at -238,024 m against the bound of 237,286 m; flexure.md "The surface
@@ -4255,14 +4266,15 @@ planets are changed anyway (the coordinator's call). Both switches are off on th
 
 ## The transition's width and the drowned continents (2026-10-22)
 
-The full measurement is in sea-level.md, "The continents under the sea and the sea's height at
-the end". For the plate model: the ocean-continent transition's width W (PLT-262) is 200 km on
-the planet, which on the quick 16k planet is 1,632 km on the Earth-sized model sphere the plate
-model runs on, eight times Earth's margins. The taper's continental half (target thickness 20 to
-33 km, `plates/transition.rs`) lies under the 35.1 km at which the median surface crosses the sea,
-so it is under the sea wherever nothing thickened it, and 97 to 100 % of the continental crust
-lies within 100 km (on the planet) of oceanic crust. Twelve runs an arm (`earthlike_quick_16k`,
-seeds 1 to 6, both starts, master df40ce80, `--set tectonics.transition_width_km=...`), medians:
+The full measurement of the cause is in sea-level.md, "The continents under the sea and the sea's
+height at the end". For the plate model: the ocean-continent transition's width W (PLT-262) was
+200 km on the planet, which on the quick 16k planet is 1,632 km on the Earth-sized model sphere
+the plate model runs on, eight times Earth's margins. The taper's continental half (target
+thickness 20 to 33 km, `plates/transition.rs`) lies under the 35.1 km at which the median surface
+crosses the sea, so it is under the sea wherever nothing thickened it, and 97 to 100 % of the
+continental crust lay within 100 km (on the planet) of oceanic crust. Twelve runs an arm
+(`earthlike_quick_16k`, seeds 1 to 6, both starts, master df40ce80, `--set
+tectonics.transition_width_km=...` on the code where W was on the planet), medians:
 
 | Median of 12 | W 200 km (master) | W 70 km | W 24.5 km (200 on the model sphere) |
 |---|---|---|---|
@@ -4273,7 +4285,68 @@ seeds 1 to 6, both starts, master df40ce80, `--set tectonics.transition_width_km
 | Continental crust's mean thickness, km | 39.5 | 41.3 (p 0.002) | 42.9 (p < 0.001) |
 | Passive margins: slope between 500 and 2,000 m, median | 2.5° | 2.8° | 3.2° |
 
-W at 70 km falls short on the final frame because its sea climbs through the run (to 741 m over
-the datum over the last 100 Myr): the higher continents shed more sediment, and none subducts. W
-is Ben's decision of 2026-10-05 and was not changed; the recommendation to him is W on the model
-sphere, or the taper in the model's frame and the drawn margin in the planet's.
+W at 70 km fell short on the final frame because its sea climbs through the run (to 741 m over
+the datum over the last 100 Myr): the higher continents shed more sediment, and none subducts.
+
+**The change (Ben, decisions log 2026-10-22, D6: "200 km on sphere").** `transition_width_km` is
+now kilometres on the model sphere, like `collision_belt_km` and the plate model's other lengths
+(`Norm::rad`, PLT-003): `width_rad` is `transition_width_km / model_radius_km`, so the taper is
+200/6,370 rad wide on every planet (24.6 km on the quick 16k planet, 2.8 L0 samples across; 4.4
+at the full presets' 250,000 samples) and the planet's radius no longer enters. The key keeps its
+name and every preset its 200: only what the number means moved. PLT-262 changed with it (unit,
+description, status). The same change turns PLT-400 on (`collision_restack_whole`, in the default
+and every built-in preset: the coordinator's call, since it moves no criterion; it is
+bookkeeping).
+
+**Measured on the shipped change.** Twelve runs an arm, `earthlike_quick_16k`, 1,000 Myr, seeds 1
+to 6, both starts, 2 threads, the crust budget on, on the test VM: the base is master 10bafdae
+(W on the planet, PLT-400 off), the arm this branch (W on the model sphere, PLT-400 on), each
+built from an archive of its commit and run side by side; *W only* is this branch with
+`--set tectonics.collision_restack_whole=false`, to see what each change does. Medians, two-sided
+Mann-Whitney U over the runs against the base:
+
+| Median of 12 | base | arm | p | W only | p |
+|---|---|---|---|---|---|
+| Land (0.26 to 0.32) | 0.247 | 0.300 | 0.001 | 0.300 | 0.001 |
+| Largest landmass (≥ 0.12) | 0.104 | 0.124 | 0.34 | 0.158 | 0.069 |
+| Continental crust under the sea (≤ 0.25) | 0.414 | 0.278 | < 0.001 | 0.263 | 0.001 |
+| Land above 2 km, of the land (≤ 0.12) | 0.248 | 0.271 | 0.80 | 0.267 | 0.40 |
+| Coast with high ground (≤ 0.15) | 0.369 | 0.411 | 0.033 | 0.404 | 0.078 |
+| Land under ice (≤ 0.15) | 0.170 | 0.170 | 0.93 | 0.174 | 0.47 |
+| Collisions per 100 Myr (2 to 6) | 1.65 | 1.80 | 0.84 | 1.60 | 1.0 |
+| Criteria of the seven met, per run | 1 | 2 | 0.018 | 2 | 0.010 |
+| Continental crust's net change over 1,000 Myr, share of the planet | −0.085 | −0.065 | 0.069 | −0.061 | 0.18 |
+| Plate checks met, of 45 | 29 | 28 | 0.38 | 28 | 0.43 |
+| Under the sea, the plate model's mean over the last 500 Myr | 0.348 | 0.215 | < 0.001 | 0.247 | < 0.001 |
+| Crust at least 25 km thick above the sea (Earth 0.81) | 0.572 | 0.677 | 0.001 | 0.693 | 0.002 |
+| Continental crust's mean thickness, km | 39.5 | 43.4 | < 0.001 | 44.4 | < 0.001 |
+| Passive margins, slope between 500 and 2,000 m, median (pooled transects) | 2.5° | 3.1° | | 3.0° | |
+
+The drowned share lands where the scratch arm put it (0.278 against 0.279; all 12 runs fall, by
+0.02 to 0.21), the land and the largest landmass reach their bands, and the passive slopes steepen
+by 0.6° (the steepest by 0.7°), not the 1.9° the decision of 2026-10-05 weighed. Five of the twelve
+runs are under 0.25; the median is not. What did not move is the high ground (above 2 km 0.271;
+the coast 0.411, slightly worse, p 0.033: the thicker continents stand higher), the ice and the
+collisions; the width does not touch those. The land's median, 0.300, is 0.026 above the scratch
+arm's 0.274 at the same W to 0.3 % (24.5 km on a planet of 782.28 km is a taper 0.26 % narrower
+than 200/6,370 rad), and the W-only arm gives 0.300 as well: any change reshuffles the runs'
+plates, and medians of twelve carry about 0.02 on the land and the drowned share. PLT-400 adds
+nothing at this size: against W only, no row of the table differs with p under 0.17 (the largest
+landmass 0.158 to 0.124, the drowned share 0.263 to 0.278).
+
+The sea stands higher with the thicker continents (820 m over the datum at the end against 538;
+sea-level.md), which keeps the final share 0.03 over the target.
+
+**Tests.** `plates::belts::tests::stacking_moves_crust_and_creates_none` tests PLT-242's share
+alone (what is added is the share times what crossed) and failed with PLT-400 on by default
+(share 0.5: 1.06 × 10¹⁰ added for 1.96 × 10¹⁰ crossed); it now sets the switch off, and
+`a_collisions_own_wedge_crosses_whole_with_the_switch` covers the switch itself. The taper's own
+tests (`plates::transition`) had Earth's 6,370 km model sphere and the quick planet's 782 km, so
+the 200 km taper on the planet spanned 9 of the fixture's 16,000 samples; with W on the model
+sphere the same 200 km would be one sample wide (178 km spacing), too coarse to test the taper's
+shape, so the fixture's model sphere is now 782 km and the taper spans the same 9 samples. A new
+assertion fixes `width_rad` at 200/6,370 on two planet sizes. No other seed-specific test moved
+(`cargo test --workspace`; 841 tests in the core crate).
+
+Decided: W is on the model sphere and PLT-400 is on. Open: the high ground, the ice and the
+collisions, which the width does not touch, are the next planet change's.

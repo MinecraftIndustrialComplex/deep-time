@@ -424,8 +424,10 @@ V1 item 1's third criterion asks that at most 0.25 of the continental crust lie 
 the final frame; master df40ce80 has a median of 0.414 on twelve runs (the plate model's own
 count, averaged over the last 500 Myr, 0.348). This section asks whether the measure
 and the target are Earth's, why the sea ends about 450 to 540 m over the datum, and whether the
-continents' hypsometry is Earth's. Nothing in the code changed; the arms below are scratch
-switches and presets set from the command line.
+continents' hypsometry is Earth's. Nothing in the code changed in the measurement; the arms below
+are scratch switches and presets set from the command line, on master df40ce80, where W (PLT-262)
+was still kilometres on the planet. Its result went into the code the same day (Ben, D6): the last
+subsection, "W on the model sphere, in the code", measures the shipped change.
 
 **Runs.** `earthlike_quick_16k`, 1,000 Myr, seeds 1 to 6, both starts (twelve runs an arm), 2
 threads, the crust budget on (`DEEPTIME_CRUST_BUDGET=1`), on the test VM through admission
@@ -443,7 +445,8 @@ scratch driver in `build/dr`, not committed). The base binary is master df40ce80
   reaches a trench is subducted.
 - *wsph*: `--set tectonics.transition_width_km=24.5`, the transition's width W at 200 km on the
   Earth-sized model sphere instead of on the planet (PLT-262; the quick planet is 8.16 times
-  smaller).
+  smaller). This is the shipped meaning since 2026-10-22, where `transition_width_km=200` does
+  the same; on df40ce80's code the key was km on the planet, so 24.5 stood for it.
 - *w70*: `--set tectonics.transition_width_km=70`, between the two.
 
 The analysis is a scratch script (`build/dr/an.py`) on the census, the dumped fields and the
@@ -570,7 +573,7 @@ final frame, medians of 12, heights over the sea):
 The shelf is about Earth's; what is extra is the crust on the slope and below it, 0.29 of the
 continental crust against Earth's 0.16, and nearly none of it is far from the sea: 97 to 100 % of
 the continental crust lies within 100 km (on the planet) of oceanic crust. That is the
-transition's continental half. W is 200 km on the planet (PLT-262, Ben's answer of 2026-10-05),
+transition's continental half. W was 200 km on the planet (PLT-262, Ben's answer of 2026-10-05),
 which is 1,632 km on the Earth-sized model sphere the plate model runs on, eight times Earth's
 margins (Harris et al. 2014: passive shelf and slope 134 km). Over the continental half of the
 taper the target thickness runs from 20 km at the boundary to 33 km at W/2 (100 km on the
@@ -623,12 +626,64 @@ By run, under the sea, master / wsph / w70: super-1 0.387 / 0.379 / 0.371, super
 0.273 / 0.393, scatt-3 0.527 / 0.270 / 0.333, scatt-4 0.394 / 0.324 / 0.448, scatt-5 0.420 /
 0.285 / 0.245, scatt-6 0.361 / 0.364 / 0.492.
 
-W is Ben's: he chose 200 km on the planet to keep Earth's slopes in the game's metres. The
-measurement says the plate model needs Earth's width in its own frame to keep Earth's share of
+W was Ben's: he chose 200 km on the planet to keep Earth's slopes in the game's metres. The
+measurement said the plate model needs Earth's width in its own frame to keep Earth's share of
 continental crust above the sea, and that the game's slopes pay less for it than was thought.
-Recommended to Ben: W at 200 km on the model sphere (24.5 km on the quick planet), or the taper
+Recommended to him: W at 200 km on the model sphere (24.5 km on the quick planet), or the taper
 in the model's frame and the drawn margin in the planet's, if the slope matters more (a larger
-change: the L1 map and the surface would draw the margin wider than the crust's taper).
+change: the L1 map and the surface would draw the margin wider than the crust's taper). He chose
+the first the same day (decisions log 2026-10-22, D6: "200 km on sphere"); see the next
+subsection.
+
+#### W on the model sphere, in the code (2026-10-22)
+
+`transition_width_km` is now kilometres on the model sphere (`plates/transition.rs`, `width_rad`
+= `Norm::rad`; PLT-262), 200 in every preset, and PLT-400 (`collision_restack_whole`) is on in the
+default and every built-in preset, the coordinator's call (bookkeeping that moved no criterion).
+Measured as above (12 runs an arm; `earthlike_quick_16k`, 1,000 Myr, seeds 1 to 6, both starts, 2
+threads, the crust budget on), the base master 10bafdae (W on the planet, PLT-400 off; it
+reproduces df40ce80's medians to the digit) against this branch, with a W-only arm
+(`--set tectonics.collision_restack_whole=false`) beside them; medians, p from a two-sided
+Mann-Whitney U over the runs against the base:
+
+| Median of 12 | base | arm | p | W only | p |
+|---|---|---|---|---|---|
+| Land (0.26 to 0.32) | 0.247 | 0.300 | 0.001 | 0.300 | 0.001 |
+| Largest landmass (≥ 0.12) | 0.104 | 0.124 | 0.34 | 0.158 | 0.069 |
+| Continental crust under the sea (≤ 0.25) | 0.414 | 0.278 | < 0.001 | 0.263 | 0.001 |
+| Land above 2 km, of the land (≤ 0.12) | 0.248 | 0.271 | 0.80 | 0.267 | 0.40 |
+| Coast with high ground (≤ 0.15) | 0.369 | 0.411 | 0.033 | 0.404 | 0.078 |
+| Land under ice (≤ 0.15) | 0.170 | 0.170 | 0.93 | 0.174 | 0.47 |
+| Collisions per 100 Myr (2 to 6) | 1.65 | 1.80 | 0.84 | 1.60 | 1.0 |
+| Criteria of the seven met, per run | 1 | 2 | 0.018 | 2 | 0.010 |
+| Under the sea, the plate model's mean over the last 500 Myr | 0.348 | 0.215 | < 0.001 | 0.247 | < 0.001 |
+| Crust at least 25 km thick above the sea (Earth 0.81) | 0.572 | 0.677 | 0.001 | 0.693 | 0.002 |
+| The census's sea over the datum, m | 538 | 820 | 0.030 | 839 | 0.069 |
+| Continental crust's mean height over the sea, m | 381 | 737 | 0.046 | 747 | 0.026 |
+| Continental crust's mean thickness, km | 39.5 | 43.4 | < 0.001 | 44.4 | < 0.001 |
+| Slope share (200 to 2,000 m under) | 0.200 | 0.115 | < 0.001 | 0.115 | < 0.001 |
+| Deeper than 2,000 m | 0.089 | 0.069 | 0.005 | | |
+| Passive margins: slope between 500 and 2,000 m, median | 2.5° | 3.1° | | 3.0° | |
+| Passive margins: the steepest slope, median | 4.4° | 5.1° | | 4.8° | |
+| Passive margins: shelf break, m | 187 | 208 | | 203 | |
+| Passive margins: shore to the 200 m isobath, km | 5.0 | 4.0 | | 4.0 | |
+
+By run, under the sea, base / arm: super-1 0.387 / 0.280, super-2 0.445 / 0.347, super-3 0.324 /
+0.287, super-4 0.418 / 0.224, super-5 0.322 / 0.197, super-6 0.412 / 0.248, scatt-1 0.428 /
+0.412, scatt-2 0.417 / 0.248, scatt-3 0.527 / 0.322, scatt-4 0.394 / 0.288, scatt-5 0.420 /
+0.275, scatt-6 0.361 / 0.217: every run falls, and five of the twelve end under 0.25.
+
+The scratch arm's result holds on the shipped code: 0.414 to 0.278 against 0.279, the land and the
+largest landmass in their bands (0.300 and 0.124), the slope 0.6° steeper. The width does not
+reach the criteria on the high ground (0.271 of the land above 2 km; the coast 0.411, p 0.033
+worse), the ice or the collisions. The land's median is 0.026 above the scratch arm's 0.274 at the
+same W to 0.3 % (24.5 km on the planet is a taper 0.26 % narrower than 200/6,370 rad); the W-only
+arm gives 0.300 too, and any change reshuffles the plates, so medians of twelve carry about 0.02
+on the land and the drowned share. PLT-400 changes nothing at this size (against W only, no
+measure compared has p under 0.17). The sea ends higher (820 m over the datum against 538, the crust under the
+sea's 0.278 still over 0.25): the thicker continents shed more sediment and none leaves the ocean
+("Why the sea stands about 500 m over the datum at the end"), so the sea's height, not the
+taper, is what remains between the final frame and its target.
 
 ## Simplifications and limits
 
@@ -701,12 +756,13 @@ change: the L1 map and the surface would draw the margin wider than the crust's 
 - The plate era's closed basins on oceanic crust grew (124 to 156 per snapshot): they stand on
   island arcs and stacked crust above the sea, which the lower sea lays dry; they belong with the
   arcs' rate (the plate-geometry task), not with the sea.
-- For Ben (2026-10-22, "The continents under the sea and the sea's height at the end"): the
-  transition's width W is 200 km on the planet, eight times Earth's margins in the plate model's
-  own frame, and it is what puts most of the drowned crust under the sea. At 200 km on the model
-  sphere (24.5 km on the quick planet) the share under the sea falls 0.414 to 0.279 and land and
-  the largest landmass come into their bands, for 0.7° of slope. Recommended: W on the model
-  sphere. Not changed: W is his decision of 2026-10-05.
+- Decided (Ben, 2026-10-22, D6 "200 km on sphere"; "The continents under the sea and the sea's
+  height at the end"): the transition's width W was 200 km on the planet, eight times Earth's
+  margins in the plate model's own frame, and it is what put most of the drowned crust under the
+  sea. It is now 200 km on the model sphere (24.6 km on the quick planet), in the code and every
+  preset: the share under the sea falls 0.414 to 0.278, and land and the largest landmass come
+  into their bands, for 0.6° of passive slope. Left: the high-ground, ice and collision
+  criteria, which the width does not move.
 - For the coordinator: the 0.25 target equals Earth's share at the model's boundary (0.237 to
   0.248, CRUST1.0 at 20 km) with no margin, and Earth fails it by Cogley's continent-ocean
   contacts (0.306). Recommended: report the share of crust at least 25 km thick above the sea
