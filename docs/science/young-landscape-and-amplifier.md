@@ -16,8 +16,9 @@ The deep-time simulation works on cells several kilometres wide. Two later steps
 | [AMP](ledger/AMP.md) | mountain character | AMP-034 to AMP-066 (33) |
 | [AMP](ledger/AMP.md) | resampling | AMP-067 to AMP-071 (5) |
 | [AMP](ledger/AMP.md) | sea floor | AMP-074 (1) |
+| [AMP](ledger/AMP.md) | steep-ground texture (the bake's relief pass) | AMP-080 to AMP-084 (5) |
 
-Rows by status (YNG and AMP, recounted 2026-10-20): `cited-unverified` 8, `calibrated` 3, `game-choice` 65, `uncited` 19.
+Rows by status (YNG and AMP, recounted 2026-10-22): `verified` 1, `cited-unverified` 8, `calibrated` 3, `game-choice` 69, `uncited` 19.
 
 ## Material for the stage 2 writer
 
@@ -269,3 +270,104 @@ failure itself; carbonate platform walls.
 crust strips with gentler edges at the source (the plates' and ocean crust's owners); this fix
 relaxes what reaches the young landscape, and on today's planet it costs the deepest trench
 1.3 km (9.1 to 7.8 km, against Earth's 10.9). The vertical scale (Ben's).
+
+## Steep ground: the jag and the cliff bands (D3, 2026-10-22)
+
+Ben's decision (decisions log 2026-10-22, D3): "jagged detail and cliff bands on steep ground in the
+heightfield, far terrain kept matching, no 3D overhangs".
+
+**What was wrong.** A steep face was drawn as an even stair: the game's surface steps from block
+to block by the same amount all the way up, with nothing to break it. The page "Volcanoes: realism
+or us?" counted 45 % of the columns stepping 3 or more blocks to a neighbour in the 201 blocks
+round one volcano; over the whole
+world the share is far lower, 3.8 to 5.4 % of steep land (slope 0.5 or more over 8 blocks) and 6
+to 8 % of steep hard rock and steep lava (seeds 1 to 3, below), and about 12 to 15 % of those steps
+change from one block to the next (a "broken" face). The mountain character already terraces
+steep hard rock in the amplifier (AMP-059), before the projection resamples the terrain to the
+world grid; the master column of the census below is what reaches the drawn surface.
+
+**What the bake does now** (`bake::relief::steep_texture`, AMP-080 to AMP-084). Last in the
+projection pass, after the cone gullies, on the world's own grid and in world blocks, from the
+drawn terrain (`elevation`) and its top rock (`surface/class_top`):
+
+- **The jag.** Steep hard rock gets a ridged noise, (1 − abs(n))² less its mean, of two octaves from
+  32 blocks, so the face breaks into knobs and chutes. Its amplitude is 4 blocks per unit of slope,
+  at most 8, and comes in between slopes of 0.3 and 1.2 (blocks per block over 16 blocks) and with
+  the rock's hardness (AMP-048: none on shale or mudstone, all on granite, gneiss, quartzite and
+  basalt). Stronger rock standing in steeper, higher relief is the direction Schmidt & Montgomery
+  1995 found (abstract read: "mountain-scale material strength can limit topographic relief"); the
+  numbers are the game's.
+- **The cliff bands.** Steep lava (basalt, andesite, rhyolite, obsidian: the volcanic classes that
+  are neither friable nor porous) gets flat benches with a cliff over the lowest 30 % of each band's
+  run, as stacked flows of a flood basalt or a lava plateau stand. The thinnest band is three
+  Columbia River basalt flows, 105 m (flows "averaging 30-40 m", Swanson & Wright 1981 in USGS
+  Circular 838, read), 3 blocks at 35 m a block; thicker ones are 2, 4 and 8 times that, up to 24
+  blocks, chosen so a band spans about 24 blocks of run down its slope. The doublings nest, so a
+  bench stays level where the slope changes; one slow noise (512 blocks) shifts all the levels
+  together. The bands only raise the ground, at most about 0.71 of a band.
+- **Where not.** Nothing within a block of the sea (fading in to 6 blocks over it), on a lake or a
+  river, under ice (fading out over 4 blocks of it), or on a young standing volcano's body (the
+  cone gullies' calm, VOL-068), whose flanks the gullies draw. A Lambert world gets none.
+
+Everything goes into `elevation`, so the game's near terrain, the far terrain (Distant Horizons)
+and the column evaluator draw the same surface; no layer was added (FORMAT.md, "The bake's
+projection pass").
+
+**Why 24 blocks of run.** The game takes the terrain's density at corners 4 blocks apart and
+interpolates between them. A band 3 blocks high on a slope of 0.5 spans 6 blocks of run, so its
+cliff falls between two corners and draws as a zigzag of single corners, not as a cliff (the first
+renders of this task). At 24 blocks of run the cliff, about 7 blocks, spans two corners and the
+bench four. So the bands are 3 to 24 blocks thick (105 to 840 m), several flows each, not single
+flows.
+
+**Measured** (`deeptime heightmap --step 4 --columns` of the whole world and a census of the
+surface as the game draws it, H at the 4-block corners and bilinear between, floored; master
+against the branch, each branch's `deeptime resume` of the same last checkpoint of
+`earthlike_quick_16k`, scattered continents, 500 Myr, seeds 1 to 3, 2026-10-22; masks from master;
+scratch scripts build/vrelief/steps.{sh,py}, not committed). Steep: slope 0.5 or more over 8
+blocks; hard rock: hardness 0.9 or more; broken: a second difference of 2 or more blocks along x or
+z.
+
+| seeds 1 / 2 / 3 | master | branch |
+|---|---|---|
+| steep hard rock (0.70, 0.54, 0.73 M columns): steps of 3+ | 6.2 / 7.0 / 7.7 % | 11.9 / 10.8 / 15.3 % |
+| steep hard rock: steps of 6+ | 0.07 / 0.14 / 0.12 % | 0.70 / 0.56 / 1.20 % |
+| steep hard rock: of the 3+ columns, broken | 14 / 14 / 12 % | 27 / 24 / 28 % |
+| steep lava (0.38, 0.38, 0.44 M columns): steps of 3+ | 6.2 / 6.0 / 8.2 % | 16.2 / 11.1 / 20.4 % |
+| steep lava: steps of 6+ | 0.11 / 0.12 / 0.13 % | 1.24 / 0.71 / 1.93 % |
+| steep lava: of the 3+ columns, broken | 15 / 15 / 13 % | 31 / 28 / 32 % |
+| steep lava: flat (no step to any neighbour: benches) | 1.6 / 1.5 / 1.6 % | 7.7 / 4.1 / 8.3 % |
+| all steep land (7.6, 5.9, 7.4 M columns): steps of 3+ | 3.8 / 5.0 / 5.4 % | 4.7 / 5.6 / 6.6 % |
+| all land: steps of 3+ | 1.5 / 1.9 / 2.7 % | 1.9 / 2.1 / 3.3 % |
+
+The pass moved 772k, 398k and 661k of the world's 2-block cells (jagged 759k, 391k, 648k; banded
+127k, 77k, 137k), a mean 0.8 to 1.1 blocks each, at most 20.3 blocks up and 4.6 down. Renders,
+before and after, shaded relief of a 384-block box and a game-scale oblique of its middle 160
+blocks (review/out/vol-relief/pair-d3-s1/, not committed): `lava` (-2048, -1792), a lava range
+whose steps of 3+ go from 1.2 to 6.4 % of the box's land, benches and risers plain on its flanks;
+`mtn` (-4352, -2176), hard rock that is not lava, a modest jag (0.0 to 0.3 %); `vol-a` and `vol-b`,
+two volcanoes with the cone gullies (1.2 to 3.2 % and 0.8 to 1.9 %).
+
+**Cost.** The texture takes 0.20 to 0.39 s of the bake's projection (the cone gullies 0.8 to 1.2
+s), 4 threads, on a full 16k world; whole `deeptime resume` runs side by side under the same load
+took 1.5 to 2.5 % longer (137.3 against 139.3 s, 134.9 against 138.3, 132.5 against 135.7), the
+same peak memory (2.87 GB). The game's per-chunk cost is unchanged: no Java or column-evaluator
+code changed, and the column evaluator over the whole world (5.5 M corners) took 31.5 against
+31.7 s on seed 2.
+
+**Simplifications.** A heightfield: no overhangs, no arches, no undercut cliffs, and a cliff rises
+over at least one spacing of the game's 4-block corners. The jag is noise, not fractures or joints: it
+does not follow bedding, faults or the rock's jointing (DiBiase et al. 2018, from memory, tie the
+relief of bedrock landscapes to fracture density). The bands are on lava only and run level, not
+along the flows' own dips, and they are several flows thick; sedimentary cliff bands (sandstone
+over shale) are left to the mountain character's terraces (AMP-059). Cells, not columns: the
+texture is drawn on the 2-block cells of `elevation`, so its finest detail is 8 blocks.
+
+**Game choices.** Every number but the flows' thickness (AMP-080 to AMP-083): the jag's strength,
+wavelength and slope and hardness ranges, the bands' run, cliff share, blend and level noise, the
+fades; the factor of three flows (AMP-084), so the bands start where the game's corners can draw
+them. Chosen by the census above and the renders (the agent, D3).
+
+**Open questions.** Whether hard rock should get cliff bands too where it is layered (sandstone,
+limestone), and whether the bands should follow the strata's dip instead of running level (they
+would then read the structure). Whether the jag should be stronger on glacial headwalls.

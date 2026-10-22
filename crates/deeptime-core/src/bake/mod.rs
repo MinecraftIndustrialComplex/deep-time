@@ -12,7 +12,7 @@
 //! | climate | `climate/{t_mean_c, p_mm, koppen}` on L1; `climate/{temperature, vegetation, continents, erosion, ridges}` on L2 (the §7.2 mapping, [`biomes`]) | [`climate`], [`biomes`] |
 //! | surface | `surface/regolith_blocks`, `surface/class_top` on L2 | [`surface`] |
 //! | meta | `meta/{plate_id, crust_type, crust_age_myr, heat_flow_mw_m2, province}` on L1 | [`meta`] |
-//! | underground | `volcanoes/active.json` (the volcanoes active at the present) and `notes.bake.underground.params` (the lava floor, lava lakes, magma chambers) | [`crate::underground`] |
+//! | underground | `volcanoes/active.json` (the volcanoes active at the present), `volcanoes/standing.json` (every standing stratovolcano, for the cone gullies of [`relief`]) and `notes.bake.underground.params` (the lava floor, lava lakes, magma chambers) | [`crate::underground`] |
 //!
 //! The record goes to `manifest.json` `notes.bake`: the detail term the game adds
 //! (`deeptime_format::DetailSpec`), what each part did and how long it took, the bytes written.
@@ -25,6 +25,7 @@ pub mod ice;
 pub mod meta;
 pub mod placement;
 pub mod project;
+pub mod relief;
 pub mod strata;
 pub mod strata_census;
 pub mod surface;
@@ -409,6 +410,9 @@ pub fn bake(
         underground["active_volcanoes"] = json!(list["volcanoes"].as_array().map_or(0, Vec::len));
         underground["volcanoes_file"] = json!(crate::underground::VOLCANOES_PATH);
         out.json(crate::underground::VOLCANOES_PATH, &list)?;
+        // Every standing stratovolcano, alive or dead, for the cone gullies the projection pass
+        // draws (`bake::relief`).
+        out.json(relief::STANDING_PATH, &relief::standing_json(st))?;
     }
     note.insert("underground".into(), underground);
 

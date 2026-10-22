@@ -2,10 +2,12 @@
 
 Status of this page: `stage 2 (constants checked against sources on 2026-10-02, package WP-2)`.
 
-Ledger ids on this page: `VOL-001` to `VOL-074`, `VOL-080` to `VOL-082` and `VOL-140` to `VOL-163`
-([ledger/VOL.md](ledger/VOL.md)) and `MAG-001` to `MAG-057` ([ledger/MAG.md](ledger/MAG.md)). The 24
-lava-flow rows of 2026-10-22 (VOL-140 to VOL-163) are 16 `game-choice`, 3 `verified`, 3
-`from-memory` and 2 `abstract-only`. Of the 131 rows VOL-001 to VOL-074 and MAG-001 to MAG-057 (the 15 rows MAG-043 to MAG-057 of 2026-10-02 are all `game-choice`; the tallies in the next sentence are those of the first 116), 84 are `game-choice`, 25 `uncited`,
+Ledger ids on this page: `VOL-001` to `VOL-074`, `VOL-080` to `VOL-082`, `VOL-090` and `VOL-091`,
+`VOL-100` to `VOL-105` and `VOL-140` to `VOL-163` ([ledger/VOL.md](ledger/VOL.md)) and `MAG-001` to
+`MAG-057` ([ledger/MAG.md](ledger/MAG.md)). The 24 lava-flow rows of 2026-10-22 (VOL-140 to VOL-163)
+are 16 `game-choice`, 3 `verified`, 3 `from-memory` and 2 `abstract-only`; the crater rows of
+2026-10-22 (VOL-090, VOL-091) are 1 `verified` and 1 `game-choice` (and VOL-026 became `verified`);
+the cone-gully rows of 2026-10-22 (VOL-100 to VOL-105) are 2 `verified` and 4 `game-choice`. Of the 131 rows VOL-001 to VOL-074 and MAG-001 to MAG-057 (the 15 rows MAG-043 to MAG-057 of 2026-10-02 are all `game-choice`; the tallies in the next sentence are those of the first 116), 84 are `game-choice`, 25 `uncited`,
 2 `verified`, 2 `abstract-only`, 1 `cited-unverified` and 2 `calibrated` (after stage 2: 81 `game-choice`, 28
 `uncited`, 1 `calibrated`; stage 1: 47 `game-choice`, 63 `uncited`, 4 `cited-unverified`, 1 `calibrated`).
 Ben's decisions of 2026-10-02 changed three defaults and added one setting (see "Decisions of 2026-10-02").
@@ -33,8 +35,19 @@ chains. A cone is planned at 0.6 to 2 km tall (30 to 100 blocks; 1.2 to 3 km unt
 measured, live cones stood a median 1.0 km and all standing cones 0.87 km (Earth's median: 1.0 km). It has a concave
 profile that steepens toward the top. At the default setting it is 7.6 to 20 km in radius (25 to 67
 blocks), twice as wide as its physical shape, so that it does not read as a spike. It has a summit
-crater at least 2 km (7 blocks) across. Its rock is andesite over tuff (volcanic ash turned to
+crater at least 2 km (7 blocks) across and 240 m (7 blocks) deep, Earth's median depth (since
+2026-10-22; before it 6 % of the cone's height, a block or two in the game). Its rock is andesite over tuff (volcanic ash turned to
 rock), or rhyolite over tuff where the crust is thick.
+
+**Gullied flanks** (since 2026-10-22, Ben's D2). A stratovolcano's summit stays smooth, but its
+flanks are cut into radial gullies that run from below the summit down to its foot. A young cone
+has many narrow ones (16 round it), sharp V-cuts between rounded ribs; an older one has fewer and
+wider ones (8), broad valleys between sharp divides, cut deeper, as on Earth (O'Hara et al. 2024).
+How much of the cone they take follows its age: about 16 % of its volume on a cone a few thousand
+years old, 23 % on an active cone 2 Myr old, up to 40 % on old ones. Once the volcano is dead
+they fade on the crater's clock while the mountains' own rugged texture takes the cone over. The
+gullies are 8 or more blocks apart round the cone (the game cannot draw finer ones), wider than
+Earth's 1 to 2 km, so on the measured planets most cones get 8.
 
 **Shield volcanoes and island chains.** Over a hotspot (a fixed plume of hot mantle) under ocean
 floor, a broad, gently sloping basalt shield rises 3.5 to 6.5 km above the sea floor, 49 to 80 km in
@@ -157,6 +170,16 @@ catalogue of individual volcanoes that ride on their plates.
    rises above the cone shows through. Before, the profile was added to sloping ground, so the
    highest point of a cone on a range's flank sat up the slope from its vent (Ben's volcano 27476,
    2026-10-22: 35 blocks up the slope and 30 blocks above the vent column).
+   **Gullies.** After the world map is drawn, the bake cuts each standing stratovolcano's flanks
+   into radial gullies on the world's own grid, in world blocks (VOL-100 to VOL-105). It reads the
+   cone from the drawn terrain: its foot is the mean height of the ring 1.0 to 1.3 radii out, its
+   top the highest point within 0.2. The upper 30 % of its height over the foot and its crater keep
+   no gullies. Below, 8 to 16 basins tile the cone divide to divide, each cut deepest on its axis;
+   the cut's depth is scaled so the cuts take O'Hara's eroded share of the cone's volume over its
+   foot for its age (the log-mean of the times since its first and its last activity; an active
+   cone last erupted 1 kyr ago). Dead cones' cuts fade by e^(−dead / 5 Myr). Nothing is cut below
+   one block over the sea, at a lake or a river, or under ice, so the coast and the closed basins
+   do not change.
 10. **Magma in the game.** The bake lists the volcanoes that are still active. The Minecraft side
     gives each a chamber (an ellipsoid whose radius is a tenth of the volcano's, between 1.2 and
     4.5 km), a conduit and a plug, and gives the most active quarter of those that can hold one a
@@ -210,7 +233,14 @@ fraction of the full height `H` at that distance.
 | VOL-022 | Shield radius | 40 × (H / 6.5 km)^0.8 ÷ flank steepness | km | none | `uncited` |
 | VOL-023 | Continental hotspot centre | 0.9 tall, 35 radius | km | none; Christiansen 2001 for Yellowstone | `uncited` |
 | VOL-024 | Flank steepness | 0.5 (radius doubled) | – | Ben, decisions log 2026-09-30 | `game-choice` |
-| VOL-026 | Summit crater | radius max(1 km, 0.07 R); depth 0.06 H | km | agent, for visibility; Grosse et al. 2014 compared | `game-choice` |
+| VOL-026 | Summit crater depth | 240 m, at most 0.37 H (VOL-090); 0.06 H until 2026-10-22 | m | Grosse et al. 2014 (Earth's median); Ben, 2026-10-22; Pike & Clow 1981 for the cap | `verified` |
+| VOL-091 | Summit crater radius | max(1 km, 0.07 R) | km | agent, for visibility; Grosse et al. 2014 and Pike & Clow 1981 compared | `game-choice` |
+| VOL-100 | Gullies' summit zone | none above 0.70 of the cone's height over its foot, full below 0.55; none in the crater | share of height | O'Hara et al. 2024 (summit region the upper 30 %); Ben, 2026-10-22 (D2) | `game-choice` |
+| VOL-101 | Eroded share of a cone's volume | 5.36 log10(age, yr) − 1.56 %, kept within 5 to 40 %; age the log-mean of first and last activity | % | O'Hara et al. 2024, Fig. 4h | `verified` |
+| VOL-102 | Last eruption of an active cone | 1 | kyr | agent | `game-choice` |
+| VOL-103 | Gully width angle and count | 20° at 10 % eroded to 50° at 35 %; 360° over it in fours, 8 to 16 | degrees, count | O'Hara et al. 2024, §4.1, §4.3 | `verified` |
+| VOL-104 | Gully cross-profile and drawing rules | (1 − 2d)^p, p 1.5 young to 0.7 old; onset at 8 to 12 blocks' spacing; axis at most 0.8 of the height; masks | – | agent | `game-choice` |
+| VOL-105 | A dead cone's gullies | × e^(−dead / 5 Myr) | – | agent, after the 2026-09-30 decision | `game-choice` |
 | VOL-029 | Caldera radius | uniform 3 to 9, at most 0.6 R | km | none; Christiansen 2001, USGS compared | `uncited` |
 | VOL-030 | Caldera depth | min(0.5 H, 400 m + 0.05 × radius) | m | none; Grosse et al. 2014 compared | `uncited` |
 | VOL-031 | Shield summit caldera | radius 0.08 R, depth min(0.04 H, 250 m), on shields over 4 km | m | none | `uncited` |
@@ -295,7 +325,8 @@ Earth, from the sources read in stage 2:
 | Basal width of stratovolcanoes | median 7.9 km, range 2–66 km | Grosse et al. 2014, table 1 | 7.6–20 km physical, 15–40 km at the default (13–28 and 27–56 km until 2026-10-02) |
 | Flank slopes of stratovolcanoes | mean flank 17.7°, steepest average 27.7° at 0.79 of the height (medians) | Grosse et al. 2014, table 1 | 9° mean and 17° at the summit for 2 km over 10 km; half that at the default |
 | Shield flanks | lava flows dip 2°–10°; subaerial shields' mean flank 8.1° (median of 89) | Clague & Sherrod 2014, p. 114; Grosse et al. 2014, table 1 | 14° at the steepest for the tallest physical shield, 7° at the default |
-| Large summit craters and calderas on composite volcanoes | 0.6–11 km across, median 2.2 km; depth under 100 to 860 m, median 240 m (smaller craters not measurable) | Grosse et al. 2014, p. 8 | craters at least 2 km across, 2.8 km on a 2-km cone, 36–120 m deep; calderas 6–18 km across (smaller on a small cone), up to 550–850 m deep |
+| Large summit craters and calderas on composite volcanoes | 0.6–11 km across, median 2.2 km; depth under 100 to 860 m, median 240 m (smaller craters not measurable) | Grosse et al. 2014, p. 8 | craters at least 2 km across, 2.8 km on a 2-km cone, 240 m deep (36–120 m until 2026-10-22); calderas 6–18 km across (smaller on a small cone), up to 550–850 m deep |
+| Gullies on stratovolcano flanks | eroded volume about 10 % at a few kyr, 30 to 40 % at 10 to 100 kyr and beyond (5.36 log10(age, yr) − 1.56 %); more than 10 summit basins on most cones; drainage density about 1 km⁻¹ young, 0.5 km⁻¹ old | O'Hara et al. 2024, Fig. 4h, §4.1 and §4.3, full text | 8 to 16 gullies at least 8 blocks (2.4 km) apart; the eroded share O'Hara's for the cone's age, capped at 0.8 of the cone's height on each gully's axis (measured below) |
 | Spacing of arc volcanoes | no characteristic spacing: spacings follow a Gamma distribution, as random points do | de Bremond d'Ars et al. 1995, abstract only | a least distance of 60 km, so cones stand evenly |
 | Mean spacing of large arc centres | 27 km (Alaska Peninsula), 42 km (Cascades, Andean Southern Volcanic Zone); 87 km between the 17 largest Cascade centres | Hildreth 2007, tables 4 and 10, full text | 60 km least (the mean spacing a run makes was not measured) |
 | Lifespan of large arc centres | mostly 0.1–1 Myr | Hildreth 2007, p. 64 | 2–8 Myr (a game choice: one cone stands for a centre over a 2-Myr step) |
@@ -337,6 +368,8 @@ described under them.
 | Effect on land height | with volcanoes off, land above 2 km falls from 0.307 to 0.170 of the land (Earth: 0.102) | hypsometry runs, `earthlike_quick_16k`, 500 Myr, 2026-10-01 (before flexure) |
 | Active volcanoes on dry land whose highest column within 0.35 radii is at the vent (within 1.6 crater radii or 2 blocks of it; VOL-082) | 0.19 → 0.68 (Ben's preset); earthlike seeds 1 to 3: 0.14 → 0.55, 0.18 → 0.43, 0.10 → 0.57. Median offset of that column from the vent 17.2 → 5.3 blocks (Ben's preset), 19.5 → 7.0, 25.4 → 21.6, 18.7 → 6.2; median height of it over the vent column 10.3 → 2.3 blocks (Ben's preset) | `deeptime volcano-census` on Ben's preset (λc pinned at 10.5) and `earthlike_quick_16k` seeds 1 to 3, scattered continents, 500 Myr, 2026-10-22, master fe61452b against the onlap (VOL-080); the simulation byte-identical, only the bake differs |
 | Visible summit craters on dry land (VOL-082: the lowest of 8 sector rims at least a block above the crater floor) | 0.00 to 0.08 of them, before and after the onlap; measured crater depth (mean sector rim over the floor) a median 1.0 to 2.2 blocks after it, against the catalogue's 2.2 to 3.0 (VOL-026: 0.06 H) | same |
+| Visible summit craters with the crater at Earth's median depth (VOL-026 since 2026-10-22: 240 m, 6.86 blocks, at most 0.37 of the cone) | all active volcanoes, seeds 1 to 3: 0.03 → 0.53, 0.03 → 0.41, 0.05 → 0.55 of 180, 115 and 119 craters; on dry land 0.05 → 0.69, 0.05 → 0.41, 0.00 → 0.64 of 61, 39 and 42 (64, 39 and 42 before: three vents of seed 1 now sit at the sea). Measured depth (mean sector rim over the floor), median 1.32 → 4.01, 1.65 → 3.80, 1.34 → 3.90 blocks (all) | `deeptime volcano-census` on `earthlike_quick_16k` seeds 1 to 3, scattered continents, 500 Myr, 2026-10-22: master 10bafdae against the D7 branch, each branch's `deeptime resume` of the same last checkpoint (the bake and the projection again); the simulation byte-identical. The drawn depth is about 4 of the bowl's 6.86 blocks: the game draws the terrain from corners 4 blocks apart and the crater is 7 to 9.5 blocks across; the craters still hidden (one rim sector at or under the floor, median -0.2 blocks) sit on tilted ground and off-centre summits: their median tilt ratio (VOL-082) 1.4 to 1.7 against the visible ones' 1.05 to 1.1, 74 to 77 % of them above 1 (53 to 62 %), their highest column a median 21 to 25 blocks from the vent (6 to 10), so the ground's fall, not the bowl's depth, hides them (a script over the census rows) |
+| Cone gullies (VOL-100 to VOL-105) | standing cones 616, 399 and 558 (seeds 1, 2, 3), of them 7, 6 and 3 not stratovolcanoes; active stratovolcanoes gullied 67 of 240, 42 of 158 and 47 of 214, the rest at sea (153, 93, 154), under 4 blocks over their foot (17, 8, 9) or with no flank to cut (3, 15, 4); 8 gullies each (the median: the fewest, since the cones are small in blocks); the active cones' eroded share a median 0.117, 0.035 and 0.102 against O'Hara's 0.234, 0.242 and 0.234 for their age: 61 of 67, 40 of 42 and 42 of 47 held by the cap (a gully's axis cut at most 0.8 of the cone's height there), on cones a median 17, 22 and 23 blocks over their foot; deepest cut a median 7.0, 6.8 and 10.7 blocks (at most 32.8, 31.9, 29.4); dead stratovolcanoes gullied 113 of 369, 35 of 235 and 95 of 341 but hardly cut (eroded share a median 0.0, 0.0 and 0.003, deepest a median 0.06 to 0.4 blocks: the fade e^(−dead / 5 Myr) has taken them); 111,706, 37,361 and 120,749 cells cut | `earthlike_quick_16k`, scattered continents, 500 Myr, seeds 1 to 3, 2026-10-22, the bake's note `notes.bake.projection.relief.cone_gullies` of the D2 and D3 branch (fd231a0c), `deeptime resume` of each seed's last checkpoint |
 | Active volcanoes at the end, the GameTest planet | 0 on master (every run; 4 hotspot shields before the solvers merge); since the arc fix 5 to 12 (3 to 10 arc stratovolcanoes, 0 to 3 shields) over seeds 11 to 16 | `planet_world_4k`, 150 Myr, 2026-10-19 ([plates.md](plates.md), "Arcs on a lattice coarser than the arc band") |
 
 Stage 2 runs (WP-2, 2026-10-02): `earthlike_quick_16k`, 500 Myr, seed 1, both starts (scattered
@@ -467,6 +500,17 @@ What the previews show:
 
 ## Simplifications and limits
 
+- **Gullies are drawn, not eroded.** The flank gullies (VOL-100 to VOL-105) are a pattern sized
+  by O'Hara et al. 2024's eroded volume against age, not a drainage network: no channel follows
+  the ground's flow, the basins are even round the cone, and the eroded rock goes nowhere (no
+  fans at the foot). Only stratovolcanoes get them (O'Hara's sample): shields and silicic centres
+  are left as they were. They are at least 8 blocks (2.4 km) apart, since the game draws the
+  terrain from corners 4 blocks apart; Earth's young cones carry channels about 1 km apart
+  (drainage density about 1 km⁻¹), which the game cannot show. A Lambert world (no projection
+  pass) gets none. The cuts fall short of O'Hara's share on most cones: on seeds 1 to 3 the active
+  cones' gullies took a median 4 to 12 % of their volume against the 23 to 24 % their ages ask,
+  since the cones stand a median 17 to 23 blocks over their foot and the cap (a gully's axis cut
+  at most 0.8 of the cone's height there) holds 85 to 95 % of them ("Earth against the mod").
 - **Three kinds only.** There are no cinder cones, no volcanoes at mid-ocean ridges or in rifts,
   and no fissure eruptions. The code's own comment notes that ridges and rifts are where lava is
   common on Earth (MAG-038); they are not exported to the game at all.
@@ -555,7 +599,8 @@ What the previews show:
 | Extra island subsidence 0 by default (VOL-048) | flexure and the plate model's ocean floor already sink old islands; the setting stays | Ben, decisions log 2026-10-02 ("Set it to 0, keep the setting") |
 | Continental hotspot centres collapse at about 1 per Myr (VOL-074) | Yellowstone had three caldera-forming eruptions in about 1.5 Myr (Christiansen 2001); the rate is a new setting | Ben, decisions log 2026-10-02 ("About 1 per Myr") |
 | Flank steepness 0.5: every volcano twice as wide as its physical profile (VOL-024) | at 15 times vertical exaggeration a physical cone is a spike | Ben, decisions log 2026-09-30 ("Setting, gentler default") |
-| Young volcanoes are smooth; old ones regain rugged ground (VOL-068) | looks | Ben, decisions log 2026-09-30 |
+| Young volcanoes are smooth; old ones regain rugged ground (VOL-068) | looks | Ben, decisions log 2026-09-30; for cone flanks changed 2026-10-22 (next row) |
+| A smooth fresh summit with radially gullied older flanks (VOL-100 to VOL-105) | looks: a cone reads as a volcano its age, as O'Hara et al. 2024 measured them | Ben, decisions log 2026-10-22 (D2); the drawing rules, the 1 kyr last eruption and the stratovolcanoes-only scope the agent's |
 | Small arc segments counted on their subduction event (VOL-015) | event volume | Ben, decisions log 2026-09-30 ("Count small ones") |
 | Volcano density 1 (VOL-012) | kept although it raises the land | Ben, decisions log 2026-10-01 |
 | Lava only at active volcanoes; random lava lakes and springs removed (MAG-001, MAG-034) | "only at active volcanoes, ridges and hotspots" is where lava is on Earth | Ben, decisions log 2026-10-01 |
@@ -566,7 +611,7 @@ What the previews show:
 | Vanilla's cave carvers are kept 6 blocks from the underwater face of a sea cliff (MAG-057) | the carvers cut arches into the underwater base of the sea cliffs beside a volcano; the arches are an artefact of the carvers, not geology | Ben's report, 2026-10-02 (the setting is `sea_cliff_skin_blocks`; 0 gives vanilla's carving) |
 | Lava is sealed in smooth basalt and never touches water (MAG-010, MAG-011, MAG-041) | lava pools were found overlapping the ocean | agent, build log 2026-10-01, after Ben's report |
 | Arc volcanoes at least 60 km apart (VOL-039) | keeps the doubled cones apart; one cone stands for a large long-lived centre | agent, build log 2026-09-30; reviewed WP-2 2026-10-02 |
-| Summit crater at least 2 km across (VOL-026) | a real crater would be under three blocks wide | agent, build log 2026-09-30 |
+| Summit crater at least 2 km across (VOL-091) | a typical real crater (0.5 km, Pike & Clow 1981) would be under two blocks wide; the drawn one is of Grosse et al. 2014's size class, so it takes their median depth, 240 m (VOL-026) | agent, build log 2026-09-30; the depth Ben, 2026-10-22 |
 | A cone is laid on the ground from its vent: the vent's ground level inside 0.4 of its radius, fading to its foot (VOL-080, VOL-081) | a cone is built by eruptions from its vent, so its summit is the vent; how far a real cone's onlap reaches down a slope was not read in a source | agent, coordinator's call, 2026-10-22, after Ben's volcano 27476 |
 | Stratovolcano lifetime 2 to 8 Myr (VOL-038) | one step is 2 Myr | agent, build log 2026-09-30 |
 | Eight flows in a flood basalt pile (VOL-052), terraces 80 m high (VOL-036) | visible layering and steps | agent, build log 2026-09-30 |
@@ -628,7 +673,7 @@ Not yet settled, for a later package or a geologist:
    summit region (at 0.79 of the height, Grosse et al. 2014); the code's cone is steepest at the
    summit. The amplifier and the crater already flatten the top, so the difference in blocks is
    small; not measured.
-6. **Crater and summit caldera sizes scale with the doubled radius** (VOL-026, VOL-031): a 3-km
+6. **Crater and summit caldera sizes scale with the doubled radius** (VOL-091, VOL-031): a 3-km
    cone has a 4-km crater, the tallest shield a 13-km summit caldera, two to four times Earth's.
    Whether the flank setting should widen craters too was never decided.
 7. **The arc flux law** (VOL-003) has no source, and the same law is coded three times (here,
@@ -671,7 +716,8 @@ Keys refer to [bibliography.md](bibliography.md).
 
 | Key | Used for | How it has been read |
 |---|---|---|
-| Grosse2014 | stratovolcano and shield heights, widths, slopes; crater and caldera sizes (VOL-016 to VOL-020, VOL-026, VOL-029, VOL-030) | in full (repository copy of the submitted version), WP-2 |
+| Grosse2014 | stratovolcano and shield heights, widths, slopes; crater and caldera sizes (VOL-016 to VOL-020, VOL-026, VOL-029, VOL-030, VOL-091) | in full (repository copy of the submitted version), WP-2; p. 8 again 2026-10-22 |
+| PikeClow1981 | typical stratocone craters: depth, width, depth over the cone's height (VOL-026, VOL-090, VOL-091) | table 2 read by a script from the library text, 2026-10-22 |
 | Hildreth2007 | arc volcano spacing, the volcanic front, lifespans (VOL-004, VOL-038, VOL-039) | in full, WP-2 |
 | ClagueSherrod2014 | Hawaiian growth, subsidence, shield slopes, reservoir depths (VOL-007, VOL-009, VOL-017, VOL-041, VOL-048, MAG-002) | in full, WP-2 |
 | Christiansen2001 | Yellowstone: plateau height, caldera size, caldera-forming eruptions (VOL-006, VOL-023, VOL-029, VOL-045, VOL-046) | the summary, physiography and chronology sections, WP-2 |

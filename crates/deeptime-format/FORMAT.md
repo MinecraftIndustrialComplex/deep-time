@@ -111,6 +111,8 @@ layout" (manifest `projection` with `layout_version` 2) and "The cube map table"
   strata/classes.json           class index → rock class name
   spawn/candidates.json         land cells for spawn selection
   volcanoes/active.json         the volcanoes active at the present ("Lava")
+  volcanoes/standing.json       the volcanoes standing at the present, alive or dead ("Standing
+                                volcanoes"; read by the bake's projection pass, not by the game)
   impacts/craters.json          the impact craters at the present ("Impact craters")
   climate_mapping.json          written by the game at the world's first start (P1-09, plan §7.2; not listed
                                 in the manifest): the tables from the baked biome inputs to the pack's
@@ -269,7 +271,18 @@ baked and gets a Lambert layout block.
   does not reach it, the open sea being each 8-connected body (x wraps) of world cells a block or
   more under sea level that holds at least 5,000 km² of cells the nearest Lambert cell left 0; the
   8-block halo is drawn again on the world grid (`notes.bake.projection.closed_basin`:
-  `cleared_low_cells`, `flagged_cells_nearest`, `flagged_cells`, `min_open_cells`, `radius_cells`). The five
+  `cleared_low_cells`, `flagged_cells_nearest`, `flagged_cells`, `min_open_cells`, `radius_cells`). The
+  world's `elevation` then gets its **block-scale relief** (`bake::relief`, drawn in world blocks on
+  the world's own grid from the drawn terrain, so it does not depend on the frame the simulation ran
+  in): the cone gullies of the standing stratovolcanoes ("Standing volcanoes"), then the
+  **steep-ground texture** (D3, ledger AMP-080 to AMP-084): a ridged jag of a few blocks on steep
+  hard rock and cliff bands (flat benches, steep risers) on steep lava, the rock read from
+  `surface/class_top`. The gullies only lower cells; the texture raises and lowers them. Neither
+  takes a cell below one block over sea level nor touches a lake, a river or the sea, so the sea and
+  land and the closed basins stay as they are; the two edge rows are glued again by the mean of each
+  pair (`notes.bake.projection.relief`, below). A Lambert world (no projection pass) gets none. No
+  new layer: both write `elevation`, which the game, the far terrain and the column evaluator read
+  as before. The five
   band coordinates and the two categories of the L2 biome inputs (`climate/koppen_l2`,
   `climate/wetland`) are held back until the world's `elevation` and `closed_basin` exist and then
   **settled to the world's ground** (BIO-170, BIO-171, BAK-057): at each L2 node's block the world's
@@ -289,7 +302,7 @@ baked and gets a Lambert layout block.
   through the local Jacobian), bodies (centre, horizontal axes and yaw through the Jacobian, and
   moved up or down by the change of the drawn terrain height between their old and new column, so a
   crater's lens stays under the drawn floor), sites (centre; box from their bodies; the index in the
-  world's frame), `volcanoes/active.json` and `impacts/craters.json` (`x`, `z`), and
+  world's frame), `volcanoes/active.json`, `volcanoes/standing.json` and `impacts/craters.json` (`x`, `z`), and
   `spawn/candidates.json` (ranked candidates moved to the nearest world L3 point,
   `surface_y` from the world's elevation, those past the simulation's pole or within 64 blocks of a
   turning edge dropped; unranked ones, dry land nearest (0, 0), picked again on the world's own
@@ -304,7 +317,15 @@ baked and gets a Lambert layout block.
   sampling), `shares` (`land_map` / `land_true`, `ice_cover_map` / `ice_cover_true`: the share of the
   world's cells, edge rows at half weight, against the simulation's true area share), `pole_anisotropy`
   (mean squared tangential over radial elevation slope 80°–88° from the equator, and at 30°–60° for
-  reference, for the world and for point sampling), `vector` and `millis`.
+  reference, for the world and for point sampling), `relief` (the block-scale relief:
+  `cone_gullies` with `cones`, `not_strato` (standing cones of other kinds, not gullied),
+  `gullied`, `cells_cut`, and `active` and `dead`, one group each for the cones active and dead at
+  the present, with `cones`, `gullied`, `skipped_sea`, `skipped_low`, `skipped_no_flank`,
+  `skipped_other`, `capped`, the medians of the cones' `target_share`, `removed_share`, `gullies`,
+  `span_blocks` and `deepest_blocks`, `deepest_blocks_max` and `first`, six cones as [id, gullies,
+  target, removed, span blocks, deepest blocks]; `steep_texture` with `cells_moved`, `cells_jagged`,
+  `cells_banded`, `cells_raised`, `cells_lowered`, `mean_abs_blocks`, `max_raise_blocks`,
+  `max_cut_blocks` and `millis`; and `millis`), `vector` and `millis`.
 
 **The guaranteed deposits under the world's ground** (DEP-221, ORE-280; 2026-10-20). Last, on the
 finished folder of either projection (`deeptime_core::deposits::anchor::anchor_folder`, also run by
@@ -1654,6 +1675,27 @@ with a zone `melt_sheet` of rock class `impact_melt` on the floor of a crater th
 body is an ellipsoid centred on the crater's original floor, which the bake seats at the height of
 `elevation` at the crater's centre less `cover_m`, so the lens lies under the floor the game draws). It is
 there for tools, and Java's `worlddata/Craters` reads it for the GameTest that checks a crater in the placed world.
+
+### Standing volcanoes (`volcanoes/standing.json`, 2026-10-22)
+
+The bake lists the volcanoes still standing at the present, alive or dead, of every kind, at least
+30 m high (VOL-064), in id order. The projection pass reads the file to cut the cone gullies into
+the stratovolcanoes and to keep the steep-ground texture off every volcano's body ("The bake's
+projection pass"; VOL-068, VOL-100 to VOL-105); the game does not read it.
+
+```json
+{"version": 1, "t_myr": 500.0, "fade_myr": 5.0, "volcanoes": [
+  {"id": 3, "kind": "stratovolcano", "x": 2410.5, "z": -1033.0, "radius_m": 14000,
+   "height_m": 1700, "crater_rho": 0.07, "born_myr": 498.0, "extinct_myr": null}]}
+```
+
+`kind` is `stratovolcano`, `shield` or `caldera_complex`, as in `volcanoes/active.json`; `x`, `z` are the
+vent's block position (moved to the world's frame by the projection, as
+`volcanoes/active.json`'s); `radius_m` the cone's drawn basal radius and `height_m` its height,
+both in game metres; `crater_rho` the summit crater's or caldera's rim as a share of the radius
+(`null`: none); `born_myr` and `extinct_myr` (`null` while active) are history times, so the
+time since its first and since its last activity are `t_myr − born_myr` and `t_myr − extinct_myr`;
+`fade_myr` is the volcano stage's fade time (VOL-065).
 
 ### Active volcanoes (`volcanoes/active.json`) and their magma
 
