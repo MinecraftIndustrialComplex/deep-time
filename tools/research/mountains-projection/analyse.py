@@ -265,6 +265,59 @@ def free_search(coast, n=60000, seed=7, keep=24, rounds=120, extra=None):
                    **{"random_" + k: v for k, v in shares(mn).items()}}
 
 
+def pole_tilt_deg(Q):
+    """The north pole's angle from the nearest cube face centre, degrees, for rotations Q[n,3,3]
+    (planet -> canonical; the pole's canonical image is Q[:, :, 2])."""
+    q = np.abs(np.asarray(Q)[..., :, 2])
+    return np.degrees(np.arccos(np.clip(q.max(-1), -1, 1)))
+
+
+def limited_search(coast, limit_deg, seed=11, keep=24, rounds=80):
+    """As free_search, but the pole may lean at most limit_deg from the centre of the face that
+    holds it (0 is the polar aspect): a grid of tilts, tilt directions and turns, then the shrinking
+    random walk with turns past the limit refused."""
+    rng = np.random.default_rng(seed)
+    Qs = []
+    for b in np.arange(0.0, limit_deg + 1e-9, 2.0):
+        for a in (np.arange(0.0, 360.0, 10.0) if b > 0 else [0.0]):
+            R = geom.rot_zyz(a, b, -a)
+            for lam_ in np.arange(0.0, 90.0, 1.0):
+                Qs.append(geom.rot_z(-lam_) @ R)
+    Q = np.stack(Qs)
+    D = corner_distances(Q, coast)
+    sc = D.min(1) + 1e-3 * D.sum(1)
+    top = np.argsort(-sc)[:keep]
+    Qk, score = Q[top].copy(), sc[top].copy()
+    for r in range(rounds):
+        sig = math.radians(2.0 * (0.03 / 2.0) ** (r / max(1, rounds - 1)))
+        tries = 32
+        Rr = Rotation.from_rotvec(rng.normal(scale=sig, size=(keep * tries, 3))).as_matrix()
+        Qn = np.einsum("nij,njk->nik", np.repeat(Qk, tries, axis=0), Rr)
+        Dn = corner_distances(Qn, coast)
+        sn = Dn.min(1) + 1e-3 * Dn.sum(1)
+        sn[pole_tilt_deg(Qn) > limit_deg + 1e-9] = -1e9
+        sn = sn.reshape(keep, tries)
+        j = np.argmax(sn, axis=1)
+        better = sn[np.arange(keep), j] > score
+        Qk[better] = Qn.reshape(keep, tries, 3, 3)[np.arange(keep), j][better]
+        score[better] = sn[np.arange(keep), j][better]
+    b_ = int(np.argmax(score))
+    Db = corner_distances(Qk[b_:b_ + 1], coast)[0]
+    return Qk[b_], {"tilt_limit_deg": limit_deg, "tilt_deg": round(float(pole_tilt_deg(Qk[b_])), 2),
+                    "best_min_distance_deg": round(float(Db.min()), 2),
+                    "distances_deg": [round(float(x), 2) for x in Db]}
+
+
+TILT_LIMITS = (10.0, 20.0, 30.0)
+
+
+def sph_tri(a, b, c):
+    """Area of the spherical triangle abc (unit vectors), Van Oosterom and Strackee."""
+    num = abs(float(a @ np.cross(b, c)))
+    den = 1.0 + float(a @ b) + float(b @ c) + float(c @ a)
+    return 2.0 * math.atan2(num, den)
+
+
 def cube_fields(cube, p, Q=None, block_m=294.6):
     s1, s2 = cube.sv_at(p, Q)
     bpa = (math.pi / 6) / (s1 * s2)
@@ -304,7 +357,12 @@ def part_cube(L, Lc, sea, mv, r_m, classes, tables, res, out, others):
     coast = Coast(p, land)
     lam, D, polar = polar_search(coast)
     Qfree, free = free_search(coast, extra=geom.rot_z(-polar["lambda0_deg"]))
-    res["corners_this_planet"] = {"polar_aspect": polar, "free_rotation": free}
+    free["tilt_deg"] = round(float(pole_tilt_deg(Qfree[None])[0]), 2)
+    Qlim, lim = {}, {}
+    for tl in TILT_LIMITS:
+        Qlim[tl], lim[f"tilt<={tl:g}"] = limited_search(coast, tl)
+        print("this planet", lim[f"tilt<={tl:g}"], flush=True)
+    res["corners_this_planet"] = {"polar_aspect": polar, "free_rotation": free, "tilt_limited": lim}
     np.save(os.path.join(out, "polar-corner-distances.npy"), D)
 
     # Other planets: the same two searches on their land.
@@ -314,9 +372,15 @@ def part_cube(L, Lc, sea, mv, r_m, classes, tables, res, out, others):
         tr = Coast(geom.ll2xyz(lat_o, lon_o), land_o)
         _, _, pol = polar_search(tr)
         Qo, fr = free_search(tr, n=30000, extra=geom.rot_z(-pol["lambda0_deg"]))
-        other_land[name] = (geom.ll2xyz(lat_o[land_o], lon_o[land_o]), Qo)
+        fr["tilt_deg"] = round(float(pole_tilt_deg(Qo[None])[0]), 2)
+        limd, limQ = {}, []
+        for tl in TILT_LIMITS:
+            Ql, info = limited_search(tr, tl)
+            limd[f"tilt<={tl:g}"] = info
+            limQ.append(Ql)
+        other_land[name] = (geom.ll2xyz(lat_o[land_o], lon_o[land_o]), Qo, geom.rot_z(-pol["lambda0_deg"]), *limQ)
         op[name] = {"land_share": round(float(land_o.mean()), 3), "polar_aspect": pol, "free_rotation": fr,
-                    "petroff_cone_check": chk}
+                    "tilt_limited": limd, "petroff_cone_check": chk}
         print("other", name, json.dumps(op[name]), flush=True)
     res["corners_other_planets"] = op
 
@@ -356,15 +420,44 @@ def part_cube(L, Lc, sea, mv, r_m, classes, tables, res, out, others):
                     a["exaggeration_mountain_1km"][f"change_within_{dist}_blocks_q"] = q(vc, [0.5, 0.9, 0.99, 1.0])
             entry[aspect] = a
         # Other planets' land, each with its own best free orientation.
-        ol = {}
-        for name, (pl, Qo) in other_land.items():
-            b = cube_fields(cube, pl, Qo)["bpa"]
-            ol[name] = {"bpa_min": round(float(b.min()), 4), "bpa_p99": round(float(np.quantile(b, 0.99)), 4),
-                        "bpa_max": round(float(b.max()), 4),
-                        "relaxed_factor_max": round(float(max(b.max(), 1 / b.min())), 4)}
-        if ol:
-            entry["other_planets_land_free"] = ol
-            entry["other_planets_land_free_worst_factor"] = max(v["relaxed_factor_max"] for v in ol.values())
+        for tl in TILT_LIMITS:
+            f = cube_fields(cube, p, Qlim[tl])
+            entry[f"tilt<={tl:g}"] = {mk: {"bpa_max": round(float(f["bpa"][masks[mk]].max()), 4),
+                                           "bpa_p999": round(float(np.quantile(f["bpa"][masks[mk]], 0.999)), 4),
+                                           "bpa_min": round(float(f["bpa"][masks[mk]].min()), 4)}
+                                      for mk in ("land", "mountain_1km")}
+        asps = [("free", 1), ("polar", 2)] + [(f"tilt<={tl:g}", 3 + i) for i, tl in enumerate(TILT_LIMITS)]
+        for asp, qi in asps:
+            ol = {}
+            for name, item in other_land.items():
+                pl, Qa = item[0], item[qi]
+                b = cube_fields(cube, pl, Qa)["bpa"]
+                # land within 5 degrees of a corner (share of the planet's land samples)
+                cpl = CORNERS @ Qa  # corners in the planet frame (rows)
+                dmin = ang_deg(np.min(np.linalg.norm(pl[:, None, :] - cpl[None], axis=-1), axis=1))
+                ol[name] = {"bpa_min": round(float(b.min()), 4), "bpa_p99": round(float(np.quantile(b, 0.99)), 4),
+                            "bpa_p999": round(float(np.quantile(b, 0.999)), 4),
+                            "bpa_max": round(float(b.max()), 4),
+                            "relaxed_factor_max": round(float(max(b.max(), 1 / b.min())), 4),
+                            "land_share_within_5deg_of_corner": round(float((dmin < 5).mean()), 5)}
+            if ol:
+                entry[f"other_planets_land_{asp}"] = ol
+                entry[f"other_planets_land_{asp}_worst_factor"] = max(v["relaxed_factor_max"] for v in ol.values())
+                entry[f"other_planets_land_{asp}_worst_p999"] = max(v["bpa_p999"] for v in ol.values())
+        # The smallest cell: the corner cell of an n x n face grid, its planet area over the mean
+        # cell's (spherical quadrilateral from the four corner points, as a finite-volume grid
+        # would take it), and its shortest edge over the mean edge.
+        cc = {}
+        for n_ in (60, 120, 240, 480):
+            uu = np.linspace(-1, 1, n_ + 1)[-2:]
+            P00, P10 = cube.face_vec(np.array([uu[0]]), np.array([uu[0]]))[0], cube.face_vec(np.array([uu[1]]), np.array([uu[0]]))[0]
+            P11, P01 = cube.face_vec(np.array([uu[1]]), np.array([uu[1]]))[0], cube.face_vec(np.array([uu[0]]), np.array([uu[1]]))[0]
+            area = sph_tri(P00, P10, P11) + sph_tri(P00, P11, P01)
+            mean_area = 4 * math.pi / (6 * n_ * n_)
+            edges = [math.acos(min(1.0, float(a @ b))) for a, b in ((P00, P10), (P10, P11), (P11, P01), (P01, P00))]
+            mean_edge = math.sqrt(mean_area)
+            cc[str(n_)] = {"area_over_mean": round(area / mean_area, 5), "shortest_edge_over_mean": round(min(edges) / mean_edge, 5)}
+        entry["corner_cell"] = cc
         # The whole planet with no placement (the map's own figures; survey §3.1 check).
         fp = cube_fields(cube, p, geom.rot_z(0.0))
         entry["planet_check"] = {"bpa": q(fp["bpa"]), "shape": q(fp["shape"]),
