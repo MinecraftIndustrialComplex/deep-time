@@ -20,6 +20,8 @@
 //!   volume put back, so Σ a·h is kept to round-off.
 //! - [`spread`]: the strength-height spreading (`spread.rs`'s law, the cube's solve).
 //! - [`failure`]: the submarine slope failure (`marine.rs`'s rule, pair volumes on true areas).
+//! - [`footprint`]: round shapes on the sphere (the volcano stage's footprint, cell weights and
+//!   foot ring), in great-circle metres where Lambert has block metric.
 //!
 //! Every sum in these solvers is taken over fixed chunks of cells in ascending order, and the
 //! chunk sums then added in order, so results do not depend on the thread count. Cells are
@@ -27,6 +29,7 @@
 
 pub mod diffusion;
 pub mod failure;
+pub mod footprint;
 mod multigrid;
 pub mod spread;
 

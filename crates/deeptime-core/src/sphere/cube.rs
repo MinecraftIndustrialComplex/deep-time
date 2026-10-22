@@ -52,6 +52,7 @@
 //! for cache-friendly orders and the GPU's tiles (S8). Storage stays row-major.
 
 use std::ops::Range;
+use std::sync::Arc;
 
 use deeptime_format::cube::{Face, cell_on};
 use deeptime_format::cube_map::CubeMap;
@@ -131,6 +132,7 @@ impl CubeTopology {
 #[derive(Clone, Debug)]
 pub struct CubeGrid {
     topo: CubeTopology,
+    map: Arc<CubeMap>,
     radius_m: f64,
     unit: Vec<[f64; 3]>,
     lat_deg: Vec<f64>,
@@ -202,11 +204,13 @@ fn arc(a: [f64; 3], b: [f64; 3]) -> f64 {
 impl CubeGrid {
     /// The grid of n × n faces on the simulation's map, on a sphere of `radius_m`.
     pub fn new(n: usize, radius_m: f64) -> CubeGrid {
-        CubeGrid::with_map(&CubeMap::simulation(), n, radius_m)
+        CubeGrid::with_map(CubeMap::simulation(), n, radius_m)
     }
 
     /// The grid on another map of the slot (the tests use the world's conformal one too).
-    pub fn with_map(map: &CubeMap, n: usize, radius_m: f64) -> CubeGrid {
+    pub fn with_map(map: Arc<CubeMap>, n: usize, radius_m: f64) -> CubeGrid {
+        let shared = Arc::clone(&map);
+        let map: &CubeMap = &map;
         let topo = CubeTopology::new(n);
         let nn = n * n;
         let cells = 6 * nn;
@@ -310,6 +314,7 @@ impl CubeGrid {
         let total_area = face_sum(n, &area);
         CubeGrid {
             topo,
+            map: shared,
             radius_m,
             unit,
             lat_deg,
@@ -394,6 +399,32 @@ impl CubeGrid {
     #[inline]
     pub fn mean_area(&self) -> f64 {
         self.mean_area
+    }
+
+    /// The map the grid was made on.
+    #[inline]
+    pub fn map(&self) -> &CubeMap {
+        &self.map
+    }
+
+    /// The cell holding the cube-frame vector `p` (any length > 0): the map's inverse, then the
+    /// cell of that local point (a point on a cell edge goes to the cell east or south of it).
+    pub fn cell_of(&self, p: [f64; 3]) -> usize {
+        let (face, u, v) = self.map.inverse(p);
+        let n = self.topo.n;
+        let at = |x: f64| (((x + 1.0) * 0.5 * n as f64).floor().max(0.0) as usize).min(n - 1);
+        self.topo.index(face, at(u), at(v))
+    }
+
+    /// The unit vector of the point (s, t) ∈ [−½, ½]² of cell c's own square on the map, s east
+    /// and t south in the face's frame ((0, 0) is the centre, [`CubeGrid::unit`]).
+    pub fn point_in(&self, c: usize, s: f64, t: f64) -> [f64; 3] {
+        let (face, i, j) = self.topo.coords(c);
+        let n = self.topo.n as f64;
+        let u = (2.0 * i as f64 + 1.0 - n + 2.0 * s) / n;
+        let v = (2.0 * j as f64 + 1.0 - n + 2.0 * t) / n;
+        self.map
+            .forward(face, u.clamp(-1.0, 1.0), v.clamp(-1.0, 1.0))
     }
 }
 
