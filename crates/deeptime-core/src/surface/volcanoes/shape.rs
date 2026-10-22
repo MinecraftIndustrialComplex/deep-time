@@ -109,7 +109,9 @@ impl Shape {
         match self.depression {
             None => 0.0,
             Some(d) if d.caldera => d.depth * height_m,
-            Some(_) => CRATER_DEPTH_M.min(CRATER_DEPTH_MAX_SHARE * height_m).max(0.0),
+            Some(_) => CRATER_DEPTH_M
+                .min(CRATER_DEPTH_MAX_SHARE * height_m)
+                .max(0.0),
         }
     }
 
@@ -279,7 +281,10 @@ mod tests {
         let rim = Shape::profile(Kind::Strato, 0.3);
         assert!((s.body(0.0) - rim).abs() < 1e-12);
         assert!((s.full_m(0.0, 1.0) - (rim - 0.2)).abs() < 1e-12);
-        assert!((s.full_m(0.1, 1.0) - (rim - 0.2)).abs() < 1e-12, "flat floor");
+        assert!(
+            (s.full_m(0.1, 1.0) - (rim - 0.2)).abs() < 1e-12,
+            "flat floor"
+        );
         assert!((s.full_m(0.3, 1.0) - rim).abs() < 1e-12, "the rim");
         assert!(s.full_m(0.5, 1.0) < rim);
         // A caldera's depth is a share of the height.

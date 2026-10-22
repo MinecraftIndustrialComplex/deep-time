@@ -14,10 +14,18 @@
 //!   of its volume over its foot. Wider and fewer gullies as it ages, and a dead cone's fade on the
 //!   crater's clock as the mountain character takes it over (VOL-068). No cut where a river or a
 //!   lake is, under ice, or below one block over the sea.
+//! - **Steep-ground texture** (Ben, decisions log 2026-10-22, D3: "jagged detail and cliff bands in
+//!   the heightfield"). Steep hard rock gets a ridged jag of a few blocks, so a face is broken into
+//!   knobs and chutes instead of a smooth stair of equal steps; steep lava (basalt, andesite,
+//!   rhyolite) gets cliff bands, benches and cliffs like a flood basalt's or a lava plateau's
+//!   (USGS Circular 838). The rock is the world's `surface/class_top`. Not over a standing
+//!   volcano's body while it is young (VOL-068's calm), nor on a lake, a river, ice or within a
+//!   block of the sea.
 //!
 //! Everything goes into the `elevation` layer (H = E + A·N unchanged; the game, the far terrain
 //! and the column evaluator read it as terrain), so the world-data format gains only the file the
-//! cone gullies read, `volcanoes/standing.json` (FORMAT.md, "Standing volcanoes").
+//! cone gullies read, `volcanoes/standing.json` (FORMAT.md, "Standing volcanoes"). No overhangs:
+//! a heightfield has none, and the far terrain keeps matching the near.
 
 use std::f64::consts::TAU;
 use std::path::Path;
@@ -25,7 +33,7 @@ use std::path::Path;
 use rayon::prelude::*;
 use serde_json::{Value, json};
 
-use deeptime_format::raster::{RasterRead, ZEdges};
+use deeptime_format::raster::{RasterRead, ZEdges, bilinear_weights};
 use deeptime_format::rivers::Rivers;
 use deeptime_format::{GridDesc, LayerDesc, LoadedLayer};
 
@@ -329,6 +337,9 @@ pub struct ConeRecord {
     pub skipped: Option<&'static str>,
 }
 
+/// Values by cell index.
+type CellValues = Vec<(u32, f32)>;
+
 /// One cone's cuts (cell, blocks) and its calm (cell, 0..1: how much of the steep-ground texture
 /// to hold back over its body), read from the terrain `e`.
 fn one_cone(
@@ -337,7 +348,7 @@ fn one_cone(
     frame: &dyn Frame,
     planet_r_m: f64,
     k: &Cone,
-) -> (Vec<(u32, f32)>, Vec<(u32, f32)>, ConeRecord) {
+) -> (CellValues, CellValues, ConeRecord) {
     let grid = g.grid;
     let mut rec = ConeRecord {
         id: k.id,
@@ -429,7 +440,7 @@ fn one_cone(
         }
     }
     // The calm over its body (VOL-068's rule, ρ 0.9 to 1.3), whatever its gullies.
-    let calm: Vec<(u32, f32)> = at
+    let calm: CellValues = at
         .iter()
         .filter_map(|a| {
             let inside = 1.0 - smooth(0.9, 1.3, a.rho); // ledger: VOL-068
@@ -521,7 +532,7 @@ fn one_cone(
     let floor = g.sea_y + 1.0;
     let mut removed = 0.0;
     let mut deepest = 0.0f64;
-    let cuts: Vec<(u32, f32)> = at
+    let cuts: CellValues = at
         .iter()
         .zip(&shape)
         .filter_map(|(a, &s)| {
@@ -559,7 +570,7 @@ pub fn cone_gullies(
         .par_iter()
         .map(|k| one_cone(read, g, frame, planet_r_m, k))
         .collect();
-    let mut cuts: Vec<(u32, f32)> = Vec::new();
+    let mut cuts: CellValues = Vec::new();
     let mut calm = vec![0u8; g.grid.cells()];
     let mut records = Vec::with_capacity(outs.len());
     for (c, k, rec) in outs.drain(..) {
@@ -642,6 +653,259 @@ pub fn cone_gullies(
     (calm, note)
 }
 
+// --- steep-ground texture (D3) -------------------------------------------------------------------
+
+/// The jag comes in as the ground's slope (blocks per block, read over [`SLOPE_REACH_CELLS`])
+/// grows from the first to the second.
+pub const JAG_SLOPE: (f64, f64) = (0.4, 1.5); // ledger: AMP-080 (game-choice)
+/// The jag's amplitude per unit of slope, blocks, and its most.
+pub const JAG_GAIN: f64 = 2.5; // ledger: AMP-080 (game-choice)
+pub const JAG_MAX_BLOCKS: f64 = 6.0; // ledger: AMP-080 (game-choice)
+/// The rock's hardness (AMP-048) over which the jag comes in: none on shale or mudstone, about
+/// 0.6 of it on sandstone, all of it on granite, gneiss, quartzite or basalt.
+pub const JAG_HARDNESS: (f64, f64) = (0.2, 0.9); // ledger: AMP-080 (game-choice)
+/// The jag's noise: ridged, (1 − |n|)², of two octaves from this wavelength (blocks), so its
+/// finest spans four of the game's 4-block noise corners.
+const JAG_WAVELENGTH: f64 = 32.0; // ledger: AMP-081 (game-choice)
+const JAG_OCTAVES: u32 = 2; // ledger: AMP-081 (game-choice)
+/// The ridged noise's mean, taken off so the jag neither raises nor lowers the ground on the
+/// whole (measured: test the_jag_is_ridged_and_centred).
+const JAG_MEAN: f64 = 0.58; // ledger: AMP-081 (game-choice)
+
+/// The cliff bands come in on lava as the slope grows from the first to the second.
+pub const BAND_SLOPE: (f64, f64) = (0.15, 0.4); // ledger: AMP-082 (game-choice)
+/// A band spans about this many blocks of run down the slope it is cut into (its height is the
+/// run times the slope, read over [`REGION_REACH_CELLS`]), so its bench is wide enough to show
+/// between the game's noise corners.
+pub const BAND_RUN_BLOCKS: f64 = 10.0; // ledger: AMP-082 (game-choice)
+/// The thinnest band, metres: three flows of the Columbia River basalts' mean thickness, 30 to
+/// 40 m (USGS Circular 838). The bands come in this height times 1, 2, 4, … (so their levels nest
+/// and stay level wherever the slope changes), the two nearest the slope's blended.
+pub const BAND_MIN_M: f64 = 105.0; // ledger: AMP-082
+/// The thickest band, blocks.
+pub const BAND_MAX_BLOCKS: f64 = 24.0; // ledger: AMP-082 (game-choice)
+/// The share of a band's run its cliff takes; the bench, flat at the band's top, takes the rest.
+pub const CLIFF_SHARE: f64 = 0.3; // ledger: AMP-082 (game-choice)
+/// The share of each doubling of the slope's band height over which the two nearest heights
+/// blend (the rest takes the nearer alone, so its benches stay flat).
+const BAND_BLEND: f64 = 0.3; // ledger: AMP-082 (game-choice)
+/// The bands' levels shift by up to the thickest band over this wavelength (blocks), so the
+/// benches do not sit at the same heights everywhere and are not quite level.
+const BAND_WAVELENGTH: f64 = 512.0; // ledger: AMP-082 (game-choice)
+
+/// The slope is the central difference over this many cells each way (2-block cells: a 16-block
+/// baseline, over the mountain character's 8-block terraces), the bands' height over the second.
+const SLOPE_REACH_CELLS: i64 = 4; // ledger: AMP-083 (game-choice)
+const REGION_REACH_CELLS: i64 = 16; // ledger: AMP-083 (game-choice)
+/// The texture fades in from the first height over the sea to the second (blocks), and out under
+/// ice over this depth (blocks).
+const COAST_FADE: (f64, f64) = (1.0, 6.0); // ledger: AMP-083 (game-choice)
+const ICE_FADE_BLOCKS: f64 = 4.0; // ledger: AMP-083 (game-choice)
+
+const JAG_SALT: u32 = 0xD3_0001;
+const BAND_LEVEL_SALT: u32 = 0xD3_0003;
+
+/// Rock hardness in [0, 1] from its erodibility multiplier: 1 at granite's (1) and below, 0 at
+/// mudstone's (3) and above, logarithmic between (the mountain character's law, AMP-048).
+fn hardness(kfac: f64) -> f64 {
+    let k = kfac.max(1e-3);
+    (((3.0f64).ln() - k.ln()) / (3.0f64).ln()).clamp(0.0, 1.0) // ledger: AMP-048
+}
+
+/// Per rock class (strata/classes.json's index, `surface/class_top`): how much of the jag it takes
+/// ([`JAG_HARDNESS`] over its hardness) and whether it is lava (a volcanic class neither friable
+/// nor porous: basalt, andesite, rhyolite, obsidian). Class 255 (none) takes neither.
+pub fn rock_weights() -> Vec<(f32, f32)> {
+    let mut out = vec![(0.0f32, 0.0f32); 256];
+    for (k, c) in crate::surface::lithology::table()
+        .iter()
+        .enumerate()
+        .take(255)
+    {
+        let hard = smooth(JAG_HARDNESS.0, JAG_HARDNESS.1, hardness(c.erodibility));
+        let lava =
+            c.family == "volcanic" && !c.tags.iter().any(|t| t == "friable" || t == "porous");
+        out[k] = (hard as f32, if lava { 1.0 } else { 0.0 });
+    }
+    out
+}
+
+/// What the steep-ground texture reads beyond the ground: the world's noise, the rock at a world
+/// point (the jag's weight and the lava share, 0..1 each) and the vertical scale.
+pub struct Rock<'a> {
+    pub noise: &'a deeptime_format::Noise,
+    pub at: &'a (dyn Fn(f64, f64) -> (f64, f64) + Sync),
+    /// Metres per block, vertically.
+    pub m_per_block_v: f64,
+}
+
+/// The ridged jag noise at world point (x, z), centred: (1 − |n|)² less its mean.
+fn jag_noise(
+    spec: &deeptime_format::DetailSpec,
+    noise: &deeptime_format::Noise,
+    x: f64,
+    z: f64,
+) -> f64 {
+    let n = spec.noise(noise, x, z);
+    (1.0 - n.abs()).powi(2) - JAG_MEAN
+}
+
+/// The cliff bands' terrace of height `y` with band height `t` and level shift `off` (blocks): flat
+/// benches at each band's top, cliffs over the lowest [`CLIFF_SHARE`] of each band's run. Never
+/// below `y`.
+fn terrace(y: f64, t: f64, off: f64) -> f64 {
+    let q = (y + off) / t;
+    let qi = q.floor();
+    let f = q - qi;
+    let g = f.max(smooth(0.0, CLIFF_SHARE, f));
+    (qi + g) * t - off
+}
+
+/// Draws the steep-ground texture into `e`: a ridged jag on steep hard rock and cliff bands on
+/// steep lava, everywhere on dry land a block or more over the sea, held back by `calm` (0..255
+/// per cell, from [`cone_gullies`]; empty: none) over the standing volcanoes' bodies (VOL-068),
+/// off lakes, rivers and ice. Returns the pass's record.
+pub fn steep_texture(e: &mut Elev, g: &Ground, rock: &Rock, calm: &[u8]) -> Value {
+    let grid = g.grid;
+    let (w, h) = (grid.w as usize, grid.h as usize);
+    let r = f64::from(grid.r);
+    let (ox, oz) = (grid.origin_block_x as f64, grid.origin_block_z as f64);
+    let jag_spec = deeptime_format::DetailSpec::new(0, JAG_SALT, JAG_OCTAVES, JAG_WAVELENGTH);
+    let level_spec = deeptime_format::DetailSpec::new(0, BAND_LEVEL_SALT, 1, BAND_WAVELENGTH);
+    // The bands come in the thinnest's height times 1, 2, 4, …, the thickest under
+    // BAND_MAX_BLOCKS (ledger: AMP-082).
+    let band_min = BAND_MIN_M / rock.m_per_block_v;
+    let band_doublings = (BAND_MAX_BLOCKS / band_min).log2().floor().max(0.0);
+    let band_top = band_min * band_doublings.exp2();
+    let floor_y = g.sea_y + 1.0;
+    let read: &Elev = e;
+    let half_step = 0.5 * read.desc.scale.abs();
+    let at = |i: i64, j: i64| -> f64 {
+        let (ci, cj) = grid.cell(i, j);
+        read.get(cj as usize * w + ci as usize)
+    };
+    let slope = |i: i64, j: i64, k: i64| -> f64 {
+        let gx = (at(i + k, j) - at(i - k, j)) / (2.0 * k as f64 * r);
+        let gz = (at(i, j + k) - at(i, j - k)) / (2.0 * k as f64 * r);
+        gx.hypot(gz)
+    };
+    let mut delta = vec![0.0f32; w * h];
+    let (jag_cells, band_cells) = delta
+        .par_chunks_mut(w)
+        .enumerate()
+        .map(|(j, row)| {
+            let mut n = (0usize, 0usize);
+            for (i, out) in row.iter_mut().enumerate() {
+                let c = j * w + i;
+                let y0 = read.get(c);
+                if y0 < floor_y || (g.lake)(c) {
+                    continue;
+                }
+                let keep = 1.0 - calm.get(c).map_or(0.0, |&v| f64::from(v) / 255.0);
+                let coast = smooth(COAST_FADE.0, COAST_FADE.1, y0 - g.sea_y);
+                if keep <= 0.0 || coast <= 0.0 {
+                    continue;
+                }
+                let (ii, jj) = (i as i64, j as i64);
+                let s = slope(ii, jj, SLOPE_REACH_CELLS);
+                if s < JAG_SLOPE.0.min(BAND_SLOPE.0) {
+                    continue;
+                }
+                let (x, z) = (ox + i as f64 * r, oz + j as f64 * r);
+                let (hard, lava) = (rock.at)(x, z);
+                let jag_w = smooth(JAG_SLOPE.0, JAG_SLOPE.1, s) * hard;
+                let band_w = smooth(BAND_SLOPE.0, BAND_SLOPE.1, s) * lava;
+                if jag_w <= 0.0 && band_w <= 0.0 {
+                    continue;
+                }
+                let ice = 1.0 - smooth(0.0, ICE_FADE_BLOCKS, (g.ice)(x, z));
+                let wt = keep * coast * ice;
+                if wt <= 0.0 {
+                    continue;
+                }
+                let mut y = y0;
+                if jag_w > 0.0 {
+                    // ledger: AMP-080, AMP-081
+                    let a = (JAG_GAIN * s).min(JAG_MAX_BLOCKS) * jag_w;
+                    y += wt * a * jag_noise(&jag_spec, rock.noise, x, z);
+                }
+                if band_w > 0.0 {
+                    // ledger: AMP-082
+                    let sr = slope(ii, jj, REGION_REACH_CELLS);
+                    let u = (BAND_RUN_BLOCKS * sr / band_min)
+                        .max(1.0)
+                        .log2()
+                        .min(band_doublings);
+                    let k = u.floor();
+                    let tb = band_min * k.exp2();
+                    // One shift for every height, so the levels nest.
+                    let off = band_top * 0.5 * (1.0 + level_spec.noise(rock.noise, x, z));
+                    let mix = smooth(0.5 - 0.5 * BAND_BLEND, 0.5 + 0.5 * BAND_BLEND, u - k);
+                    let mut t = terrace(y, tb, off);
+                    if mix > 0.0 {
+                        t += mix * (terrace(y, 2.0 * tb, off) - t);
+                    }
+                    y += wt * band_w * (t - y).max(0.0);
+                }
+                // Never under a block over the sea (ledger: AMP-083); a move under half the
+                // layer's step is no move.
+                let y = y.max(floor_y.min(y0));
+                if (y - y0).abs() >= half_step && !(g.river)(x, z) {
+                    *out = (y - y0) as f32;
+                    n.0 += usize::from(jag_w > 0.0);
+                    n.1 += usize::from(band_w > 0.0);
+                }
+            }
+            n
+        })
+        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+    let (mut up, mut down) = (0usize, 0usize);
+    let (mut sum_abs, mut max_up, mut max_down) = (0.0f64, 0.0f64, 0.0f64);
+    for (c, &d) in delta.iter().enumerate() {
+        if d == 0.0 {
+            continue;
+        }
+        let d = f64::from(d);
+        if d > 0.0 {
+            up += 1;
+            max_up = max_up.max(d);
+        } else {
+            down += 1;
+            max_down = max_down.max(-d);
+        }
+        sum_abs += d.abs();
+        let y = e.get(c);
+        e.set(c, y + d);
+    }
+    // A half-turn grid's edge rows hold each point twice (cell i is cell w − i): both take the
+    // mean of what the two were given.
+    if grid.z_edges == ZEdges::HalfTurn {
+        for j in [0, h - 1] {
+            for i in 1..w / 2 {
+                let (a, b) = (j * w + i, j * w + (w - i));
+                let (ya, yb) = (e.get(a), e.get(b));
+                if ya != yb {
+                    let m = 0.5 * (ya + yb);
+                    e.set(a, m);
+                    e.set(b, m);
+                }
+            }
+        }
+    }
+    let moved = up + down;
+    let r2 = |v: f64| (v * 100.0).round() / 100.0;
+    json!({
+        "cells_moved": moved,
+        "cells_jagged": jag_cells,
+        "cells_banded": band_cells,
+        "cells_raised": up,
+        "cells_lowered": down,
+        "mean_abs_blocks": r2(if moved > 0 { sum_abs / moved as f64 } else { 0.0 }),
+        "max_raise_blocks": r2(max_up),
+        "max_cut_blocks": r2(max_down),
+    })
+}
+
 // --- the projection pass's call --------------------------------------------------------------------
 
 impl Frame for Mapping {
@@ -666,11 +930,17 @@ pub(crate) struct OnWorld<'a> {
     pub grid: &'a GridDesc,
     pub water: Option<(&'a LayerDesc, &'a [u8])>,
     pub ice: Option<&'a LoadedLayer>,
+    /// The world's `surface/class_top` (L2): the rock the steep-ground texture reads.
+    pub class_top: Option<&'a LoadedLayer>,
     pub rivers: Option<&'a Rivers>,
     pub standing: Option<&'a Value>,
+    /// The world's noise (the detail term's seed, the world's period and edges); none: no texture.
+    pub noise: Option<deeptime_format::Noise>,
     pub sea_y: f64,
     /// The planet's radius, m.
     pub planet_r_m: f64,
+    /// Metres per block, vertically.
+    pub m_per_block_v: f64,
 }
 
 impl OnWorld<'_> {
@@ -711,9 +981,46 @@ impl OnWorld<'_> {
             .standing
             .map(|v| cones_of(v, |x, z| map.src.unit(x, z)))
             .unwrap_or_default();
-        let (_calm, cones_note) = cone_gullies(&mut e, &ground, map, self.planet_r_m, &cones);
+        let (calm, cones_note) = cone_gullies(&mut e, &ground, map, self.planet_r_m, &cones);
+        let gullies_ms = t.elapsed().as_secs_f64() * 1000.0;
+        let texture_note = match (self.noise.as_ref(), self.class_top) {
+            (Some(noise), Some(class)) => {
+                let weights = rock_weights();
+                // The rock's weights, bilinear over the four L2 cells round the point.
+                let rock_at = |x: f64, z: f64| -> (f64, f64) {
+                    let gd = &class.desc.grid;
+                    let u = (x - gd.origin_block_x as f64) / f64::from(gd.r);
+                    let v = (z - gd.origin_block_z as f64) / f64::from(gd.r);
+                    let (fi, fj) = (u.floor(), v.floor());
+                    let wts = bilinear_weights(u - fi, v - fj);
+                    let (i0, j0) = (fi as i64, fj as i64);
+                    let mut acc = (0.0, 0.0);
+                    for (k, (di, dj)) in [(0, 0), (1, 0), (0, 1), (1, 1)].into_iter().enumerate() {
+                        let raw = class.raw(i0 + di, j0 + dj);
+                        let (hw, lava) = weights[if raw.is_finite() {
+                            (raw.max(0.0) as usize).min(255)
+                        } else {
+                            255
+                        }];
+                        acc.0 += wts[k] * f64::from(hw);
+                        acc.1 += wts[k] * f64::from(lava);
+                    }
+                    acc
+                };
+                let rock = Rock {
+                    noise,
+                    at: &rock_at,
+                    m_per_block_v: self.m_per_block_v,
+                };
+                let mut note = steep_texture(&mut e, &ground, &rock, &calm);
+                note["millis"] = json!(t.elapsed().as_secs_f64() * 1000.0 - gullies_ms);
+                note
+            }
+            _ => json!(null),
+        };
         json!({
             "cone_gullies": cones_note,
+            "steep_texture": texture_note,
             "millis": t.elapsed().as_secs_f64() * 1000.0,
         })
     }
@@ -1043,6 +1350,276 @@ mod tests {
             cut > 4,
             "the cone's gullies reach the edge row: {cut} cells"
         );
+    }
+
+    #[test]
+    fn a_shield_is_not_gullied_but_calms_the_ground_over_it() {
+        let (grid, frame, rm) = flat();
+        let v = (0.0, 0.0);
+        let (desc, bytes) = cone_world(&grid, &frame, rm, v, FOOT);
+        let g = ground(&grid);
+        let k = Cone {
+            strato: false,
+            ..cone(&frame, v, 2.0, None)
+        };
+        let e = Elev {
+            desc: &desc,
+            bytes: &mut bytes.clone(),
+        };
+        let (cuts, calm, rec) = one_cone(&e, &g, &frame, rm, &k);
+        assert_eq!(rec.skipped, Some("not_strato"));
+        assert!(cuts.is_empty());
+        assert!(calm.len() > 1000 && calm.iter().any(|&(_, v)| v > 0.99));
+    }
+
+    // --- steep-ground texture ---
+
+    const SEED: u64 = 20_261_022;
+
+    /// The texture on `grid` with rock `rock_at` and calm `calm`; returns the elevation after and
+    /// the note.
+    fn textured(
+        g: &Ground,
+        noise: &deeptime_format::Noise,
+        rock_at: &(dyn Fn(f64, f64) -> (f64, f64) + Sync),
+        calm: &[u8],
+        desc: &LayerDesc,
+        bytes: &[u8],
+    ) -> (Vec<u8>, Value) {
+        let mut after = bytes.to_vec();
+        let mut e = Elev {
+            desc,
+            bytes: &mut after,
+        };
+        let rock = Rock {
+            noise,
+            at: rock_at,
+            m_per_block_v: 35.0,
+        };
+        let note = steep_texture(&mut e, g, &rock, calm);
+        (after, note)
+    }
+
+    fn cell_xz(grid: &GridDesc, c: usize) -> (f64, f64) {
+        let w = grid.w as usize;
+        (
+            (grid.origin_block_x + (c % w) as i64 * i64::from(grid.r)) as f64,
+            (grid.origin_block_z + (c / w) as i64 * i64::from(grid.r)) as f64,
+        )
+    }
+
+    #[test]
+    fn the_rocks_take_the_jag_by_hardness_and_lava_its_bands() {
+        let w = rock_weights();
+        let of = |name: &str| w[crate::surface::lithology::index(name) as usize];
+        assert_eq!(of("granite"), (1.0, 0.0));
+        assert_eq!(of("quartzite"), (1.0, 0.0));
+        assert_eq!(of("basalt"), (1.0, 1.0));
+        assert_eq!(of("andesite").1, 1.0);
+        assert_eq!(of("rhyolite").1, 1.0);
+        assert_eq!(of("tuff").1, 0.0, "tuff is not lava");
+        assert_eq!(of("scoria").1, 0.0, "scoria is not lava");
+        assert_eq!(of("shale"), (0.0, 0.0));
+        assert_eq!(of("mudstone"), (0.0, 0.0));
+        let sandstone = of("sandstone").0;
+        assert!(sandstone > 0.4 && sandstone < 0.8, "{sandstone}");
+        assert_eq!(w[255], (0.0, 0.0));
+    }
+
+    #[test]
+    fn the_jag_is_ridged_and_centred() {
+        let noise = deeptime_format::Noise::new(SEED, 4096);
+        let spec = deeptime_format::DetailSpec::new(0, JAG_SALT, JAG_OCTAVES, JAG_WAVELENGTH);
+        let (mut sum, mut lo, mut hi, mut n) = (0.0, f64::INFINITY, f64::NEG_INFINITY, 0);
+        for i in 0..400 {
+            for j in 0..400 {
+                let v = jag_noise(&spec, &noise, f64::from(i) * 3.7, f64::from(j) * 2.9);
+                sum += v;
+                lo = lo.min(v);
+                hi = hi.max(v);
+                n += 1;
+            }
+        }
+        let mean = sum / f64::from(n);
+        assert!(mean.abs() < 0.02, "the jag's mean is {mean}");
+        // Ridged: sharp crests well over the mean, broad troughs not as far under it.
+        assert!(hi > 0.3 && lo > -JAG_MEAN - 1e-9, "{lo} {hi}");
+    }
+
+    #[test]
+    fn steep_hard_rock_is_jagged_and_soft_or_gentle_ground_is_not() {
+        let (grid, _, _) = flat();
+        let noise = deeptime_format::Noise::new(SEED, grid.w * grid.r);
+        let g = ground(&grid);
+        // Granite west of x = 0, shale east; steep (1.5 blocks per block) in the south, gentle
+        // (0.2) in the north.
+        let rock = |x: f64, _: f64| if x < 0.0 { (1.0, 0.0) } else { (0.0, 0.0) };
+        let (desc, bytes) = elevation(&grid, |_, z| {
+            if z >= 0.0 {
+                400.0 + 1.5 * z
+            } else {
+                400.0 + 0.2 * z
+            }
+        });
+        let (after, note) = textured(&g, &noise, &rock, &[], &desc, &bytes);
+        let (mut steep_hard, mut sum, mut sum2) = (0usize, 0.0, 0.0);
+        let mut big = 0usize;
+        for c in 0..grid.cells() {
+            let (x, z) = cell_xz(&grid, c);
+            let d = read(&desc, &after, c) - read(&desc, &bytes, c);
+            if x >= 0.0 || z < -20.0 {
+                assert_eq!(d, 0.0, "soft or gentle ground moved at ({x}, {z}): {d}");
+                continue;
+            }
+            // Away from the slope's break at z = 0 and the grid's end.
+            if !(20.0..180.0).contains(&z) {
+                continue;
+            }
+            steep_hard += 1;
+            sum += d;
+            sum2 += d * d;
+            big += usize::from(d.abs() > 1.0);
+        }
+        let mean = sum / steep_hard as f64;
+        let sd = (sum2 / steep_hard as f64 - mean * mean).sqrt();
+        assert!(
+            mean.abs() < 0.15,
+            "the jag shifts the ground by {mean} on average"
+        );
+        assert!(sd > 0.4, "the jag's spread is {sd} blocks");
+        assert!(
+            big * 20 > steep_hard,
+            "{big} of {steep_hard} cells move over a block"
+        );
+        assert!(note["cells_jagged"].as_u64().unwrap() > 0, "{note}");
+        assert_eq!(note["cells_banded"], json!(0));
+        assert!(note["max_cut_blocks"].as_f64().unwrap() <= JAG_MAX_BLOCKS * JAG_MEAN + 1e-9);
+    }
+
+    #[test]
+    fn steep_lava_gets_benches_and_cliffs_and_is_only_raised() {
+        let (grid, _, _) = flat();
+        let noise = deeptime_format::Noise::new(SEED, grid.w * grid.r);
+        let g = ground(&grid);
+        // Lava that takes no jag, on a slope of 0.5 blocks per block: bands 5 blocks high wanted
+        // (10 blocks of run), so 6 (twice the thinnest, 105 m at 35 m a block).
+        let rock = |_: f64, _: f64| (0.0, 1.0);
+        let (desc, bytes) = elevation(&grid, |_, z| 300.0 + 0.5 * z);
+        let (after, note) = textured(&g, &noise, &rock, &[], &desc, &bytes);
+        let w = grid.w as usize;
+        let (mut bench, mut cliff, mut steps) = (0usize, 0usize, 0usize);
+        for c in 0..grid.cells() {
+            let d = read(&desc, &after, c) - read(&desc, &bytes, c);
+            assert!(d >= 0.0, "the bands only raise: cell {c} by {d}");
+            assert!(d <= 0.7 * 6.0 + 0.1, "cell {c}: {d}");
+            let j = c / w;
+            if (40..160).contains(&j) {
+                // The rise to the next cell down the slope (2 blocks; 1 block before).
+                let rise = read(&desc, &after, c + w) - read(&desc, &after, c);
+                steps += 1;
+                bench += usize::from(rise < 0.25);
+                cliff += usize::from(rise > 2.0);
+            }
+        }
+        let (b, k) = (bench as f64 / steps as f64, cliff as f64 / steps as f64);
+        assert!(b > 0.4, "benches: {b} of the steps");
+        assert!(k > 0.1, "cliffs: {k} of the steps");
+        assert!(note["cells_banded"].as_u64().unwrap() > 0, "{note}");
+        assert_eq!(note["cells_lowered"], json!(0));
+    }
+
+    #[test]
+    fn the_texture_stays_off_the_sea_ice_lakes_rivers_and_calm_ground() {
+        let (grid, _, _) = flat();
+        let noise = deeptime_format::Noise::new(SEED, grid.w * grid.r);
+        let w = grid.w as usize;
+        let ox = grid.origin_block_x as f64;
+        // Steep basalt rising out of the sea; ice in one quarter, a lake in another, a river in a
+        // third, the calm of a young cone in the last, each 200 blocks wide.
+        let quarter = |x: f64| ((x - ox) / 1024.0).floor() as i64;
+        let lake = |c: usize| quarter(ox + (c % w) as f64 * 2.0) == 1 && (c % w) % 512 < 100;
+        let river = |x: f64, _: f64| quarter(x) == 2 && (x - ox) % 1024.0 < 200.0;
+        let ice = |x: f64, _: f64| {
+            if quarter(x) == 0 && (x - ox) % 1024.0 < 200.0 {
+                10.0
+            } else {
+                0.0
+            }
+        };
+        let g = Ground {
+            grid: &grid,
+            sea_y: SEA,
+            lake: &lake,
+            river: &river,
+            ice: &ice,
+        };
+        let calm: Vec<u8> = (0..grid.cells())
+            .map(|c| {
+                let x = ox + (c % w) as f64 * 2.0;
+                if quarter(x) == 3 && (x - ox) % 1024.0 < 200.0 {
+                    255
+                } else {
+                    0
+                }
+            })
+            .collect();
+        let rock = |_: f64, _: f64| (1.0, 1.0);
+        let (desc, bytes) = elevation(&grid, |_, z| SEA - 30.0 + 1.5 * (z + 100.0));
+        let (after, _) = textured(&g, &noise, &rock, &calm, &desc, &bytes);
+        let mut moved = 0usize;
+        for (c, &calm_c) in calm.iter().enumerate() {
+            let (x, z) = cell_xz(&grid, c);
+            let (b, a) = (read(&desc, &bytes, c), read(&desc, &after, c));
+            let held = b < SEA + 1.0
+                || lake(c)
+                || river(x, z)
+                || ice(x, z) > ICE_FADE_BLOCKS
+                || calm_c == 255;
+            if held {
+                assert_eq!(a, b, "cell {c} at ({x}, {z}) moved");
+            } else {
+                assert!(a >= SEA + 1.0 - 1e-9, "cell {c}: {b} to {a}");
+                moved += usize::from(a != b);
+            }
+        }
+        assert!(moved > 10_000, "{moved} cells textured");
+    }
+
+    #[test]
+    fn the_texture_keeps_a_petroff_guyou_edge_glued_and_runs_alike_twice() {
+        let c_sim = 4096;
+        let pg = PetroffGuyou::new(PetroffGuyou::hemisphere_for(c_sim), 30.0);
+        let map = Mapping::new(pg, c_sim, 16);
+        let grid = pg.grid("L3", 2).unwrap();
+        let noise = deeptime_format::Noise::for_world(
+            SEED,
+            pg.period() as u32,
+            &deeptime_format::projection::WorldProjection::PetroffGuyou(pg),
+        );
+        // Steep ground everywhere, a function of the sphere point so the edges start glued.
+        let (desc, bytes) = elevation(&grid, |x, z| {
+            let v = Frame::unit(&map, x, z);
+            600.0 + 1200.0 * v[0] * v[1] + 300.0 * v[2]
+        });
+        let g = ground(&grid);
+        let rock = |_: f64, _: f64| (1.0, 1.0);
+        let (after, _) = textured(&g, &noise, &rock, &[], &desc, &bytes);
+        let w = grid.w as usize;
+        let h = grid.h as usize;
+        let mut moved = 0;
+        for j in [0, h - 1] {
+            for i in 1..w {
+                let (a, m) = (j * w + i, j * w + (w - i));
+                assert!(
+                    (read(&desc, &after, a) - read(&desc, &after, m)).abs() <= 1.0 / 16.0 + 1e-9,
+                    "edge cells {a} and {m}"
+                );
+                moved += usize::from(read(&desc, &after, a) != read(&desc, &bytes, a));
+            }
+        }
+        assert!(moved > 100, "{moved} edge cells textured");
+        let (again, _) = textured(&g, &noise, &rock, &[], &desc, &bytes);
+        assert_eq!(after, again);
     }
 
     #[test]
