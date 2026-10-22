@@ -559,6 +559,13 @@ pub struct TectonicParams {
     /// reach, nearest first, and the ocean floor only after it; `false` (the default and every
     /// built-in preset) the nearest room of either kind (ledger PLT-391).
     pub collapse_continent_first: bool,
+    /// The normal column the collapse measures from the sea: `true` the column a hot orogen
+    /// thins towards (`collapse_hot_myr`) and the collapse fills its room up to is the one that
+    /// stands as high over the step's sea S as the normal continental column (35.1 km) stands
+    /// over the datum, T_n + 7.0 S (41.8 km under a sea 956 m over the datum: the old lowland's
+    /// crust, standing about 500 m over the sea), within [T_n / 2, `collapse_thickness_km`];
+    /// `false` (the default and every built-in preset) T_n in the datum frame (ledger PLT-412).
+    pub collapse_sea_column: bool,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
     /// 0 = no limit.
@@ -802,6 +809,7 @@ impl Default for TectonicParams {
             collapse_reach_km: 200.0,        // ledger: PLT-257
             collapse_hot_myr: 0.0,           // ledger: PLT-390
             collapse_continent_first: false, // ledger: PLT-391
+            collapse_sea_column: false,      // ledger: PLT-412
             crust_max_km: 70.0,              // ledger: PLT-258
             crust_channel_km2_myr: 1500.0,   // ledger: PLT-300
             isostasy_relax_myr: 0.004,       // ledger: ISO-078

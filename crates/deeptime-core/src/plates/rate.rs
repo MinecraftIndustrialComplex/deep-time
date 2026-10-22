@@ -194,7 +194,16 @@ fn release(
         f64::INFINITY
     };
     let mut moved = Collapse::default();
-    collapse::spread(state, geo, env, by_plate, to, &mut moved, Some(floor));
+    collapse::spread(
+        state,
+        geo,
+        env,
+        by_plate,
+        to,
+        collapse::normal_thickness_m(),
+        &mut moved,
+        Some(floor),
+    );
     // What found no room goes down from the bottom of its column.
     for (i, s) in state.samples.iter_mut().enumerate() {
         let Some(x) = over(s, i) else { continue };
