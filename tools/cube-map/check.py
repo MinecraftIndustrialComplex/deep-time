@@ -9,7 +9,8 @@
   - statistics: area and shape on 300 x 300 cells of a face, weighted by planet area as the
     projection survey's distortion() (seamless-projection-survey.md §3.1), to compare with its
     numbers for the chosen tau;
-  - slope jumps across a face edge (the survey's crease measure) and the exact edge values.
+  - slope jumps across a face edge (the survey's crease measure) and the exact edge values;
+  - the area error next to a corner, where the flow's singular point is resolved to one cell.
 
     check.py --tables T257.bin T513.bin T1025.bin [--committed T513.bin] --out check.json
 
@@ -182,8 +183,51 @@ def edge_jump(t, d=1e-5, k=2001):
     db = (refl - p1) / d
     jump = np.linalg.norm(da - db, axis=-1) / np.linalg.norm(da, axis=-1)
     gap = angle(p1, p1[:, [1, 0, 2]])  # the edge point and its own reflection: one point
-    return {"slope_jump_max": float(jump.max()), "slope_jump_median": float(np.median(jump)),
-            "slope_jump_max_at_v": float(v[int(np.argmax(jump))]), "edge_self_gap_rad": float(gap.max())}
+    out = {"slope_jump_max": float(jump.max()), "slope_jump_median": float(np.median(jump)),
+           "slope_jump_max_at_v": float(v[int(np.argmax(jump))]), "edge_self_gap_rad": float(gap.max())}
+    for cells in (1, 4):
+        keep = np.abs(v) < 1.0 - cells / t["m"]
+        out[f"slope_jump_max_beyond_{cells}_cells_of_corner"] = float(jump[keep].max())
+    return out
+
+
+def tri_area(p, q, r):
+    num = np.abs(np.einsum("...i,...i->...", p, np.cross(q, r)))
+    den = 1 + np.einsum("...i,...i->...", p, q) + np.einsum("...i,...i->...", q, r) + np.einsum("...i,...i->...", r, p)
+    return 2 * np.arctan2(num, den)
+
+
+def corner(t, n=40, h=1e-7):
+    """The area error next to a corner (the singular point the flow resolves to one cell): the
+    node quads' planet areas (the table itself) and the bicubic's planet area per face area (what
+    the game reads), relative to the mean, on a fine grid over the last two cells."""
+    m = t["m"]
+    P = cm.padded(t["A"], t["B"])
+    Q = P[1:m + 2, 1:m + 2]
+    a, b = Q[..., 0], Q[..., 1]
+    r = np.sqrt((1.0 + a * a) + b * b)
+    U = np.stack([1.0 / r, a / r, b / r], -1)
+    area = tri_area(U[:-1, :-1], U[1:, :-1], U[1:, 1:]) + tri_area(U[:-1, :-1], U[1:, 1:], U[:-1, 1:])
+    rel = area / area.mean()
+    out = {"quad_corner_cell": float(rel[m - 1, m - 1]), "quad_rms": float(np.sqrt(np.mean((rel - 1) ** 2))),
+           "quad_total_over_quarter_face": float(area.sum() / (4 * math.pi / 24))}
+    for k in (1, 2, 4, 8):
+        keep = np.ones_like(rel, dtype=bool)
+        keep[m - k:, m - k:] = False
+        out[f"quad_range_beyond_{k}_cells"] = [float(rel[keep].min()), float(rel[keep].max())]
+    g = 1.0 - (np.arange(n) + 0.5) * (2.0 / m) / n
+    GU, GV = np.meshgrid(g, g, indexing="ij")
+    u, v = GU.ravel(), GV.ravel()
+    pu = (face_forward(P, u + h, v) - face_forward(P, u - h, v)) / (2 * h)
+    pv = (face_forward(P, u, v + h) - face_forward(P, u, v - h)) / (2 * h)
+    E = np.einsum("ij,ij->i", pu, pu)
+    F = np.einsum("ij,ij->i", pu, pv)
+    G = np.einsum("ij,ij->i", pv, pv)
+    dens = np.sqrt(E * G - F * F) / ((4 * math.pi / 6) / 4.0)
+    out["bicubic_last_two_cells"] = [float(dens.min()), float(dens.max())]
+    far = np.maximum(1 - u, 1 - v) > 1.0 / m
+    out["bicubic_second_cell"] = [float(dens[far].min()), float(dens[far].max())]
+    return out
 
 
 def exactness(t):
@@ -214,8 +258,9 @@ def main(argv):
     print(json.dumps({"positivity": res["positivity"]}, indent=1), flush=True)
     res["stats"] = stats(main_t)
     res["edge"] = edge_jump(main_t)
+    res["corner"] = corner(main_t)
     res["positivity_all"] = {t["name"]: positivity(t)["positive"] for t in tables}
-    print(json.dumps({k: res[k] for k in ("exact", "stats", "edge", "positivity_all")}, indent=1), flush=True)
+    print(json.dumps({k: res[k] for k in ("exact", "stats", "edge", "corner", "positivity_all")}, indent=1), flush=True)
     with open(args.out, "w") as f:
         json.dump(res, f, indent=1)
 
