@@ -423,6 +423,22 @@ pub const LAYOUT_VERSION: u32 = 1;
 /// every grid's r (up to 256) divides b, and the half-turn pivots sit on chunk corners.
 pub const HEMISPHERE_QUANTUM: u32 = 256; // ledger: SCL-084 (game-choice)
 
+/// The cube world's face side is a multiple of this many blocks, for the same reasons as
+/// [`HEMISPHERE_QUANTUM`]: every grid's r (up to 256) divides s, the east-west period 4s is a
+/// multiple of 512, and every turn pivot (s/2 from a face centre) sits on a chunk corner
+/// (docs/plans/cube-world-plan.md §1.1).
+pub const FACE_QUANTUM: u32 = 256; // ledger: SCL-100 (game-choice)
+
+/// The cube world's face side s for a planet `circumference` blocks round at today's scale: the
+/// six faces' 6s² blocks cover the planet's 4πR² (R = C/2π, so s = C/√(6π)), rounded to the
+/// nearest multiple of [`FACE_QUANTUM`] (game choice, ledger SCL-100). 4k: 1,024; 16k: 3,840 (the
+/// planet drawn 1.8 % larger across, 294.8 m a block); 32k: 7,424 (1.6 % smaller, 305.0 m).
+pub fn face_for(circumference: u32) -> u32 {
+    let exact = f64::from(circumference) / (6.0 * PI).sqrt();
+    let q = f64::from(FACE_QUANTUM);
+    (((exact / q).round().max(1.0)) * q) as u32
+}
+
 /// One way a world edge is glued (`edges[].kind`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1623,6 +1639,25 @@ mod petroff_guyou_tests {
     }
 
     #[test]
+    fn the_cube_face_follows_the_planet() {
+        // docs/plans/cube-world-plan.md W1: 4,096, 16,384, 32,768 give 1,024, 3,840, 7,424.
+        assert_eq!(face_for(4_096), 1_024);
+        assert_eq!(face_for(16_384), 3_840);
+        assert_eq!(face_for(32_768), 7_424);
+        for c in [1_024u32, 4_096, 16_384, 32_768] {
+            let s = face_for(c);
+            assert_eq!(s % FACE_QUANTUM, 0);
+            assert_eq!((4 * s) % 512, 0, "the x period is whole region files");
+            assert_eq!((s / 2) % 16, 0, "the turn pivots sit on chunk corners");
+            let exact = f64::from(c) / (6.0 * std::f64::consts::PI).sqrt();
+            assert!(
+                (f64::from(s) - exact).abs() <= 128.0,
+                "C {c}: s {s} vs {exact}"
+            );
+        }
+    }
+
+    #[test]
     fn landmarks_and_orientation() {
         for (b, lc) in WORLDS {
             let g = PetroffGuyou::new(b, lc);
@@ -1960,7 +1995,8 @@ mod petroff_guyou_tests {
 
 /// The cross-language parity fixture (`tests/data/projection_parity.json`): inputs and outputs of
 /// the portable trigonometry, Petroff's square and two Petroff–Guyou worlds (random points and
-/// exact inputs on the forward's degenerate lines), every number as the hex of its bits. Java's `ProjectionParityTest` and the pages' `tools/viewer/projection-check.js`
+/// exact inputs on the forward's degenerate lines) and the cube world (`"cube"`,
+/// [`crate::cube_map::parity`]), every number as the hex of its bits. Java's `ProjectionParityTest` and the pages' `tools/viewer/projection-check.js`
 /// read it and must give the same bits. `DEEPTIME_WRITE_PARITY=1 cargo test -p deeptime-format
 /// parity_fixture` rewrites it after a deliberate change.
 #[cfg(test)]
@@ -2100,7 +2136,10 @@ mod parity_fixture {
             ));
         }
         out.push_str(&worlds.join(",\n"));
-        out.push_str("\n  ]\n}\n");
+        // The cube world's geometry and maps (crate::cube_map::parity, plan M5).
+        out.push_str("\n  ],\n");
+        out.push_str(&crate::cube_map::parity::section());
+        out.push_str("\n}\n");
         out
     }
 

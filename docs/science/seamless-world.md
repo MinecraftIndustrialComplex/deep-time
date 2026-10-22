@@ -2,10 +2,18 @@
 
 Status of this page: `stage 2 (written with the code, 2026-10-04; Petroff's paper and code read in
 full, the map's properties tested; the layout and its sizes are game choices; the forward's
-degenerate lines fixed 2026-10-20)`.
+degenerate lines fixed 2026-10-20)`. The section "The cube world" at the end: `stage 1 (written
+with phase 0's code, 2026-10-22; the map's sources not read, its properties measured)`.
 
 Ledger ids on this page: `SCL-049`, `SCL-083`, `SCL-084`, `SCL-086` to `SCL-091`, `POL-022` to
-`POL-024` (see [claims.md](claims.md)).
+`POL-024`; the cube world: `SCL-078` to `SCL-081`, `SCL-100` to `SCL-108` (see
+[claims.md](claims.md)).
+
+Ben moved the world to a cube on 2026-10-22 (decisions log 2026-10-22; the plan is
+`docs/plans/cube-world-plan.md`). Everything above the section "The cube world" describes the world
+the game plays today, format 0.5 and 0.6. That section describes what phase 0 of the move has coded:
+the cube's geometry and its two maps. No bake writes a cube world yet; this page is rewritten for the
+cube when the bake and the game move (the plan's D1).
 
 ## What you see in the world
 
@@ -194,6 +202,177 @@ On the earlier bake of the same preset the isotropic footprint alone gave 13.4 a
 - Whether the cone points should also avoid the poles' neighbourhood (they cannot: both lie on the
   same edges by construction).
 
+## The cube world (format 0.7, coming; phase 0 coded 2026-10-22)
+
+### What it will look like
+
+The planet is drawn on the six faces of a cube, each a square of s blocks: s = 1,024 for a 4k planet,
+3,840 for a 16k one and 7,424 for a 32k one (SCL-078, SCL-100). Six faces of side s carry the
+planet's area, so a block is nominally 276.4 m (4k), 294.82 m (16k) or 305.0 m (32k) on a side
+(SCL-107), against 294.6 m and 300.4 m on today's world. The faces are laid out as a cross: four in a
+band from west to east (F3, F0, F1, F2, with F0 centred on x = 0), N above F0 and S below it. The
+band wraps east to west with a period of 4s (15,360 blocks at 16k), as Toroidal World wraps today;
+the whole net fits in a window 4s wide and 3s tall (SCL-079).
+
+Inside a face, and across the four seams that are straight in the net (F3 to F0 to F1 to F2, N and S
+to F0), the world is seamless. The other edges of N and S meet faces the net draws elsewhere: N's
+east edge is F1's top turned a quarter turn about F0's corner, N's far edge is F2's top turned a
+half turn, and likewise for S. Those seams are glued by a motion of the world (a quarter turn about
+one of F0's corners or a half turn about the centre of the empty square above or below F1). Until
+the wrap engine joins them, a player meets a border there; the ground seen past it is the planet
+the seam leads to, drawn up to one face width out, and anything further, or in no band, is deep
+ocean (SCL-108).
+
+The world's map is conformal: at every block the planet is drawn with the same scale in every
+direction, so a round lake is round and a mountain range keeps its proportions (the shape ratio is
+at most 1.0011 in the table). Area is not kept: a block at a face's centre covers about 1.27 times
+the mean planet area and a block very near one of the cube's eight corners much less (in the corner
+cell of the table the planet is drawn 25.6 times larger in area, 5 times in length). The corners are
+cone points: three faces meet there, so a full turn round the planet is drawn in three quarters of a
+turn of world. Four corners (F0's) lie inside the net and can be walked to; the other four lie on
+the border. Where the poles lie depends on a turn of the planet inside the cube (a free rotation,
+SCL-079) that the bake will choose so the corners sit far out at sea; that search is not coded yet,
+so nothing here says where north is. Latitude and longitude come only from the map and that turn,
+never from x and z alone.
+
+### The model in plain words
+
+1. **The face side.** s = C / √(6π) for a circumference of C blocks, so that 6s² = 4πR² at today's
+   blocks per km², rounded to the nearest multiple of 256 blocks: every grid cell up to 256 blocks
+   divides it, the period 4s is a whole number of region files, the Nether's 1:8 loop stays whole
+   and every turn pivot sits on a chunk corner (SCL-078, SCL-100).
+2. **The cube's frames.** Each face has a centre direction and two local axes in the cube frame:
+   F0 (+X, +Y, −Z), F1 (+Y, −X, −Z), F2 (−X, −Y, −Z), F3 (−Y, +X, −Z), N (+Z, +Y, +X),
+   S (−Z, +Y, −X). A direction belongs to the face of its largest component; a world block's face
+   and local (u, v) follow from the net (SCL-079).
+3. **The two maps.** A map takes a face's local square to the planet. The world's map is the
+   conformal cube (SCL-080, SCL-101): one 48th of a face, the triangle from the face centre to an
+   edge midpoint to a corner, goes conformally to the matching spherical triangle by Schwarz
+   triangle functions. The simulation's map, for when the simulation moves onto the cube (the plan's
+   phase 4), is Moser's equal-area cube (SCL-081, SCL-102): the conformal map pushed by a flow that
+   evens out the area per block. The two maps are the two ends of one family, τ = 0 (conformal) and
+   τ = 1 (equal area); the study chose τ = 0 for the world and τ = 1 for the simulation.
+4. **The tables.** Neither map has a closed form fast enough for every block, so each is computed
+   once by `tools/cube-map/cube_map.py` and stored as a table over one eighth of a face (the cube's
+   symmetry gives the rest exactly): the planet point, in the face frame's gnomonic coordinates, at
+   the nodes of a triangle 257 nodes a side (513 nodes across a face), and the reverse table on a
+   triangle 129 nodes a side. The
+   conformal map behaves like a 4/3 power at a corner, so its table adds a finer sub-table over the
+   last 4 cells by the corner, 16 times finer (SCL-104). Both files ship in the code (Rust, the jar,
+   the viewer's bundles); a world's manifest will name its map and the file's sha256.
+5. **Reading a table.** The forward (face and local point to planet) is a Catmull-Rom bicubic over
+   the nodes, padded with a ring of ghost nodes that the cube's symmetry gives exactly, so two faces
+   compute the same bits on their shared edge (SCL-105); near a corner it blends into the fine
+   sub-table over one cell (SCL-106). The inverse (planet to face) starts from the reverse table and
+   takes four Newton steps on the forward (SCL-103). The Jacobian is the bicubic's own derivative:
+   a 2 × 2 matrix of metres east and north per block of +x and +z, from which come the local size
+   σ = √|det| (metres per block at that block) and the angle of +x from east (SCL-107).
+6. **The turn.** A 3 × 3 rotation takes the planet's frame to the cube's (the manifest's
+   `projection.rotation`, replacing Petroff-Guyou's single longitude). With the identity the poles
+   are at the centres of N and S and the corners at ±35.26° latitude; the world's own turn is free.
+7. **The same bits everywhere.** Rust (`deeptime_format::cube`, `cube_map`), Java
+   (`worlddata/CubeLayout`, `CubeTurn`, `CubeMap`, `CubeWorld`) and the pages (`projection.js`:
+   `DTCube`, `DTCubeTurn`, `DTCubeMap`, `DTCubeWorld`) read the same table in the same order with
+   the portable trigonometry, and a shared fixture checks that they agree bit for bit; a Python twin
+   of the reader is what the generator measures with.
+
+### Equations and constants
+
+| Ledger id | Quantity | As coded | Units | Source | Status |
+|---|---|---|---|---|---|
+| SCL-078 | face side | s = 256·round(C / (256 √(6π))): 1,024 (4k), 3,840 (16k), 7,424 (32k) | blocks | none | `game-choice` |
+| SCL-079 | net and turn | the cross, the frames above, 7 seams (1 translation, 4 quarter turns, 2 half turns), a free 3 × 3 turn | dimensionless | geometry | `game-choice`; the turn's search `not-yet-coded` |
+| SCL-080 | conformal cube | Schwarz triangle functions, angles π(1/4, 1/2, 1/4) flat and π(1/4, 1/2, 1/3) spherical | dimensionless | Lee 1976; Rančić et al. 1996 (neither read) | `from-memory`, checked numerically |
+| SCL-081 | Moser's flow | Δu = ρ − 1, dx/dt = −∇u / ((1 − t) + tρ), RK4, 400 steps, 512² grid | dimensionless | Moser 1965 (from memory) | `game-choice` |
+| SCL-100 | face quantum | 256 | blocks | none | `game-choice` |
+| SCL-101 | world table | conformal, m = 256 (513 nodes a face), q = 128, corner patch K = 4, F = 16; 701,168 bytes, sha256 c9dd9fd4… | dimensionless | none | `game-choice` |
+| SCL-102 | simulation table | Moser τ = 1, m = 256, q = 128, 400 flow steps, no patch; 664,720 bytes, sha256 000e6532… | dimensionless | none | `game-choice` |
+| SCL-103 | inverse | bilinear start, 4 Newton steps, clamps into the triangle | steps | none | `game-choice` |
+| SCL-104 | corner patch | the last K = 4 cells, F = 16 fine cells a cell | cells | none | `game-choice` |
+| SCL-105 | interpolation | Catmull-Rom bicubic, one ghost ring: beyond u = 1 the mirror (a, b) → (1/a, b/a) | dimensionless | none | `game-choice` |
+| SCL-106 | patch blend | s = w²(3 − 2w) over one coarse cell | dimensionless | none | `game-choice` |
+| SCL-107 | nominal size | m_per_block_h = √(4πR² / 6s²); R_m = m_per_block_h · s √(3 / 2π); local σ = √(abs(det J)) | m per block | none | `game-choice` |
+| SCL-108 | outside the planet | the fold: one face width deep, nearer edge first, else deep ocean | blocks | none | `game-choice` |
+
+The forward on a face, with (u, v) the block's local position in [−1, 1]² and (a, b) the table's
+gnomonic coordinates: the planet direction in the face frame is (1, a, b) / √(1 + a² + b²), turned
+into the cube frame by the face's frame and into the planet's by the transpose of the turn.
+
+### The map against the planet
+
+Not a model of Earth: these are properties of the two maps, measured on the tables by
+`tools/cube-map/check.py` (on the test VM, 2026-10-22; the reports are
+`review/out/cube-map/check-conformal-n513.json` and `check-moser-t1-n513.json`) and by the Rust
+tests (`cargo test --release -p deeptime-format cube`, on the test VM, 2026-10-22).
+
+| Quantity | Conformal (world) | Moser (simulation) |
+|---|---|---|
+| table against one twice as fine (n 1,025) | 7.0e-7 rad (0.0036 blocks at 32k); order 1.56 | 5.5e-5 rad (0.28 blocks at 32k); order 2.49 |
+| shape ratio (long over short axis) | at most 1.0011; 2ω at most 0.063° | median 1.264, at most 1.417 |
+| blocks per planet area, over the mean | 0.79 to 2.17 (0th to 99th percentile), 25.6 at the corner | coefficient of variation 0.00052; 0.928 to 1.0057 at the corner |
+| determinant of the table's map, least | 0.0072 (at the corner; 0.0072 over 80,200 points within one block of it at 32k) | 0.52 |
+| derivative jump across a face edge | at most 0.0034 | 1.9e-4 beyond 4 cells of a corner, 0.056 beyond 1, 0.77 in the corner cell |
+| round trip, 10⁶ random points (Rust) | 6.7e-10 blocks at 32k | 4.5e-12 blocks at 32k |
+| the two faces on a shared edge | 2.8e-16 rad apart | 2.2e-16 rad apart |
+| Jacobian against finite differences | 2.6e-8 | 2.7e-8 |
+| one forward (Rust, test VM) | 30.0 ns random, 26.1 ns in raster order | 29.9 ns, 26.5 ns |
+
+An inverse takes about 206 ns and a Jacobian about 50 ns. The round trips need four Newton steps:
+on the conformal table two steps leave 0.0049 blocks at 32k on the triangle and 0.029 within 100
+blocks of a corner, three 6.3e-7 and 7.9e-5, four 3.3e-12 and 7.3e-10 (SCL-103). The conformal table
+integrates to 1.00000004 of a sixth of the sphere per face. The plan's D1 also
+asks for the land share on the cube against the planet, the corners' distances to land and the area
+and shape statistics on land; those need a bake that writes the cube and the turn's search (the
+plan's B1 to B3), so they are not measured yet. The study measured them on its own prototype
+(`docs/research/notes/mountains-and-the-projection.md` §5: land drawn up to 1.92 times its true area
+on the conformal cube, the corners 5.3° or more out at sea).
+
+### Simplifications and limits
+
+- **Area near the corners.** The conformal map keeps shapes by giving up area: around each of the
+  eight corners the planet is drawn ever larger (25.6 times in area in the table's corner cell, about
+  5 times in length), so a fixed number of metres is ever more blocks there. Every conversion from
+  metres to blocks has to use the local σ (SCL-107); the bake's use of it is phase 1, not coded.
+- **The corners themselves.** A full turn round a corner is three quarters of a turn of world;
+  walking round one is shorter than round anywhere else, and the map's derivative goes to zero at
+  the point. The turn's search is to keep all eight at sea.
+- **The simulation's table at the corners.** Moser's table has no corner patch: its derivative
+  jumps by 0.77 across an edge in the one table cell (15 blocks at 16k) touching a corner, 0.056 a
+  cell further and 1.9e-4 beyond four cells. Nothing reads it until the simulation moves (phase 4),
+  which may want a patch like the world's.
+- **Finite tables.** Both maps are tables, good to 0.0036 blocks (world) and 0.28 blocks
+  (simulation) at 32k against tables twice as fine; the world's limit is the corner's 4/3 power,
+  which the patch tames but does not remove.
+- **Borders.** Until the wrap engine joins the turning seams, the net's twelve outer edges are
+  borders (N's and S's three outer edges, the tops and bottoms of F1, F2 and F3), and four corners
+  lie on them; the border's detours round the empty squares are game work (the plan's G-items), not
+  coded.
+- **Unread sources.** The conformal map's formulas were written from memory and checked numerically
+  (SCL-080); neither Lee 1976 nor Rančić, Purser and Mesinger 1996 was read.
+
+### Game choices
+
+- Moving the world to a cube: Ben, decisions log 2026-10-22.
+- The face side, its 256-block quantum, the net, the fold's bands: the coordinator's call
+  2026-10-22 under Ben's rule of 2026-10-16, following the plan §1.1 to §1.4 (SCL-078, SCL-100,
+  SCL-108).
+- The conformal map for the world, Moser's for the simulation, and the free turn: the study's pick,
+  taken as the coordinator's call 2026-10-22 until Ben answers the plan's question Q4 (SCL-079,
+  SCL-101, SCL-102).
+- The table's resolution, the corner patch, the interpolation and its ghosts, the blend and four
+  Newton steps where the plan said two: the phase 0 agent, 2026-10-22, from the measurements above
+  (SCL-103 to SCL-106).
+- The format 0.7 layout (rasters face by face, the table shipped in the code and named by sha256 in
+  the manifest): written as schema only in `FORMAT.md`, following question Q1's recommended answer,
+  which Ben has not given yet.
+
+### Open questions
+
+- Q1 (the format) and Q4 (the map and the turn) wait for Ben (plan §8).
+- Whether a raster cell sits at a block's centre or its corner on the cube (left to the bake's B1).
+- Whether the simulation's table needs a corner patch (above).
+- The land, corner and area numbers on a real bake (above).
+
 ## Sources
 
 - `petroff2021` (Petroff, M. A. 2021, ACM TSAS 7(4):18; code Zenodo 4661351): read in full (paper by a
@@ -203,3 +382,18 @@ On the earlier bake of the same preset the isotropic footprint alone gave 13.4 a
   quantities, checked numerically (above), not a formula from the paper.
 - The projection survey, `docs/research/notes/seamless-projection-survey.md`, for Guyou's aspect,
   the shape statistics and the layout.
+
+For the cube world:
+
+- `Lee1976` (conformal projections from elliptic functions, the conformal cube): not fetched;
+  catalogue entry only.
+- `Rancic1996` (the conformal cubed sphere): not read (paywalled; a sub-agent tried, 2026-10-03).
+- `Moser1965` and `DacorognaMoser1990` (the flow that makes a map equal-area): from memory.
+- `PutmanLin2007` (finite volume on cubed spheres, the corner cells): read as extracted text by a
+  sub-agent, 2026-10-04, for the sphere-native grids note; not re-read for this page.
+- `Ronchi1996` (the gnomonic cubed sphere): abstract only. `Sadourny1972` (the first cubed sphere):
+  not fetched.
+- `RoscaPlonka2011` (QSC, the equal-area cube kept as the fallback, SCL-082): the preprint read in
+  full by a sub-agent, 2026-10-03.
+- The mountains-and-the-projection study, `docs/research/notes/mountains-and-the-projection.md` §5,
+  for the choice of maps, the turn and the face size; and the plan, `docs/plans/cube-world-plan.md`.

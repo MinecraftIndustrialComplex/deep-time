@@ -80,6 +80,9 @@ public record WorldLayout(WorldProjection.Kind kind, int layoutVersion, int hemi
         WorldProjection.Kind kind = WorldProjection.Kind.parse(k);
         if (kind == null)
             throw new IllegalArgumentException("unknown projection kind '" + k + "'");
+        if (kind == WorldProjection.Kind.CUBE)
+            throw new IllegalArgumentException("projection kind 'cube' is not readable yet: the cube world's layout block "
+                    + "(FORMAT.md B9) is parsed in phase 2 of docs/plans/cube-world-plan.md; the geometry is CubeLayout, CubeMap and CubeWorld");
         int version = o.has("layout_version") ? o.get("layout_version").getAsInt() : LAYOUT_VERSION;
         if (version != LAYOUT_VERSION)
             throw new IllegalArgumentException("projection layout_version " + version + ", this Deep Time reads " + LAYOUT_VERSION);

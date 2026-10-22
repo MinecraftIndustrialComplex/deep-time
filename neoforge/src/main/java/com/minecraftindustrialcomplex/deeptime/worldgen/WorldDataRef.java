@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
 import com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -32,6 +33,22 @@ public record WorldDataRef(String folder, int circumferenceBlocks, Optional<Stri
 
     public static final String LAMBERT = "lambert";
     public static final String PETROFF_GUYOU = "petroff_guyou";
+
+    /**
+     * The cube world's face side is a multiple of this many blocks (ledger SCL-100, game choice; the
+     * Rust {@code projection::FACE_QUANTUM}); the cube is not an accepted {@code projection} here yet
+     * (phase 2 of docs/plans/cube-world-plan.md), so the constructor still refuses "cube".
+     */
+    public static final int FACE_QUANTUM = CubeLayout.FACE_QUANTUM; // ledger: SCL-100 (game-choice)
+
+    /**
+     * The cube world's face side s for a planet {@code circumference} blocks round (the Rust
+     * {@code projection::face_for}): the six faces cover the planet's area, rounded to the nearest
+     * multiple of {@link #FACE_QUANTUM}. 4k: 1,024; 16k: 3,840; 32k: 7,424.
+     */
+    public static int faceFor(int circumference) {
+        return CubeLayout.faceFor(circumference);
+    }
 
     public static final Codec<WorldDataRef> CODEC = RecordCodecBuilder.<WorldDataRef>create(i -> i.group(
             Codec.STRING.optionalFieldOf("folder", "deeptime").forGetter(WorldDataRef::folder),

@@ -13,7 +13,13 @@ public interface WorldProjection {
     /** {@code projection.kind}. */
     enum Kind {
         LAMBERT("lambert"),
-        PETROFF_GUYOU("petroff_guyou");
+        PETROFF_GUYOU("petroff_guyou"),
+        /**
+         * The cube world (docs/plans/cube-world-plan.md): six faces in a net, {@link CubeLayout},
+         * {@link CubeMap}, {@link CubeWorld}. Not a {@link WorldProjection} yet (phase 2), so
+         * {@link #of} and {@code WorldLayout.fromJson} refuse it instead of falling back to Lambert.
+         */
+        CUBE("cube");
 
         private final String id;
 
@@ -148,6 +154,9 @@ public interface WorldProjection {
 
     /** The projection a manifest's layout block describes; null (no block) is Lambert of circumference {@code c}. */
     static WorldProjection of(WorldLayout layout, int c) {
+        if (layout != null && layout.kind() == Kind.CUBE)
+            throw new IllegalArgumentException("projection kind 'cube' is not a WorldProjection yet (phase 2 of "
+                    + "docs/plans/cube-world-plan.md); use CubeWorld for the cube world's geometry");
         if (layout != null && layout.kind() == Kind.PETROFF_GUYOU)
             return new PetroffGuyou(layout.hemisphereBlocks() > 0 ? layout.hemisphereBlocks() : c / 2, layout.lambdaCDeg());
         return new Lambert(c);
