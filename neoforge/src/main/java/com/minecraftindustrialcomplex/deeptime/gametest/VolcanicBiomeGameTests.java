@@ -210,8 +210,9 @@ public final class VolcanicBiomeGameTests {
 
     /**
      * Without volcanic biomes (vanilla: nothing in {@code #deeptime:volcanic} or its role tags can be placed), the
-     * level answers every biome query as before: every sampled column's biome is the plain search's and the level
-     * says it has nothing to do. With them, logged only.
+     * volcanic layer answers every biome query as before: it says it has nothing to do, and every sampled column's
+     * biome is the plain search's but where an ordinary biome rule decided it (the snow line binds in vanilla: its
+     * snowless mountain biomes are vanilla's; BIO-180). With them, logged only.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void volcanicBiomesChangeNothingWithoutThem(GameTestHelper helper) {
@@ -225,23 +226,24 @@ public final class VolcanicBiomeGameTests {
             for (Holder<Biome> b : registry.getTag(VolcanicBiomes.tag(role)).map(s -> (Iterable<Holder<Biome>>) s).orElse(java.util.List.of()))
                 any |= g.getBiomeSource().possibleBiomes().contains(b);
         VolcanicCensus.Result r = census(helper, level);
-        boolean active = level.getChunkSource().randomState().sampler().spawnTarget() instanceof RegionSpawnTarget m && m.volcanic().active();
-        DeepTime.LOGGER.info("[gametest] volcanicBiomesChangeNothingWithoutThem packHasVolcanicBiomes={} active={} columns={} changed={}",
-                any, active, r.now().columns, r.differ());
+        boolean active = placesVolcanicBiomes(level);
+        DeepTime.LOGGER.info("[gametest] volcanicBiomesChangeNothingWithoutThem packHasVolcanicBiomes={} active={} columns={} changed={} "
+                + "changedByRules={}", any, active, r.now().columns, r.differ(), r.differByRules());
         if (any) {
             helper.assertTrue(active, "the pack has volcanic biomes but the level does not place them");
             helper.succeed();
             return;
         }
         helper.assertTrue(!active, "the level's volcanic biome layer is active without a volcanic biome in the pack");
-        helper.assertTrue(r.differ() == 0, r.differ() + " of " + r.now().columns + " columns changed biome without volcanic biomes");
+        helper.assertTrue(r.differ() == r.differByRules(), (r.differ() - r.differByRules()) + " of " + r.now().columns
+                + " columns changed biome without volcanic biomes, other than by a biome rule");
         helper.assertTrue(r.now().columns > 100, "only " + r.now().columns + " land columns sampled");
         helper.succeed();
     }
 
-    /** Whether the level places volcanic biomes (the pack has some and the level's layer is on). */
+    /** Whether the level places volcanic biomes (the pack has some and the level's volcanic layer is on; the biome rules apart). */
     private static boolean placesVolcanicBiomes(ServerLevel level) {
-        return level.getChunkSource().randomState().sampler().spawnTarget() instanceof RegionSpawnTarget m && m.volcanic().active();
+        return level.getChunkSource().randomState().sampler().spawnTarget() instanceof RegionSpawnTarget m && m.volcanic().volcanicActive();
     }
 
     /** The census's zones as role=count, for the logs. */

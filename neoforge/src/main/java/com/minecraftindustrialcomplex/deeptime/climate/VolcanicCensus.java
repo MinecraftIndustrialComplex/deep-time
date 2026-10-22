@@ -38,7 +38,11 @@ import java.util.Map;
  *       others, in the role's biome.</li>
  *   <li>{@code replaced}: columns whose plain biome is volcanic and whose biome now is not, by the biome now
  *       (what fills the place of a kept-out biome); {@code holes}: of them, an ocean, river or cave biome.</li>
- *   <li>{@code columns_changed}: columns whose biome differs from the plain search's (0 without volcanic biomes).</li>
+ *   <li>{@code columns_changed}: columns whose biome differs from the plain search's; {@code columns_changed_by_rules}: of
+ *       them, decided by an ordinary biome rule (the snow line, peatland, the geology gate), not by the volcanic layer.
+ *       Without volcanic biomes (vanilla) every changed column is a rule's (the snow line binds in vanilla).</li>
+ *   <li>{@code active}: the level has anything to do (a biome rule or the volcanic layer); {@code volcanic_active}: the
+ *       volcanic layer itself acts (false without volcanic biomes).</li>
  *   <li>{@code specks}: surface biome cells (4 × 4 blocks) in a volcanic biome none of whose four neighbours
  *       has the same biome, over every surface zone's box.</li>
  * </ul>
@@ -82,8 +86,8 @@ public final class VolcanicCensus {
     }
 
     /** The census of one level. */
-    public record Result(Side now, Side plain, int pools, int poolsByPlaya, int differ, Map<String, Integer> replaced, int holes,
-                         Map<String, int[]> zones, Map<String, String> roles, JsonObject json) {}
+    public record Result(Side now, Side plain, int pools, int poolsByPlaya, int differ, int differByRules, Map<String, Integer> replaced,
+                         int holes, Map<String, int[]> zones, Map<String, String> roles, JsonObject json) {}
 
     private static double round(double v, int places) {
         double f = Math.pow(10, places);
@@ -121,7 +125,7 @@ public final class VolcanicCensus {
 
         Side now = new Side(), plain = new Side();
         Map<String, Integer> replaced = new HashMap<>();
-        int holes = 0, differ = 0;
+        int holes = 0, differ = 0, differByRules = 0;
         int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
         TagKey<Biome> ocean = c("is_ocean"), river = c("is_river"), cave = c("is_cave"), underground = c("is_underground");
         for (int z = -zp + step / 2; z < zp; z += step) {
@@ -145,8 +149,11 @@ public final class VolcanicCensus {
                     tally(now, b, near, out, x, z);
                 }
                 tally(plain, p, near, out, x, z);
-                if (b != p)
+                if (b != p) {
                     differ++;
+                    if (VolcanicBiomes.byOrdinaryRule(why, marker.volcanic().rules()))
+                        differByRules++;
+                }
                 if (p.is(VolcanicBiomes.KEEP_OUT) && !b.is(VolcanicBiomes.KEEP_OUT)) {
                     replaced.merge(name(b), 1, Integer::sum);
                     if (b.is(ocean) || b.is(river) || b.is(cave) || b.is(underground))
@@ -213,8 +220,10 @@ public final class VolcanicCensus {
         o.add("replaced_by", rep);
         o.addProperty("replaced_holes", holes);
         o.addProperty("columns_changed", differ);
+        o.addProperty("columns_changed_by_rules", differByRules);
         o.addProperty("active", marker.volcanic().active());
-        return new Result(now, plain, pools.size(), byPlaya, differ, replaced, holes, byRole, roles, o);
+        o.addProperty("volcanic_active", marker.volcanic().volcanicActive());
+        return new Result(now, plain, pools.size(), byPlaya, differ, differByRules, replaced, holes, byRole, roles, o);
     }
 
     private static void tally(Side side, Holder<Biome> b, double near, double out, int x, int z) {
