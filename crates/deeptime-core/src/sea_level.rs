@@ -67,15 +67,7 @@ pub fn fill_level(
     debug_assert_eq!(row_area.len(), d.h);
     let w = d.w;
     let total: f64 = row_area.iter().sum::<f64>() * w as f64;
-    fill_level_with(
-        d,
-        h,
-        |c| row_area[c / w],
-        total,
-        layer_m,
-        min_cells,
-        method,
-    )
+    fill_level_with(d, h, |c| row_area[c / w], total, layer_m, min_cells, method)
 }
 
 /// [`fill_level`] on any grid with its own cell areas (`SurfaceGrid::area`; the cube's are true

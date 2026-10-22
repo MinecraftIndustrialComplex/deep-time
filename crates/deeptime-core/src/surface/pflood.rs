@@ -75,7 +75,13 @@ impl PartialOrd for Entry {
 /// body of at least `min_cells` cells are [`BASE`]; everything else is [`LAND`] — a small closed
 /// basin below sea level (a rift floor, a Dead Sea) is a depression the flood fills as a lake, not
 /// a sea that river loads could never leave.
-pub fn open_sea<G: SurfaceGrid>(d: &G, h: &[f64], sea_level: f64, min_cells: usize, kind: &mut [u8]) {
+pub fn open_sea<G: SurfaceGrid>(
+    d: &G,
+    h: &[f64],
+    sea_level: f64,
+    min_cells: usize,
+    kind: &mut [u8],
+) {
     let n = d.cells();
     let mut label = vec![u32::MAX; n];
     let mut todo: Vec<u32> = Vec::new();
@@ -110,7 +116,12 @@ pub fn open_sea<G: SurfaceGrid>(d: &G, h: &[f64], sea_level: f64, min_cells: usi
 /// entry (their filled level is `base_z[c]`); on return, land cells that had to become sinks are
 /// marked [`SINK`]. Returns the number of sinks made.
 pub fn flood<G: SurfaceGrid>(
-    d: &G, h: &[f64], base_z: &[f64], kind: &mut [u8], filled: &mut [f64]) -> usize {
+    d: &G,
+    h: &[f64],
+    base_z: &[f64],
+    kind: &mut [u8],
+    filled: &mut [f64],
+) -> usize {
     let n = d.cells();
     let mut closed = vec![false; n];
     let mut open: BinaryHeap<Entry> = BinaryHeap::new();
