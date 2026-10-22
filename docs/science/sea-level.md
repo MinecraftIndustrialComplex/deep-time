@@ -580,33 +580,48 @@ sphere (wsph):
 
 | Median of 12 | master | wsph | p | w70 | p |
 |---|---|---|---|---|---|
-| Land (0.26 to 0.32) | 0.247 | 0.274 | 0.002 | W70_LAND |
-| Largest landmass (≥ 0.12) | 0.104 | 0.125 | 0.073 | W70_LARGEST |
-| Continental crust under the sea (≤ 0.25) | 0.414 | 0.279 | 0.002 | W70_DROWNED |
-| Land above 2 km, of the land (≤ 0.12) | 0.248 | 0.277 | 0.40 | W70_HI2 |
-| Coast with high ground (≤ 0.15) | 0.369 | 0.403 | 0.39 | W70_COAST |
-| Land under ice (≤ 0.15) | 0.170 | 0.159 | 0.89 | W70_ICE |
-| Collisions per 100 Myr (2 to 6) | 1.65 | 1.85 | 0.43 | W70_COLL |
-| Continental crust's net change over 1,000 Myr | −0.085 | −0.064 | 0.13 | W70_NET |
-| Criteria met per run | 1 | 2 | 0.035 | W70_MET |
-| Under the sea, the plate model's mean over the last 500 Myr | 0.348 | 0.236 | < 0.001 | W70_L500 |
-| Crust at least 25 km thick above the sea (Earth 0.81) | 0.572 | 0.683 | 0.014 | W70_T25 |
-| The census's sea over the datum, m | 538 | 826 | 0.069 | W70_SEA |
-| Continental crust's mean thickness, km | 39.5 | 42.9 | | W70_TH |
-| Slope share (200 to 2,000 m under) | 0.200 | 0.126 | < 0.001 | W70_SLOPE |
-| Deeper than 2,000 m | 0.089 | 0.073 | 0.017 | W70_DEEP |
-| Passive margins: slope between 500 and 2,000 m, median | 2.5° | 3.2° | | W70_SLDEG |
-| Passive margins: shelf break, m | 187 | 213 | | W70_BREAK |
+| Land (0.26 to 0.32) | 0.247 | 0.274 | 0.002 | 0.253 | 0.51 |
+| Largest landmass (≥ 0.12) | 0.104 | 0.125 | 0.073 | 0.080 | 0.84 |
+| Continental crust under the sea (≤ 0.25) | 0.414 | 0.279 | 0.002 | 0.384 | 0.40 |
+| Land above 2 km, of the land (≤ 0.12) | 0.248 | 0.277 | 0.40 | 0.222 | 0.80 |
+| Coast with high ground (≤ 0.15) | 0.369 | 0.403 | 0.39 | 0.328 | 0.77 |
+| Land under ice (≤ 0.15) | 0.170 | 0.159 | 0.89 | 0.143 | 0.93 |
+| Collisions per 100 Myr (2 to 6) | 1.65 | 1.85 | 0.43 | 1.70 | 1.0 |
+| Continental crust's net change over 1,000 Myr | −0.085 | −0.064 | 0.13 | −0.060 | 0.11 |
+| Criteria met per run | 1 | 2 | 0.035 | 2 | 0.25 |
+| Under the sea, the plate model's mean over the last 500 Myr | 0.348 | 0.236 | < 0.001 | 0.308 | 0.14 |
+| Under the sea, the plate model's mean over the frames after the first 100 Myr | 0.362 | 0.243 | < 0.001 | 0.281 | 0.001 |
+| Land, the plate model's mean over the same frames | 0.282 | 0.320 | < 0.001 | 0.306 | < 0.001 |
+| The plates' step sea, median over the run, m | 210 | 413 | 0.24 | 210 | 0.98 |
+| Crust at least 25 km thick above the sea (Earth 0.81) | 0.572 | 0.683 | 0.014 | 0.578 | 0.98 |
+| The census's sea over the datum, m | 538 | 826 | 0.069 | 900 | 0.053 |
+| Continental crust's mean thickness, km | 39.5 | 42.9 | < 0.001 | 41.3 | 0.002 |
+| Slope share (200 to 2,000 m under) | 0.200 | 0.126 | < 0.001 | 0.183 | 0.089 |
+| Deeper than 2,000 m | 0.089 | 0.073 | 0.017 | 0.080 | 0.24 |
+| Passive margins: slope between 500 and 2,000 m, median | 2.5° | 3.2° | | 2.8° |  |
+| Passive margins: shelf break, m | 187 | 213 | | 189 |  |
 
 The narrower taper keeps the continents' crust in their cores: they are thicker for their area
 and stand higher (the continental crust's mean height over the sea 381 to 822 m), the sea rises
 with them by less, and the share under it falls to 0.279. The slope share falls to below Earth's;
 the slope steepens by 0.7°, not the 1.9° the decision of 2026-10-05 weighed: that 4.5° was the
 one-sample step with the transition off (W = 0), not a narrower one, and the surface's slope
-failure and sediment now shape the slope too. By run, under the sea, master / wsph:
-super-1 0.387 / 0.379, super-2 0.445 / 0.210, super-3 0.324 / 0.230, super-4 0.418 / 0.405,
-super-5 0.322 / 0.409, super-6 0.412 / 0.269, scatt-1 0.428 / 0.261, scatt-2 0.417 / 0.273,
-scatt-3 0.527 / 0.270, scatt-4 0.394 / 0.324, scatt-5 0.420 / 0.285, scatt-6 0.361 / 0.364.
+failure and sediment now shape the slope too.
+
+W at 70 km sits between on the frames' mean (0.281, p 0.001) but not on the final frame (0.384,
+p 0.40): its sea climbs through the run (the medians of the 100 Myr windows from about 0 m at
+−900 Myr to 741 m over the last 100 Myr, against master's 180 to 290 m and then 456 to 506 m),
+and the final frame catches it at its highest. The higher, thicker continents shed more
+sediment, and none of it leaves the ocean (above), so the basins fill faster the narrower the
+taper, and the final frame's share rewards a narrower taper less than the run's mean does. Its
+passive slopes are 2.8° (the steepest 4.5°), its shelf 0.5 km wide at the median and the 200 m
+isobath 6.0 km from the shore.
+
+By run, under the sea, master / wsph / w70: super-1 0.387 / 0.379 / 0.371, super-2 0.445 /
+0.210 / 0.275, super-3 0.324 / 0.230 / 0.444, super-4 0.418 / 0.405 / 0.375, super-5 0.322 /
+0.409 / 0.393, super-6 0.412 / 0.269 / 0.190, scatt-1 0.428 / 0.261 / 0.424, scatt-2 0.417 /
+0.273 / 0.393, scatt-3 0.527 / 0.270 / 0.333, scatt-4 0.394 / 0.324 / 0.448, scatt-5 0.420 /
+0.285 / 0.245, scatt-6 0.361 / 0.364 / 0.492.
 
 W is Ben's: he chose 200 km on the planet to keep Earth's slopes in the game's metres. The
 measurement says the plate model needs Earth's width in its own frame to keep Earth's share of
