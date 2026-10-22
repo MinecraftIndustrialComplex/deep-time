@@ -134,6 +134,10 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-22: mic-viewer re-pinned after its history rewrite (coordinator; branch viewer-repin)
+
+Ben had mic-viewer's history rewritten to drop private host names, so 335ae9cf became af334960. The trees differ only in one test line (crates/mic-viewer/src/http.rs, tailnet sample addresses); Cargo.toml and Cargo.lock now pin af334960 (decisions log 2026-10-21, the last row). Old mic-viewer hashes in earlier entries refer to the pre-rewrite history.
+
 ### 2026-10-21: mic-viewer is public, so the dependency moves to https and the pin to 335ae9cf (coordinator's task; agent worktree .claude/worktrees/viewer-pin, branch viewer-pin from master 7fa3bd27; sub-agent of the coordinator's session; decisions log 2026-10-21, the last row; not merged)
 - **Change.**
   - `Cargo.toml`: `mic-viewer = { git = "https://github.com/MinecraftIndustrialComplex/mic-viewer.git", rev = "335ae9cf23d2b35ef34fb265d50de0d8788f3c07" }` (mic-viewer main, 27 commits after 212f3605, past its `feat/viewer-industry` merge). `Cargo.lock` changes in one line (the `source` is `git+https://...?rev=335ae9cf...#335ae9cf...`), made by `tools/remote/mac.sh --kind light --pull Cargo.lock -- 'cargo update -p mic-viewer'`. `deny.toml`'s `allow-git` names the https URL.
