@@ -1,7 +1,6 @@
-# Git dependencies (mic-viewer, a private repository over SSH) are fetched by the git command, not
-# cargo's built-in client: the git command uses the SSH agent on the laptop, as mic-rtsim's
-# .cargo/config.toml found, and on the test VM it follows the `url.<mirror>.insteadOf` rewrite that
-# tools/remote/git-mirrors.sh sets there (decisions log 2026-10-21).
+# Git dependencies (mic-viewer, a public repository over https since 2026-10-21) are fetched by the
+# git command, not cargo's built-in client, as mic-rtsim's .cargo/config.toml does: it follows the
+# user's git configuration (a proxy, a credential helper for a future private dependency).
 [net]
 git-fetch-with-cli = true
 
