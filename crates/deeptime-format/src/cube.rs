@@ -87,7 +87,7 @@ impl Face {
 
     /// The face's frame in the cube frame: the unit vector of its centre, then e_u and e_v, the
     /// cube-frame directions of local +u (net +x) and +v (net +z) at the centre.
-    pub fn frame(self) -> [[f64; 3]; 3] {
+    pub const fn frame(self) -> [[f64; 3]; 3] {
         const X: [f64; 3] = [1.0, 0.0, 0.0];
         const Y: [f64; 3] = [0.0, 1.0, 0.0];
         const Z: [f64; 3] = [0.0, 0.0, 1.0];
@@ -574,7 +574,10 @@ pub struct Cube {
 impl Cube {
     /// The net of face side `s` (even).
     pub fn new(s: u32) -> Cube {
-        assert!(s >= 2 && s % 2 == 0, "cube face side {s} must be even");
+        assert!(
+            s >= 2 && s.is_multiple_of(2),
+            "cube face side {s} must be even"
+        );
         let s = i64::from(s);
         Cube {
             s,
