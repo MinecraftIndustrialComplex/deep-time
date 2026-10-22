@@ -384,6 +384,30 @@ blocks), 110 crater discs (20 km²), 109 cone discs (187 km²), 64 fresh-ash dis
 sampled columns become ashen savanna) and 110 thermal-cave discs (38 km²). These sizes are the game's choices; no real
 landscape was measured for them.
 
+**On a Petroff-Guyou world** (BIO-182, 2026-10-22). The terrain lays a cone on its circle in the simulation's frame,
+and a Petroff-Guyou world draws that circle stretched: the frame's east-west and north-south scales differ by a
+factor of 1/cos² of the latitude, an axis ratio of 2 at 45° and 4 at 60°. Discs of the frame radius left
+the far ends of the crater and the flanks in the next zone out and painted plain ground on the near sides (Ben's
+volcano 27476 lies on a 2.3:1 stretch). The crater, caldera, cone and field zones are now the ellipse the
+projection makes of the circle at the vent. Measured on the snow line's census planet (above; the branch's bake,
+`/deeptime probe biomes 16` with MIC, 84,968 land columns), the same world read by the jar with discs and with
+ellipses:
+
+| | discs | ellipses |
+|---|---|---|
+| crater zones (180): area, blocks; mean | 40,200; 19.4 km² | 60,925; 29.4 km² |
+| cone zones (181): area; mean | 444,388; 213 km² | 519,615; 249 km² |
+| ash-field zones: count; area | 115; 1,590,512 | 110; 1,519,113 |
+| land columns in a volcanic biome | 1,127 | 1,141 |
+| volcanic peaks; volcanic crater; ashen savanna; yellowstone | 617; 56; 102; 352 | 612; 67; 110; 352 |
+| more than 256 blocks from every source; more than 8 blocks outside every zone | 0; 0 | 0; 0 |
+| volcanic surface cells with no neighbour of their biome | 38 | 37 |
+
+A zone's area changes by the projection's areal scale at its vent (the cones by a sixth here), and a crater's
+more (by half) because each axis is held to at least 8 blocks and given the 4-block margin; five ash fields fall
+out as rings under 8 blocks wide along an axis.
+The hot-spring fields and thermal caves are unchanged (discs: the terrain draws no cone there).
+
 ## Expanded Ecosphere and the biome rules
 
 Expanded Ecosphere (EE, 3.4.7 for NeoForge 1.21.1, by William Wythers and Cristelknight; CC BY-NC-ND 4.0) has
