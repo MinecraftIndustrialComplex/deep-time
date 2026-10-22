@@ -157,7 +157,12 @@ impl Shaper {
                     }
                     let rim = sum / 32.0;
                     let h = (v.id as f64 * 0.618_033_988_7).fract() * std::f64::consts::TAU;
-                    Some((d.rho, rim - s.depression_depth_m(at) * sharp, h, 2.3 * h + 1.0))
+                    Some((
+                        d.rho,
+                        rim - s.depression_depth_m(at) * sharp,
+                        h,
+                        2.3 * h + 1.0,
+                    ))
                 });
                 Item {
                     x: v.x,

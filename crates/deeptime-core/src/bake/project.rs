@@ -1215,8 +1215,11 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     // The block-scale relief (`bake::relief`) reads the world's ice cover (L2, resampled before the
     // elevation's L3) and the simulation's rivers and standing volcanoes.
     let mut world_ice: Option<LoadedLayer> = None;
+    let mut world_class: Option<LoadedLayer> = None;
     let rivers_sim = read_rivers(dir)?;
     let standing = crate::bake::relief::read_standing(dir)?;
+    let relief_noise = spec_seed.map(|s| deeptime_format::Noise::for_world(s, period, &wp));
+    let m_per_block_v = m.scale.m_per_block_v;
     let mut relief_note = json!(null);
     for (gname, entries) in &by_grid {
         let src_grid = m
@@ -1305,10 +1308,13 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 grid: &wg,
                 water: water.map(|w| (&srcs[w].layer.desc, &outs[w][..])),
                 ice: world_ice.as_ref(),
+                class_top: world_class.as_ref(),
                 rivers: rivers_sim.as_ref(),
                 standing: standing.as_ref(),
+                noise: relief_noise,
                 sea_y: sea,
                 planet_r_m: f64::from(c_sim) * p.scale.m_per_block_h / std::f64::consts::TAU,
+                m_per_block_v,
             };
             relief_note = on.draw(&srcs[k].layer.desc, &mut elev);
             outs[k] = elev;
@@ -1353,6 +1359,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 "detail/amplitude" => world_amp = Some(world),
                 "water_level" => world_water = Some(world),
                 CLOSED_BASIN => world_closed = Some(world),
+                "surface/class_top" => world_class = Some(world),
                 "climate/ice_cover" => {
                     shares.insert(
                         "ice_cover_map".into(),
