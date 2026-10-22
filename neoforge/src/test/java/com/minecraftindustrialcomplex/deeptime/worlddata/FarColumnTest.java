@@ -496,6 +496,52 @@ class FarColumnTest {
         assertEquals(319, l.top[l.topSolid()] - 1, "the ground is cut at the build limit");
     }
 
+    /** The surface rule's water in place of the top block (BAK-067: vanilla's swamp water at y 62). */
+    @Test
+    void paintedWaterTakesTheTopBlocksPlace() {
+        FarColumn.Layers l = new FarColumn.Layers();
+        FarColumn.Soil swamp = soil(4, false, false);
+        swamp.paintedWater = true;
+        FarColumn.layers(-64, 319, shape(Water.Kind.NONE, 62, Integer.MIN_VALUE, 0), swamp, null, 8, null, l);
+        assertFills(l, -64, 319, "painted water on dry ground");
+        assertEquals(List.of(FarColumn.ROCK, FarColumn.SOIL_UNDER, FarColumn.WATER, FarColumn.AIR),
+                java.util.Arrays.stream(materials(l)).boxed().toList());
+        assertEquals(59, l.bottom[1], "the soil keeps its depth from the ground's top");
+        assertEquals(62, l.bottom[2]);
+        assertEquals(63, l.bottom[3]);
+        assertEquals(61, l.top[l.topSolid()] - 1, "the ground under the water is one lower");
+
+        // Frozen: the water's top freezes as a lake's does, and no snow lies on it.
+        swamp.frozen = true;
+        FarColumn.layers(-64, 319, shape(Water.Kind.NONE, 62, Integer.MIN_VALUE, 0), swamp, null, 8, null, l);
+        assertEquals(FarColumn.WATER_ICE, l.material[l.at(62)]);
+        assertEquals(FarColumn.AIR, l.material[l.at(63)]);
+        swamp.frozen = false;
+
+        // A bare biome: rock under the water.
+        FarColumn.Soil bare = soil(4, true, false);
+        bare.paintedWater = true;
+        FarColumn.layers(-64, 319, shape(Water.Kind.NONE, 62, Integer.MIN_VALUE, 0), bare, null, 8, null, l);
+        assertEquals(List.of(FarColumn.ROCK, FarColumn.WATER, FarColumn.AIR), java.util.Arrays.stream(materials(l)).boxed().toList());
+        assertEquals(62, l.top[0]);
+
+        // No ice cover where the surface is water (the ice pass leaves a fluid surface alone).
+        IceCover.Spec spec = new IceCover.Spec(50.0, 12, 2, 6, 2, "minecraft:snow_block", "minecraft:packed_ice", "minecraft:blue_ice");
+        FarColumn.layers(-64, 319, shape(Water.Kind.NONE, 62, Integer.MIN_VALUE, 3), swamp, null, 8, spec, l);
+        assertFills(l, -64, 319, "painted water under an ice cap's spec");
+        assertEquals(FarColumn.WATER, l.material[l.at(62)]);
+        assertEquals(FarColumn.SOIL_UNDER, l.material[l.at(61)]);
+
+        // Under standing water the painted block joins it (a mangrove floor at y 60): the bed is one lower.
+        FarColumn.layers(-64, 319, shape(Water.Kind.SEA, 60, 62, 0), swamp, null, 8, null, l);
+        assertFills(l, -64, 319, "painted water under the sea");
+        assertEquals(FarColumn.SOIL_UNDER, l.material[l.at(59)]);
+        assertEquals(FarColumn.WATER, l.material[l.at(60)]);
+        assertEquals(l.at(60), l.at(62), "one body of water from the painted block up");
+        assertEquals(63, l.top[l.at(62)]);
+        assertEquals(59, l.top[l.topSolid()] - 1);
+    }
+
     // ---- Threads and time ----
 
     /** A hash of every layer of a section, built the way the game builds it (without the biome). */
