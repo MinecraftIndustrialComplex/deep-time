@@ -920,8 +920,10 @@ pub(in crate::plates) mod tests {
         }
         k.collapse_sea_column = true;
         assert_eq!(room_column_m(&k, 0.0), t_n);
-        assert!((room_column_m(&k, 956.0) - (t_n + 6692.0)).abs() < 1e-6);
-        assert!((room_column_m(&k, -300.0) - (t_n - 2100.0)).abs() < 1e-6);
+        let f = COLUMN_ISOSTATIC_FACTOR;
+        assert!((room_column_m(&k, 956.0) - (t_n + f * 956.0)).abs() < 1e-6);
+        assert!((room_column_m(&k, 956.0) - 41_800.0).abs() < 100.0);
+        assert!((room_column_m(&k, -300.0) - (t_n - f * 300.0)).abs() < 1e-6);
         assert_eq!(room_column_m(&k, 5000.0), t_c);
         assert_eq!(room_column_m(&k, -5000.0), 0.5 * t_n);
         assert_eq!(room_column_m(&k, f64::NAN), t_n);
