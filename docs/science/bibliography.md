@@ -7584,7 +7584,7 @@ Straume2019, Harris2014, SternScholl2010.
 - Library: not fetched.
 - Read so far (by the project): 2026-10-22, a research sub-agent, full text: "Reported mean land elevations by date are 700m (1895), 840m (1921), 871m (1931), and 797m (2012)"; the land fraction "is 0.292 and 0.2905 for the 1931 and 2012 estimates".
 
-## Volcano craters, cone gullies and steep ground (VOL-026, VOL-090 onwards), added 2026-10-22
+## Volcano craters, cone gullies and steep ground (VOL-026, VOL-090 onwards, AMP-080 to AMP-084), added 2026-10-22
 
 Read again for this task, entries above: Grosse2014 (p. 8, the craters: VOL-026, VOL-091).
 Texts in the project's source library on the test VM (`/data/ban/deeptime-sources/<key>/`), not
@@ -7607,6 +7607,33 @@ distributed.
 - Access: open access (CC BY 4.0).
 - Library: fetched (PDF, text layer). Text file: OHara2024.txt.
 - Read so far (by the project): 2026-10-22, full text. Stratovolcanoes in Indonesia, Papua New Guinea, New Zealand and Guatemala on the 30 m SRTM model, ages from the present to the early Pleistocene, lifespans of activity 100 to 1,000 kyr. §4.1: at about 10 % eroded volume "narrow (∼20° normalized width angle) and uniform ... drainages form that extend from the summit region to the lower flanks (i.e., 'parasol ribbing'; Ollier, 1988), giving a high drainage density (∼1 km−1)"; at 30 to 40 % eroded volume, on 10 to 100 kyr, summit basins widen to 40 to 60°, the network becomes dendritic, drainage density about 0.5 km−1; over more than 1 Myr the edifice loses its single-peaked cone (citing Karátson et al. 2012, Dibacto et al. 2020, Ollier 1988). §4.3: "the number of basins that reach the summit on most edifices is greater than 10" (summit basins: those in the upper 30 % of the height), with a weak trend in time; the ratio of the edifice's effective radius to the spacing of summit-basin outlets along its perimeter is about 1 to 3; younger edifices have more basins at every distance from the peak. Channels counted from 1.0 km² of drainage area. Again 2026-10-22 for the cone gullies (VOL-101, VOL-103), Fig. 4 on the page image (p. 715): panel h, "Normalized Eroded Volume" (%) against the age of activity (YPB, log axis), the fit "5.36log(x)+-1.56 (R² = 0.50) (p-val = 0.006)", data about 10 to 37 % over about 3 kyr to 300 kyr; panel a, edifice relief, "-0.56log(x)+4.21" (R² 0.77). §2: an edifice's age is "the log-mean between the most recent eruption and the oldest date of activity" (linear means give similar results, Fig. S5).
+
+### SwansonWright1981
+- Reference: Swanson, D. A. and Wright, T. L. (1981). Guide to geologic field trip between Lewiston, Idaho, and Kimberly, Oregon, emphasizing the Columbia River Basalt Group. In Johnston, D. A. and Donnelly-Nolan, J. (eds.), Guides to some volcanic terranes in Washington, Idaho, Oregon, and northern California. U.S. Geological Survey Circular 838.
+- DOI or URL: https://npshistory.com/publications/geology/circ/838/sec1b.htm (a transcription; the contents page names the authors and the circular's editors and year)
+- Cited as: "USGS Circular 838", "Swanson & Wright 1981"
+- Ledger ids: AMP-084 (and the cliff bands of AMP-082)
+- Access: open (USGS; the transcription is free).
+- Library: not fetched into the library; read on the web page.
+- Read so far (by the project): 2026-10-22, the D3 agent, section "Physical characteristics of flows", through a page fetch whose summary quotes at most about 125 characters: flows of the Grande Ronde, Wanapum and Saddle Mountains Basalts "range from a few tens of centimeters to more than 100 m thick, averaging 30-40 m"; "Even the thinner flows generally show evidence of having ponded"; the entablature "about 70 percent of the thickness of a flow". The page does not describe cliffs, benches or terraces (the words do not appear).
+
+### SchmidtMontgomery1995
+- Reference: Schmidt, K. M. and Montgomery, D. R. (1995). Limits to relief. Science 270(5236):617-620.
+- DOI or URL: 10.1126/science.270.5236.617
+- Cited as: "Schmidt & Montgomery 1995"
+- Ledger ids: AMP-080 (the direction only)
+- Access: paywalled (the publisher's page refused the fetch, HTTP 403).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-22, the D3 agent, the abstract through OpenAlex: slope profiles where bedrock landsliding is widespread, against a model of the largest stable hillslopes, show that "mountain-scale material strength can limit topographic relief"; strengths back-calculated in the northern Cascades and the Santa Cruz Mountains are far below laboratory values for intact rock and match the weakest members of each formation; against "the conventional assumption that relief is incision-limited".
+
+### DiBiase2018
+- Reference: DiBiase, R. A., Rossi, M. W. and Neely, A. B. (2018). Fracture density and grain size controls on the relief structure of bedrock landscapes. Geology 46(5):399-402. From memory: not checked.
+- DOI or URL: 10.1130/G40006.1 (from memory, not resolved)
+- Cited as: "DiBiase et al. 2018"
+- Ledger ids: AMP-080 (a simplification's note, not a value)
+- Access: not checked.
+- Library: not fetched.
+- Read so far (by the project): not read; cited from memory for the idea that the fracture density of the rock, not only its strength, sets how rocky and steep bedrock landscapes stand.
 
 ## Lava flows (VOL-140 to VOL-163), added 2026-10-22
 

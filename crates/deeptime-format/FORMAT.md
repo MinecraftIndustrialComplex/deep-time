@@ -269,10 +269,15 @@ baked and gets a Lambert layout block.
   `cleared_low_cells`, `flagged_cells_nearest`, `flagged_cells`, `min_open_cells`, `radius_cells`). The
   world's `elevation` then gets its **block-scale relief** (`bake::relief`, drawn in world blocks on
   the world's own grid from the drawn terrain, so it does not depend on the frame the simulation ran
-  in): the cone gullies of the standing stratovolcanoes ("Standing volcanoes"). It only lowers
-  cells, never below one block over sea level, so the sea and land and the closed basins stay as
-  they are and the two edge rows stay self-glued (`notes.bake.projection.relief`, below). A Lambert
-  world (no projection pass) gets none. The five
+  in): the cone gullies of the standing stratovolcanoes ("Standing volcanoes"), then the
+  **steep-ground texture** (D3, ledger AMP-080 to AMP-084): a ridged jag of a few blocks on steep
+  hard rock and cliff bands (flat benches, steep risers) on steep lava, the rock read from
+  `surface/class_top`. The gullies only lower cells; the texture raises and lowers them. Neither
+  takes a cell below one block over sea level nor touches a lake, a river or the sea, so the sea and
+  land and the closed basins stay as they are; the two edge rows are glued again by the mean of each
+  pair (`notes.bake.projection.relief`, below). A Lambert world (no projection pass) gets none. No
+  new layer: both write `elevation`, which the game, the far terrain and the column evaluator read
+  as before. The five
   band coordinates and the two categories of the L2 biome inputs (`climate/koppen_l2`,
   `climate/wetland`) are held back until the world's `elevation` and `closed_basin` exist and then
   **settled to the world's ground** (BIO-170, BIO-171, BAK-057): at each L2 node's block the world's
@@ -308,10 +313,14 @@ baked and gets a Lambert layout block.
   world's cells, edge rows at half weight, against the simulation's true area share), `pole_anisotropy`
   (mean squared tangential over radial elevation slope 80°–88° from the equator, and at 30°–60° for
   reference, for the world and for point sampling), `relief` (the block-scale relief:
-  `cone_gullies` with `cones`, `gullied`, `skipped_low`, `skipped_no_flank`, `skipped_other`,
-  `capped`, `cells_cut`, the medians of the cones' `target_share`, `removed_share`, `gullies` and
-  `deepest_blocks`, `deepest_blocks_max` and `first`, six cones as [id, gullies, target, removed,
-  span blocks, deepest blocks]; and `millis`), `vector` and `millis`.
+  `cone_gullies` with `cones`, `not_strato` (standing cones of other kinds, not gullied),
+  `gullied`, `cells_cut`, and `active` and `dead`, one group each for the cones active and dead at
+  the present, with `cones`, `gullied`, `skipped_sea`, `skipped_low`, `skipped_no_flank`,
+  `skipped_other`, `capped`, the medians of the cones' `target_share`, `removed_share`, `gullies`,
+  `span_blocks` and `deepest_blocks`, `deepest_blocks_max` and `first`, six cones as [id, gullies,
+  target, removed, span blocks, deepest blocks]; `steep_texture` with `cells_moved`, `cells_jagged`,
+  `cells_banded`, `cells_raised`, `cells_lowered`, `mean_abs_blocks`, `max_raise_blocks`,
+  `max_cut_blocks` and `millis`; and `millis`), `vector` and `millis`.
 
 **The guaranteed deposits under the world's ground** (DEP-221, ORE-280; 2026-10-20). Last, on the
 finished folder of either projection (`deeptime_core::deposits::anchor::anchor_folder`, also run by
