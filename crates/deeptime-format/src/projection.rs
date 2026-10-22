@@ -1995,7 +1995,8 @@ mod petroff_guyou_tests {
 
 /// The cross-language parity fixture (`tests/data/projection_parity.json`): inputs and outputs of
 /// the portable trigonometry, Petroff's square and two Petroff–Guyou worlds (random points and
-/// exact inputs on the forward's degenerate lines), every number as the hex of its bits. Java's `ProjectionParityTest` and the pages' `tools/viewer/projection-check.js`
+/// exact inputs on the forward's degenerate lines) and the cube world (`"cube"`,
+/// [`crate::cube_map::parity`]), every number as the hex of its bits. Java's `ProjectionParityTest` and the pages' `tools/viewer/projection-check.js`
 /// read it and must give the same bits. `DEEPTIME_WRITE_PARITY=1 cargo test -p deeptime-format
 /// parity_fixture` rewrites it after a deliberate change.
 #[cfg(test)]
@@ -2135,7 +2136,10 @@ mod parity_fixture {
             ));
         }
         out.push_str(&worlds.join(",\n"));
-        out.push_str("\n  ]\n}\n");
+        // The cube world's geometry and maps (crate::cube_map::parity, plan M5).
+        out.push_str("\n  ],\n");
+        out.push_str(&crate::cube_map::parity::section());
+        out.push_str("\n}\n");
         out
     }
 

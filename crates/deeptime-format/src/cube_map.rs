@@ -624,7 +624,11 @@ impl CubeMap {
         // d(g/r) = (dg − n (n·dg)) / r, with n·dg = (ga dga + gb dgb) / r.
         let dn = |dga: f64, dgb: f64| {
             let k = (ga * dga + gb * dgb) * ir;
-            [-(n[0] * k) * ir, (dga - n[1] * k) * ir, (dgb - n[2] * k) * ir]
+            [
+                -(n[0] * k) * ir,
+                (dga - n[1] * k) * ir,
+                (dgb - n[2] * k) * ir,
+            ]
         };
         FaceJacobian {
             p: to_cube_frame(face, n),
@@ -930,5 +934,7 @@ pub fn unit_of_lat_lon_pm(lat_deg: f64, lon_deg: f64) -> [f64; 3] {
     [cp * pm::cos(lam), cp * pm::sin(lam), sp]
 }
 
+#[cfg(test)]
+pub(crate) mod parity;
 #[cfg(test)]
 mod tests;
