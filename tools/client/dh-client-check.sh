@@ -30,6 +30,19 @@
 # -Ddeeptime.dhGenerationGate=false). DHCC_CLIENT_DROP: a jar glob left out of the client's mods
 # (e.g. 'Chunky-*.jar'), the server keeps it. The client log's Distant Horizons facts are recorded:
 # its Chunky rule, Deep Time's generation gate, and whether its request module set a world gen queue.
+#
+# Measurement knobs (all off by default; 2026-10-22, DH 3.3.3 fill-rate task):
+#   DHCC_SERIES=<s>     probe every <s> seconds during the waits and print "series ..." lines (sections the
+#                       generator made, real chunks the server built, the x extents), then the CPU seconds of
+#                       the client's and the server's Distant Horizons threads (tools/client/dh-thread-cpu.py)
+#   DHCC_PROGRESS=1     both sides' Distant Horizons config gets showGenerationProgress = "LOG" (its task
+#                       counts reach the logs) and generatorPlan SURFACE_THEN_CHUNKS with chunkGeneratorMode
+#                       FEATURES written explicitly (Ben's settings); the config files are rewritten every run
+#   DHCC_NO_PAUSE=1     as DHCC_PROGRESS, plus pauseIfMovingQuickly and limitIfServerUnhealthy = false (the A/B)
+#   DHCC_MOVE=<b/s>     after the two waits, a third phase of DHCC_MOVE_SECS (default 120) seconds in which the
+#                       script teleports the spectating player along x at that many blocks per second (once a
+#                       second): the "camera moving quickly" case of pauseIfMovingQuickly (it fires above 20)
+#   DHCC_WAIT1, DHCC_WAIT2  the two waits in seconds (default 180 and 300)
 set -uo pipefail
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$(dirname "$0")/../.."
@@ -69,6 +82,20 @@ probe() { rcon "deeptime probe dh" >/dev/null; sleep 1; grep -a '\[deeptime-prob
 field() { python3 -c 'import json,sys; d=json.loads(sys.argv[1]); l=[l for l in d.get("levels",[]) if l["level"]=="minecraft:overworld"]; print((l[0] if l else {}).get(sys.argv[2],""))' "$1" "$2"; }
 
 SPID=""; XPID=""; CPID=""
+T0=$SECONDS
+top() { python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get(sys.argv[2],""))' "$1" "$2"; }
+cpu_lines() {   # the DH threads' CPU seconds so far, client and server
+    say "   client JVM, DH threads: $(python3 "$REPO/tools/client/dh-thread-cpu.py" "$(basename "$REPO")/smoke/$P/client/pmc/libraries" 'dh' 2>/dev/null | tr '\n' ';')"
+    say "   server JVM, DH threads: $(python3 "$REPO/tools/client/dh-thread-cpu.py" "$SRV" 'dh' 2>/dev/null | tr '\n' ';')"
+}
+series() {   # $1: seconds to wait, $2: a label; with DHCC_SERIES a probe every that many seconds
+    local secs=$1 step=${DHCC_SERIES:-0} t=0 q
+    if [ "$step" -le 0 ]; then sleep "$secs"; return; fi
+    while [ $t -lt "$secs" ]; do
+        sleep "$step"; t=$(( t + step )); q="$(probe)"
+        say "series $2 t=${t}s (run $(( SECONDS - T0 )) s): sections=$(field "$q" sections) chunks_surfaced=$(top "$q" chunks_surfaced) generator_x=$(field "$q" x_extent) chunk_x=$(top "$q" chunk_x_extent) by_detail=$(field "$q" by_detail)"
+    done
+}
 cleanup() {
     [ -n "$CPID" ] && kill "$CPID" 2>/dev/null
     pkill -f -- "$(basename "$REPO")/smoke/$P/client/pmc/libraries" 2>/dev/null   # the client JVM (its classpath names this folder)
@@ -114,7 +141,23 @@ JVMX=(); for a in ${DHCC_CLIENT_JVM_ARGS:-}; do JVMX+=("--jvm-arg=$a"); done
 [ -f "$CL/game/options.txt" ] || printf 'onboardAccessibility:false\nskipMultiplayerWarning:true\njoinedFirstServer:true\nsoundCategory_master:0.0\n' > "$CL/game/options.txt"
 DHC="$CL/game/config/DistantHorizons.toml"
 mkdir -p "$CL/game/config"
-if [ -f "$DHC" ]; then
+# The measurement knobs write both sides' config afresh (defaults but for what is named here).
+dh_config() {   # $1: the file; the updater is off on the client only (a harmless key on the server)
+    {
+        printf '[client]\n\t[client.advanced]\n\t\t[client.advanced.autoUpdater]\n\t\t\tenableAutoUpdater = false\n'
+        printf '[common]\n\t[common.worldGenerator]\n\t\tgeneratorPlan = "SURFACE_THEN_CHUNKS"\n\t\tchunkGeneratorMode = "FEATURES"\n'
+        printf '\t\tshowGenerationProgress = "LOG"\n\t\tgenerationProgressDisplayIntervalInSeconds = 5\n'
+        [ -n "${DHCC_NO_PAUSE:-}" ] && printf '\t\tpauseIfMovingQuickly = false\n\t\tlimitIfServerUnhealthy = false\n'
+    } > "$1"
+}
+KNOBS=""
+if [ -n "${DHCC_PROGRESS:-}${DHCC_NO_PAUSE:-}" ]; then
+    KNOBS=1
+    mkdir -p "$SRV/config"; dh_config "$SRV/config/DistantHorizons.toml"; dh_config "$DHC"
+    say "DH config written on both sides: SURFACE_THEN_CHUNKS / FEATURES, progress LOG${DHCC_NO_PAUSE:+, pauseIfMovingQuickly and limitIfServerUnhealthy off}"
+fi
+if [ -n "$KNOBS" ]; then :
+elif [ -f "$DHC" ]; then
     sed -i 's/^\(\s*enableAutoUpdater\s*=\s*\).*/\1false/' "$DHC"
 else
     printf '[client]\n\t[client.advanced]\n\t\t[client.advanced.autoUpdater]\n\t\t\tenableAutoUpdater = false\n' > "$DHC"
@@ -185,19 +228,33 @@ rcon "gamemode spectator DeepTimeProbe" >/dev/null
 J="$(probe)"; say "probe at join: $J"
 
 # 3. Beside the spawn, then beside the seam.
-sleep 180
-A="$(probe)"; say "probe after 3 min at the spawn: $A"
+series "${DHCC_WAIT1:-180}" spawn
+A="$(probe)"; say "probe after ${DHCC_WAIT1:-180} s at the spawn: $A"
+[ -n "${DHCC_SERIES:-}" ] && cpu_lines
 X=$(( C / 2 - 100 ))
 say "== tp DeepTimeProbe $X 300 0 (seam at x = $(( C / 2 )))"
 rcon "tp DeepTimeProbe $X 300 0" >/dev/null
-sleep 300
-B="$(probe)"; say "probe after 5 min beside the seam: $B"
+series "${DHCC_WAIT2:-300}" seam
+B="$(probe)"; say "probe after ${DHCC_WAIT2:-300} s beside the seam: $B"
+[ -n "${DHCC_SERIES:-}" ] && cpu_lines
+if [ -n "${DHCC_MOVE:-}" ]; then
+    say "== moving at ${DHCC_MOVE} blocks/s for ${DHCC_MOVE_SECS:-120} s (teleports once a second)"
+    mx=$X
+    for i in $(seq "${DHCC_MOVE_SECS:-120}"); do
+        mx=$(( mx - DHCC_MOVE )); rcon "tp DeepTimeProbe $mx 300 0" >/dev/null; sleep 1
+        [ -n "${DHCC_SERIES:-}" ] && [ $(( i % ${DHCC_SERIES} )) = 0 ] && { q="$(probe)"; say "series move t=${i}s (run $(( SECONDS - T0 )) s): sections=$(field "$q" sections) chunks_surfaced=$(top "$q" chunks_surfaced) generator_x=$(field "$q" x_extent)"; }
+    done
+    M="$(probe)"; say "probe after the move: $M"
+    [ -n "${DHCC_SERIES:-}" ] && cpu_lines
+fi
 
 # 4. Verdicts. First what the client's own log says about Distant Horizons' generator.
 CLOG="$CL/game/logs/latest.log"
 say "client log: DH's Chunky rule $(grep -a -c 'Partially Incompatible Distant Horizons mod detected: \[Chunky\]' "$CLOG" 2>/dev/null) line(s);" \
     "Deep Time's gate: $(grep -a -o "\[deeptime\] Distant Horizons' world generator [a-z ]*" "$CLOG" 2>/dev/null | sort | uniq -c | tr -s ' ' | paste -sd ';' -)"
 say "client log: 'Set world gen queue' $(grep -a -c 'Set world gen queue for level' "$CLOG" 2>/dev/null) time(s) (DH's request module started)"
+say "client log: DH's progress lines (last 12): $(grep -a -i -E 'world ?gen|generation (progress|task)|chunks per second|import task' "$CLOG" 2>/dev/null | tail -12 | tr '\n' '|')"
+say "server log: DH's progress lines (last 12): $(grep -a -i -E 'world ?gen|generation (progress|task)|chunks per second|import task' "$SRV/console.log" 2>/dev/null | tail -12 | tr '\n' '|')"
 s0=$(field "$J" sections); s1=$(field "$A" sections); s2=$(field "$B" sections); ext=$(field "$B" x_extent)
 say "sections asked by the client: at the spawn $(( s1 - s0 )), beside the seam $(( s2 - s1 )); x extent $ext (lap $(( -C / 2 ))..$(( C / 2 )))"
 DB=$(find "$CL/game" -path '*Distant_Horizons*' -name '*.sqlite*' -printf '%s %p\n' 2>/dev/null | sort -n | tail -3)
