@@ -271,8 +271,9 @@ public final class FarTerrainGameTests {
             }
             FarTerrainCheck.RealColumn real = FarTerrainCheck.real(chunk, column.x(), column.z());
             (i < warm.size() ? warmTally : otherTally).add(column, real, chunk);
-            if (column.groundBlock().getBlock() != real.groundBlock().getBlock())
-                DeepTime.LOGGER.info("[gametest] seaBedDiag {}", diag(chunk, column, real, column.x(), column.z()));
+            if (column.groundBlock().getBlock() != real.groundBlock().getBlock() || column.water() != real.water())
+                DeepTime.LOGGER.info("[gametest] seaBedDiag {} far layers {}", diag(chunk, column, real, column.x(), column.z()),
+                        column.layers().subList(Math.max(0, column.layers().size() - 3), column.layers().size()));
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] farTerrainSeaBedsFollowTheSurfaceRule found warm {} other {} takenFurtherAlready={} warm {} other {}",

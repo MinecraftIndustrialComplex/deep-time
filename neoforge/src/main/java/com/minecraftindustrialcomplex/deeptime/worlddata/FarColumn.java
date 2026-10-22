@@ -76,6 +76,12 @@ public final class FarColumn {
         public boolean wideRiver;
         /** Blocks of ice cover ({@link IceCover#blocks}); 0 for none, and never laid under water. */
         public int ice;
+        /**
+         * A bank whose ground is the water's beside it ({@code minGround}): the bank pass fills
+         * whatever is open up to there, so water a surface rule paints in place of its top block
+         * becomes the block under it (WaterBodies, BAK-067).
+         */
+        public boolean sealed;
 
         public boolean water() {
             return kind.isWater() && waterTop > ground;
@@ -90,6 +96,12 @@ public final class FarColumn {
         public boolean bare;
         /** The biome freezes here: water gets an ice top, ground a snow layer. */
         public boolean frozen;
+        /**
+         * The level's surface rule paints water in place of the ground's top block (vanilla's swamp
+         * water at y 62, ledger BAK-067): that block is water, the soil or rock under it shows, and
+         * no ice cover is laid on it.
+         */
+        public boolean paintedWater;
     }
 
     /** A column's layers, bottom-up: layer i fills the blocks {@code bottom[i] <= y < top[i]}. */
@@ -154,6 +166,7 @@ public final class FarColumn {
     public static void shape(Water.Column col, int iceBlocks, int minY, int maxY, Shape out) {
         out.kind = col.kind();
         out.wideRiver = false;
+        out.sealed = false;
         int ground = col.ground();
         if (col.kind().isWater()) {
             out.waterTop = col.top();
@@ -168,6 +181,9 @@ public final class FarColumn {
                 ground = col.maxGround();
             if (col.minGround() != null && ground < col.minGround() && col.minGround() <= maxY)
                 ground = col.minGround();
+            // Water painted on the top block leaves the ground one lower when the pass reads it,
+            // below minGround wherever the ground stands at minGround: the pass raises it again.
+            out.sealed = col.minGround() != null && ground == col.minGround() && ground <= maxY;
         }
         out.ground = clampGround(ground, minY, maxY);
         out.ice = out.water() ? 0 : Math.max(0, iceBlocks);
@@ -180,6 +196,7 @@ public final class FarColumn {
     public static void shape(Water.Core core, int iceBlocks, int minY, int maxY, Shape out) {
         out.kind = core.kind();
         out.wideRiver = false;
+        out.sealed = false;
         int ground = core.ground();
         if (core.kind().isWater()) {
             out.waterTop = core.top();
@@ -209,6 +226,9 @@ public final class FarColumn {
      * @param rock      the column's horizon stack ({@link Columns#stack}), or null for a world without strata
      * @param rockDepth how far below the soil the strata are kept bed by bed (≥ 0)
      * @param cover     the ice cover's spec, or null (then {@link Shape#ice} is ignored)
+     * @param soil      the biome's soil; with {@link Soil#paintedWater} the ground's top block is water
+     *                  (the soil's top material is not drawn, what lies under it is), under the sea or a
+     *                  lake too, and no ice cover is laid (the ice pass leaves a fluid surface alone)
      */
     public static void layers(int minY, int maxY, Shape s, Soil soil, Columns.Stack rock, int rockDepth,
                               IceCover.Spec cover, Layers out) {
@@ -216,12 +236,15 @@ public final class FarColumn {
         int g = clampGround(s.ground, minY, maxY);
         int solid = g - minY + 1;                                   // blocks of ground
         boolean water = s.water();
-        int coverN = cover == null || water ? 0 : Math.min(Math.max(0, s.ice), solid);
+        // The surface rule's water in place of the top block (BAK-067): the ground under it is one lower,
+        // and the ice pass leaves a column whose surface is fluid as it is (IcePass), so no cover.
+        boolean painted = soil.paintedWater && solid > 0;
+        int coverN = cover == null || water || painted ? 0 : Math.min(Math.max(0, s.ice), solid);
         int soilN = soil.bare ? 0 : Math.min(Math.max(1, soil.depth), solid);
         // A river's bed is one block of gravel or sand on whatever the ground is.
         if (water && s.kind == Water.Kind.RIVER)
             soilN = Math.max(soilN, Math.min(1, solid));
-        int rockTop = g - Math.max(soilN, coverN);                  // the highest rock block
+        int rockTop = g - Math.max(Math.max(soilN, coverN), painted ? 1 : 0);   // the highest rock block
         int[] r = new int[2];
         if (rockTop >= minY) {
             int detailFrom = Math.max(minY, rockTop - Math.max(0, rockDepth));
@@ -249,7 +272,7 @@ public final class FarColumn {
             boolean topIsTheSurface = coverN == 0;
             int underTop = topIsTheSurface ? soilTopY : soilTopY + 1;   // exclusive
             out.add(g - soilN + 1, underTop, SOIL_UNDER, 0, 0);
-            if (topIsTheSurface)
+            if (topIsTheSurface && !painted)
                 out.add(soilTopY, soilTopY + 1, topMaterial, 0, 0);
         }
         // The ice cover replaces the top blocks, snow uppermost (IceCover.Spec.kind counts from the top).
@@ -258,7 +281,7 @@ public final class FarColumn {
             out.add(y, y + 1, kind == IceCover.Spec.SNOW ? COVER_SNOW : kind == IceCover.Spec.DEEP_ICE ? COVER_DEEP_ICE : COVER_ICE,
                     0, 0);
         }
-        int top = g + 1;                                            // the first block above the ground
+        int top = painted ? g : g + 1;                              // the first block above the ground
         if (water) {
             int wt = Math.min(s.waterTop, maxY);
             if (soil.frozen) {
@@ -268,6 +291,10 @@ public final class FarColumn {
                 out.add(top, wt + 1, WATER, 0, 0);
             }
             top = wt + 1;
+        } else if (painted) {
+            // Dry ground: the one block of water, frozen as a lake's top freezes.
+            out.add(top, top + 1, soil.frozen ? WATER_ICE : WATER, 0, 0);
+            top++;
         } else if (soil.frozen && solid > 0 && top <= maxY) {
             out.add(top, top + 1, SNOW_LAYER, 0, 0);
             top++;
