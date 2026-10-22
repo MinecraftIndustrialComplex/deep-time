@@ -156,7 +156,7 @@ public final class LavaFlows {
     static final double WANDER_MAX_RAD = Math.toRadians(35.0);      // ledger: VOL-116 (game-choice)
     /** The wander's lattice, blocks. */
     static final double WANDER_CELL = 3.0;                          // ledger: VOL-116 (game-choice)
-    /** Ground flatter than this, m/m, has no direction of its own: the path keeps its last one. */
+    /** Ground flatter than this, m/m, has no direction of its own: the path keeps its last one (at its start, out from the vent). */
     static final double FLAT_SLOPE = 1e-4;                          // ledger: VOL-116 (game-choice)
     /** How deep a flow fills a hollow before it stops there, m: aa 3 to 5 m; andesite 25 to 60 m. */
     static final double BASALT_THICK_M = 5.0, VISCOUS_THICK_M = 40.0; // ledger: VOL-117 (verified: USGS FS 144-02; NPS Yellowstone)
@@ -431,7 +431,7 @@ public final class LavaFlows {
             double rimM = rim / bl, maxM = Math.max(rimM, FLANK_MAX_SHARE * c.v.radiusM());
             s = Math.max(s, (rimM + flankU * (maxM - rimM)) * bl);
         }
-        return trace(c, c.v.x() + s * ex, c.v.z() + s * ez, length, aaFromVent, side, age, seed, flank);
+        return trace(c, c.v.x() + s * ex, c.v.z() + s * ez, ex, ez, length, aaFromVent, side, age, seed, flank);
     }
 
     /**
@@ -459,8 +459,13 @@ public final class LavaFlows {
         return 4.0 * v.craterRadiusM() / mH + 4.0;
     }
 
-    /** Traces a flow from (x, z) and paints its columns. */
-    private Flow trace(Ctx c, double x0, double z0, double length, boolean aaFromVent, int side, double age, long seed, boolean flank) {
+    /**
+     * Traces a flow from (x, z) and paints its columns. (ox, oz), a unit block direction, is the way out from the
+     * vent: a flow that starts on ground with no slope of its own (a gentle summit, where the elevation raster
+     * holds a level patch) runs that way until the ground falls.
+     */
+    private Flow trace(Ctx c, double x0, double z0, double ox, double oz, double length, boolean aaFromVent, int side, double age,
+                       long seed, boolean flank) {
         Metric met = c.met;
         double thick = (c.group == Group.BASALTIC ? BASALT_THICK_M : VISCOUS_THICK_M) / mV;
         double x = x0, z = z0;
@@ -498,12 +503,9 @@ public final class LavaFlows {
             double slope = mV * Math.sqrt(Math.max(0.0, -(gx * d[0] + gz * d[1])));
             double dx, dz;
             if (!(slope > FLAT_SLOPE)) {
-                if (Double.isNaN(px)) {
-                    stop = "flat";
-                    break;
-                }
-                dx = px;
-                dz = pz;
+                // level ground: keep going the way the flow went, or straight out from the vent at its start
+                dx = Double.isNaN(px) ? ox : px;
+                dz = Double.isNaN(px) ? oz : pz;
             } else {
                 double dn = Math.hypot(d[0], d[1]);
                 dx = d[0] / dn;
