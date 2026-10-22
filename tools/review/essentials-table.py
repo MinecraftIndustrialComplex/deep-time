@@ -202,17 +202,19 @@ def dry_rows(root, labels):
             g = e.get("regions", {}).get("essential", {})
             t = topped.get(m, {})
             rows[(key, m.split(":")[-1])] = {
-                "land": g.get("land_regions") or 0,
-                "all": g.get("ore_sources_in_land_regions"),
-                "dry": g.get("dry_ore_sources_in_land_regions"),
-                "with_ore": g.get("land_regions_with_a_source_with_ore"),
-                "with_dry": g.get("land_regions_with_a_dry_source_with_ore"),
-                "under_sea": e.get("sources_with_ore_under_the_sea"),
+                "land": g.get("top_up_land_regions") or 0,
+                "all": g.get("ore_sources_in_top_up_land_regions"),
+                "dry": g.get("dry_ore_sources_in_top_up_land_regions"),
+                "with_ore": g.get("top_up_land_regions_with_a_source_with_ore"),
+                "with_dry": g.get("top_up_land_regions_with_a_dry_source_with_ore"),
+                "under_sea": e.get("sources_with_ore_not_dry"),
                 "added": t.get("added"),
                 "left_out": t.get("sub_sea"),
                 "short_by_sea": t.get("short_by_sea"),
                 "g_sites": a.get("essentials", {}).get("guaranteed_sites"),
-                "g_sea": a.get("essentials", {}).get("guaranteed_sites_under_the_sea"),
+                "g_sea": a.get("essentials", {}).get("guaranteed_sites_not_dry"),
+                "g_below": a.get("essentials", {}).get("guaranteed_sites_below_sea_level"),
+                "g_under_water": bake.get("under_water"),
                 "added_all": bake.get("topped_up"),
                 "top_up_ms": bake.get("top_up_millis"),
                 "anchor_ms": bake.get("millis"),
@@ -224,25 +226,26 @@ def dry_main(before_dir, after_dir, labels):
     before = dry_rows(before_dir, labels)
     after = dry_rows(after_dir, labels)
     keys = sorted(set(before) & set(after))
-    print("| planet | essential | land regions | sources per land region (before, after) | "
-          "regions with a dry source with ore (before, after) | copies added (before, after) | "
-          "left out as under the sea (after) | ore sources under the sea (before, after) |")
-    print("|---|---|---|---|---|---|---|---|")
+    print("| planet | essential | land regions (before, after) | sources counted (before, after) | "
+          "per land region | land regions with a dry source with ore (before, after) | "
+          "copies added (before, after) | land regions short only for the sea (after) | "
+          "sources with ore not dry, whole world (before, after) |")
+    print("|---|---|---|---|---|---|---|---|---|")
     for k in keys:
         b, a = before[k], after[k]
-        land = b["land"] or 1
 
-        def per(x):
-            return fmt(x / land) if isinstance(x, (int, float)) else "-"
+        def per(x, land):
+            return fmt(x / land) if isinstance(x, (int, float)) and land else "-"
 
-        print(f"| {k[0]} | {k[1]} | {b['land']}, {a['land']} | {per(b['all'])}, {per(a['dry'])} | "
+        print(f"| {k[0]} | {k[1]} | {b['land']}, {a['land']} | {fmt(b['all'])}, {fmt(a['dry'])} | "
+              f"{per(b['all'], b['land'])}, {per(a['dry'], a['land'])} | "
               f"{b['with_dry']}, {a['with_dry']} | {fmt(b['added'])}, {fmt(a['added'])} | "
-              f"{fmt(a['left_out'])} | {fmt(b['under_sea'])}, {fmt(a['under_sea'])} |")
+              f"{fmt(a['short_by_sea'])} | {fmt(b['under_sea'])}, {fmt(a['under_sea'])} |")
     print()
     print("| essential | planets | land regions (before, after) | sources counted (before, after) | "
           "per land region | land regions with a dry source with ore (before, after) | "
           "copies added (before, after) | planets with every land region dry-covered (before, after) | "
-          "regions short only for the sea (after) |")
+          "land regions short only for the sea (after) |")
     print("|---|---|---|---|---|---|---|---|---|")
     for m in sorted({k[1] for k in keys}):
         ks = [k for k in keys if k[1] == m]
@@ -266,16 +269,19 @@ def dry_main(before_dir, after_dir, labels):
         runs = {}
         for k in keys:
             runs.setdefault(k[0], side[k])
-        gs = sum(v["g_sites"] or 0 for v in runs.values())
-        gw = sum(v["g_sea"] or 0 for v in runs.values())
-        ad = sum(v["added_all"] or 0 for v in runs.values())
+
+        def total(f):
+            return sum(v[f] or 0 for v in runs.values())
+
         tu = [v["top_up_ms"] for v in runs.values() if isinstance(v["top_up_ms"], (int, float))]
         an = [v["anchor_ms"] for v in runs.values() if isinstance(v["anchor_ms"], (int, float))]
         med = statistics.median(tu) if tu else float("nan")
-        print(f"{name}: {len(runs)} planets, guaranteed sites {gs}, with a centre under the sea {gw}, "
-              f"copies added {ad}, top-up median {med:.0f} ms (sum {sum(tu):.0f}, "
-              f"range {min(tu) if tu else float('nan'):.0f} to {max(tu) if tu else float('nan'):.0f}), "
-              f"anchor median {statistics.median(an) if an else float('nan'):.0f} ms")
+        print(f"{name}: {len(runs)} planets, guaranteed sites {total('g_sites')}, centre not dry "
+              f"{total('g_sea')} (ground below sea level {total('g_below')}; the pass's own "
+              f"under_water {total('g_under_water')}), copies added {total('added_all')}, top-up median "
+              f"{med:.0f} ms (sum {sum(tu):.0f}, range {min(tu) if tu else float('nan'):.0f} to "
+              f"{max(tu) if tu else float('nan'):.0f}), anchor median "
+              f"{statistics.median(an) if an else float('nan'):.0f} ms")
 
 
 def fmt(v):

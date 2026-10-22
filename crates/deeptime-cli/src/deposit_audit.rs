@@ -37,7 +37,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use deeptime_core::deposits::anchor::centre_is_dry;
+use deeptime_core::deposits::anchor::{self, centre_is_dry};
 use deeptime_core::deposits::playability::{Essential, Regions};
 use deeptime_core::deposits::types::{self, DepositType};
 use deeptime_core::surface::lithology;
@@ -1014,9 +1014,11 @@ pub fn run(o: &Options) -> CliResult<Value> {
 /// "with ore" places at least one ore block of the material in the world as generated (`ore_of`,
 /// the audit's own count): a site whose bodies all lie in the air or the soil counts for nothing
 /// in the game. A source "dry" also has its centre column on dry land (`centre_is_dry`, the test
-/// the playability pass's top-up counts by, DEP-220): the land regions with a dry source with ore,
-/// the sources with ore per land region (all, and the dry ones), the sources with ore under the
-/// sea, and the guaranteed sites of the world (any essential) with a centre under the sea.
+/// the playability pass's top-up counts by, DEP-220: the ground at or above sea level, no water
+/// over it): the top-up's land regions (its 64-block lattice) with a source with ore and with a
+/// dry one, the sources with ore in them (all, and the dry ones), the sources with ore that are
+/// not dry, and the world's guaranteed sites (any essential) that are not dry and whose ground
+/// lies below sea level.
 fn essential_sources(
     o: &Options,
     w: &ColumnWorld,
@@ -1041,12 +1043,29 @@ fn essential_sources(
         dx.min(c - dx).hypot(z - sz)
     };
     let at = |s: &Site| (f64::from(s.center[0]), f64::from(s.center[2]));
-    // The land regions of a grid: those a lattice of land points falls in.
-    let land_regions = |r: &Regions| -> HashSet<usize> {
-        let step = (r.size / 8.0).max(16.0);
+    // The land regions of a grid: those a lattice of land points `step` apart falls in.
+    let land_regions_at = |r: &Regions, step: f64| -> HashSet<usize> {
         let mut out = HashSet::new();
         let mut z = zlo;
         while z <= zhi {
+            let mut x = -c / 2.0;
+            while x < c / 2.0 {
+                if w.height(x as i64, z as i64) >= sea {
+                    out.insert(r.index(x, z));
+                }
+                x += step;
+            }
+            z += step;
+        }
+        out
+    };
+    let land_regions = |r: &Regions| land_regions_at(r, (r.size / 8.0).max(16.0));
+    // The top-up's own land regions (its 64-block lattice from the world's top edge, DEP-220).
+    let top_up_land = |r: &Regions| {
+        let step = anchor::TOP_UP_STEP_BLOCKS as f64;
+        let mut out = HashSet::new();
+        let mut z = zlo.ceil();
+        while z <= zhi.floor() {
             let mut x = -c / 2.0;
             while x < c / 2.0 {
                 if w.height(x as i64, z as i64) >= sea {
@@ -1097,11 +1116,12 @@ fn essential_sources(
             let with = regions_of(&sources);
             let with_ore_regions = regions_of(&with_ore);
             let dry_ore_regions = regions_of(&dry_with_ore);
-            let in_land = |list: &[&Site]| {
+            let top_land = top_up_land(&r);
+            let in_top_land = |list: &[&Site]| {
                 list.iter()
                     .filter(|s| {
                         let (x, z) = at(s);
-                        land.contains(&r.index(x, z))
+                        top_land.contains(&r.index(x, z))
                     })
                     .count()
             };
@@ -1111,9 +1131,11 @@ fn essential_sources(
                     "region_blocks": size, "regions": r.count(), "land_regions": land.len(),
                     "land_regions_with_a_source": land.intersection(&with).count(),
                     "land_regions_with_a_source_with_ore": land.intersection(&with_ore_regions).count(),
-                    "land_regions_with_a_dry_source_with_ore": land.intersection(&dry_ore_regions).count(),
-                    "ore_sources_in_land_regions": in_land(&with_ore),
-                    "dry_ore_sources_in_land_regions": in_land(&dry_with_ore),
+                    "top_up_land_regions": top_land.len(),
+                    "top_up_land_regions_with_a_source_with_ore": top_land.intersection(&with_ore_regions).count(),
+                    "top_up_land_regions_with_a_dry_source_with_ore": top_land.intersection(&dry_ore_regions).count(),
+                    "ore_sources_in_top_up_land_regions": in_top_land(&with_ore),
+                    "dry_ore_sources_in_top_up_land_regions": in_top_land(&dry_with_ore),
                     "regions_with_a_source": with.len(),
                 }),
             );
@@ -1138,7 +1160,7 @@ fn essential_sources(
                 "sources_with_ore": with_ore.len(),
                 "guaranteed_sources_with_ore": with_ore.iter().filter(|s| guaranteed.contains(&s.forming_event)).count(),
                 "sources_with_ore_dry": dry_with_ore.len(),
-                "sources_with_ore_under_the_sea": with_ore.len() - dry_with_ore.len(),
+                "sources_with_ore_not_dry": with_ore.len() - dry_with_ore.len(),
                 "guaranteed_sources_with_ore_dry": dry_with_ore.iter().filter(|s| guaranteed.contains(&s.forming_event)).count(),
                 "sites_with_the_material": any.len(),
                 "regions": grids,
@@ -1153,14 +1175,19 @@ fn essential_sources(
         .iter()
         .filter(|s| guaranteed.contains(&s.forming_event))
         .collect();
-    let guaranteed_under_sea = guaranteed_sites
+    let guaranteed_wet = guaranteed_sites
         .iter()
         .filter(|s| !centre_is_dry(w, s))
+        .count();
+    let guaranteed_below_sea = guaranteed_sites
+        .iter()
+        .filter(|s| w.height(i64::from(s.center[0]), i64::from(s.center[2])) < sea)
         .count();
     Ok(json!({
         "spawn_candidates": spawn.len(), "by_material": out,
         "guaranteed_sites": guaranteed_sites.len(),
-        "guaranteed_sites_under_the_sea": guaranteed_under_sea,
+        "guaranteed_sites_not_dry": guaranteed_wet,
+        "guaranteed_sites_below_sea_level": guaranteed_below_sea,
         "note": "a source is a site that counts toward the shipped essential (a primary product unless primary_only is off); distances in blocks from each spawn candidate, the first the world's spawn",
     }))
 }
