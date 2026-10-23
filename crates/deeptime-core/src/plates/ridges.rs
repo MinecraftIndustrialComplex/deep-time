@@ -22,7 +22,10 @@
 //!   trench sediment and forced-subducted continental crust accrete to the overriding plate
 //!   instead of vanishing. Continental crust a collision took across its front is consumed
 //!   instead, hidden (`stacked`, PLT-276) or still visible in the overriding plate's footprint
-//!   (PLT-292): the belt stacked its share when it crossed. (Until 2026-10-02 only whole
+//!   (PLT-292): the belt stacked its share when it crossed. Of subducted ocean floor (hidden, or
+//!   of a plate the top overrides) `sediment_subduction_share` of its sediment and sedimentary
+//!   rock goes down with the slab instead (sediment subduction, PLT-440; 0 by default, when all
+//!   of it accretes). (Until 2026-10-02 only whole
 //!   triangles of one group counted, and points on a boundary strip copied the nearest visible
 //!   sample within 0.75 spacings: where a plate overrode another, the subducting crust under the
 //!   strip won it, and the overriding plate lost its outer half-spacing at every resampling,
@@ -236,6 +239,10 @@ pub const DROPPED_GLOBAL: &str = "plates/resample_dropped_km3";
 /// … and the mafic pools of the continental crust that accretes, which `pools::accrete` does not
 /// carry (only the conserved pools join the column on top), km³.
 pub const MAFIC_DROPPED_GLOBAL: &str = "plates/resample_mafic_dropped_km3";
+/// World global: subducted ocean floor's sediment and sedimentary rock that went down with the
+/// slab at resamplings instead of accreting (`sediment_subduction_share`, PLT-440), km³
+/// (Earth-normalized; the crust budget's sediment subduction against Stern & Scholl 2010).
+pub const SEDIMENT_SUBDUCTED_GLOBAL: &str = "plates/sediment_subducted_km3";
 
 /// Resamples the crust onto a fresh lattice and returns its geometry. `tree` holds every sample
 /// at `pos` (`Tree::over(pos, |_| true)`, the one the step's motion built).
@@ -347,7 +354,8 @@ pub fn resample(
     // belt or went down with the slab (`belts.rs`): it is consumed here, not accreted a second
     // time (ledger: PLT-276, PLT-292). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
-    let mut tally: Vec<[f64; 7]> = vec![[0.0; 7]; n];
+    let mut tally: Vec<[f64; 8]> = vec![[0.0; 8]; n];
+    let sediment_share = k.sediment_subduction_share as f32; // ledger: PLT-440
     // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
     let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
     // The step's limits (`rate.rs`) on the new lattice: a covered sample's ceiling and top are
@@ -386,7 +394,7 @@ pub fn resample(
                     let under = &src[c2.major() as usize];
                     let p2 = group_plate[*g2 as usize];
                     if under.is_hidden() || p2 == *pl || overrides(*pl, p2) {
-                        let u = interpolate(src, c2, rots[*g2 as usize]);
+                        let mut u = interpolate(src, c2, rots[*g2 as usize]);
                         let conserved: f64 = u.pools[..pool::CONSERVED]
                             .iter()
                             .map(|&x| f64::from(x))
@@ -401,11 +409,28 @@ pub fn resample(
                         {
                             tally[1] += conserved;
                         } else {
+                            // Sediment subduction: of ocean floor that went under (hidden, or
+                            // of a plate the top overrides), the share of its sediment and
+                            // sedimentary rock the slab takes down past the margin; the rest
+                            // accretes. ledger: PLT-440
+                            let mut subducted = 0.0_f64;
+                            if sediment_share > 0.0
+                                && under.kind != CONTINENTAL
+                                && (under.is_hidden() || (p2 != *pl && overrides(*pl, p2)))
+                            {
+                                for kp in [pool::SEDIMENT, pool::SEDIMENTARY] {
+                                    let down = u.pools[kp].max(0.0) * sediment_share;
+                                    u.pools[kp] -= down;
+                                    subducted += f64::from(down);
+                                }
+                            }
+                            tally[7] += subducted;
+                            let kept = conserved - subducted;
                             // What accretes: hidden continental crust, hidden ocean floor's
                             // sediment, or visible crust of the same or a subducting plate.
-                            tally[0] += conserved;
+                            tally[0] += kept;
                             if !under.is_hidden() {
-                                tally[3] += conserved;
+                                tally[3] += kept;
                             } else if under.kind == CONTINENTAL {
                                 tally[2] += conserved;
                             }
@@ -455,6 +480,13 @@ pub fn resample(
         (MAFIC_DROPPED_GLOBAL, 6),
     ] {
         *world.globals.entry(name.to_owned()).or_insert(0.0) += sum(k);
+    }
+    // Only with the rule on, so a run with it off keeps the state it had before it existed.
+    if sediment_share > 0.0 {
+        *world
+            .globals
+            .entry(SEDIMENT_SUBDUCTED_GLOBAL.to_owned())
+            .or_insert(0.0) += sum(7);
     }
 
     // Gaps: fresh oceanic crust between diverging plates.
