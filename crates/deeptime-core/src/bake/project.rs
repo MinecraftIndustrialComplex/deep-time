@@ -3112,6 +3112,7 @@ mod tests {
             bake_blocks_per_world_block: 1.0,
             elevation: &elevation,
             closed: Some(&closed),
+            cube: None,
         };
         let note = settle_biome_layers(&mut held, &ground, &biomes::BiomeParams::default());
         let in_band = |b: usize| (0..n).filter(|&k| band(k) == b).count() as u64;
