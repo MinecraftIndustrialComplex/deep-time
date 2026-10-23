@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.wrapengine;
 
-import com.minecraftindustrialcomplex.deeptime.DeepTime;
-import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
-import com.toroidalworld.api.v1.ToroidalShape;
-import com.toroidalworld.api.v1.ToroidalWorldApi;
-import net.minecraft.core.Direction;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-
 /**
  * Installs the cube on the overworld behind the engine's flag (docs/design/wrap-engine.md §12.3 and
  * §12.7). Until phase 2's manifest reader exists the layout comes only from
@@ -17,6 +9,8 @@ import net.minecraft.server.level.ServerLevel;
  *
  * <p>Toroidal World keeps the slide when it loops the level (Ben, 2026-10-03, "TW slides, engine
  * turns"): {@link #decide} picks the topology's mode from the level's Toroidal World shape.
+ * {@code WrapEngine.installCube} does the install on server start; this class touches no Minecraft
+ * type, so the unit tests load it without the game on the classpath.
  */
 public final class CubeInstall {
 
@@ -81,31 +75,5 @@ public final class CubeInstall {
         if (d <= 0 || d % 16 != 0 || d > s / 2)
             throw new IllegalArgumentException("-D" + DEPTH_PROPERTY + "=" + d + ": the band depth must be a positive multiple of 16 and at most s/2 = " + s / 2);
         return d;
-    }
-
-    /** On server start, with the flag and the property set: the cube on the overworld. */
-    static void onServerStarted(MinecraftServer server) {
-        int s;
-        int d;
-        try {
-            s = side();
-            if (s == 0)
-                return;
-            d = depth(s);
-        } catch (IllegalArgumentException e) {
-            DeepTime.LOGGER.error("[wrapengine] no cube installed: {}", e.getMessage());
-            return;
-        }
-        ServerLevel overworld = server.overworld();
-        ToroidalShape shape = ToroidalWorldApi.shapeOf(overworld).orElse(null);
-        Decision dec = shape == null ? decide(false, false, 0, 0, false, s)
-                : decide(true, shape.loops(Direction.Axis.X), shape.widthBlocks(Direction.Axis.X), (long) shape.minChunk(Direction.Axis.X) * 16,
-                shape.loops(Direction.Axis.Z), s);
-        if (dec.mode() == Mode.REFUSE) {
-            DeepTime.LOGGER.error("[wrapengine] no cube installed on {}: {}", overworld.dimension().location(), dec.reason());
-            return;
-        }
-        DeepTime.LOGGER.info("[wrapengine] cube s={} depth {}: {}", s, d, dec.reason());
-        WrapEngine.install(overworld, WrapLayouts.cube(CubeLayout.of(s), d, dec.mode() == Mode.WITH_SLIDES));
     }
 }

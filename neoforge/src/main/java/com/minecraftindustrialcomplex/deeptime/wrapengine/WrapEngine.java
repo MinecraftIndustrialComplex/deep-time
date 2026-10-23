@@ -2,8 +2,12 @@
 package com.minecraftindustrialcomplex.deeptime.wrapengine;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
+import com.toroidalworld.api.v1.ToroidalShape;
+import com.toroidalworld.api.v1.ToroidalWorldApi;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -69,7 +73,7 @@ public final class WrapEngine {
             NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerAboutToStartEvent.class,
                     e -> com.minecraftindustrialcomplex.deeptime.compat.create.wrap.CreateWrapCompat.init());
         // The cube on the overworld, from -Ddeeptime.wrapengine.cube=<s> (design §12.3, §12.7).
-        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerStartedEvent.class, e -> CubeInstall.onServerStarted(e.getServer()));
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerStartedEvent.class, e -> installCube(e.getServer()));
         NeoForge.EVENT_BUS.addListener(LevelTickEvent.Post.class, e -> {
             if (e.getLevel() instanceof ServerLevel sl) {
                 BandManager b = bands(sl);
@@ -100,6 +104,35 @@ public final class WrapEngine {
             if (e.getLevel() instanceof ServerLevel sl && bands(sl) != null)
                 ((WrapLevel) sl).deeptime$setBands(null);
         });
+    }
+
+    /**
+     * On server start, with the flag and {@code -Ddeeptime.wrapengine.cube=<s>} set: the cube on the
+     * overworld, in the mode {@link CubeInstall#decide} picks from its Toroidal World shape.
+     */
+    private static void installCube(MinecraftServer server) {
+        int s;
+        int d;
+        try {
+            s = CubeInstall.side();
+            if (s == 0)
+                return;
+            d = CubeInstall.depth(s);
+        } catch (IllegalArgumentException e) {
+            DeepTime.LOGGER.error("[wrapengine] no cube installed: {}", e.getMessage());
+            return;
+        }
+        ServerLevel overworld = server.overworld();
+        ToroidalShape shape = ToroidalWorldApi.shapeOf(overworld).orElse(null);
+        CubeInstall.Decision dec = shape == null ? CubeInstall.decide(false, false, 0, 0, false, s)
+                : CubeInstall.decide(true, shape.loops(Direction.Axis.X), shape.widthBlocks(Direction.Axis.X), (long) shape.minChunk(Direction.Axis.X) * 16,
+                shape.loops(Direction.Axis.Z), s);
+        if (dec.mode() == CubeInstall.Mode.REFUSE) {
+            DeepTime.LOGGER.error("[wrapengine] no cube installed on {}: {}", overworld.dimension().location(), dec.reason());
+            return;
+        }
+        DeepTime.LOGGER.info("[wrapengine] cube s={} depth {}: {}", s, d, dec.reason());
+        install(overworld, WrapLayouts.cube(CubeLayout.of(s), d, dec.mode() == CubeInstall.Mode.WITH_SLIDES));
     }
 
     /** True when the engine's flag is on (its mixins are woven). */
