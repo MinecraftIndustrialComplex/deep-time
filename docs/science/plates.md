@@ -5814,6 +5814,67 @@ stalls puts its plates in compression and raises their initiation weight, and a 
 its plate in tension and raises its rift weight. That is the law: no separate trigger; the
 plates' forces and their relative motion redraw the boundaries.
 
+### Collision belts on the coast (2026-10-23)
+
+Gap 4's measure `coastset` (`tools/review/pool/measure_coastset.py`) on base's 24 runs puts most
+of the coast with high ground in collision belts: 0.333 of the coast has high ground (v1census's
+`coast_hi`, which fires above 0.11, docs/science/realism-checks.md), and of it 0.690 is within
+150 km of a collision belt, 0.190 at an arc and 0.085 on a rifted margin. The collision belts
+touch 0.360 of the coast, and 0.642 of that has high ground (arcs 0.246, rifted margins 0.094).
+Without the collision belts' high coasts `coast_hi` would be 0.094. The coordinator's question
+(2026-10-23): why does a collision front end at an open sea instead of inside a continent? The
+measure `collcoast` (PLT-508, registry `measures_boundary.json`) answers it from the same cached
+runs (medians of 24; the hand-offs and partings over the run after its first 100 Myr):
+
+| measure | base |
+|---|---|
+| collision regime (a Himalayan orogeny under 30 Myr old): share of the land / of it within 150 km of the sea | 0.170 / 0.427 |
+| its land's median distance to the sea | 175 km |
+| hand-offs per 100 Myr, terranes under 50 / 50 to 200 / 200 to 1000 / 1000 or more samples (about 5,100 km2 each) | 65.1 / 17.4 / 9.3 / 1.8 |
+| the plate check's collisions (a terrane of 0.1 of a starting plate or more, RLC-070) | 1.8 per 100 Myr |
+| share of the crust crossing collision fronts, in those four sizes | 0.111 / 0.104 / 0.304 / 0.061 |
+| partings (states that end with no hand-off) per 100 Myr / their share of the crust crossed | 37.6 / 0.43 |
+| partings: no continental crust left at the front (`parted`) / polarity reversed / contact closed | 0.56 / 0.27 / 0.13 |
+| collision high coasts: the belt along the coast / ending at the coast / not elongated | 0.315 / 0.216 / 0.465 |
+| collision high coasts on landmasses under 0.02 / of 0.10 or more of the land | 0.240 / 0.618 |
+
+What it says:
+
+- **Few of the coast's belts are continent-continent fronts that run out to sea.** A belt that
+  ends at the coast, the case the question names, is 0.22 of the collision high coasts. Almost
+  half are belts not elongated at 400 km, the footprint of a small terrane's belt, and a third run
+  along the coast.
+- **They are the dockings at active margins.** The model hands off about 93 collision states per
+  100 Myr, 65 of them terranes under 50 samples (about 255,000 km2), and ends another 38 with no
+  hand-off, most when the terrane's continental crust at the front is used up (stacked into the
+  belt). Earth's arc-continent sutures with ophiolites are 15 to 46 per 100 Myr (Macdonald et al.
+  2019; RLC-073, whose caveat holds: they match the model's terrane accretions, not its counted
+  collisions). The model's hand-offs of 50 samples or more, 28 per 100 Myr, sit inside that
+  range; with the smaller ones and the partings the model has about 130 docking episodes per
+  100 Myr, three to nine times Earth's sutures (a loose comparison: one suture can hold several of
+  the model's episodes). `belts.rs` stacks every collision state's shortened crust into a belt on
+  the overriding plate, whatever the terrane's size, and at an active margin the overriding plate's
+  edge is the coast: the terrane docks, the belt rises at the coast, and the ocean behind the
+  terrane stays open. That is how Earth's accreted coasts look too (the North American
+  Cordillera's), so the kind is right; the amount comes from how many terranes and arcs reach the
+  trenches.
+- **Where that number comes from**, and which of this lane's stages touch it:
+  - the subducting boundary, 1.6 times Earth's (above), with every trench a place for a docking.
+    Stage A adds transform at the ridges but does not shorten the trenches: indirect.
+  - the subduction initiations at passive margins (0.173 of the coast). Stage C1 moves them
+    offshore, which makes intra-oceanic arcs that later dock against the continent: Earth's way
+    for an arc to end, and possibly more collision coast, not less. Its arm will say which.
+  - the polarity reversals, 16.9 per 100 Myr against Crameri et al.'s 4 in 104 Myr (PLT-371):
+    each leaves a belt beside a new trench. The subduction lane's, not this one's.
+  - the arcs' crust (PLT-045), the stuff of the small terranes: not this lane's.
+  - stage C2 moves where rifts and initiations come, not how many: indirect.
+- **The belts' spread** (how far a belt's thickened crust reaches inland, which gap 4 left to this
+  lane) is not a stage here. The belt's width and its plateau would need a law from the belt's
+  strength against its driving force (the thin viscous sheet's Argand number, England and
+  McKenzie 1982, from memory), which none of the stages builds; recommended as its own lane after
+  the arms, not a knob on `belts.rs`'s widths. `collision_orogeny_myr` is only the regime's label
+  window (it decides which belts the measures call collision) and is not a lever.
+
 ### The arms (waiting for the new base)
 
 No arm has run. The exploration arms queued on 2026-10-23 (each switch alone) were cancelled
@@ -5830,9 +5891,11 @@ against it:
 
 A stage whose arm shows no divergence and no guard failure goes on by default, the rules it
 replaces off with it, its fixtures pinned off where a test needs the old behaviour, and the
-seed-pinned weld tests swept; the boundary measure and the V1 table are reported beside it as
-realism checks. The arm g2-base4 (base's seeds 1 to 4, 8 cached runs) is the matched control
-on the old base; the new base needs its own.
+seed-pinned weld tests swept; the measures `v1census`, `boundary`, `collcoast` and gap 4's
+`coastset` are reported beside it as realism checks (`pool.sh table --registry
+tools/review/pool/measures_boundary.json --registry tools/review/pool/measures_gap4.json`). The
+arm g2-base4 (base's seeds 1 to 4, 8 cached runs) is the matched control on the old base; the
+new base needs its own.
 
 ### Ben's part
 

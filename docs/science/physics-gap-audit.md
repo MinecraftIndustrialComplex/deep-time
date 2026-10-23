@@ -161,7 +161,12 @@ and that the model does not have as physics.
   and initiations weighted by the force balance's stress (PLT-504, PLT-505) and rifts along thin
   lithosphere (PLT-506, needs gap 4's thermal state); reorganisation is their composition
   (PLT-507). Off is bit-identical (`pool.sh alias`, seed 1, 1000 Myr). The arms wait for the new
-  base after the flexure and gap 4 lanes merge; the plate count (PLT-372) is not changed.
+  base after the flexure and gap 4 lanes merge; the plate count (PLT-372) is not changed. The
+  collision belts that hold 0.69 of the high coasts (gap 4's `coastset`) are mostly dockings of
+  small terranes and arcs at active margins, about 130 episodes per 100 Myr against Macdonald et
+  al. 2019's 15 to 46 arc-continent sutures, not continent-continent fronts running out to sea
+  (the measure `collcoast`, PLT-508; plates.md "Collision belts on the coast"). The belts' spread
+  inland is not built here.
 
 ### Gap 3: the trench budget
 
