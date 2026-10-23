@@ -282,6 +282,17 @@ struct Band {
     count: [u32; 2],
 }
 
+/// A gap point between two plates, in its pair's pole frame.
+struct GapPoint {
+    i: usize,
+    pair: (u32, u32),
+    band: i64,
+    theta: f64,
+    phi: f64,
+    /// Its nearest plate is the pair's first (a).
+    near_a: bool,
+}
+
 /// A pair's band offset, a fraction of a band in [0, 1) hashed from the two plates' ids, so that
 /// the pairs' band edges do not line up across the planet (game-choice: agent 2026-10-23).
 fn band_offset(a: u32, b: u32) -> f64 {
@@ -326,8 +337,7 @@ fn segment_ridges(
     }
     let mut frames: BTreeMap<(u32, u32), Option<PoleFrame>> = BTreeMap::new();
     let mut bands: BTreeMap<(u32, u32, i64), Band> = BTreeMap::new();
-    // (sample, pair, band, θ, φ, nearest is a)
-    let mut points: Vec<(usize, (u32, u32), i64, f64, f64, bool)> = Vec::new();
+    let mut points: Vec<GapPoint> = Vec::new();
     for i in 0..n {
         if !gap[i] {
             continue;
@@ -370,20 +380,28 @@ fn segment_ridges(
         let b = bands.entry((key.0, key.1, band)).or_default();
         b.cos += phi.cos();
         b.sin += phi.sin();
-        points.push((i, key, band, theta, phi, p1 == key.0));
+        points.push(GapPoint {
+            i,
+            pair: key,
+            band,
+            theta,
+            phi,
+            near_a: p1 == key.0,
+        });
     }
     for b in bands.values_mut() {
         b.phi = b.sin.atan2(b.cos);
     }
-    for &(_, key, band, _, phi, near_a) in &points {
-        if let Some(b) = bands.get_mut(&(key.0, key.1, band)) {
-            let k = usize::from(!near_a);
-            b.side[k] += wrap(phi - b.phi);
+    for g in &points {
+        if let Some(b) = bands.get_mut(&(g.pair.0, g.pair.1, g.band)) {
+            let k = usize::from(!g.near_a);
+            b.side[k] += wrap(g.phi - b.phi);
             b.count[k] += 1;
         }
     }
-    for &(i, key, band, theta, phi, _) in &points {
-        let Some(b) = bands.get(&(key.0, key.1, band)) else {
+    for g in &points {
+        let (i, key, theta, phi) = (g.i, g.pair, g.theta, g.phi);
+        let Some(b) = bands.get(&(key.0, key.1, g.band)) else {
             continue;
         };
         if b.count[0] == 0
