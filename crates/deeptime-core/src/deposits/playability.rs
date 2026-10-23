@@ -22,6 +22,7 @@
 //! (P1-15) in the content bundle (`{"essentials": [...]}`), which replaces the preset's list
 //! (`crate::preset::Preset::with_content`); runs without a bundle (the CLI) use the preset's.
 
+use deeptime_format::cube_map::CubeView;
 use deeptime_format::projection::{IndexFrame, PetroffGuyou, WorldProjection};
 use deeptime_format::{Product, Projection};
 use serde::{Deserialize, Serialize};
@@ -126,13 +127,22 @@ impl Regions {
 /// The world a planet's simulation becomes, as the playability pass needs it: where a simulation
 /// block lands in the world the game plays, and that world's region grid. A Lambert world is the
 /// simulation's own frame; a Petroff–Guyou world is the projection with the λc the world will be
-/// drawn with (`bake::project`), so an essential's regions are the ones the player walks.
+/// drawn with (`bake::project`), so an essential's regions are the ones the player walks; a cube
+/// world is the conformal cube turned as the turn search forecasts it (`bake::cube_turn`,
+/// SCL-129), its regions squares of the net's window (those in the void hold no land).
 // Copy on purpose, as `WorldProjection`: made once per run.
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Copy, Debug)]
 pub enum WorldFrame {
     Lambert(Projection),
-    PetroffGuyou { g: PetroffGuyou, src: Projection },
+    PetroffGuyou {
+        g: PetroffGuyou,
+        src: Projection,
+    },
+    Cube {
+        view: CubeView<'static>,
+        src: Projection,
+    },
 }
 
 impl WorldFrame {
@@ -141,6 +151,7 @@ impl WorldFrame {
         match self {
             WorldFrame::Lambert(_) => (x, z),
             WorldFrame::PetroffGuyou { g, src } => g.point_of_unit(src.unit(x, z)),
+            WorldFrame::Cube { view, src } => view.point_of_unit(src.unit(x, z)),
         }
     }
 
@@ -149,6 +160,7 @@ impl WorldFrame {
         match self {
             WorldFrame::Lambert(p) => WorldProjection::Lambert(*p),
             WorldFrame::PetroffGuyou { g, .. } => WorldProjection::PetroffGuyou(*g),
+            WorldFrame::Cube { view, .. } => WorldProjection::Cube(*view),
         }
     }
 

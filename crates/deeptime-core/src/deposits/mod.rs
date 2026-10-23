@@ -3615,8 +3615,12 @@ impl DepositStage {
                 json!({"projection": "lambert", "why": "no essentials"}),
             );
         }
+        use deeptime_format::projection::ProjectionKind;
         let Some(p) = self.planet.as_deref().filter(|p| {
-            p.scale.projection == deeptime_format::projection::ProjectionKind::PetroffGuyou
+            matches!(
+                p.scale.projection,
+                ProjectionKind::PetroffGuyou | ProjectionKind::Cube
+            )
         }) else {
             return (WorldFrame::Lambert(src), json!({"projection": "lambert"}));
         };
@@ -3627,6 +3631,9 @@ impl DepositStage {
             let (x, z) = src.block_of(lat, lon);
             f.elev[cluster::cell_of(&f.grid, x, z) as usize] >= 0.0
         };
+        if p.scale.projection == ProjectionKind::Cube {
+            return Self::cube_frame(p, &land, src, f.c as u32, ctx);
+        }
         let (g, choice) = ctx
             .pool
             .install(|| crate::bake::project::world_of_at(p, &land, FORECAST_SEARCH));
@@ -3639,6 +3646,46 @@ impl DepositStage {
             "lambda_c": crate::bake::project::lambda_note(choice.as_ref(), FORECAST_SEARCH),
         });
         (WorldFrame::PetroffGuyou { g, src }, note)
+    }
+
+    /// The cube world's frame for the playability pass: the conformal cube turned as the bake's
+    /// turn search would turn it on the present land, at the forecast's resolution
+    /// ([`crate::bake::cube_turn::FORECAST`], ledger: SCL-129), or the polar turn of a pinned λc.
+    /// Where the forecast's turn misses the bake's, the anchor's top-up adds the source.
+    fn cube_frame(
+        p: &crate::params::PlanetPreset,
+        land: &(dyn Fn([f64; 3]) -> bool + Sync),
+        src: deeptime_format::Projection,
+        c: u32,
+        ctx: &StageContext<'_>,
+    ) -> (WorldFrame, Value) {
+        use crate::bake::cube_turn;
+        let choice = ctx.pool.install(|| {
+            let pts = cube_turn::Land::new(land, cube_turn::FORECAST.samples);
+            if p.scale.lambda_c_deg != crate::params::LAMBDA_C_AUTO {
+                cube_turn::pinned(&pts, p.scale.lambda_c_deg)
+            } else {
+                cube_turn::search(&pts, p.seed, &cube_turn::FORECAST)
+            }
+        });
+        let s = deeptime_format::projection::face_for(c);
+        let map = deeptime_format::cube_map::CubeMap::builtin_static(
+            deeptime_format::cube_map::WORLD_MAP,
+        )
+        .expect("the built-in world map");
+        let deeptime_format::projection::WorldProjection::Cube(view) =
+            deeptime_format::projection::WorldProjection::cube(s, map, choice.turn)
+        else {
+            unreachable!("a cube projection")
+        };
+        let note = json!({
+            "projection": "cube",
+            "face_blocks": s,
+            "land": "present L1 elevation at or above sea level, nearest cell",
+            "forecast": true,
+            "turn": cube_turn::turn_note(&choice),
+        });
+        (WorldFrame::Cube { view, src }, note)
     }
 
     /// The playability pass (plan §7.8), its regions those of the world the game plays

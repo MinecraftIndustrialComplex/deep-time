@@ -23,6 +23,16 @@
 //!   tile pyramid of the polar pictures is not used;
 //! - `world-map.json`: also `kind`, `face_blocks` and `window` [x, z, width, height]; a mark per
 //!   border edge (`border <name>`, its line and pixels), per corner image and per pole image.
+//!
+//! - `seam-<seam>-<mountain|coast>.png` ([`seam_views`]): close views across each of the cube's 12
+//!   seams at one block a pixel, centred where the seam crosses the most relief and where it
+//!   crosses a coast; the pixels beyond a turning edge show what the net shows there (its fold),
+//!   so the picture is what a player standing on the seam sees. Yellow ticks at the picture's
+//!   rim mark the seam line.
+//!
+//! Either kind's `world-map.json` also holds a `census` ([`census`]): the planet's shares of land,
+//! ice and each Köppen class, read on an equal-area lattice of the planet through the world's own
+//! projection, so a polar and a cube bake of one run compare share by share (cube plan B7).
 
 use std::path::Path;
 
@@ -182,6 +192,7 @@ pub fn run(dir: &Path, zoom: u32, out: &Path) -> Result<Value, String> {
         "circumference": c,
         "projection": manifest.projection,
         "marks": marks,
+        "census": census(&manifest, dir)?,
     });
     std::fs::write(
         out.join("world-map.json"),
@@ -189,6 +200,85 @@ pub fn run(dir: &Path, zoom: u32, out: &Path) -> Result<Value, String> {
     )
     .map_err(|e| e.to_string())?;
     Ok(summary)
+}
+
+/// The census lattice's points: equal-area (a Fibonacci lattice), so a share of points is a share
+/// of the planet's area.
+const CENSUS_POINTS: usize = 1 << 21;
+
+/// The planet's shares, read through the world's projection at [`CENSUS_POINTS`] points of a
+/// Fibonacci lattice on the sphere (each point's nearest cell): `land` (elevation at or above the
+/// sea level's block), `ice` (`climate/ice_cover` above 0), `wetland` (`climate/wetland` not 0) and
+/// one share per Köppen class of `climate/koppen_l2` (`sea` the sea's). A layer the world lacks
+/// is left out. The shares of two bakes of one run differ only by what each projection does to the
+/// rasters, which is what the cube plan's check B7 compares.
+pub fn census(manifest: &Manifest, dir: &Path) -> Result<Value, String> {
+    use deeptime_core::climate::koppen;
+    let wp = manifest.world_projection();
+    let sea = f64::from(manifest.scale.sea_level_y);
+    let elev = open_layer(manifest, dir, "elevation")?;
+    let ice = open_layer(manifest, dir, "climate/ice_cover")?;
+    let wet = open_layer(manifest, dir, "climate/wetland")?;
+    let class = open_layer(manifest, dir, "climate/koppen_l2")?;
+    let (mut land, mut iced, mut wetland) = (0usize, 0usize, 0usize);
+    let mut classes = [0usize; koppen::CODES.len()];
+    let mut unread = 0usize;
+    let golden = std::f64::consts::PI * (3.0 - 5f64.sqrt());
+    for k in 0..CENSUS_POINTS {
+        let y = 1.0 - (k as f64 + 0.5) * 2.0 / CENSUS_POINTS as f64;
+        let lat = y.asin().to_degrees();
+        let lon = deeptime_format::projection::wrap_deg((k as f64 * golden).to_degrees() + 180.0) - 180.0;
+        let (x, z) = wp.block_of(lat, lon);
+        if !x.is_finite() || !z.is_finite() {
+            unread += 1;
+            continue;
+        }
+        if let Some(l) = &elev
+            && l.nearest(x, z) >= sea
+        {
+            land += 1;
+        }
+        if let Some(l) = &ice
+            && l.nearest(x, z) > 0.0
+        {
+            iced += 1;
+        }
+        if let Some(l) = &wet
+            && l.nearest(x, z) != 0.0
+        {
+            wetland += 1;
+        }
+        if let Some(l) = &class {
+            let v = l.nearest(x, z);
+            if v.is_finite() && v >= 0.0 && (v as usize) < classes.len() {
+                classes[v as usize] += 1;
+            }
+        }
+    }
+    let n = CENSUS_POINTS as f64;
+    let share = |c: usize| (c as f64 / n * 1e6).round() / 1e6;
+    let mut o = serde_json::Map::new();
+    o.insert("points".into(), json!(CENSUS_POINTS));
+    o.insert("unread".into(), json!(unread));
+    if elev.is_some() {
+        o.insert("land".into(), json!(share(land)));
+    }
+    if ice.is_some() {
+        o.insert("ice".into(), json!(share(iced)));
+    }
+    if wet.is_some() {
+        o.insert("wetland".into(), json!(share(wetland)));
+    }
+    if class.is_some() {
+        let by: serde_json::Map<String, Value> = classes
+            .iter()
+            .enumerate()
+            .filter(|&(_, &c)| c > 0)
+            .map(|(i, &c)| (koppen::CODES[i].to_owned(), json!(share(c))))
+            .collect();
+        o.insert("koppen".into(), Value::Object(by));
+    }
+    Ok(Value::Object(o))
 }
 
 /// A cone point's square.
@@ -212,6 +302,7 @@ fn run_cube(
     out: &Path,
 ) -> Result<Value, String> {
     let pics = cube_pictures(dir, manifest, spec, s, zoom)?;
+    let views = seam_views(dir, manifest, s, out)?;
     let (w, h) = (pics.frame.w, pics.frame.h);
     for (name, rgb) in [
         ("satellite.png", &pics.satellite),
@@ -232,6 +323,8 @@ fn run_cube(
         "circumference": manifest.scale.circumference_blocks,
         "projection": manifest.projection,
         "marks": pics.marks,
+        "seam_views": views,
+        "census": census(manifest, dir)?,
     });
     std::fs::write(
         out.join("world-map.json"),
@@ -464,6 +557,158 @@ fn cube_pictures(
         satellite,
         marks,
     })
+}
+
+/// A seam close view's side, blocks (and pixels: one block a pixel).
+const SEAM_VIEW_BLOCKS: usize = 320;
+/// Along a seam the views' centres are tried this many blocks apart.
+const SEAM_STEP: i64 = 16;
+/// A tried centre is scored on the elevation this many blocks to each side, in steps of
+/// [`SEAM_STEP`].
+const SEAM_REACH: i64 = 48;
+
+/// The cube's 12 seams as net lines: the five drawn inside the net (F3|F0, F0|F1, F1|F2, N|F0,
+/// S|F0), the slide (F2|F3, one of its two net edges) and the six turning seams (one net edge
+/// each). Each is (name, axis of its normal, the line's coordinate, [first, one past the last]
+/// block along it).
+fn seam_lines(cube: &Cube) -> Vec<(String, Axis, i64, [i64; 2])> {
+    let (ox, oz) = cube.face_origin(Face::F0);
+    let s = cube.side();
+    let along = [oz, oz + s];
+    let mut lines = vec![
+        ("F3|F0".to_owned(), Axis::X, ox, along),
+        ("F0|F1".to_owned(), Axis::X, ox + s, along),
+        ("F1|F2".to_owned(), Axis::X, ox + 2 * s, along),
+        ("N|F0".to_owned(), Axis::Z, oz, [ox, ox + s]),
+        ("S|F0".to_owned(), Axis::Z, oz + s, [ox, ox + s]),
+    ];
+    let edges = cube.edges();
+    for (k, e) in edges.iter().enumerate() {
+        if k < e.partner {
+            let name = format!("{}|{}", e.name, edges[e.partner].name);
+            lines.push((name, e.axis, e.coord, e.span));
+        }
+    }
+    lines
+}
+
+/// Close views across every seam of cube world `dir` (side `s`), written into `out`: for each
+/// seam, the centre along it where the elevation spans the most blocks within [`SEAM_REACH`]
+/// (on land), and the one where a coast crosses it (land and sea on both sides), each drawn
+/// [`SEAM_VIEW_BLOCKS`] square at one block a pixel by the satellite look. A read beyond a
+/// turning edge folds onto the planet as the net shows it (SCL-108); past a net corner it is
+/// the void. Returns one mark per view.
+fn seam_views(dir: &Path, manifest: &Manifest, s: u32, out: &Path) -> Result<Vec<Value>, String> {
+    let cube = Cube::shared(s);
+    let elev = open_layer(manifest, dir, "elevation")?.ok_or("the world has no elevation layer")?;
+    let sea = f64::from(manifest.scale.sea_level_y);
+    let read = |x: f64, z: f64| elev.bilinear(x - 0.5, z - 0.5);
+    let mut views = Vec::new();
+    for (name, axis, coord, span) in seam_lines(cube) {
+        let point = |t: f64, n: f64| match axis {
+            Axis::X => (coord as f64 + n, t),
+            Axis::Z => (t, coord as f64 + n),
+        };
+        let (mut best_relief, mut best_coast) = ((f64::MIN, 0.0), (f64::MIN, 0.0));
+        let mut t = span[0] + SEAM_STEP / 2;
+        while t < span[1] {
+            let tc = t as f64;
+            let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+            // Land counts on each side of the line: [before, beyond].
+            let mut land = [0usize; 2];
+            let mut read_n = [0usize; 2];
+            let mut dt = -SEAM_REACH;
+            while dt <= SEAM_REACH {
+                let mut dn = -SEAM_REACH;
+                while dn <= SEAM_REACH {
+                    if dn != 0 {
+                        let (x, z) = point(tc + dt as f64, dn as f64);
+                        let e = read(x, z);
+                        if e.is_finite() {
+                            lo = lo.min(e);
+                            hi = hi.max(e);
+                            let side = usize::from(dn > 0);
+                            read_n[side] += 1;
+                            land[side] += usize::from(e >= sea);
+                        }
+                    }
+                    dn += SEAM_STEP;
+                }
+                dt += SEAM_STEP;
+            }
+            let (x, z) = point(tc, 0.0);
+            let centre = read(x, z);
+            if centre.is_finite() && read_n[0] > 0 && read_n[1] > 0 {
+                if centre >= sea && hi - lo > best_relief.0 {
+                    best_relief = (hi - lo, tc);
+                }
+                let mixed = |k: usize| {
+                    let f = land[k] as f64 / read_n[k] as f64;
+                    f.min(1.0 - f)
+                };
+                let coast = mixed(0) + mixed(1);
+                if coast > 0.0 && coast > best_coast.0 {
+                    best_coast = (coast, tc);
+                }
+            }
+            t += SEAM_STEP;
+        }
+        for (kind, (score, tc)) in [("mountain", best_relief), ("coast", best_coast)] {
+            if score == f64::MIN {
+                continue;
+            }
+            let (cx, cz) = point(tc, 0.0);
+            let half = SEAM_VIEW_BLOCKS as f64 / 2.0;
+            let fr = Frame {
+                x0: cx - half,
+                z0: cz - half,
+                bpp: 1.0,
+                w: SEAM_VIEW_BLOCKS,
+                h: SEAM_VIEW_BLOCKS,
+            };
+            let n = fr.w * fr.h;
+            let mut height = vec![f32::NAN; n];
+            let mut face_of = vec![None; n];
+            for j in 0..fr.h {
+                for i in 0..fr.w {
+                    let (x, z) = fr.point(i, j);
+                    let e = read(x, z);
+                    height[j * fr.w + i] = e as f32;
+                    if e.is_finite() {
+                        face_of[j * fr.w + i] = Some(Face::F0);
+                    }
+                }
+            }
+            let mut rgb = satellite(&fr, &face_of, &height, sea);
+            // The seam line: ticks 12 pixels long at the rim, where it enters and leaves.
+            let at = match axis {
+                Axis::X => Frame::thick(fr.col(coord as f64), fr.w),
+                Axis::Z => Frame::thick(fr.row(coord as f64), fr.h),
+            };
+            let (first, last) = (0, SEAM_VIEW_BLOCKS as i64 - 1);
+            for ends in [(first, first + 11), (last - 11, last)] {
+                match axis {
+                    Axis::X => fr.fill(&mut rgb, at, ends, BORDER),
+                    Axis::Z => fr.fill(&mut rgb, ends, at, BORDER),
+                }
+            }
+            let file = format!("seam-{}-{kind}.png", name.replace('|', "-"));
+            let png = deeptime_viewer::encode_png_rgb(fr.w as u32, fr.h as u32, &rgb)
+                .map_err(|e| e.to_string())?;
+            std::fs::write(out.join(&file), png).map_err(|e| e.to_string())?;
+            views.push(json!({
+                "seam": name,
+                "kind": kind,
+                "file": file,
+                "centre": [cx, cz],
+                "axis": match axis { Axis::X => "x", Axis::Z => "z" },
+                "line": coord,
+                "blocks": SEAM_VIEW_BLOCKS,
+                "score": (score * 1000.0).round() / 1000.0,
+            }));
+        }
+    }
+    Ok(views)
 }
 
 /// A piecewise linear colour ramp: the colour at `t` between the stops (value, colour), the end

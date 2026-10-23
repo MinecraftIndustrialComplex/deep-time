@@ -403,6 +403,65 @@ ore and a dry centre before the top-up), `counted` (the sources with ore and a d
 regions short only for that: they would hold enough with the sea sources counted), `added`,
 `added_inland`, `short` (land regions still short: no template or no dry point)), `top_up_millis`.
 
+### The bake on a cube world (format 0.7, cube plan phase 1)
+
+A preset whose `scale.projection` is `cube` (or `deeptime run --set scale.projection=cube`, or
+`deeptime project --set scale.projection=cube` on a Lambert folder) runs the same simulation and
+Lambert bake, then rewrites the folder as a cube world (`deeptime_core::bake::project_cube`;
+science page `docs/science/cube-world-bake.md`). It is opt-in: the default stays `petroff_guyou`,
+whose pass above is unchanged byte for byte. The differences from that pass:
+
+- **The turn** (SCL-120, SCL-121): the cube `conformal-n513` of side s = `face_for(C)` is turned
+  freely on the planet so its eight corners lie as far from land as a seeded search finds
+  (`bake::cube_turn`: random rotations, the best kept and refined, and the polar turns as a
+  candidate; seeded by the preset's seed, so a planet always gets one turn). A pinned
+  `scale.lambda_c_deg` gives the polar turn at that longitude instead. The land is the Lambert
+  elevation at or above sea level. The manifest's `projection` carries the rotation and the
+  corners' `land_distance_deg` ("The cube world's layout").
+- **Rasters** (SCL-124): every world cell is a point sample at its centre (`cube_point`). Its
+  footprint on the Lambert grid comes from the composed Jacobian (world cell to planet to Lambert
+  block): along each of the footprint's two principal axes, where the cell spans more than one
+  simulation cell, a Gaussian of the remaining width averages it; else the bilinear read alone.
+  There is no polar widening (the Petroff-Guyou pass's (0.52 / cos φ)⁴): the cube has no poles of
+  its own. Categories, stacks and cover take the nearest cell as there; the ice cover keeps its
+  cover rule.
+- **Topology** (SCL-122): the closed-basin redraw, the biome layers' fills and distances, and the
+  relief's neighbours run on the cube's own cells across every seam (the open sea is an
+  8-connected body over the six faces; distances are great-circle). Nothing is glued.
+- **Relief** (SCL-123, SCL-125): the cone gullies and the steep-ground texture are drawn on each
+  face, in world blocks, across the seams; a cone's angles are taken on the planet in the vent's
+  tangent frame. The noise they read is blended across the turning seams within its reach.
+- **Vector data**: positions through the inverse map, sizes and directions through the analytic
+  Jacobian. A river chain that crosses a turning seam is cut there into two chains whose ends
+  meet under the seam's fold, the upstream part ending with `Mouth::Seam` (SCL-126; "Rivers");
+  widths scale by the local metres per block, depths are kept. Structure windows crossing a
+  turning seam are kept (SCL-128). Bodies, sites, `volcanoes/active.json`,
+  `volcanoes/standing.json`, `impacts/craters.json` move with their centres. Ranked spawn
+  candidates move to the world and are dropped within 256 blocks of a cube corner or 64 of a
+  turning edge (SCL-127).
+- **The guaranteed deposits**: the deposit stage forecasts the turn on its L1 land
+  (`notes.deposits.world_frame` with `projection` `cube` and its own `turn`, SCL-129); the anchor
+  and the top-up then run on the cube world's own index frame, with lattice points off the six
+  faces left out.
+- **The manifest**: `format_version` 0.7, `projection` the cube layout, `scale.circumference_blocks`
+  4s, `scale.m_per_block_h` the nominal √(4πR²/6s²); `notes.bake.stats` the land under the cube
+  (`corners` with each corner's latitude, longitude and `land_distance_deg`,
+  `corner_min_land_distance_deg`, `land_share`, `land_blocks_per_planet_area` quantiles,
+  `land_within_5deg_of_corner`, `land_p999_within_2x`, `corners_5deg_from_land`); and
+  `notes.bake.projection` with `kind` `cube`, `face_blocks`, `world_blocks`, `map` {name,
+  sha256}, `turn` (the search's record), `stats` (as above), `m_per_block_h`,
+  `sigma_m_per_block` (quantiles of the local metres per block), `bake_blocks_per_world_block`,
+  `layers`, `relief`, `shares` (`land_map`, `land_world_planet` (cells weighted by their planet
+  area), `land_true`, and the same for the ice cover), `footprint` (per grid: the cells by the
+  footprint's longer stretch in simulation cells, each band's mean samples and its
+  checkerboard leak), `seam_steps` (per layer: the 50th, 90th, 99th percentile and largest
+  height step between neighbouring cells within a face, near an edge, across direct seams,
+  across the slide and across turning seams), `top_raise`, `closed_basin`, `biome_land`,
+  `vector` (`rivers` with `seam_cuts`, `seam_partner_mismatch`, `cuts_on_direct_seams`,
+  `length_change` and the crossings by seam; `structure_events` with
+  `crossing_turning_seams_kept`; `bodies` with `planet_area_ratio_median` mid-face, by a seam
+  and by a corner; `sites`; `spawn_candidates`) and `millis`.
+
 ### The climate at a block (0.2, P1-25)
 
 `notes.bake.climate.monthly` is `null` for a run without a climate section, else
@@ -887,10 +946,10 @@ Java `PortableMath`, JS `DTMath`):
 
 Written by the Rust side since cube plan phase 1 (`deeptime synth --kind cube`, the bake's cube
 option; docs/plans/cube-world-plan.md B1 to B10) and read by its tools; the game reads it from
-phase 2 ("Polar and cube worlds side by side"). It follows the plan's question Q1, answer (a):
-rasters face by face with no void cells, the map table shipped in the code, and the manifest naming
-the table and its sha256. The geometry is coded and tested
-in all three languages: Rust `deeptime_format::cube` (the net) and `deeptime_format::cube_map` (the
+phase 2 ("Polar and cube worlds side by side"). It follows the plan's question Q1, answer (a)
+(Ben, 2026-10-22, decisions log): rasters face by face with no void cells, the map table shipped in
+the code, and the manifest naming the table and its sha256. The map is the conformal cube turned
+freely (Q4, Ben, 2026-10-22). The geometry is coded and tested in all three languages: Rust `deeptime_format::cube` (the net) and `deeptime_format::cube_map` (the
 map, the turn, `CubeWorld`), Java `worlddata/CubeLayout` and `worlddata/CubeMap`, JS `DTCube`,
 `DTCubeMap` and `DTCubeWorld` in `projection.js`, all checked against the parity fixture's `cube`
 section (`tests/data/projection_parity.json`).
