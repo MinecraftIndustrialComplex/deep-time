@@ -479,14 +479,14 @@ Myr, much faster than the plate weakens: the basins left in the final surface ar
 about as fast as sediment arrives, or opened in the last few Myr (which of the two, not traced).
 
 **Measured.** Through the pool, 12 seeds by two starts, 1,000 Myr, `earthlike_quick_16k`: the
-branch with the pace on (source key 76b4db9c66ff, τ = 62.8 Myr) on the base's arguments
+branch with the pace on (source key 76b4db9c66ff, τ = 62.8 Myr) on the old base's arguments
 (`fg-release`) and on the trench-m-rs12e-sheet set (`fg-release-sheet`: the sheet's four keys
-and the trench budget's three, the set a lane of 2026-10-23 makes the default), each against the
-pool's 24 runs of the same arguments without the pace (`base`, `trench-m-rs12e-sheet`). One run
-with `te_weakening_myr = 0` (supercontinent, seed 1) is bit-identical to the base's. Medians (the
-criteria: the mean a run), Mann-Whitney p:
+and the trench budget's three, master's default since 57558f0a), each against the pool's 24 runs
+of the same arguments without the pace (the old `base`; `trench-m-rs12e-sheet`, the pool's `base`
+since that merge). One run with `te_weakening_myr = 0` (supercontinent, seed 1) is bit-identical
+to the old base's. Medians (the criteria: the mean a run), Mann-Whitney p:
 
-| measure | base | pace on | p | sheet set | pace on | p |
+| measure | old base | pace on | p | the default | pace on | p |
 |---|---|---|---|---|---|---|
 | V1 criteria met (of 7) | 2.33 | 2.54 | 0.60 | 3.42 | 3.17 | 0.45 |
 | land share | 0.292 | 0.302 | 0.63 | 0.306 | 0.309 | 0.67 |
