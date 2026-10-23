@@ -227,7 +227,7 @@ fn work_terrain(field: &Field, sea_raw: i32) -> (GridDesc, Vec<i16>) {
 /// temperature and the warmest and coldest month (`climate/t_warm_c`, `climate/t_cold_c`; the
 /// mean ± 8 °C without them) bilinear from the frame's L1 climate, else the surface stage's zonal
 /// stand-in.
-fn climate_at<'w>(
+pub(crate) fn climate_at<'w>(
     world: &'w WorldState,
     circumference: f64,
 ) -> impl Fn(i64, i64) -> Climate + Sync + 'w {

@@ -235,6 +235,7 @@ mod tests {
             kfac: vec![1.0; n],
             lake_z: vec![crate::surface::amplify::resample::NO_LAKE; n],
             zs: Vec::new(),
+            closed: Vec::new(),
         }
     }
 

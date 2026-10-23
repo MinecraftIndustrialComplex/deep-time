@@ -18,14 +18,21 @@
 //!   area (a headwater cell of the coarse level is four fine cells that each own a quarter of it):
 //!   the erosion passes' prior, which they refine locally and keep beyond their reach.
 //! - **Runoff weight and erodibility**: linear.
-//! - **Lakes**: a lake (or closed basin) is its water surface, the level the young landscape's
-//!   flood filled it to. A fine cell takes the highest surface among the coarse cells of its own
+//! - **Lakes**: a lake is its water surface: the level the bake's water balance holds it at on
+//!   the first level (`balance.rs`), or with the hydrology off the level the young landscape's
+//!   flood filled the closed basin to. A fine cell takes the highest surface among the coarse cells of its own
 //!   interpolation quad (the coarse cell it sits on, or the two or four it lies between) and is a
 //!   lake cell when its terrain lies under that surface. The shore is therefore the contour of the
 //!   fine terrain at the lake's level: smooth, and the same in every direction. A footprint copied
 //!   from the coarse cells (each fine cell a lake when a coarse lake cell lay within a cell of it)
 //!   drew every lake's edge as a staircase of coarse cells, and the passes, which leave lakes
 //!   alone, cut that staircase into the walls of every closed basin (ledger AMP-090).
+//! - **Closed basins** ([`basin`]): ground the open sea does not reach is never sea, however far
+//!   below sea level it lies, and the lowest point of a basin the water balance leaves dry is
+//!   where its floor drains to (`balance.rs`). A fine cell is closed ground when every coarse
+//!   cell of its quad is, and a sink when it sits on a coarse sink. A level keeps the class a
+//!   byte a cell ([`Level::closed`]); a window keeps it in bits 1 and 2 of its lake byte
+//!   ([`cell`]), so the class costs a window nothing (ledger AMP-096).
 
 use super::window::Win;
 
@@ -44,16 +51,65 @@ pub struct Level {
     pub wgt: Vec<f32>,
     /// Rock erodibility multiplier.
     pub kfac: Vec<f32>,
-    /// The water surface, m, of the lake or closed basin the young landscape had at the cell (the
-    /// level its flood filled the basin to), [`NO_LAKE`] elsewhere.
+    /// The water surface, m, of the lake at the cell, [`NO_LAKE`] elsewhere: the lakes the water
+    /// balance leaves on the young landscape (`balance.rs`), or with the hydrology off the level
+    /// the young landscape's flood filled each closed basin to.
     pub lake_z: Vec<f32>,
     /// The glaciers' surface, m, where they were, and a metre under the ground elsewhere (so it
     /// interpolates smoothly across their margins); empty without glaciers (`glacial.rs`).
     pub zs: Vec<f32>,
+    /// What the ground of each cell is ([`basin`]); empty when every cell is [`basin::OPEN`].
+    pub closed: Vec<u8>,
 }
 
 /// [`Level::lake_z`] of a cell outside every lake.
 pub const NO_LAKE: f32 = f32::NEG_INFINITY;
+
+/// What a cell of [`Level::closed`] is (and a fine cell, [`cell::class`]).
+pub mod basin {
+    /// Ground the open sea reaches, or above sea level: under sea level it is sea.
+    pub const OPEN: u8 = 0;
+    /// The ground of a closed basin (the hydrology's `closed_basin` layer): never sea, however
+    /// far below sea level it lies.
+    pub const CLOSED: u8 = 1;
+    /// The lowest point of a basin the water balance leaves dry: its floor drains here, so the
+    /// flood keeps the basin instead of filling it (an outlet, like a lake).
+    pub const SINK: u8 = 2;
+}
+
+/// A window's byte for a fine cell ([`Fine::lake`], `Buf::lake`): bit 0 is set when the cell lies
+/// under a lake's surface, bits 1 and 2 hold its [`basin`] class. The class rides in the lake
+/// flag's byte so that a window carries no byte more for it (the default world's amplifier is
+/// within 38 MiB of the 4 GiB cap, 2026-10-23).
+pub mod cell {
+    /// The lake bit.
+    pub const LAKE: u8 = 1;
+
+    /// Whether the cell lies under a lake's surface.
+    #[inline]
+    pub fn lake(m: u8) -> bool {
+        m & LAKE != 0
+    }
+
+    /// The cell's [`super::basin`] class.
+    #[inline]
+    pub fn class(m: u8) -> u8 {
+        m >> 1
+    }
+
+    /// The byte of a cell with lake flag `lake` and basin class `class`.
+    #[inline]
+    pub fn of(lake: bool, class: u8) -> u8 {
+        u8::from(lake) | (class << 1)
+    }
+}
+
+/// Whether ground at `z` with basin class `closed` ([`basin`]) is under the sea: below sea level
+/// and open to it (ledger: AMP-096).
+#[inline]
+pub fn wet(z: f32, sea: f32, closed: u8) -> bool {
+    z <= sea && closed == basin::OPEN
+}
 
 impl Level {
     /// Bytes the arrays hold.
@@ -64,6 +120,7 @@ impl Level {
             + self.kfac.len()
             + self.lake_z.len()
             + self.zs.len()) as u64
+            + self.closed.len() as u64
     }
 
     /// Whether cell `c` lies in a lake (or closed basin).
@@ -79,7 +136,8 @@ pub struct Fine {
     pub area: Vec<f32>,
     pub own: Vec<f32>,
     pub kfac: Vec<f32>,
-    /// 1 where the cell lies under a lake's surface ([`Level::lake_surface`]), else 0. The surface
+    /// The cell's [`cell`] byte: its lake bit, set where it lies under a lake's surface
+    /// ([`Level::lake_surface`]), and its basin class ([`Level::basin_class`]). The surface
     /// itself is not kept per fine cell: the next level's [`Level::lake_z`] takes it from the
     /// coarse level when a tile hands its core on (`tiles::LevelSink`), which keeps 4 B a cell out
     /// of every window.
@@ -243,9 +301,8 @@ impl Level {
                     ar[i] = (interp - wg * (a_coarse - a_fine)).max(or[i]);
                     // The highest lake surface among the corners of the cell's quad (1, 2 or 4
                     // coarse cells); a lake cell when the terrain lies under it. ledger: AMP-090
-                    if zr[i] < self.lake_surface(gi, gj) {
-                        lr[i] = 1;
-                    }
+                    let lake = zr[i] < self.lake_surface(gi, gj);
+                    lr[i] = cell::of(lake, self.basin_class(gi, gj));
                 }
             });
         if self.zs.len() == self.cells() {
@@ -288,6 +345,31 @@ impl Level {
         s
     }
 
+    /// The [`basin`] class of fine cell (gi, gj) of the ×2 grid: closed ground when every coarse
+    /// cell at the corners of its interpolation quad is (ledger: AMP-096), and a sink on a coarse
+    /// sink's own node (ledger: AMP-097); open when the level has no classes. It is the cell's
+    /// class in a window ([`Level::sample`]) and on the next level (`tiles::LevelSink`).
+    #[inline]
+    pub fn basin_class(&self, gi: i64, gj: i64) -> u8 {
+        if self.closed.len() != self.cells() {
+            return basin::OPEN;
+        }
+        let (ci, cj) = (gi >> 1, gj >> 1);
+        let (fi, fj) = (gi & 1 == 1, gj & 1 == 1);
+        for cj2 in cj..=cj + i64::from(fj) {
+            for ci2 in ci..=ci + i64::from(fi) {
+                if self.closed[idx(self.w, self.h, ci2, cj2)] == basin::OPEN {
+                    return basin::OPEN;
+                }
+            }
+        }
+        if !fi && !fj && self.closed[idx(self.w, self.h, ci, cj)] == basin::SINK {
+            basin::SINK
+        } else {
+            basin::CLOSED
+        }
+    }
+
     /// The whole ×2 level's terrain (the fine grid's `z`), for callers that need no other array.
     pub fn upsampled_z(&self) -> Vec<f32> {
         self.sample(&Win::full(2 * self.w, 2 * self.h)).z
@@ -310,6 +392,7 @@ mod tests {
             kfac: vec![1.0; n],
             lake_z: vec![NO_LAKE; n],
             zs: Vec::new(),
+            closed: Vec::new(),
         }
     }
 
