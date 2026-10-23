@@ -129,6 +129,15 @@ public final class GameTestSupport {
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_river_depth"));
 
     /**
+     * The delta-test world (C = 1,024, folder {@code deeptime-delta}; gametest.sh writes it with
+     * {@code deeptime synth --kind delta-test}) under the bare biome with no caves: a delta plain a
+     * block over the sea's water with a river and two distributaries leaving it at the apex
+     * ({@code DeltaGameTests}; V1 gap 5, HYD-136 to HYD-140).
+     */
+    public static final ResourceKey<Level> TEST_DELTA =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_delta"));
+
+    /**
      * The real planet's world data (folder {@code deeptime-real}) with the full router,
      * {@code deeptime:planet} (noise caves and aquifers; every other test level uses
      * {@code planet_nocaves}), under the bare biome: {@code LavaGameTests.lavaStaysAtTheFloor}

@@ -63,6 +63,8 @@ pub mod delta;
 pub mod network;
 
 #[cfg(test)]
+mod delta_tests;
+#[cfg(test)]
 mod tests;
 
 use deeptime_format::GridDesc;
