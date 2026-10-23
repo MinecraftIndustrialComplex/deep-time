@@ -124,19 +124,33 @@ impl Out<'_> {
     }
 }
 
-/// Every tile of a layer as stored (`tilepack::stored_tile`), compressed in parallel (P1-19).
+/// The raw tile bytes [`stored_tiles`] compresses at once (at least one tile). A tile in flight
+/// holds its raw copy and the compressor's worst-case buffer (`lz4_flex`: 1.1 × the input), so a
+/// layer's write holds at most 1.1 × (the layer's raw bytes + this) whatever the thread count:
+/// its finished tiles, at worst 1.1 × theirs, and the batch's extra 1.1 × its own. A figure of
+/// the memory model, not a physical one (amp-est, 2026-10-23: the world's horizon stacks on
+/// full 32k, 28 tiles of 14.7 MB, held 224.6 MB in flight on 8 threads, and would hold up to
+/// 2.2 × their 299 MB on 28).
+pub(crate) const STORE_BATCH_BYTES: u64 = 32 << 20;
+
+/// Every tile of a layer as stored (`tilepack::stored_tile`), compressed in parallel (P1-19), a
+/// batch of at most [`STORE_BATCH_BYTES`] raw bytes at a time.
 pub(crate) fn stored_tiles(desc: &LayerDesc, cells: &[u8]) -> Result<Vec<Vec<u8>>, CoreError> {
     desc.validate()?;
     check_cells(desc, cells)?;
-    Ok((0..desc.tile_count())
-        .into_par_iter()
-        .map(|t| {
+    let n = desc.tile_count();
+    let tile_bytes = (desc.tile as usize).pow(2) * desc.cell_bytes();
+    let batch = (STORE_BATCH_BYTES as usize / tile_bytes.max(1)).max(1);
+    let mut tiles = Vec::with_capacity(n);
+    for first in (0..n).step_by(batch) {
+        tiles.par_extend((first..(first + batch).min(n)).into_par_iter().map(|t| {
             let mut tile = stored_tile(desc, cells, t);
             // The compressor's buffer is sized for the worst case: only the stored bytes are kept.
             tile.shrink_to_fit();
             tile
-        })
-        .collect())
+        }));
+    }
+    Ok(tiles)
 }
 
 /// Writes a layer's tile pack (atomically, the file `write_tile_pack` writes) with its tiles
@@ -267,6 +281,69 @@ pub(crate) fn grids(p: &PlanetPreset) -> Result<(GridDesc, GridDesc), CoreError>
         GridDesc::for_planet("L1", c, p.resolution.l1_r)?,
         GridDesc::for_planet("L2", c, p.resolution.l2_r)?,
     ))
+}
+
+/// The cell size of the hydrology's grid, blocks: L3's, doubled while the grid is over
+/// `hydro::MAX_CELLS` and halves evenly (`water::halve`; 4 on 32k full, else L3's 2).
+pub(crate) fn hydrology_r(p: &PlanetPreset) -> u32 {
+    let r = p.resolution.l3_r;
+    let Ok(g) = GridDesc::for_planet("L3", p.scale.circumference_blocks, r) else {
+        return r;
+    };
+    let (mut w, mut h, mut r) = (g.w as usize, g.h as usize, r);
+    while w * h > crate::hydro::MAX_CELLS && w % 2 == 0 && h % 2 == 0 {
+        (w, h, r) = (w / 2, h / 2, r * 2);
+    }
+    r
+}
+
+/// Bytes per horizon of an L1 cell the strata part holds beyond the finished world at its peak
+/// ([`strata::bake`]: the horizon stacks, 7 B a horizon, their raised copy and the layer's cells
+/// and tiles as it writes them). A figure of the memory model, not a physical one (amp-est,
+/// 2026-10-23: 26.4 and 26.5 B held on quick 16k at 50 and 1000 Myr, 19.8 B on full 32k, 32
+/// horizons).
+pub const STRATA_BYTES_PER_HORIZON_CELL: u64 = 28;
+
+/// Bytes per cell of the hydrology's grid the water part holds beyond the finished world at its
+/// peak ([`water::bake`]: the elevation it drains and `hydro::network::run`'s arrays), beside
+/// [`WATER_BYTES_PER_L1_CELL`] for the climate it samples. Figures of the memory model, fitted to
+/// two grids (amp-est, 2026-10-23: 587.2 MB held on quick 16k's 21.5 M cells and 0.34 M L1 cells,
+/// 27.3, 27.1 and 27.2 B a cell at 50 and 1000 Myr and on the world Ben plays; 658.4 MB on full
+/// 32k's halved grid of 21.3 M cells and 1.34 M L1 cells; the pair is about 7 % above both).
+pub const WATER_BYTES_PER_CELL: u64 = 28;
+
+/// Bytes per L1 cell of the climate the water part loads whole beside the network (the mean
+/// temperature and precipitation, the 12 monthly sea-level temperatures and their seasons, the
+/// temperature layer). A figure of the memory model, see [`WATER_BYTES_PER_CELL`].
+pub const WATER_BYTES_PER_L1_CELL: u64 = 80;
+
+/// The memory the bake holds beyond the finished world at its peak, `(bytes, projection)`: the
+/// largest of its parts' (they run one after another, each freeing what it held): the strata on
+/// L1 ([`STRATA_BYTES_PER_HORIZON_CELL`]), the water on the hydrology's grid (the whole L3
+/// elevation loaded first, halved beside it, then [`WATER_BYTES_PER_CELL`] on the grid it drains
+/// and [`WATER_BYTES_PER_L1_CELL`] for the climate) and the projection pass ([`project::estimate_bytes`], the second figure; 0 for Lambert). The
+/// other parts hold less. amp-est, 2026-10-23: before this the bake's figure was the projection
+/// pass alone, under the strata and the water on a Lambert world and under the pass itself on a
+/// Petroff-Guyou one (1,279 MB listed, 1,658 MB held on quick 16k at 50 Myr).
+pub fn estimate_bytes(p: &PlanetPreset) -> (u64, u64) {
+    let c = p.scale.circumference_blocks;
+    let cells = |r: u32| GridDesc::for_planet("", c, r).map_or(0, |g| g.cells() as u64);
+    let k = p.structure.as_ref().map_or(32, |s| s.horizons);
+    let l1 = cells(p.resolution.l1_r);
+    let strata = l1 * u64::from(k) * STRATA_BYTES_PER_HORIZON_CELL;
+    let water = if p.hydro.unwrap_or_default().enabled {
+        let (full, drained) = (cells(p.resolution.l3_r), cells(hydrology_r(p)));
+        let load = if drained < full {
+            full + full / 4
+        } else {
+            full
+        };
+        (load * 2).max(drained * WATER_BYTES_PER_CELL + l1 * WATER_BYTES_PER_L1_CELL)
+    } else {
+        0
+    };
+    let projection = project::estimate_bytes(p);
+    (strata.max(water).max(projection), projection)
 }
 
 fn ms(t: Instant) -> f64 {

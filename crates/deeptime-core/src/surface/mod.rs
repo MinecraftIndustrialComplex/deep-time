@@ -701,15 +701,25 @@ fn retained_per_cell(s: &SurfaceParams) -> u64 {
 /// working arrays, the log's advected copy and the glaciers' passes) and the climate's 24 monthly
 /// maps of its last snapshot (P1-25; 96 B per L1 cell). P1-17 (2026-10-05, 500 Myr, scattered
 /// continents, history excluded): 651 MiB on quick 16k against the 576 MiB the run held before
-/// the young stage, 2,127 MiB on full 16k against 2,010 MiB.
+/// the young stage, 2,127 MiB on full 16k against 2,010 MiB. Plus what is on no grid
+/// ([`UNGRIDDED_BYTES`]).
 pub fn retained_bytes(p: &PlanetPreset) -> u64 {
     let s = p.surface.clone().unwrap_or_default();
     let c = u64::from(p.scale.circumference_blocks);
     let r = u64::from(p.resolution.l1_r);
     let cells = (c / r) * (c / r / 2);
     let monthly = if p.climate.is_some() { 24 * 4 } else { 0 };
-    cells * (retained_per_cell(&s) + monthly) + crate::plates::estimate(p).bytes
+    cells * (retained_per_cell(&s) + monthly) + crate::plates::estimate(p).bytes + UNGRIDDED_BYTES
 }
+
+/// What the run holds on no grid, beside the per-cell figures (bytes): the tables built once
+/// (lithology, columns, deposit types), the sites, bodies, events and river lists, and what the
+/// bake holds into its projection pass. A figure of the memory model, not a physical one
+/// (amp-est, 2026-10-23: on the memory_estimate test planet, quick 16k at a quarter of its
+/// resolution, the world at the bake's start held 5.1 MB more than the per-cell figures and the
+/// bake 3.0 MB more again into its projection pass; this is twice their sum. On the full grids
+/// the per-cell figures' own slack covers it.)
+pub const UNGRIDDED_BYTES: u64 = 16 << 20;
 
 impl SurfaceStage {
     pub fn new(preset: PlanetPreset) -> SurfaceStage {

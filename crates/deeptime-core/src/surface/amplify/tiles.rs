@@ -129,7 +129,12 @@ pub struct LevelSink {
 }
 
 impl LevelSink {
-    pub fn new(w: usize, h: usize, dx: f64) -> LevelSink {
+    /// The next level's arrays, all of them now: the glaciers' surface too when the level it
+    /// comes from has one (`glaciers`), and the basin classes when it has them (`basins`), so the
+    /// [`LEVEL_BYTES_PER_CELL`] the run reserved for them are in use before it reserves the
+    /// tiles' (amp-est, 2026-10-23: allocated at the first tile, they came 4 B and 1 B a cell
+    /// after the tiles' reservation, which never counted them).
+    pub fn new(w: usize, h: usize, dx: f64, glaciers: bool, basins: bool) -> LevelSink {
         let n = w * h;
         LevelSink {
             level: Level {
@@ -141,8 +146,12 @@ impl LevelSink {
                 wgt: vec![0.0; n],
                 kfac: vec![0.0; n],
                 lake_z: vec![super::resample::NO_LAKE; n],
-                zs: Vec::new(),
-                closed: Vec::new(),
+                zs: if glaciers { vec![0.0; n] } else { Vec::new() },
+                closed: if basins {
+                    vec![basin::OPEN; n]
+                } else {
+                    Vec::new()
+                },
             },
         }
     }
@@ -622,6 +631,11 @@ pub fn run_tiles(
             wgt_core.reserve(cw * ch);
             kfac_core.reserve(cw * ch);
             lake_core.reserve(cw * ch);
+            // At its size: grown by pushes it ended at the next power of two, up to twice the
+            // 4 B a cell reserved (amp-est, 2026-10-23: 6.25 B a cell on quick 16k's middle level).
+            if has_zs {
+                zs_core.reserve(cw * ch);
+            }
         }
         for j in 0..ch {
             let row = (cy + j) * win.w + cx;

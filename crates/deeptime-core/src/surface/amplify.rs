@@ -632,7 +632,13 @@ pub fn run(
             accel: cfg.accel.as_deref(),
         };
         reserve((gw * gh) as u64 * LEVEL_BYTES_PER_CELL)?;
-        let mut next = LevelSink::new(gw, gh, dxf);
+        let mut next = LevelSink::new(
+            gw,
+            gh,
+            dxf,
+            level.zs.len() == level.z.len(),
+            !level.closed.is_empty(),
+        );
         let (_, stats) = run_tiles(&level, &tcfg, &mut next, cancelled, reserve)?;
         level = next.level;
         reports.push(LevelReport {
@@ -782,69 +788,146 @@ pub fn level_from_world(world: &WorldState, p: &PlanetPreset) -> Result<Level, C
     })
 }
 
-/// The world the run leaves for the bake, `(without the history, the history)` (bytes): the
-/// amplification's base, which is the finished run's memory once its buffers are gone.
-pub fn world_bytes(p: &PlanetPreset) -> (u64, u64) {
-    let c = u64::from(p.scale.circumference_blocks);
-    let l2 = (c / u64::from(p.resolution.l2_r)) * (c / u64::from(p.resolution.l2_r) / 2);
-    let surface = super::estimate(p);
+/// Bytes per L1 cell the stage holds beside the world from its start to its end: the mountain
+/// character's fields (youth, the fold's two direction terms, the volcanoes' calm), the youth and
+/// fold maps it puts in the world, and the volcanoes' flood-basalt outcrop: seven f32 arrays, and
+/// the shapers' tables (amp-est, 2026-10-23: 25, 31 and 29 B a cell held on quick 16k at 50 and
+/// 1000 Myr and on full 32k at 100 Myr).
+const CHARACTER_BYTES_PER_L1_CELL: u64 = 32;
+
+/// The cells of a preset's grid of `r` blocks per cell, `(w, h)` (`GridDesc::for_planet`; a grid
+/// the format refuses counts as `C/r × C/2r`).
+fn grid_dims(p: &PlanetPreset, r: u32) -> (u64, u64) {
+    let c = p.scale.circumference_blocks;
+    GridDesc::for_planet("L", c, r).map_or((u64::from(c / r), u64::from(c / r / 2)), |g| {
+        (u64::from(g.w), u64::from(g.h))
+    })
+}
+
+/// The world the young landscape leaves for this stage, `(without the history, the history)`
+/// (bytes): what the stages before it keep ([`super::retained_bytes`]) and the young landscape's
+/// fields on the L2 grid. (amp-est, 2026-10-23: it was the surface stage's whole estimate, its
+/// step's working arrays too, on a grid of `C/2r` rows where the Petroff-Guyou grids have `2·Zo/r`:
+/// 1,099 MB listed against 665 MB held on quick 16k at 50 Myr.)
+fn young_world(p: &PlanetPreset) -> (u64, u64) {
+    let (w2, h2) = grid_dims(p, p.resolution.l2_r);
     (
-        surface.bytes - surface.history_bytes + l2 * LEVEL_BYTES_PER_CELL,
-        surface.history_bytes,
+        super::retained_bytes(p) + w2 * h2 * young::FIELD_BYTES_PER_L2_CELL,
+        super::estimate(p).history_bytes,
     )
 }
 
-/// Estimated bytes and seconds of the stage (plan §5.7.5; P1-17 replaces the second).
-pub fn estimate(p: &PlanetPreset) -> StageEstimate {
+/// The world the run leaves for the bake, `(without the history, the history)` (bytes): the young
+/// landscape's world and what this stage leaves in it (the youth and fold maps, the preview's
+/// three layers), which is the finished run's memory once its levels and buffers are gone.
+pub fn world_bytes(p: &PlanetPreset) -> (u64, u64) {
     let a = p.amplify.clone().unwrap_or_default();
-    let c = u64::from(p.scale.circumference_blocks);
-    let width = |r: u32| c / u64::from(r);
-    let cells = |r: u32| width(r) * (width(r) / 2);
-    let l3 = cells(p.resolution.l3_r);
-    let l2 = cells(p.resolution.l2_r);
-    let levels = doublings(p.resolution.l2_r, p.resolution.l3_r).unwrap_or(1);
-    let surface = super::estimate(p);
-    let world = surface.bytes + l2 * LEVEL_BYTES_PER_CELL;
-    let cap = crate::session::DEFAULT_MEM_CAP;
-    // A level streams when its buffers would not fit next to the rest of the world under the
-    // default cap (plan §5.7.5: "any preset whose estimate exceeds its cap streams L3
-    // automatically"); a tile's window is the tile and a halo of about 200 cells on each side.
-    // The recorded history's frames give way to the buffers first (P1-17: `reserve` spills them).
-    let base = world - surface.history_bytes;
-    let window = |r: u32| {
-        let w = (u64::from(a.tile_cells) + 2 * 200).min(width(r));
-        w * w.min(width(r) / 2) * TILE_BYTES_PER_CELL
+    let (w1, h1) = grid_dims(p, p.resolution.l1_r);
+    let (w3, h3) = grid_dims(p, p.resolution.l3_r);
+    let s = preview_stride(w3 as usize, a.preview_width as usize) as u64;
+    let (world, history) = young_world(p);
+    (
+        world + w1 * h1 * 8 + w3.div_ceil(s) * h3.div_ceil(s) * PREVIEW_BYTES_PER_CELL,
+        history,
+    )
+}
+
+/// Estimated bytes and seconds of the stage under the default memory cap
+/// ([`crate::session::DEFAULT_MEM_CAP`]; [`estimate_under`]).
+pub fn estimate(p: &PlanetPreset) -> StageEstimate {
+    estimate_under(p, crate::session::DEFAULT_MEM_CAP)
+}
+
+/// The most the windows of a level of `w × h` cells cut up by `plan` hold at once (cells).
+fn window_cells(plan: TilePlan) -> u64 {
+    plan.cores()
+        .into_iter()
+        .map(|core| plan.window(core).0.cells() as u64)
+        .max()
+        .unwrap_or(0)
+}
+
+/// Estimated bytes and seconds of the stage under a memory cap of `mem_cap` bytes (plan §5.7.5;
+/// P1-17 replaces the seconds): the most the run holds at any level, the world it starts with
+/// included, on the preset's real grids (`GridDesc::for_planet`).
+///
+/// When it starts the run holds the young landscape's world ([`young_world`]), the character's
+/// fields ([`CHARACTER_BYTES_PER_L1_CELL`]) and the L2 level, and the water balance adds the
+/// bake's network on L2 for a while ([`crate::bake::WATER_BYTES_PER_CELL`]). Each level before the
+/// last adds the next level's arrays and the buffers of its windows, and hands on the next level in
+/// place of its own; the last adds [`whole_last_level_peak`] whole, or its largest window and the
+/// preview in tiles. Every level decides as the run does (`streams_on`, without a device): `auto`
+/// keeps it whole when that fits under the cap with the world as estimated less the recorded
+/// history (which `StageContext::reserve` spills first).
+///
+/// The world as estimated is at or above the world the run holds (amp-est, 2026-10-23: 140 to
+/// 265 MB above it on quick 16k and full 32k), so a cap that much above the whole path's need is
+/// one at which this lists a level in tiles that the run, seeing its real gauge, keeps whole. The
+/// run then stays under its cap (its reservation is the whole path's), above this figure.
+pub fn estimate_under(p: &PlanetPreset, mem_cap: u64) -> StageEstimate {
+    let a = p.amplify.clone().unwrap_or_default();
+    let res = &p.resolution;
+    let levels = doublings(res.l2_r, res.l3_r)
+        .filter(|&n| n >= 1)
+        .unwrap_or(1);
+    let cells = |(w, h): (u64, u64)| w * h;
+    let (world, history) = young_world(p);
+    let (w1, h1) = grid_dims(p, res.l1_r);
+    let l2_bytes = cells(grid_dims(p, res.l2_r)) * LEVEL_BYTES_PER_CELL;
+    let start = world + w1 * h1 * CHARACTER_BYTES_PER_L1_CELL + l2_bytes;
+    let cfg = AmplifyStage::new(p.clone()).config(0.0);
+    let tile = a.tile_cells as usize;
+    // Whole when `auto` finds the room for `whole` more beside `held` (bytes without the history,
+    // which gives way first).
+    let whole_fits = |held: u64, whole: u64| match a.stream {
+        StreamMode::Always => false,
+        StreamMode::Never => true,
+        StreamMode::Auto => held + whole <= mem_cap,
     };
-    let pick = |whole: u64, streamed: u64| match a.stream {
-        StreamMode::Always => streamed,
-        StreamMode::Never => whole,
-        StreamMode::Auto if base + whole > cap => streamed,
-        StreamMode::Auto => whole,
+    // The water balance (`balance::apply`) runs the bake's network on the L2 level's cells before
+    // the ladder, at the bake's figure for it, and frees it. It stays under the first level's next
+    // arrays alone (4 x 25 B an L2 cell), so on every preset with a level between L2 and L3 it
+    // never sets the figure.
+    let balance = if p.hydro.unwrap_or_default().enabled {
+        cells(grid_dims(p, res.l2_r)) * crate::bake::WATER_BYTES_PER_CELL
+    } else {
+        0
     };
-    // The pick is made from the buffers alone, under the default cap, as before; the run's own
-    // decision (`whole_last_level_peak`) also counts the level the ladder keeps and the preview,
-    // about 0.15 GiB at 16k. So a last level this lists whole may run in tiles (the estimate
-    // then overstates), and one that does run whole needs that much more than listed. Making
-    // `Stage::estimate` take the run's cap would close both (the workbench judges a run against
-    // its cap less 512 MiB, which the default-cap pick here does not know).
-    let last = pick(l3 * TILE_BYTES_PER_CELL, window(p.resolution.l3_r));
-    // The levels before the last also keep the next level's arrays.
-    let mut peak = last;
-    let mut mid_cells = 0u64;
+    let (mut held, mut level, mut peak, mut mid_cells) = (start, l2_bytes, start + balance, 0u64);
     for k in 1..levels {
-        let r = p.resolution.l3_r << (levels - k);
-        mid_cells += cells(r);
-        let kept = cells(r) * LEVEL_BYTES_PER_CELL;
-        peak = peak.max(
-            pick(cells(r) * TILE_BYTES_PER_CELL, window(r))
-                + kept
-                + cells(r) * LEVEL_BYTES_PER_CELL,
-        );
+        let (w, h) = grid_dims(p, res.l3_r << (levels - k));
+        let next = w * h * LEVEL_BYTES_PER_CELL;
+        let whole = w * h * TILE_BYTES_PER_CELL;
+        let bufs = if whole_fits(held, whole + next) || tile >= w.max(h) as usize {
+            whole
+        } else {
+            window_cells(TilePlan {
+                gw: w as usize,
+                gh: h as usize,
+                tile,
+                halo: plan_halo(&cfg.counts(true), a.repair_margin_cells as usize),
+            }) * TILE_BYTES_PER_CELL
+        };
+        peak = peak.max(held + next + bufs);
+        held = held - level + next;
+        level = next;
+        mid_cells += w * h;
     }
+    let (w3, h3) = grid_dims(p, res.l3_r);
+    let (gw, gh) = (w3 as usize, h3 as usize);
+    // The last level decides when the stage starts, with the L2 level held.
+    let whole = whole_last_level_peak(l2_bytes, levels, gw, gh, a.preview_width);
+    let last = if whole_fits(start, whole) || tile >= gw.max(gh) {
+        start + whole
+    } else {
+        let s = preview_stride(gw, a.preview_width as usize);
+        let preview = (gw.div_ceil(s) * gh.div_ceil(s)) as u64 * PREVIEW_BYTES_PER_CELL;
+        held + preview + window_cells(cfg.plan(gw, gh, true)) * TILE_BYTES_PER_CELL
+    };
     StageEstimate {
-        bytes: world + peak,
-        seconds: l3 as f64 * 1.2e-6 + mid_cells as f64 * 3.0e-6,
-        history_bytes: surface.history_bytes,
+        bytes: peak.max(last) + history,
+        seconds: (w3 * h3) as f64 * 1.2e-6 + mid_cells as f64 * 3.0e-6,
+        history_bytes: history,
     }
 }
 
@@ -1303,6 +1386,10 @@ impl Stage for AmplifyStage {
 
     fn estimate(&self) -> StageEstimate {
         estimate(&self.preset)
+    }
+
+    fn estimate_under(&self, mem_cap: u64) -> StageEstimate {
+        estimate_under(&self.preset, mem_cap)
     }
 
     fn total_steps(&self) -> u64 {
