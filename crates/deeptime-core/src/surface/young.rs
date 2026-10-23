@@ -69,6 +69,10 @@ pub mod field {
     pub const TILL: &str = "young/till_m";
 }
 
+/// Bytes per L2 cell of the fields the stage leaves in the world: the 17 of [`field`], f32 each
+/// (what the amplifier's estimate counts the world it starts with by, `amplify::estimate_under`).
+pub const FIELD_BYTES_PER_L2_CELL: u64 = 17 * 4;
+
 /// Keyframe layers of the stage.
 pub const KEYFRAME_LAYERS: [&str; 3] = [field::ELEVATION, field::DRAINAGE, field::ICE];
 
@@ -1172,8 +1176,11 @@ mod tests {
             };
             let e = estimate(&p);
             let base = (e.bytes - e.history_bytes) / MIB;
+            // The 15 % is the per-cell figures'; what is on no grid is a constant beside them
+            // (amp-est, 2026-10-23: `surface::UNGRIDDED_BYTES`, which these grids' slack covered).
+            let ungridded = crate::surface::UNGRIDDED_BYTES / MIB;
             assert!(
-                base >= held_mib && base <= held_mib * 115 / 100,
+                base >= held_mib && base <= held_mib * 115 / 100 + ungridded,
                 "{name}: {base} MiB listed, {held_mib} MiB held"
             );
         }

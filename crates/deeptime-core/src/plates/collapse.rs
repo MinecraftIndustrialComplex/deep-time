@@ -70,7 +70,7 @@
 //! crust within reach, nearest first, before any ocean floor, so less of the collapse becomes new
 //! continent below the sea.
 //!
-//! # Measured from the sea (off by default)
+//! # Measured from the sea (on by default since 2026-10-23)
 //! T_n stands at z_0 over the datum, a continent's height when the sea stands at the datum. The
 //! sea is the planet's water filling the hypsometry (ISO-085) and stands 500 to 1,200 m over the
 //! datum on the Earth-like presets, so T_n crust stands at or under it: a hot orogen thinned to
@@ -83,15 +83,15 @@
 //! continental (also for the thickest crust's spreading). Heights still follow Airy in the
 //! datum frame: only the column the collapse aims at moves with the sea.
 //!
-//! # As a thin viscous sheet (off by default)
+//! # As a thin viscous sheet (on by default since 2026-10-23)
 //! The rule above is local: a column thins at one rate down to T_c, and its crust goes to room
-//! within 200 km. On Earth a thickened region also spreads as a whole: the lithosphere is a thin
-//! viscous sheet whose depth-integrated deviatoric stress balances the gradient of the
-//! potential energy of its columns (England & McKenzie 1982; Houseman & England 1986), so a
-//! plateau extends at a rate its potential energy over the lowland around it sets, interior and
-//! edges alike (Tibet's east-west extension, England & Houseman 1989; the Basin and Range,
-//! Sonder & Jones 1999). With `collapse_sheet_viscosity_pa_s` η_0 > 0 a quiet column an orogeny
-//! raised thins in pure shear (plane strain) at
+//! within `collapse_reach_km`. On Earth a thickened region also spreads as a whole: the
+//! lithosphere is a thin viscous sheet whose depth-integrated deviatoric stress balances the
+//! gradient of the potential energy of its columns (England & McKenzie 1982; Houseman & England
+//! 1986), so a plateau extends at a rate its potential energy over the lowland around it sets,
+//! interior and edges alike (Tibet's east-west extension, England & Houseman 1989; the Basin and
+//! Range, Sonder & Jones 1999). With `collapse_sheet_viscosity_pa_s` η_0 > 0 a quiet column an
+//! orogeny raised thins in pure shear (plane strain) at
 //!
 //!   ε̇ = ΔU / (4 η L),   q = T (1 − e^(−ε̇ δt)),  at most T − T_col,
 //!
@@ -106,7 +106,7 @@
 //! orogen a few hundred Myr old (η 100 times η_0 at 290 Myr). A 4.2 km column under a sea at the
 //! datum thins 3.9 % per Myr when its orogeny ends, a 2 km one 1.3 %: e-folds of 26 and 75 Myr. The
 //! crust released goes where the rule sends it, to the nearest room on the plate within
-//! `collapse_reach_km` (a measured arm sets the reach to the plate's size, so the continent's edge
+//! `collapse_reach_km` (the default since 2026-10-23 is the plate's size, so the continent's edge
 //! moves out over its ocean floor). The quiet time still holds: an orogeny's push holds a belt up
 //! (the force balance counts the belt's potential energy against the convergence, FRC-013).
 //! ledger: PLT-414 (the law and η_0), PLT-415 (the strength's growth).
@@ -798,12 +798,18 @@ pub(in crate::plates) mod tests {
     }
 
     impl Fx {
+        /// The threshold law alone: the column from the sea, its cap and the sheet (PLT-412 to
+        /// PLT-414, on by default since 2026-10-23) are off here, and each test turns on the law
+        /// it tests.
         pub(in crate::plates) fn new() -> Fx {
             let k = TectonicParams {
                 collapse_myr: 25.0,
                 collapse_thickness_km: 45.0,
                 collapse_quiet_myr: 0.0,
                 collapse_reach_km: 1500.0,
+                collapse_sea_column: false,
+                collapse_sea_column_max_km: 0.0,
+                collapse_sheet_viscosity_pa_s: 0.0,
                 ..TectonicParams::default()
             };
             Fx {
@@ -1055,19 +1061,30 @@ pub(in crate::plates) mod tests {
         assert!(lo >= t_c - 1.0, "{lo}");
     }
 
-    /// The normal column from the sea (PLT-412): off, T_n whatever the sea; on, T_n + 7.0 S, within
-    /// [T_n / 2, T_c] and under the cap (PLT-413), and T_n when the sea is unknown.
+    /// The normal column from the sea (PLT-412): on by default since 2026-10-23, under the cap at
+    /// the continents' mean crust (PLT-413); off, T_n whatever the sea; on, T_n + 7.0 S, within
+    /// [T_n / 2, T_c] and under the cap, and T_n when the sea is unknown.
     #[test]
     fn the_room_column_stands_over_the_sea_with_the_switch() {
         let mut k = TectonicParams::default();
         let t_n = normal_thickness_m();
         let t_c = k.collapse_thickness_km * 1000.0;
+        let f = COLUMN_ISOSTATIC_FACTOR;
+        // The default: on, capped at 41.1 km.
+        assert!(k.collapse_sea_column);
+        assert_eq!(k.collapse_sea_column_max_km, 41.1);
+        assert!((room_column_m(&k, 956.0) - 41_100.0).abs() < 1e-6);
+        assert!((room_column_m(&k, 500.0) - (t_n + f * 500.0)).abs() < 1e-6);
+        assert_eq!(room_column_m(&k, 0.0), t_n);
+        // Off.
+        k.collapse_sea_column = false;
         for sea in [-300.0, 0.0, 956.0, 5000.0] {
             assert_eq!(room_column_m(&k, sea), t_n);
         }
+        // On with no cap.
         k.collapse_sea_column = true;
+        k.collapse_sea_column_max_km = 0.0;
         assert_eq!(room_column_m(&k, 0.0), t_n);
-        let f = COLUMN_ISOSTATIC_FACTOR;
         assert!((room_column_m(&k, 956.0) - (t_n + f * 956.0)).abs() < 1e-6);
         assert!((room_column_m(&k, 956.0) - 41_800.0).abs() < 100.0);
         assert!((room_column_m(&k, -300.0) - (t_n - f * 300.0)).abs() < 1e-6);
@@ -1141,9 +1158,13 @@ pub(in crate::plates) mod tests {
     /// at the datum, its orogeny this step, thins at ΔU / (4 η L) = 3.6 % per Myr with η 10²²
     /// Pa s; the rate falls e-fold per `collapse_sheet_strength_myr` of the time since its
     /// orogeny, and is 0 for crust no orogeny raised and for the normal column; the release stops
-    /// at the normal column; off, there is no sheet.
+    /// at the normal column; off, there is no sheet. η_0 10²² Pa s is the default since 2026-10-23.
     #[test]
     fn the_sheet_thins_young_high_crust_at_its_potential_energy() {
+        assert_eq!(
+            TectonicParams::default().collapse_sheet_viscosity_pa_s,
+            1.0e22
+        );
         let mut fx = Fx::new();
         assert!(Sheet::new(&fx.k, &fx.env(0), normal_thickness_m(), 0.0).is_none());
         fx.k.collapse_sheet_viscosity_pa_s = 1.0e22;
