@@ -228,9 +228,10 @@ def census(world: Path) -> dict:
         }
         if plain is not None:
             g = out["grid"]
-            # A plain at the mouth: a raised cell within 6 cells of the stem's last 30 vertices.
+            # A plain on the river: a raised cell within 6 cells of a vertex of its main stem (a
+            # plain inside a wide beach band lies far up the stem from where it meets the open sea).
             hit = False
-            for v in verts[max(f, f + n - 30):f + n]:
+            for v in verts[f:f + n]:
                 i = int((v[0] - g["origin_block_x"]) // g["r"])
                 j = int((v[1] - g["origin_block_z"]) // g["r"])
                 i0, i1 = max(i - 6, 0), min(i + 7, g["w"])
