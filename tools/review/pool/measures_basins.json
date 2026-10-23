@@ -1,0 +1,22 @@
+{
+  "_doc": "The savanna pit task's measure (2026-10-22): the closed basins of the final L1 surface, measure_basins.py. Pass with --registry tools/review/pool/measures_basins.json.",
+  "measures": {
+    "basins": {
+      "version": 1,
+      "doc": "Closed basins of the final L1 surface against the hydrology's open sea (HYD-012): counts deeper than 10 and 30 blocks, under sea level, with an arid rim, the deepest, the closed ground under sea level and the closed room; definitions in measure_basins.py",
+      "command": ["{py}", "-I", "{tools}/measure_basins.py", "{run}"],
+      "python": "numpy",
+      "needs": ["fields"],
+      "fields": ["elevation", "climate/koppen"],
+      "columns": [
+        {"key": "basins_10", "label": "closed basins deeper than 10 blocks", "target": null, "digits": 0},
+        {"key": "basins_30", "label": "deeper than 30 blocks", "target": null, "digits": 0},
+        {"key": "below_sea_10", "label": "deeper than 10 blocks, floor under sea level", "target": null, "digits": 0},
+        {"key": "dry_rim_10", "label": "deeper than 10 blocks, arid rim", "target": null, "digits": 0},
+        {"key": "deepest_blocks", "label": "deepest, blocks", "target": null, "digits": 1},
+        {"key": "closed_below_sea_kb2", "label": "closed ground under sea level, 1,000 blocks2", "target": null, "digits": 1},
+        {"key": "closed_volume_km3", "label": "room of the basins deeper than 10 blocks, km3", "target": null, "digits": 0}
+      ]
+    }
+  }
+}

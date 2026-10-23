@@ -30,6 +30,7 @@ use deeptime_gpu::{Bands, Gpu, Kernel, Use, wgpu};
 
 use super::glacial::ShapeStats;
 use super::kernels::{Buf, Counts, PassDevice, Physics, Times, erosion_setup};
+use super::resample::{basin, cell};
 
 /// Device bytes per window cell: z, z2, a, a2, norm, own, kfac, flags, cap, tmult, eroded, sed,
 /// sed2, zs.
@@ -120,6 +121,17 @@ fn grow(j: u32, dj: i32) -> u32 {
     return u32(clamp(i32(j) + dj, 0, i32(p.h) - 1));
 }
 
+// Bits of `flags`: a lake, frozen (raised by the first flood), closed ground (`resample::basin`
+// not OPEN: never sea).
+const LAKE: u32 = 1u;
+const FROZEN: u32 = 2u;
+const CLOSED: u32 = 4u;
+
+// resample::wet: under sea level and open to the sea (ledger: AMP-096).
+fn wet(z: f32, f: u32) -> bool {
+    return z <= p.sea && (f & CLOSED) == 0u;
+}
+
 fn sstep(a: f32, b: f32, x: f32) -> f32 {
     let t = clamp((x - a) / (b - a), 0.0, 1.0);
     return t * t * (3.0 - 2.0 * t);
@@ -129,7 +141,8 @@ fn sstep(a: f32, b: f32, x: f32) -> f32 {
 /// `kernels::norms`.
 const NORMS: &str = r#"
 @group(0) @binding(1) var<storage, read> z: array<f32>;
-@group(0) @binding(2) var<storage, read_write> dst: array<f32>;
+@group(0) @binding(2) var<storage, read> flags: array<u32>;
+@group(0) @binding(3) var<storage, read_write> dst: array<f32>;
 @compute @workgroup_size(16, 16)
 fn norms(@builtin(global_invocation_id) id: vec3<u32>) {
     let i = id.x;
@@ -137,7 +150,7 @@ fn norms(@builtin(global_invocation_id) id: vec3<u32>) {
     if (i >= p.w || j >= band.row1) { return; }
     let c = j * p.w + i;
     let zc = z[c];
-    if (zc <= p.sea) { dst[c] = 0.0; return; }
+    if (wet(zc, flags[c])) { dst[c] = 0.0; return; }
     var sum: f32 = 0.0;
     for (var k = 0u; k < 8u; k++) {
         let n = nb(i, j, k);
@@ -155,7 +168,8 @@ const AREA: &str = r#"
 @group(0) @binding(2) var<storage, read> norm: array<f32>;
 @group(0) @binding(3) var<storage, read> a_in: array<f32>;
 @group(0) @binding(4) var<storage, read> own: array<f32>;
-@group(0) @binding(5) var<storage, read_write> dst: array<f32>;
+@group(0) @binding(5) var<storage, read> flags: array<u32>;
+@group(0) @binding(6) var<storage, read_write> dst: array<f32>;
 @compute @workgroup_size(16, 16)
 fn area(@builtin(global_invocation_id) id: vec3<u32>) {
     let i = id.x;
@@ -163,14 +177,14 @@ fn area(@builtin(global_invocation_id) id: vec3<u32>) {
     if (i >= p.w || j >= band.row1) { return; }
     let c = j * p.w + i;
     let zc = z[c];
-    if (zc <= p.sea) { dst[c] = own[c]; return; }
+    if (wet(zc, flags[c])) { dst[c] = own[c]; return; }
     var a: f32 = own[c];
     for (var k = 0u; k < 8u; k++) {
         let n = nb(i, j, k);
         if (n == NONE) { continue; }
         let zn = z[n];
         let s = (zn - zc) / (step_len(k) * p.dx);
-        if (s > 0.0 && norm[n] > 0.0 && zn > p.sea) {
+        if (s > 0.0 && norm[n] > 0.0 && !wet(zn, flags[n])) {
             a += pw(s, p.flow_power) / norm[n] * a_in[n];
         }
     }
@@ -178,7 +192,7 @@ fn area(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 "#;
 
-/// `kernels::erode_step` (`flags`: bit 0 a lake, bit 1 frozen).
+/// `kernels::erode_step` (`flags`: bit 0 a lake, bit 1 frozen, bit 2 closed ground).
 const ERODE: &str = r#"
 @group(0) @binding(1) var<storage, read> z: array<f32>;
 @group(0) @binding(2) var<storage, read> a: array<f32>;
@@ -195,10 +209,12 @@ fn erode(@builtin(global_invocation_id) id: vec3<u32>) {
     let c = j * p.w + i;
     let zc = z[c];
     dst[c] = zc;
-    if (zc <= p.sea || flags[c] != 0u) { return; }
+    let fc = flags[c];
+    if (wet(zc, fc) || (fc & (LAKE | FROZEN)) != 0u) { return; }
     var smax: f32 = 0.0;
     var zr = zc;
     var dr = p.dx;
+    var rn = c;
     for (var k = 0u; k < 8u; k++) {
         let n = nb(i, j, k);
         if (n == NONE) { continue; }
@@ -209,10 +225,12 @@ fn erode(@builtin(global_invocation_id) id: vec3<u32>) {
             smax = s;
             zr = zn;
             dr = d;
+            rn = n;
         }
     }
     if (smax <= 0.0) { return; }
-    let lowest = max(zr, p.sea) + p.min_gradient * dr;
+    let own_floor = (fc & CLOSED) != 0u && (flags[rn] & CLOSED) != 0u;
+    let lowest = select(max(zr, p.sea), zr, own_floor) + p.min_gradient * dr;
     let room = zc - lowest;
     if (room <= 0.0) { return; }
     let spl = p.incision_m * kfac[c]
@@ -261,8 +279,9 @@ const DEPOSIT: &str = r#"
 @group(0) @binding(2) var<storage, read> a: array<f32>;
 @group(0) @binding(3) var<storage, read> norm: array<f32>;
 @group(0) @binding(4) var<storage, read> sed_in: array<f32>;
-@group(0) @binding(5) var<storage, read_write> dst: array<f32>;
-@group(0) @binding(6) var<storage, read_write> sed_out: array<f32>;
+@group(0) @binding(5) var<storage, read> flags: array<u32>;
+@group(0) @binding(6) var<storage, read_write> dst: array<f32>;
+@group(0) @binding(7) var<storage, read_write> sed_out: array<f32>;
 @compute @workgroup_size(16, 16)
 fn deposit(@builtin(global_invocation_id) id: vec3<u32>) {
     let i = id.x;
@@ -270,7 +289,7 @@ fn deposit(@builtin(global_invocation_id) id: vec3<u32>) {
     if (i >= p.w || j >= band.row1) { return; }
     let c = j * p.w + i;
     let zc = z[c];
-    if (zc <= p.sea) {
+    if (wet(zc, flags[c])) {
         dst[c] = zc;
         sed_out[c] = 0.0;
         return;
@@ -285,7 +304,7 @@ fn deposit(@builtin(global_invocation_id) id: vec3<u32>) {
         let up = (zn - zc) / (step_len(k) * p.dx);
         if (up > 0.0) {
             gap = min(gap, zn - zc);
-            if (norm[n] > 0.0 && zn > p.sea) {
+            if (norm[n] > 0.0 && !wet(zn, flags[n])) {
                 load += pw(up, p.flow_power) / norm[n] * sed_in[n];
             }
         }
@@ -541,11 +560,11 @@ impl AmplifyGpu {
         };
         let filter = g.module("filter", &format!("{PRELUDE}{FILTER}"))?;
         let k = Kernels {
-            norms: one(NORMS, "norms", &[U, R, W])?,
-            area: one(AREA, "area", &[U, R, R, R, R, W])?,
+            norms: one(NORMS, "norms", &[U, R, R, W])?,
+            area: one(AREA, "area", &[U, R, R, R, R, R, W])?,
             erode: one(ERODE, "erode", &[U, R, R, R, R, R, W, W])?,
             thermal: one(THERMAL, "thermal", &[U, R, R, W])?,
-            deposit: one(DEPOSIT, "deposit", &[U, R, R, R, R, W, W])?,
+            deposit: one(DEPOSIT, "deposit", &[U, R, R, R, R, R, W, W])?,
             depth: one(DEPTH, "depth", &[U, R, R, W])?,
             max_x: g.kernel(&filter, "max_x", &[U, R, W])?,
             max_y: g.kernel(&filter, "max_y", &[U, R, W])?,
@@ -668,7 +687,11 @@ impl<'a> Tile<'a> {
             .lake
             .iter()
             .zip(&buf.frozen)
-            .map(|(&l, &f)| u32::from(l != 0) | (u32::from(f != 0) << 1))
+            .map(|(&m, &f)| {
+                u32::from(cell::lake(m))
+                    | (u32::from(f != 0) << 1)
+                    | (u32::from(cell::class(m) != basin::OPEN) << 2)
+            })
             .collect();
         gpu.upload(&t.flags, &flags);
         Ok(t)
@@ -700,8 +723,11 @@ impl<'a> Tile<'a> {
         let k = self.k;
         let (z, a_in, a_out) = (&self.z[self.zi], &self.a[self.ai], &self.a[1 - self.ai]);
         self.run(&[
-            (&k.norms, &[z, &self.norm]),
-            (&k.area, &[z, &self.norm, a_in, &self.own, a_out]),
+            (&k.norms, &[z, &self.flags, &self.norm]),
+            (
+                &k.area,
+                &[z, &self.norm, a_in, &self.own, &self.flags, a_out],
+            ),
         ]);
         self.ai = 1 - self.ai;
     }
@@ -737,7 +763,10 @@ impl<'a> Tile<'a> {
         let k = self.k;
         let (z, z_out, a) = (&self.z[self.zi], &self.z[1 - self.zi], &self.a[self.ai]);
         let (s_in, s_out) = (&self.s[self.si], &self.s[1 - self.si]);
-        self.run(&[(&k.deposit, &[z, a, &self.norm, s_in, z_out, s_out])]);
+        self.run(&[(
+            &k.deposit,
+            &[z, a, &self.norm, s_in, &self.flags, z_out, s_out],
+        )]);
         self.zi = 1 - self.zi;
         self.si = 1 - self.si;
     }

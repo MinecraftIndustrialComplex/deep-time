@@ -21,6 +21,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
 | [PLT](ledger/PLT.md) | the continents census's Earth references and measuring choices (`tools/review/continents_census.py`, section "White patches, drowned continents and coastal high ground", 2026-10-21) | PLT-360 to PLT-363 (4) |
 | [PLT](ledger/PLT.md) | the crust flux into collision fronts: the crust budget's measures and Earth's references (section "The crust flux into collision fronts", 2026-10-21) | PLT-401 (1) |
+| [PLT](ledger/PLT.md) | the trench budget: sediment subduction, subduction erosion and where it acts, the trench's release, the measures and Earth's references (section "The trench budget", 2026-10-22; switches, off by default) | PLT-440 to PLT-444 (5) |
 
 Rows by status (after the ocean–continent transition, 2026-10-04): `verified` 17, `cited-unverified` 46, `from-memory` 4, `abstract-only` 19, `calibrated` 14, `game-choice` 79, `uncited` 42; `pending-rewrite` 151; `not-yet-coded` 8; `merged` (not counted) 33.
 
@@ -4792,7 +4793,10 @@ the shared run pool (`tools/review/pool/`, master 2db74acd); new arms go through
    ground's crust into drowned and ocean room lifts the land past its 0.32 ceiling in the arms
    that move most (PLT-391, the sheet arms above), because nothing takes crust back. The combined
    arm with that lane (this branch's switches as `--set` keys against the shared base) is the next
-   measurement; check each alone and both together on 3 or 4 seeds first.
+   measurement; check each alone and both together on 3 or 4 seeds first. Measured 2026-10-23
+   ("The trench budget", "Twelve runs of the trench budget with the sheet"): with the trench
+   budget the land is back in the band (0.300) and the continental budget balances, at 3.08
+   criteria a run against the sheet's 3.50 and the base's 2.17 (p 0.073).
 3. *The mid-run freeboard* (the sea level's and the crust budget's): the continents stand 1.0 to
    1.6 km over a low sea 400 to 500 Myr in. Whether the sea's late rise or the crust's growth is
    wrong is the sea-level task's question, measured on these frames.
@@ -4816,3 +4820,491 @@ the shared run pool (`tools/review/pool/`, master 2db74acd); new arms go through
    column again, and the loop ran to the 30 km cap. The flexure now books only the column's own
    crust's Airy change (`plates/crust_uplift_mm_yr`, ISO-092), either sign. The reproduction was
    scattered continents seed 5 with the sheet's `--set` keys, which reached the stop at step 449.
+
+## The trench budget (2026-10-22)
+
+The coordinator's task on V1 item 1, gap 3, explored on master 883a8ef6 (key 54658b9718e7, twelve
+runs, named `trench-base883` in the pool) and measured last on master 18ace5d7 with the surface
+flexure's load on gained crust (key a7d34642f456, the pool's `base`, twelve runs): sediment subduction (PLT-440) and subduction erosion (PLT-441,
+PLT-442) on Earth's numbers, PLT-312 if the measures support it once the losses are in, every loss
+booked against Stern & Scholl 2010 Table 1, and Ben's D5 trenches and deep floor: which law digs
+them, Earth's share of floor deeper than 6 km from SRTM15+, and the measures "sea floor deeper
+than 6 km, share" and "deepest point". Ledger PLT-440 to PLT-444 (new), HYP-050 and HYP-051 (new);
+sources in the bibliography, "The trench budget". Code: `plates/ridges.rs` (the resampling's
+accrete branch), `plates/subduction.rs` (`Forearcs`, `erode_forearcs`), `plates/pools.rs` (the
+trench's release, `gdh1_floor_m`), `plates/mod.rs`, `plates/gap_budget.rs` (the part `forearc`),
+`plates/crust_budget.rs`, `params.rs`; nothing in `surface/`. Tools: the pool measure `trench`
+(`tools/review/pool/measure_trench.py`, registry `measures_trench.json`), the loss table
+`tools/review/loss-budget.py` (its sediment subduction and subduction erosion rows),
+`tools/review/earth-deep-floor.py` (Earth on SRTM15+) and `tools/review/trench-depth.py` (a bake's
+trenches). Every rule is a `--set` switch and off by default.
+
+### Ben's D5 trenches against Earth's deep floor
+
+On Ben's D5 single-player bake (Lite New World, seed 1, supercontinent; `trench-depth.py`) 0.21 of
+the sea floor is deeper than 6 km below the sea and 0.032 deeper than 8 km, and the deepest cell
+is 12,803 m; its deep troughs run 78 to 175 km long and 25 to 90 km wide. The base's twelve runs
+(medians, the final frame's L1 grid of equal-area cells): 0.160 deeper than 6 km, 0.030 deeper
+than 8 km, the deepest 13,003 m, the 99th percentile 8,957 m.
+
+Earth (`earth-deep-floor.py` on GMT's `earth_relief_15m_p`, SRTM15+ at 15', Tozer et al. 2019,
+area-weighted cells below 0 m; HYP-050, HYP-051): deeper than 5 km 0.208 of the sea floor, 6 km
+0.0073 (0.0076 on 100,000 Fibonacci points), 7 km 0.0010, 8 km 0.0003, 10 km none; median depth
+4,098 m, p90 5,356, p99 5,953; the deepest 15' cell 9,242 m. Harris et al. 2014 (Table 5, read in
+full): the hadal floor deeper than 6,000 m is 3,437,930 km², 0.95 % of the mapped sea floor, and
+the 56 trenches 1,967,350 km² (0.544 %). Stern 2021 (Table 1): Challenger Deep 10,920 m, four
+trenches deeper than 10 km, the 24 listed maxima's median 8,246 m, and "all trenches deeper than
+8000 m are nonaccretionary". The model's deep floor is 20 to 30 times Earth's.
+
+### Which law digs them
+
+Split of the base's sea floor deeper than 6 km (twelve runs, medians; a scratch `deepdiag.py`
+on the pool's dumps: the depth below the step's sea of the final elevation, and the plate model's
+own elevation z_p over the datum):
+
+| what the plate model holds there | share of the sea floor |
+|---|---|
+| ocean floor in GDH1's range (z_p at or above -5,652 m: old floor under a sea 820 m over the datum) | 0.049 |
+| ocean floor pulled below GDH1's floor and not at z_t (-9,900 < z_p < -5,652) | 0.088 |
+| ocean floor at the trench law's z_t = -10,000 m | 0.0004 |
+| continental crust | 0.0005 |
+| all deeper than 6 km | 0.160 |
+
+Of the floor deeper than 8 km (0.030), 0.0297 is pulled floor. The pulled floor deeper than 6 km
+is a trench this step in only 11.8 % of its cells; 0.18 of it lies within one L1 cell of a
+current trench, 0.23 within two, 0.31 within four, 0.45 within eight; by regime it is 0.61 open
+basin, 0.13 ridge, 0.12 trench and 0.13 back-arc. Current trench cells are 0.018 of the sea floor.
+
+So three laws dig the deep floor:
+
+1. *Fossil trench depth* (0.088 of the sea floor, all of the floor deeper than 8 km). The trench
+   law pulls a TRENCH-flagged ocean sample towards z_t with a 2 Myr half-life (PLT-052, PLT-053),
+   and the flag moves with the front. Under GDH1 (PLT-352) the floor sinks by its age's increment
+   each step and nothing brings it back to its age's depth, so the depth a trench gave a sample
+   stays with it after the front has moved on, and the floor carries it across the basin. This is
+   the plate model's, and the trench's release (PLT-443, below) is its fix.
+2. *Old floor under a high sea* (0.049). GDH1 puts floor older than about 55 Myr within a few
+   hundred metres of 5,651 m below the datum; the sea stands 820 m over the datum on the base (the
+   ocean's thick oceanic-labelled crust holds it up: sea-level.md), so that floor is 6.2 to 6.5 km
+   under the sea. It falls as the sea falls, and the sea falls when the ocean's surplus sediment
+   goes down at the trenches (PLT-440).
+3. *The surface stage's own deepening.* The final elevation is the plate model's plus what the
+   surface stage does (its flexure and sediment): under floor deeper than 10 km it adds a median
+   468 m, and at the deepest point about 2.2 km (the plate model's deepest is 10,820 m, the final
+   13,003 m, medians). That is `surface/`, outside this lane; the lead for the surface lane is
+   the flexure's water load ("the sea over the cell against the sea at the reference") over a
+   trench, not verified here.
+
+What stays after those: the trench rows themselves. The plate model's trench is one row of 71 km
+samples along every oceanic front, held at z_t = -10,000 m over the datum, so about 10.8 km under
+a sea 800 m over it whatever the slab's age. Earth's trench maxima run from 3.1 km (Cascadia) to
+10.9 km and grow with the slab's age (Jarrard 1986, Table 11: Ad = -0.81 + 0.0185 As + 0.0816 Dip
+km below the regional floor, 60 % of the variance; Stern 2021, Fig. 7, read by eye: 2 to 5 km of
+relief from young to 140 Myr slabs). The model's oceanic fronts are 3.4 to 3.7 times Earth's
+43,000 km (146,000 km on the base), which the plate geometry sets.
+
+*The surface guard's worst cell* (the coordinator's question, 2026-10-23: the guard's worst stands
+14.8 to 21.9 km from the sea in every run on master 18ace5d7, [flexure.md](flexure.md)). A scratch
+build that prints the worst cell of every step past 11 km (never committed), on master 18ace5d7
+with this lane's switches off, supercontinent seed 1, 1,000 Myr (the run's worst 15,818 m, at
+−806 Myr): the worst cell is ocean floor below the sea in every step (never more than 2 cells
+stand 11 km above it), and in 483 of the 485 steps it is trench-pulled floor: the plate model
+holds it at z_t in 366 and pulled below GDH1's floor for its age in 117, and at a current trench
+in only 37. The plate model holds those cells 10.3 km under the sea (median) and the surface stage
+carries them 2.8 km deeper (4.1 km at the 17 steps past 14 km). With this lane's rules on (the
+release, s = 0.12, E = 90; the same seed) the fossil floor is gone (cells deeper than 11 km: a
+median of 145 a step to 3), the steps past 11 km fall from 485 to 322, and the worst to 14,778 m.
+It is then a current trench row (294 of the 322 steps) that the plate model holds 6.9 km under the
+sea (median), with the surface stage 4.8 km below that, and 7.8 km at the 6 steps past 14 km,
+5 of them poleward of 60°. So the guard's worst is this section's pulled floor plus the surface
+stage's own deepening; with the release, only the surface stage's part at trench rows is left past
+Earth's 10.9 km.
+
+### The laws
+
+*Sediment subduction (PLT-440).* Until now a resampling accreted every overridden column's
+conserved pools onto the column on top (PLT-276), so no sediment went down at a trench (the
+gap sea-level.md found: the ocean holds five to six times GlobSed's sediment). With
+`tectonics.sediment_subduction_share` s, of ocean floor that went under (hidden, or of a plate the
+top overrides) the share s of its sediment and sedimentary rock goes down with the slab and the
+rest accretes. Earth's share: "Globally, the median proportion of the rock delivered as sediment
+to the trench that is accreted from the subducting plate is only 17%" (Clift & Vannucchi 2004,
+[39]), so s = 0.83; von Huene & Scholl 1991 put it at all of it at type 2 margins, about 80 % at
+small and medium prisms and about 70 % at large prisms. Earth's flux: 1.1 km³ a year at ocean
+margins and 0.1 at sutures (Stern & Scholl 2010, Table 1).
+
+*Subduction erosion (PLT-441, PLT-442).* A front erodes its forearc where the convergence normal
+to it is at least 60 mm/yr and the incoming plate carries less than 1 km of sediment there
+("Tectonic erosion is favored in regions where convergence rates exceed 6 ± 0.1 cm yr-1 and where
+the sedimentary cover is <1 km", Clift & Vannucchi 2004). Such a front takes E km³ per km and
+Myr from the overriding plate's crust beyond a normal ocean floor's 7 km within 200 km of the
+front, the nearest samples first; continental columns sink by Airy and other crust by the crust-per-metre line (PLT-264). E = 90 is Clift & Vannucchi's
+"global average rate of crustal loss" per km of erosive margin (von Huene & Scholl 1991: 25 to
+50, "conservative" 30; Stern & Scholl 2010: 35 averaged over all 43,000 km of margin; Table 1:
+1.4 km³ a year at ocean margins, 0.3 at sutures).
+
+*The trench's release (PLT-443).* With `tectonics.trench_release_half_life_myr` > 0, visible
+ocean floor that is not at a trench this step and stands below the bare floor of its age
+(`pools::gdh1_floor_m`) rises back towards that floor at the half-life; floor above its age's
+depth (seamounts, plateaus, sediment) is left alone. The half-life is the trench law's own 2 Myr
+(PLT-053). A trench's depth is then the slab's to hold while the front is there, and floor away
+from a trench stands at its age's depth ("Maximum trench depth is strongly correlated with
+regional seafloor depth away from the trench", Jarrard 1986). It is the model's consistency, not a
+measured rate: `game-choice`.
+
+All three are `--set` keys, 0 by default, and the branch with them off is bit-identical to master
+(`pool.sh alias` on supercontinent seed 1, 100 Myr: world state and dynamics record identical; key
+69953ab39a57 resolves to master 883a8ef6's 54658b9718e7, and after the merge of master 18ace5d7
+key eb4ef634e607 to adf36da1f017, which master's a7d34642f456 also resolves to).
+
+### The arms on master 883a8ef6 (exploration, seeds 1 and 2)
+
+Through the pool (`tools/review/pool/pool.sh`): earthlike_quick_16k, 1,000 Myr, both starts,
+2 threads, `+DEEPTIME_CRUST_BUDGET=1`; the base is master 883a8ef6's twelve runs (key 54658b9718e7,
+named `trench-base883` here since `base` has moved on), the arms 4 runs (seeds 1 and 2; `sed83` and
+`ero90` 2 runs), and the branch's keys 2ca399c21604 and 69953ab39a57 are aliased bit-identical to
+master's with the switches off. Keys: `rel` the release (half-life 2 Myr), `s83` / `s12` the
+sediment subduction share 0.83 / 0.12, `e` the erosion at E = 90, `sheet` the high ground's sheet
+(`collapse_sea_column`, 41.1 km, 10²² Pa s, reach 5,000 km: "As a thin viscous sheet" above),
+`arcn` PLT-312. Medians, the Mann-Whitney p against the base in brackets.
+
+| arm | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | criteria per run (of 7): median, mean | sea over the datum, 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|
+| target | 0.26 to 0.32 | ≥ 0.12 | ≤ 0.25 | ≤ 0.12 | ≤ 0.15 | ≤ 0.15 | 2 to 6 | | |
+| base (883a8ef6, 12 runs) | 0.300 | 0.124 | 0.277 | 0.271 | 0.411 | 0.170 | 1.80 | 2, 2.25 | 362 / 745 |
+| s83 (2 runs) | 0.189 (0.022) | 0.080 | 0.471 (0.022) | 0.147 | 0.217 (0.022) | 0.117 | 1.45 | 1.5, 1.50 | −213 / −354 |
+| e (2 runs) | 0.328 | 0.205 | 0.177 (0.044) | 0.336 | 0.485 | 0.176 | 1.35 | 2, 2.00 | 134 / 266 |
+| s83, e | 0.191 (0.001) | 0.070 | 0.466 (0.001) | 0.144 (0.002) | 0.304 (0.008) | 0.076 (0.008) | 1.00 (0.006) | 1, 1.25 | −659 / −927 |
+| rel | 0.285 | 0.146 | 0.334 (0.058) | 0.180 (0.042) | 0.291 (0.013) | 0.154 | 2.30 | 3.5, 3.25 (0.13) | 884 / 1,250 |
+| rel, e | 0.256 (0.078) | 0.110 | 0.348 | 0.228 | 0.331 (0.058) | 0.152 | 1.65 | 1.5, 1.50 | 702 / 1,107 |
+| rel, s12, e | 0.240 (0.020) | 0.103 | 0.328 | 0.232 | 0.359 | 0.146 | 1.50 | 1.5, 1.75 | 571 / 657 |
+| rel, s83, e | 0.156 (0.001) | 0.048 (0.004) | 0.558 (0.001) | 0.143 (0.004) | 0.255 (0.002) | 0.144 | 1.15 (0.038) | 1, 1.25 | −215 / −258 |
+| sheet (11 runs) | 0.323 (0.013) | 0.169 (0.045) | 0.280 | 0.145 (< 0.001) | 0.316 (0.015) | 0.111 (0.007) | 2.10 | 3, 3.09 (0.063) | 706 / 1,078 |
+| rel, sheet | 0.293 | 0.117 | 0.367 | 0.139 (0.001) | 0.256 (0.004) | 0.116 (0.030) | 1.95 | 2.5, 2.50 | 728 / 1,414 |
+| rel, e, sheet | 0.308 | 0.136 | 0.283 | 0.117 (0.008) | 0.260 (0.078) | 0.133 (0.058) | 1.80 | 3.5, 3.25 (0.13) | 769 / 1,192 |
+| rel, e, sheet, arcn | 0.315 | 0.138 | 0.155 (0.13) | 0.220 | 0.430 | 0.165 | 1.45 | 2.5, 2.50 | 692 / 808 |
+| rel, s83, e, sheet | 0.186 (0.001) | 0.043 (0.008) | 0.486 (0.001) | 0.092 (0.001) | 0.236 (0.004) | 0.077 (0.008) | 1.45 | 2.5, 2.50 | 126 / −108 |
+
+The measure `trench` on the same runs (registry `tools/review/pool/measures_trench.json`; Earth
+from HYP-050, HYP-051 and Table 1):
+
+| arm | deeper than 6 km, share (Earth 0.0073) | deepest, m (Earth 9,242 at 15', 10,920) | deeper than 8 km (Earth 0.0003) | p99, m (Earth 5,953) | deepest: plates / surface, m | sediment subducted, km³/yr (1.1 + 0.1) | forearc eroded, km³/yr (1.4 + 0.3) | erosive / oceanic fronts, km (22,925 / 43,000) |
+|---|---|---|---|---|---|---|---|---|
+| base | 0.160 | 13,003 | 0.0301 | 8,957 | 10,820 / 13,003 | 0 | 0 | 0 / 146,155 |
+| s83 | 0.066 (0.022) | 11,594 | 0.0132 | 8,172 | 9,670 / 11,594 | 8.88 | 0 | 0 / 159,947 |
+| e | 0.139 | 12,408 | 0.0352 | 8,874 | 10,361 / 12,408 | 0 | 0.91 | 17,985 / 152,627 |
+| rel | 0.189 | 11,839 | 0.0042 (0.001) | 7,281 (0.001) | 9,988 / 11,839 | 0 | 0 | 0 / 137,796 |
+| rel, e | 0.112 (0.058) | 10,843 (0.004) | 0.0029 (0.001) | 6,892 (0.001) | 9,763 / 10,843 | 0 | 0.84 | 16,644 / 147,015 |
+| rel, s12, e | 0.052 (0.001) | 10,785 (0.008) | 0.0017 (0.001) | 6,714 (0.001) | 9,330 / 10,785 | 1.36 | 0.83 | 16,711 / 141,345 |
+| rel, s83, e | 0.0105 (0.001) | 10,798 (0.001) | 0.0003 (0.001) | 6,030 (0.001) | 8,617 / 10,798 | 8.83 | 1.19 | 25,014 / 166,164 |
+| sheet | 0.207 (0.003) | 13,168 | 0.0377 | 9,208 | 11,060 / 13,168 | 0 | 0 | 0 / 126,232 |
+| rel, e, sheet | 0.176 | 12,050 | 0.0052 (0.001) | 7,426 (0.001) | 10,162 / 12,050 | 0 | 0.69 | 13,597 / 123,493 |
+| rel, s83, e, sheet | 0.0141 (0.001) | 10,112 (0.001) | 0.0005 (0.001) | 6,257 (0.001) | 8,588 / 10,112 | 7.66 | 1.17 | 24,461 / 151,505 |
+
+What they say:
+
+1. *The release takes the fossil trench depth away and nothing else.* The floor deeper than 8 km
+   falls from 0.030 to 0.004 and the 99th percentile from 8,957 to 7,281 m; of what is left deeper
+   than 6 km by the plate model's own pull (0.015 of the sea floor) 52 % is a current trench and
+   95 % lies within 8 cells of one. But the floor deeper than 6 km rises (0.160 to 0.189): the sea
+   rises with it (884 m over the datum after 100 Myr, 1,250 at the end, against 362 and 745), since
+   floor that stands at its age's depth holds less water, and 0.178 of the sea floor is then old
+   floor in GDH1's range under that sea. With the sea at the datum the plate model's floor deeper
+   than 6 km would be 0.011. The release is also the arm with most criteria met (3.5 per run against
+   2, p 0.13), from the high ground and the coast.
+2. *Sediment subduction at Earth's share fixes the deep floor and drowns the land.* With s = 0.83
+   the sea falls to 200 to 900 m below the datum, the floor deeper than 6 km to 0.0105 (Earth
+   0.0073), deeper than 8 km to Earth's 0.0003 and the 99th percentile to Earth's 6,000 m; but the
+   land falls to 0.16 to 0.19 and half the continental crust is under the sea (the next section).
+3. *Erosion alone* (2 runs) lowers the sea and keeps the land: continental crust under the sea
+   0.177 (p 0.044), land 0.328.
+4. *PLT-312* (arcn) on the release, the erosion and the sheet: the arcs' crust falls from 4.25 to
+   3.70 km³ a year (Earth 2.5) and the continental crust under the sea from 0.283 to 0.155, but the
+   land above 2 km rises from 0.117 to 0.220 and the coast with high ground from 0.260 to 0.430, the
+   collisions fall to 1.45, and the criteria from 3.5 to 2.5 per run; one of its 4 runs reached
+   82 km from the sea (the surface guard's worst, on master 883a8ef6's flexure). The measures do not
+   support it: it stays off.
+5. *The deepest point is the surface stage's.* Every arm's plate model is within Earth's band or
+   just over it (8,588 to 10,162 m with the release); the surface stage adds 1.1 to 2.2 km to it.
+
+### The crust budget against Stern & Scholl 2010, Table 1
+
+`tools/review/loss-budget.py` over the crust budget's globals (`+DEEPTIME_CRUST_BUDGET=1`), seeds 1 and
+2 of both starts (4 runs; means over the 1,000 Myr, km³ a year; Earth's from Table 1, read in full,
+quotes in the bibliography). The arms: `base` (master), `trench-rel` (the release alone),
+`trench-rs12e` (the release, s = 0.12 and E = 90), `trench-rse` (the release, s = 0.83 and E = 90).
+
+| Table 1's row, or the model's | Earth | base | trench-rel | trench-rs12e | trench-rse |
+|---|---|---|---|---|---|
+| additions: intra-oceanic (island) arcs | 1.5 | 3.13 | 3.04 | 3.31 | 3.89 |
+| additions: continental arcs | 1.0 | 1.68 | 1.51 | 1.66 | 1.97 |
+| additions: crust-suturing zones | 0.2 | no rule | no rule | no rule | no rule |
+| additions: rifts, hotspots, rifted margins | 0.5 | 0.04 | 0.04 | 0.04 | 0.04 |
+| losses, ocean margins: sediment subduction (PLT-440) | 1.1 | 0 | 0 | 1.40 | 8.61 |
+| losses, ocean margins: subduction erosion (PLT-441) | 1.4 | 0 | 0 | 0.87 | 1.19 |
+| of it continental crust | | | | 0.30 | 0.47 |
+| losses, crust-suturing zones (sediment 0.1, erosion 0.3, continental crust 0.3) | 0.7 | 2.67 | 2.33 | 2.24 | 1.21 |
+| model only: foundering | | 0.95 | 0.76 | 0.77 | 0.34 |
+| model only: the rate cap and the resampling drops | 0 | 1.05 | 1.05 | 0.74 | 0.60 |
+| flow: ocean-floor felsic rock accreted at resamplings | | 20.82 | 18.33 | 16.51 | 6.73 |
+| flow: off the continents by the surface stage | | 16.02 | 12.71 | 12.80 | 9.62 |
+| erosive fronts, km (Clift & Vannucchi: 22,925 of 40,225) | | 0 | 0 | 17,467 | 25,152 |
+| island-arc and continental-arc fronts, km (Earth 14,500 and 27,500) | | 44,015 and 101,289 | 42,222 and 93,178 | 47,052 and 99,804 | 51,493 and 111,848 |
+| net change of the continental volume | 0 | −0.47 | +0.45 | −1.31 | −3.91 |
+
+What the table says:
+
+1. *Both new losses come out at Earth's size per km of front.* Erosion at E = 90 over the fronts
+   that meet PLT-442's test takes 0.87 to 1.19 km³ a year, against Table 1's 1.4 at ocean margins;
+   the erosive fronts are 17,000 to 25,000 km, Clift & Vannucchi's 22,925. The shortfall is the
+   200 km band running out of crust beyond 7 km on island arcs' forearcs (a third of the eroded
+   crust is continental).
+2. *Sediment subduction at Earth's share takes eight times Earth's flux.* At s = 0.83 the slabs take
+   7.5 to 9.9 km³ a year; Table 1 has 1.1. Earth's sediment reaching the trenches is about 1.3 to
+   1.5 km³ a year (von Huene & Scholl 1991: 1.5 km³ at 43,500 km of margin), and the model's ocean
+   floor carries 12 to 16 km³ a year off the continents by the surface stage, to be scraped back at
+   resamplings (16 to 21 km³ a year of ocean-floor felsic rock accreted). The share is Earth's; what
+   it acts on is not. The share that gives Table 1's flux is s = 0.12 (1.40 km³ a year), `calibrated`.
+3. *The model's continents live on that return flow.* Its additions are 4.8 to 5.9 km³ a year
+   (Earth 3.2: the arcs are twice Earth's per year, on fronts 3.4 times Earth's length), and its
+   losses before this lane were 3.6 to 3.7 km³ a year (sutures 2.3 to 2.7, four times Earth's
+   0.7; foundering 0.8 to 1.0; the rate cap and resampling drops 1.0), a net loss already on the
+   base. Earth's two subduction losses on top (2.3 to 2.5 km³ a year at s = 0.12 and E = 90) leave
+   the continents losing 1.3 km³ a year (a quarter of their volume over the run); at s = 0.83 they
+   lose 3.9.
+4. *The release adds nothing and takes nothing* (no crust moves; the floor rises to its age's depth),
+   but the sutures' loss (2.33 against 2.67) and the foundering fall a little with it and the net
+   turns slightly positive (+0.45 against −0.47 km³ a year; why was not traced).
+
+### The interaction check on master 18ace5d7 (seeds 1 to 4)
+
+This is the coordinator's check, 2026-10-23. It compares the base, the trench budget alone, the
+sheet alone, and both together.
+
+- **Branch.** It runs from this branch with master 18ace5d7 merged in (0e7e2410, key
+  eb4ef634e607).
+- **Bit-identity with the switches off.** `pool.sh alias` on supercontinent seed 1 found the
+  branch bit-identical to adf36da1f017 at 100 and at 1,000 Myr. This holds for the base's
+  argument set and for the sheet's. So `trench-m-base4` and `trench-m-sheet4` are master's `base`
+  and `fg-sheet` runs for seeds 1 to 4, read from this branch.
+- **Arms.**
+  - `rs12e` is the release, s = 0.12 and E = 90.
+  - `re` is the release and E = 90.
+  - `sheet` is the high ground's four keys.
+- **Runs.** Each arm has 8 runs (seeds 1 to 4 of both starts), with `+DEEPTIME_CRUST_BUDGET=1`.
+- **Statistics.** Each cell is the median, with the Mann-Whitney p against `trench-m-base4` in
+  brackets.
+
+| arm | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | criteria per run: median, mean | sea over the datum, 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|
+| target | 0.26 to 0.32 | ≥ 0.12 | ≤ 0.25 | ≤ 0.12 | ≤ 0.15 | ≤ 0.15 | 2 to 6 | of 7 | |
+| base | 0.292 | 0.191 | 0.253 | 0.261 | 0.378 | 0.169 | 1.80 | 3, 2.50 | 357 / 601 |
+| sheet | 0.342 (0.003) | 0.210 | 0.234 | 0.162 (0.001) | 0.354 | 0.115 (0.010) | 2.15 | 3.5, 3.50 (0.012) | 564 / 988 |
+| rs12e | 0.265 (0.021) | 0.109 (0.10) | 0.294 | 0.278 | 0.409 | 0.170 | 1.55 | 2, 2.00 (0.28) | 467 / 559 |
+| re | 0.248 (0.021) | 0.072 (0.010) | 0.347 (0.021) | 0.225 | 0.301 (0.050) | 0.170 | 1.95 | 1, 1.38 (0.037) | 578 / 1,131 |
+| rs12e, sheet | 0.298 | 0.183 | 0.279 | 0.163 (< 0.001) | 0.337 | 0.098 (0.010) | 1.85 | 3, 2.88 (0.49) | 604 / 853 |
+| re, sheet | 0.317 (0.10) | 0.162 | 0.261 | 0.166 (0.028) | 0.382 | 0.115 (0.015) | 1.50 | 3, 2.62 | 707 / 1,093 |
+
+Runs that meet each criterion (of 8; `tools/review/pool` v1census, the targets above):
+
+| arm | land | largest | under the sea | above 2 km | coast | ice | collisions | per run |
+|---|---|---|---|---|---|---|---|---|
+| base | 5 | 7 | 4 | 0 | 0 | 2 | 2 | 2.50 |
+| sheet | 2 | 7 | 5 | 2 | 0 | 7 | 5 | 3.50 |
+| rs12e | 5 | 4 | 3 | 1 | 0 | 1 | 2 | 2.00 |
+| re | 3 | 2 | 0 | 0 | 0 | 2 | 4 | 1.38 |
+| rs12e, sheet | 5 | 6 | 3 | 1 | 0 | 6 | 2 | 2.88 |
+| re, sheet | 4 | 5 | 4 | 2 | 0 | 4 | 2 | 2.62 |
+
+The trench measure:
+
+| arm | deeper than 6 km (Earth 0.0073) | deepest, m (Earth 10,920) | deeper than 8 km (Earth 0.0003) | p99, m (Earth 5,953) | deepest: plates / surface, m | sediment subducted, km³/yr (1.1 + 0.1) | forearc eroded, km³/yr (1.4 + 0.3) | erosive / oceanic fronts, km |
+|---|---|---|---|---|---|---|---|---|
+| base | 0.145 | 12,943 | 0.032 | 8,967 | 10,672 / 12,943 | 0 | 0 | 0 / 142,792 |
+| sheet | 0.196 (0.010) | 13,062 | 0.029 | 9,203 | 11,043 / 13,062 | 0 | 0 | 0 / 127,330 |
+| rs12e | 0.054 (0.002) | 11,154 (< 0.001) | 0.0022 (< 0.001) | 6,951 (< 0.001) | 9,387 / 11,154 | 1.46 | 0.92 | 18,129 / 148,234 |
+| re | 0.111 (0.028) | 11,554 (0.010) | 0.0025 (< 0.001) | 6,911 (< 0.001) | 9,549 / 11,554 | 0 | 0.84 | 17,010 / 146,832 |
+| rs12e, sheet | 0.099 (0.007) | 10,953 (< 0.001) | 0.0030 (< 0.001) | 7,115 (< 0.001) | 9,561 / 10,953 | 1.29 | 0.85 | 17,256 / 135,788 |
+| re, sheet | 0.137 | 11,558 (0.005) | 0.0033 (< 0.001) | 7,179 (< 0.001) | 10,043 / 11,558 | 0 | 0.84 | 16,842 / 129,661 |
+
+The crust budget (`tools/review/loss-budget.py`, means over 8 runs, km³ a year; Earth from
+Table 1):
+
+| row | Earth | base | sheet | rs12e | re | rs12e, sheet | re, sheet |
+|---|---|---|---|---|---|---|---|
+| island and continental arcs | 2.5 | 4.95 | 4.18 | 5.17 | 5.04 | 4.70 | 4.45 |
+| sediment subduction (PLT-440) | 1.1 | 0 | 0 | 1.47 | 0 | 1.28 | 0 |
+| subduction erosion (PLT-441) | 1.4 | 0 | 0 | 0.90 | 0.85 | 0.87 | 0.80 |
+| crust-suturing zones | 0.7 | 3.00 | 2.20 | 2.39 | 2.55 | 1.88 | 2.16 |
+| foundering and the rate cap | | 1.48 | 0.06 | 1.15 | 1.27 | 0.06 | 0.03 |
+| net change of the continental volume | 0 | −0.62 | +0.72 | −0.97 | −0.20 | +0.07 | +0.80 |
+| continental crust at the end, share of the planet | | 0.346 | 0.414 | 0.332 | 0.363 | 0.392 | 0.410 |
+
+What they say:
+
+1. *The trench budget alone takes crust from a budget that was already losing it.* With
+   rs12e the continental volume falls 0.97 km³ a year, against the base's 0.62. Land drops to
+   0.265 (p 0.021) and the largest landmass to 0.109. The arm meets 2 criteria a run, against
+   the base's 2.5. Without sediment subduction (`re`) the sea stands 1,131 m over the datum at
+   the end, and half the continental crust that is left drowns (0.347).
+2. *The sheet alone adds crust.* The founder and the rate cap almost stop: 1.48 km³ a year fall
+   to 0.06, because the sheet spreads the high ground's crust rather than founder it. The
+   continental volume then grows by 0.72 km³ a year and land reaches 0.342.
+3. *Together the budget balances, and land is back in the band.* The trench budget's 2.15 km³ a
+   year of new losses offset the sheet's gain. The net is +0.07 km³ a year (Earth's is 0) and
+   land is 0.298. On these seeds the pair meets 2.88 criteria a run, against the sheet's 3.50
+   and the base's 2.50. It wins back the land in 3 more runs than the sheet. It loses the
+   collision rate in 3 runs, the ice in 1, the high ground in 1, the largest landmass in 1 and
+   the drowned crust in 2. The collisions fall with the trench budget in every pairing (1.80 to
+   1.55 alone, 2.15 to 1.85 with the sheet); this was not traced.
+4. *`re` (no sediment subduction) is worse than `rs12e` everywhere.* Its land and sea are both
+   off, so it is not the final arm.
+
+### Twelve runs of the trench budget with the sheet
+
+`trench-m-rs12e-sheet` is the release, s = 0.12, E = 90 and the sheet's four keys, on seeds
+1 to 6 of both starts. It is compared with master's `base` and `fg-sheet` (12 runs each). The p
+in brackets is against `base`; the last row also gives the p against the sheet.
+
+| arm | land | largest landmass | under the sea | above 2 km | coast | ice | collisions | criteria per run: median, mean | sea, 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|
+| base | 0.292 | 0.144 | 0.253 | 0.245 | 0.369 | 0.168 | 1.75 | 2.5, 2.17 | 385 / 690 |
+| sheet | 0.342 (0.003) | 0.230 (0.061) | 0.234 | 0.157 (0.001) | 0.354 | 0.106 (0.001) | 2.10 | 3.5, 3.50 (< 0.001) | 505 / 988 |
+| trench and sheet | 0.300 (0.19; 0.046 against the sheet) | 0.188 | 0.249 | 0.163 (< 0.001) | 0.337 | 0.121 (0.014) | 1.90 | 3, 3.08 (0.073; 0.20 against the sheet) | 604 / 850 |
+
+The runs that meet each criterion, of 12:
+
+| arm | land | largest | under the sea | above 2 km | coast | ice | collisions |
+|---|---|---|---|---|---|---|---|
+| base | 6 | 8 | 6 | 0 | 0 | 4 | 2 |
+| sheet | 2 | 10 | 7 | 5 | 0 | 11 | 7 |
+| trench and sheet | 7 | 9 | 6 | 2 | 0 | 8 | 5 |
+
+The trench measure on the same runs:
+
+- **Deep floor.** The floor deeper than 6 km is 0.099 of the sea floor (base 0.145, sheet
+  0.200). The floor deeper than 8 km is 0.0029 (base 0.032), and the 99th percentile 7,066 m
+  (base 8,967).
+- **Deepest point.** It is 10,864 m (base 13,093), in Earth's band in 7 of 12 runs. No run
+  meets the deep-floor criterion.
+- **Fluxes.** Sediment subducted is 1.29 km³ a year (Table 1: 1.1 at ocean margins) and forearc
+  eroded 0.88 (Table 1: 1.4).
+- **Erosive fronts.** They total 17,467 km of 133,794 km of oceanic front. Clift & Vannucchi
+  have 22,925 km of 40,225.
+
+The crust budget over the 12 runs:
+
+- **New losses.** Sediment subduction takes 1.29 km³ a year and erosion 0.87 (0.31 of it
+  continental crust).
+- **Other losses.** The sutures take 1.95 (base 2.97, Earth 0.7). The founder and the rate cap
+  together take 0.06 (base 1.53).
+- **Net change of the continental volume.** It is +0.03 km³ a year (base −0.38, sheet +0.82).
+  Continental crust ends at 0.390 of the planet (base 0.355, sheet 0.421).
+
+The surface guard's worst is 16,020 m (base 15,898, sheet 16,136; p 0.71).
+
+*Does the pair keep the sheet's criteria gain and bring land back into the band?* Land, yes:
+0.300 is in the band in 7 runs of 12, against the sheet's 2 and the base's 6 (p 0.046 against
+the sheet). The gain, partly: 3.08 criteria a run, against the sheet's 3.50 and the base's
+2.17. That is two thirds of the sheet's gain, at p 0.073 against the base. No criterion the base
+meets is lost: every column has at least as many runs as the base's. Against the sheet it gives
+up the high ground in 3 runs, the ice in 3, the collisions in 2, the largest landmass in 1 and
+the drowned crust in 1. By the ship rule (a meaningful p, and no criterion of the base broken)
+it stays off: p 0.073 is not meaningful.
+
+### Which law digs the deep floor, on master 18ace5d7
+
+The same split as above (`deepdiag.py` on the pool's dumps, medians), on the merged key.
+
+- **Rows.** "Pulled" is ocean floor the plate model holds below GDH1's floor for its age.
+  "GDH1" is ocean floor within GDH1's range.
+- **"Plates, from the datum".** This row is the plate model's floor deeper than 6 km below the
+  datum: the deep floor if the sea stood at the datum.
+
+| share of the sea floor | base | sheet | rs12e | re | rs12e, sheet |
+|---|---|---|---|---|---|
+| sea over the datum at the end, m | 747 | 1,033 | 635 | 1,167 | 914 |
+| deeper than 6 km | 0.145 | 0.200 | 0.054 | 0.111 | 0.099 |
+| of it pulled floor | 0.086 | 0.084 | 0.020 | 0.0095 | 0.017 |
+| of it GDH1's old floor | 0.044 | 0.124 | 0.029 | 0.101 | 0.079 |
+| pulled floor at a current trench, share | 0.11 | 0.09 | 0.55 | 0.67 | 0.49 |
+| plates, from the datum: deeper than 6 km | 0.073 | 0.067 | 0.017 | 0.0066 | 0.0125 |
+| deepest, m (plates over the datum / surface over the datum) | 13,093 (−9,775 / −12,256) | 13,418 | 11,154 (−7,021 / −10,299) | 11,554 | 10,864 (−6,586 / −9,927) |
+
+So on master 18ace5d7:
+
+- **Fossil trench depth.** The release takes it away. Pulled floor falls from 0.086 to 0.010 to
+  0.020 of the sea floor. Half or more of what is left is a trench this step, and 93 % of it
+  lies within 8 cells of one.
+- **What the plate model holds against the datum.** Its floor deeper than 6 km is then 0.007
+  to 0.017. Earth's is 0.0073.
+- **What is left is the sea's.** GDH1's old floor lies 5.65 km below the datum. With the sea
+  600 to 1,170 m over the datum, that floor stands deeper than 6 km under the sea. It falls as
+  the sea falls: 0.029 at 635 m and 0.101 at 1,167 m. The sea stands high because the ocean
+  carries several times GlobSed's sediment (sea-level.md). Sediment subduction at Earth's share
+  would fix that, but on this model's ocean it drowns the land. The routing that puts 12 to
+  15 km³ a year of the continents' rock on the ocean floor is the surface stage's.
+- **The deepest point.** The surface stage carries the deepest cell 3.3 km below the plate
+  model's (the trace above: current trench rows, mostly poleward of 60°). This is the surface
+  lane's.
+
+### What is on
+
+Nothing new is on by default.
+
+- **The switches.** PLT-440 to PLT-443 are in the code as `--set` switches, 0 in the defaults
+  and in every built-in preset. With them off, the runs are master's bit for bit.
+- **PLT-312.** It stays off (the exploration above).
+- **Recommended values for an arm.** The release at 2 Myr. Erosion at E = 90 with
+  PLT-442's 60 mm/yr and 1 km test. Sediment subduction at s = 0.12: Table 1's flux on this
+  model's ocean (`calibrated`). Earth's share s = 0.83 takes eight times Table 1's flux here and
+  drowns the land.
+- **Why nothing ships.**
+  - Alone, the trench budget loses criteria: 2 a run against 2.5 on matched seeds. It takes land
+    to the band's floor, because the model's continents were already losing crust and Earth's
+    two subduction losses come on top.
+  - With the sheet it brings land back into the band. It balances the continental budget (+0.03
+    km³ a year over 12 runs). It keeps two thirds of the sheet's gain (3.08 criteria a run
+    against 2.17, p 0.073).
+  - It takes the deep floor deeper than 8 km to a tenth, and the deepest point to Earth's band.
+  - By the ship rule it stays off until a larger ensemble gives a meaningful p.
+- **The command line.** The pair's keys:
+  `--set tectonics.trench_release_half_life_myr=2 --set tectonics.sediment_subduction_share=0.12
+  --set tectonics.subduction_erosion_km3_per_km_myr=90 --set tectonics.collapse_sea_column=true
+  --set tectonics.collapse_sea_column_max_km=41.1 --set tectonics.collapse_sheet_viscosity_pa_s=1e22
+  --set tectonics.collapse_reach_km=5000`.
+- **The pool.** The arm `trench-m-rs12e-sheet` is in the pool: key eb4ef634e607, argkey
+  86d11d8b, 12 runs.
+
+### What is left, and for whom
+
+1. *The surface stage's deepening at trench rows* (the surface lane's, `surface/`). With the
+   release, the deepest cell stands 6.6 to 7.0 km below the datum in the plate model. The
+   surface stage carries it 3.3 km deeper.
+   - The surface guard's worst (15.6 to 16.9 km from the sea in every arm) is that deepening at
+     current trench rows. Past 14 km it is mostly poleward of 60° (the trace above).
+   - The lead, not verified here: the flexure's water load over a trench.
+2. *The sediment's routing* (the surface stage's and the sea level's).
+   - The surface stage moves 11.5 to 15.5 km³ a year of the continents' rock onto ocean floor. The
+     resamplings accrete 14.7 to 20.7 km³ a year of it back. Earth's sediment reaching the
+     trenches is about 1.5.
+   - While that loop runs, the ocean holds several times GlobSed's sediment. The sea stands 600
+     to 1,170 m over the datum, and GDH1's old floor stands deeper than 6 km under it. That is
+     the deep floor that is left: 0.03 to 0.10 of the sea floor, against the plate model's own
+     0.007 to 0.017 from the datum.
+   - Sediment subduction at Earth's share (0.83) is the physical setting. It becomes usable once
+     the ocean's sediment is Earth's size.
+3. *The fronts' length* (the plate geometry's, Ben's gap 2).
+   - The oceanic fronts are 3.1 to 3.5 times Earth's 43,000 km.
+   - The arcs add 4.2 to 5.2 km³ a year against Earth's 2.5.
+   - The sutures take 1.9 to 3.0 against Earth's 0.7.
+   - Per km of front, both new losses are Earth's size. Their totals follow the model's front
+     length.
+4. *The trench's depth against the slab's age* (this lane, not done). The trench law holds every
+   oceanic front at z_t = −10 km over the datum, whatever the slab's age. Earth's trenches run
+   from 3 to 11 km and deepen with the slab's age (Jarrard 1986, Table 11). A z_t from the
+   slab's age is the next step for the trench rows themselves.
+5. *The collision rate under the trench budget* (not traced). The collisions fall from 1.75 to
+   1.55 a 100 Myr with the trench budget alone, and from 2.10 to 1.90 with the sheet.
+6. *A larger ensemble for the pair* (the coordinator's). Twelve more seeds of `base`, `fg-sheet`
+   and the pair would settle whether p 0.073 is a real gain.

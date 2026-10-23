@@ -218,6 +218,9 @@ pub struct SurfaceRates {
     /// between under [`OceanDepth::Gdh1`] ([`gdh1_scale`]).
     pub z_ridge: f64,
     pub trench_relax: f64,
+    /// The share of the way back to its age's bare floor that ocean floor a trench left below
+    /// it rises in a step (`trench_release_half_life_myr`; 0 = none). ledger: PLT-443
+    pub trench_release: f64,
     pub gravity: f64,
     /// The ocean floor's law (`tectonics.ocean_depth`).
     pub law: OceanDepth,
@@ -279,6 +282,18 @@ pub fn surface_step(s: &mut Sample, r: &SurfaceRates, held_floor: f32) -> f64 {
     if s.flags & TRENCH != 0 && s.kind == OCEANIC {
         z += (r.z_t - z) * r.trench_relax;
         z += r.accretion_m;
+    } else if r.trench_release > 0.0
+        && r.law == OceanDepth::Gdh1
+        && s.kind == OCEANIC
+        && !s.is_hidden()
+    {
+        // The trench's depth is the slab's to hold: floor no trench holds this step and that
+        // stands below its age's bare floor, which only the pull puts it under, rises back.
+        // ledger: PLT-443
+        let floor = gdh1_floor_m(r.z_ridge, r.z_floor, s.age_myr(r.t_myr));
+        if z < floor {
+            z += (floor - z) * r.trench_release;
+        }
     }
     s.elevation_m = z.clamp(r.z_t, r.z_c) as f32;
     diagenesis(&mut s.pools, r.gravity);
@@ -314,17 +329,21 @@ pub fn gdh1_scale(z_ridge: f64, z_floor: f64) -> f64 {
     (z_ridge - z_floor) / (GDH1_FLOOR_M - GDH1_RIDGE_M)
 }
 
+/// The height of bare ocean floor `age_myr` old under GDH1 drawn between the ridge crest
+/// `z_ridge` and the old floor `z_floor` (PLT-355). ledger: PLT-351
+pub fn gdh1_floor_m(z_ridge: f64, z_floor: f64, age_myr: f64) -> f64 {
+    // z_r − s·(d − 2,600), written so that s = 1 at GDH1's depths gives −d to the bit.
+    let s = gdh1_scale(z_ridge, z_floor);
+    -(s * gdh1_depth_m(age_myr) + (-z_ridge - s * GDH1_RIDGE_M))
+}
+
 /// The height of bare ocean floor `age_myr` old under the preset's law (`tectonics.ocean_depth`),
 /// m: GDH1's shape from the preset's ridge crest (GDH1's depth below the datum, Earth's sea
 /// today, at the shipped depths; PLT-355), or the dampening's closed form [`ocean_elevation`].
 /// The floor a ridge, a gap or the first ocean is made at. ledger: PLT-351
 pub fn floor_at(k: &TectonicParams, age_myr: f64) -> f64 {
     match k.ocean_depth {
-        OceanDepth::Gdh1 => {
-            // z_r − s·(d − 2,600), written so that s = 1 at GDH1's depths gives −d to the bit.
-            let s = gdh1_scale(k.ridge_elevation_m, k.oceanic_floor_elevation_m);
-            -(s * gdh1_depth_m(age_myr) + (-k.ridge_elevation_m - s * GDH1_RIDGE_M))
-        }
+        OceanDepth::Gdh1 => gdh1_floor_m(k.ridge_elevation_m, k.oceanic_floor_elevation_m, age_myr),
         OceanDepth::Dampening => ocean_elevation(
             age_myr,
             k.ridge_elevation_m,
@@ -402,6 +421,7 @@ mod tests {
             z_floor: -10_000.0,
             z_ridge: -1000.0,
             trench_relax: 0.5,
+            trench_release: 0.0,
             gravity: 9.81,
             law: OceanDepth::Dampening,
             t_myr: 0.0,
@@ -469,6 +489,7 @@ mod tests {
             z_floor: -GDH1_FLOOR_M,
             z_ridge: -GDH1_RIDGE_M,
             trench_relax: 0.0,
+            trench_release: 0.0,
             gravity: 9.81,
             law: OceanDepth::Gdh1,
             t_myr: t,
@@ -526,6 +547,56 @@ mod tests {
         s.elevation_m = floor_at(&k, 29.0) as f32;
         surface_step(&mut s, &scaled, f32::NAN);
         assert!((f64::from(s.elevation_m) - floor_at(&k, 30.0)).abs() < 0.01);
+    }
+
+    /// The trench's release (PLT-443): under GDH1 a trench pulls its row down towards z_t, and
+    /// once no trench holds it the floor rises back to its age's bare floor with the release
+    /// on, and stays at the trench's depth with it off (the incremental subsidence keeps any
+    /// offset); floor standing above its age's (a seamount) is not touched.
+    #[test]
+    fn a_trench_gives_its_floor_back_when_it_has_gone() {
+        let rates = |t: f64, release: f64| SurfaceRates {
+            erosion_m: 0.0,
+            damping_m: 0.0,
+            accretion_m: 0.0,
+            pelagic_m: 0.0,
+            z_c: 10_000.0,
+            z_t: -10_000.0,
+            z_floor: -GDH1_FLOOR_M,
+            z_ridge: -GDH1_RIDGE_M,
+            trench_relax: trench_share(1.0, 2.0),
+            trench_release: release,
+            gravity: 9.81,
+            law: OceanDepth::Gdh1,
+            t_myr: t,
+            dt_myr: 1.0,
+            sea_m: 0.0,
+        };
+        let run = |release: f64, z0: f32, held_myr: u32| {
+            let mut s = Sample::blank(0);
+            s.elevation_m = z0;
+            for k in 1..=80 {
+                if k <= held_myr {
+                    s.flags |= TRENCH;
+                } else {
+                    s.flags &= !TRENCH;
+                }
+                surface_step(&mut s, &rates(f64::from(k), release), f32::NAN);
+            }
+            f64::from(s.elevation_m)
+        };
+        let floor = -gdh1_depth_m(80.0);
+        let at_trench = run(trench_share(1.0, 2.0), -2600.0, 80);
+        assert!(at_trench < -9_900.0, "{at_trench}");
+        let kept = run(0.0, -2600.0, 40);
+        assert!(
+            kept < floor - 3_000.0,
+            "off: the depth stays, {kept} vs {floor}"
+        );
+        let released = run(trench_share(1.0, 2.0), -2600.0, 40);
+        assert!((released - floor).abs() < 1.0, "{released} vs {floor}");
+        let mount = run(trench_share(1.0, 2.0), -1000.0, 0);
+        assert!((mount - floor - 1600.0).abs() < 0.5, "{mount} vs {floor}");
     }
 
     /// The eclogite root (PLT-278 to PLT-280): the normal column and any column whose mafic base

@@ -119,6 +119,10 @@ pub struct Output {
     pub kind: Vec<u8>,
     /// The `closed_basin` layer ([`super::closed_basin_layer`]): 1 where the game puts no sea.
     pub closed_basin: Vec<u8>,
+    /// The lowest cell of every basin the balance leaves without a lake (dry ground or a playa),
+    /// in the order they were solved: the point its floor drains to (the amplifier keeps these
+    /// basins open instead of filling them, `surface/amplify/balance.rs`).
+    pub sinks: Vec<u32>,
     pub lakes: Vec<Lake>,
     pub rivers: Rivers,
     /// Counts and timings for `notes.bake.water`.
@@ -194,6 +198,8 @@ struct Net<'a> {
     merged: Vec<bool>,
     lake_of: HashMap<u32, u32>,
     playa: Vec<u32>,
+    /// [`Output::sinks`].
+    sinks: Vec<u32>,
     tally: Tally,
     /// Cells the open sea reaches at its own level ([`super::sea_reached`]): a basin among them
     /// is open to the sea.
@@ -406,6 +412,11 @@ impl Net<'_> {
             .unwrap_or(i32::MAX);
         let flooded = open && lowest <= sea - 16;
         if inflow <= 0.0 && !flooded {
+            let sink = members
+                .iter()
+                .min_by_key(|&&m| (elev[m as usize], m))
+                .copied();
+            self.sinks.extend(sink);
             self.tally.dry += 1;
             return;
         }
@@ -518,8 +529,10 @@ impl Net<'_> {
                     self.playa.push(c);
                 }
             }
+            self.sinks.push(sink as u32);
             self.tally.playa += 1;
         } else {
+            self.sinks.push(sink as u32);
             self.tally.dry += 1;
         }
     }
@@ -739,6 +752,7 @@ pub fn run(inp: &Input<'_>) -> Output {
         merged: Vec::new(),
         lake_of: HashMap::new(),
         playa: Vec::new(),
+        sinks: Vec::new(),
         tally: Tally::default(),
         reached,
     };
@@ -769,6 +783,7 @@ pub fn run(inp: &Input<'_>) -> Output {
         merged,
         mut lake_of,
         playa,
+        sinks,
         reached,
         ..
     } = net;
@@ -1192,6 +1207,7 @@ pub fn run(inp: &Input<'_>) -> Output {
         water_level,
         kind: kinds,
         closed_basin,
+        sinks,
         lakes,
         rivers,
         stats,

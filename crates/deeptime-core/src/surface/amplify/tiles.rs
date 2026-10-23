@@ -16,21 +16,21 @@ use super::kernels::{
     Buf, Counts, NoiseCfg, PassDevice, Physics, Times, count_sinks, flood_repair, relief5,
     run_passes, run_passes_on,
 };
-use super::resample::Level;
+use super::resample::{Level, basin, cell, wet};
 use super::window::Win;
 use crate::error::CoreError;
 use crate::surface::detail::DetailParams;
 
 /// Bytes per cell of a window while a tile runs: the passes' arrays ([`Buf`]), the copy of the
 /// terrain the change is measured against, the core's arrays handed to the sink (on a level before
-/// the last: terrain, area, weight and erodibility, 4 B each, and the lake flag, 1 B; the next
-/// level's lake surface is looked up in the coarse level, not copied, [`LevelTile::from`]), and
-/// the mountain character's copy of the terrain before it (the last level) or the core's glacier
-/// surface (a level before it).
+/// the last: terrain, area, weight and erodibility, 4 B each, and the cell byte, 1 B, with the lake
+/// flag and the basin class, `resample::cell`; the next level's lake surface is looked up in the
+/// coarse level, not copied, [`LevelTile::from`]), and the mountain character's copy of the
+/// terrain before it (the last level) or the core's glacier surface (a level before it).
 pub const TILE_BYTES_PER_CELL: u64 = Buf::BYTES_PER_CELL + 4 + 17 + 4;
 /// Bytes per cell of a [`Level`] (terrain, area, weight, erodibility, lake surface, glaciers'
-/// surface).
-pub const LEVEL_BYTES_PER_CELL: u64 = 24;
+/// surface, basin class).
+pub const LEVEL_BYTES_PER_CELL: u64 = 25;
 
 /// A rectangle of the fine grid: first column, first row, width, height.
 pub type Rect = (usize, usize, usize, usize);
@@ -113,7 +113,8 @@ pub struct LevelTile<'a> {
     pub area: &'a [f32],
     pub wgt: &'a [f32],
     pub kfac: &'a [f32],
-    /// 1 where the cell lies under a lake's surface (`Fine::lake`), else 0.
+    /// The cell bytes (`Fine::lake`): the lake bit, and the basin class, the next level's
+    /// `Level::closed`.
     pub lake: &'a [u8],
     /// The level the tile was sampled from: a lake cell's surface, the next level's
     /// `Level::lake_z`, is [`Level::lake_surface`] of it, so the window need not carry it.
@@ -129,10 +130,11 @@ pub struct LevelSink {
 
 impl LevelSink {
     /// The next level's arrays, all of them now: the glaciers' surface too when the level it
-    /// comes from has one (`glaciers`), so the [`LEVEL_BYTES_PER_CELL`] the run reserved for them
-    /// are in use before it reserves the tiles' (amp-est, 2026-10-23: allocated at the first tile,
-    /// it came 4 B a cell after the tiles' reservation, which never counted it).
-    pub fn new(w: usize, h: usize, dx: f64, glaciers: bool) -> LevelSink {
+    /// comes from has one (`glaciers`), and the basin classes when it has them (`basins`), so the
+    /// [`LEVEL_BYTES_PER_CELL`] the run reserved for them are in use before it reserves the
+    /// tiles' (amp-est, 2026-10-23: allocated at the first tile, they came 4 B and 1 B a cell
+    /// after the tiles' reservation, which never counted them).
+    pub fn new(w: usize, h: usize, dx: f64, glaciers: bool, basins: bool) -> LevelSink {
         let n = w * h;
         LevelSink {
             level: Level {
@@ -145,6 +147,11 @@ impl LevelSink {
                 kfac: vec![0.0; n],
                 lake_z: vec![super::resample::NO_LAKE; n],
                 zs: if glaciers { vec![0.0; n] } else { Vec::new() },
+                closed: if basins {
+                    vec![basin::OPEN; n]
+                } else {
+                    Vec::new()
+                },
             },
         }
     }
@@ -171,7 +178,7 @@ impl TileSink for LevelSink {
                 .zip(&l.lake[src.clone()])
                 .enumerate()
             {
-                *s = if m == 1 {
+                *s = if cell::lake(m) {
                     l.from.lake_surface((x0 + i) as i64, gj)
                 } else {
                     super::resample::NO_LAKE
@@ -181,7 +188,16 @@ impl TileSink for LevelSink {
                 if self.level.zs.len() != self.level.z.len() {
                     self.level.zs = vec![0.0; self.level.z.len()];
                 }
-                self.level.zs[dst..dst + w].copy_from_slice(&l.zs[src]);
+                self.level.zs[dst..dst + w].copy_from_slice(&l.zs[src.clone()]);
+            }
+            // The basin classes, when the coarse level has them (`Level::basin_class`).
+            if !l.from.closed.is_empty() {
+                if self.level.closed.len() != self.level.z.len() {
+                    self.level.closed = vec![basin::OPEN; self.level.z.len()];
+                }
+                for (b, &m) in self.level.closed[dst..dst + w].iter_mut().zip(&l.lake[src]) {
+                    *b = cell::class(m);
+                }
             }
         }
         Ok(())
@@ -629,7 +645,8 @@ pub fn run_tiles(
             for i in 0..cw {
                 let c = row + i;
                 z_core.push(buf.z[c]);
-                if before[c] > sea {
+                let on_land = !wet(before[c], sea, cell::class(buf.lake[c]));
+                if on_land {
                     change += f64::from((buf.z[c] - before[c]).abs());
                     land += 1;
                 }
@@ -639,7 +656,7 @@ pub fn run_tiles(
                         cfg.detail
                             .amplitude_blocks(relief_blocks, f64::from(buf.a[c]), cfg.drama);
                     amp_core.push(a as f32);
-                    if before[c] > sea {
+                    if on_land {
                         detail += a;
                     }
                 } else {
