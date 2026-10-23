@@ -319,7 +319,11 @@ pub fn estimate_bytes(p: &PlanetPreset) -> (u64, u64) {
     let strata = l1 * u64::from(k) * STRATA_BYTES_PER_HORIZON_CELL;
     let water = if p.hydro.unwrap_or_default().enabled {
         let (full, drained) = (cells(p.resolution.l3_r), cells(hydrology_r(p)));
-        let load = if drained < full { full + full / 4 } else { full };
+        let load = if drained < full {
+            full + full / 4
+        } else {
+            full
+        };
         (load * 2).max(drained * WATER_BYTES_PER_CELL + l1 * WATER_BYTES_PER_L1_CELL)
     } else {
         0

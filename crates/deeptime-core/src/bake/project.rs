@@ -666,7 +666,7 @@ pub(crate) const WATER_LAYER_BYTES_PER_CELL: u64 = 4;
 /// draws the closed basins on the world's own ground (HYD-105): the ground as f64
 /// ([`world_ground`]) and `hydro::closed_basin_on_world`'s flags, 1 B each, and fronts. A figure of
 /// the memory model (amp-est, 2026-10-23: the ground and the working set held 25.1 B a cell on
-/// quick 16k's world grid of 22.2 M cells, 34.4 B where the ocean passed 2^24 cells, the bake's
+/// quick 16k's world grid of 22.2 M cells, 37.3 B where the ocean passed 2^24 cells, the bake's
 /// peak, while the closed basins' flood kept every body cell and a depth-first stack as usize;
 /// with a breadth-first front of u32 and a state byte a cell, 11.0 B: 8.0 for the ground, 3.0 for
 /// the flood).
