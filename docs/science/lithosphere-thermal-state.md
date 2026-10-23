@@ -492,7 +492,37 @@ coasts are"):
   a cold one (the gap audit cites Rey, Teyssier & Whitney 2010 for the Moho temperature's part; not
   read for this page), so the state could set it; that would be a new row above ISO-120 and was not
   tried.
-- Stages 2 and 3 (above, "The order of the stages") are designed, not built.
+- **The high coasts are collision belts at ocean coasts.** Neither stage reaches them: without the
+  collision belts' high coasts, coast_hi would be 0.06 to 0.11 in every arm, inside its band, and
+  with them it is 0.29 to 0.37. On Earth a continent-continent collision closes the ocean between
+  the two and its belt lies inland. The recommendation: a lane on why a model belt forms or stays on
+  an open coast (a continent against an arc or a sliver, a suture whose ocean stays open along
+  strike), with `coastset`'s collision rate as its measure; that is plate boundaries' ground (gap 2)
+  more than the lithosphere's.
+- **The cooling time of a stretched margin.** τ_c is a 225 km plate's, 203.5 Myr (PLT-465), for
+  every continent. Steckler & Watts (1978) fit the New York margin's subsidence with a thermal
+  lithosphere of 113 to 139 km, about 51 to 78 Myr on McKenzie's scaling (the abstract's numbers,
+  the arithmetic ours), and Montadert et al. (1979) find the time constant "increases with depth"
+  across the margin. With thermal isostasy off (as the arms ran) the time sets only the margin's
+  heat flow and strength. The recommendation: leave it until thermal isostasy goes on; then cool a
+  sample with no keel towards a 125 km plate on McKenzie's 62.8 Myr and a keeled one towards L_cold
+  on τ_c, a new row beside PLT-465.
+- **Stage 3's uplift points the wrong way for coast_hi.** With `thermal_isostasy_m` on, a belt that
+  loses its root rises by up to 1,600 m (Molnar, England & Martinod 1993 give Tibet 1,000 to
+  2,500 m), and seven in ten high coasts are collision belts. No arm here ran it with isostasy. The
+  recommendation: keep `root_removal` off with isostasy until the belts sit inland.
+- **Stage 3 and the strength.** With the strength on, the belt that loses its root is as weak as a
+  fresh orogen and spreads (g4-root-str: the largest landmass on its floor, more crust under the
+  sea). Whether the model's belt spreads further than a real one was not measured. The
+  recommendation: leave `root_removal` off; if it is tried again, try it
+  beside the plate's yield (ISO-120), which bounds what a column holds.
+- **One β for crust and mantle.** Lang, ten Brink & Makovsky (2026) fit a mantle β 2.8 times the
+  crust's at the Baltimore Canyon Trough. The recommendation: keep one β (PLT-476); a mantle β
+  would change only a margin's heat flow and strength on this model, and nothing measures those
+  against Earth yet.
+- **Collisions under the band.** β with the strength had fewer collisions (1.35 at seeds 1 to 4,
+  p 0.21), and the base is already under the band's floor (1.75 against 2). Not traced. The
+  recommendation: trace it in the plate-boundary lane, which owns the collision count.
 
 ## Sources
 
