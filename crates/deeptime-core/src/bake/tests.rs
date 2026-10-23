@@ -109,43 +109,7 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     // The plate model's heat flow (2026-10-02): continental cells only, every one between the
     // model's floor (55 mW/m²) and its largest sum (90 + 40 arc + 40 hotspot + 30 divergent), and
     // nodata on oceanic crust (where the crust-age layer has data; a continental cell has none).
-    {
-        let load = |n: &str| {
-            deeptime_format::TilePackReader::open(&dir.join(format!("rasters/{n}.dtr")))
-                .unwrap()
-                .load()
-                .unwrap()
-        };
-        let q = load("meta/heat_flow_mw_m2");
-        let age = load("meta/crust_age_myr");
-        // The crust type (2026-10-19) agrees with both: oceanic (0) wherever the crust has an
-        // age, continental (1) wherever it has a continental heat flow, and every cell has one.
-        let kind = load("meta/crust_type");
-        assert_eq!(kind.desc.dtype, deeptime_format::DType::U8);
-        assert_eq!(kind.desc.nodata, Some(255.0));
-        assert_eq!(q.desc.grid.w, age.desc.grid.w);
-        assert_eq!(kind.desc.grid.w, age.desc.grid.w);
-        let (mut hot, mut cold) = (0u32, 0u32);
-        for j in 0..q.desc.grid.h {
-            for i in 0..q.desc.grid.w {
-                let (i, j) = (i64::from(i), i64::from(j));
-                let (v, a, k) = (q.get(i, j), age.get(i, j), kind.get(i, j));
-                if v.is_nan() {
-                    cold += 1;
-                } else {
-                    assert!((54.9..=200.1).contains(&v), "({i}, {j}) heat flow {v}");
-                    assert!(a.is_nan(), "({i}, {j}) has an age and a continental flow");
-                    assert_eq!(k, 1.0, "({i}, {j}) has a continental flow on crust {k}");
-                    hot += 1;
-                }
-                if !a.is_nan() {
-                    assert_eq!(k, 0.0, "({i}, {j}) has an oceanic age on crust {k}");
-                }
-                assert!(k == 0.0 || k == 1.0, "({i}, {j}) crust type {k}");
-            }
-        }
-        assert!(hot > 0 && cold > 0, "continents {hot}, ocean {cold}");
-    }
+    check_heat_flow(&dir, 54.9);
     for f in [
         "strata/classes.json",
         "spawn/candidates.json",
@@ -364,6 +328,79 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
             .map_or(String::new(), |v| v["plutons"].to_string())
     );
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+
+/// The bake's heat flow: continental cells only, every one in [`lo`, 200.1] mW/m², and nodata on
+/// oceanic crust (where the crust-age layer has data; a continental cell has none).
+fn check_heat_flow(dir: &Path, lo: f32) {
+
+        let load = |n: &str| {
+            deeptime_format::TilePackReader::open(&dir.join(format!("rasters/{n}.dtr")))
+                .unwrap()
+                .load()
+                .unwrap()
+        };
+        let q = load("meta/heat_flow_mw_m2");
+        let age = load("meta/crust_age_myr");
+        // The crust type (2026-10-19) agrees with both: oceanic (0) wherever the crust has an
+        // age, continental (1) wherever it has a continental heat flow, and every cell has one.
+        let kind = load("meta/crust_type");
+        assert_eq!(kind.desc.dtype, deeptime_format::DType::U8);
+        assert_eq!(kind.desc.nodata, Some(255.0));
+        assert_eq!(q.desc.grid.w, age.desc.grid.w);
+        assert_eq!(kind.desc.grid.w, age.desc.grid.w);
+        let (mut hot, mut cold) = (0u32, 0u32);
+        for j in 0..q.desc.grid.h {
+            for i in 0..q.desc.grid.w {
+                let (i, j) = (i64::from(i), i64::from(j));
+                let (v, a, k) = (q.get(i, j), age.get(i, j), kind.get(i, j));
+                if v.is_nan() {
+                    cold += 1;
+                } else {
+                    assert!((lo..=200.1).contains(&v), "({i}, {j}) heat flow {v}");
+                    assert!(a.is_nan(), "({i}, {j}) has an age and a continental flow");
+                    assert_eq!(k, 1.0, "({i}, {j}) has a continental flow on crust {k}");
+                    hot += 1;
+                }
+                if !a.is_nan() {
+                    assert_eq!(k, 0.0, "({i}, {j}) has an oceanic age on crust {k}");
+                }
+                assert!(k == 0.0 || k == 1.0, "({i}, {j}) crust type {k}");
+            }
+        }
+        assert!(hot > 0 && cold > 0, "continents {hot}, ocean {cold}");
+}
+
+/// The release pace (ISO-099) on, with the heat flow's final pass (PLT-469): without the pass a
+/// cell baked 33.7 mW/m², the 229 Myr sea floor's, because crust the rate guard spread onto old
+/// floor after the step's resampling (`collapse::spread`) became continental after the step had set
+/// every sample's heat flow.
+#[test]
+fn the_release_pace_bakes_continental_heat_flow_with_the_final_pass() {
+    let dir = temp_dir("release-pace");
+    let mut v: Value = serde_json::from_str(&small_planet(100.0)).unwrap();
+    v["surface"]["flexure"]["te_weakening_myr"] = json!(62.8);
+    v["tectonics"]["heat_flow_refresh"] = json!(false);
+    run_to_folder(&v.to_string(), &dir);
+    check_heat_flow(&dir, 54.9);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The lithosphere's thermal state on (PLT-460 to PLT-469, ISO-110 to ISO-112) with the release
+/// pace: the bake's continental heat flow is the state's, at least an old craton's 41 mW/m².
+#[test]
+fn the_thermal_state_bakes_its_own_heat_flow() {
+    let dir = temp_dir("thermal");
+    let mut v: Value = serde_json::from_str(&small_planet(100.0)).unwrap();
+    v["surface"]["flexure"]["te_weakening_myr"] = json!(62.8);
+    v["tectonics"]["thermal_state"] = json!(true);
+    v["tectonics"]["thermal_isostasy_m"] = json!(1600.0);
+    v["tectonics"]["thermal_strength"] = json!(true);
+    run_to_folder(&v.to_string(), &dir);
+    let floor = crate::plates::thermal::conductive_mw_m2(crate::plates::thermal::L_COLD_KM);
+    check_heat_flow(&dir, floor as f32 - 0.1);
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]

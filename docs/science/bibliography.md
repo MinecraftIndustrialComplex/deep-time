@@ -6506,7 +6506,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: McKenzie, D. (1978). Some remarks on the development of sedimentary basins. Earth and Planetary Science Letters 40:25-32.
 - DOI or URL: 10.1016/0012-821X(78)90071-7 (the DOI from the standard citation, not seen on the scan); scan at http://www.zetaware.com/public/McKenzie_1978.pdf
 - Cited as: "McKenzie 1978" (uniform stretching by β; initial and thermal subsidence).
-- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`), PLT-415 (2026-10-22, the high-ground task: τ = 62.8 My as the e-fold of the thin sheet's viscosity with the age of the orogeny; the form is the agent's), ISO-099 (2026-10-23, the release's pace: τ as the time a plate the `Te` law weakens takes to warm; the form is the agent's)
+- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`), PLT-415 (2026-10-22, the high-ground task: τ = 62.8 My as the e-fold of the thin sheet's viscosity with the age of the orogeny; the form is the agent's), ISO-099 (2026-10-23, the release's pace: τ as the time a plate the `Te` law weakens takes to warm; the form is the agent's), PLT-460 and PLT-465 and PLT-466 (2026-10-23, the lithosphere's thermal state: the plate's a and τ, τ scaled with a²)
 - Access: scanned copy, open.
 - Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
 - Read in the release-pace task (2026-10-23, the scan's full text by a Sonnet sub-agent of the release agent, eq. 6 checked on the page image; ISO-099): eq. 6, τ = a²/(π²κ), κ "the thermal diffusivity" (Table 1 gives no κ; 0.0080 cm²/s back from τ and a, the sub-agent's arithmetic); Table 1 "(mostly taken from Parsons and Sclater [9])": "a = 125 km", "Tl = 1333°C", "τ = 62.8 My"; "After a time which depends on the thermal time constant of the stretched lithosphere, τ/β², the heat flux starts to decrease."
@@ -6584,7 +6584,7 @@ Read by a research sub-agent on 2026-10-05 for plate task 7 (Ben, 2026-10-06: "F
 - Reference: Hyndman, R. D. and Currie, C. A. (2011). Why is the North America Cordillera high? Hot backarcs, thermal isostasy, and mountain belts. Geology 39(8):783-786.
 - DOI or URL: http://web.uvic.ca/~rhyndman/PublicationPDFs/Hyndman&Currie2011WithFigs&Appendix.pdf
 - Cited as: "Hyndman & Currie 2011".
-- Ledger ids: PLT-281, PLT-282
+- Ledger ids: PLT-281, PLT-282, ISO-110 and ISO-111 (2026-10-23, the lithosphere's thermal state: E = 1,600 m and the frame)
 - Access: author's copy.
 - Read so far (by the project): full text, 2026-10-05: "The slopes between crustal thickness and elevation provide the crust-mantle density contrast, 131±12 m/km for the Cordillera and 141±27 m/km for stable areas"; the reference crust 2850 and mantle 3260 kg/m3 give 126 m/km; sea-level crustal thickness ~27 km (Cordillera) and ~38 km (craton); thermal state moves elevation by about 1,600 m at equal thickness; "the Himalaya-Tibet region of India-Asia collision where the crust reaches ~70 km and elevations ~5 km".
 
@@ -8136,7 +8136,7 @@ The sources of the release's pace (build log 2026-10-23; flexure.md, the section
 - Reference: Hyndman, R. D., Currie, C. A. and Mazzotti, S. P. (2005). Subduction zone backarcs, mobile belts, and orogenic heat. GSA Today 15(2):4-10.
 - DOI or URL: 10.1130/1052-5173(2005)015<4:SZBMBA>2.0.CO;2
 - Cited as: "Hyndman, Currie & Mazzotti 2005".
-- Ledger ids: ISO-099
+- Ledger ids: ISO-099, PLT-461, PLT-465, ISO-112 (2026-10-23, the lithosphere's thermal state)
 - Access: open (GSA Today).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-23: "The thermal effect of extension decays with a time constant of ~50 m.y."; "Moho temperatures are 800-900 °C and lithosphere thicknesses are 50-60 km, compared to 400-500 °C and 150-300 km for cratons and other regions with a thermotectonic age greater than ca. 300 Ma. The temperature differences result in backarc lithospheres that are weaker than cratons by more than a factor of 10"; "Most of the rapid decrease in heat flow appears to be in the several hundred m.y. following the last thermotectonic event."
@@ -8145,7 +8145,7 @@ The sources of the release's pace (build log 2026-10-23; flexure.md, the section
 - Reference: Currie, C. A. and Hyndman, R. D. (2006). The thermal structure of subduction zone back arcs. Journal of Geophysical Research 111:B08404.
 - DOI or URL: 10.1029/2005JB004024
 - Cited as: "Currie & Hyndman 2006".
-- Ledger ids: ISO-099
+- Ledger ids: ISO-099, PLT-461, PLT-465, ISO-112 (2026-10-23, the lithosphere's thermal state)
 - Access: author copy.
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-23: "uniformly high temperatures in the shallow mantle and a thin lithosphere (1200°C at 60 km depth) over back-arc widths of 250 to >900 km"; "Following subduction termination, we find that the high temperatures decay over a timescale of about 300 Myr"; Te "generally less than 20 km for the Cordillera back arc", the Archean craton "generally greater than 80 km"; "The most rapid cooling occurs in the first 50-100 Myr."
@@ -8154,7 +8154,7 @@ The sources of the release's pace (build log 2026-10-23; flexure.md, the section
 - Reference: Currie, C. A., Huismans, R. S. and Beaumont, C. (2008). Thinning of continental backarc lithosphere by flow-induced gravitational instability. Earth and Planetary Science Letters 269:435-446.
 - DOI or URL: 10.1016/j.epsl.2008.02.037 (from memory, not checked)
 - Cited as: "Currie, Huismans & Beaumont 2008".
-- Ledger ids: ISO-099
+- Ledger ids: ISO-099, PLT-464 (2026-10-23, the lithosphere's thermal state)
 - Access: author copy.
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-23 (model results, not observations): "rapidly-growing downwellings which result in removal of lower backarc lithosphere on timescales of 5-10 Ma"; "In the models, the majority of thinning occurs within 30 Ma of subduction initiation"; "by 60 Ma, the lithosphere is likely close to its stable steady-state thickness" (from a 120 km lithosphere). No observed onset time for a back-arc's weakening was found.
@@ -8185,3 +8185,106 @@ The sources of the release's pace (build log 2026-10-23; flexure.md, the section
 - Access: open.
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-23: "The lake level has steadily decreased with now more than - 110 cm/year, leaving the level in October 2018 at 433 m below mean sea-level (msl)."
+
+## The lithosphere's thermal state (PLT-460 to PLT-469, ISO-110 to ISO-112), added 2026-10-23
+
+The sources of the lithosphere's thermal state (gap 4; `lithosphere-thermal-state.md`). McKenzie 1978, Hyndman & Currie 2011, Hyndman, Currie & Mazzotti 2005, Currie & Hyndman 2006 and Currie, Huismans & Beaumont 2008 are above; their ledger ids now include the rows of this section. Read by a Sonnet sub-agent of the gap-4 agent on 2026-10-23; the quotes are as read, en dashes turned to hyphens. Not read: Lachenbruch & Morgan 1990 (Tectonophysics 174:39, abstract only, no thermal rule in it), Petitjean et al. 2006 (G-cubed 7, abstract: "it takes at least 200 Myr for a hot mantle plume to erode the thick lithospheric root"), Angevine, Heller & Paola 1990 (a course scan of chapter 4 read: "For the parameters that we have given, τ = 62.8 My", κ = 8 × 10^-7 m²/s, a 125 km lithosphere; not given an entry).
+
+### Jordan1978
+- Reference: Jordan, T. H. (1978). Composition and development of the continental tectosphere. Nature 274:544-548.
+- DOI or URL: 10.1038/274544a0
+- Cited as: "Jordan 1978" (cratons as depleted, buoyant, stiff keels).
+- Ledger ids: PLT-460
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): abstract only, 2026-10-23: "Beneath the old continental nuclei are thick root zones which translate coherently during plate motions. These zones are apparently stabilised against convective disruption by the depletion of the continental upper mantle in a basalt-like component."
+
+### Jordan1988
+- Reference: Jordan, T. H. (1988). Structure and formation of the continental tectosphere. Journal of Petrology Special Volume 1:11-37.
+- DOI or URL: 10.1093/petrology/Special_Volume.1.11
+- Cited as: "Jordan 1988".
+- Ledger ids: none (lithosphere-thermal-state.md, the keel)
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): abstract only (OpenAlex), 2026-10-23: "a thick (> 300 km) thermal boundary layer (TBL) beneath the ancient cratonic nuclei", "stabilized against convective disruption by a buoyant, viscous, chemical boundary layer (CBL) depleted in basaltic constituents".
+
+### Lee2011
+- Reference: Lee, C.-T. A., Luffi, P. and Chin, E. J. (2011). Building and destroying continental mantle. Annual Review of Earth and Planetary Sciences 39:59-90 (the co-authors and pages from memory).
+- DOI or URL: https://static1.squarespace.com/static/54b9bb6fe4b07b4a7d145b55/t/54bc8490e4b054d2824068be/1421640848178/63-2011LEE-Craton-AnnualReviews.pdf
+- Cited as: "Lee 2011" (Jordan's isopycnic hypothesis as stated there).
+- Ledger ids: PLT-460
+- Access: author copy.
+- Library: not kept.
+- Read so far (by the project): full text, section 1, 2026-10-23: "Jordan proposed the isopycnic (iso = equal, pycnic = density) hypothesis: Continental mantle is made up of low-density, melt-depleted peridotite residua, whose low densities exactly offset the effect of thermal contraction associated with a growing thermal boundary layer (Jordan 1978, 1988)"; the longevity of continental mantle "demands an intrinsically stronger (more viscous) mantle".
+
+### NybladePollack1993
+- Reference: Nyblade, A. A. and Pollack, H. N. (1993). A global analysis of heat flow from Precambrian terrains: implications for the thermal structure of Archean and Proterozoic lithosphere. Journal of Geophysical Research 98(B7):12207-12218.
+- DOI or URL: 10.1029/93JB00521
+- Cited as: "Nyblade & Pollack 1993" (the Archean mean heat flow).
+- Ledger ids: PLT-467
+- Access: paywalled (Wiley returned 403).
+- Library: not kept.
+- Read so far (by the project): abstract only (Crossref), 2026-10-23: heat flow is "low in Archean cratons and Proterozoic terrains adjacent to cratonic margins and higher in Proterozoic terrains that are more than a few hundred kilometers from a craton". The means are read only as cited: "The Archean parts of the cratons have low average surface heat flow values of about 41 mW m−2" and "Proterozoic regions display average heat flow around 48 mW m−2" (an open GJI paper, 180(3):999, full text); 41 ± 11 as Jaupart & Mareschal 1999 cite it (a search summary, not read). Nyblade 1996's abstract (JGR 101:17737) gives 55 ± 17 mW m-2 for undisturbed late Proterozoic terrains; 48 against 55 is unresolved.
+
+### HasterokChapman2007
+- Reference: Hasterok, D. and Chapman, D. S. (2007). Continental thermal isostasy: 1. Methods and sensitivity, and 2. Application to North America. Journal of Geophysical Research 112:B06414 and B06415.
+- DOI or URL: 10.1029/2006JB004663 and 10.1029/2006JB004664 (from memory, not checked)
+- Cited as: "Hasterok & Chapman 2007".
+- Ledger ids: ISO-110
+- Access: paywalled (Wiley and ResearchGate returned 403).
+- Library: not kept.
+- Read so far (by the project): abstracts (Crossref), 2026-10-23: part 1, "thermal isostasy can produce nearly 3 km of relief between cold shield platforms and hot rift zones"; part 2, "The best fitting continental heat flow–elevation model has a reference heat flow of 46.6 mW m−2 at 0 km", "compositionally adjusted elevations show a clear trend with ∼3 km difference between hot and cold provinces". Hasterok & Chapman 2011 (EPSL, full text, section 6.1): "a rough correlation between elevation and HF that accounts for approximately 2.5 km of elevation", zero-elevation heat flow 47.5 mW/m².
+
+### HousemanMolnar1997
+- Reference: Houseman, G. A. and Molnar, P. (1997). Gravitational (Rayleigh-Taylor) instability of a layer with non-linear viscosity and convective thinning of continental lithosphere. Geophysical Journal International 128:125-150.
+- DOI or URL: 10.1111/j.1365-246X.1997.tb04075.x
+- Cited as: "Houseman & Molnar 1997" (the heating time; root removal for stage 3).
+- Ledger ids: PLT-464
+- Access: open (OUP, a scan with an OCR layer; the equations checked on the page images).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23: p. 131, "The timescale for thinning of the boundary layer depends strongly on the mantle viscosity, but may require less than 10 Myr if the viscosity is less than about 10^21 Pa s"; conclusions, "between 50 (for rheological parameters representative of dry olivine) and 75 per cent (for wet olivine) of the lithospheric mantle would be involved in an instability whose duration is of the order of 10 Myr"; p. 144, the thermal diffusion time "about 20 Myr for wavelengths of 150 km"; eq. 30, the drop-off time tb.
+
+### ConradMolnar1997
+- Reference: Conrad, C. P. and Molnar, P. (1997). The growth of Rayleigh-Taylor-type instabilities in the lithosphere for various rheological and density structures. Geophysical Journal International 129:95-112.
+- DOI or URL: https://www.clintconrad.no/papers/Conrad_GJI1997.pdf
+- Cited as: "Conrad & Molnar 1997".
+- Ledger ids: none (lithosphere-thermal-state.md, stage 3)
+- Access: author copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23: "e-folding times of three million years, for asthenospheric viscosities of about 10^19 Pa s"; viscosities greater than about 10^20 Pa s (the exponent garbled in the PDF) "allow thermal diffusion to slow growth rates to the point of stopping Rayleigh-Taylor growth completely"; p. 96, thermal smoothing τ = λ²/4π²κ, "τ = 70 to 300 million years" for wavelengths of 300 to 600 km.
+
+### Rolandone2002
+- Reference: Rolandone, F., Jaupart, C., Mareschal, J.-C., Gariépy, C., Bienfait, G., Carbonne, C. and Lapointe, R. (2002). Surface heat flow, crustal temperatures and mantle heat flow in the Proterozoic Trans-Hudson Orogen, Canadian Shield. Journal of Geophysical Research 107(B12):2341 (the author list after the first from memory).
+- DOI or URL: https://seismo.berkeley.edu/~frede/rolandone-et-al-JGR02.pdf
+- Cited as: "Rolandone et al. 2002".
+- Ledger ids: PLT-462, PLT-463, PLT-467
+- Access: author copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23: abstract, mean Trans-Hudson heat flow "42 ± 9 mW m-2", mantle heat flow upper bound 16 and lower bound 11-12 mW m-2; section 5.1, the Superior, Trans-Hudson and Grenville provinces' "mean values and standard deviations of 41- 42 and 9 - 11 mW m-2"; para 63, "Jaupart and Mareschal [1999] concluded that lithosphere thickness beneath old cratons is unlikely to be smaller than 200 km and larger than 350 km", Jaupart et al. [1998] "a more restricted range of 200 - 250 km".
+
+### Sleep2003
+- Reference: Sleep, N. H. (2003). Survival of Archean cratonal lithosphere. Journal of Geophysical Research 108(B6):2302.
+- DOI or URL: https://geosci.uchicago.edu/~archer/deep_earth_readings/sleep.2003.craton_lith.pdf
+- Cited as: "Sleep 2003".
+- Ledger ids: PLT-462, PLT-467
+- Access: open copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23: abstract, "Modern cratonal lithospheric thicknesses are relatively uniform, 225 km"; section 2.2.1, "Jaupart et al. [1998]... compile mantle heat flows of 7-15 mW m-2 for the Canadian shield. Jaupart and Mareschal [1999] obtain 10-15 mW m-2 for eastern Canada and 17 mW m-2 for the Kaapvaal craton."
+
+### JaupartMareschal1999
+- Reference: Jaupart, C. and Mareschal, J.-C. (1999). The thermal structure and thickness of continental roots. Lithos 48:93-114.
+- DOI or URL: 10.1016/S0024-4937(99)00023-7
+- Cited as: "Jaupart & Mareschal 1999" (as Rolandone et al. 2002 and Sleep 2003 cite it).
+- Ledger ids: PLT-463, PLT-467
+- Access: paywalled (ScienceDirect returned 403; Crossref has no abstract).
+- Library: not kept.
+- Read so far (by the project): not read; only as cited (Rolandone2002, Sleep2003). A search summary of its abstract gives 200 to 330 km; Rolandone et al. cite 350 km as the upper bound.
+
+### Michaut2007
+- Reference: Michaut, C., Jaupart, C. and Bell, D. R. (2007). Transient geotherms in Archean continental lithosphere: new constraints on thickness and heat production of the subcontinental lithospheric mantle. Journal of Geophysical Research 112:B04408 (the title and co-authors from memory).
+- DOI or URL: 10.1029/2006JB004464 (from memory, not checked)
+- Cited as: "Michaut et al. 2007".
+- Ledger ids: none (lithosphere-thermal-state.md, the cooling's length)
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): abstract (Crossref), 2026-10-23: Kaapvaal lithosphere "between 200 and 270 km, with most values between 210 and 250 km", basal heat flow "between 12-16 mW m−2"; "Because of its large thickness and thermal relaxation time, Archean lithosphere cannot be in thermal equilibrium".

@@ -631,13 +631,36 @@ pub(super) fn sample_with(
             }
         });
     crate::compute::lap("l1_layers", layered);
-    names
+    let mut out: Vec<(&'static str, Vec<f32>)> = names
         .into_iter()
         .chain(extra_names)
         .chain(POOL_FIELDS)
         .zip(layers)
-        .collect()
+        .collect();
+    // The lithosphere's thermal age on continental crust (the nearest sample's; NaN on ocean
+    // floor and in gaps), only with `thermal_strength` on: the flexure's continental Te reads it
+    // in place of the orogeny's age (ledger: ISO-112).
+    if env.k.thermal_state && env.k.thermal_strength {
+        let age: Vec<f32> = (0..cells)
+            .into_par_iter()
+            .map(|c| {
+                let s = &samples[links[c].nearest as usize];
+                if info[c].mode == GAP || s.kind != CONTINENTAL || s.lithosphere_km <= 0.0 {
+                    f32::NAN
+                } else {
+                    super::thermal::thermal_age_myr(f64::from(s.lithosphere_km)).min(1.0e4) as f32
+                }
+            })
+            .collect();
+        out.push((THERMAL_AGE_FIELD, age));
+    }
+    out
 }
+
+/// The L1 field of the lithosphere's thermal age on continental crust, Myr (10,000: a craton at
+/// its full depth, whose age is infinite; NaN: ocean floor or a gap), written only with
+/// `tectonics.thermal_strength`.
+pub const THERMAL_AGE_FIELD: &str = "plates/thermal_age_myr";
 
 /// The L1 field that marks the cells in a gap between plates (1 there, 0 elsewhere).
 pub const GAP_FIELD: &str = "plates/gap";
