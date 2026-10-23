@@ -6209,6 +6209,12 @@ The survey `docs/research/notes/seamless-projection-survey.md` and its tools (`t
 - Ledger ids: none (cited with Moser 1965 for the flow behind SCL-081 and SCL-102: a prescribed Jacobian determinant on a domain with boundary, which is the face-by-face problem the generator solves with zero normal flux)
 - Access: not fetched. Read so far: from memory (added 2026-10-22, cube world phase 0, at the plan's D6).
 
+### Shoemake1992
+- Reference: Shoemake, K. (1992). Uniform random rotations. In: Kirk, D. (ed.), Graphics Gems III, Academic Press, San Diego, pp. 124-132 (editor, publisher and pages from memory, not checked).
+- Cited as: "Shoemake 1992".
+- Ledger ids: SCL-120 (the cube world's turn search draws its random turns as Shoemake's uniform unit quaternions: three uniform numbers u1, u2, u3 give (sqrt(1 - u1) sin 2 pi u2, sqrt(1 - u1) cos 2 pi u2, sqrt(u1) sin 2 pi u3, sqrt(u1) cos 2 pi u3))
+- Access: not fetched (a book chapter). Read so far: from memory (added 2026-10-22, cube world phase 1). The construction is checked only by its use: a uniform draw is all the search needs, and the refinement does the rest.
+
 ### Thurston1998
 - Reference: Thurston, W. P. (1998). Shapes of polyhedra and triangulations of the sphere. Geometry & Topology Monographs 1:511-549. arXiv:math/9801088.
 - Cited as: "Thurston 1998".

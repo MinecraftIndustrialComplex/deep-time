@@ -382,7 +382,16 @@ fn one_cone(
         z1 = z1.max(w.1);
     }
     let r = f64::from(grid.r);
-    let (ox, oz) = (grid.origin_block_x as f64, grid.origin_block_z as f64);
+    let cube = grid.is_cube();
+    // A cube grid's cells are laid out by face, not by net point: its box goes through the net's
+    // lattice of cell centres instead, folded onto the faces (SCL-123).
+    let (ox, oz) = if cube {
+        // The net's corner, (−3s/2, −3s/2): every face's cells sit on this lattice.
+        let s = f64::from(grid.face_blocks());
+        (-1.5 * s, -1.5 * s)
+    } else {
+        (grid.origin_block_x as f64, grid.origin_block_z as f64)
+    };
     let (i0, i1) = (
         ((x0 - ox) / r).floor() as i64 - 1,
         ((x1 - ox) / r).ceil() as i64 + 1,
@@ -399,7 +408,15 @@ fn one_cone(
     let mut cells: Vec<u32> = Vec::with_capacity(((i1 - i0 + 1) * (j1 - j0 + 1)) as usize);
     for j in j0..=j1 {
         for i in i0..=i1 {
-            let (ci, cj) = grid.cell(i, j);
+            let (ci, cj) = if cube {
+                let (x, z) = (ox + (i as f64 + 0.5) * r, oz + (j as f64 + 0.5) * r);
+                let Some(sp) = grid.cube_spot(x, z) else {
+                    continue;
+                };
+                grid.face_cell(sp.face, sp.a.round() as i64, sp.b.round() as i64)
+            } else {
+                grid.cell(i, j)
+            };
             cells.push((cj as usize * w + ci as usize) as u32);
         }
     }
@@ -409,19 +426,31 @@ fn one_cone(
         .iter()
         .filter_map(|&c| {
             let (ci, cj) = (c as usize % w, c as usize / w);
-            let (x, z) = (ox + ci as f64 * r, oz + cj as f64 * r);
-            let rho = angle(frame.unit(x, z), k.unit) * planet_r_m / k.radius_m;
-            if rho > FOOT_RING.1 {
+            let (x, z) = if cube {
+                grid.cube_point(ci as u32, cj as u32)
+            } else {
+                (ox + ci as f64 * r, oz + cj as f64 * r)
+            };
+            let t = frame.unit(x, z);
+            let rho = angle(t, k.unit) * planet_r_m / k.radius_m;
+            if rho.is_nan() || rho > FOOT_RING.1 {
                 return None;
             }
             let q = frame.nearest_image((x, z), vw);
             let (dx, dz) = (x - q.0, z - q.1);
+            // The angle round the vent: on a cube the net turns at the seams, so it is taken on
+            // the planet, in the vent's own tangent frame (SCL-123).
+            let theta = if cube {
+                dot(t, e2).atan2(dot(t, e1))
+            } else {
+                dz.atan2(dx)
+            };
             Some(At {
                 c,
                 x,
                 z,
                 rho,
-                theta: dz.atan2(dx),
+                theta,
                 dw: dx.hypot(dz),
                 e: e.get(c as usize),
             })
@@ -738,6 +767,18 @@ pub struct Rock<'a> {
     pub at: &'a (dyn Fn(f64, f64) -> (f64, f64) + Sync),
     /// Metres per block, vertically.
     pub m_per_block_v: f64,
+    /// A cube world's net: its noise is blended across the turning seams
+    /// ([`crate::bake::project_cube::seam_blend`]); none on any other world.
+    pub seams: Option<&'a deeptime_format::cube::Cube>,
+}
+
+/// `f` at world point (x, z), blended across a cube's turning seams within `reach` blocks
+/// ([`Rock::seams`]).
+fn blended(rock: &Rock, x: f64, z: f64, reach: f64, f: impl Fn(f64, f64) -> f64) -> f64 {
+    match rock.seams {
+        Some(cube) => crate::bake::project_cube::seam_blend(cube, x, z, reach, f),
+        None => f(x, z),
+    }
 }
 
 /// The ridged jag noise at world point (x, z), centred: (1 − |n|)² less its mean.
@@ -781,11 +822,26 @@ pub fn steep_texture(e: &mut Elev, g: &Ground, rock: &Rock, calm: &[u8]) -> Valu
     let floor_y = g.sea_y + 1.0;
     let read: &Elev = e;
     let half_step = 0.5 * read.desc.scale.abs();
+    let cube = grid.is_cube();
     let at = |i: i64, j: i64| -> f64 {
         let (ci, cj) = grid.cell(i, j);
         read.get(cj as usize * w + ci as usize)
     };
+    // A cube grid's neighbours are taken on the cell's own face, across its seams: (i, j) is the
+    // stacked cell and the steps leave its face (SCL-123).
     let slope = |i: i64, j: i64, k: i64| -> f64 {
+        if cube {
+            let n = i64::from(grid.w);
+            let (f, b) = (j.div_euclid(n), j.rem_euclid(n));
+            let face = deeptime_format::cube::Face::from_index(f as usize).expect("a face row");
+            let get = |a: i64, b: i64| {
+                let (ci, cj) = grid.face_cell(face, a, b);
+                read.get(cj as usize * w + ci as usize)
+            };
+            let gx = (get(i + k, b) - get(i - k, b)) / (2.0 * k as f64 * r);
+            let gz = (get(i, b + k) - get(i, b - k)) / (2.0 * k as f64 * r);
+            return gx.hypot(gz);
+        }
         let gx = (at(i + k, j) - at(i - k, j)) / (2.0 * k as f64 * r);
         let gz = (at(i, j + k) - at(i, j - k)) / (2.0 * k as f64 * r);
         gx.hypot(gz)
@@ -812,7 +868,11 @@ pub fn steep_texture(e: &mut Elev, g: &Ground, rock: &Rock, calm: &[u8]) -> Valu
                 if s < JAG_SLOPE.0.min(BAND_SLOPE.0) {
                     continue;
                 }
-                let (x, z) = (ox + i as f64 * r, oz + j as f64 * r);
+                let (x, z) = if cube {
+                    grid.cube_point(i as u32, j as u32)
+                } else {
+                    (ox + i as f64 * r, oz + j as f64 * r)
+                };
                 let (hard, lava) = (rock.at)(x, z);
                 let jag_w = smooth(JAG_SLOPE.0, JAG_SLOPE.1, s) * hard;
                 let band_w = smooth(BAND_SLOPE.0, BAND_SLOPE.1, s) * lava;
@@ -828,7 +888,11 @@ pub fn steep_texture(e: &mut Elev, g: &Ground, rock: &Rock, calm: &[u8]) -> Valu
                 if jag_w > 0.0 {
                     // ledger: AMP-080, AMP-081
                     let a = (JAG_GAIN * s).min(JAG_MAX_BLOCKS) * jag_w;
-                    y += wt * a * jag_noise(&jag_spec, rock.noise, x, z);
+                    y += wt
+                        * a
+                        * blended(rock, x, z, JAG_WAVELENGTH, |x, z| {
+                            jag_noise(&jag_spec, rock.noise, x, z)
+                        });
                 }
                 if band_w > 0.0 {
                     // ledger: AMP-082
@@ -840,7 +904,10 @@ pub fn steep_texture(e: &mut Elev, g: &Ground, rock: &Rock, calm: &[u8]) -> Valu
                     let k = u.floor();
                     let tb = band_min * k.exp2();
                     // One shift for every height, so the levels nest.
-                    let off = band_top * 0.5 * (1.0 + level_spec.noise(rock.noise, x, z));
+                    let level = blended(rock, x, z, BAND_WAVELENGTH, |x, z| {
+                        level_spec.noise(rock.noise, x, z)
+                    });
+                    let off = band_top * 0.5 * (1.0 + level);
                     let mix = smooth(0.5 - 0.5 * BAND_BLEND, 0.5 + 0.5 * BAND_BLEND, u - k);
                     let mut t = terrace(y, tb, off);
                     if mix > 0.0 {
@@ -923,11 +990,31 @@ impl Frame for Mapping {
     }
 }
 
+/// A world's [`Frame`] with the simulation's (Lambert) grid behind it: what [`OnWorld`] reads the
+/// rivers and the standing volcanoes through.
+pub(crate) trait SimFrame: Frame {
+    /// The simulation's block (xs, zs) of a sphere point.
+    fn sim_block(&self, v: [f64; 3]) -> (f64, f64);
+    /// The sphere point of the simulation's block (xs, zs).
+    fn sim_unit(&self, xs: f64, zs: f64) -> [f64; 3];
+}
+
+impl SimFrame for Mapping {
+    fn sim_block(&self, v: [f64; 3]) -> (f64, f64) {
+        let (xs, zs, _) = self.src_block(v);
+        (xs, zs)
+    }
+
+    fn sim_unit(&self, xs: f64, zs: f64) -> [f64; 3] {
+        self.src.unit(xs, zs)
+    }
+}
+
 /// What the projection pass hands the relief: the world's grid of the elevation and the layers and
 /// vectors it reads, the simulation's rivers and standing volcanoes (simulation blocks, read
 /// through `map`).
-pub(crate) struct OnWorld<'a> {
-    pub map: &'a Mapping,
+pub(crate) struct OnWorld<'a, M: SimFrame> {
+    pub map: &'a M,
     pub grid: &'a GridDesc,
     pub water: Option<(&'a LayerDesc, &'a [u8])>,
     pub ice: Option<&'a LoadedLayer>,
@@ -944,7 +1031,7 @@ pub(crate) struct OnWorld<'a> {
     pub m_per_block_v: f64,
 }
 
-impl OnWorld<'_> {
+impl<M: SimFrame> OnWorld<'_, M> {
     /// Draws the relief into the world's elevation cells `elev` (of `elev_desc`, on `self.grid`);
     /// returns `notes.bake.projection.relief`.
     pub(crate) fn draw(&self, elev_desc: &LayerDesc, elev: &mut [u8]) -> Value {
@@ -958,15 +1045,25 @@ impl OnWorld<'_> {
             }
             None => false,
         };
+        let cube = self.grid.is_cube();
         let river = |x: f64, z: f64| match self.rivers {
             Some(r) => {
-                let (xs, zs, _) = map.src_block(map.g.unit(x, z));
+                let (xs, zs) = map.sim_block(map.unit(x, z));
                 let s = r.sample(xs.round() as i64, zs.round() as i64);
                 s.hit.is_some() || s.bank_cap.is_some()
             }
             None => false,
         };
-        let ice = |x: f64, z: f64| self.ice.map_or(0.0, |l| l.cover(x, z));
+        // A cube's relief passes net points; its layers read blocks (a block's centre is +½).
+        let ice = |x: f64, z: f64| {
+            self.ice.map_or(0.0, |l| {
+                if cube {
+                    l.cover(x - 0.5, z - 0.5)
+                } else {
+                    l.cover(x, z)
+                }
+            })
+        };
         let ground = Ground {
             grid: self.grid,
             sea_y: self.sea_y,
@@ -980,7 +1077,7 @@ impl OnWorld<'_> {
         };
         let cones = self
             .standing
-            .map(|v| cones_of(v, |x, z| map.src.unit(x, z)))
+            .map(|v| cones_of(v, |x, z| map.sim_unit(x, z)))
             .unwrap_or_default();
         let (calm, cones_note) = cone_gullies(&mut e, &ground, map, self.planet_r_m, &cones);
         let gullies_ms = t.elapsed().as_secs_f64() * 1000.0;
@@ -990,14 +1087,31 @@ impl OnWorld<'_> {
                 // The rock's weights, bilinear over the four L2 cells round the point.
                 let rock_at = |x: f64, z: f64| -> (f64, f64) {
                     let gd = &class.desc.grid;
-                    let u = (x - gd.origin_block_x as f64) / f64::from(gd.r);
-                    let v = (z - gd.origin_block_z as f64) / f64::from(gd.r);
+                    // On a cube: the four cells round the point on its face, across its seams.
+                    let (face, u, v) = if gd.is_cube() {
+                        match gd.cube_spot(x, z) {
+                            Some(sp) => (Some(sp.face), sp.a, sp.b),
+                            None => return (0.0, 0.0),
+                        }
+                    } else {
+                        (
+                            None,
+                            (x - gd.origin_block_x as f64) / f64::from(gd.r),
+                            (z - gd.origin_block_z as f64) / f64::from(gd.r),
+                        )
+                    };
                     let (fi, fj) = (u.floor(), v.floor());
                     let wts = bilinear_weights(u - fi, v - fj);
                     let (i0, j0) = (fi as i64, fj as i64);
                     let mut acc = (0.0, 0.0);
                     for (k, (di, dj)) in [(0, 0), (1, 0), (0, 1), (1, 1)].into_iter().enumerate() {
-                        let raw = class.raw(i0 + di, j0 + dj);
+                        let raw = match face {
+                            Some(f) => {
+                                let (ci, cj) = gd.face_cell(f, i0 + di, j0 + dj);
+                                class.raw_cell(ci, cj)
+                            }
+                            None => class.raw(i0 + di, j0 + dj),
+                        };
                         let (hw, lava) = weights[if raw.is_finite() {
                             (raw.max(0.0) as usize).min(255)
                         } else {
@@ -1012,6 +1126,7 @@ impl OnWorld<'_> {
                     noise,
                     at: &rock_at,
                     m_per_block_v: self.m_per_block_v,
+                    seams: cube.then(|| self.grid.cube()),
                 };
                 let mut note = steep_texture(&mut e, &ground, &rock, &calm);
                 note["millis"] = json!(t.elapsed().as_secs_f64() * 1000.0 - gullies_ms);
@@ -1396,6 +1511,7 @@ mod tests {
             noise,
             at: rock_at,
             m_per_block_v: 35.0,
+            seams: None,
         };
         let note = steep_texture(&mut e, g, &rock, calm);
         (after, note)

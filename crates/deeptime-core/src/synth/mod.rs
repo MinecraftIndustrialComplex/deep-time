@@ -5,10 +5,12 @@
 //! layers into its run's world data (`Session::finalize_write`), which is what makes the built-in
 //! placeholder presets playable before the real stages exist.
 
+pub mod cube;
 pub mod terrain;
 
 use std::path::Path;
 
+use deeptime_format::projection::{WorldProjection, cube_border, cube_spec};
 use deeptime_format::{
     Codec, DType, FileEntry, FormatError, GridDesc, LayerDesc, LayerEntry, LoadedLayer, Manifest,
     Raster, RasterRead, Scale, TILE, fsutil::write_atomic, write_tile_pack,
@@ -182,6 +184,9 @@ pub enum Kind {
     /// (`crate::deposits::synthetic::HistoryTerrain`). Needs the history, so it is baked through
     /// [`build_with`] only and is not in [`Kind::ALL`].
     DepositHistory,
+    /// The synthetic cube world (format 0.7, [`cube`]): written by `deeptime synth --kind cube`
+    /// only and not in [`Kind::ALL`], so no preset bakes it into a polar world's folder.
+    Cube,
 }
 
 impl Kind {
@@ -193,6 +198,7 @@ impl Kind {
             Kind::WrapTest => "wrap-test",
             Kind::LakeTest => "lake-test",
             Kind::DepositHistory => "deposit-history",
+            Kind::Cube => "cube",
         }
     }
 
@@ -227,6 +233,10 @@ pub struct SynthWorld {
     pub strata: LoadedLayer,
     /// `spawn/candidates.json`.
     pub spawn: Value,
+    /// A cube world's projection (`None`: the polar synthetic worlds, Lambert).
+    pub projection: Option<WorldProjection>,
+    /// The notes `synthetic` of a kind that writes its own.
+    pub notes: Option<Value>,
 }
 
 /// Samples a synthetic world of `kind` with `strata` horizons at circumference `c`.
@@ -239,6 +249,7 @@ pub fn build(kind: Kind, strata: Strata, c: u32, codec: Codec) -> Result<SynthWo
                 "deposit-history needs its history: bake it with build_with".into(),
             ));
         }
+        Kind::Cube => return cube::build(strata, c, codec),
     };
     build_with(terrain.as_ref(), kind, strata, c, codec)
 }
@@ -336,6 +347,8 @@ pub fn build_with(
         layers,
         strata,
         spawn,
+        projection: None,
+        notes: None,
     })
 }
 
@@ -347,6 +360,15 @@ impl SynthWorld {
         let c = self.circumference;
         let radius_m = f64::from(c) * manifest.scale.m_per_block_h / (2.0 * std::f64::consts::PI);
         manifest.planet.insert("radius_m".into(), json!(radius_m));
+        if let Some(WorldProjection::Cube(view)) = self.projection {
+            // The cube's scale: its loop 4s, and the nominal block size √(4πR²/6s²) of the same
+            // planet (FORMAT.md "The cube world's layout", Scale). ledger: SCL-107
+            let s = view.cube.side() as f64;
+            manifest.scale.circumference_blocks = view.cube.period() as u32;
+            manifest.scale.m_per_block_h = radius_m * (4.0 * std::f64::consts::PI / 6.0).sqrt() / s;
+            let border = cube_border(view.cube, crate::bake::project::BORDER_INSET_BLOCKS);
+            manifest.set_projection(Some(cube_spec(&view, Some(border), None)));
+        }
         for g in &self.grids {
             manifest.grids.insert(g.name.clone(), g.clone());
         }
@@ -388,12 +410,12 @@ impl SynthWorld {
 
         manifest.notes.insert(
             "synthetic".into(),
-            json!({
+            self.notes.clone().unwrap_or_else(|| json!({
                 "kind": self.kind.name(),
                 "sampling": "cell (i, j) holds the value at block (origin_block_x + i·r, origin_block_z + j·r)",
                 "elevation": "round(16·H(x, z)); H is AnalyticTestTerrain's closed form for wrap-test, and 63 + h/20 of the deposit history's present elevation h (m, bilinear on L1) for deposit-history",
                 "climate": "round(10000·p) of AnalyticTestTerrain.raster's formulas, with H from this kind's terrain"
-            }),
+            })),
         );
         manifest
             .notes
@@ -477,12 +499,24 @@ fn strata_layer(
     let mut bytes = Vec::with_capacity(l1.cells() * 7 * k);
     for j in 0..l1.h {
         for i in 0..l1.w {
-            // Same block, L3 index: (block − origin) / r.
-            let bx = l1.block_x(i64::from(i));
-            let bz = l1.block_z(i64::from(j));
-            let ei = (bx - e.origin_block_x) / i64::from(e.r);
-            let ej = (bz - e.origin_block_z) / i64::from(e.r);
-            let surface = elevation.raw(ei, ej) as i32;
+            let surface = if l1.is_cube() {
+                // A cube grid: the elevation cell under the L1 cell's centre.
+                let (x, z) = l1.cube_point(i, j);
+                let s = e.cube_spot(x, z).expect("a cell centre lies on its face");
+                let (ci, cj) = e.face_cell(
+                    s.face,
+                    (s.a + 0.5).floor() as i64,
+                    (s.b + 0.5).floor() as i64,
+                );
+                elevation.raw_cell(ci, cj) as i32
+            } else {
+                // Same block, L3 index: (block − origin) / r.
+                let bx = l1.block_x(i64::from(i));
+                let bz = l1.block_z(i64::from(j));
+                let ei = (bx - e.origin_block_x) / i64::from(e.r);
+                let ej = (bz - e.origin_block_z) / i64::from(e.r);
+                elevation.raw(ei, ej) as i32
+            };
             for d in depths {
                 let top = (surface - d * 16).max(i32::from(i16::MIN + 1)) as i16;
                 bytes.extend_from_slice(&top.to_le_bytes());
@@ -546,27 +580,59 @@ pub fn spawn_candidates(
     let g = &elevation.desc().grid;
     let c = g.circumference() as i64;
     let stride = 4i64; // every 8 blocks at r 2
-    let mut found: Vec<(i64, i64, i64, i64, f64)> = Vec::new(); // (dist², x, z, …)
-    for j in (1..i64::from(g.h) - 1).step_by(stride as usize) {
-        for i in (0..i64::from(g.w)).step_by(stride as usize) {
-            let h = elevation.get(i, j);
-            if h < f64::from(sea_level + 2) || !water.get(i, j).is_nan() {
-                continue;
+    let mut found: Vec<(i64, i64, i64, i64, i64, f64)> = Vec::new(); // (dist², x, z, i, j, h)
+    if g.is_cube() {
+        // A cube grid: each face's cells, neighbours read across its edges; the block is the one
+        // under the cell's centre.
+        let n = i64::from(g.w);
+        for j in (0..i64::from(g.h)).step_by(stride as usize) {
+            for i in (0..n).step_by(stride as usize) {
+                let (face, a, b) = g.face_of_cell(i as u32, j as u32);
+                let (a, b) = (i64::from(a), i64::from(b));
+                let read = |l: &dyn Fn(u32, u32) -> f64, da: i64, db: i64| {
+                    let (ci, cj) = g.face_cell(face, a + da, b + db);
+                    l(ci, cj)
+                };
+                let elev = |ci: u32, cj: u32| elevation.get(i64::from(ci), i64::from(cj));
+                let h = read(&elev, 0, 0);
+                let wet = water.get(i, j);
+                if h < f64::from(sea_level + 2) || !wet.is_nan() {
+                    continue;
+                }
+                let flat = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                    .iter()
+                    .all(|&(da, db)| (read(&elev, da, db) - h).abs() <= 1.0);
+                if !flat {
+                    continue;
+                }
+                let (px, pz) = g.cube_point(i as u32, j as u32);
+                let (x, z) = (px.floor() as i64, pz.floor() as i64);
+                found.push((x * x + z * z, x, z, i, j, h));
             }
-            let flat = [(1, 0), (-1, 0), (0, 1), (0, -1)]
-                .iter()
-                .all(|&(di, dj)| (elevation.get(i + di, j + dj) - h).abs() <= 1.0);
-            if !flat {
-                continue;
+        }
+    } else {
+        for j in (1..i64::from(g.h) - 1).step_by(stride as usize) {
+            for i in (0..i64::from(g.w)).step_by(stride as usize) {
+                let h = elevation.get(i, j);
+                if h < f64::from(sea_level + 2) || !water.get(i, j).is_nan() {
+                    continue;
+                }
+                let flat = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+                    .iter()
+                    .all(|&(di, dj)| (elevation.get(i + di, j + dj) - h).abs() <= 1.0);
+                if !flat {
+                    continue;
+                }
+                let (x, z) = (g.block_x(i), g.block_z(j));
+                let jj = (z - g.origin_block_z) / i64::from(g.r);
+                found.push((x * x + z * z, x, z, i, jj, h));
             }
-            let (x, z) = (g.block_x(i), g.block_z(j));
-            found.push((x * x + z * z, x, z, i, h));
         }
     }
     found.sort_by_key(|f| (f.0, f.1, f.2));
     let mut picked: Vec<Value> = Vec::new();
     let mut taken: Vec<(i64, i64)> = Vec::new();
-    for (_, x, z, i, h) in found {
+    for (_, x, z, i, j, h) in found {
         let far = taken.iter().all(|&(tx, tz)| {
             let mut dx = (x - tx).rem_euclid(c);
             dx = dx.min(c - dx);
@@ -576,7 +642,6 @@ pub fn spawn_candidates(
             continue;
         }
         taken.push((x, z));
-        let j = (z - g.origin_block_z) / i64::from(g.r);
         picked.push(json!({ "x": x, "z": z, "surface_y": h, "cell": [i, j] }));
         if picked.len() == 8 {
             break;

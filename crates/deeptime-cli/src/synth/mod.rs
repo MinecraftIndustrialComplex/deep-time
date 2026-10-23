@@ -34,6 +34,12 @@ pub struct Summary {
 /// Writes a synthetic world.
 pub fn run(opts: &Options) -> Result<Summary, FormatError> {
     let c = opts.size;
+    if opts.kind == Kind::Cube && opts.viewer.is_some() {
+        return Err(FormatError::Invalid(
+            "the viewer bundle draws polar worlds only; `deeptime world-map` draws a cube world's net"
+                .into(),
+        ));
+    }
     let world = core_synth::build(opts.kind, opts.strata, c, opts.codec)?;
 
     // A folder with a manifest is complete: drop any old one before writing anything.
@@ -140,7 +146,21 @@ fn dump_samples(manifest: &Manifest, layers: &[LoadedLayer], strata: &LoadedLaye
                 "cells": cells
             }),
         );
-        if d.nodata.is_none() {
+        if d.nodata.is_none() && d.grid.is_cube() {
+            // A cube grid: points over the whole window and a few cells past it, so the folds
+            // through every net edge are read (null past the net's corners).
+            let s = i64::from(d.grid.face_blocks());
+            let r = i64::from(d.grid.r);
+            let mut pts: Vec<Value> = Vec::new();
+            for _ in 0..400 {
+                let bx = (-3 * s / 2 - 3 * r) as f64
+                    + rng.below(((4 * s + 6 * r) * 1000) as u64) as f64 / 1000.0;
+                let bz = (-3 * s / 2 - 3 * r) as f64
+                    + rng.below(((3 * s + 6 * r) * 1000) as u64) as f64 / 1000.0;
+                pts.push(json!([bx, bz, l.bilinear(bx, bz)]));
+            }
+            bilinear.insert(name.into(), Value::Array(pts));
+        } else if d.nodata.is_none() {
             let c = d.grid.circumference() as i64;
             let r = i64::from(d.grid.r);
             let mut pts: Vec<Value> = Vec::new();
@@ -303,6 +323,73 @@ mod tests {
         }
         let m = Manifest::read(&dir).unwrap();
         assert_eq!(m.notes["lake"]["water_level_y"], 120.0);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn cube_world_is_format_0_7_and_reads_back() {
+        let dir = std::env::temp_dir().join(format!("dt-cube-{}", std::process::id()));
+        let opts = Options {
+            kind: Kind::Cube,
+            strata: Strata::Placeholder,
+            size: 4096,
+            out: dir.join("w"),
+            viewer: None,
+            dump_samples: Some(dir.join("s.json")),
+            codec: Codec::Lz4Block,
+        };
+        run(&opts).unwrap();
+        let m = Manifest::read(&opts.out).unwrap();
+        m.verify(&opts.out).unwrap();
+        assert_eq!(m.format_version, deeptime_format::CUBE_FORMAT_VERSION);
+        assert_eq!(m.scale.circumference_blocks, 4 * 1024);
+        let spec = m.projection.as_ref().unwrap();
+        assert_eq!(spec.face_blocks, Some(1024));
+        assert_eq!(spec.edges.len(), 14);
+        assert_eq!(spec.cone_points.len(), 8);
+        assert_eq!(spec.border.as_ref().unwrap().segments.len(), 12);
+        assert_eq!(
+            m.grids["L3"],
+            deeptime_format::GridDesc::for_cube("L3", 1024, 2).unwrap()
+        );
+        let text = std::fs::read_to_string(opts.out.join(MANIFEST)).unwrap();
+        assert!(text.contains("\"kind\": \"cube\""), "{text}");
+        let e = deeptime_format::TilePackReader::open(&opts.out.join("rasters/elevation.dtr"))
+            .unwrap()
+            .load()
+            .unwrap();
+        assert_eq!(
+            (e.desc.grid.w, e.desc.grid.h, e.desc.tile),
+            (512, 3072, 256)
+        );
+        // The world's own projection reads it back.
+        let wp = m.world_projection();
+        assert_eq!(wp.period(), 4096.0);
+        let (lat, _) = wp.lat_lon(0.5, 0.5);
+        assert!(lat.is_finite());
+        // A 0.7 manifest on a polar world, or a 0.6 one on a cube, is refused.
+        std::fs::write(
+            opts.out.join(MANIFEST),
+            text.replace("\"format_version\": \"0.7\"", "\"format_version\": \"0.6\""),
+        )
+        .unwrap();
+        let err = Manifest::read(&opts.out).unwrap_err().to_string();
+        assert!(err.contains("format_version 0.6 on a cube world"), "{err}");
+        // A map table this build does not ship is refused by name and hash.
+        std::fs::write(
+            opts.out.join(MANIFEST),
+            text.replace("conformal-n513", "conformal-n999"),
+        )
+        .unwrap();
+        let err = Manifest::read(&opts.out).unwrap_err().to_string();
+        assert!(
+            err.contains("world data needs cube map conformal-n999"),
+            "{err}"
+        );
+        let dump: Value =
+            serde_json::from_slice(&std::fs::read(dir.join("s.json")).unwrap()).unwrap();
+        assert_eq!(dump["format_version"], "0.7");
+        assert_eq!(dump["bilinear"]["elevation"].as_array().unwrap().len(), 400);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
