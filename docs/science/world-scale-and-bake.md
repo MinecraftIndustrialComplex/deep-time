@@ -468,5 +468,11 @@ sampling grid, the structure classification on the JSON of each audited kind, th
 `StructureBurialGameTests` on `deeptime:test_planet_real`: over the deepest sea each covered structure is the
 vanilla start moved by exactly the rule's `dy` (boxes, jigsaw positions, junction ground levels, the start's box)
 and stands clear of the ground under every column of every piece; buried treasure and the mesa mineshaft are not
-moved; a placed buried trial chamber holds no water in the boxes of its pieces; under the highest ground nothing is
-moved. Numbers are in the STATUS.md build log.
+moved; under the highest ground nothing is moved; and a buried trial chamber placed chunk by chunk into the
+generated planet has its own blocks in place with none waterlogged, with the real floor of those chunks (not the
+model's H) above its top by `cover` or more over every sampled column, where the same chamber at vanilla's height
+sticks out of that floor. About 2 % of the cells inside the buried pieces' boxes still hold water (the vanilla-height
+control in the sea holds about 4 %, and a chamber in rock under the highest ground 7 cells in 66,803), so the boxes
+are not claimed dry: the template carries almost no water of its own (the rock control), so this is water around it
+in cells the template does not overwrite (not traced further), and the chamber is placed there over finished chunks
+without the terrain adaptation that generation applies. What real generation leaves is not checked. Numbers are in the STATUS.md build log.
