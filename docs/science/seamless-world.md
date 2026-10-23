@@ -12,8 +12,11 @@ Ledger ids on this page: `SCL-049`, `SCL-083`, `SCL-084`, `SCL-086` to `SCL-091`
 Ben moved the world to a cube on 2026-10-22 (decisions log 2026-10-22; the plan is
 `docs/plans/cube-world-plan.md`). Everything above the section "The cube world" describes the world
 the game plays today, format 0.5 and 0.6. That section describes what phase 0 of the move has coded:
-the cube's geometry and its two maps. No bake writes a cube world yet; this page is rewritten for the
-cube when the bake and the game move (the plan's D1).
+the cube's geometry and its two maps. Since phase 1 the bake writes a cube world when a run asks for
+one (`--set scale.projection=cube`, format 0.7): how it resamples the simulation onto the faces, the
+turn it chooses and what was measured are on [cube-world-bake.md](cube-world-bake.md). The game
+does not play a cube world yet; this page is rewritten for the cube when the game moves (the plan's
+D1).
 
 ## What you see in the world
 
@@ -231,9 +234,9 @@ cell of the table the planet is drawn 25.6 times larger in area, 5 times in leng
 cone points: three faces meet there, so a full turn round the planet is drawn in three quarters of a
 turn of world. Four corners (F0's) lie inside the net and can be walked to; the other four lie on
 the border. Where the poles lie depends on a turn of the planet inside the cube (a free rotation,
-SCL-079) that the bake will choose so the corners sit far out at sea; that search is not coded yet,
-so nothing here says where north is. Latitude and longitude come only from the map and that turn,
-never from x and z alone.
+SCL-079) that the bake chooses for each planet so the corners sit far out at sea (SCL-120,
+[cube-world-bake.md](cube-world-bake.md)), so nothing here says where north is. Latitude and
+longitude come only from the map and that turn, never from x and z alone.
 
 ### The model in plain words
 
@@ -281,7 +284,7 @@ never from x and z alone.
 | Ledger id | Quantity | As coded | Units | Source | Status |
 |---|---|---|---|---|---|
 | SCL-078 | face side | s = 256·round(C / (256 √(6π))): 1,024 (4k), 3,840 (16k), 7,424 (32k) | blocks | none | `game-choice` |
-| SCL-079 | net and turn | the cross, the frames above, 7 seams (1 translation, 4 quarter turns, 2 half turns), a free 3 × 3 turn | dimensionless | geometry | `game-choice`; the turn's search `not-yet-coded` |
+| SCL-079 | net and turn | the cross, the frames above, 7 seams (1 translation, 4 quarter turns, 2 half turns), a free 3 × 3 turn | dimensionless | geometry | `game-choice`; the turn's search is SCL-120 |
 | SCL-080 | conformal cube | Schwarz triangle functions, angles π(1/4, 1/2, 1/4) flat and π(1/4, 1/2, 1/3) spherical | dimensionless | Lee 1976; Rančić et al. 1996 (neither read) | `from-memory`, checked numerically |
 | SCL-081 | Moser's flow | Δu = ρ − 1, dx/dt = −∇u / ((1 − t) + tρ), RK4, 400 steps, 512² grid | dimensionless | Moser 1965 (from memory) | `game-choice` |
 | SCL-100 | face quantum | 256 | blocks | none | `game-choice` |
@@ -322,8 +325,8 @@ on the conformal table two steps leave 0.0049 blocks at 32k on the triangle and 
 blocks of a corner, three 6.3e-7 and 7.9e-5, four 3.3e-12 and 7.3e-10 (SCL-103). The conformal table
 integrates to 1.00000004 of a sixth of the sphere per face. The plan's D1 also
 asks for the land share on the cube against the planet, the corners' distances to land and the area
-and shape statistics on land; those need a bake that writes the cube and the turn's search (the
-plan's B1 to B3), so they are not measured yet. The study measured them on its own prototype
+and shape statistics on land; the phase 1 bake measures them on real bakes, reported on
+[cube-world-bake.md](cube-world-bake.md). The study measured them on its own prototype
 (`docs/research/notes/mountains-and-the-projection.md` §5: land drawn up to 1.92 times its true area
 on the conformal cube, the corners 5.3° or more out at sea).
 
@@ -332,7 +335,8 @@ on the conformal cube, the corners 5.3° or more out at sea).
 - **Area near the corners.** The conformal map keeps shapes by giving up area: around each of the
   eight corners the planet is drawn ever larger (25.6 times in area in the table's corner cell, about
   5 times in length), so a fixed number of metres is ever more blocks there. Every conversion from
-  metres to blocks has to use the local σ (SCL-107); the bake's use of it is phase 1, not coded.
+  metres to blocks has to use the local σ (SCL-107); the bake uses it since phase 1 (SCL-123 to
+  SCL-126).
 - **The corners themselves.** A full turn round a corner is three quarters of a turn of world;
   walking round one is shorter than round anywhere else, and the map's derivative goes to zero at
   the point. The turn's search is to keep all eight at sea.
