@@ -4,11 +4,13 @@ Status of this page: `stage 2 (constants checked against sources on 2026-10-23, 
 could be read; the rest marked from-memory)`. Written by the gap-4 agent, 2026-10-23, before the
 code (the brief's "design first"); the measured sections were added after the pool runs.
 
-Ledger ids on this page: `PLT-460` to `PLT-470`, `ISO-110` to `ISO-112` (see
-[claims.md](claims.md) and [ledger/PLT.md](ledger/PLT.md), [ledger/ISO.md](ledger/ISO.md)).
+Ledger ids on this page: `PLT-460` to `PLT-470`, `PLT-475` to `PLT-478`, `ISO-110` to `ISO-112`
+(see [claims.md](claims.md) and [ledger/PLT.md](ledger/PLT.md), [ledger/ISO.md](ledger/ISO.md)).
 Every law here sits behind a `--set` switch that is off by default (`tectonics.thermal_state`,
 `tectonics.thermal_isostasy_m`, `tectonics.thermal_strength`, `tectonics.thermal_backstop`,
-`tectonics.heat_flow_refresh`; `tectonics.thermal_keel_km` sets the start's keel).
+`tectonics.heat_flow_refresh`, `tectonics.transition_beta` (stage 2), `tectonics.root_removal`
+(stage 3); `tectonics.thermal_keel_km` sets the start's keel). Stages 2 and 3 were added by the
+gap-4 stages 2-3 agent on 2026-10-23, after a diagnosis of where the high coasts are.
 
 ## What you see in the world
 
@@ -143,13 +145,114 @@ craton to back-arc, the arc's orogeny restarted its continental clock, the flexu
 
 1. **Stage 1 (this task):** the state, heat flow from it with the fault's final pass, thermal
    isostasy and strength, each its own switch.
-2. **Stage 2, rifted margins:** the transition's linear taper (PLT-261 to PLT-264) replaced by a
-   stretching factor β on both sides of a new rift: crust T_n / β, lithosphere L / β, then McKenzie's
-   thermal subsidence from the state (already there: a stretched margin's L recovers over τ_c and
-   z_th falls by the same law). Coastal plains and shelves follow from the subsidence.
-3. **Stage 3, root removal:** the founder half of the 70 km cap (PLT-258) replaced by a
-   Rayleigh-Taylor removal of the thickened mantle lithosphere (Houseman & Molnar 1997: half to
-   three quarters of it in about 10 Myr), which heats L under a collision belt that has no keel.
+2. **Stage 2, rifted margins** (built 2026-10-23, `tectonics.transition_beta`, below): the
+   transition's linear taper (PLT-261 to PLT-264) replaced by a stretching factor β on both sides of
+   a new rift: crust T_n / β, lithosphere L / β, then McKenzie's thermal subsidence from the state
+   (already there: a stretched margin's L recovers over τ_c and z_th falls by the same law). Coastal
+   plains and shelves follow from the subsidence.
+3. **Stage 3, root removal** (built 2026-10-23, `tectonics.root_removal`, below): the founder half
+   of the 70 km cap (PLT-258) replaced by a Rayleigh-Taylor removal of the thickened mantle
+   lithosphere (Houseman & Molnar 1997: half to three quarters of it in about 10 Myr), which heats L
+   under a collision belt that has no keel.
+
+### Where the high coasts are (the diagnosis before stages 2 and 3)
+
+The brief asked which plate setting the coast with high ground sits in before building either
+stage, since stage 2 can only reach rifted margins and stage 3 only collision belts. The `coastset`
+measure (`tools/review/pool/measure_coastset.py`, registry `tools/review/pool/measures_gap4.json`,
+run by `pool.sh measure` over the base's cached runs, no new simulation) recomputes v1census's coast
+and high ground (`continents_census.coast_metrics`: coast cells within 1.6 cell spacings of the
+sea, high ground land above 2 km of the same landmass within 200 km) and gives each coast cell a
+setting from the plate regimes within 150 km of it, the first that holds of: collision (a collision
+belt, regime 5), arc (trench, arc or back-arc), rifted (a rift, a ridge or a passive margin),
+hotspot, other (only craton and ocean basin: an inland sea, a transform). The high ground's origin
+is the orogeny of its nearest cell above 2 km.
+
+Base, 24 runs (medians; the two starts are alike):
+
+| setting | share of the high coasts | share of the coast | high-coast rate in the setting | high coasts facing flooded continental crust |
+|---|---|---|---|---|
+| collision belt | 0.690 | 0.360 | 0.642 | 0.265 |
+| arc | 0.190 | 0.279 | 0.246 | 0.438 |
+| rifted margin | 0.085 | 0.285 | 0.094 | 0.501 |
+| hotspot | 0.000 | 0.000 | | |
+| other | 0.007 | 0.063 | 0.040 | about 1 |
+| all | 1 (coast_hi 0.333) | 1 | 0.333 | 0.323 (all coast: 0.552) |
+
+- **The high coasts are collision belts.** Seven in ten sit within 150 km of a collision belt, where
+  two in three coast cells have high ground. Their high ground is Himalayan (0.837 of it), active
+  (its orogeny's median age 0 Myr), 56 km from the coast, on 56 km of crust. Without them coast_hi
+  would be 0.094, inside its band (≤ 0.15).
+- **Rifted margins are not the problem.** They hold 0.285 of the coast but 0.085 of the high
+  coasts, a rate of 0.094 that already meets the band. Removing every rifted high coast would take
+  coast_hi from 0.333 only to 0.306. Their high ground is mostly no orogeny's (0.621; 0.265 Andean,
+  0.090 Himalayan), 56 Myr old at the median, 88 km inland, on 46.7 km of crust.
+- **Arcs** are the second share (0.190), Andean high ground 106 km inland.
+- Over the whole planet, high ground by origin: Himalayan 0.612, Andean 0.228, none 0.140.
+
+So stage 2 can move coast_hi by at most 0.03; the lever for that criterion is the collision belts,
+which stage 3 (with the strength) reaches. A collision belt at an ocean coast is itself the oddity:
+on Earth a continent-continent collision closes the ocean between the two, and its belt lies inland
+(the Himalaya, the Alps, the Urals), with the sea at its ends only.
+
+### Stage 2 as built (`tectonics.transition_beta`, PLT-475, PLT-476)
+
+- **The profile.** The transition keeps its zone (W = 200 km on the model sphere, PLT-262), its
+  catchments, its pace (τ = 20 Myr, PLT-263) and its height line (PLT-264), and its target becomes
+  a stretching factor's: T*(d) = T_o + (T_n − T_o) S(1/2 + d / W), S(s) = 3s² − 2s³. β = T_n / T*
+  stays under about 1.15 over the inner quarter of the zone (Manatschal & Chenin 2023's proximal
+  domain, crust "30+-5 km", "only a little thinned"), rises fastest at the boundary (the necking
+  domain, "from 30+-5 km to ca. 10 km") and is 3 or more over the outer quarter (the hyperextended
+  domain, under 10 km) up to T_n / T_o = 4.7 at the toe. On Earth the necking domain averages 55 km
+  and the hyperextended 50 km (Chenin et al. 2017, as Manatschal & Chenin cite it); the model's
+  zone is 200 km, so these lie inside it in that order. S is symmetric about the boundary like the
+  linear ramp, so the step's crust is held. Each conjugate margin is its own plate's boundary, so
+  both sides of a new ocean get the profile. On the quick 16k planet a sample is 71 km across on the
+  model sphere, so one or two samples a side fall in the zone: the boundary samples at d = ±35 km
+  hold 26.6 km (land side) and 13.4 km (ocean side) where the ramp gave 24.6 and 15.4.
+- **The lithosphere.** A continental source the transition thins to `keep` of its crystalline crust
+  in a step (β = 1 / keep for that step) has its lithosphere and keel thinned by the same factor,
+  L / β and K / β: McKenzie's (1978) uniform stretching, in which "a is the thickness of the
+  lithosphere and t_c the initial thickness of the continental crust" both stretch by β. Lang, ten
+  Brink & Makovsky (2026) find the mantle stretched more than the crust at the Baltimore Canyon
+  Trough (a mantle to crust "beta ratio = 2.8"); uniform stretching is the simpler choice and is
+  what McKenzie's subsidence table assumes.
+- **The subsidence.** Nothing new: the state cools the thinned lithosphere back towards L_cold over
+  τ_c (PLT-465) and, with `thermal_isostasy_m` on, z_th falls by the same law. McKenzie's Table 2
+  gives the total thermal subsidence of a stretched margin: 1,300 m at β = 1.5, 1,950 m at 2,
+  2,930 m at 4, at most 3,890 m; Montadert et al. (1979) measured about 4,000 m at the Bay of
+  Biscay's continent-ocean boundary falling to about 1 km at the shelf edge over 200 km.
+- **Without the state** there is no lithosphere to thin and only the crust's profile changes. With
+  the state but no thermal isostasy the stretched margin's heat flow and strength change (a hot,
+  weak margin) and its height is the crust's alone.
+
+### Stage 3 as built (`tectonics.root_removal`, PLT-477, PLT-478)
+
+- **Which columns.** A continental column of a collision orogeny (Himalayan) whose crust is thicker
+  than `collapse_thickness_km` (50 km, PLT-256): crust thickened that far stands for a lithosphere
+  thickened with it. No source read gives a threshold (England & Houseman 1989: the instability
+  "would only occur after there had already been substantial thickening of the lithosphere"; Kay &
+  Kay 1993: "a critical amount of shortening is required"), so the collapse's own threshold is
+  reused. An Andean range's lithosphere is the arc's (stage 1 already heats it).
+- **What happens.** Its lithosphere relaxes towards max(L_hot, K, its crust) with an e-folding time
+  of 10 Myr: the thickened mantle lithosphere drops off to the Moho, 63 % of the way in the first
+  10 Myr (Houseman & Molnar 1997: "between 50 (for rheological parameters representative of dry
+  olivine) and 75 per cent (for wet olivine) of the lithospheric mantle would be involved in an
+  instability whose duration is of the order of 10 Myr"; Conrad 2000: "The hottest 60 per cent of
+  the mantle lithosphere could be removed"). A keel holds it: a belt on a keeled craton stops at the
+  keel, as stage 1's back-arc heating does (Jordan 1978's tectosphere). A rift's or an arc's heating
+  comes first.
+- **The founder.** The 70 km cap's founder (PLT-258), which sank all of a column's excess that found
+  no room in one step, now sinks 1 − e^(−δt / 10 Myr) of it a step, the same drop-off's pace. It
+  barely fires in the base (1.15 × 10⁷ km³ foundered over 1,000 Myr on supercontinent seed 2,
+  against 8.55 × 10⁹ km³ the collapse moved), so this half is bookkeeping.
+- **The eclogite stays.** The eclogite pool (PLT-279, PLT-280) is not removed: a root only about
+  30 % eclogitized is "gravitationally stable" (Shi D. et al. 2020), and removing the eclogite would
+  raise the surface by only about 0.045 of its thickness at the model's densities.
+- **Without the state** only the founder's pace changes. With the state, the heated belt's heat
+  flow rises; with `thermal_strength` its thermal age falls to a fresh orogen's, so it spreads and
+  its flexure's Te drops; with `thermal_isostasy_m` it rises by up to E = 1,600 m (Molnar, England &
+  Martinod 1993: "approximately 1000 m to 2500 m in a few million years" over Tibet).
 
 ## Equations and constants
 
@@ -166,6 +269,10 @@ craton to back-arc, the arc's orogeny restarted its continental clock, the flexu
 | PLT-468 | the magmatic terms | +40 arc, +40 hotspot (PLT-137's); the rift's +30 dropped | mW/m² | PLT-137 (uncited) | `uncited` |
 | PLT-469 | the final heat-flow pass | after the resampling, continental q ← max(q, the law's conductive value) | mW/m² | the bake test's fault (2026-10-23) | `game-choice` (a bookkeeping fix) |
 | PLT-470 | the backstop | a source's share of the cordillera's strain w = e^(−t_eq / τ_s), τ_s = 62.8 (PLT-415) | none | Hyndman, Currie & Mazzotti 2005 (back-arcs weaker than cratons "by more than a factor of 10"); the weight is PLT-415's law | `game-choice` |
+| PLT-475 | stage 2's margin profile | T* = T_o + (T_n − T_o) S(1/2 + d / W), S(s) = 3s² − 2s³ (PLT-261's S(s) = s when off) | km | Manatschal & Chenin 2023 (the proximal, necking and hyperextended domains; full text); Montadert et al. 1979 (the Moho 25 km at the shelf break, 12 km on the lower margin; full text) | `game-choice` (the form) |
+| PLT-476 | stage 2's lithosphere | a source thinned to `keep`: L ← L · keep, K ← min(K · keep, L) | km | McKenzie 1978 (uniform stretching of the lithosphere and its crust by β; eq. 1 and Table 2 read); Lang, ten Brink & Makovsky 2026 (the mantle stretches more; full text) | `verified` |
+| PLT-477 | stage 3's drop-off | heated towards max(L_hot, K, crust) at e-folding 10 Myr; the founder sinks 1 − e^(−δt/10) of its no-room excess a step | Myr | Houseman & Molnar 1997 ("between 50 ... and 75 per cent ... of the lithospheric mantle", "of the order of 10 Myr"; full text); Conrad 2000 (60 %; abstract); Houseman, McKenzie & Molnar 1981 (under 30-50 m.y.; abstract) | `verified` |
+| PLT-478 | stage 3's trigger | a Himalayan orogeny's continental column with crust > `collapse_thickness_km` (50) | km | England & Houseman 1989, Kay & Kay 1993 (a threshold exists, no number; abstracts) | `game-choice` (the threshold is PLT-256's) |
 | ISO-110 | thermal isostasy | z_th = E (L_ref − L) / (L_cold − L_hot), E = 1,600 | m | Hyndman & Currie 2011 ("about 1,600 m at equal thickness") | `verified` |
 | ISO-111 | L_ref, the frame | 225 (craton frame) or 187 (Hyndman & Currie's frame) | km | the model's Airy line against HC2011's two sea-level crusts (below) | `game-choice` (a calibration) |
 | ISO-112 | the thermal age | t_eq = τ_c ln((L_cold − L_hot) / (L_cold − L)) into PLT-415 and ISO-051 | Myr | the inverse of PLT-460's cooling; the coupling is the agent's | `game-choice` |
@@ -278,11 +385,20 @@ rule; the yield is not made redundant by the strength, and the strength does not
 - One thermal depth per sample and a relaxation towards a target, not a conductive geotherm: the
   first mode of McKenzie's plate solution.
 - Heating is by flag (arc, back-arc, hotspot, rift), at one rate. Collisional thickening of the
-  lithosphere and its removal (stage 3) are not modelled yet: a collision belt keeps the state it had.
-  The crust's own heating when thickened (its radiogenic heat) is not in the state either, so with
-  `thermal_strength` a collision between two keeled continents stays as stiff as their keels; on
-  Earth a thickened orogen warms and weakens (its thickened crust's own heat, the removal of its
-  root: Houseman & Molnar 1997), which stage 3 is for.
+  lithosphere is not modelled: a collision belt keeps the state it had until stage 3
+  (`root_removal`) takes its mantle lithosphere off to the Moho, at once in the sense that nothing
+  thickens it first (Earth's belt thickens its mantle lithosphere, which then drops off). The
+  crust's own heating when thickened (its radiogenic heat) is not in the state either, so with
+  `thermal_strength` and stage 3 off a collision between two keeled continents stays as stiff as
+  their keels; with stage 3 on it stays as stiff as its keel and no stiffer.
+- Stage 2 stretches the lithosphere only where the transition thins crust, which on the quick
+  planet is one or two samples a side of a margin (71 km apart on the model sphere against a 200 km
+  zone). A rift that has not broken up (regime 6) heats as stage 1 says (L ← L_hot) and its crust is
+  not thinned by β. One β for crust and mantle, though the mantle stretches more on real margins
+  (Lang, ten Brink & Makovsky 2026).
+- Stage 3 removes no crust: the eclogite pool stays (Shi D. et al. 2020: a root about 30 %
+  eclogitized is stable), and the founder's cap still sinks crust above 70 km that finds no room,
+  only at the drop-off's pace.
 - The backstop takes the cordillera's crust from weak ground only. Earth's foreland craton gives the
   Andes crust by underthrusting at its edge, moving as a rigid block; the model's samples cannot
   move under a range, so a cold source gives (almost) nothing instead.
@@ -334,3 +450,10 @@ rule; the yield is not made redundant by the strength, and the strength does not
 - HasterokChapman2007: abstracts of both parts (about 3 km of relief between hot and cold
   provinces).
 - Michaut2007: abstract (Kaapvaal lithosphere 200 to 270 km, basal heat flow 12 to 16 mW/m²).
+- Stages 2 and 3 (read 2026-10-23 by a sub-agent of the stages 2-3 agent; the bibliography's section
+  "The lithosphere's stages 2 and 3"): McKenzie1978 again (eq. 1 on the page image, Table 2);
+  ManatschalChenin2023, Montadert1979, Lang2026: full text; StecklerWatts1978, LePichonSibuet1981,
+  HousemanMcKenzieMolnar1981, Conrad2000, MolnarEnglandMartinod1993, KayKay1993: abstracts only;
+  EnglandHouseman1989 and ShiD2020 as read before. Chenin et al. 2017, Mohn et al. 2012, Royden &
+  Keen 1980 and Davis & Kusznir 2004 could not be read (paywalled or no abstract); nothing is taken
+  from them except as Manatschal & Chenin cite Chenin et al.
