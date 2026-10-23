@@ -24,8 +24,8 @@
 //!   instead, hidden (`stacked`, PLT-276) or still visible in the overriding plate's footprint
 //!   (PLT-292): the belt stacked its share when it crossed. Of subducted ocean floor (hidden, or
 //!   of a plate the top overrides) `sediment_subduction_share` of its sediment and sedimentary
-//!   rock goes down with the slab instead (sediment subduction, PLT-440; 0 by default, when all
-//!   of it accretes). (Until 2026-10-02 only whole
+//!   rock goes down with the slab instead (sediment subduction, PLT-440; 0.12 by default since
+//!   2026-10-23; at 0 all of it accretes). (Until 2026-10-02 only whole
 //!   triangles of one group counted, and points on a boundary strip copied the nearest visible
 //!   sample within 0.75 spacings: where a plate overrode another, the subducting crust under the
 //!   strip won it, and the overriding plate lost its outer half-spacing at every resampling,
