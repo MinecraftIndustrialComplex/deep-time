@@ -558,15 +558,21 @@ pub fn top_up(
     let cu = c as u32;
     let (zlo, zhi) = world.z_range();
     let step = TOP_UP_STEP_BLOCKS;
-    // The lattice: x from the canonical span's start, z from the world's top edge.
+    // The lattice: x from the canonical span's start, z from the world's top edge. A cube
+    // world's span starts at its window's west edge, and its points in the void (past the net's
+    // faces) are never land (SCL-129).
+    let (x0, cube) = match wp {
+        WorldProjection::Cube(view) => (wp.index_frame().origin.0, Some(view.cube)),
+        _ => (-c / 2, None),
+    };
     let nx = (c / step).max(1) as usize;
     let nz = ((zhi - zlo) / step + 1).max(1) as usize;
-    let at = |i: usize, j: usize| (-c / 2 + i as i64 * step, zlo + j as i64 * step);
+    let at = |i: usize, j: usize| (x0 + i as i64 * step, zlo + j as i64 * step);
     let dry: Vec<bool> = (0..nx * nz)
         .into_par_iter()
         .map(|k| {
             let (x, z) = at(k % nx, k / nx);
-            world.dry(x, z)
+            cube.is_none_or(|cb| cb.face_of_block(x, z).is_some()) && world.dry(x, z)
         })
         .collect();
     // Inland: every lattice point within two steps (128 blocks) is dry land too (x wrapping;

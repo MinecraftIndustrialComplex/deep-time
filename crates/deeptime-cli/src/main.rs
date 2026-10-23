@@ -569,8 +569,8 @@ enum Command {
         json: Option<PathBuf>,
     },
     /// Run the bake's projection pass (SW-1) on a copy of a baked Lambert world-data folder, with
-    /// its own preset and `--set scale.KEY=VALUE` overrides (`scale.projection` is petroff_guyou):
-    /// tuning the pass without re-running the history.
+    /// its own preset and `--set scale.KEY=VALUE` overrides (`scale.projection` is petroff_guyou,
+    /// or cube with `--set scale.projection=cube`): tuning the pass without re-running the history.
     Project {
         /// A Lambert world-data folder a planet run baked (`--set scale.projection=lambert`).
         #[arg(long)]
@@ -578,7 +578,8 @@ enum Command {
         /// The projected copy (replaced if it exists).
         #[arg(long)]
         out: PathBuf,
-        /// Sets a preset value first, `--set scale.lambda_c_deg=30` (repeatable).
+        /// Sets a preset value first, `--set scale.lambda_c_deg=30` or
+        /// `--set scale.projection=cube` (repeatable).
         #[arg(long = "set", value_name = "PATH=VALUE")]
         set: Vec<String>,
     },
