@@ -1166,10 +1166,10 @@ fn auto_streams_when_the_whole_path_peak_would_not_fit_though_the_last_level_alo
 
     // The failing 1000 Myr run (2026-09-30): 1,643,487,517 bytes held when amplify starts, the
     // default 4 GiB cap. The last level's buffers alone fit; the reservation it makes after the
-    // ladder holds the level before it and the preview needs 4,451,574,045.
+    // ladder holds the level before it and the preview needed 4,451,574,045 then (more now: the
+    // levels carry each lake's surface since 2026-10-22, 4 B a cell).
     let cap = crate::session::DEFAULT_MEM_CAP;
-    let held = 4_451_574_045 - peak;
-    assert_eq!(held, 1_643_487_517);
+    let held = 1_643_487_517;
     assert!(
         gauge_model(held, cap)(last_only).is_ok(),
         "the last level alone fits"
@@ -1177,7 +1177,8 @@ fn auto_streams_when_the_whole_path_peak_would_not_fit_though_the_last_level_alo
     let Err(CoreError::MemoryCap { needed, .. }) = gauge_model(held, cap)(peak) else {
         panic!("the full peak must not fit");
     };
-    assert_eq!(needed, 4_451_574_045);
+    assert_eq!(needed, held + peak);
+    assert!(needed >= 4_451_574_045);
 
     // auto streams there; never and always are what they say whatever the cap.
     let reserve = gauge_model(held, cap);

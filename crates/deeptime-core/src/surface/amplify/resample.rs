@@ -25,7 +25,7 @@
 //!   fine terrain at the lake's level: smooth, and the same in every direction. A footprint copied
 //!   from the coarse cells (each fine cell a lake when a coarse lake cell lay within a cell of it)
 //!   drew every lake's edge as a staircase of coarse cells, and the passes, which leave lakes
-//!   alone, cut that staircase into the walls of every closed basin (ledger AMP-084).
+//!   alone, cut that staircase into the walls of every closed basin (ledger AMP-090).
 
 use super::window::Win;
 
@@ -243,7 +243,7 @@ impl Level {
                     let interp = lin_at(ln_area, self.w, self.h, ci, cj, fi, fj).exp() as f32;
                     ar[i] = (interp - wg * (a_coarse - a_fine)).max(or[i]);
                     // The highest lake surface among the corners of the cell's quad (1, 2 or 4
-                    // coarse cells); a lake cell when the terrain lies under it.
+                    // coarse cells); a lake cell when the terrain lies under it. ledger: AMP-090
                     let mut s = NO_LAKE;
                     for cj2 in cj..=cj + i64::from(fj) {
                         for ci2 in ci..=ci + i64::from(fi) {
