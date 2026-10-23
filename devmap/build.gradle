@@ -51,6 +51,8 @@ dependencies {
     // The world-data reader's own libraries, as neoforge/ names them for its tests.
     testImplementation 'com.google.guava:guava:32.1.2-jre'
     testImplementation 'com.google.code.gson:gson:2.10.1'
+    // The game's lz4-java: the world-data tiles SatellitePictureTest reads are LZ4 blocks.
+    testImplementation 'org.lz4:lz4-java:1.8.0'
     // PlanetGeometry's logger (Minecraft ships slf4j-api 2.0.9 at run time).
     testRuntimeOnly 'org.slf4j:slf4j-api:2.0.9'
 }
