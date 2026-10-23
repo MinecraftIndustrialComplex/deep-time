@@ -746,8 +746,9 @@ fn step_quantiles(mut v: Vec<f64>) -> Value {
 
 /// The B1 record of a layer on a cube grid: the size of the steps between neighbouring cells
 /// across each kind of seam ([`seam_class`], each seam once), against the steps inside the faces
-/// (every fourth row and column) and the first inward step from each face edge (`near_edge`, the
-/// same ground's control). Physical units of the layer; pairs with no-data skipped.
+/// (every fourth row and column) and the first inward step from each face edge (`near_edge`; and
+/// `beside_<kind>`, the same ground's control for each kind of seam, from both of its faces).
+/// Physical units of the layer; pairs with no-data skipped.
 fn seam_steps(desc: &LayerDesc, bytes: &[u8]) -> Value {
     let g = &desc.grid;
     let n = i64::from(g.w);
@@ -781,6 +782,14 @@ fn seam_steps(desc: &LayerDesc, bytes: &[u8]) -> Value {
                         push(class, val(c0), val(c1));
                     }
                     push("near_edge", val(c0), val(ci));
+                    // The same ground's control for each kind of seam: the first inward step
+                    // beside it, on both of its faces.
+                    match class {
+                        "direct" => push("beside_direct", val(c0), val(ci)),
+                        "slide" => push("beside_slide", val(c0), val(ci)),
+                        "turning" => push("beside_turning", val(c0), val(ci)),
+                        _ => {}
+                    }
                 }
             }
             for b in (0..n - 1).step_by(4) {
@@ -803,7 +812,16 @@ fn seam_steps(desc: &LayerDesc, bytes: &[u8]) -> Value {
     }
     let mut o = serde_json::Map::new();
     o.insert("grid".into(), json!(g.name));
-    for k in ["within", "near_edge", "direct", "slide", "turning"] {
+    for k in [
+        "within",
+        "near_edge",
+        "direct",
+        "slide",
+        "turning",
+        "beside_direct",
+        "beside_slide",
+        "beside_turning",
+    ] {
         o.insert(k.into(), step_quantiles(all.remove(k).unwrap_or_default()));
     }
     Value::Object(o)
