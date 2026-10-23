@@ -5475,3 +5475,22 @@ and the largest part of their gap is the carry's (the gap budget's part for the 
 semi-Lagrangian advection, the L0/L1 sampling and the clamps: 9.6, 12.8 and 16.0 km at the
 quartiles, up to 29.5 km), not the flexure's. The highest, supercontinent 2 at 82°N, a ridge sample
 at 16.2 km. Not traced further here, and the yield (below) does not reach them.
+
+### The law
+
+The trace's loop has one link that Earth does not have: a plate holding 10 to 47 km of rock away
+from local isostasy. No plate holds more than about 2 to 4 km (ISO-093: the largest free-air
+anomalies, −380 mGal at the Puerto Rico Trench and up to +300 mGal over Hawaii), because rock
+yields before it carries such stresses. The fix bounds that link, not the collapse's room or the
+rise guard: the plate's yield, ISO-120 ([flexure.md](flexure.md), "The plate's yield"). After each
+solve of the surface's flexure a cell's plate holds at most σ_max = Δg_max / 2πG of load away from
+local isostasy, 2.75 km of mantle at Δg_max = 380 mGal; the excess sinks under the cell alone. With
+it, the settling's target over a column the collapse keeps feeding is its Airy height plus at most
+2.75 km, so the crust the collapse gives it raises it only by its Airy share. Off by default:
+`--set surface.flexure.yield_anomaly_mgal=380`. Code: `surface/flexure.rs` (commit c8134072, pool
+key 08c9d7d679c0; the later commits on the branch change only comments and formatting).
+
+The collapse's room (thickness, not height) is left as it is. A column 15 km over its Airy height
+taking crust as lowland is wrong only because the column stands there; with the yield it no longer
+does, and a room rule that also read the height would have needed a law of its own (open question
+below).
