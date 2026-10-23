@@ -984,7 +984,10 @@ mod tests {
             }
             let ratio = crystalline_m(&s.pools) / crystalline_m(&b.pools);
             let l = f64::from(s.lithosphere_km) / f64::from(b.lithosphere_km);
-            assert!((l - ratio).abs() < 1e-4, "sample {i}: L by {l}, crust by {ratio}");
+            assert!(
+                (l - ratio).abs() < 1e-4,
+                "sample {i}: L by {l}, crust by {ratio}"
+            );
             assert!(s.keel_km <= s.lithosphere_km);
             if ratio < 0.95 {
                 thinned += 1;
