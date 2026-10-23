@@ -485,7 +485,22 @@ pub fn radius_cells(p: &CharacterParams, cell_blocks: f64) -> usize {
         lam *= 0.5;
     }
     let chain = 1 + 2 * r.smooth + r.relief + (r.relief / 2 + 1) + octaves + 1;
-    chain.max(1 + 3 * r.sharpen) + 1
+    chain
+        .max(1 + 3 * r.sharpen)
+        .max(lake_shore_cells(cell_blocks))
+        + 1
+}
+
+/// Distance from a lake, blocks, over which the character comes in: none on the lake's first
+/// land cells, all of it this far out. Without it the character stopped at the shore, and the
+/// change it made one cell away (the rounding and the gullies, up to a few blocks) stood as a
+/// step along the whole lake footprint (savanna pit task, 2026-10-22; an implementation choice,
+/// not physical).
+pub const LAKE_SHORE_FADE_BLOCKS: f64 = 8.0; // ledger: AMP-091
+
+/// The reach, cells, of the lake-shore fade.
+fn lake_shore_cells(cell_blocks: f64) -> usize {
+    (LAKE_SHORE_FADE_BLOCKS / cell_blocks).ceil().max(1.0) as usize
 }
 
 /// What [`apply`] did over a window's core.
@@ -797,6 +812,25 @@ pub fn apply(
         );
         (1.0 - river) * coast * (1.0 - glaciated(cell))
     };
+    // How much of its change a land cell keeps near a lake: the distance to the nearest lake
+    // cell, Euclidean so the fade follows the shore's own curve, from none one cell out to all
+    // of it at LAKE_SHORE_FADE_BLOCKS. ledger: AMP-091
+    let lake_r = lake_shore_cells(cb) as i64;
+    let lake_fade = |i: usize, j: usize| -> f64 {
+        let mut d2 = i64::MAX;
+        for dj in -lake_r..=lake_r {
+            for di in -lake_r..=lake_r {
+                let r2 = di * di + dj * dj;
+                if r2 < d2 && lake[at(win, i, j, di, dj)] != 0 {
+                    d2 = r2;
+                }
+            }
+        }
+        if d2 == i64::MAX {
+            return 1.0;
+        }
+        smoothstep(cb, LAKE_SHORE_FADE_BLOCKS.max(2.0 * cb), (d2 as f64).sqrt() * cb)
+    };
 
     // Fold ridges.
     let (base, smooth, rel, low) = (&*s.base, &*s.smooth, &*s.relief, &*s.tmp2);
@@ -945,7 +979,7 @@ pub fn apply(
             y += wt * (terr - y);
         }
         let y_in = f64::from(to_y(z[cell]));
-        let dy = (y - y_in).clamp(-p.max_change_blocks, p.max_change_blocks);
+        let dy = (y - y_in).clamp(-p.max_change_blocks, p.max_change_blocks) * lake_fade(i, j);
         let zm = f64::from(sea) + (y_in + dy - sea_y) * mv;
         *o = (zm as f32).max(sea + 0.05);
     });
