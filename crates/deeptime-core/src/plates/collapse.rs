@@ -85,13 +85,13 @@
 //!
 //! # As a thin viscous sheet (on by default since 2026-10-23)
 //! The rule above is local: a column thins at one rate down to T_c, and its crust goes to room
-//! within `collapse_reach_km`. On Earth a thickened region also spreads as a whole: the lithosphere is a thin
-//! viscous sheet whose depth-integrated deviatoric stress balances the gradient of the
-//! potential energy of its columns (England & McKenzie 1982; Houseman & England 1986), so a
-//! plateau extends at a rate its potential energy over the lowland around it sets, interior and
-//! edges alike (Tibet's east-west extension, England & Houseman 1989; the Basin and Range,
-//! Sonder & Jones 1999). With `collapse_sheet_viscosity_pa_s` η_0 > 0 a quiet column an orogeny
-//! raised thins in pure shear (plane strain) at
+//! within `collapse_reach_km`. On Earth a thickened region also spreads as a whole: the
+//! lithosphere is a thin viscous sheet whose depth-integrated deviatoric stress balances the
+//! gradient of the potential energy of its columns (England & McKenzie 1982; Houseman & England
+//! 1986), so a plateau extends at a rate its potential energy over the lowland around it sets,
+//! interior and edges alike (Tibet's east-west extension, England & Houseman 1989; the Basin and
+//! Range, Sonder & Jones 1999). With `collapse_sheet_viscosity_pa_s` η_0 > 0 a quiet column an
+//! orogeny raised thins in pure shear (plane strain) at
 //!
 //!   ε̇ = ΔU / (4 η L),   q = T (1 − e^(−ε̇ δt)),  at most T − T_col,
 //!
