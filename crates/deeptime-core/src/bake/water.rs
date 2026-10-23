@@ -24,10 +24,21 @@
 //!   in the biome temperature layer's frozen band, where vanilla alone would have iced it.
 //! - **playa.** Blocks of salt (`hydro.playa_blocks`) on the cells of a playa, 0 elsewhere: the
 //!   game replaces that many of the ground's top blocks with the `halite` rock class's block.
+//! - **Deltas** (V1 gap 5, stage 1; [`hydro::delta`]). With `hydro.deltas` the network runs
+//!   twice: the first run finds the rivers that reach the open sea, [`hydro::delta::grow`] lays a
+//!   plain at each mouth, one block above the sea's top water block, and the second run drains the
+//!   raised ground; [`hydro::delta::distributaries`] then splits each plain's main stem into
+//!   chains that leave it (`from` in the river file). The raise goes into `elevation` itself (on
+//!   its own grid, each L3 cell of a plain cell at least the plain's height), `detail/amplitude`
+//!   is zeroed there (a plain is flat), and the layer [`DELTA_LAYER`] keeps what was added, so a
+//!   re-run takes it off first and starts from the history's ground. On a Lambert world the
+//!   horizon stacks' tops are raised over the plains here; a projected world's pass does that for
+//!   every cell.
 
 use std::path::Path;
 
 use deeptime_format::column::CLOSED_BASIN;
+use deeptime_format::projection::ProjectionKind;
 use deeptime_format::rivers::{RIVERS_PATH, write_rivers};
 use deeptime_format::{DType, FileEntry, GridDesc, LoadedLayer, RasterRead};
 use rayon::prelude::*;
@@ -35,7 +46,7 @@ use serde_json::{Value, json};
 
 use super::{Out, desc};
 use crate::error::CoreError;
-use crate::hydro::{self, network};
+use crate::hydro::{self, delta, network};
 use crate::params::PlanetPreset;
 use crate::surface::climate::{zonal_precip, zonal_temperature};
 
@@ -105,6 +116,171 @@ const FROZEN_BAND_TOP: f64 = -0.45;
 pub const PLAYA_LAYER: &str = "playa";
 pub const PLAYA_ROCK_CLASS: &str = "halite";
 
+/// What the delta plains added to `elevation`, 1/16 block, on its grid (0 off the plains).
+pub const DELTA_LAYER: &str = "delta";
+
+/// Drops every listing of `name` in `out.layers` but the first (`Out::layer` tallies a rewritten
+/// layer again).
+fn tally_once(out: &mut Out<'_>, name: &str) {
+    let mut seen = false;
+    out.layers
+        .retain(|l| l != name || !std::mem::replace(&mut seen, true));
+}
+
+/// Takes a previous run's delta plains off `elevation` (a re-run over a baked folder) and drops
+/// the delta layer: the hydrology starts from the ground the history left.
+fn take_off_deltas(out: &mut Out<'_>) -> Result<(), CoreError> {
+    let Some(d) = out.m.layer(DELTA_LAYER).cloned() else {
+        return Ok(());
+    };
+    let path = out.dir.join(&d.path);
+    let (dg, raise) = load_i16(&path)?;
+    if let Some(e) = out.m.layer("elevation").cloned() {
+        let mut el = crate::bake::load_layer(&out.dir.join(&e.path))?;
+        if el.desc.grid == dg && el.desc.dtype == DType::I16 {
+            el.bytes
+                .as_chunks_mut::<2>()
+                .0
+                .par_iter_mut()
+                .zip(raise.par_iter())
+                .for_each(|(b, &r)| {
+                    if r > 0 {
+                        *b = i16::from_le_bytes(*b).saturating_sub(r).to_le_bytes();
+                    }
+                });
+            out.layer_bytes(el.desc, &el.bytes)?;
+            tally_once(out, "elevation");
+        }
+    }
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| CoreError::io(&path, e))?;
+    }
+    out.m.layers.retain(|l| l.name != DELTA_LAYER);
+    out.layers.retain(|l| l != DELTA_LAYER);
+    Ok(())
+}
+
+/// What laying the plains on the elevation's grid did.
+struct Laid {
+    /// Cells of the elevation's grid raised, and the largest raise, blocks.
+    cells: u64,
+    max_blocks: f64,
+    amplitude_zeroed: u64,
+    /// The horizon stacks raised over the plains (a Lambert world), and the largest raise, blocks.
+    stack_cells: u64,
+    stack_max_blocks: f64,
+}
+
+/// Raises `elevation` (grid `l3`) to the plains (on the hydrology's grid, `halvings` times
+/// coarser): each L3 cell of a plain cell is at least the plain's height. Writes the raise as
+/// [`DELTA_LAYER`], zeroes `detail/amplitude` on the raised cells, and on a Lambert world raises
+/// the horizon stacks' tops over them (`project::raise_world_tops`, the bake's top rule).
+fn lay_plains(
+    p: &PlanetPreset,
+    out: &mut Out<'_>,
+    l3: &GridDesc,
+    hydro_grid: &GridDesc,
+    halvings: u32,
+    plains: &delta::Plains,
+) -> Result<Laid, CoreError> {
+    let e = out
+        .m
+        .layer("elevation")
+        .cloned()
+        .ok_or_else(|| CoreError::InvalidState("no elevation layer".into()))?;
+    let mut el = crate::bake::load_layer(&out.dir.join(&e.path))?;
+    if el.desc.grid != *l3 || el.desc.dtype != DType::I16 {
+        return Err(CoreError::InvalidState(
+            "the elevation layer changed under the water part".into(),
+        ));
+    }
+    let f = 1usize << halvings;
+    let (w3, wh) = (l3.w as usize, hydro_grid.w as usize);
+    let mut raise = vec![0i16; l3.cells()];
+    let (mut cells, mut max_raw) = (0u64, 0i16);
+    for pl in &plains.plains {
+        for (&c, &h) in pl.cells.iter().zip(&pl.height) {
+            let (i, j) = (c as usize % wh, c as usize / wh);
+            for dj in 0..f {
+                for di in 0..f {
+                    let c3 = (j * f + dj) * w3 + i * f + di;
+                    let at = c3 * 2;
+                    let old = i16::from_le_bytes([el.bytes[at], el.bytes[at + 1]]);
+                    if h > old && raise[c3] == 0 {
+                        raise[c3] = h - old;
+                        max_raw = max_raw.max(h - old);
+                        cells += 1;
+                        el.bytes[at..at + 2].copy_from_slice(&h.to_le_bytes());
+                    }
+                }
+            }
+        }
+    }
+    let mut laid = Laid {
+        cells,
+        max_blocks: f64::from(max_raw) / 16.0,
+        amplitude_zeroed: 0,
+        stack_cells: 0,
+        stack_max_blocks: 0.0,
+    };
+    out.layer_bytes(el.desc.clone(), &el.bytes)?;
+    tally_once(out, "elevation");
+    out.layer(
+        desc(DELTA_LAYER, DType::I16, l3, 1.0 / 16.0, "block", None),
+        &raise,
+    )?;
+
+    // A plain is flat: no detail noise on it.
+    if let Some(a) = out.m.layer("detail/amplitude").cloned() {
+        let mut amp = crate::bake::load_layer(&out.dir.join(&a.path))?;
+        if amp.desc.grid == *l3 && amp.desc.dtype == DType::U8 {
+            for (b, &r) in amp.bytes.iter_mut().zip(&raise) {
+                if r > 0 && *b != 0 {
+                    *b = 0;
+                    laid.amplitude_zeroed += 1;
+                }
+            }
+            if laid.amplitude_zeroed > 0 {
+                out.layer_bytes(amp.desc, &amp.bytes)?;
+                tally_once(out, "detail/amplitude");
+            }
+        }
+    }
+
+    // The horizon stacks' tops over the plains: a projected world's pass raises every cell's;
+    // a Lambert world is played from these stacks, so they are raised here, over the plain cells
+    // alone (the elevation elsewhere masked as nodata).
+    if p.scale.projection == ProjectionKind::Lambert
+        && let Some(st) = out.m.layer("strata/horizons").cloned()
+    {
+        const MASK: i16 = i16::MIN;
+        let mut masked = el;
+        masked.desc.nodata = Some(f64::from(MASK));
+        for (b, &r) in masked.bytes.as_chunks_mut::<2>().0.iter_mut().zip(&raise) {
+            if r == 0 {
+                *b = MASK.to_le_bytes();
+            }
+        }
+        let mut stack = crate::bake::load_layer(&out.dir.join(&st.path))?;
+        let (n, max, _) = super::project::raise_world_tops(
+            &stack.desc,
+            &mut stack.bytes,
+            &masked,
+            None,
+            p.scale.min_y,
+            p.scale.max_y,
+            false,
+        );
+        laid.stack_cells = n;
+        laid.stack_max_blocks = max;
+        if n > 0 {
+            out.layer_bytes(stack.desc, &stack.bytes)?;
+            tally_once(out, "strata/horizons");
+        }
+    }
+    Ok(laid)
+}
+
 /// What the water part made, for the tests and the CLI.
 pub struct Water {
     pub note: Value,
@@ -164,6 +340,7 @@ pub(crate) fn halve(g: &GridDesc, v: &[i16]) -> (GridDesc, Vec<i16>) {
 pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     let params = p.hydro.unwrap_or_default();
     let rivers_path = out.dir.join(RIVERS_PATH);
+    take_off_deltas(out)?;
     if !params.enabled {
         if rivers_path.exists() {
             std::fs::remove_file(&rivers_path).map_err(|e| CoreError::io(&rivers_path, e))?;
@@ -190,9 +367,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
                 Some(f64::from(network::NODATA)),
             );
             out.layer(wd, &vec![network::NODATA; grid.cells()])?;
-            let mut seen = false;
-            out.layers
-                .retain(|l| l != "water_level" || !std::mem::replace(&mut seen, true));
+            tally_once(out, "water_level");
         }
         return Ok(Water {
             note: json!({"enabled": false, "why": "hydro.enabled is false: no lakes or rivers"}),
@@ -204,11 +379,13 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         .layer("elevation")
         .ok_or_else(|| CoreError::InvalidState("no elevation layer to drain".into()))?;
     let (mut grid, mut elev) = load_i16(&out.dir.join(&e.path))?;
-    let mut halved = false;
+    let l3 = grid.clone();
+    let mut halvings = 0u32;
     while grid.cells() > hydro::MAX_CELLS && grid.w % 2 == 0 && grid.h % 2 == 0 {
         (grid, elev) = halve(&grid, &elev);
-        halved = true;
+        halvings += 1;
     }
+    let halved = halvings > 0;
 
     // The L1 climate is small: whole in memory, so the parallel sampling shares no cache lock.
     let layer = |name: &str| -> Result<Option<LoadedLayer>, CoreError> {
@@ -247,7 +424,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         hydro::Climate::of(pr, t, t + warm, t + cold)
     };
     let sea_raw = s.sea_level_y * 16;
-    let result = network::run(&network::Input {
+    let first = network::run(&network::Input {
         grid: &grid,
         elev: &elev,
         sea_raw,
@@ -255,9 +432,80 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         climate: &climate,
         params: &params,
         width_scale: s.feature_scale.rivers,
+        mouths: params.deltas,
     });
-    drop(elev);
+    // The delta plains on the first network's mouths, then the network again on the raised
+    // ground and the distributaries across each plain.
+    let plains = if params.deltas {
+        delta::grow(
+            &delta::Input {
+                grid: &grid,
+                elev: &elev,
+                sea_raw,
+                m_per_block_h: s.m_per_block_h,
+                m_per_block_v: s.m_per_block_v,
+                fit: s.build_fit(),
+                params: &params,
+                width_scale: s.feature_scale.rivers,
+            },
+            &first,
+        )
+    } else {
+        delta::Plains::default()
+    };
+    let first_chains = first.rivers.chains.len();
+    let (result, splits, laid) = if plains.plains.is_empty() {
+        (first, Vec::new(), None)
+    } else {
+        drop(first);
+        plains.apply(&mut elev);
+        let mut second = network::run(&network::Input {
+            grid: &grid,
+            elev: &elev,
+            sea_raw,
+            m_per_block_h: s.m_per_block_h,
+            climate: &climate,
+            params: &params,
+            width_scale: s.feature_scale.rivers,
+            mouths: true,
+        });
+        let splits = delta::distributaries(
+            &delta::Input {
+                grid: &grid,
+                elev: &elev,
+                sea_raw,
+                m_per_block_h: s.m_per_block_h,
+                m_per_block_v: s.m_per_block_v,
+                fit: s.build_fit(),
+                params: &params,
+                width_scale: s.feature_scale.rivers,
+            },
+            &elev,
+            &plains,
+            &mut second,
+        );
+        drop(elev);
+        let laid = lay_plains(p, out, &l3, &grid, halvings, &plains)?;
+        (second, splits, Some(laid))
+    };
     let mut stats = result.stats.clone();
+    stats["chains"] = json!(result.rivers.chains.len());
+    stats["vertices"] = json!(result.rivers.vertices.len());
+    stats["index_entries"] = json!(result.rivers.entries.len());
+    if params.deltas {
+        let cell_km2 = (f64::from(grid.r) * s.m_per_block_h).powi(2) / 1e6;
+        let land = stats["land_cells"].as_u64().unwrap_or(0);
+        let mut d = delta::stats(&plains, &splits, land, cell_km2);
+        d["first_pass_chains"] = json!(first_chains);
+        if let Some(l) = &laid {
+            d["raised_cells"] = json!(l.cells);
+            d["max_raise_blocks"] = json!(l.max_blocks);
+            d["amplitude_zeroed"] = json!(l.amplitude_zeroed);
+            d["stack_raised_cells"] = json!(l.stack_cells);
+            d["stack_max_raise_blocks"] = json!(l.stack_max_blocks);
+        }
+        stats["deltas"] = d;
+    }
     // How much of the frozen lake area the game's frozen biomes cover (the temperature layer's
     // frozen band, below its upper edge −0.45): there vanilla's `freeze_top_layer` ices the water.
     if let Some(band) = &band {
@@ -300,16 +548,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     );
     out.layer(wd, &result.water_level)?;
     // `Out::layer` tallied the layer a second time.
-    let mut seen = false;
-    out.layers.retain(|l| {
-        if l == "water_level" {
-            let keep = !seen;
-            seen = true;
-            keep
-        } else {
-            true
-        }
-    });
+    tally_once(out, "water_level");
 
     // playa: blocks of salt on the floor of basins too dry for a lake (0 elsewhere).
     let salt = params.playa_blocks.round().clamp(0.0, 255.0) as u8;
@@ -342,7 +581,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
 
     let note = json!({
         "enabled": true,
-        "method": "hyd-100",
+        "method": if params.deltas { "hyd-130" } else { "hyd-100" },
         "params": params,
         "width_scale": s.feature_scale.rivers,
         "grid": grid.name,
@@ -367,8 +606,17 @@ pub fn summary_line(v: &Value) -> String {
         return "water disabled".into();
     }
     let s = &v["stats"];
+    let d = &s["deltas"];
+    let deltas = if d.is_null() {
+        String::new()
+    } else {
+        format!(
+            " deltas={} delta_km2={} delta_share_of_land={} distributaries={} lagoons={}",
+            d["deltas"], d["plain_km2"], d["share_of_land"], d["distributaries_added"], d["lagoons"],
+        )
+    };
     format!(
-        "water grid={} lakes={} lake_km2={} share_of_land={} largest_km2={} below_rim={} frozen={} playas={} dry={} endorheic={} below_sea_closed_km2={} below_sea_dry_km2={} below_sea_lakes={} chains={} vertices={} river_km={} max_q={} widest={} bytes={}",
+        "water grid={} lakes={} lake_km2={} share_of_land={} largest_km2={} below_rim={} frozen={} playas={} dry={} endorheic={} below_sea_closed_km2={} below_sea_dry_km2={} below_sea_lakes={} chains={} vertices={} river_km={} max_q={} widest={} bytes={}{deltas}",
         v["grid"].as_str().unwrap_or("?"),
         s["lakes"],
         s["lake_area_km2"],

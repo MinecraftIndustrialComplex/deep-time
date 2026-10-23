@@ -310,7 +310,15 @@ pub const STRATA_BYTES_PER_HORIZON_CELL: u64 = 28;
 /// two grids (amp-est, 2026-10-23: 587.2 MB held on quick 16k's 21.5 M cells and 0.34 M L1 cells,
 /// 27.3, 27.1 and 27.2 B a cell at 50 and 1000 Myr and on the world Ben plays; 658.4 MB on full
 /// 32k's halved grid of 21.3 M cells and 1.34 M L1 cells; the pair is about 7 % above both).
-pub const WATER_BYTES_PER_CELL: u64 = 28;
+/// The delta stage (deltas, 2026-10-23) added 5 B: the catchments' cell ids and lake flags that
+/// `network::run` holds beside its drainage order for the sea mouths; an estimate, not yet
+/// measured.
+pub const WATER_BYTES_PER_CELL: u64 = 33;
+
+/// Bytes per cell of the elevation's grid the water part holds while it lays the delta plains on
+/// it ([`water::bake`]: the elevation, the raise, the amplitude and their write buffers). An
+/// estimate of the memory model (deltas, 2026-10-23), not yet measured.
+pub const DELTA_BYTES_PER_L3_CELL: u64 = 10;
 
 /// Bytes per L1 cell of the climate the water part loads whole beside the network (the mean
 /// temperature and precipitation, the 12 monthly sea-level temperatures and their seasons, the
@@ -338,7 +346,14 @@ pub fn estimate_bytes(p: &PlanetPreset) -> (u64, u64) {
         } else {
             full
         };
-        (load * 2).max(drained * WATER_BYTES_PER_CELL + l1 * WATER_BYTES_PER_L1_CELL)
+        let laid = if p.hydro.unwrap_or_default().deltas {
+            full * DELTA_BYTES_PER_L3_CELL
+        } else {
+            0
+        };
+        (load * 2)
+            .max(drained * WATER_BYTES_PER_CELL + l1 * WATER_BYTES_PER_L1_CELL)
+            .max(laid)
     } else {
         0
     };

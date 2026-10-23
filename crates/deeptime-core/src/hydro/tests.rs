@@ -60,6 +60,7 @@ fn run_with(params: &HydroParams) -> Output {
         climate: &climate,
         params,
         width_scale: 1.0,
+        mouths: false,
     })
 }
 
@@ -246,6 +247,7 @@ fn width_and_depth_follow_the_discharge() {
             climate: &climate,
             params: &p,
             width_scale: 2.0,
+            mouths: false,
         })
     };
     let big = |o: &Output| {
@@ -270,6 +272,7 @@ fn run_in(climate: &(dyn Fn(i64, i64) -> Climate + Sync), params: &HydroParams) 
         climate,
         params,
         width_scale: 1.0,
+        mouths: false,
     })
 }
 
@@ -441,6 +444,7 @@ fn run_on(elev: &[i16], climate: Climate) -> Output {
         climate: &move |_, _| climate,
         params: &HydroParams::default(),
         width_scale: 1.0,
+        mouths: false,
     })
 }
 
@@ -669,6 +673,7 @@ fn run_rough(climate: &(dyn Fn(i64, i64) -> Climate + Sync), params: &HydroParam
         climate,
         params,
         width_scale: 1.0,
+        mouths: false,
     })
 }
 
