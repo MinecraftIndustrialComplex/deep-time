@@ -300,7 +300,7 @@ not checked here.
 viscosity: `--set tectonics.collapse_sea_column=true --set tectonics.collapse_sea_column_max_km=41.1
 --set tectonics.collapse_sheet_viscosity_pa_s=1e22 --set tectonics.collapse_reach_km=5000`), the
 surface guard (ISO-072) stopped one run in twelve of `earthlike_quick_16k` over 1000 Myr
-(scattered continents, seed 5, at plate step 449), and in three more the guard's worst passed
+(scattered continents, seed 5, at plate step 449), and in four more the guard's worst passed
 35 km. Plate columns stood up to 30 km over their Airy height, at the plate model's ceiling
 (`max_elevation_m`), with the surface's flexure under them at tens of km. On master's base the
 same measure was 3.6 to 10.3 km over the Airy height and the guard's worst 14.5 to 32.3 km.
@@ -348,7 +348,55 @@ rise of a belt 312 km wide on a craton moves the ground 2 km and changes no load
 `a_belt_thinned_on_a_stiff_plate_stands_below_its_airy_height` (the mirror of
 `a_belt_on_a_stiff_plate_gets_a_foreland_basin`).
 
-MEASURED
+**Measured** (the shared pool, `earthlike_quick_16k`, 1000 Myr, both starts, seeds 1 to 6, 2
+threads, `+DEEPTIME_CRUST_BUDGET=1`; before: master 883a8ef6, source key 54658b9718e7, arms `base`
+and `fg-sheet-master`; after: this fix at 1496d688, key adf36da1f017, arms `fg-base` and
+`fg-sheet`; the sheet arm is the `--set` keys above; `pool.sh table` and the per-run
+`measures/guard.json`). Per run, the guard's worst (km from the sea) and the plate columns' largest
+height over their Airy height (km):
+
+| run | base, before | base, after | sheet, before | sheet, after |
+|---|---|---|---|---|
+| scattered 1 | 15.5, 6.7 | 16.9, 2.8 | 40.6, 29.8 (at the 30 km cap) | 17.1, 6.1 |
+| scattered 2 | 16.9, 3.6 | 19.7, 4.5 | 46.5, 5.3 | 15.7, 5.0 |
+| scattered 3 | 31.3, 6.1 | 15.9, 3.7 | 16.3, 6.3 | 20.2, 3.9 |
+| scattered 4 | 18.5, 4.7 | 15.9, 3.4 | 19.3, 5.2 | 16.2, 5.0 |
+| scattered 5 | 14.5, 4.4 | 15.9, 4.7 | stopped by the guard at step 449 | 14.8, 3.7 |
+| scattered 6 | 32.3, 10.3 | 15.9, 4.3 | 15.9, 8.8 | 21.9, 2.8 |
+| super 1 | 18.0, 4.0 | 15.8, 3.8 | 22.9, 5.0 | 17.3, 3.4 |
+| super 2 | 19.8, 4.6 | 15.9, 3.5 | 25.3, 5.0 | 15.3, 3.1 |
+| super 3 | 19.5, 3.9 | 15.3, 3.2 | 26.8, 4.5 | 16.1, 3.3 |
+| super 4 | 16.5, 5.1 | 18.1, 5.2 | 37.4, 28.0 (28.9 km peak) | 15.7, 3.6 |
+| super 5 | 16.6, 4.6 | 15.4, 3.7 | 35.8, 27.0 (28.4 km peak) | 19.5, 3.8 |
+| super 6 | 17.5, 5.1 | 16.4, 3.7 | 18.3, 4.0 | 16.1, 2.9 |
+
+Medians (Mann-Whitney p against before): on the base the guard's worst 17.8 to 15.9 km (p 0.046),
+the largest height over Airy 4.7 to 3.7 km (p 0.009), the largest rise and fall of a cell in a
+step 11.5 and 14.6 km to 8.2 and 10.9 km; on the sheet arm 25.3 to 16.1 km (p 0.004), 5.3 to 3.6
+km (p < 0.001), 15.3 and 21.5 km to 6.6 and 11.0 km. No run of either arm leaves two Earth reliefs
+or stands a plate column over 8.6 km; the sheet arm's three patches at the cap and its stopped run
+are gone.
+
+The V1 measures of the base do not move (`pool.sh table --base base --arm fg-base`, every p 0.19 or
+more): land 0.300 to 0.292, the largest landmass 0.124 to 0.144, continental crust under the sea
+0.277 to 0.253, land above 2 km 0.271 to 0.245, coast with high ground 0.411 to 0.369, land under
+ice 0.170 to 0.168, collisions per 100 Myr 1.80 to 1.75, criteria met per run (median, mean) 2, 2.25
+to 2.5, 2.17. The sheet arm against the same base after the fix (`--base fg-base --arm fg-sheet`)
+meets 3.5 criteria a run against 2.5 (p < 0.001; 3 against 2 at p 0.063 before the fix): land
+above 2 km 0.157 (p 0.001), ice 0.106, the largest landmass 0.230, but land 0.342, over the band.
+
+**What bounds the offset now.** The load is the crust the column gained, so the plate can hold
+the ground at most k_a T over its Airy height (the whole root held up), and a belt wider than the
+flexural wavelength much less; a height moved without crust cannot raise it again. Over 24 runs the
+largest height over Airy is 2.8 to 6.1 km (median 3.7 km), against Earth's 2 to 4 km of rock from
+its largest gravity anomalies (ISO-093). A strength limit on the plate (a yield envelope that
+lowers `Te` where the plate is bent hard, Watts & Burov 2003) would cut the top of that range; it
+was not added, since no run keeps a column more than 5 km over Airy on more than 0.005 % of its
+samples.
+
+**What is left.** The guard's worst is now 14.8 to 21.9 km from the sea in every run of both arms,
+above Earth's relief (the Challenger Deep, 10.9 km, ISO-071) but no longer growing; which cells
+make it was not traced here.
 
 ## Game choices
 
