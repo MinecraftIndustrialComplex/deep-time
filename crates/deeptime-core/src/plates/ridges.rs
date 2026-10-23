@@ -54,9 +54,9 @@ use super::collapse::{iso_height, toward};
 use super::events::{self, PLATE_DEATH, RIDGE_BIRTH};
 use super::gap_budget;
 use super::geometry::{Cover, Geo, Tree, dijkstra_two};
-use super::normalise::Norm;
 use super::init::random_rotation;
 use super::kinematics::{arr, quat, to_world};
+use super::normalise::Norm;
 use super::pools::{
     accrete, floor_at, isostatic_change_m, ocean_heat_flow, oceanic_column, thickness,
 };

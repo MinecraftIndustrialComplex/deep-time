@@ -994,10 +994,10 @@ impl Default for TectonicParams {
             subduction_initiation_age_myr: 150.0,
             subduction_initiation_per_myr: 0.15, // ledger: PLT-063
             subduction_initiation_clearance_km: 1000.0,
-            initiation_slab_km: 150.0, // ledger: PLT-270
+            initiation_slab_km: 150.0,            // ledger: PLT-270
             subduction_initiation_margin_km: 0.0, // ledger: PLT-503 (game-choice: off by default)
-            initiation_stress_mpa: 0.0, // ledger: PLT-505 (game-choice: off by default)
-            contact_timeout_myr: 24.0, // ledger: PLT-059
+            initiation_stress_mpa: 0.0,           // ledger: PLT-505 (game-choice: off by default)
+            contact_timeout_myr: 24.0,            // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
             plate_speed_scale_mm_yr: 45.0, // ledger: PLT-181
