@@ -4357,10 +4357,12 @@ The coordinator's task on V1 item 1's high ground, on master f9005138 (after D6,
 section): move land above 2 km (at most 0.12 of the land), the coast with land above 2 km within
 200 km (at most 0.15) and land under ice (at most 0.15) towards their targets without losing the
 land (0.26 to 0.32 of the planet), the largest landmass (at least 0.12) or the drowned share (at
-most 0.25); collisions 2 to 6 per 100 Myr. Ledger PLT-412 and PLT-413 (new), PLT-390 and PLT-391
-(measured again). Code: `plates/collapse.rs`, `plates/mod.rs`, `plates/rate.rs` (one call) and
-`params.rs`; nothing in `surface/`. Both new laws are in the code as switches and **not on**
-(below, "What is on").
+most 0.25); collisions 2 to 6 per 100 Myr. Ledger PLT-412 to PLT-415 (new), PLT-390 and PLT-391
+(measured again). Code: `plates/collapse.rs`, `plates/mod.rs`, `plates/rate.rs` (one call),
+`params.rs` and the table driver `tools/review/v1-item1-table.sh`; nothing in `surface/`. The new
+laws are in the code as switches and **not on** (below, "What is on"). The diagnosis, including
+mid-run frames for Ben's question about upland continents, is in "What the high ground is" and
+"Where the high ground stands mid-run": plateau interiors are not the main term.
 
 ### What the high ground is on master f9005138
 
@@ -4507,4 +4509,179 @@ only), fills fewer margins:
 The last arm is the only one whose medians meet one criterion more than the base's (land,
 largest landmass and the drowned share) and break none; per run it is 2 against 2 (p 0.22).
 
-HG24PLACEHOLDER
+### Twenty-four runs of the last arm
+
+Twelve more runs a side (seeds 7 to 12, both starts), the base and the last arm side by side from
+the same archives, make 24 runs an arm:
+
+| Median of 24 (p against the base) | base | cap, W 40, cf, reach 150 |
+|---|---|---|
+| Land (0.26 to 0.32) | 0.292 | 0.318 (0.001) |
+| Largest landmass (≥ 0.12) | 0.118 | 0.183 (0.029) |
+| Continental crust under the sea (≤ 0.25) | 0.286 | 0.186 (0.001) |
+| Land above 2 km, of the land (≤ 0.12) | 0.259 | 0.212 (0.018) |
+| Coast with high ground (≤ 0.15) | 0.401 | 0.421 (0.58) |
+| Land under ice (≤ 0.15) | 0.171 | 0.159 (0.27) |
+| Collisions per 100 Myr (2 to 6) | 1.95 | 1.65 (0.12) |
+| Criteria of the seven met, per run | 2 | 3 (0.20) |
+| Continental crust's net change over 1,000 Myr | −0.061 | −0.082 (0.24) |
+| Sea over the datum at the end, m | 778 | 754 |
+
+Runs meeting each criterion, of 24: land 19 and 13, the largest landmass 12 and 18, under the sea
+9 and 17, above 2 km 1 and 4, the coast 0 and 0, ice 7 and 11, collisions 12 and 6.
+
+The medians hold: the largest landmass, the drowned share and the high ground move towards their
+targets at p under 0.03. But the land leaves its band in six more runs than the base's (its median
+0.318 sits under the ceiling of 0.32), the collisions in six more, and the coast does not move: per
+run the arm meets 3 criteria against 2, p 0.20. By the ship rule it stays off.
+
+### Where the high ground stands mid-run
+
+Ben asked whether a whole continent standing as upland 606 Myr ago is realistic. Six runs (seeds
+1 to 3, both starts) of the base and of the last arm ran again with `DEEPTIME_CRUST_BUDGET_MAPS`,
+which writes the plate model's samples every 50 Myr; a scratch `midrun.py` reads them with the sea
+of each run's `cb_t` lines. Heights are over the step's sea; the age is the last orogenic uplift's.
+"Near a belt" is within 250 km of crust an orogeny raised in the last 10 Myr; the "interior" is
+high ground farther than 250 km from any such crust and farther than 300 km from the sea. Medians
+of the six runs (the run ends at 0, so −600 Myr is 400 Myr in):
+
+| Base, median of 6 | −800 | −700 | −600 | −500 | −400 |
+|---|---|---|---|---|---|
+| Land, of the planet | 0.326 | 0.292 | 0.303 | 0.319 | 0.292 |
+| Land above 1 km, of the land | 0.330 | 0.426 | 0.448 | 0.558 | 0.567 |
+| Land above 2 km, of the land | 0.190 | 0.273 | 0.285 | 0.363 | 0.362 |
+| High ground an orogeny raised in the last 10 Myr | 0.56 | 0.55 | 0.53 | 0.55 | 0.51 |
+| High ground near a belt | 0.77 | 0.82 | 0.78 | 0.81 | 0.78 |
+| High ground in an interior | 0.13 | 0.14 | 0.18 | 0.16 | 0.19 |
+| Quiet high ground on crust over T_c = 50 km | 0.24 | 0.33 | 0.34 | 0.29 | 0.39 |
+| of it, with room within 200 km | 0.28 | 0.21 | 0.22 | 0.24 | 0.23 |
+| The high ground's crust, median, km | 56.5 | 56.9 | 57.6 | 57.4 | 57.5 |
+| Largest connected ground above 2 km, Mkm² | 12.7 | 13.9 | 18.5 | 18.9 | 15.5 |
+| Land in landmasses of 5 Mkm² or more standing over half above 1 km | 0.17 | 0.18 | 0.47 | 0.84 | 0.69 |
+| The continental land's median height over the sea, m | 544 | 829 | 1,041 | 1,608 | 1,547 |
+| Its median crust, km | 35.1 | 37.3 | 39.9 | 42.4 | 43.6 |
+| Continental crust of 41 ± 1.5 km, median height over the sea, m | 1,325 | 1,291 | 1,177 | 1,395 | 1,012 |
+| Sea over the datum, m | 61 | 85 | 198 | −6 | 374 |
+
+How long ground stays high: of the continental crust an orogeny last raised 0 to 10 Myr before,
+0.39 to 0.49 stands above 2 km; 10 to 20 Myr, 0.29 to 0.45; 20 to 40 Myr, 0.22 to 0.42; 40 to
+100 Myr, 0.10 to 0.31 (its median crust 34 to 40 km); over 100 Myr, 0.06 to 0.21. With the last
+arm the high ground is 0.17 to 0.23 of the land at these times, the largest connected region 7.7
+to 11.8 Mkm², the upland landmasses 0.09 to 0.27 of the land and the continental land's median
+0.50 to 0.95 km over the sea.
+
+What this says:
+
+- **Plateau interiors are not the main term.** They hold 0.13 to 0.19 of the high ground. About
+  four fifths of it lies within 250 km of an active belt and half was raised in the last 10 Myr.
+  The quiet thick crust (0.24 to 0.39 of the high ground) lies mostly in and beside the belts, and
+  a quarter of it has room within the collapse's reach. A flow that levels interiors (Bird 1991:
+  an isolated high becomes "pancake shaped, with a flat central plateau and steeper flanks
+  spreading outward") would act on about a sixth of the high ground.
+- **The belts are too many and too wide.** The largest connected ground above 2 km is 13 to 19
+  Mkm², 4 to 6 times Earth's largest ground above 3 km (2.95 Mkm², Tibet; "Against Earth" above;
+  Earth's region above 2 km was not measured, so the ratio is an upper bound). That is the audit's
+  gap 2: collision fronts 2.4 to 4.8 times Earth's length (docs/science/physics-gap-audit.md).
+- **The upland continent of 400 to 500 Myr in is freeboard over a low sea.** At −500 Myr 0.84 of
+  the land lies in large landmasses standing more than half above 1 km. Their continental land
+  stands 1.0 to 1.6 km over the sea on a median 40 to 44 km of crust, because the sea is then
+  −6 to 374 m over the datum (820 m at the end) and the model's Airy frame puts 41 km of crust
+  1.0 to 1.4 km over such a sea. Earth's shields, on about the same crust (41.1 km, Christensen &
+  Mooney 1995), stand "a few hundred meters" over the sea (Whitehead & Clift 2009, both as read
+  for PLT-412). The crust thickens through the run (the continental land's median 35 to 44 km)
+  while the sea rises only later. So the mid-run upland is mostly normal crust standing high over
+  a sea that has not yet risen: the sea level and the crust budget (the audit's gap 3), not the
+  collapse.
+
+So the answer to Ben's question is no, not as it stands, and the main terms are the belts' extent
+and the mid-run freeboard. Collapse that never reaches plateau interiors is real (the reach and
+the same-plate filter) but carries the smaller part.
+
+### As a thin viscous sheet (PLT-414, PLT-415)
+
+The coordinator asked for continents that spread sideways under their own weight, if the
+diagnosis made interiors the main term. It did not, but the audit's gap 1 ranks continent-scale
+spreading first, so the law is built as a switch and measured on all seven measures.
+
+*The sources.* England & McKenzie (1982, abstract) treat the lithosphere as "a thin sheet of power
+law material" that "flows in response to forces applied to its boundaries ... and to forces in its
+interior arising from gradients in crustal thickness"; a weak sheet (Argand number over 10) "is
+unable to sustain appreciable crustal elevation contrasts", and the forces from thickness contrasts
+"are great enough to produce net extension in the region of thick crust". Houseman & England
+(1986, abstract): with n over 3 and Ar of 1 to 10 a plateau forms. The potential energy that turned
+Tibet to east-west extension is 5 to 10 × 10¹² N/m (England & Houseman 1989, abstract), and
+buoyancy forces are "most responsible for driving extension where it is observed in the Basin and
+Range" (Sonder & Jones 1999, abstract). The depth-averaged viscosity is about 10²² Pa s for the
+Tibetan lithosphere (England & Molnar 1997, abstract) and the Basin and Range (Flesch et al. 2000,
+abstract; California's shear zone 10²¹).
+
+*The law.* With `collapse_sheet_viscosity_pa_s` η_0 above 0, a quiet column an orogeny raised also
+thins in pure shear, in plane strain, at ε̇ = ΔU / (4 η L) (the depth-integrated stress difference
+L (τ_xx − τ_zz) = 4 η L ε̇, with ε̇_zz = −ε̇_xx, balances ΔU), releasing q = T (1 − e^(−ε̇ δt)) and at most
+T − T_col. ΔU is the column's potential energy at its Airy height over the step's sea
+(`forces::column_energy`, FRC-014) less that of the collapse's normal column T_col (PLT-412, capped
+by PLT-413), L the lithosphere's 100 km (FRC-010), and η = η_0 e^(a / τ_s) with a the time since
+the column's last orogenic uplift and τ_s = 62.8 Myr, McKenzie (1978)'s thermal time (PLT-415: the
+exponential form is the model's; η is 100 times η_0 at 290 Myr). A column releases the larger of
+this and the threshold law's q. Crust no orogeny raised (cratons, platforms) does not flow: the
+audit's minimal strength field. At η_0 = 10²² Pa s a 4.2 km column under a sea at the datum
+(ΔU about 5 × 10¹² N/m, England & Houseman's figure) thins 3.9 % per Myr as its orogeny ends
+(an e-fold of 26 Myr), a 2 km one 1.3 % (75 Myr); a 255 m eclogite root pull (PLT-281) brings the
+test column to 3.56 % per Myr.
+
+*Against a channel's diffusivity.* The sheet relaxes a column at its own rate r instead of
+diffusing it; over a plateau of half-width ℓ the same decay is a diffusivity K = r ℓ² / π², about
+990 km²/Myr for the 4.2 km column and 330 km²/Myr for the 2 km one at ℓ = 500 km. The thin-channel
+law K = ρ g h³ / (12 μ) with Clark & Royden (2000, abstract)'s 15 km channel gives 2.4 × 10⁵
+km²/Myr at their 10¹⁸ Pa s under the low-gradient margins and 240 km²/Myr at 10²¹ Pa s under the
+steep ones (the arithmetic is the project's). The sheet sits at the stiff end of that range, beside
+the plates' own channel flow (K₀ = 1,500 km²/Myr, PLT-300). Bird (1991, abstract) expects such
+extrusion to be "marginal under shields and platforms", important under elevated plains and
+"dominant beneath high plateaus and/or hot, delaminated regions".
+
+*What it is not.* It is the local limit of the thin sheet: each column extends at the rate its
+own contrast with the lowland sets; nothing solves the sheet's velocity field, and n = 1, not the
+papers' n = 3. The crust it releases goes where the threshold law's goes, to the nearest room on
+the same plate within `collapse_reach_km`. Of the audit's reach limits ("Scope failures") it
+removes the 50 km floor (a column thins to T_col) and, in the arms, the 200 km reach (set to
+5,000 km, the plate's size, so a continent's edge moves out over its own ocean floor); PLT-412
+raises the room from T_n = 35.1 km to T_col. It keeps the same-plate filter (`plates/collapse.rs`,
+`plates/flow.rs`, `plates/rate.rs`), the quiet time (PLT-259: an orogeny's push holds a belt up),
+the belts' strength height of 5.1 km and its lost overflow (PLT-253) and the 70 km cap (PLT-258).
+The full solve (a velocity on the plate lattice with n = 3, the audit's "What it takes") is still
+gap 1's.
+
+SHEETARMSPLACEHOLDER
+
+### What is on
+
+Nothing new. PLT-412 to PLT-415 are in the code as switches, off in the defaults and every
+built-in preset, and the default runs are the base's bit for bit (the switches off). The table
+driver behind this section's arms is `tools/review/v1-item1-table.sh` (with
+`tools/review/v1-item1-table.py`): `run` makes an arm's runs and their census, `table` the seven
+measures, the criteria per run and the Mann-Whitney p against a base; the base's runs are listed
+for other lanes in `/data/ban/deeptime-runs/pool/BASES.md` on the test VM.
+
+### What is left, and for whom
+
+1. *The extent of the belts* (Ben's: how plates are made and moved, the audit's gap 2): about four
+   fifths of the high ground lies within 250 km of an active belt in every frame, and the largest
+   connected high ground is 4 to 6 times Tibet's. Fronts 2.4 to 4.8 times Earth's length are the
+   main term, and no collapse law reaches them while the orogeny that raises them is active.
+2. *The trench budget and the sea* (the trench-budget lane, the audit's gap 3): moving the high
+   ground's crust into drowned and ocean room lifts the land past its 0.32 ceiling in the arms
+   that move most (PLT-391, the sheet arms above), because nothing takes crust back. The combined
+   arm with that lane (this branch's switches as `--set` keys against the shared base) is the next
+   measurement; check each alone and both together on 3 or 4 seeds first.
+3. *The mid-run freeboard* (the sea level's and the crust budget's): the continents stand 1.0 to
+   1.6 km over a low sea 400 to 500 Myr in. Whether the sea's late rise or the crust's growth is
+   wrong is the sea-level task's question, measured on these frames.
+4. *The lithosphere's strength and heat* (the audit's gap 4, Ben's: an architecture change): the
+   sheet's strength is a time since uplift standing in for a thermal state, and the founder and the
+   rise cap stand in for root removal.
+5. *The full sheet* (gap 1): a velocity solve with n = 3, across plate boundaries where the
+   continents are welded, replacing the reach, the room, the same-plate filter and the flow
+   (PLT-254 to PLT-259, PLT-300). Worth building after items 1 and 2, when the belts it acts on
+   are Earth's size and the crust it moves has a sink.
+6. *The ice* follows the high ground (the audit's M6): 0.159 to 0.171 of the land at 24 runs, it
+   moves only with land above 2 km.
