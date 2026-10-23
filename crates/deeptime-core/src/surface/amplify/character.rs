@@ -829,7 +829,8 @@ pub fn apply(
         if d2 == i64::MAX {
             return 1.0;
         }
-        smoothstep(cb, LAKE_SHORE_FADE_BLOCKS.max(2.0 * cb), (d2 as f64).sqrt() * cb)
+        let d = (d2 as f64).sqrt() * cb;
+        smoothstep(cb, LAKE_SHORE_FADE_BLOCKS.max(2.0 * cb), d)
     };
 
     // Fold ridges.
