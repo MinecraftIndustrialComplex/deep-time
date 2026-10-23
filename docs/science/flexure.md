@@ -447,7 +447,10 @@ plate held, the plate's `Te` relaxes towards it as `e^(−dt/τ)` (`FlexureParam
 62.8 Myr; `weakened_te_km`): a 2 Myr step closes 3.1 % of the gap, so the craton above goes from
 80 to 77.7 km and lets go of about 9 % of its held load, not nearly all of it. Where the law gives more, the plate
 takes it at once, stress-free, as before (ISO-056). The break at a plate boundary (ISO-055) is
-mechanical, not thermal, and stays at once. `te_weakening_myr = 0` is the old rule. Unit test
+mechanical, not thermal, and stays at once. `te_weakening_myr = 0` is the old rule, and it is the
+default: on the pool's runs (below) the pace left the criteria where they were and gave more closed
+basins and larger one-step falls, so it is off until that is understood (the agent's call,
+2026-10-23); `--set flexure.te_weakening_myr=62.8` turns it on. Unit test
 `a_plate_the_law_weakens_lets_go_as_it_warms`: a belt on a craton the law weakens lets go of a
 few per cent of the instant release in the first step and stands where the instant rule put it
 after eight time constants.
@@ -461,10 +464,60 @@ inside a continent with big rivers does fill as it goes: in the Pannonian basin 
 accumulation rate was significantly higher than the subsidence rate during Late Miocene time",
 and its plain now stands 90 to 120 m above the sea on up to 700 m of Plio-Quaternary strata
 (Horváth & Cloetingh 1996, full text), although by simple isostasy its thin crust "should be well
-below the sea level" (Horváth et al. 2015, full text: the basin is "over-elevated"). (Measured:
-to come.)
+below the sea level" (Horváth et al. 2015, full text: the basin is "over-elevated").
 
-**Measured.** (to come)
+Measured with the pool's `fill` measure (`tools/review/pool/measure_fill.py`: the `basins`
+measure's closed basins deeper than 10 blocks, their net deposition and strata at the last step)
+over the 24 runs with the pace on, base arguments: the median basin takes 271 m of sediment a Myr
+(the runs' medians 120 to 698) and already holds 4.0 km of strata (3.3 to 4.9). Their room over
+the last step's deposition is 2.5 Myr (1.8 to 3.6), the median basin's own fill time 2.7 Myr (1.5
+to 4.2), and 84 % of the basins (71 to 94 %) would fill within 10 Myr. The 24 runs on the
+trench-m-rs12e-sheet arguments are alike: 268 m/Myr, 2.7 Myr, 85 %. The one run of the old rule
+(supercontinent, seed 1): 499 m/Myr, 2.0 Myr, 95 %; the base runs were measured before this field
+was dumped, so there is no wider comparison. So the surface fills a basin as it opens, in a few
+Myr, much faster than the plate weakens: the basins left in the final surface are ones that sink
+about as fast as sediment arrives, or opened in the last few Myr (which of the two, not traced).
+
+**Measured.** Through the pool, 12 seeds by two starts, 1,000 Myr, `earthlike_quick_16k`: the
+branch with the pace on (source key 76b4db9c66ff, τ = 62.8 Myr) on the base's arguments
+(`fg-release`) and on the trench-m-rs12e-sheet set (`fg-release-sheet`: the sheet's four keys
+and the trench budget's three, the set a lane of 2026-10-23 makes the default), each against the
+pool's 24 runs of the same arguments without the pace (`base`, `trench-m-rs12e-sheet`). One run
+with `te_weakening_myr = 0` (supercontinent, seed 1) is bit-identical to the base's. Medians (the
+criteria: the mean a run), Mann-Whitney p:
+
+| measure | base | pace on | p | sheet set | pace on | p |
+|---|---|---|---|---|---|---|
+| V1 criteria met (of 7) | 2.33 | 2.54 | 0.60 | 3.42 | 3.17 | 0.45 |
+| land share | 0.292 | 0.302 | 0.63 | 0.306 | 0.309 | 0.67 |
+| largest landmass | 0.139 | 0.124 | 0.53 | 0.189 | 0.157 | 0.16 |
+| closed basins deeper than 10 blocks | 125 | 144 | 0.27 | 102 | 130 | 0.018 |
+| of them under sea level | 86 | 97 | 0.58 | 69 | 86 | 0.022 |
+| deeper than 30 blocks | 75 | 74 | 0.88 | 54 | 70 | 0.12 |
+| deepest basin, blocks | 303 | 315 | 0.42 | 292 | 291 | 0.58 |
+| closed ground under sea level, kb² | 716 | 675 | 0.29 | 441 | 563 | 0.34 |
+| their room, km³ | 69,855 | 74,193 | 0.98 | 60,527 | 66,374 | 0.26 |
+| the guard's worst, m | 16,029 | 16,394 | 0.92 | 16,351 | 15,930 | 0.84 |
+| largest one-step fall of a cell, m | 11,404 | 13,984 | 0.003 | 10,649 | 14,363 | < 0.001 |
+| largest one-step rise of a cell, m | 7,993 | 8,189 | 0.065 | 6,692 | 7,981 | < 0.001 |
+
+- **V1 does not move** in either set. On the first four seeds the base set's largest landmass
+  fell from 0.191 to 0.104 (p 0.028); at twelve it is 0.139 against 0.124 (p 0.53), so that was
+  the seeds' draw.
+- **The closed basins do not fall: they rise**, significantly on the sheet set (102 to 130, and
+  69 to 86 of them under sea level). The pace was meant to stop a pit opening in a few steps; the
+  final surface has more closed basins, not fewer.
+- **The largest one-step fall of a cell grows** by 2.6 and 3.7 km, on the polar rows and away from
+  them alike (base set: polar rows 8.4 to 10.3 km, p 0.003; elsewhere 10.9 to 13.9 km, p 0.001),
+  and on the sheet set so does the largest rise.
+
+Why, a hypothesis that was not traced: a plate that weakens slowly keeps its strength, and the
+load it holds away from local isostasy, for longer, so the break at a plate boundary (ISO-055),
+still at once, lets go of more in its one step; and a plate kept stiff makes broader moats and
+bulges, which the priority flood finds as closed basins. The water the flexure puts on closed dry
+ground under sea level (it calls a cell wet by `h <= sea`, not by the open sea) would deepen the
+ones under the sea. The savanna pit's own cell cannot be compared: a changed rule makes the
+planets part after its first change.
 
 ## Game choices
 

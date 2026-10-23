@@ -140,6 +140,39 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-23: The release's pace: a plate the `Te` law weakens can now take the lower value over the lithosphere's thermal time constant (ISO-099, τ = 62.8 Myr, McKenzie 1978), not in one step; measured on the pool it leaves V1 where it was, gives more closed basins and larger one-step falls, so it is off by default (`--set flexure.te_weakening_myr=62.8`); the surface's sediment fills a basin in a few Myr (coordinator's follow-up to the savanna pit; agent branch worktree-agent-af6976f50d4669c4c-release from master 3fc91491, worktree .claude/worktrees/agent-af6976f50d4669c4c/build/af69-release; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Cause** (the savanna pit, build log 2026-10-23 part B): the law's `Te` (ISO-048 to ISO-053) is a thermal state, but a craton the Andean arc's orogeny reached went from 80 to 5 km in a step and let go of nearly all its held load at once (ISO-056), 4.3 km of floor in 6 Myr.
+- **Fix:**
+  - `surface/flexure.rs`: `FlexureParams::te_weakening_myr` and `weakened_te_km`. The plate carries the law's `Te` it held (`FlexState::te_law_km`, blended as a logarithm with its crust; NaN on new crust, which takes the law at once). Where the law gives less, the held value relaxes as e^(−dt/τ); where it gives more, at once. The ISO-055 boundary break stays at once. 0 is the old rule and the default.
+  - Unit test `a_plate_the_law_weakens_lets_go_as_it_warms` (τ = 62.8 set in the test), on dry ground: with the sea in reach the flexure's water, whose depth kinks at the sea, made the two paths end 172 m apart.
+  - The pool's `fill` measure: `tools/review/pool/measure_fill.py`, `measures_fill.json`.
+  - Docs: docs/science/flexure.md "The release's pace", ISO-099 (new), ISO-056 (amended), the bibliography (McKenzie 1978, Parsons & Sclater 1977, Hyndman, Currie & Mazzotti 2005, Watts & Zhong 2000, Beaumont 1978, Currie & Hyndman 2006, Currie, Huismans & Beaumont 2008, Horváth & Cloetingh 1996, Horváth et al. 2015), claims.md's counts.
+- **Measured** (pool, 12 seeds by two starts, 24 runs an arm, 1,000 Myr; the pace on at key 76b4db9c66ff, `fg-release` on the base's arguments and `fg-release-sheet` on trench-m-rs12e-sheet's, each against the pool's 24 runs of the same arguments). Medians, Mann-Whitney p:
+
+  | measure | base set | sheet set |
+  |---|---|---|
+  | V1 criteria (mean) | 2.33 to 2.54 (p 0.60) | 3.42 to 3.17 (p 0.45) |
+  | land share | 0.292 to 0.302 (p 0.63) | 0.306 to 0.309 (p 0.67) |
+  | largest landmass | 0.139 to 0.124 (p 0.53) | 0.189 to 0.157 (p 0.16) |
+  | closed basins deeper than 10 blocks | 125 to 144 (p 0.27) | 102 to 130 (p 0.018) |
+  | of them under sea level | 86 to 97 (p 0.58) | 69 to 86 (p 0.022) |
+  | the guard's worst, m | 16,029 to 16,394 (p 0.92) | 16,351 to 15,930 (p 0.84) |
+  | largest one-step fall of a cell, m | 11,404 to 13,984 (p 0.003) | 10,649 to 14,363 (p < 0.001) |
+  | largest one-step rise of a cell, m | 7,993 to 8,189 (p 0.065) | 6,692 to 7,981 (p < 0.001) |
+
+  - The first four seeds' largest-landmass drop on the base set (0.191 to 0.104, p 0.028) did not hold at twelve.
+  - The larger falls are on the polar rows and away from them alike (base set: 8.4 to 10.3 km, p 0.003; 10.9 to 13.9 km, p 0.001).
+  - One run at τ = 0 (supercontinent, seed 1) is bit-identical to the base's.
+  - The fill: in the 24 base-set runs with the pace on, the median closed basin takes 271 m of sediment a Myr and already holds 4.0 km; room over the last step's deposition is 2.5 Myr and 84 % of the basins would fill within 10 Myr (the sheet set: 2.7 Myr, 85 %). So the surface fills a basin as it opens, far faster than the plate weakens.
+  - Why the basins and falls grow was not traced. The hypothesis: a plate that keeps its strength longer holds more load when the boundary break (ISO-055) lets go of it in one step, and a stiffer plate makes broader moats and bulges. The flexure's water on closed dry ground under sea level (wet by `h <= sea`) would deepen the ones under the sea.
+- **Calls:**
+  - Off by default: the pace did not move V1 and made the basins and falls worse on the set that becomes the default. The pool's runs at key 76b4db9c66ff are the branch's head with `--set flexure.te_weakening_myr=62.8` (the head's key differs: the default and the test changed).
+  - The fill read at the last step only; the base runs predate the deposition field, so there is no before for it beyond the one τ = 0 run.
+- **Tests:** `cargo fmt --check`, `clippy -D warnings` and `cargo test --workspace` on the VM.
+- **Next:**
+  - The coordinator decides whether to merge it off; turning it on waits for a trace of the larger one-step falls.
+  - The flexure's water should follow the open sea and the lakes (pflood's mask), not `h <= sea`.
+
 ### 2026-10-22: The trench budget (V1 item 1, gap 3): sediment subduction (PLT-440), subduction erosion where Clift & Vannucchi find it (PLT-441, PLT-442) and the trench's release (PLT-443), all `--set` switches off by default; Ben's D5 deep floor was fossil trench depth carried across the basins, and Earth's share deeper than 6 km is 0.0073; with the high ground's sheet the pair brings land back into the band and balances the continental budget, at 3.08 criteria a run (sheet 3.50, base 2.17, p 0.073), so nothing ships (coordinator's task, brief build/coord/briefs/trench-budget.md; agent worktree .claude/worktrees/agent-a5630fbf23836cfa2, branch worktree-agent-a5630fbf23836cfa2 from master 883a8ef6, master 18ace5d7 merged in at 0e7e2410; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Code** (plates only, no format change; each rule a `TectonicParams` key, 0 = off, and the branch with them off is master bit for bit: `pool.sh alias` at 100 and 1,000 Myr, base and sheet argument sets):
   - `tectonics.sediment_subduction_share` (PLT-440). It acts in `plates/ridges.rs`, at the resampling's accrete branch. Of subducted ocean floor, the share s of its sediment and sedimentary pools goes down; the rest accretes as before. It is booked in `plates/sediment_subducted_km3`.
