@@ -348,6 +348,49 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - The coordinator decides the yield's default.
   - The oceanic carry peaks belong to the surface lane.
   - The flexure's sphere metric belongs to the flexure lane.
+### 2026-10-23: Deltas, stage 1 of V1 gap 5: plains above the sea at river mouths and distributaries across them, the river file's layout 2; on the D5 bake 359 plains (0.39 % of the land, Earth's 0.57 %) and 632 distributaries on 233 rivers (coordinator's task, brief build/coord/briefs/deltas.md; agent worktree .claude/worktrees/agent-a9e4e25c4744d5a75, branch worktree-agent-a9e4e25c4744d5a75 from master bf8477b2; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What.** The bake's water part (`bake/water.rs`) runs the network twice. Between the two runs, each loaded sea mouth gets a delta plain:
+  - its load from BQART (HYD-130, HYD-131);
+  - Earth's plain area for that load, from the 1,741 deltas of Nienhuis et al., drawn 32 times larger (HYD-132, HYD-141);
+  - grown from the mouth against the shelf's room (HYD-134, HYD-135), standing one block above the sea (HYD-136).
+- **The second run.** The network runs again on the raised ground. Each plain's main stem then splits from the apex, where the stem comes onto the plain (HYD-137), into up to 8 mouths 2 channel widths apart (HYD-138 to HYD-140, HYD-144).
+- **Unchanged.** The stream-power solve keeps its single receiver. The game's column rule carves a distributary as it does any chain.
+- **Format.** In `rivers.dtrv` layout 2 a chain gains `from` (20 bytes), and the fixed block gains a u32 `layout` (52 bytes). Old files are refused by layout number on both sides, with no migration (Ben, 2026-10-22). The world format stays 0.6, since 0.7 is the cube world's. There is a new layer `delta` (i16, 1/16 block). Rust, Java (`worlddata/Rivers`), the Python readers and FORMAT.md change together.
+- **Files:**
+  - the stage and its tests: `hydro/delta.rs` and `hydro/delta_tests.rs` (new);
+  - the network and its parameters: `hydro/network.rs` (sea mouths behind a switch), `hydro/mod.rs` (the delta parameters) and `params.rs` (`BuildFit::expand`, the inverse of the build fit);
+  - the bake: `bake/water.rs` (the plains, the second run, the stats), and `bake/project.rs` and `project_cube.rs` (`from` across the projection's chain splits);
+  - the river file: `deeptime-format/src/rivers.rs` (layout 2);
+  - the test world: `synth` (the `delta-test` world), plus `DeltaGameTests` and its dimension;
+  - eight presets (`delta_area_mult` 32, `delta_mouth_spacing` 2);
+  - tools: `tools/review/delta_census.py`.
+- **Measured** on the D5 world's Lambert bake. Its water part was run again, before and after, then projected to Petroff-Guyou. This is no simulation, so it ran outside the pool.
+
+  | measure | before | after |
+  |---|---|---|
+  | rivers that split | 0 | 233 |
+  | distributaries | 0 | 632 |
+  | Q at least 100 m³/s that split | 0 of 33 | 22 of 34 |
+  | 25 largest rivers with a plain | 0 | 23 |
+  | 25 largest rivers that split | 0 | 15 |
+  | plain share of the land | 0 | 0.39 % (Earth 0.57 %) |
+  | plains per loaded mouth | 0 | 34 % (Earth: 40 % of rivers at least 50 m wide) |
+
+  The full table, with the variants, is in rivers-and-lakes.md, "Stage 1 on the D5 bake". The private review page is https://spacesheep.dev/@benmac/deeptime-deltas.
+- **Calls:**
+  - Area multiplier 32 is the largest value measured. Earth's share would want about 50 by the trend, which was not run.
+  - The apex sits at the plain's entry. The backwater length is only reported: on 249 of 359 plains it is shorter than the stem's run on the plain.
+  - A main stem that touches its plain at one cell splits at the shore.
+  - A branch's tail takes the shortest free way to the open sea.
+- **Tests:**
+  - On the VM at d719971e, `cargo fmt --check`, `clippy -D warnings` and `cargo test --workspace` are all clean (deeptime-core 916 passed, 5 ignored).
+  - `./gradlew build test` on the VM at d719971e: BUILD SUCCESSFUL, 492 tests, 0 failures, 2 skipped.
+  - `DeltaGameTests` was added but not run, as the brief asked.
+- **Next:**
+  - The coordinator merges. The deeptime-core change moves the pool's source key, so pool aliases need the merged head.
+  - Stages 2 to 4: floodplains and levees, meanders, fans and braids.
+  - A wave and tide gate (Caldwell et al. 2019, Eq. 1; HYD-143 `not-yet-coded`).
+
 ### 2026-10-23: The trench rows: the guard's floors 4 to 11 km past the Challenger Deep were depth the plate model's heights already hold, counted a second time by two surface rules; the flexure now books the plate model's moves of the ground as no load (ISO-096), and a trench cell takes the plate model's height plus its carried offset (ISO-097) (coordinator's follow-up to the surface guard; agent worktree .claude/worktrees/agent-af6976f50d4669c4c, branch worktree-agent-af6976f50d4669c4c, master 3fc91491 merged in at 1ae9d358; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Cause** (a scratch trace of the base's scattered continents seed 1, not kept). It had 179 steps with a cell more than 11 km down, of two kinds:
   - 163 steps were ocean floor at the plate model's `z_t` with the flexure's water 2.6 km under it. One example: a gap's floor (3.5 km) that a plate then covered at 10.5 km, its 7 km of new sea loaded as a new load.

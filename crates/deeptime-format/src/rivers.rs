@@ -8,7 +8,8 @@
 //! **Chains.** The vertices of one chain are consecutive in the vertex array; segment `s` is the
 //! pair of vertices (s, s + 1), which exists when both belong to the same chain. A chain runs
 //! downstream from a head (a spring, or a lake's outlet) to its mouth: the sea, a lake, or a
-//! vertex of a larger river (a confluence). x is continuous along a chain (it may leave the
+//! vertex of a larger river (a confluence). A distributary (layout 2) starts at a vertex of the
+//! chain it leaves, its `from`, and runs to the sea. x is continuous along a chain (it may leave the
 //! canonical span [−C/2, C/2) by up to one lap near the seam); readers choose the image of a
 //! column nearest to each segment.
 //!
@@ -30,14 +31,23 @@ pub const RIVERS_PATH: &str = "rivers/rivers.dtrv";
 pub const MAGIC: [u8; 4] = *b"DTRV";
 /// Fixed fields: C, tile, tiles_x, tiles_z, vertices, chains, index entries (u32 each); the biome
 /// width, the bank zone and its ratio (f32); the index's origin x and z (i32; format 0.5, they
-/// were reserved before).
-pub const FIXED_BYTES: usize = 48;
+/// were reserved before); the file's layout (u32, [`LAYOUT`]; 2026-10-23, the deltas).
+pub const FIXED_BYTES: usize = 52;
+/// The river file's own layout number, checked by both readers: 2 adds the chains' `from` (the
+/// distributaries). Layout 1 (48 fixed bytes, 16-byte chains) had no number; its header is
+/// [`LAYOUT1_HEADER_BYTES`] long, which the readers name in their refusal. No compatibility before
+/// a public release (decisions log 2026-10-01): old files are refused, not read.
+pub const LAYOUT: u32 = 2;
+/// The header length of a layout-1 file (16 + 48 fixed + 4 sections of 16).
+pub const LAYOUT1_HEADER_BYTES: u32 = 128;
 /// Sections: vertices, chains, tile offsets, tile entries.
 pub const SECTIONS: usize = 4;
 /// x, z, w, hw, depth, q: six f32.
 pub const VERTEX_BYTES: usize = 24;
-/// first, count (u32), mouth (u8), 3 reserved bytes, into (u32).
-pub const CHAIN_BYTES: usize = 16;
+/// first, count (u32), mouth (u8), 3 reserved bytes, into (u32), from (u32; layout 2).
+pub const CHAIN_BYTES: usize = 20;
+/// `from` of a chain that leaves no other (a head).
+pub const NO_CHAIN: u32 = u32::MAX;
 /// The smallest half-width a channel has (a one-block stream on a diagonal still joins up).
 pub const MIN_HALF_WIDTH: f64 = 0.71;
 /// The index's tile edge, blocks.
@@ -108,6 +118,23 @@ pub struct Chain {
     pub mouth: Mouth,
     /// The lake id (`Mouth::Lake`), the chain (`Mouth::River`, `Mouth::Seam`), else `u32::MAX`.
     pub into: u32,
+    /// The chain this one leaves at its first vertex, a distributary splitting off at a delta's
+    /// apex or a bifurcation below it (its first vertex is a vertex of that chain), else
+    /// [`NO_CHAIN`] (layout 2; ledger: HYD-144).
+    pub from: u32,
+}
+
+impl Chain {
+    /// A chain that leaves no other.
+    pub fn new(first: u32, count: u32, mouth: Mouth, into: u32) -> Chain {
+        Chain {
+            first,
+            count,
+            mouth,
+            into,
+            from: NO_CHAIN,
+        }
+    }
 }
 
 /// The network and its index.
@@ -424,9 +451,32 @@ impl Rivers {
             if ch.mouth == Mouth::River && ch.into as usize >= self.chains.len() {
                 return bad(format!("chain {k} flows into a missing chain"));
             }
+            if ch.from != NO_CHAIN
+                && (ch.from as usize >= self.chains.len() || ch.from as usize == k)
+            {
+                return bad(format!("chain {k} leaves a missing chain"));
+            }
         }
         if next as usize != self.vertices.len() {
             return bad("the chains do not cover the vertices".into());
+        }
+        // A distributary's first vertex is a vertex of the chain it leaves.
+        for (k, ch) in self.chains.iter().enumerate() {
+            if ch.from == NO_CHAIN {
+                continue;
+            }
+            let p = &self.vertices[ch.first as usize];
+            let parent = &self.chains[ch.from as usize];
+            let on = (parent.first..parent.first + parent.count).any(|i| {
+                let q = &self.vertices[i as usize];
+                q.x == p.x && q.z == p.z
+            });
+            if !on {
+                return bad(format!(
+                    "chain {k} does not start on a vertex of chain {}",
+                    ch.from
+                ));
+            }
         }
         for (i, v) in self.vertices.iter().enumerate() {
             let finite = [v.x, v.z, v.w, v.hw, v.depth, v.q]
@@ -467,6 +517,7 @@ pub fn encode_rivers(r: &Rivers) -> Result<Vec<u8>> {
     }
     fixed.extend_from_slice(&r.origin_x.to_le_bytes());
     fixed.extend_from_slice(&r.origin_z.to_le_bytes());
+    fixed.extend_from_slice(&LAYOUT.to_le_bytes());
     debug_assert_eq!(fixed.len(), FIXED_BYTES);
     let mut verts = Vec::with_capacity(r.vertices.len() * VERTEX_BYTES);
     for v in &r.vertices {
@@ -481,6 +532,7 @@ pub fn encode_rivers(r: &Rivers) -> Result<Vec<u8>> {
         chains.push(ch.mouth.code());
         chains.extend_from_slice(&[0; 3]);
         chains.extend_from_slice(&ch.into.to_le_bytes());
+        chains.extend_from_slice(&ch.from.to_le_bytes());
     }
     let offsets: Vec<u8> = r.offsets.iter().flat_map(|v| v.to_le_bytes()).collect();
     let entries: Vec<u8> = r.entries.iter().flat_map(|v| v.to_le_bytes()).collect();
@@ -489,9 +541,25 @@ pub fn encode_rivers(r: &Rivers) -> Result<Vec<u8>> {
 
 /// Decodes `rivers/rivers.dtrv`.
 pub fn decode_rivers(path: &Path, b: &[u8]) -> Result<Rivers> {
+    let layout_refused = |found: &str| {
+        FormatError::corrupt(
+            path,
+            format!(
+                "river file layout {found}, this reader takes layout {LAYOUT} (bake the world's \
+                 water again: deeptime hydro)"
+            ),
+        )
+    };
+    if b.len() >= 8 && b[..4] == MAGIC && u32_at(b, 4) == LAYOUT1_HEADER_BYTES {
+        return Err(layout_refused("1"));
+    }
     let p = container::parse(path, b, MAGIC, FIXED_BYTES, |_| SECTIONS)?;
     let f = p.fixed;
     let [c, tile, tiles_x, tiles_z, nv, nc, ne] = std::array::from_fn(|i| u32_at(f, 4 * i));
+    let layout = u32_at(f, 48);
+    if layout != LAYOUT {
+        return Err(layout_refused(&layout.to_string()));
+    }
     let corrupt = |m: &str| FormatError::corrupt(path, m);
     let [verts, chains, offsets, entries] =
         [p.sections[0], p.sections[1], p.sections[2], p.sections[3]];
@@ -526,6 +594,7 @@ pub fn decode_rivers(path: &Path, b: &[u8]) -> Result<Rivers> {
             count: u32_at(chains, a + 4),
             mouth,
             into: u32_at(chains, a + 12),
+            from: u32_at(chains, a + 16),
         });
     }
     let r = Rivers {
@@ -593,21 +662,52 @@ mod tests {
             v(520.0, 0.0, 78.0, 0.5),
         ];
         r.chains = vec![
-            Chain {
-                first: 0,
-                count: 4,
-                mouth: Mouth::Sea,
-                into: u32::MAX,
-            },
-            Chain {
-                first: 4,
-                count: 2,
-                mouth: Mouth::River,
-                into: 0,
-            },
+            Chain::new(0, 4, Mouth::Sea, u32::MAX),
+            Chain::new(4, 2, Mouth::River, 0),
         ];
         r.build_index();
         r
+    }
+
+    /// `network` with a distributary leaving the main stem's third vertex for the sea.
+    fn with_distributary() -> Rivers {
+        let mut r = network();
+        r.vertices.push(v(520.0, 0.0, 78.0, 1.0));
+        r.vertices.push(v(530.0, 20.0, 76.0, 1.0));
+        r.chains.push(Chain {
+            from: 0,
+            ..Chain::new(6, 2, Mouth::Sea, u32::MAX)
+        });
+        r.build_index();
+        r
+    }
+
+    #[test]
+    fn a_distributary_round_trips_and_must_start_on_its_parent() {
+        let r = with_distributary();
+        let bytes = encode_rivers(&r).unwrap();
+        let back = decode_rivers(Path::new("rivers.dtrv"), &bytes).unwrap();
+        assert_eq!(back, r);
+        assert_eq!(back.chains[2].from, 0);
+        let mut off = r.clone();
+        off.vertices[6].x = 521.0;
+        assert!(off.validate().is_err(), "not on a vertex of its parent");
+        let mut missing = r.clone();
+        missing.chains[2].from = 9;
+        assert!(missing.validate().is_err());
+        let mut itself = r;
+        itself.chains[2].from = 2;
+        assert!(itself.validate().is_err());
+    }
+
+    #[test]
+    fn a_layout_1_file_is_refused_by_name() {
+        let mut bytes = encode_rivers(&network()).unwrap();
+        bytes[4..8].copy_from_slice(&LAYOUT1_HEADER_BYTES.to_le_bytes());
+        let e = decode_rivers(Path::new("x"), &bytes)
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("layout 1"), "{e}");
     }
 
     #[test]

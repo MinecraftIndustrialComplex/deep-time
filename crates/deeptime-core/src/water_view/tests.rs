@@ -410,6 +410,7 @@ fn a_river_crosses_the_seam() {
         count: 3,
         mouth: Mouth::Sea,
         into: u32::MAX,
+        from: u32::MAX,
     });
     rivers.build_index();
     let d = dir("seam");
@@ -443,6 +444,7 @@ fn straight_river(hw: f32) -> WaterView {
         count: 5,
         mouth: Mouth::Sea,
         into: u32::MAX,
+        from: u32::MAX,
     });
     rivers.build_index();
     let d = dir(&format!("straight-{hw}"));

@@ -655,10 +655,11 @@ pub fn lambda_note(choice: Option<&LambdaChoice>, search: LambdaSearch) -> Value
 
 /// Bytes per cell of the layers the bake writes on each grid (level, name, bytes), summed over the
 /// layers (the pass loads all of one grid's layers at once): L1 holds the horizon stacks, L2 and L3
-/// a few scalars. Measured on a baked planet (`the_projection_estimate_covers_the_baked_layers`
-/// fails if the bake outgrows them); a figure of the memory model, not a physical one.
+/// a few scalars (L3's 9 include the delta plains' raise, 2 B, `water::DELTA_LAYER`). Measured on a
+/// baked planet (`the_projection_estimate_covers_the_baked_layers` fails if the bake outgrows
+/// them); a figure of the memory model, not a physical one.
 pub(crate) const LAYER_BYTES_PER_CELL: [(u32, &str, u64); 3] =
-    [(1, "L1", 288), (2, "L2", 16), (3, "L3", 8)];
+    [(1, "L1", 288), (2, "L2", 16), (3, "L3", 9)];
 
 /// Of L3's bytes a cell, the water's layers (`water_level` 2 B, `playa` and `closed_basin` 1 B
 /// each): they are on the hydrology's grid, which is L3 halved where L3 is over
@@ -2277,18 +2278,37 @@ pub fn project_rivers(
     let mut splits = 0;
     // Each original chain's surviving parts (at least two vertices each).
     let mut parts_of: Vec<Vec<Part>> = Vec::with_capacity(r.chains.len());
-    for ch in &r.chains {
+    // A distributary's first part starts on the very point its parent's part holds there: (the
+    // parent chain, its part) per chain, None for a head (ledger: HYD-144).
+    let mut from_part: Vec<Option<(usize, usize)>> = Vec::with_capacity(r.chains.len());
+    for (ci, ch) in r.chains.iter().enumerate() {
         let mut parts = vec![Part {
             verts: Vec::new(),
             orig: Vec::new(),
         }];
         let mut prev: Option<(f64, f64)> = None;
+        let mut start: Option<((f64, f64), (usize, usize))> = None;
+        if (ch.from as usize) < ci {
+            let v0 = r.vertices[ch.first as usize];
+            let parent = &parts_of[ch.from as usize];
+            'find: for (pi, p) in parent.iter().enumerate() {
+                for (j, &o) in p.orig.iter().enumerate() {
+                    let pv = r.vertices[o as usize];
+                    if pv.x == v0.x && pv.z == v0.z {
+                        let at = (f64::from(p.verts[j].x), f64::from(p.verts[j].z));
+                        start = Some((at, (ch.from as usize, pi)));
+                        break 'find;
+                    }
+                }
+            }
+        }
         for k in ch.first..ch.first + ch.count {
             let v = r.vertices[k as usize];
             let q = map.to_world(f64::from(v.x), f64::from(v.z));
-            let (mut pt, turned) = match prev {
-                None => (q, false),
-                Some(pp) => map.nearest_image(pp, q),
+            let (mut pt, turned) = match (prev, start) {
+                (None, Some((at, _))) => (at, false),
+                (None, None) => (q, false),
+                (Some(pp), _) => map.nearest_image(pp, q),
             };
             let jump = prev.is_some_and(|pp| (pt.0 - pp.0).hypot(pt.1 - pp.1) > 256.0);
             if turned || jump {
@@ -2309,6 +2329,9 @@ pub fn project_rivers(
             part.orig.push(k);
             prev = Some(pt);
         }
+        // The first part keeps its parent only while it still starts on the parent's point.
+        let keeps = start.is_some() && parts[0].verts.len() >= 2;
+        from_part.push(if keeps { start.map(|s| s.1) } else { None });
         parts.retain(|p| p.verts.len() >= 2);
         parts_of.push(parts);
     }
@@ -2358,11 +2381,16 @@ pub fn project_rivers(
                     m => (m, ch.into),
                 }
             };
+            let from = match from_part[k] {
+                Some((t, tp)) if pi == 0 => first_id[t] + tp as u32,
+                _ => deeptime_format::rivers::NO_CHAIN,
+            };
             out.chains.push(Chain {
                 first: out.vertices.len() as u32,
                 count: p.verts.len() as u32,
                 mouth,
                 into,
+                from,
             });
             out.vertices.extend_from_slice(&p.verts);
         }
