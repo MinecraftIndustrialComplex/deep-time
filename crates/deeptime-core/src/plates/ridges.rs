@@ -260,8 +260,6 @@ pub const MAFIC_DROPPED_GLOBAL: &str = "plates/resample_mafic_dropped_km3";
 /// (Earth-normalized; the crust budget's sediment subduction against Stern & Scholl 2010).
 pub const SEDIMENT_SUBDUCTED_GLOBAL: &str = "plates/sediment_subducted_km3";
 
-/// Resamples the crust onto a fresh lattice and returns its geometry. `tree` holds every sample
-/// at `pos` (`Tree::over(pos, |_| true)`, the one the step's motion built).
 /// A pair's frame for the ridge segments: its relative rotation's pole ê and two unit vectors
 /// f̂, ĝ with f̂ × ĝ = ê, and the pair's band offset in [0, 1).
 struct PoleFrame {
@@ -422,6 +420,8 @@ fn segment_ridges(
     out
 }
 
+/// Resamples the crust onto a fresh lattice and returns its geometry. `tree` holds every sample
+/// at `pos` (`Tree::over(pos, |_| true)`, the one the step's motion built).
 pub fn resample(
     state: &mut PlateState,
     world: &mut WorldState,

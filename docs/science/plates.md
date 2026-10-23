@@ -5604,7 +5604,7 @@ boundaries that do not break into ridges and transforms, trenches that may not f
 convergence, rifts and subduction starts that ignore the stress the force balance computes
 (FRC-022), and no law for reorganisation. Ben's view of it (decisions log 2026-10-21): "mountains
 seem very prone to forming directly bordering oceans, I don't believe this is realistic." Ledger
-PLT-500 to PLT-509 (new). Code: `plates/ridges.rs` (the ridge segments), `plates/rifting.rs` (where
+PLT-500 to PLT-507 (new) and PLT-270 (now `verified`). Code: `plates/ridges.rs` (the ridge segments), `plates/rifting.rs` (where
 rifts and subduction start), `plates/forces.rs` (the stress handed on), `params.rs` (the
 switches); the pool's measure `boundary` (`tools/review/pool/measure_boundary.py`, registry
 `tools/review/pool/measures_boundary.json`).
@@ -5724,8 +5724,9 @@ it.
 take Earth's convergence across them (PLT-501).
 
 **C1. Subduction starts off the passive margin** (`tectonics.subduction_initiation_margin_km`,
-PLT-503). An initiation's fracture is kept at least this far, through the ocean, from the
-parent's continental crust: the old floor within it stays on the parent, and the seed old sample
+PLT-503). An initiation's fracture is kept at least this far (a great-circle distance, measured
+over the parent's visible samples) from the parent's continental crust: the old floor within it
+stays on the parent whatever the Voronoi split says, and the seed old sample
 is drawn from the old floor beyond it (no initiation when there is none). The old floor then
 goes down under the parent's oceanic margin, at an intra-oceanic trench, not under the
 continent; the floor between the trench and the coast stays passive until the ocean closes and
@@ -5748,14 +5749,14 @@ nothing).
   between p10 and p90; σ_s = 20 MPa is about half the quartiles' spread (game-choice).
 - *Subduction starts under compression* (`tectonics.initiation_stress_mpa`, σ_s, 0 = off): the
   same weight with −σ on the initiation hazard (PLT-063). "Horizontally forced SZI is clearly
-  more common than vertically forced SZI ... in the last 100 Ma" (Crameri et al. 2020), and the
-  collision of a buoyant feature at a trench, which loads its plates in compression, "is often a
-  precursor of SZI events" (ibid.).
+  more common than vertically forced SZI ... in the last 100 Ma" (Crameri et al. 2020), and
+  collisions, which load their plates in compression: "collision events along pre-existing
+  subduction trenches are often precursors of SZI events" (ibid.).
 - *Rifts along weak lithosphere* (`tectonics.rift_weakness`, an exponent m, 0 = off; needs
   `tectonics.thermal_state`): the rift's fragments are grown from their centres through the
   plate (Dijkstra over the lattice) with each edge's cost its length times (L_ref / L)^m, L the
-  lithosphere's depth (gap 4's state, `Sample::lithosphere_km`) and L_ref the old craton's
-  225 km (PLT-462). Thin, hot lithosphere is slow to cross, so the fragments meet in it: the
+  lithosphere's depth (gap 4's state, `Sample::lithosphere_km`; unset counts as L_ref, clamped
+  to 20 to 225 km) and L_ref the old craton's 225 km (PLT-462). Thin, hot lithosphere is slow to cross, so the fragments meet in it: the
   fracture runs through arcs, back-arcs, plume heads and young floor and around cratons. The
   fractal warp stays on top (PLT-086).
 
