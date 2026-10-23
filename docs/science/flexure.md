@@ -450,7 +450,7 @@ takes it at once, stress-free, as before (ISO-056). The break at a plate boundar
 mechanical, not thermal, and stays at once. `te_weakening_myr = 0` is the old rule, and it is the
 default: on the pool's runs (below) the pace left the criteria where they were and gave more closed
 basins and larger one-step falls, so it is off until that is understood (the agent's call,
-2026-10-23); `--set flexure.te_weakening_myr=62.8` turns it on. Unit test
+2026-10-23); `--set surface.flexure.te_weakening_myr=62.8` turns it on. Unit test
 `a_plate_the_law_weakens_lets_go_as_it_warms`: a belt on a craton the law weakens lets go of a
 few per cent of the instant release in the first step and stands where the instant rule put it
 after eight time constants.
@@ -517,7 +517,11 @@ still at once, lets go of more in its one step; and a plate kept stiff makes bro
 bulges, which the priority flood finds as closed basins. The water the flexure puts on closed dry
 ground under sea level (it calls a cell wet by `h <= sea`, not by the open sea) would deepen the
 ones under the sea. The savanna pit's own cell cannot be compared: a changed rule makes the
-planets part after its first change.
+planets part after its first change. With the pace on as the default, the bake's unit test
+`a_planet_run_bakes_every_chunk_time_layer` also fails: one cell of its small planet bakes a
+continental heat flow of 33.7 mW/m², under the plate model's floor of 55, which is the sea floor's
+law at 229 Myr; most likely a continental sample still holding an oceanic value (a plate-model
+edge case the changed history reaches, not traced).
 
 ## Game choices
 
