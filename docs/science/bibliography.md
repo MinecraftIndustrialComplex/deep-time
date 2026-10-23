@@ -1002,7 +1002,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Clark, M. K. and Royden, L. H. (2000). Topographic ooze: Building the eastern margin of Tibet by lower crustal flow. Geology 28(8):703-706.
 - DOI or URL: 10.1130/0091-7613(2000)28<703:TOBTEM>2.0.CO;2.
 - Cited as: (ERO, ISO, HYP) "Clark & Royden 2000, Geology 28(8):703-706" (spread.rs). (PLT) "Clark & Royden 2000, Geology 28:703".
-- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory)
+- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory); PLT-414 (2026-10-22: the channel viscosities, abstract)
 - Access: paywalled (GeoScienceWorld 403); not fetched. [other sections: paywalled (GSA; not tested).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1010,6 +1010,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated; not in code.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) metadata only.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, authors, volume 28, issue 8, first page 703 (the end page 706 is not in the Crossref record, taken as written). Attribution of "D0 range 10^2 to 10^5" to this paper cannot be checked. (PLT) correct.
+- Read in the high-ground task (2026-10-22, PLT-414): the abstract from OpenAlex's record. "For an assumed 15-km-thick channel", viscosities of "10^18 Pa · s beneath the low-gradient margins, 10^21 Pa · s beneath the steep margins" and "an upper bound of 10^16 Pa · s beneath the plateau" (the record drops the exponents' superscripts). The 15 km channel of PLT-301 is now read in the abstract. The abstract gives no diffusivity: the 10^2 to 10^5 km²/Myr range follows from the channel law K = ρ g h³ / (12 μ) with these viscosities (2.4 × 10^5 km²/Myr at 10^18 Pa s, 240 at 10^21), the project's arithmetic (plates.md, "As a thin viscous sheet").
 
 ### Royden1997
 - Reference: Royden, L. H., Burchfiel, B. C., King, R. W., Wang, E., Chen, Z., Shen, F. and Liu, Y. (1997). Surface deformation and lower crustal flow in eastern Tibet. Science 276(5313):788-790.
@@ -1053,13 +1054,14 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Bird, P. (1991). Lateral extrusion of lower crust from under high topography in the isostatic limit. Journal of Geophysical Research 96(B6):10275-10286.
 - DOI or URL: 10.1029/91JB00370.
 - Cited as: (ERO, ISO, HYP) "Bird 1991, JGR 96(B6):10275-10286". (PLT) "Bird 1991 (JGR 96:10275)".
-- Ledger ids: ISO-019, ISO-020, PLT-255 (orogenic collapse, 2026-10-03: the abstract's "cannot maintain short-wavelength (100 km) Moho relief of more than 1 km for times greater than 10–20 m.y. at most", Basin and Range); PLT-300 (2026-10-20: the same abstract quote beside the lower-crustal flow)
+- Ledger ids: ISO-019, ISO-020, PLT-255 (orogenic collapse, 2026-10-03: the abstract's "cannot maintain short-wavelength (100 km) Moho relief of more than 1 km for times greater than 10–20 m.y. at most", Basin and Range); PLT-300 (2026-10-20: the same abstract quote beside the lower-crustal flow); PLT-414 (2026-10-22: leveling and the pancake, abstract)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated; not in code.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) abstract fetched (Crossref). The abstract states that flux is proportional to the third power of the topographic gradient (cubic power law creep), which matches the project's "channel law cube".
 - Reference check: (ERO, ISO, HYP) Crossref matches volume 96, issue B6, pages 10275-10286 (2026-10-01 Crossref query on the title). (PLT) correct.
+- Read in the high-ground task (2026-10-22, PLT-414): the abstract from OpenAlex's record. Lower-crustal extrusion "removes crust from under mountains and smooths and levels the topography"; an isolated high becomes "pancake shaped, with a flat central plateau and steeper flanks spreading outward", and "When adjacent 'pancakes' merge, most of the relief is eliminated"; with published flow laws extrusion is negligible under oceans, marginal under shields and platforms, important under elevated plains and "dominant beneath high plateaus and/or hot, delaminated regions"; a delaminated Tibet may reduce "100-km-wavelength topographic features to 200 m relief in no more than 0.03-0.13 m.y.", "leaving only features with wavelengths over 400 km at the present".
 
 ### Rey2001
 - Reference: Rey, P., Vanderhaeghe, O. and Teyssier, C. (2001). Gravitational collapse of the continental crust: definition, regimes and modes. Tectonophysics 342(3-4):435-449.
