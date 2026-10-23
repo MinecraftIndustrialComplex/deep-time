@@ -5557,8 +5557,8 @@ holds should go on without a V1 gain is the coordinator's call (below).
 
 ### The trace with the yield
 
-The two worst traced runs of the base's seeds 1 to 4 for continental lines, scattered 1 and 4, ran
-again with the yield and the trace (arm `pp-yield380-trace`, argkey a2244c59, `+DEEPTIME_GAP_BUDGET=1
+Two runs ran again with the yield and the trace, scattered 4 (the base's worst) and scattered 1
+(the yield arm's worst) (arm `pp-yield380-trace`, argkey a2244c59, `+DEEPTIME_GAP_BUDGET=1
 +DEEPTIME_PEAK_TRACE=10000`; their V1 census and guard equal `pp-yield380`'s same runs). Lines above
 10 km, base / yield:
 
@@ -5568,8 +5568,9 @@ again with the yield and the trace (arm `pp-yield380-trace`, argkey a2244c59, `+
 | scattered 4 | 133 / 2 | 30.0 / 11.0 | 46.9 / 0.04 | 2 (0) / 2 (0) | 12.3 / 11.3 |
 
 The loop the trace found is gone: no continental column stands on a held `F`. The two continental
-lines left are collision orogens (63 and 68 km of crust, Airy heights 4.2 and 4.7 km) that the plate
-model's orogeny puts at 10.5 to 11.0 km, a height of their own and not the settling's. What is left
+lines left are collision columns (63 and 68 km of crust, Airy heights 4.2 and 4.7 km) at 11.0 and
+10.5 km, 5.8 to 6.8 km over the settling's target; one was resampled in the step, and the other's
+`F` is 39 m, its gap's largest parts the carry's (6.5 km) and the erosion's (5.7 km). What is left
 above 10 km is the second, oceanic kind (ridge samples, Airy height −1.8 to −3.7 km, `F` −0.7 to
 0.4 km), whose gap is the carry's part (9.3 to 23.5 km). In scattered 1 it reached 14.7 km at 78°S
 in the last step, and it is the likeliest source of that run's 15.5 km guard's worst, the arm's
