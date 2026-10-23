@@ -323,6 +323,8 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         &playa,
     )?;
     drop(playa);
+    // No wetland on or beside a playa (ledger: BIO-178).
+    let dried = dry_beside_playas(out, &grid, &result.kind, c)?;
 
     // closed_basin (ledger: BAK-055): 1 where the game puts no sea on ground below sea level
     // (HYD-100, HYD-102; FORMAT.md, "Water columns", step 3).
@@ -349,7 +351,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         "halved": halved,
         "climate": if from_stage { "climate stage (L1, bilinear)" } else { "zonal stand-in" },
         "seasons": if seasonal { "the twelve monthly layers" } else { "mean ± 8 °C" },
-        "playa": {"layer": PLAYA_LAYER, "rock_class": PLAYA_ROCK_CLASS, "blocks": salt},
+        "playa": {"layer": PLAYA_LAYER, "rock_class": PLAYA_ROCK_CLASS, "blocks": salt, "wetland_cleared": dried},
         "closed_basin": {"layer": CLOSED_BASIN, "reach_blocks": hydro::CLOSED_REACH_BLOCKS},
         "rivers_file": RIVERS_PATH,
         "rivers_bytes": bytes,
@@ -359,6 +361,81 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         note,
         output: Some(result),
     })
+}
+
+/// The wetland and erosion layers the playas clear ([`super::biomes::dry_beside_playas`]).
+const WETLAND: &str = "climate/wetland";
+const EROSION: &str = "climate/erosion";
+
+/// No wetland on or beside a playa (ledger: BIO-178): the playa cells of the hydrology's `grid`
+/// (`kind`) clear the L2 wetland flag within [`super::biomes::PLAYA_WETLAND_MARGIN_BLOCKS`] of
+/// ground, plus two L2 cells (the game's bilinear read between nodes, and the projection's
+/// nearest-cell read of the Lambert node) and a hydrology cell (the projection's footprint read of
+/// the playa), and rewrite `climate/wetland` and `climate/erosion`. In the bake the folder is the
+/// Lambert one (the projection then resamples both); `deeptime hydro` on a projected world clears
+/// on the world's own grids. The record for `notes.bake.water.playa.wetland_cleared`.
+fn dry_beside_playas(
+    out: &mut Out<'_>,
+    grid: &GridDesc,
+    kind: &[u8],
+    circumference: f64,
+) -> Result<Value, CoreError> {
+    let w = grid.w as usize;
+    let (ox, oz, r) = (
+        grid.origin_block_x,
+        grid.origin_block_z,
+        i64::from(grid.r),
+    );
+    let playas: Vec<(i64, i64)> = kind
+        .iter()
+        .enumerate()
+        .filter(|&(_, &k)| k == network::kind::PLAYA)
+        .map(|(cell, _)| (ox + (cell % w) as i64 * r, oz + (cell / w) as i64 * r))
+        .collect();
+    let (Some(we), Some(ee)) = (out.m.layer(WETLAND).cloned(), out.m.layer(EROSION).cloned()) else {
+        return Ok(json!({"skipped": "no climate/wetland or climate/erosion layer"}));
+    };
+    if playas.is_empty() {
+        return Ok(json!({"playa_cells": 0, "nodes": 0}));
+    }
+    let mut wet = crate::bake::load_layer(&out.dir.join(&we.path))?;
+    let mut ero = crate::bake::load_layer(&out.dir.join(&ee.path))?;
+    if wet.desc.dtype != DType::U8 || ero.desc.dtype != DType::I16 || wet.desc.grid != ero.desc.grid
+    {
+        return Err(CoreError::InvalidState(format!(
+            "{WETLAND} ({:?} on {}) and {EROSION} ({:?} on {}) are not u8 and i16 on one grid",
+            wet.desc.dtype, wet.desc.grid.name, ero.desc.dtype, ero.desc.grid.name
+        )));
+    }
+    let reach = super::biomes::PLAYA_WETLAND_MARGIN_BLOCKS
+        + 2.0 * f64::from(wet.desc.grid.r)
+        + f64::from(grid.r);
+    let lambert = out.m.projection.is_none().then_some(circumference);
+    let cleared = super::biomes::dry_beside_playas(
+        &mut wet.bytes,
+        &mut ero.bytes,
+        &wet.desc.grid,
+        &playas,
+        reach,
+        lambert,
+    );
+    if cleared > 0 {
+        for (layer, old) in [(wet, we.bytes), (ero, ee.bytes)] {
+            let name = layer.desc.name.clone();
+            out.layer_bytes(layer.desc, &layer.bytes)?;
+            // `Out::layer_bytes` tallied the layer and its bytes a second time.
+            out.bytes = out.bytes.saturating_sub(old);
+            let mut seen = false;
+            out.layers
+                .retain(|l| *l != name || !std::mem::replace(&mut seen, true));
+        }
+    }
+    Ok(json!({
+        "playa_cells": playas.len(),
+        "reach_blocks": reach,
+        "lambert": lambert.is_some(),
+        "nodes": cleared,
+    }))
 }
 
 /// `water …` (the CLI's line).

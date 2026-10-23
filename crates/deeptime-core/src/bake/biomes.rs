@@ -1642,6 +1642,64 @@ pub fn map(
     }
 }
 
+/// How far from a playa's salt no wetland stands, blocks of ground (ledger: BIO-178): a swamp's
+/// decoration reaches the ground beside its own biome from up to 9 blocks (a mangrove's roots:
+/// vanilla 1.21.1 `MangroveRootPlacement`, `max_root_width` 8 from the trunk, and the root one
+/// block past it), and the biome a block takes lies up to about 6 blocks off its own cell under the
+/// fuzzy zoom (BIO-165): 15 blocks, and a quarter more. The grids' own reach (a node's bilinear
+/// support, the resampling's nearest cell) is added where the rule is applied.
+pub const PLAYA_WETLAND_MARGIN_BLOCKS: f64 = 20.0;
+
+/// No wetland on or beside a playa (ledger: BIO-178). A playa is the floor of a terminal basin
+/// whose water the climate dries (HYD-053): salt, not a swamp or a bog. The wetland rule (BIO-066)
+/// reads the climate's wetness, the ground's flatness and its height, not the basins, so it can
+/// flag a playa's floor and rim, and the swamp's trees then stand over the salt. Every node of
+/// `l2` within `reach` blocks of ground of a playa cell's block (`playas`) loses its flag, and its
+/// erosion (`erosion_le`: the `climate/erosion` layer's cells, little-endian i16 in steps of
+/// [`PARAM_QUANTUM`]) is held under E5 as a cold wetland's is (BIO-133), so the class's ordinary
+/// biome stands there. `lambert`: the circumference of the bake's Lambert grid, where a block of
+/// ground east-west spans 1 / cos φ blocks (the box is widened in x) and north-south cos φ (kept
+/// at `reach`, wider than needed); `None` on a world grid, whose blocks are ground. Returns the
+/// nodes cleared.
+pub fn dry_beside_playas(
+    wetland: &mut [u8],
+    erosion_le: &mut [u8],
+    l2: &GridDesc,
+    playas: &[(i64, i64)],
+    reach: f64,
+    lambert: Option<f64>,
+) -> usize {
+    let held = ((reference().bands.erosion[5] - 1e-3) / PARAM_QUANTUM).round() as i16;
+    let r = f64::from(l2.r);
+    let (ox, oz) = (l2.origin_block_x as f64, l2.origin_block_z as f64);
+    let w = l2.w as usize;
+    let mut cleared = 0;
+    for &(px, pz) in playas {
+        let (px, pz) = (px as f64, pz as f64);
+        let hx = lambert.map_or(reach, |c| {
+            let s = deeptime_format::Projection::of(c).sin_lat(pz);
+            (reach / (1.0 - s * s).sqrt().max(1e-6)).min(0.5 * c)
+        });
+        let (i0, i1) = (((px - hx - ox) / r).ceil(), ((px + hx - ox) / r).floor());
+        let (j0, j1) = (((pz - reach - oz) / r).ceil(), ((pz + reach - oz) / r).floor());
+        for j in j0 as i64..=j1 as i64 {
+            for i in i0 as i64..=i1 as i64 {
+                let (ci, cj) = l2.cell(i, j);
+                let k = cj as usize * w + ci as usize;
+                if wetland[k] == WETLAND_NONE {
+                    continue;
+                }
+                wetland[k] = WETLAND_NONE;
+                let e = &mut erosion_le[2 * k..2 * k + 2];
+                let v = i16::from_le_bytes([e[0], e[1]]).min(held);
+                e.copy_from_slice(&v.to_le_bytes());
+                cleared += 1;
+            }
+        }
+    }
+    cleared
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2909,5 +2967,92 @@ mod tests {
         assert!(is_land_continentalness(edge + 1e-4));
         assert!(!is_land_continentalness(edge - 1e-4));
         assert!(is_land_continentalness(f64::from(edge as f32)));
+    }
+
+    /// No wetland on or beside a playa (BIO-178): the nodes within the reach lose the flag and
+    /// their erosion is held under E5 (a lower one is kept), those beyond keep both, the box
+    /// widens east-west by 1 / cos φ on the Lambert grid and wraps across its seam, and a world
+    /// grid's box is square.
+    #[test]
+    fn a_playa_clears_the_wetland_beside_it() {
+        let c = 1536u32;
+        let l2 = GridDesc::for_planet("L2", c, 8).unwrap();
+        let (w, h) = (l2.w as usize, l2.h as usize);
+        let n = w * h;
+        let raw = |v: f64| (v / PARAM_QUANTUM).round() as i16;
+        let held = raw(reference().bands.erosion[5] - 1e-3);
+        let swamp = raw(reference().bands.erosion[6] + 0.05);
+        let low = held - 500;
+        let node = |k: usize| {
+            (
+                l2.origin_block_x + (k % w) as i64 * 8,
+                l2.origin_block_z + (k / w) as i64 * 8,
+            )
+        };
+        let row = |z: i64| ((z - l2.origin_block_z) / 8) as usize;
+        // Every node a swamp, but the even columns of the equator's row a cold wetland already low
+        // (some of them beside the seam's playa, so the lower erosion is kept there).
+        let is_cold = |k: usize| k / w == row(0) && k % 2 == 0;
+        let fresh = || {
+            let mut wet = vec![WETLAND_SWAMP; n];
+            let mut ero: Vec<u8> = Vec::with_capacity(2 * n);
+            for k in 0..n {
+                let cold = is_cold(k);
+                if cold {
+                    wet[k] = WETLAND_COLD;
+                }
+                ero.extend_from_slice(&if cold { low } else { swamp }.to_le_bytes());
+            }
+            (wet, ero)
+        };
+        let ero_at = |e: &[u8], k: usize| i16::from_le_bytes([e[2 * k], e[2 * k + 1]]);
+        // 21, not 20: no box edge falls on a node (60° south's 42 against 40 = 5 columns).
+        let reach = 21.0;
+        let cf = f64::from(c);
+        // Two playas: one on the equator at the seam (x = −C/2), one at 60° south.
+        let p_eq = (l2.origin_block_x, 0i64);
+        let z60 = deeptime_format::Projection::of(cf).z_of_lat(-60.0).round() as i64;
+        let p60 = (0i64, z60);
+        for (lambert, label) in [(Some(cf), "lambert"), (None, "world")] {
+            let (mut wet, mut ero) = fresh();
+            let cleared = dry_beside_playas(&mut wet, &mut ero, &l2, &[p_eq, p60], reach, lambert);
+            let mut expect = 0;
+            for k in 0..n {
+                let (x, z) = node(k);
+                let near = |(px, pz): (i64, i64)| {
+                    let dx = (x - px).rem_euclid(i64::from(c));
+                    let dx = dx.min(i64::from(c) - dx) as f64;
+                    let s = deeptime_format::Projection::of(cf).sin_lat(pz as f64);
+                    let hx = match lambert {
+                        Some(_) => reach / (1.0 - s * s).sqrt(),
+                        None => reach,
+                    };
+                    dx <= hx + 1e-9 && ((z - pz) as f64).abs() <= reach + 1e-9
+                };
+                let was_cold = is_cold(k);
+                if near(p_eq) || near(p60) {
+                    expect += 1;
+                    assert_eq!(wet[k], WETLAND_NONE, "{label} node {k}");
+                    let want = if was_cold { low } else { held };
+                    assert_eq!(ero_at(&ero, k), want, "{label} node {k}");
+                } else {
+                    let want = if was_cold { WETLAND_COLD } else { WETLAND_SWAMP };
+                    assert_eq!(wet[k], want, "{label} node {k}");
+                    assert_eq!(ero_at(&ero, k), if was_cold { low } else { swamp });
+                }
+            }
+            assert_eq!(cleared, expect, "{label}");
+            // The seam: nodes on both sides of x = −C/2 cleared, the cold one at column 0 keeping
+            // its lower erosion; 60° south: twice as wide (cos 60° = 0.5) on the Lambert grid, so
+            // 5 columns each side, against 2 on a world grid.
+            assert_eq!(wet[row(0) * w], WETLAND_NONE, "{label}");
+            assert_eq!(ero_at(&ero, row(0) * w), low, "{label}");
+            assert_eq!(wet[row(0) * w + w - 1], WETLAND_NONE, "{label}");
+            assert_eq!(ero_at(&ero, row(0) * w + w - 1), held, "{label}");
+            let k60 = row(z60) * w + ((0 - l2.origin_block_x) / 8) as usize;
+            let cols = if lambert.is_some() { 5 } else { 2 };
+            assert_eq!(wet[k60 + cols], WETLAND_NONE, "{label}");
+            assert_eq!(wet[k60 + cols + 1], WETLAND_SWAMP, "{label}");
+        }
     }
 }
