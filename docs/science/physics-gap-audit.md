@@ -149,6 +149,19 @@ and that the model does not have as physics.
   plate-geometry merge). That row judged that none of the seven criteria needs it. This audit
   disagrees for M4 and M5. The docs' own list of what is left names this first (plates.md:2486,
   "The extent of young orogen is the high ground").
+- **State (2026-10-23).** Measured and built, every stage off by default and not yet on the pool
+  (plates.md, "Plate boundary organisation"; PLT-500 to PLT-507). The before measures (base
+  7f9d8f115049, 24 runs) answer "orient trenches": the convergence across the oceanic front is
+  Bird's (53.1 against 53.2 mm/yr), so no law is added for it (PLT-501). The subduction excess is
+  a shortage of transform (0.7 times Bird's) more than of ridge, and more than half of the coast
+  at a front is at a front an initiation made, because PLT-067's split runs along the
+  continent's edge. Built behind switches, each tested against its source: ridge segments normal
+  to the motion with transforms along it (PLT-502, replaces PLT-100/101's midline in its bands),
+  initiation off the passive margin at the arc's reach (PLT-503, replaces PLT-067's split), rifts
+  and initiations weighted by the force balance's stress (PLT-504, PLT-505) and rifts along thin
+  lithosphere (PLT-506, needs gap 4's thermal state); reorganisation is their composition
+  (PLT-507). Off is bit-identical (`pool.sh alias`, seed 1, 1000 Myr). The arms wait for the new
+  base after the flexure and gap 4 lanes merge; the plate count (PLT-372) is not changed.
 
 ### Gap 3: the trench budget
 
