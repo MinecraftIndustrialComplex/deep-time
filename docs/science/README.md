@@ -56,6 +56,7 @@ them in from [_template.md](_template.md).
 | [volcanoes-and-magma.md](volcanoes-and-magma.md) | checked against sources (stage 2, WP-2, 2026-10-02) | VOL, MAG |
 | [plates.md](plates.md) | stub; model about to be rewritten | PLT |
 | [plate-forces.md](plate-forces.md) | written with the feature (2026-10-02): the force balance, recorded and not yet applied | FRC; PLT-181 to PLT-191 |
+| [lithosphere-thermal-state.md](lithosphere-thermal-state.md) | stage 2 (gap 4, 2026-10-23): the lithosphere's thermal state, its heat flow, isostasy, strength and backstop, all off by default; measured on the pool | PLT-460 to PLT-470, ISO-110 to ISO-112 |
 | [climate.md](climate.md) | stub; model about to be rewritten | CLM, MOI |
 | [per-cell-climate.md](per-cell-climate.md) | the per-cell climate as built (P1-26, 2026-10-03): what it does, its constants, Earth against the mod; its design constants were checked against sources first (WP-14a, 2026-10-02) | CLM-119 to CLM-146, CLM-163 to CLM-168, CLM-170, CLM-172, CLM-175 to CLM-179 |
 | [mass-elevation-effect.md](mass-elevation-effect.md) | written with the feature (2026-10-21): the plateau's warmth, fitted to plateau stations against the reanalysis's free air; Earth before and after | CLM-220, CLM-225 to CLM-231, MOI-085 |
