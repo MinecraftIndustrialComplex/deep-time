@@ -697,9 +697,11 @@ pub struct TectonicParams {
     /// fragments grow from their centres through the plate, each lattice edge costing its length
     /// times (225 km / L)^m, L the lithosphere's depth (`thermal_state`'s), m this; the fragments
     /// meet, and the plate breaks, where the lithosphere is thin. 0 (the default) splits by
-    /// great-circle distance (Cortial). Needs `thermal_state`. game-choice (agent 2026-10-23):
-    /// the exponent; Audet & Bürgmann 2011: strain concentrates at pre-existing weak zones, and
-    /// the weak directions follow the gradients of the effective elastic thickness. ledger: PLT-506
+    /// great-circle distance (Cortial). Needs `thermal_state`. The value to run is 2: a brittle
+    /// strength that grows linearly with depth (Byerlee's friction, from memory) integrates to a
+    /// plate strength ∝ L², and an edge costs its strength's inverse. Audet & Bürgmann 2011:
+    /// strain concentrates at pre-existing weak zones, and the weak directions follow the
+    /// gradients of the effective elastic thickness. ledger: PLT-506
     pub rift_weakness: f64,
     /// Plates smaller than this fraction of the planet are absorbed by a neighbour.
     pub min_plate_area_frac: f64,
@@ -716,8 +718,9 @@ pub struct TectonicParams {
     /// new floor between two plates is cut into bands of this width along the meridians of their
     /// relative rotation's pole, and each band's ridge is a segment normal to the motion, the steps
     /// between them transforms. Km, Earth-normalized; 0 (the default) keeps Cortial's ridge at
-    /// the gap's midline. game-choice (agent 2026-10-23): a lattice width, five to six spacings
-    /// of the quick lattice; Earth's segments are 75 to 165 km. ledger: PLT-502
+    /// the gap's midline. The value to run is Earth's first-order segment, 600 km (Aghaei et al.
+    /// 2014 after Macdonald 1998: "600 ± 300 km"); the second-order ones (140 ± 90 km) are under
+    /// the quick lattice's two rings. ledger: PLT-502
     pub ridge_segment_km: f64,
     /// Magmatic arc: distance from the front of its axis, km.
     pub arc_distance_km: f64,
@@ -830,13 +833,14 @@ pub struct TectonicParams {
     /// self-sustaining once some 100-150 km of slab has gone down (ledger PLT-270, from memory).
     pub initiation_slab_km: f64,
     /// Subduction initiation off the passive margin (V1 gap 2's stage C1): the old floor within
-    /// this distance of the plate's continental crust (great circle, km, Earth-normalized) stays
-    /// on the plate, and the fracture's seed is old floor beyond it, so the old floor goes down at
-    /// an intra-oceanic trench and the margin stays passive (Stern 2004, Crameri et al. 2020:
-    /// no Cenozoic passive margin turned convergent). 0 (the default) lets the fracture run
-    /// anywhere through the old floor. game-choice (agent 2026-10-23): a few lattice spacings, so
-    /// that the new front is ocean-ocean. ledger: PLT-503
-    pub subduction_initiation_margin_km: f64,
+    /// the reach of the arc the new trench builds (`arc_distance_km` + `arc_width_km`, and one
+    /// lattice spacing for where on the lattice the front falls; great circle) of the plate's
+    /// continental crust stays on the plate, and the fracture's seed is old floor beyond it. The
+    /// old floor then goes down at an intra-oceanic trench, its arc stands on ocean floor (an
+    /// island arc), and the margin stays passive (Stern 2004, Crameri et al. 2020: no Cenozoic
+    /// passive margin turned convergent). Off (the default) lets the fracture run anywhere
+    /// through the old floor, along the continent's edge included. ledger: PLT-503
+    pub subduction_initiation_offshore: bool,
     /// Subduction starts under compression (V1 gap 2's stage C2): the initiation hazard weighted
     /// as `rift_stress_mpa`'s with −σ, over the plates' old floor, σ_s this, MPa (Crameri et al.
     /// 2020: horizontally forced initiation dominates the last 100 Myr). 0 (the default) leaves
@@ -994,10 +998,10 @@ impl Default for TectonicParams {
             subduction_initiation_age_myr: 150.0,
             subduction_initiation_per_myr: 0.15, // ledger: PLT-063
             subduction_initiation_clearance_km: 1000.0,
-            initiation_slab_km: 150.0,            // ledger: PLT-270
-            subduction_initiation_margin_km: 0.0, // ledger: PLT-503 (game-choice: off by default)
-            initiation_stress_mpa: 0.0,           // ledger: PLT-505 (game-choice: off by default)
-            contact_timeout_myr: 24.0,            // ledger: PLT-059
+            initiation_slab_km: 150.0,             // ledger: PLT-270
+            subduction_initiation_offshore: false, // ledger: PLT-503 (off until its pool arm)
+            initiation_stress_mpa: 0.0,            // ledger: PLT-505 (game-choice: off by default)
+            contact_timeout_myr: 24.0,             // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
             plate_speed_scale_mm_yr: 45.0, // ledger: PLT-181
@@ -1466,10 +1470,6 @@ impl PlanetPreset {
             (
                 k.subduction_initiation_clearance_km,
                 "$.tectonics.subduction_initiation_clearance_km",
-            ),
-            (
-                k.subduction_initiation_margin_km,
-                "$.tectonics.subduction_initiation_margin_km",
             ),
             (k.ridge_segment_km, "$.tectonics.ridge_segment_km"),
             (k.rift_stress_mpa, "$.tectonics.rift_stress_mpa"),

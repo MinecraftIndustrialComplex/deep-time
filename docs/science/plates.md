@@ -5695,8 +5695,15 @@ length: Earth's 0.71 is an envelope about 35° from orthogonal.
 
 ### The design
 
-Each stage is its own switch, off by default; off is the base bit for bit (the pool's alias
-check).
+Each stage is its own switch, off by default; off is the base bit for bit: the pool's alias
+check at 839dc4d2 (key 21aa3ea4d466 against base's 7f9d8f115049, seed 1, supercontinent start,
+1000 Myr: the world state's 106 files and the dynamics record identical; alias recorded). Under
+Ben's rule of 2026-10-23 (CLAUDE.md "How many runs") a stage goes on by default once it is
+built and correct, its unit tests against its sources passing and its pool arm showing no
+divergence or guard failure, and the rule it replaces goes off with it; the V1 numbers are
+realism checks, not a gate. So each stage below names the rule it replaces, and none of its
+values is chosen to move a V1 number or Bird's shares: each comes from a source or from the
+lattice's resolution.
 
 **A. Ridge segments normal to the motion, joined by transforms** (`tectonics.ridge_segment_km`,
 PLT-502). The ridge is made where the crust is: a resampling turns each gap point (no footprint
@@ -5715,26 +5722,42 @@ side, where the rotation makes the pair converge) keeps the midline. A gap is th
 the last resampling (up to `resample_drift_km`, 1,500 km), so a band straightens in one
 resampling where its obliquity's offset across the band (L tan α) is under the gap's width, and
 over several where it is wider; the ridge's older pieces stay in the plates as fracture zones.
-The length is a lattice choice (game-choice): about 400 km, five to six spacings, so that a
-segment and its transform are both wider than the two rings over which the boundary's normal is
-judged. Earth's segments are shorter (above); the ratio of transform to ridge does not depend on
-it.
+The length to run is Earth's first-order segment, 600 km ("First-order segments extend for 600 ±
+300 km and persist for >5 × 10^6 years. Second-order segments extend for 140 ± 90 km", Aghaei et
+al. 2014 after Macdonald 1998): about eight spacings of the quick lattice, where the second-order
+segments and PB2002's runs (above) are under the two rings over which the boundary's normal is
+judged. The ratio of transform to ridge does not depend on the length. *Replaces*, in the bands
+it draws: which plate a gap point goes to (the nearer one) and its α from the midline (PLT-100,
+PLT-101, Cortial's). The edges' blend z̄ stays (it is the position's interpolation between the
+two plates' edges, the same whichever plate takes the point), and a band that converges or is
+too thin to tell keeps the midline. *Test against the source*:
+`ridge_segments_stand_normal_to_the_motion_with_transforms_along_it` (`plates/ridges.rs`): on a
+gap 35° oblique, each band's ridge is one meridian of the relative
+pole, the steps run along the motion, and transform over ridge is tan 35° within 0.05.
 
 **B. Trenches that face their convergence**: measured above, and not built. The model's trenches
 take Earth's convergence across them (PLT-501).
 
-**C1. Subduction starts off the passive margin** (`tectonics.subduction_initiation_margin_km`,
-PLT-503). An initiation's fracture is kept at least this far (a great-circle distance, measured
-over the parent's visible samples) from the parent's continental crust: the old floor within it
-stays on the parent whatever the Voronoi split says, and the seed old sample
-is drawn from the old floor beyond it (no initiation when there is none). The old floor then
-goes down under the parent's oceanic margin, at an intra-oceanic trench, not under the
-continent; the floor between the trench and the coast stays passive until the ocean closes and
-the arc meets the continent (an arc-continent collision, as on Earth). The rate (PLT-063) and the
+**C1. Subduction starts off the passive margin** (`tectonics.subduction_initiation_offshore`,
+PLT-503). An initiation's fracture is kept off the parent's continental crust by the reach of the
+arc the new trench builds on the parent, `arc_distance_km` + `arc_width_km` (200 + 60 km), and
+one lattice spacing for where on the lattice the front falls (a great-circle distance, measured
+over the parent's visible samples): the old floor within it stays on the parent whatever the
+Voronoi split says, and the seed old sample is drawn from the old floor beyond it (no initiation
+when there is none). The old floor then goes down under the parent's oceanic margin, at an
+intra-oceanic trench, not under the continent; its arc stands on ocean floor (an island arc),
+and the floor between the trench and the coast stays passive until the ocean closes and the arc
+meets the continent (an arc-continent collision, as on Earth). The rate (PLT-063) and the
 qualifying floor (PLT-062, PLT-064) are unchanged, so C1 moves where subduction starts, not how
-often. Sources: Stern 2004 and Crameri et al. 2020, above. The distance is a game-choice from the
-sources' "none along a passive margin": at least a few lattice spacings, so that the front is
-ocean-ocean; 500 km explored.
+often. Sources: Stern 2004 and Crameri et al. 2020, above. There is no distance of its own to
+choose: it is the arc's (2026-10-23: a `subduction_initiation_margin_km` knob before, 500 km
+proposed; replaced by the derived reach so that no knob is left). *Replaces*: PLT-067's split
+along the continent's edge, which keeps the continent on the parent but sends the old floor
+beside it down under the coast, the passive margin turned active that PLT-067's own text says
+it prevents; and the seed's draw over all the old floor. *Test against the source*:
+`subduction_starts_off_the_passive_margin` (`plates/rifting.rs`): a 60° continent in old floor;
+off, some of eight draws send the floor beside the coast down; on, none of the sinking plate
+lies within the reach, and an arc reaching across the ocean starts nothing.
 
 **C2. Rifts and subduction starts from the stress and from weakness** (PLT-504 to PLT-506).
 FRC-022's mean in-plane stress σ (MPa, tension positive) is each plate's answer at every step; it
@@ -5746,19 +5769,29 @@ nothing).
   weighted by their area, so the expected number of rifts is the base's and only where they
   happen moves: to the plates the edge forces pull apart. On base's records the plates' σ is
   18 MPa at the median, its quartiles about 0 and 43 MPa, continental plates −3 to 60 MPa
-  between p10 and p90; σ_s = 20 MPa is about half the quartiles' spread (game-choice).
+  between p10 and p90; σ_s = 20 MPa is about half the quartiles' spread (game-choice: set from
+  the model's own stresses, not fit to any outcome). *Replaces*: the hazard's share between
+  plates by their area, continental fraction and plume heads alone (PLT-083, PLT-084, PLT-090,
+  which stay as the hazard's size). *Test*: `stress_weights_keep_the_mean_and_favour_the_stress_asked_for`.
 - *Subduction starts under compression* (`tectonics.initiation_stress_mpa`, σ_s, 0 = off): the
   same weight with −σ on the initiation hazard (PLT-063). "Horizontally forced SZI is clearly
   more common than vertically forced SZI ... in the last 100 Ma" (Crameri et al. 2020), and
   collisions, which load their plates in compression: "collision events along pre-existing
-  subduction trenches are often precursors of SZI events" (ibid.).
+  subduction trenches are often precursors of SZI events" (ibid.). *Replaces*: the share of
+  PLT-063's hazard between plates by their old floor alone.
 - *Rifts along weak lithosphere* (`tectonics.rift_weakness`, an exponent m, 0 = off; needs
   `tectonics.thermal_state`): the rift's fragments are grown from their centres through the
   plate (Dijkstra over the lattice) with each edge's cost its length times (L_ref / L)^m, L the
   lithosphere's depth (gap 4's state, `Sample::lithosphere_km`; unset counts as L_ref, clamped
-  to 20 to 225 km) and L_ref the old craton's 225 km (PLT-462). Thin, hot lithosphere is slow to cross, so the fragments meet in it: the
-  fracture runs through arcs, back-arcs, plume heads and young floor and around cratons. The
-  fractal warp stays on top (PLT-086).
+  to 20 to 225 km) and L_ref the old craton's 225 km (PLT-462). Thin, hot lithosphere is slow
+  to cross, so the fragments meet in it: the fracture runs through arcs, back-arcs, plume heads
+  and young floor and around cratons. The exponent to run is m = 2: a brittle strength growing
+  linearly with depth (Byerlee's friction, from memory) integrates to a plate strength ∝ L², and
+  an edge costs its strength's inverse. The fractal warp stays on top (PLT-087). *Replaces*: the
+  fragments' great-circle Voronoi split (Cortial's, PLT-087's distance; its warp stays). *Test
+  against the source*: `rifts_break_where_the_lithosphere_is_thin` (`plates/rifting.rs`): a
+  225 km plate with a 30 km belt off the centres' bisector; at m = 0 under 0.3 of the fracture
+  lies in the belt, at m = 2 over 0.8.
 
 **D. Reorganisation** (PLT-507). A plate reorganisation is a change of the plates' motion and of
 the boundaries that follow it. The model's motion already relaxes towards the force balance's
@@ -5774,10 +5807,38 @@ stalls puts its plates in compression and raises their initiation weight, and a 
 its plate in tension and raises its rift weight. That is the law: no separate trigger; the
 plates' forces and their relative motion redraw the boundaries.
 
+### The arms (waiting for the new base)
+
+No arm has run. The exploration arms queued on 2026-10-23 (each switch alone) were cancelled
+under the testing rules of that day: one cumulative 8-run arm per stage, on the base that master
+gets once the flexure and gap 4 lanes merge with their physics on (the coordinator: "one 24-run
+base on master"). On that base, after merging it into this branch and repeating the alias check
+against it:
+
+| arm | adds | runs |
+|---|---|---|
+| g2-A | `ridge_segment_km=600` | 8 (seeds 1 to 4, both starts) |
+| g2-AC1 | + `subduction_initiation_offshore=true` | 8 |
+| g2-AC1C2 | + `rift_stress_mpa=20`, `initiation_stress_mpa=20`, `rift_weakness=2` | 8 |
+
+A stage whose arm shows no divergence and no guard failure goes on by default, the rules it
+replaces off with it, its fixtures pinned off where a test needs the old behaviour, and the
+seed-pinned weld tests swept; the boundary measure and the V1 table are reported beside it as
+realism checks. The arm g2-base4 (base's seeds 1 to 4, 8 cached runs) is the matched control
+on the old base; the new base needs its own.
+
 ### Ben's part
 
 How plates are made and moved is Ben's scope; he approved doing the gap, not one design. The
 stages above stay on the lattice and change no world-data format. The questions for him are in
 the lane's report to the coordinator: the plate count and a finer lattice (PLT-372), and whether
-to replace the lattice's boundaries with drawn ones. Recommended: neither now, since the shares
-and the active margin can be measured and moved on the lattice as it is.
+to replace the lattice's boundaries with drawn ones (recommended: neither now, since each
+stage's physics works on the lattice as it is); and whether induced initiation near trenches
+should be its own stage. On the last: "All SZI events start less than 1500 km away from other
+active subduction zones and, in most cases, less than 500 km" (Crameri et al. 2020), while
+PLT-064 keeps every initiation 1,000 km from all trenches (`pending-rewrite` since the plate
+geometry task's arm i1, 2026-10-21); C2's weight is per plate and does not place an initiation,
+so PLT-064 is not replaced here. A stage that starts subduction at a plate's compressive boundary would
+replace PLT-064's clearance (recommended: after C2's arm, as a stage of its own). The base's
+polarity reversals, 16.9 per 100 Myr against Crameri et al.'s 4 in 104 Myr, are a measurement
+for the subduction work, not a gap-2 rule.
