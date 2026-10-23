@@ -30,11 +30,18 @@ How the trenches face their convergence (the plates step's own globals over the 
                little; it is an upper bound on the plain ratio.)
   facing_cont  the same over the fronts under continental overriding crust (the cordilleras' fronts)
   slow_front   the share of the oceanic subduction front converging under 10 mm/yr across it (the
-               record's front bands)
+               record's front bands) …
+  fast_front   … and at 80 mm/yr or more (where the factor's cap at v_0 = 100 mm/yr can bind)
+  across_mm_yr the mean convergence across the oceanic subduction front, mm/yr, from the bands'
+               middles (2.5, 7.5, 15, 30, 60, 100); Bird 2003 Table 3's SUB: 53.2
 
 The continental margin and the collisions (the plate check's, `deeptime plate-check`):
 
-  active_margin  the active share of the continental margin (CHK target 0.25 to 0.40)
+  active_margin  the active share of the continental margin (CHK target 0.25 to 0.40), and the stage
+               summary's margins line (`deeptime run`'s means over the records after 90 Myr), shares
+               of the coast: m_sub at a subduction front, of it m_andean where the continent
+               overrides and m_initiated at fronts a subduction initiation made; m_coll in a
+               collision belt; m_passive passive
   front_coll_km  the front in collision at any time, km (`plates/collision_front_km_myr` over the run's
                length; Stern & Scholl 2010: 6,000 km of active suture on average, 12,000 km today)
   coll_life_p50, coll_life_p90   collision length, first to last step, Myr (targets 15 to 50, at most 120)
@@ -46,13 +53,16 @@ The plates (the summary's counters per 100 Myr, the plate check's plates alive):
   rifts, initiations, reversals   per 100 Myr (Crameri et al. 2020: 13 initiations since 104 Ma, 4 of them
                by polarity reversal)
 
-Version 1.
+Version 2 (version 1 without fast_front, across_mm_yr and the margins line).
 """
 import json
 import sys
 from pathlib import Path
 
 SKIP_MYR = 100.0
+# The middles of the front bands' convergence across the front (lower edges 0, 5, 10, 20, 40, 80
+# mm/yr; the last band is open, 100 taken for it), mm/yr.
+MIDDLES = (2.5, 7.5, 15.0, 30.0, 60.0, 100.0)
 # Classes of dynamics::mix (ocean_ocean, ocean_continent, collision, ridge, rift, other).
 OO, OC, COLL, RIDGE, RIFT, OTHER = range(6)
 
@@ -97,7 +107,7 @@ def record_values(path):
     use = [s for s in steps if s["t"] > t0 + SKIP_MYR]
     mix = [0.0] * 6
     other_conv = 0.0
-    slow, fronts = 0.0, 0.0
+    slow, fast, across, fronts = 0.0, 0.0, 0.0, 0.0
     for s in use:
         for k, x in enumerate(s.get("mix_km", [0.0] * 6)):
             mix[k] += x
@@ -106,6 +116,8 @@ def record_values(path):
         # Normal bands 0, 5, 10, 20, 40, 80 mm/yr; rows ocean-ocean, ocean-continent.
         for row in fb.get("normal", []):
             slow += sum(row[:2])
+            fast += sum(row[5:])
+            across += sum(x * m for x, m in zip(row, MIDDLES))
             fronts += sum(row)
     total = sum(mix)
     if total > 0:
@@ -120,6 +132,8 @@ def record_values(path):
         out["total_km"] = total / n
     if fronts > 0:
         out["slow_front"] = slow / fronts
+        out["fast_front"] = fast / fronts
+        out["across_mm_yr"] = across / fronts
     return out, span
 
 
@@ -151,16 +165,29 @@ def summary_values(path, span):
     except OSError:
         return out
     at = text.find("plates_final=")
-    if at < 0:
-        return out
-    line = text[at:].split("\n", 1)[0]
-    for kv in line.split():
-        k, _, v = kv.partition("=")
-        if k in ("rifts", "initiations", "reversals"):
-            try:
-                out[k] = 100.0 * float(v) / span
-            except ValueError:
-                pass
+    if at >= 0:
+        line = text[at:].split("\n", 1)[0]
+        for kv in line.split():
+            k, _, v = kv.partition("=")
+            if k in ("rifts", "initiations", "reversals"):
+                try:
+                    out[k] = 100.0 * float(v) / span
+                except ValueError:
+                    pass
+    at = text.find("margins records=")
+    if at >= 0:
+        line = text[at:].split("\n", 1)[0]
+        kv = dict(x.partition("=")[::2] for x in line.split() if "=" in x)
+        try:
+            active = float(kv["active_mean"])
+            sub = float(kv["subduction_mean"])
+            out["m_sub"] = sub
+            out["m_andean"] = float(kv["andean_mean"])
+            out["m_initiated"] = float(kv["initiated_mean"])
+            out["m_coll"] = active - sub
+            out["m_passive"] = float(kv["passive_mean"])
+        except (KeyError, ValueError):
+            pass
     return out
 
 
