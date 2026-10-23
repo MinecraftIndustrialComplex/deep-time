@@ -520,6 +520,9 @@ struct PlateFields {
     thickness: Vec<f32>,
     /// `plates/gap` (`plates::l1::GAP_FIELD`); absent in worlds built without the L1 sampling.
     gap: Option<Vec<f32>>,
+    /// `plates/crust_uplift_mm_yr` (`plates::l1::CRUST_UPLIFT_FIELD`, ISO-091); absent in worlds
+    /// built without the L1 sampling, where the whole uplift is taken as crust.
+    crust_uplift: Option<Vec<f32>>,
 }
 
 impl PlateFields {
@@ -556,6 +559,7 @@ impl PlateFields {
             heat_flow: get("plates/heat_flow_mw_m2")?,
             thickness: get("plates/thickness_m")?,
             gap: get(crate::plates::l1::GAP_FIELD).ok(),
+            crust_uplift: get(crate::plates::l1::CRUST_UPLIFT_FIELD).ok(),
         })
     }
 }
@@ -1959,6 +1963,7 @@ impl SurfaceStage {
                 h_eroded,
                 h_before_spread,
                 uplift_mm_yr: &pf.uplift,
+                crust_uplift_mm_yr: pf.crust_uplift.as_deref().unwrap_or(&pf.uplift),
                 crust_type: &pf.crust_type,
                 crust_age_myr: &pf.crust_age,
                 orogeny_age_myr: &pf.orogeny_age,
