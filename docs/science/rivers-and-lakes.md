@@ -204,6 +204,35 @@ V1 gap 5 (physics-gap-audit.md, "Rivers and deltas"), stage 1 of four: delta pla
 
 **The game.** Nothing new in the column rule: a distributary is a chain like any other, and the existing rule (the deep hit, the channel through the sea, HYD-120 to HYD-124) cuts it at the bake's width and depth with its water at the sea's surface, one block below the plain. `DeltaGameTests` on a synthetic delta world (`deeptime synth --kind delta-test`) checks the carving.
 
+### Stage 1 on the D5 bake (measured 2026-10-23)
+
+**How.** The D5 world's Lambert bake (the play world's, master d74c74aa, `rivers-d5/lam` on the test VM), copied without its epochs, had its water part run again: `deeptime hydro --world-data <copy>`, with `--set hydro.deltas=false` for before and `--set hydro.delta_area_mult=N --set hydro.delta_mouth_spacing=K` for the variants. Before and after were then projected to Petroff-Guyou (`deeptime project`) as the play world was. `tools/review/delta_census.py` counts each world's river file and layers. This is not a simulation: the water part reads the cached bake's ground, and the pool keeps no baked worlds, so it ran outside the pool (CLAUDE.md, "No simulation outside the pool"). The review page with the largest deltas, before and after, is the private space "deeptime-deltas" (`tools/review/spaces.json`).
+
+The arms: mN is area multiplier N (HYD-141), sK is mouths K channel widths apart (HYD-138). m8s3 was the first default. m32s2 is the defaults before a split that missed the middle of its half tried the half's other front cells. m32s2r has that retry, but not yet the tail's free way to the sea or the split at the shore (HYD-140, HYD-144). After is the branch head's defaults: m32s2 with both.
+
+| Measure | before | m8s3 | m16s2 | m32s2 | m32s2r | after | before, PG | after, PG | Earth |
+|---|---|---|---|---|---|---|---|---|---|
+| Plains (the bake's count) | 0 | 190 | 275 | 359 | 359 | 359 | | | |
+| ... of loaded sea mouths | | | | | | 34 % (359 of 1,054) | | | 40 % of rivers at least 50 m wide (Caldwell et al. 2019) |
+| Distributaries | 0 | 117 | 245 | 389 | 378 | 632 | 0 | 632 | |
+| Rivers that split | 0 | 46 | 90 | 132 | 133 | 233 | 0 | 233 | |
+| Q at least 50 m³/s: split of all | 0 of 58 | 25 of 60 | 31 of 62 | 38 of 62 | 38 of 61 | 39 of 60 | 0 of 58 | 39 of 60 | |
+| Q at least 100: split of all | 0 of 33 | 15 of 35 | 20 of 34 | 22 of 34 | 23 of 35 | 22 of 34 | 0 of 33 | 22 of 34 | |
+| Q at least 300: split of all | 0 of 10 | 3 of 9 | 4 of 9 | 5 of 10 | 5 of 10 | 5 of 10 | 0 of 10 | 5 of 10 | |
+| 25 largest rivers: with a plain | 0 | 19 | 21 | 23 | 22 | 23 | 0 | 23 | near all (Caldwell et al. 2019: likelihood near 1 for the largest) |
+| 25 largest rivers: split | 0 | 11 | 14 | 15 | 16 | 15 | 0 | 15 | |
+| Plain raised, km² (the census's grid) | 0 | 2,571 | 4,691 | 8,453 | 8,453 | 8,453 | 0 | 10,390 | 847,936 (Edmonds et al. 2020) |
+| Share of the land | 0 | 0.12 % | 0.22 % | 0.39 % | 0.39 % | 0.39 % | 0 | 0.49 % | 0.57 % (Edmonds et al. 2020) |
+| Plain cells above the sea | | 96 % | 97 % | 97 % | 97 % | 97 % | | 67 % | |
+| Largest raise, blocks | | 5.7 | 7.8 | 10.3 | 10.3 | 10.3 | | 9.5 | |
+
+- **Mouths.** After, the 233 rivers that split end in 2 mouths (72 rivers), 3 (82), 4 (22), 5 (9), 6 (12), 7 (18) or 8, the cap (18). Of the 359 plains, 109 have a front that fits one mouth; of the 250 that fit two or more, 240 split. The 10 that do not: 8 have no path from the stem to the front (the second network's stem leaves the sea away from the plain), 2 no free way to the open sea.
+- **The largest rivers.** Rank 1 (Q 2,745 m³/s) ends in 6 mouths and rank 2 in 8. Of the 25 largest, 8 have a plain but do not split. Among the bake's 10 largest plains, 3 hold one mouth because their front fits only one (Q 690, 478 and 475 m³/s). For example, the Q 690 river has a 37-cell front and a channel drawn 26 blocks wide. A fourth (Q 304) found no path from its stem. The rivers are drawn 40 to 70 times their physical width (HYD-141), so a big river's plain fills with its own channels.
+- **How it got here.** The first version put the apex the backwater length up from the front: 4 of 190 plains split (14 distributaries). With the apex at the plain's entry, 51 plains split (117). Mouths 2 widths apart gave 71 (175). Area multiplier 32 gave 139 plains (389). The retry over the half's other cells split 1 more plain. The tail's shortest free way to the sea and the split at the shore gave 240 (632). Before the last step, 110 of the 250 plains that fit two mouths held one: 64 had a stem that touches the plain at one cell, 38 had no strictly descending way to the open sea past another channel's tail, and 8 had no path.
+- **Petroff-Guyou.** 67 % of the projected plain's cells stand above the sea, against 97 % on the Lambert bake. The projected plain also counts more cells (29,927 against 23,481), a share of 0.49 %. The likely cause is the projection's resampling: it spreads the delta layer's edge over sea-floor cells, and a plain one block high blends into the sea floor there. This was not checked cell by cell.
+- **Stacks.** The Lambert world's horizon tops are raised to the plain's surface on 989 cells. The raise is measured from each stack's old top, which lay up to 58 blocks below the new surface there; the plain itself raises the ground by at most 10.25 blocks. Strata are stretched to the new top, not moved.
+- **Cost.** The water part with the deltas ran in 8.45 s on the VM (the second network run included).
+
 ## Navigable rivers and deltas on the D5 world (measured 2026-10-22)
 
 Ben's reports of 2026-10-22: "I am yet to see a navigable river / interior waterway within the modpack" and "Do we have river deltas, I'm yet to see one?". This section only measures. No code was changed, and the live play server was read, never written. The world is D5, the play world on master d74c74aa (tag `play-d5`, workbench run 1a16576c9de, format 0.6, Petroff-Guyou, 13,312 blocks round, 294.6 m per block, 35 m per block of height).
