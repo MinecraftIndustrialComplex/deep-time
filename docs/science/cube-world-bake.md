@@ -3,7 +3,7 @@
 Status of this page: `stage 1 (written with the code, cube plan phase 1, 2026-10-22; measured on
 real bakes, nothing checked against a source)`.
 
-Ledger ids on this page: `SCL-120` to `SCL-129` (see [claims.md](claims.md)); it relies on the
+Ledger ids on this page: `SCL-120` to `SCL-130` (see [claims.md](claims.md)); it relies on the
 cube's geometry and maps, `SCL-078` to `SCL-081` and `SCL-100` to `SCL-108`, described on
 [seamless-world.md](seamless-world.md) ("The cube world").
 
@@ -20,7 +20,9 @@ The map is conformal, so shapes are kept: a round lake is round on every face, a
 keeps its proportions. It gives up area instead: a block in the middle of a face covers about 1.3
 times the planet's mean area per block, and a block near one of the cube's eight corners much less,
 so land there is drawn larger. The bake turns the planet inside the cube so that the eight corners
-lie far out at sea, where nobody walks. MEASURE-WHAT
+lie far out at sea, where nobody walks. On the 13 Earth-like 16k planets it was tried on, every
+corner fell at sea, 2.8° to 8.7° from the nearest land; no land is drawn at more than 2.5 times
+its planet area, and 99.9 % of it at no more than 2.2 times.
 
 Across the four seams that are straight in the net, and across the band's wrap, the world runs on
 as one surface. The other six seams turn: N's east edge is F1's top seen after a quarter turn, and
@@ -58,8 +60,11 @@ The pass runs after the Lambert bake, on the finished world folder, and rewrites
    varies with the map's local scale σ. The noises they read are written in net coordinates, which
    turn at a turning seam; within one wavelength of such a seam the bake mixes each noise with its
    value on the far side, half and half on the seam itself, so both sides read the same value.
-5. **Rivers, bodies and points** (SCL-126 to SCL-128). Positions go through the inverse map,
-   sizes and directions through the Jacobian. A river that crosses a turning seam is cut on it into
+5. **Rivers, bodies and points** (SCL-126 to SCL-128, SCL-130). Positions go through the inverse
+   map, sizes and directions through the Jacobian. A deposit body's ellipse is the exact image of
+   its planet ellipse under the Jacobian at its centre (its semi-axes the map's singular values),
+   so it keeps its planet area where the map shears; the Petroff-Guyou pass stretches each axis
+   alone (SCL-091), which grows a sheared body. A river that crosses a turning seam is cut on it into
    two chains: the upstream one ends on the seam with mouth code 3 (`seam`) into the downstream
    one, which starts at the same planet point on the partner edge. River widths are divided by the
    local scale, so a river is as many metres wide everywhere; depths are kept. Structure windows
@@ -85,6 +90,7 @@ The pass runs after the Lambert bake, on the finished world folder, and rewrites
 | SCL-127 | spawn margins | 256 from a corner, 64 from a turning edge | blocks | none | `game-choice` |
 | SCL-128 | structures on seams | kept and counted | count | none | `game-choice` |
 | SCL-129 | deposit forecast | the turn search at 100,000 points, 20,000 turns, 8 refined over 60 rounds of 24 | degrees | none | `game-choice` |
+| SCL-130 | body ellipse | semi-axes = singular values of J R(yaw) diag(a, c); the record's area over 12 x 4 points | blocks | none | `game-choice` |
 
 The footprint. The map's Jacobian, turned onto the planet, gives the ground's displacement east
 and north, in simulation blocks, per block of +x and of +z. The simulation's Lambert grid is
@@ -107,7 +113,127 @@ resolution and f the checkerboard's frequency along each axis.
 
 ## Measured on real bakes
 
-MEASURE-TABLES
+The runs (2026-10-22, on the test VM, `build/cube1/cube_bakes.sh b2` with the branch at e00f9f88;
+each world then through `deeptime world-map` and the kept ones through `deeptime deposit-audit`;
+the numbers gathered by `build/cube1/numbers.py`):
+
+- `planet_world_4k` seed 11 (face 1,024 blocks) as a cube and as Petroff-Guyou, with
+  `deposits_world_4k`'s three essentials at 2,048 blocks.
+- `earthlike_quick_16k` seed 1 (face 3,840 blocks), from a supercontinent over 1,000 Myr, as a cube
+  and as Petroff-Guyou, with the game's six essentials.
+- `earthlike_quick_16k` seeds 2 to 13, the same story, as cubes, for the turn.
+
+The four kept worlds are in the shared pool (`/data/ban/deeptime-runs/cube1/b2/`, listed in
+`/data/ban/deeptime-runs/pool/BASES.md`). The B1 control columns and the bodies' areas under
+SCL-130 come from a second bake of the two cubes on the merged branch
+(`build/cube1/cube_bakes.sh b3 build,p4kc,q16c`).
+
+**Seams (B1).** The 99th percentile of the elevation step between neighbouring L3 cells, in
+blocks: inside a face, on the first step inside a face edge, across each kind of seam, and the
+first step beside each kind of seam on both of its faces (the same ground's control).
+
+| world | inside a face | inside an edge | direct seams | the slide | turning seams |
+|---|---|---|---|---|---|
+| 16k seed 1 | 4.56 | 3.94 | 3.0 | 5.56 | 3.25 |
+| 4k seed 11 | 3.94 | 3.38 | 3.5 | 2.56 | 3.94 |
+
+MEASURE-BESIDE
+
+The largest steps: 40.6 blocks inside a face against 6.2, 7.4 and 5.6 across the direct seams, the
+slide and the turning seams (16k). The detail layer's amplitude steps are 0.375 inside a face and
+0.25 to 0.625 across seams (p99, 16k).
+
+**The footprint (B2).** The share of L3 cells and the record's checkerboard leak by D along the
+cell's long axis (simulation cells per world cell; L1 and L2 within 0.1 % of the same shares):
+
+| D (long axis) | under 1 | 1 to 1.1 | 1.1 to 1.2 | 1.2 to 1.5 | 1.5 to 2 | 2 to 4 | 4 and over |
+|---|---|---|---|---|---|---|---|
+| 16k: share | 16.4 % | 23.9 % | 17.9 % | 18.9 % | 10.5 % | 9.2 % | 3.0 % |
+| 16k: leak | 0.657 | 0.358 | 0.132 | 0.027 | 2.6e-4 | 1.5e-8 | 0 |
+| 4k: share | 28.0 % | 22.3 % | 14.0 % | 15.4 % | 9.5 % | 8.2 % | 0.7 % |
+| 4k: leak | 0.657 | 0.439 | 0.156 | 0.025 | 2.6e-4 | 1.6e-8 | 0 |
+
+Under D = 1 the world cell is finer than the simulation's and shows the checkerboard as it is: no
+alias. The plan's 1 % holds from D = 1.5 on the long axis (and, tested, where both axes span 1.2
+cells or more). Between 1 and 1.5 it does not: see "Open questions".
+
+**The turn (B3, SCL-120, SCL-121).** For each planet: the least distance from a corner to land, whether
+all eight are 5° or more from land, the land's blocks per planet area (99.9th percentile and
+largest) and the share of the 60,000 random turns that put all eight corners at sea.
+
+| planet | least distance | all 5° | land p99.9 | land largest | random turns all at sea |
+|---|---|---|---|---|---|
+| 16k seed 1 | 4.0° | no | 1.85 | 2.13 | 4.7 % |
+| 16k seed 2 | 6.25° | yes | 1.59 | 1.72 | 10.9 % |
+| 16k seed 3 | 5.55° | yes | 1.69 | 1.79 | 10.8 % |
+| 16k seed 4 | 8.2° | yes | 1.43 | 1.51 | 5.7 % |
+| 16k seed 5 | 3.4° | no | 2.07 | 2.30 | 0.85 % |
+| 16k seed 6 | 2.8° | no | 2.20 | 2.50 | 0.93 % |
+| 16k seed 7 | 8.7° | yes | 1.43 | 1.49 | 12.3 % |
+| 16k seed 8 | 4.5° | no | 1.80 | 1.95 | 9.5 % |
+| 16k seed 9 | 5.5° | yes | 1.67 | 1.84 | 9.0 % |
+| 16k seed 10 | 5.8° | yes | 1.66 | 1.78 | 4.4 % |
+| 16k seed 11 | 5.45° | yes | 1.71 | 1.83 | 9.3 % |
+| 16k seed 12 | 5.35° | yes | 1.60 | 1.79 | 5.1 % |
+| 16k seed 13 | 3.5° | no | 1.81 | 1.97 | 8.4 % |
+| 4k seed 11 | 15.65° | yes | 1.11 | 1.12 | 48.3 % |
+
+All eight corners are at sea on every planet. Both of the study's targets (corners 5° from land,
+land at most twice its area) hold on 8 of the 13 16k planets; the land within 5° of a corner is at
+most 0.34 % of the land (seed 6). The best turn about the polar axis (the plan's first B3) reached
+only −2.93° to 2.17° on the same planets: on most of them it leaves a corner on land.
+
+**Bodies, structures, spawn (B4, SCL-130).** On the 16k cube 7,448 bodies: 7,045 mid-face, 393
+within 64 blocks of a face edge, 10 within 5° of a corner. Their planet area against their source's
+(median) under SCL-091: 1.0007, 1.0041 and 1.058; under SCL-130: MEASURE-B4E. On the 4k cube 286
+bodies, by a corner 1.007 under SCL-091. Structure windows that cross a turning seam: 303 of 18,450
+(16k) and 107 of 532 (4k), all kept. Eight spawn candidates on each.
+
+**Rivers (B5, SCL-126).** 16k: 4,015 chains; 12 cut on turning seams, each with its partner; none
+cut on the direct seams or the slide, which 62 chains cross whole; the planet length changes by
+2.1e-8. 4k: 57 chains, none on a seam (5.7e-7).
+
+**Lakes (B6, SCL-122).** 16k: the 21 cell pairs across turning seams with a lake on both sides have
+the same water level, as do the 19,095 such pairs inside faces.
+
+**Biomes (B7).** The equal-area census of `deeptime world-map` (2,097,152 points on the planet),
+in % of the planet; the Köppen classes are `climate/koppen_l2`, the classes the biome inputs were
+placed by.
+
+| class | 16k cube | 16k Petroff-Guyou | 4k cube | 4k Petroff-Guyou |
+|---|---|---|---|---|
+| land | 27.78 | 27.77 | 7.785 | 7.786 |
+| ice | 4.517 | 4.531 | 0 | 0 |
+| wetland | 1.842 | 1.892 | 1.071 | 1.007 |
+| Af | 2.851 | 2.912 | 1.157 | 1.163 |
+| Aw | 1.480 | 1.475 | 0.619 | 0.737 |
+| BSh | 1.175 | 1.189 | 1.314 | 1.254 |
+| BSk | 1.763 | 1.764 | 0.855 | 0.844 |
+| Cfa | 2.458 | 2.464 | 0.549 | 0.506 |
+| Cfb | 3.240 | 3.235 | 0.832 | 0.787 |
+| Dfc | 1.508 | 1.510 | 0.045 | 0.049 |
+| EF | 4.546 | 4.531 | 0 | 0 |
+| ET | 1.596 | 1.584 | 0.148 | 0.140 |
+
+At 16k every class over 0.5 % of the planet is within 2.7 % of itself (wetland; Af 2.1 %), land
+and ice within 0.3 %. At 4k the land is the same to 0.02 %, but the classes move more: Aw 16 %,
+the Köppen land as a whole 2 % less on the cube.
+
+**Essentials (B8, SCL-129).** `deeptime deposit-audit`, regions of the shipped sizes: on the 16k cube
+every top-up land region of each of the six essentials holds a source with ore on dry ground
+(coal and iron 8 of 8, copper, gold, lead and zinc 3 of 3; Petroff-Guyou 8 of 8 and 2 of 2), with
+14 guaranteed sites, each with ore at its centre, and no region short. On the 4k cube coal, copper
+and iron hold 3 of 3 (Petroff-Guyou 2 of 2), with 7 guaranteed sites.
+
+**Relief and scale (SCL-123).** σ over the faces: 77 to 331 m per block at 16k (median 305, nominal
+294.8), 72 to 311 at 4k (median 286, nominal 276.4). The relief, 16k cube against Petroff-Guyou:
+51 and 51 active cones gullied with 8 gullies each (median), gully span 16.4 and 15.7 blocks, the
+jag on 529,535 and 505,100 L3 cells, cliff bands on 145,204 and 128,578, mean change 0.95 and
+1.01 blocks. 4k: 3 and 3 cones gullied, 8 gullies each.
+
+**Coexistence.** With `scale.projection` unset the bake writes the Petroff-Guyou world of format
+0.6 exactly as master does: `tools/review/projection-identity.sh` gives the same hashes for every
+bake and staged world (MEASURE-IDENTITY). The game (Java) still refuses a cube world.
 
 ## Simplifications and limits
 
@@ -124,6 +250,9 @@ MEASURE-TABLES
   Moser's equal-area cube.
 - **Per-face body images.** A deposit or intrusion body that crosses a turning seam keeps one
   shape, its centre's; the plan's per-face images are phase 2's (the game side reads them).
+- **The simulation's own artefacts show through.** Near the Lambert simulation's poles its fans of
+  stretched cells and its stretched impact ellipses appear on the cube as on Petroff-Guyou: the
+  bake shows what the simulation made. Phase 4 moves the simulation off that grid.
 
 ## Game choices
 
@@ -134,7 +263,17 @@ the reason for each value.
 
 ## Open questions
 
-- MEASURE-OPEN
+- **The footprint just above D = 1.** Between D = 1 and 1.5 on the long axis (60 % of a 16k
+  world's cells) a checkerboard at the simulation's resolution leaks 3 % to 36 %, as a slow beat.
+  A width that grows from 0 at D = 1 cannot stop it; a filter that could (0.92 simulation cells,
+  everywhere or from D = 1 on) halves every feature 4 cells across. The bake's rasters carry little
+  at their own resolution, so the bake keeps the sharper world; a pre-blur is the fix if beats show.
+- **Small islands and the turn.** The search's 400,000 points lie 0.32° apart, so it can miss the
+  smallest islands; the record's distance then sits under the search's (seed 13: 3.5° against
+  4.6°). More points cost little.
+- **Biome shares on a small 4k planet.** The Köppen classes of the 4k cube differ from the
+  Petroff-Guyou world's by up to 16 % of a class (Aw, 0.6 % of the planet) and its Köppen land is
+  2 % smaller, where the 16k world agrees to 2.7 %. Not traced.
 
 ## Sources
 
