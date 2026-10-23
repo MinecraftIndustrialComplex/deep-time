@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! The delta stage's laws and its plains and distributaries on a synthetic planet (C = 1,024, 2
-//! blocks a cell): one wide valley draining south to a beach band and a shallow shelf.
+//! blocks a cell): one V-shaped valley gathering all the land into one river that runs south across
+//! a band of shallows to a shelf.
 
 use deeptime_format::GridDesc;
 use deeptime_format::rivers::{Mouth, NO_CHAIN};
@@ -57,8 +58,11 @@ fn the_build_fit_expands_what_it_compressed() {
     assert!(fit.expand(310.0).is_infinite());
 }
 
-/// Terrain height, blocks: land sloping south down a wide valley to the coast at row `COAST`, a
-/// beach band (half a block under the sea's surface) to row `SHELF`, then a shelf deepening south.
+/// Terrain height, blocks: land sloping gently south (0.02 a row) to the coast at row `COAST`, its
+/// sides falling steeply (0.15 a column) to the valley's axis at column 256, so every cell drains
+/// sideways to the axis (0.15 beats a diagonal's (0.15 + 0.02) / √2) and the axis carries the whole
+/// land south; a band of shallows (half a block under the sea's surface) to row `SHELF`, then a
+/// shelf deepening south.
 fn height(i: usize, j: usize) -> f64 {
     let (fi, fj) = (i as f64, j as f64);
     if j >= SHELF {
@@ -67,8 +71,8 @@ fn height(i: usize, j: usize) -> f64 {
     if j >= COAST {
         return SEA - 0.5;
     }
-    let valley = 0.08 * (fi - 256.0).abs();
-    SEA + 0.5 + 0.25 * (COAST as f64 - fj) + valley
+    let valley = 0.15 * (fi - 256.0).abs();
+    SEA + 0.5 + 0.02 * (COAST as f64 - fj) + valley
 }
 
 fn grid() -> GridDesc {
@@ -131,7 +135,13 @@ fn deltas(params: &HydroParams) -> (Vec<i16>, Plains, Output, Vec<delta::Split>)
 
 #[test]
 fn a_large_river_builds_a_plain_above_the_sea_and_splits_across_it() {
-    let params = HydroParams::default();
+    // A larger plain and closer mouths than the defaults, so this small planet's front holds
+    // more than one of its wide channels (the defaults are measured on real worlds).
+    let params = HydroParams {
+        delta_area_mult: 16.0,
+        delta_mouth_spacing: 1.0,
+        ..HydroParams::default()
+    };
     let base = elevation();
     let (elev, plains, second, splits) = deltas(&params);
     assert!(!plains.plains.is_empty(), "no delta");
@@ -152,6 +162,23 @@ fn a_large_river_builds_a_plain_above_the_sea_and_splits_across_it() {
             assert!(e > SEA_RAW && e <= SEA_RAW + 16, "cell {c} at {e}");
         }
     }
+    // The river comes off the land onto the plain and runs across it to its front: the second
+    // network's largest sea mouth ends on the plain, and the ground under its course never rises
+    // downstream there (the ramp along the outflow, HYD-136).
+    let main = second
+        .mouths
+        .iter()
+        .max_by(|a, b| a.q.total_cmp(&b.q))
+        .expect("a sea mouth");
+    assert!(plains.owner.contains_key(&main.root), "the river leaves its plain");
+    let on: Vec<i16> = main
+        .stem
+        .iter()
+        .filter(|&&c| plains.owner.contains_key(&c))
+        .map(|&c| elev[c as usize])
+        .collect();
+    assert!(on.len() >= 3, "{} stem cells on the plain", on.len());
+    assert!(on.windows(2).all(|p| p[1] <= p[0]), "{on:?}");
     // The largest plain splits: more than one mouth, each new chain leaving its parent at one of
     // the parent's vertices and ending in the sea.
     let r = &second.rivers;
