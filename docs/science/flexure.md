@@ -482,7 +482,54 @@ Unit tests `the_sea_over_the_ocean_floors_own_moves_is_no_load` (GDH1's sinking 
 −10 km sinks no further; without the source's height, 6.5 km × 0.45 more, as before; a sea 100 m
 higher sinks the floor by 0.45 of it) and `a_trench_carries_its_offset` (advect.rs).
 
-**Measured.** (to come)
+**Measured** (the shared pool, `earthlike_quick_16k`, 1000 Myr, both starts, seeds 1 to 4, 8 runs
+an arm, `+DEEPTIME_CRUST_BUDGET=1`; each argument set against itself without the fix on the same
+seeds; medians, two-sided Mann-Whitney p). Three argument sets: the base; the trench budget's three
+keys (`trench_release_half_life_myr=2`, `sediment_subduction_share=0.12`,
+`subduction_erosion_km3_per_km_myr=90`); and those with the high ground's sheet (the four
+`collapse_*` keys), the seven that become the default. Arms `base`/`fg-trench`,
+`trench-m-rs12e`/`fg-trcomb-rs12e`, `trench-m-rs12e-sheet`/`fg-trench-sheet`.
+
+| measure (Earth) | base | fixed | p | trench keys | fixed | p | seven keys | fixed | p |
+|---|---|---|---|---|---|---|---|---|---|
+| deepest floor, m (9,242 at 15', 10,920) | 12,943 | 10,169 | < 0.001 | 11,154 | 9,113 | 0.001 | 10,953 | 9,674 | 0.028 |
+| the plate model's deepest, m | 10,672 | 9,662 | 0.002 | 9,387 | 9,240 | 0.28 | 9,561 | 9,289 | 0.11 |
+| floor deeper than 8 km, share (0.0003) | 0.0318 | 0.0163 | 0.021 | 0.0022 | 0.0007 | < 0.001 | 0.0030 | 0.0007 | 0.001 |
+| floor p99, m (5,953) | 8,967 | 8,292 | 0.001 | 6,951 | 6,663 | 0.010 | 7,115 | 6,746 | 0.050 |
+| floor deeper than 6 km, share (0.0073) | 0.145 | 0.167 | 0.23 | 0.054 | 0.077 | 0.57 | 0.099 | 0.121 | 0.20 |
+| floor p50, m | 3,924 | 4,271 | 0.083 | 3,971 | 4,181 | 0.010 | 4,276 | 4,308 | 0.80 |
+| the guard's worst, m from the sea | 15,898 | 14,452 | 0.015 | 16,938 | 13,704 | 0.065 | 15,640 | 13,837 | 0.33 |
+| the guard's worst, the arm's largest | 19,684 | 21,175 | | 28,548 | 30,945 | | 20,619 | 25,955 | |
+| V1 criteria met per run, mean | 2.50 | 2.62 | 0.91 | 2.00 | 2.12 | 0.91 | 2.88 | 3.00 | 0.78 |
+
+The guard's worst per run, m (scattered continents 1 to 4, then supercontinent 1 to 4):
+
+| arm | sc1 | sc2 | sc3 | sc4 | sp1 | sp2 | sp3 | sp4 |
+|---|---|---|---|---|---|---|---|---|
+| base | 16,894 | 19,684 | 15,892 | 15,901 | 15,818 | 15,896 | 15,322 | 18,084 |
+| fixed | 15,053 | 13,916 | 13,312 | 14,478 | 12,370 | 14,427 | 21,175 | 15,541 |
+| trench keys | 17,392 | 15,515 | 18,474 | 16,174 | 14,778 | 28,548 | 16,483 | 19,525 |
+| fixed | 15,012 | 17,761 | 12,153 | 12,878 | 12,148 | 14,530 | 30,945 | 11,784 |
+| seven keys | 16,309 | 15,550 | 20,619 | 15,730 | 15,225 | 16,608 | 14,991 | 15,165 |
+| fixed | 12,420 | 13,084 | 18,833 | 25,955 | 17,481 | 12,395 | 14,590 | 13,017 |
+
+The surface's deepest floor now stands within 0.1 to 0.5 km of the plate model's (median of the
+arm against median; it was 2.3, 1.8 and 1.4 km under it), and inside the trench measure's 8 to 11 km
+in all three sets. The plate model's own deepest rose 1.0 km on the base set: its samples read the
+surface's offset back (ISO-078), and the offset the sea added under its trenches is gone. The V1
+measures did not move in any set (every p 0.13 or more over the seven and the criteria; 0.38 or
+more in the seven-key set), so the runs stopped at 4 seeds. The median floor came out 0.2 to
+0.35 km deeper in two sets (p 0.010 and 0.083, not in the seven-key set), most likely (not traced)
+because the sea the plate model's rises of the floor took away (a trench's pull released, for one)
+had lifted it by 0.45 of each rise, and that is gone with the rest. The share deeper
+than 6 km is the plate model's (its own share moved with it, 0.143 to 0.168 on the base set), the
+trench budget's open item.
+
+**What is left.** The guard's worst median fell 1.4 to 3.2 km, to 13.7 to 14.5 km, still 3 km past
+the Challenger Deep, and single runs still reach 19 to 31 km for a few steps (the arms' largest,
+above; 23 steps beyond 19.8 km in the worst). Those runs differ from one arm to the next, with the
+fix and without it (28.5 km in the trench keys' supercontinent 2 before it, 30.9 km in their
+supercontinent 3 after). (Traced: to come.)
 
 ## Game choices
 
