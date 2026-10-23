@@ -80,6 +80,9 @@ pub struct Input<'a> {
     pub params: &'a HydroParams,
     /// `scale.feature_scale.rivers`.
     pub width_scale: f64,
+    /// Whether to find the sea mouths and their catchments ([`Output::mouths`], for the delta
+    /// stage); without, `mouths` is empty.
+    pub mouths: bool,
 }
 
 /// One lake.
@@ -905,7 +908,11 @@ pub fn run(inp: &Input<'_>) -> Output {
     }
     river_cells.sort_unstable();
     let land = order.len();
-    let catchments = catchments(&g, inp, &order, &state, to);
+    let catchments = if inp.mouths {
+        catchments(&g, inp, &order, &state, to)
+    } else {
+        HashMap::new()
+    };
     drop(order);
     // The level of the sea or lake downstream of a cell, found by walking down from it (and kept
     // for every cell on the way): a lake's level, the sea's, or a sink's own height.

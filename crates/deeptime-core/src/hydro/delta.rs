@@ -109,6 +109,7 @@ pub struct Plain {
 }
 
 /// The plains of one raster.
+#[derive(Default)]
 pub struct Plains {
     pub plains: Vec<Plain>,
     /// The plain of each plain cell.
