@@ -199,8 +199,10 @@ fn release(
         geo,
         env,
         by_plate,
-        to,
-        collapse::normal_thickness_m(),
+        collapse::RoomTo {
+            continental_m: to,
+            ocean_m: collapse::normal_thickness_m(),
+        },
         &mut moved,
         Some(floor),
     );

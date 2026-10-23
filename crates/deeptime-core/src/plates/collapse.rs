@@ -190,7 +190,11 @@ pub fn founder(
         let to = (k.collapse_thickness_km * 1000.0).clamp(normal_thickness_m(), t_max);
         if !by_plate.is_empty() {
             let ocean_to = room_column_m(k, sea_m).min(to);
-            spread(state, geo, env, by_plate, to, ocean_to, out, None);
+            let to = RoomTo {
+                continental_m: to,
+                ocean_m: ocean_to,
+            };
+            spread(state, geo, env, by_plate, to, out, None);
         }
     }
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
@@ -368,7 +372,11 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env, sea_m: f64) -> Collaps
         held_km2_m: held * area,
         ..Collapse::default()
     };
-    let shares = spread(state, geo, env, by_plate, normal, normal, &mut out, None);
+    let to = RoomTo {
+        continental_m: normal,
+        ocean_m: normal,
+    };
+    let shares = spread(state, geo, env, by_plate, to, &mut out, None);
     out.unplaced_km2_m = budgets
         .iter()
         .map(|(p, b)| b * (1.0 - shares.get(p).copied().unwrap_or(0.0)))
@@ -388,6 +396,14 @@ fn spreads(k: &crate::params::TectonicParams) -> bool {
         || k.collapse_reach_km <= 0.0)
 }
 
+/// How thick [`spread`] fills its room, m: continental crust up to `continental_m`, ocean floor up
+/// to `ocean_m` (continental once filled to it).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) struct RoomTo {
+    pub continental_m: f64,
+    pub ocean_m: f64,
+}
+
 /// Moves crust from each plate's `sources` (sample, m of thickness to release) to the nearest
 /// room on the same plate within `collapse_reach_km` (see the module docs, "The rule": continental
 /// crust thinner than `continental_to_m`, filled up to it, and ocean floor, filled up to
@@ -402,11 +418,14 @@ pub(super) fn spread(
     geo: &Geo,
     env: &Env,
     by_plate: BTreeMap<u32, Vec<(usize, f64)>>,
-    continental_to_m: f64,
-    ocean_to_m: f64,
+    to: RoomTo,
     out: &mut Collapse,
     floor: Option<&[f32]>,
 ) -> BTreeMap<u32, f64> {
+    let RoomTo {
+        continental_m: continental_to_m,
+        ocean_m: ocean_to_m,
+    } = to;
     let k = env.k;
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
     let mut shares = BTreeMap::new();
@@ -980,7 +999,10 @@ pub(in crate::plates) mod tests {
         let t_n = normal_thickness_m();
         assert!(column > t_n + 6000.0, "{column}");
         assert!(lo >= column - 1.0, "{lo} vs {column}");
-        assert!(converted > 0 && thinnest_new >= column - 1.0, "{converted} {thinnest_new}");
+        assert!(
+            converted > 0 && thinnest_new >= column - 1.0,
+            "{converted} {thinnest_new}"
+        );
         // On, under a sea at the datum: T_n, as with the switch off. In 38 Myr (τ 25) the belt
         // loses 78 % of its excess either way, so it ends about 0.78 × 7.0 S thicker under the sea.
         let (_, column0, lo0, _, _) = run(true, 0.0);
