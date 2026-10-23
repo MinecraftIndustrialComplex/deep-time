@@ -67,11 +67,18 @@ If the key fails, fix `sources.list` (a line, with a reason), and nothing else i
 
 `pool.sh alias <new> <old> --check-seed S` is for the opposite error, a commit that changes a covered file
 without changing what a run does (a comment, a rename, a refactor). It runs one seed under the new key,
-takes the old key's same run (cached, or run now), and compares the two final checkpoints bit for bit
-(sha256 of the `.ck`). If identical, it records `new -> old` in `aliases.json`, and the new key's arms
-resolve to the old key's folders from then on, for the verified arm (preset, length, argument set) only.
-`--all-arms` extends it to every arm, for a change you know cannot reach the arm you did not test. If the states
-differ the alias is not recorded, which is the right answer for a real change.
+takes the old key's same run (cached, or run now), and compares the final state of the two bit for bit:
+the sha256 of a dump of every world field and the globals (103 fields on a 16k planet; each run records it
+in `meta.json` as `state_sha256`, per-file hashes in `state.json`) and of the dynamics record `rec.json`. If
+identical, it records `new -> old` in `aliases.json`, and the new key's arms resolve to the old key's folders
+from then on, for the verified arm (preset, length, argument set) only. `--all-arms` extends it to every arm, for
+a change you know cannot reach the arm you did not test. If the states differ the alias is not recorded
+(and the differing fields are named), which is the right answer for a real change.
+
+The checkpoint file is not what is compared: measured on 2026-10-23, the same binary run twice on the same
+arguments writes `.ck` files that differ in tens of MB (the container is not byte-stable), while the world
+state dumped from them, and the plate-check record, are identical, between those two runs and between two
+keys that differ in a comment.
 
 ## Layout on the VM
 
@@ -82,10 +89,11 @@ differ the alias is not recorded, which is the right answer for a real change.
   <srckey>/used                                   touched on every use (gc reads it)
   <srckey>/<preset>-<length>/<argkey>/args.json   the sorted --set, +ENV list, threads of that arm
   <srckey>/<preset>-<length>/<argkey>/<start>-<seed>/
-      meta.json          what ran, when, how long, ck_sha256, fields_sha256, measures and their versions
+      meta.json          what ran, when, how long, state_sha256, rec_sha256, measures and their versions
+      state.json         sha256 of every file of a full dump of the final world (the alias check's evidence)
       summary.txt        the stage's own summary
       plate.json, plate-table.txt, rec.json     plate-check's output and the dynamics record
-      fields/            the dump of the final checkpoint (index.json, globals.json, <field>.f32)
+      fields/            the dump of some fields of the final checkpoint (index.json, globals.json, <field>.f32)
       measures/<name>.json                      one file per measure and version
   <srckey>/<preset>-<length>/<argkey>/<start>-<seed>.lock / .FAILED
   arms/<name>.json   aliases.json   KEEP   .pyenv-numpy
@@ -94,10 +102,13 @@ differ the alias is not recorded, which is the right answer for a real change.
 
 `argkey` is 8 hex digits of the sorted `--set` list, the sorted `+ENV` list and the thread count. A run
 is therefore named by (source key, preset, length, start, seed, sets, envs, threads), which is everything
-that can change its bytes.
+that can change its world. Every run is a CPU run (`DEEPTIME_COMPUTE=cpu`, recorded as `compute` in
+`meta.json`: a GPU world differs from a CPU world, and the VM has no GPU); `+DEEPTIME_COMPUTE=gpu` overrides it
+and, as an environment variable, is part of the argkey.
 
-Each run's final checkpoint (`final.ck`, about 0.8 GB) is deleted after the measures unless `--keep-ck`.
-What survives is a few MB: the dump of the fields below, the plate-check output and the measures. A measure
+Each run's final checkpoint (`final.ck`, 0.3 GB at 100 Myr, about 0.8 GB at 1000) is deleted after the measures
+unless `--keep-ck`. What survives is about 17 MB a run: the dump of the fields below, the plate-check output
+and the measures. A measure
 that needs a field outside the dump needs `--keep-ck` (or `--rerun` once, with the field added to its
 `fields` list in the registry).
 
