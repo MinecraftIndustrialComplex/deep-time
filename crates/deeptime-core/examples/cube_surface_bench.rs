@@ -34,6 +34,8 @@ const R: f64 = 6.371e6;
 type V3 = [f64; 3];
 
 /// The two grids and their diffusion workspaces.
+// A bench builds each grid once, so the variants' sizes do not matter.
+#[allow(clippy::large_enum_variant)]
 enum Grid {
     Cube(CubeGrid, cube::Workspace),
     Lambert(Dims, diffusion::Workspace),
@@ -59,7 +61,12 @@ fn waves(seed: u64) -> Vec<(V3, f64, f64, f64)> {
             let d = [uni() - 0.5, uni() - 0.5, uni() - 0.5];
             let l = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
             let k = 1.0 + 5.0 * uni();
-            ([d[0] / l, d[1] / l, d[2] / l], k, 6.283 * uni(), 1.0 / k)
+            (
+                [d[0] / l, d[1] / l, d[2] / l],
+                k,
+                std::f64::consts::TAU * uni(),
+                1.0 / k,
+            )
         })
         .collect()
 }
