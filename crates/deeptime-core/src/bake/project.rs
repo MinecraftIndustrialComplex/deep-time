@@ -686,7 +686,8 @@ pub(crate) const RELIEF_BYTES_PER_WORLD_CELL: u64 = 6;
 /// ([`RELIEF_BYTES_PER_WORLD_CELL`]). Beside them stay the Lambert elevation and amplitude it loads
 /// first (L3, shared with that grid's sources, kept to the end) and the world layers of the grids
 /// before: the horizon stacks (kept for the top raise), the L2 layers the relief and the biomes'
-/// land call read, and the world's elevation (the halved grid's ground). Memory accounting, 2026-10-05:
+/// land call read, and the world's elevation (the halved grid's ground). Last comes the top
+/// raise on the horizon stacks and their write, beside all of it. Memory accounting, 2026-10-05:
 /// before this the pass was not in the estimate and kept a second copy of every resampled layer
 /// beside its output. amp-est, 2026-10-23: the closed basins' ground and working set were left
 /// out (452.6 MB listed for a pass that held 969.9 MB on quick 16k), and the water's layers were
@@ -745,6 +746,24 @@ pub fn estimate_bytes(p: &PlanetPreset) -> u64 {
         let resident = if level == 3 { 0 } else { kept_sources };
         worst = worst.max(resident + kept + src + out + work);
         kept += out;
+    }
+    // The top raise, after every grid, beside their layers ([`raise_world_tops`]; amp-est,
+    // 2026-10-23: the bake's peak on the memory_estimate test planet, which the steps above left
+    // out). Its parts follow each other: the raise (the stack's two maxima as f64 and its record
+    // of moved cells, 16 B a cell, three times over while the record grows), the shifts
+    // (`world_raise_shifts`: a copy of the stacks and a dense record), then the stack's write
+    // (`bake::stored_tiles`: 1.1 × the stack and one batch, and the writer's buffer).
+    let horizons = p.structure.as_ref().map_or(0, |s| u64::from(s.horizons));
+    if horizons > 0 {
+        let cells = world_cells(p.resolution.l1_r);
+        let stack_cell = 7 * horizons;
+        let stack = cells * stack_cell;
+        let tile = u64::from(deeptime_format::raster::TILE).pow(2) * stack_cell;
+        let batch = (crate::bake::STORE_BATCH_BYTES / tile).max(1) * tile;
+        let raise = cells * (16 + 3 * 16);
+        let shifts = cells * (stack_cell + 12 + 16);
+        let write = (stack + batch.min(stack)) * 11 / 10 + (1 << 20);
+        worst = worst.max(kept_sources + kept + raise.max(shifts).max(write));
     }
     worst
 }

@@ -51,6 +51,14 @@ pub const EPOCH_CHECKPOINTS: f64 = 10.0;
 /// The default native memory cap, 4 GiB (plan §5.7.5).
 pub const DEFAULT_MEM_CAP: u64 = 4 << 30;
 
+/// How far under a stage's estimate the allocator keeps its freed blocks for reuse
+/// (`MemoryGauge::keep_below`): between a block giving way and the count, other threads' fresh
+/// blocks take the count past the bound. A figure of the memory model, not a physical one
+/// (amp-est, 2026-10-23: with the bound at the estimate, the counted peak was 325 KB over the
+/// bake's estimate on quick 16k at 50 Myr, 333 KB on Ben's world at 1000 Myr, and 33 KB over the
+/// amplifier's).
+pub const KEEP_MARGIN_BYTES: u64 = 8 << 20;
+
 /// The event-log writer name of the geology core (writer 1, `EVENTS.md`).
 pub const GEOLOGY_WRITER_NAME: &str = "deeptime:geology";
 
@@ -1265,7 +1273,8 @@ impl Session {
         k: usize,
         history: Option<&HistoryHandle>,
     ) -> Result<(), CoreError> {
-        self.gauge.keep_below(s.allowed[k].min(self.mem_cap));
+        self.gauge
+            .keep_below(s.allowed[k].min(self.mem_cap).saturating_sub(KEEP_MARGIN_BYTES));
         let Some(h) = history else {
             return Ok(());
         };
@@ -1982,7 +1991,8 @@ impl Session {
         // kept filled the count to that bound, and one fresh block passed it (tests/memory_estimate.rs,
         // 2026-10-21: 99.7 against 99.5 MiB, 41.6 MiB of it kept blocks).
         if let Some(a) = s.bake_allowed {
-            self.gauge.keep_below(a.min(self.mem_cap));
+            self.gauge
+                .keep_below(a.min(self.mem_cap).saturating_sub(KEEP_MARGIN_BYTES));
         }
         let dir = &self.out_dir;
         let manifest_path = dir.join(MANIFEST);

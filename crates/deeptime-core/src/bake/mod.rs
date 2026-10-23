@@ -124,19 +124,33 @@ impl Out<'_> {
     }
 }
 
-/// Every tile of a layer as stored (`tilepack::stored_tile`), compressed in parallel (P1-19).
+/// The raw tile bytes [`stored_tiles`] compresses at once (at least one tile). A tile in flight
+/// holds its raw copy and the compressor's worst-case buffer (`lz4_flex`: 1.1 × the input), so a
+/// layer's write holds at most 1.1 × (the layer's raw bytes + this) whatever the thread count:
+/// its finished tiles, at worst 1.1 × theirs, and the batch's extra 1.1 × its own. A figure of
+/// the memory model, not a physical one (amp-est, 2026-10-23: the world's horizon stacks on
+/// full 32k, 28 tiles of 14.7 MB, held 224.6 MB in flight on 8 threads, and would hold up to
+/// 2.2 × their 299 MB on 28).
+pub(crate) const STORE_BATCH_BYTES: u64 = 32 << 20;
+
+/// Every tile of a layer as stored (`tilepack::stored_tile`), compressed in parallel (P1-19), a
+/// batch of at most [`STORE_BATCH_BYTES`] raw bytes at a time.
 pub(crate) fn stored_tiles(desc: &LayerDesc, cells: &[u8]) -> Result<Vec<Vec<u8>>, CoreError> {
     desc.validate()?;
     check_cells(desc, cells)?;
-    Ok((0..desc.tile_count())
-        .into_par_iter()
-        .map(|t| {
+    let n = desc.tile_count();
+    let tile_bytes = (desc.tile as usize).pow(2) * desc.cell_bytes();
+    let batch = (STORE_BATCH_BYTES as usize / tile_bytes.max(1)).max(1);
+    let mut tiles = Vec::with_capacity(n);
+    for first in (0..n).step_by(batch) {
+        tiles.par_extend((first..(first + batch).min(n)).into_par_iter().map(|t| {
             let mut tile = stored_tile(desc, cells, t);
             // The compressor's buffer is sized for the worst case: only the stored bytes are kept.
             tile.shrink_to_fit();
             tile
-        })
-        .collect())
+        }));
+    }
+    Ok(tiles)
 }
 
 /// Writes a layer's tile pack (atomically, the file `write_tile_pack` writes) with its tiles
