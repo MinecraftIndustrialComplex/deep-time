@@ -114,14 +114,15 @@ def summarise(spec, base, arms):
     arm in `arms` are (name, [per-run value dicts])."""
     out = {}
     base_runs = base[1]
-    for name, runs in [base] + arms:
+    for idx, (name, runs) in enumerate([base] + arms):
+        is_base = idx == 0
         cells = {}
         for c in spec["columns"]:
             if c.get("special") == "criteria":
                 mine, theirs = criteria_counts(runs, spec), criteria_counts(base_runs, spec)
                 cells["criteria"] = {"n": len(mine), "median": statistics.median(mine) if mine else None,
                                      "mean": statistics.mean(mine) if mine else None,
-                                     "p": None if name == base[0] else mwu(theirs, mine), "runs": mine}
+                                     "p": None if is_base else mwu(theirs, mine), "runs": mine}
                 continue
             key = c["key"]
             vals = column_values(runs, key)
@@ -130,7 +131,7 @@ def summarise(spec, base, arms):
                 v2 = column_values(runs, c["key2"])
                 cell["median2"] = statistics.median(v2) if v2 else None
             else:
-                cell["p"] = None if name == base[0] else mwu(column_values(base_runs, key), vals)
+                cell["p"] = None if is_base else mwu(column_values(base_runs, key), vals)
             cells[key] = cell
         out[name] = cells
     return out
