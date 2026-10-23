@@ -926,8 +926,8 @@ impl Default for TectonicParams {
             thermal_backstop: false, // ledger: PLT-470 (game-choice: off by default)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
             heat_flow_refresh: false, // ledger: PLT-469 (game-choice: off by default)
-            transition_beta: false,   // ledger: PLT-475 (game-choice: off by default)
-            root_removal: false,      // ledger: PLT-477 (game-choice: off by default)
+            transition_beta: false, // ledger: PLT-475 (game-choice: off by default)
+            root_removal: false,  // ledger: PLT-477 (game-choice: off by default)
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
             continent_elevation_m: [150.0, 900.0],
