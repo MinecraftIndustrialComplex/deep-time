@@ -2,8 +2,10 @@
 //! The counting allocator's count is exact: after any mix of small allocations, reallocations
 //! (across size classes, in place and moved), zeroed allocations and frees, on this thread and on
 //! others, the count is back where it started (after a thread exits, within its park's bytes), with
-//! the system allocator and with mimalloc under it (`--features mimalloc`). One test in its own binary, so the allocator counts nothing else
-//! (the test harness's own threads are idle while it runs).
+//! the system allocator and with mimalloc under it (`--features mimalloc`). Its own binary without
+//! the test harness (`harness = false` in Cargo.toml), so the allocator counts nothing else: libtest's
+//! main thread files its bookkeeping for a test after it starts the test's thread, and under load
+//! those blocks landed inside the one-thread check (the gate rerun on d74c74aa).
 
 use std::alloc::{GlobalAlloc, Layout};
 
@@ -72,7 +74,11 @@ fn churn(seed: u64) {
     }
 }
 
-#[test]
+fn main() {
+    the_count_returns_to_where_it_started();
+    println!("alloc_exact: the count returns to where it started");
+}
+
 fn the_count_returns_to_where_it_started() {
     // Parked blocks (Linux) stay counted until their thread gives them back.
     alloc::unpark_thread();
