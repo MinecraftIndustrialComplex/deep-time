@@ -473,9 +473,222 @@ impl Terrain for RiverTest {
     }
 }
 
+/// The delta-test world (V1 gap 5, stage 1; `deeptime synth --kind delta-test`, the Java
+/// `DeltaGameTests`): ground by x alone, as the bake's delta stage leaves it. A plain at y 70.5 for
+/// x <= -250 and x >= 400, a slope down to the delta plain at y 63.5 (its top block 63, a block
+/// over the sea's top water block 62) from x -50 to x 120, a drop to the sea floor at y 45.5 by
+/// x 150, the sea floor to x 300 and the rise back. The river (chain 0) runs east along z 0 from
+/// x -400 to x 160, its surface 68.9 falling to the sea's 63.0 at x -50, half-width 10 and depth 8
+/// down to the apex at x 0 and its share's half-width 7 and depth 5.5 below it. Two distributaries
+/// leave the river's vertex at the apex (`from` 0): chain 1 runs south-east to (64, 64) and east
+/// along z 64 to x 160, chain 2 the same to the north along z -64, half-width 7 and depth 5.5, their
+/// surface the sea's. Every number here is a test fixture's (game-choice: agent, 2026-10-23).
+pub struct DeltaTest {
+    pub c: u32,
+}
+
+impl DeltaTest {
+    pub const PLAIN_Y: f64 = 70.5;
+    pub const DELTA_Y: f64 = 63.5;
+    pub const SEA_FLOOR_Y: f64 = 45.5;
+    pub const SLOPE_FROM_X: f64 = -250.0;
+    pub const DELTA_FROM_X: f64 = -50.0;
+    pub const FRONT_X: f64 = 120.0;
+    pub const SEA_FROM_X: f64 = 150.0;
+    pub const RISE_FROM_X: f64 = 300.0;
+    pub const PLAIN_FROM_X: f64 = 400.0;
+    pub const SEA_W: f64 = 63.0;
+
+    pub const RIVER_FROM_X: f64 = -400.0;
+    pub const RIVER_TO_X: f64 = 160.0;
+    pub const SPACING: f64 = 4.0;
+    pub const SOURCE_W: f64 = 68.9;
+    pub const APEX_X: f64 = 0.0;
+    pub const RIVER_HALF_WIDTH: f64 = 10.0;
+    pub const RIVER_DEPTH: f64 = 8.0;
+    pub const RIVER_Q: f64 = 600.0;
+    pub const BRANCH_HALF_WIDTH: f64 = 7.0;
+    pub const BRANCH_DEPTH: f64 = 5.5;
+    pub const BRANCH_Q: f64 = 200.0;
+    /// Where the distributaries turn east, |z| (and x).
+    pub const BRANCH_Z: f64 = 64.0;
+
+    fn wrap_x(&self, x: f64) -> f64 {
+        let c = f64::from(self.c);
+        x - c * (x / c).round_ties_even()
+    }
+
+    /// The river's surface at x.
+    pub fn river_w(x: f64) -> f64 {
+        if x >= Self::DELTA_FROM_X {
+            Self::SEA_W
+        } else {
+            Self::SEA_W
+                + (Self::SOURCE_W - Self::SEA_W) * (Self::DELTA_FROM_X - x)
+                    / (Self::DELTA_FROM_X - Self::RIVER_FROM_X)
+        }
+    }
+
+    /// The network: the river (chain 0) and its two distributaries (chains 1 and 2), indexed.
+    pub fn rivers(&self) -> Rivers {
+        let mut r = Rivers::empty(self.c);
+        let vertex = |x: f64, z: f64, w: f64, hw: f64, depth: f64, q: f64| RiverVertex {
+            x: x as f32,
+            z: z as f32,
+            w: w as f32,
+            hw: hw as f32,
+            depth: depth as f32,
+            q: q as f32,
+        };
+        let n = ((Self::RIVER_TO_X - Self::RIVER_FROM_X) / Self::SPACING).round() as u32;
+        for k in 0..=n {
+            let x = Self::RIVER_FROM_X + f64::from(k) * Self::SPACING;
+            let (hw, depth, q) = if x <= Self::APEX_X {
+                (Self::RIVER_HALF_WIDTH, Self::RIVER_DEPTH, Self::RIVER_Q)
+            } else {
+                (Self::BRANCH_HALF_WIDTH, Self::BRANCH_DEPTH, Self::BRANCH_Q)
+            };
+            r.vertices
+                .push(vertex(x, 0.0, Self::river_w(x), hw, depth, q));
+        }
+        r.chains
+            .push(Chain::new(0, n + 1, Mouth::Sea, u32::MAX));
+        for side in [1.0, -1.0] {
+            let first = r.vertices.len() as u32;
+            // The apex vertex itself, as the parent holds it.
+            r.vertices.push(vertex(
+                Self::APEX_X,
+                0.0,
+                Self::SEA_W,
+                Self::BRANCH_HALF_WIDTH,
+                Self::BRANCH_DEPTH,
+                Self::BRANCH_Q,
+            ));
+            let diag = (Self::BRANCH_Z / Self::SPACING).round() as u32;
+            for k in 1..=diag {
+                let d = f64::from(k) * Self::SPACING;
+                r.vertices.push(vertex(
+                    Self::APEX_X + d,
+                    side * d,
+                    Self::SEA_W,
+                    Self::BRANCH_HALF_WIDTH,
+                    Self::BRANCH_DEPTH,
+                    Self::BRANCH_Q,
+                ));
+            }
+            let east = ((Self::RIVER_TO_X - Self::APEX_X - Self::BRANCH_Z) / Self::SPACING).round()
+                as u32;
+            for k in 1..=east {
+                r.vertices.push(vertex(
+                    Self::APEX_X + Self::BRANCH_Z + f64::from(k) * Self::SPACING,
+                    side * Self::BRANCH_Z,
+                    Self::SEA_W,
+                    Self::BRANCH_HALF_WIDTH,
+                    Self::BRANCH_DEPTH,
+                    Self::BRANCH_Q,
+                ));
+            }
+            let mut ch = Chain::new(first, 1 + diag + east, Mouth::Sea, u32::MAX);
+            ch.from = 0;
+            r.chains.push(ch);
+        }
+        r.build_index();
+        r
+    }
+
+    /// The geometry, for `manifest.json` `notes.delta`.
+    pub fn notes() -> serde_json::Value {
+        serde_json::json!({
+            "profile": "ground by x alone (periodic): plain y 70.5 for x <= -250 and x >= 400; linear to the delta plain's y 63.5 at x -50; delta plain to x 120; linear to the sea floor y 45.5 at x 150; sea floor to x 300; linear back to the plain at x 400",
+            "plain_y": Self::PLAIN_Y,
+            "delta": {"from_x": Self::DELTA_FROM_X, "to_x": Self::FRONT_X, "y": Self::DELTA_Y},
+            "sea_w": Self::SEA_W,
+            "apex": {"x": Self::APEX_X, "z": 0.0, "vertex_of_chain_0": ((Self::APEX_X - Self::RIVER_FROM_X) / Self::SPACING).round()},
+            "river": {
+                "chain": 0,
+                "z": 0.0,
+                "from_x": Self::RIVER_FROM_X,
+                "to_x": Self::RIVER_TO_X,
+                "half_width": Self::RIVER_HALF_WIDTH,
+                "depth": Self::RIVER_DEPTH,
+                "below_apex": {"half_width": Self::BRANCH_HALF_WIDTH, "depth": Self::BRANCH_DEPTH}
+            },
+            "distributaries": [
+                {"chain": 1, "from": 0, "turn": [Self::BRANCH_Z, Self::BRANCH_Z], "z": Self::BRANCH_Z, "to_x": Self::RIVER_TO_X},
+                {"chain": 2, "from": 0, "turn": [Self::BRANCH_Z, -Self::BRANCH_Z], "z": -Self::BRANCH_Z, "to_x": Self::RIVER_TO_X}
+            ],
+            "branch": {"half_width": Self::BRANCH_HALF_WIDTH, "depth": Self::BRANCH_DEPTH}
+        })
+    }
+}
+
+impl Terrain for DeltaTest {
+    fn circumference(&self) -> u32 {
+        self.c
+    }
+
+    fn height(&self, x: i64, _z: i64) -> f64 {
+        let x = self.wrap_x(x as f64);
+        let lerp = |a: f64, b: f64, x0: f64, x1: f64| a + (b - a) * (x - x0) / (x1 - x0);
+        if x < Self::SLOPE_FROM_X {
+            Self::PLAIN_Y
+        } else if x < Self::DELTA_FROM_X {
+            lerp(
+                Self::PLAIN_Y,
+                Self::DELTA_Y,
+                Self::SLOPE_FROM_X,
+                Self::DELTA_FROM_X,
+            )
+        } else if x < Self::FRONT_X {
+            Self::DELTA_Y
+        } else if x < Self::SEA_FROM_X {
+            lerp(
+                Self::DELTA_Y,
+                Self::SEA_FLOOR_Y,
+                Self::FRONT_X,
+                Self::SEA_FROM_X,
+            )
+        } else if x < Self::RISE_FROM_X {
+            Self::SEA_FLOOR_Y
+        } else if x < Self::PLAIN_FROM_X {
+            lerp(
+                Self::SEA_FLOOR_Y,
+                Self::PLAIN_Y,
+                Self::RISE_FROM_X,
+                Self::PLAIN_FROM_X,
+            )
+        } else {
+            Self::PLAIN_Y
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn delta_test_profile_and_network() {
+        let t = DeltaTest { c: 1024 };
+        assert_eq!(t.height(-400, 0), 70.5);
+        assert_eq!(t.height(0, 50), 63.5);
+        assert_eq!(t.height(119, -90), 63.5);
+        assert_eq!(t.height(200, 0), 45.5);
+        let r = t.rivers();
+        r.validate().unwrap();
+        assert_eq!(r.chains.len(), 3);
+        assert_eq!(r.chains[0].from, u32::MAX);
+        for k in [1, 2] {
+            let ch = r.chains[k];
+            assert_eq!(ch.from, 0);
+            let v = r.vertices[ch.first as usize];
+            assert_eq!((v.x, v.z), (0.0, 0.0));
+            assert_eq!(r.vertices[100].x, 0.0);
+            let last = r.vertices[(ch.first + ch.count - 1) as usize];
+            assert_eq!(last.x, 160.0);
+            assert_eq!(last.z.abs(), 64.0);
+        }
+    }
 
     #[test]
     fn river_test_profile_and_network() {
