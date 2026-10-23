@@ -220,6 +220,56 @@ pub fn blur(
     }
 }
 
+/// Whether the plate model pulls the crust at cell `c` to its trench: the sample the cell reads
+/// is a subducting plate's at its trench (`plates::state::TRENCH`, as a flag in `plates/flags` or
+/// as the regime in `plates/regime`). ledger: ISO-097
+pub fn at_trench(flags: Option<&[f32]>, regime: Option<&[f32]>, c: usize) -> bool {
+    flags.is_some_and(|f| {
+        f.get(c)
+            .is_some_and(|&v| (v as u32) & u32::from(TRENCH) != 0)
+    }) || regime.is_some_and(|r| r.get(c).is_some_and(|&v| v as u8 == regime::TRENCH))
+}
+
+/// The cells whose offset over the plate model's height the surface holds at the end of a step
+/// rather than hand to the plate model, 1 or 0 (`surface.held_offsets`): the cells in a gap
+/// between plates (`plates/gap`) and on a trench row ([`at_trench`]). The next step's carry
+/// keeps their offset over the plate model's height ([`carried_elevation`]), so the plate model
+/// must not take it as well: the feedback took it every step, each time again, and the plate
+/// model's samples beside a gap rose by it step after step (the oceanic peaks, 10 to 16 km) and
+/// those under a trench sank by it. ledger: ISO-125
+pub fn held_cells(
+    gap: Option<&[f32]>,
+    flags: Option<&[f32]>,
+    regime: Option<&[f32]>,
+    n: usize,
+) -> Vec<f32> {
+    (0..n)
+        .into_par_iter()
+        .map(|c| {
+            if flagged(gap, c) || at_trench(flags, regime, c) {
+                1.0
+            } else {
+                0.0
+            }
+        })
+        .collect()
+}
+
+/// The part of the last step's offset the surface held (`prev_offset` on the cells of
+/// [`held_cells`], 0 on the rest), for [`Carry::prev_held_offset`]; `None` without the mask of a
+/// step before (the first step, a world from before the switch): the whole offset then.
+/// ledger: ISO-125
+pub fn held_offset(prev_offset: &[f32], held: Option<&[f32]>) -> Option<Vec<f32>> {
+    let held = held.filter(|h| h.len() == prev_offset.len())?;
+    Some(
+        prev_offset
+            .par_iter()
+            .zip(held.par_iter())
+            .map(|(&o, &k)| if k > 0.5 { o } else { 0.0 })
+            .collect(),
+    )
+}
+
 /// What [`carried_elevation`] reads.
 pub struct Carry<'a> {
     pub w: usize,
@@ -245,6 +295,11 @@ pub struct Carry<'a> {
     /// (`SurfaceState::offset_m`), which a cell that lay in a gap keeps and a trench carries
     /// ([`Carry::at_trench`]).
     pub prev_offset: Option<&'a [f32]>,
+    /// The part of `prev_offset` the surface held after the last step, not handed to the plate
+    /// model (`surface.held_offsets`: the offset on the cells of `surface/offset_held`, 0 on the
+    /// rest, whose offset the plate model took). With it a trench row carries only that; `None`:
+    /// the whole offset, as ISO-097 first had it. ledger: ISO-125
+    pub prev_held_offset: Option<&'a [f32]>,
     /// `plates/flags` and `plates/regime` now: where the plate model pulls a subducting plate to
     /// its trench ([`Carry::at_trench`]). `None`: no trench.
     pub flags: Option<&'a [f32]>,
@@ -265,12 +320,7 @@ impl Carry<'_> {
     /// the cell reads is a subducting plate's at its trench (`plates::state::TRENCH`, as a flag
     /// or as the regime). ledger: ISO-097
     pub fn at_trench(&self, c: usize) -> bool {
-        self.flags.is_some_and(|f| {
-            f.get(c)
-                .is_some_and(|&v| (v as u32) & u32::from(TRENCH) != 0)
-        }) || self
-            .regime
-            .is_some_and(|r| r.get(c).is_some_and(|&v| v as u8 == regime::TRENCH))
+        at_trench(self.flags, self.regime, c)
     }
 
     /// Whether cells `c` and `n` hold the same crust now: the same plate or the same rigid group.
@@ -461,7 +511,8 @@ pub fn carried_elevation(x: &Carry<'_>) -> (Vec<f32>, u64) {
         } else if z.is_nan() {
             x.plate_elevation[c]
         } else if let Some(o) = x.prev_offset.filter(|_| x.at_trench(c)) {
-            // ledger: ISO-097
+            // ledger: ISO-097, ISO-125
+            let o = x.prev_held_offset.unwrap_or(o);
             let [fi, fj] = x.src[c];
             match bilinear_same(x.w, x.h, o, fi, fj, |s| same(c, s)) {
                 Some(kept) => x.plate_elevation[c] + kept,
@@ -691,6 +742,7 @@ mod tests {
                 gap: None,
                 prev_gap: None,
                 prev_offset: None,
+                prev_held_offset: None,
                 flags: None,
                 regime: None,
                 parents,
@@ -783,6 +835,7 @@ mod tests {
             gap: Some(&gap),
             prev_gap: Some(&prev_gap),
             prev_offset: Some(&prev_offset),
+            prev_held_offset: None,
             flags: None,
             regime: None,
             parents: &[None, None],
@@ -840,7 +893,7 @@ mod tests {
                 })
             })
             .collect();
-        let carry = |flags: Option<&[f32]>, reg: Option<&[f32]>| {
+        let carry = |flags: Option<&[f32]>, reg: Option<&[f32]>, held: Option<&[f32]>| {
             carried_elevation(&Carry {
                 w,
                 h,
@@ -855,6 +908,7 @@ mod tests {
                 gap: None,
                 prev_gap: None,
                 prev_offset: Some(&prev_offset),
+                prev_held_offset: held,
                 flags,
                 regime: reg,
                 parents: &[None],
@@ -864,7 +918,7 @@ mod tests {
             })
             .0
         };
-        let z = carry(Some(&flags), Some(&reg));
+        let z = carry(Some(&flags), Some(&reg), None);
         assert_eq!(
             z[3], -5700.0,
             "the trench flag: the plate's floor and the 500 m on it"
@@ -874,7 +928,35 @@ mod tests {
             z[1], -8400.0,
             "away from the trench the height takes the uplift"
         );
-        let plain = carry(None, None);
+        let plain = carry(None, None, None);
         assert!(plain.iter().all(|&v| v == -8400.0), "no trench: {plain:?}");
+
+        // ISO-125: the surface held the offset of column 3 at the last step (a trench row then)
+        // and handed the rest to the plate model. Column 3 reads half its source from column 3
+        // and half from column 4: half the 500 m. Column 5 reads columns 5 and 6, whose offset
+        // the plate model took: the plate's floor alone.
+        let mask: Vec<f32> = (0..n)
+            .map(|c| if col(c) == 3 { 1.0 } else { 0.0 })
+            .collect();
+        let kept = held_offset(&prev_offset, Some(&mask)).expect("a mask of the grid's size");
+        let z = carry(Some(&flags), Some(&reg), Some(&kept));
+        assert_eq!(z[3], -5950.0, "half the held 500 m");
+        assert_eq!(z[w + 5], -6200.0, "nothing held: the plate's floor");
+        assert_eq!(z[1], -8400.0, "away from the trench as before");
+        assert!(held_offset(&prev_offset, Some(&mask[1..])).is_none());
+        assert!(held_offset(&prev_offset, None).is_none());
+    }
+
+    /// ISO-125: the surface holds the offset on the cells in a gap between plates and on a trench
+    /// row (the flag or the regime), and nowhere else.
+    #[test]
+    fn the_held_cells_are_the_gaps_and_the_trench_rows() {
+        let n = 6;
+        let gap = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0f32];
+        let flags = [0.0, 0.0, f32::from(TRENCH | 16), 16.0, 0.0, 0.0];
+        let reg = [0.0, 0.0, 0.0, 0.0, f32::from(regime::TRENCH), 1.0];
+        let held = held_cells(Some(&gap), Some(&flags), Some(&reg), n);
+        assert_eq!(held, vec![0.0, 1.0, 1.0, 0.0, 1.0, 0.0]);
+        assert_eq!(held_cells(None, None, None, n), vec![0.0; n]);
     }
 }
