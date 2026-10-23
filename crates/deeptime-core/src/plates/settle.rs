@@ -58,8 +58,8 @@ use rayon::prelude::*;
 
 use super::Env;
 use super::collapse::iso_height;
-use super::thermal;
 use super::state::{CONTINENTAL, PlateState, TRENCH};
+use super::thermal;
 use crate::surface::flexure::{RHO_MANTLE, RHO_WATER};
 
 /// `WorldState::globals`: the settling's rise and fall over the run, km³ of height × area.

@@ -608,6 +608,14 @@ pub struct TectonicParams {
     /// the thermal age the lithosphere's depth implies in place of the orogeny's age; needs
     /// `thermal_state` (ledger ISO-112).
     pub thermal_strength: bool,
+    /// The cordillera's back-arc source from the state: the crust behind an arc's range gives
+    /// its share of the range's shortening in proportion to its weakness, the thin sheet's
+    /// η_0 / η at its thermal age, so a cold, keeled craton is a backstop that hardly thins and a
+    /// hot back-arc gives the crust; needs `thermal_state` (ledger PLT-470).
+    pub thermal_backstop: bool,
+    /// The depleted keel under the start's continents, km (at most `thermal_reference_km`); 0 =
+    /// no keels (ledger PLT-463).
+    pub thermal_keel_km: f64,
     /// After the step's resampling, every continental sample gets at least its heat-flow law's
     /// conductive value: crust the rate guard spread onto old sea floor kept the floor's (ledger
     /// PLT-469). On with `thermal_state` whatever this says.
@@ -895,10 +903,12 @@ impl Default for TectonicParams {
             collapse_sheet_viscosity_pa_s: 1.0e22,
             // ledger: PLT-415
             collapse_sheet_strength_myr: 62.8,
-            thermal_state: false,    // ledger: PLT-460 (game-choice: off by default)
+            thermal_state: false, // ledger: PLT-460 (game-choice: off by default)
             thermal_isostasy_m: 0.0, // ledger: ISO-110 (off by default; 1,600 m when on)
             thermal_reference_km: 225.0, // ledger: ISO-111
             thermal_strength: false, // ledger: ISO-112 (game-choice: off by default)
+            thermal_backstop: false, // ledger: PLT-470 (game-choice: off by default)
+            thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
             heat_flow_refresh: false, // ledger: PLT-469 (game-choice: off by default)
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
@@ -1289,9 +1299,15 @@ impl PlanetPreset {
             "must be in [60, 225] (the hot and the cold lithosphere)",
         )?;
         check(
-            k.thermal_state || (k.thermal_isostasy_m == 0.0 && !k.thermal_strength),
+            k.thermal_keel_km.is_finite() && k.thermal_keel_km >= 0.0,
+            "$.tectonics.thermal_keel_km",
+            "must be ≥ 0",
+        )?;
+        check(
+            k.thermal_state
+                || (k.thermal_isostasy_m == 0.0 && !k.thermal_strength && !k.thermal_backstop),
             "$.tectonics.thermal_state",
-            "thermal_isostasy_m and thermal_strength need thermal_state",
+            "thermal_isostasy_m, thermal_strength and thermal_backstop need thermal_state",
         )?;
         // The force balance.
         pos(

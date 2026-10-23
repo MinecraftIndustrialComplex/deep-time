@@ -28,8 +28,9 @@ pub const L_HOT_KM: f64 = 60.0; // ledger: PLT-461
 /// 250 km (Jaupart et al. 1998 as Rolandone et al. 2002 cite it).
 pub const L_COLD_KM: f64 = 225.0; // ledger: PLT-462
 
-/// The keel under the start's continents, km: lithosphere under old cratons "unlikely to be
-/// smaller than 200 km" (Jaupart & Mareschal 1999 as Rolandone et al. 2002 cite it).
+/// The keel under the start's continents, km (the default of `thermal_keel_km`): lithosphere
+/// under old cratons "unlikely to be smaller than 200 km" (Jaupart & Mareschal 1999 as Rolandone
+/// et al. 2002 cite it).
 pub const KEEL_KM: f64 = 200.0; // ledger: PLT-463
 
 /// The heating's e-folding time, Myr: convective thinning "may require less than 10 Myr if the
@@ -96,11 +97,42 @@ pub fn heat_flow_mw_m2(l_km: f64, flags: u8) -> f64 {
 /// L_hot), 0 with E 0 (off).
 // ledger: ISO-110, ISO-111
 pub fn uplift_m(k: &TectonicParams, l_km: f32) -> f64 {
-    let e = k.thermal_isostasy_m;
-    if !(k.thermal_state && e > 0.0 && l_km > 0.0) {
-        return 0.0;
+    Switches::of(k).uplift_m(l_km)
+}
+
+/// The state's switches as the thin sheet keeps them (`collapse::Sheet` is `Copy`).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Switches {
+    /// E, m: 0 unless `thermal_state` and `thermal_isostasy_m` (ledger: ISO-110).
+    isostasy_m: f64,
+    /// L_ref, km (ledger: ISO-111).
+    reference_km: f64,
+    /// `thermal_state` and `thermal_strength` (ledger: ISO-112).
+    pub strength: bool,
+}
+
+impl Switches {
+    pub fn of(k: &TectonicParams) -> Self {
+        Switches {
+            isostasy_m: if k.thermal_state {
+                k.thermal_isostasy_m
+            } else {
+                0.0
+            },
+            reference_km: k.thermal_reference_km,
+            strength: k.thermal_state && k.thermal_strength,
+        }
     }
-    e * (k.thermal_reference_km - f64::from(l_km)) / (L_COLD_KM - L_HOT_KM)
+
+    /// [`uplift_m`] with these switches.
+    // ledger: ISO-110, ISO-111
+    pub fn uplift_m(&self, l_km: f32) -> f64 {
+        let e = self.isostasy_m;
+        if !(e > 0.0 && l_km > 0.0) {
+            return 0.0;
+        }
+        e * (self.reference_km - f64::from(l_km)) / (L_COLD_KM - L_HOT_KM)
+    }
 }
 
 /// The thermal age a lithosphere `l_km` deep stands for, Myr: the time the cooling law takes from
@@ -151,12 +183,27 @@ pub fn start(state: &mut PlateState, k: &TectonicParams) {
         return;
     }
     let l = k.thermal_reference_km;
+    let keel = k.thermal_keel_km.min(l); // ledger: PLT-463
     for s in &mut state.samples {
         if s.kind == CONTINENTAL {
             s.lithosphere_km = l as f32;
-            s.keel_km = KEEL_KM.min(l) as f32; // ledger: PLT-463
+            s.keel_km = keel as f32;
         }
     }
+}
+
+/// The share of the cordillera's strain a source behind the range takes (`subduction.rs`): 1,
+/// or with `thermal_backstop` the thin sheet's η_0 / η at its lithosphere's thermal age,
+/// e^(−t_eq / τ_s) (PLT-415's law, τ_s = `collapse_sheet_strength_myr`): a hot back-arc gives its
+/// crust, a craton at its full depth gives none. Hyndman, Currie & Mazzotti (2005): back-arc
+/// lithospheres "weaker than cratons by more than a factor of 10".
+// ledger: PLT-470
+pub fn backstop_weight(k: &TectonicParams, l_km: f32) -> f64 {
+    let tau = k.collapse_sheet_strength_myr;
+    if !(k.thermal_state && k.thermal_backstop && l_km > 0.0 && tau > 0.0) {
+        return 1.0;
+    }
+    (-thermal_age_myr(f64::from(l_km)) / tau).exp()
 }
 
 /// The step's update (see the module docs): every oceanic sample's L from its age, every visible
@@ -262,7 +309,8 @@ mod tests {
         for _ in 0..20 {
             (l, keel) = advance(l, keel, SUBDUCTION_ZONE, 2.0);
         }
-        assert!((l - L_HOT_KM).abs() < 1.0, "{l}");
+        // 40 Myr is four of its e-folding times: 60 + 65 e^-4 = 61.2 km.
+        assert!((l - L_HOT_KM).abs() < 1.5, "{l}");
         // 100 Myr after the subduction stops it is still hot (CH 2006: "most rapid cooling ... in
         // the first 50-100 Myr", decay "over a timescale of about 300 Myr").
         for _ in 0..50 {
@@ -305,12 +353,32 @@ mod tests {
     }
 
     #[test]
+    fn a_cold_craton_is_a_backstop_and_a_hot_back_arc_gives_its_crust() {
+        let mut k = TectonicParams::default();
+        assert_eq!(backstop_weight(&k, 60.0), 1.0, "off by default");
+        k.thermal_state = true;
+        k.thermal_backstop = true;
+        assert_eq!(backstop_weight(&k, L_HOT_KM as f32), 1.0);
+        assert_eq!(backstop_weight(&k, L_COLD_KM as f32), 0.0);
+        // The keeled craton behind an arc (200.5 km): about 1/480 of a back-arc's share.
+        let w = backstop_weight(&k, 200.46);
+        assert!(w > 1.0 / 600.0 && w < 1.0 / 400.0, "{w}");
+        // A back-arc 100 Myr after its arc stopped: about a fifth.
+        let w = backstop_weight(&k, 124.8);
+        assert!(w > 0.15 && w < 0.25, "{w}");
+    }
+
+    #[test]
     fn the_thermal_age_inverts_the_cooling() {
         let (mut l, mut keel) = (L_HOT_KM, 0.0);
         for _ in 0..50 {
             (l, keel) = advance(l, keel, 0, 2.0);
         }
-        assert!((thermal_age_myr(l) - 100.0).abs() < 1e-6, "{}", thermal_age_myr(l));
+        assert!(
+            (thermal_age_myr(l) - 100.0).abs() < 1e-6,
+            "{}",
+            thermal_age_myr(l)
+        );
         assert_eq!(thermal_age_myr(L_HOT_KM), 0.0);
         assert!(thermal_age_myr(L_COLD_KM).is_infinite());
         let _ = keel;

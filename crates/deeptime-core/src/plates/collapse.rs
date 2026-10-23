@@ -442,7 +442,7 @@ pub(super) struct Sheet {
     /// The lithosphere's state (`thermal.rs`): its thermal height joins the column's Airy height
     /// (ledger: ISO-110), and with `thermal_strength` its thermal age stands for the orogeny's
     /// (ledger: ISO-112).
-    thermal: crate::params::TectonicParams,
+    thermal: super::thermal::Switches,
 }
 
 impl Sheet {
@@ -471,7 +471,7 @@ impl Sheet {
             sea_m,
             z_0,
             gravity: env.gravity,
-            thermal: k.clone(),
+            thermal: super::thermal::Switches::of(k),
         })
     }
 
@@ -482,17 +482,14 @@ impl Sheet {
         if s.orogeny == OROGENY_NONE {
             return 0.0;
         }
-        let z = iso_height(&s.pools, self.z_0, self.gravity)
-            + super::thermal::uplift_m(&self.thermal, s.lithosphere_km);
+        let z =
+            iso_height(&s.pools, self.z_0, self.gravity) + self.thermal.uplift_m(s.lithosphere_km);
         let du = column_energy(z, true, 0.0, 0.0, self.sea_m, self.gravity) - self.u_normal;
         if du.is_nan() || du <= 0.0 {
             return 0.0;
         }
         // ledger: ISO-112 (the lithosphere's thermal age in place of the orogeny's, when on)
-        let age = if self.thermal.thermal_state
-            && self.thermal.thermal_strength
-            && s.lithosphere_km > 0.0
-        {
+        let age = if self.thermal.strength && s.lithosphere_km > 0.0 {
             super::thermal::thermal_age_myr(f64::from(s.lithosphere_km))
         } else {
             (self.t_myr - f64::from(s.orogeny_myr)).max(0.0)
