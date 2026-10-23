@@ -2149,6 +2149,7 @@ mod tests {
             count: 2,
             mouth: Mouth::Sea,
             into: u32::MAX,
+            from: u32::MAX,
         }];
         r.build_index();
         let set = RiverSet::new(r, 2);
