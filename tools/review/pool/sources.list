@@ -1,0 +1,54 @@
+# What a Deep Time simulation run reads, for tools/review/pool/srckey.py. The source key of a
+# checkout is a hash of the git blob of every file that matches an `include` and no `exclude`
+# (plus the text of this list, minus comments), so a commit that touches none of them (Java, the
+# pack, docs, tools) keeps the key and a run already in the pool is reused.
+#
+#   include <prefix>     a file, or a folder and everything under it, the simulation reads
+#   ignore  <prefix>     a folder the simulation does not read (said on purpose, see `members`)
+#   exclude <glob>       a file inside an included folder that changes nothing (fnmatch, * matches /)
+#   members <folder>     every first-level entry under <folder> must be covered by an include or an
+#                        ignore, so a new crate or data folder fails the key until someone says
+#                        which it is (the key fails closed)
+#
+# The key also refuses a committed include_str!/include_bytes! whose literal path leaves the
+# included set (srckey.py scans every included .rs file), so a new data file the code compiles in
+# cannot slip past this list.
+
+# The binary: `cargo build --release -p deeptime-cli` and what it links (cli -> core, format, viewer,
+# tiles; core's gpu feature -> gpu; noddy is a core dependency).
+include crates/deeptime-cli
+include crates/deeptime-core
+include crates/deeptime-format
+include crates/deeptime-gpu
+include crates/deeptime-noddy
+include crates/deeptime-viewer/assets/ramps.json
+include Cargo.toml
+include Cargo.lock
+include rust-toolchain.toml
+include .cargo
+
+# Compiled in from the mod's data folders (include_str! in deeptime-core and deeptime-cli).
+include neoforge/src/main/resources/data/deeptime/deeptime/scatter
+include neoforge/src/main/resources/data/deeptime/deeptime/essentials
+include neoforge/src/main/resources/data/deeptime/deeptime/deposit_type
+include neoforge/src/main/resources/data/deeptime/deeptime/rock_class
+
+# Prose inside an included folder (README, notes) is not read by anything.
+exclude *.md
+
+# Crates the CLI's simulation commands do not run through: the viewer and tiles bundles (a viewer's
+# page and lang file; stage, plate-check and dump-fields never read them), the dev tools and the
+# libraries Minecraft loads.
+ignore crates/deeptime-viewer
+ignore crates/deeptime-tiles
+ignore crates/deeptime-inspect
+ignore crates/deeptime-jni
+ignore crates/deeptime-cpuprobe
+ignore crates/deeptime-quincuncial
+
+# The mod's other data folders are read by the game, not by the CLI's runs.
+ignore neoforge/src/main/resources/data/deeptime/deeptime/biome_rules
+ignore neoforge/src/main/resources/data/deeptime/deeptime/far_terrain
+
+members crates
+members neoforge/src/main/resources/data/deeptime/deeptime
