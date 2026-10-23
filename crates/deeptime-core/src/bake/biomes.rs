@@ -2995,14 +2995,14 @@ mod tests {
         let row = |z: i64| ((z - l2.origin_block_z) / 8) as usize;
         // Every node a swamp, but the even columns of the equator's row a cold wetland already low
         // (some of them beside the seam's playa, so the lower erosion is kept there).
-        let is_cold = |k: usize| k / w == row(0) && k % 2 == 0;
+        let is_cold = |k: usize| k / w == row(0) && k.is_multiple_of(2);
         let fresh = || {
             let mut wet = vec![WETLAND_SWAMP; n];
             let mut ero: Vec<u8> = Vec::with_capacity(2 * n);
-            for k in 0..n {
+            for (k, wk) in wet.iter_mut().enumerate() {
                 let cold = is_cold(k);
                 if cold {
-                    wet[k] = WETLAND_COLD;
+                    *wk = WETLAND_COLD;
                 }
                 ero.extend_from_slice(&if cold { low } else { swamp }.to_le_bytes());
             }
@@ -3020,7 +3020,7 @@ mod tests {
             let (mut wet, mut ero) = fresh();
             let cleared = dry_beside_playas(&mut wet, &mut ero, &l2, &[p_eq, p60], reach, lambert);
             let mut expect = 0;
-            for k in 0..n {
+            for (k, &wk) in wet.iter().enumerate() {
                 let (x, z) = node(k);
                 let near = |(px, pz): (i64, i64)| {
                     let dx = (x - px).rem_euclid(i64::from(c));
@@ -3035,7 +3035,7 @@ mod tests {
                 let was_cold = is_cold(k);
                 if near(p_eq) || near(p60) {
                     expect += 1;
-                    assert_eq!(wet[k], WETLAND_NONE, "{label} node {k}");
+                    assert_eq!(wk, WETLAND_NONE, "{label} node {k}");
                     let want = if was_cold { low } else { held };
                     assert_eq!(ero_at(&ero, k), want, "{label} node {k}");
                 } else {
@@ -3044,7 +3044,7 @@ mod tests {
                     } else {
                         WETLAND_SWAMP
                     };
-                    assert_eq!(wet[k], want, "{label} node {k}");
+                    assert_eq!(wk, want, "{label} node {k}");
                     assert_eq!(ero_at(&ero, k), if was_cold { low } else { swamp });
                 }
             }
