@@ -599,9 +599,11 @@ pub fn build(world: &World, bx: &AreaBox, ctx: &Context) -> Result<Export> {
     let mut missing_chunks: BTreeSet<(i32, i32)> = BTreeSet::new();
     let mut not_full: BTreeMap<(i32, i32), String> = BTreeMap::new();
 
+    // A tag lists bodies by index, the order they paint in; a painted block is no longer the
+    // horizon's, so the first body naming a class keeps it, as in the game's strata pass
+    // (`StrataPass.paintBodies`; docs/science/strata.md, "Bodies are painted where they are").
     let body_class = |tag: &[(u32, u64)]| -> Option<&str> {
-        let mut cls = None;
-        for &(bi, mask) in tag {
+        tag.iter().find_map(|&(bi, mask)| {
             let b = &ctx.bodies[bi as usize];
             let mut here = b.rock_class.as_deref();
             for (zi, z) in b.zones.iter().enumerate().take(64) {
@@ -609,11 +611,8 @@ pub fn build(world: &World, bx: &AreaBox, ctx: &Context) -> Result<Export> {
                     here = z.rock_class.as_deref();
                 }
             }
-            if here.is_some() {
-                cls = here;
-            }
-        }
-        cls
+            here
+        })
     };
 
     let mut column = vec![0u16; h];
