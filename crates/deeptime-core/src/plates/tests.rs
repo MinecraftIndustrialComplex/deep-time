@@ -505,8 +505,10 @@ fn sutures_and_initiations_keep_continents_whole() {
     // the converging boundary and the arc's basement down with the slab, the same day: one weld
     // each on supercontinent 3, 4, 9, 12, 14, 16, 19 and 23 of seeds 1 to 24, scattered as in
     // `collisions_weld_on_stall_and_transfer_on_shortening`, and neither supercontinent 1 nor
-    // scattered 19 any more; every run of the 48 initiated subduction).
-    for (start, seed) in [("supercontinent", 4), ("scattered_continents", 1)] {
+    // scattered 19 any more; every run of the 48 initiated subduction; with gap 4's thermal state,
+    // strength, β and root removal on by default, 2026-10-23, neither supercontinent 4 nor
+    // scattered 1 welded, so scattered 12, which welds twice in that test's sweep).
+    for (start, seed) in [("supercontinent", 4), ("scattered_continents", 12)] {
         let p = preset(8000, 300.0, start, seed);
         let mut seen = 0usize;
         let world = run_stage(&p, |stage, world, st| {
@@ -774,7 +776,9 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // and PLT-331, the same day: 1, 2, 8, 14, 21, 22 and 24, seed 1 three times, seed 19 no more:
     // fewer arcs reach a continent; 12 of seeds 1 to 24 with the high ground's sheet and the
     // trench budget on by default, PLT-412 to PLT-415 and PLT-440 to PLT-443, 2026-10-23: 2, 5,
-    // 6, 7, 9, 10, 13, 15, 16, 18, 19 and 24, seed 1 no more).
+    // 6, 7, 9, 10, 13, 15, 16, 18, 19 and 24, seed 1 no more; 13 of seeds 1 to 24 with gap 4's
+    // thermal state, strength, β and root removal on by default, 2026-10-23: 2, 5, 6, 11 to 13,
+    // 15, 16, 18 to 20, 22 and 23, seeds 12, 18 and 19 twice, seeds 7, 9, 10 and 24 no more).
     let p = preset(8000, 300.0, "scattered_continents", 2);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
