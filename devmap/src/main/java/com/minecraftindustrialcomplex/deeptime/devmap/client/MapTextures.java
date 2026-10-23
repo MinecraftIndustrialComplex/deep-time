@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.devmap.client;
 
 import com.minecraftindustrialcomplex.deeptime.devmap.DevMap;
 import com.minecraftindustrialcomplex.deeptime.devmap.model.BaseImage;
+import com.minecraftindustrialcomplex.deeptime.devmap.model.MapLayer;
 import com.minecraftindustrialcomplex.deeptime.devmap.net.DevMapState;
 import com.minecraftindustrialcomplex.deeptime.screen.model.GlobeProjection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
@@ -12,11 +13,16 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
 
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
- * The dev map's two textures, made on the client's main thread: the base image as it came from
- * the server (block space), and the globe, drawn on the CPU by Deep Time's own
- * {@link GlobeProjection#render} from a latitude/longitude picture of the base image (built once
- * per image on a background thread). Without a base image the globe is drawn from a plain picture.
+ * The dev map's two textures, made on the client's main thread: the picture shown (satellite or
+ * elevation, {@link MapContext#image}) as it came from the server (block space), and the globe,
+ * drawn on the CPU by Deep Time's own {@link GlobeProjection#render} from a latitude/longitude
+ * picture of it (built once per server picture on a background thread and kept per layer, so
+ * switching back and forth does not rebuild). Without a picture the globe is drawn from a plain one.
  */
 final class MapTextures {
 
@@ -29,9 +35,11 @@ final class MapTextures {
     private static DynamicTexture map;
     private static DevMapState.Image mapOf;
 
-    private static volatile int[] picture;
-    private static volatile DevMapState.Image pictureOf;
-    private static DevMapState.Image pictureWanted;
+    /** A latitude/longitude picture and the server picture it was built from. */
+    private record LatLon(DevMapState.Image of, int[] abgr) {}
+
+    private static final Map<MapLayer, LatLon> PICTURES = new ConcurrentHashMap<>();
+    private static final Set<DevMapState.Image> BUILDING = ConcurrentHashMap.newKeySet();
     private static final int[] PLAIN = plain();
 
     private static DynamicTexture globe;
@@ -77,17 +85,21 @@ final class MapTextures {
     static int[] picture(DevMapState.Image im, WorldProjection p) {
         if (im == null)
             return null;
-        if (pictureOf == im)
-            return picture;
-        if (pictureWanted != im) {
-            pictureWanted = im;
+        LatLon built = PICTURES.get(im.layer());
+        if (built != null && built.of() == im)
+            return built.abgr();
+        if (BUILDING.add(im)) {
             int w = PICTURE_W, h = Projection.pictureHeight(w);
             Thread t = new Thread(() -> {
-                long t0 = System.nanoTime();
-                int[] pic = BaseImage.latLonPicture(im.abgr(), im.frame(), p, w, h);
-                picture = pic;
-                pictureOf = im;
-                DevMap.LOGGER.info("[devmap] globe picture {}x{} built in {} ms", w, h, (System.nanoTime() - t0) / 1_000_000);
+                try {
+                    long t0 = System.nanoTime();
+                    int[] pic = BaseImage.latLonPicture(im.abgr(), im.frame(), p, w, h);
+                    PICTURES.put(im.layer(), new LatLon(im, pic));
+                    DevMap.LOGGER.info("[devmap] {} globe picture {}x{} built in {} ms", im.layer().id(), w, h,
+                            (System.nanoTime() - t0) / 1_000_000);
+                } finally {
+                    BUILDING.remove(im);
+                }
             }, "deeptime_devmap-picture");
             t.setDaemon(true);
             t.start();
@@ -128,9 +140,7 @@ final class MapTextures {
     /** Forgets everything (the client left the server). */
     static void reset() {
         mapOf = null;
-        pictureOf = null;
-        pictureWanted = null;
-        picture = null;
+        PICTURES.clear();
         globeSource = null;
     }
 }

@@ -693,8 +693,9 @@ taper, is what remains between the final frame and its target.
   layer is the sea's and the land ice's alone. Lakes on land hold their own water outside it.
 - The water is fixed for the whole history: no outgassing of water from the mantle and no return
   of water with subducted slabs (Earth's long-term budget is debated; neither is modelled).
-- GDH1 is a fit to Earth's mean floor; the model has no hotspot swells, plateaus or ridge-push
-  differences beyond what the plate model builds.
+- GDH1 is a fit to Earth's mean floor; the model has no plateaus or ridge-push differences beyond
+  what the plate model builds. Hotspot swells are local ones the plate model builds (PLT-111,
+  PLT-112), not part of the GDH1 floor.
 - The first ocean starts bare: no sediment, plateaus or arcs take room in it, so the sea starts
   lower than an older ocean of the same ages would hold it (about 230 m by the laws, "What the
   numbers say").

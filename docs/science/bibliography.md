@@ -6261,12 +6261,12 @@ The research note `docs/research/notes/sphere-native-grids.md` and its benchmark
 
 ### PutmanLin2007
 - Reference: Putman, W. M. and Lin, S.-J. (2007). Finite-volume transport on various cubed-sphere grids. Journal of Computational Physics 227(1):55-78. doi:10.1016/j.jcp.2007.07.022.
-- Ledger ids: none (the note's §2.2: gnomonic against conformal and elliptic cubed spheres; conformal min/mean cell 0.16 at c360). Cited 2026-10-22 on seamless-world.md's cube section as background for the conformal cube's small corner cells; no ledger value comes from it.
+- Ledger ids: SCL-142 (2026-10-22: the cube grid's corner ghost fill, FV3's x-direction rule as the sphere-native grids note describes it; not re-read). Earlier: the note's §2.2, gnomonic against conformal and elliptic cubed spheres, conformal min/mean cell 0.16 at c360; cited 2026-10-22 on seamless-world.md's cube section as background for the conformal cube's small corner cells.
 - Access: author copy open. Read so far: full text read by a sub-agent as extracted text, 2026-10-04 (a web summariser's version was discarded after it invented content); not re-read for the cube world.
 
 ### Harris2021FV3
 - Reference: Harris, L., Chen, X., Putman, W., Zhou, L. and Chen, J.-H. (2021). A scientific description of the GFDL finite-volume cubed-sphere dynamical core. NOAA Technical Memorandum OAR GFDL 2021-001 (authors from memory of the memo; the sub-agent recorded the memo number).
-- Ledger ids: none (§2.2: edge imprinting, the Duo-Grid)
+- Ledger ids: SCL-142 (2026-10-22: the cube grid's corner ghost fill follows FV3's `fill_corners` as the 2026-10-04 reading recorded it; no code was ported and the memo was not re-read). Earlier: §2.2, edge imprinting, the Duo-Grid.
 - Access: open. Read so far: relevant sections by a sub-agent, 2026-10-04; FV3's `fv_arrays.F90`, `fv_mp_mod.F90` and `sw_core.F90` read as code (ghost width 3, corner fills).
 
 ### Ronchi1996
@@ -6793,7 +6793,7 @@ The methods behind the P1-19 changes to the surface stage's solvers (build log 2
 - Reference: Braess, D. (1995). Towards algebraic multigrid for elliptic problems of second order. Computing 55(4):379-393.
 - DOI or URL: not looked up.
 - Cited as: "Braess 1995, 'Towards algebraic multigrid for elliptic problems of second order', Computing 55:379-393" (surface/diffusion/multigrid.rs module doc).
-- Ledger ids: ERO-183
+- Ledger ids: ERO-183, SCL-146 (2026-10-22: the cube's multigrid keeps ERO-183's constants on 2 x 2 face blocks)
 - Access: paywalled (Springer).
 - Library: not fetched.
 - Read so far (by the project): from memory (piecewise-constant aggregation makes the Galerkin coarse operator too stiff for smooth error, about twice for the Laplacian, remedied by over-weighting the coarse correction). The project uses the equivalent halving of the coarse couplings (`SCALE` 0.5) and measured the effect itself (ERO-183).
@@ -7911,3 +7911,37 @@ Nothing was saved to the library.
 - Access: paywalled; the abstract from OpenAlex's record.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "Forces driving extension can originate at plate boundaries, through basal traction, basal normal forces, or from buoyancy forces internal to the crust and lithospheric mantle. The latter two are most responsible for driving extension where it is observed in the Basin and Range."
+
+## The cube simulation grid and its surface solvers (SCL-140 to SCL-152), added 2026-10-22
+
+Written for the cube world's phase 4 (S1, S2) by the agent that coded them. None of these was
+fetched: the formulas were written from memory and checked numerically (docs/science/cube-simulation-grid.md,
+"Earth against the mod"). Putman & Lin 2007, Harris et al. 2021 and Braess 1995 above also carry
+these rows.
+
+### VanOosterom1983
+- Reference: Van Oosterom, A. and Strackee, J. (1983). The solid angle of a plane triangle. IEEE Transactions on Biomedical Engineering BME-30(2):125-126 (from memory).
+- DOI or URL: not looked up.
+- Cited as: "Van Oosterom & Strackee 1983" (sphere/cube.rs: solid_angle).
+- Ledger ids: SCL-140
+- Access: paywalled (IEEE), not fetched.
+- Library: not fetched.
+- Read so far (by the project): from memory: tan(Omega/2) = |a . (b x c)| / (|a||b||c| + (a . b)|c| + (a . c)|b| + (b . c)|a|), used with unit vectors. Checked by the cube's cell areas summing to 4 pi R^2 within 2.5e-16.
+
+### Meyer2003
+- Reference: Meyer, M., Desbrun, M., Schröder, P. and Barr, A. H. (2003). Discrete differential-geometry operators for triangulated 2-manifolds. In Visualization and Mathematics III, Springer, 35-57 (from memory).
+- DOI or URL: not looked up.
+- Cited as: "Meyer, Desbrun, Schröder & Barr 2003" (sphere/cube.rs module notes, the cotangent weights).
+- Ledger ids: SCL-141
+- Access: not fetched (an author copy is said to be open).
+- Library: not fetched.
+- Read so far (by the project): from memory: the linear finite-element (P1) stiffness of a triangle mesh gives each edge half the sum of the cotangents of the two angles opposite it. Checked by the Laplacian of degree-1 and degree-2 harmonics on the cube (SCL-141).
+
+### Hilbert1891
+- Reference: Hilbert, D. (1891). Über die stetige Abbildung einer Linie auf ein Flächenstück. Mathematische Annalen 38(3):459-460 (from memory).
+- DOI or URL: not looked up.
+- Cited as: "Hilbert curve" (sphere/cube.rs: hilbert_key).
+- Ledger ids: SCL-143
+- Access: not fetched.
+- Library: not fetched.
+- Read so far (by the project): nothing; the code is the standard iterative index-to-curve map, checked by its tests (each face's keys are a permutation, consecutive cells are side neighbours).

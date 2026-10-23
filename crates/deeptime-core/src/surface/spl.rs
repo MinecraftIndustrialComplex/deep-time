@@ -49,7 +49,7 @@
 
 use rayon::prelude::*;
 
-use super::grid::Dims;
+use super::grid::SurfaceGrid;
 use super::pflood::{BASE, LAND, SINK};
 use super::routing::Routing;
 use super::routing::forest::{NONE, SharedF64};
@@ -179,6 +179,11 @@ struct Cell {
     filled: f64,
     /// Drainage area, floored at 1 % of a cell, m².
     ar: f64,
+    /// The cell's area, m², and its share of the grid's reference area (exactly 1 on the
+    /// raster, whose cells are all the reference): a lake's room is counted in metres over
+    /// cells of the reference area.
+    a: f64,
+    wgt: f64,
     /// Distance to the receiver, metres (at least 1e-9).
     len: f64,
     /// F = K A^m Δt / L^n.
@@ -201,8 +206,8 @@ struct Cell {
 /// `Forest::down` and `Forest::up`; the inflow of a cell is summed over its donors in ascending
 /// order, which is the order the serial reverse-stack loop added them in (see `forest.rs`), so the
 /// result does not depend on the thread count and equals the serial solve to the last bit.
-pub fn solve(
-    d: &Dims,
+pub fn solve<G: SurfaceGrid>(
+    d: &G,
     r: &Routing,
     input: &SplInput<'_>,
     p: &SplParams,
@@ -216,8 +221,8 @@ pub fn solve(
 /// critical slope cut each cell below the stream-power solution in the last iteration: the
 /// landslide share of the step's erosion, for the surface stage's erosion diagnostics
 /// (`ErosionBands`). The solution is the same bit for bit with or without it.
-pub fn solve_cut(
-    d: &Dims,
+pub fn solve_cut<G: SurfaceGrid>(
+    d: &G,
     r: &Routing,
     input: &SplInput<'_>,
     p: &SplParams,
@@ -225,7 +230,8 @@ pub fn solve_cut(
     qin: &mut [f64],
     cut: Option<&mut [f64]>,
 ) -> SplReport {
-    let a = d.cell_area();
+    // The unit of a lake's room (the raster's one cell area, the cube's mean). ledger: SCL-149
+    let a = d.ref_area();
     let n = d.cells();
     let f = &r.forest;
     let l = f.len();
@@ -246,12 +252,15 @@ pub fn solve_cut(
             } else {
                 (2, 0.0)
             };
-            let ar = input.area[c].max(0.01 * a);
+            let ac = d.area(c);
+            let ar = input.area[c].max(0.01 * ac);
             let len = f64::from(r.len[c]).max(1e-9);
             Cell {
                 h0,
                 filled: input.filled[c],
                 ar,
+                a: ac,
+                wgt: ac / a,
                 len,
                 factor: input.kf[c] * ar.powf(p.m) * p.dt / len.powf(p.n),
                 rfix,
@@ -330,21 +339,22 @@ pub fn solve_cut(
             }
             qs.set(i, inflow);
             let c = &cells[i];
-            let supply = inflow * p.dt / a;
+            // The inflow over this cell, m; and over the reference area, m (the room's unit).
+            let supply = inflow * p.dt / c.a;
             let o = if c.sink {
                 hs.set(i, c.h0 + supply);
                 0.0
             } else if links[i] == LAKE_CHAIN || links[i] == LAKE_SPILL {
                 // ledger: HYD-110
-                room.set(i, upstream + (c.filled - c.h0));
+                room.set(i, upstream + (c.filled - c.h0) * c.wgt);
                 inflow
             } else if links[i] == LAKE_EXIT {
-                let v = upstream + (c.filled - c.h0);
-                let dep = supply.min(v);
+                let v = upstream + (c.filled - c.h0) * c.wgt;
+                let dep = (inflow * p.dt / a).min(v);
                 share.set(i, if v > 0.0 { dep / v } else { 0.0 });
                 (inflow - dep * a / p.dt).max(0.0)
             } else {
-                let o = inflow + (c.h0 - hs.get(i)) * a / p.dt;
+                let o = inflow + (c.h0 - hs.get(i)) * c.a / p.dt;
                 if o < 0.0 {
                     hs.set(i, c.h0 + supply);
                     0.0
@@ -408,8 +418,8 @@ pub fn solve_cut(
 /// Deposition takes from the entering flux in proportion; a lake's cells all take the mix that
 /// enters the lake, and its exit takes what the whole lake kept (HYD-110). Parallel over the
 /// drainage forest and bit-identical to the serial reverse-stack loop, like [`solve`].
-pub fn families(
-    d: &Dims,
+pub fn families<G: SurfaceGrid>(
+    d: &G,
     r: &Routing,
     input: &SplInput<'_>,
     fam: &[u8],
@@ -417,14 +427,13 @@ pub fn families(
     h: &[f64],
     mix: &mut Vec<[f64; FAMILIES]>,
 ) {
-    let a = d.cell_area();
     let f = &r.forest;
     let l = f.len();
     // The erosion rate of each cell (negative: deposition) and its family, in stack order.
     let ev: Vec<f64> = r
         .stack
         .par_iter()
-        .map(|&c| (input.h0[c as usize] - h[c as usize]) * a / dt)
+        .map(|&c| (input.h0[c as usize] - h[c as usize]) * d.area(c as usize) / dt)
         .collect();
     let fv: Vec<usize> = r
         .stack

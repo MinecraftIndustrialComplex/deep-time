@@ -49,6 +49,8 @@ abstract class LevelChunkWrapMixin implements WrapChunk {
     @Unique
     private CellIsometry deeptime$bandIso;
     @Unique
+    private boolean deeptime$bandSplit;
+    @Unique
     private CellIsometry[] deeptime$images = DEEPTIME$NONE;
 
     @Shadow
@@ -63,6 +65,7 @@ abstract class LevelChunkWrapMixin implements WrapChunk {
             ChunkPos p = ((LevelChunk) (Object) this).getPos();
             WrapTopology.ChunkFold cf = t.chunkFold(p.x, p.z);
             deeptime$bandIso = cf == null ? null : cf.iso();
+            deeptime$bandSplit = cf != null && cf.split();
             deeptime$images = cf == null ? t.chunkImages(p.x, p.z) : DEEPTIME$NONE;
             deeptime$cacheFor = t;
         }
@@ -75,8 +78,24 @@ abstract class LevelChunkWrapMixin implements WrapChunk {
     }
 
     @Override
+    public boolean deeptime$bandSplit() {
+        return deeptime$refresh() != null && deeptime$bandSplit;
+    }
+
+    @Override
     public CellIsometry[] deeptime$images() {
         return deeptime$refresh() == null ? DEEPTIME$NONE : deeptime$images;
+    }
+
+    /**
+     * {@code pos} in this chunk's own frame: the chunk's columns, the position's y. Toroidal World can
+     * hand a chunk a position one period away; the engine's motions are for the chunk's own place.
+     */
+    @Unique
+    private BlockPos deeptime$own(BlockPos pos) {
+        ChunkPos p = ((LevelChunk) (Object) this).getPos();
+        int x = p.getMinBlockX() + (pos.getX() & 15), z = p.getMinBlockZ() + (pos.getZ() & 15);
+        return x == pos.getX() && z == pos.getZ() ? pos : new BlockPos(x, pos.getY(), z);
     }
 
     @Inject(method = "setBlockState", at = @At("HEAD"), cancellable = true)
@@ -93,7 +112,15 @@ abstract class LevelChunkWrapMixin implements WrapChunk {
         var bands = ((WrapLevel) level).deeptime$bands();
         if (bands == null)
             return;
-        cir.setReturnValue(bands.redirectChunkWrite((LevelChunk) (Object) this, deeptime$bandIso, pos, state, isMoving));
+        BlockPos own = deeptime$own(pos);
+        CellIsometry iso = deeptime$bandIso;
+        if (deeptime$bandSplit) {
+            WrapTopology.Fold f = ((WrapLevel) level).deeptime$wrap().fold(own.getX(), own.getZ());
+            if (f == null)
+                return;
+            iso = f.iso();
+        }
+        cir.setReturnValue(bands.redirectChunkWrite((LevelChunk) (Object) this, iso, own, state, isMoving));
     }
 
     @Inject(method = "setBlockState", at = @At("RETURN"))
@@ -102,7 +129,7 @@ abstract class LevelChunkWrapMixin implements WrapChunk {
             return;
         var bands = ((WrapLevel) level).deeptime$bands();
         if (bands != null)
-            bands.replicate((LevelChunk) (Object) this, pos, deeptime$images);
+            bands.replicate((LevelChunk) (Object) this, deeptime$own(pos), deeptime$images);
     }
 
     @Inject(method = "postProcessGeneration", at = @At("HEAD"), cancellable = true)

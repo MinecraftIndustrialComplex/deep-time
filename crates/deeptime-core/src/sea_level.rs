@@ -33,7 +33,7 @@
 
 use rayon::prelude::*;
 
-use crate::surface::grid::Dims;
+use crate::surface::grid::{Dims, SurfaceGrid};
 use crate::surface::params::FloodMethod;
 use crate::surface::pflood;
 
@@ -64,12 +64,38 @@ pub fn fill_level(
     min_cells: usize,
     method: FloodMethod,
 ) -> f64 {
-    let n = d.cells();
-    debug_assert_eq!(h.len(), n);
     debug_assert_eq!(row_area.len(), d.h);
     let w = d.w;
-    let a = |c: usize| row_area[c / w];
     let total: f64 = row_area.iter().sum::<f64>() * w as f64;
+    fill_level_with(d, h, |c| row_area[c / w], total, layer_m, min_cells, method)
+}
+
+/// [`fill_level`] on any grid with its own cell areas (`SurfaceGrid::area`; the cube's are true
+/// areas), the planet's area their sum in cell order.
+pub fn fill_level_on<G: SurfaceGrid>(
+    d: &G,
+    h: &[f64],
+    layer_m: f64,
+    min_cells: usize,
+    method: FloodMethod,
+) -> f64 {
+    // ledger: SCL-150 (game-choice: true areas, summed in cell order)
+    let total: f64 = (0..d.cells()).map(|c| d.area(c)).sum();
+    fill_level_with(d, h, |c| d.area(c), total, layer_m, min_cells, method)
+}
+
+/// The level with cell areas `a` that sum to `total` (the module notes, "How it is solved").
+fn fill_level_with<G: SurfaceGrid, A: Fn(usize) -> f64 + Sync>(
+    d: &G,
+    h: &[f64],
+    a: A,
+    total: f64,
+    layer_m: f64,
+    min_cells: usize,
+    method: FloodMethod,
+) -> f64 {
+    let n = d.cells();
+    debug_assert_eq!(h.len(), n);
     let water = layer_m.max(0.0) * total;
     // 1. The plain hypsometric level.
     let mut order: Vec<u32> = (0..n as u32).collect();
