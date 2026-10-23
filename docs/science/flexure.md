@@ -4,9 +4,11 @@ Status of this page: written with the feature on 2026-10-02. Three constants wer
 their sources (ISO-041, ISO-042, ISO-048); the rest are marked in the ledger as read from abstracts,
 uncited, or game choices. The measurements are from small ensembles of four runs; two of them
 were made before the last change of one constant (see "Earth against the mod"). Updated 2026-10-18
-for the polar holes (ISO-056 rewritten, ISO-074 to ISO-076 added; six runs).
+for the polar holes (ISO-056 rewritten, ISO-074 to ISO-076 added; six runs), and 2026-10-22 for
+the settling's feedback (ISO-061 rewritten, ISO-091 to ISO-093 added; twelve runs a side).
 
-Ledger ids on this page: `ISO-040` to `ISO-077` (see [ledger/ISO.md](ledger/ISO.md)).
+Ledger ids on this page: `ISO-040` to `ISO-077`, `ISO-088`, `ISO-091` to `ISO-093` (see
+[ledger/ISO.md](ledger/ISO.md)).
 
 ## What you see in the world
 
@@ -32,7 +34,8 @@ and the spreading of over-thick crust.
 
 1. **The loads.** For every cell the stage keeps, moving with the crust, how much weight has been
    added or removed since the start of the run. Each step it adds: the crust the plate model
-   thickened (its uplift), crust moved by spreading, rock eroded or deposited, rock the volcano
+   added or took away (the change of each column's own crust, not its whole rise: a height the
+   plate model moves alone is no load, see "The settling's feedback"), crust moved by spreading, rock eroded or deposited, rock the volcano
    stage laid on top, the change of the sea's depth over the cell, and the land ice the climate
    stage reports. On ocean floor that follows GDH1 (the shipped presets) the sea that fills the
    floor's own cooling is left out: GDH1's depths are those of floor under water, so that water's
@@ -83,7 +86,7 @@ The plate equation, as coded (ISO-040):
 | ISO-043 | Mantle density ρ_m | 3,300 | kg/m³ | none | `uncited` |
 | ISO-044 | Sea water density ρ_w | 1,030 | kg/m³ | none | `uncited` |
 | ISO-045 | Ice density ρ_i | 917 | kg/m³ | none | `uncited` |
-| ISO-046 | Crust thickened behind an uplift `u` | `u / (1 − k)`, `k` 0.818 on land, 0.736 under water | – | Airy isostasy, none cited | `uncited` |
+| ISO-046 | Crust thickened behind an uplift `u` | `u / (1 − k)`, `k` 0.858 on land, 0.793 under water (crust 2,830 kg/m³ since 2026-10-06) | – | Airy isostasy, none cited | `uncited` |
 | ISO-047 | Density of eroded and deposited rock | 2,640 on land, 2,301 under water | kg/m³ | none (keeps ISO-001, ISO-003) | `uncited` |
 | ISO-048 | Oceanic `Te` | 2.7 × √(age in Myr) | km | Calmant et al. 1990 | `verified` |
 | ISO-049 | Oceanic `Te`, at most | 40 | km | Watts & ten Brink 1989 | `abstract-only` |
@@ -104,6 +107,9 @@ The plate equation, as coded (ISO-040):
 | ISO-077 | Two more fast rates | denudation 8 to more than 30 mm/yr (Taiwan), rebound about 10 (Hudson Bay) | mm/yr | Deng et al. 2021, Sella et al. 2007 | `abstract-only` |
 | ISO-061 to ISO-064 | What counts as a load | see the ledger | | none | `uncited`, one `game-choice` |
 | ISO-088 | The sea over GDH1's own deepening | no load: GDH1 is depth under water | m | Stein & Stein 1992; Kominz et al. 1998 (PLT-353) | `cited-unverified` |
+| ISO-091 | Only crust is load | the plate model's crust uplift `u_c`, either sign: load `k_a u_c / (1 − k_a)`; the rest of the uplift and the sea it moves, none | m | none (the plate equation's load is mass, ISO-040) | `uncited` |
+| ISO-092 | The crust uplift | the change of each sample's pools' Airy height over the plate step, with the resampling's accretion and the rate limits' cut | mm/yr | none (the plate model's Airy height, PLT-278 to PLT-282) | `uncited` |
+| ISO-093 | Earth's departure from local isostasy | at most about 2 to 4 km of rock (free-air −380 to +300 mGal at 0.112 mGal/m) | km | Watts et al. 2025, ten Brink et al. 2004, Stern, Cattin et al. 2001, Hunter & Watts 2016, Watts & Burov 2003 | `verified` (measurement only) |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
 ISO-054 and ISO-057 to ISO-060, all `game-choice`.
@@ -400,5 +406,11 @@ By their keys in [bibliography.md](bibliography.md), section "Lithospheric flexu
 - `Guevara2022`, `Govin2020`, `Lidberg2010` (author preprint), `Brothers2009`, `Garzione2008`,
   `XieHeller2009`, `Portenga2011`: full text; `Deng2021`, `Sella2007`: abstracts; fetched
   2026-10-18 by a sub-agent of the polar-holes agent, the values read by the agent (ISO-076).
+- `Watts2025_Hawaii`, `tenBrink2004`, `Stern_OceanTrenches` (proof), `WattsBurov2003`: full text;
+  `HunterWatts2016` (about 200,000 of 279,000 characters, section 8 and Appendix C), `Cattin2001`
+  (about 100,000 of 130,000 characters): most of the text; `McNuttMenard1982`, `GoetzeEvans1979`:
+  abstracts; `Watts1978`, `KarnerWatts1983` and chapter 3 of `TurcotteSchubert_Geodynamics`: full
+  text this time. Read 2026-10-22 by a Sonnet sub-agent of the flexure-guard agent, the
+  quotations in the bibliography (ISO-093).
 
 The sources from `TurcotteSchubert_Geodynamics` to `DeCellesGiles1996_flexure` were read by a sub-agent on 2026-10-02, not by the agent that wrote the code.
