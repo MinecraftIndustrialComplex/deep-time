@@ -93,12 +93,15 @@ fn l2_level() -> Level {
         wgt,
         kfac: vec![1.0; w * h],
         zs: Vec::new(),
-        lake: (0..w * h)
+        lake_z: (0..w * h)
             .map(|c| {
-                u8::from(
-                    kind[c] == pflood::SINK
-                        || (kind[c] == pflood::LAND && filled[c] - hh[c] > pflood::LAKE_TOL_M),
-                )
+                if kind[c] == pflood::SINK {
+                    (hh[c] + 2.0 * pflood::LAKE_TOL_M) as f32
+                } else if kind[c] == pflood::LAND && filled[c] - hh[c] > pflood::LAKE_TOL_M {
+                    filled[c] as f32
+                } else {
+                    resample::NO_LAKE
+                }
             })
             .collect(),
     }
@@ -170,18 +173,25 @@ fn run_mem(level: &Level, cfg: &Config, plan: TilePlan, threads: usize) -> (MemS
     (sink, out)
 }
 
-/// The footprint of the lakes at L3: the L2 lakes grown by a cell at each of the two levels.
+/// The most the lakes can cover at L3: every cell the L2 lakes' surfaces reach through the two
+/// levels' quads (the passes decide which of them lie under the surface, so this holds the
+/// footprint of any terrain: here the terrain is put deep under every surface).
 fn lake_l3(l2: &Level) -> Vec<u8> {
-    let mid = l2.sample(&Win::full(2 * l2.w, 2 * l2.h));
+    let deep = |n: usize| vec![-1.0e30f32; n];
+    let reach = Level {
+        z: deep(l2.cells()),
+        ..l2.clone()
+    };
+    let mid = reach.sample(&Win::full(2 * l2.w, 2 * l2.h));
     let l1 = Level {
         w: 2 * l2.w,
         h: 2 * l2.h,
         dx: l2.dx / 2.0,
-        z: mid.z,
+        z: deep(4 * l2.cells()),
         area: mid.area,
         wgt: vec![1.0; 4 * l2.w * l2.h],
         kfac: mid.kfac,
-        lake: mid.lake,
+        lake_z: mid.lake_z,
         zs: Vec::new(),
     };
     l1.sample(&Win::full(4 * l2.w, 4 * l2.h)).lake
@@ -209,7 +219,10 @@ fn global_sinks(z: &[f32], mask: &[u8], sea: f32) -> u64 {
 #[test]
 fn amplification_creates_no_new_internal_sinks_outside_lakes() {
     let l2 = l2_level();
-    assert!(l2.lake.contains(&1), "the test planet has a lake");
+    assert!(
+        (0..l2.cells()).any(|c| l2.is_lake(c)),
+        "the test planet has a lake"
+    );
     assert!(
         l2.z.iter().any(|&z| z > 500.0) && l2.z.iter().any(|&z| z < -100.0),
         "and land and sea"
@@ -270,8 +283,8 @@ fn the_flood_repairs_a_pit_nobody_declared_a_lake() {
             .map(|k| (j + k / 3 - 1) * W2 + i + k % 3 - 1)
             .collect();
         let low = ring.iter().map(|&n| l2.z[n]).fold(f32::MAX, f32::min);
-        let all_land = ring.iter().all(|&n| l2.z[n] > 320.0 && l2.lake[n] == 0);
-        if apart && all_land && l2.lake[c] == 0 {
+        let all_land = ring.iter().all(|&n| l2.z[n] > 320.0 && !l2.is_lake(n));
+        if apart && all_land && !l2.is_lake(c) {
             // A pit 200 m deeper than the lowest ground round it, still above the sea.
             l2.z[c] = low - 200.0;
             dug.push((i, j));
@@ -598,7 +611,7 @@ fn the_seam_leaves_no_mark() {
         area: rotate(&l2.area, W2, shift),
         wgt: rotate(&l2.wgt, W2, shift),
         kfac: rotate(&l2.kfac, W2, shift),
-        lake: rotate(&l2.lake, W2, shift),
+        lake_z: rotate(&l2.lake_z, W2, shift),
         ..l2.clone()
     };
     let (rot, _) = run_mem(&shifted, &c, plan_tiled(&c), 2);
