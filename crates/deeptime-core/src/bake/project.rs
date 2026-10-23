@@ -134,7 +134,7 @@ const CATEGORICAL: [&str; 8] = [
 
 /// How a layer is resampled.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Kind {
+pub(crate) enum Kind {
     /// Footprint mean of the bilinear field (the nearest cell where a sample is no-data).
     Continuous,
     /// The nearest cell's value.
@@ -160,7 +160,7 @@ enum Kind {
 /// The layers read by the cover rule ([`Kind::Cover`]).
 const COVER: [&str; 1] = ["climate/ice_cover"];
 
-fn kind_of(desc: &LayerDesc) -> Kind {
+pub(crate) fn kind_of(desc: &LayerDesc) -> Kind {
     if desc.dtype == DType::HorizonStack {
         Kind::Stack
     } else if COVER.contains(&desc.name.as_str()) {
@@ -174,27 +174,27 @@ fn kind_of(desc: &LayerDesc) -> Kind {
     }
 }
 
-fn err(m: impl Into<String>) -> CoreError {
+pub(crate) fn err(m: impl Into<String>) -> CoreError {
     CoreError::InvalidState(m.into())
 }
 
-fn ms(t: Instant) -> f64 {
+pub(crate) fn ms(t: Instant) -> f64 {
     (t.elapsed().as_secs_f64() * 10_000.0).round() / 10.0
 }
 
 /// A loaded source layer.
-struct Src {
-    entry: usize,
+pub(crate) struct Src {
+    pub(crate) entry: usize,
     /// Shared with the pass's own copy of the elevation and amplitude layers (one load of each).
-    layer: Arc<LoadedLayer>,
-    kind: Kind,
-    cb: usize,
+    pub(crate) layer: Arc<LoadedLayer>,
+    pub(crate) kind: Kind,
+    pub(crate) cb: usize,
 }
 
 impl Src {
     /// The raw value of cell (i, j) (columns wrap, rows clamp), NaN for no-data.
     #[inline]
-    fn raw(&self, i: i64, j: i64) -> f64 {
+    pub(crate) fn raw(&self, i: i64, j: i64) -> f64 {
         let g = &self.layer.desc.grid;
         let (ci, cj) = g.cell(i, j);
         let at = (cj as usize * g.w as usize + ci as usize) * self.cb;
@@ -211,7 +211,7 @@ impl Src {
 
     /// The cell nearest block (x, z).
     #[inline]
-    fn nearest_cell(&self, x: f64, z: f64) -> (u32, u32) {
+    pub(crate) fn nearest_cell(&self, x: f64, z: f64) -> (u32, u32) {
         let g = &self.layer.desc.grid;
         let u = (x - g.origin_block_x as f64) / f64::from(g.r);
         let v = (z - g.origin_block_z as f64) / f64::from(g.r);
@@ -220,7 +220,7 @@ impl Src {
 
     /// Bilinear raw value at block (x, z) (the arithmetic of `RasterRead::bilinear`).
     #[inline]
-    fn bilinear(&self, x: f64, z: f64) -> f64 {
+    pub(crate) fn bilinear(&self, x: f64, z: f64) -> f64 {
         let g = &self.layer.desc.grid;
         let u = (x - g.origin_block_x as f64) / f64::from(g.r);
         let v = (z - g.origin_block_z as f64) / f64::from(g.r);
@@ -238,7 +238,7 @@ impl Src {
 
     /// The cover rule's raw value at block (x, z) (the arithmetic of `RasterRead::cover`).
     #[inline]
-    fn cover(&self, x: f64, z: f64) -> f64 {
+    pub(crate) fn cover(&self, x: f64, z: f64) -> f64 {
         let g = &self.layer.desc.grid;
         let u = (x - g.origin_block_x as f64) / f64::from(g.r);
         let v = (z - g.origin_block_z as f64) / f64::from(g.r);
@@ -428,8 +428,35 @@ impl Mapping {
 
 /// Applies a Jacobian (as [`Mapping::jacobian`] returns it) to a simulation vector (dx, dz).
 #[inline]
-fn apply(j: &[[f64; 2]; 2], v: (f64, f64)) -> (f64, f64) {
+pub(crate) fn apply(j: &[[f64; 2]; 2], v: (f64, f64)) -> (f64, f64) {
     (j[0][0] * v.0 + j[1][0] * v.1, j[0][1] * v.0 + j[1][1] * v.1)
+}
+
+/// What the vector data's projection reads of a world (structure windows, bodies, sites): where
+/// a simulation block lands, the local Jacobian there (as [`Mapping::jacobian`]) and the world's
+/// x period. The Petroff–Guyou world's [`Mapping`] and the cube world's
+/// (`bake::project_cube::CubeMapping`).
+pub trait WorldMap {
+    /// The world point of simulation block (xs, zs).
+    fn to_world(&self, xs: f64, zs: f64) -> (f64, f64);
+    /// World per simulation block at (xs, zs): [[dx/dxs, dz/dxs], [dx/dzs, dz/dzs]].
+    fn jacobian(&self, xs: f64, zs: f64) -> [[f64; 2]; 2];
+    /// The world's x period, blocks.
+    fn period(&self) -> i64;
+}
+
+impl WorldMap for Mapping {
+    fn to_world(&self, xs: f64, zs: f64) -> (f64, f64) {
+        Mapping::to_world(self, xs, zs)
+    }
+
+    fn jacobian(&self, xs: f64, zs: f64) -> [[f64; 2]; 2] {
+        Mapping::jacobian(self, xs, zs)
+    }
+
+    fn period(&self) -> i64 {
+        self.g.period()
+    }
 }
 
 /// The λc the bake chose and how good it is.
@@ -645,6 +672,9 @@ pub fn estimate_bytes(p: &PlanetPreset) -> u64 {
     }
     let c = p.scale.circumference_blocks;
     let b = u64::from(PetroffGuyou::hemisphere_for(c));
+    // A cube world's grids: n = s / r cells a face side, six faces.
+    let cube = p.scale.projection == ProjectionKind::Cube;
+    let s = u64::from(deeptime_format::projection::face_for(c));
     let radius = |level: u32| match level {
         1 => p.resolution.l1_r,
         2 => p.resolution.l2_r,
@@ -652,8 +682,20 @@ pub fn estimate_bytes(p: &PlanetPreset) -> u64 {
     };
     let src_cells =
         |r: u32| GridDesc::for_planet("", c, r).map_or(0, |g| u64::from(g.w) * u64::from(g.h));
-    let world_width = |r: u32| (2 * b).div_ceil(u64::from(r.max(1)));
-    let world_cells = |r: u32| world_width(r) * (b / u64::from(r.max(1)) + 1);
+    let world_width = |r: u32| {
+        if cube {
+            s / u64::from(r.max(1))
+        } else {
+            (2 * b).div_ceil(u64::from(r.max(1)))
+        }
+    };
+    let world_cells = |r: u32| {
+        if cube {
+            6 * world_width(r) * world_width(r)
+        } else {
+            world_width(r) * (b / u64::from(r.max(1)) + 1)
+        }
+    };
     // The Lambert elevation and amplitude, loaded before the first grid (a part of the L3 sources).
     let kept_sources = src_cells(radius(3)) * LAYER_BYTES_PER_CELL[2].2;
     let (mut worst, mut stacks) = (0u64, 0u64);
@@ -671,11 +713,11 @@ pub fn estimate_bytes(p: &PlanetPreset) -> u64 {
 }
 
 /// Rows of the world grid resampled at a time (their results are copied out before the next band).
-const ROW_BAND: usize = 64;
+pub(crate) const ROW_BAND: usize = 64;
 
 /// Writes a layer's tile pack (its tiles compressed in parallel) to its temporary name, its fsync
 /// started; `flusher`'s commit puts it in place (P1-19).
-fn write_deferred(
+pub(crate) fn write_deferred(
     flusher: &mut Flusher,
     path: &Path,
     desc: &LayerDesc,
@@ -832,7 +874,7 @@ fn world_row_weight(j: usize, h: usize) -> f64 {
 
 /// The share of a layer's area where `pred` holds, on the world grid (`world` = true) or on the
 /// simulation's Lambert grid (true area: rows weighted by their share of the planet).
-fn area_share(layer: &LoadedLayer, world: bool, pred: impl Fn(f64) -> bool) -> f64 {
+pub(crate) fn area_share(layer: &LoadedLayer, world: bool, pred: impl Fn(f64) -> bool) -> f64 {
     let g = &layer.desc.grid;
     let cb = layer.desc.cell_bytes();
     let (w, h) = (g.w as usize, g.h as usize);
@@ -924,7 +966,7 @@ fn band_anisotropy(
 /// Beyond a turning edge the window reads the glued cells (row −k is row k at column w − i).
 /// Returns (cells raised, largest raise in blocks, and with `record` what the raise did to each
 /// raised cell: its index and `Moved`, no lift, the raise and the last horizon it moved).
-fn raise_world_tops(
+pub(crate) fn raise_world_tops(
     desc: &LayerDesc,
     bytes: &mut [u8],
     elev: &LoadedLayer,
@@ -977,10 +1019,18 @@ fn raise_world_tops(
     };
     let e = square(elev);
     let a = amp.map_or_else(|| vec![0.0; w1 * h1], square);
-    let at = |v: &[f64], i: i64, j: i64| -> f64 {
+    let cube = g1.is_cube();
+    let at = |v: &[f64], i: i64, j: i64, di: i64, dj: i64| -> f64 {
+        // On a cube grid the window runs across the face's edges onto its neighbours, turned
+        // with them ([`GridDesc::face_cell`], SCL-122).
+        if cube {
+            let (face, a, b) = g1.face_of_cell(i as u32, j as u32);
+            let (ci, cj) = g1.face_cell(face, i64::from(a) + di, i64::from(b) + dj);
+            return v[cj as usize * w1 + ci as usize];
+        }
         // Rows past an edge are the glued rows: (i, −k) is (w − i, k); (i, h − 1 + k) is
         // (w − i, h − 1 − k).
-        let (mut i, mut j) = (i, j);
+        let (mut i, mut j) = (i + di, j + dj);
         if j < 0 {
             j = -j;
             i = w1 as i64 - i;
@@ -1007,8 +1057,8 @@ fn raise_world_tops(
                 // cells; these are point samples), so the self-glued edge rows stay glued.
                 for dj in -2i64..=2 {
                     for di in -2i64..=2 {
-                        me = me.max(at(&e, i as i64 + di, j as i64 + dj));
-                        ma = ma.max(at(&a, i as i64 + di, j as i64 + dj));
+                        me = me.max(at(&e, i as i64, j as i64, di, dj));
+                        ma = ma.max(at(&a, i as i64, j as i64, di, dj));
                     }
                 }
                 if !me.is_finite() {
@@ -1102,7 +1152,7 @@ fn horizons_of(desc: &LayerDesc, bytes: &[u8], min_y: i32) -> Horizons {
 /// ([`key_shift`], STR-056) on the raised world stacks (`desc`, `bytes`). The raise lifts the
 /// thickest rock unit near the surface and every horizon over it, so a stratabound body in one of
 /// those horizons rises with it and keeps its host (ORE-271). Zero everywhere when nothing rose.
-fn world_raise_shifts(
+pub(crate) fn world_raise_shifts(
     desc: &LayerDesc,
     bytes: &[u8],
     min_y: i32,
@@ -1133,6 +1183,10 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     if p.scale.projection == ProjectionKind::Lambert {
         m.projection = Some(WorldProjection::Lambert(Projection::new(c_sim)).spec(None));
         return Ok(json!({"version": VERSION, "kind": "lambert"}));
+    }
+    // A cube world (format 0.7, cube plan phase 1): its own pass.
+    if p.scale.projection == ProjectionKind::Cube {
+        return crate::bake::project_cube::project_folder_cube(dir, p, m);
     }
     let sea = f64::from(m.scale.sea_level_y);
 
@@ -1392,6 +1446,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 bake_blocks_per_world_block: world_m_h / p.scale.m_per_block_h,
                 elevation: we,
                 closed: world_closed.as_ref(),
+                cube: None,
             };
             let params = p.biomes.clone().unwrap_or_default();
             biome_land_note = settle_biome_layers(&mut held_biomes, &ground, &params);
@@ -1597,11 +1652,13 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 noise(c_sim, &WorldProjection::Lambert(Projection::new(c_sim))),
             ),
             c: f64::from(c_sim),
+            cube: false,
         };
         let new = Drawn {
             elev: we,
             detail: drawn_detail(world_amp.as_ref(), noise(period, &wp)),
             c: f64::from(period),
+            cube: false,
         };
         let (mut clipped, mut with_host) = (0usize, (0usize, 0.0f64));
         new_bodies = bs
@@ -1753,7 +1810,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
 /// The world's ground on grid `wg`, blocks: the elevation layer's own resampled cells when it is
 /// on this grid (`here`), else the nearest cell of the world's elevation written before (the
 /// water grid `L3h` of a world too large for the hydrology at L3). None without either.
-fn world_ground(
+pub(crate) fn world_ground(
     wg: &GridDesc,
     here: Option<(&LayerDesc, &[u8])>,
     world_elev: Option<&LoadedLayer>,
@@ -1774,6 +1831,11 @@ fn world_ground(
         (0..n)
             .into_par_iter()
             .map(|c| {
+                // A cube cell's point is its centre (a reader takes the block under it).
+                if wg.is_cube() {
+                    let (px, pz) = wg.cube_point((c % w) as u32, (c / w) as u32);
+                    return we.nearest(px - 0.5, pz - 0.5);
+                }
                 let (i, j) = ((c % w) as i64, (c / w) as i64);
                 we.nearest(
                     (wg.origin_block_x + i * r) as f64,
@@ -1785,32 +1847,35 @@ fn world_ground(
 }
 
 /// A resampled layer kept back (moved, not copied) until the pass has the ground it waits for.
-struct Held {
-    entry: usize,
-    desc: LayerDesc,
-    bytes: Vec<u8>,
+pub(crate) struct Held {
+    pub(crate) entry: usize,
+    pub(crate) desc: LayerDesc,
+    pub(crate) bytes: Vec<u8>,
 }
 
 /// The L2 layers the biome bake's land call decides (BIO-170): the five biome inputs, the wetland
 /// flag and the Köppen class the inputs were placed by.
-fn is_biome_layer(name: &str) -> bool {
+pub(crate) fn is_biome_layer(name: &str) -> bool {
     crate::synth::CLIMATE.contains(&name)
         || name == "climate/wetland"
         || name == "climate/koppen_l2"
 }
 
 /// What the biome layers' land call reads: the world's ground.
-struct BiomeGround<'a> {
-    sea_level_y: i32,
-    m_per_block_v: f64,
+pub(crate) struct BiomeGround<'a> {
+    pub(crate) sea_level_y: i32,
+    pub(crate) m_per_block_v: f64,
     /// The size of a world block, metres.
-    world_m_per_block_h: f64,
+    pub(crate) world_m_per_block_h: f64,
     /// How many of the bake's (Lambert) blocks one world block spans in ground.
-    bake_blocks_per_world_block: f64,
+    pub(crate) bake_blocks_per_world_block: f64,
     /// The world's elevation layer (blocks), the L3 ground the column rule reads.
-    elevation: &'a LoadedLayer,
+    pub(crate) elevation: &'a LoadedLayer,
     /// The world's `closed_basin` layer (HYD-105's redraw), if the bake has the hydrology.
-    closed: Option<&'a LoadedLayer>,
+    pub(crate) closed: Option<&'a LoadedLayer>,
+    /// A cube world's view and the simulation's radius (bake blocks): the land call's fills and
+    /// distances run across the faces' seams, on the planet (SCL-122).
+    pub(crate) cube: Option<(&'a deeptime_format::cube_map::CubeView<'static>, f64)>,
 }
 
 /// The land call of the biome layers on the world's ground (ledger: BIO-170, BIO-171, BAK-057, HYD-108):
@@ -1818,7 +1883,7 @@ struct BiomeGround<'a> {
 /// world's elevation and `closed_basin` layers at each L2 node's block; the nodes whose biome inputs
 /// say the other medium take the other's record ([`biomes::settle_to_ground`]); the rest are not
 /// touched. Returns the record for `notes.bake.projection.biome_land`.
-fn settle_biome_layers(
+pub(crate) fn settle_biome_layers(
     held: &mut [Held],
     ground: &BiomeGround<'_>,
     params: &biomes::BiomeParams,
@@ -1871,6 +1936,13 @@ fn settle_biome_layers(
             let z = wg.block_z(j as i64) as f64;
             for (i, (s, d)) in srow.iter_mut().zip(drow.iter_mut()).enumerate() {
                 let x = wg.block_x(i as i64) as f64;
+                // A cube node's block is the one under its cell's centre.
+                let (x, z) = if wg.is_cube() {
+                    let (px, pz) = wg.cube_point(i as u32, j as u32);
+                    (px - 0.5, pz - 0.5)
+                } else {
+                    (x, z)
+                };
                 let height = ground.elevation.nearest(x, z);
                 let closed = || ground.closed.is_some_and(|c| c.nearest(x, z) >= 0.5);
                 *s = deeptime_format::water::sea_covers_height(height, ground.sea_level_y, closed);
@@ -1878,15 +1950,24 @@ fn settle_biome_layers(
             }
         });
     let land_nodes = sea.iter().filter(|&&s| !s).count();
-    let settled = biomes::settle_to_ground(
-        &mut cells,
-        w,
-        h,
-        &sea,
-        &depth_m,
-        f64::from(wg.r) * ground.bake_blocks_per_world_block,
-        params,
-    );
+    let blocks_per_cell = f64::from(wg.r) * ground.bake_blocks_per_world_block;
+    let settled = match ground.cube {
+        Some((view, rs)) => {
+            let cs = crate::bake::project_cube::CubeSettle::new(&wg, view, rs / blocks_per_cell);
+            biomes::settle_to_ground_by(
+                &mut cells,
+                &sea,
+                &depth_m,
+                blocks_per_cell,
+                params,
+                &|v, src| cs.fill(v, src),
+                &|land, to_sea| cs.dist(land, to_sea),
+            )
+        }
+        None => {
+            biomes::settle_to_ground(&mut cells, w, h, &sea, &depth_m, blocks_per_cell, params)
+        }
+    };
     // Write the settled nodes back, and only those.
     let changed: Vec<u32> = settled
         .to_sea
@@ -1919,10 +2000,12 @@ fn settle_biome_layers(
             }
         }
     }
-    // The edge rows stay glued onto themselves.
-    for hd in held.iter_mut() {
-        let cb = hd.desc.cell_bytes();
-        glue_edge_rows(&mut hd.bytes, w, h, cb);
+    // The edge rows stay glued onto themselves (a half-turn grid's; a cube grid has none).
+    if !wg.is_cube() {
+        for hd in held.iter_mut() {
+            let cb = hd.desc.cell_bytes();
+            glue_edge_rows(&mut hd.bytes, w, h, cb);
+        }
     }
     let cell_km = f64::from(wg.r) * ground.world_m_per_block_h / 1000.0;
     let km2 = |cells: usize| (cells as f64 * cell_km * cell_km * 10.0).round() / 10.0;
@@ -1952,21 +2035,24 @@ fn glue_edge_rows(out: &mut [u8], w: usize, h: usize, cb: usize) {
 
 /// The terrain height the game draws at block (x, z): the elevation plus the detail term
 /// (`ColumnWorld::height`), from loaded layers; `c` the x period the detail noise wraps with.
-struct Drawn<'a> {
-    elev: &'a LoadedLayer,
-    detail: DrawnDetail<'a>,
-    c: f64,
+pub(crate) struct Drawn<'a> {
+    pub(crate) elev: &'a LoadedLayer,
+    pub(crate) detail: DrawnDetail<'a>,
+    pub(crate) c: f64,
+    /// A cube world's drawing: the block (⌊x⌋, ⌊z⌋) read as the game reads a cube grid, at the
+    /// block's centre, folded through the net ([`RasterRead`] on a cube grid).
+    pub(crate) cube: bool,
 }
 
 /// A drawing's detail term: the amplitude layer, the spec and the noise.
-type DrawnDetail<'a> = Option<(
+pub(crate) type DrawnDetail<'a> = Option<(
     &'a LoadedLayer,
     deeptime_format::DetailSpec,
     deeptime_format::Noise,
 )>;
 
 /// The detail term of a drawing from its amplitude layer and its noise (either may be absent).
-fn drawn_detail(
+pub(crate) fn drawn_detail(
     amp: Option<&LoadedLayer>,
     n: Option<(deeptime_format::DetailSpec, deeptime_format::Noise)>,
 ) -> DrawnDetail<'_> {
@@ -1977,7 +2063,15 @@ fn drawn_detail(
 }
 
 impl Drawn<'_> {
-    fn height(&self, x: f64, z: f64) -> f64 {
+    pub(crate) fn height(&self, x: f64, z: f64) -> f64 {
+        if self.cube {
+            let (bx, bz) = (x.floor(), z.floor());
+            let e = self.elev.bilinear(bx, bz);
+            return match &self.detail {
+                Some((amp, spec, noise)) => e + amp.bilinear(bx, bz) * spec.noise(noise, bx, bz),
+                None => e,
+            };
+        }
         let (x, z) = (x.round(), z.round());
         let wx = x - (x / self.c + 0.5).floor() * self.c;
         let e = self.elev.bilinear(wx, z);
@@ -1988,7 +2082,7 @@ impl Drawn<'_> {
     }
 }
 
-fn write_json(dir: &Path, rel: &str, v: &Value) -> Result<(u64, u32), CoreError> {
+pub(crate) fn write_json(dir: &Path, rel: &str, v: &Value) -> Result<(u64, u32), CoreError> {
     let mut bytes =
         serde_json::to_vec_pretty(v).map_err(|e| CoreError::InvalidState(format!("{rel}: {e}")))?;
     bytes.push(b'\n');
@@ -2112,7 +2206,7 @@ pub fn project_rivers(
 /// A structural event in the world: the window's centre through the projection, its axes and
 /// sizes through the local Jacobian; a fault's slip and plane turned and stretched with them.
 pub fn project_structure(
-    map: &Mapping,
+    map: &impl WorldMap,
     st: &deeptime_format::structure::Structure,
 ) -> deeptime_format::structure::Structure {
     let mut out = st.clone();
@@ -2181,7 +2275,7 @@ pub fn project_structure(
 /// Of (site id, deposit type) pairs, the sites of an in-stratum type (`hosts.in_stratum`, the
 /// built-in types): their bodies lie in a host horizon and move through the projection only with
 /// it ([`body_y`]).
-fn stratabound_sites<'a>(
+pub(crate) fn stratabound_sites<'a>(
     sites: impl IntoIterator<Item = (deeptime_format::sites::SiteId, &'a str)>,
 ) -> Result<std::collections::HashSet<deeptime_format::sites::SiteId>, CoreError> {
     let types = crate::deposits::types::builtin()?;
@@ -2194,7 +2288,7 @@ fn stratabound_sites<'a>(
 
 /// What [`body_y`] did to a body.
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum BodyY {
+pub(crate) enum BodyY {
     /// Moved by this many blocks with the drawn ground.
     Moved(f64),
     /// A stratabound body, moved by `dy` with its host horizon (0 where the world's raise left
@@ -2221,7 +2315,7 @@ fn lift_body(nb: &mut deeptime_format::Body, dy: f64) {
 /// ground over its centre: the young landscape and the amplifier ran after the deposit stage
 /// placed it, and the drawing differs from the simulation's, so the ground over a horizon can lie
 /// lower than the one the deposit stage kept the body under (ORE-271).
-fn body_y(nb: &mut deeptime_format::Body, dy: f64, host: Option<f64>, ground: f64) -> BodyY {
+pub(crate) fn body_y(nb: &mut deeptime_format::Body, dy: f64, host: Option<f64>, ground: f64) -> BodyY {
     if let Some(host) = host {
         let host = if host.is_finite() { host } else { 0.0 };
         if host != 0.0 {
@@ -2251,7 +2345,7 @@ fn body_y(nb: &mut deeptime_format::Body, dy: f64, host: Option<f64>, ground: f6
 
 /// A body in the world: its centre through the projection, its horizontal axes and yaw through
 /// the local Jacobian, its box recomputed.
-pub fn project_body(map: &Mapping, b: &deeptime_format::Body) -> deeptime_format::Body {
+pub fn project_body(map: &impl WorldMap, b: &deeptime_format::Body) -> deeptime_format::Body {
     let mut out = b.clone();
     let j = map.jacobian(b.center[0], b.center[2]);
     let (wx, wz) = map.to_world(b.center[0], b.center[2]);
@@ -2282,7 +2376,7 @@ pub fn project_body(map: &Mapping, b: &deeptime_format::Body) -> deeptime_format
 /// others); its box the union of its bodies' (already projected) or, without bodies, its old box
 /// moved with the centre.
 pub fn project_site(
-    map: &Mapping,
+    map: &impl WorldMap,
     s: &deeptime_format::Site,
     bodies: &[deeptime_format::Body],
     dy: i32,
@@ -2297,7 +2391,7 @@ pub fn project_site(
     let mut any = false;
     for b in bodies.iter().filter(|b| b.site == Some(s.id)) {
         // Boxes near the slide may sit a lap away from the centre: bring them next to it.
-        let period = map.g.period() as i32;
+        let period = map.period() as i32;
         let shift = {
             let d = (b.aabb[0][0] + b.aabb[1][0]) / 2 - cx;
             -((f64::from(d) / f64::from(period)).round() as i32) * period
@@ -2322,7 +2416,7 @@ pub fn project_site(
 
 /// No spawn candidate within this many blocks of the north and south edges (the game's
 /// `SpawnHandler.EDGE_MARGIN`, POL-024).
-const SPAWN_EDGE_MARGIN: f64 = 64.0; // ledger: POL-024
+pub(crate) const SPAWN_EDGE_MARGIN: f64 = 64.0; // ledger: POL-024
 
 /// The spawn candidates in the world. Ranked ones (by the essentials) are each moved to the world
 /// L3 point nearest their image, their surface read from the world's elevation; any that lay past
@@ -2386,6 +2480,9 @@ fn project_spawn(
 
 /// The pass's log line (`projection …`).
 pub fn summary_line(v: &Value) -> String {
+    if v["kind"] == "cube" {
+        return crate::bake::project_cube::summary_line(v);
+    }
     if v["kind"] != "petroff_guyou" {
         return format!("projection {}", v["kind"].as_str().unwrap_or("?"));
     }
