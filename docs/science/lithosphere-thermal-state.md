@@ -380,6 +380,65 @@ them back down to its own values. On V1 the yield takes back most of the strengt
 largest landmass (0.182 to 0.165) and the drowned crust (0.251 to 0.269). Neither arm meets the ship
 rule; the yield is not made redundant by the strength, and the strength does not replace it.
 
+### Measured, stages 2 and 3 (2026-10-23)
+
+The pool as above, against the same base, with the measures `v1census` and `coastset` (the
+registry `tools/review/pool/measures_gap4.json`). Every arm ran at key c9ec7e5e87f6 (this branch at
+1263dda0); the branch's last code commit, 8d35c39f (key 8b420c4c0fd9), changed only a test's bound.
+
+**Off is the base.** `pool.sh alias HEAD 7f9d8f115049 --check-seed 1 --length 1000
++DEEPTIME_CRUST_BUDGET=1` at c9ec7e5e87f6: the world state's sha256 (106 files: every field and the
+globals) is 7ed7d589e8ae17bf on both and the dynamics record is identical; the alias is recorded for
+the base's argument set only.
+
+Exploration, seeds 1 to 4 (8 runs an arm; base's own seeds 1 to 4 meet 3.00 criteria a run):
+
+| arm | switches (`--set tectonics.`) | land | largest landmass | crust under the sea | above 2 km | high coast | under ice | collisions | crust's net change | criteria a run: median, mean | sea over the datum after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| target | | 0.26 to 0.32 | ≥ 0.12 | ≤ 0.25 | ≤ 0.12 | ≤ 0.15 | ≤ 0.15 | 2 to 6 | | of 7 | |
+| base (24) | none | 0.300 | 0.151 | 0.274 | 0.151 | 0.333 | 0.116 | 1.75 | −0.035 | 3, 3.33 | 538 / 861 |
+| g4-beta | transition_beta | 0.320 (0.086) | 0.177 (0.12) | 0.250 (0.45) | 0.145 (0.72) | 0.337 (0.75) | 0.141 (0.92) | 1.70 (0.90) | −0.015 (0.22) | 3, 3.12 (0.68) | 541 / 795 |
+| g4-root | root_removal | 0.310 (0.31) | 0.149 (0.78) | 0.263 (0.75) | 0.165 (0.48) | 0.365 (0.057) | 0.116 (0.72) | 1.80 (0.71) | −0.032 (0.92) | 3, 3.00 (0.35) | 442 / 800 |
+| g4-str | thermal_state, thermal_strength (stage 1's th-str at this key: every median and p the same) | 0.319 (0.013) | 0.204 (0.018) | 0.229 (0.070) | 0.147 (0.92) | 0.340 (0.92) | 0.114 (0.85) | 1.70 (0.59) | −0.033 (0.98) | 3.5, 3.38 (0.78) | 571 / 853 |
+| g4-beta-str | transition_beta, thermal_state, thermal_strength | 0.320 (0.20) | 0.194 (0.005) | 0.246 (0.56) | 0.144 (0.78) | 0.303 (0.65) | 0.113 (0.48) | 1.35 (0.21) | −0.034 (0.85) | 3.5, 3.50 (0.53) | 546 / 815 |
+| g4-root-str | root_removal, thermal_state, thermal_strength | 0.294 (0.95) | 0.121 (0.75) | 0.282 (0.54) | 0.131 (0.43) | 0.289 (0.24) | 0.126 (0.78) | 1.75 (0.59) | −0.027 (0.29) | 3.5, 3.25 (0.98) | 598 / 917 |
+
+Where the high coasts are on the same runs (`coastset`, medians; settings as in "Where the high
+coasts are"):
+
+| arm | high coast | share of the high coasts: collision belt / arc / rifted margin | high-coast rate: collision belt / rifted margin | high coast without the collision belts' | high coasts facing flooded continental crust: collision belt / rifted margin | rifted margins' high ground: Himalayan share, km inland |
+|---|---|---|---|---|---|---|
+| base (24) | 0.333 | 0.690 / 0.190 / 0.085 | 0.642 / 0.094 | 0.094 | 0.265 / 0.501 | 0.090, 88 |
+| g4-beta | 0.337 | 0.688 / 0.185 / 0.071 | 0.618 / 0.106 | 0.109 | 0.298 / 0.412 | 0.092, 99 |
+| g4-root | 0.365 | 0.717 / 0.193 / 0.065 | 0.667 / 0.104 | 0.111 | 0.244 / 0.464 | 0.147, 89 |
+| g4-str | 0.340 | 0.758 / 0.146 / 0.087 | 0.616 / 0.093 | 0.075 | 0.247 / 0.450 | 0.104, 99 |
+| g4-beta-str | 0.303 | 0.780 / 0.153 / 0.050 | 0.640 / 0.049 | 0.060 | 0.257 / 0.416 | 0.286, 109 |
+| g4-root-str | 0.289 | 0.691 / 0.216 / 0.047 | 0.590 / 0.043 | 0.076 | 0.244 / 0.318 | 0.146, 118 |
+
+- **Stage 2 alone** (no state, so only the crust's profile changes) leans towards more land: the
+  crust's net change −0.015 against −0.035 (p 0.22) and land at the band's top (0.320, p 0.086),
+  neither past the seeds' spread. The smoothstep stands more of a new margin's crust on its land
+  side (26.6 km at the boundary sample where the ramp held 24.6) and less on its ocean side, with
+  the same crust in the zone. The rifted margins' share of the high coasts falls from 0.085 to 0.071 and the flooded
+  continental crust they face from 0.501 to 0.412; coast_hi does not move, as the diagnosis said.
+- **Stage 3 alone** (no state) only paces the founder, which barely fires, and still draws a
+  different history from the first step that differs (the runs are chaotic). Nothing moved past
+  the seeds' spread: coast_hi 0.365 at p 0.057 is the largest move, one of 8 measures in 5 arms on
+  8 runs, and the sea's 442 m after 100 Myr lies inside base's 154 to 734 m.
+- **Stage 2 with the strength** (g4-beta-str) meets the most criteria of any arm, 3.50 a run
+  against the strength alone's 3.38 on the same seeds: the largest landmass 0.194 (p 0.005), the
+  drowned crust 0.246 (inside its band at the median), coast_hi 0.303. The rifted margins' high
+  coasts nearly go: their rate falls from 0.093 (g4-str) to 0.049 and their share from 0.087 to
+  0.050, and what high ground they keep is more often Himalayan (0.286 against 0.104): an old suture
+  rifted again. Collisions fall to 1.35 (p 0.21), further under the band's floor of 2. This arm
+  earned the final (below).
+- **Stage 3 with the strength** (g4-root-str) has the lowest coast_hi (0.289) and lowers the
+  collision belts' rate (0.616 to 0.590 against g4-str), but a belt that loses its root is hot and,
+  with the strength, as weak as a fresh orogen: it spreads, and crust thins under the sea. The
+  largest landmass falls to 0.121 (the band's floor is 0.12), the drowned crust rises to 0.282 and
+  the sea stands highest of the arms (598 / 917 m). Its mean, 3.25, is under the strength alone's;
+  it did not earn a final.
+
 ## Simplifications and limits
 
 - One thermal depth per sample and a relaxation towards a target, not a conductive geotherm: the
