@@ -686,6 +686,13 @@ pub struct TectonicParams {
     pub rift_fragments: [u32; 2],
     /// Fracture-line irregularity (radians of noise warp).
     pub rift_warp_rad: f64,
+    /// Rifts under tension (V1 gap 2's stage C2, `plates::rifting::maybe_rift`): a plate's rift
+    /// hazard is weighted by e^(σ/σ_s) over its area-weighted mean across the plates that may
+    /// rift, σ the plate's mean in-plane stress from the force balance (FRC-022, tension
+    /// positive) and σ_s this, MPa; the expected count is unchanged, the rifts move to the plates
+    /// pulled apart. 0 (the default) leaves the hazard as Cortial's. game-choice (agent
+    /// 2026-10-23): about half the spread of the plates' σ on the base's records. ledger: PLT-504
+    pub rift_stress_mpa: f64,
     /// Plates smaller than this fraction of the planet are absorbed by a neighbour.
     pub min_plate_area_frac: f64,
     /// No rifting beyond this many plates.
@@ -822,6 +829,11 @@ pub struct TectonicParams {
     /// anywhere through the old floor. game-choice (agent 2026-10-23): a few lattice spacings, so
     /// that the new front is ocean-ocean. ledger: PLT-503
     pub subduction_initiation_margin_km: f64,
+    /// Subduction starts under compression (V1 gap 2's stage C2): the initiation hazard weighted
+    /// as `rift_stress_mpa`'s with −σ, over the plates' old floor, σ_s this, MPa (Crameri et al.
+    /// 2020: horizontally forced initiation dominates the last 100 Myr). 0 (the default) leaves
+    /// it unweighted. game-choice (agent 2026-10-23), as `rift_stress_mpa`. ledger: PLT-505
+    pub initiation_stress_mpa: f64,
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.
     pub contact_timeout_myr: f64,
@@ -935,6 +947,7 @@ impl Default for TectonicParams {
             rift_ocean_weight: 0.08,
             rift_fragments: [2, 4],
             rift_warp_rad: 0.2,
+            rift_stress_mpa: 0.0, // ledger: PLT-504 (game-choice: off by default)
             min_plate_area_frac: 0.003,
             max_plates: 40,
             resample_min_myr: 20.0,  // ledger: PLT-098
@@ -974,6 +987,7 @@ impl Default for TectonicParams {
             subduction_initiation_clearance_km: 1000.0,
             initiation_slab_km: 150.0, // ledger: PLT-270
             subduction_initiation_margin_km: 0.0, // ledger: PLT-503 (game-choice: off by default)
+            initiation_stress_mpa: 0.0, // ledger: PLT-505 (game-choice: off by default)
             contact_timeout_myr: 24.0, // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
@@ -1444,6 +1458,8 @@ impl PlanetPreset {
                 "$.tectonics.subduction_initiation_margin_km",
             ),
             (k.ridge_segment_km, "$.tectonics.ridge_segment_km"),
+            (k.rift_stress_mpa, "$.tectonics.rift_stress_mpa"),
+            (k.initiation_stress_mpa, "$.tectonics.initiation_stress_mpa"),
             (
                 k.cordillera_shortening_mm_yr,
                 "$.tectonics.cordillera_shortening_mm_yr",

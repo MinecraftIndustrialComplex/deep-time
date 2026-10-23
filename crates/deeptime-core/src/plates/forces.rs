@@ -748,6 +748,10 @@ pub struct Recorded {
 #[derive(Clone, Debug, Default)]
 pub struct Answer {
     pub omega: Vec<Option<DVec3>>,
+    /// Each plate's mean in-plane stress, MPa, tension positive (indexed by plate id, `None` as
+    /// for `omega`): handed on to where rifts and subduction start (ledger FRC-022, PLT-504,
+    /// PLT-505). Never stored.
+    pub stress_mpa: Vec<Option<f64>>,
     pub solved: bool,
     pub recorded: Option<Recorded>,
 }
@@ -806,7 +810,8 @@ pub fn step(
     sea_m: f64,
 ) -> Answer {
     let mut slabs = std::mem::take(&mut st.slabs);
-    let (omega, solved, out) = balance_step(st, geo, pos, env, flow, sea_m, &mut slabs);
+    let (omega, stress_mpa, solved, out) =
+        balance_step(st, geo, pos, env, flow, sea_m, &mut slabs);
     st.slabs = slabs;
     let recorded = st.dynamics.as_mut().map(|d| {
         let last: BTreeMap<u32, DVec3> = d
@@ -830,6 +835,7 @@ pub fn step(
     });
     Answer {
         omega,
+        stress_mpa,
         solved,
         recorded,
     }
@@ -843,7 +849,7 @@ fn balance_step(
     flow: DVec3,
     sea_m: f64,
     slabs: &mut Vec<SlabTrack>,
-) -> (Vec<Option<DVec3>>, bool, Recorded) {
+) -> (Vec<Option<DVec3>>, Vec<Option<f64>>, bool, Recorded) {
     let k = env.k;
     let norm = env.norm;
     let samples = &st.samples;
@@ -1149,11 +1155,13 @@ fn balance_step(
     let unit = TORQUE_UNIT_N_M;
     let mut forces = Vec::new();
     let mut out = vec![None; np];
+    let mut stress = vec![None; np];
     for p in st.alive() {
         let Some(a) = answers.get(p.id as usize).copied().flatten() else {
             continue;
         };
         out[p.id as usize] = Some(a.omega);
+        stress[p.id as usize] = Some(a.stress_mpa);
         forces.push(PlateForces {
             id: p.id,
             slab_pull: sig4(a.slab_pull / unit),
@@ -1173,6 +1181,7 @@ fn balance_step(
     }
     (
         out,
+        stress,
         solved,
         Recorded {
             forces,
