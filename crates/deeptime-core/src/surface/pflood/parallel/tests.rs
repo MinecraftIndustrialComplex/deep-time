@@ -164,7 +164,9 @@ fn check(d: &Dims, h: &[f64], sea: Option<f64>, label: &str) -> usize {
             };
             let mut wf = vec![f64::NAN; n];
             let mut lab = vec![NONE; n];
-            let sinks = in_pool(threads, || fill_w(d, &fx, h, rows, &mut wf, &mut lab));
+            let sinks = in_pool(threads, || {
+                fill_w(d, &fx, h, &d.strips(rows), &mut wf, &mut lab)
+            });
             assert!(sinks.is_empty(), "{label}: W found sinks");
             let bad = (0..n)
                 .filter(|&c| wf[c].to_bits() != wref[c].to_bits())

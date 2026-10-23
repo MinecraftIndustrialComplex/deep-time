@@ -21,9 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * every band block folds to a stored block, every stored block's band images fold back to it, and the
  * fold is a local isometry: two neighbouring blocks anywhere in the bands stay neighbours, turned the
  * same way, after folding. Checked on the bounded test seams, Guyou (with and without the slides),
- * Peirce and the cube cross net, on seeded random blocks (properties, not pinned outputs). Plus the
- * fast path (no position it rejects folds) and the band manager's chunk-level view (every block of a
- * band chunk folds by the chunk's motion into the chunk's source).
+ * Peirce, on seeded random blocks (properties, not pinned outputs). Plus the fast path (no position it
+ * rejects folds) and the band manager's chunk-level view (every block of a band chunk folds by its
+ * column's motion into that column's source), the cube included. The cube's own tests are in
+ * WrapTopologyCubeTest.
  */
 class WrapTopologyTest {
 
@@ -158,47 +159,7 @@ class WrapTopologyTest {
         checkLocalIsometry(t, -15, 240, -15, 240, 16, (x, z) -> (x >= 0 || z >= 0) && x < 256 && z < 256);
     }
 
-    @Test
-    void theCubeCrossIsSeamlessAwayFromItsCorners() {
-        int s = 256, d = 32;
-        for (boolean slides : new boolean[]{true, false}) {
-            WrapTopology t = WrapLayouts.cubeCross(s, d, slides);
-            int[][] corners = WrapLayouts.cubeCrossCorners(s);
-            BiPredicate<Integer, Integer> awayFromCorners = (x, z) -> {
-                for (int[] c : corners)
-                    if (Math.max(Math.abs(x - c[0]), Math.abs(z - c[1])) <= d + 2)
-                        return false;
-                // Without the slides, the band row's ends are Toroidal World's.
-                return slides || (x >= 0 && x < 4 * s) || z < 0 || z >= s;
-            };
-            checkLocalIsometry(t, -d, 4 * s + d, -s - d, 2 * s + d, d, awayFromCorners);
-            // The meridian walk of the survey: north out of F0 over the pole N comes out on F2 heading south.
-            WrapTopology.PointFold over = t.foldPoint(s / 2.0 + 0.25, -s - 1.5);
-            assertNotNull(over);
-            assertTrue(over.x() >= 2 * s && over.x() < 3 * s && over.z() >= 0 && over.z() < s, "lands on F2: " + over);
-            assertEquals(180f, over.iso().yawDegrees());
-            // From F1 into N through a quarter-turn.
-            WrapTopology.PointFold f1 = t.foldPoint(1.5 * s, -1.5);
-            assertNotNull(f1);
-            assertEquals(270f, f1.iso().yawDegrees());
-        }
-        WrapTopology t = WrapLayouts.cubeCross(s, d, true);
-        // Images: stored blocks near the middle of each seam (away from corners) have one.
-        Random r = new Random(11);
-        int checked = 0;
-        for (int i = 0; i < 20000; i++) {
-            int x = -d + r.nextInt(4 * s + 2 * d), z = -s - d + r.nextInt(3 * s + 2 * d);
-            if (t.inside(x, z) || !t.mayFold(x, z))
-                continue;
-            WrapTopology.Fold f = t.fold(x, z);
-            if (f == null)
-                continue;
-            boolean found = t.images(f.x(), f.z()).stream().anyMatch(q -> q[0] == x && q[1] == z);
-            assertTrue(found, "band block (" + x + ", " + z + ") is not listed as an image of its stored block");
-            checked++;
-        }
-        assertTrue(checked > 500, "too few band blocks checked: " + checked);
-    }
+    // The cube's tests (the fold against CubeLayout's, corners, split chunks, the period) are in WrapTopologyCubeTest.
 
     @Test
     void theFastPathNeverRejectsABandBlock() {
@@ -236,25 +197,31 @@ class WrapTopologyTest {
                 int cx = (int) key, cz = (int) (key >> 32);
                 WrapTopology.ChunkFold cf = t.chunkFold(cx, cz);
                 assertNotNull(cf, t + ": band chunk " + cx + "," + cz + " does not fold");
+                WrapTopology.ChunkColumns cc = t.chunkColumns(cx, cz);
+                assertNotNull(cc);
                 for (int i = 0; i < 12; i++) {
                     int x = (cx << 4) + r.nextInt(16), z = (cz << 4) + r.nextInt(16);
                     WrapTopology.Fold f = t.fold(x, z);
                     assertNotNull(f);
-                    assertEquals(cf.iso(), f.iso(), t + ": block (" + x + ", " + z + ") folds by another motion than its chunk");
-                    assertEquals(cf.sourceX(), f.x() >> 4);
-                    assertEquals(cf.sourceZ(), f.z() >> 4);
+                    WrapTopology.ChunkSource src = cc.at(x & 15, z & 15);
+                    assertNotNull(src);
+                    assertEquals(src.iso(), f.iso(), t + ": block (" + x + ", " + z + ") folds by another motion than its column");
+                    if (!cf.split())
+                        assertEquals(cf.iso(), f.iso(), t + ": block (" + x + ", " + z + ") folds by another motion than its chunk");
+                    assertEquals(src.sourceX(), f.x() >> 4);
+                    assertEquals(src.sourceZ(), f.z() >> 4);
                 }
-                // The source chunk lists this band chunk among its images.
-                boolean listed = false;
-                for (CellIsometry g : t.chunkImages(cf.sourceX(), cf.sourceZ())) {
-                    int bx = Math.min(g.applyX(cf.sourceX() << 4, cf.sourceZ() << 4), g.applyX((cf.sourceX() << 4) + 15, (cf.sourceZ() << 4) + 15));
-                    int bz = Math.min(g.applyZ(cf.sourceX() << 4, cf.sourceZ() << 4), g.applyZ((cf.sourceX() << 4) + 15, (cf.sourceZ() << 4) + 15));
-                    if (bx >> 4 == cx && bz >> 4 == cz) {
-                        listed = true;
-                        assertEquals(cf.iso().inverse(), g);
+                // Each source chunk lists this band chunk among its images.
+                for (WrapTopology.ChunkSource src : cc.sources()) {
+                    boolean listed = false;
+                    for (CellIsometry g : t.chunkImages(src.sourceX(), src.sourceZ())) {
+                        int bx = Math.min(g.applyX(src.sourceX() << 4, src.sourceZ() << 4), g.applyX((src.sourceX() << 4) + 15, (src.sourceZ() << 4) + 15));
+                        int bz = Math.min(g.applyZ(src.sourceX() << 4, src.sourceZ() << 4), g.applyZ((src.sourceX() << 4) + 15, (src.sourceZ() << 4) + 15));
+                        if (bx >> 4 == cx && bz >> 4 == cz && g.equals(src.iso().inverse()))
+                            listed = true;
                     }
+                    assertTrue(listed, t + ": band chunk " + cx + "," + cz + " missing from its source's images");
                 }
-                assertTrue(listed, t + ": band chunk " + cx + "," + cz + " missing from its source's images");
             }
         }
         assertFalse(WrapLayouts.halfTurnSeam(4100, 4096, 32, 16).isChunkAligned(), "a pivot off the chunk grid is refused");

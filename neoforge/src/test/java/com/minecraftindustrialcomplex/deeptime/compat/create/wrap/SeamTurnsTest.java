@@ -89,7 +89,8 @@ class SeamTurnsTest {
                 WrapLayouts.guyou(256, 16, true),
                 WrapLayouts.peirce(256, 16),
                 WrapLayouts.quarterTurnCorner(48, 48, 256, 16),
-                WrapLayouts.cubeCross(128, 16, true));
+                WrapLayouts.cubeCross(128, 16, true),
+                WrapLayouts.cubeCross(256, 16, false));
         int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
         Random r = new Random(7);
         for (WrapTopology t : tops) {

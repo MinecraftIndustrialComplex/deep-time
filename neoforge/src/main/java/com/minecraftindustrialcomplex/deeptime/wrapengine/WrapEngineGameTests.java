@@ -2,6 +2,8 @@
 package com.minecraftindustrialcomplex.deeptime.wrapengine;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.compat.create.wrap.SeamTurns;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -75,10 +77,31 @@ public final class WrapEngineGameTests {
 
     /**
      * A test site: origin (ox, oz) on the edge, u along the edge in [uMin, uMax), its own topology
-     * (for expectations; the level has the union), and the box of blocks it uses.
+     * (for expectations; the level has the union), the box of blocks it uses and, on the cube, the
+     * boxes {x0, x1, z0, z1} where the seam's far side is (elsewhere on the net).
      */
     record Site(String name, Kind kind, int ox, int oz, int uMin, int uMax, WrapTopology local, boolean glued,
-                int boxX0, int boxX1, int boxZ0, int boxZ1) {
+                int boxX0, int boxX1, int boxZ0, int boxZ1, List<int[]> far) {
+
+        Site(String name, Kind kind, int ox, int oz, int uMin, int uMax, WrapTopology local, boolean glued,
+             int boxX0, int boxX1, int boxZ0, int boxZ1) {
+            this(name, kind, ox, oz, uMin, uMax, local, glued, boxX0, boxX1, boxZ0, boxZ1, List.of());
+        }
+
+        /** The site's own box, then its far boxes, each {x0, x1, z0, z1}. */
+        List<int[]> boxes() {
+            List<int[]> out = new ArrayList<>();
+            out.add(new int[]{boxX0, boxX1, boxZ0, boxZ1});
+            out.addAll(far);
+            return out;
+        }
+
+        boolean inBoxes(double x, double z) {
+            for (int[] b : boxes())
+                if (x >= b[0] && x < b[1] && z >= b[2] && z < b[3])
+                    return true;
+            return false;
+        }
 
         BlockPos at(int u, int dy, int v) {
             return new BlockPos(ox + u, Y0 + dy, oz + v);
@@ -117,7 +140,7 @@ public final class WrapEngineGameTests {
         return k == Kind.HALF ? half("half-" + index, 20480 + 512 * index, 20480, 32) : quarter("quarter-" + index, 20480 + 512 * index, 22528, 48);
     }
 
-    static final int BUILD = 0, WATER = 1, REDSTONE = 2, LIGHT = 3, CONSISTENCY = 4, PLAYER = 5;
+    static final int BUILD = 0, WATER = 1, REDSTONE = 2, LIGHT = 3, CONSISTENCY = 4, PLAYER = 5, BLOCK_ENTITIES = 6;
     static final Site LONG_HALF = half("long-half", 30720, 20480, 256);
     static final Site LONG_QUARTER = quarter("long-quarter", 32768, 22528, 256);
     /** The water test's control: the same build with no gluing (its {@code local} only names the would-be far side). */
@@ -128,17 +151,67 @@ public final class WrapEngineGameTests {
         CONTROL = new Site(c.name(), c.kind(), c.ox(), c.oz(), c.uMin(), c.uMax(), c.local(), false, c.boxX0(), c.boxX1(), c.boxZ0(), c.boxZ1());
     }
 
+    // The cube (design §12): one whole net, far east of the other sites, with the engine's own slides
+    // (the GameTest server has no Toroidal World), D = 16. Site coordinates are relative to its centre
+    // (CUBE_X0, CUBE_Z0) in h = s/2: F0 [−h, h)², F1 east of it, F2 at [3h, 5h) cut at x = 2s, F3 west,
+    // N above F0 and S below. Each site's far boxes hold the blocks its band shows and the band that
+    // shows its own blocks; no two sites share a block column.
+
+    static final int CUBE_S = 256, CUBE_H = CUBE_S / 2, CUBE_X0 = 49152, CUBE_Z0 = 20480;
+    static final WrapTopology CUBE = WrapLayouts.cubeCross(CUBE_S, DEPTH, true).translated(CUBE_X0, CUBE_Z0);
+
+    /** A site on the cube: origin and far boxes {x0, x1, z0, z1} relative to the cube's centre. */
+    static Site cubeSite(String name, Kind kind, int ox, int oz, int uMin, int uMax, int[]... far) {
+        List<int[]> f = new ArrayList<>();
+        for (int[] b : far)
+            f.add(new int[]{CUBE_X0 + b[0], CUBE_X0 + b[1], CUBE_Z0 + b[2], CUBE_Z0 + b[3]});
+        int x = CUBE_X0 + ox, z = CUBE_Z0 + oz;
+        return new Site(name, kind, x, z, uMin, uMax, CUBE, true, x + uMin - 16, x + uMax + 16, z - DEPTH, z + 16, List.copyOf(f));
+    }
+
+    /** F1-top, 32 to 80 blocks from the corner (h, −h): the band shows N's east strip, a quarter turn. */
+    static final Site CUBE_QUARTER = cubeSite("cube-quarter", Kind.QUARTER, CUBE_H + 32, -CUBE_H, 0, 48,
+            new int[]{CUBE_H - 32, CUBE_H + 16, -CUBE_H - 96, -CUBE_H - 16});
+    /** F1-top, 144 to 192 blocks from the corner. */
+    static final Site CUBE_QUARTER_EDITS = cubeSite("cube-quarter-edits", Kind.QUARTER, CUBE_H + 144, -CUBE_H, 0, 48,
+            new int[]{CUBE_H - 16, CUBE_H + 16, -CUBE_H - 208, -CUBE_H - 128});
+    /** F2-top west of Toroidal World's seam: the band shows N's top strip, a half turn about (2h, −2h). */
+    static final Site CUBE_HALF = cubeSite("cube-half", Kind.HALF, 3 * CUBE_H + 56, -CUBE_H, -32, 32,
+            new int[]{16, CUBE_H, -3 * CUBE_H - 16, -3 * CUBE_H + 32});
+    /**
+     * N-top west of x = 0, the piece cut at Toroidal World's seam: the band shows F2's east half, which
+     * lives at [−2s, −3s/2), a half turn with the period composed in.
+     */
+    static final Site CUBE_HALF_TW = cubeSite("cube-half-tw", Kind.HALF, -64, -3 * CUBE_H, -32, 32,
+            new int[]{-2 * CUBE_S, -2 * CUBE_S + 112, -CUBE_H - 16, -CUBE_H + 16});
+    /**
+     * The slide at x = 2s next to F2's bottom-east corner (the turn kind names what follows the slide
+     * there): F2's east half at [−2s, −3s/2) and S's bottom strip by x = 0.
+     */
+    static final Site CUBE_SLIDE = cubeSite("cube-slide", Kind.HALF, 2 * CUBE_S, CUBE_H, 0, 0,
+            new int[]{-2 * CUBE_S, -2 * CUBE_S + 16, CUBE_H - 16, CUBE_H + 16},
+            new int[]{-16, 16, 3 * CUBE_H - 16, 3 * CUBE_H + 16});
+    /**
+     * The concave cube corner (h, h) where F0, F1 and S meet (its missing quadrant is two overlapping
+     * bands), and the convex one at S's outer corner (−h, 3h), which is F3's bottom-west corner
+     * (−3h, h) too.
+     */
+    static final Site CUBE_CORNER = cubeSite("cube-corner", Kind.QUARTER, CUBE_H, CUBE_H, 0, 0,
+            new int[]{-CUBE_H - 16, -CUBE_H + 16, 3 * CUBE_H - 16, 3 * CUBE_H + 16},
+            new int[]{-3 * CUBE_H - 16, -3 * CUBE_H + 16, CUBE_H - 16, CUBE_H + 16});
+
     /** Every glued site's edges, installed once on the overworld. */
     static final WrapTopology TOPOLOGY;
 
     static {
         List<WrapTopology> parts = new ArrayList<>();
         for (Kind k : Kind.values())
-            for (int i = BUILD; i <= PLAYER; i++)
+            for (int i = BUILD; i <= BLOCK_ENTITIES; i++) // BLOCK_ENTITIES: WrapBlockEntityGameTests (design §12.8)
                 parts.add(site(k, i).local());
         parts.add(LONG_HALF.local());
         parts.add(LONG_QUARTER.local());
         parts.addAll(CreateSeamGameTests.topologies()); // the Create adapters' sites (design §11), no Create types
+        parts.add(CUBE); // the cube's sites (design §12) share one whole net
         TOPOLOGY = WrapTopology.union("wrap-engine GameTest sites", parts);
     }
 
@@ -147,25 +220,27 @@ public final class WrapEngineGameTests {
             WrapEngine.install(level, TOPOLOGY);
     }
 
-    /** Installs the sites' topology, forceloads the site's box, clears it (stone floor at Y0 − 1, air above). */
+    /** Installs the sites' topology, forceloads the site's boxes, clears them (stone floor at Y0 − 1, air above). */
     static Site open(GameTestHelper helper, Site s) {
         ServerLevel level = helper.getLevel();
         if (s.glued())
             ensureInstalled(level);
-        for (int x = s.boxX0() >> 4; x <= (s.boxX1() - 1) >> 4; x++)
-            for (int z = s.boxZ0() >> 4; z <= (s.boxZ1() - 1) >> 4; z++) {
-                level.setChunkForced(x, z, true);
-                level.getChunk(x, z);
-            }
+        for (int[] b : s.boxes())
+            for (int x = b[0] >> 4; x <= (b[1] - 1) >> 4; x++)
+                for (int z = b[2] >> 4; z <= (b[3] - 1) >> 4; z++) {
+                    level.setChunkForced(x, z, true);
+                    level.getChunk(x, z);
+                }
         // Clear the stored blocks only; the band follows by replication.
-        for (int x = s.boxX0(); x < s.boxX1(); x++)
-            for (int z = s.boxZ0(); z < s.boxZ1(); z++) {
-                if (s.glued() && s.local().fold(x, z) != null)
-                    continue;
-                for (int y = Y0 - 1; y <= Y0 + 5; y++)
-                    level.setBlock(new BlockPos(x, y, z), y == Y0 - 1 ? Blocks.STONE.defaultBlockState() : Blocks.AIR.defaultBlockState(),
-                            Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
-            }
+        for (int[] b : s.boxes())
+            for (int x = b[0]; x < b[1]; x++)
+                for (int z = b[2]; z < b[3]; z++) {
+                    if (s.glued() && s.local().fold(x, z) != null)
+                        continue;
+                    for (int y = Y0 - 1; y <= Y0 + 5; y++)
+                        level.setBlock(new BlockPos(x, y, z), y == Y0 - 1 ? Blocks.STONE.defaultBlockState() : Blocks.AIR.defaultBlockState(),
+                                Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+                }
         log("%s opened at (%d, %d), %s", s.name(), s.ox(), s.oz(), s.glued() ? "glued: " + WrapEngine.stats(level) : "NOT glued (control)");
         return s;
     }
@@ -206,24 +281,25 @@ public final class WrapEngineGameTests {
     static int audit(ServerLevel level, Site s, String when) {
         int checked = 0, wrong = 0;
         String first = null;
-        for (int x = s.boxX0(); x < s.boxX1(); x++)
-            for (int z = s.boxZ0(); z < s.boxZ1(); z++) {
-                WrapTopology.Fold f = s.local().fold(x, z);
-                if (f == null || level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null)
-                    continue;
-                for (int y = Y0 - 1; y <= Y0 + 5; y++) {
-                    BlockPos q = new BlockPos(x, y, z);
-                    BlockState want = level.getBlockState(new BlockPos(f.x(), y, f.z())).rotate(WrapEngine.rotation(f.iso().inverse()));
-                    BlockState raw = WrapEngine.rawState(level, q);
-                    BlockState read = level.getBlockState(q);
-                    checked++;
-                    if (raw != want || read != want) {
-                        wrong++;
-                        if (first == null)
-                            first = String.format("(%d, %d, %d): raw %s, read %s, stored turned %s", x, y, z, raw, read, want);
+        for (int[] b : s.boxes())
+            for (int x = b[0]; x < b[1]; x++)
+                for (int z = b[2]; z < b[3]; z++) {
+                    WrapTopology.Fold f = s.local().fold(x, z);
+                    if (f == null || level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null)
+                        continue;
+                    for (int y = Y0 - 1; y <= Y0 + 5; y++) {
+                        BlockPos q = new BlockPos(x, y, z);
+                        BlockState want = level.getBlockState(new BlockPos(f.x(), y, f.z())).rotate(WrapEngine.rotation(f.iso().inverse()));
+                        BlockState raw = WrapEngine.rawState(level, q);
+                        BlockState read = level.getBlockState(q);
+                        checked++;
+                        if (raw != want || read != want) {
+                            wrong++;
+                            if (first == null)
+                                first = String.format("(%d, %d, %d): raw %s, read %s, stored turned %s", x, y, z, raw, read, want);
+                        }
                     }
                 }
-            }
         check(wrong == 0, "%s band consistent %s: %d of %d band blocks wrong%s", s.name(), when, wrong, checked, first == null ? "" : "; first " + first);
         return checked;
     }
@@ -762,6 +838,186 @@ public final class WrapEngineGameTests {
                     level.getServer().getPlayerList().remove(p);
                     helper.succeed();
                 });
+            });
+        });
+    }
+
+    // --- The cube (design §12) ------------------------------------------------------------------
+
+    @GameTest(templateNamespace = NS, template = TEMPLATE, timeoutTicks = 400)
+    public static void cubeBuildingAcrossQuarterTurn(GameTestHelper helper) {
+        building(helper, CUBE_QUARTER);
+    }
+
+    @GameTest(templateNamespace = NS, template = TEMPLATE, timeoutTicks = 400)
+    public static void cubeBuildingAcrossHalfTurn(GameTestHelper helper) {
+        building(helper, CUBE_HALF);
+    }
+
+    @GameTest(templateNamespace = NS, template = TEMPLATE, timeoutTicks = 300)
+    public static void cubeBandConsistentQuarterTurn(GameTestHelper helper) {
+        consistency(helper, CUBE_QUARTER_EDITS);
+    }
+
+    @GameTest(templateNamespace = NS, template = TEMPLATE, timeoutTicks = 300)
+    public static void cubeBandConsistentAtToroidalSeam(GameTestHelper helper) {
+        consistency(helper, CUBE_HALF_TW);
+    }
+
+    /**
+     * The fold of (x, z) beyond the cube's east slide done in two steps: the slide by −4s, then the
+     * fold of the block it reaches (none when that block is stored).
+     */
+    private static WrapTopology.Fold slideThenFold(int x, int z) {
+        int p = 4 * CUBE_S;
+        CellIsometry slide = CellIsometry.translation(-p, 0);
+        WrapTopology.Fold g = CUBE.fold(x - p, z);
+        return g == null ? new WrapTopology.Fold(x - p, z, slide) : new WrapTopology.Fold(g.x(), g.z(), g.iso().compose(slide));
+    }
+
+    /**
+     * The slide composed with a turn (design §12.3): beyond x = 2s the engine's own slide takes a block
+     * to F2's east half at x − 4s; where that lies beyond F2's bottom edge too, the slide's image is
+     * beyond the piece of F2-bottom cut at Toroidal World's seam and the block is on S, half turned. The
+     * fold is the slide, then the fold there. A block placed in each lands there and the band shows it;
+     * an armour stand stepping east across x = 2s is carried by the slide alone, one stepping
+     * diagonally off F2's bottom-east corner by the slide and the half turn, heading turned 180°.
+     */
+    @GameTest(templateNamespace = NS, template = TEMPLATE, timeoutTicks = 300)
+    public static void cubeSlideComposedWithTurn(GameTestHelper helper) {
+        Site s = open(helper, CUBE_SLIDE);
+        ServerLevel level = helper.getLevel();
+        int east = CUBE_X0 + 2 * CUBE_S, bottom = CUBE_Z0 + CUBE_H;
+        CubeLayout net = CubeLayout.of(CUBE_S);
+        whenSynced(helper, s, () -> {
+            BlockState north = Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH);
+            BlockPos[] qs = {new BlockPos(east + 5, Y0, bottom - 12), new BlockPos(east + 5, Y0, bottom + 3)};
+            int[] turns = {0, 2};
+            CubeLayout.Face[] faces = {CubeLayout.Face.F2, CubeLayout.Face.S};
+            for (int i = 0; i < qs.length; i++) {
+                BlockPos q = qs[i];
+                WrapTopology.Fold f = CUBE.fold(q.getX(), q.getZ());
+                WrapTopology.Fold g = slideThenFold(q.getX(), q.getZ());
+                check(f != null && f.x() == g.x() && f.z() == g.z() && f.iso().equals(g.iso()) && f.iso().quarterTurns() == turns[i],
+                        "%s: the fold of %s is the slide then the fold there: %s, two steps %s", s.name(), q.toShortString(), f, g);
+                CubeLayout.FaceCell fc = net.faceOfBlock(f.x() - CUBE_X0, f.z() - CUBE_Z0);
+                check(fc != null && fc.face() == faces[i], "%s: %s is stored on %s (%s)", s.name(), q.toShortString(), faces[i], fc);
+                level.setBlock(q, north, Block.UPDATE_ALL);
+                BlockPos stored = new BlockPos(f.x(), q.getY(), f.z());
+                Direction facing = WrapEngine.turn(f.iso(), Direction.NORTH);
+                BlockState at = WrapEngine.rawState(level, stored);
+                check(at.is(Blocks.OAK_STAIRS) && at.getValue(StairBlock.FACING) == facing, "%s: placed at %s facing north -> stored at %s facing %s: %s",
+                        s.name(), q.toShortString(), stored.toShortString(), facing, at);
+                check(WrapEngine.rawState(level, q).equals(north) && level.getBlockState(q).equals(north), "%s: the band at %s shows it: %s", s.name(),
+                        q.toShortString(), WrapEngine.rawState(level, q));
+            }
+            ArmorStand[] st = {stand(level, east - 0.5, bottom - 11.5), stand(level, east - 0.5, bottom - 0.5)};
+            float[] yaw0 = {st[0].getYRot(), st[1].getYRot()};
+            st[0].move(MoverType.SELF, new Vec3(1, 0, 0));
+            st[1].move(MoverType.SELF, new Vec3(1, 0, 1));
+            WrapTopology.PointFold[] want = new WrapTopology.PointFold[st.length];
+            for (int i = 0; i < st.length; i++) {
+                want[i] = CUBE.foldPoint(st[i].getX(), st[i].getZ());
+                check(want[i] != null && want[i].iso().quarterTurns() == turns[i] && s.inBoxes(want[i].x(), want[i].z()),
+                        "%s: stand %d stepped to (%.2f, %.2f), beyond the slide: it goes to %s", s.name(), i, st[i].getX() - CUBE_X0, st[i].getZ() - CUBE_Z0, want[i]);
+            }
+            helper.runAfterDelay(20, () -> {
+                for (int i = 0; i < st.length; i++) {
+                    ArmorStand e = st[i];
+                    check(Math.abs(e.getX() - want[i].x()) < 1e-3 && Math.abs(e.getZ() - want[i].z()) < 1e-3,
+                            "%s: stand %d carried to (%.3f, %.3f), the fold (%.3f, %.3f)", s.name(), i, e.getX(), e.getZ(), want[i].x(), want[i].z());
+                    float turn = ((e.getYRot() - yaw0[i]) % 360f + 360f) % 360f;
+                    check(Math.abs(turn - 90f * turns[i]) < 1e-3, "%s: stand %d's heading turned by %.1f degrees (want %d)", s.name(), i, turn, 90 * turns[i]);
+                    check(s.local().inside(Mth.floor(e.getX()), Mth.floor(e.getZ())), "%s: stand %d is on a stored block", s.name(), i);
+                    e.discard();
+                }
+                audit(level, s, "after the slide");
+                log("%s: %s", s.name(), WrapEngine.stats(level));
+                helper.succeed();
+            });
+        });
+    }
+
+    /**
+     * The cube's corners (design §12.4; ledger SCL-182, SCL-183): every image of the eight cone points
+     * is kept out (a seam link within 2 blocks of one is refused from both ends; 8 blocks along the
+     * same edge it is made); blocks written into the missing quadrant at the concave corner (h, h),
+     * where two bands overlap and the chunk is split by its diagonal, land on the stored blocks they
+     * are and the band shows them; armour stands left in that quadrant and in the convex quadrant at
+     * S's outer corner are carried onto the planet, heading turned by their block's motion.
+     */
+    @GameTest(templateNamespace = NS, template = TEMPLATE, timeoutTicks = 300)
+    public static void cubeCornerRefusal(GameTestHelper helper) {
+        Site s = open(helper, CUBE_CORNER);
+        ServerLevel level = helper.getLevel();
+        WrapTopology t = WrapEngine.topology(level);
+        int cx = CUBE_X0 + CUBE_H, cz = CUBE_Z0 + CUBE_H;
+        whenSynced(helper, s, () -> {
+            int images = 0;
+            for (WrapCorner c : CUBE.corners())
+                for (int[] q : c.images()) {
+                    images++;
+                    boolean in = WrapEngine.nearCorner(level, new BlockPos(q[0], Y0, q[1])) && WrapEngine.nearCorner(level, new BlockPos(q[0] - 2, Y0, q[1] - 2))
+                            && WrapEngine.nearCorner(level, new BlockPos(q[0] + 1, Y0, q[1] + 1));
+                    boolean out = !WrapEngine.nearCorner(level, new BlockPos(q[0] + 2, Y0, q[1])) && !WrapEngine.nearCorner(level, new BlockPos(q[0] - 3, Y0, q[1]))
+                            && !WrapEngine.nearCorner(level, new BlockPos(q[0], Y0, q[1] + 8));
+                    check(in && out, "corner %s's image (%d, %d) is kept out within 2 blocks, and only there", c.name(), q[0] - CUBE_X0, q[1] - CUBE_Z0);
+                }
+            check(images == 12, "the cube's eight corners have 12 images on the net (n1, n2, s1, s2 twice): %d", images);
+            // A seam link across F1-bottom from F1's bottom row: refused one block from the corner, made 8 along.
+            for (int along : new int[]{1, 8}) {
+                int vx = cx + along, vz = cz - 1;
+                WrapTopology.Fold f = t.fold(vx, vz + 1);
+                check(f != null, "%s: the block south of F1's bottom row at %d along is beyond F1-bottom", s.name(), along);
+                int[] there = SeamTurns.seamLink(t, vx, vz, f.x(), f.z());
+                int[] back = SeamTurns.seamLink(t, f.x(), f.z(), vx, vz);
+                if (along == 1)
+                    check(there == null && back == null, "%s: the link next to the corner is refused from both ends", s.name());
+                else
+                    check(there != null && there[0] == vx && there[1] == vz + 1 && back != null, "%s: the link %d along is made from both ends", s.name(), along);
+            }
+            // Writes into the missing quadrant: each lands on its own stored block, turned, and the band shows it.
+            BlockState north = Blocks.OAK_STAIRS.defaultBlockState().setValue(StairBlock.FACING, Direction.NORTH);
+            int[][] cells = {{3, 3}, {5, 2}, {2, 5}, {12, 1}, {1, 12}};
+            for (int[] c : cells) {
+                BlockPos q = new BlockPos(cx + c[0], Y0 + 1, cz + c[1]);
+                WrapTopology.Fold f = CUBE.fold(q.getX(), q.getZ());
+                level.setBlock(q, north, Block.UPDATE_ALL);
+                BlockPos stored = new BlockPos(f.x(), q.getY(), f.z());
+                Direction facing = WrapEngine.turn(f.iso(), Direction.NORTH);
+                BlockState at = WrapEngine.rawState(level, stored);
+                check(at.is(Blocks.OAK_STAIRS) && at.getValue(StairBlock.FACING) == facing && s.local().inside(f.x(), f.z()),
+                        "%s: placed at corner + (%d, %d) -> stored at %s facing %s: %s", s.name(), c[0], c[1], stored.toShortString(), facing, at);
+                check(WrapEngine.rawState(level, q).equals(north), "%s: the split band chunk at corner + (%d, %d) shows it: %s", s.name(), c[0], c[1],
+                        WrapEngine.rawState(level, q));
+            }
+            audit(level, s, "after writes into the split quadrant");
+            // Stands in the missing quadrant at (h, h) and in the convex quadrant at S's outer corner (−h, 3h).
+            int ox = CUBE_X0 - CUBE_H, oz = CUBE_Z0 + 3 * CUBE_H;
+            double[][] spots = {{cx + 0.5, cz + 0.5}, {cx + 4.5, cz + 4.5}, {cx + 7.5, cz + 2.5}, {cx + 2.5, cz + 7.5},
+                    {ox - 0.5, oz + 0.5}, {ox - 4.5, oz + 4.5}, {ox - 7.5, oz + 2.5}, {ox - 2.5, oz + 7.5}};
+            ArmorStand[] st = new ArmorStand[spots.length];
+            WrapTopology.PointFold[] want = new WrapTopology.PointFold[spots.length];
+            for (int i = 0; i < spots.length; i++) {
+                want[i] = CUBE.foldPoint(spots[i][0], spots[i][1]);
+                check(want[i] != null && s.inBoxes(want[i].x(), want[i].z()), "%s: stand %d at (%.1f, %.1f) is beyond an edge, going to %s", s.name(), i,
+                        spots[i][0] - CUBE_X0, spots[i][1] - CUBE_Z0, want[i]);
+                st[i] = stand(level, spots[i][0], spots[i][1]);
+            }
+            helper.runAfterDelay(10, () -> {
+                for (int i = 0; i < st.length; i++) {
+                    ArmorStand e = st[i];
+                    check(Math.abs(e.getX() - want[i].x()) < 1e-3 && Math.abs(e.getZ() - want[i].z()) < 1e-3
+                                    && s.local().inside(Mth.floor(e.getX()), Mth.floor(e.getZ())),
+                            "%s: stand %d carried onto the planet at (%.3f, %.3f), the fold (%.3f, %.3f)", s.name(), i, e.getX() - CUBE_X0,
+                            e.getZ() - CUBE_Z0, want[i].x() - CUBE_X0, want[i].z() - CUBE_Z0);
+                    float turn = ((e.getYRot() - 180f) % 360f + 360f) % 360f;
+                    check(Math.abs(turn - want[i].iso().yawDegrees()) < 1e-3, "%s: stand %d's heading turned by %.1f (motion %.1f)", s.name(), i, turn,
+                            want[i].iso().yawDegrees());
+                    e.discard();
+                }
+                log("%s: %s", s.name(), WrapEngine.stats(level));
+                helper.succeed();
             });
         });
     }
