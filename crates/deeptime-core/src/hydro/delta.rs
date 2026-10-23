@@ -50,6 +50,12 @@ pub const DEPTH_MAX_M: f64 = 69.0; // ledger: HYD-133
 /// (sea level, sea level + 1]), graded so the plain drains outward. ledger: HYD-136
 pub const PLAIN_TOP_STEPS: i32 = 15; // ledger: HYD-136
 pub const PLAIN_FRONT_STEPS: i32 = 1; // ledger: HYD-136
+/// The highest a cell beside the river's course stands, 1/16 block over the sea's surface: one
+/// step above the course's top, still under the plain's one block. ledger: HYD-136
+pub const PLAIN_BANK_STEPS: i32 = 16; // ledger: HYD-136
+/// The most of a plain's volume its river's course across the shallows (with the banks beside
+/// it) may take before the lobe grows at its end: half. ledger: HYD-134
+pub const PLAIN_COURSE_SHARE: f64 = 0.5; // ledger: HYD-134
 
 /// A plain of fewer cells is no delta (about 1 km² on the 600 m cells of L3). ledger: HYD-142
 pub const MIN_PLAIN_CELLS: usize = 3; // ledger: HYD-142
@@ -64,10 +70,6 @@ pub const SLOPE_REACH_M: f64 = 30_000.0; // ledger: HYD-137
 /// takes. ledger: HYD-144
 pub const PATH_SHARED_COST: f64 = 4.0; // ledger: HYD-144
 
-/// How many cells a distributary's way from its front cell across the beach band to the open sea
-/// may search before the branch is dropped (HYD-144): 4,096 cells of 600 m, a reach far past any
-/// beach band of the planets measured.
-pub const TAIL_SEARCH_CELLS: usize = 4096; // ledger: HYD-144
 
 /// What the plains need besides the first network.
 pub struct Input<'a> {
@@ -108,6 +110,12 @@ pub struct Plain {
     #[serde(skip)]
     pub dir: (f64, f64),
     pub top_steps: i32,
+    /// The river's course on the plain, entry first (the stem's crossing of the shallows, then on
+    /// to the plain's tip), and the land cell it comes off (HYD-134, HYD-136).
+    #[serde(skip)]
+    pub course: Vec<u32>,
+    #[serde(skip)]
+    pub land: Option<u32>,
     /// The plain's cells (first taken first) and their height, 1/16 block.
     #[serde(skip)]
     pub cells: Vec<u32>,
@@ -313,7 +321,8 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
         if d <= 0.0 {
             continue;
         }
-        let mut left = a_star * d;
+        let volume = a_star * d;
+        let mut left = volume;
         // The cheapest cell, at half its volume, ends the growth (HYD-134).
         let cheapest = cell_m2 * d;
         let dir = outflow(&geo, &m.stem, 5);
@@ -347,38 +356,69 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
                 .fold(f64::INFINITY, f64::min)
         };
         let key = |c: usize| (prio(c) * 16.0).round() as u64;
-        let mut heap: BinaryHeap<Reverse<(u64, u32)>> = BinaryHeap::new();
-        let mut seen: HashSet<u32> = HashSet::new();
-        for &s in &seeds {
-            heap.push(Reverse((0, s)));
-            seen.insert(s);
-        }
-        // The plain's top: one block over the sea's top water block, or the land it comes off
-        // where that is lower (HYD-136).
-        let land_raw = if from > 0 {
-            i32::from(inp.elev[m.stem[from - 1] as usize])
-        } else {
-            inp.sea_raw + PLAIN_TOP_STEPS
+        // Each cell costs its area times the deeper of the plain's thickness and the water over
+        // it (HYD-134).
+        let cost_of = |c: usize| {
+            let depth_m =
+                f64::from((inp.sea_raw - i32::from(inp.elev[c])).max(0)) / 16.0 * inp.m_per_block_v;
+            cell_m2 * d.max(depth_m) // ledger: HYD-134
         };
-        let top = (land_raw - inp.sea_raw).clamp(PLAIN_FRONT_STEPS, PLAIN_TOP_STEPS);
+        // The river's course first, coast to sea, each cell with the shallows beside it (its
+        // banks; the land cell's too beside the first), so the second network finds no lower
+        // ground beside the course; it ends where the next cell and its banks would take the
+        // course past its share of the volume, or past what is left (HYD-134).
+        let seed_set: HashSet<u32> = seeds.iter().copied().collect();
+        let land = (from > 0).then(|| m.stem[from - 1]);
+        let mut taken: HashSet<u32> = HashSet::new();
         let mut cells: Vec<u32> = Vec::new();
-        while let Some(Reverse((_, c))) = heap.pop() {
-            if left < cheapest / 2.0 {
+        let mut course: Vec<u32> = Vec::new();
+        let mut spent = 0.0;
+        for (i, &s) in seeds.iter().enumerate() {
+            let mut want = vec![s];
+            let mut around = vec![s as usize];
+            if i == 0
+                && let Some(l) = land
+            {
+                around.push(l as usize);
+            }
+            for &a in &around {
+                for k in 0..8 {
+                    let Some(nb) = geo.nb(a, k) else { continue };
+                    let nbu = nb as u32;
+                    if eligible(nb)
+                        && i32::from(inp.elev[nb]) > inp.sea_raw - 16
+                        && !owner.contains_key(&nbu)
+                        && !taken.contains(&nbu)
+                        && !seed_set.contains(&nbu)
+                        && !want.contains(&nbu)
+                    {
+                        want.push(nbu);
+                    }
+                }
+            }
+            let cost: f64 = want.iter().map(|&c| cost_of(c as usize)).sum();
+            if left < cost / 2.0 || (i > 0 && spent + cost > volume * PLAIN_COURSE_SHARE) {
                 break;
             }
-            let cu = c as usize;
-            // Each cell costs its area times the deeper of the plain's thickness and the water
-            // over it (HYD-134).
-            let depth_m = f64::from((inp.sea_raw - i32::from(inp.elev[cu])).max(0)) / 16.0
-                * inp.m_per_block_v;
-            let cost = cell_m2 * d.max(depth_m); // ledger: HYD-134
-            if left < cost / 2.0 {
-                continue;
-            }
             left -= cost;
-            cells.push(c);
+            spent += cost;
+            for &c in &want {
+                taken.insert(c);
+                cells.push(c);
+            }
+            course.push(s);
+        }
+        if course.is_empty() {
+            continue;
+        }
+        // Then the lobe around the course and beyond its end, cell by cell in order of the
+        // weighted distance (HYD-135).
+        let mut heap: BinaryHeap<Reverse<(u64, u32)>> = BinaryHeap::new();
+        let mut seen: HashSet<u32> = taken.clone();
+        seen.extend(&course);
+        let push = |c: usize, heap: &mut BinaryHeap<Reverse<(u64, u32)>>, seen: &mut HashSet<u32>| {
             for k in 0..8 {
-                if let Some(nb) = geo.nb(cu, k)
+                if let Some(nb) = geo.nb(c, k)
                     && !owner.contains_key(&(nb as u32))
                     && eligible(nb)
                     && seen.insert(nb as u32)
@@ -386,10 +426,39 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
                     heap.push(Reverse((key(nb), nb as u32)));
                 }
             }
+        };
+        for &c in &cells {
+            push(c as usize, &mut heap, &mut seen);
+        }
+        while let Some(Reverse((_, c))) = heap.pop() {
+            if left < cheapest / 2.0 {
+                break;
+            }
+            let cost = cost_of(c as usize);
+            if left < cost / 2.0 {
+                continue;
+            }
+            left -= cost;
+            cells.push(c);
+            push(c as usize, &mut heap, &mut seen);
         }
         if cells.len() < MIN_PLAIN_CELLS {
             continue;
         }
+        // The plain's top: one block over the sea's top water block, or a sixteenth under the
+        // lowest land beside the river's course (the land cell it comes off among them) where that
+        // is lower, so the river steps down onto the plain and off no bank of land (HYD-136).
+        let mut land_min = inp.sea_raw + PLAIN_TOP_STEPS + 1;
+        for &c in land.iter().chain(&course) {
+            let around = (0..8).filter_map(|k| geo.nb(c as usize, k));
+            for nb in around.chain(std::iter::once(c as usize)) {
+                let e = i32::from(inp.elev[nb]);
+                if e > inp.sea_raw {
+                    land_min = land_min.min(e);
+                }
+            }
+        }
+        let top = (land_min - 1 - inp.sea_raw).clamp(PLAIN_FRONT_STEPS, PLAIN_TOP_STEPS);
         let id = plains.len() as u32;
         for &c in &cells {
             owner.insert(c, id);
@@ -410,6 +479,8 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
             entry: seeds[0],
             dir,
             top_steps: top,
+            course,
+            land,
             cells,
             height: Vec::new(),
             pocket_cells: 0,
@@ -421,6 +492,7 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
     // reaches at its own level, before and after): small pockets join the plain beside them,
     // larger ones stay (lagoons). ledger: HYD-142
     let (mut lagoons, mut lagoon_cells) = (0u32, 0u64);
+    let mut reach_after: Vec<bool> = Vec::new();
     if !plains.is_empty() {
         let cell_km2 = cell_m2 / 1e6;
         let min_sea = ((OPEN_SEA_KM2 / cell_km2).ceil() as usize).max(1);
@@ -488,12 +560,14 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
                 }
             }
         }
+        reach_after = after;
     }
 
     // Heights: a ramp along the outflow from the plain's entry, its top there and one sixteenth
-    // over the sea at its farthest cell, level across the outflow; so the river runs forward
-    // across the plain to its front rather than off its side (HYD-136).
-    for pl in &mut plains {
+    // over the sea at its farthest cell, level across the outflow; the river's course never
+    // rises downstream and the cells beside it stand a sixteenth or more above it, so the second
+    // network keeps the river on its course across the plain to the front (HYD-136).
+    for (o, pl) in plains.iter_mut().enumerate() {
         let pe = geo.pos(pl.entry);
         let along: Vec<f64> = pl
             .cells
@@ -505,13 +579,85 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
             .collect();
         let far = along.iter().copied().fold(geo.r, f64::max);
         let span = f64::from(pl.top_steps - PLAIN_FRONT_STEPS);
-        pl.height = along
+        let mut steps: Vec<i32> = along
             .iter()
-            .map(|&f| {
-                let s = PLAIN_FRONT_STEPS + (span * (1.0 - f / far)).round() as i32;
-                (inp.sea_raw + s) as i16
-            })
+            .map(|&f| PLAIN_FRONT_STEPS + (span * (1.0 - f / far)).round() as i32)
             .collect();
+        let index: HashMap<u32, usize> =
+            pl.cells.iter().enumerate().map(|(i, &c)| (c, i)).collect();
+        // The course on from the crossing's end to the plain's tip (its cell beside the open
+        // sea's water farthest along the outflow) where the lobe closes the end off, the shortest
+        // way through the plain that keeps off its edge where it can (a cell beside water the
+        // plain does not hold costs as a shared one, HYD-144).
+        let mine = |c: u32| owner.get(&c) == Some(&(o as u32));
+        let beside_sea = |c: u32| {
+            !reach_after.is_empty()
+                && (0..8).any(|k| geo.nb(c as usize, k).is_some_and(|nb| reach_after[nb]))
+        };
+        if let Some(&end) = pl.course.last()
+            && !beside_sea(end)
+        {
+            let on_course: HashSet<u32> = pl.course.iter().copied().collect();
+            let tip = pl
+                .cells
+                .iter()
+                .zip(&along)
+                .filter(|&(&c, _)| beside_sea(c) && !on_course.contains(&c))
+                .max_by(|a, b| a.1.total_cmp(b.1).then(b.0.cmp(a.0)))
+                .map(|(&c, _)| c);
+            let edge: HashSet<u32> = pl
+                .cells
+                .iter()
+                .copied()
+                .filter(|&c| {
+                    (0..8).any(|k| {
+                        geo.nb(c as usize, k).is_some_and(|nb| {
+                            i32::from(inp.elev[nb]) <= inp.sea_raw && !mine(nb as u32)
+                        })
+                    })
+                })
+                .collect();
+            if let Some(tip) = tip
+                && let Some(path) = shortest(
+                    &geo,
+                    end,
+                    tip,
+                    |c| mine(c) && (c == end || !on_course.contains(&c)),
+                    &edge,
+                )
+            {
+                pl.course.extend(&path[1..]);
+            }
+        }
+        let mut on_course = vec![false; pl.cells.len()];
+        let mut prev = i32::MAX;
+        for &c in &pl.course {
+            let i = index[&c];
+            steps[i] = steps[i].min(prev);
+            prev = steps[i];
+            on_course[i] = true;
+        }
+        // The banks: above every course cell they touch, and above the entry beside the land
+        // cell the river comes off.
+        let lift = |c: usize, over: i32, steps: &mut [i32]| {
+            for k in 0..8 {
+                if let Some(nb) = geo.nb(c, k)
+                    && let Some(&j) = index.get(&(nb as u32))
+                    && !on_course[j]
+                {
+                    steps[j] = steps[j].max(over + 1).min(PLAIN_BANK_STEPS);
+                }
+            }
+        };
+        for &c in &pl.course {
+            let over = steps[index[&c]];
+            lift(c as usize, over, &mut steps);
+        }
+        if let Some(l) = pl.land {
+            let over = steps[index[&pl.entry]];
+            lift(l as usize, over, &mut steps);
+        }
+        pl.height = steps.iter().map(|&s| (inp.sea_raw + s) as i16).collect();
     }
     Plains {
         plains,
@@ -604,6 +750,12 @@ pub fn distributaries(
     }
     let mut ids: Vec<u32> = stem_of.keys().copied().collect();
     ids.sort_unstable();
+    // The steps from each sea-reached cell to the open sea, which the branches' tails descend.
+    let to_sea = if ids.is_empty() {
+        Vec::new()
+    } else {
+        sea_distance(&geo, &reach, &open)
+    };
     let mut out = Vec::new();
     for o in ids {
         let plain = &plains.plains[o as usize];
@@ -634,7 +786,8 @@ pub fn distributaries(
             run_m += step;
             apex -= 1;
         }
-        // The front, by bearing from the apex.
+        // The front, by bearing from the apex: the plain's cells beside the sea's water ahead of
+        // the apex, within a quarter turn of the outflow (HYD-138).
         let ap = geo.pos(mouth.stem[apex]);
         let dir = outflow(&geo, &mouth.stem[apex..], m - apex);
         let bearing = |c: u32| {
@@ -646,6 +799,7 @@ pub fn distributaries(
             .iter()
             .filter(|&&c| (0..8).any(|k| geo.nb(c as usize, k).is_some_and(|nb| reach[nb])))
             .map(|&c| (bearing(c), c))
+            .filter(|&(b, _)| b.abs() <= std::f64::consts::FRAC_PI_2) // ledger: HYD-138
             .collect();
         front.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
         let first_v = second.rivers.chains[mouth.chain as usize].first as usize;
@@ -713,7 +867,7 @@ pub fn distributaries(
             };
             // From the front cell across the beach band (if any) to the first cell of the open
             // sea, as every sea mouth ends (HYD-144).
-            let Some(tail) = to_open(&geo, goal, &reach, &open, &used) else {
+            let Some(tail) = to_open(&geo, goal, &to_sea, &used) else {
                 continue;
             };
             let plain_len = path.len();
@@ -729,7 +883,6 @@ pub fn distributaries(
             for &c in &path {
                 used.insert(c);
             }
-            let len = path.len();
             branches.push(Branch {
                 cells: path,
                 parent: Some((b, at)),
@@ -855,49 +1008,59 @@ fn shortest(
     Some(path)
 }
 
-/// The way from a plain's front cell `from` to the open sea: a breadth-first search, 8-connected,
-/// over the sea-reached ground (`reach`: the beach band and the open sea) that no channel of the
-/// plain takes yet, ending on the first `open` cell; at most [`TAIL_SEARCH_CELLS`] cells (HYD-144).
-/// Excludes `from`, includes the open cell.
-fn to_open(
-    geo: &Geo,
-    from: u32,
-    reach: &[bool],
-    open: &[bool],
-    used: &HashSet<u32>,
-) -> Option<Vec<u32>> {
-    let mut prev: HashMap<u32, u32> = HashMap::new();
-    let mut queue = std::collections::VecDeque::from([from]);
-    prev.insert(from, from);
-    let mut end = None;
-    'search: while let Some(c) = queue.pop_front() {
-        for k in 0..8 {
-            let Some(nb) = geo.nb(c as usize, k) else {
-                continue;
-            };
-            let nbu = nb as u32;
-            if !reach[nb] || used.contains(&nbu) || prev.contains_key(&nbu) {
-                continue;
+/// Each sea-reached cell's count of 8-connected steps over sea-reached ground (`reach`: the beach
+/// band and the open sea) to the nearest `open` cell, `u32::MAX` on every other cell (HYD-144).
+fn sea_distance(geo: &Geo, reach: &[bool], open: &[bool]) -> Vec<u32> {
+    let n = geo.w * geo.h;
+    let mut dist = vec![u32::MAX; n];
+    let mut queue = std::collections::VecDeque::new();
+    for c in 0..n {
+        if open[c] {
+            dist[c] = 0;
+            // Only the open sea's edge starts the search.
+            if (0..8).any(|k| geo.nb(c, k).is_some_and(|nb| reach[nb] && !open[nb])) {
+                queue.push_back(c);
             }
-            prev.insert(nbu, c);
-            if open[nb] {
-                end = Some(nbu);
-                break 'search;
-            }
-            if prev.len() >= TAIL_SEARCH_CELLS {
-                break 'search;
-            }
-            queue.push_back(nbu);
         }
     }
-    let mut c = end?;
-    let mut tail = vec![c];
-    while prev[&c] != from {
-        c = prev[&c];
-        tail.push(c);
+    while let Some(c) = queue.pop_front() {
+        for k in 0..8 {
+            if let Some(nb) = geo.nb(c, k)
+                && reach[nb]
+                && dist[nb] == u32::MAX
+            {
+                dist[nb] = dist[c] + 1;
+                queue.push_back(nb);
+            }
+        }
     }
-    tail.reverse();
-    Some(tail)
+    dist
+}
+
+/// The way from a plain's front cell `from` to the open sea: down the step counts `to_sea`
+/// ([`sea_distance`]), one step nearer each cell, over cells no channel of the plain takes yet;
+/// none where every way down is taken (HYD-144). Excludes `from`, includes the open cell.
+fn to_open(geo: &Geo, from: u32, to_sea: &[u32], used: &HashSet<u32>) -> Option<Vec<u32>> {
+    let mut tail = Vec::new();
+    let mut c = from as usize;
+    let mut here = u32::MAX;
+    loop {
+        let mut best: Option<(u32, usize)> = None;
+        for k in 0..8 {
+            let Some(nb) = geo.nb(c, k) else { continue };
+            let d = to_sea[nb];
+            if d < here && !used.contains(&(nb as u32)) && best.is_none_or(|b| (d, nb) < b) {
+                best = Some((d, nb));
+            }
+        }
+        let (d, nb) = best?;
+        tail.push(nb as u32);
+        if d == 0 {
+            return Some(tail);
+        }
+        here = d;
+        c = nb;
+    }
 }
 
 /// `notes.bake.water.stats.deltas`: counts, areas, the largest plains, and Earth's figures beside
