@@ -2225,6 +2225,11 @@ impl Session {
                 self.log
                     .push(Level::Info, crate::bake::project::summary_line(&note));
                 if let Some(b) = m.notes.get_mut(crate::bake::NOTES_KEY) {
+                    // A cube world's land under the cube's corners and seams (cube plan B3,
+                    // SCL-120): `notes.bake.stats`, beside the pass's own record.
+                    if note["kind"] == "cube" {
+                        b["stats"] = note["stats"].clone();
+                    }
                     b["projection"] = note;
                 }
             } else {

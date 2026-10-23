@@ -3,8 +3,10 @@
 //! baked Lambert world folder and runs the bake's projection pass on the copy
 //! (`deeptime_core::bake::project::project_folder`), then the guaranteed deposits' anchor and its
 //! top-up (`deeptime_core::deposits::anchor::anchor_folder`), as `Session::finalize_write` does at
-//! the end of a run whose preset says `scale.projection` `petroff_guyou`. It is how the pass's
-//! settings (λc, the footprint) are tuned without re-running the history. The copy is not the
+//! the end of a run whose preset says `scale.projection` `petroff_guyou` (the default here) or
+//! `cube` (`--set scale.projection=cube`: a format 0.7 cube world, `bake::project_cube`). It is how
+//! the pass's settings (λc, the cube's turn, the footprint) are tuned without re-running the
+//! history. The copy is not the
 //! folder such a run writes: the Lambert run's deposit stage counted the essentials' regions, and
 //! measured its inland margin, on the Lambert frame (DEP-220, DEP-222), so its guaranteed
 //! deposits lie where a Lambert world wants them; the anchor moves them under the projected
@@ -49,8 +51,11 @@ pub fn run(world_data: &Path, out: &Path, set: &[String]) -> CliResult<Value> {
     let PresetBody::Planet(p) = &preset.body else {
         return Err("the folder's preset is not a planet preset".into());
     };
-    if p.scale.projection != ProjectionKind::PetroffGuyou {
-        return Err("--set scale.projection must stay petroff_guyou".into());
+    if !matches!(
+        p.scale.projection,
+        ProjectionKind::PetroffGuyou | ProjectionKind::Cube
+    ) {
+        return Err("--set scale.projection must be petroff_guyou or cube".into());
     }
     if out.exists() {
         std::fs::remove_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
@@ -59,6 +64,10 @@ pub fn run(world_data: &Path, out: &Path, set: &[String]) -> CliResult<Value> {
     let mut m = Manifest::read(out)?;
     let note = project::project_folder(out, p, &mut m)?;
     if let Some(b) = m.notes.get_mut(deeptime_core::bake::NOTES_KEY) {
+        // As `Session::finalize_write`: a cube world's land under its corners (SCL-120).
+        if note["kind"] == "cube" {
+            b["stats"] = note["stats"].clone();
+        }
         b["projection"] = note.clone();
     }
     // The copy's preset is the one it was projected with.

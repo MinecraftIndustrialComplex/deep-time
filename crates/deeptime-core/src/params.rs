@@ -355,6 +355,11 @@ impl ScaleParams {
             ProjectionKind::PetroffGuyou => {
                 2 * PetroffGuyou::hemisphere_for(self.circumference_blocks)
             }
+            // The cube's loop: four faces of side `face_for(C)` (FORMAT.md "The cube world's
+            // layout", Scale).
+            ProjectionKind::Cube => {
+                4 * deeptime_format::projection::face_for(self.circumference_blocks)
+            }
         }
     }
 }

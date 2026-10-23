@@ -569,8 +569,8 @@ enum Command {
         json: Option<PathBuf>,
     },
     /// Run the bake's projection pass (SW-1) on a copy of a baked Lambert world-data folder, with
-    /// its own preset and `--set scale.KEY=VALUE` overrides (`scale.projection` is petroff_guyou):
-    /// tuning the pass without re-running the history.
+    /// its own preset and `--set scale.KEY=VALUE` overrides (`scale.projection` is petroff_guyou,
+    /// or cube with `--set scale.projection=cube`): tuning the pass without re-running the history.
     Project {
         /// A Lambert world-data folder a planet run baked (`--set scale.projection=lambert`).
         #[arg(long)]
@@ -578,12 +578,14 @@ enum Command {
         /// The projected copy (replaced if it exists).
         #[arg(long)]
         out: PathBuf,
-        /// Sets a preset value first, `--set scale.lambda_c_deg=30` (repeatable).
+        /// Sets a preset value first, `--set scale.lambda_c_deg=30` or
+        /// `--set scale.projection=cube` (repeatable).
         #[arg(long = "set", value_name = "PATH=VALUE")]
         set: Vec<String>,
     },
     /// Whole-world pictures of a baked world-data folder in the world's own block space
-    /// (satellite.png, provinces.png with the layout's cone points and poles, world-map.json).
+    /// (satellite.png, provinces.png with the layout's cone points and poles, world-map.json); a
+    /// cube world is drawn as its net, with the face outlines and the border edges too.
     WorldMap {
         /// World-data folder.
         #[arg(long)]
@@ -783,6 +785,10 @@ enum SynthKind {
     WrapTest,
     /// A basin (floor y 110, rim y 125, water 120) with a closed channel, on a plain at y 100.
     LakeTest,
+    /// A cube world (format 0.7) of a planet --size blocks round: sphere-defined continents, a
+    /// ridge across a quarter-turn seam, a cone on a reachable corner, a lake across a half-turn
+    /// seam.
+    Cube,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -1523,6 +1529,7 @@ fn main() -> ExitCode {
                 kind: match kind {
                     SynthKind::WrapTest => synth::Kind::WrapTest,
                     SynthKind::LakeTest => synth::Kind::LakeTest,
+                    SynthKind::Cube => synth::Kind::Cube,
                 },
                 strata: match strata {
                     StrataArg::Placeholder => synth::Strata::Placeholder,
