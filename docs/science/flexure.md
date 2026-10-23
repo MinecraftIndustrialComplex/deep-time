@@ -487,8 +487,11 @@ an arm, `+DEEPTIME_CRUST_BUDGET=1`; each argument set against itself without the
 seeds; medians, two-sided Mann-Whitney p). Three argument sets: the base; the trench budget's three
 keys (`trench_release_half_life_myr=2`, `sediment_subduction_share=0.12`,
 `subduction_erosion_km3_per_km_myr=90`); and those with the high ground's sheet (the four
-`collapse_*` keys), the seven that become the default. Arms `base`/`fg-trench`,
-`trench-m-rs12e`/`fg-trcomb-rs12e`, `trench-m-rs12e-sheet`/`fg-trench-sheet`.
+`collapse_*` keys), the seven that are master's default since 57558f0a, so that column is the
+fix against the pool's new `base` (its seeds 1 to 4). Arms `base`/`fg-trench` (the old base),
+`trench-m-rs12e`/`fg-trcomb-rs12e`, `trench-m-rs12e-sheet`/`fg-trench-sheet`. The branch with
+57558f0a merged in, at its own default, made `fg-trench-sheet`'s supercontinent 1 again, every
+field and the plate table byte for byte.
 
 | measure (Earth) | base | fixed | p | trench keys | fixed | p | seven keys | fixed | p |
 |---|---|---|---|---|---|---|---|---|---|
