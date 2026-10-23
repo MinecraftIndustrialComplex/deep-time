@@ -1102,7 +1102,18 @@ mod tests {
 
     /// RMS change, blocks, of the character over the cone's flanks.
     fn change(fields: &CharacterFields, kfac: f32, rug: f64) -> (f64, Vec<f32>) {
-        let (win, mut z, area, k, lake) = cone(kfac);
+        let (_, _, _, _, lake) = cone(kfac);
+        change_with_lake(fields, kfac, rug, &lake)
+    }
+
+    /// [`change`] with a lake footprint.
+    fn change_with_lake(
+        fields: &CharacterFields,
+        kfac: f32,
+        rug: f64,
+        lake: &[u8],
+    ) -> (f64, Vec<f32>) {
+        let (win, mut z, area, k, _) = cone(kfac);
         let before = z.clone();
         let n = win.cells();
         let mut sc: Vec<Vec<f32>> = (0..7).map(|_| vec![0f32; n]).collect();
@@ -1137,7 +1148,7 @@ mod tests {
             &mut z,
             &area,
             &k,
-            &lake,
+            lake,
             &[],
             scratch,
             &ctx,
@@ -1219,6 +1230,52 @@ mod tests {
                 assert!(z[c] > 0.0, "cell {c} went under the sea");
             }
         }
+    }
+
+    #[test]
+    fn the_character_fades_in_from_a_lake_shore() {
+        // A lake over the cone's foot (beyond 200 blocks from the axis, under y = 167): its
+        // shore is a terrain contour, a circle. Lake cells keep their height, the land cells
+        // beside the shore keep theirs (no step along the footprint), and the character is whole
+        // LAKE_SHORE_FADE_BLOCKS out. ledger: AMP-091
+        let young = CharacterFields::uniform(1.0, 0.0, 0.0);
+        let (win, before, ..) = cone(0.8);
+        let r_blocks = |c: usize| {
+            let (i, j) = ((c % win.w) as f64, (c / win.w) as f64);
+            ((i - 160.0).powi(2) + (j - 80.0).powi(2)).sqrt() * 2.0
+        };
+        let lake: Vec<u8> = (0..win.cells())
+            .map(|c| u8::from(r_blocks(c) >= 200.0))
+            .collect();
+        let (_, z) = change_with_lake(&young, 0.8, 1.0, &lake);
+        let d = |c: usize| f64::from(z[c] - before[c]) / MV;
+        let (mut shore, mut out, mut n_out) = (0f64, 0f64, 0);
+        for j in 1..win.h - 1 {
+            for i in 1..win.w - 1 {
+                let c = j * win.w + i;
+                if lake[c] != 0 {
+                    assert_eq!(z[c], before[c], "lake cell {c} moved");
+                    continue;
+                }
+                let r = r_blocks(c);
+                let edge = [c - 1, c + 1, c - win.w, c + win.w];
+                if edge.iter().any(|&n| lake[n] != 0) {
+                    shore = shore.max(d(c).abs());
+                } else if (200.0 - r) > LAKE_SHORE_FADE_BLOCKS + 2.0 && r > 150.0 {
+                    out += d(c).abs();
+                    n_out += 1;
+                }
+            }
+        }
+        let out = out / f64::from(n_out);
+        assert!(
+            shore < 1e-4,
+            "the shore's land cells moved by up to {shore} blocks"
+        );
+        assert!(
+            out > 0.5,
+            "the flank above the shore changed by {out} blocks (mean)"
+        );
     }
 
     #[test]
