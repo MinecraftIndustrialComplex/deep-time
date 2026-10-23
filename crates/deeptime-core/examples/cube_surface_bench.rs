@@ -184,13 +184,12 @@ fn run(grid: &mut Grid, h0: Vec<f64>, steps: usize, warm: usize) -> Times {
         let s = Instant::now();
         let sea_mask: Vec<bool> = kind.iter().map(|&k| k == BASE).collect();
         // The mouths and the cells their fills reached (printed for the last step).
-        let (mut mouths, mut fill_cells, mut capped, mut delivered) = (0usize, 0usize, 0usize, 0.0);
+        let (mut mouths, mut fill_cells) = (0usize, 0usize);
         for m in 0..n {
             if kind[m] == BASE && qin[m] > 0.0 {
                 let vol = qin[m] * dt;
                 mouths += 1;
-                delivered += vol;
-                let reached = match grid {
+                fill_cells += match grid {
                     Grid::Cube(g, _) => {
                         marine::fill(g, &sea_mask, m, vol, &fp, &mut h, &mut dep, &mut scratch)
                     }
@@ -198,8 +197,6 @@ fn run(grid: &mut Grid, h0: Vec<f64>, steps: usize, warm: usize) -> Times {
                         marine::fill(d, &sea_mask, m, vol, &fp, &mut h, &mut dep, &mut scratch)
                     }
                 };
-                fill_cells += reached;
-                capped += usize::from(reached >= fp.max_cells);
             }
         }
         lap(&mut t, "4 mouth fill", s, timed);
@@ -262,10 +259,7 @@ fn run(grid: &mut Grid, h0: Vec<f64>, steps: usize, warm: usize) -> Times {
         if step + 1 == steps {
             eprintln!(
                 "  last step: sea level {level:.1} m; {mouths} mouth fills over {fill_cells} \
-                 cells ({capped} stopped at {} cells; {:.4e} km³ delivered); multigrid \
-                 iterations {mg_its}, Jacobi {jac_its} over {steps} steps",
-                fp.max_cells,
-                delivered * 1e-9
+                 cells; multigrid iterations {mg_its}, Jacobi {jac_its} over {steps} steps"
             );
         }
     }
