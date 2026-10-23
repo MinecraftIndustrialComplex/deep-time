@@ -462,10 +462,6 @@ pub fn run_tiles(
         if device.is_none() {
             reserve(tile_bytes)?;
         }
-        let probe = stats.tiles == 0;
-        if probe {
-            super::amp_probe(&format!("tile0_reserved bytes={tile_bytes} cells={}", win.cells()));
-        }
         stats.tiles += 1;
         stats.window_cells_max = stats.window_cells_max.max(win.cells());
         let started = Instant::now();
@@ -474,9 +470,6 @@ pub fn run_tiles(
         let mut buf = Buf::new(win, fine);
         buf.core = (cx, cy, core.2, core.3);
         let before = buf.z.clone();
-        if probe {
-            super::amp_probe("tile0_buf_ready");
-        }
         let (ph, counts, noise) = (&cfg.ph, &cfg.counts, &cfg.noise);
         let pass = match run_passes_on(device, &mut buf, ph, counts, noise, &mut stats.times) {
             Ok(pass) => {
@@ -492,9 +485,6 @@ pub fn run_tiles(
                 run_passes(&mut buf, ph, counts, noise, &mut stats.times)
             }
         };
-        if probe {
-            super::amp_probe("tile0_passes_done");
-        }
         if let (true, Some(cc)) = (cfg.last, cfg.character.as_ref()) {
             // Mountain character, then a flood so the surface still drains (the arrays the
             // passes are done with are its scratch).
@@ -593,9 +583,6 @@ pub fn run_tiles(
                 stats.character_flood_max_raise_m.max(fl.max_raise_m);
             stats.character_ms += started.elapsed().as_secs_f64() * 1000.0;
         }
-        if probe {
-            super::amp_probe("tile0_character_done");
-        }
         let (_, _, cw, ch) = core;
         let started = Instant::now();
         stats.sinks += count_sinks(&win, &buf.z, &buf.lake, sea, (cx, cy, cw, ch));
@@ -689,9 +676,6 @@ pub fn run_tiles(
             }
         }
         stats.detail_ms += started.elapsed().as_secs_f64() * 1000.0;
-        if probe {
-            super::amp_probe("tile0_cores_ready");
-        }
         let started = Instant::now();
         sink.put(&TileOut {
             rect: core,
@@ -707,9 +691,6 @@ pub fn run_tiles(
             }),
         })?;
         stats.sink_ms += started.elapsed().as_secs_f64() * 1000.0;
-        if probe {
-            super::amp_probe("tile0_put_done");
-        }
     }
     Ok((preview, stats))
 }

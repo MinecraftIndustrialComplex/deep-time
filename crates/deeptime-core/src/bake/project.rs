@@ -667,8 +667,9 @@ pub(crate) const WATER_LAYER_BYTES_PER_CELL: u64 = 4;
 /// ([`world_ground`]) and `hydro::closed_basin_on_world`'s flags, 1 B each, and fronts. A figure of
 /// the memory model (amp-est, 2026-10-23: the ground and the working set held 25.1 B a cell on
 /// quick 16k's world grid of 22.2 M cells, 34.4 B where the ocean passed 2^24 cells, the bake's
-/// peak, before the closed basins' flood held a breadth-first front instead of every body cell and
-/// a depth-first stack as usize; after it, see the science page's memory section).
+/// peak, while the closed basins' flood kept every body cell and a depth-first stack as usize;
+/// with a breadth-first front of u32 and a state byte a cell, 11.0 B: 8.0 for the ground, 3.0 for
+/// the flood).
 pub(crate) const GROUND_BYTES_PER_WORLD_CELL: u64 = 12;
 
 /// Bytes per world cell of the elevation's grid the block-scale relief holds beside the grid's
@@ -684,9 +685,8 @@ pub(crate) const RELIEF_BYTES_PER_WORLD_CELL: u64 = 6;
 /// ([`GROUND_BYTES_PER_WORLD_CELL`]), the relief on the elevation's
 /// ([`RELIEF_BYTES_PER_WORLD_CELL`]). Beside them stay the Lambert elevation and amplitude it loads
 /// first (L3, shared with that grid's sources, kept to the end) and the world layers of the grids
-/// before: the
-/// horizon stacks (kept for the top raise), the L2 layers the relief and the biomes' land call
-/// read, and the world's elevation (the halved grid's ground). Memory accounting, 2026-10-05:
+/// before: the horizon stacks (kept for the top raise), the L2 layers the relief and the biomes'
+/// land call read, and the world's elevation (the halved grid's ground). Memory accounting, 2026-10-05:
 /// before this the pass was not in the estimate and kept a second copy of every resampled layer
 /// beside its output. amp-est, 2026-10-23: the closed basins' ground and working set were left
 /// out (452.6 MB listed for a pass that held 969.9 MB on quick 16k), and the water's layers were
@@ -1245,8 +1245,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     );
     let elev_src = Arc::new(elev_src?);
     let amp_src = amp_src?.map(Arc::new);
-    crate::surface::amplify::amp_probe_seg("proj_loaded");
-    let spec =deeptime_format::DetailSpec::of(m)?;
+    let spec = deeptime_format::DetailSpec::of(m)?;
     let spec_seed = spec.as_ref().map(|s| s.seed()).transpose()?;
     let src_proj = Projection::new(c_sim);
     let land = |v: [f64; 3]| -> bool {
@@ -1273,8 +1272,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     let t = Instant::now();
     let map = Mapping::new(g, c_sim, stretch_r);
     let stretch_ms = ms(t);
-    crate::surface::amplify::amp_probe_seg("proj_mapping");
-    let wp =WorldProjection::PetroffGuyou(g);
+    let wp = WorldProjection::PetroffGuyou(g);
     let period = g.period() as u32;
     // The true size of a world block, metres: the planet's area over the world's 2b² blocks.
     let world_m_h = f64::from(c_sim) * p.scale.m_per_block_h / std::f64::consts::TAU
@@ -1314,7 +1312,6 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     let relief_noise = spec_seed.map(|s| deeptime_format::Noise::for_world(s, period, &wp));
     let m_per_block_v = m.scale.m_per_block_v;
     let mut relief_note = json!(null);
-    crate::surface::amplify::amp_probe_seg("proj_rivers_read");
     for (gname, entries) in &by_grid {
         let src_grid = m
             .grids
@@ -1351,11 +1348,9 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             })
             .collect::<Result<_, _>>()?;
         load_ms += ms(tl);
-        crate::surface::amplify::amp_probe_seg(&format!("proj_{gname}_srcs"));
         let tl = Instant::now();
         let mut outs = resample_grid(&map, &srcs, &wg);
         resample_ms += ms(tl);
-        crate::surface::amplify::amp_probe_seg(&format!("proj_{gname}_resampled"));
         // The closed basins on the world's own ground (HYD-105).
         if let Some(ci) = srcs.iter().position(|s| s.layer.desc.name == CLOSED_BASIN) {
             let tl = Instant::now();
@@ -1371,7 +1366,6 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                     .ceil()
                     .max(1.0) as usize;
                 let (w, h) = (wg.w as usize, wg.h as usize);
-                crate::surface::amplify::amp_probe_seg(&format!("proj_{gname}_ground"));
                 let before = outs[ci].iter().filter(|&&v| v == 1).count();
                 let (layer, cleared) = hydro::closed_basin_on_world(
                     w,
@@ -1384,7 +1378,6 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 );
                 let after = layer.iter().filter(|&&v| v == 1).count();
                 outs[ci] = layer;
-                crate::surface::amplify::amp_probe_seg(&format!("proj_{gname}_closed"));
                 closed_note = json!({
                     "grid": gname,
                     "min_open_cells": min_open,
@@ -1414,10 +1407,8 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 planet_r_m: f64::from(c_sim) * p.scale.m_per_block_h / std::f64::consts::TAU,
                 m_per_block_v,
             };
-            crate::surface::amplify::amp_probe_seg(&format!("proj_{gname}_pre_relief"));
             relief_note = on.draw(&srcs[k].layer.desc, &mut elev);
             outs[k] = elev;
-            crate::surface::amplify::amp_probe_seg(&format!("proj_{gname}_relief"));
         }
 
         let tl = Instant::now();
@@ -1476,7 +1467,6 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         }
         new_grids.insert(gname.clone(), wg);
         write_ms += ms(tl);
-        crate::surface::amplify::amp_probe_seg(&format!("proj_{gname}_written"));
     }
     m.grids = new_grids;
     // The biome layers' land call, on the world's own ground (BIO-170).
@@ -1511,7 +1501,6 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         }
         write_ms += ms(tl);
     }
-    crate::surface::amplify::amp_probe_seg("proj_biomes");
     let bodies = read_bodies(dir)?;
     let sites = read_sites(dir)?;
     // A body of an in-stratum type (`hosts.in_stratum`: MVT) lies in its host horizon. The bake
@@ -1588,7 +1577,6 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         write_ms += ms(tl);
     }
     let raster_ms = ms(t);
-    crate::surface::amplify::amp_probe_seg("proj_tops");
 
     // --- the evidence: streaks round the poles -----------------------------------------------
     let t = Instant::now();
@@ -1650,7 +1638,6 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         });
     }
     let aniso_ms = ms(t);
-    crate::surface::amplify::amp_probe_seg("proj_aniso");
 
     // --- vector data --------------------------------------------------------------------------
     let t = Instant::now();
@@ -1809,13 +1796,11 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         set_file(m, spawn_rel, crc.0, crc.1);
     }
     let vector_ms = ms(t);
-    crate::surface::amplify::amp_probe_seg("proj_vector");
     // The rewritten rasters reach their names (each fsynced, then renamed) before the manifest
     // that lists them is written.
     let t = Instant::now();
     flusher.commit()?;
     let commit_ms = ms(t);
-    crate::surface::amplify::amp_probe_seg("proj_commit");
 
     // --- the manifest --------------------------------------------------------------------------
     let border = match p.scale.edge_border {

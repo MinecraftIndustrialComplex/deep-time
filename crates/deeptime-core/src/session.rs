@@ -2054,14 +2054,12 @@ impl Session {
             let (note, l) = self
                 .pool
                 .install(|| crate::bake::bake(world, p, dir, &mut m))?;
-            crate::surface::amplify::amp_probe("bake_lambert_done");
             lift = l;
             self.log.push(Level::Info, crate::bake::summary_line(&note));
             m.notes.insert(crate::bake::NOTES_KEY.into(), note);
             // The last frame shows the rivers and lakes the bake wrote (before the frame files
             // are listed in the manifest below).
             self.bake_water_into_last_frame(world, dir, &m);
-            crate::surface::amplify::amp_probe("bake_water_frame_done");
         }
         let mut files = std::mem::take(&mut m.files);
 
@@ -2223,11 +2221,9 @@ impl Session {
                 // The blocks the bake freed and the allocator keeps are the wrong sizes for this
                 // pass's arrays: they would sit in the count beside them.
                 self.gauge.release();
-                crate::surface::amplify::amp_probe("bake_project_start");
                 let note = self
                     .pool
                     .install(|| crate::bake::project::project_folder(dir, p, &mut m))?;
-                crate::surface::amplify::amp_probe("bake_project_done");
                 self.log
                     .push(Level::Info, crate::bake::project::summary_line(&note));
                 if let Some(b) = m.notes.get_mut(crate::bake::NOTES_KEY) {
