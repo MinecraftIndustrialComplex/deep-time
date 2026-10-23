@@ -1235,21 +1235,29 @@ pub(crate) fn project_body_exact(
     out
 }
 
-/// B4: the planet area a projected body covers against its area in the simulation (Lambert,
-/// equal-area): the map's local scale squared averaged over the world ellipse (12 directions on
-/// 4 rings, weighted by area) times the ellipse's area. Points off the planet (past a turning
-/// seam) are left out; None with none on it.
+/// B4: a projected body's planet area against its area in the simulation (Lambert, equal-area).
+struct BodyArea {
+    /// The map's local scale squared averaged over the world ellipse's points on the planet (12
+    /// directions on 4 rings, weighted by area) times the ellipse's area: the planet area the
+    /// ellipse would cover were its points past a turning seam drawn across it (phase 2's images).
+    ratio: f64,
+    /// The share of the ellipse's points off the planet (past a turning seam, in the net's void).
+    off_planet: f64,
+}
+
+/// [`BodyArea`] of world body `nb` projected from simulation body `b`; None with no point of it on
+/// the planet.
 fn body_area_ratio(
     view: &CubeView<'_>,
     b: &deeptime_format::Body,
     nb: &deeptime_format::Body,
-) -> Option<f64> {
+) -> Option<BodyArea> {
     const RINGS: usize = 4;
     const DIRS: usize = 12;
     let a0 = f64::from(b.axes[0]) * f64::from(b.axes[2]);
     let (a, c) = (f64::from(nb.axes[0]), f64::from(nb.axes[2]));
     let (sy, cy) = f64::from(nb.yaw).sin_cos();
-    let (mut sum, mut weight) = (0.0, 0.0);
+    let (mut sum, mut weight, mut all) = (0.0, 0.0, 0.0);
     for i in 0..RINGS {
         let r = (i as f64 + 0.5) / RINGS as f64;
         for k in 0..DIRS {
@@ -1259,6 +1267,7 @@ fn body_area_ratio(
                 nb.center[0] + u * cy - v * sy,
                 nb.center[2] + u * sy + v * cy,
             );
+            all += r;
             if let Some(j) = view.jacobian(x, z) {
                 sum += r * j.sigma * j.sigma;
                 weight += r;
@@ -1266,7 +1275,25 @@ fn body_area_ratio(
         }
     }
     let ratio = sum / weight * a * c / a0;
-    (a0 > 0.0 && weight > 0.0 && ratio.is_finite()).then_some(ratio)
+    (a0 > 0.0 && weight > 0.0 && ratio.is_finite()).then(|| BodyArea {
+        ratio,
+        off_planet: 1.0 - weight / all,
+    })
+}
+
+/// Whether world body `nb`'s horizontal ellipse holds a cube corner's image (net period `period`):
+/// the map's scale is singular there (a 360° neighbourhood folded into 270°), so no one ellipse
+/// keeps such a body's planet area; phase 2 draws it per face.
+fn body_holds_a_corner(corners: &[[i64; 2]], period: f64, nb: &deeptime_format::Body) -> bool {
+    let (a, c) = (f64::from(nb.axes[0]), f64::from(nb.axes[2]));
+    let (sy, cy) = f64::from(nb.yaw).sin_cos();
+    corners.iter().any(|im| {
+        let mut dx = im[0] as f64 - nb.center[0];
+        dx -= (dx / period).round() * period;
+        let dz = im[1] as f64 - nb.center[2];
+        let (u, v) = (cy * dx + sy * dz, -sy * dx + cy * dz);
+        (u / a).powi(2) + (v / c).powi(2) <= 1.0
+    })
 }
 
 /// The distance from net point (x, z) to the nearest cube corner image and to the nearest turning
@@ -1817,7 +1844,16 @@ pub fn project_folder_cube(
                 0
             }
         };
+        // A body whose ellipse holds a corner's image is counted apart (its own record below):
+        // the map is singular there, so its area is phase 2's per-face images' to keep.
+        let corner_images: Vec<[i64; 2]> = cube
+            .corners()
+            .iter()
+            .flat_map(|c| c.images.iter().copied())
+            .collect();
         let mut ratios: [Vec<f64>; 3] = Default::default();
+        let mut ratios_091: [Vec<f64>; 3] = Default::default();
+        let (mut over_corner, mut off_planet) = (Vec::new(), (0usize, 0.0f64));
         let (mut shifts, mut clipped, mut with_host) = ((0usize, 0.0f64), 0usize, (0usize, 0.0f64));
         new_bodies = bs
             .iter()
@@ -1825,8 +1861,33 @@ pub fn project_folder_cube(
             .map(|(i, b)| {
                 let mut nb = project_body_exact(&cm, b);
                 let (x, z) = (nb.center[0], nb.center[2]);
-                if let Some(r) = body_area_ratio(&cm.view, b, &nb) {
-                    ratios[place(x, z)].push(r);
+                let old = project_body(&cm, b);
+                let (area, area_091) = (
+                    body_area_ratio(&cm.view, b, &nb),
+                    body_area_ratio(&cm.view, b, &old),
+                );
+                if body_holds_a_corner(&corner_images, f64::from(period), &nb) {
+                    let (corner, _) = corner_and_edge_distance(cube, x, z);
+                    over_corner.push(json!({
+                        "id": b.id, "role": b.role,
+                        "semi_axes_blocks": [nb.axes[0], nb.axes[2]],
+                        "corner_distance_blocks": (corner * 10.0).round() / 10.0,
+                        "planet_area_ratio": area.as_ref().map(|r| (r.ratio * 1e4).round() / 1e4),
+                        "planet_area_ratio_scl091": area_091.as_ref().map(|r| (r.ratio * 1e4).round() / 1e4),
+                        "off_planet_share": area.as_ref().map(|r| (r.off_planet * 1e3).round() / 1e3),
+                    }));
+                } else {
+                    let k = place(x, z);
+                    if let Some(r) = &area {
+                        ratios[k].push(r.ratio);
+                        if r.off_planet > 0.0 {
+                            off_planet.0 += 1;
+                            off_planet.1 = off_planet.1.max(r.off_planet);
+                        }
+                    }
+                    if let Some(r) = &area_091 {
+                        ratios_091[k].push(r.ratio);
+                    }
                 }
                 let ground = new.height(x, z);
                 let dy = ground - old.height(b.center[0], b.center[2]);
@@ -1855,7 +1916,19 @@ pub fn project_folder_cube(
             v.sort_by(f64::total_cmp);
             json!((v[v.len() / 2] * 1e5).round() / 1e5)
         };
-        let [mut r0, mut r1, mut r2] = ratios;
+        let by_place = |[mut r0, mut r1, mut r2]: [Vec<f64>; 3]| -> Value {
+            let worst = r0
+                .iter()
+                .chain(&r1)
+                .chain(&r2)
+                .map(|r| (r - 1.0).abs())
+                .fold(0.0f64, f64::max);
+            json!({
+                "mid_face": median(&mut r0), "seam": median(&mut r1), "corner": median(&mut r2),
+                "counts": [r0.len(), r1.len(), r2.len()],
+                "largest_change": (worst * 1e4).round() / 1e4,
+            })
+        };
         vec_note.insert(
             "bodies".into(),
             json!({
@@ -1863,10 +1936,12 @@ pub fn project_folder_cube(
                 "largest_move_blocks": shifts.1, "stratabound_clipped_to_ground": clipped,
                 "stratabound_raised_with_host": with_host.0,
                 "stratabound_largest_host_raise_blocks": with_host.1,
-                "planet_area_ratio_median": {
-                    "mid_face": median(&mut r0), "seam": median(&mut r1), "corner": median(&mut r2),
-                    "counts": [r0.len(), r1.len(), r2.len()],
+                "planet_area_ratio_median": by_place(ratios),
+                "planet_area_ratio_median_scl091": by_place(ratios_091),
+                "reaching_past_a_turning_seam": {
+                    "count": off_planet.0, "largest_off_planet_share": (off_planet.1 * 1e3).round() / 1e3,
                 },
+                "over_a_corner": over_corner,
             }),
         );
     }
@@ -2278,7 +2353,9 @@ mod tests {
             let old = project_body(&m, &b);
             let old_ratio = f64::from(old.axes[0]) * f64::from(old.axes[2]) * s2;
             assert!(old_ratio >= at_centre - 1e-4, "yaw {yaw}: {old_ratio}");
-            body_area_ratio(&m.view, &b, &nb).expect("on the planet")
+            body_area_ratio(&m.view, &b, &nb)
+                .expect("on the planet")
+                .ratio
         };
         // 2° from corner (1, 1, 1) towards F0's centre.
         let c = normalize([1.0, 1.0, 1.0]);
@@ -2296,6 +2373,31 @@ mod tests {
             for (name, r) in [("mid", mid), ("seam", seam), ("corner", corner)] {
                 assert!((r - 1.0).abs() < 0.01, "{name}, yaw {yaw}: {r}");
             }
+        }
+        // A body wider than its distance from the corner holds the corner's image (and is counted
+        // apart); the small one beside it does not.
+        let images: Vec<[i64; 2]> = m
+            .cube
+            .corners()
+            .iter()
+            .flat_map(|c| c.images.iter().copied())
+            .collect();
+        let (xs, zs, _) = m.src_block(m.view.turn.to_planet(normalize(by_corner)));
+        let period = m.cube.period() as f64;
+        for (axes, holds) in [([6.0, 3.0, 4.0], false), ([60.0, 30.0, 90.0], true)] {
+            let b = Body::new(
+                1,
+                None,
+                Shape::Lens,
+                "ore",
+                [xs, 40.0, zs],
+                axes,
+                0.8,
+                0.0,
+                NO_CLIP,
+            );
+            let nb = project_body_exact(&m, &b);
+            assert_eq!(body_holds_a_corner(&images, period, &nb), holds, "{axes:?}");
         }
     }
 
