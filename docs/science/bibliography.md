@@ -1132,7 +1132,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Cogley, J. G. (1984). Continental margins and the extent and number of the continents. Reviews of Geophysics 22(2):101-122.
 - DOI or URL: 10.1029/RG022i002p00101.
 - Cited as: (ERO, ISO, HYP) "Cogley 1984 (continental crust 41 % of the surface)". (PLT) "Cogley 1984, Rev. Geophys. 22:101-122" (29 percent land on 41 percent continental crust).
-- Ledger ids: HYP-012, HYP-013, PLT-158, PLT-159, PLT-205; HYP-035 (2026-10-20: the 41 % share as the stand-in contour for the continental edge); HYP-042 (2026-10-22: the 30.6 % submerged against the drowned-crust target)
+- Ledger ids: RLC-030 (2026-10-23: the 41 % crust share, as the realism-checks page uses it); HYP-012, HYP-013, PLT-158, PLT-159, PLT-205; HYP-035 (2026-10-20: the 41 % share as the stand-in contour for the continental edge); HYP-042 (2026-10-22: the 30.6 % submerged against the drowned-crust target)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1227,7 +1227,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Tozer, B., Sandwell, D. T., Smith, W. H. F., Olson, C., Beale, J. R. and Wessel, P. (2019). Global bathymetry and topography at 15 arc sec: SRTM15+. Earth and Space Science 6(10):1847-1864.
 - DOI or URL: (ERO, ISO, HYP) 10.1029/2019EA000658 (gold open access; DOAJ record https://doaj.org/article/95db1757cac2402aaa9c72408bdc82ed). (MOI, BIO) https://doi.org/10.1029/2019EA000658 (gold open access) (PLT) 10.1029/2019EA000658 (open access in Wiley). (CLM) 10.1029/2019EA000658
 - Cited as: (ERO, ISO, HYP) "Tozer et al. 2019" (SRTM15+) in build log 2026-10-01. (MOI, BIO) "GMT earth_relief (SRTM15+, Tozer et al. 2019)" (PLT) "Tozer et al. 2019 (SRTM15+, GMT earth_relief 30 arc-minute)".
-- Ledger ids: HYP-001 to HYP-011, HYP-032, PLT-168, PLT-170; none (relief used in the Earth comparisons); notes: as the dataset behind GMT earth_relief; relief used in the Earth comparisons; HYP-035 (2026-10-20: the median distance from land to the coast on the model's sampling, computed on earth_relief_15m_p); PLT-360 (2026-10-21: the coastal high ground, the hypsometry and the highest 1,000 km box, computed on earth_relief_15m_p by tools/review/continents_census.py); HYP-050, HYP-051 (2026-10-22, the trench budget: the floor deeper than 6 km and the deepest cell on earth_relief_15m_p, tools/review/earth-deep-floor.py)
+- Ledger ids: RLC-003 (2026-10-23: the present-day control of the Earth-history pipeline, tools/review/earth-paleodem.py); HYP-001 to HYP-011, HYP-032, PLT-168, PLT-170; none (relief used in the Earth comparisons); notes: as the dataset behind GMT earth_relief; relief used in the Earth comparisons; HYP-035 (2026-10-20: the median distance from land to the coast on the model's sampling, computed on earth_relief_15m_p); PLT-360 (2026-10-21: the coastal high ground, the hypsometry and the highest 1,000 km box, computed on earth_relief_15m_p by tools/review/continents_census.py); HYP-050, HYP-051 (2026-10-22, the trench budget: the floor deeper than 6 km and the deepest cell on earth_relief_15m_p, tools/review/earth-deep-floor.py)
 - Access: open access. [other sections: open access (Wiley/AGU). / not checked (journal is open access)]
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): (ERO, ISO, HYP) no record. (MOI, BIO) used as data (PLT) numbers computed by the project from the GMT grid. (CLM) data used
@@ -6784,7 +6784,7 @@ What an ice sheet is, for the temperate present's land-ice target (decisions log
 - Reference: National Snow and Ice Data Center. Glacier Quick Facts (web page).
 - DOI or URL: https://nsidc.org/learn/parts-cryosphere/glaciers/glacier-quick-facts
 - Cited as: "NSIDC, Glacier Quick Facts" (Earth's land under ice today and at the last glacial maximum).
-- Ledger ids: CLM-150
+- Ledger ids: CLM-150; RLC-060, RLC-061 (2026-10-23: land under ice today and at the last glacial maximum, the realism checks)
 - Access: open (web page).
 - Read so far (by the project): through the web fetch tool, 2026-10-18: "Presently, 10 percent of land area on Earth is covered with glacial ice", glaciers, ice caps and the ice sheets of Greenland and Antarctica; "Glacierized areas cover over 15 million square kilometers"; at the maximum of the last ice age "glaciers covered about 32 percent of the total land area"; "There are over 200,000 glaciers distinct from the ice sheets".
 
@@ -8299,3 +8299,53 @@ The sources of the lithosphere's thermal state (gap 4; `lithosphere-thermal-stat
 - Access: paywalled.
 - Library: not kept.
 - Read so far (by the project): abstract (Crossref), 2026-10-23: Kaapvaal lithosphere "between 200 and 270 km, with most values between 210 and 250 km", basal heat flow "between 12-16 mW m−2"; "Because of its large thickness and thermal relaxation time, Archean lithosphere cannot be in thermal equilibrium".
+
+### Marcilly2022
+- Reference: Marcilly, C. M., Torsvik, T. H. and Conrad, C. P. (2022). Global Phanerozoic sea levels from paleogeographic flooding maps. Gondwana Research 110:128-142.
+- DOI or URL: 10.1016/j.gr.2022.05.011 ; https://www.clintconrad.no/papers/Marcilly_etal_GR2022.pdf
+- Cited as: "Marcilly, Torsvik and Conrad 2022", "Marcilly et al. 2022, Table 1" (exposed land and continental crust at 10 Myr steps; the hypsometric slope).
+- Ledger ids: RLC-010, RLC-011, RLC-013, RLC-014, RLC-030, RLC-031 (2026-10-23: Earth's land share and flooded continental crust over the Phanerozoic, the realism checks)
+- Access: open (the author's copy on the Conrad group's page).
+- Library: not kept (the PDF and its two text extractions were scratch files of the 2026-10-23 realism-checks task, outside the repository).
+- Read so far (by the project): the PDF text, 2026-10-23: Table 1 in full (age; continental crust area; modern-day crust area; exposed land area, in 10^6 km2, 0 to 520 Ma at 10 Myr steps) and the paragraph giving the hypsometric slope C = 0.0057 km per 10^6 km2. Values read: exposed land 149.00 at 0 Ma, 94.19 at 80 Ma, 66.95 at 510 Ma; continental crust 210.49 at 0 Ma. The shares in the ledger divide by 510.07 x 10^6 km2 (the project's arithmetic).
+- Reference check: the title, venue and DOI are as printed on the fetched copy. The table's minus signs are a special character that breaks a naive number parse (five rows, 0, 10, 30, 180 and 210 Ma, were skipped by the first parse and read by the second).
+
+### ScoteseWright2018
+- Reference: Scotese, C. R. and Wright, N. (2018). PALEOMAP Paleodigital Elevation Models (PaleoDEMS) for the Phanerozoic. PALEOMAP Project (EarthByte data collection; report and 1 x 1 degree netCDF maps 1 to 88, 0 to 540 Ma).
+- DOI or URL: https://www.earthbyte.org/paleodem-resource-scotese-and-wright-2018/ ; data https://www.earthbyte.org/webdav/ftp/Data_Collections/Scotese_Wright_2018_PaleoDEM/Scotese_Wright_2018_Maps_1-88_1degX1deg_PaleoDEMS_nc.zip
+- Cited as: "Scotese and Wright 2018 PaleoDEMs" (the report's own citation line: "Scotese, C.R., and Wright, N., 2018. PALEOMAP Paleodigital Elevation Models (PaleoDEMS) for the Phanerozoic PALEOMAP Project").
+- Ledger ids: RLC-003, RLC-012, RLC-014, RLC-020, RLC-040, RLC-041, RLC-051 (2026-10-23: the census's land measures run on Earth's own paleo-elevation maps)
+- Access: open; Creative Commons Attribution 4.0 (the License.txt that comes in the data folder).
+- Library: not kept (scratch copies in /tmp of the 2026-10-23 task; the data reproduce from the URL and tools/review/earth-paleodem.py).
+- Read so far (by the project): the report's text, 2026-10-23, for its caveats: a "first draft", the highest elevations "likely overestimated", maps built in two phases that are not homogeneous. The data were used, not only read: 109 maps, 0 to 540 Ma every 5 Myr, run through the census's helpers by tools/review/earth-paleodem.py with a present-day SRTM15+ control (Tozer2019). The 0 Ma map and the control agree (land 0.276 against 0.291; largest landmass 0.156).
+- Reference check: the report names itself the source of the 120 paleogeographic reconstructions (117 Phanerozoic, 3 Precambrian) and says the DEMs were produced in two phases; it gives no uncertainty per map. A land bridge of one 1 degree cell joins two landmasses, so the largest-landmass measure jumps between neighbouring maps (80 Ma 0.070, 240 Ma 0.363).
+
+### Condie2015
+- Reference: Condie, K., Pisarevsky, S. A., Korenaga, J. and Gardoll, S. (2015). Is the rate of supercontinent assembly changing with time? Precambrian Research 259:278-289. The title is `from-memory`; the authors, journal, volume and pages are as RLC-071 and PLT-157 record them.
+- DOI or URL: not checked.
+- Cited as: "Condie 2015, Precambrian Research 259" (collision frequency through time; a rate of about six collisions per 100 Myr within a range of one to twenty).
+- Ledger ids: RLC-002, RLC-071, RLC-072, RLC-075 (2026-10-23: the collision rate as a realism check)
+- Access: the abstract was reachable from repository pages; the full-text PDF host (people.earth.yale.edu) did not resolve from the laptop, curl and the fetch tool alike.
+- Library: not kept.
+- Read so far (by the project): abstract only, 2026-10-23: craton collisions peak at 1850 and 600 Ma, less at 1100 and 350 Ma, and are "very low" over 150 to 0 Ma; not related to supercontinent assembly. The figures "about one to 20 per 100 Myr, with an average of six" come from a search-engine extract recorded in PLT-157 and were NOT found in the pages read: RLC-072 carries them `cited-unverified`. The proposed M7 ceiling of 6 leans on them, so reading the full text is the first open item of the realism-checks page.
+- Reference check: not done; no copy of the paper was read.
+
+### Macdonald2019
+- Reference: Macdonald, F. A., Swanson-Hysell, N. L., Park, Y., Lisiecki, L. and Jagoutz, O. (2019). Arc-continent collisions in the tropics set Earth's climate state. Science 364:181-184. The full author list is `from-memory`; the title, journal, volume and pages are as PLT-157 records them.
+- DOI or URL: 10.1126/science.aav5300 (from memory, not checked); the analysis code and data are on GitHub as Swanson-Hysell-Group/Arc_Continent_Analysis (from memory, the repository was not opened).
+- Cited as: "Macdonald et al. 2019" (arc-continent sutures per 100 Myr and the Phanerozoic peaks of total suture length).
+- Ledger ids: PLT-157; RLC-073 (2026-10-23: the literature's collision counts are for a different object than the model's)
+- Access: paywalled at Science; the copy that was read is the one PLT-157 records (the full text was read by the 2026-10-22 research agent and again in the first pass of the 2026-10-23 realism-checks task).
+- Library: not kept.
+- Read so far (by the project): in full: six peaks of total suture length in 540 Myr for the major orogenies (about 1.1 per 100 Myr) and 15 to 46 ophiolite-bearing arc-continent sutures per 100 Myr (Paleozoic 44 in 290 Myr, Mesozoic 32 in 185, Cenozoic 30 in 65). RLC-073 uses these only to say they count sutures, not the model's terranes of at least 3.64 million km2 that end in a weld, so they bound nothing.
+- Reference check: not done by the realism-checks task.
+
+### WikipediaRealismChecks2026
+- Reference: Wikipedia (read 2026-10-23, tertiary sources and said to be): Last Glacial Maximum; Ice sheet; Greenhouse and icehouse Earth; Late Paleozoic icehouse; Caledonian orogeny; Variscan orogeny; Uralian orogeny; Cimmerian Plate; Alpine orogeny; Indian Plate; Arabian Plate. (The Indosinian orogeny page returned 404 and was not used.)
+- DOI or URL: https://en.wikipedia.org/wiki/<page title> for each of the above.
+- Cited as: "Wikipedia" in the realism-checks rows, never as the only source of a number that sets a band.
+- Ledger ids: RLC-013, RLC-060, RLC-061, RLC-062, RLC-070, RLC-074 (2026-10-23)
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): the pages above, in full or in the sections named in the rows: the land under ice today and at the Last Glacial Maximum (25 to 32 percent of the land, by figure), the greenhouse and icehouse intervals of the Phanerozoic, and the dates of the main collisions the writer's from-memory count of M7 leans on. Zachos et al. 2001 was cited by these pages and not read.
+- Reference check: the greenhouse and icehouse interval list is inconsistent inside its own page (RLC-062); no band edge rests on it.
