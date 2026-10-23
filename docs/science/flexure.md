@@ -5,9 +5,10 @@ their sources (ISO-041, ISO-042, ISO-048); the rest are marked in the ledger as 
 uncited, or game choices. The measurements are from small ensembles of four runs; two of them
 were made before the last change of one constant (see "Earth against the mod"). Updated 2026-10-18
 for the polar holes (ISO-056 rewritten, ISO-074 to ISO-076 added; six runs), and 2026-10-22 for
-the settling's feedback (ISO-061 rewritten, ISO-091 to ISO-093 added; twelve runs a side).
+the settling's feedback (ISO-061 rewritten, ISO-091 to ISO-093 added; twelve runs a side), and
+2026-10-23 for the release's pace (ISO-099 added, ISO-056 amended).
 
-Ledger ids on this page: `ISO-040` to `ISO-077`, `ISO-088`, `ISO-091` to `ISO-093` (see
+Ledger ids on this page: `ISO-040` to `ISO-077`, `ISO-088`, `ISO-091` to `ISO-093`, `ISO-099` (see
 [ledger/ISO.md](ledger/ISO.md)).
 
 ## What you see in the world
@@ -43,7 +44,9 @@ and the spreading of over-thick crust.
    about 1.45 times GDH1).
 2. **The stiffness.** The effective elastic thickness `Te` says how thick the stiff part of the
    shell is. Ocean floor stiffens with age. Continental crust is weak just after mountain
-   building and stiffens over a few hundred million years. Volcanic arcs and rifts are weak. The
+   building and stiffens over a few hundred million years. Volcanic arcs and rifts are weak. A
+   plate that the law weakens (an orogeny, an arc, a rift reaching it) has to warm first and
+   weakens over tens of millions of years ("The release's pace"). The
    boundary between two plates is a break: one plate does not hold the other up.
 3. **The solve.** The shell is treated as a thin elastic plate floating on a fluid. The plate
    carried from the last step is in balance with the load it carries; the stage solves only for
@@ -406,9 +409,11 @@ Added 2026-10-23 (ISO-099), after the savanna pit (build log 2026-10-23, "Savann
 in the last three steps at the L1 cell (396, 231): its regime went from craton to back-arc, the
 plate let go of 2,047, 1,216 and 1,025 m of held load (ISO-056; the sea's share of it −43 m), and
 the floor fell 4.3 km in 6 Myr, with `plates/thickness_m` going from 38.6 to 27.6 km over the last
-40 Myr. The `basins` measure counts 115 to 138 closed basins deeper than 10 blocks a run on the
-base, 80 to 92 of them with their floor under sea level. Earth's lowest dry land, the Dead Sea's
-shore, is about 430 m below the sea.
+40 Myr. On the pool's base runs (12, both starts, 1,000 Myr) the `basins` measure counts 61 to 246
+closed basins deeper than 10 blocks (350 m) a run, median 116, and 33 to 145 of them, median 81,
+with their floor under sea level. Earth's lowest dry land, the Dead Sea's shore, was 433 m below
+the sea in October 2018 (Vey et al. 2021, full text), and it is low because the lake is drying, not
+because the plate let go.
 
 **The cause.** The release itself is the right kind of thing: a plate that weakens stops holding
 up what it held, and the ground goes towards local isostasy (ISO-056). Its pace was not. The law's
@@ -419,31 +424,45 @@ law's clock restarts, and `Te` went from the craton's 80 km to the floor's 5 km 
 `D` fell to (5/80)³ = 0.0002 of itself, and nearly all the load the craton held came loose at once
 (over three steps here, as the smoothed `Te` of the neighbouring cells followed).
 
-**What Earth does.** A plate loses strength when its interior warms, and heat crosses the
-lithosphere by conduction. The time that sets the pace is the lithosphere's thermal time
-constant, `τ = a² / (π² κ)`: 62.8 Myr for a plate a = 125 km thick (McKenzie 1978, Table 1, read
-in full text; the same `τ` the plate model's thin sheet uses for an orogen's strength, PLT-415).
-The viscous relaxation of the elastic layer once it is warm is faster (about 1 Myr, Beaumont 1978,
-abstract), so it does not set the pace: the plate cannot let go of a load before it is warm
+**What Earth does.** A plate loses strength when its interior warms (Te follows the depth of
+the 300 to 600 °C isotherms, Watts & Zhong 2000, full text), and heat crosses the lithosphere by
+conduction. The time that sets the pace is the lithosphere's thermal time constant,
+`τ = a² / (π² κ)`: 62.8 Myr for a plate a = 125 km thick (McKenzie 1978, Table 1 and eq. 6, read
+in full text; Parsons & Sclater's sea-floor cooling constant, the same 62.8; the same `τ` the
+plate model's thin sheet uses for an orogen's strength, PLT-415). "The thermal effect of
+extension decays with a time constant of ~50 m.y." (Hyndman, Currie & Mazzotti 2005, full text).
+The viscous relaxation of the elastic layer is faster: most of it within 1 to 2 Myr of loading,
+with small changes out to 100 Myr (Watts & Zhong 2000), a fitted 10^6 yr in Beaumont 1978
+(abstract). So it does not set the pace: the plate cannot let go of a load before it is warm
 enough to flow. The plate model itself lets an orogen's heat flow decay over 60 Myr
-(`plates/mod.rs`).
+(`plates/mod.rs`). Faster routes exist where the mantle does the work: `τ` goes as the plate's
+thickness squared, so a back-arc's 50 to 60 km lithosphere (Currie & Hyndman 2006) re-equilibrates
+in 10 to 15 Myr, and models remove a back-arc's lower lithosphere by convection in 5 to 10 Myr,
+most of the thinning "within 30 Ma of subduction initiation" (Currie, Huismans & Beaumont 2008,
+full text). One `τ` for every plate is the model's simplification (ISO-099).
 
 **The fix.** The plate holds a law's `Te` of its own, carried with its crust (`FlexState::te_law_km`,
 as a logarithm like the rigidity, ISO-075). Each step, where the law gives a lower `Te` than the
 plate held, the plate's `Te` relaxes towards it as `e^(−dt/τ)` (`FlexureParams::te_weakening_myr`,
 62.8 Myr; `weakened_te_km`): a 2 Myr step closes 3.1 % of the gap, so the craton above goes from
-80 to 77.7 km and lets go of 9 % of its held load, not 100 %. Where the law gives more, the plate
+80 to 77.7 km and lets go of about 9 % of its held load, not nearly all of it. Where the law gives more, the plate
 takes it at once, stress-free, as before (ISO-056). The break at a plate boundary (ISO-055) is
 mechanical, not thermal, and stays at once. `te_weakening_myr = 0` is the old rule. Unit test
 `a_plate_the_law_weakens_lets_go_as_it_warms`: a belt on a craton the law weakens lets go of a
 few per cent of the instant release in the first step and stands where the instant rule put it
 after eight time constants.
 
-**Does the surface's sediment fill it?** Yes, as far as sediment reaches it. A closed basin is a
+**Does the surface's sediment fill it?** As far as sediment reaches it. A closed basin is a
 lake in the surface stage (`pflood`: ground under sea level that the open sea does not reach is
 land) and a lake keeps all the sediment that reaches it up to its room, settling it over its whole
 floor (HYD-110, `spl.rs`); land nothing drains keeps everything. What it gets is what its
-catchment erodes. (Measured: to come.)
+catchment erodes, so the fill is limited by supply, not by the rules. On Earth a basin that opens
+inside a continent with big rivers does fill as it goes: in the Pannonian basin "Sediment
+accumulation rate was significantly higher than the subsidence rate during Late Miocene time",
+and its plain now stands 90 to 120 m above the sea on up to 700 m of Plio-Quaternary strata
+(Horváth & Cloetingh 1996, full text), although by simple isostasy its thin crust "should be well
+below the sea level" (Horváth et al. 2015, full text: the basin is "over-elevated"). (Measured:
+to come.)
 
 **Measured.** (to come)
 
@@ -473,10 +492,16 @@ catchment erodes. (Measured: to come.)
 - Single cells still change by 5 to 10 km in a step (2.5 to 5 mm/yr), by the fluvial step, marine
   fill, the glacial step and the flexure: within the fastest rates measured on Earth, above what a
   region sustains over 2 Myr ("The polar holes", "What is left"). Not checked process by process.
-- The rule for a plate that weakens lets go at once, within the step. Relaxation takes about a
-  million years (Beaumont 1978, abstract); Watts & Zhong 2000 (abstract) find oceanic plates
-  elastic on long timescales, which is the stiffening side. That the share let go is `1 − r` of
-  the load held is the agent's rule, from the two limits; no source states it.
+- A plate that weakens lets go of what it held as its `Te` falls (ISO-056), and since 2026-10-23
+  the law's `Te` falls over the lithosphere's thermal time constant (ISO-099, "The release's
+  pace"), not in the step. That a plate's `Te` follows the law's value as a single exponential at
+  McKenzie's 62.8 Myr is the agent's simplification of a warming geotherm (a real one warms from
+  below first, and its `Te` would fall slowly, then faster); no source gives the curve. The
+  viscous relaxation once the plate is warm takes about a million years (Beaumont 1978,
+  abstract); Watts & Zhong 2000 (abstract) find oceanic plates elastic on long timescales, which
+  is the stiffening side. That the share let go is `1 − r` of the load held is the agent's rule,
+  from the two limits; no source states it. The break at a plate boundary (ISO-055) still lets go
+  at once.
 - The recovery law of continental `Te` (ISO-051) has no source for its form or its 300 Myr.
 - Densities (ISO-043 to ISO-047) are uncited, and the model uses three different crust densities
   elsewhere (see [isostasy-and-height-limit.md](isostasy-and-height-limit.md)).
