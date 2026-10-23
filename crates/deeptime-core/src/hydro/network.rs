@@ -111,6 +111,32 @@ pub struct Lake {
     pub cell: u32,
 }
 
+/// A river that reaches the open sea, with what the delta stage reads of it ([`super::delta`]).
+#[derive(Clone, Debug)]
+pub struct SeaMouth {
+    /// Its chain in [`Output::rivers`] (the main stem: at every junction the larger donor).
+    pub chain: u32,
+    /// Its last land cell and the sea cell it runs into.
+    pub root: u32,
+    pub sea: u32,
+    /// Discharge, m³/s, and drainage area, km², at the root.
+    pub q: f64,
+    pub area_km2: f64,
+    /// The catchment's highest ground, 1/16 block: over every cell whose receivers lead to the
+    /// root (a terminal lake's basin included).
+    pub max_raw: i16,
+    /// The catchment's mean annual temperature, °C (its cells on every 4th row and column; the
+    /// root's own where none lies there).
+    pub t_mean_c: f64,
+    /// The share of the catchment's cells whose way to the sea crosses a lake (its sediment
+    /// stays there: HYD-131).
+    pub lake_share: f64,
+    /// The main stem's cells, its head first and the sea cell last, and the filled surface on
+    /// each, 1/16 block.
+    pub stem: Vec<u32>,
+    pub stem_fill: Vec<i16>,
+}
+
 /// The network of one raster.
 pub struct Output {
     /// The lake surface per cell, [`NODATA`] elsewhere.
@@ -125,6 +151,8 @@ pub struct Output {
     pub sinks: Vec<u32>,
     pub lakes: Vec<Lake>,
     pub rivers: Rivers,
+    /// The rivers that reach the open sea, in chain order.
+    pub mouths: Vec<SeaMouth>,
     /// Counts and timings for `notes.bake.water`.
     pub stats: Value,
 }
@@ -877,6 +905,7 @@ pub fn run(inp: &Input<'_>) -> Output {
     }
     river_cells.sort_unstable();
     let land = order.len();
+    let catchments = catchments(&g, inp, &order, &state, to);
     drop(order);
     // The level of the sea or lake downstream of a cell, found by walking down from it (and kept
     // for every cell on the way): a lake's level, the sea's, or a sink's own height.
@@ -1130,6 +1159,38 @@ pub fn run(inp: &Input<'_>) -> Output {
         }
     }
     rivers.build_index();
+    // The sea mouths, for the delta stage.
+    let mut mouths: Vec<SeaMouth> = Vec::new();
+    for (k, wk) in walks.iter().enumerate() {
+        let m = wk.cells.len();
+        let sea = wk.cells[m - 1] as usize;
+        if wk.mouth != Mouth::Sea || m < 2 || state[sea] & SEA == 0 {
+            continue;
+        }
+        let root = wk.cells[m - 2];
+        let Some(ct) = catchments.get(&root) else {
+            continue;
+        };
+        let t_mean_c = if ct.t_n > 0 {
+            ct.t_sum / f64::from(ct.t_n)
+        } else {
+            let ru = root as usize;
+            (inp.climate)(ox + (ru % g.w) as i64 * ri, oz + (ru / g.w) as i64 * ri).t_mean_c
+        };
+        mouths.push(SeaMouth {
+            chain: k as u32,
+            root,
+            sea: sea as u32,
+            q: q[root as usize],
+            area_km2: f64::from(area[root as usize]),
+            max_raw: ct.max_raw,
+            t_mean_c,
+            lake_share: f64::from(ct.through_lake) / f64::from(ct.cells.max(1)),
+            stem: wk.cells.clone(),
+            stem_fill: wk.cells.iter().map(|&c| fill[c as usize]).collect(),
+        });
+    }
+    drop(catchments);
     millis.insert("rivers".into(), json!(ms(t)));
 
     // 8. Where the game puts no sea (HYD-100, HYD-102), and what the ground a block or more below
@@ -1211,6 +1272,7 @@ pub fn run(inp: &Input<'_>) -> Output {
         sinks,
         lakes,
         rivers,
+        mouths,
         stats,
     }
 }
@@ -1556,9 +1618,86 @@ fn flood(
     }
 }
 
+/// What the delta stage reads of the catchment of one coastal cell.
+struct Catchment {
+    max_raw: i16,
+    cells: u32,
+    through_lake: u32,
+    t_sum: f64,
+    t_n: u32,
+}
+
+/// The catchment of every land cell that drains straight into the open sea (the cells whose
+/// receivers lead to it), by that cell: its highest ground, its cell count, how many of its cells
+/// drain through a lake, and the mean annual temperature on every 4th row and column (HYD-130,
+/// HYD-131). `order` holds the land cells with every cell after the cell it drains to.
+fn catchments(
+    g: &Grid,
+    inp: &Input<'_>,
+    order: &[u32],
+    state: &[u8],
+    to: impl Fn(usize) -> Option<usize>,
+) -> HashMap<u32, Catchment> {
+    const STEP: usize = 4;
+    let n = g.w * g.h;
+    let (sw, sh) = (g.w.div_ceil(STEP), g.h.div_ceil(STEP));
+    let (ox, oz, ri) = (
+        inp.grid.origin_block_x,
+        inp.grid.origin_block_z,
+        i64::from(inp.grid.r),
+    );
+    let temps: Vec<f32> = (0..sw * sh)
+        .into_par_iter()
+        .map(|s| {
+            let (i, j) = ((s % sw) * STEP, (s / sw) * STEP);
+            (inp.climate)(ox + i as i64 * ri, oz + j as i64 * ri).t_mean_c as f32
+        })
+        .collect();
+    let mut id_of = vec![u32::MAX; n];
+    let mut through = vec![false; n];
+    let mut roots: Vec<u32> = Vec::new();
+    let mut aggs: Vec<Catchment> = Vec::new();
+    for &c in order {
+        let cu = c as usize;
+        let id = match to(cu) {
+            Some(r) if state[r] & SEA != 0 => {
+                roots.push(c);
+                aggs.push(Catchment {
+                    max_raw: i16::MIN,
+                    cells: 0,
+                    through_lake: 0,
+                    t_sum: 0.0,
+                    t_n: 0,
+                });
+                (aggs.len() - 1) as u32
+            }
+            Some(r) => {
+                through[cu] = through[r];
+                id_of[r]
+            }
+            None => u32::MAX,
+        };
+        through[cu] |= state[cu] & LAKE != 0;
+        id_of[cu] = id;
+        if id == u32::MAX {
+            continue;
+        }
+        let a = &mut aggs[id as usize];
+        a.max_raw = a.max_raw.max(inp.elev[cu]);
+        a.cells += 1;
+        a.through_lake += u32::from(through[cu]);
+        let (i, j) = (cu % g.w, cu / g.w);
+        if i % STEP == 0 && j % STEP == 0 {
+            a.t_sum += f64::from(temps[(j / STEP) * sw + i / STEP]);
+            a.t_n += 1;
+        }
+    }
+    roots.into_iter().zip(aggs).collect()
+}
+
 /// Gaussian smoothing of a polyline's interior vertices over ±`half` vertices (σ = half / 2),
 /// two passes; the first and last vertices stay.
-fn smooth(pts: &mut [(f64, f64)], half: usize) {
+pub(crate) fn smooth(pts: &mut [(f64, f64)], half: usize) {
     let sigma = (half as f64 / 2.0).max(0.5);
     let weights: Vec<f64> = (0..=half)
         .map(|j| (-(j as f64).powi(2) / (2.0 * sigma * sigma)).exp())
