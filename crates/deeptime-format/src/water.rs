@@ -657,14 +657,25 @@ mod tests {
         // segment the column sits on is 8 deep. The bed is the deepest floor (HYD-120).
         let c = column(&t, &s, 1024, 9, 0);
         let h = c.river.expect("a channel covers it");
-        assert_eq!((h.seg, h.d), (9, 9.0), "the hit is still the lowest-w, lowest-id segment");
+        assert_eq!(
+            (h.seg, h.d),
+            (9, 9.0),
+            "the hit is still the lowest-w, lowest-id segment"
+        );
         assert_eq!(c.kind, WaterKind::River);
-        assert_eq!((c.top, c.bed), (Some(62), Some(55)), "⌊63 − 8⌋, not ⌊63 − 3.5⌋");
+        assert_eq!(
+            (c.top, c.bed),
+            (Some(62), Some(55)),
+            "⌊63 − 8⌋, not ⌊63 − 3.5⌋"
+        );
         // Upstream, the sloping reach: w 63.55 at x −55 would be lake (see below); at x −25,
         // w 63.25, top block 63, level with the plain's ground (63) at the banks: water and bed go
         // a block down (HYD-123), the bed to ⌊63.25 − 8⌋ − 1.
         let up = column(&t, &s, 1024, -25, 0);
-        assert_eq!((up.kind, up.top, up.bed), (WaterKind::River, Some(62), Some(54)));
+        assert_eq!(
+            (up.kind, up.top, up.bed),
+            (WaterKind::River, Some(62), Some(54))
+        );
         // Into the sea: the channel runs on under the sea's top across ground at 57 (HYD-121).
         let sea = column(&t, &s, 1024, 46, 0);
         assert_eq!(sea.kind, WaterKind::Sea);
@@ -772,9 +783,15 @@ mod tests {
         // Upstream of x 0 (where w crosses 64, in the dip) the water's top is the plain's ground
         // top, flush; downstream a block under it.
         let up = column(&t, &s, 1024, -30, 0);
-        assert_eq!((up.kind, up.top, up.bed), (WaterKind::River, Some(63), Some(62)));
+        assert_eq!(
+            (up.kind, up.top, up.bed),
+            (WaterKind::River, Some(63), Some(62))
+        );
         let down = column(&t, &s, 1024, 30, 0);
-        assert_eq!((down.kind, down.top, down.bed), (WaterKind::River, Some(62), Some(61)));
+        assert_eq!(
+            (down.kind, down.top, down.bed),
+            (WaterKind::River, Some(62), Some(61))
+        );
     }
 
     #[test]
