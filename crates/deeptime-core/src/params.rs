@@ -828,8 +828,6 @@ impl Default for TectonicParams {
             collapse_continent_first: false, // ledger: PLT-391
             collapse_sea_column: false,      // ledger: PLT-412
             collapse_sea_column_max_km: 0.0, // ledger: PLT-413
-            collapse_sheet_viscosity_pa_s: 0.0, // ledger: PLT-414
-            collapse_sheet_strength_myr: 62.8, // ledger: PLT-415
             crust_max_km: 70.0,              // ledger: PLT-258
             crust_channel_km2_myr: 1500.0,   // ledger: PLT-300
             isostasy_relax_myr: 0.004,       // ledger: ISO-078
@@ -838,6 +836,10 @@ impl Default for TectonicParams {
             transition_width_km: 200.0,      // ledger: PLT-262 (km on the model sphere)
             transition_myr: 20.0,            // ledger: PLT-263
             transition_ocean_crust: false,   // ledger: PLT-294 (game-choice; presets set true)
+            // ledger: PLT-414
+            collapse_sheet_viscosity_pa_s: 0.0,
+            // ledger: PLT-415
+            collapse_sheet_strength_myr: 62.8,
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
             continent_elevation_m: [150.0, 900.0],

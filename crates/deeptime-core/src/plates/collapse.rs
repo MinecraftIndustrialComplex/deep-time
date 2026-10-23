@@ -1170,7 +1170,10 @@ pub(in crate::plates) mod tests {
         // 62.8 Myr after its orogeny: e-fold slower.
         s.orogeny_myr = -62.8;
         let older = sheet.rate_per_myr(&s);
-        assert!((older * std::f64::consts::E / e - 1.0).abs() < 1e-3, "{older}");
+        assert!(
+            (older * std::f64::consts::E / e - 1.0).abs() < 1e-3,
+            "{older}"
+        );
         // No orogeny: rigid. The normal column: nothing to give.
         s.orogeny = OROGENY_NONE;
         assert_eq!(sheet.release(&s), 0.0);
@@ -1222,7 +1225,10 @@ pub(in crate::plates) mod tests {
         let none = run(None);
         assert!(none >= t_c - 1.0, "{none}");
         let old = run(Some(-600.0));
-        assert!(old >= t_c - 50.0 && (old - none).abs() < 50.0, "{old} {none}");
+        assert!(
+            old >= t_c - 50.0 && (old - none).abs() < 50.0,
+            "{old} {none}"
+        );
     }
 
     /// With `collapse_continent_first` the crust a belt at the continent's edge releases goes to
