@@ -471,7 +471,7 @@ public final class StructureBurialGameTests {
      * <ul>
      *   <li>a cave's, before the placing: {@code deeptime:planet_nocaves} turns aquifers off, so the biomes' carvers
      *       fill every tunnel they cut under sea level with water, also under the sea floor (52 cells at y -169..-147
-     *       in the buried chamber's boxes at the deepest sea of master 049c4278's planet, CAVEUNDER or more blocks
+     *       in the buried chamber's boxes at the deepest sea of master 049c4278's planet, 34 or more blocks
      *       under the floor; the template wrote over all of them);</li>
      *   <li>the template's own, after it: vanilla's trial chamber templates carry basins ({@code corridor/end_2}: 60
      *       water and 23 waterlogged waxed oxidized cut copper stairs; {@code intersection/intersection_1}: 966
