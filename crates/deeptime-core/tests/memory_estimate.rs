@@ -165,7 +165,8 @@ fn no_stage_holds_more_than_its_estimate() {
         mib(estimate["bake_projection_bytes"].as_u64().unwrap()),
     );
     // The bake's own figure holds too (amp-est, 2026-10-23: it listed 452.6 MB for a projection
-    // pass that held 964.8 MB on quick 16k, and the session keeps the allocator's blocks under it).
+    // pass that held 969.9 MB on quick 16k, and the session keeps the allocator's blocks under it;
+    // on this planet the bake's peak is the projection's top raise, `project::estimate_bytes`).
     let bake_held = peaks.get("bake").copied().unwrap_or(0);
     if bake_held > est_bake {
         over.push(format!(
