@@ -434,18 +434,24 @@ in the first place that is a different story.)"
 **Where the pit comes from.** Not the young landscape and not the amplifier: the pit is in the
 simulation's own surface (L1, 16 blocks a cell) by the end of history, 1.5 to 2 km under the
 sea's level on a plain that stands 0.8 km over it. The per-step parts of the surface's isostatic
-gap at the pit's cell (`surface/gap_*_m`, dumped for the last 20 steps of Ben's seed) put nearly
-all of it in one term, the load a weakened plate lets go (ISO-056, `surface/flexure.rs`): the
-cell's regime goes from craton to back-arc at step 498, the plate's flexural rigidity falls, and
-the released part is -2,047 m, -1,216 m and -1,025 m at steps 498, 499 and 500. The water's part
-is -43 m in each step, so the sea is not loading the hole twice. The law releases
-`(1 - D_now / D_prev)` of the load the stiff plate held, all within a step; a back-arc that
-reheats under a craton sinks, but its basin would fill with sediment and water as it went down
-(the Pannonian basin, a back-arc on old crust, filled and lies about 100 m over sea level; the
-lowest dry land on Earth, the Dead Sea's shore, is about 430 m under it: both from memory). That law
-is the flexure lane's (a peer's branch works in `flexure.rs`), so it is a recommended follow-up,
-not changed here. The census below shows that such basins are common on the planets, not a
-one-off.
+gap at the pit's cell (`surface/gap_*_m`, dumped for the last 20 steps of Ben's seed, steps 481
+to 500, 2 Myr each) put nearly all of it in one term, the load a weakened plate lets go (ISO-056,
+`surface/flexure.rs`): the cell's regime goes from craton to back-arc at step 498, the plate's
+flexural rigidity falls, and the released part is -2,047 m, -1,216 m and -1,025 m at steps 498,
+499 and 500 (-4,389 m over the 20 steps; the surface went from 103 m under the sea to 2,218 m
+under it). The water's part is -43 m over the 20 steps, so the sea is not loading the hole twice.
+The release does not overshoot: the cell's surface stood 3,448 m over its local isostatic level
+at step 496 (`surface/flexure_m`, held up by the stiff plate) and still 460 m over it at step
+500. What the plate had been holding up is a crust that thinned from 38.6 km to 27.6 km in those
+40 Myr (`plates/thickness_m`), most of it while the cell was still a craton. So the pit has a
+physical reason: thinned crust sinks to its isostatic level once the plate no longer holds it, as
+a back-arc basin does. What is not like Earth is the pace and the emptiness: the plate let go of
+3 km of support in three steps, faster than sediment came in, and the hole stays dry; a back-arc
+basin fills with sediment and water as it sinks (the Pannonian basin, a back-arc on old crust,
+filled and lies about 100 m over sea level; the lowest dry land on Earth, the Dead Sea's shore, is
+about 430 m under it: both from memory). The thinning and the release are the plate and flexure
+lanes' (a peer's branch works in `flexure.rs`), so they are a recommended follow-up, not changed
+here. The census below shows that such basins are common on the planets, not a one-off.
 
 **What the amplifier did with them.** The young landscape floods each closed basin to its spill
 point and the amplifier used that lake as the cells it leaves alone; worse, every cell at or
