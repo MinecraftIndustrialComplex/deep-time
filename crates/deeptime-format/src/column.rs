@@ -343,10 +343,15 @@ impl ColumnWorld {
             let mut class: Option<&str> = horizon_at(&horizons, y)
                 .and_then(|h| self.classes.get(usize::from(horizons[h].1)))
                 .map(String::as_str);
-            for b in &near {
-                if let Some(Some(bc)) = self.body_class(b, wx, y, z) {
-                    class = Some(bc);
-                }
+            // Bodies paint in id order and a painted block is no longer the horizon's, so where
+            // two bodies name a class at a block the first by id keeps it, as the game's strata
+            // pass (`StrataPass.paintBodies`) and the workbench's rock views leave it
+            // (docs/science/strata.md, "Bodies are painted where they are").
+            if let Some(bc) = near
+                .iter()
+                .find_map(|b| self.body_class(b, wx, y, z).flatten())
+            {
+                class = Some(bc);
             }
             match rock.last_mut() {
                 Some(run) if run.2.as_deref() == class => run.1 = y,

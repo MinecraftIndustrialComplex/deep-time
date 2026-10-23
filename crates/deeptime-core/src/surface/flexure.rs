@@ -2160,10 +2160,10 @@ pub fn step(
     let mut changes = vec![0.0f64; n];
     // ledger: ISO-120
     // The plate's strength (on by default since 2026-10-23; 0 turns it off). An elastic plate
-    // holds any load; a real one yields where it is bent hard: its elastic thickness falls to about half at
-    // a curvature of 1e-6 per m (Watts & Burov 2003), and no plate on Earth holds more than about
-    // 3 km of rock away from local isostasy (the largest free-air anomalies over held loads,
-    // ISO-093). Where the load a cell's plate holds after the solve, ρ_m (Q + ice − w), passes
+    // holds any load; a real one yields where it is bent hard: its elastic thickness falls to
+    // about half at a curvature of 1e-6 per m (Watts & Burov 2003), and no plate on Earth holds
+    // more than about 3 km of rock away from local isostasy (the largest free-air anomalies over
+    // held loads, ISO-093). Where the load a cell's plate holds after the solve, ρ_m (Q + ice − w), passes
     // that bound, the plate there has yielded: the rest of the load sinks (or rises) under the
     // cell alone, as on a plate with no strength, and the carried plate takes the result as its
     // state (ISO-068). Without it a narrow column the collapse fed crust step after step stood up
@@ -4047,7 +4047,7 @@ mod tests {
         let n = w * h;
         let faces = sphere_faces(h, dx, r_m);
         let sphere = RowMetric::from_sin_faces(&faces, 1);
-        let land = |c: usize| ((c % w) / 64 + (c / w) / 41) % 2 == 0;
+        let land = |c: usize| ((c % w) / 64 + (c / w) / 41).is_multiple_of(2);
         let (d_land, d_sea) = (
             rigidity_per_g(80.0, G),
             rigidity_per_g(2.7 * 60f64.sqrt(), G),
@@ -4056,10 +4056,22 @@ mod tests {
             .map(|c| if land(c) { d_land } else { d_sea })
             .collect();
         let d_y: Vec<f64> = (0..n)
-            .map(|c| if (c / w / 41) % 2 == 0 { d_land } else { d_sea })
+            .map(|c| {
+                if (c / w / 41).is_multiple_of(2) {
+                    d_land
+                } else {
+                    d_sea
+                }
+            })
             .collect();
         let d_x: Vec<f64> = (0..n)
-            .map(|c| if (c % w / 64) % 2 == 0 { d_land } else { d_sea })
+            .map(|c| {
+                if (c % w / 64).is_multiple_of(2) {
+                    d_land
+                } else {
+                    d_sea
+                }
+            })
             .collect();
         let d_one = vec![d_land; n];
         let cr = vec![RHO_MANTLE; n];
