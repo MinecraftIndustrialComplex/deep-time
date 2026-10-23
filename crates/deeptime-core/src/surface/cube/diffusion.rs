@@ -131,6 +131,8 @@ pub struct Workspace {
     ap: Vec<f64>,
     z: Vec<f64>,
     tmp: Vec<f64>,
+    /// `op.cells` is 0..n and `op.cols` the topology's slots (they depend on n only).
+    dense: bool,
     pub(super) hier: Option<Hierarchy>,
 }
 
@@ -141,32 +143,35 @@ fn fit(v: &mut Vec<f64>, n: usize) {
 }
 
 impl Workspace {
-    /// Builds the operator for `kd` and `dt`: every cell (`all`), or the cells with a coupling.
+    /// Builds the operator for `kd` and `dt`: every cell (`all`, or when every cell has a
+    /// coupling), or the cells with a coupling.
     fn build(&mut self, g: &CubeGrid, kd: &[f64], dt: f64, all: bool) {
         let n = g.topology().cells();
         let scale = dt / g.mean_area();
         let mean = g.mean_area();
         let areas = g.areas();
         let op = &mut self.op;
-        op.all = all;
-        if all {
-            op.cells.clear();
-            op.cells.extend(0..n as u32);
-            op.k.resize(n, [0.0; 8]);
-            op.k.par_iter_mut()
-                .enumerate()
-                .for_each(|(c, k)| *k = couplings(g, kd, scale, c));
-            op.cols.resize(n, [NO_CELL; 8]);
-            op.cols
-                .par_iter_mut()
-                .enumerate()
-                .for_each(|(c, s)| *s = *g.topology().slots(c));
+        op.k.resize(n, [0.0; 8]);
+        op.k.par_iter_mut()
+            .enumerate()
+            .for_each(|(c, k)| *k = couplings(g, kd, scale, c));
+        // Every cell with a coupling is the same operator as every cell.
+        let every = all || op.k.par_iter().all(|k| k.iter().any(|&v| v != 0.0));
+        op.all = every;
+        if every {
+            if !(self.dense && op.cells.len() == n && op.cols.len() == n) {
+                op.cells.clear();
+                op.cells.extend(0..n as u32);
+                op.cols.resize(n, [NO_CELL; 8]);
+                op.cols
+                    .par_iter_mut()
+                    .enumerate()
+                    .for_each(|(c, s)| *s = *g.topology().slots(c));
+                self.dense = true;
+            }
         } else {
-            self.full.resize(n, [0.0; 8]);
-            self.full
-                .par_iter_mut()
-                .enumerate()
-                .for_each(|(c, k)| *k = couplings(g, kd, scale, c));
+            self.dense = false;
+            std::mem::swap(&mut op.k, &mut self.full);
             let full = &self.full;
             op.cells.clear();
             op.cells.par_extend(
@@ -245,13 +250,10 @@ pub fn step_in(ws: &mut Workspace, g: &CubeGrid, h: &mut [f64], kd: &[f64], dt: 
     if dt.is_nan() || dt <= 0.0 {
         return 0;
     }
+    // Every cell taking part builds the dense operator, which runs the first guess.
     ws.build(g, kd, dt, false);
     if ws.op.len() == 0 {
         return 0;
-    }
-    if ws.op.len() == g.topology().cells() {
-        // Every cell takes part: the same operator with the first guess.
-        ws.op.all = true;
     }
     run(ws, g, h, CG_TOL_M, false)
 }
@@ -298,8 +300,12 @@ fn run(ws: &mut Workspace, g: &CubeGrid, h: &mut [f64], tol_m: f64, mg: bool) ->
             .enumerate()
             .for_each(|(i, xv)| *xv += kk * op.s[i] / op.mu[i]);
     }
-    for (i, &c) in op.cells.iter().enumerate() {
-        h[c as usize] = x[i];
+    if op.all {
+        h[..l].copy_from_slice(&x[..l]);
+    } else {
+        for (i, &c) in op.cells.iter().enumerate() {
+            h[c as usize] = x[i];
+        }
     }
     iterations
 }

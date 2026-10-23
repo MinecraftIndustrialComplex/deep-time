@@ -310,10 +310,10 @@ fn flood_and_sea_level_are_the_same_turned() {
         vols.push((0..n).map(|c| (filled[c] - h[c]) * a[c]).sum::<f64>());
         // The sea level: a plain at 500 m with a basin 4 km deep and 30° across.
         let mut ground = vec![500.0; n];
-        for c in 0..n {
+        for (c, z) in ground.iter_mut().enumerate() {
             let t = angle(g.unit(c), p.centre);
             if t < r1 {
-                ground[c] = -4000.0 * (1.0 - (t / r1).powi(2));
+                *z = -4000.0 * (1.0 - (t / r1).powi(2));
             }
         }
         levels.push(fill_level_on(&g, &ground, 60.0, 1, FloodMethod::Parallel));
@@ -428,6 +428,56 @@ fn diffusion_converges_on_a_harmonic() {
         eprintln!("cube diffusion n {n}: harmonic step error {err:.3e}");
         assert!(err < 0.3 * last, "n {n}: {err:.3e} after {last:.3e}");
         last = err;
+    }
+}
+
+/// The slope failure's neighbourhood skip changes nothing: the same bits as recomputing every
+/// cell in every iteration, on a pile (few movers) and on a rough sea floor (many), with the
+/// raster's bound and with every iteration after the first taking the skip.
+#[test]
+fn slope_failure_skips_nothing_that_moves() {
+    let g = CubeGrid::new(48, R);
+    let n = g.topology().cells();
+    let deg = std::f64::consts::PI / 180.0;
+    let fp = FailureParams {
+        critical_slope: 1.0e-3,
+        rate: marine::FAILURE_RATE,
+        iterations: marine::FAILURE_ITERATIONS,
+    };
+    let corner = places()[2];
+    let (pile, _) = cone(&g, corner, 15.0 * deg, 3000.0);
+    let floor: Vec<f64> = planet(&g, 5).iter().map(|z| z - 5000.0).collect();
+    for (name, h0, avail0) in [
+        (
+            "pile",
+            pile.iter().map(|z| z - 4000.0).collect::<Vec<_>>(),
+            pile.clone(),
+        ),
+        ("floor", floor.clone(), vec![200.0; n]),
+    ] {
+        let sea = vec![true; n];
+        let run = |dense_above: usize| {
+            let (mut h, mut avail) = (h0.clone(), avail0.clone());
+            let m =
+                failure::slope_failure_with(&g, &sea, 0.0, &fp, &mut h, &mut avail, dense_above);
+            let bits: Vec<u64> = h.iter().chain(&avail).map(|v| v.to_bits()).collect();
+            (m.to_bits(), bits)
+        };
+        // Every iteration dense, the real bound, and every iteration after the first sparse.
+        let (m_all, all) = run(0);
+        assert!(f64::from_bits(m_all) > 0.0, "{name}: nothing moved");
+        for dense_above in [n / 4, n] {
+            let (m, bits) = run(dense_above);
+            let differ = bits.iter().zip(&all).filter(|(a, b)| a != b).count();
+            assert_eq!(
+                differ, 0,
+                "{name}, bound {dense_above}: {differ} values differ"
+            );
+            assert_eq!(
+                m, m_all,
+                "{name}, bound {dense_above}: the metres moved differ"
+            );
+        }
     }
 }
 
@@ -548,10 +598,10 @@ fn stream_power_and_mouth_fill_are_the_same_turned() {
         }
         // The mouth fill: a load into a bowl-shaped sea floor from its deepest point.
         let mut floor = vec![-500.0; n];
-        for c in 0..n {
+        for (c, z) in floor.iter_mut().enumerate() {
             let t = angle(g.unit(c), p.centre);
             if t < 30.0 * deg {
-                floor[c] = -3000.0 + 2500.0 * t / (30.0 * deg);
+                *z = -3000.0 + 2500.0 * t / (30.0 * deg);
             }
         }
         let sea = vec![true; n];
@@ -620,7 +670,7 @@ fn planet(g: &CubeGrid, seed: u64) -> Vec<f64> {
         .map(|_| {
             let d = norm([uni() - 0.5, uni() - 0.5, uni() - 0.5]);
             let k = 1.0 + 5.0 * uni();
-            (d, k, 6.283 * uni(), 1.0 / k)
+            (d, k, std::f64::consts::TAU * uni(), 1.0 / k)
         })
         .collect();
     (0..g.topology().cells())
