@@ -257,7 +257,9 @@ fn a_plain_short_of_the_open_sea_splits_across_the_beach_band() {
         }
     }
     let Some((elev, plains, second)) = found else {
-        panic!("no multiplier gives a plain short of the shelf that splits (mult, row, added): {tried:?}");
+        panic!(
+            "no multiplier gives a plain short of the shelf that splits (mult, row, added): {tried:?}"
+        );
     };
     let main = second
         .mouths
