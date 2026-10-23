@@ -2,8 +2,12 @@
 package com.minecraftindustrialcomplex.deeptime.wrapengine;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
+import com.toroidalworld.api.v1.ToroidalShape;
+import com.toroidalworld.api.v1.ToroidalWorldApi;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -68,6 +72,8 @@ public final class WrapEngine {
         if (net.neoforged.fml.ModList.get().isLoaded("create"))
             NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerAboutToStartEvent.class,
                     e -> com.minecraftindustrialcomplex.deeptime.compat.create.wrap.CreateWrapCompat.init());
+        // The cube on the overworld, from -Ddeeptime.wrapengine.cube=<s> (design §12.3, §12.7).
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerStartedEvent.class, e -> installCube(e.getServer()));
         NeoForge.EVENT_BUS.addListener(LevelTickEvent.Post.class, e -> {
             if (e.getLevel() instanceof ServerLevel sl) {
                 BandManager b = bands(sl);
@@ -98,6 +104,35 @@ public final class WrapEngine {
             if (e.getLevel() instanceof ServerLevel sl && bands(sl) != null)
                 ((WrapLevel) sl).deeptime$setBands(null);
         });
+    }
+
+    /**
+     * On server start, with the flag and {@code -Ddeeptime.wrapengine.cube=<s>} set: the cube on the
+     * overworld, in the mode {@link CubeInstall#decide} picks from its Toroidal World shape.
+     */
+    private static void installCube(MinecraftServer server) {
+        int s;
+        int d;
+        try {
+            s = CubeInstall.side();
+            if (s == 0)
+                return;
+            d = CubeInstall.depth(s);
+        } catch (IllegalArgumentException e) {
+            DeepTime.LOGGER.error("[wrapengine] no cube installed: {}", e.getMessage());
+            return;
+        }
+        ServerLevel overworld = server.overworld();
+        ToroidalShape shape = ToroidalWorldApi.shapeOf(overworld).orElse(null);
+        CubeInstall.Decision dec = shape == null ? CubeInstall.decide(false, false, 0, 0, false, s)
+                : CubeInstall.decide(true, shape.loops(Direction.Axis.X), shape.widthBlocks(Direction.Axis.X), (long) shape.minChunk(Direction.Axis.X) * 16,
+                shape.loops(Direction.Axis.Z), s);
+        if (dec.mode() == CubeInstall.Mode.REFUSE) {
+            DeepTime.LOGGER.error("[wrapengine] no cube installed on {}: {}", overworld.dimension().location(), dec.reason());
+            return;
+        }
+        DeepTime.LOGGER.info("[wrapengine] cube s={} depth {}: {}", s, d, dec.reason());
+        install(overworld, WrapLayouts.cube(CubeLayout.of(s), d, dec.mode() == CubeInstall.Mode.WITH_SLIDES));
     }
 
     /** True when the engine's flag is on (its mixins are woven). */
@@ -213,6 +248,47 @@ public final class WrapEngine {
     public static String stats(ServerLevel level) {
         BandManager b = bands(level);
         return b == null ? "no topology" : b.stats();
+    }
+
+    /**
+     * True when {@code pos} lies within {@link WrapTopology#CORNER_KEEP_OUT} blocks of a cone point of
+     * the level's topology (a cube corner), where seam links are refused (design §12.4; ledger:
+     * SCL-183). False without a topology.
+     */
+    public static boolean nearCorner(Level level, BlockPos pos) {
+        WrapTopology t = topology(level);
+        return t != null && t.nearCorner(pos.getX(), pos.getZ());
+    }
+
+    /**
+     * The names of the edges the level's topology joins, without the pieces' {@code @tw} suffix and
+     * without the engine's own slides: the net edges the border W3 leaves out (design §12.5). Empty
+     * without a topology.
+     */
+    public static java.util.Set<String> joinedEdges(Level level) {
+        WrapTopology t = topology(level);
+        if (t == null)
+            return java.util.Set.of();
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        for (WrapEdge e : t.edges()) {
+            String n = e.name();
+            if (n.endsWith(WrapLayouts.SLIDE))
+                continue;
+            out.add(n.endsWith(WrapLayouts.TW_PIECE) ? n.substring(0, n.length() - WrapLayouts.TW_PIECE.length()) : n);
+        }
+        return java.util.Collections.unmodifiableSet(out);
+    }
+
+    /**
+     * Of a stored position and its band images, the one nearest {@code from} (the position the player
+     * sees: a sign editor, a range check; design §12.8). {@code stored} itself without a topology.
+     */
+    public static BlockPos nearestImage(Level level, BlockPos stored, Vec3 from) {
+        WrapTopology t = topology(level);
+        if (t == null)
+            return stored;
+        int[] q = t.nearestImage(stored.getX(), stored.getZ(), from.x, from.z);
+        return q[0] == stored.getX() && q[1] == stored.getZ() ? stored : new BlockPos(q[0], stored.getY(), q[1]);
     }
 
     /** The raw state in chunk storage at a position, bypassing the fold (what collisions and the client see). */

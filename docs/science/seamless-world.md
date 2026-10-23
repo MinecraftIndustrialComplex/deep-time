@@ -330,6 +330,39 @@ and shape statistics on land; the phase 1 bake measures them on real bakes, repo
 (`docs/research/notes/mountains-and-the-projection.md` §5: land drawn up to 1.92 times its true area
 on the conformal cube, the corners 5.3° or more out at sea).
 
+### The seams joined (the wrap engine; dev-only, E1 and E2 coded 2026-10-22)
+
+The wrap engine (`docs/design/wrap-engine.md` §12) joins the twelve turning net edges so that a
+player walks across them as across any other seam. It is behind `-Ddeeptime.wrapengine=true` and
+installs a cube only with `-Ddeeptime.wrapengine.cube=<s>`; nothing in the shipped game reads it yet.
+
+- **A seam is a motion of blocks.** Each turning seam glues two edges by a grid isometry (a quarter
+  or half turn and a translation), so a block across the seam is an ordinary neighbour of the same
+  size, and the conformal map's two faces agree on the shared edge with a matching derivative (the
+  measurements above). Nothing about the metric jumps (SCL-184).
+- **Toroidal World keeps the east-west slide**; the engine's folds land in its window, with the slide
+  composed in where a seam crosses the window's end (SCL-180).
+- **Bands overlap at F0's corners.** There a block takes the edge it lies least deep beyond, the same
+  rule as the generator's fold, so each corner square splits on its diagonal (SCL-181).
+- **The corners stay cone points.** Three faces meet at each, so a loop round one turns a heading by
+  a quarter turn and no gluing makes it flat; seam links within 2 blocks of a corner are refused
+  (SCL-182, SCL-183).
+- **The band is D = 32 blocks deep** (two chunks; SCL-185).
+- **Block entities show across the seam.** A chest, a sign's text, an end gateway's exit or a
+  suspicious block's brushing side shows in the band where it is drawn, its positions moved and its
+  directions turned by the seam's motion. Reach and the side of a sign are measured from the copy
+  nearest the player (SCL-186).
+
+| Ledger id | Quantity | As coded | Status |
+|---|---|---|---|
+| SCL-180 | seams and motions in TW's frame | 12 edges; F2-top/bottom cut at x = 2s, N-top/S-bottom at x = 0 | `game-choice` |
+| SCL-181 | fold on overlapping bands | least deep edge, ties to the earlier; split chunks; convex corners extended by D | `game-choice` |
+| SCL-182 | corners | 8 cone points of 270°, holonomy a quarter turn | derived |
+| SCL-183 | corner keep-out | K = 2 blocks | `game-choice` |
+| SCL-184 | metric across a seam | grid isometry; faces 2.8e-16 rad apart, derivative jump at most 0.0034 | derived |
+| SCL-185 | band depth | D = 32 (16 in the GameTests) | `game-choice` |
+| SCL-186 | block-entity data in the band | positions move, directions turn; reach from the nearest image | `game-choice` |
+
 ### Simplifications and limits
 
 - **Area near the corners.** The conformal map keeps shapes by giving up area: around each of the
@@ -350,7 +383,8 @@ on the conformal cube, the corners 5.3° or more out at sea).
 - **Borders.** Until the wrap engine joins the turning seams, the net's twelve outer edges are
   borders (N's and S's three outer edges, the tops and bottoms of F1, F2 and F3), and four corners
   lie on them; the border's detours round the empty squares are game work (the plan's G-items), not
-  coded.
+  coded. The wrap engine joins all twelve when it is on (above; dev-only), and the border, when
+  phase 2 builds it, leaves the joined edges out (`WrapEngine.joinedEdges`).
 - **Unread sources.** The conformal map's formulas were written from memory and checked numerically
   (SCL-080); neither Lee 1976 nor Rančić, Purser and Mesinger 1996 was read.
 

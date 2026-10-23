@@ -695,8 +695,8 @@ public final class CubeLayout {
 
     /**
      * The 14 net edges: the two slide edges, then the turning edges in the wrap engine's order
-     * ({@code WrapLayouts.cubeCross}): N-east, F1-top, N-west, F3-top, N-top, F2-top, S-east,
-     * F1-bottom, S-west, F3-bottom, S-bottom, F2-bottom.
+     * ({@code WrapLayouts.cube} builds its edges from these): N-east, F1-top, N-west, F3-top, N-top,
+     * F2-top, S-east, F1-bottom, S-west, F3-bottom, S-bottom, F2-bottom.
      */
     public List<NetEdge> edges() {
         return edges;
