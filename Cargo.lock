@@ -395,6 +395,7 @@ version = "0.0.1"
 dependencies = [
  "deeptime-core",
  "deeptime-format",
+ "deeptime-tiles",
  "jni",
  "rayon",
  "serde_json",

@@ -10,7 +10,7 @@ import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
 /**
- * The base image on the wire: ABGR pixels as four bytes each (A, B, G, R), deflated, cut into
+ * A map picture on the wire: ABGR pixels as four bytes each (A, B, G, R), deflated, cut into
  * parts small enough for one custom payload packet each (a clientbound one carries at most 1 MiB).
  */
 public final class ImageCodec {
