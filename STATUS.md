@@ -140,6 +140,35 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-23: The polar peaks: plate columns 10 to 30 km high were the settling (ISO-078) following an elastic plate that held 10 to 47 km of rock away from local isostasy under columns the collapse kept feeding; the plate's yield (ISO-120, σ_max = Δg_max / 2πG, 2.75 km of mantle at 380 mGal) bounds it, off by default (coordinator's task, brief build/coord/briefs/polar-peaks.md; agent worktree .claude/worktrees/agent-a5fedb29ed22d0cd8, branch worktree-agent-a5fedb29ed22d0cd8 from master bf8477b2; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Trace** (`DEEPTIME_PEAK_TRACE=<m>`, `plates/peaks.rs`, measurement only, off by default; pool arm `pp-trace`, key 81404d9815b5, seeds 1 to 4, both starts, its V1 and guard equal the base's).
+  - 314 lines (a sample above 10 km at a step) over 8 runs, 252 of them continental.
+  - 236 of the continental lines were last raised by the settling, and 188 of the 209 with a known `F` stand at its target (the Airy height plus `F`). `F` quartiles 10.8, 14.3 and 20.1 km, up to 46.9 km; the crust 25 to 40 km thick.
+  - The crust came from the collapse (PLT-412, 799 km summed) and the founder's spread (PLT-277, 274 km). Both judge room by thickness, so a column held 15 km high takes crust as lowland.
+  - Nothing brings them down: the rise guard (PLT-288) measures from the step's start, the 70 km cap (PLT-258) does not reach crust this thin, and `fronts_finish` lowers them within the step only for the settling to restore them.
+  - The poles are not special in kind. The polar rows hold 99 of the 314 lines, 64 of them from one run; without it 14 %, their share of the area. The worst run (scattered 4) peaks at 7 to 16°S.
+  - The flexure's block metric (about 1 / cos⁴ φ too stiff north to south on the polar rows) is noted, not measured.
+  - A second, oceanic kind (ridge and basin samples raised 10 to 16 km by the surface's carry) is not reached by the fix.
+- **Fix:**
+  - `surface/flexure.rs`: `FlexureParams::yield_anomaly_mgal` (0, off), `yield_held_kg_m2`, `G_NEWTON` (CODATA 2022), `YIELDED_GLOBAL`, `StepOut::yielded_cells`. After each solve the held load past σ_max sinks (or rises) under the cell alone, through w, the elevation, the carried state and `released_m`.
+  - `surface/mod.rs`: the count.
+  - Unit test `a_plate_that_yields_holds_no_more_than_its_strength`.
+  - Docs: plates.md "The polar peaks", flexure.md "The plate's yield", ISO-120 (new, `game-choice`), the bibliography (CODATA2022_G; ISO-120 added to four entries), claims.md's counts.
+- **Measured** (pool arm `pp-yield380`, key 08c9d7d679c0, `--set surface.flexure.yield_anomaly_mgal=380 +DEEPTIME_CRUST_BUDGET=1`, seeds 1 to 12, both starts, 1000 Myr, against `base`, master bf8477b2's 24 runs).
+  - The guard's worst: median 13.7 to 13.1 km (p 0.015), largest 30.0 to 15.5 km, runs over 15 km 9 to 1, over 20 km 4 to 0.
+  - The largest one-step fall 9.45 to 7.42 km (p < 0.001), rise 6.99 to 6.52 km (p 0.012).
+  - V1: no criterion moved (every p 0.24 or more); criteria met per run 3.33 to 3.04 (p 0.31). **Does not meet the ship rule**; no criterion's median left its band.
+  - Traced again with the yield (scattered 1 and 4): continental lines 21 to 0 and 133 to 2, the largest `F` 46.9 km to 39 m. What stays above 10 km is the oceanic carry kind (scattered 1, up to 14.7 km at 78°S).
+- **Calls:**
+  - 380 mGal (the Puerto Rico Trench's anomaly, the largest on Earth) as the bound; no other value run.
+  - The bound after the solve, not as a weaker plate: the weaker-plate form failed its test (20.8 km held against 2.7 km).
+  - The collapse's and the founder's room left as they are.
+  - The arms ran at c8134072; the later commits change only comments, docs and formatting (checked with `git diff c8134072 HEAD -- crates`), so no alias was recorded.
+- **Tests** (VM): `cargo fmt --check` clean (after 21dde5e1), `clippy -D warnings` clean, `cargo test --workspace` all passed (deeptime-core 911 passed, 5 ignored). No seed-pinned test moved: the switch is off by default.
+- **Next:**
+  - The coordinator decides the yield's default.
+  - The oceanic carry peaks belong to the surface lane.
+  - The flexure's sphere metric belongs to the flexure lane.
 ### 2026-10-23: The trench rows: the guard's floors 4 to 11 km past the Challenger Deep were depth the plate model's heights already hold, counted a second time by two surface rules; the flexure now books the plate model's moves of the ground as no load (ISO-096), and a trench cell takes the plate model's height plus its carried offset (ISO-097) (coordinator's follow-up to the surface guard; agent worktree .claude/worktrees/agent-af6976f50d4669c4c, branch worktree-agent-af6976f50d4669c4c, master 3fc91491 merged in at 1ae9d358; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Cause** (a scratch trace of the base's scattered continents seed 1, not kept). It had 179 steps with a cell more than 11 km down, of two kinds:
   - 163 steps were ocean floor at the plate model's `z_t` with the flexure's water 2.6 km under it. One example: a gap's floor (3.5 km) that a plate then covered at 10.5 km, its 7 km of new sea loaded as a new load.
