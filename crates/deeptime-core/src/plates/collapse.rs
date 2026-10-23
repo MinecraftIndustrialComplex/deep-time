@@ -1379,7 +1379,11 @@ pub(in crate::plates) mod tests {
             if belt(fx.geo.points()[i]) {
                 n += 1;
                 let want = 135_100.0 - pace * (135_100.0 - t_max);
-                assert!((f64::from(s.thickness_m) - want).abs() < 1.0, "{} vs {want}", s.thickness_m);
+                assert!(
+                    (f64::from(s.thickness_m) - want).abs() < 1.0,
+                    "{} vs {want}",
+                    s.thickness_m
+                );
                 assert_eq!(s.pools[pool::SEDIMENT], b.pools[pool::SEDIMENT]);
             } else {
                 assert_eq!(s, b);
@@ -1388,11 +1392,21 @@ pub(in crate::plates) mod tests {
         let expect = n as f64 * pace * (135_100.0 - t_max) * fx.norm.sample_area_km2();
         assert!((lost - expect).abs() < 1e-3 * expect, "{lost} vs {expect}");
         for step in 2..60 {
-            founder(&mut st, &fx.geo, &fx.env(step), &mut Collapse::default(), 0.0);
+            founder(
+                &mut st,
+                &fx.geo,
+                &fx.env(step),
+                &mut Collapse::default(),
+                0.0,
+            );
         }
         for (i, s) in st.samples.iter().enumerate() {
             if belt(fx.geo.points()[i]) {
-                assert!(f64::from(s.thickness_m) < t_max + 1000.0, "{}", s.thickness_m);
+                assert!(
+                    f64::from(s.thickness_m) < t_max + 1000.0,
+                    "{}",
+                    s.thickness_m
+                );
             }
         }
     }

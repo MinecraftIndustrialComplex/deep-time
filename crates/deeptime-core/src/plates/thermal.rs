@@ -492,7 +492,10 @@ mod tests {
             (l, keel) = advance(l, keel, 0, 2.0);
         }
         let back = (l - 112.5) / (L_COLD_KM - 112.5);
-        assert!((back - (1.0 - (-1.0f64).exp())).abs() < 0.01, "{back} {keel}");
+        assert!(
+            (back - (1.0 - (-1.0f64).exp())).abs() < 0.01,
+            "{back} {keel}"
+        );
     }
 
     #[test]
