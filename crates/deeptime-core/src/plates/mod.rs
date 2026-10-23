@@ -495,13 +495,13 @@ impl PlatesStage {
         // Crust beyond the thickest column goes down; thickened crust that nothing raises any
         // more spreads and gives its area back.
         let mut fell = collapse::Collapse::default();
-        let foundered = collapse::founder(st, &cache.geo, &env, &mut fell);
+        let foundered = collapse::founder(st, &cache.geo, &env, &mut fell, sea);
         book(st, gap_budget::Part::Founder);
         *world
             .globals
             .entry(collapse::FOUNDERED_GLOBAL.to_owned())
             .or_insert(0.0) += foundered / 1000.0;
-        let quiet = collapse::step(st, &cache.geo, &env);
+        let quiet = collapse::step(st, &cache.geo, &env, sea);
         book(st, gap_budget::Part::Collapse);
         fell.sources += quiet.sources;
         fell.moved_km2_m += quiet.moved_km2_m;
