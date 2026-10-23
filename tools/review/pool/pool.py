@@ -602,6 +602,9 @@ def save_arm(name, ctx, runs, a):
         merged = [list(r) for r in runs]
         if old and (old["key"], old["preset"], old["length"], old["argkey"]) == (ctx["key"], ctx["preset"], ctx["length"], ctx["argkey"]):
             merged = sorted({tuple(r) for r in old["runs"]} | {tuple(r) for r in runs})
+        elif old and not a.replace:
+            raise Fail(f"arm {name} is key {old['key']}, {old['preset']}-{old['length']}, argkey {old['argkey']} "
+                       f"(branch {old.get('branch')}, {old.get('updated')}); name this arm differently, or pass --replace")
         elif old:
             say(f"arm {name}: replaces the arm of that name (it was key {old['key']}, {old['preset']}-{old['length']}, argkey {old['argkey']})")
         atomic_write(path, json.dumps({
@@ -910,6 +913,7 @@ def main():
     r.add_argument("--starts", default="supercontinent,scattered_continents")
     r.add_argument("--seeds", default="1,2,3")
     r.add_argument("--rerun", action="store_true", help="delete the cached runs asked for and run them again")
+    r.add_argument("--replace", action="store_true", help="let this run replace an arm of that name on another key or argument set")
     r.set_defaults(fn=cmd_run)
 
     b = sub.add_parser("build")
