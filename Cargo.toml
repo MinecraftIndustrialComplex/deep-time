@@ -25,8 +25,10 @@ deeptime-noddy = { path = "crates/deeptime-noddy" }
 # The GPU compute path (docs/design/gpu-compute.md), behind deeptime-core's `gpu` feature.
 deeptime-gpu = { path = "crates/deeptime-gpu" }
 deeptime-viewer = { path = "crates/deeptime-viewer" }
-# The workbench's "Final world" map renderer behind mic-viewer's TileSource (VWD-18).
-deeptime-tiles = { path = "crates/deeptime-tiles" }
+# The workbench's "Final world" map renderer behind mic-viewer's TileSource (VWD-18). Without its
+# default features here: the JNI library draws the dev map's satellite picture with it and does not
+# link mic-viewer; the CLI turns `tile-source` on.
+deeptime-tiles = { path = "crates/deeptime-tiles", default-features = false }
 # The shared viewer core of Deep Time and mic-rtsim (decisions log 2026-10-21, VW3 and BR-VWD):
 # the HTTP server, server-sent events, the tile cache and the slippy map. MPL-2.0. A git dependency
 # at a pinned commit, as mic-rtsim has it (decisions log 2026-10-21, "vendor mic-viewer or depend on

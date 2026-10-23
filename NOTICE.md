@@ -27,7 +27,9 @@ and contribute no code.
   terms. Its server, tile cache and map core began as Deep Time's own workbench code
   (`watch/http.rs`, `watch/tiles.rs`, `deeptime-viewer`'s PNG encoder and `assets/worldmap.js`),
   which the author relicensed under MPL-2.0 for it. Deep Time links it (`crates/deeptime-cli`,
-  `crates/deeptime-tiles`) and the workbench serves its `map.js`.
+  `crates/deeptime-tiles` with its `tile-source` feature) and the workbench serves its `map.js`.
+  The native library in the mod jar (`crates/deeptime-jni`) uses `deeptime-tiles` without that
+  feature, so it does not link mic-viewer.
 
 ## APIs called (nothing ported, nothing shipped)
 

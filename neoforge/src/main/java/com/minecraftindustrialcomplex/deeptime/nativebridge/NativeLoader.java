@@ -743,7 +743,7 @@ public final class NativeLoader {
                 reason);
     }
 
-    private static synchronized void requireLinked() {
+    static synchronized void requireLinked() {
         if (linkedPath == null)
             throw new IllegalStateException("the Deep Time native library is not linked"
                     + (status != null && !status.isOk() ? ": " + status.summary() : ""));

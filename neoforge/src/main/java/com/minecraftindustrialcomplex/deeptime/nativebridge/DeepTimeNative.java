@@ -5,7 +5,7 @@ import java.nio.ByteBuffer;
 
 /**
  * The native methods of {@code deeptime_jni} (plan §6.1). Package-private: only
- * {@link NativeLoader} and {@link SimSession} call it, and only after {@link NativeLoader} linked
+ * {@link NativeLoader}, {@link SimSession} and {@link NativeWorldMap} call it, and only after {@link NativeLoader} linked
  * the library. Errors arrive as the exceptions of this package (plan §6.3), or as
  * {@link IllegalStateException} for a stale or forged session id,
  * {@link IllegalArgumentException} for a bad argument and
@@ -118,4 +118,16 @@ final class DeepTimeNative {
      * "Columns"). The Java twin is {@code worlddata/Columns}.
      */
     static native String sampleColumn(String worldDataDir, int x, int z);
+
+    /**
+     * A world-data folder drawn as the workbench's Final world draws it (deeptime-tiles'
+     * {@code BakeMap::render_frame}): {@code layer} {@code "sat"} (the satellite look) or {@code "elev"}
+     * over a frame of {@code w × h} pixels whose pixel (i, j) is block (x0 + (i + ½)·s, z0 + (j + ½)·s),
+     * RGBA8 row by row from the north into the direct buffer {@code dstRgba} (at least w·h·4 bytes),
+     * drawn by {@code threads} threads. Returns JSON
+     * {@code {"layer","w","h","zoom","climate","rivers","lakes","ms"}}. Writes nothing to the folder.
+     * See {@link NativeWorldMap}.
+     */
+    static native String renderWorldMap(String worldDataDir, String layer, double x0, double z0, double blocksPerPx,
+                                        int w, int h, int threads, ByteBuffer dstRgba);
 }
