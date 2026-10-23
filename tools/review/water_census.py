@@ -338,15 +338,17 @@ def read_dtr(path: Path) -> tuple[np.ndarray, dict]:
 
 
 def read_rivers(path: Path) -> tuple[np.ndarray, np.ndarray, int]:
-    """`rivers/rivers.dtrv`: the vertices (x, z, w, hw, depth, q) and the chains (first, count)."""
+    """`rivers/rivers.dtrv` (layout 2): the vertices (x, z, w, hw, depth, q) and the chains
+    (first, count, mouth word, into, from)."""
     data = path.read_bytes()
     assert data[:4] == b"DTRV", path
     fixed = struct.unpack_from("<7I", data, 16)
     c, nv, nc = fixed[0], fixed[4], fixed[5]
-    table = 16 + 48
+    assert struct.unpack_from("<I", data, 16 + 48)[0] == 2, f"{path}: river file layout 2 expected"
+    table = 16 + 52
     s = [struct.unpack_from("<QII", data, table + 16 * k) for k in range(4)]
     verts = np.frombuffer(data[s[0][0]:s[0][0] + s[0][1]], dtype="<f4").reshape(nv, 6)
-    chains = np.frombuffer(data[s[1][0]:s[1][0] + s[1][1]], dtype="<u4").reshape(nc, 4)
+    chains = np.frombuffer(data[s[1][0]:s[1][0] + s[1][1]], dtype="<u4").reshape(nc, 5)
     return verts, chains, c
 
 
@@ -380,7 +382,7 @@ def bake_stats(world: Path) -> dict:
     area = 0.0
     length = 0.0
     hw_len = []
-    for first, count, _mouth, _into in chains:
+    for first, count, _mouth, _into, _from in chains:
         v = verts[first:first + count]
         if len(v) < 2:
             continue

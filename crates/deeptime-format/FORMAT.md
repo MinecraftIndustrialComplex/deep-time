@@ -85,6 +85,15 @@ move to a cube"):** written by the Rust side for cube worlds only, while the pol
 stores its grids face by face ("Cube grids"). `deeptime synth --kind cube` writes one; a planet
 bakes to one with `scale.projection` `cube` in its preset or `deeptime run --set scale.projection=cube`.
 
+**The river file's layout 2 (2026-10-23, the deltas; Ben, decisions log 2026-10-22: "Start now,
+format change OK (Recommended)"):** `rivers/rivers.dtrv` carries its own layout number, the last word
+of its fixed block, and both readers refuse any other with `river file layout 1, this reader takes
+layout 2 (bake the world's water again: deeptime hydro)`. Layout 2 adds each chain's `from` (a
+distributary leaves the chain it splits from at a delta; "Rivers"). The world's `format_version` and
+every header's minor are unchanged: 0.7 is the cube world's, so the river file numbers its own
+layouts, as the cube's `layout_version` does. A layout-1 file (no number; 48 fixed bytes, 16-byte
+chains) is recognised by its header length, 128. No file is migrated.
+
 ### Polar and cube worlds side by side (until cube plan phase 2)
 
 Phase 1 of the cube plan writes cube worlds while the game still plays only polar ones, so two
@@ -1563,10 +1572,12 @@ and it adds no physical value: it reads the world data, the key layout of
 ## Rivers (`rivers/rivers.dtrv`, P1-22)
 
 Code `crates/deeptime-format/src/rivers.rs` (Java `worlddata/Rivers`); written by the bake's water
-part (`deeptime_core::hydro`, `bake::water`; plan §8.4). `DTRV` fixed fields (48 bytes): `u32 C, u32
-tile (32), u32 tiles_x (C / tile), u32 tiles_z (2·Zo / tile), u32 V vertices, u32 K chains, u32 E
-index entries, f32 biome_min_width, f32 bank_zone, f32 bank_ratio, 8 reserved bytes`. Sections: 0 V
-vertices of 24 bytes, 1 K chains of 16 bytes, 2 `tiles_x · tiles_z + 1` u32 offsets, 3 E u32 entries.
+part (`deeptime_core::hydro`, `bake::water`; plan §8.4). `DTRV` fixed fields (52 bytes, layout 2):
+`u32 C, u32 tile (32), u32 tiles_x (C / tile), u32 tiles_z (2·Zo / tile), u32 V vertices, u32 K
+chains, u32 E index entries, f32 biome_min_width, f32 bank_zone, f32 bank_ratio, i32 origin_x, i32
+origin_z, u32 layout (2)`. Both readers refuse a layout other than 2 by name (a layout-1 file, whose
+header is 128 bytes long, as layout 1). Sections: 0 V vertices of 24 bytes, 1 K chains of 20 bytes,
+2 `tiles_x · tiles_z + 1` u32 offsets, 3 E u32 entries.
 
 ```text
 vertex                                         chain
@@ -1575,13 +1586,20 @@ vertex                                         chain
 8   4  f32 w: water surface (fills y < w)       8   1  u8 mouth: 0 sea (or the polar edge row), 1 lake, 2 river, 3 seam
 12  4  f32 hw: half-width, blocks (> 0)         9   3  reserved, 0
 16  4  f32 depth at the centre, blocks (≥ 1)    12  4  u32 into: the lake (mouth 1) or chain (2, 3), else u32::MAX
-20  4  f32 q: discharge, m³/s
+20  4  f32 q: discharge, m³/s                   16  4  u32 from: the chain this one leaves (a distributary), else u32::MAX
 ```
 
 Chains are consecutive in the vertex array; **segment s** is vertices (s, s + 1) when both belong to
 one chain. A chain runs downstream from a spring or a lake's outlet (whose first vertex is the lake
 cell feeding it) to its mouth: its last vertex lies in the sea, in lake `into`, or on a vertex of
 chain `into` (a confluence, where the tributary keeps its own width). w never rises along a chain.
+**A distributary** (layout 2, HYD-144) has `from` = the chain it splits from at a delta: its first
+vertex is (x and z bit for bit) a vertex of chain `from` (both readers check it), its last lies in
+the sea, and it carries its own share of the discharge with its own width and depth; the chain it
+leaves runs on with the rest. Readers sample a distributary like any chain: the column rule needs
+nothing new. A projection pass that splits chains carries `from` to the part holding that vertex and
+starts the distributary's first part on that part's point (a distributary whose first part does not
+survive loses its `from`).
 **On a cube world** (format 0.7, mouth 3, SCL-126) a chain that crosses a turning seam of the net
 ("The cube world's layout") is cut there into two chains: the first ends with mouth 3 on the seam,
 `into` the second, whose first vertex is the same planet point on the partner edge (the image of the
@@ -1647,7 +1665,18 @@ as ground a river crosses; chains follow the largest donor; w = max(F − `freeb
 level of the sea or lake downstream); width `width_coef · Q^0.5 · scale.feature_scale.rivers` and
 depth `depth_coef · Q^0.4` (at least 1, at most `max_width_blocks`, `max_depth_blocks`); vertex
 positions smoothed by a Gaussian of half-width `smoothing_blocks` (ends fixed; a tributary's mouth
-on the smoothed vertex it joins). `notes.bake.water`: `enabled`, `method`, `params`,
+on the smoothed vertex it joins). **Deltas** (since "hyd-130", 2026-10-23; docs/science/
+rivers-and-lakes.md "Deltas and distributaries", HYD-130 to HYD-144): between two runs of the
+network, each river reaching the sea builds a delta plain from its BQART sediment load: over the sea
+and beach cells near its mouth, taken in a lobe ahead of the channel, until the volume
+(Nienhuis's area for the load times the channel depth) is spent; the plain's height lies in
+(sea level, sea level + 1] (top block = sea level, falling 1/16 block a step from the mouth to the
+front), its `detail/amplitude` is 0, and the raster **`delta`** (i16, 1/16 block, on the
+`elevation` grid; 0 off the plains) holds what the plain added, which a re-run of the water bake
+takes off first. The second run drains the raised ground, and its main stem across each plain
+splits at the apex (the backwater length upstream of the shoreline) into distributaries (`from`).
+`notes.bake.water.deltas` holds the parameters and `stats.deltas` the counts, areas and the largest
+deltas. `notes.bake.water`: `enabled`, `method`, `params`,
 `width_scale`, `grid`, `halved`, `climate`, `seasons`, `rivers_file`, `rivers_bytes`, `stats`
 (counts, lengths, largest discharge and width, milliseconds per step; since "p1-22b" also
 `lake_share_of_land`, `basins` (candidates, full, below_rim, playa, dry, merged, nested_too_deep),
@@ -1659,8 +1688,8 @@ input `climate/temperature` lies in the frozen band, below −0.45, where the ga
 since "hyd-100" also `below_sea`: `open_km2` (ground at or under sea level the sea reaches),
 `closed_km2`, `closed_share_of_land`, the closed ground's `lake_km2`, `playa_km2`, `dry_km2` and
 `dry_share_of_land`, `lakes_below_sea_level` and their km², and `closed_basin_radius_cells`).
-`method` is "p1-22" in a folder baked before the water balance, "p1-22b" since and "hyd-100" since
-format 0.6; the game does not read it. `notes.bake.water.closed_basin` is `{layer, reach_blocks}`.
+`method` is "p1-22" in a folder baked before the water balance, "p1-22b" since, "hyd-100" since
+format 0.6 and "hyd-130" since the deltas; the game does not read it. `notes.bake.water.closed_basin` is `{layer, reach_blocks}`.
 
 ## Water columns (P1-22)
 

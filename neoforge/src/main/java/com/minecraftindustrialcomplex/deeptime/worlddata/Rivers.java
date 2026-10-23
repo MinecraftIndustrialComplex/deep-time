@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worlddata;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -15,9 +17,17 @@ import java.util.Arrays;
 public final class Rivers {
 
     public static final String FILE = "rivers/rivers.dtrv";
-    static final int FIXED_BYTES = 48;
+    /** The fixed block: 13 words, the last the file's layout (2; Rust {@code rivers::LAYOUT}). */
+    static final int FIXED_BYTES = 52;
     static final int VERTEX_BYTES = 24;
-    static final int CHAIN_BYTES = 16;
+    /** first, count, mouth (u8) and 3 reserved bytes, into, from (layout 2). */
+    static final int CHAIN_BYTES = 20;
+    /** The river file's own layout number (2026-10-23: the chains' {@code from}, the distributaries). */
+    public static final int LAYOUT = 2;
+    /** The header length of a layout-1 file (16 + 48 + 4 sections of 16), refused by name. */
+    static final int LAYOUT1_HEADER_BYTES = 128;
+    /** {@code from} of a chain that leaves no other. */
+    public static final int NO_CHAIN = -1;
     /** The smallest half-width a channel has. */
     public static final double MIN_HALF_WIDTH = 0.71;
 
@@ -29,13 +39,13 @@ public final class Rivers {
     private final float biomeMinWidth, bankZone, bankRatio;
     /** x, z, w, hw, depth, q per vertex. */
     private final float[] x, z, w, hw, depth, q;
-    /** first, count, mouth, into per chain. */
-    private final int[] chainFirst, chainCount, chainMouth, chainInto;
+    /** first, count, mouth, into, from per chain. */
+    private final int[] chainFirst, chainCount, chainMouth, chainInto, chainFrom;
     private final int[] offsets, entries;
 
     private Rivers(int c, int tile, int tilesX, int tilesZ, int originX, int originZ, float biomeMinWidth, float bankZone, float bankRatio,
                    float[] x, float[] z, float[] w, float[] hw, float[] depth, float[] q,
-                   int[] chainFirst, int[] chainCount, int[] chainMouth, int[] chainInto, int[] offsets, int[] entries) {
+                   int[] chainFirst, int[] chainCount, int[] chainMouth, int[] chainInto, int[] chainFrom, int[] offsets, int[] entries) {
         this.c = c;
         this.tile = tile;
         this.tilesX = tilesX;
@@ -55,6 +65,7 @@ public final class Rivers {
         this.chainCount = chainCount;
         this.chainMouth = chainMouth;
         this.chainInto = chainInto;
+        this.chainFrom = chainFrom;
         this.offsets = offsets;
         this.entries = entries;
     }
@@ -64,8 +75,19 @@ public final class Rivers {
         Path path = folder.resolve(FILE);
         if (!Files.isRegularFile(path))
             return null;
-        Sectioned s = Sectioned.read(path, "DTRV", FIXED_BYTES, f -> 4);
+        byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(path);
+        } catch (IOException e) {
+            throw new WorldDataException(path + ": " + e.getMessage(), e);
+        }
+        if (bytes.length >= 8 && bytes[0] == 'D' && bytes[1] == 'T' && bytes[2] == 'R' && bytes[3] == 'V'
+                && ByteBuffer.wrap(bytes, 4, 4).order(ByteOrder.LITTLE_ENDIAN).getInt() == LAYOUT1_HEADER_BYTES)
+            throw layoutRefused(path, "1");
+        Sectioned s = Sectioned.parse(path, bytes, "DTRV", FIXED_BYTES, f -> 4);
         ByteBuffer f = s.fixed();
+        if (f.getInt(48) != LAYOUT)
+            throw layoutRefused(path, Integer.toString(f.getInt(48)));
         int c = f.getInt(0), tile = f.getInt(4), tilesX = f.getInt(8), tilesZ = f.getInt(12);
         int nv = f.getInt(16), nc = f.getInt(20), ne = f.getInt(24);
         ByteBuffer vs = s.section(0), cs = s.section(1), os = s.section(2), es = s.section(3);
@@ -84,7 +106,7 @@ public final class Rivers {
             d[i] = vs.getFloat(a + 16);
             q[i] = vs.getFloat(a + 20);
         }
-        int[] first = new int[nc], count = new int[nc], mouth = new int[nc], into = new int[nc];
+        int[] first = new int[nc], count = new int[nc], mouth = new int[nc], into = new int[nc], from = new int[nc];
         int next = 0;
         for (int k = 0; k < nc; k++) {
             int a = k * CHAIN_BYTES;
@@ -92,12 +114,26 @@ public final class Rivers {
             count[k] = cs.getInt(a + 4);
             mouth[k] = cs.get(a + 8) & 0xFF;
             into[k] = cs.getInt(a + 12);
+            from[k] = cs.getInt(a + 16);
             if (first[k] != next || count[k] < 2 || mouth[k] > MOUTH_RIVER)
                 throw Sectioned.corrupt(path, "chain " + k + " is out of order, short or has an unknown mouth");
             next = first[k] + count[k];
         }
         if (next != nv)
             throw Sectioned.corrupt(path, "the chains do not cover the vertices");
+        // A distributary starts on a vertex of the chain it leaves (Rust Rivers::validate).
+        for (int k = 0; k < nc; k++) {
+            if (from[k] == NO_CHAIN)
+                continue;
+            if (from[k] < 0 || from[k] >= nc || from[k] == k)
+                throw Sectioned.corrupt(path, "chain " + k + " leaves a missing chain");
+            int p = first[k], pf = first[from[k]];
+            boolean on = false;
+            for (int i = pf; i < pf + count[from[k]] && !on; i++)
+                on = x[i] == x[p] && z[i] == z[p];
+            if (!on)
+                throw Sectioned.corrupt(path, "chain " + k + " does not start on a vertex of chain " + from[k]);
+        }
         int[] offsets = new int[(int) tiles + 1];
         for (int t = 0; t <= tiles; t++)
             offsets[t] = os.getInt(t * 4);
@@ -113,7 +149,12 @@ public final class Rivers {
             if (offsets[t] > offsets[t + 1])
                 throw Sectioned.corrupt(path, "the tile offsets decrease");
         return new Rivers(c, tile, tilesX, tilesZ, f.getInt(40), f.getInt(44), f.getFloat(28), f.getFloat(32), f.getFloat(36),
-                x, z, w, hw, d, q, first, count, mouth, into, offsets, entries);
+                x, z, w, hw, d, q, first, count, mouth, into, from, offsets, entries);
+    }
+
+    private static WorldDataException layoutRefused(Path path, String found) {
+        return new WorldDataException(path + ": river file layout " + found + ", this reader takes layout " + LAYOUT
+                + " (bake the world's water again: deeptime hydro)");
     }
 
     public int circumference() {
@@ -136,6 +177,8 @@ public final class Rivers {
     public int chainLength(int k) { return chainCount[k]; }
     public int chainMouth(int k) { return chainMouth[k]; }
     public int chainInto(int k) { return chainInto[k]; }
+    /** The chain this one leaves at its first vertex (a distributary), else {@link #NO_CHAIN}. */
+    public int chainFrom(int k) { return chainFrom[k]; }
 
     /** The tile of canonical column (wx, z). */
     int tileOf(long wx, long z) {

@@ -493,10 +493,11 @@ def read_rivers(world):
     b = open(p, "rb").read()
     assert b[:4] == b"DTRV"
     (c, tile, tx, tz, nv, nk, ne) = struct.unpack_from("<7I", b, 16)
-    table = 16 + 48
+    assert struct.unpack_from("<I", b, 16 + 48)[0] == 2, "river file layout 2 expected"
+    table = 16 + 52
     secs = [struct.unpack_from("<QII", b, table + 16 * k) for k in range(4)]
     v = np.frombuffer(b, dtype="<f4", count=nv * 6, offset=secs[0][0]).reshape(nv, 6)
-    ch = np.frombuffer(b, dtype="<u4", count=nk * 4, offset=secs[1][0]).reshape(nk, 4)
+    ch = np.frombuffer(b, dtype="<u4", count=nk * 5, offset=secs[1][0]).reshape(nk, 5)
     return {"C": c, "v": v, "chains": ch}
 
 
@@ -631,7 +632,7 @@ def part_water(P, out):
     put("rivers/chains", int(len(chains)))
     for stride in (1, 4, 16, 64):
         th, wl = [], []
-        for first, count, _, _ in chains:
+        for first, count, _, _, _ in chains:
             x = v[first : first + count, 0].astype(np.float64)
             z = v[first : first + count, 1].astype(np.float64)
             if count <= stride:
@@ -657,7 +658,7 @@ def part_water(P, out):
     runs = []
     sinu = []
     total = 0.0
-    for first, count, _, _ in chains:
+    for first, count, _, _, _ in chains:
         x = v[first : first + count, 0].astype(np.float64)
         z = v[first : first + count, 1].astype(np.float64)
         dx, dz = np.diff(x), np.diff(z)
@@ -1023,7 +1024,7 @@ def part_pick(P, out):
     if rv is not None:
         v = rv["v"]
         bestrun = (0, 0, 0)
-        for first, count, _, _ in rv["chains"]:
+        for first, count, _, _, _ in rv["chains"]:
             x = v[first : first + count, 0].astype(np.float64)
             z = v[first : first + count, 1].astype(np.float64)
             hd = np.degrees(np.arctan2(np.diff(z), np.diff(x)))

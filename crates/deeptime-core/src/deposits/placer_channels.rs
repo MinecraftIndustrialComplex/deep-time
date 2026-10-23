@@ -535,12 +535,14 @@ mod tests {
             count: 41,
             mouth: Mouth::River,
             into: 1,
+            from: u32::MAX,
         });
         r.chains.push(Chain {
             first: 41,
             count: 40,
             mouth: Mouth::Sea,
             into: u32::MAX,
+            from: u32::MAX,
         });
         r.build_index();
         r

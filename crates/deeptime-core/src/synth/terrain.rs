@@ -360,6 +360,7 @@ impl RiverTest {
             count: n + 1,
             mouth: Mouth::Sea,
             into: u32::MAX,
+            from: u32::MAX,
         });
         let first = r.vertices.len() as u32;
         let m = ((Self::STREAM_TO_Z - Self::STREAM_FROM_Z) / Self::STREAM_SPACING).round() as u32;
@@ -388,6 +389,7 @@ impl RiverTest {
             count: m + 2,
             mouth: Mouth::River,
             into: 0,
+            from: u32::MAX,
         });
         r.build_index();
         r
