@@ -706,14 +706,7 @@ impl PlatesStage {
         }
         book(st, gap_budget::Part::Other);
         rifting::maybe_rift(st, world, &cache.geo, &pos, &env, &balance.stress_mpa)?;
-        rifting::maybe_initiate_subduction(
-            st,
-            world,
-            &cache.geo,
-            &pos,
-            &env,
-            &balance.stress_mpa,
-        )?;
+        rifting::maybe_initiate_subduction(st, world, &cache.geo, &pos, &env, &balance.stress_mpa)?;
         book(st, gap_budget::Part::Rifting);
         lap(&mut clock, "motion_rifting");
 
