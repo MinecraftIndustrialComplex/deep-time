@@ -315,7 +315,16 @@ baked and gets a Lambert layout block.
   continentalness from the depth, Köppen class 31, no wetland; the land's: continentalness from the
   distance to the sea and the nearest agreeing land node's other fields), and every other node is
   left as the resampling wrote it (`notes.bake.projection.biome_land`: `land_biome_under_sea` and
-  `ocean_biome_on_dry_ground`, each `nodes` and `km2`). The first horizon of every stack cell is then raised to
+  `ocean_biome_on_dry_ground`, each `nodes` and `km2`). The ice cover (`climate/ice_cover`) is held with
+  them (after the relief has read it as resampled) and settled by its own extent rule, a land cell
+  ("The ice cover", step 1), on the world's ground (BIO-177): a node the world's sea covers is set to 0,
+  and a node still covered is of the Köppen class EF (BIO-158) whatever the settle gave it
+  (`biome_land`: `ice_cover_off_the_sea` and `ice_cover_class_ef`, each `nodes` and `km2`). After the
+  settle no wetland stands on or beside the world's playas ("The wetland flag", BIO-178): a node holds a
+  playa when a cell of the world's `playa` layer lies in its square, and every node within 20 blocks plus
+  two L2 cells plus one `playa` cell of such a node (the settle's own distance in cells) is dried
+  (`biome_land.playa_dried`: `playa_nodes`, `reach_blocks`, `nodes`, `km2`). The
+  first horizon of every stack cell is then raised to
   the bake's top rule over the world's own terrain (`notes.bake.projection.top_raise`): the stacks
   come from the nearest cell and the terrain from the footprint mean.
 - **Vector data**: rivers (vertices through the projection, x continuous along a chain; a chain
@@ -733,7 +742,8 @@ glaciated ground regardless of biome. The contract between the climate and that 
   climate's ice fields") laid on the L2 cells, in three steps (ledger BIO-082, BIO-157):
   1. **The extent**: an L2 land cell (ground at or above the sea) is a candidate when its nearest L1
      cell carries at least 1 m of ice (as for `climate/glacier`), so the candidates are the climate's
-     own ice cells and no more. Its thickness `t` is the bilinear blend of the L1 thickness over the
+     own ice cells and no more (a Petroff-Guyou world applies the land test again on its own
+     ground in the projection pass, BIO-177). Its thickness `t` is the bilinear blend of the L1 thickness over the
      iced corners only (renormalised over them), so the ice keeps its depth up to its edge instead of
      being blended with the bare cells beside it.
   2. **Its balance**: each candidate has the climate stage's surface mass balance
@@ -795,6 +805,19 @@ flagged cells of that region, and the pack draws its biome there. The verdict
 (`""` when it has none), at the first biome query of a flagged cell, and stored in
 `climate_mapping.json` as `peatland: {erosion, regions, biomes}` so a pack update does not move
 explored biomes; `regions: []` means the pack has none and cold wetland is taiga everywhere.
+
+No wetland stands on or beside a playa (BIO-178). A cell within the reach of a playa whose flag is not 0,
+or whose `climate/erosion` is in vanilla's swamp band E6 with the flag 0, gets the flag 0 and its erosion
+held under E5 as a cold wetland's is (a lower one is kept); any other cell is left alone. The water bake
+does it after it writes `playa`, on every L2 cell within `PLAYA_WETLAND_MARGIN_BLOCKS` (20) blocks of
+ground of a playa cell's block, plus two L2 cells and one water cell (the grids' reach); on the Lambert
+grid the box is 1 / cos φ times as wide in x (a block of ground spans that many grid blocks east-west)
+and wraps across the seam. The projection pass does it again on the world's own L2 cells after its land
+call ("The bake's projection pass"), since the resampling and the land call can carry a swamp's record onto
+the world's playa. A playa is a basin whose water dries off its floor, so a swamp there came from the
+climate's wetness or a neighbour's record, and its trees (a mangrove's roots reach 9 blocks) stood over the
+salt. `notes.bake.water.playa.wetland_cleared` is `{playa_cells, reach_blocks, lambert, nodes}` (`nodes`:
+the cells it changed).
 
 ## Grids
 
@@ -1750,7 +1773,8 @@ lake's top (⌈level⌉ − 1 by the shore rule), at generation (`freeze_top_lay
 **Playas (game side).** `playa` (u8, on the `water_level` grid) holds, for the cells of a playa
 (the floor of a terminal basin whose balance lake is under the lake thresholds: "Rivers"), the
 blocks of salt to lay there (`hydro.playa_blocks`, 2; 0 elsewhere). `notes.bake.water.playa` is
-`{layer, rock_class ("halite"), blocks}`. After the water pass, in every column whose nearest cell
+`{layer, rock_class ("halite"), blocks, wetland_cleared}` (the wetland flag cleared beside the
+playas, "The wetland flag", BIO-178). After the water pass, in every column whose nearest cell
 holds n > 0, `worldgen/PlayaPass` replaces the top n blocks of the ground (not air, fluid or
 bedrock; not under water) with the block the rock palette resolves for `rock_class`, as a stratum
 of that class would be: the pack's rock tags decide it.

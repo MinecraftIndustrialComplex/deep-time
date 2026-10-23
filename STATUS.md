@@ -140,6 +140,30 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-23: The gate's ice and salt: the ice cover is taken off the world's sea and a still-covered node is EF (BIO-177); no swamp on or beside a playa, on the bake's nodes and again on the world's own after the land call (BIO-178) (task gate-ice-salt, agent aecc22cd9a4caccbe, branch from master bf8477b2)
+- **Ice cause** (`iceCoverLaidOnGlaciatedGround`, all five profiles on master 57558f0a: "22 covered columns not of class EF").
+  - Reproduced exactly with that commit's simulation and this branch's bake (planet_world_4k, 8 threads, `deeptime inspect-column` on the test's 16-block grid): 29 covered columns, 22 of class 31.
+  - Those 22 are world sea: 1.4 to 25.9 blocks under sea level 63, hydrology sea, `closed_basin` 0, 49.9 to 64.4 degrees of latitude, 1 to 10 blocks of cover. At (904, -600) the L1 class is EF and the crust oceanic, 11 Myr old.
+  - The cover is laid on the simulation's ground; the Petroff-Guyou footprint takes that young coast under the sea. The class was right, the cover wrong.
+- **Salt cause** (`lakeIceAndSaltFollowTheClimate`, MIC only: mangrove_roots at (-1230, 67, 438) in mangrove_swamp).
+  - The column's world record: playa 2, `closed_basin` 1, class 31, flag 0, erosion 0.6251 (E6) on all four nodes round it (one donor's value).
+  - The playa's own cells 12 to 18 blocks north are flagged swamp, Csa, E6 (19.8 C, 634 mm, aridity index 0.534).
+  - Two routes carry a swamp's record onto the basin: `biomes::map` gives a node it calls sea its nearest land node's erosion, and the land call (BIO-170, BIO-171) gives a node it settles to land the nearest land node's whole record (1,496 world nodes moved from ocean to land). Vanilla puts warm E6 to mangrove swamp whatever the flag.
+  - A first version (water bake only, flagged nodes only) changed 0 nodes on the gate's planet.
+- **Fix:**
+  - `bake/project.rs`: `settle_biome_layers` holds `climate/ice_cover` and, in the land call, sets it to 0 on every node the world's sea covers (`water::sea_covers_height`) and makes every still-covered node EF (notes `biome_land.ice_cover_off_the_sea`, `ice_cover_class_ef`). After the land call it dries every world node within 38 blocks (20 + 2 L2 cells + 1 playa cell) of a node holding a world playa cell (`biome_land.playa_dried`). `BiomeGround` gains `playa`.
+  - `bake/project_cube.rs`: the same on cube worlds.
+  - `bake/biomes.rs`: `dry_node` (the rule: flag set, or erosion in E6 with no flag, goes to flag 0 and erosion under E5), `dry_beside_playas` (bake nodes, now also unflagged E6), `dry_beside_playa_nodes` (world nodes).
+  - `bake/water.rs`: calls `dry_beside_playas` once the playa layer is laid (`water.playa.wetland_cleared`).
+  - Tests: `the_biome_layers_settle_to_the_worlds_sea_rule` (cover cases), `a_playa_clears_the_wetland_beside_it`, `a_world_playa_dries_the_swamp_beside_it`.
+  - Docs: biomes.md "The ice cover off the world's sea" and "No swamp beside a salt flat"; ledger BIO-177, BIO-178; FORMAT.md "The bake's projection pass", "The wetland flag"; claims recount.
+- **Measured** on the gate's planet (57558f0a's simulation, this branch's bake, `build/gate-ice-salt/m575fix.sh`):
+  - Ice: the cover left 87 world nodes (567.2 km2); the world's covered share 0.0015 to 0.0004 (the simulation's 0.0016); no node needed the EF rule.
+  - Salt: the water bake changed 68 nodes (190 playa cells), the projection 63 world nodes (410.7 km2) round 29 playa nodes. The failing column's erosion is now 0.449, flag 0.
+  - Both GameTests on that planet (`-Ddeeptime.gametestOnly`), standalone and MIC: pass. Ice 3 columns, thickest 10, none under water, none of another class. Salt 24 playa columns, all calcite, 2 under a canopy, wrong 0.
+- **Tests:** on the VM at 75cd1791: `cargo fmt --check` and `clippy --workspace --all-targets -D warnings` clean; `cargo test -p deeptime-core` 906 passed, 0 failed, 5 ignored, and its 6 integration tests passed. No pool run (bake only).
+- **GameTests** on the branch's own planet (all 100): standalone, MIC, TerraBlender, EE and EV each 99 of 100 (`build/gate-ice-salt/gt.sh`, code at 75cd1791). Both lane tests pass in all five: the ice test covers 0 columns on this planet, the salt test reads 8 playa columns, all calcite, wrong 0. The one failure in every profile is `buriedChamberStandsUnderTheFloor` (23 waterlogged at (-128, -512)), which fails the same way on bf8477b2 without this branch.
+- **Next:** the coordinator merges. `buriedChamberStandsUnderTheFloor` fails on bf8477b2's planet with or without this branch (23 waterlogged at (-128, -512); its vanilla control has 23 too). On the branch's planet the ice test covers 0 columns, so it is checked only on the gate's planet. Marine ice sheets (ice grounded below sea level) are not drawn.
 ### 2026-10-23: Gap 4, the lithosphere's thermal state (stage 1): each plate sample carries its thermal lithosphere's depth and a keel; heat flow, thermal isostasy, a strength and a backstop from it, every one a switch and off by default; the release pace's heat-flow fault reproduced and fixed; on the pool only the strength moves V1 and it does not meet the ship rule (gap-4 agent, agent-a8b1af85532f6fbc5)
 - **Design first:** docs/science/lithosphere-thermal-state.md (new), written before the code: what each sample carries and what resets it, how the state enters the Airy height, the strength, heat flow (PLT-137), rifted margins with β and McKenzie cooling (stage 2) and root removal on a Rayleigh-Taylor time (stage 3), and the stage order.
 - **Code, by file:**
