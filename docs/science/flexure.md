@@ -4,9 +4,11 @@ Status of this page: written with the feature on 2026-10-02. Three constants wer
 their sources (ISO-041, ISO-042, ISO-048); the rest are marked in the ledger as read from abstracts,
 uncited, or game choices. The measurements are from small ensembles of four runs; two of them
 were made before the last change of one constant (see "Earth against the mod"). Updated 2026-10-18
-for the polar holes (ISO-056 rewritten, ISO-074 to ISO-076 added; six runs).
+for the polar holes (ISO-056 rewritten, ISO-074 to ISO-076 added; six runs), and 2026-10-22 for
+the settling's feedback (ISO-061 rewritten, ISO-091 to ISO-093 added; twelve runs a side).
 
-Ledger ids on this page: `ISO-040` to `ISO-077` (see [ledger/ISO.md](ledger/ISO.md)).
+Ledger ids on this page: `ISO-040` to `ISO-077`, `ISO-088`, `ISO-091` to `ISO-093` (see
+[ledger/ISO.md](ledger/ISO.md)).
 
 ## What you see in the world
 
@@ -32,7 +34,8 @@ and the spreading of over-thick crust.
 
 1. **The loads.** For every cell the stage keeps, moving with the crust, how much weight has been
    added or removed since the start of the run. Each step it adds: the crust the plate model
-   thickened (its uplift), crust moved by spreading, rock eroded or deposited, rock the volcano
+   added or took away (the change of each column's own crust, not its whole rise: a height the
+   plate model moves alone is no load, see "The settling's feedback"), crust moved by spreading, rock eroded or deposited, rock the volcano
    stage laid on top, the change of the sea's depth over the cell, and the land ice the climate
    stage reports. On ocean floor that follows GDH1 (the shipped presets) the sea that fills the
    floor's own cooling is left out: GDH1's depths are those of floor under water, so that water's
@@ -83,7 +86,7 @@ The plate equation, as coded (ISO-040):
 | ISO-043 | Mantle density ρ_m | 3,300 | kg/m³ | none | `uncited` |
 | ISO-044 | Sea water density ρ_w | 1,030 | kg/m³ | none | `uncited` |
 | ISO-045 | Ice density ρ_i | 917 | kg/m³ | none | `uncited` |
-| ISO-046 | Crust thickened behind an uplift `u` | `u / (1 − k)`, `k` 0.818 on land, 0.736 under water | – | Airy isostasy, none cited | `uncited` |
+| ISO-046 | Crust thickened behind an uplift `u` | `u / (1 − k)`, `k` 0.858 on land, 0.793 under water (crust 2,830 kg/m³ since 2026-10-06) | – | Airy isostasy, none cited | `uncited` |
 | ISO-047 | Density of eroded and deposited rock | 2,640 on land, 2,301 under water | kg/m³ | none (keeps ISO-001, ISO-003) | `uncited` |
 | ISO-048 | Oceanic `Te` | 2.7 × √(age in Myr) | km | Calmant et al. 1990 | `verified` |
 | ISO-049 | Oceanic `Te`, at most | 40 | km | Watts & ten Brink 1989 | `abstract-only` |
@@ -104,6 +107,9 @@ The plate equation, as coded (ISO-040):
 | ISO-077 | Two more fast rates | denudation 8 to more than 30 mm/yr (Taiwan), rebound about 10 (Hudson Bay) | mm/yr | Deng et al. 2021, Sella et al. 2007 | `abstract-only` |
 | ISO-061 to ISO-064 | What counts as a load | see the ledger | | none | `uncited`, one `game-choice` |
 | ISO-088 | The sea over GDH1's own deepening | no load: GDH1 is depth under water | m | Stein & Stein 1992; Kominz et al. 1998 (PLT-353) | `cited-unverified` |
+| ISO-091 | Only crust is load | the plate model's crust uplift `u_c`, either sign: load `k_a u_c / (1 − k_a)`; the rest of the uplift and the sea it moves, none | m | none (the plate equation's load is mass, ISO-040) | `uncited` |
+| ISO-092 | The crust uplift | the change of each sample's pools' Airy height over the plate step, with the resampling's accretion and the rate limits' cut | mm/yr | none (the plate model's Airy height, PLT-278 to PLT-282) | `uncited` |
+| ISO-093 | Earth's departure from local isostasy | at most about 2 to 4 km of rock (free-air −380 to +300 mGal at 0.112 mGal/m) | km | Watts et al. 2025, ten Brink et al. 2004, Stern, Cattin et al. 2001, Hunter & Watts 2016, Watts & Burov 2003 | `verified` (measurement only) |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
 ISO-054 and ISO-057 to ISO-060, all `game-choice`.
@@ -288,6 +294,110 @@ code), show which processes make them:
 They partly cancel within the step. Whether each is right at a single 39 km cell over 2 Myr was
 not checked here.
 
+## The settling's feedback
+
+**What was seen.** Under the collapse arms of the high-ground lane (the sea column and the sheet's
+viscosity: `--set tectonics.collapse_sea_column=true --set tectonics.collapse_sea_column_max_km=41.1
+--set tectonics.collapse_sheet_viscosity_pa_s=1e22 --set tectonics.collapse_reach_km=5000`), the
+surface guard (ISO-072) stopped one run in twelve of `earthlike_quick_16k` over 1000 Myr
+(scattered continents, seed 5, at plate step 449), and in four more the guard's worst passed
+35 km. Plate columns stood up to 30 km over their Airy height, at the plate model's ceiling
+(`max_elevation_m`), with the surface's flexure under them at tens of km. On master's base the
+same measure was 3.6 to 10.3 km over the Airy height and the guard's worst 14.5 to 32.3 km.
+
+**The trace.** The stopped run, traced step by step (a scratch patch that printed every clamp,
+plate column and flexure cell, not kept in the code). The flexure `F` (`surface/flexure_m`, how far
+the plate holds the ground from local isostasy) under continental samples passed 5 km at plate
+step 19 and 10 km at step 49; the plate columns' height over their Airy height passed 5 km at
+step 39; the 30 km ceiling first clamped at step 305. One column, a rift sample, over steps 290 to
+299: its crust 36 to 45 km thick and its Airy height 0.7 to 1.9 km, the plate rules left it near
+10 km each step, the settling (ISO-078) moved it to its Airy height plus `F`, the rise guard
+(PLT-288) cut that to 7 km in the step, and the surface took the 7 km as crust thickened:
+7 / (1 − 0.858) = 49 km of crust, its root held up by the plate. `F` grew from 10.5 to 32 km
+over the ten steps. From step 305 polar craton cells (`Te` 80 km) did the same with roots of up
+to 42 km a step, held over 148 to 788 km, and `F` reached 95 km by step 350.
+
+**The cause.** The flexure booked every rise of a building column (continental crust, arcs,
+hotspots) as crust thickened, 1 / (1 − k) times the rise, whatever raised it (ISO-061 until
+2026-10-22), and never booked a fall. The settling moves a height alone, with no crust: to the
+column's Airy height plus `F`. The flexure took the move as new crust, a stiff plate held most of
+its root up, `F` grew, and the next step's settling target with it: a loop whose gain passes one
+on the stiffest plates, ended only by the ceiling's clamp. A column the collapse thinned also kept
+the load of the crust it had lost (only rises were booked), a ratchet in the same direction.
+
+**What Earth does.** A plate holds the ground at most a few km from local isostasy. The largest
+gravity anomalies over flexurally held loads are about +300 mGal over Hawaii (Watts et al. 2025)
+and −380 mGal at the Puerto Rico Trench, the most negative on Earth (ten Brink et al. 2004);
+trenches typically sit about 200 mGal under the isostatic expectation and outer rises about 50
+over it (Stern, "Ocean Trenches"). At 2πGρ = 0.112 mGal per m of rock (ρ 2,670 kg/m³) these are
+1.8 to 3.4 km of rock, and a free-air anomaly is an upper bound on the departure (the moat already
+compensates part of the load). Under the Himalaya the foreland is overcompensated and the high
+range undercompensated (Cattin et al. 2001). What limits it is the plate's strength: an elastic
+plate bent as hard as the trench walls would carry up to 900 MPa (Hunter & Watts 2016), real
+plates yield, and `Te` halves at a curvature of 10⁻⁶ m⁻¹ (Watts & Burov 2003). ISO-093.
+
+**The fix** (ISO-091, ISO-092). Only crust is load. The plate model records for each sample the
+change of its own crust's Airy height over the step (`plates/crust_uplift_mm_yr`: the pools'
+`iso_height` after the step's rules against before, plus the resampling's accretion and the rate
+limits' cut, ISO-092), and the flexure books that, either sign, as crust thickened or thinned. The
+rest of the uplift (the settling, the height rules, the rise guard's hold) moves the ground with
+no load, and the sea it lets in or pushes out is no load either. A thinned column now gives up the
+load of the crust it lost. The plate model keeps its heights; only what the surface's plate is told
+it carries changes. Unit tests `a_height_moved_alone_is_no_load` (on land and under the sea, a 2 km
+rise of a belt 312 km wide on a craton moves the ground 2 km and changes no load) and
+`a_belt_thinned_on_a_stiff_plate_stands_below_its_airy_height` (the mirror of
+`a_belt_on_a_stiff_plate_gets_a_foreland_basin`).
+
+**Measured** (the shared pool, `earthlike_quick_16k`, 1000 Myr, both starts, seeds 1 to 6, 2
+threads, `+DEEPTIME_CRUST_BUDGET=1`; before: master 883a8ef6, source key 54658b9718e7, arms `base`
+and `fg-sheet-master`; after: this fix at 1496d688, key adf36da1f017, arms `fg-base` and
+`fg-sheet`; the sheet arm is the `--set` keys above; `pool.sh table` and the per-run
+`measures/guard.json`). Per run, the guard's worst (km from the sea) and the plate columns' largest
+height over their Airy height (km):
+
+| run | base, before | base, after | sheet, before | sheet, after |
+|---|---|---|---|---|
+| scattered 1 | 15.5, 6.7 | 16.9, 2.8 | 40.6, 29.8 (at the 30 km cap) | 17.1, 6.1 |
+| scattered 2 | 16.9, 3.6 | 19.7, 4.5 | 46.5, 5.3 | 15.7, 5.0 |
+| scattered 3 | 31.3, 6.1 | 15.9, 3.7 | 16.3, 6.3 | 20.2, 3.9 |
+| scattered 4 | 18.5, 4.7 | 15.9, 3.4 | 19.3, 5.2 | 16.2, 5.0 |
+| scattered 5 | 14.5, 4.4 | 15.9, 4.7 | stopped by the guard at step 449 | 14.8, 3.7 |
+| scattered 6 | 32.3, 10.3 | 15.9, 4.3 | 15.9, 8.8 | 21.9, 2.8 |
+| super 1 | 18.0, 4.0 | 15.8, 3.8 | 22.9, 5.0 | 17.3, 3.4 |
+| super 2 | 19.8, 4.6 | 15.9, 3.5 | 25.3, 5.0 | 15.3, 3.1 |
+| super 3 | 19.5, 3.9 | 15.3, 3.2 | 26.8, 4.5 | 16.1, 3.3 |
+| super 4 | 16.5, 5.1 | 18.1, 5.2 | 37.4, 28.0 (28.9 km peak) | 15.7, 3.6 |
+| super 5 | 16.6, 4.6 | 15.4, 3.7 | 35.8, 27.0 (28.4 km peak) | 19.5, 3.8 |
+| super 6 | 17.5, 5.1 | 16.4, 3.7 | 18.3, 4.0 | 16.1, 2.9 |
+
+Medians (Mann-Whitney p against before): on the base the guard's worst 17.8 to 15.9 km (p 0.046),
+the largest height over Airy 4.7 to 3.7 km (p 0.009), the largest rise and fall of a cell in a
+step 11.5 and 14.6 km to 8.2 and 10.9 km; on the sheet arm 25.3 to 16.1 km (p 0.004), 5.3 to 3.6
+km (p < 0.001), 15.3 and 21.5 km to 6.6 and 11.0 km. No run of either arm leaves two Earth reliefs
+or stands a plate column over 8.6 km; the sheet arm's three patches at the cap and its stopped run
+are gone.
+
+The V1 measures of the base do not move (`pool.sh table --base base --arm fg-base`, every p 0.19 or
+more): land 0.300 to 0.292, the largest landmass 0.124 to 0.144, continental crust under the sea
+0.277 to 0.253, land above 2 km 0.271 to 0.245, coast with high ground 0.411 to 0.369, land under
+ice 0.170 to 0.168, collisions per 100 Myr 1.80 to 1.75, criteria met per run (median, mean) 2, 2.25
+to 2.5, 2.17. The sheet arm against the same base after the fix (`--base fg-base --arm fg-sheet`)
+meets 3.5 criteria a run against 2.5 (p < 0.001; 3 against 2 at p 0.063 before the fix): land
+above 2 km 0.157 (p 0.001), ice 0.106, the largest landmass 0.230, but land 0.342, over the band.
+
+**What bounds the offset now.** The load is the crust the column gained, so the plate can hold
+the ground at most k_a T over its Airy height (the whole root held up), and a belt wider than the
+flexural wavelength much less; a height moved without crust cannot raise it again. Over 24 runs the
+largest height over Airy is 2.8 to 6.1 km (median 3.7 km), against Earth's 2 to 4 km of rock from
+its largest gravity anomalies (ISO-093). A strength limit on the plate (a yield envelope that
+lowers `Te` where the plate is bent hard, Watts & Burov 2003) would cut the top of that range; it
+was not added, since no run keeps a column more than 5 km over Airy on more than 0.005 % of its
+samples.
+
+**What is left.** The guard's worst is now 14.8 to 21.9 km from the sea in every run of both arms,
+above Earth's relief (the Challenger Deep, 10.9 km, ISO-071) but no longer growing; which cells
+make it was not traced here.
+
 ## Game choices
 
 - **Flexural lengths are Earth-normalized** (ISO-057): the plate's kilometres are the plate
@@ -344,5 +454,11 @@ By their keys in [bibliography.md](bibliography.md), section "Lithospheric flexu
 - `Guevara2022`, `Govin2020`, `Lidberg2010` (author preprint), `Brothers2009`, `Garzione2008`,
   `XieHeller2009`, `Portenga2011`: full text; `Deng2021`, `Sella2007`: abstracts; fetched
   2026-10-18 by a sub-agent of the polar-holes agent, the values read by the agent (ISO-076).
+- `Watts2025_Hawaii`, `tenBrink2004`, `Stern_OceanTrenches` (proof), `WattsBurov2003`: full text;
+  `HunterWatts2016` (about 200,000 of 279,000 characters, section 8 and Appendix C), `Cattin2001`
+  (about 100,000 of 130,000 characters): most of the text; `McNuttMenard1982`, `GoetzeEvans1979`:
+  abstracts; `Watts1978`, `KarnerWatts1983` and chapter 3 of `TurcotteSchubert_Geodynamics`: full
+  text this time. Read 2026-10-22 by a Sonnet sub-agent of the flexure-guard agent, the
+  quotations in the bibliography (ISO-093).
 
 The sources from `TurcotteSchubert_Geodynamics` to `DeCellesGiles1996_flexure` were read by a sub-agent on 2026-10-02, not by the agent that wrote the code.
