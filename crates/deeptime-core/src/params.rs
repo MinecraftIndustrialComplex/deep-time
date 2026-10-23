@@ -886,9 +886,9 @@ impl Default for TectonicParams {
             cordillera_height_m: 2500.0, // ledger: PLT-050
             trench_half_life_myr: 2.0,   // ledger: PLT-053
             pelagic_m_per_myr: 5.0,
-            sediment_subduction_share: 0.0,          // ledger: PLT-440
-            subduction_erosion_km3_per_km_myr: 0.0,  // ledger: PLT-441
-            subduction_erosion_min_mm_yr: 60.0,      // ledger: PLT-442
+            sediment_subduction_share: 0.0,         // ledger: PLT-440
+            subduction_erosion_km3_per_km_myr: 0.0, // ledger: PLT-441
+            subduction_erosion_min_mm_yr: 60.0,     // ledger: PLT-442
             subduction_erosion_max_sediment_m: 1000.0, // ledger: PLT-442
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
