@@ -1226,6 +1226,17 @@ impl ClimateStage {
                     .filter(|f| f.data.len() == n)
                     .map(|f| f.data.as_slice())
             };
+            // The offset the surface held (`surface.held_offsets`), as its own carry reads it.
+            let held = if self
+                .preset
+                .surface
+                .as_ref()
+                .is_some_and(|s| s.held_offsets)
+            {
+                advect::held_offset(&st.offset_m, ids(crate::surface::field::OFFSET_HELD))
+            } else {
+                None
+            };
             let (carried, _) = advect::carried_elevation(&advect::Carry {
                 w,
                 h: hgt,
@@ -1240,6 +1251,7 @@ impl ClimateStage {
                 gap: ids(crate::plates::l1::GAP_FIELD),
                 prev_gap: ids(crate::surface::field::CRUST_GAP),
                 prev_offset: Some(&st.offset_m),
+                prev_held_offset: held.as_deref(),
                 flags: ids("plates/flags"),
                 regime: ids("regime"),
                 parents: &parents,
