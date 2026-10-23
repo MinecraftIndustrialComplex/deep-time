@@ -370,16 +370,19 @@ fn check_heat_flow(dir: &Path, lo: f64) {
     assert!(hot > 0 && cold > 0, "continents {hot}, ocean {cold}");
 }
 
-/// The release pace (ISO-099) on, with the heat flow's final pass (PLT-469): without the pass a
-/// cell baked 33.7 mW/m², the 229 Myr sea floor's, because crust the rate guard spread onto old
-/// floor after the step's resampling (`collapse::spread`) became continental after the step had set
-/// every sample's heat flow.
+/// The release pace (ISO-099) on, with the heat flow's final pass (PLT-469). Without the pass this
+/// planet (seed 1, 60 Myr) bakes four continental cells under the floor, the lowest 33.5 mW/m² at
+/// (150, 60) (gap 4's scan of seeds 1 to 12 at 60 and 100 Myr, 2026-10-23; at release commit
+/// 1bdacb76 the default seed at 100 Myr baked 33.7 at (159, 11)): crust the rate guard spread onto
+/// old floor after the step's resampling (`collapse::spread`) became continental after the step had
+/// set every sample's heat flow, and kept the sea floor's.
 #[test]
 fn the_release_pace_bakes_continental_heat_flow_with_the_final_pass() {
     let dir = temp_dir("release-pace");
-    let mut v: Value = serde_json::from_str(&small_planet(100.0)).unwrap();
+    let mut v: Value = serde_json::from_str(&small_planet(60.0)).unwrap();
+    v["seed"] = json!(1);
     v["surface"]["flexure"]["te_weakening_myr"] = json!(62.8);
-    v["tectonics"]["heat_flow_refresh"] = json!(false);
+    v["tectonics"]["heat_flow_refresh"] = json!(true);
     run_to_folder(&v.to_string(), &dir);
     check_heat_flow(&dir, 54.9);
     let _ = std::fs::remove_dir_all(&dir);
@@ -390,7 +393,9 @@ fn the_release_pace_bakes_continental_heat_flow_with_the_final_pass() {
 #[test]
 fn the_thermal_state_bakes_its_own_heat_flow() {
     let dir = temp_dir("thermal");
-    let mut v: Value = serde_json::from_str(&small_planet(100.0)).unwrap();
+    // The release-pace fault's planet (the test above).
+    let mut v: Value = serde_json::from_str(&small_planet(60.0)).unwrap();
+    v["seed"] = json!(1);
     v["surface"]["flexure"]["te_weakening_myr"] = json!(62.8);
     v["tectonics"]["thermal_state"] = json!(true);
     v["tectonics"]["thermal_isostasy_m"] = json!(1600.0);
