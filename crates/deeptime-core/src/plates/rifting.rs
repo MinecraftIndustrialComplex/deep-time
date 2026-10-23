@@ -917,9 +917,11 @@ mod tests {
         let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
         let cap = |p: DVec3| p.z > 0.5;
         let initiate_with = |margin_km: f64, seed: u64| -> (PlateState, Vec<DVec3>) {
-            let mut k = TectonicParams::default();
-            k.subduction_initiation_per_myr = 100.0;
-            k.subduction_initiation_margin_km = margin_km;
+            let k = TectonicParams {
+                subduction_initiation_per_myr: 100.0,
+                subduction_initiation_margin_km: margin_km,
+                ..Default::default()
+            };
             let mut state = one_plate(
                 &geo,
                 seed,
@@ -982,9 +984,11 @@ mod tests {
         let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
         let belt = |p: DVec3| p.z > 0.25 && p.z < 0.4;
         let split = |weakness: f64| -> f64 {
-            let mut k = TectonicParams::default();
-            k.rift_warp_rad = 0.0;
-            k.rift_weakness = weakness;
+            let k = TectonicParams {
+                rift_warp_rad: 0.0,
+                rift_weakness: weakness,
+                ..Default::default()
+            };
             let mut state = one_plate(&geo, 7, |p| {
                 let mut s = continental();
                 s.lithosphere_km = if belt(p) { 30.0 } else { 225.0 };
