@@ -139,3 +139,7 @@ The game puts the sea on a column by one test, step 3 of the column evaluator: t
 - **The 35 m band** (HYD-107). A column whose height H lies in (sea level - 1, sea level] has top block sea level - 1, which is not under the line, so it is dry: one block of height, 35 m, of beach flat at the sea's level. The biome bake called all of it ocean, and 5 to 10 % of the land carried an ocean biome on dry ground (92 % of those nodes in the band).
 - **Two grids** (HYD-108). The biome bake decided on the simulation's Lambert L2 grid, the world is a footprint mean on another grid with its own closed flag (HYD-105), so 0.6 to 1.2 % of the land carried a land biome under the sea (a pocket HYD-105 opened to the world's sea, or ground the world averages under the line). The projection pass now re-decides every L2 node with `water::sea_covers_height` on the world's `elevation` and `closed_basin` and settles the nodes that disagree (BIO-170 to BIO-172, biomes.md "The land call on the world's ground"); 0 L2 nodes disagree after, on four earthlike_quick_16k bakes. What is left at the 8-block columns is the sub-node coast (BIO-174, 0.25 to 0.38 % and 0.79 to 1.09 % of the land, a median 2 blocks from the line).
 - **Not on this rule** (HYD-109). `VolcanicBiomes.land`, `GeologyGround.sea`, the fluid picker in `LavaFluids` and the biome census's `land` keep their own thresholds; they answer other questions or measure, and were not changed.
+
+## Navigable rivers and deltas on the D5 world (measured 2026-10-22)
+
+Work in progress: the measurements below are being filled in.
