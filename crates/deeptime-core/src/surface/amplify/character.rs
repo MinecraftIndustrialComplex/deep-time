@@ -729,8 +729,10 @@ fn relief(win: &Win, src: &[f32], lo: &mut [f32], hi: &mut [f32], dst: &mut [f32
 }
 
 /// Applies the character to the window's terrain `z` (m) in place, reading the effective drainage
-/// area `area` (m²), the erodibility `kfac` and the lake footprint. Sea and lake cells are left as
-/// they are; no land cell goes under the sea. Returns the statistics of `core`'s land cells.
+/// area `area` (m²), the erodibility `kfac`, the lake footprint and the basin classes `closed`
+/// (`resample::basin`; empty: all open). Sea and lake cells are left as they are; no land cell
+/// open to the sea goes under it, and closed ground (never sea) has no coast. Returns the
+/// statistics of `core`'s land cells.
 #[allow(clippy::too_many_arguments)]
 pub fn apply(
     win: &Win,
@@ -738,6 +740,7 @@ pub fn apply(
     area: &[f32],
     kfac: &[f32],
     lake: &[u8],
+    closed: &[u8],
     glacier: &[f32],
     s: Scratch<'_>,
     ctx: &CharacterCtx<'_>,
@@ -793,7 +796,9 @@ pub fn apply(
             gj,
         )
     };
-    let is_land = |cell: usize| z[cell] > sea && lake[cell] == 0;
+    let class = |cell: usize| closed.get(cell).copied().unwrap_or(super::resample::basin::OPEN);
+    let is_open = |cell: usize| class(cell) == super::resample::basin::OPEN;
+    let is_land = |cell: usize| !super::resample::wet(z[cell], sea, class(cell)) && lake[cell] == 0;
     // How much of the character a land cell takes: none on rivers and at the coast, nor in the
     // glacial troughs and cirques `glacial.rs` cut (`glacier`: the trough fade, 0–1, a smooth
     // field (`run_tiles`); empty without glaciers): gullies and fold ridges would fight the U.
@@ -805,11 +810,16 @@ pub fn apply(
     let fade = |cell: usize| -> f64 {
         let a_km2 = f64::from(area[cell]) * 1.0e-6;
         let river = smoothstep(a0, a1, a_km2);
-        let coast = smoothstep(
-            0.0,
-            p.coast_blocks.max(1e-6),
-            f64::from(s.smooth[cell]) - sea_y,
-        );
+        // Closed ground has no coast. ledger: AMP-096
+        let coast = if is_open(cell) {
+            smoothstep(
+                0.0,
+                p.coast_blocks.max(1e-6),
+                f64::from(s.smooth[cell]) - sea_y,
+            )
+        } else {
+            1.0
+        };
         (1.0 - river) * coast * (1.0 - glaciated(cell))
     };
     // How much of its change a land cell keeps near a lake: the distance to the nearest lake
@@ -982,7 +992,11 @@ pub fn apply(
         let y_in = f64::from(to_y(z[cell]));
         let dy = (y - y_in).clamp(-p.max_change_blocks, p.max_change_blocks) * lake_fade(i, j);
         let zm = f64::from(sea) + (y_in + dy - sea_y) * mv;
-        *o = (zm as f32).max(sea + 0.05);
+        *o = if is_open(cell) {
+            (zm as f32).max(sea + 0.05)
+        } else {
+            zm as f32
+        };
     });
 
     let mut st = CharacterStats::default();
@@ -1150,6 +1164,7 @@ mod tests {
             &area,
             &k,
             lake,
+            &[],
             &[],
             scratch,
             &ctx,

@@ -10,33 +10,39 @@
 //! the module headers). Their workflow alternates ×2 upsampling with an erosion pass, a thermal
 //! pass and a deposition pass; `kernels.rs` and `thermal.rs` hold the ports and what changed.
 //! Here, per level:
+//! 0. **Water** (`balance.rs`, once, on L2): the bake's hydrology on the young landscape says
+//!    which basins hold a lake (and at what level), which ground below sea level the open sea
+//!    does not reach (closed ground: land, however low) and where each basin it leaves dry
+//!    drains to (its sink). With the hydrology off, the young landscape's spill-full lakes.
 //! 1. **Upsample** ×2 (`resample.rs`): clamped Catmull–Rom terrain, the drainage area the level
-//!    below computed (the erosion pass's prior), the runoff weight and rock erodibility, and the
-//!    footprint of the lakes the young landscape had.
+//!    below computed (the erosion pass's prior), the runoff weight and rock erodibility, the
+//!    lakes' footprint and the closed ground.
 //! 2. **Seed** smooth noise of amplitude `seed_relief · slope · cell size` on the land, so the
 //!    passes have concavities to concentrate flow in below the coarse level's resolution.
 //! 3. **Erode** `erosion_iterations` times: multiple-flow drainage area refined from its prior,
-//!    stream-power incision scaled by the rock's erodibility, sea level the base level, lakes
-//!    left alone.
+//!    stream-power incision scaled by the rock's erodibility, sea level the base level of the
+//!    ground open to the sea, lakes left alone.
 //! 4. **Slump** `thermal_iterations` times: slopes over the critical slope × (0.25 + 0.75 ·
 //!    drama) (`surface.drama`, the editor's slider) shed material downhill.
 //! 5. **Silt** `deposition_iterations` times: the eroded material travels along the flow and
 //!    settles where the capacity falls below the load (valley floors, fans).
-//! 6. **Flood** (`kernels::flood_repair`): every land cell outside the lakes is made to drain.
+//! 6. **Flood** (`kernels::flood_repair`): every land cell outside the lakes is made to drain, to
+//!    the sea, a lake or a dry basin's sink.
 //!
 //! Levels but the last run on the whole raster with `coarse_iteration_factor ×` the iterations
 //! (they are a quarter or less of the cells); the last runs on tiles with a halo so that its peak
 //! memory does not depend on the planet, and its result is the same either way (`tiles.rs`).
 //!
 //! # No new sinks
-//! A cell outside the lake footprint the young landscape had (grown by a cell per level) that
-//! has no strictly lower neighbour is a *new internal sink*; the flood leaves none, and the stage
-//! counts them over the finished tiles (`notes.amplify.sinks`, asserted 0 by the tests).
+//! A land cell outside the lakes and the dry basins' sinks that has no strictly lower neighbour
+//! is a *new internal sink*; the flood leaves none, and the stage counts them over the finished
+//! tiles (`notes.amplify.sinks`, asserted 0 by the tests).
 //!
 //! # Detail layer
 //! `detail.rs`: the local relief × drama, damped along channels, as the u8 layer
 //! `detail/amplitude` that `deeptime:terrain` multiplies a C-periodic noise by (plan §8.2).
 
+pub mod balance;
 pub mod character;
 pub mod glacial;
 #[cfg(feature = "gpu")]
@@ -771,6 +777,8 @@ pub fn level_from_world(world: &WorldState, p: &PlanetPreset) -> Result<Level, C
             .map(|(&m, &g)| if m > 0.0 { g + m } else { resample::NO_LAKE })
             .collect(),
         zs,
+        // Every cell open until the water balance (`balance::apply`) says otherwise.
+        closed: Vec::new(),
     })
 }
 
@@ -947,6 +955,14 @@ impl AmplifyStage {
                 relief.apply(&mut level, &g2, sea)
             }
             None => structure::ReliefStats::default(),
+        };
+        // The water the young landscape holds by the bake's own balance, on the terrain the
+        // ladder starts from (`balance.rs`): its lakes, the closed ground no sea reaches and the
+        // sinks of the basins left dry.
+        let balance_note = {
+            let g2 = GridDesc::for_planet("L2", c, r.l2_r)?;
+            let hydro = self.preset.hydro.clone().unwrap_or_default();
+            balance::apply(&mut level, &g2, world, &self.preset.scale, &hydro, sea)
         };
         let (gw, gh) = (l3.w as usize, l3.h as usize);
 
@@ -1144,6 +1160,7 @@ impl AmplifyStage {
             "preview": {"w": out.preview.w, "h": out.preview.h, "stride": s},
             "layers": [layer(&files.elevation), layer(&files.amplitude)],
             "structure_relief": relief_stats,
+            "balance": balance_note,
             "volcanoes": {
                 "shaped": shaper.as_ref().map_or(0, volcano::Shaper::len),
                 "l2_cells": volcano_cells,
