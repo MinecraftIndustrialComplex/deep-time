@@ -5667,6 +5667,28 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: the page and its value as read; the authors of the 2022 adjustment are from memory, not checked.
 
+### Snyder1987
+- Reference: Snyder, J. P. (1987). Map Projections: A Working Manual. U.S. Geological Survey Professional Paper 1395. Washington, D.C.: U.S. Government Printing Office. ix + 385 pp.
+- DOI or URL: 10.3133/pp1395; https://pubs.usgs.gov/pp/1395/report.pdf
+- Cited as: "Snyder 1987" (the cylindrical equal-area projection's scale factors)
+- Ledger ids: ISO-127
+- Access: open (USGS).
+- Library (the project's source library, not distributed): not filed; read in the USGS PDF.
+- Read so far (by the project): chapter 10, "Cylindrical Equal-Area Projection" (pp. 76 to 85), chapter 4 (p. 21) and the table footnote on p. 27, by a Sonnet sub-agent of the flexure-faults agent, 2026-10-23, the equations checked on the rendered page image. P. 77, "FORMULAS FOR THE SPHERE": x = R (λ − λ0) cos φs (10-1), y = R sin φ / cos φs (10-2), h = cos φ / cos φs (10-2a), k = 1/h (10-2b), "where φs is the standard parallel (N. or S.), or the Equator in Lambert's original form"; "There is no distortion of area anywhere on the projections"; "the parallels are spaced from the Equator in proportion to the sine of the latitude". P. 21: the scale factor "along the meridian is called h and along the parallel, k".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: title, series and pages from the USGS record.
+
+### Hetenyi1946
+- Reference: Hetényi, M. (1946). Beams on Elastic Foundation: Theory with Applications in the Fields of Civil and Mechanical Engineering. University of Michigan Studies, Scientific Series, Vol. XVI. Ann Arbor: The University of Michigan Press.
+- DOI or URL: https://archive.org/details/in.ernet.dli.2015.73919 (a scan of the 1955 fourth printing)
+- Cited as: "Hetényi 1946" (a uniform load over a finite length of a beam on an elastic foundation)
+- Ledger ids: ISO-127
+- Access: open scan (archive.org, Digital Library of India).
+- Library (the project's source library, not distributed): not filed.
+- Read so far (by the project): chapter 1, pp. 3 to 17, in the scan's text and on page images of pp. 3, 4, 15 and 16, by a Sonnet sub-agent of the flexure-faults agent, 2026-10-23. Eq. (1) EI d⁴y/dx⁴ = −ky + q; λ = (k/4EI)^¼ (eq. f, p. 4); D_λx = e^(−λx) cos λx (eq. h, p. 12). Section 5, "Uniformly Distributed Loading": under the load, "y_C = (q/2k)(2 − D_λa − D_λb)" (7a, p. 15), a and b the distances to the load's two ends; to the left of it "y_C = (q/2k)(D_λa − D_λb)" (8a, p. 16), and to the right the same with a and b exchanged and the sign changed (9a).
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: title, series and publisher from the scan's title page.
+
 ## Force-balance plate motion: sources added in WP-13a (2026-10-02)
 
 ### FaccennaBecker2012
