@@ -249,8 +249,18 @@ and that the model does not have as physics.
   0.98): the yield takes back the strength's gain and keeps its own cut of the guard's worst
   (13.7 to 13.0 km, p 0.033); the strength bounds no load, so it does not replace the yield.
   Thermal isostasy lifts the sea (craton frame) or sinks the start's continents (Hyndman &
-  Currie's). Rifted margins with β (stage 2) and root removal on a
-  Rayleigh-Taylor time (stage 3) are designed, not built.
+  Currie's). Stages 2 and 3 are built, each off by default (PLT-475 to PLT-478): rifted margins
+  drawn by a stretching factor β (crust T_n / β on a smoothstep across the proximal, necking and
+  hyperextended domains, lithosphere and keel L / β, then McKenzie's subsidence from the state;
+  `tectonics.transition_beta`) and root removal (a collision belt's crust over 50 km has its
+  mantle lithosphere drop off to the Moho at 10 Myr, Houseman & Molnar 1997, and the founder
+  sinks at that pace; `tectonics.root_removal`). The diagnosis before them (the `coastset`
+  measure over the base's 24 runs): 0.690 of the high coasts sit at collision belts, 0.085 at
+  rifted margins, so stage 2 can move coast_hi by 0.03 at most; without the collision belts' high
+  coasts it would be 0.094, inside its band. On 8-run arms neither stage moved V1 enough for a
+  final (β with the strength 3.50 criteria a run against the strength alone's 3.38 and the base's
+  3.00 on the same seeds; root removal with the strength 3.25, its largest landmass on the band's
+  floor). The lever for the high coasts is collision belts at open coasts, which is gap 2's.
 
 ### Gap 5: river and delta landforms
 
