@@ -1491,6 +1491,8 @@ pub fn project_folder_cube(
     let mut world_amp: Option<LoadedLayer> = None;
     let mut world_water: Option<LoadedLayer> = None;
     let mut world_closed: Option<LoadedLayer> = None;
+    // The world's playa layer: no swamp beside its salt (BIO-178), after the land call.
+    let mut world_playa: Option<LoadedLayer> = None;
     let mut held_biomes: Vec<Held> = Vec::new();
     let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
     let mut shares = serde_json::Map::new();
@@ -1669,6 +1671,7 @@ pub fn project_folder_cube(
                 "detail/amplitude" => world_amp = Some(world),
                 "water_level" => world_water = Some(world),
                 CLOSED_BASIN => world_closed = Some(world),
+                crate::bake::water::PLAYA_LAYER => world_playa = Some(world),
                 "surface/class_top" => world_class = Some(world),
                 _ => {}
             }
@@ -1698,6 +1701,7 @@ pub fn project_folder_cube(
                 bake_blocks_per_world_block: rs / cube.radius(),
                 elevation: we,
                 closed: world_closed.as_ref(),
+                playa: world_playa.as_ref(),
                 cube: Some((&cm.view, rs)),
             };
             let params = p.biomes.clone().unwrap_or_default();

@@ -1320,6 +1320,8 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     // The world's closed-basin flag (HYD-105's redraw), and the biome layers whose land call waits
     // for it and for the elevation (BIO-170): L2 is resampled before L3 is.
     let mut world_closed: Option<LoadedLayer> = None;
+    // The world's playa layer: no swamp beside its salt (BIO-178), after the land call.
+    let mut world_playa: Option<LoadedLayer> = None;
     let mut held_biomes: Vec<Held> = Vec::new();
     // The world's horizon stacks (entry, descriptor, cells), raised over the world's terrain below.
     let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
@@ -1486,6 +1488,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 "detail/amplitude" => world_amp = Some(world),
                 "water_level" => world_water = Some(world),
                 CLOSED_BASIN => world_closed = Some(world),
+                crate::bake::water::PLAYA_LAYER => world_playa = Some(world),
                 "surface/class_top" => world_class = Some(world),
                 _ => {}
             }
@@ -1516,6 +1519,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 bake_blocks_per_world_block: world_m_h / p.scale.m_per_block_h,
                 elevation: we,
                 closed: world_closed.as_ref(),
+                playa: world_playa.as_ref(),
                 cube: None,
             };
             let params = p.biomes.clone().unwrap_or_default();
@@ -1952,6 +1956,8 @@ pub(crate) struct BiomeGround<'a> {
     pub(crate) elevation: &'a LoadedLayer,
     /// The world's `closed_basin` layer (HYD-105's redraw), if the bake has the hydrology.
     pub(crate) closed: Option<&'a LoadedLayer>,
+    /// The world's `playa` layer, if the bake has the hydrology: no swamp beside its salt (BIO-178).
+    pub(crate) playa: Option<&'a LoadedLayer>,
     /// A cube world's view and the simulation's radius (bake blocks): the land call's fills and
     /// distances run across the faces' seams, on the planet (SCL-122).
     pub(crate) cube: Option<(&'a deeptime_format::cube_map::CubeView<'static>, f64)>,
@@ -2032,26 +2038,66 @@ pub(crate) fn settle_biome_layers(
         });
     let land_nodes = sea.iter().filter(|&&s| !s).count();
     let blocks_per_cell = f64::from(wg.r) * ground.bake_blocks_per_world_block;
-    let settled = match ground.cube {
-        Some((view, rs)) => {
-            let cs = crate::bake::project_cube::CubeSettle::new(&wg, view, rs / blocks_per_cell);
-            biomes::settle_to_ground_by(
-                &mut cells,
-                &sea,
-                &depth_m,
-                blocks_per_cell,
-                params,
-                &|v, src| cs.fill(v, src),
-                &|land, to_sea| cs.dist(land, to_sea),
-            )
-        }
+    let cube = ground.cube.map(|(view, rs)| {
+        crate::bake::project_cube::CubeSettle::new(&wg, view, rs / blocks_per_cell)
+    });
+    let settled = match &cube {
+        Some(cs) => biomes::settle_to_ground_by(
+            &mut cells,
+            &sea,
+            &depth_m,
+            blocks_per_cell,
+            params,
+            &|v, src| cs.fill(v, src),
+            &|land, to_sea| cs.dist(land, to_sea),
+        ),
         None => biomes::settle_to_ground(&mut cells, w, h, &sea, &depth_m, blocks_per_cell, params),
     };
-    // Write the settled nodes back, and only those.
+    // No swamp on or beside a playa, on the world's own nodes after the land call (BIO-178): the
+    // projection's reads and the land call's donors bring a swamp's erosion and flag onto ground
+    // the bake's own clearing (`water`, on the Lambert nodes) did not see. A node holds a playa
+    // when a playa cell lies in its square; the reach is the margin, the game's bilinear read
+    // (a block's four nodes, up to a cell and a half from the node marked for its playa cell, so
+    // two cells) and a playa cell. ledger: BIO-178
+    let (mut dried, mut playa_nodes, mut reach_blocks) = (Vec::new(), 0usize, 0.0);
+    if let Some(pl) = ground.playa {
+        let r2 = f64::from(wg.r);
+        let r3 = f64::from(pl.desc.grid.r);
+        let m = ((r2 / r3).round() as usize).max(1);
+        let step = r2 / m as f64;
+        let at: Vec<bool> = (0..n)
+            .into_par_iter()
+            .map(|k| {
+                let (i, j) = (k % w, k / w);
+                let (x, z) = if wg.is_cube() {
+                    wg.cube_point(i as u32, j as u32)
+                } else {
+                    (wg.block_x(i as i64) as f64, wg.block_z(j as i64) as f64)
+                };
+                (0..m * m).any(|s| {
+                    let dx = -0.5 * r2 + ((s % m) as f64 + 0.5) * step;
+                    let dz = -0.5 * r2 + ((s / m) as f64 + 0.5) * step;
+                    pl.nearest(x + dx, z + dz) > 0.0
+                })
+            })
+            .collect();
+        playa_nodes = at.iter().filter(|&&a| a).count();
+        reach_blocks = biomes::PLAYA_WETLAND_MARGIN_BLOCKS + 2.0 * r2 + r3;
+        if playa_nodes > 0 {
+            let elsewhere: Vec<bool> = at.iter().map(|&a| !a).collect();
+            let from_playa = match &cube {
+                Some(cs) => cs.dist(&elsewhere, true),
+                None => biomes::distance_cells(&elsewhere, w, h, true),
+            };
+            dried = biomes::dry_beside_playa_nodes(&mut cells, &from_playa, reach_blocks / r2);
+        }
+    }
+    // Write the settled and dried nodes back, and only those.
     let changed: Vec<u32> = settled
         .to_sea
         .iter()
         .chain(&settled.to_land)
+        .chain(&dried)
         .copied()
         .collect();
     let five: [&Vec<f32>; 5] = [
@@ -2133,6 +2179,12 @@ pub(crate) fn settle_biome_layers(
         "ocean_biome_on_dry_ground": {"nodes": settled.to_land.len(), "km2": km2(settled.to_land.len())},
         "ice_cover_off_the_sea": {"nodes": cover_cleared, "km2": km2(cover_cleared)},
         "ice_cover_class_ef": {"nodes": cover_ef, "km2": km2(cover_ef)},
+        "playa_dried": {
+            "playa_nodes": playa_nodes,
+            "reach_blocks": reach_blocks,
+            "nodes": dried.len(),
+            "km2": km2(dried.len()),
+        },
         "bake_blocks_per_world_block": ground.bake_blocks_per_world_block,
     })
 }
@@ -3242,6 +3294,7 @@ mod tests {
             bake_blocks_per_world_block: 1.0,
             elevation: &elevation,
             closed: Some(&closed),
+            playa: None,
             cube: None,
         };
         let note = settle_biome_layers(&mut held, &ground, &biomes::BiomeParams::default());
@@ -3334,6 +3387,108 @@ mod tests {
                 "band {b}"
             );
         }
+    }
+
+    /// No swamp beside a world playa after the land call (BIO-178): on dry ground (no node
+    /// settled), every node within the reach of the playa's node loses its wetland flag and has a
+    /// swamp-band erosion held under E5, a node below the swamp band keeps its erosion, and every
+    /// node beyond the reach keeps its record.
+    #[test]
+    fn a_world_playa_dries_the_swamp_beside_it() {
+        let grid = GridDesc::for_planet("L2", 1024, 8).unwrap();
+        let fine = GridDesc::for_planet("L3", 1024, 2).unwrap();
+        let (w, h) = (grid.w as usize, grid.h as usize);
+        let n = w * h;
+        let layer = |g: &GridDesc, name: &str, dtype: DType, scale: f64, units: &str| {
+            crate::bake::desc(name, dtype, g, scale, units, None)
+        };
+        let elevation = LoadedLayer::new(
+            layer(&grid, "elevation", DType::F32, 1.0, "block"),
+            (0..n).flat_map(|_| 100f32.to_le_bytes()).collect(),
+        )
+        .unwrap();
+        // One cell of salt, the fine cell at the block of node (i0, j0).
+        let (i0, j0) = (w / 2, h / 2);
+        let (px, pz) = (grid.block_x(i0 as i64), grid.block_z(j0 as i64));
+        let fw = fine.w as usize;
+        let playa = LoadedLayer::new(
+            layer(&fine, "playa", DType::U8, 1.0, "blocks"),
+            (0..fine.cells())
+                .map(|c| {
+                    let (x, z) = (fine.block_x((c % fw) as i64), fine.block_z((c / fw) as i64));
+                    if (x, z) == (px, pz) { 2 } else { 0 }
+                })
+                .collect(),
+        )
+        .unwrap();
+        assert_eq!(playa.bytes.iter().filter(|&&b| b > 0).count(), 1);
+        let quantum = |v: f64| ((v / 1e-4).round() as i16).to_le_bytes();
+        let i16_layer = |name: &str, f: &dyn Fn(usize) -> f64| Held {
+            entry: 0,
+            desc: layer(&grid, name, DType::I16, 1e-4, "vanilla_param"),
+            bytes: (0..n).flat_map(|k| quantum(f(k))).collect(),
+        };
+        // Even columns in the swamp band (E6), odd ones below it; even rows flagged swamp.
+        let erosion_of = |k: usize| if (k % w).is_multiple_of(2) { 0.6 } else { 0.2 };
+        let wet_of = |k: usize| u8::from((k / w).is_multiple_of(2));
+        let mut held = vec![
+            i16_layer("climate/temperature", &|_| 0.1),
+            i16_layer("climate/vegetation", &|_| -0.2),
+            i16_layer("climate/continents", &|_| 0.3),
+            i16_layer("climate/erosion", &erosion_of),
+            i16_layer("climate/ridges", &|_| 0.4),
+            Held {
+                entry: 0,
+                desc: layer(&grid, "climate/wetland", DType::U8, 1.0, ""),
+                bytes: (0..n).map(wet_of).collect(),
+            },
+        ];
+        let before: Vec<Vec<u8>> = held.iter().map(|x| x.bytes.clone()).collect();
+        let ground = BiomeGround {
+            sea_level_y: 64,
+            m_per_block_v: 1.0,
+            world_m_per_block_h: 8.0,
+            bake_blocks_per_world_block: 1.0,
+            elevation: &elevation,
+            closed: None,
+            playa: Some(&playa),
+            cube: None,
+        };
+        let note = settle_biome_layers(&mut held, &ground, &biomes::BiomeParams::default());
+        assert_eq!(note["ocean_biome_on_dry_ground"]["nodes"], 0, "{note}");
+        assert_eq!(note["playa_dried"]["playa_nodes"], 1, "{note}");
+        // The margin, two cells and a fine cell: 38 blocks, 4.75 cells.
+        let reach = note["playa_dried"]["reach_blocks"].as_f64().unwrap();
+        assert_eq!(reach, biomes::PLAYA_WETLAND_MARGIN_BLOCKS + 16.0 + 2.0);
+        let held_e = ((biomes::reference().bands.erosion[5] - 1e-3) / 1e-4).round() as i16;
+        let raw16 = |b: &[u8], k: usize| i16::from_le_bytes([b[2 * k], b[2 * k + 1]]);
+        let mut expect = 0;
+        // (Rows 0 and h − 1 are glued onto themselves: left out.)
+        for k in w..n - w {
+            let (di, dj) = ((k % w) as f64 - i0 as f64, (k / w) as f64 - j0 as f64);
+            let near = di.hypot(dj) <= reach / 8.0;
+            let (e0, f0) = (erosion_of(k), wet_of(k));
+            let changes = near && (f0 == 1 || e0 > 0.55);
+            let (e, f) = (raw16(&held[3].bytes, k), held[5].bytes[k]);
+            let e_was = raw16(&before[3], k);
+            if changes {
+                expect += 1;
+                assert_eq!(f, 0, "node {k}");
+                assert_eq!(e, e_was.min(held_e), "node {k}");
+            } else {
+                assert_eq!((f, e), (f0, e_was), "node {k}");
+            }
+            // The other four inputs are as they were.
+            for li in [0, 1, 2, 4] {
+                assert_eq!(
+                    raw16(&held[li].bytes, k),
+                    raw16(&before[li], k),
+                    "layer {li}"
+                );
+            }
+        }
+        assert!(expect > 20, "{expect}");
+        assert_eq!(note["playa_dried"]["nodes"], expect, "{note}");
     }
 
     /// Flags and codes take the nearest cell: the wetland flag (0 none, 1 swamp, 2 cold) must not
