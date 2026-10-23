@@ -693,6 +693,14 @@ pub struct TectonicParams {
     /// pulled apart. 0 (the default) leaves the hazard as Cortial's. game-choice (agent
     /// 2026-10-23): about half the spread of the plates' σ on the base's records. ledger: PLT-504
     pub rift_stress_mpa: f64,
+    /// Rifts along weak lithosphere (V1 gap 2's stage C2, `plates::rifting::rift`): a rift's
+    /// fragments grow from their centres through the plate, each lattice edge costing its length
+    /// times (225 km / L)^m, L the lithosphere's depth (`thermal_state`'s), m this; the fragments
+    /// meet, and the plate breaks, where the lithosphere is thin. 0 (the default) splits by
+    /// great-circle distance (Cortial). Needs `thermal_state`. game-choice (agent 2026-10-23):
+    /// the exponent; Audet & Bürgmann 2011: strain concentrates at pre-existing weak zones, and
+    /// the weak directions follow the gradients of the effective elastic thickness. ledger: PLT-506
+    pub rift_weakness: f64,
     /// Plates smaller than this fraction of the planet are absorbed by a neighbour.
     pub min_plate_area_frac: f64,
     /// No rifting beyond this many plates.
@@ -948,6 +956,7 @@ impl Default for TectonicParams {
             rift_fragments: [2, 4],
             rift_warp_rad: 0.2,
             rift_stress_mpa: 0.0, // ledger: PLT-504 (game-choice: off by default)
+            rift_weakness: 0.0,   // ledger: PLT-506 (game-choice: off by default)
             min_plate_area_frac: 0.003,
             max_plates: 40,
             resample_min_myr: 20.0,  // ledger: PLT-098
@@ -1340,6 +1349,11 @@ impl PlanetPreset {
             "$.tectonics.thermal_state",
             "thermal_isostasy_m, thermal_strength and thermal_backstop need thermal_state",
         )?;
+        check(
+            k.thermal_state || k.rift_weakness == 0.0,
+            "$.tectonics.rift_weakness",
+            "needs thermal_state",
+        )?;
         // The force balance.
         pos(
             k.plate_speed_scale_mm_yr,
@@ -1459,6 +1473,7 @@ impl PlanetPreset {
             ),
             (k.ridge_segment_km, "$.tectonics.ridge_segment_km"),
             (k.rift_stress_mpa, "$.tectonics.rift_stress_mpa"),
+            (k.rift_weakness, "$.tectonics.rift_weakness"),
             (k.initiation_stress_mpa, "$.tectonics.initiation_stress_mpa"),
             (
                 k.cordillera_shortening_mm_yr,

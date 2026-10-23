@@ -321,7 +321,7 @@ fn segment_ridges(
 ) -> Vec<Option<(u32, f64)>> {
     let n = gap.len();
     let mut out = vec![None; n];
-    if !(seg_rad > 0.0) {
+    if seg_rad.is_nan() || seg_rad <= 0.0 {
         return out;
     }
     let mut frames: BTreeMap<(u32, u32), Option<PoleFrame>> = BTreeMap::new();
@@ -344,9 +344,12 @@ fn segment_ridges(
         let frame = frames.entry(key).or_insert_with(|| {
             let w = omega[key.0 as usize] - omega[key.1 as usize];
             let len = w.length();
+            if len.is_nan() || len <= 0.0 {
+                return None;
+            }
             // A pair spreading at under 1 mm/yr anywhere has no pole worth the name.
             let f = w.any_orthogonal_vector().normalize_or_zero();
-            if !(len > 0.0) || norm.velocity_mm_yr(w, f).length() < 1.0 {
+            if norm.velocity_mm_yr(w, f).length() < 1.0 {
                 return None;
             }
             let e = w / len;
@@ -961,4 +964,22 @@ pub fn bury(
         state.counters.plate_deaths += 1;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn band_offsets_are_fractions_and_wrap_folds_into_a_turn() {
+        for (a, b) in [(0, 1), (3, 17), (39, 40), (1, 0)] {
+            let o = band_offset(a, b);
+            assert!((0.0..1.0).contains(&o), "{o}");
+        }
+        assert_ne!(band_offset(0, 1), band_offset(0, 2));
+        use std::f64::consts::PI;
+        assert!((wrap(4.0) - (4.0 - 2.0 * PI)).abs() < 1e-12);
+        assert!((wrap(-0.5) + 0.5).abs() < 1e-12);
+        assert!((wrap(2.0 * PI + 0.25) - 0.25).abs() < 1e-12);
+    }
 }

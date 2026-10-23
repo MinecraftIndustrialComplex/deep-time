@@ -36,6 +36,11 @@ use deeptime_format::EventId;
 /// Plates below this many samples never rift.
 const MIN_RIFT_SAMPLES: u32 = 64;
 
+/// The thinnest lithosphere `rift_weakness` weighs, km: a young ridge's or a back-arc's is thinner,
+/// and weighs as this (game-choice: agent 2026-10-23, so that one edge costs at most
+/// (225 / 20)^m times its length). ledger: PLT-506
+const WEAK_MIN_KM: f64 = 20.0;
+
 /// The stress weight of V1 gap 2's stage C2 (ledger PLT-504, PLT-505): each plate's
 /// e^(sign·σ/σ_s) over its mean across the plates `candidates` names with their weights `w`
 /// (area), so the hazard's expected count over them is unchanged and only where it falls moves.
@@ -48,7 +53,7 @@ fn stress_weights(
     scale_mpa: f64,
     sign: f64,
 ) -> Option<BTreeMap<u32, f64>> {
-    if !(scale_mpa > 0.0) {
+    if scale_mpa.is_nan() || scale_mpa <= 0.0 {
         return None;
     }
     // Clamped so that one plate's extreme stress cannot overflow the weights.
@@ -94,17 +99,17 @@ pub fn maybe_rift(
     let ids: Vec<u32> = state.alive().map(|p| p.id).collect();
     // Rifts under tension (V1 gap 2's stage C2): the plates the edge forces pull apart rift
     // more, the others less, at the same expected count. ledger: PLT-504
-    let weights = (k.rift_stress_mpa > 0.0)
-        .then(|| {
-            let candidates: Vec<(u32, f64)> = ids
-                .iter()
-                .map(|&id| &state.plates[id as usize])
-                .filter(|p| f64::from(p.samples) >= min)
-                .map(|p| (p.id, f64::from(p.samples)))
-                .collect();
-            stress_weights(stress, &candidates, k.rift_stress_mpa, 1.0)
-        })
-        .flatten();
+    let weights = if k.rift_stress_mpa > 0.0 {
+        let candidates: Vec<(u32, f64)> = ids
+            .iter()
+            .map(|&id| &state.plates[id as usize])
+            .filter(|p| f64::from(p.samples) >= min)
+            .map(|p| (p.id, f64::from(p.samples)))
+            .collect();
+        stress_weights(stress, &candidates, k.rift_stress_mpa, 1.0)
+    } else {
+        None
+    };
     for id in ids {
         let alive = state.alive().count() as u32;
         if alive >= k.max_plates {
@@ -170,23 +175,50 @@ pub fn rift(
     }
     // Spread centroids: each new one the best of 16 random candidates.
     let mut centres: Vec<DVec3> = Vec::with_capacity(fragments as usize);
-    centres.push(pos[visible[state.rng.below(visible.len() as u64) as usize] as usize]);
+    let mut centre_at: Vec<u32> = Vec::with_capacity(fragments as usize);
+    let first = visible[state.rng.below(visible.len() as u64) as usize];
+    centres.push(pos[first as usize]);
+    centre_at.push(first);
     while centres.len() < fragments as usize {
-        let mut best = (f64::NEG_INFINITY, DVec3::Z);
+        let mut best = (f64::NEG_INFINITY, DVec3::Z, 0u32);
         for _ in 0..16 {
-            let c = pos[visible[state.rng.below(visible.len() as u64) as usize] as usize];
+            let at = visible[state.rng.below(visible.len() as u64) as usize];
+            let c = pos[at as usize];
             let d = centres
                 .iter()
                 .map(|e| e.angle_between(c))
                 .fold(f64::INFINITY, f64::min);
             if d > best.0 {
-                best = (d, c);
+                best = (d, c, at);
             }
         }
         centres.push(best.1);
+        centre_at.push(best.2);
     }
     let seed = state.rng.next_u64();
     let warp = k.rift_warp_rad;
+    let member = membership(&members, n);
+    // Rifts along weak lithosphere (V1 gap 2's stage C2): each fragment grows from its centre
+    // through the plate with every edge's cost its length times (L_cold / L)^m, L the
+    // lithosphere's depth (`thermal.rs`), so the fragments meet where it is thin. Off (m = 0),
+    // the distance is the great circle's. ledger: PLT-506
+    let grown: Option<Vec<Vec<f64>>> = (k.rift_weakness > 0.0).then(|| {
+        let depth = |i: u32| {
+            let l = f64::from(state.samples[i as usize].lithosphere_km);
+            if l > 0.0 {
+                l.clamp(WEAK_MIN_KM, super::thermal::L_COLD_KM)
+            } else {
+                super::thermal::L_COLD_KM
+            }
+        };
+        let factor = |v: u32, u: u32| {
+            (super::thermal::L_COLD_KM / (0.5 * (depth(v) + depth(u)))).powf(k.rift_weakness)
+        };
+        centre_at
+            .iter()
+            .map(|&c| super::geometry::dijkstra_weighted(geo, c, |i| member[i as usize], factor))
+            .collect()
+    });
     // Label = fragment index; non-members keep a label no fragment uses.
     let mut label = vec![u32::MAX; n];
     for &i in &members {
@@ -194,12 +226,16 @@ pub fn rift(
         label[i as usize] = (0..fragments)
             .map(|f| {
                 let noise = warp * fbm(p, 4.0, 3, seed.wrapping_add(u64::from(f) * 31));
-                (f, p.angle_between(centres[f as usize]) + noise)
+                let d = grown
+                    .as_ref()
+                    .map(|g| g[f as usize][i as usize])
+                    .filter(|d| d.is_finite())
+                    .unwrap_or_else(|| p.angle_between(centres[f as usize]));
+                (f, d + noise)
             })
             .fold((0, f64::INFINITY), |a, b| if b.1 < a.1 { b } else { a })
             .0;
     }
-    let member = membership(&members, n);
     connect_plates(geo, &mut label, |i| member[i]);
     let split_coast = coast_split(geo, state, &members, |i| member[i], |i| label[i]);
     let mut counts = vec![0usize; fragments as usize];
@@ -393,16 +429,16 @@ pub fn maybe_initiate_subduction(
     let ids: Vec<u32> = state.alive().map(|p| p.id).collect();
     // Subduction starts under compression (V1 gap 2's stage C2): the same weight with −σ, over
     // the plates' old floor. ledger: PLT-505
-    let weights = (k.initiation_stress_mpa > 0.0)
-        .then(|| {
-            let candidates: Vec<(u32, f64)> = ids
-                .iter()
-                .filter(|&&id| old[id as usize].len() >= 16)
-                .map(|&id| (id, old[id as usize].len() as f64))
-                .collect();
-            stress_weights(stress, &candidates, k.initiation_stress_mpa, -1.0)
-        })
-        .flatten();
+    let weights = if k.initiation_stress_mpa > 0.0 {
+        let candidates: Vec<(u32, f64)> = ids
+            .iter()
+            .filter(|&&id| old[id as usize].len() >= 16)
+            .map(|&id| (id, old[id as usize].len() as f64))
+            .collect();
+        stress_weights(stress, &candidates, k.initiation_stress_mpa, -1.0)
+    } else {
+        None
+    };
     for id in ids {
         if state.alive().count() as u32 >= k.max_plates {
             break;
@@ -428,7 +464,7 @@ pub fn maybe_initiate_subduction(
                     continue;
                 }
                 let seed = far[state.rng.below(far.len() as u64) as usize];
-                initiate(state, world, geo, pos, env, id, seed, o, Some(&near))?;
+                initiate(state, world, geo, pos, env, id, seed, o, Some(near.as_slice()))?;
             } else {
                 let seed = o[state.rng.below(o.len() as u64) as usize];
                 initiate(state, world, geo, pos, env, id, seed, o, None)?;
@@ -749,4 +785,27 @@ pub fn heal(
         state.recount(pos);
     }
     Ok(healed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stress_weights_keep_the_mean_and_favour_the_stress_asked_for() {
+        let stress = vec![Some(40.0), Some(0.0), Some(-20.0), None];
+        let cands = [(0, 2.0), (1, 1.0), (2, 1.0), (3, 5.0)];
+        let w = stress_weights(&stress, &cands, 20.0, 1.0).unwrap();
+        // The area-weighted mean over the plates with a stress is 1; one without weighs 1.
+        let mean = (2.0 * w[&0] + w[&1] + w[&2]) / 4.0;
+        assert!((mean - 1.0).abs() < 1e-12, "{mean}");
+        assert_eq!(w[&3], 1.0);
+        assert!(w[&0] > w[&1] && w[&1] > w[&2]);
+        // Compression favoured with the sign turned.
+        let c = stress_weights(&stress, &cands, 20.0, -1.0).unwrap();
+        assert!(c[&2] > c[&1] && c[&1] > c[&0]);
+        // Off, or no stress at all: no weights.
+        assert!(stress_weights(&stress, &cands, 0.0, 1.0).is_none());
+        assert!(stress_weights(&[None, None], &[(0, 1.0), (1, 1.0)], 20.0, 1.0).is_none());
+    }
 }
