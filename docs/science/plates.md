@@ -4651,16 +4651,134 @@ the belts' strength height of 5.1 km and its lost overflow (PLT-253) and the 70 
 The full solve (a velocity on the plate lattice with n = 3, the audit's "What it takes") is still
 gap 1's.
 
-SHEETARMSPLACEHOLDER
+#### The sheet's arms
+
+The sheet's binary is this branch at 46887626 (an archive of the commit; with the switches off it
+runs the base's planets bit for bit). Every arm below sets PLT-412 and PLT-413 at 41.1 km and no
+hot window. *Plate-wide* is `collapse_reach_km` 5,000; *cf* PLT-391.
+
+Exploration first (the coordinator's rule: the fewest seeds that answer the question), seeds 1
+and 2, both starts, 4 runs an arm against the base's same 4 (with 4 runs a side the smallest
+two-sided p is 0.029):
+
+| Median of 4 (p against the base) | base | plate-wide, cf, no sheet | sheet 10²², plate-wide, cf | sheet 10²², plate-wide | sheet 10²², reach 200 |
+|---|---|---|---|---|---|
+| Land (0.26 to 0.32) | 0.269 | 0.360 (0.029) | 0.385 (0.029) | 0.331 (0.34) | 0.321 (0.057) |
+| Largest landmass (≥ 0.12) | 0.086 | 0.170 (0.057) | 0.246 (0.029) | 0.162 (0.11) | 0.126 (0.11) |
+| Continental crust under the sea (≤ 0.25) | 0.314 | 0.143 (0.029) | 0.133 (0.029) | 0.287 (1.0) | 0.277 (0.49) |
+| Land above 2 km, of the land (≤ 0.12) | 0.231 | 0.235 (1.0) | 0.142 (0.11) | 0.135 (0.029) | 0.140 (0.057) |
+| Coast with high ground (≤ 0.15) | 0.407 | 0.522 (0.029) | 0.404 (0.89) | 0.307 (0.20) | 0.290 (0.20) |
+| Land under ice (≤ 0.15) | 0.152 | 0.173 (0.15) | 0.169 (0.38) | 0.095 (0.11) | 0.165 (0.89) |
+| Collisions per 100 Myr (2 to 6) | 1.80 | 1.80 (1.0) | 1.85 (1.0) | 2.10 (0.38) | 1.90 (0.55) |
+| Criteria of the seven met, per run | 2 | 2 (0.44) | 3 (0.16) | 3 (0.13) | 2 (0.35) |
+| Continental crust at the end, of the planet | 0.355 | 0.341 (0.49) | 0.387 (0.11) | 0.452 (0.029) | 0.403 (0.057) |
+| Sea over the datum at the end, m | 820 | 1,151 (0.057) | 1,375 (0.029) | 1,331 (0.029) | 877 (0.89) |
+
+The plate-wide reach with continental room first and no sheet moves crust out of no high ground
+(0.235): it is the sheet that takes the high ground down, by two fifths (0.142, 0.135 and 0.140),
+and the threshold-law arms never did that. Without cf the coast falls with it (0.307) and the ice
+(0.095, in band in all 4 runs). What the high ground loses the continents' area gains: the crust
+the sheet releases fills the nearest room on the plate, which is mostly ocean floor without cf,
+and filled ocean floor turns continental at T_col, so the continental crust grows from 0.355 to
+0.452 of the planet and the sea climbs about 500 m. With cf the drowned margins fill first: the
+drowned share falls to 0.13 and the land to 0.385, far over its ceiling. At the threshold law's
+200 km reach the sheet takes the high ground down as far (0.140) and fills less (continental crust
+0.403, the sea 877 m), but the coast and the ice move less and criteria per run stay at 2. The
+plate-wide arm without cf went on to 12 runs.
+
+#### Twelve runs of the sheet
+
+Seeds 1 to 6, both starts, against the base's 12 (the base's binary and runs of "The arms"; the
+runs are deterministic). One run, scattered continents seed 5, stopped at −102 Myr on the surface
+guard (below), so the arm has 11:
+
+| Median (p against the base) | base, 12 | sheet 10²², plate-wide, 11 |
+|---|---|---|
+| Land (0.26 to 0.32) | 0.300 | 0.323 (0.013) |
+| Largest landmass (≥ 0.12) | 0.124 | 0.169 (0.049) |
+| Continental crust under the sea (≤ 0.25) | 0.278 | 0.280 (0.90) |
+| Land above 2 km, of the land (≤ 0.12) | 0.271 | 0.145 (0.001) |
+| Coast with high ground (≤ 0.15) | 0.411 | 0.316 (0.014) |
+| Land under ice (≤ 0.15) | 0.170 | 0.111 (0.007) |
+| Collisions per 100 Myr (2 to 6) | 1.80 | 2.10 (0.13) |
+| Criteria of the seven met, per run | 2 | 3 (0.063) |
+| Continental crust's net change over 1,000 Myr | −0.065 | +0.003 (< 0.001) |
+| Plate checks met, of 45 | 28 | 29 (0.14) |
+| Above 2 km, the plate model's mean over the frames after 100 Myr | 0.257 | 0.172 (< 0.001) |
+| Continental crust at the end, of the planet | 0.358 | 0.425 (< 0.001) |
+| Sea over the datum at the end, m (the census's) | 820 | 1,139 (0.003) |
+| Continental crust's mean thickness, km | 43.4 | 43.7 (0.74) |
+| The land's mean height over the sea, m | 1,374 | 983 |
+
+Runs meeting each criterion, base (of 12) and sheet (of 11): land 8 and 2, the largest landmass
+7 and 10, under the sea 5 and 4, above 2 km 0 and 3, the coast 0 and 0, ice 4 and 8, collisions
+3 and 7.
+
+What it does:
+
+- **The sheet takes the high ground down by almost half** (0.271 to 0.145, in band in 3 runs
+  against none), and the coast (0.411 to 0.316) and the ice (0.170 to 0.111, in band in 8 runs
+  against 4) with it. Over the run the plate model's high ground falls from 0.257 to 0.172. No
+  collapse law measured on this lane did as much: the threshold law's best was 0.167 with cf.
+- **The land goes over its ceiling.** 0.323, in band in 2 runs against the base's 8. The
+  continents gain area at the same mean thickness (43.4 and 43.7 km): the crust budget's parts
+  over the run give the collapse 0.43 of the planet in continental area made (gross, cumulative)
+  against the base's 0.16, and the founder 0.13 against 0.08 (the thickest crust's own fill of
+  ocean room to T_col, PLT-277: its volume to the mantle goes from −72 to +806 in the budget's
+  units, so less founders), less 0.10 more taken by subduction. The continental crust's net
+  change goes from −0.065 to +0.003 and its area from 0.358 to 0.425 of the planet. The filled
+  ocean floor's water goes to the sea, which rises 320 m, and the land still climbs.
+- **The drowned share does not get worse** (0.278 to 0.280), against the audit's expectation from
+  PLT-390: the sheet's crust ends at T_col over the sea, not at T_n under it. It does not get
+  better either: it is out of band in both.
+
+*The surface guard.* The stopped run's surface reached 242 km under the sea at L1 cell (325, 112),
+past the guard's 237 km. A rerun from a checkpoint (scratch `div.sh`, `div2.sh`, `onset.py`) shows
+why. From at least −400 Myr, 50 to 250 cells stand with the plate model's elevation over 20 km,
+up to its 30 km cap (`max_elevation_m`), over a median 31 to 38 km of crust (11 to 24 km over its
+Airy height) with no orogeny, while the surface's flexure under them is a median 10 to 34 km (up
+to 290 km). The patch rides its plate from the north pole's rows at −368 Myr to row 110 at −112
+Myr, and the surface under it falls 37 km, 93 km and 242 km under the sea in the last three
+steps. The plates' own laws
+(the collapse, the sheet, the spread's receivers) never raise a column past its Airy height
+(`collapse::toward`): the height comes from the surface's feedback (the whole offset of the
+surface over the plate model, `PlatesStage::apply_surface_feedback`, clamped at 30 km), so the
+fault is in the coupling of the surface's flexure to the plates, outside this lane. The arms
+trigger it more often than the base (each run's `guard_worst_m`). The base's 24 runs never take
+the surface more than two Earth reliefs (39.6 km) from the sea (worst 37.8 km) and never end with
+a peak over 20 km. The arms that move much crust by the collapse do in 1 to 3 runs of 12: the
+worst is 110 km with W 40, 89 km with W 20, 57 km with W 40 and cf, 41 km with the sea column, W 40
+and cf, 218 km with the cap, W 40 and cf (19 km short of the stop), 86 km with the same at reach
+150 (of 24), and 46 km in a finished run of the sheet. Patches at the 30 km cap end 1 run of 12 of
+the sea column with W 40 and cf, 3 of the sheet's 11, and 1 of 4 of each exploration arm with the
+plate-wide reach (none of the 4 at reach 200).
+
+*By the ship rule it stays off*: criteria per run rise from 2 to 3 at p 0.063, not a meaningful p,
+and it breaks the land criterion that the base meets in 8 of 12 runs; one run stops on the guard.
+Its `--set` keys for the combined arm with the trench-budget lane are
+`--set tectonics.collapse_sea_column=true --set tectonics.collapse_sea_column_max_km=41.1
+--set tectonics.collapse_sheet_viscosity_pa_s=1e22 --set tectonics.collapse_reach_km=5000`
+(and, to try the threshold law's reach, without the last).
+
+*Did the arms need the trench side?* Yes, for the land. Every arm that moves the high ground's
+crust into room (PLT-391, the sheet) turns ocean floor continental and nothing takes the crust
+back: the continental crust's net change rises to zero or above and the land passes 0.32. The
+drowned share is kept, not mended, by the sheet; with cf it is mended but the land goes further
+over. A sink for continental crust at the trenches (sediment subduction and subduction erosion,
+with PLT-312) is what would let the sheet's lower high ground stand with the land in band.
 
 ### What is on
 
 Nothing new. PLT-412 to PLT-415 are in the code as switches, off in the defaults and every
-built-in preset, and the default runs are the base's bit for bit (the switches off). The table
+built-in preset, and the default runs are the base's bit for bit (the switches off). The arm
+closest to shipping by the medians (the sheet, plate-wide) fails the ship rule on the land and
+on its p; the arm closest by the ship rule (cap, W 40, cf, reach 150) is 3 criteria against 2 at
+p 0.20 over 24 runs. The table
 driver behind this section's arms is `tools/review/v1-item1-table.sh` (with
 `tools/review/v1-item1-table.py`): `run` makes an arm's runs and their census, `table` the seven
 measures, the criteria per run and the Mann-Whitney p against a base; the base's runs are listed
-for other lanes in `/data/ban/deeptime-runs/pool/BASES.md` on the test VM.
+for other lanes in `/data/ban/deeptime-runs/pool/BASES.md` on the test VM. These runs predate
+the shared run pool (`tools/review/pool/`, master 2db74acd); new arms go through it.
 
 ### What is left, and for whom
 
@@ -4684,4 +4802,12 @@ for other lanes in `/data/ban/deeptime-runs/pool/BASES.md` on the test VM.
    (PLT-254 to PLT-259, PLT-300). Worth building after items 1 and 2, when the belts it acts on
    are Earth's size and the crust it moves has a sink.
 6. *The ice* follows the high ground (the audit's M6): 0.159 to 0.171 of the land at 24 runs, it
-   moves only with land above 2 km.
+   moves only with land above 2 km; with the sheet it falls to 0.111.
+7. *The surface guard under the collapse arms* (the surface flexure's owner; `surface/` was not
+   touched here): plate columns held 20 km or more over their Airy height by the surface's
+   feedback, with the flexure under them at tens of km, appear in the arms that move the most
+   crust and stopped one run of the sheet ("The sheet's arms", the surface guard). Which coupling
+   step lets the flexure's offset grow (the feedback's clamp at `max_elevation_m`, the polar rows
+   where one patch formed, or the collapse's single-step rise of filled ocean floor) is not
+   settled; the reproduction is scattered continents seed 5 with the sheet's `--set` keys, which
+   reaches the stop at step 449.
