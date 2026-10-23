@@ -458,7 +458,9 @@ impl SurfaceGrid for CubeGrid {
     fn neighbours(&self, c: usize) -> impl Iterator<Item = (usize, f64)> + '_ {
         let s = &self.topo.nbr[c];
         let d = &self.dist[c];
-        (0..8).filter_map(move |k| (s[k] != NO_CELL).then(|| (s[k] as usize, d[k])))
+        (0..8)
+            .filter(move |&k| s[k] != NO_CELL)
+            .map(move |k| (s[k] as usize, d[k]))
     }
 
     #[inline]
