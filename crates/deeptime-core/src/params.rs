@@ -551,6 +551,8 @@ pub struct TectonicParams {
     /// … once no orogeny has raised it for this long, Myr …
     pub collapse_quiet_myr: f64,
     /// … and how far from the collapsing crust the crust it loses may go, km (Earth-normalized).
+    /// 5,000 (the default and every built-in preset since 2026-10-23) is a plate's size, so the
+    /// crust a collapse releases reaches its continent's edge (ledger PLT-257).
     pub collapse_reach_km: f64,
     /// Post-orogenic collapse: for this long after its last orogeny a quiet column's crust is
     /// still hot and weak, and thins back towards the normal continental column (35.1 km,
@@ -569,20 +571,21 @@ pub struct TectonicParams {
     /// stands as high over the step's sea S as the normal continental column (35.1 km) stands
     /// over the datum, T_n + 7.0 S (41.8 km under a sea 956 m over the datum: the old lowland's
     /// crust, standing about 500 m over the sea), within [T_n / 2, `collapse_thickness_km`];
-    /// `false` (the default and every built-in preset) T_n in the datum frame (ledger PLT-412).
+    /// `true` is the default and every built-in preset's since 2026-10-23; `false` T_n in the
+    /// datum frame (ledger PLT-412).
     pub collapse_sea_column: bool,
     /// … and never thicker than this, km: the continents' mean crust (Christensen & Mooney 1995:
     /// 41.1 km, shields and platforms about the same), so a sea that rises past about 850 m over
-    /// the datum does not lift the column with it. 0 = no bound but `collapse_thickness_km` (the
-    /// default; ledger PLT-413).
+    /// the datum does not lift the column with it. 41.1 is the default and every built-in
+    /// preset's since 2026-10-23; 0 = no bound but `collapse_thickness_km` (ledger PLT-413).
     pub collapse_sea_column_max_km: f64,
     /// The collapse as a thin viscous sheet (`plates/collapse.rs`, "As a thin viscous sheet"):
     /// with this depth-averaged viscosity of a young orogen's lithosphere, Pa s, a quiet column
     /// raised by an orogeny thins at the strain rate its potential energy over the collapse's
     /// normal column drives, ΔU / (4 η L) (L the lithosphere's 100 km), down to that column,
     /// where it outpaces the threshold law (Tibet and the Basin and Range: about 10²² Pa s,
-    /// England & Molnar 1997, Flesch et al. 2000). 0 = off (the default and every built-in
-    /// preset; ledger PLT-414).
+    /// England & Molnar 1997, Flesch et al. 2000). 10²² is the default and every built-in
+    /// preset's since 2026-10-23; 0 = off (ledger PLT-414).
     pub collapse_sheet_viscosity_pa_s: f64,
     /// … with the viscosity growing e-fold per this many Myr since the column's last orogeny,
     /// as its lithosphere cools (McKenzie 1978's thermal time, 62.8 Myr); crust no orogeny raised
@@ -708,20 +711,23 @@ pub struct TectonicParams {
     /// trench this step and stands below the bare floor of its age (`pools::floor_at`), where a
     /// trench's pull left it, rises back towards that floor, closing half the distance in this
     /// time, Myr. GDH1's subsidence moves the floor by its age's increment only, so without it
-    /// a trench's depth stays wherever the trench has been. 0, the default, releases nothing
-    /// (the model before the trench budget, 2026-10-22). ledger: PLT-443
+    /// a trench's depth stays wherever the trench has been. 2 (PLT-053's half-life) is the
+    /// default and every built-in preset's since 2026-10-23; 0 releases nothing (the model before
+    /// the trench budget, 2026-10-22). ledger: PLT-443
     pub trench_release_half_life_myr: f64,
     /// Pelagic sedimentation on oceanic crust, m/Myr.
     pub pelagic_m_per_myr: f64,
     /// Sediment subduction: the share of subducted ocean floor's sediment (its sediment and
     /// sedimentary pools) that goes down with the slab at a resampling instead of accreting to
-    /// the column on top (`ridges::resample`), on every overriding plate. 0, the default,
-    /// accretes all of it (the model before the trench budget, 2026-10-22). ledger: PLT-440
+    /// the column on top (`ridges::resample`), on every overriding plate. 0.12 is the default
+    /// and every built-in preset's since 2026-10-23; 0 accretes all of it (the model before the
+    /// trench budget, 2026-10-22). ledger: PLT-440
     pub sediment_subduction_share: f64,
     /// Subduction erosion: the crust a front's overriding plate loses from below, km³ per km of
     /// front and Myr (Earth-normalized), where the front erodes (the two keys below); taken
     /// from the front sample's crust beyond a normal ocean floor's (`subduction::erode_forearcs`).
-    /// 0, the default, erodes nothing. ledger: PLT-441
+    /// 90 is the default and every built-in preset's since 2026-10-23; 0 erodes nothing.
+    /// ledger: PLT-441
     pub subduction_erosion_km3_per_km_myr: f64,
     /// … where the convergence normal to the front is at least this, mm/yr …
     /// ledger: PLT-442
@@ -841,31 +847,31 @@ impl Default for TectonicParams {
             subduction_uplift_mm_yr: 0.6,
             collision_threshold_km: 100.0, // ledger: PLT-068
             subduction_peak_km: 300.0,
-            collision_belt_km: 400.0,        // ledger: PLT-241
-            collision_stacking_share: 0.95,  // ledger: PLT-242
-            collision_restack_whole: true,   // ledger: PLT-400 (game-choice; on since 2026-10-22)
-            wedge_slope_deg: 1.5,            // ledger: PLT-192
-            weld_speed_mm_yr: 5.0,           // ledger: PLT-246
-            weld_after_myr: 10.0,            // ledger: PLT-246
-            reversal_by_arc_crust: false,    // ledger: PLT-371
-            collapse_myr: 15.0,              // ledger: PLT-255
-            collapse_thickness_km: 50.0,     // ledger: PLT-256
-            collapse_quiet_myr: 10.0,        // ledger: PLT-259
-            collapse_reach_km: 200.0,        // ledger: PLT-257
-            collapse_hot_myr: 0.0,           // ledger: PLT-390
-            collapse_continent_first: false, // ledger: PLT-391
-            collapse_sea_column: false,      // ledger: PLT-412
-            collapse_sea_column_max_km: 0.0, // ledger: PLT-413
-            crust_max_km: 70.0,              // ledger: PLT-258
-            crust_channel_km2_myr: 1500.0,   // ledger: PLT-300
-            isostasy_relax_myr: 0.004,       // ledger: ISO-078
-            thickening_max_mm_yr: 5.0,       // ledger: PLT-287
-            uplift_max_mm_yr: 3.5,           // ledger: PLT-288
-            transition_width_km: 200.0,      // ledger: PLT-262 (km on the model sphere)
-            transition_myr: 20.0,            // ledger: PLT-263
-            transition_ocean_crust: false,   // ledger: PLT-294 (game-choice; presets set true)
-            // ledger: PLT-414
-            collapse_sheet_viscosity_pa_s: 0.0,
+            collision_belt_km: 400.0,         // ledger: PLT-241
+            collision_stacking_share: 0.95,   // ledger: PLT-242
+            collision_restack_whole: true,    // ledger: PLT-400 (game-choice; on since 2026-10-22)
+            wedge_slope_deg: 1.5,             // ledger: PLT-192
+            weld_speed_mm_yr: 5.0,            // ledger: PLT-246
+            weld_after_myr: 10.0,             // ledger: PLT-246
+            reversal_by_arc_crust: false,     // ledger: PLT-371
+            collapse_myr: 15.0,               // ledger: PLT-255
+            collapse_thickness_km: 50.0,      // ledger: PLT-256
+            collapse_quiet_myr: 10.0,         // ledger: PLT-259
+            collapse_reach_km: 5000.0,        // ledger: PLT-257 (since 2026-10-23)
+            collapse_hot_myr: 0.0,            // ledger: PLT-390
+            collapse_continent_first: false,  // ledger: PLT-391
+            collapse_sea_column: true,        // ledger: PLT-412 (on since 2026-10-23)
+            collapse_sea_column_max_km: 41.1, // ledger: PLT-413
+            crust_max_km: 70.0,               // ledger: PLT-258
+            crust_channel_km2_myr: 1500.0,    // ledger: PLT-300
+            isostasy_relax_myr: 0.004,        // ledger: ISO-078
+            thickening_max_mm_yr: 5.0,        // ledger: PLT-287
+            uplift_max_mm_yr: 3.5,            // ledger: PLT-288
+            transition_width_km: 200.0,       // ledger: PLT-262 (km on the model sphere)
+            transition_myr: 20.0,             // ledger: PLT-263
+            transition_ocean_crust: false,    // ledger: PLT-294 (game-choice; presets set true)
+            // ledger: PLT-414 (on since 2026-10-23)
+            collapse_sheet_viscosity_pa_s: 1.0e22,
             // ledger: PLT-415
             collapse_sheet_strength_myr: 62.8,
             initial_plates: 14,
@@ -892,11 +898,11 @@ impl Default for TectonicParams {
             cordillera_width_km: 120.0,
             cordillera_height_m: 2500.0,       // ledger: PLT-050
             trench_half_life_myr: 2.0,         // ledger: PLT-053
-            trench_release_half_life_myr: 0.0, // ledger: PLT-443
+            trench_release_half_life_myr: 2.0, // ledger: PLT-443 (on since 2026-10-23)
             pelagic_m_per_myr: 5.0,
-            sediment_subduction_share: 0.0,         // ledger: PLT-440
-            subduction_erosion_km3_per_km_myr: 0.0, // ledger: PLT-441
-            subduction_erosion_min_mm_yr: 60.0,     // ledger: PLT-442
+            sediment_subduction_share: 0.12, // ledger: PLT-440
+            subduction_erosion_km3_per_km_myr: 90.0, // ledger: PLT-441
+            subduction_erosion_min_mm_yr: 60.0, // ledger: PLT-442
             subduction_erosion_max_sediment_m: 1000.0, // ledger: PLT-442
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
