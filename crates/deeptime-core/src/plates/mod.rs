@@ -1216,6 +1216,11 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32], se
         z_floor: k.oceanic_floor_elevation_m,
         z_ridge: k.ridge_elevation_m,
         trench_relax: pools::trench_share(env.dt_myr, k.trench_half_life_myr),
+        trench_release: if k.trench_release_half_life_myr > 0.0 {
+            pools::trench_share(env.dt_myr, k.trench_release_half_life_myr) // ledger: PLT-443
+        } else {
+            0.0
+        },
         gravity: env.gravity,
         law: k.ocean_depth,
         t_myr: env.t_myr,

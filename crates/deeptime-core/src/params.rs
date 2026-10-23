@@ -704,6 +704,13 @@ pub struct TectonicParams {
     /// A trench sample closes half its distance to z_t in this time, Myr (half of it per step
     /// at the 2-Myr step). Ledger PLT-053.
     pub trench_half_life_myr: f64,
+    /// The trench's release under `ocean_depth: gdh1`: visible ocean floor that is not at a
+    /// trench this step and stands below the bare floor of its age (`pools::floor_at`), where a
+    /// trench's pull left it, rises back towards that floor, closing half the distance in this
+    /// time, Myr. GDH1's subsidence moves the floor by its age's increment only, so without it
+    /// a trench's depth stays wherever the trench has been. 0, the default, releases nothing
+    /// (the model before the trench budget, 2026-10-22). ledger: PLT-443
+    pub trench_release_half_life_myr: f64,
     /// Pelagic sedimentation on oceanic crust, m/Myr.
     pub pelagic_m_per_myr: f64,
     /// Sediment subduction: the share of subducted ocean floor's sediment (its sediment and
@@ -883,8 +890,9 @@ impl Default for TectonicParams {
             arc_mature_crust_km: 15.0,            // ledger: PLT-047
             cordillera_shortening_mm_yr: 0.0,     // ledger: PLT-048
             cordillera_width_km: 120.0,
-            cordillera_height_m: 2500.0, // ledger: PLT-050
-            trench_half_life_myr: 2.0,   // ledger: PLT-053
+            cordillera_height_m: 2500.0,       // ledger: PLT-050
+            trench_half_life_myr: 2.0,         // ledger: PLT-053
+            trench_release_half_life_myr: 0.0, // ledger: PLT-443
             pelagic_m_per_myr: 5.0,
             sediment_subduction_share: 0.0,         // ledger: PLT-440
             subduction_erosion_km3_per_km_myr: 0.0, // ledger: PLT-441
@@ -1224,6 +1232,10 @@ impl PlanetPreset {
             (
                 k.subduction_erosion_max_sediment_m,
                 "$.tectonics.subduction_erosion_max_sediment_m",
+            ),
+            (
+                k.trench_release_half_life_myr,
+                "$.tectonics.trench_release_half_life_myr",
             ),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
