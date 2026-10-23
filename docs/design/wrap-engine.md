@@ -1358,7 +1358,7 @@ without `-Ddeeptime.wrapengine.cube=<s>`).
 | `PlayerWrapMixin` | `canInteractWithBlock` is true when the nearest band image is in reach (menus' `stillValid`, the sign editor's keep-alive) |
 | `ServerPlayerWrapMixin` | The sign editor and its block update go to the image nearest the player |
 | `SignBlockEntityWrapMixin` | Front or back of a sign is judged from the player's position moved through that image (without it, a player at the image edits whichever side faces the far-away stored sign) |
-| `ChunkHolderAccessor` | Test access to a holder's marks and its block-entity send |
+| `ChunkHolderAccessor` | Test access to a holder's marks and its block-entity send. The tests reach it only through a nested class: GameTest registration reflects over a test holder's own method signatures, and without `-PwrapEngine` this config is not applied, so loading the accessor there is an illegal classload that stops the server before any test runs |
 
 The access transformer widens `ClientboundLevelChunkPacketData$BlockEntityInfo` and its
 constructor, and `ClientboundBlockEntityDataPacket`'s constructor. These lines apply whether the
