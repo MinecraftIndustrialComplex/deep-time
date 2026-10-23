@@ -984,16 +984,38 @@ fn project_rivers_cube(cm: &CubeMapping, r: &Rivers, frame: IndexFrame) -> (Rive
     let face_of = |u: [f64; 3]| cm.view.local_of_unit(u).0;
     let mut st = RiverStats::default();
     let mut parts_of: Vec<Vec<Part>> = Vec::with_capacity(r.chains.len());
-    for ch in &r.chains {
+    // A distributary's first part starts on the very point its parent's part holds there (the
+    // last vertex of the parent that came from that original vertex; a seam cut also files its
+    // crossing points under it): (the parent chain, its part) per chain (ledger: HYD-144).
+    let mut from_part: Vec<Option<(usize, usize)>> = Vec::with_capacity(r.chains.len());
+    for (ci, ch) in r.chains.iter().enumerate() {
         let mut parts = vec![new_part()];
         let mut prev: Option<((f64, f64), [f64; 3], RiverVertex)> = None;
+        let mut start: Option<((f64, f64), (usize, usize))> = None;
+        if (ch.from as usize) < ci {
+            let v0 = r.vertices[ch.first as usize];
+            for (pi, p) in parts_of[ch.from as usize].iter().enumerate() {
+                for (j, &o) in p.orig.iter().enumerate() {
+                    let pv = r.vertices[o as usize];
+                    if pv.x == v0.x && pv.z == v0.z {
+                        let at = (f64::from(p.verts[j].x), f64::from(p.verts[j].z));
+                        start = Some((at, (ch.from as usize, pi)));
+                    }
+                }
+            }
+        }
         for k in ch.first..ch.first + ch.count {
             let v = r.vertices[k as usize];
             let unit = cm.src.unit(f64::from(v.x), f64::from(v.z));
             let q = cm.view.point_of_unit(unit);
             let Some((pp, pu, pv)) = prev else {
+                let q = start.map_or(q, |s| s.0);
                 let part = parts.last_mut().expect("a part");
-                part.verts.push(world(v, q));
+                part.verts.push(RiverVertex {
+                    x: q.0 as f32,
+                    z: q.1 as f32,
+                    ..world(v, q)
+                });
                 part.orig.push(k);
                 prev = Some((q, unit, v));
                 continue;
@@ -1066,6 +1088,9 @@ fn project_rivers_cube(cm: &CubeMapping, r: &Rivers, frame: IndexFrame) -> (Rive
             }
             prev = Some((here, unit, v));
         }
+        // The first part keeps its parent only while it still starts on the parent's point.
+        let keeps = start.is_some() && parts[0].verts.len() >= 2;
+        from_part.push(if keeps { start.map(|s| s.1) } else { None });
         // A part a sea cut left with one vertex goes (a seam cut never leaves one).
         parts.retain(|p| p.verts.len() >= 2);
         // The world's length, and the seam halves checked.
@@ -1148,11 +1173,16 @@ fn project_rivers_cube(cm: &CubeMapping, r: &Rivers, frame: IndexFrame) -> (Rive
                     m => (m, ch.into),
                 }
             };
+            let from = match from_part[k] {
+                Some((t, tp)) if pi == 0 => first_id[t] + tp as u32,
+                _ => deeptime_format::rivers::NO_CHAIN,
+            };
             out.chains.push(Chain {
                 first: out.vertices.len() as u32,
                 count: p.verts.len() as u32,
                 mouth,
                 into,
+                from,
             });
             out.vertices.extend_from_slice(&p.verts);
         }
@@ -2486,6 +2516,7 @@ mod tests {
                 count: v.len() as u32,
                 mouth: Mouth::Sea,
                 into: u32::MAX,
+                from: u32::MAX,
             });
             r.vertices.extend(v);
         }

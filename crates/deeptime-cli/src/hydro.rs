@@ -6,6 +6,12 @@
 //! part reads only what the bake wrote before it, so this gives the bytes a run with the same
 //! preset writes; it is how the parameters are tuned without re-running the history.
 //!
+//! One exception, the delta plains (HYD-136): a folder that already holds them gets their raise
+//! taken off `elevation` first (the `delta` layer), but the detail amplitude they set to 0 and a
+//! Lambert world's stack tops they raised stay as the earlier run left them, so over the old
+//! plains the ground's detail and the stacks can differ from a fresh bake's. For exact bytes,
+//! re-run from a folder baked with `hydro.deltas=false` or bake again from the history.
+//!
 //! The spawn candidates stay as they were (they need the run's sites; a lake may now cover one).
 //! The placers settle again into the new channels (`deposits::placer_channels::settle_folder`).
 

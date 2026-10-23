@@ -244,6 +244,22 @@ impl BuildFit {
             y
         }
     }
+
+    /// The simulated elevation of stored elevation `s`, blocks: the inverse of
+    /// [`BuildFit::compress`] (at or past `top_y`, infinite).
+    pub fn expand(&self, s: f64) -> f64 {
+        let band = self.top_y - self.knee_y;
+        if s > self.knee_y && band > 0.0 {
+            let f = (s - self.knee_y) / band;
+            if f >= 1.0 {
+                f64::INFINITY
+            } else {
+                self.knee_y - band * (1.0 - f).ln()
+            }
+        } else {
+            s
+        }
+    }
 }
 
 /// Block-space scales (plan §5.1).

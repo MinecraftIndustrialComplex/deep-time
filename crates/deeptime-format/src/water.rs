@@ -489,6 +489,7 @@ mod tests {
             count: 2,
             mouth: Mouth::Sea,
             into: u32::MAX,
+            from: u32::MAX,
         }];
         r.build_index();
         Toy { rivers: r }
@@ -643,6 +644,7 @@ mod tests {
             count: 16,
             mouth: Mouth::Sea,
             into: u32::MAX,
+            from: u32::MAX,
         }];
         r.build_index();
         Reach { rivers: r }
@@ -738,6 +740,7 @@ mod tests {
             count: 11,
             mouth: Mouth::Sea,
             into: u32::MAX,
+            from: u32::MAX,
         }];
         r.build_index();
         Stream { rivers: r }
