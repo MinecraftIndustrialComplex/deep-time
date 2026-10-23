@@ -1028,7 +1028,20 @@ fn essential_sources(
 ) -> CliResult<Value> {
     let c = w.c as f64;
     let sea = f64::from(w.manifest.scale.sea_level_y);
-    let (zlo, zhi) = w.manifest.world_projection().z_range();
+    let wp = w.manifest.world_projection();
+    let (zlo, zhi) = wp.z_range();
+    // The lattices' x span: from -c/2, or on a cube world from its window's west edge, the void
+    // past the net's faces never land; as the top-up lays its own (SCL-129).
+    let (x_lo, cube) = match &wp {
+        deeptime_format::projection::WorldProjection::Cube(view) => {
+            (wp.index_frame().origin.0 as f64, Some(view.cube))
+        }
+        _ => (-c / 2.0, None),
+    };
+    let land_at = |x: f64, z: f64| {
+        cube.is_none_or(|cb| cb.face_of_block(x as i64, z as i64).is_some())
+            && w.height(x as i64, z as i64) >= sea
+    };
     let spawn: Vec<(f64, f64)> =
         std::fs::read_to_string(o.world_data.join("spawn/candidates.json"))
             .ok()
@@ -1048,9 +1061,9 @@ fn essential_sources(
         let mut out = HashSet::new();
         let mut z = zlo;
         while z <= zhi {
-            let mut x = -c / 2.0;
-            while x < c / 2.0 {
-                if w.height(x as i64, z as i64) >= sea {
+            let mut x = x_lo;
+            while x < x_lo + c {
+                if land_at(x, z) {
                     out.insert(r.index(x, z));
                 }
                 x += step;
@@ -1066,9 +1079,9 @@ fn essential_sources(
         let mut out = HashSet::new();
         let mut z = zlo.ceil();
         while z <= zhi.floor() {
-            let mut x = -c / 2.0;
-            while x < c / 2.0 {
-                if w.height(x as i64, z as i64) >= sea {
+            let mut x = x_lo;
+            while x < x_lo + c {
+                if land_at(x, z) {
                     out.insert(r.index(x, z));
                 }
                 x += step;
