@@ -610,9 +610,9 @@ impl Default for HydroParams {
             bank_zone_ratio: 0.5,
             protect_water_from_carvers: true,
             deltas: true,
-            delta_area_mult: 8.0, // ledger: HYD-141 (game-choice)
-            delta_shape_k: 1.0,   // ledger: HYD-135 (game-choice)
-            delta_max_mouths: 8,  // ledger: HYD-138 (game-choice)
+            delta_area_mult: 8.0,     // ledger: HYD-141 (game-choice)
+            delta_shape_k: 1.0,       // ledger: HYD-135 (game-choice)
+            delta_max_mouths: 8,      // ledger: HYD-138 (game-choice)
             delta_mouth_spacing: 3.0, // ledger: HYD-138
         }
     }

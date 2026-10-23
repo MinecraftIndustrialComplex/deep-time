@@ -612,7 +612,11 @@ pub fn summary_line(v: &Value) -> String {
     } else {
         format!(
             " deltas={} delta_km2={} delta_share_of_land={} distributaries={} lagoons={}",
-            d["deltas"], d["plain_km2"], d["share_of_land"], d["distributaries_added"], d["lagoons"],
+            d["deltas"],
+            d["plain_km2"],
+            d["share_of_land"],
+            d["distributaries_added"],
+            d["lagoons"],
         )
     };
     format!(

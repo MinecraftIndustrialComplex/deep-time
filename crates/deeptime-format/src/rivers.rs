@@ -451,7 +451,8 @@ impl Rivers {
             if ch.mouth == Mouth::River && ch.into as usize >= self.chains.len() {
                 return bad(format!("chain {k} flows into a missing chain"));
             }
-            if ch.from != NO_CHAIN && (ch.from as usize >= self.chains.len() || ch.from as usize == k)
+            if ch.from != NO_CHAIN
+                && (ch.from as usize >= self.chains.len() || ch.from as usize == k)
             {
                 return bad(format!("chain {k} leaves a missing chain"));
             }
@@ -703,7 +704,9 @@ mod tests {
     fn a_layout_1_file_is_refused_by_name() {
         let mut bytes = encode_rivers(&network()).unwrap();
         bytes[4..8].copy_from_slice(&LAYOUT1_HEADER_BYTES.to_le_bytes());
-        let e = decode_rivers(Path::new("x"), &bytes).unwrap_err().to_string();
+        let e = decode_rivers(Path::new("x"), &bytes)
+            .unwrap_err()
+            .to_string();
         assert!(e.contains("layout 1"), "{e}");
     }
 
