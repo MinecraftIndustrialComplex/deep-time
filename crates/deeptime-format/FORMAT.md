@@ -124,6 +124,7 @@ format versions live together for a while:
   rasters/water_level.dtr       L3, i16, 1/16 block, nodata −32768 (lake surfaces; grid L3h on 32k full)
   rivers/rivers.dtrv            optional: the river network (P1-22, "Rivers")
   rasters/detail/amplitude.dtr  L3, u8, 1/16 block: amplitude of the sub-cell detail term (P1-06)
+  rasters/delta.dtr             L3, i16, 1/16 block: what the delta plains added to elevation ("Rivers", deltas)
   rasters/climate/<name>.dtr    L2, i16, vanilla parameter × 10,000
                                 (<name> ∈ temperature, vegetation, continents, erosion, ridges)
   rasters/climate/t_mean_c.dtr  L1, i16, 0.01 °C            ┐
@@ -1669,14 +1670,15 @@ on the smoothed vertex it joins). **Deltas** (since "hyd-130", 2026-10-23; docs/
 rivers-and-lakes.md "Deltas and distributaries", HYD-130 to HYD-144): between two runs of the
 network, each river reaching the sea builds a delta plain from its BQART sediment load: over the sea
 and beach cells near its mouth, taken in a lobe ahead of the channel, until the volume
-(Nienhuis's area for the load times the channel depth) is spent; the plain's height lies in
+(Nienhuis's area for the load times `delta_area_mult`, times the channel depth) is spent; the plain's height lies in
 (sea level, sea level + 1] (top block = sea level, falling 1/16 block a step from the mouth to the
 front), its `detail/amplitude` is 0, and the raster **`delta`** (i16, 1/16 block, on the
 `elevation` grid; 0 off the plains) holds what the plain added, which a re-run of the water bake
 takes off first. The second run drains the raised ground, and its main stem across each plain
 splits at the apex (the backwater length upstream of the shoreline) into distributaries (`from`).
-`notes.bake.water.deltas` holds the parameters and `stats.deltas` the counts, areas and the largest
-deltas. `notes.bake.water`: `enabled`, `method`, `params`,
+`notes.bake.water.params` holds the parameters (`deltas`, `delta_area_mult`, `delta_shape_k`,
+`delta_max_mouths`, `delta_mouth_spacing`) and `stats.deltas` the counts, areas, the largest deltas
+and Earth's figures beside them. `notes.bake.water`: `enabled`, `method`, `params`,
 `width_scale`, `grid`, `halved`, `climate`, `seasons`, `rivers_file`, `rivers_bytes`, `stats`
 (counts, lengths, largest discharge and width, milliseconds per step; since "p1-22b" also
 `lake_share_of_land`, `basins` (candidates, full, below_rim, playa, dry, merged, nested_too_deep),
