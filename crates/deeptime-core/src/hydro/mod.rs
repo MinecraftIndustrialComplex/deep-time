@@ -154,15 +154,22 @@ pub fn sea_reached_by(
     low: impl Fn(usize) -> bool,
 ) -> Vec<bool> {
     let mut reached = open.to_vec();
-    let mut stack: Vec<usize> = (0..n).filter(|&c| open[c]).collect();
-    while let Some(c) = stack.pop() {
-        for k in 0..8 {
-            if let Some(nb) = nb(c, k)
-                && !reached[nb]
-                && low(nb)
-            {
-                reached[nb] = true;
-                stack.push(nb);
+    // The open cells one at a time, each flooded to the end before the next: the same ground
+    // (what any open cell reaches), and the stack holds only the low cells a flood found, not
+    // every open cell at once (amp-est, 2026-10-23: the ocean's cells as usize, 134 MB on quick
+    // 16k's world grid and twice that on an ocean past 2^24 cells).
+    let mut stack: Vec<usize> = Vec::new();
+    for c0 in (0..n).filter(|&c| open[c]) {
+        stack.push(c0);
+        while let Some(c) = stack.pop() {
+            for k in 0..8 {
+                if let Some(nb) = nb(c, k)
+                    && !reached[nb]
+                    && low(nb)
+                {
+                    reached[nb] = true;
+                    stack.push(nb);
+                }
             }
         }
     }
@@ -275,38 +282,60 @@ pub fn closed_basin_on_world_by(
         n,
         "the closed_basin flags do not match the grid"
     );
-    let mut done = vec![false; n];
+    // A cell is new, met by the body being flooded, or done (its body decided).
+    const NEW: u8 = 0;
+    const MET: u8 = 1;
+    const DONE: u8 = 2;
+    assert!(
+        u32::try_from(n).is_ok(),
+        "a world grid of 2^32 cells or more"
+    );
+    let mut state = vec![NEW; n];
     let mut open = vec![false; n];
-    let mut members: Vec<usize> = Vec::new();
-    let mut stack: Vec<usize> = Vec::new();
+    // Breadth first, by u32 index: the queue holds a flood's front, not its body. Each body is
+    // flooded twice, the second time through its own cells only, to mark it done and open or not;
+    // the cells are the same, since each was met from one of them (amp-est, 2026-10-23: the body's
+    // cells and a depth-first stack, as usize, held 380 MB on quick 16k's world grid of 22.2 M
+    // cells and 648 MB where the ocean passed 2^24 cells; the bake's peak).
+    let mut queue: std::collections::VecDeque<u32> = std::collections::VecDeque::new();
     for c0 in 0..n {
-        if done[c0] || !deep(c0) {
+        if state[c0] != NEW || !deep(c0) {
             continue;
         }
-        members.clear();
-        stack.push(c0);
-        done[c0] = true;
+        state[c0] = MET;
+        queue.push_back(c0 as u32);
         let mut open_cells = 0usize;
-        while let Some(c) = stack.pop() {
-            members.push(c);
+        while let Some(c) = queue.pop_front() {
+            let c = c as usize;
             open_cells += usize::from(flag[c] == 0);
             for k in 0..8 {
                 if let Some(m) = nb(c, k)
-                    && !done[m]
+                    && state[m] == NEW
                     && deep(m)
                 {
-                    done[m] = true;
-                    stack.push(m);
+                    state[m] = MET;
+                    queue.push_back(m as u32);
                 }
             }
         }
-        if open_cells >= min_open {
-            for &c in &members {
-                open[c] = true;
+        let is_open = open_cells >= min_open;
+        state[c0] = DONE;
+        open[c0] = is_open;
+        queue.push_back(c0 as u32);
+        while let Some(c) = queue.pop_front() {
+            for k in 0..8 {
+                if let Some(m) = nb(c as usize, k)
+                    && state[m] == MET
+                {
+                    state[m] = DONE;
+                    open[m] = is_open;
+                    queue.push_back(m as u32);
+                }
             }
         }
     }
-    drop(done);
+    drop(state);
+    drop(queue);
     let reached = sea_reached_by(n, &nb, &open, &low);
     drop(open);
     let mut cleared = 0u64;

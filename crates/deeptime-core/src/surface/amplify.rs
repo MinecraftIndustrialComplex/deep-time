@@ -836,6 +836,15 @@ pub fn amp_probe(tag: &str) {
     }
 }
 
+/// TEMPORARY PROBE (amp-est lane, never committed): prints, then starts a new window, so `wpeak` is
+/// the segment's peak since the previous segment probe.
+pub fn amp_probe_seg(tag: &str) {
+    if std::env::var_os("DEEPTIME_AMP_PROBE").is_some() {
+        amp_probe(tag);
+        crate::alloc::start_window();
+    }
+}
+
 /// Estimated bytes and seconds of the stage under the default memory cap
 /// ([`crate::session::DEFAULT_MEM_CAP`]; [`estimate_under`]).
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {

@@ -269,6 +269,56 @@ pub(crate) fn grids(p: &PlanetPreset) -> Result<(GridDesc, GridDesc), CoreError>
     ))
 }
 
+/// The cell size of the hydrology's grid, blocks: L3's, doubled while the grid is over
+/// `hydro::MAX_CELLS` and halves evenly (`water::halve`; 4 on 32k full, else L3's 2).
+pub(crate) fn hydrology_r(p: &PlanetPreset) -> u32 {
+    let r = p.resolution.l3_r;
+    let Ok(g) = GridDesc::for_planet("L3", p.scale.circumference_blocks, r) else {
+        return r;
+    };
+    let (mut w, mut h, mut r) = (g.w as usize, g.h as usize, r);
+    while w * h > crate::hydro::MAX_CELLS && w % 2 == 0 && h % 2 == 0 {
+        (w, h, r) = (w / 2, h / 2, r * 2);
+    }
+    r
+}
+
+/// Bytes per horizon of an L1 cell the strata part holds beyond the finished world at its peak
+/// ([`strata::bake`]: the horizon stacks, 7 B a horizon, their raised copy and the layer's cells
+/// and tiles as it writes them). A figure of the memory model, not a physical one (amp-est,
+/// 2026-10-23: 26.4 and 26.5 B held on quick 16k at 50 and 1000 Myr, 32 horizons).
+pub const STRATA_BYTES_PER_HORIZON_CELL: u64 = 28;
+
+/// Bytes per cell of the hydrology's grid the water part holds beyond the finished world at its
+/// peak ([`water::bake`]: the elevation it drains and `hydro::network::run`'s arrays). A figure of
+/// the memory model (amp-est, 2026-10-23: 27.3, 27.1 and 27.2 B held on quick 16k's 21.5 M cells
+/// at 50 and 1000 Myr and on the Petroff-Guyou world Ben plays).
+pub const WATER_BYTES_PER_CELL: u64 = 30;
+
+/// The memory the bake holds beyond the finished world at its peak, `(bytes, projection)`: the
+/// largest of its parts' (they run one after another, each freeing what it held): the strata on
+/// L1 ([`STRATA_BYTES_PER_HORIZON_CELL`]), the water on the hydrology's grid (the whole L3
+/// elevation loaded first, halved beside it, then [`WATER_BYTES_PER_CELL`] on the grid it drains)
+/// and the projection pass ([`project::estimate_bytes`], the second figure; 0 for Lambert). The
+/// other parts hold less. amp-est, 2026-10-23: before this the bake's figure was the projection
+/// pass alone, under the strata and the water on a Lambert world and under the pass itself on a
+/// Petroff-Guyou one (1,279 MB listed, 1,658 MB held on quick 16k at 50 Myr).
+pub fn estimate_bytes(p: &PlanetPreset) -> (u64, u64) {
+    let c = p.scale.circumference_blocks;
+    let cells = |r: u32| GridDesc::for_planet("", c, r).map_or(0, |g| g.cells() as u64);
+    let k = p.structure.as_ref().map_or(32, |s| s.horizons);
+    let strata = cells(p.resolution.l1_r) * u64::from(k) * STRATA_BYTES_PER_HORIZON_CELL;
+    let water = if p.hydro.unwrap_or_default().enabled {
+        let (full, drained) = (cells(p.resolution.l3_r), cells(hydrology_r(p)));
+        let load = if drained < full { full + full / 4 } else { full };
+        (load * 2).max(drained * WATER_BYTES_PER_CELL)
+    } else {
+        0
+    };
+    let projection = project::estimate_bytes(p);
+    (strata.max(water).max(projection), projection)
+}
+
 fn ms(t: Instant) -> f64 {
     (t.elapsed().as_secs_f64() * 1000.0 * 10.0).round() / 10.0
 }

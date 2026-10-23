@@ -58,6 +58,11 @@ pub fn bake(
     // The structure stage's horizons when it kept them for these inputs (P1-19).
     let (mut hz, kept) = bake_horizons::bake_noting(world, p)?;
     let horizons_ms = started.elapsed().as_secs_f64() * 1000.0;
+    crate::surface::amplify::amp_probe_seg(&format!(
+        "strata_horizons cells={} k={}",
+        hz.grid.cells(),
+        hz.k
+    ));
     hz.check()
         .map_err(|e| CoreError::InvalidState(format!("the horizon bake failed its check: {e}")))?;
     // What a geologist would object to in the stacks as written (before the top raise, which
@@ -139,7 +144,9 @@ pub fn bake(
         &tables.unconsolidated,
     );
     drop(points);
+    crate::surface::amplify::amp_probe_seg("strata_raised");
     let layer = hz.to_layer(deeptime_format::Codec::Lz4Block)?;
+    crate::surface::amplify::amp_probe_seg("strata_layer");
     let mean = hz.mean_horizons();
     let k = hz.k;
     out.layer_bytes(layer.desc, &layer.bytes)?;
