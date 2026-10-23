@@ -312,6 +312,7 @@ pub fn maybe_initiate_subduction(
         .collect();
     let trench_tree = (!trenches.is_empty()).then(|| Tree::over(&trenches, |_| true));
     let clearance = env.norm.rad(k.subduction_initiation_clearance_km);
+    let margin = env.norm.rad(k.subduction_initiation_margin_km);
     let clear = |i: usize| {
         trench_tree.as_ref().is_none_or(|tr| {
             tr.nearest(pos[i])
@@ -341,11 +342,46 @@ pub fn maybe_initiate_subduction(
         let rate = k.subduction_initiation_per_myr * env.dt_myr;
         let lambda = rate * o.len() as f64 * area / state.a0_km2;
         if state.rng.next_f64() < 1.0 - (-lambda).exp() {
-            let seed = o[state.rng.below(o.len() as u64) as usize];
-            initiate(state, world, geo, pos, env, id, seed, o)?;
+            if margin > 0.0 {
+                // Off the passive margin (V1 gap 2's stage C1): the old floor within the margin
+                // of the plate's continental crust stays on the plate, and the fracture's seed
+                // is old floor beyond it; none, no initiation. ledger: PLT-503
+                let near = near_continent(state, pos, id, margin);
+                let far: Vec<u32> = o.iter().copied().filter(|&i| !near[i as usize]).collect();
+                if far.is_empty() {
+                    continue;
+                }
+                let seed = far[state.rng.below(far.len() as u64) as usize];
+                initiate(state, world, geo, pos, env, id, seed, o, Some(&near))?;
+            } else {
+                let seed = o[state.rng.below(o.len() as u64) as usize];
+                initiate(state, world, geo, pos, env, id, seed, o, None)?;
+            }
         }
     }
     Ok(())
+}
+
+/// The plate's visible oceanic samples within `margin` (radians, great circle) of its visible
+/// continental crust: where a subduction initiation's fracture may not run (ledger PLT-503).
+fn near_continent(state: &PlateState, pos: &[DVec3], id: u32, margin: f64) -> Vec<bool> {
+    let n = state.samples.len();
+    let on = |i: usize| state.plate_of(i) == id && !state.samples[i].is_hidden();
+    let land = |i: usize| on(i) && state.samples[i].kind == CONTINENTAL;
+    if !(0..n).any(land) {
+        return vec![false; n];
+    }
+    let tree = Tree::over(pos, land);
+    (0..n)
+        .into_par_iter()
+        .map(|i| {
+            on(i)
+                && state.samples[i].kind != CONTINENTAL
+                && tree
+                    .nearest(pos[i])
+                    .is_some_and(|(_, d2)| angle_of_chord2(d2) <= margin)
+        })
+        .collect()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -358,6 +394,7 @@ fn initiate(
     id: u32,
     seed: u32,
     old: &[u32],
+    keep: Option<&[bool]>,
 ) -> Result<(), CoreError> {
     let k = env.k;
     let norm = env.norm;
@@ -394,7 +431,11 @@ fn initiate(
         let p = pos[i as usize];
         let da = p.angle_between(c_old) + warp * fbm(p, 4.0, 3, noise_seed);
         let db = p.angle_between(c_young) + warp * fbm(p, 4.0, 3, noise_seed ^ 0x55);
-        label[i as usize] = u32::from(da < db && state.samples[i as usize].kind != CONTINENTAL);
+        label[i as usize] = u32::from(
+            da < db
+                && state.samples[i as usize].kind != CONTINENTAL
+                && !keep.is_some_and(|kp| kp[i as usize]),
+        );
     }
     connect_plates(geo, &mut label, |i| member[i]);
     let split_coast = coast_split(geo, state, &members, |i| member[i], |i| label[i]);
