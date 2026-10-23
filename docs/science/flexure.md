@@ -398,6 +398,55 @@ samples.
 above Earth's relief (the Challenger Deep, 10.9 km, ISO-071) but no longer growing; which cells
 make it was not traced here.
 
+## The release's pace
+
+Added 2026-10-23 (ISO-099), after the savanna pit (build log 2026-10-23, "Savanna pit, part B").
+
+**What was seen.** On Ben's seed (`earthlike_quick_16k`, supercontinent, 1,000 Myr) a pit opened
+in the last three steps at the L1 cell (396, 231): its regime went from craton to back-arc, the
+plate let go of 2,047, 1,216 and 1,025 m of held load (ISO-056; the sea's share of it −43 m), and
+the floor fell 4.3 km in 6 Myr, with `plates/thickness_m` going from 38.6 to 27.6 km over the last
+40 Myr. The `basins` measure counts 115 to 138 closed basins deeper than 10 blocks a run on the
+base, 80 to 92 of them with their floor under sea level. Earth's lowest dry land, the Dead Sea's
+shore, is about 430 m below the sea.
+
+**The cause.** The release itself is the right kind of thing: a plate that weakens stops holding
+up what it held, and the ground goes towards local isostasy (ISO-056). Its pace was not. The law's
+`Te` (ISO-048 to ISO-053) is a thermal state: the depth of an isotherm, set by the floor's age,
+the time since the last orogeny, or an arc's or a rift's heat. When the Andean arc's uplift
+reaches a craton the plate model stamps an orogeny on it (`plates/subduction.rs`, PLT-060), the
+law's clock restarts, and `Te` went from the craton's 80 km to the floor's 5 km in the step:
+`D` fell to (5/80)³ = 0.0002 of itself, and nearly all the load the craton held came loose at once
+(over three steps here, as the smoothed `Te` of the neighbouring cells followed).
+
+**What Earth does.** A plate loses strength when its interior warms, and heat crosses the
+lithosphere by conduction. The time that sets the pace is the lithosphere's thermal time
+constant, `τ = a² / (π² κ)`: 62.8 Myr for a plate a = 125 km thick (McKenzie 1978, Table 1, read
+in full text; the same `τ` the plate model's thin sheet uses for an orogen's strength, PLT-415).
+The viscous relaxation of the elastic layer once it is warm is faster (about 1 Myr, Beaumont 1978,
+abstract), so it does not set the pace: the plate cannot let go of a load before it is warm
+enough to flow. The plate model itself lets an orogen's heat flow decay over 60 Myr
+(`plates/mod.rs`).
+
+**The fix.** The plate holds a law's `Te` of its own, carried with its crust (`FlexState::te_law_km`,
+as a logarithm like the rigidity, ISO-075). Each step, where the law gives a lower `Te` than the
+plate held, the plate's `Te` relaxes towards it as `e^(−dt/τ)` (`FlexureParams::te_weakening_myr`,
+62.8 Myr; `weakened_te_km`): a 2 Myr step closes 3.1 % of the gap, so the craton above goes from
+80 to 77.7 km and lets go of 9 % of its held load, not 100 %. Where the law gives more, the plate
+takes it at once, stress-free, as before (ISO-056). The break at a plate boundary (ISO-055) is
+mechanical, not thermal, and stays at once. `te_weakening_myr = 0` is the old rule. Unit test
+`a_plate_the_law_weakens_lets_go_as_it_warms`: a belt on a craton the law weakens lets go of a
+few per cent of the instant release in the first step and stands where the instant rule put it
+after eight time constants.
+
+**Does the surface's sediment fill it?** Yes, as far as sediment reaches it. A closed basin is a
+lake in the surface stage (`pflood`: ground under sea level that the open sea does not reach is
+land) and a lake keeps all the sediment that reaches it up to its room, settling it over its whole
+floor (HYD-110, `spl.rs`); land nothing drains keeps everything. What it gets is what its
+catchment erodes. (Measured: to come.)
+
+**Measured.** (to come)
+
 ## Game choices
 
 - **Flexural lengths are Earth-normalized** (ISO-057): the plate's kilometres are the plate
