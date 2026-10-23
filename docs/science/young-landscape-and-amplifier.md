@@ -493,9 +493,61 @@ level is untouched) and `surface::amplify::character::tests::the_basin_class_dra
 (a cone on a plain 4 blocks above the sea, half the window closed ground: not one cell differs
 from the all-open window).
 
-**Measured.** RESULTS PENDING
+**Measured** (Ben's seed and seed 2, earthlike_quick_16k, 1,000 Myr from the supercontinent; each
+seed's young checkpoint amplified and baked by part A's branch and by this one, at a pinned
+projection centre, `scale.lambda_c_deg` 120.25 and 73.0, because the automatic centre jumps on
+small coastal changes; scratch scripts in the task's build folder, not committed).
+
+On the simulation's own surface (L1; the pool's `basins` measure,
+`tools/review/pool/measure_basins.py`) Ben's seed has 115 closed basins deeper than 10 blocks, 66
+deeper than 30, 80 with a floor under sea level and 13 with an arid rim, the deepest 271 blocks;
+seed 2 has 137, 68, 91 and 17, the deepest 339.5. The young landscape (L2) keeps 15 of Ben's
+seed's (13 under sea level, the deepest 159.5). So such basins come with the planets, not with
+one seed.
+
+In the bake (closed depressions of the baked height against the sea; a basin is one deeper than
+10 blocks under its spill; "dry" has no lake on most of it; a4 is the four-fold anisotropy of its
+walls' downslope directions, 0 for walls that face every way, 1 for a coarse grid's staircase):
+
+| World | Over 10 | Over 30 | Floor under sea | Dry | Deepest | a4 median | a4 by wall area |
+|---|---|---|---|---|---|---|---|
+| Ben's play world (an older master's bake) | 20 | 11 | 12 | 7 | 88.3 | 0.248 | 0.257 |
+| Ben's seed, part A | 12 | 4 | 5 | 6 | 125.9 | 0.158 | 0.159 |
+| Ben's seed, part B | 11 | 3 | 4 | 6 | 125.8 | 0.166 | 0.156 |
+| Seed 2, part A | 15 | 5 | 7 | 6 | 241.5 | 0.229 | 0.362 |
+| Seed 2, part B | 14 | 5 | 6 | 5 | 228.8 | 0.231 | 0.349 |
+
+Part B changes how the basins look, not how many there are: those are the surface's. Ben's pit
+(65 blocks under its spill, 123,000 blocks2) goes from a4 0.119 to 0.095, and the share of its
+cells flatter than 0.02 block a block from 0.111 to 0.141; seed 2's second deepest basin goes
+from a4 0.262 to 0.083 and lies 21 blocks deeper (124.6 to 145.5). In the renders the pit's
+walls lose part A's soft contour at the young lake's old waterline, and its stepped north-west
+rim softens. Against part A the window round the pit (x -2640 to -2300, z 900 to 1180) moved by
+0.43 block on average (most 11.5, 99th percentile 4.7). The flood repair before erosion raised
+262,054 cells on Ben's seed (15,198 with part A) and 118,244 on seed 2 (13,334): closed ground
+under sea level is land now and its hollows fill towards its basin's sink as land's do; the
+largest raise is the same (218 m on Ben's seed, 243 to 249 m on seed 2).
+
+The first version of the fix gave closed ground no coast fade. It drew a new jagged ring, 2 to 4
+blocks high, round Ben's pit at y 63 to 68, on the young landscape's 8-block grid: the closed
+class comes from the hydrology's `closed_basin` layer, whose halo reaches above sea level, and
+on the plain the closed side took the whole character while the open side next to it took
+almost none. With the coast fade by height on all ground the ring is gone from the renders, and
+the census is the same as the first version's to the block (a4 by wall area 0.157 against 0.156
+on Ben's seed, seed 2 unchanged).
 
 **Still there, and the follow-up.** The pit itself: its depth is the flexure law's, and the fix
 here only makes it look like ground. Recommended for the flexure lane: release the held load
 over the plate's thermal time instead of in one step, and let the surface's sediment fill what
-it opens (a back-arc fills as it sinks), then measure the census below again.
+it opens (a back-arc fills as it sinks), then measure the census above again. Master's flexure
+change of 2026-10-23 (18ace5d7: the flexure loads only the crust a column gained or lost,
+ISO-091) keeps the release law and does not end the basins: the `basins` measure over the pool's
+base runs, 12 a side (both starts, `DEEPTIME_CRUST_BUDGET=1`), before and after it, gives 138 and
+116 basins deeper than 10 blocks (Mann-Whitney p 0.36), 92 and 81 with a floor under sea level
+(p 0.23), the deepest 309.7 and 303.0 blocks (p 0.37). Recommended for the
+plate lane: the pit's cell lost 11 km of crust (38.6 to 27.6 km) in 40 Myr, most of it while it
+was still a craton; whether a craton should thin that fast is that lane's question. For scale,
+from memory: Earth's closed depressions under sea level are a handful (the lowest, the Dead
+Sea's shore, about 430 m under it, 12 blocks at this planet's 35 m a block; Lake Assal, the
+Qattara and Turpan depressions and Death Valley shallower), while each seed here has 80 or more
+closed basins of the surface with floors under sea level.
