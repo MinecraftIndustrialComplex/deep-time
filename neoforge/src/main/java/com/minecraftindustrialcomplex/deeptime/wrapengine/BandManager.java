@@ -236,6 +236,9 @@ public final class BandManager {
             if (!all)
                 continue; // its tickets load them; try again next tick
             copy(band, srcs, cc);
+            // Its viewers may hold it from before the copy (or from its save, unchanged): send them the
+            // stored block entities it shows (design §12.8).
+            BandBlockEntities.markShown(level, band);
             if (fresh.remove(key))
                 dropGeneratedMobs(band);
             it.remove();
@@ -293,7 +296,8 @@ public final class BandManager {
                 }
             }
         }
-        // Copies carry no block entities (design §4.2): drop what the band chunk generated.
+        // Copies carry no block entities (design §4.2): drop what the band chunk generated. The client
+        // gets the stored ones at their band positions (BandBlockEntities, design §12.8).
         for (BlockPos p : new ArrayList<>(band.getBlockEntities().keySet()))
             band.removeBlockEntity(p);
         band.setUnsaved(true);
