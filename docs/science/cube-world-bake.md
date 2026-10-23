@@ -132,12 +132,15 @@ SCL-130 come from a second bake of the two cubes on the merged branch
 blocks: inside a face, on the first step inside a face edge, across each kind of seam, and the
 first step beside each kind of seam on both of its faces (the same ground's control).
 
-| world | inside a face | inside an edge | direct seams | the slide | turning seams |
+| world | inside a face | inside an edge | direct seams (beside) | the slide (beside) | turning seams (beside) |
 |---|---|---|---|---|---|
-| 16k seed 1 | 4.56 | 3.94 | 3.0 | 5.56 | 3.25 |
-| 4k seed 11 | 3.94 | 3.38 | 3.5 | 2.56 | 3.94 |
+| 16k seed 1 | 4.56 | 3.94 | 3.0 (3.0) | 5.56 (5.63) | 3.25 (3.25) |
+| 4k seed 11 | 3.94 | 3.38 | 3.5 (3.44) | 2.56 (2.44) | 3.94 (3.5) |
 
-MEASURE-BESIDE
+Every kind of seam steps no more than the inside of a face. At 16k each also steps no more than
+the ground beside it: the slide's 5.56 is the band's own steep ground there (5.63 beside it), not
+a seam. At 4k the turning seams' 3.94 is a little over the 3.5 beside them and equal to the inside
+of a face; the 4k planet has 3,072 turning-seam pairs, a quarter of the 16k's sample.
 
 The largest steps: 40.6 blocks inside a face against 6.2, 7.4 and 5.6 across the direct seams, the
 slide and the turning seams (16k). The detail layer's amplitude steps are 0.375 inside a face and
