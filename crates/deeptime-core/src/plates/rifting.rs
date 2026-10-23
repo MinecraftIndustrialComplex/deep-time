@@ -36,18 +36,75 @@ use deeptime_format::EventId;
 /// Plates below this many samples never rift.
 const MIN_RIFT_SAMPLES: u32 = 64;
 
-/// Draws a rift for every plate (in id order) and runs the ones drawn.
+/// The stress weight of V1 gap 2's stage C2 (ledger PLT-504, PLT-505): each plate's
+/// e^(sign·σ/σ_s) over its mean across the plates `candidates` names with their weights `w`
+/// (area), so the hazard's expected count over them is unchanged and only where it falls moves.
+/// σ is the plate's mean in-plane stress from the step's force balance (FRC-022, MPa, tension
+/// positive); a plate without one (not in the balance, or born this step) weighs 1. `None` when
+/// the rule is off (`scale_mpa` 0) or no candidate has a stress.
+fn stress_weights(
+    stress: &[Option<f64>],
+    candidates: &[(u32, f64)],
+    scale_mpa: f64,
+    sign: f64,
+) -> Option<BTreeMap<u32, f64>> {
+    if !(scale_mpa > 0.0) {
+        return None;
+    }
+    // Clamped so that one plate's extreme stress cannot overflow the weights.
+    let raw = |id: u32| {
+        stress
+            .get(id as usize)
+            .copied()
+            .flatten()
+            .map(|s| (sign * s / scale_mpa).clamp(-20.0, 20.0).exp())
+    };
+    let (mut num, mut den) = (0.0, 0.0);
+    for &(id, a) in candidates {
+        if let Some(x) = raw(id) {
+            num += a * x;
+            den += a;
+        }
+    }
+    if !(den > 0.0 && num > 0.0) {
+        return None;
+    }
+    let mean = num / den;
+    Some(
+        candidates
+            .iter()
+            .map(|&(id, _)| (id, raw(id).map_or(1.0, |x| x / mean)))
+            .collect(),
+    )
+}
+
+/// Draws a rift for every plate (in id order) and runs the ones drawn. `stress` is each plate's
+/// mean in-plane stress from the step's force balance (by plate id), for `rift_stress_mpa`.
 pub fn maybe_rift(
     state: &mut PlateState,
     world: &mut WorldState,
     geo: &Geo,
     pos: &[DVec3],
     env: &Env,
+    stress: &[Option<f64>],
 ) -> Result<(), CoreError> {
     let k = env.k;
     let area = env.norm.sample_area_km2();
     let min = (k.min_plate_area_frac * f64::from(state.n) * 8.0).max(f64::from(MIN_RIFT_SAMPLES));
     let ids: Vec<u32> = state.alive().map(|p| p.id).collect();
+    // Rifts under tension (V1 gap 2's stage C2): the plates the edge forces pull apart rift
+    // more, the others less, at the same expected count. ledger: PLT-504
+    let weights = (k.rift_stress_mpa > 0.0)
+        .then(|| {
+            let candidates: Vec<(u32, f64)> = ids
+                .iter()
+                .map(|&id| &state.plates[id as usize])
+                .filter(|p| f64::from(p.samples) >= min)
+                .map(|p| (p.id, f64::from(p.samples)))
+                .collect();
+            stress_weights(stress, &candidates, k.rift_stress_mpa, 1.0)
+        })
+        .flatten();
     for id in ids {
         let alive = state.alive().count() as u32;
         if alive >= k.max_plates {
@@ -66,7 +123,10 @@ pub fn maybe_rift(
         };
         // ledger: PLT-082, PLT-083 (per Myr, so the step's λ_0 scales with its length)
         let lambda0 = k.rift_per_myr * env.dt_myr;
-        let lambda = lambda0 * f * f64::from(p.samples) * area / state.a0_km2 * boost;
+        let mut lambda = lambda0 * f * f64::from(p.samples) * area / state.a0_km2 * boost;
+        if let Some(w) = weights.as_ref().and_then(|w| w.get(&id)) {
+            lambda *= w;
+        }
         let prob = lambda * (-lambda).exp();
         if state.rng.next_f64() < prob {
             let fragments = state
@@ -296,6 +356,7 @@ pub fn maybe_initiate_subduction(
     geo: &Geo,
     pos: &[DVec3],
     env: &Env,
+    stress: &[Option<f64>],
 ) -> Result<(), CoreError> {
     let k = env.k;
     if k.subduction_initiation_per_myr <= 0.0 {
@@ -330,6 +391,18 @@ pub fn maybe_initiate_subduction(
         }
     }
     let ids: Vec<u32> = state.alive().map(|p| p.id).collect();
+    // Subduction starts under compression (V1 gap 2's stage C2): the same weight with −σ, over
+    // the plates' old floor. ledger: PLT-505
+    let weights = (k.initiation_stress_mpa > 0.0)
+        .then(|| {
+            let candidates: Vec<(u32, f64)> = ids
+                .iter()
+                .filter(|&&id| old[id as usize].len() >= 16)
+                .map(|&id| (id, old[id as usize].len() as f64))
+                .collect();
+            stress_weights(stress, &candidates, k.initiation_stress_mpa, -1.0)
+        })
+        .flatten();
     for id in ids {
         if state.alive().count() as u32 >= k.max_plates {
             break;
@@ -340,7 +413,10 @@ pub fn maybe_initiate_subduction(
         }
         // ledger: PLT-063 (per Myr, so the step's rate scales with its length)
         let rate = k.subduction_initiation_per_myr * env.dt_myr;
-        let lambda = rate * o.len() as f64 * area / state.a0_km2;
+        let mut lambda = rate * o.len() as f64 * area / state.a0_km2;
+        if let Some(w) = weights.as_ref().and_then(|w| w.get(&id)) {
+            lambda *= w;
+        }
         if state.rng.next_f64() < 1.0 - (-lambda).exp() {
             if margin > 0.0 {
                 // Off the passive margin (V1 gap 2's stage C1): the old floor within the margin
