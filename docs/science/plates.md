@@ -5554,3 +5554,43 @@ largest excursion 30.0 to 15.5 km, the runs over 20 km 4 to 0, the largest one-s
 and the high coast, which are plateaus and ranges, did not move measurably (p 0.50 and 0.37). So the
 switch stays off by default; whether a correction of what the plate
 holds should go on without a V1 gain is the coordinator's call (below).
+
+### The trace with the yield
+
+The two worst traced runs of the base's seeds 1 to 4 for continental lines, scattered 1 and 4, ran
+again with the yield and the trace (arm `pp-yield380-trace`, argkey a2244c59, `+DEEPTIME_GAP_BUDGET=1
++DEEPTIME_PEAK_TRACE=10000`; their V1 census and guard equal `pp-yield380`'s same runs). Lines above
+10 km, base / yield:
+
+| run | continental lines | highest continental z, km | largest `F`, km | oceanic lines (polar) | highest oceanic z, km |
+|---|---|---|---|---|---|
+| scattered 1 | 21 / 0 | 15.8 / none | 15.3 / none | 3 (1) / 17 (9) | 10.9 / 14.7 |
+| scattered 4 | 133 / 2 | 30.0 / 11.0 | 46.9 / 0.04 | 2 (0) / 2 (0) | 12.3 / 11.3 |
+
+The loop the trace found is gone: no continental column stands on a held `F`. The two continental
+lines left are collision orogens (63 and 68 km of crust, Airy heights 4.2 and 4.7 km) that the plate
+model's orogeny puts at 10.5 to 11.0 km, a height of their own and not the settling's. What is left
+above 10 km is the second, oceanic kind (ridge samples, Airy height −1.8 to −3.7 km, `F` −0.7 to
+0.4 km), whose gap is the carry's part (9.3 to 23.5 km). In scattered 1 it reached 14.7 km at 78°S
+in the last step, and it is the likeliest source of that run's 15.5 km guard's worst, the arm's
+largest (the trace reads plate samples and the guard L1 cells, so this is not shown).
+
+### What is left, and for whom
+
+- **The oceanic carry peaks** (above, and "Are the poles special?"): ridge and basin samples raised
+  10 to 16 km by the surface's carry, more often on the polar rows. They are now the guard's
+  largest excursions with the yield on. The surface lane's (the carry in `surface/advect.rs` and the
+  gap budget's carry part); not traced to a rule here.
+- **The surface flexure's block metric** ([flexure.md](flexure.md), "Simplifications and limits"):
+  the solve treats every row as the equator's, about 1 / cos⁴ φ too stiff north to south on the
+  polar rows. A numerical fault; correcting it moves master's output and needs its own arm. The
+  flexure lane's.
+- **The collapse's and the founder's room** judge room by thickness, not height. With the yield on,
+  the columns no longer stand high, so it was left; a height-aware room would need a law and a
+  source of its own. The plates' lane, only if a later trace shows columns standing over their Airy
+  height again.
+- **The yield's default.** Off: it does not meet the ship rule. It is the correction of a fault (a
+  plate holding up to 47 km of rock away from local isostasy) and moves no V1 criterion, so the
+  coordinator may take it on as such.
+- **The bound's value.** Only 380 mGal (the largest anomaly on Earth) was run; 300 mGal (Hawaii's
+  largest) or a bound that depends on the plate (`Te`, age) were not.
