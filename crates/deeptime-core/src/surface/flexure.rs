@@ -114,6 +114,9 @@ pub mod field {
 pub const SOLVES_GLOBAL: &str = "surface/flexure_solves";
 pub const ITERATIONS_GLOBAL: &str = "surface/flexure_iterations";
 pub const UNCONVERGED_GLOBAL: &str = "surface/flexure_unconverged";
+/// `WorldState::globals`: the solve's cells whose plate yielded, summed over the steps (only
+/// with `yield_anomaly_mgal`, ISO-120).
+pub const YIELDED_GLOBAL: &str = "surface/flexure_yielded_cells";
 
 /// The `surface.flexure` section: every key optional.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -146,6 +149,13 @@ pub struct FlexureParams {
     /// basins and larger one-step falls, docs/science/flexure.md "The release's pace"). The break
     /// at a plate boundary is not the law's and stays at once.
     pub te_weakening_myr: f64,
+    /// The plate's strength as the largest free-air gravity anomaly a plate holds, mGal: where
+    /// the load a cell's plate holds away from local isostasy after the solve, ρ_m (Q + ice − w),
+    /// passes Δg / 2πG, the plate there yields and the rest of the load sinks (or rises) under
+    /// the cell alone, as on a plate with no strength. 380 is Earth's most negative free-air
+    /// anomaly (the Puerto Rico Trench, ten Brink et al. 2004): 9.1 × 10⁶ kg/m², 2.75 km of
+    /// mantle. 0, the default: off, the purely elastic plate (ISO-120).
+    pub yield_anomaly_mgal: f64,
     /// Solve every this many plate steps (loads in between wait for the next solve).
     pub every_steps: u32,
     /// The solve stops when its error estimate is under this, m.
@@ -165,6 +175,7 @@ impl Default for FlexureParams {
             te_recovery_myr: 300.0, // ledger: ISO-051 (uncited: this agent's choice)
             te_min_km: 5.0, // ledger: ISO-052
             te_weakening_myr: 0.0, // ledger: ISO-099 (game-choice: off by default)
+            yield_anomaly_mgal: 0.0, // ledger: ISO-120 (off by default)
             every_steps: 1, // ledger: ISO-059 (game-choice: numerical)
             tolerance_m: 2.0, // ledger: ISO-059
             max_iterations: 60, // ledger: ISO-059
@@ -217,6 +228,12 @@ impl FlexureParams {
             "must be in [0, 10000]",
         )?;
         check(
+            self.yield_anomaly_mgal.is_finite()
+                && (0.0..=100_000.0).contains(&self.yield_anomaly_mgal),
+            "yield_anomaly_mgal",
+            "must be in [0, 100000]",
+        )?;
+        check(
             self.te_ocean_max_km <= 500.0 && self.te_craton_km <= 500.0,
             "te_craton_km",
             "elastic thicknesses must be at most 500 km",
@@ -267,7 +284,19 @@ impl FlexureParams {
             target + (was - target) * (-dt_myr / self.te_weakening_myr).exp()
         }
     }
+
+    /// The most load a plate holds away from local isostasy, kg/m² (`yield_anomaly_mgal` as a
+    /// mass, Δg / 2πG); `None` when off.
+    // ledger: ISO-120
+    pub fn yield_held_kg_m2(&self) -> Option<f64> {
+        (self.yield_anomaly_mgal > 0.0)
+            .then(|| self.yield_anomaly_mgal * 1.0e-5 / (std::f64::consts::TAU * G_NEWTON))
+    }
 }
+
+/// The gravitational constant, m³/(kg s²) (CODATA 2022, NIST: 6.674 30(15) × 10⁻¹¹).
+// ledger: ISO-120
+pub const G_NEWTON: f64 = 6.674_30e-11;
 
 /// Flexural rigidity over gravity, D / g, kg·m, of a plate `te_km` thick.
 pub fn rigidity_per_g(te_km: f64, gravity_m_s2: f64) -> f64 {
@@ -1362,6 +1391,8 @@ pub struct StepOut {
     pub loads_m: Vec<f32>,
     pub roots_m: Vec<f32>,
     pub released_m: Vec<f32>,
+    /// The solve's cells whose plate yielded this step (`yield_anomaly_mgal`, ISO-120).
+    pub yielded_cells: usize,
 }
 
 /// The load share of the step's eroded and deposited rock, on land and under the sea (m of mantle
@@ -1784,6 +1815,24 @@ pub fn step(
     // (P1-17).
     let mut flex = vec![0.0f32; n];
     let mut changes = vec![0.0f64; n];
+    // ledger: ISO-120
+    // The plate's strength (off unless `yield_anomaly_mgal` is set). An elastic plate holds any
+    // load; a real one yields where it is bent hard: its elastic thickness falls to about half at
+    // a curvature of 1e-6 per m (Watts & Burov 2003), and no plate on Earth holds more than about
+    // 3 km of rock away from local isostasy (the largest free-air anomalies over held loads,
+    // ISO-093). Where the load a cell's plate holds after the solve, ρ_m (Q + ice − w), passes
+    // that bound, the plate there has yielded: the rest of the load sinks (or rises) under the
+    // cell alone, as on a plate with no strength, and the carried plate takes the result as its
+    // state (ISO-068). Without it a narrow column the collapse fed crust step after step stood up
+    // to 28 km over its Airy height on a stiff plate, and the plate model's settling (ISO-078)
+    // followed it (docs/science/plates.md, "The polar peaks").
+    let yield_bound = p.yield_held_kg_m2();
+    let mut yielded = vec![0.0f32; if yield_bound.is_some() { n } else { 0 }];
+    let mut yielded_rows: Vec<&mut [f32]> = if yield_bound.is_some() {
+        yielded.chunks_mut(w).collect()
+    } else {
+        (0..hgt).map(|_| <&mut [f32]>::default()).collect()
+    };
     (
         h.par_chunks_mut(w),
         st.load_m.par_chunks_mut(w),
@@ -1794,10 +1843,11 @@ pub fn step(
         st.unsolved_m.par_chunks_mut(w),
         flex.par_chunks_mut(w),
         changes.par_chunks_mut(w),
+        yielded_rows.par_iter_mut(),
     )
         .into_par_iter()
         .enumerate()
-        .for_each(|(j, (hr, lr, dr, wr, ir, rr, ur, fr, cr))| {
+        .for_each(|(j, (hr, lr, dr, wr, ir, rr, ur, fr, cr, yr))| {
             for i in 0..w {
                 let c = j * w + i;
                 let cell = &cells[c];
@@ -1808,9 +1858,21 @@ pub fn step(
                 cr[i] = change;
                 let depth = (sea - hr[i]).max(0.0);
                 let w_prev = if cell.fresh { 0.0 } else { f64::from(dr[i]) };
-                let w_new = w_prev + cell.root + delta;
+                let mut w_new = w_prev + cell.root + delta;
                 let load = cell.load + water_share * (depth - cell.water);
                 let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
+                let mut holds = RHO_MANTLE * (load + ice_share * ice - w_new);
+                if let Some(bound) = yield_bound
+                    && holds.abs() > bound
+                {
+                    // ledger: ISO-120
+                    let sink = (holds - bound * holds.signum()) / RHO_MANTLE;
+                    hr[i] -= p.strength * sink;
+                    cr[i] -= p.strength * sink;
+                    w_new += sink;
+                    holds -= RHO_MANTLE * sink;
+                    yr[i] = sink as f32;
+                }
                 lr[i] = load as f32;
                 dr[i] = w_new as f32;
                 wr[i] = depth as f32;
@@ -1822,7 +1884,7 @@ pub fn step(
                 } else {
                     RHO_MANTLE
                 };
-                fr[i] = (RHO_MANTLE * (load + ice_share * ice - w_new) / restoring) as f32;
+                fr[i] = (holds / restoring) as f32;
             }
         });
     // The sum in cell order on this thread, beside the copies (P1-19). The seen elevation is
@@ -1856,6 +1918,15 @@ pub fn step(
         },
     );
     st.seen_elevation_m = seen;
+    if !yielded.is_empty() {
+        out.yielded_cells = yielded.iter().filter(|&&v| v != 0.0).count();
+        // The gap budget's split: what the plate let go as it yielded is load let go.
+        if out.released_m.len() == n {
+            for (r, &v) in out.released_m.iter_mut().zip(&yielded) {
+                *r -= (p.strength as f32) * v;
+            }
+        }
+    }
     out.sum_change_m = sum;
     out.max_change_m = peak;
     out.deflection_m = deflection;
@@ -3396,5 +3467,85 @@ mod tests {
             let_go > 5000.0,
             "the boundary crossed the disc: {let_go:.0} m"
         );
+    }
+
+    /// A narrow column on a craton fed crust step after step (the collapse's receiver in the
+    /// polar peaks): the elastic plate holds its root up without bound; with the yield on
+    /// (ISO-120) the plate holds at most its bound, the rest sinks under the column, and a load
+    /// under the bound moves exactly as before.
+    #[test]
+    fn a_plate_that_yields_holds_no_more_than_its_strength() {
+        let (w, h) = (64usize, 64usize);
+        let n = w * h;
+        let sea = -1.0e6;
+        let column = |c: usize| (31..33).contains(&(c % w)) && (31..33).contains(&(c / w));
+        // After each step: the most any cell's plate holds, the column's height, the cells that
+        // yielded.
+        let run = |p: &FlexureParams, mm_yr: f32, steps: usize| -> Vec<(f64, f64, usize)> {
+            let mut wd = World::new(w, h, 300.0);
+            let (mut sv, mut st) = started(&mut wd, p, sea);
+            for c in 0..n {
+                if column(c) {
+                    wd.uplift[c] = mm_yr;
+                }
+            }
+            (0..steps)
+                .map(|_| {
+                    let out = wd.step(p, &mut sv, &mut st, &vec![0.0; n], sea);
+                    let most = out
+                        .flexure_m
+                        .iter()
+                        .fold(0.0f64, |m, &v| m.max(f64::from(v).abs()));
+                    let top = (0..n)
+                        .filter(|&c| column(c))
+                        .map(|c| wd.h[c])
+                        .fold(f64::MIN, f64::max);
+                    (most, top, out.yielded_cells)
+                })
+                .collect()
+        };
+        let elastic = on();
+        let strong = FlexureParams {
+            yield_anomaly_mgal: 380.0, // ledger: ISO-120
+            ..on()
+        };
+        strong.validate().unwrap();
+        let bound = strong.yield_held_kg_m2().unwrap() / RHO_MANTLE;
+        assert!(
+            (bound - 2745.0).abs() < 5.0,
+            "380 mGal is {bound:.0} m of mantle"
+        );
+        // 1 mm/yr of Airy height a step, 14 km of crust: the elastic plate holds most of its root.
+        let held = run(&elastic, 1.0, 12);
+        assert!(
+            held[11].0 > 4.0 * bound,
+            "the elastic plate holds {:.0} m",
+            held[11].0
+        );
+        let yielded = run(&strong, 1.0, 12);
+        for (k, (&(most, top, cells), &(_, top_elastic, _))) in
+            yielded.iter().zip(&held).enumerate()
+        {
+            assert!(
+                most <= bound + 1.0,
+                "step {k}: {most:.0} m held, the bound {bound:.0} m"
+            );
+            assert!(
+                cells > 0 && top < top_elastic - 1000.0,
+                "step {k}: {cells} cells yielded, the column {top:.0} m against {top_elastic:.0} m"
+            );
+        }
+        // The column's Airy height is 2 km higher each step; the yielded plate holds it at most
+        // the bound above that.
+        let airy = 300.0 + 12.0 * 2000.0;
+        assert!(
+            yielded[11].1 <= airy + bound + 50.0,
+            "{:.0} m against {airy:.0} + {bound:.0} m",
+            yielded[11].1
+        );
+        // A load the plate can hold: nothing yields and nothing differs.
+        let small = run(&elastic, 0.05, 3);
+        assert!(small[2].0 < 0.9 * bound, "{small:?}");
+        assert_eq!(small, run(&strong, 0.05, 3));
     }
 }

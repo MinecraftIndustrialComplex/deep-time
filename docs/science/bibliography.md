@@ -5490,7 +5490,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Watts, A. B., Burov, E. B. (2003). Lithospheric strength and its relationship to the elastic and seismogenic layer thickness. Earth and Planetary Science Letters 213(1-2):113-131.
 - DOI or URL: 10.1016/S0012-821X(03)00289-9; copy https://www.whoi.edu/fileserver.do?id=114324&pt=10&p=75973
 - Cited as: "Watts & Burov 2003" (a plate yields where it is bent hard)
-- Ledger ids: ISO-093
+- Ledger ids: ISO-093, ISO-120
 - Access: paywalled; a copy on WHOI's file server.
 - Library (the project's source library, not distributed): not filed; fetched to /tmp by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22 (pdftotext; its minus signs come out as "3", decoded with the paper's own 5e-6 and 1.3e-6).
 - Read so far (by the project): full text, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: "Te slowly decreases with increasing curvature and, hence, bending stress"; for 80 Ma lithosphere at a strain rate of 1e-14 s^-1 the ratio Te(YSE)/Te(elastic) is 1 for K <= 1e-8 m^-1, and "For K = 1e-6 m^-1 the ratio is ~0.5, indicating 50% yielding"; at the northern Chile trench (K = 1.3e-6 m^-1) "Te is 22 +- 2 km" against 34 km from the plate's age; "Ideal elastic materials support any stress level. In the case of real materials, however, stress levels are limited to the rock strength at the corresponding depth"; Byerlee's brittle strength at the Moho (~35 km) 0.6 GPa (tension) to 2.0 GPa (compression).
@@ -5501,7 +5501,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Hunter, J., Watts, A. B. (2016). Gravity anomalies, flexure and mantle rheology seaward of circum-Pacific trenches. Geophysical Journal International 207(1):288-316.
 - DOI or URL: 10.1093/gji/ggw275; https://academic.oup.com/gji/article/207/1/288/2583844
 - Cited as: "Hunter & Watts 2016" (an elastic plate's stresses are too high; Te falls landward of the outer rise)
-- Ledger ids: ISO-093
+- Ledger ids: ISO-093, ISO-120
 - Access: open (OUP).
 - Library (the project's source library, not distributed): not filed; read on the publisher's page.
 - Read so far (by the project): about 200,000 of 279,000 characters, all of section 8 and Appendix C, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: "the elastic model, unlike viscous models, predicts unreasonably high bending stresses (up to 900 MPa) in the outermost portions of the flexed plate"; weakening switched on at "kappa = 1x10^-7 m^-1"; "Te landward of the outer rise is generally 40-65 per cent less than the Te seaward" (mean 51 +- 11 %, range 20-72 %); the outer rise's gravity high "<16 mGal at the Middle America and Peru-Chile trenches to up to 40 mGal at old (>80 Ma) trenches".
@@ -5512,7 +5512,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Watts, A. B., Xu, C., Wessel, P., Shillington, D. J., Boston, B., Dunn, R. A. (2025). Seismic and gravity constraints on plate flexure and mantle rheology along the whole Hawaiian-Emperor seamount chain. Nature Communications 16:11013.
 - DOI or URL: 10.1038/s41467-025-65442-3
 - Cited as: "Watts et al. 2025" (the largest flexurally held load on Earth, in gravity)
-- Ledger ids: ISO-093
+- Ledger ids: ISO-093, ISO-120
 - Access: open.
 - Library (the project's source library, not distributed): not filed; read on the publisher's PDF.
 - Read so far (by the project): full text, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: "observed free-air gravity anomalies that are in the range -100 to +300 mGal"; Vening Meinesz and Gunn showed "the southeast end of the chain was regionally rather than locally isostatically compensated"; "It is apparently only in high curvature regions of the seaward wall of a trench and the region immediately beneath a large volcanic edifice where bending stresses are sufficiently high that the flexed oceanic plate weakens".
@@ -5523,7 +5523,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: ten Brink, U. S., Danforth, W., Polloni, C., et al. (2004). New seafloor map of the Puerto Rico Trench helps assess earthquake and tsunami hazards. Eos, Transactions American Geophysical Union 85(37):349-354.
 - DOI or URL: copy https://earthjay.com/earthquakes/20180928_indonesia/ten_brink_etal_2004_seafloor_map_puerto_rico_trench.pdf
 - Cited as: "ten Brink et al. 2004" (the most negative free-air anomaly on Earth)
-- Ledger ids: ISO-093
+- Ledger ids: ISO-093, ISO-120
 - Access: paywalled; a copy on a teaching site.
 - Library (the project's source library, not distributed): not filed.
 - Read so far (by the project): full text of the Eos note, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: "the Puerto Rico Trench is also characterized by the most negative free-air gravity anomaly on Earth, -380 mGal, located 50 km south of the trench, where water depth is 7950 m".
@@ -5574,6 +5574,17 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read so far (by the project): the fetch tool's paraphrase of the abstract, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: a limiting yield-strength curve from brittle and ductile laws; stresses must reach "values greater than 100 MPa" at 25-45 km depth. A paraphrase, not a quotation.
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: journal, volume and pages as the sub-agent read them; the title is from memory, not checked.
+
+### CODATA2022_G
+- Reference: Mohr, P. J., Newell, D. B., Taylor, B. N., Tiesinga, E. CODATA recommended values of the fundamental physical constants: 2022. NIST Reference on Constants, Units, and Uncertainty.
+- DOI or URL: https://physics.nist.gov/cgi-bin/cuu/Value?bg
+- Cited as: "CODATA 2022" (the Newtonian constant of gravitation)
+- Ledger ids: ISO-120
+- Access: open (NIST).
+- Library (the project's source library, not distributed): not filed; read on NIST's page.
+- Read so far (by the project): NIST's value page, by the polar-peaks agent, 2026-10-23: "6.674 30 x 10-11 m3 kg-1 s-2", standard uncertainty "0.000 15 x 10-11", "Source: 2022 CODATA". That the 2018 adjustment gave the same value is from memory.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: the page and its value as read; the authors of the 2022 adjustment are from memory, not checked.
 
 ## Force-balance plate motion: sources added in WP-13a (2026-10-02)
 
