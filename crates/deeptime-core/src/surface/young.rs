@@ -69,6 +69,10 @@ pub mod field {
     pub const TILL: &str = "young/till_m";
 }
 
+/// Bytes per L2 cell of the fields the stage leaves in the world: the 17 of [`field`], f32 each
+/// (what the amplifier's estimate counts the world it starts with by, `amplify::estimate_under`).
+pub const FIELD_BYTES_PER_L2_CELL: u64 = 17 * 4;
+
 /// Keyframe layers of the stage.
 pub const KEYFRAME_LAYERS: [&str; 3] = [field::ELEVATION, field::DRAINAGE, field::ICE];
 

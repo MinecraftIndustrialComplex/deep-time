@@ -317,7 +317,9 @@ pub fn bake(
     note.insert("baked".into(), json!(true));
 
     let t = Instant::now();
+    crate::surface::amplify::amp_probe("bake_start");
     let terrain = terrain::bake(world, p, surface, &mut out)?;
+    crate::surface::amplify::amp_probe("bake_terrain");
     millis.insert("terrain".into(), json!(ms(t)));
     note.insert("terrain".into(), terrain.note.clone());
     if terrain.detail {
@@ -331,6 +333,7 @@ pub fn bake(
 
     let t = Instant::now();
     let (mut strata, lift) = strata::bake(world, p, &terrain, &mut out)?;
+    crate::surface::amplify::amp_probe("bake_strata");
     // The strata part reads every elevation tile once (the top raise) and counts the terrain above
     // the build limit on the way; the count belongs to the terrain's note.
     if let Some(limit) = strata.as_object_mut().and_then(|s| s.remove("build_limit"))
@@ -380,12 +383,14 @@ pub fn bake(
         "climate".into(),
         climate::bake(world, p, surface, &mut out)?,
     );
+    crate::surface::amplify::amp_probe("bake_climate");
     millis.insert("climate".into(), json!(ms(t)));
 
     // Water after the climate (it drains the terrain with the climate's runoff), then the spawn
     // candidates, which stay out of the lakes.
     let t = Instant::now();
     let water = water::bake(p, &mut out)?;
+    crate::surface::amplify::amp_probe("bake_water");
     note.insert("water".into(), water.note);
     millis.insert("water".into(), json!(ms(t)));
     let n = terrain::spawn(p, &terrain, &mut out)?;
@@ -398,10 +403,12 @@ pub fn bake(
         "surface".into(),
         surface::bake(world, p, surface, &mut out)?,
     );
+    crate::surface::amplify::amp_probe("bake_surface");
     millis.insert("surface".into(), json!(ms(t)));
 
     let t = Instant::now();
     note.insert("meta".into(), meta::bake(world, p, surface, &mut out)?);
+    crate::surface::amplify::amp_probe("bake_meta");
     millis.insert("meta".into(), json!(ms(t)));
 
     // Lava: the settings the game reads when it generates chunks (the lava floor, lava lakes, the
