@@ -11,5 +11,12 @@ repository.workspace = true
 [dependencies]
 deeptime-core.workspace = true
 deeptime-format.workspace = true
-mic-viewer.workspace = true
+# The shared viewer's TileSource (feature `tile-source`, on by default; the JNI library leaves it
+# off, so the natives in the jar do not link mic-viewer).
+mic-viewer = { workspace = true, optional = true }
 serde_json = "1.0.151"
+
+[features]
+default = ["tile-source"]
+# `BakeMap` as mic-viewer's TileSource (the workbench's routes).
+tile-source = ["dep:mic-viewer"]
