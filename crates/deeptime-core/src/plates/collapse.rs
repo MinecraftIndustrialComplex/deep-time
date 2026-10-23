@@ -267,17 +267,22 @@ pub fn normal_thickness_m() -> f64 {
 
 /// The normal column the collapse uses under a sea `sea_m` over the datum, m: with
 /// `collapse_sea_column` the column whose Airy height stands as high over the sea as the normal
-/// column's stands over the datum, T_n + 7.0 S, kept within [T_n / 2, T_c]; else T_n (see the
-/// module docs, "Measured from the sea"). ledger: PLT-412
+/// column's stands over the datum, T_n + 7.0 S, kept within [T_n / 2, T_c] and under
+/// `collapse_sea_column_max_km` when that is set; else T_n (see the module docs, "Measured from
+/// the sea"). ledger: PLT-412, PLT-413
 pub fn room_column_m(k: &crate::params::TectonicParams, sea_m: f64) -> f64 {
     let normal = normal_thickness_m();
     if !k.collapse_sea_column || !sea_m.is_finite() {
         return normal;
     }
-    let t_c = (k.collapse_thickness_km * 1000.0).max(normal);
+    let mut top = (k.collapse_thickness_km * 1000.0).max(normal);
+    if k.collapse_sea_column_max_km > 0.0 {
+        // ledger: PLT-413 (the continents' mean crust, never under T_n).
+        top = top.min((k.collapse_sea_column_max_km * 1000.0).max(normal));
+    }
     // game-choice: the bounds are guards (a sea 2.1 km over the datum or 2.5 km under it), not
     // reached by the shipped presets' seas (about −300 to +1,200 m).
-    (normal + COLUMN_ISOSTATIC_FACTOR * sea_m).clamp(0.5 * normal, t_c)
+    (normal + COLUMN_ISOSTATIC_FACTOR * sea_m).clamp(0.5 * normal, top)
 }
 
 /// What one step did.
@@ -909,7 +914,7 @@ pub(in crate::plates) mod tests {
     }
 
     /// The normal column from the sea (PLT-412): off, T_n whatever the sea; on, T_n + 7.0 S, within
-    /// [T_n / 2, T_c], and T_n when the sea is unknown.
+    /// [T_n / 2, T_c] and under the cap (PLT-413), and T_n when the sea is unknown.
     #[test]
     fn the_room_column_stands_over_the_sea_with_the_switch() {
         let mut k = TectonicParams::default();
@@ -927,6 +932,12 @@ pub(in crate::plates) mod tests {
         assert_eq!(room_column_m(&k, 5000.0), t_c);
         assert_eq!(room_column_m(&k, -5000.0), 0.5 * t_n);
         assert_eq!(room_column_m(&k, f64::NAN), t_n);
+        // The cap (PLT-413): the continents' mean crust bounds the column, never under T_n.
+        k.collapse_sea_column_max_km = 41.1;
+        assert!((room_column_m(&k, 1236.0) - 41_100.0).abs() < 1e-6);
+        assert!((room_column_m(&k, 500.0) - (t_n + f * 500.0)).abs() < 1e-6);
+        k.collapse_sea_column_max_km = 20.0;
+        assert_eq!(room_column_m(&k, 956.0), t_n);
     }
 
     /// With `collapse_sea_column` under a sea 956 m over the datum, a hot belt thins towards the
