@@ -479,7 +479,7 @@ impl Sheet {
         }
         let z = iso_height(&s.pools, self.z_0, self.gravity);
         let du = column_energy(z, true, 0.0, 0.0, self.sea_m, self.gravity) - self.u_normal;
-        if !(du > 0.0) {
+        if du.is_nan() || du <= 0.0 {
             return 0.0;
         }
         let age = (self.t_myr - f64::from(s.orogeny_myr)).max(0.0);
