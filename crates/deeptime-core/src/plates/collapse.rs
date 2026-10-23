@@ -70,7 +70,7 @@
 //! crust within reach, nearest first, before any ocean floor, so less of the collapse becomes new
 //! continent below the sea.
 //!
-//! # Measured from the sea (off by default)
+//! # Measured from the sea (on by default since 2026-10-23)
 //! T_n stands at z_0 over the datum, a continent's height when the sea stands at the datum. The
 //! sea is the planet's water filling the hypsometry (ISO-085) and stands 500 to 1,200 m over the
 //! datum on the Earth-like presets, so T_n crust stands at or under it: a hot orogen thinned to
@@ -83,9 +83,9 @@
 //! continental (also for the thickest crust's spreading). Heights still follow Airy in the
 //! datum frame: only the column the collapse aims at moves with the sea.
 //!
-//! # As a thin viscous sheet (off by default)
+//! # As a thin viscous sheet (on by default since 2026-10-23)
 //! The rule above is local: a column thins at one rate down to T_c, and its crust goes to room
-//! within 200 km. On Earth a thickened region also spreads as a whole: the lithosphere is a thin
+//! within `collapse_reach_km`. On Earth a thickened region also spreads as a whole: the lithosphere is a thin
 //! viscous sheet whose depth-integrated deviatoric stress balances the gradient of the
 //! potential energy of its columns (England & McKenzie 1982; Houseman & England 1986), so a
 //! plateau extends at a rate its potential energy over the lowland around it sets, interior and
@@ -106,7 +106,7 @@
 //! orogen a few hundred Myr old (η 100 times η_0 at 290 Myr). A 4.2 km column under a sea at the
 //! datum thins 3.9 % per Myr when its orogeny ends, a 2 km one 1.3 %: e-folds of 26 and 75 Myr. The
 //! crust released goes where the rule sends it, to the nearest room on the plate within
-//! `collapse_reach_km` (a measured arm sets the reach to the plate's size, so the continent's edge
+//! `collapse_reach_km` (the default since 2026-10-23 is the plate's size, so the continent's edge
 //! moves out over its ocean floor). The quiet time still holds: an orogeny's push holds a belt up
 //! (the force balance counts the belt's potential energy against the convergence, FRC-013).
 //! ledger: PLT-414 (the law and η_0), PLT-415 (the strength's growth).
