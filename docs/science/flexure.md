@@ -5,9 +5,11 @@ their sources (ISO-041, ISO-042, ISO-048); the rest are marked in the ledger as 
 uncited, or game choices. The measurements are from small ensembles of four runs; two of them
 were made before the last change of one constant (see "Earth against the mod"). Updated 2026-10-18
 for the polar holes (ISO-056 rewritten, ISO-074 to ISO-076 added; six runs), and 2026-10-22 for
-the settling's feedback (ISO-061 rewritten, ISO-091 to ISO-093 added; twelve runs a side).
+the settling's feedback (ISO-061 rewritten, ISO-091 to ISO-093 added; twelve runs a side), and
+2026-10-23 for the trench rows (ISO-096 and ISO-097 added, ISO-088 merged into ISO-096).
 
-Ledger ids on this page: `ISO-040` to `ISO-077`, `ISO-088`, `ISO-091` to `ISO-093` (see
+Ledger ids on this page: `ISO-040` to `ISO-077`, `ISO-088` (merged), `ISO-091` to `ISO-093`,
+`ISO-096`, `ISO-097` (see
 [ledger/ISO.md](ledger/ISO.md)).
 
 ## What you see in the world
@@ -37,10 +39,11 @@ and the spreading of over-thick crust.
    added or took away (the change of each column's own crust, not its whole rise: a height the
    plate model moves alone is no load, see "The settling's feedback"), crust moved by spreading, rock eroded or deposited, rock the volcano
    stage laid on top, the change of the sea's depth over the cell, and the land ice the climate
-   stage reports. On ocean floor that follows GDH1 (the shipped presets) the sea that fills the
-   floor's own cooling is left out: GDH1's depths are those of floor under water, so that water's
-   weight is in them already (ISO-088; before 2026-10-21 it was loaded again, and old floor sank
-   about 1.45 times GDH1).
+   stage reports. On ocean floor the sea over the plate model's own moves of the ground is left
+   out (its cooling under GDH1, a trench's pull, a plate covering a gap): the plate model's depths
+   are those of floor under water, so that water's weight is in them already (ISO-096; ISO-088
+   for the cooling from 2026-10-21, before which old floor sank about 1.45 times GDH1; the rest
+   from 2026-10-23, "The trench rows").
 2. **The stiffness.** The effective elastic thickness `Te` says how thick the stiff part of the
    shell is. Ocean floor stiffens with age. Continental crust is weak just after mountain
    building and stiffens over a few hundred million years. Volcanic arcs and rifts are weak. The
@@ -106,10 +109,11 @@ The plate equation, as coded (ISO-040):
 | ISO-076 | Earth's fastest vertical rates | exhumation 9 to 13 mm/yr, rebound 11, subsidence 9 to 12; sustained over millions of years, below 1 mm/yr | mm/yr | Guevara et al. 2022, Govin et al. 2020, Lidberg et al. 2010, Brothers et al. 2009, Garzione et al. 2008, Xie & Heller 2009 and others (the ledger) | `verified` |
 | ISO-077 | Two more fast rates | denudation 8 to more than 30 mm/yr (Taiwan), rebound about 10 (Hudson Bay) | mm/yr | Deng et al. 2021, Sella et al. 2007 | `abstract-only` |
 | ISO-061 to ISO-064 | What counts as a load | see the ledger | | none | `uncited`, one `game-choice` |
-| ISO-088 | The sea over GDH1's own deepening | no load: GDH1 is depth under water | m | Stein & Stein 1992; Kominz et al. 1998 (PLT-353) | `cited-unverified` |
 | ISO-091 | Only crust is load | the plate model's crust uplift `u_c`, either sign: load `k_a u_c / (1 − k_a)`; the rest of the uplift and the sea it moves, none | m | none (the plate equation's load is mass, ISO-040) | `uncited` |
 | ISO-092 | The crust uplift | the change of each sample's pools' Airy height over the plate step, with the resampling's accretion and the rate limits' cut | mm/yr | none (the plate model's Airy height, PLT-278 to PLT-282) | `uncited` |
 | ISO-093 | Earth's departure from local isostasy | at most about 2 to 4 km of rock (free-air −380 to +300 mGal at 0.112 mGal/m) | km | Watts et al. 2025, ten Brink et al. 2004, Stern, Cattin et al. 2001, Hunter & Watts 2016, Watts & Burov 2003 | `verified` (measurement only) |
+| ISO-096 | The sea over the plate model's own moves | no load: the move as the carry made it (`h_start` less the source's elevation before the step); on ocean floor that builds nothing all of it, on building columns all but the crust's change (ISO-091). Took in ISO-088 (GDH1's cooling) | m | Turcotte & Schubert §3.13; Levitt & Sandwell 1995; Zhang et al. 2014 | `cited-unverified` |
+| ISO-097 | The carry at a trench | the plate model's elevation plus the carried offset, no uplift added | m | none (numerics; Earth's trench depths for the check: Zhang et al. 2014, 2018) | `game-choice` |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
 ISO-054 and ISO-057 to ISO-060, all `game-choice`.
@@ -139,8 +143,8 @@ the artifact fixes); the sea-depth row is from the final code (law 2.7, after th
 - Every plate boundary is a break, also where two plates slide past each other.
 - On the quick presets a flexural feature is 2 to 8 cells wide.
 - Trenches and the ocean floor's deepening with age are not flexure in the model; they are
-  prescribed by the plate model, and under GDH1 the water that fills the deepening is no load
-  either (ISO-088).
+  prescribed by the plate model, the water that fills them is no load either (ISO-096), and at a
+  trench the surface follows the plate model's height and keeps only its own offset (ISO-097).
 - Along active margins the ground still zigzags from cell to cell somewhat more than without
   flexure: narrow loads that are real at this resolution (marine fill of kilometres in trench
   cells) and the load a plate lets go where a plate boundary moves through cells (since
@@ -395,8 +399,90 @@ was not added, since no run keeps a column more than 5 km over Airy on more than
 samples.
 
 **What is left.** The guard's worst is now 14.8 to 21.9 km from the sea in every run of both arms,
-above Earth's relief (the Challenger Deep, 10.9 km, ISO-071) but no longer growing; which cells
-make it was not traced here.
+above Earth's relief (the Challenger Deep, 10.9 km, ISO-071) but no longer growing. The cells that
+make it are traced in "The trench rows".
+
+## The trench rows
+
+**What was seen.** After the settling's fix the guard's worst stood 14.8 to 21.9 km below the sea
+in all 24 runs, 4 to 11 km past the Challenger Deep. The base's scattered start, seed 1
+(`earthlike_quick_16k`, 1000 Myr), traced step by step with a scratch patch that split each deep
+cell's offset from the plate model's height into the surface steps that made it (not kept in the
+code): 179 plate steps had a cell more than 11 km down, the run's worst 15.8 km. They are of two
+kinds.
+
+- 163 steps: ocean floor where the plate model itself stood at its deepest, the trench depth
+  `z_t` = −10 km (median 10.1 km below the sea), and the surface 2.8 km under it. Of that, 2.6 km
+  was the flexure's water load. Traced to its start (−724 Myr, 8°S): a cell in a gap of the plate
+  model's coverage, its floor GDH1's for its age (3.5 km down), that a plate then covered at
+  10.5 km. The carry put the plate's height there, and the flexure loaded the 7 km of new sea over
+  it as a new load, 0.45 of it again (ρ_w/(ρ_m − ρ_w)). The plate model reads the surface's offset
+  back as the mean over its samples (ISO-078's feedback), clamped at `z_t`, so the samples stayed at
+  the clamp and the cells under them deeper still.
+- 16 steps, the run's worst among them: rows of cells on a trench (the plate model's TRENCH flag,
+  the trench regime), where the plate model stood 6.7 km down and the surface 6.0 km under that at
+  the step's start: 4.9 km from the carry, 0.8 km from the flexure's water (nearly all of it the
+  sea over the plate model's pull towards `z_t`), 0.3 km from its rock. The worst cell (−806 Myr,
+  58.5°S): of its four source corners three were on the other plate, and the one on its own plate
+  stood 5.9 km under the plate model's height there (12.7 km down against 6.8). The carry took
+  that and added the step's uplift, −1.25 mm/yr or −2.5 km (the trench sample pulled towards
+  `z_t`), while the plate model's height at the cell itself rose 0.4 km over the source's: the cell
+  began the step 8.8 km under the plate model (15.3 km down against 6.4), and the flexure's loads
+  took it to 15.8 km.
+
+**The cause.** Two surface rules counted, a second time, depth that the plate model's heights
+already hold.
+
+1. *The sea over the plate model's own moves.* The flexure loads the change of the sea over each
+   cell. Since ISO-088 (2026-10-21) it left out the sea over GDH1's cooling, since ISO-091
+   (2026-10-22) the sea over a building column's height moved alone; every other move of the
+   ocean floor's ground the plate model made, it still loaded: the pull of a trench sample towards
+   `z_t` (up to 2.4 km a step), the release from it, and the plate that covers a gap's floor (up to
+   7 km in a step). Cortial's `z_t` and GDH1 are depths under the sea, the water's weight in them,
+   and so is every height the plate model gives the ocean floor.
+2. *The carry on a trench row.* The surface carries its ground with the crust (advect.rs), and on
+   a cell that is not in a gap adds the plate model's uplift there, `(z_end − z0)/dt` of the
+   samples round it. That is right where the samples move with the crust. On a trench row the crust
+   moves into the trench and is consumed: each step the cell's source is a cell of the same row
+   that the step before already took down, the uplift of the trench sample (its pull towards `z_t`)
+   is added again, and the plate model's height at the cell, interpolated from samples that are
+   consumed and replaced, does not follow. The sum of the pulls ran 5 to 9 km under the plate
+   model's own trench, and the plate model's feedback (means over its samples, 71 km apart) does not
+   take back a row one cell wide.
+
+**What Earth does.** A trench is the ocean floor bent down by the subducting plate, and the sea
+fills it: the water "fills in the space vacated" by the mantle the bent plate moves aside, and the
+restoring force is (ρ_m − ρ_w) g w (Turcotte & Schubert §3.13, eqs. 3.101 to 3.103); fits of the
+trench's outer wall take the restoring force so and fit the depth of the floor under the sea
+directly (Levitt & Sandwell 1995; Zhang et al. 2014, eq. 1). The deepest floor is the Challenger
+Deep at 10.9 km (ISO-071), with a trench relief, its depth below the far-field floor, of 5.7 km;
+along the Mariana trench the relief is 0.9 to 5.7 km (Zhang et al. 2014), and averaged over
+sections of the world's trenches 0.9 to 4.7 km (Zhang et al. 2018). The bent plate's elastic
+thickness is 20 to 30 km at most trenches (Stern). The plate model's `z_t` of −10 km and its pull
+there are its picture of that bend, the water in them.
+
+**The fix** (ISO-096, ISO-097).
+
+1. *The water* (ISO-096). The flexure books the plate model's move of the ground as the carry made
+   it, the step's start less the surface's elevation at the crust's source before the step (carried
+   with the flexure's state, `FlexState::from_m`; the plate model's uplift where that is unknown).
+   On ocean floor that builds nothing (oceanic crust outside arcs and hotspots) the whole move is a
+   height moved alone, its sea no load; on building columns the crust's own change is a load as
+   before (ISO-091) and the rest of the move is not. This covers GDH1's cooling (ISO-088, whose
+   separate rule went), the trench's pull and release, the carry's onto a trench row and a gap's
+   floor covered by a plate. The change of the sea level itself, the water that erosion and
+   deposition displace and the water thickened crust pushes aside still load the floor.
+2. *The trench rows* (ISO-097). On a cell at a trench (the TRENCH flag or the trench regime) the
+   carry no longer adds the uplift to the carried ground: the cell takes the plate model's height
+   there plus the offset carried from its source (the surface's own departures: its sediment, its
+   flexure), as the carry already did in a gap. The plate model's trench sets the trench's depth.
+
+Unit tests `the_sea_over_the_ocean_floors_own_moves_is_no_load` (GDH1's sinking and a trench's
+2.4 km pull sink the floor by exactly the move; a gap's floor at −3.5 km covered by a plate at
+−10 km sinks no further; without the source's height, 6.5 km × 0.45 more, as before; a sea 100 m
+higher sinks the floor by 0.45 of it) and `a_trench_carries_its_offset` (advect.rs).
+
+**Measured.** (to come)
 
 ## Game choices
 

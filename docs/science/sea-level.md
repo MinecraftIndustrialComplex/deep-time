@@ -112,7 +112,8 @@ Because the level follows the ground, everything that changes the ocean basins' 
 - **Isostasy of the water**: the surface flexure loads the sea floor with the water over it (ISO-044,
   ISO-046), so a sea that rises presses its floor down and makes some of its own room, the
   hydro-isostatic share Earth's backstripping writes as (ρ_m − ρ_w)/ρ_m (Kominz et al. 1998).
-  The water that fills GDH1's own deepening is no new load (ISO-088): GDH1 is the depth of floor
+  The water that fills GDH1's own deepening is no new load (ISO-088, since 2026-10-23 part of
+  ISO-096 with the plate model's other moves of the floor, flexure.md "The trench rows"): GDH1 is the depth of floor
   under water, that water's weight in it. Until the review of 2026-10-21 the flexure loaded it
   again, and the floor sank about 1.45 times GDH1 ("The flexure's water over GDH1's floor").
 
@@ -147,7 +148,9 @@ than GDH1's own −2,600 and −5,651 m (the editor's ridge and abyssal depths),
 stretched between them, z = z_r − s·(d(t) − 2,600) with s = (z_r − z_f)/3,051, and each step
 sinks s times as much (PLT-355); every shipped preset has s = 1.
 
-The flexure's water over that floor (`surface/flexure.rs`, `cooled_under_sea`): of the step's
+The flexure's water over that floor (`surface/flexure.rs`, `cooled_under_sea` until 2026-10-23;
+since then `booked`, which leaves out the sea over the whole of the plate model's move of the
+floor, GDH1's sinking among it, ISO-096, flexure.md "The trench rows"): of the step's
 change of the sea's depth over an oceanic cell that is not new at the place, the part
 
   min(max(S − h_start, 0), s·[d(t) − d(t − Δt)])
@@ -169,7 +172,7 @@ a mean of t_m/3 = 60 Myr (Earth's floor today 64.2, Seton et al. 2020) and a med
 | ISO-085 | The planet's surface water, a layer over the whole planet | `planet.surface_water_m` 2,664 (default and every shipped preset) | m | Charette & Smith 2010 (ocean 1.33238·10⁹ km³), Fretwell et al. 2013 (Antarctica 26.54·10⁶ km³ grounded), Morlighem et al. 2017 (Greenland 2.99·10⁶ km³), IPCC AR5 Table 4.1 (glaciers 0.41 m); Earth's area from memory | `verified` |
 | ISO-086 | The sea at S is the open sea: a connected body of ground below S of at least n/500 cells; closed hollows take no water until the sea tops their rim | `fill_level` with the surface's `open_sea` rule (ERO-055) | m | none needed (mass balance); the size rule is ERO-055's | `game-choice` |
 | ISO-087 | The sea level series' check against Earth's Phanerozoic range | −100 to +250 m against today | m | Müller et al. 2008 (Late Cretaceous 170 m, 85 to 270), Miller et al. 2005 (Cretaceous peak 100 ± 50 m), both abstracts; Haq et al. 1987's 250 m at second hand (Miller et al. 2011) | `abstract-only` |
-| ISO-088 | The sea over GDH1's own deepening is no new load on the floor | `flexure::cooled_under_sea` | m | Stein & Stein 1992 (GDH1 is depth below the sea); Kominz et al. 1998's relation (PLT-353) | `cited-unverified` |
+| ISO-088 | The sea over GDH1's own deepening is no new load on the floor (merged into ISO-096, 2026-10-23) | `flexure::cooled_under_sea` until 2026-10-23, then `flexure::booked` | m | Stein & Stein 1992 (GDH1 is depth below the sea); Kominz et al. 1998's relation (PLT-353) | `cited-unverified` |
 | CLM-210 | Land ice holds (ρ_i/ρ_w) of its volume of the planet's water out of the sea | `sea_level::ice_layer_m`, 917/1028 (CLM-099) | m | IPCC AR5 Table 4.1 note b (917 and 1028 kg/m³, read) | `verified` |
 | PLT-350 | The ocean floor's law | `tectonics.ocean_depth`: `gdh1` in every shipped Earth-like preset, `dampening` (PLT-129) the default and the plate-only presets' | - | the brief: PLT-129's dampening fixed at an age–depth law | `game-choice` |
 | PLT-351 | New ocean floor at the law's depth for its age | `pools::floor_at` (init, ridges, L1 gaps) | m | as PLT-352 | `cited-unverified` |
