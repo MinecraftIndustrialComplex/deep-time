@@ -8336,7 +8336,7 @@ The sources of the lithosphere's thermal state (gap 4; `lithosphere-thermal-stat
 - Reference: Macdonald, F. A., Swanson-Hysell, N. L., Park, Y., Lisiecki, L. and Jagoutz, O. (2019). Arc-continent collisions in the tropics set Earth's climate state. Science 364:181-184. The full author list is `from-memory`; the title, journal, volume and pages are as PLT-157 records them.
 - DOI or URL: 10.1126/science.aav5300 (from memory, not checked); the analysis code and data are on GitHub as Swanson-Hysell-Group/Arc_Continent_Analysis (from memory, the repository was not opened).
 - Cited as: "Macdonald et al. 2019" (arc-continent sutures per 100 Myr and the Phanerozoic peaks of total suture length).
-- Ledger ids: PLT-157; RLC-073 (2026-10-23: the literature's collision counts are for a different object than the model's)
+- Ledger ids: PLT-157; RLC-073 (2026-10-23: the literature's collision counts are for a different object than the model's); PLT-508 (2026-10-23, V1 gap 2: the reference for collcoast's docking episodes)
 - Access: paywalled at Science; the copy that was read is the one PLT-157 records (the full text was read by the 2026-10-22 research agent and again in the first pass of the 2026-10-23 realism-checks task).
 - Library: not kept.
 - Read so far (by the project): in full: six peaks of total suture length in 540 Myr for the major orogenies (about 1.1 per 100 Myr) and 15 to 46 ophiolite-bearing arc-continent sutures per 100 Myr (Paleozoic 44 in 290 Myr, Mesozoic 32 in 185, Cenozoic 30 in 65). RLC-073 uses these only to say they count sutures, not the model's terranes of at least 3.64 million km2 that end in a weld, so they bound nothing.
