@@ -115,7 +115,7 @@ pub const SOLVES_GLOBAL: &str = "surface/flexure_solves";
 pub const ITERATIONS_GLOBAL: &str = "surface/flexure_iterations";
 pub const UNCONVERGED_GLOBAL: &str = "surface/flexure_unconverged";
 /// `WorldState::globals`: the solve's cells whose plate yielded, summed over the steps (only
-/// with `yield_anomaly_mgal`, ISO-105).
+/// with `yield_anomaly_mgal`, ISO-120).
 pub const YIELDED_GLOBAL: &str = "surface/flexure_yielded_cells";
 
 /// The `surface.flexure` section: every key optional.
@@ -154,7 +154,7 @@ pub struct FlexureParams {
     /// passes Δg / 2πG, the plate there yields and the rest of the load sinks (or rises) under
     /// the cell alone, as on a plate with no strength. 380 is Earth's most negative free-air
     /// anomaly (the Puerto Rico Trench, ten Brink et al. 2004): 9.1 × 10⁶ kg/m², 2.75 km of
-    /// mantle. 0, the default: off, the purely elastic plate (ISO-105).
+    /// mantle. 0, the default: off, the purely elastic plate (ISO-120).
     pub yield_anomaly_mgal: f64,
     /// Solve every this many plate steps (loads in between wait for the next solve).
     pub every_steps: u32,
@@ -175,7 +175,7 @@ impl Default for FlexureParams {
             te_recovery_myr: 300.0, // ledger: ISO-051 (uncited: this agent's choice)
             te_min_km: 5.0, // ledger: ISO-052
             te_weakening_myr: 0.0, // ledger: ISO-099 (game-choice: off by default)
-            yield_anomaly_mgal: 0.0, // ledger: ISO-105 (off by default)
+            yield_anomaly_mgal: 0.0, // ledger: ISO-120 (off by default)
             every_steps: 1, // ledger: ISO-059 (game-choice: numerical)
             tolerance_m: 2.0, // ledger: ISO-059
             max_iterations: 60, // ledger: ISO-059
@@ -287,15 +287,15 @@ impl FlexureParams {
 
     /// The most load a plate holds away from local isostasy, kg/m² (`yield_anomaly_mgal` as a
     /// mass, Δg / 2πG); `None` when off.
-    // ledger: ISO-105
+    // ledger: ISO-120
     pub fn yield_held_kg_m2(&self) -> Option<f64> {
         (self.yield_anomaly_mgal > 0.0)
             .then(|| self.yield_anomaly_mgal * 1.0e-5 / (std::f64::consts::TAU * G_NEWTON))
     }
 }
 
-/// The gravitational constant, m³/(kg s²) (CODATA 2018).
-// ledger: ISO-105
+/// The gravitational constant, m³/(kg s²) (CODATA 2022, NIST: 6.674 30(15) × 10⁻¹¹).
+// ledger: ISO-120
 pub const G_NEWTON: f64 = 6.674_30e-11;
 
 /// Flexural rigidity over gravity, D / g, kg·m, of a plate `te_km` thick.
@@ -1391,7 +1391,7 @@ pub struct StepOut {
     pub loads_m: Vec<f32>,
     pub roots_m: Vec<f32>,
     pub released_m: Vec<f32>,
-    /// The solve's cells whose plate yielded this step (`yield_anomaly_mgal`, ISO-105).
+    /// The solve's cells whose plate yielded this step (`yield_anomaly_mgal`, ISO-120).
     pub yielded_cells: usize,
 }
 
@@ -1815,7 +1815,7 @@ pub fn step(
     // (P1-17).
     let mut flex = vec![0.0f32; n];
     let mut changes = vec![0.0f64; n];
-    // ledger: ISO-105
+    // ledger: ISO-120
     // The plate's strength (off unless `yield_anomaly_mgal` is set). An elastic plate holds any
     // load; a real one yields where it is bent hard: its elastic thickness falls to about half at
     // a curvature of 1e-6 per m (Watts & Burov 2003), and no plate on Earth holds more than about
@@ -1865,7 +1865,7 @@ pub fn step(
                 if let Some(bound) = yield_bound
                     && holds.abs() > bound
                 {
-                    // ledger: ISO-105
+                    // ledger: ISO-120
                     let sink = (holds - bound * holds.signum()) / RHO_MANTLE;
                     hr[i] -= p.strength * sink;
                     cr[i] -= p.strength * sink;
@@ -3471,7 +3471,7 @@ mod tests {
 
     /// A narrow column on a craton fed crust step after step (the collapse's receiver in the
     /// polar peaks): the elastic plate holds its root up without bound; with the yield on
-    /// (ISO-105) the plate holds at most its bound, the rest sinks under the column, and a load
+    /// (ISO-120) the plate holds at most its bound, the rest sinks under the column, and a load
     /// under the bound moves exactly as before.
     #[test]
     fn a_plate_that_yields_holds_no_more_than_its_strength() {
@@ -3506,7 +3506,7 @@ mod tests {
         };
         let elastic = on();
         let strong = FlexureParams {
-            yield_anomaly_mgal: 380.0, // ledger: ISO-105
+            yield_anomaly_mgal: 380.0, // ledger: ISO-120
             ..on()
         };
         strong.validate().unwrap();
