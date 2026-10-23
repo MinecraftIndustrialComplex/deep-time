@@ -11,14 +11,16 @@
 //! ([`heat_flow_mw_m2`]), a thermal term of the Airy height ([`uplift_m`]) and a thermal age
 //! ([`thermal_age_myr`]) for the thin sheet's viscosity and the flexure's Te.
 //!
-//! All of it is off unless `tectonics.thermal_state` is set; the height and the strength have
-//! switches of their own (`thermal_isostasy_m`, `thermal_strength`).
+//! `tectonics.thermal_state` and `thermal_strength` are on by default since 2026-10-23 (Ben's
+//! rule of that day, "Always, fix V1 elsewhere": physics goes on once built and correct); off,
+//! for tests that isolate one law, there is no state and heat flow is the old proxy. The thermal
+//! height (`thermal_isostasy_m`, an open fault: no frame for its reference depth is right while
+//! the model's sea is not) and the backstop (`thermal_backstop`, a stand-in) stay off.
 //!
-//! Stage 3 (`tectonics.root_removal`): a collision belt's thickened mantle lithosphere drops off
-//! by Rayleigh-Taylor instability, so its lithosphere heats to the Moho, or to its keel where it
-//! has one ([`ROOT_REMOVAL_MYR`]). Stage 2 (`tectonics.transition_beta`) thins a rifted margin's
-//! lithosphere with its crust in `transition.rs` ([`stretch`]); the cooling here is then
-//! McKenzie's thermal subsidence.
+//! Stage 3: a collision belt's thickened mantle lithosphere drops off by Rayleigh-Taylor
+//! instability, so its lithosphere heats to the Moho, or to its keel where it has one
+//! ([`ROOT_REMOVAL_MYR`]). Stage 2 thins a rifted margin's lithosphere with its crust in
+//! `transition.rs` ([`stretch`]); the cooling here is then McKenzie's thermal subsidence.
 
 use rayon::prelude::*;
 
@@ -177,16 +179,15 @@ fn heating(flags: u8) -> Option<bool> {
     }
 }
 
-/// The crust, km, of a continental sample whose thickened mantle lithosphere is unstable (stage 3,
-/// `root_removal`): a collision belt (a Himalayan orogeny) whose crust is thicker than the model's
-/// thickened crust, `collapse_thickness_km` (PLT-256: the lithosphere thickened with it by about
-/// the crust's factor, 1.5 or more, Houseman, McKenzie & Molnar 1981's thickened boundary layer);
-/// `None` elsewhere or with the switch off.
+/// The crust, km, of a continental sample whose thickened mantle lithosphere is unstable (stage
+/// 3): a collision belt (a Himalayan orogeny) whose crust is thicker than the model's thickened
+/// crust, `collapse_thickness_km` (PLT-256: the lithosphere thickened with it by about the crust's
+/// factor, 1.5 or more, Houseman, McKenzie & Molnar 1981's thickened boundary layer); `None`
+/// elsewhere.
 // ledger: PLT-478
 pub fn root_crust_km(k: &TectonicParams, s: &Sample) -> Option<f64> {
     let crust_km = f64::from(s.thickness_m) / 1000.0;
-    (k.root_removal && s.orogeny == OROGENY_HIMALAYAN && crust_km > k.collapse_thickness_km)
-        .then_some(crust_km)
+    (s.orogeny == OROGENY_HIMALAYAN && crust_km > k.collapse_thickness_km).then_some(crust_km)
 }
 
 /// One step of a continental sample's state over `dt_myr`: (L, K) after it. `flags` are the
@@ -287,7 +288,7 @@ pub fn step(state: &mut PlateState, env: &Env) {
     });
 }
 
-/// Stage 2 (`transition_beta`): a continental column whose crystalline crust the transition thins
+/// Stage 2: a continental column whose crystalline crust the transition thins
 /// to `keep` of what it was (a stretch by β = 1 / `keep`) has its lithosphere and keel thinned by
 /// the same factor, L / β and K / β (McKenzie 1978's uniform stretching of the whole lithosphere,
 /// pure shear); a sample with no state keeps none.
@@ -444,17 +445,14 @@ mod tests {
         );
     }
 
-    /// The root is unstable only in a collision belt thickened past the collapse threshold, and
-    /// only with the switch on.
+    /// The root is unstable only in a collision belt thickened past the collapse threshold.
     #[test]
     fn only_a_thickened_collision_belt_loses_its_root() {
-        let mut k = TectonicParams::default();
+        let k = TectonicParams::default();
         let mut s = Sample::blank(0);
         s.kind = CONTINENTAL;
         s.orogeny = OROGENY_HIMALAYAN;
         s.thickness_m = 60_000.0;
-        assert_eq!(root_crust_km(&k, &s), None, "off by default");
-        k.root_removal = true;
         assert_eq!(root_crust_km(&k, &s), Some(60.0));
         s.thickness_m = 45_000.0;
         assert_eq!(root_crust_km(&k, &s), None, "not thickened");

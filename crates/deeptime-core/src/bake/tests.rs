@@ -375,7 +375,8 @@ fn check_heat_flow(dir: &Path, lo: f64) {
 /// (150, 60) (gap 4's scan of seeds 1 to 12 at 60 and 100 Myr, 2026-10-23; at release commit
 /// 1bdacb76 the default seed at 100 Myr baked 33.7 at (159, 11)): crust the rate guard spread onto
 /// old floor after the step's resampling (`collapse::spread`) became continental after the step had
-/// set every sample's heat flow, and kept the sea floor's.
+/// set every sample's heat flow, and kept the sea floor's. The pass alone: the lithosphere's
+/// thermal state (on by default since 2026-10-23, with its own heat flow) is off here.
 #[test]
 fn the_release_pace_bakes_continental_heat_flow_with_the_final_pass() {
     let dir = temp_dir("release-pace");
@@ -383,6 +384,7 @@ fn the_release_pace_bakes_continental_heat_flow_with_the_final_pass() {
     v["seed"] = json!(1);
     v["surface"]["flexure"]["te_weakening_myr"] = json!(62.8);
     v["tectonics"]["heat_flow_refresh"] = json!(true);
+    v["tectonics"]["thermal_state"] = json!(false);
     run_to_folder(&v.to_string(), &dir);
     check_heat_flow(&dir, 54.9);
     let _ = std::fs::remove_dir_all(&dir);

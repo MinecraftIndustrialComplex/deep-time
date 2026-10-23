@@ -2078,3 +2078,37 @@ fn thick_ocean_crust_cools_towards_the_floor_it_holds_up() {
     assert!((f64::from(st.samples[oceanic[0]].elevation_m) - z_f).abs() < 50.0);
     assert!(last < 0.0 && last > z_f + 2000.0, "{last}");
 }
+
+/// TEMPORARY (gap 4 defaults, 2026-10-23): which seeds of 1 to 24 weld in 300 Myr on the
+/// weld test's planet. Removed before the commit.
+#[test]
+#[ignore]
+fn weld_seed_sweep_tmp() {
+    let seeds: Vec<u64> = (1..=24).collect();
+    let welds = std::sync::Mutex::new(Vec::new());
+    std::thread::scope(|scope| {
+        for chunk in seeds.chunks(4) {
+            let welds = &welds;
+            scope.spawn(move || {
+                for &seed in chunk {
+                    let p = preset(8000, 300.0, "scattered_continents", seed);
+                    let world = run_stage(&p, |_, _, _| {});
+                    let st = world.plates.as_ref().unwrap();
+                    let d = st.dynamics.as_ref().unwrap();
+                    let n = d.collisions.iter().filter(|c| c.sutured).count();
+                    let short = d
+                        .collisions
+                        .iter()
+                        .filter(|c| c.sutured && c.end_myr - c.start_myr < 4.0)
+                        .count();
+                    welds.lock().unwrap().push((seed, n, short));
+                }
+            });
+        }
+    });
+    let mut w = welds.into_inner().unwrap();
+    w.sort();
+    for (seed, n, short) in &w {
+        println!("SWEEP seed {seed}: {n} welds, {short} under 4 Myr");
+    }
+}
