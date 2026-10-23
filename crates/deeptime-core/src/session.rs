@@ -1273,8 +1273,7 @@ impl Session {
         k: usize,
         history: Option<&HistoryHandle>,
     ) -> Result<(), CoreError> {
-        self.gauge
-            .keep_below(s.allowed[k].min(self.mem_cap).saturating_sub(KEEP_MARGIN_BYTES));
+        self.gauge.keep_below(s.allowed[k].min(self.mem_cap).saturating_sub(KEEP_MARGIN_BYTES));
         let Some(h) = history else {
             return Ok(());
         };
@@ -1991,8 +1990,7 @@ impl Session {
         // kept filled the count to that bound, and one fresh block passed it (tests/memory_estimate.rs,
         // 2026-10-21: 99.7 against 99.5 MiB, 41.6 MiB of it kept blocks).
         if let Some(a) = s.bake_allowed {
-            self.gauge
-                .keep_below(a.min(self.mem_cap).saturating_sub(KEEP_MARGIN_BYTES));
+            self.gauge.keep_below(a.min(self.mem_cap).saturating_sub(KEEP_MARGIN_BYTES));
         }
         let dir = &self.out_dir;
         let manifest_path = dir.join(MANIFEST);
