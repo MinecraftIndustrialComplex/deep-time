@@ -409,7 +409,13 @@ pub fn maybe_initiate_subduction(
         .collect();
     let trench_tree = (!trenches.is_empty()).then(|| Tree::over(&trenches, |_| true));
     let clearance = env.norm.rad(k.subduction_initiation_clearance_km);
-    let margin = env.norm.rad(k.subduction_initiation_margin_km);
+    // Off the passive margin (V1 gap 2's stage C1): the reach of the arc the new trench builds
+    // on the plate, and a lattice spacing for where the front falls. ledger: PLT-503
+    let margin = if k.subduction_initiation_offshore {
+        env.norm.rad(k.arc_distance_km + k.arc_width_km) + env.norm.spacing_rad()
+    } else {
+        0.0
+    };
     let clear = |i: usize| {
         trench_tree.as_ref().is_none_or(|tr| {
             tr.nearest(pos[i])
@@ -455,9 +461,8 @@ pub fn maybe_initiate_subduction(
         }
         if state.rng.next_f64() < 1.0 - (-lambda).exp() {
             if margin > 0.0 {
-                // Off the passive margin (V1 gap 2's stage C1): the old floor within the margin
-                // of the plate's continental crust stays on the plate, and the fracture's seed
-                // is old floor beyond it; none, no initiation. ledger: PLT-503
+                // The old floor within the margin of the plate's continental crust stays on the
+                // plate, and the fracture's seed is old floor beyond it; none, no initiation.
                 let near = near_continent(state, pos, id, margin);
                 let far: Vec<u32> = o.iter().copied().filter(|&i| !near[i as usize]).collect();
                 if far.is_empty() {
@@ -907,19 +912,21 @@ mod tests {
     /// Stern 2004 (§4.1): "There are no Cenozoic examples of a passive continental margin
     /// transforming into a convergent margin"; Crameri et al. 2020: passive margins are less
     /// favourable for subduction initiation than heterogeneous ocean interiors. A continent
-    /// (a 60° cap) in an ocean of old floor: without the margin, the initiation's fracture runs
-    /// along the continent's edge on some draws and the old floor beside the coast goes to the
-    /// sinking plate (the passive margin turned active); with it, no sample of the sinking plate
-    /// lies within the margin of the continent, and with a margin wider than the ocean there is
-    /// no initiation. ledger: PLT-503, PLT-067
+    /// (a 60° cap) in an ocean of old floor: off, the initiation's fracture runs along the
+    /// continent's edge on some draws and the old floor beside the coast goes to the sinking plate
+    /// (the passive margin turned active, which PLT-067 meant to stop); on, no sample of the
+    /// sinking plate lies within the arc's reach and a spacing of the continent, so the arc the
+    /// new trench builds stands on ocean floor; with an arc reaching across the ocean there is no
+    /// initiation. ledger: PLT-503, PLT-067
     #[test]
     fn subduction_starts_off_the_passive_margin() {
         let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
         let cap = |p: DVec3| p.z > 0.5;
-        let initiate_with = |margin_km: f64, seed: u64| -> (PlateState, Vec<DVec3>) {
+        let initiate_with = |offshore: bool, arc_km: f64, seed: u64| -> (PlateState, Vec<DVec3>) {
             let k = TectonicParams {
                 subduction_initiation_per_myr: 100.0,
-                subduction_initiation_margin_km: margin_km,
+                subduction_initiation_offshore: offshore,
+                arc_distance_km: arc_km,
                 ..Default::default()
             };
             let mut state = one_plate(
@@ -938,17 +945,19 @@ mod tests {
             land.nearest(p)
                 .map_or(f64::INFINITY, |(_, d2)| angle_of_chord2(d2))
         };
-        let spacing = Norm::new(6370.0, 6371.0, N).spacing_rad();
-        let margin = Norm::new(6370.0, 6371.0, N).rad(500.0);
+        let k = TectonicParams::default();
+        let norm = Norm::new(6370.0, 6371.0, N);
+        let spacing = norm.spacing_rad();
+        let margin = norm.rad(k.arc_distance_km + k.arc_width_km) + spacing;
         let (mut touched, mut started) = (0, 0);
         for seed in 1..=8 {
-            let (base, pos) = initiate_with(0.0, seed);
+            let (base, pos) = initiate_with(false, k.arc_distance_km, seed);
             if base.plates.len() == 2
                 && (0..N).any(|i| base.plate_of(i) == 1 && to_land(pos[i]) < 1.5 * spacing)
             {
                 touched += 1;
             }
-            let (kept, pos) = initiate_with(500.0, seed);
+            let (kept, pos) = initiate_with(true, k.arc_distance_km, seed);
             if kept.plates.len() == 2 {
                 started += 1;
                 let nearest = (0..N)
@@ -961,12 +970,9 @@ mod tests {
                 );
             }
         }
-        assert!(
-            touched >= 1,
-            "without the margin some fracture runs along the coast"
-        );
-        assert!(started >= 1, "with it, subduction still starts");
-        let (none, _) = initiate_with(20_000.0, 1);
+        assert!(touched >= 1, "off, some fracture runs along the coast");
+        assert!(started >= 1, "on, subduction still starts");
+        let (none, _) = initiate_with(true, 20_000.0, 1);
         assert_eq!(
             none.plates.len(),
             1,
