@@ -333,8 +333,9 @@ public final class StructureBurialGameTests {
      * What one placed start holds, read back from the generated chunks inside its pieces' boxes. Every cell is read
      * before the start is placed and again after. Before, a wet cell is the sea's (it lies over its column's real
      * floor: the open sea, or a lake) or a cave's (under that floor: a carver's tunnel, which a level without
-     * aquifers fills with water below sea level). After, a wet cell is the template's own (the placing put it there)
-     * or the world's water left in place (the placing did not write the cell).
+     * aquifers fills with water below sea level). After, a wet cell is the template's own (the placing changed it)
+     * or the world's left in place (the cell is as it was: the placing did not write it, or wrote the same water over
+     * it, as {@code corridor/end_2}'s basin over a flooded tunnel does under MIC).
      */
     private static final class Tally {
         long read, structure, structureWet, seaBefore, caveBefore, water, left, columns;
