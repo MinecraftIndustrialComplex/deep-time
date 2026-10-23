@@ -800,6 +800,11 @@ pub fn heal(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::params::TectonicParams;
+    use crate::plates::geometry::positions;
+    use crate::plates::normalise::Norm;
+    use crate::plates::pools::{continental_column, oceanic_column};
+    use crate::plates::state::Sample;
 
     #[test]
     fn stress_weights_keep_the_mean_and_favour_the_stress_asked_for() {
@@ -817,5 +822,192 @@ mod tests {
         // Off, or no stress at all: no weights.
         assert!(stress_weights(&stress, &cands, 0.0, 1.0).is_none());
         assert!(stress_weights(&[None, None], &[(0, 1.0), (1, 1.0)], 20.0, 1.0).is_none());
+    }
+
+    const N: usize = 16_000;
+
+    fn env(k: &TectonicParams) -> Env<'_> {
+        Env {
+            k,
+            norm: Norm::new(6370.0, 6371.0, N),
+            dt_myr: 2.0,
+            dt_yr: 2.0e6,
+            gravity: 9.81,
+            step: 1,
+            t_myr: 2.0,
+        }
+    }
+
+    /// One plate over the whole sphere, each sample as `make` says from its position.
+    fn one_plate(geo: &Geo, seed: u64, make: impl Fn(DVec3) -> Sample) -> PlateState {
+        let ident = [0.0, 0.0, 0.0, 1.0];
+        let mut st = PlateState {
+            n: N as u32,
+            lattice: ident,
+            samples: geo.points().iter().map(|&p| make(p)).collect(),
+            groups: vec![Group {
+                plate: 0,
+                rot: ident,
+            }],
+            plates: vec![Plate {
+                id: 0,
+                alive: true,
+                omega: [0.0; 3],
+                born_myr: 0.0,
+                died_myr: None,
+                birth_event: None,
+                parent: None,
+                lip_until_myr: f64::NEG_INFINITY,
+                lip_event: None,
+                samples: 0,
+                centroid: [0.0, 0.0, 1.0],
+                continental_frac: 0.0,
+            }],
+            contacts: Vec::new(),
+            hotspots: Vec::new(),
+            ridges: Vec::new(),
+            rift_links: Vec::new(),
+            rng: crate::sphere::SplitMix64::new(seed),
+            step: 0,
+            t_myr: 0.0,
+            start_myr: 0.0,
+            resample_step: 0,
+            resample_myr: 0.0,
+            a0_km2: 1.0,
+            counters: Default::default(),
+            slabs: Vec::new(),
+            dynamics: None,
+            gap_budget: None,
+            limits: None,
+        };
+        let pos = positions(&st, geo);
+        st.recount(&pos);
+        st
+    }
+
+    fn continental() -> Sample {
+        let mut s = Sample::blank(0);
+        s.kind = CONTINENTAL;
+        s.pools = continental_column();
+        s.thickness_m = s.pools.iter().sum();
+        s.elevation_m = 300.0;
+        s
+    }
+
+    /// Ocean floor formed 400 Myr ago: old enough to start subducting anywhere (PLT-062).
+    fn old_floor() -> Sample {
+        let mut s = Sample::blank(0);
+        s.pools = oceanic_column();
+        s.thickness_m = s.pools.iter().sum();
+        s.elevation_m = -5600.0;
+        s.formed_myr = -400.0;
+        s
+    }
+
+    /// Stern 2004 (§4.1): "There are no Cenozoic examples of a passive continental margin
+    /// transforming into a convergent margin"; Crameri et al. 2020: passive margins are less
+    /// favourable for subduction initiation than heterogeneous ocean interiors. A continent
+    /// (a 60° cap) in an ocean of old floor: without the margin, the initiation's fracture runs
+    /// along the continent's edge on some draws and the old floor beside the coast goes to the
+    /// sinking plate (the passive margin turned active); with it, no sample of the sinking plate
+    /// lies within the margin of the continent, and with a margin wider than the ocean there is
+    /// no initiation. ledger: PLT-503, PLT-067
+    #[test]
+    fn subduction_starts_off_the_passive_margin() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let cap = |p: DVec3| p.z > 0.5;
+        let initiate_with = |margin_km: f64, seed: u64| -> (PlateState, Vec<DVec3>) {
+            let mut k = TectonicParams::default();
+            k.subduction_initiation_per_myr = 100.0;
+            k.subduction_initiation_margin_km = margin_km;
+            let mut state = one_plate(
+                &geo,
+                seed,
+                |p| if cap(p) { continental() } else { old_floor() },
+            );
+            let pos = positions(&state, &geo);
+            let mut world = WorldState::new(1, 16_384, 0.0);
+            maybe_initiate_subduction(&mut state, &mut world, &geo, &pos, &env(&k), &[]).unwrap();
+            (state, pos)
+        };
+        let points = geo.points();
+        let land = Tree::over(points, |i| cap(points[i]));
+        let to_land = |p: DVec3| {
+            land.nearest(p)
+                .map_or(f64::INFINITY, |(_, d2)| angle_of_chord2(d2))
+        };
+        let spacing = Norm::new(6370.0, 6371.0, N).spacing_rad();
+        let margin = Norm::new(6370.0, 6371.0, N).rad(500.0);
+        let (mut touched, mut started) = (0, 0);
+        for seed in 1..=8 {
+            let (base, pos) = initiate_with(0.0, seed);
+            if base.plates.len() == 2
+                && (0..N).any(|i| base.plate_of(i) == 1 && to_land(pos[i]) < 1.5 * spacing)
+            {
+                touched += 1;
+            }
+            let (kept, pos) = initiate_with(500.0, seed);
+            if kept.plates.len() == 2 {
+                started += 1;
+                let nearest = (0..N)
+                    .filter(|&i| kept.plate_of(i) == 1)
+                    .map(|i| to_land(pos[i]))
+                    .fold(f64::INFINITY, f64::min);
+                assert!(
+                    nearest > margin,
+                    "seed {seed}: the sinking plate within {nearest} rad of the coast"
+                );
+            }
+        }
+        assert!(
+            touched >= 1,
+            "without the margin some fracture runs along the coast"
+        );
+        assert!(started >= 1, "with it, subduction still starts");
+        let (none, _) = initiate_with(20_000.0, 1);
+        assert_eq!(
+            none.plates.len(),
+            1,
+            "no old floor beyond the margin: no initiation"
+        );
+    }
+
+    /// Audet & Bürgmann 2011 (abstract): "strain is concentrated at pre-existing zones of
+    /// weakness"; the plate's effective elastic thickness is "low in the surrounding Phanerozoic
+    /// belts". A plate of 225 km lithosphere with a thin belt (30 km) between 14.5° and 23.6° N,
+    /// its centres drawn in the polar caps: the two fragments' fracture runs along the equator's
+    /// side of the caps' bisector without the weakness, and inside the belt with it. ledger: PLT-506
+    #[test]
+    fn rifts_break_where_the_lithosphere_is_thin() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let belt = |p: DVec3| p.z > 0.25 && p.z < 0.4;
+        let split = |weakness: f64| -> f64 {
+            let mut k = TectonicParams::default();
+            k.rift_warp_rad = 0.0;
+            k.rift_weakness = weakness;
+            let mut state = one_plate(&geo, 7, |p| {
+                let mut s = continental();
+                s.lithosphere_km = if belt(p) { 30.0 } else { 225.0 };
+                // Only the caps are visible, so the fragments' centres are drawn there.
+                if p.z.abs() < 0.6 {
+                    s.flags |= HIDDEN;
+                }
+                s
+            });
+            let pos = positions(&state, &geo);
+            let mut world = WorldState::new(1, 16_384, 0.0);
+            rift(&mut state, &mut world, &geo, &pos, &env(&k), 0, 2).unwrap();
+            assert_eq!(state.plates.len(), 2, "the plate rifted");
+            let line: Vec<usize> = (0..N)
+                .filter(|&i| {
+                    geo.edges(i as u32)
+                        .any(|(u, _)| state.plate_of(u as usize) != state.plate_of(i))
+                })
+                .collect();
+            line.iter().filter(|&&i| belt(pos[i])).count() as f64 / line.len() as f64
+        };
+        let (plain, weak) = (split(0.0), split(2.0));
+        assert!(plain < 0.3, "the bisector mostly misses the belt: {plain}");
+        assert!(weak > 0.8, "the fracture runs in the thin belt: {weak}");
     }
 }
