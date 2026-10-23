@@ -6,11 +6,18 @@ code (the brief's "design first"); the measured sections were added after the po
 
 Ledger ids on this page: `PLT-460` to `PLT-470`, `PLT-475` to `PLT-478`, `ISO-110` to `ISO-112`
 (see [claims.md](claims.md) and [ledger/PLT.md](ledger/PLT.md), [ledger/ISO.md](ledger/ISO.md)).
-Every law here sits behind a `--set` switch that is off by default (`tectonics.thermal_state`,
-`tectonics.thermal_isostasy_m`, `tectonics.thermal_strength`, `tectonics.thermal_backstop`,
-`tectonics.heat_flow_refresh`, `tectonics.transition_beta` (stage 2), `tectonics.root_removal`
-(stage 3); `tectonics.thermal_keel_km` sets the start's keel). Stages 2 and 3 were added by the
-gap-4 stages 2-3 agent on 2026-10-23, after a diagnosis of where the high coasts are.
+**On by default since 2026-10-23** (Ben's rule of that day, "Always, fix V1 elsewhere": physics goes
+on once it is built and correct, and the rule it replaces goes off with it; "On by default" below):
+the state with its heat flow (`tectonics.thermal_state`), the strength from it
+(`tectonics.thermal_strength`), stage 2's stretched rifted margins (in place of the linear taper)
+and stage 3's root removal (in place of the founder's sinking at once). Stages 2 and 3 have no
+switch: the rules they replace are gone. **Off by default:** thermal isostasy
+(`tectonics.thermal_isostasy_m`, an open fault: no frame for it is right while the model's sea is
+not) and the backstop (`tectonics.thermal_backstop`, a stand-in, not physics); the heat-flow lane
+owns `tectonics.heat_flow_refresh`, which the state turns on for itself. `thermal_state=false`
+remains for tests that isolate one law. `tectonics.thermal_keel_km` sets the start's keel. Stages 2
+and 3 were added by the gap-4 stages 2-3 agent on 2026-10-23, after a diagnosis of where the high
+coasts are.
 
 ## What you see in the world
 
@@ -19,13 +26,16 @@ down to the depth where the rock is hot enough (about 1,333 °C) to flow. Under 
 thin, 50 to 60 km; under an old craton it is 200 to 250 km. A hot lithosphere stands higher at the
 same crust, because warm rock is lighter, and it is weak; a cold one stands lower and is stiff.
 
-With the switches on, ground behind an active subduction zone, over a hotspot and in a continental
-rift warms over about ten million years and rises; it cools and sinks slowly once the heating stops,
-over hundreds of millions of years. The old continents the planet starts with carry a depleted,
-buoyant keel that back-arc heating cannot remove, so they stay cold and stiff when an arc reaches
-them. The heat flow the game reads (geothermal fields, metamorphism, deposits) comes from the same
-state: about 41 mW/m² over an old craton, about 53 over a cooled younger continent, about 82 behind
-an arc.
+Ground behind an active subduction zone, over a hotspot and in a continental rift warms over about
+ten million years and grows weak; it cools and stiffens slowly once the heating stops, over hundreds
+of millions of years. The old continents the planet starts with carry a depleted, buoyant keel that
+back-arc heating cannot remove, so they stay cold and stiff when an arc reaches them. A mountain
+belt whose crust a collision thickened loses the thickened mantle under it in about ten million
+years, heats and weakens, and spreads. A rifted margin thins towards the new ocean the way stretched
+continents do: barely at first, fastest at the old boundary, very thin at its outer edge. The heat
+flow the game reads (geothermal fields, metamorphism, deposits) comes from the same state: about
+41 mW/m² over an old craton, about 53 over a cooled younger continent, about 82 behind an arc. With
+thermal isostasy (off by default) warm ground would also stand higher, by up to 1,600 m.
 
 ## The model in plain words
 
@@ -73,7 +83,8 @@ A resampling copies both numbers from the nearest corner of the sample's kind (`
   converted sample kept the sea floor's value (33.7 mW/m² on 229 Myr floor) into the bake's
   continental heat-flow layer. A final pass after the resampling gives every continental sample at
   least its law's conductive value.
-- **Thermal isostasy** (`tectonics.thermal_isostasy_m` > 0): the Airy height a continental column
+- **Thermal isostasy** (`tectonics.thermal_isostasy_m` > 0; off by default, "On by default" says
+  why): the Airy height a continental column
   settles to (`settle.rs`) and the height the thin sheet takes its potential energy from
   (`collapse.rs`, `Sheet`) gain z_th = E (L_ref − L) / (L_cold − L_hot). E is the height between a
   hot back-arc and a cold craton at equal crust (1,600 m, Hyndman & Currie 2011). L_ref is the
@@ -89,7 +100,8 @@ A resampling copies both numbers from the nearest corner of the sample's kind (`
   load. The bound is the plate's yield (ISO-120, `surface.flexure.yield_anomaly_mgal`), a separate
   switch ("Measured" has the two together).
 
-- **The backstop** (`tectonics.thermal_backstop`): an arc's cordillera grows by crust shortened
+- **The backstop** (`tectonics.thermal_backstop`; off by default, a stand-in: "On by default"): an
+  arc's cordillera grows by crust shortened
   into it from the same plate's crust behind the range (PLT-048), which loses the same share of
   every pool. With the backstop each source's share is weighted by its weakness, the sheet's
   η_0 / η at its thermal age, w = e^(−t_eq / τ_s): a hot back-arc gives its crust, a cold craton
@@ -143,17 +155,17 @@ craton to back-arc, the arc's orogeny restarted its continental clock, the flexu
 
 ### The order of the stages
 
-1. **Stage 1 (this task):** the state, heat flow from it with the fault's final pass, thermal
-   isostasy and strength, each its own switch.
-2. **Stage 2, rifted margins** (built 2026-10-23, `tectonics.transition_beta`, below): the
-   transition's linear taper (PLT-261 to PLT-264) replaced by a stretching factor β on both sides of
-   a new rift: crust T_n / β, lithosphere L / β, then McKenzie's thermal subsidence from the state
-   (already there: a stretched margin's L recovers over τ_c and z_th falls by the same law). Coastal
-   plains and shelves follow from the subsidence.
-3. **Stage 3, root removal** (built 2026-10-23, `tectonics.root_removal`, below): the founder half
-   of the 70 km cap (PLT-258) replaced by a Rayleigh-Taylor removal of the thickened mantle
-   lithosphere (Houseman & Molnar 1997: half to three quarters of it in about 10 Myr), which heats L
-   under a collision belt that has no keel.
+1. **Stage 1:** the state, heat flow from it with the fault's final pass, thermal isostasy and
+   strength, each its own switch. The state and the strength on by default since 2026-10-23.
+2. **Stage 2, rifted margins** (built 2026-10-23, on by default, below): the transition's linear
+   taper (PLT-261) replaced by a stretching factor β on both sides of a new rift: crust T_n / β,
+   lithosphere L / β, then McKenzie's thermal subsidence from the state (a stretched margin's L
+   recovers over τ_c; its height follows only once thermal isostasy is on, z_th falling by the same
+   law). Coastal plains and shelves follow from the subsidence.
+3. **Stage 3, root removal** (built 2026-10-23, on by default, below): the founder half of the
+   70 km cap (PLT-258) replaced by a Rayleigh-Taylor removal of the thickened mantle lithosphere
+   (Houseman & Molnar 1997: half to three quarters of it in about 10 Myr), which heats L under a
+   collision belt that has no keel.
 
 ### Where the high coasts are (the diagnosis before stages 2 and 3)
 
@@ -195,7 +207,10 @@ which stage 3 (with the strength) reaches. A collision belt at an ocean coast is
 on Earth a continent-continent collision closes the ocean between the two, and its belt lies inland
 (the Himalaya, the Alps, the Urals), with the sea at its ends only.
 
-### Stage 2 as built (`tectonics.transition_beta`, PLT-475, PLT-476)
+### Stage 2 as built (PLT-475, PLT-476)
+
+Measured below as the switch `tectonics.transition_beta`, removed when it went on by default.
+
 
 - **The profile.** The transition keeps its zone (W = 200 km on the model sphere, PLT-262), its
   catchments, its pace (τ = 20 Myr, PLT-263) and its height line (PLT-264), and its target becomes
@@ -222,11 +237,15 @@ on Earth a continent-continent collision closes the ocean between the two, and i
   gives the total thermal subsidence of a stretched margin: 1,300 m at β = 1.5, 1,950 m at 2,
   2,930 m at 4, at most 3,890 m; Montadert et al. (1979) measured about 4,000 m at the Bay of
   Biscay's continent-ocean boundary falling to about 1 km at the shelf edge over 200 km.
-- **Without the state** there is no lithosphere to thin and only the crust's profile changes. With
-  the state but no thermal isostasy the stretched margin's heat flow and strength change (a hot,
-  weak margin) and its height is the crust's alone.
+- **By default** (the state on, thermal isostasy off) the stretched margin's heat flow and strength
+  change (a hot, weak margin) and its height is the crust's alone: the thermal subsidence waits for
+  thermal isostasy. With the state off (tests only) there is no lithosphere to thin and only the
+  crust's profile is drawn.
 
-### Stage 3 as built (`tectonics.root_removal`, PLT-477, PLT-478)
+### Stage 3 as built (PLT-477, PLT-478)
+
+Measured below as the switch `tectonics.root_removal`, removed when it went on by default.
+
 
 - **Which columns.** A continental column of a collision orogeny (Himalayan) whose crust is thicker
   than `collapse_thickness_km` (50 km, PLT-256): crust thickened that far stands for a lithosphere
@@ -249,10 +268,11 @@ on Earth a continent-continent collision closes the ocean between the two, and i
 - **The eclogite stays.** The eclogite pool (PLT-279, PLT-280) is not removed: a root only about
   30 % eclogitized is "gravitationally stable" (Shi D. et al. 2020), and removing the eclogite would
   raise the surface by only about 0.045 of its thickness at the model's densities.
-- **Without the state** only the founder's pace changes. With the state, the heated belt's heat
-  flow rises; with `thermal_strength` its thermal age falls to a fresh orogen's, so it spreads and
-  its flexure's Te drops; with `thermal_isostasy_m` it rises by up to E = 1,600 m (Molnar, England &
-  Martinod 1993: "approximately 1000 m to 2500 m in a few million years" over Tibet).
+- **By default** (the state and the strength on) the heated belt's heat flow rises and its thermal
+  age falls to a fresh orogen's, so it spreads and its flexure's Te drops. With `thermal_isostasy_m`
+  it would also rise by up to E = 1,600 m (Molnar, England & Martinod 1993: "approximately 1000 m to
+  2500 m in a few million years" over Tibet). With the state off (tests only) only the founder's
+  pace is there.
 
 ## Equations and constants
 
@@ -269,7 +289,7 @@ on Earth a continent-continent collision closes the ocean between the two, and i
 | PLT-468 | the magmatic terms | +40 arc, +40 hotspot (PLT-137's); the rift's +30 dropped | mW/m² | PLT-137 (uncited) | `uncited` |
 | PLT-469 | the final heat-flow pass | after the resampling, continental q ← max(q, the law's conductive value) | mW/m² | the bake test's fault (2026-10-23) | `game-choice` (a bookkeeping fix) |
 | PLT-470 | the backstop | a source's share of the cordillera's strain w = e^(−t_eq / τ_s), τ_s = 62.8 (PLT-415) | none | Hyndman, Currie & Mazzotti 2005 (back-arcs weaker than cratons "by more than a factor of 10"); the weight is PLT-415's law | `game-choice` |
-| PLT-475 | stage 2's margin profile | T* = T_o + (T_n − T_o) S(1/2 + d / W), S(s) = 3s² − 2s³ (PLT-261's S(s) = s when off) | km | Manatschal & Chenin 2023 (the proximal, necking and hyperextended domains; full text); Montadert et al. 1979 (the Moho 25 km at the shelf break, 12 km on the lower margin; full text) | `game-choice` (the form) |
+| PLT-475 | stage 2's margin profile | T* = T_o + (T_n − T_o) S(1/2 + d / W), S(s) = 3s² − 2s³ (PLT-261's S(s) = s until 2026-10-23) | km | Manatschal & Chenin 2023 (the proximal, necking and hyperextended domains; full text); Montadert et al. 1979 (the Moho 25 km at the shelf break, 12 km on the lower margin; full text) | `game-choice` (the form) |
 | PLT-476 | stage 2's lithosphere | a source thinned to `keep`: L ← L · keep, K ← min(K · keep, L) | km | McKenzie 1978 (uniform stretching of the lithosphere and its crust by β; eq. 1 and Table 2 read); Lang, ten Brink & Makovsky 2026 (the mantle stretches more; full text) | `verified` |
 | PLT-477 | stage 3's drop-off | heated towards max(L_hot, K, crust) at e-folding 10 Myr; the founder sinks 1 − e^(−δt/10) of its no-room excess a step | Myr | Houseman & Molnar 1997 ("between 50 ... and 75 per cent ... of the lithospheric mantle", "of the order of 10 Myr"; full text); Conrad 2000 (60 %; abstract); Houseman, McKenzie & Molnar 1981 (under 30-50 m.y.; abstract) | `verified` |
 | PLT-478 | stage 3's trigger | a Himalayan orogeny's continental column with crust > `collapse_thickness_km` (50) | km | England & Houseman 1989, Kay & Kay 1993 (a threshold exists, no number; abstracts) | `game-choice` (the threshold is PLT-256's) |
@@ -297,7 +317,8 @@ below its sea and 38 km stands 338 m above it: the model's line lies 338 m above
 60 to 225 km, the model's line is the lithosphere at 60 + (1,229 / 1,600) × 165 = 187 km: that is
 Hyndman & Currie's frame, in which the start's continents begin at 187 km and cool by up to 368 m.
 The craton frame takes the model's line as the craton's (L_ref = L_cold = 225): nothing that stays
-cold moves and only heated ground rises, by up to 1,600 m. The pool chooses between them.
+cold moves and only heated ground rises, by up to 1,600 m. Neither is right yet, as the 187 km
+depends on the model's sea, itself gap 1's fault ("On by default"), so thermal isostasy is off.
 
 ## Earth against the mod
 
@@ -355,7 +376,8 @@ Runs meeting each criterion, base against th-str: land 20 to 13, largest landmas
 under the sea 8 to 12, above 2 km 9 to 6, high coast 0 to 1, under ice 17 to 19, collisions 9 to 9.
 Seed for seed the criteria rose in 10 runs and fell in 7. The ship rule (criteria mean up at
 p < 0.05, no median pushed out of its band) is not met: no median left its band, but the mean rose by
-0.08 at p 0.57. The strength stays off. It does what Earth's cratons do (the largest landmass and
+0.08 at p 0.57, so the strength stayed off until Ben's rule of the same day put it on ("On by
+default"). It does what Earth's cratons do (the largest landmass and
 the drowned crust both move towards their targets at p 0.010 and 0.18) and the land share's top is
 what it runs into: seven runs end over 0.32.
 
@@ -437,25 +459,99 @@ coasts are"):
   largest landmass falls to 0.121 (the band's floor is 0.12), the drowned crust rises to 0.282 and
   the sea stands highest of the arms (598 / 917 m). Its mean, 3.25, is under the strength alone's.
 
-**No final ran.** The coordinator's rule (2026-10-23, after Ben asked lanes to test more
-efficiently): a 24-run final only for an 8-run arm whose criteria mean is at least 0.5 above the
-base's, since the base's per-run spread (sd 0.92) needs a gain of about 0.52 for 24 runs against
-24 to reach p < 0.05. The best arm, g4-beta-str, read 3.50 against 3.33 (p 0.53), and its
-collisions moved further from their band. Its final was started and stopped before any of its
-16 new runs began; the 8 runs above stay in the pool. Both stages stay off by default, as stage 1
-does: off is the base bit for bit, and neither meets the ship rule on this evidence.
+**No final ran.** Under the coordinator's first rule of 2026-10-23 (a 24-run final only for an
+8-run arm whose criteria mean is at least 0.5 above the base's) g4-beta-str's final (3.50 against
+3.33, p 0.53) was started and stopped before any of its 16 new runs began. Ben's rule later that
+day ("On by default", next) makes the V1 numbers realism checks, not a gate, so no final is run to
+decide a default; the 8 runs above stay in the pool.
+
+**Off was the base bit for bit** before the defaults changed: the alias check above, and again at
+the branch's last commit with the switches (2e396409, key b40869d8b891): IDENTICAL, so the arms
+measured the switches and nothing else.
+
+### On by default (2026-10-23)
+
+Ben's rule (decisions log 2026-10-23, "Always, fix V1 elsewhere"): physics goes on by default once
+it is built and correct (unit tests against its sources, no divergence or guard failure on the
+pool), and the rule or forcing term it replaces goes off with it; the V1 numbers are realism checks.
+And: "Results that don't align with earth but are still perfectly playable and physics backed >
+Results that are forced to align with earth by introducing extremely weird forcing functions".
+Under it, on the coordinator's instruction of the same day:
+
+- **On** in `TectonicParams::default`, and so in every built-in preset (none sets these keys): the
+  state with its heat flow (PLT-460 to PLT-468; the final pass PLT-469 runs with the state), the
+  strength from the thermal age (ISO-112), stage 2 (PLT-475, PLT-476) and stage 3 (PLT-477,
+  PLT-478).
+- **Gone:** the linear taper's shape (PLT-261's S(s) = s), the founder's sinking at once (PLT-258's
+  founder half), and the switches `transition_beta` and `root_removal` (a preset that sets either
+  is now refused as an unknown key). The old heat-flow proxy (PLT-137) and the orogeny's age as the
+  strength's clock (ISO-051, PLT-415) remain only under `thermal_state=false`, which tests that
+  isolate one law set (the collapse's fixture, the heat-flow pass's bake test).
+- **Correct by its sources, the unit tests:** the cooling and heating laws and the keel
+  (`thermal.rs`: McKenzie's τ_c and the inverse thermal age, Jordan's keel against back-arc heating,
+  Houseman & Molnar's drop-off held by a keel, stretching by β), the heat flow's floor at an old
+  craton's 41 mW/m² in a bake, the profile's crust kept and its domains (Manatschal & Chenin's
+  proximal, necking and hyperextended order), a stretched margin's L / L₀ = T / T₀ (McKenzie's
+  uniform stretching), and the founder's excess going at 1 − e^(−δt / 10 Myr) a step, mafic root
+  first, to the cap after many steps.
+- **No divergence or guard failure on the pool.** The `guard` measure over every cached run of the
+  arms (8 runs an arm; th-str 24): every run finished, and in no run of any arm did a step leave an
+  L1 cell more than two Earth reliefs (39.6 km) from the sea. The guard's worst over a run is
+  12.4 to 32.8 km on g4-beta-str and 12.5 to 35.2 km on g4-root-str against the base's 11.9 to
+  30.0 km, a heavy tail in the base too; no median moved at p < 0.05.
+
+| arm | the guard's worst, m from the sea | steps beyond 2 Earth reliefs | largest rise / fall of a cell in a step, m | continental cells 5 km over Airy, share | plate cells' largest excess over Airy, m | highest plate elevation, m |
+|---|---|---|---|---|---|---|
+| base (24) | 13,716 | 0 | 6,992 / 9,450 | 0.0000 | 3,510 | 6,509 |
+| th-str (24) | 14,746 (0.60) | 0 | 7,810 / 10,620 | 0.0000 (0.96) | 3,536 (0.70) | 6,585 (0.27) |
+| g4-str | 14,594 (0.98) | 0 | 7,834 / 11,367 | 0.0000 (0.24) | 3,529 (0.48) | 6,617 (0.19) |
+| g4-beta | 13,634 (0.81) | 0 | 7,720 / 10,037 | 0.0000 (0.76) | 3,531 (0.72) | 6,297 (0.10) |
+| g4-root | 13,088 (0.15) | 0 | 6,804 / 9,393 | 0.0000 (0.92) | 3,858 (0.29) | 6,575 (0.69) |
+| g4-beta-str | 24,208 (0.078) | 0 | 7,866 / 10,750 | 0.0000 (0.76) | 3,338 (0.56) | 6,498 (0.98) |
+| g4-root-str | 13,596 (0.81) | 0 | 7,550 / 11,172 | 0.0000 (0.59) | 3,237 (0.40) | 6,580 (0.27) |
+
+(`pool.py table --base base --measure guard`, medians, p against the base in brackets.) No arm ran
+all four together (stages 2 and 3 with the strength): the coordinator's 24-run base on master after
+this merge is the first, and its guard measure is that combination's check.
+
+- **Thermal isostasy (ISO-110) stays off, an open fault.** A frame is right by its sources only if
+  it puts Hyndman & Currie's two columns at the sea: a hot back-arc on 27 km of crust and a craton on
+  38 km. The craton frame (L_ref = L_cold) takes the model's line for the craton's, which holds only
+  if the sea stands 938 m over the datum (the model's 38 km column's height); at the model's 600 m
+  it is 338 m off, and every column warmer than a craton then rises and lifts the sea (th-iso: 959 /
+  1,403 m). Hyndman & Currie's frame is the right kind, since it reads L_ref from both columns, but
+  it moves with the sea: L_ref = 60 + (S + 629 m) × 165 / 1,600 km for a sea S over the datum, so
+  125 km at the datum and 180 to 214 km over the base's run (538 to 861 m). The sea over the datum
+  is gap 1's fault: an Earth-like world's sea stands at its datum. A fixed L_ref is therefore not
+  right today, and one that followed the model's sea would feed the sea's error into every column's
+  height. ISO-110 goes on when gap 1 holds the sea at its datum (then Hyndman & Currie's 125 km), or
+  when the continental column's height comes from the whole lithosphere's buoyancy instead of a
+  frame (open questions).
+- **The backstop (PLT-470) stays off, a stand-in.** It reweights a kinematic rule (PLT-048: a
+  cordillera takes a share of the crust 440 to 800 km behind it) by the sheet's η_0 / η. On Earth a
+  cold foreland gives the Andes its crust by underthrusting as a rigid block (Simplifications); the
+  weight makes a cold craton give almost nothing instead. It is a forcing of where the crust comes
+  from, not a force balance, so it stays off; the physics that would replace PLT-048 is a range fed
+  by the plates' own convergence and the sheet's strength.
+- **The V1 numbers, now realism checks:** on the exploration arms above, stage 2 with the strength
+  met the most criteria (3.50 a run against the base's 3.33), stage 3 with the strength put the
+  largest landmass on its band's floor (0.121) and the collisions stayed under theirs (1.35 to
+  1.80 against 2). None is a reason to keep physics off under Ben's rule; a check that fires on
+  the coordinator's base is a pointer to missing physics (open questions), not to a knob.
 
 ## Simplifications and limits
 
 - One thermal depth per sample and a relaxation towards a target, not a conductive geotherm: the
   first mode of McKenzie's plate solution.
 - Heating is by flag (arc, back-arc, hotspot, rift), at one rate. Collisional thickening of the
-  lithosphere is not modelled: a collision belt keeps the state it had until stage 3
-  (`root_removal`) takes its mantle lithosphere off to the Moho, at once in the sense that nothing
-  thickens it first (Earth's belt thickens its mantle lithosphere, which then drops off). The
-  crust's own heating when thickened (its radiogenic heat) is not in the state either, so with
-  `thermal_strength` and stage 3 off a collision between two keeled continents stays as stiff as
-  their keels; with stage 3 on it stays as stiff as its keel and no stiffer.
+  lithosphere is not modelled: a collision belt keeps the state it had until stage 3 takes its
+  mantle lithosphere off to the Moho, at once in the sense that nothing thickens it first (Earth's
+  belt thickens its mantle lithosphere, which then drops off). The crust's own heating when
+  thickened (its radiogenic heat) is not in the state either, so a collision between two keeled
+  continents stays as stiff as its keel and no stiffer.
+- Thermal isostasy is off by default, so no height follows the state: a stretched margin's thermal
+  subsidence (stage 2) and a belt's rise when its root drops off (stage 3) wait for it ("On by
+  default").
 - Stage 2 stretches the lithosphere only where the transition thins crust, which on the quick
   planet is one or two samples a side of a margin (71 km apart on the model sphere against a 200 km
   zone). A rift that has not broken up (regime 6) heats as stage 1 says (L ← L_hot) and its crust is
@@ -481,19 +577,22 @@ does: off is the base bit for bit, and neither meets the ship rule on this evide
 
 ## Open questions
 
-- The frame (ISO-111). Neither frame helped V1 ("Measured"): the craton frame lifts the sea, Hyndman
-  & Currie's sinks the start's continents and loses crust. Hyndman & Currie's is the physical one
-  (the start's continents are not all cratons at the model's line); the isostasy should wait until
-  the sea's 840 m over the datum (gap 1) is gone, and be tried again in that frame.
-- The heat-flow pass (PLT-469) changes only the heat flow of the cells the rate guard turned
-  continental (the bake's `meta/heat_flow_mw_m2`, the deposits' and the underground's reading of
-  it), not the plates' dynamics. It should go on with the release pace (ISO-099), or on its own by
-  default: the fault is a bookkeeping one either way.
+- **Thermal isostasy's frame (ISO-110, ISO-111), an open fault.** No fixed frame is right while the
+  model's sea stands off its datum ("On by default"). The recommendation: the physics, not a frame:
+  give a continental column the height of its whole lithosphere's buoyancy (the crust's density,
+  the mantle lithosphere's thermal contraction and the keel's depletion) against the ridge's column,
+  as Lachenbruch & Morgan (1990) do (from-memory, not read), in place of PLT-281's line, so the
+  sea follows the columns' volume and no L_ref is needed; it belongs with gap 1's sea. Until then,
+  once gap 1 holds the sea at its datum, Hyndman & Currie's frame at 125 km is the one their two
+  columns give.
+- The heat-flow pass (PLT-469) runs whenever the state is on, so it is on by default with it; the
+  heat-flow lane owns its own switch for worlds with the state off.
 - The land share's top. The strength moves the largest landmass and the drowned crust towards
   Earth and pushes seven of 24 runs over 0.32 land: the crust it keeps from spreading under the sea
-  stands on land instead. Whether it can go on beside a change that lowers the land share, or
-  with a weaker keel than 200 km on some of the start's continents (no keel at all lost the gain),
-  is open; neither was tried.
+  stands on land instead. Under Ben's rule this is a realism check, not a reason to turn it off: if
+  the coordinator's base flags the land, the recommendation is the missing physics that drowns old
+  continents on Earth (thermal subsidence once ISO-110 goes on; the keel's own buoyancy), not a
+  weaker keel chosen to hit the band.
 - The yield's bound (ISO-120) is one figure for every plate. A hot lithosphere yields at less than
   a cold one (the gap audit cites Rey, Teyssier & Whitney 2010 for the Moho temperature's part; not
   read for this page), so the state could set it; that would be a new row above ISO-120 and was not
@@ -509,19 +608,20 @@ does: off is the base bit for bit, and neither meets the ship rule on this evide
   every continent. Steckler & Watts (1978) fit the New York margin's subsidence with a thermal
   lithosphere of 113 to 139 km, about 51 to 78 Myr on McKenzie's scaling (the abstract's numbers,
   the arithmetic ours), and Montadert et al. (1979) find the time constant "increases with depth"
-  across the margin. With thermal isostasy off (as the arms ran) the time sets only the margin's
-  heat flow and strength. The recommendation: leave it until thermal isostasy goes on; then cool a
+  across the margin. With thermal isostasy off (the default) the time sets only the margin's heat
+  flow and strength. The recommendation: leave it until thermal isostasy goes on; then cool a
   sample with no keel towards a 125 km plate on McKenzie's 62.8 Myr and a keeled one towards L_cold
   on τ_c, a new row beside PLT-465.
-- **Stage 3's uplift points the wrong way for coast_hi.** With `thermal_isostasy_m` on, a belt that
-  loses its root rises by up to 1,600 m (Molnar, England & Martinod 1993 give Tibet 1,000 to
-  2,500 m), and seven in ten high coasts are collision belts. No arm here ran it with isostasy. The
-  recommendation: keep `root_removal` off with isostasy until the belts sit inland.
+- **Stage 3's uplift and coast_hi.** With thermal isostasy on, a belt that loses its root would
+  rise by up to 1,600 m (Molnar, England & Martinod 1993 give Tibet 1,000 to 2,500 m), and seven in
+  ten high coasts are collision belts. The rise is physics; the oddity is the belt at an open coast.
+  The recommendation: fix where belts form (the high coasts' question above), not the drop-off.
 - **Stage 3 and the strength.** With the strength on, the belt that loses its root is as weak as a
   fresh orogen and spreads (g4-root-str: the largest landmass on its floor, more crust under the
   sea). Whether the model's belt spreads further than a real one was not measured. The
-  recommendation: leave `root_removal` off; if it is tried again, try it
-  beside the plate's yield (ISO-120), which bounds what a column holds.
+  recommendation: if the coordinator's base flags it, measure the belts' spreading against Tibet's
+  (the thin sheet's own test) beside the plate's yield (ISO-120), which bounds what a column holds,
+  before touching the drop-off.
 - **One β for crust and mantle.** Lang, ten Brink & Makovsky (2026) fit a mantle β 2.8 times the
   crust's at the Baltimore Canyon Trough. The recommendation: keep one β (PLT-476); a mantle β
   would change only a margin's heat flow and strength on this model, and nothing measures those
