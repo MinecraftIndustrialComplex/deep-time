@@ -17,10 +17,13 @@
 //! # Loads, and what is already compensated
 //! The surface stage keeps, with the crust, the load `Q` since the start of the run (m of mantle
 //! displaced under Airy: kg/m² ÷ ρ_m) and the deflection `w` that goes with it. Each step it adds
-//! - the crust the plate model thickened (its uplift is an Airy elevation: the thickening is
-//!   u / (1 − k), k = ρ_c/ρ_m on land and (ρ_c − ρ_w)/(ρ_m − ρ_w) under water), and the crust the
-//!   plateau spreading moved (`spread.rs`): for these the Airy root `a` is already in the
-//!   elevation, and the spreading's stays there (it bends nothing, ISO-070);
+//! - the crust the plate model thickened or thinned (the Airy change u_c of the column's own crust,
+//!   `plates/crust_uplift_mm_yr`: the thickening is u_c / (1 − k_a), k_a = ρ_c/ρ_m, and it raises
+//!   the ground 1 − k_a of it in the air and 1 − k_w, k_w = (ρ_c − ρ_w)/(ρ_m − ρ_w), under water),
+//!   and the crust the plateau spreading moved (`spread.rs`): for these the Airy root `a` is
+//!   already in the elevation, and the spreading's stays there (it bends nothing, ISO-070). The
+//!   rest of the plate model's uplift moved a height alone (its settling to the Airy height plus
+//!   this flexure, its height rules, its rate limit's hold) and is no load (ISO-091);
 //! - the step's erosion and deposition, the rock other stages laid on the surface since the last
 //!   step (the volcano stage's cones), the sea over the cell against the sea at the reference,
 //!   and land ice: for these nothing has been applied;
@@ -274,30 +277,104 @@ fn thickening(u: f64, z0: f64, sea: f64) -> (f64, f64) {
     (t * ka, t - u)
 }
 
-/// The rise of the surface below the sea (m, negative for a fall) that the plate model's uplift
-/// of thickened crust and the plateau spreading brought at cell `c` this step, `h_now` the
-/// elevation after the spreading: the sea water they pushed aside, which the step's change of sea
-/// water counts. Measurement only: the gap budget books it with the roots, whose compensation
-/// under the sea it is ([`StepOut::roots_m`], [`local_answers`]).
-fn built_under_sea(x: &StepIn<'_>, c: usize, fresh: bool, h_now: f64) -> f64 {
-    let sea = x.sea_level_m;
-    let part = |u: f64, z0: f64| {
-        let (lo, hi) = if u > 0.0 { (z0, z0 + u) } else { (z0 + u, z0) };
-        (sea.min(hi) - lo).max(0.0) * u.signum()
+/// The part of a change `u` (m, either sign) of ground standing at `z0` that lies below the sea at
+/// `sea` (negative for a fall): the sea water the change moved.
+fn under_sea(u: f64, z0: f64, sea: f64) -> f64 {
+    let (lo, hi) = if u > 0.0 { (z0, z0 + u) } else { (z0 + u, z0) };
+    (sea.min(hi) - lo).max(0.0) * u.signum()
+}
+
+/// The crust T behind a change `uc` (m, either sign) of a column's dry Airy height, and the
+/// elevation change e it makes at ground standing at `z0`: a metre of crust raises the ground
+/// 1 − k_w under the sea and 1 − k_a in the air ([`airy_shares`]). Returns (load in m of mantle
+/// k_a·T, the root already in the elevation a = T − e, e). The inverse of [`thickening`].
+fn crust_thickening(uc: f64, z0: f64, sea: f64) -> (f64, f64, f64) {
+    if uc == 0.0 {
+        return (0.0, 0.0, 0.0);
+    }
+    let (ka, kw) = airy_shares();
+    let t = uc / (1.0 - ka);
+    let e = if t > 0.0 {
+        // Under the sea first, up to the sea level.
+        let room = (sea - z0).max(0.0);
+        let filling = room / (1.0 - kw);
+        if t <= filling {
+            t * (1.0 - kw)
+        } else {
+            room + (t - filling) * (1.0 - ka)
+        }
+    } else {
+        // In the air first, down to the sea level.
+        let room = (z0 - sea).max(0.0);
+        let emptying = room / (1.0 - ka);
+        if -t <= emptying {
+            t * (1.0 - ka)
+        } else {
+            -room + (t + emptying) * (1.0 - kw)
+        }
     };
-    // As in `step`: crust the plate model thickened, and crust the spreading moved.
-    let u = f64::from(x.uplift_mm_yr[c]) * x.dt_myr * 1.0e3;
+    (t * ka, t - e, e)
+}
+
+/// The plate model's uplift at a cell as the flexure books it.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct Booked {
+    /// The load of the crust the column gained or lost, m of mantle …
+    load: f64,
+    /// … the root already in the elevation …
+    root: f64,
+    /// … and the sea water that crust's own rise or fall pushed aside, m (its compensation under
+    /// the sea, with the roots).
+    crust_water: f64,
+    /// The sea water the rest of the uplift moved, m (negative for a fall): a height moved alone
+    /// (the plate model's settling, a height rule, its rate limit's hold) is no load, and the sea
+    /// it lets in or pushes out is none either.
+    rest_water: f64,
+}
+
+// ledger: ISO-061, ISO-091
+/// The plate model's uplift at cell `c` this step: where the crust builds (continental crust, an
+/// arc or a hotspot; not new at the place), the crust it gained or lost is a thickening or a
+/// thinning ([`crust_thickening`] of `plates/crust_uplift_mm_yr`), and the rest of the uplift moves
+/// the ground with no load. Subsidence and uplift that move no crust (the ocean floor cooling, a
+/// sample pulled to trench depth, a column settling to its height) are no load. Until 2026-10-22
+/// every rise of a building column was taken as thickening, 1 / (1 − k) = 7 times it, whose root
+/// a stiff plate held up: the plate model's settling (ISO-078) moved a column back to its Airy
+/// height plus this flexure, the flexure took the move as new crust with a root it held, and the
+/// two raised each other without bound (`docs/science/flexure.md`, "The settling's feedback").
+fn booked(x: &StepIn<'_>, c: usize, fresh: bool) -> Booked {
     let reg = x.regime[c] as u8;
     let builds = x.crust_type[c] as u8 != OCEANIC || reg == regime::ARC || reg == regime::HOTSPOT;
-    let lifted = if !fresh && u > 0.0 && builds {
-        part(u, x.h_start[c] - u)
-    } else {
-        0.0
-    };
+    if fresh || !builds {
+        return Booked::default();
+    }
+    let lift = x.dt_myr * 1.0e3; // mm/yr over the step, in m
+    let sea = x.sea_level_m;
+    let u = f64::from(x.uplift_mm_yr[c]) * lift;
+    let uc = f64::from(x.crust_uplift_mm_yr[c]) * lift;
+    let z0 = x.h_start[c] - u;
+    let (load, root, e) = crust_thickening(uc, z0, sea);
+    Booked {
+        load,
+        root,
+        crust_water: under_sea(e, z0, sea),
+        rest_water: under_sea(u - e, z0 + e, sea),
+    }
+}
+
+/// The rise of the surface below the sea (m, negative for a fall) that the plate model's crust
+/// and the plateau spreading brought at cell `c` this step, `h_now` the elevation after the
+/// spreading: the sea water they pushed aside, which the step's change of sea water counts.
+/// Measurement only: the gap budget books it with the roots, whose compensation under the sea it
+/// is ([`StepOut::roots_m`], [`local_answers`]).
+fn built_under_sea(x: &StepIn<'_>, c: usize, fresh: bool, h_now: f64) -> f64 {
+    let sea = x.sea_level_m;
+    // As in `step`: crust the plate model thickened or thinned, and crust the spreading moved.
+    let lifted = booked(x, c, fresh).crust_water;
     let ds = h_now - x.h_before_spread[c];
     lifted
         + if ds != 0.0 {
-            part(ds, x.h_before_spread[c])
+            under_sea(ds, x.h_before_spread[c], sea)
         } else {
             0.0
         }
@@ -1148,6 +1225,10 @@ pub struct StepIn<'a> {
     /// crust), `plates/orogeny_age_myr` (NaN: none), `regime` (the regime, not `plates/flags`:
     /// the flags are zero on the steps the plate model resamples its crust).
     pub uplift_mm_yr: &'a [f32],
+    /// `plates/crust_uplift_mm_yr`: the part of the uplift that is the column's own crust gained
+    /// or lost, its pools' Airy change. Only this is crust thickened or thinned; the rest moved a
+    /// height alone and is no load (`ledger: ISO-091`).
+    pub crust_uplift_mm_yr: &'a [f32],
     pub crust_type: &'a [f32],
     pub crust_age_myr: &'a [f32],
     pub orogeny_age_myr: &'a [f32],
@@ -1259,7 +1340,8 @@ pub fn local_answers(
                 || (age >= 0.0 && f64::from(age) < x.dt_myr);
             let (water_ref, ice_prev) = match st {
                 Some(st) if !fresh => (
-                    f64::from(st.water_m[c]) + cooled_under_sea(x, c, fresh),
+                    f64::from(st.water_m[c]) + cooled_under_sea(x, c, fresh)
+                        - booked(x, c, fresh).rest_water,
                     f64::from(st.ice_m[c]),
                 ),
                 _ => ((sea - x.h_start[c]).max(0.0), 0.0),
@@ -1313,7 +1395,6 @@ pub fn step(
     if st.load_m.len() != n {
         *st = FlexState::fresh(n);
     }
-    let lift = x.dt_myr * 1.0e3; // mm/yr over the step, in m
     let water_share = RHO_WATER / RHO_MANTLE;
     let ice_share = RHO_ICE / RHO_MANTLE;
     let (rock_land, rock_sea) = rock_shares(x.rock_share);
@@ -1355,26 +1436,17 @@ pub fn step(
                     f64::from(st.ice_m[c]),
                 )
             };
+            // ledger: ISO-061, ISO-091
+            // Crust the plate model thickened or thinned: orogens, arcs, hotspot volcanism,
+            // rifts. The rest of its uplift moved a height alone, and the sea it let in or pushed
+            // out is no load either ([`booked`]).
+            let b = booked(x, c, fresh);
             // The sea over the floor's GDH1 cooling is in GDH1 already: no load (ISO-088).
-            let water = water + cooled_under_sea(x, c, fresh);
-            let mut load = prev;
-            let mut root = 0.0;
-            let mut plate_root = 0.0;
-            let mut root_load = 0.0;
-            // ledger: ISO-061
-            // Crust the plate model thickened: orogens, arcs and hotspot volcanism. Subsidence
-            // (the ocean floor cooling, a sample pulled to trench depth) is not a load.
-            let u = f64::from(x.uplift_mm_yr[c]) * lift;
-            let reg = x.regime[c] as u8;
-            let builds =
-                x.crust_type[c] as u8 != OCEANIC || reg == regime::ARC || reg == regime::HOTSPOT;
-            if !fresh && u > 0.0 && builds {
-                let (q, a) = thickening(u, x.h_start[c] - u, sea);
-                load += q;
-                root += a;
-                plate_root = a;
-                root_load += q;
-            }
+            let water = water + cooled_under_sea(x, c, fresh) - b.rest_water;
+            let mut load = prev + b.load;
+            let mut root = b.root;
+            let plate_root = b.root;
+            let mut root_load = b.load;
             // Erosion and deposition.
             let dm = x.h_eroded[c] - x.h_start[c];
             load += dm
@@ -2016,6 +2088,24 @@ mod tests {
         assert!((across - 0.5 * (a + under)).abs() < 1e-6);
         let (qn, an) = thickening(-1000.0, 1500.0, 0.0);
         assert!((qn + q).abs() < 1e-6 && (an + a).abs() < 1e-6);
+        // The crust behind a dry Airy change is the inverse: the same load and root, and the
+        // elevation change that made them, on land, under the sea and across it either way.
+        let (ka, _) = airy_shares();
+        for (u, z0) in [
+            (1000.0, 500.0),
+            (1000.0, -3000.0),
+            (1000.0, -500.0),
+            (-1000.0, 1500.0),
+            (-1000.0, 300.0),
+            (-1000.0, -2000.0),
+        ] {
+            let (q, a) = thickening(u, z0, 0.0);
+            let (qc, ac, e) = crust_thickening(q / ka * (1.0 - ka), z0, 0.0);
+            assert!(
+                (qc - q).abs() < 1e-6 && (ac - a).abs() < 1e-6 && (e - u).abs() < 1e-6,
+                "{u} at {z0}: ({qc}, {ac}, {e}) against ({q}, {a}, {u})"
+            );
+        }
     }
 
     struct World {
@@ -2031,6 +2121,8 @@ mod tests {
         plate: Vec<f32>,
         ice: Vec<f32>,
         gdh1: Option<f64>,
+        /// The share of the uplift that is crust (1: all of it; 0: a height moved alone).
+        crust_share: f64,
     }
 
     impl World {
@@ -2050,6 +2142,7 @@ mod tests {
                 plate: vec![0.0; n],
                 ice: vec![0.0; n],
                 gdh1: None,
+                crust_share: 1.0,
             }
         }
 
@@ -2084,6 +2177,13 @@ mod tests {
                 .map(|(&z, &u)| z + f64::from(u) * dt_myr * 1.0e3)
                 .collect();
             let h_eroded: Vec<f64> = h_start.iter().zip(eroded).map(|(a, b)| a + b).collect();
+            // The uplift is crust thickened at its Airy height: its crust's dry Airy change.
+            let crust_uplift: Vec<f32> = self
+                .h
+                .iter()
+                .zip(&self.uplift)
+                .map(|(&z, &u)| crust_equivalent(u, z, sea, dt_myr) * self.crust_share as f32)
+                .collect();
             let mut h = h_eroded.clone();
             if let Some((hs, d0)) = spreading {
                 super::super::spread::step(&self.d, &mut h, sea, hs, d0, dt_myr * 1.0e6);
@@ -2103,6 +2203,7 @@ mod tests {
                     h_eroded: &h_eroded,
                     h_before_spread: &h_eroded,
                     uplift_mm_yr: &self.uplift,
+                    crust_uplift_mm_yr: &crust_uplift,
                     crust_type: &self.crust,
                     crust_age_myr: &self.age,
                     orogeny_age_myr: &self.orogeny,
@@ -2119,6 +2220,14 @@ mod tests {
             self.h = h;
             out
         }
+    }
+
+    /// The dry Airy change of the crust behind an elevation change of `u_mm_yr` over `dt_myr` of
+    /// ground at `z0` (the plate model's `crust_uplift_mm_yr` for an uplift that is all crust).
+    fn crust_equivalent(u_mm_yr: f32, z0: f64, sea: f64, dt_myr: f64) -> f32 {
+        let (ka, _) = airy_shares();
+        let (q, _) = thickening(f64::from(u_mm_yr) * dt_myr * 1.0e3, z0, sea);
+        (q / ka * (1.0 - ka) / (dt_myr * 1.0e3)) as f32
     }
 
     fn on() -> FlexureParams {
@@ -2325,6 +2434,89 @@ mod tests {
                 out.loads_m[c]
             );
         }
+    }
+
+    /// A height the plate model moved alone (its settling, a height rule; ISO-091) is no load, on
+    /// land and under the sea: a stiff plate holds nothing up for it, the ground moves by the
+    /// uplift and no more, and the load the plate carries does not change. Booked as crust (until
+    /// 2026-10-22) the same rise stood hundreds of metres above it on the stiff plate.
+    #[test]
+    fn a_height_moved_alone_is_no_load() {
+        let p = on();
+        let (w, h) = (32usize, 256usize);
+        let n = w * h;
+        for (z, sea) in [(300.0, -1.0e6), (-4000.0, 0.0)] {
+            let mut wd = World::new(w, h, z);
+            let (mut sv, mut st) = started(&mut wd, &p, sea);
+            let load0: f64 = st
+                .as_ref()
+                .unwrap()
+                .load_m
+                .iter()
+                .map(|&q| f64::from(q))
+                .sum();
+            wd.crust_share = 0.0;
+            for c in 0..n {
+                if (124..132).contains(&(c / w)) {
+                    wd.uplift[c] = 1.0; // 2 km in the step
+                }
+            }
+            let before = wd.h.clone();
+            let out = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
+            for j in [127usize, 135, 160, 250] {
+                let c = j * w + 3;
+                let change = wd.h[c] - before[c] - f64::from(wd.uplift[c]) * 2000.0;
+                assert!(change.abs() < 1.0, "at {z}, row {j}: moved {change}");
+                assert!(
+                    out.flexure_m[c].abs() < 1.0,
+                    "at {z}, row {j}: {}",
+                    out.flexure_m[c]
+                );
+            }
+            let load: f64 = st
+                .as_ref()
+                .unwrap()
+                .load_m
+                .iter()
+                .map(|&q| f64::from(q))
+                .sum();
+            assert!((load - load0).abs() < 1.0, "at {z}: load {load0} to {load}");
+        }
+    }
+
+    /// Crust the plate model thinned (a rift, the collapse of a plateau) is a load taken away: a
+    /// stiff plate holds the thinned belt below its Airy height and lifts its flanks, the mirror
+    /// of a belt raised.
+    #[test]
+    fn a_belt_thinned_on_a_stiff_plate_stands_below_its_airy_height() {
+        let p = on();
+        let (w, h) = (32usize, 256usize);
+        let n = w * h;
+        let mut wd = World::new(w, h, 3000.0);
+        let sea = -1.0e6;
+        let (mut sv, mut st) = started(&mut wd, &p, sea);
+        for c in 0..n {
+            if (124..132).contains(&(c / w)) {
+                wd.uplift[c] = -1.0; // 2 km of Airy fall in the step
+            }
+        }
+        let out = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
+        assert!(out.solve.as_ref().unwrap().converged, "{:?}", out.solve);
+        assert!(
+            out.flexure_m[127 * w + 3] < -500.0,
+            "{}",
+            out.flexure_m[127 * w + 3]
+        );
+        assert!(
+            out.flexure_m[135 * w + 3] > 100.0,
+            "{}",
+            out.flexure_m[135 * w + 3]
+        );
+        assert!(
+            wd.h[127 * w + 3] < 3000.0 - 2000.0 - 500.0,
+            "{}",
+            wd.h[127 * w + 3]
+        );
     }
 
     /// A belt raised by the plate model on a craton: the plate holds part of its root, so the
@@ -2704,6 +2896,7 @@ mod tests {
                     h_eroded: &h_eroded,
                     h_before_spread: &h_eroded,
                     uplift_mm_yr: &uplift,
+                    crust_uplift_mm_yr: &uplift,
                     crust_type: &crust,
                     crust_age_myr: &age,
                     orogeny_age_myr: &orogeny,

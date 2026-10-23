@@ -67,6 +67,35 @@ pub struct Settle {
     pub fall_km2_m: f64,
 }
 
+/// The Airy height of each sample's own crust, m, over a fixed datum (`iso_height` at 0): the
+/// step's change of it is the sample's crust uplift (`Sample::crust_uplift_mm_yr`).
+pub fn crust_heights(state: &PlateState, gravity: f64) -> Vec<f64> {
+    state
+        .samples
+        .par_iter()
+        .map(|s| iso_height(&s.pools, 0.0, gravity))
+        .collect()
+}
+
+/// Sets each sample's crust uplift to the change of its crust's Airy height since `before`
+/// (from [`crust_heights`] on the same samples) over a step of `dt_yr` years, or with `add` adds
+/// that change to it (a later pass of the same step).
+// ledger: ISO-091
+pub fn crust_uplift(state: &mut PlateState, before: &[f64], gravity: f64, dt_yr: f64, add: bool) {
+    state
+        .samples
+        .par_iter_mut()
+        .zip(before.par_iter())
+        .for_each(|(s, &z)| {
+            let rate = ((iso_height(&s.pools, 0.0, gravity) - z) / dt_yr * 1.0e3) as f32;
+            s.crust_uplift_mm_yr = if add {
+                s.crust_uplift_mm_yr + rate
+            } else {
+                rate
+            };
+        });
+}
+
 /// The height a column of dry Airy height `z_a` settles at under a sea at `sea`, m.
 pub fn equilibrium_m(z_a: f64, sea: f64) -> f64 {
     if z_a >= sea {
