@@ -777,6 +777,8 @@ enum StrataArg {
     Basin,
 }
 
+// The variants are the `--kind` names (wrap-test, lake-test, river-test), so they share their postfix.
+#[allow(clippy::enum_variant_names)]
 #[derive(Clone, Copy, ValueEnum)]
 enum SynthKind {
     /// The §7.1 analytic terrain (AnalyticTestTerrain) with latitude climate.

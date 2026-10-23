@@ -16,8 +16,9 @@ Rain that does not evaporate runs downhill, gathers into rivers and fills hollow
 | [HYD](ledger/HYD.md) | below sea level (below, "Below sea level", 2026-10-20) | HYD-100 to HYD-105 (6) |
 | [HYD](ledger/HYD.md) | a lake's sediment (below, "Basins that outlast their sediment", 2026-10-21) | HYD-110 (1) |
 | [HYD](ledger/HYD.md) | the sea's one rule (below, "The sea's one rule", 2026-10-21) | HYD-106 to HYD-109 (4) |
+| [HYD](ledger/HYD.md) | river channels in the game (below, "River channels cut to the bake's depth", 2026-10-22) | HYD-120 to HYD-124 (5) |
 
-Rows by status (92 active, 1 `merged`): `verified` 2, `cited-unverified` 12, `from-memory` 5, `abstract-only` 2, `calibrated` 1, `game-choice` 47, `uncited` 23.
+Rows by status (97 active, 1 `merged`): `verified` 2, `cited-unverified` 12, `from-memory` 5, `abstract-only` 2, `calibrated` 1, `game-choice` 52, `uncited` 23.
 
 ## Material for the stage 2 writer
 
@@ -131,6 +132,43 @@ First measured on master 72280b3b (before HYD-110) against the branch at 51d309c
 
 - There the bake's lakes fell 0 to 0.27 points of the land (median 4.30 to 4.16 %), the map's 0.16 to 0.31 points (median 4.16 to 3.95 %); playas were 0.01 to 0.02 % of the land.
 - `tools/review/lake_basins.py` was not re-run: it reads a checkpoint's plate fields, and the simulation is unchanged.
+
+## River channels cut to the bake's depth, not curbed (2026-10-22, HYD-120 to HYD-124)
+
+Ben's largest river on a fresh earthlike_quick_16k single-player world (x 6131, z -3022, 1,000 to 1,727 m3/s) was about a block deep where the bake's channel is 7.9 to 9.9 blocks deep and 16 to 21 half-wide, and every river, most visibly the one-block streams, ran between one-block lips along both banks. Both came from the game's column rule (`water::core_with_surface` and `finish`, Java `Water.core` and `finish`), not from the bake: the bake's rivers file holds the right channel.
+
+**Why the channels were shallow.**
+
+- *The lowest-surface hit* (the main cause). A river column took its water and its bed from the one covering segment with the lowest water surface w, ties to the lowest segment id (`Rivers::sample_among`, Java `Rivers.sampleRange`). A wide river's vertices are 3 to 4 blocks apart against a half-width of 16 to 21, so a dozen segment capsules cover each column, and where w is flat (at sea level, or along a filled reach) or falls downstream, the lowest-w one is a neighbour whose capsule only grazes the column: d/hw 0.88 to 0.99 on the largest river's centre line, where its parabolic bed is a block deep. The game cut that neighbour's bed.
+- *Lake and sea before the river* (minor). The column rule tested the lake level and then the sea before the river, with the bed at the ground, so a channel crossing lake water or shallows lost its depth there.
+- *The curb.* Every bank column beside a river was raised to the river's top + 1 (HYD-069). A stream sits about a block under its filled surface (HYD-018), and the ground beside it rounds to the same block as its water, so the rule built a one-block wall on both sides.
+
+**The rules now.**
+
+- **The deep hit** (HYD-120). The bed comes from the covering segment whose floor under the column, w - max(1, depth (1 - (d/hw)²)), is lowest; the water's top still comes from the lowest-surface hit, so the water stays level across a confluence or a flat.
+- **Through the sea** (HYD-121). A sea column a channel covers takes the lower of its ground and the channel's floor as its bed, and the water pass cuts it as a river column with the sea's top: the channel runs on across sea-level flats and through the shallows at the mouth, as an estuary's does.
+- **Across a shallow lake** (HYD-122). A lake column a channel covers takes the channel's bed only where the lake water is less than a block deep over the generated surface (a river running over a lake's flat edge); deeper lake water keeps its own floor, so a river entering a lake does not trench it.
+- **Incision instead of a curb** (HYD-123). Where the lower of the ground a block beyond the channel's two edges is at or under the river's top block, the water and the bed go a block down (never under the sea's top block), so the banks are the ground itself. Where the banks stand above the water, as in a valley, nothing changes.
+- **Banks hold the water there is** (HYD-124). A bank beside a river is raised only to the water the river holds there: its own top, or a higher neighbour's top where the river steps down. A raise is left only where a real dip in the ground crosses the river's path.
+
+Java, the far terrain and the Rust mirror agree: `FarColumn` reads `Water.core` and counts a sea or lake column cut by a channel as channel for its sand, gravel and soil; `deeptime-format`'s water module and `deeptime-inspect`'s river map are the Rust side; the column parity fixtures (`ColumnParityTest`, `WaterRegionTest`) pin them. FORMAT.md's "Water columns" gives the steps.
+
+**Measured on a copy of Ben's bake** (C 13,312, 2,850 chains; `deeptime inspect-column` before and after over the river's vertex columns and cross-sections, scripts in the branch's build/river-depth/). Bed against the bake's bed w - depth, + is shallower:
+
+| Columns | Before | After |
+|---|---|---|
+| Largest river, last 700 vertex columns with depth 3 or more | mean +5.87 blocks, 4 % within a block | +0.01, 100 % |
+| Every channel's vertex centre column with hw and depth 2 or more, river (13,911) | +1.59, 59 % | -0.03, 99 % |
+| the same, lake water (235) | +2.22, 20 % | +0.13, 98 % |
+| the same, sea (30) | +1.63, 53 % | +0.17, 100 % |
+| Bank columns beside streams (hw under 3) raised | 3,594 of 18,865 (19.1 %), 3,580 by one block | 9 (0.05 %) |
+| Bank columns beside rivers raised | 549 of 3,123 (17.6 %) | 0 |
+
+Near the lake mouths (columns within hw + 2 of the last vertex of chains ending in a lake) no lake column is cut (879 keep their floor); a cut without HYD-122's test trenched 500 of them a mean 1.94 blocks. On the river's edge columns the lowest neighbouring bank now stands level with the water's top block in 2,992 of 18,166 stream and 415 of 3,129 river columns (flush), where before it was never under top + 1.
+
+**The GameTest** (`RiverDepthGameTests` on the river-test world, `deeptime synth --kind river-test`: a river of half-width 10 and depth 8 sloping down onto sea-level flats and through a block of sea into the sea, and a stream on a plain whose surface lies in the plain's ground block). Before (the base's column rule): 19 of 1,255 columns of the river's lower reach within a block of the bake's depth (1.5 %), 12 of 745 at w = sea level, a mean 2.08 blocks of water against 6.56; all 225 stream columns held their water in the plain's ground block behind a raised bank, 150 of 750 side columns raised a block. After: 1,253 of 1,255 (99.8 %, the two others where the surface steps down a block), 745 of 745 at sea level, 6.30 against 6.56; no stream column perched and no side column raised.
+
+**Game choices.** All five rows are block-world choices (agent, 2026-10-22, for the coordinator's river depth task and Ben's curb report). The depth the game cuts is the bake's own (HYD-022). The one-block incision is the freeboard the bake already leaves under its filled surface (HYD-018). No levee height is cited: the walls were the rule's, not levees; natural levees build from overbank deposition on lowland rivers (from memory), which the bake does not model.
 
 ## The sea's one rule (2026-10-21, HYD-106 to HYD-109)
 
