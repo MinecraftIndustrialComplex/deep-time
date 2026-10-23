@@ -469,10 +469,21 @@ sampling grid, the structure classification on the JSON of each audited kind, th
 vanilla start moved by exactly the rule's `dy` (boxes, jigsaw positions, junction ground levels, the start's box)
 and stands clear of the ground under every column of every piece; buried treasure and the mesa mineshaft are not
 moved; under the highest ground nothing is moved; and a buried trial chamber placed chunk by chunk into the
-generated planet has its own blocks in place with none waterlogged, with the real floor of those chunks (not the
-model's H) above its top by `cover` or more over every sampled column, where the same chamber at vanilla's height
-sticks out of that floor. About 2 % of the cells inside the buried pieces' boxes still hold water (the vanilla-height
-control in the sea holds about 4 %, and a chamber in rock under the highest ground 7 cells in 66,803), so the boxes
-are not claimed dry: the template carries almost no water of its own (the rock control), so this is water around it
-in cells the template does not overwrite (not traced further), and the chamber is placed there over finished chunks
-without the terrain adaptation that generation applies. What real generation leaves is not checked. Numbers are in the STATUS.md build log.
+generated planet has its own blocks in place and no cell inside its pieces' boxes held water before it was placed,
+with the real floor of those chunks (not the model's H) above its top by `cover` or more over every sampled column,
+where the same chamber at vanilla's height sticks out of that floor and its cells hold the sea.
+
+Every cell is read before and after the placing, so the water in a placed chamber is told apart: the world's (there
+before, left as it was) and the template's own (put there by the placing). Vanilla's trial chamber templates carry
+water of their own (read from the 1.21.1 client jar's 170 `trial_chambers` templates): `corridor/end_2` a basin of 60
+water and 23 waterlogged waxed oxidized cut copper stairs in one layer, `intersection/intersection_1` 966 water over
+seven layers, `corridor/atrium_1` 17, and one each in `corridor/addon/display_1`, `corridor/addon/display_2` and
+`corridor/entrance_1`. Trial chambers place with `LiquidSettings.IGNORE_WATERLOGGING` (vanilla's `Structures`
+bootstrap), so the world's water never waterlogs their blocks, and a count of waterlogged blocks cannot tell a
+chamber in the sea from one in rock. Until 2026-10-23 the test asserted that none of the buried chamber's own blocks
+was waterlogged: it passed while the sampled chunks missed `corridor/end_2` and failed once master bf8477b2's planet
+moved the deepest sea to (-128, -512), where they took it in (23 waterlogged in the buried chamber and the same 23 in
+the vanilla-height control; the buried chamber's 83 water cells were that basin's 60 water and 23 stairs, all in one
+layer at y -183). The chamber is placed over finished chunks there, without the terrain adaptation (`encapsulate`)
+that generation applies, which only adds rock round its pieces; what real generation leaves is not checked. Numbers
+are in the STATUS.md build log.
