@@ -9,8 +9,8 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * One part of the base image (server to client): {@link ImageCodec}'s deflated bytes, part
- * {@code index} of {@code count} of image {@code imageId} ({@link MapInfoPayload#imageId}).
+ * One part of a map picture (server to client): {@link ImageCodec}'s deflated bytes, part
+ * {@code index} of {@code count} of image {@code imageId} (a {@link MapInfoPayload.Picture}'s id).
  */
 public record MapImagePayload(int imageId, int index, int count, byte[] data) implements CustomPacketPayload {
 

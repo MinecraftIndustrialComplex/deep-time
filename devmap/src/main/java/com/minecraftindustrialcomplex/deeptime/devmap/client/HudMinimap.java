@@ -15,7 +15,8 @@ import net.minecraft.client.gui.GuiGraphics;
 
 /**
  * The corner minimap (the HUD key, period by default): a north-up square of the block-space map
- * around the player, with the graticule, the seam, the edges, the poles and the players, and the
+ * around the player in the dev map's picture (satellite by default, the choice made with S on the
+ * map screen), with the graticule, the seam, the edges, the poles and the players, and the
  * player's latitude and longitude under it. Top right, or bottom right while F3 is open so it does
  * not cover the debug text. Hidden while the dev map screen is open.
  */
