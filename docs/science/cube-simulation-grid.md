@@ -160,8 +160,8 @@ gives the same p99 (230,606 km² both). A ridge struck at 0°, 30° and 45° to 
 
 Conservation on a closed planet (n 32, 1,000 steps of the open sea, the flood, the routing, the
 stream-power solve with G 1, the mouth fill, the multigrid diffusion, the slope failure and the
-spreading): Σ a·h drifted by 3.57e-15 of Σ a·|h|, the worst single step by 1.9e-15; the water the
-roots collect was the planet's area to 6.6e-15 in every step (4,301,227 lake cell-steps, no sinks).
+spreading): Σ a·h drifted by 4.68e-15 of Σ a·|h|, the worst single step by 1.83e-15; the water the
+roots collect was the planet's area to 6.5e-15 in every step (4,301,144 lake cell-steps, no sinks).
 
 ## Simplifications and limits
 
@@ -184,6 +184,12 @@ roots collect was the planet's area to 6.6e-15 in every step (4,301,227 lake cel
 - **Memory.** A `CubeGrid` holds about 216 bytes per cell (unit vector, latitude, longitude,
   bearing, area, eight distances, eight couplings, eight neighbours): about 75 MB at n 240, quick
   16k's L1. The map table it shares is 0.66 MB.
+- **Speed.** At the same cell count the cube's routing, flood, stream power, spreading and sea
+  level run at 0.7 to 1.1 times the raster's time, its slope failure at 1.4 to 1.7 times, and its
+  diffusion at 2.2 to 2.6 times: the P1
+  operator has eight couplings a cell where the raster's stencil has two stored. A step without
+  the mouth fill takes 1.10 times as long. The table and its causes are in
+  [the design note](../design/cube-simulation-grid.md) ("Speed").
 - **What is not on the cube yet.** The young landscape, the glacial and thermal passes, the
   advection and the amplifier (window and tiles), the impacts, the erosion bands, the carbonate and
   the volcano stage itself; only the volcanoes' footprint code has a cube-metric version.
