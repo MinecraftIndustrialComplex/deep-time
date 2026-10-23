@@ -732,10 +732,7 @@ impl GapBudget {
 
     /// One sample's account (the peak trace, `peaks.rs`): its gap's parts, and this step's
     /// changes of its elevation and of its column's thickness by part, m.
-    pub fn sample_parts(
-        &self,
-        v: usize,
-    ) -> Option<(&[f32; PARTS], &[f32; PARTS], &[f32; PARTS])> {
+    pub fn sample_parts(&self, v: usize) -> Option<(&[f32; PARTS], &[f32; PARTS], &[f32; PARTS])> {
         self.track
             .get(v)
             .map(|t| (&t.parts, &t.step_dz, &t.step_dt))

@@ -3511,7 +3511,10 @@ mod tests {
         };
         strong.validate().unwrap();
         let bound = strong.yield_held_kg_m2().unwrap() / RHO_MANTLE;
-        assert!((bound - 2745.0).abs() < 5.0, "380 mGal is {bound:.0} m of mantle");
+        assert!(
+            (bound - 2745.0).abs() < 5.0,
+            "380 mGal is {bound:.0} m of mantle"
+        );
         // 1 mm/yr of Airy height a step, 14 km of crust: the elastic plate holds most of its root.
         let held = run(&elastic, 1.0, 12);
         assert!(
