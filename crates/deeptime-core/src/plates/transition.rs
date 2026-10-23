@@ -74,6 +74,28 @@
 //! thinned under an Airy root and loads its flexure with it (`surface/flexure.rs`), so the shelf,
 //! slope and rise come from the taper, the sediment the surface brings and its slope failure.
 //!
+//! # Stage 2: a stretching factor (`tectonics.transition_beta`)
+//! With the switch on (off by default; lithosphere-thermal-state.md, "Stage 2") the margin is
+//! drawn as a stretching factor β = T_n / T* across it rather than a linear ramp of thickness, on
+//! both sides of the boundary (each conjugate margin is its own plate's boundary):
+//!
+//!   T*(d) = T_o + (T_n − T_o) · S(1/2 + d / W),  S(s) = 3s² − 2s³ on [0, 1],
+//!
+//! so β stays under about 1.15 over the inner quarter of the zone (the proximal domain, crust
+//! 30 ± 5 km, "only a little thinned"), rises fastest at the boundary (the necking domain, where
+//! "the crust is thinned from 30 ± 5 km to ca. 10 km") and is 3 or more over the outer quarter
+//! (the hyperextended domain; Manatschal & Chenin 2023 after Chenin et al. 2017). S is symmetric
+//! about s = 1/2 like the linear ramp, so it holds the step's crust; W, τ, the catchments and the
+//! height line are unchanged (PLT-475, the form a game-choice).
+//!
+//! A continental source thinned to `keep` of its crystalline crust (β = 1 / `keep` for that step)
+//! has its lithosphere and keel thinned by the same factor, L / β and K / β (McKenzie 1978's
+//! uniform stretching; `thermal::stretch`, PLT-476). The state then cools it back over τ_c, and
+//! with `thermal_isostasy_m` on its thermal height z_th falls by the same law: McKenzie's thermal
+//! subsidence of the margin. Without `tectonics.thermal_state` there is no lithosphere to thin
+//! and only the crust's profile changes; with the state but no thermal isostasy the stretched
+//! margin is hotter and weaker (heat flow, `thermal_strength`) and its height is the crust's.
+//!
 //! # Catchments
 //! Crust moves within a stretch of margin, not across the plate: boundary samples are grouped
 //! round seeds picked along the boundary at least W/2 apart (in index order, so a run is
@@ -136,6 +158,18 @@ pub fn crust_per_metre(env: &Env) -> f64 {
 /// that crust is not a margin's).
 pub fn held_floor_m(crystalline: f64, target: f64, z_f: f64, f: f64) -> f64 {
     z_f + (crystalline.min(target) - oceanic_m()).max(0.0) / f
+}
+
+/// The share of the way from the ocean's crust to the continent's that the target stands at, at
+/// `s` = 1/2 + d/W in [0, 1] (0 the toe, 1 the hinge): `s` itself for the linear taper (PLT-261);
+/// with `transition_beta` (stage 2) the smoothstep 3s² − 2s³, whose stretching factor
+/// β = T_n / T* stays near 1 over the proximal margin, rises fastest at the boundary (the necking
+/// zone) and stays high over the distal margin. Both are symmetric about s = 1/2, so both hold
+/// the step's crust (see the module docs).
+// ledger: PLT-261, PLT-475
+pub fn shape(s: f64, beta: bool) -> f64 {
+    let s = s.clamp(0.0, 1.0);
+    if beta { s * s * (3.0 - 2.0 * s) } else { s }
 }
 
 /// What one step did.
@@ -331,8 +365,8 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
             return None;
         }
         let i = i as usize;
-        // ledger: PLT-261.
-        let target = t_o + (t_n - t_o) * (0.5 + d / w).clamp(0.0, 1.0);
+        // ledger: PLT-261, PLT-475.
+        let target = t_o + (t_n - t_o) * shape(0.5 + d / w, k.transition_beta);
         Some(Member {
             i,
             seed,
@@ -385,6 +419,10 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         s.basement_m *= keep as f32;
         s.thickness_m = s.pools.iter().sum();
         s.elevation_m = (f64::from(s.elevation_m) - g / f).clamp(lo, hi) as f32;
+        if k.transition_beta {
+            // Stage 2: the lithosphere stretches with the crust (ledger: PLT-476).
+            super::thermal::stretch(s, keep);
+        }
         out.moved_km2_m += g * env.norm.sample_area_km2();
     }
     // What an oceanic sink takes: the ocean column's own rock in its own proportion.
@@ -887,5 +925,100 @@ mod tests {
             };
             assert_eq!(width_rad(&env), 200.0 / 6370.0);
         }
+    }
+
+    /// Stage 2's profile holds the step's crust as the linear taper does (both are symmetric about
+    /// the boundary, so their mean is the mean of the two crusts), meets both crusts at the zone's
+    /// ends, and is flatter than the taper near the hinge (the proximal margin, β near 1) and
+    /// steeper at the boundary (the necking zone).
+    #[test]
+    fn the_stretching_profile_keeps_the_steps_crust() {
+        let n = 10_000;
+        let mean = |beta: bool| {
+            (0..n)
+                .map(|i| shape((i as f64 + 0.5) / n as f64, beta))
+                .sum::<f64>()
+                / n as f64
+        };
+        assert!((mean(true) - 0.5).abs() < 1e-9 && (mean(false) - 0.5).abs() < 1e-9);
+        assert_eq!((shape(0.0, true), shape(1.0, true)), (0.0, 1.0));
+        assert_eq!((shape(-0.3, true), shape(1.4, true)), (0.0, 1.0));
+        for s in [0.1, 0.25, 0.4] {
+            assert!((shape(s, true) + shape(1.0 - s, true) - 1.0).abs() < 1e-12);
+            assert!(shape(1.0 - s, true) > shape(1.0 - s, false), "proximal");
+        }
+        let slope = |beta: bool| (shape(0.51, beta) - shape(0.49, beta)) / 0.02;
+        assert!((slope(true) - 1.5).abs() < 1e-3 && (slope(false) - 1.0).abs() < 1e-9);
+    }
+
+    /// With `transition_beta` the continental side's lithosphere and keel thin by the factor its
+    /// crystalline crust thins (L / β, K / β): every continental source keeps L / L₀ = T / T₀;
+    /// a sample with no state, the ocean side and the margin with the switch off keep theirs. The
+    /// crust's volume is kept and the crust follows the new profile.
+    #[test]
+    fn a_stretched_margins_lithosphere_thins_with_its_crust() {
+        let base = Fx::new(MODEL_KM);
+        let fx = Fx::with(TectonicParams {
+            transition_beta: true,
+            thermal_state: true,
+            ..base.k.clone()
+        });
+        let mut st = planet(&fx.geo, 0.0);
+        for s in st.samples.iter_mut() {
+            if s.kind == CONTINENTAL {
+                s.lithosphere_km = 225.0;
+                s.keel_km = 200.0;
+            }
+        }
+        let before = st.samples.clone();
+        let vol0 = crystalline_total(&st, 0);
+        fx.run(&mut st, 30);
+        let vol = crystalline_total(&st, 0);
+        assert!((vol - vol0).abs() < 1e-6 * vol0, "volume {vol} vs {vol0}");
+        let mut thinned = 0;
+        for (i, s) in st.samples.iter().enumerate() {
+            let b = &before[i];
+            if s.kind != CONTINENTAL {
+                assert_eq!(s.lithosphere_km, b.lithosphere_km, "ocean side {i}");
+                continue;
+            }
+            let ratio = crystalline_m(&s.pools) / crystalline_m(&b.pools);
+            let l = f64::from(s.lithosphere_km) / f64::from(b.lithosphere_km);
+            assert!((l - ratio).abs() < 1e-4, "sample {i}: L by {l}, crust by {ratio}");
+            assert!(s.keel_km <= s.lithosphere_km);
+            if ratio < 0.95 {
+                thinned += 1;
+                let k = f64::from(s.keel_km) / f64::from(b.keel_km);
+                assert!((k - ratio).abs() < 1e-4, "keel {i}: {k} vs {ratio}");
+            }
+        }
+        assert!(thinned > 20, "{thinned} samples stretched");
+        let (t_n, t_o) = (continental_m(), oceanic_m());
+        let w = fx.k.transition_width_km;
+        let thick = profile(&st, &fx.geo, 0, 20.0, 160.0, |s| crystalline_m(&s.pools));
+        for &(d, t) in &thick {
+            let want = t_o + (t_n - t_o) * shape(0.5 + d / w, true);
+            assert!(
+                (t - want).abs() < 2500.0,
+                "{d:.0} km: {t:.0} m against the profile's {want:.0}"
+            );
+        }
+        // Off: the lithosphere is not touched by the taper.
+        let mut off = before.clone();
+        let mut st = planet(&base.geo, 0.0);
+        st.samples.clone_from(&off);
+        base.run(&mut st, 30);
+        for (i, s) in st.samples.iter().enumerate() {
+            assert_eq!(s.lithosphere_km, before[i].lithosphere_km);
+        }
+        // No state (L 0): nothing to stretch.
+        for s in off.iter_mut() {
+            s.lithosphere_km = 0.0;
+            s.keel_km = 0.0;
+        }
+        let mut st = planet(&fx.geo, 0.0);
+        st.samples.clone_from(&off);
+        fx.run(&mut st, 30);
+        assert!(st.samples.iter().all(|s| s.lithosphere_km == 0.0));
     }
 }

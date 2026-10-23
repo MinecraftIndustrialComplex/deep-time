@@ -127,7 +127,10 @@
 //! the column and is gone (it gives no area back). Since 2026-10-05 (plate task 7, ledger
 //! PLT-277); until then all of the excess foundered, and a collision's crust, also accreted a
 //! second time at each resampling (PLT-276), foundered at three times the old motion law's rate
-//! under the force balance.
+//! under the force balance. With `tectonics.root_removal` (gap 4 stage 3, off by default) what
+//! finds no room drops off at a Rayleigh-Taylor instability's pace, the share 1 − e^(−δt/τ) of it
+//! a step with τ = `thermal::ROOT_REMOVAL_MYR` (10 Myr; Houseman & Molnar 1997), and the belt's
+//! lithosphere heats as its mantle part goes (`thermal::root_crust_km`). ledger: PLT-477.
 //!
 //! # What it is not
 //! A lower-crustal flow solve. The surface stage's spreading (`surface::spread`) moves the surface
@@ -178,7 +181,8 @@ const ROOT_ORDER: [usize; pool::COUNT] = [
 /// Continental crust thicker than `crust_max_km` spreads the excess to the nearest room on its
 /// plate at once (as the collapse moves crust, [`spread`], whether or not an orogeny holds it
 /// up), and what finds no room goes to the mantle from the bottom of its column (see the module
-/// docs, "The thickest crust"); returns the crust lost, km² × m, and adds what spread to `out`.
+/// docs, "The thickest crust"), at once or, with `root_removal`, at the Rayleigh-Taylor pace
+/// (`thermal::ROOT_REMOVAL_MYR`); returns the crust lost, km² × m, and adds what spread to `out`.
 /// `sea_m` is the step's sea (m over the datum), read only with `collapse_sea_column` (the ocean
 /// floor's fill, [`room_column_m`]). Runs every step, before [`step`].
 pub fn founder(
@@ -227,12 +231,19 @@ pub fn founder(
         }
     }
     let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
+    // With root removal (stage 3) the root beyond the cap drops off at the Rayleigh-Taylor pace,
+    // the share 1 − e^(−δt/τ) of it a step, rather than at once (ledger: PLT-477).
+    let pace = if k.root_removal {
+        1.0 - (-env.dt_myr / super::thermal::ROOT_REMOVAL_MYR).exp()
+    } else {
+        1.0
+    };
     let mut lost = 0.0;
     for s in state.samples.iter_mut() {
         if s.kind != CONTINENTAL || s.is_hidden() || f64::from(s.thickness_m) <= t_max {
             continue;
         }
-        let left = f64::from(s.thickness_m) - t_max;
+        let left = pace * (f64::from(s.thickness_m) - t_max);
         let pools_before = s.pools;
         lost += sink(s, left);
         // Isostasy, as in the collapse: towards the height of the column kept, never past it (a
@@ -1339,6 +1350,51 @@ pub(in crate::plates) mod tests {
         }
         let expect = n as f64 * (135_100.0 - t_max) * fx.norm.sample_area_km2();
         assert!((lost - expect).abs() < 1e-3 * expect, "{lost} vs {expect}");
+    }
+
+    /// With root removal (stage 3, PLT-477) the root beyond the cap that finds no room drops off
+    /// at the Rayleigh-Taylor pace: the share 1 − e^(−δt/τ) of the excess a step, from the bottom,
+    /// so after many steps the column nears the cap as before.
+    #[test]
+    fn with_root_removal_the_root_beyond_the_cap_drops_off_at_its_pace() {
+        let mut fx = Fx::new();
+        fx.k.collapse_myr = f64::NAN;
+        fx.k.root_removal = true;
+        let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
+        let mut st = planet(&fx.geo, belt, 0.0);
+        for (i, s) in st.samples.iter_mut().enumerate() {
+            if belt(fx.geo.points()[i]) {
+                s.pools[pool::FELSIC_PLUTONIC] += 100_000.0;
+                s.thickness_m += 100_000.0;
+            }
+        }
+        let before = st.samples.clone();
+        let env = fx.env(1);
+        let pace = 1.0 - (-env.dt_myr / crate::plates::thermal::ROOT_REMOVAL_MYR).exp();
+        let lost = founder(&mut st, &fx.geo, &env, &mut Collapse::default(), 0.0);
+        let t_max = fx.k.crust_max_km * 1000.0;
+        let mut n = 0;
+        for (i, s) in st.samples.iter().enumerate() {
+            let b = &before[i];
+            if belt(fx.geo.points()[i]) {
+                n += 1;
+                let want = 135_100.0 - pace * (135_100.0 - t_max);
+                assert!((f64::from(s.thickness_m) - want).abs() < 1.0, "{} vs {want}", s.thickness_m);
+                assert_eq!(s.pools[pool::SEDIMENT], b.pools[pool::SEDIMENT]);
+            } else {
+                assert_eq!(s, b);
+            }
+        }
+        let expect = n as f64 * pace * (135_100.0 - t_max) * fx.norm.sample_area_km2();
+        assert!((lost - expect).abs() < 1e-3 * expect, "{lost} vs {expect}");
+        for step in 2..60 {
+            founder(&mut st, &fx.geo, &fx.env(step), &mut Collapse::default(), 0.0);
+        }
+        for (i, s) in st.samples.iter().enumerate() {
+            if belt(fx.geo.points()[i]) {
+                assert!(f64::from(s.thickness_m) < t_max + 1000.0, "{}", s.thickness_m);
+            }
+        }
     }
 
     /// The excess over `crust_max_km` spreads at once to the nearest room on the plate, even while

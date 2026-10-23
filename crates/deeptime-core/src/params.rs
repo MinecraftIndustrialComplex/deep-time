@@ -620,6 +620,22 @@ pub struct TectonicParams {
     /// conductive value: crust the rate guard spread onto old sea floor kept the floor's (ledger
     /// PLT-469). On with `thermal_state` whatever this says.
     pub heat_flow_refresh: bool,
+    /// Rifted margins as stretching (gap 4 stage 2, `plates/transition.rs`): the transition's
+    /// target is the normal crust stretched by a factor β that rises from 1 at the hinge towards
+    /// the ocean, T_n / β(d), with a margin's domains in place of the linear taper, and a
+    /// continental source's lithosphere and keel thin with its crust (L / β, pure shear), so the
+    /// margin then cools and subsides on McKenzie's law from the state. Without `thermal_state`
+    /// only the crust's profile changes. Off (the default and every built-in preset) = the linear
+    /// taper (ledger PLT-475, PLT-476).
+    pub transition_beta: bool,
+    /// Root removal (gap 4 stage 3, `plates/thermal.rs`, `plates/collapse.rs`): a collision belt's
+    /// thickened mantle lithosphere drops off by Rayleigh-Taylor instability (Houseman & Molnar
+    /// 1997), so its lithosphere heats to the Moho or its keel over `thermal::ROOT_REMOVAL_MYR`,
+    /// and the crust beyond `crust_max_km` that finds no room sinks at that pace, not at once (the
+    /// founder half of the cap). The heating needs `thermal_state`; without it only the founder
+    /// changes. Off (the default and every built-in preset) = the cap's founder (ledger PLT-477,
+    /// PLT-478).
+    pub root_removal: bool,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
     /// 0 = no limit.
@@ -910,6 +926,8 @@ impl Default for TectonicParams {
             thermal_backstop: false, // ledger: PLT-470 (game-choice: off by default)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
             heat_flow_refresh: false, // ledger: PLT-469 (game-choice: off by default)
+            transition_beta: false,   // ledger: PLT-475 (game-choice: off by default)
+            root_removal: false,      // ledger: PLT-477 (game-choice: off by default)
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
             continent_elevation_m: [150.0, 900.0],
