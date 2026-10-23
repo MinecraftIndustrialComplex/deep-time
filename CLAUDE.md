@@ -68,6 +68,13 @@ per run), put an unmerged lane's branch next to another's with `pool.sh combine 
 combination once, and let a commit that only edits a comment reuse the old key's runs with `pool.sh alias`. Add a measure
 through a registry file, not a new sim (`pool.sh measure` runs it over the cached folders). Before starting an ensemble of
 your own, run `pool.sh arms` and `pool.sh status`: the run you need may be there.
+How many runs (decisions log 2026-10-23, Ben: "see if agents can be more efficient about testing ... If not, then lower
+the amount of sub-agents"): explore with one cumulative 8-run arm per stage (stage 1, then 1+2, ...), not every switch
+alone and every combination; per-switch arms only to find which part of a failed arm is at fault. Run a 24-run final only
+when the 8-run arm's criteria mean is at least 0.5 above its base (base's per-run sd is 0.92), or for a fault fix going
+on by default. A lane's final arm becomes the next base: after the merge the coordinator aliases master's default to it
+(`pool.sh alias --check-seed 1`) and the next lane runs on top of it. At most two lanes queue simulations at once; the
+others work from cached runs. No simulation outside the pool.
 
 ## Rules
 - **The test machine is the Azure VM `deeptime-test`** (Ben, 2026-10-01; D32as_v7, 32 vCPU, 125 GiB,
