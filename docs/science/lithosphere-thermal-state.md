@@ -192,7 +192,65 @@ cold moves and only heated ground rises, by up to 1,600 m. The pool chooses betw
 
 ## Earth against the mod
 
-Filled in after the pool runs (below, "Measured").
+The state's own numbers stand where the sources put them by construction: an old craton's heat flow
+41 mW/m² (Earth's Archean mean 41), a cooled younger continent's 53 (Proterozoic terrains away from
+cratons 55 ± 17), a back-arc's 82 (Hyndman, Currie & Mazzotti 2005 give back-arcs "high heat flow");
+a keeled craton reached by an arc keeps a Te of 58 km after 40 Myr. What follows is what the switches
+do to the V1 measures.
+
+### Measured (2026-10-23)
+
+The pool (`pool.sh table --base base --arm <arm>`): earthlike_quick_16k, 1,000 Myr, both starts,
+`+DEEPTIME_CRUST_BUDGET=1`, 2 threads, against master bf8477b2's 24 runs (the base, key
+7f9d8f115049). Every arm ran at key c2acdd83055b (the branch before master fc6ab402 was merged in;
+that merge brought only the plate's yield, off unless set). Medians, the two-sided Mann-Whitney p
+against the base in brackets.
+
+Exploration, seeds 1 to 4 (8 runs an arm):
+
+| arm | switches (`--set tectonics.`) | land | largest landmass | crust under the sea | above 2 km | high coast | under ice | collisions | crust's net change | criteria a run, mean |
+|---|---|---|---|---|---|---|---|---|---|---|
+| target | | 0.26 to 0.32 | ≥ 0.12 | ≤ 0.25 | ≤ 0.12 | ≤ 0.15 | ≤ 0.15 | 2 to 6 | | of 7 |
+| base (24) | none | 0.300 | 0.151 | 0.274 | 0.151 | 0.333 | 0.116 | 1.75 | −0.035 | 3.33 (seeds 1 to 4: 3.00) |
+| th-iso | state, isostasy 1600 (craton frame) | 0.302 (0.85) | 0.131 (0.78) | 0.304 (0.36) | 0.174 (0.48) | 0.345 (0.69) | 0.158 (0.25) | 1.95 (0.32) | −0.048 (0.16) | 2.62 (0.24) |
+| th-iso187 | state, isostasy 1600, frame 187 | 0.296 (0.45) | 0.170 (0.59) | 0.285 (0.98) | 0.153 (0.85) | 0.345 (0.48) | 0.119 (0.75) | 1.30 (0.023) | −0.059 (0.026) | 2.88 (0.25) |
+| th-str | state, strength | 0.319 (0.013) | 0.204 (0.018) | 0.229 (0.070) | 0.147 (0.92) | 0.340 (0.92) | 0.114 (0.85) | 1.70 (0.59) | −0.033 (0.98) | 3.38 (0.78) |
+| th-bs | state, backstop | 0.323 (0.009) | 0.189 (0.19) | 0.272 (0.36) | 0.160 (0.78) | 0.358 (0.36) | 0.133 (0.95) | 1.15 (0.10) | −0.029 (0.27) | 2.88 (0.22) |
+| th-full | state, strength, isostasy 1600, frame 187 | 0.286 (0.38) | 0.135 (0.95) | 0.280 (0.75) | 0.138 (0.62) | 0.334 (0.78) | 0.132 (0.45) | 1.55 (0.63) | −0.074 (0.007) | 3.00 (0.31) |
+| th-str-k0 | state, strength, keel 0 | 0.326 (0.020) | 0.192 (0.14) | 0.225 (0.15) | 0.138 (0.95) | 0.318 (0.51) | 0.146 (0.33) | 1.65 (0.60) | −0.026 (0.36) | 2.62 (0.100) |
+
+- **Thermal isostasy in the craton frame** lifts the sea, not the land: every continent that is
+  not at L_cold stands higher (ground made from ocean floor starts at its 125 km or less and stands
+  up to 970 m higher), so the drowned crust displaces water, and the sea over the datum went from
+  538 to 959 m after 100 Myr and from 861 to 1,403 m at the end. Land did not move; more crust sank
+  under the sea and more land is under ice.
+- **Hyndman & Currie's frame** keeps the sea nearer (738 / 1,114 m) but the start's continents sink
+  by up to 368 m as they cool: fewer collisions (1.75 to 1.30) and twice the crust lost. Why the
+  collisions fall was not traced.
+- **The strength** is the one that moves V1 towards Earth: cold, keeled crust no longer spreads as
+  a fresh orogen does, so less of it thins under the sea and the largest landmass grows. Its cost is
+  land over the band's top in some runs.
+- **The backstop** keeps more crust on land, too much: land over the band at the median, and the
+  fewest collisions of any arm.
+- **No keels** (the start's continents heat like any other behind an arc) loses the strength's gain:
+  land further over the band, criteria 2.62. The keels are what the strength needs.
+
+Final, the strength (`thermal_state=true`, `thermal_strength=true`), seeds 1 to 12 (24 runs):
+
+| arm | land | largest landmass | crust under the sea | above 2 km | high coast | under ice | collisions | crust's net change | criteria a run: median, mean | sea over the datum after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| base | 0.300 | 0.151 | 0.274 | 0.151 | 0.333 | 0.116 | 1.75 | −0.035 | 3, 3.33 | 538 / 861 |
+| th-str | 0.314 (0.049) | 0.182 (0.010) | 0.251 (0.18) | 0.146 (0.86) | 0.295 (0.32) | 0.113 (0.50) | 1.80 (1.0) | −0.032 (0.78) | 3, 3.42 (0.57) | 543 / 817 |
+
+Runs meeting each criterion, base against th-str: land 20 to 13, largest landmass 17 to 22, crust
+under the sea 8 to 12, above 2 km 9 to 6, high coast 0 to 1, under ice 17 to 19, collisions 9 to 9.
+Seed for seed the criteria rose in 10 runs and fell in 7. The ship rule (criteria mean up at
+p < 0.05, no median pushed out of its band) is not met: no median left its band, but the mean rose by
+0.08 at p 0.57. The strength stays off. It does what Earth's cratons do (the largest landmass and
+the drowned crust both move towards their targets at p 0.010 and 0.18) and the land share's top is
+what it runs into: seven runs end over 0.32.
+
+STRENGTH-YIELD-PLACEHOLDER
 
 ## Simplifications and limits
 
@@ -214,15 +272,27 @@ Filled in after the pool runs (below, "Measured").
 ## Game choices
 
 - Every start continent is a keeled craton (PLT-463). Earth's continents are a mix of cratons and
-  younger mobile belts; the planet's start stands for an old continental world.
+  younger mobile belts; the planet's start stands for an old continental world. The pool says the
+  keels matter: without them the strength's gain is lost (th-str-k0, "Measured").
 - The frame L_ref (ISO-111) is a calibration of the model's existing Airy line, not a physical
   constant.
 
 ## Open questions
 
-- The frame (ISO-111): the pool's answer is under "Measured".
-- Whether the heat-flow pass (PLT-469) should go on by default on its own, so the release pace
-  (ISO-099) can go on without the rest.
+- The frame (ISO-111). Neither frame helped V1 ("Measured"): the craton frame lifts the sea, Hyndman
+  & Currie's sinks the start's continents and loses crust. Hyndman & Currie's is the physical one
+  (the start's continents are not all cratons at the model's line); the isostasy should wait until
+  the sea's 840 m over the datum (gap 1) is gone, and be tried again in that frame.
+- The heat-flow pass (PLT-469) changes only the heat flow of the cells the rate guard turned
+  continental (the bake's `meta/heat_flow_mw_m2`, the deposits' and the underground's reading of
+  it), not the plates' dynamics. It should go on with the release pace (ISO-099), or on its own by
+  default: the fault is a bookkeeping one either way.
+- The land share's top. The strength moves the largest landmass and the drowned crust towards
+  Earth and pushes seven of 24 runs over 0.32 land: the crust it keeps from spreading under the sea
+  stands on land instead. Whether it can go on beside a change that lowers the land share, or
+  with a weaker keel than 200 km on some of the start's continents (no keel at all lost the gain),
+  is open; neither was tried.
+- Stages 2 and 3 (above, "The order of the stages") are designed, not built.
 
 ## Sources
 
