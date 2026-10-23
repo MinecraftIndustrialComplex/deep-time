@@ -17,8 +17,9 @@ The deep-time simulation works on cells several kilometres wide. Two later steps
 | [AMP](ledger/AMP.md) | resampling | AMP-067 to AMP-071 (5) |
 | [AMP](ledger/AMP.md) | sea floor | AMP-074 (1) |
 | [AMP](ledger/AMP.md) | steep-ground texture (the bake's relief pass) | AMP-080 to AMP-084 (5) |
+| [AMP](ledger/AMP.md) | lake shores | AMP-090, AMP-091 (2) |
 
-Rows by status (YNG and AMP, recounted 2026-10-22): `verified` 1, `cited-unverified` 8, `calibrated` 3, `game-choice` 69, `uncited` 19.
+Rows by status (YNG and AMP, recounted 2026-10-22): `verified` 1, `cited-unverified` 8, `calibrated` 3, `game-choice` 71, `uncited` 19.
 
 ## Material for the stage 2 writer
 
@@ -371,3 +372,55 @@ them. Chosen by the census above and the renders (the agent, D3).
 **Open questions.** Whether hard rock should get cliff bands too where it is layered (sandstone,
 limestone), and whether the bands should follow the strata's dip instead of running level (they
 would then read the structure). Whether the jag should be stronger on glacial headwalls.
+
+## Lake shores in the amplifier (savanna pit task, 2026-10-22)
+
+Ben, on deep pits in a savanna plain: "The savana pit was fine, the weird thing was all of the
+straight lines, angles, etc. It didn't feel like a natural pit but instead like a glitch."
+
+**What was wrong.** Round each pit the terrain stepped along straight lines that met at right
+angles, a staircase with 8-block treads (renders of Ben's world, x -2780 to -2520, z 1040 to 1220,
+and of the same seed rebaked on master: the steps sit on the slopes round each closed basin, at
+the edge of the young landscape's lake).
+
+**Cause.** The young landscape floods every closed basin to its spill point and hands the lake on
+to the amplifier as a mask on its own grid (L2, 8 blocks a cell). The amplifier carried that mask
+to each finer level by nearest sampling plus a 3 x 3 dilation (AMP-020 as it was), so on L3 the
+lake's edge was a staircase of the L2 grid. Two things stop at that edge: the amplifier's erosion
+(lake cells are not eroded) and the mountain character (`character::apply` changes land cells
+only), so the edge stood in the terrain as a step. Both were found by reading the fields round the
+pit (`deeptime dump-fields` of the young checkpoint) and by rebaking with the character off
+(`amplify.ruggedness` 0), which leaves no step on the contour rule's edge.
+
+**Fix.** (1) A fine cell is in the lake when its terrain lies under the highest lake surface among
+the coarse corners of its interpolation quad (AMP-090), so the lake's edge is the terrain's own
+contour at the lake's level, smooth and of no preferred direction; the levels carry each lake's
+surface (`Level::lake_z`, 4 B a cell; the window's buffers carry it too, so the memory model's
+bytes per cell went from 79 to 83 in a window and from 21 to 24 in a level). (2) The character
+fades in from the shore: none on the first land cells, all of it 8 blocks out, by the Euclidean
+distance to the nearest lake cell (AMP-091). With (1) alone the step was gone but a lip of 0.3 to
+0.5 block was left along the contour (the change the character made on the first land cell);
+with (2) the profile across the shore falls monotonically. Test:
+`surface::amplify::character::tests::the_character_fades_in_from_a_lake_shore` (a lake round a
+cone's foot: the shore's land cells keep their height, the flank above changes by more than half a
+block on average).
+
+**Measured** (the young checkpoint of Ben's seed on master, amplified and baked at the pinned
+projection, `scale.lambda_c_deg` 120.25; master, the contour rule alone, and both; window
+x -2640 to -2300, z 900 to 1180, and a second pit at x 4300 to 4560, z 3100 to 3300; scratch
+scripts not committed). Profile down the slope at x -2476, z 966 to 976, blocks: master 71.7, 71.3,
+71.4, 71.6, 71.1, 70.5 (a 0.3-block lip, then the stair); contour rule 71.6, 71.2, 70.8, 70.3, 70.2,
+70.5 (a 0.3-block lip); both 71.6, 71.3, 71.1, 70.9, 70.8, 70.6. Against master the whole window
+moved by 0.06 block on average (most 4.2, 99th percentile 1.25), the second pit's by 0.25 (most
+10.2).
+
+**The plain's terraces are not the same cause.** The contour-like terraces on the flat savanna
+round the pits are the game's 1-block steps: on the plain of Ben's world (slope under 0.2, no
+steep ground within 12 blocks) floor(bake height + a constant) equals the generated ground on
+87.6 % of the cells, and the neighbour steps there are of exactly one block.
+
+**Still there.** The young lake is the whole closed basin to its spill, and the amplifier adds
+nothing inside it (no erosion, no character), while the bake's water balance later leaves most of
+such a basin dry in a semi-arid climate. So the dry floor and the lower walls of a pit keep the
+young landscape's coarser terrain, and the character's fade marks the old waterline as a soft
+contour. Making the amplifier's lake the water-balance lake would end both; it is not done here.
