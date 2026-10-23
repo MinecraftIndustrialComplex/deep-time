@@ -117,6 +117,11 @@ pub struct SurfaceParams {
     pub glacial: super::glacial::GlacialParams,
     /// The plate's stiffness (`flexure.rs`; Ben, 2026-10-02: "General flexure everywhere").
     pub flexure: super::flexure::FlexureParams,
+    /// The surface holds the offset it carries over the plate model's height (in a gap between
+    /// plates, on a trench row) instead of handing it to the plate model's feedback each step
+    /// (`advect::held_cells`; flexure.md "The held offsets"). Off: the feedback takes the whole
+    /// offset everywhere, as before. ledger: ISO-125
+    pub held_offsets: bool,
     /// How the stage's solvers run (P1-19): numerics that change no law.
     pub numerics: Numerics,
 }
@@ -249,6 +254,7 @@ impl Default for SurfaceParams {
             drama: 1.0,
             glacial: super::glacial::GlacialParams::default(),
             flexure: super::flexure::FlexureParams::default(),
+            held_offsets: false, // ledger: ISO-125
             numerics: Numerics::default(),
         }
     }

@@ -66,6 +66,7 @@ pub mod events;
 pub mod facies;
 pub mod fields;
 pub mod flexure;
+pub mod floors;
 pub mod glacial;
 pub mod grid;
 pub mod guard;
@@ -141,8 +142,14 @@ pub mod field {
     pub const DRAINAGE: &str = "surface/drainage";
     /// Regolith thickness, m.
     pub const REGOLITH: &str = "surface/regolith_m";
-    /// Elevation change the plate model applies to L0 at its next step, m.
+    /// Elevation change the plate model applies to L0 at its next step, m. With
+    /// `surface.held_offsets` NaN on the cells whose offset the surface holds ([`OFFSET_HELD`]):
+    /// the plate model takes nothing of theirs.
     pub const FEEDBACK: &str = "surface/feedback_m";
+    /// 1 on the cells whose offset over the plate model's height the surface held at the end of
+    /// the last step (`advect::held_cells`: a gap between plates, a trench row), 0 elsewhere;
+    /// written with `surface.held_offsets` or the peak trace on. ledger: ISO-125
+    pub const OFFSET_HELD: &str = "surface/offset_held";
     /// Material added (+) or removed (−) by surface processes, m (the plate model's rock pools).
     pub const MATERIAL: &str = "surface/material_m";
     /// Felsic volcanic rock the volcano stage's cones added (+) or a caldera took back (−) since
@@ -339,6 +346,8 @@ struct Moved {
     prev_elevation: Vec<f32>,
     /// The offset over the plate model after the last step, which a cell in a gap keeps.
     prev_offset: Vec<f32>,
+    /// The part of it the surface held (`surface.held_offsets`, `advect::Carry::prev_held_offset`).
+    prev_held_offset: Option<Vec<f32>>,
     newborn: Vec<bool>,
     known_plates: usize,
 }
@@ -375,6 +384,7 @@ impl Moved {
             gap: pf.gap.as_deref(),
             prev_gap: prev_ids(field::CRUST_GAP),
             prev_offset: Some(&self.prev_offset),
+            prev_held_offset: self.prev_held_offset.as_deref(),
             flags: Some(&pf.flags),
             regime: Some(&pf.regime),
             parents,
@@ -863,6 +873,17 @@ impl SurfaceStage {
                     // Back in the state once the flexure carry has read it (below).
                     prev_elevation: std::mem::take(&mut st.elevation_m),
                     prev_offset: crate::alloc::copied(&st.offset_m),
+                    prev_held_offset: if p.held_offsets {
+                        advect::held_offset(
+                            &st.offset_m,
+                            world
+                                .fields
+                                .get(field::OFFSET_HELD)
+                                .map(|f| f.data.as_slice()),
+                        )
+                    } else {
+                        None
+                    },
                     newborn: Vec::new(),
                     known_plates: st.omega.len(),
                 };
@@ -1960,7 +1981,9 @@ impl SurfaceStage {
             .plates
             .as_ref()
             .is_some_and(|st| st.gap_budget.is_some());
-        let h_spread = (budget && flex_on).then(|| crate::alloc::copied(&sc.h));
+        // The floor trace (`floors.rs`, measurement only) reads the stage's grounds too.
+        let floor_trace = floors::threshold().is_some();
+        let h_spread = ((budget || floor_trace) && flex_on).then(|| crate::alloc::copied(&sc.h));
         let mut answers: Option<Vec<(f64, f64)>> = None;
         if let (Some(h_eroded), Some(h_before_spread)) = (&h_eroded, &h_before_spread) {
             let started = Instant::now();
@@ -2176,10 +2199,69 @@ impl SurfaceStage {
         // coarser samples, its clamps) stayed in the surface for good and the two drifted apart:
         // crust the plate model held at 2.8 km stood at 14 km and still took a full collision
         // surge.
-        let feedback: Vec<f32> = (0..n)
+        let mut feedback: Vec<f32> = (0..n)
             .into_par_iter()
             .map(|c| (sc.h[c] - f64::from(pf.elevation[c])) as f32)
             .collect();
+        // The cells whose offset the surface holds (`advect::held_cells`, ISO-125): the next
+        // step's carry keeps it over the plate model's height, so the plate model takes none of
+        // it (NaN). The mask goes to the next step's carry, and to the peak trace.
+        let held = (p.held_offsets || crate::plates::peaks::threshold().is_some()).then(|| {
+            advect::held_cells(pf.gap.as_deref(), Some(&pf.flags), Some(&pf.regime), n)
+        });
+        if p.held_offsets
+            && let Some(held) = &held
+        {
+            feedback
+                .par_iter_mut()
+                .zip(held.par_iter())
+                .for_each(|(f, &k)| {
+                    if k > 0.5 {
+                        *f = f32::NAN;
+                    }
+                });
+        }
+        floors::print(&floors::Step {
+            t_myr: t_end_myr,
+            grid: &grid,
+            sea,
+            h_start: &h_start,
+            h_eroded: h_eroded.as_deref(),
+            h_before_spread: h_before_spread.as_deref(),
+            h_spread: h_spread.as_deref(),
+            h_end: &sc.h,
+            plate_z: &pf.elevation,
+            offset_start: &st.offset_m,
+            held: held.as_deref(),
+            gap: pf.gap.as_deref(),
+            flags: &pf.flags,
+            regime: &pf.regime,
+            parts: {
+                use crate::plates::gap_budget::field as gb;
+                [
+                    ("rebound", gb::REBOUND),
+                    ("water", gb::WATER),
+                    ("flexure", gb::FLEXURE),
+                    ("roots", gb::ROOTS),
+                    ("released", gb::RELEASED),
+                    ("flex_rest", gb::FLEX_REST),
+                ]
+                .into_iter()
+                .filter_map(|(k, name)| {
+                    world
+                        .fields
+                        .get(name)
+                        .filter(|f| f.data.len() == n)
+                        .map(|f| (k, f.data.as_slice()))
+                })
+                .collect()
+            },
+            flex: st
+                .flexure
+                .as_ref()
+                .filter(|f| f.load_m.len() == n)
+                .map(|f| [&f.load_m[..], &f.deflection_m[..], &f.water_m[..]]),
+        });
         let material: Vec<f32> = net.par_iter().map(|&x| x as f32).collect();
         st.offset_m = (0..n)
             .into_par_iter()
@@ -2213,6 +2295,9 @@ impl SurfaceStage {
         put(world, field::DRAINAGE, drainage);
         put(world, field::REGOLITH, crate::alloc::copied(&st.regolith_m));
         put(world, field::FEEDBACK, feedback);
+        if let Some(held) = held {
+            put(world, field::OFFSET_HELD, held);
+        }
         put(world, field::MATERIAL, material);
         let ice_now: Vec<f32> = if ela_z.is_some() && sc.glacial.ice.footprint.len() == n {
             // Over the glaciers' whole width, on the ground as it now is.

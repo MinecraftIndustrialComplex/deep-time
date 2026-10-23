@@ -708,6 +708,40 @@ fn flexure_off_changes_nothing_and_on_bends_the_plate() {
     );
 }
 
+/// The held offsets (ISO-125) in the coupled pipeline: with `surface.held_offsets` the surface
+/// marks the cells whose offset it holds (a gap between plates, a trench row) and hands the plate
+/// model none of their offset (NaN in the feedback), every other cell's whole offset as before;
+/// without it neither the mask nor a NaN.
+#[test]
+fn the_surface_hands_the_plate_model_nothing_of_a_held_offset() {
+    let run = |on: bool, name: &str| {
+        let mut v: serde_json::Value = serde_json::from_str(&pipeline_json(3000, 40.0, 7)).unwrap();
+        v["surface"]["held_offsets"] = serde_json::json!(on);
+        let dir = temp_dir(name);
+        let s = session(&v.to_string(), &dir);
+        finish(&s);
+        let world = s.checkpoint().unwrap().world;
+        let _ = std::fs::remove_dir_all(dir);
+        world
+    };
+    let off = run(false, "held-off");
+    assert!(!off.fields.contains_key(field::OFFSET_HELD));
+    assert!(off.fields[field::FEEDBACK].data.iter().all(|x| x.is_finite()));
+    let on = run(true, "held-on");
+    let held = &on.fields[field::OFFSET_HELD].data;
+    let fb = &on.fields[field::FEEDBACK].data;
+    let n_held = held.iter().filter(|&&k| k > 0.5).count();
+    assert!(n_held > 0, "a trench row or a gap somewhere");
+    assert!(n_held < held.len() / 4, "{n_held} of {}", held.len());
+    for (c, (&k, &f)) in held.iter().zip(fb).enumerate() {
+        assert_eq!(k > 0.5, f.is_nan(), "cell {c}: held {k}, feedback {f}");
+    }
+    let st = on.surface.as_ref().unwrap();
+    assert!(st.elevation_m.iter().all(|z| z.is_finite()));
+    let samples = &on.plates.as_ref().unwrap().samples;
+    assert!(samples.iter().all(|s| s.elevation_m.is_finite()));
+}
+
 /// The surface on large cells (build log 2026-10-18, the surface divergence): the small coupled
 /// planet at 1,221 m a block, the Earth-proportioned scale, whose cells are 78 km wide. While the
 /// plate held the plateau spreading's change up as crust (before ISO-070) this planet grew a
