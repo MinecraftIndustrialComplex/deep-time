@@ -1035,6 +1035,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated; not in code.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) metadata only.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 70, issue 2, pages 295-321, and the correction record (volume 73, issue 2, pages 523-532). (PLT) correct. A correction exists (GJRAS 73:523-532, 1983).
+- Read in the high-ground task (2026-10-22, PLT-414): the abstract, from OpenAlex's record (the full text stays paywalled): the lithosphere as "a thin sheet of power law material overlying an inviscid substrate"; "The material flows in response to forces applied to its boundaries (for example, the indenting of one continent by another) and to forces in its interior arising from gradients in crustal thickness"; "In the limit of a very weak medium (Ar > 10) the lithosphere is unable to sustain appreciable crustal elevation contrasts"; "the forces arising from crustal thickness contrasts are great enough to produce net extension in the region of thick crust in front of the influx boundary". Ledger ids added: PLT-414.
 
 ### MolnarLyonCaen1988
 - Reference: Molnar, P. and Lyon-Caen, H. (1988). Some simple physical aspects of the support, structure, and evolution of mountain belts. In: Clark, S. P., Burchfiel, B. C. and Suppe, J. (eds), Processes in Continental Lithospheric Deformation, Geological Society of America Special Paper 218, pp. 179-208.
@@ -6399,7 +6400,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: McKenzie, D. (1978). Some remarks on the development of sedimentary basins. Earth and Planetary Science Letters 40:25-32.
 - DOI or URL: 10.1016/0012-821X(78)90071-7 (the DOI from the standard citation, not seen on the scan); scan at http://www.zetaware.com/public/McKenzie_1978.pdf
 - Cited as: "McKenzie 1978" (uniform stretching by β; initial and thermal subsidence).
-- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`)
+- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`), PLT-415 (2026-10-22, the high-ground task: τ = 62.8 My as the e-fold of the thin sheet's viscosity with the age of the orogeny; the form is the agent's)
 - Access: scanned copy, open.
 - Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
 
@@ -7863,3 +7864,48 @@ Nothing was saved to the library.
 - Access: paywalled; the abstract from OpenAlex's record.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "If continent elevation (freeboard) remains at the present value of a few hundred meters, the past continent‐ocean area ratio might have been quite different, depending on earlier volumes of continental crust and water. We conclude that, along with the ages of ocean basins, continental crustal thickening exerts a first‐order control on the global sea level over hundreds of million years"; since 65 Ma "a 156‐m increase of continent elevation over sea level", "affected most strongly by the roughly 1.7% continent surface area decrease caused by Cenozoic mountain building".
+
+### HousemanEngland1986
+- Reference: Houseman, G. A. and England, P. C. (1986). Finite strain calculations of continental deformation: 1. Method and general results for convergent zones. Journal of Geophysical Research 91(B3):3651-3663.
+- DOI or URL: 10.1029/JB091iB03p03651
+- Cited as: "Houseman & England 1986" (the thin viscous sheet, the Argand number).
+- Ledger ids: PLT-414
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "the strength of the sheet relative to the gravitational forces (which may be expressed as a dimensionless number: the Argand number Ar)"; "For n > 3 and Ar between 1 and 10 a plateau of thickened crust is formed in front of the indenter"; "the length scale of deformation increases with Ar and time since the start of the collision and decreases with n".
+
+### EnglandHouseman1989
+- Reference: England, P. and Houseman, G. (1989). Extension during continental convergence, with application to the Tibetan Plateau. Journal of Geophysical Research 94(B12):17561-17579.
+- DOI or URL: 10.1029/JB094iB12p17561
+- Cited as: "England & Houseman 1989".
+- Ledger ids: PLT-414, PLT-415
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "For the last 5 m.y. or so the plateau has been thinning by the mechanism of extension on north‐south trending normal faults"; the collision time scale "(∼50 m.y. in the case of India and Asia)"; "the increase in surface height (as much as 2 km) and of potential energy (5 to 10 × 10 12 N m −1 ) resulting from convective instability of the lower lithosphere are sufficient for east‐west extension to replace north‐south compression as the dominant feature of the stress field of the Tibetan plateau".
+
+### EnglandMolnar1997
+- Reference: England, P. and Molnar, P. (1997). Active deformation of Asia: from kinematics to dynamics. Science 278(5338):647-650.
+- DOI or URL: 10.1126/science.278.5338.647
+- Cited as: "England & Molnar 1997" (the Tibetan lithosphere's viscosity).
+- Ledger ids: PLT-414
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "gradients of stress point uphill toward the center of Tibet, where gravitational potential energy per unit surface area reaches a maximum"; "This balance, in the region of the Tibetan plateau, yields an estimate of 10 22 pascal second for the average viscosity of the Tibetan lithosphere, which is only about 10 to 100 times greater than the viscosity of the convecting upper mantle".
+
+### FleschEtAl2000
+- Reference: Flesch, L. M., Holt, W. E., Haines, A. J. and Shen-Tu, B. (2000). Dynamics of the Pacific-North American plate boundary in the western United States. Science 287(5454):834-836.
+- DOI or URL: 10.1126/science.287.5454.834
+- Cited as: "Flesch et al. 2000" (the Basin and Range's viscosity).
+- Ledger ids: PLT-414
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "Deformation in the Basin and Range is driven, in part, by gravitational potential energy differences, but extension directions there are modified by plate interaction stresses. The California shear zone has relatively low vertically averaged viscosity of about 10(21) pascal.seconds, whereas the Basin and Range has a higher vertically averaged viscosity of 10(22) pascal.seconds."
+
+### SonderJones1999
+- Reference: Sonder, L. J. and Jones, C. H. (1999). Western United States extension: how the west was widened. Annual Review of Earth and Planetary Sciences 27:417-462.
+- DOI or URL: 10.1146/annurev.earth.27.1.417
+- Cited as: "Sonder & Jones 1999".
+- Ledger ids: PLT-414
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "Forces driving extension can originate at plate boundaries, through basal traction, basal normal forces, or from buoyancy forces internal to the crust and lithospheric mantle. The latter two are most responsible for driving extension where it is observed in the Basin and Range."
