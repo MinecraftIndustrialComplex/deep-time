@@ -1588,6 +1588,15 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Library: not fetched.
 - Read so far (by the project): the abstract as quoted in search results, 2026-10-23: widths, depths and lengths of distributaries fall with each bifurcation; the bar forms within 0 < x/W < 2 of the mouth.
 
+### Ganti2014
+- Reference: Ganti, V., Chu, Z., Lamb, M. P., Nittrouer, J. A. and Parker, G. (2014). Testing morphodynamic controls on the location and frequency of river avulsions on fans versus deltas: Huanghe (Yellow River), China. Geophysical Research Letters 41(22):7882-7890.
+- DOI or URL: 10.1002/2014GL061918
+- Cited as: "Ganti et al. 2014" (rivers-and-lakes.md; physics-gap-audit.md).
+- Ledger ids: HYD-137
+- Access: paywalled (Wiley 403 on 2026-10-23); not fetched.
+- Library: not fetched.
+- Read so far (by the project): the abstract as quoted in search results, 2026-10-23: where the river debouches from the Loess Plateau, avulsions occur at an abrupt decrease in bed slope and recur about every 607 years; the key points say fans and deltas have different drivers for avulsion and delta lobe size scales with the backwater length. The abstract's delta sentences were cut off.
+
 ### Canestrelli2014
 - Reference: Canestrelli, A., Nardin, W., Edmonds, D., Fagherazzi, S. and Slingerland, R. (2014). Importance of frictional effects and jet instability on the morphodynamics of river mouth bars and levees. Journal of Geophysical Research: Oceans 119 (the reference from memory).
 - DOI or URL: not checked.
