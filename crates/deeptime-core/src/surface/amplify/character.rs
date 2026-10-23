@@ -729,10 +729,10 @@ fn relief(win: &Win, src: &[f32], lo: &mut [f32], hi: &mut [f32], dst: &mut [f32
 }
 
 /// Applies the character to the window's terrain `z` (m) in place, reading the effective drainage
-/// area `area` (m²), the erodibility `kfac`, the lake footprint and the basin classes `closed`
-/// (`resample::basin`; empty: all open). Sea and lake cells are left as they are; no land cell
-/// open to the sea goes under it, and closed ground (never sea) has no coast. Returns the
-/// statistics of `core`'s land cells.
+/// area `area` (m²), the erodibility `kfac` and the window's cell bytes `lake` (the lake flag and
+/// the basin class, `resample::cell`; empty: no lakes, all open). Sea and lake cells are left as
+/// they are, and no land cell open to the sea goes under it; closed ground (never sea) may.
+/// Returns the statistics of `core`'s land cells.
 #[allow(clippy::too_many_arguments)]
 pub fn apply(
     win: &Win,
@@ -818,16 +818,15 @@ pub fn apply(
     let fade = |cell: usize| -> f64 {
         let a_km2 = f64::from(area[cell]) * 1.0e-6;
         let river = smoothstep(a0, a1, a_km2);
-        // Closed ground has no coast. ledger: AMP-096
-        let coast = if is_open(cell) {
-            smoothstep(
-                0.0,
-                p.coast_blocks.max(1e-6),
-                f64::from(s.smooth[cell]) - sea_y,
-            )
-        } else {
-            1.0
-        };
+        // By height on all ground, closed ground too: the basin classes are drawn on the coarse
+        // grid (the hydrology's halo round closed ground reaches above sea level), and a fade
+        // that switched on them drew that grid's staircase into the ground near sea level.
+        // Closed ground under sea level therefore takes no character. ledger: AMP-061, AMP-096
+        let coast = smoothstep(
+            0.0,
+            p.coast_blocks.max(1e-6),
+            f64::from(s.smooth[cell]) - sea_y,
+        );
         (1.0 - river) * coast * (1.0 - glaciated(cell))
     };
     // How much of its change a land cell keeps near a lake: the distance to the nearest lake
@@ -1299,6 +1298,33 @@ mod tests {
             out > 0.5,
             "the flank above the shore changed by {out} blocks (mean)"
         );
+    }
+
+    #[test]
+    fn the_basin_class_draws_no_line_above_sea_level() {
+        // The west half of the window is closed ground, as the hydrology's halo round a closed
+        // basin reaches above sea level and is drawn on the coarse grid. The cone stands on a
+        // plain 4 blocks above the sea, inside the coast fade: on ground above sea level the
+        // character must not see the class, or the coarse grid's staircase shows round the
+        // basin (the jagged ring round Ben's savanna pit). ledger: AMP-061, AMP-096
+        use super::super::resample::{basin, cell};
+        let young = CharacterFields::uniform(1.0, 0.0, 0.0);
+        let (win, ..) = cone(0.8);
+        let open = vec![cell::of(false, basin::OPEN); win.cells()];
+        let half: Vec<u8> = (0..win.cells())
+            .map(|c| {
+                let class = if c % win.w < 160 {
+                    basin::CLOSED
+                } else {
+                    basin::OPEN
+                };
+                cell::of(false, class)
+            })
+            .collect();
+        let (_, a) = change_with_lake(&young, 0.8, 1.0, &open);
+        let (_, b) = change_with_lake(&young, 0.8, 1.0, &half);
+        let moved = a.iter().zip(&b).filter(|(x, y)| x != y).count();
+        assert_eq!(moved, 0, "{moved} cells differ with the west half closed");
     }
 
     #[test]

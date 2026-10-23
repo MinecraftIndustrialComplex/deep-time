@@ -470,8 +470,11 @@ before the doublings (`surface/amplify/balance.rs`). Its lakes, at their balance
 amplifier's lakes (AMP-095); the young flood's spill-full lakes go. (2) Ground the open sea does
 not reach (the network's `closed_basin` layer) is closed ground, carried to each finer level as
 a quad's corners agree (`resample::basin`), and sea is only ground under sea level that is open
-to it (AMP-096): closed ground gets no sea clamp, no coast fade and no sea base level, so the
-passes work it as land. (3) A basin the balance leaves dry or a playa drains to its lowest cell
+to it (AMP-096): closed ground gets no sea clamp and no sea base level, so the passes work it as
+land. Every rule that tells the classes apart does so only at or below sea level, because the
+classes are drawn on the coarse grid and the hydrology's halo round closed ground reaches above
+it; the character's coast fade (AMP-061) stays by height on closed ground too (see "Measured"
+for the version that lifted it). (3) A basin the balance leaves dry or a playa drains to its lowest cell
 (a sink, AMP-097): the flood repair takes that cell as an outlet instead of filling the basin to
 its rim, and erosion on closed ground takes the receiver's height as its base, so the dry floor
 and the lower walls get the erosion, slumping and silt of any land and the floor collects its
@@ -486,7 +489,9 @@ leave 6 MiB of the default 4 GiB workbench cap's 38 MiB margin, and two would re
 world.
 Tests: `surface::amplify::balance::tests` (a dry bowl 1.5 km under sea level is closed ground
 with one sink at its centre; a wet bowl keeps its lake and no sink; with the hydrology off the
-level is untouched).
+level is untouched) and `surface::amplify::character::tests::the_basin_class_draws_no_line_above_sea_level`
+(a cone on a plain 4 blocks above the sea, half the window closed ground: not one cell differs
+from the all-open window).
 
 **Measured.** RESULTS PENDING
 
