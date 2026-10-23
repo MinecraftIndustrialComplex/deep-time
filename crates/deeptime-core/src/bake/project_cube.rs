@@ -1237,16 +1237,16 @@ pub(crate) fn project_body_exact(
 
 /// B4: a projected body's planet area against its area in the simulation (Lambert, equal-area).
 struct BodyArea {
-    /// The map's local scale squared averaged over the world ellipse's points on the planet (12
-    /// directions on 4 rings, weighted by area) times the ellipse's area: the planet area the
-    /// ellipse would cover were its points past a turning seam drawn across it (phase 2's images).
+    /// The map's local scale squared averaged over the world ellipse (12 directions on 4 rings,
+    /// weighted by area) times the ellipse's area. A point in the net's void past a turning seam
+    /// reads the scale where the net folds it, on the partner face, as the wrap engine draws it.
     ratio: f64,
-    /// The share of the ellipse's points off the planet (past a turning seam, in the net's void).
-    off_planet: f64,
+    /// The share of the ellipse in the net's void (past a turning seam, folded onto its partner).
+    in_void: f64,
 }
 
-/// [`BodyArea`] of world body `nb` projected from simulation body `b`; None with no point of it on
-/// the planet.
+/// [`BodyArea`] of world body `nb` projected from simulation body `b`; None with no point of it
+/// that folds onto the planet.
 fn body_area_ratio(
     view: &CubeView<'_>,
     b: &deeptime_format::Body,
@@ -1257,7 +1257,7 @@ fn body_area_ratio(
     let a0 = f64::from(b.axes[0]) * f64::from(b.axes[2]);
     let (a, c) = (f64::from(nb.axes[0]), f64::from(nb.axes[2]));
     let (sy, cy) = f64::from(nb.yaw).sin_cos();
-    let (mut sum, mut weight, mut all) = (0.0, 0.0, 0.0);
+    let (mut sum, mut weight, mut void, mut all) = (0.0, 0.0, 0.0, 0.0);
     for i in 0..RINGS {
         let r = (i as f64 + 0.5) / RINGS as f64;
         for k in 0..DIRS {
@@ -1268,6 +1268,9 @@ fn body_area_ratio(
                 nb.center[2] + u * sy + v * cy,
             );
             all += r;
+            if view.cube.local_of_point(x, z).is_none() {
+                void += r;
+            }
             if let Some(j) = view.jacobian(x, z) {
                 sum += r * j.sigma * j.sigma;
                 weight += r;
@@ -1277,13 +1280,15 @@ fn body_area_ratio(
     let ratio = sum / weight * a * c / a0;
     (a0 > 0.0 && weight > 0.0 && ratio.is_finite()).then(|| BodyArea {
         ratio,
-        off_planet: 1.0 - weight / all,
+        in_void: void / all,
     })
 }
 
-/// Whether world body `nb`'s horizontal ellipse holds a cube corner's image (net period `period`):
-/// the map's scale is singular there (a 360° neighbourhood folded into 270°), so no one ellipse
-/// keeps such a body's planet area; phase 2 draws it per face.
+/// Whether world body `nb`'s horizontal ellipse holds a cube corner's image (net period `period`).
+/// Round a corner the planet has three quarters of a turn: an ellipse over it covers a full turn
+/// of the net, and the quarter in the void folds back onto ground it already covers (its planet
+/// area as drawn about 4/3 of its own), and the map's scale is singular there. No one ellipse keeps
+/// such a body's area; phase 2 draws it per face.
 fn body_holds_a_corner(corners: &[[i64; 2]], period: f64, nb: &deeptime_format::Body) -> bool {
     let (a, c) = (f64::from(nb.axes[0]), f64::from(nb.axes[2]));
     let (sy, cy) = f64::from(nb.yaw).sin_cos();
@@ -1853,7 +1858,7 @@ pub fn project_folder_cube(
             .collect();
         let mut ratios: [Vec<f64>; 3] = Default::default();
         let mut ratios_091: [Vec<f64>; 3] = Default::default();
-        let (mut over_corner, mut off_planet) = (Vec::new(), (0usize, 0.0f64));
+        let (mut over_corner, mut past_seam) = (Vec::new(), (0usize, 0.0f64));
         let (mut shifts, mut clipped, mut with_host) = ((0usize, 0.0f64), 0usize, (0usize, 0.0f64));
         new_bodies = bs
             .iter()
@@ -1874,15 +1879,15 @@ pub fn project_folder_cube(
                         "corner_distance_blocks": (corner * 10.0).round() / 10.0,
                         "planet_area_ratio": area.as_ref().map(|r| (r.ratio * 1e4).round() / 1e4),
                         "planet_area_ratio_scl091": area_091.as_ref().map(|r| (r.ratio * 1e4).round() / 1e4),
-                        "off_planet_share": area.as_ref().map(|r| (r.off_planet * 1e3).round() / 1e3),
+                        "void_share": area.as_ref().map(|r| (r.in_void * 1e3).round() / 1e3),
                     }));
                 } else {
                     let k = place(x, z);
                     if let Some(r) = &area {
                         ratios[k].push(r.ratio);
-                        if r.off_planet > 0.0 {
-                            off_planet.0 += 1;
-                            off_planet.1 = off_planet.1.max(r.off_planet);
+                        if r.in_void > 0.0 {
+                            past_seam.0 += 1;
+                            past_seam.1 = past_seam.1.max(r.in_void);
                         }
                     }
                     if let Some(r) = &area_091 {
@@ -1939,7 +1944,7 @@ pub fn project_folder_cube(
                 "planet_area_ratio_median": by_place(ratios),
                 "planet_area_ratio_median_scl091": by_place(ratios_091),
                 "reaching_past_a_turning_seam": {
-                    "count": off_planet.0, "largest_off_planet_share": (off_planet.1 * 1e3).round() / 1e3,
+                    "count": past_seam.0, "largest_void_share": (past_seam.1 * 1e3).round() / 1e3,
                 },
                 "over_a_corner": over_corner,
             }),
@@ -2398,6 +2403,15 @@ mod tests {
             );
             let nb = project_body_exact(&m, &b);
             assert_eq!(body_holds_a_corner(&images, period, &nb), holds, "{axes:?}");
+            // Part of the one over the corner lies in the net's void and folds back onto ground
+            // the ellipse already covers: its planet area as drawn is well over its own.
+            let area = body_area_ratio(&m.view, &b, &nb).expect("on the planet");
+            if holds {
+                assert!(area.in_void > 0.0, "{axes:?}: {}", area.in_void);
+                assert!(area.ratio > 1.1, "{axes:?}: {}", area.ratio);
+            } else {
+                assert_eq!(area.in_void, 0.0, "{axes:?}");
+            }
         }
     }
 
