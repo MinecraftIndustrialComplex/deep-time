@@ -10,16 +10,21 @@
 //! - [`kdtree`] — [`SampleTree`], nearest-sample queries (`kiddo`) on unit vectors.
 //! - [`coupling`] — [`BlockFrame`] (block x/z ↔ latitude/longitude ↔ unit vector, with the seam
 //!   wrap) and [`Coupling`] (raster cell → triangle, barycentric weights and nearest sample).
+//! - [`cube`] — [`CubeGrid`], the simulation's grid on Moser's equal-area cube (cube world plan
+//!   §3, S1): six n × n faces, the D8 neighbours across the seams, the true metric, the ghost
+//!   rings and Hilbert keys.
 //!
 //! Every function here is deterministic: parallel loops (Rayon, on the caller's pool) write
 //! disjoint outputs, and the hull's insertion order comes from a seeded [`SplitMix64`].
 
 pub mod coupling;
+pub mod cube;
 pub mod fibonacci;
 pub mod hull;
 pub mod kdtree;
 
 pub use coupling::{BlockFrame, CellLink, Coupling, lat_lon_deg, unit_from_lat_lon_deg};
+pub use cube::{CubeGrid, CubeTopology, GhostTable};
 pub use fibonacci::{fibonacci_point, fibonacci_sphere, mean_spacing_rad};
 pub use hull::{Adjacency, HullError, SphereMesh};
 pub use kdtree::SampleTree;
