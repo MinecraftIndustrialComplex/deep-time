@@ -1,0 +1,31 @@
+{
+  "_doc": "Gap 4 stages 2 and 3 (2026-10-23): which plate setting the coast with high ground sits in, and where its high ground came from (docs/science/lithosphere-thermal-state.md, 'Where the high coasts are'). Pass it with --registry tools/review/pool/measures_gap4.json (or DEEPTIME_POOL_MEASURES) and --measures v1census,coastset. Definitions in measure_coastset.py.",
+  "measures": {
+    "coastset": {
+      "version": 2,
+      "doc": "the coast with high ground (v1census coast_hi) by the plate setting within 150 km (collision, arc, rifted, hotspot, other) and by its high ground's orogeny; definitions in measure_coastset.py",
+      "command": ["{py}", "-I", "{tools}/measure_coastset.py", "{run}"],
+      "python": "numpy",
+      "needs": ["fields"],
+      "fields": ["elevation", "regime", "plates/crust_type", "plates/orogeny_type", "plates/orogeny_age_myr", "plates/thickness_m"],
+      "columns": [
+        {"key": "coast_hi", "label": "coast with high ground", "target": [null, 0.15], "digits": 3},
+        {"key": "hi_collision", "key2": "rate_collision", "label": "collision belt: share of the high coasts / rate on its coast", "target": null, "digits": 3, "pair": true},
+        {"key": "hi_arc", "key2": "rate_arc", "label": "arc: share / rate", "target": null, "digits": 3, "pair": true},
+        {"key": "hi_rifted", "key2": "rate_rifted", "label": "rifted margin: share / rate", "target": null, "digits": 3, "pair": true},
+        {"key": "hi_hotspot", "key2": "rate_hotspot", "label": "hotspot: share / rate", "target": null, "digits": 3, "pair": true},
+        {"key": "hi_other", "key2": "rate_other", "label": "other: share / rate", "target": null, "digits": 3, "pair": true},
+        {"key": "coast_collision", "key2": "coast_rifted", "label": "the coast in a collision belt / on a rifted margin", "target": null, "digits": 3, "pair": true},
+        {"key": "coast_arc", "key2": "coast_other", "label": "the coast at an arc / other", "target": null, "digits": 3, "pair": true},
+        {"key": "without_rifted", "key2": "without_collision", "label": "coast_hi without the rifted / collision high coasts", "target": null, "digits": 3, "pair": true},
+        {"key": "hg_him", "key2": "hg_and", "label": "high ground Himalayan / Andean", "target": null, "digits": 3, "pair": true},
+        {"key": "rifted_hg_him", "key2": "rifted_hg_none", "label": "rifted margin's high ground Himalayan / no orogeny", "target": null, "digits": 3, "pair": true},
+        {"key": "hg_age_med_rifted", "key2": "hg_age_med_collision", "label": "high ground's orogeny age, rifted / collision, Myr", "target": null, "digits": 0, "pair": true},
+        {"key": "hg_dist_med_rifted", "key2": "hg_thick_med_rifted", "label": "rifted: coast to high ground km / its crust km", "target": null, "digits": 0, "pair": true},
+        {"key": "coast_thick_med_rifted", "key2": "coast_thick_med_collision", "label": "crust under the high coast, rifted / collision, km", "target": null, "digits": 1, "pair": true},
+        {"key": "coast_sea_cont", "key2": "hi_sea_cont", "label": "facing a flooded continent: all coast / high coasts", "target": null, "digits": 3, "pair": true},
+        {"key": "sea_cont_collision", "key2": "sea_cont_rifted", "label": "facing a flooded continent: collision / rifted high coasts", "target": null, "digits": 3, "pair": true}
+      ]
+    }
+  }
+}
