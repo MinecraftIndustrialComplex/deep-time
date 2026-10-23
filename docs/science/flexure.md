@@ -745,7 +745,14 @@ the plate, which the solve does not keep. Over a load narrower than its depth of
 anomaly is less than 2πGσ, so for one cell of the quick presets (39 km) the bound is stricter than
 Earth's anomalies require. The bound does not depend on `Te`, the plate's age or the latitude.
 
-**Measured.** See [plates.md](plates.md), "The polar peaks", for the pool's arms.
+**Measured** (pool arm `pp-yield380`, key 08c9d7d679c0, seeds 1 to 12 by both starts, 1000 Myr,
+`+DEEPTIME_CRUST_BUDGET=1`, against the 24 runs of master bf8477b2; per-run tables in
+[plates.md](plates.md), "The polar peaks"). The guard's worst fell from 13.7 to 13.1 km at the
+median (Mann-Whitney p 0.015) and from 30.0 to 15.5 km at the largest; 9 base runs passed 15 km and
+4 passed 20 km, against 1 and 0 with the yield. The largest one-step fall went from 9.45 to 7.42 km
+(p < 0.001) and the largest rise from 6.99 to 6.52 km (p 0.012). No V1 criterion moved (every p
+0.24 or more; criteria met per run 3.33 to 3.04, p 0.31), so it does not meet the ship rule (a
+criteria gain at p < 0.05) and stays off by default.
 
 ## Game choices
 
