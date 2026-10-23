@@ -8367,6 +8367,15 @@ The sources of V1 gap 2 (build log 2026-10-23 "Gap 2"; plates.md, the section "P
 - Library: not kept (search pages only, `BuiterTorsvik2014/`).
 - Read so far (by the project): not read.
 
+### Byerlee1978
+- Reference: Byerlee, J. (1978). Friction of rocks. Pure and Applied Geophysics 116:615-626 (from memory).
+- DOI or URL: not checked (10.1007/BF00876528 from memory).
+- Cited as: "Byerlee's friction" (from memory).
+- Ledger ids: PLT-506 (the exponent 2 of `rift_weakness`: a brittle strength growing linearly with depth integrates to a plate strength proportional to the square of its thickness)
+- Access: not looked for.
+- Library: not kept.
+- Read so far (by the project): not read; the linear growth of frictional strength with normal stress, so with depth, is from memory.
+
 ### Matthews2016
 - Reference: Matthews, K. J., Maloney, K. T., Zahirovic, S., Williams, S. E., Seton, M. and Müller, R. D. (2016). Global plate boundary evolution and kinematics since the late Paleozoic. Global and Planetary Change 146:226-250.
 - DOI or URL: 10.1016/j.gloplacha.2016.10.002 (accepted manuscript open).
