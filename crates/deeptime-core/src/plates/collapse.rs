@@ -1161,7 +1161,10 @@ pub(in crate::plates) mod tests {
     /// at the normal column; off, there is no sheet. η_0 10²² Pa s is the default since 2026-10-23.
     #[test]
     fn the_sheet_thins_young_high_crust_at_its_potential_energy() {
-        assert_eq!(TectonicParams::default().collapse_sheet_viscosity_pa_s, 1.0e22);
+        assert_eq!(
+            TectonicParams::default().collapse_sheet_viscosity_pa_s,
+            1.0e22
+        );
         let mut fx = Fx::new();
         assert!(Sheet::new(&fx.k, &fx.env(0), normal_thickness_m(), 0.0).is_none());
         fx.k.collapse_sheet_viscosity_pa_s = 1.0e22;
