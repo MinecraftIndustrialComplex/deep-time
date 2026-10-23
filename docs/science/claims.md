@@ -45,12 +45,12 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 71 | 2 | 8 | 0 | 1 | 2 | 51 | 7 | 11 | 0 | 3 |
 | [PRV](ledger/PRV.md) | geologic provinces | 29 | 0 | 0 | 0 | 5 | 3 | 11 | 10 | 0 | 0 | 2 |
 | [RCK](ledger/RCK.md) | rock classes, metamorphism, plutons | 82 | 11 | 8 | 1 | 1 | 1 | 57 | 3 | 0 | 0 | 11 |
-| [SCL](ledger/SCL.md) | world scale, planet constants | 95 | 5 | 6 | 8 | 0 | 2 | 68 | 6 | 0 | 3 | 1 |
+| [SCL](ledger/SCL.md) | world scale, planet constants | 102 | 5 | 6 | 8 | 0 | 2 | 73 | 8 | 0 | 3 | 1 |
 | [STE](ledger/STE.md) |  | 15 | 1 | 0 | 3 | 0 | 0 | 10 | 1 | 0 | 0 | 0 |
 | [STR](ledger/STR.md) | strata, traps, hosts | 53 | 1 | 0 | 0 | 1 | 2 | 49 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 109 | 7 | 0 | 3 | 3 | 2 | 70 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 21 | 0 | 0 | 0 | 0 | 1 | 10 | 10 | 0 | 0 | 2 |
-| **all** | | **2,739** | **326** | **335** | **66** | **117** | **86** | **1,302** | **507** | **329** | **11** | **239** |
+| **all** | | **2,746** | **326** | **335** | **66** | **117** | **86** | **1,307** | **509** | **329** | **11** | **239** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),
