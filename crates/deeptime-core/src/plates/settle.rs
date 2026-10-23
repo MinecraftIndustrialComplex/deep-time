@@ -42,7 +42,8 @@
 //! (`surface/flexure_m`, the flexure solve of ISO-040: how far the plate holds the ground above
 //! or below local isostasy; 0 without a surface stage), τ = `isostasy_relax_myr` (4 kyr: the
 //! whole way at any plate step, ISO-078). The change is the step's uplift; the step's rise guard
-//! (PLT-288) runs after it.
+//! (PLT-288) runs after it. With `tectonics.thermal_isostasy_m` on, z_A gains the lithosphere's
+//! thermal height (`thermal::uplift_m`, ISO-110): a hot lithosphere holds its column higher.
 //!
 //! The settling moves a height alone: it adds and removes no crust, so the surface's flexure
 //! takes it as no load (ISO-091). The flexure books only `Sample::crust_uplift_mm_yr`, the change
@@ -57,6 +58,7 @@ use rayon::prelude::*;
 
 use super::Env;
 use super::collapse::iso_height;
+use super::thermal;
 use super::state::{CONTINENTAL, PlateState, TRENCH};
 use crate::surface::flexure::{RHO_MANTLE, RHO_WATER};
 
@@ -138,7 +140,9 @@ pub fn step(state: &mut PlateState, env: &Env, flexure: Option<&[f64]>, sea: f64
                 .and_then(|f| f.get(i).copied())
                 .filter(|f| f.is_finite())
                 .unwrap_or(0.0);
-            let target = equilibrium_m(iso_height(&s.pools, z_0, g), sea) + f;
+            // The lithosphere's thermal height joins the crust's (ledger: ISO-110; 0 when off).
+            let z_a = iso_height(&s.pools, z_0, g) + thermal::uplift_m(k, s.lithosphere_km);
+            let target = equilibrium_m(z_a, sea) + f;
             let z = f64::from(s.elevation_m);
             let dz = (target - z) * share;
             s.elevation_m = (z + dz) as f32;

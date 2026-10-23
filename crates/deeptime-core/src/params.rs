@@ -591,6 +591,27 @@ pub struct TectonicParams {
     /// as its lithosphere cools (McKenzie 1978's thermal time, 62.8 Myr); crust no orogeny raised
     /// does not flow. 0 = no growth (ledger PLT-415).
     pub collapse_sheet_strength_myr: f64,
+    /// The lithosphere's thermal state (`plates/thermal.rs`, gap 4): each sample carries the depth
+    /// of its thermal lithosphere and its depleted keel; arcs, back-arcs, hotspots and rifts heat
+    /// it, elsewhere it cools on McKenzie's time; continental heat flow comes from it (with the
+    /// final pass of `heat_flow_refresh`). Off = the old proxy (ledger PLT-137, PLT-460).
+    pub thermal_state: bool,
+    /// Thermal isostasy, m: the height between a hot back-arc's lithosphere and a cold craton's at
+    /// equal crust, added to a continental column's Airy height in proportion to its
+    /// lithosphere's depth (`thermal_reference_km` stands at 0). 0 = off; needs `thermal_state`
+    /// (ledger ISO-110).
+    pub thermal_isostasy_m: f64,
+    /// The lithosphere's depth, km, at which the model's Airy line stands (the thermal height is 0
+    /// there), and the depth the start's continents begin at (ledger ISO-111).
+    pub thermal_reference_km: f64,
+    /// Strength from the state: the thin sheet's viscosity and the flexure's continental Te take
+    /// the thermal age the lithosphere's depth implies in place of the orogeny's age; needs
+    /// `thermal_state` (ledger ISO-112).
+    pub thermal_strength: bool,
+    /// After the step's resampling, every continental sample gets at least its heat-flow law's
+    /// conductive value: crust the rate guard spread onto old sea floor kept the floor's (ledger
+    /// PLT-469). On with `thermal_state` whatever this says.
+    pub heat_flow_refresh: bool,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
     /// 0 = no limit.
@@ -874,6 +895,11 @@ impl Default for TectonicParams {
             collapse_sheet_viscosity_pa_s: 1.0e22,
             // ledger: PLT-415
             collapse_sheet_strength_myr: 62.8,
+            thermal_state: false,    // ledger: PLT-460 (game-choice: off by default)
+            thermal_isostasy_m: 0.0, // ledger: ISO-110 (off by default; 1,600 m when on)
+            thermal_reference_km: 225.0, // ledger: ISO-111
+            thermal_strength: false, // ledger: ISO-112 (game-choice: off by default)
+            heat_flow_refresh: false, // ledger: PLT-469 (game-choice: off by default)
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
             continent_elevation_m: [150.0, 900.0],
@@ -1249,6 +1275,23 @@ impl PlanetPreset {
         pos(
             k.collision_threshold_km,
             "$.tectonics.collision_threshold_km",
+        )?;
+        // The lithosphere's thermal state (`plates/thermal.rs`).
+        check(
+            k.thermal_isostasy_m.is_finite() && k.thermal_isostasy_m >= 0.0,
+            "$.tectonics.thermal_isostasy_m",
+            "must be ≥ 0",
+        )?;
+        check(
+            k.thermal_reference_km >= crate::plates::thermal::L_HOT_KM
+                && k.thermal_reference_km <= crate::plates::thermal::L_COLD_KM,
+            "$.tectonics.thermal_reference_km",
+            "must be in [60, 225] (the hot and the cold lithosphere)",
+        )?;
+        check(
+            k.thermal_state || (k.thermal_isostasy_m == 0.0 && !k.thermal_strength),
+            "$.tectonics.thermal_state",
+            "thermal_isostasy_m and thermal_strength need thermal_state",
         )?;
         // The force balance.
         pos(
