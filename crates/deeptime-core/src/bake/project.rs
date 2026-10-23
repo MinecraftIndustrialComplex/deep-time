@@ -2090,22 +2090,27 @@ pub(crate) fn settle_biome_layers(
         let cb = hd.desc.cell_bytes();
         let (scale, offset, dtype) = (hd.desc.scale, hd.desc.offset, hd.desc.dtype);
         let mut covered = vec![false; n];
-        for k in 0..n {
-            let cell = &mut hd.bytes[k * cb..(k + 1) * cb];
+        for ((cell, &at_sea), cov) in hd
+            .bytes
+            .chunks_exact_mut(cb)
+            .zip(&sea)
+            .zip(covered.iter_mut())
+        {
             if hd.desc.physical(dtype.decode_scalar(cell)) > 0.0 {
-                if sea[k] {
+                if at_sea {
                     put_raw(dtype, (0.0 - offset) / scale, cell);
                     cover_cleared += 1;
                 } else {
-                    covered[k] = true;
+                    *cov = true;
                 }
             }
         }
         if let Some(li) = class_idx {
-            let hd = &mut held[li];
-            for k in (0..n).filter(|&k| covered[k] && hd.bytes[k] != crate::climate::koppen::EF) {
-                hd.bytes[k] = crate::climate::koppen::EF;
-                cover_ef += 1;
+            for (class, &cov) in held[li].bytes.iter_mut().zip(&covered) {
+                if cov && *class != crate::climate::koppen::EF {
+                    *class = crate::climate::koppen::EF;
+                    cover_ef += 1;
+                }
             }
         }
     }
