@@ -317,12 +317,13 @@ pub const STRATA_BYTES_PER_HORIZON_CELL: u64 = 28;
 pub const WATER_BYTES_PER_CELL: u64 = 33;
 
 /// Bytes per cell of the elevation's grid the water part holds while it lays the delta plains on
-/// it ([`water::bake`]: the elevation, the raise, the amplitude and their write buffers). An
-/// estimate of the memory model (deltas, 2026-10-23), not yet measured. Beside it the second
+/// it ([`water::bake`]: the elevation, the raise, the amplitude and their write buffers, and the
+/// distributaries' u32 step count to the open sea). An estimate of the memory model (deltas,
+/// 2026-10-23), not yet measured. Beside it the second
 /// network's output stays held (its water layers, [`project::WATER_LAYER_BYTES_PER_CELL`] a
 /// drained cell) and, on a Lambert world, the horizon stacks loaded whole with two f64 maxima a
 /// stack cell ([`DELTA_STACK_BYTES_PER_L1_CELL`] plus [`HORIZON_RECORD_BYTES`] a horizon).
-pub const DELTA_BYTES_PER_L3_CELL: u64 = 10;
+pub const DELTA_BYTES_PER_L3_CELL: u64 = 14;
 
 /// Bytes per L1 cell `project::raise_world_tops` holds beside the stacks (two f64 maxima).
 pub const DELTA_STACK_BYTES_PER_L1_CELL: u64 = 16;
@@ -362,9 +363,7 @@ pub fn estimate_bytes(p: &PlanetPreset) -> (u64, u64) {
             } else {
                 0
             };
-            full * DELTA_BYTES_PER_L3_CELL
-                + drained * project::WATER_LAYER_BYTES_PER_CELL
-                + stacks
+            full * DELTA_BYTES_PER_L3_CELL + drained * project::WATER_LAYER_BYTES_PER_CELL + stacks
         } else {
             0
         };
