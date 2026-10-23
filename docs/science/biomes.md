@@ -1035,6 +1035,12 @@ from the nearest land node, which can be bare ground beside the ice. `notes.bake
 (`ice_cover_off_the_sea`, `ice_cover_class_ef`, nodes and km2). The cube projection does the same. Lambert presets
 have no projection pass and keep the cover as laid.
 
+**Measured** on the gate's planet (that commit's simulation, this branch's bake, MIC's placement): the cover left
+87 world nodes (567.2 km2), and the world's covered share fell from 0.0015 to 0.0004 of the surface (the
+simulation's own: 0.0016); no node needed the EF rule. `iceCoverLaidOnGlaciatedGround` then passes standalone and
+with MIC: 3 covered columns on its grid, the thickest 10 blocks, none under water, none of another class. Most of
+this planet's cover was on a coast the world puts under the sea.
+
 **Not drawn.** Real ice sheets rest on beds below sea level wherever the ice is too thick to float (West
 Antarctica). Part of the cleared ice is that thick (up to 10 blocks of cover, at least 1,440 m of ice by the
 cover's 160 m step, over as little as 50 m of water). Drawing it would need the ice pass to build ice up from a sea
@@ -1048,21 +1054,47 @@ stage's wetness, the ground's flatness and its height, so on a flat, low rim of 
 it, it flags swamp beside the salt, and the swamp's own trees then stand on it.
 
 **What the gate found.** On master 57558f0a with MIC, `lakeIceAndSaltFollowTheClimate` met `minecraft:mangrove_roots`
-on a salt column at (-1230, 67, 438), in `minecraft:mangrove_swamp`. The playa's inspected column (-1240, 424):
-Csa, 19.8 °C mean, 634 mm a year, the hydrology's aridity index 0.534 (dry subhumid), elevation 60.56 blocks (a closed
-basin under sea level), wetland flag 1 (swamp), erosion 0.617 (the swamp band E6). A mangrove swamp on a salt
-flat's rim is a biome choice error, not a decoration to paint salt over: the precedent is the hot springs on a playa
-(BIO-165, decisions log 2026-10-20, gate batch 7), where the biome, not the salt, gave way.
+on a salt column at (-1230, 67, 438), in `minecraft:mangrove_swamp`. A mangrove swamp on a salt flat's rim is a
+biome choice error, not a decoration to paint salt over: the precedent is the hot springs on a playa (BIO-165,
+decisions log 2026-10-20, gate batch 7), where the biome, not the salt, gave way.
 
-**What the bake does now** (BIO-178). After the water bake lays the playa layer, every L2 node within a reach of a
-playa cell's block loses its wetland flag, and its erosion is held under E5 as a cold wetland's is (BIO-133), so the
-class's ordinary biome stands there. The reach is 20 blocks of ground plus the grids' own reach: two L2 cells (the
-game reads the L2 layers bilinear from the projection's nearest Lambert node) and one hydrology cell (the
-projection reads the playa as a footprint). The 20 blocks: a mangrove's roots reach about 9 blocks from its trunk
-(vanilla 1.21.1 `MangroveRootPlacer`, `max_root_width` 8; read in the game's sources), and the biome a block takes
-lies up to about 6 blocks off under the fuzzy zoom (BIO-165): 15, and a quarter more. On the bake's Lambert grid
-the box is widened east-west by 1/cos φ, since a block of ground spans that many Lambert blocks there.
-`notes.bake.water.playa.wetland_cleared` counts the playa cells, the reach and the nodes cleared.
+**How the swamp got there.** `deeptime inspect-column` on the world's layers (that commit's simulation, this
+branch's bake, 8 threads), on a 6-block grid round the column:
+
+| where | world record |
+|---|---|
+| the failing column (-1230, 438) | playa 2 blocks, `closed_basin` 1, elevation 60.69 blocks (under sea level 63); class 31 (sea), wetland flag 0, erosion 0.6251 (the swamp band E6) at the nearest node and in the bilinear blend alike, temperature 0.2301, vegetation -0.7293, continentalness -0.102 (land) |
+| the playa's own cells 12 to 18 blocks north (z 420 to 426) | wetland flag 1 (swamp), class Csa, erosion in E6; at (-1240, 424): 19.8 °C mean, 634 mm a year, the hydrology's aridity index 0.534 (dry subhumid) |
+| the rest of the closed basin round the salt | class 31, flag 0, erosion in E6 |
+
+Two routes carry a swamp's record onto a basin the bake never flagged. The biome bake (`map`) gives every node it
+calls sea its nearest land node's erosion, so a basin it called sea takes the swamp's E6 beside it with no flag
+(the four nodes round the failing column hold one value, 0.6251: one donor's). And the world's land call (BIO-170,
+BIO-171) gives a node it settles to land the nearest stable land node's whole record, flag and class included:
+on this planet 1,496 world nodes went from an ocean record to land, among them the basin's. Vanilla puts E6 at a
+warm temperature to mangrove swamp whatever the flag says.
+
+**What the bake does now** (BIO-178). A node within a reach of a playa that is flagged wetland, or in the swamp band
+E6 without the flag, loses the flag and has its erosion held under E5 as a cold wetland's is (BIO-133), so the
+class's ordinary biome stands there; other nodes are left alone. It runs in two places:
+
+- in the water bake, once it has laid the playa layer, on the bake's own L2 nodes: the reach is 20 blocks of ground
+  plus two L2 cells and one hydrology cell of a playa cell's block, the box widened east-west by 1/cos φ on the
+  Lambert grid (a block of ground spans that many Lambert blocks there);
+- in the projection pass, on the world's own L2 nodes after the land call, from the world's `playa` layer: a node
+  holds a playa when a playa cell lies in its square, and every node within 20 blocks plus two L2 cells plus one
+  playa cell of such a node (38 blocks on the 4k planet) is dried, by the land call's own distance in cells (across
+  the seams on a cube world). Two cells: the game reads a block's biome inputs bilinear from the four nodes round
+  it, up to a cell and a half from the node marked for the playa cell beside it.
+
+The first version ran in the water bake only, and on flagged nodes only: on the gate's planet it changed none
+(190 playa cells), since the swamp reached the world's playa through the two routes above, after it ran.
+`notes.bake.water.playa.wetland_cleared` and `notes.bake.projection.biome_land.playa_dried` count the nodes each
+changed. The 20 blocks: a mangrove's roots reach about 9 blocks from its trunk (vanilla 1.21.1
+`MangroveRootPlacer`, `max_root_width` 8; read in the game's sources), and the biome a block takes lies up to about
+6 blocks off under the fuzzy zoom (BIO-165): 15, and a quarter more.
+
+PLAYA_RESULT_PLACEHOLDER
 
 ## The snow line (2026-10-22, BIO-180, BIO-181)
 
