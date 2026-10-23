@@ -425,7 +425,32 @@ plus `WATER_BYTES_PER_L1_CELL` (80 B) for the L1 climate it loads whole (587.2 M
 turn on their real rows, the water's layers on the hydrology's grid ("L3h" where it is halved), the
 closed basins' ground and flood (`GROUND_BYTES_PER_WORLD_CELL`, 12 B a world cell: 8.0 for the ground
 as f64 and 3.0 for the flood, measured on quick 16k and Ben's world) and the relief
-(`RELIEF_BYTES_PER_WORLD_CELL`, 6 B: its f32 change and calm flag, 5.0 held).
+(`RELIEF_BYTES_PER_WORLD_CELL`, 6 B: its f32 change and calm flag, 5.0 held). Last, the top raise
+on the world's horizon stacks (`raise_world_tops`), beside every grid's layers: the stacks' two
+maxima as f64 and the record of moved cells (64 B a world L1 cell at most), then the shifts
+(`world_raise_shifts`: a copy of the stacks and a dense record, 7K + 28 B a cell for K horizons),
+then the stacks' write. The write compresses the tiles a batch at a time (`bake::stored_tiles`,
+`STORE_BATCH_BYTES` 32 MiB of raw tiles): a tile in flight holds its raw copy and lz4's worst-case
+buffer (1.1 times the input, `lz4_flex::block::get_maximum_output_size`), so a layer's write holds at
+most 1.1 times its raw bytes plus one batch, whatever the thread count. Before, every tile could be
+in flight at once: full 32k's stacks, 28 tiles of 14.7 MB, held 224.6 MB in flight on 8 threads and
+could hold up to 2.2 times their 299 MB on 28.
+
+**What is on no grid** (`surface::UNGRIDDED_BYTES`, 16 MiB, in the coupled stages' retained world,
+so the young landscape, the amplifier and the bake carry it). The tables built once (lithology,
+columns, deposit types), the sites, bodies, events and river lists, and what the bake holds into
+its projection pass are on no grid, so no per-cell figure counts them. On the full grids the
+per-cell figures' own slack covers them; on `tests/memory_estimate.rs`'s planet (quick 16k at a
+quarter of its resolution) it did not: the world at the bake's start held 5.1 MB more than its
+per-cell figures, the bake 3.0 MB more again into its projection pass, and the test failed (the
+amplifier 72.5 MiB held against 71.0, the bake 70.5 against 61.1, the bake's peak the top raise,
+which the projection's figure left out). The constant is twice the 8.1 MB measured.
+
+**The kept blocks' margin** (`session::KEEP_MARGIN_BYTES`, 8 MiB). With the cache on, the session
+keeps the allocator's freed blocks this far under each stage's figure (`MemoryGauge::keep_below`).
+At the figure itself the counted peak passed it by what other threads counted between a block's
+count and the shed that made room for it: 325 KB over the bake's figure on quick 16k at 50 Myr,
+333 KB on Ben's world at 1000 Myr, 33 KB over the amplifier's.
 
 **The closed basins' flood** (`hydro::closed_basin_on_world_by`, `hydro::sea_reached_by`; HYD-105's
 rule unchanged, the world output byte-identical). The flood kept each body's cells and a depth-first
