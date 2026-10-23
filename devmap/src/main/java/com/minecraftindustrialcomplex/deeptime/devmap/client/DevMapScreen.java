@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.devmap.client;
 
 import com.minecraftindustrialcomplex.deeptime.devmap.model.Graticule;
 import com.minecraftindustrialcomplex.deeptime.devmap.model.MapFrame;
+import com.minecraftindustrialcomplex.deeptime.devmap.model.MapLayer;
 import com.minecraftindustrialcomplex.deeptime.devmap.model.PlanetGeometry;
 import com.minecraftindustrialcomplex.deeptime.devmap.model.ViewTransform;
 import com.minecraftindustrialcomplex.deeptime.devmap.net.PlayersPayload;
@@ -27,17 +28,22 @@ import java.util.Locale;
  * The dev map (key: comma by default). Two views of the planet the player is on, both through
  * Deep Time's own projection:
  * <ul>
- *   <li><b>Map</b>: the world as it is laid out in block space (north up), the base image tiled
- *       across the x wrap, the latitude/longitude graticule, the wrap seam (magenta), the edges or
- *       pole lines (orange), the poles, the cone points, the world spawn and the players.</li>
+ *   <li><b>Map</b>: the world as it is laid out in block space (north up), the server's picture
+ *       tiled across the x wrap, the latitude/longitude graticule, the wrap seam (magenta), the
+ *       edges or pole lines (orange), the poles, the cone points, the world spawn and the players.</li>
  *   <li><b>Globe</b>: an orthographic sphere ({@code GlobeProjection}, the Create World screen's
  *       globe) of the same picture with the same marks, centred on the player at first.</li>
  * </ul>
+ * The picture is the <b>satellite</b> view by default (true colour, the workbench's "Final world"
+ * look drawn by Deep Time's natives on the server) or the <b>elevation</b> ramp ({@link MapLayer});
+ * S or the button switches it for the map, the globe and the HUD minimap, and the client config
+ * ({@code mapLayer}) remembers the choice. While the chosen picture is not here (still rendering,
+ * or a server without natives) the other one is drawn and the readout says why.
  * Left-drag pans or turns, the wheel zooms, right-click teleports there (operators, on a server
  * with the dev map), Tab switches the view, C centres on the player, H toggles the HUD minimap.
  * The readout under the view gives the player's block, latitude and longitude (the F3 line's
  * convention, with Deep Time's own F3 line beside it for comparison), the distances to the seam,
- * the edge and the nearest pole, and the projection.
+ * the edge and the nearest pole, the projection and the picture.
  */
 public final class DevMapScreen extends Screen {
 
@@ -47,7 +53,9 @@ public final class DevMapScreen extends Screen {
             BORDER = 0xA0FFA020, POLE = 0xFF40FFFF, CONE = 0xFFFFFF40, SPAWN = 0xFFFFFFFF, OTHER = 0xFF40C0FF,
             SELF = 0xFFFF3030, OUTLINE = 0xFF000000, PANEL = 0xC0000000, TEXT = 0xFFE0E0E0, DIM = 0xFFA0A0A0;
 
-    private static final int TOP = 22, LINE_H = 10, READOUT_LINES = 7;
+    private static final int TOP = 22, LINE_H = 10, READOUT_LINES = 8;
+    /** The button row: Map, Globe, Centre, HUD, the picture; the header text starts after it. */
+    private static final int HEADER_X = 4 + 42 * 2 + 62 + 98 + 82 + 6;
     private static Mode lastMode = Mode.MAP;
 
     private Mode mode = lastMode;
@@ -57,7 +65,7 @@ public final class DevMapScreen extends Screen {
     private double hoverX = Double.NaN, hoverZ = Double.NaN;
     private String status = "";
     private int vl, vt, vw, vh;
-    private Button hudButton;
+    private Button hudButton, layerButton;
 
     public DevMapScreen() {
         super(Component.literal("Deep Time dev map"));
@@ -81,6 +89,8 @@ public final class DevMapScreen extends Screen {
             DevMapClient.toggleHud();
             b.setMessage(hudLabel());
         }).bounds(x, 3, 96, 16).build());
+        x += 98;
+        layerButton = addRenderableWidget(Button.builder(layerLabel(), b -> toggleLayer()).bounds(x, 3, 80, 16).build());
         vl = 4;
         vt = TOP;
         vw = width - 8;
@@ -102,10 +112,32 @@ public final class DevMapScreen extends Screen {
         return Component.literal("HUD map (H): " + (DevMapClient.hudOn() ? "on" : "off"));
     }
 
+    /** The picture button names the chosen picture. */
+    private static Component layerLabel() {
+        return Component.literal(ClientConfig.mapLayer().label() + " (S)");
+    }
+
     // ---- what the shot driver and the keys use ----
 
     public Mode mode() {
         return mode;
+    }
+
+    /** The chosen picture (the client config's {@code mapLayer}). */
+    public MapLayer layer() {
+        return ClientConfig.mapLayer();
+    }
+
+    /** Chooses the picture for the map, the globe and the HUD minimap, and remembers it. */
+    public void setLayer(MapLayer layer) {
+        ClientConfig.mapLayer(layer);
+        if (layerButton != null)
+            layerButton.setMessage(layerLabel());
+    }
+
+    /** The S key and the picture button: satellite to elevation and back. */
+    public void toggleLayer() {
+        setLayer(layer().other());
     }
 
     public void setMode(Mode m) {
@@ -235,6 +267,10 @@ public final class DevMapScreen extends Screen {
                 hudButton.setMessage(hudLabel());
             return true;
         }
+        if (keyCode == GLFW.GLFW_KEY_S) {
+            toggleLayer();
+            return true;
+        }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
@@ -305,7 +341,7 @@ public final class DevMapScreen extends Screen {
         MapContext c = MapContext.current();
         Minecraft mc = Minecraft.getInstance();
         g.drawString(font, "Dev map: " + (mode == Mode.MAP ? "block space" : "globe")
-                + "   drag: move   wheel: zoom   right-click: teleport   Tab: switch", 4 + 42 * 2 + 62 + 98 + 6, 7, DIM, false);
+                + "   drag: move   wheel: zoom   right-click: teleport   Tab: switch", HEADER_X, 7, DIM, false);
         if (c.problem() != null || view == null) {
             Draw.rect(g, vl, vt, vl + vw, vt + vh, 0xFF101418);
             g.flush();
@@ -599,11 +635,11 @@ public final class DevMapScreen extends Screen {
         } else {
             lines.add("Cursor: off the map");
         }
-        String server = !MapContext.serverHasDevMap() ? "server has no dev map: Deep Time's projection only, no base image, players or teleport"
+        String server = !MapContext.serverHasDevMap() ? "server has no dev map: Deep Time's projection only, no picture, players or teleport"
                 : c.devInfo() == null ? "waiting for the server's dev map info" : c.devInfo().note()
-                + (c.image() == null && c.devInfo().imageId() != 0 ? " (receiving)" : "")
                 + (c.devInfo().canTeleport() ? "   teleport: yes (operator)" : "   teleport: no (not an operator)");
         lines.add("Server: " + server + (status.isEmpty() ? "" : "   | " + status));
+        lines.add("Picture (S): " + c.pictureLine());
         int yy = top + 3;
         for (String s : lines) {
             g.drawString(font, s, vl + 4, yy, TEXT, false);

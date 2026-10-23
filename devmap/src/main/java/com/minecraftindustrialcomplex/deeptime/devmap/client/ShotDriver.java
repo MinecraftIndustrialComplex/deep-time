@@ -2,7 +2,10 @@
 package com.minecraftindustrialcomplex.deeptime.devmap.client;
 
 import com.minecraftindustrialcomplex.deeptime.devmap.DevMap;
+import com.minecraftindustrialcomplex.deeptime.devmap.model.MapLayer;
 import com.minecraftindustrialcomplex.deeptime.devmap.model.PlanetGeometry;
+import com.minecraftindustrialcomplex.deeptime.devmap.net.DevMapState;
+import com.minecraftindustrialcomplex.deeptime.devmap.net.MapInfoPayload;
 import com.minecraftindustrialcomplex.deeptime.net.PlanetDebugLine;
 import com.minecraftindustrialcomplex.deeptime.screen.model.GlobeProjection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
@@ -29,7 +32,10 @@ import java.util.Locale;
  * is how long it waits there for the terrain) it right-clicks the place on the map
  * (the operator teleport), waits for the terrain, checks the readout against Deep Time's own F3
  * line and the markers' screen positions against the projection's inverse, and takes the HUD
- * (with F3), the map and the globe. Every step logs a {@code [devmap-shot]} line; a failed check
+ * (with F3), the map and the globe. It first waits for the server's pictures (a server with a frame
+ * but no satellite picture fails), walks in the default picture (satellite) and shoots the spawn's
+ * maps again in elevation through the screen's switch ({@code -elevation} shots), checking that
+ * the chosen picture is the one drawn. Every step logs a {@code [devmap-shot]} line; a failed check
  * logs {@code FAIL}. Screenshots go to {@code <gamedir>/screenshots/devmap-*.png}.
  */
 final class ShotDriver {
@@ -102,13 +108,24 @@ final class ShotDriver {
             }
             case WAIT_IMAGE -> {
                 boolean has = MapContext.serverHasDevMap();
-                boolean noImage = c.devInfo() != null && c.devInfo().imageId() == 0 && !c.devInfo().note().contains("rendering");
+                MapInfoPayload info = c.devInfo();
+                // Every picture the server named is here, or the server said why it has none.
+                boolean settled = info != null && info.pictures().stream()
+                        .noneMatch(p -> p.rendering() || DevMapState.receiving(info, p.layer()));
                 boolean teleport = c.canTeleport();
-                if ((c.image() != null || noImage || !has) && (teleport || stepTicks > 20 * 60)) {
-                    log("server dev map {}, info {}, image {}, teleport {}", has, c.devInfo() == null ? "none" : c.devInfo().note(),
-                            c.image() == null ? "none" : c.image().frame(), teleport);
+                if ((settled || !has) && (teleport || stepTicks > 20 * 60)) {
+                    log("server dev map {}, info {}, teleport {}", has, info == null ? "none" : info.note(), teleport);
+                    for (MapLayer l : MapLayer.values()) {
+                        DevMapState.Image im = DevMapState.image(c.dimension(), l);
+                        log("picture {}: {} ({})", l.id(), im == null ? "none" : im.frame(),
+                                info == null || info.picture(l) == null ? "not sent" : info.picture(l).note());
+                    }
                     if (!teleport)
                         fail("no teleport permission: the places cannot be visited, only the spawn is shot");
+                    if (has && info != null && info.frame() != null && DevMapState.image(c.dimension(), MapLayer.SATELLITE) == null)
+                        fail("the server has a frame but no satellite picture");
+                    // The walk shoots the default picture; the spawn's map is shot in elevation too.
+                    ClientConfig.mapLayer(MapLayer.DEFAULT);
                     go(Step.GO);
                 }
             }
@@ -174,24 +191,42 @@ final class ShotDriver {
                 }
             }
             case MAP -> {
+                // At the spawn the whole-world map and the close map are shot in both pictures
+                // (S on the screen); elsewhere in the default one.
+                boolean both = place == 0;
                 if (stepTicks == 1) {
                     screen = new DevMapScreen();
                     mc.setScreen(screen);
                     screen.setMode(DevMapScreen.Mode.MAP);
+                    screen.setLayer(MapLayer.DEFAULT);
                     if (place == 0) {
                         screen.showWholeWorld();
                         screen.centreOn(mc.player.getX(), 0.5 * (c.projection().zMin() + c.projection().zMax()));
                     }
                 }
-                if (stepTicks == 10 && place == 0)
-                    shot(placeName() + "-map-whole");
-                if (stepTicks == 12) {
+                if (stepTicks == 10 && place == 0) {
+                    shotOf(c, placeName() + "-map-whole");
+                    screen.toggleLayer();
+                }
+                if (stepTicks == 20 && place == 0) {
+                    shotOf(c, placeName() + "-map-whole-" + c.wanted().id());
+                    screen.toggleLayer();
+                }
+                if (stepTicks == 22) {
                     screen.zoomBlocks(1600);
                     screen.centreOnPlayer();
                     checkMapMarker(c, mc);
                 }
-                if (stepTicks == 20) {
-                    shot(placeName() + "-map");
+                if (stepTicks == 30) {
+                    shotOf(c, placeName() + "-map");
+                    if (both)
+                        screen.toggleLayer();
+                    else
+                        go(Step.GLOBE);
+                }
+                if (stepTicks == 40 && both) {
+                    shotOf(c, placeName() + "-map-" + c.wanted().id());
+                    screen.toggleLayer();
                     go(Step.GLOBE);
                 }
             }
@@ -227,6 +262,18 @@ final class ShotDriver {
 
     private static String placeName() {
         return String.format(Locale.ROOT, "%d-%s", place + 1, places.get(place).name);
+    }
+
+    /**
+     * A shot of the map screen, with the picture it shows logged: the chosen one ({@code
+     * c.wanted()}, read this tick), which must be the one drawn whenever the server sent it.
+     */
+    private static void shotOf(MapContext c, String name) {
+        MapLayer drawn = c.shown();
+        log("{}: picture chosen {}, drawn {}; {}", name, c.wanted().id(), drawn == null ? "none" : drawn.id(), c.pictureLine());
+        if (DevMapState.image(c.dimension(), c.wanted()) != null && drawn != c.wanted())
+            fail("{}: the chosen picture {} is here but {} is drawn", name, c.wanted().id(), drawn);
+        shot(name);
     }
 
     /** The places: the player's own spot, beside the seam, beside the north pole (or the property's list). */

@@ -8,7 +8,9 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import java.util.function.DoubleBinaryOperator;
 
 /**
- * The map's base image, drawn the way Deep Time's own review map draws the world data
+ * The map's elevation picture ({@code MapLayer.ELEVATION}; its satellite sibling is drawn by Deep
+ * Time's natives, {@code nativebridge.NativeWorldMap}, and needs them, so this one is also the
+ * fallback), drawn the way Deep Time's own review map draws the world data
  * ({@code screen.model.ReviewModel.elevationMap}): the terrain height H = E + A·N
  * ({@code WorldData.height}) through the shared {@code elevation} colour ramp
  * ({@code deeptime/ramps.json}, the ramp the keyframes, the viewer and the Create World screen use),

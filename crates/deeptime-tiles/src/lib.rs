@@ -1721,7 +1721,9 @@ impl BakeMap {
         let tiles = nx * ny;
         let threads = threads.clamp(1, tiles.max(1));
         let next = AtomicUsize::new(0);
-        let drawn: Mutex<Vec<(usize, Result<Vec<u8>, String>)>> = Mutex::new(Vec::new());
+        /// Each tile's index and its pixels (or why it failed).
+        type Drawn = Vec<(usize, Result<Vec<u8>, String>)>;
+        let drawn: Mutex<Drawn> = Mutex::new(Vec::new());
         std::thread::scope(|sc| {
             for _ in 0..threads {
                 sc.spawn(|| {
@@ -2174,7 +2176,9 @@ mod tests {
         assert_eq!(map.zoom_for(4.0), 0);
         assert_eq!(map.zoom_for(2.0), 1);
         assert_eq!(map.zoom_for(1.0), 2);
-        assert_eq!(map.zoom_for(2.9), 1);
+        // Nearest by the logarithm: 2.83 (√8) is halfway between zooms 1 and 0.
+        assert_eq!(map.zoom_for(2.7), 1);
+        assert_eq!(map.zoom_for(2.9), 0);
         assert_eq!(map.zoom_for(1000.0), 0);
         assert_eq!(map.zoom_for(0.1), 2, "clamped to the last native zoom");
         // The dev map's own frame of this world: 2048 pixels across the lap, C / 2048 a pixel.
@@ -2189,7 +2193,15 @@ mod tests {
             let (w, h) = (300, 100);
             for threads in [1, 3] {
                 let f = map
-                    .render_frame(layer, a.x0 - 0.5 * a.s, a.z0 - 0.5 * a.s, a.s, w, h, threads)
+                    .render_frame(
+                        layer,
+                        a.x0 - 0.5 * a.s,
+                        a.z0 - 0.5 * a.s,
+                        a.s,
+                        w,
+                        h,
+                        threads,
+                    )
                     .unwrap();
                 assert_eq!(f.len(), w * h * 4);
                 for j in 0..h {
@@ -2207,14 +2219,23 @@ mod tests {
                 }
             }
         }
-        for (s, x0) in [(0.0, 0.0), (-1.0, 0.0), (f64::NAN, 0.0), (1.0, f64::INFINITY)] {
+        for (s, x0) in [
+            (0.0, 0.0),
+            (-1.0, 0.0),
+            (f64::NAN, 0.0),
+            (1.0, f64::INFINITY),
+        ] {
             assert!(
                 map.render_frame(Layer::Satellite, x0, 0.0, s, 8, 8, 1)
                     .is_err(),
                 "s {s}, x0 {x0}"
             );
         }
-        assert!(map.render_frame(Layer::Satellite, 0.0, 0.0, 1.0, 0, 0, 1).unwrap().is_empty());
+        assert!(
+            map.render_frame(Layer::Satellite, 0.0, 0.0, 1.0, 0, 0, 1)
+                .unwrap()
+                .is_empty()
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
