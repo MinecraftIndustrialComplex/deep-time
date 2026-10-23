@@ -5595,3 +5595,188 @@ largest (the trace reads plate samples and the guard L1 cells, so this is not sh
   coordinator may take it on as such.
 - **The bound's value.** Only 380 mGal (the largest anomaly on Earth) was run; 300 mGal (Hawaii's
   largest) or a bound that depends on the plate (`Te`, age) were not.
+
+## Plate boundary organisation (2026-10-23, V1 gap 2)
+
+The fourth of the V1 gaps Ben put inside V1 (decisions log 2026-10-22, answer 1: "All four inside
+V1 (Recommended)"; [physics-gap-audit.md](physics-gap-audit.md), "Gap 2"). The gap: spreading
+boundaries that do not break into ridges and transforms, trenches that may not face their
+convergence, rifts and subduction starts that ignore the stress the force balance computes
+(FRC-022), and no law for reorganisation. Ben's view of it (decisions log 2026-10-21): "mountains
+seem very prone to forming directly bordering oceans, I don't believe this is realistic." Ledger
+PLT-500 to PLT-509 (new). Code: `plates/ridges.rs` (the ridge segments), `plates/rifting.rs` (where
+rifts and subduction start), `plates/forces.rs` (the stress handed on), `params.rs` (the
+switches); the pool's measure `boundary` (`tools/review/pool/measure_boundary.py`, registry
+`tools/review/pool/measures_boundary.json`).
+
+### The boundary before (pool arm base, 24 runs)
+
+The measure `boundary` reads a run's plate check (`plate.json`), its dynamics record
+(`rec.json`), its globals and its summary: no new sim. On the pool's base (master bf8477b2, key
+7f9d8f115049, argkey 2a53566b: `earthlike_quick_16k`, 1000 Myr, both starts, seeds 1 to 12,
+`+DEEPTIME_CRUST_BUDGET=1`), medians of the 24 runs with their quartiles; the shares are of the
+boundary's length over the steps after the first 100 Myr (PLT-500):
+
+| measure | base: median (quartiles) | Earth |
+|---|---|---|
+| subducting | 0.342 (0.337 to 0.347) | SUB 0.197 (Bird 2003, Table 3) |
+| spreading (ridge and rift) | 0.360 (0.357 to 0.364) | OSR + CRB 0.363 |
+| transform | 0.212 (0.207 to 0.215) | OTF + CTF 0.283 |
+| in collision | 0.066 (0.064 to 0.071) | CCB 0.088 |
+| converging with no slab | 0.019 (0.017 to 0.024) | OCB 0.067 |
+| ocean-ocean share of the subducting boundary | 0.302 (0.296 to 0.312) | about 0.35 (PLT-370) |
+| subducting / all boundary, lattice km | 151,400 / 443,700 | 51,310 / 260,487 geodesic |
+| trench convergence across over full, capped (PLT-312's measurement): all / continental | 0.798 / 0.805 | SUB 0.854 |
+| mean convergence across the oceanic front | 53.1 mm/yr (51.9 to 55.3) | SUB 53.2 mm/yr |
+| oceanic front under 10 / at 80 or more mm/yr across | 0.042 / 0.190 | |
+| active share of the continental margin | 0.518 (0.505 to 0.541) | 0.25 to 0.40 (CHK) |
+| coast at a subduction front / in a collision belt | 0.312 / 0.208 | |
+| coast at a front where the continent overrides / at a front an initiation made | 0.227 / 0.173 | |
+| passive coast | 0.460 | |
+| front in collision | 25,800 km (25,100 to 29,200) | 6,000 on average, 12,000 today (PLT-401) |
+| collision length p50 / p90 | 41 / 106 Myr | 15 to 50 / at most 120 (CHK) |
+| collisions | 1.75 per 100 Myr | 2 to 6 (CHK) |
+| plates alive | 23 | 52, 19 over 0.0377 sr (PLT-372) |
+| rifts / initiations / polarity reversals | 2.4 / 6.5 / 16.9 per 100 Myr | 13 initiations in 104 Myr, 4 of them reversals (Crameri et al. 2020, Table 1) |
+
+The lattice's boundary is about 1.84 times a geodesic one (PLT-213), so in Earth's terms the
+model has about 82,300 km of subducting boundary against Bird's 51,310, 86,800 km of spreading
+against 94,810 and 51,100 km of transform against 73,915; the total, about 241,000 km, is close
+to Bird's 260,487. What the table says:
+
+- **The trenches already face their convergence.** The convergence across the oceanic front is
+  Bird's to the millimetre a year (53.1 against 53.2), and the capped ratio is 0.80 (the cap at
+  v_0 lifts it, so the plain ratio is lower still) against Bird's 0.854. The audit's "orient
+  trenches" is answered by this measurement: no law is needed for it (PLT-501).
+- **The excess of subduction is not obliquity but a shortage of transform**: the model has 1.6
+  times Earth's trench and 0.7 times its transform, and its spreading boundary is Earth's.
+- **More than half of the coast at a subduction front is at a front that a subduction
+  initiation made** (0.173 of the coast, of 0.312), and most of that has the continent
+  overriding. `rifting::initiate` splits the plate's old floor off along a Voronoi line, keeping
+  continental crust on the parent (PLT-067): where the old floor lies against a continent, which
+  on an Atlantic-type ocean it does, the line runs along the continent's edge and the old floor
+  goes down under it. That is a passive margin turned into an active one, which Earth does not
+  do: "There are no Cenozoic examples of a passive continental margin transforming into a
+  convergent margin, in spite of the fact that seafloor adjacent to SE Africa, NW Africa and
+  eastern N. America is about 170 Ma old" (Stern 2004, §4.1); of Crameri et al.'s 13 initiations
+  since 104 Ma none lies along a passive margin and two near one, and "heterogeneous oceanic
+  plate interiors are more favourable for SZI than ocean-continent boundaries, or more
+  specifically, passive margins" (Crameri et al. 2020, conclusions). This is Ben's "mountains ...
+  directly bordering oceans": the active margin is 0.52 of the coast against Earth's 0.25 to
+  0.40.
+- **The front in collision is 2 to 4 times Earth's**, as before (PLT-401), while the collisions'
+  lengths are within their targets.
+
+### Earth's ridges and transforms, from PB2002's steps
+
+Bird's `PB2002_steps.dat` (fetched with the paper: 5,819 digitisation steps; read with a lane
+script, `build/gap2/tools/bird_segments.py`, not kept), as runs of consecutive steps of one class
+along one boundary:
+
+| | runs | median | mean | p90 | length-weighted median |
+|---|---|---|---|---|---|
+| OSR (spreading ridge) | 596 | 75 km | 113 km | 250 km | 165 km |
+| OTF (oceanic transform) | 601 | 36 km | 80 km | 200 km | 165 km |
+| OSR between two OTF | 462 | 70 km | 105 km | 228 km | 152 km |
+
+The ridge's obliquity (the angle between the relative velocity and the step's normal) is 5° at
+the length-weighted median and 11.5° on average, with 82 % of the ridge within 20° of
+orthogonal; the subduction zones' is 21° at the median, 49 % within 20°. Transform length is
+0.71 of the ridge's. Gerya 2012 (Tectonophysics 522-523, §1): "The perpendicularity of the
+ridges and the transform faults is so common that it is considered to be an 'intrinsic property'
+of the oceanic spreading process (Oldenburg and Brune, 1972). Tens to hundreds of kilometer long
+active transform fault sections connecting two spreading centers are typically extended from
+both sides by even longer (up to thousands of kilometers) inactive fracture zones of similar
+orientation." The quick lattice's spacing is about 71 km and the boundary's normal is judged
+over two rings (PLT-310), so Earth's 75 to 165 km segments are under its resolution; their
+geometry is not. A ridge segment normal to the motion and a transform along it share a fixed
+ratio for a given envelope obliquity α, transform over ridge = tan α, whatever the segments'
+length: Earth's 0.71 is an envelope about 35° from orthogonal.
+
+### The design
+
+Each stage is its own switch, off by default; off is the base bit for bit (the pool's alias
+check).
+
+**A. Ridge segments normal to the motion, joined by transforms** (`tectonics.ridge_segment_km`,
+PLT-502). The ridge is made where the crust is: a resampling turns each gap point (no footprint
+covers it) into new floor of the nearer plate, so the ridge is the gap's midline and keeps the
+shape of the rift that opened it. With the switch on, the gap points between two plates a and b
+are put in the frame of the pair's relative rotation, ê = (ω_a − ω_b) / |ω_a − ω_b|:
+colatitude θ about ê and longitude φ around it. A transform follows a small circle about the
+relative pole (constant θ), a ridge normal to the motion a meridian (constant φ). The gap is cut
+into bands of θ `ridge_segment_km` wide (shifted by a per-pair offset, so pairs do not share band
+edges); in each band the ridge stands at the circular mean of the gap's φ there, and a gap point
+on a's side of it (the +φ side: a moves that way from b) goes to a, the rest to b. Its age and
+height follow its distance from that segment's ridge, as Cortial's α follows the distance from
+the midline. Each band's ridge is a meridian piece, and the steps between bands are small-circle
+pieces: transforms by construction. A band whose two sides lie the other way round (a on the −φ
+side, where the rotation makes the pair converge) keeps the midline. A gap is the spreading since
+the last resampling (up to `resample_drift_km`, 1,500 km), so a band straightens in one
+resampling where its obliquity's offset across the band (L tan α) is under the gap's width, and
+over several where it is wider; the ridge's older pieces stay in the plates as fracture zones.
+The length is a lattice choice (game-choice): about 400 km, five to six spacings, so that a
+segment and its transform are both wider than the two rings over which the boundary's normal is
+judged. Earth's segments are shorter (above); the ratio of transform to ridge does not depend on
+it.
+
+**B. Trenches that face their convergence**: measured above, and not built. The model's trenches
+take Earth's convergence across them (PLT-501).
+
+**C1. Subduction starts off the passive margin** (`tectonics.subduction_initiation_margin_km`,
+PLT-503). An initiation's fracture is kept at least this far, through the ocean, from the
+parent's continental crust: the old floor within it stays on the parent, and the seed old sample
+is drawn from the old floor beyond it (no initiation when there is none). The old floor then
+goes down under the parent's oceanic margin, at an intra-oceanic trench, not under the
+continent; the floor between the trench and the coast stays passive until the ocean closes and
+the arc meets the continent (an arc-continent collision, as on Earth). The rate (PLT-063) and the
+qualifying floor (PLT-062, PLT-064) are unchanged, so C1 moves where subduction starts, not how
+often. Sources: Stern 2004 and Crameri et al. 2020, above. The distance is a game-choice from the
+sources' "none along a passive margin": at least a few lattice spacings, so that the front is
+ocean-ocean; 500 km explored.
+
+**C2. Rifts and subduction starts from the stress and from weakness** (PLT-504 to PLT-506).
+FRC-022's mean in-plane stress σ (MPa, tension positive) is each plate's answer at every step; it
+is handed on from the force balance to the rifting rules (no state is kept, so off changes
+nothing).
+
+- *Rifts under tension* (`tectonics.rift_stress_mpa`, σ_s, 0 = off): a plate's rift hazard
+  (PLT-083) is weighted by w = e^(σ/σ_s) / ⟨e^(σ/σ_s)⟩, the mean over the plates that may rift
+  weighted by their area, so the expected number of rifts is the base's and only where they
+  happen moves: to the plates the edge forces pull apart. On base's records the plates' σ is
+  18 MPa at the median, its quartiles about 0 and 43 MPa, continental plates −3 to 60 MPa
+  between p10 and p90; σ_s = 20 MPa is about half the quartiles' spread (game-choice).
+- *Subduction starts under compression* (`tectonics.initiation_stress_mpa`, σ_s, 0 = off): the
+  same weight with −σ on the initiation hazard (PLT-063). "Horizontally forced SZI is clearly
+  more common than vertically forced SZI ... in the last 100 Ma" (Crameri et al. 2020), and the
+  collision of a buoyant feature at a trench, which loads its plates in compression, "is often a
+  precursor of SZI events" (ibid.).
+- *Rifts along weak lithosphere* (`tectonics.rift_weakness`, an exponent m, 0 = off; needs
+  `tectonics.thermal_state`): the rift's fragments are grown from their centres through the
+  plate (Dijkstra over the lattice) with each edge's cost its length times (L_ref / L)^m, L the
+  lithosphere's depth (gap 4's state, `Sample::lithosphere_km`) and L_ref the old craton's
+  225 km (PLT-462). Thin, hot lithosphere is slow to cross, so the fragments meet in it: the
+  fracture runs through arcs, back-arcs, plume heads and young floor and around cratons. The
+  fractal warp stays on top (PLT-086).
+
+**D. Reorganisation** (PLT-507). A plate reorganisation is a change of the plates' motion and of
+the boundaries that follow it. The model's motion already relaxes towards the force balance's
+answer over 6 Myr (PLT-191), and the balance answers every boundary change (a slab that breaks
+off, a collision that stalls, a new trench). The design adds the boundaries' half: with A on,
+the ridge's segments are drawn again at every resampling in the frame of the pair's present
+relative rotation, so a change of spreading direction re-segments the ridge and its old segments
+stay behind as fracture zones. Gerya 2012 (§4): transform faults' development "occurs on the
+timescale of plate separation and thus should react nearly instantaneously to changes in
+spreading direction (Menard and Atwater, 1968; Merkur'ev et al., 2009)". With C2 on, a change of
+the boundary forces moves where the next rifts and subduction starts come: a collision that
+stalls puts its plates in compression and raises their initiation weight, and a slab's pull puts
+its plate in tension and raises its rift weight. That is the law: no separate trigger; the
+plates' forces and their relative motion redraw the boundaries.
+
+### Ben's part
+
+How plates are made and moved is Ben's scope; he approved doing the gap, not one design. The
+stages above stay on the lattice and change no world-data format. The questions for him are in
+the lane's report to the coordinator: the plate count and a finer lattice (PLT-372), and whether
+to replace the lattice's boundaries with drawn ones. Recommended: neither now, since the shares
+and the active margin can be measured and moved on the lattice as it is.
