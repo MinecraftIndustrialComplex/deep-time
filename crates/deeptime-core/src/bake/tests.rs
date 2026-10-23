@@ -370,7 +370,8 @@ fn check_heat_flow(dir: &Path, lo: f64) {
     assert!(hot > 0 && cold > 0, "continents {hot}, ocean {cold}");
 }
 
-/// The release pace (ISO-099) on, with the heat flow's final pass (PLT-469). Without the pass this
+/// The release pace (ISO-099) on, with the heat flow's final pass (PLT-469; on by default since
+/// 2026-10-23, so the fixture does not set it). Without the pass (`heat_flow_refresh` false) this
 /// planet (seed 1, 60 Myr) bakes four continental cells under the floor, the lowest 33.5 mW/m² at
 /// (150, 60) (gap 4's scan of seeds 1 to 12 at 60 and 100 Myr, 2026-10-23; at release commit
 /// 1bdacb76 the default seed at 100 Myr baked 33.7 at (159, 11)): crust the rate guard spread onto
@@ -382,7 +383,6 @@ fn the_release_pace_bakes_continental_heat_flow_with_the_final_pass() {
     let mut v: Value = serde_json::from_str(&small_planet(60.0)).unwrap();
     v["seed"] = json!(1);
     v["surface"]["flexure"]["te_weakening_myr"] = json!(62.8);
-    v["tectonics"]["heat_flow_refresh"] = json!(true);
     run_to_folder(&v.to_string(), &dir);
     check_heat_flow(&dir, 54.9);
     let _ = std::fs::remove_dir_all(&dir);
