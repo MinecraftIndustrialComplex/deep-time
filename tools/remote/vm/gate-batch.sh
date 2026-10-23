@@ -24,7 +24,8 @@ A cargo:clippy nix develop $P -c zsh -c 'cargo clippy --workspace --all-targets 
 A cargo:test nix develop $P -c zsh -c 'cargo test --workspace --locked 2>&1 | grep -E "^test result|FAILED|panicked|^error" | sort | uniq -c | sort -rn | head -15'
 run 'cargo deny check licenses bans 2>&1 | tail -1'
 # The pages' own checks (projection parity, world map, deposits overlay): light, so not admitted.
-for c in tools/viewer/*-check.js; do nix shell nixpkgs#nodejs -c node "$c" 2>&1 | tail -1 | cut -c1-200; done
+# Inside the dev shell, since worldmap-check.js builds its fixture with cargo.
+for c in tools/viewer/*-check.js; do run "nix shell nixpkgs#nodejs -c node $c 2>&1 | tail -1 | cut -c1-200"; done
 A gradle:build nix develop $P -c zsh -c 'cd neoforge && ./gradlew build test --console=plain 2>&1 | grep -E "BUILD|FAILED|error:" | head -8; python3 ../tools/ci/junit-summary.py build/test-results/test 2>&1 | tail -1'
 A cargo:build nix develop $P -c zsh -c 'cargo build --release -p deeptime-cli 2>&1 | tail -1'
 echo "== gametests $(date +%H:%M)"
