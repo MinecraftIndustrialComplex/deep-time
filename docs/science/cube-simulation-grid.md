@@ -195,8 +195,10 @@ roots collect was the planet's area to 6.6e-15 in every step (4,301,227 lake cel
   Chosen by the S2 agent, build log 2026-10-22.
 - The first guess runs only when every cell takes part (SCL-145); a solve on a few cells (the crust's
   spreading) goes straight to the conjugate gradients. Build log 2026-10-22.
-- The slope failure visits every cell each iteration; the raster's neighbourhood skipping is a
-  speed-up of the same result and is not ported (SCL-148). Build log 2026-10-22.
+- The slope failure skips the cells away from the last iteration's movers, as the raster does,
+  when the movers are a quarter of the cells or fewer. A speed-up only: a test
+  (`slope_failure_skips_nothing_that_moves`) checks that the result is the same bits with and
+  without it. Build log 2026-10-22.
 - Hilbert keys with row-major storage (SCL-143): the keys give tiles, the storage keeps the format's
   order.
 
