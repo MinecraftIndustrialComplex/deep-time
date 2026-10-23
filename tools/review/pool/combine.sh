@@ -4,7 +4,7 @@
 # Test two or more unmerged branches together in one set of runs (Ben, 2026-10-22: "If both deltas and
 # continent spread need to do a world gen to test they should just merge their test."):
 #
-#   tools/review/pool/combine.sh <name> <branch> [<branch> ...]
+#   tools/review/pool/combine.sh [--no-build] <name> <branch> [<branch> ...]
 #
 # Makes a scratch worktree of origin/master under build/, merges each branch into it in turn
 # (`git merge --no-commit --no-ff`, committed on the throwaway branch pool/<name>), builds the CLI on the
@@ -12,13 +12,16 @@
 # `tools/review/pool/pool.sh run <arm> --key <key> ...`. A merge conflict stops the whole thing and says
 # which files: this script never resolves one (the lanes' owners do, or the lanes run apart). Nothing is
 # pushed and master is untouched; the scratch worktree and its VM copy are removed after the build, the
-# branch stays until `tools/review/pool/pool.sh forget <name>`.
+# branch stays until `tools/review/pool/pool.sh forget <name>`. With --no-build it only merges, reports
+# conflicts and prints the key the combination would have (nothing is built; the branch is removed too).
 set -euo pipefail
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 cd "$REPO"
 
 die() { echo "combine.sh: $*" >&2; exit 2; }
-[ $# -ge 2 ] || die "usage: combine.sh <name> <branch> [<branch> ...]"
+no_build=""
+if [ "${1:-}" = "--no-build" ]; then no_build=1; shift; fi
+[ $# -ge 2 ] || die "usage: combine.sh [--no-build] <name> <branch> [<branch> ...]"
 name=$1; shift
 [[ "$name" =~ ^[A-Za-z0-9_.-]+$ ]] || die "the name '$name' may hold letters, digits, _ . - only"
 branches=("$@")
@@ -72,6 +75,13 @@ rm -rf tools/review/pool/__pycache__
 joined=$(IFS=+; echo "${branches[*]}")
 key=$(python3 -I tools/review/pool/srckey.py key --ref HEAD) || { echo "combine.sh: the combined tree has no usable source key; the scratch worktree stays at $scratch" >&2; exit 3; }
 echo "combine.sh: source key $key for pool/$name = $base + ${branches[*]}"
+if [ -n "$no_build" ]; then
+    cd "$REPO"
+    git worktree remove --force "$scratch"
+    git branch -D "pool/$name" > /dev/null 2>&1 || true
+    echo "combine.sh: --no-build: merged without conflicts; nothing built, scratch worktree and branch removed"
+    exit 0
+fi
 if ! tools/review/pool/pool.sh build --key "$key" --note "combine:$name=$joined"; then
     echo "combine.sh: the build failed; the scratch worktree stays at $scratch and its VM copy at /data/ban/mic/mods/pool-$name" >&2
     exit 1
