@@ -488,6 +488,7 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
          history_mib={:.1} land_z_p50_m={:.0} land_z_p90_m={:.0} land_z_p99_m={:.0} plate_cap_bound_share={:.5} \
          foreign_crust_cell_steps={:.0} spread_cell_steps={:.0} spread_km3={:.3e} \
          flexure_solves={:.0} flexure_iterations_per_solve={:.2} flexure_unconverged={:.0} \
+         flexure_yielded_cells={:.0} flexure_dry_below_sea/wet_above_sea_cells={:.0}/{:.0} \
          guard_worst_m={:.0} guard_steps_over_1/2/3/6_reliefs={:.0}/{:.0}/{:.0}/{:.0} \
          step_rise/fall_polar_m={:.0}/{:.0} step_rise/fall_rest_m={:.0}/{:.0}",
         t.steps,
@@ -537,6 +538,9 @@ pub(crate) fn surface_line(world: &deeptime_core::world::WorldState) -> Option<S
         global(deeptime_core::surface::flexure::ITERATIONS_GLOBAL)
             / global(deeptime_core::surface::flexure::SOLVES_GLOBAL).max(1.0),
         global(deeptime_core::surface::flexure::UNCONVERGED_GLOBAL),
+        global(deeptime_core::surface::flexure::YIELDED_GLOBAL),
+        global(deeptime_core::surface::lakes::DRY_BELOW_SEA_GLOBAL),
+        global(deeptime_core::surface::lakes::WET_ABOVE_SEA_GLOBAL),
         global(deeptime_core::surface::guard::WORST_GLOBAL),
         global(deeptime_core::surface::guard::NEAR_GLOBALS[0]),
         global(deeptime_core::surface::guard::NEAR_GLOBALS[1]),

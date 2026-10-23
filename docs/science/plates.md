@@ -5493,8 +5493,9 @@ rise guard: the plate's yield, ISO-120 ([flexure.md](flexure.md), "The plate's y
 solve of the surface's flexure a cell's plate holds at most σ_max = Δg_max / 2πG of load away from
 local isostasy, 2.75 km of mantle at Δg_max = 380 mGal; the excess sinks under the cell alone. With
 it, the settling's target over a column the collapse keeps feeding is its Airy height plus at most
-2.75 km, so the crust the collapse gives it raises it only by its Airy share. Off by default:
-`--set surface.flexure.yield_anomaly_mgal=380`. Code: `surface/flexure.rs` (commit c8134072, pool
+2.75 km, so the crust the collapse gives it raises it only by its Airy share. Off by default when
+it landed (`--set surface.flexure.yield_anomaly_mgal=380`); on by default since the flexure-faults
+lane, 2026-10-23 ([flexure.md](flexure.md), "The plate's yield"). Code: `surface/flexure.rs` (commit c8134072, pool
 key 08c9d7d679c0; the later commits on the branch change only comments and formatting).
 
 The collapse's room (thickness, not height) is left as it is. A column 15 km over its Airy height
@@ -5559,8 +5560,10 @@ base and stay out), and none moved at p under 0.24. The yield takes the guard's 
 largest excursion 30.0 to 15.5 km, the runs over 20 km 4 to 0, the largest one-step fall 9.45 to
 7.42 km) without moving the planet's V1 shape: the peaks were a few cells, and the land above 2 km
 and the high coast, which are plateaus and ranges, did not move measurably (p 0.50 and 0.37). So the
-switch stays off by default; whether a correction of what the plate
-holds should go on without a V1 gain is the coordinator's call (below).
+switch stayed off by default; whether a correction of what the plate
+holds should go on without a V1 gain was the coordinator's call (below). It went on with the
+flexure-faults lane on 2026-10-23, under the decisions log's rule of that day (physics goes on
+once built and correct; the V1 criteria are no gate).
 
 ### The trace with the yield
 
@@ -5588,17 +5591,23 @@ largest (the trace reads plate samples and the guard L1 cells, so this is not sh
 - **The oceanic carry peaks** (above, and "Are the poles special?"): ridge and basin samples raised
   10 to 16 km by the surface's carry, more often on the polar rows. They are now the guard's
   largest excursions with the yield on. The surface lane's (the carry in `surface/advect.rs` and the
-  gap budget's carry part); not traced to a rule here.
+  gap budget's carry part); not traced to a rule here. *Done 2026-10-23, the flexure-faults lane*:
+  an integrator between the offset the surface holds over a gap and the plate model's feedback
+  (ISO-078), fixed by the held offsets (ISO-125, on by default; [flexure.md](flexure.md), "The held
+  offsets"): the guard's worst 13.8 to 10.2 km at the median over 8 runs (p < 0.001).
 - **The surface flexure's block metric** ([flexure.md](flexure.md), "Simplifications and limits"):
   the solve treats every row as the equator's, about 1 / cos⁴ φ too stiff north to south on the
   polar rows. A numerical fault; correcting it moves master's output and needs its own arm. The
-  flexure lane's.
+  flexure lane's. *2026-10-23*: a solve on the sphere's metric exists (ISO-127) and is right for
+  a single solve, but its step diverges at the poles on the pool, so it is off: its preconditioner does not
+  converge where the rigidity changes along a row near a pole ([flexure.md](flexure.md), "Why it
+  diverges"; the recommended cure is a line solve along those rows).
 - **The collapse's and the founder's room** judge room by thickness, not height. With the yield on,
   the columns no longer stand high, so it was left; a height-aware room would need a law and a
   source of its own. The plates' lane, only if a later trace shows columns standing over their Airy
   height again.
 - **The yield's default.** Off: it does not meet the ship rule. It is the correction of a fault (a
   plate holding up to 47 km of rock away from local isostasy) and moves no V1 criterion, so the
-  coordinator may take it on as such.
+  coordinator may take it on as such. *On by default since 2026-10-23.*
 - **The bound's value.** Only 380 mGal (the largest anomaly on Earth) was run; 300 mGal (Hawaii's
   largest) or a bound that depends on the plate (`Te`, age) were not.
