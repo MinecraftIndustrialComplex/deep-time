@@ -49,7 +49,7 @@ use crate::bake::cube_turn;
 use crate::bake::load_layer;
 use crate::bake::project::{
     BORDER_INSET_BLOCKS, BiomeGround, BodyY, Drawn, Held, Kind, ROW_BAND, SPAWN_EDGE_MARGIN, Src,
-    VERSION, WorldMap, area_share, body_y, drawn_detail, err, is_biome_layer, kind_of, ms,
+    VERSION, WorldMap, apply, area_share, body_y, drawn_detail, err, is_biome_layer, kind_of, ms,
     project_body, project_site, project_structure, put_raw, raise_world_tops, settle_biome_layers,
     stratabound_sites, world_ground, world_raise_shifts, write_deferred, write_json,
 };
@@ -1187,6 +1187,85 @@ impl RiverStats {
     }
 }
 
+/// A deposit body on a cube world (B4; SCL-091 made exact, ledger: SCL-130): its centre through
+/// the map as [`project_body`], and its horizontal ellipse's exact image under the composed
+/// Jacobian J. The image of the ellipse R(yaw) diag(a, c) has the singular values of
+/// J R diag(a, c) as its semi-axes, so its area is |det J| a c even where the Lambert grid's shear
+/// turns the two axes' images off the perpendicular. SCL-091 stretches each axis by the length of
+/// its own image, which overstates the area there (by 25 % for a body yawed 45° at 45° latitude);
+/// the Petroff-Guyou world keeps that rule. The new first axis is the singular direction nearest
+/// the old first axis's image, sign included, so a dip keeps its side.
+pub(crate) fn project_body_exact(
+    map: &impl WorldMap,
+    b: &deeptime_format::Body,
+) -> deeptime_format::Body {
+    let mut out = project_body(map, b);
+    let j = map.jacobian(b.center[0], b.center[2]);
+    let (sy, cy) = f64::from(b.yaw).sin_cos();
+    let (a, c) = (f64::from(b.axes[0]), f64::from(b.axes[2]));
+    let p = apply(&j, (cy * a, sy * a));
+    let q = apply(&j, (-sy * c, cy * c));
+    // M Mᵀ for M = [p q]: its eigenvalues are the squared semi-axes, its eigenvectors their
+    // directions.
+    let (s00, s01, s11) = (
+        p.0 * p.0 + q.0 * q.0,
+        p.0 * p.1 + q.0 * q.1,
+        p.1 * p.1 + q.1 * q.1,
+    );
+    let half = 0.5 * (s00 + s11);
+    let root = (0.25 * (s00 - s11).powi(2) + s01 * s01).sqrt();
+    let (major, minor) = ((half + root).sqrt(), (half - root).max(0.0).sqrt());
+    let theta = 0.5 * (2.0 * s01).atan2(s00 - s11);
+    let toward = p.1.atan2(p.0);
+    let (k, _) = (0..4)
+        .map(|k| (k, (theta + f64::from(k) * 0.5 * PI - toward).cos()))
+        .fold((0, f64::MIN), |best, x| if x.1 > best.1 { x } else { best });
+    let (ax0, ax2) = if k % 2 == 0 {
+        (major, minor)
+    } else {
+        (minor, major)
+    };
+    let yaw = (theta + f64::from(k) * 0.5 * PI + PI).rem_euclid(TAU) - PI;
+    if ax0.is_finite() && ax2.is_finite() && ax0 > 0.0 && ax2 > 0.0 {
+        out.axes[0] = ax0 as f32;
+        out.axes[2] = ax2 as f32;
+        out.yaw = yaw as f32;
+        out.aabb = out.computed_aabb();
+    }
+    out
+}
+
+/// B4: the planet area a projected body covers against its area in the simulation (Lambert,
+/// equal-area): the map's local scale squared averaged over the world ellipse (12 directions on
+/// 4 rings, weighted by area) times the ellipse's area. Points off the planet (past a turning
+/// seam) are left out; None with none on it.
+fn body_area_ratio(
+    view: &CubeView<'_>,
+    b: &deeptime_format::Body,
+    nb: &deeptime_format::Body,
+) -> Option<f64> {
+    const RINGS: usize = 4;
+    const DIRS: usize = 12;
+    let a0 = f64::from(b.axes[0]) * f64::from(b.axes[2]);
+    let (a, c) = (f64::from(nb.axes[0]), f64::from(nb.axes[2]));
+    let (sy, cy) = f64::from(nb.yaw).sin_cos();
+    let (mut sum, mut weight) = (0.0, 0.0);
+    for i in 0..RINGS {
+        let r = (i as f64 + 0.5) / RINGS as f64;
+        for k in 0..DIRS {
+            let t = TAU * k as f64 / DIRS as f64;
+            let (u, v) = (a * r * t.cos(), c * r * t.sin());
+            let (x, z) = (nb.center[0] + u * cy - v * sy, nb.center[2] + u * sy + v * cy);
+            if let Some(j) = view.jacobian(x, z) {
+                sum += r * j.sigma * j.sigma;
+                weight += r;
+            }
+        }
+    }
+    let ratio = sum / weight * a * c / a0;
+    (a0 > 0.0 && weight > 0.0 && ratio.is_finite()).then_some(ratio)
+}
+
 /// The distance from net point (x, z) to the nearest cube corner image and to the nearest turning
 /// net edge, blocks.
 fn corner_and_edge_distance(cube: &Cube, x: f64, z: f64) -> (f64, f64) {
@@ -1741,14 +1820,10 @@ pub fn project_folder_cube(
             .iter()
             .enumerate()
             .map(|(i, b)| {
-                let mut nb = project_body(&cm, b);
+                let mut nb = project_body_exact(&cm, b);
                 let (x, z) = (nb.center[0], nb.center[2]);
-                if let Some(j) = cm.view.jacobian(x, z) {
-                    let a0 = f64::from(b.axes[0]) * f64::from(b.axes[2]);
-                    let a1 = f64::from(nb.axes[0]) * f64::from(nb.axes[2]) * j.sigma * j.sigma;
-                    if a0 > 0.0 && a1.is_finite() {
-                        ratios[place(x, z)].push(a1 / a0);
-                    }
+                if let Some(r) = body_area_ratio(&cm.view, b, &nb) {
+                    ratios[place(x, z)].push(r);
                 }
                 let ground = new.height(x, z);
                 let dy = ground - old.height(b.center[0], b.center[2]);
@@ -2168,11 +2243,13 @@ mod tests {
     }
 
     /// B4: a body's planet area through the projection, mid-face, on a turning seam and 2° from
-    /// a corner (yaw 0: the Lambert block's axes stay perpendicular through a conformal map).
+    /// a corner, at several yaws: the exact ellipse image keeps the area at its centre to 1e-4
+    /// and over the whole body (the scale squared averaged over it) to 1 %; stretching each axis
+    /// by its own image (SCL-091) never gives less.
     #[test]
     fn a_body_keeps_its_planet_area_on_a_seam_and_by_a_corner() {
         let m = mapping(1024, 4096, turned());
-        let ratio = |cube_dir: [f64; 3]| {
+        let ratio = |cube_dir: [f64; 3], yaw: f32| {
             let p = m.view.turn.to_planet(normalize(cube_dir));
             assert!(p[2].abs() < 0.95, "too near the simulation's pole: {p:?}");
             let (xs, zs, _) = m.src_block(p);
@@ -2183,32 +2260,40 @@ mod tests {
                 "ore",
                 [xs, 40.0, zs],
                 [6.0, 3.0, 4.0],
-                0.0,
+                yaw,
                 0.0,
                 NO_CLIP,
             );
-            let nb = project_body(&m, &b);
+            let nb = project_body_exact(&m, &b);
             let j = m
                 .view
                 .jacobian(nb.center[0], nb.center[2])
                 .expect("on the planet");
-            f64::from(nb.axes[0]) * f64::from(nb.axes[2]) * j.sigma * j.sigma / 24.0
+            let s2 = j.sigma * j.sigma / 24.0;
+            let at_centre = f64::from(nb.axes[0]) * f64::from(nb.axes[2]) * s2;
+            assert!((at_centre - 1.0).abs() < 1e-4, "yaw {yaw}: {at_centre}");
+            let old = project_body(&m, &b);
+            let old_ratio = f64::from(old.axes[0]) * f64::from(old.axes[2]) * s2;
+            assert!(old_ratio >= at_centre - 1e-4, "yaw {yaw}: {old_ratio}");
+            body_area_ratio(&m.view, &b, &nb).expect("on the planet")
         };
-        let mid = ratio([1.0, 0.1, -0.05]);
-        let seam = ratio([0.0, 1.0, 1.0]);
         // 2° from corner (1, 1, 1) towards F0's centre.
         let c = normalize([1.0, 1.0, 1.0]);
         let x = normalize([1.0, -0.5, -0.5]);
         let a = 2f64.to_radians();
-        let corner = ratio([
+        let by_corner = [
             c[0] * a.cos() + x[0] * a.sin(),
             c[1] * a.cos() + x[1] * a.sin(),
             c[2] * a.cos() + x[2] * a.sin(),
-        ]);
-        for (name, r) in [("mid", mid), ("seam", seam), ("corner", corner)] {
-            assert!((r - 1.0).abs() < 0.01, "{name}: {r}");
+        ];
+        for yaw in [0.0f32, 0.8, 2.0] {
+            let mid = ratio([1.0, 0.1, -0.05], yaw);
+            let seam = ratio([0.0, 1.0, 1.0], yaw);
+            let corner = ratio(by_corner, yaw);
+            for (name, r) in [("mid", mid), ("seam", seam), ("corner", corner)] {
+                assert!((r - 1.0).abs() < 0.01, "{name}, yaw {yaw}: {r}");
+            }
         }
-        assert!((seam / mid - 1.0).abs() < 0.01 && (corner / mid - 1.0).abs() < 0.01);
     }
 
     /// Simulation-block vertices along the great circle from cube-frame `a` to `b`, x kept
