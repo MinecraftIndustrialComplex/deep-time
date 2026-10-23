@@ -140,6 +140,37 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-23: The trench rows: the guard's floors 4 to 11 km past the Challenger Deep were depth the plate model's heights already hold, counted a second time by two surface rules; the flexure now books the plate model's moves of the ground as no load (ISO-096), and a trench cell takes the plate model's height plus its carried offset (ISO-097) (coordinator's follow-up to the surface guard; agent worktree .claude/worktrees/agent-af6976f50d4669c4c, branch worktree-agent-af6976f50d4669c4c, master 3fc91491 merged in at 1ae9d358; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Cause** (a scratch trace of the base's scattered continents seed 1, not kept). It had 179 steps with a cell more than 11 km down, of two kinds:
+  - 163 steps were ocean floor at the plate model's `z_t` with the flexure's water 2.6 km under it. One example: a gap's floor (3.5 km) that a plate then covered at 10.5 km, its 7 km of new sea loaded as a new load.
+  - 16 steps were trench rows. There the carry added the trench sample's pull each step to a source row the step before had already taken down, 5.9 to 8.8 km under the plate model.
+- **Fix:**
+  - `surface/flexure.rs`: the flexure books the plate model's move of the ground as the carry made it. That is the step's start less the surface's elevation at the crust's source, carried as `FlexState::from_m`. Its sea is no load. Building columns keep ISO-091, and ISO-088's separate cooling rule went.
+  - `surface/advect.rs`: on a trench cell (TRENCH flag or the trench regime) the carry takes the plate model's height plus the carried offset.
+  - `surface/mod.rs` and `climate/mod.rs` pass the new state through.
+  - Unit tests: `the_sea_over_the_ocean_floors_own_moves_is_no_load` and `a_trench_carries_its_offset`.
+  - Docs: docs/science/flexure.md "The trench rows", ISO-096 and ISO-097, the bibliography, sea-level.md.
+- **Measured** (pool, seeds 1 to 4, 8 runs an arm, `+DEEPTIME_CRUST_BUDGET=1`). Each argument set was run against itself without the fix, on three sets: base, the trench keys, and the seven keys that become the default. Medians before and after:
+
+  | measure | base | trench keys | seven keys |
+  |---|---|---|---|
+  | deepest floor, km | 12.9 to 10.2 (p < 0.001) | 11.2 to 9.1 (p 0.001) | 11.0 to 9.7 (p 0.028) |
+  | share deeper than 8 km | 0.032 to 0.016 | 0.0022 to 0.0007 | 0.0030 to 0.0007 |
+  | the guard's worst, km | 15.9 to 14.5 (p 0.015) | 16.9 to 13.7 (p 0.065) | 15.6 to 13.8 (p 0.33) |
+
+  - V1 did not move: every p was 0.13 or more, so the runs stopped at 4 seeds.
+  - The per-run guard table is in flexure.md.
+  - The arms' largest excursions are 19.7 to 21.2 km (base), 28.5 to 30.9 km (trench keys) and 20.6 to 26.0 km (seven keys). Guard-traced reruns reproduced the worst runs to the metre (scratch binaries, not kept): before the fix (trench keys' supercontinent 2) and after it (trench keys' supercontinent 3, seven keys' scattered 4), all three are plate-model peaks, not floors. The columns stood 15 to 29.4 km above the sea in the plate model, their uplift at PLT-288's 3.5 mm/yr ceiling, on the polar rows in two of the three runs. Every step past 19.8 km was such a peak.
+  - Floors more than 11 km down: 341 steps in the traced run before the fix, against 25 and 22 in the two after it.
+- **Calls:**
+  - The fix measured against each set's own arm, not against master's base alone.
+  - The master merge (3fc91491) brought only the amplifier's and water network's bake-side changes on top of the trench budget, which the pool's stage (to volcanoes) does not run, so `trench-m-rs12e` against `fg-trcomb-rs12e` isolates the fix.
+- **Tests:** `cargo test --workspace` on the VM, before the master merge: all passed. fmt and clippy were clean.
+- **Next:**
+  - The coordinator merges.
+  - The plate model's polar peaks (PLT-288's ceiling held step after step up to the 30 km cap) belong to the plates' lane.
+  - The −6 to −8 km offset still carried on some trench cells (floors to 14.4 km) was not traced.
+
 ### 2026-10-22: The trench budget (V1 item 1, gap 3): sediment subduction (PLT-440), subduction erosion where Clift & Vannucchi find it (PLT-441, PLT-442) and the trench's release (PLT-443), all `--set` switches off by default; Ben's D5 deep floor was fossil trench depth carried across the basins, and Earth's share deeper than 6 km is 0.0073; with the high ground's sheet the pair brings land back into the band and balances the continental budget, at 3.08 criteria a run (sheet 3.50, base 2.17, p 0.073), so nothing ships (coordinator's task, brief build/coord/briefs/trench-budget.md; agent worktree .claude/worktrees/agent-a5630fbf23836cfa2, branch worktree-agent-a5630fbf23836cfa2 from master 883a8ef6, master 18ace5d7 merged in at 0e7e2410; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Code** (plates only, no format change; each rule a `TectonicParams` key, 0 = off, and the branch with them off is master bit for bit: `pool.sh alias` at 100 and 1,000 Myr, base and sheet argument sets):
   - `tectonics.sediment_subduction_share` (PLT-440). It acts in `plates/ridges.rs`, at the resampling's accrete branch. Of subducted ocean floor, the share s of its sediment and sedimentary pools goes down; the rest accretes as before. It is booked in `plates/sediment_subducted_km3`.
