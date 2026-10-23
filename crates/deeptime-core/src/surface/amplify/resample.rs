@@ -79,10 +79,11 @@ pub struct Fine {
     pub area: Vec<f32>,
     pub own: Vec<f32>,
     pub kfac: Vec<f32>,
-    /// 1 where the cell lies under a lake's surface ([`Level::sample`]), else 0.
+    /// 1 where the cell lies under a lake's surface ([`Level::lake_surface`]), else 0. The surface
+    /// itself is not kept per fine cell: the next level's [`Level::lake_z`] takes it from the
+    /// coarse level when a tile hands its core on (`tiles::LevelSink`), which keeps 4 B a cell out
+    /// of every window.
     pub lake: Vec<u8>,
-    /// That surface, m, at the lake cells, [`NO_LAKE`] elsewhere.
-    pub lake_z: Vec<f32>,
     pub zs: Vec<f32>,
 }
 
@@ -211,7 +212,6 @@ impl Level {
             own: vec![0.0; n],
             kfac: vec![0.0; n],
             lake: vec![0; n],
-            lake_z: vec![NO_LAKE; n],
             zs: Vec::new(),
         };
         let dxf = self.fine_dx();
@@ -227,9 +227,8 @@ impl Level {
             .zip(f.own.par_chunks_mut(w))
             .zip(f.kfac.par_chunks_mut(w))
             .zip(f.lake.par_chunks_mut(w))
-            .zip(f.lake_z.par_chunks_mut(w))
             .enumerate()
-            .for_each(|(j, (((((zr, ar), or), kr), lr), sr))| {
+            .for_each(|(j, ((((zr, ar), or), kr), lr))| {
                 for i in 0..w {
                     let (gi, gj) = win.global(i, j);
                     let (gi, gj) = (gi as i64, gj as i64);
@@ -244,15 +243,8 @@ impl Level {
                     ar[i] = (interp - wg * (a_coarse - a_fine)).max(or[i]);
                     // The highest lake surface among the corners of the cell's quad (1, 2 or 4
                     // coarse cells); a lake cell when the terrain lies under it. ledger: AMP-090
-                    let mut s = NO_LAKE;
-                    for cj2 in cj..=cj + i64::from(fj) {
-                        for ci2 in ci..=ci + i64::from(fi) {
-                            s = s.max(self.lake_z[idx(self.w, self.h, ci2, cj2)]);
-                        }
-                    }
-                    if zr[i] < s {
+                    if zr[i] < self.lake_surface(gi, gj) {
                         lr[i] = 1;
-                        sr[i] = s;
                     }
                 }
             });
@@ -276,6 +268,24 @@ impl Level {
             });
         }
         f
+    }
+
+    /// The lake surface over fine cell (gi, gj) of the ×2 grid, m: the highest lake surface among
+    /// the coarse cells at the corners of its interpolation quad (the coarse cell it sits on, or
+    /// the two or four it lies between), [`NO_LAKE`] when none of them is in a lake. The fine
+    /// cell is a lake cell when its terrain lies under it ([`Level::sample`]), and then this is
+    /// its [`Level::lake_z`] on the next level (`tiles::LevelSink`). ledger: AMP-090
+    #[inline]
+    pub fn lake_surface(&self, gi: i64, gj: i64) -> f32 {
+        let (ci, cj) = (gi >> 1, gj >> 1);
+        let (fi, fj) = (gi & 1 == 1, gj & 1 == 1);
+        let mut s = NO_LAKE;
+        for cj2 in cj..=cj + i64::from(fj) {
+            for ci2 in ci..=ci + i64::from(fi) {
+                s = s.max(self.lake_z[idx(self.w, self.h, ci2, cj2)]);
+            }
+        }
+        s
     }
 
     /// The whole ×2 level's terrain (the fine grid's `z`), for callers that need no other array.
@@ -382,7 +392,6 @@ mod tests {
                 assert_eq!(part.area[c], whole.area[g]);
                 assert_eq!(part.own[c], whole.own[g]);
                 assert_eq!(part.lake[c], whole.lake[g]);
-                assert_eq!(part.lake_z[c], whole.lake_z[g]);
             }
         }
     }
@@ -422,11 +431,12 @@ mod tests {
             .flat_map(|j| (7..=9).map(move |i| j * 32 + i))
             .collect();
         assert_eq!(cells, want);
-        assert!(cells.iter().all(|&c| f.lake_z[c] == 1.0));
+        let surface = |c: usize| l.lake_surface((c % 32) as i64, (c / 32) as i64);
+        assert!(cells.iter().all(|&c| surface(c) == 1.0));
         assert!(
             (0..32 * 16)
                 .filter(|c| !want.contains(c))
-                .all(|c| f.lake_z[c] == NO_LAKE)
+                .all(|c| surface(c) == NO_LAKE)
         );
     }
 
