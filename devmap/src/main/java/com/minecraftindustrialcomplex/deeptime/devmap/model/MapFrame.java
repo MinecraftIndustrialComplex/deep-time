@@ -4,7 +4,7 @@ package com.minecraftindustrialcomplex.deeptime.devmap.model;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 
 /**
- * Where the base image sits in block space: pixel column i covers block x in
+ * Where the map's pictures (satellite and elevation) sit in block space: pixel column i covers block x in
  * [x0 + i·s, x0 + (i + 1)·s), row j block z in [z0 + j·s, z0 + (j + 1)·s), s blocks a pixel. The
  * image covers the world's whole domain: x over one period from the seam (−period/2), z from the
  * world's north limit (the north pole on Lambert, the north edge on Petroff–Guyou) south.
@@ -17,7 +17,7 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
  */
 public record MapFrame(double x0, double z0, double blocksPerPx, int w, int h) {
 
-    /** The width a server renders the base image at, pixels (6.5 blocks a pixel on the play planet). */
+    /** The width a server draws the pictures at, pixels (6.5 blocks a pixel on the play planet). */
     public static final int DEFAULT_WIDTH = 2048;
 
     public MapFrame {
