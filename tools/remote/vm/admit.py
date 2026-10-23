@@ -760,9 +760,39 @@ class Store:
         # re-entrant thread lock and only the outermost one opens, flocks and writes.
         self._tlock = threading.RLock()
         self._depth = 0
+        # A handler that enters between the outermost flock and its depth count opens a second fd and
+        # deadlocks the same way (2026-10-23: an arm's queued wrappers, all sent TERM at once, froze
+        # every admission on the VM for 57 min). While any thread is inside the store, a handler
+        # defers its signal (`defer`) and the last one out raises it again.
+        self._busy_lock = threading.RLock()
+        self._busy = 0
+        self._pending = None
+
+    def defer(self, sig):
+        """For a signal handler that needs the store: True, with the signal kept to be raised again,
+        while any thread is inside the store."""
+        if self._busy:
+            self._pending = sig
+            return True
+        return False
+
+    def _leave(self):
+        with self._busy_lock:
+            self._busy -= 1
+            sig = self._pending if self._busy == 0 else None
+            if sig is not None:
+                self._pending = None
+        if sig is not None:
+            signal.raise_signal(sig)
 
     def __enter__(self):
-        self._tlock.acquire()
+        with self._busy_lock:
+            self._busy += 1
+        try:
+            self._tlock.acquire()
+        except BaseException:
+            self._leave()
+            raise
         try:
             if self._depth == 0:
                 self.fd = os.open(self.lock_path, os.O_RDWR | os.O_CREAT, 0o664)
@@ -772,6 +802,7 @@ class Store:
             self._depth += 1
         except BaseException:
             self._tlock.release()
+            self._leave()
             raise
         return self
 
@@ -796,6 +827,7 @@ class Store:
                     self.fd = None
         finally:
             self._tlock.release()
+            self._leave()
 
     @staticmethod
     def _read(path, default):
@@ -1081,6 +1113,8 @@ def _merge_json(path, fields):
 
 def _install_wait_signals(store, job_id):
     def bail(sig, _frame):
+        if store.defer(sig):
+            return
         with store as s:
             s.state["queue"].pop(job_id, None)
         sys.exit(128 + sig)
