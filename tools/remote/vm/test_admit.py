@@ -578,6 +578,33 @@ class StoreSharing(unittest.TestCase):
             with admit.Store(d) as s:
                 self.assertEqual((s.state["a"], s.state["b"]), (1, 2))
 
+    def test_term_between_flock_and_depth_leaves_the_queue(self):
+        """A queued job sent TERM after its outermost flock but before its depth count (2026-10-23: the
+        handler opened a second fd and deadlocked, holding the lock every admission waits on)."""
+        child = (
+            "import os, signal, sys, time\n"
+            "sys.path.insert(0, sys.argv[1])\n"
+            "import admit\n"
+            "store = admit.Store(sys.argv[2])\n"
+            "with store as s:\n"
+            "    s.state['queue']['j'] = {'pid': os.getpid()}\n"
+            "admit._install_wait_signals(store, 'j')\n"
+            "read = store._read\n"
+            "def read_then_term(path, default):\n"
+            "    store._read = read\n"
+            "    os.kill(os.getpid(), signal.SIGTERM)\n"  # its handler runs inside __enter__, in the window
+            "    return read(path, default)\n"
+            "store._read = read_then_term\n"
+            "with store:\n"
+            "    pass\n"
+            "time.sleep(30)\n"
+        )
+        with tempfile.TemporaryDirectory() as d:
+            p = subprocess.run([sys.executable, "-I", "-c", child, HERE, d], timeout=20, capture_output=True)
+            self.assertEqual(p.returncode, 128 + 15, p.stderr.decode())
+            with admit.Store(d) as s:
+                self.assertNotIn("j", s.state["queue"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

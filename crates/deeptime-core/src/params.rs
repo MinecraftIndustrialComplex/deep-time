@@ -594,31 +594,37 @@ pub struct TectonicParams {
     /// The lithosphere's thermal state (`plates/thermal.rs`, gap 4): each sample carries the depth
     /// of its thermal lithosphere and its depleted keel; arcs, back-arcs, hotspots and rifts heat
     /// it, elsewhere it cools on McKenzie's time; continental heat flow comes from it (with the
-    /// final pass of `heat_flow_refresh`). Off = the old proxy (ledger PLT-137, PLT-460).
+    /// final pass of `heat_flow_refresh`). On by default and in every built-in preset since
+    /// 2026-10-23 (decisions log, "Always, fix V1 elsewhere"); off = the old proxy, kept for tests
+    /// that isolate one law (ledger PLT-137, PLT-460).
     pub thermal_state: bool,
     /// Thermal isostasy, m: the height between a hot back-arc's lithosphere and a cold craton's at
     /// equal crust, added to a continental column's Airy height in proportion to its
-    /// lithosphere's depth (`thermal_reference_km` stands at 0). 0 = off; needs `thermal_state`
-    /// (ledger ISO-110).
+    /// lithosphere's depth (`thermal_reference_km` stands at 0). 0 = off, the default: no frame
+    /// for the reference depth is right yet, as the model's sea is not (an open fault,
+    /// lithosphere-thermal-state.md); needs `thermal_state` (ledger ISO-110).
     pub thermal_isostasy_m: f64,
     /// The lithosphere's depth, km, at which the model's Airy line stands (the thermal height is 0
     /// there), and the depth the start's continents begin at (ledger ISO-111).
     pub thermal_reference_km: f64,
     /// Strength from the state: the thin sheet's viscosity and the flexure's continental Te take
-    /// the thermal age the lithosphere's depth implies in place of the orogeny's age; needs
-    /// `thermal_state` (ledger ISO-112).
+    /// the thermal age the lithosphere's depth implies in place of the orogeny's age; does
+    /// nothing without `thermal_state`. On by default since 2026-10-23; off = the orogeny's age,
+    /// kept for tests that isolate one law (ledger ISO-112, ISO-051).
     pub thermal_strength: bool,
     /// The cordillera's back-arc source from the state: the crust behind an arc's range gives
     /// its share of the range's shortening in proportion to its weakness, the thin sheet's
     /// η_0 / η at its thermal age, so a cold, keeled craton is a backstop that hardly thins and a
-    /// hot back-arc gives the crust; needs `thermal_state` (ledger PLT-470).
+    /// hot back-arc gives the crust; needs `thermal_state`. Off by default: a stand-in for the
+    /// force balance's own strength, not physics of its own (ledger PLT-470).
     pub thermal_backstop: bool,
     /// The depleted keel under the start's continents, km (at most `thermal_reference_km`); 0 =
     /// no keels (ledger PLT-463).
     pub thermal_keel_km: f64,
     /// After the step's resampling, every continental sample gets at least its heat-flow law's
     /// conductive value: crust the rate guard spread onto old sea floor kept the floor's (ledger
-    /// PLT-469). On with `thermal_state` whatever this says.
+    /// PLT-469). On by default since 2026-10-23 (the coordinator's call: a bookkeeping fix that
+    /// moves no elevation); on with `thermal_state` whatever this says.
     pub heat_flow_refresh: bool,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
@@ -942,13 +948,13 @@ impl Default for TectonicParams {
             collapse_sheet_viscosity_pa_s: 1.0e22,
             // ledger: PLT-415
             collapse_sheet_strength_myr: 62.8,
-            thermal_state: false, // ledger: PLT-460 (game-choice: off by default)
-            thermal_isostasy_m: 0.0, // ledger: ISO-110 (off by default; 1,600 m when on)
+            thermal_state: true,         // ledger: PLT-460 (on since 2026-10-23)
+            thermal_isostasy_m: 0.0,     // ledger: ISO-110 (off: an open fault; 1,600 m when on)
             thermal_reference_km: 225.0, // ledger: ISO-111
-            thermal_strength: false, // ledger: ISO-112 (game-choice: off by default)
-            thermal_backstop: false, // ledger: PLT-470 (game-choice: off by default)
+            thermal_strength: true,      // ledger: ISO-112 (on since 2026-10-23)
+            thermal_backstop: false,     // ledger: PLT-470 (off: a stand-in, not physics)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
-            heat_flow_refresh: false, // ledger: PLT-469 (game-choice: off by default)
+            heat_flow_refresh: true, // ledger: PLT-469 (game-choice: on since 2026-10-23, the coordinator's call)
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
             continent_elevation_m: [150.0, 900.0],
@@ -1347,11 +1353,12 @@ impl PlanetPreset {
             "$.tectonics.thermal_keel_km",
             "must be ≥ 0",
         )?;
+        // `thermal_strength` (on by default) does nothing without the state, so turning the state
+        // off alone is allowed; the two opt-in terms are refused without it.
         check(
-            k.thermal_state
-                || (k.thermal_isostasy_m == 0.0 && !k.thermal_strength && !k.thermal_backstop),
+            k.thermal_state || (k.thermal_isostasy_m == 0.0 && !k.thermal_backstop),
             "$.tectonics.thermal_state",
-            "thermal_isostasy_m, thermal_strength and thermal_backstop need thermal_state",
+            "thermal_isostasy_m and thermal_backstop need thermal_state",
         )?;
         check(
             k.thermal_state || k.rift_weakness == 0.0,

@@ -250,20 +250,28 @@ and that the model does not have as physics.
   - Root removal: never mentioned as a mechanism. The papers sit in the bibliography, with no
     ledger row or deferral note.
   - Cratons as stiff, buoyant keels: never mentioned.
-- **State (2026-10-23).** Stage 1 is built, every part off by default
-  ([lithosphere-thermal-state.md](lithosphere-thermal-state.md), PLT-460 to PLT-470, ISO-110 to
-  ISO-112): each sample carries its thermal lithosphere's depth and a keel; heat flow comes from
-  it (PLT-137's proxy kept when off), with a final pass that fixes the release pace's 33.7 mW/m²
-  bake fault; thermal isostasy in two frames; a strength from the thermal age for the thin sheet
-  and the flexure's Te; a backstop for the cordillera's source. On the pool only the strength
-  moves V1 towards Earth (24 runs: largest landmass 0.151 to 0.182, p 0.010; crust under the sea
-  0.274 to 0.251, p 0.18) and it pushes land over the band's top in seven runs, so criteria a run
-  go 3.33 to 3.42 (p 0.57) and it stays off. With the plate's yield (ISO-120) as well, 3.17 (p
-  0.98): the yield takes back the strength's gain and keeps its own cut of the guard's worst
-  (13.7 to 13.0 km, p 0.033); the strength bounds no load, so it does not replace the yield.
-  Thermal isostasy lifts the sea (craton frame) or sinks the start's continents (Hyndman &
-  Currie's). Rifted margins with β (stage 2) and root removal on a
-  Rayleigh-Taylor time (stage 3) are designed, not built.
+- **State (2026-10-23).** Stages 1 to 3 are built and, under Ben's rule of 2026-10-23 (physics on
+  once built and correct; decisions log "Always, fix V1 elsewhere"), on by default except two parts
+  ([lithosphere-thermal-state.md](lithosphere-thermal-state.md), PLT-460 to PLT-478, ISO-110 to
+  ISO-112). On: the state (each sample's thermal lithosphere depth and keel, PLT-460, with the heat
+  flow from it, PLT-467, in place of PLT-137's proxy, and the final pass that fixes the release
+  pace's 33.7 mW/m² bake fault, PLT-469, on by default on its own too), the strength from the thermal age for the
+  thin sheet and the flexure's Te (ISO-112, in place of the orogeny's date), rifted margins drawn
+  by a stretching factor β (crust T_n / β on a smoothstep across the proximal, necking and
+  hyperextended domains, lithosphere and keel L / β; PLT-475 and PLT-476, in place of PLT-261's
+  linear ramp) and root removal (a collision belt's crust over 50 km has its mantle lithosphere
+  drop off to the Moho at 10 Myr, Houseman & Molnar 1997, and the founder sinks at that pace;
+  PLT-477 and PLT-478, in place of PLT-258's all-at-once removal). The switches for stages 2 and 3
+  are gone with the rules they replaced. The correctness evidence: unit tests against the sources,
+  and no step beyond 2 Earth reliefs on any run of any arm (8 runs each for stages 2 and 3 alone
+  and with the strength, 24 for the strength); no arm ran all four at once, which master's next
+  24-run base does. Off: thermal isostasy (ISO-110), an open fault, since neither frame is right by
+  its sources while the model's sea stands 538 to 861 m over its datum (gap 1; Hyndman & Currie's
+  frame is right once the sea holds at the datum, at L_ref 125 km), and the backstop (PLT-470), a
+  stand-in that reweights the kinematic source PLT-048 rather than a force balance. The diagnosis
+  of the high coasts (the `coastset` measure over the base's 24 runs): 0.690 sit at collision
+  belts, 0.085 at rifted margins, so stage 2 can move coast_hi by 0.03 at most; the lever is
+  collision belts at open coasts, which is gap 2's.
 
 ### Gap 5: river and delta landforms
 
@@ -594,12 +602,12 @@ game-choice rule or a knob tuned to a target; (d) present but off by default; (e
 | Lower-crustal channel flow | Conservative diffusion of thickness above 50 km, two rings, same plate | (a) form, (c) K0 | `plates/flow.rs` | PLT-300, PLT-301 |
 | Continent-scale spreading | None | (e) | | |
 | Isostasy | Whole-column Airy, one density, eclogite root, instant settling | (a)/(b) | `plates/settle.rs:81`; `plates/collapse.rs:222`; `plates/pools.rs:63-110` | PLT-278 to PLT-282, ISO-043, ISO-044, ISO-078 |
-| Thermal isostasy | None | (e) | | (deferred) |
-| Lithosphere temperature, thickness | None; heat-flow proxy for deposits only | (e) | `plates/state.rs`; `plates/mod.rs:1309` | PLT-137 |
-| Root removal | None; the 70 km cap founders excess bottom-first | (e), (c) stand-in | `plates/collapse.rs:140-190` | PLT-258 |
+| Thermal isostasy | Built, off: an open fault while the sea is off its datum (2026-10-23) | (d) | `plates/thermal.rs`: uplift_m | ISO-110, ISO-111 |
+| Lithosphere temperature, thickness | Since 2026-10-23 on by default: each sample's thermal lithosphere depth and keel, relaxed towards hot or cold targets; heat flow and the strength (thin sheet, Te) from it | (b)/(c) | `plates/thermal.rs` | PLT-460 to PLT-469, ISO-112 |
+| Root removal | Since 2026-10-23: a collision belt over 50 km heats to its Moho over 10 Myr; the 70 km cap's no-room excess founders bottom-first at that pace | (b)/(c) | `plates/thermal.rs`; `plates/collapse.rs` | PLT-258, PLT-477, PLT-478 |
 | Cratons | Regime label | (e) | `plates/mod.rs:1352` | PLT-139 |
 | Rifting | Poisson by continental share, Voronoi pieces, LIP boost | (c) | `plates/rifting.rs:40-86` | PLT-082 to PLT-091 |
-| Rifted margins | Linear taper W = 200 km, 20 Myr | (c) | `plates/transition.rs` | PLT-261 to PLT-264, PLT-294 |
+| Rifted margins | Stretching profile (a smoothstep in thickness, since 2026-10-23) W = 200 km, 20 Myr; the lithosphere thins by the same β | (b)/(c) | `plates/transition.rs` | PLT-261 to PLT-264, PLT-294, PLT-475, PLT-476 |
 | Plumes, hotspots, LIPs | Random points, swells, piles | (c) | `plates/hotspots.rs` | PLT-108 to PLT-120 |
 | Crust budget | Recorded, not enforced | (c) | `plates/crust_budget.rs` | PLT-302, PLT-401 |
 

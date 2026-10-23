@@ -1132,7 +1132,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Cogley, J. G. (1984). Continental margins and the extent and number of the continents. Reviews of Geophysics 22(2):101-122.
 - DOI or URL: 10.1029/RG022i002p00101.
 - Cited as: (ERO, ISO, HYP) "Cogley 1984 (continental crust 41 % of the surface)". (PLT) "Cogley 1984, Rev. Geophys. 22:101-122" (29 percent land on 41 percent continental crust).
-- Ledger ids: HYP-012, HYP-013, PLT-158, PLT-159, PLT-205; HYP-035 (2026-10-20: the 41 % share as the stand-in contour for the continental edge); HYP-042 (2026-10-22: the 30.6 % submerged against the drowned-crust target)
+- Ledger ids: RLC-030 (2026-10-23: the 41 % crust share, as the realism-checks page uses it); HYP-012, HYP-013, PLT-158, PLT-159, PLT-205; HYP-035 (2026-10-20: the 41 % share as the stand-in contour for the continental edge); HYP-042 (2026-10-22: the 30.6 % submerged against the drowned-crust target)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1227,7 +1227,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Tozer, B., Sandwell, D. T., Smith, W. H. F., Olson, C., Beale, J. R. and Wessel, P. (2019). Global bathymetry and topography at 15 arc sec: SRTM15+. Earth and Space Science 6(10):1847-1864.
 - DOI or URL: (ERO, ISO, HYP) 10.1029/2019EA000658 (gold open access; DOAJ record https://doaj.org/article/95db1757cac2402aaa9c72408bdc82ed). (MOI, BIO) https://doi.org/10.1029/2019EA000658 (gold open access) (PLT) 10.1029/2019EA000658 (open access in Wiley). (CLM) 10.1029/2019EA000658
 - Cited as: (ERO, ISO, HYP) "Tozer et al. 2019" (SRTM15+) in build log 2026-10-01. (MOI, BIO) "GMT earth_relief (SRTM15+, Tozer et al. 2019)" (PLT) "Tozer et al. 2019 (SRTM15+, GMT earth_relief 30 arc-minute)".
-- Ledger ids: HYP-001 to HYP-011, HYP-032, PLT-168, PLT-170; none (relief used in the Earth comparisons); notes: as the dataset behind GMT earth_relief; relief used in the Earth comparisons; HYP-035 (2026-10-20: the median distance from land to the coast on the model's sampling, computed on earth_relief_15m_p); PLT-360 (2026-10-21: the coastal high ground, the hypsometry and the highest 1,000 km box, computed on earth_relief_15m_p by tools/review/continents_census.py); HYP-050, HYP-051 (2026-10-22, the trench budget: the floor deeper than 6 km and the deepest cell on earth_relief_15m_p, tools/review/earth-deep-floor.py)
+- Ledger ids: RLC-003 (2026-10-23: the present-day control of the Earth-history pipeline, tools/review/earth-paleodem.py); HYP-001 to HYP-011, HYP-032, PLT-168, PLT-170; none (relief used in the Earth comparisons); notes: as the dataset behind GMT earth_relief; relief used in the Earth comparisons; HYP-035 (2026-10-20: the median distance from land to the coast on the model's sampling, computed on earth_relief_15m_p); PLT-360 (2026-10-21: the coastal high ground, the hypsometry and the highest 1,000 km box, computed on earth_relief_15m_p by tools/review/continents_census.py); HYP-050, HYP-051 (2026-10-22, the trench budget: the floor deeper than 6 km and the deepest cell on earth_relief_15m_p, tools/review/earth-deep-floor.py)
 - Access: open access. [other sections: open access (Wiley/AGU). / not checked (journal is open access)]
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
 - Read so far (by the project): (ERO, ISO, HYP) no record. (MOI, BIO) used as data (PLT) numbers computed by the project from the GMT grid. (CLM) data used
@@ -6517,7 +6517,8 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: McKenzie, D. (1978). Some remarks on the development of sedimentary basins. Earth and Planetary Science Letters 40:25-32.
 - DOI or URL: 10.1016/0012-821X(78)90071-7 (the DOI from the standard citation, not seen on the scan); scan at http://www.zetaware.com/public/McKenzie_1978.pdf
 - Cited as: "McKenzie 1978" (uniform stretching by β; initial and thermal subsidence).
-- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`), PLT-415 (2026-10-22, the high-ground task: τ = 62.8 My as the e-fold of the thin sheet's viscosity with the age of the orogeny; the form is the agent's), ISO-099 (2026-10-23, the release's pace: τ as the time a plate the `Te` law weakens takes to warm; the form is the agent's), PLT-460 and PLT-465 and PLT-466 (2026-10-23, the lithosphere's thermal state: the plate's a and τ, τ scaled with a²)
+- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`), PLT-415 (2026-10-22, the high-ground task: τ = 62.8 My as the e-fold of the thin sheet's viscosity with the age of the orogeny; the form is the agent's), ISO-099 (2026-10-23, the release's pace: τ as the time a plate the `Te` law weakens takes to warm; the form is the agent's), PLT-460 and PLT-465 and PLT-466 (2026-10-23, the lithosphere's thermal state: the plate's a and τ, τ scaled with a²), PLT-476 (2026-10-23, stage 2: the lithosphere stretched by the crust's β)
+- Read in the stage 2-3 task (2026-10-23, the scan by a sub-agent, eq. 1 on the page image; PLT-476): eq. 1, S_i ∝ (1 − 1/β), "where a is the thickness of the lithosphere and t_c the initial thickness of the continental crust"; "S_i is positive if t_c >~ 18 km. Hence land areas will subside but regions with thin crust can be elevated by the stretching"; Table 2, total thermal subsidence e(0) 781 m at β = 1.25, 1,300 at 1.5, 1,950 at 2, 2,930 at 4, 3,520 at 10, 3,890 at infinity; real basins "an approximate value of β estimated from Fig. 4 of 1.5" (the North Sea) and "β ~ 2" (the Aegean).
 - Access: scanned copy, open.
 - Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
 - Read in the release-pace task (2026-10-23, the scan's full text by a Sonnet sub-agent of the release agent, eq. 6 checked on the page image; ISO-099): eq. 6, τ = a²/(π²κ), κ "the thermal diffusivity" (Table 1 gives no κ; 0.0080 cm²/s back from τ and a, the sub-agent's arithmetic); Table 1 "(mostly taken from Parsons and Sclater [9])": "a = 125 km", "Tl = 1333°C", "τ = 62.8 My"; "After a time which depends on the thermal time constant of the stretched lithosphere, τ/β², the heat flux starts to decrease."
@@ -6579,7 +6580,7 @@ Read by a research sub-agent on 2026-10-05 for plate task 7 (Ben, 2026-10-06: "F
 - Reference: Shi, D., Klemperer, S. L., Shi, J., Wu, Z. and Zhao, W. (2020). Localized foundering of Indian lower crust in the India-Tibet collision zone. Proceedings of the National Academy of Sciences 117(40):24742-24747.
 - DOI or URL: https://pmc.ncbi.nlm.nih.gov/articles/PMC7547243/
 - Cited as: "Shi D. et al. 2020".
-- Ledger ids: PLT-279, PLT-280, ISO-043
+- Ledger ids: PLT-279, PLT-280, ISO-043, PLT-477 (2026-10-23: why stage 3's root removal leaves the eclogite pool)
 - Access: open (PubMed Central).
 - Read so far (by the project): full text, 2026-10-05: densities "granulitic rocks (2,850 kg/m3...)", "the mantle (3,300 kg/m3...)", "mafic eclogite (3,450 kg/m3) (values taken from ref. 16)" (Hetényi et al. 2007); "the lower crust being only ~30% eclogitized so gravitationally stable"; "the doublet layer has a density ~3,000-3,100 kg/m3"; Moho locally "~90 km". Co-authors written from memory; check before quoting.
 
@@ -6784,7 +6785,7 @@ What an ice sheet is, for the temperate present's land-ice target (decisions log
 - Reference: National Snow and Ice Data Center. Glacier Quick Facts (web page).
 - DOI or URL: https://nsidc.org/learn/parts-cryosphere/glaciers/glacier-quick-facts
 - Cited as: "NSIDC, Glacier Quick Facts" (Earth's land under ice today and at the last glacial maximum).
-- Ledger ids: CLM-150
+- Ledger ids: CLM-150; RLC-060, RLC-061 (2026-10-23: land under ice today and at the last glacial maximum, the realism checks)
 - Access: open (web page).
 - Read so far (by the project): through the web fetch tool, 2026-10-18: "Presently, 10 percent of land area on Earth is covered with glacial ice", glaciers, ice caps and the ice sheets of Greenland and Antarctica; "Glacierized areas cover over 15 million square kilometers"; at the maximum of the last ice age "glaciers covered about 32 percent of the total land area"; "There are over 200,000 glaciers distinct from the ice sheets".
 
@@ -7323,11 +7324,12 @@ The sources named for a lake's sediment trap (HYD-110) and for the sediment-load
 - Read so far (by the project): nothing. The claim taken from it, that a lake's sediment accumulates fastest in its deep basin (sediment focusing), is from memory and unchecked.
 
 ### StecklerWatts1978
-- Reference: Steckler, M. S. and Watts, A. B. (1978). Subsidence of the Atlantic-type continental margin off New York. Earth and Planetary Science Letters 41(1):1-13 (from memory; not checked).
-- Cited as: "Steckler & Watts 1978 (from memory, not read)".
-- Ledger ids: PLT-129 (the 2026-10-21 note)
-- Access: not fetched.
-- Read so far (by the project): nothing. The claim taken from it, that a sediment column under water stands up by its load's isostatic correction (the backstripping relation), is from memory and unchecked.
+- Reference: Steckler, M. S. and Watts, A. B. (1978). Subsidence of the Atlantic-type continental margin off New York. Earth and Planetary Science Letters 41(1):1-13 (the title from memory; the volume and pages seen on the abstract's record).
+- DOI or URL: 10.1016/0012-821X(78)90036-5; abstract at https://ora.ox.ac.uk/objects/uuid:038601f7-8449-4b15-a4fe-6b1db4050f08
+- Cited as: "Steckler & Watts 1978" (abstract only).
+- Ledger ids: PLT-129 (the 2026-10-21 note); lithosphere-thermal-state.md (stage 2, the margin's cooling time; no row)
+- Access: paywalled (Elsevier and ADS refused, Unpaywall lists it closed); the abstract from Oxford's repository.
+- Read so far (by the project): the abstract, 2026-10-23 (a sub-agent of the gap-4 stages 2-3 task): "The remaining subsidence has been interpreted in terms of a simple thermal model for the cooling lithosphere. Based on this model a thickness of the thermal lithosphere of 113-139 km is estimated". No time constant or β in the abstract; with McKenzie's τ = a²/(π²κ) scaled from 62.8 My at 125 km, 113 to 139 km is about 51 to 78 Myr (the sub-agent's arithmetic). The backstripping relation taken for PLT-129 is still from memory and unchecked.
 
 ## Sea level from the ocean's volume (ISO-085 to ISO-087, PLT-350 to PLT-353, CLM-210), added 2026-10-21
 
@@ -7997,7 +7999,7 @@ Nothing was saved to the library.
 - Reference: England, P. and Houseman, G. (1989). Extension during continental convergence, with application to the Tibetan Plateau. Journal of Geophysical Research 94(B12):17561-17579.
 - DOI or URL: 10.1029/JB094iB12p17561
 - Cited as: "England & Houseman 1989".
-- Ledger ids: PLT-414, PLT-415
+- Ledger ids: PLT-414, PLT-415, PLT-478 (2026-10-23: the instability "would only occur after there had already been substantial thickening of the lithosphere", the same abstract read again)
 - Access: paywalled; the abstract from OpenAlex's record.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "For the last 5 m.y. or so the plateau has been thinning by the mechanism of extension on north‐south trending normal faults"; the collision time scale "(∼50 m.y. in the case of India and Asia)"; "the increase in surface height (as much as 2 km) and of potential energy (5 to 10 × 10 12 N m −1 ) resulting from convective instability of the lower lithosphere are sufficient for east‐west extension to replace north‐south compression as the dominant feature of the stress field of the Tibetan plateau".
@@ -8250,7 +8252,7 @@ The sources of the lithosphere's thermal state (gap 4; `lithosphere-thermal-stat
 - Reference: Houseman, G. A. and Molnar, P. (1997). Gravitational (Rayleigh-Taylor) instability of a layer with non-linear viscosity and convective thinning of continental lithosphere. Geophysical Journal International 128:125-150.
 - DOI or URL: 10.1111/j.1365-246X.1997.tb04075.x
 - Cited as: "Houseman & Molnar 1997" (the heating time; root removal for stage 3).
-- Ledger ids: PLT-464
+- Ledger ids: PLT-464, PLT-477
 - Access: open (OUP, a scan with an OCR layer; the equations checked on the page images).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-23: p. 131, "The timescale for thinning of the boundary layer depends strongly on the mantle viscosity, but may require less than 10 Myr if the viscosity is less than about 10^21 Pa s"; conclusions, "between 50 (for rheological parameters representative of dry olivine) and 75 per cent (for wet olivine) of the lithospheric mantle would be involved in an instability whose duration is of the order of 10 Myr"; p. 144, the thermal diffusion time "about 20 Myr for wavelengths of 150 km"; eq. 30, the drop-off time tb.
@@ -8300,6 +8302,129 @@ The sources of the lithosphere's thermal state (gap 4; `lithosphere-thermal-stat
 - Library: not kept.
 - Read so far (by the project): abstract (Crossref), 2026-10-23: Kaapvaal lithosphere "between 200 and 270 km, with most values between 210 and 250 km", basal heat flow "between 12-16 mW m−2"; "Because of its large thickness and thermal relaxation time, Archean lithosphere cannot be in thermal equilibrium".
 
+### Marcilly2022
+- Reference: Marcilly, C. M., Torsvik, T. H. and Conrad, C. P. (2022). Global Phanerozoic sea levels from paleogeographic flooding maps. Gondwana Research 110:128-142.
+- DOI or URL: 10.1016/j.gr.2022.05.011 ; https://www.clintconrad.no/papers/Marcilly_etal_GR2022.pdf
+- Cited as: "Marcilly, Torsvik and Conrad 2022", "Marcilly et al. 2022, Table 1" (exposed land and continental crust at 10 Myr steps; the hypsometric slope).
+- Ledger ids: RLC-010, RLC-011, RLC-013, RLC-014, RLC-030, RLC-031 (2026-10-23: Earth's land share and flooded continental crust over the Phanerozoic, the realism checks)
+- Access: open (the author's copy on the Conrad group's page).
+- Library: not kept (the PDF and its two text extractions were scratch files of the 2026-10-23 realism-checks task, outside the repository).
+- Read so far (by the project): the PDF text, 2026-10-23: Table 1 in full (age; continental crust area; modern-day crust area; exposed land area, in 10^6 km2, 0 to 520 Ma at 10 Myr steps) and the paragraph giving the hypsometric slope C = 0.0057 km per 10^6 km2. Values read: exposed land 149.00 at 0 Ma, 94.19 at 80 Ma, 66.95 at 510 Ma; continental crust 210.49 at 0 Ma. The shares in the ledger divide by 510.07 x 10^6 km2 (the project's arithmetic).
+- Reference check: the title, venue and DOI are as printed on the fetched copy. The table's minus signs are a special character that breaks a naive number parse (five rows, 0, 10, 30, 180 and 210 Ma, were skipped by the first parse and read by the second).
+
+### ScoteseWright2018
+- Reference: Scotese, C. R. and Wright, N. (2018). PALEOMAP Paleodigital Elevation Models (PaleoDEMS) for the Phanerozoic. PALEOMAP Project (EarthByte data collection; report and 1 x 1 degree netCDF maps 1 to 88, 0 to 540 Ma).
+- DOI or URL: https://www.earthbyte.org/paleodem-resource-scotese-and-wright-2018/ ; data https://www.earthbyte.org/webdav/ftp/Data_Collections/Scotese_Wright_2018_PaleoDEM/Scotese_Wright_2018_Maps_1-88_1degX1deg_PaleoDEMS_nc.zip
+- Cited as: "Scotese and Wright 2018 PaleoDEMs" (the report's own citation line: "Scotese, C.R., and Wright, N., 2018. PALEOMAP Paleodigital Elevation Models (PaleoDEMS) for the Phanerozoic PALEOMAP Project").
+- Ledger ids: RLC-003, RLC-012, RLC-014, RLC-020, RLC-040, RLC-041, RLC-051 (2026-10-23: the census's land measures run on Earth's own paleo-elevation maps)
+- Access: open; Creative Commons Attribution 4.0 (the License.txt that comes in the data folder).
+- Library: not kept (scratch copies in /tmp of the 2026-10-23 task; the data reproduce from the URL and tools/review/earth-paleodem.py).
+- Read so far (by the project): the report's text, 2026-10-23, for its caveats: a "first draft", the highest elevations "likely overestimated", maps built in two phases that are not homogeneous. The data were used, not only read: 109 maps, 0 to 540 Ma every 5 Myr, run through the census's helpers by tools/review/earth-paleodem.py with a present-day SRTM15+ control (Tozer2019). The 0 Ma map and the control agree (land 0.276 against 0.291; largest landmass 0.156).
+- Reference check: the report names itself the source of the 120 paleogeographic reconstructions (117 Phanerozoic, 3 Precambrian) and says the DEMs were produced in two phases; it gives no uncertainty per map. A land bridge of one 1 degree cell joins two landmasses, so the largest-landmass measure jumps between neighbouring maps (80 Ma 0.070, 240 Ma 0.363).
+
+### Condie2015
+- Reference: Condie, K., Pisarevsky, S. A., Korenaga, J. and Gardoll, S. (2015). Is the rate of supercontinent assembly changing with time? Precambrian Research 259:278-289. The title is `from-memory`; the authors, journal, volume and pages are as RLC-071 and PLT-157 record them.
+- DOI or URL: not checked.
+- Cited as: "Condie 2015, Precambrian Research 259" (collision frequency through time; a rate of about six collisions per 100 Myr within a range of one to twenty).
+- Ledger ids: RLC-002, RLC-071, RLC-072, RLC-075 (2026-10-23: the collision rate as a realism check)
+- Access: the abstract was reachable from repository pages; the full-text PDF host (people.earth.yale.edu) did not resolve from the laptop, curl and the fetch tool alike.
+- Library: not kept.
+- Read so far (by the project): abstract only, 2026-10-23: craton collisions peak at 1850 and 600 Ma, less at 1100 and 350 Ma, and are "very low" over 150 to 0 Ma; not related to supercontinent assembly. The figures "about one to 20 per 100 Myr, with an average of six" come from a search-engine extract recorded in PLT-157 and were NOT found in the pages read: RLC-072 carries them `cited-unverified`. The proposed M7 ceiling of 6 leans on them, so reading the full text is the first open item of the realism-checks page.
+- Reference check: not done; no copy of the paper was read.
+
+### Macdonald2019
+- Reference: Macdonald, F. A., Swanson-Hysell, N. L., Park, Y., Lisiecki, L. and Jagoutz, O. (2019). Arc-continent collisions in the tropics set Earth's climate state. Science 364:181-184. The full author list is `from-memory`; the title, journal, volume and pages are as PLT-157 records them.
+- DOI or URL: 10.1126/science.aav5300 (from memory, not checked); the analysis code and data are on GitHub as Swanson-Hysell-Group/Arc_Continent_Analysis (from memory, the repository was not opened).
+- Cited as: "Macdonald et al. 2019" (arc-continent sutures per 100 Myr and the Phanerozoic peaks of total suture length).
+- Ledger ids: PLT-157; RLC-073 (2026-10-23: the literature's collision counts are for a different object than the model's)
+- Access: paywalled at Science; the copy that was read is the one PLT-157 records (the full text was read by the 2026-10-22 research agent and again in the first pass of the 2026-10-23 realism-checks task).
+- Library: not kept.
+- Read so far (by the project): in full: six peaks of total suture length in 540 Myr for the major orogenies (about 1.1 per 100 Myr) and 15 to 46 ophiolite-bearing arc-continent sutures per 100 Myr (Paleozoic 44 in 290 Myr, Mesozoic 32 in 185, Cenozoic 30 in 65). RLC-073 uses these only to say they count sutures, not the model's terranes of at least 3.64 million km2 that end in a weld, so they bound nothing.
+- Reference check: not done by the realism-checks task.
+
+### WikipediaRealismChecks2026
+- Reference: Wikipedia (read 2026-10-23, tertiary sources and said to be): Last Glacial Maximum; Ice sheet; Greenhouse and icehouse Earth; Late Paleozoic icehouse; Caledonian orogeny; Variscan orogeny; Uralian orogeny; Cimmerian Plate; Alpine orogeny; Indian Plate; Arabian Plate. (The Indosinian orogeny page returned 404 and was not used.)
+- DOI or URL: https://en.wikipedia.org/wiki/<page title> for each of the above.
+- Cited as: "Wikipedia" in the realism-checks rows, never as the only source of a number that sets a band.
+- Ledger ids: RLC-013, RLC-060, RLC-061, RLC-062, RLC-070, RLC-074 (2026-10-23)
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): the pages above, in full or in the sections named in the rows: the land under ice today and at the Last Glacial Maximum (25 to 32 percent of the land, by figure), the greenhouse and icehouse intervals of the Phanerozoic, and the dates of the main collisions the writer's from-memory count of M7 leans on. Zachos et al. 2001 was cited by these pages and not read.
+- Reference check: the greenhouse and icehouse interval list is inconsistent inside its own page (RLC-062); no band edge rests on it.
+
+## The lithosphere's stages 2 and 3 (PLT-475 to PLT-478), added 2026-10-23
+
+The sources of stage 2 (rifted margins drawn by a stretching factor) and stage 3 (root removal) of the lithosphere's thermal state (gap 4; `lithosphere-thermal-state.md`). McKenzie 1978, Steckler & Watts 1978, Shi D. et al. 2020, Houseman & Molnar 1997 and England & Houseman 1989 are above; their ledger ids now include this section's rows. Read by a sub-agent of the gap-4 stages 2-3 agent on 2026-10-23, as each entry says; quotes as read, en dashes turned to hyphens. Titles marked "from memory" were not seen on the record and are unchecked. Numbers seen only in search-engine summaries were not used.
+
+### ManatschalChenin2023
+- Reference: Manatschal, G. and Chenin, P. (2023). A field guide to the fossil rifted margins in the Alps (the title from memory and the copy's file name, unchecked). Geological Field Trips and Maps 15(1.2).
+- DOI or URL: 10.3301/GFT.2023.02; https://www.geologicalfieldtripsandmaps.com/fulltext/70/fossil-rifted-margins-in-the-alps.pdf
+- Cited as: "Manatschal & Chenin 2023".
+- Ledger ids: PLT-475
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23: "the proximal domain where the top basement and Moho are sub-horizontal and parallel and where the crust is only a little thinned (30+-5 km); the necking domain where the crust is thinned from 30+-5 km to ca. 10 km; the hyperextended domain where the crust is thinned from ca. 10 km to 0 km"; "Based on a worldwide compilation of seismic sections, Chenin et al. (2017) proposed ... necking domains range between ca. 10 and 100 km with an average of 55 km; hyperextended domains between ca. 20 and 70 km with an average of 50 km; and exhumed mantle domains between 20 and 110 km with an average of 60 km"; a figure caption separates a "stretching phase (low-beta phase)" from the "early necking phase (onset of the high-beta phase)". Chenin et al. 2017 itself not read.
+
+### Montadert1979
+- Reference: Montadert, L., Roberts, D. G., De Charpal, O. and Guennoc, P. (1979). Rifting and subsidence of the northern continental margin of the Bay of Biscay (the title from memory). Initial Reports of the Deep Sea Drilling Project 48:1025-1060.
+- DOI or URL: https://deepseadrilling.org/48/volume/dsdp48_54.pdf
+- Cited as: "Montadert et al. 1979".
+- Ledger ids: PLT-475
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23: "The thinning of the continental crust cannot be explained by the 10 to 15 per cent of extension estimated for the upper brittle part"; "The Moho discontinuity, 25 km deep in the vicinity of the shelf break, is 12 km deep in the lower part of the margin. In this area the ductile part of the crust (6.3 km/s) is only 3 km thick"; post-rift subsidence "decreases continuously from the oceanic/continental crust boundary (4000 m) to the shelf break. For each point of the margin, the subsidence versus time curve is an exponential, the time constant of which increases with depth"; "Only in the lower part of the margin is the constant similar to the one of the oceanic crust. There is, therefore, not a single law that characterizes the subsidence of a whole margin, but one law for each point". Figs. 31 and 32 seen on the page image (about 4,000 m at the boundary falling to about 1 km or less at the shelf edge over 200 km, read off the plot).
+
+### Lang2026
+- Reference: Lang, ten Brink and Makovsky (2026; initials and title not recorded). Communications Earth & Environment 7:548.
+- DOI or URL: 10.1038/s43247-026-03742-2
+- Cited as: "Lang, ten Brink & Makovsky 2026".
+- Ledger ids: PLT-476
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23, the Baltimore Canyon Trough: "~500 km wide"; uniform stretching predicts sediment wherever the crust is under 34 km, but sediment "accumulated only where the crust is thinner than 25.5-31 km"; crust fully magmatic at 17.4 +- 0.36 km; a best-fit mantle to crust "beta ratio = 2.8"; thermal diffusivity rising "from 38% to 100% over 55 km" at the hinge.
+
+### LePichonSibuet1981
+- Reference: Le Pichon, X. and Sibuet, J.-C. (1981). Passive margins: a model of formation (the title from memory). Journal of Geophysical Research 86(B5):3708-3720.
+- Cited as: "Le Pichon & Sibuet 1981".
+- Ledger ids: none (lithosphere-thermal-state.md, stage 2)
+- Access: paywalled; the abstract from Crossref.
+- Library: not kept.
+- Read so far (by the project): abstract, 2026-10-23: "The amount of brittle stretching observed in the upper 8 km of the prestretched continental crust reaches a maximum value of about 3. This large amount of thinning is comparable to the thinning of the whole continental crust observed by seismic refraction measurements".
+
+### HousemanMcKenzieMolnar1981
+- Reference: Houseman, G. A., McKenzie, D. P. and Molnar, P. (1981). Convective instability of a thickened boundary layer and its relevance for the thermal evolution of continental convergent belts (the title from memory). Journal of Geophysical Research 86(B7):6115-6132.
+- DOI or URL: 10.1029/JB086iB07p06115
+- Cited as: "Houseman, McKenzie & Molnar 1981".
+- Ledger ids: PLT-477
+- Access: paywalled; the abstract from Crossref.
+- Library: not kept.
+- Read so far (by the project): abstract, 2026-10-23: "When crust thickens during crustal shortening, the underlying mantle lithosphere must shorten and thicken also, causing the submersion of cold, dense material into the surrounding asthenosphere"; "the boundary layer is removed in times less than the duration of deformation in some collision zones (30-50 m.y.)"; "in some cases the entire mantle lithosphere may detach from the lower crust during crustal shortening".
+
+### Conrad2000
+- Reference: Conrad, C. P. (2000). Convective instability of thickening mantle lithosphere (the title from memory). Geophysical Journal International 143:52-70.
+- Cited as: "Conrad 2000".
+- Ledger ids: PLT-477
+- Access: the abstract from OpenAlex.
+- Library: not kept.
+- Read so far (by the project): abstract, 2026-10-23: "at most only the lower 30 per cent of the lithosphere participates in the downwelling associated with this initial super-exponential growth event"; "The hottest 60 per cent of the mantle lithosphere could be removed in such an event, which would be followed by an influx of hot, buoyant asthenosphere that causes rapid surface uplift"; Tibet "shortened by about 50 per cent in ~30Myr and afterwards, at ~8Ma, experienced a period of rapid uplift".
+
+### MolnarEnglandMartinod1993
+- Reference: Molnar, P., England, P. and Martinod, J. (1993). Mantle dynamics, uplift of the Tibetan Plateau, and the Indian monsoon (the title from memory). Reviews of Geophysics 31(4):357-396.
+- DOI or URL: 10.1029/93RG02030
+- Cited as: "Molnar, England & Martinod 1993".
+- Ledger ids: none (lithosphere-thermal-state.md, stage 3)
+- Access: paywalled; the abstract from Crossref.
+- Library: not kept.
+- Read so far (by the project): abstract, 2026-10-23: "Convective removal of lower lithosphere beneath the Tibetan Plateau can account for a rapid increase in the mean elevation of the Tibetan Plateau of 1000 m or more in a few million years"; "uplift was rapid: approximately 1000 m to 2500 m in a few million years".
+
+### KayKay1993
+- Reference: Kay, R. W. and Kay, S. M. (1993). Delamination and delamination magmatism (the title from memory). Tectonophysics 219:177-189.
+- DOI or URL: 10.1016/0040-1951(93)90295-U
+- Cited as: "Kay & Kay 1993".
+- Ledger ids: PLT-478
+- Access: paywalled; the abstract from Semantic Scholar.
+- Library: not kept.
+- Read so far (by the project): abstract, 2026-10-23: "Crustal thickening that results from shortening may result in a crustal root that, due to phase changes, becomes denser than the underlying mantle lithosphere and should delaminate with it"; "a critical amount of shortening is required for the densifying effect of cooler temperature to counterbalance the effect of composition". No thickness threshold in the abstract.
 ## Plate boundary organisation (PLT-500 to PLT-507), added 2026-10-23
 
 The sources of V1 gap 2 (build log 2026-10-23 "Gap 2"; plates.md, the section "Plate boundary organisation"). Read again for it: Bird 2003 (Table 3 and PB2002_steps.dat), Stern 2004, Crameri et al. 2020 and Gurnis et al. 2004 (above). Texts in the project's source library on the test VM (`/data/ban/deeptime-sources/<key>/`), not distributed.
