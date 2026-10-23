@@ -165,7 +165,7 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Calls:**
   - The fix measured against each set's own arm, not against master's base alone.
   - The master merge (3fc91491) brought only the amplifier's and water network's bake-side changes on top of the trench budget, which the pool's stage (to volcanoes) does not run, so `trench-m-rs12e` against `fg-trcomb-rs12e` isolates the fix.
-- **Tests:** `cargo test --workspace` on the VM, before the master merge: all passed. fmt and clippy were clean.
+- **Tests:** `cargo fmt --check`, `clippy -D warnings` and `cargo test --workspace` on the VM, on the branch with master 3fc91491 merged in: all clean, every test passed (deeptime-core 909 passed, 5 ignored).
 - **Next:**
   - The coordinator merges.
   - The plate model's polar peaks (PLT-288's ceiling held step after step up to the 30 km cap) belong to the plates' lane.
