@@ -431,6 +431,13 @@ def ensure_run(ctx, start, seed):
     return status, rd
 
 
+def state_fingerprint(folder):
+    """(one sha256 over all, {file: sha256}) for the files of a full dump-fields folder."""
+    files = {p.name: sha256_file(p) for p in sorted(Path(folder).iterdir()) if p.is_file()}
+    blob = "".join(f"{n} {h}\n" for n, h in files.items())
+    return hashlib.sha256(blob.encode()).hexdigest(), files
+
+
 def step_file(kind, label, cmd, path, **kw):
     with open(path, "w") as f:
         return step(kind, label, cmd, stdout=f, **kw)
@@ -446,7 +453,9 @@ def simulate(ctx, arm, rid, start, seed, label):
     (work / "measures").mkdir(parents=True)
     ck = work / "final.ck"
     binp = ctx["bin"]
-    extra_env = {}
+    # The pool's runs are CPU runs whatever adapter a machine has (a GPU world differs from a CPU world; the
+    # VM has none, so this is what `auto` already does there); `+DEEPTIME_COMPUTE=gpu` overrides it.
+    extra_env = {"DEEPTIME_COMPUTE": "cpu"}
     for e in ctx["envs"]:
         k, _, v = e.partition("=")
         extra_env[k] = v.replace("@RUN@", str(work))
@@ -475,11 +484,24 @@ def simulate(ctx, arm, rid, start, seed, label):
                                work / "dump-fields.txt")
         if rc != 0 or not (work / "fields" / "index.json").exists():
             raise Fail(f"dump-fields failed (exit {rc}): {(work / 'dump-fields.txt').read_text()[-300:]}")
+        # The world state's fingerprint: a dump of EVERY field (about 130 MB at this size), hashed file by file and
+        # deleted. The .ck itself is not byte-stable (the same binary run twice gives checkpoints that differ in
+        # tens of MB; measured 2026-10-23), the dumped world state is, so this is what `alias` compares.
+        rc, _o, _e = step_file("shell:pool-dump-fields", f"pool-{label.replace('/', '-')}-st",
+                               [str(binp), "dump-fields", "--in", str(ck), "--out", str(work / "state-dump")], work / "state-dump.txt")
+        if rc != 0 or not (work / "state-dump" / "index.json").exists():
+            raise Fail(f"the full dump-fields failed (exit {rc}): {(work / 'state-dump.txt').read_text()[-300:]}")
+        state_sha, state_files = state_fingerprint(work / "state-dump")
+        shutil.rmtree(work / "state-dump")
+        (work / "state-dump.txt").unlink(missing_ok=True)
+        atomic_write(work / "state.json", json.dumps({"sha256": state_sha, "files": state_files}, indent=1, sort_keys=True) + "\n")
         meta = {
             "srckey": ctx["key"], "preset": ctx["preset"], "length_myr": ctx["length"], "start": start, "seed": seed,
             "threads": ctx["threads"], "sets": sorted(ctx["sets"]), "envs": sorted(ctx["envs"]), "argkey": ctx["argkey"],
+            "compute": extra_env.get("DEEPTIME_COMPUTE"),
             "stage": STAGE, "ran": now(), "sim_seconds": sim_seconds, "host": socket.gethostname(), "first_arm": ctx.get("arm"),
-            "ck_sha256": sha256_file(ck), "ck_bytes": ck.stat().st_size, "fields_sha256": sha256_tree(work / "fields"),
+            "state_sha256": state_sha, "state_files": len(state_files), "rec_sha256": sha256_file(work / "rec.json"),
+            "ck_bytes": ck.stat().st_size, "fields_sha256": sha256_tree(work / "fields"),
             "dumped_fields": fields, "kept_ck": bool(ctx.get("keep_ck")), "measures": {}}
         # The measures run on the staging folder, so a finished folder always has them.
         ensure_measures(ctx["reg"], work, ctx["measures"], label)
@@ -814,13 +836,23 @@ def cmd_alias(a):
             raise Fail(f"the {tag} run ({'key ' + (new if tag == 'new' else old_target)}) is {res[tag][0]}: {res[tag][1]}")
     mn = read_json(Path(res["new"][1]) / "meta.json")
     mo = read_json(Path(res["old"][1]) / "meta.json")
-    same_ck = mn["ck_sha256"] == mo["ck_sha256"]
-    same_fields = mn["fields_sha256"] == mo["fields_sha256"]
-    same_rec = sha256_file(Path(res["new"][1]) / "rec.json") == sha256_file(Path(res["old"][1]) / "rec.json")
-    say(f"checkpoint sha256: new {mn['ck_sha256'][:16]} old {mo['ck_sha256'][:16]}: {'IDENTICAL' if same_ck else 'differ'}")
-    say(f"dumped fields: {'identical' if same_fields else 'differ'}; dynamics record: {'identical' if same_rec else 'differ'}")
-    if not same_ck:
-        say(f"NO ALIAS: the two keys' final states differ bit for bit ({new} is a real change from {old}, or the run is not deterministic)")
+    if not mn.get("state_sha256") or not mo.get("state_sha256"):
+        raise Fail("a run has no world-state fingerprint (it was made before the pool kept one): pool.sh run ... --rerun it, then check again")
+    # The final state, bit for bit: every world field and the globals of the final checkpoint (103 fields in a
+    # 16k planet), and the dynamics record. The .ck file itself is not compared: it is not byte-stable, even
+    # for one binary run twice.
+    same_state = mn["state_sha256"] == mo["state_sha256"]
+    same_rec = mn["rec_sha256"] == mo["rec_sha256"]
+    say(f"world state ({mn['state_files']} files: every field and the globals) sha256: new {mn['state_sha256'][:16]} "
+        f"old {mo['state_sha256'][:16]}: {'IDENTICAL' if same_state else 'differ'}")
+    say(f"dynamics record (rec.json): {'IDENTICAL' if same_rec else 'differ'}")
+    if not (same_state and same_rec):
+        if not same_state:
+            sn = read_json(Path(res["new"][1]) / "state.json", {}).get("files", {})
+            so = read_json(Path(res["old"][1]) / "state.json", {}).get("files", {})
+            bad = sorted(f for f in set(sn) | set(so) if sn.get(f) != so.get(f))
+            say(f"differing files ({len(bad)}): {', '.join(bad[:12])}{' ...' if len(bad) > 12 else ''}")
+        say(f"NO ALIAS: the two keys' final states differ ({new} is a real change from {old})")
         return 1
     with flock(POOL / ".aliases.lock"):
         cur = aliases()
