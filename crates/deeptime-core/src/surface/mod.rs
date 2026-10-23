@@ -2071,7 +2071,7 @@ impl SurfaceStage {
                 dims: &d,
                 norm_dx_m: std::f64::consts::TAU * self.preset.tectonics.model_radius_km * 1000.0
                     / w as f64,
-                sin_faces: p.flexure.row_metric.then_some(&faces[..]),
+                sin_faces: Some(&faces[..]),
                 // The plate model's mean sample spacing on its sphere.
                 plate_spacing_m: (4.0
                     * std::f64::consts::PI
