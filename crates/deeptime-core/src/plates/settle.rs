@@ -41,8 +41,16 @@
 //! (ISO-044: a column below the sea carries the water above it) and F the surface's flexure
 //! (`surface/flexure_m`, the flexure solve of ISO-040: how far the plate holds the ground above
 //! or below local isostasy; 0 without a surface stage), τ = `isostasy_relax_myr` (4 kyr: the
-//! whole way at any plate step, ISO-078). The change is the step's uplift, which the surface
-//! stage takes as it takes any uplift; the step's rise guard (PLT-288) runs after it.
+//! whole way at any plate step, ISO-078). The change is the step's uplift; the step's rise guard
+//! (PLT-288) runs after it.
+//!
+//! The settling moves a height alone: it adds and removes no crust, so the surface's flexure
+//! takes it as no load (ISO-091). The flexure books only `Sample::crust_uplift_mm_yr`, the change
+//! of the column's own crust's Airy height ([`crust_uplift`]). Until 2026-10-22 it booked every
+//! rise of a continental column as crust thickened, 7 times the rise, whose root a stiff plate
+//! held up; the settling then moved the column to its Airy height plus that larger F, and the
+//! two raised each other to the 30 km ceiling (`docs/science/flexure.md`, "The settling's
+//! feedback").
 // ledger: ISO-078 (the rule and τ), ISO-064 (the 3-5 kyr), ISO-044 (ρ_w), ISO-043 (ρ_m).
 
 use rayon::prelude::*;
