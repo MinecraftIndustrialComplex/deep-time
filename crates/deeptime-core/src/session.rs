@@ -225,9 +225,9 @@ const OWN_ONLY_ESTIMATES: [&str; 4] = [
 ];
 
 /// The bake's working set, `(base, history, projection)` (bytes): the world the amplification
-/// leaves plus the projection pass's working set ([`crate::bake::project::estimate_bytes`]); all
-/// zero for a preset without the amplify stage (the plate-only and placeholder presets, whose
-/// bake is small or absent).
+/// leaves plus the largest of the bake's parts ([`crate::bake::estimate_bytes`]: the strata, the
+/// water or the projection pass, whose own figure is the third); all zero for a preset without
+/// the amplify stage (the plate-only and placeholder presets, whose bake is small or absent).
 fn bake_set(preset: &Preset, list: &[Box<dyn Stage>]) -> (u64, u64, u64) {
     let crate::preset::PresetBody::Planet(p) = &preset.body else {
         return (0, 0, 0);
@@ -239,8 +239,8 @@ fn bake_set(preset: &Preset, list: &[Box<dyn Stage>]) -> (u64, u64, u64) {
         return (0, 0, 0);
     }
     let (world, hist) = crate::surface::amplify::world_bytes(p);
-    let projection = crate::bake::project::estimate_bytes(p);
-    (world + projection, hist, projection)
+    let (bake, projection) = crate::bake::estimate_bytes(p);
+    (world + bake, hist, projection)
 }
 
 /// The memory and time estimate for a preset run under a memory cap of `mem_cap` bytes (0: the
@@ -251,7 +251,8 @@ fn bake_set(preset: &Preset, list: &[Box<dyn Stage>]) -> (u64, u64, u64) {
 ///   "coupled_to"}, …]}`
 ///
 /// `bake_bytes` (only for a preset with the amplify stage) is the bake's peak after the last stage:
-/// the finished world and the projection pass's working set (`bake_projection_bytes`). It counts
+/// the finished world and the largest of the bake's parts (the strata, the water and the
+/// projection pass, whose own working set is `bake_projection_bytes`). It counts
 /// in `peak_bytes`, not in the base (which a stage's own working set decides).
 ///
 /// `coupled_to` is the stage a coupled stage steps with (`Stage::coupled_to`), or null: a
@@ -304,9 +305,9 @@ pub fn estimate_for(
         })
         .collect();
     // The bake after the last stage (`finalize_write`): the finished world, which stays in memory
-    // beside it, and the projection pass's working set (the Lambert bake itself has stayed inside
-    // the stages' peak so far; `tests/memory_estimate.rs` checks the run's peak). The session
-    // holds the allocator's kept blocks under this figure while it bakes (`Stepper::bake_allowed`).
+    // beside it, and the largest of the bake's parts (`tests/memory_estimate.rs` checks the bake's
+    // peak and the run's). The session holds the allocator's kept blocks under this figure while
+    // it bakes (`Stepper::bake_allowed`).
     let (bake_base, bake_hist, projection) = bake_set(&preset, &list);
     let bake_bytes = if bake_base > 0 {
         bake_base + bake_hist.min(cap.saturating_sub(bake_base))

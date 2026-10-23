@@ -1081,6 +1081,7 @@ impl<M: SimFrame> OnWorld<'_, M> {
             .unwrap_or_default();
         let (calm, cones_note) = cone_gullies(&mut e, &ground, map, self.planet_r_m, &cones);
         let gullies_ms = t.elapsed().as_secs_f64() * 1000.0;
+        crate::surface::amplify::amp_probe_seg("relief_gullies");
         let texture_note = match (self.noise.as_ref(), self.class_top) {
             (Some(noise), Some(class)) => {
                 let weights = rock_weights();

@@ -653,8 +653,14 @@ fn the_projection_estimate_covers_the_baked_layers() {
         .max()
         .unwrap();
     assert!(super::project::estimate_bytes(&p) >= biggest);
+    // The bake's figure is the largest of its parts': at least the pass's, and the strata's and
+    // the water's on a Lambert world (amp-est, 2026-10-23).
+    let (bake, projection) = super::estimate_bytes(&p);
+    assert_eq!(projection, super::project::estimate_bytes(&p));
+    assert!(bake >= projection);
     let mut lambert = (*p).clone();
     lambert.scale.projection = deeptime_format::projection::ProjectionKind::Lambert;
     assert_eq!(super::project::estimate_bytes(&lambert), 0);
+    assert!(super::estimate_bytes(&lambert).0 > 0);
     std::fs::remove_dir_all(&dir).unwrap();
 }
