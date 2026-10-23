@@ -25,6 +25,7 @@ use rayon::prelude::*;
 use deeptime_format::GridDesc;
 
 use crate::plates::kinematics::rotation;
+use crate::plates::state::{TRENCH, regime};
 use crate::sphere::BlockFrame;
 
 /// Where every cell's material was before the step: fractional (i, j) in the grid.
@@ -241,8 +242,13 @@ pub struct Carry<'a> {
     pub gap: Option<&'a [f32]>,
     pub prev_gap: Option<&'a [f32]>,
     /// The surface's offset over the plate model's elevation after the last step
-    /// (`SurfaceState::offset_m`), which a cell that lay in a gap keeps.
+    /// (`SurfaceState::offset_m`), which a cell that lay in a gap keeps and a trench carries
+    /// ([`Carry::at_trench`]).
     pub prev_offset: Option<&'a [f32]>,
+    /// `plates/flags` and `plates/regime` now: where the plate model pulls a subducting plate to
+    /// its trench ([`Carry::at_trench`]). `None`: no trench.
+    pub flags: Option<&'a [f32]>,
+    pub regime: Option<&'a [f32]>,
     /// Each plate's parent, and how many plates existed before the step (a plate past that count
     /// was born in it, and its crust was its parent's).
     pub parents: &'a [Option<u32>],
@@ -255,6 +261,18 @@ pub struct Carry<'a> {
 }
 
 impl Carry<'_> {
+    /// Whether the plate model pulls the crust at cell `c` to its trench this step: the sample
+    /// the cell reads is a subducting plate's at its trench (`plates::state::TRENCH`, as a flag
+    /// or as the regime). ledger: ISO-097
+    pub fn at_trench(&self, c: usize) -> bool {
+        self.flags.is_some_and(|f| {
+            f.get(c)
+                .is_some_and(|&v| (v as u32) & u32::from(TRENCH) != 0)
+        }) || self
+            .regime
+            .is_some_and(|r| r.get(c).is_some_and(|&v| v as u8 == regime::TRENCH))
+    }
+
     /// Whether cells `c` and `n` hold the same crust now: the same plate or the same rigid group.
     pub fn same_now(&self, c: usize, n: usize) -> bool {
         self.plate[c] == self.plate[n] || self.group.is_some_and(|g| g[c] == g[n])
@@ -400,6 +418,17 @@ pub fn newborn(
 /// the young floor stood 200 to 450 m too high, for good (ledger: PLT-354). A step longer than
 /// `blur_ref_yr` has the blur it owes ([`blur_owed`]) spread into the carried surface before the
 /// uplift, over the same crust only.
+///
+/// Where the plate model pulls a subducting plate to its trench ([`Carry::at_trench`]) the cell
+/// carries its offset over the plate model's elevation instead (the same corners, the same
+/// crust): the plate's bending is the plate model's, and the surface keeps only what it added
+/// (ledger: ISO-097). The uplift there is a trench sample's pull towards the trench depth; the
+/// cell's elevation is read across the triangle of samples around it, whose trench corner is
+/// soon subducted, so the two part. Carried as a height, the pull went in each step and the
+/// plate model's elevation under the cell rose: a row one cell wide stood 5 to 9 km under the
+/// plate model's trench, 15 to 16 km deep, which the plate model's feedback (sample means) never
+/// took back (`docs/science/flexure.md`, "The trench rows"). Earth's deepest floor, the
+/// Challenger Deep, is about 10.9 km down, within the bending of the plate (Zhang et al. 2014).
 pub fn carried_elevation(x: &Carry<'_>) -> (Vec<f32>, u64) {
     let same = |c: usize, s: usize| x.same(c, s);
     let lift = x.dt_yr * 1.0e-3;
@@ -431,6 +460,13 @@ pub fn carried_elevation(x: &Carry<'_>) -> (Vec<f32>, u64) {
             x.plate_elevation[c] + kept
         } else if z.is_nan() {
             x.plate_elevation[c]
+        } else if let Some(o) = x.prev_offset.filter(|_| x.at_trench(c)) {
+            // ledger: ISO-097
+            let [fi, fj] = x.src[c];
+            match bilinear_same(x.w, x.h, o, fi, fj, |s| same(c, s)) {
+                Some(kept) => x.plate_elevation[c] + kept,
+                None => x.plate_elevation[c],
+            }
         } else {
             (f64::from(*z) + f64::from(x.uplift_mm_yr[c]) * lift) as f32
         };
@@ -655,6 +691,8 @@ mod tests {
                 gap: None,
                 prev_gap: None,
                 prev_offset: None,
+                flags: None,
+                regime: None,
                 parents,
                 known_plates: 2,
                 dt_yr: 2.0e6,
@@ -745,6 +783,8 @@ mod tests {
             gap: Some(&gap),
             prev_gap: Some(&prev_gap),
             prev_offset: Some(&prev_offset),
+            flags: None,
+            regime: None,
             parents: &[None, None],
             known_plates: 2,
             dt_yr: 2.0e6,
@@ -766,5 +806,75 @@ mod tests {
             "already in the gap: what lies on it stays"
         );
         assert!(!fresh[0] && !fresh[7]);
+    }
+
+    /// At a trench the cell carries its offset over the plate model's elevation, not its height
+    /// (ISO-097): the plate model's pull of its trench samples, which the cell's elevation read
+    /// across their triangle does not follow, is not added again, and the surface keeps what it
+    /// added. Elsewhere the height moves with the uplift.
+    #[test]
+    fn a_trench_carries_its_offset() {
+        let (w, h) = (8usize, 4usize);
+        let n = w * h;
+        let col = |c: usize| c % w;
+        let src: Vec<[f64; 2]> = (0..n)
+            .map(|c| [col(c) as f64 + 0.5, (c / w) as f64])
+            .collect();
+        let plate = vec![0.0f32; n];
+        // The floor stood at −6.5 km with 500 m of the surface's own on it; the plate model now
+        // pulls its trench samples down 2.4 km in the step while the elevation it reads under
+        // the cells rises 300 m.
+        let prev_elevation = vec![-6000.0f32; n];
+        let prev_offset = vec![500.0f32; n];
+        let plate_elevation = vec![-6200.0f32; n];
+        let uplift = vec![-1.2f32; n];
+        let flags: Vec<f32> = (0..n)
+            .map(|c| if col(c) == 3 { f32::from(TRENCH) } else { 0.0 })
+            .collect();
+        let reg: Vec<f32> = (0..n)
+            .map(|c| {
+                f32::from(if col(c) == 5 {
+                    regime::TRENCH
+                } else {
+                    regime::OCEAN_BASIN
+                })
+            })
+            .collect();
+        let carry = |flags: Option<&[f32]>, reg: Option<&[f32]>| {
+            carried_elevation(&Carry {
+                w,
+                h,
+                src: &src,
+                prev_elevation: &prev_elevation,
+                prev_plate: Some(&plate),
+                prev_group: None,
+                plate: &plate,
+                group: None,
+                plate_elevation: &plate_elevation,
+                uplift_mm_yr: &uplift,
+                gap: None,
+                prev_gap: None,
+                prev_offset: Some(&prev_offset),
+                flags,
+                regime: reg,
+                parents: &[None],
+                known_plates: 1,
+                dt_yr: 2.0e6,
+                blur_ref_yr: 0.0,
+            })
+            .0
+        };
+        let z = carry(Some(&flags), Some(&reg));
+        assert_eq!(
+            z[3], -5700.0,
+            "the trench flag: the plate's floor and the 500 m on it"
+        );
+        assert_eq!(z[w + 5], -5700.0, "the trench regime");
+        assert_eq!(
+            z[1], -8400.0,
+            "away from the trench the height takes the uplift"
+        );
+        let plain = carry(None, None);
+        assert!(plain.iter().all(|&v| v == -8400.0), "no trench: {plain:?}");
     }
 }

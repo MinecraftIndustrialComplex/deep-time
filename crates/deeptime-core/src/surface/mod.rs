@@ -375,6 +375,8 @@ impl Moved {
             gap: pf.gap.as_deref(),
             prev_gap: prev_ids(field::CRUST_GAP),
             prev_offset: Some(&self.prev_offset),
+            flags: Some(&pf.flags),
+            regime: Some(&pf.regime),
             parents,
             known_plates: self.known_plates,
             dt_yr,
@@ -1982,15 +1984,6 @@ impl SurfaceStage {
                 ice_m: ice,
                 rock_share: p.isostasy,
                 parts: budget,
-                gdh1_scale: {
-                    let k = &self.preset.tectonics;
-                    (k.ocean_depth == crate::params::OceanDepth::Gdh1).then(|| {
-                        crate::plates::pools::gdh1_scale(
-                            k.ridge_elevation_m,
-                            k.oceanic_floor_elevation_m,
-                        )
-                    })
-                },
             };
             if budget {
                 answers = Some(flexure::local_answers(

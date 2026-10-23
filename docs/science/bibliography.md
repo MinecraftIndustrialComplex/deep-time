@@ -4313,7 +4313,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Turcotte, D. L., Schubert, G. Geodynamics. Cambridge University Press (editions 1982, 2002, 2014).
 - DOI or URL: none; Internet Archive copy (geodynamics0000turc) is lending-only (HTTP 401).
 - Cited as: "Turcotte & Schubert, Geodynamics" (flexure; gross slab pull "not confirmed").
-- Ledger ids: ISO-040 to ISO-042, ISO-067, PLT-183, PLT-193, FRC-002, FRC-004, FRC-008, FRC-012 (ridge push from memory; not read)
+- Ledger ids: ISO-040 to ISO-042, ISO-067, ISO-096, PLT-183, PLT-193, FRC-002, FRC-004, FRC-008, FRC-012 (ridge push from memory; not read)
 - Access: book (not online).
 - Library (the project's source library, not distributed): not fetched. Reason: book, no open copy named.
 - Read so far (by the project): not read; gross slab pull "not confirmed in Turcotte & Schubert itself". For the flexure feature (2026-10-02) a sub-agent read chapter 3 as a PDF (https://sseh.uchicago.edu/doc/Geodynamics_Turcotte_Schubert_ch_3.pdf: E = 70 GPa and ν = 0.25 in the periodic-loading example, 100 GPa elsewhere) and the flexure formulas in lecture notes on the chapter (https://topex.ucsd.edu/geodynamics/12flexure.pdf); the edition of that PDF was not recorded.
@@ -4321,6 +4321,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference check: edition not stated anywhere in the code or designs; the numbers depend on the edition and chapter.
 - Read in WP-13a (2026-10-02): not read. Its slab-pull law is read as Faccenna et al. 2012's eq. 1, which follows Turcotte & Schubert 1982 (PLT-182, PLT-183). A course directory's copy of a chapter was found and not used: it is not an author's or publisher's copy.
 - Read 2026-10-22 (the flexure guard, ISO-093): chapter 3 (the same PDF) by a Sonnet sub-agent of the flexure-guard agent: the fibre stress of a bent plate, sigma_xx = E y / (1 - nu^2) x |d2w/dx2|, largest at its faces, sigma_max = 6M/h^2 (eqs. 3.64 to 3.70 and 3.86).
+- Read 2026-10-23 (the trench rows, ISO-096): §3.13 of the same PDF, by a Sonnet sub-agent of the trench-row agent: under a water-covered plate, water fills "the space vacated" by the deflection and the restoring force is (rho_m - rho_w) g w (eqs. 3.101 to 3.103). The chapter copy ends at §3.14 and holds no line-load fit of the Mariana; the book's Mariana figures (x_b, w_b, h) were not found and are not used.
 
 ### Buck2004
 - Reference: Buck, W. R. (2004). Consequences of asthenospheric variability on continental rifting. In: Karner, G. D., Taylor, B., Driscoll, N. W., Kohlstedt, D. L. (eds.), Rheology and Deformation of the Lithosphere at Continental Margins, Columbia University Press, pp. 1-30.
@@ -5530,12 +5531,13 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Stern, R. J. Ocean Trenches. In: Encyclopedia of Geology (Elsevier), Earth Processes.
 - DOI or URL: proof copy https://personal.utdallas.edu/~rjstern/pdfs/TrenchProof.pdf
 - Cited as: "Stern, Ocean Trenches" (trenches against isostasy, in gravity)
-- Ledger ids: ISO-093
+- Ledger ids: ISO-093, ISO-097
 - Access: the author's proof copy.
 - Library (the project's source library, not distributed): not filed.
 - Read so far (by the project): full text (proof), by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: "Typically, the gravity over the outer swell is about 50 mGals higher than expected from isostasy, while gravity over the trench is about 200 mGals less than that expected from isostatic considerations".
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: the edition and year of the encyclopedia were not recorded.
+- Read 2026-10-23 (the trench rows, ISO-097): the 2021 Encyclopedia of Geology chapter, https://personal.utdallas.edu/~rjstern/pdfs/OceanicTrenchesEoG221.pdf, by a Sonnet sub-agent of the trench-row agent: the elastic thickness of the bent plate is 20 to 30 km for most trench profiles.
 
 ### Cattin2001
 - Reference: Cattin, R., et al. (2001). Gravity anomalies, crustal structure and thermo-mechanical support of the Himalaya of Central Nepal. Geophysical Journal International 147(2):381-392.
@@ -8085,3 +8087,40 @@ The sources of the trench budget (build log 2026-10-22 "The trench budget"; plat
 - Access: author copy open.
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-22 (research sub-agent): Table 1, "Maximum trench depth" (m): Challenger (Mariana) 10,920, Tonga 10,800, Philippine 10,057, Kermadec 10,047, Izu-Bonin 9,780, Kuril 9,550, North New Hebrides 9,175, New Britain 8,940, Yap 8,650, Puerto Rico 8,605, South Sandwich 8,325, South Solomons 8,322, Peru-Chile 8,170, Japan 8,130, Palau 8,055, Aleutians 7,680, Ryukyu 7,460, Sunda 7,125, Middle America 6,660, Hellenic 5,092, Nankai 4,900, Calabrian 4,200, Makran 3,200, Cascadia 3,136; "Table 1 shows that all trenches deeper than 8000 m are nonaccretionary. In contrast, all trenches with growing accretionary prisms are shallower than 8000 m"; "The relative depth is affected by the age of the lithosphere at the trench, the convergence rate, and the dip of the subducted slab at intermediate depths"; "There are about 50,000 km of convergent plate margins in the world". Fig. 7 (after Grellet & Dubois 1982), read by eye, not numbers: the trench from about 5 km near age 0 to about 11 km at about 140 Ma, the normal floor from about 3 to about 6 km, so 2 to 5 km of relief with age. The sub-agent's counts on Table 1: 4 trenches deeper than 10 km, 15 than 8 km, 19 than 6 km; the maxima's median 8,246 m.
+
+## The trench rows (ISO-096, ISO-097), added 2026-10-23
+
+Also read for these rows: Turcotte & Schubert (TurcotteSchubert_Geodynamics) and Stern's chapter (Stern_OceanTrenches, the same chapter as Stern2021 above, from another copy), with what was read on 2026-10-23 under each.
+
+### LevittSandwell1995
+- Reference: Levitt, D. A., Sandwell, D. T. (1995). Lithospheric bending at subduction zones based on depth soundings and satellite gravity. Journal of Geophysical Research 100(B1):379-400.
+- DOI or URL: 10.1029/94JB02468; author copy https://topex.ucsd.edu/sandwell/publications/60.pdf
+- Cited as: "Levitt & Sandwell 1995" (the restoring force under a water-filled trench; trench profiles fitted to the bathymetry)
+- Ledger ids: ISO-096
+- Access: author copy (open).
+- Library (the project's source library, not distributed): not filed.
+- Read so far (by the project): full text (author copy), by a Sonnet sub-agent of the trench-row agent, 2026-10-23: "the thin plate is acted upon by a restoring force g(rho_m - rho_w)w, where w is the plate deflection ... rho_m and rho_w are mantle and water density"; the trench profiles are fitted to the depth soundings directly.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: journal, volume and first page as the sub-agent read them; the title, the issue and the last page are from memory, not checked.
+
+### ZhangLinZhan2014
+- Reference: Zhang, F., Lin, J., Zhan, W. (2014). Variations in oceanic plate bending along the Mariana trench. Earth and Planetary Science Letters 401:206-214.
+- DOI or URL: 10.1016/j.epsl.2014.05.032; open copy https://www.whoi.edu/fileserver.do?id=188564&pt=2&p=68128
+- Cited as: "Zhang, Lin & Zhan 2014" (the Mariana's trench relief; the Challenger Deep's depth)
+- Ledger ids: ISO-096, ISO-097
+- Access: open copy (WHOI).
+- Library (the project's source library, not distributed): not filed.
+- Read so far (by the project): full text, by a Sonnet sub-agent of the trench-row agent, 2026-10-23: "the trench relief varies from 0.9 to 5.7 km" along the Mariana; "the Challenger Deep, with trench depth of about 10.9 km and trench relief of 5.7 km" (the far-field floor there, about 5.2 km, is the agent's subtraction); relief is "calculated from subtracting the trench-axis depth from a far-field reference depth"; eq. 1, "(rho_m - rho_w) g w represents hydrostatic restoring force".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: journal, volume and first page as the sub-agent read them; the title, the DOI and the last page are from memory, not checked.
+
+### ZhangTrench2018
+- Reference: Zhang, F., Lin, J., Zhou, Z., Yang, H., Zhan, W. (2018). Intra- and intertrench variations in flexural bending of the Manila, Mariana and global trenches: implications on plate weakening in controlling trench dynamics. Geophysical Journal International 212(2):1429-1449 (authors, title and last page from memory; the volume and first page from the URL). Not the same work as Zhang2018 (supercontinent breakup).
+- DOI or URL: https://academic.oup.com/gji/article/212/2/1429/4604782
+- Cited as: "Zhang et al. 2018 (GJI 212:1429)" (the world's section-averaged trench relief)
+- Ledger ids: ISO-097
+- Access: open (OUP).
+- Library (the project's source library, not distributed): not filed.
+- Read so far (by the project): full text, by a Sonnet sub-agent of the trench-row agent, 2026-10-23: trench relief W0 is "trench axis depth relative to a far-field reference seafloor depth"; the global "section-averaged W0 is in the range of 0.9-4.7 km" (Manila 0.4 to 2.1 km, southern Mariana 1.7 to 5.7 km).
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: the authors and the title are from memory, not checked; journal, volume and first page from the URL.

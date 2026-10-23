@@ -23,7 +23,11 @@
 //!   and the crust the plateau spreading moved (`spread.rs`): for these the Airy root `a` is
 //!   already in the elevation, and the spreading's stays there (it bends nothing, ISO-070). The
 //!   rest of the plate model's uplift moved a height alone (its settling to the Airy height plus
-//!   this flexure, its height rules, its rate limit's hold) and is no load (ISO-091);
+//!   this flexure, its height rules, its rate limit's hold) and is no load (ISO-091). On ocean
+//!   floor that builds nothing all of it is (its cooling, the pull to a trench and the release
+//!   from it), and so is what the carry made of a gap's floor; the sea a height moved alone lets
+//!   in or pushes out is no load either: the plate model's heights are heights under the sea, with
+//!   the water's weight in them (ISO-096);
 //! - the step's erosion and deposition, the rock other stages laid on the surface since the last
 //!   step (the volcano stage's cones), the sea over the cell against the sea at the reference,
 //!   and land ice: for these nothing has been applied;
@@ -332,26 +336,46 @@ struct Booked {
     rest_water: f64,
 }
 
-// ledger: ISO-061, ISO-091
-/// The plate model's uplift at cell `c` this step: where the crust builds (continental crust, an
-/// arc or a hotspot; not new at the place), the crust it gained or lost is a thickening or a
-/// thinning ([`crust_thickening`] of `plates/crust_uplift_mm_yr`), and the rest of the uplift moves
-/// the ground with no load. Subsidence and uplift that move no crust (the ocean floor cooling, a
-/// sample pulled to trench depth, a column settling to its height) are no load. Until 2026-10-22
-/// every rise of a building column was taken as thickening, 1 / (1 − k) = 7 times it, whose root
-/// a stiff plate held up: the plate model's settling (ISO-078) moved a column back to its Airy
-/// height plus this flexure, the flexure took the move as new crust with a root it held, and the
-/// two raised each other without bound (`docs/science/flexure.md`, "The settling's feedback").
-fn booked(x: &StepIn<'_>, c: usize, fresh: bool) -> Booked {
-    let reg = x.regime[c] as u8;
-    let builds = x.crust_type[c] as u8 != OCEANIC || reg == regime::ARC || reg == regime::HOTSPOT;
-    if fresh || !builds {
+// ledger: ISO-061, ISO-091, ISO-096
+/// The plate model's move of the ground at cell `c` this step, as the carry made it: the step's
+/// start less the surface's elevation at the crust's source before the step (`from`,
+/// [`FlexState::from_m`]; the plate model's uplift where that is unknown). Where the crust builds
+/// (continental crust, an arc or a hotspot; not new at the place), the crust it gained or lost is
+/// a thickening or a thinning ([`crust_thickening`] of `plates/crust_uplift_mm_yr`), and the rest
+/// of the move is a height moved alone, no load. On ocean floor that builds nothing the whole move
+/// is a height moved alone: its cooling (GDH1), the pull to a trench and the release from it, the
+/// carry onto the trench's bent plate (ISO-097), a gap's floor deepening and the plate that covers
+/// it. The sea such a move lets in or pushes out is no load either (`rest_water`): the plate
+/// model's height of the ocean floor is its depth under the sea, the water's weight in it (GDH1's
+/// fit; Cortial's trench depth; Turcotte & Schubert §3.13: the water fills the room the bending
+/// makes, and the plate's restoring force is (ρ_m − ρ_w) g w). Until 2026-10-23 only GDH1's
+/// cooling left its sea out: a trench row's pull of 2.4 km in a step sank it by up to
+/// ρ_w/(ρ_m − ρ_w) = 0.45 of that more, and a gap's floor that a plate 6 km deeper covered sank
+/// 2.4 km more; the plate model took little of either back (its feedback reads sample means) and
+/// the deep floor stood 11 to 16 km down (`docs/science/flexure.md`, "The trench rows"). Until
+/// 2026-10-22 every rise of a building column was taken as thickening, 1 / (1 − k) = 7 times it,
+/// whose root a stiff plate held up: the plate model's settling (ISO-078) moved a column back to
+/// its Airy height plus this flexure, the flexure took the move as new crust with a root it held,
+/// and the two raised each other without bound (`docs/science/flexure.md`, "The settling's
+/// feedback").
+fn booked(x: &StepIn<'_>, c: usize, fresh: bool, from: f64) -> Booked {
+    if fresh {
         return Booked::default();
     }
+    let reg = x.regime[c] as u8;
+    let builds = x.crust_type[c] as u8 != OCEANIC || reg == regime::ARC || reg == regime::HOTSPOT;
     let lift = x.dt_myr * 1.0e3; // mm/yr over the step, in m
     let sea = x.sea_level_m;
-    let u = f64::from(x.uplift_mm_yr[c]) * lift;
-    let uc = f64::from(x.crust_uplift_mm_yr[c]) * lift;
+    let u = if from.is_finite() {
+        x.h_start[c] - from
+    } else {
+        f64::from(x.uplift_mm_yr[c]) * lift
+    };
+    let uc = if builds {
+        f64::from(x.crust_uplift_mm_yr[c]) * lift
+    } else {
+        0.0
+    };
     let z0 = x.h_start[c] - u;
     let (load, root, e) = crust_thickening(uc, z0, sea);
     Booked {
@@ -365,12 +389,13 @@ fn booked(x: &StepIn<'_>, c: usize, fresh: bool) -> Booked {
 /// The rise of the surface below the sea (m, negative for a fall) that the plate model's crust
 /// and the plateau spreading brought at cell `c` this step, `h_now` the elevation after the
 /// spreading: the sea water they pushed aside, which the step's change of sea water counts.
+/// `from` as for [`booked`].
 /// Measurement only: the gap budget books it with the roots, whose compensation under the sea it
 /// is ([`StepOut::roots_m`], [`local_answers`]).
-fn built_under_sea(x: &StepIn<'_>, c: usize, fresh: bool, h_now: f64) -> f64 {
+fn built_under_sea(x: &StepIn<'_>, c: usize, fresh: bool, from: f64, h_now: f64) -> f64 {
     let sea = x.sea_level_m;
     // As in `step`: crust the plate model thickened or thinned, and crust the spreading moved.
-    let lifted = booked(x, c, fresh).crust_water;
+    let lifted = booked(x, c, fresh, from).crust_water;
     let ds = h_now - x.h_before_spread[c];
     lifted
         + if ds != 0.0 {
@@ -404,6 +429,12 @@ pub struct FlexState {
     pub seen_elevation_m: Vec<f32>,
     /// Plate steps since the last solve.
     pub since_solve: u32,
+    /// The surface's elevation before the step at the crust's source, m (the carry's corners,
+    /// [`FlexState::carry`]); NaN where the crust is new at the place. The step's start less this
+    /// is the plate model's move of the ground as the carry made it ([`booked`]). Set by the
+    /// carry and taken by the next step.
+    #[serde(skip)]
+    pub from_m: Vec<f32>,
 }
 
 impl FlexState {
@@ -417,6 +448,7 @@ impl FlexState {
             unsolved_m: vec![0.0; n],
             seen_elevation_m: Vec::new(),
             since_solve: 0,
+            from_m: Vec::new(),
         }
     }
 
@@ -473,6 +505,7 @@ impl FlexState {
                 &ln_rigidity,
                 &self.ice_m,
                 &self.unsolved_m,
+                elevation_m,
             ],
         );
         self.water_m
@@ -482,11 +515,11 @@ impl FlexState {
             .zip(self.rigidity.par_iter_mut())
             .zip(self.ice_m.par_iter_mut())
             .zip(self.unsolved_m.par_iter_mut())
-            .zip(moved.into_par_iter())
+            .zip(moved.par_iter())
             .for_each(|((((((w, l), s), r), i), u), m)| {
-                let [water, load, sunk, ln_d, ice, unsolved] = m
+                let [water, load, sunk, ln_d, ice, unsolved, _] = m
                     .filter(|m| m[..3].iter().chain(&m[4..]).all(|y| y.is_finite()))
-                    .unwrap_or([f32::NAN, 0.0, 0.0, f32::NAN, 0.0, 0.0]);
+                    .unwrap_or([f32::NAN, 0.0, 0.0, f32::NAN, 0.0, 0.0, f32::NAN]);
                 *w = water;
                 *l = load;
                 *s = sunk;
@@ -494,6 +527,14 @@ impl FlexState {
                 *i = ice;
                 *u = unsolved;
             });
+        // ledger: ISO-096
+        self.from_m = moved
+            .into_par_iter()
+            .map(|m| {
+                m.filter(|m| m[..3].iter().chain(&m[4..]).all(|y| y.is_finite()))
+                    .map_or(f32::NAN, |m| m[6])
+            })
+            .collect();
     }
 }
 
@@ -1244,34 +1285,12 @@ pub struct StepIn<'a> {
     /// [`StepOut::released_m`]). Measurement only (the gap budget,
     /// `plates::gap_budget`): the step's own solve and result do not change.
     pub parts: bool,
-    /// The share of GDH1's subsidence the plate model's ocean floor takes
-    /// (`plates::pools::gdh1_scale`) when it follows GDH1 (`tectonics.ocean_depth` = `gdh1`),
-    /// else None. GDH1 is the depth of floor under water, its water load in it: the sea that
-    /// fills the floor's cooling is no new load ([`cooled_under_sea`]).
-    pub gdh1_scale: Option<f64>,
 }
 
-/// The sea water, m, that the plate model's cooling of the ocean floor let over a cell this step
-/// under GDH1 ([`StepIn::gdh1_scale`]): the step's GDH1 sinking for the cell's age, as far as it
-/// lies under the sea. GDH1 is fitted to the depth of floor under water, so that water's load is
-/// in the law already, and the flexure leaves it out of the step's load (else old floor sank
-/// 1/(1 − ρ_w/ρ_m) of GDH1 under a strong plate; ledger: ISO-088). 0 on crust new at the place,
-/// on continental crust and without GDH1.
-fn cooled_under_sea(x: &StepIn<'_>, c: usize, fresh: bool) -> f64 {
-    let Some(s) = x.gdh1_scale else {
-        return 0.0;
-    };
-    if fresh || x.crust_type[c] as u8 != OCEANIC {
-        return 0.0;
-    }
-    let age = f64::from(x.crust_age_myr[c]);
-    if age.is_nan() || age < 0.0 {
-        return 0.0;
-    }
-    let sink = s
-        * (crate::plates::pools::gdh1_depth_m(age)
-            - crate::plates::pools::gdh1_depth_m(age - x.dt_myr));
-    (x.sea_level_m - x.h_start[c]).clamp(0.0, sink.max(0.0))
+/// The surface's elevation before the step at the crust's source at cell `c`
+/// ([`FlexState::from_m`]), NaN where it is not known (crust new at the place, no carry).
+fn carried_from(from_m: &[f32], c: usize) -> f64 {
+    from_m.get(c).map_or(f64::NAN, |&v| f64::from(v))
 }
 
 /// What a step did.
@@ -1338,10 +1357,12 @@ pub fn local_answers(
             let age = x.crust_age_myr[c];
             let fresh = st.is_none_or(|st| st.water_m[c].is_nan())
                 || (age >= 0.0 && f64::from(age) < x.dt_myr);
+            let from = st
+                .filter(|st| st.from_m.len() == n)
+                .map_or(f64::NAN, |st| carried_from(&st.from_m, c));
             let (water_ref, ice_prev) = match st {
                 Some(st) if !fresh => (
-                    f64::from(st.water_m[c]) + cooled_under_sea(x, c, fresh)
-                        - booked(x, c, fresh).rest_water,
+                    f64::from(st.water_m[c]) - booked(x, c, fresh, from).rest_water,
                     f64::from(st.ice_m[c]),
                 ),
                 _ => ((sea - x.h_start[c]).max(0.0), 0.0),
@@ -1354,7 +1375,7 @@ pub fn local_answers(
             // The water the plate model's thickened crust and the spreading pushed aside goes with
             // their roots ([`StepOut::roots_m`]).
             let other_water = (sea - h[c]).max(0.0) - water_ref - eroded_water
-                + built_under_sea(x, c, fresh, h[c]);
+                + built_under_sea(x, c, fresh, from, h[c]);
             let q_water = water_share * other_water + ice_share * (ice - ice_prev);
             let wet = if h[c] <= sea { 1.0 } else { 0.0 };
             let answer = -p.strength * RHO_MANTLE / (RHO_MANTLE - RHO_WATER * p.strength * wet);
@@ -1395,6 +1416,9 @@ pub fn step(
     if st.load_m.len() != n {
         *st = FlexState::fresh(n);
     }
+    // The carry's sources, for this step only ([`FlexState::from_m`]).
+    let from_m = std::mem::take(&mut st.from_m);
+    let from_m: &[f32] = if from_m.len() == n { &from_m } else { &[] };
     let water_share = RHO_WATER / RHO_MANTLE;
     let ice_share = RHO_ICE / RHO_MANTLE;
     let (rock_land, rock_sea) = rock_shares(x.rock_share);
@@ -1436,13 +1460,14 @@ pub fn step(
                     f64::from(st.ice_m[c]),
                 )
             };
-            // ledger: ISO-061, ISO-091
+            // ledger: ISO-061, ISO-091, ISO-096
             // Crust the plate model thickened or thinned: orogens, arcs, hotspot volcanism,
-            // rifts. The rest of its uplift moved a height alone, and the sea it let in or pushed
-            // out is no load either ([`booked`]).
-            let b = booked(x, c, fresh);
-            // The sea over the floor's GDH1 cooling is in GDH1 already: no load (ISO-088).
-            let water = water + cooled_under_sea(x, c, fresh) - b.rest_water;
+            // rifts. The rest of its move of the ground (all of it on ocean floor that builds
+            // nothing: its cooling, a trench's pull, a gap's floor) moved a height alone, and the
+            // sea it let in or pushed out is no load either ([`booked`]).
+            let from = carried_from(from_m, c);
+            let b = booked(x, c, fresh, from);
+            let water = water - b.rest_water;
             let mut load = prev + b.load;
             let mut root = b.root;
             let plate_root = b.root;
@@ -1467,7 +1492,7 @@ pub fn step(
                 // The sea water the roots' crust pushed aside goes with the roots (it is in `dq`
                 // as a change of water): under the sea their load less their root is then nil
                 // too, and only their bending is left.
-                root_load -= water_share * built_under_sea(x, c, fresh, h[c]);
+                root_load -= water_share * built_under_sea(x, c, fresh, from, h[c]);
             }
             let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
             Cell {
@@ -2120,7 +2145,6 @@ mod tests {
         regime: Vec<f32>,
         plate: Vec<f32>,
         ice: Vec<f32>,
-        gdh1: Option<f64>,
         /// The share of the uplift that is crust (1: all of it; 0: a height moved alone).
         crust_share: f64,
     }
@@ -2141,7 +2165,6 @@ mod tests {
                 regime: vec![f32::from(regime::CRATON); n],
                 plate: vec![0.0; n],
                 ice: vec![0.0; n],
-                gdh1: None,
                 crust_share: 1.0,
             }
         }
@@ -2212,7 +2235,6 @@ mod tests {
                     ice_m: Some(&self.ice),
                     rock_share: 0.8,
                     parts: true,
-                    gdh1_scale: self.gdh1,
                 },
                 &mut h,
             )
@@ -2312,12 +2334,13 @@ mod tests {
         assert!((wd.h[under] - bare[under]).abs() < 0.5, "rebound");
     }
 
-    /// Old ocean floor under the sea, sinking by GDH1's cooling (the plate model's uplift): GDH1
-    /// is the depth of floor under water, so the sea that fills the sinking is no new load, and
-    /// the floor sinks by GDH1 alone (ISO-088). Without GDH1 (the dampening) the same water is a
-    /// load, and the floor sinks by ρ_w/(ρ_m − ρ_w) of it more.
+    /// The plate model's moves of ocean floor that builds nothing are heights under the sea, the
+    /// water's weight in them (ISO-096): GDH1's cooling and a trench's pull (its uplift), and a
+    /// gap's floor that a plate 6.5 km deeper covers (the carry's move, [`FlexState::from_m`]),
+    /// sink the floor by themselves alone. Read as sea let in, the cover sank the floor
+    /// ρ_w/(ρ_m − ρ_w) of the move more. The sea rising over the floor is a load.
     #[test]
-    fn the_sea_over_gdh1_cooling_is_no_new_load() {
+    fn the_sea_over_the_ocean_floors_own_moves_is_no_load() {
         let p = FlexureParams {
             te_craton_km: 0.001,
             te_min_km: 0.001,
@@ -2326,25 +2349,54 @@ mod tests {
         };
         let (w, h) = (32usize, 16usize);
         let n = w * h;
-        let sink =
-            crate::plates::pools::gdh1_depth_m(60.0) - crate::plates::pools::gdh1_depth_m(58.0);
-        let run = |gdh1: Option<f64>| -> f64 {
-            let mut wd = World::new(w, h, -5000.0);
+        let probe = 8 * w + 16;
+        let ocean = |wd: &mut World, reg: u8| {
             wd.crust = vec![f32::from(OCEANIC); n];
             wd.age = vec![60.0; n];
-            wd.regime = vec![f32::from(regime::RIDGE); n];
-            wd.gdh1 = gdh1;
-            let (mut sv, mut st) = started(&mut wd, &p, 0.0);
-            let before = wd.h[8 * w + 16];
-            wd.uplift = vec![(-sink / 2.0e3) as f32; n];
-            wd.step(&p, &mut sv, &mut st, &vec![0.0; n], 0.0);
-            before - wd.h[8 * w + 16]
+            wd.regime = vec![f32::from(reg); n];
         };
-        let with = run(Some(1.0));
-        assert!((with - sink).abs() < 0.05, "{with} vs {sink}");
-        let without = run(None);
-        let loaded = sink * RHO_MANTLE / (RHO_MANTLE - RHO_WATER);
-        assert!((without - loaded).abs() < 0.1, "{without} vs {loaded}");
+        let sink =
+            crate::plates::pools::gdh1_depth_m(60.0) - crate::plates::pools::gdh1_depth_m(58.0);
+        for (reg, fall) in [(regime::OCEAN_BASIN, sink), (regime::TRENCH, 2400.0)] {
+            let mut wd = World::new(w, h, -5000.0);
+            ocean(&mut wd, reg);
+            let (mut sv, mut st) = started(&mut wd, &p, 0.0);
+            let before = wd.h[probe];
+            wd.uplift = vec![(-fall / 2.0e3) as f32; n];
+            wd.step(&p, &mut sv, &mut st, &vec![0.0; n], 0.0);
+            let sank = before - wd.h[probe];
+            assert!((sank - fall).abs() < 0.05, "regime {reg}: {sank} vs {fall}");
+        }
+        let cover = |carried: bool| -> f64 {
+            let mut wd = World::new(w, h, -3500.0);
+            ocean(&mut wd, regime::BACK_ARC);
+            let (mut sv, mut st) = started(&mut wd, &p, 0.0);
+            if carried {
+                st.as_mut().unwrap().from_m = wd.h.iter().map(|&z| z as f32).collect();
+            }
+            wd.h = vec![-10_000.0; n];
+            wd.step(&p, &mut sv, &mut st, &vec![0.0; n], 0.0);
+            -10_000.0 - wd.h[probe]
+        };
+        let moved = cover(true);
+        assert!(
+            moved.abs() < 0.05,
+            "the cover sank the floor {moved} m more"
+        );
+        let read = cover(false);
+        let loaded = 6500.0 * RHO_WATER / (RHO_MANTLE - RHO_WATER);
+        assert!((read - loaded).abs() < 1.0, "{read} vs {loaded}");
+        let mut wd = World::new(w, h, -5000.0);
+        ocean(&mut wd, regime::OCEAN_BASIN);
+        let (mut sv, mut st) = started(&mut wd, &p, 0.0);
+        let before = wd.h[probe];
+        wd.step(&p, &mut sv, &mut st, &vec![0.0; n], 100.0);
+        let sank = before - wd.h[probe];
+        let want = 100.0 * RHO_WATER / (RHO_MANTLE - RHO_WATER);
+        assert!(
+            (sank - want).abs() < 0.05,
+            "the sea's rise: {sank} vs {want}"
+        );
     }
 
     /// A collision as the plate model builds it (`plates/belts.rs`, tasks 3 and 4): a belt on the
@@ -2859,6 +2911,8 @@ mod tests {
                 gap: None,
                 prev_gap: None,
                 prev_offset: None,
+                flags: None,
+                regime: None,
                 parents: &parents,
                 known_plates: 3,
                 dt_yr: dt_myr * 1.0e6,
@@ -2905,7 +2959,6 @@ mod tests {
                     ice_m: None,
                     rock_share: 0.8,
                     parts: false,
-                    gdh1_scale: None,
                 },
                 &mut hh,
             )
@@ -3036,6 +3089,8 @@ mod tests {
                 gap: None,
                 prev_gap: None,
                 prev_offset: None,
+                flags: None,
+                regime: None,
                 parents: &parents,
                 known_plates: 1,
                 dt_yr: 2.0e6,
