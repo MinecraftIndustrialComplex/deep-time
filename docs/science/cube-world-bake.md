@@ -124,9 +124,8 @@ the numbers gathered by `build/cube1/numbers.py`):
 - `earthlike_quick_16k` seeds 2 to 13, the same story, as cubes, for the turn.
 
 The four kept worlds are in the shared pool (`/data/ban/deeptime-runs/cube1/b2/`, listed in
-`/data/ban/deeptime-runs/pool/BASES.md`). The B1 control columns and the bodies' areas under
-SCL-130 come from a second bake of the two cubes on the merged branch
-(`build/cube1/cube_bakes.sh b3 build,p4kc,q16c`).
+`/data/ban/deeptime-runs/pool/BASES.md`). The B1 control columns and the bodies' areas come from
+a later bake of the two cubes on the merged branch (`build/cube1/cube_bakes.sh b5 build,p4kc,q16c`).
 
 **Seams (B1).** The 99th percentile of the elevation step between neighbouring L3 cells, in
 blocks: inside a face, on the first step inside a face edge, across each kind of seam, and the
@@ -186,11 +185,27 @@ land at most twice its area) hold on 8 of the 13 16k planets; the land within 5�
 most 0.34 % of the land (seed 6). The best turn about the polar axis (the plan's first B3) reached
 only −2.93° to 2.17° on the same planets: on most of them it leaves a corner on land.
 
-**Bodies, structures, spawn (B4, SCL-130).** On the 16k cube 7,448 bodies: 7,045 mid-face, 393
-within 64 blocks of a face edge, 10 within 5° of a corner. Their planet area against their source's
-(median) under SCL-091: 1.0007, 1.0041 and 1.058; under SCL-130: MEASURE-B4E. On the 4k cube 286
-bodies, by a corner 1.007 under SCL-091. Structure windows that cross a turning seam: 303 of 18,450
-(16k) and 107 of 532 (4k), all kept. Eight spawn candidates on each.
+**Bodies, structures, spawn (B4, SCL-130).** A body's planet area as drawn, against its source's:
+the map's local scale squared averaged over 12 directions on 4 rings of the ellipse, times the
+ellipse's area. The medians, under SCL-130 and (beside) under SCL-091 for the same bodies:
+
+| world | mid-face | within 64 blocks of a face edge | within 5° of a corner | largest change |
+|---|---|---|---|---|
+| 16k seed 1 (7,045, 393 and 10 bodies) | 0.99999 (1.0007) | 0.99999 (1.0041) | 1.0007 (1.058) | 0.0043 (16.2) |
+| 4k seed 11 (241, 43 and 0 bodies) | 0.99997 (1.00002) | 0.99996 (0.99999) | none | 0.098 (99.3) |
+
+The largest change is that of the one body furthest from 1, as a fraction: SCL-091 draws some
+bodies where the map shears 17 and 100 times their planet area. Two more 4k bodies hold the image
+of a corner (an aureole 61.8 by 101.5 blocks and a pluton 57.2 by 88.1, both centred 38 blocks
+from corner s0): they read 1.38 and 1.31 (SCL-091 1.39 and 1.32). Round a corner the world has
+three quarters of a turn, so an ellipse over it covers a full turn of the net and the quarter in
+the void folds back onto ground it already covers: about 4/3 for any one ellipse. The record lists
+such bodies apart (`over_a_corner`) and leaves them out of the medians; phase 2's per-face images
+are theirs. MEASURE-B5V. The first record (b2) read the scale at the body's centre alone, which
+misses that fold: it gave the two 1.007.
+
+Structure windows that cross a turning seam: 303 of 18,450 (16k) and 107 of 532 (4k), all kept.
+Eight spawn candidates on each.
 
 **Rivers (B5, SCL-126).** 16k: 4,015 chains; 12 cut on turning seams, each with its partner; none
 cut on the direct seams or the slide, which 62 chains cross whole; the planet length changes by
@@ -235,8 +250,11 @@ jag on 529,535 and 505,100 L3 cells, cliff bands on 145,204 and 128,578, mean ch
 1.01 blocks. 4k: 3 and 3 cones gullied, 8 gullies each.
 
 **Coexistence.** With `scale.projection` unset the bake writes the Petroff-Guyou world of format
-0.6 exactly as master does: `tools/review/projection-identity.sh` gives the same hashes for every
-bake and staged world (MEASURE-IDENTITY). The game (Java) still refuses a cube world.
+0.6 exactly as master does: `tools/review/projection-identity.sh` on master (8485aaf6) and on the
+branch gives the same hashes for all 385 files of every bake and staged world but two of the
+viewer's: `report.js` differs between two runs of one binary, and `bundle.js` holds its build time
+and the preset's folder in its title. No field was added to a Petroff-Guyou world's notes. The game
+(Java) still refuses a cube world.
 
 ## Simplifications and limits
 
@@ -252,7 +270,9 @@ bake and staged world (MEASURE-IDENTITY). The game (Java) still refuses a cube w
   shows the simulation's resolution, as on every other world. Phase 4 moves the simulation onto
   Moser's equal-area cube.
 - **Per-face body images.** A deposit or intrusion body that crosses a turning seam keeps one
-  shape, its centre's; the plan's per-face images are phase 2's (the game side reads them).
+  shape, its centre's; the part past the seam lies in the net's void and the game would fold it
+  onto the partner face. A body over a corner draws about 4/3 of its planet area (see B4). The
+  plan's per-face images are phase 2's (the game side reads them).
 - **The simulation's own artefacts show through.** Near the Lambert simulation's poles its fans of
   stretched cells and its stretched impact ellipses appear on the cube as on Petroff-Guyou: the
   bake shows what the simulation made. Phase 4 moves the simulation off that grid.
