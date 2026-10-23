@@ -1,0 +1,29 @@
+{
+  "_doc": "The pool's measures registry. A measure is a command that reads one run folder and prints a JSON object of numbers; the pool caches it as <run>/measures/<name>.json and tabulates it. {run} is the run folder, {tools} this folder, {py} the Python with numpy and scipy (a nix environment the pool builds once). A measure's `version` is part of its cache: raise it when the definition changes and `pool measure` recomputes over the cached folders without a sim. `dump_fields` are the fields of the final checkpoint every run keeps (the checkpoint itself is deleted); a measure that needs another field needs `--keep-ck` runs. `columns` give the table: a `key` of the printed object, a label, the target (lo, hi; null is open) and digits; `pair` shows `median / median` of two keys; `criteria` lists the keys whose targets count toward the `special: criteria` column (`criteria met per run`). A second registry file (--registry FILE or DEEPTIME_POOL_MEASURES) adds or replaces entries by name.",
+  "dump_fields": [
+    "elevation", "surface/elevation_m", "plates/elevation_m", "plates/thickness_m", "plates/crust_type",
+    "plates/orogeny_type", "plates/orogeny_age_myr", "climate/ice_thickness_m", "climate/ela_m",
+    "climate/t_warm_c", "climate/t_mean_c", "climate/koppen", "regime"
+  ],
+  "measures": {
+    "v1census": {
+      "version": 1,
+      "doc": "V1 item 1's seven measures on the final frame (decisions log 2026-10-21) plus the crust's net change and the sea over the datum; definitions in measure_v1census.py",
+      "command": ["{py}", "-I", "{tools}/measure_v1census.py", "{run}"],
+      "needs": ["fields", "plate", "rec"],
+      "columns": [
+        {"key": "land", "label": "land", "target": [0.26, 0.32], "digits": 3},
+        {"key": "largest", "label": "largest landmass", "target": [0.12, null], "digits": 3},
+        {"key": "under_sea", "label": "continental crust under the sea", "target": [null, 0.25], "digits": 3},
+        {"key": "above_2km", "label": "land above 2 km", "target": [null, 0.12], "digits": 3},
+        {"key": "coast_hi", "label": "coast with high ground", "target": [null, 0.15], "digits": 3},
+        {"key": "under_ice", "label": "land under ice", "target": [null, 0.15], "digits": 3},
+        {"key": "collisions", "label": "collisions per 100 Myr", "target": [2, 6], "digits": 2},
+        {"key": "crust_net", "label": "continental crust's net change over the run", "target": null, "digits": 3, "signed": true},
+        {"special": "criteria", "label": "criteria met per run: median, mean"},
+        {"key": "sea_after100_m", "key2": "sea_end_m", "label": "sea over the datum, median after 100 Myr / end, m", "target": null, "digits": 0, "pair": true}
+      ],
+      "criteria": ["land", "largest", "under_sea", "above_2km", "coast_hi", "under_ice", "collisions"]
+    }
+  }
+}
