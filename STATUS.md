@@ -140,6 +140,39 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-23: Coordinator, overnight while Ben sleeps: 3fc91491 in both Prism instances; the memory estimates, the sheet and trench budget by default, and the two flexure follow-ups merged; the pool's base moved; the gate red on two GameTests; four lanes started (coordinator, session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Deploy of 3fc91491** (gated: gate batch on that head green in full, 100 GameTests in every profile).
+  - `install.sh mic --preset earthlike_quick_16k --start supercontinent --length-myr 1000`, `install.sh mic-lite` and `:devmap:assemble` on the VM. Deep Time jar 2b3ec1e023b4..., dev map 16520e2ba301....
+  - Stages `play-client-stage.sh --hash 3fc91491 --extra-mod <dev map>`: client 182 mods, server 158, both 153, client only 29 (Bathymetry and MossyLib now among them), server only 5.
+  - `--hash 3fc91491 --set lite`: client 31, server 25, both 25; Bathymetry in.
+  - Applied with `play-client-apply.py`, dry run first. "MIC Deep Time Test" changed only the two Deep Time jars (182 jars). "MIC Deep Time Lite" changed the two jars (the dev map put back by `--extra-mod`) and `kubejs/data/deeptime/tags/block/rock_fallback/hornfels.json` (32 jars).
+  - Prism's launcher window was open (since 18:53 the day before), but no game ran from either instance.
+  - The apply's own check refused once on a false alarm: it greps `ps` for a line holding both "java" and the instance's name, and the coordinator's shell command held both words. Run the apply from a command line without the word "java".
+  - The lite instance's Distant Horizons `pauseIfMovingQuickly` and `limitIfServerUnhealthy` read true, last written by the game at 19:24 the day before (Ben's own session). Left alone.
+- **Merged:**
+  - 71f2362d: the honest memory estimates.
+  - 57558f0a: the sheet and the trench budget as defaults.
+  - 56643099: the trench rows (ISO-096, ISO-097).
+  - bf8477b2: the release's pace, ISO-099, off by default. Its flexure.md and ledger/ISO.md conflicts were both sides' appended rows: both kept, the ISO header recounted from its rows (80 active, 8 merged).
+  - The flexure lane's four open points went to lanes: the polar peaks (a plates lane, below); the continental heat flow under 55 mW/m² with ISO-099 on (folded into gap 4); the open-sea mask for the flexure (`h <= sea` calls closed dry ground below sea level wet; its own task, not started); the trench cells' remaining -6 to -8 km offset (later).
+- **The pool's base.**
+  - From 57558f0a, the arm `base` pointed at key eb4ef634e607, argkey 86d11d8b: the 24 trench-m-rs12e-sheet runs, which the new default equals bit for bit. That cost no runs, and the key is in pool/KEEP.
+  - The trench-row fix in 56643099 changes the default world, so `base` is re-run fresh on bf8477b2: 24 runs, seeds 1-12 x both starts, 1000 Myr, +DEEPTIME_CRUST_BUDGET=1.
+  - Both moves are logged in the VM's BASES.md.
+  - V1 item 1 on the 57558f0a base (medians): land 0.306, largest 0.189, under the sea 0.238, above 2 km 0.161 (target at most 0.12), high coast 0.344 (at most 0.15), ice 0.123, collisions 1.95 (2 to 6). Criteria met per run: 3, mean 3.42.
+- **Gate on 57558f0a: red.** cargo (fmt, clippy, test), deny, Gradle (492 tests) and the JS checks passed. Two GameTests failed:
+  - `iceCoverLaidOnGlaciatedGround` in all five profiles: 22 covered columns of Köppen class 31, which is "sea".
+  - `lakeIceAndSaltFollowTheClimate` with -PwithMic only: mangrove roots on a salt-lake column in a mangrove swamp.
+
+  3fc91491 passed both, so the new defaults changed the 4k test planet. A fix lane is running and may run GameTests itself. The deploy of the new defaults waits for it.
+- **VM:** `mac-gc.sh` deleted 11 merged worktree copies (about 55 GB); /data went from 81 % to 70 %.
+- **Lanes started from bf8477b2 (Opus):**
+  - V1 gap 4, the lithosphere's thermal and mechanical state (Ben's order of 2026-10-22, after gaps 1 and 3), with the heat-flow fault and the craton thinning; brief build/coord/briefs/gap4-thermal.md.
+  - The polar peaks: plate columns 15.5 to 29.4 km at the uplift ceiling; brief polar-peaks.md.
+  - Rivers and deltas, gap 5 (Ben's answer of 2026-10-22, format change approved); brief deltas.md.
+  - The red gate; brief gate-ice-salt.md.
+- **Next:** merge the gate fix, gate, then deploy the new default to both Prism instances. Read the lanes against the bf8477b2 base when its 24 runs land.
+
 ### 2026-10-23: The trench rows: the guard's floors 4 to 11 km past the Challenger Deep were depth the plate model's heights already hold, counted a second time by two surface rules; the flexure now books the plate model's moves of the ground as no load (ISO-096), and a trench cell takes the plate model's height plus its carried offset (ISO-097) (coordinator's follow-up to the surface guard; agent worktree .claude/worktrees/agent-af6976f50d4669c4c, branch worktree-agent-af6976f50d4669c4c, master 3fc91491 merged in at 1ae9d358; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Cause** (a scratch trace of the base's scattered continents seed 1, not kept). It had 179 steps with a cell more than 11 km down, of two kinds:
   - 163 steps were ocean floor at the plate model's `z_t` with the flexure's water 2.6 km under it. One example: a gap's floor (3.5 km) that a plate then covered at 10.5 km, its 7 km of new sea loaded as a new load.
