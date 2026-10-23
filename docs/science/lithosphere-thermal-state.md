@@ -430,14 +430,20 @@ coasts are"):
   drowned crust 0.246 (inside its band at the median), coast_hi 0.303. The rifted margins' high
   coasts nearly go: their rate falls from 0.093 (g4-str) to 0.049 and their share from 0.087 to
   0.050, and what high ground they keep is more often Himalayan (0.286 against 0.104): an old suture
-  rifted again. Collisions fall to 1.35 (p 0.21), further under the band's floor of 2. This arm
-  earned the final (below).
+  rifted again. Collisions fall to 1.35 (p 0.21), further under the band's floor of 2.
 - **Stage 3 with the strength** (g4-root-str) has the lowest coast_hi (0.289) and lowers the
   collision belts' rate (0.616 to 0.590 against g4-str), but a belt that loses its root is hot and,
   with the strength, as weak as a fresh orogen: it spreads, and crust thins under the sea. The
   largest landmass falls to 0.121 (the band's floor is 0.12), the drowned crust rises to 0.282 and
-  the sea stands highest of the arms (598 / 917 m). Its mean, 3.25, is under the strength alone's;
-  it did not earn a final.
+  the sea stands highest of the arms (598 / 917 m). Its mean, 3.25, is under the strength alone's.
+
+**No final ran.** The coordinator's rule (2026-10-23, after Ben asked lanes to test more
+efficiently): a 24-run final only for an 8-run arm whose criteria mean is at least 0.5 above the
+base's, since the base's per-run spread (sd 0.92) needs a gain of about 0.52 for 24 runs against
+24 to reach p < 0.05. The best arm, g4-beta-str, read 3.50 against 3.33 (p 0.53), and its
+collisions moved further from their band. Its final was started and stopped before any of its
+16 new runs began; the 8 runs above stay in the pool. Both stages stay off by default, as stage 1
+does: off is the base bit for bit, and neither meets the ship rule on this evidence.
 
 ## Simplifications and limits
 
