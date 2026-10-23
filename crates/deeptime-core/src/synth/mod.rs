@@ -18,7 +18,7 @@ use deeptime_format::{
 };
 use serde_json::{Value, json};
 
-use terrain::{LakeTest, RiverTest, Terrain, WrapTest};
+use terrain::{DeltaTest, LakeTest, RiverTest, Terrain, WrapTest};
 
 /// Blocks per cell of each grid in the synthetic worlds (the "16k quick" ladder of plan §5.2 at
 /// every size: L3 r 2, L2 r 4 — the climate layers' vanilla quart grid — and L1 r 16).
@@ -183,6 +183,9 @@ pub enum Kind {
     LakeTest,
     /// A big river into the sea and a flush stream, with their network (`terrain::RiverTest`).
     RiverTest,
+    /// A delta plain at the sea's level with a river and two distributaries leaving it
+    /// (`terrain::DeltaTest`).
+    DeltaTest,
     /// A synthetic deposit world's terrain (P1-15): the deposit history's present elevation
     /// (`crate::deposits::synthetic::HistoryTerrain`). Needs the history, so it is baked through
     /// [`build_with`] only and is not in [`Kind::ALL`].
@@ -194,19 +197,25 @@ pub enum Kind {
 
 impl Kind {
     /// The kinds [`build`] makes from a name alone.
-    pub const ALL: [Kind; 3] = [Kind::WrapTest, Kind::LakeTest, Kind::RiverTest];
+    pub const ALL: [Kind; 4] = [
+        Kind::WrapTest,
+        Kind::LakeTest,
+        Kind::RiverTest,
+        Kind::DeltaTest,
+    ];
 
     pub fn name(self) -> &'static str {
         match self {
             Kind::WrapTest => "wrap-test",
             Kind::LakeTest => "lake-test",
             Kind::RiverTest => "river-test",
+            Kind::DeltaTest => "delta-test",
             Kind::DepositHistory => "deposit-history",
             Kind::Cube => "cube",
         }
     }
 
-    /// The kind called `name` (`wrap-test`, `lake-test`, `river-test`).
+    /// The kind called `name` (`wrap-test`, `lake-test`, `river-test`, `delta-test`).
     pub fn from_name(name: &str) -> Option<Kind> {
         Kind::ALL.into_iter().find(|k| k.name() == name)
     }
@@ -249,6 +258,7 @@ pub fn build(kind: Kind, strata: Strata, c: u32, codec: Codec) -> Result<SynthWo
         Kind::WrapTest => Box::new(WrapTest::new(c)),
         Kind::LakeTest => Box::new(LakeTest { c }),
         Kind::RiverTest => Box::new(RiverTest { c }),
+        Kind::DeltaTest => Box::new(DeltaTest { c }),
         Kind::DepositHistory => {
             return Err(FormatError::Invalid(
                 "deposit-history needs its history: bake it with build_with".into(),
@@ -440,6 +450,18 @@ impl SynthWorld {
                 crc32,
             });
             manifest.notes.insert("river".into(), RiverTest::notes());
+        }
+        if self.kind == Kind::DeltaTest {
+            let rivers = DeltaTest { c }.rivers();
+            let (bytes, crc32) = write_rivers(out, &rivers)?;
+            total += bytes;
+            manifest.files.retain(|f| f.path != RIVERS_PATH);
+            manifest.files.push(FileEntry {
+                path: RIVERS_PATH.to_owned(),
+                bytes,
+                crc32,
+            });
+            manifest.notes.insert("delta".into(), DeltaTest::notes());
         }
         Ok(total)
     }
