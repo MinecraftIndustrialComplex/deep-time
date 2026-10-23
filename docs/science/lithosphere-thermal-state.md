@@ -96,6 +96,47 @@ A resampling copies both numbers from the nearest corner of the sample's kind (`
 This reuses the release pace's state rather than adding a clock: McKenzie's τ is the same law, and
 the flexure's held Te (ISO-099) keeps working on top of the new target.
 
+### The two faults folded in
+
+**Heat flow with the release pace on.** At release commit 1bdacb76, with
+`surface.flexure.te_weakening_myr=62.8`, `bake::tests::a_planet_run_bakes_every_chunk_time_layer`
+(seed 5, 100 Myr) baked a continental cell at (159, 11) with 33.7 mW/m², under the old proxy's
+55 floor: that is the heat flow of 229 Myr sea floor. On master bf8477b2 that planet no longer
+shows it, so a scan of the same test planet with the release pace on (seeds 1 to 12 at 60 and at
+100 Myr, no final pass) looked for it again: seed 1 at 60 Myr bakes four continental cells under
+the floor, the lowest 33.5 at (150, 60); the 23 other planets are clean. The cause is the order of
+two steps. The plate step sets every sample's heat flow, then resamples, and only then does the rate
+guard spread crust onto old floor next to it (`collapse::spread`, PLT-331), making those samples
+continental with the sea floor's value still on them; the release pace changes which steps spread,
+so it shows the fault, it does not make it. The fix is the final pass (PLT-469,
+`tectonics.heat_flow_refresh`, and always on with the state): after the resampling and the spread,
+every continental sample gets at least its law's conductive value (the proxy's
+55 + 35 e^(−t/60), at least 55 mW/m²; with the state, q_c + B / L). The same planet with the pass bakes no cell under 55 (the scan's
+rerun), and `the_release_pace_bakes_continental_heat_flow_with_the_final_pass` bakes it with the
+release pace on and holds every continental cell to at least 54.9;
+`the_thermal_state_bakes_its_own_heat_flow` bakes it with the state on and holds them to the
+state's floor, an old craton's 41.
+
+**The savanna pit's craton** (build log 2026-10-23, savanna pit part B: Ben's seed, L1 cell
+(396, 231)). An Andean arc's subduction zone reached a craton at step 498: its regime went from
+craton to back-arc, the arc's orogeny restarted its continental clock, the flexure's Te went from
+80 to 5 km in one step and let go of its held load, and its crust went from 38.6 to 27.6 km in
+40 Myr. What the state does to each part:
+
+- *Te and the sheet's strength* (`thermal_strength`). A keeled craton behind a trench heats only
+  to its keel: after 40 Myr its lithosphere is 200.5 km deep, a thermal age of 388 Myr. The flexure
+  reads Te = 80 (1 − e^(−388/300)) = 58 km in place of 5, and the thin sheet's viscosity stays
+  about 480 times a fresh orogen's. The step that dug the pit does not happen (test
+  `a_keeled_craton_behind_an_arc_stays_cold_and_stiff`). Without a keel (`thermal_keel_km=0`) the
+  same craton warms to a back-arc's 60 km over a few tens of Myr, so its Te falls at that pace, not
+  in one step.
+- *The crust.* The 11 km is not thermal. Continental crust 440 to 800 km behind an arc is the
+  cordillera's source (PLT-048): it gives the range its share of the shortening, at most 1.7 mm a
+  year over the band's 360 km, 19 % of its crust in 40 Myr, about 7 of the 11 km (the trace did not
+  record the cell's distance to the front or the rest of its losses). The state reaches it through
+  the backstop (`thermal_backstop`, PLT-470): a source gives in proportion to η_0 / η at its thermal
+  age, so the keeled craton gives about 1/480 of a back-arc's share, about 14 m in the 40 Myr.
+
 ### The order of the stages
 
 1. **Stage 1 (this task):** the state, heat flow from it with the fault's final pass, thermal
