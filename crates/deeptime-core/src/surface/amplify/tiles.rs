@@ -22,8 +22,11 @@ use crate::error::CoreError;
 use crate::surface::detail::DetailParams;
 
 /// Bytes per cell of a window while a tile runs: the passes' arrays ([`Buf`]), the copy of the
-/// terrain the change is measured against, the core's arrays handed to the sink, and the mountain
-/// character's copy of the terrain before it.
+/// terrain the change is measured against, the core's arrays handed to the sink (on a level before
+/// the last: terrain, area, weight and erodibility, 4 B each, and the lake flag, 1 B; the next
+/// level's lake surface is looked up in the coarse level, not copied, [`LevelTile::from`]), and
+/// the mountain character's copy of the terrain before it (the last level) or the core's glacier
+/// surface (a level before it).
 pub const TILE_BYTES_PER_CELL: u64 = Buf::BYTES_PER_CELL + 4 + 17 + 4;
 /// Bytes per cell of a [`Level`] (terrain, area, weight, erodibility, lake surface, glaciers'
 /// surface).
@@ -110,8 +113,11 @@ pub struct LevelTile<'a> {
     pub area: &'a [f32],
     pub wgt: &'a [f32],
     pub kfac: &'a [f32],
-    /// The lake surface (`Level::lake_z`).
-    pub lake_z: &'a [f32],
+    /// 1 where the cell lies under a lake's surface (`Fine::lake`), else 0.
+    pub lake: &'a [u8],
+    /// The level the tile was sampled from: a lake cell's surface, the next level's
+    /// `Level::lake_z`, is [`Level::lake_surface`] of it, so the window need not carry it.
+    pub from: &'a Level,
     /// The glaciers' surface (empty without glaciers).
     pub zs: &'a [f32],
 }
@@ -155,7 +161,18 @@ impl TileSink for LevelSink {
             self.level.area[dst..dst + w].copy_from_slice(&l.area[src.clone()]);
             self.level.wgt[dst..dst + w].copy_from_slice(&l.wgt[src.clone()]);
             self.level.kfac[dst..dst + w].copy_from_slice(&l.kfac[src.clone()]);
-            self.level.lake_z[dst..dst + w].copy_from_slice(&l.lake_z[src.clone()]);
+            let gj = (y0 + j) as i64;
+            for (i, (s, &m)) in self.level.lake_z[dst..dst + w]
+                .iter_mut()
+                .zip(&l.lake[src.clone()])
+                .enumerate()
+            {
+                *s = if m == 1 {
+                    l.from.lake_surface((x0 + i) as i64, gj)
+                } else {
+                    super::resample::NO_LAKE
+                };
+            }
             if !l.zs.is_empty() {
                 if self.level.zs.len() != self.level.z.len() {
                     self.level.zs = vec![0.0; self.level.z.len()];
@@ -620,7 +637,7 @@ pub fn run_tiles(
                     area_core.push(buf.a[c]);
                     wgt_core.push(buf.own[c] / a_fine);
                     kfac_core.push(buf.kfac[c]);
-                    lake_core.push(buf.lake_z[c]);
+                    lake_core.push(buf.lake[c]);
                     if has_zs {
                         zs_core.push(buf.zs[c]);
                     }
@@ -659,7 +676,8 @@ pub fn run_tiles(
                 area: &area_core,
                 wgt: &wgt_core,
                 kfac: &kfac_core,
-                lake_z: &lake_core,
+                lake: &lake_core,
+                from: level,
                 zs: &zs_core,
             }),
         })?;

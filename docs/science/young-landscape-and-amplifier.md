@@ -395,8 +395,12 @@ pit (`deeptime dump-fields` of the young checkpoint) and by rebaking with the ch
 **Fix.** (1) A fine cell is in the lake when its terrain lies under the highest lake surface among
 the coarse corners of its interpolation quad (AMP-090), so the lake's edge is the terrain's own
 contour at the lake's level, smooth and of no preferred direction; the levels carry each lake's
-surface (`Level::lake_z`, 4 B a cell; the window's buffers carry it too, so the memory model's
-bytes per cell went from 79 to 83 in a window and from 21 to 24 in a level). (2) The character
+surface (`Level::lake_z`, 4 B a cell in place of the 1-B mask, so a level's bytes per cell in the
+memory model went from 21 to 24). The windows do not carry it: a window keeps the 1-B lake flag,
+and when a tile hands its core on, the next level takes each lake cell's surface from the coarse
+level it was sampled from (`Level::lake_surface`, the same quad rule), so a window stays at 79 B
+a cell. (The first version, merged 2026-10-22, gave the windows an f32 copy as well, 83 B a cell,
+which put `pipeline_quick_16k`'s estimate over the workbench's default 4 GiB cap.) (2) The character
 fades in from the shore: none on the first land cells, all of it 8 blocks out, by the Euclidean
 distance to the nearest lake cell (AMP-091). With (1) alone the step was gone but a lip of 0.3 to
 0.5 block was left along the contour (the change the character made on the first land cell);
