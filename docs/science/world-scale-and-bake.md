@@ -12,6 +12,7 @@ A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and o
 | [SCL](ledger/SCL.md) | planet constants | SCL-022 to SCL-031 (10) |
 | [SCL](ledger/SCL.md) | timeline | SCL-032 to SCL-041 (10) |
 | [SCL](ledger/SCL.md) | resolution | SCL-042 to SCL-051 (10) |
+| [SCL](ledger/SCL.md) | structures keep to the ground | SCL-200, SCL-201 (2) |
 | [BAK](ledger/BAK.md) | bake terrain | BAK-001 to BAK-013 (13) |
 | [BAK](ledger/BAK.md) | spawn placement | BAK-014 to BAK-016 (3) |
 | [BAK](ledger/BAK.md) | satellite view | BAK-017 to BAK-032 (16) |
@@ -19,7 +20,7 @@ A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and o
 | [BAK](ledger/BAK.md) | far terrain | BAK-039 to BAK-042, BAK-048, BAK-050, BAK-065, BAK-067 (8) |
 | [BAK](ledger/BAK.md) | Distant Horizons curvature | BAK-043 to BAK-047 (5) |
 
-Rows by status: `verified` 2, `cited-unverified` 6, `calibrated` 2, `game-choice` 78, `uncited` 12.
+Rows by status: `verified` 2, `cited-unverified` 6, `calibrated` 2, `game-choice` 80, `uncited` 12.
 
 ## Material for the stage 2 writer
 
@@ -389,3 +390,89 @@ override kept, "not overridable"). `DhApiBindingTest` runs the same controller t
 newest DH jars. **Not checked:** a real client. The GameTests have none, and the software-GL
 client has not made DH request LODs (see above), so how the bent LODs meet the flat chunks has
 not been seen.
+
+## Structures keep to the ground
+
+**The case (Ben's single-player world, 2026-10-22).** A trial chamber's deepslate hung in open sea water over
+a trench: start chunk (46, 105), 207 pieces, box x 656 to 766, y -40 to 17, z 1628 to 1732, over a sea floor
+near y -149 that falls to -303 in the trench beside it.
+
+**Why.** Vanilla gives some structures a start height in absolute blocks, chosen for vanilla's ground (read in the
+1.21.1 sources and data):
+
+| Structure | How vanilla places it | Where that is |
+|---|---|---|
+| `minecraft:trial_chambers` | jigsaw, `start_height` uniform absolute -40 to -20, `terrain_adaptation: encapsulate` | box y -40 to 17 in Ben's start (57 blocks tall) |
+| `minecraft:ancient_city` | jigsaw, `start_height` absolute -27, `beard_box` | starts at y -27 |
+| `minecraft:mineshaft`, `minecraft:stronghold` | `StructurePiecesBuilder.moveBelowSeaLevel(seaLevel, minY, random, 10)`: the top is set anywhere from the world floor up to y 52 | in water or above the floor wherever the sea floor is lower than the top |
+
+Deep Time's ground is its own. The median sea floor is about y -56 (the coordinator's figure for the planets baked so
+far; (63 + 56) blocks x 35 m is 4.2 km below sea level), the world's floor is y -512, and the trench beside Ben's
+chamber reaches y -303. A structure at a
+vanilla height therefore stands in the sea, and the terrain it wraps itself in (the Beardifier's `encapsulate` and
+`beard_box` shells) hangs round it as a blob in open water.
+
+**The rule** (`worldgen/StructureBurial`, ledger SCL-200 and SCL-201; applied at the return of
+`Structure.generate` by `mixin/StructureBurialMixin`, so world generation and `/place structure` both go
+through it, before the start is stored or its box read):
+
+1. Only a start of a structure the rule covers (below).
+2. H is the least ground height over the pieces' bounding box, from the same `TerrainSource.height` the terrain is
+   built from, on a grid of at most 16 blocks with the edges and corners included.
+3. If the start's top is higher than `H - cover` (cover = 8), every piece moves down so that its top sits `cover`
+   blocks under H. A start that is already deeper is not touched (buried treasure, ruins and wrecks follow the
+   floor anyway, and an ancient city under a mountain stays where vanilla put it).
+4. If the move would put the bottom under `min_y + 8`, the start is dropped (the structure sets then try their next
+   candidate). A drop is rare: a 57-block chamber needs ground above y -439 in a world with its floor at -512.
+5. `-Ddeeptime.buryStructures=false` turns the rule off.
+
+The start is moved, not dropped, so the frequency of a structure does not fall with the sea: trial chambers are
+progression content (trial keys, vaults, breeze rods).
+
+**What a move carries along.** Each piece's bounding box and, for a jigsaw piece, its `position` (the template is
+placed there): `StructurePiece.move` does both. A `JigsawJunction` holds an absolute `sourceGroundY` that
+`Beardifier` reads and `move` leaves alone, so the junctions are rebuilt with their ground level shifted (their
+`deltaY` and a piece's `groundLevelDelta` are relative and stay). `StructureStart` is final and caches its box
+lazily (the pieces' union inflated by 12 for terrain adaptation), so a fresh start is made from the same pieces and
+nothing stale is cached. A move draws no random number: the result depends only on the start and the world data,
+so chunks in any order, or generated again after a crash, give the same start.
+
+**Which structures** (`StructureBurial.covers`, decided once per structure on its encoded JSON, so any mod's
+jigsaw kind answers the same way with no list to keep):
+
+- covered: `minecraft:stronghold` in any step (vanilla registers it in `surface_structures`); in the steps
+  `underground_structures`, `underground_decoration` and `strongholds`, a structure with a `start_height` and no
+  `project_start_to_heightmap` (trial chambers, ancient cities, Cataclysm's ancient factory and amethyst nest,
+  Bosses of Mass Destruction's gauntlet arena), and the ordinary `minecraft:mineshaft`;
+- left alone, because they follow the ground or are not the rule's: buried treasure (its box sits at y 90 and the
+  heightmap places it), trail ruins and any start projected to a heightmap, the mesa mineshaft (set between sea
+  level and the ground), types the rule does not know (Ice and Fire's dragon caves find their own spot), and every
+  structure above ground or in another step.
+
+**Audit** (`tools/smoke/structure_audit.py`, run on the test VM over the 159 jars of the MIC server set plus the
+vanilla resources jar, 2026-10-22): 130 structure definitions; 7 covered, 3 follow the ground, 5 are of an unknown
+type in an underground step, 104 are in other steps, and 11 have an absolute start height below y 63 in a step the
+rule does not look at. The 11 are Cataclysm's burning arena, ruined citadel and sunken city, vanilla's bastion remnant (a Nether
+structure at y 33) and seven Terralith underground sites: `underground/frosted_dungeon`, `giant_bee_hive`,
+`mining_outpost`, `oak_cabin`, `old_refinery`, `sunken_tower`, and `underground_cabin`. The Terralith seven are the
+real gap: registered in `surface_structures`, start height uniform absolute -40 to 40, `beard_box` or `bury`, so they
+stand in the sea over deep floors as the chamber did. They are left out on
+purpose for now: the step restriction is what keeps above-ground absolute structures (Terralith's spire at y 92,
+Cataclysm's acropolis at y 200) from being pushed into rock, and an id list for the underground ones is the follow-up.
+
+**Not covered by this change.** Chunks generated before it keep their structure starts as saved (no migration:
+unreleased). Nothing here was looked at in a real client.
+
+**What was checked.** `StructureBurialTest` (the move, the already-buried case, the drop, the world-floor edge, the
+sampling grid, the structure classification on the JSON of each audited kind, the property). The GameTests
+`StructureBurialGameTests` on `deeptime:test_planet_real`: over the deepest sea each covered structure is the
+vanilla start moved by exactly the rule's `dy` (boxes, jigsaw positions, junction ground levels, the start's box)
+and stands clear of the ground under every column of every piece; buried treasure and the mesa mineshaft are not
+moved; under the highest ground nothing is moved; and a buried trial chamber placed chunk by chunk into the
+generated planet has its own blocks in place with none waterlogged, with the real floor of those chunks (not the
+model's H) above its top by `cover` or more over every sampled column, where the same chamber at vanilla's height
+sticks out of that floor. About 2 % of the cells inside the buried pieces' boxes still hold water (the vanilla-height
+control in the sea holds about 4 %, and a chamber in rock under the highest ground 7 cells in 66,803), so the boxes
+are not claimed dry: the template carries almost no water of its own (the rock control), so this is water around it
+in cells the template does not overwrite (not traced further), and the chamber is placed there over finished chunks
+without the terrain adaptation that generation applies. What real generation leaves is not checked. Numbers are in the STATUS.md build log.
