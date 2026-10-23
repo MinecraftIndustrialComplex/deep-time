@@ -237,7 +237,12 @@ pub fn at_trench(flags: Option<&[f32]>, regime: Option<&[f32]>, c: usize) -> boo
 /// must not take it as well: the feedback took it every step, each time again, and the plate
 /// model's samples beside a gap rose by it step after step (the oceanic peaks, 10 to 16 km) and
 /// those under a trench sank by it. ledger: ISO-125
-pub fn held_cells(gap: Option<&[f32]>, flags: Option<&[f32]>, regime: Option<&[f32]>, n: usize) -> Vec<f32> {
+pub fn held_cells(
+    gap: Option<&[f32]>,
+    flags: Option<&[f32]>,
+    regime: Option<&[f32]>,
+    n: usize,
+) -> Vec<f32> {
     (0..n)
         .into_par_iter()
         .map(|c| {
@@ -930,7 +935,9 @@ mod tests {
         // and handed the rest to the plate model. Column 3 reads half its source from column 3
         // and half from column 4: half the 500 m. Column 5 reads columns 5 and 6, whose offset
         // the plate model took: the plate's floor alone.
-        let mask: Vec<f32> = (0..n).map(|c| if col(c) == 3 { 1.0 } else { 0.0 }).collect();
+        let mask: Vec<f32> = (0..n)
+            .map(|c| if col(c) == 3 { 1.0 } else { 0.0 })
+            .collect();
         let kept = held_offset(&prev_offset, Some(&mask)).expect("a mask of the grid's size");
         let z = carry(Some(&flags), Some(&reg), Some(&kept));
         assert_eq!(z[3], -5950.0, "half the held 500 m");

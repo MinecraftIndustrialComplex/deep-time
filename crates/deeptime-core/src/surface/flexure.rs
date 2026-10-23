@@ -156,6 +156,17 @@ pub struct FlexureParams {
     /// anomaly (the Puerto Rico Trench, ten Brink et al. 2004): 9.1 × 10⁶ kg/m², 2.75 km of
     /// mantle. 0, the default: off, the purely elastic plate (ISO-120).
     pub yield_anomaly_mgal: f64,
+    /// The solve on the sphere's metric (ISO-127): on the equal-area raster a cell at latitude φ
+    /// is cos φ as wide and 1 / cos φ as tall as at the equator, and the Laplacian in the raster's
+    /// coordinates is ∂x(cos⁻²φ ∂x) + ∂y(cos²φ ∂y). False: every cell a square of the equator's
+    /// width (the block metric, the rule before 2026-10-23), about 1 / cos⁴ φ too stiff north to
+    /// south and cos⁴ φ too soft east to west.
+    pub row_metric: bool,
+    /// The water over a cell is the open sea's or its lake's, not every cell under sea level's
+    /// (ISO-126): a closed basin carries its lake at the level its water balance holds, or no
+    /// water when it is dry. False: every cell at or under sea level is under the sea (the rule
+    /// before 2026-10-23).
+    pub water_by_basin: bool,
     /// Solve every this many plate steps (loads in between wait for the next solve).
     pub every_steps: u32,
     /// The solve stops when its error estimate is under this, m.
@@ -176,6 +187,8 @@ impl Default for FlexureParams {
             te_min_km: 5.0, // ledger: ISO-052
             te_weakening_myr: 0.0, // ledger: ISO-099 (game-choice: off by default)
             yield_anomaly_mgal: 0.0, // ledger: ISO-120 (off by default)
+            row_metric: false, // ledger: ISO-127
+            water_by_basin: false, // ledger: ISO-126
             every_steps: 1, // ledger: ISO-059 (game-choice: numerical)
             tolerance_m: 2.0, // ledger: ISO-059
             max_iterations: 60, // ledger: ISO-059
@@ -420,7 +433,7 @@ fn booked(x: &StepIn<'_>, c: usize, fresh: bool, from: f64) -> Booked {
     let reg = x.regime[c] as u8;
     let builds = x.crust_type[c] as u8 != OCEANIC || reg == regime::ARC || reg == regime::HOTSPOT;
     let lift = x.dt_myr * 1.0e3; // mm/yr over the step, in m
-    let sea = x.sea_level_m;
+    let sea = x.sea_at(c);
     let u = if from.is_finite() {
         x.h_start[c] - from
     } else {
@@ -448,7 +461,7 @@ fn booked(x: &StepIn<'_>, c: usize, fresh: bool, from: f64) -> Booked {
 /// Measurement only: the gap budget books it with the roots, whose compensation under the sea it
 /// is ([`StepOut::roots_m`], [`local_answers`]).
 fn built_under_sea(x: &StepIn<'_>, c: usize, fresh: bool, from: f64, h_now: f64) -> f64 {
-    let sea = x.sea_level_m;
+    let sea = x.sea_at(c);
     // As in `step`: crust the plate model thickened or thinned, and crust the spreading moved.
     let lifted = booked(x, c, fresh, from).crust_water;
     let ds = h_now - x.h_before_spread[c];
@@ -656,11 +669,160 @@ pub struct SolveReport {
     pub converged: bool,
 }
 
+/// The solve raster's metric on the sphere (`row_metric`, ISO-127). The L1 raster is Lambert's
+/// cylindrical equal-area projection (x = R λ, y = R sin φ): a cell at latitude φ is cos φ as
+/// wide and 1 / cos φ as tall on the sphere as at the equator, its area the same, and the
+/// Laplacian in the raster's coordinates is ∂x(cos⁻²φ ∂x) + ∂y(cos²φ ∂y). In finite volumes on
+/// the raster: per row the east-west coupling `a` = 1 / cos²φ at the row's middle, and per
+/// boundary between rows the north-south coupling `b` = cos²φ there (`b[j]` is the boundary above
+/// row j; `b[0]` and `b[h]`, the raster's first and last edge, are 0: closed, as the block
+/// metric's rows are). The operator is symmetric, as the block metric's is (the area element is
+/// uniform), and at the equator a = b = 1, the block metric.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RowMetric {
+    pub a: Vec<f64>,
+    pub b: Vec<f64>,
+}
+
+impl RowMetric {
+    /// From the sine of the latitude at each boundary between the fine raster's rows (h + 1
+    /// values; past a pole they clamp to ±1), `f` fine rows to a row.
+    // ledger: ISO-127
+    pub fn from_sin_faces(sin_faces: &[f64], f: usize) -> RowMetric {
+        let f = f.max(1);
+        let h = sin_faces.len().saturating_sub(1) / f;
+        let s = |k: usize| sin_faces[k * f].clamp(-1.0, 1.0);
+        // A row wholly past a pole has no middle on the planet: its cos²φ is taken as half a
+        // full row's height in sin φ, under that of a row that reaches the pole (game-choice:
+        // numerical; such a row covers nothing, and its coupling only keeps the operator finite).
+        let full = (0..h).map(|j| (s(j + 1) - s(j)).abs()).fold(0.0, f64::max);
+        let least = (0.5 * full).max(1e-12);
+        let a = (0..h)
+            .map(|j| {
+                let m = 0.5 * (s(j) + s(j + 1));
+                1.0 / (1.0 - m * m).max(least)
+            })
+            .collect();
+        let b = (0..=h)
+            .map(|k| {
+                if k == 0 || k == h {
+                    0.0
+                } else {
+                    1.0 - s(k) * s(k)
+                }
+            })
+            .collect();
+        RowMetric { a, b }
+    }
+
+    /// The block metric's couplings (every row a = 1, every inner boundary b = 1).
+    #[cfg(test)]
+    fn block(h: usize) -> RowMetric {
+        RowMetric {
+            a: vec![1.0; h],
+            b: (0..=h)
+                .map(|k| if k == 0 || k == h { 0.0 } else { 1.0 })
+                .collect(),
+        }
+    }
+}
+
+/// The exact solve of (d L² + c) x = r for uniform d and c on the metric's raster (ISO-127):
+/// after a Fourier transform along x, L is per wavenumber k a symmetric tridiagonal matrix in y
+/// (diagonal a_j λ_k − b_j − b_(j+1), off the diagonal b_(j+1), over dx²), so d L² + c is a
+/// symmetric positive definite pentadiagonal one, factored as L D Lᵀ and solved per column.
+struct RowSolve {
+    a: Vec<f64>,
+    b: Vec<f64>,
+    /// The second difference's Fourier symbol along x per wavenumber, 2 cos(2πk / w) − 2.
+    lx: Vec<f64>,
+    /// 1 / dx².
+    inv: f64,
+}
+
+impl RowSolve {
+    /// `x` ← (d L_k² + c)⁻¹ `x` for wavenumber `k`; `dd`, `l1`, `l2` are scratch of the column's
+    /// length.
+    #[allow(clippy::too_many_arguments)]
+    fn solve(
+        &self,
+        k: usize,
+        d: f64,
+        c: f64,
+        x: &mut [Complex64],
+        dd: &mut [f64],
+        l1: &mut [f64],
+        l2: &mut [f64],
+    ) {
+        let h = x.len();
+        let (a, b, inv, lx) = (&self.a, &self.b, self.inv, self.lx[k]);
+        // L_k: diagonal t(j), off the diagonal e(j) between j and j + 1.
+        let t = |j: usize| (a[j] * lx - b[j] - b[j + 1]) * inv;
+        let e = |j: usize| if j + 1 < h { b[j + 1] * inv } else { 0.0 };
+        // d L_k² + c, by band: (j, j), (j, j + 1), (j, j + 2).
+        let m0 = |j: usize| {
+            let up = if j > 0 { e(j - 1) } else { 0.0 };
+            d * (t(j) * t(j) + up * up + e(j) * e(j)) + c
+        };
+        let m1 = |j: usize| d * e(j) * (t(j) + t(j + 1));
+        let m2 = |j: usize| d * e(j) * e(j + 1);
+        for j in 0..h {
+            let (mut p1, mut p2) = (0.0, 0.0);
+            if j >= 2 {
+                p2 = m2(j - 2) / dd[j - 2];
+            }
+            if j >= 1 {
+                let carried = if j >= 2 {
+                    p2 * dd[j - 2] * l1[j - 1]
+                } else {
+                    0.0
+                };
+                p1 = (m1(j - 1) - carried) / dd[j - 1];
+            }
+            let mut dj = m0(j);
+            if j >= 1 {
+                dj -= p1 * p1 * dd[j - 1];
+            }
+            if j >= 2 {
+                dj -= p2 * p2 * dd[j - 2];
+            }
+            dd[j] = dj;
+            l1[j] = p1;
+            l2[j] = p2;
+        }
+        for j in 0..h {
+            let mut v = x[j];
+            if j >= 1 {
+                v -= x[j - 1] * l1[j];
+            }
+            if j >= 2 {
+                v -= x[j - 2] * l2[j];
+            }
+            x[j] = v;
+        }
+        for j in 0..h {
+            x[j] /= dd[j];
+        }
+        for j in (0..h).rev() {
+            let mut v = x[j];
+            if j + 1 < h {
+                v -= x[j + 1] * l1[j + 1];
+            }
+            if j + 2 < h {
+                v -= x[j + 2] * l2[j + 2];
+            }
+            x[j] = v;
+        }
+    }
+}
+
 /// The transforms that diagonalise the 5-point Laplacian on a raster that wraps in x and is
 /// closed at its first and last row: a Fourier transform along x (two real rows at a time, as
 /// the real and imaginary part of one complex row), a cosine transform (DCT-II) along y by one
 /// complex transform of the column's length (Makhoul's reordering: even entries first, odd ones
-/// reversed after them).
+/// reversed after them). On the sphere's metric (`rows`, ISO-127) the operator is not the same
+/// on every row: there is no transform along y, and the division by d·λ² + c is
+/// [`RowSolve::solve`] per wavenumber.
 struct Spectral {
     w: usize,
     h: usize,
@@ -673,9 +835,25 @@ struct Spectral {
     twiddle: Vec<Complex64>,
     /// The Laplacian's eigenvalue squared, column-major (k·h + m), 1/m⁴.
     lam2: Vec<f64>,
+    /// The sphere's metric (ISO-127): no transform along y, a solve per wavenumber instead.
+    rows: Option<RowSolve>,
 }
 
 impl Spectral {
+    /// [`Self::new`], on the sphere's metric when given.
+    fn with_rows(w: usize, h: usize, dx: f64, metric: Option<&RowMetric>) -> Spectral {
+        let mut s = Spectral::new(w, h, dx);
+        s.rows = metric.map(|m| RowSolve {
+            a: m.a.clone(),
+            b: m.b.clone(),
+            lx: (0..s.nk)
+                .map(|k| 2.0 * (std::f64::consts::TAU * k as f64 / w as f64).cos() - 2.0)
+                .collect(),
+            inv: 1.0 / (dx * dx),
+        });
+        s
+    }
+
     fn new(w: usize, h: usize, dx: f64) -> Spectral {
         let mut planner = FftPlanner::<f64>::new();
         let nk = w / 2 + 1;
@@ -706,6 +884,7 @@ impl Spectral {
             iy: planner.plan_fft_inverse(h),
             twiddle,
             lam2,
+            rows: None,
         }
     }
 
@@ -767,6 +946,21 @@ impl Spectral {
                 },
             );
         let half = &*half;
+        if let Some(rows) = &self.rows {
+            // The sphere's metric: the columns as they are, solved per wavenumber (ISO-127).
+            spec.par_chunks_mut(h).enumerate().for_each_init(
+                || (vec![0.0; h], vec![0.0; h], vec![0.0; h]),
+                |(dd, l1, l2), (k, col)| {
+                    for (j, x) in col.iter_mut().enumerate() {
+                        *x = half[j * nk + k];
+                    }
+                    if let Some((d, c)) = divide {
+                        rows.solve(k, d, c, col, dd, l1, l2);
+                    }
+                },
+            );
+            return;
+        }
         spec.par_chunks_mut(h).enumerate().for_each_init(
             || (vec![zero; h], vec![zero; self.fy.get_inplace_scratch_len()]),
             |(buf, scratch), (k, col)| {
@@ -806,24 +1000,27 @@ impl Spectral {
         let (w, h, nk) = (self.w, self.h, self.nk);
         let zero = Complex64::new(0.0, 0.0);
         let norm_y = 1.0 / h as f64;
-        spec.par_chunks_mut(h).for_each_init(
-            || (vec![zero; h], vec![zero; self.iy.get_inplace_scratch_len()]),
-            |(buf, scratch), col| {
-                buf[0] = col[0];
-                for m in 1..h {
-                    let c = col[h - m];
-                    buf[m] = self.twiddle[m].conj() * (col[m] + Complex64::new(c.im, -c.re));
-                }
-                self.iy.process_with_scratch(buf, scratch);
-                for j in 0..h {
-                    col[j] = if j % 2 == 0 {
-                        buf[j / 2]
-                    } else {
-                        buf[h - 1 - j / 2]
-                    } * norm_y;
-                }
-            },
-        );
+        // (on the sphere's metric there is no transform along y, ISO-127)
+        if self.rows.is_none() {
+            spec.par_chunks_mut(h).for_each_init(
+                || (vec![zero; h], vec![zero; self.iy.get_inplace_scratch_len()]),
+                |(buf, scratch), col| {
+                    buf[0] = col[0];
+                    for m in 1..h {
+                        let c = col[h - m];
+                        buf[m] = self.twiddle[m].conj() * (col[m] + Complex64::new(c.im, -c.re));
+                    }
+                    self.iy.process_with_scratch(buf, scratch);
+                    for j in 0..h {
+                        col[j] = if j % 2 == 0 {
+                            buf[j / 2]
+                        } else {
+                            buf[h - 1 - j / 2]
+                        } * norm_y;
+                    }
+                },
+            );
+        }
         let spec = &*spec;
         let norm_x = 1.0 / w as f64;
         out.par_chunks_mut(2 * w).enumerate().for_each_init(
@@ -935,7 +1132,14 @@ struct Preconditioner<'a> {
 }
 
 impl<'a> Preconditioner<'a> {
-    fn new(d: &'a [f64], c: &'a [f64], w: usize, h: usize, dx: f64) -> Preconditioner<'a> {
+    fn new(
+        d: &'a [f64],
+        c: &'a [f64],
+        w: usize,
+        h: usize,
+        dx: f64,
+        metric: Option<&RowMetric>,
+    ) -> Preconditioner<'a> {
         let bank = Bank::new(d, c, dx);
         let n = w * h;
         let inv = 1.0 / (dx * dx * dx * dx);
@@ -946,11 +1150,27 @@ impl<'a> Preconditioner<'a> {
                 .into_par_iter()
                 .map(|k| {
                     let (i, j) = (k % w, k / w);
-                    let around = d[j * w + (i + 1) % w]
-                        + d[j * w + (i + w - 1) % w]
-                        + d[j.saturating_sub(1) * w + i]
-                        + d[(j + 1).min(h - 1) * w + i];
-                    0.5 / (c[k] + (16.0 * d[k] + around) * inv)
+                    let (east, west) = (d[j * w + (i + 1) % w], d[j * w + (i + w - 1) % w]);
+                    let (north, south) = (
+                        d[j.saturating_sub(1) * w + i],
+                        d[(j + 1).min(h - 1) * w + i],
+                    );
+                    match metric {
+                        None => {
+                            let around = east + west + north + south;
+                            0.5 / (c[k] + (16.0 * d[k] + around) * inv)
+                        }
+                        // (L D L)'s diagonal on the sphere's metric (ISO-127).
+                        Some(m) => {
+                            let (a, bn, bs) = (m.a[j], m.b[j], m.b[j + 1]);
+                            let centre = 2.0 * a + bn + bs;
+                            let diag = d[k] * centre * centre
+                                + (east + west) * a * a
+                                + north * bn * bn
+                                + south * bs * bs;
+                            0.5 / (c[k] + diag * inv)
+                        }
+                    }
                 })
                 .collect()
         };
@@ -971,6 +1191,8 @@ pub struct Solver {
     pub h: usize,
     /// Cell side, m (Earth-normalized).
     pub dx: f64,
+    /// The sphere's metric (ISO-127); None: the block metric.
+    pub metric: Option<RowMetric>,
     spectral: Spectral,
     half: Vec<Complex64>,
     spec: Vec<Complex64>,
@@ -1017,20 +1239,28 @@ fn max_abs_and_dot(w: usize, a: &[f64], b: &[f64]) -> (f64, f64) {
 
 impl Solver {
     pub fn new(w: usize, h: usize, dx: f64) -> Solver {
+        Solver::with_metric(w, h, dx, None)
+    }
+
+    /// [`Self::new`], on the sphere's metric when given (ISO-127).
+    pub fn with_metric(w: usize, h: usize, dx: f64, metric: Option<RowMetric>) -> Solver {
         let nk = w / 2 + 1;
         let zero = Complex64::new(0.0, 0.0);
+        let metric = metric.filter(|m| m.a.len() == h && m.b.len() == h + 1);
         Solver {
             w,
             h,
             dx,
-            spectral: Spectral::new(w, h, dx),
+            spectral: Spectral::with_rows(w, h, dx, metric.as_ref()),
+            metric,
             half: vec![zero; h * nk],
             spec: vec![zero; nk * h],
             tmp: vec![0.0; w * h],
         }
     }
 
-    /// out ← the 5-point Laplacian of `v` (x wraps, the first and last row are closed), 1/m².
+    /// out ← the 5-point Laplacian of `v` (x wraps, the first and last row are closed), 1/m²: in
+    /// the block metric, or on the sphere's ([`RowMetric`], ISO-127).
     pub fn laplacian(&self, v: &[f64], out: &mut [f64]) {
         self.laplacian_then(v, Then::Nothing, out);
     }
@@ -1040,13 +1270,27 @@ impl Solver {
     fn laplacian_then(&self, v: &[f64], then: Then<'_>, out: &mut [f64]) {
         let (w, h) = (self.w, self.h);
         let inv = 1.0 / (self.dx * self.dx);
+        let metric = self.metric.as_ref();
         out.par_chunks_mut(w).enumerate().for_each(|(j, row)| {
             let at = |jj: usize| &v[jj * w..(jj + 1) * w];
             let (mid, north, south) = (at(j), at(j.saturating_sub(1)), at((j + 1).min(h - 1)));
-            for i in 0..w {
-                let west = mid[if i == 0 { w - 1 } else { i - 1 }];
-                let east = mid[if i + 1 == w { 0 } else { i + 1 }];
-                row[i] = (west + east + north[i] + south[i] - 4.0 * mid[i]) * inv;
+            if let Some(m) = metric {
+                // ledger: ISO-127
+                let (a, bn, bs) = (m.a[j], m.b[j], m.b[j + 1]);
+                for i in 0..w {
+                    let west = mid[if i == 0 { w - 1 } else { i - 1 }];
+                    let east = mid[if i + 1 == w { 0 } else { i + 1 }];
+                    let x = mid[i];
+                    row[i] =
+                        (a * (west + east - 2.0 * x) + bn * (north[i] - x) + bs * (south[i] - x))
+                            * inv;
+                }
+            } else {
+                for i in 0..w {
+                    let west = mid[if i == 0 { w - 1 } else { i - 1 }];
+                    let east = mid[if i + 1 == w { 0 } else { i + 1 }];
+                    row[i] = (west + east + north[i] + south[i] - 4.0 * mid[i]) * inv;
+                }
             }
             let cells = j * w..(j + 1) * w;
             match then {
@@ -1162,7 +1406,7 @@ impl Solver {
         let n = self.w * self.h;
         assert!(d.len() == n && c.len() == n && b.len() == n, "raster size");
         let w = self.w;
-        let mut pre = Preconditioner::new(d, c, w, self.h, self.dx);
+        let mut pre = Preconditioner::new(d, c, w, self.h, self.dx, self.metric.as_ref());
         let mut x = vec![0.0; n];
         let mut r = b.to_vec();
         let mut z = vec![0.0; n];
@@ -1323,12 +1567,21 @@ pub struct StepIn<'a> {
     pub dims: &'a Dims,
     /// The L1 cell's side on the Earth-normalized sphere, m.
     pub norm_dx_m: f64,
+    /// The sine of the latitude at each boundary between the raster's rows, h + 1 values (past a
+    /// pole: ±1), for the solve on the sphere's metric (`row_metric`, ISO-127); None: the block
+    /// metric.
+    pub sin_faces: Option<&'a [f64]>,
     /// The plate model's sample spacing on the same sphere, m (0: no filter). The plate model's
     /// uplift carries no information on shorter scales; only the part of its root it resolves
     /// bends the plate (`ledger: ISO-069`).
     pub plate_spacing_m: f64,
     pub gravity_m_s2: f64,
     pub sea_level_m: f64,
+    /// The level of the water standing over each cell, m (ISO-126, `water_by_basin`): the sea
+    /// level over the open sea, a closed basin's lake level over its lake, −∞ where no water
+    /// stands (dry ground, a dry basin under sea level). None: every cell at or under
+    /// `sea_level_m` is under the sea.
+    pub water_z: Option<&'a [f64]>,
     pub dt_myr: f64,
     /// Elevation at the start of the step: carried with the crust, plus the plate model's uplift.
     pub h_start: &'a [f64],
@@ -1359,6 +1612,17 @@ pub struct StepIn<'a> {
     /// [`StepOut::released_m`]). Measurement only (the gap budget,
     /// `plates::gap_budget`): the step's own solve and result do not change.
     pub parts: bool,
+}
+
+impl StepIn<'_> {
+    // ledger: ISO-126
+    /// The level of the water over cell `c`, m: the open sea's or its lake's with `water_z`, else
+    /// the sea level (−∞: no water).
+    fn sea_at(&self, c: usize) -> f64 {
+        self.water_z
+            .and_then(|w| w.get(c))
+            .map_or(self.sea_level_m, |&z| z)
+    }
 }
 
 /// The surface's elevation before the step at the crust's source at cell `c`
@@ -1421,7 +1685,6 @@ pub fn local_answers(
     h: &[f64],
 ) -> Vec<(f64, f64)> {
     let n = h.len();
-    let sea = x.sea_level_m;
     let water_share = RHO_WATER / RHO_MANTLE;
     let ice_share = RHO_ICE / RHO_MANTLE;
     let (rock_land, rock_sea) = rock_shares(x.rock_share);
@@ -1429,6 +1692,7 @@ pub fn local_answers(
     (0..n)
         .into_par_iter()
         .map(|c| {
+            let sea = x.sea_at(c);
             // As in `step`: crust new at the place starts from the sea over it, with no ice.
             let age = x.crust_age_myr[c];
             let fresh = st.is_none_or(|st| st.water_m[c].is_nan())
@@ -1460,6 +1724,70 @@ pub fn local_answers(
         .collect()
 }
 
+/// The metric trace: measurement only, off by default (ISO-127). With it set, every solve is
+/// solved again on the other metric (the sphere's for a run in the block metric, the block
+/// metric for a run on the sphere's) and one line on stderr compares the two by band of latitude:
+/// the rms of the step's deflection on the sphere's metric, the rms and the largest difference of
+/// the block metric's from it, m. No rule reads it, and the world it makes is the same.
+pub const METRIC_TRACE_ENV: &str = "DEEPTIME_FLEX_METRIC_TRACE";
+
+/// One solve's [`METRIC_TRACE_ENV`] line; `system` is the solve's (d, c, r).
+fn metric_trace(
+    sv: &Solver,
+    faces: &[f64],
+    f: usize,
+    system: (&[f64], &[f64], &[f64]),
+    dw: &[f64],
+    p: &FlexureParams,
+) {
+    let (d, c, r) = system;
+    let on_sphere = sv.metric.is_some();
+    let other_metric = (!on_sphere).then(|| RowMetric::from_sin_faces(faces, f));
+    let mut other = Solver::with_metric(sv.w, sv.h, sv.dx, other_metric);
+    let (dw2, rep) = other.solve(d, c, r, p.tolerance_m, p.max_iterations);
+    let (sphere, block) = if on_sphere {
+        (dw, &dw2[..])
+    } else {
+        (&dw2[..], dw)
+    };
+    const BANDS: [f64; 7] = [0.0, 30.0, 50.0, 60.0, 70.0, 80.0, 90.0];
+    // Per band: cells, Σ sphere², Σ (block − sphere)², max |block − sphere|.
+    let mut acc = [[0.0f64; 4]; 6];
+    for j in 0..sv.h {
+        let s = 0.5 * (faces[j * f].clamp(-1.0, 1.0) + faces[(j + 1) * f].clamp(-1.0, 1.0));
+        let lat = s.asin().to_degrees().abs();
+        let band = (0..6).find(|&b| lat < BANDS[b + 1]).unwrap_or(5);
+        let a = &mut acc[band];
+        for i in 0..sv.w {
+            let k = j * sv.w + i;
+            let diff = block[k] - sphere[k];
+            a[0] += 1.0;
+            a[1] += sphere[k] * sphere[k];
+            a[2] += diff * diff;
+            a[3] = a[3].max(diff.abs());
+        }
+    }
+    let mut line = format!(
+        "flexmetric solve={} other_iterations={} other_converged={}",
+        if on_sphere { "sphere" } else { "block" },
+        rep.iterations,
+        u8::from(rep.converged)
+    );
+    for (b, a) in acc.iter().enumerate() {
+        if a[0] > 0.0 {
+            line.push_str(&format!(
+                " lat{:.0}-{:.0}={:.1}/{:.1}/{:.1}",
+                BANDS[b],
+                BANDS[b + 1],
+                (a[1] / a[0]).sqrt(),
+                (a[2] / a[0]).sqrt(),
+                a[3]
+            ));
+        }
+    }
+    eprintln!("{line}");
+}
+
 /// The largest power of two that keeps the solve cell at or under [`SOLVE_CELL_M`] and divides
 /// the raster.
 pub fn coarsening(w: usize, h: usize, norm_dx_m: f64) -> usize {
@@ -1487,7 +1815,6 @@ pub fn step(
 ) -> Result<StepOut, CoreError> {
     let (w, hgt) = (x.dims.w, x.dims.h);
     let n = w * hgt;
-    let sea = x.sea_level_m;
     let st = state.get_or_insert_with(|| FlexState::fresh(n));
     if st.load_m.len() != n {
         *st = FlexState::fresh(n);
@@ -1526,6 +1853,8 @@ pub fn step(
             // it as its reference; the plate model's uplift was not added to it.
             let age = x.crust_age_myr[c];
             let fresh = st.water_m[c].is_nan() || (age >= 0.0 && f64::from(age) < x.dt_myr);
+            // ledger: ISO-126
+            let sea = x.sea_at(c);
             let depth = (sea - h[c]).max(0.0);
             let (prev, water, ice_prev) = if fresh {
                 (0.0, (sea - x.h_start[c]).max(0.0), 0.0)
@@ -1659,11 +1988,17 @@ pub fn step(
     // 3. The residual of the step: ρ_m (ΔQ − a) − L(D L a) for the loads and the roots already
     // in the elevation, the last solve's unfinished part, and the load a weakened plate lets
     // go.
+    // ledger: ISO-127
+    // The solve on the sphere's metric, or in the block metric.
+    let metric = x
+        .sin_faces
+        .filter(|s| p.row_metric && s.len() == hgt + 1)
+        .map(|s| RowMetric::from_sin_faces(s, f));
     if solver
         .as_ref()
-        .is_none_or(|s| s.w != ws || s.h != hs || s.dx != dxs)
+        .is_none_or(|s| s.w != ws || s.h != hs || s.dx != dxs || s.metric != metric)
     {
-        *solver = Some(Solver::new(ws, hs, dxs));
+        *solver = Some(Solver::with_metric(ws, hs, dxs, metric));
     }
     let sv = solver.as_mut().expect("built above");
     let pick = |get: &(dyn Fn(usize) -> f64 + Sync)| -> Vec<f64> { restrict_by(w, hgt, f, get) };
@@ -1703,7 +2038,7 @@ pub fn step(
         }
         pf
     };
-    let wet = pick(&|c| if h[c] <= sea { 1.0 } else { 0.0 });
+    let wet = pick(&|c| if h[c] <= x.sea_at(c) { 1.0 } else { 0.0 });
     let d_prev = pick(&|c| {
         if cells[c].fresh {
             f64::NAN
@@ -1769,6 +2104,11 @@ pub fn step(
             ));
         }
         out.solve = Some(report);
+        if let Some(faces) = x.sin_faces.filter(|s| s.len() == hgt + 1)
+            && std::env::var_os(METRIC_TRACE_ENV).is_some()
+        {
+            metric_trace(sv, faces, f, (&d_now, &c_rest, &r), &dw, p);
+        }
         if x.parts {
             // The step's loads, the roots and the load let go, each solved alone, more
             // tightly than the step (the solve is linear; the rest of the step's change is the
@@ -1856,6 +2196,7 @@ pub fn step(
                 let change = -p.strength * delta;
                 hr[i] += change;
                 cr[i] = change;
+                let sea = x.sea_at(c);
                 let depth = (sea - hr[i]).max(0.0);
                 let w_prev = if cell.fresh { 0.0 } else { f64::from(dr[i]) };
                 let mut w_new = w_prev + cell.root + delta;
@@ -2283,6 +2624,10 @@ mod tests {
         ice: Vec<f32>,
         /// The share of the uplift that is crust (1: all of it; 0: a height moved alone).
         crust_share: f64,
+        /// The sines at the rows' boundaries (`StepIn::sin_faces`), None: the block metric only.
+        sin_faces: Option<Vec<f64>>,
+        /// The water over each cell (`StepIn::water_z`), None: the sea over every cell under it.
+        water_z: Option<Vec<f64>>,
     }
 
     impl World {
@@ -2302,6 +2647,8 @@ mod tests {
                 plate: vec![0.0; n],
                 ice: vec![0.0; n],
                 crust_share: 1.0,
+                sin_faces: None,
+                water_z: None,
             }
         }
 
@@ -2354,9 +2701,11 @@ mod tests {
                 &StepIn {
                     dims: &self.d,
                     norm_dx_m: self.norm_dx,
+                    sin_faces: self.sin_faces.as_deref(),
                     plate_spacing_m: self.plate_spacing,
                     gravity_m_s2: G,
                     sea_level_m: sea,
+                    water_z: self.water_z.as_deref(),
                     dt_myr,
                     h_start: &h_start,
                     h_eroded: &h_eroded,
@@ -3150,9 +3499,11 @@ mod tests {
                 &StepIn {
                     dims: &d,
                     norm_dx_m: 39_000.0,
+                    sin_faces: None,
                     plate_spacing_m: 71_000.0,
                     gravity_m_s2: G,
                     sea_level_m: sea,
+                    water_z: None,
                     dt_myr,
                     h_start: &h_start,
                     h_eroded: &h_eroded,
@@ -3549,5 +3900,209 @@ mod tests {
         let small = run(&elastic, 0.05, 3);
         assert!(small[2].0 < 0.9 * bound, "{small:?}");
         assert_eq!(small, run(&strong, 0.05, 3));
+    }
+
+    /// The sines at the `h + 1` row boundaries of a raster of `h` rows of side `dx` on Lambert's
+    /// cylindrical equal-area projection of a sphere of radius `r_m` (y = R sin φ), centred on the
+    /// equator, north first; past a pole they clamp to ±1.
+    fn sphere_faces(h: usize, dx: f64, r_m: f64) -> Vec<f64> {
+        (0..=h)
+            .map(|k| ((0.5 * h as f64 - k as f64) * dx / r_m).clamp(-1.0, 1.0))
+            .collect()
+    }
+
+    /// The sphere's metric (ISO-127): the block metric at the equator, 1 / cos²φ east to west and
+    /// cos²φ north to south elsewhere, closed at the raster's first and last edge, and taken on
+    /// every `f`-th boundary for a coarser solve raster.
+    #[test]
+    fn the_row_metric_is_the_block_metric_at_the_equator() {
+        let (w, h) = (512usize, 164usize);
+        let r_m = 6.371e6;
+        let dx = std::f64::consts::TAU * r_m / w as f64;
+        let faces = sphere_faces(h, dx, r_m);
+        assert!(
+            faces[0] == 1.0 && faces[h] == -1.0,
+            "the raster covers the poles"
+        );
+        let m = RowMetric::from_sin_faces(&faces, 1);
+        assert_eq!((m.a.len(), m.b.len()), (h, h + 1));
+        assert_eq!((m.b[0], m.b[h]), (0.0, 0.0));
+        assert_eq!(m.b[h / 2], 1.0, "the equator");
+        assert!((m.a[h / 2] - 1.0).abs() < 1e-4, "{}", m.a[h / 2]);
+        for j in 0..h {
+            let s = 0.5 * (faces[j] + faces[j + 1]);
+            if s.abs() < 0.99 {
+                assert!((m.a[j] * (1.0 - s * s) - 1.0).abs() < 1e-12, "row {j}");
+                assert!((m.b[j + 1] - (1.0 - faces[j + 1] * faces[j + 1])).abs() < 1e-15);
+            }
+            assert!(m.a[j].is_finite() && m.a[j] >= 1.0);
+        }
+        let m2 = RowMetric::from_sin_faces(&faces, 2);
+        assert_eq!((m2.a.len(), m2.b.len()), (h / 2, h / 2 + 1));
+        assert_eq!(m2.b[1], 1.0 - faces[2] * faces[2]);
+        assert_eq!(RowMetric::block(4).b, vec![0.0, 1.0, 1.0, 1.0, 0.0]);
+    }
+
+    /// On the sphere's metric (ISO-127) the operator L D L + C is symmetric; the row solve
+    /// inverts it exactly for a uniform plate (conjugate gradients stop after one iteration), and
+    /// with the block metric's couplings it gives the cosine transform's answer; a plate whose
+    /// rigidity varies a hundredfold converges.
+    #[test]
+    fn the_solve_on_the_sphere_inverts_its_operator() {
+        let (w, h, dx) = (64usize, 32usize, 50_000.0);
+        let faces = sphere_faces(h, dx, 0.49 * h as f64 * dx);
+        let metric = RowMetric::from_sin_faces(&faces, 1);
+        let n = w * h;
+        let noise = |seed: usize| -> Vec<f64> {
+            (0..n)
+                .map(|c| (((c * 7919 + seed * 104_729) % 1009) as f64 - 504.0) * 10.0)
+                .collect()
+        };
+        // Symmetric, with a plate twice as soft in a band and a wet zone.
+        let mut sv = Solver::with_metric(w, h, dx, Some(metric.clone()));
+        let d: Vec<f64> = (0..n)
+            .map(|c| rigidity_per_g(if (c / w) % 9 < 4 { 40.0 } else { 8.0 }, G))
+            .collect();
+        let cr: Vec<f64> = (0..n)
+            .map(|c| {
+                if c % w < 20 {
+                    RHO_MANTLE - RHO_WATER
+                } else {
+                    RHO_MANTLE
+                }
+            })
+            .collect();
+        let (u, v) = (noise(1), noise(2));
+        let (mut au, mut av) = (vec![0.0; n], vec![0.0; n]);
+        sv.operator(&d, &cr, &u, &mut au);
+        sv.operator(&d, &cr, &v, &mut av);
+        let (uav, vau) = (dot(w, &u, &av), dot(w, &v, &au));
+        assert!(
+            (uav - vau).abs() <= 1e-12 * uav.abs().max(vau.abs()),
+            "{uav} vs {vau}"
+        );
+
+        // Exact for a uniform plate.
+        let (du, cu) = uniform(n, 25.0, G);
+        let b = noise(3);
+        let (x, rep) = sv.solve(&du, &cu, &b, 1e-9, 20);
+        assert_eq!(rep.iterations, 1, "{rep:?}");
+        let mut ax = vec![0.0; n];
+        sv.operator(&du, &cu, &x, &mut ax);
+        let worst = ax
+            .iter()
+            .zip(&b)
+            .map(|(p, q)| (p - q).abs())
+            .fold(0.0, f64::max);
+        let top = b.iter().map(|q| q.abs()).fold(0.0, f64::max);
+        assert!(worst < 1e-9 * top, "{worst} of {top}");
+
+        // The block metric's couplings through the row solve: the cosine transform's answer.
+        let mut rows = Solver::with_metric(w, h, dx, Some(RowMetric::block(h)));
+        let mut block = Solver::new(w, h, dx);
+        let (xr, _) = rows.solve(&du, &cu, &b, 1e-9, 20);
+        let (xb, _) = block.solve(&du, &cu, &b, 1e-9, 20);
+        let peak = xb.iter().map(|v| v.abs()).fold(0.0, f64::max);
+        let diff = xr
+            .iter()
+            .zip(&xb)
+            .map(|(p, q)| (p - q).abs())
+            .fold(0.0, f64::max);
+        assert!(diff < 1e-9 * peak, "{diff} of {peak}");
+
+        // A plate whose rigidity varies.
+        let (x, rep) = sv.solve(&d, &cr, &b, 1e-6, 200);
+        assert!(rep.converged, "{rep:?}");
+        sv.operator(&d, &cr, &x, &mut ax);
+        let worst = ax
+            .iter()
+            .zip(&b)
+            .map(|(p, q)| (p - q).abs())
+            .fold(0.0, f64::max);
+        assert!(worst < 1e-3 * top, "{worst} of {top}");
+    }
+
+    /// The fault the sphere's metric mends (ISO-127): a load along a row (an east-west strip) at
+    /// latitude φ on a plate of flexural parameter α, against the analytic strip on an elastic
+    /// foundation (Hetényi: w = q/2k (2 − e^(−a/α) cos(a/α) − e^(−b/α) cos(b/α)) inside it,
+    /// q/2k (e^(−a/α) cos(a/α) − e^(−b/α) cos(b/α)) outside, a and b the distances to its edges)
+    /// in true distance, the strip as wide as the row is tall on the sphere. The block metric
+    /// takes the row as tall as at the equator: its strip carries cos φ of the load and its
+    /// profile is 1 / cos φ too wide. Prints the table (`--nocapture`).
+    #[test]
+    fn a_load_along_a_row_bends_the_plate_as_on_the_sphere() {
+        let (w, h) = (1024usize, 328usize);
+        let r_m = 6.371e6;
+        let dx = std::f64::consts::TAU * r_m / w as f64;
+        let faces = sphere_faces(h, dx, r_m);
+        let alpha = 400_000.0;
+        let c = RHO_MANTLE;
+        let n = w * h;
+        let d = vec![c * alpha.powi(4) / 4.0; n];
+        let cr = vec![c; n];
+        let q = 1.0e4; // kg/m²
+        let mut sphere = Solver::with_metric(w, h, dx, Some(RowMetric::from_sin_faces(&faces, 1)));
+        let mut block = Solver::new(w, h, dx);
+        let lat = |k: usize| faces[k].asin();
+        let mid = |j: usize| 0.5 * (lat(j) + lat(j + 1));
+        let strip = |s: f64, half: f64| -> f64 {
+            let f = |x: f64| (-x / alpha).exp() * (x / alpha).cos();
+            let (a, b) = ((s.abs() - half).abs(), s.abs() + half);
+            if s.abs() < half {
+                q / (2.0 * c) * (2.0 - f(a) - f(b))
+            } else {
+                q / (2.0 * c) * (f(a) - f(b))
+            }
+        };
+        eprintln!("lat   rows/α  w0_m    sphere_peak  block_peak  sphere_worst  block_worst");
+        for (deg, sphere_most, block_least) in [
+            (0.0, 0.02, 0.0),
+            (45.0, 0.03, 0.2),
+            (60.0, 0.05, 0.4),
+            (70.0, 0.08, 0.5),
+            (80.0, f64::INFINITY, 0.5),
+        ] {
+            let j0 = (0..h)
+                .min_by(|&p, &k| {
+                    (mid(p).to_degrees() - deg)
+                        .abs()
+                        .total_cmp(&(mid(k).to_degrees() - deg).abs())
+                })
+                .unwrap();
+            let half = 0.5 * r_m * (lat(j0) - lat(j0 + 1));
+            let b: Vec<f64> = (0..n).map(|k| if k / w == j0 { q } else { 0.0 }).collect();
+            let w0 = strip(0.0, half);
+            // Each solve's worst error, over the rows within 2α of the strip on the equator's
+            // side, as a share of the peak.
+            let worst = |x: &[f64]| -> (f64, f64) {
+                let mut most = 0.0f64;
+                for j in j0..h {
+                    let s = r_m * (mid(j0) - mid(j));
+                    if s > 2.0 * alpha {
+                        break;
+                    }
+                    most = most.max((x[j * w] - strip(s, half)).abs() / w0);
+                }
+                (x[j0 * w], most)
+            };
+            let (xs, rs) = sphere.solve(&d, &cr, &b, 1e-9, 20);
+            let (xb, rb) = block.solve(&d, &cr, &b, 1e-9, 20);
+            assert!(rs.converged && rb.converged, "{rs:?} {rb:?}");
+            let (ps, es) = worst(&xs);
+            let (pb, eb) = worst(&xb);
+            eprintln!(
+                "{deg:>4.0}  {:>6.2}  {w0:>6.3}  {ps:>11.3}  {pb:>10.3}  {es:>12.3}  {eb:>11.3}",
+                alpha / (2.0 * half)
+            );
+            assert!(es <= sphere_most, "{deg}°: the sphere's worst {es:.3}");
+            assert!(
+                eb >= block_least,
+                "{deg}°: the block metric's worst {eb:.3}"
+            );
+            assert!(
+                es <= eb + 1e-9,
+                "{deg}°: {es:.3} against the block's {eb:.3}"
+            );
+        }
     }
 }

@@ -710,8 +710,9 @@ fn flexure_off_changes_nothing_and_on_bends_the_plate() {
 
 /// The held offsets (ISO-125) in the coupled pipeline: with `surface.held_offsets` the surface
 /// marks the cells whose offset it holds (a gap between plates, a trench row) and hands the plate
-/// model none of their offset (NaN in the feedback), every other cell's whole offset as before;
-/// without it neither the mask nor a NaN.
+/// model none of their offset (NaN in the feedback; the plate model counts such a cell as an
+/// offset of 0 at its weight), every other cell's whole offset as before; without it neither the
+/// mask nor a NaN.
 #[test]
 fn the_surface_hands_the_plate_model_nothing_of_a_held_offset() {
     let run = |on: bool, name: &str| {
@@ -726,7 +727,12 @@ fn the_surface_hands_the_plate_model_nothing_of_a_held_offset() {
     };
     let off = run(false, "held-off");
     assert!(!off.fields.contains_key(field::OFFSET_HELD));
-    assert!(off.fields[field::FEEDBACK].data.iter().all(|x| x.is_finite()));
+    assert!(
+        off.fields[field::FEEDBACK]
+            .data
+            .iter()
+            .all(|x| x.is_finite())
+    );
     let on = run(true, "held-on");
     let held = &on.fields[field::OFFSET_HELD].data;
     let fb = &on.fields[field::FEEDBACK].data;
