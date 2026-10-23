@@ -365,9 +365,14 @@ base run (master 84b8ee03, key 7f9d8f115049, argkey 2a53566b, pass off).
   that is built and correct goes on without a V1 gate, and the pass fixes a real fault). By the code
   it changes only the heat flow of the cells the rate guard turned continental (the bake's
   `meta/heat_flow_mw_m2`, the deposits' and the underground's reading of it). By the pool the 1,000
-  Myr runs part from record 79 or 99 ("Measured: the heat-flow pass on by default"), and no path
-  from the field to the plates was found. Whether the pass or noise moves the dynamics is open: an
-  A/A control on the merged master answers it.
+  Myr runs part from record 79 or 99 ("Measured: the heat-flow pass on by default"). The path, found
+  in the code by the coordinator on 2026-10-23 and not yet confirmed by a field dump: the structure
+  stage reads `plates/heat_flow_mw_m2` as the metamorphism's geotherm (`structure/mod.rs`, the
+  `Thermal` of each column), `metamorphism::metamorphose` rewrites the classes of the surface's
+  strata log (RCK-037), the surface erodes the log by class (`surface/lithology.rs`, erodibility),
+  and erosion and deposition feed the next plate step. Hotter crust metamorphoses more and erodes
+  more slowly, which is physics, not a fault. It is not noise: the runs are bit-identical (off
+  equals the base byte for byte), so an A/A control would only repeat the on arm.
 - The land share's top. The strength moves the largest landmass and the drowned crust towards
   Earth and pushes seven of 24 runs over 0.32 land: the crust it keeps from spreading under the sea
   stands on land instead. Whether it can go on beside a change that lowers the land share, or
