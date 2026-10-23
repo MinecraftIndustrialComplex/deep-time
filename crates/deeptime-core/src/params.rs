@@ -618,7 +618,8 @@ pub struct TectonicParams {
     pub thermal_keel_km: f64,
     /// After the step's resampling, every continental sample gets at least its heat-flow law's
     /// conductive value: crust the rate guard spread onto old sea floor kept the floor's (ledger
-    /// PLT-469). On with `thermal_state` whatever this says.
+    /// PLT-469). On by default since 2026-10-23 (the coordinator's call: a bookkeeping fix that
+    /// moves no elevation); on with `thermal_state` whatever this says.
     pub heat_flow_refresh: bool,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
@@ -909,7 +910,7 @@ impl Default for TectonicParams {
             thermal_strength: false, // ledger: ISO-112 (game-choice: off by default)
             thermal_backstop: false, // ledger: PLT-470 (game-choice: off by default)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
-            heat_flow_refresh: false, // ledger: PLT-469 (game-choice: off by default)
+            heat_flow_refresh: true, // ledger: PLT-469 (game-choice: on since 2026-10-23, the coordinator's call)
             initial_plates: 14,
             plate_size_variety_rad: 0.35,
             continent_elevation_m: [150.0, 900.0],
