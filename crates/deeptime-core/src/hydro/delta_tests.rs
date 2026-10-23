@@ -168,19 +168,26 @@ fn a_large_river_builds_a_plain_above_the_sea_and_splits_across_it() {
         .unwrap();
     assert!(biggest.qs_kg_s > 0.0 && biggest.a_star_km2 > 0.0 && biggest.d_m > 0.0);
     assert!(biggest.cells.len() >= delta::MIN_PLAIN_CELLS);
-    // Every plain cell was sea or beach and is land a block above the sea's top water block now:
-    // its height in (sea level, sea level + 1].
+    // Every plain cell was sea or beach and is land a block above the sea's top water block now
+    // (its height in (sea level, sea level + 1]), but the river's course, which keeps the beach
+    // band's height (in (sea level - 1, sea level]) and was never lowered.
     for p in &plains.plains {
+        assert!(!p.course.is_empty());
         for &c in &p.cells {
             let c = c as usize;
             assert!(i32::from(base[c]) <= SEA_RAW, "cell {c} was land");
             let e = i32::from(elev[c]);
-            assert!(e > SEA_RAW && e <= SEA_RAW + 16, "cell {c} at {e}");
+            if p.course.contains(&(c as u32)) {
+                assert!(e > SEA_RAW - 16 && e <= SEA_RAW, "course cell {c} at {e}");
+                assert!(elev[c] >= base[c], "course cell {c} lowered");
+            } else {
+                assert!(e > SEA_RAW && e <= SEA_RAW + 16, "cell {c} at {e}");
+            }
         }
     }
-    // The river comes off the land onto the plain and runs across it to its front: the second
-    // network's largest sea mouth ends on the plain, and the ground under its course never rises
-    // downstream there (the ramp along the outflow, HYD-136).
+    // The river comes off the land onto the plain and runs across it to its front on its course:
+    // the second network's largest sea mouth ends on the plain, every cell of its stem on the
+    // plain is a course cell, and the ground under it never rises downstream (HYD-136).
     let main = second
         .mouths
         .iter()
@@ -198,6 +205,14 @@ fn a_large_river_builds_a_plain_above_the_sea_and_splits_across_it() {
         .collect();
     assert!(on.len() >= 3, "{} stem cells on the plain", on.len());
     assert!(on.windows(2).all(|p| p[1] <= p[0]), "{on:?}");
+    for &c in &main.stem {
+        if let Some(&o) = plains.owner.get(&c) {
+            assert!(
+                plains.plains[o as usize].course.contains(&c),
+                "the river leaves its course at cell {c}"
+            );
+        }
+    }
     // The largest plain splits: more than one mouth, each new chain leaving its parent at one of
     // the parent's vertices and ending in the sea.
     let r = &second.rivers;
