@@ -7,7 +7,6 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.StructureBurial;
 import com.minecraftindustrialcomplex.deeptime.worldgen.StructureBurialPass;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
@@ -32,10 +31,13 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Structures placed at an absolute height are buried under Deep Time's ground (SCL-200; Ben's single-player
@@ -319,24 +321,44 @@ public final class StructureBurialGameTests {
                 || p.equals("trial_spawner") || p.equals("vault") || p.equals("iron_bars") || p.equals("crafter");
     }
 
-    /** What one placed start holds, read back from the generated chunks inside its pieces' boxes. */
+    /** A piece's template ({@code minecraft:trial_chambers/corridor/end_2}), or its class for a piece that is not a pool element. */
+    private static String pieceName(StructurePiece p) {
+        if (!(p instanceof PoolElementStructurePiece pe))
+            return p.getClass().getSimpleName();
+        String e = pe.getElement().toString();   // Single[Left[minecraft:trial_chambers/corridor/end_2]]
+        return e.substring(e.lastIndexOf('[') + 1).replace("]", "");
+    }
+
+    /**
+     * What one placed start holds, read back from the generated chunks inside its pieces' boxes. Every cell is read
+     * before the start is placed and again after, so the water in it is told apart: the world's (the cell held water
+     * before and the placement left it as it was: the sea, a lake or an aquifer the start stands in) and the
+     * template's own (the placement put it there).
+     */
     private static final class Tally {
-        long read, structure, structureWet, water, waterNextToStructure, columns;
-        int waterLow = Integer.MAX_VALUE, waterHigh = Integer.MIN_VALUE;
+        long read, structure, structureWet, waterBefore, water, worldWater, columns;
+        int worldLow = Integer.MAX_VALUE, worldHigh = Integer.MIN_VALUE;
         /** Least over the sampled columns of (the real floor's top solid y) - (the start's top y): the cover that stands over it. */
         int cover = Integer.MAX_VALUE;
-        String firstWater;
+        String firstWorldWater;
+        /** The waterlogged structure blocks by the piece that holds them: template, {count, least y, greatest y}. */
+        final Map<String, int[]> wetPieces = new TreeMap<>();
 
         String line() {
-            return "read " + read + " structure " + structure + " waterlogged " + structureWet + " water " + water
-                    + (water == 0 ? "" : " (y " + waterLow + ".." + waterHigh + ", next to a structure block " + waterNextToStructure
-                    + ", first " + firstWater + ")") + " cover " + (columns == 0 ? "n/a" : cover) + " over " + columns + " columns";
+            StringBuilder w = new StringBuilder();
+            wetPieces.forEach((k, v) -> w.append(w.isEmpty() ? "" : ", ").append(k).append(": ").append(v[0])
+                    .append(" at y ").append(v[1]).append("..").append(v[2]));
+            return "read " + read + " structure " + structure + " waterlogged " + structureWet + (structureWet == 0 ? "" : " (" + w + ")")
+                    + "; water before placing " + waterBefore + ", after " + water + " (the template's " + (water - worldWater)
+                    + ", the world's left " + worldWater + (worldWater == 0 ? "" : " at y " + worldLow + ".." + worldHigh + ", first " + firstWorldWater)
+                    + "); cover " + (columns == 0 ? "n/a" : cover) + " over " + columns + " columns";
         }
     }
 
-    /** Reads the chunk {@code chunk} inside {@code start}'s pieces' boxes (and {@code writable}) into {@code t}. */
-    private static void blocks(LevelChunk chunk, StructureStart start, BoundingBox writable, Tally t) {
-        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(), nb = new BlockPos.MutableBlockPos();
+    /** The cells of {@code start}'s pieces' boxes in {@code chunk} (and {@code writable}) as they stand now, before it is placed; counts their water into {@code t}. */
+    private static Map<Long, BlockState> before(LevelChunk chunk, StructureStart start, BoundingBox writable, Tally t) {
+        Map<Long, BlockState> cells = new HashMap<>();
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         for (StructurePiece p : start.getPieces()) {
             BoundingBox b = p.getBoundingBox();
             if (!b.intersects(writable))
@@ -345,27 +367,48 @@ public final class StructureBurialGameTests {
                 for (int z = Math.max(b.minZ(), writable.minZ()); z <= Math.min(b.maxZ(), writable.maxZ()); z++)
                     for (int y = Math.max(b.minY(), writable.minY()); y <= Math.min(b.maxY(), writable.maxY()); y++) {
                         BlockState s = chunk.getBlockState(pos.set(x, y, z));
+                        if (cells.putIfAbsent(pos.asLong(), s) == null && s.getFluidState().is(FluidTags.WATER))
+                            t.waterBefore++;
+                    }
+        }
+        return cells;
+    }
+
+    /** Reads the cells {@link #before} took, after {@code start} was placed, into {@code t} (each cell once, under the first piece whose box holds it). */
+    private static void blocks(LevelChunk chunk, StructureStart start, BoundingBox writable, Map<Long, BlockState> before, Tally t) {
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (StructurePiece p : start.getPieces()) {
+            BoundingBox b = p.getBoundingBox();
+            if (!b.intersects(writable))
+                continue;
+            for (int x = Math.max(b.minX(), writable.minX()); x <= Math.min(b.maxX(), writable.maxX()); x++)
+                for (int z = Math.max(b.minZ(), writable.minZ()); z <= Math.min(b.maxZ(), writable.maxZ()); z++)
+                    for (int y = Math.max(b.minY(), writable.minY()); y <= Math.min(b.maxY(), writable.maxY()); y++) {
+                        BlockState was = before.remove(pos.set(x, y, z).asLong());
+                        if (was == null)
+                            continue;
+                        BlockState s = chunk.getBlockState(pos);
                         t.read++;
                         boolean wet = s.getFluidState().is(FluidTags.WATER);
                         if (structureBlock(s)) {
                             t.structure++;
-                            if (wet)
+                            if (wet) {
                                 t.structureWet++;
-                        }
-                        if (wet) {
-                            t.water++;
-                            t.waterLow = Math.min(t.waterLow, y);
-                            t.waterHigh = Math.max(t.waterHigh, y);
-                            for (Direction d : Direction.values()) {
-                                int nx = x + d.getStepX(), nz = z + d.getStepZ();
-                                if ((nx >> 4) == chunk.getPos().x && (nz >> 4) == chunk.getPos().z
-                                        && structureBlock(chunk.getBlockState(nb.set(nx, y + d.getStepY(), nz)))) {
-                                    t.waterNextToStructure++;
-                                    break;
-                                }
+                                int[] w = t.wetPieces.computeIfAbsent(pieceName(p), k -> new int[]{0, Integer.MAX_VALUE, Integer.MIN_VALUE});
+                                w[0]++;
+                                w[1] = Math.min(w[1], y);
+                                w[2] = Math.max(w[2], y);
                             }
-                            if (t.firstWater == null)
-                                t.firstWater = pos.toShortString() + " " + BuiltInRegistries.BLOCK.getKey(s.getBlock());
+                        }
+                        if (!wet)
+                            continue;
+                        t.water++;
+                        if (s == was) {
+                            t.worldWater++;
+                            t.worldLow = Math.min(t.worldLow, y);
+                            t.worldHigh = Math.max(t.worldHigh, y);
+                            if (t.firstWorldWater == null)
+                                t.firstWorldWater = pos.toShortString() + " " + BuiltInRegistries.BLOCK.getKey(s.getBlock()) + " in " + pieceName(p);
                         }
                     }
         }
@@ -395,19 +438,27 @@ public final class StructureBurialGameTests {
      * Placed as world generation places it, a buried trial chamber stands under the floor and not in the sea. The
      * start is made over the deepest sea twice (buried as the game makes it; at vanilla's own height as a control),
      * both are placed chunk by chunk into the generated level ({@code placeInChunk}, as
-     * {@code SeamGameTests.structureStraddlesSeam} does) and read back inside their pieces' boxes:
+     * {@code SeamGameTests.structureStraddlesSeam} does), and every cell inside their pieces' boxes is read before
+     * and after:
      * <ul>
      *   <li>the structure's own blocks (tuff bricks, copper, spawners) are there;</li>
-     *   <li>none of them is waterlogged, and the real floor of the generated chunks (not the model's H) stands at
-     *       least {@code cover} above the buried start's top over every sampled column of its footprint;</li>
-     *   <li>the control, at vanilla's height, sticks out of that floor, which is the picture of the report.</li>
+     *   <li>no cell the buried chamber takes held water before it was placed (the sea's, a lake's or an aquifer's),
+     *       and the real floor of the generated chunks (not the model's H) stands at least {@code cover} above its
+     *       top over every sampled column of its footprint;</li>
+     *   <li>the control, at vanilla's height, sticks out of that floor and its cells hold the sea's water: the picture
+     *       of the report, and the proof that the read sees the sea.</li>
      * </ul>
-     * About 2 % of the cells inside the buried boxes still hold water (the control at vanilla's height holds about 4 %,
-     * and a chamber in solid rock under the highest ground holds almost none: 7 of 66,803 cells in the run), so
-     * the boxes are not asserted dry. The template carries almost no water of its own (the rock control), so this is
-     * water around it in cells the template does not overwrite (not traced further); the chamber is placed over
-     * finished chunks here, without the terrain adaptation that generation applies, and what real generation
-     * leaves is not checked. The numbers are logged with where the water is.
+     * Water the placement put there is the template's own and no fault of the rule: vanilla's trial chamber templates
+     * carry basins ({@code corridor/end_2}: 60 water and 23 waterlogged waxed oxidized cut copper stairs;
+     * {@code intersection/intersection_1}: 966 water; {@code corridor/atrium_1}: 17; one each in
+     * {@code corridor/addon/display_1}, {@code display_2} and {@code corridor/entrance_1}; read from the 1.21.1
+     * client jar's templates). Nor do waterlogged blocks tell a chamber in the sea from one in rock: trial chambers
+     * place with {@code LiquidSettings.IGNORE_WATERLOGGING}, so the world's water never waterlogs their blocks, and
+     * the count only says whether {@code corridor/end_2} fell in the sampled chunks (it did at the deepest sea of
+     * master bf8477b2's planet: 23 in the buried chamber and 23 in the control, the assertion this test had before).
+     * Both kinds of water are logged, the waterlogged blocks by piece. The chamber is placed over finished chunks
+     * here, without the terrain adaptation ({@code encapsulate}) that generation applies, which only adds rock round
+     * its pieces.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void buriedChamberStandsUnderTheFloor(GameTestHelper helper) {
@@ -437,36 +488,8 @@ public final class StructureBurialGameTests {
         for (int i = 0; i < all.size() && chunks.size() < 12; i += stride)
             chunks.add(all.get(i));
 
-        // A dry control under the highest ground: a chamber that stands in solid rock, to tell the template's own water from the sea's.
-        Site high = find(t, false);
-        StructureStart dryStart = StructureBurialPass.withoutBurial(() -> start(level, chambers, new ChunkPos(high.x >> 4, high.z >> 4)));
-        helper.assertTrue(dryStart.isValid(), "no trial chamber start under the highest ground");
-        Set<ChunkPos> dryTouched = new LinkedHashSet<>();
-        for (StructurePiece p : dryStart.getPieces()) {
-            BoundingBox b = p.getBoundingBox();
-            for (int cx = b.minX() >> 4; cx <= b.maxX() >> 4; cx++)
-                for (int cz = b.minZ() >> 4; cz <= b.maxZ() >> 4; cz++)
-                    dryTouched.add(new ChunkPos(cx, cz));
-        }
-        List<ChunkPos> dryAll = new ArrayList<>(dryTouched), dryChunks = new ArrayList<>();
-        int dryStride = Math.max(1, dryAll.size() / 12);
-        for (int i = 0; i < dryAll.size() && dryChunks.size() < 12; i += dryStride)
-            dryChunks.add(dryAll.get(i));
-
-        Tally buried = new Tally(), vanilla = new Tally(), dry = new Tally();
-        int deepJobs = chunks.size();
-        ChunkSampling.forEach(helper, deepJobs + dryChunks.size(), i -> {
-            if (i >= deepJobs) {
-                ChunkPos dp = dryChunks.get(i - deepJobs);
-                LevelChunk dc = (LevelChunk) level.getChunkSource().getChunk(dp.x, dp.z, ChunkStatus.FULL, true);
-                BoundingBox dw = new BoundingBox(dp.getMinBlockX(), level.getMinBuildHeight() + 1, dp.getMinBlockZ(),
-                        dp.getMaxBlockX(), level.getMaxBuildHeight() - 1, dp.getMaxBlockZ());
-                floor(dc, dryStart, dw, dry);
-                dryStart.placeInChunk(level, level.structureManager(), level.getChunkSource().getGenerator(),
-                        RandomSource.create(dp.toLong()), dw, dp);
-                blocks(dc, dryStart, dw, dry);
-                return true;
-            }
+        Tally buried = new Tally(), vanilla = new Tally();
+        ChunkSampling.forEach(helper, chunks.size(), i -> {
             ChunkPos cp = chunks.get(i);
             LevelChunk chunk = (LevelChunk) level.getChunkSource().getChunk(cp.x, cp.z, ChunkStatus.FULL, true);
             BoundingBox writable = new BoundingBox(cp.getMinBlockX(), level.getMinBuildHeight() + 1, cp.getMinBlockZ(),
@@ -474,24 +497,25 @@ public final class StructureBurialGameTests {
             floor(chunk, start, writable, buried);
             floor(chunk, control, writable, vanilla);
             for (StructureStart st : List.of(start, control)) {
+                Tally into = st == start ? buried : vanilla;
+                Map<Long, BlockState> cells = before(chunk, st, writable, into);
                 st.placeInChunk(level, level.structureManager(), level.getChunkSource().getGenerator(),
                         RandomSource.create(cp.toLong()), writable, cp);
-                blocks(chunk, st, writable, st == start ? buried : vanilla);
+                blocks(chunk, st, writable, cells, into);
             }
             return true;
         }, () -> {
-            DeepTime.LOGGER.info("[gametest] buriedChamberStandsUnderTheFloor site=({}, {}) ground {}..{} chunks {}/{}\n  buried (box y {}..{}): {}\n  vanilla control (box y {}..{}): {}"
-                            + "\n  dry control under the highest ground ({}, {}) ground {}..{} (box y {}..{}, chunks {}/{}): {}",
+            DeepTime.LOGGER.info("[gametest] buriedChamberStandsUnderTheFloor site=({}, {}) ground {}..{} chunks {}/{}\n  buried (box y {}..{}): {}\n  vanilla control (box y {}..{}): {}",
                     site.x, site.z, site.least, site.most, chunks.size(), all.size(), box.minY(), box.maxY(), buried.line(),
-                    controlBox.minY(), controlBox.maxY(), vanilla.line(), high.x, high.z, high.least, high.most,
-                    union(dryStart).minY(), union(dryStart).maxY(), dryChunks.size(), dryAll.size(), dry.line());
+                    controlBox.minY(), controlBox.maxY(), vanilla.line());
             helper.assertTrue(buried.structure > 0, "none of the structure's own blocks (tuff bricks, copper, spawners) was found in the "
                     + buried.read + " blocks read: the chamber was not placed");
-            helper.assertTrue(buried.structureWet == 0, buried.structureWet + " of the buried chamber's own blocks are waterlogged: " + buried.line());
+            helper.assertTrue(buried.waterBefore == 0, buried.waterBefore + " of the cells the buried chamber takes held water before it was placed: "
+                    + buried.line());
             helper.assertTrue(buried.columns > 0 && buried.cover >= StructureBurial.COVER - SLACK,
                     "the real floor stands only " + buried.cover + " blocks over the buried chamber's top (cover " + StructureBurial.COVER + ")");
-            helper.assertTrue(vanilla.columns > 0 && vanilla.cover < 0,
-                    "the control (vanilla height) does not stick out of the floor: " + vanilla.line());
+            helper.assertTrue(vanilla.columns > 0 && vanilla.cover < 0 && vanilla.waterBefore > 0,
+                    "the control (vanilla height) does not stick out of the floor into the sea: " + vanilla.line());
             helper.succeed();
         });
     }
