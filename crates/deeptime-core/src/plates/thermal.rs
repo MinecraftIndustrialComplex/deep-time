@@ -11,13 +11,24 @@
 //! ([`heat_flow_mw_m2`]), a thermal term of the Airy height ([`uplift_m`]) and a thermal age
 //! ([`thermal_age_myr`]) for the thin sheet's viscosity and the flexure's Te.
 //!
-//! All of it is off unless `tectonics.thermal_state` is set; the height and the strength have
-//! switches of their own (`thermal_isostasy_m`, `thermal_strength`).
+//! `tectonics.thermal_state` and `thermal_strength` are on by default since 2026-10-23 (Ben's
+//! rule of that day, "Always, fix V1 elsewhere": physics goes on once built and correct); off,
+//! for tests that isolate one law, there is no state and heat flow is the old proxy. The thermal
+//! height (`thermal_isostasy_m`, an open fault: no frame for its reference depth is right while
+//! the model's sea is not) and the backstop (`thermal_backstop`, a stand-in) stay off.
+//!
+//! Stage 3: a collision belt's thickened mantle lithosphere drops off by Rayleigh-Taylor
+//! instability, so its lithosphere heats to the Moho, or to its keel where it has one
+//! ([`ROOT_REMOVAL_MYR`]). Stage 2 thins a rifted margin's lithosphere with its crust in
+//! `transition.rs` ([`stretch`]); the cooling here is then McKenzie's thermal subsidence.
 
 use rayon::prelude::*;
 
 use super::Env;
-use super::state::{ARC, CONTINENTAL, DIVERGENT, HOTSPOT, OCEANIC, PlateState, SUBDUCTION_ZONE};
+use super::state::{
+    ARC, CONTINENTAL, DIVERGENT, HOTSPOT, OCEANIC, OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE,
+    Sample,
+};
 use crate::params::TectonicParams;
 
 /// A hot back-arc's lithosphere, km: "lithosphere thicknesses are 50-60 km" (Hyndman, Currie &
@@ -37,6 +48,13 @@ pub const KEEL_KM: f64 = 200.0; // ledger: PLT-463
 /// viscosity is less than about 10^21 Pa s" (Houseman & Molnar 1997, p. 131); removal of lower
 /// back-arc lithosphere "on timescales of 5-10 Ma" (Currie, Huismans & Beaumont 2008).
 pub const HEATING_MYR: f64 = 10.0; // ledger: PLT-464
+
+/// Rayleigh-Taylor removal of a thickened mantle lithosphere (stage 3), e-folding time, Myr:
+/// "between 50 (for rheological parameters representative of dry olivine) and 75 per cent (for wet
+/// olivine) of the lithospheric mantle would be involved in an instability whose duration is of the
+/// order of 10 Myr" (Houseman & Molnar 1997, conclusions); 1 − e^(−1), 63 per cent, goes in the
+/// first 10 Myr here.
+pub const ROOT_REMOVAL_MYR: f64 = 10.0; // ledger: PLT-477
 
 /// McKenzie's (1978) plate: a = 125 km, τ = 62.8 My (Table 1), τ = a²/(π²κ) (eq. 6).
 pub const PLATE_KM: f64 = 125.0; // ledger: PLT-465
@@ -161,14 +179,41 @@ fn heating(flags: u8) -> Option<bool> {
     }
 }
 
+/// The crust, km, of a continental sample whose thickened mantle lithosphere is unstable (stage
+/// 3): a collision belt (a Himalayan orogeny) whose crust is thicker than the model's thickened
+/// crust, `collapse_thickness_km` (PLT-256: the lithosphere thickened with it by about the crust's
+/// factor, 1.5 or more, Houseman, McKenzie & Molnar 1981's thickened boundary layer); `None`
+/// elsewhere.
+// ledger: PLT-478
+pub fn root_crust_km(k: &TectonicParams, s: &Sample) -> Option<f64> {
+    let crust_km = f64::from(s.thickness_m) / 1000.0;
+    (s.orogeny == OROGENY_HIMALAYAN && crust_km > k.collapse_thickness_km).then_some(crust_km)
+}
+
 /// One step of a continental sample's state over `dt_myr`: (L, K) after it. `flags` are the
 /// step's.
 // ledger: PLT-460, PLT-464, PLT-465
 pub fn advance(l_km: f64, keel_km: f64, flags: u8, dt_myr: f64) -> (f64, f64) {
-    let (target, tau, rift) = match heating(flags) {
-        Some(true) => (L_HOT_KM, HEATING_MYR, true),
-        Some(false) => (L_HOT_KM.max(keel_km), HEATING_MYR, false),
-        None => (L_COLD_KM, cooling_myr(), false),
+    advance_with_root(l_km, keel_km, flags, None, dt_myr)
+}
+
+/// [`advance`] with stage 3: `root` is the crust, km, of a column whose thickened mantle
+/// lithosphere is unstable ([`root_crust_km`]). Its lithosphere drops off towards the Moho over
+/// [`ROOT_REMOVAL_MYR`] unless a keel holds it (Jordan's depleted tectosphere is buoyant): the
+/// target is max(L_hot, K, crust). A rift or an arc's heating comes first.
+// ledger: PLT-460, PLT-464, PLT-465, PLT-477
+pub fn advance_with_root(
+    l_km: f64,
+    keel_km: f64,
+    flags: u8,
+    root: Option<f64>,
+    dt_myr: f64,
+) -> (f64, f64) {
+    let (target, tau, rift) = match (heating(flags), root) {
+        (Some(true), _) => (L_HOT_KM, HEATING_MYR, true),
+        (Some(false), _) => (L_HOT_KM.max(keel_km), HEATING_MYR, false),
+        (None, Some(crust_km)) => (L_HOT_KM.max(keel_km).max(crust_km), ROOT_REMOVAL_MYR, false),
+        (None, None) => (L_COLD_KM, cooling_myr(), false),
     };
     // A convective target never lies below the keel; a lithosphere already thinner than its
     // target (a rift's, cooling) moves up towards it.
@@ -231,15 +276,29 @@ pub fn step(state: &mut PlateState, env: &Env) {
         if s.is_hidden() {
             return;
         }
-        let (l, keel) = advance(
+        let (l, keel) = advance_with_root(
             f64::from(s.lithosphere_km),
             f64::from(s.keel_km),
             s.flags,
+            root_crust_km(k, s),
             dt,
         );
         s.lithosphere_km = l as f32;
         s.keel_km = keel as f32;
     });
+}
+
+/// Stage 2: a continental column whose crystalline crust the transition thins
+/// to `keep` of what it was (a stretch by β = 1 / `keep`) has its lithosphere and keel thinned by
+/// the same factor, L / β and K / β (McKenzie 1978's uniform stretching of the whole lithosphere,
+/// pure shear); a sample with no state keeps none.
+// ledger: PLT-476
+pub fn stretch(s: &mut Sample, keep: f64) {
+    if s.kind != CONTINENTAL || s.lithosphere_km <= 0.0 || !(0.0..1.0).contains(&keep) {
+        return;
+    }
+    s.lithosphere_km = (f64::from(s.lithosphere_km) * keep).max(1.0) as f32;
+    s.keel_km = (f64::from(s.keel_km) * keep).min(f64::from(s.lithosphere_km)) as f32;
 }
 
 /// The heat flow of a continental sample as the state gives it, mW/m² (`finish_samples`).
@@ -350,6 +409,91 @@ mod tests {
             (l, keel) = advance(l, keel, DIVERGENT, 2.0);
         }
         assert!(l < 65.0 && keel <= l, "{l} {keel}");
+    }
+
+    /// Stage 3 (PLT-477): a collision belt with no keel loses half to three quarters of its
+    /// mantle lithosphere in 10 Myr (Houseman & Molnar 1997) and its lithosphere ends at its Moho;
+    /// a keel holds it (the target is the keel); a rift or an arc's heating comes first.
+    #[test]
+    fn a_belts_thickened_mantle_lithosphere_drops_off_unless_a_keel_holds_it() {
+        let crust = 65.0;
+        let (mut l, mut keel) = (L_COLD_KM, 0.0);
+        for _ in 0..5 {
+            (l, keel) = advance_with_root(l, keel, 0, Some(crust), 2.0);
+        }
+        let removed = (L_COLD_KM - l) / (L_COLD_KM - crust);
+        assert!((0.5..=0.75).contains(&removed), "{removed}");
+        for _ in 0..50 {
+            (l, keel) = advance_with_root(l, keel, 0, Some(crust), 2.0);
+        }
+        assert!((l - crust).abs() < 0.1, "{l}");
+        assert_eq!(keel, 0.0);
+        // Its heat flow is near a back-arc's, its thermal age young (6.3 Myr at 65 km).
+        assert!(conductive_mw_m2(l) > 75.0 && thermal_age_myr(l) < 10.0);
+        // A keel holds it: the lithosphere stops at the keel.
+        let (mut l, mut keel) = (L_COLD_KM, KEEL_KM);
+        for _ in 0..50 {
+            (l, keel) = advance_with_root(l, keel, 0, Some(crust), 2.0);
+        }
+        assert!((l - KEEL_KM).abs() < 0.1 && keel == KEEL_KM, "{l} {keel}");
+        // A rift's heating comes first; with no root it cools as before.
+        let rift = advance_with_root(L_COLD_KM, KEEL_KM, DIVERGENT, Some(crust), 2.0);
+        assert_eq!(rift, advance(L_COLD_KM, KEEL_KM, DIVERGENT, 2.0));
+        assert_eq!(
+            advance_with_root(100.0, 0.0, 0, None, 2.0),
+            advance(100.0, 0.0, 0, 2.0)
+        );
+    }
+
+    /// The root is unstable only in a collision belt thickened past the collapse threshold.
+    #[test]
+    fn only_a_thickened_collision_belt_loses_its_root() {
+        let k = TectonicParams::default();
+        let mut s = Sample::blank(0);
+        s.kind = CONTINENTAL;
+        s.orogeny = OROGENY_HIMALAYAN;
+        s.thickness_m = 60_000.0;
+        assert_eq!(root_crust_km(&k, &s), Some(60.0));
+        s.thickness_m = 45_000.0;
+        assert_eq!(root_crust_km(&k, &s), None, "not thickened");
+        s.thickness_m = 60_000.0;
+        s.orogeny = crate::plates::state::OROGENY_ANDEAN;
+        assert_eq!(root_crust_km(&k, &s), None, "an arc's heating is its own");
+    }
+
+    /// Stage 2 (PLT-476): stretching by β thins the lithosphere and the keel by β; ocean floor and
+    /// crust with no state keep theirs.
+    #[test]
+    fn stretching_thins_the_lithosphere_and_its_keel_by_beta() {
+        let mut s = Sample::blank(0);
+        s.kind = CONTINENTAL;
+        s.lithosphere_km = 225.0;
+        s.keel_km = 200.0;
+        stretch(&mut s, 0.5);
+        assert_eq!((s.lithosphere_km, s.keel_km), (112.5, 100.0));
+        stretch(&mut s, 1.0);
+        assert_eq!((s.lithosphere_km, s.keel_km), (112.5, 100.0));
+        let mut o = Sample::blank(0);
+        o.kind = OCEANIC;
+        o.lithosphere_km = 80.0;
+        stretch(&mut o, 0.5);
+        assert_eq!(o.lithosphere_km, 80.0);
+        let mut n = Sample::blank(0);
+        n.kind = CONTINENTAL;
+        stretch(&mut n, 0.5);
+        assert_eq!(n.lithosphere_km, 0.0);
+        // McKenzie's cooling then brings it back: a β = 2 margin's lithosphere is two thirds back
+        // after one τ_c (the relaxation's 1 − e^(−1) of the way).
+        let (mut l, mut keel) = (f64::from(s.lithosphere_km), f64::from(s.keel_km));
+        let steps = (cooling_myr() / 2.0).round() as usize;
+        for _ in 0..steps {
+            (l, keel) = advance(l, keel, 0, 2.0);
+        }
+        let back = (l - 112.5) / (L_COLD_KM - 112.5);
+        assert!(
+            (back - (1.0 - (-1.0f64).exp())).abs() < 0.01,
+            "{back} {keel}"
+        );
     }
 
     #[test]
