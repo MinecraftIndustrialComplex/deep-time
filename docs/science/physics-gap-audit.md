@@ -112,6 +112,10 @@ and that the model does not have as physics.
   lower-crustal channel. Whole-lithosphere spreading works over the width of the orogen or more
   (England & Houseman 1986). No document proposed or ruled out a lithosphere-scale solve until
   plates.md:3711 (2026-10-21): "would be a flow solve, not a constant".
+- **State (2026-10-23).** A stand-in is on by default, not the solve: the collapse measured from
+  the sea with its cap (PLT-412, PLT-413), a thin sheet's strain rate from the column energy
+  (PLT-414, PLT-415) and the reach at a plate's size (PLT-257, 5,000 km); with gap 3 it takes M4
+  from 0.261 to 0.161 over 24 runs (plates.md, "On by default (2026-10-23)").
 
 ### Gap 2: plate boundary organisation
 
@@ -175,6 +179,10 @@ and that the model does not have as physics.
 - **Known.** Yes: plates.md:2537 ("no rule"), sea-level.md's open questions and STATUS.md:253.
   PLT-312 is off "until the continental crust's losses are on Earth's numbers too"
   (plates.md:2459). No task holds it.
+- **State (2026-10-23).** Sediment subduction (PLT-440, s = 0.12), subduction erosion (PLT-441,
+  PLT-442) and the trench's release (PLT-443) are on by default with gap 1's stand-in: M1 0.306
+  in band, M3 0.238, criteria 3.42 a run against 2.33 (p 0.004, 24 runs; plates.md, "On by
+  default (2026-10-23)"); PLT-312 stays off and the sea still stands 840 m over the datum.
 
 ### Gap 4: the lithosphere's thermal and mechanical state
 
