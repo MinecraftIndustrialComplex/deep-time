@@ -29,7 +29,7 @@ import java.util.Set;
  * <p><b>Which structures.</b> Only those that place by an absolute height: see {@link #covers}.
  * Structures that follow the ground (buried treasure, trail ruins, ruins and wrecks) are never touched.
  *
- * <p>Ledger SCL-200 ({@link #COVER}, a game choice). {@code -Ddeeptime.buryStructures=false} turns the rule
+ * <p>Ledger SCL-200 ({@link #COVER}, a game choice) and SCL-201 ({@link #covers}). {@code -Ddeeptime.buryStructures=false} turns the rule
  * off, for A/B checks.
  */
 public final class StructureBurial {
@@ -62,10 +62,10 @@ public final class StructureBurial {
         return !"false".equalsIgnoreCase(System.getProperty(PROPERTY, "true"));
     }
 
-    private static final Set<String> UNDERGROUND_STEPS = Set.of("underground_structures", "underground_decoration", "strongholds");
+    private static final Set<String> UNDERGROUND_STEPS = Set.of("underground_structures", "underground_decoration", "strongholds");   // ledger: SCL-201
 
     /**
-     * Whether the rule looks at a structure: it places itself by an absolute height, below ground, whatever the
+     * Whether the rule looks at a structure (ledger: SCL-201, game-choice): it places itself by an absolute height, below ground, whatever the
      * ground is. Decided on the structure's own JSON (the encoded {@code Structure}, so any mod's jigsaw kind
      * answers the same way, with no list to keep):
      * <ul>
