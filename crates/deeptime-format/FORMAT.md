@@ -319,7 +319,11 @@ baked and gets a Lambert layout block.
   them (after the relief has read it as resampled) and settled by its own extent rule, a land cell
   ("The ice cover", step 1), on the world's ground (BIO-177): a node the world's sea covers is set to 0,
   and a node still covered is of the Köppen class EF (BIO-158) whatever the settle gave it
-  (`biome_land`: `ice_cover_off_the_sea` and `ice_cover_class_ef`, each `nodes` and `km2`). The
+  (`biome_land`: `ice_cover_off_the_sea` and `ice_cover_class_ef`, each `nodes` and `km2`). After the
+  settle no wetland stands on or beside the world's playas ("The wetland flag", BIO-178): a node holds a
+  playa when a cell of the world's `playa` layer lies in its square, and every node within 20 blocks plus
+  two L2 cells plus one `playa` cell of such a node (the settle's own distance in cells) is dried
+  (`biome_land.playa_dried`: `playa_nodes`, `reach_blocks`, `nodes`, `km2`). The
   first horizon of every stack cell is then raised to
   the bake's top rule over the world's own terrain (`notes.bake.projection.top_raise`): the stacks
   come from the nearest cell and the terrain from the footprint mean.
@@ -802,14 +806,18 @@ flagged cells of that region, and the pack draws its biome there. The verdict
 `climate_mapping.json` as `peatland: {erosion, regions, biomes}` so a pack update does not move
 explored biomes; `regions: []` means the pack has none and cold wetland is taiga everywhere.
 
-No wetland stands on or beside a playa (BIO-178): the water bake, after it writes `playa`, sets the flag
-to 0 on every L2 cell within `PLAYA_WETLAND_MARGIN_BLOCKS` (20) blocks of ground of a playa cell's block,
-plus two L2 cells and one water cell (the grids' reach), and holds that cell's `climate/erosion` under E5
-as a cold wetland's is (a lower one is kept). On the Lambert grid the box is 1 / cos φ times as wide in x
-(a block of ground spans that many grid blocks east-west) and wraps across the seam. A playa is a basin
-whose water dries off its floor, so a swamp's flag there came from the climate's wetness alone, and its
-trees (a mangrove's roots reach 9 blocks) stood over the salt. `notes.bake.water.playa.wetland_cleared` is
-`{playa_cells, reach_blocks, lambert, nodes}` (`nodes`: the cells whose flag it cleared).
+No wetland stands on or beside a playa (BIO-178). A cell within the reach of a playa whose flag is not 0,
+or whose `climate/erosion` is in vanilla's swamp band E6 with the flag 0, gets the flag 0 and its erosion
+held under E5 as a cold wetland's is (a lower one is kept); any other cell is left alone. The water bake
+does it after it writes `playa`, on every L2 cell within `PLAYA_WETLAND_MARGIN_BLOCKS` (20) blocks of
+ground of a playa cell's block, plus two L2 cells and one water cell (the grids' reach); on the Lambert
+grid the box is 1 / cos φ times as wide in x (a block of ground spans that many grid blocks east-west)
+and wraps across the seam. The projection pass does it again on the world's own L2 cells after its land
+call ("The bake's projection pass"), since the resampling and the land call can carry a swamp's record onto
+the world's playa. A playa is a basin whose water dries off its floor, so a swamp there came from the
+climate's wetness or a neighbour's record, and its trees (a mangrove's roots reach 9 blocks) stood over the
+salt. `notes.bake.water.playa.wetland_cleared` is `{playa_cells, reach_blocks, lambert, nodes}` (`nodes`:
+the cells it changed).
 
 ## Grids
 
