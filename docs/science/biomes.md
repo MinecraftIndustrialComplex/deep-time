@@ -998,6 +998,72 @@ the same 8 blocks away on all four sides), the share of dry columns with an ocea
 land biome, each at most 1 %; the 4k planet's own count is logged, and was not run on this branch (the
 coordinator's batch).
 
+## The ice cover off the world's sea (2026-10-23, BIO-177)
+
+The ice cover (BIO-157 to BIO-159) is laid on the **simulation's** L2 ground: a cell of the young stage's elevation
+above sea level whose nearest L1 climate cell holds at least 1 m of ice. The game draws it with `IcePass`, which
+stands the cover's blocks on a column's ground and leaves alone a column whose top block is a fluid. On a
+Petroff-Guyou world the ground the game stands on is another one: the projection's footprint mean of the height,
+which past about 59° of latitude smooths features smaller than its footprint. A covered coastal cell of the
+simulation can then be world sea. There the game has sea water and lays no ice, the land call (BIO-170, BIO-171)
+gives the node the sea's Koppen class, and the cover layer still says ice.
+
+**What the gate found.** On master 57558f0a, the commit that turned the high ground's sheet and the trench budget on
+by default, `iceCoverLaidOnGlaciatedGround` failed in all five profiles: "22 covered columns not of class EF:
+(904,-600) class 31; ...". With that commit's simulation and this branch's bake (planet_world_4k, 8 threads; the
+simulation is the same at any thread count) `deeptime inspect-column` on the test's 16-block grid gives the same 22
+columns, and 7 more that are covered and EF:
+
+| covered columns | class | world ground | cover |
+|---|---|---|---|
+| 22 | 31 (sea) | 1.4 to 25.9 blocks under sea level 63, about 50 to 910 m of water; hydrology sea, `closed_basin` 0, continentalness -0.30 to -0.35 | 1 to 10 blocks |
+| 7 | EF | 62.4 to 66.4 blocks, dry | 2 to 11 blocks |
+
+They lie at 49.9° to 64.4° of latitude on one coast. At (904, -600) the L1 class is EF and the crust oceanic and 11
+Myr old: the simulation's ground there is a young coast the world's footprint takes under the sea.
+
+**Which side was wrong.** The class: the world's sea covers those columns, the game fills them with sea water, and
+`IcePass` lays nothing on them, so class 31 is what a player sees. The cover named ice the game never draws, so
+the cover was wrong, not the class, and not the test (it asks that every covered column be EF, the rule BIO-158
+states).
+
+**What the pass does now** (BIO-177). The projection pass holds `climate/ice_cover` with the biome layers (after the
+block-scale relief has read it) and, in the land call on the world's ground, sets the cover to 0 on every L2 node
+the world's sea covers (`water::sea_covers_height` on the world's `elevation` and `closed_basin`, the column rule of
+HYD-106). Every node still covered is of the class EF: a covered node the land call settled to land took its record
+from the nearest land node, which can be bare ground beside the ice. `notes.bake.projection.biome_land` counts both
+(`ice_cover_off_the_sea`, `ice_cover_class_ef`, nodes and km2). The cube projection does the same. Lambert presets
+have no projection pass and keep the cover as laid.
+
+**Not drawn.** Real ice sheets rest on beds below sea level wherever the ice is too thick to float (West
+Antarctica). Part of the cleared ice is that thick (up to 10 blocks of cover, at least 1,440 m of ice by the
+cover's 160 m step, over as little as 50 m of water). Drawing it would need the ice pass to build ice up from a sea
+floor, under the sea's water level: a marine ice sheet. Left as an open question.
+
+## No swamp beside a salt flat (2026-10-23, BIO-178)
+
+A playa is the floor of a terminal basin whose water balance leaves no lasting lake: the water that arrives dries
+off the floor and leaves salt (HYD-053). The wetland rule (BIO-066) does not read the basins: it reads the climate
+stage's wetness, the ground's flatness and its height, so on a flat, low rim of a basin in a climate wet enough for
+it, it flags swamp beside the salt, and the swamp's own trees then stand on it.
+
+**What the gate found.** On master 57558f0a with MIC, `lakeIceAndSaltFollowTheClimate` met `minecraft:mangrove_roots`
+on a salt column at (-1230, 67, 438), in `minecraft:mangrove_swamp`. The playa's inspected column (-1240, 424):
+Csa, 19.8 °C mean, 634 mm a year, the hydrology's aridity index 0.534 (dry subhumid), elevation 60.56 blocks (a closed
+basin under sea level), wetland flag 1 (swamp), erosion 0.617 (the swamp band E6). A mangrove swamp on a salt
+flat's rim is a biome choice error, not a decoration to paint salt over: the precedent is the hot springs on a playa
+(BIO-165, decisions log 2026-10-20, gate batch 7), where the biome, not the salt, gave way.
+
+**What the bake does now** (BIO-178). After the water bake lays the playa layer, every L2 node within a reach of a
+playa cell's block loses its wetland flag, and its erosion is held under E5 as a cold wetland's is (BIO-133), so the
+class's ordinary biome stands there. The reach is 20 blocks of ground plus the grids' own reach: two L2 cells (the
+game reads the L2 layers bilinear from the projection's nearest Lambert node) and one hydrology cell (the
+projection reads the playa as a footprint). The 20 blocks: a mangrove's roots reach about 9 blocks from its trunk
+(vanilla 1.21.1 `MangroveRootPlacer`, `max_root_width` 8; read in the game's sources), and the biome a block takes
+lies up to about 6 blocks off under the fuzzy zoom (BIO-165): 15, and a quarter more. On the bake's Lambert grid
+the box is widened east-west by 1/cos φ, since a block of ground spans that many Lambert blocks there.
+`notes.bake.water.playa.wetland_cleared` counts the playa cells, the reach and the nodes cleared.
+
 ## The snow line (2026-10-22, BIO-180, BIO-181)
 
 **What was wrong.** A temperate mountain carried snow in its own mild climate: frozen peaks, jagged peaks or snowy
@@ -1128,6 +1194,11 @@ snowy slopes, and on grove:
   coarse cell did not reach is not drawn, and the trim takes a body's lowest cells whether or not they are its
   terminus. Covered cells are EF by choice (BIO-158): Köppen classes a climate, and the ground beside a glacier's
   tongue keeps its own class.
+- On a Petroff-Guyou world the cover is taken off the world's sea (BIO-177): ice the simulation laid on a coast the
+  world's footprint puts under the sea is not drawn at all, though part of it would be thick enough to rest on the
+  sea floor.
+- The swamp's margin beside a playa (BIO-178) is sized by a mangrove's roots and the fuzzy zoom, not by the basin:
+  a real playa's rim can hold a spring-fed marsh, and the bake draws none within the reach.
 - Expanded Ecosphere is tested in its default mode only. Its COMPATIBLE mode (with TerraBlender) registers a
   TerraBlender region instead of the dimension override; Deep Time would deal that region to provinces like
   any other, untested. EE with Terralith is not supported by EE itself (both define the overworld's biomes).
@@ -1157,7 +1228,9 @@ floor (BIO-161) and the census's bound on the ice cap's ice spikes (BIO-162) are
 on Ben's ice spikes report), and so is the target they serve: BIO-077's share of the frozen, driest flats, not the
 pack's own share and not an area ("Ice spikes and the rare variants"). The snow line (BIO-180, BIO-181: its two
 lines, its two tags and the choice of a game-side rule) and the volcanic zones drawn as ellipses on a Petroff-Guyou
-world (BIO-182) are the coordinator's calls (2026-10-22, after Ben's report on volcano 27476).
+world (BIO-182) are the coordinator's calls (2026-10-22, after Ben's report on volcano 27476). The ice cover taken
+off the world's sea (BIO-177) and the wetland kept off a playa and its rim (BIO-178) are the coordinator's calls
+(2026-10-23, the gate on master 57558f0a); BIO-178's margin is the agent's.
 
 ## Open questions
 
@@ -1180,6 +1253,10 @@ world (BIO-182) are the coordinator's calls (2026-10-22, after Ben's report on v
 - 72 to 78 % of the measured planets' land is near-inland without EF's floor (continentalness from the distance to the
   sea), against 22 to 27 % in the packs' own worlds; it shapes every biome that differs between near- and
   mid-inland.
+- Marine ice is not drawn (BIO-177): the cover is taken off the world's sea even where the simulation's ice would be
+  thick enough to rest on the sea floor (up to 10 blocks of cover over about 50 m of water on the 2026-10-23 gate
+  planet). Drawing it needs the ice pass to build ice up from a sea floor under the sea's water: a game-side feature,
+  not taken.
 - The Holdridge biotemperature upper cut-off at 30 °C (HYD-030) is missing from the hydrology code.
   Confirmed in Holdridge's text (see the sources) and left to the rivers and lakes package, which
   owns that row.
