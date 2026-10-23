@@ -5394,3 +5394,204 @@ deepening at trench rows, the sediment's routing (the sea 600 to 1,170 m over th
 length, the trench's depth against the slab's age and the collisions under the trench budget. The
 high ground's "What is left" holds too, the belts' extent first. The coast with high ground (0.34 of
 the coast against at most 0.15) is the criterion no arm moves.
+
+## The polar peaks (2026-10-23)
+
+The coordinator's lane after the trench rows ([flexure.md](flexure.md), "The trench rows", "What is
+left"): in two of three traced runs the plate model's columns stood 15.5 to 29.4 km above the sea
+on the polar rows, held at the rise guard's ceiling (PLT-288, 3.5 mm/yr) step after step and
+reaching for the preset's 30 km cap (`max_elevation_m`). On the pool's base (master bf8477b2, key
+7f9d8f115049, 24 runs) the guard's worst is 11.9 to 30.0 km, median 13.7 km, and over 24 km in four
+runs (scattered 4 and 7, supercontinent 5 and 7). Ledger ISO-120 (new). Code: `surface/flexure.rs`
+and `surface/mod.rs` (the law), `plates/peaks.rs` with hooks in `plates/mod.rs` and
+`plates/gap_budget.rs` (the trace, measurement only).
+
+### The trace
+
+`DEEPTIME_PEAK_TRACE=<m>` (`plates/peaks.rs`, off by default, no rule reads it) prints, every plate
+step, the visible samples that end the step higher than `<m>` (at most six a step, the highest
+first): latitude, crust kind, regime and flags, the crust's thickness, the height before the
+surface's feedback, after it and at the step's end, the Airy height, the surface's flexure `F` under
+the sample and the settling's target, and with the gap budget on (`DEEPTIME_GAP_BUDGET`) each
+process's change of the height and the thickness over the step and the largest parts of the gap.
+The arm `pp-trace` (key 81404d9815b5, the base's code with the trace) ran seeds 1 to 4, both
+starts, 1000 Myr, with `+DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_GAP_BUDGET=1 +DEEPTIME_PEAK_TRACE=10000`.
+Its V1 census and guard equal the base's runs to the digit (three runs compared; the state hashes
+differ, since the budget keeps its parts in the state). Scratch readers `peaks.py`, `peaks_agg.py`
+and `peaks_polar.py` (in the lane's `build/polar-peaks/`, not kept).
+
+Over the eight runs, 314 lines (a sample above 10 km at a step): 252 continental, 62 oceanic.
+
+- **What holds them up is the settling.** 236 of the 252 continental lines were last raised by the
+  settling (ISO-078), and 188 of the 209 whose `F` is known stand at its target, the Airy height
+  plus `F`, within 50 m. Quartiles: `F` 10.8, 14.3 and 20.1 km; the height over the Airy height
+  10.7, 13.6 and 19.3 km; the crust 25.0, 33.7 and 39.2 km thick. Summed over the continental
+  lines, the settling raised them 1,499 km in the step and the subduction stage's heights
+  (`subduction::fronts_finish`) took 717 km back; each step the one undid the other.
+- **What feeds them is the collapse.** The crust that reached them in the step came from the
+  collapse (799 km summed over the lines; 78 lines took more than 1 km in their step) and the
+  thickest crust's spread (PLT-277, 274 km, nearly all in scattered 4), against 104 km of
+  resampling's accretion and 22 km from the arcs. They are back-arc (67 lines), rift (56),
+  collision (48) and passive-margin (23) samples, with no collision under way at the step
+  (`coll_mm_yr` 0 in every quartile).
+- **Why they are room.** The collapse and the spread fill continental crust thinner than their
+  column (PLT-412's T_col, at most 41.1 km; PLT-277's 50 km) and ocean floor. These columns are 25
+  to 40 km thick, so they are room, whatever their height: a column held 15 km over its Airy height
+  takes crust as if it were lowland.
+- **`F` grows, and nothing bounds it.** `F` is the load the surface's plate holds away from local
+  isostasy, over the restoring density. Under a column the collapse fed step after step it grew by
+  1.5 to 3.7 km a step. The worst run's worst column, scattered 4, sample 65563, a rift column at
+  10 to 15°S: from −438 to −432 Myr the collapse gave it 10.0, 10.0, 10.0 and 8.6 km of crust a step
+  (the thickening's rate limit, PLT-287), its crust stayed 37.6 to 39.3 km thick (the surface
+  eroded about as much: the gap budget's erosion part fell 16 to 20 km a step), and `F` under it went 17.9, 21.6, 22.8 and 24.4 km. At −432 Myr it began the
+  step at 19.8 km, the subduction stage took it to 10.0 km, and the settling put it back at
+  25.5 km, its Airy height 1.1 km plus `F`. The largest `F` traced was 46.9 km (scattered 4) and
+  28.5 km on the polar rows (scattered 3, sample 22820 at 75°S, a back-arc column of 13.7 km
+  standing at 22.4 km). The plate is elastic: no rule limits what it holds.
+- **What does not bring them down.** The rise guard (PLT-288) caps a step's rise from the column's
+  height at the step's start; these columns start the step already high, so the guard lets them
+  stay there, and they rise towards the cap by up to 7 km a step when `F` grows. The 70 km cap
+  (PLT-258) does not apply to crust 25 to 40 km thick. The sheet's collapse takes crust from columns
+  thicker than its column, so it adds to these columns rather than taking from them. The arcs' and
+  fronts' heights pull them down within the step, and the settling restores them.
+
+**Are the poles special?** Not in kind. The polar rows (60° and over, 13.4 % of the planet) hold
+99 of the 314 lines (61 continental), 64 of them from one run (scattered 3, whose columns stand
+there for 31 steps); without it they hold 35 of 248 (14 %), their share of the area. The worst run,
+scattered 4, peaks at 7 to 16°S, and all its 135 lines lie between 60°S and 60°N (46 of them within
+30° of the equator). Nothing in the polar lines looks degenerate: their convergence (38, 47 and
+68 mm/yr at the quartiles) is like the low latitudes' (33, 36 and 59), their regimes are the same
+kinds (collision 21, back-arc 15, rift 10, arc 6, craton 6 of the 61), and the same loop (collapse
+in, `F` up, settling) raises them. What is particular to the poles, and was not
+measured here, is the surface flexure's metric: the solve treats every cell as a square of the
+equator's width, so on the polar rows it bends about 1 / cos⁴ φ too stiffly north to south
+([flexure.md](flexure.md), "Simplifications and limits"), which lets a pole-side plate hold more of a
+column's root than it should.
+
+A second, smaller kind is oceanic and polar: 38 of the polar lines are ocean floor (22 ridge, 16
+basin samples) 10.1 to 16.2 km high, their Airy height median −1.9 km and `F` −0.5 to 1.2 km. The
+surface's feedback raised them (0.4, 1.6 and 2.5 km in the step at the quartiles, up to 6.7 km),
+and the largest part of their gap is the carry's (the gap budget's part for the surface's
+semi-Lagrangian advection, the L0/L1 sampling and the clamps: 9.6, 12.8 and 16.0 km at the
+quartiles, up to 29.5 km), not the flexure's. The highest, supercontinent 2 at 82°N, a ridge sample
+at 16.2 km. Not traced further here, and the yield (below) does not reach them.
+
+### The law
+
+The trace's loop has one link that Earth does not have: a plate holding 10 to 47 km of rock away
+from local isostasy. No plate holds more than about 2 to 4 km (ISO-093: the largest free-air
+anomalies, −380 mGal at the Puerto Rico Trench and up to +300 mGal over Hawaii), because rock
+yields before it carries such stresses. The fix bounds that link, not the collapse's room or the
+rise guard: the plate's yield, ISO-120 ([flexure.md](flexure.md), "The plate's yield"). After each
+solve of the surface's flexure a cell's plate holds at most σ_max = Δg_max / 2πG of load away from
+local isostasy, 2.75 km of mantle at Δg_max = 380 mGal; the excess sinks under the cell alone. With
+it, the settling's target over a column the collapse keeps feeding is its Airy height plus at most
+2.75 km, so the crust the collapse gives it raises it only by its Airy share. Off by default:
+`--set surface.flexure.yield_anomaly_mgal=380`. Code: `surface/flexure.rs` (commit c8134072, pool
+key 08c9d7d679c0; the later commits on the branch change only comments and formatting).
+
+The collapse's room (thickness, not height) is left as it is. A column 15 km over its Airy height
+taking crust as lowland is wrong only because the column stands there; with the yield it no longer
+does, and a room rule that also read the height would have needed a law of its own (open question
+below).
+
+### The arms
+
+Pool arm `pp-yield380` (key 08c9d7d679c0, argkey e042f3ab): `--set
+surface.flexure.yield_anomaly_mgal=380`, `+DEEPTIME_CRUST_BUDGET=1`, 1000 Myr, both starts, against
+the pool's `base` (master bf8477b2, key 7f9d8f115049, argkey 2a53566b, the same arguments without
+the switch). Exploration on seeds 1 to 4 (8 runs against the base's 24): the guard's worst fell from
+13.7 to 12.9 km at the median (p 0.051) and its largest from 26.0 to 15.5 km, with every V1 p 0.35
+or more. Final on seeds 1 to 12 (24 runs a side), medians and the two-sided Mann-Whitney p:
+
+| arm | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | crust's net change | criteria met per run: median, mean | sea over the datum after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| target | 0.26 to 0.32 | ≥ 0.12 | ≤ 0.25 | ≤ 0.12 | ≤ 0.15 | ≤ 0.15 | 2 to 6 |  | of 7 |  |
+| base | 0.300 | 0.151 | 0.274 | 0.151 | 0.333 | 0.116 | 1.75 | −0.035 | 3, 3.33 | 538 / 861 |
+| pp-yield380 | 0.313 (0.35) | 0.161 (0.24) | 0.253 (0.37) | 0.160 (0.50) | 0.351 (0.37) | 0.126 (0.73) | 1.80 (0.56) | −0.033 (1.0) | 3, 3.04 (0.31) | 495 (0.32) / 759 (0.18) |
+
+| arm | the guard's worst, m | runs over 15 / 20 km | largest rise / fall of a cell in a step, m | plate cells 5 km over Airy (final frame), share | largest excess over Airy (final frame), m | highest plate elevation (final frame), m |
+|---|---|---|---|---|---|---|
+| base | 13716 | 9 / 4 | 6992 / 9450 | 0.0000 | 3510 | 6509 |
+| pp-yield380 | 13112 (0.015) | 1 / 0 | 6524 (0.012) / 7422 (< 0.001) | 0.0000 (0.041) | 3391 (0.32) | 6495 (0.60) |
+
+Per run, base / yield (`sc` scattered continents, `sp` supercontinent; the runs part once the yield
+first acts, so a run's two columns are two different planets, not a before and after):
+
+| run | land | largest | under the sea | above 2 km | high coast | under ice | collisions | criteria met | the guard's worst, km |
+|---|---|---|---|---|---|---|---|---|---|
+| sc1 | 0.294 / 0.321 | 0.166 / 0.213 | 0.272 / 0.249 | 0.168 / 0.158 | 0.346 / 0.346 | 0.096 / 0.145 | 1.50 / 1.80 | 3 / 3 | 12.4 / 15.5 |
+| sc2 | 0.309 / 0.284 | 0.277 / 0.261 | 0.294 / 0.272 | 0.157 / 0.172 | 0.340 / 0.354 | 0.094 / 0.066 | 1.90 / 2.10 | 3 / 4 | 13.1 / 11.9 |
+| sc3 | 0.266 / 0.238 | 0.115 / 0.151 | 0.279 / 0.466 | 0.234 / 0.088 | 0.327 / 0.255 | 0.079 / 0.077 | 2.10 / 1.40 | 3 / 3 | 18.8 / 12.2 |
+| sc4 | 0.329 / 0.322 | 0.176 / 0.276 | 0.276 / 0.163 | 0.090 / 0.244 | 0.272 / 0.455 | 0.094 / 0.161 | 2.20 / 2.10 | 4 / 3 | 26.0 / 13.0 |
+| sc5 | 0.299 / 0.331 | 0.124 / 0.277 | 0.295 / 0.256 | 0.161 / 0.162 | 0.365 / 0.383 | 0.143 / 0.134 | 1.30 / 1.60 | 3 / 2 | 15.0 / 13.2 |
+| sc6 | 0.314 / 0.343 | 0.100 / 0.163 | 0.165 / 0.125 | 0.196 / 0.217 | 0.431 / 0.442 | 0.108 / 0.207 | 2.10 / 2.30 | 4 / 3 | 15.6 / 13.5 |
+| sc7 | 0.317 / 0.283 | 0.138 / 0.108 | 0.229 / 0.309 | 0.164 / 0.155 | 0.382 / 0.327 | 0.043 / 0.144 | 2.30 / 2.20 | 5 / 3 | 30.0 / 12.6 |
+| sc8 | 0.292 / 0.329 | 0.073 / 0.158 | 0.264 / 0.223 | 0.137 / 0.180 | 0.304 / 0.330 | 0.185 / 0.087 | 2.70 / 1.20 | 2 / 3 | 13.5 / 12.1 |
+| sc9 | 0.260 / 0.325 | 0.110 / 0.206 | 0.384 / 0.176 | 0.118 / 0.246 | 0.277 / 0.425 | 0.118 / 0.212 | 1.60 / 1.80 | 3 / 2 | 13.7 / 12.3 |
+| sc10 | 0.335 / 0.318 | 0.167 / 0.244 | 0.173 / 0.153 | 0.238 / 0.288 | 0.435 / 0.452 | 0.119 / 0.189 | 1.10 / 2.20 | 3 / 4 | 13.3 / 13.3 |
+| sc11 | 0.301 / 0.313 | 0.126 / 0.206 | 0.319 / 0.176 | 0.082 / 0.291 | 0.282 / 0.434 | 0.081 / 0.153 | 1.60 / 2.00 | 4 / 4 | 13.8 / 14.1 |
+| sc12 | 0.308 / 0.313 | 0.114 / 0.159 | 0.278 / 0.202 | 0.099 / 0.136 | 0.287 / 0.296 | 0.108 / 0.105 | 1.40 / 1.70 | 3 / 4 | 12.3 / 11.9 |
+| sp1 | 0.290 / 0.308 | 0.148 / 0.125 | 0.306 / 0.257 | 0.099 / 0.145 | 0.301 / 0.271 | 0.081 / 0.213 | 1.10 / 1.20 | 4 / 2 | 17.5 / 13.5 |
+| sp2 | 0.284 / 0.256 | 0.192 / 0.060 | 0.237 / 0.419 | 0.360 / 0.040 | 0.407 / 0.179 | 0.210 / 0.093 | 1.30 / 1.50 | 3 / 2 | 12.4 / 13.3 |
+| sp3 | 0.230 / 0.314 | 0.055 / 0.240 | 0.511 / 0.217 | 0.071 / 0.167 | 0.196 / 0.348 | 0.115 / 0.108 | 1.20 / 2.00 | 2 / 5 | 14.6 / 12.9 |
+| sp4 | 0.309 / 0.280 | 0.081 / 0.102 | 0.241 / 0.306 | 0.145 / 0.149 | 0.343 / 0.389 | 0.197 / 0.075 | 1.70 / 1.90 | 2 / 2 | 13.0 / 12.7 |
+| sp5 | 0.289 / 0.200 | 0.205 / 0.041 | 0.325 / 0.571 | 0.106 / 0.061 | 0.286 / 0.189 | 0.071 / 0.067 | 2.80 / 2.50 | 5 / 3 | 29.1 / 12.7 |
+| sp6 | 0.297 / 0.325 | 0.154 / 0.098 | 0.272 / 0.216 | 0.155 / 0.158 | 0.335 / 0.422 | 0.160 / 0.120 | 2.00 / 1.30 | 3 / 2 | 13.6 / 12.4 |
+| sp7 | 0.300 / 0.306 | 0.179 / 0.184 | 0.327 / 0.274 | 0.147 / 0.130 | 0.274 / 0.331 | 0.169 / 0.120 | 1.20 / 2.20 | 2 / 4 | 24.7 / 13.1 |
+| sp8 | 0.284 / 0.357 | 0.203 / 0.200 | 0.335 / 0.168 | 0.105 / 0.173 | 0.192 / 0.392 | 0.144 / 0.052 | 1.00 / 1.50 | 4 / 3 | 18.4 / 13.7 |
+| sp9 | 0.300 / 0.285 | 0.215 / 0.155 | 0.244 / 0.337 | 0.209 / 0.118 | 0.357 / 0.234 | 0.166 / 0.132 | 1.80 / 1.50 | 3 / 4 | 13.3 / 13.1 |
+| sp10 | 0.328 / 0.268 | 0.160 / 0.102 | 0.190 / 0.395 | 0.217 / 0.084 | 0.331 / 0.198 | 0.168 / 0.113 | 2.50 / 2.20 | 3 / 4 | 11.9 / 13.7 |
+| sp11 | 0.317 / 0.296 | 0.159 / 0.132 | 0.165 / 0.302 | 0.268 / 0.181 | 0.441 / 0.358 | 0.135 / 0.157 | 1.80 / 1.50 | 4 / 2 | 12.1 / 13.6 |
+| sp12 | 0.309 / 0.332 | 0.121 / 0.274 | 0.251 / 0.222 | 0.108 / 0.214 | 0.334 / 0.373 | 0.082 / 0.172 | 2.00 / 1.70 | 5 / 2 | 17.1 / 14.8 |
+
+**The ship rule.** Not met. The criteria met per run fell from 3.33 to 3.04 (p 0.31), not up at
+p < 0.05. No criterion's median left its band (land, the largest landmass and the ice stay in it;
+the crust under the sea, land above 2 km, the high coast and the collisions were out of it on the
+base and stay out), and none moved at p under 0.24. The yield takes the guard's tail away (the
+largest excursion 30.0 to 15.5 km, the runs over 20 km 4 to 0, the largest one-step fall 9.45 to
+7.42 km) without moving the planet's V1 shape: the peaks were a few cells, and the land above 2 km
+and the high coast, which are plateaus and ranges, did not move measurably (p 0.50 and 0.37). So the
+switch stays off by default; whether a correction of what the plate
+holds should go on without a V1 gain is the coordinator's call (below).
+
+### The trace with the yield
+
+Two runs ran again with the yield and the trace, scattered 4 (the base's worst) and scattered 1
+(the yield arm's worst) (arm `pp-yield380-trace`, argkey a2244c59, `+DEEPTIME_GAP_BUDGET=1
++DEEPTIME_PEAK_TRACE=10000`; their V1 census and guard equal `pp-yield380`'s same runs). Lines above
+10 km, base / yield:
+
+| run | continental lines | highest continental z, km | largest `F`, km | oceanic lines (polar) | highest oceanic z, km |
+|---|---|---|---|---|---|
+| scattered 1 | 21 / 0 | 15.8 / none | 15.3 / none | 3 (1) / 17 (9) | 10.9 / 14.7 |
+| scattered 4 | 133 / 2 | 30.0 / 11.0 | 46.9 / 0.04 | 2 (0) / 2 (0) | 12.3 / 11.3 |
+
+The loop the trace found is gone: no continental column stands on a held `F`. The two continental
+lines left are collision columns (63 and 68 km of crust, Airy heights 4.2 and 4.7 km) at 11.0 and
+10.5 km, 5.8 to 6.8 km over the settling's target; one was resampled in the step, and the other's
+`F` is 39 m, its gap's largest parts the carry's (6.5 km) and the erosion's (5.7 km). What is left
+above 10 km is the second, oceanic kind (ridge samples, Airy height −1.8 to −3.7 km, `F` −0.7 to
+0.4 km), whose gap is the carry's part (9.3 to 23.5 km). In scattered 1 it reached 14.7 km at 78°S
+in the last step, and it is the likeliest source of that run's 15.5 km guard's worst, the arm's
+largest (the trace reads plate samples and the guard L1 cells, so this is not shown).
+
+### What is left, and for whom
+
+- **The oceanic carry peaks** (above, and "Are the poles special?"): ridge and basin samples raised
+  10 to 16 km by the surface's carry, more often on the polar rows. They are now the guard's
+  largest excursions with the yield on. The surface lane's (the carry in `surface/advect.rs` and the
+  gap budget's carry part); not traced to a rule here.
+- **The surface flexure's block metric** ([flexure.md](flexure.md), "Simplifications and limits"):
+  the solve treats every row as the equator's, about 1 / cos⁴ φ too stiff north to south on the
+  polar rows. A numerical fault; correcting it moves master's output and needs its own arm. The
+  flexure lane's.
+- **The collapse's and the founder's room** judge room by thickness, not height. With the yield on,
+  the columns no longer stand high, so it was left; a height-aware room would need a law and a
+  source of its own. The plates' lane, only if a later trace shows columns standing over their Airy
+  height again.
+- **The yield's default.** Off: it does not meet the ship rule. It is the correction of a fault (a
+  plate holding up to 47 km of rock away from local isostasy) and moves no V1 criterion, so the
+  coordinator may take it on as such.
+- **The bound's value.** Only 380 mGal (the largest anomaly on Earth) was run; 300 mGal (Hawaii's
+  largest) or a bound that depends on the plate (`Te`, age) were not.

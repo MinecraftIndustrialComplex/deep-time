@@ -136,8 +136,15 @@ the artifact fixes); the sea-depth row is from the final code (law 2.7, after th
 
 ## Simplifications and limits
 
-- The plate is purely elastic. Real lithosphere also depends on whether crust and mantle are
-  coupled and on how sharply the plate is bent (Burov & Diament 1995); neither is modelled.
+- The plate is purely elastic by default. Real lithosphere also depends on whether crust and mantle are
+  coupled and on how sharply the plate is bent (Burov & Diament 1995); neither is modelled. A
+  plate's strength as a bound on the load it holds is a switch since 2026-10-23, off by default
+  ("The plate's yield", ISO-120).
+- The solve works in the raster's block metric: every cell is a square of the equator's width
+  (`norm_dx_m`). On the equal-area raster a cell at latitude φ is cos φ as wide and 1 / cos φ as
+  tall on the sphere, so near the poles the plate bends as if it were about 1 / cos⁴ φ too stiff
+  north to south and cos⁴ φ too soft east to west (about 300 times each way at 76°). Not corrected
+  (an open question).
 - `Te` depends only on the crust's type and thermal age.
 - The plate equation's extra terms for varying rigidity are left out (ISO-040).
 - A step is 2 million years; the ground answers in thousands of years on Earth. The solve gives
@@ -399,7 +406,8 @@ largest height over Airy is 2.8 to 6.1 km (median 3.7 km), against Earth's 2 to 
 its largest gravity anomalies (ISO-093). A strength limit on the plate (a yield envelope that
 lowers `Te` where the plate is bent hard, Watts & Burov 2003) would cut the top of that range; it
 was not added, since no run keeps a column more than 5 km over Airy on more than 0.005 % of its
-samples.
+samples. (Added on 2026-10-23 as a switch, off by default, after the polar peaks showed the
+transient columns: "The plate's yield", ISO-120.)
 
 **What is left.** The guard's worst is now 14.8 to 21.9 km from the sea in every run of both arms,
 above Earth's relief (the Challenger Deep, 10.9 km, ISO-071) but no longer growing. The cells that
@@ -687,6 +695,65 @@ continental heat flow of 33.7 mW/m², under the plate model's floor of 55, which
 law at 229 Myr; most likely a continental sample still holding an oceanic value (a plate-model
 edge case the changed history reaches, not traced).
 
+## The plate's yield
+
+Added 2026-10-23 (ISO-120), from the polar peaks ([plates.md](plates.md), "The polar peaks"). Off
+by default; `--set surface.flexure.yield_anomaly_mgal=380` turns it on.
+
+**What was seen.** On the pool's base (master bf8477b2, 24 runs) the guard's worst passed 24 km in
+four runs (24.7 to 30.0 km). Traced on seeds 1 to 4 (scattered 4, at 26.0 km, the worst of them),
+those steps are plate columns of 25 to 40 km of crust standing 10 to 30 km high: the settling (ISO-078) holds each at its Airy height plus `F`, the flexure's offset,
+and `F` under them was 10 to 47 km. The plate held the roots of the crust the collapse fed them step
+after step, and nothing bounded what it held. "What bounds the offset now" (in "The settling's
+feedback", above) reckoned that bound as at most k_a T of the column's own crust; a column the
+collapse keeps feeding has no such limit, since every step's crust is new load.
+
+**What Earth does** (ISO-093). No plate holds more than about 2 to 4 km of rock away from local
+isostasy: the largest free-air anomalies over held loads are −380 mGal at the Puerto Rico Trench,
+"the most negative free-air gravity anomaly on Earth" (ten Brink et al. 2004), and up to +300 mGal
+over Hawaii (Watts et al. 2025). What sets the limit is the plate's strength: "Ideal elastic
+materials support any stress level. In the case of real materials, however, stress levels are
+limited to the rock strength at the corresponding depth", and `Te` falls to about half at a
+curvature of 10⁻⁶ m⁻¹, "50% yielding" (Watts & Burov 2003); an elastic plate bent as hard as the
+trench walls would carry "unreasonably high bending stresses (up to 900 MPa)" (Hunter & Watts 2016).
+
+**The law** (ISO-120). The plate's strength is the largest free-air anomaly it holds, Δg_max. A
+sheet of surplus mass σ per square metre pulls 2πGσ (the Bouguer slab), so the most load a plate
+holds away from local isostasy is σ_max = Δg_max / 2πG, with G = 6.674 30 × 10⁻¹¹ m³/(kg s²)
+(CODATA 2022). At 380 mGal, σ_max = 9.06 × 10⁶ kg/m²: 2.75 km of mantle, the ground held 2.75 km
+from local isostasy on land and 3.99 km under the sea (ρ_m − ρ_w). After each solve, where a cell's
+held load ρ_m (Q + ice − w) passes σ_max either way, the plate there has yielded: the excess sinks
+(or rises) under the cell alone, w gains (held − σ_max) / ρ_m with the held load's sign, and the
+elevation, the carried state (ISO-068) and the step's release record (`released_m`, which the gap
+budget reads) take it. That is the answer of a plate with no strength left (local isostasy, as `D`
+goes to 0: "The polar holes"), for the part of the load past the strength. Where the plate holds
+less, nothing changes: the solve is the elastic one, bit for bit. The count of cells that yielded is
+kept in `surface/flexure_yielded_cells`. Unit test `a_plate_that_yields_holds_no_more_than_its_strength`:
+a column two cells wide on a 64 × 64 craton, fed 1 mm/yr of Airy height for 12 steps, stands held
+more than four times the bound by the elastic plate; with the yield no cell holds more than the
+bound at any step, the column stands within the bound of its Airy height, and a load the plate can
+hold (0.05 mm/yr) runs the same with and without the switch.
+
+**Why after the solve, and not a weaker plate.** The first form lowered the cell's rigidity to
+D σ_max / |held| for the next solve and let ISO-056 release the rest. It failed the test: after one
+step the column held 20.8 km against a bound of 2.7 km, because the force ISO-056 released was
+spread again by the stiffness the neighbours kept.
+
+**Simplifications.** The bound is on the load a cell's plate holds, not on its bending stress: a
+yield envelope (Goetze & Evans 1979, abstract; Watts & Burov 2003) would need the stresses through
+the plate, which the solve does not keep. Over a load narrower than its depth of compensation the
+anomaly is less than 2πGσ, so for one cell of the quick presets (39 km) the bound is stricter than
+Earth's anomalies require. The bound does not depend on `Te`, the plate's age or the latitude.
+
+**Measured** (pool arm `pp-yield380`, key 08c9d7d679c0, seeds 1 to 12 by both starts, 1000 Myr,
+`+DEEPTIME_CRUST_BUDGET=1`, against the 24 runs of master bf8477b2; per-run tables in
+[plates.md](plates.md), "The polar peaks"). The guard's worst fell from 13.7 to 13.1 km at the
+median (Mann-Whitney p 0.015) and from 30.0 to 15.5 km at the largest; 9 base runs passed 15 km and
+4 passed 20 km, against 1 and 0 with the yield. The largest one-step fall went from 9.45 to 7.42 km
+(p < 0.001) and the largest rise from 6.99 to 6.52 km (p 0.012). No V1 criterion moved (every p
+0.24 or more; criteria met per run 3.33 to 3.04, p 0.31), so it does not meet the ship rule (a
+criteria gain at p < 0.05) and stays off by default.
+
 ## Game choices
 
 - **Flexural lengths are Earth-normalized** (ISO-057): the plate's kilometres are the plate
@@ -723,6 +790,13 @@ edge case the changed history reaches, not traced).
   is the stiffening side. That the share let go is `1 − r` of the load held is the agent's rule,
   from the two limits; no source states it. The break at a plate boundary (ISO-055) still lets go
   at once.
+- The solve's block metric ("Simplifications and limits"): on the sphere the equal-area raster's
+  Laplacian is ∂x(cos⁻²φ ∂x) + ∂y(cos²φ ∂y) in the raster's own coordinates (its area element is
+  uniform), so a row-dependent operator would correct it; the spectral preconditioner assumes one
+  operator for every row and would need rework at the poles. Noticed in the polar peaks lane
+  (2026-10-23), not measured.
+- The yield's bound (ISO-120) is on the load a cell holds, not on the plate's stress or curvature;
+  whether a curvature form (Watts & Burov 2003) gives different planets was not tried.
 - The recovery law of continental `Te` (ISO-051) has no source for its form or its 300 Myr.
 - Densities (ISO-043 to ISO-047) are uncited, and the model uses three different crust densities
   elsewhere (see [isostasy-and-height-limit.md](isostasy-and-height-limit.md)).
@@ -754,6 +828,7 @@ By their keys in [bibliography.md](bibliography.md), section "Lithospheric flexu
   (about 100,000 of 130,000 characters): most of the text; `McNuttMenard1982`, `GoetzeEvans1979`:
   abstracts; `Watts1978`, `KarnerWatts1983` and chapter 3 of `TurcotteSchubert_Geodynamics`: full
   text this time. Read 2026-10-22 by a Sonnet sub-agent of the flexure-guard agent, the
-  quotations in the bibliography (ISO-093).
+  quotations in the bibliography (ISO-093). The yield (ISO-120) reads the same entries.
+- `CODATA2022_G`: NIST's value page for G, read 2026-10-23 by the polar-peaks agent (ISO-120).
 
 The sources from `TurcotteSchubert_Geodynamics` to `DeCellesGiles1996_flexure` were read by a sub-agent on 2026-10-02, not by the agent that wrote the code.
