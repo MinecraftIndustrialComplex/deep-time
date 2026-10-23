@@ -1,0 +1,28 @@
+{
+  "_doc": "The trench budget's measures (2026-10-22): the deep sea floor against Earth's (SRTM15+ at 15', tools/review/earth-deep-floor.py; ledger HYP-050, HYP-051) and the losses at subduction zones against Stern & Scholl 2010 Table 1. Pass it with --registry tools/review/pool/measures_trench.json (or DEEPTIME_POOL_MEASURES) and --measures v1census,trench. Definitions in measure_trench.py. The deep6 target is Earth's 0.0073 (15') to 0.0095 (Harris et al. 2014, SRTM30_PLUS) with room for the L1 grid's 44 km cells and the plate model's 71 km trench rows (game-choice: tolerance, agent 2026-10-22); deepest spans Earth's 9,242 m at 15' and Challenger Deep's 10,920 m.",
+  "measures": {
+    "trench": {
+      "version": 1,
+      "doc": "the deep sea floor (share deeper than 6/8/10 km, deepest, by stage) and the subduction zones' losses, km3/yr; definitions in measure_trench.py",
+      "command": ["{py}", "-I", "{tools}/measure_trench.py", "{run}"],
+      "python": "numpy",
+      "needs": ["fields", "rec"],
+      "fields": ["elevation", "plates/elevation_m", "surface/elevation_m"],
+      "columns": [
+        {"key": "deep6", "label": "sea floor deeper than 6 km, share (Earth 0.0073)", "target": [null, 0.015], "digits": 4},
+        {"key": "deepest_m", "label": "deepest point, m (Earth 9,242 at 15', 10,920)", "target": [8000, 11000], "digits": 0},
+        {"key": "deep8", "label": "deeper than 8 km (Earth 0.0003)", "target": null, "digits": 4},
+        {"key": "p99_m", "label": "sea floor p99, m (Earth 5,953)", "target": null, "digits": 0},
+        {"key": "plate_deep6", "key2": "surface_deep6", "label": "deeper than 6 km: plates / surface", "target": null, "digits": 4, "pair": true},
+        {"key": "plate_deepest_m", "key2": "surface_deepest_m", "label": "deepest: plates / surface, m", "target": null, "digits": 0, "pair": true},
+        {"key": "sed_subducted", "label": "sediment subducted, km3/yr (Stern & Scholl 1.1 + 0.1)", "target": null, "digits": 2},
+        {"key": "forearc_eroded", "label": "forearc eroded, km3/yr (1.4 + 0.3)", "target": null, "digits": 2},
+        {"key": "erosive_km", "key2": "front_km", "label": "erosive / all oceanic fronts, km (Earth 22,925 / 43,000)", "target": null, "digits": 0, "pair": true},
+        {"key": "arcs", "label": "arc crust added, km3/yr (2.5)", "target": null, "digits": 2},
+        {"key": "accreted", "label": "accreted at resamplings, km3/yr", "target": null, "digits": 2},
+        {"special": "criteria", "label": "criteria met per run: median, mean"}
+      ],
+      "criteria": ["deep6", "deepest_m"]
+    }
+  }
+}

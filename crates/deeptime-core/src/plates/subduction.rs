@@ -47,6 +47,19 @@
 //! visible samples next to its own hidden ones) are pulled towards z_t and receive sediment
 //! accretion (`pools.rs`). Slab pull turns the subducting plate's axis towards its fronts. Uplift
 //! of crust above sea level is scaled by the isostatic ceiling (1 − z/z_c) ([`ceiling`]).
+//!
+//! **Subduction erosion** ([`erode_forearcs`], PLT-441, PLT-442; off unless
+//! `subduction_erosion_km3_per_km_myr` is set). Where an oceanic slab comes in fast across the
+//! front (orthogonal convergence at least `subduction_erosion_min_mm_yr`) under little sediment
+//! (its sediment and sedimentary rock under `subduction_erosion_max_sediment_m`), the margin is
+//! erosive (Clift & Vannucchi 2004: erosion where convergence passes 6 cm/yr and the cover is under
+//! 1 km): the front takes `subduction_erosion_km3_per_km_myr` of the overriding plate's crust per
+//! km of front to the mantle. It takes it from the forearc, the samples the front reaches nearer
+//! than the arc's axis, the nearest first and each down to an ocean's column: the plate model's
+//! fronts stay where they are in their plate's frame, so the forearc the trench eats into is the
+//! front's own row and then the row behind it, as the trench's retreat landward does (Clift &
+//! Vannucchi's 1 to 5 km/Myr). The column loses each pool in proportion (the wedge goes whole) and
+//! sinks by its Airy change (an island arc's forearc on the ocean's height line).
 
 use std::collections::BTreeMap;
 
@@ -65,7 +78,7 @@ use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
 };
-use super::transition::{continental_m, crust_per_metre, crystalline_m, held_floor_m};
+use super::transition::{continental_m, crust_per_metre, crystalline_m, held_floor_m, oceanic_m};
 use crate::error::CoreError;
 use crate::world::WorldState;
 
@@ -698,6 +711,45 @@ pub struct Pull {
     /// The same two over the fronts under continental overriding crust (the continental arcs and
     /// their cordilleras), km × Myr.
     pub front_g_continental_km_myr: [f64; 2],
+    /// The step's erosive fronts and their forearcs ([`erode_forearcs`]); `None` while the rule is
+    /// off.
+    pub forearcs: Option<Forearcs>,
+}
+
+/// The step's erosive fronts (subduction erosion, [`erode_forearcs`]) and the distance field
+/// their forearcs are found on.
+pub struct Forearcs {
+    /// Per front (the distance field's label): the crust its erosion takes this step, km³
+    /// (Earth-normalized; 0 where the margin is not erosive).
+    pub loss_km3: Vec<f64>,
+    /// Per front: its overriding crust is continental (where the front sample's is).
+    pub continental: Vec<bool>,
+    /// The fronts' distance field ([`fronts_reach`]): distances (rad), labels, the reached samples.
+    dist: Vec<f64>,
+    label: Vec<u32>,
+    reached: Vec<u32>,
+}
+
+/// World global: the overriding plates' crust subduction erosion took to the mantle over the run,
+/// km³ (Earth-normalized): continental crust (its basement left out) …
+pub const FOREARC_CONTINENTAL_GLOBAL: &str = "plates/forearc_eroded_continental_km3";
+/// … and the rest (ocean crust under it, island arcs' forearcs), km³.
+pub const FOREARC_OTHER_GLOBAL: &str = "plates/forearc_eroded_other_km3";
+/// World global: the erosive fronts over the run, km × Myr, under continental overriding crust …
+pub const FOREARC_FRONT_CONTINENTAL_GLOBAL: &str = "plates/forearc_front_continental_km_myr";
+/// … and under oceanic overriding crust.
+pub const FOREARC_FRONT_OCEANIC_GLOBAL: &str = "plates/forearc_front_oceanic_km_myr";
+/// World global: the erosion the forearcs had no crust above an ocean's column for, km³.
+pub const FOREARC_SHORT_GLOBAL: &str = "plates/forearc_short_km3";
+
+/// What [`erode_forearcs`] did this step, km³ (Earth-normalized) and km × Myr.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Eroded {
+    pub continental_km3: f64,
+    pub other_km3: f64,
+    pub short_km3: f64,
+    pub front_continental_km_myr: f64,
+    pub front_oceanic_km_myr: f64,
 }
 
 /// One subducting-side sample's effect on its contact and on the crust budget.
@@ -977,6 +1029,9 @@ pub fn fronts_finish(
     let v0 = k.convergence_ref_mm_yr; // ledger: PLT-037
     let (mut g_full_km_myr, mut g_normal_km_myr) = (0.0_f64, 0.0_f64);
     let mut g_continental_km_myr = [0.0_f64; 2];
+    // Subduction erosion's fronts (PLT-441, PLT-442), in the order of the distance field's labels.
+    let erosion_km3 = k.subduction_erosion_km3_per_km_myr * front_km * env.dt_myr; // ledger: PLT-441
+    let (mut loss_km3, mut loss_continental) = (Vec::new(), Vec::new());
     for (v, b) in boundary.iter().enumerate() {
         if let Some((u, c, rel, out)) = b.front {
             let su = state.samples[u as usize];
@@ -985,6 +1040,16 @@ pub fn fronts_finish(
             // the sample's along the boundary's normal. ledger: PLT-312
             let normal = normals[v];
             let across = (-rel.dot(normal)).max(0.0);
+            if erosion_km3 > 0.0 {
+                // An oceanic slab coming in fast under little sediment: an erosive margin.
+                // ledger: PLT-442
+                let cover = f64::from(su.pools[pool::SEDIMENT] + su.pools[pool::SEDIMENTARY]);
+                let erosive = su.kind != CONTINENTAL
+                    && across >= k.subduction_erosion_min_mm_yr
+                    && cover < k.subduction_erosion_max_sediment_m;
+                loss_km3.push(if erosive { erosion_km3 } else { 0.0 });
+                loss_continental.push(state.samples[v].kind == CONTINENTAL);
+            }
             if su.kind != CONTINENTAL {
                 g_full_km_myr += front_km * env.dt_myr * (speed / v0).min(1.0);
                 g_normal_km_myr += front_km * env.dt_myr * (across / v0).min(1.0);
@@ -1346,7 +1411,99 @@ pub fn fronts_finish(
         front_g_full_km_myr: g_full_km_myr,
         front_g_normal_km_myr: g_normal_km_myr,
         front_g_continental_km_myr: g_continental_km_myr,
+        forearcs: (erosion_km3 > 0.0).then_some(Forearcs {
+            loss_km3,
+            continental: loss_continental,
+            dist,
+            label,
+            reached,
+        }),
     }
+}
+
+/// Subduction erosion (see the module docs; PLT-441, PLT-442): each erosive front takes its
+/// step's crust from its forearc, the visible samples it reaches nearer than `arc_distance_km`,
+/// the nearest first, each down to an ocean's column (`transition::oceanic_m`, 7 km). A column
+/// loses its pools and its basement in proportion and sinks by the change, towards and never past
+/// the height the column holds: continental crust by its Airy change, an island arc's forearc on
+/// the ocean's height line (as the arcs raise them), never below z_t.
+pub fn erode_forearcs(state: &mut PlateState, env: &Env, forearcs: &Forearcs) -> Eroded {
+    let k = env.k;
+    let norm = env.norm;
+    let area = norm.sample_area_km2();
+    let mut out = Eroded::default();
+    let front_myr = norm.km(norm.spacing_rad()) * env.dt_myr;
+    for (loss, &continental) in forearcs.loss_km3.iter().zip(&forearcs.continental) {
+        if *loss > 0.0 {
+            if continental {
+                out.front_continental_km_myr += front_myr;
+            } else {
+                out.front_oceanic_km_myr += front_myr;
+            }
+        }
+    }
+    // The forearcs' samples, by front, the nearest first (ties by sample).
+    let width_rad = norm.rad(k.arc_distance_km); // ledger: PLT-441 (the forearc: to the arc's axis)
+    let mut band: Vec<(u32, f64, u32)> = forearcs
+        .reached
+        .iter()
+        .filter_map(|&i| {
+            let d = forearcs.dist[i as usize];
+            let f = forearcs.label[i as usize];
+            (d.is_finite()
+                && d < width_rad
+                && forearcs.loss_km3[f as usize] > 0.0
+                && !state.samples[i as usize].is_hidden())
+            .then_some((f, d, i))
+        })
+        .collect();
+    band.sort_unstable_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)).then(a.2.cmp(&b.2)));
+    let floor_m = oceanic_m(); // ledger: PLT-441
+    let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
+    let (z_f, per_m) = (k.oceanic_floor_elevation_m, crust_per_metre(env));
+    let z_t = k.trench_elevation_m;
+    let mut left_m = vec![0.0_f64; forearcs.loss_km3.len()];
+    for (f, x) in forearcs.loss_km3.iter().enumerate() {
+        left_m[f] = x / area * 1000.0;
+    }
+    for &(f, _, i) in &band {
+        let left = &mut left_m[f as usize];
+        if *left <= 0.0 {
+            continue;
+        }
+        let s = &mut state.samples[i as usize];
+        let t = f64::from(s.thickness_m);
+        let take = (t - floor_m).max(0.0).min(*left);
+        if take <= 0.0 {
+            continue;
+        }
+        *left -= take;
+        let q = take / t;
+        let before = s.pools;
+        let basement = f64::from(s.basement_m);
+        for p in s.pools.iter_mut() {
+            *p = (f64::from(*p) * (1.0 - q)) as f32;
+        }
+        s.basement_m = (basement * (1.0 - q)) as f32;
+        s.thickness_m = s.pools.iter().sum();
+        let gone = t - f64::from(s.thickness_m);
+        let z = f64::from(s.elevation_m);
+        let lowered = if s.kind == CONTINENTAL {
+            let base_gone = basement * q;
+            out.continental_km3 += (gone - base_gone) * area / 1000.0;
+            out.other_km3 += base_gone * area / 1000.0;
+            let change = isostatic_change_m(&before, &s.pools, env.gravity);
+            toward(z, change, iso_height(&s.pools, z_0, env.gravity))
+        } else {
+            out.other_km3 += gone * area / 1000.0;
+            let after = crystalline_m(&s.pools);
+            let change = (after - crystalline_m(&before)) / per_m;
+            toward(z, change, held_floor_m(after, f64::INFINITY, z_f, per_m))
+        };
+        s.elevation_m = lowered.max(z_t.min(z)) as f32;
+    }
+    out.short_km3 = left_m.iter().map(|m| m.max(0.0) * area / 1000.0).sum();
+    out
 }
 
 /// The arc band's weight at `d_km` from the front (Gaussian, centred `arc_distance_km` from it).
