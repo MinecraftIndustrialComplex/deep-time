@@ -463,31 +463,42 @@ bake's time did not grow (22.4 against 25.9 s on quick 16k at 50 Myr, a loaded m
 
 **Measured** (`deeptime bench --threads 8 --compute cpu --mem-cap <cap>`, `DEEPTIME_MEM_TRACE`, the
 large-block cache off, `DEEPTIME_LARGE_CACHE=0`, so the peak is live bytes; the bake's peak is the
-trace's bake phase; MB = 10^6 B; scratch scripts not committed):
+trace's bake phase; MB = 10^6 B; the binary of 5c0341ed, except the two 1000 Myr runs marked *,
+measured with its parent f3d43a50, whose stages and bake allocate the same and whose estimate is
+the same less `UNGRIDDED_BYTES`; scratch scripts not committed):
 
 | Run (preset, start, length, cap) | Run peak | Estimate | Margin | Bake peak | Bake estimate | Margin |
 |---|---|---|---|---|---|---|
-| pipeline_quick_16k, scattered_continents, 50 Myr, 4 GiB | 2,411.8 | 2,662.1 | +250.3 (+10.4 %) | 1,345.6 | 1,564.1 | +218.6 (+16.2 %) |
-| pipeline_quick_16k, scattered_continents, 1000 Myr, 4 GiB | 3,024.5 | 3,259.8 | +235.2 (+7.8 %) | 1,999.5 | 2,161.8 | +162.3 (+8.1 %) |
-| pipeline_full_32k, supercontinent, 100 Myr, 8 GiB | 4,976.1 | 5,607.3 (amplifier 5,242.0) | +631.2 (+12.7 %; amplifier +265.9, +5.3 %) | 3,969.0 | 4,548.5 | +579.5 (+14.6 %) |
-| Ben's world (earthlike, Petroff-Guyou C 13312), supercontinent, 1000 Myr, 4 GiB | 3,023.3 | 3,259.8 | +236.5 (+7.8 %) | 2,000.1 | 2,161.8 | +161.7 (+8.1 %) |
+| `tests/memory_estimate.rs`'s planet (quick 16k at L1 64, L3 16 blocks), scattered_continents, 100 Myr, 2 threads, 4 GiB | 76.0 | 91.2 | +15.2 (+20.0 %) | 73.9 | 85.7 | +11.7 (+15.9 %) |
+| pipeline_quick_16k, scattered_continents, 50 Myr, 4 GiB | 2,417.1 | 2,684.2 | +267.1 (+11.1 %) | 1,345.5 | 1,580.9 | +235.4 (+17.5 %) |
+| pipeline_quick_16k, scattered_continents, 1000 Myr, 4 GiB * | 3,029.9 | 3,281.9 | +252.0 (+8.3 %) | 1,999.6 | 2,178.6 | +179.0 (+9.0 %) |
+| pipeline_full_32k, supercontinent, 100 Myr, 8 GiB | 5,003.0 | 5,607.3 (amplifier 5,285.7) | +604.3 (+12.1 %; amplifier +282.6, +5.6 %) | 3,975.7 | 4,565.3 | +589.6 (+14.8 %) |
+| Ben's world (earthlike, Petroff-Guyou C 13312), supercontinent, 1000 Myr, 4 GiB * | 3,028.6 | 3,281.9 | +253.3 (+8.4 %) | 2,000.1 | 2,178.6 | +178.5 (+8.9 %) |
 
 Every run's peak is the amplifier's last level; full 32k's estimate peak is the deposits stage's
-(5,607.3 MB, 3,431.3 held). With the cache on (the game's default) the kept blocks fill to the
-ceiling, so the counted peak sits at the estimate: 2,662.3 against 2,662.1 on quick 16k at 50 Myr,
-3,259.0 against 3,259.8 on Ben's world, its bake 2,162.1 against 2,161.8. The 0.2 and 0.3 MB over
-are what other threads count in the instant between a block's count and the shed that makes room
-for it; they are kept blocks, not live data. Each run's 68 to 87 files and layers have the same
-checksums as the same run before the change (the manifests' crc32s, against a build of the old flood).
+(5,607.3 MB, 3,431.8 held). On the test planet the bake's peak is the top raise (the projection's
+figure 23.6 MB, which the grid steps alone put at 17.5); on the others it is the closed basins or
+the relief on L3, and the top raise stays under them (on full 32k, about 1,600 MB of the
+projection's 1,665.6). With the cache on (the game's default) the kept blocks fill to
+`KEEP_MARGIN_BYTES` under each figure: the counted peak was 8.7 MB under the run's figure and 8.1
+under the bake's on quick 16k at 50 Myr (2,675.6 against 2,684.2; 1,572.8 against 1,580.9), 9.2 and
+8.1 on Ben's world (3,272.7 against 3,281.9; 2,170.5 against 2,178.6), 13.2 and 8.1 on the test
+planet; the 0.3 MB by which each passes its kept-block bound is what other threads count between a
+block's count and the shed that makes room for it. `tests/memory_estimate.rs` (cache on, MiB): the
+amplifier 74.4 against 87.0, the bake 73.9 against 81.7, the young landscape 64.0 against 80.8 (it
+failed before: the amplifier 72.5 against 71.0, the bake 70.5 against 61.1). Each run's 68 to 87
+files and layers have the same checksums as the same run before the flood's change (the
+manifests' crc32s, against a build of the old flood).
 
-**The margin's parts.** Of the run's 235 to 266 MB, the world as estimated is 138 MB above the world
-the run holds on quick 16k at 50 Myr and 257 MB on full 32k (the stages' retained layers and the
-recorded history: at 1000 Myr 629.1 MB listed for 493.0 MB held). So a cap in that band above the
-whole path's need is one at which the estimate lists a level in tiles that the run, seeing its real
-gauge, keeps whole; the run stays under its cap either way. The editor judges a run at its cap less
-`SERVER_OVERHEAD_BYTES` (512 MiB), while the run itself uses the whole cap. Under the editor's 4 GiB
-the default quick world now has 1,127 MB between its amplifier's base (2,630.6 MB) and the stage cap
-(3,758.1 MB), where it had 40.0 MB.
+**The margin's parts.** Of the run's 252 to 283 MB (the amplifier's figure), the world as estimated
+is about 155 MB above the world the run holds on quick 16k at 50 Myr and 274 MB on full 32k (138
+and 257 MB before `UNGRIDDED_BYTES`; the stages' retained layers and the recorded history: at 1000
+Myr 629.1 MB listed for 493.0 MB held). So a cap in that band above the whole path's need is one at
+which the estimate lists a level in tiles that the run, seeing its real gauge, keeps whole; the run
+stays under its cap either way. The editor judges a run at its cap less `SERVER_OVERHEAD_BYTES` (512
+MiB), while the run itself uses the whole cap. Under the editor's 4 GiB the default quick world now
+has 1,105 MB between its amplifier's base (2,652.8 MB) and the stage cap (3,758.1 MB), where it had
+40.0 MB.
 
 ## Lake shores in the amplifier (savanna pit task, 2026-10-22)
 
