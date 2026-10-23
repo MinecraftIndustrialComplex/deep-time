@@ -701,6 +701,10 @@ pub struct Split {
     pub mouths: u32,
     /// Chains added.
     pub added: u32,
+    /// Splits given up: [the split point at the stem's last cell on the plain, no front cell of
+    /// the half it heads for reached across the plain, none of those with a free way down to the
+    /// open sea] (HYD-144).
+    pub fails: [u32; 3],
 }
 
 /// Splits each plain's main stem in the second network (`second`, run on the raised ground) into
@@ -819,16 +823,16 @@ pub fn distributaries(
             fit: mouths_n as u32,
             mouths: 1,
             added: 0,
+            fails: [0; 3],
         };
         if mouths_n < 2 || front.len() < mouths_n {
             out.push(split);
             continue;
         }
-        let target = |s: usize| front[((2 * s + 1) * front.len()) / (2 * mouths_n)].1;
+        let seg_at = |i: usize| (i * mouths_n / front.len()).min(mouths_n - 1);
         let seg_of = |c: u32| {
             let b = bearing(c);
-            let i = front.partition_point(|f| f.0 < b);
-            (i * mouths_n / front.len()).min(mouths_n - 1)
+            seg_at(front.partition_point(|f| f.0 < b))
         };
         let mut branches = vec![Branch {
             cells: mouth.stem[apex..].to_vec(),
@@ -842,7 +846,11 @@ pub fn distributaries(
         // point takes the other half's middle (HYD-139, HYD-140).
         let mut work: Vec<(usize, usize, usize, usize)> = vec![(0, 0, mouths_n, 0)];
         while let Some((b, lo, hi, at)) = work.pop() {
-            if hi - lo < 2 || at + 1 >= branches[b].on_plain {
+            if hi - lo < 2 {
+                continue;
+            }
+            if at + 1 >= branches[b].on_plain {
+                split.fails[0] += 1;
                 continue;
             }
             let mid = (lo + hi) / 2;
@@ -852,22 +860,44 @@ pub fn distributaries(
             } else {
                 ((mid, hi), (lo, mid))
             };
-            let t_seg = (give.0 + give.1 - 1) / 2;
             let start = branches[b].cells[at];
-            let goal = target(t_seg);
-            let Some(mut path) = shortest(&geo, start, goal, |c| on(c) || c == start, &used) else {
-                continue;
-            };
-            // From the front cell across the beach band (if any) to the first cell of the open
-            // sea, as every sea mouth ends (HYD-144).
-            let Some(tail) = to_open(&geo, goal, &to_sea, &used) else {
-                continue;
-            };
-            let plain_len = path.len();
-            path.extend(tail);
-            if path.len() < 3 {
-                continue;
+            // The give half's front cells, its middle first and then outward: the first that no
+            // channel takes, that a path reaches across the plain and that has a free way down to
+            // the open sea is the new mouth (HYD-144).
+            let t_seg = (give.0 + give.1 - 1) / 2;
+            let mid_i = ((2 * t_seg + 1) * front.len()) / (2 * mouths_n);
+            let in_half = (give.0 * front.len()).div_ceil(mouths_n)
+                ..(give.1 * front.len()).div_ceil(mouths_n);
+            let mut order: Vec<usize> = in_half.collect();
+            order.sort_by_key(|&i| (i.abs_diff(mid_i), i));
+            let prev = paths_from(&geo, start, |c| on(c) || c == start, &used);
+            let mut reached = false;
+            let mut found = None;
+            for i in order {
+                let goal = front[i].1;
+                if used.contains(&goal) {
+                    continue;
+                }
+                let Some(mut path) = path_to(&prev, start, goal) else {
+                    continue;
+                };
+                reached = true;
+                // From the front cell across the beach band (if any) to the first cell of the
+                // open sea, as every sea mouth ends (HYD-144).
+                let Some(tail) = to_open(&geo, goal, &to_sea, &used) else {
+                    continue;
+                };
+                let plain_len = path.len();
+                path.extend(tail);
+                if path.len() >= 3 {
+                    found = Some((path, plain_len, seg_at(i)));
+                    break;
+                }
             }
+            let Some((path, plain_len, t_seg)) = found else {
+                split.fails[if reached { 2 } else { 1 }] += 1;
+                continue;
+            };
             let span = (hi - lo) as f64;
             let base = branches[b].share_at(at);
             branches[b]
@@ -947,7 +977,8 @@ pub fn distributaries(
 }
 
 /// The shortest 8-connected path from `start` to `goal` over cells where `inside` holds, a step
-/// costing [`PATH_SHARED_COST`] times more on a cell in `used` (HYD-144). Includes both ends.
+/// costing [`PATH_SHARED_COST`] times more onto a cell in `used` other than `goal` (HYD-144).
+/// Includes both ends.
 fn shortest(
     geo: &Geo,
     start: u32,
@@ -955,13 +986,37 @@ fn shortest(
     inside: impl Fn(u32) -> bool,
     used: &HashSet<u32>,
 ) -> Option<Vec<u32>> {
+    path_to(&search(geo, start, Some(goal), inside, used), start, goal)
+}
+
+/// The shortest 8-connected paths from `start` over cells where `inside` holds, a step costing
+/// [`PATH_SHARED_COST`] times more onto a cell in `used` (HYD-144): each reached cell's cell
+/// before it.
+fn paths_from(
+    geo: &Geo,
+    start: u32,
+    inside: impl Fn(u32) -> bool,
+    used: &HashSet<u32>,
+) -> HashMap<u32, u32> {
+    search(geo, start, None, inside, used)
+}
+
+/// Dijkstra from `start` for [`shortest`] (stopping at `goal`, which costs no more for being in
+/// `used`) and [`paths_from`] (no goal): each reached cell's cell before it.
+fn search(
+    geo: &Geo,
+    start: u32,
+    goal: Option<u32>,
+    inside: impl Fn(u32) -> bool,
+    used: &HashSet<u32>,
+) -> HashMap<u32, u32> {
     let mut dist: HashMap<u32, u64> = HashMap::new();
     let mut prev: HashMap<u32, u32> = HashMap::new();
     let mut heap: BinaryHeap<Reverse<(u64, u32)>> = BinaryHeap::new();
     dist.insert(start, 0);
     heap.push(Reverse((0, start)));
     while let Some(Reverse((d, c))) = heap.pop() {
-        if c == goal {
+        if Some(c) == goal {
             break;
         }
         if dist.get(&c).is_some_and(|&b| d > b) {
@@ -975,7 +1030,7 @@ fn shortest(
             if !inside(nb) {
                 continue;
             }
-            let w = if used.contains(&nb) && nb != goal {
+            let w = if used.contains(&nb) && Some(nb) != goal {
                 PATH_SHARED_COST
             } else {
                 1.0
@@ -988,7 +1043,13 @@ fn shortest(
             }
         }
     }
-    if !dist.contains_key(&goal) {
+    prev
+}
+
+/// The path [`paths_from`] found from `start` to `goal`, both ends included; none where it did
+/// not reach `goal`.
+fn path_to(prev: &HashMap<u32, u32>, start: u32, goal: u32) -> Option<Vec<u32>> {
+    if goal != start && !prev.contains_key(&goal) {
         return None;
     }
     let mut path = vec![goal];
@@ -1071,6 +1132,15 @@ pub fn stats(plains: &Plains, splits: &[Split], land_cells: u64, cell_km2: f64) 
     };
     let mouths_hist = hist(|s| s.mouths);
     let fit_hist = hist(|s| s.fit);
+    let fails = |keep: fn(&Split) -> bool| {
+        let mut f = [0u32; 3];
+        for s in splits.iter().filter(|s| keep(s)) {
+            for (a, b) in f.iter_mut().zip(s.fails) {
+                *a += b;
+            }
+        }
+        f
+    };
     let split_of: HashMap<u32, &Split> = splits.iter().map(|s| (s.plain, s)).collect();
     let mut by_q: Vec<usize> = (0..plains.plains.len()).collect();
     by_q.sort_by(|&a, &b| {
@@ -1104,6 +1174,7 @@ pub fn stats(plains: &Plains, splits: &[Split], land_cells: u64, cell_km2: f64) 
                 "backwater_m": s.map_or(-1.0, |s| s.backwater_m),
                 "front_cells": s.map_or(0, |s| s.front_cells),
                 "fit": s.map_or(0, |s| s.fit),
+                "fails": s.map_or([0; 3], |s| s.fails),
             })
         })
         .collect();
@@ -1124,6 +1195,11 @@ pub fn stats(plains: &Plains, splits: &[Split], land_cells: u64, cell_km2: f64) 
         "deltas_by_mouths": mouths_hist,
         "deltas_by_mouths_fit": fit_hist,
         "backwater_inside_plain": splits.iter().filter(|s| s.backwater_inside).count(),
+        // Splits given up, [stem end, no path, no tail]: over all plains, and the plains that fit
+        // 2 mouths or more and hold 1.
+        "split_fails": fails(|_| true),
+        "fit_unsplit": splits.iter().filter(|s| s.fit >= 2 && s.added == 0).count(),
+        "fit_unsplit_fails": fails(|s| s.fit >= 2 && s.added == 0),
         "earth": {
             "delta_share_of_land": 0.0057,
             "delta_area_km2": 847_936,
