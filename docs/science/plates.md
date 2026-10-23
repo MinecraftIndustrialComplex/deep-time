@@ -5494,3 +5494,63 @@ The collapse's room (thickness, not height) is left as it is. A column 15 km ove
 taking crust as lowland is wrong only because the column stands there; with the yield it no longer
 does, and a room rule that also read the height would have needed a law of its own (open question
 below).
+
+### The arms
+
+Pool arm `pp-yield380` (key 08c9d7d679c0, argkey e042f3ab): `--set
+surface.flexure.yield_anomaly_mgal=380`, `+DEEPTIME_CRUST_BUDGET=1`, 1000 Myr, both starts, against
+the pool's `base` (master bf8477b2, key 7f9d8f115049, argkey 2a53566b, the same arguments without
+the switch). Exploration on seeds 1 to 4 (8 runs against the base's 24): the guard's worst fell from
+13.7 to 12.9 km at the median (p 0.051) and its largest from 26.0 to 15.5 km, with every V1 p 0.35
+or more. Final on seeds 1 to 12 (24 runs a side), medians and the two-sided Mann-Whitney p:
+
+| arm | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | crust's net change | criteria met per run: median, mean | sea over the datum after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| target | 0.26 to 0.32 | ≥ 0.12 | ≤ 0.25 | ≤ 0.12 | ≤ 0.15 | ≤ 0.15 | 2 to 6 |  | of 7 |  |
+| base | 0.300 | 0.151 | 0.274 | 0.151 | 0.333 | 0.116 | 1.75 | −0.035 | 3, 3.33 | 538 / 861 |
+| pp-yield380 | 0.313 (0.35) | 0.161 (0.24) | 0.253 (0.37) | 0.160 (0.50) | 0.351 (0.37) | 0.126 (0.73) | 1.80 (0.56) | −0.033 (1.0) | 3, 3.04 (0.31) | 495 (0.32) / 759 (0.18) |
+
+| arm | the guard's worst, m | runs over 15 / 20 km | largest rise / fall of a cell in a step, m | plate cells 5 km over Airy (final frame), share | largest excess over Airy (final frame), m | highest plate elevation (final frame), m |
+|---|---|---|---|---|---|---|
+| base | 13716 | 9 / 4 | 6992 / 9450 | 0.0000 | 3510 | 6509 |
+| pp-yield380 | 13112 (0.015) | 1 / 0 | 6524 (0.012) / 7422 (< 0.001) | 0.0000 (0.041) | 3391 (0.32) | 6495 (0.60) |
+
+Per run, base / yield (`sc` scattered continents, `sp` supercontinent; the runs part once the yield
+first acts, so a run's two columns are two different planets, not a before and after):
+
+| run | land | largest | under the sea | above 2 km | high coast | under ice | collisions | criteria met | the guard's worst, km |
+|---|---|---|---|---|---|---|---|---|---|
+| sc1 | 0.294 / 0.321 | 0.166 / 0.213 | 0.272 / 0.249 | 0.168 / 0.158 | 0.346 / 0.346 | 0.096 / 0.145 | 1.50 / 1.80 | 3 / 3 | 12.4 / 15.5 |
+| sc2 | 0.309 / 0.284 | 0.277 / 0.261 | 0.294 / 0.272 | 0.157 / 0.172 | 0.340 / 0.354 | 0.094 / 0.066 | 1.90 / 2.10 | 3 / 4 | 13.1 / 11.9 |
+| sc3 | 0.266 / 0.238 | 0.115 / 0.151 | 0.279 / 0.466 | 0.234 / 0.088 | 0.327 / 0.255 | 0.079 / 0.077 | 2.10 / 1.40 | 3 / 3 | 18.8 / 12.2 |
+| sc4 | 0.329 / 0.322 | 0.176 / 0.276 | 0.276 / 0.163 | 0.090 / 0.244 | 0.272 / 0.455 | 0.094 / 0.161 | 2.20 / 2.10 | 4 / 3 | 26.0 / 13.0 |
+| sc5 | 0.299 / 0.331 | 0.124 / 0.277 | 0.295 / 0.256 | 0.161 / 0.162 | 0.365 / 0.383 | 0.143 / 0.134 | 1.30 / 1.60 | 3 / 2 | 15.0 / 13.2 |
+| sc6 | 0.314 / 0.343 | 0.100 / 0.163 | 0.165 / 0.125 | 0.196 / 0.217 | 0.431 / 0.442 | 0.108 / 0.207 | 2.10 / 2.30 | 4 / 3 | 15.6 / 13.5 |
+| sc7 | 0.317 / 0.283 | 0.138 / 0.108 | 0.229 / 0.309 | 0.164 / 0.155 | 0.382 / 0.327 | 0.043 / 0.144 | 2.30 / 2.20 | 5 / 3 | 30.0 / 12.6 |
+| sc8 | 0.292 / 0.329 | 0.073 / 0.158 | 0.264 / 0.223 | 0.137 / 0.180 | 0.304 / 0.330 | 0.185 / 0.087 | 2.70 / 1.20 | 2 / 3 | 13.5 / 12.1 |
+| sc9 | 0.260 / 0.325 | 0.110 / 0.206 | 0.384 / 0.176 | 0.118 / 0.246 | 0.277 / 0.425 | 0.118 / 0.212 | 1.60 / 1.80 | 3 / 2 | 13.7 / 12.3 |
+| sc10 | 0.335 / 0.318 | 0.167 / 0.244 | 0.173 / 0.153 | 0.238 / 0.288 | 0.435 / 0.452 | 0.119 / 0.189 | 1.10 / 2.20 | 3 / 4 | 13.3 / 13.3 |
+| sc11 | 0.301 / 0.313 | 0.126 / 0.206 | 0.319 / 0.176 | 0.082 / 0.291 | 0.282 / 0.434 | 0.081 / 0.153 | 1.60 / 2.00 | 4 / 4 | 13.8 / 14.1 |
+| sc12 | 0.308 / 0.313 | 0.114 / 0.159 | 0.278 / 0.202 | 0.099 / 0.136 | 0.287 / 0.296 | 0.108 / 0.105 | 1.40 / 1.70 | 3 / 4 | 12.3 / 11.9 |
+| sp1 | 0.290 / 0.308 | 0.148 / 0.125 | 0.306 / 0.257 | 0.099 / 0.145 | 0.301 / 0.271 | 0.081 / 0.213 | 1.10 / 1.20 | 4 / 2 | 17.5 / 13.5 |
+| sp2 | 0.284 / 0.256 | 0.192 / 0.060 | 0.237 / 0.419 | 0.360 / 0.040 | 0.407 / 0.179 | 0.210 / 0.093 | 1.30 / 1.50 | 3 / 2 | 12.4 / 13.3 |
+| sp3 | 0.230 / 0.314 | 0.055 / 0.240 | 0.511 / 0.217 | 0.071 / 0.167 | 0.196 / 0.348 | 0.115 / 0.108 | 1.20 / 2.00 | 2 / 5 | 14.6 / 12.9 |
+| sp4 | 0.309 / 0.280 | 0.081 / 0.102 | 0.241 / 0.306 | 0.145 / 0.149 | 0.343 / 0.389 | 0.197 / 0.075 | 1.70 / 1.90 | 2 / 2 | 13.0 / 12.7 |
+| sp5 | 0.289 / 0.200 | 0.205 / 0.041 | 0.325 / 0.571 | 0.106 / 0.061 | 0.286 / 0.189 | 0.071 / 0.067 | 2.80 / 2.50 | 5 / 3 | 29.1 / 12.7 |
+| sp6 | 0.297 / 0.325 | 0.154 / 0.098 | 0.272 / 0.216 | 0.155 / 0.158 | 0.335 / 0.422 | 0.160 / 0.120 | 2.00 / 1.30 | 3 / 2 | 13.6 / 12.4 |
+| sp7 | 0.300 / 0.306 | 0.179 / 0.184 | 0.327 / 0.274 | 0.147 / 0.130 | 0.274 / 0.331 | 0.169 / 0.120 | 1.20 / 2.20 | 2 / 4 | 24.7 / 13.1 |
+| sp8 | 0.284 / 0.357 | 0.203 / 0.200 | 0.335 / 0.168 | 0.105 / 0.173 | 0.192 / 0.392 | 0.144 / 0.052 | 1.00 / 1.50 | 4 / 3 | 18.4 / 13.7 |
+| sp9 | 0.300 / 0.285 | 0.215 / 0.155 | 0.244 / 0.337 | 0.209 / 0.118 | 0.357 / 0.234 | 0.166 / 0.132 | 1.80 / 1.50 | 3 / 4 | 13.3 / 13.1 |
+| sp10 | 0.328 / 0.268 | 0.160 / 0.102 | 0.190 / 0.395 | 0.217 / 0.084 | 0.331 / 0.198 | 0.168 / 0.113 | 2.50 / 2.20 | 3 / 4 | 11.9 / 13.7 |
+| sp11 | 0.317 / 0.296 | 0.159 / 0.132 | 0.165 / 0.302 | 0.268 / 0.181 | 0.441 / 0.358 | 0.135 / 0.157 | 1.80 / 1.50 | 4 / 2 | 12.1 / 13.6 |
+| sp12 | 0.309 / 0.332 | 0.121 / 0.274 | 0.251 / 0.222 | 0.108 / 0.214 | 0.334 / 0.373 | 0.082 / 0.172 | 2.00 / 1.70 | 5 / 2 | 17.1 / 14.8 |
+
+**The ship rule.** Not met. The criteria met per run fell from 3.33 to 3.04 (p 0.31), not up at
+p < 0.05. No criterion's median left its band (land, the largest landmass and the ice stay in it;
+the crust under the sea, land above 2 km, the high coast and the collisions were out of it on the
+base and stay out), and none moved at p under 0.24. The yield takes the guard's tail away (the
+largest excursion 30.0 to 15.5 km, the runs over 20 km 4 to 0, the largest one-step fall 9.45 to
+7.42 km) without moving the planet's V1 shape: the peaks were a few cells, and the land above 2 km
+and the high coast, which are plateaus and ranges, did not move measurably (p 0.50 and 0.37). So the
+switch stays off by default; whether a correction of what the plate
+holds should go on without a V1 gain is the coordinator's call (below).
