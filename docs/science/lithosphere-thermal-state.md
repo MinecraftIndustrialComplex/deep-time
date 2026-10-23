@@ -294,8 +294,11 @@ base run (master 84b8ee03, key 7f9d8f115049, argkey 2a53566b, pass off).
   the events' count 7,844 against 8,215 and 7,958 against 8,106, the land above 2 km on the
   supercontinent start 0.099 against 0.198, the ocean's median age 55.5 against 68.2 Myr and 68.1
   against 50.8. The per-step records show where they part. Supercontinent: records 0 to 98
-  identical, then `land` and `sea_m` at record 99 (t = -800 Myr), the sea by 6.8e-7 m, the plates'
-  other recorded numbers equal at that record. Scattered_continents: records 0 to 78 identical,
+  identical, then `land` 28,818 against 28,822 cells and `sea_m` 475.243311 against 475.243312 m
+  (6.8e-7 m) at record 99 (t = -800 Myr), the plates' other recorded numbers equal at that record,
+  `land` differing in 400 of 500 records (a sea that moves by 7e-7 m moves the land count by four
+  cells only if some heights already differ by more than that, so the ground differs a step
+  or two before the first visible record). Scattered_continents: records 0 to 78 identical,
   then at record 79 (t = -840 Myr) `land` 33,083 against 33,082 cells, `sea_m` 103.661188 against 103.661183 m, the
   forces table and the oceanic arc count; by step 99 `land` is 32,704 against 32,672 and by the last
   step 32,663 against 32,916, with `land` differing in 420 of 500 steps and `collisions` in 28. The
