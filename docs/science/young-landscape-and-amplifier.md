@@ -373,6 +373,90 @@ them. Chosen by the census above and the renders (the agent, D3).
 limestone), and whether the bands should follow the strata's dip instead of running level (they
 would then read the structure). Whether the jag should be stronger on glacial headwalls.
 
+## The amplifier's and the bake's memory estimate (amp-est, 2026-10-23)
+
+Not a physical model: what the run's memory estimate (`session::estimate_for`, which the workbench
+and the editor hold to a run's cap) counts for the amplifier and the bake, against the counting
+allocator's measured peak. No ledger row names these byte constants; they are figures of the memory
+model, marked so in the code.
+
+**Before.** On quick 16k at 50 Myr the estimate listed 3,750 MB for a run whose allocator peaked at
+2,894 MB (cache on). The amplifier's figure counted W x W/2 cells on every level where the world's
+grids have `Projection::grid_rows` rows (909 MiB of cells the run never has on the last level),
+and left out `whole_last_level_peak`'s extra (the level the ladder keeps, the preview). Under that
+excess the bake's figure was too low: it was the projection pass alone, 452.6 MB, where the pass
+held 969.9 MB above the world (the closed basins on the world's ground, HYD-105) and the bake 1,658
+MB in all; on the world Ben plays (1000 Myr) 1,877 MB was listed and 2,581 MB held. An honest
+amplifier figure alone would have let the editor accept a run whose bake passes its cap.
+
+**Where the "300 MiB" went.** The run held about 300 MiB more than its start plus the whole last
+level's peak. (1) Most of it was the allocator's kept blocks (freed large blocks it keeps for
+reuse; 655.9 MB at most on quick 16k at 50 Myr, counted peak 2,893.7 MB against a live peak of
+2,409.8). They are held under a ceiling the session sets from the estimate and never above the cap
+(`alloc::keep_below`), and the run's reservations (`StageContext::reserve`) count live bytes only,
+so they cannot carry a run past its cap. (2) A real gap in the run's own reservation: each level
+before the last held 10.25 B a cell that `run_tiles` never reserved. The glaciers' surface of the
+next level (`LevelSink`'s `zs`, 4 B a cell) was allocated at the first tile, after the tiles'
+reservation, and the cores' copy of it (`zs_core`) grew by pushes to the next power of two, 6.25 B a
+cell instead of 4 (about 55 MB on quick 16k's middle level, 220 MB on full 32k's). Both are now
+allocated at their size before the reservation, so `LEVEL_BYTES_PER_CELL` covers them.
+
+**The amplifier's figure** (`amplify::estimate_under`, the stage's `Stage::estimate_under` for the
+run's cap): the young landscape's world on the L2 grid's real rows (`young::FIELD_BYTES_PER_L2_CELL`,
+17 f32 fields), the character's fields (`CHARACTER_BYTES_PER_L1_CELL`, 32 B: 25, 31 and 29 B held on
+quick 16k at 50 and 1000 Myr and full 32k at 100 Myr), the L2 level, then each level on its real
+grid (`GridDesc::for_planet`), deciding whole or tiled as the run does under the run's cap, and the
+last level with `whole_last_level_peak` whole, or its largest window and the preview in tiles.
+
+**The bake's figure** (`bake::estimate_bytes`): the largest of its parts, which run one after
+another. The strata on L1, `STRATA_BYTES_PER_HORIZON_CELL` (28 B a horizon of a cell; 26.4 and 26.5
+B held on quick 16k, 19.8 on full 32k, 32 horizons). The water on the hydrology's grid (L3, halved
+while it is over `hydro::MAX_CELLS`: 32k full), `WATER_BYTES_PER_CELL` (28 B) on the cells it drains
+plus `WATER_BYTES_PER_L1_CELL` (80 B) for the L1 climate it loads whole (587.2 MB held on quick
+16k's 21.5 M cells and 0.34 M L1 cells; 658.4 MB on full 32k's 21.3 M and 1.34 M; the pair is about
+7 % above both). The projection pass (`project::estimate_bytes`, Petroff-Guyou only): the grids in
+turn on their real rows, the water's layers on the hydrology's grid ("L3h" where it is halved), the
+closed basins' ground and flood (`GROUND_BYTES_PER_WORLD_CELL`, 12 B a world cell: 8.0 for the ground
+as f64 and 3.0 for the flood, measured on quick 16k and Ben's world) and the relief
+(`RELIEF_BYTES_PER_WORLD_CELL`, 6 B: its f32 change and calm flag, 5.0 held).
+
+**The closed basins' flood** (`hydro::closed_basin_on_world_by`, `hydro::sea_reached_by`; HYD-105's
+rule unchanged, the world output byte-identical). The flood kept each body's cells and a depth-first
+stack as usize, and `sea_reached` pushed every open cell onto its stack at once, all grown by
+doubling: 17.1 B a world cell, 29.3 B where the ocean passed 2^24 cells (the doubling's cliff, on
+Ben's world). Now a state byte a cell (new, met, done) and a breadth-first front of u32 (each body is
+flooded twice, the second time through its own cells to mark it done and open or not), and the sea's
+reach floods from one open cell at a time: 3.0 B a world cell on both worlds (67.0 and 67.6 MB). The
+bake's time did not grow (22.4 against 25.9 s on quick 16k at 50 Myr, a loaded machine).
+
+**Measured** (`deeptime bench --threads 8 --compute cpu --mem-cap <cap>`, `DEEPTIME_MEM_TRACE`, the
+large-block cache off, `DEEPTIME_LARGE_CACHE=0`, so the peak is live bytes; the bake's peak is the
+trace's bake phase; MB = 10^6 B; scratch scripts not committed):
+
+| Run (preset, start, length, cap) | Run peak | Estimate | Margin | Bake peak | Bake estimate | Margin |
+|---|---|---|---|---|---|---|
+| pipeline_quick_16k, scattered_continents, 50 Myr, 4 GiB | 2,411.8 | 2,662.1 | +250.3 (+10.4 %) | 1,345.6 | 1,564.1 | +218.6 (+16.2 %) |
+| pipeline_quick_16k, scattered_continents, 1000 Myr, 4 GiB | 3,024.5 | 3,259.8 | +235.2 (+7.8 %) | 1,999.5 | 2,161.8 | +162.3 (+8.1 %) |
+| pipeline_full_32k, supercontinent, 100 Myr, 8 GiB | 4,976.1 | 5,607.3 (amplifier 5,242.0) | +631.2 (+12.7 %; amplifier +265.9, +5.3 %) | 3,969.0 | 4,548.5 | +579.5 (+14.6 %) |
+| Ben's world (earthlike, Petroff-Guyou C 13312), supercontinent, 1000 Myr, 4 GiB | 3,023.3 | 3,259.8 | +236.5 (+7.8 %) | 2,000.1 | 2,161.8 | +161.7 (+8.1 %) |
+
+Every run's peak is the amplifier's last level; full 32k's estimate peak is the deposits stage's
+(5,607.3 MB, 3,431.3 held). With the cache on (the game's default) the kept blocks fill to the
+ceiling, so the counted peak sits at the estimate: 2,662.3 against 2,662.1 on quick 16k at 50 Myr,
+3,259.0 against 3,259.8 on Ben's world, its bake 2,162.1 against 2,161.8. The 0.2 and 0.3 MB over
+are what other threads count in the instant between a block's count and the shed that makes room
+for it; they are kept blocks, not live data. Each run's 68 to 87 files and layers have the same
+checksums as the same run before the change (the manifests' crc32s, against a build of the old flood).
+
+**The margin's parts.** Of the run's 235 to 266 MB, the world as estimated is 138 MB above the world
+the run holds on quick 16k at 50 Myr and 257 MB on full 32k (the stages' retained layers and the
+recorded history: at 1000 Myr 629.1 MB listed for 493.0 MB held). So a cap in that band above the
+whole path's need is one at which the estimate lists a level in tiles that the run, seeing its real
+gauge, keeps whole; the run stays under its cap either way. The editor judges a run at its cap less
+`SERVER_OVERHEAD_BYTES` (512 MiB), while the run itself uses the whole cap. Under the editor's 4 GiB
+the default quick world now has 1,127 MB between its amplifier's base (2,630.6 MB) and the stage cap
+(3,758.1 MB), where it had 40.0 MB.
+
 ## Lake shores in the amplifier (savanna pit task, 2026-10-22)
 
 Ben, on deep pits in a savanna plain: "The savana pit was fine, the weird thing was all of the

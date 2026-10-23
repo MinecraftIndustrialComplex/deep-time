@@ -785,10 +785,9 @@ const CHARACTER_BYTES_PER_L1_CELL: u64 = 32;
 /// the format refuses counts as `C/r × C/2r`).
 fn grid_dims(p: &PlanetPreset, r: u32) -> (u64, u64) {
     let c = p.scale.circumference_blocks;
-    GridDesc::for_planet("L", c, r).map_or(
-        (u64::from(c / r), u64::from(c / r / 2)),
-        |g| (u64::from(g.w), u64::from(g.h)),
-    )
+    GridDesc::for_planet("L", c, r).map_or((u64::from(c / r), u64::from(c / r / 2)), |g| {
+        (u64::from(g.w), u64::from(g.h))
+    })
 }
 
 /// The world the young landscape leaves for this stage, `(without the history, the history)`
