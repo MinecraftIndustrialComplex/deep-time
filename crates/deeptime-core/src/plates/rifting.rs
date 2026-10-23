@@ -803,7 +803,7 @@ pub fn heal(
 }
 
 #[cfg(test)]
-mod tests {
+pub(in crate::plates) mod tests {
     use super::*;
     use crate::params::TectonicParams;
     use crate::plates::geometry::positions;
@@ -829,7 +829,7 @@ mod tests {
         assert!(stress_weights(&[None, None], &[(0, 1.0), (1, 1.0)], 20.0, 1.0).is_none());
     }
 
-    const N: usize = 16_000;
+    pub(in crate::plates) const N: usize = 16_000;
 
     fn env(k: &TectonicParams) -> Env<'_> {
         Env {
@@ -844,7 +844,11 @@ mod tests {
     }
 
     /// One plate over the whole sphere, each sample as `make` says from its position.
-    fn one_plate(geo: &Geo, seed: u64, make: impl Fn(DVec3) -> Sample) -> PlateState {
+    pub(in crate::plates) fn one_plate(
+        geo: &Geo,
+        seed: u64,
+        make: impl Fn(DVec3) -> Sample,
+    ) -> PlateState {
         let ident = [0.0, 0.0, 0.0, 1.0];
         let mut st = PlateState {
             n: N as u32,
@@ -890,7 +894,7 @@ mod tests {
         st
     }
 
-    fn continental() -> Sample {
+    pub(in crate::plates) fn continental() -> Sample {
         let mut s = Sample::blank(0);
         s.kind = CONTINENTAL;
         s.pools = continental_column();
@@ -900,7 +904,7 @@ mod tests {
     }
 
     /// Ocean floor formed 400 Myr ago: old enough to start subducting anywhere (PLT-062).
-    fn old_floor() -> Sample {
+    pub(in crate::plates) fn old_floor() -> Sample {
         let mut s = Sample::blank(0);
         s.pools = oceanic_column();
         s.thickness_m = s.pools.iter().sum();
