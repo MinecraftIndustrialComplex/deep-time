@@ -4,10 +4,11 @@ Status of this page: `stage 2 (constants checked against sources on 2026-10-23, 
 could be read; the rest marked from-memory)`. Written by the gap-4 agent, 2026-10-23, before the
 code (the brief's "design first"); the measured sections were added after the pool runs.
 
-Ledger ids on this page: `PLT-460` to `PLT-469`, `ISO-110` to `ISO-112` (see
+Ledger ids on this page: `PLT-460` to `PLT-470`, `ISO-110` to `ISO-112` (see
 [claims.md](claims.md) and [ledger/PLT.md](ledger/PLT.md), [ledger/ISO.md](ledger/ISO.md)).
 Every law here sits behind a `--set` switch that is off by default (`tectonics.thermal_state`,
-`tectonics.thermal_isostasy_m`, `tectonics.thermal_strength`, `tectonics.heat_flow_refresh`).
+`tectonics.thermal_isostasy_m`, `tectonics.thermal_strength`, `tectonics.thermal_backstop`,
+`tectonics.heat_flow_refresh`; `tectonics.thermal_keel_km` sets the start's keel).
 
 ## What you see in the world
 
@@ -52,7 +53,7 @@ settling, when this step's flags are all set. For each visible continental sampl
    t, set each step; it matters only when the floor becomes continental (an arc matures, crust spreads
    onto it), and the new continental sample starts from it with no keel.
 4. **The start.** The continents the planet starts with begin at L = L_ref (the frame below) with a
-   keel K = min(K_0, L). A continental sample that appears later with no state (none is set) takes
+   keel K = min(K_0, L) (K_0 = `thermal_keel_km`, 200 km; 0 gives no keels). A continental sample that appears later with no state (none is set) takes
    L_ref and no keel.
 
 A resampling copies both numbers from the nearest corner of the sample's kind (`ridges.rs`
@@ -84,6 +85,14 @@ A resampling copies both numbers from the nearest corner of the sample's kind (`
   reached by an arc's orogeny keeps its strength, where today the orogeny's new date makes it as weak
   as a new arc.
 
+- **The backstop** (`tectonics.thermal_backstop`): an arc's cordillera grows by crust shortened
+  into it from the same plate's crust behind the range (PLT-048), which loses the same share of
+  every pool. With the backstop each source's share is weighted by its weakness, the sheet's
+  η_0 / η at its thermal age, w = e^(−t_eq / τ_s): a hot back-arc gives its crust, a cold craton
+  hardly any, and the range gets what the sources give (volume kept). Hyndman, Currie & Mazzotti
+  (2005): back-arc lithospheres are "weaker than cratons by more than a factor of 10", so the
+  back-arc, not the craton, takes the shortening.
+
 This reuses the release pace's state rather than adding a clock: McKenzie's τ is the same law, and
 the flexure's held Te (ISO-099) keeps working on top of the new target.
 
@@ -113,6 +122,7 @@ the flexure's held Te (ISO-099) keeps working on top of the new target.
 | PLT-467 | continental heat flow | q = q_c + B / L, q_c = 26 mW/m², B = 3,375 mW/m² × km | mW/m² | Archean mean 41 (Nyblade & Pollack 1993 as two open papers cite it); mantle heat flow 11 to 17 (Rolandone et al. 2002; Sleep 2003 citing Jaupart & Mareschal 1999), 15 taken at L_cold | `abstract-only` |
 | PLT-468 | the magmatic terms | +40 arc, +40 hotspot (PLT-137's); the rift's +30 dropped | mW/m² | PLT-137 (uncited) | `uncited` |
 | PLT-469 | the final heat-flow pass | after the resampling, continental q ← max(q, the law's conductive value) | mW/m² | the bake test's fault (2026-10-23) | `game-choice` (a bookkeeping fix) |
+| PLT-470 | the backstop | a source's share of the cordillera's strain w = e^(−t_eq / τ_s), τ_s = 62.8 (PLT-415) | none | Hyndman, Currie & Mazzotti 2005 (back-arcs weaker than cratons "by more than a factor of 10"); the weight is PLT-415's law | `game-choice` |
 | ISO-110 | thermal isostasy | z_th = E (L_ref − L) / (L_cold − L_hot), E = 1,600 | m | Hyndman & Currie 2011 ("about 1,600 m at equal thickness") | `verified` |
 | ISO-111 | L_ref, the frame | 225 (craton frame) or 187 (Hyndman & Currie's frame) | km | the model's Airy line against HC2011's two sea-level crusts (below) | `game-choice` (a calibration) |
 | ISO-112 | the thermal age | t_eq = τ_c ln((L_cold − L_hot) / (L_cold − L)) into PLT-415 and ISO-051 | Myr | the inverse of PLT-460's cooling; the coupling is the agent's | `game-choice` |
@@ -149,6 +159,13 @@ Filled in after the pool runs (below, "Measured").
   first mode of McKenzie's plate solution.
 - Heating is by flag (arc, back-arc, hotspot, rift), at one rate. Collisional thickening of the
   lithosphere and its removal (stage 3) are not modelled yet: a collision belt keeps the state it had.
+  The crust's own heating when thickened (its radiogenic heat) is not in the state either, so with
+  `thermal_strength` a collision between two keeled continents stays as stiff as their keels; on
+  Earth a thickened orogen warms and weakens (its thickened crust's own heat, the removal of its
+  root: Houseman & Molnar 1997), which stage 3 is for.
+- The backstop takes the cordillera's crust from weak ground only. Earth's foreland craton gives the
+  Andes crust by underthrusting at its edge, moving as a rigid block; the model's samples cannot
+  move under a range, so a cold source gives (almost) nothing instead.
 - The keel is static: it forms only at the start and thins only in a rift. No new keel grows.
 - Heat flow has one crust part everywhere (26 mW/m²): the crust's own heat production does not
   follow its rock.

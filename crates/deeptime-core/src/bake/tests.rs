@@ -330,46 +330,44 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-
 /// The bake's heat flow: continental cells only, every one in [`lo`, 200.1] mW/m², and nodata on
 /// oceanic crust (where the crust-age layer has data; a continental cell has none).
-fn check_heat_flow(dir: &Path, lo: f32) {
-
-        let load = |n: &str| {
-            deeptime_format::TilePackReader::open(&dir.join(format!("rasters/{n}.dtr")))
-                .unwrap()
-                .load()
-                .unwrap()
-        };
-        let q = load("meta/heat_flow_mw_m2");
-        let age = load("meta/crust_age_myr");
-        // The crust type (2026-10-19) agrees with both: oceanic (0) wherever the crust has an
-        // age, continental (1) wherever it has a continental heat flow, and every cell has one.
-        let kind = load("meta/crust_type");
-        assert_eq!(kind.desc.dtype, deeptime_format::DType::U8);
-        assert_eq!(kind.desc.nodata, Some(255.0));
-        assert_eq!(q.desc.grid.w, age.desc.grid.w);
-        assert_eq!(kind.desc.grid.w, age.desc.grid.w);
-        let (mut hot, mut cold) = (0u32, 0u32);
-        for j in 0..q.desc.grid.h {
-            for i in 0..q.desc.grid.w {
-                let (i, j) = (i64::from(i), i64::from(j));
-                let (v, a, k) = (q.get(i, j), age.get(i, j), kind.get(i, j));
-                if v.is_nan() {
-                    cold += 1;
-                } else {
-                    assert!((lo..=200.1).contains(&v), "({i}, {j}) heat flow {v}");
-                    assert!(a.is_nan(), "({i}, {j}) has an age and a continental flow");
-                    assert_eq!(k, 1.0, "({i}, {j}) has a continental flow on crust {k}");
-                    hot += 1;
-                }
-                if !a.is_nan() {
-                    assert_eq!(k, 0.0, "({i}, {j}) has an oceanic age on crust {k}");
-                }
-                assert!(k == 0.0 || k == 1.0, "({i}, {j}) crust type {k}");
+fn check_heat_flow(dir: &Path, lo: f64) {
+    let load = |n: &str| {
+        deeptime_format::TilePackReader::open(&dir.join(format!("rasters/{n}.dtr")))
+            .unwrap()
+            .load()
+            .unwrap()
+    };
+    let q = load("meta/heat_flow_mw_m2");
+    let age = load("meta/crust_age_myr");
+    // The crust type (2026-10-19) agrees with both: oceanic (0) wherever the crust has an
+    // age, continental (1) wherever it has a continental heat flow, and every cell has one.
+    let kind = load("meta/crust_type");
+    assert_eq!(kind.desc.dtype, deeptime_format::DType::U8);
+    assert_eq!(kind.desc.nodata, Some(255.0));
+    assert_eq!(q.desc.grid.w, age.desc.grid.w);
+    assert_eq!(kind.desc.grid.w, age.desc.grid.w);
+    let (mut hot, mut cold) = (0u32, 0u32);
+    for j in 0..q.desc.grid.h {
+        for i in 0..q.desc.grid.w {
+            let (i, j) = (i64::from(i), i64::from(j));
+            let (v, a, k) = (q.get(i, j), age.get(i, j), kind.get(i, j));
+            if v.is_nan() {
+                cold += 1;
+            } else {
+                assert!((lo..=200.1).contains(&v), "({i}, {j}) heat flow {v}");
+                assert!(a.is_nan(), "({i}, {j}) has an age and a continental flow");
+                assert_eq!(k, 1.0, "({i}, {j}) has a continental flow on crust {k}");
+                hot += 1;
             }
+            if !a.is_nan() {
+                assert_eq!(k, 0.0, "({i}, {j}) has an oceanic age on crust {k}");
+            }
+            assert!(k == 0.0 || k == 1.0, "({i}, {j}) crust type {k}");
         }
-        assert!(hot > 0 && cold > 0, "continents {hot}, ocean {cold}");
+    }
+    assert!(hot > 0 && cold > 0, "continents {hot}, ocean {cold}");
 }
 
 /// The release pace (ISO-099) on, with the heat flow's final pass (PLT-469): without the pass a
@@ -399,7 +397,7 @@ fn the_thermal_state_bakes_its_own_heat_flow() {
     v["tectonics"]["thermal_strength"] = json!(true);
     run_to_folder(&v.to_string(), &dir);
     let floor = crate::plates::thermal::conductive_mw_m2(crate::plates::thermal::L_COLD_KM);
-    check_heat_flow(&dir, floor as f32 - 0.1);
+    check_heat_flow(&dir, floor - 0.1);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

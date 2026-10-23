@@ -8136,7 +8136,7 @@ The sources of the release's pace (build log 2026-10-23; flexure.md, the section
 - Reference: Hyndman, R. D., Currie, C. A. and Mazzotti, S. P. (2005). Subduction zone backarcs, mobile belts, and orogenic heat. GSA Today 15(2):4-10.
 - DOI or URL: 10.1130/1052-5173(2005)015<4:SZBMBA>2.0.CO;2
 - Cited as: "Hyndman, Currie & Mazzotti 2005".
-- Ledger ids: ISO-099, PLT-461, PLT-465, ISO-112 (2026-10-23, the lithosphere's thermal state)
+- Ledger ids: ISO-099, PLT-461, PLT-465, PLT-470, ISO-112 (2026-10-23, the lithosphere's thermal state)
 - Access: open (GSA Today).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-23: "The thermal effect of extension decays with a time constant of ~50 m.y."; "Moho temperatures are 800-900 °C and lithosphere thicknesses are 50-60 km, compared to 400-500 °C and 150-300 km for cratons and other regions with a thermotectonic age greater than ca. 300 Ma. The temperature differences result in backarc lithospheres that are weaker than cratons by more than a factor of 10"; "Most of the rapid decrease in heat flow appears to be in the several hundred m.y. following the last thermotectonic event."
@@ -8186,7 +8186,7 @@ The sources of the release's pace (build log 2026-10-23; flexure.md, the section
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-23: "The lake level has steadily decreased with now more than - 110 cm/year, leaving the level in October 2018 at 433 m below mean sea-level (msl)."
 
-## The lithosphere's thermal state (PLT-460 to PLT-469, ISO-110 to ISO-112), added 2026-10-23
+## The lithosphere's thermal state (PLT-460 to PLT-470, ISO-110 to ISO-112), added 2026-10-23
 
 The sources of the lithosphere's thermal state (gap 4; `lithosphere-thermal-state.md`). McKenzie 1978, Hyndman & Currie 2011, Hyndman, Currie & Mazzotti 2005, Currie & Hyndman 2006 and Currie, Huismans & Beaumont 2008 are above; their ledger ids now include the rows of this section. Read by a Sonnet sub-agent of the gap-4 agent on 2026-10-23; the quotes are as read, en dashes turned to hyphens. Not read: Lachenbruch & Morgan 1990 (Tectonophysics 174:39, abstract only, no thermal rule in it), Petitjean et al. 2006 (G-cubed 7, abstract: "it takes at least 200 Myr for a hot mantle plume to erode the thick lithospheric root"), Angevine, Heller & Paola 1990 (a course scan of chapter 4 read: "For the parameters that we have given, τ = 62.8 My", κ = 8 × 10^-7 m²/s, a 125 km lithosphere; not given an entry).
 
