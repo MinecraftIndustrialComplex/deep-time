@@ -80,10 +80,11 @@ def fjords(base, info):
 def mouths(world):
     b = open(world + "/rivers/rivers.dtrv", "rb").read()
     c, _t, _tx, _tz, nv, nk, _e = struct.unpack_from("<7I", b, 16)
-    secs = [struct.unpack_from("<QII", b, 64 + 16 * i) for i in range(4)]
+    # Layout 2: 52 fixed bytes, 20-byte chains (FORMAT.md "Rivers").
+    secs = [struct.unpack_from("<QII", b, 68 + 16 * i) for i in range(4)]
     out = []
     for k in range(nk):
-        first, count, mouth = struct.unpack_from("<IIB", b, secs[1][0] + 16 * k)
+        first, count, mouth = struct.unpack_from("<IIB", b, secs[1][0] + 20 * k)
         x, z, _w, hw, _d, q = struct.unpack_from("<6f", b, secs[0][0] + 24 * (first + count - 1))
         if mouth == 0:
             out.append((q, x, z, hw))

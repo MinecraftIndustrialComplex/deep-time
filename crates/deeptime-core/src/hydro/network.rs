@@ -1116,6 +1116,7 @@ pub fn run(inp: &Input<'_>) -> Output {
                 wk.mouth
             },
             into,
+            from: u32::MAX,
         });
     }
     // Monotone surfaces along every chain: the vertices were taken from cells whose surface never
