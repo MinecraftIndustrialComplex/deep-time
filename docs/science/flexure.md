@@ -484,7 +484,10 @@ branch with the pace on (source key 76b4db9c66ff, τ = 62.8 Myr) on the old base
 and the trench budget's three, master's default since 57558f0a), each against the pool's 24 runs
 of the same arguments without the pace (the old `base`; `trench-m-rs12e-sheet`, the pool's `base`
 since that merge). One run with `te_weakening_myr = 0` (supercontinent, seed 1) is bit-identical
-to the old base's. Medians (the criteria: the mean a run), Mann-Whitney p:
+to the old base's. With 57558f0a merged in, the branch at its default made the new base's
+supercontinent 1 again and with τ = 62.8 made `fg-release-sheet`'s again, every field byte for
+byte, so the right-hand columns are the pace against the new base. Medians (the criteria: the mean
+a run), Mann-Whitney p:
 
 | measure | old base | pace on | p | the default | pace on | p |
 |---|---|---|---|---|---|---|
