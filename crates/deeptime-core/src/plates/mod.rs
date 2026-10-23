@@ -326,6 +326,8 @@ impl PlatesStage {
         };
         let sea = sea_m(world);
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+        // The crust's own Airy heights as the step begins (its crust uplift, ledger: ISO-091).
+        let crust0 = settle::crust_heights(st, env.gravity);
         if let Some(gb) = st.gap_budget.as_mut() {
             gb.begin_step(&st.samples);
         }
@@ -647,6 +649,7 @@ impl PlatesStage {
         surface(st, &cache.geo, &env, &taper.floor_m, sea);
         book(st, gap_budget::Part::PlateSurface);
         finish_samples(st, &cache.geo, &z0, &env);
+        settle::crust_uplift(st, &crust0, env.gravity, env.dt_yr, false);
         book(st, gap_budget::Part::Finish);
         let arcs = dynamics::arc_heights(st, sea);
         lap(&mut clock, "surface_finish");
@@ -713,12 +716,14 @@ impl PlatesStage {
             // The accretion is thickening too (ledger: PLT-287); the surface's change counts as
             // the step's uplift, as the accretion's own rise does.
             let z: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+            let crust = settle::crust_heights(st, env.gravity);
             let limited = rate::limit(st, &geo, &env);
             if limited.columns > 0 {
                 for (s, &z) in st.samples.iter_mut().zip(&z) {
                     s.uplift_mm_yr +=
                         ((f64::from(s.elevation_m) - f64::from(z)) / env.dt_yr * 1.0e3) as f32;
                 }
+                settle::crust_uplift(st, &crust, env.gravity, env.dt_yr, true);
             }
             book(st, gap_budget::Part::Rate);
             add_limited(world, limited);

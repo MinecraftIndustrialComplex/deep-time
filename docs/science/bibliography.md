@@ -4320,6 +4320,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read in this pass: not fetched; a 2024 paper that cites it was read (see Li2024).
 - Reference check: edition not stated anywhere in the code or designs; the numbers depend on the edition and chapter.
 - Read in WP-13a (2026-10-02): not read. Its slab-pull law is read as Faccenna et al. 2012's eq. 1, which follows Turcotte & Schubert 1982 (PLT-182, PLT-183). A course directory's copy of a chapter was found and not used: it is not an author's or publisher's copy.
+- Read 2026-10-22 (the flexure guard, ISO-093): chapter 3 (the same PDF) by a Sonnet sub-agent of the flexure-guard agent: the fibre stress of a bent plate, sigma_xx = E y / (1 - nu^2) x |d2w/dx2|, largest at its faces, sigma_max = 6M/h^2 (eqs. 3.64 to 3.70 and 3.86).
 
 ### Buck2004
 - Reference: Buck, W. R. (2004). Consequences of asthenospheric variability on continental rifting. In: Karner, G. D., Taylor, B., Driscoll, N. W., Kohlstedt, D. L. (eds.), Rheology and Deformation of the Lithosphere at Continental Margins, Columbia University Press, pp. 1-30.
@@ -5160,7 +5161,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Library: fetched in WP-14a. Text file: Guilloteau2000.txt.
 - Read in WP-14a: "The scale height of water ... is small (typically 2 km)". Institutional lecture notes, not peer reviewed.
 
-## Lithospheric flexure (ISO-040 to ISO-077)
+## Lithospheric flexure (ISO-040 to ISO-077, ISO-091 to ISO-093)
 
 ### Calmant1990
 - Reference: Calmant, S., Francheteau, J., Cazenave, A. (1990). Elastic layer thickening with age of the oceanic lithosphere: a tool for prediction of the age of volcanoes or oceanic crust. Geophysical Journal International 100(1):59-67.
@@ -5184,6 +5185,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: Te 20-30 km along the chain, "corresponds closely to the 450 +- 150 C isotherm".
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct. That a load keeps the elastic thickness of its time of loading is how the abstract is commonly summarised; the paper body was not read.
+- Read 2026-10-22 (the flexure guard): full text (https://oceaniron.org/wp-content/uploads/sites/14/2018/10/Watts_1978_114185.pdf) by a Sonnet sub-agent of the flexure-guard agent: Te 20-30 km, and "the large deformations and associated flexural stresses (> 1 kbar) at seamount loads do not appear to change appreciably through time". ISO-093.
 
 ### WattsTenBrink1989
 - Reference: Watts, A. B., ten Brink, U. S. (1989). Crustal structure, flexure, and subsidence history of the Hawaiian Islands. Journal of Geophysical Research 94(B8):10473-10500.
@@ -5254,6 +5256,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: Te 80-100 km for the Himalaya's foreland, 25-50 km for the Alps, 80-130 km for the Appalachians.
+- Read 2026-10-22 (the flexure guard): full text (https://oceaniron.org/wp-content/uploads/sites/14/2018/10/Karner_Watts_1983_114245.pdf) by a Sonnet sub-agent of the flexure-guard agent: the Alps' Bouguer minimum "about 100-200 mGal in amplitude", the Himalaya's "at least 100 mGal and may on some profiles exceed 400 mGal" (Bouguer anomalies, mostly the roots, not departures from isostasy). ISO-093.
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct.
 
@@ -5478,6 +5481,94 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Read so far (by the project): full text, fetched by a Sonnet sub-agent and the values read by the polar-holes agent, 2026-10-18: foreland basins, "The maximum magnitude of tectonic subsidence seen in compiled curves is ~3 km"; strike-slip basins, "rapid and short-lived (typically <10 m.y.) subsidence", "Tectonic subsidence typically exceeds 2 km and reaches 4 km in exceptional cases". Magnitudes and durations, not rates.
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct (on the PDF).
+
+### WattsBurov2003
+- Reference: Watts, A. B., Burov, E. B. (2003). Lithospheric strength and its relationship to the elastic and seismogenic layer thickness. Earth and Planetary Science Letters 213(1-2):113-131.
+- DOI or URL: 10.1016/S0012-821X(03)00289-9; copy https://www.whoi.edu/fileserver.do?id=114324&pt=10&p=75973
+- Cited as: "Watts & Burov 2003" (a plate yields where it is bent hard)
+- Ledger ids: ISO-093
+- Access: paywalled; a copy on WHOI's file server.
+- Library (the project's source library, not distributed): not filed; fetched to /tmp by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22 (pdftotext; its minus signs come out as "3", decoded with the paper's own 5e-6 and 1.3e-6).
+- Read so far (by the project): full text, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: "Te slowly decreases with increasing curvature and, hence, bending stress"; for 80 Ma lithosphere at a strain rate of 1e-14 s^-1 the ratio Te(YSE)/Te(elastic) is 1 for K <= 1e-8 m^-1, and "For K = 1e-6 m^-1 the ratio is ~0.5, indicating 50% yielding"; at the northern Chile trench (K = 1.3e-6 m^-1) "Te is 22 +- 2 km" against 34 km from the plate's age; "Ideal elastic materials support any stress level. In the case of real materials, however, stress levels are limited to the rock strength at the corresponding depth"; Byerlee's brittle strength at the Moho (~35 km) 0.6 GPa (tension) to 2.0 GPa (compression).
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: journal, volume, pages and DOI as the sub-agent read them; the title is from memory, not checked.
+
+### HunterWatts2016
+- Reference: Hunter, J., Watts, A. B. (2016). Gravity anomalies, flexure and mantle rheology seaward of circum-Pacific trenches. Geophysical Journal International 207(1):288-316.
+- DOI or URL: 10.1093/gji/ggw275; https://academic.oup.com/gji/article/207/1/288/2583844
+- Cited as: "Hunter & Watts 2016" (an elastic plate's stresses are too high; Te falls landward of the outer rise)
+- Ledger ids: ISO-093
+- Access: open (OUP).
+- Library (the project's source library, not distributed): not filed; read on the publisher's page.
+- Read so far (by the project): about 200,000 of 279,000 characters, all of section 8 and Appendix C, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: "the elastic model, unlike viscous models, predicts unreasonably high bending stresses (up to 900 MPa) in the outermost portions of the flexed plate"; weakening switched on at "kappa = 1x10^-7 m^-1"; "Te landward of the outer rise is generally 40-65 per cent less than the Te seaward" (mean 51 +- 11 %, range 20-72 %); the outer rise's gravity high "<16 mGal at the Middle America and Peru-Chile trenches to up to 40 mGal at old (>80 Ma) trenches".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: journal, volume, pages and DOI as the sub-agent read them; the title is from memory, not checked.
+
+### Watts2025_Hawaii
+- Reference: Watts, A. B., Xu, C., Wessel, P., Shillington, D. J., Boston, B., Dunn, R. A. (2025). Seismic and gravity constraints on plate flexure and mantle rheology along the whole Hawaiian-Emperor seamount chain. Nature Communications 16:11013.
+- DOI or URL: 10.1038/s41467-025-65442-3
+- Cited as: "Watts et al. 2025" (the largest flexurally held load on Earth, in gravity)
+- Ledger ids: ISO-093
+- Access: open.
+- Library (the project's source library, not distributed): not filed; read on the publisher's PDF.
+- Read so far (by the project): full text, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: "observed free-air gravity anomalies that are in the range -100 to +300 mGal"; Vening Meinesz and Gunn showed "the southeast end of the chain was regionally rather than locally isostatically compensated"; "It is apparently only in high curvature regions of the seaward wall of a trench and the region immediately beneath a large volcanic edifice where bending stresses are sufficiently high that the flexed oceanic plate weakens".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: correct.
+
+### tenBrink2004
+- Reference: ten Brink, U. S., Danforth, W., Polloni, C., et al. (2004). New seafloor map of the Puerto Rico Trench helps assess earthquake and tsunami hazards. Eos, Transactions American Geophysical Union 85(37):349-354.
+- DOI or URL: copy https://earthjay.com/earthquakes/20180928_indonesia/ten_brink_etal_2004_seafloor_map_puerto_rico_trench.pdf
+- Cited as: "ten Brink et al. 2004" (the most negative free-air anomaly on Earth)
+- Ledger ids: ISO-093
+- Access: paywalled; a copy on a teaching site.
+- Library (the project's source library, not distributed): not filed.
+- Read so far (by the project): full text of the Eos note, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: "the Puerto Rico Trench is also characterized by the most negative free-air gravity anomaly on Earth, -380 mGal, located 50 km south of the trench, where water depth is 7950 m".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: the first three authors, volume and pages as the sub-agent read them; the title is from memory, not checked.
+
+### Stern_OceanTrenches
+- Reference: Stern, R. J. Ocean Trenches. In: Encyclopedia of Geology (Elsevier), Earth Processes.
+- DOI or URL: proof copy https://personal.utdallas.edu/~rjstern/pdfs/TrenchProof.pdf
+- Cited as: "Stern, Ocean Trenches" (trenches against isostasy, in gravity)
+- Ledger ids: ISO-093
+- Access: the author's proof copy.
+- Library (the project's source library, not distributed): not filed.
+- Read so far (by the project): full text (proof), by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: "Typically, the gravity over the outer swell is about 50 mGals higher than expected from isostasy, while gravity over the trench is about 200 mGals less than that expected from isostatic considerations".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: the edition and year of the encyclopedia were not recorded.
+
+### Cattin2001
+- Reference: Cattin, R., et al. (2001). Gravity anomalies, crustal structure and thermo-mechanical support of the Himalaya of Central Nepal. Geophysical Journal International 147(2):381-392.
+- DOI or URL: https://academic.oup.com/gji/article/147/2/381/719559
+- Cited as: "Cattin et al. 2001" (the Himalaya held up and its foreland pulled down)
+- Ledger ids: ISO-093
+- Access: open (OUP).
+- Library (the project's source library, not distributed): not filed.
+- Read so far (by the project): about 100,000 of 130,000 characters, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: the Bouguer anomaly goes "from about -40 to -500 mgal"; "The foreland appears overcompensated while the high range is undercompensated"; Ganga basin Te 40-50 km. No isostatic-anomaly number.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: first author, journal, volume and pages as the sub-agent read them; the title is from memory, not checked.
+
+### McNuttMenard1982
+- Reference: McNutt, M. K., Menard, H. W. (1982). Constraints on yield strength in the oceanic lithosphere derived from observations of flexure. Geophysical Journal of the Royal Astronomical Society 71(2):363-394.
+- DOI or URL: https://academic.oup.com/gji/article/71/2/363/579182
+- Cited as: "McNutt & Menard 1982" (bending moment saturates at high curvature)
+- Ledger ids: ISO-093
+- Access: paywalled (abstract visible).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: the bending moment saturates at high curvature, read as a depth-dependent yield strength; old oceanic lithosphere has "no long-term strength below about 40 km depth"; the method "is most appropriate for trench profiles with curvatures greater than 10^-7 m^-1".
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: journal, volume and pages as the sub-agent read them; the title is from memory, not checked.
+
+### GoetzeEvans1979
+- Reference: Goetze, C., Evans, B. (1979). Stress and temperature in the bending lithosphere as constrained by experimental rock mechanics. Geophysical Journal of the Royal Astronomical Society 59(3):463-478.
+- DOI or URL: https://academic.oup.com/gji/article/59/3/463/651917
+- Cited as: "Goetze & Evans 1979" (the yield-strength envelope)
+- Ledger ids: ISO-093
+- Access: paywalled (abstract visible).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): the fetch tool's paraphrase of the abstract, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: a limiting yield-strength curve from brittle and ductile laws; stresses must reach "values greater than 100 MPa" at 25-45 km depth. A paraphrase, not a quotation.
+- Read in this pass: not part of stage 1; see "Read so far".
+- Reference check: journal, volume and pages as the sub-agent read them; the title is from memory, not checked.
 
 ## Force-balance plate motion: sources added in WP-13a (2026-10-02)
 

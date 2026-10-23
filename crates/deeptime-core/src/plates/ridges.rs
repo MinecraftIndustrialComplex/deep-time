@@ -146,6 +146,7 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
     };
     s.oxidation = lerp(&|x| x.oxidation);
     s.uplift_mm_yr = lerp(&|x| x.uplift_mm_yr);
+    s.crust_uplift_mm_yr = lerp(&|x| x.crust_uplift_mm_yr);
     // Heat flow belongs to the kind of crust (the sea floor's age law against the continental
     // sum), so only the corners of the sample's own kind are blended: a continental sample on the
     // coast must not take the young ridge crust's 300 mW/m² from an oceanic corner. (The next
@@ -182,6 +183,20 @@ fn interpolate(src: &[Sample], c: &Cover, rot: DQuat) -> Sample {
     s.flags &= FORELAND;
     s.thickness_m = thickness(&s.pools);
     s
+}
+
+/// The crust uplift (`Sample::crust_uplift_mm_yr`) of a resampling's accretion onto a column whose
+/// blended pools were `blended`: the Airy change of the crust it gained, mm/yr (ledger: ISO-091).
+fn accreted_uplift_mm_yr(
+    blended: &[f32; pool::COUNT],
+    pools: &[f32; pool::COUNT],
+    gravity: f64,
+    env: &Env,
+) -> f32 {
+    if pools == blended {
+        return 0.0;
+    }
+    (isostatic_change_m(blended, pools, gravity) / env.dt_yr * 1.0e3) as f32
 }
 
 /// Where the mantle-frame direction `q` falls in group `group`'s footprint (rotation `rot`): the
@@ -463,6 +478,8 @@ pub fn resample(
                         tally[4] += rise;
                     }
                 }
+                // The accreted crust is crust uplift, whatever its rise (ledger: ISO-091).
+                s.crust_uplift_mm_yr += accreted_uplift_mm_yr(&blended, &s.pools, gravity, env);
                 s.thickness_m = thickness(&s.pools);
                 s
             }

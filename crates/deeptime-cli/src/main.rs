@@ -785,6 +785,9 @@ enum SynthKind {
     WrapTest,
     /// A basin (floor y 110, rim y 125, water 120) with a closed channel, on a plain at y 100.
     LakeTest,
+    /// A big river (half-width 10, depth 8) across sea-level flats into the sea and a flush stream
+    /// on a plain at y 70.5, with their network (rivers/rivers.dtrv).
+    RiverTest,
     /// A cube world (format 0.7) of a planet --size blocks round: sphere-defined continents, a
     /// ridge across a quarter-turn seam, a cone on a reachable corner, a lake across a half-turn
     /// seam.
@@ -1529,6 +1532,7 @@ fn main() -> ExitCode {
                 kind: match kind {
                     SynthKind::WrapTest => synth::Kind::WrapTest,
                     SynthKind::LakeTest => synth::Kind::LakeTest,
+                    SynthKind::RiverTest => synth::Kind::RiverTest,
                     SynthKind::Cube => synth::Kind::Cube,
                 },
                 strata: match strata {
