@@ -657,14 +657,41 @@ pub fn lambda_note(choice: Option<&LambdaChoice>, search: LambdaSearch) -> Value
 pub(crate) const LAYER_BYTES_PER_CELL: [(u32, &str, u64); 3] =
     [(1, "L1", 288), (2, "L2", 16), (3, "L3", 8)];
 
+/// Of L3's bytes a cell, the water's layers (`water_level` 2 B, `playa` and `closed_basin` 1 B
+/// each): they are on the hydrology's grid, which is L3 halved where L3 is over
+/// `hydro::MAX_CELLS` (`water::bake`; 32k full), a grid of its own then ("L3h").
+pub(crate) const WATER_LAYER_BYTES_PER_CELL: u64 = 4;
+
+/// Bytes per world cell of the hydrology's grid the pass holds beside that grid's layers while it
+/// draws the closed basins on the world's own ground (HYD-105): the ground as f64
+/// ([`world_ground`]) and `hydro::closed_basin_on_world`'s flags, 1 B each, and fronts. A figure of
+/// the memory model (amp-est, 2026-10-23: the ground and the working set held 25.1 B a cell on
+/// quick 16k's world grid of 22.2 M cells, 37.3 B where the ocean passed 2^24 cells, the bake's
+/// peak, while the closed basins' flood kept every body cell and a depth-first stack as usize;
+/// with a breadth-first front of u32 and a state byte a cell, 11.0 B: 8.0 for the ground, 3.0 for
+/// the flood).
+pub(crate) const GROUND_BYTES_PER_WORLD_CELL: u64 = 12;
+
+/// Bytes per world cell of the elevation's grid the block-scale relief holds beside the grid's
+/// layers (`relief::OnWorld::draw`: its f32 change and the calm flag; 5.0 B held on quick 16k).
+pub(crate) const RELIEF_BYTES_PER_WORLD_CELL: u64 = 6;
+
 /// The memory the projection pass holds beyond the finished world (bytes), for the run's
 /// estimate (`session::estimate_for`): 0 for a Lambert preset (the pass only writes the layout).
 ///
-/// The pass takes the grids in turn, holding the grid's source layers, its resampled layers and
-/// one band of rows ([`ROW_BAND`]); beside them stay the Lambert elevation and amplitude it loads
-/// first (L3, shared with that grid's sources) and, once L1 is done, the world's horizon stacks
-/// (kept for the top raise). Memory accounting, 2026-10-05: before this the pass was not in the
-/// estimate and kept a second copy of every resampled layer beside its output.
+/// The pass takes the grids in turn (L1, L2, L3, then the hydrology's halved grid if there is one),
+/// holding the grid's source layers, its resampled layers and one band of rows ([`ROW_BAND`]) or,
+/// after the band, what it draws on that grid: the closed basins on the hydrology's grid
+/// ([`GROUND_BYTES_PER_WORLD_CELL`]), the relief on the elevation's
+/// ([`RELIEF_BYTES_PER_WORLD_CELL`]). Beside them stay the Lambert elevation and amplitude it loads
+/// first (L3, shared with that grid's sources, kept to the end) and the world layers of the grids
+/// before: the horizon stacks (kept for the top raise), the L2 layers the relief and the biomes'
+/// land call read, and the world's elevation (the halved grid's ground). Last comes the top
+/// raise on the horizon stacks and their write, beside all of it. Memory accounting, 2026-10-05:
+/// before this the pass was not in the estimate and kept a second copy of every resampled layer
+/// beside its output. amp-est, 2026-10-23: the closed basins' ground and working set were left
+/// out (452.6 MB listed for a pass that held 969.9 MB on quick 16k), and the water's layers were
+/// counted on L3 where the hydrology's grid is halved.
 pub fn estimate_bytes(p: &PlanetPreset) -> u64 {
     use deeptime_format::projection::{PetroffGuyou, ProjectionKind};
     if p.scale.projection == ProjectionKind::Lambert {
@@ -675,11 +702,6 @@ pub fn estimate_bytes(p: &PlanetPreset) -> u64 {
     // A cube world's grids: n = s / r cells a face side, six faces.
     let cube = p.scale.projection == ProjectionKind::Cube;
     let s = u64::from(deeptime_format::projection::face_for(c));
-    let radius = |level: u32| match level {
-        1 => p.resolution.l1_r,
-        2 => p.resolution.l2_r,
-        _ => p.resolution.l3_r,
-    };
     let src_cells =
         |r: u32| GridDesc::for_planet("", c, r).map_or(0, |g| u64::from(g.w) * u64::from(g.h));
     let world_width = |r: u32| {
@@ -696,18 +718,52 @@ pub fn estimate_bytes(p: &PlanetPreset) -> u64 {
             world_width(r) * (b / u64::from(r.max(1)) + 1)
         }
     };
+    let r3 = p.resolution.l3_r;
+    let hydro_r = crate::bake::hydrology_r(p);
+    let l3 = LAYER_BYTES_PER_CELL[2].2;
+    let terrain = l3 - WATER_LAYER_BYTES_PER_CELL;
+    // (grid, cell size, layer bytes a cell), in the pass's order.
+    let mut grids = vec![
+        (1, p.resolution.l1_r, LAYER_BYTES_PER_CELL[0].2),
+        (2, p.resolution.l2_r, LAYER_BYTES_PER_CELL[1].2),
+        (3, r3, if hydro_r == r3 { l3 } else { terrain }),
+    ];
+    if hydro_r != r3 {
+        grids.push((4, hydro_r, WATER_LAYER_BYTES_PER_CELL));
+    }
     // The Lambert elevation and amplitude, loaded before the first grid (a part of the L3 sources).
-    let kept_sources = src_cells(radius(3)) * LAYER_BYTES_PER_CELL[2].2;
-    let (mut worst, mut stacks) = (0u64, 0u64);
-    for &(level, _, per_cell) in &LAYER_BYTES_PER_CELL {
-        let r = radius(level);
+    let kept_sources = src_cells(r3) * terrain;
+    let (mut worst, mut kept) = (0u64, 0u64);
+    for (level, r, per_cell) in grids {
         let (src, out) = (src_cells(r) * per_cell, world_cells(r) * per_cell);
-        let band = ROW_BAND as u64 * world_width(r) * per_cell;
-        let resident = if level == 3 { 0 } else { kept_sources };
-        worst = worst.max(resident + stacks + src + out + band);
-        if level == 1 {
-            stacks = out;
+        let mut work = ROW_BAND as u64 * world_width(r) * per_cell;
+        if level >= 3 && r == hydro_r {
+            work = work.max(world_cells(r) * GROUND_BYTES_PER_WORLD_CELL);
         }
+        if level == 3 {
+            work = work.max(world_cells(r) * RELIEF_BYTES_PER_WORLD_CELL);
+        }
+        let resident = if level == 3 { 0 } else { kept_sources };
+        worst = worst.max(resident + kept + src + out + work);
+        kept += out;
+    }
+    // The top raise, after every grid, beside their layers ([`raise_world_tops`]; amp-est,
+    // 2026-10-23: the bake's peak on the memory_estimate test planet, which the steps above left
+    // out). Its parts follow each other: the raise (the stack's two maxima as f64 and its record
+    // of moved cells, 16 B a cell, three times over while the record grows), the shifts
+    // (`world_raise_shifts`: a copy of the stacks and a dense record), then the stack's write
+    // (`bake::stored_tiles`: 1.1 × the stack and one batch, and the writer's buffer).
+    let horizons = p.structure.as_ref().map_or(0, |s| u64::from(s.horizons));
+    if horizons > 0 {
+        let cells = world_cells(p.resolution.l1_r);
+        let stack_cell = 7 * horizons;
+        let stack = cells * stack_cell;
+        let tile = u64::from(deeptime_format::raster::TILE).pow(2) * stack_cell;
+        let batch = (crate::bake::STORE_BATCH_BYTES / tile).max(1) * tile;
+        let raise = cells * (16 + 3 * 16);
+        let shifts = cells * (stack_cell + 12 + 16);
+        let write = (stack + batch.min(stack)) * 11 / 10 + (1 << 20);
+        worst = worst.max(kept_sources + kept + raise.max(shifts).max(write));
     }
     worst
 }
