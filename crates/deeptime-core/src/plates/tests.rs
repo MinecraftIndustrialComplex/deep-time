@@ -2078,3 +2078,66 @@ fn thick_ocean_crust_cools_towards_the_floor_it_holds_up() {
     assert!((f64::from(st.samples[oceanic[0]].elevation_m) - z_f).abs() < 50.0);
     assert!(last < 0.0 && last > z_f + 2000.0, "{last}");
 }
+
+/// The heat flow's final pass (ledger: PLT-469), on by default since 2026-10-23: continental crust
+/// that kept the sea floor's heat flow (33.7 mW/m² was baked on 229 Myr floor) is lifted to the
+/// proxy's floor (55 + 35 e^(−t/60), at least 55); continental crust already above its law and
+/// oceanic crust are left alone; with the switch off nothing changes.
+#[test]
+fn the_final_heat_flow_pass_lifts_only_low_continental_samples() {
+    let p = preset(2_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, _geo) = init::initial_state(&p, &env).unwrap();
+    assert!(TectonicParams::default().heat_flow_refresh, "on by default");
+    assert!(p.tectonics.heat_flow_refresh, "and in the built-in preset");
+    let cont: Vec<usize> = (0..st.samples.len())
+        .filter(|&i| st.samples[i].kind == CONTINENTAL)
+        .take(3)
+        .collect();
+    let sea = (0..st.samples.len())
+        .find(|&i| st.samples[i].kind == OCEANIC)
+        .unwrap();
+    assert_eq!(cont.len(), 3);
+    // Orogeny long ago (the floor is 55.0016 at 600 Myr), 20 Myr ago (55 + 35 e^(-1/3) = 80.1)
+    // and never (55).
+    let t = st.t_myr;
+    st.samples[cont[0]].orogeny_myr = (t - 600.0) as f32;
+    st.samples[cont[1]].orogeny_myr = (t - 20.0) as f32;
+    st.samples[cont[2]].orogeny_myr = f32::NEG_INFINITY;
+    for &i in &cont {
+        st.samples[i].heat_flow_mw_m2 = 33.7;
+    }
+    st.samples[sea].heat_flow_mw_m2 = 33.7;
+    let before = st.clone();
+    let mut off = p.tectonics.clone();
+    off.heat_flow_refresh = false;
+    assert!(!off.thermal_state);
+    thermal::refresh_heat_flow(&mut st, &off, t);
+    assert_eq!(st, before, "off changes nothing");
+    thermal::refresh_heat_flow(&mut st, &p.tectonics, t);
+    let q = |i: usize| f64::from(st.samples[i].heat_flow_mw_m2);
+    assert!((q(cont[0]) - 55.0016).abs() < 0.001, "{}", q(cont[0]));
+    assert!(
+        (q(cont[1]) - (55.0 + 35.0 * (-20.0f64 / 60.0).exp())).abs() < 0.001,
+        "{}",
+        q(cont[1])
+    );
+    assert!((q(cont[2]) - 55.0).abs() < 0.001, "{}", q(cont[2]));
+    assert_eq!(q(sea), f64::from(33.7f32), "the sea floor keeps its own");
+    // Crust above its law keeps its value, and only heat flow moves.
+    let hot = cont[0];
+    st.samples[hot].heat_flow_mw_m2 = 120.0;
+    let mut after = st.clone();
+    thermal::refresh_heat_flow(&mut after, &p.tectonics, t);
+    assert_eq!(after, st, "a second pass changes nothing");
+    let mut flat = st.clone();
+    for s in &mut flat.samples {
+        s.heat_flow_mw_m2 = 0.0;
+    }
+    let mut was = before.clone();
+    for s in &mut was.samples {
+        s.heat_flow_mw_m2 = 0.0;
+    }
+    assert_eq!(flat, was, "no field but heat flow moved");
+}
