@@ -1137,8 +1137,8 @@ pub(in crate::plates) mod tests {
         assert_eq!(a.samples, b.samples);
     }
 
-    /// The thin sheet's rate (PLT-414, PLT-415): a column 26 km over T_n (4.2 km high) under a sea
-    /// at the datum, its orogeny this step, thins at ΔU / (4 η L) = 3.9 % per Myr with η 10²²
+    /// The thin sheet's rate (PLT-414, PLT-415): a column 26 km over T_n (4.0 km high) under a sea
+    /// at the datum, its orogeny this step, thins at ΔU / (4 η L) = 3.6 % per Myr with η 10²²
     /// Pa s; the rate falls e-fold per `collapse_sheet_strength_myr` of the time since its
     /// orogeny, and is 0 for crust no orogeny raised and for the normal column; the release stops
     /// at the normal column; off, there is no sheet.
@@ -1157,10 +1157,13 @@ pub(in crate::plates) mod tests {
         s.thickness_m = s.pools.iter().sum();
         s.orogeny = OROGENY_HIMALAYAN;
         s.orogeny_myr = 0.0;
-        // By hand: z = 525 + 26,000 / 7.02 = 4,229 m; U = ρ g z (35 km + 3 z) = 5.44e12 N/m, the
-        // normal column's (525 m) 5.18e11; ε̇ = 4.92e12 / (4 × 1e22 × 1e5 m) = 1.23e-15 / s.
+        // By hand: z = 525 + 26,000 / 7.02 = 4,229 m less its eclogite root's pull (PLT-281),
+        // 255 m: 3,975 m; U = ρ g z (35 km + 3 z) = 5.03e12 N/m, the normal column's (525 m)
+        // 5.18e11; ε̇ = 4.51e12 / (4 × 1e22 × 1e5 m) = 1.13e-15 / s.
+        let z = iso_height(&s.pools, 525.0, 9.81);
+        assert!((z - 3975.0).abs() < 5.0, "{z}");
         let e = sheet.rate_per_myr(&s);
-        assert!((e - 0.0388).abs() < 0.001, "{e}");
+        assert!((e - 0.0356).abs() < 0.0005, "{e}");
         let q = sheet.release(&s);
         let t = f64::from(s.thickness_m);
         assert!((q - t * (1.0 - (-2.0 * e).exp())).abs() < 1e-6, "{q}");
@@ -1219,7 +1222,7 @@ pub(in crate::plates) mod tests {
         let none = run(None);
         assert!(none >= t_c - 1.0, "{none}");
         let old = run(Some(-600.0));
-        assert!(old >= t_c - 50.0 && old < t_c + 500.0, "{old}");
+        assert!(old >= t_c - 50.0 && (old - none).abs() < 50.0, "{old} {none}");
     }
 
     /// With `collapse_continent_first` the crust a belt at the continent's edge releases goes to
