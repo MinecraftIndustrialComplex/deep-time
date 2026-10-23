@@ -188,24 +188,32 @@ pub fn columns(dir: &Path, out: &Path, bbox: [i64; 4], scale: usize) -> Result<V
     }
     let spec = w.water_spec();
     let sea = f64::from(spec.sea_level_y);
-    // Cores over the box and a one-column margin, then each column from its neighbours.
-    let (ew, eh) = (pw + 2, ph + 2);
+    // Cores over the box and a two-column margin (what a river neighbour holds reads its own
+    // neighbours), then each column from its neighbours.
+    let (ew, eh) = (pw + 4, ph + 4);
     let cores: Vec<water::Core> = (0..ew * eh)
         .map(|k| {
-            let (x, z) = (x0 - 1 + (k % ew) as i64, z0 - 1 + (k / ew) as i64);
+            let (x, z) = (x0 - 2 + (k % ew) as i64, z0 - 2 + (k / ew) as i64);
             water::core(&w, &spec, w.c, x, z)
         })
         .collect();
+    let at = |i: usize, j: usize| cores[j * ew + i];
+    let around = |i: usize, j: usize| {
+        water::NEIGHBOURS.map(|(dx, dz)| at((i as i64 + dx) as usize, (j as i64 + dz) as usize))
+    };
     let mut img = Image::new(pw, ph, [0, 0, 0, 255]);
     let mut counts = std::collections::BTreeMap::<&str, u64>::new();
     let mut biome = 0u64;
     for pz in 0..ph {
         for px in 0..pw {
-            let k = (pz + 1) * ew + px + 1;
-            let n = water::NEIGHBOURS.map(|(dx, dz)| {
-                cores[((pz as i64 + 1 + dz) as usize) * ew + (px as i64 + 1 + dx) as usize]
+            let (i, j) = (px + 2, pz + 2);
+            let k = j * ew + i;
+            let n = around(i, j);
+            let holds = water::NEIGHBOURS.map(|(dx, dz)| {
+                let (ni, nj) = ((i as i64 + dx) as usize, (j as i64 + dz) as usize);
+                water::held(&at(ni, nj), &around(ni, nj))
             });
-            let col = water::finish(&cores[k], &n);
+            let col = water::finish(&cores[k], &n, &holds);
             *counts.entry(col.kind.name()).or_default() += 1;
             biome += u64::from(col.river_biome);
             let s = cores[k].surface;

@@ -37,15 +37,18 @@ import net.minecraft.world.level.material.Fluids;
  *   <li><b>Sea</b> columns the aquifer left dry (it decides from its own noise near the surface, so
  *       a coastal flat a block below sea level can stay land) are filled to the sea's top, so the
  *       coast is where the terrain puts it and rivers reaching it meet water. The pass therefore
- *       also runs in every chunk with elevation cells within 17 blocks of sea level.</li>
+ *       also runs in every chunk with elevation cells within 17 blocks of sea level. A sea column
+ *       whose bed a river's channel lowers (its channel run on across the shallows, HYD-121) is cut
+ *       like a river column; so is the bed of a lake column a channel crosses (HYD-122).</li>
  *   <li><b>Closed basins</b> below sea level ({@code closed_basin}, HYD-100) hold no sea: the
  *       column rule gives them none and the fluid picker none ({@link LavaFluids}), but the
  *       aquifer also reads the picker at columns up to three chunks away and can bring a nearby
  *       sea's water in near the coast. In such a column the open water over the ground and above
  *       the column's own water (a lake's or a river's top) is drained up to the sea's top
  *       ({@link #drain}).</li>
- *   <li><b>Bank</b> columns are raised to their {@code minGround} (the neighbouring water's top,
- *       +1 beside a river), lowered to their {@code maxGround} (a 1:1 slope from the channel), and
+ *   <li><b>Bank</b> columns are raised to their {@code minGround} (the neighbouring water's top;
+ *       beside a river the highest water it holds with its steps, HYD-124), lowered to their
+ *       {@code maxGround} (a 1:1 slope from the channel), and
  *       air between the neighbours' beds and {@code minGround} is sealed, so no water finds a way
  *       out. A bank keeps its top block (grass on a raised or lowered bank).</li>
  *   <li><b>Fills.</b> Whatever the pass fills (a raised bank, ground under a channel's bed, a
@@ -96,6 +99,12 @@ public final class WaterBodies {
     /** Air or water: what water may fill. */
     static boolean open(BlockState s) {
         return s.isAir() || s.is(Blocks.WATER);
+    }
+
+    /** A channel's sediment (HYD-079): sand in a channel at least 6 blocks wide, gravel in a narrower one. */
+    static BlockState sediment(Water.Column col) {
+        Rivers.Hit h = col.river();
+        return h != null && h.hw() >= 3.0 ? Blocks.SAND.defaultBlockState() : Blocks.GRAVEL.defaultBlockState();
     }
 
     /**
@@ -296,7 +305,10 @@ public final class WaterBodies {
                     drained += drain(chunk, pos, x, z, col.kind().isWater() ? col.top() : Integer.MIN_VALUE, Math.min(seaTop, maxY), minY);
                 if (col.kind() == Water.Kind.NONE)
                     continue;
-                if (col.kind() == Water.Kind.SEA) {
+                // A channel run on into the sea is cut to its bed as a river's is (ledger: HYD-121):
+                // the river path below, with the sea's top.
+                boolean seaChannel = col.kind() == Water.Kind.SEA && Water.cutByChannel(col);
+                if (col.kind() == Water.Kind.SEA && !seaChannel) {
                     // The aquifer's sea, where it left the column dry: a flat a little below sea level
                     // (the aquifer decides from its own noise near the surface, not from the sea's
                     // extent). Filled to the sea's top so the coast is where the terrain says, and
@@ -325,7 +337,7 @@ public final class WaterBodies {
                 int g = start;
                 while (g >= minY && open(chunk.getBlockState(pos.set(x, g, z))))
                     g--;
-                switch (col.kind()) {
+                switch (seaChannel ? Water.Kind.RIVER : col.kind()) {
                     case RIVER -> {
                         int t = Math.min(col.top(), maxY), bed = col.bed();
                         for (int y = Math.max(g, t); y > t; y--)
@@ -343,8 +355,7 @@ public final class WaterBodies {
                             }
                         }
                         shielded += shield(masks, lx, lz, bed + 1, t, minY, maxY);
-                        Rivers.Hit h = col.river();
-                        BlockState sediment = h != null && h.hw() >= 3.0 ? Blocks.SAND.defaultBlockState() : Blocks.GRAVEL.defaultBlockState();
+                        BlockState sediment = sediment(col);
                         BlockState rock = rockUnder(chunk, pos, x, Math.min(g, maxY), z, minY);
                         // Ground under the channel's bed: its sediment over the column's rock (HYD-079).
                         for (int y = g + 1; y <= bed && y <= maxY; y++) {
@@ -401,7 +412,10 @@ public final class WaterBodies {
                                 filled++;
                             }
                         }
-                        if (y < t && y >= minY) {
+                        if (y == bed && bed >= minY && bed <= maxY && Water.cutByChannel(col)) {
+                            // A channel across shallow lake water (ledger: HYD-122): its sediment on the bed.
+                            chunk.setBlockState(pos.set(x, bed, z), sediment(col), false);
+                        } else if (y < t && y >= minY) {
                             BlockState b = chunk.getBlockState(pos.set(x, y, z));
                             if (underWater(b) != b)
                                 chunk.setBlockState(pos, underWater(b), false);

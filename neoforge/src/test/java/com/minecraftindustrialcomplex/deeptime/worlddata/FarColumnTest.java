@@ -378,6 +378,7 @@ class FarColumnTest {
     static FarColumn.Shape shape(Water.Kind kind, int ground, int waterTop, int ice) {
         FarColumn.Shape s = new FarColumn.Shape();
         s.kind = kind;
+        s.channel = kind == Water.Kind.RIVER;
         s.ground = ground;
         s.waterTop = waterTop;
         s.ice = ice;
@@ -451,6 +452,13 @@ class FarColumnTest {
         assertEquals(FarColumn.SEA_BED, l.material[l.at(40)]);
         assertEquals(FarColumn.WATER, l.material[l.at(41)]);
         assertEquals(63, l.top[l.at(62)]);
+        // A channel run on into the sea (HYD-121): the channel's sediment on the bed it cuts.
+        FarColumn.Shape mouth = shape(Water.Kind.SEA, 55, 62, 0);
+        mouth.channel = true;
+        mouth.wideRiver = true;
+        FarColumn.layers(-64, 319, mouth, soil(4, false, false), null, 8, null, l);
+        assertEquals(FarColumn.RIVER_SAND, l.material[l.at(55)]);
+        assertEquals(FarColumn.WATER, l.material[l.at(56)]);
     }
 
     @Test

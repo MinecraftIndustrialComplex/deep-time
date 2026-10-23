@@ -6,6 +6,8 @@
 
 use std::f64::consts::PI;
 
+use deeptime_format::rivers::{Chain, Mouth, RiverVertex, Rivers};
+
 /// Water surface of the lake test, in blocks.
 pub const LAKE_WATER_Y: f64 = 120.0;
 
@@ -253,9 +255,257 @@ impl Terrain for LakeTest {
     }
 }
 
+/// The river test (HYD-120 to HYD-124): a big river into the sea and a flush stream, the shapes
+/// Ben's play world showed a block deep and curbed (2026-10-22). The ground is a function of x
+/// alone, periodic in x:
+///
+/// - a plain at y 70.5 (ground block 70) for x ≤ −250 and x ≥ 400, through the seam;
+/// - a slope down to flats at y 63.5 (ground 63, a block over the sea's top block 62), x −250 to −50;
+/// - the flats to x 40, then shallows at y 61.5 (ground 61: sea, one block of it) to x 100;
+/// - a shore down to a sea floor at y 45.5 over x 100 to 130, the sea to x 300, and a rise back to
+///   the plain by x 400.
+///
+/// The river (chain 0) runs along z = 0 from x −400 to x 160 (in the sea), a vertex every 4
+/// blocks, half-width 10 and centre depth 8 throughout, so every column of it lies in several
+/// overlapping segment capsules, as on a baked planet; its surface falls from 68.9 to the sea's
+/// 63.0 at x −50 and stays there across the flats and the shallows. The stream (chain 1) runs south
+/// along x −332 on the plain from z −110 to z −14 and then into the river's vertex at x −332:
+/// half-width 1, depth 1, its surface 70.95 falling to 70.55, so its top block is the plain's ground
+/// block (flush). Every number here is a test fixture's (game-choice: agent, 2026-10-22).
+pub struct RiverTest {
+    pub c: u32,
+}
+
+impl RiverTest {
+    pub const PLAIN_Y: f64 = 70.5;
+    pub const FLATS_Y: f64 = 63.5;
+    pub const SHALLOWS_Y: f64 = 61.5;
+    pub const SEA_FLOOR_Y: f64 = 45.5;
+    /// Where the plain ends and the slope begins, and where the flats begin.
+    pub const SLOPE_FROM_X: f64 = -250.0;
+    pub const FLATS_FROM_X: f64 = -50.0;
+    pub const SHALLOWS_FROM_X: f64 = 40.0;
+    pub const SHORE_FROM_X: f64 = 100.0;
+    pub const SEA_FROM_X: f64 = 130.0;
+    pub const RISE_FROM_X: f64 = 300.0;
+    pub const PLAIN_FROM_X: f64 = 400.0;
+
+    /// The river's centre line z, its first and last vertex x and the spacing of its vertices.
+    pub const RIVER_Z: f64 = 0.0;
+    pub const RIVER_FROM_X: f64 = -400.0;
+    pub const RIVER_TO_X: f64 = 160.0;
+    pub const RIVER_SPACING: f64 = 4.0;
+    pub const RIVER_HALF_WIDTH: f64 = 10.0;
+    pub const RIVER_DEPTH: f64 = 8.0;
+    pub const RIVER_Q: f64 = 400.0;
+    /// The river's surface at its first vertex; it falls evenly to [`Self::SEA_W`] at
+    /// [`Self::FLATS_FROM_X`] and is that from there on.
+    pub const RIVER_SOURCE_W: f64 = 68.9;
+    /// The sea's level, the synthetic worlds' (`Scale::default_for`).
+    pub const SEA_W: f64 = 63.0;
+
+    /// The stream: its x, its first and last vertex z before the confluence, and its spacing.
+    pub const STREAM_X: f64 = -332.0;
+    pub const STREAM_FROM_Z: f64 = -110.0;
+    pub const STREAM_TO_Z: f64 = -14.0;
+    pub const STREAM_SPACING: f64 = 4.0;
+    pub const STREAM_HALF_WIDTH: f64 = 1.0;
+    pub const STREAM_DEPTH: f64 = 1.0;
+    pub const STREAM_Q: f64 = 2.0;
+    pub const STREAM_W_FROM: f64 = 70.95;
+    pub const STREAM_W_TO: f64 = 70.55;
+
+    /// x brought into [−C/2, C/2).
+    fn wrap_x(&self, x: f64) -> f64 {
+        let c = f64::from(self.c);
+        x - c * (x / c).round_ties_even()
+    }
+
+    /// The river's surface at x (its vertices carry it).
+    pub fn river_w(x: f64) -> f64 {
+        if x >= Self::FLATS_FROM_X {
+            Self::SEA_W
+        } else {
+            Self::SEA_W
+                + (Self::RIVER_SOURCE_W - Self::SEA_W) * (Self::FLATS_FROM_X - x)
+                    / (Self::FLATS_FROM_X - Self::RIVER_FROM_X)
+        }
+    }
+
+    /// The river network: the river (chain 0) and the stream (chain 1), indexed.
+    pub fn rivers(&self) -> Rivers {
+        let mut r = Rivers::empty(self.c);
+        let vertex = |x: f64, z: f64, w: f64, hw: f64, depth: f64, q: f64| RiverVertex {
+            x: x as f32,
+            z: z as f32,
+            w: w as f32,
+            hw: hw as f32,
+            depth: depth as f32,
+            q: q as f32,
+        };
+        let n = ((Self::RIVER_TO_X - Self::RIVER_FROM_X) / Self::RIVER_SPACING).round() as u32;
+        for k in 0..=n {
+            let x = Self::RIVER_FROM_X + f64::from(k) * Self::RIVER_SPACING;
+            r.vertices.push(vertex(
+                x,
+                Self::RIVER_Z,
+                Self::river_w(x),
+                Self::RIVER_HALF_WIDTH,
+                Self::RIVER_DEPTH,
+                Self::RIVER_Q,
+            ));
+        }
+        r.chains.push(Chain {
+            first: 0,
+            count: n + 1,
+            mouth: Mouth::Sea,
+            into: u32::MAX,
+        });
+        let first = r.vertices.len() as u32;
+        let m = ((Self::STREAM_TO_Z - Self::STREAM_FROM_Z) / Self::STREAM_SPACING).round() as u32;
+        for k in 0..=m {
+            let f = f64::from(k) / f64::from(m);
+            r.vertices.push(vertex(
+                Self::STREAM_X,
+                Self::STREAM_FROM_Z + f * (Self::STREAM_TO_Z - Self::STREAM_FROM_Z),
+                Self::STREAM_W_FROM + f * (Self::STREAM_W_TO - Self::STREAM_W_FROM),
+                Self::STREAM_HALF_WIDTH,
+                Self::STREAM_DEPTH,
+                Self::STREAM_Q,
+            ));
+        }
+        // The confluence: the river's own vertex at the stream's x.
+        r.vertices.push(vertex(
+            Self::STREAM_X,
+            Self::RIVER_Z,
+            Self::river_w(Self::STREAM_X),
+            Self::STREAM_HALF_WIDTH,
+            Self::STREAM_DEPTH,
+            Self::STREAM_Q,
+        ));
+        r.chains.push(Chain {
+            first,
+            count: m + 2,
+            mouth: Mouth::River,
+            into: 0,
+        });
+        r.build_index();
+        r
+    }
+
+    /// The geometry, for `manifest.json` `notes.river`.
+    pub fn notes() -> serde_json::Value {
+        serde_json::json!({
+            "profile": "ground by x alone (periodic): plain y 70.5 for x <= -250 and x >= 400; linear to the flats' y 63.5 at x -50; flats to x 40; shallows y 61.5 (sea, one block deep) to x 100; linear to the sea floor y 45.5 at x 130; sea floor to x 300; linear back to the plain at x 400",
+            "plain_y": Self::PLAIN_Y,
+            "flats": {"from_x": Self::FLATS_FROM_X, "to_x": Self::SHALLOWS_FROM_X, "y": Self::FLATS_Y},
+            "shallows": {"from_x": Self::SHALLOWS_FROM_X, "to_x": Self::SHORE_FROM_X, "y": Self::SHALLOWS_Y},
+            "sea_w": Self::SEA_W,
+            "river": {
+                "chain": 0,
+                "z": Self::RIVER_Z,
+                "from_x": Self::RIVER_FROM_X,
+                "to_x": Self::RIVER_TO_X,
+                "spacing": Self::RIVER_SPACING,
+                "half_width": Self::RIVER_HALF_WIDTH,
+                "depth": Self::RIVER_DEPTH,
+                "source_w": Self::RIVER_SOURCE_W,
+                "sea_w_from_x": Self::FLATS_FROM_X,
+                "lower_reach": {"from_x": -150.0, "to_x": Self::SHORE_FROM_X}
+            },
+            "stream": {
+                "chain": 1,
+                "x": Self::STREAM_X,
+                "from_z": Self::STREAM_FROM_Z,
+                "to_z": Self::STREAM_TO_Z,
+                "half_width": Self::STREAM_HALF_WIDTH,
+                "depth": Self::STREAM_DEPTH,
+                "w_from": Self::STREAM_W_FROM,
+                "w_to": Self::STREAM_W_TO,
+                "into": "the river's vertex at x -332, z 0"
+            }
+        })
+    }
+}
+
+impl Terrain for RiverTest {
+    fn circumference(&self) -> u32 {
+        self.c
+    }
+
+    fn height(&self, x: i64, _z: i64) -> f64 {
+        let x = self.wrap_x(x as f64);
+        let lerp = |a: f64, b: f64, x0: f64, x1: f64| a + (b - a) * (x - x0) / (x1 - x0);
+        if x < Self::SLOPE_FROM_X {
+            Self::PLAIN_Y
+        } else if x < Self::FLATS_FROM_X {
+            lerp(
+                Self::PLAIN_Y,
+                Self::FLATS_Y,
+                Self::SLOPE_FROM_X,
+                Self::FLATS_FROM_X,
+            )
+        } else if x < Self::SHALLOWS_FROM_X {
+            Self::FLATS_Y
+        } else if x < Self::SHORE_FROM_X {
+            Self::SHALLOWS_Y
+        } else if x < Self::SEA_FROM_X {
+            lerp(
+                Self::SHALLOWS_Y,
+                Self::SEA_FLOOR_Y,
+                Self::SHORE_FROM_X,
+                Self::SEA_FROM_X,
+            )
+        } else if x < Self::RISE_FROM_X {
+            Self::SEA_FLOOR_Y
+        } else if x < Self::PLAIN_FROM_X {
+            lerp(
+                Self::SEA_FLOOR_Y,
+                Self::PLAIN_Y,
+                Self::RISE_FROM_X,
+                Self::PLAIN_FROM_X,
+            )
+        } else {
+            Self::PLAIN_Y
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn river_test_profile_and_network() {
+        let t = RiverTest { c: 1024 };
+        assert_eq!(t.height(-400, 0), 70.5);
+        assert_eq!(t.height(-150, 9), 67.0);
+        assert_eq!(t.height(0, -100), 63.5);
+        assert_eq!(t.height(60, 0), 61.5);
+        assert_eq!(t.height(200, 0), 45.5);
+        assert_eq!(t.height(500, 0), 70.5);
+        assert_eq!(t.height(-400 + 1024, 0), 70.5);
+        let r = t.rivers();
+        r.validate().unwrap();
+        assert_eq!(r.chains.len(), 2);
+        assert_eq!(r.chains[0].count, 141);
+        // The river's surface: 68.9 at its source, the sea's from x -50 on.
+        assert!((f64::from(r.vertices[0].w) - 68.9).abs() < 1e-5);
+        assert_eq!(r.vertices[87].x, -52.0);
+        assert!(r.vertices[87].w > 63.0);
+        assert_eq!(r.vertices[88].w, 63.0);
+        // Its columns lie in several capsules; the deepest is the one through the column.
+        let s = r.sample(0, 3);
+        let deep = s.deep.unwrap();
+        assert!((deep.d - 3.0).abs() < 1e-9);
+        assert!((deep.floor() - (63.0 - 8.0 * 0.91)).abs() < 1e-6);
+        // The stream's last vertex is the river's at its x.
+        let last = &r.vertices[r.vertices.len() - 1];
+        assert_eq!((last.x, last.z), (-332.0, 0.0));
+        assert_eq!(last.w, r.vertices[17].w);
+        let s = r.sample(-332, -60);
+        assert!(s.hit.is_some_and(|h| h.seg >= 141 && h.w > 70.5));
+    }
 
     #[test]
     fn wrap_test_is_periodic_and_in_range() {

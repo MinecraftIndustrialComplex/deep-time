@@ -88,6 +88,10 @@ dev cargo run --release -q -p deeptime-cli -- parity --world-data "$RUN"/world/d
 # World data for the test_lake level (P0-13): a basin and a closed channel holding water at y 120.
 dev cargo run --release -q -p deeptime-cli -- synth --kind lake-test --size 1024 --out "$RUN"/world/deeptime-lake \
     || { echo "FAILED: deeptime synth lake-test"; exit 1; }
+# World data for the test_river_depth level (HYD-120 to HYD-124): a big river across sea-level flats into the
+# sea and a flush stream on a plain, with their network (RiverDepthGameTests).
+dev cargo run --release -q -p deeptime-cli -- synth --kind river-test --size 1024 --out "$RUN"/world/deeptime-river \
+    || { echo "FAILED: deeptime synth river-test"; exit 1; }
 
 # The set's jars, copied for this run (an install.sh refreshing smoke/<set> meanwhile cannot change
 # them), and this job's voice-chat port (Simple Voice Chat binds one even in a GameTest server).

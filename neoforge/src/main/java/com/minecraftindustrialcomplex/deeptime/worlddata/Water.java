@@ -69,6 +69,22 @@ public final class Water {
     /** How far below the sea's top a coastal bank is sealed, blocks (Rust {@code SEA_SEAL}). */
     public static final int SEA_SEAL = 3;
 
+    /**
+     * A lake column a channel covers keeps the channel's bed where the lake's water over the
+     * generated surface is less than this deep, blocks: the bake's own line between lake water a
+     * river crosses and lake water it ends in (HYD-020, a block), read at the column (Rust
+     * {@code SHALLOW_LAKE}; ledger: HYD-122).
+     */
+    public static final double SHALLOW_LAKE = 1.0;
+
+    /**
+     * How far a river column's water and bed go down where its banks do not stand above the water,
+     * blocks: one, the freeboard the bake leaves under its filled surface (HYD-018), so a channel on
+     * flat ground is cut a block into it rather than walled a block above it (Rust {@code INCISION};
+     * game-choice: Ben's curb report, 2026-10-22; ledger: HYD-123).
+     */
+    public static final int INCISION = 1;
+
     /** The 4-neighbour offsets, in the order both readers visit them. */
     public static final int[][] NEIGHBOURS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
@@ -146,27 +162,87 @@ public final class Water {
         return best;
     }
 
+    /**
+     * Whether a river's channel lowers the bed of a sea or lake column under its ground: a channel
+     * run on into the sea (HYD-121) or across lake water less than {@link #SHALLOW_LAKE} deep
+     * (HYD-122). The game cuts such a bed and lays the channel's sediment on it.
+     */
+    public static boolean cutByChannel(Column c) {
+        return (c.kind() == Kind.SEA || c.kind() == Kind.LAKE) && c.bed() != null && c.bed() < c.ground();
+    }
+
+    /** {@link #cutByChannel(Column)} for a column's core. */
+    public static boolean cutByChannel(Core c) {
+        return (c.kind() == Kind.SEA || c.kind() == Kind.LAKE) && c.bed() < c.ground();
+    }
+
+    /** The top block of a generated surface, as step 1 clamps it. */
+    static int groundOf(Spec spec, double surface) {
+        return Double.isFinite(surface) ? Math.max(spec.minY() - 1, Math.min(spec.maxY(), topBlock(surface))) : spec.minY() - 1;
+    }
+
     /** Steps 1–4 for canonical column (wx, z) given its surface and channel sample. */
     public static Core core(WorldData wd, Spec spec, long wx, long z, double surface, Rivers.Sample rivers) {
-        int ground = Double.isFinite(surface) ? Math.max(spec.minY() - 1, Math.min(spec.maxY(), topBlock(surface))) : spec.minY() - 1;
+        int ground = groundOf(spec, surface);
         double level = wd.has(WorldData.WATER_LEVEL) ? levelAt(wd.layer(WorldData.WATER_LEVEL), wx, z, spec.reach()) : Double.NaN;
+        // The channel's floor under the column, as a block: the lowest of its covering segments'
+        // parabolas (ledger: HYD-022, HYD-120).
+        Rivers.Hit deep = rivers.deep();
+        boolean channel = deep != null;
+        int f = channel ? (int) Math.floor(deep.floor()) : 0;
         if (Double.isFinite(level)) {
             int t = topBlock(level);
-            if (ground < t)
-                return new Core(Kind.LAKE, surface, ground, level, t, ground, rivers);
+            if (ground < t) {
+                // A channel crossing lake water less than a block deep keeps its bed (ledger: HYD-122).
+                int bed = channel && level - surface < SHALLOW_LAKE ? Math.min(ground, f) : ground;
+                return new Core(Kind.LAKE, surface, ground, level, t, bed, rivers);
+            }
         }
         // No sea in a closed basin below sea level (HYD-100; Rust WaterSource::closed).
-        if (seaCovers(ground, spec.seaLevel(), () -> wd.closedBasin(wx, z)))
-            return new Core(Kind.SEA, surface, ground, level, spec.seaLevel() - 1, ground, rivers);
+        if (seaCovers(ground, spec.seaLevel(), () -> wd.closedBasin(wx, z))) {
+            // A channel into the sea keeps its bed across the shallows (ledger: HYD-121).
+            int bed = channel ? Math.min(ground, f) : ground;
+            return new Core(Kind.SEA, surface, ground, level, spec.seaLevel() - 1, bed, rivers);
+        }
         Rivers.Hit h = rivers.hit();
-        if (h != null) {
+        if (h != null && channel) {
             int t = topBlock(h.w());
-            double r = h.d() / h.hw();
-            double dp = Math.max(h.depth() * (1.0 - r * r), 1.0);
-            int bed = Math.min((int) Math.floor(h.w() - dp), t - 1);
-            return new Core(Kind.RIVER, surface, ground, level, t, bed, rivers);
+            // Incised, not perched: where the ground at the channel's banks does not stand above the
+            // water's top block, the water and the bed go INCISION down; never under the sea's top
+            // (ledger: HYD-123).
+            int seaTop = spec.seaLevel() - 1;
+            int drop = t > seaTop && bankGround(wd, spec, ground, deep) <= t ? Math.min(INCISION, t - seaTop) : 0;
+            int top = t - drop;
+            return new Core(Kind.RIVER, surface, ground, level, top, Math.min(f - drop, top - 1), rivers);
         }
         return new Core(Kind.NONE, surface, ground, level, Integer.MIN_VALUE, Integer.MIN_VALUE, rivers);
+    }
+
+    /**
+     * The lower of the generated ground's top blocks at the two points a block beyond the edges of
+     * channel {@code d} (on its segment's normal through the foot at {@code d.t()}, {@code d.hw()} + 1
+     * out each side): where the channel's banks stand before the pass touches them (Rust
+     * {@code bank_ground}; ledger: HYD-123). A segment of no length has no normal: the column's own
+     * {@code ground}.
+     */
+    public static int bankGround(WorldData wd, Spec spec, int ground, Rivers.Hit d) {
+        Rivers r = wd.rivers();
+        if (r == null)
+            return ground;
+        double ax = r.vertexX(d.seg()), az = r.vertexZ(d.seg());
+        double ex = (double) r.vertexX(d.seg() + 1) - ax, ez = (double) r.vertexZ(d.seg() + 1) - az;
+        double l = Math.sqrt(ex * ex + ez * ez);
+        if (l <= 0.0)
+            return ground;
+        double cx = ax + d.t() * ex, cz = az + d.t() * ez;
+        double nx = -ez / l, nz = ex / l;
+        double off = d.hw() + 1.0;
+        return Math.min(groundAt(wd, spec, cx + nx * off, cz + nz * off), groundAt(wd, spec, cx - nx * off, cz - nz * off));
+    }
+
+    private static int groundAt(WorldData wd, Spec spec, double px, double pz) {
+        long x = wrap(wd, (long) Math.floor(px));
+        return groundOf(spec, cellSurface(wd, spec, x, (long) Math.floor(pz)));
     }
 
     /** Steps 1–4 for column (x, z), any lap. */
@@ -177,18 +253,40 @@ public final class Water {
         return core(wd, spec, wx, z, cellSurface(wd, spec, wx, z), s);
     }
 
-    /** Step 5: the column from its own core and its neighbours' ({@link #NEIGHBOURS} order). */
-    public static Column finish(Core own, Core[] n) {
+    /**
+     * The highest water block a water column holds once the pass has put in its steps: its own top,
+     * or a higher water 4-neighbour's, whose flowing water the pass spreads into it ({@code n} in
+     * {@link #NEIGHBOURS} order; Rust {@code held}; ledger: HYD-124). Not water:
+     * {@link Integer#MIN_VALUE}.
+     */
+    public static int held(Core own, Core[] n) {
+        if (!own.kind().isWater())
+            return Integer.MIN_VALUE;
+        int m = own.top();
+        for (Core c : n)
+            if (c.kind().isWater())
+                m = Math.max(m, c.top());
+        return m;
+    }
+
+    /**
+     * Step 5: the column from its own core and its neighbours' ({@link #NEIGHBOURS} order), with
+     * what each neighbour holds ({@link #held}).
+     */
+    public static Column finish(Core own, Core[] n, int[] holds) {
         Double level = Double.isFinite(own.level()) ? own.level() : null;
         Rivers.Sample rs = own.rivers();
         if (own.kind().isWater())
             return new Column(own.kind(), own.surface(), own.ground(), level, own.top(), own.bed(), null, null, null,
                     rs.biome(), rs.hit());
         Integer minGround = null, seal = null;
-        for (Core c : n) {
+        for (int k = 0; k < 4; k++) {
+            Core c = n[k];
             if (!c.kind().isWater())
                 continue;
-            int need = c.top() + (c.kind() == Kind.RIVER ? 1 : 0);
+            // Beside a river, the water it holds with its steps (ledger: HYD-124); beside a lake or
+            // the sea, its top (HYD-077).
+            int need = c.kind() == Kind.RIVER ? holds[k] : c.top();
             minGround = minGround == null ? need : Math.max(minGround, need);
             // Beside the sea only the waterline is sealed (cave mouths at the coast).
             int from = c.kind() == Kind.SEA ? Math.max(c.bed() + 1, c.top() - SEA_SEAL) : c.bed() + 1;
@@ -206,14 +304,33 @@ public final class Water {
         Core[] n = new Core[4];
         for (int k = 0; k < 4; k++)
             n[k] = core(wd, spec, x + NEIGHBOURS[k][0], z + NEIGHBOURS[k][1]);
-        return finish(own, n);
+        int[] holds = {Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+        if (!own.kind().isWater()) {
+            // A river neighbour's own neighbours: the ring two blocks out, and this column.
+            for (int k = 0; k < 4; k++) {
+                if (n[k].kind() != Kind.RIVER)
+                    continue;
+                long nx = x + NEIGHBOURS[k][0], nz = z + NEIGHBOURS[k][1];
+                Core[] nn = new Core[4];
+                for (int e = 0; e < 4; e++) {
+                    long ex = nx + NEIGHBOURS[e][0], ez = nz + NEIGHBOURS[e][1];
+                    nn[e] = ex == x && ez == z ? own : core(wd, spec, ex, ez);
+                }
+                holds[k] = held(n[k], nn);
+            }
+        }
+        return finish(own, n, holds);
     }
 
     /**
      * The cores of a block box [x0, x0 + w) × [z0, z0 + h) at once (the game's pass: one gather of
-     * the river segments for the box); {@link #at} indexes it. x0 may be any lap.
+     * the river segments for the box); {@link #at} indexes it. x0 may be any lap. It holds a ring of
+     * {@link #MARGIN} more (what a bank's river neighbour holds reads the neighbour's neighbours), so
+     * {@link #at} also answers one block outside the box.
      */
     public static final class Region {
+        /** The hidden ring of cores round the box, blocks. */
+        static final int MARGIN = 1;
         public final long x0, z0;
         public final int w, h;
         private final Core[] cores;
@@ -226,21 +343,36 @@ public final class Water {
             this.cores = cores;
         }
 
+        /** The core at (x0 + dx, z0 + dz), dx in [−1, w], dz in [−1, h]. */
         public Core at(int dx, int dz) {
-            return cores[dz * w + dx];
+            return cores[(dz + MARGIN) * (w + 2 * MARGIN) + dx + MARGIN];
+        }
+
+        private Core[] around(int dx, int dz) {
+            Core[] n = new Core[4];
+            for (int k = 0; k < 4; k++)
+                n[k] = at(dx + NEIGHBOURS[k][0], dz + NEIGHBOURS[k][1]);
+            return n;
         }
 
         /** The column at (x0 + dx, z0 + dz), which must not be on the region's edge. */
         public Column column(int dx, int dz) {
-            Core[] n = new Core[4];
-            for (int k = 0; k < 4; k++)
-                n[k] = at(dx + NEIGHBOURS[k][0], dz + NEIGHBOURS[k][1]);
-            return finish(at(dx, dz), n);
+            Core own = at(dx, dz);
+            Core[] n = around(dx, dz);
+            int[] holds = {Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE};
+            if (!own.kind().isWater())
+                for (int k = 0; k < 4; k++)
+                    if (n[k].kind() == Kind.RIVER)
+                        holds[k] = held(n[k], around(dx + NEIGHBOURS[k][0], dz + NEIGHBOURS[k][1]));
+            return finish(own, n, holds);
         }
     }
 
-    /** The cores of block box [x0, x0 + w) × [z0, z0 + h) (x0 any lap). */
-    public static Region region(WorldData wd, Spec spec, long x0, long z0, int w, int h) {
+    /** The cores of block box [x0, x0 + w) × [z0, z0 + h) (x0 any lap), and its hidden ring. */
+    public static Region region(WorldData wd, Spec spec, long bx0, long bz0, int bw, int bh) {
+        int m = Region.MARGIN;
+        long x0 = bx0 - m, z0 = bz0 - m;
+        int w = bw + 2 * m, h = bh + 2 * m;
         Rivers r = wd.rivers();
         int[] segs = r == null ? new int[0] : r.entriesIn(x0, z0, x0 + w - 1, z0 + h - 1);
         Core[] cores = new Core[w * h];
@@ -268,6 +400,6 @@ public final class Water {
                 cores[dz * w + dx] = core(wd, spec, wx, z, surface, s);
             }
         }
-        return new Region(x0, z0, w, h, cores);
+        return new Region(bx0, bz0, bw, bh, cores);
     }
 }

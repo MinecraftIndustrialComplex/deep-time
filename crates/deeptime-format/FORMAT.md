@@ -1598,7 +1598,12 @@ wx = x folded; over the entries of wx's tile, for segment (a, b): `k = ⌊(ax �
 0), clamped to [0, 1] (`t < 0 → 0`, `t > 1 → 1`); `d = √(dx² + dz²)` with `dx = px − (ax + t·ex)`,
 `dz = z − (az + t·ez)`; `hw = hw_a + (hw_b − hw_a)·t`, `hw' = max(hw, 0.71)`; likewise w, depth, q.
 If d ≤ hw' the segment **covers** the column: the hit is the covering segment with the lowest w
-(ties: the lowest segment id), and `river_biome` is set when 2·hw ≥ biome_min_width. Otherwise, if
+(ties: the lowest segment id), the **deep hit** the covering segment whose channel floor
+`w − max(1, depth · (1 − (d/hw')²))` is lowest (ties: the lowest segment id; HYD-120), and
+`river_biome` is set when 2·hw ≥ biome_min_width. A wide river's segments overlap a column many
+times over (a vertex every few blocks, a half-width of ten or twenty), and the hit is mostly a
+neighbour downstream whose end cap only grazes it; its floor there is a block under w, so the bed
+follows the deep hit and the water surface the hit. Otherwise, if
 d ≤ hw' + bank_zone + bank_ratio·hw, it offers the **bank cap** ⌈w⌉ + ⌊d − hw'⌋; the lowest offered
 is the column's `max_ground`.
 
@@ -1669,13 +1674,18 @@ width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore
    values h00, h10, h01, h11 as `a = h00 + (h10 − h00)·fx`, `b = h01 + (h11 − h01)·fx`,
    `a + (b − a)·fz`): the generated surface. **ground** = ⌈surface⌉ − 1 clamped to [min_y − 1,
    max_y] (min_y − 1 when not finite).
+   **channel** = ⌊f⌋ of the deep hit's floor f = w − max(1, depth · (1 − (d/hw')²)) ("Rivers"),
+   when a segment covers the column.
 2. **level** = the `water_level` cell nearest the column, else the value of the nearest wet cell
    within `reach` blocks (cells visited by column then row, first at the smallest squared distance;
    Java `WaterLevels.levelAt`). **Lake** when level is finite and ground < top = ⌈level⌉ − 1; bed =
-   ground.
+   ground, or min(ground, channel) where a channel covers the column and level − surface < 1 (a river
+   crossing lake water less than a block deep keeps its bed; `water::SHALLOW_LAKE`, HYD-122).
 3. Else **sea** when ground < sea level − 1 and the column is not in a closed basin (the
    `closed_basin` layer's nearest cell is not 1; absent layer: never; Rust `WaterSource::closed`,
-   Java `WorldData.closedBasin`; HYD-100, format 0.6): top = sea level − 1, bed = ground. The test is
+   Java `WorldData.closedBasin`; HYD-100, format 0.6): top = sea level − 1, bed = ground, or
+   min(ground, channel) where a channel covers the column (a river run on across the shallows into
+   the sea keeps its bed; HYD-121). The test is
    one function in each language, `water::sea_covers` (Java `Water.seaCovers`; HYD-106), which the
    bake's biome layers read too (`sea_covers_height`, BIO-170): a column whose height H lies in
    (sea level − 1, sea level] has top block sea level − 1 and is dry. The
@@ -1683,10 +1693,19 @@ width `cell` (4 in `deeptime:planet`; the parity fixture assumes 4) as the shore
    its own noise near the surface, and leaves coastal flats a block below sea level dry). In a
    closed basin a column below sea level goes on to steps 4 and 5: dry ground unless a lake, a river
    or a bank holds it.
-4. Else **river** when a segment covers the column (the hit of "Rivers"): top = ⌈w⌉ − 1, bed =
-   min(top − 1, ⌊w − max(1, depth · (1 − (d/hw')²))⌋).
+4. Else **river** when a segment covers the column: with t = ⌈w⌉ − 1 of the hit, the channel
+   **incises** (HYD-123): drop = min(1, t − (sea level − 1)) (`water::INCISION`, 1) when t > sea
+   level − 1 and the **bank ground** ≤ t, else 0; top = t − drop, bed = min(top − 1, channel − drop).
+   The bank ground is the lower of the ground (steps 1's ⌈surface⌉ − 1, clamped) at the two points
+   hw' + 1 blocks out on either side of the deep hit's segment, on its normal through the foot at the
+   deep hit's t (points floored to blocks, x folded; a segment of no length: the column's own
+   ground): where the channel's banks stand before the pass touches them. A channel whose banks do
+   not stand over its water's top block is cut a block lower, so its banks hold it without being
+   raised; never under the sea's top block.
 5. Else, visiting the neighbours (x+1, z), (x−1, z), (x, z+1), (x, z−1) evaluated by 1–4: for each
-   that holds water (river, lake, sea), `min_ground` = max(top + 1 for a river, top otherwise) and
+   that holds water (river, lake, sea), `min_ground` = max(held for a river, top otherwise), where a
+   river's **held** is the highest top among it and its own water neighbours (the step the pass puts
+   on it where a neighbour's water stands higher; HYD-124; so the rule reads a ring of two), and
    `seal_from` = min(bed + 1, or for the sea max(bed + 1, top − 3): only its waterline); `max_ground` = the column's bank cap. The column is a **bank** when
    either `min_ground` or `max_ground` is set, else **none**. `river_biome` and `river` (the hit)
    are kept whatever the kind.
@@ -1703,7 +1722,9 @@ removed. Caves and aquifers under a closed basin are kept as elsewhere; only the
 
 The pass: a sea column the aquifer left dry is filled from the sea's top down to the ground (the
 pass runs in every chunk with elevation cells within 17 blocks of sea level for this); a river column is cut or filled to `bed` (gravel on the bed of a channel under 6 blocks
-wide, sand on a wider one), water from bed + 1 to top, air above; a lake column is cut to its `bed` as a river's
+wide, sand on a wider one), water from bed + 1 to top, air above; a sea column whose bed is under its
+ground (a channel's, HYD-121) is cut as a river column is, with the sea's top; a lake column whose
+bed a channel lowers under its ground (HYD-122) gets the channel's gravel or sand on its bed; a lake column is cut to its `bed` as a river's
 channel is: generated ground over `top` is removed, ground between `bed` and `top` becomes water
 (the generated ground between noise-cell corners can stand a block or two above `ground`, because the
 terrain density's scale differs from corner to corner; before the cut such a column in a lake one
