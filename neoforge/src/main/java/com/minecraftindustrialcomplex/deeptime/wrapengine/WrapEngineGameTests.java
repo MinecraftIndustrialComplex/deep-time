@@ -140,7 +140,7 @@ public final class WrapEngineGameTests {
         return k == Kind.HALF ? half("half-" + index, 20480 + 512 * index, 20480, 32) : quarter("quarter-" + index, 20480 + 512 * index, 22528, 48);
     }
 
-    static final int BUILD = 0, WATER = 1, REDSTONE = 2, LIGHT = 3, CONSISTENCY = 4, PLAYER = 5;
+    static final int BUILD = 0, WATER = 1, REDSTONE = 2, LIGHT = 3, CONSISTENCY = 4, PLAYER = 5, BLOCK_ENTITIES = 6;
     static final Site LONG_HALF = half("long-half", 30720, 20480, 256);
     static final Site LONG_QUARTER = quarter("long-quarter", 32768, 22528, 256);
     /** The water test's control: the same build with no gluing (its {@code local} only names the would-be far side). */
@@ -206,7 +206,7 @@ public final class WrapEngineGameTests {
     static {
         List<WrapTopology> parts = new ArrayList<>();
         for (Kind k : Kind.values())
-            for (int i = BUILD; i <= PLAYER; i++)
+            for (int i = BUILD; i <= BLOCK_ENTITIES; i++) // BLOCK_ENTITIES: WrapBlockEntityGameTests (design §12.8)
                 parts.add(site(k, i).local());
         parts.add(LONG_HALF.local());
         parts.add(LONG_QUARTER.local());
