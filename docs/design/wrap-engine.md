@@ -18,6 +18,10 @@ Nothing here changes the shipped mod. The spike's code is applied only with
 `wrapengine`, still dev-only: `-Ddeeptime.wrapengine=true`, `./gametest.sh -PwrapEngine`. Its API is
 §9, what was built and measured is §10. Where §7 says `wrapspike`, read `wrapengine`.
 
+**The cube (2026-10-22).** Phase 6 of the cube plan: the engine joins the turned conformal cube's 12
+turning edges, with Toroidal World keeping the slide. Its design, the corners, the border and the
+order of E1 to E8 are §12; the API additions are §9.6.
+
 Read first: [`seamless-wrapping.md`](seamless-wrapping.md) (the gluing tables, what breaks with
 portals), [`rotated-seam-worlds-prior-art.md`](../research/notes/rotated-seam-worlds-prior-art.md)
 (nobody has built turning seams), [`immersive-portals-pillowcase-prototype.md`](../research/notes/immersive-portals-pillowcase-prototype.md).
@@ -613,6 +617,19 @@ on axis direction flip under a half-turn.
   `entity()`, `iso()`, `from()`, `to()`. Cancel it to carry the entity yourself (contraptions, Sable
   bodies); the engine asks again next tick while the entity is still beyond the edge.
 
+### 9.6 Additions for the cube (2026-10-22, §12)
+
+Additions only; nothing above changes meaning, except that `fold` takes the nearest edge where bands
+overlap (no phase-1 layout has overlapping bands).
+
+| Addition | What |
+|---|---|
+| `WrapCorner(name, images)` | A cone point and its images (block corners) in the topology's frame. |
+| `WrapTopology(name, edges, corners, periodX, windowLo)` | The general constructor: with `periodX` > 0 a block outside [windowLo, windowLo + periodX) is reduced into it before folding (Toroidal World's loop). `corners()`, `periodX()`, `nearCorner(x, z)` (within 2 blocks of an image), `translated(dx, dz)` (the same topology moved, for tests). |
+| `ChunkFold.split()`, `chunkSources(cx, cz)` | A band chunk that folds by more than one motion (the diagonal of a corner square), and every (source chunk, motion) of a band chunk. |
+| `WrapLayouts.cube(layout, depth, slides)` | The cube from `CubeLayout` in Toroidal World's frame; `cubeCross(s, depth, slides)` is `cube(CubeLayout.of(s), …)`, `cubeCrossCorners(s)` its corners. |
+| `WrapEngine.nearCorner(level, pos)`, `joinedEdges(level)`, `nearestImage(level, pos, from)` | Queries for adapters and the border: near a cone point; the base names of the joined edges (W3 leaves them out); the band image of a stored position nearest a point. |
+
 ## 10. Phase 1 as built (2026-10-04)
 
 Branch `worktree-agent-a4445c63094be0023`. Dev-only: nothing changes without
@@ -717,9 +734,10 @@ benchmark interleaves them.
 
 - **Whole-world topologies from the world data.** The layout is not chosen (Guyou or the cube cross),
   and the bake still writes Lambert, so nothing installs a topology on a real world yet. The engine
-  takes either layout as an edge table (`WrapLayouts`).
+  takes either layout as an edge table (`WrapLayouts`). The cube was chosen (2026-10-22); §12 is the
+  plan for it.
 - **Block-entity data in the band** (chests, signs, banners drawn by the client there) and container
-  range across a seam (`Container.stillValidBlockEntity` with the nearest image).
+  range across a seam (`Container.stillValidBlockEntity` with the nearest image). E2, §12.8.
 - **Not folded yet**: `blockEvent`, `levelEvent`, `playSound`, `gameEvent`, explosions' entity part,
   `setBlockEntity` with a band position, `LevelTicks.clearArea`, `isLoaded`/`hasChunkAt` (they answer
   for the band chunk, which holds its source loaded).
@@ -1114,3 +1132,196 @@ Create tests, which then have nothing to carry them:
 - **Sites.** The tests use sites 8–11 of the engine tests' grid (x = 20480 + 512 i), with controls at
   z 24576 and 26624. Their glued sites join the engine tests' topology through
   `CreateSeamGameTests.topologies()`.
+
+## 12. The cube (2026-10-22)
+
+Phase 6 of [`cube-world-plan.md`](../plans/cube-world-plan.md) (§5, E1 to E8): the engine joins the
+turned conformal cube's seams. Ben scheduled it on 2026-10-22 (Q3, "the wrap engine now"), in
+parallel with V1. This section makes §10.4 and the plan's E1 to E8 concrete. It was written before
+the code (branch `worktree-agent-ab9924d9a8a834409`); §12.9 says what was built.
+
+### 12.1 Which seams turn, and by how much
+
+The net is phase 0's fold W2 (`worlddata/CubeLayout`, pinned against Rust by the parity fixture):
+face side s (a multiple of 256 in a real world, SCL-100), h = s/2, the strip F3, F0, F1, F2 at
+z ∈ [−h, h), N above F0 and S below it, period 4s east to west. Its 14 net edges form 7 seams:
+
+| Seam | Net edges | Motion (beyond → planet) | Turn | Pivot |
+|---|---|---|---|---|
+| east_west | F3-west, F2-east | translation by ±4s | none | none |
+| ne | N-east, F1-top | quarter turn | 90° | (h, −h), F0's north-east corner |
+| nw | N-west, F3-top | quarter turn | 90° | (−h, −h) |
+| se | S-east, F1-bottom | quarter turn | 90° | (h, h) |
+| sw | S-west, F3-bottom | quarter turn | 90° | (−h, h) |
+| nn | N-top, F2-top | half turn | 180° | (s, −s) |
+| ss | S-bottom, F2-bottom | half turn | 180° | (s, s) |
+
+- **Toroidal World keeps the slide** (Ben, 2026-10-03, "TW slides, engine turns"). The engine joins
+  the 12 turning edges (`owner` = `wrap_engine` in the manifest).
+- **Every motion keeps blocks on blocks, and chunks on chunks.** Each is a grid isometry (k quarter
+  turns and a translation). With s a multiple of 256 every pivot sits on a chunk corner, so a band
+  chunk shows exactly one stored chunk (except the split chunks of §12.2).
+- **The metric across a seam is continuous.** The conformal cube maps two faces onto the sphere so
+  that they agree on their shared edge, and the cube's reflection symmetry makes the map's
+  derivative match across it: measured, two faces' points on a shared edge are 2.8e-16 rad apart and
+  the derivative jumps by at most 0.0034 (`docs/science/seamless-world.md`, "The cube world"). The
+  gluing itself is a grid isometry, so a block across a seam is an ordinary neighbour of the same
+  size (SCL-184).
+- **The planet's rotation and north bearing do not enter the engine.** They are the world's map and
+  G9's business. The engine only moves blocks, block states and entities by grid motions.
+
+### 12.2 One geometry, and the topology built from it
+
+- **One geometry in Java.** `WrapLayouts.cube(CubeLayout, depth, slides)` builds the engine's edges
+  from `CubeLayout.edges()` and its corners from `CubeLayout.corners()`. The old
+  `WrapLayouts.cubeCross` (a shifted copy in the window [0, 4s) with F3 east) is deleted;
+  `cubeCross(s, depth, slides)` becomes `cube(CubeLayout.of(s), depth, slides)`. There is no second
+  copy of the net to drift.
+- **From the manifest (phase 2).** Format 0.7 layout_version 2's manifest carries the same table
+  (FORMAT.md, "Projection", `edges[]` and `cone_points[]`). Phase 2's reader checks the manifest's
+  edges and cone points against `CubeLayout.of(face_blocks)` (name, axis, side, coord, span, iso)
+  and refuses a world whose table differs; it then calls `WrapLayouts.cube(CubeLayout.of(face_blocks),
+  depth, slides)`. The two sources therefore cannot disagree in play, and the engine needs no second
+  parser of the table. The general constructor `WrapTopology(name, edges, corners, periodX,
+  windowLo)` takes any edge and corner list, for another layout or a test.
+- **The fold rule: the nearest edge.** Phase 1's topologies have bands that never overlap, so it
+  folded by the first edge whose band holds a block. The cube's bands overlap in the void squares by
+  F0's corners, and there the first edge is wrong: a player walking north off F1 ten blocks from
+  F0's corner would be carried back onto F1 by N-east instead of onto N. The engine now uses
+  `CubeLayout.fold`'s rule (SCL-108): the edge the block is least deep beyond, ties to the earlier
+  edge in the list, so each square splits on its diagonal through the corner. Points (entities) take
+  the edge their block takes. For the old layouts nothing changes (no block lies in two bands).
+- **Split chunks.** A chunk on such a diagonal folds by two motions. The topology finds these
+  chunks when it is built (the pairwise intersections of band rectangles), and for them
+  `chunkSources(cx, cz)` lists every (source chunk, motion). The band manager holds a ticket on every
+  source of a split chunk and copies it column by column; replication writes a stored change into a
+  split chunk only where the fold of the band position is the stored position. `chunkFold` keeps
+  answering for the chunk's corner and gains `split()`, so code that uses it as a band test is
+  unchanged.
+- **Band depth.** D is a multiple of 16 and at most s/2 (so only adjacent bands meet). Production
+  default 32 blocks: two chunks, what light and collisions need (§4.2; SCL-185, game-choice);
+  `-Ddeeptime.wrapengine.depth` overrides it. GameTests use 16 at s = 256.
+
+### 12.3 Composition with Toroidal World's slide
+
+- **TW's frame.** TW's canonical window is x ∈ [−2s, 2s) (C = 4s), so its seam cuts F2 in half at
+  x = 2s: F2's east half lives at x ∈ [−2s, −3s/2). Folded positions the engine hands back must be
+  canonical, or TW and the engine would store one block twice.
+- **The cut.** `cube` cuts the two edges whose bands straddle the window's end and the two whose
+  destinations do:
+  - F2-top and F2-bottom are cut at x = 2s; the east piece moves to [−2s, −3s/2) with its motion
+    composed with the translation 4s (`F2-top@tw`, `F2-bottom@tw`);
+  - N-top and S-bottom are cut at x = 0 by destination: the half with x < 0 lands in F2's east
+    half, so its motion is composed with the translation −4s (`N-top@tw`, `S-bottom@tw`).
+
+  Pieces keep their parent's place in the edge order, so ties break as in `CubeLayout`.
+- **`slides = false` (production, TW on the level).** The topology has period 4s and window lo −2s.
+  A block outside the window (a mod asking before TW aliases it) is reduced into the window before
+  the band test, and the translation is composed into the motion; a block in no band is left to TW.
+  Band chunks exist only inside the window (TW aliases the rest).
+- **`slides = true` (GameTests, and a dev world without TW's loop).** The engine adds two slide
+  edges at x = ±2s over F2's rows and their bands (z ∈ [−h − D, h + D)), D deep. A block beyond the
+  slide and beyond F2-top slides first and then turns (two steps of the fold).
+- **The install decision.** `CubeInstall` asks `ToroidalWorldApi.shapeOf(overworld)`: a level that
+  loops x with width 4s and minimum −2s takes `slides = false`; a level that does not loop takes
+  `slides = true`; any other shape (another width, a z loop) is refused with an error in the log,
+  and nothing is installed. The decision is a pure function, unit-tested.
+
+### 12.4 The corners
+
+- **Eight cone points of 270°.** Three faces meet at each cube corner, so the angle round it is 270°
+  and the holonomy of a loop round it is a quarter turn (SCL-182). No local gluing can make it flat:
+  near a corner the band shows one face twice or not at all, whatever the engine does.
+- **Images in TW's frame.** n0 (h, −h), n3 (−h, −h), s0 (h, h), s3 (−h, h) once each; n1 (h, −3h)
+  and (3h, −h); n2 (−h, −3h) and (−3h, −h); s1 and s2 likewise (CubeLayout's third image at x = 5h is
+  −3h in TW's frame).
+- **Seam links are refused near them.** `WrapTopology.nearCorner(x, z)` is true within a keep-out of
+  K = 2 blocks of any image (the 4 × 4 blocks round it; SCL-183, game-choice: the degenerate
+  neighbours are the corner's 2 × 2 blocks and their diagonals). `SeamTurns.seamLink` refuses a link
+  when either end, or either image it found, is near a corner, so Create's networks, belts and
+  track are refused from both ends alike. Phase 1's refusal (turns that do not cancel) stays as the
+  general rule; the keep-out makes it exact at the cube's corners. E4 reuses the same test for
+  leashes and ghosts.
+- **The convex corners of the net.** At N's and S's outer corners, (±h, −3h) and (±h, 3h), the
+  quadrant beyond both edges is in no band of `CubeLayout`, so a diagonal step off N's corner block
+  would land in ocean with nothing to carry it back. The engine extends N-east and N-west (S-east,
+  S-west) by D past the outer corner and N-top (S-bottom) by D each side; the nearest-edge rule then
+  splits the quadrant on its diagonal, and it shows F1 and F2 (or F2 and F3) by the corner's other
+  image. `CubeLayout.fold` still answers ocean there (the generator's fill, G5); the band copy
+  overwrites that fill within D. Equivalence tests against `CubeLayout.fold` leave these quadrants
+  out (SCL-181).
+- **The concave corners** (F0's four, and n1, n2, s1, s2's second images on the strip's top and
+  bottom lines) are covered twice: two bands meet there. That is the cone point showing one face
+  twice; entities follow the nearest edge, and links are refused.
+
+### 12.5 What the border W3 becomes as seams join
+
+- **Until the engine is on, W3 stops everything at 12 border segments** (the turning edges, inset,
+  with a warning band; plan §1.3). It ships with phase 2.
+- **With the engine on, a joined edge has no border.** `WrapEngine.joinedEdges(level)` names the
+  edges of the installed topology (the base names, `@tw` stripped). W3 leaves those segments out:
+  no stop, no warning band, no push-back. Installing the cube joins all 12 at once, so on an engine
+  world W3 is empty.
+- **W4 stays.** An arrival outside the planet (portal, `/tp`, ender pearl) further out than the band
+  is folded onto its partner block by W4; one inside the band is carried by the engine on the next
+  tick.
+- **No slip at the corners.** Entities are carried as soon as their position is beyond an edge, so
+  they never go deeper than one tick's movement; the corner squares and the convex quadrants are all
+  in bands (§12.4).
+
+### 12.6 E1 to E8: order and gates
+
+| Order | Item | What | Gate |
+|---|---|---|---|
+| 1 | E1 | The cube topology from the layout, split chunks, corners, TW's slide, the install behind the flag (this branch) | unit tests: the engine's fold equals `CubeLayout.fold` (mod 4s, same turn) in every band for s = 256, 1024, 3840, both modes; GameTests on a quarter seam, a half seam, the slide composed, a corner refusal |
+| 2 | E2 | Block-entity data in the band, container range across a seam (this branch; §12.8) | GameTests: a band chunk's packet carries the turned block entities; a re-addressed data packet; changes reach the band's holder; a chest in range across a seam; the sign editor opens at the near image |
+| 3 | E4 | Entities: leashes, ghosts, items and projectiles across turns, AI distances by nearest image | GameTests per entity kind at a quarter and a half seam, refused near a corner |
+| 4 | E3 | Keeping the band current as players build, on a phase-2 world whose generator already fills the band (G5) | a baked cube world: copying a band chunk of untouched ground changes no block |
+| 5 | E5 | The client re-anchor across a turn; G9's north bearing turns with it | a real-client walk on the VM (`vm-client.sh`) across a quarter and a half seam with no reload |
+| 6 | E8 | The detail noise and fill: joining a seam changes no terrain | E3's check on every seam of a 1k and a 4k world |
+| 7 | E6 | Pack compatibility: TW on the same level, Distant Horizons LODs of band chunks, Sable through `PhysicsPipeline.teleport`, Create trains | `./gametest.sh -PwithMic -PwrapEngine` and a planet server with the MIC set |
+| 8 | E7 | Hardening: writes off the server thread, C2ME, save and reload, a busy multiplayer seam | a soak and the benchmark on the VM |
+
+After E7 the default (on for cube worlds, or still dev-only) is Ben's decision.
+
+### 12.7 What depends on phase 2, and how it is tested before
+
+- **From phase 2:** the manifest reader (format 0.7 layout_version 2's `edges[]` and
+  `cone_points[]`), cube worlds from the bake (phase 1), the generator's band fill (G5), the border
+  W3. E1's install takes its layout from the manifest once the reader exists; until then only from
+  `-Ddeeptime.wrapengine.cube=<s>` (dev).
+- **Before phase 2:** everything is tested on synthetic topologies from phase 0's net
+  (`CubeLayout.of(s)`): unit tests over whole bands, and GameTests on a cube of s = 256 moved to a
+  far site of the test world (`WrapTopology.translated`), joined with the phase-1 sites.
+
+### 12.8 Block-entity data in the band (E2)
+
+What §4.2 promised, as it will be built:
+
+- **Chunk packets.** When a band chunk's packet is built (`ClientboundLevelChunkPacketData`), the
+  engine appends a block-entity entry for every band position of the chunk whose stored block has a
+  block entity: the stored entity's update tag, turned (below), at the band position. The client then
+  draws chests, signs and banners there as it does anywhere. Copies still hold no block entity on the
+  server.
+- **Updates.** A change at a stored position (`ServerChunkCache.blockChanged`, which a block entity's
+  `sendBlockUpdated` reaches) is also marked at each of its images, so the band's holder sends it.
+  When a holder sends a block entity for a band position (`ChunkHolder.broadcastBlockEntity`), the
+  engine sends the stored entity's data addressed to the band position instead of vanilla's packet,
+  which carried the stored position.
+- **Turning a tag** (`BandTags`). Block states already turn. A short table of position-bearing keys
+  says what else does: absolute positions move by the motion stored → band, offsets and direction
+  indices turn by its turn. Vanilla needs two rows (an end gateway's `exit_portal`, a brushable
+  block's `hit_direction`); Create's keys join in E6, and the table can become a data file then, as
+  Toroidal World's position rows are.
+- **Container range.** A menu's `stillValid` asks `Player.canInteractWithBlock` with the stored
+  position, which can be the far side of the world. When vanilla's answer is no and a topology is
+  installed, the engine answers yes if an image of the position is in range.
+- **Sign editing.** `ServerPlayer.openTextEdit` sends the stored position; the engine sends the image
+  nearest the player when the stored one is out of range, so the editor opens on the sign the player
+  sees. The edit comes back addressed to the band position, which folded access resolves.
+- **Not in E2:** block events (a chest lid opening in the band), and block-entity renderers that read
+  neighbouring block entities through absolute positions in their tags (Create's, E6).
+
+### 12.9 As built
+
+Filled in when E1 and E2 land.
