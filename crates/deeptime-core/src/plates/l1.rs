@@ -374,7 +374,8 @@ pub(super) fn sample_with(
     const THICK: usize = 4;
     const CONT_W: usize = 5;
     const CONT_HEAT: usize = 6;
-    const POOL0: usize = 7;
+    const CRUST_UP: usize = 7;
+    const POOL0: usize = 8;
     let continental = |v: u32| samples[v as usize].kind == CONTINENTAL;
     const INTERP: usize = POOL0 + POOL_FIELDS.len();
     let value = |v: u32| {
@@ -392,6 +393,7 @@ pub(super) fn sample_with(
         } else {
             0.0
         };
+        out[CRUST_UP] = f64::from(s.crust_uplift_mm_yr);
         for k in 0..POOL_FIELDS.len() {
             out[POOL0 + k] = f64::from(s.pools[k]);
         }
@@ -409,7 +411,7 @@ pub(super) fn sample_with(
     let cells = links.len();
     // The deposit engine's inputs and the surface's basement (P1-04): the nearest sample's flags,
     // top rock pool and trench values; the rest interpolated.
-    let extra = |c: usize, interp: &[f64; INTERP]| -> [f32; 13] {
+    let extra = |c: usize, interp: &[f64; INTERP]| -> [f32; 14] {
         let s = &samples[links[c].nearest as usize];
         if info[c].mode == GAP {
             let age = gap_of(&info[c], links[c].nearest).1;
@@ -427,6 +429,7 @@ pub(super) fn sample_with(
                 0.0,
                 0.0,
                 1.0,
+                0.0,
             ];
         }
         let top = TOP_ORDER
@@ -452,6 +455,7 @@ pub(super) fn sample_with(
             s.collision_mm_yr,
             s.shortening_km,
             0.0,
+            interp[CRUST_UP] as f32,
         ]
     };
     // The rock pools, interpolated like the other thicknesses (P1-07's basement columns,
@@ -565,7 +569,7 @@ pub(super) fn sample_with(
         "plates/fold_trend_deg",
         "plates/plate_id",
     ];
-    let extra_names: [&'static str; 13] = [
+    let extra_names: [&'static str; 14] = [
         "plates/flags",
         "plates/top_pool",
         "plates/oxidation",
@@ -590,11 +594,15 @@ pub(super) fn sample_with(
         // next resampling turns into samples), 0 elsewhere: the surface takes the gap's floor
         // there as crust new at the place (`surface::advect::carried_elevation`). ledger: PLT-354
         GAP_FIELD,
+        // The part of `plates/uplift_mm_yr` that is the column's own crust gained or lost
+        // (`Sample::crust_uplift_mm_yr`; 0 in gaps): the surface's flexure takes only this as a
+        // load. ledger: ISO-091
+        CRUST_UPLIFT_FIELD,
     ];
     // Every layer written in one pass over the cells, each block of cells on one thread (P1-19:
     // the cells' values were collected per group, then each layer drawn out of them in a pass of
     // its own, 30 passes over the L1 every step).
-    const FIELDS: usize = 11 + 13 + POOL_FIELDS.len();
+    const FIELDS: usize = 11 + 14 + POOL_FIELDS.len();
     const BLOCK: usize = 1 << 12;
     let mut layers: Vec<Vec<f32>> = (0..FIELDS).map(|_| vec![0.0; cells]).collect();
     let mut blocks: Vec<Vec<&mut [f32]>> = (0..cells.div_ceil(BLOCK))
@@ -633,6 +641,9 @@ pub(super) fn sample_with(
 
 /// The L1 field that marks the cells in a gap between plates (1 there, 0 elsewhere).
 pub const GAP_FIELD: &str = "plates/gap";
+
+/// The L1 field of the crust uplift, mm/yr (`Sample::crust_uplift_mm_yr`).
+pub const CRUST_UPLIFT_FIELD: &str = "plates/crust_uplift_mm_yr";
 
 /// The L1 fields holding the rock pools (interpolated), metres, in [`pool`] order
 /// (`plates/pool/<name>_m`; P1-07 builds the basement below the strata log from them).

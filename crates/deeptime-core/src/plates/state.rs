@@ -171,6 +171,13 @@ pub struct Sample {
     /// while the crust stays hidden, after the collision ends too, and a terrane transfer or weld
     /// leaves such crust where it is (ledger PLT-291).
     pub stacked: bool,
+    /// The part of `uplift_mm_yr` that is the column's own crust, mm/yr: the change of its pools'
+    /// Airy height (`collapse::iso_height`) over the last step, crust gained (belts, arcs, the
+    /// collapse's and the flow's receivers, accretion) or lost. The rest of the uplift moved a
+    /// height alone (the settling, a height rule, the rate limit's hold). The surface's flexure
+    /// takes only this part as crust thickened or thinned (ledger: ISO-091).
+    #[serde(default)]
+    pub crust_uplift_mm_yr: f32,
 }
 
 impl Sample {
@@ -201,6 +208,7 @@ impl Sample {
             collision_mm_yr: 0.0,
             shortening_km: 0.0,
             stacked: false,
+            crust_uplift_mm_yr: 0.0,
         }
     }
 
