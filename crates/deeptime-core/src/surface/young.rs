@@ -1176,8 +1176,11 @@ mod tests {
             };
             let e = estimate(&p);
             let base = (e.bytes - e.history_bytes) / MIB;
+            // The 15 % is the per-cell figures'; what is on no grid is a constant beside them
+            // (amp-est, 2026-10-23: `surface::UNGRIDDED_BYTES`, which these grids' slack covered).
+            let ungridded = crate::surface::UNGRIDDED_BYTES / MIB;
             assert!(
-                base >= held_mib && base <= held_mib * 115 / 100,
+                base >= held_mib && base <= held_mib * 115 / 100 + ungridded,
                 "{name}: {base} MiB listed, {held_mib} MiB held"
             );
         }
