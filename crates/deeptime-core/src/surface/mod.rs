@@ -525,6 +525,10 @@ struct PlateFields {
     /// `plates/crust_uplift_mm_yr` (`plates::l1::CRUST_UPLIFT_FIELD`, ISO-091); absent in worlds
     /// built without the L1 sampling, where the whole uplift is taken as crust.
     crust_uplift: Option<Vec<f32>>,
+    /// The flexure's continental age: `plates/orogeny_age_myr`, except where the plates' thermal
+    /// age (`plates::l1::THERMAL_AGE_FIELD`, written only with `tectonics.thermal_strength`) gives
+    /// one (ledger: ISO-112). `None`: the orogeny's age throughout.
+    te_age: Option<Vec<f32>>,
 }
 
 impl PlateFields {
@@ -542,6 +546,13 @@ impl PlateFields {
                     ))
                 })
         };
+        let orogeny_age = get("plates/orogeny_age_myr")?;
+        let te_age = get(crate::plates::l1::THERMAL_AGE_FIELD).ok().map(|th| {
+            th.iter()
+                .zip(&orogeny_age)
+                .map(|(&a, &o)| if a.is_nan() { o } else { a })
+                .collect()
+        });
         Ok(PlateFields {
             elevation: get("plates/elevation_m")?,
             uplift: get("plates/uplift_mm_yr")?,
@@ -551,7 +562,7 @@ impl PlateFields {
             crust_age: get("crust_age")?,
             regime: get("regime")?,
             orogeny_type: get("plates/orogeny_type")?,
-            orogeny_age: get("plates/orogeny_age_myr")?,
+            orogeny_age,
             top_pool: get("plates/top_pool")?,
             flags: get("plates/flags")?,
             oxidation: get("plates/oxidation")?,
@@ -562,6 +573,7 @@ impl PlateFields {
             thickness: get("plates/thickness_m")?,
             gap: get(crate::plates::l1::GAP_FIELD).ok(),
             crust_uplift: get(crate::plates::l1::CRUST_UPLIFT_FIELD).ok(),
+            te_age,
         })
     }
 }
@@ -1978,7 +1990,7 @@ impl SurfaceStage {
                 crust_uplift_mm_yr: pf.crust_uplift.as_deref().unwrap_or(&pf.uplift),
                 crust_type: &pf.crust_type,
                 crust_age_myr: &pf.crust_age,
-                orogeny_age_myr: &pf.orogeny_age,
+                orogeny_age_myr: pf.te_age.as_deref().unwrap_or(&pf.orogeny_age),
                 regime: &pf.regime,
                 plate_id: &pf.plate_id,
                 ice_m: ice,
