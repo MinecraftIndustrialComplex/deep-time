@@ -244,6 +244,14 @@ This gap gets its own section below, "Rivers and deltas". In short: nothing in t
 delta, distributary, floodplain, levee, meander, fan or braid. It moves none of M1 to M7, but it is
 what a player meets most.
 
+- **State (2026-10-23).** Stage 1 of 4 is built on branch worktree-agent-a9e4e25c4744d5a75 (not
+  merged): delta plains above the sea at river mouths, sized by the BQART load and the Nienhuis
+  area fit against the shelf's room, and distributaries across them as new chains in the river
+  file (its layout 2, `from`). On the D5 bake 359 of 1,054 loaded mouths get a plain, 0.39 % of
+  the land (Earth 0.57 %), and 233 rivers split into 632 distributaries; 23 of the 25 largest
+  rivers have a plain and 15 split (rivers-and-lakes.md, "Stage 1 on the D5 bake"). Floodplains
+  and levees, meanders, fans and braids remain.
+
 ### Gap 6: flexural foreland basins
 
 - **What it controls on Earth.** A thrust belt loads the stiff plate beneath it. The plate bends
