@@ -29,8 +29,11 @@ The model's rows:
                      2026-10-20; runs before it have none, so the whole 7 km)
   pelagic            felsic rock the plate step's surface makes (`cb_parts` felsic, part
                      `plate_surface`: the pelagic sediment, `pelagic_m_per_myr`)
-  sediment subd.,    none: the conserved pools of subducted crust accrete to the column on top
-  subd. erosion      at a resampling (`accreted`, of it ocean floor's: accreted - accreted_continent)
+  sediment subd.     the share of the slab's sediment and sedimentary rock a resampling sends to the
+                     mantle (`sed_subducted`, PLT-440, since 2026-10-22; the rest accretes to the
+                     column on top, `accreted`, of it ocean floor's: accreted - accreted_continent)
+  subd. erosion      the forearc crust erosive fronts take to the mantle (`forearc_c` continental,
+                     `forearc_o` the rest; PLT-441, since 2026-10-22; 0 with the rule off)
   collision          crust a collision took across its front less the share stacked (crossed - kept),
                      split (since 2026-10-21, PLT-401) into the crust found no room (`noroom_sliver`:
                      left over in a belt with room in it; `noroom_capped`: the belt at the strength
@@ -116,6 +119,10 @@ def budget(run, length):
         "basement": o2c_basement / yrs,
         "pelagic": part("felsic", "plate_surface"),
         "accreted_ocean": per(g.get("accreted", 0.0) - g.get("accreted_continent", 0.0)),
+        "sed_subducted": per(g.get("sed_subducted", 0.0)),
+        "forearc": per(g.get("forearc_c", 0.0) + g.get("forearc_o", 0.0)),
+        "forearc_c": per(g.get("forearc_c", 0.0)),
+        "erosive_km": (g.get("forearc_front_c", 0.0) + g.get("forearc_front_o", 0.0)) / length,
         "collision": per(g.get("crossed", 0.0) - g.get("kept", 0.0)),
         "foundering": per(g.get("foundered", 0.0)),
         "rate_cap": per(g.get("rate_lost", 0.0)),
@@ -173,8 +180,9 @@ ROWS = [
     ("model only: ocean floor's own crust made continental", "ocean_floor", 0.0),
     ("model only: pelagic sediment made", "pelagic", 0.0),
     ("losses", None, None),
-    ("ocean margins: sediment subduction", None, 1.1),
-    ("ocean margins: subduction erosion", None, 1.4),
+    ("ocean margins: sediment subduction (PLT-440)", "sed_subducted", 1.1),
+    ("ocean margins: subduction erosion (PLT-441)", "forearc", 1.4),
+    ("  of it continental crust", "forearc_c", float("nan")),
     ("crust-suturing zones (all three)", "collision", 0.7),
     ("  of it PLT-242's share", "coll_share", float("nan")),
     ("  of it no room: left over in a belt with room", "noroom_sliver", float("nan")),
@@ -197,6 +205,7 @@ ROWS = [
 LENGTHS = [
     ("island-arc front, km (Earth 14,500)", "front_o_km", "{:.0f}"),
     ("continental-arc front, km (Earth 27,500)", "front_c_km", "{:.0f}"),
+    ("erosive fronts, km (Clift & Vannucchi 2004: 22,925 of 40,225)", "erosive_km", "{:.0f}"),
     ("island arcs per km of front, km3/km/Myr (Earth ~100 at full rate)", "arc_o_per_km", "{:.1f}"),
     ("continental arcs per km, km3/km/Myr (Earth 35)", "arc_c_per_km", "{:.1f}"),
     ("cordillera per km of continental front, km3/km/Myr", "cord_per_km", "{:.1f}"),
