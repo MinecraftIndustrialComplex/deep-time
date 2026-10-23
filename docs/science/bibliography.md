@@ -3905,7 +3905,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Stern, R. J. (2004). Subduction initiation: spontaneous and induced. Earth and Planetary Science Letters 226(3-4):275-292.
 - DOI or URL: 10.1016/S0012-821X(04)00498-4 (OpenAlex lists 10.1016/j.epsl.2004.08.007).
 - Cited as: "Stern 2004, EPSL 226:275".
-- Ledger ids: PLT-062, PLT-067, PLT-207, PLT-056 and PLT-371 (2026-10-21: polarity reversal against transference)
+- Ledger ids: PLT-062, PLT-067, PLT-207, PLT-056 and PLT-371 (2026-10-21: polarity reversal against transference), PLT-503 (2026-10-23: initiation off the passive margin)
 - Access: paywalled (no abstract available in OpenAlex); an author copy is open (2026-10-21).
 - Library (the project's source library, not distributed): fetched 2026-10-21 (author copy and the author's encyclopedia chapter "Subduction initiation"). Files: `Stern2004/SternEPSL04.pdf`, `SternEPSL04.txt`, `SubInitEoG221.pdf`.
 - Substitute: none needed.
@@ -5631,9 +5631,9 @@ with pdftotext; the others are abstracts on the publisher's or the laboratory's 
 - Reference: Bird, P. (2003). An updated digital model of plate boundaries. Geochemistry, Geophysics, Geosystems 4(3):1027.
 - DOI or URL: 10.1029/2001GC000252; full text http://peterbird.name/publications/2003_PB2002/2001GC000252.pdf
 - Cited as: "Bird 2003, Table 3"
-- Ledger ids: PLT-213 (and PLT-214, PLT-221 by reference), PLT-401 (2026-10-21: the CCB's length, speed and area). The same work is under `Bird2003` in the plate tectonics and climate sections for other claims.
+- Ledger ids: PLT-213 (and PLT-214, PLT-221 by reference), PLT-401 (2026-10-21: the CCB's length, speed and area), PLT-500 and PLT-501 (2026-10-23: the boundary measure's shares and the trenches' facing), PLT-502 (2026-10-23: PB2002_steps.dat's segments). The same work is under `Bird2003` in the plate tectonics and climate sections for other claims.
 - Access: open (the author's site).
-- Read so far (by the project): full text, 2026-10-02: Table 3 "Collective Properties of Plate Boundaries by Class": CCB 23,003 km (8.8 %), CTF 26,132 (10.0 %), CRB 27,472 (10.5 %), OSR 67,338 (25.8 %), OTF 47,783 (18.3 %), OCB 17,449 (6.7 %), SUB 51,310 (19.7 %), total 260,487 km (100 %); paragraph 126 defines SUB as convergent steps "with a Benioff zone of intermediate to deep earthquakes and/or a parallel volcanic arc with Quaternary activity", "not divided into continental and oceanic types"; 5,819 steps of mean length 44.7 km.
+- Read so far (by the project): full text, 2026-10-02: Table 3 "Collective Properties of Plate Boundaries by Class": CCB 23,003 km (8.8 %), CTF 26,132 (10.0 %), CRB 27,472 (10.5 %), OSR 67,338 (25.8 %), OTF 47,783 (18.3 %), OCB 17,449 (6.7 %), SUB 51,310 (19.7 %), total 260,487 km (100 %); paragraph 126 defines SUB as convergent steps "with a Benioff zone of intermediate to deep earthquakes and/or a parallel volcanic arc with Quaternary activity", "not divided into continental and oceanic types"; 5,819 steps of mean length 44.7 km. 2026-10-23 (V1 gap 2): SUB's area flux 0.086516 m2/s over 51,310 km is 53.2 mm/yr across the trench, against a mean relative speed of 62.3 (the agent's arithmetic on Table 3); and PB2002_steps.dat (the steps file beside the paper, `Bird2003/PB2002_steps.dat`) read with a lane script: OSR runs median 75 km and 165 km length-weighted, transform runs 0.71 of the ridge's length, 82 % of the ridge and 49 % of the subduction zones within 20 degrees of orthogonal to the relative motion.
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct.
 - Read again 2026-10-21 (the crust flux into collision fronts, PLT-401; the library copy `Bird2003/Bird2003.txt`): Table 3's other columns for the continental convergent boundary, "23,003 (8.8%)" km, mean velocity "26.2" mm/a, area production "0.013616 (12.6%)" m2/s (consumed: 0.43 km2 a year; over the length, 18.7 mm/yr of normal convergence, against the full vector's 26.2); paragraph 127: "Continental plate boundary steps are any that are not oceanic. (Thus, transitional steps are considered continental.)", oceanic steps being those "within seafloor whose age is known from linear magnetic anomalies to be less than 180 Ma" and/or "at water depths exceeding 2000 m", and SUB steps classed first, so a CCB step is a convergent step on continental or transitional lithosphere with no Benioff zone or arc.
@@ -7424,16 +7424,16 @@ The sources of the plate-geometry task (build log 2026-10-21 "The plate geometry
 - Reference: Crameri, F., Magni, V., Domeier, M., Shephard, G. E., Chotalia, K., Cooper, G., Eakin, C. M., Grima, A. G., Gürer, D., Király, Á., Mulyukova, E., Peters, K., Robert, B. and Thielmann, M. (2020). A transdisciplinary and community-driven database to unravel subduction zone initiation. Nature Communications 11:3750.
 - DOI or URL: 10.1038/s41467-020-17522-9 (open access).
 - Cited as: "Crameri et al. 2020".
-- Ledger ids: PLT-062, PLT-064 (2026-10-21 notes), PLT-371 (the polarity reversals' rate)
+- Ledger ids: PLT-062, PLT-064 (2026-10-21 notes), PLT-371 (the polarity reversals' rate), PLT-503 and PLT-505 (2026-10-23: initiation off the passive margin, and under compression)
 - Access: open.
 - Library (the project's source library, not distributed): fetched 2026-10-21 with Supplementary Information and Supplementary Data 1. Files: `Crameri2020/crameri2020.pdf`, `crameri2020.txt`, `41467_2020_17522_MOESM1_ESM.pdf` to `MOESM3_ESM.xlsx`, `Supplementary_Data1_Analysis_sheet.txt` (the xlsx's analysis sheet as text).
-- Read so far (by the project): full text and Supplementary Data 1's analysis sheet, 2026-10-21. Table 1: 13 subduction-zone initiation (SZI) events from 6 ± 1 to 104 ± 1 Ma, four of them polarity reversals (Aleutian 53 ± 2, Tonga-Kermadec 50 ± 5, New Hebrides-New Britain 10 ± 2, Philippine 9 ± 3 Ma); some candidates were "deemed too unclear to be included", so 13 is a floor. "All SZI events start less than 1500 km away from other active subduction zones and, in most cases, less than 500 km"; "At least nine of all thirteen events ... occur at or near a pre-existing convergent plate boundary"; "collision events along pre-existing subduction trenches are often precursors of SZI events"; "subduction breeds subduction"; "horizontally forced subduction zone initiation is dominant over the last 100 Ma". Supplementary Data 1: the subducting plates' mean ages at initiation, Aleutian 31.7, Izu-Bonin 40.7, Sunda-Java 44.8, Lesser Antilles 49, Tonga-Kermadec 54.4, South Sandwich 61.2, New Hebrides-New Britain 62.5, Philippine 66.2, Halmahera 117.4 Myr.
+- Read so far (by the project): full text and Supplementary Data 1's analysis sheet, 2026-10-21. Table 1: 13 subduction-zone initiation (SZI) events from 6 ± 1 to 104 ± 1 Ma, four of them polarity reversals (Aleutian 53 ± 2, Tonga-Kermadec 50 ± 5, New Hebrides-New Britain 10 ± 2, Philippine 9 ± 3 Ma); some candidates were "deemed too unclear to be included", so 13 is a floor. "All SZI events start less than 1500 km away from other active subduction zones and, in most cases, less than 500 km"; "At least nine of all thirteen events ... occur at or near a pre-existing convergent plate boundary"; "collision events along pre-existing subduction trenches are often precursors of SZI events"; "subduction breeds subduction"; "horizontally forced subduction zone initiation is dominant over the last 100 Ma". Supplementary Data 1: the subducting plates' mean ages at initiation, Aleutian 31.7, Izu-Bonin 40.7, Sunda-Java 44.8, Lesser Antilles 49, Tonga-Kermadec 54.4, South Sandwich 61.2, New Hebrides-New Britain 62.5, Philippine 66.2, Halmahera 117.4 Myr. Read again 2026-10-23 (V1 gap 2): "heterogeneous oceanic plate interiors are more favourable for SZI than ocean-continent boundaries, or more specifically, passive margins"; "we find no event that is purely plate-buoyancy driven or, in other words, spontaneous"; "only two (i.e., Anatolia and Oman) of the SZI database events formed" near a passive margin.
 
 ### GurnisHallLavier2004
 - Reference: Gurnis, M., Hall, C. and Lavier, L. (2004). Evolving force balance during incipient subduction. Geochemistry, Geophysics, Geosystems 5(7):Q07001.
 - DOI or URL: 10.1029/2003GC000681 (open, the author's site).
 - Cited as: "Gurnis et al. 2004".
-- Ledger ids: PLT-062, PLT-064 (2026-10-21 notes)
+- Ledger ids: PLT-062, PLT-064 (2026-10-21 notes), PLT-270 (2026-10-23: `from-memory` to `verified`), PLT-505 (2026-10-23)
 - Access: open.
 - Library (the project's source library, not distributed): fetched 2026-10-21. Files: `Gurnis2004/GURggg04.pdf`, `GURggg04.txt`.
 - Read so far (by the project): full text, 2026-10-21. Abstract: "Nearly half of all active subduction zones initiated during the Cenozoic"; "Subduction initiation is known to have occurred in a variety of tectonic settings: old fracture zones, transform faults, and extinct spreading centers and through polarity reversal behind active subduction zones" ("Izu-Bonin-Mariana (IBM) along a fracture zone, Tonga-Kermadec along an extinct subduction boundary, New Hebrides within a back arc, and Puysegur-Fiordland along a spreading center"); "The large initial bending resistance can be entirely eliminated in ridge models, explaining the propensity for new subduction zones to form through polarity reversals"; "A FZ must be underthrust by the older plate for 100–150 km before a transition from forced to self-sustaining" subduction. Table 1 "Cenozoic Subduction Initiation": eleven zones, their heritage fracture zone, transform, spreading centre, extinct subduction zone or polarity reversal (New Britain-San Cristobal, New Hebrides); none from old floor far from a plate boundary.
@@ -8299,3 +8299,88 @@ The sources of the lithosphere's thermal state (gap 4; `lithosphere-thermal-stat
 - Access: paywalled.
 - Library: not kept.
 - Read so far (by the project): abstract (Crossref), 2026-10-23: Kaapvaal lithosphere "between 200 and 270 km, with most values between 210 and 250 km", basal heat flow "between 12-16 mW m−2"; "Because of its large thickness and thermal relaxation time, Archean lithosphere cannot be in thermal equilibrium".
+
+## Plate boundary organisation (PLT-500 to PLT-507), added 2026-10-23
+
+The sources of V1 gap 2 (build log 2026-10-23 "Gap 2"; plates.md, the section "Plate boundary organisation"). Read again for it: Bird 2003 (Table 3 and PB2002_steps.dat), Stern 2004, Crameri et al. 2020 and Gurnis et al. 2004 (above). Texts in the project's source library on the test VM (`/data/ban/deeptime-sources/<key>/`), not distributed.
+
+### Gerya2012
+- Reference: Gerya, T. (2012). Origin and models of oceanic transform faults. Tectonophysics 522-523:34-54.
+- DOI or URL: 10.1016/j.tecto.2011.07.006
+- Cited as: "Gerya 2012".
+- Ledger ids: PLT-502, PLT-507
+- Access: open copy (the author's ETH page).
+- Library (the project's source library, not distributed): fetched 2026-10-23. Files: `Gerya2012/Gerya2012.pdf`, `Gerya2012.txt`.
+- Read so far (by the project): full text, 2026-10-23. §1: "The perpendicularity of the ridges and the transform faults is so common that it is considered to be an 'intrinsic property' of the oceanic spreading process (Oldenburg and Brune, 1972). Tens to hundreds of kilometer long active transform fault sections connecting two spreading centers"; §4: transform faults' development "should react nearly instantaneously to changes in spreading direction (Menard and Atwater, 1968; ...)".
+
+### Aghaei2014
+- Reference: Aghaei, O., Nedimović, M. R., Carton, H., Carbotte, S. M., Canales, J. P. and Mutter, J. C. (2014). Crustal thickness and Moho character of the fast-spreading East Pacific Rise from 9°42'N to 9°57'N from poststack-migrated 3-D MCS data. Geochemistry, Geophysics, Geosystems 15:634-657.
+- DOI or URL: 10.1002/2013GC005069
+- Cited as: "Aghaei et al. 2014" (after Macdonald 1998).
+- Ledger ids: PLT-502
+- Access: open (AGU).
+- Library (the project's source library, not distributed): fetched 2026-10-23. Files: `Aghaei2014/Aghaei2014.pdf`, `Aghaei2014.txt`.
+- Read so far (by the project): the introduction, 2026-10-23: "First-order and second-order (large scale) ridge segments, bounded by transform faults and overlapping spreading centers (OSCs), respectively"; "First-order segments extend for 600 ± 300 km and persist for >5 × 10^6 years [e.g., Macdonald, 1998]. Second-order segments extend for 140 ± 90 km".
+
+### MacdonaldFox1990
+- Reference: Macdonald, K. C. and Fox, P. J. (1990). The mid-ocean ridge. Scientific American 262(6):72-79 (the volume, issue and pages from memory).
+- DOI or URL: the text as kept on a course page (`Macdonald_SciAm.html`).
+- Cited as: "Macdonald & Fox 1990".
+- Ledger ids: PLT-502
+- Access: the article's text, open on a course page.
+- Library (the project's source library, not distributed): fetched 2026-10-23. File: `Macdonald_SciAm.html`.
+- Read so far (by the project): full text, 2026-10-23: "First-order discontinuities offset the ridge segments by at least 20 kilometers and usually more than 50 kilometers"; "These discontinuities typically define segments from 200 to 800 kilometers long"; the transforms' traces run in the ridge's flanks "for hundreds to thousands of kilometers".
+
+### AtwaterMacdonald1977
+- Reference: Atwater, T. and Macdonald, K. C. (1977). Are spreading centers perpendicular to their transform faults? Nature 270:715-719.
+- DOI or URL: 10.1038/270715a0
+- Cited as: "Atwater & Macdonald 1977".
+- Ledger ids: PLT-502
+- Access: paywalled.
+- Library (the project's source library, not distributed): the abstract page, fetched 2026-10-23. File: `AtwaterMacdonald1977.html`.
+- Read so far (by the project): abstract, 2026-10-23: "Of eight segmented, slow-spreading centres (half-rate less than 3 cm yr−1) we did not find a case which was, in fact, perpendicular. All were 6–38° oblique"; "Fast- and some intermediate-rate spreading centres, on the other hand, seem to be perpendicular within the errors of measurements".
+
+### Heidbach2018
+- Reference: Heidbach, O., Rajabi, M., Cui, X., Fuchs, K., Müller, B., Reinecker, J., Reiter, K., Tingay, M., Wenzel, F., Xie, F., Ziegler, M. O., Zoback, M.-L. and Zoback, M. (2018). The World Stress Map database release 2016: Crustal stress pattern across scales. Tectonophysics 744:484-498.
+- DOI or URL: 10.1016/j.tecto.2018.07.007 (post-print at GFZpublic).
+- Cited as: "Heidbach et al. 2018".
+- Ledger ids: PLT-504
+- Access: open post-print.
+- Library (the project's source library, not distributed): fetched 2026-10-23. Files: `Heidbach2018/Heidbach2018.pdf`, `Heidbach2018.txt`.
+- Read so far (by the project): full text, 2026-10-23. §3: the maximum horizontal stress "is often sub-parallel to the direction of absolute plate motion indicating that the forces that drive plate motion also control the first-order intra-plate crustal stress pattern"; §1: the wavelength of the stress pattern "can be several thousand kilometres"; §2: the 2008 release "revealed that plate boundary forces are not enough to fully explain the crustal stress pattern".
+
+### AudetBurgmann2011
+- Reference: Audet, P. and Bürgmann, R. (2011). Dominant role of tectonic inheritance in supercontinent cycles. Nature Geoscience 4:184-187 (the title from memory).
+- DOI or URL: 10.1038/ngeo1080
+- Cited as: "Audet & Bürgmann 2011".
+- Ledger ids: PLT-506
+- Access: paywalled.
+- Library (the project's source library, not distributed): the abstract page, fetched 2026-10-23. File: `Audet2011/ngeo1080.html`.
+- Read so far (by the project): abstract, 2026-10-23: "effective elastic thickness is high in Archean cratons, but low in the surrounding Phanerozoic belts"; "directions of mechanical weakness align with large gradients in effective elastic thickness and with tectonic boundaries"; "during the supercontinent cycle, strain is concentrated at pre-existing zones of weakness".
+
+### BuiterTorsvik2014
+- Reference: Buiter, S. J. H. and Torsvik, T. H. (2014). A review of Wilson Cycle plate margins: a role for mantle plumes in continental break-up along sutures? Gondwana Research 26:627-653 (from memory).
+- DOI or URL: not checked.
+- Cited as: not cited (looked for as a source for PLT-506).
+- Ledger ids: none
+- Access: paywalled; no abstract or open copy found 2026-10-23.
+- Library: not kept (search pages only, `BuiterTorsvik2014/`).
+- Read so far (by the project): not read.
+
+### Matthews2016
+- Reference: Matthews, K. J., Maloney, K. T., Zahirovic, S., Williams, S. E., Seton, M. and Müller, R. D. (2016). Global plate boundary evolution and kinematics since the late Paleozoic. Global and Planetary Change 146:226-250.
+- DOI or URL: 10.1016/j.gloplacha.2016.10.002 (accepted manuscript open).
+- Cited as: "Matthews et al. 2016".
+- Ledger ids: PLT-507
+- Access: open accepted manuscript.
+- Library (the project's source library, not distributed): fetched 2026-10-23. Files: `Matthews2016/Matthews2016.pdf`, `Matthews2016.txt`.
+- Read so far (by the project): full text, 2026-10-23. Abstract: "Except for during the period ~260–160 Ma, the number of plates (16–46) and ratio of 'large' plates (≥10^7.5 km2) to smaller plates (~2.7–6.6) are fairly similar to present-day values (46 and 6.6, respectively)"; the model's reorganisations at 270, 230 and 120 Ma, and "the well-recognized plate reorganisation at ~50 Ma" and "the 100 Ma reorganisation"; "Terrane collision is a key trigger of subduction zone reorganisations such as polarity" reversals.
+
+### PhilipponCorti2016
+- Reference: Philippon, M. and Corti, G. (2016). Obliquity along plate boundaries. Tectonophysics 693:171-182.
+- DOI or URL: 10.1016/j.tecto.2016.05.033
+- Cited as: "Philippon & Corti 2016" (plates.md only).
+- Ledger ids: none (plates.md, the obliquity of Earth's boundaries)
+- Access: paywalled (HAL holds a notice only).
+- Library: not kept (the abstract from the HAL API).
+- Read so far (by the project): abstract, 2026-10-23: "roughly only 8% of the plate boundaries total length shows a very low obliquity (ranging from 0 to 10 deg, sub-orthogonal to the plate displacement)".
