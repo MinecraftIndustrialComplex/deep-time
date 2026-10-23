@@ -626,6 +626,7 @@ def cmd_table(a):
         raise Fail(f"unknown measure {name} (registry has: {', '.join(reg['measures'])})")
     spec = reg["measures"][name]
     sel = []
+    seen = {}
     for n in [a.base] + a.arm:
         arm = load_arm(n)
         rows = arm_rows(arm, name, spec["version"])
@@ -634,7 +635,9 @@ def cmd_table(a):
         if miss:
             print(f"warning: arm {n}: {len(miss)} of {len(rows)} runs lack measure {name} ({', '.join(miss[:6])}{' ...' if len(miss) > 6 else ''});"
                   f" pool.sh run or pool.sh measure makes them", file=sys.stderr)
-        sel.append((n, have))
+        seen[n] = seen.get(n, 0) + 1
+        # An arm against itself (a check that the table reads) gets a second row of its own.
+        sel.append((n if seen[n] == 1 else f"{n} #{seen[n]}", have))
     if any(not runs for _, runs in sel):
         raise Fail("an arm has no measured runs; nothing to tabulate")
     text, summary = pooltable.render(spec, sel[0], sel[1:], name)

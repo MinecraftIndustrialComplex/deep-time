@@ -24,7 +24,7 @@ tools/review/pool/pool.sh table --base <arm> --arm <arm> [--arm <arm> ...] [--me
 tools/review/pool/pool.sh measure [--arm <arm>]... [--measures a,b]     a new or changed measure over cached runs
 tools/review/pool/pool.sh alias <new key|HEAD> <old key> --check-seed S [--preset P] [--length Myr]
                                     [--start a] [--threads T] [--set k=v]... [--all-arms]
-tools/review/pool/pool.sh combine <name> <branch> [<branch> ...]        merge unmerged branches, build, print the key
+tools/review/pool/pool.sh combine [--no-build] <name> <branch> [<branch> ...]   merge unmerged branches, build, print the key
 tools/review/pool/pool.sh forget <name>                                  delete the throwaway branch pool/<name>
 tools/review/pool/pool.sh key [--ref REF]                                this checkout's source key
 tools/review/pool/pool.sh arms | status | gc [--days N] [--apply] | keep <key> [reason] [--remove]
@@ -161,7 +161,9 @@ master). 3 or 4 seeds per start is the least that gives the table a p worth read
   `pool.sh keep <key> [reason]` writes the key into `pool/KEEP`, which gc never deletes (also the alias target
   of a kept key); `--remove` unkeeps. A key counts as used when a run, build, table or alias touches it.
 - A run needs about 1.2 GiB while it runs and refuses to start with under 6 GiB free on the pool's disk.
-- `combine.sh` leaves nothing behind on a conflict (the scratch worktree and branch are removed, exit 3).
+- `combine.sh --no-build` only merges and prints the key (a quick "do these branches conflict?"; nothing is
+  built, the scratch worktree and branch are removed). `combine.sh` leaves nothing behind on a conflict (the
+  scratch worktree and branch are removed, exit 3).
   After a successful build the scratch worktree and its VM copy are removed; the branch `pool/<name>` stays
   until `pool.sh forget <name>`. Nothing is pushed and master is untouched.
 - The pool's own tests: `selftest.py` (Mann-Whitney against scipy), run with
