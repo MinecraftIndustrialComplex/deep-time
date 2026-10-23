@@ -4350,3 +4350,161 @@ assertion fixes `width_rad` at 200/6,370 on two planet sizes. No other seed-spec
 
 Decided: W is on the model sphere and PLT-400 is on. Open: the high ground, the ice and the
 collisions, which the width does not touch, are the next planet change's.
+
+## The high ground after D6: the collapse measured from the sea (2026-10-22)
+
+The coordinator's task on V1 item 1's high ground, on master f9005138 (after D6, the previous
+section): move land above 2 km (at most 0.12 of the land), the coast with land above 2 km within
+200 km (at most 0.15) and land under ice (at most 0.15) towards their targets without losing the
+land (0.26 to 0.32 of the planet), the largest landmass (at least 0.12) or the drowned share (at
+most 0.25); collisions 2 to 6 per 100 Myr. Ledger PLT-412 and PLT-413 (new), PLT-390 and PLT-391
+(measured again). Code: `plates/collapse.rs`, `plates/mod.rs`, `plates/rate.rs` (one call) and
+`params.rs`; nothing in `surface/`. Both new laws are in the code as switches and **not on**
+(below, "What is on").
+
+### What the high ground is on master f9005138
+
+Twelve runs (`earthlike_quick_16k`, 1,000 Myr, seeds 1 to 6, both starts, the crust budget on),
+the final frame, medians of the runs (a scratch `hg.py` on `deeptime dump-fields`; the age is the
+last orogeny stamp, the thickness the plate model's):
+
+- Land above 2 km is 0.271 of the land and the sea stands 820 m over the datum.
+- *Active belts.* 0.53 of the high ground was raised by an orogeny within the last 10 Myr (0.13
+  from 10 to 20 Myr, 0.11 from 20 to 40, 0.11 from 40 to 100, 0.05 older, 0.03 none); 0.67 of it
+  is Himalayan (collision), 0.31 Andean. 0.72 of it is still rising. Only 0.04 of it stands on
+  crust thinner than 50 km.
+- *Quiet thick crust that cannot collapse.* 0.43 of the high ground is quiet (its last orogeny
+  10 Myr or more ago) and thicker than T_c = 50 km; only 0.30 of that has room on its plate within
+  the collapse's 200 km (continental crust thinner than T_n = 35.1 km, or ocean floor).
+- *The lowland it would collapse into is not room.* The plates' old dry lowland (no orogeny in
+  100 Myr, area-weighted over the plates) is 41.3 km of crust standing 528 m over the sea: crust
+  between 35.1 km and the lowland's 41 km is no room for the collapse though it stands 2 km
+  under the orogen beside it. And the hot window's target T_n stands at z_0 = 525 m over the
+  datum, so 300 m under a sea 820 m over it: thinned to T_n, an orogen ends under the sea, which
+  is why PLT-390 drowns the continents.
+- *Volume.* The high ground's crust over 35.1 km is 1.04 × 10⁹ km³ and the drowned continental
+  crust's room under 35.1 km 0.23 × 10⁹ km³; up to 42 km the two are 0.76 and 0.53 × 10⁹ km³.
+- *The coast.* The high ground within 200 km of the sea is about four fifths raised within the
+  last 10 Myr and three quarters Himalayan: belts at the continents' edges, not collapsed crust.
+
+So even a collapse that took every quiet column to the lowland would leave the active belts,
+0.53 × 0.271 = 0.14 of the land, above the 0.12 target. The rest of the way is the collisions'
+(the front's length in collision, "The crust flux into collision fronts" above), not the collapse's.
+
+### The law: the column from the sea (PLT-412) and its cap (PLT-413)
+
+Gravitational collapse "corresponds to the decay of lateral contrast in gravitational potential
+energy"; with the surroundings fixed it is "a transfer of gravitational potential energy from the
+elevated regions towards the low lands ... accommodated by a combination of gravitational sliding
+of the brittle crust and horizontal spread of the lower crust", and "fixed-boundary divergent
+collapse implies the lateral growth of the orogenic domain at the expense of the surrounding
+lithosphere" (Rey, Vanderhaeghe & Teyssier 2001, abstract). The level a collapse works towards is
+the surrounding lowland's, not a column fixed at the datum. Earth's stable continents are about
+the global mean: "Shields and platforms have an average crustal thickness nearly equal to the
+global average", 41.1 km (extended crust 30.5 km, orogens 46.3 km; Christensen & Mooney 1995,
+abstract), and they stand "a few hundred meters" over the sea, the freeboard; the continents'
+thickening "exerts a first‐order control on the global sea level" (Whitehead & Clift 2009,
+abstract).
+
+**PLT-412** (`collapse_sea_column`). With the switch on, the collapse's normal column is the one
+whose Airy height stands as far over the step's sea S as T_n's stands over the datum:
+T_col = T_n + 7.02 S (`pools::COLUMN_ISOSTATIC_FACTOR`), 41.8 km under a sea 956 m over the
+datum, which is the model's own old lowland (41.3 km at 528 m over the sea on the base) and
+Christensen & Mooney's mean. T_col is what a hot orogen thins towards (PLT-390), the level the
+collapse fills its room up to (continental crust thinner than T_col, and ocean floor), the column
+at which filled ocean floor turns continental, and the thickest crust's ocean fill (PLT-277, no
+higher than its own fill). It is kept within [T_n / 2, T_c] (guards, not reached by the presets'
+seas). Heights still follow Airy in the datum frame; only the column the collapse aims at moves.
+The thickening's own spread (`rate.rs`, PLT-287) keeps T_n: it is not the collapse.
+
+**PLT-413** (`collapse_sea_column_max_km`). The same column, never thicker than Christensen &
+Mooney's 41.1 km: a sea more than 855 m over the datum no longer thickens it. Added in the second
+wave after the first showed the sea rising with the arms (below).
+
+### The arms
+
+Twelve runs an arm, `earthlike_quick_16k`, 1,000 Myr, seeds 1 to 6, both starts, 2 threads,
+`DEEPTIME_CRUST_BUDGET=1`, on the test VM; the base is master f9005138 and the arms this branch
+(commits 7a823bf8 and 6a498363, which run the base's planets bit for bit with the switches off),
+each built from an archive of its commit; the first wave ran side by side with the base, the
+second a few hours later (the runs are deterministic: the cap's binary with the cap unset
+reproduces the first wave's PLT-391 arm's census byte for byte). The census of the final frame
+(`tools/review/continents_census.py`), the plate checks, and a two-sided Mann-Whitney U over the
+runs against the base. Master moved to f87de661 during the task with documents only. *W* is
+PLT-390's window (`collapse_hot_myr`), *cf* PLT-391 (`collapse_continent_first`), *sea* PLT-412,
+*cap* PLT-412 with PLT-413 at 41.1 km.
+
+| Median of 12 (p against the base) | base | W 40 | W 20 | W 40, cf | sea, W 0 | sea, W 40 | sea, W 40, cf |
+|---|---|---|---|---|---|---|---|
+| Land (0.26 to 0.32) | 0.300 | 0.262 (0.29) | 0.278 (0.19) | 0.249 (0.069) | 0.298 (0.98) | 0.304 (0.91) | 0.353 (0.001) |
+| Largest landmass (≥ 0.12) | 0.124 | 0.086 (0.75) | 0.112 (0.89) | 0.091 (0.44) | 0.097 (0.53) | 0.152 (0.51) | 0.193 (0.019) |
+| Continental crust under the sea (≤ 0.25) | 0.278 | 0.399 (0.078) | 0.358 (0.17) | 0.440 (0.057) | 0.266 (1.0) | 0.253 (0.84) | 0.171 (0.017) |
+| Land above 2 km, of the land (≤ 0.12) | 0.271 | 0.214 (0.035) | 0.212 (0.16) | 0.194 (0.026) | 0.201 (0.54) | 0.214 (0.035) | 0.167 (0.002) |
+| Coast with high ground (≤ 0.15) | 0.411 | 0.332 (0.004) | 0.322 (0.002) | 0.331 (0.003) | 0.374 (0.36) | 0.352 (0.009) | 0.395 (0.44) |
+| Land under ice (≤ 0.15) | 0.170 | 0.162 (0.71) | 0.178 (0.19) | 0.161 (0.98) | 0.169 (0.98) | 0.157 (0.34) | 0.148 (0.19) |
+| Collisions per 100 Myr (2 to 6) | 1.80 | 1.65 (0.75) | 1.55 (0.30) | 1.65 (0.69) | 1.85 (0.24) | 1.75 (1.0) | 2.10 (0.064) |
+| Criteria of the seven met, per run | 2 | 2 (0.20) | 2 (0.19) | 2 (0.20) | 2 (0.61) | 2 (0.68) | 3 (0.021) |
+| Continental crust's net change over 1,000 Myr | −0.065 | −0.012 (< 0.001) | −0.041 (0.083) | −0.021 (< 0.001) | −0.046 (0.26) | −0.040 (0.023) | −0.043 (0.061) |
+| Plate checks met, of 45 | 28 | 28 | 28 | 28 | 28 | 28 | 28 |
+| Above 2 km, the plate model's mean over the frames after 100 Myr | 0.257 | 0.187 (0.001) | 0.195 (0.006) | 0.175 (< 0.001) | 0.247 (0.44) | 0.191 (0.001) | 0.164 (< 0.001) |
+| Sea over the datum at the end, m | 820 | 726 | 664 | 955 | 915 | 746 | 1,236 (0.005) |
+| Continental crust's mean thickness, km | 43.4 | 40.3 | 41.4 | 41.1 | 43.5 | 41.2 | 45.2 |
+
+Runs meeting each criterion, of 12:
+
+| | base | W 40 | W 40, cf | sea, W 40 | sea, W 40, cf | cap, W 40, cf | sea, W 40, cf, reach 150 | cap, W 40, cf, reach 150 |
+|---|---|---|---|---|---|---|---|---|
+| Land | 8 | 3 | 3 | 6 | 3 | 3 | 6 | 7 |
+| Largest landmass | 7 | 5 | 4 | 8 | 11 | 8 | 9 | 8 |
+| Under the sea | 5 | 3 | 2 | 6 | 9 | 8 | 5 | 8 |
+| Above 2 km | 0 | 1 | 1 | 1 | 2 | 4 | 3 | 2 |
+| Coast with high ground | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Under ice | 4 | 4 | 4 | 4 | 6 | 5 | 6 | 6 |
+| Collisions | 3 | 3 | 5 | 4 | 8 | 7 | 6 | 4 |
+
+The hot window alone (W 40, as PLT-390 measured on master d53cc6c4) still takes the high ground
+down by a fifth and the coast by 0.08 and still drowns the continents (land 0.262, under the sea
+0.399); W 20 does about as much to the high ground and drowns less. Measured from the sea, the
+same window keeps the land (0.304), the largest landmass (0.152) and the drowned share (0.253)
+where the base has them while the high ground falls as far (0.214, p 0.035) and the coast with it
+(0.352, p 0.009): the collapsed crust now ends at the lowland's height instead of under the sea,
+the continents keep more of their crust (net −0.040 against −0.065) and the sea does not rise.
+The column from the sea alone (W 0) moves nothing at p under 0.24: what it changes is where the
+hot window's crust goes. But criteria met per run do not rise: 2 against 2 (p 0.68).
+
+With continental room first as well, the drowned margins fill before the ocean floor: the
+largest landmass (0.193), the drowned share (0.171) and the collisions (2.10) reach their bands in
+most runs, and criteria per run rise to 3 (p 0.021). But the land overshoots, 0.353 (in band in
+3 runs against the base's 8), as the sea climbs to 1,236 m over the datum and the continental
+slope empties (crust 200 to 2,000 m under the sea: 0.064 of the continental crust against 0.115;
+the shelf 0.060 against 0.087).
+
+### Why continental room first lifts the land and the sea
+
+Filling the thin continental crust within reach to T_col (standing about 500 m over the sea)
+before any ocean floor lifts the drowned margins out of the sea; the water they held goes to the
+ocean, the sea rises, and with it T_col. The cap (PLT-413) was the test of that loop: with the
+column held at 41.1 km the sea still ends 1,208 m over the datum and the land at 0.327 (p 0.040),
+so it is the order, not the column's feedback, that lifts the sea (PLT-391 with W 40 alone also
+lifts it, to 955 m). A shorter reach, 150 km (the lower crust's channel "travels at most 150 km
+into the foreland", Rey, Teyssier & Whitney 2010, as in PLT-391; PLT-257 unchanged, measured
+only), fills fewer margins:
+
+| Median of 12 (p against the base) | base | cap, W 40, cf | sea, W 40, cf, reach 150 | cap, W 40, cf, reach 150 |
+|---|---|---|---|---|
+| Land (0.26 to 0.32) | 0.300 | 0.327 (0.040) | 0.322 (0.046) | 0.318 (0.035) |
+| Largest landmass (≥ 0.12) | 0.124 | 0.161 (0.37) | 0.159 (0.21) | 0.196 (0.17) |
+| Continental crust under the sea (≤ 0.25) | 0.278 | 0.227 (0.20) | 0.266 (0.25) | 0.188 (0.038) |
+| Land above 2 km, of the land (≤ 0.12) | 0.271 | 0.172 (0.002) | 0.169 (0.005) | 0.191 (0.019) |
+| Coast with high ground (≤ 0.15) | 0.411 | 0.350 (0.017) | 0.345 (0.19) | 0.381 (0.37) |
+| Land under ice (≤ 0.15) | 0.170 | 0.156 (0.34) | 0.150 (0.56) | 0.152 (0.36) |
+| Collisions per 100 Myr (2 to 6) | 1.80 | 2.10 (0.097) | 2.00 (0.40) | 1.75 (0.88) |
+| Criteria of the seven met, per run | 2 | 3 (0.19) | 2 (0.22) | 2 (0.22) |
+| Continental crust's net change over 1,000 Myr | −0.065 | −0.035 (0.004) | −0.056 (0.51) | −0.078 (0.67) |
+| Plate checks met, of 45 | 28 | 28 | 28 | 28 |
+| Sea over the datum at the end, m | 820 | 1,208 (0.001) | 933 (0.47) | 811 (0.89) |
+
+The last arm is the only one whose medians meet one criterion more than the base's (land,
+largest landmass and the drowned share) and break none; per run it is 2 against 2 (p 0.22).
+
+HG24PLACEHOLDER

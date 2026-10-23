@@ -1071,6 +1071,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated; not in code.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) metadata only.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 342, issue 3-4, pages 435-449. (PLT) correct.
+- Read in the high-ground task (2026-10-22, PLT-412): the abstract, verbatim, from the University of Minnesota's research portal (Experts@Minnesota, https://experts.umn.edu/en/publications/gravitational-collapse-of-the-continental-crust-definition-regime/; the full text stays paywalled). "Gravitational collapse corresponds to the decay of lateral contrast in gravitational potential energy that builds up during lithospheric deformation"; "When the surrounding lithosphere is fixed (fixed-boundary collapse), collapse occurs through a transfer of gravitational potential energy from the elevated regions towards the low lands. This transfer is accommodated by a combination of gravitational sliding of the brittle crust and horizontal spread of the lower crust. In orogenic domains, fixed-boundary divergent collapse implies the lateral growth of the orogenic domain at the expense of the surrounding lithosphere"; and of convergent collapse, "a deficit in gravitational potential energy drives crustal material towards the deformed lithosphere. This regime can be expected to occur following thinning of the continental crust." Ledger ids added: PLT-412.
 
 ### Beaumont2001
 - Reference: Beaumont, C., Jamieson, R. A., Nguyen, M. H. and Lee, B. (2001). Himalayan tectonics explained by extrusion of a low-viscosity crustal channel coupled to focused surface denudation. Nature 414(6865):738-742.
@@ -5881,6 +5882,7 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Ledger ids: RCK-033, PLT-256 (orogenic collapse, 2026-10-03: orogens 46.3 km, global 41.1 km, as comparison), PLT-281 (2026-10-06: the mean crustal density, 2830 kg/m3)
 - Library: `ChristensenMooney1995/abstract.json` (the USGS publications record).
 - Read: abstract only. Average crustal thickness 41.1 km (extended 30.5 km, orogens 46.3 km); "The mean crustal density calculated from our model is 2830 kg/m3".
+- Read again in the high-ground task (2026-10-22, PLT-412 and PLT-413): the abstract, from OpenAlex's record (doi 10.1029/95JB00259): "extended crust showing an average thickness of 30.5 km and orogens an average of 46.3 km. Shields and platforms have an average crustal thickness nearly equal to the global average"; "The weighted average crustal thickness based on these values is 41.1 km." Ledger ids added: PLT-412, PLT-413.
 
 ### BrownJohnson2018_dataset
 - Reference: Brown, M. and Johnson, T. (2018). Global age, temperature and pressure data for secular change in metamorphism. EarthChem Library, doi 10.1594/IEDA/111316; slides of M. Brown's presidential address to the Mineralogical Society of America.
@@ -7852,3 +7854,12 @@ Nothing was saved to the library.
 - Access: open; a book; open.
 - Library: not fetched.
 - Read so far (by the project): Heliker et al. only in a search summary (Pu'u 'O'o's open channels 2 to 5 m deep and 5 to 25 m wide, tubes 3 to 5 m wide); Siebert et al. not read (it may tabulate how often arc eruptions make lava flows); Etna's page fetched 2026-10-22: "Since the year AD 1600, at least 60 flank eruptions", nearly half since 1900.
+
+### WhiteheadClift2009
+- Reference: Whitehead, J. A. and Clift, P. D. (2009). Continent elevation, mountains, and erosion: Freeboard implications. Journal of Geophysical Research: Solid Earth 114(B5).
+- DOI or URL: 10.1029/2008JB006176
+- Cited as: "Whitehead & Clift 2009".
+- Ledger ids: PLT-412
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "If continent elevation (freeboard) remains at the present value of a few hundred meters, the past continent‐ocean area ratio might have been quite different, depending on earlier volumes of continental crust and water. We conclude that, along with the ages of ocean basins, continental crustal thickening exerts a first‐order control on the global sea level over hundreds of million years"; since 65 Ma "a 156‐m increase of continent elevation over sea level", "affected most strongly by the roughly 1.7% continent surface area decrease caused by Cenozoic mountain building".
