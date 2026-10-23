@@ -1568,8 +1568,8 @@ pub struct StepIn<'a> {
     /// The L1 cell's side on the Earth-normalized sphere, m.
     pub norm_dx_m: f64,
     /// The sine of the latitude at each boundary between the raster's rows, h + 1 values (past a
-    /// pole: ±1), for the solve on the sphere's metric (`row_metric`, ISO-127); None: the block
-    /// metric.
+    /// pole: ±1), for the solve on the sphere's metric (with `row_metric`, ISO-127) and the
+    /// metric trace; None: the block metric, whatever `row_metric` says.
     pub sin_faces: Option<&'a [f64]>,
     /// The plate model's sample spacing on the same sphere, m (0: no filter). The plate model's
     /// uplift carries no information on shorter scales; only the part of its root it resolves
@@ -4035,7 +4035,7 @@ mod tests {
         let r_m = 6.371e6;
         let dx = std::f64::consts::TAU * r_m / w as f64;
         let faces = sphere_faces(h, dx, r_m);
-        let alpha = 400_000.0;
+        let alpha: f64 = 400_000.0;
         let c = RHO_MANTLE;
         let n = w * h;
         let d = vec![c * alpha.powi(4) / 4.0; n];

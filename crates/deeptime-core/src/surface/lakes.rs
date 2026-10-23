@@ -234,12 +234,11 @@ pub fn water_levels<G: SurfaceGrid>(
             }
         })
         .collect();
-    for c in 0..n {
-        let z = out.water_z[c];
-        if h[c] <= sea && h[c] > z {
+    for (&hc, &z) in h.iter().zip(&out.water_z) {
+        if hc <= sea && hc > z {
             out.dry_below_sea += 1;
         }
-        if h[c] > sea && h[c] < z {
+        if hc > sea && hc < z {
             out.wet_above_sea += 1;
         }
     }
