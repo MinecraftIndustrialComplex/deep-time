@@ -13,9 +13,11 @@ use crate::params::BuildFit;
 
 const C: u32 = 1024;
 const SEA: f64 = 63.0;
-/// The coast's row: the beach band from here, the shelf from `SHELF`.
+/// The coast's row: the beach band from here, the shelf from `SHELF` (`WIDE_SHELF` for a beach
+/// band wider than a plain grows).
 const COAST: usize = 110;
 const SHELF: usize = 118;
+const WIDE_SHELF: usize = 150;
 
 fn close(a: f64, b: f64, rel: f64) -> bool {
     (a - b).abs() <= rel * b.abs()
@@ -26,7 +28,11 @@ fn bqart_area_and_depth_follow_their_sources() {
     // Q 1,000 m³/s (31.56 km³/yr), A 10⁵ km², R 2 km, T 10 °C: 0.02 · 31.56^0.31 · 316.2 · 2 · 10.
     let q_km3 = 1000.0 * 31_557_600.0 / 1e9;
     let warm = 0.02 * f64::powf(q_km3, 0.31) * 1e5f64.sqrt() * 2.0 * 10.0;
-    assert!(close(delta::bqart_kg_s(1000.0, 1e5, 2.0, 10.0, 0.0), warm, 1e-12));
+    assert!(close(
+        delta::bqart_kg_s(1000.0, 1e5, 2.0, 10.0, 0.0),
+        warm,
+        1e-12
+    ));
     assert!(close(warm, 368.8, 0.002), "{warm}");
     // Below 2 °C the cold branch: 2 ω B Q^0.31 A^0.5 R, whatever T.
     let cold = delta::bqart_kg_s(1000.0, 1e5, 2.0, -5.0, 0.0);
@@ -61,12 +67,12 @@ fn the_build_fit_expands_what_it_compressed() {
 /// Terrain height, blocks: land sloping gently south (0.02 a row) to the coast at row `COAST`, its
 /// sides falling steeply (0.15 a column) to the valley's axis at column 256, so every cell drains
 /// sideways to the axis (0.15 beats a diagonal's (0.15 + 0.02) / √2) and the axis carries the whole
-/// land south; a band of shallows (half a block under the sea's surface) to row `SHELF`, then a
+/// land south; a band of shallows (half a block under the sea's surface) to row `shelf`, then a
 /// shelf deepening south.
-fn height(i: usize, j: usize) -> f64 {
+fn height(i: usize, j: usize, shelf: usize) -> f64 {
     let (fi, fj) = (i as f64, j as f64);
-    if j >= SHELF {
-        return SEA - 1.5 - (fj - SHELF as f64) * 0.1;
+    if j >= shelf {
+        return SEA - 1.5 - (fj - shelf as f64) * 0.1;
     }
     if j >= COAST {
         return SEA - 0.5;
@@ -79,12 +85,16 @@ fn grid() -> GridDesc {
     GridDesc::for_planet("L3", C, 2).unwrap()
 }
 
-fn elevation() -> Vec<i16> {
+fn elevation_to(shelf: usize) -> Vec<i16> {
     let g = grid();
     let (w, h) = (g.w as usize, g.h as usize);
     (0..w * h)
-        .map(|c| (height(c % w, c / w) * 16.0).round() as i16)
+        .map(|c| (height(c % w, c / w, shelf) * 16.0).round() as i16)
         .collect()
+}
+
+fn elevation() -> Vec<i16> {
+    elevation_to(SHELF)
 }
 
 const SEA_RAW: i32 = (SEA * 16.0) as i32;
@@ -122,8 +132,14 @@ fn input<'a>(g: &'a GridDesc, elev: &'a [i16], params: &'a HydroParams) -> delta
 
 /// The two passes as the bake's water part runs them.
 fn deltas(params: &HydroParams) -> (Vec<i16>, Plains, Output, Vec<delta::Split>) {
+    deltas_on(params, elevation())
+}
+
+fn deltas_on(
+    params: &HydroParams,
+    mut elev: Vec<i16>,
+) -> (Vec<i16>, Plains, Output, Vec<delta::Split>) {
     let g = grid();
-    let mut elev = elevation();
     let first = net(&elev, params);
     assert!(!first.mouths.is_empty(), "no sea mouths");
     let plains = delta::grow(&input(&g, &elev, params), &first);
@@ -170,7 +186,10 @@ fn a_large_river_builds_a_plain_above_the_sea_and_splits_across_it() {
         .iter()
         .max_by(|a, b| a.q.total_cmp(&b.q))
         .expect("a sea mouth");
-    assert!(plains.owner.contains_key(&main.root), "the river leaves its plain");
+    assert!(
+        plains.owner.contains_key(&main.root),
+        "the river leaves its plain"
+    );
     let on: Vec<i16> = main
         .stem
         .iter()
@@ -200,6 +219,60 @@ fn a_large_river_builds_a_plain_above_the_sea_and_splits_across_it() {
         let last = r.vertices[(ch.first + ch.count - 1) as usize];
         assert!(last.w <= SEA as f32 + 1e-3);
         assert!(last.q > 0.0);
+    }
+}
+
+#[test]
+fn a_plain_short_of_the_open_sea_splits_across_the_beach_band() {
+    // A beach band 40 rows (24 km) wide: the plain stops inside it, the second network's river
+    // leaves the plain over the band, and the distributaries cross the band to the open sea.
+    let params = HydroParams {
+        delta_area_mult: 16.0,
+        delta_mouth_spacing: 1.0,
+        ..HydroParams::default()
+    };
+    let base = elevation_to(WIDE_SHELF);
+    let (elev, plains, second, splits) = deltas_on(&params, base.clone());
+    let g = grid();
+    let w = g.w as usize;
+    let biggest = plains
+        .plains
+        .iter()
+        .max_by(|a, b| a.q_m3s.total_cmp(&b.q_m3s))
+        .expect("a delta");
+    let deepest = biggest.cells.iter().map(|&c| c as usize / w).max().unwrap();
+    assert!(
+        deepest < WIDE_SHELF,
+        "the plain reached the shelf (row {deepest})"
+    );
+    let main = second
+        .mouths
+        .iter()
+        .max_by(|a, b| a.q.total_cmp(&b.q))
+        .expect("a sea mouth");
+    assert!(
+        !plains.owner.contains_key(&main.root),
+        "the river's last land cell is on the plain: the band is not crossed"
+    );
+    let r = &second.rivers;
+    r.validate().expect("the river file holds");
+    let added: u32 = splits.iter().map(|s| s.added).sum();
+    assert!(added >= 1, "no distributaries: {splits:?}");
+    for ch in r.chains.iter().filter(|c| c.from != NO_CHAIN) {
+        // Each ends past the band, on the shelf's first rows.
+        let last = r.vertices[(ch.first + ch.count - 1) as usize];
+        let row = ((f64::from(last.z) - g.origin_block_z as f64) / f64::from(g.r)).floor();
+        assert!(
+            row >= WIDE_SHELF as f64 - 2.0,
+            "a distributary ends at row {row}"
+        );
+        assert_eq!(ch.mouth, Mouth::Sea);
+    }
+    // The band's cells the plain did not take are as they were.
+    for (c, (&e, &b)) in elev.iter().zip(&base).enumerate() {
+        if !plains.owner.contains_key(&(c as u32)) {
+            assert_eq!(e, b, "cell {c}");
+        }
     }
 }
 

@@ -551,8 +551,7 @@ impl DeltaTest {
             r.vertices
                 .push(vertex(x, 0.0, Self::river_w(x), hw, depth, q));
         }
-        r.chains
-            .push(Chain::new(0, n + 1, Mouth::Sea, u32::MAX));
+        r.chains.push(Chain::new(0, n + 1, Mouth::Sea, u32::MAX));
         for side in [1.0, -1.0] {
             let first = r.vertices.len() as u32;
             // The apex vertex itself, as the parent holds it.
@@ -576,8 +575,8 @@ impl DeltaTest {
                     Self::BRANCH_Q,
                 ));
             }
-            let east = ((Self::RIVER_TO_X - Self::APEX_X - Self::BRANCH_Z) / Self::SPACING).round()
-                as u32;
+            let east =
+                ((Self::RIVER_TO_X - Self::APEX_X - Self::BRANCH_Z) / Self::SPACING).round() as u32;
             for k in 1..=east {
                 r.vertices.push(vertex(
                     Self::APEX_X + Self::BRANCH_Z + f64::from(k) * Self::SPACING,

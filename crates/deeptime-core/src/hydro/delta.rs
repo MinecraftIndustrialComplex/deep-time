@@ -64,6 +64,11 @@ pub const SLOPE_REACH_M: f64 = 30_000.0; // ledger: HYD-137
 /// takes. ledger: HYD-144
 pub const PATH_SHARED_COST: f64 = 4.0; // ledger: HYD-144
 
+/// How many cells a distributary's way from its front cell across the beach band to the open sea
+/// may search before the branch is dropped (HYD-144): 4,096 cells of 600 m, a reach far past any
+/// beach band of the planets measured.
+pub const TAIL_SEARCH_CELLS: usize = 4096; // ledger: HYD-144
+
 /// What the plains need besides the first network.
 pub struct Input<'a> {
     /// The hydrology grid and its ground before any plain, 1/16 block.
@@ -459,8 +464,7 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
                     if let Some(&o) = owner.get(&(nb as u32)) {
                         beside = Some(beside.map_or(o, |b: u32| b.min(o)));
                     }
-                    if !done[nb] && before[nb] && !after[nb] && !owner.contains_key(&(nb as u32))
-                    {
+                    if !done[nb] && before[nb] && !after[nb] && !owner.contains_key(&(nb as u32)) {
                         done[nb] = true;
                         stack.push(nb);
                     }
@@ -524,6 +528,9 @@ struct Branch {
     cells: Vec<u32>,
     /// The parent branch and the index in the parent's cells it leaves at (none: the main stem).
     parent: Option<(usize, usize)>,
+    /// How many of its first cells lie on the plain (the rest cross the beach band to the sea):
+    /// splits happen there only.
+    on_plain: usize,
     /// The front segment its mouth lies in.
     seg: usize,
     /// From which of its cells on it carries which share of the apex discharge, in order.
@@ -551,7 +558,8 @@ pub struct Split {
     pub chain: u32,
     pub apex_blocks: f64,
     pub backwater_m: f64,
-    /// The plain's front (cells beside the open sea) and the mouths it holds.
+    /// The plain's front (cells beside the sea's water, the beach band or the open sea) and the
+    /// mouths it holds.
     pub front_cells: u32,
     pub mouths: u32,
     /// Chains added.
@@ -578,11 +586,15 @@ pub fn distributaries(
         |c| i32::from(elev[c]) <= inp.sea_raw - 16,
         min_sea,
     );
+    // The ground the open sea reaches at its own level: the open sea and the beach band joined
+    // to it (a plain stands above the sea, so none of its cells). A plain's front faces it.
+    let reach = super::sea_reached(geo.w, geo.h, &open, |c| i32::from(elev[c]) <= inp.sea_raw);
     // The second network's main stem across each plain: the sea mouth with the most discharge
-    // whose last land cell is on the plain.
+    // whose stem crosses the plain (the last plain it crosses; it may leave the plain over the
+    // beach band beyond it before it meets the open sea).
     let mut stem_of: HashMap<u32, usize> = HashMap::new();
     for (k, m) in second.mouths.iter().enumerate() {
-        if let Some(&o) = plains.owner.get(&m.root) {
+        if let Some(&o) = m.stem.iter().rev().find_map(|c| plains.owner.get(c)) {
             let e = stem_of.entry(o).or_insert(k);
             let best = &second.mouths[*e];
             if m.q > best.q || (m.q == best.q && m.chain < best.chain) {
@@ -598,18 +610,20 @@ pub fn distributaries(
         let mouth = second.mouths[stem_of[&o]].clone();
         let on = |c: u32| plains.owner.get(&c) == Some(&o);
         let m = mouth.stem.len();
-        if m < 3 {
+        let Some(exit) = mouth.stem.iter().rposition(|&c| on(c)) else {
+            continue;
+        };
+        if m < 3 || exit + 1 >= m {
             continue;
         }
-        let root = m - 2;
-        // The apex: the backwater length up from the root, never above where the stem enters
-        // the plain (HYD-137).
+        // The apex: the backwater length up from where the stem leaves the plain, never above
+        // where it enters the plain (HYD-137).
         let backwater_m = if plain.slope > 0.0 {
             plain.d_m / plain.slope
         } else {
             f64::INFINITY
         };
-        let mut apex = root;
+        let mut apex = exit;
         let mut run_m = 0.0;
         while apex > 0 && on(mouth.stem[apex - 1]) {
             let (dx, dz) = geo.delta(geo.pos(mouth.stem[apex - 1]), geo.pos(mouth.stem[apex]));
@@ -630,7 +644,7 @@ pub fn distributaries(
         let mut front: Vec<(f64, u32)> = plain
             .cells
             .iter()
-            .filter(|&&c| (0..8).any(|k| geo.nb(c as usize, k).is_some_and(|nb| open[nb])))
+            .filter(|&&c| (0..8).any(|k| geo.nb(c as usize, k).is_some_and(|nb| reach[nb])))
             .map(|&c| (bearing(c), c))
             .collect();
         front.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.cmp(&b.1)));
@@ -640,7 +654,8 @@ pub fn distributaries(
         // As many mouths as fit the front `delta_mouth_spacing` channel widths apart (HYD-138).
         let mut mouths_n = 1usize;
         for k in 2..=p.delta_max_mouths as usize {
-            let need = k as f64 * p.delta_mouth_spacing * p.width(q_apex / k as f64, inp.width_scale);
+            let need =
+                k as f64 * p.delta_mouth_spacing * p.width(q_apex / k as f64, inp.width_scale);
             if need <= front_blocks {
                 mouths_n = k;
             }
@@ -671,7 +686,8 @@ pub fn distributaries(
         let mut branches = vec![Branch {
             cells: mouth.stem[apex..].to_vec(),
             parent: None,
-            seg: seg_of(mouth.stem[root]),
+            on_plain: exit - apex + 1,
+            seg: seg_of(mouth.stem[exit]),
             share: Vec::new(),
         }];
         let mut used: HashSet<u32> = branches[0].cells.iter().copied().collect();
@@ -679,7 +695,7 @@ pub fn distributaries(
         // point takes the other half's middle (HYD-139, HYD-140).
         let mut work: Vec<(usize, usize, usize, usize)> = vec![(0, 0, mouths_n, 0)];
         while let Some((b, lo, hi, at)) = work.pop() {
-            if hi - lo < 2 || at + 1 >= branches[b].cells.len() {
+            if hi - lo < 2 || at + 1 >= branches[b].on_plain {
                 continue;
             }
             let mid = (lo + hi) / 2;
@@ -692,19 +708,16 @@ pub fn distributaries(
             let t_seg = (give.0 + give.1 - 1) / 2;
             let start = branches[b].cells[at];
             let goal = target(t_seg);
-            let Some(mut path) = shortest(&geo, start, goal, |c| on(c) || c == start, &used)
-            else {
+            let Some(mut path) = shortest(&geo, start, goal, |c| on(c) || c == start, &used) else {
                 continue;
             };
-            // One cell into the open sea, as every sea mouth ends.
-            let Some(sea) = (0..8)
-                .filter_map(|k| geo.nb(goal as usize, k))
-                .filter(|&nb| open[nb])
-                .min()
-            else {
+            // From the front cell across the beach band (if any) to the first cell of the open
+            // sea, as every sea mouth ends (HYD-144).
+            let Some(tail) = to_open(&geo, goal, &reach, &open, &used) else {
                 continue;
             };
-            path.push(sea as u32);
+            let plain_len = path.len();
+            path.extend(tail);
             if path.len() < 3 {
                 continue;
             }
@@ -720,13 +733,14 @@ pub fn distributaries(
             branches.push(Branch {
                 cells: path,
                 parent: Some((b, at)),
+                on_plain: plain_len,
                 seg: t_seg,
                 share: vec![(0, base * (give.1 - give.0) as f64 / span)],
             });
             let nb = branches.len() - 1;
-            let b_len = branches[b].cells.len();
+            let b_len = branches[b].on_plain;
             work.push((b, keep.0, keep.1, at + (b_len - at) / 2));
-            work.push((nb, give.0, give.1, len / 2));
+            work.push((nb, give.0, give.1, plain_len / 2));
         }
         // The main stem's own vertices below its splits carry their share.
         let main = &branches[0];
@@ -839,6 +853,51 @@ fn shortest(
     }
     path.reverse();
     Some(path)
+}
+
+/// The way from a plain's front cell `from` to the open sea: a breadth-first search, 8-connected,
+/// over the sea-reached ground (`reach`: the beach band and the open sea) that no channel of the
+/// plain takes yet, ending on the first `open` cell; at most [`TAIL_SEARCH_CELLS`] cells (HYD-144).
+/// Excludes `from`, includes the open cell.
+fn to_open(
+    geo: &Geo,
+    from: u32,
+    reach: &[bool],
+    open: &[bool],
+    used: &HashSet<u32>,
+) -> Option<Vec<u32>> {
+    let mut prev: HashMap<u32, u32> = HashMap::new();
+    let mut queue = std::collections::VecDeque::from([from]);
+    prev.insert(from, from);
+    let mut end = None;
+    'search: while let Some(c) = queue.pop_front() {
+        for k in 0..8 {
+            let Some(nb) = geo.nb(c as usize, k) else {
+                continue;
+            };
+            let nbu = nb as u32;
+            if !reach[nb] || used.contains(&nbu) || prev.contains_key(&nbu) {
+                continue;
+            }
+            prev.insert(nbu, c);
+            if open[nb] {
+                end = Some(nbu);
+                break 'search;
+            }
+            if prev.len() >= TAIL_SEARCH_CELLS {
+                break 'search;
+            }
+            queue.push_back(nbu);
+        }
+    }
+    let mut c = end?;
+    let mut tail = vec![c];
+    while prev[&c] != from {
+        c = prev[&c];
+        tail.push(c);
+    }
+    tail.reverse();
+    Some(tail)
 }
 
 /// `notes.bake.water.stats.deltas`: counts, areas, the largest plains, and Earth's figures beside
