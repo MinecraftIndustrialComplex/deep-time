@@ -59,6 +59,7 @@
 //!
 //! What the game does with it is `deeptime_format::water` (and FORMAT.md, "Water columns").
 
+pub mod delta;
 pub mod network;
 
 #[cfg(test)]
@@ -563,6 +564,21 @@ pub struct HydroParams {
     /// open into a lake or river bed; only the water itself is never replaced (no air pockets in
     /// it, no holes in a lake's surface). Read by the game from `notes.bake.water.params`.
     pub protect_water_from_carvers: bool,
+    /// Delta plains at the mouths of rivers that reach the open sea, and distributaries across
+    /// them ([`delta`]; V1 gap 5, stage 1).
+    pub deltas: bool,
+    /// How many times Earth's delta area for a river's load its plain is drawn (HYD-141,
+    /// game-choice: agent, 2026-10-23). The rivers are drawn about 40 times their physical
+    /// width (HYD-001), so a plain of Earth's area is barely wider than its own channel and holds
+    /// no second one.
+    pub delta_area_mult: f64,
+    /// How strongly a plain grows forward of its mouth rather than along the coast: a cell's
+    /// distance is weighted 1 + k (1 − cos θ), θ from the outflow direction (HYD-135).
+    pub delta_shape_k: f64,
+    /// The most mouths a delta's distributaries end in (HYD-138).
+    pub delta_max_mouths: u32,
+    /// How many channel widths apart a delta's mouths lie along its front (HYD-138).
+    pub delta_mouth_spacing: f64,
 }
 
 impl Default for HydroParams {
@@ -591,6 +607,11 @@ impl Default for HydroParams {
             bank_zone_blocks: 1.0,
             bank_zone_ratio: 0.5,
             protect_water_from_carvers: true,
+            deltas: true,
+            delta_area_mult: 8.0, // ledger: HYD-141 (game-choice)
+            delta_shape_k: 1.0,   // ledger: HYD-135 (game-choice)
+            delta_max_mouths: 8,  // ledger: HYD-138 (game-choice)
+            delta_mouth_spacing: 3.0, // ledger: HYD-138
         }
     }
 }
@@ -661,7 +682,16 @@ impl HydroParams {
             "biome_min_width_blocks",
         )?;
         within(self.bank_zone_blocks, 0.0, 32.0, "bank_zone_blocks")?;
-        within(self.bank_zone_ratio, 0.0, 4.0, "bank_zone_ratio")
+        within(self.bank_zone_ratio, 0.0, 4.0, "bank_zone_ratio")?;
+        within(self.delta_area_mult, 0.0, 1000.0, "delta_area_mult")?;
+        within(self.delta_shape_k, 0.0, 10.0, "delta_shape_k")?;
+        within(
+            f64::from(self.delta_max_mouths),
+            1.0,
+            64.0,
+            "delta_max_mouths",
+        )?;
+        within(self.delta_mouth_spacing, 0.5, 20.0, "delta_mouth_spacing")
     }
 
     /// The water budget of a cell under climate `c`.
