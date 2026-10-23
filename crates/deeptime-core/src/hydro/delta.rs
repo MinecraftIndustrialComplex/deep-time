@@ -50,9 +50,10 @@ pub const DEPTH_MAX_M: f64 = 69.0; // ledger: HYD-133
 /// (sea level, sea level + 1]), graded so the plain drains outward. ledger: HYD-136
 pub const PLAIN_TOP_STEPS: i32 = 15; // ledger: HYD-136
 pub const PLAIN_FRONT_STEPS: i32 = 1; // ledger: HYD-136
-/// The highest a cell beside the river's course stands, 1/16 block over the sea's surface: one
-/// step above the course's top, still under the plain's one block. ledger: HYD-136
-pub const PLAIN_BANK_STEPS: i32 = 16; // ledger: HYD-136
+/// The lowest the river's course across the plain lies, 1/16 block under the sea's surface: a
+/// sixteenth above the open sea's depth (the course is dry ground of the beach band's height, the
+/// column one block under the plain, and never open sea). ledger: HYD-136
+pub const COURSE_FLOOR_STEPS: i32 = -15; // ledger: HYD-136
 /// The most of a plain's volume its river's course across the shallows (with the banks beside
 /// it) may take before the lobe grows at its end: half. ledger: HYD-134
 pub const PLAIN_COURSE_SHARE: f64 = 0.5; // ledger: HYD-134
@@ -445,20 +446,12 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
         if cells.len() < MIN_PLAIN_CELLS {
             continue;
         }
-        // The plain's top: one block over the sea's top water block, or a sixteenth under the
-        // lowest land beside the river's course (the land cell it comes off among them) where that
-        // is lower, so the river steps down onto the plain and off no bank of land (HYD-136).
-        let mut land_min = inp.sea_raw + PLAIN_TOP_STEPS + 1;
-        for &c in land.iter().chain(&course) {
-            let around = (0..8).filter_map(|k| geo.nb(c as usize, k));
-            for nb in around.chain(std::iter::once(c as usize)) {
-                let e = i32::from(inp.elev[nb]);
-                if e > inp.sea_raw {
-                    land_min = land_min.min(e);
-                }
-            }
-        }
-        let top = (land_min - 1 - inp.sea_raw).clamp(PLAIN_FRONT_STEPS, PLAIN_TOP_STEPS);
+        // The plain's top: one block over the sea's top water block, or the land it comes off
+        // where that is lower (HYD-136).
+        let land_raw = land.map_or(inp.sea_raw + PLAIN_TOP_STEPS, |l| {
+            i32::from(inp.elev[l as usize])
+        });
+        let top = (land_raw - inp.sea_raw).clamp(PLAIN_FRONT_STEPS, PLAIN_TOP_STEPS);
         let id = plains.len() as u32;
         for &c in &cells {
             owner.insert(c, id);
@@ -564,9 +557,9 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
     }
 
     // Heights: a ramp along the outflow from the plain's entry, its top there and one sixteenth
-    // over the sea at its farthest cell, level across the outflow; the river's course never
-    // rises downstream and the cells beside it stand a sixteenth or more above it, so the second
-    // network keeps the river on its course across the plain to the front (HYD-136).
+    // over the sea at its farthest cell, level across the outflow. The river's course stays at
+    // the beach band's height under the plain, never rising downstream, so the second network
+    // keeps the river on it across the plain to the front (HYD-136).
     for (o, pl) in plains.iter_mut().enumerate() {
         let pe = geo.pos(pl.entry);
         let along: Vec<f64> = pl
@@ -629,33 +622,27 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
                 pl.course.extend(&path[1..]);
             }
         }
-        let mut on_course = vec![false; pl.cells.len()];
-        let mut prev = i32::MAX;
-        for &c in &pl.course {
-            let i = index[&c];
-            steps[i] = steps[i].min(prev);
-            prev = steps[i];
-            on_course[i] = true;
-        }
-        // The banks: above every course cell they touch, and above the entry beside the land
-        // cell the river comes off.
-        let lift = |c: usize, over: i32, steps: &mut [i32]| {
-            for k in 0..8 {
-                if let Some(nb) = geo.nb(c, k)
-                    && let Some(&j) = index.get(&(nb as u32))
-                    && !on_course[j]
-                {
-                    steps[j] = steps[j].max(over + 1).min(PLAIN_BANK_STEPS);
-                }
-            }
-        };
-        for &c in &pl.course {
-            let over = steps[index[&c]];
-            lift(c as usize, over, &mut steps);
-        }
-        if let Some(l) = pl.land {
-            let over = steps[index[&pl.entry]];
-            lift(l as usize, over, &mut steps);
+        // The course: each cell at the highest ground the course has from it on (so it never
+        // rises downstream and nothing is lowered), at most the sea's surface, and at least the
+        // floor: a sixteenth over the open sea's depth, or the lowest sea-reached ground beside
+        // its last cell where that is higher (so the river spills from it onto the beach band
+        // rather than into a pit).
+        let old = |c: u32| i32::from(inp.elev[c as usize]) - inp.sea_raw;
+        let floor = pl
+            .course
+            .last()
+            .and_then(|&end| {
+                (0..8)
+                    .filter_map(|k| geo.nb(end as usize, k))
+                    .filter(|&nb| !reach_after.is_empty() && reach_after[nb])
+                    .map(|nb| old(nb as u32))
+                    .min()
+            })
+            .map_or(COURSE_FLOOR_STEPS, |m| m.max(COURSE_FLOOR_STEPS));
+        let mut high = i32::MIN;
+        for &c in pl.course.iter().rev() {
+            high = high.max(old(c));
+            steps[index[&c]] = high.clamp(floor.min(0), 0); // ledger: HYD-136
         }
         pl.height = steps.iter().map(|&s| (inp.sea_raw + s) as i16).collect();
     }
@@ -733,8 +720,11 @@ pub fn distributaries(
         min_sea,
     );
     // The ground the open sea reaches at its own level: the open sea and the beach band joined
-    // to it (a plain stands above the sea, so none of its cells). A plain's front faces it.
-    let reach = super::sea_reached(geo.w, geo.h, &open, |c| i32::from(elev[c]) <= inp.sea_raw);
+    // to it, none of a plain's cells (its river's course lies at the band's height). A plain's
+    // front faces it.
+    let reach = super::sea_reached(geo.w, geo.h, &open, |c| {
+        i32::from(elev[c]) <= inp.sea_raw && !plains.owner.contains_key(&(c as u32))
+    });
     // The second network's main stem across each plain: the sea mouth with the most discharge
     // whose stem crosses the plain (the last plain it crosses; it may leave the plain over the
     // beach band beyond it before it meets the open sea).
