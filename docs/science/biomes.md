@@ -1094,7 +1094,12 @@ changed. The 20 blocks: a mangrove's roots reach about 9 blocks from its trunk (
 `MangroveRootPlacer`, `max_root_width` 8; read in the game's sources), and the biome a block takes lies up to about
 6 blocks off under the fuzzy zoom (BIO-165): 15, and a quarter more.
 
-PLAYA_RESULT_PLACEHOLDER
+**Measured** on the gate's planet (that commit's simulation, this branch's bake, with MIC's placement and without it
+alike): the water bake changed 68 of its own nodes beside its 190 playa cells, and the projection 63 world nodes
+(410.7 km2) within 38 blocks of the 29 world nodes that hold a playa. At the failing column the erosion is now 0.449
+(under E5) at the nearest node and in the blend, the flag 0, the class 31 as before. `lakeIceAndSaltFollowTheClimate`
+then passes standalone and with MIC: 24 playa columns read, every one salt (calcite), 2 of them under a neighbour's
+canopy, none wrong.
 
 ## The snow line (2026-10-22, BIO-180, BIO-181)
 
