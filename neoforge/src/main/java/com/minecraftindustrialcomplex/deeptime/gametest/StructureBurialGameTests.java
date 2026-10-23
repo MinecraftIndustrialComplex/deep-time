@@ -336,7 +336,10 @@ public final class StructureBurialGameTests {
      * template's own (the placement put it there).
      */
     private static final class Tally {
-        long read, structure, structureWet, waterBefore, water, worldWater, columns;
+        long read, structure, structureWet, waterBefore, structureBefore, water, worldWater, columns;
+        int placed, beforeLow = Integer.MAX_VALUE, beforeHigh = Integer.MIN_VALUE;
+        String firstBefore;
+        final Map<String, Integer> beforeKinds = new TreeMap<>(), beforeChunks = new TreeMap<>();
         int worldLow = Integer.MAX_VALUE, worldHigh = Integer.MIN_VALUE;
         /** Least over the sampled columns of (the real floor's top solid y) - (the start's top y): the cover that stands over it. */
         int cover = Integer.MAX_VALUE;
@@ -351,7 +354,9 @@ public final class StructureBurialGameTests {
             return "read " + read + " structure " + structure + " waterlogged " + structureWet + (structureWet == 0 ? "" : " (" + w + ")")
                     + "; water before placing " + waterBefore + ", after " + water + " (the template's " + (water - worldWater)
                     + ", the world's left " + worldWater + (worldWater == 0 ? "" : " at y " + worldLow + ".." + worldHigh + ", first " + firstWorldWater)
-                    + "); cover " + (columns == 0 ? "n/a" : cover) + " over " + columns + " columns";
+                    + "); cover " + (columns == 0 ? "n/a" : cover) + " over " + columns + " columns"
+                    + "; DIAG structure blocks before placing " + structureBefore + (waterBefore == 0 ? "" : ", water before at y " + beforeLow + ".." + beforeHigh
+                    + ", first " + firstBefore + ", by chunk " + beforeChunks) + ", cells before " + beforeKinds;
         }
     }
 
@@ -367,8 +372,19 @@ public final class StructureBurialGameTests {
                 for (int z = Math.max(b.minZ(), writable.minZ()); z <= Math.min(b.maxZ(), writable.maxZ()); z++)
                     for (int y = Math.max(b.minY(), writable.minY()); y <= Math.min(b.maxY(), writable.maxY()); y++) {
                         BlockState s = chunk.getBlockState(pos.set(x, y, z));
-                        if (cells.putIfAbsent(pos.asLong(), s) == null && s.getFluidState().is(FluidTags.WATER))
+                        if (cells.putIfAbsent(pos.asLong(), s) != null)
+                            continue;
+                        t.beforeKinds.merge(BuiltInRegistries.BLOCK.getKey(s.getBlock()).getPath(), 1, Integer::sum);
+                        if (structureBlock(s))
+                            t.structureBefore++;
+                        if (s.getFluidState().is(FluidTags.WATER)) {
                             t.waterBefore++;
+                            t.beforeLow = Math.min(t.beforeLow, y);
+                            t.beforeHigh = Math.max(t.beforeHigh, y);
+                            t.beforeChunks.merge(chunk.getPos().x + "," + chunk.getPos().z + "#" + t.placed, 1, Integer::sum);
+                            if (t.firstBefore == null)
+                                t.firstBefore = pos.toShortString() + " " + s + " in " + pieceName(p) + " after " + t.placed + " chunks placed";
+                        }
                     }
         }
         return cells;
@@ -496,12 +512,17 @@ public final class StructureBurialGameTests {
                     cp.getMaxBlockX(), level.getMaxBuildHeight() - 1, cp.getMaxBlockZ());
             floor(chunk, start, writable, buried);
             floor(chunk, control, writable, vanilla);
+            chunk.getAllReferences().forEach((k, v) -> {
+                if (!v.isEmpty())
+                    buried.beforeKinds.merge("REF " + level.registryAccess().registryOrThrow(Registries.STRUCTURE).getKey(k) + " " + cp.x + "," + cp.z, v.size(), Integer::sum);
+            });
             for (StructureStart st : List.of(start, control)) {
                 Tally into = st == start ? buried : vanilla;
                 Map<Long, BlockState> cells = before(chunk, st, writable, into);
                 st.placeInChunk(level, level.structureManager(), level.getChunkSource().getGenerator(),
                         RandomSource.create(cp.toLong()), writable, cp);
                 blocks(chunk, st, writable, cells, into);
+                into.placed++;
             }
             return true;
         }, () -> {
