@@ -298,7 +298,8 @@ public final class StrataGameTests {
         if (rockTags(helper)) {
             // The MIC rows since 2026-10-01 (decisions log, "Use stone for common rocks").
             e.that(live, "shale", Source.FALLBACK, "minecraft:stone");
-            e.that(live, "hornfels", Source.FALLBACK, loaded(BIC) ? "born_in_chaos_v1:fired_black_argillite" : "minecraft:smooth_basalt");
+            // Ben, 2026-10-22: fired black argillite reads as a polished block, so hornfels is smooth basalt only.
+            e.that(live, "hornfels", Source.FALLBACK, "minecraft:smooth_basalt");
             e.that(live, "peridotite", Source.FALLBACK, loaded(CREATE) ? "create:veridium" : "minecraft:tuff");
             e.that(live, "anhydrite", Source.FALLBACK, loaded(CREATE) ? "create:limestone" : "minecraft:diorite");
             e.that(live, "bauxite", Source.FALLBACK, loaded(CREATE) ? "create:ochrum" : "minecraft:red_sand");
