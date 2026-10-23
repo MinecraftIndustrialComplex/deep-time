@@ -117,6 +117,10 @@ The plate equation, as coded (ISO-040):
 | ISO-093 | Earth's departure from local isostasy | at most about 2 to 4 km of rock (free-air −380 to +300 mGal at 0.112 mGal/m) | km | Watts et al. 2025, ten Brink et al. 2004, Stern, Cattin et al. 2001, Hunter & Watts 2016, Watts & Burov 2003 | `verified` (measurement only) |
 | ISO-096 | The sea over the plate model's own moves | no load: the move as the carry made it (`h_start` less the source's elevation before the step); on ocean floor that builds nothing all of it, on building columns all but the crust's change (ISO-091). Took in ISO-088 (GDH1's cooling) | m | Turcotte & Schubert §3.13; Levitt & Sandwell 1995; Zhang et al. 2014 | `cited-unverified` |
 | ISO-097 | The carry at a trench | the plate model's elevation plus the carried offset, no uplift added | m | none (numerics; Earth's trench depths for the check: Zhang et al. 2014, 2018) | `game-choice` |
+| ISO-120 | The plate's yield | where the load a cell's plate holds from local isostasy, ρ_m (Q + ice − w), passes Δg_max / 2πG, the excess sinks under the cell alone; Δg_max 380 mGal when on | mGal | ten Brink et al. 2004, Watts et al. 2025, Watts & Burov 2003, Hunter & Watts 2016; G from CODATA 2022 | `game-choice` (the form is the agent's) |
+| ISO-125 | The held offsets | cells whose offset the surface holds (gaps between plates, trench rows) hand the plate model's feedback no offset; they count as 0 at their full weight | – | none (numerics) | `game-choice` |
+| ISO-126 | Water by basin | the open sea at the sea level, a lake at its water balance's level, other ground dry, for the water load and `C` | – | none (the balance: HYD-050, HYD-057, HYD-100, HYD-101) | `game-choice` |
+| ISO-127 | The solve on the sphere's metric | the Laplacian's east-west coupling 1 / cos²φ at a row's middle, north-south cos²φ at a row boundary | – | Snyder 1987, eqs. 10-1 to 10-2b | `verified` |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
 ISO-054 and ISO-057 to ISO-060, all `game-choice`.
@@ -558,7 +562,8 @@ pool's 30,945 and 25,955 m to the metre):
 - Every step past 19.8 km in the two runs is such a peak (23 and 6 steps). The deepest floors in
   them were 13.8 and 14.4 km down, 3 to 3.5 km past the Challenger Deep, on trench cells where the
   plate model stood 8.2 and 10.4 km down and the surface's carried offset was still −6.1 and
-  −8.2 km. What builds that offset under a trench now was not traced.
+  −8.2 km. What builds that offset under a trench now was not traced here; it was traced on
+  2026-10-23 to the plate model reading the held offset back every step ("The held offsets").
 - The trench keys' supercontinent 2, before the fix (traced on the trench budget's head, the
   pool's 28,548 m to the metre): the same kind of peak. From −46 to −14 Myr a collision, rift and
   back-arc column on the polar rows (67 to 73°S) stood 14.5 to 29.0 km above the sea in the plate
@@ -754,6 +759,127 @@ median (Mann-Whitney p 0.015) and from 30.0 to 15.5 km at the largest; 9 base ru
 0.24 or more; criteria met per run 3.33 to 3.04, p 0.31), so it does not meet the ship rule (a
 criteria gain at p < 0.05) and stays off by default.
 
+## The held offsets
+
+Added 2026-10-23 (ISO-125), the flexure-faults lane, for the last two faults the yield left: the
+oceanic carry peaks ([plates.md](plates.md), "The polar peaks", "What is left") and the trench
+offset ("The trench rows", "What is left").
+
+**What was seen.** With the yield on, the largest excursions left in the plate model were ridge
+and basin samples raised 10 to 16 km, the carry's part of their gap 9 to 23 km; one stood 14.7 km
+high at 78°S in the last step of the scattered start, seed 1. Under the trenches some cells still
+carried an offset of −6 to −8 km under the plate model's height, their floors down to 14.4 km.
+
+**The trace.** That run (`earthlike_quick_16k`, 1000 Myr, scattered start, seed 1, the yield at
+380 mGal, `+DEEPTIME_CRUST_BUDGET=1`) ran again with the peak trace (`DEEPTIME_PEAK_TRACE=10000`,
+plates/peaks.rs, which now also prints the share of a sample's cells whose offset the surface holds
+and what those cells handed its elevation in the step) and a floor trace of the surface
+(`DEEPTIME_FLOOR_TRACE=11000`, surface/floors.rs: every cell more than 11 km under the sea, the
+plate model's height under it, its offset over that at the step's start and end, and whether the
+surface holds that offset; measurement only, the world is the same).
+
+- 17 peak lines, every one an ocean sample (Airy height −1.8 to −3.7 km) at a ridge, 10.0 to
+  14.7 km high, 9 of them on the polar rows. 0.2 to 0.99 of their cells (0.75 or more in 11 of
+  the 14 with a mask) lay in a gap between plates, and those cells handed the sample's elevation
+  0.7 to 2.8 km in the step, which is what the sample rose by: at −2 Myr, 77.9°S, it went from
+  9.5 to 12.3 km in one step, 2.8 km of it from its gap cells.
+- 34 floor lines, every one on a trench row (the trench regime): 11.0 to 15.5 km under the sea,
+  the plate model's height under them −6.8 to −9.4 km, their offset at the step's start −1.2 to
+  −7.9 km. The deepest (−46 Myr, 62°N): 15.5 km down, the plate model at −9.4 km and the offset
+  −5.3 km. The guard's worst of the run was this cell.
+
+**The cause.** Two rules each kept the same offset. The surface holds its offset over the plate
+model's height on two kinds of cell: in a gap between plates the carry takes the plate model's
+height there plus the offset carried from the cell's source (the gap budget's carry), and on a
+trench row it does the same (ISO-097, "The trench rows"). The plate model's feedback (ISO-078)
+read that offset back every step as well, as the mean of `surface h − plate elevation` over each
+sample's cells, and added it to the sample's elevation. The next step the surface again stood the
+same offset over the sample's new height, and the feedback added it again: an integrator. Beside a
+gap the offset is positive (the floor the gap carries stands over the plate model's young ridge)
+and the ridge samples rose by it step after step; under a trench it is negative (the trench row's
+sediment and flexure) and the trench samples sank by it, and the cells over them stood that much
+deeper again.
+
+**The fix** (ISO-125, `surface.held_offsets`). The surface marks the cells whose offset it holds
+(`surface/offset_held`: a gap between plates or a trench row) and hands the plate model no offset
+there; the plate model counts such a cell as an offset of 0 at its full weight (a sample half on
+held cells takes half the offset of the rest). The carry onto a trench row then keeps only the
+offset the surface held, and the climate stage's carry reads it the same way. The first form
+renormalised the mean over the cells not held: in the traced run a collision column whose cells
+were 92 % held took 13 times its few other cells' offset and rose 7.6 km in a step (2.7 to
+10.3 km), so the held cells now keep their weight.
+
+Unit tests `the_surface_hands_the_plate_model_nothing_of_a_held_offset` (surface/tests.rs),
+`the_held_cells_are_the_gaps_and_the_trench_rows` and `a_trench_carries_its_offset` (advect.rs; a
+trench row whose source was half held takes half the offset, one whose offset the plate model took
+the plate's floor alone).
+
+**Traced with the fix** (the first form, renormalised): one peak line (the collision column above)
+and no floor past 11 km; the guard's worst 10.3 km against 15.5 km, the highest ground 7.0 km
+against 8.2 km, land 0.301 against 0.322, collisions 15 against 18.
+
+## Water by basin
+
+Added 2026-10-23 (ISO-126), `surface.flexure.water_by_basin`.
+
+**The fault.** The flexure loads the change of the water over each cell, and it took a cell to be
+under water when its ground stood at or under the sea level, `h ≤ sea`. A closed basin below the
+sea level with no outlet to the ocean (the Dead Sea's, the Caspian's, the Qattara Depression's) was
+loaded as if the sea filled it, and a lake above the sea level carried no water.
+
+**The law.** The water over a cell stands at the level of the body it is in:
+
+- the open sea (the surface's open-sea mask, `pflood::open_sea`, taken again on the ground the
+  flexure starts from: every body at or under the sea level of at least 1/500 of the cells,
+  joined to the ocean or not, the surface's own rule for what is sea) at the sea level;
+- a lake (a closed basin the routing's flood fills, `filled − h` over 1 cm) at the level its water
+  balance holds: the basin's inflow (the runoff routed into it and what the lakes above it spill)
+  against the evaporation less the rain over its surface (`HydroParams::budget`, HYD-050, HYD-057,
+  HYD-100, HYD-101; the bake's lakes take the same balance). If the inflow
+  meets the loss over the whole flooded area, the lake fills to its spill level; otherwise it fills
+  from its lowest cell up while the loss over the cells it covers is less than the inflow, and the
+  level is the height of the first cell it cannot cover. A lake whose level is at or under the sea
+  level stands at the sea level (it is the sea's);
+- everything else is dry: no water, however low.
+
+The flexure's water load and its choice of ρ_m or ρ_m − ρ_w per cell take that level instead of
+the sea level. Unit tests (surface/lakes.rs): `the_sea_is_the_sea_and_land_is_dry`,
+`a_wet_climate_fills_a_closed_bowl_to_its_rim`, `a_dry_climate_leaves_a_closed_bowl_dry`,
+`a_terminal_lake_stands_where_its_losses_take_its_inflow`, `a_lake_at_the_sea_level_is_the_sea`,
+`ground_the_sea_reaches_after_the_flood_is_under_the_sea`. The stage summary counts the cells under
+the sea level that are dry and the cells over it that are wet
+(`surface/flexure_dry_below_sea_cells`, `surface/flexure_wet_above_sea_cells`), and the lakes.
+
+## The solve on the sphere's metric
+
+Added 2026-10-23 (ISO-127), `surface.flexure.row_metric`.
+
+**The fault.** The L1 raster is Lambert's cylindrical equal-area projection: x = R λ, y = R sin φ
+(Snyder 1987, eqs. 10-1, 10-2 with the equator as the standard parallel), so the scale along a
+parallel is 1 / cos φ and along a meridian cos φ (eqs. 10-2a, 10-2b), and a cell at latitude φ is
+cos φ as wide and 1 / cos φ as tall on the sphere as a cell at the equator, its area the same. The
+solve treated every cell as a square of the equator's width (the block metric). The Laplacian in
+the raster's coordinates is ∂x(cos⁻²φ ∂x) + ∂y(cos²φ ∂y) (the area element is uniform, so the
+metric's factors stand inside the derivatives), and the plate equation's operator is its square:
+the block metric is about 1 / cos⁴ φ too stiff north to south and cos⁴ φ too soft east to west.
+
+**The law.** In finite volumes on the raster, each row's east-west coupling is a_j = 1 / cos²φ at
+its middle and each boundary between rows has the north-south coupling b = cos²φ there (0 at the
+raster's first and last edge, closed as before; a row wholly past a pole takes cos²φ as half a
+row's height in sin φ, so the operator stays finite: a numerical choice). The operator stays
+symmetric, and at the equator it is the block metric's. The preconditioner, which solved the block
+metric's operator exactly by a Fourier transform along both axes, keeps the transform along x and
+solves each wavenumber's column exactly as a symmetric pentadiagonal system (an L D Lᵀ
+factorisation), so it is still the exact inverse of the uniform-rigidity operator; its diagonal
+scaling takes the metric's diagonal.
+
+Unit tests `the_row_metric_is_the_block_metric_at_the_equator`,
+`the_solve_on_the_sphere_inverts_its_operator` and
+`a_load_along_a_row_bends_the_plate_as_on_the_sphere` (flexure.rs). The last puts a strip load
+along a row at latitudes 0 to 75° and compares the sinking across it with the analytic profile of
+a beam on an elastic foundation under a uniform load over a finite width (Hetényi 1946, §5,
+eqs. 7a and 8a), with the strip's width and the flexural length in the sphere's kilometres.
+
 ## Game choices
 
 - **Flexural lengths are Earth-normalized** (ISO-057): the plate's kilometres are the plate
@@ -830,5 +956,7 @@ By their keys in [bibliography.md](bibliography.md), section "Lithospheric flexu
   text this time. Read 2026-10-22 by a Sonnet sub-agent of the flexure-guard agent, the
   quotations in the bibliography (ISO-093). The yield (ISO-120) reads the same entries.
 - `CODATA2022_G`: NIST's value page for G, read 2026-10-23 by the polar-peaks agent (ISO-120).
+- `Snyder1987` (chapter 10, chapter 4), `Hetenyi1946` (chapter 1): full text, read 2026-10-23 by a
+  Sonnet sub-agent of the flexure-faults agent, the equations checked on page images (ISO-127).
 
 The sources from `TurcotteSchubert_Geodynamics` to `DeCellesGiles1996_flexure` were read by a sub-agent on 2026-10-02, not by the agent that wrote the code.
