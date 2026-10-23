@@ -571,6 +571,18 @@ pub struct TectonicParams {
     /// the datum does not lift the column with it. 0 = no bound but `collapse_thickness_km` (the
     /// default; ledger PLT-413).
     pub collapse_sea_column_max_km: f64,
+    /// The collapse as a thin viscous sheet (`plates/collapse.rs`, "As a thin viscous sheet"):
+    /// with this depth-averaged viscosity of a young orogen's lithosphere, Pa s, a quiet column
+    /// raised by an orogeny thins at the strain rate its potential energy over the collapse's
+    /// normal column drives, ΔU / (4 η L) (L the lithosphere's 100 km), down to that column,
+    /// where it outpaces the threshold law (Tibet and the Basin and Range: about 10²² Pa s,
+    /// England & Molnar 1997, Flesch et al. 2000). 0 = off (the default and every built-in
+    /// preset; ledger PLT-414).
+    pub collapse_sheet_viscosity_pa_s: f64,
+    /// … with the viscosity growing e-fold per this many Myr since the column's last orogeny,
+    /// as its lithosphere cools (McKenzie 1978's thermal time, 62.8 Myr); crust no orogeny raised
+    /// does not flow. 0 = no growth (ledger PLT-415).
+    pub collapse_sheet_strength_myr: f64,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
     /// 0 = no limit.
@@ -816,6 +828,8 @@ impl Default for TectonicParams {
             collapse_continent_first: false, // ledger: PLT-391
             collapse_sea_column: false,      // ledger: PLT-412
             collapse_sea_column_max_km: 0.0, // ledger: PLT-413
+            collapse_sheet_viscosity_pa_s: 0.0, // ledger: PLT-414
+            collapse_sheet_strength_myr: 62.8, // ledger: PLT-415
             crust_max_km: 70.0,              // ledger: PLT-258
             crust_channel_km2_myr: 1500.0,   // ledger: PLT-300
             isostasy_relax_myr: 0.004,       // ledger: ISO-078
@@ -1156,6 +1170,14 @@ impl PlanetPreset {
             (
                 k.collapse_sea_column_max_km,
                 "$.tectonics.collapse_sea_column_max_km",
+            ),
+            (
+                k.collapse_sheet_viscosity_pa_s,
+                "$.tectonics.collapse_sheet_viscosity_pa_s",
+            ),
+            (
+                k.collapse_sheet_strength_myr,
+                "$.tectonics.collapse_sheet_strength_myr",
             ),
             (k.crust_max_km, "$.tectonics.crust_max_km"),
             (k.crust_channel_km2_myr, "$.tectonics.crust_channel_km2_myr"),

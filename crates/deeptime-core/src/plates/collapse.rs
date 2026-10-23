@@ -83,6 +83,34 @@
 //! continental (also for the thickest crust's spreading). Heights still follow Airy in the
 //! datum frame: only the column the collapse aims at moves with the sea.
 //!
+//! # As a thin viscous sheet (off by default)
+//! The rule above is local: a column thins at one rate down to T_c, and its crust goes to room
+//! within 200 km. On Earth a thickened region also spreads as a whole: the lithosphere is a thin
+//! viscous sheet whose depth-integrated deviatoric stress balances the gradient of the
+//! potential energy of its columns (England & McKenzie 1982; Houseman & England 1986), so a
+//! plateau extends at a rate its potential energy over the lowland around it sets, interior and
+//! edges alike (Tibet's east-west extension, England & Houseman 1989; the Basin and Range,
+//! Sonder & Jones 1999). With `collapse_sheet_viscosity_pa_s` η_0 > 0 a quiet column an orogeny
+//! raised thins in pure shear (plane strain) at
+//!
+//!   ε̇ = ΔU / (4 η L),   q = T (1 − e^(−ε̇ δt)),  at most T − T_col,
+//!
+//! where ΔU is the potential energy of the column at its Airy height over the step's sea less
+//! that of the collapse's normal column T_col (`forces::column_energy`, FRC-014), L the
+//! lithosphere's 100 km (FRC-010) and η = η_0 e^(a / τ_s), a the time since the column's last
+//! orogeny and τ_s `collapse_sheet_strength_myr`: the lithosphere stiffens as it cools after the
+//! orogeny (τ_s = 62.8 Myr is McKenzie 1978's thermal time; the exponential form is the model's).
+//! η_0 = 10²² Pa s is the depth-averaged viscosity found for Tibet (England & Molnar 1997) and the
+//! Basin and Range (Flesch et al. 2000). A column releases the larger of this and the threshold
+//! law's q. Crust no orogeny raised (cratons, platforms) does not flow; nor, in effect, does an
+//! orogen a few hundred Myr old (η 100 times η_0 at 290 Myr). A 4.2 km column under a sea at the
+//! datum thins 3.9 % per Myr when its orogeny ends, a 2 km one 1.3 %: e-folds of 26 and 75 Myr. The
+//! crust released goes where the rule sends it, to the nearest room on the plate within
+//! `collapse_reach_km` (a measured arm sets the reach to the plate's size, so the continent's edge
+//! moves out over its ocean floor). The quiet time still holds: an orogeny's push holds a belt up
+//! (the force balance counts the belt's potential energy against the convergence, FRC-013).
+//! ledger: PLT-414 (the law and η_0), PLT-415 (the strength's growth).
+//!
 //! # The thickest crust
 //! No continental crust on Earth is much thicker than Tibet's or the Altiplano's. Continental
 //! crust that a collision carries down further goes into the mantle with the slab (continental
@@ -107,13 +135,14 @@
 //! orogen spreads is the plate's nearest room, not a flow field.
 // ledger: PLT-254 (the rule), PLT-255 (τ), PLT-256 (the threshold thickness), PLT-257 (the
 // reach), PLT-258 (the thickest crust), PLT-390 (the hot window), PLT-391 (continental room first),
-// PLT-412 (the normal column from the sea).
+// PLT-412 (the normal column from the sea), PLT-414 and PLT-415 (the thin sheet).
 
 use std::collections::BTreeMap;
 
 use rayon::prelude::*;
 
 use super::Env;
+use super::forces::{LITHOSPHERE_KM, YEAR_S, column_energy};
 use super::geometry::{Geo, dijkstra_sparse};
 use super::pools::{
     COLUMN_ISOSTATIC_FACTOR, continental_column, eclogite_m, isostatic_change_m, root_drop_m,
@@ -335,6 +364,13 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env, sea_m: f64) -> Collaps
             t_c
         }
     };
+    // What a column releases: the threshold law's, or the thin sheet's where it is larger
+    // (ledger: PLT-254, PLT-255, PLT-256, PLT-390; PLT-414, PLT-415).
+    let sheet = Sheet::new(k, env, normal, sea_m);
+    let release_of = |s: &Sample| {
+        let q = rate * (f64::from(s.thickness_m) - to(s));
+        sheet.as_ref().map_or(q, |sh| q.max(sh.release(s)))
+    };
 
     // Each plate's sources and what they would release this step, m of thickness.
     let mut by_plate: BTreeMap<u32, Vec<(usize, f64)>> = BTreeMap::new();
@@ -344,7 +380,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env, sea_m: f64) -> Collaps
         .samples
         .par_iter()
         .filter(|s| s.kind == CONTINENTAL && !s.is_hidden() && s.orogeny_myr >= quiet_before)
-        .map(|s| (rate * (f64::from(s.thickness_m) - to(s))).max(0.0))
+        .map(|s| release_of(s).max(0.0))
         .collect::<Vec<f64>>()
         .iter()
         .sum();
@@ -356,8 +392,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env, sea_m: f64) -> Collaps
             if s.kind != CONTINENTAL || s.is_hidden() || s.orogeny_myr >= quiet_before {
                 return None;
             }
-            // ledger: PLT-254, PLT-255, PLT-256, PLT-390.
-            let q = rate * (f64::from(s.thickness_m) - to(s));
+            let q = release_of(s);
             (q > 0.0).then_some((i, q))
         })
         .collect();
@@ -383,6 +418,94 @@ pub fn step(state: &mut PlateState, geo: &Geo, env: &Env, sea_m: f64) -> Collaps
         .sum::<f64>()
         * area;
     out
+}
+
+/// The collapse as a thin viscous sheet for one step (see the module docs, "As a thin viscous
+/// sheet"; ledger PLT-414, PLT-415).
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Sheet {
+    /// η_0, Pa s: the viscosity of a column whose orogeny is this step's …
+    eta_pa_s: f64,
+    /// … growing e-fold per this many Myr of the time since (0: no growth).
+    strength_myr: f64,
+    /// The step's time and length, Myr.
+    t_myr: f64,
+    dt_myr: f64,
+    /// The column it thins towards, m, and that column's potential energy, N/m.
+    normal_m: f64,
+    u_normal: f64,
+    /// The step's sea over the datum, m (the datum if unknown), the normal column's height there
+    /// (`continent_elevation_m`'s middle) and gravity.
+    sea_m: f64,
+    z_0: f64,
+    gravity: f64,
+}
+
+impl Sheet {
+    /// The sheet for a step towards the normal column `normal_m` under a sea `sea_m`; `None` with
+    /// `collapse_sheet_viscosity_pa_s` 0 (off).
+    pub(super) fn new(
+        k: &crate::params::TectonicParams,
+        env: &Env,
+        normal_m: f64,
+        sea_m: f64,
+    ) -> Option<Sheet> {
+        let eta_pa_s = k.collapse_sheet_viscosity_pa_s; // ledger: PLT-414
+        if !(eta_pa_s > 0.0 && eta_pa_s.is_finite()) {
+            return None;
+        }
+        let sea_m = if sea_m.is_finite() { sea_m } else { 0.0 };
+        let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
+        let z_n = z_0 + (normal_m - normal_thickness_m()) / COLUMN_ISOSTATIC_FACTOR;
+        Some(Sheet {
+            eta_pa_s,
+            strength_myr: k.collapse_sheet_strength_myr, // ledger: PLT-415
+            t_myr: env.t_myr,
+            dt_myr: env.dt_myr,
+            normal_m,
+            u_normal: column_energy(z_n, true, 0.0, 0.0, sea_m, env.gravity), // ledger: FRC-014
+            sea_m,
+            z_0,
+            gravity: env.gravity,
+        })
+    }
+
+    /// The column's thinning rate, per Myr: ε̇ = ΔU / (4 η L) for plane strain in a sheet L thick
+    /// (FRC-010), ΔU its potential energy at its Airy height over the normal column's; 0 for
+    /// crust no orogeny raised or no higher than the normal column.
+    pub(super) fn rate_per_myr(&self, s: &Sample) -> f64 {
+        if s.orogeny == OROGENY_NONE {
+            return 0.0;
+        }
+        let z = iso_height(&s.pools, self.z_0, self.gravity);
+        let du = column_energy(z, true, 0.0, 0.0, self.sea_m, self.gravity) - self.u_normal;
+        if !(du > 0.0) {
+            return 0.0;
+        }
+        let age = (self.t_myr - f64::from(s.orogeny_myr)).max(0.0);
+        // ledger: PLT-415 (the lithosphere stiffens as it cools; the form is the model's)
+        let eta = if self.strength_myr > 0.0 {
+            self.eta_pa_s * (age / self.strength_myr).exp()
+        } else {
+            self.eta_pa_s
+        };
+        // ledger: PLT-414, FRC-010
+        du / (4.0 * eta * LITHOSPHERE_KM * 1000.0) * YEAR_S * 1.0e6
+    }
+
+    /// What the column releases this step, m of thickness: T (1 − e^(−ε̇ δt)), at most down to
+    /// the normal column.
+    pub(super) fn release(&self, s: &Sample) -> f64 {
+        let t = f64::from(s.thickness_m);
+        if t <= self.normal_m {
+            return 0.0;
+        }
+        let e = self.rate_per_myr(s);
+        if e <= 0.0 {
+            return 0.0;
+        }
+        (t * (1.0 - (-e * self.dt_myr).exp())).min(t - self.normal_m)
+    }
 }
 
 /// One plate's release plan (`spread`): its budget, what is left of it and the receivers' shares.
@@ -1012,6 +1135,91 @@ pub(in crate::plates) mod tests {
         let (a, ..) = run(false, sea);
         let (b, ..) = run(false, 0.0);
         assert_eq!(a.samples, b.samples);
+    }
+
+    /// The thin sheet's rate (PLT-414, PLT-415): a column 26 km over T_n (4.2 km high) under a sea
+    /// at the datum, its orogeny this step, thins at ΔU / (4 η L) = 3.9 % per Myr with η 10²²
+    /// Pa s; the rate falls e-fold per `collapse_sheet_strength_myr` of the time since its
+    /// orogeny, and is 0 for crust no orogeny raised and for the normal column; the release stops
+    /// at the normal column; off, there is no sheet.
+    #[test]
+    fn the_sheet_thins_young_high_crust_at_its_potential_energy() {
+        let mut fx = Fx::new();
+        assert!(Sheet::new(&fx.k, &fx.env(0), normal_thickness_m(), 0.0).is_none());
+        fx.k.collapse_sheet_viscosity_pa_s = 1.0e22;
+        let env = fx.env(0);
+        let t_n = normal_thickness_m();
+        let sheet = Sheet::new(&fx.k, &env, t_n, 0.0).unwrap();
+        let mut s = Sample::blank(0);
+        s.kind = CONTINENTAL;
+        s.pools = continental_column();
+        s.pools[pool::METAMORPHIC] += 26_000.0;
+        s.thickness_m = s.pools.iter().sum();
+        s.orogeny = OROGENY_HIMALAYAN;
+        s.orogeny_myr = 0.0;
+        // By hand: z = 525 + 26,000 / 7.02 = 4,229 m; U = ρ g z (35 km + 3 z) = 5.44e12 N/m, the
+        // normal column's (525 m) 5.18e11; ε̇ = 4.92e12 / (4 × 1e22 × 1e5 m) = 1.23e-15 / s.
+        let e = sheet.rate_per_myr(&s);
+        assert!((e - 0.0388).abs() < 0.001, "{e}");
+        let q = sheet.release(&s);
+        let t = f64::from(s.thickness_m);
+        assert!((q - t * (1.0 - (-2.0 * e).exp())).abs() < 1e-6, "{q}");
+        // 62.8 Myr after its orogeny: e-fold slower.
+        s.orogeny_myr = -62.8;
+        let older = sheet.rate_per_myr(&s);
+        assert!((older * std::f64::consts::E / e - 1.0).abs() < 1e-3, "{older}");
+        // No orogeny: rigid. The normal column: nothing to give.
+        s.orogeny = OROGENY_NONE;
+        assert_eq!(sheet.release(&s), 0.0);
+        s.orogeny = OROGENY_HIMALAYAN;
+        let mut flat = s;
+        flat.pools = continental_column();
+        flat.thickness_m = flat.pools.iter().sum();
+        assert_eq!(sheet.release(&flat), 0.0);
+        // A long step stops at the normal column.
+        let mut fx_long = Fx::new();
+        fx_long.k.collapse_sheet_viscosity_pa_s = 1.0e18;
+        let long = Sheet::new(&fx_long.k, &fx_long.env(0), t_n, 0.0).unwrap();
+        s.orogeny_myr = 0.0;
+        assert!((long.release(&s) - (t - t_n)).abs() < 1e-6);
+    }
+
+    /// With the sheet on, a quiet belt raised by an orogeny thins past T_c towards the normal
+    /// column, keeping the volume; a belt no orogeny raised, or one whose orogeny is 600 Myr old,
+    /// stops at T_c as the threshold law has it (ledger: PLT-414, PLT-415).
+    #[test]
+    fn with_the_sheet_a_young_belt_thins_past_the_collapse_thickness() {
+        let belt = |p: DVec3| p.x < -0.1 && p.y > 0.766 && p.y < 0.85;
+        let t_c = Fx::new().k.collapse_thickness_km * 1000.0;
+        let run = |stamp: Option<f32>| {
+            let mut fx = Fx::new();
+            fx.k.collapse_sheet_viscosity_pa_s = 1.0e22;
+            let mut st = planet(&fx.geo, belt, 26_000.0);
+            if let Some(at) = stamp {
+                for s in st.samples.iter_mut().filter(|s| s.thickness_m > 40_000.0) {
+                    s.orogeny = OROGENY_HIMALAYAN;
+                    s.orogeny_myr = at;
+                }
+            }
+            let crust0 = crust_m(&st);
+            for step in 1..=30 {
+                step_once(&fx, &mut st, step);
+            }
+            assert!((crust_m(&st) - crust0).abs() < 1e-6 * crust0, "volume kept");
+            (0..st.samples.len())
+                .filter(|&i| belt(fx.geo.points()[i]))
+                .map(|i| f64::from(st.samples[i].thickness_m))
+                .fold(f64::MAX, f64::min)
+        };
+        let young = run(Some(0.0));
+        assert!(
+            young >= normal_thickness_m() - 1.0 && young < t_c - 3000.0,
+            "{young}"
+        );
+        let none = run(None);
+        assert!(none >= t_c - 1.0, "{none}");
+        let old = run(Some(-600.0));
+        assert!(old >= t_c - 50.0 && old < t_c + 500.0, "{old}");
     }
 
     /// With `collapse_continent_first` the crust a belt at the continent's edge releases goes to
