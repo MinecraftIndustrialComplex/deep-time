@@ -184,16 +184,26 @@ public final class Rivers {
     }
 
     /** A channel over one column (Rust {@code RiverHit}). */
-    public record Hit(int seg, double t, double d, double w, double hw, double depth, double q) {}
+    public record Hit(int seg, double t, double d, double w, double hw, double depth, double q) {
+        /**
+         * The channel's floor under the column: w − max(1, depth · (1 − (d / hw)²)), its parabolic
+         * cross-section with at least one block of water (ledger: HYD-022).
+         */
+        public double floor() {
+            double r = d / hw;
+            return w - Math.max(depth * (1.0 - r * r), 1.0);
+        }
+    }
 
     /**
      * What the channels decide at one column (Rust {@code RiverSample}): the covering segment
-     * with the lowest surface (ties: lowest id), the lowest bank cap of the segments whose bank
-     * zone (but not channel) holds it, and whether a covering channel is wide enough for a river
-     * biome.
+     * with the lowest surface (ties: lowest id), the covering segment with the lowest
+     * {@link Hit#floor} (ties: lowest id; the channel the column lies deepest in, ledger HYD-120),
+     * the lowest bank cap of the segments whose bank zone (but not channel) holds it, and whether
+     * a covering channel is wide enough for a river biome.
      */
-    public record Sample(Hit hit, Integer bankCap, boolean biome) {
-        public static final Sample NONE = new Sample(null, null, false);
+    public record Sample(Hit hit, Hit deep, Integer bankCap, boolean biome) {
+        public static final Sample NONE = new Sample(null, null, null, false);
     }
 
     /** What the channels decide at column (x, z), any lap, from its tile's segments. */
@@ -245,7 +255,7 @@ public final class Rivers {
     private Sample sampleRange(int[] segs, int from, int to, long wx, long z) {
         double cc = c;
         double px0 = wx, pz = z;
-        Hit best = null;
+        Hit best = null, deep = null;
         Integer cap = null;
         boolean biome = false;
         for (int i = from; i < to; i++) {
@@ -263,9 +273,13 @@ public final class Rivers {
             double h = lerp(hw[s], hw[s + 1], t);
             double hEff = Math.max(h, MIN_HALF_WIDTH);
             if (d <= hEff) {
-                double wv = lerp(w[s], w[s + 1], t);
-                if (best == null || wv < best.w() || (wv == best.w() && s < best.seg()))
-                    best = new Hit(s, t, d, wv, hEff, lerp(depth[s], depth[s + 1], t), lerp(q[s], q[s + 1], t));
+                Hit hit = new Hit(s, t, d, lerp(w[s], w[s + 1], t), hEff, lerp(depth[s], depth[s + 1], t), lerp(q[s], q[s + 1], t));
+                if (best == null || hit.w() < best.w() || (hit.w() == best.w() && s < best.seg()))
+                    best = hit;
+                // The deepest channel (ledger: HYD-120).
+                double f = hit.floor();
+                if (deep == null || f < deep.floor() || (f == deep.floor() && s < deep.seg()))
+                    deep = hit;
                 if (2.0 * h >= (double) biomeMinWidth)
                     biome = true;
             } else if (d <= hEff + (double) bankZone + (double) bankRatio * h) {
@@ -274,6 +288,6 @@ public final class Rivers {
                 cap = cap == null ? b : Math.min(cap, b);
             }
         }
-        return best == null && cap == null && !biome ? Sample.NONE : new Sample(best, cap, biome);
+        return best == null && cap == null && !biome ? Sample.NONE : new Sample(best, deep, cap, biome);
     }
 }
