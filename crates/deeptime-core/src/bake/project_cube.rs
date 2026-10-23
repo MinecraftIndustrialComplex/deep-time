@@ -1861,10 +1861,10 @@ pub fn project_folder_cube(
             .map(|(i, b)| {
                 let mut nb = project_body_exact(&cm, b);
                 let (x, z) = (nb.center[0], nb.center[2]);
-                let old = project_body(&cm, b);
+                let scl091 = project_body(&cm, b);
                 let (area, area_091) = (
                     body_area_ratio(&cm.view, b, &nb),
-                    body_area_ratio(&cm.view, b, &old),
+                    body_area_ratio(&cm.view, b, &scl091),
                 );
                 if body_holds_a_corner(&corner_images, f64::from(period), &nb) {
                     let (corner, _) = corner_and_edge_distance(cube, x, z);
