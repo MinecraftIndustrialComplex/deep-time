@@ -33,8 +33,12 @@ Keys (shares are of the coast with high ground unless named otherwise):
   hg_dist_med_<set>       median distance from a setting's high coast to its high ground, km
   hg_thick_med_<set>      median crust thickness under that high ground, km
   coast_thick_med_<set>   median crust thickness under a setting's high coasts, km
+  sea_cont_<set>          share of a setting's high coasts whose nearest sea cell is continental crust (a
+                          flooded continent: an inland sea or a shelf) rather than ocean floor
+  coast_sea_cont, hi_sea_cont
+                          the same over all the coast, and over all the coast with high ground
 
-Needs numpy and scipy (the pool resolves them with nix). Version 1.
+Needs numpy and scipy (the pool resolves them with nix). Version 2 (version 1 had no sea_cont keys).
 """
 import argparse
 import json
@@ -69,13 +73,18 @@ def coastset(fields_dir, radius_km):
     oro = np.rint(np.nan_to_num(f["plates/orogeny_type"][ok], nan=0.0)).astype(int)
     oro_age = f["plates/orogeny_age_myr"][ok].astype(float)
     thick = f["plates/thickness_m"][ok].astype(float) / 1000.0
+    cont = f["plates/crust_type"][ok] > 0.5
 
     # coast_metrics' coast and high ground, keeping the nearest high cell of each high coast.
     land = z > 0
     d_sea = np.zeros(z.size)
-    ds, _ = cKDTree(p[~land]).query(p[land])
+    sea_idx = np.nonzero(~land)[0]
+    ds, js = cKDTree(p[~land]).query(p[land])
     d_sea[land] = cc.arc_km(ds)
     coast = land & (d_sea <= 1.6 * spacing)
+    # The crust of each land cell's nearest sea cell.
+    sea_cont = np.zeros(z.size, bool)
+    sea_cont[land] = cont[sea_idx[js]]
     hi = land & (z > 2000)
     comp = cc.components(p, land, spacing)
     has = np.zeros(z.size, bool)
@@ -111,7 +120,9 @@ def coastset(fields_dir, radius_km):
     origin = np.full(z.size, -1)
     hj = near_hi[hc]
     origin[hc] = np.where(oro[hj] == 2, 0, np.where(oro[hj] == 1, 1, 2))
-    out = {"coast_hi": hc.sum() / n_coast}
+    out = {"coast_hi": hc.sum() / n_coast,
+           "coast_sea_cont": (coast & sea_cont).sum() / n_coast,
+           "hi_sea_cont": (hc & sea_cont).sum() / n_hc}
     for si, name in enumerate(SETS):
         cs = coast & (setting == si)
         hs = hc & (setting == si)
@@ -129,8 +140,9 @@ def coastset(fields_dir, radius_km):
             out[f"hg_dist_med_{name}"] = float(np.median(near_d[idx]))
             out[f"hg_thick_med_{name}"] = float(np.median(thick[near_hi[idx]]))
             out[f"coast_thick_med_{name}"] = float(np.median(thick[idx]))
+            out[f"sea_cont_{name}"] = float(sea_cont[idx].mean())
         else:
-            for k in ("hg_age_med_", "hg_dist_med_", "hg_thick_med_", "coast_thick_med_"):
+            for k in ("hg_age_med_", "hg_dist_med_", "hg_thick_med_", "coast_thick_med_", "sea_cont_"):
                 out[k + name] = None
     for oi, oname in enumerate(ORIGINS):
         out[f"hg_{oname}"] = float((origin[hc] == oi).mean()) if hc.any() else None
