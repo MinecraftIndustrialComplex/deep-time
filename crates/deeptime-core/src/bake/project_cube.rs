@@ -48,10 +48,11 @@ use deeptime_format::{FileEntry, GridDesc, LayerDesc, LoadedLayer, Manifest};
 use crate::bake::cube_turn;
 use crate::bake::load_layer;
 use crate::bake::project::{
-    BORDER_INSET_BLOCKS, BiomeGround, BodyY, Drawn, Held, Kind, ROW_BAND, SPAWN_EDGE_MARGIN, Src,
-    VERSION, WorldMap, apply, area_share, body_y, drawn_detail, err, is_biome_layer, kind_of, ms,
-    project_body, project_site, project_structure, put_raw, raise_world_tops, settle_biome_layers,
-    stratabound_sites, world_ground, world_raise_shifts, write_deferred, write_json,
+    BORDER_INSET_BLOCKS, BiomeGround, BodyY, Drawn, Held, ICE_COVER, Kind, ROW_BAND,
+    SPAWN_EDGE_MARGIN, Src, VERSION, WorldMap, apply, area_share, body_y, drawn_detail, err,
+    is_biome_layer, kind_of, ms, project_body, project_site, project_structure, put_raw,
+    raise_world_tops, settle_biome_layers, stratabound_sites, world_ground, world_raise_shifts,
+    write_deferred, write_json,
 };
 use crate::bake::relief::{Frame, SimFrame};
 use crate::error::CoreError;
@@ -1490,11 +1491,15 @@ pub fn project_folder_cube(
     let mut world_amp: Option<LoadedLayer> = None;
     let mut world_water: Option<LoadedLayer> = None;
     let mut world_closed: Option<LoadedLayer> = None;
+    // The world's playa layer: no swamp beside its salt (BIO-178), after the land call.
+    let mut world_playa: Option<LoadedLayer> = None;
     let mut held_biomes: Vec<Held> = Vec::new();
     let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
     let mut shares = serde_json::Map::new();
     let mut closed_note = json!(null);
+    // The ice cover, for the relief, then held with the biome layers (BIO-177).
     let mut world_ice: Option<LoadedLayer> = None;
+    let mut ice_entry: Option<usize> = None;
     let mut world_class: Option<LoadedLayer> = None;
     let rivers_sim = read_rivers(dir)?;
     let standing = crate::bake::relief::read_standing(dir)?;
@@ -1623,6 +1628,18 @@ pub fn project_folder_cube(
                 continue;
             }
             if is_biome_layer(&desc.name) {
+                if desc.name == ICE_COVER {
+                    // The relief reads the cover as resampled (moved, not copied); the land call
+                    // takes it off the sea (BIO-177) once the world's elevation is drawn, and
+                    // holds it after the relief.
+                    shares.insert(
+                        "ice_cover_true".into(),
+                        json!(area_share(&s.layer, false, |v| v > 0.0)),
+                    );
+                    world_ice = Some(LoadedLayer::new(desc, bytes)?);
+                    ice_entry = Some(s.entry);
+                    continue;
+                }
                 held_biomes.push(Held {
                     entry: s.entry,
                     desc,
@@ -1654,22 +1671,8 @@ pub fn project_folder_cube(
                 "detail/amplitude" => world_amp = Some(world),
                 "water_level" => world_water = Some(world),
                 CLOSED_BASIN => world_closed = Some(world),
+                crate::bake::water::PLAYA_LAYER => world_playa = Some(world),
                 "surface/class_top" => world_class = Some(world),
-                "climate/ice_cover" => {
-                    shares.insert(
-                        "ice_cover_map".into(),
-                        json!(area_share(&world, true, |v| v > 0.0)),
-                    );
-                    shares.insert(
-                        "ice_cover_world_planet".into(),
-                        json!(planet_share(&world, map, |v| v > 0.0)),
-                    );
-                    shares.insert(
-                        "ice_cover_true".into(),
-                        json!(area_share(&s.layer, false, |v| v > 0.0)),
-                    );
-                    world_ice = Some(world);
-                }
                 _ => {}
             }
         }
@@ -1677,6 +1680,14 @@ pub fn project_folder_cube(
         write_ms += ms(tl);
     }
     m.grids = new_grids;
+    // The ice cover joins the held biome layers now that the relief has read it (BIO-177).
+    if let (Some(entry), Some(ice)) = (ice_entry, world_ice.take()) {
+        held_biomes.push(Held {
+            entry,
+            desc: ice.desc,
+            bytes: ice.bytes,
+        });
+    }
     // The biome layers' land call on the world's ground, its fills and distances on the planet
     // (BIO-170, SCL-122).
     let mut biome_land_note = json!(null);
@@ -1690,6 +1701,7 @@ pub fn project_folder_cube(
                 bake_blocks_per_world_block: rs / cube.radius(),
                 elevation: we,
                 closed: world_closed.as_ref(),
+                playa: world_playa.as_ref(),
                 cube: Some((&cm.view, rs)),
             };
             let params = p.biomes.clone().unwrap_or_default();
@@ -1705,6 +1717,17 @@ pub fn project_folder_cube(
             )?;
             entry.bytes = written.bytes;
             entry.crc32 = written.crc32;
+            if held.desc.name == ICE_COVER {
+                let world = LoadedLayer::new(held.desc, held.bytes)?;
+                shares.insert(
+                    "ice_cover_map".into(),
+                    json!(area_share(&world, true, |v| v > 0.0)),
+                );
+                shares.insert(
+                    "ice_cover_world_planet".into(),
+                    json!(planet_share(&world, map, |v| v > 0.0)),
+                );
+            }
         }
         write_ms += ms(tl);
     }
