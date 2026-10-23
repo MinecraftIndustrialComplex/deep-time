@@ -70,11 +70,14 @@ through a registry file, not a new sim (`pool.sh measure` runs it over the cache
 your own, run `pool.sh arms` and `pool.sh status`: the run you need may be there.
 How many runs (decisions log 2026-10-23, Ben: "see if agents can be more efficient about testing ... If not, then lower
 the amount of sub-agents"): explore with one cumulative 8-run arm per stage (stage 1, then 1+2, ...), not every switch
-alone and every combination; per-switch arms only to find which part of a failed arm is at fault. Run a 24-run final only
-when the 8-run arm's criteria mean is at least 0.5 above its base (base's per-run sd is 0.92), or for a fault fix going
-on by default. A lane's final arm becomes the next base: after the merge the coordinator aliases master's default to it
-(`pool.sh alias --check-seed 1`) and the next lane runs on top of it. At most two lanes queue simulations at once; the
-others work from cached runs. No simulation outside the pool.
+alone and every combination; per-switch arms only to find which part of a failed arm is at fault. Physics goes on by
+default once it is built and correct (unit tests against its sources, no divergence or guard failure on the pool), and the
+rule or forcing term it replaces goes off with it (Ben, 2026-10-23: "Always, fix V1 elsewhere"); the V1 numbers are
+realism checks, not a gate, so no 24-run final is run to decide a default. After a merge that changes the planet, master's
+default gets one 24-run base, and the next lane runs on top of it. At most two lanes queue simulations at once; the others
+work from cached runs. No simulation outside the pool. Never add a knob, cap or forcing term to move a V1 number (Ben:
+"Results that don't align with earth but are still perfectly playable and physics backed > Results that are forced to
+align with earth by introducing extremely weird forcing functions").
 
 ## Rules
 - **The test machine is the Azure VM `deeptime-test`** (Ben, 2026-10-01; D32as_v7, 32 vCPU, 125 GiB,
