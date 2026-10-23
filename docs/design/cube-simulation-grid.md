@@ -56,6 +56,52 @@ cells) that is 75 MB; at n 480, 299 MB. The map table is shared (0.66 MB). The d
 holds the operator (about 124 bytes a cell) and nine f64 vectors (72 bytes a cell), plus the
 multigrid's f32 levels. S8's `memory_estimate` should count these per 6n² cells.
 
+### Speed
+
+`crates/deeptime-core/examples/cube_surface_bench.rs` runs one surface step of every ported solver
+on a smooth random planet: the cube at n 240 (345,600 cells, quick 16k's L1) against a 1,024 x 338
+raster (346,112 cells, the same mean cell area) on the raster's own code, 8 threads, 12 steps of
+2 Myr with the first 2 not timed, the fastest of three repeats. On the VM (r4, the final head;
+`cargo run --release -p deeptime-core --example cube_surface_bench`), milliseconds per step:
+
+| Phase | Cube | Raster | Cube / raster | Plan |
+|---|---|---|---|---|
+| Flood (open sea, lakes) | 5.25 | 7.51 | 0.70 | |
+| Routing (receivers, stack, drainage area) | 4.10 | 5.14 | 0.80 | 1.0 |
+| Stream power | 23.42 | 26.01 | 0.90 | |
+| Mouth fill | 9.20 | 363.81 | 0.03 | |
+| Diffusion, Jacobi | 14.90 | 6.52 | 2.29 | 1.0 to 1.3 |
+| Diffusion, multigrid | 19.29 | 8.90 | 2.17 | 1.0 to 1.3 |
+| Slope failure | 13.40 | 9.57 | 1.40 | |
+| Spreading | 3.38 | 3.14 | 1.08 | |
+| Sea level | 14.33 | 15.04 | 0.95 | |
+
+The ratios move with the VM's load: an earlier run (r3) gave routing 0.96, diffusion 2.65 and 2.53,
+slope failure 1.71. The iteration counts match (multigrid 24 on both; Jacobi 84 against 80 over the
+12 steps).
+
+- **Diffusion costs about 2.2 to 2.6 times the raster's.** The raster's operator is a 5-point
+  stencil, stored as an east and a south coupling per cell, its matrix product fused into strips. The
+  cube's P1 operator has eight couplings and eight column indices per cell, about four times the
+  memory per matrix product, and the same iteration counts. The plan's 1.0 to 1.3 assumed a 5-point
+  stencil. Ways to close part of the gap: store each pair's coupling once (four a cell, by
+  symmetry), index a face's inside cells by offset instead of a column table, and hold the couplings
+  in f32 (the multigrid already does).
+- **The slope failure** skips the cells away from the last iteration's movers once they are a
+  quarter of the cells or fewer, as the raster does (it was 10.6 times the raster's before the
+  skip).
+- **The mouth fill cannot be compared yet.** Both grids run the same `marine::fill`. In the last
+  step the cube's 3,875 fills reached 19,288 cells in all (5 a mouth), and the raster's 4,579 fills
+  reached 1,819,325 cells (397 a mouth). 1,819,325 is close to 9 x 200,000, the bench's
+  `max_cells`, so a few raster fills may run to the cap. The bench's raster is not a sphere: it is a
+  rectangle with closed north and south edges, sampled at equal steps of sin(latitude), so its seas
+  are not the cube's. This is not explained yet. A diagnostic run (commit 0b925182, reverted after;
+  it counts the fills stopped at `max_cells` and the volume delivered) is queued on the VM as
+  `cube-bench-r5`, with its output in `/data/ban/deeptime-runs/cube-s1s2/bench-n240-r5.{log,csv}`.
+  The totals of the two grids (107 against 446 ms) are therefore not a fair comparison. A step
+  with one diffusion solver (multigrid) and without the mouth fill takes 83 ms on the cube against
+  75 ms on the raster: 1.10 times.
+
 ## 2. What each later item needs
 
 ### S3, climate
