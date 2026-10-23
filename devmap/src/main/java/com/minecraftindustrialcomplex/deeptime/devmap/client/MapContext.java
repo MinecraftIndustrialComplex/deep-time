@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.devmap.client;
 
 import com.minecraftindustrialcomplex.deeptime.devmap.model.Graticule;
+import com.minecraftindustrialcomplex.deeptime.devmap.model.MapLayer;
 import com.minecraftindustrialcomplex.deeptime.devmap.model.PlanetGeometry;
 import com.minecraftindustrialcomplex.deeptime.devmap.net.DevMapState;
 import com.minecraftindustrialcomplex.deeptime.devmap.net.MapInfoPayload;
@@ -20,30 +21,53 @@ import java.util.Locale;
 /**
  * What the map shows now, read once a frame: the level, Deep Time's projection and planet info
  * for it ({@link ClientPlanetState}, the same objects the F3 line uses), the server dev map's info
- * and base image when the server has the dev map, and the player. {@link #problem} is set when
- * there is nothing to draw.
+ * and the picture to draw when the server has the dev map, and the player. The picture is the
+ * player's choice ({@link #wanted}, the client config's {@code mapLayer}, satellite by default)
+ * when it is here, else the other one ({@link MapLayer#shown}); {@link #image} is null when neither
+ * is. {@link #problem} is set when there is nothing to draw.
  */
 record MapContext(String dimension, WorldProjection projection, WorldInfoPayload info, MapInfoPayload devInfo,
-                  DevMapState.Image image, String problem) {
+                  MapLayer wanted, DevMapState.Image image, String problem) {
 
     static MapContext current() {
         Minecraft mc = Minecraft.getInstance();
+        MapLayer wanted = ClientConfig.mapLayer();
         if (mc.level == null || mc.player == null)
-            return new MapContext("", null, null, null, null, "not in a world");
+            return new MapContext("", null, null, null, wanted, null, "not in a world");
         String dim = mc.level.dimension().location().toString();
         WorldProjection p = ClientPlanetState.projection(mc.level);
         WorldInfoPayload info = ClientPlanetState.worldInfo();
         MapInfoPayload dev = DevMapState.info(dim);
         if (p == null) {
             boolean waiting = info == null || !info.dimension().equals(dim);
-            return new MapContext(dim, null, info, dev, null,
+            return new MapContext(dim, null, info, dev, wanted, null,
                     waiting ? "waiting for Deep Time's planet info" : "No Deep Time planet in this dimension");
         }
-        DevMapState.Image im = DevMapState.image(dim);
         // The server drew with its projection: a frame for another period is not this world's.
-        if (im != null && dev != null && dev.period() != (int) Math.round(p.period()))
-            im = null;
-        return new MapContext(dim, p, info, dev, im, null);
+        boolean sameWorld = dev == null || dev.period() == (int) Math.round(p.period());
+        MapLayer shown = sameWorld ? MapLayer.shown(wanted, l -> DevMapState.image(dim, l) != null) : null;
+        return new MapContext(dim, p, info, dev, wanted, shown == null ? null : DevMapState.image(dim, shown), null);
+    }
+
+    /** The picture drawn, or null. */
+    MapLayer shown() {
+        return image == null ? null : image.layer();
+    }
+
+    /**
+     * The readout's picture line: which picture is drawn, and when it is not the chosen one, what
+     * became of that (still rendering, receiving, or the server's reason it has none).
+     */
+    String pictureLine() {
+        if (devInfo == null)
+            return "none (no dev map info from the server)";
+        MapInfoPayload.Picture want = devInfo.picture(wanted);
+        String why = want == null ? "not sent by the server"
+                : DevMapState.receiving(devInfo, wanted) ? "receiving" : want.note();
+        if (image != null && image.layer() == wanted)
+            return wanted.label().toLowerCase(Locale.ROOT) + ": " + why;
+        String shown = image == null ? "none" : image.layer().label().toLowerCase(Locale.ROOT) + " for now";
+        return shown + " (" + wanted.label().toLowerCase(Locale.ROOT) + ": " + why + ")";
     }
 
     /** Whether the server has the dev map (its channel is open on this connection). */

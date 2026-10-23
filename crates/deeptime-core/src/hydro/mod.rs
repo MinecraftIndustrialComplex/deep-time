@@ -142,12 +142,22 @@ pub fn open_sea_mask(
 /// sea level). It is the ground whose spill level towards the sea is at most sea level; a closed
 /// basin's floor below sea level, behind a rim above it, is not reached, and no sea stands there.
 pub fn sea_reached(w: usize, h: usize, open: &[bool], low: impl Fn(usize) -> bool) -> Vec<bool> {
-    let n = w * h;
+    sea_reached_by(w * h, |c, k| neighbour8(w, h, c, k), open, low)
+}
+
+/// [`sea_reached`] on any grid of `n` cells whose neighbour `k` (0..8) of cell `c` is `nb(c, k)`
+/// (a cube world's grid steps across its seams, SCL-122).
+pub fn sea_reached_by(
+    n: usize,
+    nb: impl Fn(usize, usize) -> Option<usize>,
+    open: &[bool],
+    low: impl Fn(usize) -> bool,
+) -> Vec<bool> {
     let mut reached = open.to_vec();
     let mut stack: Vec<usize> = (0..n).filter(|&c| open[c]).collect();
     while let Some(c) = stack.pop() {
         for k in 0..8 {
-            if let Some(nb) = neighbour8(w, h, c, k)
+            if let Some(nb) = nb(c, k)
                 && !reached[nb]
                 && low(nb)
             {
@@ -172,10 +182,20 @@ pub fn closed_basin_layer(
     reached: &[bool],
     radius: usize,
 ) -> Vec<u8> {
+    closed_basin_layer_by(w * h, |c, k| neighbour8(w, h, c, k), low, reached, radius)
+}
+
+/// [`closed_basin_layer`] on any grid of `n` cells with neighbours `nb` ([`sea_reached_by`]).
+pub fn closed_basin_layer_by(
+    n: usize,
+    nb: impl Fn(usize, usize) -> Option<usize>,
+    low: impl Fn(usize) -> bool,
+    reached: &[bool],
+    radius: usize,
+) -> Vec<u8> {
     use std::collections::VecDeque;
     const OPEN: u8 = 1;
     const CLOSED: u8 = 2;
-    let n = w * h;
     let mut side = vec![0u8; n];
     for c in 0..n {
         if low(c) {
@@ -187,9 +207,7 @@ pub fn closed_basin_layer(
     let mut queue: VecDeque<(u32, u16)> = VecDeque::new();
     for want in [OPEN, CLOSED] {
         for c in 0..n {
-            if side[c] == want
-                && (0..8).any(|k| neighbour8(w, h, c, k).is_some_and(|nb| side[nb] == 0))
-            {
+            if side[c] == want && (0..8).any(|k| nb(c, k).is_some_and(|m| side[m] == 0)) {
                 queue.push_back((c as u32, 0));
             }
         }
@@ -200,11 +218,11 @@ pub fn closed_basin_layer(
         }
         let s = side[c as usize];
         for k in 0..8 {
-            if let Some(nb) = neighbour8(w, h, c as usize, k)
-                && side[nb] == 0
+            if let Some(m) = nb(c as usize, k)
+                && side[m] == 0
             {
-                side[nb] = s;
-                queue.push_back((nb as u32, d + 1));
+                side[m] = s;
+                queue.push_back((m as u32, d + 1));
             }
         }
     }
@@ -230,7 +248,28 @@ pub fn closed_basin_on_world(
     min_open: usize,
     radius: usize,
 ) -> (Vec<u8>, u64) {
-    let n = w * h;
+    closed_basin_on_world_by(
+        w * h,
+        |c, k| neighbour8(w, h, c, k),
+        low,
+        deep,
+        flag,
+        min_open,
+        radius,
+    )
+}
+
+/// [`closed_basin_on_world`] on any grid of `n` cells with neighbours `nb` ([`sea_reached_by`]):
+/// a cube world's grid, whose open sea and basins run across the seams (SCL-122).
+pub fn closed_basin_on_world_by(
+    n: usize,
+    nb: impl Fn(usize, usize) -> Option<usize>,
+    low: impl Fn(usize) -> bool,
+    deep: impl Fn(usize) -> bool,
+    flag: &[u8],
+    min_open: usize,
+    radius: usize,
+) -> (Vec<u8>, u64) {
     assert_eq!(
         flag.len(),
         n,
@@ -252,12 +291,12 @@ pub fn closed_basin_on_world(
             members.push(c);
             open_cells += usize::from(flag[c] == 0);
             for k in 0..8 {
-                if let Some(nb) = neighbour8(w, h, c, k)
-                    && !done[nb]
-                    && deep(nb)
+                if let Some(m) = nb(c, k)
+                    && !done[m]
+                    && deep(m)
                 {
-                    done[nb] = true;
-                    stack.push(nb);
+                    done[m] = true;
+                    stack.push(m);
                 }
             }
         }
@@ -268,7 +307,7 @@ pub fn closed_basin_on_world(
         }
     }
     drop(done);
-    let reached = sea_reached(w, h, &open, &low);
+    let reached = sea_reached_by(n, &nb, &open, &low);
     drop(open);
     let mut cleared = 0u64;
     // The side each low cell takes: closed only where the bake said so and this ground's sea does
@@ -281,7 +320,25 @@ pub fn closed_basin_on_world(
         })
         .collect();
     drop(reached);
-    (closed_basin_layer(w, h, &low, &not_closed, radius), cleared)
+    (
+        closed_basin_layer_by(n, &nb, &low, &not_closed, radius),
+        cleared,
+    )
+}
+
+/// The 8 neighbours of a cube grid's stacked cell `c` (FORMAT.md, "Cube grids"): the same steps as
+/// [`neighbour8`], taken in the cell's own face and resolved across its seams by
+/// [`GridDesc::face_cell`] (the corner squares give the diagonal ghost). No step is ever off the
+/// grid: the cube has no edge (SCL-122).
+pub fn cube_neighbour8(grid: &GridDesc) -> impl Fn(usize, usize) -> Option<usize> + '_ {
+    const DX: [i64; 8] = [1, -1, 0, 0, 1, -1, 1, -1];
+    const DZ: [i64; 8] = [0, 0, 1, -1, 1, 1, -1, -1];
+    let w = grid.w as usize;
+    move |c, k| {
+        let (face, a, b) = grid.face_of_cell((c % w) as u32, (c / w) as u32);
+        let (i, j) = grid.face_cell(face, i64::from(a) + DX[k], i64::from(b) + DZ[k]);
+        Some(j as usize * w + i as usize)
+    }
 }
 
 /// The closed basins below sea level of an elevation field in metres (ledger: HYD-100): every

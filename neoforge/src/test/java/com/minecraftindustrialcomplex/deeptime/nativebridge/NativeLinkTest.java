@@ -296,4 +296,40 @@ class NativeLinkTest {
         assertEquals(500, checked);
         System.out.println("[junit] sampleColumnIsTheParityFixture columns=" + checked);
     }
+
+    /**
+     * The dev map's satellite picture across JNI ({@code renderWorldMap}, {@link NativeWorldMap}): the
+     * whole real test planet at 256 pixels across, both layers opaque and different; bad arguments
+     * map to their exceptions, a folder without world data to {@link DeepTimeIoException}.
+     */
+    @Test
+    void renderWorldMapDrawsTheTestPlanet() {
+        Path world = Path.of(System.getProperty("deeptime.testWorlds")).resolve("planet4k");
+        double s = 4096 / 256.0;
+        NativeWorldMap.Picture sat = NativeWorldMap.render(world, NativeWorldMap.SATELLITE, -2048, -1024, s, 256, 128, 2);
+        NativeWorldMap.Picture elev = NativeWorldMap.render(world, NativeWorldMap.ELEVATION, -2048, -1024, s, 256, 128, 2);
+        assertEquals(256 * 128, sat.abgr().length);
+        assertTrue(sat.info().contains("\"layer\":\"sat\"") && sat.info().contains("\"w\":256"), sat.info());
+        int differ = 0;
+        for (int i = 0; i < sat.abgr().length; i++) {
+            assertEquals(0xff, sat.abgr()[i] >>> 24, "satellite pixel " + i + " is opaque");
+            assertEquals(0xff, elev.abgr()[i] >>> 24, "elevation pixel " + i + " is opaque");
+            if (sat.abgr()[i] != elev.abgr()[i])
+                differ++;
+        }
+        assertTrue(differ > sat.abgr().length / 2, "the two layers are different pictures: " + differ);
+        ByteBuffer small = ByteBuffer.allocateDirect(16);
+        assertThrows(IllegalArgumentException.class,
+                () -> DeepTimeNative.renderWorldMap(world.toString(), "sat", 0, 0, 1, 8, 8, 1, small), "short buffer");
+        assertThrows(IllegalArgumentException.class,
+                () -> DeepTimeNative.renderWorldMap(world.toString(), "sat", 0, 0, 1, 2, 2, 1, ByteBuffer.allocate(16)),
+                "heap buffer");
+        assertThrows(IllegalArgumentException.class,
+                () -> NativeWorldMap.render(world, "water", 0, 0, 1, 2, 2, 1), "not a dev map layer");
+        assertThrows(IllegalArgumentException.class,
+                () -> NativeWorldMap.render(world, NativeWorldMap.SATELLITE, 0, 0, 0, 2, 2, 1), "zero blocks a pixel");
+        assertThrows(DeepTimeIoException.class,
+                () -> NativeWorldMap.render(gameDir.resolve("nowhere"), NativeWorldMap.SATELLITE, 0, 0, 1, 2, 2, 1));
+        System.out.println("[junit] renderWorldMapDrawsTheTestPlanet " + sat.info() + " " + elev.info());
+    }
 }

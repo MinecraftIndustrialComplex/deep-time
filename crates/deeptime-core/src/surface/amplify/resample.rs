@@ -18,8 +18,14 @@
 //!   area (a headwater cell of the coarse level is four fine cells that each own a quarter of it):
 //!   the erosion passes' prior, which they refine locally and keep beyond their reach.
 //! - **Runoff weight and erodibility**: linear.
-//! - **Lakes**: each fine cell is a lake cell when any of the fine 3 × 3 around it lies in a coarse
-//!   lake cell, so the footprint is inherited and grows by one fine cell.
+//! - **Lakes**: a lake (or closed basin) is its water surface, the level the young landscape's
+//!   flood filled it to. A fine cell takes the highest surface among the coarse cells of its own
+//!   interpolation quad (the coarse cell it sits on, or the two or four it lies between) and is a
+//!   lake cell when its terrain lies under that surface. The shore is therefore the contour of the
+//!   fine terrain at the lake's level: smooth, and the same in every direction. A footprint copied
+//!   from the coarse cells (each fine cell a lake when a coarse lake cell lay within a cell of it)
+//!   drew every lake's edge as a staircase of coarse cells, and the passes, which leave lakes
+//!   alone, cut that staircase into the walls of every closed basin (ledger AMP-090).
 
 use super::window::Win;
 
@@ -38,19 +44,31 @@ pub struct Level {
     pub wgt: Vec<f32>,
     /// Rock erodibility multiplier.
     pub kfac: Vec<f32>,
-    /// 1 inside the lakes (and closed basins) the young landscape had, else 0.
-    pub lake: Vec<u8>,
+    /// The water surface, m, of the lake or closed basin the young landscape had at the cell (the
+    /// level its flood filled the basin to), [`NO_LAKE`] elsewhere.
+    pub lake_z: Vec<f32>,
     /// The glaciers' surface, m, where they were, and a metre under the ground elsewhere (so it
     /// interpolates smoothly across their margins); empty without glaciers (`glacial.rs`).
     pub zs: Vec<f32>,
 }
 
+/// [`Level::lake_z`] of a cell outside every lake.
+pub const NO_LAKE: f32 = f32::NEG_INFINITY;
+
 impl Level {
     /// Bytes the arrays hold.
     pub fn bytes(&self) -> u64 {
-        4 * (self.z.len() + self.area.len() + self.wgt.len() + self.kfac.len() + self.zs.len())
-            as u64
-            + self.lake.len() as u64
+        4 * (self.z.len()
+            + self.area.len()
+            + self.wgt.len()
+            + self.kfac.len()
+            + self.lake_z.len()
+            + self.zs.len()) as u64
+    }
+
+    /// Whether cell `c` lies in a lake (or closed basin).
+    pub fn is_lake(&self, c: usize) -> bool {
+        self.lake_z.get(c).is_some_and(|s| s.is_finite())
     }
 }
 
@@ -61,7 +79,10 @@ pub struct Fine {
     pub area: Vec<f32>,
     pub own: Vec<f32>,
     pub kfac: Vec<f32>,
+    /// 1 where the cell lies under a lake's surface ([`Level::sample`]), else 0.
     pub lake: Vec<u8>,
+    /// That surface, m, at the lake cells, [`NO_LAKE`] elsewhere.
+    pub lake_z: Vec<f32>,
     pub zs: Vec<f32>,
 }
 
@@ -190,6 +211,7 @@ impl Level {
             own: vec![0.0; n],
             kfac: vec![0.0; n],
             lake: vec![0; n],
+            lake_z: vec![NO_LAKE; n],
             zs: Vec::new(),
         };
         let dxf = self.fine_dx();
@@ -205,8 +227,9 @@ impl Level {
             .zip(f.own.par_chunks_mut(w))
             .zip(f.kfac.par_chunks_mut(w))
             .zip(f.lake.par_chunks_mut(w))
+            .zip(f.lake_z.par_chunks_mut(w))
             .enumerate()
-            .for_each(|(j, ((((zr, ar), or), kr), lr))| {
+            .for_each(|(j, (((((zr, ar), or), kr), lr), sr))| {
                 for i in 0..w {
                     let (gi, gj) = win.global(i, j);
                     let (gi, gj) = (gi as i64, gj as i64);
@@ -219,17 +242,18 @@ impl Level {
                     // Area: log-space interpolation, less the coarse cell's own area shared out.
                     let interp = lin_at(ln_area, self.w, self.h, ci, cj, fi, fj).exp() as f32;
                     ar[i] = (interp - wg * (a_coarse - a_fine)).max(or[i]);
-                    let mut lake = 0u8;
-                    'scan: for b in -1..=1i64 {
-                        for a in -1..=1i64 {
-                            let c = idx(self.w, self.h, (gi + a) >> 1, (gj + b) >> 1);
-                            if self.lake[c] != 0 {
-                                lake = 1;
-                                break 'scan;
-                            }
+                    // The highest lake surface among the corners of the cell's quad (1, 2 or 4
+                    // coarse cells); a lake cell when the terrain lies under it. ledger: AMP-090
+                    let mut s = NO_LAKE;
+                    for cj2 in cj..=cj + i64::from(fj) {
+                        for ci2 in ci..=ci + i64::from(fi) {
+                            s = s.max(self.lake_z[idx(self.w, self.h, ci2, cj2)]);
                         }
                     }
-                    lr[i] = lake;
+                    if zr[i] < s {
+                        lr[i] = 1;
+                        sr[i] = s;
+                    }
                 }
             });
         if self.zs.len() == self.cells() {
@@ -274,7 +298,7 @@ mod tests {
             area: vec![1.0e6; n],
             wgt: vec![1.0; n],
             kfac: vec![1.0; n],
-            lake: vec![0; n],
+            lake_z: vec![NO_LAKE; n],
             zs: Vec::new(),
         }
     }
@@ -334,7 +358,9 @@ mod tests {
     fn a_window_equals_the_same_cells_of_the_whole() {
         let mut l = level(32, 16, |i, j| ((i * 7 + j * 13) % 29) as f32 * 3.0);
         l.area = (0..32 * 16).map(|c| 1.0e6 * (1 + c % 17) as f32).collect();
-        l.lake = (0..32 * 16).map(|c| u8::from(c % 41 == 0)).collect();
+        l.lake_z = (0..32 * 16)
+            .map(|c| if c % 41 == 0 { l.z[c] + 40.0 } else { NO_LAKE })
+            .collect();
         l.wgt = (0..32 * 16).map(|c| 0.5 + (c % 5) as f32 * 0.1).collect();
         let whole = l.sample(&Win::full(64, 32));
         // A window across the seam and touching the north pole.
@@ -356,12 +382,13 @@ mod tests {
                 assert_eq!(part.area[c], whole.area[g]);
                 assert_eq!(part.own[c], whole.own[g]);
                 assert_eq!(part.lake[c], whole.lake[g]);
+                assert_eq!(part.lake_z[c], whole.lake_z[g]);
             }
         }
     }
 
     #[test]
-    fn area_prior_of_a_headwater_is_its_own_fine_area_and_lakes_grow() {
+    fn area_prior_of_a_headwater_is_its_own_fine_area() {
         let mut l = level(16, 8, |_, _| 0.0);
         // Every coarse cell is a headwater (its area is its own): so is every fine cell.
         l.area = vec![1.0e6; 16 * 8];
@@ -381,12 +408,63 @@ mod tests {
             f.area[8 * 32 + 8]
         );
         assert!(f.area[8 * 32 + 9] > 1.0e7 && f.area[8 * 32 + 9] < 1.0e9);
-        // One coarse lake cell: a 2 × 2 fine block plus one fine cell all round is lake.
-        l.lake[4 * 16 + 4] = 1;
+    }
+
+    #[test]
+    fn a_lake_on_flat_ground_covers_the_quads_round_its_cell() {
+        // One coarse lake cell on flat ground: every fine cell whose quad has it as a corner (the
+        // cell's own point and the half-way cells round it, 3 × 3) lies under its surface.
+        let mut l = level(16, 8, |_, _| 0.0);
+        l.lake_z[4 * 16 + 4] = 1.0;
         let f = l.sample(&Win::full(32, 16));
-        let count: usize = f.lake.iter().map(|&x| usize::from(x)).sum();
-        assert_eq!(count, 16, "4 × 4 fine cells");
-        assert_eq!(f.lake[8 * 32 + 7], 1);
-        assert_eq!(f.lake[8 * 32 + 6], 0);
+        let cells: Vec<usize> = (0..32 * 16).filter(|&c| f.lake[c] == 1).collect();
+        let want: Vec<usize> = (7..=9)
+            .flat_map(|j| (7..=9).map(move |i| j * 32 + i))
+            .collect();
+        assert_eq!(cells, want);
+        assert!(cells.iter().all(|&c| f.lake_z[c] == 1.0));
+        assert!(
+            (0..32 * 16)
+                .filter(|c| !want.contains(c))
+                .all(|c| f.lake_z[c] == NO_LAKE)
+        );
+    }
+
+    #[test]
+    fn a_lake_shore_is_the_terrain_contour_at_its_surface_and_round() {
+        // A round bowl, its centre off the grid, filled to 600 m: the coarse lake is a disc of
+        // coarse cells (a staircase of them). On the fine grid every cell under the surface is
+        // lake and no other (the shore is the contour), and the shore lies at the same distance
+        // from the centre in every direction, to within the fine cells' own step.
+        let (cx, cz) = (16.3f32, 8.6f32);
+        let bowl = |x: f32, z: f32| 2.0 * ((x - cx).powi(2) + (z - cz).powi(2));
+        let mut l = level(32, 16, |i, j| bowl(i as f32, j as f32));
+        let surface = 30.0;
+        l.lake_z = (0..32 * 16)
+            .map(|c| if l.z[c] < surface { surface } else { NO_LAKE })
+            .collect();
+        let f = l.sample(&Win::full(64, 32));
+        let mut shore = Vec::new();
+        for j in 1..31 {
+            for i in 1..63 {
+                let c = j * 64 + i;
+                assert_eq!(f.lake[c] == 1, f.z[c] < surface, "({i},{j})");
+                let edge = [c - 1, c + 1, c - 64, c + 64]
+                    .iter()
+                    .any(|&n| f.lake[n] != f.lake[c]);
+                if f.lake[c] == 1 && edge {
+                    shore.push(
+                        ((i as f32 / 2.0 - cx).powi(2) + (j as f32 / 2.0 - cz).powi(2)).sqrt(),
+                    );
+                }
+            }
+        }
+        let (lo, hi) = shore
+            .iter()
+            .fold((f32::MAX, f32::MIN), |(a, b), &r| (a.min(r), b.max(r)));
+        // The contour's radius is √15 ≈ 3.87 coarse cells; a coarse staircase spreads by a
+        // coarse cell or more.
+        assert!(shore.len() > 20, "{}", shore.len());
+        assert!(hi - lo < 0.75, "shore radius {lo}..{hi} coarse cells");
     }
 }

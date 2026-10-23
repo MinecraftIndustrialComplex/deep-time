@@ -78,10 +78,33 @@ rule's sea step ("Water columns", step 3) holds only where the layer is 0 or abs
 fluid picker, its water pass, the cave shield and the coast tests read the same layer. Water
 `method` is "hyd-100" and `stats.below_sea` is new ("Rivers"). 0.5 worlds are refused.
 
-**0.7, coming (the cube world; Ben, decisions log 2026-10-22: "Fuck it, remove equal are
-restriction and move to a cube"):** not written yet. The writer writes 0.6 and every reader accepts
-only 0.6 until the bake's cube items land. The schema is fixed ahead of them: "The cube world's
-layout" (manifest `projection` with `layout_version` 2) and "The cube map table" below.
+**0.7, the cube world (Ben, decisions log 2026-10-22: "Fuck it, remove equal are restriction and
+move to a cube"):** written by the Rust side for cube worlds only, while the polar layouts stay 0.6
+("Polar and cube worlds side by side"). A cube world's manifest has `projection.kind` `cube` with
+`layout_version` 2 ("The cube world's layout"), names its map table ("The cube map table") and
+stores its grids face by face ("Cube grids"). `deeptime synth --kind cube` writes one; a planet
+bakes to one with `scale.projection` `cube` in its preset or `deeptime run --set scale.projection=cube`.
+
+### Polar and cube worlds side by side (until cube plan phase 2)
+
+Phase 1 of the cube plan writes cube worlds while the game still plays only polar ones, so two
+format versions live together for a while:
+
+- A **cube world's `manifest.json` says `"format_version": "0.7"`**, and only a cube world's does.
+  A polar world (Petroff–Guyou or Lambert) keeps 0.6. Every file header of either kind keeps
+  `format_minor` 6 (tile packs, the sectioned files, keyframes, events): none of those files
+  changed, and the manifest is what a reader checks first.
+- The Rust readers (`Manifest::read`) accept 0.6 and 0.7 and refuse the mismatch either way: a 0.7
+  manifest must have a `cube` layout and a cube layout must say 0.7 (`format_version 0.6 on a cube
+  world, which is 0.7`). They then refuse a cube world whose map table they do not ship by name and
+  sha256, or whose rotation is not one, before anything else is read. Their version refusal names
+  both: `world data 0.9, this Deep Time reads 0.6 (polar worlds) and 0.7 (cube worlds); before 1.0
+  worlds are not migrated`.
+- The game (Java) still reads 0.6 only, so it refuses a cube world by its version with the usual
+  message, and refuses `projection.kind` `cube` too should a manifest claim 0.6.
+- Phase 2 moves everything to 0.7 (the workspace's `format_version`, every header's minor), makes
+  the game read cube worlds and drops the polar layouts; 0.6 worlds are then refused. No world is
+  migrated.
 
 ## Folder layout
 
@@ -379,6 +402,65 @@ ore and a dry centre before the top-up), `counted` (the sources with ore and a d
 (the sources with ore left out because their centre lies under the sea), `short_by_sea` (land
 regions short only for that: they would hold enough with the sea sources counted), `added`,
 `added_inland`, `short` (land regions still short: no template or no dry point)), `top_up_millis`.
+
+### The bake on a cube world (format 0.7, cube plan phase 1)
+
+A preset whose `scale.projection` is `cube` (or `deeptime run --set scale.projection=cube`, or
+`deeptime project --set scale.projection=cube` on a Lambert folder) runs the same simulation and
+Lambert bake, then rewrites the folder as a cube world (`deeptime_core::bake::project_cube`;
+science page `docs/science/cube-world-bake.md`). It is opt-in: the default stays `petroff_guyou`,
+whose pass above is unchanged byte for byte. The differences from that pass:
+
+- **The turn** (SCL-120, SCL-121): the cube `conformal-n513` of side s = `face_for(C)` is turned
+  freely on the planet so its eight corners lie as far from land as a seeded search finds
+  (`bake::cube_turn`: random rotations, the best kept and refined, and the polar turns as a
+  candidate; seeded by the preset's seed, so a planet always gets one turn). A pinned
+  `scale.lambda_c_deg` gives the polar turn at that longitude instead. The land is the Lambert
+  elevation at or above sea level. The manifest's `projection` carries the rotation and the
+  corners' `land_distance_deg` ("The cube world's layout").
+- **Rasters** (SCL-124): every world cell is a point sample at its centre (`cube_point`). Its
+  footprint on the Lambert grid comes from the composed Jacobian (world cell to planet to Lambert
+  block): along each of the footprint's two principal axes, where the cell spans more than one
+  simulation cell, a Gaussian of the remaining width averages it; else the bilinear read alone.
+  There is no polar widening (the Petroff-Guyou pass's (0.52 / cos φ)⁴): the cube has no poles of
+  its own. Categories, stacks and cover take the nearest cell as there; the ice cover keeps its
+  cover rule.
+- **Topology** (SCL-122): the closed-basin redraw, the biome layers' fills and distances, and the
+  relief's neighbours run on the cube's own cells across every seam (the open sea is an
+  8-connected body over the six faces; distances are great-circle). Nothing is glued.
+- **Relief** (SCL-123, SCL-125): the cone gullies and the steep-ground texture are drawn on each
+  face, in world blocks, across the seams; a cone's angles are taken on the planet in the vent's
+  tangent frame. The noise they read is blended across the turning seams within its reach.
+- **Vector data**: positions through the inverse map, sizes and directions through the analytic
+  Jacobian. A river chain that crosses a turning seam is cut there into two chains whose ends
+  meet under the seam's fold, the upstream part ending with `Mouth::Seam` (SCL-126; "Rivers");
+  widths scale by the local metres per block, depths are kept. Structure windows crossing a
+  turning seam are kept (SCL-128). Bodies, sites, `volcanoes/active.json`,
+  `volcanoes/standing.json`, `impacts/craters.json` move with their centres. Ranked spawn
+  candidates move to the world and are dropped within 256 blocks of a cube corner or 64 of a
+  turning edge (SCL-127).
+- **The guaranteed deposits**: the deposit stage forecasts the turn on its L1 land
+  (`notes.deposits.world_frame` with `projection` `cube` and its own `turn`, SCL-129); the anchor
+  and the top-up then run on the cube world's own index frame, with lattice points off the six
+  faces left out.
+- **The manifest**: `format_version` 0.7, `projection` the cube layout, `scale.circumference_blocks`
+  4s, `scale.m_per_block_h` the nominal √(4πR²/6s²); `notes.bake.stats` the land under the cube
+  (`corners` with each corner's latitude, longitude and `land_distance_deg`,
+  `corner_min_land_distance_deg`, `land_share`, `land_blocks_per_planet_area` quantiles,
+  `land_within_5deg_of_corner`, `land_p999_within_2x`, `corners_5deg_from_land`); and
+  `notes.bake.projection` with `kind` `cube`, `face_blocks`, `world_blocks`, `map` {name,
+  sha256}, `turn` (the search's record), `stats` (as above), `m_per_block_h`,
+  `sigma_m_per_block` (quantiles of the local metres per block), `bake_blocks_per_world_block`,
+  `layers`, `relief`, `shares` (`land_map`, `land_world_planet` (cells weighted by their planet
+  area), `land_true`, and the same for the ice cover), `footprint` (per grid: the cells by the
+  footprint's longer stretch in simulation cells, each band's mean samples and its
+  checkerboard leak), `seam_steps` (per layer: the 50th, 90th, 99th percentile and largest
+  height step between neighbouring cells within a face, near an edge, across direct seams,
+  across the slide and across turning seams), `top_raise`, `closed_basin`, `biome_land`,
+  `vector` (`rivers` with `seam_cuts`, `seam_partner_mismatch`, `cuts_on_direct_seams`,
+  `length_change` and the crossings by seam; `structure_events` with
+  `crossing_turning_seams_kept`; `bodies` with `planet_area_ratio_median` mid-face, by a seam
+  and by a corner; `sites`; `spawn_candidates`) and `millis`.
 
 ### The climate at a block (0.2, P1-25)
 
@@ -860,14 +942,14 @@ Java `PortableMath`, JS `DTMath`):
   continues smoothly through every seam; round trips to 10⁻⁸ rad and 10⁻⁶ blocks; the equator is the
   line z = 0, north is −z along it, east +x.
 
-## The cube world's layout (coming in 0.7, `layout_version` 2)
+## The cube world's layout (format 0.7, `layout_version` 2)
 
-**Schema only.** No writer emits it yet and no reader accepts it: format 0.7 ships when the bake's
-cube items do (docs/plans/cube-world-plan.md B1 to B10). It follows the plan's question Q1, answer
-(a), which is recommended and **still open** (Ben has not answered): rasters face by face with no
-void cells, the map table shipped in the code, and the manifest naming the table and its sha256. If
-Q1 is answered otherwise, this section changes before 0.7 ships. The geometry is coded and tested
-in all three languages: Rust `deeptime_format::cube` (the net) and `deeptime_format::cube_map` (the
+Written by the Rust side since cube plan phase 1 (`deeptime synth --kind cube`, the bake's cube
+option; docs/plans/cube-world-plan.md B1 to B10) and read by its tools; the game reads it from
+phase 2 ("Polar and cube worlds side by side"). It follows the plan's question Q1, answer (a)
+(Ben, 2026-10-22, decisions log): rasters face by face with no void cells, the map table shipped in
+the code, and the manifest naming the table and its sha256. The map is the conformal cube turned
+freely (Q4, Ben, 2026-10-22). The geometry is coded and tested in all three languages: Rust `deeptime_format::cube` (the net) and `deeptime_format::cube_map` (the
 map, the turn, `CubeWorld`), Java `worlddata/CubeLayout` and `worlddata/CubeMap`, JS `DTCube`,
 `DTCubeMap` and `DTCubeWorld` in `projection.js`, all checked against the parity fixture's `cube`
 section (`tests/data/projection_parity.json`).
@@ -1011,19 +1093,49 @@ metres (`planet.radius_m`): 294.82 m at 16k. The true size varies with the map: 
 metres-to-blocks conversion uses the local scale σ (planet metres per block) from the map's
 Jacobian (`CubeWorld::jacobian`, which also gives the 2 × 2 matrix and the local angle).
 
-**Rasters (Q1 (a)).** A grid of cell size r is stored face by face: six planes of n × n cells,
-n = s / r, in the faces' order, each in its own net orientation (cell (i, j) is the r × r square
-of net blocks from `origin` + (i·r, j·r), row j outer and column i inner), so a reader never turns a
-cell. There are no void cells. The grid descriptor gives way to `{"name": "L3", "kind": "cube",
-"n": 1920, "r": 2}` (w = n, h = 6n for the tile pack: the six planes stacked F0 to S down the
-rows, with a tile size that divides n so no tile holds two faces), and its one `cell(face, i, j)`
-resolves an index off a face through the face adjacency (`cube::ADJACENCY`, `cube::cell_on`): one
-side out, the neighbour's cell with the quarter turns between the two frames; beyond two sides at
-once (the 270° corners) the diagonal ghost copies the neighbour along the adjacent strip (the FV3
-rule). Where a cell's value sits (its centre or its corner) and the bilinear rule on faces are the
-bake's choice (B1), written here when made. The spatial indexes (sites, rivers, structure) and the
+### Cube grids
+
+A grid of cell size r is stored face by face: six planes of n × n cells, n = s / r, in the faces'
+order, each in its own net orientation (cell (i, j) is the r × r square of net blocks from
+`origin` + (i·r, j·r), row j outer and column i inner), so a reader never turns a cell. There are no
+void cells. Rust `GridDesc::for_cube`, `face_cell`, `cube_spot` and the cube branches of
+`RasterRead`.
+
+- **Descriptor.** `{"name": "L3", "kind": "cube", "n": 1920, "r": 2}`, in the manifest's `grids`
+  and in every tile pack's LayerDesc. A reader takes w = n and h = 6n (the six planes stacked F0 to
+  S down the rows), no x wrap, and origin F0's north-west corner (−s/2, −s/2), s = n·r. Postcard
+  copies (checkpoints) keep the polar grids' fields with `z_edges` `cube`.
+- **Tiles.** `tile` is the largest divisor of n that divides 256, so no tile holds two faces: 256 at
+  4k (n 512, 256), 64 for L1 at 4k (n 64); 128, 64 and 16 at 16k (n 1,920, 960, 240).
+- **Where a value sits.** Cell (i, j)'s value is the **centre** of its square, the net point
+  `origin + ((i + ½)·r, (j + ½)·r)` (not a point sample on a block corner as on the polar grids):
+  the faces tile the planet with no shared samples, and every cell has the same footing on all six
+  faces. The bake and the synthetic world sample the planet there.
+- **A reader's block.** Every reader takes block (bx, bz) as on the polar grids, and on a cube grid
+  reads at the block's centre, the net point (bx + ½, bz + ½). That point is first folded onto the
+  planet through the net edges (`Cube::fold_point`: the slide, then the nearest band's motion), which
+  gives its face and its local point; past the net's corners there is no planet and a read is NaN
+  (cover 0). Its fractional cell is `a = (x − ox)/r − ½`, `b = (z − oz)/r − ½`, (x, z) the folded
+  point and (ox, oz) its face's origin.
+- **Nearest:** the face's cell `(floor(a + ½), floor(b + ½))`. **Bilinear:** `i0 = floor(a)`,
+  `j0 = floor(b)`, the four cells (i0, j0), (i0 + 1, j0), (i0, j0 + 1), (i0 + 1, j0 + 1) of that face
+  with the polar grids' arithmetic and order; a cell off the face is read through the adjacency
+  below. The **column spline** (`strata/lift`, the horizon tops) and the **cover** rule read their
+  4 × 4 and 2 × 2 cells the same way.
+- **Off the face.** A face's cell (i, j) with one index out of [0, n) (up to n out) is the
+  neighbour's cell across that side, with the quarter turns between the two frames
+  (`cube::ADJACENCY`, `cube::cell_on`). Beyond two sides at once (the corner squares, where three
+  faces meet at a 270° corner) it is the neighbour across the side it is further out of, ties going
+  east or west, with the other index clamped onto the face: the corner square repeats the strip of
+  that neighbour along its edge (the diagonal ghost of the FV3 rule). More than a face out clamps to
+  a face out. A stacked index (i, j) reads face ⌊j / n⌋ (clamped to the six) at (i, j mod n) by the
+  same rule (`GridDesc::cell`); a reader that steps across a face's edge steps in face coordinates,
+  never down the stacked rows. So bilinear reads are continuous across every seam.
+
+The spatial indexes (sites, rivers, structure buckets, the site index) of a cube world use the
+window as their frame: origin (−3s/2, −3s/2), span (4s, 3s) (`WorldProjection::index_frame`). The
 bake's notes (`notes.bake.stats`: the land's largest and 99.9th-percentile blocks per planet area
-and the land share within 5° of a corner, study §5.4 item 7) move with the bake items.
+and the land share within 5° of a corner, study §5.4 item 7) are "The bake on a cube world".
 
 ## The cube map table (`crates/deeptime-format/data/cube-map-<name>.bin`)
 
@@ -1460,9 +1572,9 @@ vertices of 24 bytes, 1 K chains of 16 bytes, 2 `tiles_x · tiles_z + 1` u32 off
 vertex                                         chain
 0   4  f32 x (block; continuous along a chain)  0   4  u32 first vertex
 4   4  f32 z (block)                            4   4  u32 vertex count (≥ 2)
-8   4  f32 w: water surface (fills y < w)       8   1  u8 mouth: 0 sea (or the polar edge row), 1 lake, 2 river
+8   4  f32 w: water surface (fills y < w)       8   1  u8 mouth: 0 sea (or the polar edge row), 1 lake, 2 river, 3 seam
 12  4  f32 hw: half-width, blocks (> 0)         9   3  reserved, 0
-16  4  f32 depth at the centre, blocks (≥ 1)    12  4  u32 into: the lake (mouth 1) or chain (2), else u32::MAX
+16  4  f32 depth at the centre, blocks (≥ 1)    12  4  u32 into: the lake (mouth 1) or chain (2, 3), else u32::MAX
 20  4  f32 q: discharge, m³/s
 ```
 
@@ -1470,6 +1582,12 @@ Chains are consecutive in the vertex array; **segment s** is vertices (s, s + 1)
 one chain. A chain runs downstream from a spring or a lake's outlet (whose first vertex is the lake
 cell feeding it) to its mouth: its last vertex lies in the sea, in lake `into`, or on a vertex of
 chain `into` (a confluence, where the tributary keeps its own width). w never rises along a chain.
+**On a cube world** (format 0.7, mouth 3, SCL-126) a chain that crosses a turning seam of the net
+("The cube world's layout") is cut there into two chains: the first ends with mouth 3 on the seam,
+`into` the second, whose first vertex is the same planet point on the partner edge (the image of the
+crossing under the edge's isometry), with the same w, hw, depth and q. A chain crossing a sliding
+seam (F3|F0, F0|F1, F1|F2, N|F0, S|F0, and F2|F3 across the period) is never cut: its x and z stay
+continuous across it. `tiles_z` is then `3s / tile` from z = −3s/2 and the x fold is the period 4s.
 **The index**: tile (tx, tz) covers x ∈ [−C/2 + tx·tile, …), z ∈ [−Zo + tz·tile, …) ("Grids"); entries
 `offsets[t] … offsets[t+1]` of tile t = tz·tiles_x + tx are the segments, ascending, whose box grown
 by `max(hw_a, hw_b, 0.71) + bank_zone + bank_ratio · max(hw_a, hw_b) + 1` touches it (x folded).
@@ -2545,6 +2663,17 @@ survives in, the finished folder. The manifest's `notes.run.history` reports wha
   West of it (format 0.6) two closed bowls below sea level (`notes.lake.closed_bowls`): a dry one
   with its floor at y 40 round (−200, −70) and one with its floor at y 30 round (−200, 70) holding
   `water_level` 50, both 1 in a `closed_basin` layer (HYD-100).
+- `cube` (format 0.7, cube plan B10) — a cube world ("The cube world's layout") of a planet `--size`
+  blocks round: face side `face_for(size)` (1,024 at 4,096), the world map `conformal-n513`, the
+  turn azimuth −71.5°, tilt 38°, spin 12° (the parity fixture's free turn). Its terrain is a closed
+  form on the sphere sampled at each cell's centre through the map and the turn, so every net edge
+  is seamless: `elevation = round(16·H(p))`, H = 63 − 60·p_x + 25·sin(4·p_y + 0.5)·cos(3·p_z) (p the
+  planet unit vector), plus a 450-block ridge across the `ne` seam (a quarter turn), a 300-block cone
+  on corner `n0` (reachable) and a plateau at y 116 round a lake across the `nn` seam (a half turn):
+  floor y 100, `water_level` 108 within 0.06 R of its centre, a 6-block wall. Climate is the polar
+  worlds' formulas with the planet's latitude asin(p_z). `manifest.json` `notes.synthetic` holds the
+  formula and the features' net blocks. The viewer bundle (`--viewer`) is refused: it draws polar
+  worlds; `deeptime world-map` draws the net.
 - `deposit-history` (P1-15) — not a `synth --kind`: a `deposits_synthetic` preset with
   `"terrain": {"strata": "placeholder" | "every-class"}` bakes it at `finalize_write` next to the run's
   sites, bodies and events. `elevation` = round(16·(63 + h/20)) of the synthetic history's present

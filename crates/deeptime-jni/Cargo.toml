@@ -17,6 +17,9 @@ deeptime-format.workspace = true
 jni.workspace = true
 rayon.workspace = true
 serde_json.workspace = true
+# The bake drawn as the workbench's Final world (`renderWorldMap`: the dev map's satellite
+# picture), without mic-viewer's TileSource.
+deeptime-tiles.workspace = true
 
 # The GPU compute path (docs/design/gpu-compute.md) on Linux and Windows, whose Vulkan and DX12
 # drivers load at run time. Not on macOS yet: its natives are cross-built without Apple's SDK, and

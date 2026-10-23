@@ -58,6 +58,13 @@ pub fn pixel_block(
     py: u32,
 ) -> (i64, i64) {
     use deeptime_format::projection::WorldProjection;
+    if let WorldProjection::Cube(v) = wp {
+        // The cube's window: x from −3s/2 over 4s, z from −3s/2 over 3s.
+        let s = v.cube.side();
+        let x = -3 * s / 2 + 4 * s * i64::from(px) / i64::from(w.max(1));
+        let z = -3 * s / 2 + 3 * s * i64::from(py) / i64::from(h.max(1));
+        return (x, z);
+    }
     let x = -c / 2 + c * i64::from(px) / i64::from(w);
     let z = match wp {
         WorldProjection::Lambert(p) => p.picture_z(f64::from(py), h).floor() as i64,
@@ -65,17 +72,20 @@ pub fn pixel_block(
             let b = g.hemisphere() as f64;
             (-b / 2.0 + b * f64::from(py) / f64::from(h.max(1))).floor() as i64
         }
+        WorldProjection::Cube(_) => unreachable!(),
     };
     (x, z)
 }
 
-/// The height of a whole-world map `w` pixels wide: π : 1 on Lambert, 2 : 1 on Petroff–Guyou.
+/// The height of a whole-world map `w` pixels wide: π : 1 on Lambert, 2 : 1 on Petroff–Guyou,
+/// 4 : 3 on a cube's window.
 pub fn picture_height(wp: &deeptime_format::projection::WorldProjection, w: u32) -> u32 {
     match wp {
         deeptime_format::projection::WorldProjection::Lambert(_) => {
             deeptime_format::Projection::picture_height(w)
         }
         deeptime_format::projection::WorldProjection::PetroffGuyou(_) => (w / 2).max(1),
+        deeptime_format::projection::WorldProjection::Cube(_) => (3 * w / 4).max(1),
     }
 }
 

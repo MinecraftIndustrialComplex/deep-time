@@ -179,7 +179,7 @@ impl Relief {
                 continue;
             }
             let mut z1 = z0;
-            if dz != 0.0 && level.lake.get(c).copied().unwrap_or(0) == 0 {
+            if dz != 0.0 && !level.is_lake(c) {
                 z1 = (z0 + dz).max(floor.min(z0));
                 if z1 != z0 {
                     let d = f64::from(z1 - z0);
@@ -233,7 +233,7 @@ mod tests {
             area: vec![1.0; n],
             wgt: vec![1.0; n],
             kfac: vec![1.0; n],
-            lake: vec![0; n],
+            lake_z: vec![crate::surface::amplify::resample::NO_LAKE; n],
             zs: Vec::new(),
         }
     }
@@ -343,7 +343,7 @@ mod tests {
         let s = relief(vec![(fault(0.0), 1.0)]).apply(&mut sea, &grid, 0.0);
         assert_eq!(s.cells_changed, 0);
         let mut lake = level(&grid, 500.0);
-        lake.lake.fill(1);
+        lake.lake_z.fill(1.0e4);
         assert_eq!(
             relief(vec![(fault(0.0), 1.0)])
                 .apply(&mut lake, &grid, 0.0)

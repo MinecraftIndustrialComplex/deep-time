@@ -108,6 +108,7 @@ fn every_river_descends_to_the_sea_or_a_lake() {
                     });
                 assert!(joins, "chain {k} ends on a vertex of chain {}", ch.into);
             }
+            Mouth::Seam => panic!("chain {k}: the simulation's network has no seams"),
         }
         // Following the mouths always ends in the sea or a lake.
         let mut at = k;
@@ -745,7 +746,7 @@ fn check_holds(out: &Output, elev: &[i16], g: &GridDesc) {
                     "chain {k} meets its lake's level"
                 );
             }
-            Mouth::River => assert!((ch.into as usize) < r.chains.len()),
+            Mouth::River | Mouth::Seam => assert!((ch.into as usize) < r.chains.len()),
             Mouth::Sea => {}
         }
     }
