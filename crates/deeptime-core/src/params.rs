@@ -706,6 +706,22 @@ pub struct TectonicParams {
     pub trench_half_life_myr: f64,
     /// Pelagic sedimentation on oceanic crust, m/Myr.
     pub pelagic_m_per_myr: f64,
+    /// Sediment subduction: the share of subducted ocean floor's sediment (its sediment and
+    /// sedimentary pools) that goes down with the slab at a resampling instead of accreting to
+    /// the column on top (`ridges::resample`), on every overriding plate. 0, the default,
+    /// accretes all of it (the model before the trench budget, 2026-10-22). ledger: PLT-440
+    pub sediment_subduction_share: f64,
+    /// Subduction erosion: the crust a front's overriding plate loses from below, km³ per km of
+    /// front and Myr (Earth-normalized), where the front erodes (the two keys below); taken
+    /// from the front sample's crust beyond a normal ocean floor's (`subduction::erode_forearcs`).
+    /// 0, the default, erodes nothing. ledger: PLT-441
+    pub subduction_erosion_km3_per_km_myr: f64,
+    /// … where the convergence normal to the front is at least this, mm/yr …
+    /// ledger: PLT-442
+    pub subduction_erosion_min_mm_yr: f64,
+    /// … and the incoming plate's sediment (its sediment and sedimentary pools at the front)
+    /// is thinner than this, m. ledger: PLT-442
+    pub subduction_erosion_max_sediment_m: f64,
     /// Hotspots at the start.
     pub hotspots_initial: u32,
     /// New hotspots per 100 Myr (Poisson).
@@ -870,6 +886,10 @@ impl Default for TectonicParams {
             cordillera_height_m: 2500.0, // ledger: PLT-050
             trench_half_life_myr: 2.0,   // ledger: PLT-053
             pelagic_m_per_myr: 5.0,
+            sediment_subduction_share: 0.0,          // ledger: PLT-440
+            subduction_erosion_km3_per_km_myr: 0.0,  // ledger: PLT-441
+            subduction_erosion_min_mm_yr: 60.0,      // ledger: PLT-442
+            subduction_erosion_max_sediment_m: 1000.0, // ledger: PLT-442
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
@@ -1193,6 +1213,18 @@ impl PlanetPreset {
             (k.uplift_max_mm_yr, "$.tectonics.uplift_max_mm_yr"),
             (k.transition_width_km, "$.tectonics.transition_width_km"),
             (k.transition_myr, "$.tectonics.transition_myr"),
+            (
+                k.subduction_erosion_km3_per_km_myr,
+                "$.tectonics.subduction_erosion_km3_per_km_myr",
+            ),
+            (
+                k.subduction_erosion_min_mm_yr,
+                "$.tectonics.subduction_erosion_min_mm_yr",
+            ),
+            (
+                k.subduction_erosion_max_sediment_m,
+                "$.tectonics.subduction_erosion_max_sediment_m",
+            ),
         ] {
             check(v.is_finite() && v >= 0.0, key, "must be ≥ 0")?;
         }
@@ -1295,6 +1327,10 @@ impl PlanetPreset {
             ),
             (k.min_plate_area_frac, "$.tectonics.min_plate_area_frac"),
             (k.lip_probability, "$.tectonics.lip_probability"),
+            (
+                k.sediment_subduction_share,
+                "$.tectonics.sediment_subduction_share",
+            ),
         ] {
             check((0.0..=1.0).contains(&v), key, "must be in [0, 1]")?;
         }
