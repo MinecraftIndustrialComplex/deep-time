@@ -525,11 +525,36 @@ had lifted it by 0.45 of each rise, and that is gone with the rest. The share de
 than 6 km is the plate model's (its own share moved with it, 0.143 to 0.168 on the base set), the
 trench budget's open item.
 
-**What is left.** The guard's worst median fell 1.4 to 3.2 km, to 13.7 to 14.5 km, still 3 km past
-the Challenger Deep, and single runs still reach 19 to 31 km for a few steps (the arms' largest,
-above; 23 steps beyond 19.8 km in the worst). Those runs differ from one arm to the next, with the
-fix and without it (28.5 km in the trench keys' supercontinent 2 before it, 30.9 km in their
-supercontinent 3 after). (Traced: to come.)
+**What is left.** The guard's worst median fell 1.4 to 3.2 km, to 13.7 to 14.5 km, and single runs
+still reach 19 to 31 km for a few steps (the arms' largest, above; 23 steps beyond 19.8 km in the
+worst). Those runs differ from one arm to the next, with the fix and without it (28.5 km in the
+trench keys' supercontinent 2 before it, 30.9 km in their supercontinent 3 after). The guard's
+worst is the cell farthest from the sea either way, and these are peaks, not floors. Traced (a
+scratch patch, not kept, printed the guard's cell at every step past 11 km; the reruns gave the
+pool's 30,945 and 25,955 m to the metre):
+
+- The trench keys' supercontinent 3, fixed: from −262 to −216 Myr a continental column on the
+  polar rows (79 to 81°N) stood 18.6 to 29.4 km above the sea in the plate model itself (the
+  preset's cap, `max_elevation_m`, is 30 km). It was a collision, back-arc and rift column whose
+  plate uplift ran 1.3 to 3.5 mm/yr each step while the peak moved 90 cells west along the row.
+  The surface stood 1.6 km over the plate model at the worst step.
+- The seven keys' scattered 4, fixed: from −222 to −212 Myr a back-arc and rift column at 37°S
+  stood 15.5 to 29.2 km above the sea in the plate model, beside trench cells 7 km down. The surface
+  stood 3.3 km under the plate model at the worst step.
+- Every step past 19.8 km in the two runs is such a peak (23 and 6 steps). The deepest floors in
+  them were 13.8 and 14.4 km down, 3 to 3.5 km past the Challenger Deep, on trench cells where the
+  plate model stood 8.2 and 10.4 km down and the surface's carried offset was still −6.1 and
+  −8.2 km. What builds that offset under a trench now was not traced.
+- The trench keys' supercontinent 2, before the fix (traced on the trench budget's head, the
+  pool's 28,548 m to the metre): the same kind of peak. From −46 to −14 Myr a collision, rift and
+  back-arc column on the polar rows (67 to 73°S) stood 14.5 to 29.0 km above the sea in the plate
+  model, its uplift at 1.3 to 3.5 mm/yr, and the surface's offset over it reached +10 to +13 km at
+  the worst steps. All 13 steps past 19.8 km are that peak. The same run had 341 steps with a floor
+  more than 11 km down, the deepest 15.8 km; the two fixed runs above had 25 and 22.
+
+Those heights are the plate model's own (plates/), outside this lane: a column whose uplift runs
+at the rate limit's ceiling (PLT-288, 3.5 mm/yr) step after step, up to the 30 km cap, on the
+polar rows twice in three runs.
 
 ## Game choices
 
