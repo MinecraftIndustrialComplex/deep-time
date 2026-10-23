@@ -178,6 +178,11 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
     | deepest, m | 10,864 | 13,093 | |
 
   - *Earth's share s = 0.83.* It subducts 8.6 km³ a year from this model's ocean and drowns the land (0.16 to 0.19).
+- **Gates** (on the VM, merged head; `build/trench/fullcheck.sh`, run with `tools/remote/mac.sh --kind cargo:test`):
+  - `cargo fmt --check`: clean;
+  - `cargo test --workspace --no-fail-fast`: every binary ok (deeptime-core 903 passed, 5 ignored);
+  - `clippy -D warnings`: clean;
+  - `cargo deny check licenses bans`: ok.
 - **Calls** (mine, undoable):
   - s = 0.12 (`calibrated` to Table 1's flux) over Earth's 0.83;
   - E = 90 (Clift & Vannucchi's global average);
