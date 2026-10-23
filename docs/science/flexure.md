@@ -288,6 +288,62 @@ code), show which processes make them:
 They partly cancel within the step. Whether each is right at a single 39 km cell over 2 Myr was
 not checked here.
 
+## The settling's feedback
+
+**What was seen.** Under the collapse arms of the high-ground lane (the sea column and the sheet's
+viscosity: `--set tectonics.collapse_sea_column=true --set tectonics.collapse_sea_column_max_km=41.1
+--set tectonics.collapse_sheet_viscosity_pa_s=1e22 --set tectonics.collapse_reach_km=5000`), the
+surface guard (ISO-072) stopped one run in twelve of `earthlike_quick_16k` over 1000 Myr
+(scattered continents, seed 5, at plate step 449), and in three more the guard's worst passed
+35 km. Plate columns stood up to 30 km over their Airy height, at the plate model's ceiling
+(`max_elevation_m`), with the surface's flexure under them at tens of km. On master's base the
+same measure was 3.6 to 10.3 km over the Airy height and the guard's worst 14.5 to 32.3 km.
+
+**The trace.** The stopped run, traced step by step (a scratch patch that printed every clamp,
+plate column and flexure cell, not kept in the code). The flexure `F` (`surface/flexure_m`, how far
+the plate holds the ground from local isostasy) under continental samples passed 5 km at plate
+step 19 and 10 km at step 49; the plate columns' height over their Airy height passed 5 km at
+step 39; the 30 km ceiling first clamped at step 305. One column, a rift sample, over steps 290 to
+299: its crust 36 to 45 km thick and its Airy height 0.7 to 1.9 km, the plate rules left it near
+10 km each step, the settling (ISO-078) moved it to its Airy height plus `F`, the rise guard
+(PLT-288) cut that to 7 km in the step, and the surface took the 7 km as crust thickened:
+7 / (1 − 0.858) = 49 km of crust, its root held up by the plate. `F` grew from 10.5 to 32 km
+over the ten steps. From step 305 polar craton cells (`Te` 80 km) did the same with roots of up
+to 42 km a step, held over 148 to 788 km, and `F` reached 95 km by step 350.
+
+**The cause.** The flexure booked every rise of a building column (continental crust, arcs,
+hotspots) as crust thickened, 1 / (1 − k) times the rise, whatever raised it (ISO-061 until
+2026-10-22), and never booked a fall. The settling moves a height alone, with no crust: to the
+column's Airy height plus `F`. The flexure took the move as new crust, a stiff plate held most of
+its root up, `F` grew, and the next step's settling target with it: a loop whose gain passes one
+on the stiffest plates, ended only by the ceiling's clamp. A column the collapse thinned also kept
+the load of the crust it had lost (only rises were booked), a ratchet in the same direction.
+
+**What Earth does.** A plate holds the ground at most a few km from local isostasy. The largest
+gravity anomalies over flexurally held loads are about +300 mGal over Hawaii (Watts et al. 2025)
+and −380 mGal at the Puerto Rico Trench, the most negative on Earth (ten Brink et al. 2004);
+trenches typically sit about 200 mGal under the isostatic expectation and outer rises about 50
+over it (Stern, "Ocean Trenches"). At 2πGρ = 0.112 mGal per m of rock (ρ 2,670 kg/m³) these are
+1.8 to 3.4 km of rock, and a free-air anomaly is an upper bound on the departure (the moat already
+compensates part of the load). Under the Himalaya the foreland is overcompensated and the high
+range undercompensated (Cattin et al. 2001). What limits it is the plate's strength: an elastic
+plate bent as hard as the trench walls would carry up to 900 MPa (Hunter & Watts 2016), real
+plates yield, and `Te` halves at a curvature of 10⁻⁶ m⁻¹ (Watts & Burov 2003). ISO-093.
+
+**The fix** (ISO-091, ISO-092). Only crust is load. The plate model records for each sample the
+change of its own crust's Airy height over the step (`plates/crust_uplift_mm_yr`: the pools'
+`iso_height` after the step's rules against before, plus the resampling's accretion and the rate
+limits' cut, ISO-092), and the flexure books that, either sign, as crust thickened or thinned. The
+rest of the uplift (the settling, the height rules, the rise guard's hold) moves the ground with
+no load, and the sea it lets in or pushes out is no load either. A thinned column now gives up the
+load of the crust it lost. The plate model keeps its heights; only what the surface's plate is told
+it carries changes. Unit tests `a_height_moved_alone_is_no_load` (on land and under the sea, a 2 km
+rise of a belt 312 km wide on a craton moves the ground 2 km and changes no load) and
+`a_belt_thinned_on_a_stiff_plate_stands_below_its_airy_height` (the mirror of
+`a_belt_on_a_stiff_plate_gets_a_foreland_basin`).
+
+MEASURED
+
 ## Game choices
 
 - **Flexural lengths are Earth-normalized** (ISO-057): the plate's kilometres are the plate
