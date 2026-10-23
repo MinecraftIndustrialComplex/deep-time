@@ -55,6 +55,19 @@ tools/viewer/mac-watch.sh [--preset P --start S --length-myr L] [--tv] | stop | 
 tools/remote/mac-gc.sh [--dry-run]                      # after merges: delete merged worktrees' Mac copies
 python3 ../../pack/tools/gc/pack-gc.py [report|--dry-run]  # the laptop side: Rust targets and spent agent worktrees of every pack repo (daily timer)
 tools/remote/mac.sh --no-sync -- deeptime-admit status  # the VM's admission tool: what runs, what waits and why, the estimates
+tools/review/pool/pool.sh run <arm> [--key K] [--preset P] [--length Myr] [--starts a,b] [--seeds 1,2,3]   # the shared test-run pool: table, combine, alias, gc, see tools/review/pool/README.md
+
+**Test through the pool, not with your own ensemble** (Ben, 2026-10-22: "If both deltas and continent spread need to do a
+world gen to test they should just merge their test. To my understanding the current #1 bottleneck is the testing speed,
+not agents programming."). A world-gen run for a measurement is named by (source key, preset, length, start, seed,
+`--set` list, `+ENV` list, threads) and kept under `/data/ban/deeptime-runs/pool/`; the source key is a hash of the git
+blobs the simulation reads, so a Java, pack, docs or tools commit keeps it, and a run that exists is reused (a second
+request waits on the first's lock). Ask for yours with `tools/review/pool/pool.sh run <arm> ...` from a committed
+checkout, read arms against a base with `pool.sh table --base base --arm <arm>` (medians, Mann-Whitney p, the criteria met
+per run), put an unmerged lane's branch next to another's with `pool.sh combine <name> <branch> <branch>` and run the
+combination once, and let a commit that only edits a comment reuse the old key's runs with `pool.sh alias`. Add a measure
+through a registry file, not a new sim (`pool.sh measure` runs it over the cached folders). Before starting an ensemble of
+your own, run `pool.sh arms` and `pool.sh status`: the run you need may be there.
 
 ## Rules
 - **The test machine is the Azure VM `deeptime-test`** (Ben, 2026-10-01; D32as_v7, 32 vCPU, 125 GiB,
