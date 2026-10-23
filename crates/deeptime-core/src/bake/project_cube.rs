@@ -48,8 +48,8 @@ use deeptime_format::{FileEntry, GridDesc, LayerDesc, LoadedLayer, Manifest};
 use crate::bake::cube_turn;
 use crate::bake::load_layer;
 use crate::bake::project::{
-    BORDER_INSET_BLOCKS, BiomeGround, BodyY, Drawn, Held, Kind, ROW_BAND, SPAWN_EDGE_MARGIN, Src,
-    VERSION, WorldMap, apply, area_share, body_y, drawn_detail, err, is_biome_layer, kind_of, ms,
+    BORDER_INSET_BLOCKS, BiomeGround, BodyY, Drawn, Held, ICE_COVER, Kind, ROW_BAND,
+    SPAWN_EDGE_MARGIN, Src, VERSION, WorldMap, apply, area_share, body_y, drawn_detail, err, is_biome_layer, kind_of, ms,
     project_body, project_site, project_structure, put_raw, raise_world_tops, settle_biome_layers,
     stratabound_sites, world_ground, world_raise_shifts, write_deferred, write_json,
 };
@@ -1623,6 +1623,15 @@ pub fn project_folder_cube(
                 continue;
             }
             if is_biome_layer(&desc.name) {
+                if desc.name == ICE_COVER {
+                    // The relief reads the cover as resampled; the land call takes it off the sea
+                    // (BIO-177) once the world's elevation is drawn.
+                    shares.insert(
+                        "ice_cover_true".into(),
+                        json!(area_share(&s.layer, false, |v| v > 0.0)),
+                    );
+                    world_ice = Some(LoadedLayer::new(desc.clone(), bytes.clone())?);
+                }
                 held_biomes.push(Held {
                     entry: s.entry,
                     desc,
@@ -1655,21 +1664,6 @@ pub fn project_folder_cube(
                 "water_level" => world_water = Some(world),
                 CLOSED_BASIN => world_closed = Some(world),
                 "surface/class_top" => world_class = Some(world),
-                "climate/ice_cover" => {
-                    shares.insert(
-                        "ice_cover_map".into(),
-                        json!(area_share(&world, true, |v| v > 0.0)),
-                    );
-                    shares.insert(
-                        "ice_cover_world_planet".into(),
-                        json!(planet_share(&world, map, |v| v > 0.0)),
-                    );
-                    shares.insert(
-                        "ice_cover_true".into(),
-                        json!(area_share(&s.layer, false, |v| v > 0.0)),
-                    );
-                    world_ice = Some(world);
-                }
                 _ => {}
             }
         }
@@ -1705,6 +1699,17 @@ pub fn project_folder_cube(
             )?;
             entry.bytes = written.bytes;
             entry.crc32 = written.crc32;
+            if held.desc.name == ICE_COVER {
+                let world = LoadedLayer::new(held.desc, held.bytes)?;
+                shares.insert(
+                    "ice_cover_map".into(),
+                    json!(area_share(&world, true, |v| v > 0.0)),
+                );
+                shares.insert(
+                    "ice_cover_world_planet".into(),
+                    json!(planet_share(&world, map, |v| v > 0.0)),
+                );
+            }
         }
         write_ms += ms(tl);
     }
