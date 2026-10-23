@@ -697,6 +697,8 @@ pub struct Split {
     /// The plain's front (cells beside the sea's water, the beach band or the open sea), the
     /// mouths that fit along it (HYD-138) and the mouths it holds.
     pub front_cells: u32,
+    /// The front's cells the main stem itself runs over (a stem along the plain's seaward edge).
+    pub front_on_stem: u32,
     pub fit: u32,
     pub mouths: u32,
     /// Chains added.
@@ -840,6 +842,10 @@ pub fn distributaries(
             },
             backwater_inside: backwater_m < run_m,
             front_cells: front.len() as u32,
+            front_on_stem: front
+                .iter()
+                .filter(|f| mouth.stem[apex..].contains(&f.1))
+                .count() as u32,
             fit: mouths_n as u32,
             mouths: 1,
             added: 0,
@@ -1211,6 +1217,7 @@ pub fn stats(plains: &Plains, splits: &[Split], land_cells: u64, cell_km2: f64) 
                 "river_q_m3s": r1(s.river_q),
                 "river_on_plain": s.river_on_plain,
                 "front_cells": s.front_cells,
+                "front_on_stem": s.front_on_stem,
                 "fit": s.fit,
                 "fails": s.fails,
             })
