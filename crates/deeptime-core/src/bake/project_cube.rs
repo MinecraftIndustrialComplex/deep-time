@@ -1459,6 +1459,9 @@ pub fn project_folder_cube(
         for (s, bytes) in srcs.iter().zip(outs) {
             let mut desc = s.layer.desc.clone();
             desc.grid = wg.clone();
+            // A cube grid's tiles never hold two faces: the face's own tile edge, not the
+            // Lambert grid's (256 does not divide a 4k face's 64 L1 cells).
+            desc.tile = wg.tile();
             layer_notes.push(json!([desc.name, format!("{:?}", s.kind).to_lowercase()]));
             if s.kind == Kind::Continuous
                 && matches!(desc.name.as_str(), "elevation" | "water_level" | "detail/amplitude")
