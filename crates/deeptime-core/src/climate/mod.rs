@@ -1240,6 +1240,8 @@ impl ClimateStage {
                 gap: ids(crate::plates::l1::GAP_FIELD),
                 prev_gap: ids(crate::surface::field::CRUST_GAP),
                 prev_offset: Some(&st.offset_m),
+                flags: ids("plates/flags"),
+                regime: ids("regime"),
                 parents: &parents,
                 known_plates: prev.len(),
                 dt_yr: dt_myr * 1.0e6,
