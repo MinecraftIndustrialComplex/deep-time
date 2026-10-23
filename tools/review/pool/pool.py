@@ -806,9 +806,11 @@ def cmd_alias(a):
             raise Fail(f"{k!r} is not a source key")
     if new == old:
         raise Fail("the two keys are the same")
-    old_target = aliases().get(old, {}).get("of", old)
     sets = list(a.set or [])
     envs = list(a.envs)
+    # OLD's runs of this arm: under OLD itself unless OLD is a verified alias for this arm (an alias
+    # recorded for other arms only does not move this one's folders).
+    old_target = resolve_key(old, a.preset, a.length, argkey_of(sets, envs, a.threads))
     reg = load_registry(a.registry or [])
     ctx_base = {"preset": a.preset, "length": a.length, "threads": a.threads, "sets": sets, "envs": envs,
                 "argkey": argkey_of(sets, envs, a.threads), "measures": [], "reg": reg, "keep_ck": False,
