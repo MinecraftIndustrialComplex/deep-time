@@ -2082,16 +2082,30 @@ pub(crate) fn settle_biome_layers(
     // The ice cover lies on the ground: where the world's sea stands the game has water, the ice
     // pass leaves a column whose top is fluid alone, and the class is the sea's (BIO-171), so the
     // cover goes too and a covered node stays of the class EF (BIO-158, BIO-159). ledger: BIO-177
-    let mut cover_cleared = 0usize;
+    // A covered node the land call settled to land took its class from a land donor, which may
+    // be bare ground beside the ice: it is of the class EF as every covered node is.
+    let (mut cover_cleared, mut cover_ef) = (0usize, 0usize);
     if let Some(ci) = cover_idx.filter(|&ci| held[ci].desc.grid == wg) {
         let hd = &mut held[ci];
         let cb = hd.desc.cell_bytes();
         let (scale, offset, dtype) = (hd.desc.scale, hd.desc.offset, hd.desc.dtype);
-        for k in (0..n).filter(|&k| sea[k]) {
+        let mut covered = vec![false; n];
+        for k in 0..n {
             let cell = &mut hd.bytes[k * cb..(k + 1) * cb];
             if hd.desc.physical(dtype.decode_scalar(cell)) > 0.0 {
-                put_raw(dtype, (0.0 - offset) / scale, cell);
-                cover_cleared += 1;
+                if sea[k] {
+                    put_raw(dtype, (0.0 - offset) / scale, cell);
+                    cover_cleared += 1;
+                } else {
+                    covered[k] = true;
+                }
+            }
+        }
+        if let Some(li) = class_idx {
+            let hd = &mut held[li];
+            for k in (0..n).filter(|&k| covered[k] && hd.bytes[k] != crate::climate::koppen::EF) {
+                hd.bytes[k] = crate::climate::koppen::EF;
+                cover_ef += 1;
             }
         }
     }
@@ -2113,6 +2127,7 @@ pub(crate) fn settle_biome_layers(
         "land_biome_under_sea": {"nodes": settled.to_sea.len(), "km2": km2(settled.to_sea.len())},
         "ocean_biome_on_dry_ground": {"nodes": settled.to_land.len(), "km2": km2(settled.to_land.len())},
         "ice_cover_off_the_sea": {"nodes": cover_cleared, "km2": km2(cover_cleared)},
+        "ice_cover_class_ef": {"nodes": cover_ef, "km2": km2(cover_ef)},
         "bake_blocks_per_world_block": ground.bake_blocks_per_world_block,
     })
 }
@@ -3204,11 +3219,14 @@ mod tests {
             i16_layer("climate/ridges", 0.4, 0.0),
             u8_layer("climate/wetland", 1, 0),
             u8_layer("climate/koppen_l2", 5, koppen::SEA),
-            // Six blocks of ice cover on the first four bands, whatever their medium.
+            // Six blocks of ice cover on the three mismatched bands, whatever their medium; the
+            // dry land beside them, the land donor, is bare.
             Held {
                 entry: 0,
                 desc: layer(ICE_COVER, DType::U8, 1.0, "blocks"),
-                bytes: (0..n).map(|k| if band(k) < 4 { 6 } else { 0 }).collect(),
+                bytes: (0..n)
+                    .map(|k| if matches!(band(k), 1..=3) { 6 } else { 0 })
+                    .collect(),
             },
         ];
         let before: Vec<Vec<u8>> = held.iter().map(|x| x.bytes.clone()).collect();
@@ -3276,24 +3294,31 @@ mod tests {
         let k_of = |b: usize| (h / 2) * w + (0..w).find(|&i| band(i) == b).unwrap() + w / 24;
         assert_eq!(at("climate/koppen_l2", k_of(2)) as u8, koppen::SEA);
         assert_eq!(at("climate/wetland", k_of(2)) as u8, biomes::WETLAND_NONE);
-        // The ice cover leaves the nodes the world's sea covers, and only those (BIO-177): every
-        // node still covered is of a land class.
+        // The ice cover leaves the nodes the world's sea covers, and only those, and a covered
+        // node that took a bare land donor's record is of the class EF (BIO-177): every node
+        // still covered is EF.
         assert_eq!(
             note["ice_cover_off_the_sea"]["nodes"].as_u64(),
             Some(in_band(2)),
             "{note}"
         );
+        assert_eq!(
+            note["ice_cover_class_ef"]["nodes"].as_u64(),
+            Some(in_band(1) + in_band(3)),
+            "{note}"
+        );
         assert_eq!(at(ICE_COVER, k_of(2)), 0.0);
-        for b in [0, 1, 3] {
+        for b in [1, 3] {
             assert_eq!(at(ICE_COVER, k_of(b)), 6.0, "band {b}");
         }
         for k in w..n - w {
             if at(ICE_COVER, k) > 0.0 {
-                assert_ne!(at("climate/koppen_l2", k) as u8, koppen::SEA, "node {k}");
+                assert_eq!(at("climate/koppen_l2", k) as u8, koppen::EF, "node {k}");
             }
         }
+        assert_eq!(at("climate/koppen_l2", k_of(0)) as u8, 5);
         for b in [1, 3] {
-            assert_eq!(at("climate/koppen_l2", k_of(b)) as u8, 5, "band {b}");
+            assert_eq!(at("climate/koppen_l2", k_of(b)) as u8, koppen::EF, "band {b}");
             assert_eq!(at("climate/wetland", k_of(b)) as u8, 1, "band {b}");
             assert!(
                 (at("climate/temperature", k_of(b)) - 0.1).abs() < 2e-4,
