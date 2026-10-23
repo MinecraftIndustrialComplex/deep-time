@@ -52,6 +52,30 @@ public record WrapEdge(String name, boolean normalX, boolean minSide, int coord,
         return v >= coord && v < (double) coord + depth;
     }
 
+    /**
+     * How deep the block (x, z) lies beyond this edge, in its band (0 touching the line), or -1 when it
+     * is not beyond the edge in its band. Where two bands overlap the topology folds by the edge the
+     * block is least deep beyond (docs/design/wrap-engine.md §12.2; ledger: SCL-181).
+     */
+    public int depthBeyond(int x, int z) {
+        if (!beyond(x, z))
+            return -1;
+        int v = normalX ? x : z;
+        return minSide ? coord - 1 - v : v - coord;
+    }
+
+    /** True when this edge's band and {@code o}'s share a block. */
+    public boolean bandOverlaps(WrapEdge o) {
+        return bandMinX() < o.bandMaxX() && o.bandMinX() < bandMaxX() && bandMinZ() < o.bandMaxZ() && o.bandMinZ() < bandMaxZ();
+    }
+
+    /** This edge moved by (dx, dz): its line, span and band moved, its motion conjugated (T ∘ iso ∘ T⁻¹). */
+    public WrapEdge translated(int dx, int dz) {
+        CellIsometry t = CellIsometry.translation(dx, dz);
+        return new WrapEdge(name, normalX, minSide, coord + (normalX ? dx : dz), spanLo + (normalX ? dz : dx), spanHi + (normalX ? dz : dx), depth,
+                t.compose(iso).compose(t.inverse()));
+    }
+
     /** Distance in blocks from the block (x, z) to the edge line, measured along the normal (0 = touching). */
     public int distanceInside(int x, int z) {
         int v = normalX ? x : z;

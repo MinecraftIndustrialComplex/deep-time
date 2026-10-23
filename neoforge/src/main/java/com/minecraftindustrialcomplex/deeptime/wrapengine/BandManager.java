@@ -112,7 +112,8 @@ public final class BandManager {
     void close() {
         closed = true;
         for (Long2IntOpenHashMap.Entry e : ticketLevel.long2IntEntrySet())
-            level.getChunkSource().removeRegionTicket(TICKET, source(e.getLongKey()), FULL - e.getIntValue(), new ChunkPos(e.getLongKey()));
+            for (ChunkPos src : sources(e.getLongKey()))
+                level.getChunkSource().removeRegionTicket(TICKET, src, FULL - e.getIntValue(), new ChunkPos(e.getLongKey()));
         ticketLevel.clear();
     }
 
@@ -183,23 +184,30 @@ public final class BandManager {
             int have = ticketLevel.get(key);
             if (want == have)
                 continue;
-            ChunkPos src = source(key);
             ChunkPos band = new ChunkPos(key);
-            if (have != Integer.MAX_VALUE)
-                level.getChunkSource().removeRegionTicket(TICKET, src, FULL - have, band);
-            if (want != Integer.MAX_VALUE) {
-                level.getChunkSource().addRegionTicket(TICKET, src, FULL - want, band);
-                ticketLevel.put(key, want);
-            } else {
-                ticketLevel.remove(key);
+            for (ChunkPos src : sources(key)) {
+                if (have != Integer.MAX_VALUE)
+                    level.getChunkSource().removeRegionTicket(TICKET, src, FULL - have, band);
+                if (want != Integer.MAX_VALUE)
+                    level.getChunkSource().addRegionTicket(TICKET, src, FULL - want, band);
             }
+            if (want != Integer.MAX_VALUE)
+                ticketLevel.put(key, want);
+            else
+                ticketLevel.remove(key);
         }
         wantedLevel.clear();
     }
 
-    private ChunkPos source(long bandKey) {
-        WrapTopology.ChunkFold cf = topology.chunkFold(ChunkPos.getX(bandKey), ChunkPos.getZ(bandKey));
-        return new ChunkPos(cf.sourceX(), cf.sourceZ());
+    /** The distinct source chunks of a band chunk: one, or two or three for a split chunk (design §12.2). */
+    private List<ChunkPos> sources(long bandKey) {
+        List<ChunkPos> out = new ArrayList<>(1);
+        for (WrapTopology.ChunkSource s : topology.chunkSources(ChunkPos.getX(bandKey), ChunkPos.getZ(bandKey))) {
+            ChunkPos p = new ChunkPos(s.sourceX(), s.sourceZ());
+            if (!out.contains(p))
+                out.add(p);
+        }
+        return out;
     }
 
     private void copyPending() {
@@ -212,16 +220,22 @@ public final class BandManager {
             long key = it.nextLong();
             int bx = ChunkPos.getX(key), bz = ChunkPos.getZ(key);
             LevelChunk band = level.getChunkSource().getChunkNow(bx, bz);
-            WrapTopology.ChunkFold cf = topology.chunkFold(bx, bz);
-            if (band == null || cf == null) {
-                if (cf == null)
+            WrapTopology.ChunkColumns cc = topology.chunkColumns(bx, bz);
+            if (band == null || cc == null) {
+                if (cc == null)
                     it.remove();
                 continue;
             }
-            LevelChunk src = level.getChunkSource().getChunkNow(cf.sourceX(), cf.sourceZ());
-            if (src == null)
-                continue; // its ticket loads it; try again next tick
-            copy(band, src, cf.iso());
+            LevelChunk[] srcs = new LevelChunk[cc.sources().size()];
+            boolean all = true;
+            for (int i = 0; i < srcs.length && all; i++) {
+                WrapTopology.ChunkSource s = cc.sources().get(i);
+                srcs[i] = level.getChunkSource().getChunkNow(s.sourceX(), s.sourceZ());
+                all = srcs[i] != null;
+            }
+            if (!all)
+                continue; // its tickets load them; try again next tick
+            copy(band, srcs, cc);
             if (fresh.remove(key))
                 dropGeneratedMobs(band);
             it.remove();
@@ -230,24 +244,47 @@ public final class BandManager {
         }
     }
 
-    /** Rewrites a band chunk from its source: every block that differs from the source's turned state. */
-    private void copy(LevelChunk band, LevelChunk src, CellIsometry iso) {
-        Rotation toBand = WrapEngine.rotation(iso.inverse());
-        Map<BlockState, BlockState> turned = new IdentityHashMap<>();
-        LevelChunkSection[] bs = band.getSections(), ss = src.getSections();
+    /**
+     * Rewrites a band chunk from its sources: every block that differs from its source's turned state.
+     * A split chunk takes each column from the source its fold names.
+     */
+    private void copy(LevelChunk band, LevelChunk[] srcs, WrapTopology.ChunkColumns cc) {
+        int n = srcs.length;
+        CellIsometry[] isos = new CellIsometry[n];
+        Rotation[] toBand = new Rotation[n];
+        @SuppressWarnings("unchecked")
+        Map<BlockState, BlockState>[] turned = new Map[4];
+        for (int i = 0; i < n; i++) {
+            isos[i] = cc.sources().get(i).iso();
+            toBand[i] = WrapEngine.rotation(isos[i].inverse());
+        }
+        LevelChunkSection[] bs = band.getSections();
         int bx0 = band.getPos().getMinBlockX(), bz0 = band.getPos().getMinBlockZ();
+        byte[] columns = cc.columns();
         long written = 0;
         for (int si = 0; si < bs.length; si++) {
-            LevelChunkSection b = bs[si], s = ss[si];
-            if (b.hasOnlyAir() && s.hasOnlyAir())
+            LevelChunkSection b = bs[si];
+            boolean air = b.hasOnlyAir();
+            for (int i = 0; i < n && air; i++)
+                air = srcs[i].getSections()[si].hasOnlyAir();
+            if (air)
                 continue;
             int y0 = band.getSectionYFromSectionIndex(si) << 4;
             for (int lz = 0; lz < 16; lz++) {
                 for (int lx = 0; lx < 16; lx++) {
+                    int ci = columns[(lz << 4) | lx];
+                    if (ci < 0)
+                        continue;
+                    CellIsometry iso = isos[ci];
+                    LevelChunkSection s = srcs[ci].getSections()[si];
+                    Rotation rot = toBand[ci];
+                    Map<BlockState, BlockState> memo = turned[rot.ordinal()];
+                    if (memo == null)
+                        memo = turned[rot.ordinal()] = new IdentityHashMap<>();
                     int x = bx0 + lx, z = bz0 + lz;
                     int sx = iso.applyX(x, z) & 15, sz = iso.applyZ(x, z) & 15;
                     for (int ly = 0; ly < 16; ly++) {
-                        BlockState want = turned.computeIfAbsent(s.getBlockState(sx, ly, sz), st -> st.rotate(toBand));
+                        BlockState want = memo.computeIfAbsent(s.getBlockState(sx, ly, sz), st -> st.rotate(rot));
                         if (b.getBlockState(lx, ly, lz) != want) {
                             writeCopy(band, new BlockPos(x, y0 + ly, z), want);
                             written++;
@@ -274,7 +311,9 @@ public final class BandManager {
 
     /**
      * After a stored block changed: its turned copy into every loaded band chunk that shows it. Unloaded
-     * band chunks are copied when they load.
+     * band chunks are copied when they load. {@code pos} is in the stored chunk's own frame; a target
+     * is written only where its fold is {@code pos} (near two bands' diagonal a motion of the chunk
+     * shows only part of it, design §12.2).
      */
     public void replicate(LevelChunk stored, BlockPos pos, CellIsometry[] images) {
         if (closed)
@@ -283,6 +322,9 @@ public final class BandManager {
         BlockState state = stored.getBlockState(pos);
         for (CellIsometry g : images) {
             int x = g.applyX(pos.getX(), pos.getZ()), z = g.applyZ(pos.getX(), pos.getZ());
+            WrapTopology.Fold back = topology.fold(x, z);
+            if (back == null || back.x() != pos.getX() || back.z() != pos.getZ())
+                continue;
             if (!onThread) {
                 markDirty(ChunkPos.asLong(x >> 4, z >> 4));
                 continue;
@@ -336,6 +378,7 @@ public final class BandManager {
      * A direct {@code LevelChunk.setBlockState} into a band chunk (a mod or tool writing chunk storage):
      * written to the stored block instead, turned, through the source chunk's own {@code setBlockState}
      * (so it replicates back into this band chunk). Returns what that returns, turned back.
+     * {@code pos} is in the band chunk's own frame and {@code iso} is its column's motion.
      */
     public BlockState redirectChunkWrite(LevelChunk band, CellIsometry iso, BlockPos pos, BlockState state, boolean isMoving) {
         int sx = iso.applyX(pos.getX(), pos.getZ()), sz = iso.applyZ(pos.getX(), pos.getZ());
