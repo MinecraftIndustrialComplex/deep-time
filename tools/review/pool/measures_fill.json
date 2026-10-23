@@ -1,0 +1,22 @@
+{
+  "_doc": "The release-pace task's measure (2026-10-23): how fast the surface's own sediment fills the closed basins of the final L1 surface, measure_fill.py. Pass with --registry tools/review/pool/measures_fill.json (with measures_basins.json for the counts).",
+  "measures": {
+    "fill": {
+      "version": 1,
+      "doc": "Deposition into the closed basins deeper than 10 blocks (the basins measure's) at the last step: the median basin's rate, the km3 a Myr into all of them, their room, the time that rate takes to fill them, the median basin's fill time, the share that fills within 10 Myr, the median sediment thickness; definitions in measure_fill.py",
+      "command": ["{py}", "-I", "{tools}/measure_fill.py", "{run}"],
+      "python": "numpy",
+      "needs": ["fields"],
+      "fields": ["elevation", "surface/deposition_m_myr", "surface/sediment_m"],
+      "columns": [
+        {"key": "fill_dep_med_m_myr", "label": "median basin's deposition, m/Myr", "target": null, "digits": 1},
+        {"key": "fill_dep_km3_myr", "label": "deposition into the basins, km3/Myr", "target": null, "digits": 1},
+        {"key": "fill_room_km3", "label": "their room, km3", "target": null, "digits": 0},
+        {"key": "fill_myr", "label": "room / deposition, Myr", "target": null, "digits": 0},
+        {"key": "fill_myr_med", "label": "median basin's fill time, Myr", "target": null, "digits": 0},
+        {"key": "fill_fast_share", "label": "share filling within 10 Myr", "target": null, "digits": 2},
+        {"key": "fill_sed_med_m", "label": "median basin's sediment, m", "target": null, "digits": 0}
+      ]
+    }
+  }
+}
