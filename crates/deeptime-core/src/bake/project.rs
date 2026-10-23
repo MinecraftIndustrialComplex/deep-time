@@ -123,7 +123,8 @@ const MAX_SAMPLES_Z: usize = 64;
 /// takes it for how far that cell's stack rose, so it must be the same cell's (STR-055).
 /// `delta` (2026-10-23) is a number too, what a delta plain added to the ground, but it says where
 /// the plain is: the world's plain is the nearest cell's ([`PLAIN_NEAREST`]), and a footprint mean
-/// spread the layer over 5,747 sea cells beside the D5 world's plains (HYD-146).
+/// spread the layer over 5,747 cells beside the D5 world's plains, 4,808 of them not above the
+/// sea's level (HYD-146).
 const CATEGORICAL: [&str; 9] = [
     "climate/koppen",
     "climate/koppen_l2",
@@ -142,8 +143,8 @@ const CATEGORICAL: [&str; 9] = [
 /// bilinear read and the footprint mean blend its edge with the beach band and the sea beside it,
 /// which lie a fraction of a block under the sea. On the D5 world 3,534 of the 24,313 world cells
 /// on a plain fell under the sea that way (the mean 0.10 blocks under it at the median) and 1,048
-/// more were rounded onto the sea's level, so 79 % stood above the sea against the bake's 97 %.
-/// The amplitude is 0 on the plain (`water`), and the world's is too. ledger: HYD-146
+/// more whose mean stood over it ended at or under it, so 79 % stood above the sea against the
+/// bake's 97 %. The amplitude is 0 on the plain (`water`), and the world's is too. ledger: HYD-146
 pub(crate) const PLAIN_NEAREST: [&str; 2] = ["elevation", "detail/amplitude"];
 
 /// Per source of one grid, whether a world cell on a delta plain takes its nearest cell
