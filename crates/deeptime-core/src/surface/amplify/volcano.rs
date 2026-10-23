@@ -539,7 +539,7 @@ mod tests {
             area: vec![1.0; n],
             wgt: vec![1.0; n],
             kfac: vec![1.0; n],
-            lake: vec![0; n],
+            lake_z: vec![crate::surface::amplify::resample::NO_LAKE; n],
             zs: Vec::new(),
         };
         let it = &sh.items[0];
@@ -682,7 +682,7 @@ mod tests {
             area: vec![1.0; n],
             wgt: vec![1.0; n],
             kfac: vec![1.0; n],
-            lake: vec![0; n],
+            lake_z: vec![crate::surface::amplify::resample::NO_LAKE; n],
             zs: Vec::new(),
         };
         sh.sharpen_level(&mut level, &g2);

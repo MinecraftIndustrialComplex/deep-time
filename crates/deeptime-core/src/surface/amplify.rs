@@ -764,7 +764,12 @@ pub fn level_from_world(world: &WorldState, p: &PlanetPreset) -> Result<Level, C
         area: get(young::field::AREA_M2)?.clone(),
         wgt: get(young::field::WEIGHT)?.clone(),
         kfac: get(young::field::ERODIBILITY)?.clone(),
-        lake: lake.iter().map(|&m| u8::from(m > 0.0)).collect(),
+        // A lake's surface: its floor plus the depth the young landscape's flood filled it to.
+        lake_z: lake
+            .iter()
+            .zip(z)
+            .map(|(&m, &g)| if m > 0.0 { g + m } else { resample::NO_LAKE })
+            .collect(),
         zs,
     })
 }
