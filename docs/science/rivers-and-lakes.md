@@ -204,7 +204,7 @@ V1 gap 5 (physics-gap-audit.md, "Rivers and deltas"), stage 1 of four: delta pla
 
 **The game.** Nothing new in the column rule: a distributary is a chain like any other, and the existing rule (the deep hit, the channel through the sea, HYD-120 to HYD-124) cuts it at the bake's width and depth with its water at the sea's surface, one block below the plain. `DeltaGameTests` on a synthetic delta world (`deeptime synth --kind delta-test`) checks the carving.
 
-
+## Navigable rivers and deltas on the D5 world (measured 2026-10-22)
 
 Ben's reports of 2026-10-22: "I am yet to see a navigable river / interior waterway within the modpack" and "Do we have river deltas, I'm yet to see one?". This section only measures. No code was changed, and the live play server was read, never written. The world is D5, the play world on master d74c74aa (tag `play-d5`, workbench run 1a16576c9de, format 0.6, Petroff-Guyou, 13,312 blocks round, 294.6 m per block, 35 m per block of height).
 
