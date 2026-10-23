@@ -334,7 +334,7 @@ mod tests {
         for _ in 0..20 {
             (l, keel) = advance(l, keel, SUBDUCTION_ZONE, 2.0);
         }
-        assert!(l >= KEEL_KM && l < 201.0, "{l}");
+        assert!((KEEL_KM..201.0).contains(&l), "{l}");
         assert_eq!(keel, KEEL_KM);
         let age = thermal_age_myr(l);
         assert!(age > 350.0, "{age}");
