@@ -1837,6 +1837,130 @@ fn a_cordillera_takes_its_crust_from_behind_the_range() {
     );
 }
 
+/// Subduction erosion (PLT-441, PLT-442): an oceanic slab coming in faster than the threshold
+/// under little sediment takes the rate's crust per km of erosive front from the overriding
+/// plate's forearc, every km³ of it booked, no column below an ocean's and none raised; a slower
+/// slab, or one under more than the cover threshold, takes none.
+#[test]
+fn an_erosive_front_takes_its_forearc_to_the_mantle() {
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    p.tectonics.subduction_erosion_km3_per_km_myr = 90.0;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let total = |st: &PlateState| -> f64 {
+        st.samples
+            .iter()
+            .map(|s| s.pools.iter().map(|&x| f64::from(x)).sum::<f64>())
+            .sum()
+    };
+    let run = |speed: f64, cover_m: f32| {
+        let (mut st, geo, pos) = two_plates(&p, &env, 0.1);
+        st.plates[1].omega = (DVec3::X * env.norm.omega_of_speed(speed)).to_array();
+        for s in st.samples.iter_mut().filter(|s| s.kind != CONTINENTAL) {
+            s.pools[state::pool::SEDIMENTARY] = cover_m;
+            s.thickness_m = pools::thickness(&s.pools);
+        }
+        let mut cones = vec![[0.0; 2]; st.samples.len()];
+        let pull = subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+        let before = st.clone();
+        let forearcs = pull.forearcs.expect("the rule is on");
+        let e = subduction::erode_forearcs(&mut st, &env, &forearcs);
+        (before, st, e)
+    };
+    let (before, after, e) = run(80.0, 200.0);
+    assert!(e.front_continental_km_myr > 0.0, "{e:?}");
+    let asked = 90.0 * (e.front_continental_km_myr + e.front_oceanic_km_myr);
+    let booked = e.continental_km3 + e.other_km3;
+    assert!(
+        (booked + e.short_km3 - asked).abs() < 1e-3 * asked,
+        "{booked} + {} km³ booked for {asked}",
+        e.short_km3
+    );
+    let lost = (total(&before) - total(&after)) * env.norm.sample_area_km2() / 1000.0;
+    assert!(
+        (lost - booked).abs() < 1e-3 * booked,
+        "{lost} lost, {booked} booked"
+    );
+    let mut thinned = 0;
+    for (a, b) in before.samples.iter().zip(&after.samples) {
+        if b.thickness_m < a.thickness_m - 1.0 {
+            thinned += 1;
+            assert!(b.thickness_m >= 6999.0, "a forearc below an ocean's column");
+            assert!(b.elevation_m <= a.elevation_m, "an eroded forearc rose");
+        }
+    }
+    assert!(thinned > 0);
+    for (speed, cover) in [(50.0, 200.0), (80.0, 1500.0)] {
+        let (_, _, e) = run(speed, cover);
+        assert_eq!(e, subduction::Eroded::default(), "{speed} mm/yr, {cover} m");
+    }
+}
+
+/// Sediment subduction (PLT-440): of the sediment and sedimentary rock on oceanic crust hidden
+/// under the overriding plate, a resampling sends its share to the mantle and accretes the rest;
+/// the subducted global books what the accretion lost, and a run without the rule has no global.
+#[test]
+fn a_resampling_subducts_its_share_of_the_slabs_sediment() {
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let (mut st, geo, pos) = two_plates(&p, &stage.env(&p.tectonics, 1), 0.1);
+    for s in st.samples.iter_mut().filter(|s| s.is_hidden()) {
+        s.pools[state::pool::SEDIMENT] = 100.0;
+        s.pools[state::pool::SEDIMENTARY] = 400.0;
+        s.thickness_m = pools::thickness(&s.pools);
+    }
+    let conserved = |st: &PlateState| -> f64 {
+        st.samples
+            .iter()
+            .map(|s| {
+                s.pools[..state::pool::CONSERVED]
+                    .iter()
+                    .map(|&x| f64::from(x))
+                    .sum::<f64>()
+            })
+            .sum()
+    };
+    let mut out = Vec::new();
+    for share in [0.0, 0.83] {
+        p.tectonics.sediment_subduction_share = share;
+        let env = stage.env(&p.tectonics, 1);
+        let mut s2 = st.clone();
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        ridges::resample(
+            &mut s2,
+            &mut world,
+            &pos,
+            &Tree::over(&pos, |_| true),
+            &geo,
+            &env,
+        )
+        .unwrap();
+        out.push((
+            conserved(&s2) * env.norm.sample_area_km2() / 1000.0,
+            world
+                .globals
+                .get(ridges::ACCRETED_GLOBAL)
+                .copied()
+                .unwrap_or(0.0),
+            world
+                .globals
+                .get(ridges::SEDIMENT_SUBDUCTED_GLOBAL)
+                .copied(),
+        ));
+    }
+    let (kept, sent) = (&out[0], &out[1]);
+    assert_eq!(kept.2, None);
+    let down = sent.2.expect("the subducted global");
+    assert!(down > 0.0);
+    assert!(
+        ((kept.1 - sent.1) - down).abs() < 1e-3 * down,
+        "accreted {} → {} km³ for {down} km³ subducted",
+        kept.1,
+        sent.1
+    );
+    assert!(((kept.0 - sent.0) - down).abs() < 1e-3 * down);
+}
+
 /// Plate task 8 (the gap budget's recommendation 1): continental crust a resampling accretes
 /// raises the surface by its Airy height, never past the column's, and the surface gets the rise
 /// as uplift; crust a collision already stacked is consumed and raises far less.

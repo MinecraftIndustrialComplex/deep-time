@@ -140,6 +140,67 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-22: The trench budget (V1 item 1, gap 3): sediment subduction (PLT-440), subduction erosion where Clift & Vannucchi find it (PLT-441, PLT-442) and the trench's release (PLT-443), all `--set` switches off by default; Ben's D5 deep floor was fossil trench depth carried across the basins, and Earth's share deeper than 6 km is 0.0073; with the high ground's sheet the pair brings land back into the band and balances the continental budget, at 3.08 criteria a run (sheet 3.50, base 2.17, p 0.073), so nothing ships (coordinator's task, brief build/coord/briefs/trench-budget.md; agent worktree .claude/worktrees/agent-a5630fbf23836cfa2, branch worktree-agent-a5630fbf23836cfa2 from master 883a8ef6, master 18ace5d7 merged in at 0e7e2410; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Code** (plates only, no format change; each rule a `TectonicParams` key, 0 = off, and the branch with them off is master bit for bit: `pool.sh alias` at 100 and 1,000 Myr, base and sheet argument sets):
+  - `tectonics.sediment_subduction_share` (PLT-440). It acts in `plates/ridges.rs`, at the resampling's accrete branch. Of subducted ocean floor, the share s of its sediment and sedimentary pools goes down; the rest accretes as before. It is booked in `plates/sediment_subducted_km3`.
+  - `tectonics.subduction_erosion_km3_per_km_myr` (PLT-441), with `subduction_erosion_min_mm_yr` 60 and `subduction_erosion_max_sediment_m` 1,000 (PLT-442). The code is `plates/subduction.rs` (`Forearcs`, `erode_forearcs`), called from `plates/mod.rs` after the fronts. The gap budget's part is `forearc`, and the globals are `plates/forearc_*`.
+  - `tectonics.trench_release_half_life_myr` (PLT-443). The code is `plates/pools.rs` (`SurfaceRates.trench_release`, `gdh1_floor_m`) and `plates/mod.rs` `surface()`. Off-trench ocean floor below GDH1's floor for its age rises back to it.
+  - Tests are in `plates/tests.rs`.
+- **Tools:**
+  - the pool measure `trench` (`tools/review/pool/measure_trench.py`, registry `measures_trench.json`);
+  - the loss table's rows for both new losses (`tools/review/loss-budget.py`);
+  - `tools/review/earth-deep-floor.py` (SRTM15+ at 15');
+  - `tools/review/trench-depth.py` (a bake's trenches).
+- **D5's deep floor** (Ben's bake: 0.21 of the sea floor deeper than 6 km, deepest 12,803 m; Earth 0.0073 and 10,920 m, HYP-050 and HYP-051):
+  - *Fossil trench depth.* The trench law pulls a sample towards z_t, the flag moves on, and GDH1 never lifts the floor back. On master 883a8ef6 this is 0.088 of the sea floor and all of it deeper than 8 km.
+  - *GDH1's old floor under a sea 750 to 820 m over the datum.* This is 0.044 to 0.049 of the sea floor.
+  - *The surface stage's own deepening.* It adds 2.2 to 2.3 km at the deepest point.
+  - *With the release.* Pulled floor falls to 0.010 to 0.020, deeper than 8 km to 0.002 to 0.003, and the plate model's floor deeper than 6 km below the datum to 0.007 to 0.017. What is left is the high sea's, and the surface stage's at trench rows.
+- **The guard's worst cell** (scratch trace, never committed: supercontinent seed 1).
+  - *On master 18ace5d7.* The worst cell is trench-pulled ocean floor in 483 of 485 steps past 11 km. The plates hold it 10.3 km under the sea and the surface stage 2.8 km more.
+  - *With the trench rules on.* It is a current trench row in 294 of 322 steps. The plates hold it 6.9 km under the sea and the surface stage 4.8 km more; 5 of the 6 steps past 14 km are poleward of 60°.
+  - *Overall.* The guard's median worst does not move with this lane (15.6 to 16.9 km, p 0.27 or more). The remainder belongs to the surface lane.
+- **Measured** (pool, earthlike_quick_16k 1,000 Myr, `+DEEPTIME_CRUST_BUDGET=1`).
+  - *Exploration.* On master 883a8ef6, seeds 1 and 2, see plates.md. PLT-312 stays off: 3.5 to 2.5 criteria a run, and one run reached 82 km from the sea.
+  - *Interaction check on 18ace5d7.* Seeds 1 to 4, base and sheet on matched seeds. In criteria a run (mean): base 2.50, sheet 3.50, trench budget (release, s 0.12, E 90) 2.00, trench with sheet 2.88.
+  - *Twelve runs of trench with sheet* (`trench-m-rs12e-sheet`, key eb4ef634e607, argkey 86d11d8b), against `base` / `fg-sheet`:
+
+    | measure | trench with sheet | base | sheet |
+    |---|---|---|---|
+    | land | 0.300 | 0.292 | 0.342 |
+    | runs with land in the band | 7 of 12 | 6 | 2 |
+    | criteria a run | 3.08 (p 0.073) | 2.17 | 3.50 |
+    | net continental change, km³ a year | +0.03 | −0.38 | +0.82 |
+    | sediment subducted, km³ a year | 1.29 (Earth 1.1) | | |
+    | eroded, km³ a year | 0.88 (Earth 1.4) | | |
+    | deeper than 6 km | 0.099 | 0.145 | |
+    | deeper than 8 km | 0.0029 | 0.032 | |
+    | deepest, m | 10,864 | 13,093 | |
+
+  - *Earth's share s = 0.83.* It subducts 8.6 km³ a year from this model's ocean and drowns the land (0.16 to 0.19).
+- **Gates** (on the VM, merged head; `build/trench/fullcheck.sh`, run with `tools/remote/mac.sh --kind cargo:test`):
+  - `cargo fmt --check`: clean;
+  - `cargo test --workspace --no-fail-fast`: every binary ok (deeptime-core 903 passed, 5 ignored);
+  - `clippy -D warnings`: clean;
+  - `cargo deny check licenses bans`: ok.
+- **Calls** (mine, undoable):
+  - s = 0.12 (`calibrated` to Table 1's flux) over Earth's 0.83;
+  - E = 90 (Clift & Vannucchi's global average);
+  - the release at the trench law's own 2 Myr (`game-choice`);
+  - nothing on by default (the ship rule: p 0.073);
+  - PLT-312 off.
+- **Docs:**
+  - plates.md "The trench budget (2026-10-22)" and the ledger-ids row;
+  - PLT-440 to PLT-444 and PLT-312's row amended;
+  - HYP-050 and HYP-051;
+  - the bibliography's "The trench budget";
+  - claims counts.
+- **Next:**
+  - the coordinator merges; nothing changes by default;
+  - for the pair's ship decision, twelve more seeds of `base`, `fg-sheet` and `trench-m-rs12e-sheet`;
+  - the surface lane: the deepening at polar trench rows;
+  - this lane, later: z_t from the slab's age (Jarrard 1986).
+
 ### 2026-10-22: The quick 16k world fits the default 4 GiB cap again: the amplifier's windows no longer carry the lake surface (AMP-090) (coordinator's task after master facf9356 failed four deeptime-cli tests; agent worktree .claude/worktrees/agent-abffaab214ac9e912, branch worktree-agent-abffaab214ac9e912 from master facf9356; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Cause** (VM, master facf9356). The four tests (editor `edits_land_where_the_core_reads_them`, `a_tuned_code_from_the_game_loads_unchanged`, `a_run_over_its_memory_cap_is_refused_and_a_raised_cap_allows_it`, watch `workbench_queue_editor_and_kept_runs`) fail because the editor refuses pipeline_quick_16k at the default cap: needed (peak + `SERVER_OVERHEAD_BYTES`) 4,389,206,656 B against 4,294,967,296, 94,239,360 B over. The pit merge 9f51d372 added the lake surface twice: `Level::lake_z` (level 21 to 24 B a cell, +6,291,456 B on the world's L2 level) and an f32 copy in every window, `Buf::lake_z` (tile 79 to 83 B a cell, +134,217,728 B on the whole last level). The second is what broke the cap: the amplifier's base estimate (3,852,335,744 B) went over the 3.5 GiB stage cap, so no streaming could fit it either.
 - **Fix** (`surface/amplify/`). The window copy goes: `Fine::lake_z` and `Buf::lake_z` removed, `Buf::BYTES_PER_CELL` back to 12 x 4 + 2 + 4 (tile 79 B). The quad rule (the highest lake surface among the cell's 1, 2 or 4 coarse corners) moves into `Level::lake_surface` (resample.rs), which `Level::sample` uses for the lake flag; `LevelSink::put` (tiles.rs) sets the next level's `lake_z` from it for each flagged cell (`LevelTile` hands on the 1-B flags and the coarse level, `from`, in place of the f32s). The flags are never changed after sampling, so every level's `lake_z` is the value the window used to carry. `LEVEL_BYTES_PER_CELL` stays 24: the level does keep 4 B of lake surface. Tests (resample.rs, tests.rs) read the surface through `lake_surface`; `auto_streams_when_whole_is_too_big`'s pinned bytes are the 79-B ones again. The rule itself is unchanged (the savanna-pit lane owns it).

@@ -112,7 +112,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 44] = [
+const GLOBALS: [(&str, &str); 50] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -162,6 +162,18 @@ const GLOBALS: [(&str, &str); 44] = [
         super::subduction::FRONT_G_CONTINENTAL_NORMAL_GLOBAL,
     ),
     ("transition_moved", super::transition::MOVED_GLOBAL),
+    ("sed_subducted", super::ridges::SEDIMENT_SUBDUCTED_GLOBAL),
+    ("forearc_c", super::subduction::FOREARC_CONTINENTAL_GLOBAL),
+    ("forearc_o", super::subduction::FOREARC_OTHER_GLOBAL),
+    ("forearc_short", super::subduction::FOREARC_SHORT_GLOBAL),
+    (
+        "forearc_front_c",
+        super::subduction::FOREARC_FRONT_CONTINENTAL_GLOBAL,
+    ),
+    (
+        "forearc_front_o",
+        super::subduction::FOREARC_FRONT_OCEANIC_GLOBAL,
+    ),
     ("hotspot_magma", super::hotspots::MAGMA_GLOBAL),
     ("rate_capped", super::rate::CAPPED_GLOBAL),
     ("accreted_visible", super::ridges::ACCRETED_VISIBLE_GLOBAL),
