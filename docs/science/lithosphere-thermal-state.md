@@ -487,7 +487,8 @@ Under it, on the coordinator's instruction of the same day:
   founder half), and the switches `transition_beta` and `root_removal` (a preset that sets either
   is now refused as an unknown key). The old heat-flow proxy (PLT-137) and the orogeny's age as the
   strength's clock (ISO-051, PLT-415) remain only under `thermal_state=false`, which tests that
-  isolate one law set (the collapse's fixture, the heat-flow pass's bake test).
+  isolate one law set (the collapse's fixture, the heat-flow pass's bake test with the release
+  pace, and its plates test, `the_final_heat_flow_pass_lifts_only_low_continental_samples`).
 - **Correct by its sources, the unit tests:** the cooling and heating laws and the keel
   (`thermal.rs`: McKenzie's τ_c and the inverse thermal age, Jordan's keel against back-arc heating,
   Houseman & Molnar's drop-off held by a keel, stretching by β), the heat flow's floor at an old
