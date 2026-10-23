@@ -905,6 +905,11 @@ def main():
     al.add_argument("--all-arms", action="store_true", help="the alias covers every arm, not only the one checked")
     al.set_defaults(fn=cmd_alias, length=100)
 
+    pe = sub.add_parser("pyenv", help="print the python with numpy and scipy the measures use (built with nix on first use)")
+    pe.add_argument("name", nargs="?", default="numpy")
+    pe.add_argument("--registry", action="append")
+    pe.set_defaults(fn=lambda a: print(pyenv(load_registry(a.registry or []), a.name)) or 0)
+
     sub.add_parser("arms").set_defaults(fn=cmd_arms)
     sub.add_parser("status").set_defaults(fn=cmd_status)
     g = sub.add_parser("gc")

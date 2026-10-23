@@ -39,7 +39,7 @@ def _u_counts(m, n):
 
 def mwu(x, y):
     """Two-sided Mann-Whitney U p-value, as scipy.stats.mannwhitneyu(x, y) gives it by default: exact
-    when both samples have 8 values or fewer and there are no ties, else the normal approximation with
+    when the smaller sample has 8 values or fewer and there are no ties, else the normal approximation with
     the tie and the continuity corrections. None when a sample is empty."""
     n1, n2 = len(x), len(y)
     if n1 == 0 or n2 == 0:
@@ -49,7 +49,7 @@ def mwu(x, y):
     u = max(u1, n1 * n2 - u1)
     n = n1 + n2
     tied = len(set(x) | set(y)) < n
-    if not tied and max(n1, n2) <= 8:
+    if not tied and min(n1, n2) <= 8:
         counts = _u_counts(n1, n2)
         tail = sum(counts[int(round(u)):]) / sum(counts)
         return min(1.0, 2.0 * tail)
