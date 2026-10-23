@@ -5394,3 +5394,84 @@ deepening at trench rows, the sediment's routing (the sea 600 to 1,170 m over th
 length, the trench's depth against the slab's age and the collisions under the trench budget. The
 high ground's "What is left" holds too, the belts' extent first. The coast with high ground (0.34 of
 the coast against at most 0.15) is the criterion no arm moves.
+
+## The polar peaks (2026-10-23)
+
+The coordinator's lane after the trench rows ([flexure.md](flexure.md), "The trench rows", "What is
+left"): in two of three traced runs the plate model's columns stood 15.5 to 29.4 km above the sea
+on the polar rows, held at the rise guard's ceiling (PLT-288, 3.5 mm/yr) step after step and
+reaching for the preset's 30 km cap (`max_elevation_m`). On the pool's base (master bf8477b2, key
+7f9d8f115049, 24 runs) the guard's worst is 11.9 to 30.0 km, median 13.7 km, and over 24 km in four
+runs (scattered 4 and 7, supercontinent 5 and 7). Ledger ISO-120 (new). Code: `surface/flexure.rs`
+and `surface/mod.rs` (the law), `plates/peaks.rs` with hooks in `plates/mod.rs` and
+`plates/gap_budget.rs` (the trace, measurement only).
+
+### The trace
+
+`DEEPTIME_PEAK_TRACE=<m>` (`plates/peaks.rs`, off by default, no rule reads it) prints, every plate
+step, the visible samples that end the step higher than `<m>` (at most six a step, the highest
+first): latitude, crust kind, regime and flags, the crust's thickness, the height before the
+surface's feedback, after it and at the step's end, the Airy height, the surface's flexure `F` under
+the sample and the settling's target, and with the gap budget on (`DEEPTIME_GAP_BUDGET`) each
+process's change of the height and the thickness over the step and the largest parts of the gap.
+The arm `pp-trace` (key 81404d9815b5, the base's code with the trace) ran seeds 1 to 4, both
+starts, 1000 Myr, with `+DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_GAP_BUDGET=1 +DEEPTIME_PEAK_TRACE=10000`.
+Its V1 census and guard equal the base's runs to the digit (three runs compared; the state hashes
+differ, since the budget keeps its parts in the state). Scratch readers `peaks.py`, `peaks_agg.py`
+and `peaks_polar.py` (in the lane's `build/polar-peaks/`, not kept).
+
+Over the eight runs, 314 lines (a sample above 10 km at a step): 252 continental, 62 oceanic.
+
+- **What holds them up is the settling.** 236 of the 252 continental lines were last raised by the
+  settling (ISO-078), and 188 of the 209 whose `F` is known stand at its target, the Airy height
+  plus `F`, within 50 m. Quartiles: `F` 10.8, 14.3 and 20.1 km; the height over the Airy height
+  10.7, 13.6 and 19.3 km; the crust 25.0, 33.7 and 39.2 km thick. Summed over the continental
+  lines, the settling raised them 1,499 km in the step and the subduction stage's heights
+  (`subduction::fronts_finish`) took 717 km back; each step the one undid the other.
+- **What feeds them is the collapse.** The crust that reached them in the step came from the
+  collapse (799 km summed over the lines; 78 lines took more than 1 km in their step) and the
+  thickest crust's spread (PLT-277, 274 km, nearly all in scattered 4), against 104 km of
+  resampling's accretion and 22 km from the arcs. They are back-arc (67 lines), rift (56),
+  collision (48) and passive-margin (23) samples, with no collision under way at the step
+  (`coll_mm_yr` 0 in every quartile).
+- **Why they are room.** The collapse and the spread fill continental crust thinner than their
+  column (PLT-412's T_col, at most 41.1 km; PLT-277's 50 km) and ocean floor. These columns are 25
+  to 40 km thick, so they are room, whatever their height: a column held 15 km over its Airy height
+  takes crust as if it were lowland.
+- **`F` grows, and nothing bounds it.** `F` is the load the surface's plate holds away from local
+  isostasy, over the restoring density. Under a column the collapse fed step after step it grew by
+  1.5 to 3.7 km a step. The worst run's worst column, scattered 4, sample 65563, a rift column at
+  10 to 15°S: from −438 to −432 Myr the collapse gave it 10.0, 10.0, 10.0 and 8.6 km of crust a step
+  (the thickening's rate limit, PLT-287), its crust stayed 37.6 to 39.3 km thick (the surface
+  eroded about as much: the gap budget's erosion part fell 16 to 20 km a step), and `F` under it went 17.9, 21.6, 22.8 and 24.4 km. At −432 Myr it began the
+  step at 19.8 km, the subduction stage took it to 10.0 km, and the settling put it back at
+  25.5 km, its Airy height 1.1 km plus `F`. The largest `F` traced was 46.9 km (scattered 4) and
+  28.5 km on the polar rows (scattered 3, sample 22820 at 75°S, a back-arc column of 13.7 km
+  standing at 22.4 km). The plate is elastic: no rule limits what it holds.
+- **What does not bring them down.** The rise guard (PLT-288) caps a step's rise from the column's
+  height at the step's start; these columns start the step already high, so the guard lets them
+  stay there, and they rise towards the cap by up to 7 km a step when `F` grows. The 70 km cap
+  (PLT-258) does not apply to crust 25 to 40 km thick. The sheet's collapse takes crust from columns
+  thicker than its column, so it adds to these columns rather than taking from them. The arcs' and
+  fronts' heights pull them down within the step, and the settling restores them.
+
+**Are the poles special?** Not in kind. The polar rows (60° and over, 13.4 % of the planet) hold
+99 of the 314 lines (61 continental), 64 of them from one run (scattered 3, whose columns stand
+there for 31 steps); without it they hold 35 of 248 (14 %), their share of the area. The worst run,
+scattered 4, peaks at 7 to 16°S, and all its 135 lines lie between 60°S and 60°N (46 of them within
+30° of the equator). Nothing in the polar lines looks degenerate: their convergence (38, 47 and
+68 mm/yr at the quartiles) is like the low latitudes' (33, 36 and 59), their regimes are the same
+kinds (collision 21, back-arc 15, rift 10, arc 6, craton 6 of the 61), and the same loop (collapse
+in, `F` up, settling) raises them. What is particular to the poles, and was not
+measured here, is the surface flexure's metric: the solve treats every cell as a square of the
+equator's width, so on the polar rows it bends about 1 / cos⁴ φ too stiffly north to south
+([flexure.md](flexure.md), "Simplifications and limits"), which lets a pole-side plate hold more of a
+column's root than it should.
+
+A second, smaller kind is oceanic and polar: 38 of the polar lines are ocean floor (22 ridge, 16
+basin samples) 10.1 to 16.2 km high, their Airy height median −1.9 km and `F` −0.5 to 1.2 km. The
+surface's feedback raised them (0.4, 1.6 and 2.5 km in the step at the quartiles, up to 6.7 km),
+and the largest part of their gap is the carry's (the gap budget's part for the surface's
+semi-Lagrangian advection, the L0/L1 sampling and the clamps: 9.6, 12.8 and 16.0 km at the
+quartiles, up to 29.5 km), not the flexure's. The highest, supercontinent 2 at 82°N, a ridge sample
+at 16.2 km. Not traced further here, and the yield (below) does not reach them.
