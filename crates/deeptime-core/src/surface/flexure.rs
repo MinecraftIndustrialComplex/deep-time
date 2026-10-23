@@ -2772,27 +2772,30 @@ mod tests {
     /// floor and stays there). Weakening at once, the belt sinks most of the way to local
     /// isostasy in the step; weakening over the thermal time (ISO-099), a step lets go of a few
     /// per cent of that, and after eight time constants the plate stands where weakening at once
-    /// put it.
+    /// put it. The plate stands on dry ground, the sea far below: with the sea at 0 the loading
+    /// took ground under it (the lowest cell 4.3 km down without water), the flexure's water came
+    /// in, whose depth has a kink at the sea, and the two paths ended 172 m apart.
     #[test]
     fn a_plate_the_law_weakens_lets_go_as_it_warms() {
         let (w, h) = (32usize, 128usize);
         let n = w * h;
+        let sea = -20_000.0;
         let belt = |c: usize| (60..64).contains(&(c / w));
         let run = |p: &FlexureParams, steps: usize| -> (Vec<f64>, f64, Vec<f64>) {
             let mut wd = World::new(w, h, 300.0);
-            let (mut sv, mut st) = started(&mut wd, p, 0.0);
+            let (mut sv, mut st) = started(&mut wd, p, sea);
             for c in 0..n {
                 if belt(c) {
                     wd.uplift[c] = 1.0;
                 }
             }
-            wd.step(p, &mut sv, &mut st, &vec![0.0; n], 0.0);
+            wd.step(p, &mut sv, &mut st, &vec![0.0; n], sea);
             wd.uplift = vec![0.0; n];
             wd.orogeny = vec![0.0; n]; // the orogeny's clock restarts every step
-            let first = wd.step(p, &mut sv, &mut st, &vec![0.0; n], 0.0);
+            let first = wd.step(p, &mut sv, &mut st, &vec![0.0; n], sea);
             let te = f64::from(first.elastic_thickness_km[62 * w]);
             for _ in 1..steps {
-                wd.step(p, &mut sv, &mut st, &vec![0.0; n], 0.0);
+                wd.step(p, &mut sv, &mut st, &vec![0.0; n], sea);
             }
             let released = first.released_m.iter().map(|&r| f64::from(r)).collect();
             (wd.h, te, released)
