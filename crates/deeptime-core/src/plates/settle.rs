@@ -41,8 +41,16 @@
 //! (ISO-044: a column below the sea carries the water above it) and F the surface's flexure
 //! (`surface/flexure_m`, the flexure solve of ISO-040: how far the plate holds the ground above
 //! or below local isostasy; 0 without a surface stage), τ = `isostasy_relax_myr` (4 kyr: the
-//! whole way at any plate step, ISO-078). The change is the step's uplift, which the surface
-//! stage takes as it takes any uplift; the step's rise guard (PLT-288) runs after it.
+//! whole way at any plate step, ISO-078). The change is the step's uplift; the step's rise guard
+//! (PLT-288) runs after it.
+//!
+//! The settling moves a height alone: it adds and removes no crust, so the surface's flexure
+//! takes it as no load (ISO-091). The flexure books only `Sample::crust_uplift_mm_yr`, the change
+//! of the column's own crust's Airy height ([`crust_uplift`]). Until 2026-10-22 it booked every
+//! rise of a continental column as crust thickened, 7 times the rise, whose root a stiff plate
+//! held up; the settling then moved the column to its Airy height plus that larger F, and the
+//! two raised each other to the 30 km ceiling (`docs/science/flexure.md`, "The settling's
+//! feedback").
 // ledger: ISO-078 (the rule and τ), ISO-064 (the 3-5 kyr), ISO-044 (ρ_w), ISO-043 (ρ_m).
 
 use rayon::prelude::*;
@@ -65,6 +73,35 @@ pub struct Settle {
     /// Σ of the rises and of the falls, m × km² (Earth-normalized).
     pub rise_km2_m: f64,
     pub fall_km2_m: f64,
+}
+
+/// The Airy height of each sample's own crust, m, over a fixed datum (`iso_height` at 0): the
+/// step's change of it is the sample's crust uplift (`Sample::crust_uplift_mm_yr`).
+pub fn crust_heights(state: &PlateState, gravity: f64) -> Vec<f64> {
+    state
+        .samples
+        .par_iter()
+        .map(|s| iso_height(&s.pools, 0.0, gravity))
+        .collect()
+}
+
+/// Sets each sample's crust uplift to the change of its crust's Airy height since `before`
+/// (from [`crust_heights`] on the same samples) over a step of `dt_yr` years, or with `add` adds
+/// that change to it (a later pass of the same step).
+// ledger: ISO-091
+pub fn crust_uplift(state: &mut PlateState, before: &[f64], gravity: f64, dt_yr: f64, add: bool) {
+    state
+        .samples
+        .par_iter_mut()
+        .zip(before.par_iter())
+        .for_each(|(s, &z)| {
+            let rate = ((iso_height(&s.pools, 0.0, gravity) - z) / dt_yr * 1.0e3) as f32;
+            s.crust_uplift_mm_yr = if add {
+                s.crust_uplift_mm_yr + rate
+            } else {
+                rate
+            };
+        });
 }
 
 /// The height a column of dry Airy height `z_a` settles at under a sea at `sea`, m.
