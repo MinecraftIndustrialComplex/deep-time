@@ -9,13 +9,14 @@ pub mod terrain;
 
 use std::path::Path;
 
+use deeptime_format::rivers::{RIVERS_PATH, write_rivers};
 use deeptime_format::{
     Codec, DType, FileEntry, FormatError, GridDesc, LayerDesc, LayerEntry, LoadedLayer, Manifest,
     Raster, RasterRead, Scale, TILE, fsutil::write_atomic, write_tile_pack,
 };
 use serde_json::{Value, json};
 
-use terrain::{LakeTest, Terrain, WrapTest};
+use terrain::{LakeTest, RiverTest, Terrain, WrapTest};
 
 /// Blocks per cell of each grid in the synthetic worlds (the "16k quick" ladder of plan §5.2 at
 /// every size: L3 r 2, L2 r 4 — the climate layers' vanilla quart grid — and L1 r 16).
@@ -178,6 +179,8 @@ impl Strata {
 pub enum Kind {
     WrapTest,
     LakeTest,
+    /// A big river into the sea and a flush stream, with their network (`terrain::RiverTest`).
+    RiverTest,
     /// A synthetic deposit world's terrain (P1-15): the deposit history's present elevation
     /// (`crate::deposits::synthetic::HistoryTerrain`). Needs the history, so it is baked through
     /// [`build_with`] only and is not in [`Kind::ALL`].
@@ -186,17 +189,18 @@ pub enum Kind {
 
 impl Kind {
     /// The kinds [`build`] makes from a name alone.
-    pub const ALL: [Kind; 2] = [Kind::WrapTest, Kind::LakeTest];
+    pub const ALL: [Kind; 3] = [Kind::WrapTest, Kind::LakeTest, Kind::RiverTest];
 
     pub fn name(self) -> &'static str {
         match self {
             Kind::WrapTest => "wrap-test",
             Kind::LakeTest => "lake-test",
+            Kind::RiverTest => "river-test",
             Kind::DepositHistory => "deposit-history",
         }
     }
 
-    /// The kind called `name` (`wrap-test`, `lake-test`).
+    /// The kind called `name` (`wrap-test`, `lake-test`, `river-test`).
     pub fn from_name(name: &str) -> Option<Kind> {
         Kind::ALL.into_iter().find(|k| k.name() == name)
     }
@@ -234,6 +238,7 @@ pub fn build(kind: Kind, strata: Strata, c: u32, codec: Codec) -> Result<SynthWo
     let terrain: Box<dyn Terrain> = match kind {
         Kind::WrapTest => Box::new(WrapTest::new(c)),
         Kind::LakeTest => Box::new(LakeTest { c }),
+        Kind::RiverTest => Box::new(RiverTest { c }),
         Kind::DepositHistory => {
             return Err(FormatError::Invalid(
                 "deposit-history needs its history: bake it with build_with".into(),
@@ -341,7 +346,8 @@ pub fn build_with(
 
 impl SynthWorld {
     /// Writes the tile packs and the side files into `out` and records them in `manifest` (grids,
-    /// layers, files, `planet.radius_m`, notes `synthetic`, `strata` and for the lake `lake`).
+    /// layers, files, `planet.radius_m`, notes `synthetic`, `strata`, for the lake `lake` and for
+    /// the river test its network and `river`).
     /// Writing the manifest itself is the caller's job, and comes last. Returns the bytes written.
     pub fn write_into(&self, out: &Path, manifest: &mut Manifest) -> Result<u64, FormatError> {
         let c = self.circumference;
@@ -400,6 +406,18 @@ impl SynthWorld {
             .insert("strata".into(), strata_notes(self.strata_kind));
         if self.kind == Kind::LakeTest {
             manifest.notes.insert("lake".into(), LakeTest::notes());
+        }
+        if self.kind == Kind::RiverTest {
+            let rivers = RiverTest { c }.rivers();
+            let (bytes, crc32) = write_rivers(out, &rivers)?;
+            total += bytes;
+            manifest.files.retain(|f| f.path != RIVERS_PATH);
+            manifest.files.push(FileEntry {
+                path: RIVERS_PATH.to_owned(),
+                bytes,
+                crc32,
+            });
+            manifest.notes.insert("river".into(), RiverTest::notes());
         }
         Ok(total)
     }
