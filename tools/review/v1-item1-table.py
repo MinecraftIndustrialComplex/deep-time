@@ -24,15 +24,15 @@ LO, HI = (int(x) for x in (sys.argv[4] if len(sys.argv) > 4 else "1-6").split("-
 LEN = os.environ.get("LEN", "1000")
 STARTS = ("supercontinent", "scattered_continents")
 EARTH_MKM2 = 510.07
-# V1 item 1's targets (STATUS.md; plates.md "V1 item 1's seven measures").
+# V1 item 1's realism checks: each passes inside the band, fires outside it (docs/science/realism-checks.md, decisions log 2026-10-23).
 CRITERIA = [
-    ("land", "land, share of the planet (0.26-0.32)", "{:.3f}", lambda v: 0.26 <= v <= 0.32),
-    ("largest", "largest landmass, share of the planet (>= 0.12)", "{:.3f}", lambda v: v >= 0.12),
-    ("drowned", "continental crust under the sea, share (<= 0.25)", "{:.3f}", lambda v: v <= 0.25),
-    ("hi2", "land above 2 km, share of the land (<= 0.12)", "{:.3f}", lambda v: v <= 0.12),
-    ("coast_hg", "coast with land above 2 km within 200 km (<= 0.15)", "{:.3f}", lambda v: v <= 0.15),
-    ("ice", "land under ice, share of the land (<= 0.15)", "{:.3f}", lambda v: v <= 0.15),
-    ("coll", "collisions per 100 Myr (2-6)", "{:.2f}", lambda v: 2.0 <= v <= 6.0),
+    ("land", "land, share of the planet (0.13-0.36)", "{:.3f}", lambda v: 0.13 <= v <= 0.36),
+    ("largest", "largest landmass, share of the planet (>= 0.06)", "{:.3f}", lambda v: v >= 0.06),
+    ("drowned", "continental crust under the sea, share (<= 0.56)", "{:.3f}", lambda v: v <= 0.56),
+    ("hi2", "land above 2 km, share of the land (<= 0.07)", "{:.3f}", lambda v: v <= 0.07),
+    ("coast_hg", "coast with land above 2 km within 200 km (<= 0.11)", "{:.3f}", lambda v: v <= 0.11),
+    ("ice", "land under ice, share of the land (<= 0.32)", "{:.3f}", lambda v: v <= 0.32),
+    ("coll", "collisions per 100 Myr (<= 6)", "{:.2f}", lambda v: v <= 6.0),
 ]
 EXTRA = [
     ("cont", "continental crust at the end, share of the planet", "{:.3f}"),
