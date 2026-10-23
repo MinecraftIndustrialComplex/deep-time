@@ -61,6 +61,7 @@ pub mod kinematics;
 pub mod l1;
 pub mod noise;
 pub mod normalise;
+pub mod peaks;
 pub mod pools;
 pub mod rate;
 pub mod ridges;
@@ -70,6 +71,7 @@ pub mod shortening;
 pub mod state;
 pub mod stats;
 pub mod subduction;
+pub mod thermal;
 pub mod transition;
 
 use std::collections::BTreeMap;
@@ -300,6 +302,12 @@ impl PlatesStage {
         }
         // The settling (`settle.rs`) reads the flexure too.
         let settles = k.isostasy_relax_myr.is_finite() && k.isostasy_relax_myr > 0.0;
+        // The peak trace (`peaks.rs`, measurement only, off by default).
+        let tracing = peaks::threshold().is_some();
+        let mut traced = peaks::Begin::default();
+        if tracing {
+            traced.z_pre = st.samples.iter().map(|s| s.elevation_m).collect();
+        }
         let (mut cones, flexure) =
             self.apply_surface_feedback(st, world, &env, collisions || settles)?;
         cones.resize(st.samples.len(), [0.0; 2]);
@@ -326,6 +334,12 @@ impl PlatesStage {
         };
         let sea = sea_m(world);
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+        if tracing {
+            traced.z0 = z0.clone();
+            traced.flexure = flexure
+                .clone()
+                .unwrap_or_else(|| vec![f64::NAN; st.samples.len()]);
+        }
         // The crust's own Airy heights as the step begins (its crust uplift, ledger: ISO-091).
         let crust0 = settle::crust_heights(st, env.gravity);
         if let Some(gb) = st.gap_budget.as_mut() {
@@ -628,6 +642,8 @@ impl PlatesStage {
         hotspots::step(st, world, &pos, &tree, &env, &mut cones)?;
         book(st, gap_budget::Part::Hotspots);
         lap(&mut clock, "hotspots");
+        // The lithosphere's thermal state from the step's flags (`thermal.rs`; off by default).
+        thermal::step(st, &env);
         // Continental columns settle towards the height their crust holds up (`settle.rs`).
         let settled = settle::step(st, &env, flexure.as_deref(), sea);
         book(st, gap_budget::Part::Settle);
@@ -708,7 +724,9 @@ impl PlatesStage {
         // A suture resamples at once, so the welded plate's subducted slab is consumed (hidden
         // crust of one plate under the same plate would surface).
         let final_step = step >= self.total;
-        if ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step) {
+        let resampling =
+            ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step);
+        if resampling {
             let geo = ridges::resample(st, world, &pos, &tree, &cache.geo, &env)?;
             if let Some(b) = cb.borrow_mut().as_mut() {
                 b.book_lattice(&st.samples, gap_budget::Part::ResampleBlend);
@@ -742,8 +760,13 @@ impl PlatesStage {
             lap(&mut clock, "resample");
         }
         rate::end(st);
+        // Crust made continental after `finish_samples` set the heat flow (ledger: PLT-469).
+        thermal::refresh_heat_flow(st, env.k, env.t_myr);
 
         book(st, gap_budget::Part::Other);
+        if tracing {
+            peaks::print(st, &cache.geo, &env, sea, &traced, resampling);
+        }
         if let Some(gb) = st.gap_budget.as_mut() {
             gb.end_step(&st.samples, env.t_myr, env.dt_myr);
             let every = (GAP_SNAPSHOT_MYR / env.dt_myr).round().max(1.0) as u64;
@@ -1322,6 +1345,8 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
     // label (`transition.rs`), and that is no arc. Until 2026-10-02 a mature arc also had to
     // stand above sea level that step; most intra-oceanic arcs are submarine (Stern 2010).
     let mature_m = (env.k.arc_mature_crust_km * 1000.0 - transition::oceanic_m()).max(0.0) as f32;
+    let thermal_heat = env.k.thermal_state;
+    let thermal_reference = env.k.thermal_reference_km as f32;
     st.samples.par_iter_mut().enumerate().for_each(|(i, s)| {
         if s.kind == OCEANIC
             && !s.is_hidden()
@@ -1340,6 +1365,15 @@ fn finish_samples(st: &mut PlateState, geo: &Geo, z0: &[f32], env: &Env<'_>) {
         let f = s.flags;
         s.heat_flow_mw_m2 = if s.kind == OCEANIC {
             ocean_heat_flow(s.age_myr(t)) as f32
+        } else if thermal_heat {
+            // From the lithosphere's state (ledger: PLT-467, PLT-468); an arc matured this step
+            // carries its floor's.
+            let l = if s.lithosphere_km > 0.0 {
+                s.lithosphere_km
+            } else {
+                thermal_reference
+            };
+            thermal::sample_heat_flow(l, f)
         } else {
             let since = (t - f64::from(s.orogeny_myr)).max(0.0);
             let mut q = 55.0 + 35.0 * (-since / 60.0).exp();
