@@ -3318,7 +3318,11 @@ mod tests {
         }
         assert_eq!(at("climate/koppen_l2", k_of(0)) as u8, 5);
         for b in [1, 3] {
-            assert_eq!(at("climate/koppen_l2", k_of(b)) as u8, koppen::EF, "band {b}");
+            assert_eq!(
+                at("climate/koppen_l2", k_of(b)) as u8,
+                koppen::EF,
+                "band {b}"
+            );
             assert_eq!(at("climate/wetland", k_of(b)) as u8, 1, "band {b}");
             assert!(
                 (at("climate/temperature", k_of(b)) - 0.1).abs() < 2e-4,

@@ -381,18 +381,15 @@ fn dry_beside_playas(
     circumference: f64,
 ) -> Result<Value, CoreError> {
     let w = grid.w as usize;
-    let (ox, oz, r) = (
-        grid.origin_block_x,
-        grid.origin_block_z,
-        i64::from(grid.r),
-    );
+    let (ox, oz, r) = (grid.origin_block_x, grid.origin_block_z, i64::from(grid.r));
     let playas: Vec<(i64, i64)> = kind
         .iter()
         .enumerate()
         .filter(|&(_, &k)| k == network::kind::PLAYA)
         .map(|(cell, _)| (ox + (cell % w) as i64 * r, oz + (cell / w) as i64 * r))
         .collect();
-    let (Some(we), Some(ee)) = (out.m.layer(WETLAND).cloned(), out.m.layer(EROSION).cloned()) else {
+    let (Some(we), Some(ee)) = (out.m.layer(WETLAND).cloned(), out.m.layer(EROSION).cloned())
+    else {
         return Ok(json!({"skipped": "no climate/wetland or climate/erosion layer"}));
     };
     if playas.is_empty() {
