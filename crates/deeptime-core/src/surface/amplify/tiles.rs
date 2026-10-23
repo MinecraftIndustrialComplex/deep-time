@@ -25,8 +25,9 @@ use crate::surface::detail::DetailParams;
 /// terrain the change is measured against, the core's arrays handed to the sink, and the mountain
 /// character's copy of the terrain before it.
 pub const TILE_BYTES_PER_CELL: u64 = Buf::BYTES_PER_CELL + 4 + 17 + 4;
-/// Bytes per cell of a [`Level`] (terrain, area, weight, erodibility, lake, glaciers' surface).
-pub const LEVEL_BYTES_PER_CELL: u64 = 21;
+/// Bytes per cell of a [`Level`] (terrain, area, weight, erodibility, lake surface, glaciers'
+/// surface).
+pub const LEVEL_BYTES_PER_CELL: u64 = 24;
 
 /// A rectangle of the fine grid: first column, first row, width, height.
 pub type Rect = (usize, usize, usize, usize);
@@ -109,7 +110,8 @@ pub struct LevelTile<'a> {
     pub area: &'a [f32],
     pub wgt: &'a [f32],
     pub kfac: &'a [f32],
-    pub lake: &'a [u8],
+    /// The lake surface (`Level::lake_z`).
+    pub lake_z: &'a [f32],
     /// The glaciers' surface (empty without glaciers).
     pub zs: &'a [f32],
 }
@@ -131,7 +133,7 @@ impl LevelSink {
                 area: vec![0.0; n],
                 wgt: vec![0.0; n],
                 kfac: vec![0.0; n],
-                lake: vec![0; n],
+                lake_z: vec![super::resample::NO_LAKE; n],
                 zs: Vec::new(),
             },
         }
@@ -153,7 +155,7 @@ impl TileSink for LevelSink {
             self.level.area[dst..dst + w].copy_from_slice(&l.area[src.clone()]);
             self.level.wgt[dst..dst + w].copy_from_slice(&l.wgt[src.clone()]);
             self.level.kfac[dst..dst + w].copy_from_slice(&l.kfac[src.clone()]);
-            self.level.lake[dst..dst + w].copy_from_slice(&l.lake[src.clone()]);
+            self.level.lake_z[dst..dst + w].copy_from_slice(&l.lake_z[src.clone()]);
             if !l.zs.is_empty() {
                 if self.level.zs.len() != self.level.z.len() {
                     self.level.zs = vec![0.0; self.level.z.len()];
@@ -618,7 +620,7 @@ pub fn run_tiles(
                     area_core.push(buf.a[c]);
                     wgt_core.push(buf.own[c] / a_fine);
                     kfac_core.push(buf.kfac[c]);
-                    lake_core.push(buf.lake[c]);
+                    lake_core.push(buf.lake_z[c]);
                     if has_zs {
                         zs_core.push(buf.zs[c]);
                     }
@@ -657,7 +659,7 @@ pub fn run_tiles(
                 area: &area_core,
                 wgt: &wgt_core,
                 kfac: &kfac_core,
-                lake: &lake_core,
+                lake_z: &lake_core,
                 zs: &zs_core,
             }),
         })?;
