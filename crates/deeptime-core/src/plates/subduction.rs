@@ -784,6 +784,9 @@ struct Plan {
     demand_m: f64,
     /// The sample is continental crust behind the range that the shortening draws on.
     source: bool,
+    /// A source's share of the strain: 1, or with `tectonics.thermal_backstop` its lithosphere's
+    /// weakness (`thermal::backstop_weight`, ledger: PLT-470).
+    weight: f64,
 }
 
 /// Per contact: what its arcs and cordillera add up to this step.
@@ -1170,6 +1173,7 @@ pub fn fronts_finish(
                     plan.demand_m = f64::from(s.thickness_m) * strain_axis * w * room;
                 } else {
                     plan.source = true;
+                    plan.weight = super::thermal::backstop_weight(k, s.lithosphere_km);
                 }
             }
             plan
@@ -1220,9 +1224,11 @@ pub fn fronts_finish(
         }
         b.demand_m += plan.demand_m;
         if plan.source {
-            b.supply_m += s.pools.iter().map(|&x| f64::from(x.max(0.0))).sum::<f64>();
+            // Weighted by the source's weakness (1 unless `thermal_backstop`; ledger: PLT-470).
+            let w = plan.weight;
+            b.supply_m += w * s.pools.iter().map(|&x| f64::from(x.max(0.0))).sum::<f64>();
             for (a, &x) in b.supply_pools.iter_mut().zip(&s.pools) {
-                *a += f64::from(x.max(0.0));
+                *a += w * f64::from(x.max(0.0));
             }
         }
     }
@@ -1303,6 +1309,8 @@ pub fn fronts_finish(
                 }
                 cordillera = gain;
             } else if plan.source && phi > 0.0 {
+                // A cold, stiff source gives its weakness's share (ledger: PLT-470).
+                let phi = phi * plan.weight;
                 for p in s.pools.iter_mut() {
                     *p -= (f64::from(p.max(0.0)) * phi) as f32;
                 }

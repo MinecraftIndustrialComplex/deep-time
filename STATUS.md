@@ -164,6 +164,87 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Tests:** on the VM at 75cd1791: `cargo fmt --check` and `clippy --workspace --all-targets -D warnings` clean; `cargo test -p deeptime-core` 906 passed, 0 failed, 5 ignored, and its 6 integration tests passed. No pool run (bake only).
 - **GameTests** on the branch's own planet (all 100): GT_RESULTS
 - **Next:** the coordinator merges. `buriedChamberStandsUnderTheFloor` fails on bf8477b2's planet with or without this branch (23 waterlogged at (-128, -512); its vanilla control has 23 too). On the branch's planet the ice test covers 0 columns, so it is checked only on the gate's planet. Marine ice sheets (ice grounded below sea level) are not drawn.
+### 2026-10-23: Gap 4, the lithosphere's thermal state (stage 1): each plate sample carries its thermal lithosphere's depth and a keel; heat flow, thermal isostasy, a strength and a backstop from it, every one a switch and off by default; the release pace's heat-flow fault reproduced and fixed; on the pool only the strength moves V1 and it does not meet the ship rule (gap-4 agent, agent-a8b1af85532f6fbc5)
+- **Design first:** docs/science/lithosphere-thermal-state.md (new), written before the code: what each sample carries and what resets it, how the state enters the Airy height, the strength, heat flow (PLT-137), rifted margins with β and McKenzie cooling (stage 2) and root removal on a Rayleigh-Taylor time (stage 3), and the stage order.
+- **Code, by file:**
+  - `plates/thermal.rs` (new): the state's update (L relaxes to its target over τ_h = 10 Myr when heated by an arc, back-arc, hotspot or rift, else over McKenzie's τ_c = 203.5 Myr towards 225 km; a keel the convective heating cannot remove), the ocean floor's plate-model lithosphere, heat flow q = 26 + 3,375 / L, the thermal age, the thermal height `Switches::uplift_m`, the backstop's weight, the heat flow's final pass.
+  - `plates/state.rs`: `Sample::lithosphere_km`, `keel_km`. `plates/init.rs`: the start (L_ref, keel `thermal_keel_km`). `plates/mod.rs`: the step and the final pass after the spread. `plates/settle.rs`, `plates/collapse.rs`: the thermal height in the Airy height and the sheet's; the sheet's age from the state under `thermal_strength`. `plates/subduction.rs`: the cordillera's sources weighted under `thermal_backstop`. `plates/l1.rs`: the L1 field `plates/thermal_age_myr`; `surface/mod.rs`: the flexure's Te reads it. `params.rs`: the switches and their checks.
+  - Switches (`--set tectonics.`): `thermal_state`, `thermal_isostasy_m` (1600), `thermal_reference_km` (225 or 187), `thermal_strength`, `thermal_backstop`, `thermal_keel_km` (200), `heat_flow_refresh`.
+  - Ledger: PLT-460 to PLT-470 (new), ISO-110 to ISO-112 (new), PLT-048, PLT-137, PLT-415 and ISO-051 amended; bibliography; claims counts; the audit's gap 4 state line; the science index.
+- **The heat-flow fault** (ISO-099 on, 33.7 mW/m² at (159, 11) at release commit 1bdacb76): gone on master bf8477b2's default planet. A scan of the bake test's planet (seeds 1 to 12 at 60 and 100 Myr, release pace on, no final pass) found seed 1 at 60 Myr: four continental cells under 55, the lowest 33.5 at (150, 60); with the pass, none. Cause: `collapse::spread` turns old sea floor continental after the step set every sample's heat flow. `the_release_pace_bakes_continental_heat_flow_with_the_final_pass` now bakes that planet with the release pace and `heat_flow_refresh` on and passes; `the_thermal_state_bakes_its_own_heat_flow` bakes it with the state.
+- **The savanna pit's craton:** with `thermal_strength` a keeled craton behind the arc keeps L = 200.5 km after 40 Myr (thermal age 388 Myr): Te 58 km, not 5, and the sheet about 480 times stiffer than a fresh orogen. The 11 km of crust lost is mostly the cordillera's source (PLT-048, at most 19 % in 40 Myr); with `thermal_backstop` the craton gives about 1/480 of a back-arc's share.
+- **Measured** (pool, earthlike_quick_16k, 1,000 Myr, both starts, `+DEEPTIME_CRUST_BUDGET=1`, against base = master bf8477b2's 24 runs; `pool.sh table --base base --arm <arm>`). Exploration, seeds 1 to 4: the craton frame's isostasy lifts the sea 540 m and drowns crust (criteria 2.62); Hyndman & Currie's frame loses twice the crust and collisions (2.88); the backstop puts land over the band (2.88); the strength 3.38 against the base's 3.00 on the same seeds; the strength without keels 2.62; the strength with isostasy at 187, 3.00. Final, the strength, 24 runs: land 0.300 to 0.314 (p 0.049), largest landmass 0.151 to 0.182 (p 0.010), crust under the sea 0.274 to 0.251 (p 0.18), criteria a run 3.33 to 3.42 (p 0.57; land met in 13 runs against 20). The ship rule is not met; it stays off. The coordinator's combined arm (strength plus the yield, ISO-120 at 380 mGal, 24 runs at key 37afd1c8fbf1): 3.17 (p 0.98); guard's worst 13.0 km against base 13.7 (p 0.033) and the strength alone 14.7.
+- **Off is bit-identical:** `pool.sh alias HEAD 7f9d8f115049 --check-seed 1 --length 1000 +DEEPTIME_CRUST_BUDGET=1` (through `build/gap4/proof.sh`): IDENTICAL world state and dynamics at c2acdd83055b and at the merged 37afd1c8fbf1. Again at the final code, key 4a9e8dc63418 (591abefb): IDENTICAL (state sha256 7ed7d589e8ae17bf both).
+- **Calls:**
+  - Master fc6ab402 (the plate's yield) merged in at b6e4ab8a; ISO.md and claims.md conflicts resolved by keeping both and recounting.
+  - `surface/young.rs` `the_estimate_covers_the_measured_hold_closely`: the Sample grew 8 B, which lifted quick's listed estimate to 1,107 MiB, 2 MiB over the bound; the test's holds now add that growth (947 to 949, 3,462 to 3,468 MiB), derived, not measured again.
+  - Every exploration arm ran on key c2acdd83055b (the sim code before the merge), the combined arm on 37afd1c8fbf1.
+- **Tests:** on the VM at 591abefb (master fc6ab402 merged in): `cargo fmt --all -- --check` clean, `cargo clippy --workspace --all-targets -- -D warnings` clean, `cargo test --workspace --no-fail-fast` all passed (deeptime-core 920 passed, 5 ignored). New tests: seven in `plates::thermal` (the heat-flow anchors, McKenzie's times, a back-arc heats, the keeled craton, the backstop's weights, the thermal age's inverse, the thermal height), the two bake tests above.
+- **Next:**
+  - The coordinator merges. Nothing changes by default.
+  - Open for the coordinator: `heat_flow_refresh` on by default (or with ISO-099); the frame if thermal isostasy is tried again after the sea's datum fix; stage 2 (β margins) and stage 3 (root removal).
+### 2026-10-23: Coordinator, overnight while Ben sleeps: 3fc91491 in both Prism instances; the memory estimates, the sheet and trench budget by default, and the two flexure follow-ups merged; the pool's base moved; the gate red on two GameTests; four lanes started (coordinator, session f981c0d3-5144-49ec-8686-2946d755872c)
+- **Deploy of 3fc91491** (gated: gate batch on that head green in full, 100 GameTests in every profile).
+  - `install.sh mic --preset earthlike_quick_16k --start supercontinent --length-myr 1000`, `install.sh mic-lite` and `:devmap:assemble` on the VM. Deep Time jar 2b3ec1e023b4..., dev map 16520e2ba301....
+  - Stages `play-client-stage.sh --hash 3fc91491 --extra-mod <dev map>`: client 182 mods, server 158, both 153, client only 29 (Bathymetry and MossyLib now among them), server only 5.
+  - `--hash 3fc91491 --set lite`: client 31, server 25, both 25; Bathymetry in.
+  - Applied with `play-client-apply.py`, dry run first. "MIC Deep Time Test" changed only the two Deep Time jars (182 jars). "MIC Deep Time Lite" changed the two jars (the dev map put back by `--extra-mod`) and `kubejs/data/deeptime/tags/block/rock_fallback/hornfels.json` (32 jars).
+  - Prism's launcher window was open (since 18:53 the day before), but no game ran from either instance.
+  - The apply's own check refused once on a false alarm: it greps `ps` for a line holding both "java" and the instance's name, and the coordinator's shell command held both words. Run the apply from a command line without the word "java".
+  - The lite instance's Distant Horizons `pauseIfMovingQuickly` and `limitIfServerUnhealthy` read true, last written by the game at 19:24 the day before (Ben's own session). Left alone.
+- **Merged:**
+  - 71f2362d: the honest memory estimates.
+  - 57558f0a: the sheet and the trench budget as defaults.
+  - 56643099: the trench rows (ISO-096, ISO-097).
+  - bf8477b2: the release's pace, ISO-099, off by default. Its flexure.md and ledger/ISO.md conflicts were both sides' appended rows: both kept, the ISO header recounted from its rows (80 active, 8 merged).
+  - The flexure lane's four open points went to lanes: the polar peaks (a plates lane, below); the continental heat flow under 55 mW/m² with ISO-099 on (folded into gap 4); the open-sea mask for the flexure (`h <= sea` calls closed dry ground below sea level wet; its own task, not started); the trench cells' remaining -6 to -8 km offset (later).
+- **The pool's base.**
+  - From 57558f0a, the arm `base` pointed at key eb4ef634e607, argkey 86d11d8b: the 24 trench-m-rs12e-sheet runs, which the new default equals bit for bit. That cost no runs, and the key is in pool/KEEP.
+  - The trench-row fix in 56643099 changes the default world, so `base` is re-run fresh on bf8477b2: 24 runs, seeds 1-12 x both starts, 1000 Myr, +DEEPTIME_CRUST_BUDGET=1.
+  - Both moves are logged in the VM's BASES.md.
+  - V1 item 1 on the 57558f0a base (medians): land 0.306, largest 0.189, under the sea 0.238, above 2 km 0.161 (target at most 0.12), high coast 0.344 (at most 0.15), ice 0.123, collisions 1.95 (2 to 6). Criteria met per run: 3, mean 3.42.
+- **Gate on 57558f0a: red.** cargo (fmt, clippy, test), deny, Gradle (492 tests) and the JS checks passed. Two GameTests failed:
+  - `iceCoverLaidOnGlaciatedGround` in all five profiles: 22 covered columns of Köppen class 31, which is "sea".
+  - `lakeIceAndSaltFollowTheClimate` with -PwithMic only: mangrove roots on a salt-lake column in a mangrove swamp.
+
+  3fc91491 passed both, so the new defaults changed the 4k test planet. A fix lane is running and may run GameTests itself. The deploy of the new defaults waits for it.
+- **VM:** `mac-gc.sh` deleted 11 merged worktree copies (about 55 GB); /data went from 81 % to 70 %.
+- **Lanes started from bf8477b2 (Opus):**
+  - V1 gap 4, the lithosphere's thermal and mechanical state (Ben's order of 2026-10-22, after gaps 1 and 3), with the heat-flow fault and the craton thinning; brief build/coord/briefs/gap4-thermal.md.
+  - The polar peaks: plate columns 15.5 to 29.4 km at the uplift ceiling; brief polar-peaks.md.
+  - Rivers and deltas, gap 5 (Ben's answer of 2026-10-22, format change approved); brief deltas.md.
+  - The red gate; brief gate-ice-salt.md.
+- **Next:** merge the gate fix, gate, then deploy the new default to both Prism instances. Read the lanes against the bf8477b2 base when its 24 runs land.
+
+### 2026-10-23: The polar peaks: plate columns 10 to 30 km high were the settling (ISO-078) following an elastic plate that held 10 to 47 km of rock away from local isostasy under columns the collapse kept feeding; the plate's yield (ISO-120, σ_max = Δg_max / 2πG, 2.75 km of mantle at 380 mGal) bounds it, off by default (coordinator's task, brief build/coord/briefs/polar-peaks.md; agent worktree .claude/worktrees/agent-a5fedb29ed22d0cd8, branch worktree-agent-a5fedb29ed22d0cd8 from master bf8477b2; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Trace** (`DEEPTIME_PEAK_TRACE=<m>`, `plates/peaks.rs`, measurement only, off by default; pool arm `pp-trace`, key 81404d9815b5, seeds 1 to 4, both starts, its V1 and guard equal the base's).
+  - 314 lines (a sample above 10 km at a step) over 8 runs, 252 of them continental.
+  - 236 of the continental lines were last raised by the settling, and 188 of the 209 with a known `F` stand at its target (the Airy height plus `F`). `F` quartiles 10.8, 14.3 and 20.1 km, up to 46.9 km; the crust 25 to 40 km thick.
+  - The crust came from the collapse (PLT-412, 799 km summed) and the founder's spread (PLT-277, 274 km). Both judge room by thickness, so a column held 15 km high takes crust as lowland.
+  - Nothing brings them down: the rise guard (PLT-288) measures from the step's start, the 70 km cap (PLT-258) does not reach crust this thin, and `fronts_finish` lowers them within the step only for the settling to restore them.
+  - The poles are not special in kind. The polar rows hold 99 of the 314 lines, 64 of them from one run; without it 14 %, their share of the area. The worst run (scattered 4) peaks at 7 to 16°S.
+  - The flexure's block metric (about 1 / cos⁴ φ too stiff north to south on the polar rows) is noted, not measured.
+  - A second, oceanic kind (ridge and basin samples raised 10 to 16 km by the surface's carry) is not reached by the fix.
+- **Fix:**
+  - `surface/flexure.rs`: `FlexureParams::yield_anomaly_mgal` (0, off), `yield_held_kg_m2`, `G_NEWTON` (CODATA 2022), `YIELDED_GLOBAL`, `StepOut::yielded_cells`. After each solve the held load past σ_max sinks (or rises) under the cell alone, through w, the elevation, the carried state and `released_m`.
+  - `surface/mod.rs`: the count.
+  - Unit test `a_plate_that_yields_holds_no_more_than_its_strength`.
+  - Docs: plates.md "The polar peaks", flexure.md "The plate's yield", ISO-120 (new, `game-choice`), the bibliography (CODATA2022_G; ISO-120 added to four entries), claims.md's counts.
+- **Measured** (pool arm `pp-yield380`, key 08c9d7d679c0, `--set surface.flexure.yield_anomaly_mgal=380 +DEEPTIME_CRUST_BUDGET=1`, seeds 1 to 12, both starts, 1000 Myr, against `base`, master bf8477b2's 24 runs).
+  - The guard's worst: median 13.7 to 13.1 km (p 0.015), largest 30.0 to 15.5 km, runs over 15 km 9 to 1, over 20 km 4 to 0.
+  - The largest one-step fall 9.45 to 7.42 km (p < 0.001), rise 6.99 to 6.52 km (p 0.012).
+  - V1: no criterion moved (every p 0.24 or more); criteria met per run 3.33 to 3.04 (p 0.31). **Does not meet the ship rule**; no criterion's median left its band.
+  - Traced again with the yield (scattered 1 and 4): continental lines 21 to 0 and 133 to 2, the largest `F` 46.9 km to 39 m. What stays above 10 km is the oceanic carry kind (scattered 1, up to 14.7 km at 78°S).
+- **Calls:**
+  - 380 mGal (the Puerto Rico Trench's anomaly, the largest on Earth) as the bound; no other value run.
+  - The bound after the solve, not as a weaker plate: the weaker-plate form failed its test (20.8 km held against 2.7 km).
+  - The collapse's and the founder's room left as they are.
+  - The arms ran at c8134072; the later commits change only comments, docs and formatting (checked with `git diff c8134072 HEAD -- crates`), so no alias was recorded.
+- **Tests** (VM): `cargo fmt --check` clean (after 21dde5e1), `clippy -D warnings` clean, `cargo test --workspace` all passed (deeptime-core 911 passed, 5 ignored). No seed-pinned test moved: the switch is off by default.
+- **Next:**
+  - The coordinator decides the yield's default.
+  - The oceanic carry peaks belong to the surface lane.
+  - The flexure's sphere metric belongs to the flexure lane.
 ### 2026-10-23: The trench rows: the guard's floors 4 to 11 km past the Challenger Deep were depth the plate model's heights already hold, counted a second time by two surface rules; the flexure now books the plate model's moves of the ground as no load (ISO-096), and a trench cell takes the plate model's height plus its carried offset (ISO-097) (coordinator's follow-up to the surface guard; agent worktree .claude/worktrees/agent-af6976f50d4669c4c, branch worktree-agent-af6976f50d4669c4c, master 3fc91491 merged in at 1ae9d358; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Cause** (a scratch trace of the base's scattered continents seed 1, not kept). It had 179 steps with a cell more than 11 km down, of two kinds:
   - 163 steps were ocean floor at the plate model's `z_t` with the flexure's water 2.6 km under it. One example: a gap's floor (3.5 km) that a plate then covered at 10.5 km, its 7 km of new sea loaded as a new load.

@@ -464,6 +464,8 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
     };
     let mut state = state;
     state.slabs = earlier_slabs(&geo, &plate, &state.samples, &omega, k, t0, &norm);
+    // The start's continents carry an old craton's lithosphere and keel (ledger: PLT-463).
+    super::thermal::start(&mut state, k);
     Ok((state, geo))
 }
 

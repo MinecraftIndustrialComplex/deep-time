@@ -178,6 +178,13 @@ pub struct Sample {
     /// takes only this part as crust thickened or thinned (ledger: ISO-091).
     #[serde(default)]
     pub crust_uplift_mm_yr: f32,
+    /// The depth of the thermal lithosphere's base, km, and the thickness of the depleted keel
+    /// under the crust, km (`thermal.rs`; 0 = no state: `tectonics.thermal_state` off, or set at
+    /// the next step). ledger: PLT-460
+    #[serde(default)]
+    pub lithosphere_km: f32,
+    #[serde(default)]
+    pub keel_km: f32,
 }
 
 impl Sample {
@@ -209,6 +216,8 @@ impl Sample {
             shortening_km: 0.0,
             stacked: false,
             crust_uplift_mm_yr: 0.0,
+            lithosphere_km: 0.0,
+            keel_km: 0.0,
         }
     }
 
