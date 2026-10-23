@@ -555,6 +555,100 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
     })
 }
 
+/// The layers `renderWorldMap` draws: the workbench's satellite look and its elevation ramp.
+const WORLD_MAP_LAYERS: [deeptime_tiles::Layer; 2] =
+    [deeptime_tiles::Layer::Satellite, deeptime_tiles::Layer::Elevation];
+
+/// What `renderWorldMap` does, without JNI: `layer` (`sat` or `elev`) of the world-data folder
+/// `dir` over the frame `w × h` pixels from (x0, z0), `s` blocks a pixel, pixel centres, drawn by
+/// `threads` threads into the first `w·h·4` bytes of `dst` (RGBA8, row 0 north). Returns the JSON
+/// `{"layer","w","h","zoom","climate","rivers","lakes","ms"}`.
+#[allow(clippy::too_many_arguments)]
+pub fn render_world_map(
+    dir: &std::path::Path,
+    layer: &str,
+    (x0, z0, s): (f64, f64, f64),
+    w: u32,
+    h: u32,
+    threads: u32,
+    dst: &mut [u8],
+) -> BridgeResult<String> {
+    let started = std::time::Instant::now();
+    let Some(l) = deeptime_tiles::Layer::parse(layer).filter(|l| WORLD_MAP_LAYERS.contains(l))
+    else {
+        return Err(BridgeError::IllegalArgument(format!(
+            "layer must be sat or elev, got {layer:?}"
+        )));
+    };
+    let bytes = u64::from(w) * u64::from(h) * 4;
+    if bytes > dst.len() as u64 {
+        return Err(BridgeError::IllegalArgument(format!(
+            "dstRgba holds {} bytes, a {w} x {h} frame needs {bytes}",
+            dst.len()
+        )));
+    }
+    if !(s > 0.0 && s.is_finite() && x0.is_finite() && z0.is_finite()) {
+        return Err(BridgeError::IllegalArgument(format!(
+            "bad frame: x0 {x0}, z0 {z0}, {s} blocks a pixel"
+        )));
+    }
+    let failed = |reason: String| {
+        CoreError::Format(deeptime_format::FormatError::Corrupt {
+            path: dir.to_owned(),
+            reason,
+        })
+    };
+    let map = deeptime_tiles::BakeMap::open(dir).map_err(failed)?;
+    let (w, h) = (w as usize, h as usize);
+    let rgba = map
+        .render_frame(l, x0, z0, s, w, h, threads.max(1) as usize)
+        .map_err(failed)?;
+    dst[..rgba.len()].copy_from_slice(&rgba);
+    Ok(serde_json::json!({
+        "layer": l.id(),
+        "w": w,
+        "h": h,
+        "zoom": map.zoom_for(s),
+        "climate": map.meta.climate,
+        "rivers": map.meta.rivers,
+        "lakes": map.meta.lakes,
+        "ms": started.elapsed().as_millis() as u64,
+    })
+    .to_string())
+}
+
+/// `renderWorldMap`: the dev map's picture of a world-data folder as the workbench's Final world
+/// draws it (`deeptime_tiles::BakeMap::render_frame`; layer `sat` or `elev`), RGBA8 into
+/// `dstRgba`; see [`render_world_map`]. A view of finished world data: writes nothing to it.
+#[unsafe(no_mangle)]
+#[allow(clippy::too_many_arguments)]
+pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge_DeepTimeNative_renderWorldMap<
+    'l,
+>(
+    mut env: EnvUnowned<'l>,
+    _class: JClass<'l>,
+    world_data_dir: JString<'l>,
+    layer: JString<'l>,
+    x0: f64,
+    z0: f64,
+    blocks_per_px: f64,
+    w: jint,
+    h: jint,
+    threads: jint,
+    dst_rgba: JByteBuffer<'l>,
+) -> JString<'l> {
+    guard(&mut env, |env| {
+        let dir = PathBuf::from(string_arg(env, &world_data_dir, "worldDataDir")?);
+        let layer = string_arg(env, &layer, "layer")?;
+        let (w, h) = (non_negative(w, "w")?, non_negative(h, "h")?);
+        let threads = non_negative(threads, "threads")?;
+        let json = with_direct_bytes(env, &dst_rgba, |dst| {
+            render_world_map(&dir, &layer, (x0, z0, blocks_per_px), w, h, threads, dst)
+        })?;
+        Ok(env.new_string(json)?)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -569,6 +663,59 @@ mod tests {
             rest.ends_with(&format!("target={TARGET};cpu={CPU_LEVEL}")),
             "{v}"
         );
+    }
+
+    /// The dev map's picture: the frame's bytes and its JSON; a wrong layer, a short buffer, a bad
+    /// frame or a folder that is not world data are errors, not panics.
+    #[test]
+    fn render_world_map_draws_the_frame_and_refuses_bad_arguments() {
+        use deeptime_core::synth::{Kind, Strata, build};
+        use deeptime_format::{Codec, Manifest};
+        let dir = std::env::temp_dir().join(format!("deeptime-jni-worldmap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let world = build(Kind::LakeTest, Strata::Placeholder, 2048, Codec::Lz4Block).unwrap();
+        let mut manifest = Manifest::new(
+            "synth:lake-test",
+            deeptime_format::Writer::this("deeptime-jni"),
+            deeptime_format::Scale::default_for(2048),
+        );
+        world.write_into(&dir, &mut manifest).unwrap();
+        manifest.write(&dir).unwrap();
+        let frame = (-1024.0, -512.0, 4.0);
+        let mut dst = vec![7u8; 512 * 256 * 4 + 3];
+        for layer in ["sat", "elev"] {
+            let json = render_world_map(&dir, layer, frame, 512, 256, 2, &mut dst).unwrap();
+            let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+            assert_eq!(v["layer"], layer);
+            assert_eq!((v["w"].as_u64(), v["h"].as_u64()), (Some(512), Some(256)));
+            assert_eq!(v["zoom"], 0);
+            assert!(dst[..512 * 256 * 4].chunks(4).all(|p| p[3] == 255), "{layer} is opaque");
+            assert_eq!(&dst[512 * 256 * 4..], &[7, 7, 7], "nothing past the frame");
+        }
+        let err = |r: BridgeResult<String>| match r {
+            Err(e) => e,
+            Ok(json) => panic!("expected an error, got {json}"),
+        };
+        assert!(matches!(
+            err(render_world_map(&dir, "water", frame, 8, 8, 1, &mut dst)),
+            BridgeError::IllegalArgument(_)
+        ));
+        assert!(matches!(
+            err(render_world_map(&dir, "sat", frame, 512, 512, 1, &mut dst)),
+            BridgeError::IllegalArgument(_)
+        ));
+        assert!(matches!(
+            err(render_world_map(&dir, "sat", (0.0, 0.0, 0.0), 8, 8, 1, &mut dst)),
+            BridgeError::IllegalArgument(_)
+        ));
+        let empty = dir.join("not-world-data");
+        std::fs::create_dir_all(&empty).unwrap();
+        assert!(matches!(
+            err(render_world_map(&empty, "sat", frame, 8, 8, 1, &mut dst)),
+            BridgeError::Core(CoreError::Format(_))
+        ));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
