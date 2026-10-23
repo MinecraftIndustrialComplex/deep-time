@@ -153,7 +153,10 @@ pub struct Buf {
     pub sed2: Vec<f32>,
     pub own: Vec<f32>,
     pub kfac: Vec<f32>,
+    /// 1 under a lake's surface, else 0 ([`super::resample::Level::sample`]).
     pub lake: Vec<u8>,
+    /// That surface, m, at the lake cells (handed on to the next level).
+    pub lake_z: Vec<f32>,
     /// 1 where the flood after the seeding raised the cell: a filled depression, not a channel,
     /// which the erosion leaves alone (it would cut a gorge out of nothing).
     pub frozen: Vec<u8>,
@@ -168,7 +171,7 @@ pub struct Buf {
 
 impl Buf {
     /// Bytes per cell of a buffer (the memory estimate).
-    pub const BYTES_PER_CELL: u64 = 12 * 4 + 2 + 4;
+    pub const BYTES_PER_CELL: u64 = 13 * 4 + 2 + 4;
 
     pub fn new(win: Win, fine: Fine) -> Buf {
         let n = win.cells();
@@ -185,6 +188,7 @@ impl Buf {
             own: fine.own,
             kfac: fine.kfac,
             lake: fine.lake,
+            lake_z: fine.lake_z,
             frozen: vec![0; n],
             cap: vec![0.0; n],
             tmult: vec![1.0; n],
