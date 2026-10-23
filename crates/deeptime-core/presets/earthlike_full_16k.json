@@ -487,10 +487,10 @@
     "bank_zone_ratio": 0.5,
     "protect_water_from_carvers": true,
     "deltas": true,
-    "delta_area_mult": 8.0,
+    "delta_area_mult": 32.0,
     "delta_shape_k": 1.0,
     "delta_max_mouths": 8,
-    "delta_mouth_spacing": 3.0
+    "delta_mouth_spacing": 2.0
   },
   "underground": {
     "lava_floor_blocks": 10,

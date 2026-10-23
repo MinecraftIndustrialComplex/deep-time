@@ -572,7 +572,7 @@ pub struct HydroParams {
     /// How many times Earth's delta area for a river's load its plain is drawn (HYD-141,
     /// game-choice: agent, 2026-10-23). The rivers are drawn about 40 times their physical
     /// width (HYD-001), so a plain of Earth's area is barely wider than its own channel and holds
-    /// no second one.
+    /// no second one; 32 puts D5's plains at 0.39 % of its land, against Earth's 0.57 % (HYD-143).
     pub delta_area_mult: f64,
     /// How strongly a plain grows forward of its mouth rather than along the coast: a cell's
     /// distance is weighted 1 + k (1 − cos θ), θ from the outflow direction (HYD-135).
@@ -610,10 +610,10 @@ impl Default for HydroParams {
             bank_zone_ratio: 0.5,
             protect_water_from_carvers: true,
             deltas: true,
-            delta_area_mult: 8.0,     // ledger: HYD-141 (game-choice)
+            delta_area_mult: 32.0,    // ledger: HYD-141 (game-choice)
             delta_shape_k: 1.0,       // ledger: HYD-135 (game-choice)
             delta_max_mouths: 8,      // ledger: HYD-138 (game-choice)
-            delta_mouth_spacing: 3.0, // ledger: HYD-138
+            delta_mouth_spacing: 2.0, // ledger: HYD-138
         }
     }
 }
