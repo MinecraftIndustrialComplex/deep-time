@@ -2011,6 +2011,12 @@ impl SurfaceStage {
                     count(flexure::UNCONVERGED_GLOBAL, 1.0);
                 }
             }
+            if out.yielded_cells > 0 {
+                *world
+                    .globals
+                    .entry(flexure::YIELDED_GLOBAL.to_owned())
+                    .or_insert(0.0) += out.yielded_cells as f64;
+            }
             flexed = Some(out);
             self.time("flexure", started);
         }
