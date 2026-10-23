@@ -562,6 +562,10 @@ pub fn land_stats(view: &CubeView<'_>, land: &Land<'_>, choice: &TurnChoice) -> 
             "share_of_land": near as f64 / land_pts.len().max(1) as f64,
             "share_of_planet": near as f64 / land.points.len().max(1) as f64,
         },
+        // The study's two targets (§5.4 item 7): the land drawn at most twice its planet area
+        // (99.9th percentile), and every corner at least 5° out to sea.
+        "land_p999_within_2x": q(0.999) <= 2.0,
+        "corners_5deg_from_land": choice.min_distance_deg() >= CORNER_ZONE_DEG,
     })
 }
 
