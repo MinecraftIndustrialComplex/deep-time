@@ -34,7 +34,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [GLA](ledger/GLA.md) | glacial erosion and landforms | 74 | 0 | 25 | 1 | 0 | 1 | 28 | 19 | 0 | 0 | 2 |
 | [HNT](ledger/HNT.md) | editor hint texts | 122 | 18 | 13 | 3 | 4 | 8 | 62 | 14 | 0 | 0 | 2 |
 | [HYD](ledger/HYD.md) | rivers, lakes, runoff | 92 | 2 | 12 | 5 | 2 | 1 | 47 | 23 | 0 | 0 | 1 |
-| [HYP](ledger/HYP.md) | hypsometry and calibration targets | 40 | 1 | 16 | 0 | 2 | 16 | 1 | 4 | 0 | 0 | 2 |
+| [HYP](ledger/HYP.md) | hypsometry and calibration targets | 42 | 3 | 16 | 0 | 2 | 16 | 1 | 4 | 0 | 0 | 2 |
 | [IMP](ledger/IMP.md) | meteor impacts | 137 | 43 | 9 | 6 | 6 | 1 | 57 | 15 | 0 | 0 | 6 |
 | [ISO](ledger/ISO.md) | isostasy, flexure, subsidence, height limit, sea level | 75 | 6 | 12 | 0 | 10 | 4 | 20 | 23 | 0 | 0 | 7 |
 | [MAG](ledger/MAG.md) | magma and lava | 57 | 2 | 1 | 0 | 1 | 0 | 52 | 1 | 0 | 0 | 0 |
