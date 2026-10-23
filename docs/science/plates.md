@@ -744,7 +744,9 @@ bibliography, "The eclogite root and whole-column isostasy". Read by a research 
    by E × (3,450 − 2,830) / 3,300. The root stays crust: at 30 % it is lighter than the mantle.
 3. *The surface flexure* (ISO-046) infers the crust thickened behind a plate uplift with the same
    mean density, so the thickening it passes to the flexed plate is the one the plate model made
-   (7.0 times the uplift, not 5.5).
+   (7.0 times the uplift, not 5.5). Since 2026-10-22 the uplift it reads for this is the change of
+   the column's own crust's Airy height (`plates/crust_uplift_mm_yr`, ISO-091 and ISO-092), not
+   the column's whole rise: the settling's and the height rules' moves are no load.
 
 **What the root can and cannot do.** The model's 35 km continental column stands at about 525 m
 (the middle of `continent_elevation_m`). A 50 km column now stands at about 2.66 km (3.2 km
@@ -4806,8 +4808,11 @@ the shared run pool (`tools/review/pool/`, master 2db74acd); new arms go through
 7. *The surface guard under the collapse arms* (the surface flexure's owner; `surface/` was not
    touched here): plate columns held 20 km or more over their Airy height by the surface's
    feedback, with the flexure under them at tens of km, appear in the arms that move the most
-   crust and stopped one run of the sheet ("The sheet's arms", the surface guard). Which coupling
-   step lets the flexure's offset grow (the feedback's clamp at `max_elevation_m`, the polar rows
-   where one patch formed, or the collapse's single-step rise of filled ocean floor) is not
-   settled; the reproduction is scattered continents seed 5 with the sheet's `--set` keys, which
-   reaches the stop at step 449.
+   crust and stopped one run of the sheet ("The sheet's arms", the surface guard). Settled
+   2026-10-22 (ISO-091, [flexure.md](flexure.md), "The settling's feedback"): the coupling step
+   was the surface flexure booking every rise of a building column as crust thickened, 7 times
+   the rise, including the settling's move of a column to its Airy height plus the flexure's
+   offset (ISO-078). A stiff plate held that root up, the offset grew, the settling moved the
+   column again, and the loop ran to the 30 km cap. The flexure now books only the column's own
+   crust's Airy change (`plates/crust_uplift_mm_yr`, ISO-092), either sign. The reproduction was
+   scattered continents seed 5 with the sheet's `--set` keys, which reached the stop at step 449.
