@@ -480,7 +480,8 @@ there is the template's own and water it left in place the world's. The test pla
 (`deeptime:planet_nocaves`) turn aquifers off, so the biomes' carvers (which `GeologicChunkGenerator` runs) fill
 every tunnel they cut below sea level with water, under the sea floor too: at master 049c4278's deepest sea 52 cells
 in the buried chamber's boxes held such water (y -169 to -147, 34 blocks or more under the floor) and the template
-wrote over every one. Carvers run after the noise's encapsulation in real generation as well, so a water-filled
+wrote over every one (1,130 cells with Expanded Ecosphere's set; 1,043 with MIC's set, whose chamber there is
+another layout, 12 blocks or more under the floor). Carvers run after the noise's encapsulation in real generation as well, so a water-filled
 tunnel can cross a buried chamber there; the test logs that water and does not assert on it, since it is the
 carvers' and not the burial's. Vanilla's trial chamber templates carry water of their own (read from the 1.21.1
 client jar's 170 `trial_chambers` templates): `corridor/end_2` a basin of 60 water and 23 waterlogged waxed oxidized
