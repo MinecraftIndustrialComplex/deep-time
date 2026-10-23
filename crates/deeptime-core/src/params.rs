@@ -566,6 +566,11 @@ pub struct TectonicParams {
     /// crust, standing about 500 m over the sea), within [T_n / 2, `collapse_thickness_km`];
     /// `false` (the default and every built-in preset) T_n in the datum frame (ledger PLT-412).
     pub collapse_sea_column: bool,
+    /// … and never thicker than this, km: the continents' mean crust (Christensen & Mooney 1995:
+    /// 41.1 km, shields and platforms about the same), so a sea that rises past about 850 m over
+    /// the datum does not lift the column with it. 0 = no bound but `collapse_thickness_km` (the
+    /// default; ledger PLT-413).
+    pub collapse_sea_column_max_km: f64,
     /// The thickest continental crust, km: a column thicker than this loses the excess from its
     /// bottom to the mantle (continental subduction, a foundering root; `plates/collapse.rs`).
     /// 0 = no limit.
@@ -810,6 +815,7 @@ impl Default for TectonicParams {
             collapse_hot_myr: 0.0,           // ledger: PLT-390
             collapse_continent_first: false, // ledger: PLT-391
             collapse_sea_column: false,      // ledger: PLT-412
+            collapse_sea_column_max_km: 0.0, // ledger: PLT-413
             crust_max_km: 70.0,              // ledger: PLT-258
             crust_channel_km2_myr: 1500.0,   // ledger: PLT-300
             isostasy_relax_myr: 0.004,       // ledger: ISO-078
@@ -1147,6 +1153,10 @@ impl PlanetPreset {
             (k.collapse_quiet_myr, "$.tectonics.collapse_quiet_myr"),
             (k.collapse_reach_km, "$.tectonics.collapse_reach_km"),
             (k.collapse_hot_myr, "$.tectonics.collapse_hot_myr"),
+            (
+                k.collapse_sea_column_max_km,
+                "$.tectonics.collapse_sea_column_max_km",
+            ),
             (k.crust_max_km, "$.tectonics.crust_max_km"),
             (k.crust_channel_km2_myr, "$.tectonics.crust_channel_km2_myr"),
             (k.isostasy_relax_myr, "$.tectonics.isostasy_relax_myr"),
