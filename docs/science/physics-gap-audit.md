@@ -237,6 +237,17 @@ and that the model does not have as physics.
   - Root removal: never mentioned as a mechanism. The papers sit in the bibliography, with no
     ledger row or deferral note.
   - Cratons as stiff, buoyant keels: never mentioned.
+- **State (2026-10-23).** Stage 1 is built, every part off by default
+  ([lithosphere-thermal-state.md](lithosphere-thermal-state.md), PLT-460 to PLT-470, ISO-110 to
+  ISO-112): each sample carries its thermal lithosphere's depth and a keel; heat flow comes from
+  it (PLT-137's proxy kept when off), with a final pass that fixes the release pace's 33.7 mW/m²
+  bake fault; thermal isostasy in two frames; a strength from the thermal age for the thin sheet
+  and the flexure's Te; a backstop for the cordillera's source. On the pool only the strength
+  moves V1 towards Earth (24 runs: largest landmass 0.151 to 0.182, p 0.010; crust under the sea
+  0.274 to 0.251, p 0.18) and it pushes land over the band's top in seven runs, so criteria a run
+  go 3.33 to 3.42 (p 0.57) and it stays off. Thermal isostasy lifts the sea (craton frame) or sinks
+  the start's continents (Hyndman & Currie's). Rifted margins with β (stage 2) and root removal on a
+  Rayleigh-Taylor time (stage 3) are designed, not built.
 
 ### Gap 5: river and delta landforms
 
