@@ -61,6 +61,7 @@ pub mod kinematics;
 pub mod l1;
 pub mod noise;
 pub mod normalise;
+pub mod peaks;
 pub mod pools;
 pub mod rate;
 pub mod ridges;
@@ -300,6 +301,12 @@ impl PlatesStage {
         }
         // The settling (`settle.rs`) reads the flexure too.
         let settles = k.isostasy_relax_myr.is_finite() && k.isostasy_relax_myr > 0.0;
+        // The peak trace (`peaks.rs`, measurement only, off by default).
+        let tracing = peaks::threshold().is_some();
+        let mut traced = peaks::Begin::default();
+        if tracing {
+            traced.z_pre = st.samples.iter().map(|s| s.elevation_m).collect();
+        }
         let (mut cones, flexure) =
             self.apply_surface_feedback(st, world, &env, collisions || settles)?;
         cones.resize(st.samples.len(), [0.0; 2]);
@@ -326,6 +333,12 @@ impl PlatesStage {
         };
         let sea = sea_m(world);
         let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
+        if tracing {
+            traced.z0 = z0.clone();
+            traced.flexure = flexure
+                .clone()
+                .unwrap_or_else(|| vec![f64::NAN; st.samples.len()]);
+        }
         // The crust's own Airy heights as the step begins (its crust uplift, ledger: ISO-091).
         let crust0 = settle::crust_heights(st, env.gravity);
         if let Some(gb) = st.gap_budget.as_mut() {
@@ -708,7 +721,9 @@ impl PlatesStage {
         // A suture resamples at once, so the welded plate's subducted slab is consumed (hidden
         // crust of one plate under the same plate would surface).
         let final_step = step >= self.total;
-        if ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step) {
+        let resampling =
+            ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step);
+        if resampling {
             let geo = ridges::resample(st, world, &pos, &tree, &cache.geo, &env)?;
             if let Some(b) = cb.borrow_mut().as_mut() {
                 b.book_lattice(&st.samples, gap_budget::Part::ResampleBlend);
@@ -744,6 +759,9 @@ impl PlatesStage {
         rate::end(st);
 
         book(st, gap_budget::Part::Other);
+        if tracing {
+            peaks::print(st, &cache.geo, &env, sea, &traced, resampling);
+        }
         if let Some(gb) = st.gap_budget.as_mut() {
             gb.end_step(&st.samples, env.t_myr, env.dt_myr);
             let every = (GAP_SNAPSHOT_MYR / env.dt_myr).round().max(1.0) as u64;
