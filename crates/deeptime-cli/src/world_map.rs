@@ -209,9 +209,11 @@ const CENSUS_POINTS: usize = 1 << 21;
 /// The planet's shares, read through the world's projection at [`CENSUS_POINTS`] points of a
 /// Fibonacci lattice on the sphere (each point's nearest cell): `land` (elevation at or above the
 /// sea level's block), `ice` (`climate/ice_cover` above 0), `wetland` (`climate/wetland` not 0) and
-/// one share per Köppen class of `climate/koppen_l2` (`sea` the sea's). A layer the world lacks
-/// is left out. The shares of two bakes of one run differ only by what each projection does to the
-/// rasters, which is what the cube plan's check B7 compares.
+/// one share per Köppen class of `climate/koppen_l2`, the classes the biome inputs were placed by
+/// (`climate/koppen` on a world without it; `sea` the sea's). A layer the world lacks is left out.
+/// The shares of two bakes of one run differ only by what each projection does to the rasters,
+/// which is what the cube plan's check B7 compares (the game's biome census cannot read a cube
+/// world before phase 2).
 pub fn census(manifest: &Manifest, dir: &Path) -> Result<Value, String> {
     use deeptime_core::climate::koppen;
     let wp = manifest.world_projection();
@@ -219,7 +221,10 @@ pub fn census(manifest: &Manifest, dir: &Path) -> Result<Value, String> {
     let elev = open_layer(manifest, dir, "elevation")?;
     let ice = open_layer(manifest, dir, "climate/ice_cover")?;
     let wet = open_layer(manifest, dir, "climate/wetland")?;
-    let class = open_layer(manifest, dir, "climate/koppen_l2")?;
+    let class = match open_layer(manifest, dir, "climate/koppen_l2")? {
+        Some(l) => Some(l),
+        None => open_layer(manifest, dir, "climate/koppen")?,
+    };
     let (mut land, mut iced, mut wetland) = (0usize, 0usize, 0usize);
     let mut classes = [0usize; koppen::CODES.len()];
     let mut unread = 0usize;
