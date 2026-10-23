@@ -42,7 +42,7 @@ import continents_census as cc  # noqa: E402
 
 
 def census(fields_dir):
-    f, g, e = cc.load_dump(fields_dir)
+    f, _globals, e = cc.load_dump(fields_dir)
     h, w, r = e["h"], e["w"], e["r"]
     lat_r, ok_r = cc.lat_of_rows(h, r, w * r)
     lat = np.repeat(lat_r[:, None], w, 1)
@@ -70,7 +70,6 @@ def census(fields_dir):
         "under_ice": float((land & (ice >= cc.ICE_MIN_M)).sum()) / n_land,
         "cont": cont.sum() / ncell,
         "cells": ncell,
-        "t_years": g.get("t_years", g.get("globals", {}).get("t_years")),
     }
 
 

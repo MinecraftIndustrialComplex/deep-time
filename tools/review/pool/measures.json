@@ -10,7 +10,9 @@
       "version": 1,
       "doc": "V1 item 1's seven measures on the final frame (decisions log 2026-10-21) plus the crust's net change and the sea over the datum; definitions in measure_v1census.py",
       "command": ["{py}", "-I", "{tools}/measure_v1census.py", "{run}"],
+      "python": "numpy",
       "needs": ["fields", "plate", "rec"],
+      "fields": ["elevation", "plates/crust_type", "climate/ice_thickness_m"],
       "columns": [
         {"key": "land", "label": "land", "target": [0.26, 0.32], "digits": 3},
         {"key": "largest", "label": "largest landmass", "target": [0.12, null], "digits": 3},
