@@ -313,14 +313,18 @@ pub(crate) struct Foot {
 }
 
 impl Foot {
-    /// The share of a checkerboard at the simulation's resolution that the footprint passes
-    /// (the bilinear read's [`BILINEAR_CHECKER`] times the Gaussian's response at its frequency).
+    /// The share of a checkerboard at the simulation's resolution that the footprint passes:
+    /// the bilinear read's [`BILINEAR_CHECKER`] times the Gaussian's mean response to the
+    /// checkerboard's two diagonal waves, cos πu cos πv = ½ (cos π(u + v) + cos π(u − v)).
     pub(crate) fn checker_leak(&self, r_s: f64) -> f64 {
         let e2 = (-self.e1.1, self.e1.0);
-        let f1 = (self.e1.0 + self.e1.1) / (2.0 * r_s);
-        let f2 = (e2.0 + e2.1) / (2.0 * r_s);
-        let ex = 2.0 * PI * PI * ((self.sigma.0 * f1).powi(2) + (self.sigma.1 * f2).powi(2));
-        BILINEAR_CHECKER * (-ex).exp()
+        let response = |sz: f64| {
+            let f1 = (self.e1.0 + sz * self.e1.1) / (2.0 * r_s);
+            let f2 = (e2.0 + sz * e2.1) / (2.0 * r_s);
+            let ex = 2.0 * PI * PI * ((self.sigma.0 * f1).powi(2) + (self.sigma.1 * f2).powi(2));
+            (-ex).exp()
+        };
+        BILINEAR_CHECKER * 0.5 * (response(1.0) + response(-1.0))
     }
 
     /// The footprint's samples (Lambert x, z, weight; weights summing to 1) into `out`.
@@ -1890,13 +1894,14 @@ pub fn summary_line(v: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use deeptime_format::DType;
+    use deeptime_format::bodies::{Body, NO_CLIP, Shape};
     use deeptime_format::cube::CubeTurn;
-    use deeptime_format::{DType, LayerDesc};
 
     fn mapping(s: u32, c_sim: u32, turn: CubeTurn) -> CubeMapping {
         let map = CubeMap::builtin_static(WORLD_MAP).expect("the world map");
         let WorldProjection::Cube(view) = WorldProjection::cube(s, map, turn) else {
-            unreachable!()
+            unreachable!("a cube projection")
         };
         CubeMapping::new(Cube::shared(s), view, c_sim)
     }
@@ -1905,75 +1910,415 @@ mod tests {
         CubeTurn::from_angles(37.0, 21.0, 11.0)
     }
 
-    /// A Lambert source layer of f32 cells from `f` at each cell's block.
-    fn lambert_src(c: u32, r: u32, f: impl Fn(f64, f64, i64, i64) -> f64) -> Src {
+    /// A Lambert layer of f32 cells, `f` of each cell's index.
+    fn lambert_src(c: u32, r: u32, f: impl Fn(i64, i64) -> f64) -> Src {
         let grid = GridDesc::for_planet("L3", c, r).expect("a grid");
         let mut bytes = Vec::with_capacity(grid.w as usize * grid.h as usize * 4);
         for j in 0..i64::from(grid.h) {
             for i in 0..i64::from(grid.w) {
-                let (x, z) = (grid.block_x(i) as f64, grid.block_z(j) as f64);
-                bytes.extend_from_slice(&(f(x, z, i, j) as f32).to_le_bytes());
+                bytes.extend_from_slice(&(f(i, j) as f32).to_le_bytes());
             }
         }
-        let desc = LayerDesc {
-            name: "elevation".into(),
-            grid,
-            dtype: DType::F32,
-            scale: 1.0,
-            offset: 0.0,
-            nodata: None,
-            units: "blocks".into(),
-            ..LayerDesc::test_default()
-        };
+        let desc = crate::bake::desc("elevation", DType::F32, &grid, 1.0, "blocks", None);
         let layer = Arc::new(LoadedLayer::new(desc, bytes).expect("a layer"));
-        let cb = layer.desc.cell_bytes();
         Src {
             entry: 0,
             kind: Kind::Continuous,
+            cb: 4,
             layer,
-            cb,
         }
     }
 
+    /// Local (u, v) of a stacked cube cell's centre.
+    fn cell_local(g: &GridDesc, c: usize) -> (Face, f64, f64) {
+        let w = g.w as usize;
+        let (face, a, b) = g.face_of_cell((c % w) as u32, (c / w) as u32);
+        let half = f64::from(g.face_blocks()) / 2.0;
+        let r = f64::from(g.r);
+        (
+            face,
+            ((f64::from(a) + 0.5) * r - half) / half,
+            ((f64::from(b) + 0.5) * r - half) / half,
+        )
+    }
+
+    /// SCL-125: on every turning seam both faces read the same blended value, and a point
+    /// away from the turning seams reads the field itself.
     #[test]
-    fn seam_blend_meets_on_the_seam() {
+    fn seam_blend_agrees_across_every_turning_seam() {
         let cube = Cube::shared(256);
-        // A pattern in net coordinates that differs across every turning seam.
-        let f = |x: f64, z: f64| (x * 0.031).sin() + (z * 0.017).cos();
-        for e in cube.edges().iter().skip(2) {
+        let f = |x: f64, z: f64| (x * 0.031).sin() + (z * 0.017).cos() + 0.001 * x;
+        let reach = 32.0;
+        let mut checked = 0;
+        for (k, e) in cube.edges().iter().enumerate().skip(2) {
             let partner = &cube.edges()[e.partner];
-            for k in 1..8 {
-                let t = e.span[0] as f64 + (e.span[1] - e.span[0]) as f64 * f64::from(k) / 8.0;
-                // A point on the edge's line, a hair inside its face, and the planet point it
-                // shows from the partner's side.
-                let inward = match e.beyond {
-                    Side::Min => 1e-7,
-                    Side::Max => -1e-7,
+            for step in 1..8 {
+                let t =
+                    e.span[0] as f64 + (e.span[1] - e.span[0]) as f64 * f64::from(step) / 8.0;
+                let p = match e.axis {
+                    Axis::X => (e.coord as f64, t),
+                    Axis::Z => (t, e.coord as f64),
                 };
-                let (x, z) = match e.axis {
-                    Axis::X => (e.coord as f64 + inward, t),
-                    Axis::Z => (t, e.coord as f64 + inward),
-                };
-                let (px, pz) = partner.iso.inverse().point(x, z);
-                let (qx, qz) = e.iso.inverse().point(px, pz);
-                let _ = (qx, qz);
-                let a = seam_blend(cube, x, z, 32.0, f);
-                // The partner side's point on its own face (just inside).
-                let (bx, bz) = partner.iso.inverse().point(x, z);
-                let b = {
-                    // bx, bz lies just beyond the partner edge; fold it home.
-                    let p = cube.fold_point(bx, bz).expect("on the planet");
-                    let _ = p;
-                    seam_blend(cube, e.iso.point(bx, bz).0, e.iso.point(bx, bz).1, 32.0, f)
-                };
-                let _ = b;
-                // Both sides of the seam: the partner face's point is where the edge's iso
-                // takes the point beyond it.
-                let (ox, oz) = cube.edges()[e.partner].iso.inverse().point(x, z);
-                let home = e.iso.point(ox, oz);
-                let _ = home;
-                assert!(a.is_finite());
+                // The same planet point seen from the partner's face.
+                let q = partner.iso.inverse().point(p.0, p.1);
+                assert_eq!(edge_under(cube, q, 1e-9), Some(e.partner), "edge {k}");
+                let a = seam_blend(cube, p.0, p.1, reach, f);
+                let b = seam_blend(cube, q.0, q.1, reach, f);
+                assert!((a - b).abs() < 1e-9, "edge {k} at {p:?}: {a} vs {b}");
+                // Half and half on the seam.
+                assert!((a - 0.5 * (f(p.0, p.1) + f(q.0, q.1))).abs() < 1e-9);
+                checked += 1;
             }
         }
+        assert_eq!(checked, 12 * 7);
+        // F1's centre: no turning seam within reach.
+        assert_eq!(seam_blend(cube, 256.0, 0.0, reach, f), f(256.0, 0.0));
+        // At the reach the blend has faded out.
+        let e = &cube.edges()[2];
+        let mid = 0.5 * (e.span[0] + e.span[1]) as f64;
+        let inward = match e.beyond {
+            Side::Min => reach,
+            Side::Max => -reach,
+        };
+        let p = match e.axis {
+            Axis::X => (e.coord as f64 + inward, mid),
+            Axis::Z => (mid, e.coord as f64 + inward),
+        };
+        assert_eq!(seam_blend(cube, p.0, p.1, reach, f), f(p.0, p.1));
+    }
+
+    /// SCL-122: the settle's distances are great-circle distances to the nearest source, found
+    /// across every seam, and its fills copy the nearest source's value.
+    #[test]
+    fn the_settle_distances_are_great_circle_across_the_seams() {
+        let (s, r) = (256u32, 8u32);
+        let m = mapping(s, 1024, turned());
+        let grid = GridDesc::for_cube("L2", s, r).expect("a cube grid");
+        let cs = CubeSettle::new(&grid, &m.view, 1.0);
+        let n = grid.w as usize * grid.h as usize;
+        // Land in two patches that each cross several faces.
+        let land: Vec<bool> = (0..n)
+            .map(|c| {
+                let u = cs.units[c];
+                (u[0] > 0.55 && u[1] > -0.3) || (u[2] < -0.45 && u[1] > 0.1)
+            })
+            .collect();
+        let sea: Vec<usize> = (0..n).filter(|&c| !land[c]).collect();
+        let d = cs.dist(&land, true);
+        let cell = (PI / 2.0) / f64::from(grid.w);
+        let (mut worst, mut off) = (0.0f64, 0usize);
+        for c in 0..n {
+            let truth = sea
+                .iter()
+                .map(|&k| angle(cs.units[c], cs.units[k]))
+                .fold(f64::INFINITY, f64::min);
+            let e = (f64::from(d[c]) - truth).abs();
+            worst = worst.max(e);
+            off += usize::from(e > 1e-4 * cell);
+        }
+        assert!(worst < 0.5 * cell, "worst {worst} rad, a cell {cell}");
+        assert!(
+            (off as f64) < 0.03 * n as f64,
+            "{off} of {n} cells off the true nearest"
+        );
+        let mut v: Vec<f32> = (0..n)
+            .map(|c| if land[c] { -1.0 } else { c as f32 })
+            .collect();
+        assert!(cs.fill(&mut v, &land.iter().map(|l| !l).collect::<Vec<_>>()));
+        assert!(v.iter().all(|&x| x >= 0.0 && !land[x as usize]));
+        assert!(!cs.fill(&mut v, &vec![false; n]));
+    }
+
+    /// The analytic Jacobian of the Lambert → cube map against finite differences.
+    #[test]
+    fn the_analytic_jacobian_matches_finite_differences() {
+        let m = mapping(1024, 4096, turned());
+        let mut checked = 0;
+        for k in 0..600 {
+            let xs = -2048.0 + 4096.0 * ((f64::from(k) * 0.618_034) % 1.0);
+            let zs = m.rs * 0.9 * (2.0 * ((f64::from(k) * 0.414_214) % 1.0) - 1.0);
+            let h = 0.02;
+            let p0 = m.to_world(xs, zs);
+            let px = m.to_world(xs + h, zs);
+            let pz = m.to_world(xs, zs + h);
+            let face = |p: (f64, f64)| m.cube.local_of_point(p.0, p.1).map(|l| l.0);
+            if face(p0).is_none() || face(p0) != face(px) || face(p0) != face(pz) {
+                continue;
+            }
+            let fd = [
+                [(px.0 - p0.0) / h, (px.1 - p0.1) / h],
+                [(pz.0 - p0.0) / h, (pz.1 - p0.1) / h],
+            ];
+            let j = m.jacobian_at(xs, zs);
+            let scale = fd.iter().flatten().fold(0.0f64, |a, &b| a.max(b.abs()));
+            for a in 0..2 {
+                for b in 0..2 {
+                    assert!(
+                        (fd[a][b] - j[a][b]).abs() < 1e-3 * scale,
+                        "({xs}, {zs}) J[{a}][{b}]: {} vs {}",
+                        j[a][b],
+                        fd[a][b]
+                    );
+                }
+            }
+            checked += 1;
+        }
+        assert!(checked > 500, "{checked}");
+    }
+
+    /// B2 (SCL-124): a checkerboard at the simulation's resolution, read through the cells'
+    /// footprints, by band of the footprint's short axis D₂ (simulation cells per world cell).
+    /// Where D₂ ≥ 1.2 the checkerboard's peak stays under 1 % (analytically at most 0.86 %);
+    /// below that the world cell is about as fine as the simulation's and passes it, as the
+    /// bilinear read does (65.7 %).
+    #[test]
+    fn the_footprint_stops_the_simulations_checkerboard() {
+        let (c_sim, r_s, s) = (2048u32, 8u32, 512u32);
+        let src = lambert_src(c_sim, r_s, |i, j| if (i + j) % 2 == 0 { 1.0 } else { -1.0 });
+        let m = mapping(s, c_sim, turned());
+        let g = src.layer.desc.grid.clone();
+        for r_w in [8u32, 16] {
+            let wg = GridDesc::for_cube("L3", s, r_w).expect("a cube grid");
+            let (outs, _) = resample_cube(&m, std::slice::from_ref(&src), &wg);
+            let n = wg.w as usize * wg.h as usize;
+            let (mut num, mut den, mut cnt, mut leak) = ([0.0; 7], [0.0; 7], [0usize; 7], [0.0; 7]);
+            for c in 0..n {
+                let (face, u, v) = cell_local(&wg, c);
+                let (f, _) = m.foot(face, u, v, f64::from(r_w), f64::from(r_s));
+                let su = (f.xs - g.origin_block_x as f64) / f64::from(r_s);
+                let sv = (f.zs - g.origin_block_z as f64) / f64::from(r_s);
+                let cc = (PI * su).cos() * (PI * sv).cos();
+                let out = f64::from(f32::from_le_bytes(
+                    outs[0][c * 4..c * 4 + 4].try_into().expect("4 bytes"),
+                ));
+                let b = D_BANDS
+                    .iter()
+                    .position(|&e| f.d.1 < e)
+                    .unwrap_or(D_BANDS.len());
+                num[b] += out * cc;
+                den[b] += cc * cc;
+                cnt[b] += 1;
+                leak[b] += f.checker_leak(f64::from(r_s));
+            }
+            for b in 0..7 {
+                if cnt[b] == 0 {
+                    continue;
+                }
+                let amp = num[b] / den[b];
+                eprintln!(
+                    "r_w {r_w} D2 band {b}: cells {} amp {:.4} expected {:.4}",
+                    cnt[b],
+                    amp,
+                    leak[b] / cnt[b] as f64
+                );
+                if b >= 3 && cnt[b] >= 200 {
+                    assert!(amp.abs() < 0.01, "r_w {r_w} band {b}: {amp}");
+                }
+            }
+            assert!(cnt[3..].iter().sum::<usize>() > 0 || r_w == 8);
+        }
+    }
+
+    /// B4: a body's planet area through the projection, mid-face, on a turning seam and 2° from
+    /// a corner (yaw 0: the Lambert block's axes stay perpendicular through a conformal map).
+    #[test]
+    fn a_body_keeps_its_planet_area_on_a_seam_and_by_a_corner() {
+        let m = mapping(1024, 4096, turned());
+        let ratio = |cube_dir: [f64; 3]| {
+            let p = m.view.turn.to_planet(normalize(cube_dir));
+            assert!(p[2].abs() < 0.95, "too near the simulation's pole: {p:?}");
+            let (xs, zs, _) = m.src_block(p);
+            let b = Body::new(
+                1,
+                None,
+                Shape::Lens,
+                "ore",
+                [xs, 40.0, zs],
+                [6.0, 3.0, 4.0],
+                0.0,
+                0.0,
+                NO_CLIP,
+            );
+            let nb = project_body(&m, &b);
+            let j = m
+                .view
+                .jacobian(nb.center[0], nb.center[2])
+                .expect("on the planet");
+            f64::from(nb.axes[0]) * f64::from(nb.axes[2]) * j.sigma * j.sigma / 24.0
+        };
+        let mid = ratio([1.0, 0.1, -0.05]);
+        let seam = ratio([0.0, 1.0, 1.0]);
+        // 2° from corner (1, 1, 1) towards F0's centre.
+        let c = normalize([1.0, 1.0, 1.0]);
+        let x = normalize([1.0, -0.5, -0.5]);
+        let a = 2f64.to_radians();
+        let corner = ratio([
+            c[0] * a.cos() + x[0] * a.sin(),
+            c[1] * a.cos() + x[1] * a.sin(),
+            c[2] * a.cos() + x[2] * a.sin(),
+        ]);
+        for (name, r) in [("mid", mid), ("seam", seam), ("corner", corner)] {
+            assert!((r - 1.0).abs() < 0.01, "{name}: {r}");
+        }
+        assert!((seam / mid - 1.0).abs() < 0.01 && (corner / mid - 1.0).abs() < 0.01);
+    }
+
+    /// Simulation-block vertices along the great circle from cube-frame `a` to `b`, x kept
+    /// continuous.
+    fn chain_between(m: &CubeMapping, a: [f64; 3], b: [f64; 3], n: usize) -> Vec<RiverVertex> {
+        let (a, b) = (normalize(a), normalize(b));
+        let c = m.src.circumference();
+        let mut out: Vec<RiverVertex> = Vec::with_capacity(n);
+        for k in 0..n {
+            let t = k as f64 / (n - 1) as f64;
+            let p = m.view.turn.to_planet(normalize([
+                a[0] + t * (b[0] - a[0]),
+                a[1] + t * (b[1] - a[1]),
+                a[2] + t * (b[2] - a[2]),
+            ]));
+            let (mut xs, zs, _) = m.src_block(p);
+            if let Some(prev) = out.last() {
+                xs += c * ((f64::from(prev.x) - xs) / c).round();
+            }
+            out.push(RiverVertex {
+                x: xs as f32,
+                z: zs as f32,
+                w: 70.0 - k as f32 * 0.1,
+                hw: 3.0,
+                depth: 2.0,
+                q: 10.0 + k as f32,
+            });
+        }
+        out
+    }
+
+    /// B5 (SCL-126): a chain across a turning seam is cut there into two halves on partner
+    /// edges at the same planet point; one across a direct seam is not cut; the planet length
+    /// changes by under 0.5 %.
+    #[test]
+    fn rivers_are_cut_on_turning_seams_only() {
+        let m = mapping(1024, 4096, turned());
+        let mut r = Rivers::empty(4096);
+        for (a, b) in [
+            // F1 → N (turning).
+            ([0.15, 1.0, 0.7], [0.15, 0.7, 1.0]),
+            // F0 → F1 (direct).
+            ([1.0, 0.7, 0.1], [0.7, 1.0, 0.15]),
+        ] {
+            let v = chain_between(&m, a, b, 60);
+            r.chains.push(Chain {
+                first: r.vertices.len() as u32,
+                count: v.len() as u32,
+                mouth: Mouth::Sea,
+                into: u32::MAX,
+            });
+            r.vertices.extend(v);
+        }
+        let frame = WorldProjection::Cube(m.view).index_frame();
+        let (out, st) = project_rivers_cube(&m, &r, frame);
+        assert_eq!(st.seam_cuts, 1);
+        assert_eq!(st.sea_cuts, 0);
+        assert_eq!(st.partner_mismatch, 0);
+        assert_eq!(out.chains.len(), 3);
+        assert_eq!(out.chains[0].mouth, Mouth::Seam);
+        assert_eq!(out.chains[0].into, 1);
+        assert_eq!(out.chains[1].mouth, Mouth::Sea);
+        let end = out.vertices[(out.chains[0].count - 1) as usize];
+        let start = out.vertices[out.chains[1].first as usize];
+        let ua = m.view.unit(f64::from(end.x), f64::from(end.z)).expect("on the planet");
+        let ub = m
+            .view
+            .unit(f64::from(start.x), f64::from(start.z))
+            .expect("on the planet");
+        assert!(angle(ua, ub) * m.rs < 0.05, "the halves meet at one point");
+        let change = st.len_world / st.len_sim_kept - 1.0;
+        assert!(change.abs() < 0.005, "length change {change}");
+        // The direct seam's crossing is whole.
+        assert_eq!(st.crossings.get("F0|F1"), Some(&[1, 0, 0]));
+        // Widths are in world blocks: the simulation's over σ.
+        let v = out.vertices[out.chains[2].first as usize];
+        let sig = m
+            .view
+            .jacobian(f64::from(v.x), f64::from(v.z))
+            .expect("on the planet")
+            .sigma;
+        assert!((f64::from(v.hw) * sig - 3.0).abs() < 1e-3);
+        out.validate().expect("a valid network");
+    }
+
+    /// B6 (SCL-122): a basin across a turning seam is one basin: closed on both faces while the
+    /// ocean does not reach it, and opened on both when the ocean joins it from one side.
+    #[test]
+    fn a_basin_on_a_turning_seam_is_one_basin() {
+        let (s, r) = (256u32, 8u32);
+        let m = mapping(s, 1024, CubeTurn::IDENTITY);
+        let grid = GridDesc::for_cube("L3", s, r).expect("a cube grid");
+        let cs = CubeSettle::new(&grid, &m.view, 1.0);
+        let n = grid.w as usize * grid.h as usize;
+        // The basin round the middle of the N|F1 seam; the ocean round F3's centre.
+        let seam = normalize([0.0, 1.0, 1.0]);
+        let ocean = [0.0, -1.0, 0.0];
+        let basin_cells = |c: usize| dot(cs.units[c], seam) > 0.97;
+        let ground = |join: bool| -> Vec<f64> {
+            (0..n)
+                .map(|c| {
+                    let u = cs.units[c];
+                    if dot(u, ocean) > 0.5 {
+                        -50.0
+                    } else if basin_cells(c) {
+                        -5.0
+                    } else if join && u[2] > 0.5 && u[1] < 0.75 && u[1] > -0.9 {
+                        // A channel over N from the basin to the ocean.
+                        if u[0].abs() < 0.08 { -5.0 } else { 10.0 }
+                    } else {
+                        10.0
+                    }
+                })
+                .collect()
+        };
+        let faces_of = |cells: &[usize]| -> Vec<Face> {
+            let mut f: Vec<Face> = cells
+                .iter()
+                .map(|&c| cell_local(&grid, c).0)
+                .collect();
+            f.sort();
+            f.dedup();
+            f
+        };
+        let basin: Vec<usize> = (0..n).filter(|&c| basin_cells(c)).collect();
+        assert_eq!(faces_of(&basin), vec![Face::F1, Face::N]);
+        for join in [false, true] {
+            let e = ground(join);
+            let flag: Vec<u8> = (0..n).map(|c| u8::from(basin_cells(c))).collect();
+            let (layer, _) = hydro::closed_basin_on_world_by(
+                n,
+                hydro::cube_neighbour8(&grid),
+                |c| e[c] <= 0.0,
+                |c| e[c] <= -1.0,
+                &flag,
+                20,
+                1,
+            );
+            let closed: Vec<u8> = basin.iter().map(|&c| layer[c]).collect();
+            if join {
+                assert!(closed.iter().all(|&v| v == 0), "the ocean opens it on both faces");
+            } else {
+                assert!(closed.iter().all(|&v| v == 1), "closed on both faces");
+            }
+        }
+    }
+
+    /// The nearest image of a planet point across a turning seam is the point beyond the edge.
+    #[test]
+    fn the_nearest_image_crosses_turning_seams() {
+        let m = mapping(1024, 4096, turned());
+        let near = |c: [f64; 3]| m.view.point_of_unit(m.view.turn.to_planet(normalize(c)));
+        // F1 just south of its north edge (N|F1), and N just across.
+        let p = near([0.2, 1.0, 0.99]);
+        let q = near([0.2, 0.99, 1.0]);
+        assert!((q.0 - p.0).hypot(q.1 - p.1) > 100.0, "far apart in the net");
+        let (im, kind) = m.nearest_image(p, q);
+        assert!(matches!(kind, Image::Turn(_)));
+        assert!((im.0 - p.0).hypot(im.1 - p.1) < 20.0, "{im:?} vs {p:?}");
     }
 }
