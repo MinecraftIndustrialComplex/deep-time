@@ -49,9 +49,10 @@ use crate::bake::cube_turn;
 use crate::bake::load_layer;
 use crate::bake::project::{
     BORDER_INSET_BLOCKS, BiomeGround, BodyY, Drawn, Held, ICE_COVER, Kind, ROW_BAND,
-    SPAWN_EDGE_MARGIN, Src, VERSION, WorldMap, apply, area_share, body_y, drawn_detail, err, is_biome_layer, kind_of, ms,
-    project_body, project_site, project_structure, put_raw, raise_world_tops, settle_biome_layers,
-    stratabound_sites, world_ground, world_raise_shifts, write_deferred, write_json,
+    SPAWN_EDGE_MARGIN, Src, VERSION, WorldMap, apply, area_share, body_y, drawn_detail, err,
+    is_biome_layer, kind_of, ms, project_body, project_site, project_structure, put_raw,
+    raise_world_tops, settle_biome_layers, stratabound_sites, world_ground, world_raise_shifts,
+    write_deferred, write_json,
 };
 use crate::bake::relief::{Frame, SimFrame};
 use crate::error::CoreError;
