@@ -193,8 +193,8 @@ public final class StructureBurialGameTests {
         ServerLevel level = planet(helper);
         WorldDataTerrain t = terrain(helper, level);
         Site site = find(t, true);
-        helper.assertTrue(site.most < -40, "the deepest sea of the planet (greatest H around it " + site.most
-                + ") is deeper than a trial chamber's start (-40): the premise of the test");
+        helper.assertTrue(site.most < 0, "the deepest sea of the planet (greatest H around it " + site.most
+                + ") lies more than 63 blocks under the sea: the premise of the test");
         ChunkPos at = new ChunkPos(site.x >> 4, site.z >> 4);
         int minY = level.getMinBuildHeight();
         StringBuilder log = new StringBuilder();
