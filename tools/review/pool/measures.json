@@ -26,6 +26,22 @@
         {"key": "sea_after100_m", "key2": "sea_end_m", "label": "sea over the datum, median after 100 Myr / end, m", "target": null, "digits": 0, "pair": true}
       ],
       "criteria": ["land", "largest", "under_sea", "above_2km", "coast_hi", "under_ice", "collisions"]
+    },
+    "guard": {
+      "version": 1,
+      "doc": "How close the surface came to the surface guard (ISO-072) over the run, from the stage's summary, and the plate columns standing far above their Airy height at the end (the flexure guard's lane); definitions in measure_guard.py",
+      "command": ["{py}", "-I", "{tools}/measure_guard.py", "{run}"],
+      "python": "numpy",
+      "needs": ["fields"],
+      "fields": ["plates/elevation_m", "plates/thickness_m", "plates/crust_type"],
+      "columns": [
+        {"key": "guard_worst_m", "label": "the guard's worst, m from the sea", "target": null, "digits": 0},
+        {"key": "guard_over_2", "label": "steps beyond 2 Earth reliefs", "target": null, "digits": 0},
+        {"key": "step_rise_max_m", "key2": "step_fall_max_m", "label": "largest rise / fall of a cell in a step, m", "target": null, "digits": 0, "pair": true},
+        {"key": "over_airy_5km", "label": "continental plate cells 5 km over Airy, share", "target": null, "digits": 4},
+        {"key": "over_airy_max_m", "label": "plate cells' largest excess over Airy, m", "target": null, "digits": 0},
+        {"key": "plate_peak_m", "label": "highest plate elevation, m", "target": null, "digits": 0}
+      ]
     }
   }
 }
