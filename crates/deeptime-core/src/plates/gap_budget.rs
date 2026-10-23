@@ -730,6 +730,17 @@ impl GapBudget {
         self.sample_steps = vec![0.0; BANDS];
     }
 
+    /// One sample's account (the peak trace, `peaks.rs`): its gap's parts, and this step's
+    /// changes of its elevation and of its column's thickness by part, m.
+    pub fn sample_parts(
+        &self,
+        v: usize,
+    ) -> Option<(&[f32; PARTS], &[f32; PARTS], &[f32; PARTS])> {
+        self.track
+            .get(v)
+            .map(|t| (&t.parts, &t.step_dz, &t.step_dt))
+    }
+
     /// The largest difference between a sample's parts and its gap, m (a check: the parts add up).
     pub fn worst_residual_m(&self) -> f64 {
         self.track
