@@ -409,7 +409,11 @@ run's cap): the young landscape's world on the L2 grid's real rows (`young::FIEL
 17 f32 fields), the character's fields (`CHARACTER_BYTES_PER_L1_CELL`, 32 B: 25, 31 and 29 B held on
 quick 16k at 50 and 1000 Myr and full 32k at 100 Myr), the L2 level, then each level on its real
 grid (`GridDesc::for_planet`), deciding whole or tiled as the run does under the run's cap, and the
-last level with `whole_last_level_peak` whole, or its largest window and the preview in tiles.
+last level with `whole_last_level_peak` whole, or its largest window and the preview in tiles. The
+water balance on L2 (`balance.rs`, the closed basins below) runs the bake's network on the L2
+level's cells before the ladder and frees it; it is counted at the bake's figure for that network
+(`WATER_BYTES_PER_CELL`, 28 B an L2 cell), under the first level's next arrays alone (100 B an L2
+cell), so it does not set the figure on any preset with a level between L2 and L3.
 
 **The bake's figure** (`bake::estimate_bytes`): the largest of its parts, which run one after
 another. The strata on L1, `STRATA_BYTES_PER_HORIZON_CELL` (28 B a horizon of a cell; 26.4 and 26.5

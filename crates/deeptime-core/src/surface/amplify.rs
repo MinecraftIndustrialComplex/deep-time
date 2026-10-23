@@ -852,12 +852,13 @@ fn window_cells(plan: TilePlan) -> u64 {
 /// included, on the preset's real grids (`GridDesc::for_planet`).
 ///
 /// When it starts the run holds the young landscape's world ([`young_world`]), the character's
-/// fields ([`CHARACTER_BYTES_PER_L1_CELL`]) and the L2 level. Each level before the last adds the
-/// next level's arrays and the buffers of its windows, and hands on the next level in place of its
-/// own; the last adds [`whole_last_level_peak`] whole, or its largest window and the preview in
-/// tiles. Every level decides as the run does (`streams_on`, without a device): `auto` keeps it
-/// whole when that fits under the cap with the world as estimated less the recorded history (which
-/// `StageContext::reserve` spills first).
+/// fields ([`CHARACTER_BYTES_PER_L1_CELL`]) and the L2 level, and the water balance adds the
+/// bake's network on L2 for a while ([`crate::bake::WATER_BYTES_PER_CELL`]). Each level before the
+/// last adds the next level's arrays and the buffers of its windows, and hands on the next level in
+/// place of its own; the last adds [`whole_last_level_peak`] whole, or its largest window and the
+/// preview in tiles. Every level decides as the run does (`streams_on`, without a device): `auto`
+/// keeps it whole when that fits under the cap with the world as estimated less the recorded
+/// history (which `StageContext::reserve` spills first).
 ///
 /// The world as estimated is at or above the world the run holds (amp-est, 2026-10-23: 140 to
 /// 265 MB above it on quick 16k and full 32k), so a cap that much above the whole path's need is
@@ -883,7 +884,16 @@ pub fn estimate_under(p: &PlanetPreset, mem_cap: u64) -> StageEstimate {
         StreamMode::Never => true,
         StreamMode::Auto => held + whole <= mem_cap,
     };
-    let (mut held, mut level, mut peak, mut mid_cells) = (start, l2_bytes, start, 0u64);
+    // The water balance (`balance::apply`) runs the bake's network on the L2 level's cells before
+    // the ladder, at the bake's figure for it, and frees it. It stays under the first level's next
+    // arrays alone (4 x 25 B an L2 cell), so on every preset with a level between L2 and L3 it
+    // never sets the figure.
+    let balance = if p.hydro.unwrap_or_default().enabled {
+        cells(grid_dims(p, res.l2_r)) * crate::bake::WATER_BYTES_PER_CELL
+    } else {
+        0
+    };
+    let (mut held, mut level, mut peak, mut mid_cells) = (start, l2_bytes, start + balance, 0u64);
     for k in 1..levels {
         let (w, h) = grid_dims(p, res.l3_r << (levels - k));
         let next = w * h * LEVEL_BYTES_PER_CELL;
