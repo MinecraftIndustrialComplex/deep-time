@@ -117,9 +117,10 @@ impl<'a> Land<'a> {
                 .map(|(p, _)| *p)
                 .collect()
         };
-        let (land, sea) = rayon::join(|| SampleTree::new(&pick(true)), || {
-            SampleTree::new(&pick(false))
-        });
+        let (land, sea) = rayon::join(
+            || SampleTree::new(&pick(true)),
+            || SampleTree::new(&pick(false)),
+        );
         Land {
             test,
             points,
@@ -304,7 +305,9 @@ fn symmetries() -> Vec<[[f64; 3]; 3]> {
 }
 
 fn mat_mul(a: &[[f64; 3]; 3], b: &[[f64; 3]; 3]) -> [[f64; 3]; 3] {
-    std::array::from_fn(|i| std::array::from_fn(|j| a[i][0] * b[0][j] + a[i][1] * b[1][j] + a[i][2] * b[2][j]))
+    std::array::from_fn(|i| {
+        std::array::from_fn(|j| a[i][0] * b[0][j] + a[i][1] * b[1][j] + a[i][2] * b[2][j])
+    })
 }
 
 /// The turn the search chose, and how good it is.
@@ -373,7 +376,9 @@ pub fn search(land: &Land<'_>, seed: u64, s: &TurnSearch) -> TurnChoice {
     let corners = corner_dirs();
     // The random stage: one stream, so the candidates do not depend on the threads.
     let mut rng = SplitMix64::new(seed ^ SALT_RANDOM);
-    let cands: Vec<Quat> = (0..s.random.max(1)).map(|_| random_quat(&mut rng)).collect();
+    let cands: Vec<Quat> = (0..s.random.max(1))
+        .map(|_| random_quat(&mut rng))
+        .collect();
     let scored: Vec<(f64, f64)> = cands
         .par_iter()
         .map(|&q| {

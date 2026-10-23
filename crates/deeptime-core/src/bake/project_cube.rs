@@ -209,7 +209,12 @@ impl CubeSettle {
         if !src.iter().any(|&s| s) {
             return None;
         }
-        if let Some((_, r)) = self.cache.borrow().iter().find(|(k, _)| k.as_slice() == src) {
+        if let Some((_, r)) = self
+            .cache
+            .borrow()
+            .iter()
+            .find(|(k, _)| k.as_slice() == src)
+        {
             return Some(r.clone());
         }
         let n = src.len();
@@ -340,7 +345,13 @@ impl Foot {
         let (m1, h1) = axis(self.sigma.0, FOOT_MAX_STEPS.0);
         let (m2, h2) = axis(self.sigma.1, FOOT_MAX_STEPS.1);
         let e2 = (-self.e1.1, self.e1.0);
-        let wt = |a: f64, s: f64| if s > 0.0 { (-a * a / (2.0 * s * s)).exp() } else { 1.0 };
+        let wt = |a: f64, s: f64| {
+            if s > 0.0 {
+                (-a * a / (2.0 * s * s)).exp()
+            } else {
+                1.0
+            }
+        };
         let mut total = 0.0;
         for i in -m1..=m1 {
             let a1 = i as f64 * h1;
@@ -401,7 +412,7 @@ impl CubeMapping {
     }
 
     /// The world point (in the net's window) of simulation block (xs, zs).
-    pub(crate) fn to_world(&self, xs: f64, zs: f64) -> (f64, f64) {
+    pub(crate) fn world_at(&self, xs: f64, zs: f64) -> (f64, f64) {
         self.view.point_of_unit(self.src.unit(xs, zs))
     }
 
@@ -414,7 +425,11 @@ impl CubeMapping {
         let mut cands: [((f64, f64), Image); 39] = [((0.0, 0.0), Image::Direct); 39];
         let mut n = 0;
         for k in [0.0, -1.0, 1.0] {
-            let kind = if k == 0.0 { Image::Direct } else { Image::Slide };
+            let kind = if k == 0.0 {
+                Image::Direct
+            } else {
+                Image::Slide
+            };
             cands[n] = ((q.0 + k * per, q.1), kind);
             n += 1;
         }
@@ -531,7 +546,7 @@ impl CubeMapping {
 
 impl WorldMap for CubeMapping {
     fn to_world(&self, xs: f64, zs: f64) -> (f64, f64) {
-        CubeMapping::to_world(self, xs, zs)
+        self.world_at(xs, zs)
     }
 
     fn jacobian(&self, xs: f64, zs: f64) -> [[f64; 2]; 2] {
@@ -581,7 +596,10 @@ struct FootStats {
 
 impl FootStats {
     fn add(&mut self, f: &Foot, n: usize, r_s: f64) {
-        let b = D_BANDS.iter().position(|&e| f.d.0 < e).unwrap_or(D_BANDS.len());
+        let b = D_BANDS
+            .iter()
+            .position(|&e| f.d.0 < e)
+            .unwrap_or(D_BANDS.len());
         self.cells[b] += 1;
         self.samples[b] += n as u64;
         self.leak[b] += f.checker_leak(r_s);
@@ -786,10 +804,7 @@ fn seam_steps(desc: &LayerDesc, bytes: &[u8]) -> Value {
     let mut o = serde_json::Map::new();
     o.insert("grid".into(), json!(g.name));
     for k in ["within", "near_edge", "direct", "slide", "turning"] {
-        o.insert(
-            k.into(),
-            step_quantiles(all.remove(k).unwrap_or_default()),
-        );
+        o.insert(k.into(), step_quantiles(all.remove(k).unwrap_or_default()));
     }
     Value::Object(o)
 }
@@ -1207,7 +1222,7 @@ fn project_spawn_cube(
             if z.abs() >= cm.rs {
                 return false;
             }
-            let (wx, wz) = cm.to_world(x, z);
+            let (wx, wz) = cm.world_at(x, z);
             let Some(sp) = g.cube_spot(wx, wz) else {
                 return false;
             };
@@ -1464,7 +1479,10 @@ pub fn project_folder_cube(
             desc.tile = wg.tile();
             layer_notes.push(json!([desc.name, format!("{:?}", s.kind).to_lowercase()]));
             if s.kind == Kind::Continuous
-                && matches!(desc.name.as_str(), "elevation" | "water_level" | "detail/amplitude")
+                && matches!(
+                    desc.name.as_str(),
+                    "elevation" | "water_level" | "detail/amplitude"
+                )
             {
                 steps_note.insert(desc.name.clone(), seam_steps(&desc, &bytes));
             }
@@ -1801,7 +1819,7 @@ pub fn project_folder_cube(
         if let Some(list) = v[key].as_array_mut() {
             for o in list {
                 if let (Some(x), Some(z)) = (o["x"].as_f64(), o["z"].as_f64()) {
-                    let (wx, wz) = cm.to_world(x, z);
+                    let (wx, wz) = cm.world_at(x, z);
                     o["x"] = json!((wx * 1000.0).round() / 1000.0);
                     o["z"] = json!((wz * 1000.0).round() / 1000.0);
                 }
@@ -1966,8 +1984,7 @@ mod tests {
         for (k, e) in cube.edges().iter().enumerate().skip(2) {
             let partner = &cube.edges()[e.partner];
             for step in 1..8 {
-                let t =
-                    e.span[0] as f64 + (e.span[1] - e.span[0]) as f64 * f64::from(step) / 8.0;
+                let t = e.span[0] as f64 + (e.span[1] - e.span[0]) as f64 * f64::from(step) / 8.0;
                 let p = match e.axis {
                     Axis::X => (e.coord as f64, t),
                     Axis::Z => (t, e.coord as f64),
@@ -2020,12 +2037,12 @@ mod tests {
         let d = cs.dist(&land, true);
         let cell = (PI / 2.0) / f64::from(grid.w);
         let (mut worst, mut off) = (0.0f64, 0usize);
-        for c in 0..n {
+        for (c, &dc) in d.iter().enumerate() {
             let truth = sea
                 .iter()
                 .map(|&k| angle(cs.units[c], cs.units[k]))
                 .fold(f64::INFINITY, f64::min);
-            let e = (f64::from(d[c]) - truth).abs();
+            let e = (f64::from(dc) - truth).abs();
             worst = worst.max(e);
             off += usize::from(e > 1e-4 * cell);
         }
@@ -2051,9 +2068,9 @@ mod tests {
             let xs = -2048.0 + 4096.0 * ((f64::from(k) * 0.618_034) % 1.0);
             let zs = m.rs * 0.9 * (2.0 * ((f64::from(k) * 0.414_214) % 1.0) - 1.0);
             let h = 0.02;
-            let p0 = m.to_world(xs, zs);
-            let px = m.to_world(xs + h, zs);
-            let pz = m.to_world(xs, zs + h);
+            let p0 = m.world_at(xs, zs);
+            let px = m.world_at(xs + h, zs);
+            let pz = m.world_at(xs, zs + h);
             let face = |p: (f64, f64)| m.cube.local_of_point(p.0, p.1).map(|l| l.0);
             if face(p0).is_none() || face(p0) != face(px) || face(p0) != face(pz) {
                 continue;
@@ -2238,7 +2255,10 @@ mod tests {
         assert_eq!(out.chains[1].mouth, Mouth::Sea);
         let end = out.vertices[(out.chains[0].count - 1) as usize];
         let start = out.vertices[out.chains[1].first as usize];
-        let ua = m.view.unit(f64::from(end.x), f64::from(end.z)).expect("on the planet");
+        let ua = m
+            .view
+            .unit(f64::from(end.x), f64::from(end.z))
+            .expect("on the planet");
         let ub = m
             .view
             .unit(f64::from(start.x), f64::from(start.z))
@@ -2290,10 +2310,7 @@ mod tests {
                 .collect()
         };
         let faces_of = |cells: &[usize]| -> Vec<Face> {
-            let mut f: Vec<Face> = cells
-                .iter()
-                .map(|&c| cell_local(&grid, c).0)
-                .collect();
+            let mut f: Vec<Face> = cells.iter().map(|&c| cell_local(&grid, c).0).collect();
             f.sort();
             f.dedup();
             f
@@ -2314,7 +2331,10 @@ mod tests {
             );
             let closed: Vec<u8> = basin.iter().map(|&c| layer[c]).collect();
             if join {
-                assert!(closed.iter().all(|&v| v == 0), "the ocean opens it on both faces");
+                assert!(
+                    closed.iter().all(|&v| v == 0),
+                    "the ocean opens it on both faces"
+                );
             } else {
                 assert!(closed.iter().all(|&v| v == 1), "closed on both faces");
             }
