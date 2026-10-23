@@ -1153,7 +1153,11 @@ mod tests {
     /// full 4,311 → 4,349 MiB. Again once the step freed its arrays as soon as it stopped reading
     /// them (2026-10-19, the same method): quick 1,171 → 947 MiB (1,166.9 less 219.5), full
     /// 4,349 → 3,462 MiB (the history all on disk); they list 1,060 and 3,769 MiB with 320 B a
-    /// cell, 1,086 and 3,872 MiB with 340 (2026-10-20, `OWN_BYTES_PER_L2_CELL`).
+    /// cell, 1,086 and 3,872 MiB with 340 (2026-10-20, `OWN_BYTES_PER_L2_CELL`). Gap 4
+    /// (2026-10-23) gave every plate `Sample` two more `f32`s (`lithosphere_km`, `keel_km`), 8 B a
+    /// sample in the three copies `plates::estimate` lists: 2.3 MiB on quick (100,000 samples) and
+    /// 5.7 MiB on full (250,000). The holds below are the 2026-10-19 measures plus that, not
+    /// measured again (quick 947 → 949, full 3,462 → 3,468 MiB); quick lists 1,107 MiB.
     #[test]
     fn the_estimate_covers_the_measured_hold_closely() {
         const MIB: u64 = 1 << 20;
@@ -1166,8 +1170,8 @@ mod tests {
             .unwrap()
         };
         for (name, held_mib) in [
-            ("earthlike_quick_16k", 947u64),
-            ("earthlike_full_16k", 3462),
+            ("earthlike_quick_16k", 949u64),
+            ("earthlike_full_16k", 3468),
         ] {
             let crate::preset::PresetBody::Planet(p) =
                 crate::preset::Preset::from_json(&json(name)).unwrap().body
