@@ -19,7 +19,7 @@ computes a git hash, starts the VM job detached and waits for it.
 ```
 tools/review/pool/pool.sh run <arm> [--key K] [--preset P] [--length Myr] [--starts a,b] [--seeds 1,2,3]
                                     [--threads T] [--set k=v]... [+ENV=v]... [--measures a,b] [--keep-ck]
-                                    [--retry] [--rerun]
+                                    [--retry] [--rerun] [--replace]
 tools/review/pool/pool.sh table --base <arm> --arm <arm> [--arm <arm> ...] [--measure v1census] [--json FILE]
 tools/review/pool/pool.sh measure [--arm <arm>]... [--measures a,b]     a new or changed measure over cached runs
 tools/review/pool/pool.sh alias <new key|HEAD> <old key> --check-seed S [--preset P] [--length Myr]
@@ -43,6 +43,9 @@ built there once per key.
 
 An arm is a name for a set of runs with one key, preset, length and argument set; `run` records it under
 `pool/arms/<name>.json` on the VM, and a second `run` of the same arm name with more seeds adds to it.
+A `run` of an arm name that is recorded on another key, preset, length or argument set is refused before
+anything runs (on 2026-10-23 a lane's `run base` on an older master replaced the shared base for 20
+minutes); name lane arms after the lane (`pit-*`, `trench-*`), and pass `--replace` only to replace your own.
 `table` reads arms by name, so a lane can tabulate its arm against `base` made by someone else.
 
 Run it twice at once, from two shells, or from two lanes: the second request waits on the first run's lock
@@ -147,8 +150,9 @@ sample has 8 runs or fewer and no ties, the corrected normal approximation other
 
 Two lanes that each need a world gen (say A and B) do not run two:
 
-1. The base, once: from a checkout at master, `pool.sh run base --seeds 1,2,3,4`. If it exists under master's key
-   already, this returns at once.
+1. The base, once: the arm `base` is the coordinator's, run from master (`pool.sh run base ... --replace` when
+   master's key moves). A lane reads it with `pool.sh arms`; a lane that needs a base on another commit
+   names it after itself (`pit-base`), and asks the coordinator when master's has none.
 2. Each lane's own arm, from its own committed checkout: `pool.sh run A ...` and `pool.sh run B ...` with
    the same preset, length, starts and seeds.
 3. The combination: `pool.sh combine AB <branch-A> <branch-B>` (merges both onto origin/master in a scratch
