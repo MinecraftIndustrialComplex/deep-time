@@ -802,6 +802,15 @@ flagged cells of that region, and the pack draws its biome there. The verdict
 `climate_mapping.json` as `peatland: {erosion, regions, biomes}` so a pack update does not move
 explored biomes; `regions: []` means the pack has none and cold wetland is taiga everywhere.
 
+No wetland stands on or beside a playa (BIO-178): the water bake, after it writes `playa`, sets the flag
+to 0 on every L2 cell within `PLAYA_WETLAND_MARGIN_BLOCKS` (20) blocks of ground of a playa cell's block,
+plus two L2 cells and one water cell (the grids' reach), and holds that cell's `climate/erosion` under E5
+as a cold wetland's is (a lower one is kept). On the Lambert grid the box is 1 / cos φ times as wide in x
+(a block of ground spans that many grid blocks east-west) and wraps across the seam. A playa is a basin
+whose water dries off its floor, so a swamp's flag there came from the climate's wetness alone, and its
+trees (a mangrove's roots reach 9 blocks) stood over the salt. `notes.bake.water.playa.wetland_cleared` is
+`{playa_cells, reach_blocks, lambert, nodes}` (`nodes`: the cells whose flag it cleared).
+
 ## Grids
 
 Rasters in block space on the **Lambert cylindrical equal-area projection** (plan §5.2 as amended
@@ -1756,7 +1765,8 @@ lake's top (⌈level⌉ − 1 by the shore rule), at generation (`freeze_top_lay
 **Playas (game side).** `playa` (u8, on the `water_level` grid) holds, for the cells of a playa
 (the floor of a terminal basin whose balance lake is under the lake thresholds: "Rivers"), the
 blocks of salt to lay there (`hydro.playa_blocks`, 2; 0 elsewhere). `notes.bake.water.playa` is
-`{layer, rock_class ("halite"), blocks}`. After the water pass, in every column whose nearest cell
+`{layer, rock_class ("halite"), blocks, wetland_cleared}` (the wetland flag cleared beside the
+playas, "The wetland flag", BIO-178). After the water pass, in every column whose nearest cell
 holds n > 0, `worldgen/PlayaPass` replaces the top n blocks of the ground (not air, fluid or
 bedrock; not under water) with the block the rock palette resolves for `rock_class`, as a stratum
 of that class would be: the pack's rock tags decide it.
