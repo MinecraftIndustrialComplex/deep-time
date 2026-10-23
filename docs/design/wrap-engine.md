@@ -1174,9 +1174,9 @@ z ∈ [−h, h), N above F0 and S below it, period 4s east to west. Its 14 net e
 
 - **One geometry in Java.** `WrapLayouts.cube(CubeLayout, depth, slides)` builds the engine's edges
   from `CubeLayout.edges()` and its corners from `CubeLayout.corners()`. The old
-  `WrapLayouts.cubeCross` (a shifted copy in the window [0, 4s) with F3 east) is deleted;
-  `cubeCross(s, depth, slides)` becomes `cube(CubeLayout.of(s), depth, slides)`. There is no second
-  copy of the net to drift.
+  `WrapLayouts.cubeCross` (a shifted copy in the window [0, 4s) with F3 east) is gone;
+  `cubeCross(s, depth, slides)` is now a one-line alias of `cube(CubeLayout.of(s), depth, slides)`.
+  There is no second copy of the net to drift.
 - **From the manifest (phase 2).** Format 0.7 layout_version 2's manifest carries the same table
   (FORMAT.md, "Projection", `edges[]` and `cone_points[]`). Phase 2's reader checks the manifest's
   edges and cone points against `CubeLayout.of(face_blocks)` (name, axis, side, coord, span, iso)
@@ -1191,9 +1191,10 @@ z ∈ [−h, h), N above F0 and S below it, period 4s east to west. Its 14 net e
   `CubeLayout.fold`'s rule (SCL-108): the edge the block is least deep beyond, ties to the earlier
   edge in the list, so each square splits on its diagonal through the corner. Points (entities) take
   the edge their block takes. For the old layouts nothing changes (no block lies in two bands).
-- **Split chunks.** A chunk on such a diagonal folds by two motions. The topology finds these
-  chunks when it is built (the pairwise intersections of band rectangles), and for them
-  `chunkSources(cx, cz)` lists every (source chunk, motion). The band manager holds a ticket on every
+- **Split chunks.** A chunk on such a diagonal folds by two motions. The topology finds them when
+  asked: `chunkFold` folds the chunk's four corners, and the chunk is split when they fold by
+  different motions (a diagonal is a half-plane boundary, and a half-plane that cuts a square
+  separates two of its corners). For them `chunkSources(cx, cz)` lists every (source chunk, motion). The band manager holds a ticket on every
   source of a split chunk and copies it column by column; replication writes a stored change into a
   split chunk only where the fold of the band position is the stored position. `chunkFold` keeps
   answering for the chunk's corner and gains `split()`, so code that uses it as a band test is
@@ -1222,10 +1223,11 @@ z ∈ [−h, h), N above F0 and S below it, period 4s east to west. Its 14 net e
 - **`slides = true` (GameTests, and a dev world without TW's loop).** The engine adds two slide
   edges at x = ±2s over F2's rows and their bands (z ∈ [−h − D, h + D)), D deep. A block beyond the
   slide and beyond F2-top slides first and then turns (two steps of the fold).
-- **The install decision.** `CubeInstall` asks `ToroidalWorldApi.shapeOf(overworld)`: a level that
-  loops x with width 4s and minimum −2s takes `slides = false`; a level that does not loop takes
-  `slides = true`; any other shape (another width, a z loop) is refused with an error in the log,
-  and nothing is installed. The decision is a pure function, unit-tested.
+- **The install decision.** `WrapEngine` asks `ToroidalWorldApi.shapeOf(overworld)` when the server
+  has started and hands the shape to `CubeInstall.decide`: a level that loops x with width 4s and
+  minimum −2s takes `slides = false` (`TURNS_ONLY`); a level that does not loop takes
+  `slides = true` (`WITH_SLIDES`); any other shape (another width, a z loop) is refused (`REFUSE`)
+  with an error in the log, and nothing is installed. The decision is a pure function, unit-tested.
 
 ### 12.4 The corners
 
@@ -1324,4 +1326,58 @@ What §4.2 promised, as it will be built:
 
 ### 12.9 As built
 
-Filled in when E1 and E2 land.
+E1 and E2 on branch `worktree-agent-ab9924d9a8a834409` (2026-10-22), still dev-only
+(`-Ddeeptime.wrapengine=true`); master's Petroff-Guyou worlds are untouched (nothing installs
+without `-Ddeeptime.wrapengine.cube=<s>`).
+
+**E1, the cube topology.**
+
+- `WrapLayouts.cube(CubeLayout, depth, slides)` as §12.2 and §12.3 describe, with the cut pieces
+  named `<edge>@tw`; `cubeCross` stays as an alias. `WrapTopology` gained the nearest-edge fold,
+  split chunks found from a chunk's corners (`ChunkFold.split()`, `chunkColumns`, `chunkSources`),
+  `nearCorner` (keep-out `CORNER_KEEP_OUT` = 2), the period window, and `translated(dx, dz)` for
+  test sites. The band manager copies a split chunk column by column from each source and holds a
+  ticket on each.
+- `CubeInstall` is pure (no Minecraft type, so the unit tests load it): the two properties, the
+  default depth 32, and `decide(...)` returning `TURNS_ONLY`, `WITH_SLIDES` or `REFUSE` with a
+  reason. The install itself (`WrapEngine.installCube`, on `ServerStartedEvent`) reads Toroidal
+  World's shape and installs on the overworld.
+- `WrapEngine.joinedEdges`, `nearCorner`, and the `SeamTurns.seamLink` refusal near a corner
+  (§9.6, §12.4).
+
+**E2, block entities in the band** (§12.8):
+
+| Piece | What it does |
+|---|---|
+| `BandTags` | The position-bearing tag table (pure): `exit_portal` moves, `hit_direction` turns; unit-tested |
+| `BandBlockEntities` | Which stored entities a band chunk shows, their turned tags, the re-addressed data packet, marking images, the nearest band image |
+| `ClientboundLevelChunkPacketDataWrapMixin` | A band chunk's packet lists the stored entities it shows, at band positions |
+| `ServerChunkCacheWrapMixin` | `blockChanged` at a stored position also marks its band images |
+| `ChunkHolderWrapMixin` | A band holder sends the stored entity's data re-addressed instead of vanilla's packet |
+| `BandManager.copy` | After a copy, every entity the chunk shows is marked (a reloaded band chunk that wrote no block still sends its entities' data) |
+| `PlayerWrapMixin` | `canInteractWithBlock` is true when the nearest band image is in reach (menus' `stillValid`, the sign editor's keep-alive) |
+| `ServerPlayerWrapMixin` | The sign editor and its block update go to the image nearest the player |
+| `SignBlockEntityWrapMixin` | Front or back of a sign is judged from the player's position moved through that image (without it, a player at the image edits whichever side faces the far-away stored sign) |
+| `ChunkHolderAccessor` | Test access to a holder's marks and its block-entity send |
+
+The access transformer widens `ClientboundLevelChunkPacketData$BlockEntityInfo` and its
+constructor, and `ClientboundBlockEntityDataPacket`'s constructor. These lines apply whether the
+engine is on or not; they only widen access. Toroidal World's period copies never count as band
+images: a block's own copy a period away is TW's business.
+
+**GameTests** (namespace `deeptime_wrapengine`, `./gametest.sh -PwrapEngine`). The cube is
+`cube(CubeLayout.of(256), 16, true)` moved to (49152, 20480) and joined with the phase-1 sites in
+one topology. Each site's boxes hold its own blocks and the far side's, and no two sites share a
+column.
+
+| Test | Site | Checks |
+|---|---|---|
+| `cubeBuildingAcrossQuarterTurn` | F1-top by (h, −h) | phase 1's building test on a quarter turn of the cube |
+| `cubeBuildingAcrossHalfTurn` | F2-top | the same on a half turn |
+| `cubeBandConsistentQuarterTurn` | F1-top, farther along | random edits on both sides keep the band a turned copy |
+| `cubeBandConsistentAtToroidalSeam` | N-top west of x = 0 | the same where the half turn has the period composed in |
+| `cubeSlideComposedWithTurn` | F2's bottom-east corner | a block beyond the slide and the turn folds in two steps |
+| `cubeCornerRefusal` | (h, h) and S's outer corner | the keep-out at every image; writes into the split corner square; stands carried off both quadrants |
+| `blockEntitiesAcrossHalfTurn`, `blockEntitiesAcrossQuarterTurn`, `cubeBlockEntitiesAcrossQuarterTurn` | plain site 6; F3-top by (−h, −h) | E2's six checks (`WrapBlockEntityGameTests`) |
+
+Results: see STATUS.md's build log for this branch.

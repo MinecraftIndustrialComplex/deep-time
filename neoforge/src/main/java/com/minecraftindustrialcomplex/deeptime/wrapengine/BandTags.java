@@ -35,7 +35,7 @@ public final class BandTags {
     public record Row(String type, String key, Kind kind) {}
 
     /** The rows, vanilla's: an end gateway's exit and a brushable block's brushing side. */
-    public static final List<Row> ROWS = List.of(
+    public static final List<Row> ROWS = List.of( // ledger: SCL-186 (vanilla needs these two rows; E6 adds Create's)
             new Row("minecraft:end_gateway", "exit_portal", Kind.BLOCK_POS),
             new Row("minecraft:brushable_block", "hit_direction", Kind.DIRECTION));
 
