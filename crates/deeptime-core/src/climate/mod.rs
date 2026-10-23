@@ -1227,12 +1227,7 @@ impl ClimateStage {
                     .map(|f| f.data.as_slice())
             };
             // The offset the surface held (`surface.held_offsets`), as its own carry reads it.
-            let held = if self
-                .preset
-                .surface
-                .as_ref()
-                .is_some_and(|s| s.held_offsets)
-            {
+            let held = if self.preset.surface.as_ref().is_some_and(|s| s.held_offsets) {
                 advect::held_offset(&st.offset_m, ids(crate::surface::field::OFFSET_HELD))
             } else {
                 None

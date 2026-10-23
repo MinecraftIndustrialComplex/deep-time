@@ -411,8 +411,9 @@ mod tests {
         let mut r = routing::Routing::default();
         routing::receivers(&d, &filled, &kind, &mut r);
         routing::stack(&d, &kind, &mut r);
-        // The cells draining into the bowl, outside it.
-        let lake = |c: usize| filled[c] - z[c] > LAKE_TOL_M;
+        // The cells draining into the bowl, outside it (the sea's cells are filled to the sea
+        // level, a kilometre over their floor, but are no lake).
+        let lake = |c: usize| kind[c] == LAND && filled[c] - z[c] > LAKE_TOL_M;
         let mut into = 0usize;
         for c in 0..n {
             if lake(c) {
