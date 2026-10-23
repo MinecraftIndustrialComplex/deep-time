@@ -1125,10 +1125,9 @@ fn every_pipeline_preset_adds_little_by_streaming_when_it_must() {
         let crate::preset::PresetBody::Planet(p) = &preset.body else {
             panic!("a planet preset");
         };
-        // Without the recorded history: under the cap it spills to disk (P1-17), so a stage's
-        // `bytes` can be below the surface's whole estimate on the big presets.
-        let s_est = crate::surface::estimate(p);
-        let world = s_est.bytes - s_est.history_bytes;
+        // Without the recorded history: under the cap it spills to disk (P1-17). The world is the
+        // one the young landscape leaves.
+        let (world, _) = young_world(p);
         let gib = |b: u64| b as f64 / (1u64 << 30) as f64;
         let own = amp["base_bytes"].as_u64().unwrap() - world;
         eprintln!(
@@ -1139,9 +1138,8 @@ fn every_pipeline_preset_adds_little_by_streaming_when_it_must() {
             amp["seconds"].as_f64().unwrap(),
         );
         // What the amplifier adds to the world stays under 2.75 GiB on every preset: the whole
-        // raster when it fits (79 B a cell: 2.5 GiB at 16k quick), tiles when it does not (32k
-        // full would need 8 GiB whole). (2.5 GiB before the glaciers' surface, 4 B a cell in the
-        // window and in each level, `glacial.rs`.)
+        // raster when it fits (79 B a cell: 1.6 GiB on quick 16k's 8192 x 2624 cells), tiles
+        // when it does not (32k full would need 6.3 GiB whole).
         assert!(own < (11u64 << 28), "{name}: the stage adds {own} bytes");
     }
 }

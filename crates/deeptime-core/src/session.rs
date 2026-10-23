@@ -173,14 +173,15 @@ const SPILL_SECONDS_PER_BYTE: f64 = 3.0e-9;
 /// the stages before it built is counted in (it stays in memory under the stages after them), and
 /// a coupled group's stages, which step in turn over the same world, each hold the group's most.
 /// A follower that steps beside the lead's next step (P1-19, `Stage::steps_beside_lead`) holds
-/// its own working set on top of the lead's then.
-fn stage_sets(list: &[Box<dyn Stage>]) -> Result<Vec<(u64, u64)>, CoreError> {
+/// its own working set on top of the lead's then. Under a cap of `mem_cap` bytes
+/// ([`Stage::estimate_under`]).
+fn stage_sets(list: &[Box<dyn Stage>], mem_cap: u64) -> Result<Vec<(u64, u64)>, CoreError> {
     let (mut world, mut world_history) = (0u64, 0u64);
     let mut own = Vec::with_capacity(list.len());
     let mut sets: Vec<(u64, u64)> = list
         .iter()
         .map(|s| {
-            let e = s.estimate();
+            let e = s.estimate_under(mem_cap);
             let mut hist = e.history_bytes.min(e.bytes);
             let mut b = e.bytes - hist;
             let only = OWN_ONLY_ESTIMATES.contains(&s.name());
@@ -282,12 +283,12 @@ pub fn estimate_for(
     };
     let (mut peak, mut base, mut history, mut spill) = (0u64, 0u64, 0u64, 0u64);
     let list = preset.stages();
-    let sets = stage_sets(&list)?;
+    let sets = stage_sets(&list, cap)?;
     let stages: Vec<Value> = list
         .iter()
         .zip(&sets)
         .map(|(s, &(b, hist))| {
-            let e = s.estimate();
+            let e = s.estimate_under(cap);
             let held = hist.min(cap.saturating_sub(b));
             let spilled = hist - held;
             peak = peak.max(b + held);
@@ -887,7 +888,7 @@ impl Session {
         let mut stages = preset.stages();
         let groups = stage_groups(&stages)?;
         let at_start = gauge.in_use();
-        let sets = stage_sets(&stages)?;
+        let sets = stage_sets(&stages, mem_cap)?;
         let allowed = sets
             .iter()
             .map(|&(b, h)| at_start + b + h.min(mem_cap.saturating_sub(b)))
@@ -2052,12 +2053,14 @@ impl Session {
             let (note, l) = self
                 .pool
                 .install(|| crate::bake::bake(world, p, dir, &mut m))?;
+            crate::surface::amplify::amp_probe("bake_lambert_done");
             lift = l;
             self.log.push(Level::Info, crate::bake::summary_line(&note));
             m.notes.insert(crate::bake::NOTES_KEY.into(), note);
             // The last frame shows the rivers and lakes the bake wrote (before the frame files
             // are listed in the manifest below).
             self.bake_water_into_last_frame(world, dir, &m);
+            crate::surface::amplify::amp_probe("bake_water_frame_done");
         }
         let mut files = std::mem::take(&mut m.files);
 
@@ -2219,9 +2222,11 @@ impl Session {
                 // The blocks the bake freed and the allocator keeps are the wrong sizes for this
                 // pass's arrays: they would sit in the count beside them.
                 self.gauge.release();
+                crate::surface::amplify::amp_probe("bake_project_start");
                 let note = self
                     .pool
                     .install(|| crate::bake::project::project_folder(dir, p, &mut m))?;
+                crate::surface::amplify::amp_probe("bake_project_done");
                 self.log
                     .push(Level::Info, crate::bake::project::summary_line(&note));
                 if let Some(b) = m.notes.get_mut(crate::bake::NOTES_KEY) {

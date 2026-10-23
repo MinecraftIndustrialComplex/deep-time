@@ -754,10 +754,12 @@ pub fn run_passes_on(
     times: &mut Times,
 ) -> Result<PassStats, String> {
     let pre_flood = seed_and_flood(buf, ph, cfg, times);
+    super::amp_probe("passes_seed_flood");
     let glacial = match device {
         Some(d) => d.middle(buf, ph, counts, times)?,
         None => middle_cpu(buf, ph, counts, times),
     };
+    super::amp_probe("passes_middle");
     let started = Instant::now();
     let flood = flood_repair(
         &buf.win,
