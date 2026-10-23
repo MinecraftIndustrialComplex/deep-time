@@ -176,10 +176,13 @@ fn run(grid: &mut Grid, h0: Vec<f64>, steps: usize, warm: usize) -> Times {
         lap(&mut t, "3 spl", s, timed);
         let s = Instant::now();
         let sea_mask: Vec<bool> = kind.iter().map(|&k| k == BASE).collect();
+        // The mouths and the cells their fills reached (printed for the last step).
+        let (mut mouths, mut fill_cells) = (0usize, 0usize);
         for m in 0..n {
             if kind[m] == BASE && qin[m] > 0.0 {
                 let vol = qin[m] * dt;
-                let _cells = match grid {
+                mouths += 1;
+                fill_cells += match grid {
                     Grid::Cube(g, _) => {
                         marine::fill(g, &sea_mask, m, vol, &fp, &mut h, &mut dep, &mut scratch)
                     }
@@ -248,8 +251,8 @@ fn run(grid: &mut Grid, h0: Vec<f64>, steps: usize, warm: usize) -> Times {
         lap(&mut t, "9 sea level", s, timed);
         if step + 1 == steps {
             eprintln!(
-                "  last step: sea level {level:.1} m; multigrid iterations {mg_its}, Jacobi \
-                 {jac_its} over {steps} steps"
+                "  last step: sea level {level:.1} m; {mouths} mouth fills over {fill_cells} \
+                 cells; multigrid iterations {mg_its}, Jacobi {jac_its} over {steps} steps"
             );
         }
     }

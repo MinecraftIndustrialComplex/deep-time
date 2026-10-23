@@ -29,6 +29,7 @@ pub fn slope_failure(
     avail: &mut [f64],
 ) -> f64 {
     // Above this many movers every cell is recomputed (the raster's bound).
+    // game-choice: a speed bound only, the same bits either way (tested; Claude 2026-10-22)
     let dense_above = g.topology().cells() / 4;
     slope_failure_with(g, sea, sea_level, p, h, avail, dense_above)
 }
