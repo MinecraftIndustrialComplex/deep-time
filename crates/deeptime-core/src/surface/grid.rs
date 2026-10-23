@@ -97,6 +97,127 @@ impl Dims {
     }
 }
 
+/// What the surface's graph solvers need of a grid (cube world plan §3 S2): its cells, each cell's
+/// D8 neighbours with their distances in the fixed order of [`OFFSETS`] (a missing neighbour is
+/// skipped), each cell's area, and how to cut the cells into strips for the parallel flood.
+/// [`Dims`] (the x-wrapped raster, block metric) and `sphere::cube::CubeGrid` (the cube, true
+/// metric) implement it. On `Dims` every method is the raster's own arithmetic, so a solver
+/// written on this trait gives the raster's results bit for bit.
+pub trait SurfaceGrid: Sync {
+    /// Number of cells.
+    fn cells(&self) -> usize;
+
+    /// The neighbours of `c` with their distances, metres, in [`OFFSETS`] order.
+    fn neighbours(&self, c: usize) -> impl Iterator<Item = (usize, f64)> + '_;
+
+    /// Area of cell `c`, m².
+    fn area(&self, c: usize) -> f64;
+
+    /// The area a lake's room is counted in (`spl.rs`: metres times cells of this area), m²: the
+    /// raster's one cell area, the cube's mean.
+    fn ref_area(&self) -> f64;
+
+    /// `Some(a)` when every cell has area `a` (the raster), so a sum of areas keeps its one
+    /// product (`marine::fill`).
+    fn uniform_area(&self) -> Option<f64>;
+
+    /// The parallel flood's strips: contiguous cell ranges, ascending, covering every cell, about
+    /// `rows` grid rows each. A grain of work only: the flood's result does not depend on it.
+    fn strips(&self, rows: usize) -> Vec<std::ops::Range<usize>>;
+
+    /// The cells of the strip `s` (one of [`SurfaceGrid::strips`]) that may have a neighbour
+    /// outside it, ascending (a superset is allowed), into `out`.
+    fn strip_border(&self, s: std::ops::Range<usize>, out: &mut Vec<usize>);
+
+    /// The neighbours of `c` (the cells of [`SurfaceGrid::neighbours`], in its order) whose index
+    /// lies in `[lo, hi)`, into `out`; returns how many.
+    #[inline]
+    fn neighbours_in(&self, c: usize, lo: usize, hi: usize, out: &mut [usize; 8]) -> usize {
+        let mut k = 0;
+        for (m, _) in self.neighbours(c) {
+            if m >= lo && m < hi {
+                out[k] = m;
+                k += 1;
+            }
+        }
+        k
+    }
+}
+
+impl SurfaceGrid for Dims {
+    #[inline]
+    fn cells(&self) -> usize {
+        Dims::cells(self)
+    }
+
+    #[inline]
+    fn neighbours(&self, c: usize) -> impl Iterator<Item = (usize, f64)> + '_ {
+        Dims::neighbours(self, c)
+    }
+
+    #[inline]
+    fn area(&self, _c: usize) -> f64 {
+        self.cell_area()
+    }
+
+    #[inline]
+    fn ref_area(&self) -> f64 {
+        self.cell_area()
+    }
+
+    #[inline]
+    fn uniform_area(&self) -> Option<f64> {
+        Some(self.cell_area())
+    }
+
+    fn strips(&self, rows: usize) -> Vec<std::ops::Range<usize>> {
+        let rows = rows.max(1);
+        (0..self.h)
+            .step_by(rows)
+            .map(|j0| j0 * self.w..(j0 + rows).min(self.h) * self.w)
+            .collect()
+    }
+
+    fn strip_border(&self, s: std::ops::Range<usize>, out: &mut Vec<usize>) {
+        // The first and the last row of the strip: the others reach only rows inside it.
+        let w = self.w.max(1);
+        let (j0, j1) = (s.start / w, s.end / w);
+        out.clear();
+        out.extend(j0 * w..(j0 + 1).min(j1) * w);
+        if j1 > j0 + 1 {
+            out.extend((j1 - 1) * w..j1 * w);
+        }
+    }
+
+    /// The row-based form of the default: the strip `[lo, hi)` is whole rows.
+    #[inline]
+    fn neighbours_in(&self, c: usize, lo: usize, hi: usize, out: &mut [usize; 8]) -> usize {
+        let w = self.w as i64;
+        let (r0, r1) = ((lo / self.w) as i64, (hi / self.w) as i64);
+        let (i, j) = ((c % self.w) as i64, (c / self.w) as i64);
+        let mut k = 0;
+        for &(di, dj, _) in &OFFSETS {
+            let nj = j + dj;
+            if nj < r0 || nj >= r1 {
+                continue;
+            }
+            let mut ni = i + di;
+            if ni < 0 || ni >= w {
+                if !self.wrap_x {
+                    continue;
+                }
+                ni = ni.rem_euclid(w);
+            }
+            let m = (nj * w + ni) as usize;
+            if m != c {
+                out[k] = m;
+                k += 1;
+            }
+        }
+        k
+    }
+}
+
 /// Box blur of `v` (in place) with half-width `r` cells, repeated `passes` times (three passes
 /// approximate a Gaussian of σ ≈ r). x wraps when the grid does; rows clamp. Mass is kept on a
 /// wrapping row, and the edge rows reflect.

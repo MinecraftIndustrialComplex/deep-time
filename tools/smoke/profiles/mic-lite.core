@@ -24,6 +24,10 @@ ferritecore         performance: memory
 immediatelyfast     client performance: immediate-mode rendering
 entityculling       client performance: entity culling
 
+# Deep Time's deep seas (Ben, 2026-10-22: vanilla water shows the floor of the deepest sea from the surface).
+# Client only; its library MossyLib comes from the dependency closure.
+bathymetry@client   deep water darkens with depth seen from above (the pack's pin)
+
 # Undeclared client dependencies, found by booting the lite client (tools/client/vm-client.sh --mods
 # mic-lite). "mod@client" keeps a mod in the client set only; the server boots without it.
 jei@client          Destroy's DestroyMysteriousItemConversions loads JEI's API on the client and Destroy does not declare JEI (the pack always has it)

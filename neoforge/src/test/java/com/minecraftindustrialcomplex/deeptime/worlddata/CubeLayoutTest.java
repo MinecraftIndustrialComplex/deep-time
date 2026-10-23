@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 /**
  * The cube world's net ({@link CubeLayout}, plan item W1 and W2) against its own invariants, the
  * Rust tests of {@code deeptime_format::cube} ported one for one, and the wrap engine's
- * {@link WrapLayouts#cubeCross} (the same net in the engine's frame). The fixture rows are checked
+ * {@link WrapLayouts#cube} (the engine's topology built from this net). The fixture rows are checked
  * bit for bit by {@code ProjectionParityTest}.
  *
  * <p>Float comparisons use {@code ==}, as the Rust tests' {@code assert_eq!} does, never
@@ -625,150 +625,92 @@ class CubeLayoutTest {
     }
 
     // ------------------------------------------------------------------------------------------
-    // The wrap engine's cube cross is the same net
+    // The wrap engine's cube is this net
     // ------------------------------------------------------------------------------------------
 
     /**
-     * {@link WrapLayouts#cubeCross}(s, s, true) has F0 at [0, s)² and F3 on the right, at
-     * [3s, 4s) × [0, s); this layout's F0 is centred on the origin with F3 on the left, in the
-     * window x in [-3s/2, 5s/2). The frames differ by the translation (s/2, s/2): X = x + s/2 and
-     * Z = z + s/2 (X in [-s, 3s) for a window x). Edges 2 to 13 are the same twelve edges in the same
-     * order; the two engine bands over the void squares above and below F3 (F3-top, F3-bottom) sit one
-     * period to the right of this layout's (X + 4s), the engine having no wrap before its fold, so each
-     * edge carries its copy offset. The slides (edges 0 and 1) are not compared. Where two bands meet,
-     * in the void squares by F0's corners, the engine takes the first edge in its list and chains, this
-     * layout the nearer edge: those blocks are compared against the engine's candidate set, not
-     * against its fold.
+     * {@link WrapLayouts#cube} builds the engine's topology from this layout in the same frame (no
+     * translation; design wrap-engine.md §12): the twelve turning edges in this layout's order, each
+     * with its axis, side, line and motion, D deep, its span extended D past N's and S's outer corners;
+     * a piece cut at Toroidal World's seam ({@code <edge>@tw}) right after its parent, the two spans
+     * covering the edge's once and the piece's motion the same up to a whole period. With
+     * {@code slides} the two slides come first; without them the topology is periodic (4s from −2s).
+     * The fold equivalence block by block is {@code WrapTopologyCubeTest}'s.
      */
     @Test
-    void theLayoutIsTheWrapEnginesCubeCross() {
-        for (int si : SIDES) {
-            CubeLayout cube = CubeLayout.of(si);
-            int s = si;
-            int h = s / 2;
-            WrapTopology topo = WrapLayouts.cubeCross(s, s, true);
-            List<WrapEdge> we = topo.edges();
-            assertEquals(14, we.size());
-            int[] offset = new int[14];
-            // Geometry and motions of the twelve turning edges.
-            for (int k = 2; k < 14; k++) {
-                NetEdge e = cube.edges().get(k);
-                WrapEdge w = we.get(k);
-                String what = "s " + s + " edge " + k + " " + e.name() + " / " + w.name();
-                assertEquals(e.axis() == Axis.X, w.normalX(), what);
-                assertEquals(e.beyond() == Side.MIN, w.minSide(), what);
-                assertEquals(s, w.depth(), what);
-                assertEquals(e.coord() + h, w.coord(), what);
-                long lo = e.spanFrom() + h;
-                if (e.axis() == Axis.Z) {
-                    long off = w.spanLo() - lo;
-                    assertTrue(off == 0 || off == 4L * s, what + ": span offset " + off);
-                    offset[k] = (int) off;
+    void theWrapEnginesCubeIsThisNet() {
+        for (int s : SIDES) {
+            CubeLayout cube = CubeLayout.of(s);
+            int d = Math.min(32, s / 2);
+            long p = 4L * s;
+            for (boolean slides : new boolean[]{true, false}) {
+                WrapTopology topo = WrapLayouts.cube(cube, d, slides);
+                List<WrapEdge> we = topo.edges();
+                String top = "s " + s + (slides ? " with slides" : " turns only");
+                int i = 0;
+                if (slides) {
+                    assertEquals("west" + WrapLayouts.SLIDE, we.get(0).name(), top);
+                    assertEquals("east" + WrapLayouts.SLIDE, we.get(1).name(), top);
+                    assertEquals(CellIsometry.translation((int) p, 0), we.get(0).iso(), top);
+                    assertEquals(CellIsometry.translation((int) -p, 0), we.get(1).iso(), top);
+                    assertEquals(-2 * s, we.get(0).coord(), top);
+                    assertEquals(2 * s, we.get(1).coord(), top);
+                    assertEquals(0, topo.periodX(), top);
+                    i = 2;
                 } else {
-                    assertEquals(lo, w.spanLo(), what);
+                    assertEquals(p, topo.periodX(), top);
+                    assertEquals(-2 * s, topo.windowLo(), top);
                 }
-                assertEquals(lo + offset[k], w.spanLo(), what);
-                assertEquals(lo + offset[k] + s, w.spanHi(), what);
-                // The motion, on the first and the last row of the band: the same image (x modulo
-                // the period) and the same quarter turns.
-                for (int row : new int[]{0, s - 1}) {
-                    for (long t = e.spanFrom(); t < e.spanTo(); t++) {
-                        long n = e.beyond() == Side.MAX ? e.coord() + row : e.coord() - 1 - row;
-                        long x = e.axis() == Axis.X ? n : t;
-                        long z = e.axis() == Axis.X ? t : n;
-                        int bigX = (int) (x + h + offset[k]);
-                        int bigZ = (int) (z + h);
-                        String at = what + " row " + row + " (" + x + ", " + z + ")";
-                        assertTrue(w.beyond(bigX, bigZ), at);
-                        long[] mine = e.iso().cell(x, z);
-                        CellIsometry g = w.iso();
-                        assertEquals(Math.floorMod(mine[0] + h, 4L * s), Math.floorMod((long) g.applyX(bigX, bigZ), 4L * s), at);
-                        assertEquals(mine[1] + h, g.applyZ(bigX, bigZ), at);
-                        assertEquals(e.iso().k(), g.quarterTurns(), at);
+                for (int k = 2; k < 14; k++) {
+                    NetEdge e = cube.edges().get(k);
+                    String what = top + " edge " + k + " " + e.name();
+                    List<WrapEdge> pieces = new ArrayList<>();
+                    pieces.add(we.get(i++));
+                    if (i < we.size() && we.get(i).name().equals(e.name() + WrapLayouts.TW_PIECE))
+                        pieces.add(we.get(i++));
+                    assertEquals(e.name(), pieces.get(0).name(), what);
+                    boolean polar = e.face() == Face.N || e.face() == Face.S;
+                    boolean polarSide = e.faceSide() == FaceSide.EAST || e.faceSide() == FaceSide.WEST;
+                    long from = e.spanFrom() - (e.face() == Face.N || (polar && !polarSide) ? d : 0);
+                    long to = e.spanTo() + (e.face() == Face.S || (polar && !polarSide) ? d : 0);
+                    long covered = 0;
+                    for (WrapEdge w : pieces) {
+                        assertEquals(e.axis() == Axis.X, w.normalX(), what);
+                        assertEquals(e.beyond() == Side.MIN, w.minSide(), what);
+                        assertEquals(e.coord(), w.coord(), what);
+                        assertEquals(d, w.depth(), what);
+                        covered += w.spanHi() - w.spanLo();
+                        assertEquals(e.iso().k(), w.iso().quarterTurns(), what);
+                        // The motion on the band's first and last rows at both ends of the piece: this
+                        // layout's image of the same block, x modulo the period.
+                        for (int row : new int[]{0, d - 1}) {
+                            for (int t : new int[]{w.spanLo(), w.spanHi() - 1}) {
+                                long n = e.beyond() == Side.MAX ? e.coord() + row : e.coord() - 1 - row;
+                                long x = e.axis() == Axis.X ? n : t;
+                                long z = e.axis() == Axis.X ? t : n;
+                                long xe = x;
+                                while (e.axis() == Axis.Z && xe < from)
+                                    xe += p;
+                                while (e.axis() == Axis.Z && xe >= to)
+                                    xe -= p;
+                                String at = what + " " + w.name() + " (" + x + ", " + z + ")";
+                                assertTrue(w.beyond((int) x, (int) z), at);
+                                long[] mine = e.iso().cell(xe, z);
+                                assertEquals(Math.floorMod(mine[0], p), Math.floorMod((long) w.iso().applyX((int) x, (int) z), p), at);
+                                assertEquals(mine[1], w.iso().applyZ((int) x, (int) z), at);
+                            }
+                        }
                     }
+                    assertEquals(to - from, covered, what + ": the pieces cover the extended span once");
+                    if (pieces.size() == 1)
+                        assertEquals(e.iso().toCellIsometry(), pieces.get(0).iso(), what);
+                    else
+                        assertTrue(e.face() == Face.F2 || (polar && !polarSide), what + ": only F2's and the polar tops are cut");
                 }
-            }
-            // Every block of the window, against the engine's candidates.
-            boolean dense = s <= 64;
-            Rng rng = new Rng(0xC0B3_C055L ^ s);
-            long xLo = -7 * (long) s / 2, xHi = 9 * (long) s / 2, zLo = -5 * (long) s / 2, zHi = 5 * (long) s / 2;
-            long total = dense ? (xHi - xLo) * (zHi - zLo) : 60_000;
-            long[] counts = new long[3];
-            for (long n = 0; n < total; n++) {
-                long x, z;
-                if (dense) {
-                    x = xLo + n % (xHi - xLo);
-                    z = zLo + n / (xHi - xLo);
-                } else {
-                    x = rng.range(xLo, xHi);
-                    z = rng.range(zLo, zHi);
-                }
-                compareWithTheEngine(cube, topo, offset, x, z, counts);
-            }
-            System.out.println("CubeLayoutTest s " + s + " vs cubeCross: " + counts[0] + " on the planet, " + counts[1]
-                    + " outside, " + counts[2] + " ocean, all checked");
-            assertTrue(counts[0] > 0 && counts[1] > 0 && counts[2] > 0);
-        }
-    }
-
-    private static void compareWithTheEngine(CubeLayout cube, WrapTopology topo, int[] offset, long x, long z, long[] counts) {
-        int s = (int) cube.side();
-        int h = s / 2;
-        long xw = cube.wrapX(x);
-        int bigX = (int) (xw + h);
-        int bigZ = (int) (z + h);
-        List<WrapEdge> we = topo.edges();
-        List<Integer> candidates = new ArrayList<>();
-        for (int k = 2; k < 14; k++)
-            if (we.get(k).beyond(bigX + offset[k], bigZ))
-                candidates.add(k);
-        // The nearest candidate by this layout's depth, ties to the earlier edge.
-        long bestD = Long.MAX_VALUE;
-        int best = -1;
-        for (int k : candidates) {
-            long d = cube.edges().get(k).depth(xw, z);
-            assertTrue(d >= 0 && d < s, "depth " + d);
-            if (d < bestD) {
-                bestD = d;
-                best = k;
-            }
-        }
-        String what = "s " + s + " (" + x + ", " + z + ")";
-        switch (cube.fold(x, z)) {
-            case OnFace of -> {
-                counts[0]++;
-                assertTrue(candidates.isEmpty(), what + ": on a face, yet beyond " + candidates);
-                assertNull(topo.fold((int) Math.floorMod((long) bigX, 4L * s), bigZ), what);
-            }
-            case Outside out -> {
-                counts[1]++;
-                assertEquals(best, out.edge(), what + ": candidates " + candidates);
-                CellIsometry g = we.get(out.edge()).iso();
-                int gx = bigX + offset[out.edge()];
-                assertEquals(Math.floorMod(out.x() + h, 4L * s), Math.floorMod((long) g.applyX(gx, bigZ), 4L * s), what);
-                assertEquals(out.z() + h, g.applyZ(gx, bigZ), what);
-                assertEquals(out.iso().k(), g.quarterTurns(), what);
-                // The planet block it shows is a block of a face.
-                assertNotNull(cube.faceOfBlock(out.x(), out.z()), what + ": (" + out.x() + ", " + out.z() + ") is not a block of a face");
-                if (candidates.size() == 1) {
-                    WrapTopology.Fold tf = topo.fold(gx, bigZ);
-                    assertNotNull(tf, what);
-                    assertEquals(Math.floorMod(out.x() + h, 4L * s), Math.floorMod((long) tf.x(), 4L * s), what);
-                    assertEquals(out.z() + h, tf.z(), what);
-                    assertEquals(out.iso().k(), tf.iso().quarterTurns(), what);
-                }
-            }
-            case CubeLayout.Ocean ocean -> {
-                counts[2]++;
-                // Either no band holds the block, or the nearest band's image is not a block of the
-                // planet (the missing quarter round an outer cube corner).
-                if (best >= 0) {
-                    CellIsometry g = we.get(best).iso();
-                    int gx = bigX + offset[best];
-                    long px = cube.wrapX(Math.floorMod((long) g.applyX(gx, bigZ) - h, 4L * s));
-                    long pz = g.applyZ(gx, bigZ) - h;
-                    assertNull(cube.faceOfBlock(px, pz), what + ": ocean, yet edge " + best + " shows (" + px + ", " + pz + ")");
-                }
+                assertEquals(we.size(), i, top + ": no edge left over");
+                assertEquals(cube.corners().size(), topo.corners().size(), top);
+                for (int c = 0; c < cube.corners().size(); c++)
+                    assertEquals(cube.corners().get(c).name(), topo.corners().get(c).name(), top);
             }
         }
     }

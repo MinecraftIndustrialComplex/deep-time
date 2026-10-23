@@ -492,9 +492,9 @@ fn lod(d: &Dims, h: &mut [f64], kd: &[f64], dt: f64, live: &Live) {
 const COL_BLOCK: usize = 8;
 
 /// RMS residual (m) at which the conjugate gradients stop …
-const CG_TOL_M: f64 = 1.0e-6;
+pub(crate) const CG_TOL_M: f64 = 1.0e-6;
 /// … or after this many iterations.
-const CG_MAX_ITER: usize = 400;
+pub(crate) const CG_MAX_ITER: usize = 400;
 
 /// Rows per task in the fused passes. It sets the grain of the work and nothing else: every sum is
 /// taken per row, so no result depends on it (the parity test runs grids whose height it does not
@@ -1071,6 +1071,8 @@ fn cyclic(lo: &[f64], di: &[f64], up: &[f64], alpha: f64, beta: f64, b: &mut [f6
 }
 
 mod multigrid;
+/// The cycle's settings, shared with the cube grid's multigrid (`surface/cube/multigrid.rs`).
+pub(crate) use multigrid::{COARSE_SWEEPS, COARSEST, NU, OMEGA, SCALE};
 
 #[cfg(test)]
 mod parity;

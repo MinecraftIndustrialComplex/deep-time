@@ -1036,7 +1036,7 @@ part of done"):
 
    Gate: `tools/remote/vm/play-stage.sh` on the cube level type; play checks; the world format
    checked before the jar swap (the recorded deploy trap).
-7. **Phase 6: the wrap engine** (E1 to E8), when Ben schedules it (Q3).
+7. **Phase 6: the wrap engine** (E1 to E8). Ben scheduled it now, in parallel with V1 (Q3, 2026-10-22).
 
 ### 7.2 Tools, viewer and workbench (phase 3's items)
 
@@ -1154,6 +1154,9 @@ Each lane takes its own ledger id range so concurrent agents do not collide.
    `mountains-projection`, `tools/review/world-shape`) as research.
 
 ## 8. Questions only Ben can answer
+
+**Answered 2026-10-22** (decisions log): Q4 (a), Q1 (a), Q2 (a), and Q3 (b), the wrap engine now, in
+parallel with V1. Phase 6 runs as its own lane from now; borders (W3) still ship with phase 2.
 
 Asked in one batch when Ben says he is back (log 2026-10-22: no questions until then). The
 recommended option comes first in each. Everything else in this plan is undoable and taken as the
