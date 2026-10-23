@@ -4486,7 +4486,7 @@ before any ocean floor lifts the drowned margins out of the sea; the water they 
 ocean, the sea rises, and with it T_col. The cap (PLT-413) was the test of that loop: with the
 column held at 41.1 km the sea still ends 1,208 m over the datum and the land at 0.327 (p 0.040),
 so it is the order, not the column's feedback, that lifts the sea (PLT-391 with W 40 alone also
-lifts it, to 955 m). A shorter reach, 150 km (the lower crust's channel "travels at most 150 km
+lifts it, to 955 m, though not at a meaningful p: 0.44). A shorter reach, 150 km (the lower crust's channel "travels at most 150 km
 into the foreland", Rey, Teyssier & Whitney 2010, as in PLT-391; PLT-257 unchanged, measured
 only), fills fewer margins:
 
