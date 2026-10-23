@@ -194,14 +194,16 @@ ellipse's area. The medians, under SCL-130 and (beside) under SCL-091 for the sa
 | 16k seed 1 (7,045, 393 and 10 bodies) | 0.99999 (1.0007) | 0.99999 (1.0041) | 1.0007 (1.058) | 0.0043 (16.2) |
 | 4k seed 11 (241, 43 and 0 bodies) | 0.99997 (1.00002) | 0.99996 (0.99999) | none | 0.098 (99.3) |
 
-The largest change is that of the one body furthest from 1, as a fraction: SCL-091 draws some
-bodies where the map shears 17 and 100 times their planet area. Two more 4k bodies hold the image
+The largest change is that of the one body furthest from 1: where the map shears, SCL-091 draws
+one 16k body at 17 times its planet area and one 4k body at 100 times. Two more 4k bodies hold the image
 of a corner (an aureole 61.8 by 101.5 blocks and a pluton 57.2 by 88.1, both centred 38 blocks
 from corner s0): they read 1.38 and 1.31 (SCL-091 1.39 and 1.32). Round a corner the world has
 three quarters of a turn, so an ellipse over it covers a full turn of the net and the quarter in
 the void folds back onto ground it already covers: about 4/3 for any one ellipse. The record lists
 such bodies apart (`over_a_corner`) and leaves them out of the medians; phase 2's per-face images
-are theirs. MEASURE-B5V. The first record (b2) read the scale at the body's centre alone, which
+are theirs (0.16 of each lies in the void). Away from the corners, 52 bodies at 16k and 11 at 4k
+reach past a turning seam into the void (at most 0.49 and 0.41 of one ellipse); the game has to
+fold that part onto the partner face. The first record (b2) read the scale at the body's centre alone, which
 misses that fold: it gave the two 1.007.
 
 Structure windows that cross a turning seam: 303 of 18,450 (16k) and 107 of 532 (4k), all kept.
