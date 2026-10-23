@@ -27,12 +27,13 @@
 //!    its way to base level) by the parallel Priority-Flood of Barnes 2016, "Parallel
 //!    Priority-Flood depression filling for trillion cell digital elevation models on desktops or
 //!    clusters" (Computers & Geosciences 96:56–68; arXiv 1606.06204), implemented from the paper:
-//!    the raster is cut into strips of whole rows (so the wrap in x stays inside a strip); each
+//!    the grid is cut into strips (the grid's own [`SurfaceGrid::strips`]: whole rows of the
+//!    raster, so the wrap in x stays inside a strip, or whole rows of one cube face); each
 //!    strip is flooded on its own from its base-level cells and the cells of its edges that border
 //!    another strip (his Algorithm 1), labelling each cell with the watershed it drains to and
 //!    noting, for each pair of watersheds that meet, the lowest level at which they meet; the
-//!    strips' edges are joined (his Algorithm 2, every cell against the two or three across the
-//!    edge); a Priority-Flood over that graph of watersheds from the base level (label 0, at −∞)
+//!    strips' edges are joined (his Algorithm 2, every edge cell against its neighbours in later
+//!    strips); a Priority-Flood over that graph of watersheds from the base level (label 0, at −∞)
 //!    gives each watershed the lowest level at which it can drain; and each cell is raised to its
 //!    watershed's level. The paper treats ε = 0 only ("Setting ε > 0 requires more complex methods
 //!    than those described here"), and W does not depend on order: ties at ε = 0 give equal
@@ -59,14 +60,18 @@
 
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
+use std::ops::Range;
 
 use rayon::prelude::*;
 
-use super::super::grid::{Dims, OFFSETS};
+use super::super::grid::SurfaceGrid;
 use super::{BASE, LAND, SINK};
 
 /// Rows per strip of the first phase. A grain of work only: the result is the same for any.
 pub(crate) const STRIP_ROWS: usize = 16;
+
+/// Cells per task of the passes that visit every cell on its own.
+const CHUNK: usize = 4096;
 
 /// The base level's watershed label.
 const OCEAN: u32 = 0;
@@ -94,32 +99,23 @@ impl PartialOrd for Entry {
     }
 }
 
-/// The neighbours of `c` (the eight of `Dims::neighbours`, the same cells) whose rows lie in
-/// `[r0, r1)`, into `out`; returns how many.
-#[inline]
-fn nbrs(d: &Dims, c: usize, r0: usize, r1: usize, out: &mut [usize; 8]) -> usize {
-    let w = d.w as i64;
-    let (i, j) = ((c % d.w) as i64, (c / d.w) as i64);
-    let mut k = 0;
-    for &(di, dj, _) in &OFFSETS {
-        let nj = j + dj;
-        if nj < r0 as i64 || nj >= r1 as i64 {
-            continue;
-        }
-        let mut ni = i + di;
-        if ni < 0 || ni >= w {
-            if !d.wrap_x {
-                continue;
-            }
-            ni = ni.rem_euclid(w);
-        }
-        let m = (nj * w + ni) as usize;
-        if m != c {
-            out[k] = m;
-            k += 1;
-        }
+/// `v` cut into the strips' slices (contiguous, ascending, covering `v`).
+fn split_strips<'a, T>(v: &'a mut [T], strips: &[Range<usize>]) -> Vec<&'a mut [T]> {
+    let mut out = Vec::with_capacity(strips.len());
+    let mut rest = v;
+    for st in strips {
+        let (a, b) = std::mem::take(&mut rest).split_at_mut(st.end - st.start);
+        out.push(a);
+        rest = b;
     }
-    k
+    debug_assert!(rest.is_empty());
+    out
+}
+
+/// Whether `c` has a neighbour outside `[lo, hi)`.
+#[inline]
+fn reaches_out<G: SurfaceGrid>(d: &G, c: usize, lo: usize, hi: usize) -> bool {
+    d.neighbours(c).any(|(m, _)| m < lo || m >= hi)
 }
 
 /// The cells that hold their level: base cells at `base_z`, sinks at their height.
@@ -154,18 +150,16 @@ struct Strip {
     edges: Vec<(u32, u32, f64)>,
 }
 
-fn strip_fill(
-    d: &Dims,
+fn strip_fill<G: SurfaceGrid>(
+    d: &G,
     fx: &Fixed,
     h: &[f64],
-    j0: usize,
-    j1: usize,
+    st: Range<usize>,
     wf: &mut [f64],
     lab: &mut [u32],
 ) -> Strip {
-    let w = d.w;
-    let off = j0 * w;
-    let len = (j1 - j0) * w;
+    let (off, hi) = (st.start, st.end);
+    let len = hi - off;
     let mut open: BinaryHeap<Entry> = BinaryHeap::new();
     let mut pit: VecDeque<u32> = VecDeque::new();
     let mut nb = [0usize; 8];
@@ -184,18 +178,24 @@ fn strip_fill(
     }
     // Seeds: base cells beside a land cell of the strip, at their level, and the land cells of
     // the edges that border another strip, at their height (they may drain across the edge).
+    // The heap's order is total (level, then cell), so the order of the pushes does not matter.
     for l in 0..len {
         let c = off + l;
-        let jl = l / w;
         if lab[l] == OCEAN {
-            let k = nbrs(d, c, j0, j1, &mut nb);
+            let k = d.neighbours_in(c, off, hi, &mut nb);
             if nb[..k].iter().any(|&m| lab[m - off] != OCEAN) {
                 open.push(Entry {
                     z: wf[l],
                     c: c as u32,
                 });
             }
-        } else if (jl == 0 && j0 > 0) || (jl + 1 == j1 - j0 && j1 < d.h) {
+        }
+    }
+    let mut border = Vec::new();
+    d.strip_border(st.clone(), &mut border);
+    for &c in &border {
+        let l = c - off;
+        if lab[l] != OCEAN && reaches_out(d, c, off, hi) {
             open.push(Entry {
                 z: wf[l],
                 c: c as u32,
@@ -225,7 +225,7 @@ fn strip_fill(
             off + scan
         };
         let l = c - off;
-        let k = nbrs(d, c, j0, j1, &mut nb);
+        let k = d.neighbours_in(c, off, hi, &mut nb);
         if lab[l] == NONE {
             // An edge cell: the watershed of a labelled neighbour no higher, or a new one.
             lab[l] = match nb[..k]
@@ -286,23 +286,19 @@ fn union(p: &mut [u32], a: u32, b: u32) {
 
 /// Phase 1: `wf` = W, `lab` = global watershed labels. Returns the cells that must become sinks
 /// (empty when every watershed drains to base level).
-fn fill_w(
-    d: &Dims,
+fn fill_w<G: SurfaceGrid>(
+    d: &G,
     fx: &Fixed,
     h: &[f64],
-    rows: usize,
+    ranges: &[Range<usize>],
     wf: &mut [f64],
     lab: &mut [u32],
 ) -> Vec<usize> {
-    let (w, hgt) = (d.w, d.h);
-    let strips: Vec<Strip> = wf
-        .par_chunks_mut(rows * w)
-        .zip(lab.par_chunks_mut(rows * w))
-        .enumerate()
-        .map(|(s, (ws, ls))| {
-            let j0 = s * rows;
-            strip_fill(d, fx, h, j0, (j0 + rows).min(hgt), ws, ls)
-        })
+    let strips: Vec<Strip> = split_strips(wf, ranges)
+        .into_par_iter()
+        .zip(split_strips(lab, ranges))
+        .zip(ranges.par_iter())
+        .map(|((ws, ls), st)| strip_fill(d, fx, h, st.clone(), ws, ls))
         .collect();
     // Global labels: strip s's local label l is offset[s] + l; 0 stays the base level.
     let mut offset = Vec::with_capacity(strips.len());
@@ -311,7 +307,8 @@ fn fill_w(
         offset.push(total);
         total += s.labels;
     }
-    lab.par_chunks_mut(rows * w)
+    split_strips(lab, ranges)
+        .into_par_iter()
         .zip(offset.par_iter())
         .for_each(|(ls, &o)| {
             for v in ls.iter_mut() {
@@ -322,18 +319,20 @@ fn fill_w(
         });
     let glob = |o: u32, l: u32| if l == OCEAN { OCEAN } else { o + l };
     // The graph: the strips' own edges, and their joins (Barnes 2016, Algorithm 2: each cell of a
-    // strip's last row against the two or three cells across the edge).
-    let joins: Vec<Vec<(u32, u32, f64)>> = (1..strips.len())
-        .into_par_iter()
-        .map(|s| {
-            let ja = s * rows - 1;
+    // strip's edge against its neighbours in later strips; on the raster, a strip's last row
+    // against the two or three cells across the edge).
+    let joins: Vec<Vec<(u32, u32, f64)>> = ranges
+        .par_iter()
+        .map(|st| {
             let mut out = Vec::new();
-            let mut nb = [0usize; 8];
+            let mut border = Vec::new();
+            d.strip_border(st.clone(), &mut border);
             let (lab, wf) = (&*lab, &*wf);
-            for i in 0..w {
-                let a = ja * w + i;
-                let k = nbrs(d, a, ja + 1, ja + 2, &mut nb);
-                for &b in &nb[..k] {
+            for &a in &border {
+                for (b, _) in d.neighbours(a) {
+                    if b < st.end {
+                        continue;
+                    }
                     let (la, lb) = (lab[a], lab[b]);
                     if la != lb {
                         out.push((la.min(lb), la.max(lb), wf[a].max(wf[b])));
@@ -434,13 +433,19 @@ fn ulp_bound(x: f64, k: f64) -> f64 {
 
 /// Fills `filled` with the ε-filled surface of `h`, as [`super::flood`] (same arguments, same
 /// sinks), but order-independent and in parallel (the module's notes). Returns the sinks made.
-pub fn flood(d: &Dims, h: &[f64], base_z: &[f64], kind: &mut [u8], filled: &mut [f64]) -> usize {
+pub fn flood<G: SurfaceGrid>(
+    d: &G,
+    h: &[f64],
+    base_z: &[f64],
+    kind: &mut [u8],
+    filled: &mut [f64],
+) -> usize {
     flood_rows(d, h, base_z, kind, filled, STRIP_ROWS)
 }
 
 /// [`flood`] with strips of `rows` rows (the tests vary it; the result must not change).
-pub(crate) fn flood_rows(
-    d: &Dims,
+pub(crate) fn flood_rows<G: SurfaceGrid>(
+    d: &G,
     h: &[f64],
     base_z: &[f64],
     kind: &mut [u8],
@@ -451,7 +456,7 @@ pub(crate) fn flood_rows(
     if n == 0 {
         return 0;
     }
-    let rows = rows.max(1);
+    let ranges = d.strips(rows.max(1));
     let mut lab = vec![NONE; n];
     let mut sink_mark: Option<Vec<bool>> = None;
     let mut sinks = 0;
@@ -462,7 +467,7 @@ pub(crate) fn flood_rows(
             h,
             sink: sink_mark.as_deref(),
         };
-        let new = fill_w(d, &fx, h, rows, filled, &mut lab);
+        let new = fill_w(d, &fx, h, &ranges, filled, &mut lab);
         if new.is_empty() {
             break;
         }
@@ -484,15 +489,15 @@ pub(crate) fn flood_rows(
     let k = n as f64;
     {
         let wf: &[f64] = filled;
-        lab.par_chunks_mut(d.w).enumerate().for_each(|(j, row)| {
+        lab.par_chunks_mut(CHUNK).enumerate().for_each(|(j, row)| {
             let mut nb = [0usize; 8];
             for (i, v) in row.iter_mut().enumerate() {
-                let c = j * d.w + i;
+                let c = j * CHUNK + i;
                 if fx.level(c).is_some() {
                     *v = KNOWN;
                     continue;
                 }
-                let cnt = nbrs(d, c, 0, d.h, &mut nb);
+                let cnt = d.neighbours_in(c, 0, n, &mut nb);
                 let drains = nb[..cnt].iter().any(|&m| {
                     let up = match fx.level(m) {
                         Some(z) => z,
@@ -506,13 +511,13 @@ pub(crate) fn flood_rows(
     }
     // The pending cells' connected groups (8 neighbours), in ascending order of their first cell.
     let pending: Vec<u32> = lab
-        .par_chunks(d.w)
+        .par_chunks(CHUNK)
         .enumerate()
         .flat_map_iter(|(j, row)| {
             row.iter()
                 .enumerate()
                 .filter(|(_, v)| **v == PENDING)
-                .map(move |(i, _)| (j * d.w + i) as u32)
+                .map(move |(i, _)| (j * CHUNK + i) as u32)
                 .collect::<Vec<_>>()
         })
         .collect();
@@ -529,7 +534,7 @@ pub(crate) fn flood_rows(
         todo.push(s);
         while let Some(c) = todo.pop() {
             members.push(c);
-            let cnt = nbrs(d, c as usize, 0, d.h, &mut nb);
+            let cnt = d.neighbours_in(c as usize, 0, n, &mut nb);
             for &m in &nb[..cnt] {
                 if lab[m] == PENDING {
                     lab[m] = g;
@@ -555,7 +560,7 @@ pub(crate) fn flood_rows(
             let mut nb = [0usize; 8];
             let mut seeds: Vec<u32> = Vec::new();
             for &c in members {
-                let cnt = nbrs(d, c as usize, 0, d.h, &mut nb);
+                let cnt = d.neighbours_in(c as usize, 0, n, &mut nb);
                 seeds.extend(
                     nb[..cnt]
                         .iter()
@@ -573,7 +578,7 @@ pub(crate) fn flood_rows(
                 });
             }
             while let Some(Entry { z, c }) = q.pop() {
-                let cnt = nbrs(d, c as usize, 0, d.h, &mut nb);
+                let cnt = d.neighbours_in(c as usize, 0, n, &mut nb);
                 for &m in &nb[..cnt] {
                     if lab[m] != g {
                         continue;
@@ -611,22 +616,25 @@ pub(crate) fn flood_rows(
 /// bodies, the bodies that touch across a strip edge are joined, and every cell of a body large
 /// enough becomes [`BASE`], the rest [`LAND`]. The bodies are the terrain's, so the result is the
 /// serial one's cell for cell.
-pub fn open_sea(d: &Dims, h: &[f64], sea_level: f64, min_cells: usize, kind: &mut [u8]) {
-    let (w, hgt) = (d.w, d.h);
+pub fn open_sea<G: SurfaceGrid>(
+    d: &G,
+    h: &[f64],
+    sea_level: f64,
+    min_cells: usize,
+    kind: &mut [u8],
+) {
     let n = d.cells();
     if n == 0 {
         return;
     }
-    let rows = STRIP_ROWS;
+    let ranges = d.strips(STRIP_ROWS);
     let mut lab = vec![NONE; n];
     // Per strip: its bodies' sizes, local labels 0..len.
-    let sizes: Vec<Vec<u32>> = lab
-        .par_chunks_mut(rows * w)
-        .enumerate()
-        .map(|(s, ls)| {
-            let j0 = s * rows;
-            let j1 = (j0 + rows).min(hgt);
-            let off = j0 * w;
+    let sizes: Vec<Vec<u32>> = split_strips(&mut lab, &ranges)
+        .into_par_iter()
+        .zip(ranges.par_iter())
+        .map(|(ls, st)| {
+            let (off, hi) = (st.start, st.end);
             let mut sizes = Vec::new();
             let mut todo: Vec<usize> = Vec::new();
             let mut nb = [0usize; 8];
@@ -640,7 +648,7 @@ pub fn open_sea(d: &Dims, h: &[f64], sea_level: f64, min_cells: usize, kind: &mu
                 todo.push(off + l);
                 while let Some(c) = todo.pop() {
                     count += 1;
-                    let k = nbrs(d, c, j0, j1, &mut nb);
+                    let k = d.neighbours_in(c, off, hi, &mut nb);
                     for &m in &nb[..k] {
                         if ls[m - off] == NONE && h[m] <= sea_level {
                             ls[m - off] = g;
@@ -659,7 +667,8 @@ pub fn open_sea(d: &Dims, h: &[f64], sea_level: f64, min_cells: usize, kind: &mu
         offset.push(total);
         total += s.len() as u32;
     }
-    lab.par_chunks_mut(rows * w)
+    split_strips(&mut lab, &ranges)
+        .into_par_iter()
         .zip(offset.par_iter())
         .for_each(|(ls, &o)| {
             for v in ls.iter_mut() {
@@ -668,18 +677,18 @@ pub fn open_sea(d: &Dims, h: &[f64], sea_level: f64, min_cells: usize, kind: &mu
                 }
             }
         });
+    // The bodies that touch across a strip's edge (each pair once, from the earlier strip; the
+    // union's roots do not depend on the order).
     let mut parent: Vec<u32> = (0..total).collect();
-    let mut nb = [0usize; 8];
-    for s in 1..sizes.len() {
-        let ja = s * rows - 1;
-        for i in 0..w {
-            let a = ja * w + i;
+    let mut border = Vec::new();
+    for st in &ranges {
+        d.strip_border(st.clone(), &mut border);
+        for &a in &border {
             if lab[a] == NONE {
                 continue;
             }
-            let k = nbrs(d, a, ja + 1, ja + 2, &mut nb);
-            for &b in &nb[..k] {
-                if lab[b] != NONE {
+            for (b, _) in d.neighbours(a) {
+                if b >= st.end && lab[b] != NONE {
                     union(&mut parent, lab[a], lab[b]);
                 }
             }

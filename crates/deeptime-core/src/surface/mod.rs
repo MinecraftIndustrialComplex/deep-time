@@ -58,6 +58,7 @@ pub mod advect;
 pub mod amplify;
 pub mod carbonate;
 pub mod climate;
+pub mod cube;
 pub mod detail;
 pub mod diffusion;
 pub mod erosion_bands;

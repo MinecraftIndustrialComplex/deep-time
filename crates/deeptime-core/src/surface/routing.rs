@@ -27,7 +27,7 @@
 
 use rayon::prelude::*;
 
-use super::grid::Dims;
+use super::grid::SurfaceGrid;
 use super::pflood::{BASE, LAND, SINK};
 
 pub mod forest;
@@ -55,7 +55,7 @@ pub struct Routing {
 }
 
 /// D8 receivers of every cell on the filled surface `f`.
-pub fn receivers(d: &Dims, f: &[f64], kind: &[u8], out: &mut Routing) {
+pub fn receivers<G: SurfaceGrid>(d: &G, f: &[f64], kind: &[u8], out: &mut Routing) {
     let n = d.cells();
     out.rcv.resize(n, 0);
     out.len.resize(n, 0.0);
@@ -87,7 +87,7 @@ pub fn receivers(d: &Dims, f: &[f64], kind: &[u8], out: &mut Routing) {
 
 /// Donor lists (CSR) and the stack, basin by basin, rooted at every base-level cell and sink that
 /// has donors. Land cells without a path to any root (impossible after the flood) are left out.
-pub fn stack(d: &Dims, kind: &[u8], r: &mut Routing) {
+pub fn stack<G: SurfaceGrid>(d: &G, kind: &[u8], r: &mut Routing) {
     let n = d.cells();
     let mut count = vec![0u32; n + 1];
     for c in 0..n {
@@ -140,10 +140,14 @@ pub fn stack(d: &Dims, kind: &[u8], r: &mut Routing) {
 /// Parallel over the drainage forest (`Forest::up`); every cell adds its donors' areas to its own
 /// weight in ascending donor order, the order of the serial reverse-stack loop, so the sums are
 /// bit-identical to it.
-pub fn accumulate(d: &Dims, r: &Routing, weight: &[f32], area: &mut Vec<f64>) {
-    let a = d.cell_area();
+pub fn accumulate<G: SurfaceGrid>(d: &G, r: &Routing, weight: &[f32], area: &mut Vec<f64>) {
     area.clear();
-    area.par_extend(weight.par_iter().map(|&w| f64::from(w) * a));
+    area.par_extend(
+        weight
+            .par_iter()
+            .enumerate()
+            .map(|(c, &w)| f64::from(w) * d.area(c)),
+    );
     let f = &r.forest;
     let acc = SharedF64::new(f.len(), 0.0);
     {
