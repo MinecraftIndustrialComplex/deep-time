@@ -13,8 +13,9 @@ the state with its heat flow (`tectonics.thermal_state`), the strength from it
 and stage 3's root removal (in place of the founder's sinking at once). Stages 2 and 3 have no
 switch: the rules they replace are gone. **Off by default:** thermal isostasy
 (`tectonics.thermal_isostasy_m`, an open fault: no frame for it is right while the model's sea is
-not) and the backstop (`tectonics.thermal_backstop`, a stand-in, not physics); the heat-flow lane
-owns `tectonics.heat_flow_refresh`, which the state turns on for itself. `thermal_state=false`
+not) and the backstop (`tectonics.thermal_backstop`, a stand-in, not physics); the heat-flow pass
+(`tectonics.heat_flow_refresh`, PLT-469) is on by default too, and the state turns it on for
+itself. `thermal_state=false`
 remains for tests that isolate one law. `tectonics.thermal_keel_km` sets the start's keel. Stages 2
 and 3 were added by the gap-4 stages 2-3 agent on 2026-10-23, after a diagnosis of where the high
 coasts are.
@@ -77,7 +78,7 @@ A resampling copies both numbers from the nearest corner of the sample's kind (`
   q = q_c + B / L, with B / L the heat conducted up through the lithosphere's base, plus the old
   proxy's magmatic terms for an arc and a hotspot (+40 each, PLT-137). The proxy's +30 for a rift is
   dropped: a rift's thinning is now in L. The ocean keeps its age law.
-- **The heat-flow fault** (`tectonics.heat_flow_refresh`, and on with the state): after the step's
+- **The heat-flow fault** (`tectonics.heat_flow_refresh`, on by default, and on with the state): after the step's
   resampling, the rate guard can spread crust onto old sea floor and turn it continental
   (`collapse::spread`, PLT-331). That happens after the step set every sample's heat flow, so the
   converted sample kept the sea floor's value (33.7 mW/m² on 229 Myr floor) into the bake's
@@ -125,7 +126,7 @@ two steps. The plate step sets every sample's heat flow, then resamples, and onl
 guard spread crust onto old floor next to it (`collapse::spread`, PLT-331), making those samples
 continental with the sea floor's value still on them; the release pace changes which steps spread,
 so it shows the fault, it does not make it. The fix is the final pass (PLT-469,
-`tectonics.heat_flow_refresh`, and always on with the state): after the resampling and the spread,
+`tectonics.heat_flow_refresh`, on by default since 2026-10-23, and always on with the state): after the resampling and the spread,
 every continental sample gets at least its law's conductive value (the proxy's
 55 + 35 e^(−t/60), at least 55 mW/m²; with the state, q_c + B / L). The same planet with the pass bakes no cell under 55 (the scan's
 rerun), and `the_release_pace_bakes_continental_heat_flow_with_the_final_pass` bakes it with the
@@ -287,7 +288,7 @@ Measured below as the switch `tectonics.root_removal`, removed when it went on b
 | PLT-466 | the ocean floor's lithosphere | min(2.32 √(κ t), 125), κ = 0.80 × 10⁻⁶ m²/s from McKenzie's τ and a | km | McKenzie 1978 (a, τ); the 2.32 (the 90 % isotherm of a half-space) is from memory | `from-memory` |
 | PLT-467 | continental heat flow | q = q_c + B / L, q_c = 26 mW/m², B = 3,375 mW/m² × km | mW/m² | Archean mean 41 (Nyblade & Pollack 1993 as two open papers cite it); mantle heat flow 11 to 17 (Rolandone et al. 2002; Sleep 2003 citing Jaupart & Mareschal 1999), 15 taken at L_cold | `abstract-only` |
 | PLT-468 | the magmatic terms | +40 arc, +40 hotspot (PLT-137's); the rift's +30 dropped | mW/m² | PLT-137 (uncited) | `uncited` |
-| PLT-469 | the final heat-flow pass | after the resampling, continental q ← max(q, the law's conductive value) | mW/m² | the bake test's fault (2026-10-23) | `game-choice` (a bookkeeping fix) |
+| PLT-469 | the final heat-flow pass | after the resampling, continental q ← max(q, the law's conductive value) | mW/m² | the bake test's fault (2026-10-23) | `game-choice` (a bookkeeping fix, on by default since 2026-10-23) |
 | PLT-470 | the backstop | a source's share of the cordillera's strain w = e^(−t_eq / τ_s), τ_s = 62.8 (PLT-415) | none | Hyndman, Currie & Mazzotti 2005 (back-arcs weaker than cratons "by more than a factor of 10"); the weight is PLT-415's law | `game-choice` |
 | PLT-475 | stage 2's margin profile | T* = T_o + (T_n − T_o) S(1/2 + d / W), S(s) = 3s² − 2s³ (PLT-261's S(s) = s until 2026-10-23) | km | Manatschal & Chenin 2023 (the proximal, necking and hyperextended domains; full text); Montadert et al. 1979 (the Moho 25 km at the shelf break, 12 km on the lower margin; full text) | `game-choice` (the form) |
 | PLT-476 | stage 2's lithosphere | a source thinned to `keep`: L ← L · keep, K ← min(K · keep, L) | km | McKenzie 1978 (uniform stretching of the lithosphere and its crust by β; eq. 1 and Table 2 read); Lang, ten Brink & Makovsky 2026 (the mantle stretches more; full text) | `verified` |
@@ -538,6 +539,61 @@ this merge is the first, and its guard measure is that combination's check.
   largest landmass on its band's floor (0.121) and the collisions stayed under theirs (1.35 to
   1.80 against 2). None is a reason to keep physics off under Ben's rule; a check that fires on
   the coordinator's base is a pointer to missing physics (open questions), not to a knob.
+### Measured: the heat-flow pass on by default (2026-10-23)
+
+Two pool arms of one source key (06b62e1202b8, master 84b8ee03 with the flip): earthlike_quick_16k,
+1,000 Myr, both starts, seed 1, `+DEEPTIME_CRUST_BUDGET=1`, 2 threads. The pass on (argkey
+2a53566b) and off (`--set tectonics.heat_flow_refresh=false`, argkey fa64281e), each against the
+base run (master 84b8ee03, key 7f9d8f115049, argkey 2a53566b, pass off).
+
+- **Off is the base.** The world state's per-file sha256, the per-step records (`rec.json`) and
+  `plate-table.txt` of the off arm equal the base's on both starts. With the switch off the code is
+  inert.
+- **On against off, the L1 heat-flow layers.** The fault is fixed where it was seen. The continental
+  cells under 54.9 mW/m² in the final L1 snapshot (`hfcells`, `tools/review/pool/measure_hfcells.py`;
+  the lowest value in brackets): supercontinent 76 (32.3) off, 0 (55.0) on; scattered_continents
+  268 (34.3) off, 0 (55.0) on. These two pairs are not a clean before and after: the worlds part
+  (next point), so they differ in more than the pass.
+- **On against off, the dynamics: not byte for byte.** `summary.txt` differs in 133 of its 164 lines
+  (supercontinent) and 134 (scattered_continents): plates at the end 32 against 21 and 21 against 22,
+  the events' count 7,844 against 8,215 and 7,958 against 8,106, the land above 2 km on the
+  supercontinent start 0.099 against 0.198, the ocean's median age 55.5 against 68.2 Myr and 68.1
+  against 50.8. The per-step records show where they part. Supercontinent: records 0 to 98
+  identical, then `land` 28,818 against 28,822 cells and `sea_m` 475.243311 against 475.243312 m
+  (6.8e-7 m) at record 99 (t = -800 Myr), the plates' other recorded numbers equal at that record,
+  `land` differing in 400 of 500 records (a sea that moves by 7e-7 m moves the land count by four
+  cells only if some heights already differ by more than that, so the ground differs a step
+  or two before the first visible record). Scattered_continents: records 0 to 78 identical,
+  then at record 79 (t = -840 Myr) `land` 33,083 against 33,082 cells, `sea_m` 103.661188 against 103.661183 m, the
+  forces table and the oceanic arc count; by step 99 `land` is 32,704 against 32,672 and by the last
+  step 32,663 against 32,916, with `land` differing in 420 of 500 steps and `collisions` in 28. The
+  same pass on the 200 Myr planet (a different history, since the run's length sets its start
+  time) changed only the two heat-flow layers and `structure/log_grade`, and a repeat of the on arm
+  there was byte for byte the first.
+- **What it changes in the plates, by the code.** The pass writes `Sample::heat_flow_mw_m2` of
+  continental samples that sit under their law, and nothing else (`thermal::refresh_heat_flow`,
+  called once at the end of the plate step). The field's readers are the next step's resampling
+  (`ridges.rs`, which blends it into a heat flow and nothing else), `finish_samples` (which sets it
+  afresh each step), the L1 layers `plates/heat_flow_mw_m2` and `plates/continental_heat_flow_mw_m2`,
+  the surface stage's step fields (the burial temperature and the heat-flow field the deposit
+  engine accumulates, `surface/fields.rs`), and after the run the structure stage's metamorphic
+  grade, the bake's `meta/heat_flow_mw_m2`, the underground and the deposits. No plate, climate or
+  surface law reads it back: elevation, thickness, forces, the Airy height, the flexure's Te and
+  the sea level take nothing from it.
+- **The two disagree and the carrier is not found.** The code says the plates' dynamics should be
+  byte for byte, the pool says they part at record 79 or 99, first in the sea level the plates
+  stood under (the climate stage's `sea_from_water` over the plates' elevation, which reads only
+  `plates/plate_id`, `elevation_m`, `group_id`, `uplift_mm_yr` and `flags`) and in the land count.
+  Two readings fit: a reader that the search missed carries heat flow into that stage or the
+  plates' step, or the extra pass moved a float sum or a solver's last digit, which the plate
+  dynamics then amplify over the next 400 steps. The second is the less likely: the climate's sums
+  add their rows in row order on purpose (`volume_km3`), and the off arm repeats the base byte for
+  byte. A repeat of the on arm at another argkey (an A/A control) separates them: a repeat that
+  differs from the first on arm is noise and the pass is innocent. The next measurement is that
+  pair on the merged master, and a `dump-fields` of the two arms cut at record 80
+  (`stage --length-myr 1000 --max-steps 80`; the recipe is written and was not run, since this
+  lane ran nothing outside the pool after the coordinator's call), to see which field differs
+  first.
 
 ## Simplifications and limits
 
@@ -585,8 +641,20 @@ this merge is the first, and its guard measure is that combination's check.
   sea follows the columns' volume and no L_ref is needed; it belongs with gap 1's sea. Until then,
   once gap 1 holds the sea at its datum, Hyndman & Currie's frame at 125 km is the one their two
   columns give.
-- The heat-flow pass (PLT-469) runs whenever the state is on, so it is on by default with it; the
-  heat-flow lane owns its own switch for worlds with the state off.
+- The heat-flow pass (PLT-469) is on by default since 2026-10-23 (the coordinator's call: physics
+  that is built and correct goes on without a V1 gate, and the pass fixes a real fault). By the code
+  it changes only the heat flow of the cells the rate guard turned continental (the bake's
+  `meta/heat_flow_mw_m2`, the deposits' and the underground's reading of it). By the pool the 1,000
+  Myr runs part from record 79 or 99 ("Measured: the heat-flow pass on by default"). The path, found
+  in the code by the coordinator on 2026-10-23 and not yet confirmed by a field dump: the structure
+  stage reads `plates/heat_flow_mw_m2` as the metamorphism's geotherm (`structure/mod.rs`, the
+  `Thermal` of each column), `metamorphism::metamorphose` rewrites the classes of the surface's
+  strata log (RCK-037), the surface erodes the log by class (`surface/lithology.rs`, erodibility),
+  and erosion and deposition feed the next plate step. Hotter crust metamorphoses more and erodes
+  more slowly, which is physics, not a fault. It is not noise: the runs are bit-identical (off
+  equals the base byte for byte), so an A/A control would only repeat the on arm. With the
+  lithosphere's thermal state on (the default since 2026-10-23) the pass runs whatever its switch
+  says, and the state's own heat flow (PLT-467) reaches the plates by the same path.
 - The land share's top. The strength moves the largest landmass and the drowned crust towards
   Earth and pushes seven of 24 runs over 0.32 land: the crust it keeps from spreading under the sea
   stands on land instead. Under Ben's rule this is a realism check, not a reason to turn it off: if
