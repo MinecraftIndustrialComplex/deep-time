@@ -19,7 +19,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 public final class DevMapNetwork {
 
     /** The channel version: bump it whenever a codec or a handler's meaning changes. */
-    public static final String VERSION = "1";
+    public static final String VERSION = "2"; // 2: the info names a satellite and an elevation picture
 
     private DevMapNetwork() {}
 

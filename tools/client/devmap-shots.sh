@@ -15,11 +15,13 @@
 # copied; nothing of the play folder is written), then a real client (portablemc, the same three jars,
 # Mesa llvmpipe on the job's own Xvfb display) that joins it. The player is made an operator over
 # RCON after joining (the dev map re-sends its info on the permission change, which turns the teleport
-# on), and the client's -Ddeeptime_devmap.shots=true driver (devmap client/ShotDriver) visits the
-# spawn, the wrap seam and the north pole by right-clicking the map, checks the readout against Deep
-# Time's F3 line and the markers against the projection's inverse, and takes the HUD (with F3), the
-# map and the globe at each. The server logs each teleport's surface against the world data's height
-# and water (AGREE / DIFFER).
+# on), and the client's -Ddeeptime_devmap.shots=true driver (devmap client/ShotDriver) waits for the
+# server's two pictures (satellite, drawn by the natives, and elevation), visits the spawn, the wrap
+# seam and the north pole by right-clicking the map, checks the readout against Deep Time's F3 line
+# and the markers against the projection's inverse, and takes the HUD (with F3), the map and the
+# globe at each in the satellite picture, plus the spawn's maps in elevation (devmap-1-spawn-map*-
+# elevation.png). The server logs each teleport's surface against the world data's height and water
+# (AGREE / DIFFER).
 #
 #   --name N      output folder review/out/<N>/ (default devmap-shots); replaced on every run
 #   --world DIR   the world data (default: the play server's, <PLAY_DIR>/planet/deeptime from
@@ -149,7 +151,7 @@ SPID=$!
 for i in $(seq 360); do grep -a -q 'RCON running on' "$SRV/console.log" && break; kill -0 $SPID 2>/dev/null || { say "server died ($(grep -a -m3 -e ERROR -e Exception "$SRV/console.log" | head -3))"; exit 1; }; sleep 5; done
 grep -a -q 'RCON running on' "$SRV/console.log" || { say "server not up after 30 min"; exit 1; }
 rcon "gamerule doDaylightCycle false" >/dev/null; rcon "time set noon" >/dev/null; rcon "gamerule doWeatherCycle false" >/dev/null
-say "server up; $(grep -a -m1 '\[devmap\] base image' "$SRV/console.log" | sed 's/.*\[devmap\] //' || true)"
+say "server up; $(grep -a '\[devmap\] [a-z]* picture' "$SRV/console.log" | sed 's/.*\[devmap\] //' | tr '\n' ';' || true)"
 
 # 2. The client: the server's three jars, an offline profile, software GL on the job's display.
 mkdir -p "$CL/game/mods" "$CL/game/config"
