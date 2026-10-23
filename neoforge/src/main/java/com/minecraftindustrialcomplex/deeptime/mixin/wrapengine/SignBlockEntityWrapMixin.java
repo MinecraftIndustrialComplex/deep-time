@@ -31,7 +31,7 @@ abstract class SignBlockEntityWrapMixin {
         if (level == null)
             return;
         BlockPos pos = self.getBlockPos();
-        Vec3 seen = BandBlockEntities.seenFrom(level, pos, player.position());
+        Vec3 seen = BandBlockEntities.seenFrom(level, pos, player.position()); // ledger: SCL-186
         BlockState state = self.getBlockState();
         if (seen == null || !(state.getBlock() instanceof SignBlock sign))
             return;

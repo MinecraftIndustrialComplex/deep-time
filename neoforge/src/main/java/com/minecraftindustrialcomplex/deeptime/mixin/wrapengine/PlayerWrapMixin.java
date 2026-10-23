@@ -32,7 +32,7 @@ abstract class PlayerWrapMixin {
         BandBlockEntities.Image im = BandBlockEntities.nearestBandImage(self.level(), WrapEngine.canonical(self.level(), pos), eye);
         if (im == null || im.pos().equals(pos))
             return;
-        double r = self.blockInteractionRange() + distance;
+        double r = self.blockInteractionRange() + distance; // ledger: SCL-186 (vanilla's reach, measured to the nearest band image)
         if (new AABB(im.pos()).distanceToSqr(eye) < r * r)
             cir.setReturnValue(true);
     }
