@@ -218,7 +218,11 @@ mod tests {
         let below: Vec<usize> = (0..W * 36).filter(|&c| level.z[c] < 0.0).collect();
         assert!(below.len() > 10);
         for &c in &below {
-            assert_ne!(level.closed[c], basin::OPEN, "bowl cell {c} is open: {stats}");
+            assert_ne!(
+                level.closed[c],
+                basin::OPEN,
+                "bowl cell {c} is open: {stats}"
+            );
         }
         // The sea stays open.
         assert_eq!(level.closed[40 * W + 5], basin::OPEN);

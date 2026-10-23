@@ -740,7 +740,6 @@ pub fn apply(
     area: &[f32],
     kfac: &[f32],
     lake: &[u8],
-    closed: &[u8],
     glacier: &[f32],
     s: Scratch<'_>,
     ctx: &CharacterCtx<'_>,
@@ -796,9 +795,18 @@ pub fn apply(
             gj,
         )
     };
-    let class = |cell: usize| closed.get(cell).copied().unwrap_or(super::resample::basin::OPEN);
+    // `lake` holds the window's cell bytes: the lake bit and the basin class (`resample::cell`).
+    let class = |cell: usize| {
+        lake.get(cell).map_or(super::resample::basin::OPEN, |&m| {
+            super::resample::cell::class(m)
+        })
+    };
     let is_open = |cell: usize| class(cell) == super::resample::basin::OPEN;
-    let is_land = |cell: usize| !super::resample::wet(z[cell], sea, class(cell)) && lake[cell] == 0;
+    let is_lake = |cell: usize| {
+        lake.get(cell)
+            .is_some_and(|&m| super::resample::cell::lake(m))
+    };
+    let is_land = |cell: usize| !super::resample::wet(z[cell], sea, class(cell)) && !is_lake(cell);
     // How much of the character a land cell takes: none on rivers and at the coast, nor in the
     // glacial troughs and cirques `glacial.rs` cut (`glacier`: the trough fade, 0–1, a smooth
     // field (`run_tiles`); empty without glaciers): gullies and fold ridges would fight the U.
@@ -831,7 +839,7 @@ pub fn apply(
         for dj in -lake_r..=lake_r {
             for di in -lake_r..=lake_r {
                 let r2 = di * di + dj * dj;
-                if r2 < d2 && lake[at(win, i, j, di, dj)] != 0 {
+                if r2 < d2 && is_lake(at(win, i, j, di, dj)) {
                     d2 = r2;
                 }
             }
@@ -1164,7 +1172,6 @@ mod tests {
             &area,
             &k,
             lake,
-            &[],
             &[],
             scratch,
             &ctx,

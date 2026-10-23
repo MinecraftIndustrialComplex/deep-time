@@ -16,15 +16,18 @@ use super::kernels::{
     Buf, Counts, NoiseCfg, PassDevice, Physics, Times, count_sinks, flood_repair, relief5,
     run_passes, run_passes_on,
 };
-use super::resample::{Level, wet};
+use super::resample::{Level, basin, cell, wet};
 use super::window::Win;
 use crate::error::CoreError;
 use crate::surface::detail::DetailParams;
 
 /// Bytes per cell of a window while a tile runs: the passes' arrays ([`Buf`]), the copy of the
-/// terrain the change is measured against, the core's arrays handed to the sink, and the mountain
-/// character's copy of the terrain before it.
-pub const TILE_BYTES_PER_CELL: u64 = Buf::BYTES_PER_CELL + 4 + 18 + 4;
+/// terrain the change is measured against, the core's arrays handed to the sink (on a level before
+/// the last: terrain, area, weight and erodibility, 4 B each, and the cell byte, 1 B, with the lake
+/// flag and the basin class, `resample::cell`; the next level's lake surface is looked up in the
+/// coarse level, not copied, [`LevelTile::from`]), and the mountain character's copy of the
+/// terrain before it (the last level) or the core's glacier surface (a level before it).
+pub const TILE_BYTES_PER_CELL: u64 = Buf::BYTES_PER_CELL + 4 + 17 + 4;
 /// Bytes per cell of a [`Level`] (terrain, area, weight, erodibility, lake surface, glaciers'
 /// surface, basin class).
 pub const LEVEL_BYTES_PER_CELL: u64 = 25;
@@ -110,12 +113,14 @@ pub struct LevelTile<'a> {
     pub area: &'a [f32],
     pub wgt: &'a [f32],
     pub kfac: &'a [f32],
-    /// The lake surface (`Level::lake_z`).
-    pub lake_z: &'a [f32],
+    /// The cell bytes (`Fine::lake`): the lake bit, and the basin class, the next level's
+    /// `Level::closed`.
+    pub lake: &'a [u8],
+    /// The level the tile was sampled from: a lake cell's surface, the next level's
+    /// `Level::lake_z`, is [`Level::lake_surface`] of it, so the window need not carry it.
+    pub from: &'a Level,
     /// The glaciers' surface (empty without glaciers).
     pub zs: &'a [f32],
-    /// The basin classes (`Level::closed`; empty when the level has none).
-    pub closed: &'a [u8],
 }
 
 /// Collects the cores of a level before the last into the arrays of the next.
@@ -158,18 +163,32 @@ impl TileSink for LevelSink {
             self.level.area[dst..dst + w].copy_from_slice(&l.area[src.clone()]);
             self.level.wgt[dst..dst + w].copy_from_slice(&l.wgt[src.clone()]);
             self.level.kfac[dst..dst + w].copy_from_slice(&l.kfac[src.clone()]);
-            self.level.lake_z[dst..dst + w].copy_from_slice(&l.lake_z[src.clone()]);
+            let gj = (y0 + j) as i64;
+            for (i, (s, &m)) in self.level.lake_z[dst..dst + w]
+                .iter_mut()
+                .zip(&l.lake[src.clone()])
+                .enumerate()
+            {
+                *s = if cell::lake(m) {
+                    l.from.lake_surface((x0 + i) as i64, gj)
+                } else {
+                    super::resample::NO_LAKE
+                };
+            }
             if !l.zs.is_empty() {
                 if self.level.zs.len() != self.level.z.len() {
                     self.level.zs = vec![0.0; self.level.z.len()];
                 }
                 self.level.zs[dst..dst + w].copy_from_slice(&l.zs[src.clone()]);
             }
-            if !l.closed.is_empty() {
+            // The basin classes, when the coarse level has them (`Level::basin_class`).
+            if !l.from.closed.is_empty() {
                 if self.level.closed.len() != self.level.z.len() {
-                    self.level.closed = vec![0; self.level.z.len()];
+                    self.level.closed = vec![basin::OPEN; self.level.z.len()];
                 }
-                self.level.closed[dst..dst + w].copy_from_slice(&l.closed[src]);
+                for (b, &m) in self.level.closed[dst..dst + w].iter_mut().zip(&l.lake[src]) {
+                    *b = cell::class(m);
+                }
             }
         }
         Ok(())
@@ -511,7 +530,6 @@ pub fn run_tiles(
                 &buf.a,
                 &buf.kfac,
                 &buf.lake,
-                &buf.closed,
                 if troughs { buf.zs.as_slice() } else { &[] },
                 Scratch {
                     base: &mut buf.norm,
@@ -535,7 +553,6 @@ pub fn run_tiles(
                 &win,
                 &mut buf.a2,
                 &buf.lake,
-                &buf.closed,
                 cfg.ph.sea,
                 cfg.ph.eps_m,
                 &mut buf.z2,
@@ -557,7 +574,6 @@ pub fn run_tiles(
                 &win,
                 &mut buf.z,
                 &buf.lake,
-                &buf.closed,
                 cfg.ph.sea,
                 cfg.ph.eps_m,
                 &mut buf.z2,
@@ -576,7 +592,7 @@ pub fn run_tiles(
         }
         let (_, _, cw, ch) = core;
         let started = Instant::now();
-        stats.sinks += count_sinks(&win, &buf.z, &buf.lake, &buf.closed, sea, (cx, cy, cw, ch));
+        stats.sinks += count_sinks(&win, &buf.z, &buf.lake, sea, (cx, cy, cw, ch));
         stats.pre_flood_raised_cells += pass.pre_flood.raised_cells;
         stats.pre_flood_max_raise_m = stats.pre_flood_max_raise_m.max(pass.pre_flood.max_raise_m);
         stats.flood_raised_cells += pass.flood.raised_cells;
@@ -600,9 +616,7 @@ pub fn run_tiles(
         let mut amp_core = Vec::with_capacity(if cfg.last { cw * ch } else { 0 });
         let (mut area_core, mut wgt_core, mut kfac_core, mut lake_core, mut zs_core) =
             (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
-        let mut closed_core = Vec::new();
         let has_zs = buf.zs.len() == win.cells();
-        let has_closed = !level.closed.is_empty();
         if !cfg.last {
             area_core.reserve(cw * ch);
             wgt_core.reserve(cw * ch);
@@ -617,7 +631,7 @@ pub fn run_tiles(
             for i in 0..cw {
                 let c = row + i;
                 z_core.push(buf.z[c]);
-                let on_land = !wet(before[c], sea, buf.closed[c]);
+                let on_land = !wet(before[c], sea, cell::class(buf.lake[c]));
                 if on_land {
                     change += f64::from((buf.z[c] - before[c]).abs());
                     land += 1;
@@ -635,12 +649,9 @@ pub fn run_tiles(
                     area_core.push(buf.a[c]);
                     wgt_core.push(buf.own[c] / a_fine);
                     kfac_core.push(buf.kfac[c]);
-                    lake_core.push(buf.lake_z[c]);
+                    lake_core.push(buf.lake[c]);
                     if has_zs {
                         zs_core.push(buf.zs[c]);
-                    }
-                    if has_closed {
-                        closed_core.push(buf.closed[c]);
                     }
                 }
                 eroded += f64::from(buf.eroded[c]);
@@ -677,9 +688,9 @@ pub fn run_tiles(
                 area: &area_core,
                 wgt: &wgt_core,
                 kfac: &kfac_core,
-                lake_z: &lake_core,
+                lake: &lake_core,
+                from: level,
                 zs: &zs_core,
-                closed: &closed_core,
             }),
         })?;
         stats.sink_ms += started.elapsed().as_secs_f64() * 1000.0;

@@ -74,6 +74,11 @@ public final class FarColumn {
         public int waterTop;
         /** A river wide enough for a sand bed. */
         public boolean wideRiver;
+        /**
+         * The bed is a river channel's: a river column, or a sea or lake column whose bed a channel
+         * cuts under its ground ({@link Water#cutByChannel}); its top is the channel's sediment.
+         */
+        public boolean channel;
         /** Blocks of ice cover ({@link IceCover#blocks}); 0 for none, and never laid under water. */
         public int ice;
         /**
@@ -167,11 +172,12 @@ public final class FarColumn {
         out.kind = col.kind();
         out.wideRiver = false;
         out.sealed = false;
+        out.channel = col.kind() == Water.Kind.RIVER || Water.cutByChannel(col);
         int ground = col.ground();
         if (col.kind().isWater()) {
             out.waterTop = col.top();
             ground = col.bed();
-            if (col.kind() == Water.Kind.RIVER && col.river() != null)
+            if (out.channel && col.river() != null)
                 out.wideRiver = col.river().hw() >= WIDE_RIVER_HALF_WIDTH;
         } else {
             out.waterTop = Integer.MIN_VALUE;
@@ -197,12 +203,13 @@ public final class FarColumn {
         out.kind = core.kind();
         out.wideRiver = false;
         out.sealed = false;
+        out.channel = core.kind() == Water.Kind.RIVER || Water.cutByChannel(core);
         int ground = core.ground();
         if (core.kind().isWater()) {
             out.waterTop = core.top();
             ground = core.bed();
             Rivers.Hit hit = core.rivers().hit();
-            if (core.kind() == Water.Kind.RIVER && hit != null)
+            if (out.channel && hit != null)
                 out.wideRiver = hit.hw() >= WIDE_RIVER_HALF_WIDTH;
         } else {
             out.waterTop = Integer.MIN_VALUE;
@@ -242,7 +249,7 @@ public final class FarColumn {
         int coverN = cover == null || water || painted ? 0 : Math.min(Math.max(0, s.ice), solid);
         int soilN = soil.bare ? 0 : Math.min(Math.max(1, soil.depth), solid);
         // A river's bed is one block of gravel or sand on whatever the ground is.
-        if (water && s.kind == Water.Kind.RIVER)
+        if (water && s.channel)
             soilN = Math.max(soilN, Math.min(1, solid));
         int rockTop = g - Math.max(Math.max(soilN, coverN), painted ? 1 : 0);   // the highest rock block
         int[] r = new int[2];
@@ -267,7 +274,7 @@ public final class FarColumn {
         int soilTopY = g - coverN;                                  // the highest soil block left under the cover
         if (soilN > coverN) {
             int topMaterial = !water ? SOIL_TOP
-                    : s.kind == Water.Kind.RIVER ? (s.wideRiver ? RIVER_SAND : RIVER_GRAVEL)
+                    : s.channel ? (s.wideRiver ? RIVER_SAND : RIVER_GRAVEL)
                     : s.kind == Water.Kind.SEA ? SEA_BED : LAKE_BED;
             boolean topIsTheSurface = coverN == 0;
             int underTop = topIsTheSurface ? soilTopY : soilTopY + 1;   // exclusive

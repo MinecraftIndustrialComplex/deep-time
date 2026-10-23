@@ -396,8 +396,12 @@ pit (`deeptime dump-fields` of the young checkpoint) and by rebaking with the ch
 **Fix.** (1) A fine cell is in the lake when its terrain lies under the highest lake surface among
 the coarse corners of its interpolation quad (AMP-090), so the lake's edge is the terrain's own
 contour at the lake's level, smooth and of no preferred direction; the levels carry each lake's
-surface (`Level::lake_z`, 4 B a cell; the window's buffers carry it too, so the memory model's
-bytes per cell went from 79 to 83 in a window and from 21 to 24 in a level). (2) The character
+surface (`Level::lake_z`, 4 B a cell in place of the 1-B mask, so a level's bytes per cell in the
+memory model went from 21 to 24). The windows do not carry it: a window keeps the 1-B lake flag,
+and when a tile hands its core on, the next level takes each lake cell's surface from the coarse
+level it was sampled from (`Level::lake_surface`, the same quad rule), so a window stays at 79 B
+a cell. (The first version, merged 2026-10-22, gave the windows an f32 copy as well, 83 B a cell,
+which put `pipeline_quick_16k`'s estimate over the workbench's default 4 GiB cap.) (2) The character
 fades in from the shore: none on the first land cells, all of it 8 blocks out, by the Euclidean
 distance to the nearest lake cell (AMP-091). With (1) alone the step was gone but a lip of 0.3 to
 0.5 block was left along the contour (the change the character made on the first land cell);
@@ -473,6 +477,13 @@ its rim, and erosion on closed ground takes the receiver's height as its base, s
 and the lower walls get the erosion, slumping and silt of any land and the floor collects its
 catchment's sediment (AMP-017, AMP-021). Nothing in the world-data format changed. With the
 hydrology off the amplifier keeps the young landscape's lakes and treats every cell as open.
+Memory: a level keeps the class in a byte a cell of its own (`Level::closed`, so
+`LEVEL_BYTES_PER_CELL` goes from 24 to 25: 2 MiB on the quick 16k world's L2 level, 8 MiB on the
+level the ladder keeps), but a window does not. A window's cell already had a lake byte, of which
+the lake flag used one bit; the class rides in bits 1 and 2 of it (`resample::cell`), so a window
+stays at 79 B a cell. A byte a window cell more is 32 MiB on the whole last level, which would
+leave 6 MiB of the default 4 GiB workbench cap's 38 MiB margin, and two would refuse the default
+world.
 Tests: `surface::amplify::balance::tests` (a dry bowl 1.5 km under sea level is closed ground
 with one sink at its centre; a wet bowl keeps its lake and no sink; with the hydrology off the
 level is untouched).

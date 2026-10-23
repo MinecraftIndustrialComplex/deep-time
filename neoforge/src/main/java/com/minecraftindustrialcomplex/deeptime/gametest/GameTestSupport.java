@@ -120,6 +120,15 @@ public final class GameTestSupport {
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_rivers_carved"));
 
     /**
+     * The river-test world (C = 1,024, folder {@code deeptime-river}; gametest.sh writes it with
+     * {@code deeptime synth --kind river-test}) under the bare biome with no caves: a big river whose
+     * segments overlap, run across sea-level flats into the sea, and a flush stream on a plain
+     * ({@code RiverDepthGameTests}; HYD-120 to HYD-124).
+     */
+    public static final ResourceKey<Level> TEST_RIVER_DEPTH =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_river_depth"));
+
+    /**
      * The real planet's world data (folder {@code deeptime-real}) with the full router,
      * {@code deeptime:planet} (noise caves and aquifers; every other test level uses
      * {@code planet_nocaves}), under the bare biome: {@code LavaGameTests.lavaStaysAtTheFloor}
