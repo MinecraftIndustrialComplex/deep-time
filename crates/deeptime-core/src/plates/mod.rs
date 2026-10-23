@@ -936,14 +936,15 @@ impl PlatesStage {
         let n = st.samples.len();
         let tris = mesh.triangles();
         let links = coupling.links();
-        // `w` over every cell (the rock, the cones); `wz` over the cells whose offset the plate
-        // model takes (the elevation, the material and the parts the gap budget books against it):
-        // the surface holds the offset of the rest (NaN, `surface.held_offsets`, ISO-125). `wh`,
+        // Over every cell, by its weight: the offset `z`, the material and the parts the gap
+        // budget books against it, the rock, the cones. A cell whose offset the surface holds
+        // (NaN, `surface.held_offsets`, ISO-125) gives none and keeps its weight: a sample half on
+        // held cells takes half the offset of the rest (renormalised over the rest, a sample 92 %
+        // on held cells took 13 times its few other cells' offset and rose 7.6 km in a step). `wh`,
         // `zh`: the held cells' share and what they handed over (the peak trace).
         #[derive(Clone, Copy, Default)]
         struct Sums {
             w: f64,
-            wz: f64,
             z: f64,
             m: f64,
             mz: f64,
@@ -969,9 +970,7 @@ impl PlatesStage {
                     // Without the material field the feedback is the rock (a held cell: none).
                     let dm = material
                         .as_ref()
-                        .map_or(if dz.is_nan() { 0.0 } else { dz }, |m| {
-                            f64::from(m.data[c])
-                        });
+                        .map_or(if dz.is_nan() { 0.0 } else { dz }, |m| f64::from(m.data[c]));
                     let cone = [0, 1].map(|k| {
                         cone_fields[k]
                             .as_ref()
@@ -988,7 +987,6 @@ impl PlatesStage {
                             let a = &mut sums[v as usize];
                             a.w += w;
                             if taken {
-                                a.wz += w;
                                 a.z += w * dz;
                                 a.mz += w * dm;
                             }
@@ -1031,11 +1029,11 @@ impl PlatesStage {
             .par_iter_mut()
             .enumerate()
             .map(|(v, s)| {
-                if sums[v].wz <= 0.0 {
+                if sums[v].w <= 0.0 {
                     return 0.0;
                 }
                 let z0 = s.elevation_m;
-                s.elevation_m = (f64::from(z0) + sums[v].z / sums[v].wz)
+                s.elevation_m = (f64::from(z0) + sums[v].z / sums[v].w)
                     .clamp(k.trench_elevation_m, k.max_elevation_m)
                     as f32;
                 f64::from(s.elevation_m) - f64::from(z0)
@@ -1083,12 +1081,12 @@ impl PlatesStage {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += km3;
         }
         if let Some(gb) = st.gap_budget.as_mut() {
-            // Over the cells whose offset the plate model took, as its elevation (ISO-125).
+            // By the weight of every cell, as its elevation (ISO-125).
             let mean = |sum: &dyn Fn(usize) -> f64| -> Vec<f64> {
                 (0..n)
                     .map(|v| {
-                        if sums[v].wz > 0.0 {
-                            sum(v) / sums[v].wz
+                        if sums[v].w > 0.0 {
+                            sum(v) / sums[v].w
                         } else {
                             0.0
                         }

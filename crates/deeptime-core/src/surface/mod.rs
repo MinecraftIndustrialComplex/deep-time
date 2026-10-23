@@ -71,6 +71,7 @@ pub mod glacial;
 pub mod grid;
 pub mod guard;
 pub mod impacts;
+pub mod lakes;
 pub mod lithology;
 pub mod marine;
 pub mod oracle;
@@ -144,7 +145,8 @@ pub mod field {
     pub const REGOLITH: &str = "surface/regolith_m";
     /// Elevation change the plate model applies to L0 at its next step, m. With
     /// `surface.held_offsets` NaN on the cells whose offset the surface holds ([`OFFSET_HELD`]):
-    /// the plate model takes nothing of theirs.
+    /// the plate model takes nothing of theirs (a sample counts them as an offset of 0 at their
+    /// weight).
     pub const FEEDBACK: &str = "surface/feedback_m";
     /// 1 on the cells whose offset over the plate model's height the surface held at the end of
     /// the last step (`advect::held_cells`: a gap between plates, a trench row), 0 elsewhere;
@@ -1198,6 +1200,46 @@ impl SurfaceStage {
         } = setup;
         let class_of = |st: &SurfaceState, c: usize| surface_class(&cls, &basement, st, c);
 
+        // ledger: ISO-126
+        // What each cell gives and takes as water, for the lakes the flexure loads (`lakes.rs`):
+        // the bake's lake budget (`HydroParams::budget`) on the step's climate, the climate
+        // stage's seasons about the surface's own mean temperature.
+        let hydro_p = self.preset.hydro.unwrap_or_default();
+        let cell_water: Option<Vec<lakes::CellWater>> =
+            (p.flexure.active() && p.flexure.water_by_basin).then(|| {
+                let season = |name: &str| {
+                    world
+                        .fields
+                        .get(name)
+                        .filter(|f| f.data.len() == n)
+                        .map(|f| &f.data[..])
+                };
+                let warm = season(crate::climate::field::T_WARM);
+                let cold = season(crate::climate::field::T_COLD);
+                (0..n)
+                    .into_par_iter()
+                    .map(|c| {
+                        let t = f64::from(clim.t_c[c]);
+                        let half = match (warm, cold) {
+                            (Some(w), Some(k)) => 0.5 * f64::from(w[c] - k[c]),
+                            _ => f64::NAN,
+                        };
+                        let cl = crate::hydro::Climate::of(
+                            f64::from(clim.precip_mm[c]),
+                            t,
+                            t + half,
+                            t - half,
+                        );
+                        let b = hydro_p.budget(&cl);
+                        lakes::CellWater {
+                            runoff_m_yr: b.runoff_mm / 1000.0,
+                            loss_m_yr: (b.evaporation_mm - b.rain_mm) / 1000.0,
+                        }
+                    })
+                    .collect()
+            });
+        let mut water_levels: Option<lakes::Levels> = None;
+
         // 3. The LEM steps.
         let mut parts = Parts::new(n);
         let subs = p.substeps.max(1) as usize;
@@ -1269,6 +1311,24 @@ impl SurfaceStage {
             routing::stack(&d, &sc.kind, &mut sc.routing);
             routing::accumulate(&d, &sc.routing, &sc.weight, &mut sc.area);
             self.time("routing", started);
+            // ledger: ISO-126
+            // The water the flexure loads: the last flood's open sea and lakes.
+            if sub + 1 == subs
+                && let Some(cw) = &cell_water
+            {
+                let started = Instant::now();
+                water_levels = Some(lakes::water_levels(
+                    &d,
+                    &sc.h,
+                    &sc.filled,
+                    &sc.kind,
+                    &sc.routing,
+                    sea,
+                    hydro_p.lake_balance,
+                    &|c| cw[c],
+                ));
+                self.time("lakes", started);
+            }
             // Under a glacier the ice erodes, not a river: K keeps the ice-free share of a cell.
             if let Some(ela) = &ela_z {
                 let started = Instant::now();
@@ -1993,10 +2053,25 @@ impl SurfaceStage {
                 .get(crate::climate::field::ICE_THICKNESS)
                 .filter(|f| f.data.len() == n)
                 .map(|f| &f.data[..]);
+            // ledger: ISO-126
+            // The water over each cell: the open sea on the elevation the flexure starts from,
+            // the last flood's lakes.
+            let water_end = water_levels
+                .as_ref()
+                .map(|lv| lakes::at_step_end(&d, &sc.h, sea, (n / 500).max(1), lv));
+            // ledger: ISO-127
+            // The sines at the rows' boundaries, for the solve on the sphere's metric.
+            let faces: Vec<f64> = (0..=grid.h)
+                .map(|j| {
+                    let z = grid.block_z(i64::from(j)) as f64 - 0.5 * f64::from(grid.r);
+                    grid.projection().sin_lat(z)
+                })
+                .collect();
             let x_in = flexure::StepIn {
                 dims: &d,
                 norm_dx_m: std::f64::consts::TAU * self.preset.tectonics.model_radius_km * 1000.0
                     / w as f64,
+                sin_faces: p.flexure.row_metric.then_some(&faces[..]),
                 // The plate model's mean sample spacing on its sphere.
                 plate_spacing_m: (4.0
                     * std::f64::consts::PI
@@ -2005,6 +2080,7 @@ impl SurfaceStage {
                 .sqrt(),
                 gravity_m_s2: gravity,
                 sea_level_m: sea,
+                water_z: water_end.as_ref().map(|l| &l.water_z[..]),
                 dt_myr,
                 h_start: &h_start,
                 h_eroded,
@@ -2051,6 +2127,16 @@ impl SurfaceStage {
                     .globals
                     .entry(flexure::YIELDED_GLOBAL.to_owned())
                     .or_insert(0.0) += out.yielded_cells as f64;
+            }
+            if let Some(lv) = &water_end {
+                for (name, by) in [
+                    (lakes::DRY_BELOW_SEA_GLOBAL, lv.dry_below_sea),
+                    (lakes::WET_ABOVE_SEA_GLOBAL, lv.wet_above_sea),
+                    (lakes::LAKES_GLOBAL, lv.lakes),
+                    (lakes::DRY_LAKES_GLOBAL, lv.dry),
+                ] {
+                    *world.globals.entry(name.to_owned()).or_insert(0.0) += by as f64;
+                }
             }
             flexed = Some(out);
             self.time("flexure", started);
@@ -2206,9 +2292,8 @@ impl SurfaceStage {
         // The cells whose offset the surface holds (`advect::held_cells`, ISO-125): the next
         // step's carry keeps it over the plate model's height, so the plate model takes none of
         // it (NaN). The mask goes to the next step's carry, and to the peak trace.
-        let held = (p.held_offsets || crate::plates::peaks::threshold().is_some()).then(|| {
-            advect::held_cells(pf.gap.as_deref(), Some(&pf.flags), Some(&pf.regime), n)
-        });
+        let held = (p.held_offsets || crate::plates::peaks::threshold().is_some())
+            .then(|| advect::held_cells(pf.gap.as_deref(), Some(&pf.flags), Some(&pf.regime), n));
         if p.held_offsets
             && let Some(held) = &held
         {
