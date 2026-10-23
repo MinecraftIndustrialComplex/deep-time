@@ -588,12 +588,12 @@ game-choice rule or a knob tuned to a target; (d) present but off by default; (e
 | Lower-crustal channel flow | Conservative diffusion of thickness above 50 km, two rings, same plate | (a) form, (c) K0 | `plates/flow.rs` | PLT-300, PLT-301 |
 | Continent-scale spreading | None | (e) | | |
 | Isostasy | Whole-column Airy, one density, eclogite root, instant settling | (a)/(b) | `plates/settle.rs:81`; `plates/collapse.rs:222`; `plates/pools.rs:63-110` | PLT-278 to PLT-282, ISO-043, ISO-044, ISO-078 |
-| Thermal isostasy | None | (e) | | (deferred) |
-| Lithosphere temperature, thickness | None; heat-flow proxy for deposits only | (e) | `plates/state.rs`; `plates/mod.rs:1309` | PLT-137 |
-| Root removal | None; the 70 km cap founders excess bottom-first | (e), (c) stand-in | `plates/collapse.rs:140-190` | PLT-258 |
+| Thermal isostasy | Built, off: an open fault while the sea is off its datum (2026-10-23) | (d) | `plates/thermal.rs`: uplift_m | ISO-110, ISO-111 |
+| Lithosphere temperature, thickness | Since 2026-10-23 on by default: each sample's thermal lithosphere depth and keel, relaxed towards hot or cold targets; heat flow and the strength (thin sheet, Te) from it | (b)/(c) | `plates/thermal.rs` | PLT-460 to PLT-469, ISO-112 |
+| Root removal | Since 2026-10-23: a collision belt over 50 km heats to its Moho over 10 Myr; the 70 km cap's no-room excess founders bottom-first at that pace | (b)/(c) | `plates/thermal.rs`; `plates/collapse.rs` | PLT-258, PLT-477, PLT-478 |
 | Cratons | Regime label | (e) | `plates/mod.rs:1352` | PLT-139 |
 | Rifting | Poisson by continental share, Voronoi pieces, LIP boost | (c) | `plates/rifting.rs:40-86` | PLT-082 to PLT-091 |
-| Rifted margins | Linear taper W = 200 km, 20 Myr | (c) | `plates/transition.rs` | PLT-261 to PLT-264, PLT-294 |
+| Rifted margins | Stretching profile (a smoothstep in thickness, since 2026-10-23) W = 200 km, 20 Myr; the lithosphere thins by the same β | (b)/(c) | `plates/transition.rs` | PLT-261 to PLT-264, PLT-294, PLT-475, PLT-476 |
 | Plumes, hotspots, LIPs | Random points, swells, piles | (c) | `plates/hotspots.rs` | PLT-108 to PLT-120 |
 | Crust budget | Recorded, not enforced | (c) | `plates/crust_budget.rs` | PLT-302, PLT-401 |
 

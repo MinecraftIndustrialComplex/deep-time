@@ -173,7 +173,9 @@ adds a whole column to the one on top (PLT-228). None of that crust gave area ba
    lower crust of a belt that a long collision thickens flows out while the convergence goes
    on). It fills continental crust only up to `collapse_thickness_km` and ocean floor up to the
    normal column. What finds no room within reach goes to the mantle from the bottom of the
-   column (mafic root first) and gives no area.
+   column (mafic root first) and gives no area; since 2026-10-23 at the pace of a root's
+   drop-off, 1 − e^(−δt / 10 Myr) of it a step, not all at once (PLT-477, stage 3 of
+   [the lithosphere's thermal state](lithosphere-thermal-state.md)).
 2. *Collapse* (PLT-254): a visible continental sample that no orogeny has raised for
    `collapse_quiet_myr` (10 Myr, PLT-259: collapse follows the end of the thickening) and whose
    crust is thicker than `collapse_thickness_km` (50 km since 2026-10-05, was 55; PLT-256) releases
@@ -271,10 +273,15 @@ orogenic collapse and before the surface processes:
    transition's width and the drowned continents" at the end of this page) gets a signed distance
    d from it (inland positive)
    and a target crystalline thickness (the crust less its sediment and sedimentary rock)
-   T*(d) = T_o + (T_n − T_o) · clamp(1/2 + d/W, 0, 1), with T_n = 33.0 km (the normal continental
-   column's) and T_o = 7 km (the ocean's). The profile is linear in thickness: β = T_n / T* runs
-   from 1 at the hinge to T_n / T_o ≈ 4.7 at the toe, and centred on the model's boundary, so
-   turning the one-sample step into the ramp keeps the crust's volume.
+   T*(d) = T_o + (T_n − T_o) · S(1/2 + d/W), with T_n = 33.0 km (the normal continental
+   column's) and T_o = 7 km (the ocean's). Since 2026-10-23 S is a smoothstep, 3s² − 2s³ on
+   [0, 1] (PLT-475, stage 2 of [the lithosphere's thermal state](lithosphere-thermal-state.md)):
+   β = T_n / T* stays near 1 over the zone's inner quarter, rises fastest at the boundary and is
+   3 or more over its outer quarter, the proximal, necking and hyperextended domains; before, S
+   was the linear clamp(s, 0, 1). β runs from 1 at the hinge to T_n / T_o ≈ 4.7 at the toe, and
+   the profile is centred on the model's boundary and symmetric about it, so turning the
+   one-sample step into it keeps the crust's volume. A continental source thinned by β has its
+   lithosphere and keel thinned by β too (PLT-476).
 3. *Moving the crust.* Crust moves from samples thicker than T* to samples thinner than T* within a
    stretch of margin (boundary samples grouped round seeds at least W/2 apart; every sample of the
    zone belongs to the seed of its nearest boundary sample, through its own crust and plate), the
@@ -338,9 +345,9 @@ in a step, older ocean floor and the rift families) is partly chance: the rule c
 course.
 
 **Limits and game choices.**
-- The profile is linear in thickness and the same on every margin; Earth's margins have a necking
-  zone where the crust thins fastest, and volcanic and magma-poor margins differ in width by a
-  factor of two to three. One width (200 km, inside the sources' 50–300 km) stands for all.
+- The profile is the same on every margin (a smoothstep since 2026-10-23, linear in thickness
+  before; Earth's margins have a necking zone where the crust thins fastest, which the smoothstep
+  draws), and volcanic and magma-poor margins differ in width by a factor of two to three. One width (200 km, inside the sources' 50–300 km) stands for all.
 - The width was in metres on the planet until 2026-10-22, so a small planet's margins were as wide
   as Earth's in metres and took eight times the share of its continents (23 samples across on the
   quick 16k planet). It is now in kilometres on the model sphere (Ben, decisions log 2026-10-22,
