@@ -1495,7 +1495,9 @@ pub fn project_folder_cube(
     let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
     let mut shares = serde_json::Map::new();
     let mut closed_note = json!(null);
+    // The ice cover, for the relief, then held with the biome layers (BIO-177).
     let mut world_ice: Option<LoadedLayer> = None;
+    let mut ice_entry: Option<usize> = None;
     let mut world_class: Option<LoadedLayer> = None;
     let rivers_sim = read_rivers(dir)?;
     let standing = crate::bake::relief::read_standing(dir)?;
@@ -1625,13 +1627,16 @@ pub fn project_folder_cube(
             }
             if is_biome_layer(&desc.name) {
                 if desc.name == ICE_COVER {
-                    // The relief reads the cover as resampled; the land call takes it off the sea
-                    // (BIO-177) once the world's elevation is drawn.
+                    // The relief reads the cover as resampled (moved, not copied); the land call
+                    // takes it off the sea (BIO-177) once the world's elevation is drawn, and
+                    // holds it after the relief.
                     shares.insert(
                         "ice_cover_true".into(),
                         json!(area_share(&s.layer, false, |v| v > 0.0)),
                     );
-                    world_ice = Some(LoadedLayer::new(desc.clone(), bytes.clone())?);
+                    world_ice = Some(LoadedLayer::new(desc, bytes)?);
+                    ice_entry = Some(s.entry);
+                    continue;
                 }
                 held_biomes.push(Held {
                     entry: s.entry,
@@ -1672,6 +1677,14 @@ pub fn project_folder_cube(
         write_ms += ms(tl);
     }
     m.grids = new_grids;
+    // The ice cover joins the held biome layers now that the relief has read it (BIO-177).
+    if let (Some(entry), Some(ice)) = (ice_entry, world_ice.take()) {
+        held_biomes.push(Held {
+            entry,
+            desc: ice.desc,
+            bytes: ice.bytes,
+        });
+    }
     // The biome layers' land call on the world's ground, its fills and distances on the planet
     // (BIO-170, SCL-122).
     let mut biome_land_note = json!(null);

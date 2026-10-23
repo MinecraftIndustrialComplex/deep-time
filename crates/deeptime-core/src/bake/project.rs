@@ -1326,8 +1326,10 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     let mut shares = serde_json::Map::new();
     let mut closed_note = json!(null);
     // The block-scale relief (`bake::relief`) reads the world's ice cover (L2, resampled before the
-    // elevation's L3) and the simulation's rivers and standing volcanoes.
+    // elevation's L3) and the simulation's rivers and standing volcanoes. The cover is a biome
+    // layer too (BIO-177): its manifest entry, for the land call after the relief.
     let mut world_ice: Option<LoadedLayer> = None;
+    let mut ice_entry: Option<usize> = None;
     let mut world_class: Option<LoadedLayer> = None;
     let rivers_sim = read_rivers(dir)?;
     let standing = crate::bake::relief::read_standing(dir)?;
@@ -1445,13 +1447,16 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             }
             if is_biome_layer(&desc.name) {
                 if desc.name == ICE_COVER {
-                    // The relief below reads the cover as resampled: the land call that takes it
-                    // off the sea (BIO-177) waits for the world's elevation, which the relief draws.
+                    // The relief below reads the cover as resampled (moved, not copied): the land
+                    // call that takes it off the sea (BIO-177) waits for the world's elevation,
+                    // which the relief draws, and holds it after the relief.
                     shares.insert(
                         "ice_cover_true".into(),
                         json!(area_share(&s.layer, false, |v| v > 0.0)),
                     );
-                    world_ice = Some(LoadedLayer::new(desc.clone(), bytes.clone())?);
+                    world_ice = Some(LoadedLayer::new(desc, bytes)?);
+                    ice_entry = Some(s.entry);
+                    continue;
                 }
                 // Held (moved) for the land call on the world's ground below, then written.
                 held_biomes.push(Held {
@@ -1489,6 +1494,14 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         write_ms += ms(tl);
     }
     m.grids = new_grids;
+    // The ice cover joins the held biome layers now that the relief has read it (BIO-177).
+    if let (Some(entry), Some(ice)) = (ice_entry, world_ice.take()) {
+        held_biomes.push(Held {
+            entry,
+            desc: ice.desc,
+            bytes: ice.bytes,
+        });
+    }
     // The biome layers' land call, on the world's own ground (BIO-170).
     let mut biome_land_note = json!(null);
     if !held_biomes.is_empty() {
