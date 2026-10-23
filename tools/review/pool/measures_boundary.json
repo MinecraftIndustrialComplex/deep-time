@@ -2,7 +2,7 @@
   "_doc": "V1 gap 2's measures (plate boundary organisation, 2026-10-23): the boundary mix against Bird 2003 Table 3, how the trenches face their convergence, the active share of the continental margin, the collision front's length and the collisions' durations. Pass it with --registry tools/review/pool/measures_boundary.json (or DEEPTIME_POOL_MEASURES) and --measures v1census,boundary. Definitions in measure_boundary.py. The share bands are Bird's shares with room for the lattice (game-choice: tolerance, agent 2026-10-23; the plate check's own bands where it has one: subducting 15 to 25 %, the active margin 0.25 to 0.40, collision length 15 to 50 Myr and at most 120). The collision front's bound is Stern & Scholl 2010's 12,000 km of active suture today (ledger PLT-500).",
   "measures": {
     "boundary": {
-      "version": 1,
+      "version": 2,
       "doc": "the boundary's shares by class against Bird 2003, the trenches' facing, the active margin, the collision front and the collisions' lengths, the plate counts and the rifts and initiations per 100 Myr; definitions in measure_boundary.py",
       "command": ["{py}", "-I", "{tools}/measure_boundary.py", "{run}"],
       "python": "numpy",
@@ -16,8 +16,11 @@
         {"key": "oo_of_sub", "label": "ocean-ocean share of subducting (Stern & Scholl 0.35)", "target": null, "digits": 3},
         {"key": "sub_km", "key2": "total_km", "label": "subducting / all boundary, lattice km (Bird 51,310 / 260,487 geodesic; lattice 1.84x)", "target": null, "digits": 0, "pair": true},
         {"key": "facing", "key2": "facing_cont", "label": "trench convergence across / full, capped (Bird SUB 0.854): all / continental", "target": null, "digits": 3, "pair": true},
-        {"key": "slow_front", "label": "oceanic front under 10 mm/yr across", "target": null, "digits": 3},
+        {"key": "slow_front", "key2": "fast_front", "label": "oceanic front under 10 / at 80 or more mm/yr across", "target": null, "digits": 3, "pair": true},
+        {"key": "across_mm_yr", "label": "mean convergence across the oceanic front, mm/yr (Bird SUB 53.2)", "target": null, "digits": 1},
         {"key": "active_margin", "label": "active share of continental margin", "target": [0.25, 0.40], "digits": 3},
+        {"key": "m_sub", "key2": "m_coll", "label": "coast at a subduction front / in a collision belt", "target": null, "digits": 3, "pair": true},
+        {"key": "m_andean", "key2": "m_initiated", "label": "coast at a front: the continent overriding / an initiation's", "target": null, "digits": 3, "pair": true},
         {"key": "front_coll_km", "label": "front in collision, km (Stern & Scholl 6,000 to 12,000)", "target": [null, 12000], "digits": 0},
         {"key": "coll_life_p50", "key2": "coll_life_p90", "label": "collision length p50 / p90, Myr (15 to 50 / at most 120)", "target": null, "digits": 0, "pair": true},
         {"key": "plates", "label": "plates alive (Bird 52; 19 over 0.0377 sr)", "target": null, "digits": 0},
