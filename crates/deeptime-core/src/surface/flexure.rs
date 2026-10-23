@@ -154,18 +154,21 @@ pub struct FlexureParams {
     /// passes Δg / 2πG, the plate there yields and the rest of the load sinks (or rises) under
     /// the cell alone, as on a plate with no strength. 380 is Earth's most negative free-air
     /// anomaly (the Puerto Rico Trench, ten Brink et al. 2004): 9.1 × 10⁶ kg/m², 2.75 km of
-    /// mantle. 0, the default: off, the purely elastic plate (ISO-120).
+    /// mantle. The default since 2026-10-23 (on by Ben's rule: physics built and correct goes on);
+    /// 0 turns it off, the purely elastic plate (ISO-120).
     pub yield_anomaly_mgal: f64,
     /// The solve on the sphere's metric (ISO-127): on the equal-area raster a cell at latitude φ
     /// is cos φ as wide and 1 / cos φ as tall as at the equator, and the Laplacian in the raster's
     /// coordinates is ∂x(cos⁻²φ ∂x) + ∂y(cos²φ ∂y). False: every cell a square of the equator's
     /// width (the block metric, the rule before 2026-10-23), about 1 / cos⁴ φ too stiff north to
-    /// south and cos⁴ φ too soft east to west.
+    /// south and cos⁴ φ too soft east to west. Off: its preconditioner does not converge where
+    /// the rigidity changes along a row near a pole, and the step diverges there (flexure.md,
+    /// "Why it diverges").
     pub row_metric: bool,
     /// The water over a cell is the open sea's or its lake's, not every cell under sea level's
     /// (ISO-126): a closed basin carries its lake at the level its water balance holds, or no
-    /// water when it is dry. False: every cell at or under sea level is under the sea (the rule
-    /// before 2026-10-23).
+    /// water when it is dry. On by default since 2026-10-23. False: every cell at or under sea
+    /// level is under the sea (the rule before).
     pub water_by_basin: bool,
     /// Solve every this many plate steps (loads in between wait for the next solve).
     pub every_steps: u32,
@@ -186,9 +189,9 @@ impl Default for FlexureParams {
             te_recovery_myr: 300.0, // ledger: ISO-051 (uncited: this agent's choice)
             te_min_km: 5.0, // ledger: ISO-052
             te_weakening_myr: 0.0, // ledger: ISO-099 (game-choice: off by default)
-            yield_anomaly_mgal: 0.0, // ledger: ISO-120 (off by default)
+            yield_anomaly_mgal: 380.0, // ledger: ISO-120
             row_metric: false, // ledger: ISO-127
-            water_by_basin: false, // ledger: ISO-126
+            water_by_basin: true, // ledger: ISO-126
             every_steps: 1, // ledger: ISO-059 (game-choice: numerical)
             tolerance_m: 2.0, // ledger: ISO-059
             max_iterations: 60, // ledger: ISO-059
@@ -2156,8 +2159,8 @@ pub fn step(
     let mut flex = vec![0.0f32; n];
     let mut changes = vec![0.0f64; n];
     // ledger: ISO-120
-    // The plate's strength (off unless `yield_anomaly_mgal` is set). An elastic plate holds any
-    // load; a real one yields where it is bent hard: its elastic thickness falls to about half at
+    // The plate's strength (on by default since 2026-10-23; 0 turns it off). An elastic plate
+    // holds any load; a real one yields where it is bent hard: its elastic thickness falls to about half at
     // a curvature of 1e-6 per m (Watts & Burov 2003), and no plate on Earth holds more than about
     // 3 km of rock away from local isostasy (the largest free-air anomalies over held loads,
     // ISO-093). Where the load a cell's plate holds after the solve, ρ_m (Q + ice − w), passes
@@ -2737,11 +2740,16 @@ mod tests {
         (q / ka * (1.0 - ka) / (dt_myr * 1.0e3)) as f32
     }
 
+    /// The plate alone: purely elastic, on the block metric, the sea's rule for the water (the
+    /// switches on by default since 2026-10-23 are pinned off; their own tests turn them on).
     fn on() -> FlexureParams {
         FlexureParams {
             strength: 1.0,
             tolerance_m: 0.01,
             max_iterations: 200,
+            yield_anomaly_mgal: 0.0,
+            row_metric: false,
+            water_by_basin: false,
             ..FlexureParams::default()
         }
     }
@@ -4022,6 +4030,158 @@ mod tests {
         assert!(worst < 1e-3 * top, "{worst} of {top}");
     }
 
+    /// Probe (ISO-127, measurement only; `--ignored --nocapture`): why the step on the sphere's
+    /// metric does not hold. On the raster of `earthlike_quick_16k` (its first and last row past
+    /// the poles), single solves of a cell-scale load on a plate whose rigidity varies (cratons
+    /// and 60 Myr ocean in blocks of 64 cells by 41 rows), each metric's iterations and error and
+    /// the row where the true residual is largest; then a few steps whose ocean alternates between
+    /// 60 and 15 Myr old, so a weakening plate lets go of what it held (ISO-056). Found
+    /// 2026-10-23: only rigidity that changes along a row near a pole stalls the solve (flexure.md,
+    /// "Why it diverges").
+    #[test]
+    #[ignore]
+    fn probe_the_sphere_solve_where_the_rigidity_varies() {
+        let (w, h) = (1024usize, 328usize);
+        let r_m = 6.371e6;
+        let dx = std::f64::consts::TAU * r_m / w as f64;
+        let n = w * h;
+        let faces = sphere_faces(h, dx, r_m);
+        let sphere = RowMetric::from_sin_faces(&faces, 1);
+        let land = |c: usize| ((c % w) / 64 + (c / w) / 41) % 2 == 0;
+        let (d_land, d_sea) = (
+            rigidity_per_g(80.0, G),
+            rigidity_per_g(2.7 * 60f64.sqrt(), G),
+        );
+        let d_xy: Vec<f64> = (0..n)
+            .map(|c| if land(c) { d_land } else { d_sea })
+            .collect();
+        let d_y: Vec<f64> = (0..n)
+            .map(|c| if (c / w / 41) % 2 == 0 { d_land } else { d_sea })
+            .collect();
+        let d_x: Vec<f64> = (0..n)
+            .map(|c| if (c % w / 64) % 2 == 0 { d_land } else { d_sea })
+            .collect();
+        let d_one = vec![d_land; n];
+        let cr = vec![RHO_MANTLE; n];
+        let b: Vec<f64> = (0..n)
+            .map(|c| RHO_MANTLE * ((((c * 7919) % 1009) as f64 / 1009.0) - 0.5) * 100.0)
+            .collect();
+        // The past-pole rows given the polar rows' couplings, and every row's capped at 60°.
+        let mut merged = sphere.clone();
+        merged.a[0] = merged.a[1];
+        merged.a[h - 1] = merged.a[h - 2];
+        merged.b[1] = merged.b[2];
+        merged.b[h - 1] = merged.b[h - 2];
+        let mut capped = sphere.clone();
+        for a in capped.a.iter_mut() {
+            *a = a.min(4.0);
+        }
+        for (k, b) in capped.b.iter_mut().enumerate() {
+            if k > 0 && k < h {
+                *b = b.max(0.25);
+            }
+        }
+        let cases: [(&str, Option<RowMetric>, &[f64]); 7] = [
+            ("block, rigidity by x and y", None, &d_xy),
+            ("sphere, uniform rigidity", Some(sphere.clone()), &d_one),
+            ("sphere, rigidity by y", Some(sphere.clone()), &d_y),
+            ("sphere, rigidity by x", Some(sphere.clone()), &d_x),
+            ("sphere, rigidity by x and y", Some(sphere.clone()), &d_xy),
+            ("sphere, past-pole rows merged", Some(merged), &d_xy),
+            ("sphere, capped at 60°", Some(capped), &d_xy),
+        ];
+        for (label, metric, d) in cases {
+            let mut sv = Solver::with_metric(w, h, dx, metric);
+            let (x, rep) = sv.solve(d, &cr, &b, 0.01, 200);
+            let mut ax = vec![0.0; n];
+            sv.operator(d, &cr, &x, &mut ax);
+            let row_res = |j: usize| {
+                (0..w)
+                    .map(|i| (ax[j * w + i] - b[j * w + i]).abs() / RHO_MANTLE)
+                    .fold(0.0, f64::max)
+            };
+            let worst = (0..h)
+                .max_by(|&p, &q| row_res(p).total_cmp(&row_res(q)))
+                .unwrap();
+            let x_row = |j: usize| (0..w).map(|i| x[j * w + i].abs()).fold(0.0, f64::max);
+            eprintln!(
+                "{label}: iterations {} error {:.3} m converged {}; residual (m of mantle) row 0 \
+                 {:.1}, 1 {:.1}, 2 {:.1}, 10 {:.1}, equator {:.1}, worst {:.1} at row {worst}; \
+                 |x| row 0 {:.1}, 1 {:.1}, equator {:.1}",
+                rep.iterations,
+                rep.error_m,
+                rep.converged,
+                row_res(0),
+                row_res(1),
+                row_res(2),
+                row_res(10),
+                row_res(h / 2),
+                row_res(worst),
+                x_row(0),
+                x_row(1),
+                x_row(h / 2)
+            );
+        }
+
+        // Steps whose ocean weakens and stiffens in turn.
+        for metric in [true, false] {
+            let mut wd = World::new(w, h, 0.0);
+            wd.norm_dx = dx;
+            wd.sin_faces = Some(faces.clone());
+            for c in 0..n {
+                wd.h[c] = if land(c) { 600.0 } else { -4000.0 };
+                if !land(c) {
+                    wd.crust[c] = 0.0;
+                    wd.age[c] = 60.0;
+                    wd.regime[c] = f32::from(regime::OCEAN_BASIN);
+                }
+            }
+            let p = FlexureParams {
+                row_metric: metric,
+                max_iterations: 60,
+                tolerance_m: 2.0,
+                ..on()
+            };
+            let (mut sv, mut st) = (None, None);
+            let h0 = wd.h.clone();
+            for s in 0..24usize {
+                let age = if s % 2 == 0 { 60.0 } else { 15.0 };
+                for c in 0..n {
+                    if !land(c) {
+                        wd.age[c] = age;
+                    }
+                }
+                let eroded: Vec<f64> = (0..n)
+                    .map(|c| (((c * 7919 + s * 104_729) % 1009) as f64 / 1009.0 - 0.5) * 100.0)
+                    .collect();
+                let out = wd.step(&p, &mut sv, &mut st, &eroded, 0.0);
+                let unsolved = &st.as_ref().expect("stepped").unsolved_m;
+                let row_of = |v: &dyn Fn(usize) -> f64, j: usize| {
+                    (0..w).map(|i| v(j * w + i).abs()).fold(0.0, f64::max)
+                };
+                let un = |c: usize| f64::from(unsolved[c]);
+                let dh = |c: usize| wd.h[c] - h0[c];
+                let worst_un = (0..h)
+                    .max_by(|&p, &q| row_of(&un, p).total_cmp(&row_of(&un, q)))
+                    .unwrap();
+                eprintln!(
+                    "steps sphere {metric} step {s} (ocean {age} Myr): unsolved row 0 {:.0}, 1 \
+                     {:.0}, 2 {:.0}, equator {:.0}, worst {:.0} at row {worst_un}; |Δh| row 0 \
+                     {:.0}, 1 {:.0}, equator {:.0}; solve {:?}",
+                    row_of(&un, 0),
+                    row_of(&un, 1),
+                    row_of(&un, 2),
+                    row_of(&un, h / 2),
+                    row_of(&un, worst_un),
+                    row_of(&dh, 0),
+                    row_of(&dh, 1),
+                    row_of(&dh, h / 2),
+                    out.solve
+                );
+            }
+        }
+    }
+
     /// The fault the sphere's metric mends (ISO-127): a load along a row (an east-west strip) at
     /// latitude φ on a plate of flexural parameter α, against the analytic strip on an elastic
     /// foundation (Hetényi: w = q/2k (2 − e^(−a/α) cos(a/α) − e^(−b/α) cos(b/α)) inside it,
@@ -4055,12 +4215,13 @@ mod tests {
             }
         };
         eprintln!("lat   rows/α  w0_m    sphere_peak  block_peak  sphere_worst  block_worst");
+        let mut table = Vec::new();
         for (deg, sphere_most, block_least) in [
             (0.0, 0.02, 0.0),
             (45.0, 0.03, 0.2),
             (60.0, 0.05, 0.4),
             (70.0, 0.08, 0.5),
-            (80.0, f64::INFINITY, 0.5),
+            (80.0, 0.12, 0.5),
         ] {
             let j0 = (0..h)
                 .min_by(|&p, &k| {
@@ -4094,15 +4255,18 @@ mod tests {
                 "{deg:>4.0}  {:>6.2}  {w0:>6.3}  {ps:>11.3}  {pb:>10.3}  {es:>12.3}  {eb:>11.3}",
                 alpha / (2.0 * half)
             );
+            table.push((deg, es, eb, sphere_most, block_least));
+        }
+        for (deg, es, eb, sphere_most, block_least) in table {
             assert!(es <= sphere_most, "{deg}°: the sphere's worst {es:.3}");
             assert!(
                 eb >= block_least,
                 "{deg}°: the block metric's worst {eb:.3}"
             );
-            assert!(
-                es <= eb + 1e-9,
-                "{deg}°: {es:.3} against the block's {eb:.3}"
-            );
+            // At the equator the two metrics are one; elsewhere the sphere's does better.
+            if deg > 0.0 {
+                assert!(es < eb, "{deg}°: {es:.3} against the block's {eb:.3}");
+            }
         }
     }
 }

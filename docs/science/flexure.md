@@ -7,10 +7,12 @@ were made before the last change of one constant (see "Earth against the mod"). 
 for the polar holes (ISO-056 rewritten, ISO-074 to ISO-076 added; six runs), and 2026-10-22 for
 the settling's feedback (ISO-061 rewritten, ISO-091 to ISO-093 added; twelve runs a side), and
 2026-10-23 for the trench rows (ISO-096 and ISO-097 added, ISO-088 merged into ISO-096) and the
-release's pace (ISO-099 added, ISO-056 amended).
+release's pace (ISO-099 added, ISO-056 amended), and the same day for the flexure faults: the
+plate's yield (ISO-120) on by default, the held offsets (ISO-125) and water by basin (ISO-126)
+added and on by default, the solve on the sphere's metric (ISO-127) added and off (it diverges).
 
 Ledger ids on this page: `ISO-040` to `ISO-077`, `ISO-088` (merged), `ISO-091` to `ISO-093`,
-`ISO-096`, `ISO-097`, `ISO-099` (see
+`ISO-096`, `ISO-097`, `ISO-099`, `ISO-120`, `ISO-125` to `ISO-127` (see
 [ledger/ISO.md](ledger/ISO.md)).
 
 ## What you see in the world
@@ -117,10 +119,10 @@ The plate equation, as coded (ISO-040):
 | ISO-093 | Earth's departure from local isostasy | at most about 2 to 4 km of rock (free-air −380 to +300 mGal at 0.112 mGal/m) | km | Watts et al. 2025, ten Brink et al. 2004, Stern, Cattin et al. 2001, Hunter & Watts 2016, Watts & Burov 2003 | `verified` (measurement only) |
 | ISO-096 | The sea over the plate model's own moves | no load: the move as the carry made it (`h_start` less the source's elevation before the step); on ocean floor that builds nothing all of it, on building columns all but the crust's change (ISO-091). Took in ISO-088 (GDH1's cooling) | m | Turcotte & Schubert §3.13; Levitt & Sandwell 1995; Zhang et al. 2014 | `cited-unverified` |
 | ISO-097 | The carry at a trench | the plate model's elevation plus the carried offset, no uplift added | m | none (numerics; Earth's trench depths for the check: Zhang et al. 2014, 2018) | `game-choice` |
-| ISO-120 | The plate's yield | where the load a cell's plate holds from local isostasy, ρ_m (Q + ice − w), passes Δg_max / 2πG, the excess sinks under the cell alone; Δg_max 380 mGal when on | mGal | ten Brink et al. 2004, Watts et al. 2025, Watts & Burov 2003, Hunter & Watts 2016; G from CODATA 2022 | `game-choice` (the form is the agent's) |
-| ISO-125 | The held offsets | cells whose offset the surface holds (gaps between plates, trench rows) hand the plate model's feedback no offset; they count as 0 at their full weight | – | none (numerics) | `game-choice` |
-| ISO-126 | Water by basin | the open sea at the sea level, a lake at its water balance's level, other ground dry, for the water load and `C` | – | none (the balance: HYD-050, HYD-057, HYD-100, HYD-101) | `game-choice` |
-| ISO-127 | The solve on the sphere's metric | the Laplacian's east-west coupling 1 / cos²φ at a row's middle, north-south cos²φ at a row boundary | – | Snyder 1987, eqs. 10-1 to 10-2b | `verified` |
+| ISO-120 | The plate's yield | where the load a cell's plate holds from local isostasy, ρ_m (Q + ice − w), passes Δg_max / 2πG, the excess sinks under the cell alone; Δg_max 380 mGal, on by default | mGal | ten Brink et al. 2004, Watts et al. 2025, Watts & Burov 2003, Hunter & Watts 2016; G from CODATA 2022 | `game-choice` (the form is the agent's) |
+| ISO-125 | The held offsets | cells whose offset the surface holds (gaps between plates, trench rows) hand the plate model's feedback no offset; they count as 0 at their full weight; on by default | – | none (numerics) | `game-choice` |
+| ISO-126 | Water by basin | the open sea at the sea level, a lake at its water balance's level, other ground dry, for the water load and `C`; on by default | – | none (the balance: HYD-050, HYD-057, HYD-100, HYD-101) | `game-choice` |
+| ISO-127 | The solve on the sphere's metric | the Laplacian's east-west coupling 1 / cos²φ at a row's middle, north-south cos²φ at a row boundary; off (the step diverges at the poles) | – | Snyder 1987, eqs. 10-1 to 10-2b | `verified` |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
 ISO-054 and ISO-057 to ISO-060, all `game-choice`.
@@ -140,15 +142,16 @@ the artifact fixes); the sea-depth row is from the final code (law 2.7, after th
 
 ## Simplifications and limits
 
-- The plate is purely elastic by default. Real lithosphere also depends on whether crust and mantle are
-  coupled and on how sharply the plate is bent (Burov & Diament 1995); neither is modelled. A
-  plate's strength as a bound on the load it holds is a switch since 2026-10-23, off by default
-  ("The plate's yield", ISO-120).
+- The plate is elastic up to its strength, which is a bound on the load a cell's plate holds away
+  from local isostasy (since 2026-10-23, on by default: "The plate's yield", ISO-120), not on its
+  bending stress. Real lithosphere also depends on whether crust and mantle are coupled and on how
+  sharply the plate is bent (Burov & Diament 1995); neither is modelled.
 - The solve works in the raster's block metric: every cell is a square of the equator's width
   (`norm_dx_m`). On the equal-area raster a cell at latitude φ is cos φ as wide and 1 / cos φ as
   tall on the sphere, so near the poles the plate bends as if it were about 1 / cos⁴ φ too stiff
-  north to south and cos⁴ φ too soft east to west (about 300 times each way at 76°). Not corrected
-  (an open question).
+  north to south and cos⁴ φ too soft east to west (about 300 times each way at 76°). A solve on
+  the sphere's metric exists since 2026-10-23 (ISO-127) but is off: its step diverges at the poles
+  ("The solve on the sphere's metric").
 - `Te` depends only on the crust's type and thermal age.
 - The plate equation's extra terms for varying rigidity are left out (ISO-040).
 - A step is 2 million years; the ground answers in thousands of years on Earth. The solve gives
@@ -702,8 +705,9 @@ edge case the changed history reaches, not traced).
 
 ## The plate's yield
 
-Added 2026-10-23 (ISO-120), from the polar peaks ([plates.md](plates.md), "The polar peaks"). Off
-by default; `--set surface.flexure.yield_anomaly_mgal=380` turns it on.
+Added 2026-10-23 (ISO-120), from the polar peaks ([plates.md](plates.md), "The polar peaks"). On
+by default since the flexure-faults lane the same day, at 380 mGal;
+`--set surface.flexure.yield_anomaly_mgal=0` turns it off (a purely elastic plate).
 
 **What was seen.** On the pool's base (master bf8477b2, 24 runs) the guard's worst passed 24 km in
 four runs (24.7 to 30.0 km). Traced on seeds 1 to 4 (scattered 4, at 26.0 km, the worst of them),
@@ -756,8 +760,23 @@ Earth's anomalies require. The bound does not depend on `Te`, the plate's age or
 median (Mann-Whitney p 0.015) and from 30.0 to 15.5 km at the largest; 9 base runs passed 15 km and
 4 passed 20 km, against 1 and 0 with the yield. The largest one-step fall went from 9.45 to 7.42 km
 (p < 0.001) and the largest rise from 6.99 to 6.52 km (p 0.012). No V1 criterion moved (every p
-0.24 or more; criteria met per run 3.33 to 3.04, p 0.31), so it does not meet the ship rule (a
-criteria gain at p < 0.05) and stays off by default.
+0.24 or more; criteria met per run 3.33 to 3.04, p 0.31).
+
+**On by default** (2026-10-23). Under the rule of the decisions log of that day (Ben: "Always, fix
+V1 elsewhere"; physics goes on by default once it is built and correct, the V1 criteria are realism
+checks and no gate), the yield is on: it is unit-tested against its sources' bound, and its pool
+arm had no divergence and no guard failure while it cut the guard's worst and the largest one-step
+fall. No forcing term goes off with it: nothing else in the model bounded the load a plate holds.
+
+**300 or 380 mGal.** The bound is the largest anomaly a plate holds. 380 mGal is the Puerto Rico
+Trench's, Earth's most negative free-air anomaly (ten Brink et al. 2004), but a trench's anomaly is
+not all a load held by the plate's strength: the slab's pull and the mantle's flow under it hold
+part of it down. Hawaii's +300 mGal (Watts et al. 2025) is a volcanic load on old ocean floor, the
+textbook case of a load the plate's strength alone holds, so 300 mGal is the better-sourced bound
+for what this law bounds, and 380 the larger of the two measured. 380 stays: with the held offsets
+on (below) the bound is passed rarely (13,000 cell-steps at the median of a 1000 Myr run of 500
+steps, about 27 cells a step), so the choice between them moves little, and no 300 mGal arm was
+run. An open question.
 
 ## The held offsets
 
@@ -818,6 +837,30 @@ the plate's floor alone).
 and no floor past 11 km; the guard's worst 10.3 km against 15.5 km, the highest ground 7.0 km
 against 8.2 km, land 0.301 against 0.322, collisions 15 against 18.
 
+**Measured** (pool arm `ff-held`, key 9bdf6a15219c at 9a46f3c2, the yield at 380 mGal and the held
+offsets, `earthlike_quick_16k`, 1000 Myr, seeds 1 to 4 by both starts, `+DEEPTIME_CRUST_BUDGET=1`;
+medians against the same eight runs of the base, master bf8477b2, key 7f9d8f115049, and of the yield
+alone, `pp-yield380`, key 08c9d7d679c0; Mann-Whitney p against the base):
+
+| measure | base | yield | yield + held offsets |
+|---|---|---|---|
+| the guard's worst (km) | 13.84 | 12.92 (p 0.20) | 10.17 (p < 0.001; every run 9.7 to 10.5) |
+| largest one-step fall (km) | 9.44 | 7.53 (p 0.015) | 7.08 (p 0.002) |
+| largest one-step rise (km) | 6.90 | 6.68 (p 0.65) | 6.50 (p 0.074) |
+| most over the Airy height (km) | 3.85 | 3.29 (p 0.16) | 3.21 (p 0.083) |
+| deepest sea floor (km) | 9.67 | 9.25 (p 0.16) | 8.94 (p 0.050) |
+| share deeper than 6 km | 0.121 | 0.114 | 0.099 (p 0.44) |
+| V1 criteria met per run (mean of 7) | 3.00 | 3.00 (p 0.87) | 3.75 (p 0.13) |
+| land | 0.292 | 0.296 | 0.315 (p 0.16) |
+| cells yielded (whole run) | | | 13,340 |
+
+No measure is worse: the worst spike is down by a quarter, and the spread of the guard's worst
+between runs, 9.7 to 10.5 km, is a third of the base's. The plate model's own deepest floor
+(9.41 km against 9.29) did not move (p 0.65): the trench floors under 11 km were the surface's.
+
+**On by default** (2026-10-23): it removes an integrator, a numerical fault and no physics, and the
+pool shows no divergence and no guard failure. Nothing goes off with it.
+
 ## Water by basin
 
 Added 2026-10-23 (ISO-126), `surface.flexure.water_by_basin`.
@@ -850,6 +893,27 @@ the sea level. Unit tests (surface/lakes.rs): `the_sea_is_the_sea_and_land_is_dr
 the sea level that are dry and the cells over it that are wet
 (`surface/flexure_dry_below_sea_cells`, `surface/flexure_wet_above_sea_cells`), and the lakes.
 
+**Measured** (pool arm `ff-basin`, key 9bdf6a15219c, the yield at 380 mGal and water by basin, the
+same eight runs as `ff-held` above). Over a run, at the median, 86,900 cell-steps under the sea level
+were dry (about 174 cells a step) and 1.34 million over it were wet (about 2,700 a step: the lakes'
+water, which the old rule never loaded). Against the base: the guard's worst 13.11 km (p 0.38), the
+largest one-step fall 7.30 km (p 0.004, the yield's), the deepest floor 9.88 km (p 0.88), criteria
+met per run 3.12 (p 0.96); no measure moved past the yield alone's. The law changes which cells
+carry water and so where the plate bends under lakes and dry basins, not the planet's large
+numbers.
+
+**Simplifications** (game-choice, numerical, the agent's; surface/lakes.rs). The lakes' levels are
+those of the step's last flood, on the elevation it flooded; the open sea is taken again on the
+elevation the flexure starts from, so ground the step's later processes put under the sea level
+carries the sea. Neither is taken again on the ground the flexure moves in its own step. One level
+stands over each flooded depression, so a basin whose balance level falls under a sill inside it
+is still one body of water (its water's mass is right, its share between the sub-basins is not),
+and a lake with two outlets spills over the one its last exit drains to.
+
+**On by default** (2026-10-23): it is the load the physics asks for (water where water stands),
+unit-tested against the balance it takes from the hydrology, and the pool shows no divergence and
+no guard failure. The rule it replaces, `h ≤ sea`, goes off with it.
+
 ## The solve on the sphere's metric
 
 Added 2026-10-23 (ISO-127), `surface.flexure.row_metric`.
@@ -876,9 +940,78 @@ scaling takes the metric's diagonal.
 Unit tests `the_row_metric_is_the_block_metric_at_the_equator`,
 `the_solve_on_the_sphere_inverts_its_operator` and
 `a_load_along_a_row_bends_the_plate_as_on_the_sphere` (flexure.rs). The last puts a strip load
-along a row at latitudes 0 to 75° and compares the sinking across it with the analytic profile of
+along a row at latitudes 0 to 80° and compares the sinking across it with the analytic profile of
 a beam on an elastic foundation under a uniform load over a finite width (Hetényi 1946, §5,
-eqs. 7a and 8a), with the strip's width and the flexural length in the sphere's kilometres.
+eqs. 7a and 8a), with the strip's width and the flexural length in the sphere's kilometres (a
+uniform plate, α = 400 km; the worst error over the rows within 2α of the strip, as a share of
+the analytic peak):
+
+| latitude | sphere's metric | block metric |
+|---|---|---|
+| 0° | 0.004 | 0.003 |
+| 45° | 0.016 | 0.292 |
+| 60° | 0.028 | 0.509 |
+| 70° | 0.043 | 0.643 |
+| 80° | 0.086 | 0.697 |
+
+A single solve on the sphere's metric is right where the block metric is not.
+
+**Measured: the step diverges** (pool arm `ff-metric`, key 9bdf6a15219c, the yield at 380 mGal and
+the metric, seeds 1 to 4 by both starts, 1000 Myr). Six of the eight runs were stopped by the
+surface guard, 202 to 942 Myr into the run, every one at a cell of the row that reaches the north
+pole (row 1) or of the last row, wholly past the south pole (row 327), 0.4 to 3.6 thousand km under
+the sea; the two that finished had the guard's worst at 25.7 and 234 km. The metric trace
+(`DEEPTIME_FLEX_METRIC_TRACE=1`, `metric_trace` in flexure.rs: each step solves the same right-hand
+side again in the other metric and prints, per band of latitude, the rms of the sphere's deflection
+and the rms and largest difference) on the first of them (arm `ff-metric-trace2`, scattered 1,
+stopped at the same step and cell) shows the growth: over the last three steps the rms of the
+step's deflection over 80 to 90° went 0.94, 1.79 and 3.20 thousand km (1.8 to 1.9 times a step),
+while under 50° it stayed at 230 to 340 m. One bad solve would not do that; the step itself is
+unstable at the poles.
+
+**Why it diverges.** The probe `probe_the_sphere_solve_where_the_rigidity_varies` (flexure.rs,
+`--ignored --nocapture`) takes the raster of `earthlike_quick_16k` (1024 by 328 cells, its first
+and last row past the poles), a load of ±50 m of mantle in noise, and cratons (`Te` 80 km) against
+60 Myr ocean in blocks of 64 cells by 41 rows, and solves once to 0.01 m or 200 iterations:
+
+| case | iterations | converged | largest residual, m of mantle (row) |
+|---|---|---|---|
+| block metric, rigidity by x and y | 29 | yes | 0.3 (124) |
+| sphere's metric, uniform rigidity | 1 | yes | 0.0 |
+| sphere's metric, rigidity changing from row to row only | 26 | yes | 0.1 (286) |
+| sphere's metric, rigidity changing along the rows only | 200 | no (14.8 m) | 1,062 (327); 727 on row 0, 758 on row 1 |
+| sphere's metric, rigidity by x and y | 200 | no (15.1 m) | 1,145 (0) |
+| the same, the rows past the poles given the polar rows' couplings | 200 | no (8.8 m) | 401 (320); 395 on row 2 |
+| the same, the couplings capped at their 60° values (a ≤ 4, b ≥ ¼) | 67 | yes | 0.4 (299) |
+
+The solve fails where the rigidity changes along a row near a pole, and only there. The cause is
+the preconditioner. Its bank solves the operator of a uniform plate exactly and blends those
+answers cell by cell by the cell's own rigidity, which is right while a load's response stays on
+plate of about the cell's rigidity; the damped Jacobi sweeps around it reach only error at the
+cell scale. On the sphere's metric a row's east-west coupling is a = 1 / cos²φ, so the plate's
+flexural length along the row, counted in cells, is √a times the equator's: the craton's 3.6
+cells (α = 141 km) become 27 on row 2 (a = 55.5), 47 on row 1 (a = 167) and 65 on the row past
+the pole (a = 326), the blocks' width, and the ocean's 1.3 become 10 to 24. A load's response
+there spans plate 56 times stiffer or softer than its own cell, which the blend does not see.
+Rigidity that changes from row to row does no harm, since the north-south coupling cos²φ is
+small near the poles; capping the couplings at 60° brings the solve back (67 iterations, the
+craton's flexural length 7 cells); giving the rows past the poles the polar rows' couplings moves
+the worst residual one row towards the equator and cures nothing. The block metric never meets
+it: its flexural length is the same in every row.
+
+In the step, a solve's unfinished part waits as a load in the unsolved residual (ISO-059) for the
+next solve. The operator at the polar rows is a² ≈ 3 × 10³ to 10⁵ times stiffer east to west than
+at the equator, so a centimetre's error in the deflection there is kilometres of load. In the
+probe's 24 steps (the default 60 iterations and 2 m; the ocean's age alternating between 60 and
+15 Myr, so the weakening plate lets go, ISO-056) every solve on the sphere's metric stopped at 60
+iterations unconverged (error 11 to 21 m), and the residual carried at rows 0, 1 and 327 stood at
+1.5 to 8 km of mantle, against 5 to 37 m on the block metric. In those steps it did not grow, and
+the ground at the poles moved as much as at the equator. What turns it into the runs' growth of
+1.8 to 1.9 times a step was not isolated: the probe has no plate model, no surface processes, and
+its yield never acted. The candidates are the yield (ISO-120), which acts on the deflection of an
+unconverged solve, the load a weakening plate lets go (ISO-056), which counts the carried residual
+as held, and the surface's answer to a pole that sinks. Each feeds on the unconverged solve, so a
+solve that converges at the poles is the cure; the growth is its symptom.
 
 ## Game choices
 
@@ -916,13 +1049,28 @@ eqs. 7a and 8a), with the strip's width and the flexural length in the sphere's 
   is the stiffening side. That the share let go is `1 − r` of the load held is the agent's rule,
   from the two limits; no source states it. The break at a plate boundary (ISO-055) still lets go
   at once.
-- The solve's block metric ("Simplifications and limits"): on the sphere the equal-area raster's
-  Laplacian is ∂x(cos⁻²φ ∂x) + ∂y(cos²φ ∂y) in the raster's own coordinates (its area element is
-  uniform), so a row-dependent operator would correct it; the spectral preconditioner assumes one
-  operator for every row and would need rework at the poles. Noticed in the polar peaks lane
-  (2026-10-23), not measured.
+- The solve's block metric ("Simplifications and limits"): the solve on the sphere's metric
+  (ISO-127) is built and right for a single solve on a uniform plate, but its step diverges at the
+  poles ("The solve on the sphere's metric", "Why it diverges"), so it is off. Its preconditioner
+  does not converge where the rigidity changes along a row near a pole. The recommendation is a
+  line solve for those rows: on every row where the east-west coupling passes a few times the
+  equator's (a > 4, past 60°), an exact solve of the row's own operator along x with its own
+  rigidity (a cyclic five-band system per row) in place of the point Jacobi sweeps, around the
+  same bank. Rows there are coupled mostly along themselves, so the row solve holds the part the
+  bank misses. Line relaxation along the strongly coupled direction is the usual cure for an
+  operator this anisotropic (from memory, no source read). The probe's capped case says the bank
+  alone is enough below 60°. Then the probe, the strip test and one 8-run arm; it goes on by
+  default if that arm neither diverges nor fails the guard. Capping the couplings at 60° also
+  converges, but it is the block metric's error again past 60°, so it is not recommended.
 - The yield's bound (ISO-120) is on the load a cell holds, not on the plate's stress or curvature;
   whether a curvature form (Watts & Burov 2003) gives different planets was not tried.
+- The yield's value: 380 mGal (the Puerto Rico Trench, where the slab's pull holds part of the
+  anomaly) or 300 mGal (Hawaii, a load the plate's strength alone holds), "The plate's yield". The
+  recommendation is to keep 380 until a 300 mGal arm is run on the next base; the bound is passed
+  on about 27 cells a step.
+- Water by basin (ISO-126) takes the lakes' levels from the step's last flood, before the flexure
+  moves the ground, and one level per flooded depression; whether a basin the flexure deepens in
+  the step should take its water again was not measured.
 - The recovery law of continental `Te` (ISO-051) has no source for its form or its 300 Myr.
 - Densities (ISO-043 to ISO-047) are uncited, and the model uses three different crust densities
   elsewhere (see [isostasy-and-height-limit.md](isostasy-and-height-limit.md)).
