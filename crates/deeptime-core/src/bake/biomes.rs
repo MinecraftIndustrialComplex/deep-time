@@ -1681,7 +1681,10 @@ pub fn dry_beside_playas(
             (reach / (1.0 - s * s).sqrt().max(1e-6)).min(0.5 * c)
         });
         let (i0, i1) = (((px - hx - ox) / r).ceil(), ((px + hx - ox) / r).floor());
-        let (j0, j1) = (((pz - reach - oz) / r).ceil(), ((pz + reach - oz) / r).floor());
+        let (j0, j1) = (
+            ((pz - reach - oz) / r).ceil(),
+            ((pz + reach - oz) / r).floor(),
+        );
         for j in j0 as i64..=j1 as i64 {
             for i in i0 as i64..=i1 as i64 {
                 let (ci, cj) = l2.cell(i, j);
@@ -3036,7 +3039,11 @@ mod tests {
                     let want = if was_cold { low } else { held };
                     assert_eq!(ero_at(&ero, k), want, "{label} node {k}");
                 } else {
-                    let want = if was_cold { WETLAND_COLD } else { WETLAND_SWAMP };
+                    let want = if was_cold {
+                        WETLAND_COLD
+                    } else {
+                        WETLAND_SWAMP
+                    };
                     assert_eq!(wet[k], want, "{label} node {k}");
                     assert_eq!(ero_at(&ero, k), if was_cold { low } else { swamp });
                 }
