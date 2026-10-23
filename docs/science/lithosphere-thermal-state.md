@@ -83,7 +83,9 @@ A resampling copies both numbers from the nearest corner of the sample's kind (`
   and in the flexure's continental Te law (ISO-050, ISO-051), which reads it from the L1 field
   `plates/thermal_age_myr`. A hot orogen spreads as a fresh one does today; a cold, keeled craton
   reached by an arc's orogeny keeps its strength, where today the orogeny's new date makes it as weak
-  as a new arc.
+  as a new arc. It is not a strength envelope: it bounds no stress, so a stiffer craton holds more
+  load. The bound is the plate's yield (ISO-120, `surface.flexure.yield_anomaly_mgal`), a separate
+  switch ("Measured" has the two together).
 
 - **The backstop** (`tectonics.thermal_backstop`): an arc's cordillera grows by crust shortened
   into it from the same plate's crust behind the range (PLT-048), which loses the same share of
@@ -250,7 +252,26 @@ p < 0.05, no median pushed out of its band) is not met: no median left its band,
 the drowned crust both move towards their targets at p 0.010 and 0.18) and the land share's top is
 what it runs into: seven runs end over 0.32.
 
-STRENGTH-YIELD-PLACEHOLDER
+**The strength with the plate's yield** (ISO-120, `surface.flexure.yield_anomaly_mgal=380`, master
+fc6ab402; the coordinator's combined arm, key 37afd1c8fbf1, seeds 1 to 12, 24 runs), beside the
+polar-peaks lane's yield alone (`pp-yield380`):
+
+| arm | land | largest landmass | crust under the sea | above 2 km | high coast | under ice | collisions | criteria a run: median, mean | sea after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|
+| base | 0.300 | 0.151 | 0.274 | 0.151 | 0.333 | 0.116 | 1.75 | 3, 3.33 | 538 / 861 |
+| pp-yield380 | 0.313 (0.35) | 0.161 (0.24) | 0.253 (0.37) | 0.160 (0.50) | 0.351 (0.37) | 0.126 (0.73) | 1.80 (0.56) | 3, 3.04 (0.31) | 495 / 759 |
+| th-str | 0.314 (0.049) | 0.182 (0.010) | 0.251 (0.18) | 0.146 (0.86) | 0.295 (0.32) | 0.113 (0.50) | 1.80 (1.0) | 3, 3.42 (0.57) | 543 / 817 |
+| th-str-y380 | 0.309 (0.34) | 0.165 (0.26) | 0.269 (0.86) | 0.128 (0.28) | 0.278 (0.074) | 0.108 (0.48) | 1.80 (0.49) | 3, 3.17 (0.98) | 564 / 941 |
+
+The `guard` measure on the same arms (medians): the guard's worst 13,716 m (base), 13,112
+(yield, p 0.015), 14,746 (strength, p 0.60), 13,044 (both, p 0.033); the largest one-step fall
+9,450, 7,422, 10,620 and 7,492 m. The two do different things. The strength is a clock: it sets the
+thin sheet's viscosity and the flexure's Te from the thermal age, so a cold keeled craton keeps a Te
+of up to 80 km and holds more load, and nothing in it bounds what a plate holds. The yield is that
+bound. With the strength on, the guard's worst and the largest fall grow a little; the yield takes
+them back down to its own values. On V1 the yield takes back most of the strength's gain in the
+largest landmass (0.182 to 0.165) and the drowned crust (0.251 to 0.269). Neither arm meets the ship
+rule; the yield is not made redundant by the strength, and the strength does not replace it.
 
 ## Simplifications and limits
 
@@ -292,6 +313,10 @@ STRENGTH-YIELD-PLACEHOLDER
   stands on land instead. Whether it can go on beside a change that lowers the land share, or
   with a weaker keel than 200 km on some of the start's continents (no keel at all lost the gain),
   is open; neither was tried.
+- The yield's bound (ISO-120) is one figure for every plate. A hot lithosphere yields at less than
+  a cold one (the gap audit cites Rey, Teyssier & Whitney 2010 for the Moho temperature's part; not
+  read for this page), so the state could set it; that would be a new row above ISO-120 and was not
+  tried.
 - Stages 2 and 3 (above, "The order of the stages") are designed, not built.
 
 ## Sources

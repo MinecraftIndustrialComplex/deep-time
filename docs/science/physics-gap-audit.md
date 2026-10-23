@@ -245,8 +245,11 @@ and that the model does not have as physics.
   and the flexure's Te; a backstop for the cordillera's source. On the pool only the strength
   moves V1 towards Earth (24 runs: largest landmass 0.151 to 0.182, p 0.010; crust under the sea
   0.274 to 0.251, p 0.18) and it pushes land over the band's top in seven runs, so criteria a run
-  go 3.33 to 3.42 (p 0.57) and it stays off. Thermal isostasy lifts the sea (craton frame) or sinks
-  the start's continents (Hyndman & Currie's). Rifted margins with β (stage 2) and root removal on a
+  go 3.33 to 3.42 (p 0.57) and it stays off. With the plate's yield (ISO-120) as well, 3.17 (p
+  0.98): the yield takes back the strength's gain and keeps its own cut of the guard's worst
+  (13.7 to 13.0 km, p 0.033); the strength bounds no load, so it does not replace the yield.
+  Thermal isostasy lifts the sea (craton frame) or sinks the start's continents (Hyndman &
+  Currie's). Rifted margins with β (stage 2) and root removal on a
   Rayleigh-Taylor time (stage 3) are designed, not built.
 
 ### Gap 5: river and delta landforms
