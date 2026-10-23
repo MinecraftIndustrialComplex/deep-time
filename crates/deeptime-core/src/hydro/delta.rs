@@ -70,7 +70,6 @@ pub const SLOPE_REACH_M: f64 = 30_000.0; // ledger: HYD-137
 /// takes. ledger: HYD-144
 pub const PATH_SHARED_COST: f64 = 4.0; // ledger: HYD-144
 
-
 /// What the plains need besides the first network.
 pub struct Input<'a> {
     /// The hydrology grid and its ground before any plain, 1/16 block.
@@ -416,17 +415,18 @@ pub fn grow(inp: &Input<'_>, first: &network::Output) -> Plains {
         let mut heap: BinaryHeap<Reverse<(u64, u32)>> = BinaryHeap::new();
         let mut seen: HashSet<u32> = taken.clone();
         seen.extend(&course);
-        let push = |c: usize, heap: &mut BinaryHeap<Reverse<(u64, u32)>>, seen: &mut HashSet<u32>| {
-            for k in 0..8 {
-                if let Some(nb) = geo.nb(c, k)
-                    && !owner.contains_key(&(nb as u32))
-                    && eligible(nb)
-                    && seen.insert(nb as u32)
-                {
-                    heap.push(Reverse((key(nb), nb as u32)));
+        let push =
+            |c: usize, heap: &mut BinaryHeap<Reverse<(u64, u32)>>, seen: &mut HashSet<u32>| {
+                for k in 0..8 {
+                    if let Some(nb) = geo.nb(c, k)
+                        && !owner.contains_key(&(nb as u32))
+                        && eligible(nb)
+                        && seen.insert(nb as u32)
+                    {
+                        heap.push(Reverse((key(nb), nb as u32)));
+                    }
                 }
-            }
-        };
+            };
         for &c in &cells {
             push(c as usize, &mut heap, &mut seen);
         }
