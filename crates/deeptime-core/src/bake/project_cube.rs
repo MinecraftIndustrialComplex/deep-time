@@ -406,7 +406,8 @@ impl CubeMapping {
     }
 
     /// The image of world point `q` (canonical) nearest to `p`: `q` itself, a lap east or west,
-    /// or the point beyond a turning net edge that shows it (each checked through the fold).
+    /// or the point beyond a turning net edge that shows it (in the edge's band, a face deep, or
+    /// on its line: a seam point is on both faces' edges).
     pub(crate) fn nearest_image(&self, p: (f64, f64), q: (f64, f64)) -> ((f64, f64), Image) {
         let per = self.cube.period() as f64;
         let edges = self.cube.edges();
@@ -427,17 +428,26 @@ impl CubeMapping {
         let d = |c: (f64, f64)| (c.0 - p.0).hypot(c.1 - p.1);
         let c = &mut cands[..n];
         c.sort_by(|a, b| d(a.0).total_cmp(&d(b.0)));
-        let qx = self.cube.wrap_x_point(q.0);
-        let tol = 1e-6 * self.cube.side() as f64;
+        let side = self.cube.side() as f64;
+        let tol = 1e-6 * side;
         for &(pt, kind) in c.iter() {
             match kind {
-                Image::Turn(_) => {
-                    if let Some(f) = self.cube.fold_point(pt.0, pt.1) {
-                        let mut dx = (self.cube.wrap_x_point(f.x) - qx).abs();
-                        dx = dx.min(per - dx);
-                        if dx < tol && (f.z - q.1).abs() < tol {
-                            return (pt, kind);
-                        }
+                Image::Turn(ei) => {
+                    let e = &edges[ei];
+                    let x = self.cube.wrap_x_point(pt.0);
+                    let (n, t) = match e.axis {
+                        Axis::X => (x, pt.1),
+                        Axis::Z => (pt.1, x),
+                    };
+                    let depth = match e.beyond {
+                        Side::Min => e.coord as f64 - n,
+                        Side::Max => n - e.coord as f64,
+                    };
+                    if t >= e.span[0] as f64 - tol
+                        && t <= e.span[1] as f64 + tol
+                        && (-tol..=side).contains(&depth)
+                    {
+                        return (pt, kind);
                     }
                 }
                 _ => return (pt, kind),
