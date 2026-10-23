@@ -138,6 +138,14 @@ pub struct FlexureParams {
     /// Te of arcs, rifts and everything else at least, km (the low end of continental Te: 5 km,
     /// Lu et al. 2024, abstract).
     pub te_min_km: f64,
+    /// Where the law above lowers a plate's Te (an orogeny, an arc, a rift: heating), the plate
+    /// weakens towards it as e^(−t / this), Myr: the time its geotherm takes to warm (the
+    /// lithosphere's thermal time constant: 62.8 Myr, ISO-099). It stiffens at once. 0, the
+    /// default: weakens at once too, the rule before 2026-10-23 (off until the pool says
+    /// otherwise: on the pool's runs 62.8 left the criteria where they were and gave more closed
+    /// basins and larger one-step falls, docs/science/flexure.md "The release's pace"). The break
+    /// at a plate boundary is not the law's and stays at once.
+    pub te_weakening_myr: f64,
     /// Solve every this many plate steps (loads in between wait for the next solve).
     pub every_steps: u32,
     /// The solve stops when its error estimate is under this, m.
@@ -156,6 +164,7 @@ impl Default for FlexureParams {
             te_craton_km: 80.0, // ledger: ISO-050
             te_recovery_myr: 300.0, // ledger: ISO-051 (uncited: this agent's choice)
             te_min_km: 5.0, // ledger: ISO-052
+            te_weakening_myr: 0.0, // ledger: ISO-099 (game-choice: off by default)
             every_steps: 1, // ledger: ISO-059 (game-choice: numerical)
             tolerance_m: 2.0, // ledger: ISO-059
             max_iterations: 60, // ledger: ISO-059
@@ -203,6 +212,11 @@ impl FlexureParams {
             check(v.is_finite() && v > 0.0, key, "must be > 0")?;
         }
         check(
+            self.te_weakening_myr.is_finite() && (0.0..=10_000.0).contains(&self.te_weakening_myr),
+            "te_weakening_myr",
+            "must be in [0, 10000]",
+        )?;
+        check(
             self.te_ocean_max_km <= 500.0 && self.te_craton_km <= 500.0,
             "te_craton_km",
             "elastic thicknesses must be at most 500 km",
@@ -240,6 +254,18 @@ impl FlexureParams {
             self.te_craton_km
         };
         te.max(self.te_min_km) * self.elastic_thickness_scale
+    }
+
+    /// The law's Te a plate holds after a step of `dt_myr`, km: the law's value `target` where it
+    /// is at or above the Te the plate held, `was` (NaN: crust new at the place); below it, `was`
+    /// relaxes towards it as e^(−dt / `te_weakening_myr`).
+    // ledger: ISO-099
+    pub fn weakened_te_km(&self, target: f64, was: f64, dt_myr: f64) -> f64 {
+        if was.is_nan() || was <= target || self.te_weakening_myr <= 0.0 {
+            target
+        } else {
+            target + (was - target) * (-dt_myr / self.te_weakening_myr).exp()
+        }
     }
 }
 
@@ -418,6 +444,11 @@ pub struct FlexState {
     /// The rigidity over gravity the cell was last solved with, D / g, kg·m (carried as its
     /// logarithm: ISO-075).
     pub rigidity: Vec<f32>,
+    /// The law's elastic thickness the plate held at the last step, km, before the smoothing and
+    /// the break at plate boundaries ([`FlexureParams::weakened_te_km`], ISO-099; carried as its
+    /// logarithm, as the rigidity is); NaN where the crust is new at the place.
+    #[serde(default)]
+    pub te_law_km: Vec<f32>,
     /// The land ice the plate carried at the last step, m.
     pub ice_m: Vec<f32>,
     /// The solve's unfinished residual, m of mantle: what the last solve left (under its
@@ -444,6 +475,7 @@ impl FlexState {
             deflection_m: vec![0.0; n],
             water_m: vec![f32::NAN; n],
             rigidity: vec![f32::NAN; n],
+            te_law_km: vec![f32::NAN; n],
             ice_m: vec![0.0; n],
             unsolved_m: vec![0.0; n],
             seen_elevation_m: Vec::new(),
@@ -486,6 +518,19 @@ impl FlexState {
                         *unsolved += q;
                     }
                 });
+        }
+        // ledger: ISO-099, ISO-075
+        // The law's Te the plate holds goes with its crust, blended as a logarithm as the
+        // rigidity is: a blend errs towards the weaker corner, and the next step's law then
+        // stiffens it at once, which moves nothing. NaN where no corner held the same crust.
+        if self.te_law_km.len() == n {
+            let ln_te: Vec<f32> = self.te_law_km.par_iter().map(|&t| t.ln()).collect();
+            self.te_law_km = advect::carried_fields(x, [&ln_te])
+                .into_par_iter()
+                .map(|m| m.map_or(f32::NAN, |[l]| l.exp()))
+                .collect();
+        } else {
+            self.te_law_km = vec![f32::NAN; n];
         }
         // Crust that is new at a place starts unloaded and flat (its water is NaN until the
         // next step takes its reference).
@@ -1511,15 +1556,34 @@ pub fn step(
     let f = coarsening(w, hgt, x.norm_dx_m);
     let (ws, hs) = (w / f, hgt / f);
     let dxs = x.norm_dx_m * f as f64;
-    let mut te = restrict_by(w, hgt, f, |c| {
-        let reg = x.regime[c] as u8;
-        p.elastic_thickness_km(
-            x.crust_type[c] as u8 == OCEANIC,
-            f64::from(x.crust_age_myr[c]),
-            f64::from(x.orogeny_age_myr[c]),
-            reg == regime::ARC || reg == regime::RIFT,
-        )
-    });
+    // ledger: ISO-099
+    // The law is the plate's thermal state: Te follows the depth of an isotherm, set by the
+    // floor's age or the time since the last orogeny, and an arc's or a rift's heat. A plate the
+    // law weakens has to warm first, and it does so by conduction over the lithosphere's thermal
+    // time; only then does it let go of the load it held (ISO-056), and the ground settles as
+    // fast as the geotherm warms, not in the step the law changed (the savanna pit: a craton the
+    // Andean arc's orogeny reached gave up 4.3 km of held load in three steps, build log
+    // 2026-10-23). A plate the law stiffens joins stress-free at once, as before.
+    let law: Vec<f64> = (0..n)
+        .into_par_iter()
+        .map(|c| {
+            let reg = x.regime[c] as u8;
+            let target = p.elastic_thickness_km(
+                x.crust_type[c] as u8 == OCEANIC,
+                f64::from(x.crust_age_myr[c]),
+                f64::from(x.orogeny_age_myr[c]),
+                reg == regime::ARC || reg == regime::RIFT,
+            );
+            let was = if cells[c].fresh {
+                f64::NAN
+            } else {
+                st.te_law_km.get(c).map_or(f64::NAN, |&t| f64::from(t))
+            };
+            p.weakened_te_km(target, was, x.dt_myr)
+        })
+        .collect();
+    st.te_law_km = law.par_iter().map(|&t| t as f32).collect();
+    let mut te = restrict_by(w, hgt, f, |c| law[c]);
     let ds = Dims::new(ws, hs, dxs, x.dims.wrap_x);
     box_blur(&ds, &mut te, 2, 2); // ledger: ISO-054 (game-choice: numerical)
     // ledger: ISO-055
@@ -1622,7 +1686,8 @@ pub fn step(
     // the same share of the stress the plate held: where D falls to r·D the plate stops holding
     // up (1 − r) of the load it kept away from local isostasy, ρ_m (Q + ice − w − unsolved),
     // and that is a force. It moves the ground towards local isostasy, where a plate with no
-    // strength puts it, and no further, whatever the cell's size or latitude. (The moment it
+    // strength puts it, and no further, whatever the cell's size or latitude. The law's part of
+    // a loss comes as the plate warms (ISO-099), a boundary's break at once. (The moment it
     // replaces, L((1 − r)·M), is the same force where r is uniform; where r changes from cell to
     // cell, along a plate boundary or the edge of a reheated zone, its curvature made forces of
     // several times the load held: the polar holes and spikes, build log 2026-10-18.)
@@ -2756,6 +2821,77 @@ mod tests {
         wd.step(&p, &mut sv, &mut st, &vec![0.0; n], 0.0);
         let rise = wd.h[62 * w] - before[62 * w];
         assert!(rise > 2000.0 + 3000.0, "held up by the craton: {rise}");
+    }
+
+    /// A belt held up by a craton, then an orogeny reaches the craton (the law's Te falls to its
+    /// floor and stays there). Weakening at once, the belt sinks most of the way to local
+    /// isostasy in the step; weakening over the thermal time (ISO-099), a step lets go of a few
+    /// per cent of that, and after eight time constants the plate stands where weakening at once
+    /// put it. The plate stands on dry ground, the sea far below: with the sea at 0 the loading
+    /// took ground under it (the lowest cell 4.3 km down without water), the flexure's water came
+    /// in, whose depth has a kink at the sea, and the two paths ended 172 m apart.
+    #[test]
+    fn a_plate_the_law_weakens_lets_go_as_it_warms() {
+        let (w, h) = (32usize, 128usize);
+        let n = w * h;
+        let sea = -20_000.0;
+        let belt = |c: usize| (60..64).contains(&(c / w));
+        let run = |p: &FlexureParams, steps: usize| -> (Vec<f64>, f64, Vec<f64>) {
+            let mut wd = World::new(w, h, 300.0);
+            let (mut sv, mut st) = started(&mut wd, p, sea);
+            for c in 0..n {
+                if belt(c) {
+                    wd.uplift[c] = 1.0;
+                }
+            }
+            wd.step(p, &mut sv, &mut st, &vec![0.0; n], sea);
+            wd.uplift = vec![0.0; n];
+            wd.orogeny = vec![0.0; n]; // the orogeny's clock restarts every step
+            let first = wd.step(p, &mut sv, &mut st, &vec![0.0; n], sea);
+            let te = f64::from(first.elastic_thickness_km[62 * w]);
+            for _ in 1..steps {
+                wd.step(p, &mut sv, &mut st, &vec![0.0; n], sea);
+            }
+            let released = first.released_m.iter().map(|&r| f64::from(r)).collect();
+            (wd.h, te, released)
+        };
+        let at_once = FlexureParams {
+            te_weakening_myr: 0.0,
+            ..on()
+        };
+        let p = FlexureParams {
+            te_weakening_myr: 62.8, // ledger: ISO-099
+            ..on()
+        };
+        let steps = (8.0 * p.te_weakening_myr / 2.0).ceil() as usize;
+        let (h_now, te_now, rel_now) = run(&at_once, steps);
+        let (h_slow, te_slow, rel_slow) = run(&p, steps);
+        let c = 62 * w;
+        assert!(te_now < 5.5, "at once: Te {te_now}");
+        let expect = 5.0 + 75.0 * (-2.0 / p.te_weakening_myr).exp();
+        assert!(
+            (te_slow - expect).abs() < 0.5,
+            "one step of warming: Te {te_slow}, {expect} expected"
+        );
+        assert!(
+            rel_now[c] < -500.0,
+            "the belt sinks in the step: {}",
+            rel_now[c]
+        );
+        assert!(
+            rel_slow[c] < 0.0 && rel_slow[c] > 0.15 * rel_now[c],
+            "one step lets go of a few per cent: {} against {}",
+            rel_slow[c],
+            rel_now[c]
+        );
+        let worst = h_now
+            .iter()
+            .zip(&h_slow)
+            .fold(0.0f64, |a, (x, y)| a.max((x - y).abs()));
+        assert!(
+            worst < 0.02 * (h_now[c] - 300.0).abs().max(100.0),
+            "the same plate in the end: {worst} m apart"
+        );
     }
 
     /// The solve grid: one L1 cell on the quick presets, two on the full ones, and the same

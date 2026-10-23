@@ -1117,13 +1117,14 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Parsons, B. and Sclater, J. G. (1977). An analysis of the variation of ocean floor bathymetry and heat flow with age. Journal of Geophysical Research 82(5):803-827.
 - DOI or URL: 10.1029/JB082i005p00803.
 - Cited as: (ERO, ISO, HYP) "Parsons & Sclater 1977 (mean ridge crest depth 2.5 km)" (build log). (PLT) "Parsons & Sclater 1977" (ridge crest depth 2.5 km); no title or journal given in the code.
-- Ledger ids: ISO-014, PLT-204
+- Ledger ids: ISO-014, PLT-204, ISO-099
 - Access: paywalled; not fetched. [other sections: paywalled (no abstract fetched).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Merged keys: Parsons1977
 - Read so far (by the project): (ERO, ISO, HYP) no record. (PLT) not stated.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) not fetched itself; its formulas were read as reproduced in King & Adam 2014 (a secondary open copy) and Wikipedia "Seafloor spreading".
+- Read in the release-pace task (2026-10-23, the abstract through OpenAlex, by a Sonnet sub-agent of the release agent; ISO-099): "Inverting the data gives a plate thickness of 125±10 km, a bottom boundary temperature of 1350°±275°C"; "for regions older than 20 m.y. B.P. by the relation d(t) = 6400 - 3200 exp (−t/62.8) m"; "the heat flow only responds to the bottom boundary at approximately twice the age at which the depth does".
 - Reference check: (ERO, ISO, HYP) Crossref matches the title, volume 82, issue 5, pages 803-827. The sources file gives no year-title pair; the 1977 paper is the correct identification. (PLT) now identifiable. Identification only; the "2.5 km" is the intercept of the square-root law (see Part 2).
 - Read 2026-10-21 (ledger PLT-352, as the cross-check): the scanned first page at https://topex.ucsd.edu/geodynamics/parsons_sclater77.pdf, by OCR: "Between 0 and 70 m.y. B.P. the depth can be represented by the relation d(t) = 2500 + 350 t^1/2 m ... and for regions older than 20 m.y. B.P. by the relation d(t) = 6400 - 3200 exp(-t/62.8) m" (OCR gave 6400 as "6L00"; Wikipedia's secondary copy resolves it).
 
@@ -5377,10 +5378,11 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Beaumont, C. (1978). The evolution of sedimentary basins on a viscoelastic lithosphere: theory and examples. Geophysical Journal of the Royal Astronomical Society 55(2):471-497.
 - DOI or URL: 10.1111/j.1365-246X.1978.tb04283.x
 - Cited as: "Beaumont 1978"
-- Ledger ids: ISO-056
+- Ledger ids: ISO-056, ISO-099
 - Access: paywalled (abstract visible on OUP).
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): abstract by a Sonnet sub-agent of the polar-holes agent, 2026-10-18: "long wavelengths being compensated most rapidly", "flexural rigidity of ~ 5 x 10^25 Nm and relaxation time constant ~ 10^6 yr". The abstract states no Airy limit.
+- Read in the release-pace task (2026-10-23, the abstract through OpenAlex, by a Sonnet sub-agent of the release agent; ISO-099): "A model, in which a 50-km wide graben subsides exponentially with a time constant of 5 × 10^7 yr during the interval 180-100 Myr bp, is shown to be consistent with the largest scale structure of the North Sea Basin if the underlying lithosphere is viscoelastic with a flexural rigidity of ~ 5 × 10^25 Nm and relaxation time constant ~ 10^6 yr." The 10^6 yr is a fit to one basin.
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct (the year is 1978, not 1976 as it is sometimes given).
 
@@ -5388,10 +5390,11 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Watts, A. B., Zhong, S. (2000). Observations of flexure and the rheology of oceanic lithosphere. Geophysical Journal International 142(3):855-875.
 - DOI or URL: 10.1046/j.1365-246x.2000.00189.x
 - Cited as: "Watts & Zhong 2000" (the counterpoint: an oceanic plate stays elastic on long timescales)
-- Ledger ids: ISO-056
+- Ledger ids: ISO-056, ISO-099
 - Access: paywalled (abstract visible).
 - Library (the project's source library, not distributed): not fetched.
 - Read so far (by the project): abstract by a Sonnet sub-agent of the polar-holes agent, 2026-10-18: rigidity "depends on load age, being large at short times and small at long times"; the plate "behaves as a thin elastic plate on long timescales".
+- Read in the release-pace task (2026-10-23, full text by a Sonnet sub-agent of the release agent: the text layer garbled, OCR, the key sentences checked on the page images, pp. 856 and 861; ISO-099): "The timescale over which this relaxation occurs is apparently in the range 0 to 1-2 Myr"; "no single relaxation time can explain all the data. Furthermore, no relaxation time can explain the data in the long term"; "~ 50 per cent of the subsequent flexure is reached within 10 ka" and "it takes a further 100 Myr to reach the same amount of flexure as occurred during the first 10 kyr of loading"; conclusion (2): "The decrease is most rapid during the first 1-2 Myr after loading, but appears to continue on longer timescales, although changes during 1-2 to 100 Myr are small"; conclusion (1): Te is "a function of the thermal age of the lithosphere at the time of loading, being well described by the depth to the 300-600 °C oceanic isotherms".
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: as read in the abstract.
 
@@ -6503,9 +6506,10 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: McKenzie, D. (1978). Some remarks on the development of sedimentary basins. Earth and Planetary Science Letters 40:25-32.
 - DOI or URL: 10.1016/0012-821X(78)90071-7 (the DOI from the standard citation, not seen on the scan); scan at http://www.zetaware.com/public/McKenzie_1978.pdf
 - Cited as: "McKenzie 1978" (uniform stretching by β; initial and thermal subsidence).
-- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`), PLT-415 (2026-10-22, the high-ground task: τ = 62.8 My as the e-fold of the thin sheet's viscosity with the age of the orogeny; the form is the agent's)
+- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`), PLT-415 (2026-10-22, the high-ground task: τ = 62.8 My as the e-fold of the thin sheet's viscosity with the age of the orogeny; the form is the agent's), ISO-099 (2026-10-23, the release's pace: τ as the time a plate the `Te` law weakens takes to warm; the form is the agent's)
 - Access: scanned copy, open.
 - Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
+- Read in the release-pace task (2026-10-23, the scan's full text by a Sonnet sub-agent of the release agent, eq. 6 checked on the page image; ISO-099): eq. 6, τ = a²/(π²κ), κ "the thermal diffusivity" (Table 1 gives no κ; 0.0080 cm²/s back from τ and a, the sub-agent's arithmetic); Table 1 "(mostly taken from Parsons and Sclater [9])": "a = 125 km", "Tl = 1333°C", "τ = 62.8 My"; "After a time which depends on the thermal time constant of the stretched lithosphere, τ/β², the heat flux starts to decrease."
 
 Not read: Péron-Pinvidic, Manatschal & Osmundsen 2013 (Marine and Petroleum Geology 43:21-47), Sutra et al. 2013 (G-cubed 14:2575), Mohn et al. 2012 (Tectonics 31:TC1012), Chenin et al. 2017 (Geosphere 13:559; a search summary gives magma-poor margins "approximately 165 km on average", unverified).
 
@@ -8124,3 +8128,60 @@ Also read for these rows: Turcotte & Schubert (TurcotteSchubert_Geodynamics) and
 - Read so far (by the project): full text, by a Sonnet sub-agent of the trench-row agent, 2026-10-23: trench relief W0 is "trench axis depth relative to a far-field reference seafloor depth"; the global "section-averaged W0 is in the range of 0.9-4.7 km" (Manila 0.4 to 2.1 km, southern Mariana 1.7 to 5.7 km).
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: the authors and the title are from memory, not checked; journal, volume and first page from the URL.
+## The release's pace (ISO-099), added 2026-10-23
+
+The sources of the release's pace (build log 2026-10-23; flexure.md, the section of that name). McKenzie 1978, Parsons & Sclater 1977, Beaumont 1978 and Watts & Zhong 2000 are above, with what was read this time. Read by a Sonnet sub-agent of the release agent on 2026-10-23; the quotes are as read, en dashes turned to hyphens, and the sub-agent's own arithmetic is marked as such. Not read: Turcotte & Schubert on the thermal time (only the front matter was reachable), Watts 1978 and Lambeck & Nakiboglu 1981 (not opened), England & Thompson 1984 (abstract only, on heating thickened crust, nothing on weakening), Royden et al. 1983 (abstract only: Pannonian thermal subsidence and heat flow "about twice those predicted by assuming a uniform extension model"), Sclater et al. 1980 (a search tool's paraphrase only).
+
+### HyndmanCurrieMazzotti2005
+- Reference: Hyndman, R. D., Currie, C. A. and Mazzotti, S. P. (2005). Subduction zone backarcs, mobile belts, and orogenic heat. GSA Today 15(2):4-10.
+- DOI or URL: 10.1130/1052-5173(2005)015<4:SZBMBA>2.0.CO;2
+- Cited as: "Hyndman, Currie & Mazzotti 2005".
+- Ledger ids: ISO-099
+- Access: open (GSA Today).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23: "The thermal effect of extension decays with a time constant of ~50 m.y."; "Moho temperatures are 800-900 °C and lithosphere thicknesses are 50-60 km, compared to 400-500 °C and 150-300 km for cratons and other regions with a thermotectonic age greater than ca. 300 Ma. The temperature differences result in backarc lithospheres that are weaker than cratons by more than a factor of 10"; "Most of the rapid decrease in heat flow appears to be in the several hundred m.y. following the last thermotectonic event."
+
+### CurrieHyndman2006
+- Reference: Currie, C. A. and Hyndman, R. D. (2006). The thermal structure of subduction zone back arcs. Journal of Geophysical Research 111:B08404.
+- DOI or URL: 10.1029/2005JB004024
+- Cited as: "Currie & Hyndman 2006".
+- Ledger ids: ISO-099
+- Access: author copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23: "uniformly high temperatures in the shallow mantle and a thin lithosphere (1200°C at 60 km depth) over back-arc widths of 250 to >900 km"; "Following subduction termination, we find that the high temperatures decay over a timescale of about 300 Myr"; Te "generally less than 20 km for the Cordillera back arc", the Archean craton "generally greater than 80 km"; "The most rapid cooling occurs in the first 50-100 Myr."
+
+### CurrieHuismansBeaumont2008
+- Reference: Currie, C. A., Huismans, R. S. and Beaumont, C. (2008). Thinning of continental backarc lithosphere by flow-induced gravitational instability. Earth and Planetary Science Letters 269:435-446.
+- DOI or URL: 10.1016/j.epsl.2008.02.037 (from memory, not checked)
+- Cited as: "Currie, Huismans & Beaumont 2008".
+- Ledger ids: ISO-099
+- Access: author copy.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23 (model results, not observations): "rapidly-growing downwellings which result in removal of lower backarc lithosphere on timescales of 5-10 Ma"; "In the models, the majority of thinning occurs within 30 Ma of subduction initiation"; "by 60 Ma, the lithosphere is likely close to its stable steady-state thickness" (from a 120 km lithosphere). No observed onset time for a back-arc's weakening was found.
+
+### HorvathCloetingh1996
+- Reference: Horváth, F. and Cloetingh, S. (1996). Stress-induced late-stage subsidence anomalies in the Pannonian basin. Tectonophysics 266:287-300.
+- DOI or URL: 10.1016/S0040-1951(96)00194-1
+- Cited as: "Horváth & Cloetingh 1996" (a basin that opened and filled as it subsided).
+- Ledger ids: none (flexure.md, "The release's pace": the fill)
+- Access: open (VU research portal).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23: "the Pannonian depression has been filled up by a fluvial dominated delta-system which prograded from the basin periphery towards the interior"; "Sediment accumulation rate was significantly higher than the subsidence rate during Late Miocene time"; "Late Pliocene and Quaternary strata (0-2.4 Ma) can only be found in the Great Hungarian Plain with a thickness up to 700 m. The surface of this area is indeed a plain and with an elevation between 90-120 m above sea level."
+
+### Horvath2015
+- Reference: Horváth, F., Musitz, B., Balázs, A., Végh, A., Uhrin, A., Nádor, A., Koroknai, B., Pap, N., Tóth, T. and Wórum, G. (2015). Evolution of the Pannonian basin and its geothermal resources. Geothermics 53:328-352 (the author list after the first from memory).
+- DOI or URL: 10.1016/j.geothermics.2014.07.009
+- Cited as: "Horváth et al. 2015".
+- Ledger ids: none (flexure.md, "The release's pace": the fill)
+- Access: open (Utrecht repository).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23: "deep troughs exceeding a thickness of 5 km, shallow basin areas typically with a depth of 1 to 2 km"; "Rapid subsidence began at places which led to locally 800-1000 m water depths"; "Lake Pannon reached its largest extent about 9.8 Ma. Then, rapid infill of clastic material started by inflow of large rivers"; the basin is "'over-elevated', in other words it should be well below the sea level in case of equilibrium."
+
+### Vey2021
+- Reference: Vey, S., Al-Halbouni, D. et al. (2021) (the initials from memory). Delayed subsidence of the Dead Sea shore due to hydro-meteorological changes. Scientific Reports (volume and article number not checked).
+- DOI or URL: 10.1038/s41598-021-91949-y
+- Cited as: "Vey et al. 2021" (the Dead Sea's level).
+- Ledger ids: none (flexure.md, "The release's pace": Earth's lowest dry land)
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-23: "The lake level has steadily decreased with now more than - 110 cm/year, leaving the level in October 2018 at 433 m below mean sea-level (msl)."
