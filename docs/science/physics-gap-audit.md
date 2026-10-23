@@ -237,30 +237,27 @@ and that the model does not have as physics.
   - Root removal: never mentioned as a mechanism. The papers sit in the bibliography, with no
     ledger row or deferral note.
   - Cratons as stiff, buoyant keels: never mentioned.
-- **State (2026-10-23).** Stage 1 is built, every part off by default
-  ([lithosphere-thermal-state.md](lithosphere-thermal-state.md), PLT-460 to PLT-470, ISO-110 to
-  ISO-112): each sample carries its thermal lithosphere's depth and a keel; heat flow comes from
-  it (PLT-137's proxy kept when off), with a final pass that fixes the release pace's 33.7 mW/m²
-  bake fault; thermal isostasy in two frames; a strength from the thermal age for the thin sheet
-  and the flexure's Te; a backstop for the cordillera's source. On the pool only the strength
-  moves V1 towards Earth (24 runs: largest landmass 0.151 to 0.182, p 0.010; crust under the sea
-  0.274 to 0.251, p 0.18) and it pushes land over the band's top in seven runs, so criteria a run
-  go 3.33 to 3.42 (p 0.57) and it stays off. With the plate's yield (ISO-120) as well, 3.17 (p
-  0.98): the yield takes back the strength's gain and keeps its own cut of the guard's worst
-  (13.7 to 13.0 km, p 0.033); the strength bounds no load, so it does not replace the yield.
-  Thermal isostasy lifts the sea (craton frame) or sinks the start's continents (Hyndman &
-  Currie's). Stages 2 and 3 are built, each off by default (PLT-475 to PLT-478): rifted margins
-  drawn by a stretching factor β (crust T_n / β on a smoothstep across the proximal, necking and
-  hyperextended domains, lithosphere and keel L / β, then McKenzie's subsidence from the state;
-  `tectonics.transition_beta`) and root removal (a collision belt's crust over 50 km has its
-  mantle lithosphere drop off to the Moho at 10 Myr, Houseman & Molnar 1997, and the founder
-  sinks at that pace; `tectonics.root_removal`). The diagnosis before them (the `coastset`
-  measure over the base's 24 runs): 0.690 of the high coasts sit at collision belts, 0.085 at
-  rifted margins, so stage 2 can move coast_hi by 0.03 at most; without the collision belts' high
-  coasts it would be 0.094, inside its band. On 8-run arms neither stage moved V1 enough for a
-  final (β with the strength 3.50 criteria a run against the strength alone's 3.38 and the base's
-  3.00 on the same seeds; root removal with the strength 3.25, its largest landmass on the band's
-  floor). The lever for the high coasts is collision belts at open coasts, which is gap 2's.
+- **State (2026-10-23).** Stages 1 to 3 are built and, under Ben's rule of 2026-10-23 (physics on
+  once built and correct; decisions log "Always, fix V1 elsewhere"), on by default except two parts
+  ([lithosphere-thermal-state.md](lithosphere-thermal-state.md), PLT-460 to PLT-478, ISO-110 to
+  ISO-112). On: the state (each sample's thermal lithosphere depth and keel, PLT-460, with the heat
+  flow from it, PLT-467, in place of PLT-137's proxy), the strength from the thermal age for the
+  thin sheet and the flexure's Te (ISO-112, in place of the orogeny's date), rifted margins drawn
+  by a stretching factor β (crust T_n / β on a smoothstep across the proximal, necking and
+  hyperextended domains, lithosphere and keel L / β; PLT-475 and PLT-476, in place of PLT-261's
+  linear ramp) and root removal (a collision belt's crust over 50 km has its mantle lithosphere
+  drop off to the Moho at 10 Myr, Houseman & Molnar 1997, and the founder sinks at that pace;
+  PLT-477 and PLT-478, in place of PLT-258's all-at-once removal). The switches for stages 2 and 3
+  are gone with the rules they replaced. The correctness evidence: unit tests against the sources,
+  and no step beyond 2 Earth reliefs on any run of any arm (8 runs each for stages 2 and 3 alone
+  and with the strength, 24 for the strength); no arm ran all four at once, which master's next
+  24-run base does. Off: thermal isostasy (ISO-110), an open fault, since neither frame is right by
+  its sources while the model's sea stands 538 to 861 m over its datum (gap 1; Hyndman & Currie's
+  frame is right once the sea holds at the datum, at L_ref 125 km), and the backstop (PLT-470), a
+  stand-in that reweights the kinematic source PLT-048 rather than a force balance. The diagnosis
+  of the high coasts (the `coastset` measure over the base's 24 runs): 0.690 sit at collision
+  belts, 0.085 at rifted margins, so stage 2 can move coast_hi by 0.03 at most; the lever is
+  collision belts at open coasts, which is gap 2's.
 
 ### Gap 5: river and delta landforms
 
