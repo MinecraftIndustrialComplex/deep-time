@@ -51,6 +51,14 @@ pub const EPOCH_CHECKPOINTS: f64 = 10.0;
 /// The default native memory cap, 4 GiB (plan §5.7.5).
 pub const DEFAULT_MEM_CAP: u64 = 4 << 30;
 
+/// How far under a stage's estimate the allocator keeps its freed blocks for reuse
+/// (`MemoryGauge::keep_below`): between a block giving way and the count, other threads' fresh
+/// blocks take the count past the bound. A figure of the memory model, not a physical one
+/// (amp-est, 2026-10-23: with the bound at the estimate, the counted peak was 325 KB over the
+/// bake's estimate on quick 16k at 50 Myr, 333 KB on Ben's world at 1000 Myr, and 33 KB over the
+/// amplifier's).
+pub const KEEP_MARGIN_BYTES: u64 = 8 << 20;
+
 /// The event-log writer name of the geology core (writer 1, `EVENTS.md`).
 pub const GEOLOGY_WRITER_NAME: &str = "deeptime:geology";
 
@@ -173,14 +181,15 @@ const SPILL_SECONDS_PER_BYTE: f64 = 3.0e-9;
 /// the stages before it built is counted in (it stays in memory under the stages after them), and
 /// a coupled group's stages, which step in turn over the same world, each hold the group's most.
 /// A follower that steps beside the lead's next step (P1-19, `Stage::steps_beside_lead`) holds
-/// its own working set on top of the lead's then.
-fn stage_sets(list: &[Box<dyn Stage>]) -> Result<Vec<(u64, u64)>, CoreError> {
+/// its own working set on top of the lead's then. Under a cap of `mem_cap` bytes
+/// ([`Stage::estimate_under`]).
+fn stage_sets(list: &[Box<dyn Stage>], mem_cap: u64) -> Result<Vec<(u64, u64)>, CoreError> {
     let (mut world, mut world_history) = (0u64, 0u64);
     let mut own = Vec::with_capacity(list.len());
     let mut sets: Vec<(u64, u64)> = list
         .iter()
         .map(|s| {
-            let e = s.estimate();
+            let e = s.estimate_under(mem_cap);
             let mut hist = e.history_bytes.min(e.bytes);
             let mut b = e.bytes - hist;
             let only = OWN_ONLY_ESTIMATES.contains(&s.name());
@@ -224,9 +233,9 @@ const OWN_ONLY_ESTIMATES: [&str; 4] = [
 ];
 
 /// The bake's working set, `(base, history, projection)` (bytes): the world the amplification
-/// leaves plus the projection pass's working set ([`crate::bake::project::estimate_bytes`]); all
-/// zero for a preset without the amplify stage (the plate-only and placeholder presets, whose
-/// bake is small or absent).
+/// leaves plus the largest of the bake's parts ([`crate::bake::estimate_bytes`]: the strata, the
+/// water or the projection pass, whose own figure is the third); all zero for a preset without
+/// the amplify stage (the plate-only and placeholder presets, whose bake is small or absent).
 fn bake_set(preset: &Preset, list: &[Box<dyn Stage>]) -> (u64, u64, u64) {
     let crate::preset::PresetBody::Planet(p) = &preset.body else {
         return (0, 0, 0);
@@ -238,8 +247,8 @@ fn bake_set(preset: &Preset, list: &[Box<dyn Stage>]) -> (u64, u64, u64) {
         return (0, 0, 0);
     }
     let (world, hist) = crate::surface::amplify::world_bytes(p);
-    let projection = crate::bake::project::estimate_bytes(p);
-    (world + projection, hist, projection)
+    let (bake, projection) = crate::bake::estimate_bytes(p);
+    (world + bake, hist, projection)
 }
 
 /// The memory and time estimate for a preset run under a memory cap of `mem_cap` bytes (0: the
@@ -250,7 +259,8 @@ fn bake_set(preset: &Preset, list: &[Box<dyn Stage>]) -> (u64, u64, u64) {
 ///   "coupled_to"}, …]}`
 ///
 /// `bake_bytes` (only for a preset with the amplify stage) is the bake's peak after the last stage:
-/// the finished world and the projection pass's working set (`bake_projection_bytes`). It counts
+/// the finished world and the largest of the bake's parts (the strata, the water and the
+/// projection pass, whose own working set is `bake_projection_bytes`). It counts
 /// in `peak_bytes`, not in the base (which a stage's own working set decides).
 ///
 /// `coupled_to` is the stage a coupled stage steps with (`Stage::coupled_to`), or null: a
@@ -282,12 +292,12 @@ pub fn estimate_for(
     };
     let (mut peak, mut base, mut history, mut spill) = (0u64, 0u64, 0u64, 0u64);
     let list = preset.stages();
-    let sets = stage_sets(&list)?;
+    let sets = stage_sets(&list, cap)?;
     let stages: Vec<Value> = list
         .iter()
         .zip(&sets)
         .map(|(s, &(b, hist))| {
-            let e = s.estimate();
+            let e = s.estimate_under(cap);
             let held = hist.min(cap.saturating_sub(b));
             let spilled = hist - held;
             peak = peak.max(b + held);
@@ -303,9 +313,9 @@ pub fn estimate_for(
         })
         .collect();
     // The bake after the last stage (`finalize_write`): the finished world, which stays in memory
-    // beside it, and the projection pass's working set (the Lambert bake itself has stayed inside
-    // the stages' peak so far; `tests/memory_estimate.rs` checks the run's peak). The session
-    // holds the allocator's kept blocks under this figure while it bakes (`Stepper::bake_allowed`).
+    // beside it, and the largest of the bake's parts (`tests/memory_estimate.rs` checks the bake's
+    // peak and the run's). The session holds the allocator's kept blocks under this figure while
+    // it bakes (`Stepper::bake_allowed`).
     let (bake_base, bake_hist, projection) = bake_set(&preset, &list);
     let bake_bytes = if bake_base > 0 {
         bake_base + bake_hist.min(cap.saturating_sub(bake_base))
@@ -887,7 +897,7 @@ impl Session {
         let mut stages = preset.stages();
         let groups = stage_groups(&stages)?;
         let at_start = gauge.in_use();
-        let sets = stage_sets(&stages)?;
+        let sets = stage_sets(&stages, mem_cap)?;
         let allowed = sets
             .iter()
             .map(|&(b, h)| at_start + b + h.min(mem_cap.saturating_sub(b)))
@@ -1263,7 +1273,11 @@ impl Session {
         k: usize,
         history: Option<&HistoryHandle>,
     ) -> Result<(), CoreError> {
-        self.gauge.keep_below(s.allowed[k].min(self.mem_cap));
+        self.gauge.keep_below(
+            s.allowed[k]
+                .min(self.mem_cap)
+                .saturating_sub(KEEP_MARGIN_BYTES),
+        );
         let Some(h) = history else {
             return Ok(());
         };
@@ -1980,7 +1994,8 @@ impl Session {
         // kept filled the count to that bound, and one fresh block passed it (tests/memory_estimate.rs,
         // 2026-10-21: 99.7 against 99.5 MiB, 41.6 MiB of it kept blocks).
         if let Some(a) = s.bake_allowed {
-            self.gauge.keep_below(a.min(self.mem_cap));
+            self.gauge
+                .keep_below(a.min(self.mem_cap).saturating_sub(KEEP_MARGIN_BYTES));
         }
         let dir = &self.out_dir;
         let manifest_path = dir.join(MANIFEST);

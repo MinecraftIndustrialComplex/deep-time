@@ -48,8 +48,8 @@
 //! accretion (`pools.rs`). Slab pull turns the subducting plate's axis towards its fronts. Uplift
 //! of crust above sea level is scaled by the isostatic ceiling (1 − z/z_c) ([`ceiling`]).
 //!
-//! **Subduction erosion** ([`erode_forearcs`], PLT-441, PLT-442; off unless
-//! `subduction_erosion_km3_per_km_myr` is set). Where an oceanic slab comes in fast across the
+//! **Subduction erosion** ([`erode_forearcs`], PLT-441, PLT-442; on by default since 2026-10-23,
+//! off with `subduction_erosion_km3_per_km_myr` 0). Where an oceanic slab comes in fast across the
 //! front (orthogonal convergence at least `subduction_erosion_min_mm_yr`) under little sediment
 //! (its sediment and sedimentary rock under `subduction_erosion_max_sediment_m`), the margin is
 //! erosive (Clift & Vannucchi 2004: erosion where convergence passes 6 cm/yr and the cover is under
