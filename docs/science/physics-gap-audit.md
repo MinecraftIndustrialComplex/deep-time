@@ -241,7 +241,8 @@ and that the model does not have as physics.
   once built and correct; decisions log "Always, fix V1 elsewhere"), on by default except two parts
   ([lithosphere-thermal-state.md](lithosphere-thermal-state.md), PLT-460 to PLT-478, ISO-110 to
   ISO-112). On: the state (each sample's thermal lithosphere depth and keel, PLT-460, with the heat
-  flow from it, PLT-467, in place of PLT-137's proxy), the strength from the thermal age for the
+  flow from it, PLT-467, in place of PLT-137's proxy, and the final pass that fixes the release
+  pace's 33.7 mW/m² bake fault, PLT-469, on by default on its own too), the strength from the thermal age for the
   thin sheet and the flexure's Te (ISO-112, in place of the orogeny's date), rifted margins drawn
   by a stretching factor β (crust T_n / β on a smoothstep across the proximal, necking and
   hyperextended domains, lithosphere and keel L / β; PLT-475 and PLT-476, in place of PLT-261's
