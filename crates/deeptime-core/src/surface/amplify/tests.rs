@@ -93,6 +93,7 @@ fn l2_level() -> Level {
         wgt,
         kfac: vec![1.0; w * h],
         zs: Vec::new(),
+        closed: Vec::new(),
         lake_z: (0..w * h)
             .map(|c| {
                 if kind[c] == pflood::SINK {
@@ -186,7 +187,7 @@ fn lake_l3(l2: &Level) -> Vec<u8> {
     let lake_z = (0..4 * l2.cells())
         .map(|c| {
             let (i, j) = (c % (2 * l2.w), c / (2 * l2.w));
-            if mid.lake[c] == 1 {
+            if resample::cell::lake(mid.lake[c]) {
                 reach.lake_surface(i as i64, j as i64)
             } else {
                 resample::NO_LAKE
@@ -203,6 +204,7 @@ fn lake_l3(l2: &Level) -> Vec<u8> {
         kfac: mid.kfac,
         lake_z,
         zs: Vec::new(),
+        closed: Vec::new(),
     };
     l1.sample(&Win::full(4 * l2.w, 4 * l2.h)).lake
 }
@@ -738,8 +740,8 @@ fn the_sea_floor_keeps_its_own_critical_slope() {
     let ones = vec![1.0f32; win.cells()];
     let mut land = vec![0.0f32; win.cells()];
     let mut mixed = vec![0.0f32; win.cells()];
-    super::kernels::tmult_fill(&win, &noise, &ones, &[], 60.0, 0.0, &mut land);
-    super::kernels::tmult_fill(&win, &noise, &z, &[], 60.0, 0.0, &mut mixed);
+    super::kernels::tmult_fill(&win, &noise, &ones, &[], &[], 60.0, 0.0, &mut land);
+    super::kernels::tmult_fill(&win, &noise, &z, &[], &[], 60.0, 0.0, &mut mixed);
     let ratio = (c.p.submarine_slope / c.p.thermal_slope) as f32;
     for (k, ((&zk, &l), &m)) in z.iter().zip(&land).zip(&mixed).enumerate() {
         let want = if zk < 0.0 { l * ratio } else { l };
@@ -753,7 +755,7 @@ fn the_sea_floor_keeps_its_own_critical_slope() {
         .map(|(k, &zk)| zk + if k % 2 == 0 { 200.0 } else { 10.0 })
         .collect();
     let mut iced = vec![0.0f32; win.cells()];
-    super::kernels::tmult_fill(&win, &noise, &z, &zs, 60.0, 0.0, &mut iced);
+    super::kernels::tmult_fill(&win, &noise, &z, &zs, &[], 60.0, 0.0, &mut iced);
     for (k, ((&zk, &l), &m)) in z.iter().zip(&land).zip(&iced).enumerate() {
         let want = if zk < 0.0 && k % 2 == 1 { l * ratio } else { l };
         assert_eq!(m.to_bits(), want.to_bits(), "iced cell {k}");
@@ -1176,9 +1178,10 @@ fn auto_streams_when_the_whole_path_peak_would_not_fit_though_the_last_level_alo
 
     // The failing 1000 Myr run (2026-09-30) held 1,643,487,517 bytes when amplify started, under
     // the default 4 GiB cap: the last level's buffers alone fitted, the reservation made after
-    // the ladder (with the level before it and the preview) needed 4,451,574,045, and needs 3 B
-    // a cell of the kept level more since the levels carry each lake's surface (2026-10-22,
-    // AMP-090; the windows do not, so the buffers are as they were).
+    // the ladder (with the level before it and the preview) needed 4,451,574,045, and needs 4 B
+    // a cell of the kept level more since the levels carry each lake's surface (3 B more,
+    // 2026-10-22, AMP-090) and each cell's basin class (1 B, 2026-10-23, AMP-096); the windows
+    // carry neither, so the buffers are as they were.
     let cap = crate::session::DEFAULT_MEM_CAP;
     let held = 1_643_487_517;
     assert!(
@@ -1188,7 +1191,7 @@ fn auto_streams_when_the_whole_path_peak_would_not_fit_though_the_last_level_alo
     let Err(CoreError::MemoryCap { needed, .. }) = gauge_model(held, cap)(peak) else {
         panic!("the full peak must not fit");
     };
-    assert_eq!(needed, 4_451_574_045 + 3 * (4096 * 2048 - 2048 * 1024));
+    assert_eq!(needed, 4_451_574_045 + 4 * (4096 * 2048 - 2048 * 1024));
     assert!(needed > cap);
 
     // auto streams there; never and always are what they say whatever the cap.

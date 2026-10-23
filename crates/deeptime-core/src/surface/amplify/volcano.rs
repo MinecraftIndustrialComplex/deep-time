@@ -541,6 +541,7 @@ mod tests {
             kfac: vec![1.0; n],
             lake_z: vec![crate::surface::amplify::resample::NO_LAKE; n],
             zs: Vec::new(),
+            closed: Vec::new(),
         };
         let it = &sh.items[0];
         let mh = preset.scale.m_per_block_h;
@@ -684,6 +685,7 @@ mod tests {
             kfac: vec![1.0; n],
             lake_z: vec![crate::surface::amplify::resample::NO_LAKE; n],
             zs: Vec::new(),
+            closed: Vec::new(),
         };
         sh.sharpen_level(&mut level, &g2);
         let vent = crate::surface::volcanoes::cell_of(&g2, 0.0, 0.0);

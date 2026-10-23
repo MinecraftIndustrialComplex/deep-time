@@ -729,8 +729,10 @@ fn relief(win: &Win, src: &[f32], lo: &mut [f32], hi: &mut [f32], dst: &mut [f32
 }
 
 /// Applies the character to the window's terrain `z` (m) in place, reading the effective drainage
-/// area `area` (m²), the erodibility `kfac` and the lake footprint. Sea and lake cells are left as
-/// they are; no land cell goes under the sea. Returns the statistics of `core`'s land cells.
+/// area `area` (m²), the erodibility `kfac` and the window's cell bytes `lake` (the lake flag and
+/// the basin class, `resample::cell`; empty: no lakes, all open). Sea and lake cells are left as
+/// they are, and no land cell open to the sea goes under it; closed ground (never sea) may.
+/// Returns the statistics of `core`'s land cells.
 #[allow(clippy::too_many_arguments)]
 pub fn apply(
     win: &Win,
@@ -793,7 +795,18 @@ pub fn apply(
             gj,
         )
     };
-    let is_land = |cell: usize| z[cell] > sea && lake[cell] == 0;
+    // `lake` holds the window's cell bytes: the lake bit and the basin class (`resample::cell`).
+    let class = |cell: usize| {
+        lake.get(cell).map_or(super::resample::basin::OPEN, |&m| {
+            super::resample::cell::class(m)
+        })
+    };
+    let is_open = |cell: usize| class(cell) == super::resample::basin::OPEN;
+    let is_lake = |cell: usize| {
+        lake.get(cell)
+            .is_some_and(|&m| super::resample::cell::lake(m))
+    };
+    let is_land = |cell: usize| !super::resample::wet(z[cell], sea, class(cell)) && !is_lake(cell);
     // How much of the character a land cell takes: none on rivers and at the coast, nor in the
     // glacial troughs and cirques `glacial.rs` cut (`glacier`: the trough fade, 0–1, a smooth
     // field (`run_tiles`); empty without glaciers): gullies and fold ridges would fight the U.
@@ -805,6 +818,10 @@ pub fn apply(
     let fade = |cell: usize| -> f64 {
         let a_km2 = f64::from(area[cell]) * 1.0e-6;
         let river = smoothstep(a0, a1, a_km2);
+        // By height on all ground, closed ground too: the basin classes are drawn on the coarse
+        // grid (the hydrology's halo round closed ground reaches above sea level), and a fade
+        // that switched on them drew that grid's staircase into the ground near sea level.
+        // Closed ground under sea level therefore takes no character. ledger: AMP-061, AMP-096
         let coast = smoothstep(
             0.0,
             p.coast_blocks.max(1e-6),
@@ -821,7 +838,7 @@ pub fn apply(
         for dj in -lake_r..=lake_r {
             for di in -lake_r..=lake_r {
                 let r2 = di * di + dj * dj;
-                if r2 < d2 && lake[at(win, i, j, di, dj)] != 0 {
+                if r2 < d2 && is_lake(at(win, i, j, di, dj)) {
                     d2 = r2;
                 }
             }
@@ -982,7 +999,11 @@ pub fn apply(
         let y_in = f64::from(to_y(z[cell]));
         let dy = (y - y_in).clamp(-p.max_change_blocks, p.max_change_blocks) * lake_fade(i, j);
         let zm = f64::from(sea) + (y_in + dy - sea_y) * mv;
-        *o = (zm as f32).max(sea + 0.05);
+        *o = if is_open(cell) {
+            (zm as f32).max(sea + 0.05)
+        } else {
+            zm as f32
+        };
     });
 
     let mut st = CharacterStats::default();
@@ -1277,6 +1298,33 @@ mod tests {
             out > 0.5,
             "the flank above the shore changed by {out} blocks (mean)"
         );
+    }
+
+    #[test]
+    fn the_basin_class_draws_no_line_above_sea_level() {
+        // The west half of the window is closed ground, as the hydrology's halo round a closed
+        // basin reaches above sea level and is drawn on the coarse grid. The cone stands on a
+        // plain 4 blocks above the sea, inside the coast fade: on ground above sea level the
+        // character must not see the class, or the coarse grid's staircase shows round the
+        // basin (the jagged ring round Ben's savanna pit). ledger: AMP-061, AMP-096
+        use super::super::resample::{basin, cell};
+        let young = CharacterFields::uniform(1.0, 0.0, 0.0);
+        let (win, ..) = cone(0.8);
+        let open = vec![cell::of(false, basin::OPEN); win.cells()];
+        let half: Vec<u8> = (0..win.cells())
+            .map(|c| {
+                let class = if c % win.w < 160 {
+                    basin::CLOSED
+                } else {
+                    basin::OPEN
+                };
+                cell::of(false, class)
+            })
+            .collect();
+        let (_, a) = change_with_lake(&young, 0.8, 1.0, &open);
+        let (_, b) = change_with_lake(&young, 0.8, 1.0, &half);
+        let moved = a.iter().zip(&b).filter(|(x, y)| x != y).count();
+        assert_eq!(moved, 0, "{moved} cells differ with the west half closed");
     }
 
     #[test]
