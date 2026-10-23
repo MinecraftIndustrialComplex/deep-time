@@ -4363,7 +4363,9 @@ land (0.26 to 0.32 of the planet), the largest landmass (at least 0.12) or the d
 most 0.25); collisions 2 to 6 per 100 Myr. Ledger PLT-412 to PLT-415 (new), PLT-390 and PLT-391
 (measured again). Code: `plates/collapse.rs`, `plates/mod.rs`, `plates/rate.rs` (one call),
 `params.rs` and the table driver `tools/review/v1-item1-table.sh`; nothing in `surface/`. The new
-laws are in the code as switches and **not on** (below, "What is on"). The diagnosis, including
+laws were in the code as switches and **not on** when this section was written (below, "What is
+on"); the sheet's four keys are on by default since 2026-10-23, with the trench budget ("On by
+default (2026-10-23)", at the end of this page). The diagnosis, including
 mid-run frames for Ben's question about upland continents, is in "What the high ground is" and
 "Where the high ground stands mid-run": plateau interiors are not the main term.
 
@@ -4772,6 +4774,10 @@ with PLT-312) is what would let the sheet's lower high ground stand with the lan
 
 ### What is on
 
+**Since 2026-10-23 the sheet is on by default**, plate-wide and with the cap (the four keys above),
+together with the trench budget: "On by default (2026-10-23)", at the end of this page. What follows
+is this section's state when it was written.
+
 Nothing new. PLT-412 to PLT-415 are in the code as switches, off in the defaults and every
 built-in preset, and the default runs are the base's bit for bit (the switches off). The arm
 closest to shipping by the medians (the sheet, plate-wide) fails the ship rule on the land and
@@ -4837,7 +4843,9 @@ trench's release, `gdh1_floor_m`), `plates/mod.rs`, `plates/gap_budget.rs` (the 
 (`tools/review/pool/measure_trench.py`, registry `measures_trench.json`), the loss table
 `tools/review/loss-budget.py` (its sediment subduction and subduction erosion rows),
 `tools/review/earth-deep-floor.py` (Earth on SRTM15+) and `tools/review/trench-depth.py` (a bake's
-trenches). Every rule is a `--set` switch and off by default.
+trenches). Every rule is a `--set` switch. PLT-440, PLT-441 and PLT-443 were off by default when
+this section was written and are on since 2026-10-23 at the values under "What is on" (the next
+section, "On by default (2026-10-23)"); PLT-312 stays off.
 
 ### Ben's D5 trenches against Earth's deep floor
 
@@ -5250,10 +5258,12 @@ So on master 18ace5d7:
 
 ### What is on
 
-Nothing new is on by default.
+**Since 2026-10-23 the pair below is the default** (the trench budget at the recommended values
+with the sheet): "On by default (2026-10-23)", the next section. What follows is this section's
+state when it was written: nothing new was on by default.
 
 - **The switches.** PLT-440 to PLT-443 are in the code as `--set` switches, 0 in the defaults
-  and in every built-in preset. With them off, the runs are master's bit for bit.
+  and in every built-in preset until 2026-10-23. With them off, the runs are master's bit for bit.
 - **PLT-312.** It stays off (the exploration above).
 - **Recommended values for an arm.** The release at 2 Myr. Erosion at E = 90 with
   PLT-442's 60 mm/yr and 1 km test. Sediment subduction at s = 0.12: Table 1's flux on this
@@ -5267,7 +5277,8 @@ Nothing new is on by default.
     km³ a year over 12 runs). It keeps two thirds of the sheet's gain (3.08 criteria a run
     against 2.17, p 0.073).
   - It takes the deep floor deeper than 8 km to a tenth, and the deepest point to Earth's band.
-  - By the ship rule it stays off until a larger ensemble gives a meaningful p.
+  - By the ship rule it stays off until a larger ensemble gives a meaningful p. The 24-run
+    ensemble gave it: 3.42 criteria a run against 2.33, p 0.004 (the next section).
 - **The command line.** The pair's keys:
   `--set tectonics.trench_release_half_life_myr=2 --set tectonics.sediment_subduction_share=0.12
   --set tectonics.subduction_erosion_km3_per_km_myr=90 --set tectonics.collapse_sea_column=true
@@ -5307,4 +5318,79 @@ Nothing new is on by default.
 5. *The collision rate under the trench budget* (not traced). The collisions fall from 1.75 to
    1.55 a 100 Myr with the trench budget alone, and from 2.10 to 1.90 with the sheet.
 6. *A larger ensemble for the pair* (the coordinator's). Twelve more seeds of `base`, `fg-sheet`
-   and the pair would settle whether p 0.073 is a real gain.
+   and the pair would settle whether p 0.073 is a real gain. Done on 2026-10-23: seeds 1 to 12,
+   p 0.004, and the pair is the default (the next section).
+
+## On by default (2026-10-23)
+
+The coordinator's call under Ben's ship rule for V1 item 1 (a Mann-Whitney p under 0.05 on 24 runs an
+arm, and no criterion the base meets in fewer runs; decisions log 2026-10-23): the high ground's sheet
+("As a thin viscous sheet", above) and the trench budget (the previous section) are the default and
+every built-in preset's since 2026-10-23. Seven keys changed:
+
+- **The sheet.** `tectonics.collapse_sea_column` true (PLT-412), `collapse_sea_column_max_km` 41.1
+  (PLT-413), `collapse_sheet_viscosity_pa_s` 1e22 (PLT-414) and `collapse_reach_km` 5,000, a plate's
+  size (PLT-257; 200 before). PLT-415's strength growth (62.8 Myr) is read with PLT-414 and keeps its
+  value.
+- **The trench budget.** `tectonics.sediment_subduction_share` 0.12 (PLT-440),
+  `subduction_erosion_km3_per_km_myr` 90 (PLT-441) and `trench_release_half_life_myr` 2 (PLT-443).
+  PLT-442's test (60 mm/yr, 1 km) is read with PLT-441 and keeps its value. PLT-312 stays off.
+
+The code is in `params.rs` (`TectonicParams::default`) and the twelve built-in presets
+(`presets/earthlike_*`, `presets/pipeline/pipeline_*`, `presets/plates/plates_*`); the Java side
+packs those files into the jar, so the Create World screen and the workbench read the same values. The
+test preset `tests/presets/planet_world_4k.json` lists none of the six other keys and takes them from
+the default; it keeps its own `collapse_reach_km` 200 and has the collapse off (`collapse_myr` 0).
+
+### Twenty-four runs
+
+`pool.sh table --base base --arm fg-sheet --arm trench-m-rs12e-sheet`: `earthlike_quick_16k`,
+1,000 Myr, both starts, seeds 1 to 12, the crust budget on (`+DEEPTIME_CRUST_BUDGET=1`), 2 threads.
+`base` is master 3fc91491 (key a7d34642f456), `fg-sheet` the sheet's four keys (key adf36da1f017) and
+`trench-m-rs12e-sheet` the seven keys (key eb4ef634e607, argkey 86d11d8b). Medians of the runs, the
+p against `base` in brackets. The default since 2026-10-23 is the last arm's runs bit for bit (below).
+
+| arm | land | largest landmass | continental crust under the sea | land above 2 km | coast with high ground | land under ice | collisions per 100 Myr | continental crust's net change over the run | criteria met per run: median, mean | sea over the datum, median after 100 Myr / end, m |
+|---|---|---|---|---|---|---|---|---|---|---|
+| target | 0.26 to 0.32 | ≥ 0.12 | ≤ 0.25 | ≤ 0.12 | ≤ 0.15 | ≤ 0.15 | 2 to 6 | | of 7 | |
+| base | 0.292 | 0.139 | 0.264 | 0.261 | 0.389 | 0.170 | 1.75 | −0.064 | 3, 2.33 | 393 / 701 |
+| fg-sheet | 0.347 (< 0.001) | 0.236 (0.001) | 0.241 (0.10) | 0.156 (< 0.001) | 0.347 (0.031) | 0.129 (< 0.001) | 2.00 (0.10) | −0.001 (< 0.001) | 3, 3.33 (0.002) | 551 / 1,029 |
+| trench and sheet | 0.306 (0.065) | 0.189 (0.068) | 0.238 (0.28) | 0.161 (< 0.001) | 0.344 (0.038) | 0.123 (< 0.001) | 1.95 (0.16) | −0.035 (0.004) | 3, 3.42 (0.004) | 597 / 843 |
+| **default since 2026-10-23** | 0.306 | 0.189 | 0.238 | 0.161 | 0.344 | 0.123 | 1.95 | −0.035 | 3, 3.42 | 597 / 843 |
+
+The runs that meet each criterion, of 24 (`pool.sh table --json`, counted against the targets):
+
+| arm | land | largest | under the sea | above 2 km | coast | ice | collisions | criteria, all runs |
+|---|---|---|---|---|---|---|---|---|
+| base | 15 | 15 | 11 | 0 | 0 | 8 | 7 | 56 |
+| fg-sheet | 4 | 22 | 14 | 9 | 0 | 17 | 14 | 80 |
+| trench and sheet, the default | 15 | 20 | 14 | 6 | 0 | 15 | 12 | 82 |
+
+*Does the pair meet the ship rule?* Yes. It meets 3.42 criteria a run against the base's 2.33 at
+p 0.004, and every column has at least as many runs as the base's: the land is in the band in 15 runs,
+as in the base, where the sheet alone keeps it in 4. Against the twelve runs of seeds 1 to 6 (3.08 at
+p 0.073, the previous section) seeds 7 to 12 moved the mean up and the p under 0.05. No criterion is
+met for the coast with high ground in any arm.
+
+*What changes in a default run.* The high ground falls from 0.26 of the land to 0.16 and the ice from
+0.17 to 0.12; the largest landmass grows from 0.14 to 0.19 of the planet. The continental crust's net
+loss falls from 0.064 of the planet to 0.035. The sea stands higher over the datum, 597 m after
+100 Myr and 843 m at the end against 393 and 701: the sheet's spreading crust displaces the ocean
+("Why continental room first lifts the land and the sea", above).
+
+*The default is the measured arm.* The new default on this branch was checked against the arm's key:
+
+- **The pool's alias check** (`pool.sh alias HEAD eb4ef634e607 --check-seed 1 --length 1000` with the
+  seven keys as `--set` and `+DEEPTIME_CRUST_BUDGET=1`): the seven keys on the new defaults give
+  supercontinent seed 1's state and record bit for bit (`state_sha256`, `rec_sha256`).
+- **The default with no `--set`** (the pool's arm `ship-default`, seeds 1 and 2 of both starts): each
+  run's `state_sha256` in `meta.json` equals the `trench-m-rs12e-sheet` run of the same start and
+  seed.
+
+### What is left
+
+The trench budget's "What is left" (above) holds for the default as it stands: the surface stage's
+deepening at trench rows, the sediment's routing (the sea 600 to 1,170 m over the datum), the fronts'
+length, the trench's depth against the slab's age and the collisions under the trench budget. The
+high ground's "What is left" holds too, the belts' extent first. The coast with high ground (0.34 of
+the coast against at most 0.15) is the criterion no arm moves.

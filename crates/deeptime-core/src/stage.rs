@@ -136,6 +136,14 @@ pub trait Stage: Send {
     /// Memory and time for this stage, from the parameters it was built with.
     fn estimate(&self) -> StageEstimate;
 
+    /// [`Stage::estimate`] for a run under a memory cap of `mem_cap` bytes, for a stage whose
+    /// working set depends on it (the amplifier keeps a level whole when the cap has room for it,
+    /// and tiles it when it does not); the same as `estimate` for the others.
+    fn estimate_under(&self, mem_cap: u64) -> StageEstimate {
+        let _ = mem_cap;
+        self.estimate()
+    }
+
     fn total_steps(&self) -> u64;
 
     fn steps_done(&self) -> u64;
