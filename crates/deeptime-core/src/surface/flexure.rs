@@ -136,8 +136,11 @@ pub struct FlexureParams {
     pub te_min_km: f64,
     /// Where the law above lowers a plate's Te (an orogeny, an arc, a rift: heating), the plate
     /// weakens towards it as e^(−t / this), Myr: the time its geotherm takes to warm (the
-    /// lithosphere's thermal time constant). It stiffens at once. 0: weakens at once too (the
-    /// rule until 2026-10-23). The break at a plate boundary is not the law's and stays at once.
+    /// lithosphere's thermal time constant: 62.8 Myr, ISO-099). It stiffens at once. 0, the
+    /// default: weakens at once too, the rule before 2026-10-23 (off until the pool says
+    /// otherwise: on the pool's runs 62.8 left the criteria where they were and gave more closed
+    /// basins and larger one-step falls, docs/science/flexure.md "The release's pace"). The break
+    /// at a plate boundary is not the law's and stays at once.
     pub te_weakening_myr: f64,
     /// Solve every this many plate steps (loads in between wait for the next solve).
     pub every_steps: u32,
@@ -157,7 +160,7 @@ impl Default for FlexureParams {
             te_craton_km: 80.0, // ledger: ISO-050
             te_recovery_myr: 300.0, // ledger: ISO-051 (uncited: this agent's choice)
             te_min_km: 5.0, // ledger: ISO-052
-            te_weakening_myr: 62.8, // ledger: ISO-099
+            te_weakening_myr: 0.0, // ledger: ISO-099 (game-choice: off by default)
             every_steps: 1, // ledger: ISO-059 (game-choice: numerical)
             tolerance_m: 2.0, // ledger: ISO-059
             max_iterations: 60, // ledger: ISO-059
@@ -2804,7 +2807,10 @@ mod tests {
             te_weakening_myr: 0.0,
             ..on()
         };
-        let p = on();
+        let p = FlexureParams {
+            te_weakening_myr: 62.8, // ledger: ISO-099
+            ..on()
+        };
         let steps = (8.0 * p.te_weakening_myr / 2.0).ceil() as usize;
         let (h_now, te_now, rel_now) = run(&at_once, steps);
         let (h_slow, te_slow, rel_slow) = run(&p, steps);
