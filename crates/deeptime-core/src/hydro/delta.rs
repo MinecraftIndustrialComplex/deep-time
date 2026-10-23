@@ -12,7 +12,7 @@
 //! it carves every chain.
 
 use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 
 use deeptime_format::GridDesc;
 use deeptime_format::rivers::{Chain, Mouth, RiverVertex};
@@ -701,8 +701,8 @@ pub struct Split {
     pub mouths: u32,
     /// Chains added.
     pub added: u32,
-    /// Splits given up: [the split point at the stem's last cell on the plain, no front cell of
-    /// the half it heads for reached across the plain, none of those with a free way down to the
+    /// Splits given up: [the split point at a branch's last cell on the plain, no front cell of
+    /// the half it heads for reached across the plain, none of those with a free way to the
     /// open sea] (HYD-144).
     pub fails: [u32; 3],
 }
@@ -748,12 +748,6 @@ pub fn distributaries(
     }
     let mut ids: Vec<u32> = stem_of.keys().copied().collect();
     ids.sort_unstable();
-    // The steps from each sea-reached cell to the open sea, which the branches' tails descend.
-    let to_sea = if ids.is_empty() {
-        Vec::new()
-    } else {
-        sea_distance(&geo, &reach, &open)
-    };
     let mut out = Vec::new();
     for o in ids {
         let plain = &plains.plains[o as usize];
@@ -849,7 +843,10 @@ pub fn distributaries(
             if hi - lo < 2 {
                 continue;
             }
-            if at + 1 >= branches[b].on_plain {
+            // A branch splits short of its last cell on the plain; a main stem that touches the
+            // plain at one cell (the plain spread along the coast beside an open mouth) splits
+            // there, at the shore (HYD-140).
+            if at + 1 >= branches[b].on_plain && branches[b].on_plain > 1 {
                 split.fails[0] += 1;
                 continue;
             }
@@ -862,7 +859,7 @@ pub fn distributaries(
             };
             let start = branches[b].cells[at];
             // The give half's front cells, its middle first and then outward: the first that no
-            // channel takes, that a path reaches across the plain and that has a free way down to
+            // channel takes, that a path reaches across the plain and that has a free way to
             // the open sea is the new mouth (HYD-144).
             let t_seg = (give.0 + give.1 - 1) / 2;
             let mid_i = ((2 * t_seg + 1) * front.len()) / (2 * mouths_n);
@@ -884,7 +881,7 @@ pub fn distributaries(
                 reached = true;
                 // From the front cell across the beach band (if any) to the first cell of the
                 // open sea, as every sea mouth ends (HYD-144).
-                let Some(tail) = to_open(&geo, goal, &to_sea, &used) else {
+                let Some(tail) = to_open(&geo, goal, &reach, &open, &used) else {
                     continue;
                 };
                 let plain_len = path.len();
@@ -1062,59 +1059,42 @@ fn path_to(prev: &HashMap<u32, u32>, start: u32, goal: u32) -> Option<Vec<u32>> 
     Some(path)
 }
 
-/// Each sea-reached cell's count of 8-connected steps over sea-reached ground (`reach`: the beach
-/// band and the open sea) to the nearest `open` cell, `u32::MAX` on every other cell (HYD-144).
-fn sea_distance(geo: &Geo, reach: &[bool], open: &[bool]) -> Vec<u32> {
-    let n = geo.w * geo.h;
-    let mut dist = vec![u32::MAX; n];
-    let mut queue = std::collections::VecDeque::new();
-    for c in 0..n {
-        if open[c] {
-            dist[c] = 0;
-            // Only the open sea's edge starts the search.
-            if (0..8).any(|k| geo.nb(c, k).is_some_and(|nb| reach[nb] && !open[nb])) {
-                queue.push_back(c);
-            }
-        }
-    }
+/// The shortest 8-connected way from a plain's front cell `from` over sea-reached cells (`reach`:
+/// the beach band and the open sea) that no channel of the plain takes yet, to the nearest `open`
+/// cell; none where every way is taken (HYD-144). Excludes `from`, includes the open cell.
+fn to_open(
+    geo: &Geo,
+    from: u32,
+    reach: &[bool],
+    open: &[bool],
+    used: &HashSet<u32>,
+) -> Option<Vec<u32>> {
+    let mut prev: HashMap<u32, u32> = HashMap::new();
+    let mut queue = VecDeque::from([from]);
     while let Some(c) = queue.pop_front() {
         for k in 0..8 {
-            if let Some(nb) = geo.nb(c, k)
-                && reach[nb]
-                && dist[nb] == u32::MAX
-            {
-                dist[nb] = dist[c] + 1;
-                queue.push_back(nb);
+            let Some(nb) = geo.nb(c as usize, k) else {
+                continue;
+            };
+            let n = nb as u32;
+            if !reach[nb] || n == from || used.contains(&n) || prev.contains_key(&n) {
+                continue;
             }
+            prev.insert(n, c);
+            if open[nb] {
+                let mut tail = vec![n];
+                let mut x = c;
+                while x != from {
+                    tail.push(x);
+                    x = prev[&x];
+                }
+                tail.reverse();
+                return Some(tail);
+            }
+            queue.push_back(n);
         }
     }
-    dist
-}
-
-/// The way from a plain's front cell `from` to the open sea: down the step counts `to_sea`
-/// ([`sea_distance`]), one step nearer each cell, over cells no channel of the plain takes yet;
-/// none where every way down is taken (HYD-144). Excludes `from`, includes the open cell.
-fn to_open(geo: &Geo, from: u32, to_sea: &[u32], used: &HashSet<u32>) -> Option<Vec<u32>> {
-    let mut tail = Vec::new();
-    let mut c = from as usize;
-    let mut here = u32::MAX;
-    loop {
-        let mut best: Option<(u32, usize)> = None;
-        for k in 0..8 {
-            let Some(nb) = geo.nb(c, k) else { continue };
-            let d = to_sea[nb];
-            if d < here && !used.contains(&(nb as u32)) && best.is_none_or(|b| (d, nb) < b) {
-                best = Some((d, nb));
-            }
-        }
-        let (d, nb) = best?;
-        tail.push(nb as u32);
-        if d == 0 {
-            return Some(tail);
-        }
-        here = d;
-        c = nb;
-    }
+    None
 }
 
 /// `notes.bake.water.stats.deltas`: counts, areas, the largest plains, and Earth's figures beside
