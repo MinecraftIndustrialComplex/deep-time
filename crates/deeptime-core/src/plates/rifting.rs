@@ -464,7 +464,17 @@ pub fn maybe_initiate_subduction(
                     continue;
                 }
                 let seed = far[state.rng.below(far.len() as u64) as usize];
-                initiate(state, world, geo, pos, env, id, seed, o, Some(near.as_slice()))?;
+                initiate(
+                    state,
+                    world,
+                    geo,
+                    pos,
+                    env,
+                    id,
+                    seed,
+                    o,
+                    Some(near.as_slice()),
+                )?;
             } else {
                 let seed = o[state.rng.below(o.len() as u64) as usize];
                 initiate(state, world, geo, pos, env, id, seed, o, None)?;
