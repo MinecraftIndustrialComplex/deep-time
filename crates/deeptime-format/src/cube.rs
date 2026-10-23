@@ -590,6 +590,24 @@ impl Cube {
         Cube::new(face_for(circumference))
     }
 
+    /// The net of face side `s`, made once per process and shared: a world's readers (rasters,
+    /// [`crate::projection::WorldProjection`]) fold through it without building the edge list
+    /// each time. A process meets a handful of sides, so the nets are kept for its life.
+    pub fn shared(s: u32) -> &'static Cube {
+        use std::sync::{Mutex, OnceLock};
+        static NETS: OnceLock<Mutex<Vec<&'static Cube>>> = OnceLock::new();
+        let mut nets = NETS
+            .get_or_init(|| Mutex::new(Vec::new()))
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(c) = nets.iter().find(|c| c.s == i64::from(s)) {
+            return c;
+        }
+        let c: &'static Cube = Box::leak(Box::new(Cube::new(s)));
+        nets.push(c);
+        c
+    }
+
     /// s, blocks.
     #[inline]
     pub fn side(&self) -> i64 {
@@ -621,6 +639,7 @@ impl Cube {
             x_max: 5.0 * h,
             z_min: -3.0 * h,
             z_max: 3.0 * h,
+            period_x: Some(4 * self.s),
         }
     }
 
@@ -872,6 +891,41 @@ impl CubeTurn {
         CubeTurn {
             m: [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]],
         }
+    }
+
+    /// A free turn: R_z(spin) · R_x(tilt) · R_z(azimuth), planet to cube, on the portable
+    /// functions (the parity fixture's free turn is `from_angles(−71.5, 38, 12)`). Readers take a
+    /// world's rows from its manifest and never recompute them.
+    pub fn from_angles(azimuth_deg: f64, tilt_deg: f64, spin_deg: f64) -> CubeTurn {
+        use crate::portable_math as pm;
+        let rz = |d: f64| {
+            let r = pm::to_radians(d);
+            let (s, c) = (pm::sin(r), pm::cos(r));
+            CubeTurn {
+                m: [[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]],
+            }
+        };
+        let rx = |d: f64| {
+            let r = pm::to_radians(d);
+            let (s, c) = (pm::sin(r), pm::cos(r));
+            CubeTurn {
+                m: [[1.0, 0.0, 0.0], [0.0, c, s], [0.0, -s, c]],
+            }
+        };
+        rz(spin_deg).then_after(&rx(tilt_deg).then_after(&rz(azimuth_deg)))
+    }
+
+    /// The product self · first: the turn that applies `first`, then this one (rows planet to
+    /// cube, so `self.then_after(f).to_cube(p)` is `self.to_cube(f.to_cube(p))`).
+    pub fn then_after(&self, first: &CubeTurn) -> CubeTurn {
+        let (a, b) = (&self.m, &first.m);
+        let mut m = [[0.0; 3]; 3];
+        for (i, row) in m.iter_mut().enumerate() {
+            for (j, x) in row.iter_mut().enumerate() {
+                *x = (a[i][0] * b[0][j] + a[i][1] * b[1][j]) + a[i][2] * b[2][j];
+            }
+        }
+        CubeTurn { m }
     }
 
     /// The rows, planet to cube.

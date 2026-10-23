@@ -5,10 +5,15 @@
 //! when a page asks.
 //!
 //! Its own crate (it was `deeptime-cli`'s `watch::worldmap`) so another viewer can draw a Deep Time
-//! world without the command line tool: [`BakeMap`] is a [`mic_viewer::tiles::TileSource`]
-//! (the shared viewer core, decisions log 2026-10-21), layers `sat`, `elev`, `water` and `overlay`
-//! on the pyramid below. The workbench's routes and per-run cache are `deeptime-cli`'s
-//! `watch::tiles`.
+//! world without the command line tool: [`BakeMap`] is a `mic_viewer::tiles::TileSource`
+//! (the shared viewer core, decisions log 2026-10-21; feature `tile-source`, on by default), layers
+//! `sat`, `elev`, `water` and `overlay` on the pyramid below. The workbench's routes and per-run
+//! cache are `deeptime-cli`'s `watch::tiles`.
+//!
+//! The game's dev map (the `deeptime_devmap` mod) shows the same satellite look:
+//! [`BakeMap::render_frame`] draws a layer over any equirectangular frame, and `deeptime-jni`'s
+//! `renderWorldMap` hands it to the server, which sends it to the map screen and the HUD minimap.
+//! The JNI library builds this crate without `tile-source`, so the natives do not link mic-viewer.
 //!
 //! # The pyramid
 //! Equirectangular, 256-pixel tiles, XYZ-style with the geodetic 2:1 layout: zoom `z` is
@@ -54,6 +59,7 @@ use deeptime_format::rivers::read_rivers;
 use deeptime_format::{
     DetailSpec, GridDesc, LayerDesc, Manifest, Noise, Ramps, Rivers, TilePackReader,
 };
+#[cfg(feature = "tile-source")]
 use mic_viewer::tiles::{Rendered, TileError, TileSource};
 use serde_json::{Value, json};
 
@@ -1409,10 +1415,12 @@ impl BakeMap {
         let mut out = vec![1f32; TILE * TILE];
         let lambert = match self.meta.projection {
             deeptime_format::projection::WorldProjection::Lambert(p) => Some(p),
-            deeptime_format::projection::WorldProjection::PetroffGuyou(_) => None,
+            deeptime_format::projection::WorldProjection::PetroffGuyou(_)
+            | deeptime_format::projection::WorldProjection::Cube(_) => None,
         };
-        // A Petroff–Guyou world's blocks are what a player walks: slopes in its own block metric,
-        // a block `m_per_block_h` wide.
+        // A Petroff–Guyou or cube world's blocks are what a player walks: slopes in its own block
+        // metric, a block `m_per_block_h` wide (the cube's nominal width; its local σ is within
+        // a few percent of it).
         let metres_px = if lambert.is_some() {
             metres_px
         } else {
@@ -1664,6 +1672,87 @@ impl BakeMap {
     }
 
     // -----------------------------------------------------------------------------------------
+    // A frame
+    // -----------------------------------------------------------------------------------------
+
+    /// The pyramid's zoom whose pixel is nearest `s` blocks (by its logarithm), clamped to
+    /// `0..=max_zoom`: the zoom a frame of `s` blocks a pixel draws its rivers at.
+    pub fn zoom_for(&self, s: f64) -> u32 {
+        let z = (f64::from(self.meta.c) / (2.0 * TILE as f64 * s))
+            .log2()
+            .round();
+        if z.is_finite() {
+            z.clamp(0.0, f64::from(self.meta.max_zoom)) as u32
+        } else {
+            0
+        }
+    }
+
+    /// `layer` over a frame of `w × h` pixels in block space, RGBA8, row 0 north: pixel `(i, j)`
+    /// is block `(x0 + (i + ½)·s, z0 + (j + ½)·s)`, its centre (x any lap; rows past the
+    /// world's z range are drawn as [`render`](Self::render) draws them). Drawn tile by tile by
+    /// [`render`](Self::render) at the zoom [`zoom_for`](Self::zoom_for) picks, so it is the
+    /// workbench's Final world itself: a frame laid on a tile's pixels is that tile. This is what
+    /// the game's dev map shows as its satellite picture (`DeepTimeNative.renderWorldMap`).
+    /// `threads` tiles are drawn at once (at least one).
+    #[allow(clippy::too_many_arguments)]
+    pub fn render_frame(
+        &self,
+        layer: Layer,
+        x0: f64,
+        z0: f64,
+        s: f64,
+        w: usize,
+        h: usize,
+        threads: usize,
+    ) -> Result<Vec<u8>, String> {
+        if !(s > 0.0 && s.is_finite() && x0.is_finite() && z0.is_finite()) {
+            return Err(format!("bad frame: x0 {x0}, z0 {z0}, {s} blocks a pixel"));
+        }
+        let (nx, ny) = (w.div_ceil(TILE), h.div_ceil(TILE));
+        let z = self.zoom_for(s);
+        let geom = |k: usize| TileGeom {
+            z,
+            tx: (k % nx) as u32,
+            ty: (k / nx) as u32,
+            s,
+            x0: x0 + (0.5 + ((k % nx) * TILE) as f64) * s,
+            z0: z0 + (0.5 + ((k / nx) * TILE) as f64) * s,
+        };
+        let mut out = vec![0u8; w * h * 4];
+        let tiles = nx * ny;
+        let threads = threads.clamp(1, tiles.max(1));
+        let next = AtomicUsize::new(0);
+        /// Each tile's index and its pixels (or why it failed).
+        type Drawn = Vec<(usize, Result<Vec<u8>, String>)>;
+        let drawn: Mutex<Drawn> = Mutex::new(Vec::new());
+        std::thread::scope(|sc| {
+            for _ in 0..threads {
+                sc.spawn(|| {
+                    loop {
+                        let k = next.fetch_add(1, Ordering::Relaxed);
+                        if k >= tiles {
+                            break;
+                        }
+                        let tile = self.render(layer, &geom(k));
+                        lock(&drawn).push((k, tile));
+                    }
+                });
+            }
+        });
+        for (k, tile) in drawn.into_inner().unwrap_or_else(|e| e.into_inner()) {
+            let tile = tile?;
+            let (i0, j0) = ((k % nx) * TILE, (k / nx) * TILE);
+            let cols = TILE.min(w - i0);
+            for j in 0..TILE.min(h - j0) {
+                let at = ((j0 + j) * w + i0) * 4;
+                out[at..at + cols * 4].copy_from_slice(&tile[j * TILE * 4..(j * TILE + cols) * 4]);
+            }
+        }
+        Ok(out)
+    }
+
+    // -----------------------------------------------------------------------------------------
     // One block
     // -----------------------------------------------------------------------------------------
 
@@ -1772,6 +1861,7 @@ impl BakeMap {
 
 /// The bake as the shared viewer's base map: layer ids as [`Layer::id`], zoom and indices as
 /// [`TileGeom::new`] (zoom 0 to [`Meta::max_zoom`], `x` below `2^(z+1)`, `y` below `2^z`).
+#[cfg(feature = "tile-source")]
 impl TileSource for BakeMap {
     fn render(&self, layer: &str, z: i32, x: i64, y: i64) -> Result<Rendered, TileError> {
         let Some(l) = Layer::parse(layer) else {
@@ -1850,6 +1940,7 @@ mod tests {
 
     /// The map as the shared viewer's tile source: every layer answers a PNG; an index outside
     /// the pyramid or an unknown layer is 404, and only drawn tiles are cached.
+    #[cfg(feature = "tile-source")]
     #[test]
     fn the_map_serves_as_a_tile_source() {
         use mic_viewer::tiles::{TileCache, serve};
@@ -2075,5 +2166,78 @@ mod tests {
             (0..TILE).any(|i| cov0.alpha[row * TILE + i] > 0.9),
             "a hairline at the lowest zoom"
         );
+    }
+
+    /// The dev map's frame (`render_frame`, pixel centres) laid on the pyramid's tiles is those
+    /// tiles, edge tiles cropped, whatever the number of threads; the zoom follows the pixel size.
+    #[test]
+    fn a_frame_on_the_pyramid_is_its_tiles() {
+        let dir = lake_world(2048, "frame");
+        let map = BakeMap::open(&dir).unwrap();
+        assert_eq!(map.meta.max_zoom, 2);
+        assert_eq!(map.zoom_for(4.0), 0);
+        assert_eq!(map.zoom_for(2.0), 1);
+        assert_eq!(map.zoom_for(1.0), 2);
+        // Nearest by the logarithm: 2.83 (√8) is halfway between zooms 1 and 0.
+        assert_eq!(map.zoom_for(2.7), 1);
+        assert_eq!(map.zoom_for(2.9), 0);
+        assert_eq!(map.zoom_for(1000.0), 0);
+        assert_eq!(map.zoom_for(0.1), 2, "clamped to the last native zoom");
+        // The dev map's own frame of this world: 2048 pixels across the lap, C / 2048 a pixel.
+        assert_eq!(map.zoom_for(2048.0 / 2048.0), 2);
+        let a = TileGeom::new(2048, 1, 2, 0).unwrap();
+        let b = TileGeom::new(2048, 1, 3, 0).unwrap();
+        for layer in [Layer::Satellite, Layer::Elevation] {
+            let ta = map.render(layer, &a).unwrap();
+            let tb = map.render(layer, &b).unwrap();
+            // 300 × 100 pixels from tile a's top left: a's first 100 rows, then b's first 44
+            // columns on the right.
+            let (w, h) = (300, 100);
+            for threads in [1, 3] {
+                let f = map
+                    .render_frame(
+                        layer,
+                        a.x0 - 0.5 * a.s,
+                        a.z0 - 0.5 * a.s,
+                        a.s,
+                        w,
+                        h,
+                        threads,
+                    )
+                    .unwrap();
+                assert_eq!(f.len(), w * h * 4);
+                for j in 0..h {
+                    let row = &f[j * w * 4..(j + 1) * w * 4];
+                    assert_eq!(
+                        &row[..TILE * 4],
+                        &ta[j * TILE * 4..(j + 1) * TILE * 4],
+                        "{layer:?} row {j}"
+                    );
+                    assert_eq!(
+                        &row[TILE * 4..],
+                        &tb[j * TILE * 4..(j * TILE + w - TILE) * 4],
+                        "{layer:?} row {j}"
+                    );
+                }
+            }
+        }
+        for (s, x0) in [
+            (0.0, 0.0),
+            (-1.0, 0.0),
+            (f64::NAN, 0.0),
+            (1.0, f64::INFINITY),
+        ] {
+            assert!(
+                map.render_frame(Layer::Satellite, x0, 0.0, s, 8, 8, 1)
+                    .is_err(),
+                "s {s}, x0 {x0}"
+            );
+        }
+        assert!(
+            map.render_frame(Layer::Satellite, 0.0, 0.0, 1.0, 0, 0, 1)
+                .unwrap()
+                .is_empty()
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

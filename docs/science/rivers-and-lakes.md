@@ -179,3 +179,235 @@ The game puts the sea on a column by one test, step 3 of the column evaluator: t
 - **The 35 m band** (HYD-107). A column whose height H lies in (sea level - 1, sea level] has top block sea level - 1, which is not under the line, so it is dry: one block of height, 35 m, of beach flat at the sea's level. The biome bake called all of it ocean, and 5 to 10 % of the land carried an ocean biome on dry ground (92 % of those nodes in the band).
 - **Two grids** (HYD-108). The biome bake decided on the simulation's Lambert L2 grid, the world is a footprint mean on another grid with its own closed flag (HYD-105), so 0.6 to 1.2 % of the land carried a land biome under the sea (a pocket HYD-105 opened to the world's sea, or ground the world averages under the line). The projection pass now re-decides every L2 node with `water::sea_covers_height` on the world's `elevation` and `closed_basin` and settles the nodes that disagree (BIO-170 to BIO-172, biomes.md "The land call on the world's ground"); 0 L2 nodes disagree after, on four earthlike_quick_16k bakes. What is left at the 8-block columns is the sub-node coast (BIO-174, 0.25 to 0.38 % and 0.79 to 1.09 % of the land, a median 2 blocks from the line).
 - **Not on this rule** (HYD-109). `VolcanicBiomes.land`, `GeologyGround.sea`, the fluid picker in `LavaFluids` and the biome census's `land` keep their own thresholds; they answer other questions or measure, and were not changed.
+
+## Navigable rivers and deltas on the D5 world (measured 2026-10-22)
+
+Ben's reports of 2026-10-22: "I am yet to see a navigable river / interior waterway within the modpack" and "Do we have river deltas, I'm yet to see one?". This section only measures. No code was changed, and the live play server was read, never written. The world is D5, the play world on master d74c74aa (tag `play-d5`, workbench run 1a16576c9de, format 0.6, Petroff-Guyou, 13,312 blocks round, 294.6 m per block, 35 m per block of height).
+
+Words used below. A **main stem** runs from a sea mouth upstream along the donor with the larger discharge at every junction, through lakes. **Navigable** means the bake's channel is 8 or more blocks wide and 3 or more deep (the vertex's width 2 hw and depth, read from the bake; the game does not yet generate that depth, see "Depth in the game"). A **step** is a place where the water surface's top block, ceil(w) - 1, rises by one block going upstream: a one-block waterfall in the game. **Earth-equivalent** is a value times 66.33, Earth's area (510.07 million km2, from memory) over this planet's (7.690 million km2, radius 782.3 km); a length is scaled by the square root of that, 8.14.
+
+### Short answers
+
+1. **Sizes.** Seen against its own size the world is not short of big rivers. Seen in absolute terms it is, and all of that is the planet being 66 times smaller in area. The largest river carries 2,745 m3/s and is 52 blocks wide and 11.9 deep at the mouth (catchment 256,870 km2). Scaled by area that is 182,000 m3/s, 87 % of the Amazon's 209,000. Sea-reaching rivers of at least 50 / 100 / 300 / 1,000 / 3,000 m3/s number 57 / 33 / 10 / 2 / 0; Earth has 45 / 25 / 7 / 1 / 1 at the area-scaled thresholds (3,315 / 6,630 / 19,890 / 66,300 / 198,900 m3/s). Ben's single-player world has 48 / 30 / 5 / 1 / 0 at the same absolute thresholds, on a planet of the same size.
+2. **Navigable reaches.** By the bake's own width and depth the 25 largest are navigable for 33 to 781 km (132 to 2,641 blocks; median 115 km). Only ranks 1 and 2 pass 500 km. The water surface steps down one block 459 times in the 17,640 blocks of main stem examined (one step per 38 blocks, 11 km). The first step lies 7 to 545 blocks from the mouth (median 129 blocks, 38 km); for 6 rivers (ranks 9, 10, 20, 21, 22, 23) it lies above the navigable reach. The steps are the real fall of the terrain: the surface falls 450 blocks over the lowest reaches against the terrain's 451 (correlation 0.996), so they are neither noise nor a placement rule. In the generated world the surface is still water (98 to 99 % source blocks), the top blocks match the bake's in 91 to 98 % of the columns and within one block in 99 to 100 %, and the steps are where the bake puts them or up to half a river width upstream. The depth is not: the generated centre of ranks 1, 2 and 3 is 2, 1 and 1 deep against the bake's 12, 8 and 5.
+3. **Mouths and deltas.** Every river reaches the sea in one channel; the routing has no distributaries, and there are 0 to 4 small mouths within 10 km of the 25 (at most one of 50 m3/s or more). The land that mouth fill can add is capped at sea level, so at most it is the beach band, height in (62, 63] joined to the sea. Around the 25 mouths that band covers a median 997 km2 of the 60 km square, against 122 km2 around coasts with no mouth near (p90 398 km2); 17 of the 25 are above that p90. Seven of the 25 (ranks 3, 6, 11, 12, 16, 19, 24) rise 2 m or more per km in their first 50 km and have only 94 to 260 km2 of it. What the river itself built cannot be separated out: the bake does not record it. In the game the mouths (ranks 1 to 3) are a single channel, 1 to 2 deep at the centre.
+4. **What else is in the way.** The game-side depth rule (above, another agent's fix); the steps as waterfalls (a boat very probably cannot climb one; not tested, no client); the discharge needed for 8 x 3, 88 m3/s, which only 35 sea-reaching rivers reach; and the lakes, which five of the 25 main stems cross. The width and depth caps (64 and 12) do not bind: they start at 4,096 and 2,822 m3/s and no river reaches either.
+
+### How it was measured
+
+The bake keeps neither the catchment area nor the discharge field nor the receivers; they exist only inside `hydro::network::run`. The hydrology runs on the Lambert equal-area L3 grid (8,192 x 2,624 cells of 600 m, 0.36 km2) whatever the world's projection, so the catchments were taken by running that stage again on the D5 run's own history. A temporary hook (env var `DT_RIVDUMP_DIR`, in `hydro/network.rs`) wrote the arrays, and a temporary pin of `scale.projection` in `epochs::key()` let a Lambert resume accept the Petroff-Guyou run's checkpoints. Both were reverted and never committed.
+
+| Step | Command (on the test VM, through `tools/remote/mac.sh`) |
+|---|---|
+| Lambert bake of D5 | `deeptime resume --out <lam> --no-epochs --threads 8 --set scale.projection=lambert`, from the run's step-450 checkpoint (t = -100 Myr, the last 50 steps), with the hook on |
+| Drainage arrays | `deeptime hydro --world-data <lam>` with `DT_RIVDUMP_DIR` set: area (km2), discharge, receiver, fill, state, 8,192 x 2,624 |
+| Rivers, steps, reaches | Python scripts over `rivers.dtrv` of the D5 world (Petroff-Guyou frame, lengths in blocks) and of the Lambert bake (true surface km), in `build/rivers-d5/` (gitignored): `rv.py`, `catch.py`, `steps.py`, `mouths.py`, `navnet.py`, `distsea.py` |
+| Generated world | `tools/workbench/preview.py submit --profile standalone --size 13312 --world-data <D5 world data> --keep-world --job rivers-d5-gen2 --box ...` (36 boxes of 128 x 128 columns on the lowest 1,000 blocks of ranks 1 to 3), then `gen_lib.py`, `steps_game.py`, `transect3.py` read the region files |
+
+The Lambert bake's water statistics equal the D5 bake's in all 14 values compared (land cells, river cells, chains, vertices, river length, maximum discharge, widest river, land area, lakes, lake area, largest lake, basins, lake share, playa area). The counts at 50 / 100 / 300 / 1,000 m3/s are the same in both rivers files (57 / 33 / 10 / 2). The sea-mouth chains number 1,048 in the Petroff-Guyou file and 1,062 in the Lambert one (the projection pass's handling of chain ends at the coast; not traced). Kilometres below are the Lambert bake's true surface kilometres; blocks are the Petroff-Guyou file's (what a player walks). Earth's rivers are from Wikipedia, "List of rivers by discharge" (fetched 2026-10-22, rows 1 to 100, discharge and Outflow columns). A river counts as sea-reaching when the page's Outflow is a sea, ocean, gulf or bay (the Brahmaputra and Ganges, the Paraná and Uruguay, and the Tocantins are counted by their own outflow, the Volga's Caspian as a sea). Without the Volga Earth's first two counts are 44 and 24.
+
+### 1. River sizes
+
+Discharge at the sea mouths (1,048 mouths; the median is 4.2 m3/s, the 99th percentile 280 m3/s; the sum 20,958 m3/s, which is 1.39 million m3/s Earth-equivalent, against 1.22 to 1.40 million for the oceans on Earth: the page gives 38,500 to 44,200 km3 per year):
+
+| At least (m3/s) | 2 | 5 | 10 | 20 | 50 | 100 | 200 | 300 | 500 | 1,000 | 2,000 | 3,000 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Sea-reaching rivers | 1,048 | 438 | 217 | 109 | 57 | 33 | 20 | 10 | 6 | 2 | 1 | 0 |
+
+The 25 largest (catchment area from the drainage arrays; runoff is Q over the catchment; width and depth are the bake's at the mouth):
+
+| Rank | Q (m3/s) | Q x 66.3 | Catchment (km2) | Runoff (mm/yr) | Main stem (km) | Width x depth (blocks) |
+|---|---|---|---|---|---|---|
+| 1 | 2,745 | 182,053 | 256,870 | 337 | 906 | 52.4 x 11.9 |
+| 2 | 1,774 | 117,666 | 121,208 | 462 | 616 | 42.1 x 10.0 |
+| 3 | 690 | 45,744 | 44,566 | 488 | 569 | 26.3 x 6.8 |
+| 4 | 645 | 42,793 | 50,604 | 402 | 256 | 25.4 x 6.7 |
+| 5 | 523 | 34,703 | 16,851 | 980 | 245 | 22.9 x 6.1 |
+| 6 | 523 | 34,702 | 61,345 | 269 | 340 | 22.9 x 6.1 |
+| 7 | 478 | 31,710 | 13,225 | 1,141 | 143 | 21.9 x 5.9 |
+| 8 | 475 | 31,521 | 16,112 | 931 | 237 | 21.8 x 5.9 |
+| 9 | 345 | 22,893 | 18,733 | 581 | 159 | 18.6 x 5.2 |
+| 10 | 304 | 20,169 | 14,714 | 652 | 221 | 17.4 x 4.9 |
+| 11 | 299 | 19,805 | 60,992 | 154 | 413 | 17.3 x 4.9 |
+| 12 | 258 | 17,118 | 27,216 | 299 | 236 | 16.1 x 4.6 |
+| 13 | 257 | 17,054 | 11,857 | 684 | 139 | 16.0 x 4.6 |
+| 14 | 237 | 15,718 | 13,855 | 540 | 188 | 15.4 x 4.5 |
+| 15 | 233 | 15,436 | 14,729 | 499 | 185 | 15.3 x 4.4 |
+| 16 | 230 | 15,266 | 9,441 | 769 | 111 | 15.2 x 4.4 |
+| 17 | 223 | 14,778 | 24,564 | 286 | 245 | 14.9 x 4.3 |
+| 18 | 222 | 14,717 | 37,393 | 187 | 345 | 14.9 x 4.3 |
+| 19 | 214 | 14,165 | 16,617 | 406 | 204 | 14.6 x 4.3 |
+| 20 | 205 | 13,611 | 12,197 | 531 | 168 | 14.3 x 4.2 |
+| 21 | 194 | 12,871 | 8,082 | 758 | 140 | 13.9 x 4.1 |
+| 22 | 181 | 12,032 | 7,451 | 768 | 166 | 13.5 x 4.0 |
+| 23 | 173 | 11,440 | 4,821 | 1,129 | 107 | 13.1 x 3.9 |
+| 24 | 153 | 10,133 | 10,840 | 445 | 145 | 12.4 x 3.7 |
+| 25 | 149 | 9,899 | 17,650 | 267 | 214 | 12.2 x 3.7 |
+
+Against Earth's sea-reaching rivers, rank for rank (Earth: Wikipedia, mean discharge in m3/s):
+
+| Rank | D5 Q x 66.3 | Earth river | Earth Q |
+|---|---|---|---|
+| 1 | 182,053 | Amazon | 209,000 |
+| 2 | 117,666 | Congo | 41,400 |
+| 3 | 45,744 | Orinoco | 39,000 |
+| 4 | 42,793 | Yangtze | 31,900 |
+| 5 | 34,703 | Brahmaputra | 27,000 |
+| 6 | 34,702 | Mississippi | 21,300 |
+| 7 | 31,710 | Yenisei | 20,200 |
+| 8 | 31,521 | Parana | 19,706 |
+| 9 | 22,893 | Lena | 18,300 |
+| 10 | 20,169 | Mekong | 16,010 |
+| 15 | 15,436 | Amur | 12,360 |
+| 20 | 13,611 | Volga (Caspian) | 8,380 |
+| 25 | 9,899 | Salween | 6,691 |
+
+D5 is above Earth at every rank from 2 to 25 on this scaling, and below it only at the very top. Rank 1 has 2.8 times the Amazon's area when scaled (17.0 against 6.02 million km2) but 337 mm of runoff a year against the Amazon's 1,096 (209,000 m3/s over 6,020,438 km2, both from the page), so it is a big dry basin. The mean runoff of the sea catchments is 408 mm/yr.
+
+**Planet size against drainage.** The counts at area-scaled thresholds:
+
+| D5 threshold (m3/s) | Earth-equivalent (m3/s) | D5 | Ben's single-player world | Earth |
+|---|---|---|---|---|
+| 50 | 3,315 | 57 | 48 | 45 |
+| 100 | 6,630 | 33 | 30 | 25 |
+| 300 | 19,890 | 10 | 5 | 7 |
+| 1,000 | 66,300 | 2 | 1 | 1 |
+| 3,000 | 198,900 | 0 | 0 | 1 |
+
+Ben's single-player world (Lite Prism, `rivers.dtrv`, C = 13,312; largest river 1,727 m3/s, 41.6 blocks wide and 9.9 deep) is the same size as D5, so planet size explains none of the difference between the two; the difference is the layout of the continents. D5 has 9 more rivers at 50 m3/s, 3 more at 100, 5 more at 300 and one more at 1,000, and its largest river is 59 % larger. The single-player catchments were not measured (the save is read only and the counts came from the coordinator). Against Earth, the whole shortfall in absolute discharge is the factor 66: a river of Earth's rank is 66 times smaller here. Per area both worlds carry about Earth's number of big rivers (the single-player world has 5 against Earth's 7 at 19,890 m3/s Earth-equivalent and none at the top); the spread between the two worlds is layout.
+
+What limits the size of a river is the size of a continent. The largest landmass is 730,139 km2 (48 million km2 Earth-equivalent) but it is split: its biggest catchment is 8 % of it, 11 % (82,182 km2) drains inland, and its biggest rivers are ranks 3, 4, 6, 11, 13, 17 and 19. The two largest rivers sit on landmasses where one river takes over half (55 % of 464,332 km2 for rank 1, 52 % of 232,985 km2 for rank 2). Overall 4.06 % of the land (94,188 km2 of 2,318,897) drains away from the sea. The farthest land from the sea is 236 km (about 1,920 km Earth-equivalent; Earth's is about 2,600 km, from memory); 14.5 % of the land is farther than 100 km.
+
+### 2. Navigable reaches and steps
+
+Reach is the length of the main stem from the mouth to the first vertex narrower than 8 or shallower than 3, on bake values. A lake on the way counts as water. Steps are counted in the lowest 1,000 blocks of the main stem, or the whole main stem where it is shorter (20 of the 25 are, 370 to 870 blocks), and in the reach. The fall columns are the water surface's and the terrain's (median of the ground under the line over 50 blocks) over the same lowest reach.
+
+| Rank | Reach (km) | Reach (blocks) | Lake in main stem (km) | First step (blocks) | Steps, lowest 1,000 | Steps in reach | Surface fall (blocks) | Terrain fall (blocks) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 781 | 2,641 | | 91 | 3 | 3 | 2.1 | 3.6 |
+| 2 | 529 | 1,637 | | 545 | 4 | 14 | 3.5 | 5.5 |
+| 3 | 231 | 800 | 182 (in reach) | 48 | 4 | 4 | 4.0 | 4.5 |
+| 4 | 190 | 605 | | 55 | 10 | 2 | 9.3 | 9.3 |
+| 5 | 182 | 567 | | 154 | 17 | 8 | 16.8 | 17.4 |
+| 6 | 215 | 730 | 25 (in reach) | 34 | 15 | 8 | 14.8 | 16.6 |
+| 7 | 115 | 509 | | 129 | 3 | 2 | 2.3 | 4.1 |
+| 8 | 125 | 429 | 6 | 244 | 25 | 8 | 24.4 | 25.8 |
+| 9 | 61 | 236 | 8 | 332 | 17 | 0 | 16.9 | 18.5 |
+| 10 | 135 | 378 | | 418 | 17 | 0 | 16.9 | 16.6 |
+| 11 | 320 | 1,092 | 207 (in reach) | 19 | 7 | 7 | 7.6 | 7.4 |
+| 12 | 112 | 415 | | 33 | 38 | 5 | 37.3 | 37.5 |
+| 13 | 59 | 248 | | 118 | 56 | 5 | 55.8 | 52.6 |
+| 14 | 103 | 342 | | 215 | 26 | 3 | 25.8 | 22.8 |
+| 15 | 96 | 327 | | 70 | 41 | 4 | 40.6 | 36.9 |
+| 16 | 47 | 156 | | 20 | 10 | 3 | 9.5 | 8.9 |
+| 17 | 159 | 541 | | 321 | 22 | 5 | 21.2 | 20.5 |
+| 18 | 240 | 874 | | 168 | 15 | 11 | 14.5 | 16.3 |
+| 19 | 80 | 265 | | 14 | 27 | 12 | 26.4 | 23.9 |
+| 20 | 90 | 308 | | 336 | 3 | 0 | 2.9 | 4.3 |
+| 21 | 46 | 161 | | 368 | 4 | 0 | 3.5 | 4.8 |
+| 22 | 54 | 248 | | 388 | 10 | 0 | 9.4 | 10.8 |
+| 23 | 33 | 132 | | 142 | 12 | 0 | 12.0 | 12.5 |
+| 24 | 72 | 222 | | 7 | 52 | 16 | 51.9 | 47.9 |
+| 25 | 136 | 407 | | 72 | 21 | 9 | 20.9 | 22.1 |
+
+- **Reach.** Ten rivers have 500 blocks or more of navigable channel (ranks 1 to 7, 11, 17, 18). The biggest river is the only one with a long clean reach: 3 steps in 2,641 blocks, all in the first 663 blocks, then about 1,980 blocks (580 km) without one. Six rivers (9, 10, 20, 21, 22, 23) have no step inside their reach: 33 to 135 km of clean 8 x 3 water from the sea.
+- **Network.** Across the whole bake there are 52 river systems with any 8 x 3 channel, 5,586 km in all (14 systems of 100 km or more, 2 of 500 km or more, 1 of 1,000 km: 1,301 km; the next is 732 km). At 4 x 2 there are 121 systems and 12,770 km. For a boat alone (2 wide, 1 deep) there are 813 systems and 48,109 km, 15 systems of 500 km or more and 5 of 1,000 km or more (the largest 8,332 km). All channel is 76,948 km in 4,003 chains.
+- **Do the steps follow the real fall?** Yes. Over the lowest reaches of the 25 the water surface falls 450 blocks and the terrain under the line 451 (mean absolute difference 1.5 blocks per river, at most 4.1; correlation 0.996; surface fall = 1.03 x terrain fall). A step is one crossing of a block level, and the 459 steps are 1.02 per block of fall. The surface is held at the sea's base level (63) over a median 21 % of the lowest 1,000 blocks (more than half in ranks 2, 9, 10, 20, 21 and 22), so those rivers run level for a long way before their first step. So the steps are not noise and not the placement rule: they are the terrain falling 35 m a block. The fall is steep for rivers this big. It averages 3.0 m per km over the 5,197 km of lowest reach examined (450 blocks of 35 m over 17,640 blocks of 294.6 m); Earth's great rivers fall a few cm to about 10 cm per km in their lower thousand kilometres (from memory). The relief is Earth's but the horizontal scale is 1:8 (reasoned, not measured).
+- **Generated world, ranks 1 to 3** (36 boxes, covering 295, 390 and 297 of the 407, 513 and 395 vertices of the lowest 1,000 blocks):
+
+| Rank | Bake steps (blocks from the mouth) | Generated steps | Tops equal | Within 1 block | Source blocks |
+|---|---|---|---|---|---|
+| 1 | 3 at 93, 206, 665 | 2 at 116, 230 | 91 % | 100 % | 293 of 295 |
+| 2 | 1 at 546 | 1 at 559 | 98 % | 100 % | 389 of 390 |
+| 3 | 4 at 50, 56, 59, 191 | 4 at 62, 64, 67, 191 | 98 % | 99 % | 293 of 297 |
+
+Both are counted on the covered vertices only, so the bake's step counts here (3, 1, 4) differ from the table above (3, 4, 4) where the boxes do not reach.
+
+The generated top is the highest water block in the 3 x 3 columns round each vertex. No surface falls going upstream, the surface is still water, and the steps come out 0 to 24 blocks upstream of the bake's (rank 1's half width is 26). The game's top is on average lower than the bake's by 0.09, 0.02 and 0.03 blocks (probably the lowest-w rule below picking a downstream segment's lower surface; not traced), and rank 1's third bake step (665) has no match in the generated tops.
+
+### Depth in the game (the measure the coordinator asked for)
+
+The game-side depth bug has its own fix agent; nothing was fixed here. On the 25 largest rivers the bake asks for 3.7 to 11.9 blocks of water at the mouth. In the generated lower reaches of ranks 1 to 3:
+
+Cross-sections cut every few vertices across the channel, columns every 2 blocks from one bank to the other (rule and nearest are the bake's rule evaluated on the same columns, see below):
+
+| Rank | Cross-sections | Generated, centre third (median) | Bake intends (median) | The rule gives (median) | Smallest d / hw gives (median) | Sections with a 3-deep column | Same, in the centre third |
+|---|---|---|---|---|---|---|---|
+| 1 | 50 | 2 | 11 | 2 | 11 | 74 % | 62 % |
+| 2 | 63 | 1 | 8 | 1 | 8 | 19 % | 13 % |
+| 3 | 39 | 1 | 4.5 | 1 | 5 | 13 % | 8 % |
+
+The centre line of the path, one column per vertex (295, 375 and 239 vertices of the lowest 1,000 blocks):
+
+| Rank | Generated depth (median) | Bake depth (median) | Vertices 3 or more deep | Vertices 1 or less deep | First 3-deep vertex (blocks from the mouth) |
+|---|---|---|---|---|---|
+| 1 | 2 | 12 | 41 % | 39 % | 68 |
+| 2 | 1 | 8 | 12 % | 83 % | 534 |
+| 3 | 1 | 5 | 8 % | 84 % | 39 |
+
+The width is right (the generated water columns x 2 against 2 hw: 50 against 50.8, 36 against 35.2, 20 against 19.7). The depth is not, along the whole lowest 1,000 blocks of all three rivers checked. The cause is the covering-segment rule (`Rivers.sampleRange`: of the segments that cover a column, the one with the lowest w, ties to the lowest id). Segments are capsules, so their round caps overlap at every vertex, and where the surface falls the downstream segment (lower w) wins the column, where it is level the lower id does, over the deep centre of the segment that should own it. Evaluating the documented rule over the same cross-sections gives 2, 1 and 1, the game's depths; choosing the covering segment with the smallest d / hw instead gives 11, 8 and 5, the bake's. The sea test is not the cause: the centre column is under the sea rule (ground at or below y 62, answered before the river rule) in 0, 9 and 0 % of ranks 1 to 3's lowest 1,000 vertices, and in 0 to 9 % (median 0.4 %) over the 25. Rank 1's first 68 blocks are under 3 deep at the centre without it.
+
+### 3. Mouths and deltas
+
+How a river meets the sea, for the 25 largest. Beach band is the land with height in (62, 63] joined to the sea (the 35 m flat of "The sea's one rule"); flat to +3 is the same up to height 65. Both are counted in the 60 km square round the mouth (3,600 km2). Rise is the water surface's rise over the first 50 km, in m per km. To +3 is the length of channel up to which the water surface is within 3 blocks of the sea's. Others is the number of other sea mouths within 10 km.
+
+| Rank | Beach band (km2) | Flat to +3 (km2) | Rise (m/km) | To +3 (km) | Others |
+|---|---|---|---|---|---|
+| 1 | 322 | 943 | 0.7 | 803 | 0 |
+| 2 | 2,383 | 2,390 | 0.0 | 329 | 2 |
+| 3 | 260 | 472 | 2.9 | 28 | 0 |
+| 4 | 754 | 1,226 | 0.5 | 233 | 1 |
+| 5 | 1,578 | 2,127 | 0.0 | 121 | 3 |
+| 6 | 258 | 509 | 4.6 | 18 | 0 |
+| 7 | 1,411 | 2,043 | 0.9 | 143 | 4 |
+| 8 | 1,828 | 2,003 | 0.0 | 103 | 0 |
+| 9 | 1,939 | 2,201 | 0.0 | 110 | 0 |
+| 10 | 1,930 | 2,253 | 0.0 | 176 | 1 |
+| 11 | 153 | 269 | 3.7 | 6 | 0 |
+| 12 | 148 | 444 | 3.2 | 24 | 0 |
+| 13 | 923 | 1,615 | 1.8 | 53 | 4 |
+| 14 | 1,251 | 1,696 | 0.0 | 104 | 1 |
+| 15 | 997 | 1,514 | 1.3 | 68 | 0 |
+| 16 | 175 | 432 | 2.1 | 62 | 0 |
+| 17 | 1,066 | 1,767 | 0.0 | 142 | 0 |
+| 18 | 784 | 1,364 | 1.2 | 205 | 0 |
+| 19 | 94 | 189 | 6.6 | 13 | 0 |
+| 20 | 1,548 | 2,106 | 0.0 | 168 | 1 |
+| 21 | 1,084 | 1,576 | 0.0 | 137 | 0 |
+| 22 | 1,893 | 1,905 | 0.0 | 110 | 3 |
+| 23 | 1,396 | 2,176 | 1.0 | 63 | 2 |
+| 24 | 108 | 171 | 9.6 | 20 | 0 |
+| 25 | 712 | 1,026 | 1.7 | 56 | 1 |
+
+- **Channels.** The routing gives each cell one receiver, so a river reaches the sea in one channel and does not split. There is no distributary in the bake. Of the 25, 14 have no other mouth within 10 km, the rest 1 to 4, and only ranks 7, 22 and 25 have one of 50 m3/s or more.
+- **Land built by the river.** The surface stage's mouth fill (`surface/marine.rs`) raises the sea cells next to a mouth to a level `marine_fill_depth_m` below sea level (the preset's value is 0.0), falling with distance, so it cannot make land above sea level. The most it makes is the beach band. That band joined to the sea covers a median 997 km2 round the 25 mouths, 28 % of the square. Round 3,000 coast cells drawn from the 59,806 with no sea mouth of 5 m3/s or more within 36 km it covers a median 122 km2 (mean 185, p90 398), and round 3,000 drawn from all 99,321 coast cells a median 154 km2 (p90 528). 17 of the 25 are above the no-mouth p90, and the flat to +3 shows the same (median 1,576 km2 round the 25 against 207 km2). The bake does not record which cells a river built, and the mouth fill's land is the same height as flat coast the plates left, so this is an upper bound and a sign, not an attribution. Seven rivers sit on a rising coast (ranks 3, 6, 11, 12, 16, 19, 24: 2.1 to 9.6 m per km in the first 50 km) with 94 to 260 km2 of beach band. The land of two checkpoints (steps 439 and 450) could not be differenced: they are 22 Myr apart, the sea stood 723.9 m at one and 851.2 m at the other, and the plates moved.
+- **Plain behind the mouth.** Most big rivers run on a very flat plain: the water surface stays within 3 blocks (105 m) of the sea's for a median 104 km of channel, 803 km on rank 1, 329 km on rank 2. The surface is held at the base level (63) over a median 21 % of the lowest 1,000 blocks.
+- **What the game shows** (ranks 1 to 3, generated). One wide channel through low flat ground: rank 1's top blocks run from y 62 to 64 over its lowest 1,000 blocks, its first 68 blocks are under 3 deep at the centre, and nothing fans out. There is no delta in the sense of a river that splits and builds land out into the sea. The flat coastal plain is there, but it is not marked as anything, and the water in it is 1 to 2 deep at the centre (above).
+
+### 4. Other things in the way
+
+- **The depth rule in the game** (above): the lower reaches of the three rivers checked are 1 to 2 deep where the bake asks for 5 to 12.
+- **Steps are waterfalls.** 459 of them in 17,640 blocks of main stem. A boat very probably cannot climb a one-block drop of flowing water; this was not tested (no client). The biggest river has only 3.
+- **The entry ticket.** Width is Q^0.5 and depth 0.5 Q^0.4 (the bake's laws, HYD-001 to HYD-004; the D5 mouths fit them: 52.4 = 2,745^0.5); 8 x 3 needs 88 m3/s (depth is the binding one: 8 wide needs only 64). 35 sea-reaching rivers reach it (58 reach 50). Only 52 river systems carry any 8 x 3 channel, 5,586 km in all, because the planet is small.
+- **Lakes.** Five of the 25 main stems pass through a lake (ranks 3, 6, 8, 9, 11: 182, 25, 6, 8 and 207 km). Lakes are open water and sailable; a lake that fills a basin on a main stem also keeps the river's sediment (HYD-110).
+- **The caps** (HYD-006, HYD-007). Width is capped at 64 (Q = 4,096) and depth at 12 (Q = 2,822); rank 1 (2,745 m3/s, 11.9 deep) is just under the depth cap and no river passes either.
+
+### What could not be measured
+
+- Ben's single-player catchments, steps and mouths: the save is read only and holds the rivers file, not the drainage arrays; only the counts the coordinator gave are used.
+- The generated world beyond ranks 1 to 3 and beyond the lowest 1,000 blocks: only 36 boxes were generated. The 22 other rivers' game depth is not measured; the rule is the same for all.
+- Boats at a step: no client was run.
+- Land built by the river: not recorded in the bake (above).
+- Earth's navigable lengths, mouth widths and depths: not fetched, and not used.
+
+### World generation runs (Ben's pool rule of 2026-10-22)
+
+Measured on existing data first: the D5 `rivers.dtrv` (Petroff-Guyou) for every count, path and step; Ben's single-player numbers as given; the bakes in `/data/ban/deeptime-runs/pool/BASES.md` (the cube1 and high-ground lanes, none of them D5). Three kinds of run were needed:
+
+| Run | What | Why an existing one would not do |
+|---|---|---|
+| `deeptime resume` of run 1a16576c9de from step 450, Lambert, `--no-epochs`, 8 threads (twice: the first run's dump came from a coarser call of the stage and was discarded; the second kept epochs for a look at the surface fields of steps 439 and 450, which was dropped) | the Lambert bake with the hydrology's drainage dumped | The bake keeps no catchment area, discharge field or receivers, and Ben's own save and the pool's bakes are other worlds. |
+| `deeptime hydro --world-data <lam>` with the dump on | the full-resolution drainage arrays (8,192 x 2,624) | The first resume dumped a coarser call of the same stage. |
+| Two `tools/workbench/preview.py submit` jobs, `rivers-d5-gen` (failed: `--size` was not 13312) and `rivers-d5-gen2` (36 boxes of 128 x 128 columns; it failed only in its export step, after the chunks were saved) | generated chunks on the lower reaches of ranks 1 to 3 | The live play world holds 4 region files, round the spawn (r.-1.-1 to r.0.0), none on these rivers, and the server is read only. |
+
+Kept on the VM and listed in BASES.md: `/data/ban/deeptime-runs/rivers-d5/` `lam` (the Lambert bake; its epochs are hard links of the D5 run's), `dump2` (the drainage arrays), `world-d5`, `region-gen`, and the result files (`pg.json`, `lam.json`, `catch.json`, `steps.json`, `mouths.json`, `transect.json`, `transect3.json`, the paths in `pg_paths.npz` and `lam_paths.npz`).

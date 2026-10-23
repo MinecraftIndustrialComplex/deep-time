@@ -1245,7 +1245,30 @@ pub fn settle_to_ground(
     blocks_per_cell: f64,
     p: &BiomeParams,
 ) -> Settled {
-    let n = w * h;
+    settle_to_ground_by(
+        c,
+        sea,
+        depth_m,
+        blocks_per_cell,
+        p,
+        &|v, src| fill_nearest(v, src, w, h),
+        &|land, to_sea| distance_cells(land, w, h, to_sea),
+    )
+}
+
+/// [`settle_to_ground`] on any grid: `fill` is [`fill_nearest`] on it and `dist` is
+/// [`distance_cells`] (in cells of `blocks_per_cell` bake blocks). A cube world's grid passes its
+/// own, which run across the seams (SCL-122).
+pub fn settle_to_ground_by(
+    c: &mut BiomeCells,
+    sea: &[bool],
+    depth_m: &[f32],
+    blocks_per_cell: f64,
+    p: &BiomeParams,
+    fill: &dyn Fn(&mut [f32], &[bool]) -> bool,
+    dist: &dyn Fn(&[bool], bool) -> Vec<f32>,
+) -> Settled {
+    let n = sea.len();
     let r = reference();
     let edge = r.bands.continents[3];
     let now_land: Vec<bool> = c
@@ -1263,7 +1286,7 @@ pub fn settle_to_ground(
     let stable_sea: Vec<bool> = (0..n).map(|k| sea[k] && !now_land[k]).collect();
     let take = |v: &mut [f32], flips: &[bool], donors: &[bool]| {
         let mut filled = v.to_vec();
-        if fill_nearest(&mut filled, donors, w, h) {
+        if fill(&mut filled, donors) {
             for k in (0..n).filter(|&k| flips[k]) {
                 v[k] = filled[k];
             }
@@ -1297,7 +1320,7 @@ pub fn settle_to_ground(
     }
     // Continentalness, and the deep sea floor's erosion, by `map`'s laws on the world's ground.
     let anchors = ContinentAnchors::new(p);
-    let from_sea = distance_cells(&sea.iter().map(|&s| !s).collect::<Vec<_>>(), w, h, true);
+    let from_sea = dist(&sea.iter().map(|&s| !s).collect::<Vec<_>>(), true);
     let deep_sea_floor = (0.5 * (r.bands.erosion[4] + r.bands.erosion[5])) as f32;
     let quantum = PARAM_QUANTUM as f32;
     for k in 0..n {

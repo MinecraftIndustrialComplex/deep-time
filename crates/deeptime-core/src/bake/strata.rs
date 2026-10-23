@@ -798,23 +798,22 @@ fn heights_sorted(
 /// (the floor) by what that key moved. `hz` is the raised stacks, `moved` per cell what raised
 /// them.
 pub fn key_shift(hz: &Horizons, moved: &[Moved], x: f64, y: f64, z: f64) -> f64 {
-    use deeptime_format::strata::{CELLS, bspline};
+    use deeptime_format::strata::{CELLS, bspline, spline_cell, spline_cell_at};
     let g = &hz.grid;
     if g.w == 0 || g.r == 0 || moved.len() != g.cells() {
         return 0.0;
     }
-    // The column rule's sixteen cells and weights at the block column (`stack_at`).
+    // The column rule's sixteen cells and weights at the block column (`stack_at`; on a cube's
+    // grid the block's face, across its seams).
     let (bx, bz) = (x.floor() as i64, z.floor() as i64);
-    let c = i64::from(g.w) * i64::from(g.r);
-    let wx = (bx + c / 2).rem_euclid(c) - c / 2;
-    let u = (wx - g.origin_block_x) as f64 / f64::from(g.r);
-    let v = (bz - g.origin_block_z) as f64 / f64::from(g.r);
-    let (i0, j0) = (u.floor() as i64, v.floor() as i64);
-    let (bu, bv) = (bspline(u - i0 as f64), bspline(v - j0 as f64));
+    let Some((face, i0, j0, fu, fv)) = spline_cell(g, bx, bz) else {
+        return 0.0;
+    };
+    let (bu, bv) = (bspline(fu), bspline(fv));
     let mut cells = [(0usize, 0.0f64); CELLS];
     for (b, &wv) in bv.iter().enumerate() {
         for (a, &wu) in bu.iter().enumerate() {
-            let (ci, cj) = g.cell(i0 - 1 + a as i64, j0 - 1 + b as i64);
+            let (ci, cj) = spline_cell_at(g, face, i0 - 1 + a as i64, j0 - 1 + b as i64);
             cells[b * 4 + a] = (cj as usize * g.w as usize + ci as usize, wu * wv);
         }
     }

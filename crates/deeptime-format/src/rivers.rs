@@ -68,6 +68,10 @@ pub enum Mouth {
     Lake,
     /// Its last vertex is a vertex of chain `into` (a confluence).
     River,
+    /// Its last vertex lies on a turning seam of a cube world (format 0.7): the river goes on as
+    /// chain `into`, whose first vertex is the same planet point on the seam's partner edge
+    /// (FORMAT.md "Rivers", the cube's split).
+    Seam,
 }
 
 impl Mouth {
@@ -76,11 +80,12 @@ impl Mouth {
             Mouth::Sea => 0,
             Mouth::Lake => 1,
             Mouth::River => 2,
+            Mouth::Seam => 3,
         }
     }
 
     pub fn from_code(c: u8) -> Option<Mouth> {
-        [Mouth::Sea, Mouth::Lake, Mouth::River]
+        [Mouth::Sea, Mouth::Lake, Mouth::River, Mouth::Seam]
             .into_iter()
             .find(|m| m.code() == c)
     }
@@ -90,6 +95,7 @@ impl Mouth {
             Mouth::Sea => "sea",
             Mouth::Lake => "lake",
             Mouth::River => "river",
+            Mouth::Seam => "seam",
         }
     }
 }
@@ -100,7 +106,7 @@ pub struct Chain {
     pub first: u32,
     pub count: u32,
     pub mouth: Mouth,
-    /// The lake id (`Mouth::Lake`), the chain (`Mouth::River`), else `u32::MAX`.
+    /// The lake id (`Mouth::Lake`), the chain (`Mouth::River`, `Mouth::Seam`), else `u32::MAX`.
     pub into: u32,
 }
 

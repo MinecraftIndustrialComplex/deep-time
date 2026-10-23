@@ -76,6 +76,7 @@ them in from [_template.md](_template.md).
 | [pole-cap.md](pole-cap.md) | stub | POL |
 | [quincuncial-projection.md](quincuncial-projection.md) | stage 1 (prototype only, not shipped) | SCL-070 to SCL-077 |
 | [seamless-world.md](seamless-world.md) | stage 2 for the Petroff-Guyou world (2026-10-04); its section on the cube world at stage 1 (phase 0, 2026-10-22) | SCL-049, SCL-078 to SCL-081, SCL-083, SCL-084, SCL-086 to SCL-091, SCL-100 to SCL-108, POL-022 to POL-024 |
+| [cube-world-bake.md](cube-world-bake.md) | stage 1 (cube plan phase 1, 2026-10-22): the bake writes cube worlds; measured on real bakes, nothing checked against a source | SCL-120 to SCL-129 |
 | [geothermal-features.md](geothermal-features.md) | written (stage 2, WP-16) | GEO |
 | [playability-steering.md](playability-steering.md) | written with the feature (2026-10-05): the epoch tools and the end-weighted nudges | STE |
 
