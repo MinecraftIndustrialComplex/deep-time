@@ -193,19 +193,17 @@ public final class WrapBlockEntityGameTests {
                 check(BandBlockEntities.packetFor(level, s.stored(gateway)) == null, "%s: no re-addressed packet for a stored position", s.name());
 
                 // 3. A change to the stored sign's data is marked at its band position (so the band's viewers get it).
-                ChunkHolderAccessor holder8 = holder(level, signs[2]);
-                int sec = level.getSectionIndex(signs[2].getY());
                 short rel = SectionPos.sectionRelativePos(signs[2]);
-                ShortSet before = holder8.deeptime$changedBlocksPerSection()[sec];
+                ShortSet before = Holders.changed(level, signs[2]);
                 check(before == null || !before.contains(rel), "%s: the band sign at %s is not marked before the change", s.name(), signs[2].toShortString());
                 ((SignBlockEntity) level.getBlockEntity(s.stored(signs[2]))).setText(new SignText().setMessage(0, Component.literal("marked")), true);
-                ShortSet after = holder8.deeptime$changedBlocksPerSection()[sec];
+                ShortSet after = Holders.changed(level, signs[2]);
                 check(after != null && after.contains(rel), "%s: setting the stored sign's text marks its band position %s", s.name(), signs[2].toShortString());
 
                 // The band holder sends the stored sign's data to the band position.
                 ServerPlayer p = helper.makeMockServerPlayerInLevel();
                 sent(p);
-                holder(level, signs[0]).deeptime$broadcastBlockEntity(List.of(p), level, signs[0]);
+                Holders.broadcast(level, signs[0], p);
                 List<Packet<?>> got = sent(p);
                 check(got.stream().anyMatch(q -> q instanceof ClientboundBlockEntityDataPacket d && d.getPos().equals(signs[0]) && d.getTag().toString().contains(TEXT)),
                         "%s: the band holder sent the sign's data addressed to %s: %s", s.name(), signs[0].toShortString(), got);
@@ -301,8 +299,25 @@ public final class WrapBlockEntityGameTests {
         return es.get(0);
     }
 
-    private static ChunkHolderAccessor holder(ServerLevel level, BlockPos pos) {
-        return (ChunkHolderAccessor) level.getChunkSource().chunkMap.getVisibleChunkIfPresent(ChunkPos.asLong(pos));
+    /**
+     * The holder accessor, kept out of this class's own method signatures: GameTest registration reflects
+     * over them, and without {@code -PwrapEngine} the accessor's mixin config is not applied, so loading
+     * {@link ChunkHolderAccessor} there is an illegal classload. This class loads only when a test runs.
+     */
+    private static final class Holders {
+        private static ChunkHolderAccessor of(ServerLevel level, BlockPos pos) {
+            return (ChunkHolderAccessor) level.getChunkSource().chunkMap.getVisibleChunkIfPresent(ChunkPos.asLong(pos));
+        }
+
+        /** The holder's marked changes in {@code pos}'s section (null when none). */
+        static @Nullable ShortSet changed(ServerLevel level, BlockPos pos) {
+            return of(level, pos).deeptime$changedBlocksPerSection()[level.getSectionIndex(pos.getY())];
+        }
+
+        /** The holder's private block-entity send for {@code pos}, to {@code p}. */
+        static void broadcast(ServerLevel level, BlockPos pos, ServerPlayer p) {
+            of(level, pos).deeptime$broadcastBlockEntity(List.of(p), level, pos);
+        }
     }
 
     /** Puts the player on the stored side half a block from the edge, beside column {@code u} of the band. */
