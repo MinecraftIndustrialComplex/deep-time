@@ -147,9 +147,9 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - Unit test `a_plate_the_law_weakens_lets_go_as_it_warms` (τ = 62.8 set in the test), on dry ground: with the sea in reach the flexure's water, whose depth kinks at the sea, made the two paths end 172 m apart.
   - The pool's `fill` measure: `tools/review/pool/measure_fill.py`, `measures_fill.json`.
   - Docs: docs/science/flexure.md "The release's pace", ISO-099 (new), ISO-056 (amended), the bibliography (McKenzie 1978, Parsons & Sclater 1977, Hyndman, Currie & Mazzotti 2005, Watts & Zhong 2000, Beaumont 1978, Currie & Hyndman 2006, Currie, Huismans & Beaumont 2008, Horváth & Cloetingh 1996, Horváth et al. 2015), claims.md's counts.
-- **Measured** (pool, 12 seeds by two starts, 24 runs an arm, 1,000 Myr; the pace on at key 76b4db9c66ff, `fg-release` on the base's arguments and `fg-release-sheet` on trench-m-rs12e-sheet's, each against the pool's 24 runs of the same arguments). Medians, Mann-Whitney p:
+- **Measured** (pool, 12 seeds by two starts, 24 runs an arm, 1,000 Myr; the pace on at key 76b4db9c66ff, `fg-release` on the base's arguments and `fg-release-sheet` on trench-m-rs12e-sheet's, each against the pool's 24 runs of the same arguments; the sheet set is master's default and the pool's `base` since 57558f0a, so its column is the comparison with the new base). Medians, Mann-Whitney p:
 
-  | measure | base set | sheet set |
+  | measure | old base set | sheet set (the new base) |
   |---|---|---|
   | V1 criteria (mean) | 2.33 to 2.54 (p 0.60) | 3.42 to 3.17 (p 0.45) |
   | land share | 0.292 to 0.302 (p 0.63) | 0.306 to 0.309 (p 0.67) |
