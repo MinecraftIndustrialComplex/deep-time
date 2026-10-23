@@ -1650,17 +1650,33 @@ pub fn map(
 /// support, the resampling's nearest cell) is added where the rule is applied.
 pub const PLAYA_WETLAND_MARGIN_BLOCKS: f64 = 20.0;
 
+/// BIO-178 on one node beside a playa: a node flagged wetland, or in vanilla's swamp band (E6)
+/// without the flag, loses the flag and has its erosion (`erosion`, stored in steps of
+/// [`PARAM_QUANTUM`]) held under E5 as a cold wetland's is (BIO-133); any other node is left as
+/// it is. An unflagged node reaches E6 from a swamp beside it: [`map`] gives a sea node its nearest
+/// land node's erosion, and the land call ([`settle_to_ground`]) gives a node it settles to land a
+/// donor's whole record. Returns the new erosion when the node changed.
+fn dry_node(wetland: &mut u8, erosion: i16) -> Option<i16> {
+    let bands = &reference().bands.erosion;
+    let e6 = (bands[6] / PARAM_QUANTUM).round() as i16;
+    if *wetland == WETLAND_NONE && erosion < e6 {
+        return None;
+    }
+    *wetland = WETLAND_NONE;
+    Some(erosion.min(((bands[5] - 1e-3) / PARAM_QUANTUM).round() as i16))
+}
+
 /// No wetland on or beside a playa (ledger: BIO-178). A playa is the floor of a terminal basin
 /// whose water the climate dries (HYD-053): salt, not a swamp or a bog. The wetland rule (BIO-066)
 /// reads the climate's wetness, the ground's flatness and its height, not the basins, so it can
 /// flag a playa's floor and rim, and the swamp's trees then stand over the salt. Every node of
-/// `l2` within `reach` blocks of ground of a playa cell's block (`playas`) loses its flag, and its
-/// erosion (`erosion_le`: the `climate/erosion` layer's cells, little-endian i16 in steps of
-/// [`PARAM_QUANTUM`]) is held under E5 as a cold wetland's is (BIO-133), so the class's ordinary
-/// biome stands there. `lambert`: the circumference of the bake's Lambert grid, where a block of
-/// ground east-west spans 1 / cos φ blocks (the box is widened in x) and north-south cos φ (kept
-/// at `reach`, wider than needed); `None` on a world grid, whose blocks are ground. Returns the
-/// nodes cleared.
+/// `l2` within `reach` blocks of ground of a playa cell's block (`playas`) is dried as
+/// [`dry_node`] says (`erosion_le`: the `climate/erosion` layer's cells, little-endian i16 in steps
+/// of [`PARAM_QUANTUM`]), so the class's ordinary biome stands there. `lambert`: the circumference
+/// of the bake's Lambert grid, where a block of ground east-west spans 1 / cos φ blocks (the box
+/// is widened in x) and north-south cos φ (kept at `reach`, wider than needed); `None` on a world
+/// grid, whose blocks are ground. Returns the nodes changed. A projected world is dried again on
+/// its own grid after the land call ([`dry_beside_playa_nodes`]).
 pub fn dry_beside_playas(
     wetland: &mut [u8],
     erosion_le: &mut [u8],
@@ -1669,7 +1685,6 @@ pub fn dry_beside_playas(
     reach: f64,
     lambert: Option<f64>,
 ) -> usize {
-    let held = ((reference().bands.erosion[5] - 1e-3) / PARAM_QUANTUM).round() as i16;
     let r = f64::from(l2.r);
     let (ox, oz) = (l2.origin_block_x as f64, l2.origin_block_z as f64);
     let w = l2.w as usize;
@@ -1689,18 +1704,41 @@ pub fn dry_beside_playas(
             for i in i0 as i64..=i1 as i64 {
                 let (ci, cj) = l2.cell(i, j);
                 let k = cj as usize * w + ci as usize;
-                if wetland[k] == WETLAND_NONE {
-                    continue;
-                }
-                wetland[k] = WETLAND_NONE;
                 let e = &mut erosion_le[2 * k..2 * k + 2];
-                let v = i16::from_le_bytes([e[0], e[1]]).min(held);
-                e.copy_from_slice(&v.to_le_bytes());
-                cleared += 1;
+                if let Some(v) = dry_node(&mut wetland[k], i16::from_le_bytes([e[0], e[1]])) {
+                    e.copy_from_slice(&v.to_le_bytes());
+                    cleared += 1;
+                }
             }
         }
     }
     cleared
+}
+
+/// [`dry_beside_playas`] on a projected world's own grid, after the land call (ledger: BIO-178):
+/// the projection reads the Lambert nodes again (the class and the flag nearest, the erosion at
+/// the point) and the land call hands a donor's record to the nodes it settles to land, so a
+/// swamp's erosion and flag can reach a world playa from Lambert nodes beyond the bake's reach.
+/// Every node whose distance to the nearest node holding a playa cell (`from_playa`, cells of the
+/// grid) is at most `reach_cells` is dried as [`dry_node`] says, its erosion (`c.erosion`,
+/// physical) on the layer's quantum. Returns the nodes changed.
+pub fn dry_beside_playa_nodes(
+    c: &mut BiomeCells,
+    from_playa: &[f32],
+    reach_cells: f64,
+) -> Vec<u32> {
+    let mut changed = Vec::new();
+    for (k, &d) in from_playa.iter().enumerate() {
+        if f64::from(d) > reach_cells {
+            continue;
+        }
+        let raw = (f64::from(c.erosion[k]) / PARAM_QUANTUM).round() as i16;
+        if let Some(v) = dry_node(&mut c.wetland[k], raw) {
+            c.erosion[k] = (f64::from(v) * PARAM_QUANTUM) as f32;
+            changed.push(k as u32);
+        }
+    }
+    changed
 }
 
 #[cfg(test)]
@@ -2973,9 +3011,10 @@ mod tests {
     }
 
     /// No wetland on or beside a playa (BIO-178): the nodes within the reach lose the flag and
-    /// their erosion is held under E5 (a lower one is kept), those beyond keep both, the box
-    /// widens east-west by 1 / cos φ on the Lambert grid and wraps across its seam, and a world
-    /// grid's box is square.
+    /// their erosion is held under E5 (a lower one is kept), an unflagged node in the swamp band
+    /// (a sea node's fill) is held too and an unflagged one below it is left alone, those beyond
+    /// keep everything, the box widens east-west by 1 / cos φ on the Lambert grid and wraps across
+    /// its seam, and a world grid's box is square.
     #[test]
     fn a_playa_clears_the_wetland_beside_it() {
         let c = 1536u32;
@@ -2994,17 +3033,30 @@ mod tests {
         };
         let row = |z: i64| ((z - l2.origin_block_z) / 8) as usize;
         // Every node a swamp, but the even columns of the equator's row a cold wetland already low
-        // (some of them beside the seam's playa, so the lower erosion is kept there).
+        // (some of them beside the seam's playa, so the lower erosion is kept there), and the row
+        // south of it unflagged: its even columns in the swamp band (a sea node's fill), its odd
+        // ones below it (ordinary dry land, never touched).
         let is_cold = |k: usize| k / w == row(0) && k.is_multiple_of(2);
+        let is_fill = |k: usize| k / w == row(0) + 1 && k.is_multiple_of(2);
+        let is_dry = |k: usize| k / w == row(0) + 1 && !k.is_multiple_of(2);
+        let start = |k: usize| -> (u8, i16) {
+            if is_cold(k) {
+                (WETLAND_COLD, low)
+            } else if is_fill(k) {
+                (WETLAND_NONE, swamp)
+            } else if is_dry(k) {
+                (WETLAND_NONE, low)
+            } else {
+                (WETLAND_SWAMP, swamp)
+            }
+        };
         let fresh = || {
             let mut wet = vec![WETLAND_SWAMP; n];
             let mut ero: Vec<u8> = Vec::with_capacity(2 * n);
             for (k, wk) in wet.iter_mut().enumerate() {
-                let cold = is_cold(k);
-                if cold {
-                    *wk = WETLAND_COLD;
-                }
-                ero.extend_from_slice(&if cold { low } else { swamp }.to_le_bytes());
+                let (f, e) = start(k);
+                *wk = f;
+                ero.extend_from_slice(&e.to_le_bytes());
             }
             (wet, ero)
         };
@@ -3032,20 +3084,14 @@ mod tests {
                     };
                     dx <= hx + 1e-9 && ((z - pz) as f64).abs() <= reach + 1e-9
                 };
-                let was_cold = is_cold(k);
-                if near(p_eq) || near(p60) {
+                let (f0, e0) = start(k);
+                if (near(p_eq) || near(p60)) && !is_dry(k) {
                     expect += 1;
                     assert_eq!(wk, WETLAND_NONE, "{label} node {k}");
-                    let want = if was_cold { low } else { held };
-                    assert_eq!(ero_at(&ero, k), want, "{label} node {k}");
+                    assert_eq!(ero_at(&ero, k), e0.min(held), "{label} node {k}");
                 } else {
-                    let want = if was_cold {
-                        WETLAND_COLD
-                    } else {
-                        WETLAND_SWAMP
-                    };
-                    assert_eq!(wk, want, "{label} node {k}");
-                    assert_eq!(ero_at(&ero, k), if was_cold { low } else { swamp });
+                    assert_eq!(wk, f0, "{label} node {k}");
+                    assert_eq!(ero_at(&ero, k), e0, "{label} node {k}");
                 }
             }
             assert_eq!(cleared, expect, "{label}");
