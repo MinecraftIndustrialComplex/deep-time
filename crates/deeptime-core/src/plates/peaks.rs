@@ -38,6 +38,10 @@ pub struct Begin {
     pub z0: Vec<f32>,
     /// The surface's flexure under each sample, m (NaN where no cell sees it).
     pub flexure: Vec<f64>,
+    /// The share of each sample's cells whose offset the surface holds (a gap between plates, a
+    /// trench row: `surface/offset_held`, ISO-125) and what they handed the sample's elevation in
+    /// the feedback, m (0 with `surface.held_offsets` on); empty without the mask.
+    pub held: Vec<[f32; 2]>,
 }
 
 /// One step's lines (see the module docs). `resampled`: the samples are new, so the step's start
@@ -80,6 +84,7 @@ pub fn print(st: &PlateState, geo: &Geo, env: &Env, sea: f64, begin: &Begin, res
             (f64::NAN, f64::NAN, f64::NAN)
         };
         let target = equilibrium_m(iso, sea) + if f.is_finite() { f } else { 0.0 };
+        let held = begin.held.get(i).filter(|_| same).copied();
         let mut line = format!(
             "peak t={:.1} n_high={} rank={} v={} lat={:.2} lon={:.2} plate={} kind={} regime={} \
              flags={:#04x} orogeny={} orogeny_myr={:.1} T_km={:.2} z_pre={:.0} z0={:.0} z={:.0} \
@@ -126,6 +131,9 @@ pub fn print(st: &PlateState, geo: &Geo, env: &Env, sea: f64, begin: &Begin, res
                 list(step_dt, 20.0, 6),
                 list(parts, 200.0, 8)
             ));
+        }
+        if let Some([share, dz]) = held {
+            line.push_str(&format!(" held_share={share:.3} held_dz={dz:.0}"));
         }
         eprintln!("{line}");
     }

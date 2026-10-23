@@ -494,6 +494,8 @@ public final class Columns {
                 int idx = st.classes[h];
                 cls = idx < classes.size() ? classes.get(idx) : null;
             }
+            // Bodies paint in id order and a painted block is no longer the horizon's, so the first
+            // body naming a class keeps the block, as StrataPass.paintBodies leaves it.
             for (Body b : near) {
                 Body.Location at = b.locate(c, wx, y, z);
                 if (at == null)
@@ -502,8 +504,10 @@ public final class Columns {
                 for (Body.Zone zone : b.zones())
                     if (zone.rockClass() != null && zone.contains(at.d(), at.v()))
                         bc = zone.rockClass();
-                if (bc != null)
+                if (bc != null) {
                     cls = bc;
+                    break;
+                }
             }
             Run last = rock.isEmpty() ? null : rock.getLast();
             if (last != null && java.util.Objects.equals(last.rockClass(), cls))

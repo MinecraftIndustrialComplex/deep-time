@@ -308,8 +308,11 @@ impl PlatesStage {
         if tracing {
             traced.z_pre = st.samples.iter().map(|s| s.elevation_m).collect();
         }
-        let (mut cones, flexure) =
+        let (mut cones, flexure, held) =
             self.apply_surface_feedback(st, world, &env, collisions || settles)?;
+        if tracing {
+            traced.held = held.unwrap_or_default();
+        }
         cones.resize(st.samples.len(), [0.0; 2]);
         if let Some(b) = cb.as_mut() {
             b.book(&st.samples, gap_budget::Part::Erosion);
@@ -890,7 +893,7 @@ impl PlatesStage {
             world.fields.remove(crate::surface::field::VOLCANIC_MAFIC),
         ];
         let Some(fb) = world.fields.remove(crate::surface::field::FEEDBACK) else {
-            return Ok((Vec::new(), None));
+            return Ok((Vec::new(), None, None));
         };
         let material = world.fields.remove(crate::surface::field::MATERIAL);
         // The surface's parts of the feedback, for the gap budget (`gap_budget.rs`).
@@ -901,8 +904,14 @@ impl PlatesStage {
             .collect();
         let grid = self.l1_grid()?;
         if fb.data.len() != grid.cells() {
-            return Ok((Vec::new(), None));
+            return Ok((Vec::new(), None, None));
         }
+        // The cells whose offset the surface holds (`surface/offset_held`, ISO-125), for the peak
+        // trace only; the surface's own field, which its next step's carry reads (not taken).
+        let held_field: Option<&[f32]> = peaks::threshold()
+            .and(world.fields.get(crate::surface::field::OFFSET_HELD))
+            .filter(|f| f.data.len() == grid.cells())
+            .map(|f| f.data.as_slice());
         let cone_fields: [Option<Field>; 2] =
             cone_fields.map(|f| f.filter(|f| f.data.len() == grid.cells()));
         let parts: Option<Vec<Field>> = if st.gap_budget.is_some() {
@@ -927,12 +936,21 @@ impl PlatesStage {
         let n = st.samples.len();
         let tris = mesh.triangles();
         let links = coupling.links();
+        // Over every cell, by its weight: the offset `z`, the material and the parts the gap
+        // budget books against it, the rock, the cones. A cell whose offset the surface holds
+        // (NaN, `surface.held_offsets`, ISO-125) gives none and keeps its weight: a sample half on
+        // held cells takes half the offset of the rest (renormalised over the rest, a sample 92 %
+        // on held cells took 13 times its few other cells' offset and rose 7.6 km in a step). `wh`,
+        // `zh`: the held cells' share and what they handed over (the peak trace).
         #[derive(Clone, Copy, Default)]
         struct Sums {
             w: f64,
             z: f64,
             m: f64,
+            mz: f64,
             c: [f64; 2],
+            wh: f64,
+            zh: f64,
         }
         // The flexure's sample (`sample_flexure`) beside the feedback's sums, on another thread:
         // both read the last sampling's links and neither writes what the other reads (P1-19:
@@ -949,7 +967,10 @@ impl PlatesStage {
                 for (c, l) in links.iter().enumerate() {
                     let t = tris[l.tri as usize];
                     let dz = f64::from(fb.data[c]);
-                    let dm = material.as_ref().map_or(dz, |m| f64::from(m.data[c]));
+                    // Without the material field the feedback is the rock (a held cell: none).
+                    let dm = material
+                        .as_ref()
+                        .map_or(if dz.is_nan() { 0.0 } else { dz }, |m| f64::from(m.data[c]));
                     let cone = [0, 1].map(|k| {
                         cone_fields[k]
                             .as_ref()
@@ -958,16 +979,27 @@ impl PlatesStage {
                     let pc = parts
                         .as_ref()
                         .map(|p| std::array::from_fn::<f64, SP, _>(|k| f64::from(p[k].data[c])));
+                    let taken = !dz.is_nan();
+                    let held = held_field.is_some_and(|h| h[c] > 0.5);
                     for (&v, &w) in t.iter().zip(l.w.iter()) {
                         let w = f64::from(w);
                         if w > 0.0 {
                             let a = &mut sums[v as usize];
                             a.w += w;
-                            a.z += w * dz;
+                            if taken {
+                                a.z += w * dz;
+                                a.mz += w * dm;
+                            }
                             a.m += w * dm;
                             a.c[0] += w * cone[0];
                             a.c[1] += w * cone[1];
-                            if let Some(pc) = pc {
+                            if held {
+                                a.wh += w;
+                                if taken {
+                                    a.zh += w * dz;
+                                }
+                            }
+                            if let Some(pc) = pc.filter(|_| taken) {
                                 for (a, x) in psum[v as usize].iter_mut().zip(pc) {
                                     *a += w * x;
                                 }
@@ -980,17 +1012,28 @@ impl PlatesStage {
             || flex_field.and_then(|f| flexure_of(links, tris, points, f)),
         );
         let wsum = |v: usize| sums[v].w;
+        let held = held_field.map(|_| {
+            (0..n)
+                .map(|v| {
+                    if wsum(v) > 0.0 {
+                        [(sums[v].wh / wsum(v)) as f32, (sums[v].zh / wsum(v)) as f32]
+                    } else {
+                        [f32::NAN; 2]
+                    }
+                })
+                .collect()
+        });
         let k = env.k;
         let dz: Vec<f64> = st
             .samples
             .par_iter_mut()
             .enumerate()
             .map(|(v, s)| {
-                if wsum(v) <= 0.0 {
+                if sums[v].w <= 0.0 {
                     return 0.0;
                 }
                 let z0 = s.elevation_m;
-                s.elevation_m = (f64::from(z0) + sums[v].z / wsum(v))
+                s.elevation_m = (f64::from(z0) + sums[v].z / sums[v].w)
                     .clamp(k.trench_elevation_m, k.max_elevation_m)
                     as f32;
                 f64::from(s.elevation_m) - f64::from(z0)
@@ -1038,12 +1081,19 @@ impl PlatesStage {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += km3;
         }
         if let Some(gb) = st.gap_budget.as_mut() {
+            // By the weight of every cell, as its elevation (ISO-125).
             let mean = |sum: &dyn Fn(usize) -> f64| -> Vec<f64> {
                 (0..n)
-                    .map(|v| if wsum(v) > 0.0 { sum(v) / wsum(v) } else { 0.0 })
+                    .map(|v| {
+                        if sums[v].w > 0.0 {
+                            sum(v) / sums[v].w
+                        } else {
+                            0.0
+                        }
+                    })
                     .collect()
             };
-            let m = mean(&|v| sums[v].m);
+            let m = mean(&|v| sums[v].mz);
             let part = |k: usize| {
                 if psum.is_empty() {
                     vec![0.0; n]
@@ -1069,6 +1119,7 @@ impl PlatesStage {
                 .map(|(c, _)| c.map(|x| x.max(0.0)))
                 .collect(),
             flexure,
+            held,
         ))
     }
 
@@ -1114,8 +1165,10 @@ impl PlatesStage {
     }
 }
 
-/// [`PlatesStage::apply_surface_feedback`]'s cone rock per sample and the flexure per sample.
-type Feedback = (Vec<[f64; 2]>, Option<Vec<f64>>);
+/// [`PlatesStage::apply_surface_feedback`]'s cone rock per sample, the flexure per sample, and
+/// (for the peak trace) the share of each sample's cells whose offset the surface holds and what
+/// they handed it, m.
+type Feedback = (Vec<[f64; 2]>, Option<Vec<f64>>, Option<Vec<[f32; 2]>>);
 
 /// The surface's flexure per sample through the links (`PlatesStage::sample_flexure`), for the
 /// `n` samples of `tris`; `None` where the field is not the links' grid.
