@@ -469,10 +469,31 @@ sampling grid, the structure classification on the JSON of each audited kind, th
 vanilla start moved by exactly the rule's `dy` (boxes, jigsaw positions, junction ground levels, the start's box)
 and stands clear of the ground under every column of every piece; buried treasure and the mesa mineshaft are not
 moved; under the highest ground nothing is moved; and a buried trial chamber placed chunk by chunk into the
-generated planet has its own blocks in place with none waterlogged, with the real floor of those chunks (not the
-model's H) above its top by `cover` or more over every sampled column, where the same chamber at vanilla's height
-sticks out of that floor. About 2 % of the cells inside the buried pieces' boxes still hold water (the vanilla-height
-control in the sea holds about 4 %, and a chamber in rock under the highest ground 7 cells in 66,803), so the boxes
-are not claimed dry: the template carries almost no water of its own (the rock control), so this is water around it
-in cells the template does not overwrite (not traced further), and the chamber is placed there over finished chunks
-without the terrain adaptation that generation applies. What real generation leaves is not checked. Numbers are in the STATUS.md build log.
+generated planet has its own blocks in place and no cell inside its pieces' boxes held the sea's water (water over
+its column's real floor) before it was placed, with the real floor of those chunks (not the model's H) above its top
+by `cover` or more over every sampled column, where the same chamber at vanilla's height sticks out of that floor and
+its cells held the sea.
+
+Every cell is read before and after the placing. Before, water over the column's real floor (its top solid block in
+`OCEAN_FLOOR_WG`, which water does not stop) is the sea's and water under it a cave's; after, water the placing put
+there is the template's own and water it left in place the world's. The test planet's noise settings
+(`deeptime:planet_nocaves`) turn aquifers off, so the biomes' carvers (which `GeologicChunkGenerator` runs) fill
+every tunnel they cut below sea level with water, under the sea floor too: at master 049c4278's deepest sea 52 cells
+in the buried chamber's boxes held such water (y -169 to -147, 34 blocks or more under the floor) and the template
+wrote over every one (1,130 cells with Expanded Ecosphere's set; 1,043 with MIC's set, whose chamber there is
+another layout, 12 blocks or more under the floor). Carvers run after the noise's encapsulation in real generation as well, so a water-filled
+tunnel can cross a buried chamber there; the test logs that water and does not assert on it, since it is the
+carvers' and not the burial's. Vanilla's trial chamber templates carry water of their own (read from the 1.21.1
+client jar's 170 `trial_chambers` templates): `corridor/end_2` a basin of 60 water and 23 waterlogged waxed oxidized
+cut copper stairs in one layer, `intersection/intersection_1` 966 water over seven layers, `corridor/atrium_1` 17,
+and one each in `corridor/addon/display_1`, `corridor/addon/display_2` and `corridor/entrance_1`. Trial chambers place with `LiquidSettings.IGNORE_WATERLOGGING` (vanilla's `Structures`
+bootstrap), so the world's water never waterlogs their blocks, and a count of waterlogged blocks cannot tell a
+chamber in the sea from one in rock. Until 2026-10-23 the test asserted that none of the buried chamber's own blocks
+was waterlogged: it passed while the sampled chunks missed `corridor/end_2` and failed once master bf8477b2's planet
+moved the deepest sea to (-128, -512), where they took it in (23 waterlogged in the buried chamber and the same 23 in
+the vanilla-height control; the buried chamber's 83 water cells were that basin's 60 water and 23 stairs, all in one
+layer at y -183). The chamber in rock under the highest ground, read until then as a control, held 7 water cells in
+66,803 because its sampled chunks took in almost none of those basins, not because the templates carry almost no
+water; the before and after read replaces it. The chamber is placed over finished chunks there, without the terrain adaptation (`encapsulate`)
+that generation applies, which only adds rock round its pieces; what real generation leaves is not checked. Numbers
+are in the STATUS.md build log.
