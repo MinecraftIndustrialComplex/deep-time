@@ -63,6 +63,86 @@ def read_rivers(path: Path):
     return verts, chains, c
 
 
+def bilinear_at(arr: np.ndarray, grid: dict, bx: np.ndarray, bz: np.ndarray) -> np.ndarray:
+    """`arr` read bilinear at blocks (bx, bz), the game's read of a climate layer (rows bz,
+    columns bx; x wraps, z clamps), as `tools/review/biome_land_census.py` reads it."""
+    w, hh, r = grid["w"], grid["h"], grid["r"]
+    u = (bx - grid["origin_block_x"]) / r
+    v = np.clip((bz - grid["origin_block_z"]) / r, 0, hh - 1)
+    i0 = np.floor(u).astype(np.int64)
+    j0 = np.floor(v).astype(np.int64)
+    fu = (u - i0).astype(np.float32)
+    fv = (v - j0).astype(np.float32)
+    j1 = np.minimum(j0 + 1, hh - 1)
+    ia, ib = i0 % w, (i0 + 1) % w
+    a = arr[j0][:, ia] * (1 - fu)[None, :] + arr[j0][:, ib] * fu[None, :]
+    b = arr[j1][:, ia] * (1 - fu)[None, :] + arr[j1][:, ib] * fu[None, :]
+    return a * (1 - fv)[:, None] + b * fv[:, None]
+
+
+def dilate(m: np.ndarray, k: int) -> np.ndarray:
+    """A square dilation by k cells (x wraps, z clamps)."""
+    out = m.copy()
+    for s in range(1, k + 1):
+        out |= np.roll(m, s, axis=1) | np.roll(m, -s, axis=1)
+    m2 = out.copy()
+    for s in range(1, k + 1):
+        out[s:] |= m2[:-s]
+        out[:-s] |= m2[s:]
+    return out
+
+
+def plain_biomes(world: Path, man: dict, plain: np.ndarray, el: np.ndarray, ed: dict) -> dict:
+    """Ocean biomes on the plains (BIO-185): the plain's dry columns (the world's rule,
+    `water::sea_covers`: top block under sea level - 1 and not closed) whose continentalness, read
+    bilinear from L2 at the column as the game reads it, is under the ocean | coast edge; and the
+    sea's columns within an L2 cell of the plain's dry ones that read the coast's or the land's."""
+    r = world / "rasters"
+    cpath = r / "climate" / "continents.dtr"
+    if not cpath.exists():
+        return {}
+    sea_y = int(man["scale"]["sea_level_y"])
+    bands = man["notes"]["bake"]["climate"]["reference"]["bands"]
+    edge = float(bands["continents"][3])
+    er_b = bands.get("erosion", [])
+    e6 = float(er_b[6]) if len(er_b) > 6 else None
+    g = ed["grid"]
+    h = el.astype(np.float32) * ed.get("scale", 1.0) + ed.get("offset", 0.0)
+    sea = (np.ceil(h).astype(np.int32) - 1) < sea_y - 1
+    cbp = r / "closed_basin.dtr"
+    if cbp.exists():
+        cb, cbd = read_dtr(cbp)
+        if (cbd["grid"]["w"], cbd["grid"]["h"]) == (g["w"], g["h"]):
+            sea &= cb == 0
+    co, cod = read_dtr(cpath)
+    c = co.astype(np.float32) * cod.get("scale", 1.0) + cod.get("offset", 0.0)
+    cg = cod["grid"]
+    bx = g["origin_block_x"] + np.arange(g["w"], dtype=np.float64) * g["r"]
+    bz = g["origin_block_z"] + np.arange(g["h"], dtype=np.float64) * g["r"]
+    cont = bilinear_at(c, cg, bx, bz)
+    dry_plain = plain & ~sea
+    ocean = dry_plain & (cont < edge)
+    reach = max(int(round(cg["r"] / g["r"])) - 1, 0)
+    beside = dilate(dry_plain, reach) & sea
+    coast_on_sea = beside & (cont >= edge)
+    out = {
+        "plain_dry_columns": int(dry_plain.sum()),
+        "plain_ocean_biome_columns": int(ocean.sum()),
+        "plain_ocean_biome_share": round(float(ocean.sum()) / max(int(dry_plain.sum()), 1), 4),
+        "sea_columns_beside_plain": int(beside.sum()),
+        "sea_columns_beside_plain_coast_or_land": int(coast_on_sea.sum()),
+        "all_ocean_biome_on_dry": int((~sea & (cont < edge)).sum()),
+        "all_land_biome_under_sea": int((sea & (cont >= edge)).sum()),
+    }
+    ep = r / "climate" / "erosion.dtr"
+    if e6 is not None and ep.exists():
+        er, erd = read_dtr(ep)
+        ev = bilinear_at(er.astype(np.float32) * erd.get("scale", 1.0) + erd.get("offset", 0.0),
+                         erd["grid"], bx, bz)
+        out["plain_dry_in_swamp_band_e6"] = int((dry_plain & (ev >= e6)).sum())
+    return out
+
+
 def census(world: Path) -> dict:
     man = json.loads((world / "manifest.json").read_text())
     sc = man["scale"]
@@ -122,7 +202,7 @@ def census(world: Path) -> dict:
         d, desc = read_dtr(dpath)
         g = desc["grid"]
         plain = d > 0
-        el, _ = read_dtr(world / "rasters" / "elevation.dtr")
+        el, eld = read_dtr(world / "rasters" / "elevation.dtr")
         above = plain & (el.astype(np.int32) > sea_raw)
         cell_km2 = (g["r"] * m_h / 1000.0) ** 2
         land = int((el.astype(np.int32) >= sea_raw).sum())
@@ -133,6 +213,7 @@ def census(world: Path) -> dict:
         out["delta_share_of_land_cells"] = round(float(plain.sum()) / max(land, 1), 5)
         out["delta_raise_blocks_max"] = round(float(d.max()) / 16.0, 2)
         out["grid"] = {k: g[k] for k in ("name", "w", "h", "r", "origin_block_x", "origin_block_z")}
+        out["plain_biomes"] = plain_biomes(world, man, plain, el, eld)
     top = []
     for rank, k in enumerate(ranked[:25], 1):
         f, n = first[k], count[k]
@@ -165,8 +246,9 @@ def census(world: Path) -> dict:
         out["top25_with_plain"] = sum(1 for r in top if r.get("plain"))
     sd = st.get("deltas")
     if sd:
-        out["bake_stats_deltas"] = {k: v for k, v in sd.items() if k != "largest"}
+        out["bake_stats_deltas"] = {k: v for k, v in sd.items() if k not in ("largest", "fit_unsplit_plains")}
         out["bake_largest"] = sd.get("largest", [])[:10]
+        out["fit_unsplit"] = sd.get("fit_unsplit_plains", [])
     return out
 
 
@@ -198,10 +280,14 @@ def main() -> int:
         print(f"== {n} top 25")
         for t in r["top25"]:
             print("  ", t)
+        if r.get("plain_biomes"):
+            print("   plain biomes:", json.dumps(r["plain_biomes"]))
         if "bake_stats_deltas" in r:
             print("   bake stats:", json.dumps(r["bake_stats_deltas"]))
             for b in r["bake_largest"]:
                 print("   largest:", json.dumps(b))
+            for b in r.get("fit_unsplit", []):
+                print("   unsplit:", json.dumps(b))
     if js:
         Path(js).write_text(json.dumps(res, indent=1))
     if top:
