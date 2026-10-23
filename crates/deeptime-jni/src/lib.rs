@@ -556,8 +556,10 @@ pub extern "system" fn Java_com_minecraftindustrialcomplex_deeptime_nativebridge
 }
 
 /// The layers `renderWorldMap` draws: the workbench's satellite look and its elevation ramp.
-const WORLD_MAP_LAYERS: [deeptime_tiles::Layer; 2] =
-    [deeptime_tiles::Layer::Satellite, deeptime_tiles::Layer::Elevation];
+const WORLD_MAP_LAYERS: [deeptime_tiles::Layer; 2] = [
+    deeptime_tiles::Layer::Satellite,
+    deeptime_tiles::Layer::Elevation,
+];
 
 /// What `renderWorldMap` does, without JNI: `layer` (`sat` or `elev`) of the world-data folder
 /// `dir` over the frame `w × h` pixels from (x0, z0), `s` blocks a pixel, pixel centres, drawn by
@@ -671,7 +673,8 @@ mod tests {
     fn render_world_map_draws_the_frame_and_refuses_bad_arguments() {
         use deeptime_core::synth::{Kind, Strata, build};
         use deeptime_format::{Codec, Manifest};
-        let dir = std::env::temp_dir().join(format!("deeptime-jni-worldmap-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("deeptime-jni-worldmap-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let world = build(Kind::LakeTest, Strata::Placeholder, 2048, Codec::Lz4Block).unwrap();
@@ -690,7 +693,10 @@ mod tests {
             assert_eq!(v["layer"], layer);
             assert_eq!((v["w"].as_u64(), v["h"].as_u64()), (Some(512), Some(256)));
             assert_eq!(v["zoom"], 0);
-            assert!(dst[..512 * 256 * 4].chunks(4).all(|p| p[3] == 255), "{layer} is opaque");
+            assert!(
+                dst[..512 * 256 * 4].chunks(4).all(|p| p[3] == 255),
+                "{layer} is opaque"
+            );
             assert_eq!(&dst[512 * 256 * 4..], &[7, 7, 7], "nothing past the frame");
         }
         let err = |r: BridgeResult<String>| match r {
@@ -706,7 +712,15 @@ mod tests {
             BridgeError::IllegalArgument(_)
         ));
         assert!(matches!(
-            err(render_world_map(&dir, "sat", (0.0, 0.0, 0.0), 8, 8, 1, &mut dst)),
+            err(render_world_map(
+                &dir,
+                "sat",
+                (0.0, 0.0, 0.0),
+                8,
+                8,
+                1,
+                &mut dst
+            )),
             BridgeError::IllegalArgument(_)
         ));
         let empty = dir.join("not-world-data");

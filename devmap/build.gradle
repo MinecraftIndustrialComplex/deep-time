@@ -57,6 +57,10 @@ dependencies {
 
 tasks.named('test', Test) {
     useJUnitPlatform()
+    // SatellitePictureTest draws the satellite picture of Deep Time's real test planet through the
+    // natives (Deep Time's resources carry the host build) and reads that planet's world data.
+    dependsOn ':testWorlds'
+    systemProperty 'deeptime.testWorlds', project(':').layout.buildDirectory.dir('test-worlds').get().asFile.absolutePath
     testLogging { events 'passed', 'failed'; exceptionFormat 'full' }
 }
 
