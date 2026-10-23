@@ -157,8 +157,11 @@ pub(crate) enum Kind {
     Cover,
 }
 
+/// The ice cover layer (blocks of snow and ice, `bake::ice`).
+pub(crate) const ICE_COVER: &str = "climate/ice_cover";
+
 /// The layers read by the cover rule ([`Kind::Cover`]).
-const COVER: [&str; 1] = ["climate/ice_cover"];
+const COVER: [&str; 1] = [ICE_COVER];
 
 pub(crate) fn kind_of(desc: &LayerDesc) -> Kind {
     if desc.dtype == DType::HorizonStack {
@@ -1441,6 +1444,15 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 continue;
             }
             if is_biome_layer(&desc.name) {
+                if desc.name == ICE_COVER {
+                    // The relief below reads the cover as resampled: the land call that takes it
+                    // off the sea (BIO-177) waits for the world's elevation, which the relief draws.
+                    shares.insert(
+                        "ice_cover_true".into(),
+                        json!(area_share(&s.layer, false, |v| v > 0.0)),
+                    );
+                    world_ice = Some(LoadedLayer::new(desc.clone(), bytes.clone())?);
+                }
                 // Held (moved) for the land call on the world's ground below, then written.
                 held_biomes.push(Held {
                     entry: s.entry,
@@ -1470,17 +1482,6 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 "water_level" => world_water = Some(world),
                 CLOSED_BASIN => world_closed = Some(world),
                 "surface/class_top" => world_class = Some(world),
-                "climate/ice_cover" => {
-                    shares.insert(
-                        "ice_cover_map".into(),
-                        json!(area_share(&world, true, |v| v > 0.0)),
-                    );
-                    shares.insert(
-                        "ice_cover_true".into(),
-                        json!(area_share(&s.layer, false, |v| v > 0.0)),
-                    );
-                    world_ice = Some(world);
-                }
                 _ => {}
             }
         }
@@ -1517,6 +1518,13 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             )?;
             entry.bytes = written.bytes;
             entry.crc32 = written.crc32;
+            if held.desc.name == ICE_COVER {
+                let world = LoadedLayer::new(held.desc, held.bytes)?;
+                shares.insert(
+                    "ice_cover_map".into(),
+                    json!(area_share(&world, true, |v| v > 0.0)),
+                );
+            }
         }
         write_ms += ms(tl);
     }
@@ -1910,11 +1918,13 @@ pub(crate) struct Held {
 }
 
 /// The L2 layers the biome bake's land call decides (BIO-170): the five biome inputs, the wetland
-/// flag and the Köppen class the inputs were placed by.
+/// flag and the Köppen class the inputs were placed by, and the ice cover, which it takes off the
+/// nodes the world's sea covers (BIO-177).
 pub(crate) fn is_biome_layer(name: &str) -> bool {
     crate::synth::CLIMATE.contains(&name)
         || name == "climate/wetland"
         || name == "climate/koppen_l2"
+        || name == ICE_COVER
 }
 
 /// What the biome layers' land call reads: the world's ground.
@@ -1938,7 +1948,8 @@ pub(crate) struct BiomeGround<'a> {
 /// the rule is the column evaluator's own ([`deeptime_format::water::sea_covers_height`]) on the
 /// world's elevation and `closed_basin` layers at each L2 node's block; the nodes whose biome inputs
 /// say the other medium take the other's record ([`biomes::settle_to_ground`]); the rest are not
-/// touched. Returns the record for `notes.bake.projection.biome_land`.
+/// touched. The ice cover, when held with them, is taken off every node the world's sea covers
+/// (BIO-177). Returns the record for `notes.bake.projection.biome_land`.
 pub(crate) fn settle_biome_layers(
     held: &mut [Held],
     ground: &BiomeGround<'_>,
@@ -1952,6 +1963,7 @@ pub(crate) fn settle_biome_layers(
     };
     let wet_idx = find("climate/wetland");
     let class_idx = find("climate/koppen_l2");
+    let cover_idx = find(ICE_COVER);
     let wg = held[idx[0]].desc.grid.clone();
     let (w, h) = (wg.w as usize, wg.h as usize);
     let n = w * h;
@@ -2054,6 +2066,22 @@ pub(crate) fn settle_biome_layers(
             }
         }
     }
+    // The ice cover lies on the ground: where the world's sea stands the game has water, the ice
+    // pass leaves a column whose top is fluid alone, and the class is the sea's (BIO-171), so the
+    // cover goes too and a covered node stays of the class EF (BIO-158, BIO-159). ledger: BIO-177
+    let mut cover_cleared = 0usize;
+    if let Some(ci) = cover_idx.filter(|&ci| held[ci].desc.grid == wg) {
+        let hd = &mut held[ci];
+        let cb = hd.desc.cell_bytes();
+        let (scale, offset, dtype) = (hd.desc.scale, hd.desc.offset, hd.desc.dtype);
+        for k in (0..n).filter(|&k| sea[k]) {
+            let cell = &mut hd.bytes[k * cb..(k + 1) * cb];
+            if hd.desc.physical(dtype.decode_scalar(cell)) > 0.0 {
+                put_raw(dtype, (0.0 - offset) / scale, cell);
+                cover_cleared += 1;
+            }
+        }
+    }
     // The edge rows stay glued onto themselves (a half-turn grid's; a cube grid has none).
     if !wg.is_cube() {
         for hd in held.iter_mut() {
@@ -2071,6 +2099,7 @@ pub(crate) fn settle_biome_layers(
         "land_km2": km2(land_nodes),
         "land_biome_under_sea": {"nodes": settled.to_sea.len(), "km2": km2(settled.to_sea.len())},
         "ocean_biome_on_dry_ground": {"nodes": settled.to_land.len(), "km2": km2(settled.to_land.len())},
+        "ice_cover_off_the_sea": {"nodes": cover_cleared, "km2": km2(cover_cleared)},
         "bake_blocks_per_world_block": ground.bake_blocks_per_world_block,
     })
 }
@@ -3162,6 +3191,12 @@ mod tests {
             i16_layer("climate/ridges", 0.4, 0.0),
             u8_layer("climate/wetland", 1, 0),
             u8_layer("climate/koppen_l2", 5, koppen::SEA),
+            // Six blocks of ice cover on the first four bands, whatever their medium.
+            Held {
+                entry: 0,
+                desc: layer(ICE_COVER, DType::U8, 1.0, "blocks"),
+                bytes: (0..n).map(|k| if band(k) < 4 { 6 } else { 0 }).collect(),
+            },
         ];
         let before: Vec<Vec<u8>> = held.iter().map(|x| x.bytes.clone()).collect();
         let ground = BiomeGround {
@@ -3228,6 +3263,22 @@ mod tests {
         let k_of = |b: usize| (h / 2) * w + (0..w).find(|&i| band(i) == b).unwrap() + w / 24;
         assert_eq!(at("climate/koppen_l2", k_of(2)) as u8, koppen::SEA);
         assert_eq!(at("climate/wetland", k_of(2)) as u8, biomes::WETLAND_NONE);
+        // The ice cover leaves the nodes the world's sea covers, and only those (BIO-177): every
+        // node still covered is of a land class.
+        assert_eq!(
+            note["ice_cover_off_the_sea"]["nodes"].as_u64(),
+            Some(in_band(2)),
+            "{note}"
+        );
+        assert_eq!(at(ICE_COVER, k_of(2)), 0.0);
+        for b in [0, 1, 3] {
+            assert_eq!(at(ICE_COVER, k_of(b)), 6.0, "band {b}");
+        }
+        for k in w..n - w {
+            if at(ICE_COVER, k) > 0.0 {
+                assert_ne!(at("climate/koppen_l2", k) as u8, koppen::SEA, "node {k}");
+            }
+        }
         for b in [1, 3] {
             assert_eq!(at("climate/koppen_l2", k_of(b)) as u8, 5, "band {b}");
             assert_eq!(at("climate/wetland", k_of(b)) as u8, 1, "band {b}");
