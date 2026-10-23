@@ -232,7 +232,8 @@ pub fn census(manifest: &Manifest, dir: &Path) -> Result<Value, String> {
     for k in 0..CENSUS_POINTS {
         let y = 1.0 - (k as f64 + 0.5) * 2.0 / CENSUS_POINTS as f64;
         let lat = y.asin().to_degrees();
-        let lon = deeptime_format::projection::wrap_deg((k as f64 * golden).to_degrees() + 180.0) - 180.0;
+        let lon =
+            deeptime_format::projection::wrap_deg((k as f64 * golden).to_degrees() + 180.0) - 180.0;
         let (x, z) = wp.block_of(lat, lon);
         if !x.is_finite() || !z.is_finite() {
             unread += 1;

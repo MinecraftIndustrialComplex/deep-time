@@ -207,9 +207,7 @@ pub fn closed_basin_layer_by(
     let mut queue: VecDeque<(u32, u16)> = VecDeque::new();
     for want in [OPEN, CLOSED] {
         for c in 0..n {
-            if side[c] == want
-                && (0..8).any(|k| nb(c, k).is_some_and(|m| side[m] == 0))
-            {
+            if side[c] == want && (0..8).any(|k| nb(c, k).is_some_and(|m| side[m] == 0)) {
                 queue.push_back((c as u32, 0));
             }
         }

@@ -1964,9 +1964,7 @@ pub(crate) fn settle_biome_layers(
                 &|land, to_sea| cs.dist(land, to_sea),
             )
         }
-        None => {
-            biomes::settle_to_ground(&mut cells, w, h, &sea, &depth_m, blocks_per_cell, params)
-        }
+        None => biomes::settle_to_ground(&mut cells, w, h, &sea, &depth_m, blocks_per_cell, params),
     };
     // Write the settled nodes back, and only those.
     let changed: Vec<u32> = settled
@@ -2315,7 +2313,12 @@ fn lift_body(nb: &mut deeptime_format::Body, dy: f64) {
 /// ground over its centre: the young landscape and the amplifier ran after the deposit stage
 /// placed it, and the drawing differs from the simulation's, so the ground over a horizon can lie
 /// lower than the one the deposit stage kept the body under (ORE-271).
-pub(crate) fn body_y(nb: &mut deeptime_format::Body, dy: f64, host: Option<f64>, ground: f64) -> BodyY {
+pub(crate) fn body_y(
+    nb: &mut deeptime_format::Body,
+    dy: f64,
+    host: Option<f64>,
+    ground: f64,
+) -> BodyY {
     if let Some(host) = host {
         let host = if host.is_finite() { host } else { 0.0 };
         if host != 0.0 {
