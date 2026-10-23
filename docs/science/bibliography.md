@@ -1002,7 +1002,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Clark, M. K. and Royden, L. H. (2000). Topographic ooze: Building the eastern margin of Tibet by lower crustal flow. Geology 28(8):703-706.
 - DOI or URL: 10.1130/0091-7613(2000)28<703:TOBTEM>2.0.CO;2.
 - Cited as: (ERO, ISO, HYP) "Clark & Royden 2000, Geology 28(8):703-706" (spread.rs). (PLT) "Clark & Royden 2000, Geology 28:703".
-- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory)
+- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory); PLT-414 (2026-10-22: the channel viscosities, abstract)
 - Access: paywalled (GeoScienceWorld 403); not fetched. [other sections: paywalled (GSA; not tested).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
@@ -1010,6 +1010,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated; not in code.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) metadata only.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, authors, volume 28, issue 8, first page 703 (the end page 706 is not in the Crossref record, taken as written). Attribution of "D0 range 10^2 to 10^5" to this paper cannot be checked. (PLT) correct.
+- Read in the high-ground task (2026-10-22, PLT-414): the abstract from OpenAlex's record. "For an assumed 15-km-thick channel", viscosities of "10^18 Pa · s beneath the low-gradient margins, 10^21 Pa · s beneath the steep margins" and "an upper bound of 10^16 Pa · s beneath the plateau" (the record drops the exponents' superscripts). The 15 km channel of PLT-301 is now read in the abstract. The abstract gives no diffusivity: the 10^2 to 10^5 km²/Myr range follows from the channel law K = ρ g h³ / (12 μ) with these viscosities (2.4 × 10^5 km²/Myr at 10^18 Pa s, 240 at 10^21), the project's arithmetic (plates.md, "As a thin viscous sheet").
 
 ### Royden1997
 - Reference: Royden, L. H., Burchfiel, B. C., King, R. W., Wang, E., Chen, Z., Shen, F. and Liu, Y. (1997). Surface deformation and lower crustal flow in eastern Tibet. Science 276(5313):788-790.
@@ -1035,6 +1036,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated; not in code.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) metadata only.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 70, issue 2, pages 295-321, and the correction record (volume 73, issue 2, pages 523-532). (PLT) correct. A correction exists (GJRAS 73:523-532, 1983).
+- Read in the high-ground task (2026-10-22, PLT-414): the abstract, from OpenAlex's record (the full text stays paywalled): the lithosphere as "a thin sheet of power law material overlying an inviscid substrate"; "The material flows in response to forces applied to its boundaries (for example, the indenting of one continent by another) and to forces in its interior arising from gradients in crustal thickness"; "In the limit of a very weak medium (Ar > 10) the lithosphere is unable to sustain appreciable crustal elevation contrasts"; "the forces arising from crustal thickness contrasts are great enough to produce net extension in the region of thick crust in front of the influx boundary". Ledger ids added: PLT-414.
 
 ### MolnarLyonCaen1988
 - Reference: Molnar, P. and Lyon-Caen, H. (1988). Some simple physical aspects of the support, structure, and evolution of mountain belts. In: Clark, S. P., Burchfiel, B. C. and Suppe, J. (eds), Processes in Continental Lithospheric Deformation, Geological Society of America Special Paper 218, pp. 179-208.
@@ -1052,13 +1054,14 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Bird, P. (1991). Lateral extrusion of lower crust from under high topography in the isostatic limit. Journal of Geophysical Research 96(B6):10275-10286.
 - DOI or URL: 10.1029/91JB00370.
 - Cited as: (ERO, ISO, HYP) "Bird 1991, JGR 96(B6):10275-10286". (PLT) "Bird 1991 (JGR 96:10275)".
-- Ledger ids: ISO-019, ISO-020, PLT-255 (orogenic collapse, 2026-10-03: the abstract's "cannot maintain short-wavelength (100 km) Moho relief of more than 1 km for times greater than 10–20 m.y. at most", Basin and Range); PLT-300 (2026-10-20: the same abstract quote beside the lower-crustal flow)
+- Ledger ids: ISO-019, ISO-020, PLT-255 (orogenic collapse, 2026-10-03: the abstract's "cannot maintain short-wavelength (100 km) Moho relief of more than 1 km for times greater than 10–20 m.y. at most", Basin and Range); PLT-300 (2026-10-20: the same abstract quote beside the lower-crustal flow); PLT-414 (2026-10-22: leveling and the pancake, abstract)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated; not in code.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) abstract fetched (Crossref). The abstract states that flux is proportional to the third power of the topographic gradient (cubic power law creep), which matches the project's "channel law cube".
 - Reference check: (ERO, ISO, HYP) Crossref matches volume 96, issue B6, pages 10275-10286 (2026-10-01 Crossref query on the title). (PLT) correct.
+- Read in the high-ground task (2026-10-22, PLT-414): the abstract from OpenAlex's record. Lower-crustal extrusion "removes crust from under mountains and smooths and levels the topography"; an isolated high becomes "pancake shaped, with a flat central plateau and steeper flanks spreading outward", and "When adjacent 'pancakes' merge, most of the relief is eliminated"; with published flow laws extrusion is negligible under oceans, marginal under shields and platforms, important under elevated plains and "dominant beneath high plateaus and/or hot, delaminated regions"; a delaminated Tibet may reduce "100-km-wavelength topographic features to 200 m relief in no more than 0.03-0.13 m.y.", "leaving only features with wavelengths over 400 km at the present".
 
 ### Rey2001
 - Reference: Rey, P., Vanderhaeghe, O. and Teyssier, C. (2001). Gravitational collapse of the continental crust: definition, regimes and modes. Tectonophysics 342(3-4):435-449.
@@ -1071,6 +1074,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated; not in code.
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) metadata only.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 342, issue 3-4, pages 435-449. (PLT) correct.
+- Read in the high-ground task (2026-10-22, PLT-412): the abstract, verbatim, from the University of Minnesota's research portal (Experts@Minnesota, https://experts.umn.edu/en/publications/gravitational-collapse-of-the-continental-crust-definition-regime/; the full text stays paywalled). "Gravitational collapse corresponds to the decay of lateral contrast in gravitational potential energy that builds up during lithospheric deformation"; "When the surrounding lithosphere is fixed (fixed-boundary collapse), collapse occurs through a transfer of gravitational potential energy from the elevated regions towards the low lands. This transfer is accommodated by a combination of gravitational sliding of the brittle crust and horizontal spread of the lower crust. In orogenic domains, fixed-boundary divergent collapse implies the lateral growth of the orogenic domain at the expense of the surrounding lithosphere"; and of convergent collapse, "a deficit in gravitational potential energy drives crustal material towards the deformed lithosphere. This regime can be expected to occur following thinning of the continental crust." Ledger ids added: PLT-412.
 
 ### Beaumont2001
 - Reference: Beaumont, C., Jamieson, R. A., Nguyen, M. H. and Lee, B. (2001). Himalayan tectonics explained by extrusion of a low-viscosity crustal channel coupled to focused surface denudation. Nature 414(6865):738-742.
@@ -5881,6 +5885,7 @@ Added in stage 2, package WP-7 (2026-10-02). Each entry is held in the project's
 - Ledger ids: RCK-033, PLT-256 (orogenic collapse, 2026-10-03: orogens 46.3 km, global 41.1 km, as comparison), PLT-281 (2026-10-06: the mean crustal density, 2830 kg/m3)
 - Library: `ChristensenMooney1995/abstract.json` (the USGS publications record).
 - Read: abstract only. Average crustal thickness 41.1 km (extended 30.5 km, orogens 46.3 km); "The mean crustal density calculated from our model is 2830 kg/m3".
+- Read again in the high-ground task (2026-10-22, PLT-412 and PLT-413): the abstract, from OpenAlex's record (doi 10.1029/95JB00259): "extended crust showing an average thickness of 30.5 km and orogens an average of 46.3 km. Shields and platforms have an average crustal thickness nearly equal to the global average"; "The weighted average crustal thickness based on these values is 41.1 km." Ledger ids added: PLT-412, PLT-413.
 
 ### BrownJohnson2018_dataset
 - Reference: Brown, M. and Johnson, T. (2018). Global age, temperature and pressure data for secular change in metamorphism. EarthChem Library, doi 10.1594/IEDA/111316; slides of M. Brown's presidential address to the Mineralogical Society of America.
@@ -6403,7 +6408,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: McKenzie, D. (1978). Some remarks on the development of sedimentary basins. Earth and Planetary Science Letters 40:25-32.
 - DOI or URL: 10.1016/0012-821X(78)90071-7 (the DOI from the standard citation, not seen on the scan); scan at http://www.zetaware.com/public/McKenzie_1978.pdf
 - Cited as: "McKenzie 1978" (uniform stretching by β; initial and thermal subsidence).
-- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`)
+- Ledger ids: PLT-261, PLT-263, PLT-264, ISO-078 (2026-10-20, the continent budget: τ = 62.8 My of Table 1, tried as the settling's time and dropped, `plates/settle.rs`), PLT-415 (2026-10-22, the high-ground task: τ = 62.8 My as the e-fold of the thin sheet's viscosity with the age of the orogeny; the form is the agent's)
 - Access: scanned copy, open.
 - Read so far (by the project): full text (OCR; the equations partly garbled), 2026-10-04: "a unit length of continental lithosphere is suddenly extended to a length β, causing upwelling of hot asthenosphere"; "The slow subsidence and the heat flow depend only on the amount of stretching"; Table 1: τ = 62.8 My, E0 = 3.2 km, ρ_c 2.8, ρ_m 3.33, ρ_w 1.0 g/cm³; thermal subsidence S_t ≈ E0 r (1 − e^(−t/τ)), r = (β/π) sin(π/β).
 
@@ -7858,6 +7863,60 @@ Nothing was saved to the library.
 - Access: open; a book; open.
 - Library: not fetched.
 - Read so far (by the project): Heliker et al. only in a search summary (Pu'u 'O'o's open channels 2 to 5 m deep and 5 to 25 m wide, tubes 3 to 5 m wide); Siebert et al. not read (it may tabulate how often arc eruptions make lava flows); Etna's page fetched 2026-10-22: "Since the year AD 1600, at least 60 flank eruptions", nearly half since 1900.
+
+### WhiteheadClift2009
+- Reference: Whitehead, J. A. and Clift, P. D. (2009). Continent elevation, mountains, and erosion: Freeboard implications. Journal of Geophysical Research: Solid Earth 114(B5).
+- DOI or URL: 10.1029/2008JB006176
+- Cited as: "Whitehead & Clift 2009".
+- Ledger ids: PLT-412
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "If continent elevation (freeboard) remains at the present value of a few hundred meters, the past continent‐ocean area ratio might have been quite different, depending on earlier volumes of continental crust and water. We conclude that, along with the ages of ocean basins, continental crustal thickening exerts a first‐order control on the global sea level over hundreds of million years"; since 65 Ma "a 156‐m increase of continent elevation over sea level", "affected most strongly by the roughly 1.7% continent surface area decrease caused by Cenozoic mountain building".
+
+### HousemanEngland1986
+- Reference: Houseman, G. A. and England, P. C. (1986). Finite strain calculations of continental deformation: 1. Method and general results for convergent zones. Journal of Geophysical Research 91(B3):3651-3663.
+- DOI or URL: 10.1029/JB091iB03p03651
+- Cited as: "Houseman & England 1986" (the thin viscous sheet, the Argand number).
+- Ledger ids: PLT-414
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "the strength of the sheet relative to the gravitational forces (which may be expressed as a dimensionless number: the Argand number Ar)"; "For n > 3 and Ar between 1 and 10 a plateau of thickened crust is formed in front of the indenter"; "the length scale of deformation increases with Ar and time since the start of the collision and decreases with n".
+
+### EnglandHouseman1989
+- Reference: England, P. and Houseman, G. (1989). Extension during continental convergence, with application to the Tibetan Plateau. Journal of Geophysical Research 94(B12):17561-17579.
+- DOI or URL: 10.1029/JB094iB12p17561
+- Cited as: "England & Houseman 1989".
+- Ledger ids: PLT-414, PLT-415
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "For the last 5 m.y. or so the plateau has been thinning by the mechanism of extension on north‐south trending normal faults"; the collision time scale "(∼50 m.y. in the case of India and Asia)"; "the increase in surface height (as much as 2 km) and of potential energy (5 to 10 × 10 12 N m −1 ) resulting from convective instability of the lower lithosphere are sufficient for east‐west extension to replace north‐south compression as the dominant feature of the stress field of the Tibetan plateau".
+
+### EnglandMolnar1997
+- Reference: England, P. and Molnar, P. (1997). Active deformation of Asia: from kinematics to dynamics. Science 278(5338):647-650.
+- DOI or URL: 10.1126/science.278.5338.647
+- Cited as: "England & Molnar 1997" (the Tibetan lithosphere's viscosity).
+- Ledger ids: PLT-414
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "gradients of stress point uphill toward the center of Tibet, where gravitational potential energy per unit surface area reaches a maximum"; "This balance, in the region of the Tibetan plateau, yields an estimate of 10 22 pascal second for the average viscosity of the Tibetan lithosphere, which is only about 10 to 100 times greater than the viscosity of the convecting upper mantle".
+
+### FleschEtAl2000
+- Reference: Flesch, L. M., Holt, W. E., Haines, A. J. and Shen-Tu, B. (2000). Dynamics of the Pacific-North American plate boundary in the western United States. Science 287(5454):834-836.
+- DOI or URL: 10.1126/science.287.5454.834
+- Cited as: "Flesch et al. 2000" (the Basin and Range's viscosity).
+- Ledger ids: PLT-414
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "Deformation in the Basin and Range is driven, in part, by gravitational potential energy differences, but extension directions there are modified by plate interaction stresses. The California shear zone has relatively low vertically averaged viscosity of about 10(21) pascal.seconds, whereas the Basin and Range has a higher vertically averaged viscosity of 10(22) pascal.seconds."
+
+### SonderJones1999
+- Reference: Sonder, L. J. and Jones, C. H. (1999). Western United States extension: how the west was widened. Annual Review of Earth and Planetary Sciences 27:417-462.
+- DOI or URL: 10.1146/annurev.earth.27.1.417
+- Cited as: "Sonder & Jones 1999".
+- Ledger ids: PLT-414
+- Access: paywalled; the abstract from OpenAlex's record.
+- Library: not fetched.
+- Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "Forces driving extension can originate at plate boundaries, through basal traction, basal normal forces, or from buoyancy forces internal to the crust and lithospheric mantle. The latter two are most responsible for driving extension where it is observed in the Basin and Range."
 
 ## The cube simulation grid and its surface solvers (SCL-140 to SCL-152), added 2026-10-22
 
