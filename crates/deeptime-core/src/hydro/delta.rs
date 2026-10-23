@@ -64,7 +64,8 @@ pub const MIN_PLAIN_CELLS: usize = 3; // ledger: HYD-142
 /// ones stay as lagoons (closed basins). ledger: HYD-142
 pub const POCKET_FILL_CELLS: usize = 200; // ledger: HYD-142
 
-/// How far the main stem's slope is measured above the old mouth, m (the apex). ledger: HYD-137
+/// How far the main stem's slope is measured above the old mouth, m (the backwater length beside
+/// the apex). ledger: HYD-137
 pub const SLOPE_REACH_M: f64 = 30_000.0; // ledger: HYD-137
 
 /// A distributary's path costs this much more on a cell another channel of the plain already
@@ -686,14 +687,17 @@ impl Branch {
 #[derive(Clone, Debug, Serialize)]
 pub struct Split {
     pub plain: u32,
-    /// The second network's main stem across the plain, the apex's distance from its sea cell
-    /// (blocks) and the backwater length (m).
+    /// The second network's main stem across the plain, the apex's distance along it from where
+    /// it leaves the plain (blocks), the backwater length (m) and whether that length is the
+    /// shorter (HYD-137).
     pub chain: u32,
     pub apex_blocks: f64,
     pub backwater_m: f64,
-    /// The plain's front (cells beside the sea's water, the beach band or the open sea) and the
-    /// mouths it holds.
+    pub backwater_inside: bool,
+    /// The plain's front (cells beside the sea's water, the beach band or the open sea), the
+    /// mouths that fit along it (HYD-138) and the mouths it holds.
     pub front_cells: u32,
+    pub fit: u32,
     pub mouths: u32,
     /// Chains added.
     pub added: u32,
@@ -758,8 +762,9 @@ pub fn distributaries(
         if m < 3 || exit + 1 >= m {
             continue;
         }
-        // The apex: the backwater length up from where the stem leaves the plain, never above
-        // where it enters the plain (HYD-137).
+        // The apex: where the stem comes onto the plain, the valley's mouth (HYD-137). The
+        // backwater length up from where it leaves the plain is reported beside it: where it is
+        // the shorter, the river is a steep one, whose fan delta spreads from the valley's mouth.
         let backwater_m = if plain.slope > 0.0 {
             plain.d_m / plain.slope
         } else {
@@ -769,11 +774,7 @@ pub fn distributaries(
         let mut run_m = 0.0;
         while apex > 0 && on(mouth.stem[apex - 1]) {
             let (dx, dz) = geo.delta(geo.pos(mouth.stem[apex - 1]), geo.pos(mouth.stem[apex]));
-            let step = (dx * dx + dz * dz).sqrt() * inp.m_per_block_h;
-            if run_m + step > backwater_m {
-                break;
-            }
-            run_m += step;
+            run_m += (dx * dx + dz * dz).sqrt() * inp.m_per_block_h;
             apex -= 1;
         }
         // The front, by bearing from the apex: the plain's cells beside the sea's water ahead of
@@ -813,7 +814,9 @@ pub fn distributaries(
             } else {
                 -1.0
             },
+            backwater_inside: backwater_m < run_m,
             front_cells: front.len() as u32,
+            fit: mouths_n as u32,
             mouths: 1,
             added: 0,
         };
@@ -1059,13 +1062,15 @@ pub fn stats(plains: &Plains, splits: &[Split], land_cells: u64, cell_km2: f64) 
     let cells: u64 = plains.plains.iter().map(|p| p.cells.len() as u64).sum();
     let area_km2 = cells as f64 * cell_km2;
     let added: u32 = splits.iter().map(|s| s.added).sum();
-    let mouths_hist = {
+    let hist = |of: fn(&Split) -> u32| {
         let mut h = [0u32; 9];
         for s in splits {
-            h[(s.mouths as usize).min(8)] += 1;
+            h[(of(s) as usize).min(8)] += 1;
         }
         h
     };
+    let mouths_hist = hist(|s| s.mouths);
+    let fit_hist = hist(|s| s.fit);
     let split_of: HashMap<u32, &Split> = splits.iter().map(|s| (s.plain, s)).collect();
     let mut by_q: Vec<usize> = (0..plains.plains.len()).collect();
     by_q.sort_by(|&a, &b| {
@@ -1098,6 +1103,7 @@ pub fn stats(plains: &Plains, splits: &[Split], land_cells: u64, cell_km2: f64) 
                 "apex_blocks": s.map_or(0.0, |s| (s.apex_blocks * 10.0).round() / 10.0),
                 "backwater_m": s.map_or(-1.0, |s| s.backwater_m),
                 "front_cells": s.map_or(0, |s| s.front_cells),
+                "fit": s.map_or(0, |s| s.fit),
             })
         })
         .collect();
@@ -1116,6 +1122,8 @@ pub fn stats(plains: &Plains, splits: &[Split], land_cells: u64, cell_km2: f64) 
         "lagoon_cells": plains.lagoon_cells,
         "distributaries_added": added,
         "deltas_by_mouths": mouths_hist,
+        "deltas_by_mouths_fit": fit_hist,
+        "backwater_inside_plain": splits.iter().filter(|s| s.backwater_inside).count(),
         "earth": {
             "delta_share_of_land": 0.0057,
             "delta_area_km2": 847_936,
