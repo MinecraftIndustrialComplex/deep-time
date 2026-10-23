@@ -18,8 +18,9 @@ The deep-time simulation works on cells several kilometres wide. Two later steps
 | [AMP](ledger/AMP.md) | sea floor | AMP-074 (1) |
 | [AMP](ledger/AMP.md) | steep-ground texture (the bake's relief pass) | AMP-080 to AMP-084 (5) |
 | [AMP](ledger/AMP.md) | lake shores | AMP-090, AMP-091 (2) |
+| [AMP](ledger/AMP.md) | closed basins | AMP-095 to AMP-097 (3) |
 
-Rows by status (YNG and AMP, recounted 2026-10-22): `verified` 1, `cited-unverified` 8, `calibrated` 3, `game-choice` 71, `uncited` 19.
+Rows by status (YNG and AMP, recounted 2026-10-23): `verified` 1, `cited-unverified` 8, `from-memory` 1, `calibrated` 3, `game-choice` 73, `uncited` 19.
 
 ## Material for the stage 2 writer
 
@@ -399,7 +400,9 @@ before the last held 10.25 B a cell that `run_tiles` never reserved. The glacier
 next level (`LevelSink`'s `zs`, 4 B a cell) was allocated at the first tile, after the tiles'
 reservation, and the cores' copy of it (`zs_core`) grew by pushes to the next power of two, 6.25 B a
 cell instead of 4 (about 55 MB on quick 16k's middle level, 220 MB on full 32k's). Both are now
-allocated at their size before the reservation, so `LEVEL_BYTES_PER_CELL` covers them.
+allocated at their size before the reservation, so `LEVEL_BYTES_PER_CELL` covers them; so is the
+next level's basin class (`Level::closed`, 1 B a cell, from the closed basins below), which came in
+at the first tile the same way.
 
 **The amplifier's figure** (`amplify::estimate_under`, the stage's `Stage::estimate_under` for the
 run's cap): the young landscape's world on the L2 grid's real rows (`young::FIELD_BYTES_PER_L2_CELL`,
@@ -511,4 +514,126 @@ steep ground within 12 blocks) floor(bake height + a constant) equals the genera
 nothing inside it (no erosion, no character), while the bake's water balance later leaves most of
 such a basin dry in a semi-arid climate. So the dry floor and the lower walls of a pit keep the
 young landscape's coarser terrain, and the character's fade marks the old waterline as a soft
-contour. Making the amplifier's lake the water-balance lake would end both; it is not done here.
+contour. Making the amplifier's lake the water-balance lake would end both: done in part B, below.
+
+## Closed basins in the amplifier (savanna pit task, part B, 2026-10-23)
+
+Ben: "(Assuming that it had an actually realistic reason for existing, if the pit shouldn't exist
+in the first place that is a different story.)"
+
+**Where the pit comes from.** Not the young landscape and not the amplifier: the pit is in the
+simulation's own surface (L1, 16 blocks a cell) by the end of history, 1.5 to 2 km under the
+sea's level on a plain that stands 0.8 km over it. The per-step parts of the surface's isostatic
+gap at the pit's cell (`surface/gap_*_m`, dumped for the last 20 steps of Ben's seed, steps 481
+to 500, 2 Myr each) put nearly all of it in one term, the load a weakened plate lets go (ISO-056,
+`surface/flexure.rs`): the cell's regime goes from craton to back-arc at step 498, the plate's
+flexural rigidity falls, and the released part is -2,047 m, -1,216 m and -1,025 m at steps 498,
+499 and 500 (-4,389 m over the 20 steps; the surface went from 103 m under the sea to 2,218 m
+under it). The water's part is -43 m over the 20 steps, so the sea is not loading the hole twice.
+The release does not overshoot: the cell's surface stood 3,448 m over its local isostatic level
+at step 496 (`surface/flexure_m`, held up by the stiff plate) and still 460 m over it at step
+500. What the plate had been holding up is a crust that thinned from 38.6 km to 27.6 km in those
+40 Myr (`plates/thickness_m`), most of it while the cell was still a craton. So the pit has a
+physical reason: thinned crust sinks to its isostatic level once the plate no longer holds it, as
+a back-arc basin does. What is not like Earth is the pace and the emptiness: the plate let go of
+3 km of support in three steps, faster than sediment came in, and the hole stays dry; a back-arc
+basin fills with sediment and water as it sinks (the Pannonian basin, a back-arc on old crust,
+filled and lies about 100 m over sea level; the lowest dry land on Earth, the Dead Sea's shore, is
+about 430 m under it: both from memory). The thinning and the release are the plate and flexure
+lanes' (a peer's branch works in `flexure.rs`), so they are a recommended follow-up, not changed
+here. The census below shows that such basins are common on the planets, not a one-off.
+
+**What the amplifier did with them.** The young landscape floods each closed basin to its spill
+point and the amplifier used that lake as the cells it leaves alone; worse, every cell at or
+below sea level counted as sea, whether or not the sea could reach it, so a dry pit 100 blocks
+under sea level was clamped, faded and eroded as sea floor. The bake's water balance then found
+the basin dry (or a playa) and drained it: what Ben walked on was the coarse level's terrain,
+flat floor, straight walls and all.
+
+**Fix.** (1) The amplifier runs the bake's own hydrology (`hydro::network::run`, the preset's
+parameters and climate) once on its first level, L2, after the volcano and structure passes and
+before the doublings (`surface/amplify/balance.rs`). Its lakes, at their balance levels, are the
+amplifier's lakes (AMP-095); the young flood's spill-full lakes go. (2) Ground the open sea does
+not reach (the network's `closed_basin` layer) is closed ground, carried to each finer level as
+a quad's corners agree (`resample::basin`), and sea is only ground under sea level that is open
+to it (AMP-096): closed ground gets no sea clamp and no sea base level, so the passes work it as
+land. Every rule that tells the classes apart does so only at or below sea level, because the
+classes are drawn on the coarse grid and the hydrology's halo round closed ground reaches above
+it; the character's coast fade (AMP-061) stays by height on closed ground too (see "Measured"
+for the version that lifted it). (3) A basin the balance leaves dry or a playa drains to its lowest cell
+(a sink, AMP-097): the flood repair takes that cell as an outlet instead of filling the basin to
+its rim, and erosion on closed ground takes the receiver's height as its base, so the dry floor
+and the lower walls get the erosion, slumping and silt of any land and the floor collects its
+catchment's sediment (AMP-017, AMP-021). Nothing in the world-data format changed. With the
+hydrology off the amplifier keeps the young landscape's lakes and treats every cell as open.
+Memory: a level keeps the class in a byte a cell of its own (`Level::closed`, so
+`LEVEL_BYTES_PER_CELL` goes from 24 to 25: 2 MiB on the quick 16k world's L2 level, 8 MiB on the
+level the ladder keeps), but a window does not. A window's cell already had a lake byte, of which
+the lake flag used one bit; the class rides in bits 1 and 2 of it (`resample::cell`), so a window
+stays at 79 B a cell. A byte a window cell more is 32 MiB on the whole last level, which would
+leave 6 MiB of the default 4 GiB workbench cap's 38 MiB margin, and two would refuse the default
+world.
+Tests: `surface::amplify::balance::tests` (a dry bowl 1.5 km under sea level is closed ground
+with one sink at its centre; a wet bowl keeps its lake and no sink; with the hydrology off the
+level is untouched) and `surface::amplify::character::tests::the_basin_class_draws_no_line_above_sea_level`
+(a cone on a plain 4 blocks above the sea, half the window closed ground: not one cell differs
+from the all-open window).
+
+**Measured** (Ben's seed and seed 2, earthlike_quick_16k, 1,000 Myr from the supercontinent; each
+seed's young checkpoint amplified and baked by part A's branch and by this one, at a pinned
+projection centre, `scale.lambda_c_deg` 120.25 and 73.0, because the automatic centre jumps on
+small coastal changes; scratch scripts in the task's build folder, not committed).
+
+On the simulation's own surface (L1; the pool's `basins` measure,
+`tools/review/pool/measure_basins.py`) Ben's seed has 115 closed basins deeper than 10 blocks, 66
+deeper than 30, 80 with a floor under sea level and 13 with an arid rim, the deepest 271 blocks;
+seed 2 has 137, 68, 91 and 17, the deepest 339.5. The young landscape (L2) keeps 15 of Ben's
+seed's (13 under sea level, the deepest 159.5). So such basins come with the planets, not with
+one seed.
+
+In the bake (closed depressions of the baked height against the sea; a basin is one deeper than
+10 blocks under its spill; "dry" has no lake on most of it; a4 is the four-fold anisotropy of its
+walls' downslope directions, 0 for walls that face every way, 1 for a coarse grid's staircase):
+
+| World | Over 10 | Over 30 | Floor under sea | Dry | Deepest | a4 median | a4 by wall area |
+|---|---|---|---|---|---|---|---|
+| Ben's play world (an older master's bake) | 20 | 11 | 12 | 7 | 88.3 | 0.248 | 0.257 |
+| Ben's seed, part A | 12 | 4 | 5 | 6 | 125.9 | 0.158 | 0.159 |
+| Ben's seed, part B | 11 | 3 | 4 | 6 | 125.8 | 0.166 | 0.156 |
+| Seed 2, part A | 15 | 5 | 7 | 6 | 241.5 | 0.229 | 0.362 |
+| Seed 2, part B | 14 | 5 | 6 | 5 | 228.8 | 0.231 | 0.349 |
+
+Part B changes how the basins look, not how many there are: those are the surface's. Ben's pit
+(65 blocks under its spill, 123,000 blocks2) goes from a4 0.119 to 0.095, and the share of its
+cells flatter than 0.02 block a block from 0.111 to 0.141; seed 2's second deepest basin goes
+from a4 0.262 to 0.083 and lies 21 blocks deeper (124.6 to 145.5). In the renders the pit's
+walls lose part A's soft contour at the young lake's old waterline, and its stepped north-west
+rim softens. Against part A the window round the pit (x -2640 to -2300, z 900 to 1180) moved by
+0.43 block on average (most 11.5, 99th percentile 4.7). The flood repair before erosion raised
+262,054 cells on Ben's seed (15,198 with part A) and 118,244 on seed 2 (13,334): closed ground
+under sea level is land now and its hollows fill towards its basin's sink as land's do; the
+largest raise is the same (218 m on Ben's seed, 243 to 249 m on seed 2).
+
+The first version of the fix gave closed ground no coast fade. It drew a new jagged ring, 2 to 4
+blocks high, round Ben's pit at y 63 to 68, on the young landscape's 8-block grid: the closed
+class comes from the hydrology's `closed_basin` layer, whose halo reaches above sea level, and
+on the plain the closed side took the whole character while the open side next to it took
+almost none. With the coast fade by height on all ground the ring is gone from the renders, and
+the census is the same as the first version's to the block (a4 by wall area 0.157 against 0.156
+on Ben's seed, seed 2 unchanged).
+
+**Still there, and the follow-up.** The pit itself: its depth is the flexure law's, and the fix
+here only makes it look like ground. Recommended for the flexure lane: release the held load
+over the plate's thermal time instead of in one step, and let the surface's sediment fill what
+it opens (a back-arc fills as it sinks), then measure the census above again. Master's flexure
+change of 2026-10-23 (18ace5d7: the flexure loads only the crust a column gained or lost,
+ISO-091) keeps the release law and does not end the basins: the `basins` measure over the pool's
+base runs, 12 a side (both starts, `DEEPTIME_CRUST_BUDGET=1`), before and after it, gives 138 and
+116 basins deeper than 10 blocks (Mann-Whitney p 0.36), 92 and 81 with a floor under sea level
+(p 0.23), the deepest 309.7 and 303.0 blocks (p 0.37). Recommended for the
+plate lane: the pit's cell lost 11 km of crust (38.6 to 27.6 km) in 40 Myr, most of it while it
+was still a craton; whether a craton should thin that fast is that lane's question. For scale,
+from memory: Earth's closed depressions under sea level are a handful (the lowest, the Dead
+Sea's shore, about 430 m under it, 12 blocks at this planet's 35 m a block; Lake Assal, the
+Qattara and Turpan depressions and Death Valley shallower), while each seed here has 80 or more
+closed basins of the surface with floors under sea level.

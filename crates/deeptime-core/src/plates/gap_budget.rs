@@ -116,6 +116,8 @@ pub enum Part {
     Belts,
     /// `subduction::fronts_and_uplift`: arcs and Andean margins.
     Arcs,
+    /// `subduction::erode_forearcs`: subduction erosion.
+    Forearc,
     /// `collapse::founder`.
     Founder,
     /// `collapse::step`.
@@ -163,7 +165,7 @@ pub const SURFACE_PARTS: [(Part, &str); 8] = [
 ];
 
 /// The number of parts.
-pub const PARTS: usize = 30;
+pub const PARTS: usize = 31;
 
 /// The parts' names, in order.
 pub const NAMES: [&str; PARTS] = [
@@ -182,6 +184,7 @@ pub const NAMES: [&str; PARTS] = [
     "shortening",
     "belts",
     "arcs",
+    "forearc",
     "founder",
     "collapse",
     "flow",

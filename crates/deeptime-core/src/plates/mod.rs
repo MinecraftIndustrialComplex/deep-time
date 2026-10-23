@@ -489,6 +489,28 @@ impl PlatesStage {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
         lap(&mut clock, "fronts");
+        // Subduction erosion (PLT-441): its globals only while the rule is on, so a run without
+        // it keeps its record.
+        if let Some(forearcs) = &pull.forearcs {
+            let e = subduction::erode_forearcs(st, &env, forearcs);
+            book(st, gap_budget::Part::Forearc);
+            for (name, x) in [
+                (subduction::FOREARC_CONTINENTAL_GLOBAL, e.continental_km3),
+                (subduction::FOREARC_OTHER_GLOBAL, e.other_km3),
+                (subduction::FOREARC_SHORT_GLOBAL, e.short_km3),
+                (
+                    subduction::FOREARC_FRONT_CONTINENTAL_GLOBAL,
+                    e.front_continental_km_myr,
+                ),
+                (
+                    subduction::FOREARC_FRONT_OCEANIC_GLOBAL,
+                    e.front_oceanic_km_myr,
+                ),
+            ] {
+                *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
+            }
+            lap(&mut clock, "forearcs");
+        }
         // The boundary mix (measurement only) on the same samples as the fronts, before the
         // collapse below turns any crust over.
         let mix = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
@@ -1199,6 +1221,11 @@ fn surface(st: &mut PlateState, geo: &Geo, env: &Env<'_>, held_floor: &[f32], se
         z_floor: k.oceanic_floor_elevation_m,
         z_ridge: k.ridge_elevation_m,
         trench_relax: pools::trench_share(env.dt_myr, k.trench_half_life_myr),
+        trench_release: if k.trench_release_half_life_myr > 0.0 {
+            pools::trench_share(env.dt_myr, k.trench_release_half_life_myr) // ledger: PLT-443
+        } else {
+            0.0
+        },
         gravity: env.gravity,
         law: k.ocean_depth,
         t_myr: env.t_myr,
