@@ -810,8 +810,12 @@ pub fn step(
     sea_m: f64,
 ) -> Answer {
     let mut slabs = std::mem::take(&mut st.slabs);
-    let (omega, stress_mpa, solved, out) =
-        balance_step(st, geo, pos, env, flow, sea_m, &mut slabs);
+    let Balanced {
+        omega,
+        stress_mpa,
+        solved,
+        out,
+    } = balance_step(st, geo, pos, env, flow, sea_m, &mut slabs);
     st.slabs = slabs;
     let recorded = st.dynamics.as_mut().map(|d| {
         let last: BTreeMap<u32, DVec3> = d
@@ -841,6 +845,15 @@ pub fn step(
     }
 }
 
+/// What [`balance_step`] answers: each plate's balance rotation and mean stress (by plate id),
+/// whether the solve succeeded, and the record's part.
+struct Balanced {
+    omega: Vec<Option<DVec3>>,
+    stress_mpa: Vec<Option<f64>>,
+    solved: bool,
+    out: Recorded,
+}
+
 fn balance_step(
     st: &PlateState,
     geo: &Geo,
@@ -849,7 +862,7 @@ fn balance_step(
     flow: DVec3,
     sea_m: f64,
     slabs: &mut Vec<SlabTrack>,
-) -> (Vec<Option<DVec3>>, Vec<Option<f64>>, bool, Recorded) {
+) -> Balanced {
     let k = env.k;
     let norm = env.norm;
     let samples = &st.samples;
@@ -1179,16 +1192,16 @@ fn balance_step(
             rot_known: false,
         });
     }
-    (
-        out,
-        stress,
+    Balanced {
+        omega: out,
+        stress_mpa: stress,
         solved,
-        Recorded {
+        out: Recorded {
             forces,
             slabs_km,
             breakoffs,
         },
-    )
+    }
 }
 
 #[cfg(test)]
