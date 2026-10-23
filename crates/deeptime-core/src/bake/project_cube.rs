@@ -1255,7 +1255,10 @@ fn body_area_ratio(
         for k in 0..DIRS {
             let t = TAU * k as f64 / DIRS as f64;
             let (u, v) = (a * r * t.cos(), c * r * t.sin());
-            let (x, z) = (nb.center[0] + u * cy - v * sy, nb.center[2] + u * sy + v * cy);
+            let (x, z) = (
+                nb.center[0] + u * cy - v * sy,
+                nb.center[2] + u * sy + v * cy,
+            );
             if let Some(j) = view.jacobian(x, z) {
                 sum += r * j.sigma * j.sigma;
                 weight += r;
