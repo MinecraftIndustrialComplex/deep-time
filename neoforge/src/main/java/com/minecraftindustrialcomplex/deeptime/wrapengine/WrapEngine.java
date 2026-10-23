@@ -68,6 +68,8 @@ public final class WrapEngine {
         if (net.neoforged.fml.ModList.get().isLoaded("create"))
             NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerAboutToStartEvent.class,
                     e -> com.minecraftindustrialcomplex.deeptime.compat.create.wrap.CreateWrapCompat.init());
+        // The cube on the overworld, from -Ddeeptime.wrapengine.cube=<s> (design §12.3, §12.7).
+        NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.event.server.ServerStartedEvent.class, e -> CubeInstall.onServerStarted(e.getServer()));
         NeoForge.EVENT_BUS.addListener(LevelTickEvent.Post.class, e -> {
             if (e.getLevel() instanceof ServerLevel sl) {
                 BandManager b = bands(sl);
@@ -213,6 +215,47 @@ public final class WrapEngine {
     public static String stats(ServerLevel level) {
         BandManager b = bands(level);
         return b == null ? "no topology" : b.stats();
+    }
+
+    /**
+     * True when {@code pos} lies within {@link WrapTopology#CORNER_KEEP_OUT} blocks of a cone point of
+     * the level's topology (a cube corner), where seam links are refused (design §12.4; ledger:
+     * SCL-183). False without a topology.
+     */
+    public static boolean nearCorner(Level level, BlockPos pos) {
+        WrapTopology t = topology(level);
+        return t != null && t.nearCorner(pos.getX(), pos.getZ());
+    }
+
+    /**
+     * The names of the edges the level's topology joins, without the pieces' {@code @tw} suffix and
+     * without the engine's own slides: the net edges the border W3 leaves out (design §12.5). Empty
+     * without a topology.
+     */
+    public static java.util.Set<String> joinedEdges(Level level) {
+        WrapTopology t = topology(level);
+        if (t == null)
+            return java.util.Set.of();
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        for (WrapEdge e : t.edges()) {
+            String n = e.name();
+            if (n.endsWith(WrapLayouts.SLIDE))
+                continue;
+            out.add(n.endsWith(WrapLayouts.TW_PIECE) ? n.substring(0, n.length() - WrapLayouts.TW_PIECE.length()) : n);
+        }
+        return java.util.Collections.unmodifiableSet(out);
+    }
+
+    /**
+     * Of a stored position and its band images, the one nearest {@code from} (the position the player
+     * sees: a sign editor, a range check; design §12.8). {@code stored} itself without a topology.
+     */
+    public static BlockPos nearestImage(Level level, BlockPos stored, Vec3 from) {
+        WrapTopology t = topology(level);
+        if (t == null)
+            return stored;
+        int[] q = t.nearestImage(stored.getX(), stored.getZ(), from.x, from.z);
+        return q[0] == stored.getX() && q[1] == stored.getZ() ? stored : new BlockPos(q[0], stored.getY(), q[1]);
     }
 
     /** The raw state in chunk storage at a position, bypassing the fold (what collisions and the client see). */

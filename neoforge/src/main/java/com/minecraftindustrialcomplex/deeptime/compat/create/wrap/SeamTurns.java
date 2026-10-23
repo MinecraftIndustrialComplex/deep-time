@@ -59,22 +59,22 @@ public final class SeamTurns {
     }
 
     /**
-     * Pure part of {@code SeamFrames.link}: the image {x, z} of stored block (tx, tz) within {@code reach} of
-     * (vx, vz), nearest first; null if none. Unit-tested (SeamTurnsTest).
-     */
-    /**
      * The image {x, z} of stored block (tx, tz) next to (vx, vz) (reach 1), accepted only when the link
      * is the same seen from both ends: the target also sees the viewer through the seam, and the two
      * turns cancel. Next to a cube corner (a 270° cone point) a diagonal seen through the seam can fail
-     * that, and is then refused from both ends alike, so Create's propagation cannot flicker. Null when
+     * that, and is then refused from both ends alike, so Create's propagation cannot flicker. On a
+     * topology that names its cone points, a link with either end or either image within
+     * {@link WrapTopology#CORNER_KEEP_OUT} of one is refused outright (ledger: SCL-183). Null when
      * there is no such link.
      */
     public static int[] seamLink(WrapTopology t, int vx, int vz, int tx, int tz) {
+        if (t.nearCorner(vx, vz) || t.nearCorner(tx, tz))
+            return null;
         int[] q = nearestImage(t, vx, vz, tx, tz, 1);
-        if (q == null)
+        if (q == null || t.nearCorner(q[0], q[1]))
             return null;
         int[] back = nearestImage(t, tx, tz, vx, vz, 1);
-        if (back == null)
+        if (back == null || t.nearCorner(back[0], back[1]))
             return null;
         WrapTopology.Fold f = t.fold(q[0], q[1]), g = t.fold(back[0], back[1]);
         if (f == null || g == null || (f.iso().quarterTurns() + g.iso().quarterTurns()) % 4 != 0)
@@ -82,17 +82,23 @@ public final class SeamTurns {
         return q;
     }
 
+    /**
+     * Pure part of {@code SeamFrames.link}: the image {x, z} of stored block (tx, tz) within {@code reach} of
+     * (vx, vz), nearest first; null if none. On a periodic topology the image's copy nearest (vx, vz).
+     * Unit-tested (SeamTurnsTest).
+     */
     public static int[] nearestImage(WrapTopology t, int vx, int vz, int tx, int tz, int reach) {
         List<int[]> images = t.images(tx, tz);
         int[] best = null;
         int bestD = Integer.MAX_VALUE;
         for (int[] q : images) {
-            int dx = Math.abs(q[0] - vx), dz = Math.abs(q[1] - vz);
+            int qx = t.nearX(q[0], vx);
+            int dx = Math.abs(qx - vx), dz = Math.abs(q[1] - vz);
             if (Math.max(dx, dz) > reach)
                 continue;
             if (dx + dz < bestD) {
                 bestD = dx + dz;
-                best = q;
+                best = new int[]{qx, q[1]};
             }
         }
         return best;
