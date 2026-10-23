@@ -1525,6 +1525,87 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Read in this pass: (HYD, YNG) not fetched (OpenAlex has no abstract). The paper is about the tropics; whether it gives a global ~900 m figure is not established. (AMP, GLA) not fetched (metadata only)
 - Reference check: (HYD, YNG) title and journal match what the code's "Porter 2001" would be; the 900 m claim is unchecked. (AMP, GLA) this is my identification of an otherwise vague citation, found by author and year. The paper is about the TROPICS, while the code uses "about 900 m" as a general last-glacial-maximum snowline lowering. The 900 m figure could not be checked. Identification is likely but not confirmed.
 
+### SyvitskiMilliman2007
+- Reference: Syvitski, J. P. M. and Milliman, J. D. (2007). Geology, geography, and humans battle for dominance over the delivery of fluvial sediment to the coastal ocean. Journal of Geology 115(1):1-19.
+- DOI or URL: 10.1086/509246; an open copy at https://website.whoi.edu/gfd/wp-content/uploads/sites/14/2018/10/syvitski__Milliman_2007_75324.pdf
+- Cited as: "BQART (Syvitski & Milliman 2007)" (hydro/delta.rs).
+- Ledger ids: HYD-130, HYD-131
+- Access: paywalled; an open copy (WHOI).
+- Library: not fetched (the copy read is in the deltas agent's scratch folder, not the library).
+- Read so far (by the project): 2026-10-23, the deltas agent, the WHOI copy in full text: Qs = ωBQ^0.31A^0.5RT for T ≥ 2 °C, Qs = 2ωBQ^0.31A^0.5R for T < 2 °C, ω = 0.02 for kg/s (0.0006 for Mt/yr), Q km³/yr, A km², R km, T °C; B = I L (1 − TE) Eh with I = 1 + 0.09 Ag, L from 0.5 to 3 (mean 1), TE the trapping of lakes and reservoirs; B = 1 explains 68 % of the variance.
+
+### Caldwell2019
+- Reference: Caldwell, R. L., Edmonds, D. A., Baumgardner, S., Paola, C., Roy, S. and Nienhuis, J. H. (2019). A global delta dataset and the environmental variables that predict delta formation on marine coastlines. Earth Surface Dynamics 7(3):773-787.
+- DOI or URL: 10.5194/esurf-7-773-2019
+- Cited as: "Caldwell et al. 2019" (hydro/delta.rs stats; rivers-and-lakes.md).
+- Ledger ids: HYD-143
+- Access: open access.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-23, the deltas agent, the PDF as text: 5,399 coastal rivers at least 50 m wide, 40 % (2,174) with a delta; Eq. 1, ln(π/(1 − π)) = 1.45 + 0.000589 Qw + 2.56 Qs − 0.974 Hw − 0.187 Ht; Eq. 2 without waves and tides; the largest rivers have a delta with likelihood near 1; 85 % of the global flux enters deltas.
+
+### Edmonds2020
+- Reference: Edmonds, D. A., Caldwell, R. L., Brondizio, E. S. and Siani, S. M. O. (2020). Coastal flooding will disproportionately impact people on river deltas. Nature Communications 11:4741.
+- DOI or URL: 10.1038/s41467-020-18531-4 (PMC7525510)
+- Cited as: "Edmonds et al. 2020" (hydro/delta.rs stats; rivers-and-lakes.md).
+- Ledger ids: HYD-143
+- Access: open access.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-23, the deltas agent, an open PDF copy as text: deltas hold 847,936 km² of geomorphic area (0.57 % of the land), 710,187 km² habitable; the Amazon 84,429 km² and the Ganges-Brahmaputra 80,174 km²; the ten largest 48 % of the area; the polygon runs from the delta node (the upstream-most bifurcation) to the shoreline.
+
+### Nienhuis2026
+- Reference: Nienhuis, J. H., Paniagua-Arroyave, J. F., Dunn, F. E., Cohen, S. and Törnqvist, T. E. (2026). Global river sediment retention on delta plains. AGU Advances. Code and data: jhnienhuis/GlobalSedimentRetention v3, Zenodo 10.5281/zenodo.23034704 (MIT).
+- DOI or URL: preprint 10.22541/essoar.15002227/v1; code and data https://github.com/jhnienhuis/GlobalSedimentRetention/tree/v3
+- Cited as: "Nienhuis et al., `get_retention.m`" and "the 1,741 deltas of their data" (hydro/delta.rs).
+- Ledger ids: HYD-132, HYD-133, HYD-134
+- Access: the article not reached (ESSOAr 403); the code and data open.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-23, the deltas agent: `get_retention.m` (depth = 0.08 Q^0.65, at most 69 m; plain volume area × depth over t_delta), `Text_Numbers.m` (t_delta 7,000 yr, bulk density 1,600 kg/m³) and GlobalDeltaRetention.xlsx (1,741 deltas: flux-weighted retention 0.285, mean 0.041, total area 874,136 km²; the agent's fit log10 A[m²] = 5.463 + 0.932 log10 Qs[kg/s]); the abstract through search results (about 830,000 km² of deltaic land, 28 ± 14 % of the global flux retained on delta plains).
+
+### Edmonds2021
+- Reference: Edmonds, D. A., Chadwick, A. J., Lamb, M. P., Lorenzo-Trueba, J., Murray, A. B., Nardin, W., Salter, G. and Shaw, J. B. (2021). Morphodynamic modeling of river-dominated deltas: a review and future perspectives. Treatise on Geomorphology, 2nd edition (the author list from memory).
+- DOI or URL: an open copy at https://lamb.caltech.edu/documents/19809/Edmonds_etal_2021.pdf
+- Cited as: "Edmonds et al. 2021" (hydro/delta.rs; rivers-and-lakes.md).
+- Ledger ids: HYD-137, HYD-138, HYD-139, HYD-140
+- Access: an open copy (Caltech).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-23, the deltas agent, the Caltech copy: the avulsion length scales with the backwater length L_b = h/S (after Jerolmack & Swenson 2007); lobes fan from an apex (the avulsion node); mouth bars form within about two channel widths of a stable jet (after Canestrelli et al. 2014); channel widths, depths and lengths fall with each bifurcation (after Edmonds & Slingerland 2007).
+
+### JerolmackSwenson2007
+- Reference: Jerolmack, D. J. and Swenson, J. B. (2007). Scaling relationships and evolution of distributary networks on wave-influenced deltas. Geophysical Research Letters 34:L23402.
+- DOI or URL: 10.1029/2007GL031823
+- Cited as: "Jerolmack & Swenson 2007" (rivers-and-lakes.md, through Edmonds et al. 2021).
+- Ledger ids: HYD-137
+- Access: paywalled; not fetched.
+- Library: not fetched.
+- Read so far (by the project): at second hand only (Edmonds et al. 2021; search results), 2026-10-23.
+
+### EdmondsSlingerland2007
+- Reference: Edmonds, D. A. and Slingerland, R. L. (2007). Mechanics of river mouth bar formation: implications for the morphodynamics of delta distributary networks. Journal of Geophysical Research 112:F02034.
+- DOI or URL: 10.1029/2006JF000574
+- Cited as: "Edmonds & Slingerland 2007" (rivers-and-lakes.md).
+- Ledger ids: HYD-139
+- Access: paywalled (Wiley 403); not fetched.
+- Library: not fetched.
+- Read so far (by the project): the abstract as quoted in search results, 2026-10-23: widths, depths and lengths of distributaries fall with each bifurcation; the bar forms within 0 < x/W < 2 of the mouth.
+
+### Ganti2014
+- Reference: Ganti, V., Chu, Z., Lamb, M. P., Nittrouer, J. A. and Parker, G. (2014). Testing morphodynamic controls on the location and frequency of river avulsions on fans versus deltas: Huanghe (Yellow River), China. Geophysical Research Letters 41(22):7882-7890.
+- DOI or URL: 10.1002/2014GL061918
+- Cited as: "Ganti et al. 2014" (rivers-and-lakes.md; physics-gap-audit.md).
+- Ledger ids: HYD-137
+- Access: paywalled (Wiley 403 on 2026-10-23); not fetched.
+- Library: not fetched.
+- Read so far (by the project): the abstract as quoted in search results, 2026-10-23: where the river debouches from the Loess Plateau, avulsions occur at an abrupt decrease in bed slope and recur about every 607 years; the key points say fans and deltas have different drivers for avulsion and delta lobe size scales with the backwater length. The abstract's delta sentences were cut off.
+
+### Canestrelli2014
+- Reference: Canestrelli, A., Nardin, W., Edmonds, D., Fagherazzi, S. and Slingerland, R. (2014). Importance of frictional effects and jet instability on the morphodynamics of river mouth bars and levees. Journal of Geophysical Research: Oceans 119 (the reference from memory).
+- DOI or URL: not checked.
+- Cited as: "Canestrelli et al. 2014" (rivers-and-lakes.md, through Edmonds et al. 2021).
+- Ledger ids: HYD-138
+- Access: not checked.
+- Library: not fetched.
+- Read so far (by the project): at second hand only (Edmonds et al. 2021), 2026-10-23.
+
 ### Mentioned for later, not implemented (no ledger ids)
 Each verified only as a bibliographic record (OpenAlex), not read.
 - Cordonnier2019: Cordonnier, Guillaume; Bovy, Benoit; Braun, Jean. 2019. A versatile, linear complexity algorithm for flow routing in topographies with depressions. Earth Surface Dynamics 7(2):549-562. https://doi.org/10.5194/esurf-7-549-2019 (open access journal). The project's "Cordonnier et al. 2019 basin graph and cost anchor" fits this paper; the "100-400 s per call at 16,384^2" figure is not checked.
