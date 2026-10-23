@@ -184,6 +184,16 @@ fn lake_l3(l2: &Level) -> Vec<u8> {
         ..l2.clone()
     };
     let mid = reach.sample(&Win::full(2 * l2.w, 2 * l2.h));
+    let lake_z = (0..4 * l2.cells())
+        .map(|c| {
+            let (i, j) = (c % (2 * l2.w), c / (2 * l2.w));
+            if resample::cell::lake(mid.lake[c]) {
+                reach.lake_surface(i as i64, j as i64)
+            } else {
+                resample::NO_LAKE
+            }
+        })
+        .collect();
     let l1 = Level {
         w: 2 * l2.w,
         h: 2 * l2.h,
@@ -192,7 +202,7 @@ fn lake_l3(l2: &Level) -> Vec<u8> {
         area: mid.area,
         wgt: vec![1.0; 4 * l2.w * l2.h],
         kfac: mid.kfac,
-        lake_z: mid.lake_z,
+        lake_z,
         zs: Vec::new(),
         closed: Vec::new(),
     };
@@ -215,7 +225,7 @@ fn plan_tiled(c: &Config) -> TilePlan {
 /// Land cells outside `mask` of `z` with no strictly lower neighbour, over the whole planet.
 fn global_sinks(z: &[f32], mask: &[u8], sea: f32) -> u64 {
     let win = Win::full(4 * W2, 4 * H2);
-    count_sinks(&win, z, mask, &[], sea, (0, 0, win.w, win.h))
+    count_sinks(&win, z, mask, sea, (0, 0, win.w, win.h))
 }
 
 #[test]
@@ -1168,11 +1178,12 @@ fn auto_streams_when_the_whole_path_peak_would_not_fit_though_the_last_level_alo
 
     // The failing 1000 Myr run (2026-09-30) held 1,643,487,517 bytes when amplify started, under
     // the default 4 GiB cap: the last level's buffers alone fitted, the reservation made after
-    // the ladder (with the level before it and the preview) needed 4,451,574,045. Since the
-    // window and the levels carry each lake's surface (2026-10-22, 4 B a cell more in each) the
-    // last level alone no longer fits beside that much, so the case is held at 1.4 GB.
+    // the ladder (with the level before it and the preview) needed 4,451,574,045, and needs 4 B
+    // a cell of the kept level more since the levels carry each lake's surface (3 B more,
+    // 2026-10-22, AMP-090) and each cell's basin class (1 B, 2026-10-23, AMP-096); the windows
+    // carry neither, so the buffers are as they were.
     let cap = crate::session::DEFAULT_MEM_CAP;
-    let held = 1_400_000_000;
+    let held = 1_643_487_517;
     assert!(
         gauge_model(held, cap)(last_only).is_ok(),
         "the last level alone fits"
@@ -1180,7 +1191,7 @@ fn auto_streams_when_the_whole_path_peak_would_not_fit_though_the_last_level_alo
     let Err(CoreError::MemoryCap { needed, .. }) = gauge_model(held, cap)(peak) else {
         panic!("the full peak must not fit");
     };
-    assert_eq!(needed, held + peak);
+    assert_eq!(needed, 4_451_574_045 + 4 * (4096 * 2048 - 2048 * 1024));
     assert!(needed > cap);
 
     // auto streams there; never and always are what they say whatever the cap.

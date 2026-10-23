@@ -47,7 +47,7 @@ use std::cmp::Ordering;
 use std::collections::{BinaryHeap, VecDeque};
 use std::time::Instant;
 
-use super::resample::{Fine, basin, wet};
+use super::resample::{Fine, basin, cell, wet};
 use super::window::{NONE, STEP, Win, map_cells, map_cells2};
 use crate::surface::detail::Noise;
 use crate::surface::thermal;
@@ -66,16 +66,17 @@ fn pw(x: f32, p: f32) -> f32 {
     }
 }
 
-/// The basin class of cell `c` ([`basin`]; `basin::OPEN` when `closed` is empty).
+/// The basin class of cell `c` from the window's cell bytes ([`cell`], `Buf::lake`);
+/// `basin::OPEN` when `cells` is empty.
 #[inline]
-fn class(closed: &[u8], c: usize) -> u8 {
-    closed.get(c).copied().unwrap_or(basin::OPEN)
+fn class(cells: &[u8], c: usize) -> u8 {
+    cells.get(c).map_or(basin::OPEN, |&m| cell::class(m))
 }
 
 /// Whether cell `c` is under the sea ([`wet`]).
 #[inline]
-fn wet_at(z: &[f32], closed: &[u8], sea: f32, c: usize) -> bool {
-    wet(z[c], sea, class(closed, c))
+fn wet_at(z: &[f32], cells: &[u8], sea: f32, c: usize) -> bool {
+    wet(z[c], sea, class(cells, c))
 }
 
 /// The resolved numbers of one level's passes.
@@ -168,12 +169,9 @@ pub struct Buf {
     pub sed2: Vec<f32>,
     pub own: Vec<f32>,
     pub kfac: Vec<f32>,
-    /// 1 under a lake's surface, else 0 ([`super::resample::Level::sample`]).
+    /// 1 under a lake's surface, else 0 ([`super::resample::Level::sample`]). The surface is not
+    /// kept here: the next level takes it from the coarse level (`tiles::LevelSink`).
     pub lake: Vec<u8>,
-    /// That surface, m, at the lake cells (handed on to the next level).
-    pub lake_z: Vec<f32>,
-    /// Each cell's [`basin`] class (handed on to the next level).
-    pub closed: Vec<u8>,
     /// 1 where the flood after the seeding raised the cell: a filled depression, not a channel,
     /// which the erosion leaves alone (it would cut a gorge out of nothing).
     pub frozen: Vec<u8>,
@@ -188,7 +186,7 @@ pub struct Buf {
 
 impl Buf {
     /// Bytes per cell of a buffer (the memory estimate).
-    pub const BYTES_PER_CELL: u64 = 13 * 4 + 3 + 4;
+    pub const BYTES_PER_CELL: u64 = 12 * 4 + 2 + 4;
 
     pub fn new(win: Win, fine: Fine) -> Buf {
         let n = win.cells();
@@ -205,8 +203,6 @@ impl Buf {
             own: fine.own,
             kfac: fine.kfac,
             lake: fine.lake,
-            lake_z: fine.lake_z,
-            closed: fine.closed,
             frozen: vec![0; n],
             cap: vec![0.0; n],
             tmult: vec![1.0; n],
@@ -265,11 +261,11 @@ pub trait PassDevice: Send + Sync + std::fmt::Debug {
 }
 
 /// N(c) = Σ (slope to each lower neighbour)^p for land cells, 0 for the sea.
-pub fn norms(win: &Win, z: &[f32], closed: &[u8], ph: &Physics, out: &mut [f32]) {
+pub fn norms(win: &Win, z: &[f32], cells: &[u8], ph: &Physics, out: &mut [f32]) {
     map_cells(win, out, |i, j, o| {
         let c = j * win.w + i;
         let zc = z[c];
-        if wet_at(z, closed, ph.sea, c) {
+        if wet_at(z, cells, ph.sea, c) {
             *o = 0.0;
             return;
         }
@@ -294,7 +290,7 @@ pub fn norms(win: &Win, z: &[f32], closed: &[u8], ph: &Physics, out: &mut [f32])
 pub fn area_step(
     win: &Win,
     z: &[f32],
-    closed: &[u8],
+    cells: &[u8],
     norm: &[f32],
     a_in: &[f32],
     own: &[f32],
@@ -304,7 +300,7 @@ pub fn area_step(
     map_cells(win, out, |i, j, o| {
         let c = j * win.w + i;
         let zc = z[c];
-        if wet_at(z, closed, ph.sea, c) {
+        if wet_at(z, cells, ph.sea, c) {
             *o = own[c];
             return;
         }
@@ -317,7 +313,7 @@ pub fn area_step(
             }
             let n = n as usize;
             let s = (z[n] - zc) / (STEP[k] * ph.dx);
-            if s > 0.0 && norm[n] > 0.0 && !wet_at(z, closed, ph.sea, n) {
+            if s > 0.0 && norm[n] > 0.0 && !wet_at(z, cells, ph.sea, n) {
                 a += pw(s, ph.flow_power) / norm[n] * a_in[n];
             }
         }
@@ -334,7 +330,6 @@ pub fn erode_step(
     kfac: &[f32],
     lake: &[u8],
     frozen: &[u8],
-    closed: &[u8],
     cap: &[f32],
     ph: &Physics,
     out: &mut [f32],
@@ -344,7 +339,7 @@ pub fn erode_step(
         let c = j * win.w + i;
         let zc = z[c];
         *o = zc;
-        if wet_at(z, closed, ph.sea, c) || lake[c] != 0 || frozen[c] != 0 {
+        if wet_at(z, lake, ph.sea, c) || cell::lake(lake[c]) || frozen[c] != 0 {
             return;
         }
         let mut nb = [NONE; 8];
@@ -369,7 +364,7 @@ pub fn erode_step(
         }
         // Sea level is the base level, except from closed ground to closed ground: a closed
         // basin's floor is its own. ledger: AMP-021, AMP-096
-        let base = if class(closed, c) != basin::OPEN && class(closed, rn) != basin::OPEN {
+        let base = if class(lake, c) != basin::OPEN && class(lake, rn) != basin::OPEN {
             zr
         } else {
             zr.max(ph.sea)
@@ -398,7 +393,7 @@ pub fn erode_step(
 pub fn deposit_step(
     win: &Win,
     z: &[f32],
-    closed: &[u8],
+    cells: &[u8],
     a: &[f32],
     norm: &[f32],
     sed_in: &[f32],
@@ -409,7 +404,7 @@ pub fn deposit_step(
     map_cells2(win, out, sed_out, |i, j, o, so| {
         let c = j * win.w + i;
         let zc = z[c];
-        if wet_at(z, closed, ph.sea, c) {
+        if wet_at(z, cells, ph.sea, c) {
             // Sediment that reaches the sea leaves the amplifier.
             *o = zc;
             *so = 0.0;
@@ -429,7 +424,7 @@ pub fn deposit_step(
             let up = (z[n] - zc) / d;
             if up > 0.0 {
                 gap = gap.min(z[n] - zc);
-                if norm[n] > 0.0 && !wet_at(z, closed, ph.sea, n) {
+                if norm[n] > 0.0 && !wet_at(z, cells, ph.sea, n) {
                     load += pw(up, ph.flow_power) / norm[n] * sed_in[n];
                 }
             }
@@ -457,7 +452,7 @@ pub fn deposit_step(
 pub fn seed_step(
     win: &Win,
     z: &[f32],
-    closed: &[u8],
+    cells: &[u8],
     ph: &Physics,
     cfg: &NoiseCfg,
     out: &mut [f32],
@@ -467,7 +462,7 @@ pub fn seed_step(
         let c = j * win.w + i;
         let zc = z[c];
         *o = zc;
-        if wet_at(z, closed, ph.sea, c) || cfg.seed_relief <= 0.0 {
+        if wet_at(z, cells, ph.sea, c) || cfg.seed_relief <= 0.0 {
             return;
         }
         let mut nb = [NONE; 8];
@@ -487,7 +482,7 @@ pub fn seed_step(
             + 0.35 * cfg.noise.value(x, zb, 7.0 * cell, 102);
         let v = zc + cfg.seed_relief * smax * ph.dx * n as f32;
         // Land open to the sea stays above it; closed ground has no sea to stay above.
-        *o = if class(closed, c) == basin::OPEN {
+        *o = if class(cells, c) == basin::OPEN {
             v.max(ph.sea + 0.05)
         } else {
             v
@@ -497,12 +492,12 @@ pub fn seed_step(
 
 /// How much each land cell may lose to erosion in all: `cap_frac` of its drop to its lowest
 /// neighbour (0 on flats and pits).
-pub fn incision_cap(win: &Win, z: &[f32], closed: &[u8], ph: &Physics, out: &mut [f32]) {
+pub fn incision_cap(win: &Win, z: &[f32], cells: &[u8], ph: &Physics, out: &mut [f32]) {
     map_cells(win, out, |i, j, o| {
         let c = j * win.w + i;
         let zc = z[c];
         *o = 0.0;
-        if wet_at(z, closed, ph.sea, c) {
+        if wet_at(z, cells, ph.sea, c) {
             return;
         }
         let mut nb = [NONE; 8];
@@ -513,7 +508,7 @@ pub fn incision_cap(win: &Win, z: &[f32], closed: &[u8], ph: &Physics, out: &mut
                 low = low.min(z[n as usize]);
             }
         }
-        let base = if class(closed, c) == basin::OPEN {
+        let base = if class(cells, c) == basin::OPEN {
             low.max(ph.sea)
         } else {
             low
@@ -526,13 +521,15 @@ pub fn incision_cap(win: &Win, z: &[f32], closed: &[u8], ph: &Physics, out: &mut
 /// `cfg.submarine` where the cell is under the open sea (`z < sea`): the sea floor's own critical
 /// slope (sea-floor spikes task, 2026-10-20; AMP-074). A sea cell under more than `ice_m` of
 /// the glaciers' surface `zs` (empty without glaciers) keeps the land's: a fjord is a trough the
-/// ice cut in rock, and its walls go on under the water as steep as above it.
+/// ice cut in rock, and its walls go on under the water as steep as above it. `cells` are the
+/// window's cell bytes (`resample::cell`): closed ground under sea level is land, not sea floor.
+#[allow(clippy::too_many_arguments)]
 pub fn tmult_fill(
     win: &Win,
     cfg: &NoiseCfg,
     z: &[f32],
     zs: &[f32],
-    closed: &[u8],
+    cells: &[u8],
     ice_m: f32,
     sea: f32,
     out: &mut [f32],
@@ -545,7 +542,7 @@ pub fn tmult_fill(
         let zb = cfg.origin_z + gj as f64 * cell;
         let m = 1.0 + cfg.thermal_noise * cfg.noise.value(x, zb, 40.0 * cell, 103) as f32;
         let c = j * win.w + i;
-        *o = if z[c] < sea && class(closed, c) == basin::OPEN && !iced(c) {
+        *o = if z[c] < sea && class(cells, c) == basin::OPEN && !iced(c) {
             m * cfg.submarine
         } else {
             m
@@ -602,7 +599,6 @@ pub fn flood_repair(
     win: &Win,
     z: &mut [f32],
     lake: &[u8],
-    basins: &[u8],
     sea: f32,
     eps: f32,
     scratch: &mut [f32],
@@ -620,9 +616,9 @@ pub fn flood_repair(
     let open_bottom = !win.bottom_edge();
     // ledger: AMP-017, AMP-097 (a dry basin drains to its sink)
     let outlet = |i: usize, j: usize, c: usize| -> bool {
-        wet_at(z, basins, sea, c)
-            || lake[c] != 0
-            || class(basins, c) == basin::SINK
+        wet_at(z, lake, sea, c)
+            || cell::lake(lake[c])
+            || class(lake, c) == basin::SINK
             || (open_west_east && (i == 0 || i + 1 == w))
             || (open_top && j == 0)
             || (open_bottom && j + 1 == h)
@@ -694,7 +690,7 @@ pub fn flood_repair(
             (cx0..cx0 + cw).contains(&i) && (cy0..cy0 + ch).contains(&j)
         };
         if !closed[c] {
-            if !wet_at(z, basins, sea, c) && in_core {
+            if !wet_at(z, lake, sea, c) && in_core {
                 stats.unreached += 1;
             }
             continue;
@@ -721,7 +717,6 @@ pub fn count_sinks(
     win: &Win,
     z: &[f32],
     lake: &[u8],
-    closed: &[u8],
     sea: f32,
     core: (usize, usize, usize, usize),
 ) -> u64 {
@@ -734,7 +729,7 @@ pub fn count_sinks(
             let mut nb = [NONE; 8];
             for i in x0..x0 + cw {
                 let c = j * win.w + i;
-                if wet_at(z, closed, sea, c) || lake[c] != 0 || class(closed, c) == basin::SINK {
+                if wet_at(z, lake, sea, c) || cell::lake(lake[c]) || class(lake, c) == basin::SINK {
                     continue;
                 }
                 win.nbrs(i, j, &mut nb);
@@ -818,7 +813,6 @@ pub fn run_passes_on(
         &buf.win,
         &mut buf.z,
         &buf.lake,
-        &buf.closed,
         ph.sea,
         ph.eps_m,
         &mut buf.z2,
@@ -836,7 +830,7 @@ pub fn run_passes_on(
 /// the glaciers; returns the erodibility to restore once the erosion is done (`glacial::damp`).
 pub fn erosion_setup(buf: &mut Buf, ph: &Physics) -> Option<Vec<f32>> {
     buf.eroded.iter_mut().for_each(|e| *e = 0.0);
-    incision_cap(&buf.win, &buf.z, &buf.closed, ph, &mut buf.cap);
+    incision_cap(&buf.win, &buf.z, &buf.lake, ph, &mut buf.cap);
     // Rivers cut little where the glaciers were (`glacial.rs`); the rates come back after.
     super::glacial::damp(&ph.glacial, &buf.z, &buf.zs, &mut buf.kfac)
 }
@@ -846,14 +840,14 @@ pub fn erosion_setup(buf: &mut Buf, ph: &Physics) -> Option<Vec<f32>> {
 fn seed_and_flood(buf: &mut Buf, ph: &Physics, cfg: &NoiseCfg, times: &mut Times) -> FloodStats {
     let win = buf.win;
     let started = Instant::now();
-    seed_step(&win, &buf.z, &buf.closed, ph, cfg, &mut buf.z2);
+    seed_step(&win, &buf.z, &buf.lake, ph, cfg, &mut buf.z2);
     std::mem::swap(&mut buf.z, &mut buf.z2);
     tmult_fill(
         &win,
         cfg,
         &buf.z,
         &buf.zs,
-        &buf.closed,
+        &buf.lake,
         ph.glacial.min_ice_m as f32,
         ph.sea,
         &mut buf.tmult,
@@ -865,7 +859,6 @@ fn seed_and_flood(buf: &mut Buf, ph: &Physics, cfg: &NoiseCfg, times: &mut Times
         &win,
         &mut buf.z,
         &buf.lake,
-        &buf.closed,
         ph.sea,
         ph.eps_m,
         &mut buf.z2,
@@ -889,11 +882,11 @@ pub fn middle_cpu(
     let started = Instant::now();
     let kfac_saved = erosion_setup(buf, ph);
     for _ in 0..counts.erode {
-        norms(&win, &buf.z, &buf.closed, ph, &mut buf.norm);
+        norms(&win, &buf.z, &buf.lake, ph, &mut buf.norm);
         area_step(
             &win,
             &buf.z,
-            &buf.closed,
+            &buf.lake,
             &buf.norm,
             &buf.a,
             &buf.own,
@@ -908,7 +901,6 @@ pub fn middle_cpu(
             &buf.kfac,
             &buf.lake,
             &buf.frozen,
-            &buf.closed,
             &buf.cap,
             ph,
             &mut buf.z2,
@@ -965,11 +957,11 @@ pub fn middle_cpu(
     let started = Instant::now();
     buf.sed.copy_from_slice(&buf.eroded);
     for _ in 0..counts.deposit {
-        norms(&win, &buf.z, &buf.closed, ph, &mut buf.norm);
+        norms(&win, &buf.z, &buf.lake, ph, &mut buf.norm);
         area_step(
             &win,
             &buf.z,
-            &buf.closed,
+            &buf.lake,
             &buf.norm,
             &buf.a,
             &buf.own,
@@ -980,7 +972,7 @@ pub fn middle_cpu(
         deposit_step(
             &win,
             &buf.z,
-            &buf.closed,
+            &buf.lake,
             &buf.a,
             &buf.norm,
             &buf.sed,
@@ -1060,16 +1052,7 @@ mod tests {
         }
         let before = z.clone();
         let mut scratch = vec![0.0; 32 * 16];
-        let st = flood_repair(
-            &win,
-            &mut z,
-            &lake,
-            &[],
-            0.0,
-            0.01,
-            &mut scratch,
-            (0, 0, 32, 16),
-        );
+        let st = flood_repair(&win, &mut z, &lake, 0.0, 0.01, &mut scratch, (0, 0, 32, 16));
         assert!(st.raised_cells > 0);
         assert_eq!(st.unreached, 0);
         // The lake bed is untouched, and no other land cell is left without a lower neighbour.
@@ -1078,7 +1061,7 @@ mod tests {
                 assert_eq!(z[j * 32 + i], before[j * 32 + i]);
             }
         }
-        assert_eq!(count_sinks(&win, &z, &lake, &[], 0.0, (0, 0, 32, 16)), 0);
+        assert_eq!(count_sinks(&win, &z, &lake, 0.0, (0, 0, 32, 16)), 0);
         // The pit rose to just above its lowest neighbour's level, the far slope did not move.
         assert!(z[8 * 32 + 5] > before[8 * 32 + 5] + 100.0);
         assert_eq!(z[15 * 32 + 30], before[15 * 32 + 30]);
@@ -1099,7 +1082,6 @@ mod tests {
             &Win::full(w, h),
             &mut whole,
             &lake,
-            &[],
             0.0,
             0.01,
             &mut scratch,
@@ -1127,7 +1109,6 @@ mod tests {
             &win,
             &mut part,
             &lake_p,
-            &[],
             0.0,
             0.01,
             &mut scratch,
@@ -1176,7 +1157,6 @@ mod tests {
             &kfac,
             &lake,
             &frozen,
-            &[],
             &cap,
             &ph,
             &mut out,
@@ -1190,7 +1170,7 @@ mod tests {
         assert!(eroded.iter().any(|&e| e > 0.0));
         // Every eroded cell still has a strictly lower neighbour.
         let none = vec![0u8; n];
-        assert_eq!(count_sinks(&win, &out, &none, &[], 0.0, (0, 0, 32, 16)), 0);
+        assert_eq!(count_sinks(&win, &out, &none, 0.0, (0, 0, 32, 16)), 0);
     }
 
     #[test]
@@ -1213,28 +1193,29 @@ mod tests {
         }
         // Order between neighbours is kept: the plane still drains everywhere.
         let none = vec![0u8; n];
-        assert_eq!(count_sinks(&win, &out, &none, &[], 0.0, (0, 0, 32, 16)), 0);
+        assert_eq!(count_sinks(&win, &out, &none, 0.0, (0, 0, 32, 16)), 0);
         assert!(load_total > 0.0);
     }
 
     /// A plane draining to the sea in the north with a bowl cut 300 m under sea level in the
-    /// middle of the land: the bowl's ground (`CLOSED`, `SINK` at its lowest cell) and nothing else.
+    /// middle of the land, and the window's cell bytes ([`cell`]): the bowl's ground is `CLOSED`,
+    /// `SINK` at its lowest cell, and nothing is a lake.
     fn closed_bowl(w: usize, h: usize) -> (Vec<f32>, Vec<u8>, usize) {
         let mut z = plane(w, h);
         let (ci, cj) = (w / 2, h / 2);
-        let mut closed = vec![basin::OPEN; w * h];
+        let mut closed = vec![cell::of(false, basin::OPEN); w * h];
         for j in 0..h {
             for i in 0..w {
                 let r = ((i as f32 - ci as f32).powi(2) + (j as f32 - cj as f32).powi(2)).sqrt();
                 if r <= 5.0 {
                     let c = j * w + i;
                     z[c] = -300.0 + 60.0 * r;
-                    closed[c] = basin::CLOSED;
+                    closed[c] = cell::of(false, basin::CLOSED);
                 }
             }
         }
         let sink = cj * w + ci;
-        closed[sink] = basin::SINK;
+        closed[sink] = cell::of(false, basin::SINK);
         (z, closed, sink)
     }
 
@@ -1245,7 +1226,6 @@ mod tests {
         let n = win.cells();
         let ph = physics(600.0);
         let (z, closed, sink) = closed_bowl(w, h);
-        let lake = vec![0u8; n];
         // As land, the bowl's walls have flow; read as sea (no classes) they have none.
         let mut norm = vec![0.0; n];
         let wall = sink + 2;
@@ -1259,7 +1239,6 @@ mod tests {
         let st = flood_repair(
             &win,
             &mut filled,
-            &lake,
             &closed,
             ph.sea,
             ph.eps_m,
@@ -1268,15 +1247,14 @@ mod tests {
         );
         assert_eq!(filled[sink], z[sink]);
         assert!(st.max_raise_m < 1.0, "raised {} m", st.max_raise_m);
-        assert_eq!(count_sinks(&win, &filled, &lake, &closed, ph.sea, (0, 0, w, h)), 0);
+        assert_eq!(count_sinks(&win, &filled, &closed, ph.sea, (0, 0, w, h)), 0);
         // Without the sink the flood fills it: the drained surface has no basin.
         let mut no_sink = closed.clone();
-        no_sink[sink] = basin::CLOSED;
+        no_sink[sink] = cell::of(false, basin::CLOSED);
         let mut flat = z.clone();
         flood_repair(
             &win,
             &mut flat,
-            &lake,
             &no_sink,
             ph.sea,
             ph.eps_m,
@@ -1292,7 +1270,16 @@ mod tests {
         let cap = vec![1.0e9f32; n];
         let (mut out, mut eroded) = (vec![0.0; n], vec![0.0; n]);
         erode_step(
-            &win, &z, &a, &kfac, &lake, &frozen, &closed, &cap, &ph, &mut out, &mut eroded,
+            &win,
+            &z,
+            &a,
+            &kfac,
+            &closed,
+            &frozen,
+            &cap,
+            &ph,
+            &mut out,
+            &mut eroded,
         );
         assert!(eroded[wall] > 0.0 && out[wall] < 0.0, "{}", out[wall]);
         assert!(out.iter().zip(&z).all(|(o, z)| o <= z));
@@ -1300,7 +1287,17 @@ mod tests {
         // Sediment reaching the bowl stays in it; the sea still takes what reaches it.
         let sed = vec![3.0f32; n];
         let (mut dep, mut sed_out) = (vec![0.0; n], vec![0.0; n]);
-        deposit_step(&win, &z, &closed, &a, &norm, &sed, &ph, &mut dep, &mut sed_out);
+        deposit_step(
+            &win,
+            &z,
+            &closed,
+            &a,
+            &norm,
+            &sed,
+            &ph,
+            &mut dep,
+            &mut sed_out,
+        );
         assert!(dep[sink] > z[sink]);
         assert_eq!(sed_out[3], 0.0);
         // The seeding and the incision cap do not lift the bowl to the sea.

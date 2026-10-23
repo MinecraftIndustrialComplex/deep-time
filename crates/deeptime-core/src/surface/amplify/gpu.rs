@@ -30,6 +30,7 @@ use deeptime_gpu::{Bands, Gpu, Kernel, Use, wgpu};
 
 use super::glacial::ShapeStats;
 use super::kernels::{Buf, Counts, PassDevice, Physics, Times, erosion_setup};
+use super::resample::{basin, cell};
 
 /// Device bytes per window cell: z, z2, a, a2, norm, own, kfac, flags, cap, tmult, eroded, sed,
 /// sed2, zs.
@@ -686,9 +687,10 @@ impl<'a> Tile<'a> {
             .lake
             .iter()
             .zip(&buf.frozen)
-            .zip(&buf.closed)
-            .map(|((&l, &f), &b)| {
-                u32::from(l != 0) | (u32::from(f != 0) << 1) | (u32::from(b != 0) << 2)
+            .map(|(&m, &f)| {
+                u32::from(cell::lake(m))
+                    | (u32::from(f != 0) << 1)
+                    | (u32::from(cell::class(m) != basin::OPEN) << 2)
             })
             .collect();
         gpu.upload(&t.flags, &flags);
@@ -722,7 +724,10 @@ impl<'a> Tile<'a> {
         let (z, a_in, a_out) = (&self.z[self.zi], &self.a[self.ai], &self.a[1 - self.ai]);
         self.run(&[
             (&k.norms, &[z, &self.flags, &self.norm]),
-            (&k.area, &[z, &self.norm, a_in, &self.own, &self.flags, a_out]),
+            (
+                &k.area,
+                &[z, &self.norm, a_in, &self.own, &self.flags, a_out],
+            ),
         ]);
         self.ai = 1 - self.ai;
     }

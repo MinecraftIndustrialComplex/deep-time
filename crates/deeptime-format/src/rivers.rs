@@ -139,6 +139,12 @@ pub struct Rivers {
 pub struct RiverSample {
     /// The covering segment with the lowest water surface (ties: the lowest segment id).
     pub hit: Option<RiverHit>,
+    /// The covering segment whose channel floor under the column ([`RiverHit::floor`]) is lowest
+    /// (ties: the lowest segment id): the channel the column lies deepest in. A wide, winding
+    /// river's segments overlap a column many times over, and the lowest-surface one is mostly a
+    /// neighbour whose edge (or end) only grazes it, one block deep there; the bed follows this one
+    /// (ledger: HYD-120).
+    pub deep: Option<RiverHit>,
     /// The lowest bank top of the segments whose bank zone holds the column but whose channel
     /// does not: ⌈w⌉ + ⌊d − hw⌋ (a 1:1 slope up from one block above the water).
     pub bank_cap: Option<i32>,
@@ -159,6 +165,15 @@ pub struct RiverHit {
     pub hw: f64,
     pub depth: f64,
     pub q: f64,
+}
+
+impl RiverHit {
+    /// The channel's floor under the column: w − max(1, depth · (1 − (d / hw)²)), its parabolic
+    /// cross-section with at least one block of water (ledger: HYD-022).
+    pub fn floor(&self) -> f64 {
+        let r = self.d / self.hw;
+        self.w - (self.depth * (1.0 - r * r)).max(1.0)
+    }
 }
 
 /// The geometry of one segment at one column (both readers do this arithmetic in this order).
@@ -315,21 +330,33 @@ impl Rivers {
             let hw = lerp(a.hw, b.hw, g.t);
             let hw_eff = hw.max(MIN_HALF_WIDTH);
             if g.d <= hw_eff {
-                let w = lerp(a.w, b.w, g.t);
+                let h = RiverHit {
+                    seg: s,
+                    t: g.t,
+                    d: g.d,
+                    w: lerp(a.w, b.w, g.t),
+                    hw: hw_eff,
+                    depth: lerp(a.depth, b.depth, g.t),
+                    q: lerp(a.q, b.q, g.t),
+                };
                 let better = match &out.hit {
                     None => true,
-                    Some(h) => w < h.w || (w == h.w && s < h.seg),
+                    Some(o) => h.w < o.w || (h.w == o.w && s < o.seg),
                 };
                 if better {
-                    out.hit = Some(RiverHit {
-                        seg: s,
-                        t: g.t,
-                        d: g.d,
-                        w,
-                        hw: hw_eff,
-                        depth: lerp(a.depth, b.depth, g.t),
-                        q: lerp(a.q, b.q, g.t),
-                    });
+                    out.hit = Some(h);
+                }
+                // The deepest channel (ledger: HYD-120).
+                let f = h.floor();
+                let deeper = match &out.deep {
+                    None => true,
+                    Some(o) => {
+                        let of = o.floor();
+                        f < of || (f == of && s < o.seg)
+                    }
+                };
+                if deeper {
+                    out.deep = Some(h);
                 }
                 if 2.0 * hw >= f64::from(self.biome_min_width) {
                     out.biome = true;

@@ -961,7 +961,7 @@ impl AmplifyStage {
         // sinks of the basins left dry.
         let balance_note = {
             let g2 = GridDesc::for_planet("L2", c, r.l2_r)?;
-            let hydro = self.preset.hydro.clone().unwrap_or_default();
+            let hydro = self.preset.hydro.unwrap_or_default();
             balance::apply(&mut level, &g2, world, &self.preset.scale, &hydro, sea)
         };
         let (gw, gh) = (l3.w as usize, l3.h as usize);
