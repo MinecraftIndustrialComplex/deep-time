@@ -627,11 +627,8 @@ pub fn run(
         };
         reserve((gw * gh) as u64 * LEVEL_BYTES_PER_CELL)?;
         let mut next = LevelSink::new(gw, gh, dxf, level.zs.len() == level.z.len());
-        amp_probe("mid_sink_ready");
         let (_, stats) = run_tiles(&level, &tcfg, &mut next, cancelled, reserve)?;
-        amp_probe("mid_done");
         level = next.level;
-        amp_probe("mid_old_dropped");
         reports.push(LevelReport {
             w: gw,
             h: gh,
@@ -656,9 +653,7 @@ pub fn run(
         character,
         accel: cfg.accel.as_deref(),
     };
-    amp_probe("last_start");
     let (preview, stats) = run_tiles(&level, &last, sink, cancelled, reserve)?;
-    amp_probe("last_done");
     Ok(Outcome {
         preview,
         last: stats,
@@ -824,27 +819,6 @@ pub fn world_bytes(p: &PlanetPreset) -> (u64, u64) {
     )
 }
 
-/// TEMPORARY PROBE (amp-est lane, never committed).
-pub fn amp_probe(tag: &str) {
-    if std::env::var_os("DEEPTIME_AMP_PROBE").is_some() {
-        eprintln!(
-            "AMP_PROBE {tag} in_use={} kept={} wpeak={}",
-            crate::alloc::in_use(),
-            crate::alloc::kept_bytes(),
-            crate::alloc::window_peak()
-        );
-    }
-}
-
-/// TEMPORARY PROBE (amp-est lane, never committed): prints, then starts a new window, so `wpeak` is
-/// the segment's peak since the previous segment probe.
-pub fn amp_probe_seg(tag: &str) {
-    if std::env::var_os("DEEPTIME_AMP_PROBE").is_some() {
-        amp_probe(tag);
-        crate::alloc::start_window();
-    }
-}
-
 /// Estimated bytes and seconds of the stage under the default memory cap
 /// ([`crate::session::DEFAULT_MEM_CAP`]; [`estimate_under`]).
 pub fn estimate(p: &PlanetPreset) -> StageEstimate {
@@ -977,7 +951,6 @@ impl AmplifyStage {
 
     fn advance(&mut self, world: &mut WorldState, ctx: &StageContext<'_>) -> Result<(), CoreError> {
         let started = Instant::now();
-        amp_probe("advance_start");
         let r = &self.preset.resolution;
         let n_dbl = doublings(r.l2_r, r.l3_r)
             .filter(|&n| n >= 1)
@@ -1024,7 +997,6 @@ impl AmplifyStage {
             }
         }
         let mut level = level_from_world(world, &self.preset)?;
-        amp_probe("after_level_from_world");
         // Volcanoes (P1-21): the cone put in place at L2 before the erosion passes, the rest at
         // L3 after the character pass (the sink below).
         let mut volcano_cells = 0;
@@ -1045,7 +1017,6 @@ impl AmplifyStage {
             None => structure::ReliefStats::default(),
         };
         let (gw, gh) = (l3.w as usize, l3.h as usize);
-        amp_probe("after_relief");
 
         // Whole raster in memory, or tile by tile (plan §5.7.5: streams automatically when the
         // buffers would not fit under the memory cap).
@@ -1077,7 +1048,6 @@ impl AmplifyStage {
         let mut sink = PackSink::create(ctx.out_dir, &l3, 256, sea, cfg.sea_y, cfg.mv)?;
         // Nothing is stored above the build limit: the top band is compressed (`params::BuildFit`).
         sink.fit = Some(self.preset.scale.build_fit());
-        amp_probe("after_packsink");
         let setup_ms = started.elapsed().as_secs_f64() * 1000.0;
         let cancelled = || ctx.cancelled();
         let character = cfg.character(&fields);
@@ -1105,9 +1075,7 @@ impl AmplifyStage {
                 level, n_dbl, &cfg, character, plan, target, &cancelled, &reserve,
             )?
         };
-        amp_probe("after_run");
         let files = sink.finish()?;
-        amp_probe("after_finish");
         let (pw, ps) = (out.preview.w, out.preview.stride);
         if let Some(sh) = &craters {
             sh.shape_block(&l3, 0, 0, pw, ps, &mut out.preview.z_m);

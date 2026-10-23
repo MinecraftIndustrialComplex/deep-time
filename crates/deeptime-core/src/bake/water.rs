@@ -209,7 +209,6 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         (grid, elev) = halve(&grid, &elev);
         halved = true;
     }
-    crate::surface::amplify::amp_probe_seg(&format!("water_loaded cells={}", grid.cells()));
 
     // The L1 climate is small: whole in memory, so the parallel sampling shares no cache lock.
     let layer = |name: &str| -> Result<Option<LoadedLayer>, CoreError> {
@@ -257,7 +256,6 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         params: &params,
         width_scale: s.feature_scale.rivers,
     });
-    crate::surface::amplify::amp_probe_seg("water_network");
     drop(elev);
     let mut stats = result.stats.clone();
     // How much of the frozen lake area the game's frozen biomes cover (the temperature layer's
