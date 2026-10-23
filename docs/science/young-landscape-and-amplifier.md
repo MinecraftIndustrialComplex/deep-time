@@ -18,8 +18,9 @@ The deep-time simulation works on cells several kilometres wide. Two later steps
 | [AMP](ledger/AMP.md) | sea floor | AMP-074 (1) |
 | [AMP](ledger/AMP.md) | steep-ground texture (the bake's relief pass) | AMP-080 to AMP-084 (5) |
 | [AMP](ledger/AMP.md) | lake shores | AMP-090, AMP-091 (2) |
+| [AMP](ledger/AMP.md) | closed basins | AMP-095 to AMP-097 (3) |
 
-Rows by status (YNG and AMP, recounted 2026-10-22): `verified` 1, `cited-unverified` 8, `calibrated` 3, `game-choice` 71, `uncited` 19.
+Rows by status (YNG and AMP, recounted 2026-10-23): `verified` 1, `cited-unverified` 8, `from-memory` 1, `calibrated` 3, `game-choice` 73, `uncited` 19.
 
 ## Material for the stage 2 writer
 
@@ -423,4 +424,56 @@ steep ground within 12 blocks) floor(bake height + a constant) equals the genera
 nothing inside it (no erosion, no character), while the bake's water balance later leaves most of
 such a basin dry in a semi-arid climate. So the dry floor and the lower walls of a pit keep the
 young landscape's coarser terrain, and the character's fade marks the old waterline as a soft
-contour. Making the amplifier's lake the water-balance lake would end both; it is not done here.
+contour. Making the amplifier's lake the water-balance lake would end both: done in part B, below.
+
+## Closed basins in the amplifier (savanna pit task, part B, 2026-10-23)
+
+Ben: "(Assuming that it had an actually realistic reason for existing, if the pit shouldn't exist
+in the first place that is a different story.)"
+
+**Where the pit comes from.** Not the young landscape and not the amplifier: the pit is in the
+simulation's own surface (L1, 16 blocks a cell) by the end of history, 1.5 to 2 km under the
+sea's level on a plain that stands 0.8 km over it. The per-step parts of the surface's isostatic
+gap at the pit's cell (`surface/gap_*_m`, dumped for the last 20 steps of Ben's seed) put nearly
+all of it in one term, the load a weakened plate lets go (ISO-056, `surface/flexure.rs`): the
+cell's regime goes from craton to back-arc at step 498, the plate's flexural rigidity falls, and
+the released part is -2,047 m, -1,216 m and -1,025 m at steps 498, 499 and 500. The water's part
+is -43 m in each step, so the sea is not loading the hole twice. The law releases
+`(1 - D_now / D_prev)` of the load the stiff plate held, all within a step; a back-arc that
+reheats under a craton sinks, but its basin would fill with sediment and water as it went down
+(the Pannonian basin, a back-arc on old crust, filled and lies about 100 m over sea level; the
+lowest dry land on Earth, the Dead Sea's shore, is about 430 m under it: both from memory). That law
+is the flexure lane's (a peer's branch works in `flexure.rs`), so it is a recommended follow-up,
+not changed here. The census below shows that such basins are common on the planets, not a
+one-off.
+
+**What the amplifier did with them.** The young landscape floods each closed basin to its spill
+point and the amplifier used that lake as the cells it leaves alone; worse, every cell at or
+below sea level counted as sea, whether or not the sea could reach it, so a dry pit 100 blocks
+under sea level was clamped, faded and eroded as sea floor. The bake's water balance then found
+the basin dry (or a playa) and drained it: what Ben walked on was the coarse level's terrain,
+flat floor, straight walls and all.
+
+**Fix.** (1) The amplifier runs the bake's own hydrology (`hydro::network::run`, the preset's
+parameters and climate) once on its first level, L2, after the volcano and structure passes and
+before the doublings (`surface/amplify/balance.rs`). Its lakes, at their balance levels, are the
+amplifier's lakes (AMP-095); the young flood's spill-full lakes go. (2) Ground the open sea does
+not reach (the network's `closed_basin` layer) is closed ground, carried to each finer level as
+a quad's corners agree (`resample::basin`), and sea is only ground under sea level that is open
+to it (AMP-096): closed ground gets no sea clamp, no coast fade and no sea base level, so the
+passes work it as land. (3) A basin the balance leaves dry or a playa drains to its lowest cell
+(a sink, AMP-097): the flood repair takes that cell as an outlet instead of filling the basin to
+its rim, and erosion on closed ground takes the receiver's height as its base, so the dry floor
+and the lower walls get the erosion, slumping and silt of any land and the floor collects its
+catchment's sediment (AMP-017, AMP-021). Nothing in the world-data format changed. With the
+hydrology off the amplifier keeps the young landscape's lakes and treats every cell as open.
+Tests: `surface::amplify::balance::tests` (a dry bowl 1.5 km under sea level is closed ground
+with one sink at its centre; a wet bowl keeps its lake and no sink; with the hydrology off the
+level is untouched).
+
+**Measured.** RESULTS PENDING
+
+**Still there, and the follow-up.** The pit itself: its depth is the flexure law's, and the fix
+here only makes it look like ground. Recommended for the flexure lane: release the held load
+over the plate's thermal time instead of in one step, and let the surface's sediment fill what
+it opens (a back-arc fills as it sinks), then measure the census below again.

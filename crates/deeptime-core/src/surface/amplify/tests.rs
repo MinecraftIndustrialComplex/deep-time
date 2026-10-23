@@ -93,6 +93,7 @@ fn l2_level() -> Level {
         wgt,
         kfac: vec![1.0; w * h],
         zs: Vec::new(),
+        closed: Vec::new(),
         lake_z: (0..w * h)
             .map(|c| {
                 if kind[c] == pflood::SINK {
@@ -193,6 +194,7 @@ fn lake_l3(l2: &Level) -> Vec<u8> {
         kfac: mid.kfac,
         lake_z: mid.lake_z,
         zs: Vec::new(),
+        closed: Vec::new(),
     };
     l1.sample(&Win::full(4 * l2.w, 4 * l2.h)).lake
 }
@@ -213,7 +215,7 @@ fn plan_tiled(c: &Config) -> TilePlan {
 /// Land cells outside `mask` of `z` with no strictly lower neighbour, over the whole planet.
 fn global_sinks(z: &[f32], mask: &[u8], sea: f32) -> u64 {
     let win = Win::full(4 * W2, 4 * H2);
-    count_sinks(&win, z, mask, sea, (0, 0, win.w, win.h))
+    count_sinks(&win, z, mask, &[], sea, (0, 0, win.w, win.h))
 }
 
 #[test]
@@ -728,8 +730,8 @@ fn the_sea_floor_keeps_its_own_critical_slope() {
     let ones = vec![1.0f32; win.cells()];
     let mut land = vec![0.0f32; win.cells()];
     let mut mixed = vec![0.0f32; win.cells()];
-    super::kernels::tmult_fill(&win, &noise, &ones, &[], 60.0, 0.0, &mut land);
-    super::kernels::tmult_fill(&win, &noise, &z, &[], 60.0, 0.0, &mut mixed);
+    super::kernels::tmult_fill(&win, &noise, &ones, &[], &[], 60.0, 0.0, &mut land);
+    super::kernels::tmult_fill(&win, &noise, &z, &[], &[], 60.0, 0.0, &mut mixed);
     let ratio = (c.p.submarine_slope / c.p.thermal_slope) as f32;
     for (k, ((&zk, &l), &m)) in z.iter().zip(&land).zip(&mixed).enumerate() {
         let want = if zk < 0.0 { l * ratio } else { l };
@@ -743,7 +745,7 @@ fn the_sea_floor_keeps_its_own_critical_slope() {
         .map(|(k, &zk)| zk + if k % 2 == 0 { 200.0 } else { 10.0 })
         .collect();
     let mut iced = vec![0.0f32; win.cells()];
-    super::kernels::tmult_fill(&win, &noise, &z, &zs, 60.0, 0.0, &mut iced);
+    super::kernels::tmult_fill(&win, &noise, &z, &zs, &[], 60.0, 0.0, &mut iced);
     for (k, ((&zk, &l), &m)) in z.iter().zip(&land).zip(&iced).enumerate() {
         let want = if zk < 0.0 && k % 2 == 1 { l * ratio } else { l };
         assert_eq!(m.to_bits(), want.to_bits(), "iced cell {k}");

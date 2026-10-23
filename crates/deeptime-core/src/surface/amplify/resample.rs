@@ -26,6 +26,10 @@
 //!   from the coarse cells (each fine cell a lake when a coarse lake cell lay within a cell of it)
 //!   drew every lake's edge as a staircase of coarse cells, and the passes, which leave lakes
 //!   alone, cut that staircase into the walls of every closed basin (ledger AMP-090).
+//! - **Closed basins** ([`basin`]): ground the open sea does not reach is never sea, however far
+//!   below sea level it lies, and the lowest point of a basin the water balance leaves dry is
+//!   where its floor drains to (`balance.rs`). A fine cell is closed ground when every coarse
+//!   cell of its quad is, and a sink when it sits on a coarse sink.
 
 use super::window::Win;
 
@@ -44,16 +48,38 @@ pub struct Level {
     pub wgt: Vec<f32>,
     /// Rock erodibility multiplier.
     pub kfac: Vec<f32>,
-    /// The water surface, m, of the lake or closed basin the young landscape had at the cell (the
-    /// level its flood filled the basin to), [`NO_LAKE`] elsewhere.
+    /// The water surface, m, of the lake at the cell, [`NO_LAKE`] elsewhere: the lakes the water
+    /// balance leaves on the young landscape (`balance.rs`), or with the hydrology off the level
+    /// the young landscape's flood filled each closed basin to.
     pub lake_z: Vec<f32>,
     /// The glaciers' surface, m, where they were, and a metre under the ground elsewhere (so it
     /// interpolates smoothly across their margins); empty without glaciers (`glacial.rs`).
     pub zs: Vec<f32>,
+    /// What the ground of each cell is ([`basin`]); empty when every cell is [`basin::OPEN`].
+    pub closed: Vec<u8>,
 }
 
 /// [`Level::lake_z`] of a cell outside every lake.
 pub const NO_LAKE: f32 = f32::NEG_INFINITY;
+
+/// What a cell of [`Level::closed`] (and [`Fine::closed`]) is.
+pub mod basin {
+    /// Ground the open sea reaches, or above sea level: under sea level it is sea.
+    pub const OPEN: u8 = 0;
+    /// The ground of a closed basin (the hydrology's `closed_basin` layer): never sea, however
+    /// far below sea level it lies.
+    pub const CLOSED: u8 = 1;
+    /// The lowest point of a basin the water balance leaves dry: its floor drains here, so the
+    /// flood keeps the basin instead of filling it (an outlet, like a lake).
+    pub const SINK: u8 = 2;
+}
+
+/// Whether ground at `z` with basin class `closed` ([`basin`]) is under the sea: below sea level
+/// and open to it (ledger: AMP-096).
+#[inline]
+pub fn wet(z: f32, sea: f32, closed: u8) -> bool {
+    z <= sea && closed == basin::OPEN
+}
 
 impl Level {
     /// Bytes the arrays hold.
@@ -64,6 +90,7 @@ impl Level {
             + self.kfac.len()
             + self.lake_z.len()
             + self.zs.len()) as u64
+            + self.closed.len() as u64
     }
 
     /// Whether cell `c` lies in a lake (or closed basin).
@@ -84,6 +111,8 @@ pub struct Fine {
     /// That surface, m, at the lake cells, [`NO_LAKE`] elsewhere.
     pub lake_z: Vec<f32>,
     pub zs: Vec<f32>,
+    /// The cell's [`basin`] class (every cell's, `basin::OPEN` when the level has none).
+    pub closed: Vec<u8>,
 }
 
 /// The Catmull–Rom value half-way between `p1` and `p2`, clamped between them.
@@ -213,6 +242,7 @@ impl Level {
             lake: vec![0; n],
             lake_z: vec![NO_LAKE; n],
             zs: Vec::new(),
+            closed: vec![basin::OPEN; n],
         };
         let dxf = self.fine_dx();
         let a_fine = (dxf * dxf) as f32;
@@ -220,6 +250,7 @@ impl Level {
         let ln_area = |c: usize| f64::from(self.area[c].max(1.0)).ln();
         let wgt = |c: usize| f64::from(self.wgt[c]);
         let kfac = |c: usize| f64::from(self.kfac[c]);
+        let has_closed = self.closed.len() == self.cells();
         use rayon::prelude::*;
         let w = win.w;
         f.z.par_chunks_mut(w)
@@ -228,8 +259,9 @@ impl Level {
             .zip(f.kfac.par_chunks_mut(w))
             .zip(f.lake.par_chunks_mut(w))
             .zip(f.lake_z.par_chunks_mut(w))
+            .zip(f.closed.par_chunks_mut(w))
             .enumerate()
-            .for_each(|(j, (((((zr, ar), or), kr), lr), sr))| {
+            .for_each(|(j, ((((((zr, ar), or), kr), lr), sr), br))| {
                 for i in 0..w {
                     let (gi, gj) = win.global(i, j);
                     let (gi, gj) = (gi as i64, gj as i64);
@@ -253,6 +285,24 @@ impl Level {
                     if zr[i] < s {
                         lr[i] = 1;
                         sr[i] = s;
+                    }
+                    // Closed ground when the whole quad is; a sink on a coarse sink's own node.
+                    // ledger: AMP-096, AMP-097
+                    if has_closed {
+                        let mut all = true;
+                        for cj2 in cj..=cj + i64::from(fj) {
+                            for ci2 in ci..=ci + i64::from(fi) {
+                                all &= self.closed[idx(self.w, self.h, ci2, cj2)] != basin::OPEN;
+                            }
+                        }
+                        if all {
+                            let own = self.closed[idx(self.w, self.h, ci, cj)];
+                            br[i] = if !fi && !fj && own == basin::SINK {
+                                basin::SINK
+                            } else {
+                                basin::CLOSED
+                            };
+                        }
                     }
                 }
             });
@@ -300,6 +350,7 @@ mod tests {
             kfac: vec![1.0; n],
             lake_z: vec![NO_LAKE; n],
             zs: Vec::new(),
+            closed: Vec::new(),
         }
     }
 
