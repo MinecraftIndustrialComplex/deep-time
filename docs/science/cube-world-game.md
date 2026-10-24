@@ -79,6 +79,15 @@ the game uses them:
    corner with no blend, and a block off the faces reads its partner's value exactly. The bake's
    own relief noises (the jag, the cliff bands' levels) are the same function, so the bake and the
    game agree on the ground at a seam. Petroff-Guyou and Lambert worlds keep the plain noise.
+8. **The climate API** (`api/climate/DeepTimeClimate`, version 5, cube plan G9). Other mods read
+   the planet's geometry from it on the server and on the client. On a cube world
+   `projectionKind` is `"cube"` and `circumferenceBlocks` is the period 4s. `latitudeDeg` and
+   `longitudeDeg` go through the fold and the map, so a block off the faces reads its partner's
+   place. Two calls are new. `northBearingDeg` gives the direction of north in the block frame,
+   in degrees clockwise from -z. It runs smoothly over a face and on into the copy past its
+   edge, and goes all the way round each pole. `metresPerBlock` gives the planet's metres per
+   block there. Both are NaN past the corners. The old static `latitudeDeg(z, C)` was right on
+   Lambert worlds only and is gone.
 
 ## Equations and constants
 
@@ -101,6 +110,16 @@ The first set is the equatorial band, the second N and S shrunk at their edges, 
 whole, so that F0's corners (where N's and S's side edges meet F1's and F3's top and bottom edges)
 stay inside. A heading of yaw y turns with a motion of k quarter turns as the vector (-sin y, cos y)
 does under the motion.
+
+The climate API's north and scale come from the map's Jacobian J at the block: its rows are the
+planet's (east, north) metres per block of +x and of +z, through the fold's motion off the faces
+(`CubeWorld.jacobian`). North in the block frame is the (dx, dz) that J takes to (0, 1),
+normalised. Its bearing is atan2(dx, -dz) in degrees, taken into [0, 360). The metres per block
+are sqrt(|det J|), with J taken on the sphere of the six faces' area, whose radius is
+m_per_block_h · s · sqrt(3/(2π)) metres (SCL-107). The conformal map
+has one scale in every direction, so this is the length of a block both ways. On the equal-area
+Lambert and Petroff-Guyou worlds the API gives m_per_block_h everywhere, since a block's area is
+the same everywhere there.
 
 ## Earth against the mod
 
