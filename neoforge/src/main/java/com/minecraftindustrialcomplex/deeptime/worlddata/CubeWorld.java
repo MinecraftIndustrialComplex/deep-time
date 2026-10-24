@@ -14,7 +14,7 @@ public final class CubeWorld {
      * The planet's metres per block at a point of the cube world ({@link #jacobian}).
      *
      * @param m     {@code [[east, north] per block of net +x, [east, north] per block of net +z]},
-     *              planet metres (the layout of {@code PetroffGuyou.jacobian}); for the conformal map
+     *              planet metres; for the conformal map
      *              a scalar times a rotation and a reflection (net +z is south-ish)
      * @param sigma √|det m|: planet metres per block (the conformal map's one scale; for another map
      *              the geometric mean of its two)

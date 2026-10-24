@@ -104,7 +104,7 @@ public final class Structure {
         this.buckets = lists;
     }
 
-    /** Reads {@code structure/} of a Lambert world-data folder; null when the world has no structural events. */
+    /** Reads {@code structure/} of a Lambert-frame world-data folder; null when the world has no structural events. */
     public static Structure read(Path folder, int circumference) {
         return read(folder, circumference, new WorldProjection.Lambert(circumference));
     }
