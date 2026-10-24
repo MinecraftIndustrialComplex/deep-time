@@ -13,7 +13,7 @@ is unchanged.
 
 ## 1. The flow
 
-1. **Singleplayer, Create New World** opens Create World on **Deep Time** (`deeptime:planet`).
+1. **Singleplayer, Create New World** opens Create World on **Deep Time** (`deeptime:planet_cube`, the cube: the only world shape that ships, decisions log 2026-10-24).
    The other world types stay in the World tab. The client setting `defaultWorldType` (on by
    default, `deeptime-client.toml`) turns this off. Without the natives (an unsupported platform) the
    game's own default stays, so Create keeps working.
@@ -37,7 +37,7 @@ NeoForge has no hook for the default world type, so `mixin.client.CreateWorldScr
 (the client section of `deeptime.mixins.json`) does two things:
 
 - `@ModifyArg` on `CreateWorldScreen.openFresh`'s `Minecraft.setScreen` call hands the new screen
-  to `CreateWorldFlow.fresh`, which selects `deeptime:planet` the way the World tab's button does
+  to `CreateWorldFlow.fresh`, which selects `deeptime:planet_cube` the way the World tab's button does
   (`WorldCreationUiState.setWorldType`). `createFromExisting` (Re-Create) is not touched: it keeps the
   world's own type.
 - `@Inject(HEAD, cancellable)` on `onCreate` (the Create button and Enter) asks

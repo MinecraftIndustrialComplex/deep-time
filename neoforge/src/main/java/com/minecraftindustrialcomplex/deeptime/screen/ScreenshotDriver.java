@@ -55,7 +55,7 @@ import java.util.List;
  * <p>Properties ({@code -Ddeeptime.dev.screenshots.<name>}): {@code length=<Myr>} (the only setting
  * changed by default, so a walk takes minutes), {@code start=<start>} and {@code preset=<family>}
  * (left at the defaults unless given), {@code worldtype=<preset id>} picks that world type from the
- * list before Customize (e.g. {@code deeptime:planet_cube}, cube plan G13; default {@code deeptime:planet}),
+ * list before Customize (e.g. {@code deeptime:planet_cube}, cube plan G13; default {@code deeptime:planet_cube}, the type Create World opens on),
  * {@code projection=<id>} sets the editor's projection, {@code customize=false} skips the Customize shots,
  * {@code layers=a,b,…} the layers shot while the run goes (default plates, Köppen climate, rock,
  * provinces), {@code cancel=false} skips the cancel-and-create-again at the start (by default the
@@ -343,16 +343,16 @@ final class ScreenshotDriver {
                     } else if (stepTicks == 15) {
                         // The screen exactly as Create World opens it, before the driver touches it.
                         WorldCreationUiState ui = cws.getUiState();
-                        boolean deepTime = ui.getWorldType().preset() != null && ui.getWorldType().preset().is(PlanetGenerators.PLANET);
+                        boolean deepTime = ui.getWorldType().preset() != null && ui.getWorldType().preset().is(PlanetGenerators.PLANET_CUBE);
                         DeepTime.LOGGER.info("[deeptime-shot] fresh world type: {} (natives {})",
                                 ui.getWorldType().preset() == null ? "custom"
                                         : ui.getWorldType().preset().unwrapKey().map(Object::toString).orElse("?"),
                                 NativeLoader.isLinked() ? "loaded" : "missing");
                         if (NativeLoader.isLinked() && !deepTime)
-                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: Create World did not open on deeptime:planet");
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: Create World did not open on deeptime:planet_cube");
                         shot("00-create-world-fresh");
                         worldTab(cws);
-                        String wanted = System.getProperty(PROP + ".worldtype", PlanetGenerators.PLANET.location().toString());
+                        String wanted = System.getProperty(PROP + ".worldtype", PlanetGenerators.PLANET_CUBE.location().toString());
                         boolean onWanted = ui.getWorldType().preset() != null
                                 && ui.getWorldType().preset().unwrapKey().map(k -> k.location().toString().equals(wanted)).orElse(false);
                         if (!onWanted)

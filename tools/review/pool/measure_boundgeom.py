@@ -8,7 +8,9 @@ stdout.
 
     python3 -I measure_boundgeom.py <run folder>
 
-Each snapshot after the first 100 Myr: the visible samples' Delaunay triangulation (their convex hull);
+Each snapshot after the first 100 Myr, except those taken at a resampling (every sample visible, the
+record's `samples`: the lattice just rebuilt, nothing hidden and no front flagged, so they measure no
+working boundary): the visible samples' Delaunay triangulation (their convex hull);
 the boundary is the Voronoi edges between samples of two plates, a chain of the triangles'
 circumcentres. A triangle of three plates is a triple junction; a piece is the chain between two
 junctions (or a closed loop with none: an island of one plate in another), as Bird's 150 boundaries run
@@ -35,15 +37,27 @@ library's Bird2003/PB2002_geometry.json; ledger PLT-531).
                    of lengths over the sum of chords (Bird 1.100 / 1.290 / 1.220)
   tau_p50_l380, tau_wmean_l380, tau_sum_l380   at 380 km (Bird 1.025 / 1.205 / 1.143)
   tau_front_wmean_l77, tau_front_sum_l77, tau_front_wmean_l380, tau_front_sum_l380   the same over the
-                   pieces mostly at a subduction front (more than half their edges touch a sample with
-                   the TRENCH flag: on the subducting plate at the trench); Bird's mostly-SUB pieces
-                   (42): 1.172 / 1.145 at 77 km, 1.132 / 1.110 at 380 km
+                   pieces mostly at a convergent front (more than half their edges are front edges, below);
+                   Bird's mostly-SUB pieces (42): 1.172 / 1.145 at 77 km, 1.132 / 1.110 at 380 km
   tau_div_sum_l77, tau_other_sum_l77   the same, sum over sum, over the pieces mostly divergent
                    (the DIVERGENT flag) and the rest
   share_front, share_div   the shares of the boundary at 77 km in mostly-front and mostly-divergent pieces
-  front_l77, front_l380    the subduction front's runs of edges, km (Bird SUB 51,310 at full resolution)
+  front_l77, front_l380    the convergent front's runs of edges, km. A front edge joins two plates and
+                   touches a sample the boundary mix (`dynamics::classify_boundary`) put at a front, on
+                   the overriding side: the map's MAP_FRONT_SUBDUCTION (256, the subducting sample
+                   oceanic) or MAP_FRONT_COLLISION (512, continental) flag (crust_budget.rs, PLT-550).
+                   The front is subduction and continental collision together, so it reads against
+                   Bird's SUB plus CCB (51,310 + 23,003 = 74,313 km at full resolution; plates.md,
+                   "Step 7"). Maps made before 2026-10-24 have no such flags: there a front edge
+                   touches a TRENCH sample (on the subducting plate at the trench), which marks
+                   collisions' fronts as well
+  front_sub_l77, front_sub_l380   of it, the subduction front alone (the 256 flag; Bird SUB 51,310)
+  front_trench_l77, front_trench_l380   on flagged maps, the front as older maps give it (TRENCH), to read
+                   an arm with the flags against one without
   arcfront_l77     of it, where the overriding sample is oceanic crust (Stern & Scholl 2010's 14,500 km of
                    intra-oceanic arc)
+  front_flagged    the share of the snapshots measured whose front came from the 256 / 512 flags
+  resampled        snapshots skipped as taken at a resampling
   comps_per_plate  connected pieces of each plate (through its own samples' Delaunay edges), mean
   frag_samples     the share of samples outside their plate's largest piece
   e_l380_first, e_l380_last   e_l380 in the first snapshot after 100 Myr and in the last
@@ -51,12 +65,21 @@ library's Bird2003/PB2002_geometry.json; ledger PLT-531).
                    largest) by size, shares of the samples: 1 to 10 samples, 11 to 100, over 100
   frag_cut, frag_own   the same by what they are: mostly of rigid groups that also have samples in
                    the plate's largest piece (cut off it), or of groups of their own (terranes)
-  <key>_clean      bnd, e, ppcap_aw_l380, junctions, pieces, loops, tau_sum, tau_front_sum, front and
-                   arcfront_l77 on the map with every cut-off piece given the plate most of its
+  <key>_clean      bnd, e, ppcap_aw_l380, junctions, pieces, loops, tau_sum, tau_front_sum, front,
+                   front_sub and arcfront_l77 on the map with every cut-off piece given the plate most of its
                    neighbours in a plate's largest piece carry (what the boundary would be with each
                    plate one connected body; `clean`)
+  <key>_k7         bnd, e, front, front_sub, front_trench, arcfront_l77 and the tortuosities on one lattice: the
+                   cleaned map put on a fixed Fibonacci lattice of 100,000 points (`k7`), each point the
+                   commonest plate of its 7 nearest visible samples and the flags of the nearest
+                   sample of that plate. The model's visible samples sit on two lattices or more at a
+                   boundary (each plate's own, turned at the last resampling and moved since; where
+                   crust overlaps, on two at once), PB2002's raster on one; this is the like-for-like
+                   length, and PB2002's raster goes through the same step (bird_raster.py)
 
-Version 2 (2026-10-24: the fragments' classes and the cleaned map's numbers).
+Version 2 (2026-10-24: the fragments' classes and the cleaned map's numbers). Version 3 (2026-10-24,
+PLT-550): resampling snapshots skipped, the front from the boundary mix's flags (subduction and
+collision, against Bird's SUB + CCB), front_sub, and the one-lattice `_k7` numbers.
 """
 import json
 import math
@@ -71,6 +94,9 @@ from scipy.spatial import ConvexHull
 R = 6371.0
 SKIP_MYR = 100.0
 TRENCH, DIVERGENT = 2, 16  # plates/state.rs sample flags
+FRONT_SUB, FRONT_COLL = 256, 512  # crust_budget.rs MAP_FRONT_SUBDUCTION, MAP_FRONT_COLLISION
+FRONT = FRONT_SUB | FRONT_COLL
+K7_N, K7_K = 100_000, 7  # the one lattice's points and the neighbours a point's plate is voted by
 FIELDS = 11  # crust_budget.rs MAP_FIELDS
 RES = (77.0, 380.0)
 
@@ -136,7 +162,8 @@ def median(xs):
 
 def measure(xyz, plate, flags, kind):
     """The boundary geometry of one snapshot: unit vectors `xyz` (N, 3), plate ids, flags and
-    continental (bool) per sample. Returns a dict of numbers."""
+    continental (bool) per sample. Returns a dict of numbers. The front is read from the FRONT
+    flags when the snapshot has any, else from TRENCH (maps made before the flags)."""
     hull = ConvexHull(xyz)
     tri = hull.simplices
     nbr = hull.neighbors
@@ -156,10 +183,19 @@ def measure(xyz, plate, flags, kind):
     e1, e2, eu, ev = t_idx[cross_], t2[cross_], u[cross_], v[cross_]
     ne = len(e1)
     fl = flags[eu] | flags[ev]
-    front = (fl & TRENCH) != 0
+    flagged = bool(np.any((flags & FRONT) != 0))
     div = (fl & DIVERGENT) != 0
-    # The overriding sample of a front edge: the one without the TRENCH flag.
-    over = np.where((flags[eu] & TRENCH) != 0, ev, eu)
+    trench = (fl & TRENCH) != 0
+    if flagged:
+        front = (fl & FRONT) != 0
+        sub = (fl & FRONT_SUB) != 0
+        # The overriding sample of a front edge: the one with a FRONT flag.
+        over = np.where((flags[eu] & FRONT) != 0, eu, ev)
+    else:
+        front = (fl & TRENCH) != 0
+        sub = None
+        # The overriding sample of a front edge: the one without the TRENCH flag.
+        over = np.where((flags[eu] & TRENCH) != 0, ev, eu)
     arc = front & ~kind[over]
     # Adjacency of the boundary graph: triangles joined by boundary edges.
     nodes = np.concatenate([e1, e2])
@@ -221,7 +257,11 @@ def measure(xyz, plate, flags, kind):
             d_share = float(np.mean(div[pe]))
             # Runs of front edges within the piece, and of island-arc front edges.
             runs = {}
-            for name, mask in (("front", front[pe]), ("arc", arc[pe])):
+            masks = [("front", front[pe]), ("arc", arc[pe])]
+            if sub is not None:
+                masks.append(("sub", sub[pe]))
+                masks.append(("trench", trench[pe]))
+            for name, mask in masks:
                 tot = {r: 0.0 for r in RES}
                 i = 0
                 ml = mask.tolist()
@@ -240,7 +280,7 @@ def measure(xyz, plate, flags, kind):
             out_pieces.append({"kind": kind_, "lens": lens, "chord": chord, "front": f_share, "div": d_share,
                                "runs": runs})
     res = {"plates": len(area), "junctions": junctions, "junctions_euler": 2 * (len(area) - 2),
-           "pieces": len(pieces), "loops": len(loops)}
+           "pieces": len(pieces), "loops": len(loops), "front_flagged": 1.0 if flagged else 0.0}
     for r in RES:
         tag = f"l{int(r)}"
         res["bnd_" + tag] = sum(p["lens"][r] for p in out_pieces)
@@ -248,6 +288,9 @@ def measure(xyz, plate, flags, kind):
         res["e_" + tag] = sum(perim[r].values()) / pc
         res["front_" + tag] = sum(p["runs"]["front"][r] for p in out_pieces)
         res["arcfront_" + tag] = sum(p["runs"]["arc"][r] for p in out_pieces)
+        if sub is not None:
+            res["front_sub_" + tag] = sum(p["runs"]["sub"][r] for p in out_pieces)
+            res["front_trench_" + tag] = sum(p["runs"]["trench"][r] for p in out_pieces)
     rat = [perim[380.0][i] / cap_perimeter(area[i]) for i in area]
     res["ppcap_aw_l380"] = wmean(rat, [area[i] for i in area])
     pp = [p for p in out_pieces if p["kind"] == "piece"]
@@ -295,6 +338,50 @@ def measure(xyz, plate, flags, kind):
     return res
 
 
+def fib(n):
+    """The Fibonacci lattice of `n` unit vectors (bird_raster.py's)."""
+    i = np.arange(n)
+    z = 1.0 - (2 * i + 1) / n
+    r = np.sqrt(np.maximum(0.0, 1.0 - z * z))
+    phi = (1.0 + math.sqrt(5.0)) / 2.0
+    lon = 2.0 * math.pi * np.mod(i / phi, 1.0)
+    return np.stack([r * np.cos(lon), r * np.sin(lon), z], axis=1)
+
+
+_LATTICE = {}
+
+
+def k7(xyz, plate, flags, kind, n=K7_N, k=K7_K):
+    """The map on one fixed lattice of `n` points: each point takes the commonest plate of its `k`
+    nearest samples (ties to the nearest sample's plate if it is among them, else the lowest id)
+    and the flags and crust of the nearest sample of that plate. Returns the lattice's (xyz, plate,
+    flags, kind)."""
+    from scipy.spatial import cKDTree
+    lat = _LATTICE.get(n)
+    if lat is None:
+        lat = _LATTICE[n] = fib(n)
+    _, J = cKDTree(xyz).query(lat, k=k)
+    P = plate[J]
+    cnt = (P[:, :, None] == P[:, None, :]).sum(axis=2)
+    top = cnt.max(axis=1)
+    lowest = np.where(cnt == top[:, None], P, np.iinfo(np.int64).max).min(axis=1)
+    chosen = np.where(cnt[:, 0] == top, P[:, 0], lowest)
+    first = np.argmax(P == chosen[:, None], axis=1)
+    jj = J[np.arange(n), first]
+    return lat, chosen, flags[jj], kind[jj]
+
+
+K7_KEYS = ["bnd_l77", "bnd_l380", "e_l77", "e_l380", "front_l77", "front_l380", "front_sub_l77",
+           "front_sub_l380", "front_trench_l77", "front_trench_l380", "arcfront_l77", "tau_sum_l77",
+           "tau_sum_l380", "tau_front_sum_l77", "tau_front_sum_l380"]
+
+
+def measure_k7(xyz, plate, flags, kind):
+    """`measure` of the map put on the one lattice (`k7`), the K7_KEYS as `<key>_k7`."""
+    d = measure(*k7(xyz, plate, flags, kind))
+    return {key + "_k7": d.get(key) for key in K7_KEYS}
+
+
 def read_snapshot(map_path, plate_path):
     a = np.fromfile(map_path, "<f4").reshape(-1, FIELDS).astype(np.float64)
     if not plate_path.exists():
@@ -309,7 +396,7 @@ def read_snapshot(map_path, plate_path):
 
 CLEAN_KEYS = ["bnd_l77", "bnd_l380", "e_l77", "e_l380", "ppcap_aw_l380", "junctions", "pieces", "loops",
               "tau_sum_l77", "tau_sum_l380", "tau_front_sum_l77", "tau_front_sum_l380", "front_l77", "front_l380",
-              "arcfront_l77"]
+              "front_sub_l77", "front_sub_l380", "arcfront_l77"]
 
 
 def _pieces(plate, au, av, n):
@@ -389,7 +476,11 @@ def main():
         print(json.dumps({}))
         return
     t0 = float(files[0].stem[1:])
+    # The planet's samples: a snapshot with all of them visible was taken at a resampling.
+    rec_path = Path(sys.argv[1]) / "rec.json"
+    n_all = int(json.loads(rec_path.read_text()).get("samples", 0)) if rec_path.exists() else 0
     rows = []
+    resampled = 0
     for f in files:
         t = float(f.stem[1:])
         if t <= t0 + SKIP_MYR:
@@ -398,6 +489,9 @@ def main():
         if snap is None:
             continue
         xyz, plate, flags, kind, group = snap
+        if n_all and len(plate) >= n_all:
+            resampled += 1
+            continue
         row = measure(xyz, plate, flags, kind)
         cleaned, frag = clean(xyz, plate, group)
         row.update(frag)
@@ -407,8 +501,9 @@ def main():
             cl = row
         for k in CLEAN_KEYS:
             row[k + "_clean"] = cl.get(k)
+        row.update(measure_k7(xyz, cleaned, flags, kind))
         rows.append(row)
-    out = {"snaps": len(rows)}
+    out = {"snaps": len(rows), "resampled": resampled}
     if rows:
         keys = sorted({k for r in rows for k in r})
         for k in keys:

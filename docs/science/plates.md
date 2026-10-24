@@ -7631,3 +7631,184 @@ give 0.281 against its 24 runs' 0.213).
 One thing is left as it was: held crust still forms its plate's triangles in `detect`, so where a
 contact has the slab's plate overriding another, crust of the other that comes over the slab
 goes under it until the resampling, as hidden crust's triangles did before. It is not measured.
+
+### Step 7: the subduction zone through a resampling (PLT-550) and the front measured like for like (2026-10-24)
+
+After step 6 the pool measure `boundgeom` still put the subduction front at 77 km at about 2.2
+times PB2002's. Before any law, the diagnosis read the cached maps of fl-ls2 and fl-sat (8 runs
+each) and base6's records (seeds 1 to 4, both starts); no simulation ran for it. It found four
+parts, and none of them is an outline rough at the plates' scale.
+
+**1. The measure.** `boundgeom` averaged in the snapshots taken at a resampling, where nothing is
+hidden, no sample has the TRENCH flag and so there is no front. Between resamplings the raw front
+at 77 km is 2.76 times PB2002's (fl-ls2) and 2.53 (fl-sat).
+
+**2. Two lattices at the front.** Put on one fixed lattice (each snapshot re-rastered onto a
+100,000-point Fibonacci lattice, a point taking the commonest plate of its 7 nearest visible
+samples, `k7`; PB2002's raster through the same step), the front is as rough as PB2002's at 300 km
+and longer chords: its length at 300 km over its length at 1,200 km is 1.029 (fl-ls2) and 1.028
+(fl-sat) against PB2002's 1.031. At 77 km it is 1.19 against 1.10, the lattice's staircase. The
+ladder for fl-ls2, at 77 / 1,200 km against PB2002's SUB raster: raw 2.76 / 2.19, one lattice at
+the same resolution (k1) 2.23 / 1.85, k7 1.98 / 1.83. Two plates' lattices meeting at the front
+cost 1.24 times at 77 km and 1.19 at 1,200 km, single stray samples 1.13 at 77 km. The mechanism:
+`geometry::cover` hides a subducting sample only inside a whole lattice triangle of the overriding
+group, so the subducting plate's edge row reaches into the overriding plate's before it goes
+under; 43 % of the front's TRENCH samples have another plate's sample within half a spacing.
+
+**3. What counts as front.** The TRENCH flag marks a collision's front as well as a subduction
+zone's (collisions are 18 % of the record's subduction plus collision length), while PB2002's
+raster flagged SUB only. Bird 2003 classes a continental convergent boundary (CCB) apart from a
+subduction zone (SUB): SUB steps are convergent steps "with a Benioff zone of intermediate to deep
+earthquakes and/or a parallel volcanic arc with Quaternary activity" ([126]), classed first, and
+a continental step is any that is not oceanic ([127]), so a CCB step is a convergent step on
+continental or transitional lithosphere with no Benioff zone or arc; Table 3 gives SUB 51,310 km
+and CCB 23,003. The model's boundary mix (`dynamics::classify_boundary`) counts a front wherever
+an active contact converges, whatever the crust, and calls it a collision when the subducting
+side is continental. So the like-for-like reference is SUB plus CCB, 74,313 km, not SUB alone.
+This fixes the measure; it does not move a target. For context only, Mallard et al. 2016 give
+48,000 km of trenches on Earth today and 66,000 on average in their model 2, whose plate sizes
+they find Earth-like.
+
+**4. The resampling's dip.** A resampling rebuilds every plate's lattice and leaves no overlap
+anywhere, and a contact counted as a working subduction zone (fronts, arcs, uplift, slab pull, the
+boundary mix) only at a step that saw its overlap. The overlap takes a few steps to form again,
+so every resampling switched the subduction zones off. Base6, seeds 1 to 4, both starts, the
+record's subducting length and the converging boundary with no contact
+(`front_bands.other_converging`), km, by Myr since the last resampling:
+
+| Myr since the resampling | subducting | converging, no contact |
+|---|---|---|
+| 0 (the resampling step) | 98,912 | 6,462 |
+| 1 to 2 | 63,341 | 37,459 |
+| 3 to 4 | 85,184 | 12,985 |
+| 5 to 6 | 91,421 | 6,867 |
+| 7 to 8 | 94,398 | 5,334 |
+| 9 to 12 | 96,438 | 4,794 |
+| 13 to 20 | 99,562 | 4,522 |
+
+With a resampling every 16 Myr on average (median 20) the time-mean subducting length sits about
+8 % under its steady state, and the measured front grows through each cycle (on k7 at 1,200 km,
+fl-ls2 74,000 to 91,000 km, fl-sat 60,000 to 95,000, while the hidden share goes from 1.5 to 2 %
+to 7.6 to 9.3 %). This one is a dynamic artefact, not a measuring one.
+
+**The law** (`tectonics.contact_carry`, on by default; `Contact::carried` and `Contact::active` in
+`state.rs`, `subduction::carry`, `resolve`, `fronts_begin`, `fronts_finish`; ledger PLT-550). A
+lattice rebuild is a numerical step, not a geological event, and a subduction zone that worked
+before it works after it. A contact active at the resampling step is carried: it counts as active
+for its fronts, arcs and uplift, its slab pull (`forces.rs`), the boundary mix, rifting's touching
+test and the record's live contacts, until its overlap is seen again (then it is active by that,
+as before), or a step finds no front on its boundary (its plates no longer converge across it;
+`fronts_finish` ends the carry), or `contact_timeout_myr` (PLT-059, 24 Myr since the overlap was
+last seen) closes it. The fronts are still found each step by convergence across the boundary, so
+a carried contact makes fronts only where its plates converge. Collisions are carried as
+subduction zones are: the rebuild is no more an event for a collision, and the collision's own
+clock (its onset, the belts) is untouched. What acts on the overlap itself still reads the step it
+was last seen: the hiding, a collision's onset, the crust-shown counter (`shown.rs`) and the
+timeout.
+
+**The unit test** (`a_subduction_zone_goes_on_through_a_resampling`): the ocean plate of the
+two-plate planet (20,000 samples) converging on the continent at 50 mm/yr has 136 front samples.
+The planet is resampled and, before the plates move, the contact sees no overlap. Carried, it has
+144 front samples; off, none. Turned to slide past each other, the plates have no front and the
+carry ends; turned to converge further, the overlap is seen again and the contact is active by
+it, carried no more.
+
+**The measure, version 3** (`tools/review/pool/measure_boundgeom.py`, `measures_front.json`; the
+maps' flags in `crust_budget.rs`). The crust maps now carry the boundary mix's class on the
+overriding side of each front: MAP_FRONT_SUBDUCTION (256) where the subducting sample is oceanic,
+MAP_FRONT_COLLISION (512) where it is continental, none at a resampling snapshot. `boundgeom`
+skips the snapshots taken at a resampling, reads the front from these flags (TRENCH on older
+maps), reports `front` (both, against SUB plus CCB) and `front_sub` (against SUB), and the same
+numbers on one lattice (`_k7`). PB2002 through the same code (`bird_raster.py`, the front flags
+on the overriding side of SUB steps and both sides of the unpolarised CCB steps): on the lattice
+SUB plus CCB is 79,608 km at 77 km and 72,965 at 380, SUB alone 52,743 and 48,619; through the
+one-lattice step 77,844 / 72,060 and 51,614 / 47,982, the boundary 259,814 / 232,613; SUB flagged
+TRENCH on its subducting side, as maps without the flags read, 51,812 / 48,094 on one lattice. On
+one of fl-ls2's runs (scattered start, seed 1; old maps, so the TRENCH front) the one-lattice front
+is 98,048 km at 77 km, 1.26 times SUB plus CCB.
+
+**The arm** (`pool.sh run fl-carry --length 1000 --seeds 1,2,3,4 --threads 2
++DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, key 7836eb64cc67, argkey
+cd665cef, 8 runs, both starts, the carry on by default). Read against base6's own seeds 1 to 4
+(arm `base6-s1to4`, the same runs as base6's, so matched starts and seeds), and against base6's
+24 where said; medians, Mann-Whitney p in brackets:
+
+- **The dip.** The record's mix by Myr since the resampling, as in the table above: the
+  subducting length is 83,020 km at 1 to 2 Myr (63,341 before), 89,173 at 3 to 4 (85,184), 97,992
+  at 13 to 20 (99,562), and the converging boundary with no contact 5,557 km at 1 to 2 Myr (37,459)
+  against 3,600 to 4,300 otherwise. Over the cycle the subducting length's time mean is 0.954 of its
+  level at 13 to 20 Myr, against 0.921. Ocean-ocean fronts and collisions no longer dip (38,347 and
+  21,153 km at 1 to 2 Myr against 38,080 and 19,933 at 13 to 20); the oceanic arc cells neither
+  (2,509 against 1,858 before). What is left is the ocean-continent front alone: 44,673 km at 1 to
+  2 Myr, climbing to 59,912 at 13 to 20, as before the carry (base6 37,342 to 60,320) and before
+  one-way subduction (fl-shown, master 25941ca5, 39,174 to 62,812). It is not a contact switched
+  off: the boundary that is neither a front, a ridge, a rift nor converging is 16,000 to 17,500 km
+  longer at 1 to 2 Myr than at 13 to 20 in all three arms, so after a rebuild about that much of the
+  ocean-continent boundary is judged not converging and comes back over the cycle. The continental
+  arc cells follow it (435 at 1 to 2 Myr to 652; base6 357 to 648). The cause is not found.
+- **The plate check** passes 183 measures, as base6-s1to4. In fewer runs: the oceanic over
+  continental speed (5 against 8, 2.08 against 2.50), the slab-pulled over free speed (6 against
+  8), the rifts alive at 50 Myr (3 against 5), the lowest continental share (0 against 2). In more:
+  the speed and area's rank correlation (5 against 2), the collisions' p90 length (2 against 0,
+  143 against 186 Myr), the active margin, the supercontinent's tenure and period, the large
+  plates' p90 speed, the collisions' convergence ratio, the continental arcs' p50 height.
+- **The V1 census.** Land 0.318 to 0.298 (p 0.23), the largest landmass 0.198 to 0.178 (p 0.57),
+  continental crust under the sea 0.202 to 0.234 (p 0.51), **land above 2 km 0.128 to 0.174 (p
+  0.038; against base6's 24, p 0.015)**, **coast with high ground 0.244 to 0.282 (p 0.021; against
+  the 24, p < 0.001)**, ice 0.114 to 0.105, collisions per 100 Myr 1.45 either way, the continental
+  crust's net change -0.054 to -0.057 (p 0.51), criteria met 5 either way (mean 5.12 to 4.88).
+  Land above 2 km is higher in all 8 start-and-seed pairs, by 0.002 to 0.138 (chaotic planets, so
+  a sign count, not a paired test).
+- **The guard.** No step beyond 2 Earth reliefs; the worst 10,236 m from the sea against 10,418
+  (p 0.80); `guard_bind_steps` 0 in all 8 runs.
+- **The area book.** The continental crust ends at 0.365 of the planet against 0.369, its volume
+  6.82 against 6.92. The parts that moved: the fronts' hiding -0.679 to -0.722, the oceanic arcs'
+  maturing (`finish`) +0.289 to +0.319; in volume, the arcs 917 to 990, the belts 14,910 to
+  15,290, erosion -8,839 to -9,287.
+- **The arcs' heights** by Myr since the resampling (`arc_continental` in the record): the
+  continental arcs' p90 stands 100 to 280 m higher in every phase of the cycle (3,580 against
+  3,304 m at 1 to 2 Myr, 3,096 against 2,975 at 13 to 20).
+- **The boundary and the front** (record): the subducting share of the boundary 0.289 to 0.301 (p
+  0.021; Bird SUB 0.197), converging with no slab 0.031 to 0.013 (p < 0.001), the subduction front
+  82,604 to 85,882 straight km a step (p 0.16), the boundary 309,725 to 308,120, E 1.813 to 1.801.
+  The crust that went under 2.99 to 3.15 km² a year, the resamplings consumed 2.86 to 2.99.
+  Sutures 29,682 to 27,220 km per 100 Myr (p 0.083); the partings' share of front-time 0.340 to
+  0.508 (p 0.015).
+- **The measure, version 3, on the arm** (8 runs, every snapshot's front from the flags, 3 a run
+  skipped at a resampling). The front, subduction and collision: 126,931 / 96,237 km at 77 / 380
+  km, 1.59 / 1.32 times PB2002's SUB plus CCB on the lattice; **on one lattice 87,550 / 75,693,
+  1.12 / 1.05 times PB2002's through the same step** (1.18 / 1.02 times Bird's 74,313). Subduction
+  alone: 104,979 / 79,430, on one lattice 71,270 / 61,756, 1.38 / 1.29 times SUB. The boundary on
+  one lattice 299,021 / 262,736 (1.15 / 1.13 times PB2002's), perimeters over caps 1.708 / 1.499
+  (1.503 / 1.345), the mostly-front pieces' tortuosity 1.519 / 1.318 (1.247 / 1.138). The front
+  as the TRENCH flag gives it, on one lattice: 98,604 / 85,193, between fl-ls2's 102,658 / 87,707
+  and fl-sat's 94,863 / 81,007 (older simulations).
+
+What the arm says. The carry does what it is for: the converging boundary with no contact after a
+rebuild falls from 37,500 km to 5,600, the island arcs and collisions go on through it, and the
+subducting length's time mean is 5 % under its steady level, not 8 %. The rest of the dip is the
+ocean-continent boundary's own geometry after a rebuild, which a contact cannot reach. Measured
+like for like, on one lattice and against SUB plus CCB, the model's front is now 1.12 times
+PB2002's at 77 km and 1.05 at 380 km; most of the 2.2 times step 6 left was the measure (the
+snapshots at a resampling, SUB alone against a front that holds the collisions) and the two
+lattices. Subduction alone is still 1.38 times SUB, and the collision front shorter than CCB, so
+the model calls more of its convergent boundary subduction than Earth does.
+
+What it costs is high ground: land above 2 km and coast with high ground rise, both realism checks
+that already fired. A reading, not a measured cause: before, every rebuild took a third or more of
+the island arcs' and the collisions' fronts away for 1 to 2 Myr and a tenth for the next 2 (base6:
+ocean-ocean 25,999 km at 1 to 2 Myr against 39,242 at 13 to 20, collisions 12,331 against
+21,007), every 16 to 20 Myr, while erosion went on, so arcs and belts stood lower than their own
+laws give; now the uplift runs all the time, the continental arcs
+stand 100 to 280 m higher through the whole cycle, and a share over a threshold moves more than the
+volumes (the arcs' 8 %, the belts' 2.5 %). The census was flattered by the artefact; no knob is
+added to take it back (the foreland basins of gap 6 are the lane expected to lower both).
+
+**The two lattices after the carry.** The front on the model's own samples is 1.45 times its
+length on one lattice at 77 km and 1.27 at 380 km, where PB2002's raster is 1.02 and 1.01: the
+part the carry cannot touch, as large as before it (fl-ls2's raw over one-lattice, 1.39 at 77 km).
+The record's own subducting length (the boundary mix, 93,743 lattice km) is 1.32 times the
+one-lattice subduction front, so the boundary criteria (the subducting share 0.301 against Bird's
+0.197) still read a front inflated by the subducting plate's edge row reaching into the overriding
+plate's before it goes under (`geometry::cover`, part 2 above). Whether the laws that count front
+samples (the slab pull's length, the arcs) see the same inflation is not measured.
