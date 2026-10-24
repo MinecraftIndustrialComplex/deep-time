@@ -30,6 +30,8 @@ public final class RuleCensus {
     private final Map<String, Integer> seen = new TreeMap<>();
     private int columns, notCandidate, wrongClass, exclusiveLeaked, coldWetland, coldWetlandPeat;
     private final List<String> examples = new java.util.ArrayList<>();
+    /** Cold-wetland columns per decision and biome ("&lt;decision&gt; &lt;biome&gt;"), so a low peatland share names its cause. */
+    private final Map<String, Integer> coldWetlandBy = new TreeMap<>();
 
     public RuleCensus(BiomeRules.Set_ rules) {
         this.rules = rules;
@@ -75,6 +77,7 @@ public final class RuleCensus {
             coldWetland++;
             if (b.is(PEATLAND))
                 coldWetlandPeat++;
+            coldWetlandBy.merge(key + " " + name, 1, Integer::sum);
         }
     }
 
@@ -116,6 +119,11 @@ public final class RuleCensus {
 
     public int coldWetlandPeat() {
         return coldWetlandPeat;
+    }
+
+    /** Cold-wetland columns per decision and biome, keyed "&lt;decision&gt; &lt;biome&gt;". */
+    public Map<String, Integer> coldWetlandBy() {
+        return coldWetlandBy;
     }
 
     /** Columns per biome of the rules' candidates (every rule's, role rules included). */
@@ -175,6 +183,9 @@ public final class RuleCensus {
         o.addProperty("exclusive_leaked", exclusiveLeaked);
         o.addProperty("cold_wetland_columns", coldWetland);
         o.addProperty("cold_wetland_on_peatland", coldWetlandPeat);
+        JsonObject cw = new JsonObject();
+        coldWetlandBy.forEach(cw::addProperty);
+        o.add("cold_wetland_by", cw);
         JsonArray ex = new JsonArray();
         examples.forEach(ex::add);
         o.add("examples", ex);
