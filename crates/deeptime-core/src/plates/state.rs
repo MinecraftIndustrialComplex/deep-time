@@ -522,6 +522,11 @@ pub struct SlabTrack {
     pub km: f64,
     pub blocked_myr: f64,
     pub idle_myr: f64,
+    /// A copy a split handed to a piece of a plate (`inherit.rs`, ledger PLT-534) that has had no
+    /// front of its own yet: it pulls only at that piece's fronts and does not hang, so a piece
+    /// that borders the other plate off the trench holds none of the slab, and it is gone after
+    /// `slab_breakoff_myr` with no front. Its first front makes it a slab like any other.
+    pub latent: bool,
 }
 
 /// Counters for the run summary.

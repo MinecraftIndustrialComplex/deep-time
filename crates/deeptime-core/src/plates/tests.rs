@@ -2529,19 +2529,22 @@ fn the_final_heat_flow_pass_lifts_only_low_continental_samples() {
 /// ragged"): which part of the step cuts the plates into pieces, over the quick preset's
 /// defaults. A diagnosis, not a check: it prints each part's samples cut off their plate and
 /// joined back, and the share cut off at the end of every 50 Myr; then the same with
-/// `plate_fission` (PLT-532) on, and its globals.
+/// `plate_fission` (PLT-532) on, and its globals; then with the level set (PLT-536) on as well.
 #[test]
 #[ignore = "diagnosis: 300 Myr at 40k samples; run with --release -- --ignored --nocapture"]
 fn where_the_plates_are_cut() {
     cut_trace::enable(true);
-    for (start, seed, fission) in [
-        ("supercontinent", 1, false),
-        ("scattered_continents", 2, false),
-        ("supercontinent", 1, true),
-        ("scattered_continents", 2, true),
+    for (start, seed, fission, level_set) in [
+        ("supercontinent", 1, false, false),
+        ("scattered_continents", 2, false, false),
+        ("supercontinent", 1, true, false),
+        ("scattered_continents", 2, true, false),
+        ("supercontinent", 1, true, true),
+        ("scattered_continents", 2, true, true),
     ] {
         let mut p = preset(40_000, 300.0, start, seed);
         p.tectonics.plate_fission = fission;
+        p.tectonics.level_set_membership = level_set;
         let _ = cut_trace::take();
         let mut shares = Vec::new();
         let mut next = 50.0;
@@ -2556,7 +2559,8 @@ fn where_the_plates_are_cut() {
         });
         let parts = cut_trace::take();
         eprintln!(
-            "{start} seed {seed} fission {fission}: cut share, plates every 50 Myr {shares:.3?}"
+            "{start} seed {seed} fission {fission} level set {level_set}: cut share, plates every \
+             50 Myr {shares:.3?}"
         );
         let g = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
         eprintln!(
