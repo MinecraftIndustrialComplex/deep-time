@@ -5989,7 +5989,9 @@ above 2 km 0.134 on base2, p 0.29 to 0.56 for the arms; coast with high ground 0
   with high ground 0.292 to 0.330 (neither significant).
 
 The seed-pinned weld tests were swept with every stage on (`plates/tests.rs`, the seed history in
-each test's comment), and the one-law fixtures that need the old rules pin them off.
+each test's comment): three tests moved to new seeds, and no one-law fixture needed the old rules
+pinned off. In none of the 32 arm runs did the plate speed guard bind (`plates/guard_bound_plate_steps`
+absent); on the small test planet it bound once, at scattered seed 18.
 
 ### What was decided, and what comes next
 
