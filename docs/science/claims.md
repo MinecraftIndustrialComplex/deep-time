@@ -22,7 +22,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | [AMP](ledger/AMP.md) | the amplifier | 84 | 1 | 8 | 1 | 0 | 2 | 63 | 9 | 0 | 0 | 0 |
 | [BAK](ledger/BAK.md) | the bake, satellite view | 56 | 2 | 0 | 0 | 0 | 1 | 48 | 5 | 0 | 0 | 0 |
-| [BIO](ledger/BIO.md) | Köppen classes and biomes | 172 | 25 | 3 | 5 | 3 | 1 | 133 | 2 | 0 | 0 | 1 |
+| [BIO](ledger/BIO.md) | Köppen classes and biomes | 173 | 25 | 3 | 5 | 3 | 1 | 134 | 2 | 0 | 0 | 1 |
 | [CHK](ledger/CHK.md) | plate-check target ranges | 60 | 19 | 3 | 1 | 7 | 0 | 12 | 18 | 3 | 1 | 0 |
 | [CLM](ledger/CLM.md) | climate physics | 185 | 34 | 32 | 6 | 3 | 20 | 39 | 51 | 112 | 1 | 16 |
 | [CRE](ledger/CRE.md) | core engine: plate geometry, noise, plate state, deformation lattice | 35 | 0 | 8 | 0 | 0 | 0 | 0 | 27 | 1 | 0 | 0 |
@@ -40,7 +40,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [MAG](ledger/MAG.md) | magma and lava | 57 | 2 | 1 | 0 | 1 | 0 | 52 | 1 | 0 | 0 | 0 |
 | [MOI](ledger/MOI.md) | moisture, winds, seasons | 71 | 0 | 17 | 0 | 0 | 0 | 9 | 45 | 70 | 0 | 6 |
 | [ORE](ledger/ORE.md) | deposit formation, coal, petroleum, placers | 199 | 27 | 17 | 2 | 17 | 0 | 68 | 68 | 0 | 0 | 75 |
-| [PLT](ledger/PLT.md) | plate tectonics | 310 | 50 | 54 | 9 | 29 | 11 | 123 | 34 | 132 | 6 | 47 |
+| [PLT](ledger/PLT.md) | plate tectonics | 311 | 50 | 54 | 10 | 29 | 11 | 123 | 34 | 132 | 6 | 47 |
 | [POL](ledger/POL.md) | the pole cap | 25 | 0 | 0 | 0 | 0 | 0 | 22 | 3 | 0 | 0 | 0 |
 | [PRS](ledger/PRS.md) | presets other than earthlike_quick_16k; test and world presets | 71 | 2 | 8 | 0 | 1 | 2 | 51 | 7 | 11 | 0 | 3 |
 | [PRV](ledger/PRV.md) | geologic provinces | 29 | 0 | 0 | 0 | 5 | 3 | 11 | 10 | 0 | 0 | 2 |
@@ -51,7 +51,7 @@ ISO-067, added to master the same day by its own agent, and ISO-068, ISO-069 fro
 | [STR](ledger/STR.md) | strata, traps, hosts | 53 | 1 | 0 | 0 | 1 | 2 | 49 | 0 | 0 | 0 | 4 |
 | [VOL](ledger/VOL.md) | volcanoes | 109 | 7 | 0 | 3 | 3 | 2 | 70 | 24 | 0 | 0 | 0 |
 | [YNG](ledger/YNG.md) | the young landscape | 21 | 0 | 0 | 0 | 0 | 1 | 10 | 10 | 0 | 0 | 2 |
-| **all** | | **2,918** | **376** | **347** | **69** | **127** | **87** | **1,400** | **512** | **329** | **11** | **241** |
+| **all** | | **2,920** | **376** | **347** | **70** | **127** | **87** | **1,401** | **512** | **329** | **11** | **241** |
 
 72 rows are `verified` (counted from the ledger files after WP-2 merged WP-15/16 and the plate-check boundary mix, 2026-10-02, WP-13a, the volcano decisions and WP-8): PLT-213 and PLT-218 (plate-check boundary mix and arc heights), ISO-041, ISO-042
 and ISO-048 (the flexure agent), MAG-028 and MAG-029 (WP-2), one GEO row and thirteen HNT rows (WP-15, WP-16, WP-2 and the volcano decisions),

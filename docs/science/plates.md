@@ -7514,3 +7514,120 @@ tests' seeds still weld (12 and 19). One test's planet is held on the fixed suct
 nudge test (`the_nudges_reach_their_targets_gently`) is about the climate's nudges, and with the
 saturating suction its steered planet warms past the band's top in its last step and the
 outgassing turns back once.
+
+### Step 6: the crust shown again and one-way subduction (PLT-542, 2026-10-24)
+
+"The overlaps' hiding" (above) asked for a count before the law: how much of the crust that goes
+down a trench shows again, and why.
+
+**The counter** (`shown.rs`, measurement only, kept beside the dynamics record; the pool measure
+`shown` in `tools/review/pool/measures_front.json`). Each step it counts the samples that went
+under (visible as `resolve` began, hidden after it) and those shown again (hidden before,
+visible after, or brought up by a collision), by the first cause that holds: a rift moved the
+sample to another plate (`plate`), the contact reversed this step (`reversal`), its plate now
+overrides the plate it lies under (`on_top`), no contact was seen (`unseen`), it lies under no
+plate's cover (`left`), a collision brought it up (`collision`). At each resampling it counts the
+hidden samples consumed and the samples that went under since the last resampling and stand
+visible (escaped), by the cause of their last showing, with the ages of the ocean floor among
+them. On arm fl-shown (master 25941ca5's simulation with the counter, key 601e007feb64, argkey
+2a53566b, `earthlike_quick_16k`, 1000 Myr, both starts, seeds 1 to 4, 8 runs; its supercontinent
+runs' state hashes equal base5's, so the counter changes nothing), medians of the 8 runs:
+
+- 3.34 km² a year went under (Earth-normalised) and the resamplings consumed 2.55.
+- 0.230 of what went under showed again: 0.199 because the overriding plate moved off it
+  (`left`), 0.025 under a plate its own now overrides (`on_top`), 0.004 at reversals, 0.002 by
+  collisions, 0.001 by rifts, nothing for want of a contact.
+- 0.167 of what went under since the last resampling stood visible at the next one (escaped):
+  0.144 `left`, 0.016 `on_top`, the rest under 0.004 each. That is 0.017 of the planet a
+  resampling, 16 % of it continental.
+- The escaped ocean floor was 99.5 Myr old on average, the consumed ocean floor 104.7, the
+  visible ocean floor 115.3 at the resamplings (112.6 with the escaped counted as new).
+
+**Why it matters.** Crust that goes down a trench is the slab, and its weight is the slab pull
+the force balance applies (`forces.rs`, Forsyth & Uyeda 1975); none of it comes back to the
+surface. Here a sixth of it came back as old ocean floor where the overriding plate had moved
+off. In a steady state the ocean floor's mean age is its area over the rate new floor is made,
+and that rate is the rate floor is consumed; consuming the escaped ocean floor too (2.55 km² a
+year over 1 less 0.167, less its continental share) would raise it to about 2.98 to 3.06 km² a
+year and bring the mean age from 115 to about 96 to 99 Myr. The plate check's ocean p90 age was
+247 Myr against at most 230 on fl-sat (Step 5). So the counter says the law matters.
+
+**The law** (`tectonics.one_way_subduction`; `subduction::resolve`, `ridges::resample`; ledger
+PLT-542). Ocean floor hidden under an overriding plate's forearc is held: it stays hidden each
+step, whatever that plate does next, until the next resampling. The forearc is the overriding
+plate's visible crust within the arc's distance of a subduction front (`arc_distance_km`,
+PLT-042, 200 km) plus one lattice spacing for where the front falls, as PLT-503's reach, from
+the fronts the last step left (`fronts_finish`); a sample counts as hidden under it when the
+cover's major corner is there. Gating by the forearc keeps the law to trenches: a contact forms
+for any overlap, with no test of convergence, and the subduction zone flag reaches 1,800 km, too
+far. Continental crust is never held (it is too buoyant to stay down, Cloos 1993, PLT-047: it
+collides, or shows again where the overriding plate leaves it, as before), held crust that a
+collision brings up or a rule turns continental is let go, and the held set is cleared at each
+resampling (so the first step after one holds nothing new). At the resampling held crust is
+never on top of the new lattice, and a point that only held crust covers is a gap and gets new
+sea floor from the gap fill (PLT-502): the ground the overriding plate left opens as new crust,
+as a back-arc opens. The held crust's conserved pools at such points go down with the slab
+(`plates/resample_slab_km3`, its sediment counted in `plates/sediment_subducted_km3` too).
+
+**The unit test** (`one_way_subduction_keeps_the_slab_down`): an ocean plate running under a
+continent on a 20,000-sample planet, with 200 m of sediment on its floor. After the fronts are
+found, a step hides the ocean's leading edge under the continent (249 samples); then the ocean
+plate is turned back to where it was before it converged, out from under the continent, and the
+planet is resampled. Off, all of it shows again and the resampling makes no new floor. On, the
+207 samples under the forearc stay hidden (the 42 beyond its reach show again), the resampling
+makes 205 samples of young sea floor where they were, and the slab global is their sediment, 205
+× 200 m × the sample area, within 5 %. With no fronts found first, or with continental crust in
+the overlap, nothing is held.
+
+**The arm** (`pool.sh run fl-oneway --length 1000 --seeds 1,2,3,4 --threads 2 --set
+tectonics.one_way_subduction=true +DEEPTIME_CRUST_BUDGET=1`, key d2580cce8210, argkey f2aaae39,
+8 runs, both starts; master 25941ca5's simulation with the switch set). Read against fl-shown
+(the same simulation off, the same seeds and starts), medians, Mann-Whitney p in brackets:
+
+- **The counter.** 3.06 km² a year went under (fewer: less crust goes down twice) and the
+  resamplings consumed 2.92, near the estimate. 0.050 of what went under showed again (0.230),
+  0.038 of it `left` (crust hidden beyond the forearc's reach, and continental crust); 0.033
+  escaped the resamplings (0.167), now 56 % continental. The visible ocean floor's mean age at
+  the resamplings is 105.7 Myr (115.3).
+- **The plate check** passes 175 measures, as fl-shown. The ocean's p90 age is 214.2 Myr
+  against 247.1 (7 runs of 8 at most 230, against 2; base5's 24: 219.4) and its median 73.2
+  against 76.2 (8 against 7). In fewer runs: the lowest continental share (1 against 5, 0.345
+  against 0.377), the oceanic over continental speed (4 against 6, 2.00 against 2.30), the
+  large plates' p90 speed (1 against 4), the supercontinent's tenure (1 against 3), the
+  collisions per 100 Myr (0 against 2, 1.50 against 1.40) and their lengths. In more: the largest
+  land gain (5 against 3), the highest continental share (5 against 4), the collisions'
+  convergence ratio (3 against 1).
+- **The V1 census.** Land 0.315 to 0.287 (p 0.38), the largest landmass 0.220 to 0.131 (p
+  0.028), continental crust under the sea 0.263 to 0.301 (p 0.80), land above 2 km 0.113 to
+  0.125, coast with high ground 0.224 to 0.242, ice 0.104 to 0.111, collisions per 100 Myr 1.40
+  to 1.50, criteria met 5 to 5. The continental crust's net change over the run is -0.017 to
+  -0.049 of the planet (p 0.038; against base5's 24, -0.016, p 0.004), and the sea ends 693 m
+  over the datum (961).
+- **The guard.** No step beyond 2 Earth reliefs; the worst 10,157 m from the sea against 10,590
+  (p 0.23). `guard_bind_steps` is 0 in all 8 runs.
+- **The area book** (shares of the planet over the run). The continental crust ends at 0.374
+  against 0.405, its volume 6.88 against 7.90 (Earth-normalised units of the book). The parts
+  that moved: the oceanic arcs' maturing (`finish`) +0.315 to +0.294, the thickness limits'
+  spreading (`rate`) +0.088 to +0.069, the fronts' hiding -0.732 to -0.751, the resampling's
+  blend -0.156 to -0.132.
+- **The boundary and the front.** The ocean-ocean front 37,624 to 34,707 straight km a step (p
+  0.007), the subduction front 86,745 to 82,390 (p 0.19), the boundary 325,739 to 305,653 (p
+  0.065); plates alive per step 28.4 to 26.8 (p 0.040), E 1.876 to 1.796 (p 0.038). Polarity
+  reversals 11.6 to 9.1 per 100 Myr (p 0.051), initiations 11.8 to 10.8. Sutures 36.5 to 31.8
+  per 100 Myr, 32,666 to 28,352 km (p 0.038). The oceanic arcs' p90 height 752 to 606 m.
+
+What the arm says. The law does what it is for: the crust shown again falls to a fifth, the
+resamplings consume what went under, and the ocean floor is younger, by about the steady-state
+estimate. The plates are fewer and their outlines straighter. What it costs is continental
+crust: about 3 % of the planet less over 1000 Myr, the largest landmass smaller. The area book
+puts most of it in the crust the fronts make: the island arcs mature less (the ocean-ocean
+front is 8 % shorter, the oceanic arcs lower) and less thick crust spreads onto ocean floor. A
+reading, not a measured cause: before, about a quarter of the crust that went down a trench
+came back, and some of it went down again (what went under fell by 8 % with the law), which
+kept ocean-ocean fronts and their arcs working on recycled floor; now the ground behind an
+overriding plate that moves off opens as new floor instead. The largest landmass is a chaotic number on 8 runs (base5's own seeds 1 to 4
+give 0.281 against its 24 runs' 0.213).
+
+One thing is left as it was: held crust still forms its plate's triangles in `detect`, so where a
+contact has the slab's plate overriding another, crust of the other that comes over the slab
+goes under it until the resampling, as hidden crust's triangles did before. It is not measured.

@@ -240,8 +240,9 @@ pub fn collide(
         }
         for &i in &terrane {
             let s = &mut state.samples[i as usize];
-            if !s.stacked {
+            if !s.stacked && s.is_hidden() {
                 s.flags &= !HIDDEN;
+                super::shown::collided(state, i as usize);
             }
         }
     } else {
@@ -261,7 +262,10 @@ pub fn collide(
             });
             let s = &mut state.samples[i as usize];
             s.group = new;
-            s.flags &= !HIDDEN;
+            if s.is_hidden() {
+                s.flags &= !HIDDEN;
+                super::shown::collided(state, i as usize);
+            }
         }
     }
 

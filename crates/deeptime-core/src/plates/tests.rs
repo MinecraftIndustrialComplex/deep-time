@@ -948,6 +948,7 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     let (mut balance_steps, mut longest_slab) = (0u64, 0.0f64);
     let mut deaths_before = 0;
     let mut prev_omega: BTreeMap<u32, glam::DVec3> = BTreeMap::new();
+    let (mut pending, mut escaped, mut consumed) = (0i64, 0u64, 0u64);
     let with = run_stage(&p, |stage, _, st| {
         life.step(st);
         let d = st.dynamics.as_ref().expect("recording is on by default");
@@ -1092,8 +1093,27 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
             assert!((0.0..=p.tectonics.slab_depth_km).contains(&km), "{km}");
             longest_slab = longest_slab.max(km);
         }
+        // The crust shown again (`shown.rs`, measurement only): what went under less what showed
+        // again since the last resampling is what lies hidden, and what the resampling consumes.
+        let sh = &step.shown;
+        pending += i64::from(sh.under) - sh.shown.iter().map(|&x| i64::from(x)).sum::<i64>();
+        assert!(sh.shown_cont.iter().zip(&sh.shown).all(|(c, n)| c <= n));
+        assert!(sh.escaped_cont.iter().zip(&sh.escaped).all(|(c, n)| c <= n));
+        if st.resample_step == st.step {
+            assert_eq!(pending, i64::from(sh.consumed), "step {}", st.step);
+            assert!(sh.escaped_ocean <= sh.ocean && sh.consumed_cont <= sh.consumed);
+            pending = 0;
+            escaped += u64::from(sh.escaped.iter().sum::<u32>());
+            consumed += u64::from(sh.consumed);
+        } else {
+            let hidden = st.samples.iter().filter(|s| s.is_hidden()).count() as i64;
+            assert_eq!(pending, hidden, "step {}", st.step);
+            assert_eq!(sh.consumed + sh.escaped.iter().sum::<u32>(), 0);
+        }
         checked += 1;
     });
+    eprintln!("shown again: {escaped} samples escaped the resamplings, {consumed} consumed");
+    assert!(consumed > 0 && escaped > 0);
     assert_eq!(checked, total);
     assert_eq!(balance_steps, total, "a balance every step");
     // The switch (force-balance design, task 7): the balance was solved every step and the speed
@@ -1230,6 +1250,7 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     let strip = |mut w: WorldState| {
         let st = w.plates.as_mut().unwrap();
         st.dynamics = None;
+        st.shown = None;
         for c in &mut st.contacts {
             c.cont_in = 0;
         }
@@ -1799,6 +1820,109 @@ fn a_resampling_consumes_the_visible_crust_a_collision_took() {
     );
     // The hidden, unstacked crust accretes either way.
     assert!(forced.2 > 0.0 && (collided.2 - forced.2).abs() < 1e-6 * forced.2);
+}
+
+/// One-way subduction (`tectonics.one_way_subduction`, ledger PLT-542): ocean floor that went
+/// down a trench, under the overriding plate's forearc and arc, stays down when that plate moves
+/// off it, and the resampling gives the ground it leaves new sea floor and counts the crust the
+/// slab took; off, the old ocean floor shows again and the resampling keeps it. With the switch
+/// on, ocean floor under crust that no front reaches (no fronts found, as where plates only slide
+/// past each other) and continental crust (too buoyant to stay down) are judged each step as
+/// before. The ocean of `converging_plates` runs under the continent; a step later, with the
+/// plates where they were, the hiding is found again; then the ocean turns back where it was
+/// before the turn, which leaves no overlap, and the planet is resampled.
+#[test]
+fn one_way_subduction_keeps_the_slab_down() {
+    const SEDIMENT_M: f64 = 200.0;
+    let p0 = preset(20_000, 20.0, "supercontinent", 5);
+    // (samples under, held, of those under shown again after the turn back, young sea floor
+    // after the resampling, the slab's global).
+    let run = |on: bool, fronts: bool, continental: bool| {
+        let mut p = p0.clone();
+        p.tectonics.one_way_subduction = on;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let (mut st, geo, pos) = converging_plates(&p, &env);
+        // The ocean floor's sediment: what the slab takes counts by its conserved pools.
+        for s in st.samples.iter_mut().filter(|s| s.kind == OCEANIC) {
+            s.pools[state::pool::SEDIMENT] = SEDIMENT_M as f32;
+            s.thickness_m = pools::thickness(&s.pools);
+        }
+        let under: Vec<usize> = (0..st.samples.len())
+            .filter(|&i| st.samples[i].is_hidden())
+            .collect();
+        if continental {
+            for &i in &under {
+                let s = &mut st.samples[i];
+                s.kind = CONTINENTAL;
+                s.pools = pools::continental_column();
+                s.thickness_m = pools::thickness(&s.pools);
+            }
+        }
+        if fronts {
+            let mut cones = vec![[0.0; 2]; st.samples.len()];
+            subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+        }
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        let env2 = stage.env(&p.tectonics, 2);
+        let tree = Tree::over(&pos, |_| true);
+        let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+        subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
+        let held = st
+            .one_way
+            .as_ref()
+            .map_or(0, |ow| ow.held.iter().filter(|&&h| h).count());
+        st.groups[1].rot = [0.0, 0.0, 0.0, 1.0];
+        let pos = geometry::positions(&st, &geo);
+        let env3 = stage.env(&p.tectonics, 3);
+        let tree = Tree::over(&pos, |_| true);
+        let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+        subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env3).unwrap();
+        let shown = under
+            .iter()
+            .filter(|&&i| !st.samples[i].is_hidden())
+            .count();
+        ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env3).unwrap();
+        let young = st
+            .samples
+            .iter()
+            .filter(|s| s.kind == OCEANIC && !s.is_hidden() && s.age_myr(env3.t_myr) < 30.0)
+            .count();
+        let slab = world.globals.get(ridges::SLAB_GLOBAL).copied();
+        (under.len(), held, shown, young, slab)
+    };
+    let area = PlatesStage::new(p0.clone())
+        .env(&p0.tectonics, 1)
+        .norm
+        .sample_area_km2();
+    let (under, held, shown, young, slab) = run(true, true, false);
+    eprintln!("one way: {under} under, {held} held, {shown} shown again, {young} young, {slab:?}");
+    assert!(under > 20, "{under} samples under");
+    // Held: the ocean floor under the forearc and arc (the turn put some of it deeper).
+    assert!(held > 0 && held <= under, "{held} of {under} held");
+    assert_eq!(shown, under - held, "held crust showed again");
+    assert!(
+        2 * young >= held && young <= 2 * held,
+        "{young} new samples of young sea floor where {held} held samples were"
+    );
+    // The new sea floor's points took the held floor's sediment down with the slab.
+    let expected = young as f64 * SEDIMENT_M * area / 1000.0;
+    assert!(
+        slab.is_some_and(|v| (v - expected).abs() < 0.05 * expected),
+        "{slab:?} km³ against {expected} km³"
+    );
+    for (on, fronts, continental, label) in [
+        (false, true, false, "off"),
+        (true, false, false, "no front"),
+        (true, true, true, "continental"),
+    ] {
+        let (under, held, shown, young, slab) = run(on, fronts, continental);
+        assert_eq!(held, 0, "{label}");
+        assert_eq!(shown, under, "{label}: crust stayed under");
+        assert_eq!(young, 0, "{label}: young sea floor");
+        assert_eq!(slab.is_some(), on, "{label}");
+        assert!(slab.unwrap_or(0.0) == 0.0, "{label}: {slab:?}");
+    }
 }
 
 /// Ocean floor with a normal continental column's crystalline crust (T_n) turns continental
