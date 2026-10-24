@@ -106,7 +106,9 @@ features.
    is kept open: the lake rule that stops vanilla's freezing on a lake the climate keeps open
    (`LakeFreeze`, through `BiomeFreezeMixin` on `Biome.shouldFreeze`, which both the generation
    feature `freeze_top_layer` and the weather call) also answers "does not freeze" for the column
-   `Geothermal.poolSurface` names, whatever the biome. (GEO-062)
+   `Geothermal.poolSurface` names, whatever the biome. (GEO-062) Only that block: the lake rule
+   itself answers only in a lake's own columns, so a lake beside a pool whose top block lies in the
+   pool's water does not keep that block open (it did until 2026-10-23; HYD-072).
 7. **Fields on hot ground** (2026-10-02; GEO-052 to GEO-056). Beyond the volcanoes, the world is cut
    into cells of 10,000 km2 (100 km across at the default density); each cell tries up to six random
    points and puts one field at the first where the baked heat flow is at least 100 mW/m2 (the setting)

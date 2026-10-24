@@ -72,7 +72,8 @@ public final class LakeIce {
     /**
      * Whether block (x, y, z) is the surface block of a lake of {@code wd} that the rule keeps
      * open: the lake's top block by the shore rule ({@link Water#levelAt} with the generator's
-     * noise cell width as {@code reach}), not frozen. False in a world without the rule.
+     * noise cell width as {@code reach}) in a column that holds the lake ({@link #holdsLake}), not
+     * frozen. False in a world without the rule.
      */
     public static boolean keepsOpen(WorldData wd, int reach, int x, int y, int z) {
         if (!wd.has(WorldData.WATER_LEVEL))
@@ -81,14 +82,14 @@ public final class LakeIce {
         if (ice == null)
             return false;
         double level = Water.levelAt(wd.layer(WorldData.WATER_LEVEL), x, z, reach);
-        return Double.isFinite(level) && y == Water.topBlock(level) && !ice.frozen(x, z);
+        return Double.isFinite(level) && y == Water.topBlock(level) && holdsLake(wd, reach, x, z, level) && !ice.frozen(x, z);
     }
 
     /**
      * Whether block (x, y, z) is the surface block of a lake of {@code wd} that the rule freezes: the
-     * lake's top block by the shore rule, as {@link #keepsOpen}, and frozen. {@code worldgen/WaterBodies}
-     * ices exactly that block, also where the lake is a block deep and its ice lies on the bed. False in
-     * a world without the rule.
+     * lake's top block by the shore rule in a column that holds the lake, as {@link #keepsOpen}, and
+     * frozen. {@code worldgen/WaterBodies} ices exactly that block, also where the lake is a block deep
+     * and its ice lies on the bed. False in a world without the rule.
      */
     public static boolean ices(WorldData wd, int reach, int x, int y, int z) {
         if (!wd.has(WorldData.WATER_LEVEL))
@@ -97,7 +98,21 @@ public final class LakeIce {
         if (ice == null)
             return false;
         double level = Water.levelAt(wd.layer(WorldData.WATER_LEVEL), x, z, reach);
-        return Double.isFinite(level) && y == Water.topBlock(level) && ice.frozen(x, z);
+        return Double.isFinite(level) && y == Water.topBlock(level) && holdsLake(wd, reach, x, z, level) && ice.frozen(x, z);
+    }
+
+    /**
+     * Whether column (x, z), whose shore-rule level is {@code level}, holds the lake: the water
+     * pass's own test ({@link Water#lakeCovers} on the column's generated ground, as
+     * {@link Water#core} reads it). The shore rule gives the lake's level to every column within
+     * {@code reach} of a lake cell, and the dry ones there (a bank, or a hot-spring pool's ground
+     * standing over the lake's top) hold no lake. Until 2026-10-23 the rule answered for them too:
+     * on master 4ab29084's test planet it kept open five blocks of a pool's water one block under
+     * the pool's surface, where the top block of a lake beside the pool lay (ledger HYD-072).
+     */
+    static boolean holdsLake(WorldData wd, int reach, long x, long z, double level) {
+        Water.Spec spec = Water.Spec.of(wd, reach);
+        return Water.lakeCovers(Water.groundOf(spec, Water.cellSurface(wd, spec, Water.wrap(wd, x), z)), level);
     }
 
     /** The temperature below which a lake is frozen, °C. */
