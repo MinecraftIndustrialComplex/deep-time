@@ -1749,14 +1749,16 @@ changes: the chains keep their order and get more vertices (spaced a 40th of the
 blocks), the water surface along a redrawn reach is the old course's at the same distance down the
 valley, a tributary whose parent moved ends on a vertex of the parent's new channel, and
 distributaries are left as they were.
-**Fans** (since "hyd-165", 2026-10-24; rivers-and-lakes.md "Fans and braids", HYD-165 to HYD-170):
+**Fans** (since "hyd-165", 2026-10-24; rivers-and-lakes.md "Fans and braids", HYD-165 to HYD-170,
+HYD-177):
 the first network's chains are searched for apexes, cells where the river's surface falls at least
 Bull's (1964) fan slope S_F = 0.022 A_D^−0.32 over the fan's free length upstream and less than it
 downstream; at each, a cone of that slope (measured on the planet) is laid where it stands over
 the ground and the land is no lake, playa, delta plain or larger river's channel (and nowhere
 thicker than over the apex), high enough to
 cover Bull's area A_F = 1.3 A_D^0.88 (square miles) and at most as high as a free fan (a quarter
-circle of that area). `detail/amplitude` is 0 there, and the raster **`fan`** (i16, 1/16 block, on
+circle of that area); a hollow the cones close on the fan cells is filled to its spill (HYD-177),
+and on L3 a filled cell's cells stand at the spill. `detail/amplitude` is 0 there, and the raster **`fan`** (i16, 1/16 block, on
 the `elevation` grid; 0 off the fans) holds what the cones added, which a re-run takes off first.
 The second network run (which then runs when there are fans and no delta plain too) drains down
 the cones; no floodplain is laid on a fan.

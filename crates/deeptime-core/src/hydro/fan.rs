@@ -25,6 +25,11 @@
 //!   (the median sector of Stock et al.'s 2008 four fans), so a fan hemmed in by higher ground is
 //!   smaller than Bull's. A fan less than a block high at its apex is not drawn (HYD-170).
 //!   Overlapping fans take the higher cone.
+//! - **No hollow on a fan** (HYD-177). The cone falls with the straight distance from its apex, not
+//!   along the ground's drainage, so where the way off part of a fan turns back towards the apex
+//!   (a river bending round a spur, a lobe behind a hill) the cone stands higher on that way out
+//!   than on the part, and closes a hollow there. Each such hollow is filled to its spill
+//!   ([`Fans::fill_ponds`]): the fan's deposit fills it.
 //! - **The planet's metric.** Distances are the planet's: on a Lambert frame a block east is cos φ
 //!   of the planet's and a block south 1 / cos φ, so a fan is round on the planet
 //!   (round-features.md, SCL-230). The frame's cells are of equal area, so a fan's area is its
@@ -33,7 +38,8 @@
 //! The water part raises the ground to the fans before it runs the network again, which then
 //! runs its rivers down the cones; the fans are no floodplain.
 
-use std::collections::{HashMap, VecDeque};
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap, VecDeque};
 
 use deeptime_format::{GridDesc, Projection};
 use rayon::prelude::*;
@@ -130,6 +136,12 @@ pub struct Fans {
     pub thin: u64,
     /// Fans whose cone met higher ground or a blocker before Bull's area.
     pub hemmed: u64,
+    /// The fan cells in a hollow the cones close, with its spill, 1/16 block, sorted by cell
+    /// ([`Fans::fill_ponds`], HYD-177); and how much they were raised, 1/16 block, in all and at
+    /// most.
+    pub ponds: Vec<(u32, i16)>,
+    pub pond_raise_raw: i64,
+    pub pond_max_raw: i16,
     /// The grid's circumference and metric, for [`Fans::cone_raw`].
     c: f64,
     lambert: Option<Projection>,
@@ -144,10 +156,93 @@ impl Fans {
                 *e = (*e).max(h);
             }
         }
+        for &(c, h) in &self.ponds {
+            let e = &mut elev[c as usize];
+            *e = (*e).max(h);
+        }
     }
 
-    /// Every fan cell with its highest cone (the ground there once applied), 1/16 block, sorted
-    /// by cell.
+    /// Fills the hollows the cones close (HYD-177) on `elev`, the ground with the fans (and the
+    /// delta plains) on it, and keeps them in [`Fans::ponds`]: a Priority-Flood of the fan cells
+    /// alone (8-connected, as the network drains) from the land around them, each cell beside it
+    /// starting at the higher of its own ground and its lowest neighbour off the fans (the grid's
+    /// first and last rows at their own, the network's outlets there), gives each fan cell its
+    /// spill level towards the land off the fans; a cell under it is raised to it.
+    pub fn fill_ponds(&mut self, g: &GridDesc, elev: &mut [i16]) {
+        let cells = self.cells();
+        let (w, h) = (g.w as usize, g.h as usize);
+        let idx = |c: usize| cells.binary_search(&(c as u32)).ok();
+        let nb8 = |c: usize| -> [Option<usize>; 8] {
+            let (i, j) = ((c % w) as i64, (c / w) as i64);
+            let mut out = [None; 8];
+            let steps = [(1i64, 0i64), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
+            for (o, (di, dj)) in out.iter_mut().zip(steps) {
+                let nj = j + dj;
+                if nj < 0 || nj >= h as i64 {
+                    continue;
+                }
+                let ni = if g.wraps_x {
+                    (i + di).rem_euclid(w as i64)
+                } else if (0..w as i64).contains(&(i + di)) {
+                    i + di
+                } else {
+                    continue;
+                };
+                *o = Some(nj as usize * w + ni as usize);
+            }
+            out
+        };
+        let mut best = vec![i16::MAX; cells.len()];
+        let mut heap: BinaryHeap<Reverse<(i16, u32)>> = BinaryHeap::new();
+        for (k, &c) in cells.iter().enumerate() {
+            let cu = c as usize;
+            let ground = elev[cu];
+            let row = cu / w;
+            let start = if row == 0 || row + 1 == h {
+                Some(ground)
+            } else {
+                nb8(cu)
+                    .into_iter()
+                    .flatten()
+                    .filter(|&nb| idx(nb).is_none())
+                    .map(|nb| elev[nb])
+                    .min()
+                    .map(|off| off.max(ground))
+            };
+            if let Some(s) = start {
+                best[k] = s;
+                heap.push(Reverse((s, k as u32)));
+            }
+        }
+        while let Some(Reverse((lvl, k))) = heap.pop() {
+            if lvl > best[k as usize] {
+                continue;
+            }
+            for nb in nb8(cells[k as usize] as usize).into_iter().flatten() {
+                let Some(j) = idx(nb) else { continue };
+                let cand = lvl.max(elev[nb]);
+                if cand < best[j] {
+                    best[j] = cand;
+                    heap.push(Reverse((cand, j as u32)));
+                }
+            }
+        }
+        self.ponds.clear();
+        (self.pond_raise_raw, self.pond_max_raw) = (0, 0);
+        for (k, &c) in cells.iter().enumerate() {
+            let e = &mut elev[c as usize];
+            if best[k] != i16::MAX && best[k] > *e {
+                let d = best[k] - *e;
+                self.pond_raise_raw += i64::from(d);
+                self.pond_max_raw = self.pond_max_raw.max(d);
+                self.ponds.push((c, best[k]));
+                *e = best[k];
+            }
+        }
+    }
+
+    /// Every fan cell with its highest cone, or its hollow's spill (the ground there once
+    /// applied), 1/16 block, sorted by cell.
     pub fn ground(&self) -> Vec<(u32, i16)> {
         let mut v: Vec<(u32, i16)> = self
             .fans
@@ -156,6 +251,11 @@ impl Fans {
             .collect();
         v.sort_unstable_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
         v.dedup_by_key(|e| e.0);
+        for &(c, h) in &self.ponds {
+            if let Ok(i) = v.binary_search_by_key(&c, |e| e.0) {
+                v[i].1 = v[i].1.max(h);
+            }
+        }
         v
     }
 
@@ -535,5 +635,11 @@ pub fn stats(fans: &Fans, land_cells: u64, cell_km2: f64, m_per_block_v: f64) ->
         "drainage_km2": {"p10": q(drainage.clone(), 0.1), "p50": q(drainage.clone(), 0.5), "p90": q(drainage.clone(), 0.9), "max": q(drainage, 1.0)},
         "slope": {"p10": q(slope.clone(), 0.1), "p50": q(slope.clone(), 0.5), "p90": q(slope, 0.9)},
         "beyond_bull_range": beyond,
+        "ponds_filled": {
+            "cells": fans.ponds.len(),
+            "km2": (fans.ponds.len() as f64 * cell_km2).round(),
+            "max_blocks": f64::from(fans.pond_max_raw) / 16.0,
+            "volume_km3": (fans.pond_raise_raw as f64 / 16.0 * m_per_block_v * cell_km2 / 1000.0 * 10.0).round() / 10.0,
+        },
     })
 }
