@@ -6009,3 +6009,127 @@ replace PLT-064's clearance. The base's polarity reversals, 16.9 per 100 Myr aga
 al.'s 4 in 104 Myr, are a measurement for the subduction work; stage R (PLT-371, its arm above)
 is the reversal judged by the arc's crust, the subduction lane's law, run here on top of C2 at
 the coordinator's request, and on by default with the others.
+
+## Docking: what stands at the collision fronts (2026-10-23)
+
+V1 item 1 (the docking lane, `build/coord/briefs/docking-rate.md`): on base3 (key 88c144b6c2cb,
+24 runs, `earthlike_quick_16k`, 1000 Myr) the land above 2 km is 0.153 (Earth 0.047 to 0.055) and
+the coast with high ground 0.354 (Earth 0.076), and collision belts hold 0.832 of that high coast
+(`coastwalk`, PLT-513). Gap 2's reading by count ("Collision belts on the coast" above: most
+hand-offs are small terranes at active margins) is right about the count but not about what
+stands at the fronts. Read by front-time, length of front times how long it stands, the high coast
+is held by a few long continent-continent collisions that never end.
+
+### What was measured
+
+All from cached runs, no new simulation: the measures `sutures` (PLT-512) and `coastwalk`
+(PLT-513) in `tools/review/pool/measures_docking.json`, the dock tally (PLT-515) and the confirmed
+reversals (PLT-514) in the run summary (both measurement only; HEAD a9fd061e564f, its seed-1 run
+bit-identical to base3's, `pool.sh alias`), and four scratch reads of `rec.json` (the
+`partings` and `collisions` records and the last step's plates and force balance).
+
+**The count is not the fault.** Base3 hands off 101.3 collision states per 100 Myr, but a state
+hands off every 100 km of shortening (PLT-068) and a new one begins on the same contact, so they
+make 55.7 sutures per 100 Myr (27.0 of terranes of 50 samples or more) against Macdonald et al.
+2019's 19 per 100 Myr over the Phanerozoic and 39 in the last 100 Myr (their table of 104
+ophiolite-bearing arc-continent sutures); suture length 39,715 km per 100 Myr against their 23,235
+over the Phanerozoic and 50,919 over 0 to 100 Ma. The model's sutures are shorter (median 271 km,
+Earth's 1,019) and 1.4 to 2.9 times as many: inside Earth's range by length.
+
+**What stands at the fronts in the last 30 Myr** (the collision regime's window, so what makes
+the collision high coast; medians of 24, share of the front-time):
+
+| collision states | share |
+|---|---|
+| handed off (transfers and welds) | 0.224 |
+| still open at the end, begun under 10 Myr before it | 0.009 |
+| still open, 10 to 30 Myr old | 0.067 |
+| still open, 30 to 60 Myr old | 0.148 |
+| still open, 60 Myr old or more | 0.482 |
+| parted, reversed, closed | 0.006, 0.012, 0.001 |
+| open, the incoming plate with 3,000 or more continental samples / 500 to 3,000 | 0.569 / 0.110 |
+
+At the end of a run 16 collision states are open (27,554 km of front, geodesic), 0.81 of that
+front on contacts over 60 Myr old. The 134 open states 30 Myr or older (5.6 a run) have gone on
+70 Myr (median), shortened 1,089 km across 3,186 km of front, crossed 3.6 million km2 of crust and
+peaked at 2.8 km and 31 mm/yr. Gap 2's boundary measure says the same at the plate scale: 18,950 km
+of front in collision against Stern & Scholl 2010's 12,000 km of active suture, and collisions
+lasting 48 / 143 Myr (p50 / p90) against the plate check's 15 to 50 and at most 120.
+
+**What the long ones are** (the dock tally, seed 1, after the first 100 Myr; km·Myr of front by
+the state's own age, with the means of the front's sides; "near" is continental crust within
+300 km of the front on the subducting plate's side):
+
+| state age | share of the front-time | incoming side continental / near | dry incoming crust / dry overriding edge | convergence, mm/yr |
+|---|---|---|---|---|
+| under 10 Myr | 0.13 | 0.425 / 0.504 | 0.282 / 0.277 | 18.9 |
+| 10 to 30 Myr | 0.16 | 0.635 / 0.700 | 0.546 / 0.448 | 13.5 |
+| 30 to 60 Myr | 0.23 | 0.722 / 0.788 | 0.688 / 0.645 | 12.8 |
+| 60 Myr or more | 0.49 | 0.749 / 0.818 | 0.847 / 0.770 | 12.5 |
+
+Of the 60-Myr-old front-time, the overriding plate's reach (400 km, the belt's width, PLT-241) is
+under a quarter ocean for 0.38 and a quarter to a half ocean for 0.43: the belt is built on an
+overriding continent about as wide as the belt, so its far side is a coast. The land across a
+collision high coast is 512 km (Earth's coasts 600 km, `tools/review/earth-across.py`), and 0.771
+of those coasts face a trench or an arc within 300 km.
+
+**What keeps them going** (the force balance of the last step, `steps[-1].forces`, torque in
+10^24 N m; medians over 24 runs):
+
+| plates | n | visible samples | continental | own slab front, lattice km | slab pull | collision resistance | its share of the driving torque | speed, mm/yr |
+|---|---|---|---|---|---|---|---|---|
+| incoming, in a collision 60 Myr or older | 57 | 12,193 | 0.49 | 9,283 | 878 | 642 | 0.425 | 15.7 |
+| overriding them | 65 | 4,316 | 0.48 | 1,143 | 137 | 364 | 0.573 | 15.2 |
+| all others | 410 | 1,728 | 0.05 | 4,606 | 629 | 13 | 0.012 | 38.4 |
+
+Every incoming plate of a long collision has a slab of its own elsewhere, and they are the
+planet's largest plates (0.12 of its surface each, the size of the Indo-Australian plate). The
+collision's own slab broke off long ago (its front is three quarters continental, PLT-184's
+breakoff after 10 Myr), and the plate's other slabs pull it on: the rigid plate carries their pull
+to the jammed continent without limit, the collision resists at its plastic force (Cloos 1993's
+buoyancy, FRC-028, and the belt's weight) and converges at 12 to 16 mm/yr, never under the weld
+speed (5 mm/yr for 10 Myr, PLT-246), and the state ends only when the crust leaves the front. A
+continent of `collision_suture_frac` or more never moves alone (PLT-078): it waits for a stall
+that a plate pulled elsewhere never gives.
+
+### What Earth does instead
+
+Stern 2004 (read in full, 2026-10-21): induced subduction initiation follows a collision in two
+ways. In **transference** "a buoyant crustal block enters the subduction zone and causes it to
+fail, and in the process is sutured to the original hanging wall ... the oceanic lithosphere
+outboard of the collision zone ultimately ruptures to become a new subduction zone"; polarity
+reversal nucleates the new zone in the overriding plate instead (the model's PLT-056 and PLT-371).
+Gurnis et al. 2004 (read in full) give the work: the force resisting a new subduction zone grows
+as the plate bends, "reaching a maximum value dependent on plate thickness, but typically ranging
+from 2 to 3 × 10^12 N/m for cases that become self-sustaining", "Cumulative convergence, not the
+rate of convergence, is the dominant control", and the critical convergence before the zone
+sustains itself "only varies between 100 and 130 km" (their Table 3; "100–150 km" in the
+abstract; Hall et al. 2003: "approximately 100 km of convergence"). The model's collision pushes
+back with more than that per metre of front once it has shortened some 30 km
+(`collision_buoyancy_n_m`: 2.25 × 3 × 10^13 N/m × 30/700 for 30 km of crust), so a plate that
+keeps converging on a jammed continent carries a force across the continent's own passive margin
+that would break the lithosphere there, and the continent would stay with the overriding plate.
+
+India is the counter-example Stern names: 50 Myr after the collision "a new subduction zone
+outboard of the colliding blocks has not formed but appears to be in the making", because "It
+takes less work to deform large parts of continental Asia than it does to start a new subduction
+zone in the Indian Plate". That is the overriding plate deforming across thousands of km, which
+the model's 400 km belt (PLT-241) does not do (gap 2's note on the belts' spread, above). In the
+model the jammed front takes the whole force, so the cheaper failure is the incoming plate's.
+
+### The stage this lane builds
+
+**T. Transference** (`tectonics.transference`, ledger PLT-516 to PLT-518): a continent in a
+collision moves alone to the overriding plate, as a small terrane does, once (1) its contact's
+slab has broken off (the subduction has failed: no slab of the pair is left, PLT-184), (2) its
+plate has gone on converging on it for Gurnis et al.'s critical convergence of 100 km since then
+(the collision's shortening since the jam), and (3) the collision's force on it, over the length
+of the continent's margin against its own plate's ocean floor, is at least Gurnis et al.'s
+3 × 10^12 N/m (gravity-scaled as the slab pull). The continent's ocean floor stays on its plate;
+the force balance then decides what the new boundary does (a trench where the floor converges on
+the continent, a rift where it parts), as with every other transfer. A continent whose plate has
+no ocean floor at its margin, or whose collision stalls first, still welds its plate whole on the
+stall (PLT-246). It replaces the indefinite deferral of PLT-078 for a pushed continent; it does
+not replace PLT-064's clearance, which keeps spontaneous initiation on old floor away from
+trenches (T's new trench is the collision's own, 0 km from it, the kind of near-trench initiation
+Crameri et al. 2020 count).
