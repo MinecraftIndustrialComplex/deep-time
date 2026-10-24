@@ -3236,7 +3236,10 @@ steps after the first 100 Myr):
 
 The model's boundary is 480,054 lattice km a step against Bird's 260,487 km: a boundary on the
 lattice zigzags, so its lattice length is 1.84 times the geodesic one, and Earth's 14,500 km of
-island arc is about 26,700 lattice km.
+island arc is about 26,700 lattice km. (Corrected 2026-10-24, the front lane, PLT-530: the 1.84
+was this ratio itself, which assumes the model's boundary is as long as Earth's. One spacing per
+boundary sample counts a straight boundary 1.04 times, so the model's boundary is about 460,300
+km, 1.77 times Bird's, and Earth's island arc is about 15,100 lattice km.)
 
 ### What makes the gap
 
@@ -3330,7 +3333,16 @@ By the crust the arc stands on, the model's island-arc front is 1.7 times Earth'
 times, and its continental-arc front 2.0 times: both near the subducting share's 1.76 times
 (0.347 against 0.197). The rates per km of each kind of arc now sit near Stern & Scholl's. So the
 island arcs' crust (3.22 km³ a year against 1.5) is 1.7 times from the front's length and 1.3
-times from the rate, and the front's length is the orientation above. On the plate-check table the
+times from the rate, and the front's length is the orientation above.
+
+(Corrected 2026-10-24, the front lane, PLT-530: the lattice counts a straight front 1.04 times,
+not 1.84. Earth's arcs are about 15,100 and 28,700 lattice km; the branch's island-arc front,
+45,275 lattice km, is about 43,400 km, 3.0 times Earth's 14,500, and its continental-arc front
+about 96,800 km, 3.5 times Earth's 27,500 (master's 5.6 and 2.1 times); the rates per km become
+about 74 and 17 km³/km/Myr on the branch (master 40 and 28), below Stern & Scholl's 100 and 35.
+So the island arcs' crust is about 3.0 times from the front's length and 0.74 times from the
+rate, and the length is the whole boundary's 1.77 times Bird's times the subducting share's
+1.76: "The front's length: why the plates are ragged (2026-10-24)" below.) On the plate-check table the
 reported share of ocean-ocean subduction moves from 56.7 % to 29.5 % (after the first 100 Myr) and
 from 65.6 % to 50.2 % (the first 50 Myr).
 
@@ -3400,7 +3412,8 @@ the counters' total (about 146,200 lattice km a step) and the subducting share (
 same on master and the branch. What the arc-front task measured as an island-arc front 2.9 times
 Earth's was 85,095 lattice km named by the front sample's crust; by the arc's crust it is 45,275,
 1.7 times Earth's 14,500 km on the lattice's 1.84. The remaining excess is the subducting
-share's, which PLT-330 could not move either (32.1 to 34.4 % there).
+share's, which PLT-330 could not move either (32.1 to 34.4 % there). (On the lattice's 1.04,
+PLT-530, 2026-10-24: 3.0 times, the subducting share's 1.76 times the whole boundary's 1.77.)
 
 ### Against c24ff793 and master
 
@@ -5658,14 +5671,26 @@ boundary's length over the steps after the first 100 Myr (PLT-500):
 The lattice's boundary is about 1.84 times a geodesic one (PLT-213), so in Earth's terms the
 model has about 82,300 km of subducting boundary against Bird's 51,310, 86,800 km of spreading
 against 94,810 and 51,100 km of transform against 73,915; the total, about 241,000 km, is close
-to Bird's 260,487. What the table says:
+to Bird's 260,487.
+
+(Corrected 2026-10-24, the front lane, PLT-530: the 1.84 was the model's lattice boundary over
+Bird's, so it assumed the totals equal. One spacing per boundary sample counts a straight
+boundary 1.04 times (`shortening::crossing_sum` over great and small circles, the test
+`the_straight_shares_add_up_to_the_boundarys_length`). In Earth's terms the model has about
+145,200 km of subducting boundary against Bird's 51,310 (2.8 times), 153,100 km of spreading
+against 94,810 (1.6 times) and 90,200 km of transform against 73,915 (1.2 times); the total,
+about 425,400 km, is 1.63 times Bird's with 23 plates against 52. The shares below stand; the
+lengths are all long, and the subducting boundary most. Why: "The front's length: why the plates
+are ragged (2026-10-24)" below.) What the table says:
 
 - **The trenches already face their convergence.** The convergence across the oceanic front is
   Bird's to the millimetre a year (53.1 against 53.2), and the capped ratio is 0.80 (the cap at
   v_0 lifts it, so the plain ratio is lower still) against Bird's 0.854. The audit's "orient
   trenches" is answered by this measurement: no law is needed for it (PLT-501).
 - **The excess of subduction is not obliquity but a shortage of transform**: the model has 1.6
-  times Earth's trench and 0.7 times its transform, and its spreading boundary is Earth's.
+  times Earth's trench and 0.7 times its transform, and its spreading boundary is Earth's. (By
+  share, 1.74 times Earth's subducting share and 0.75 times its transform share; by length, on
+  the corrected 1.04, 2.8 and 1.2 times.)
 - **More than half of the coast at a subduction front is at a front that a subduction
   initiation made** (0.173 of the coast, of 0.312), and most of that has the continent
   overriding. `rifting::initiate` splits the plate's old floor off along a Voronoi line, keeping
@@ -6034,7 +6059,11 @@ make 55.7 sutures per 100 Myr (27.0 of terranes of 50 samples or more) against M
 2019's 19 per 100 Myr over the Phanerozoic and 39 in the last 100 Myr (their table of 104
 ophiolite-bearing arc-continent sutures); suture length 39,715 km per 100 Myr against their 23,235
 over the Phanerozoic and 50,919 over 0 to 100 Ma. The model's sutures are shorter (median 271 km,
-Earth's 1,019) and 1.4 to 2.9 times as many: inside Earth's range by length.
+Earth's 1,019) and 1.4 to 2.9 times as many: inside Earth's range by length. (Corrected
+2026-10-24, the front lane: the measure divided the collision fronts, straight lengths already
+(PLT-222), by 1.84. Version 3 does not: 73,076 km per 100 Myr, 1.4 to 3.1 times Macdonald's, and
+the median suture 499 km, half his. So by length too the sutures are more than Earth's, and
+shorter; PLT-512.)
 
 **What stands at the fronts in the last 30 Myr** (the collision regime's window, so what makes
 the collision high coast; medians of 24, share of the front-time):
@@ -6049,7 +6078,8 @@ the collision high coast; medians of 24, share of the front-time):
 | parted, reversed, closed | 0.006, 0.012, 0.001 |
 | open, the incoming plate with 3,000 or more continental samples / 500 to 3,000 | 0.569 / 0.110 |
 
-At the end of a run 16 collision states are open (27,554 km of front, geodesic), 0.81 of that
+At the end of a run 16 collision states are open (27,554 km of front, geodesic; 50,700 km by
+version 3, the fronts not divided by 1.84), 0.81 of that
 front on contacts over 60 Myr old. The 134 open states 30 Myr or older (5.6 a run) have gone on
 70 Myr (median), shortened 1,089 km across 3,186 km of front, crossed 3.6 million km2 of crust and
 peaked at 2.8 km and 31 mm/yr. Gap 2's boundary measure says the same at the plate scale: 18,950 km
@@ -6149,7 +6179,7 @@ before (34 Myr, 1.1 mm/yr).
 
 | measure | base3 | dock-T | p | Earth |
 |---|---|---|---|---|
-| collisions open at the end: front, geodesic km | 27,554 | 9,399 | | |
+| collisions open at the end: front, geodesic km (version 3, not over 1.84: 50,700 / about 17,300) | 27,554 | 9,399 | | |
 | collisions open at the end: how long they have gone on, Myr | 90 | 20 | | |
 | last 30 Myr's front-time on partings (open collisions included) | 0.776 | 0.487 | | |
 | collision length p50 / p90, Myr | 48 / 143 | 33 / 77 | | 15 to 50 / at most 120 |
@@ -6267,7 +6297,9 @@ continents 11.56 and 6.74. What is off:
   the boundary is 36.6 % (dock-c3 33.8 %) against Bird 2003's 19.7 % and fails in every run of
   both arms, and the whole boundary is about 1.65 times Bird's: the arcs' surplus is the
   subduction zones' length, gap 2's boundary organisation (`physics-gap-audit.md`), with or
-  without T. Base3 hid it under the excess loss at sutures; under T nothing offsets it, so the
+  without T. (Corrected 2026-10-24, PLT-530: over 1.04, not 1.12, the rates are about 74 and 17
+  km3/km/Myr, the fronts about 45,900 and 102,900 km, and the boundary 1.63 to 1.77 times Bird's.)
+  Base3 hid it under the excess loss at sutures; under T nothing offsets it, so the
   volume grows by about 4 km3 a year and the crust thickens.
 - Subduction erosion takes 0.6 of Earth's, for two reasons. Its erosive fronts are 16,888 lattice
   km (about 15,100 km) against Clift & Vannucchi's 22,925, because few slabs come in at the
@@ -6376,7 +6408,8 @@ f2c8da8b0dd4, argkey 295dc57c, 8 runs, both starts; with S1 off the key is bit-i
 base3, `pool.sh alias`, seed 1, 1000 Myr). Medians, dock-T to dock-TS1:
 
 - The retreat does what it was built to do: 2.44 to 2.60 km/Myr per lattice km of continental
-  erosive front in every run (2.7 to 2.9 per km of front, by the lattice's 1.12 below), taking
+  erosive front in every run (2.7 to 2.9 per km of front, by the lattice's 1.12 below; 2.55 to
+  2.71 by the corrected 1.04, PLT-530), taking
   0.011 km2 of continental area a year (0.022 of the planet over the run; a quarter of the erosive
   front is under continental crust). Subduction erosion's volume falls from 0.83 to 0.61 km3 a
   year: the retreat replaces the band's thinning, and an island-arc forearc's column is thinner
@@ -6416,6 +6449,19 @@ three: each front sample's share of the straight front, its crossing sum along t
 normal (`shortening::crossing_sum`, `boundary_normal`). It is not made here, because through the
 arcs it changes the default planet.
 
+(Corrected 2026-10-24, the front lane, PLT-530. The spacing the counters book is sqrt(4 pi / N)
+R, 71.4 km on the quick lattice; `zigzag.py` took the hexagonal neighbour distance, 76.7 km, so
+its 1.12 is 1.04 on the counters' own spacing, and the crossing sums agree: on great and small
+circles each side's straight shares add up to the circle's length within 1.5 % and 4 %, and the
+lattice counts it 1.043 times (the test `the_straight_shares_add_up_to_the_boundarys_length`).
+So each per-km rate is about 4 % over its source, not 12 %: the retreat's 2.44 to 2.60 per
+lattice km is 2.55 to 2.71 per km. Under T the fronts are about 45,900 and 102,900 km, not 42,700
+and 95,800, against Earth's 14,500 and 27,500; on master's base the boundary is about 425,000 to
+460,000 km, 1.63 to 1.77 times Bird's (the gap 2 section's base 1.63, the plate geometry's
+c790d1f3 1.77). The collision fronts are straight lengths, so `measure_sutures.py` no longer
+divides them by 1.84 (version 3, PLT-512). The change named here is built: "The front's length:
+why the plates are ragged (2026-10-24)".)
+
 **What comes after S1: nothing in this lane.** With the lengths read right, no flux left in this
 lane is off Earth's numbers in the direction that would close the area:
 
@@ -6427,8 +6473,9 @@ lane is off Earth's numbers in the direction that would close the area:
 - the arcs mature at Cloos's 15 km (PLT-047), a sourced threshold.
 
 What is off is the island-arc front's length, about three times Earth's, and the plates'
-slowness (the erosive front is 0.66 of Earth's): gap 2's boundary organisation, which Ben deferred
-until after V1 item 1. On Earth's 14,500 km of island arc the maturing would make about 0.09 km2 a
+slowness (the erosive front is 0.66 of Earth's): gap 2's boundary organisation. (Corrected
+2026-10-24: this said Ben deferred it until after V1 item 1. He did not: gap 2 was his scope and
+it is built; holding the plate count and the lattice was the coordinator's call.) On Earth's 14,500 km of island arc the maturing would make about 0.09 km2 a
 year, and the book would stand at about 0.21 made against 0.31 consumed (an inference from the
 book's parts, not a run). The lane stops here: the coordinator's step 3 stops when a stage makes
 T and the sink correct, and never tunes to a V1 number. T and S1 stay off by default, both built

@@ -28,7 +28,7 @@
 //! island-arc and continental-arc magma (m), the plate group, the flags) for
 //! `tools/review/continent-budget.py`, and the same samples' plate ids to
 //! `plate/t<Myr>.bin` (little-endian u32, one per record; [`CrustBudget::write_plates`]) for the
-//! front lane's boundary geometry (`tools/review/pool/measure_frontgeom.py`). Each snapshot also splits the land by the origin of its
+//! front lane's boundary geometry (`tools/review/pool/measure_boundgeom.py`). Each snapshot also splits the land by the origin of its
 //! crust (`cb_origin`: island arc, collision, Andean margin, the rest).
 //!
 //! Off unless [`ON_ENV`] is set; it changes nothing the model does.
