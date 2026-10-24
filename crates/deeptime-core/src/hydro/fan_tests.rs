@@ -363,12 +363,19 @@ fn ground_falling_away_faster_than_the_fan_ends_it() {
     let (mut east, mut west) = (f64::MIN, f64::MAX);
     for (&c, &h) in f.cells.iter().zip(&f.height) {
         let (x, z) = win.pos(c as usize);
-        let (e, _) = win.planet(x, z);
-        (east, west) = (east.max(e), west.min(e));
+        let (e, s) = win.planet(x, z);
         assert!(f64::from(h) - f64::from(elev[c as usize]) <= apex_raise + 1.0);
+        // Within 20 blocks of planet of the apex's parallel a cell's distance from the apex is
+        // little more than its distance east, so the fan ends where the ground's fall from 20
+        // blocks east overtakes the cone's: 20 x 0.01 / (0.01 - 0.0026), 27 blocks east.
+        // Further south the cone has fallen further and the fan runs on east (the bound is on
+        // thickness, not on direction).
+        if s.abs() <= 20.0 {
+            (east, west) = (east.max(e), west.min(e));
+        }
     }
     // Where the ground falls faster than the cone the fan stops short of the free fan's radius
     // (64 blocks of planet for Bull's 1,171 km²); west, on the flat plain, it reaches it.
-    assert!(east < 45.0, "east to {east}");
+    assert!(east < 32.0, "east to {east}");
     assert!(west < -55.0, "west to {west}");
 }
