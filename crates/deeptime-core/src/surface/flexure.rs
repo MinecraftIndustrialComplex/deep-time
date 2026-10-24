@@ -3591,7 +3591,7 @@ mod tests {
             if (22..25).contains(&j) && (6..10).contains(&i) {
                 plate[c] = 2.0; // a third plate inside the carrying plate
             }
-            if (18..20).contains(&j) && (i < 3 || i > 13) {
+            if (18..20).contains(&j) && !(3..=13).contains(&i) {
                 carrier[c] = 1.0; // the belt, across the wrap
             }
             if j == 20 && i < 2 {
@@ -3600,17 +3600,17 @@ mod tests {
         }
         let near = belt_reach(w, h, &plate, &carrier, 6);
         let at = |c: usize| near.iter().find(|e| e.0 == c).copied();
-        for c in 0..n {
+        for (c, &pc) in plate.iter().enumerate() {
             let (i, j) = (c % w, c / w);
             match at(c) {
                 Some((_, k, belt)) => {
                     assert_eq!((k, belt), (1.0, 0.0), "cell ({i}, {j})");
-                    assert_eq!(plate[c], 1.0, "cell ({i}, {j}) is not the carrying plate's");
+                    assert_eq!(pc, 1.0, "cell ({i}, {j}) is not the carrying plate's");
                     assert!(j <= 19 + 6, "cell ({i}, {j}) beyond the reach");
                 }
                 // Every cell of the carrying plate within two rows of the belt is in reach.
                 None => assert!(
-                    plate[c] != 1.0 || j > 21,
+                    pc != 1.0 || j > 21,
                     "cell ({i}, {j}) of the carrying plate within reach left out"
                 ),
             }
