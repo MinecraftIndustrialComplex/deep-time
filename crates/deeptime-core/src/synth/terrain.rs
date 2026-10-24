@@ -911,7 +911,10 @@ impl FanTest {
     /// The planet's distance from the apex to block (x, z), blocks of planet: the Lambert metric
     /// at the middle latitude, as [`crate::hydro::fan`] takes it.
     pub fn apex_dist(&self, x: f64, z: f64) -> f64 {
-        let cs = self.projection().cos_lat(0.5 * (Self::APEX_Z + z)).max(0.05);
+        let cs = self
+            .projection()
+            .cos_lat(0.5 * (Self::APEX_Z + z))
+            .max(0.05);
         (self.wrap_x(x - Self::APEX_X) * cs).hypot((z - Self::APEX_Z) / cs)
     }
 
@@ -1150,7 +1153,9 @@ mod tests {
             // On the fan, around an island, and its water 1.25 blocks under the cone where it runs
             // (the cone falls away from the course; to the block, 0.1 of 0.71 of a block).
             assert!(v.iter().all(|q| t.on_fan(f64::from(q.x), f64::from(q.z))));
-            let far = v.iter().fold(0.0f32, |m, q| if q.z.abs() > m.abs() { q.z } else { m });
+            let far = v
+                .iter()
+                .fold(0.0f32, |m, q| if q.z.abs() > m.abs() { q.z } else { m });
             assert!((10.0..=25.0).contains(&far.abs()), "{far}: {stats}");
             for q in v {
                 let ground = t.height(q.x.round() as i64, q.z.round() as i64);

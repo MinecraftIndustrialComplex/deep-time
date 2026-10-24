@@ -267,9 +267,7 @@ impl Net<'_> {
             return (Vec::new(), tally);
         }
         let n = (total / STEP).floor() as usize + 1;
-        let pts: Vec<Pt> = (0..n)
-            .map(|j| Self::at(v, &u, j as f64 * STEP))
-            .collect();
+        let pts: Vec<Pt> = (0..n).map(|j| Self::at(v, &u, j as f64 * STEP)).collect();
         let (mv, mh) = (self.inp.m_per_block_v, self.inp.m_per_block_h);
         // Samples that braid: on a fan, or on the plain and steeper than the line over a bar.
         let mut cand = vec![false; n];
@@ -337,9 +335,10 @@ impl Net<'_> {
                     continue;
                 }
                 let (ua, ub) = (u[a], u[b]);
-                let island = [side, -side]
-                    .into_iter()
-                    .find_map(|sg| self.thread(own, first, v, &u, a, b, ua, ub, sg).map(|t| (sg, t)));
+                let island = [side, -side].into_iter().find_map(|sg| {
+                    self.thread(own, first, v, &u, a, b, ua, ub, sg)
+                        .map(|t| (sg, t))
+                });
                 match island {
                     Some((sg, thread)) => {
                         tally.islands += 1;
@@ -349,11 +348,7 @@ impl Net<'_> {
                         }
                         tally.by_q[q_class(p.q)][1] += ub - ua;
                         let along = (a + 1..b).map(|i| (u[i] - ua) / (ub - ua)).collect();
-                        islands.push(Island {
-                            a,
-                            along,
-                            thread,
-                        });
+                        islands.push(Island { a, along, thread });
                         side = -sg;
                         s = ub;
                     }
@@ -435,7 +430,10 @@ impl Net<'_> {
             // No turning back on itself (an island inside a tight bend).
             if let Some(&last) = out.last() {
                 let (ex, ez) = self.scales(z);
-                let d = (self.dx(f64::from(last.x), x) * ex, (z - f64::from(last.z)) * ez);
+                let d = (
+                    self.dx(f64::from(last.x), x) * ex,
+                    (z - f64::from(last.z)) * ez,
+                );
                 if let Some(pd) = prev_dir
                     && d.0 * pd.0 + d.1 * pd.1 < 0.0
                 {
@@ -498,10 +496,8 @@ pub fn apply(rivers: &mut Rivers, inp: &Input<'_>) -> Value {
         c: f64::from(rivers.c),
         chain_of,
     };
-    let plans: Vec<(Vec<Island>, Tally)> = (0..k_chains)
-        .into_par_iter()
-        .map(|k| net.plan(k))
-        .collect();
+    let plans: Vec<(Vec<Island>, Tally)> =
+        (0..k_chains).into_par_iter().map(|k| net.plan(k)).collect();
     drop(net);
     let mut total = Tally::default();
     let mut threads = 0u64;
