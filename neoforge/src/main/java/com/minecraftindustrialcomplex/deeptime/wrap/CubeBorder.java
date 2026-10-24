@@ -151,6 +151,55 @@ public final class CubeBorder {
     }
 
     /**
+     * The way out of A(d) for a footprint (the Sable border, cube plan W3): {@code xz} holds points
+     * {x0, z0, x1, z1, ...} (a hull's bounds' four corners). Returns {nx, nz, depth}: n the unit
+     * vector out of the planet, the sum over the points outside A(d) of each one's offset from its
+     * nearest point of A(d), normalised (the deepest point's when the sum vanishes), and depth the
+     * largest such offset, blocks. Null when every point is in A(d).
+     */
+    public double[] outward(double[] xz, double d) {
+        double sx = 0, sz = 0, depth = 0, dx = 0, dz = 0;
+        for (int i = 0; i + 1 < xz.length; i += 2) {
+            double x = xz[i], z = xz[i + 1];
+            if (inside(x, z, d))
+                continue;
+            double[] q = nearest(x, z, d);
+            double ox = x - q[0], oz = z - q[1], len = Math.hypot(ox, oz);
+            sx += ox;
+            sz += oz;
+            if (len > depth) {
+                depth = len;
+                dx = ox;
+                dz = oz;
+            }
+        }
+        if (!(depth > 0))
+            return null;
+        double len = Math.hypot(sx, sz);
+        if (len < 1e-9 * depth) {
+            sx = dx;
+            sz = dz;
+            len = depth;
+        }
+        return new double[]{sx / len, sz / len, depth};
+    }
+
+    /**
+     * The velocity change that holds a hull at the border: {dvx, dvz} taking away the part of (vx, vz)
+     * along {@code out} (from {@link #outward}) when it points out, and adding {@code push} blocks/s
+     * back in. Velocity only, never a teleport, as at the pole cap's hard stop.
+     */
+    public static double[] stopVelocity(double vx, double vz, double[] out, double push) {
+        double vn = vx * out[0] + vz * out[1];
+        double dvx = -push * out[0], dvz = -push * out[1];
+        if (vn > 0) {
+            dvx -= vn * out[0];
+            dvz -= vn * out[1];
+        }
+        return new double[]{dvx, dvz};
+    }
+
+    /**
      * The shortest walk from (x0, z0) to (x1, z1) on the planet under the border, blocks (cube plan
      * G11): the shortest path inside A(0), the band and the polar column, which the border's segments
      * bound, x through every period image. A(0) is a cross whose four inner corners (±h, ±h) are its
