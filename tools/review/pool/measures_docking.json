@@ -2,7 +2,7 @@
   "_doc": "V1 item 1's measures (the docking lane, 2026-10-23): the collision record counted as Macdonald et al. 2019's sutures, what docked, which collisions hold the front, and what stands behind a high coast. Pass it with --registry tools/review/pool/measures_docking.json (or DEEPTIME_POOL_MEASURES) and --measures sutures,coastwalk, next to measures_boundary.json's collcoast and measures_gap4.json's coastset. Definitions in measure_sutures.py (ledger PLT-512) and measure_coastwalk.py (ledger PLT-513). Macdonald 2019's arc-continent sutures: 19 per 100 Myr over the Phanerozoic, 39 over 0 to 100 Ma; 23,235 and 50,919 km per 100 Myr; median 1,019 km (ledger PLT-157).",
   "measures": {
     "sutures": {
-      "version": 2,
+      "version": 3,
       "doc": "collision states merged per contact at the 6 Myr grace into sutures, their count, length and duration; the front-time held by each kind of collision; the docked terranes' provenance; the collisions open at the end; definitions in measure_sutures.py (ledger PLT-512)",
       "command": ["{py}", "-I", "{tools}/measure_sutures.py", "{run}"],
       "python": "numpy",
