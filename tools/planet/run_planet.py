@@ -201,6 +201,8 @@ def main():
             print(f"   probe tw: {m.group(1) if m else out}", flush=True)
             if not m:
                 failures.append("probe tw did not answer")
+            elif json.loads(m.group(1)).get("widthIsPeriod") is False:
+                failures.append("probe tw: Toroidal World does not wrap at the planet's period")
             if a.cube_4k:
                 failures += cube_probes(rcon, os.path.join(RUN, "world", "deeptime"))
             for spec in a.run:
@@ -240,6 +242,19 @@ def cube_probes(rcon, world_data):
         if not same:
             failures.append("cube probe " + rows[-1])
     print("   cube probes: " + "; ".join(rows), flush=True)
+    # The poles (cube plan G11): inside N and S, reachable under the border, and from the console's
+    # spawn the planet distances to them add up to half the way round.
+    m = PROBE.search(rcon("deeptime probe pole"))
+    pole = json.loads(m.group(1)) if m else {}
+    north, south = pole.get("northPole") or {}, pole.get("southPole") or {}
+    ok = (north.get("face") == "N" and south.get("face") == "S" and north.get("reachable") is True
+          and south.get("reachable") is True and abs((north.get("latitude") or 0) - 90) < 1e-3
+          and abs((south.get("latitude") or 0) + 90) < 1e-3)
+    print("   probe pole: " + " ".join(
+        f"{n} {p.get('face')} ({p.get('x', 0):.1f}, {p.get('z', 0):.1f}) {p.get('distanceKm', 0):.1f} km, walk {p.get('walkBlocks', 0):.0f}"
+        for n, p in (("north", north), ("south", south))), flush=True)
+    if not ok:
+        failures.append(f"cube probe pole: {m.group(1) if m else 'no answer'}")
     return failures
 
 

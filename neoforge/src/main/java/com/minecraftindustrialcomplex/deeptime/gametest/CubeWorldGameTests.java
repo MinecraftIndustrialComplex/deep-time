@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.gametest;
 
+import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.api.climate.DeepTimeClimate;
 import com.minecraftindustrialcomplex.deeptime.farterrain.FarTerrain;
 import com.minecraftindustrialcomplex.deeptime.farterrain.FarTerrainCheck;
 import com.minecraftindustrialcomplex.deeptime.net.PlanetDebugLine;
 import com.minecraftindustrialcomplex.deeptime.net.WorldInfoPayload;
+import com.minecraftindustrialcomplex.deeptime.server.DeepTimeCommands;
+import com.minecraftindustrialcomplex.deeptime.server.SiteCommands;
 import com.minecraftindustrialcomplex.deeptime.server.SpawnHandler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
@@ -52,7 +56,8 @@ import java.util.Map;
  * and planet info agree; chunks generate on the faces, at every seam and at the corners; a chunk off
  * the faces is its partner turned, block for block and biome for biome; past the net's corners is
  * deep ocean; block states turn with the fold; the temporary border stops a survival player at the
- * 12 turning edges, folds a deep arrival onto its partner and lets a spectator pass.
+ * 12 turning edges, folds a deep arrival onto its partner and lets a spectator pass; the probe
+ * commands give the poles, the fold, north, the scale and the distances (cube plan G11).
  */
 @GameTestHolder(GameTestSupport.NS)
 @PrefixGameTestTemplate(false)
@@ -519,6 +524,134 @@ public final class CubeWorldGameTests {
             for (long[] c : forced)
                 level.setChunkForced((int) c[0], (int) c[1], false);
         }
+    }
+
+    /**
+     * The commands on a cube world (cube plan G11), through the JSON they print.
+     * <ul>
+     *   <li>{@code probe pole} finds both poles inside N and S, at the projection's pole blocks, where
+     *       the border lets a player reach them. From anywhere, the planet distances to the two poles
+     *       add up to half the planet's circumference, and the walk under the border is never shorter
+     *       than the straight line in the net.</li>
+     *   <li>{@code probe column} gives the face and cell, the turning edge a block lies past and the
+     *       planet block it shows (the layout's fold), or the ocean past the corners, with north and the
+     *       metres a block spans as the climate API gives them.</li>
+     *   <li>{@code probe tw} gives the period 4s and the face side.</li>
+     *   <li>{@code sites near} gives each site's planet distance and its walk, never shorter than its
+     *       distance in the net.</li>
+     * </ul>
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
+    public static void cubeCommandProbes(GameTestHelper helper) {
+        ServerLevel level = level(helper, GameTestSupport.TEST_PLANET_CUBE);
+        GeologicChunkGenerator g = generator(helper, level);
+        CubeLayout cube = g.cubeLayout();
+        if (!(g.terrain() instanceof WorldDataTerrain t && t.data().projection() instanceof WorldProjection.Cube wp)) {
+            helper.fail("test_planet_cube's projection is not the cube");
+            return;
+        }
+        double mpb = t.data().manifest().mPerBlockH(), h = cube.side() / 2.0, period = cube.period();
+        CubeBorder border = CubeBorder.of(cube.side());
+        double halfKm = Math.PI * wp.radius() * mpb / 1000.0;   // ledger: SCL-107
+        StringBuilder log = new StringBuilder();
+
+        // probe pole from F0's, N's and S's centres and from F2.
+        double[] np = wp.blockOf(90, 0), sp = wp.blockOf(-90, 0);
+        helper.assertTrue(np != null && sp != null, "the poles have blocks");
+        for (double[] from : new double[][]{{0.5, 0.5}, {0.5, -2 * h + 0.5}, {0.5, 2 * h + 0.5}, {4 * h + 0.5, 100.5}}) {
+            JsonObject o = DeepTimeCommands.poleJson(level, from[0], from[1]);
+            String where = "probe pole at (" + from[0] + ", " + from[1] + "): " + o;
+            helper.assertTrue("cube".equals(o.get("projection").getAsString()) && o.get("cubeBorder").getAsBoolean()
+                    && o.get("borderZone").getAsInt() == 0, "a cube world inside its border: " + where);
+            helper.assertTrue(Math.abs(o.get("latitude").getAsDouble() - DeepTimeClimate.latitudeDeg(level, from[0], from[1])) < 1e-9
+                            && Math.abs(o.get("northBearing").getAsDouble() - DeepTimeClimate.northBearingDeg(level, from[0], from[1])) < 1e-9
+                            && Math.abs(o.get("metresPerBlock").getAsDouble() - DeepTimeClimate.metresPerBlock(level, from[0], from[1])) < 1e-9,
+                    "the source's latitude, north and scale are the climate API's: " + where);
+            double km = 0;
+            for (boolean north : new boolean[]{true, false}) {
+                JsonObject p = o.getAsJsonObject(north ? "northPole" : "southPole");
+                double[] want = north ? np : sp;
+                double px = p.get("x").getAsDouble(), pz = p.get("z").getAsDouble();
+                double dx = px - want[0];
+                dx -= period * Math.rint(dx / period);
+                helper.assertTrue(p.get("face").getAsString().equals(north ? "N" : "S")
+                                && Math.abs(p.get("latitude").getAsDouble()) > 89.999 && p.get("latitude").getAsDouble() * (north ? 1 : -1) > 0
+                                && Math.hypot(dx, pz - want[1]) < 1e-3 && px >= -2 * cube.side() && px < 2 * cube.side()
+                                && p.get("reachable").getAsBoolean(),
+                        (north ? "the north" : "the south") + " pole, in " + (north ? "N" : "S") + " at ("
+                                + want[0] + ", " + want[1] + ") in Toroidal World's frame, reachable: " + where);
+                double sx = from[0] - px;
+                sx -= period * Math.rint(sx / period);
+                double straight = Math.hypot(sx, from[1] - pz), walk = p.get("walkBlocks").getAsDouble();
+                helper.assertTrue(walk >= straight - 1e-6 && walk < straight + 4 * h,
+                        "the walk to the pole is no shorter than the straight line in the net (" + straight + "): " + where);
+                km += p.get("distanceKm").getAsDouble();
+            }
+            helper.assertTrue(Math.abs(km - halfKm) < 1e-6 * halfKm, "the distances to the two poles add up to "
+                    + halfKm + " km: " + km + ", " + where);
+            log.append(String.format(java.util.Locale.ROOT, " pole(%.0f, %.0f: N %.0f km walk %.0f, S %.0f km walk %.0f)", from[0], from[1],
+                    o.getAsJsonObject("northPole").get("distanceKm").getAsDouble(), o.getAsJsonObject("northPole").get("walkBlocks").getAsDouble(),
+                    o.getAsJsonObject("southPole").get("distanceKm").getAsDouble(), o.getAsJsonObject("southPole").get("walkBlocks").getAsDouble()));
+        }
+        // Past the corners: off the planet, no walk.
+        ChunkPos ocean = oceanChunk(cube);
+        helper.assertTrue(ocean != null, "a chunk past the net's corners");
+        JsonObject off = DeepTimeCommands.poleJson(level, ocean.getMiddleBlockX() + 0.5, ocean.getMiddleBlockZ() + 0.5);
+        helper.assertTrue(off.get("borderZone").getAsInt() == 2 && Double.isNaN(off.get("latitude").getAsDouble())
+                        && Double.isNaN(off.getAsJsonObject("northPole").get("walkBlocks").getAsDouble())
+                        && Double.isNaN(off.getAsJsonObject("northPole").get("distanceKm").getAsDouble()),
+                "probe pole past the corners: off the planet, no distance and no walk: " + off);
+
+        // probe column: on a face, past each turning edge, past the corners.
+        JsonObject centre = DeepTimeCommands.columnJson(level, 0, 0);
+        JsonObject cf = centre.getAsJsonObject("fold");
+        helper.assertTrue(centre.get("faceBlocks").getAsLong() == cube.side() && "face".equals(cf.get("kind").getAsString())
+                        && "F0".equals(cf.get("face").getAsString())
+                        && cube.fold(0, 0) instanceof CubeLayout.OnFace on && on.i() == cf.get("i").getAsLong() && on.j() == cf.get("j").getAsLong(),
+                "probe column at F0's centre: " + centre);
+        List<CubeLayout.NetEdge> edges = cube.edges();
+        for (int k = 2; k < edges.size(); k++) {
+            CubeLayout.NetEdge e = edges.get(k);
+            long[] b = beyond(e, 64, (e.spanFrom() + e.spanTo()) / 2);
+            JsonObject o = DeepTimeCommands.columnJson(level, (int) b[0], (int) b[1]);
+            JsonObject f = o.getAsJsonObject("fold");
+            double bx = b[0] + 0.5, bz = b[1] + 0.5;
+            boolean folds = cube.fold(b[0], b[1]) instanceof CubeLayout.Outside out && "outside".equals(f.get("kind").getAsString())
+                    && e.name().equals(f.get("edge").getAsString()) && out.x() == f.get("x").getAsLong() && out.z() == f.get("z").getAsLong()
+                    && out.iso().k() == f.get("quarterTurns").getAsInt();
+            double north = o.get("northBearing").getAsDouble(), m = o.get("metresPerBlock").getAsDouble();
+            helper.assertTrue(folds && north == DeepTimeClimate.northBearingDeg(level, bx, bz) && m == DeepTimeClimate.metresPerBlock(level, bx, bz)
+                            && !Double.isNaN(north) && m > 0.9 * mpb && m < 1.5 * mpb,
+                    "probe column 64 past " + e.name() + " folds onto its partner, north and scale the API's: " + o);
+            if (k == 2)
+                log.append(" column(").append(e.name()).append(" +64: ").append(f).append(", north ")
+                        .append(String.format(java.util.Locale.ROOT, "%.1f, %.1f m", north, m)).append(')');
+        }
+        JsonObject oc = DeepTimeCommands.columnJson(level, ocean.getMiddleBlockX(), ocean.getMiddleBlockZ());
+        helper.assertTrue("ocean".equals(oc.getAsJsonObject("fold").get("kind").getAsString())
+                        && Double.isNaN(oc.get("northBearing").getAsDouble()) && Double.isNaN(oc.get("metresPerBlock").getAsDouble()),
+                "probe column past the corners: the ocean, no north, no scale: " + oc);
+
+        // probe tw: the period and the face side.
+        JsonObject tw = DeepTimeCommands.twJson(level);
+        helper.assertTrue("cube".equals(tw.get("projection").getAsString()) && tw.get("periodBlocks").getAsLong() == cube.period()
+                        && tw.get("faceBlocks").getAsLong() == cube.side()
+                        && (!tw.has("widthIsPeriod") || tw.get("widthIsPeriod").getAsBoolean()),
+                "probe tw: period 4s, face side s, Toroidal World's width the period: " + tw);
+        log.append(" tw(").append(tw).append(')');
+
+        // sites near F0's centre: the planet distance and the walk to each.
+        JsonObject sites = SiteCommands.sitesNearJson(level, 0, 0, (int) (3 * h));
+        int n = 0;
+        for (var el : sites.getAsJsonArray("sites")) {
+            JsonObject s = el.getAsJsonObject();
+            double d = s.get("distance").getAsDouble(), walk = s.get("walk").getAsDouble(), km = s.get("distance_km").getAsDouble();
+            helper.assertTrue(walk >= d - 0.11 && km >= 0 && km < halfKm, "sites near: the walk is no shorter than the net's distance: " + s);
+            n++;
+        }
+        log.append(" sites(").append(n).append(" within ").append((int) (3 * h)).append(')');
+        DeepTime.LOGGER.info("[gametest] cubeCommandProbes{}", log);
+        helper.succeed();
     }
 
     /** One far-terrain sample: its group, where it is, and the block (x in Toroidal World's frame). */
