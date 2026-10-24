@@ -391,7 +391,7 @@ what a player meets most.
   on the incoming plate's end with that plate's stiffness (ISO-131, PLT-546), and the foreland
   slides under it in the belt's frame (ISO-133); the unit tests hold the broken plate's profile
   and a plate sliding under a standing load bends as one at rest. On the pool (8 runs against
-  base7's same 8) no foredeep came beyond the wedge: the foreland's `Te` near the front, 20 to
+  base7's same 8, and 8 on master 4dd85fe2 against base8's) no foredeep came beyond the wedge: the foreland's `Te` near the front, 20 to
   35 km, puts the deflection's first zero about a wedge's width from the belt, and the frame's
   split of the deflection into a bent and a local part does not hold on the runs (the largest
   change of a step doubled). Next: the belt's own deflection solved and carried apart, and the
