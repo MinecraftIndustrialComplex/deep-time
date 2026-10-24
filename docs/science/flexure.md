@@ -1123,20 +1123,22 @@ cell it lies on.
   the shortening of the front carry the incoming plate and its foreland's lithosphere; the belt
   beyond the shortening, the foreland and the overriding plate carry nothing; off, nothing does.
 
-**On the pool** (2026-10-24; arm `g6-frame1`: both starts x seeds 1 to 4, 1,000 Myr, the
-switch on, on master 1b56529d, against base7's 24 runs and its same 8, `g6-base7-s1to4`;
-Mann-Whitney p against the 24, then the 8). Nothing diverged and no step passed one Earth relief
-(19.8 km), but the foreland basin did not come:
+**On the pool** (2026-10-24; arms `g6-frame1` and `g6-frame2`: both starts x seeds 1 to 4,
+1,000 Myr, the switch on; the first on master 1b56529d against base7's 24 runs and its same 8,
+`g6-base7-s1to4`, the second on master 4dd85fe2, the outline cover, against base8's same 8,
+`g6-base8-s1to4`, which are the front lane's `fl-outline`; Mann-Whitney p against base7's 24,
+then against the same 8). Nothing diverged and no step passed one Earth relief (19.8 km) in any
+of the 16 runs, but the foreland basin did not come:
 
-| | base7, 24 runs | base7, the same 8 | switch on, 8 |
-|---|---|---|---|
-| land above 2 km | 0.141 | 0.174 | 0.107 (p 0.12; 0.005) |
-| coast with high ground | 0.266 | 0.282 | 0.261 (p 0.95; 0.28) |
-| criteria met per run, mean | 5.04 | 4.88 | 5.12 |
-| record: belts above 3 km with a foredeep | | 0.42 | 0.21 |
-| record: foredeep width, median, km | | 18 | 0 (p 0.20) |
-| the guard's worst, km from the sea | | 10.2 | 13.9 (p < 0.001) |
-| largest rise / fall of a cell in a step, km | | 7.8 / 7.3 | 15.4 / 12.4 |
+| | base7, 24 runs | base7, the same 8 | switch on, 8 | base8, the same 8 | switch on, 8 |
+|---|---|---|---|---|---|
+| land above 2 km | 0.141 | 0.174 | 0.107 (p 0.12; 0.005) | 0.118 | 0.102 (p 0.083) |
+| coast with high ground | 0.266 | 0.282 | 0.261 (p 0.95; 0.28) | 0.254 | 0.260 (p 0.88) |
+| criteria met per run, mean | 5.04 | 4.88 | 5.12 | 5.12 | 5.00 |
+| record: belts above 3 km with a foredeep | | 0.42 | 0.21 | 0.36 | 0.18 |
+| record: foredeep width, median, km | | 18 | 0 (p 0.20) | 0 | 0 (p 0.076) |
+| the guard's worst, km from the sea | | 10.2 | 13.9 (p < 0.001) | 10.3 | 15.0 (p < 0.001) |
+| largest rise / fall of a cell in a step, km | | 7.8 / 7.3 | 15.4 / 12.4 | 7.9 / 7.4 | 14.2 / 13.3 |
 
 In the final frames the flexure just beyond the footprint's toe stands above local isostasy at
 the median (+100 to +200 m in the first 40 km: the forebulge), with the switch on, off, and with
