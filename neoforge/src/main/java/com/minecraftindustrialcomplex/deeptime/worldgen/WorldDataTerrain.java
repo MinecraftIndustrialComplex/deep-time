@@ -237,6 +237,20 @@ public final class WorldDataTerrain implements TerrainSource {
     }
 
     /**
+     * What the heat-flow fields of {@link #geothermal} could find on this world ({@link Geothermal#heatFlowOdds}), on the
+     * same terrain height, water columns and climate, sampled every {@code step} blocks (a whole-world scan: for checks
+     * and reports, not chunk generation).
+     */
+    public Geothermal.HeatFlowOdds geothermalHeatFlowOdds(int cell, int seaLevel, int step) {
+        WorldData wd = data();
+        var spec = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Spec.of(wd, cell);
+        var none = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Kind.NONE;
+        return Geothermal.heatFlowOdds(geothermalRules(), (x, z) -> wd.height(wrapX(x), z),
+                (x, z) -> com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, wrapX(x), z).kind() != none,
+                new GeothermalEnv(wd), wd.circumference(), seaLevel, wd.manifest().mPerBlockH(), step);
+    }
+
+    /**
      * How the level asks its biome source where the pack has a peatland biome (BIO-106): set by the
      * generator, called at the first flagged cold-wetland column of a world whose mapping has no verdict
      * yet. It answers null while it cannot (TerraBlender's trees are not built).

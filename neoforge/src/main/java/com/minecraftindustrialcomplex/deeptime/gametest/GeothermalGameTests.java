@@ -37,6 +37,15 @@ public final class GeothermalGameTests {
 
     private GeothermalGameTests() {}
 
+    /**
+     * A planet without a heat-flow field fails when the chance of that, from its hot dry ground, is under this
+     * (ledger: GEO-064, game-choice: a significance level, not physics).
+     */
+    static final double HEAT_NONE_P = 1e-3;
+
+    /** The grid the hot dry ground is sampled on, blocks (half the 8-block L2 cell of the test planet). */
+    static final int HEAT_ODDS_STEP = 4;
+
     /** What was read back around one site. */
     private static final class Tally {
         long poolBlocks, poolWater, rimColumns, rimSolid, bedColumns, bedSolid, uncut, uncutOpen, leaks, wetNextToMagma, lavaNear,
@@ -68,10 +77,14 @@ public final class GeothermalGameTests {
      *       column is the palette's block for it (columns with a fluid or magma on top are left alone),
      *       and a vent's heart is the vent block.</li>
      * </ul>
-     * The test planet's preset puts fields on its hot continental ground (heat flow of 50 mW/m2 or
-     * more), so it always has sites: a planet with none fails (Ben's rule, decisions log 2026-10-01: a
-     * test that reads nothing is not a pass). Whether its active volcanoes have sites of their own
-     * depends on dry land beside them, so their count is logged, not asserted.
+     * A planet with no site at all fails (Ben's rule, decisions log 2026-10-01: a test that reads
+     * nothing is not a pass). The test planet's preset puts fields on its hot continental ground (heat
+     * flow of 50 mW/m2 or more); one of them is read back when the planet has one. How much hot dry
+     * ground a planet has is its history's (GEO-061: since the thermal state, only crust the history
+     * heated), so a planet without a heat-flow field fails only where its hot dry ground made that
+     * improbable ({@link Geothermal#heatFlowOdds}, under {@link #HEAT_NONE_P}; GEO-064), and one
+     * with no heat flow on any column fails (the layer is missing). Whether its active volcanoes have
+     * sites of their own depends on dry land beside them, so their count is logged, not asserted.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void geothermalAroundActiveVolcanoes(GameTestHelper helper) {
@@ -102,10 +115,23 @@ public final class GeothermalGameTests {
             geo.sites().stream().filter(s -> s.kind() == k).findFirst().ifPresent(picked::add);
         geo.sites().stream().max(java.util.Comparator.comparingInt(Geothermal.Site::reach)).filter(s -> !picked.contains(s))
                 .ifPresent(picked::add);
-        // The test planet's preset lowers the heat-flow threshold to 50 (every continental cell; GEO-061), so
-        // the fields of hot ground are on it: read one back as well (2026-10-02, "Export heat flow").
-        helper.assertTrue(geo.heatFlowSites() > 0, "the test planet has no geothermal site from the baked heat flow ("
-                + t.geothermalRules() + ", " + geo.sites().size() + " sites): the layer meta/heat_flow_mw_m2 or the setting is missing");
+        // The fields of hot ground (2026-10-02, "Export heat flow"): read one back when the planet has one. The test
+        // planet's preset puts the setting at its floor (50 mW/m2) and the density at its top (GEO-061), but since the
+        // lithosphere's thermal state (2026-10-23) its continents start as 41 mW/m2 cratons, and only the crust its
+        // history heated reaches 50, mostly arcs the sea drowned: a planet may have a few thousand km2 of hot dry
+        // ground or none. So a planet without a field fails only when its hot dry ground made none improbable (GEO-064).
+        Geothermal.HeatFlowOdds odds = t.geothermalHeatFlowOdds(g.waterReach(), sea, HEAT_ODDS_STEP);
+        DeepTime.LOGGER.info("[gametest] geothermalAroundActiveVolcanoes heat flow: {} fields; {}", geo.heatFlowSites(), odds);
+        if (odds.continental() == 0) {
+            helper.fail("the test planet has no heat flow on any column (" + t.geothermalRules()
+                    + "): the layer meta/heat_flow_mw_m2 is missing or empty");
+            return;
+        }
+        if (geo.heatFlowSites() == 0 && odds.pNone() < HEAT_NONE_P) {
+            helper.fail("the test planet has no geothermal site from the baked heat flow (" + t.geothermalRules() + ", "
+                    + geo.sites().size() + " sites), where its " + odds + " (under " + HEAT_NONE_P + ")");
+            return;
+        }
         geo.sites().stream().filter(s -> s.volcano() == Geothermal.HEAT_FLOW_SOURCE).findFirst().filter(s -> !picked.contains(s))
                 .ifPresent(picked::add);
         GeothermalPalette palette = GeothermalPalette.get();
