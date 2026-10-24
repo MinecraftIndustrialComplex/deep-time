@@ -74,6 +74,43 @@ pub fn sources(grid: &GridDesc, plate_id: &[f32], omega: &[[f64; 3]], dt_yr: f64
         .collect()
 }
 
+/// [`sources`] for chosen cells, each moved with the plate given beside it (ISO-133: a
+/// collision's footprint under the plate that carries it). A plate without a rotation leaves the
+/// cell where it is.
+pub fn sources_with(
+    grid: &GridDesc,
+    cells: &[(usize, f32)],
+    omega: &[[f64; 3]],
+    dt_yr: f64,
+) -> Vec<[f64; 2]> {
+    let frame = BlockFrame::new(grid.circumference() as u32);
+    let proj = frame.projection();
+    let w = grid.w as usize;
+    let r = f64::from(grid.r);
+    let (ox, oz) = (grid.origin_block_x as f64, grid.origin_block_z as f64);
+    cells
+        .par_iter()
+        .map(|&(c, p)| {
+            let (i, j) = (c % w, c / w);
+            let om = if p.is_finite() && p >= 0.0 {
+                omega.get(p as usize).copied().filter(|om| *om != [0.0; 3])
+            } else {
+                None
+            };
+            let Some(om) = om else {
+                return [i as f64, j as f64];
+            };
+            let rot = rotation(DVec3::from_array(om), -dt_yr);
+            let z = grid.block_z(j as i64) as f64;
+            let (sp, cp) = (proj.sin_lat(z), proj.cos_lat(z));
+            let (sl, cl) = proj.lon_deg(grid.block_x(i as i64) as f64).to_radians().sin_cos();
+            let q = DVec3::new(cp * cl, cp * sl, sp);
+            let (x, z) = frame.block(rot * q);
+            [(x - ox) / r, (z - oz) / r]
+        })
+        .collect()
+}
+
 /// Bilinear sample of `v` at fractional (fi, fj): x wraps, rows clamp.
 pub fn bilinear(w: usize, h: usize, v: &[f32], fi: f64, fj: f64) -> f32 {
     let fj = fj.clamp(0.0, (h - 1) as f64);

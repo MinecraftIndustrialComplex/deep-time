@@ -352,6 +352,9 @@ struct Moved {
     prev_held_offset: Option<Vec<f32>>,
     newborn: Vec<bool>,
     known_plates: usize,
+    /// A collision belt's foreland (`flexure::belt_reach`): each cell, the plate that bends it
+    /// and its source had it moved with the belt (ISO-133, `flexure::FlexState::carry_frame`).
+    frame_src: Vec<(usize, f32, [f64; 2])>,
 }
 
 impl Moved {
@@ -878,6 +881,29 @@ impl SurfaceStage {
                     .map(|f| f.data.as_slice());
                 let mut src = advect::sources(&grid, &pf.plate_id, &omega, dt);
                 advect::hold_gaps(w, &mut src, prev_gap);
+                // ledger: ISO-133
+                let frame_src = match (&pf.carrier_plate_id, p.flexure.active()) {
+                    (Some(car), true) => {
+                        let cell_m = std::f64::consts::TAU
+                            * self.preset.tectonics.model_radius_km
+                            * 1000.0
+                            / w as f64;
+                        let reach = (p
+                            .flexure
+                            .belt_reach_m(self.preset.planet.gravity_m_s2)
+                            / cell_m)
+                            .ceil() as usize;
+                        let near = flexure::belt_reach(w, hgt, &pf.plate_id, car, reach);
+                        let cells: Vec<(usize, f32)> =
+                            near.iter().map(|&(c, _, belt)| (c, belt)).collect();
+                        let to = advect::sources_with(&grid, &cells, &omega, dt);
+                        near.into_iter()
+                            .zip(to)
+                            .map(|((c, bends, _), s)| (c, bends, s))
+                            .collect()
+                    }
+                    _ => Vec::new(),
+                };
                 let mut m = Moved {
                     src,
                     // Back in the state once the flexure carry has read it (below).
@@ -896,6 +922,7 @@ impl SurfaceStage {
                     },
                     newborn: Vec::new(),
                     known_plates: st.omega.len(),
+                    frame_src,
                 };
                 // The elevation moves with its own crust and takes the plate model's uplift
                 // (`advect::carried_elevation`); the offset is what stands over the plate model's
@@ -1031,9 +1058,10 @@ impl SurfaceStage {
                     let carry = m.carry(world, &pf, &parents, (w, hgt), dt, blur_ref);
                     // The plate's load and deflection move with the same crust.
                     if p.flexure.active() {
-                        st.flexure
-                            .get_or_insert_default()
-                            .carry(&carry, &m.prev_elevation);
+                        let fs = st.flexure.get_or_insert_default();
+                        // ledger: ISO-133
+                        fs.carry_frame(w, hgt, &m.frame_src, carry.prev_plate);
+                        fs.carry(&carry, &m.prev_elevation);
                     } else {
                         st.flexure = None;
                     }
