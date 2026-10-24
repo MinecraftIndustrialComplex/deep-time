@@ -185,8 +185,8 @@ impl Net<'_> {
         let (xi, zi) = (x.round() as i64, z.round() as i64);
         let ci = i64::from(r.c);
         let wx = (xi + ci / 2).rem_euclid(ci) - ci / 2;
-        for &s in r.tile_entries(r.tile_of(wx, zi)) {
-            let su = s as usize;
+        for &seg in r.tile_entries(r.tile_of(wx, zi)) {
+            let su = seg as usize;
             let k = self.chain_of[su];
             if k == u32::MAX || self.chain_of.get(su + 1) != Some(&k) {
                 continue;

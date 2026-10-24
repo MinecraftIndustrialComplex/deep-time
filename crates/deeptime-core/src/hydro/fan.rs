@@ -36,7 +36,7 @@ use deeptime_format::{GridDesc, Projection};
 use rayon::prelude::*;
 use serde_json::{Value, json};
 
-use super::network::{self, FlowWalk};
+use super::network;
 
 /// Bull (1964, Fig. 54A; p. 126): fan area A_F = 1.3 A_D^0.88, both in square miles, for the
 /// drainage basins of 58 to 68 % sandstone (0.5 to 296 mi² of drainage; the mudstone and shale

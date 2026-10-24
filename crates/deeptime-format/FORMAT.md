@@ -126,6 +126,7 @@ format versions live together for a while:
   rasters/detail/amplitude.dtr  L3, u8, 1/16 block: amplitude of the sub-cell detail term (P1-06)
   rasters/delta.dtr             L3, i16, 1/16 block: what the delta plains added to elevation ("Rivers", deltas)
   rasters/floodplain.dtr        L3, i16, 1/16 block, nodata −32768: what the floodplains moved elevation by ("Rivers", floodplains)
+  rasters/fan.dtr               L3, i16, 1/16 block: what the alluvial fans added to elevation ("Rivers", fans)
   rasters/climate/<name>.dtr    L2, i16, vanilla parameter × 10,000
                                 (<name> ∈ temperature, vegetation, continents, erosion, ridges)
   rasters/climate/t_mean_c.dtr  L1, i16, 0.01 °C            ┐
@@ -235,6 +236,7 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `playa` | as `water_level` | u8 | 1, block | — | blocks of salt on a playa's floor, 0 elsewhere ("Playas"); absent when `hydro.enabled` is false |
 | `closed_basin` | as `water_level` | u8 | 1, flag | - | 1 where no sea stands on ground below sea level: a closed basin the open sea does not reach, with an 8-block halo ("Rivers", "Water columns" step 3; HYD-100, HYD-102), 0 elsewhere; absent when `hydro.enabled` is false (the sea then stands on all ground below sea level) |
 | `floodplain` | L3 (the `elevation` grid) | i16 | 1/16, block | −32768 | what laying the floodplains moved `elevation` by on each plain cell, nodata off the plains ("Rivers", floodplains; HYD-150 to HYD-152; added 2026-10-24); the game reads it as a category, on a plain or not (the levee, HYD-153), and the projection pass takes the nearest cell; absent without `hydro.floodplains` |
+| `fan` | L3 (the `elevation` grid) | i16 | 1/16, block | — | what the alluvial fans added to `elevation` on each fan cell, 0 off the fans ("Rivers", fans; HYD-165 to HYD-170; added 2026-10-24); a re-run of the water bake takes it off first; the game does not read it, and the projection pass resamples it as a number (bilinear); absent without `hydro.fans` or with no fan |
 | `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks with key spans, smoothed ("The 0.2 bake"), the first top raised ("The P1-08 bake") |
 | `strata/lift` | L1 (the grid of `strata/horizons`) | i16 | 1/16, blocks | none | how far every horizon of the cell's stack rose after the history (the bake's whole-stack lift, ledger STR-052; ≥ 0), which the structure file's heights do not include: the deformed column rule adds it ("Structural events", "The lift"; added 2026-10-20). A companion of the stacks: the projection pass takes the nearest cell, as it does theirs |
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
@@ -1747,14 +1749,38 @@ changes: the chains keep their order and get more vertices (spaced a 40th of the
 blocks), the water surface along a redrawn reach is the old course's at the same distance down the
 valley, a tributary whose parent moved ends on a vertex of the parent's new channel, and
 distributaries are left as they were.
+**Fans** (since "hyd-165", 2026-10-24; rivers-and-lakes.md "Fans and braids", HYD-165 to HYD-170):
+the first network's chains are searched for apexes, cells where the river's surface falls at least
+Bull's (1964) fan slope S_F = 0.022 A_D^−0.32 over the fan's free length upstream and less than it
+downstream; at each, a cone of that slope (measured on the planet) is laid where it stands over
+the ground and the land is no lake, playa, delta plain or larger river's channel, high enough to
+cover Bull's area A_F = 1.3 A_D^0.88 (square miles) and at most as high as a free fan (a quarter
+circle of that area). `detail/amplitude` is 0 there, and the raster **`fan`** (i16, 1/16 block, on
+the `elevation` grid; 0 off the fans) holds what the cones added, which a re-run takes off first.
+The second network run (which then runs when there are fans and no delta plain too) drains down
+the cones; no floodplain is laid on a fan.
+**Braids** (since "hyd-165", 2026-10-24; rivers-and-lakes.md "Fans and braids", HYD-171 to
+HYD-175): after the meanders, a reach on a fan, or on a plain and steeper than Leopold & Wolman's
+braided line, divides around islands 5 channel widths long, on alternate sides. Nothing in the
+layout changes: the course stays one chain, narrowed (0.9 of its width) and shallowed (0.75 of its
+depth) around each island and carrying half the flow there; each island's other thread is a chain
+of its own appended after the old chains, with `from` and `into` both the course's chain and mouth
+`River`, its first and last vertices copies of two of the course's vertices, and its water surface
+the course's at the same distance down it.
 `notes.bake.water.params` holds the parameters (`deltas`, `delta_area_mult`, `delta_shape_k`,
-`delta_max_mouths`, `delta_mouth_spacing`, `floodplains`, `meanders`), `stats.deltas` the counts, areas, the largest deltas
+`delta_max_mouths`, `delta_mouth_spacing`, `floodplains`, `meanders`, `fans`, `braids`), `stats.deltas` the counts, areas, the largest deltas
 and Earth's figures beside them, `stats.floodplains` the plain's cells, km² and share of the land
 (within 60° too), the same by the area its river drains, how far it moved the ground and each cell's
 top block, the heights above the drains and the cells left out, and `stats.meanders` the network's
 length before and after (km of planet), the course on a plain, too steep, too narrow or too short,
 the reaches redrawn, their axis and path length and sinuosity (with a histogram), the mean amplitude
-and largest offset, the same by discharge class, the vertex counts and the joins cut, carried or moved. `notes.bake.water`: `enabled`, `method`, `params`,
+and largest offset, the same by discharge class, the vertex counts and the joins cut, carried or moved,
+`stats.fans` the fans, the candidates and those too thin or hemmed in, their cells, km², share of the
+land and volume, their area over Bull's, thickness, area, drainage area and slope (percentiles), the
+fans past Bull's range of drainage areas, and `laid` (the L3 cells raised, the largest raise, the
+amplitude cells zeroed, the horizon stacks' cells raised and their largest raise), and `stats.braids` the threads added, islands and islands with no room, the
+network's km, the km on fans, steep on a plain, too narrow, braided and braided on fans, the same
+by discharge class, and the milliseconds. `notes.bake.water`: `enabled`, `method`, `params`,
 `width_scale`, `grid`, `halved`, `climate`, `seasons`, `rivers_file`, `rivers_bytes`, `stats`
 (counts, lengths, largest discharge and width, milliseconds per step; since "p1-22b" also
 `lake_share_of_land`, `basins` (candidates, full, below_rim, playa, dry, merged, nested_too_deep),
@@ -1767,7 +1793,7 @@ since "hyd-100" also `below_sea`: `open_km2` (ground at or under sea level the s
 `closed_km2`, `closed_share_of_land`, the closed ground's `lake_km2`, `playa_km2`, `dry_km2` and
 `dry_share_of_land`, `lakes_below_sea_level` and their km², and `closed_basin_radius_cells`).
 `method` is "p1-22" in a folder baked before the water balance, "p1-22b" since, "hyd-100" since
-format 0.6, "hyd-130" since the deltas, "hyd-150" since the floodplains and "hyd-155" since the meanders; the game does not read it. `notes.bake.water.closed_basin` is `{layer, reach_blocks}`.
+format 0.6, "hyd-130" since the deltas, "hyd-150" since the floodplains, "hyd-155" since the meanders and "hyd-165" since the fans and braids; the game does not read it. `notes.bake.water.closed_basin` is `{layer, reach_blocks}`.
 
 ## Water columns (P1-22)
 
