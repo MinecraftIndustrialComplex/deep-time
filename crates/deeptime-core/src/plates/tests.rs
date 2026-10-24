@@ -1912,6 +1912,105 @@ fn an_erosive_front_takes_its_forearc_to_the_mantle() {
     }
 }
 
+/// The trench's retreat (PLT-522, PLT-523; Scholl & von Huene 2010): with `erosion_retreat` on,
+/// an erosive margin consumes its front samples whole, at the chance that moves the trench
+/// inboard by 2.5 km/Myr. Over many draws of one step the area consumed per km of erosive front
+/// and Myr is that retreat; every km³ of the consumed columns is booked, and the volume per km
+/// and Myr is the retreat times the column; each consumed sample leaves the overriding plate
+/// for the slab's, as the slab's sample across the front with no sediment, where it stands;
+/// nothing else changes. A slower slab, or one under more than the cover threshold, takes none.
+#[test]
+fn an_eroding_margin_retreats_at_scholl_and_von_huenes_rate() {
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    p.tectonics.subduction_erosion_km3_per_km_myr = 90.0;
+    p.tectonics.erosion_retreat = true;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let area = env.norm.sample_area_km2();
+    let setup = |speed: f64, cover_m: f32| {
+        let (mut st, geo, pos) = two_plates(&p, &env, 0.1);
+        st.plates[1].omega = (DVec3::X * env.norm.omega_of_speed(speed)).to_array();
+        for s in st.samples.iter_mut().filter(|s| s.kind != CONTINENTAL) {
+            s.pools[state::pool::SEDIMENTARY] = cover_m;
+            s.thickness_m = pools::thickness(&s.pools);
+        }
+        let mut cones = vec![[0.0; 2]; st.samples.len()];
+        let pull = subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+        (st, geo, pull.forearcs.expect("the rule is on"))
+    };
+    let (st, _geo, forearcs) = setup(80.0, 200.0);
+    let same = |a: &state::Sample, b: &state::Sample| {
+        a.group == b.group
+            && a.thickness_m.to_bits() == b.thickness_m.to_bits()
+            && a.elevation_m.to_bits() == b.elevation_m.to_bits()
+            && a.kind == b.kind
+    };
+    let across: std::collections::BTreeMap<u32, u32> =
+        forearcs.front.iter().map(|&[v, u]| (v, u)).collect();
+    let (mut swept_km2, mut front_km_myr, mut booked_km3, mut column_km3) = (0.0, 0.0, 0.0, 0.0);
+    for draw in 0..400_u64 {
+        let mut s2 = st.clone();
+        s2.rng = crate::sphere::SplitMix64::new(draw);
+        let e = subduction::erode_forearcs(&mut s2, &env, &forearcs);
+        assert!(
+            e.front_continental_km_myr > 0.0 && e.short_km3 == 0.0,
+            "{e:?}"
+        );
+        front_km_myr += e.front_continental_km_myr + e.front_oceanic_km_myr;
+        swept_km2 += e.retreat_continental_km2 + e.retreat_other_km2;
+        booked_km3 += e.continental_km3 + e.other_km3;
+        let mut gone = 0.0;
+        for (i, (a, b)) in st.samples.iter().zip(&s2.samples).enumerate() {
+            if same(a, b) {
+                continue;
+            }
+            let u = *across.get(&(i as u32)).expect("only front samples change");
+            assert_eq!(
+                s2.plate_of(i),
+                st.plate_of(u as usize),
+                "{i} left for the slab"
+            );
+            assert_ne!(s2.plate_of(i), st.plate_of(i));
+            let slab = st.samples[u as usize];
+            assert_eq!(b.kind, slab.kind);
+            assert_eq!(b.elevation_m, slab.elevation_m);
+            assert_eq!(b.pools[state::pool::SEDIMENTARY], 0.0);
+            assert_eq!(
+                s2.groups[b.group as usize].rot, st.groups[a.group as usize].rot,
+                "{i} moved"
+            );
+            gone += f64::from(a.thickness_m) * area / 1000.0;
+        }
+        assert!(
+            ((e.continental_km3 + e.other_km3) - gone).abs() <= 1e-6 * gone.max(1.0),
+            "{gone} km³ consumed, {e:?}"
+        );
+        column_km3 += gone;
+    }
+    let retreat = swept_km2 / front_km_myr;
+    assert!(
+        (retreat - subduction::RETREAT_KM_PER_MYR).abs() < 0.15 * subduction::RETREAT_KM_PER_MYR,
+        "{retreat} km/Myr over {front_km_myr} km × Myr"
+    );
+    // The volume per km and Myr is the retreat times the consumed columns: here the continental
+    // margin's (with the arc's crust on it).
+    assert!((booked_km3 - column_km3).abs() < 1e-6 * column_km3);
+    let column_km = column_km3 / swept_km2;
+    let normal_km = f64::from(pools::thickness(&pools::continental_column())) / 1000.0;
+    assert!(
+        column_km >= 0.99 * normal_km && column_km < 1.3 * normal_km,
+        "{column_km} km consumed, the normal column {normal_km} km"
+    );
+    for (speed, cover) in [(50.0, 200.0), (80.0, 1500.0)] {
+        let (st, _, forearcs) = setup(speed, cover);
+        let mut s2 = st.clone();
+        let e = subduction::erode_forearcs(&mut s2, &env, &forearcs);
+        assert_eq!(e, subduction::Eroded::default(), "{speed} mm/yr, {cover} m");
+        assert_eq!(s2.groups.len(), st.groups.len());
+        assert!(st.samples.iter().zip(&s2.samples).all(|(a, b)| same(a, b)));
+    }
+}
+
 /// Sediment subduction (PLT-440): of the sediment and sedimentary rock on oceanic crust hidden
 /// under the overriding plate, a resampling sends its share to the mantle and accretes the rest;
 /// the subducted global books what the accretion lost, and a run without the rule has no global.
