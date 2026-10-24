@@ -553,8 +553,8 @@ pub struct TectonicParams {
     pub weld_after_myr: f64,
     /// Polarity reversal (`plates/subduction.rs`, PLT-056): `true` judges the overriding side by
     /// the crust its arc stands on (its plate's continental crust within `arc_distance_km` of the
-    /// overlap, PLT-370) rather than by its crust in the overlap; `false` (the default and every
-    /// built-in preset) by the overlap (ledger PLT-371).
+    /// overlap, PLT-370; the default and every built-in preset since 2026-10-23, V1 gap 2) rather
+    /// than by its crust in the overlap (`false`, PLT-056's old judgement; ledger PLT-371).
     pub reversal_by_arc_crust: bool,
     /// Orogenic collapse (`plates/collapse.rs`): continental crust thicker than
     /// `collapse_thickness_km` that no orogeny is raising any more thins by spreading, with this
@@ -709,19 +709,21 @@ pub struct TectonicParams {
     /// Fracture-line irregularity (radians of noise warp).
     pub rift_warp_rad: f64,
     /// Rifts under tension (V1 gap 2's stage C2, `plates::rifting::maybe_rift`): a plate's rift
-    /// hazard is weighted by e^(σ/σ_s) over its area-weighted mean across the plates that may
-    /// rift, σ the plate's mean in-plane stress from the force balance (FRC-022, tension
-    /// positive) and σ_s this, MPa; the expected count is unchanged, the rifts move to the plates
-    /// pulled apart. 0 (the default) leaves the hazard as Cortial's. game-choice (agent
-    /// 2026-10-23): about half the spread of the plates' σ on the base's records. ledger: PLT-504
+    /// hazard is weighted by e^(σ/σ_s) over its mean across the plates that may rift, weighted by
+    /// their unweighted hazards, σ the plate's mean in-plane stress from the force balance
+    /// (FRC-022, tension positive) and σ_s this, MPa; the expected count is unchanged, the rifts
+    /// move to the plates pulled apart. 0 leaves the hazard as Cortial's; 20 is the default
+    /// (since 2026-10-23). game-choice (agent 2026-10-23): about half the spread of the plates' σ
+    /// on the base's records. ledger: PLT-504
     pub rift_stress_mpa: f64,
     /// Rifts along weak lithosphere (V1 gap 2's stage C2, `plates::rifting::rift`): a rift's
     /// fragments grow from their centres through the plate, each lattice edge costing its length
     /// times (225 km / L)^m, L the lithosphere's depth (`thermal_state`'s), m this; the fragments
-    /// meet, and the plate breaks, where the lithosphere is thin. 0 (the default) splits by
-    /// great-circle distance (Cortial). Needs `thermal_state`. The value to run is 2: a brittle
-    /// strength that grows linearly with depth (Byerlee's friction, from memory) integrates to a
-    /// plate strength ∝ L², and an edge costs its strength's inverse. Audet & Bürgmann 2011:
+    /// meet, and the plate breaks, where the lithosphere is thin. 0 splits by great-circle
+    /// distance (Cortial), as does any m without `thermal_state`. The default is 2 (since
+    /// 2026-10-23): a brittle strength that grows linearly with depth (Byerlee's friction, from
+    /// memory) integrates to a plate strength ∝ L², and an edge costs its strength's inverse.
+    /// Audet & Bürgmann 2011:
     /// strain concentrates at pre-existing weak zones, and the weak directions follow the
     /// gradients of the effective elastic thickness. ledger: PLT-506
     pub rift_weakness: f64,
@@ -739,9 +741,9 @@ pub struct TectonicParams {
     /// Ridge segments (V1 gap 2's stage A, `plates::ridges::segment_ridges`): at a resampling the
     /// new floor between two plates is cut into bands of this width along the meridians of their
     /// relative rotation's pole, and each band's ridge is a segment normal to the motion, the steps
-    /// between them transforms. Km, Earth-normalized; 0 (the default) keeps Cortial's ridge at
-    /// the gap's midline. The value to run is Earth's first-order segment, 600 km (Aghaei et al.
-    /// 2014 after Macdonald 1998: "600 ± 300 km"); the second-order ones (140 ± 90 km) are under
+    /// between them transforms. Km, Earth-normalized; 0 keeps Cortial's ridge at the gap's
+    /// midline. The default (since 2026-10-23) is Earth's first-order segment, 600 km (Aghaei et
+    /// al. 2014 after Macdonald 1998: "600 ± 300 km"); the second-order ones (140 ± 90 km) are under
     /// the quick lattice's two rings. ledger: PLT-502
     pub ridge_segment_km: f64,
     /// Magmatic arc: distance from the front of its axis, km.
@@ -860,13 +862,14 @@ pub struct TectonicParams {
     /// continental crust stays on the plate, and the fracture's seed is old floor beyond it. The
     /// old floor then goes down at an intra-oceanic trench, its arc stands on ocean floor (an
     /// island arc), and the margin stays passive (Stern 2004, Crameri et al. 2020: no Cenozoic
-    /// passive margin turned convergent). Off (the default) lets the fracture run anywhere
-    /// through the old floor, along the continent's edge included. ledger: PLT-503
+    /// passive margin turned convergent). On by default since 2026-10-23; off lets the fracture
+    /// run anywhere through the old floor, along the continent's edge included. ledger: PLT-503
     pub subduction_initiation_offshore: bool,
     /// Subduction starts under compression (V1 gap 2's stage C2): the initiation hazard weighted
     /// as `rift_stress_mpa`'s with −σ, over the plates' old floor, σ_s this, MPa (Crameri et al.
-    /// 2020: horizontally forced initiation dominates the last 100 Myr). 0 (the default) leaves
-    /// it unweighted. game-choice (agent 2026-10-23), as `rift_stress_mpa`. ledger: PLT-505
+    /// 2020: horizontally forced initiation dominates the last 100 Myr). 0 leaves it unweighted;
+    /// 20 is the default (since 2026-10-23). game-choice (agent 2026-10-23), as
+    /// `rift_stress_mpa`. ledger: PLT-505
     pub initiation_stress_mpa: f64,
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.
@@ -943,7 +946,7 @@ impl Default for TectonicParams {
             wedge_slope_deg: 1.5,             // ledger: PLT-192
             weld_speed_mm_yr: 5.0,            // ledger: PLT-246
             weld_after_myr: 10.0,             // ledger: PLT-246
-            reversal_by_arc_crust: false,     // ledger: PLT-371
+            reversal_by_arc_crust: true,      // ledger: PLT-371 (on since 2026-10-23)
             collapse_myr: 15.0,               // ledger: PLT-255
             collapse_thickness_km: 50.0,      // ledger: PLT-256
             collapse_quiet_myr: 10.0,         // ledger: PLT-259
@@ -981,14 +984,14 @@ impl Default for TectonicParams {
             rift_ocean_weight: 0.08,
             rift_fragments: [2, 4],
             rift_warp_rad: 0.2,
-            rift_stress_mpa: 0.0, // ledger: PLT-504 (game-choice: off by default)
-            rift_weakness: 0.0,   // ledger: PLT-506 (game-choice: off by default)
+            rift_stress_mpa: 20.0, // ledger: PLT-504 (game-choice; on since 2026-10-23)
+            rift_weakness: 2.0,    // ledger: PLT-506 (on since 2026-10-23)
             min_plate_area_frac: 0.003,
             max_plates: 40,
             resample_min_myr: 20.0,  // ledger: PLT-098
             resample_max_myr: 120.0, // ledger: PLT-098
             resample_drift_km: 1500.0,
-            ridge_segment_km: 0.0, // ledger: PLT-502 (game-choice: off by default)
+            ridge_segment_km: 600.0, // ledger: PLT-502 (on since 2026-10-23)
             arc_distance_km: 200.0,
             arc_width_km: 60.0,
             island_arc_km3_per_km_myr: 100.0,     // ledger: PLT-045
@@ -1020,10 +1023,10 @@ impl Default for TectonicParams {
             subduction_initiation_age_myr: 150.0,
             subduction_initiation_per_myr: 0.15, // ledger: PLT-063
             subduction_initiation_clearance_km: 1000.0,
-            initiation_slab_km: 150.0,             // ledger: PLT-270
-            subduction_initiation_offshore: false, // ledger: PLT-503 (off until its pool arm)
-            initiation_stress_mpa: 0.0,            // ledger: PLT-505 (game-choice: off by default)
-            contact_timeout_myr: 24.0,             // ledger: PLT-059
+            initiation_slab_km: 150.0,            // ledger: PLT-270
+            subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
+            initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
+            contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
             plate_speed_scale_mm_yr: 45.0, // ledger: PLT-181
@@ -1369,17 +1372,12 @@ impl PlanetPreset {
             "$.tectonics.thermal_keel_km",
             "must be ≥ 0",
         )?;
-        // `thermal_strength` (on by default) does nothing without the state, so turning the state
-        // off alone is allowed; the two opt-in terms are refused without it.
+        // `thermal_strength` and `rift_weakness` (on by default) do nothing without the state, so
+        // turning the state off alone is allowed; the two opt-in terms are refused without it.
         check(
             k.thermal_state || (k.thermal_isostasy_m == 0.0 && !k.thermal_backstop),
             "$.tectonics.thermal_state",
             "thermal_isostasy_m and thermal_backstop need thermal_state",
-        )?;
-        check(
-            k.thermal_state || k.rift_weakness == 0.0,
-            "$.tectonics.rift_weakness",
-            "needs thermal_state",
         )?;
         // The force balance.
         pos(

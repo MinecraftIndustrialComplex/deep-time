@@ -342,13 +342,12 @@ pub fn resolve(
         // Polarity reversal: continental crust arriving on the subducting side of an oceanic
         // overriding plate stops that subduction and starts the opposite one (Cortial: "an oceanic
         // plate always plunges beneath a continental plate"; without it a continent at a junction
-        // of three trenches is handed round them for ever). ledger: PLT-056. It judges the
-        // overriding side by its crust in the overlap, often an oceanic fringe in front of its
-        // continent, and fires about 17 times per 100 Myr against Crameri et al. (2020)'s 4 in
-        // about 105 Myr; judged by the crust the arc stands on instead (Stern 2004,
-        // `reversal_by_arc_crust`, off by default) it fires about 12 times, the collisions it ends
-        // fall from 8 to 5 per 100 Myr and the collisions rise to 1.85 to 2.2 per 100 Myr, by
-        // longer fronts in collision (ledger: PLT-371, which has what it does to the land).
+        // of three trenches is handed round them for ever). ledger: PLT-056. By default (since
+        // 2026-10-23, V1 gap 2) the overriding side is judged by the crust its arc stands on
+        // (Stern 2004, `reversal_by_arc_crust`, ledger: PLT-371, which has what it does to the
+        // land); with the switch off, by its crust in the overlap (PLT-056's old judgement), often
+        // an oceanic fringe in front of its continent, which fired about 17 times per 100 Myr
+        // against Crameri et al. (2020)'s 4 in about 105 Myr.
         if let Some(&k) = index.get(&(lo, hi)) {
             let c = &state.contacts[k];
             let under_side = usize::from(c.under != lo);
@@ -523,8 +522,8 @@ pub(super) fn locked_against(
 /// an arc behind a front there would stand on continental crust. The boundary mix measures the
 /// same distance (`dynamics`, PLT-370).
 /// The arc-front counters measure with it, and the polarity reversal judges the overriding side
-/// by it with `reversal_by_arc_crust` (off by default; plates.md, "The plate geometry" and "The
-/// crust flux into collision fronts", 2026-10-21; ledger: PLT-371).
+/// by it with `reversal_by_arc_crust` (on by default since 2026-10-23; plates.md, "The plate
+/// geometry" and "The crust flux into collision fronts", 2026-10-21; ledger: PLT-371).
 fn continent_within(
     state: &PlateState,
     geo: &Geo,

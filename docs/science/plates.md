@@ -5711,15 +5711,17 @@ length: Earth's 0.71 is an envelope about 35° from orthogonal.
 
 ### The design
 
-Each stage is its own switch, off by default; off is the base bit for bit: the pool's alias
-check at 839dc4d2 (key 21aa3ea4d466 against base's 7f9d8f115049, seed 1, supercontinent start,
-1000 Myr: the world state's 106 files and the dynamics record identical; alias recorded). Under
-Ben's rule of 2026-10-23 (CLAUDE.md "How many runs") a stage goes on by default once it is
-built and correct, its unit tests against its sources passing and its pool arm showing no
-divergence or guard failure, and the rule it replaces goes off with it; the V1 numbers are
-realism checks, not a gate. So each stage below names the rule it replaces, and none of its
-values is chosen to move a V1 number or Bird's shares: each comes from a source or from the
-lattice's resolution.
+Each stage is its own switch. They were built off by default, and off was the base bit for bit:
+the pool's alias check at 839dc4d2 (key 21aa3ea4d466 against base's 7f9d8f115049, seed 1,
+supercontinent start, 1000 Myr: the world state's 106 files and the dynamics record identical;
+alias recorded), and again on the new base at 0fe14663 (key 15660e3c5636 against base2's
+4eeee4b84a8c: the world state's 108 files and the dynamics record identical). Under Ben's rule
+of 2026-10-23 (CLAUDE.md "How many runs") a stage goes on by default once it is built and
+correct, its unit tests against its sources passing and its pool arm showing no divergence or
+guard failure, and the rule it replaces goes off with it; the V1 numbers are realism checks, not
+a gate. Every stage passed and is on by default since 2026-10-23 ("The arms", below). So each
+stage below names the rule it replaces, and none of its values is chosen to move a V1 number or
+Bird's shares: each comes from a source or from the lattice's resolution.
 
 **A. Ridge segments normal to the motion, joined by transforms** (`tectonics.ridge_segment_km`,
 PLT-502). The ridge is made where the crust is: a resampling turns each gap point (no footprint
@@ -5802,8 +5804,9 @@ nothing).
   collisions, which load their plates in compression: "collision events along pre-existing
   subduction trenches are often precursors of SZI events" (ibid.). *Replaces*: the share of
   PLT-063's hazard between plates by their old floor alone.
-- *Rifts along weak lithosphere* (`tectonics.rift_weakness`, an exponent m, 0 = off; needs
-  `tectonics.thermal_state`, on by default since gap 4's merge of 2026-10-23): the rift's fragments are grown from their centres through the
+- *Rifts along weak lithosphere* (`tectonics.rift_weakness`, an exponent m, 0 = off; it reads
+  `tectonics.thermal_state`, on by default since gap 4's merge of 2026-10-23, and with the state
+  off the split is the great circle's whatever m is): the rift's fragments are grown from their centres through the
   plate (Dijkstra over the lattice) with each edge's cost its length times (L_ref / L)^m, L the
   lithosphere's depth (gap 4's state, `Sample::lithosphere_km`; unset counts as L_ref, clamped
   to 20 to 225 km) and L_ref the old craton's 225 km (PLT-462). Thin, hot lithosphere is slow
@@ -5893,40 +5896,114 @@ What it says:
   the arms, not a knob on `belts.rs`'s widths. `collision_orogeny_myr` is only the regime's label
   window (it decides which belts the measures call collision) and is not a lever.
 
-### The arms (waiting for the new base)
+### The arms (2026-10-23, on the new base)
 
-No arm has run. The exploration arms queued on 2026-10-23 (each switch alone) were cancelled
-under the testing rules of that day: one cumulative 8-run arm per stage, on the base that master
-gets once the flexure and gap 4 lanes merge with their physics on (the coordinator: "one 24-run
-base on master"). On that base, after merging it into this branch and repeating the alias check
-against it:
+Master 2fde68f7 merged in (the flexure and gap 4 lanes with their physics on; its base is the
+pool's base2, key 4eeee4b84a8c, argkey 2a53566b, 24 runs) and the alias check repeated on it
+(above). One cumulative 8-run arm per stage, `earthlike_quick_16k`, 1000 Myr, seeds 1 to 4, both
+starts, `+DEEPTIME_CRUST_BUDGET=1`, key 15660e3c5636, read against g2-base2s4 (base2's own runs of
+the same seeds and starts, cached, no sim):
 
-| arm | adds | runs |
+| arm | adds | argkey |
 |---|---|---|
-| g2-A | `ridge_segment_km=600` | 8 (seeds 1 to 4, both starts) |
-| g2-AC1 | + `subduction_initiation_offshore=true` | 8 |
-| g2-AC1C2 | + `rift_stress_mpa=20`, `initiation_stress_mpa=20`, `rift_weakness=2` | 8 |
+| g2-A | `ridge_segment_km=600` | af86bbd6 |
+| g2-AC1 | + `subduction_initiation_offshore=true` | a14b0ebd |
+| g2-AC1C2 | + `rift_stress_mpa=20`, `initiation_stress_mpa=20`, `rift_weakness=2` | ac2787f9 |
+| g2-AC1C2R | + `reversal_by_arc_crust=true` (PLT-371, the coordinator's request) | 1ae5c62e |
 
-A stage whose arm shows no divergence and no guard failure goes on by default, the rules it
-replaces off with it, its fixtures pinned off where a test needs the old behaviour, and the
-seed-pinned weld tests swept; the measures `v1census`, `boundary`, `collcoast` and gap 4's
-`coastset` are reported beside it as realism checks (`pool.sh table --registry
-tools/review/pool/measures_boundary.json --registry tools/review/pool/measures_gap4.json`). The
-arm g2-base4 (base's seeds 1 to 4, 8 cached runs) is the matched control on the old base; the
-new base needs its own.
+Medians of 8 runs, the two-sided Mann-Whitney p against the control in brackets (`pool.sh table
+--base g2-base2s4 --registry tools/review/pool/measures_boundary.json --registry
+tools/review/pool/measures_gap4.json`, measures `v1census`, `boundary`, `collcoast`, `coastset`
+and `guard`); the docking episodes are the sum of the four hand-off medians and the partings':
 
-### Ben's part
+| measure | control | g2-A | g2-AC1 | g2-AC1C2 | g2-AC1C2R |
+|---|---|---|---|---|---|
+| runs that failed | 0 | 0 | 0 | 0 | 0 |
+| guard: steps beyond 2 Earth reliefs | 0 | 0 | 0 | 0 | 0 |
+| guard's worst, m from the sea | 12,172 | 13,144 (0.046) | 12,341 (0.13) | 11,810 (0.72) | 12,061 (1.0) |
+| plate cells' largest excess over Airy, m | 2,971 | 3,407 (0.083) | 3,256 (0.44) | 3,398 (0.015) | 3,481 (0.44) |
+| land | 0.315 | 0.333 (0.44) | 0.311 (1.0) | 0.331 (0.23) | 0.319 (0.72) |
+| largest landmass | 0.173 | 0.147 (0.80) | 0.220 (0.16) | 0.243 (0.13) | 0.235 (0.16) |
+| land above 2 km (fires above 0.07) | 0.126 | 0.110 (0.80) | 0.116 (0.80) | 0.110 (0.57) | 0.146 (0.57) |
+| coast with high ground (fires above 0.11) | 0.310 | 0.254 (0.57) | 0.311 (1.0) | 0.292 (0.65) | 0.330 (0.57) |
+| collisions per 100 Myr | 1.65 | 1.95 (0.29) | 1.70 (0.75) | 1.60 (0.96) | 1.95 (0.057) |
+| continental crust's net change over the run | −0.020 | +0.019 (0.10) | −0.006 (0.38) | +0.025 (0.021) | −0.005 (0.28) |
+| v1census criteria met per run, mean of 7 | 5.00 | 5.12 | 5.12 | 4.75 | 5.00 |
+| subducting / transform / spreading (Bird 0.197 / 0.283 / 0.363) | 0.340 / 0.213 / 0.358 | 0.334 / 0.212 / 0.364 | 0.340 / 0.211 / 0.358 | 0.339 / 0.211 / 0.359 | 0.338 / 0.215 / 0.356 |
+| ocean-ocean share of subducting (about 0.35) | 0.300 | 0.319 (0.007) | 0.339 (< 0.001) | 0.345 (< 0.001) | 0.347 (< 0.001) |
+| active share of the continental margin (0.25 to 0.40) | 0.532 | 0.540 (0.72) | 0.527 (0.44) | 0.516 (0.28) | 0.527 (0.88) |
+| coast at a front: the continent overriding / an initiation's | 0.226 / 0.167 | 0.220 / 0.149 | 0.202 / 0.156 | 0.203 / 0.131 | 0.208 / 0.167 |
+| front in collision, km (6,000 to 12,000) | 28,616 | 30,688 (0.33) | 32,886 (0.038) | 29,658 (0.38) | 33,751 (0.010) |
+| collision length p50 / p90, Myr | 32 / 102 | 46 / 138 | 38 / 136 | 46 / 135 | 52 / 125 |
+| rifts / initiations per 100 Myr | 2.45 / 6.50 | 2.85 / 6.70 | 2.10 / 8.00 | 2.45 / 7.90 | 2.55 / 7.20 |
+| polarity reversals per 100 Myr (Crameri: 4 in 104 Myr) | 16.3 | 19.3 (0.040) | 17.6 (0.13) | 15.8 (0.80) | 12.1 (0.005) |
+| hand-offs per 100 Myr, under 50 / 50 to 200 / 200 to 1000 / 1000 or more samples | 63.8 / 15.8 / 8.1 / 1.6 | 70.3 / 18.6 / 9.2 / 2.0 | 64.5 / 20.3 / 10.0 / 1.8 | 68.0 / 19.0 / 9.2 / 1.6 | 69.7 / 20.7 / 10.9 / 1.9 |
+| partings per 100 Myr | 34.4 | 38.9 | 35.9 | 33.0 | 32.8 |
+| docking episodes per 100 Myr (Macdonald et al. 2019: 15 to 46 sutures) | about 124 | about 139 | about 133 | about 131 | about 136 |
+| collision belts' share of the high coasts (`coastset`) | 0.767 | 0.786 | 0.823 | 0.812 | 0.803 |
+
+Read against base2's 24 runs instead (`--base base2`), the realism checks are the same: land
+above 2 km 0.134 on base2, p 0.29 to 0.56 for the arms; coast with high ground 0.312, p 0.22 to
+0.62. What the tables say:
+
+- **Every stage is correct by Ben's rule, so every stage is on.** All 32 runs ran their 1000 Myr,
+  none had a step beyond two Earth reliefs, and the guard's worst stays within 11,810 to 13,144 m
+  of the control's 12,172 (A's p 0.046, the others 0.13 or more). Since 2026-10-23 the defaults are
+  `ridge_segment_km` 600, `subduction_initiation_offshore` true, `rift_stress_mpa` and
+  `initiation_stress_mpa` 20, `rift_weakness` 2 and `reversal_by_arc_crust` true: the default
+  planet is g2-AC1C2R's. The rules they replace run only with them off: PLT-100/101's nearer plate
+  and midline α in the ridge's bands, PLT-067's split along the continent's edge, the hazards'
+  share between plates by area, continental fraction, plume heads and old floor alone (PLT-083,
+  PLT-084, PLT-090, PLT-063, which stay as the hazards' sizes), PLT-087's great-circle distance
+  (its warp stays) and PLT-056's judgement of the overriding side by its crust in the overlap.
+  PLT-064's clearance stays.
+- **The two realism checks that fire on the base fire on every arm, and no stage moves them**
+  (p 0.57 or more on both): land above 2 km 0.110 to 0.146 (fires above 0.07), coast with high
+  ground 0.254 to 0.330 (fires above 0.11). Nothing was tuned to them.
+- **The docking count stays about 130 per 100 Myr** (124 on the control, 131 to 139 on the arms),
+  three to nine times Macdonald et al.'s sutures, and the collision belts keep 0.79 to 0.82 of
+  the high coasts. None of these stages was built to change the number of terranes and arcs
+  reaching the trenches, and none does.
+- **A does not show in the boundary's classes.** Transform stays 0.211 to 0.215 (Bird 0.283) and
+  spreading 0.356 to 0.364. The law is built and its test holds (one meridian per band, transform
+  over ridge tan α), but the boundary's classes are read on the lattice over two rings (PLT-310)
+  and its transform window (PLT-311) at every step, and either a band's transform step (L tan α)
+  is too short to read there or the plates' edges between resamplings do not keep it; which of the
+  two is not measured (a measure of the spreading boundary's obliquity from the record would say).
+  A raised the reversals to 19.3 (p 0.040) and the ocean-ocean share to 0.319 (p 0.007).
+- **C1 makes the intra-oceanic trenches Earth has**: the ocean-ocean share of the subducting
+  boundary goes to 0.339 and on to 0.347 with C2 and R (p < 0.001; Stern & Scholl's about 0.35),
+  and the coast where the continent overrides falls from 0.220 to 0.202. The active margin barely
+  moves (0.540 to 0.527): a coast counts as at a front within 400 km of one
+  (`stats::MARGIN_ACTIVE_KM`), and C1's trench starts at the arc's reach, about 330 km off the
+  continent, inside that window.
+- **C2 keeps the counts and moves the places**: rifts 2.10 to 2.45 and initiations 8.00 to 7.90 per
+  100 Myr (the weights keep the expected count). The continental crust's net change over the run
+  goes from −0.020 on the control to +0.025 (p 0.021), and the largest excess of a plate cell over
+  Airy from 2,971 to 3,398 m (p 0.015), still far from the guard's 2 reliefs.
+- **R does what PLT-371's row measured on the older bases**: the reversals fall from 15.8 to 12.1
+  per 100 Myr (p 0.005 against the control, Crameri et al.'s 4 in 104 Myr), the share of
+  partings ended by a reversal from 0.261 to 0.175, and the jams go on as collisions instead: the
+  front in collision 29,700 to 33,800 km (p 0.010 against the control, already 2 to 4 times
+  Earth's), collisions 1.60 to 1.95 per 100 Myr (p 0.057), land above 2 km 0.110 to 0.146 and coast
+  with high ground 0.292 to 0.330 (neither significant).
+
+The seed-pinned weld tests were swept with every stage on (`plates/tests.rs`, the seed history in
+each test's comment), and the one-law fixtures that need the old rules pin them off.
+
+### What was decided, and what comes next
 
 How plates are made and moved is Ben's scope; he approved doing the gap, not one design. The
-stages above stay on the lattice and change no world-data format. The questions for him are in
-the lane's report to the coordinator: the plate count and a finer lattice (PLT-372), and whether
-to replace the lattice's boundaries with drawn ones (recommended: neither now, since each
-stage's physics works on the lattice as it is); and whether induced initiation near trenches
-should be its own stage. On the last: "All SZI events start less than 1500 km away from other
-active subduction zones and, in most cases, less than 500 km" (Crameri et al. 2020), while
-PLT-064 keeps every initiation 1,000 km from all trenches (`pending-rewrite` since the plate
-geometry task's arm i1, 2026-10-21); C2's weight is per plate and does not place an initiation,
-so PLT-064 is not replaced here. A stage that starts subduction at a plate's compressive boundary would
-replace PLT-064's clearance (recommended: after C2's arm, as a stage of its own). The base's
-polarity reversals, 16.9 per 100 Myr against Crameri et al.'s 4 in 104 Myr, are a measurement
-for the subduction work, not a gap-2 rule.
+stages above stay on the lattice and change no world-data format. Two questions were raised and
+settled by the coordinator (2026-10-23), not put to Ben: the plate count and a finer lattice
+(PLT-372) stay as they are, and the lattice's boundaries are not replaced by drawn ones, since
+each stage's physics works on the lattice as it is. Induced initiation near trenches comes later,
+as its own stage after C2's arm: "All SZI events start less than 1500 km away from other active
+subduction zones and, in most cases, less than 500 km" (Crameri et al. 2020), while PLT-064
+keeps every initiation 1,000 km from all trenches (`pending-rewrite` since the plate geometry
+task's arm i1, 2026-10-21); C2's weight is per plate and does not place an initiation, so PLT-064
+is not replaced here. A stage that starts subduction at a plate's compressive boundary would
+replace PLT-064's clearance. The base's polarity reversals, 16.9 per 100 Myr against Crameri et
+al.'s 4 in 104 Myr, are a measurement for the subduction work; stage R (PLT-371, its arm above)
+is the reversal judged by the arc's crust, the subduction lane's law, run here on top of C2 at
+the coordinator's request, and on by default with the others.
