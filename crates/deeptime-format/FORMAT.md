@@ -1757,9 +1757,11 @@ downstream; at each, a cone of that slope (measured on the planet) is laid where
 the ground and the land is no lake, playa, delta plain or larger river's channel (and nowhere
 thicker than over the apex), high enough to
 cover Bull's area A_F = 1.3 A_D^0.88 (square miles) and at most as high as a free fan (a quarter
-circle of that area); a hollow the cones close on the fan cells is filled to its spill (HYD-177),
-and on L3 a filled cell's cells stand at the spill. `detail/amplitude` is 0 there, and the raster **`fan`** (i16, 1/16 block, on
-the `elevation` grid; 0 off the fans) holds what the cones added, which a re-run takes off first.
+circle of that area); a cell whose spill level (from the open sea and the grid's end rows) the
+fans raised over its ground, on a fan or behind one, is filled to it unless the first network had a
+lake or playa there (HYD-177), and on L3 a filled cell's cells stand at the spill. `detail/amplitude` is 0 there, and the raster **`fan`** (i16, 1/16 block, on
+the `elevation` grid; 0 off the fans) holds what the cones and the fill added, which a re-run takes
+off first.
 The second network run (which then runs when there are fans and no delta plain too) drains down
 the cones; no floodplain is laid on a fan.
 **Braids** (since "hyd-165", 2026-10-24; rivers-and-lakes.md "Fans and braids", HYD-171 to
