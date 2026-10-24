@@ -17,7 +17,10 @@
 //! - **Extent** (HYD-168, HYD-169). The cone is laid where it stands over the ground, on the cells
 //!   joined to its apex across land that is no lake, playa, delta plain or channel of a larger
 //!   river ("the radii of a fan are restricted by adjacent fans, and by stream deposits at the toe
-//!   of the fan", Bull 1964, p. 94). Its height over the apex is found so that it covers A_F, but
+//!   of the fan", Bull 1964, p. 94), and nowhere thicker than over its apex: where the ground falls
+//!   away from the apex faster than the fan (off a plateau's edge, into a deeper valley) the fan
+//!   ends, as the cone would otherwise bury lower ground far below it. Its height over the apex is
+//!   found so that it covers A_F, but
 //!   at most the height of a free fan: the cone of A_F spread over a quarter circle on flat ground
 //!   (the median sector of Stock et al.'s 2008 four fans), so a fan hemmed in by higher ground is
 //!   smaller than Bull's. A fan less than a block high at its apex is not drawn (HYD-170).
@@ -364,13 +367,17 @@ pub fn find(inp: &Input<'_>, net: &network::Output) -> Fans {
         let apex = pos(cd.cell);
         let top = cd.top_raw + thick_m / mv * 16.0;
         let fall = cd.slope * mh / mv * 16.0;
+        // Nowhere thicker than over the apex: the ground no lower than a cone of the fan's slope
+        // through the apex's ground.
+        let cap = top - f64::from(inp.elev[cd.cell as usize]);
         let mut seen: HashMap<u32, ()> = HashMap::new();
         let mut queue = VecDeque::from([cd.cell]);
         seen.insert(cd.cell, ());
         while let Some(cell) = queue.pop_front() {
             let cu = cell as usize;
             let cone = top - fall * dist(apex, pos(cell));
-            if cone <= f64::from(inp.elev[cu]) || !free(cu) {
+            let e = f64::from(inp.elev[cu]);
+            if cone <= e || cone - e > cap || !free(cu) {
                 continue;
             }
             if let Some(&(k, _, a)) = on.get(&cell)
