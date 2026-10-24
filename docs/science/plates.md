@@ -6207,5 +6207,14 @@ coast the long collisions made, but the model's continental area was held at Ear
 those same collisions. What holds it on Earth, against the area the arcs make, is missing: an
 area sink of continental crust (the forearc's tectonic erosion, PLT-441, only thins the edge in
 the model, never below a normal ocean floor's 7 km: `forearc` −328 of volume and no area;
-continental crust never turns oceanic, `c2o` 0 in every process). That is another lane's physics (the crust budget's, build log
+continental crust never turns oceanic, `c2o` 0 in every process). That is the crust budget's physics (build log
 2026-10-19 "mountains eat the world"), not a cap on this one.
+
+**Held off** (the coordinator's call, 2026-10-23). Ben's rule turns physics on once it is built
+and correct on the pool. T's own physics is (its unit tests against Gurnis et al. and Stern,
+no divergence, no guard failure), but the planet under it is not: the plate check fails in 8
+of 8 runs (PLT-159's highest continental share 0.45, the arcs' continental heights, the largest
+land gain) and one plate holds over half the planet in 16.5 % of the steps, and a drowned
+master would move every GameTest planet and every deployed world for the other lanes. So
+`tectonics.transference` stays off by default (off is bit-identical to base3) until it can go
+on together with the sink of continental area it exposes; that sink is this lane's next stage.
