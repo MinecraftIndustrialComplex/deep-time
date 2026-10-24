@@ -715,10 +715,14 @@ section 7.4 is deleted yet.
   `probe column` gives the fold, north and metres per block; `probe tw` the period 4s, the face side
   and whether Toroidal World wraps at it, which the smoke checks; `sites near` adds km and the walk;
   `CubeBorder.walkDistance`, `WorldProjection.greatCircleBlocks`, `CubeWorldGameTests.cubeCommandProbes`;
-  the dedicated-server first start on the cube is G6's 16k smoke run).
-- Left: G12 (the presets themselves; the smoke
-  uses `tools/smoke/presets/*_cube.json`), the rest of G13 and G14, G16, the Sable border, and the
-  section 7.4 deletions with the rewrites of the Petroff-Guyou tests they bring.
+  the dedicated-server first start on the cube is G6's 16k smoke run), G12's opt-in part (a cube
+  level type takes every built-in preset of its size and bakes it as a cube: `Presets.withProjection`,
+  `FirstStartGenerator.presetsFor`, the `server.json` template, `install.sh --cube`; the 16k smoke's
+  first start bakes `earthlike_quick_16k` on `deeptime:planet_cube`).
+- Left: the rest of G13 and G14, G16, the Sable border, and section 7.4 with what waits for it: G12's
+  preset edits (`planet` and `planet_32k` made cubes, `planet_lambert*` deleted, the Rust presets'
+  projection keys, the deposits fixtures as cubes), G13's `editor_fields.json` keys, and the
+  deletions with the rewrites of the Petroff-Guyou tests they bring.
 
 **The work.**
 
@@ -832,6 +836,12 @@ section 7.4 is deleted yet.
     That covers earthlike, pipeline and plates at full and quick for 16k and 32k, and
     `tests/presets/planet_world_4k.json`. `deposits_world_4k` and `deposits_world_16k` become cubes.
   - The quick keyframe size `d_keyframe_size` [1024, 326] is a π:1 picture and stays (G13).
+
+  Phase 2 builds the opt-in part only (coordinator's call, 2026-10-23): the level type chooses the
+  map, so a cube level type bakes any preset of its notional size as a cube
+  (`Presets.withProjection` on a copy, `--set scale.projection=cube` on the CLI line), and
+  `presetsFor` lists the built-ins for it. Petroff-Guyou and Lambert keep their path. The renames,
+  the deletions, the Rust preset keys and the deposits fixtures wait for section 7.4.
 
   Check: `Presets` JUnit; `FirstStartGenerator` on both level types.
 - **G13. The Create World screen.**

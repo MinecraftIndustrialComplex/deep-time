@@ -228,6 +228,18 @@ public final class Presets {
         return new Info(name, placeholder, c, timeline, string(preset, "description"), projection);
     }
 
+    /**
+     * A copy of the preset with {@code scale.projection} set (cube plan G12: a cube level type bakes a
+     * preset of another map as a cube; Rust {@code ProjectionKind}'s names).
+     */
+    public static JsonObject withProjection(JsonObject preset, String projection) {
+        JsonObject copy = preset.deepCopy();
+        if (!copy.has("scale") || !copy.get("scale").isJsonObject())
+            copy.add("scale", new JsonObject());
+        copy.getAsJsonObject("scale").addProperty("projection", projection);
+        return copy;
+    }
+
     /** Sets {@code timeline} in a preset and returns its canonical JSON. */
     public static String withTimeline(JsonObject preset, Timeline t) {
         JsonObject copy = preset.deepCopy();

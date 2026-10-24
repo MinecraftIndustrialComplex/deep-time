@@ -255,7 +255,8 @@ BAK-048, BAK-050, BAK-065 and BAK-067) are game choices about how far terrain st
   (844, 396), sand at y -7 under deep lukewarm ocean alone and deep ocean on another thread. Far
   terrain's searches now start cold (`ColdBiomeSearch`, a mixin on the search that forgets the
   thread's last answer inside it), so a tie goes to the first entry in the tree's order on every
-  thread; real chunks keep vanilla's search, so at a tie a chunk may still hold the other entry.
+  thread; real chunks on the polar worlds keep vanilla's search, so at a tie a chunk may still hold
+  the other entry (a cube world's chunks search cold too, cube-world-game.md item 2).
   Measured in one GameTest run on the test planet with a warm or cold switch (branch commit
   614bde8e, since removed; the VM loaded with an ensemble): warm
   1 section of 24 differs, cold none, standalone and with MIC; a section costs 9.1 and 24.9 ms warm,

@@ -60,6 +60,17 @@
 //! front's own row and then the row behind it, as the trench's retreat landward does (Clift &
 //! Vannucchi's 1 to 5 km/Myr). The column loses each pool in proportion (the wedge goes whole) and
 //! sinks by its Airy change (an island arc's forearc on the ocean's height line).
+//!
+//! **The trench's retreat** (`tectonics.erosion_retreat`, the docking lane's stage S1, PLT-522,
+//! PLT-523; off by default). With it the erosive margin truncates its overriding plate instead
+//! (Scholl & von Huene 2010: "Subduction erosion truncates the margin (migrates the trench inboard)
+//! at ~2.5 km/Ma"): each erosive front sample goes whole, its column booked to the mantle, at the
+//! chance that moves the trench inboard by [`RETREAT_KM_PER_MYR`] ([`retreat_chance`]), and the
+//! sample leaves its plate for the slab's (a twin of its group in the subducting plate, so it
+//! stays where it is this step), as the slab's own surface beside it with no sediment. The front,
+//! the forearc and the arc then stand one row inboard. The volume is the retreat times the column
+//! (on the normal continental column about Clift & Vannucchi's global 90 km³/km/Myr), and the area
+//! goes with it; PLT-441's volume rate and its floor at an ocean's column are off while it is on.
 
 use std::collections::BTreeMap;
 
@@ -754,6 +765,8 @@ pub struct Forearcs {
     pub loss_km3: Vec<f64>,
     /// Per front: its overriding crust is continental (where the front sample's is).
     pub continental: Vec<bool>,
+    /// Per front: the front sample (overriding plate) and the slab's sample across from it.
+    pub front: Vec<[u32; 2]>,
     /// The fronts' distance field ([`fronts_reach`]): distances (rad), labels, the reached samples.
     dist: Vec<f64>,
     label: Vec<u32>,
@@ -771,8 +784,26 @@ pub const FOREARC_FRONT_CONTINENTAL_GLOBAL: &str = "plates/forearc_front_contine
 pub const FOREARC_FRONT_OCEANIC_GLOBAL: &str = "plates/forearc_front_oceanic_km_myr";
 /// World global: the erosion the forearcs had no crust above an ocean's column for, km³.
 pub const FOREARC_SHORT_GLOBAL: &str = "plates/forearc_short_km3";
+/// World global, with the trench's retreat on (PLT-523): the area its erosive margins consumed
+/// over the run, km² (Earth-normalized), of continental crust …
+pub const RETREAT_CONTINENTAL_GLOBAL: &str = "plates/forearc_retreat_continental_km2";
+/// … and of other crust (island arcs' forearcs, ocean floor).
+pub const RETREAT_OTHER_GLOBAL: &str = "plates/forearc_retreat_other_km2";
 
-/// What [`erode_forearcs`] did this step, km³ (Earth-normalized) and km × Myr.
+/// The trench's retreat under subduction erosion, km/Myr: Scholl & von Huene 2010, "Subduction
+/// erosion truncates the margin (migrates the trench inboard) at ~2.5 km/Ma" (1 to 5); Clift &
+/// Vannucchi 2004's Table 2, 0.9 to 4.7, median 3.0. ledger: PLT-522 (verified)
+pub const RETREAT_KM_PER_MYR: f64 = 2.5;
+
+/// The chance that an erosive front sample goes this step (PLT-523): the area the trench sweeps
+/// over the sample's piece of front, `retreat_km` × `front_km`, over the sample's area, at most 1.
+/// The expected area consumed per km of front is then the retreat (volume: the retreat times the
+/// column).
+pub fn retreat_chance(retreat_km: f64, front_km: f64, sample_area_km2: f64) -> f64 {
+    (retreat_km * front_km / sample_area_km2).clamp(0.0, 1.0)
+}
+
+/// What [`erode_forearcs`] did this step, km³ (Earth-normalized), km × Myr and km².
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Eroded {
     pub continental_km3: f64,
@@ -780,6 +811,9 @@ pub struct Eroded {
     pub short_km3: f64,
     pub front_continental_km_myr: f64,
     pub front_oceanic_km_myr: f64,
+    /// With the trench's retreat on: the area consumed, continental crust and other crust, km².
+    pub retreat_continental_km2: f64,
+    pub retreat_other_km2: f64,
 }
 
 /// One subducting-side sample's effect on its contact and on the crust budget.
@@ -1064,7 +1098,7 @@ pub fn fronts_finish(
     let mut g_continental_km_myr = [0.0_f64; 2];
     // Subduction erosion's fronts (PLT-441, PLT-442), in the order of the distance field's labels.
     let erosion_km3 = k.subduction_erosion_km3_per_km_myr * front_km * env.dt_myr; // ledger: PLT-441
-    let (mut loss_km3, mut loss_continental) = (Vec::new(), Vec::new());
+    let (mut loss_km3, mut loss_continental, mut loss_front) = (Vec::new(), Vec::new(), Vec::new());
     for (v, b) in boundary.iter().enumerate() {
         if let Some((u, c, rel, out)) = b.front {
             let su = state.samples[u as usize];
@@ -1082,6 +1116,7 @@ pub fn fronts_finish(
                     && cover < k.subduction_erosion_max_sediment_m;
                 loss_km3.push(if erosive { erosion_km3 } else { 0.0 });
                 loss_continental.push(state.samples[v].kind == CONTINENTAL);
+                loss_front.push([v as u32, u]);
             }
             if su.kind != CONTINENTAL {
                 g_full_km_myr += front_km * env.dt_myr * (speed / v0).min(1.0);
@@ -1454,6 +1489,7 @@ pub fn fronts_finish(
         forearcs: (erosion_km3 > 0.0).then_some(Forearcs {
             loss_km3,
             continental: loss_continental,
+            front: loss_front,
             dist,
             label,
             reached,
@@ -1481,6 +1517,9 @@ pub fn erode_forearcs(state: &mut PlateState, env: &Env, forearcs: &Forearcs) ->
                 out.front_oceanic_km_myr += front_myr;
             }
         }
+    }
+    if k.erosion_retreat {
+        return retreat_forearcs(state, env, forearcs, out);
     }
     // The forearcs' samples, by front, the nearest first (ties by sample).
     let width_rad = norm.rad(k.arc_distance_km); // ledger: PLT-441 (the forearc: to the arc's axis)
@@ -1543,6 +1582,61 @@ pub fn erode_forearcs(state: &mut PlateState, env: &Env, forearcs: &Forearcs) ->
         s.elevation_m = lowered.max(z_t.min(z)) as f32;
     }
     out.short_km3 = left_m.iter().map(|m| m.max(0.0) * area / 1000.0).sum();
+    out
+}
+
+/// The trench's retreat (PLT-522, PLT-523; the module docs): each erosive front sample goes whole
+/// at [`retreat_chance`], its column booked to the mantle (continental crust, its basement as
+/// other crust, as [`erode_forearcs`] books), and leaves its plate for the slab's: a twin of its
+/// group in the subducting plate (the same rotation, so it stays where it is), holding the slab's
+/// sample across the front with no sediment (that sample's own sediment is not counted twice).
+/// The draws are in the fronts' order, from the plate state's generator.
+fn retreat_forearcs(
+    state: &mut PlateState,
+    env: &Env,
+    forearcs: &Forearcs,
+    mut out: Eroded,
+) -> Eroded {
+    let norm = env.norm;
+    let area = norm.sample_area_km2();
+    let chance = retreat_chance(
+        RETREAT_KM_PER_MYR * env.dt_myr, // ledger: PLT-522
+        norm.km(norm.spacing_rad()),
+        area,
+    );
+    let mut twins: BTreeMap<(u32, u32), u32> = BTreeMap::new();
+    for (f, &[v, u]) in forearcs.front.iter().enumerate() {
+        if forearcs.loss_km3[f] <= 0.0 {
+            continue;
+        }
+        let (vi, ui) = (v as usize, u as usize);
+        let s = state.samples[vi];
+        let under = state.plate_of(ui);
+        if s.is_hidden() || state.plate_of(vi) == under || state.rng.next_f64() >= chance {
+            continue;
+        }
+        let t = f64::from(s.thickness_m);
+        if s.kind == CONTINENTAL {
+            let basement = f64::from(s.basement_m);
+            out.continental_km3 += (t - basement) * area / 1000.0;
+            out.other_km3 += basement * area / 1000.0;
+            out.retreat_continental_km2 += area;
+        } else {
+            out.other_km3 += t * area / 1000.0;
+            out.retreat_other_km2 += area;
+        }
+        let twin = *twins.entry((s.group, under)).or_insert_with(|| {
+            let rot = state.groups[s.group as usize].rot;
+            state.groups.push(super::state::Group { plate: under, rot });
+            (state.groups.len() - 1) as u32
+        });
+        let mut slab = state.samples[ui];
+        slab.group = twin;
+        slab.pools[pool::SEDIMENT] = 0.0;
+        slab.pools[pool::SEDIMENTARY] = 0.0;
+        slab.thickness_m = slab.pools.iter().sum();
+        state.samples[vi] = slab;
+    }
     out
 }
 
@@ -1619,6 +1713,24 @@ pub fn close_contacts(
 mod tests {
     use super::*;
     use crate::sphere::{SplitMix64, fibonacci_sphere};
+
+    /// The trench's retreat against its sources (PLT-522, PLT-523): Scholl & von Huene 2010's
+    /// ~2.5 km/Myr, inside Clift & Vannucchi 2004's Table 2 range (0.9 to 4.7); on the normal
+    /// continental column it takes about Clift & Vannucchi's global 90 km³/km/Myr (PLT-441; their
+    /// margins 20.0 to 139.4); the chance is the swept area over the sample's, at most 1.
+    #[test]
+    fn the_retreat_is_scholl_and_von_huenes_and_takes_clift_and_vannucchis_volume() {
+        assert_eq!(RETREAT_KM_PER_MYR, 2.5);
+        assert!((0.9..=4.7).contains(&RETREAT_KM_PER_MYR));
+        let per_km = RETREAT_KM_PER_MYR * continental_m() / 1000.0;
+        assert!((per_km - 90.0).abs() < 0.1 * 90.0, "{per_km} km³/km/Myr");
+        assert!((20.0..=139.4).contains(&per_km));
+        let (front_km, area_km2) = (76.7, 5100.0);
+        let p = retreat_chance(5.0, front_km, area_km2);
+        assert!((p - 5.0 * front_km / area_km2).abs() < 1e-12);
+        assert_eq!(retreat_chance(5_000.0, front_km, area_km2), 1.0);
+        assert_eq!(retreat_chance(0.0, front_km, area_km2), 0.0);
+    }
 
     /// Wherever the cubes say a sample's nearest are all its plate's, brute force agrees, on a
     /// lattice and on random samples, with plates cut along wavy bands and a gap left open.

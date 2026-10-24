@@ -813,6 +813,14 @@ pub struct TectonicParams {
     /// … and the incoming plate's sediment (its sediment and sedimentary pools at the front)
     /// is thinner than this, m. ledger: PLT-442
     pub subduction_erosion_max_sediment_m: f64,
+    /// Subduction erosion's trench retreat (the docking lane's stage S1, 2026-10-23; Scholl & von
+    /// Huene 2010): with subduction erosion on, an erosive margin (the two keys above) truncates
+    /// its overriding plate, its trench migrating inboard at `subduction::RETREAT_KM_PER_MYR`:
+    /// each front sample goes whole, its column to the mantle, at the chance that gives that
+    /// retreat, and leaves its plate for the slab's (`subduction::erode_forearcs`). The volume is
+    /// the retreat times the column; PLT-441's volume rate and its floor at an ocean's column are
+    /// off while it is on. Off, the forearc thins and the front stays. ledger: PLT-523
+    pub erosion_retreat: bool,
     /// Hotspots at the start.
     pub hotspots_initial: u32,
     /// New hotspots per 100 Myr (Poisson).
@@ -1015,6 +1023,7 @@ impl Default for TectonicParams {
             subduction_erosion_km3_per_km_myr: 90.0, // ledger: PLT-441
             subduction_erosion_min_mm_yr: 60.0, // ledger: PLT-442
             subduction_erosion_max_sediment_m: 1000.0, // ledger: PLT-442
+            erosion_retreat: false,          // ledger: PLT-523
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
