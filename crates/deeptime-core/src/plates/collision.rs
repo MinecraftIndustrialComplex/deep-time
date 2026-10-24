@@ -359,6 +359,8 @@ pub fn collide(
         state.counters.accretions += 1;
         Some(collision)
     };
+    // In the dynamics record a transference is the collision of a continent (`frac` of
+    // `collision_suture_frac` or more) that did not suture: without it every such one welds.
     if transferred {
         state.counters.transferences += 1;
     }
@@ -388,7 +390,6 @@ pub fn collide(
             sutured: suture,
             died: suture.then_some(die),
             stalled,
-            transference: transferred,
             start_myr: collision_onset_myr,
             end_myr: t_myr,
             contact_onset_myr,

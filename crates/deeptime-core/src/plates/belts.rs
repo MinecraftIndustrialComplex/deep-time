@@ -1644,6 +1644,14 @@ mod tests {
         assert_eq!(jam, col.shortening_km);
         fx.step(&mut st, 3, None);
         assert_eq!(st.contacts[0].collision.as_ref().unwrap().jam_km, Some(jam));
+        // The jam is kept through a checkpoint (postcard: a field skipped when written cannot be
+        // read back).
+        let bytes = postcard::to_stdvec(&st).unwrap();
+        assert_eq!(postcard::from_bytes::<PlateState>(&bytes).unwrap(), st);
+        let mut none = st.clone();
+        none.contacts[0].collision.as_mut().unwrap().jam_km = None;
+        let bytes = postcard::to_stdvec(&none).unwrap();
+        assert_eq!(postcard::from_bytes::<PlateState>(&bytes).unwrap(), none);
 
         let mut world = crate::world::WorldState::new(1, 16_384, 0.0);
         let pos = positions(&st, &fx.geo);

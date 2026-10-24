@@ -411,7 +411,9 @@ pub struct Collision {
     /// The collision's shortening when its contact's slab was first found broken off, km: the
     /// subduction has failed and from then on the plate pushes the continent (transference,
     /// `collision::transference_due`; set only with `tectonics.transference`, ledger PLT-516).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Always written: the checkpoint's postcard has no field names, so a skipped field cannot
+    /// be read back.
+    #[serde(default)]
     pub jam_km: Option<f64>,
     /// The belt this collision has built (`belts.rs`).
     pub belt: Belt,
