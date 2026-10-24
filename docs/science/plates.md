@@ -5611,3 +5611,401 @@ largest (the trace reads plate samples and the guard L1 cells, so this is not sh
   coordinator may take it on as such. *On by default since 2026-10-23.*
 - **The bound's value.** Only 380 mGal (the largest anomaly on Earth) was run; 300 mGal (Hawaii's
   largest) or a bound that depends on the plate (`Te`, age) were not.
+
+## Plate boundary organisation (2026-10-23, V1 gap 2)
+
+The fourth of the V1 gaps Ben put inside V1 (decisions log 2026-10-22, answer 1: "All four inside
+V1 (Recommended)"; [physics-gap-audit.md](physics-gap-audit.md), "Gap 2"). The gap: spreading
+boundaries that do not break into ridges and transforms, trenches that may not face their
+convergence, rifts and subduction starts that ignore the stress the force balance computes
+(FRC-022), and no law for reorganisation. Ben's view of it (decisions log 2026-10-21): "mountains
+seem very prone to forming directly bordering oceans, I don't believe this is realistic." Ledger
+PLT-500 to PLT-507 (new) and PLT-270 (now `verified`). Code: `plates/ridges.rs` (the ridge segments), `plates/rifting.rs` (where
+rifts and subduction start), `plates/forces.rs` (the stress handed on), `params.rs` (the
+switches); the pool's measure `boundary` (`tools/review/pool/measure_boundary.py`, registry
+`tools/review/pool/measures_boundary.json`).
+
+### The boundary before (pool arm base, 24 runs)
+
+The measure `boundary` reads a run's plate check (`plate.json`), its dynamics record
+(`rec.json`), its globals and its summary: no new sim. On the pool's base (master bf8477b2, key
+7f9d8f115049, argkey 2a53566b: `earthlike_quick_16k`, 1000 Myr, both starts, seeds 1 to 12,
+`+DEEPTIME_CRUST_BUDGET=1`), medians of the 24 runs with their quartiles; the shares are of the
+boundary's length over the steps after the first 100 Myr (PLT-500):
+
+| measure | base: median (quartiles) | Earth |
+|---|---|---|
+| subducting | 0.342 (0.337 to 0.347) | SUB 0.197 (Bird 2003, Table 3) |
+| spreading (ridge and rift) | 0.360 (0.357 to 0.364) | OSR + CRB 0.363 |
+| transform | 0.212 (0.207 to 0.215) | OTF + CTF 0.283 |
+| in collision | 0.066 (0.064 to 0.071) | CCB 0.088 |
+| converging with no slab | 0.019 (0.017 to 0.024) | OCB 0.067 |
+| ocean-ocean share of the subducting boundary | 0.302 (0.296 to 0.312) | about 0.35 (PLT-370) |
+| subducting / all boundary, lattice km | 151,400 / 443,700 | 51,310 / 260,487 geodesic |
+| trench convergence across over full, capped (PLT-312's measurement): all / continental | 0.798 / 0.805 | SUB 0.854 |
+| mean convergence across the oceanic front | 53.1 mm/yr (51.9 to 55.3) | SUB 53.2 mm/yr |
+| oceanic front under 10 / at 80 or more mm/yr across | 0.042 / 0.190 | |
+| active share of the continental margin | 0.518 (0.505 to 0.541) | 0.25 to 0.40 (CHK) |
+| coast at a subduction front / in a collision belt | 0.312 / 0.208 | |
+| coast at a front where the continent overrides / at a front an initiation made | 0.227 / 0.173 | |
+| passive coast | 0.460 | |
+| front in collision | 25,800 km (25,100 to 29,200) | 6,000 on average, 12,000 today (PLT-401) |
+| collision length p50 / p90 | 41 / 106 Myr | 15 to 50 / at most 120 (CHK) |
+| collisions | 1.75 per 100 Myr | 2 to 6 (CHK) |
+| plates alive | 23 | 52, 19 over 0.0377 sr (PLT-372) |
+| rifts / initiations / polarity reversals | 2.4 / 6.5 / 16.9 per 100 Myr | 13 initiations in 104 Myr, 4 of them reversals (Crameri et al. 2020, Table 1) |
+
+The lattice's boundary is about 1.84 times a geodesic one (PLT-213), so in Earth's terms the
+model has about 82,300 km of subducting boundary against Bird's 51,310, 86,800 km of spreading
+against 94,810 and 51,100 km of transform against 73,915; the total, about 241,000 km, is close
+to Bird's 260,487. What the table says:
+
+- **The trenches already face their convergence.** The convergence across the oceanic front is
+  Bird's to the millimetre a year (53.1 against 53.2), and the capped ratio is 0.80 (the cap at
+  v_0 lifts it, so the plain ratio is lower still) against Bird's 0.854. The audit's "orient
+  trenches" is answered by this measurement: no law is needed for it (PLT-501).
+- **The excess of subduction is not obliquity but a shortage of transform**: the model has 1.6
+  times Earth's trench and 0.7 times its transform, and its spreading boundary is Earth's.
+- **More than half of the coast at a subduction front is at a front that a subduction
+  initiation made** (0.173 of the coast, of 0.312), and most of that has the continent
+  overriding. `rifting::initiate` splits the plate's old floor off along a Voronoi line, keeping
+  continental crust on the parent (PLT-067): where the old floor lies against a continent, which
+  on an Atlantic-type ocean it does, the line runs along the continent's edge and the old floor
+  goes down under it. That is a passive margin turned into an active one, which Earth does not
+  do: "There are no Cenozoic examples of a passive continental margin transforming into a
+  convergent margin, in spite of the fact that seafloor adjacent to SE Africa, NW Africa and
+  eastern N. America is about 170 Ma old" (Stern 2004, §4.1); of Crameri et al.'s 13 initiations
+  since 104 Ma none lies along a passive margin and two near one, and "heterogeneous oceanic
+  plate interiors are more favourable for SZI than ocean-continent boundaries, or more
+  specifically, passive margins" (Crameri et al. 2020, conclusions). This is Ben's "mountains ...
+  directly bordering oceans": the active margin is 0.52 of the coast against Earth's 0.25 to
+  0.40.
+- **The front in collision is 2 to 4 times Earth's**, as before (PLT-401), while the collisions'
+  lengths are within their targets.
+
+### Earth's ridges and transforms, from PB2002's steps
+
+Bird's `PB2002_steps.dat` (fetched with the paper: 5,819 digitisation steps; read with a lane
+script, `build/gap2/tools/bird_segments.py`, not kept), as runs of consecutive steps of one class
+along one boundary:
+
+| | runs | median | mean | p90 | length-weighted median |
+|---|---|---|---|---|---|
+| OSR (spreading ridge) | 596 | 75 km | 113 km | 250 km | 165 km |
+| OTF (oceanic transform) | 601 | 36 km | 80 km | 200 km | 165 km |
+| OSR between two OTF | 462 | 70 km | 105 km | 228 km | 152 km |
+
+The ridge's obliquity (the angle between the relative velocity and the step's normal) is 5° at
+the length-weighted median and 11.5° on average, with 82 % of the ridge within 20° of
+orthogonal; the subduction zones' is 21° at the median, 49 % within 20°. Transform length is
+0.71 of the ridge's. Gerya 2012 (Tectonophysics 522-523, §1): "The perpendicularity of the
+ridges and the transform faults is so common that it is considered to be an 'intrinsic property'
+of the oceanic spreading process (Oldenburg and Brune, 1972). Tens to hundreds of kilometer long
+active transform fault sections connecting two spreading centers are typically extended from
+both sides by even longer (up to thousands of kilometers) inactive fracture zones of similar
+orientation." The quick lattice's spacing is about 71 km and the boundary's normal is judged
+over two rings (PLT-310), so Earth's 75 to 165 km segments are under its resolution; their
+geometry is not. A ridge segment normal to the motion and a transform along it share a fixed
+ratio for a given envelope obliquity α, transform over ridge = tan α, whatever the segments'
+length: Earth's 0.71 is an envelope about 35° from orthogonal.
+
+### The design
+
+Each stage is its own switch. They were built off by default, and off was the base bit for bit:
+the pool's alias check at 839dc4d2 (key 21aa3ea4d466 against base's 7f9d8f115049, seed 1,
+supercontinent start, 1000 Myr: the world state's 106 files and the dynamics record identical;
+alias recorded), and again on the new base at 0fe14663 (key 15660e3c5636 against base2's
+4eeee4b84a8c: the world state's 108 files and the dynamics record identical). Under Ben's rule
+of 2026-10-23 (CLAUDE.md "How many runs") a stage goes on by default once it is built and
+correct, its unit tests against its sources passing and its pool arm showing no divergence or
+guard failure, and the rule it replaces goes off with it; the V1 numbers are realism checks, not
+a gate. Every stage passed and is on by default since 2026-10-23 ("The arms", below). So each
+stage below names the rule it replaces, and none of its values is chosen to move a V1 number or
+Bird's shares: each comes from a source or from the lattice's resolution.
+
+**A. Ridge segments normal to the motion, joined by transforms** (`tectonics.ridge_segment_km`,
+PLT-502). The ridge is made where the crust is: a resampling turns each gap point (no footprint
+covers it) into new floor of the nearer plate, so the ridge is the gap's midline and keeps the
+shape of the rift that opened it. With the switch on, the gap points between two plates a and b
+are put in the frame of the pair's relative rotation, ê = (ω_a − ω_b) / |ω_a − ω_b|:
+colatitude θ about ê and longitude φ around it. A transform follows a small circle about the
+relative pole (constant θ), a ridge normal to the motion a meridian (constant φ). The gap is cut
+into bands of θ `ridge_segment_km` wide (shifted by a per-pair offset, so pairs do not share band
+edges); in each band the ridge stands at the circular mean of the gap's φ there, and a gap point
+on a's side of it (the +φ side: a moves that way from b) goes to a, the rest to b. Its age and
+height follow its distance from that segment's ridge, as Cortial's α follows the distance from
+the midline. Each band's ridge is a meridian piece, and the steps between bands are small-circle
+pieces: transforms by construction. A band whose two sides lie the other way round (a on the −φ
+side, where the rotation makes the pair converge) keeps the midline. A gap is the spreading since
+the last resampling (up to `resample_drift_km`, 1,500 km), so a band straightens in one
+resampling where its obliquity's offset across the band (L tan α) is under the gap's width, and
+over several where it is wider; the ridge's older pieces stay in the plates as fracture zones.
+The length to run is Earth's first-order segment, 600 km ("First-order segments extend for 600 ±
+300 km and persist for >5 × 10^6 years. Second-order segments extend for 140 ± 90 km", Aghaei et
+al. 2014 after Macdonald 1998): about eight spacings of the quick lattice, where the second-order
+segments and PB2002's runs (above) are under the two rings over which the boundary's normal is
+judged. The ratio of transform to ridge does not depend on the length. *Replaces*, in the bands
+it draws: which plate a gap point goes to (the nearer one) and its α from the midline (PLT-100,
+PLT-101, Cortial's). The edges' blend z̄ stays (it is the position's interpolation between the
+two plates' edges, the same whichever plate takes the point), and a band that converges or is
+too thin to tell keeps the midline, as does a point whose band's meridian lies beyond the other
+plate's edge: where a gap is narrower than its obliquity's offset across a band, the band's
+segment ends inside the band and does not cross the gap at its ends, so those rows keep the
+midline rather than going whole to one plate with no ridge in them. *Test against the source*:
+`ridge_segments_stand_normal_to_the_motion_with_transforms_along_it` (`plates/ridges.rs`): on a
+gap 35° oblique, each band's ridge is one meridian of the relative
+pole, the steps run along the motion, and transform over ridge is tan 35° within 0.05; and
+`a_segment_ends_where_its_meridian_leaves_the_gap`: on a gap 2° wide in 4° bands (an offset of
+2.8° across each), no point is handed to a side with its band's meridian beyond the other plate's
+edge, and the rows that take the segment hold both plates.
+
+**B. Trenches that face their convergence**: measured above, and not built. The model's trenches
+take Earth's convergence across them (PLT-501).
+
+**C1. Subduction starts off the passive margin** (`tectonics.subduction_initiation_offshore`,
+PLT-503). An initiation's fracture is kept off the parent's continental crust by the reach of the
+arc the new trench builds on the parent, `arc_distance_km` + `arc_width_km` (200 + 60 km), and
+one lattice spacing for where on the lattice the front falls (a great-circle distance, measured
+over the parent's visible samples): the old floor within it stays on the parent whatever the
+Voronoi split says, and the seed old sample is drawn from the old floor beyond it (no initiation
+when there is none). The old floor then goes down under the parent's oceanic margin, at an
+intra-oceanic trench, not under the continent; its arc stands on ocean floor (an island arc),
+and the floor between the trench and the coast stays passive until the ocean closes and the arc
+meets the continent (an arc-continent collision, as on Earth). The rate (PLT-063) and the
+qualifying floor (PLT-062, PLT-064) are unchanged, so C1 moves where subduction starts, not how
+often. Sources: Stern 2004 and Crameri et al. 2020, above. There is no distance of its own to
+choose: it is the arc's (2026-10-23: a `subduction_initiation_margin_km` knob before, 500 km
+proposed; replaced by the derived reach so that no knob is left). *Replaces*: PLT-067's split
+along the continent's edge, which keeps the continent on the parent but sends the old floor
+beside it down under the coast, the passive margin turned active that PLT-067's own text says
+it prevents; and the seed's draw over all the old floor. *Test against the source*:
+`subduction_starts_off_the_passive_margin` (`plates/rifting.rs`): a 60° continent in old floor;
+off, some of eight draws send the floor beside the coast down; on, none of the sinking plate
+lies within the reach, and an arc reaching across the ocean starts nothing.
+
+**C2. Rifts and subduction starts from the stress and from weakness** (PLT-504 to PLT-506).
+FRC-022's mean in-plane stress σ (MPa, tension positive) is each plate's answer at every step; it
+is handed on from the force balance to the rifting rules (no state is kept, so off changes
+nothing).
+
+- *Rifts under tension* (`tectonics.rift_stress_mpa`, σ_s, 0 = off): a plate's rift hazard
+  (PLT-083) is weighted by w = e^(σ/σ_s) / ⟨e^(σ/σ_s)⟩, the mean over the plates that may rift
+  weighted by the hazard each has unweighted (its λ: area, continental fraction and plume
+  boost), so the expected number of rifts is the base's (to first order in λ) and only where
+  they happen moves: to the plates the edge forces pull apart. On base's records the plates' σ is
+  18 MPa at the median, its quartiles about 0 and 43 MPa, continental plates −3 to 60 MPa
+  between p10 and p90; σ_s = 20 MPa is about half the quartiles' spread (game-choice: set from
+  the model's own stresses, not fit to any outcome). *Replaces*: the hazard's share between
+  plates by their area, continental fraction and plume heads alone (PLT-083, PLT-084, PLT-090,
+  which stay as the hazard's size). *Test*: `stress_weights_keep_the_mean_and_favour_the_stress_asked_for`.
+- *Subduction starts under compression* (`tectonics.initiation_stress_mpa`, σ_s, 0 = off): the
+  same weight with −σ on the initiation hazard (PLT-063). "Horizontally forced SZI is clearly
+  more common than vertically forced SZI ... in the last 100 Ma" (Crameri et al. 2020), and
+  collisions, which load their plates in compression: "collision events along pre-existing
+  subduction trenches are often precursors of SZI events" (ibid.). *Replaces*: the share of
+  PLT-063's hazard between plates by their old floor alone.
+- *Rifts along weak lithosphere* (`tectonics.rift_weakness`, an exponent m, 0 = off; it reads
+  `tectonics.thermal_state`, on by default since gap 4's merge of 2026-10-23, and with the state
+  off the split is the great circle's whatever m is): the rift's fragments are grown from their centres through the
+  plate (Dijkstra over the lattice) with each edge's cost its length times (L_ref / L)^m, L the
+  lithosphere's depth (gap 4's state, `Sample::lithosphere_km`; unset counts as L_ref, clamped
+  to 20 to 225 km) and L_ref the old craton's 225 km (PLT-462). Thin, hot lithosphere is slow
+  to cross, so the fragments meet in it: the fracture runs through arcs, back-arcs, plume heads
+  and young floor and around cratons. The exponent to run is m = 2: a brittle strength growing
+  linearly with depth (Byerlee's friction, from memory) integrates to a plate strength ∝ L², and
+  an edge costs its strength's inverse. The fractal warp stays on top (PLT-087). A sample no
+  fragment reaches through the plate (a part cut off on the lattice) goes by the great circle to
+  every centre. *Replaces*: the
+  fragments' great-circle Voronoi split (Cortial's, PLT-087's distance; its warp stays). *Test
+  against the source*: `rifts_break_where_the_lithosphere_is_thin` (`plates/rifting.rs`): a
+  225 km plate with a 30 km belt off the centres' bisector; at m = 0 under 0.3 of the fracture
+  lies in the belt, at m = 2 over 0.8.
+
+**D. Reorganisation** (PLT-507). A plate reorganisation is a change of the plates' motion and of
+the boundaries that follow it. The model's motion already relaxes towards the force balance's
+answer over 6 Myr (PLT-191), and the balance answers every boundary change (a slab that breaks
+off, a collision that stalls, a new trench). The design adds the boundaries' half: with A on,
+the ridge's segments are drawn again at every resampling in the frame of the pair's present
+relative rotation, so a change of spreading direction re-segments the ridge and its old segments
+stay behind as fracture zones. Gerya 2012 (§4): transform faults' development "occurs on the
+timescale of plate separation and thus should react nearly instantaneously to changes in
+spreading direction (Menard and Atwater, 1968; Merkur'ev et al., 2009)". With C2 on, a change of
+the boundary forces moves where the next rifts and subduction starts come: a collision that
+stalls puts its plates in compression and raises their initiation weight, and a slab's pull puts
+its plate in tension and raises its rift weight. That is the law: no separate trigger; the
+plates' forces and their relative motion redraw the boundaries.
+
+### Collision belts on the coast (2026-10-23)
+
+Gap 4's measure `coastset` (`tools/review/pool/measure_coastset.py`) on base's 24 runs puts most
+of the coast with high ground in collision belts: 0.333 of the coast has high ground (v1census's
+`coast_hi`, which fires above 0.11, docs/science/realism-checks.md), and of it 0.690 is within
+150 km of a collision belt, 0.190 at an arc and 0.085 on a rifted margin. The collision belts
+touch 0.360 of the coast, and 0.642 of that has high ground (arcs 0.246, rifted margins 0.094).
+Without the collision belts' high coasts `coast_hi` would be 0.094. The coordinator's question
+(2026-10-23): why does a collision front end at an open sea instead of inside a continent? The
+measure `collcoast` (PLT-508, registry `measures_boundary.json`) answers it from the same cached
+runs (medians of 24; the hand-offs and partings over the run after its first 100 Myr):
+
+| measure | base |
+|---|---|
+| collision regime (a Himalayan orogeny under 30 Myr old): share of the land / of it within 150 km of the sea | 0.170 / 0.427 |
+| its land's median distance to the sea | 175 km |
+| hand-offs per 100 Myr, terranes under 50 / 50 to 200 / 200 to 1000 / 1000 or more samples (about 5,100 km2 each) | 65.1 / 17.4 / 9.3 / 1.8 |
+| the plate check's collisions (a terrane of 0.1 of a starting plate or more, RLC-070) | 1.8 per 100 Myr |
+| share of the crust crossing collision fronts, in those four sizes | 0.111 / 0.104 / 0.304 / 0.061 |
+| partings (states that end with no hand-off) per 100 Myr / their share of the crust crossed | 37.6 / 0.43 |
+| partings: no continental crust left at the front (`parted`) / polarity reversed / contact closed | 0.56 / 0.27 / 0.13 |
+| collision high coasts: the belt along the coast / ending at the coast / not elongated | 0.315 / 0.216 / 0.465 |
+| collision high coasts on landmasses under 0.02 / of 0.10 or more of the land | 0.240 / 0.618 |
+
+What it says:
+
+- **Few of the coast's belts are continent-continent fronts that run out to sea.** A belt that
+  ends at the coast, the case the question names, is 0.22 of the collision high coasts. Almost
+  half are belts not elongated at 400 km, the footprint of a small terrane's belt, and a third run
+  along the coast.
+- **They are the dockings at active margins.** The model hands off about 93 collision states per
+  100 Myr, 65 of them terranes under 50 samples (about 255,000 km2), and ends another 38 with no
+  hand-off, most when the terrane's continental crust at the front is used up (stacked into the
+  belt). Earth's arc-continent sutures with ophiolites are 15 to 46 per 100 Myr (Macdonald et al.
+  2019; RLC-073, whose caveat holds: they match the model's terrane accretions, not its counted
+  collisions). The model's hand-offs of 50 samples or more, 28 per 100 Myr, sit inside that
+  range; with the smaller ones and the partings the model has about 130 docking episodes per
+  100 Myr, three to nine times Earth's sutures (a loose comparison: one suture can hold several of
+  the model's episodes). `belts.rs` stacks every collision state's shortened crust into a belt on
+  the overriding plate, whatever the terrane's size, and at an active margin the overriding plate's
+  edge is the coast: the terrane docks, the belt rises at the coast, and the ocean behind the
+  terrane stays open. That is how Earth's accreted coasts look too (the North American
+  Cordillera's), so the kind is right; the amount comes from how many terranes and arcs reach the
+  trenches.
+- **Where that number comes from**, and which of this lane's stages touch it:
+  - the subducting boundary, 1.6 times Earth's (above), with every trench a place for a docking.
+    Stage A adds transform at the ridges but does not shorten the trenches: indirect.
+  - the subduction initiations at passive margins (0.173 of the coast). Stage C1 moves them
+    offshore, which makes intra-oceanic arcs that later dock against the continent: Earth's way
+    for an arc to end, and possibly more collision coast, not less. Its arm will say which.
+  - the polarity reversals, 16.9 per 100 Myr against Crameri et al.'s 4 in 104 Myr (PLT-371):
+    each leaves a belt beside a new trench. The subduction lane's, not this one's.
+  - the arcs' crust (PLT-045), the stuff of the small terranes: not this lane's.
+  - stage C2 moves where rifts and initiations come, not how many: indirect.
+- **The belts' spread** (how far a belt's thickened crust reaches inland, which gap 4 left to this
+  lane) is not a stage here. The belt's width and its plateau would need a law from the belt's
+  strength against its driving force (the thin viscous sheet's Argand number, England and
+  McKenzie 1982, from memory), which none of the stages builds; recommended as its own lane after
+  the arms, not a knob on `belts.rs`'s widths. `collision_orogeny_myr` is only the regime's label
+  window (it decides which belts the measures call collision) and is not a lever.
+
+### The arms (2026-10-23, on the new base)
+
+Master 2fde68f7 merged in (the flexure and gap 4 lanes with their physics on; its base is the
+pool's base2, key 4eeee4b84a8c, argkey 2a53566b, 24 runs) and the alias check repeated on it
+(above). One cumulative 8-run arm per stage, `earthlike_quick_16k`, 1000 Myr, seeds 1 to 4, both
+starts, `+DEEPTIME_CRUST_BUDGET=1`, key 15660e3c5636, read against g2-base2s4 (base2's own runs of
+the same seeds and starts, cached, no sim):
+
+| arm | adds | argkey |
+|---|---|---|
+| g2-A | `ridge_segment_km=600` | af86bbd6 |
+| g2-AC1 | + `subduction_initiation_offshore=true` | a14b0ebd |
+| g2-AC1C2 | + `rift_stress_mpa=20`, `initiation_stress_mpa=20`, `rift_weakness=2` | ac2787f9 |
+| g2-AC1C2R | + `reversal_by_arc_crust=true` (PLT-371, the coordinator's request) | 1ae5c62e |
+
+Medians of 8 runs, the two-sided Mann-Whitney p against the control in brackets (`pool.sh table
+--base g2-base2s4 --registry tools/review/pool/measures_boundary.json --registry
+tools/review/pool/measures_gap4.json`, measures `v1census`, `boundary`, `collcoast`, `coastset`
+and `guard`); the docking episodes are the sum of the four hand-off medians and the partings':
+
+| measure | control | g2-A | g2-AC1 | g2-AC1C2 | g2-AC1C2R |
+|---|---|---|---|---|---|
+| runs that failed | 0 | 0 | 0 | 0 | 0 |
+| guard: steps beyond 2 Earth reliefs | 0 | 0 | 0 | 0 | 0 |
+| guard's worst, m from the sea | 12,172 | 13,144 (0.046) | 12,341 (0.13) | 11,810 (0.72) | 12,061 (1.0) |
+| plate cells' largest excess over Airy, m | 2,971 | 3,407 (0.083) | 3,256 (0.44) | 3,398 (0.015) | 3,481 (0.44) |
+| land | 0.315 | 0.333 (0.44) | 0.311 (1.0) | 0.331 (0.23) | 0.319 (0.72) |
+| largest landmass | 0.173 | 0.147 (0.80) | 0.220 (0.16) | 0.243 (0.13) | 0.235 (0.16) |
+| land above 2 km (fires above 0.07) | 0.126 | 0.110 (0.80) | 0.116 (0.80) | 0.110 (0.57) | 0.146 (0.57) |
+| coast with high ground (fires above 0.11) | 0.310 | 0.254 (0.57) | 0.311 (1.0) | 0.292 (0.65) | 0.330 (0.57) |
+| collisions per 100 Myr | 1.65 | 1.95 (0.29) | 1.70 (0.75) | 1.60 (0.96) | 1.95 (0.057) |
+| continental crust's net change over the run | −0.020 | +0.019 (0.10) | −0.006 (0.38) | +0.025 (0.021) | −0.005 (0.28) |
+| v1census criteria met per run, mean of 7 | 5.00 | 5.12 | 5.12 | 4.75 | 5.00 |
+| subducting / transform / spreading (Bird 0.197 / 0.283 / 0.363) | 0.340 / 0.213 / 0.358 | 0.334 / 0.212 / 0.364 | 0.340 / 0.211 / 0.358 | 0.339 / 0.211 / 0.359 | 0.338 / 0.215 / 0.356 |
+| ocean-ocean share of subducting (about 0.35) | 0.300 | 0.319 (0.007) | 0.339 (< 0.001) | 0.345 (< 0.001) | 0.347 (< 0.001) |
+| active share of the continental margin (0.25 to 0.40) | 0.532 | 0.540 (0.72) | 0.527 (0.44) | 0.516 (0.28) | 0.527 (0.88) |
+| coast at a front: the continent overriding / an initiation's | 0.226 / 0.167 | 0.220 / 0.149 | 0.202 / 0.156 | 0.203 / 0.131 | 0.208 / 0.167 |
+| front in collision, km (6,000 to 12,000) | 28,616 | 30,688 (0.33) | 32,886 (0.038) | 29,658 (0.38) | 33,751 (0.010) |
+| collision length p50 / p90, Myr | 32 / 102 | 46 / 138 | 38 / 136 | 46 / 135 | 52 / 125 |
+| rifts / initiations per 100 Myr | 2.45 / 6.50 | 2.85 / 6.70 | 2.10 / 8.00 | 2.45 / 7.90 | 2.55 / 7.20 |
+| polarity reversals per 100 Myr (Crameri: 4 in 104 Myr) | 16.3 | 19.3 (0.040) | 17.6 (0.13) | 15.8 (0.80) | 12.1 (0.005) |
+| hand-offs per 100 Myr, under 50 / 50 to 200 / 200 to 1000 / 1000 or more samples | 63.8 / 15.8 / 8.1 / 1.6 | 70.3 / 18.6 / 9.2 / 2.0 | 64.5 / 20.3 / 10.0 / 1.8 | 68.0 / 19.0 / 9.2 / 1.6 | 69.7 / 20.7 / 10.9 / 1.9 |
+| partings per 100 Myr | 34.4 | 38.9 | 35.9 | 33.0 | 32.8 |
+| docking episodes per 100 Myr (Macdonald et al. 2019: 15 to 46 sutures) | about 124 | about 139 | about 133 | about 131 | about 136 |
+| collision belts' share of the high coasts (`coastset`) | 0.767 | 0.786 | 0.823 | 0.812 | 0.803 |
+
+Read against base2's 24 runs instead (`--base base2`), the realism checks are the same: land
+above 2 km 0.134 on base2, p 0.29 to 0.56 for the arms; coast with high ground 0.312, p 0.22 to
+0.62. What the tables say:
+
+- **Every stage is correct by Ben's rule, so every stage is on.** All 32 runs ran their 1000 Myr,
+  none had a step beyond two Earth reliefs, and the guard's worst stays within 11,810 to 13,144 m
+  of the control's 12,172 (A's p 0.046, the others 0.13 or more). Since 2026-10-23 the defaults are
+  `ridge_segment_km` 600, `subduction_initiation_offshore` true, `rift_stress_mpa` and
+  `initiation_stress_mpa` 20, `rift_weakness` 2 and `reversal_by_arc_crust` true: the default
+  planet is g2-AC1C2R's. The rules they replace run only with them off: PLT-100/101's nearer plate
+  and midline α in the ridge's bands, PLT-067's split along the continent's edge, the hazards'
+  share between plates by area, continental fraction, plume heads and old floor alone (PLT-083,
+  PLT-084, PLT-090, PLT-063, which stay as the hazards' sizes), PLT-087's great-circle distance
+  (its warp stays) and PLT-056's judgement of the overriding side by its crust in the overlap.
+  PLT-064's clearance stays.
+- **The two realism checks that fire on the base fire on every arm, and no stage moves them**
+  (p 0.57 or more on both): land above 2 km 0.110 to 0.146 (fires above 0.07), coast with high
+  ground 0.254 to 0.330 (fires above 0.11). Nothing was tuned to them.
+- **The docking count stays about 130 per 100 Myr** (124 on the control, 131 to 139 on the arms),
+  three to nine times Macdonald et al.'s sutures, and the collision belts keep 0.79 to 0.82 of
+  the high coasts. None of these stages was built to change the number of terranes and arcs
+  reaching the trenches, and none does.
+- **A does not show in the boundary's classes.** Transform stays 0.211 to 0.215 (Bird 0.283) and
+  spreading 0.356 to 0.364. The law is built and its test holds (one meridian per band, transform
+  over ridge tan α), but the boundary's classes are read on the lattice over two rings (PLT-310)
+  and its transform window (PLT-311) at every step, and either a band's transform step (L tan α)
+  is too short to read there or the plates' edges between resamplings do not keep it; which of the
+  two is not measured (a measure of the spreading boundary's obliquity from the record would say).
+  A raised the reversals to 19.3 (p 0.040) and the ocean-ocean share to 0.319 (p 0.007).
+- **C1 makes the intra-oceanic trenches Earth has**: the ocean-ocean share of the subducting
+  boundary goes to 0.339 and on to 0.347 with C2 and R (p < 0.001; Stern & Scholl's about 0.35),
+  and the coast where the continent overrides falls from 0.220 to 0.202. The active margin barely
+  moves (0.540 to 0.527): a coast counts as at a front within 400 km of one
+  (`stats::MARGIN_ACTIVE_KM`), and C1's trench starts at the arc's reach, about 330 km off the
+  continent, inside that window.
+- **C2 keeps the counts and moves the places**: rifts 2.10 to 2.45 and initiations 8.00 to 7.90 per
+  100 Myr (the weights keep the expected count). The continental crust's net change over the run
+  goes from −0.020 on the control to +0.025 (p 0.021), and the largest excess of a plate cell over
+  Airy from 2,971 to 3,398 m (p 0.015), still far from the guard's 2 reliefs.
+- **R does what PLT-371's row measured on the older bases**: the reversals fall from 15.8 to 12.1
+  per 100 Myr (p 0.005 against the control, Crameri et al.'s 4 in 104 Myr), the share of
+  partings ended by a reversal from 0.261 to 0.175, and the jams go on as collisions instead: the
+  front in collision 29,700 to 33,800 km (p 0.010 against the control, already 2 to 4 times
+  Earth's), collisions 1.60 to 1.95 per 100 Myr (p 0.057), land above 2 km 0.110 to 0.146 and coast
+  with high ground 0.292 to 0.330 (neither significant).
+
+The seed-pinned weld tests were swept with every stage on (`plates/tests.rs`, the seed history in
+each test's comment): three tests moved to new seeds, and no one-law fixture needed the old rules
+pinned off. In none of the 32 arm runs did the plate speed guard bind (`plates/guard_bound_plate_steps`
+absent); on the small test planet it bound once, at scattered seed 18.
+
+### What was decided, and what comes next
+
+How plates are made and moved is Ben's scope; he approved doing the gap, not one design. The
+stages above stay on the lattice and change no world-data format. Two questions were raised and
+settled by the coordinator (2026-10-23), not put to Ben: the plate count and a finer lattice
+(PLT-372) stay as they are, and the lattice's boundaries are not replaced by drawn ones, since
+each stage's physics works on the lattice as it is. Induced initiation near trenches comes later,
+as its own stage after C2's arm: "All SZI events start less than 1500 km away from other active
+subduction zones and, in most cases, less than 500 km" (Crameri et al. 2020), while PLT-064
+keeps every initiation 1,000 km from all trenches (`pending-rewrite` since the plate geometry
+task's arm i1, 2026-10-21); C2's weight is per plate and does not place an initiation, so PLT-064
+is not replaced here. A stage that starts subduction at a plate's compressive boundary would
+replace PLT-064's clearance. The base's polarity reversals, 16.9 per 100 Myr against Crameri et
+al.'s 4 in 104 Myr, are a measurement for the subduction work; stage R (PLT-371, its arm above)
+is the reversal judged by the arc's crust, the subduction lane's law, run here on top of C2 at
+the coordinator's request, and on by default with the others.

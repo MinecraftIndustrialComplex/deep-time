@@ -149,6 +149,42 @@ and that the model does not have as physics.
   plate-geometry merge). That row judged that none of the seven criteria needs it. This audit
   disagrees for M4 and M5. The docs' own list of what is left names this first (plates.md:2486,
   "The extent of young orogen is the high ground").
+- **State (2026-10-23, later).** Every stage on by default on the lane's branch, not merged
+  (plates.md, "The arms"). Under Ben's rule of 2026-10-23 each cumulative 8-run arm on the new
+  base (key 15660e3c5636, base2's seeds 1 to 4 as the control) was read for divergence and the
+  guard: g2-A (ridge segments), g2-AC1 (+ initiation off the passive margin), g2-AC1C2 (+ the
+  stress weights and rifts along thin lithosphere) and g2-AC1C2R (+ PLT-371's reversal judged by
+  the arc's crust). No run failed and none had a step beyond two Earth reliefs, so all six
+  switches are on and the rules they replace (PLT-067's split, PLT-100/101's midline in the
+  ridge's bands, the hazards' share between plates, PLT-087's great-circle distance, PLT-056's
+  overlap judgement) run only with them off. The two realism checks that fire on the base still
+  fire on every arm, unmoved at p ≥ 0.57: land above 2 km 0.126 on the control, 0.110 to 0.146
+  on the arms (fires above 0.07); coast with high ground 0.310, 0.254 to 0.330 (fires above
+  0.11). The docking episodes stay about 124 to 139 per 100 Myr (Macdonald et al. 2019: 15 to
+  46). What moved: the ocean-ocean share of the subducting boundary 0.300 to 0.347 (Stern &
+  Scholl's 0.35, p < 0.001), the reversals 16.3 to 12.1 per 100 Myr with R (p 0.005), and the
+  front in collision 28,600 to 33,800 km with R (p 0.010). The transform share did not move
+  (0.213 to 0.215 against Bird's 0.283): the ridge's segments do not show in the boundary's
+  classes on the quick lattice. Next: induced initiation near trenches, its own stage (it would
+  replace PLT-064's clearance).
+- **State (2026-10-23).** Measured and built, every stage off by default and not yet on the pool
+  (plates.md, "Plate boundary organisation"; PLT-500 to PLT-507). The before measures (base
+  7f9d8f115049, 24 runs) answer "orient trenches": the convergence across the oceanic front is
+  Bird's (53.1 against 53.2 mm/yr), so no law is added for it (PLT-501). The subduction excess is
+  a shortage of transform (0.7 times Bird's) more than of ridge, and more than half of the coast
+  at a front is at a front an initiation made, because PLT-067's split runs along the
+  continent's edge. Built behind switches, each tested against its source: ridge segments normal
+  to the motion with transforms along it (PLT-502, replaces PLT-100/101's midline in its bands),
+  initiation off the passive margin at the arc's reach (PLT-503, replaces PLT-067's split), rifts
+  and initiations weighted by the force balance's stress (PLT-504, PLT-505) and rifts along thin
+  lithosphere (PLT-506, needs gap 4's thermal state); reorganisation is their composition
+  (PLT-507). Off is bit-identical (`pool.sh alias`, seed 1, 1000 Myr). The arms wait for the new
+  base after the flexure and gap 4 lanes merge; the plate count (PLT-372) is not changed. The
+  collision belts that hold 0.69 of the high coasts (gap 4's `coastset`) are mostly dockings of
+  small terranes and arcs at active margins, about 130 episodes per 100 Myr against Macdonald et
+  al. 2019's 15 to 46 arc-continent sutures, not continent-continent fronts running out to sea
+  (the measure `collcoast`, PLT-508; plates.md "Collision belts on the coast"). The belts' spread
+  inland is not built here.
 
 ### Gap 3: the trench budget
 
@@ -583,13 +619,13 @@ game-choice rule or a knob tuned to a target; (d) present but off by default; (e
 | Ridge push, column energy | Half-space column potential energy | (a)/(b) | `plates/forces.rs:169` | FRC-009 to FRC-014, PLT-187 |
 | Mantle convection | Fixed degree-2 flow | (c) | `plates/forces.rs:197-204` | FRC-015 |
 | Dynamic topography | None | (e) | | |
-| Seafloor spreading | Kinematic; 7 km of new crust at resampling | (b) | `plates/ridges.rs:242`; `plates/pools.rs:150` | PLT-100 to PLT-106 |
+| Seafloor spreading | Kinematic; 7 km of new crust at resampling; since 2026-10-23 the ridge is cut into 600 km segments normal to the motion, transforms between | (b) | `plates/ridges.rs`: segment_ridges, resample; `plates/pools.rs:150` | PLT-100 to PLT-106, PLT-502 |
 | Ocean cooling | GDH1 age-depth | (b) | `plates/pools.rs:292-306` | PLT-350 to PLT-356 |
-| Subduction start | Poisson on old floor | (c) | `plates/rifting.rs:293,352` | PLT-062 to PLT-067 |
+| Subduction start | Poisson on old floor; since 2026-10-23 shared between plates by their compression and started off the passive margin, at the new arc's reach | (b)/(c) | `plates/rifting.rs`: maybe_initiate_subduction, initiate | PLT-062 to PLT-067, PLT-503, PLT-505 |
 | Subduction uplift | Cortial's transfer functions | (b)/(c) | `plates/subduction.rs` | PLT-035 to PLT-060 |
 | Arc crust | Fixed volume per km per Myr times min(v/100, 1) | (b) rate, (c) geometry | `plates/subduction.rs:1051-1052` | PLT-042 to PLT-047, PLT-285 |
 | Arcs on normal convergence | Built, off | (d) | `plates/subduction.rs:782` | PLT-312 |
-| Arc polarity reversal | Built, off | (d) | `params.rs:537` | PLT-371 |
+| Arc polarity reversal | Since 2026-10-23 on by default: judged by the crust the overriding arc stands on | (b)/(c) | `plates/subduction.rs`: resolve, continent_within | PLT-056, PLT-371 |
 | Cordillera | Pure shear at 1.7 mm/yr up to 3,000 m | (b)/(c) | `plates/subduction.rs:1053-1100` | PLT-048, PLT-050, PLT-320 |
 | Accretion | Terranes and hidden pools onto the column above | (b)/(c) | `plates/collision.rs`; `plates/pools.rs:191` | PLT-076 to PLT-078, PLT-276 |
 | Sediment subduction, subduction erosion | None | (e) | | (plates.md:2537) |
@@ -604,7 +640,7 @@ game-choice rule or a knob tuned to a target; (d) present but off by default; (e
 | Lithosphere temperature, thickness | Since 2026-10-23 on by default: each sample's thermal lithosphere depth and keel, relaxed towards hot or cold targets; heat flow and the strength (thin sheet, Te) from it | (b)/(c) | `plates/thermal.rs` | PLT-460 to PLT-469, ISO-112 |
 | Root removal | Since 2026-10-23: a collision belt over 50 km heats to its Moho over 10 Myr; the 70 km cap's no-room excess founders bottom-first at that pace | (b)/(c) | `plates/thermal.rs`; `plates/collapse.rs` | PLT-258, PLT-477, PLT-478 |
 | Cratons | Regime label | (e) | `plates/mod.rs:1352` | PLT-139 |
-| Rifting | Poisson by continental share, Voronoi pieces, LIP boost | (c) | `plates/rifting.rs:40-86` | PLT-082 to PLT-091 |
+| Rifting | Poisson by continental share and LIP boost, since 2026-10-23 shared between plates by their tension; the pieces grow through the plate and meet where the lithosphere is thin | (c) | `plates/rifting.rs`: maybe_rift, rift | PLT-082 to PLT-091, PLT-504, PLT-506 |
 | Rifted margins | Stretching profile (a smoothstep in thickness, since 2026-10-23) W = 200 km, 20 Myr; the lithosphere thins by the same β | (b)/(c) | `plates/transition.rs` | PLT-261 to PLT-264, PLT-294, PLT-475, PLT-476 |
 | Plumes, hotspots, LIPs | Random points, swells, piles | (c) | `plates/hotspots.rs` | PLT-108 to PLT-120 |
 | Crust budget | Recorded, not enforced | (c) | `plates/crust_budget.rs` | PLT-302, PLT-401 |

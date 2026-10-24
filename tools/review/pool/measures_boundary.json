@@ -1,0 +1,56 @@
+{
+  "_doc": "V1 gap 2's measures (plate boundary organisation, 2026-10-23): the boundary mix against Bird 2003 Table 3, how the trenches face their convergence, the active share of the continental margin, the collision front's length and the collisions' durations. Pass it with --registry tools/review/pool/measures_boundary.json (or DEEPTIME_POOL_MEASURES) and --measures v1census,boundary,collcoast (gap 4's coastset: add --registry tools/review/pool/measures_gap4.json). Definitions in measure_boundary.py and measure_collcoast.py; Earth's arc-continent sutures for collcoast's hand-off counts are Macdonald 2019's 15 to 46 per 100 Myr (ledger PLT-157). The share bands are Bird's shares with room for the lattice (game-choice: tolerance, agent 2026-10-23; the plate check's own bands where it has one: subducting 15 to 25 %, the active margin 0.25 to 0.40, collision length 15 to 50 Myr and at most 120). The collision front's bound is Stern & Scholl 2010's 12,000 km of active suture today (ledger PLT-500).",
+  "measures": {
+    "boundary": {
+      "version": 2,
+      "doc": "the boundary's shares by class against Bird 2003, the trenches' facing, the active margin, the collision front and the collisions' lengths, the plate counts and the rifts and initiations per 100 Myr; definitions in measure_boundary.py",
+      "command": ["{py}", "-I", "{tools}/measure_boundary.py", "{run}"],
+      "python": "numpy",
+      "needs": ["plate", "rec"],
+      "columns": [
+        {"key": "sub", "label": "subducting, share of boundary (Bird SUB 0.197)", "target": [0.15, 0.25], "digits": 3},
+        {"key": "transform", "label": "transform (Bird OTF + CTF 0.283)", "target": [0.22, 0.34], "digits": 3},
+        {"key": "spread", "label": "spreading (Bird OSR + CRB 0.363)", "target": [0.30, 0.42], "digits": 3},
+        {"key": "coll", "label": "in collision (Bird CCB 0.088)", "target": [0.05, 0.13], "digits": 3},
+        {"key": "nocontact", "label": "converging, no slab (Bird OCB 0.067)", "target": null, "digits": 3},
+        {"key": "oo_of_sub", "label": "ocean-ocean share of subducting (Stern & Scholl 0.35)", "target": null, "digits": 3},
+        {"key": "sub_km", "key2": "total_km", "label": "subducting / all boundary, lattice km (Bird 51,310 / 260,487 geodesic; lattice 1.84x)", "target": null, "digits": 0, "pair": true},
+        {"key": "facing", "key2": "facing_cont", "label": "trench convergence across / full, capped (Bird SUB 0.854): all / continental", "target": null, "digits": 3, "pair": true},
+        {"key": "slow_front", "key2": "fast_front", "label": "oceanic front under 10 / at 80 or more mm/yr across", "target": null, "digits": 3, "pair": true},
+        {"key": "across_mm_yr", "label": "mean convergence across the oceanic front, mm/yr (Bird SUB 53.2)", "target": null, "digits": 1},
+        {"key": "active_margin", "label": "active share of continental margin", "target": [0.25, 0.40], "digits": 3},
+        {"key": "m_sub", "key2": "m_coll", "label": "coast at a subduction front / in a collision belt", "target": null, "digits": 3, "pair": true},
+        {"key": "m_andean", "key2": "m_initiated", "label": "coast at a front: the continent overriding / an initiation's", "target": null, "digits": 3, "pair": true},
+        {"key": "front_coll_km", "label": "front in collision, km (Stern & Scholl 6,000 to 12,000)", "target": [null, 12000], "digits": 0},
+        {"key": "coll_life_p50", "key2": "coll_life_p90", "label": "collision length p50 / p90, Myr (15 to 50 / at most 120)", "target": null, "digits": 0, "pair": true},
+        {"key": "plates", "label": "plates alive (Bird 52; 19 over 0.0377 sr)", "target": null, "digits": 0},
+        {"key": "rifts", "key2": "initiations", "label": "rifts / initiations per 100 Myr", "target": null, "digits": 2, "pair": true},
+        {"key": "reversals", "label": "polarity reversals per 100 Myr", "target": null, "digits": 1},
+        {"special": "criteria", "label": "boundary criteria met per run: median, mean"}
+      ],
+      "criteria": ["sub", "transform", "spread", "coll", "active_margin", "front_coll_km"]
+    },
+    "collcoast": {
+      "version": 1,
+      "doc": "why collision belts stand on the coast: hand-offs per 100 Myr by the terrane's size and the crust crossed in each, the partings by reason, the collision regime's land and its distance to the sea, the collision high coasts' belt geometry and landmass size; definitions in measure_collcoast.py (ledger PLT-508)",
+      "command": ["{py}", "-I", "{tools}/measure_collcoast.py", "{run}"],
+      "python": "numpy",
+      "needs": ["fields", "rec"],
+      "fields": ["elevation", "regime"],
+      "columns": [
+        {"key": "hand_lt50_per100", "key2": "hand_50_200_per100", "label": "hand-offs per 100 Myr, terranes under 50 / 50 to 200 samples", "target": null, "digits": 1, "pair": true},
+        {"key": "hand_200_1000_per100", "key2": "hand_ge1000_per100", "label": "hand-offs per 100 Myr, 200 to 1000 / 1000 or more samples", "target": null, "digits": 1, "pair": true},
+        {"key": "counted_per100", "label": "collisions the plate check counts, per 100 Myr (terranes of 0.1 of a plate or more)", "target": null, "digits": 2},
+        {"key": "hand_lt50_crossed", "key2": "hand_50_200_crossed", "label": "crust crossed in hand-offs under 50 / 50 to 200 samples", "target": null, "digits": 3, "pair": true},
+        {"key": "hand_200_1000_crossed", "key2": "hand_ge1000_crossed", "label": "crust crossed in hand-offs 200 to 1000 / 1000 or more", "target": null, "digits": 3, "pair": true},
+        {"key": "partings_per100", "key2": "partings_crossed", "label": "partings per 100 Myr / their share of the crust crossed", "target": null, "digits": 2, "pair": true},
+        {"key": "parted", "key2": "reversed", "label": "partings parted / reversed", "target": null, "digits": 3, "pair": true},
+        {"key": "coll_land", "key2": "coll_land_near", "label": "collision regime: share of the land / of it within 150 km of the sea", "target": null, "digits": 3, "pair": true},
+        {"key": "coll_land_dsea_km", "label": "collision land's median distance to the sea, km", "target": null, "digits": 0},
+        {"key": "geom_side", "key2": "geom_end", "label": "collision high coasts: the belt along the coast / ending at it", "target": null, "digits": 3, "pair": true},
+        {"key": "geom_round", "label": "collision high coasts: belt not elongated", "target": null, "digits": 3},
+        {"key": "landmass_small", "key2": "landmass_large", "label": "collision high coasts on landmasses under 0.02 / 0.10 or more of the land", "target": null, "digits": 3, "pair": true}
+      ]
+    }
+  }
+}

@@ -255,6 +255,15 @@ pub fn resolve(
         .dynamics
         .is_some()
         .then(|| state.samples.iter().map(|s| s.is_hidden()).collect());
+    // ledger: PLT-371 (the reversal judged by the crust the arc stands on), PLT-370 (the reach):
+    // the arc's footing is the crust visible as the step starts, since the flags are set again
+    // below.
+    let by_arc = env.k.reversal_by_arc_crust;
+    let hidden_before: Vec<bool> = if by_arc {
+        state.samples.iter().map(|s| s.is_hidden()).collect()
+    } else {
+        Vec::new()
+    };
     for s in &mut state.samples {
         s.flags &=
             !(HIDDEN | TRENCH | ARC | HOTSPOT | DIVERGENT | SUBDUCTION_ZONE | EMERGED | FORELAND);
@@ -295,8 +304,6 @@ pub fn resolve(
         })
         .collect();
     let mut aggs: BTreeMap<(u32, u32), Agg> = BTreeMap::new();
-    // ledger: PLT-371 (the reversal judged by the crust the arc stands on), PLT-370 (the reach).
-    let by_arc = env.k.reversal_by_arc_crust;
     let arc_steps = (env.k.arc_distance_km / env.norm.km(env.norm.spacing_rad())).floor() as u32;
     for o in overlaps {
         let a = state.plate_of(o.i as usize);
@@ -310,7 +317,7 @@ pub fn resolve(
         for (side, idx) in [(sa, o.i), (sb, o.cover.major())] {
             let s = &state.samples[idx as usize];
             e.seen[side] += 1;
-            if by_arc && continent_within(state, geo, idx, arc_steps) {
+            if by_arc && continent_within(state, geo, idx, arc_steps, |v| hidden_before[v]) {
                 e.near[side] += 1;
             }
             if s.kind == CONTINENTAL {
@@ -335,26 +342,19 @@ pub fn resolve(
         // Polarity reversal: continental crust arriving on the subducting side of an oceanic
         // overriding plate stops that subduction and starts the opposite one (Cortial: "an oceanic
         // plate always plunges beneath a continental plate"; without it a continent at a junction
-        // of three trenches is handed round them for ever). ledger: PLT-056. It judges the
-        // overriding side by its crust in the overlap, often an oceanic fringe in front of its
-        // continent, and fires about 17 times per 100 Myr against Crameri et al. (2020)'s 4 in
-        // about 105 Myr; judged by the crust the arc stands on instead (Stern 2004,
-        // `reversal_by_arc_crust`, off by default) it fires about 12 times, the collisions it ends
-        // fall from 8 to 5 per 100 Myr and the collisions rise to 1.85 to 2.2 per 100 Myr, by
-        // longer fronts in collision (ledger: PLT-371, which has what it does to the land).
+        // of three trenches is handed round them for ever). ledger: PLT-056. By default (since
+        // 2026-10-23, V1 gap 2) the overriding side is judged by the crust its arc stands on
+        // (Stern 2004, `reversal_by_arc_crust`, ledger: PLT-371, which has what it does to the
+        // land); with the switch off, by its crust in the overlap (PLT-056's old judgement), often
+        // an oceanic fringe in front of its continent, which fired about 17 times per 100 Myr
+        // against Crameri et al. (2020)'s 4 in about 105 Myr.
         if let Some(&k) = index.get(&(lo, hi)) {
             let c = &state.contacts[k];
             let under_side = usize::from(c.under != lo);
             let (u, o) = (under_side, 1 - under_side);
             let near = |s: usize| f64::from(agg.near[s]) / f64::from(agg.seen[s].max(1));
-            let over_oceanic = if by_arc {
-                near(o) < REVERSAL_OVER
-            } else {
-                frac(o) < REVERSAL_OVER
-            };
             if agg.count >= MIN_CONTACT
-                && ((frac(u) >= REVERSAL_UNDER && over_oceanic)
-                    || (lock(u) >= REVERSAL_UNDER && lock(o) < REVERSAL_OVER))
+                && reverses([frac(u), frac(o)], near(o), [lock(u), lock(o)], by_arc)
             {
                 reverse(state, world, env, k)?;
             }
@@ -518,12 +518,19 @@ pub(super) fn locked_against(
 }
 
 /// Whether visible continental crust of sample `i`'s plate lies within `steps` lattice steps of it
-/// through that plate's visible samples (itself included): an arc behind a front there would stand
-/// on continental crust. The boundary mix measures the same distance (`dynamics`, PLT-370).
+/// through that plate's visible samples (itself included; `hidden` says which are not visible):
+/// an arc behind a front there would stand on continental crust. The boundary mix measures the
+/// same distance (`dynamics`, PLT-370).
 /// The arc-front counters measure with it, and the polarity reversal judges the overriding side
-/// by it with `reversal_by_arc_crust` (off by default; plates.md, "The plate geometry" and "The
-/// crust flux into collision fronts", 2026-10-21; ledger: PLT-371).
-fn continent_within(state: &PlateState, geo: &Geo, i: u32, steps: u32) -> bool {
+/// by it with `reversal_by_arc_crust` (on by default since 2026-10-23; plates.md, "The plate
+/// geometry" and "The crust flux into collision fronts", 2026-10-21; ledger: PLT-371).
+fn continent_within(
+    state: &PlateState,
+    geo: &Geo,
+    i: u32,
+    steps: u32,
+    hidden: impl Fn(usize) -> bool,
+) -> bool {
     let p = state.plate_of(i as usize);
     let mut seen = vec![i];
     let mut frontier = vec![i];
@@ -531,17 +538,14 @@ fn continent_within(state: &PlateState, geo: &Geo, i: u32, steps: u32) -> bool {
         let mut next = Vec::new();
         for &v in &frontier {
             let s = &state.samples[v as usize];
-            if s.kind == CONTINENTAL && !s.is_hidden() {
+            if s.kind == CONTINENTAL && !hidden(v as usize) {
                 return true;
             }
             if depth == steps {
                 continue;
             }
             for (u, _) in geo.edges(v) {
-                if !seen.contains(&u)
-                    && state.plate_of(u as usize) == p
-                    && !state.samples[u as usize].is_hidden()
-                {
+                if !seen.contains(&u) && state.plate_of(u as usize) == p && !hidden(u as usize) {
                     seen.push(u);
                     next.push(u);
                 }
@@ -557,6 +561,25 @@ fn continent_within(state: &PlateState, geo: &Geo, i: u32, steps: u32) -> bool {
 const REVERSAL_UNDER: f64 = 0.5;
 /// … and less than this fraction of its overriding side's.
 const REVERSAL_OVER: f64 = 0.25;
+
+/// Whether a contact reverses its polarity (ledger: PLT-056, PLT-371), from the shares of its
+/// overlap samples on the subducting side `[0]` and the overriding side `[1]`: `cont` continental,
+/// `lock` locked against it, `over_near` the overriding side's with their plate's continental
+/// crust within the arc's distance ([`continent_within`]). Buoyant crust arriving on the
+/// subducting side reverses an oceanic overriding plate; with `by_arc` the overriding side is
+/// oceanic only where its arc would stand on ocean floor, so a continent behind an oceanic fringe
+/// goes on as a collision ("polarity reversal ... is triggered by buoyant crust entering the
+/// trench"; against a continent, "It takes less work to deform large parts of continental Asia
+/// than it does to start a new subduction zone in the Indian Plate", Stern 2004).
+fn reverses(cont: [f64; 2], over_near: f64, lock: [f64; 2], by_arc: bool) -> bool {
+    let over_oceanic = if by_arc {
+        over_near < REVERSAL_OVER
+    } else {
+        cont[1] < REVERSAL_OVER
+    };
+    (cont[0] >= REVERSAL_UNDER && over_oceanic)
+        || (lock[0] >= REVERSAL_UNDER && lock[1] < REVERSAL_OVER)
+}
 
 /// Reverses contact `k`: the subducting plate becomes the overriding one. The old subduction zone
 /// closes (with its Andean orogeny, if any, and its collision state) and a fresh contact starts
@@ -1092,7 +1115,9 @@ pub fn fronts_finish(
                 front_len[under] += front_km;
                 // Measurement only: by the crust the arc stands on, as the boundary mix counts it
                 // (ledger: PLT-370).
-                if continent_within(state, geo, v as u32, arc_steps) {
+                if continent_within(state, geo, v as u32, arc_steps, |u| {
+                    state.samples[u].is_hidden()
+                }) {
                     front_continental += front_km * env.dt_myr;
                 } else {
                     front_oceanic += front_km * env.dt_myr;
@@ -1628,6 +1653,95 @@ mod tests {
                 }
             }
             assert!(skipped >= 600, "{skipped}");
+        }
+    }
+
+    /// Stern 2004: "polarity reversal ... is triggered by buoyant crust entering the trench", and
+    /// against a continent "It takes less work to deform large parts of continental Asia than it
+    /// does to start a new subduction zone in the Indian Plate". The reach first: on a cap of
+    /// continent in old floor, a sample finds continental crust within `steps` lattice steps
+    /// through its plate exactly when its lattice distance to the cap is at most `steps`, and
+    /// hidden crust is no arc's footing. Then the judgement (ledger: PLT-056, PLT-371): off, an
+    /// oceanic fringe in the overlap in front of a continent reverses; judged by the arc's
+    /// crust it goes on as a collision; an intra-oceanic arc reverses either way, an overriding
+    /// continent in the overlap never, and oceanic crust arriving never.
+    #[test]
+    fn reversal_judges_the_overriding_side_by_the_crust_its_arc_stands_on() {
+        use crate::plates::rifting::tests::{N, continental, old_floor, one_plate};
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let cap = |p: DVec3| p.z > 0.5;
+        let mut state = one_plate(
+            &geo,
+            3,
+            |p| if cap(p) { continental() } else { old_floor() },
+        );
+        let hid = |st: &PlateState| {
+            let h: Vec<bool> = st.samples.iter().map(|s| s.is_hidden()).collect();
+            move |v: usize| h[v]
+        };
+        // Lattice distance to the cap by breadth first search (the edges are symmetric).
+        let mut dist = vec![u32::MAX; N];
+        let mut frontier: Vec<u32> = (0..N as u32)
+            .filter(|&i| cap(geo.points()[i as usize]))
+            .collect();
+        for &i in &frontier {
+            dist[i as usize] = 0;
+        }
+        let mut d = 0;
+        while !frontier.is_empty() {
+            d += 1;
+            let mut next = Vec::new();
+            for &v in &frontier {
+                for (u, _) in geo.edges(v) {
+                    if dist[u as usize] == u32::MAX {
+                        dist[u as usize] = d;
+                        next.push(u);
+                    }
+                }
+            }
+            frontier = next;
+        }
+        let vis = hid(&state);
+        for steps in [0, 1, 3] {
+            let mut near = 0;
+            for i in (0..N as u32).step_by(7) {
+                let want = dist[i as usize] <= steps;
+                near += usize::from(want && dist[i as usize] > 0);
+                assert_eq!(
+                    continent_within(&state, &geo, i, steps, &vis),
+                    want,
+                    "sample {i}, {steps} steps, distance {}",
+                    dist[i as usize]
+                );
+            }
+            assert!(
+                steps == 0 || near > 0,
+                "{steps} steps: no ocean sample in reach"
+            );
+        }
+        for s in state.samples.iter_mut().filter(|s| s.kind == CONTINENTAL) {
+            s.flags |= crate::plates::state::HIDDEN;
+        }
+        let vis = hid(&state);
+        assert!((0..N as u32).all(|i| !continent_within(&state, &geo, i, 3, &vis)));
+
+        // A continent arriving under an oceanic fringe whose plate's continent is within the arc's
+        // reach: the overlap's crust reverses it, the arc's does not.
+        assert!(reverses([1.0, 0.0], 1.0, [0.0, 0.0], false));
+        assert!(!reverses([1.0, 0.0], 1.0, [0.0, 0.0], true));
+        // An intra-oceanic arc: buoyant crust arriving reverses it either way.
+        assert!(reverses([1.0, 0.0], 0.0, [0.0, 0.0], false));
+        assert!(reverses([1.0, 0.0], 0.0, [0.0, 0.0], true));
+        // An overriding continent in the overlap: a collision either way.
+        for by_arc in [false, true] {
+            assert!(!reverses([1.0, 1.0], 1.0, [0.0, 0.0], by_arc));
+            // Oceanic crust arriving never reverses.
+            assert!(!reverses([0.0, 0.0], 0.0, [0.0, 0.0], by_arc));
+        }
+        // Locked (freshly sutured) crust arriving reverses an unlocked overriding continent,
+        // whatever the arc stands on.
+        for by_arc in [false, true] {
+            assert!(reverses([1.0, 1.0], 1.0, [1.0, 0.0], by_arc));
         }
     }
 }

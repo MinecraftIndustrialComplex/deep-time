@@ -36,27 +36,71 @@ use deeptime_format::EventId;
 /// Plates below this many samples never rift.
 const MIN_RIFT_SAMPLES: u32 = 64;
 
-/// Draws a rift for every plate (in id order) and runs the ones drawn.
+/// The thinnest lithosphere `rift_weakness` weighs, km: a young ridge's or a back-arc's is thinner,
+/// and weighs as this (game-choice: agent 2026-10-23, so that one edge costs at most
+/// (225 / 20)^m times its length). ledger: PLT-506
+const WEAK_MIN_KM: f64 = 20.0;
+
+/// The stress weight of V1 gap 2's stage C2 (ledger PLT-504, PLT-505): each plate's
+/// e^(sign·σ/σ_s) over its mean across the plates `candidates` names, weighted by the hazard `w`
+/// each has unweighted, so the hazard's expected count over them is unchanged (to first order in
+/// the hazard) and only where it falls moves.
+/// σ is the plate's mean in-plane stress from the step's force balance (FRC-022, MPa, tension
+/// positive); a plate without one (not in the balance, or born this step) weighs 1. `None` when
+/// the rule is off (`scale_mpa` 0) or no candidate has a stress.
+fn stress_weights(
+    stress: &[Option<f64>],
+    candidates: &[(u32, f64)],
+    scale_mpa: f64,
+    sign: f64,
+) -> Option<BTreeMap<u32, f64>> {
+    if scale_mpa.is_nan() || scale_mpa <= 0.0 {
+        return None;
+    }
+    // Clamped so that one plate's extreme stress cannot overflow the weights.
+    let raw = |id: u32| {
+        stress
+            .get(id as usize)
+            .copied()
+            .flatten()
+            .map(|s| (sign * s / scale_mpa).clamp(-20.0, 20.0).exp())
+    };
+    let (mut num, mut den) = (0.0, 0.0);
+    for &(id, a) in candidates {
+        if let Some(x) = raw(id) {
+            num += a * x;
+            den += a;
+        }
+    }
+    if !(den > 0.0 && num > 0.0) {
+        return None;
+    }
+    let mean = num / den;
+    Some(
+        candidates
+            .iter()
+            .map(|&(id, _)| (id, raw(id).map_or(1.0, |x| x / mean)))
+            .collect(),
+    )
+}
+
+/// Draws a rift for every plate (in id order) and runs the ones drawn. `stress` is each plate's
+/// mean in-plane stress from the step's force balance (by plate id), for `rift_stress_mpa`.
 pub fn maybe_rift(
     state: &mut PlateState,
     world: &mut WorldState,
     geo: &Geo,
     pos: &[DVec3],
     env: &Env,
+    stress: &[Option<f64>],
 ) -> Result<(), CoreError> {
     let k = env.k;
     let area = env.norm.sample_area_km2();
     let min = (k.min_plate_area_frac * f64::from(state.n) * 8.0).max(f64::from(MIN_RIFT_SAMPLES));
     let ids: Vec<u32> = state.alive().map(|p| p.id).collect();
-    for id in ids {
-        let alive = state.alive().count() as u32;
-        if alive >= k.max_plates {
-            break;
-        }
-        let p = &state.plates[id as usize];
-        if f64::from(p.samples) < min {
-            continue;
-        }
+    let a0 = state.a0_km2;
+    // A plate's rift hazard λ (Cortial's: continental weight, area, plume boost).
+    let hazard = |p: &Plate| {
         let x = p.continental_frac;
         let f = k.rift_ocean_weight + (1.0 - k.rift_ocean_weight) * x * x;
         let boost = if env.t_myr < p.lip_until_myr {
@@ -66,7 +110,35 @@ pub fn maybe_rift(
         };
         // ledger: PLT-082, PLT-083 (per Myr, so the step's λ_0 scales with its length)
         let lambda0 = k.rift_per_myr * env.dt_myr;
-        let lambda = lambda0 * f * f64::from(p.samples) * area / state.a0_km2 * boost;
+        lambda0 * f * f64::from(p.samples) * area / a0 * boost
+    };
+    // Rifts under tension (V1 gap 2's stage C2): the plates the edge forces pull apart rift
+    // more, the others less, at the same expected count (the weights' mean is taken over the
+    // plates' hazards). ledger: PLT-504
+    let weights = if k.rift_stress_mpa > 0.0 {
+        let candidates: Vec<(u32, f64)> = ids
+            .iter()
+            .map(|&id| &state.plates[id as usize])
+            .filter(|p| f64::from(p.samples) >= min)
+            .map(|p| (p.id, hazard(p)))
+            .collect();
+        stress_weights(stress, &candidates, k.rift_stress_mpa, 1.0)
+    } else {
+        None
+    };
+    for id in ids {
+        let alive = state.alive().count() as u32;
+        if alive >= k.max_plates {
+            break;
+        }
+        let p = &state.plates[id as usize];
+        if f64::from(p.samples) < min {
+            continue;
+        }
+        let mut lambda = hazard(p);
+        if let Some(w) = weights.as_ref().and_then(|w| w.get(&id)) {
+            lambda *= w;
+        }
         let prob = lambda * (-lambda).exp();
         if state.rng.next_f64() < prob {
             let fragments = state
@@ -110,36 +182,72 @@ pub fn rift(
     }
     // Spread centroids: each new one the best of 16 random candidates.
     let mut centres: Vec<DVec3> = Vec::with_capacity(fragments as usize);
-    centres.push(pos[visible[state.rng.below(visible.len() as u64) as usize] as usize]);
+    let mut centre_at: Vec<u32> = Vec::with_capacity(fragments as usize);
+    let first = visible[state.rng.below(visible.len() as u64) as usize];
+    centres.push(pos[first as usize]);
+    centre_at.push(first);
     while centres.len() < fragments as usize {
-        let mut best = (f64::NEG_INFINITY, DVec3::Z);
+        let mut best = (f64::NEG_INFINITY, DVec3::Z, 0u32);
         for _ in 0..16 {
-            let c = pos[visible[state.rng.below(visible.len() as u64) as usize] as usize];
+            let at = visible[state.rng.below(visible.len() as u64) as usize];
+            let c = pos[at as usize];
             let d = centres
                 .iter()
                 .map(|e| e.angle_between(c))
                 .fold(f64::INFINITY, f64::min);
             if d > best.0 {
-                best = (d, c);
+                best = (d, c, at);
             }
         }
         centres.push(best.1);
+        centre_at.push(best.2);
     }
     let seed = state.rng.next_u64();
     let warp = k.rift_warp_rad;
+    let member = membership(&members, n);
+    // Rifts along weak lithosphere (V1 gap 2's stage C2): each fragment grows from its centre
+    // through the plate with every edge's cost its length times (L_cold / L)^m, L the
+    // lithosphere's depth (`thermal.rs`), so the fragments meet where it is thin. Off (m = 0, or
+    // no thermal state), the distance is the great circle's. ledger: PLT-506
+    let grown: Option<Vec<Vec<f64>>> = (k.rift_weakness > 0.0 && k.thermal_state).then(|| {
+        let depth = |i: u32| {
+            let l = f64::from(state.samples[i as usize].lithosphere_km);
+            if l > 0.0 {
+                l.clamp(WEAK_MIN_KM, super::thermal::L_COLD_KM)
+            } else {
+                super::thermal::L_COLD_KM
+            }
+        };
+        let factor = |v: u32, u: u32| {
+            (super::thermal::L_COLD_KM / (0.5 * (depth(v) + depth(u)))).powf(k.rift_weakness)
+        };
+        centre_at
+            .iter()
+            .map(|&c| super::geometry::dijkstra_weighted(geo, c, |i| member[i as usize], factor))
+            .collect()
+    });
     // Label = fragment index; non-members keep a label no fragment uses.
     let mut label = vec![u32::MAX; n];
     for &i in &members {
         let p = pos[i as usize];
+        // A sample some fragment reached through the plate goes by the grown distances (one no
+        // fragment reached is beyond them all); one none reached (a part of the plate cut off on
+        // the lattice) by the great circle to every centre.
+        let reached = grown
+            .as_ref()
+            .is_some_and(|g| g.iter().any(|d| d[i as usize].is_finite()));
         label[i as usize] = (0..fragments)
             .map(|f| {
                 let noise = warp * fbm(p, 4.0, 3, seed.wrapping_add(u64::from(f) * 31));
-                (f, p.angle_between(centres[f as usize]) + noise)
+                let d = match grown.as_ref() {
+                    Some(g) if reached => g[f as usize][i as usize],
+                    _ => p.angle_between(centres[f as usize]),
+                };
+                (f, d + noise)
             })
             .fold((0, f64::INFINITY), |a, b| if b.1 < a.1 { b } else { a })
             .0;
     }
-    let member = membership(&members, n);
     connect_plates(geo, &mut label, |i| member[i]);
     let split_coast = coast_split(geo, state, &members, |i| member[i], |i| label[i]);
     let mut counts = vec![0usize; fragments as usize];
@@ -296,6 +404,7 @@ pub fn maybe_initiate_subduction(
     geo: &Geo,
     pos: &[DVec3],
     env: &Env,
+    stress: &[Option<f64>],
 ) -> Result<(), CoreError> {
     let k = env.k;
     if k.subduction_initiation_per_myr <= 0.0 {
@@ -312,6 +421,13 @@ pub fn maybe_initiate_subduction(
         .collect();
     let trench_tree = (!trenches.is_empty()).then(|| Tree::over(&trenches, |_| true));
     let clearance = env.norm.rad(k.subduction_initiation_clearance_km);
+    // Off the passive margin (V1 gap 2's stage C1): the reach of the arc the new trench builds
+    // on the plate, and a lattice spacing for where the front falls. ledger: PLT-503
+    let margin = if k.subduction_initiation_offshore {
+        env.norm.rad(k.arc_distance_km + k.arc_width_km) + env.norm.spacing_rad()
+    } else {
+        0.0
+    };
     let clear = |i: usize| {
         trench_tree.as_ref().is_none_or(|tr| {
             tr.nearest(pos[i])
@@ -329,6 +445,18 @@ pub fn maybe_initiate_subduction(
         }
     }
     let ids: Vec<u32> = state.alive().map(|p| p.id).collect();
+    // Subduction starts under compression (V1 gap 2's stage C2): the same weight with −σ, over
+    // the plates' old floor. ledger: PLT-505
+    let weights = if k.initiation_stress_mpa > 0.0 {
+        let candidates: Vec<(u32, f64)> = ids
+            .iter()
+            .filter(|&&id| old[id as usize].len() >= 16)
+            .map(|&id| (id, old[id as usize].len() as f64))
+            .collect();
+        stress_weights(stress, &candidates, k.initiation_stress_mpa, -1.0)
+    } else {
+        None
+    };
     for id in ids {
         if state.alive().count() as u32 >= k.max_plates {
             break;
@@ -339,13 +467,60 @@ pub fn maybe_initiate_subduction(
         }
         // ledger: PLT-063 (per Myr, so the step's rate scales with its length)
         let rate = k.subduction_initiation_per_myr * env.dt_myr;
-        let lambda = rate * o.len() as f64 * area / state.a0_km2;
+        let mut lambda = rate * o.len() as f64 * area / state.a0_km2;
+        if let Some(w) = weights.as_ref().and_then(|w| w.get(&id)) {
+            lambda *= w;
+        }
         if state.rng.next_f64() < 1.0 - (-lambda).exp() {
-            let seed = o[state.rng.below(o.len() as u64) as usize];
-            initiate(state, world, geo, pos, env, id, seed, o)?;
+            if margin > 0.0 {
+                // The old floor within the margin of the plate's continental crust stays on the
+                // plate, and the fracture's seed is old floor beyond it; none, no initiation.
+                let near = near_continent(state, pos, id, margin);
+                let far: Vec<u32> = o.iter().copied().filter(|&i| !near[i as usize]).collect();
+                if far.is_empty() {
+                    continue;
+                }
+                let seed = far[state.rng.below(far.len() as u64) as usize];
+                initiate(
+                    state,
+                    world,
+                    geo,
+                    pos,
+                    env,
+                    id,
+                    seed,
+                    o,
+                    Some(near.as_slice()),
+                )?;
+            } else {
+                let seed = o[state.rng.below(o.len() as u64) as usize];
+                initiate(state, world, geo, pos, env, id, seed, o, None)?;
+            }
         }
     }
     Ok(())
+}
+
+/// The plate's visible oceanic samples within `margin` (radians, great circle) of its visible
+/// continental crust: where a subduction initiation's fracture may not run (ledger PLT-503).
+fn near_continent(state: &PlateState, pos: &[DVec3], id: u32, margin: f64) -> Vec<bool> {
+    let n = state.samples.len();
+    let on = |i: usize| state.plate_of(i) == id && !state.samples[i].is_hidden();
+    let land = |i: usize| on(i) && state.samples[i].kind == CONTINENTAL;
+    if !(0..n).any(land) {
+        return vec![false; n];
+    }
+    let tree = Tree::over(pos, land);
+    (0..n)
+        .into_par_iter()
+        .map(|i| {
+            on(i)
+                && state.samples[i].kind != CONTINENTAL
+                && tree
+                    .nearest(pos[i])
+                    .is_some_and(|(_, d2)| angle_of_chord2(d2) <= margin)
+        })
+        .collect()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -358,6 +533,7 @@ fn initiate(
     id: u32,
     seed: u32,
     old: &[u32],
+    keep: Option<&[bool]>,
 ) -> Result<(), CoreError> {
     let k = env.k;
     let norm = env.norm;
@@ -394,7 +570,11 @@ fn initiate(
         let p = pos[i as usize];
         let da = p.angle_between(c_old) + warp * fbm(p, 4.0, 3, noise_seed);
         let db = p.angle_between(c_young) + warp * fbm(p, 4.0, 3, noise_seed ^ 0x55);
-        label[i as usize] = u32::from(da < db && state.samples[i as usize].kind != CONTINENTAL);
+        label[i as usize] = u32::from(
+            da < db
+                && state.samples[i as usize].kind != CONTINENTAL
+                && !keep.is_some_and(|kp| kp[i as usize]),
+        );
     }
     connect_plates(geo, &mut label, |i| member[i]);
     let split_coast = coast_split(geo, state, &members, |i| member[i], |i| label[i]);
@@ -632,4 +812,228 @@ pub fn heal(
         state.recount(pos);
     }
     Ok(healed)
+}
+
+#[cfg(test)]
+pub(in crate::plates) mod tests {
+    use super::*;
+    use crate::params::TectonicParams;
+    use crate::plates::geometry::positions;
+    use crate::plates::normalise::Norm;
+    use crate::plates::pools::{continental_column, oceanic_column};
+    use crate::plates::state::Sample;
+
+    #[test]
+    fn stress_weights_keep_the_mean_and_favour_the_stress_asked_for() {
+        let stress = vec![Some(40.0), Some(0.0), Some(-20.0), None];
+        let cands = [(0, 2.0), (1, 1.0), (2, 1.0), (3, 5.0)];
+        let w = stress_weights(&stress, &cands, 20.0, 1.0).unwrap();
+        // The area-weighted mean over the plates with a stress is 1; one without weighs 1.
+        let mean = (2.0 * w[&0] + w[&1] + w[&2]) / 4.0;
+        assert!((mean - 1.0).abs() < 1e-12, "{mean}");
+        assert_eq!(w[&3], 1.0);
+        assert!(w[&0] > w[&1] && w[&1] > w[&2]);
+        // Compression favoured with the sign turned.
+        let c = stress_weights(&stress, &cands, 20.0, -1.0).unwrap();
+        assert!(c[&2] > c[&1] && c[&1] > c[&0]);
+        // Off, or no stress at all: no weights.
+        assert!(stress_weights(&stress, &cands, 0.0, 1.0).is_none());
+        assert!(stress_weights(&[None, None], &[(0, 1.0), (1, 1.0)], 20.0, 1.0).is_none());
+    }
+
+    pub(in crate::plates) const N: usize = 16_000;
+
+    fn env(k: &TectonicParams) -> Env<'_> {
+        Env {
+            k,
+            norm: Norm::new(6370.0, 6371.0, N),
+            dt_myr: 2.0,
+            dt_yr: 2.0e6,
+            gravity: 9.81,
+            step: 1,
+            t_myr: 2.0,
+        }
+    }
+
+    /// One plate over the whole sphere, each sample as `make` says from its position.
+    pub(in crate::plates) fn one_plate(
+        geo: &Geo,
+        seed: u64,
+        make: impl Fn(DVec3) -> Sample,
+    ) -> PlateState {
+        let ident = [0.0, 0.0, 0.0, 1.0];
+        let mut st = PlateState {
+            n: N as u32,
+            lattice: ident,
+            samples: geo.points().iter().map(|&p| make(p)).collect(),
+            groups: vec![Group {
+                plate: 0,
+                rot: ident,
+            }],
+            plates: vec![Plate {
+                id: 0,
+                alive: true,
+                omega: [0.0; 3],
+                born_myr: 0.0,
+                died_myr: None,
+                birth_event: None,
+                parent: None,
+                lip_until_myr: f64::NEG_INFINITY,
+                lip_event: None,
+                samples: 0,
+                centroid: [0.0, 0.0, 1.0],
+                continental_frac: 0.0,
+            }],
+            contacts: Vec::new(),
+            hotspots: Vec::new(),
+            ridges: Vec::new(),
+            rift_links: Vec::new(),
+            rng: crate::sphere::SplitMix64::new(seed),
+            step: 0,
+            t_myr: 0.0,
+            start_myr: 0.0,
+            resample_step: 0,
+            resample_myr: 0.0,
+            a0_km2: 1.0,
+            counters: Default::default(),
+            slabs: Vec::new(),
+            dynamics: None,
+            gap_budget: None,
+            limits: None,
+        };
+        let pos = positions(&st, geo);
+        st.recount(&pos);
+        st
+    }
+
+    pub(in crate::plates) fn continental() -> Sample {
+        let mut s = Sample::blank(0);
+        s.kind = CONTINENTAL;
+        s.pools = continental_column();
+        s.thickness_m = s.pools.iter().sum();
+        s.elevation_m = 300.0;
+        s
+    }
+
+    /// Ocean floor formed 400 Myr ago: old enough to start subducting anywhere (PLT-062).
+    pub(in crate::plates) fn old_floor() -> Sample {
+        let mut s = Sample::blank(0);
+        s.pools = oceanic_column();
+        s.thickness_m = s.pools.iter().sum();
+        s.elevation_m = -5600.0;
+        s.formed_myr = -400.0;
+        s
+    }
+
+    /// Stern 2004 (§4.1): "There are no Cenozoic examples of a passive continental margin
+    /// transforming into a convergent margin"; Crameri et al. 2020: passive margins are less
+    /// favourable for subduction initiation than heterogeneous ocean interiors. A continent
+    /// (a 60° cap) in an ocean of old floor: off, the initiation's fracture runs along the
+    /// continent's edge on some draws and the old floor beside the coast goes to the sinking plate
+    /// (the passive margin turned active, which PLT-067 meant to stop); on, no sample of the
+    /// sinking plate lies within the arc's reach and a spacing of the continent, so the arc the
+    /// new trench builds stands on ocean floor; with an arc reaching across the ocean there is no
+    /// initiation. ledger: PLT-503, PLT-067
+    #[test]
+    fn subduction_starts_off_the_passive_margin() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let cap = |p: DVec3| p.z > 0.5;
+        let initiate_with = |offshore: bool, arc_km: f64, seed: u64| -> (PlateState, Vec<DVec3>) {
+            let k = TectonicParams {
+                subduction_initiation_per_myr: 100.0,
+                subduction_initiation_offshore: offshore,
+                arc_distance_km: arc_km,
+                ..Default::default()
+            };
+            let mut state = one_plate(
+                &geo,
+                seed,
+                |p| if cap(p) { continental() } else { old_floor() },
+            );
+            let pos = positions(&state, &geo);
+            let mut world = WorldState::new(1, 16_384, 0.0);
+            maybe_initiate_subduction(&mut state, &mut world, &geo, &pos, &env(&k), &[]).unwrap();
+            (state, pos)
+        };
+        let points = geo.points();
+        let land = Tree::over(points, |i| cap(points[i]));
+        let to_land = |p: DVec3| {
+            land.nearest(p)
+                .map_or(f64::INFINITY, |(_, d2)| angle_of_chord2(d2))
+        };
+        let k = TectonicParams::default();
+        let norm = Norm::new(6370.0, 6371.0, N);
+        let spacing = norm.spacing_rad();
+        let margin = norm.rad(k.arc_distance_km + k.arc_width_km) + spacing;
+        let (mut touched, mut started) = (0, 0);
+        for seed in 1..=8 {
+            let (base, pos) = initiate_with(false, k.arc_distance_km, seed);
+            if base.plates.len() == 2
+                && (0..N).any(|i| base.plate_of(i) == 1 && to_land(pos[i]) < 1.5 * spacing)
+            {
+                touched += 1;
+            }
+            let (kept, pos) = initiate_with(true, k.arc_distance_km, seed);
+            if kept.plates.len() == 2 {
+                started += 1;
+                let nearest = (0..N)
+                    .filter(|&i| kept.plate_of(i) == 1)
+                    .map(|i| to_land(pos[i]))
+                    .fold(f64::INFINITY, f64::min);
+                assert!(
+                    nearest > margin,
+                    "seed {seed}: the sinking plate within {nearest} rad of the coast"
+                );
+            }
+        }
+        assert!(touched >= 1, "off, some fracture runs along the coast");
+        assert!(started >= 1, "on, subduction still starts");
+        let (none, _) = initiate_with(true, 20_000.0, 1);
+        assert_eq!(
+            none.plates.len(),
+            1,
+            "no old floor beyond the margin: no initiation"
+        );
+    }
+
+    /// Audet & Bürgmann 2011 (abstract): "strain is concentrated at pre-existing zones of
+    /// weakness"; the plate's effective elastic thickness is "low in the surrounding Phanerozoic
+    /// belts". A plate of 225 km lithosphere with a thin belt (30 km) between 14.5° and 23.6° N,
+    /// its centres drawn in the polar caps: the two fragments' fracture runs along the equator's
+    /// side of the caps' bisector without the weakness, and inside the belt with it. ledger: PLT-506
+    #[test]
+    fn rifts_break_where_the_lithosphere_is_thin() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let belt = |p: DVec3| p.z > 0.25 && p.z < 0.4;
+        let split = |weakness: f64| -> f64 {
+            let k = TectonicParams {
+                rift_warp_rad: 0.0,
+                rift_weakness: weakness,
+                ..Default::default()
+            };
+            let mut state = one_plate(&geo, 7, |p| {
+                let mut s = continental();
+                s.lithosphere_km = if belt(p) { 30.0 } else { 225.0 };
+                // Only the caps are visible, so the fragments' centres are drawn there.
+                if p.z.abs() < 0.6 {
+                    s.flags |= HIDDEN;
+                }
+                s
+            });
+            let pos = positions(&state, &geo);
+            let mut world = WorldState::new(1, 16_384, 0.0);
+            rift(&mut state, &mut world, &geo, &pos, &env(&k), 0, 2).unwrap();
+            assert_eq!(state.plates.len(), 2, "the plate rifted");
+            let line: Vec<usize> = (0..N)
+                .filter(|&i| {
+                    geo.edges(i as u32)
+                        .any(|(u, _)| state.plate_of(u as usize) != state.plate_of(i))
+                })
+                .collect();
+            line.iter().filter(|&&i| belt(pos[i])).count() as f64 / line.len() as f64
+        };
+        let (plain, weak) = (split(0.0), split(2.0));
+        assert!(plain < 0.3, "the bisector mostly misses the belt: {plain}");
+        assert!(weak > 0.8, "the fracture runs in the thin belt: {weak}");
+    }
 }

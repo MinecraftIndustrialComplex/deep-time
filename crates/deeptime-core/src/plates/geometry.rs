@@ -277,6 +277,46 @@ pub fn dijkstra(
     (dist, label)
 }
 
+/// [`dijkstra`] from one source with each edge's length times `factor(from, to)` (finite, > 0): a
+/// weighted lattice distance, over the vertices `allow` accepts. Returns per vertex the distance
+/// (∞ when unreached). Serial; deterministic.
+pub fn dijkstra_weighted(
+    geo: &Geo,
+    source: u32,
+    allow: impl Fn(u32) -> bool,
+    factor: impl Fn(u32, u32) -> f64,
+) -> Vec<f64> {
+    let n = geo.points().len();
+    let mut dist = vec![f64::INFINITY; n];
+    let mut heap = BinaryHeap::new();
+    dist[source as usize] = 0.0;
+    heap.push(Entry {
+        d: 0.0,
+        v: source,
+        label: 0,
+    });
+    while let Some(Entry { d, v, .. }) = heap.pop() {
+        if d > dist[v as usize] {
+            continue;
+        }
+        for (u, len) in geo.edges(v) {
+            if !allow(u) {
+                continue;
+            }
+            let nd = d + f64::from(len) * factor(v, u);
+            if nd < dist[u as usize] {
+                dist[u as usize] = nd;
+                heap.push(Entry {
+                    d: nd,
+                    v: u,
+                    label: 0,
+                });
+            }
+        }
+    }
+    dist
+}
+
 thread_local! {
     /// [`dijkstra_sparse`]'s distances and labels, ∞ and `u32::MAX` between calls.
     static SPARSE: std::cell::RefCell<(Vec<f64>, Vec<u32>)> =
