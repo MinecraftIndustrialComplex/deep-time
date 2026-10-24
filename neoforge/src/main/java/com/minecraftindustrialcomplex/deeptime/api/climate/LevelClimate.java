@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.api.climate;
 
-import com.minecraftindustrialcomplex.deeptime.net.ClientPlanetState;
 import com.minecraftindustrialcomplex.deeptime.worlddata.ClimateLayers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
@@ -49,66 +48,6 @@ final class LevelClimate implements DeepTimeClimate {
             return new LevelClimate(true, l == null ? null : new ClimateColumns(l), d.manifest().seaLevelY(),
                     () -> t.geothermal(g.waterReach(), g.generatorSettings().value().noiseSettings().minY(), g.getSeaLevel()));
         });
-    }
-
-    /**
-     * {@link DeepTimeClimate#circumferenceBlocks}: the generator's on a server level, the planet info's
-     * on a client level (both allocation-free), 0 for anything else.
-     */
-    static int circumferenceBlocks(Level level) {
-        if (level == null)
-            return 0;
-        if (level.isClientSide())
-            return ClientPlanetState.circumference(level);
-        if (level instanceof ServerLevel server && server.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g)
-            return g.dataRef().circumferenceBlocks();
-        return 0;
-    }
-
-    /** {@link DeepTimeClimate#projectionKind}. */
-    static String projectionKind(Level level) {
-        if (level == null)
-            return "";
-        if (level.isClientSide()) {
-            var p = ClientPlanetState.projection(level);
-            return p == null ? "" : p.kind().id();
-        }
-        if (level instanceof ServerLevel server && server.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g)
-            return g.dataRef().projection();
-        return "";
-    }
-
-    /**
-     * The world projection of {@code level}: the world data's on a server (Lambert of the generator's C
-     * on a test terrain), the planet info's on a client; null for anything else.
-     */
-    static com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection projection(Level level) {
-        if (level == null)
-            return null;
-        if (level.isClientSide())
-            return ClientPlanetState.projection(level);
-        if (level instanceof ServerLevel server && server.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g) {
-            if (g.terrain() instanceof WorldDataTerrain t)
-                return t.data().projection();
-            return new com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Lambert(g.dataRef().circumferenceBlocks());
-        }
-        return null;
-    }
-
-    /**
-     * The nominal horizontal metres per block of {@code level}: its manifest's {@code m_per_block_h} on
-     * a server (the default on a test terrain, as the planet info sends), the planet info's on a
-     * client; NaN for anything else.
-     */
-    static double mPerBlockH(Level level) {
-        if (level == null)
-            return Double.NaN;
-        if (level.isClientSide())
-            return ClientPlanetState.mPerBlockH(level);
-        if (level instanceof ServerLevel server && server.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g)
-            return g.terrain() instanceof WorldDataTerrain t ? t.data().manifest().mPerBlockH()
-                    : com.minecraftindustrialcomplex.deeptime.worlddata.Manifest.DEFAULT_M_PER_BLOCK_H;
-        return Double.NaN;
     }
 
     @Override
