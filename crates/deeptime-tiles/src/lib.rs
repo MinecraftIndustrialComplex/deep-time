@@ -26,7 +26,12 @@
 //! z = ∓R = ∓C/2π, and pixels past them are drawn as the page's background. On a Petroff–Guyou
 //! world (format 0.5, the default) the frame is exactly the world: x ∈ [−b, b) with C = 2b, z from
 //! −b/2 to b/2, every pixel on the planet; rows past the north and south edges fold through their
-//! half-turns (`GridDesc::cell`), so the map continues through the seams.
+//! half-turns (`GridDesc::cell`), so the map continues through the seams. A cube world (format 0.7)
+//! is read on its net (cube plan G14): its layers, stored as six face planes, are read as the net
+//! window's flat raster, x ∈ [−3s/2, 5s/2) wrapping with the period 4s, z ∈ [−3s/2, 3s/2], each net
+//! cell its face's cell and the void's cells the copies the fold brings in, so a frame
+//! ([`BakeMap::render_frame`], the dev map's satellite) draws every face. The pyramid itself is
+//! still the polar worlds' 2:1 one (the cube's 4:3 net pyramid is cube plan T2).
 //!
 //! # What the pixels are
 //! The finest data the bake has is the **terrain height** `H = E + A·N` (FORMAT.md "The terrain
@@ -54,7 +59,8 @@ use std::time::Instant;
 use deeptime_core::climate::{glaciers, koppen, snapshot};
 use deeptime_core::satellite::{self, Cell, Light, Look, Palette};
 use deeptime_core::world::Field as CoreField;
-use deeptime_format::raster::cover_of;
+use deeptime_format::cube::{Cube, Face};
+use deeptime_format::raster::{ZEdges, cover_of};
 use deeptime_format::rivers::read_rivers;
 use deeptime_format::{
     DetailSpec, GridDesc, LayerDesc, Manifest, Noise, Ramps, Rivers, TilePackReader,
@@ -78,6 +84,77 @@ const STORE_BYTES: usize = 96 << 20;
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+// ---------------------------------------------------------------------------------------------
+// A cube world's net (cube plan G14)
+// ---------------------------------------------------------------------------------------------
+
+/// The stored face and local cell of a cube world's net cell `(i, j)` on face grids of `n` cells
+/// a side, `r` blocks a cell (`cube` of side s = n·r): cell (i, j) is the r × r square from F0's
+/// north-west corner (−s/2, −s/2) + (i·r, j·r), and x wraps with the period 4s. On a face it is
+/// that face's cell. In the void around N and S it is the cell under the fold of its centre
+/// ([`Cube::fold_point`]: the copy the game shows there), so a bilinear read across a face's
+/// edge meets the face across the seam. `None` past the net's corners.
+fn cube_net_cell(cube: &Cube, n: i64, r: f64, i: i64, j: i64) -> Option<(Face, i64, i64)> {
+    let iw = (i + n).rem_euclid(4 * n) - n;
+    let (ci, cj) = (iw.div_euclid(n), j.div_euclid(n));
+    let face = match (ci, cj) {
+        (-1, 0) => Some(Face::F3),
+        (0, 0) => Some(Face::F0),
+        (1, 0) => Some(Face::F1),
+        (2, 0) => Some(Face::F2),
+        (0, -1) => Some(Face::N),
+        (0, 1) => Some(Face::S),
+        _ => None,
+    };
+    if let Some(f) = face {
+        return Some((f, iw - ci * n, j - cj * n));
+    }
+    let h = cube.side() as f64 / 2.0;
+    let p = cube.fold_point(-h + (i as f64 + 0.5) * r, -h + (j as f64 + 0.5) * r)?;
+    let (ox, oz) = cube.face_origin(p.face);
+    let a = ((p.x - ox as f64) / r).floor() as i64;
+    let b = ((p.z - oz as f64) / r).floor() as i64;
+    Some((p.face, a.clamp(0, n - 1), b.clamp(0, n - 1)))
+}
+
+/// A cube world's six stacked face planes (`n` × `6n` cells of `r` blocks, as a cube grid stores
+/// them, row-major) as a flat raster of its net window: `4n` × `3n` cells from (−3s/2, −3s/2),
+/// each the face cell [`cube_net_cell`] names (NaN past the net's corners). The renderer's flat
+/// readers (x wraps, z clamps) then read a cube world as they read a Petroff–Guyou one.
+fn cube_net(cube: &Cube, n: usize, r: f64, stacked: &[f32]) -> Vec<f32> {
+    let (w, h) = (4 * n, 3 * n);
+    let mut out = vec![f32::NAN; w * h];
+    for (jj, row) in out.chunks_mut(w).enumerate() {
+        for (ii, o) in row.iter_mut().enumerate() {
+            let (i, j) = (ii as i64 - n as i64, jj as i64 - n as i64);
+            if let Some((f, a, b)) = cube_net_cell(cube, n as i64, r, i, j)
+                && let Some(&v) = stacked.get((f.index() * n + b as usize) * n + a as usize)
+            {
+                *o = v;
+            }
+        }
+    }
+    out
+}
+
+/// The flat grid of a cube grid's net raster ([`cube_net`]): `4n` × `3n` cells of `r` blocks, x
+/// wrapping with the period 4s, rows clamped, cell (0, 0)'s point at the centre of the net
+/// window's north-west cell (−3s/2 + r/2; a cube cell's value sits at its square's centre).
+fn cube_net_desc(g: &GridDesc) -> GridDesc {
+    let s = i64::from(g.face_blocks());
+    let o = -3 * s / 2 + i64::from(g.r / 2);
+    GridDesc {
+        name: g.name.clone(),
+        w: 4 * g.w,
+        h: 3 * g.w,
+        r: g.r,
+        wraps_x: true,
+        origin_block_x: o,
+        origin_block_z: o,
+        z_edges: ZEdges::Clamp,
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -280,18 +357,32 @@ impl LayerStore {
         Ok(cells)
     }
 
-    /// Cells `[i0, i0 + w) × [j0, j0 + h)` (x wraps, z clamps) as physical f32.
+    /// Cells `[i0, i0 + w) × [j0, j0 + h)` (x wraps, z clamps) as physical f32. On a cube grid
+    /// the cells are the net's ([`cube_net_cell`], from F0's north-west corner; NaN past the net's
+    /// corners) and each value sits at its cell's centre.
     fn window(&self, i0: i64, j0: i64, w: usize, h: usize) -> Result<Window, String> {
         let d = self.desc();
         let g = &d.grid;
         let (cb, tile) = (d.cell_bytes(), i64::from(d.tile));
+        let cube = g.is_cube().then(|| g.cube());
         let mut data = vec![0f32; w * h];
         let mut tile_for: Option<(usize, Arc<Vec<u8>>)> = None;
         for jj in 0..h {
             let row = &mut data[jj * w..(jj + 1) * w];
             for (ii, out) in row.iter_mut().enumerate() {
-                // Columns wrap; rows clamp (Lambert) or fold through the edges (Petroff–Guyou).
-                let (ci, cj) = g.cell(i0 + ii as i64, j0 + jj as i64);
+                // Columns wrap; rows clamp (Lambert) or fold through the edges (Petroff–Guyou);
+                // a cube's net cells are their faces' cells.
+                let (i, j) = (i0 + ii as i64, j0 + jj as i64);
+                let (ci, cj) = match cube {
+                    Some(cube) => match cube_net_cell(cube, i64::from(g.w), f64::from(g.r), i, j) {
+                        Some((f, a, b)) => g.face_cell(f, a, b),
+                        None => {
+                            *out = f32::NAN;
+                            continue;
+                        }
+                    },
+                    None => g.cell(i, j),
+                };
                 let (i, j) = (i64::from(ci), i64::from(cj));
                 let t = ((j / tile) as usize) * d.tiles_x() as usize + (i / tile) as usize;
                 if tile_for.as_ref().is_none_or(|(k, _)| *k != t) {
@@ -303,20 +394,36 @@ impl LayerStore {
                 *out = d.physical(d.dtype.decode_scalar(&bytes[at..at + cb])) as f32;
             }
         }
+        let centre = if cube.is_some() {
+            f64::from(g.r) / 2.0
+        } else {
+            0.0
+        };
         Ok(Window {
             i0,
             j0,
             w,
             h,
             r: f64::from(g.r),
-            ox: g.origin_block_x as f64,
-            oz: g.origin_block_z as f64,
+            ox: g.origin_block_x as f64 + centre,
+            oz: g.origin_block_z as f64 + centre,
             data,
         })
     }
 
-    /// The whole layer as physical f32 (row-major), for the small layers (L1, L2).
+    /// The whole layer as physical f32 (row-major), for the small layers (L1, L2). A cube grid's
+    /// layer comes as its net raster ([`cube_net`], on [`cube_net_desc`]'s flat grid).
     fn load_f32(path: &Path) -> Result<(GridDesc, Vec<f32>), String> {
+        let (g, data) = Self::load_f32_stored(path)?;
+        if !g.is_cube() {
+            return Ok((g, data));
+        }
+        let net = cube_net(g.cube(), g.w as usize, f64::from(g.r), &data);
+        Ok((cube_net_desc(&g), net))
+    }
+
+    /// The whole layer as stored, physical f32 (row-major).
+    fn load_f32_stored(path: &Path) -> Result<(GridDesc, Vec<f32>), String> {
         let reader = TilePackReader::open(path).map_err(|e| e.to_string())?;
         let d = reader.desc().clone();
         let cb = d.cell_bytes();
@@ -536,14 +643,29 @@ fn build_mips(
                 .zip(&wt)
                 .map(|(&a, &b)| if b > 0.0 { a / b } else { f32::NAN })
                 .collect();
-            levels.push(Grid {
-                w: cw,
-                h: ch,
-                r: cell,
-                ox: g.origin_block_x as f64 + off,
-                oz: g.origin_block_z as f64 + off,
-                data,
-            });
+            if g.is_cube() {
+                // The level's face planes (whole: a face side is a multiple of 256 blocks, so n
+                // halves cleanly at every level a frame reads) as the net's flat raster, each
+                // cell's point at its centre.
+                let o = -1.5 * f64::from(g.face_blocks()) + cell / 2.0;
+                levels.push(Grid {
+                    w: 4 * cw,
+                    h: 3 * cw,
+                    r: cell,
+                    ox: o,
+                    oz: o,
+                    data: cube_net(g.cube(), cw, cell, &data),
+                });
+            } else {
+                levels.push(Grid {
+                    w: cw,
+                    h: ch,
+                    r: cell,
+                    ox: g.origin_block_x as f64 + off,
+                    oz: g.origin_block_z as f64 + off,
+                    data,
+                });
+            }
             if m == last {
                 break;
             }
@@ -2056,6 +2178,157 @@ mod tests {
             let x = grid.ox + ci as f64 * grid.r;
             assert_eq!(x, -512.0 + 2.0 * (ci * n) as f64 + (n - 1) as f64);
         }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The synthetic cube world at circumference `c`, written as `deeptime synth --kind cube`
+    /// writes it (format 0.7, face side `face_for(c)`).
+    fn cube_world(c: u32, tag: &str) -> std::path::PathBuf {
+        use deeptime_core::synth::{Kind, Strata, build};
+        let dir = tmp(&format!("cube{c}-{tag}"));
+        let world = build(Kind::Cube, Strata::Placeholder, c, Codec::Lz4Block).unwrap();
+        let mut manifest = Manifest::new(
+            &format!("synth:{}", Kind::Cube.name()),
+            deeptime_format::Writer::this("deeptime-tiles"),
+            deeptime_format::Scale::default_for(c),
+        );
+        world.write_into(&dir, &mut manifest).unwrap();
+        manifest.write(&dir).unwrap();
+        dir
+    }
+
+    /// Points (block x, z) of a cube world of face side 2h: every face; a face's first or last
+    /// block row or column (its bilinear read takes a cell of the next face) beside each joined
+    /// side, both sides of the slide and both sides of turning seams; x past Toroidal World's frame
+    /// and past the window either way; two void points well inside one fold's band. None is
+    /// within a few cells of a corner.
+    fn cube_points(h: f64) -> Vec<(&'static str, f64, f64)> {
+        vec![
+            ("F0", 0.0, 0.0),
+            ("F0 by F1", h - 1.0, 7.0),
+            ("F0 by F3", -h, 30.0),
+            ("F0 by N", 40.0, -h),
+            ("F0 by S", -40.0, h - 1.0),
+            ("F1", 2.0 * h, 0.0),
+            ("F1 by F2", 3.0 * h - 1.0, 20.0),
+            ("F1 by its north border", 2.0 * h, -h),
+            ("F1 by its south border", 2.0 * h + 9.0, h - 1.0),
+            ("F2 past TW's frame", 4.5 * h, -100.0),
+            ("F2 by the slide", 5.0 * h - 1.0, 5.0),
+            ("F2 by its north border", 4.0 * h, -h),
+            ("F3 by the slide", -3.0 * h, 5.0),
+            ("F3", -2.0 * h, 50.0),
+            ("F3 by its south border", -2.0 * h, h - 1.0),
+            ("past the window east", 5.0 * h + 10.0, 5.0),
+            ("past the window west", -3.0 * h - 10.0, 5.0),
+            ("N", 10.0, -2.0 * h),
+            ("N by its east border", h - 1.0, -2.0 * h),
+            ("N by its west border", -h, -1.5 * h),
+            ("S", -50.0, 2.0 * h),
+            ("S by its east border", h - 1.0, 2.0 * h + 33.0),
+            ("void above F1", 1.5 * h, -1.2 * h),
+            ("void beside S", -1.2 * h, 1.6 * h),
+        ]
+    }
+
+    /// A cube world's layers read on the net (cube plan G14): the L3 window (fine tiles), the L2
+    /// net raster (`load_f32`, the climate and rock) and the mips (coarse tiles) give what the
+    /// format's reader gives at every face, across every kind of seam, past the window and in the
+    /// void, where the stacked planes read as a flat raster gave F1's plane for S and clamped F2.
+    #[test]
+    fn a_cube_worlds_layers_read_on_the_net_as_its_raster_reader_reads_them() {
+        let dir = cube_world(4096, "net");
+        let m = Manifest::read(&dir).unwrap();
+        let path = dir.join(&m.layer("elevation").unwrap().path);
+        let store = LayerStore::open(&path).unwrap();
+        let loaded = TilePackReader::open(&path).unwrap().load().unwrap();
+        let g = store.desc().grid.clone();
+        assert!(g.is_cube());
+        let h = f64::from(g.face_blocks()) / 2.0;
+        let path2 = dir.join(&m.layer("climate/temperature").unwrap().path);
+        let loaded2 = TilePackReader::open(&path2).unwrap().load().unwrap();
+        let (g2, net2) = LayerStore::load_f32(&path2).unwrap();
+        let n2 = loaded2.desc.grid.w;
+        assert_eq!((g2.w, g2.h, g2.r), (4 * n2, 3 * n2, loaded2.desc.grid.r));
+        assert_eq!(g2.origin_block_x, -3 * h as i64 + i64::from(g2.r / 2));
+        let grid2 = Grid::new(&g2, net2);
+        let mut spread = 0.0f64;
+        for (name, x, z) in cube_points(h) {
+            let win = window_for(&store, (x - 4.0, x + 4.0), (z - 4.0, z + 4.0)).unwrap();
+            let (got, want) = (
+                f64::from(win.bilinear(x + 0.5, z + 0.5)),
+                loaded.bilinear(x, z),
+            );
+            assert!(
+                want.is_finite() && (got - want).abs() < 1e-3,
+                "L3 {name} ({x}, {z}): {got} {want}"
+            );
+            let (got2, want2) = (
+                f64::from(grid2.bilinear(x + 0.5, z + 0.5)),
+                loaded2.bilinear(x, z),
+            );
+            assert!(
+                (got2 - want2).abs() < 1e-3,
+                "L2 {name} ({x}, {z}): {got2} {want2}"
+            );
+            spread = spread.max((want - loaded.bilinear(0.0, 0.0)).abs());
+        }
+        assert!(spread > 1.0, "the points see different terrain ({spread})");
+
+        // Mips: a cell on each face is the mean of its stored cells, its point at its middle.
+        let n = i64::from(g.w);
+        let mips = build_mips(&store, 2, 4, &[|v| (v, 1.0)])
+            .unwrap()
+            .pop()
+            .unwrap();
+        for (k, grid) in mips.levels.iter().enumerate() {
+            let step = 1i64 << (2 + k);
+            let nm = n / step;
+            assert_eq!((grid.w, grid.h), (4 * nm as usize, 3 * nm as usize));
+            for face in Face::ALL {
+                let (cx, cz) = face.centre_units();
+                let (ci, cj) = (5i64, 3i64);
+                let (ni, nj) = ((cx + 1) * nm + ci, (cz + 1) * nm + cj);
+                let mut sum = 0.0;
+                for j in 0..step {
+                    for i in 0..step {
+                        sum += loaded.get(ci * step + i, face.index() as i64 * n + cj * step + j);
+                    }
+                }
+                let want = (sum / (step * step) as f64) as f32;
+                let got = grid.data[nj as usize * grid.w + ni as usize];
+                assert!(
+                    (want - got).abs() < 1e-3,
+                    "level {} {face:?}: {want} {got}",
+                    2 + k
+                );
+                let (ox, oz) = g.cube().face_origin(face);
+                assert_eq!(
+                    grid.ox + ni as f64 * grid.r,
+                    ox as f64 + (ci as f64 + 0.5) * grid.r
+                );
+                assert_eq!(
+                    grid.oz + nj as f64 * grid.r,
+                    oz as f64 + (cj as f64 + 0.5) * grid.r
+                );
+            }
+        }
+
+        // A frame over the whole window draws (the dev map's satellite of a cube world).
+        let map = BakeMap::open(&dir).unwrap();
+        let (w, hh) = (256, 192);
+        let px = map
+            .render_frame(
+                Layer::Satellite,
+                -3.0 * h,
+                -3.0 * h,
+                8.0 * h / w as f64,
+                w,
+                hh,
+                2,
+            )
+            .unwrap();
+        assert_eq!(px.len(), w * hh * 4);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

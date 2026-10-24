@@ -132,7 +132,8 @@ final class GenerationPage implements PlanetEditorScreen.Page {
         if (globe) {
             int size = Math.min(viewW, viewH);
             int gx = viewX + (viewW - size) / 2, gy = viewY + (viewH - size) / 2;
-            globeWidget = s.add(new GlobeWidget(gx, gy, size, this::currentPixels, this::currentSize, this::markers));
+            globeWidget = s.add(new GlobeWidget(gx, gy, size, this::currentPixels, this::currentSize, this::markers,
+                    () -> model == null ? java.util.Optional.empty() : model.cubeOutline()));
         } else {
             s.add(new MapWidget(viewX, viewY, viewW, viewH, mapTexture, this::markers, List::of));
         }
