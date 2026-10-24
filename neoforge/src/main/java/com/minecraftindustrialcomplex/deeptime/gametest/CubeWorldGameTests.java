@@ -524,6 +524,12 @@ public final class CubeWorldGameTests {
     /** One far-terrain sample: its group, where it is, and the block (x in Toroidal World's frame). */
     private record FarSample(String group, String where, int x, int z) {}
 
+    /** 1 when far terrain shows dry ground at (x, z) above the build floor's band, else 0 (far terrain alone: no chunk). */
+    private static int dry(FarTerrain far, int x, int z, int minY) {
+        FarTerrain.Column c = far.column(x, z);
+        return !c.water() && c.ground() >= minY + 32 ? 1 : 0;
+    }
+
     /**
      * Far terrain on the cube (cube plan G6) against the generated chunks where the cube differs from
      * a polar world: beside each of the 12 turning edges on the face (the column rule's rasters fold
@@ -533,8 +539,11 @@ public final class CubeWorldGameTests {
      * corners (deep ocean). Each column is read as the column rule, the fill and the carvers left it,
      * before any feature, as {@code FarTerrainGameTests}' seam test reads them (no features are placed
      * off the faces yet, coordinator 2026-10-23), and each group must meet the planet-wide test's
-     * properties ({@link FarTerrainGameTests#assertAgrees}). Also the sphere Distant Horizons is told
-     * the planet curves as: the cube's nominal radius s √(1.5 / π), not its period over 2π.
+     * properties ({@link FarTerrainGameTests#assertAgrees}) and the seam test's on land
+     * ({@link FarTerrainGameTests#assertLand}; places with dry ground are searched by far terrain
+     * alone, as that test's land rows are, since the 4k cube's first run of this test met 23 dry
+     * columns of 288 by the edges and none at the two crossings). Also the sphere Distant Horizons
+     * is told the planet curves as: the cube's nominal radius s √(1.5 / π), not its period over 2π.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
     public static void farTerrainMatchesTheCube(GameTestHelper helper) {
@@ -551,40 +560,85 @@ public final class CubeWorldGameTests {
         long s = cube.side(), h = s / 2;
         int sea = g.getSeaLevel(), minY = level.getMinBuildHeight();
         List<FarSample> samples = new ArrayList<>();
-        // Beside and past every turning edge, at three places along it (clear of the other tests' chunks).
+        // Beside and past every turning edge, at three places along it (clear of the other tests' chunks),
+        // and at a fourth where far terrain shows the most dry ground by the edge, so the fold is
+        // checked on land wherever the planet has any there (the 4k cube's edges are mostly sea).
         List<CubeLayout.NetEdge> edges = cube.edges();
+        long[] inside = {-1, -6, -11, -16}, outside = {0, 5, 10, 15};
+        List<String> landAt = new ArrayList<>();
         for (int k = 2; k < edges.size(); k++) {
             CubeLayout.NetEdge e = edges.get(k);
             long span = e.spanTo() - e.spanFrom();
-            for (long along : new long[]{e.spanFrom() + span / 4 + 24, e.spanFrom() + span / 2 + 104, e.spanFrom() + 3 * span / 4 + 8}) {
-                for (long d : new long[]{-1, -6, -11, -16}) {
+            long[] fixed = {e.spanFrom() + span / 4 + 24, e.spanFrom() + span / 2 + 104, e.spanFrom() + 3 * span / 4 + 8};
+            long best = Long.MIN_VALUE;
+            int bestDry = 0;
+            for (long along = e.spanFrom() + 72; along < e.spanTo() - 64; along += 32) {
+                int dry = 0;
+                for (long[] ds : new long[][]{inside, outside})
+                    for (long d : ds) {
+                        long[] b = beyond(e, d, along);
+                        dry += dry(far, (int) CubeFill.twX(cube, b[0]), (int) b[1], minY);
+                    }
+                if (dry > bestDry) {
+                    bestDry = dry;
+                    best = along;
+                }
+            }
+            long[] alongs = best == Long.MIN_VALUE ? fixed : new long[]{fixed[0], fixed[1], fixed[2], best};
+            if (best != Long.MIN_VALUE)
+                landAt.add(e.name() + "@" + best + ":" + bestDry);
+            for (long along : alongs) {
+                for (long d : inside) {
                     long[] b = beyond(e, d, along);
                     samples.add(new FarSample("beside the turning edges", e.name() + " " + d, (int) CubeFill.twX(cube, b[0]), (int) b[1]));
                 }
-                for (long d : new long[]{0, 5, 10, 15}) {
+                for (long d : outside) {
                     long[] b = beyond(e, d, along);
                     samples.add(new FarSample("past the turning edges", e.name() + " +" + d, (int) CubeFill.twX(cube, b[0]), (int) b[1]));
                 }
             }
         }
-        // The slide and Toroidal World's seam, on five rows of the band.
+        // The slide and Toroidal World's seam, on five rows of the band, then on up to three rows each
+        // where far terrain shows the most dry ground across it: 64 blocks each side, a column every 4.
         long[] rows = {-h + 40, -h / 2 + 7, 9, h / 2 + 3, h - 37};
         long slide = -3 * h, seam = 2 * s;
+        // {group, side label, x of the first column west, x of the first column east}
+        Object[][] crossings = {{"the slide", "F2", "F3", slide - 1, slide}, {"Toroidal World's seam", "west", "east", seam - 1, -seam}};
         for (long z : rows)
-            for (long d : new long[]{0, 5, 10, 15}) {
-                samples.add(new FarSample("the slide", "F2 " + d, (int) (slide - 1 - d), (int) z));
-                samples.add(new FarSample("the slide", "F3 " + d, (int) (slide + d), (int) z));
-                samples.add(new FarSample("Toroidal World's seam", "west " + d, (int) (seam - 1 - d), (int) z));
-                samples.add(new FarSample("Toroidal World's seam", "east " + d, (int) (-seam + d), (int) z));
+            for (long d : outside)
+                for (Object[] c : crossings) {
+                    samples.add(new FarSample((String) c[0], c[1] + " " + d, (int) ((long) c[3] - d), (int) z));
+                    samples.add(new FarSample((String) c[0], c[2] + " " + d, (int) ((long) c[4] + d), (int) z));
+                }
+        for (Object[] c : crossings) {
+            List<long[]> byDry = new ArrayList<>();   // {z, dry}
+            for (long z = -h + 9; z < h; z += 16) {
+                int dry = 0;
+                for (long d = 0; d < 64; d += 4)
+                    dry += dry(far, (int) ((long) c[3] - d), (int) z, minY) + dry(far, (int) ((long) c[4] + d), (int) z, minY);
+                if (dry > 0)
+                    byDry.add(new long[]{z, dry});
             }
+            byDry.sort((a, b) -> Long.compare(b[1], a[1]));
+            for (long[] row : byDry.subList(0, Math.min(3, byDry.size()))) {
+                landAt.add(c[0] + "@z" + row[0] + ":" + row[1]);
+                for (long d = 0; d < 64; d += 4) {
+                    samples.add(new FarSample((String) c[0], c[1] + " " + d + " land row", (int) ((long) c[3] - d), (int) row[0]));
+                    samples.add(new FarSample((String) c[0], c[2] + " " + d + " land row", (int) ((long) c[4] + d), (int) row[0]));
+                }
+            }
+        }
         ChunkPos ocean = oceanChunk(cube);
         helper.assertTrue(ocean != null, "a chunk past the net's corners");
         for (int lx = 3; lx < 16; lx += 4)
             samples.add(new FarSample("past the corners", "ocean " + lx, ocean.getMinBlockX() + lx, ocean.getMiddleBlockZ()));
 
         Map<String, FarTerrainCheck.Tally> tallies = new LinkedHashMap<>();
-        for (FarSample p : samples)
+        Map<String, int[]> farDry = new LinkedHashMap<>();   // dry columns far terrain shows among those compared (no carver's cut)
+        for (FarSample p : samples) {
             tallies.computeIfAbsent(p.group(), k -> new FarTerrainCheck.Tally());
+            farDry.computeIfAbsent(p.group(), k -> new int[1]);
+        }
         int[] taken = {0}, logged = {0};
         ChunkSampling.forEach(helper, samples.size(), i -> {
             FarSample p = samples.get(i);
@@ -597,7 +651,11 @@ public final class CubeWorldGameTests {
                 return true;
             }
             FarTerrainCheck.RealColumn real = FarTerrainCheck.real(chunk, p.x(), p.z());
-            tallies.get(p.group()).add(column, real, chunk);
+            FarTerrainCheck.Tally into = tallies.get(p.group());
+            int carved = into.carved;
+            into.add(column, real, chunk);
+            if (!column.water() && into.carved == carved)
+                farDry.get(p.group())[0]++;
             if ((Math.abs(column.ground() - real.ground()) > 2 || column.water() != real.water()
                     || column.groundBlock().getBlock() != real.groundBlock().getBlock() || !column.biome().equals(real.biome()))
                     && logged[0]++ < 40)
@@ -605,12 +663,13 @@ public final class CubeWorldGameTests {
                         column.biome().getRegisteredName(), FarTerrainGameTests.diag(chunk, column, real, p.x(), p.z()));
             return true;
         }, () -> {
-            DeepTime.LOGGER.info("[gametest] farTerrainMatchesTheCube {} samples, {} chunks taken further already, R {}: {}",
-                    samples.size(), taken[0], r, tallies);
-            FarTerrainGameTests.assertAgrees(helper, tallies.get("beside the turning edges"), 96, "beside the turning edges: ");
-            FarTerrainGameTests.assertAgrees(helper, tallies.get("past the turning edges"), 96, "past the turning edges: ");
-            FarTerrainGameTests.assertAgrees(helper, tallies.get("the slide"), 24, "across the slide: ");
-            FarTerrainGameTests.assertAgrees(helper, tallies.get("Toroidal World's seam"), 24, "across Toroidal World's seam: ");
+            DeepTime.LOGGER.info("[gametest] farTerrainMatchesTheCube {} samples, {} chunks taken further already, R {}; land searched {}; "
+                            + "far dry {}: {}", samples.size(), taken[0], r, landAt,
+                    farDry.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue()[0]).toList(), tallies);
+            for (String group : new String[]{"beside the turning edges", "past the turning edges", "the slide", "Toroidal World's seam"}) {
+                FarTerrainGameTests.assertAgrees(helper, tallies.get(group), group.contains("turning") ? 96 : 24, group + ": ");
+                FarTerrainGameTests.assertLand(helper, tallies.get(group), farDry.get(group)[0], group + ": ");
+            }
             FarTerrainCheck.Tally o = tallies.get("past the corners");
             helper.assertTrue(o.columns == 4 && o.heightExact == 4 && o.waterTopExact == 4 && o.biomeSame == 4 && o.groundBlockSame == 4,
                     "past the corners far terrain is the fill's deep ocean: " + o.toJson());
