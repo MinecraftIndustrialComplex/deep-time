@@ -252,7 +252,9 @@ neoForge {
             // The 160-mod MIC set needs more heap than the default runtime.
             // (The OutOfMemoryError "in lakeHolds" of P1-12/P1-09 was the suite's scattered column
             // samples all resident at once; gametest/ChunkSampling bounds them per tick.)
-            jvmArgument(project.hasProperty('withMic') ? '-Xmx8G' : '-Xmx6G')
+            // The cube tests (CubeWorldGameTests) load about 21k chunks: -PwithEv ran out of a 6 GiB
+            // heap on master 5d3b1569, so every set gets 2 GiB more.
+            jvmArgument(project.hasProperty('withMic') ? '-Xmx10G' : '-Xmx8G')
             if (project.hasProperty('gametestDebugLog')) logLevel = org.slf4j.event.Level.DEBUG
             gameDirectory = gameTestDir
         }
