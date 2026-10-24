@@ -46,12 +46,17 @@
 //! and moved the ground by up to several kilometres a step along margins and near the poles: the
 //! cell-scale zigzag and the polar stripes of the build log, 2026-10-02.)
 //!
-//! One plate is not carried rigidly: a collision's belt and the incoming plate under it (ISO-131)
-//! bend as one plate while their crusts move against each other at the convergence, so the
-//! carried state of that system is out of balance after every move. There the step also
-//! answers the force the move left: the plate's bending force carried with the crust less the
-//! bending force of the carried deflection (ISO-133). Elsewhere every plate moves as a whole and
-//! that force is nil.
+//! One place is not carried with its crust: the foreland of a collision's belt (ISO-133). The
+//! belt and the incoming plate under it bend as one plate, the incoming plate's (ISO-131); the
+//! belt's crust moves with the plate it stands on, and the incoming plate's crust slides towards
+//! it. The deflection there is where the belt's weight puts it, so within a flexural wavelength
+//! of the belt the incoming plate's state stays with the belt: the place keeps its deflection
+//! and the load the plate held, and the crust that slides through brings its own load (the load
+//! over what the place answered waits in the unsolved residual) and the roots local isostasy put
+//! under it. An elastic plate under a load that stands still bends the same however fast it
+//! slides (Beaumont 1981; Flemings & Jordan 1989): carried with its crust, the foredeep's
+//! deflection went with the crust into the front, and the basin was a quarter as deep. Elsewhere
+//! every cell's crust moves with the plate that bends it, and nothing changes.
 //!
 //! # A plate that stiffens keeps its shape; one that weakens settles
 //! Rigidity gained by cooling joins stress-free: nothing moves, and later loads meet the stiffer
@@ -308,6 +313,20 @@ impl FlexureParams {
         }
     }
 
+    /// How far a collision belt's foreland reaches, m (ISO-133): one flexural wavelength, 2πα,
+    /// of the stiffest plate the law allows, beyond which the deflection under a line load is
+    /// under e^(−2π) = 0.2 % of the deflection under it (game-choice: numerical, agent
+    /// 2026-10-24; the foreland's frame moves nothing where there is no deflection to move).
+    // ledger: ISO-133
+    pub fn belt_reach_m(&self, gravity_m_s2: f64) -> f64 {
+        let te = self
+            .te_craton_km
+            .max(self.te_ocean_max_km)
+            .max(self.te_min_km)
+            * self.elastic_thickness_scale;
+        std::f64::consts::TAU * flexural_parameter_m(rigidity_per_g(te, gravity_m_s2))
+    }
+
     /// The most load a plate holds away from local isostasy, kg/m² (`yield_anomaly_mgal` as a
     /// mass, Δg / 2πG); `None` when off.
     // ledger: ISO-120
@@ -512,11 +531,25 @@ pub struct FlexState {
     pub seen_elevation_m: Vec<f32>,
     /// Plate steps since the last solve.
     pub since_solve: u32,
-    /// The plate's bending force after the last step, L(D L w) / ρ_m, m of mantle (ISO-133);
-    /// NaN where the crust is new at the place, empty where no collision's footprint is carried
-    /// (`StepIn::carrier_plate_id` absent).
+    /// The part of the deflection the plate does not hold, m (ISO-133): the roots the plate model
+    /// leaves locally compensated (below its sample spacing, ISO-069; the plateau spreading's,
+    /// ISO-070) and the sinking where the plate yielded (ISO-120), which local isostasy put under
+    /// their own crust and which go with it through a belt's foreland. Kept from the start of
+    /// the run with the collisions' carrying plates (`StepIn::carrier_plate_id`), empty
+    /// otherwise.
     #[serde(default)]
-    pub bending_m: Vec<f32>,
+    pub local_m: Vec<f32>,
+    /// A collision's footprint at the last step (ISO-133): each footprint cell and the plate
+    /// that carried it, in cell order.
+    #[serde(default)]
+    pub footprint: Vec<(u32, f32)>,
+    /// A belt's foreland in the belt's frame (ISO-133): per foreland cell of this step, the
+    /// deflection, load, ice, unsolved residual, rigidity and the deflection the plate does not
+    /// hold that the place had a step ago, moved with the belt (the rigidity blended as its
+    /// logarithm, as the carry blends it). Set by [`FlexState::carry_frame`] and taken by the
+    /// next step, in cell order.
+    #[serde(skip)]
+    pub framed: Vec<(u32, [f32; 6])>,
     /// The surface's elevation before the step at the crust's source, m (the carry's corners,
     /// [`FlexState::carry`]); NaN where the crust is new at the place. The step's start less this
     /// is the plate model's move of the ground as the carry made it ([`booked`]). Set by the
@@ -537,9 +570,92 @@ impl FlexState {
             unsolved_m: vec![0.0; n],
             seen_elevation_m: Vec::new(),
             since_solve: 0,
-            bending_m: Vec::new(),
+            local_m: Vec::new(),
+            footprint: Vec::new(),
+            framed: Vec::new(),
             from_m: Vec::new(),
         }
+    }
+
+    // ledger: ISO-133
+    /// Before [`FlexState::carry`]: the state each foreland cell of a belt held a step ago in the
+    /// belt's frame ([`belt_reach`]). `frame` lists the foreland's cells, each with the plate
+    /// that bends it (the belt's carrying plate) and its source under the belt's plate's
+    /// rotation. A source's corners count where, before the step, they held a state and belonged
+    /// to the bending plate: its own crust (`prev_plate`) or the footprint it carried at the last
+    /// step. A cell without such a corner is left out: its crust carries its state as anywhere.
+    pub fn carry_frame(
+        &mut self,
+        w: usize,
+        h: usize,
+        frame: &[(usize, f32, [f64; 2])],
+        prev_plate: Option<&[f32]>,
+    ) {
+        let n = w * h;
+        self.framed = Vec::new();
+        let Some(prev_plate) = prev_plate.filter(|v| v.len() == n) else {
+            return;
+        };
+        if frame.is_empty() || self.load_m.len() != n || self.water_m.len() != n {
+            return;
+        }
+        let footprint = &self.footprint;
+        let in_system = |s: usize, id: f32| {
+            self.water_m[s].is_finite()
+                && (prev_plate[s] == id
+                    || footprint
+                        .binary_search_by_key(&(s as u32), |e| e.0)
+                        .is_ok_and(|k| footprint[k].1 == id))
+        };
+        let ln_rigidity: Vec<f32> = self.rigidity.par_iter().map(|&d| d.ln()).collect();
+        let nil;
+        let local: &Vec<f32> = if self.local_m.len() == n {
+            &self.local_m
+        } else {
+            nil = vec![0.0f32; n];
+            &nil
+        };
+        let fields = [
+            &self.deflection_m,
+            &self.load_m,
+            &self.ice_m,
+            &self.unsolved_m,
+            &ln_rigidity,
+            local,
+        ];
+        let framed = frame
+            .par_iter()
+            .filter_map(|&(c, id, [fi, fj])| {
+                let fj = fj.clamp(0.0, (h - 1) as f64);
+                let (i0, j0) = (fi.floor(), fj.floor());
+                let (ti, tj) = (fi - i0, fj - j0);
+                let wi = |i: f64| (i as i64).rem_euclid(w as i64) as usize;
+                let j0u = j0 as usize;
+                let j1u = (j0u + 1).min(h - 1);
+                let (a, b) = (wi(i0), wi(i0 + 1.0));
+                let corners = [
+                    (j0u * w + a, (1.0 - ti) * (1.0 - tj)),
+                    (j0u * w + b, ti * (1.0 - tj)),
+                    (j1u * w + a, (1.0 - ti) * tj),
+                    (j1u * w + b, ti * tj),
+                ];
+                let mut sum = [0.0f64; 6];
+                let mut weight = 0.0f64;
+                for (s, wt) in corners {
+                    if wt > 0.0 && in_system(s, id) && ln_rigidity[s].is_finite() {
+                        for (acc, v) in sum.iter_mut().zip(&fields) {
+                            *acc += wt * f64::from(v[s]);
+                        }
+                        weight += wt;
+                    }
+                }
+                (weight > 1e-9).then(|| {
+                    let [w, q, i, u, l, a] = sum.map(|y| y / weight);
+                    (c as u32, [w, q, i, u, l.exp(), a].map(|y| y as f32))
+                })
+            })
+            .collect();
+        self.framed = framed;
     }
 
     /// Carries the state with the crust over a plate step (`advect::carried_elevation`'s rule:
@@ -631,14 +747,13 @@ impl FlexState {
                 *u = unsolved;
             });
         // ledger: ISO-133
-        // The bending force goes with the crust: what the plate's stress was where it came from.
-        if self.bending_m.len() == n {
-            self.bending_m = advect::carried_field(x, &self.bending_m)
+        if self.local_m.len() == n {
+            self.local_m = advect::carried_field(x, &self.local_m)
                 .into_par_iter()
-                .map(|b| b.unwrap_or(f32::NAN))
+                .map(|v| v.unwrap_or(0.0))
                 .collect();
         } else {
-            self.bending_m = Vec::new();
+            self.local_m = Vec::new();
         }
         // ledger: ISO-096
         self.from_m = moved
@@ -649,6 +764,58 @@ impl FlexState {
             })
             .collect();
     }
+}
+
+// ledger: ISO-133
+/// A collision belt's foreland: each cell of a carrying plate's own crust no more than `reach`
+/// cells (8-connected, through that plate's crust) from a belt it carries (a footprint cell of
+/// another plate's crust, `carrier` its carrying plate, NaN off footprints), with the carrying
+/// plate and the belt's plate, the nearest belt's. The wedge (a footprint cell of the carrying
+/// plate's own crust) is foreland too. In cell order; x wraps.
+pub fn belt_reach(
+    w: usize,
+    h: usize,
+    plate: &[f32],
+    carrier: &[f32],
+    reach: usize,
+) -> Vec<(usize, f32, f32)> {
+    let n = w * h;
+    let mut dist = vec![u32::MAX; n];
+    let mut label = vec![(f32::NAN, f32::NAN); n];
+    let mut queue = std::collections::VecDeque::new();
+    for c in 0..n.min(plate.len()).min(carrier.len()) {
+        let k = carrier[c];
+        if k.is_finite() && plate[c] != k {
+            dist[c] = 0;
+            label[c] = (k, plate[c]);
+            queue.push_back(c);
+        }
+    }
+    if queue.is_empty() {
+        return Vec::new();
+    }
+    while let Some(c) = queue.pop_front() {
+        let d = dist[c];
+        if d as usize >= reach {
+            continue;
+        }
+        let (k, belt) = label[c];
+        let (i, j) = (c % w, c / w);
+        for jj in j.saturating_sub(1)..(j + 2).min(h) {
+            for ii in [i + w - 1, i, i + 1] {
+                let m = jj * w + ii % w;
+                if dist[m] == u32::MAX && plate[m] == k {
+                    dist[m] = d + 1;
+                    label[m] = (k, belt);
+                    queue.push_back(m);
+                }
+            }
+        }
+    }
+    (0..n)
+        .filter(|&c| dist[c] != u32::MAX && dist[c] > 0)
+        .map(|c| (c, label[c].0, label[c].1))
+        .collect()
 }
 
 /// The share of cells where `v` zigzags at the cell scale: the cell and its next neighbour along
@@ -1842,31 +2009,6 @@ fn metric_trace(
     eprintln!("{line}");
 }
 
-// ledger: ISO-133
-/// How far around a carried footprint the move's force is answered, solve cells (game-choice:
-/// numerical, agent 2026-10-24): the bending stencil reaches two cells, so the force of a move
-/// along the footprint's edge lies within two cells of it; one more for the edge's own move.
-const MOTION_REACH: usize = 3;
-
-/// The cells of a ws × hs raster within `reach` cells (x wraps, rows clamp) of one where `v` is
-/// not 0.
-fn dilate(v: &[f64], ws: usize, hs: usize, reach: usize) -> Vec<bool> {
-    let along: Vec<bool> = (0..ws * hs)
-        .into_par_iter()
-        .map(|c| {
-            let (i, j) = (c % ws, c / ws);
-            (0..=2 * reach).any(|k| v[j * ws + (i + ws * (reach + 1) + k - reach) % ws] != 0.0)
-        })
-        .collect();
-    (0..ws * hs)
-        .into_par_iter()
-        .map(|c| {
-            let (i, j) = (c % ws, c / ws);
-            (j.saturating_sub(reach)..=(j + reach).min(hs - 1)).any(|jj| along[jj * ws + i])
-        })
-        .collect()
-}
-
 /// The largest power of two that keeps the solve cell at or under [`SOLVE_CELL_M`] and divides
 /// the raster.
 pub fn coarsening(w: usize, h: usize, norm_dx_m: f64) -> usize {
@@ -1904,6 +2046,40 @@ pub fn step(
     let water_share = RHO_WATER / RHO_MANTLE;
     let ice_share = RHO_ICE / RHO_MANTLE;
     let (rock_land, rock_sea) = rock_shares(x.rock_share);
+    // ledger: ISO-133
+    // A belt's foreland in the belt's frame (the module doc): the place keeps the deflection the
+    // plate held there, less the local roots of the crust that was there, plus those of the crust
+    // that is there now; the ground follows (`frame_dh`, m). The load the plate held stays as it
+    // was: what the crust brings over what the place answered (its own load less what its roots
+    // compensate, and its ice) waits in the unsolved residual and is solved with the step's loads.
+    let framed = std::mem::take(&mut st.framed);
+    let mut frame_dh = Vec::new();
+    if !framed.is_empty() {
+        frame_dh = vec![0.0f64; n];
+        for &(c, [wf, qf, i_f, uf, df, lf]) in &framed {
+            let c = c as usize;
+            if c >= n {
+                continue;
+            }
+            let age = x.crust_age_myr[c];
+            if st.water_m[c].is_nan() || (age >= 0.0 && f64::from(age) < x.dt_myr) {
+                continue;
+            }
+            let local = f64::from(st.local_m.get(c).copied().unwrap_or(0.0));
+            let (wc, qc, ic) = (
+                f64::from(st.deflection_m[c]),
+                f64::from(st.load_m[c]),
+                f64::from(st.ice_m[c]),
+            );
+            let [wf, qf, i_f, uf, lf] = [wf, qf, i_f, uf, lf].map(f64::from);
+            let w_new = wf - lf + local;
+            frame_dh[c] = -p.strength * (w_new - wc);
+            st.deflection_m[c] = w_new as f32;
+            st.unsolved_m[c] = (uf + (qc - local) - (qf - lf) + ice_share * (ic - i_f)) as f32;
+            st.rigidity[c] = df;
+        }
+    }
+    let fdh = |c: usize| frame_dh.get(c).copied().unwrap_or(0.0);
 
     // 1. The loads of the step and the roots already in the elevation. Increments only: the
     // carried plate is in equilibrium under the carried load.
@@ -1934,7 +2110,7 @@ pub fn step(
             let fresh = st.water_m[c].is_nan() || (age >= 0.0 && f64::from(age) < x.dt_myr);
             // ledger: ISO-126
             let sea = x.sea_at(c);
-            let depth = (sea - h[c]).max(0.0);
+            let depth = (sea - (h[c] + fdh(c))).max(0.0);
             let (prev, water, ice_prev) = if fresh {
                 (0.0, (sea - x.h_start[c]).max(0.0), 0.0)
             } else {
@@ -2136,7 +2312,7 @@ pub fn step(
         }
         pf
     };
-    let wet = pick(&|c| if h[c] <= x.sea_at(c) { 1.0 } else { 0.0 });
+    let wet = pick(&|c| if h[c] + fdh(c) <= x.sea_at(c) { 1.0 } else { 0.0 });
     let d_prev = pick(&|c| {
         if cells[c].fresh {
             f64::NAN
@@ -2177,54 +2353,6 @@ pub fn step(
         })
         .collect();
     drop(held);
-    // ledger: ISO-133
-    // The force the plate's move left in a carried collision system (the module doc): the
-    // bending force carried with the crust less the bending force of the carried deflection,
-    // with the carried rigidity, on the system's cells and the solve cells around them. Where
-    // every part of a plate moved alike the two are the same; where the incoming plate slid
-    // under its belt they part, and the plate answers as it would a load.
-    let carried_cells = x.carrier_plate_id.is_some() && (0..n).any(|c| x.carrier(c).is_some());
-    if carried_cells && st.bending_m.len() == n {
-        let unknown = |c: usize| cells[c].fresh || !st.bending_m[c].is_finite();
-        let system = dilate(
-            &pick(&|c| f64::from(u8::from(x.carrier(c).is_some()))),
-            ws,
-            hs,
-            MOTION_REACH,
-        );
-        let unknown_near = dilate(
-            &pick(&|c| f64::from(u8::from(unknown(c)))),
-            ws,
-            hs,
-            2,
-        );
-        let wc = pick(&|c| {
-            if unknown(c) {
-                0.0
-            } else {
-                f64::from(st.deflection_m[c])
-            }
-        });
-        let carried_b = pick(&|c| {
-            if unknown(c) {
-                0.0
-            } else {
-                RHO_MANTLE * f64::from(st.bending_m[c])
-            }
-        });
-        let d_carried: Vec<f64> = d_prev
-            .iter()
-            .zip(&d_now)
-            .map(|(&a, &b)| if a.is_finite() { a } else { b })
-            .collect();
-        let mut b_now = vec![0.0; ws * hs];
-        sv.bend(&d_carried, &wc, &mut b_now);
-        let_go
-            .par_iter_mut()
-            .enumerate()
-            .filter(|(c, _)| system[*c] && !unknown_near[*c])
-            .for_each(|(c, l)| *l += carried_b[c] - b_now[c]);
-    }
     let mut bend_root = vec![0.0; ws * hs];
     sv.bend(&d_now, &bend_part, &mut bend_root);
     let r: Vec<f64> = (0..ws * hs)
@@ -2251,6 +2379,18 @@ pub fn step(
             ));
         }
         out.solve = Some(report);
+        if std::env::var_os("DEEPTIME_ISO133_TRACE").is_some() {
+            let (k, m) = dw.iter().enumerate().fold((0, 0.0f64), |(k, m), (c, &v)| {
+                if v.abs() > m { (c, v.abs()) } else { (k, m) }
+            });
+            let top = frame_dh.iter().fold(0.0f64, |a, &v| a.max(v.abs()));
+            eprintln!(
+                "iso133 framed {} max |frame dh| {top:.0} m | solve max |dw| {m:.0} m at ({}, {})",
+                framed.len(),
+                k % ws,
+                k / ws
+            );
+        }
         if let Some(faces) = x.sin_faces.filter(|s| s.len() == hgt + 1)
             && std::env::var_os(METRIC_TRACE_ENV).is_some()
         {
@@ -2314,6 +2454,20 @@ pub fn step(
     // to 28 km over its Airy height on a stiff plate, and the plate model's settling (ISO-078)
     // followed it (docs/science/plates.md, "The polar peaks").
     let yield_bound = p.yield_held_kg_m2();
+    // ledger: ISO-133
+    // The part of the deflection the plate does not hold, with a carried collision system: the
+    // root less the part of it the plate bends, and what sank where the plate yielded.
+    if x.carrier_plate_id.is_none() {
+        st.local_m = Vec::new();
+    } else if st.local_m.len() != n {
+        st.local_m = vec![0.0; n];
+    }
+    let keep_local = !st.local_m.is_empty();
+    let mut local_rows: Vec<&mut [f32]> = if keep_local {
+        st.local_m.chunks_mut(w).collect()
+    } else {
+        (0..hgt).map(|_| <&mut [f32]>::default()).collect()
+    };
     let mut yielded = vec![0.0f32; if yield_bound.is_some() { n } else { 0 }];
     let mut yielded_rows: Vec<&mut [f32]> = if yield_bound.is_some() {
         yielded.chunks_mut(w).collect()
@@ -2331,22 +2485,29 @@ pub fn step(
         flex.par_chunks_mut(w),
         changes.par_chunks_mut(w),
         yielded_rows.par_iter_mut(),
+        local_rows.par_iter_mut(),
     )
         .into_par_iter()
         .enumerate()
-        .for_each(|(j, (hr, lr, dr, wr, ir, rr, ur, fr, cr, yr))| {
+        .for_each(|(j, (hr, lr, dr, wr, ir, rr, ur, fr, cr, yr, ar))| {
             for i in 0..w {
                 let c = j * w + i;
                 let cell = &cells[c];
                 let coarse = coarse_cell(ws, f, i, j);
                 let delta = linear_at(&dw, ws, hs, f, i, j);
-                let change = -p.strength * delta;
+                let change = -p.strength * delta + fdh(c);
                 hr[i] += change;
                 cr[i] = change;
                 let sea = x.sea_at(c);
                 let depth = (sea - hr[i]).max(0.0);
                 let w_prev = if cell.fresh { 0.0 } else { f64::from(dr[i]) };
                 let mut w_new = w_prev + cell.root + delta;
+                let mut local = if keep_local {
+                    let prev = if cell.fresh { 0.0 } else { f64::from(ar[i]) };
+                    prev + cell.root - linear_at(&bend_part, ws, hs, f, i, j)
+                } else {
+                    0.0
+                };
                 let load = cell.load + water_share * (depth - cell.water);
                 let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
                 let mut holds = RHO_MANTLE * (load + ice_share * ice - w_new);
@@ -2360,6 +2521,10 @@ pub fn step(
                     w_new += sink;
                     holds -= RHO_MANTLE * sink;
                     yr[i] = sink as f32;
+                    local += sink;
+                }
+                if keep_local {
+                    ar[i] = local as f32;
                 }
                 lr[i] = load as f32;
                 dr[i] = w_new as f32;
@@ -2407,21 +2572,14 @@ pub fn step(
     );
     st.seen_elevation_m = seen;
     // ledger: ISO-133
-    if x.carrier_plate_id.is_some() {
-        let wc = restrict_by(w, hgt, f, |c| f64::from(st.deflection_m[c]));
-        sv.bend(&d_now, &wc, &mut bend_root);
-        let at = |c: usize| (bend_root[coarse_cell(ws, f, c % w, c / w)] / RHO_MANTLE) as f32;
-        if st.bending_m.len() == n {
-            st.bending_m
-                .par_iter_mut()
-                .enumerate()
-                .for_each(|(c, b)| *b = at(c));
-        } else {
-            st.bending_m = (0..n).into_par_iter().map(at).collect();
-        }
+    st.footprint = if x.carrier_plate_id.is_some() {
+        (0..n)
+            .into_par_iter()
+            .filter_map(|c| x.carrier(c).map(|(id, _)| (c as u32, id)))
+            .collect()
     } else {
-        st.bending_m = Vec::new();
-    }
+        Vec::new()
+    };
     if !yielded.is_empty() {
         out.yielded_cells = yielded.iter().filter(|&&v| v != 0.0).count();
         // The gap budget's split: what the plate let go as it yielded is load let go.
@@ -3337,6 +3495,15 @@ mod tests {
                 if plate[c] == 1.0 { [i, j + v] } else { [i, j] }
             })
             .collect();
+        // The foreland in the belt's frame: the belt stands still.
+        let reach = (p.belt_reach_m(G) / wd.norm_dx).ceil() as usize;
+        let frame: Vec<(usize, f32, [f64; 2])> = {
+            let car: Vec<f32> = wd.carrier.as_ref().unwrap().0.clone();
+            belt_reach(w, h, &plate, &car, reach)
+                .into_iter()
+                .map(|(c, k, _)| (c, k, [(c % w) as f64, (c / w) as f64]))
+                .collect()
+        };
         let still = vec![0.0f32; n];
         let plate_elev = vec![300.0f32; n];
         let parents = [None, None];
@@ -3365,7 +3532,9 @@ mod tests {
                 dt_yr: 2.0e6,
                 blur_ref_yr: 2.0e6,
             };
-            st.as_mut().unwrap().carry(&carry, &elev);
+            let fs = st.as_mut().unwrap();
+            fs.carry_frame(w, h, &frame, Some(&plate));
+            fs.carry(&carry, &elev);
             let (carried, _) = advect::carried_elevation(&carry);
             wd.h = carried.iter().map(|&z| f64::from(z)).collect();
             last = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
@@ -3382,11 +3551,13 @@ mod tests {
 
     /// The foreland basin is where the belt's weight puts it, however fast the incoming plate
     /// slides under the belt: a plate moving under a load that stands still bends as it would
-    /// at rest (elastic, so the deflection has no memory of the plate's past). Without the
-    /// move's force (ISO-133) the carried deflection went with the foreland's crust into the
-    /// front, and at half a row a step (10 km/Myr) the basin by the front was a quarter as deep
-    /// (2.5 km against 10.3 after 20 steps, and the basin ended a hundred km nearer the front).
-    /// With it the two agree to 2 m at 10 km/Myr and 13 m at 30 km/Myr.
+    /// at rest (elastic: the deflection has no memory of the plate's past). Carried with its
+    /// crust (before ISO-133), the foredeep's deflection went with the crust into the front,
+    /// and at half a row a step (10 km/Myr) the basin by the front was a quarter as deep (2.5 km
+    /// against 10.3 after 20 steps, and the basin ended a hundred km nearer the front). In the
+    /// belt's frame the two agree to the metre over the belt and the basin at 10 and 30 km/Myr
+    /// (and after 10, 40 and 80 steps, measured); beyond the foreland's reach, one flexural
+    /// wavelength, the crust carries its state again, where there is next to nothing to carry.
     #[test]
     fn a_foreland_sliding_under_its_belt_bends_as_one_at_rest() {
         let (z0, f0, _) = sliding_foreland(0.0, 20);
@@ -3395,9 +3566,9 @@ mod tests {
         for v in [0.5, 1.5] {
             let (z1, f1, _) = sliding_foreland(v, 20);
             for j in 100..220 {
+                let bound = if j < 145 { 1.0 } else { 0.005 * deepest.abs() };
                 assert!(
-                    (f1[j] - f0[j]).abs() < 0.005 * deepest.abs()
-                        && (z1[j] - z0[j]).abs() < 0.005 * deepest.abs(),
+                    (f1[j] - f0[j]).abs() < bound && (z1[j] - z0[j]).abs() < bound,
                     "{v} rows a step, row {j}: flexure {} against {} at rest, elevation {} \
                      against {}",
                     f1[j],
@@ -3407,6 +3578,51 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// A belt's foreland is the carrying plate's own crust within the reach of the belt, the
+    /// wedge with it; not the belt, not the over plate behind it, not a third plate. Across the
+    /// wrap in x.
+    #[test]
+    fn a_belts_foreland_is_the_carrying_plates_crust_within_reach() {
+        let (w, h) = (16usize, 40usize);
+        let n = w * h;
+        let mut plate = vec![0.0f32; n];
+        let mut carrier = vec![f32::NAN; n];
+        for c in 0..n {
+            let (i, j) = (c % w, c / w);
+            if j >= 20 {
+                plate[c] = 1.0;
+            }
+            if (22..25).contains(&j) && (6..10).contains(&i) {
+                plate[c] = 2.0; // a third plate inside the carrying plate
+            }
+            if (18..20).contains(&j) && (i < 3 || i > 13) {
+                carrier[c] = 1.0; // the belt, across the wrap
+            }
+            if j == 20 && i < 2 {
+                carrier[c] = 1.0; // the wedge: the carrying plate's own crust
+            }
+        }
+        let near = belt_reach(w, h, &plate, &carrier, 6);
+        let at = |c: usize| near.iter().find(|e| e.0 == c).copied();
+        for c in 0..n {
+            let (i, j) = (c % w, c / w);
+            match at(c) {
+                Some((_, k, belt)) => {
+                    assert_eq!((k, belt), (1.0, 0.0), "cell ({i}, {j})");
+                    assert_eq!(plate[c], 1.0, "cell ({i}, {j}) is not the carrying plate's");
+                    assert!(j <= 19 + 6, "cell ({i}, {j}) beyond the reach");
+                }
+                None => assert!(
+                    plate[c] != 1.0 || j > 25,
+                    "cell ({i}, {j}) of the carrying plate within reach left out"
+                ),
+            }
+        }
+        assert!(at(20 * w).is_some(), "the wedge");
+        assert!(at(20 * w + 15).is_some() && at(21 * w + 2).is_some(), "across the wrap");
+        assert!(at(17 * w).is_none(), "the over plate behind the belt");
     }
 
     /// Under the sea the roots' part of the split is their bending only, as on land: crust the
