@@ -5746,10 +5746,16 @@ judged. The ratio of transform to ridge does not depend on the length. *Replaces
 it draws: which plate a gap point goes to (the nearer one) and its α from the midline (PLT-100,
 PLT-101, Cortial's). The edges' blend z̄ stays (it is the position's interpolation between the
 two plates' edges, the same whichever plate takes the point), and a band that converges or is
-too thin to tell keeps the midline. *Test against the source*:
+too thin to tell keeps the midline, as does a point whose band's meridian lies beyond the other
+plate's edge: where a gap is narrower than its obliquity's offset across a band, the band's
+segment ends inside the band and does not cross the gap at its ends, so those rows keep the
+midline rather than going whole to one plate with no ridge in them. *Test against the source*:
 `ridge_segments_stand_normal_to_the_motion_with_transforms_along_it` (`plates/ridges.rs`): on a
 gap 35° oblique, each band's ridge is one meridian of the relative
-pole, the steps run along the motion, and transform over ridge is tan 35° within 0.05.
+pole, the steps run along the motion, and transform over ridge is tan 35° within 0.05; and
+`a_segment_ends_where_its_meridian_leaves_the_gap`: on a gap 2° wide in 4° bands (an offset of
+2.8° across each), no point is handed to a side with its band's meridian beyond the other plate's
+edge, and the rows that take the segment hold both plates.
 
 **B. Trenches that face their convergence**: measured above, and not built. The model's trenches
 take Earth's convergence across them (PLT-501).
@@ -5782,8 +5788,9 @@ nothing).
 
 - *Rifts under tension* (`tectonics.rift_stress_mpa`, σ_s, 0 = off): a plate's rift hazard
   (PLT-083) is weighted by w = e^(σ/σ_s) / ⟨e^(σ/σ_s)⟩, the mean over the plates that may rift
-  weighted by their area, so the expected number of rifts is the base's and only where they
-  happen moves: to the plates the edge forces pull apart. On base's records the plates' σ is
+  weighted by the hazard each has unweighted (its λ: area, continental fraction and plume
+  boost), so the expected number of rifts is the base's (to first order in λ) and only where
+  they happen moves: to the plates the edge forces pull apart. On base's records the plates' σ is
   18 MPa at the median, its quartiles about 0 and 43 MPa, continental plates −3 to 60 MPa
   between p10 and p90; σ_s = 20 MPa is about half the quartiles' spread (game-choice: set from
   the model's own stresses, not fit to any outcome). *Replaces*: the hazard's share between
@@ -5803,7 +5810,9 @@ nothing).
   to cross, so the fragments meet in it: the fracture runs through arcs, back-arcs, plume heads
   and young floor and around cratons. The exponent to run is m = 2: a brittle strength growing
   linearly with depth (Byerlee's friction, from memory) integrates to a plate strength ∝ L², and
-  an edge costs its strength's inverse. The fractal warp stays on top (PLT-087). *Replaces*: the
+  an edge costs its strength's inverse. The fractal warp stays on top (PLT-087). A sample no
+  fragment reaches through the plate (a part cut off on the lattice) goes by the great circle to
+  every centre. *Replaces*: the
   fragments' great-circle Voronoi split (Cortial's, PLT-087's distance; its warp stays). *Test
   against the source*: `rifts_break_where_the_lithosphere_is_thin` (`plates/rifting.rs`): a
   225 km plate with a 30 km belt off the centres' bisector; at m = 0 under 0.3 of the fracture
