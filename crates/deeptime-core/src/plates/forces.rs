@@ -752,6 +752,11 @@ pub struct Answer {
     /// for `omega`): handed on to where rifts and subduction start (ledger FRC-022, PLT-504,
     /// PLT-505). Never stored.
     pub stress_mpa: Vec<Option<f64>>,
+    /// Each collision front's plastic resistance this step, N (by contact index): the force the
+    /// collision pushes back on its plates with while it converges faster than the floor, summed
+    /// over the front (design §3.4). Read by transference (`collision::transference_due`, ledger
+    /// PLT-516). Never stored.
+    pub collision_n: BTreeMap<usize, f64>,
     pub solved: bool,
     pub recorded: Option<Recorded>,
 }
@@ -813,6 +818,7 @@ pub fn step(
     let Balanced {
         omega,
         stress_mpa,
+        collision_n,
         solved,
         out,
     } = balance_step(st, geo, pos, env, flow, sea_m, &mut slabs);
@@ -840,6 +846,7 @@ pub fn step(
     Answer {
         omega,
         stress_mpa,
+        collision_n,
         solved,
         recorded,
     }
@@ -850,6 +857,7 @@ pub fn step(
 struct Balanced {
     omega: Vec<Option<DVec3>>,
     stress_mpa: Vec<Option<f64>>,
+    collision_n: BTreeMap<usize, f64>,
     solved: bool,
     out: Recorded,
 }
@@ -1064,6 +1072,7 @@ fn balance_step(
     // The collision drag's convergence floor (design §3.4 linearises with the weld speed; it sits
     // under it, so a held collision stalls).
     let floor = COLLISION_FLOOR_MM_YR.min(k.weld_speed_mm_yr); // ledger: FRC-011
+    let mut collision_n: BTreeMap<usize, f64> = BTreeMap::new();
     for e in &edges {
         let v = e.v as usize;
         let sv = &samples[v];
@@ -1096,6 +1105,7 @@ fn balance_step(
                         * ell;
                     let speed = conv.max(floor) * 1.0e-3 / YEAR_S;
                     if force > 0.0 {
+                        *collision_n.entry(ci).or_default() += force;
                         bal.add_link(Link {
                             a: under,
                             b: p,
@@ -1195,6 +1205,7 @@ fn balance_step(
     Balanced {
         omega: out,
         stress_mpa: stress,
+        collision_n,
         solved,
         out: Recorded {
             forces,

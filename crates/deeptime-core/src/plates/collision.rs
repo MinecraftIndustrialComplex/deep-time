@@ -18,7 +18,12 @@
 //! - a smaller terrane (an island arc, a microcontinent) **moves alone** to the overriding plate
 //!   (its samples move into a new rigid group of that plate with the rotation they already had),
 //!   once the collision has shortened by `collision_threshold_km` or stalled; the overriding plate
-//!   takes the area-weighted mean of its rotation and the terrane's.
+//!   takes the area-weighted mean of its rotation and the terrane's;
+//! - with `tectonics.transference` (Stern 2004's transference; ledger PLT-516), a continent whose
+//!   collision has not stalled also moves alone, once its subduction has failed (the contact's
+//!   slab is gone), its plate has gone on converging on it by the critical convergence since, and
+//!   the collision's push on it over its margin against its own plate's ocean floor is enough to
+//!   start a new subduction zone there ([`transference_due`]).
 //!
 //! No uplift is applied here: the belt is built while the collision lasts. (Until tasks 3 and 4
 //! a collision raised everything within up to 2,000 km of the contact by one surge in the step it
@@ -37,11 +42,39 @@ use glam::DVec3;
 use super::Env;
 use super::dynamics::{CollisionRec, Footprint};
 use super::events::{self, COLLISION, OROGENY_PHASE, PLATE_DEATH, TERRANE_ACCRETION};
+use super::forces::G_EARTH;
 use super::geometry::{Geo, coast_split};
 use super::kinematics::cap_speed;
 use super::state::{CONTINENTAL, Group, HIDDEN, PlateState};
 use crate::error::CoreError;
 use crate::world::WorldState;
+
+/// The force a plate must push with, per metre of a margin of oceanic lithosphere, to start a new
+/// subduction zone there that goes on by itself, N/m at Earth's gravity: Gurnis et al. 2004 find
+/// the resisting force "reaching a maximum value dependent on plate thickness, but typically
+/// ranging from 2 to 3 × 10^12 N/m for cases that become self-sustaining"; the top of the range
+/// is taken. Scaled with gravity as the slab pull is (FRC-002). ledger: PLT-517 (verified)
+pub const TRANSFERENCE_FORCE_N_M: f64 = 3.0e12;
+
+/// The convergence a new subduction zone needs before it goes on by itself, km: Gurnis et al.
+/// 2004's critical convergence "only varies between 100 and 130 km (Table 3)" ("Cumulative
+/// convergence, not the rate of convergence, is the dominant control"); Hall et al. 2003 give
+/// "approximately 100 km of convergence". ledger: PLT-518 (verified)
+pub const TRANSFERENCE_KM: f64 = 100.0;
+
+/// Whether a continent pushed into a collision whose subduction has failed moves alone to the
+/// overriding plate (Stern 2004's transference: "the oceanic lithosphere outboard of the
+/// collision zone ultimately ruptures to become a new subduction zone"): its plate has converged
+/// on it by [`TRANSFERENCE_KM`] since its slab was lost (`since_jam_km`), and the collision's push
+/// on it (`push_n`, N) over the length of its margin against its own plate's ocean floor
+/// (`margin_m`, m) reaches [`TRANSFERENCE_FORCE_N_M`] × `g_scale` (the planet's gravity over
+/// Earth's). A continent with no ocean floor at its margin has nowhere to start the new zone.
+/// ledger: PLT-516, PLT-517, PLT-518
+pub fn transference_due(push_n: f64, margin_m: f64, since_jam_km: f64, g_scale: f64) -> bool {
+    margin_m > 0.0
+        && since_jam_km >= TRANSFERENCE_KM
+        && push_n / margin_m >= TRANSFERENCE_FORCE_N_M * g_scale
+}
 
 /// What a collision did.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -57,7 +90,9 @@ pub struct Collided {
 
 /// Ends the collision of contact `k`, whose subducting plate's continental crust `seeds` stands at
 /// or under the overriding plate, when it is due (see the module docs): `stalled` says whether
-/// its convergence has stayed below `weld_speed_mm_yr` for `weld_after_myr`.
+/// its convergence has stayed below `weld_speed_mm_yr` for `weld_after_myr`; `push_n` is the
+/// collision's plastic resistance this step, N (`forces::Answer::collision_n`), which
+/// transference reads.
 #[allow(clippy::too_many_arguments)]
 pub fn collide(
     state: &mut PlateState,
@@ -68,6 +103,7 @@ pub fn collide(
     k: usize,
     seeds: &[u32],
     stalled: bool,
+    push_n: Option<f64>,
 ) -> Result<Collided, CoreError> {
     let p = env.k;
     let t_myr = env.t_myr;
@@ -90,6 +126,19 @@ pub fn collide(
         deferred: true,
         ..Collided::default()
     };
+    // Transference (ledger PLT-516): a pushed continent may go alone once its subduction has
+    // failed and its plate has converged on it by the critical convergence since (the
+    // shortening since the jam, km, and the push, N); the force is judged on the whole terrane.
+    let pushed = if p.transference && !stalled {
+        state.contacts[k]
+            .collision
+            .as_ref()
+            .and_then(|c| c.jam_km.map(|j| c.shortening_km - j))
+            .filter(|&km| km >= TRANSFERENCE_KM) // ledger: PLT-518
+            .zip(push_n)
+    } else {
+        None
+    };
 
     // The terrane: continental crust of the subducting plate connected to the seeds.
     let mut in_terrane = vec![false; n];
@@ -105,7 +154,7 @@ pub fn collide(
         terrane.push(v);
         // P1-19: once the part found welds the plate (the test only grows with the terrane), an
         // unstalled collision is deferred whatever the rest of the terrane holds.
-        if !stalled && welds(terrane.len()) {
+        if !stalled && pushed.is_none() && welds(terrane.len()) {
             return Ok(deferred);
         }
         for (u, _) in geo.edges(v) {
@@ -122,9 +171,30 @@ pub fn collide(
     }
     terrane.sort_unstable();
     let area_km2 = terrane.len() as f64 * norm.sample_area_km2();
-    let suture = welds(terrane.len());
+    let mut suture = welds(terrane.len());
+    let mut transferred = false;
     if suture && !stalled {
-        return Ok(deferred);
+        let Some((since_km, push)) = pushed else {
+            return Ok(deferred);
+        };
+        // The continent's margin against its own plate's ocean floor: where the new subduction
+        // zone would start.
+        let margin = terrane
+            .iter()
+            .filter(|&&i| {
+                !state.samples[i as usize].is_hidden()
+                    && geo.edges(i).any(|(u, _)| {
+                        let o = &state.samples[u as usize];
+                        plate_of(u as usize) == under && o.kind != CONTINENTAL && !o.is_hidden()
+                    })
+            })
+            .count();
+        let margin_m = norm.km(margin as f64 * norm.spacing_rad()) * 1000.0;
+        if !transference_due(push, margin_m, since_km, env.gravity / G_EARTH) {
+            return Ok(deferred);
+        }
+        suture = false;
+        transferred = true;
     }
     let over_samples = f64::from(state.plates[over as usize].samples.max(1));
     let under_samples = f64::from(state.plates[under as usize].samples.max(1));
@@ -238,6 +308,11 @@ pub fn collide(
             .param("coast_split_km", coast_km)
             .param("sutured", i64::from(suture))
             .caused_by(onset);
+        let e = if transferred {
+            e.param("transference", 1_i64)
+        } else {
+            e
+        };
         let id = world.emit(e)?;
         state.counters.accretions += 1;
         Some(id)
@@ -256,6 +331,11 @@ pub fn collide(
             .param("sutured", i64::from(suture))
             .param("stalled", i64::from(stalled))
             .caused_by(onset);
+        let e = if transferred {
+            e.param("transference", 1_i64)
+        } else {
+            e
+        };
         let collision = world.emit(e)?;
         let e = events::event(world, t_myr, TERRANE_ACCRETION, q)
             .magnitude((area_km2 / state.a0_km2) as f32)
@@ -279,6 +359,11 @@ pub fn collide(
         state.counters.accretions += 1;
         Some(collision)
     };
+    // In the dynamics record a transference is the collision of a continent (`frac` of
+    // `collision_suture_frac` or more) that did not suture: without it every such one welds.
+    if transferred {
+        state.counters.transferences += 1;
+    }
     if suture {
         let at = DVec3::from_array(state.plates[die as usize].centroid);
         let e = events::event(world, t_myr, PLATE_DEATH, at)
