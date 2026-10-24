@@ -56,19 +56,31 @@ class GeothermalCensusTest {
         // The hot ground: the share of land columns (a coarse grid) at each heat-flow level, over the world's own
         // z span (the projection's, as the fields use; the Lambert pole is not the Petroff-Guyou planet's edge).
         int step = 16;
-        long land = 0, withData = 0;
+        long land = 0, withData = 0, nanContinental = 0, nanNearestHas = 0, nanOceanic = 0;
         double[] bars = {41, 45, 50, 55, 60, 70, 80, 100, 120, 150};
         long[] over = new long[bars.length];
         double qMax = Double.NEGATIVE_INFINITY;
         int pole = (int) (Double.isNaN(env.zHalf()) ? com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c) : env.zHalf());
+        var crust = wd.has("meta/crust_type") ? wd.layer("meta/crust_type") : null;
+        var heat = wd.has("meta/heat_flow_mw_m2") ? wd.layer("meta/heat_flow_mw_m2") : null;
         for (int z = -pole + step / 2; z < pole; z += step)
             for (int x = -c / 2 + step / 2; x < c / 2; x += step) {
                 if (Magma.top(h.at(x, z)) < sea + 5 || wet.at(x, z))
                     continue;
                 land++;
                 double q = env.heatFlowMwM2(x, z);
-                if (Double.isNaN(q))
+                if (Double.isNaN(q)) {
+                    // Why no heat flow: oceanic crust under the land, or a continental column beside it (the bilinear
+                    // read is NaN when one of its four cells is oceanic).
+                    double ct = crust == null ? Double.NaN : crust.nearest(x, z);
+                    if (ct == 1.0)
+                        nanContinental++;
+                    else if (ct == 0.0)
+                        nanOceanic++;
+                    if (heat != null && !Double.isNaN(heat.nearest(x, z)))
+                        nanNearestHas++;
                     continue;
+                }
                 withData++;
                 qMax = Math.max(qMax, q);
                 for (int k = 0; k < bars.length; k++)
@@ -76,7 +88,8 @@ class GeothermalCensusTest {
                         over[k]++;
             }
         StringBuilder sb = new StringBuilder("CENSUS dry land samples=" + land + " continental=" + withData + " zHalf=" + pole
-                + String.format(" qMax=%.1f", qMax));
+                + String.format(" qMax=%.1f", qMax) + " noHeatFlow: crustContinental=" + nanContinental + " crustOceanic="
+                + nanOceanic + " nearestCellHasHeatFlow=" + nanNearestHas);
         for (int k = 0; k < bars.length; k++)
             sb.append(String.format(" >=%.0f:%.4f", bars[k], land == 0 ? 0.0 : (double) over[k] / land));
         System.out.println(sb);
@@ -132,6 +145,34 @@ class GeothermalCensusTest {
             }
         System.out.println("CENSUS fields cells=" + cells + " (" + nx + "x" + nz + ", side " + Math.round(side) + " blocks) draws=" + draws
                 + " continental=" + cont + " atThreshold=" + hot + " atThresholdDry=" + hotDry + " cellsWithOne=" + hotCells);
+        // What the draws could find: each cell's share f of hot dry ground (a 4-block grid), the cells' expected count
+        // of fields sum(1 - (1 - f)^draws) and the chance that no cell finds any, prod((1 - f)^draws).
+        int fine = 4;
+        double expected = 0.0, logNone = 0.0, hotDryKm2 = 0.0, cellKm2 = wx * wz * Math.pow(wd.manifest().mPerBlockH() / 1000.0, 2);
+        int hotCellsAny = 0;
+        for (int gz = 0; gz < nz; gz++)
+            for (int gx = 0; gx < nx; gx++) {
+                long all = 0, good = 0;
+                for (double bz = -pole + gz * wz + fine / 2.0; bz < -pole + (gz + 1) * wz; bz += fine)
+                    for (double bx = -c / 2.0 + gx * wx + fine / 2.0; bx < -c / 2.0 + (gx + 1) * wx; bx += fine) {
+                        int fx = Math.floorMod((int) Math.round(bx) + c / 2, c) - c / 2, fz = (int) Math.round(bz);
+                        all++;
+                        double q = env.heatFlowMwM2(fx, fz);
+                        if (!(q >= rules.heatFlowMinMwM2()))
+                            continue;
+                        if (Magma.top(h.at(fx, fz)) < sea + Geothermal.MIN_ABOVE_SEA + 2 || wet.at(fx, fz) || env.iced(fx, fz))
+                            continue;
+                        good++;
+                    }
+                double f = all == 0 ? 0.0 : (double) good / all;
+                if (good > 0)
+                    hotCellsAny++;
+                hotDryKm2 += f * cellKm2;
+                expected += 1.0 - Math.pow(1.0 - f, Geothermal.HEAT_DRAWS);
+                logNone += Geothermal.HEAT_DRAWS * Math.log1p(-Math.min(f, 0.999999));
+            }
+        System.out.println(String.format("CENSUS hot dry ground %.0f km2 in %d cells; expected cells with a field %.2f; P(none) %.4f",
+                hotDryKm2, hotCellsAny, expected, Math.exp(logNone)));
         // Each active volcano: its crust (the volcano list's flag and whether the heat-flow layer has data there), the
         // heat flow at its summit and the hottest within its base, and the summit's height above the sea.
         for (var v : wd.volcanoes().list()) {

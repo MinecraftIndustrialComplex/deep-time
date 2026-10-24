@@ -38,6 +38,7 @@ class ColdDesertCensusTest {
         long bwk = 0, cold = 0, coldWarmRule = 0, coldWarmFlat = 0, coldNearestWarm = 0, warm = 0, warmColdRule = 0;
         Map<Integer, Integer> byExcess = new TreeMap<>();
         Map<Integer, Integer> byDetail = new TreeMap<>();
+        Map<String, Integer> byVolcano = new TreeMap<>();
         double[] sumDetail = new double[2];
         long[] nDetail = new long[2];
         int printed = 0;
@@ -61,6 +62,20 @@ class ColdDesertCensusTest {
                         coldNearestWarm++;
                     if (tRule >= 10.0) {
                         coldWarmRule++;
+                        // The nearest volcano, in its radii (a shield's flank is where the young landscape's bump and
+                        // the amplified cone part).
+                        double best = Double.POSITIVE_INFINITY;
+                        String bestKind = "none";
+                        for (var v : wd.volcanoes().list()) {
+                            double dx = Math.floorMod((long) Math.round(v.x() - x) + c / 2, c) - c / 2, dz = v.z() - z;
+                            double rr = Math.hypot(dx, dz) / Math.max(1.0, v.radiusM() / wd.manifest().mPerBlockH());
+                            if (rr < best) {
+                                best = rr;
+                                bestKind = String.valueOf(v.kind());
+                            }
+                        }
+                        byVolcano.merge(bestKind + (best < 1.0 ? " <1r" : best < 1.5 ? " <1.5r" : best < 3 ? " <3r" : " far"), 1,
+                                Integer::sum);
                         byExcess.merge((int) Math.floor(tRule - 10.0), 1, Integer::sum);
                         sumDetail[0] += detail;
                         nDetail[0]++;
@@ -87,6 +102,7 @@ class ColdDesertCensusTest {
                 + " | warm=" + warm + " of them ruleMean<10: " + warmColdRule);
         System.out.println("CENSUS cold with ruleMean>=10 by floor(ruleMean-10): " + byExcess);
         System.out.println("CENSUS cold with ruleMean>=10 by detail (height-elevation, 4-block bins): " + byDetail);
+        System.out.println("CENSUS cold with ruleMean>=10 by nearest volcano (kind, distance in its radii): " + byVolcano);
         System.out.println(String.format("CENSUS mean detail: cold-warm %.2f blocks (n=%d), cold-cold %.2f blocks (n=%d)",
                 nDetail[0] == 0 ? Double.NaN : sumDetail[0] / nDetail[0], nDetail[0],
                 nDetail[1] == 0 ? Double.NaN : sumDetail[1] / nDetail[1], nDetail[1]));
