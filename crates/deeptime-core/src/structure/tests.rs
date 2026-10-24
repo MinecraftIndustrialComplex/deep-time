@@ -220,11 +220,16 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
         }
         b.validate().unwrap();
     }
-    if let (Some(a), Some(p)) = (
-        aureoles.first(),
-        world.bodies.iter().rfind(|b| b.role == "pluton"),
-    ) {
-        assert!(p.id < a.id, "the plutons come before the aureoles");
+    // So do the stock roots (each keeps its stock's rock through the aureole it rises across).
+    if let Some(a) = aureoles.first() {
+        assert!(
+            world
+                .bodies
+                .iter()
+                .filter(|b| b.role == "pluton" || b.role == "stock")
+                .all(|b| b.id < a.id),
+            "the plutons and stock roots come before the aureoles"
+        );
     }
     assert_eq!(note["horizons"]["check"], "ok");
     // Keyframe layers exist with valid values.
