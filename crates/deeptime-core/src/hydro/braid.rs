@@ -22,7 +22,9 @@
 //! - **Format.** The river keeps its course as one thread (narrowed and shallowed around each
 //!   island) and each island's other thread is a chain of its own that leaves the course at a
 //!   vertex (`from`) and rejoins it at another (`into`, mouth `River`): no format change. The
-//!   water surface along a thread is the course's at the same distance down it.
+//!   water surface along a thread is the course's at the same distance down it, lowered by as much
+//!   as a fan's ground under the thread lies below the fan's ground under the course (a cone falls
+//!   away to either side of a course down its axis), and never rising.
 //! - **Room.** A thread is drawn only where its bank lies on the floodplain (at or over its water)
 //!   or the fan, and no other channel's bank zone lies within twice its reach across the course;
 //!   the island goes to the other side when one side has no room. Distances are the planet's
@@ -60,6 +62,9 @@ pub const THREAD_Q_SHARE: f64 = 0.5; // ledger: HYD-175 (game-choice)
 const STEP: f64 = 1.0;
 /// The least cos φ the Lambert metric is taken at (the pole rows).
 const COS_MIN: f64 = 0.05;
+/// How far short of a distance down the course a vertex may lie and still count as at it, blocks
+/// of planet (f32 vertex positions on a Lambert frame land a few ulps off).
+const SNAP: f64 = 0.01;
 /// Lower bounds of the discharge classes in the record, m³/s.
 const Q_CLASSES: [f64; 4] = [0.0, 10.0, 100.0, 1000.0];
 
@@ -67,8 +72,8 @@ const Q_CLASSES: [f64; 4] = [0.0, 10.0, 100.0, 1000.0];
 pub struct Input<'a> {
     /// The floodplain's level at block (x, z), 1/16 block, None off the plain.
     pub plain: &'a (dyn Fn(f64, f64) -> Option<i32> + Sync),
-    /// Whether block (x, z) lies on an alluvial fan.
-    pub fan: &'a (dyn Fn(f64, f64) -> bool + Sync),
+    /// The ground of an alluvial fan at block (x, z), blocks; None off the fans.
+    pub fan: &'a (dyn Fn(f64, f64) -> Option<f64> + Sync),
     /// The planet whose Lambert blocks the network is in; None for a frame drawn true to shape.
     pub lambert: Option<Projection>,
     /// Metres per block across and up.
@@ -172,7 +177,8 @@ impl Net<'_> {
     /// Ground a thread may run on at (x, z) with water surface w: the floodplain at or over the
     /// water, or a fan.
     fn room(&self, x: f64, z: f64, w: f64) -> bool {
-        (self.inp.fan)(x, z) || (self.inp.plain)(x, z).is_some_and(|lv| lv >= flush_level(w))
+        (self.inp.fan)(x, z).is_some()
+            || (self.inp.plain)(x, z).is_some_and(|lv| lv >= flush_level(w))
     }
 
     /// Whether (x, z), `t` blocks across the course of chain `own` (vertices from `first`, their
@@ -270,7 +276,7 @@ impl Net<'_> {
         let mut cand = vec![false; n];
         for j in 0..n {
             let p = &pts[j];
-            let on_fan = (self.inp.fan)(p.x, p.z);
+            let on_fan = (self.inp.fan)(p.x, p.z).is_some();
             let qc = q_class(p.q);
             if on_fan {
                 tally.fan += STEP;
@@ -325,8 +331,8 @@ impl Net<'_> {
                     break;
                 }
                 // The island's span, on the course's vertices.
-                let a = u.partition_point(|&x| x < s);
-                let b = u.partition_point(|&x| x < u[a.min(m - 1)] + len);
+                let a = u.partition_point(|&x| x < s - SNAP);
+                let b = u.partition_point(|&x| x < u[a.min(m - 1)] + len - SNAP);
                 if a < 1 || b + 1 >= m || b < a + 2 || u[b] > s_end + STEP {
                     s += 0.5 * len;
                     continue;
@@ -339,7 +345,7 @@ impl Net<'_> {
                     Some((sg, thread)) => {
                         tally.islands += 1;
                         tally.braided += ub - ua;
-                        if (self.inp.fan)(p.x, p.z) {
+                        if (self.inp.fan)(p.x, p.z).is_some() {
                             tally.braided_fan += ub - ua;
                         }
                         tally.by_q[q_class(p.q)][1] += ub - ua;
@@ -446,6 +452,12 @@ impl Net<'_> {
             } else {
                 f64::from(v[a].x) + self.dx(f64::from(v[a].x), x)
             };
+            // On a fan the thread's water stands as far under its ground as the course's under
+            // the course's ground: the cone falls away to either side of a course down its axis.
+            let lower = match ((self.inp.fan)(p.x, p.z), (self.inp.fan)(x, z)) {
+                (Some(gc), Some(gt)) => (gc - gt).max(0.0),
+                _ => 0.0,
+            };
             out.push(RiverVertex {
                 x: x as f32,
                 z: z as f32,
@@ -454,7 +466,7 @@ impl Net<'_> {
                 } else if i == steps {
                     v[b].w
                 } else {
-                    p.w as f32
+                    (p.w - lower) as f32
                 },
                 hw: hw_t as f32,
                 depth: (p.depth * (1.0 - (1.0 - THREAD_DEPTH_SHARE) * f)) as f32,

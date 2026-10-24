@@ -143,6 +143,19 @@ impl Fans {
         }
     }
 
+    /// Every fan cell with its highest cone (the ground there once applied), 1/16 block, sorted
+    /// by cell.
+    pub fn ground(&self) -> Vec<(u32, i16)> {
+        let mut v: Vec<(u32, i16)> = self
+            .fans
+            .iter()
+            .flat_map(|f| f.cells.iter().copied().zip(f.height.iter().copied()))
+            .collect();
+        v.sort_unstable_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
+        v.dedup_by_key(|e| e.0);
+        v
+    }
+
     /// Every fan cell, sorted.
     pub fn cells(&self) -> Vec<u32> {
         let mut v: Vec<u32> = self.fans.iter().flat_map(|f| f.cells.iter().copied()).collect();

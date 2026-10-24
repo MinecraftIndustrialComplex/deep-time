@@ -2,8 +2,8 @@
 //! The braids (HYD-171 to HYD-175) on straight fixture rivers: a steep river on a plain divides
 //! around islands 5 widths long on alternate sides, the threads and the island as Leopold &
 //! Wolman's divided channels are, the same on the planet at 0° and 55°; a gentle river keeps one
-//! channel off a fan and braids on one; a narrow channel, a narrow plain and a neighbour stop the
-//! islands.
+//! channel off a fan and braids on one, and a thread on a cone keeps its water under the cone's
+//! ground; a narrow channel, a narrow plain and a neighbour stop the islands.
 
 use deeptime_format::Projection;
 use deeptime_format::rivers::{Chain, Mouth, NO_CHAIN, RiverVertex, Rivers};
@@ -60,7 +60,7 @@ fn w_at(z: f64, len: f64, slope: f64, x: f64) -> f64 {
 fn run(
     r: &mut Rivers,
     plain: &(dyn Fn(f64, f64) -> Option<i32> + Sync),
-    fan: &(dyn Fn(f64, f64) -> bool + Sync),
+    fan: &(dyn Fn(f64, f64) -> Option<f64> + Sync),
 ) -> Value {
     r.build_index();
     let s = braid::apply(
@@ -124,7 +124,7 @@ fn steep_on_a_plain(lat: f64) -> (Rivers, Value, f64) {
     let plain = move |x: f64, z: f64| {
         (((z - z0) / cos0).abs() <= 60.0).then(|| bank(w_at(z0, len, slope, x)))
     };
-    let s = run(&mut r, &plain, &|_, _| false);
+    let s = run(&mut r, &plain, &|_, _| None);
     (r, s, z0)
 }
 
@@ -186,7 +186,9 @@ fn a_gentle_river_braids_on_a_fan_alone() {
         let mut r = Rivers::empty(C);
         east(&mut r, z0, len, 4.0, 50.0, slope);
         let plain = move |x: f64, z: f64| (z.abs() <= 60.0).then(|| bank(w_at(z0, len, slope, x)));
-        let fan = move |x: f64, _: f64| on_fan && x > 0.0;
+        let fan = move |x: f64, _: f64| {
+            (on_fan && x > 0.0).then(|| f64::from(bank(w_at(z0, len, slope, x))) / 16.0)
+        };
         let s = run(&mut r, &plain, &fan);
         let th = threads(&r, 0, z0);
         if on_fan {
@@ -203,6 +205,35 @@ fn a_gentle_river_braids_on_a_fan_alone() {
     }
 }
 
+/// A river down the axis of a cone fan (its apex at the river's source, falling 0.1 a block of
+/// planet), its water a block under the cone: the cone falls away to either side, and each
+/// thread's water stands a block under the cone's ground where the thread runs, lower than the
+/// course's at the same distance near the apex.
+#[test]
+fn a_thread_on_a_cone_keeps_its_water_under_the_ground() {
+    let z0 = 0.0;
+    let fall = 0.1;
+    let (len, slope) = (600.0, fall * M_V / M_H);
+    let mut r = Rivers::empty(C);
+    east(&mut r, z0, len, 4.0, 50.0, slope);
+    let apex = -0.5 * len;
+    let cone = move |x: f64, z: f64| 151.0 - fall * (x - apex).hypot(z - z0);
+    let fan = move |x: f64, z: f64| Some(cone(x, z));
+    let s = run(&mut r, &|_, _| None, &fan);
+    assert!(r.chains.len() >= 6, "{s}");
+    let mut lowered = 0.0f64;
+    for k in 1..r.chains.len() {
+        for q in chain(&r, k) {
+            let (x, z, w) = (f64::from(q.x), f64::from(q.z), f64::from(q.w));
+            assert!(cone(x, z) - w >= 1.0 - 1e-3, "thread {k}: {q:?}");
+            lowered = lowered.max(w_at(z0, len, slope, x) - w);
+        }
+    }
+    // The first islands lie near the apex, where a thread 15 blocks off the axis is half a block
+    // lower.
+    assert!(lowered > 0.3, "{lowered}");
+}
+
 #[test]
 fn a_narrow_channel_or_plain_keeps_one_channel() {
     let z0 = 0.0;
@@ -211,14 +242,14 @@ fn a_narrow_channel_or_plain_keeps_one_channel() {
     let mut r = Rivers::empty(C);
     east(&mut r, z0, len, 1.0, 50.0, slope);
     let plain = move |x: f64, z: f64| (z.abs() <= 60.0).then(|| bank(w_at(z0, len, slope, x)));
-    let s = run(&mut r, &plain, &|_, _| false);
+    let s = run(&mut r, &plain, &|_, _| None);
     assert_eq!(r.chains.len(), 1, "{s}");
     assert!(s["too_narrow_km"].as_f64().unwrap() > 0.0);
     // A plain 10 blocks either side: no room for the thread and its bank.
     let mut r = Rivers::empty(C);
     east(&mut r, z0, len, 4.0, 50.0, slope);
     let plain = move |x: f64, z: f64| (z.abs() <= 10.0).then(|| bank(w_at(z0, len, slope, x)));
-    let s = run(&mut r, &plain, &|_, _| false);
+    let s = run(&mut r, &plain, &|_, _| None);
     assert_eq!(r.chains.len(), 1, "{s}");
     assert!(s["no_room"].as_u64().unwrap() > 0);
     assert_eq!(chain(&r, 0).iter().map(|v| v.hw).fold(0.0, f32::max), 4.0);
@@ -232,7 +263,7 @@ fn a_neighbour_sends_the_islands_to_the_far_side() {
     east(&mut r, z0, len, 4.0, 50.0, slope);
     east(&mut r, z0 + 30.0, len, 4.0, 50.0, slope);
     let plain = move |x: f64, z: f64| (z.abs() <= 100.0).then(|| bank(w_at(z0, len, slope, x)));
-    let s = run(&mut r, &plain, &|_, _| false);
+    let s = run(&mut r, &plain, &|_, _| None);
     let (a, b) = (threads(&r, 0, z0), threads(&r, 1, z0 + 30.0));
     assert!(a.len() >= 10 && b.len() >= 10, "{s}");
     // Each river's islands away from the other, and no thread crosses into the gap's far half.

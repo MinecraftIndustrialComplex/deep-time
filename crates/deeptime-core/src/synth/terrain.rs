@@ -853,7 +853,7 @@ impl Terrain for MeanderTest {
 /// 50 m³/s, its surface 1.25 blocks under the cone's, then 69.25 at the fan's toe (x -40) falling
 /// to 69.1 at x 380 and to the sea's 63.0 at x 412. The file holds the river as the bake leaves it
 /// after the braids (HYD-171 to HYD-175, [`crate::hydro::braid`]) on the fan: the course and a
-/// thread around each island. Every number here is a test fixture's (game-choice: agent,
+/// thread around each island, its water 1.25 blocks under the cone where it runs. Every number here is a test fixture's (game-choice: agent,
 /// 2026-10-24).
 pub struct FanTest {
     pub c: u32,
@@ -983,7 +983,7 @@ impl FanTest {
     pub fn rivers(&self) -> (Rivers, serde_json::Value) {
         let mut r = self.straight();
         let plain = |_: f64, _: f64| None;
-        let fan = |x: f64, z: f64| self.on_fan(x, z);
+        let fan = |x: f64, z: f64| self.on_fan(x, z).then(|| self.cone(x, z));
         let scale = deeptime_format::Scale::default_for(self.c);
         let stats = crate::hydro::braid::apply(
             &mut r,
@@ -1147,13 +1147,14 @@ mod tests {
             assert_eq!((ch.from, ch.into, ch.mouth), (0, 0, Mouth::River));
             let v = &r.vertices[ch.first as usize..(ch.first + ch.count) as usize];
             assert!(v.windows(2).all(|p| p[1].w <= p[0].w));
-            // On the fan, around an island, and the ground over the thread's water.
+            // On the fan, around an island, and its water 1.25 blocks under the cone where it runs
+            // (the cone falls away from the course; to the block, 0.1 of 0.71 of a block).
             assert!(v.iter().all(|q| t.on_fan(f64::from(q.x), f64::from(q.z))));
             let far = v.iter().fold(0.0f32, |m, q| if q.z.abs() > m.abs() { q.z } else { m });
             assert!((10.0..=25.0).contains(&far.abs()), "{far}: {stats}");
             for q in v {
                 let ground = t.height(q.x.round() as i64, q.z.round() as i64);
-                assert!(ground - f64::from(q.w) > 0.75, "{q:?}: ground {ground}");
+                assert!(ground - f64::from(q.w) > 1.15, "{q:?}: ground {ground}");
             }
             sides.push(far.signum());
         }
