@@ -26,7 +26,9 @@
 //! [`MAP_FIELDS`]: latitude and longitude in degrees, elevation (m), thickness (m), kind (0
 //! oceanic, 1 continental), orogeny (0 none, 1 Andean, 2 Himalayan), the orogeny's age (Myr), the
 //! island-arc and continental-arc magma (m), the plate group, the flags) for
-//! `tools/review/continent-budget.py`. Each snapshot also splits the land by the origin of its
+//! `tools/review/continent-budget.py`, and the same samples' plate ids to
+//! `plate/t<Myr>.bin` (little-endian u32, one per record; [`CrustBudget::write_plates`]) for the
+//! front lane's boundary geometry (`tools/review/pool/measure_boundgeom.py`). Each snapshot also splits the land by the origin of its
 //! crust (`cb_origin`: island arc, collision, Andean margin, the rest).
 //!
 //! Off unless [`ON_ENV`] is set; it changes nothing the model does.
@@ -580,6 +582,24 @@ impl CrustBudget {
         self.lines.push(line);
         if let Some(dir) = &self.maps {
             write_map(dir, samples, pos, t_myr);
+        }
+    }
+
+    /// With [`MAPS_ENV`] set, writes the plate of each visible sample (the records of the map the
+    /// snapshot at `t_myr` wrote, in order) to `<dir>/plate/t<Myr>.bin` as little-endian u32
+    /// (measurement only; a failure is reported and ignored).
+    pub fn write_plates(&self, samples: &[Sample], plate_of: impl Fn(usize) -> u32, t_myr: f64) {
+        let Some(dir) = &self.maps else { return };
+        let mut buf: Vec<u8> = Vec::with_capacity(samples.len() * 4);
+        for (i, s) in samples.iter().enumerate() {
+            if !s.is_hidden() {
+                buf.extend_from_slice(&plate_of(i).to_le_bytes());
+            }
+        }
+        let dir = dir.join("plate");
+        let path = dir.join(format!("t{:04.0}.bin", t_myr.round()));
+        if let Err(e) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, &buf)) {
+            eprintln!("crust_budget: cannot write {}: {e}", path.display());
         }
     }
 

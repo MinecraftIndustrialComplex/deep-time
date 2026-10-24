@@ -55,9 +55,9 @@ use rayon::prelude::*;
 
 use super::Env;
 use super::collapse::{iso_height, toward};
-use super::events::{self, PLATE_DEATH, RIDGE_BIRTH};
+use super::events::{self, PLATE_BIRTH, PLATE_DEATH, RIDGE_BIRTH};
 use super::gap_budget;
-use super::geometry::{Cover, Geo, Tree, dijkstra_two};
+use super::geometry::{Cover, Geo, Tree, connect_plates, dijkstra_two, pieces};
 use super::init::random_rotation;
 use super::kinematics::{arr, quat, to_world};
 use super::normalise::Norm;
@@ -65,7 +65,7 @@ use super::pools::{
     accrete, floor_at, isostatic_change_m, ocean_heat_flow, oceanic_column, thickness,
 };
 use super::state::{
-    CONTINENTAL, FORELAND, Group, OCEANIC, PlateState, Ridge, Sample, pool, regime,
+    CONTINENTAL, FORELAND, Group, OCEANIC, Plate, PlateState, Ridge, Sample, pool, regime,
 };
 use crate::error::CoreError;
 use crate::world::WorldState;
@@ -898,6 +898,128 @@ pub fn resample(
     Ok(geo)
 }
 
+/// World globals (the front lane, measurement; PLT-532, only while `plate_fission` is on): plates
+/// born of a plate's cut-off pieces at resamplings …
+pub const FISSION_GLOBAL: &str = "plates/fission_births";
+/// … the samples they took …
+pub const FISSION_SAMPLES_GLOBAL: &str = "plates/fission_samples";
+/// … and the samples of smaller cut-off pieces the plate around them took (capture).
+pub const CAPTURED_SAMPLES_GLOBAL: &str = "plates/captured_samples";
+
+/// A plate is one rigid body (`tectonics.plate_fission`, the front lane, 2026-10-24; ledger
+/// PLT-532). Right after a resampling (`geo` the lattice every group shares, each group
+/// unrotated), each plate's visible crust that the step's overlaps and the resampling's
+/// footprints have cut into pieces meeting only through other plates (`geometry::pieces`) keeps
+/// its largest piece as the plate. Every other piece of `min_plate_area_frac` of the planet
+/// (PLT-091) or more becomes a plate of its own, with the parent's rotation (fission: Stock & Lee
+/// 1994, "if a small fragment breaks off a large plate, then it may lose its slab-pull force and
+/// become driven entirely by different conditions"; the Farallon plate's, Lonsdale 2005): the
+/// force balance moves it from the next step. Every smaller piece joins the plate most of its
+/// lattice neighbours belong to (capture: Stock & Lee 1994, microplates that "became attached to
+/// the Pacific plate"; Nicholson et al. 1994), as a plate below that size is absorbed below.
+/// Returns (plates born, samples to them, samples captured).
+fn split_cut_plates(
+    state: &mut PlateState,
+    world: &mut WorldState,
+    geo: &Geo,
+    pos: &[DVec3],
+    env: &Env,
+) -> Result<(u32, usize, usize), CoreError> {
+    let n = state.samples.len();
+    let t = env.t_myr;
+    let visible: Vec<bool> = state.samples.iter().map(|s| !s.is_hidden()).collect();
+    let mut label: Vec<u32> = (0..n).map(|i| state.plate_of(i)).collect();
+    let (comp, sizes, keep) = pieces(geo, &label, |i| visible[i]);
+    let min = (env.k.min_plate_area_frac * f64::from(state.n)).ceil() as usize; // ledger: PLT-091
+    // The pieces that become plates, largest first (ties by piece).
+    let mut big: Vec<u32> = (0..sizes.len() as u32)
+        .filter(|&c| {
+            let (p, size) = sizes[c as usize];
+            keep[&p].1 != c && size >= min
+        })
+        .collect();
+    big.sort_by_key(|&c| (std::cmp::Reverse(sizes[c as usize].1), c));
+    let first = state.plates.len() as u32;
+    let new_of: BTreeMap<u32, u32> = big
+        .iter()
+        .enumerate()
+        .map(|(k, &c)| (c, first + k as u32))
+        .collect();
+    for (i, l) in label.iter_mut().enumerate() {
+        if let Some(&np) = new_of.get(&comp[i]) {
+            *l = np;
+        }
+    }
+    // The rest of the cut-off pieces go to the plate around them.
+    let captured = connect_plates(geo, &mut label, |i| visible[i]);
+    // New plates: the parent's motion, one unrotated group each.
+    for &c in &big {
+        let parent = state.plates[sizes[c as usize].0 as usize].clone();
+        let id = new_of[&c];
+        debug_assert_eq!(id as usize, state.plates.len());
+        state.plates.push(Plate {
+            id,
+            alive: true,
+            omega: parent.omega,
+            born_myr: t,
+            died_myr: None,
+            birth_event: None,
+            parent: Some(parent.id),
+            lip_until_myr: f64::NEG_INFINITY,
+            lip_event: None,
+            samples: 0,
+            centroid: parent.centroid,
+            continental_frac: 0.0,
+        });
+    }
+    let mut group_of: BTreeMap<u32, u32> = BTreeMap::new();
+    for (g, grp) in state.groups.iter().enumerate() {
+        group_of.entry(grp.plate).or_insert(g as u32);
+    }
+    let mut moved = 0usize;
+    for (i, &l) in label.iter().enumerate() {
+        if l == state.plate_of(i) {
+            continue;
+        }
+        let rot = state.groups[state.samples[i].group as usize].rot;
+        let g = *group_of.entry(l).or_insert_with(|| {
+            state.groups.push(Group { plate: l, rot });
+            (state.groups.len() - 1) as u32
+        });
+        state.samples[i].group = g;
+        if l >= first {
+            moved += 1;
+        }
+    }
+    if big.is_empty() {
+        return Ok((0, 0, captured));
+    }
+    state.recount(pos);
+    let norm = &env.norm;
+    for &c in &big {
+        let id = new_of[&c];
+        let p = &state.plates[id as usize];
+        let (parent, count, centroid) = (sizes[c as usize].0, p.samples, p.centroid);
+        let at = DVec3::from_array(centroid);
+        let area = f64::from(count) * norm.sample_area_km2();
+        let e = events::event(world, t, PLATE_BIRTH, at)
+            .magnitude((area / state.a0_km2) as f32)
+            .param("plate", i64::from(id))
+            .param("parent", i64::from(parent))
+            .param("area_km2", norm.planet_area_km2(area))
+            .param("continental_frac", p.continental_frac)
+            .param(
+                "speed_mm_yr",
+                norm.speed_mm_yr(DVec3::from_array(p.omega), at),
+            )
+            .param("origin", "fission");
+        let birth = world.emit(e)?;
+        state.plates[id as usize].birth_event = Some(birth);
+        state.counters.plate_births += 1;
+    }
+    Ok((big.len() as u32, moved, captured))
+}
+
 /// Marks plates without samples dead and, when `geo` is the lattice every group shares (right
 /// after a resampling), absorbs plates below `min_plate_area_frac` into the neighbour they share
 /// most lattice edges with. `pos` are current positions (for centroids). `causes` maps a plate to
@@ -913,6 +1035,17 @@ pub fn bury(
     let t = env.t_myr;
     state.recount(pos);
     if let Some(geo) = geo {
+        if env.k.plate_fission {
+            let (born, moved, captured) = split_cut_plates(state, world, geo, pos, env)?;
+            for (key, x) in [
+                (FISSION_GLOBAL, f64::from(born)),
+                (FISSION_SAMPLES_GLOBAL, moved as f64),
+                (CAPTURED_SAMPLES_GLOBAL, captured as f64),
+            ] {
+                *world.globals.entry(key.to_owned()).or_insert(0.0) += x;
+            }
+            state.recount(pos);
+        }
         let min = (env.k.min_plate_area_frac * f64::from(state.n)).ceil() as u32;
         while let Some(small) = state
             .alive()
@@ -1243,5 +1376,123 @@ mod tests {
         // Most rows on a segment hold the ridge between both plates' points.
         let both = rows.values().filter(|c| c[0] > 0 && c[1] > 0).count();
         assert!(both * 4 >= rows.len() * 3, "{both} of {} rows", rows.len());
+    }
+
+    /// A plate is one rigid body (Gordon 1998: "The central assumption of plate tectonics is that
+    /// the plates are rigid"; Bird 2003 [123]: PB2002's 52 plates are 52 segments, each "a
+    /// closed curve outlining that plate"; Stock & Lee 1994: a fragment broken off a plate "may
+    /// lose its slab-pull force and become driven entirely by different conditions", and
+    /// microplates "became attached to the Pacific plate"). Plate 0 is cut in two by a band of
+    /// plate 1 (0 < z < 0.3) and keeps one small patch inside the band. With `plate_fission` its
+    /// southern piece (the larger) stays plate 0, its northern piece becomes plate 2 with plate
+    /// 0's rotation and parent, and the patch joins plate 1; every plate is then one connected
+    /// piece and no sample moved. Off, plate 0 keeps all three pieces. ledger: PLT-532
+    #[test]
+    fn a_plate_cut_in_two_splits_and_a_cut_off_patch_is_captured() {
+        use crate::params::TectonicParams;
+        use crate::plates::geometry::{cut_samples, positions};
+        use crate::plates::rifting::tests::{N, continental, one_plate};
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let centre = DVec3::new(1.0, 0.0, 0.15).normalize();
+        let patch = |p: DVec3| p.dot(centre) > 0.06f64.cos();
+        let band = |p: DVec3| p.z > 0.0 && p.z < 0.3 && !patch(p);
+        let omega = [0.0, 1.0e-3, 2.0e-3];
+        let build = || {
+            let mut st = one_plate(&geo, 3, |_| continental());
+            st.plates[0].omega = omega;
+            let mut p1 = st.plates[0].clone();
+            p1.id = 1;
+            p1.omega = [0.0; 3];
+            st.plates.push(p1);
+            st.groups.push(Group {
+                plate: 1,
+                rot: [0.0, 0.0, 0.0, 1.0],
+            });
+            let pts = geo.points();
+            for (i, s) in st.samples.iter_mut().enumerate() {
+                s.group = u32::from(band(pts[i]));
+            }
+            let pos = positions(&st, &geo);
+            st.recount(&pos);
+            (st, pos)
+        };
+        let run = |fission: bool| {
+            let k = TectonicParams {
+                plate_fission: fission,
+                ..Default::default()
+            };
+            let env = Env {
+                k: &k,
+                norm: Norm::new(6370.0, 6371.0, N),
+                dt_myr: 2.0,
+                dt_yr: 2.0e6,
+                gravity: 9.81,
+                step: 1,
+                t_myr: 50.0,
+            };
+            let (mut st, pos) = build();
+            let mut world = WorldState::new(1, 16_384, 0.0);
+            bury(
+                &mut st,
+                &mut world,
+                Some(&geo),
+                &pos,
+                &env,
+                &BTreeMap::new(),
+            )
+            .unwrap();
+            assert_eq!(positions(&st, &geo), pos, "no sample moved");
+            (st, world)
+        };
+        let pts = geo.points();
+        let patch_n = (0..N).filter(|&i| patch(pts[i])).count();
+        assert!(
+            patch_n > 3
+                && (patch_n as f64) < TectonicParams::default().min_plate_area_frac * N as f64,
+            "the patch is below the smallest plate: {patch_n}"
+        );
+        let labels = |st: &PlateState| (0..N).map(|i| st.plate_of(i)).collect::<Vec<u32>>();
+
+        let (off, _) = run(false);
+        assert_eq!(off.plates.len(), 2);
+        let cut = cut_samples(&geo, &labels(&off), |_| true);
+        let north = (0..N).filter(|&i| pts[i].z >= 0.3).count();
+        assert_eq!(cut, north + patch_n, "off, plate 0 keeps its pieces");
+
+        let (on, world) = run(true);
+        assert_eq!(on.plates.len(), 3, "one plate born");
+        let born = &on.plates[2];
+        assert!(born.alive);
+        assert_eq!(born.parent, Some(0));
+        assert_eq!(born.omega, omega, "the parent's rotation");
+        assert_eq!(born.born_myr, 50.0);
+        assert_eq!(born.samples as usize, north);
+        for (i, &q) in pts.iter().enumerate() {
+            let want = if patch(q) || band(q) {
+                1
+            } else if q.z >= 0.3 {
+                2
+            } else {
+                0
+            };
+            assert_eq!(on.plate_of(i), want, "sample {i} at {q}");
+        }
+        assert_eq!(cut_samples(&geo, &labels(&on), |_| true), 0);
+        let births: Vec<_> = world
+            .events
+            .iter()
+            .filter(|e| e.kind == PLATE_BIRTH)
+            .collect();
+        assert_eq!(births.len(), 1);
+        assert!(matches!(
+            births[0].params.get("origin"),
+            Some(deeptime_format::ParamValue::Str(o)) if o == "fission"
+        ));
+        assert!(born.birth_event.is_some());
+        assert_eq!(world.globals[FISSION_GLOBAL], 1.0);
+        assert_eq!(world.globals[FISSION_SAMPLES_GLOBAL], north as f64);
+        assert_eq!(world.globals[CAPTURED_SAMPLES_GLOBAL], patch_n as f64);
+        assert_eq!(on.counters.plate_births, 1);
+        assert!(on.groups.iter().all(|g| g.rot == [0.0, 0.0, 0.0, 1.0]));
     }
 }

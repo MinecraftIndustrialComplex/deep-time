@@ -486,11 +486,19 @@ pub fn dijkstra_two(
     best
 }
 
-/// Keeps, for every label, only its largest connected piece (over lattice edges between samples
-/// with that label) and hands every other piece to the label most of its outside neighbours
-/// carry. Only samples `active` selects take part (the rest keep their labels and cast no votes).
-/// `plate[i]` is rewritten in place. Returns how many samples moved.
-pub fn connect_plates(geo: &Geo, plate: &mut [u32], active: impl Fn(usize) -> bool) -> usize {
+/// The connected pieces of every label over lattice edges between `active` samples with that
+/// label: each sample's piece (`u32::MAX` for an inactive sample), each piece's (label, size),
+/// and each label's largest piece (size, piece; the first found of equal sizes).
+#[allow(clippy::type_complexity)]
+pub fn pieces(
+    geo: &Geo,
+    plate: &[u32],
+    active: impl Fn(usize) -> bool,
+) -> (
+    Vec<u32>,
+    Vec<(u32, usize)>,
+    std::collections::BTreeMap<u32, (usize, u32)>,
+) {
     let n = plate.len();
     let mut comp = vec![u32::MAX; n];
     let mut sizes: Vec<(u32, usize)> = Vec::new(); // (plate, size) per component
@@ -515,7 +523,6 @@ pub fn connect_plates(geo: &Geo, plate: &mut [u32], active: impl Fn(usize) -> bo
         }
         sizes.push((p, size));
     }
-    // The largest component of each plate stays.
     let mut keep: std::collections::BTreeMap<u32, (usize, u32)> = Default::default();
     for (c, &(p, size)) in sizes.iter().enumerate() {
         let e = keep.entry(p).or_insert((0, u32::MAX));
@@ -523,6 +530,28 @@ pub fn connect_plates(geo: &Geo, plate: &mut [u32], active: impl Fn(usize) -> bo
             *e = (size, c as u32);
         }
     }
+    (comp, sizes, keep)
+}
+
+/// The `active` samples outside their label's largest connected piece ([`pieces`]): a plate's
+/// cut-off pieces (measurement: `cut_trace.rs`).
+pub fn cut_samples(geo: &Geo, plate: &[u32], active: impl Fn(usize) -> bool) -> usize {
+    let (_, sizes, keep) = pieces(geo, plate, active);
+    sizes
+        .iter()
+        .enumerate()
+        .filter(|&(c, &(p, _))| keep[&p].1 != c as u32)
+        .map(|(_, &(_, size))| size)
+        .sum()
+}
+
+/// Keeps, for every label, only its largest connected piece (over lattice edges between samples
+/// with that label) and hands every other piece to the label most of its outside neighbours
+/// carry. Only samples `active` selects take part (the rest keep their labels and cast no votes).
+/// `plate[i]` is rewritten in place. Returns how many samples moved.
+pub fn connect_plates(geo: &Geo, plate: &mut [u32], active: impl Fn(usize) -> bool) -> usize {
+    // The largest component of each plate stays.
+    let (mut comp, mut sizes, keep) = pieces(geo, plate, &active);
     let mut moved = 0;
     // Hand orphan pieces to a neighbour, smallest first, repeating until stable.
     for _ in 0..8 {
