@@ -274,7 +274,12 @@ fn neighbours_pushed_together_keep_to_their_halves() {
     }
     let plain = move |_: f64, z: f64| (z.abs() <= 0.5 * gap + 3.0).then_some(bank(69.9));
     let s = run(&mut r, &plain);
-    let zs = |k: usize| chain(&r, k).iter().map(|p| f64::from(p.z)).collect::<Vec<_>>();
+    let zs = |k: usize| {
+        chain(&r, k)
+            .iter()
+            .map(|p| f64::from(p.z))
+            .collect::<Vec<_>>()
+    };
     let (north, south) = (zs(0), zs(1));
     let north_max = north.iter().fold(f64::MIN, |m, &z| m.max(z));
     let south_min = south.iter().fold(f64::MAX, |m, &z| m.min(z));
