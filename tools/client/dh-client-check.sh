@@ -21,7 +21,9 @@
 # client's requests past the seam reach the generator folded into the planet's lap). The
 # client's own Distant Horizons database is then read: it must hold sections further from the
 # client than any chunk it loaded, on both sides of the seam (they can only have been sent by the
-# server). Nothing is rendered or judged by eye.
+# server). On a cube world (the probe's slide_x) the player is then moved beside the slide, the
+# net's F2 to F3 edge (cube plan G6), and the database must hold sent sections on both sides of it
+# too. Nothing is rendered or judged by eye.
 #
 # Output: smoke/<profile>/client-check.txt (the probe lines and the verdicts); exit 0 when the
 # client's requests reached the generator on both sides of the seam and the sections arrived.
@@ -42,7 +44,7 @@
 #   DHCC_MOVE=<b/s>     after the two waits, a third phase of DHCC_MOVE_SECS (default 120) seconds in which the
 #                       script teleports the spectating player along x at that many blocks per second (once a
 #                       second): the "camera moving quickly" case of pauseIfMovingQuickly (it fires above 20)
-#   DHCC_WAIT1, DHCC_WAIT2  the two waits in seconds (default 180 and 300)
+#   DHCC_WAIT1, DHCC_WAIT2, DHCC_WAIT3  the waits in seconds (default 180, 300 and, on a cube, 300 beside the slide)
 #   DHCC_JOIN_SECS=<s>  how long one attempt waits for the client to join (default 900; the full MIC client
 #                       on a loaded VM needs more)
 set -uo pipefail
@@ -248,6 +250,17 @@ rcon "tp DeepTimeProbe $X 300 0" >/dev/null
 series "${DHCC_WAIT2:-300}" seam
 B="$(probe)"; say "probe after ${DHCC_WAIT2:-300} s beside the seam: $B"
 [ -n "${DHCC_SERIES:-}" ] && cpu_lines
+# A cube world (cube plan G6): then beside the slide, its F2 to F3 edge (the probe's slide_x), where
+# far terrain's areas change face; Toroidal World's seam above lies inside F2.
+SL=$(field "$S0" slide_x); X3=""; D="$B"
+if [ -n "$SL" ]; then
+    X3=$(( SL + 100 ))
+    say "== tp DeepTimeProbe $X3 300 0 (a cube world: the slide at x = $SL)"
+    rcon "tp DeepTimeProbe $X3 300 0" >/dev/null
+    series "${DHCC_WAIT3:-300}" slide
+    D="$(probe)"; say "probe after ${DHCC_WAIT3:-300} s beside the slide: $D"
+    [ -n "${DHCC_SERIES:-}" ] && cpu_lines
+fi
 if [ -n "${DHCC_MOVE:-}" ]; then
     say "== moving at ${DHCC_MOVE} blocks/s for ${DHCC_MOVE_SECS:-120} s (teleports once a second)"
     mx=$X
@@ -273,6 +286,11 @@ say "client's Distant Horizons databases (bytes):"; say "${DB:-none}"
 ok=0
 [ $(( s1 - s0 )) -gt 0 ] || { say "FAIL: the client asked for nothing at the spawn"; ok=1; }
 [ $(( s2 - s1 )) -gt 0 ] || { say "FAIL: the client asked for nothing beside the seam"; ok=1; }
+if [ -n "$SL" ]; then
+    s3=$(field "$D" sections)
+    say "sections asked by the client beside the slide: $(( s3 - s2 ))"
+    [ $(( s3 - s2 )) -gt 0 ] || { say "FAIL: the client asked for nothing beside the slide"; ok=1; }
+fi
 lo=${ext%..*}; hi=${ext#*..}
 if [ "$ext" = none ] || [ "$lo" -gt $(( -C / 2 + 2048 )) ] || [ "$hi" -lt $(( C / 2 - 64 )) ]; then
     say "FAIL: the sections asked do not reach both ends of the lap (east of the seam is x = $(( -C / 2 )) on)"; ok=1
@@ -286,20 +304,23 @@ MAIN=$(find "$CL/game" -path '*Distant_Horizons*' -name '*.sqlite' -printf '%s %
 if [ -n "$MAIN" ]; then
     rm -rf "$CL/dbcopy"; mkdir -p "$CL/dbcopy"; cp "$MAIN"* "$CL/dbcopy/" 2>/dev/null
     SPAWN=$(python3 -c 'import json,sys; print(*json.loads(sys.argv[1]).get("spawn",[0,0]))' "$S0")
-    python3 - "$CL/dbcopy/$(basename "$MAIN")" "$C" "$X" $SPAWN <<'PY' | tee -a "$OUT"
+    python3 - "$CL/dbcopy/$(basename "$MAIN")" "$C" "$X" $SPAWN "${SL:-none}" "${X3:-none}" <<'PY' | tee -a "$OUT"
 import sqlite3, sys
 db, c, seam_post_x, spawn_x, spawn_z = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+slide = None if sys.argv[6] == "none" else int(sys.argv[6])           # a cube world's slide, x in the lap
+slide_post_x = None if sys.argv[7] == "none" else int(sys.argv[7])
 con = sqlite3.connect(db)
 cols = [r[1] for r in con.execute("pragma table_info(FullData)")]
 if not {"DetailLevel", "PosX", "PosZ"} <= set(cols):
     print("client database: no FullData(DetailLevel, PosX, PosZ) table; tables:",
           [r[0] for r in con.execute("select name from sqlite_master where type='table'")])
-    print("RECEIVED far=0 west=0 east=0")
+    print("RECEIVED far=0 west=0 east=0 slide_west=0 slide_east=0")
     sys.exit(0)
 rows = con.execute("select DetailLevel, PosX, PosZ from FullData").fetchall()
 half = c // 2
 base = 6 if rows and min(r[0] for r in rows) >= 6 else 0   # stored from 0 (a 64-block section) or as the section's own level
-far = west = east = 0
+far = west = east = slide_west = slide_east = 0
+posts = [(spawn_x, spawn_z), (seam_post_x, 0)] + ([(slide_post_x, 0)] if slide_post_x is not None else [])
 by = {}
 for d, px, pz in rows:
     d -= base
@@ -310,22 +331,32 @@ for d, px, pz in rows:
     def clear(cx, cz):   # further than 512 blocks from a position, measured through the seam
         dx = min(abs((x0 + w // 2 - cx) % c), c - abs((x0 + w // 2 - cx) % c))
         return max(dx, abs(z0 + w // 2 - cz)) - w // 2 > 512
-    if clear(spawn_x, spawn_z) and clear(seam_post_x, 0):
+    if all(clear(px_, pz_) for px_, pz_ in posts):
         far += 1
         if d == 0 and half - 2048 <= xf < half: west += 1
         if d == 0 and -half <= xf < -half + 2048: east += 1
+        if d == 0 and slide is not None:
+            off = (x0 - slide) % c   # blocks east of the slide, through the seam
+            if off < 2048: slide_east += 1
+            if off >= c - 2048: slide_west += 1
 print(f"client database: {len(rows)} sections; x extent by detail level (blocks): "
       + "; ".join(f"{d}: {lo}..{hi}" for d, (lo, hi) in sorted(by.items())))
-print(f"client database: {far} sections further than 512 blocks from both of the client's positions "
-      f"(sent by the server); of the 64-block ones, {west} in the 2048 blocks west of the seam and {east} in the 2048 blocks east of it")
-print(f"RECEIVED far={far} west={west} east={east}")
+print(f"client database: {far} sections further than 512 blocks from every one of the client's {len(posts)} positions "
+      f"(sent by the server); of the 64-block ones, {west} in the 2048 blocks west of the seam and {east} in the 2048 blocks east of it"
+      + (f"; {slide_west} in the 2048 blocks west of the slide (x = {slide}) and {slide_east} in the 2048 blocks east of it"
+         if slide is not None else ""))
+print(f"RECEIVED far={far} west={west} east={east} slide_west={slide_west} slide_east={slide_east}")
 PY
     R=$(grep -a '^RECEIVED ' "$OUT" | tail -1)
-    far=$(echo "$R" | sed -n 's/.*far=\([0-9]*\).*/\1/p'); west=$(echo "$R" | sed -n 's/.*west=\([0-9]*\).*/\1/p'); east=$(echo "$R" | sed -n 's/.*east=\([0-9]*\).*/\1/p')
+    far=$(echo "$R" | sed -n 's/.*far=\([0-9]*\).*/\1/p'); west=$(echo "$R" | sed -n 's/.* west=\([0-9]*\).*/\1/p'); east=$(echo "$R" | sed -n 's/.* east=\([0-9]*\).*/\1/p')
+    swest=$(echo "$R" | sed -n 's/.*slide_west=\([0-9]*\).*/\1/p'); seast=$(echo "$R" | sed -n 's/.*slide_east=\([0-9]*\).*/\1/p')
     [ "${far:-0}" -gt 0 ] || { say "FAIL: the client's database holds no section beyond its own loaded chunks (nothing was sent)"; ok=1; }
     { [ "${west:-0}" -gt 0 ] && [ "${east:-0}" -gt 0 ]; } || { say "FAIL: the client's database lacks sent sections on one side of the seam (west $west, east $east)"; ok=1; }
+    if [ -n "$SL" ]; then
+        { [ "${swest:-0}" -gt 0 ] && [ "${seast:-0}" -gt 0 ]; } || { say "FAIL: the client's database lacks sent sections on one side of the slide (west $swest, east $seast)"; ok=1; }
+    fi
 else
     say "FAIL: the client has no Distant Horizons database"; ok=1
 fi
-[ $ok = 0 ] && say "PASS: the client's requests reached Deep Time's generator on both sides of the seam, and the sections arrived in the client's database"
+[ $ok = 0 ] && say "PASS: the client's requests reached Deep Time's generator on both sides of the seam${SL:+ and of the slide}, and the sections arrived in the client's database"
 exit $ok

@@ -454,7 +454,8 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
        terrain agrees with the chunks generated afterwards at the same columns.
     4. The seam: 2 and 3 again with a pregeneration on each side of x = C/2, inside the lap (DH asked
        nothing for a square past the seam), checked on 160 blocks either side of the seam.
-    5. `/deeptime probe far bench`: the time a section takes without Distant Horizons' storing.
+    5. On a cube world, 2 and 3 across the slide (the net's F2 to F3 edge, cube plan G6).
+    6. `/deeptime probe far bench`: the time a section takes without Distant Horizons' storing.
     """
     st, out = probe_json(server, rcon, "deeptime probe dh")
     if not steps.check("dh: /deeptime probe dh answers", "[deeptime-probe] JSON", "ok" if st else out[:200], st is not None):
@@ -575,6 +576,36 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     steps.record("dh across the seam: sections asked of the override", level.get("sections", 0) - before,
                  note=f"{radius_seam}-chunk square centred on x = {across_x}, z = {sz + 1024}, crossing x = {half}: 257 sections")
 
+    # A cube world's slide (its F2 to F3 edge, cube plan G6; the probe's slide_x): a pregeneration
+    # square across it, then what DH holds against the chunks on the 160 blocks either side. Toroidal
+    # World's seam lies inside F2 on a cube, so the slide is no lap end and one square spans it.
+    slide = level.get("slide_x")
+    if slide is not None:
+        best = None
+        for z in (0, 768, -768, 1536, -1536):
+            zz = z // 64 * 64
+            shares = []
+            for x in (slide - 128, slide + 64):
+                land, _ = probe_json(server, rcon, f"deeptime probe far land {x // 64 * 64} {zz}", wait=0.5)
+                shares.append((land or {}).get("land_share", 0.0))
+            share = sum(shares) / len(shares)
+            if best is None or share > best[0]:
+                best = (share, zz)
+            if share >= 0.95:
+                break
+        slide_land, lz = best
+        steps.record("dh slide: area checked", f"x = {slide} (the cube's F2 to F3 edge), z = {lz} "
+                                               f"({100 * slide_land:.0f} % land either side), pregen radius {radius_seam} chunks across it")
+        before = level.get("sections", 0)
+        dh_pregen(steps, rcon, slide, lz, radius_seam, "slide ")
+        st, out = probe_json(server, rcon, "deeptime probe dh")
+        level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
+        steps.check("dh slide: Distant Horizons asked the override for the slide's sections", "> 0 more",
+                    level.get("sections", 0) - before, level.get("sections", 0) > before)
+        steps.check("dh slide: no section failed", "0", level.get("failures"), level.get("failures") == 0)
+        dh_area_check(steps, server, rcon, smoke, slide - 16 * seam_side, lz - 80, seam_side, "slide west ", "dh-check-slide-west.json", st)
+        dh_area_check(steps, server, rcon, smoke, slide, lz - 80, seam_side, "slide east ", "dh-check-slide-east.json", st)
+
     for detail in (0, 3, 6):
         b, out = probe_json(server, rcon, f"deeptime probe far bench {cx} {cz} {detail} 64", wait=2.0)
         if b and "ms_per_section" in b:
@@ -597,8 +628,17 @@ def region_chunks(path):
     return sum(1 for i in range(1024) if struct.unpack_from(">I", header, 4 * i)[0] != 0)
 
 
+def region_span(period):
+    """The region columns (rx) that hold Toroidal World's lap x in [-P/2, P/2): (lowest, highest).
+    A period that is not a multiple of 1,024 (26,112 on a 32k Petroff-Guyou world) ends the lap
+    inside a region, which then holds both ends."""
+    half = period // 2
+    return (-half) // 512, (half - 1) // 512
+
+
 def region_span_check(world, circumference):
-    """Every region file that stores a chunk must satisfy -C/1024 <= rx < C/1024 (plan §9.5).
+    """Every region file that stores a chunk must lie in the lap's region columns (plan §9.5; the
+    period P from the generator, cube plan T5): -P/1024 <= rx < P/1024 when P is a multiple of 1,024.
 
     Checked in region/, entities/ and poi/. Vanilla creates an empty .mca whenever it opens a
     region file for a read (structure checks, "is this chunk generated" lookups), and on a wrapped
@@ -607,7 +647,7 @@ def region_span_check(world, circumference):
     is recorded, not counted. Returns (files with chunks, of them outside the span, empty files
     outside the span).
     """
-    half = circumference // 1024
+    rlo, rhi = region_span(circumference)
     outside, empty_outside, total = [], [], 0
     for sub in ("region", "entities", "poi"):
         d = os.path.join(world, sub)
@@ -617,7 +657,7 @@ def region_span_check(world, circumference):
             m = re.match(r"r\.(-?\d+)\.(-?\d+)\.mca$", f)
             if not m:
                 continue
-            inside = -half <= int(m.group(1)) < half
+            inside = rlo <= int(m.group(1)) <= rhi
             if region_chunks(os.path.join(d, f)) == 0:
                 if not inside:
                     empty_outside.append(f"{sub}/{f}")
@@ -939,6 +979,7 @@ def main():
     props = re.sub(r"(?m)^level-type=.*$", "level-type=" + level_type.replace(":", "\\:"), props)
     open(props_path, "w").write(props)
     is_planet = level_type.startswith("deeptime:")
+    period = install["size"]   # until the generator's own probe answers (T5)
 
     if a.fresh or a.scenario:
         import shutil
@@ -1028,6 +1069,14 @@ def main():
                 out = rcon("deeptime probe column 0 0", check=False)
                 m = PROBE.search(out)
                 steps.check("/deeptime probe column 0 0 answers", "[deeptime-probe] JSON", out[:200], m is not None)
+                # The east-west period (cube plan T5): the generator's circumference, which is the
+                # notional size only on a Lambert world (13,312 on a 16k Petroff-Guyou world, 4s =
+                # 15,360 on a 16k cube). The seam probes and the region span below use it.
+                try:
+                    period = int(json.loads(m.group(1)).get("circumference") or 0) or period if m else period
+                except ValueError:
+                    pass
+                steps.record("east-west period (blocks)", f"{period} (notional size {install['size']})")
                 # Every rock class -> its resolved blocks (P1-12), for `deeptime-inspect rock --palette`.
                 out = rcon("deeptime probe palette", check=False)
                 time.sleep(1)   # RCON may cut a long reply; the server log has the whole line
@@ -1064,7 +1113,7 @@ def main():
 
             tasks = []
             if a.chunky:
-                cx, cz = chunky_center(a.chunky_center, install["size"])
+                cx, cz = chunky_center(a.chunky_center, period)
                 steps.record("chunky square", f"centre {cx},{cz} radius {a.chunky} (x {cx - a.chunky}..{cx + a.chunky})")
                 tasks.append(("chunky pregeneration finished", cx, cz, a.chunky))
             for spec in a.chunky_at:
@@ -1076,7 +1125,7 @@ def main():
                 # centre ±(C/2 - 72) and radius 64 that is x in [C/2 - 144, C/2) and
                 # [-C/2, -C/2 + 144), z in [-64, 80): no chunk outside the canonical span
                 # (the region check below).
-                half = install["size"] // 2
+                half = period // 2
                 tasks.append(("chunky seam east finished", half - 72, 0, 64))
                 tasks.append(("chunky seam west finished", -(half - 72), 0, 64))
             finished = re.compile(r"Task finished for|Task complete")
@@ -1124,25 +1173,26 @@ def main():
             rcon("save-all flush")
             time.sleep(3)
             if is_planet:
-                total, outside, empty = region_span_check(world, install["size"])
+                total, outside, empty = region_span_check(world, period)
+                rlo, rhi = region_span(period)
                 print(f"   regions outside span: {len(outside)} (of {total} region files holding chunks; span "
-                      f"{-install['size'] // 1024} <= rx < {install['size'] // 1024}; {len(empty)} empty files outside)",
+                      f"{rlo} <= rx <= {rhi}; {len(empty)} empty files outside)",
                       flush=True)
                 steps.check("regions outside span", "0", f"{len(outside)} (of {total} region/entities/poi files holding chunks"
                             + (f": {', '.join(sorted(outside)[:8])}" if outside else "") + ")", not outside,
-                            note=f"-C/1024 <= rx < C/1024, C = {install['size']}")
+                            note=f"the regions holding x in [-P/2, P/2), P = {period}")
                 steps.record("empty region files outside the span (0 chunks, opened by lookups)",
                              f"{len(empty)}" + (f": {', '.join(sorted(empty)[:8])}" if empty else ""))
                 if a.chunky_seam or (a.chunky and a.chunky_center == "seam"):
                     # Both sides of the seam hold chunks: the last region column (rx = C/1024 - 1)
                     # and the first (rx = -C/1024).
-                    half = install["size"] // 1024
+                    rlo, rhi = region_span(period)
                     rdir = os.path.join(world, "region")
                     side = lambda rx: sum(region_chunks(os.path.join(rdir, f)) for f in os.listdir(rdir)
                                           if re.match(rf"r\.{rx}\.-?\d+\.mca$", f))
-                    east, west = side(half - 1), side(-half)
+                    east, west = side(rhi), side(rlo)
                     steps.check("chunks stored on both sides of the seam", "east > 0 and west > 0",
-                                f"east (rx={half - 1}) {east}, west (rx={-half}) {west}", east > 0 and west > 0)
+                                f"east (rx={rhi}) {east}, west (rx={rlo}) {west}", east > 0 and west > 0)
 
             steps.record("peak RSS (MB)", (server.peak_rss_kb() or 0) // 1024)
             server.stop(rcon)

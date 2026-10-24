@@ -102,7 +102,7 @@ public final class CubeFill {
     }
 
     /** The deep ocean biome among the biome source's, or null. */
-    static Holder<Biome> deepOcean(BiomeSource source) {
+    public static Holder<Biome> deepOcean(BiomeSource source) {
         for (Holder<Biome> h : source.possibleBiomes())
             if (h.is(Biomes.DEEP_OCEAN))
                 return h;
@@ -113,8 +113,8 @@ public final class CubeFill {
      * The biome a cube world's chunks hold at quart (qx, qy, qz): the biome source's on a face, the
      * partner quart's off the faces (quarts map onto quarts), deep ocean past the net's corners.
      */
-    static Holder<Biome> foldedBiome(CubeLayout cube, BiomeSource source, Climate.Sampler sampler, Holder<Biome> ocean,
-                                     int qx, int qy, int qz) {
+    public static Holder<Biome> foldedBiome(CubeLayout cube, BiomeSource source, Climate.Sampler sampler, Holder<Biome> ocean,
+                                            int qx, int qy, int qz) {
         CubeLayout.Fold f = cube.fold(4L * qx + 1, 4L * qz + 1);
         if (f instanceof CubeLayout.Outside o)
             return source.getNoiseBiome((int) Math.floorDiv(twX(cube, o.x()), 4), qy, (int) Math.floorDiv(o.z(), 4), sampler);
