@@ -30,6 +30,7 @@
 //! | `prev_omega` | each plate's rotation vector after the last step (for the next step's change) |
 //! | `belts` | one [`BeltRec`] per collision (a terrane of `collision_min_frac` or more) that ended in a transfer or weld: its belt, wedge, foredeep and slowdown |
 //! | `steps[].forces`, `slabs_km`, `breakoffs`; `prev_balance` | version 4: the force balance (below) |
+//! | `steps[].shown` | the crust that went under and the crust shown again, by cause, and what each resampling consumed and what escaped it ([`super::shown::Step`], 2026-10-24) |
 //!
 //! # The force balance (version 4)
 //! `forces.rs` sums each plate's driving and resisting forces every step and solves the torque
@@ -220,6 +221,10 @@ pub struct StepRec {
     /// The subducting boundary by slab length, convergence and contact age ([`FrontBands`]).
     #[serde(default)]
     pub front_bands: FrontBands,
+    /// The crust that went under and the crust shown again this step, by cause, and at a
+    /// resampling what it consumed and what escaped it (`shown.rs`; the front lane, 2026-10-24).
+    #[serde(default)]
+    pub shown: super::shown::Step,
 }
 
 /// One plate's force budget in a step (`forces.rs`, version 4): the size of each torque term,
@@ -1631,6 +1636,7 @@ pub fn record_step(
         forces: seen.forces.map(|f| f.forces.clone()).unwrap_or_default(),
         slabs_km: seen.forces.map(|f| f.slabs_km.clone()).unwrap_or_default(),
         breakoffs: seen.forces.map_or(0, |f| f.breakoffs),
+        shown: super::shown::take_step(st),
     });
 
     let every = (AGE_EVERY_MYR / env.dt_myr).round().max(1.0) as u64;
