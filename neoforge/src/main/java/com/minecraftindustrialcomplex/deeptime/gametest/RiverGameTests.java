@@ -517,6 +517,14 @@ public final class RiverGameTests {
      * its rare biomes fill their cells, rivers included, so its warm, wettest cell (temperature 3,
      * humidity 4) is fungal jungle over every channel. The planet of master 84fb7d7c put all 24
      * samples there.
+     *
+     * <p>A pack whose own parameter list replaces vanilla's does the same, so a sample counts as well
+     * where vanilla's own overworld list ({@code MultiNoiseBiomeSourceParameterList.Preset.OVERWORLD},
+     * whatever the pack's dimension file says) has a river or a swamp at the same climate point.
+     * Expanded Ecosphere 3.4.7 puts its sandy jungle at erosion 0.57 to 1 (E6), temperature 0.275 to
+     * 0.57 and humidity 0.3 to 1 across weirdness 0 (its {@code resources/ee_default} overworld.json,
+     * read 2026-10-24), in vanilla's mangrove swamp slot. The planet of master 25941ca5 put 5 of its
+     * 11 samples there.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 600)
     public static void riverBiomes(GameTestHelper helper) {
@@ -530,9 +538,14 @@ public final class RiverGameTests {
         var sampler = level.getChunkSource().randomState().sampler();
         var g = level.getChunkSource().getGenerator();
         boolean regions = net.neoforged.fml.ModList.get().isLoaded("terrablender");
-        int sampled = 0, river = 0, swamp = 0, painted = 0;
+        // Vanilla's own overworld list, whatever list the pack's dimension file gives the level.
+        var vanillaList = net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterList.knownPresets()
+                .get(net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterList.Preset.OVERWORLD);
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        int sampled = 0, river = 0, swamp = 0, painted = 0, packOwn = 0;
         StringBuilder seen = new StringBuilder();
         java.util.Map<String, Integer> byRegion = new java.util.TreeMap<>();
+        java.util.Map<String, Integer> byPack = new java.util.TreeMap<>();
         for (int i = 0; i < r.vertexCount() && sampled < 200; i += 3) {
             int x = Math.round(r.vertexX(i)), z = Math.round(r.vertexZ(i));
             // At sea level the channel is the river's mouth, over the sea's own biomes.
@@ -557,21 +570,35 @@ public final class RiverGameTests {
                 }
             }
             int v = valley(b);
-            if (v == 1)
+            if (v == 1) {
                 river++;
-            else if (v == 2)
+                continue;
+            }
+            if (v == 2) {
                 swamp++;
-            else if (seen.length() < 400)
+                continue;
+            }
+            // The pack's own list may give vanilla's valley slot a biome of its own (Expanded Ecosphere's sandy jungle
+            // on the flattest, wettest warm ground): the slice reached the channel and the pack chose what grows on it.
+            var vanilla = biomes.getHolderOrThrow(vanillaList.findValue(
+                    sampler.sample(QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z))));
+            if (valley(vanilla) > 0) {
+                packOwn++;
+                byPack.merge(b.getRegisteredName() + " for " + vanilla.getRegisteredName(), 1, Integer::sum);
+                continue;
+            }
+            if (seen.length() < 400)
                 seen.append(' ').append(b.getRegisteredName()).append(region >= 0 ? "@" + region : "")
                         .append('(').append(x).append(',').append(z).append(')');
         }
-        DeepTime.LOGGER.info("[gametest] riverBiomes sampled={} river={} swamp={} paintedByRegion={} share={} byRegion={} others:{}", sampled,
-                river, swamp, painted, sampled == 0 ? "n/a" : String.format("%.3f", (river + swamp + painted) / (double) sampled),
-                byRegion, seen);
+        DeepTime.LOGGER.info("[gametest] riverBiomes sampled={} river={} swamp={} paintedByRegion={} packOwn={} share={} byRegion={} byPack={}"
+                + " others:{}", sampled, river, swamp, painted, packOwn,
+                sampled == 0 ? "n/a" : String.format("%.3f", (river + swamp + painted + packOwn) / (double) sampled), byRegion, byPack, seen);
         if (sampled > 0)
-            helper.assertTrue(river + swamp + painted >= sampled / 2, "only " + river + " river and " + swamp + " swamp of " + sampled
-                    + " wide-channel samples (" + painted + " more where a TerraBlender region paints the valley slice):"
-                    + " the valley slice is not reaching the channels");
+            helper.assertTrue(river + swamp + painted + packOwn >= sampled / 2, "only " + river + " river and " + swamp + " swamp of " + sampled
+                    + " wide-channel samples (" + painted + " more where a TerraBlender region paints the valley slice, " + packOwn
+                    + " where the pack's own list puts its own biome in vanilla's river or swamp slot): the valley slice is not reaching"
+                    + " the channels");
         helper.succeed();
     }
 
