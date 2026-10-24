@@ -718,8 +718,13 @@ section 7.4 is deleted yet.
   the dedicated-server first start on the cube is G6's 16k smoke run), G12's opt-in part (a cube
   level type takes every built-in preset of its size and bakes it as a cube: `Presets.withProjection`,
   `FirstStartGenerator.presetsFor`, the `server.json` template, `install.sh --cube`; the 16k smoke's
-  first start bakes `earthlike_quick_16k` on `deeptime:planet_cube`).
-- Left: the rest of G13 and G14, G16, the Sable border, and section 7.4 with what waits for it: G12's
+  first start bakes `earthlike_quick_16k` on `deeptime:planet_cube`), G13's globe and review (a
+  finished cube run's globe draws the cube's twelve edges, the border's six apart, and its eight
+  corners, the four a player can reach apart, `screen/model/CubeOutline`; the review's final map is
+  the net as it is played, 4 : 3, with the border's lines and the hints over the faces,
+  `screen/model/NetView`; `CubeNetViewsTest`, a cube run in `RealRunWiringTest`, the Create World
+  walk's `06d-generation-globe-cube` and `08-review` shots).
+- Left: G14, G16, the Sable border, and section 7.4 with what waits for it: G12's
   preset edits (`planet` and `planet_32k` made cubes, `planet_lambert*` deleted, the Rust presets'
   projection keys, the deposits fixtures as cubes), G13's `editor_fields.json` keys, and the
   deletions with the rewrites of the Petroff-Guyou tests they bring.
@@ -857,6 +862,10 @@ section 7.4 is deleted yet.
     widgets keep working.
   - The globe adds the cube's edges and corners. `ReviewModel`'s final-world view draws the net with
     the border.
+
+  Phase 2 builds the globe and the review (coordinator's call, 2026-10-23: G13's editor follows
+  G12's rule). The cube's turn is chosen on the final land when the world data is baked, so the
+  globe draws the edges once the run is done. The `editor_fields.json` edits wait for section 7.4.
 
   Check: `EditorModelGameTests`; the Create World walk on the VM (`tools/client/vm-client.sh`) with
   screenshots of the globe and the final world.
