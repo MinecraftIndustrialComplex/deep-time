@@ -6313,9 +6313,11 @@ sources go) 0.36 by extension plus the arcs' against about 0.51. What is off:
   (`forearc` takes volume only; continental crust never turns oceanic, `c2o` 0 in every
   process): about 0.06 km2 a year on Earth, none here. This is missing physics, the trench's
   retreat.
-- The collision fronts consume 0.251 km2 a year under T (the area crossing them; dock-c3
-  0.585), against Bird's 0.43 for today and about half of it for a long-term suturing length.
-  Base3's was above Earth's; T's is near the long-term.
+- The collisions consume 0.30 km2 a year under T (the book's two sinks, all of them at
+  collision fronts, since nothing else consumes continental area; the area crossing the fronts
+  is 0.251 on the lattice front, about 0.14 on the geodesic one; dock-c3 0.585 on the lattice
+  front), against Bird's 0.43 for today and about half of it for a long-term suturing length.
+  Base3's was above Earth's; T's is between the two.
 - The arcs' maturing makes 0.26 km2 a year on fronts twice Earth's length, and extension
   (collapse and the rate part, 0.10) makes less than Bird's CRB. The first is gap 2's again.
 
