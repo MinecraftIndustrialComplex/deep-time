@@ -180,10 +180,11 @@ public final class FanGameTests {
      *
      * <p>The surface at a column is the column rule's (FORMAT.md, "the hit is the covering segment
      * with the lowest w"), not the thread's surface at the point walked: on a fan, falling 0.1 a block,
-     * the round end of the next segment down covers a centre column with water up to a third of a
-     * block lower, so a column whose surface lies just over a whole block holds its top block one
-     * lower than the walked point's (the first run of this test, on master 1e27a44f, asked for that
-     * one and failed 119 of 144 columns that the rule had drawn right).
+     * the round end of the next segment down covers a centre column with water a few tenths of a
+     * block lower (0.31 at (-184, 13): w 82.84 against the walked point's 83.15), so a column whose
+     * surface lies just over a whole block holds its top block one lower than the walked point's
+     * (the first run of this test, on master 1e27a44f, asked for that one and failed 119 of 144
+     * columns, the one it named drawn as the rule says).
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void threadsHoldWaterAroundDryIslands(GameTestHelper helper) {
