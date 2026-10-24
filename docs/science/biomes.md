@@ -549,7 +549,7 @@ columns, `tools/review/terralith_emulate.py`):
 |---|---|---|
 | Am (monsoon forest) | humidity band 4.05 and up | Terralith's jungles sit in the wettest band; band 3 is its brushland and shrubland |
 | Csa, Csb, Csc (Mediterranean) | humidity squeezed into 0.1 … 0.6; erosion held to 0.38 and below (since 2026-10-23) | Terralith's shrubland, a dry scrub, is the driest part of the dry band (humidity below −0.585); plains and its alpine highlands are above. Near the coast its erosion slot 0.40 to 0.565 is windswept savanna and savanna badlands at every dry humidity, and its shrublands end at 0.40; MIC's climate mapping turns 0.38 into 0.30 |
-| BSk (cold steppe) | the same dry humidity, erosion held to 0.12 … 0.4 | Terralith's steppe needs erosion 0.05 to 0.40 in the pack's own units; MIC's climate mapping (Tectonic's router) turns 0.12 … 0.4 into about 0.12 … 0.33 |
+| BSk (cold steppe) | the same dry humidity, erosion held to 0.12 … 0.38 (0.4 until 2026-10-23) | Terralith's steppe needs erosion 0.05 to 0.40 in the pack's own units; MIC's climate mapping (Tectonic's router) turns 0.12 … 0.38 into about 0.11 … 0.30; the top is under 0.40 by Cs's margin, since 0.4 would tie the steppe's edge where a pack's mapping is the identity |
 | ET (tundra) | the positive branch of the variant noise | in the frozen band's humidity band 1 the negative branch is vanilla's snowy plains, the positive Terralith's gravel desert (and frozen peaks, not jagged ones). Holding ET's humidity at 1.5, the survey's proposal, was measured and changed nothing: most ET is in band 1 already |
 | Cfb, Cwb, Cfc, Cwc below 25° latitude, above 1,000 m, P/PET above 1 | rule `cloud_forest`: the cold band, humidity 3.05 and up, erosion 0.62 and up, far inland | Terralith's cloud forest has one slot: cold band, humid, the swamp band's erosion, far inland |
 
@@ -684,9 +684,9 @@ land lay there. On master 378a0af3 Cs on shrubland and steppe read 38 of 96 colu
 windswept savanna on 56 and savanna badlands on 2, and 44 % of Csa's columns were windswept savanna. The numbers
 were the same on 2fde68f7 and with the deltas off, so stage 1b of the deltas did not move it. Holding Cs to
 erosion 0.38 and below (reference units) puts it in the shrublands' slots. MIC's climate mapping (Tectonic's router)
-turns 0.38 into 0.30, and Terralith's 0.40 edge is reference 0.425 there. The limit is 0.38, not BSk's 0.4, to keep
+turns 0.38 into 0.30, and Terralith's 0.40 edge is reference 0.425 there. The limit is 0.38, not 0.4, to keep
 a margin where a pack's mapping is the identity (Terralith without Tectonic's router), because 0.4 would tie the two
-slots there. The same 378a0af3 planet then reads 98 of 99 (0.99), with Csa 86 % shrubland and Csb's windswept
+slots there; BSk's top, 0.4 until then, was lowered to 0.38 for the same reason (BIO-142). The same 378a0af3 planet then reads 98 of 99 (0.99), with Csa 86 % shrubland and Csb's windswept
 savanna gone (8 % before). On master 4ab29084 (V1 gap 2 on, which moved the test planet again: Csa 934 columns instead of
 151, Csb 178 instead of 98) Cs read 277 of 298 (0.93) without the limit and the same with it. The limit took the 6 windswept savanna columns off the
 class border with the sea. Oceanic land (Cfb) keeps windswept savanna in that slot (14 % of the 378a0af3 planet's
