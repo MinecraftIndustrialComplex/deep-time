@@ -31,6 +31,32 @@
         {"key": "excess_cont", "key2": "excess_ocean", "label": "E with continental share 0.3 or more / less", "target": null, "digits": 3, "pair": true},
         {"key": "excess_slow", "key2": "excess_fast", "label": "E under / over 20 mm/yr", "target": null, "digits": 3, "pair": true}
       ]
+    },
+    "boundgeom": {
+      "version": 1,
+      "doc": "the boundary's pieces between triple junctions, their tortuosity, the plates' perimeters against spherical caps, the subduction front's runs and the plates' fragments, measured with Bird 2003's divider walks at 77 and 380 km on the visible samples' Delaunay triangulation; needs the crust budget's maps (+DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps). The labels give PB2002 rasterised on the same 100,000-point lattice and put through the same code (build/front/bird_raster.py), then Bird's own divider numbers; definitions in measure_boundgeom.py (ledger PLT-531)",
+      "command": ["{py}", "-I", "{tools}/measure_boundgeom.py", "{run}"],
+      "python": "numpy",
+      "needs": ["rec"],
+      "columns": [
+        {"key": "plates", "label": "plates (PB2002 52)", "target": null, "digits": 1},
+        {"key": "bnd_l77", "key2": "bnd_l380", "label": "boundary at 77 / 380 km, km (PB2002 on the lattice 273,631 / 236,679; Bird 246,541 / 231,009)", "target": null, "digits": 0, "pair": true},
+        {"key": "e_l77", "key2": "e_l380", "label": "perimeters over cap perimeters at 77 / 380 km (lattice 1.578 / 1.365; Bird 1.418 / 1.274)", "target": null, "digits": 3, "pair": true},
+        {"key": "ppcap_aw_l380", "label": "P / P_cap at 380 km, area-weighted (lattice 1.396; Bird 1.324)", "target": null, "digits": 3},
+        {"key": "junctions", "key2": "junctions_euler", "label": "triple junctions / 2(N-2) (lattice 98 / 100; Bird 100)", "target": null, "digits": 1, "pair": true},
+        {"key": "pieces", "key2": "loops", "label": "pieces / closed loops (lattice 147 / 1; Bird 150 / 0)", "target": null, "digits": 1, "pair": true},
+        {"key": "stub_share", "key2": "loop_share", "label": "pieces with ends under 77 km apart / loops' share of the boundary (lattice 0.020 / 0.031)", "target": null, "digits": 3, "pair": true},
+        {"key": "piece_p50_l77", "key2": "piece_wmean_l77", "label": "piece length at 77 km: median / length-weighted, km (lattice 1,000 / 4,498; Bird 899 / 1,644)", "target": null, "digits": 0, "pair": true},
+        {"key": "tau_sum_l77", "key2": "tau_sum_l380", "label": "tortuosity, sum of lengths over sum of chords, 77 / 380 km (lattice 1.323 / 1.151; Bird 1.220 / 1.143)", "target": null, "digits": 3, "pair": true},
+        {"key": "tau_wmean_l77", "key2": "tau_wmean_l380", "label": "tortuosity, length-weighted mean, 77 / 380 km (lattice 1.400 / 1.212; Bird 1.290 / 1.205)", "target": null, "digits": 3, "pair": true},
+        {"key": "tau_front_sum_l77", "key2": "tau_front_sum_l380", "label": "tortuosity of mostly-front pieces, 77 / 380 km (lattice 1.199 / 1.100; Bird SUB 1.145 / 1.110)", "target": null, "digits": 3, "pair": true},
+        {"key": "tau_div_sum_l77", "key2": "tau_other_sum_l77", "label": "tortuosity at 77 km, mostly divergent / the rest (lattice 1.388 / 1.319)", "target": null, "digits": 3, "pair": true},
+        {"key": "share_front", "key2": "share_div", "label": "share of the boundary in mostly-front / mostly-divergent pieces (lattice 0.198 / 0.461)", "target": null, "digits": 3, "pair": true},
+        {"key": "front_l77", "key2": "front_l380", "label": "subduction front at 77 / 380 km, km (lattice 52,564 / 48,406; Bird SUB 51,310)", "target": null, "digits": 0, "pair": true},
+        {"key": "arcfront_l77", "label": "front under oceanic overriding crust at 77 km, km (Stern & Scholl 14,500 of island arc)", "target": null, "digits": 0},
+        {"key": "comps_per_plate", "key2": "frag_samples", "label": "connected pieces per plate / samples outside their plate's largest (PB2002 1 / 0)", "target": null, "digits": 3, "pair": true},
+        {"key": "e_l380_first", "key2": "e_l380_last", "label": "perimeters over cap perimeters at 380 km, first / last snapshot", "target": null, "digits": 3, "pair": true}
+      ]
     }
   }
 }
