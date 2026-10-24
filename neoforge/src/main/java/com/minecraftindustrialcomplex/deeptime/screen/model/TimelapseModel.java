@@ -94,6 +94,8 @@ public final class TimelapseModel {
     private State state = State.RUNNING;
     private String failure;
     private String manifestJson;
+    /** A cube world's edges and corners, read from the finished run's world data (null before, or not a cube). */
+    private volatile CubeOutline cubeOutline;
     private final java.util.concurrent.atomic.AtomicBoolean cleanedUp = new java.util.concurrent.atomic.AtomicBoolean();
 
     // The ring: guarded by `ring`.
@@ -111,7 +113,7 @@ public final class TimelapseModel {
     /**
      * @param stageNames the preset's stage names in order (from its estimate), for the progress line
      * @param loader     decodes frames (a background thread in the game, direct in tests)
-     * @param io         deletes the staging folder of a cancelled or failed run
+     * @param io         deletes the staging folder of a cancelled or failed run, and reads a finished cube world's outline
      */
     public TimelapseModel(RunHandle run, String stagingId, String presetJson, int circumference, List<String> stageNames,
             Executor loader, Executor io) {
@@ -180,6 +182,11 @@ public final class TimelapseModel {
         return Optional.ofNullable(manifestJson);
     }
 
+    /** A finished cube world's edges and corners ({@link CubeOutline}, cube plan G13); empty before, and on the polar worlds. */
+    public Optional<CubeOutline> cubeOutline() {
+        return Optional.ofNullable(cubeOutline);
+    }
+
     public SimSession.Progress progress() {
         return progress;
     }
@@ -216,6 +223,8 @@ public final class TimelapseModel {
                 manifestJson = run.completion().join();
                 state = State.DONE;
                 progress = run.progress();
+                // The cube's turn is chosen when the world data is baked: its edges are known now.
+                io.execute(() -> cubeOutline = CubeOutline.read(run.outDir()).orElse(null));
             } catch (CompletionException | java.util.concurrent.CancellationException e) {
                 Throwable cause = e.getCause() == null ? e : e.getCause();
                 if (cause instanceof CancelledException || e instanceof java.util.concurrent.CancellationException) {

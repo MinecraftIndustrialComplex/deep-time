@@ -19,7 +19,8 @@ import java.util.function.DoubleBinaryOperator;
  * surface like any lake, and its dry ground as the lowest land, the ramp's colour at sea level.
  * Only the sampling grid
  * differs: block space, one sample at each pixel's centre, rather than the review map's
- * latitude/longitude picture.
+ * latitude/longitude picture. On a cube the pixels off the six faces (the void of the net's window)
+ * are transparent ({@link #maskVoid}).
  */
 public final class BaseImage {
 
@@ -45,9 +46,12 @@ public final class BaseImage {
     public static int[] render(MapFrame f, WorldProjection p, DoubleBinaryOperator height, DoubleBinaryOperator water,
                                DoubleBinaryOperator closed, double seaLevel, Ramps.Ramp land, Ramps.Ramp lake) {
         int[] px = new int[f.w() * f.h()];
+        boolean cube = PlanetGeometry.cube(p) != null;
         for (int j = 0; j < f.h(); j++) {
             double z = f.blockZ(j + 0.5);
             for (int i = 0; i < f.w(); i++) {
+                if (cube && !PlanetGeometry.onPlanet(p, f.blockX(i + 0.5), z))
+                    continue;
                 double[] c = p.canonical(f.blockX(i + 0.5), z);
                 double h = height.applyAsDouble(c[0], c[1]);
                 double wl = water.applyAsDouble(c[0], c[1]);
@@ -61,6 +65,24 @@ public final class BaseImage {
             }
         }
         return px;
+    }
+
+    /**
+     * Clears, in place, the pixels of a block-space image of a cube world whose centres lie off the
+     * six faces (the void of the net's window, which the satellite's natives draw as the copies the
+     * fold brings in), so the map shows the net as it is played; nothing on a polar world. Returns
+     * the image.
+     */
+    public static int[] maskVoid(int[] abgr, MapFrame f, WorldProjection p) {
+        if (PlanetGeometry.cube(p) == null)
+            return abgr;
+        for (int j = 0; j < f.h(); j++) {
+            double z = f.blockZ(j + 0.5);
+            for (int i = 0; i < f.w(); i++)
+                if (!PlanetGeometry.onPlanet(p, f.blockX(i + 0.5), z))
+                    abgr[j * f.w() + i] = 0;
+        }
+        return abgr;
     }
 
     /**

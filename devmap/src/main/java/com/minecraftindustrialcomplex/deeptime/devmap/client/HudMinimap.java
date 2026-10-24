@@ -18,7 +18,8 @@ import net.minecraft.client.gui.GuiGraphics;
  * around the player in the dev map's picture (satellite by default, the choice made with S on the
  * map screen), with the graticule, the seam, the edges, the poles and the players, and the
  * player's latitude and longitude under it. Top right, or bottom right while F3 is open so it does
- * not cover the debug text. Hidden while the dev map screen is open.
+ * not cover the debug text. Hidden while the dev map screen is open. On a cube the seam is the slide
+ * and the edges are the border's segments, as on the map screen.
  */
 final class HudMinimap {
 
@@ -52,7 +53,9 @@ final class HudMinimap {
         g.fill(left - 1, top - 1, left + size + 1, bottom + 1, 0xFF000000);
         g.enableScissor(left, top, left + size, bottom);
         Draw.rect(g, left, top, left + size, bottom, 0xFF101418);
-        int k0 = v.firstCopy(-P / 2, P / 2) - 1, k1 = v.lastCopy(-P / 2, P / 2) + 1;
+        double w0 = PlanetGeometry.west(p);
+        boolean cube = PlanetGeometry.cube(p) != null;
+        int k0 = v.firstCopy(w0, w0 + P) - 1, k1 = v.lastCopy(w0, w0 + P) + 1;
         if (MapTextures.map(c.image())) {
             MapFrame f = c.image().frame();
             for (int k = k0; k <= k1; k++) {
@@ -63,7 +66,8 @@ final class HudMinimap {
             }
         } else {
             for (int k = k0; k <= k1; k++)
-                Draw.rect(g, v.screenX(-P / 2 + k * P), v.screenY(zMin), v.screenX(P / 2 + k * P), v.screenY(zMax), 0xFF2A4A6A);
+                for (double[] q : PlanetGeometry.pieces(p))
+                    Draw.rect(g, v.screenX(q[0] + k * P), v.screenY(q[1]), v.screenX(q[2] + k * P), v.screenY(q[3]), 0xFF2A4A6A);
         }
         double l = left - 4, r = left + size + 4, t = top - 4, b = bottom + 4;
         for (Graticule.Line line : c.graticule()) {
@@ -81,15 +85,28 @@ final class HudMinimap {
             }
         }
         for (int k = k0; k <= k1; k++) {
-            double sx = v.screenX(P / 2 + k * P);
-            if (sx >= l && sx <= r)
-                Draw.dashed(g, sx, Math.max(t, v.screenY(zMin)), sx, Math.min(b, v.screenY(zMax)), 2 * px, 3, DevMapScreen.SEAM);
+            if (cube) {
+                PlanetGeometry.Polyline slide = PlanetGeometry.slide(p);
+                double sx = v.screenX(slide.xs()[0] + k * P);
+                if (sx >= l && sx <= r)
+                    Draw.dashed(g, sx, Math.max(t, v.screenY(slide.zs()[0])), sx, Math.min(b, v.screenY(slide.zs()[1])), 2 * px, 3, DevMapScreen.SEAM);
+                for (PlanetGeometry.Polyline e : PlanetGeometry.borderOutline(p, 0.0)) {
+                    double[] xs = e.xs(), zs = e.zs();
+                    for (int i = 1; i < xs.length; i++)
+                        Draw.line(g, v.screenX(xs[i - 1] + k * P), v.screenY(zs[i - 1]), v.screenX(xs[i] + k * P), v.screenY(zs[i]), 2 * px,
+                                DevMapScreen.EDGE);
+                }
+            } else {
+                double sx = v.screenX(P / 2 + k * P);
+                if (sx >= l && sx <= r)
+                    Draw.dashed(g, sx, Math.max(t, v.screenY(zMin)), sx, Math.min(b, v.screenY(zMax)), 2 * px, 3, DevMapScreen.SEAM);
+            }
             for (PlanetGeometry.Pole pole : PlanetGeometry.poles(p))
                 if (!pole.line())
                     for (double[] im : pole.images())
                         Draw.ring(g, v.screenX(im[0] + k * P), v.screenY(im[1]), 4, 2 * px, DevMapScreen.POLE);
         }
-        for (double ze : new double[]{zMin, zMax}) {
+        for (double ze : cube ? new double[0] : new double[]{zMin, zMax}) {
             double sy = v.screenY(ze);
             if (sy >= t && sy <= b)
                 Draw.line(g, left, sy, left + size, sy, 2 * px, DevMapScreen.EDGE);
@@ -98,7 +115,7 @@ final class HudMinimap {
         for (PlayersPayload.Entry e : DevMapState.players(c.dimension())) {
             if (e.name().equals(self))
                 continue;
-            double dx = p.wrapX(e.x() - mc.player.getX());
+            double dx = PlanetGeometry.wrapCentred(p, e.x() - mc.player.getX());
             double yaw = Math.toRadians(e.yaw());
             Draw.arrow(g, v.screenX(mc.player.getX() + dx), v.screenY(e.z()), -Math.sin(yaw), Math.cos(yaw), 4, DevMapScreen.OTHER, DevMapScreen.OUTLINE);
         }
@@ -108,8 +125,11 @@ final class HudMinimap {
         g.disableScissor();
         double[] ll = PlanetGeometry.displayLatLon(p, mc.player.getX(), mc.player.getZ());
         String s1 = PlanetGeometry.formatLatLon(ll[0], ll[1]);
-        String s2 = String.format(java.util.Locale.ROOT, "seam %.0f  pole %.0f", PlanetGeometry.seamDistance(p, mc.player.getX()),
-                PlanetGeometry.nearestPole(p, mc.player.getX(), mc.player.getZ()).blocks());
+        String s2 = cube
+                ? String.format(java.util.Locale.ROOT, "%s  slide %.0f  border %.0f", PlanetGeometry.faceName(p, mc.player.getX(), mc.player.getZ()),
+                        PlanetGeometry.seamDistance(p, mc.player.getX(), mc.player.getZ()), PlanetGeometry.edgeDistance(p, mc.player.getX(), mc.player.getZ()))
+                : String.format(java.util.Locale.ROOT, "seam %.0f  pole %.0f", PlanetGeometry.seamDistance(p, mc.player.getX(), mc.player.getZ()),
+                        PlanetGeometry.nearestPole(p, mc.player.getX(), mc.player.getZ()).blocks());
         g.fill(left - 1, bottom + 1, left + size + 1, bottom + 21, 0xA0000000);
         g.drawString(font, shorten(font, s1, size), left + 1, bottom + 2, 0xFFE0E0E0, false);
         g.drawString(font, shorten(font, s2, size), left + 1, bottom + 11, 0xFFA0A0A0, false);

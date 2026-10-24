@@ -144,6 +144,45 @@ the game uses them:
     `config/deeptime/server.json`. If the preset's size does not match the level type, the first
     start stops with the presets that fit. The other level types still need a preset of their own
     map.
+12. **The Create World screen** (`screen/model/CubeOutline`, `screen/model/NetView`, cube plan G13).
+    The timelapse's pictures stay the simulation's latitude-longitude pictures, so the map and the
+    globe work as on the other worlds while the planet's history runs. The cube is turned on the
+    planet when the world data is baked, on the final land, so a cube world's edges are known only
+    when the run is done. From then on the globe draws the cube's twelve edges over the planet. The
+    six edges the border closes are thick orange-red lines, and the other six (five joined in the
+    net, and the slide) are thin white ones. Each edge is sampled 48 times along its face side
+    through the world's own map, so the line is where the world's faces meet. The eight corners
+    are dots: white for the four touching F0, which a player can reach, and orange-red for the four
+    behind the border. The review page's final map is the net as it is played: the window of 4s by
+    3s blocks drawn 4 : 3, 512 by 384 pixels (8 blocks a pixel at 4k), north (-z) up. The faces
+    carry the world data's elevation, the void around N and S is transparent, and the border's
+    twelve lines are drawn over it with the five joined face sides. The ore-province hints keep
+    their latitude-longitude cells and are painted over the faces. The spawn marker sits at its
+    point on its face, and hovering shows the latitude, longitude and face. The editor keeps its
+    `projection` and `lambda_c_deg` fields until section 7.4.
+13. **The developer map** (`devmap/`, never shipped; `devmap/model/PlanetGeometry`, cube plan G14).
+    The dev map reads a cube world as its net. Its picture is the window of 4s by 3s blocks from
+    x = -3s/2, and the void around N and S is transparent and cannot be clicked: the server clears
+    the void in the satellite picture after the natives draw it, and the elevation picture skips
+    it. The natives (`deeptime-tiles`, the workbench's renderer) read a cube world's layers, stored
+    as six face planes, as the net window's flat raster: each net cell is its face's cell, a void
+    cell the cell under the fold of its centre, x wrapping with the period 4s; read as one flat
+    raster from F0's corner, S showed F1's plane and F2 F1's east column. The seam is the slide
+    (x = -3s/2, the same line as 5s/2, for |z| up to s/2), dashed. The edges are the border's 12
+    segments, drawn as one outline with the border's inset dashed inside it, and the five face sides
+    the net joins are faint dashed lines. The two poles are single points inside N and S. The cone points are the eight corners at their twelve images in the window: a
+    cross in the cone colour on the four corners of F0, which a player can stand on, and in
+    orange-red on the four the border keeps a player off. The readout names the face and gives the
+    distance to the slide and to the nearest border segment; the minimap's second line reads
+    `F0  slide N  border N`. Distances and the player markers wrap x in Toroidal World's frame
+    (-2s to 2s), not the window, so a delta across the slide is short. The graticule is cut only
+    where a line crosses a turning seam (two faces the net does not join); across the slide and
+    the five joined sides it runs on. A teleport by right-click lands at the nearest point at
+    least the border's inset and the edge margin inside the segments (`CubeBorder.nearest`), never
+    on a copy in the void. The globe draws the cube's outline as the Create World screen does
+    (item 12). The shot driver's places on a cube: the spawn, 25 blocks onto F3 from the slide,
+    40 blocks inside N's east segment (a quarter-turn seam's border), the north pole, beside F0's
+    north-east corner and 40 blocks under the F1, F2 and N corner.
 
 ## Equations and constants
 
@@ -223,6 +262,8 @@ Java give the same pinned values. The seam steps it gives the bake are on the ba
   scale σ varies across a face the noise's texture is stretched with it on the planet, as the
   plain noise's is on the other projections; in blocks it is the same everywhere.
 - Sable ships are not stopped by the cube border yet.
+- The timelapse cannot show the cube's edges while the run is going: the cube's turn is chosen on
+  the final land when the world data is baked.
 
 ## Game choices
 
