@@ -242,7 +242,7 @@ class DeepTimePlanetContractTest {
             assertEquals(0.0, pl.distanceMetres(x, z, x, z), 0.0);
             // The canonical position: in the window, the same point, a fixed point.
             BlockXZ cc = c.get();
-            assertEquals(cc.x(), p.wrapX(cc.x()), "canonical x is in the window");
+            assertTrue(cc.x() >= x0 && cc.x() < x0 + per, "canonical x is in the window: " + cc);
             assertTrue(cc.z() >= zLo && cc.z() <= zHi, "canonical z in range: " + cc);
             double d = pl.distanceMetres(x, z, cc.x(), cc.z());
             assertTrue(d < 1e-6 * w.m(), "the canonical position shows the same point: " + d + " m");
@@ -338,7 +338,7 @@ class DeepTimePlanetContractTest {
         ProjectionPlanet pl = w.planet();
         WorldProjection p = w.p();
         boolean conformal = p instanceof WorldProjection.Cube || p instanceof WorldProjection.Lambert;
-        double rM = w.r(), degPerM = Math.toDegrees(1.0 / rM), h = 0.5;
+        double rM = w.r(), degPerM = Math.toDegrees(1.0 / rM), h = 0.5, hb = 1.0;
         SplittableRandom rnd = new SplittableRandom(19);
         int n = 3000, tested = 0, kinked = 0, nearSingular = 0, polar = 0;
         double worstStep = 0, worstBearing = 0, worstArea = 0, worstEast = 0, worstNorth = 0, worstLon = 0, worstGrad = 0, worstGradNorth = 0;
@@ -386,7 +386,7 @@ class DeepTimePlanetContractTest {
                 double dx = Math.cos(k * Math.PI / 4 + 0.1), dz = Math.sin(k * Math.PI / 4 + 0.1);
                 double dist = pl.distanceMetres(x - dx / 2, z - dz / 2, x + dx / 2, z + dz / 2);
                 worstStep = Math.max(worstStep, Math.abs(f.metresOfStep(dx, dz) / dist - 1.0));
-                double fwd = pl.initialBearingDeg(x, z, x + h * dx, z + h * dz), bwd = pl.initialBearingDeg(x, z, x - h * dx, z - h * dz) - 180.0;
+                double fwd = pl.initialBearingDeg(x, z, x + hb * dx, z + hb * dz), bwd = pl.initialBearingDeg(x, z, x - hb * dx, z - hb * dz) - 180.0;
                 double mean = fwd + signedTurn(bwd, fwd) / 2.0;
                 worstBearing = Math.max(worstBearing, turnDiff(mean, f.bearingOfStep(dx, dz)));
                 BlockXZ back = f.step(f.bearingOfStep(dx, dz), f.metresOfStep(dx, dz));
@@ -421,7 +421,8 @@ class DeepTimePlanetContractTest {
                 tested, kinked, worstKinkedStep, nearSingular, polar, worstStep, worstBearing, worstArea, worstEast, worstNorth, worstLon, worstGrad, worstGradNorth);
         assertTrue(tested > n / 2, "smooth points tested " + tested + " of " + n);
         assertTrue(worstStep < TOL, "short steps' length against the distance call: " + worstStep);
-        assertTrue(worstBearing < 1e-3, "short steps' bearing against the initial bearing: " + worstBearing + " deg");
+        // (The maps' unit vectors carry ~1e-8 of numerical noise, which a bearing over a block magnifies to ~1e-3 deg.)
+        assertTrue(worstBearing < 5e-3, "short steps' bearing against the initial bearing: " + worstBearing + " deg");
         assertTrue(worstArea < TOL, "a block's area: " + worstArea);
         assertTrue(worstEast < TOL, "a step east keeps the latitude: " + worstEast);
         assertTrue(worstNorth < TOL, "a step north raises it by its metres over R: " + worstNorth);
@@ -523,9 +524,12 @@ class DeepTimePlanetContractTest {
                 BlockXZ there = pl.destination(c.xo(), c.zo(), pl.initialBearingDeg(c.xo(), c.zo(), fp[0], fp[1]), dout).orElseThrow();
                 assertTrue(pl.distanceMetres(there.x(), there.z(), fp[0], fp[1]) < 1e-3 * w.m(), "destination from past the seam lands at " + c);
             }
-            double[] j = jumps.computeIfAbsent(c.seam(), k -> new double[6]);
+            double[] j = jumps.computeIfAbsent(c.seam(), k -> new double[7]);
             if (Math.abs(latIn) < w.latMax()) {   // east and north turn fast near a pole, which Petroff-Guyou's edges cross
+                // North turns across the seam (j[0]) against how it turns over the block before it (j[6]).
+                LocalFrame f2 = pl.frame(2 * c.xi() - c.xo(), 2 * c.zi() - c.zo()).orElseThrow();
                 j[0] = Math.max(j[0], turnDiff(fi.northBearingDeg(), fo.northBearingDeg()));
+                j[6] = Math.max(j[6], turnDiff(f2.northBearingDeg(), fi.northBearingDeg()));
                 j[1] = Math.max(j[1], Math.abs(fo.metresPerBlockEast() / fi.metresPerBlockEast() - 1.0));
                 j[2] = Math.max(j[2], Math.abs(fo.metresPerBlockNorth() / fi.metresPerBlockNorth() - 1.0));
             }
@@ -537,8 +541,8 @@ class DeepTimePlanetContractTest {
         boolean pg = w.p() instanceof PetroffGuyou;
         for (var e : jumps.entrySet()) {
             double[] j = e.getValue();
-            report("seam", w, "%-12s n %3.0f: frame jump north %.4f deg, metres east %.3g, north %.3g; step vs distance %.3g; destination off %.3g of the step",
-                    e.getKey(), j[5], j[0], j[1], j[2], j[3], j[4]);
+            report("seam", w, "%-12s n %3.0f: north turns %.4f deg across (%.4f over the block before), metres east %.3g, north %.3g; step vs distance %.3g; destination off %.3g of the step",
+                    e.getKey(), j[5], j[0], j[6], j[1], j[2], j[3], j[4]);
             assertTrue(j[3] < 0.05, e.getKey() + ": a block across is a block on the ground: " + j[3]);
             assertTrue(j[4] < 0.05, e.getKey() + ": the frame's step across lands past the seam: " + j[4]);
             if (!pg) {
@@ -553,9 +557,10 @@ class DeepTimePlanetContractTest {
     @MethodSource("worlds")
     void distancesRunOnRoundEveryConePointAndCorner(World w) {
         ProjectionPlanet pl = w.planet();
-        int rings = 0;
+        int rings = 0, cuts = 0;
         double worst = 0.0;
         for (double[] c : w.singularAt()) {
+            int ringCuts = 0;
             double[] centre = w.singular().get((int) c[2]);
             double r0 = 3.0;
             int k = 48;
@@ -578,17 +583,25 @@ class DeepTimePlanetContractTest {
                 if (prev != null) {
                     double d = pl.distanceMetres(prev[0], prev[1], q[0], q[1]);
                     double ref = step * Math.max(out, prevOut);
-                    worst = Math.max(worst, d / ref);
-                    assertTrue(d < 6 * ref, "neighbours on the ring round " + c[0] + ", " + c[1] + " are " + d + " m apart (ring radius " + out + " m)");
+                    assertTrue(d <= out + prevOut + 1e-9 * w.r(), "the triangle through the centre round " + c[0] + ", " + c[1]);
+                    if (d < 6 * ref) {
+                        worst = Math.max(worst, d / ref);
+                    } else {
+                        // A cut: two copies of ground from elsewhere meet here without being glued
+                        // (the cube's void squares split on the diagonal through a corner).
+                        ringCuts++;
+                    }
                 }
                 prev = q;
                 prevOut = out;
             }
             if (on > 0)
                 rings++;
+            assertTrue(ringCuts <= 1, "at most one cut round " + c[0] + ", " + c[1] + ": " + ringCuts);
+            cuts += ringCuts;
         }
         assertEquals(w.singularAt().isEmpty(), rings == 0);
-        report("rings", w, "%d rings, worst neighbour distance %.3f of the net's angle step on the ground ring", rings, worst);
+        report("rings", w, "%d rings, %d cuts, worst neighbour distance elsewhere %.3f of the net's angle step on the ground ring", rings, cuts, worst);
     }
 
     // ---- 5. long range --------------------------------------------------------------------

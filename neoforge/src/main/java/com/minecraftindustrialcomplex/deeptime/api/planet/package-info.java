@@ -55,10 +55,15 @@
  * bearings are measured as if the pole had been reached along the meridian of longitude 0.
  *
  * <p><b>Distances.</b> Metres along the great circle on the sphere, in [0, πR]. Distance, initial
- * bearing and destination are the sphere's, so they are continuous everywhere on the planet: across
- * every edge, seam, corner and wrap of the map, walking from one position to the next one block
- * away always moves a short distance. The initial bearing between two points is NaN when they are
- * the same point or antipodal (no single great circle joins them). A destination is a canonical
+ * bearing and destination are the sphere's: they depend only on the planet points, so they run on
+ * unbroken across every edge, seam, corner and wrap where the world glues one stretch of blocks to
+ * the next, and two positions a block apart across such a line are about a block apart on the
+ * ground. A world can also hold <em>cuts</em>: lines where two stretches showing ground from
+ * elsewhere meet without being glued (on the cube world, the diagonals through the squares beside
+ * its corners, where the copies past two edges meet). Positions either side of a cut show points
+ * that are not neighbours, and the calls answer their true distance, so never assume that a step of
+ * one block is short on the ground; ask. The initial bearing between two points is NaN when they
+ * are the same point or antipodal (no single great circle joins them). A destination is a canonical
  * position; a negative distance goes the opposite way.
  *
  * <p><b>The local frame.</b> {@code frame(x, z)} is the first-order link between a step in the
@@ -68,7 +73,10 @@
  * They are not always perpendicular in the block plane, and a block along one is not always as long
  * on the ground as a block along the other ({@code metresPerBlockNorth} and {@code
  * metresPerBlockEast} can differ); use {@code step} and {@code bearingOfStep} for any other
- * direction. {@code metresPerBlock} is the square root of one block's ground area. The frame is
+ * direction. North is where a short step goes due north, which is not always the direction in which
+ * latitude climbs fastest: the two agree only where the map keeps angles, though the latitude
+ * gradient is always perpendicular to east. {@code metresPerBlock} is the square root of one
+ * block's ground area. The frame is
  * exact in the limit of short steps; over long distances use the distance calls. It is empty off
  * the planet and at the isolated points or zero-area lines where the map has no derivative (a pole
  * drawn as a line, a cone point where the map folds), and it changes smoothly elsewhere except
