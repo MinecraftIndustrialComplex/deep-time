@@ -28,6 +28,17 @@ pub trait Terrain: Sync {
         None
     }
 
+    /// Whether the terrain writes a `floodplain` layer (HYD-152).
+    fn writes_floodplain(&self) -> bool {
+        false
+    }
+
+    /// The `floodplain` layer at block (x, z): the ground's move there, blocks, or `None` off the
+    /// plain. Asked only where [`Terrain::writes_floodplain`] holds.
+    fn floodplain(&self, _x: i64, _z: i64) -> Option<f64> {
+        None
+    }
+
     /// Latitude φ = asin(z/R), R = C/2π (the Lambert projection, `deeptime_format::projection`;
     /// south positive here), clamped to ±π/2 beyond the poles (`AnalyticTestTerrain.latitude`;
     /// its own formula, twinned in Java).
@@ -482,7 +493,9 @@ impl Terrain for RiverTest {
 /// down to the apex at x 0 and its share's half-width 7 and depth 5.5 below it. Two distributaries
 /// leave the river's vertex at the apex (`from` 0): chain 1 runs south-east to (64, 64) and east
 /// along z 64 to x 160, chain 2 the same to the north along z -64, half-width 7 and depth 5.5, their
-/// surface the sea's. Every number here is a test fixture's (game-choice: agent, 2026-10-23).
+/// surface the sea's. A floodplain (the `floodplain` layer, HYD-152, a move of 0) covers the river's
+/// reach on the upstream plain, x -400 to -270 and |z| up to 40, for the levee texture (HYD-153).
+/// Every number here is a test fixture's (game-choice: agent, 2026-10-23).
 pub struct DeltaTest {
     pub c: u32,
 }
@@ -512,6 +525,9 @@ impl DeltaTest {
     pub const BRANCH_Q: f64 = 200.0;
     /// Where the distributaries turn east, |z| (and x).
     pub const BRANCH_Z: f64 = 64.0;
+    /// The floodplain's east end (it starts at the river's source, x -400) and half-width in z.
+    pub const FLOODPLAIN_TO_X: f64 = -270.0;
+    pub const FLOODPLAIN_HALF_WIDTH: f64 = 40.0;
 
     fn wrap_x(&self, x: f64) -> f64 {
         let c = f64::from(self.c);
@@ -616,7 +632,8 @@ impl DeltaTest {
                 {"chain": 1, "from": 0, "turn": [Self::BRANCH_Z, Self::BRANCH_Z], "z": Self::BRANCH_Z, "to_x": Self::RIVER_TO_X},
                 {"chain": 2, "from": 0, "turn": [Self::BRANCH_Z, -Self::BRANCH_Z], "z": -Self::BRANCH_Z, "to_x": Self::RIVER_TO_X}
             ],
-            "branch": {"half_width": Self::BRANCH_HALF_WIDTH, "depth": Self::BRANCH_DEPTH}
+            "branch": {"half_width": Self::BRANCH_HALF_WIDTH, "depth": Self::BRANCH_DEPTH},
+            "floodplain": {"from_x": Self::RIVER_FROM_X, "to_x": Self::FLOODPLAIN_TO_X, "half_width": Self::FLOODPLAIN_HALF_WIDTH}
         })
     }
 }
@@ -659,6 +676,17 @@ impl Terrain for DeltaTest {
         } else {
             Self::PLAIN_Y
         }
+    }
+
+    fn writes_floodplain(&self) -> bool {
+        true
+    }
+
+    fn floodplain(&self, x: i64, z: i64) -> Option<f64> {
+        let x = self.wrap_x(x as f64);
+        let on = (Self::RIVER_FROM_X..=Self::FLOODPLAIN_TO_X).contains(&x)
+            && (z as f64).abs() <= Self::FLOODPLAIN_HALF_WIDTH;
+        on.then_some(0.0)
     }
 }
 

@@ -351,6 +351,23 @@ pub fn build_with(
         layers.push(LoadedLayer::new(d, flag)?);
     }
 
+    // A floodplain (HYD-152), where the terrain writes one: the ground's move, NODATA off the plain.
+    if terrain.writes_floodplain() {
+        let plain = sample_i16(&l3, |x, z| match terrain.floodplain(x, z) {
+            Some(m) => quantise(m * 16.0),
+            None => NODATA_I16,
+        });
+        layers.push(layer_i16(
+            crate::bake::water::FLOODPLAIN_LAYER,
+            "block",
+            1.0 / 16.0,
+            Some(NODATA_I16),
+            &l3,
+            codec,
+            &plain,
+        )?);
+    }
+
     let strata_kind = strata;
     let strata = strata_layer(&l1, &layers[0], strata_kind, codec)?;
     let spawn = spawn_candidates(&layers[0], &layers[1], Scale::default_for(c).sea_level_y);
