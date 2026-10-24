@@ -160,12 +160,16 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - cargo `fmt --check`, `clippy -D warnings` and `test --workspace --no-fail-fast`: 1,258 passed, 0 failed, 7 ignored. No Rust changed after this run.
   - `./gradlew build test` at a7d48ad8: 503 tests, 0 failures, 0 errors, 2 skipped.
   - GameTests standalone: 110 of 110 at a4a65d95. The later commits touch only the river reader's mouth code, the border's unbound-data guard and tools.
+    - The seven cube tests alone at 639c35eb (`-PgametestOnly=cubeWorldLayout,...`): 7 of 7, 371 s, peak 42,618 chunks (26,663 in `test_planet_cube`, 14,277 in `test_cube_bare`), heap peak 5,825 of 6,144 MB. The server saved and exited.
+    - An earlier run of the same seven passed, saved its worlds and then did not exit for 80 minutes until it was killed. It did not come back on the rerun. That run shared `neoforge/build/gametest-standalone.log` with a full standalone run started in the same checkout, which truncated it: `gametest.sh` writes one log per set, so two runs of one set from one checkout clobber each other's log.
   - GameTests `-PwithMic` at 77e0e5b7: 109 of 110. `packTableClassesReachTheirBiomes` fails with "terralith:Cs_scrub 0.396 < 0.500 (96 columns)". Master 2fde68f7 alone (the test by itself, `-PwithMic`) fails with the same census: 38 of 96, 56 of the misses `minecraft:windswept_savanna`. It is master's, from the planet the flexure merge made.
   - `tools/smoke/first-start-acceptance.sh` at 16k on the cube (`earthlike_quick_16k_cube.json`):
     - standalone: the three refusal scenarios OK; the fresh start PASS (generation 383 s, native peak 3.1 of 4.0 GiB); 8 of 8 probe columns equal `inspect-column`, including both sides of the slide at x ±7,642 and both poles; the restart does not regenerate.
     - mic (158 mods): the same, generation 421 s; the COE, CDG and Distant Horizons guard mixins applied.
     - The first 16k run found a reader fault: rivers.dtrv's seam-cut chains (mouth 3) failed the Java reader at the spawn search. The 4k test cube has no seam-cut chain.
-  - 32k: see below.
+  - The same at 32k (`earthlike_quick_32k_cube.json`, s = 7,424):
+    - standalone: the three refusal scenarios OK; the fresh start PASS (generation 398 s, native peak 3.1 GiB); 8 of 8 probe columns equal `inspect-column`; the restart does not regenerate.
+    - mic (158 mods): the three refusal scenarios OK; the fresh start PASS (generation 397 s, native peak 3.1 GiB); 8 of 8; the COE, CDG and Distant Horizons guard mixins applied; the restart does not regenerate.
   - `gametest-planet.sh --boot-only --cube-4k` PASS. The first run crashed a second after Done: the border read the GameTest dimensions' unbound world data, fixed at 5668725f.
   - The Create World walk (`vm-client.sh --name cube-walk2 --prop length=300 --prop worldtype=deeptime:planet_cube`, the VM's private Xvfb): 28 screenshots. World type "Deep Time Planet Cube"; the bake is "projection cube s=3840"; the world binds format 0.7, C = 15,360; the player stands in world on the cube's generator; the guidance pass runs too.
   - Not run: `tools/client/dh-client-check.sh`. Far terrain on the cube is G6, not built, so there is no cube far terrain to check across the slide.
