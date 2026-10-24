@@ -51,6 +51,13 @@
 //!   lost when oceanic crust carrying it went under another plate. Its roof depth follows the
 //!   surface's net material change at its cell (`surface/material_m`); a pluton eroded through its
 //!   whole height is gone.
+//! - **Round on the planet.** Its plan, a_m × c_m at its strike, and its aureole's, that plan grown
+//!   by the aureole's width on every side, are ellipses on the planet: the outcrop is drawn with
+//!   the planet's offsets from its centre ([`for_each_cell_grown`]) and the bodies carry the
+//!   ellipse the Lambert blocks draw of it ([`Pluton::plan_blocks`]), which the world's projection
+//!   carries back to the planet's (ledger SCL-235; until 2026-10-23 both were drawn in Lambert
+//!   blocks, so the world stretched every pluton north–south by 1 / cos² of its latitude). A
+//!   stock's plan (a structural event's window, `deform::intrude`) is drawn the same way.
 
 use std::collections::HashMap;
 
@@ -68,8 +75,9 @@ use crate::deposits::random::Rng;
 use crate::params::ScaleParams;
 use crate::plates::kinematics::rotation;
 use crate::plates::state::{ARC, CONTINENTAL, regime};
-use crate::sphere::BlockFrame;
+use crate::sphere::{Around, BlockFrame};
 use crate::surface::lithology::{index, table};
+use crate::surface::volcanoes::for_cells;
 use crate::synth::EVERY_CLASS;
 
 use super::bake_horizons;
@@ -104,7 +112,7 @@ pub struct Pluton {
     pub a_m: f32,
     pub c_m: f32,
     pub b_m: f32,
-    /// Strike, radians from +x towards +z.
+    /// Strike on the planet, radians from east towards south (+x towards +z).
     pub yaw: f32,
     pub class: u16,
     /// Width of its contact aureole outside it, m (0: none): [`aureole_width_m`] of the host at
@@ -112,6 +120,22 @@ pub struct Pluton {
     pub aureole_m: f32,
     /// Emplacement time, Myr.
     pub t_myr: f32,
+}
+
+impl Pluton {
+    /// Its plan grown by `grow_m` on every side as the ellipse the Lambert blocks of a planet
+    /// `circumference` blocks round draw of it at its centre ([`Around::ellipse_blocks`]):
+    /// (semi-axis nearest its strike, the other, yaw), blocks and radians from +x towards +z. The
+    /// world's projection draws that ellipse as the planet's a_m × c_m (ledger: SCL-235).
+    pub fn plan_blocks(&self, circumference: u32, m_per_block_h: f64, grow_m: f64) -> [f64; 3] {
+        let g = grow_m.max(0.0);
+        let (a, c, yaw) = Around::of(circumference, m_per_block_h, self.x, self.z).ellipse_blocks(
+            f64::from(self.a_m) + g,
+            f64::from(self.c_m) + g,
+            f64::from(self.yaw),
+        );
+        [a, c, yaw]
+    }
 }
 
 /// Counters for the run summary.
@@ -323,7 +347,9 @@ pub fn for_each_cell(
 
 /// Calls `f(cell, r2, r2_grown)` for every L1 cell whose centre lies inside the pluton's
 /// horizontal ellipse grown by `grow_m` on every side (its aureole's), with r2 in the pluton's
-/// own axes and `r2_grown` in the grown ones.
+/// own axes and `r2_grown` in the grown ones. The ellipses are the planet's: a cell's offset is
+/// its great-circle distance from the centre along its bearing (ledger: SCL-235; the Lambert
+/// grid's block offsets until 2026-10-23).
 pub fn for_each_cell_grown(
     pl: &Pluton,
     grid: &GridDesc,
@@ -331,36 +357,18 @@ pub fn for_each_cell_grown(
     grow_m: f64,
     mut f: impl FnMut(usize, f64, f64),
 ) {
-    let r = f64::from(grid.r);
     let (a, c) = (f64::from(pl.a_m), f64::from(pl.c_m));
     let (ga, gc) = (a + grow_m.max(0.0), c + grow_m.max(0.0));
-    let ext_blocks = ga.max(gc) / m_per_block_h;
-    let cells = (ext_blocks / r).ceil() as i64 + 1;
-    let c0 = cell_of(grid, pl.x, pl.z);
-    let w = grid.w as usize;
-    let (i0, j0) = ((c0 % w) as i64, (c0 / w) as i64);
-    let frame = BlockFrame::new(grid.circumference() as u32);
     let (sy, cy) = f64::from(pl.yaw).sin_cos();
-    for dj in -cells..=cells {
-        let j = j0 + dj;
-        if j < 0 || j >= i64::from(grid.h) {
-            continue;
+    for_cells(grid, m_per_block_h, pl.x, pl.z, ga.max(gc), |cell, e, s| {
+        let u = cy * e + sy * s;
+        let v = -sy * e + cy * s;
+        let r2_grown = (u / ga).powi(2) + (v / gc).powi(2);
+        if r2_grown <= 1.0 {
+            let r2 = (u / a).powi(2) + (v / c).powi(2);
+            f(cell, r2, r2_grown);
         }
-        for di in -cells..=cells {
-            let i = i0 + di;
-            let bx = grid.block_x(grid.wrap_i(i) as i64) as f64;
-            let bz = grid.block_z(j) as f64;
-            let dx = frame.wrap_x(bx - pl.x) * m_per_block_h;
-            let dz = (bz - pl.z) * m_per_block_h;
-            let u = cy * dx + sy * dz;
-            let v = -sy * dx + cy * dz;
-            let r2_grown = (u / ga).powi(2) + (v / gc).powi(2);
-            if r2_grown <= 1.0 {
-                let r2 = (u / a).powi(2) + (v / c).powi(2);
-                f(j as usize * w + grid.wrap_i(i) as usize, r2, r2_grown);
-            }
-        }
-    }
+    });
 }
 
 /// Where the pluton sits in the column at a point of its footprint with r2: the depths of its top
@@ -410,12 +418,15 @@ pub fn outcrop_at(
 }
 
 /// The pluton as a body: centre y from the surface elevation `surface_y` (blocks) at its cell,
-/// its age the time from its emplacement to `now_myr`, the end of the history. `None` when it
-/// lies wholly below `min_y`.
+/// its age the time from its emplacement to `now_myr`, the end of the history, its plan the
+/// planet's ellipse in the Lambert blocks of a planet `circumference` blocks round
+/// ([`Pluton::plan_blocks`]). `None` when it lies wholly below `min_y`.
+#[allow(clippy::too_many_arguments)]
 pub fn to_body(
     pl: &Pluton,
     id: u32,
     surface_y: f64,
+    circumference: u32,
     m_per_block_h: f64,
     m_per_block_v: f64,
     min_y: i32,
@@ -426,11 +437,8 @@ pub fn to_body(
     if cy + b_blocks < f64::from(min_y) {
         return None;
     }
-    let axes = [
-        (f64::from(pl.a_m) / m_per_block_h).max(0.5) as f32,
-        b_blocks.max(0.5) as f32,
-        (f64::from(pl.c_m) / m_per_block_h).max(0.5) as f32,
-    ];
+    let [a, c, yaw] = pl.plan_blocks(circumference, m_per_block_h, 0.0);
+    let axes = [a.max(0.5) as f32, b_blocks.max(0.5) as f32, c.max(0.5) as f32];
     let mut body = Body::new(
         id,
         None,
@@ -438,7 +446,7 @@ pub fn to_body(
         "pluton",
         [pl.x, cy, pl.z],
         axes,
-        pl.yaw,
+        yaw as f32,
         0.0,
         NO_CLIP,
     );
@@ -718,6 +726,11 @@ pub struct Aureole {
     pub yaw: f32,
     /// How far it reaches out from the intrusion, m.
     pub width_m: f64,
+    /// Its own plan when it is drawn on the planet (a pluton's: the pluton's plan grown by the
+    /// width there, [`Pluton::plan_blocks`]): semi-axes along and across, blocks, and the yaw,
+    /// radians from +x towards +z. `None`: the intrusion's axes grown by the width in blocks, at
+    /// its yaw (a stock's, whose plan is Lambert's).
+    pub plan: Option<[f64; 3]>,
     /// The ground's y at the centre, blocks (the bands' depths are below it).
     pub surface_y: f64,
     pub bands: Vec<Band>,
@@ -729,23 +742,25 @@ pub struct Aureole {
 }
 
 impl Aureole {
-    /// The aureole of `pl` under ground at `surface_y`, without its bands yet.
+    /// The aureole of `pl` under ground at `surface_y`, without its bands yet, on a planet
+    /// `circumference` blocks round: the pluton's plan and the plan grown by its width are the
+    /// planet's ellipses ([`Pluton::plan_blocks`]).
     pub fn of_pluton(
         pl: &Pluton,
         surface_y: f64,
+        circumference: u32,
         m_per_block_h: f64,
         m_per_block_v: f64,
         now_myr: f64,
     ) -> Aureole {
+        let [a, c, yaw] = pl.plan_blocks(circumference, m_per_block_h, 0.0);
+        let width_m = f64::from(pl.aureole_m);
         Aureole {
             centre: [pl.x, centre_y(pl, surface_y, m_per_block_v), pl.z],
-            axes: [
-                f64::from(pl.a_m) / m_per_block_h,
-                f64::from(pl.b_m) / m_per_block_v,
-                f64::from(pl.c_m) / m_per_block_h,
-            ],
-            yaw: pl.yaw,
-            width_m: f64::from(pl.aureole_m),
+            axes: [a, f64::from(pl.b_m) / m_per_block_v, c],
+            yaw: yaw as f32,
+            width_m,
+            plan: Some(pl.plan_blocks(circumference, m_per_block_h, width_m)),
             surface_y,
             bands: Vec::new(),
             hollow: false,
@@ -753,13 +768,23 @@ impl Aureole {
         }
     }
 
-    /// Its semi-axes, blocks: the intrusion's grown by its width.
+    /// Its semi-axes, blocks: the intrusion's grown by its width (its own [`plan`](Self::plan)
+    /// in plan when it has one).
     pub fn grown(&self, m_per_block_h: f64, m_per_block_v: f64) -> [f64; 3] {
-        [
-            self.axes[0] + self.width_m / m_per_block_h,
-            self.axes[1] + self.width_m / m_per_block_v,
-            self.axes[2] + self.width_m / m_per_block_h,
-        ]
+        let up = self.axes[1] + self.width_m / m_per_block_v;
+        match self.plan {
+            Some([a, c, _]) => [a, up, c],
+            None => [
+                self.axes[0] + self.width_m / m_per_block_h,
+                up,
+                self.axes[2] + self.width_m / m_per_block_h,
+            ],
+        }
+    }
+
+    /// The yaw of its body: its plan's, or the intrusion's.
+    pub fn body_yaw(&self) -> f32 {
+        self.plan.map_or(self.yaw, |p| p[2] as f32)
     }
 
     /// The depths below the ground at the centre it spans, m: [top, base].
@@ -798,7 +823,7 @@ impl Aureole {
             "aureole",
             self.centre,
             g.map(|x| x.max(0.5) as f32),
-            self.yaw,
+            self.body_yaw(),
             0.0,
             NO_CLIP,
         );
@@ -1087,9 +1112,61 @@ mod tests {
     }
 
     #[test]
+    fn a_pluton_is_round_on_the_planet_at_high_latitude() {
+        // SCL-235: at 30°, 55° and 70° N a round pluton's outcrop reaches as far east as north on
+        // the planet, and its body's plan is wide in Lambert x by 1 / cos φ and narrow in z by
+        // cos φ, so the world draws it round; so is its aureole's.
+        let c = 16_384;
+        let grid = GridDesc::for_planet("L1", c, 16).unwrap();
+        let frame = BlockFrame::new(c);
+        let (mh, mv) = (300.0, 20.0);
+        for lat in [30.0f64, 55.0, 70.0] {
+            let cos = lat.to_radians().cos();
+            let mut pl = pluton(0.0, frame.z_of_lat(lat));
+            (pl.a_m, pl.c_m) = (30_000.0, 30_000.0);
+            let at = Around::new(frame, mh, pl.x, pl.z);
+            let (mut east, mut north) = (0.0f64, 0.0f64);
+            for_each_cell(&pl, &grid, mh, |cell, r2| {
+                let (i, j) = (cell % grid.w as usize, cell / grid.w as usize);
+                let bx = grid.block_x(i as i64) as f64;
+                let (e, s) = at.offset(bx, grid.block_z(j as i64) as f64);
+                assert!(((e.hypot(s) / 30_000.0).powi(2) - r2).abs() < 1e-9, "{lat}°: r2 {r2}");
+                east = east.max(e.abs());
+                north = north.max(s.abs());
+            });
+            // An L1 cell is 4.8 km of the planet east–west times cos φ, north–south over it.
+            assert!(east <= 30_000.0 && east > 30_000.0 - 4800.0 * cos, "{lat}°: east {east}");
+            assert!(north <= 30_000.0 && north > 30_000.0 - 4800.0 / cos, "{lat}°: north {north}");
+            let b = to_body(&pl, 1, 100.0, c, mh, mv, -352, 40.0).unwrap();
+            assert!((f64::from(b.axes[0]) * cos * mh / 30_000.0 - 1.0).abs() < 1e-3, "{lat}°");
+            assert!((f64::from(b.axes[2]) * mh / cos / 30_000.0 - 1.0).abs() < 1e-3, "{lat}°");
+            let a = Aureole::of_pluton(&pl, 100.0, c, mh, mv, 40.0);
+            let g = a.grown(mh, mv);
+            let w = 30_000.0 + f64::from(pl.aureole_m);
+            assert!((g[0] * cos * mh / w - 1.0).abs() < 1e-3, "{lat}°: aureole {g:?}");
+            assert!((g[2] * mh / cos / w - 1.0).abs() < 1e-3, "{lat}°: aureole {g:?}");
+        }
+        // A yawed one keeps its outline on the planet: every point of its body's plan, drawn in
+        // Lambert blocks, lies on the planet's 6 × 4 km ellipse at its strike.
+        let mut pl = pluton(0.0, frame.z_of_lat(55.0));
+        pl.yaw = 0.5;
+        let [a, b, yaw] = pl.plan_blocks(c, mh, 0.0);
+        let at = Around::new(frame, mh, pl.x, pl.z);
+        let (sy, cy) = (0.5f64).sin_cos();
+        for k in 0..72 {
+            let t = f64::from(k) * 5f64.to_radians();
+            let (u, v) = (a * t.cos(), b * t.sin());
+            let (x, z) = (pl.x + yaw.cos() * u - yaw.sin() * v, pl.z + yaw.sin() * u + yaw.cos() * v);
+            let (e, s) = at.offset(x, z);
+            let r2 = ((cy * e + sy * s) / 6000.0).powi(2) + ((-sy * e + cy * s) / 4000.0).powi(2);
+            assert!((r2 - 1.0).abs() < 1e-2, "at {k}: r2 {r2}");
+        }
+    }
+
+    #[test]
     fn a_pluton_becomes_a_body_with_its_age() {
         let pl = pluton(10.0, 20.0);
-        let b = to_body(&pl, 7, 100.0, 300.0, 20.0, -352, 40.0).unwrap();
+        let b = to_body(&pl, 7, 100.0, 16_384, 300.0, 20.0, -352, 40.0).unwrap();
         assert_eq!(b.rock_class.as_deref(), Some("granodiorite"));
         assert!(b.zones.is_empty(), "the aureole is a body of its own");
         // Emplaced at -10 Myr, the history ends at 40: 50 Myr old.
@@ -1097,11 +1174,12 @@ mod tests {
         b.validate().unwrap();
         // Roof 3 km (150 blocks) below y 100, half-height 75 blocks.
         assert!((b.center[1] - (100.0 - 225.0)).abs() < 1e-9);
-        assert!((b.axes[0] - 20.0).abs() < 1e-5 && (b.axes[1] - 75.0).abs() < 1e-5);
+        // 20 blocks of 300 m east–west, a hair more at its latitude (0.44°).
+        assert!((b.axes[0] - 20.0).abs() < 1e-3 && (b.axes[1] - 75.0).abs() < 1e-5);
         // Buried below the world: no body.
         let mut deep = pl.clone();
         deep.roof_m = 20_000.0;
-        assert!(to_body(&deep, 8, 0.0, 300.0, 20.0, -352, 40.0).is_none());
+        assert!(to_body(&deep, 8, 0.0, 16_384, 300.0, 20.0, -352, 40.0).is_none());
         let (top, bottom) = span_at(&pl, 0.0);
         assert!((top - 3000.0).abs() < 1e-9 && (bottom - 6000.0).abs() < 1e-9);
     }
@@ -1263,7 +1341,7 @@ mod tests {
         let t = Tables::get();
         let pl = pluton(0.0, 0.0);
         let (mh, mv) = (300.0, 20.0);
-        let mut a = Aureole::of_pluton(&pl, 100.0, mh, mv, 40.0);
+        let mut a = Aureole::of_pluton(&pl, 100.0, 16_384, mh, mv, 40.0);
         // Its top 900 m above the roof (3 km deep), its base 900 m below the floor (6 km).
         let [top, base] = a.depths_m(mh, mv);
         assert!((top - 2100.0).abs() < 1e-6 && (base - 6900.0).abs() < 1e-6);
@@ -1302,6 +1380,7 @@ mod tests {
             axes: [15.0, 30.0, 12.0],
             yaw: 0.4,
             width_m: 600.0,
+            plan: None,
             surface_y: 60.0,
             bands: Vec::new(),
             hollow: true,
@@ -1352,6 +1431,7 @@ mod tests {
             axes: [15.0, 30.0, 12.0],
             yaw: 0.0,
             width_m: 600.0,
+            plan: None,
             surface_y: 100.0,
             bands: Vec::new(),
             hollow: true,

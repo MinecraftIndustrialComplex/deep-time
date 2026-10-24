@@ -78,6 +78,48 @@ fn arcs_line_up_along_the_front_at_the_spacing() {
 }
 
 #[test]
+fn arcs_are_spaced_on_the_planet_at_high_latitude() {
+    // SCL-232: the spacing is a great-circle distance, so an arc at 60° N (a Lambert block east
+    // is half a block of the planet there) gets as many volcanoes as its length on the planet
+    // holds, not twice as many.
+    let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
+    let (w, n) = (grid.w as usize, grid.cells());
+    let frame = BlockFrame::new(16_384);
+    let mh = 300.0;
+    let row = (0..grid.h as i64)
+        .min_by(|&a, &b| {
+            let d = |j: i64| (frame.lat_deg(grid.block_z(j) as f64) - 60.0).abs();
+            d(a).total_cmp(&d(b))
+        })
+        .unwrap() as usize;
+    let mut flux = vec![0.0f64; n];
+    for i in 100..600 {
+        flux[(row - 1) * w + i] = 0.8;
+        flux[row * w + i] = 1.0;
+        flux[(row + 1) * w + i] = 0.8;
+    }
+    let spacing = 60_000.0;
+    let born = place_arcs(&grid, mh, &flux, 0.25, spacing, &mut Vec::new(), &mut Rng::stream(5, "test"));
+    let pts: Vec<(f64, f64)> = born.iter().map(|&(x, z, _)| (x, z)).collect();
+    let mut nn = Vec::new();
+    for (a, &(x, z)) in pts.iter().enumerate() {
+        let at = Around::new(frame, mh, x, z);
+        let best = (pts.iter().enumerate())
+            .filter(|&(b, _)| b != a)
+            .map(|(_, &(ox, oz))| at.distance_m(ox, oz) / 1000.0)
+            .fold(f64::INFINITY, f64::min);
+        assert!(best >= 0.8 * 60.0 - 1e-6, "{best} km on the planet");
+        nn.push(best);
+    }
+    let mean = nn.iter().sum::<f64>() / nn.len() as f64;
+    assert!((48.0..=80.0).contains(&mean), "mean neighbour distance {mean} km");
+    // 500 cells of 16 blocks at cos 60° are 1,200 km on the planet: 15 to 25 at 48 to 80 km.
+    let len_km = 500.0 * 16.0 * frame.lat_deg(grid.block_z(row as i64) as f64).to_radians().cos() * mh / 1000.0;
+    let count = born.len() as f64;
+    assert!((len_km / 80.0 - 1.0..=len_km / 48.0 + 1.0).contains(&count), "{count} volcanoes on {len_km} km of arc");
+}
+
+#[test]
 fn the_front_is_the_middle_of_the_arc_band() {
     let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
     let (w, n) = (grid.w as usize, grid.cells());

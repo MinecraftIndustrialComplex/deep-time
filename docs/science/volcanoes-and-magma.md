@@ -568,11 +568,16 @@ What the previews show:
   broad for a real flow but a thin line in the world, so the flows cover 2 to 12 % of a cone where
   Mauna Loa's young flows cover 35 to 40 % in 1,000 years. On dry cones the bound of 256 flows ends
   the count well before the 35 % cap.
-- **The cone and its flows are measured differently.** The amplifier draws a cone in the
-  simulation's frame, so the projection can stretch it; the flows measure length and slope on the
-  ground through the world's metric, read once at each vent. Until volcanoes are drawn round in
-  world blocks (on hold with the projection), a flow is the right length on a stretched cone. Flows
-  stop at the world's z edge.
+- **Cones are round on the planet.** Since 2026-10-23 the volcano stage, its edifice and caldera
+  footprints, the ignimbrite sheet, the flood-basalt provinces, the arc and hotspot spacing and the
+  amplifier's cone all measure the great-circle distance from the vent (ledger SCL-230 to SCL-232,
+  [round-features.md](round-features.md)): a cone is the ellipse the Lambert grid makes of a circle,
+  which the conformal cube world draws round (the equal-area Petroff–Guyou world with its own
+  stretch, as every shape), so the cone and its flows (measured
+  on the ground through the world's metric, read once at each vent) now agree. Until then a cone
+  was round in Lambert blocks, long north–south on the planet by 1 / cos² of its latitude (3.0 to 1
+  at 55°), and a flow was the right length on a stretched cone. On the Lambert world preset (a test
+  layout) a cone is now wide east–west. Flows stop at the world's z edge.
 - **Ice hides flows.** The ice pass runs after the flows, so on an ice-capped cone (13601 on the q1
   planet) they lie under snow blocks.
 - **Far away a flow is a broken line.** At a level of detail coarser than a block, far terrain

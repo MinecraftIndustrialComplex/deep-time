@@ -1192,8 +1192,9 @@ impl RiverStats {
 /// J R diag(a, c) as its semi-axes, so its area is |det J| a c even where the Lambert grid's shear
 /// turns the two axes' images off the perpendicular. SCL-091 stretches each axis by the length of
 /// its own image, which overstates the area there (by 25 % for a body yawed 45° at 45° latitude);
-/// the Petroff-Guyou world keeps that rule. The new first axis is the singular direction nearest
-/// the old first axis's image, sign included, so a dip keeps its side.
+/// the Petroff-Guyou world uses this one too since 2026-10-23 (SCL-236). The new first axis is
+/// the singular direction nearest the old first axis's image, sign included, so a dip keeps its
+/// side.
 pub(crate) fn project_body_exact(
     map: &impl WorldMap,
     b: &deeptime_format::Body,
@@ -1204,27 +1205,9 @@ pub(crate) fn project_body_exact(
     let (a, c) = (f64::from(b.axes[0]), f64::from(b.axes[2]));
     let p = apply(&j, (cy * a, sy * a));
     let q = apply(&j, (-sy * c, cy * c));
-    // M Mᵀ for M = [p q]: its eigenvalues are the squared semi-axes, its eigenvectors their
-    // directions.
-    let (s00, s01, s11) = (
-        p.0 * p.0 + q.0 * q.0,
-        p.0 * p.1 + q.0 * q.1,
-        p.1 * p.1 + q.1 * q.1,
-    );
-    let half = 0.5 * (s00 + s11);
-    let root = (0.25 * (s00 - s11).powi(2) + s01 * s01).sqrt();
-    let (major, minor) = ((half + root).sqrt(), (half - root).max(0.0).sqrt());
-    let theta = 0.5 * (2.0 * s01).atan2(s00 - s11);
-    let toward = p.1.atan2(p.0);
-    let (k, _) = (0..4)
-        .map(|k| (k, (theta + f64::from(k) * 0.5 * PI - toward).cos()))
-        .fold((0, f64::MIN), |best, x| if x.1 > best.1 { x } else { best });
-    let (ax0, ax2) = if k % 2 == 0 {
-        (major, minor)
-    } else {
-        (minor, major)
-    };
-    let yaw = (theta + f64::from(k) * 0.5 * PI + PI).rem_euclid(TAU) - PI;
+    // The axes of the ellipse with conjugate semi-diameters p and q: the eigen-decomposition of
+    // M Mᵀ for M = [p q], the first axis the one nearest p.
+    let (ax0, ax2, yaw) = crate::sphere::conjugate_axes(p, q);
     if ax0.is_finite() && ax2.is_finite() && ax0 > 0.0 && ax2 > 0.0 {
         out.axes[0] = ax0 as f32;
         out.axes[2] = ax2 as f32;
@@ -2394,6 +2377,85 @@ mod tests {
                 assert_eq!(area.in_void, 0.0, "{axes:?}");
             }
         }
+    }
+
+    /// SCL-235 and SCL-236 on the cube world: a plug drawn round on the planet (its window the circle's ellipse in
+    /// Lambert blocks) is a disc in world blocks at 30, 55 and 70° wherever the point is more than 5° from a cube
+    /// corner (the map is conformal), and so is a breccia lens's body through the exact body rule; the same circle
+    /// drawn round in Lambert blocks, as before 2026-10-23, is long by about 1 / cos² φ.
+    #[test]
+    fn on_the_cube_a_circle_on_the_planet_is_a_disc_in_world_blocks() {
+        use crate::bake::project::project_structure;
+        use deeptime_format::structure::{Shape as SShape, StructEvent, Structure, Window};
+        let (c_sim, mh) = (4096u32, 300.0);
+        let m = mapping(1024, c_sim, turned());
+        let frame = crate::sphere::BlockFrame::new(c_sim);
+        let corner_cos = 5f64.to_radians().cos();
+        let mut seen = 0;
+        for lat in [30.0f64, 55.0, 70.0] {
+            let z = frame.z_of_lat(lat);
+            for x in [-1500.0, -700.0, 100.0, 900.0, 1700.0] {
+                let c = m.view.turn.to_cube(m.src.unit(x, z));
+                let near = [-1.0f64, 1.0].iter().any(|&a| {
+                    [-1.0f64, 1.0].iter().any(|&b| {
+                        [-1.0f64, 1.0].iter().any(|&d| {
+                            (a * c[0] + b * c[1] + d * c[2]) / 3f64.sqrt() > corner_cos
+                        })
+                    })
+                });
+                if near {
+                    continue;
+                }
+                seen += 1;
+                let at = crate::sphere::Around::new(frame, mh, x, z);
+                let (first, second, yaw) = at.ellipse_blocks(1500.0, 1500.0, 0.0);
+                let ev = |(first, second, yaw): (f64, f64, f64)| StructEvent {
+                    id: 1,
+                    key: 0,
+                    t_years: 0.0,
+                    window: Window {
+                        centre: [x, z],
+                        along: [yaw.cos(), yaw.sin()],
+                        across: [-yaw.sin(), yaw.cos()],
+                        half_along: first,
+                        half_across: second,
+                    },
+                    shape: SShape::Intrusion {
+                        y: 0.0,
+                        half_height: 10.0,
+                        class: 1,
+                    },
+                };
+                let st = Structure {
+                    events: vec![ev((first, second, yaw)), ev((5.0, 5.0, 0.0))],
+                    profiles: Vec::new(),
+                    margin: 64.0,
+                };
+                let out = project_structure(&m, &st);
+                let w = &out.events[0].window;
+                let ratio = w.half_along.max(w.half_across) / w.half_along.min(w.half_across);
+                assert!(ratio < 1.003, "{lat}° x {x}: plug {w:?}");
+                let w = &out.events[1].window;
+                let old = w.half_along.max(w.half_across) / w.half_along.min(w.half_across);
+                let cos2 = lat.to_radians().cos().powi(2);
+                assert!((old * cos2 - 1.0).abs() < 0.01, "{lat}° x {x}: the Lambert circle {old}");
+                let b = Body::new(
+                    1,
+                    None,
+                    Shape::Lens,
+                    "breccia",
+                    [x, 40.0, z],
+                    [first as f32, 3.0, second as f32],
+                    yaw as f32,
+                    0.0,
+                    NO_CLIP,
+                );
+                let nb = project_body_exact(&m, &b);
+                let ratio = f64::from(nb.axes[0].max(nb.axes[2]) / nb.axes[0].min(nb.axes[2]));
+                assert!(ratio < 1.003, "{lat}° x {x}: lens {:?}", nb.axes);
+            }
+        }
+        assert!(seen >= 9, "{seen} points clear of the corners");
     }
 
     /// Simulation-block vertices along the great circle from cube-frame `a` to `b`, x kept

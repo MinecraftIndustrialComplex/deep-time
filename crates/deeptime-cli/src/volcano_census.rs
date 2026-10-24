@@ -2,11 +2,12 @@
 //! `deeptime volcano-census`: how the active volcanoes of a world-data folder stand on the ground
 //! the game reads (the acceptance measure of VOL-080, the vent as the summit).
 //!
-//! Every volcano of `volcanoes/active.json` is measured in its own simulation frame: the simulation
-//! draws a cone as a circle in its Lambert block metric (`vol::for_cells`: metres east–west are the
-//! planet radius times the longitude difference, north–south the radius times the difference of
-//! the unit vector's z), so a column's ρ (distance from the vent over the catalogue radius) is
-//! computed exactly from the world projection's unit vector, whatever the projection stretches.
+//! Every volcano of `volcanoes/active.json` is measured on the planet, where the simulation draws a
+//! cone round (`vol::for_cells` and `sphere::Around`, ledger SCL-230: the great-circle distance from
+//! the vent, laid out on the vent's azimuthal equidistant plane), so a column's ρ (distance from the
+//! vent over the catalogue radius) is computed exactly from the world projection's unit vector,
+//! whatever the projection stretches. Until 2026-10-23 the simulation drew cones round in its Lambert
+//! block metric and this census measured there.
 //! For each volcano:
 //!
 //! - **summit**: the highest column within ρ ≤ 0.35 (`SUMMIT_RHO`), its ρ, its distance from the
@@ -116,14 +117,29 @@ fn io(path: &Path, source: std::io::Error) -> FormatError {
 fn measure(w: &ColumnWorld, v: &Entry, m_per_rad: f64, mv: f64, sea_y: f64) -> Option<Value> {
     let proj = w.manifest.world_projection();
     let u0 = proj.unit(v.x, v.z);
-    let lon0 = u0[1].atan2(u0[0]);
     let tau = std::f64::consts::TAU;
-    // Simulation-frame metres of world point (x, z) from the vent.
+    // The planet's east and north at the vent (a pole falls back to the frame's x and y).
+    let c0 = u0[0].hypot(u0[1]);
+    let (east, north) = if c0 > 1e-9 {
+        (
+            [-u0[1] / c0, u0[0] / c0, 0.0],
+            [-u0[2] * u0[0] / c0, -u0[2] * u0[1] / c0, c0],
+        )
+    } else {
+        ([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+    };
+    // Planet metres (east, south) of world point (x, z) from the vent, on the vent's azimuthal
+    // equidistant plane: the great-circle distance along the bearing.
     let frame = |x: f64, z: f64| -> (f64, f64) {
         let u = proj.unit(x, z);
-        let dl =
-            (u[1].atan2(u[0]) - lon0 + std::f64::consts::PI).rem_euclid(tau) - std::f64::consts::PI;
-        (m_per_rad * dl, -m_per_rad * (u[2] - u0[2]))
+        let dot = |a: [f64; 3]| u[0] * a[0] + u[1] * a[1] + u[2] * a[2];
+        let (e, n, c) = (dot(east), dot(north), dot(u0));
+        let s = e.hypot(n);
+        if s <= 0.0 {
+            return (0.0, 0.0);
+        }
+        let d = m_per_rad * s.atan2(c);
+        (d * e / s, -d * n / s)
     };
     // The box: the smallest scale of the local Jacobian reaches past the ring.
     let (px, pz) = frame(v.x + 1.0, v.z);

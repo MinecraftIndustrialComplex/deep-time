@@ -348,7 +348,8 @@ baked and gets a Lambert layout block.
   crossing a turning edge is split there, the parts before the edge ending as at the sea, and
   confluences re-pointed; the index rebuilt in the world's frame), structural events (the window's
   centre through the projection, its axes, sizes, a fold's wavelength and a fault's slip and plane
-  through the local Jacobian), bodies (centre, horizontal axes and yaw through the Jacobian, and
+  through the local Jacobian; an intrusion's window the exact image of its ellipse, ledger SCL-236),
+  bodies (centre, and the exact image of the horizontal ellipse under the Jacobian, SCL-130 and SCL-236, and
   moved up or down by the change of the drawn terrain height between their old and new column, so a
   crater's lens stays under the drawn floor), sites (centre; box from their bodies; the index in the
   world's frame), `volcanoes/active.json`, `volcanoes/standing.json` and `impacts/craters.json` (`x`, `z`), and
@@ -2095,9 +2096,12 @@ TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
   touched.
 - **Roles**, in priority order, each a disc in blocks around its centre (R the basal radius
   `radius_m` / `m_per_block_h`, at least 6; r = `volcanic_biome_reach`); no disc is under 8 blocks in radius.
-  On a Petroff-Guyou world a volcano's crater, caldera, cone and field zones are instead the ellipse the
-  projection makes of that circle in the simulation's frame at the vent (semi-axes from the projection's
-  Jacobian there, each at least 8 blocks; ledger BIO-182); hot-spring fields and thermal caves stay discs:
+  On a projected world a volcano's crater, caldera, cone and field zones are instead the ellipse the
+  projection makes of that circle on the planet at the vent (since 2026-10-23, SCL-230; the simulation's
+  Lambert frame before), semi-axes from the projection's Jacobian there, each at least 8 blocks (ledger
+  BIO-182): discs on the conformal cube, the map's own stretch on Petroff–Guyou, wide east-west on a
+  Lambert world; hot-spring fields and
+  thermal caves stay discs:
   `hot_spring_field` (every hot-spring pool, from a volcano or hot ground: its reach + 4),
   `caldera` (a crater with `caldera: true`: 0.9 of its rim radius), `crater` (any other crater: its rim
   radius + 4), `cone` (stratovolcanoes and shields: 0.45 R · r), `ash_field` (stratovolcanoes and caldera

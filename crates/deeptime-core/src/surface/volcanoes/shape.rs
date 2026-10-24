@@ -2,8 +2,11 @@
 //! Volcano shapes (P1-21): the radial profiles of the edifices, their rendering onto a planet grid
 //! and the band-pass residuals the young landscape and the amplifier add at finer grids.
 //!
-//! Distances are block-metric (the game's flat world: block offsets × `m_per_block_h`), so a
-//! volcano is round in the world whatever its latitude, like the plutons (`structure/plutons.rs`).
+//! Distances are the planet's (`volcanoes::for_cells`: great-circle distances, offsets east and
+//! south on the sphere), so a volcano is round on the planet whatever its latitude, and so in the
+//! world, like the plutons (`structure/plutons.rs`) and the craters. Until 2026-10-23 they were
+//! the Lambert grid's block metric (block offsets × `m_per_block_h`), which drew a volcano long
+//! north–south by 1 / cos² of its latitude (docs/science/round-features.md; ledger SCL-230).
 //!
 //! **Profiles** (ρ = r / R, R the basal radius; the body is 1 at the summit and 0 at the foot):
 //! - stratovolcano: (1 − ρ)^1.5, a concave cone, steepest at the summit (1.5 H/R: 17° for 2 km
@@ -235,14 +238,22 @@ pub fn band(f: &dyn Fn(f64) -> f64, fine: f64, coarse: f64) -> Radial {
 }
 
 /// The cell-averaged weight of a normalised radial function over the cell centred on
-/// (`dx_m`, `dz_m`) (metres from the volcano's centre) of side `cell_m`, for basal radius `r_m`:
-/// the mean of 4 × 4 samples.
-pub fn cell_weight(f: &dyn Fn(f64) -> f64, dx_m: f64, dz_m: f64, cell_m: f64, r_m: f64) -> f64 {
+/// (`dx_m`, `dz_m`) (metres east and south of the volcano's centre on the planet,
+/// `volcanoes::for_cells`), `cell_m` = (east–west, north–south) its true extent there
+/// (`volcanoes::cell_extent_m`: a Lambert cell is narrow and tall poleward), for basal radius
+/// `r_m`: the mean of 4 × 4 samples over that extent (ledger: SCL-231).
+pub fn cell_weight(
+    f: &dyn Fn(f64) -> f64,
+    dx_m: f64,
+    dz_m: f64,
+    cell_m: (f64, f64),
+    r_m: f64,
+) -> f64 {
     let mut s = 0.0;
     for a in 0..4 {
         for b in 0..4 {
-            let u = dx_m + cell_m * ((f64::from(a) + 0.5) / 4.0 - 0.5);
-            let v = dz_m + cell_m * ((f64::from(b) + 0.5) / 4.0 - 0.5);
+            let u = dx_m + cell_m.0 * ((f64::from(a) + 0.5) / 4.0 - 0.5);
+            let v = dz_m + cell_m.1 * ((f64::from(b) + 0.5) / 4.0 - 0.5);
             s += f(u.hypot(v) / r_m);
         }
     }
@@ -349,8 +360,8 @@ mod tests {
     #[test]
     fn cell_weights_average_the_profile() {
         let f = |r: f64| Shape::profile(Kind::Shield, r);
-        let w = cell_weight(&f, 0.0, 0.0, 100.0, 10_000.0);
+        let w = cell_weight(&f, 0.0, 0.0, (100.0, 100.0), 10_000.0);
         assert!(w > 0.99 && w <= 1.0);
-        assert_eq!(cell_weight(&f, 20_000.0, 0.0, 100.0, 10_000.0), 0.0);
+        assert_eq!(cell_weight(&f, 20_000.0, 0.0, (100.0, 100.0), 10_000.0), 0.0);
     }
 }

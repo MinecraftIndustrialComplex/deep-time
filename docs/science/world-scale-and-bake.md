@@ -13,6 +13,7 @@ A Deep Time planet is small. Its circumference is 16,384 or 32,768 blocks, and o
 | [SCL](ledger/SCL.md) | timeline | SCL-032 to SCL-041 (10) |
 | [SCL](ledger/SCL.md) | resolution | SCL-042 to SCL-051 (10) |
 | [SCL](ledger/SCL.md) | structures keep to the ground | SCL-200, SCL-201 (2) |
+| [SCL](ledger/SCL.md) | features round on the planet ([round-features.md](round-features.md)) | SCL-230 to SCL-236 (7) |
 | [BAK](ledger/BAK.md) | bake terrain | BAK-001 to BAK-013 (13) |
 | [BAK](ledger/BAK.md) | spawn placement | BAK-014 to BAK-016 (3) |
 | [BAK](ledger/BAK.md) | satellite view | BAK-017 to BAK-032 (16) |
