@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
-import com.minecraftindustrialcomplex.deeptime.worlddata.PortableMath;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 
@@ -18,13 +17,15 @@ import java.util.Map;
  * the magma bodies ({@link Magma}); the biome a role puts there is the pack's business
  * ({@code climate.VolcanicBiomes}, the tags {@code #deeptime:volcanic/<role>}).
  *
- * <p>Every zone is an ellipse in blocks (a disc on a Lambert world), each semi-axis at least
+ * <p>Every zone is an ellipse in blocks (a disc on the conformal cube world), each semi-axis at least
  * {@link #MIN_RADIUS} (two of the biome grid's 4-block cells), so a role never makes a speck of one or
  * two biome cells; a ring (the ash and lava fields round a cone) is a zone of lower priority than the
  * cone's, and is left out when it would be narrower than {@link #MIN_RING}. Where zones overlap,
- * {@link Role}'s order decides. The simulation draws a cone as a circle in its own frame, which a
- * Petroff–Guyou world shows stretched; a volcano's zones take the projection's local stretch at the
- * vent ({@link #stretch}), so they lie on the cone, its crater and its flanks as the terrain draws them.
+ * {@link Role}'s order decides. The simulation draws a cone as a circle on the planet (since
+ * 2026-10-23; a circle in its Lambert blocks before), which a Lambert world shows wide east–west, the
+ * conformal cube round and the equal-area Petroff–Guyou world with its own local shape stretch (median
+ * 1.78 : 1); a volcano's zones take the projection's local stretch at the vent
+ * ({@link #stretch}), so they lie on the cone, its crater and its flanks as the terrain draws them.
  * Every number here is a game choice (ledger BIO-104 to BIO-113, BIO-182).
  */
 public final class VolcanicZones {
@@ -241,7 +242,7 @@ public final class VolcanicZones {
         return best;
     }
 
-    /** The world's zones as on a Lambert world (discs): {@link #build(List, List, List, VolcanicBiomeRules, double, int, WorldProjection)} without a projection. */
+    /** The world's zones as discs: {@link #build(List, List, List, VolcanicBiomeRules, double, int, WorldProjection)} without a projection. */
     public static VolcanicZones build(List<Volcanoes.Volcano> volcanoes, List<Geothermal.Site> sites, List<Magma.Body> bodies,
                                       VolcanicBiomeRules rules, double mH, int circumference) {
         return build(volcanoes, sites, bodies, rules, mH, circumference, null);
@@ -256,7 +257,7 @@ public final class VolcanicZones {
      * @param mH            metres per block across
      * @param circumference blocks round the world (x wraps); 0: no wrap
      * @param projection    the world's projection: a volcano's zones take its local stretch at the vent
-     *                      ({@link #stretch}); null or Lambert: discs
+     *                      ({@link #stretch}); null: discs
      */
     public static VolcanicZones build(List<Volcanoes.Volcano> volcanoes, List<Geothermal.Site> sites, List<Magma.Body> bodies,
                                       VolcanicBiomeRules rules, double mH, int circumference, WorldProjection projection) {
@@ -268,7 +269,7 @@ public final class VolcanicZones {
             int x = circumference <= 0 ? (int) Math.round(v.x())
                     : Math.floorMod((int) Math.round(v.x()) + circumference / 2, circumference) - circumference / 2;
             int z = (int) Math.round(v.z());
-            // World blocks per simulation block along the stretch's two axes (1 and 1 on Lambert: discs).
+            // World blocks per planet block along the stretch's two axes (equal on the conformal cube).
             Stretch st = stretch(projection, v.x(), v.z()); // ledger: BIO-182 (game-choice)
             double basal = Math.max(6.0, v.radiusM() / mH);
             double crater = v.craterRadiusM() / mH;
@@ -315,9 +316,9 @@ public final class VolcanicZones {
     }
 
     /**
-     * A projection's local stretch at a point: the world blocks one simulation block spans along the
-     * semi-major axis ({@code major}, unit direction {@code ax, az} in block space) and across it
-     * ({@code minor}).
+     * A projection's local stretch at a point: the world blocks one planet block (a block of the
+     * planet's surface, {@code mH} metres) spans along the semi-major axis ({@code major}, unit
+     * direction {@code ax, az} in block space) and across it ({@code minor}).
      */
     record Stretch(double major, double minor, double ax, double az) {
 
@@ -331,29 +332,39 @@ public final class VolcanicZones {
 
     /**
      * The stretch at world point (x, z) (ledger: BIO-182, game-choice). The simulation draws a cone as a
-     * circle in its own frame: east–west the sphere's radius times the longitude difference, north–south
-     * the radius times the difference of the unit vector's z (Lambert's blocks; {@code deeptime
-     * volcano-census} measures in the same frame), which a Petroff–Guyou world shows as an ellipse. The
-     * local Jacobian J of the map from world blocks to that frame (central differences over one block,
-     * in {@code radius()} blocks a radian) gives it: a frame circle of radius s is the world ellipse of
-     * semi-axes s/σ, σ the singular values of J, its semi-major axis along the eigenvector of JᵀJ's
-     * smaller eigenvalue. {@link Stretch#NONE} (a disc) with no projection, on Lambert (whose blocks are
-     * the frame) and where J is not finite or is degenerate.
+     * circle on the planet (ledger SCL-230: its distances are great-circle ones, the azimuthal equidistant
+     * frame at the vent; {@code deeptime volcano-census} measures in the same frame), which a world shows
+     * as the ellipse its projection makes of it there: wide east–west by 1/cos φ and narrow north–south by
+     * cos φ on a Lambert world, round on the conformal cube, by the map's own stretch on Petroff–Guyou
+     * (equal-area, so not conformal: 1.78 : 1 at the median, up to 2.67 : 1). The local
+     * Jacobian J of the map from world blocks to the planet's tangent plane at the vent (east and south,
+     * central differences over one block, in {@code radius()} blocks a radian) gives it: a circle of
+     * radius s there is the world ellipse of semi-axes s/σ, σ the singular values of J, its semi-major
+     * axis along the eigenvector of JᵀJ's smaller eigenvalue. {@link Stretch#NONE} (a disc) with no
+     * projection, at a pole and where J is not finite or is degenerate. Until 2026-10-23 the frame was
+     * the simulation's Lambert blocks (east–west the radius times the longitude difference, north–south
+     * the radius times the unit vector's z difference), and a Lambert world kept discs.
      */
     static Stretch stretch(WorldProjection p, double x, double z) {
-        if (p == null || p.kind() == WorldProjection.Kind.LAMBERT)
+        if (p == null)
             return Stretch.NONE;
         double rr = p.radius();
         double[] u0 = p.unit(x, z);
-        double lon0 = PortableMath.atan2(u0[1], u0[0]);
+        double c0 = Math.sqrt(u0[0] * u0[0] + u0[1] * u0[1]);
+        if (!(c0 > 1e-9))
+            return Stretch.NONE;
+        // The planet's east and north at the vent.
+        double ex = -u0[1] / c0, ey = u0[0] / c0;
+        double nx = -u0[2] * u0[0] / c0, ny = -u0[2] * u0[1] / c0, nz = c0;
         double[][] at = {{x + 1.0, z}, {x - 1.0, z}, {x, z + 1.0}, {x, z - 1.0}};
         double[] east = new double[4], south = new double[4];
         for (int i = 0; i < 4; i++) {
             double[] u = p.unit(at[i][0], at[i][1]);
-            east[i] = rr * Math.IEEEremainder(PortableMath.atan2(u[1], u[0]) - lon0, 2.0 * Math.PI);
-            south[i] = -rr * (u[2] - u0[2]);
+            double dx = u[0] - u0[0], dy = u[1] - u0[1], dz = u[2] - u0[2];
+            east[i] = rr * (ex * dx + ey * dy);
+            south[i] = -rr * (nx * dx + ny * dy + nz * dz);
         }
-        // J = [[a, b], [c, d]]: its columns are the frame's (east, south) change per block of x and of z.
+        // J = [[a, b], [c, d]]: its columns are the tangent plane's (east, south) change per block of x and of z.
         double a = 0.5 * (east[0] - east[1]), c = 0.5 * (south[0] - south[1]);
         double b = 0.5 * (east[2] - east[3]), d = 0.5 * (south[2] - south[3]);
         double sxx = a * a + c * c, sxz = a * b + c * d, szz = b * b + d * d;

@@ -15,13 +15,20 @@
 //! end from the volcano catalogue, which rides the plates itself. The batholiths of P1-07
 //! (`plutons.rs`) stay bodies: they are far larger than the structures. Plutons and stocks both
 //! get contact aureoles, written as bodies at the end of the run (`plutons::Aureole`).
+//!
+//! A stock's and a plug's outline is drawn on the planet (ledger SCL-235): its semi-axes are the
+//! planet's metres and its trend an azimuth on the planet, and its window is the ellipse the
+//! Lambert blocks make of that outline (`sphere::Around::ellipse_blocks`), which the world's
+//! projection carries back to the planet's (`bake::project::project_structure`, SCL-236). Until
+//! 2026-10-23 both were drawn in Lambert blocks, so a round plug was long north–south on the planet
+//! by 1 / cos² of its latitude. A dyke is a sheet and keeps its Lambert trend and length.
 
 use super::emplace::{Inputs, length_blocks, mask_axis, strain};
-use super::feature::{Counts, Feature, Kind};
+use super::feature::{Counts, Feature, Kind, azimuth_of};
 use super::params::DeformationParams;
 use crate::deposits::random::Rng;
 use crate::plates::state::{ARC, CONTINENTAL, regime};
-use crate::sphere::BlockFrame;
+use crate::sphere::{Around, BlockFrame};
 use crate::structure::params::StructureParams;
 use crate::structure::plutons::{self, Pluton};
 use crate::surface::lithology::index;
@@ -78,8 +85,9 @@ pub fn root_on_plutons(
             if (f64::from(pl.t_myr) - f64::from(f.t_myr)).abs() > ROOT_WINDOW_MYR {
                 continue;
             }
-            let dx = frame.wrap_x(f.x - pl.x) * m_per_block_h;
-            let dz = (f.z - pl.z) * m_per_block_h;
+            // The stock's offset from the pluton's centre on the planet, where its plan is drawn
+            // (ledger: SCL-235).
+            let (dx, dz) = Around::new(*frame, m_per_block_h, pl.x, pl.z).offset(f.x, f.z);
             let (sy, cy) = f64::from(pl.yaw).sin_cos();
             let (u, w) = (cy * dx + sy * dz, -sy * dx + cy * dz);
             let r2 = (u / f64::from(pl.a_m)).powi(2) + (w / f64::from(pl.c_m)).powi(2);
@@ -208,15 +216,23 @@ pub fn emplace(
             if kind == Kind::Stock {
                 // ledger: DEF-042 (sigma 0.4)
                 let radius = length_blocks(p.stock_radius_km, 0.4, km_to_blocks, rng);
-                f.azimuth_deg = random_trend as f32;
-                f.half_across = radius as f32;
-                f.half_along = (radius * (1.0 + 0.6 * u[0])) as f32; // ledger: DEF-043
+                // Its outline on the planet (m), long axis `random_trend` clockwise from north,
+                // drawn as the ellipse the Lambert blocks make of it (ledger: SCL-235).
+                let across_m = radius * x.m_per_block_h;
+                let along_m = across_m * (1.0 + 0.6 * u[0]); // ledger: DEF-043
+                let (first, second, yaw) = outline_blocks(
+                    &frame,
+                    x.m_per_block_h,
+                    (bx, bz),
+                    (along_m, across_m),
+                    random_trend,
+                );
+                f.azimuth_deg = azimuth_of(yaw.cos(), yaw.sin()) as f32;
+                f.half_along = first as f32;
+                f.half_across = second as f32;
                 f.depth = lerp(p.stock_top_depth_blocks, u[1]) as f32;
                 // Its own floor: as thick as a pluton of its outline.
-                f.base = (stock_thickness_m(
-                    f64::from(f.half_along) * x.m_per_block_h,
-                    f64::from(f.half_across) * x.m_per_block_h,
-                ) / x.m_per_block_v) as f32;
+                f.base = (stock_thickness_m(along_m, across_m) / x.m_per_block_v) as f32;
                 // ledger: DEF-045
                 f.rock = if x.regime[c] as u8 == regime::COLLISION {
                     index("granite")
@@ -249,18 +265,42 @@ pub fn emplace(
     born
 }
 
+/// The window of an outline on the planet at block `at` of `frame`: semi-axes `(along_m,
+/// across_m)` metres, the first `azimuth_deg` clockwise from north, as the ellipse the Lambert
+/// blocks make of it (first semi-axis, second, and the first's direction in radians from +x
+/// toward +z; ledger SCL-235). Its area is the outline's: Lambert is equal-area.
+fn outline_blocks(
+    frame: &BlockFrame,
+    m_per_block_h: f64,
+    at: (f64, f64),
+    (along_m, across_m): (f64, f64),
+    azimuth_deg: f64,
+) -> (f64, f64, f64) {
+    // Clockwise from north is (sin, cos) east and north, so south is −cos: the yaw from east
+    // toward south that `ellipse_blocks` takes.
+    let (sa, ca) = azimuth_deg.to_radians().sin_cos();
+    Around::new(*frame, m_per_block_h, at.0, at.1).ellipse_blocks(
+        along_m,
+        across_m,
+        (-ca).atan2(sa),
+    )
+}
+
 /// The plugs of the extinct volcanoes on land in `volcanoes`: the solid conduit up each cone's
 /// axis, dated to the volcano's death, so the edifice is cut and anything laid down since is not.
-/// Ids are `first_id`, `first_id + 1`, ….
+/// Each is round on the planet (SCL-235) of a planet `circumference` blocks round. Ids are
+/// `first_id`, `first_id + 1`, ….
 pub fn plugs(
     volcanoes: &[Volcano],
     p: &DeformationParams,
+    circumference: u32,
     m_per_block_h: f64,
     first_id: u32,
 ) -> Vec<Feature> {
     if !p.enabled() || p.intrusions <= 0.0 {
         return Vec::new();
     }
+    let frame = BlockFrame::new(circumference);
     let [lo, hi] = p.plug_radius_blocks;
     let mut out = Vec::new();
     for v in volcanoes {
@@ -279,8 +319,13 @@ pub fn plugs(
             v.plate,
             died,
         );
-        f.half_along = radius as f32;
-        f.half_across = radius as f32;
+        // Blocks of the planet: the window is the circle's ellipse in Lambert blocks.
+        let r_m = radius * m_per_block_h;
+        let (first, second, yaw) =
+            outline_blocks(&frame, m_per_block_h, (v.x, v.z), (r_m, r_m), 90.0);
+        f.azimuth_deg = azimuth_of(yaw.cos(), yaw.sin()) as f32;
+        f.half_along = first as f32;
+        f.half_across = second as f32;
         f.rise = RISE;
         // ledger: DEF-050
         f.rock = if v.silicic || v.kind == VolcanoKind::Silicic {
@@ -299,8 +344,69 @@ pub fn plugs(
 #[cfg(test)]
 mod tests {
     use super::super::emplace::tests::Planet;
+    use super::super::feature::direction;
     use super::*;
     use deeptime_format::structure::Shape;
+
+    #[test]
+    fn a_stock_and_a_plug_are_round_on_the_planet_at_high_latitude() {
+        // SCL-235: at 30°, 55° and 70° N the window a stock or a plug is given, read as a feature
+        // reads it (its azimuth's direction and half-lengths in Lambert blocks), is the planet's
+        // outline: every point of its edge lies on the 6 × 4 km ellipse at the trend (a stock) or
+        // the circle of 1.5 km (a plug) on the planet, and the window keeps the outline's area.
+        // On the planet's tangent plane at the centre (the frame's linear map there: a block of x
+        // is cos φ blocks east, a block of z 1/cos φ south) the edge is the outline to f32's
+        // digits; by the great-circle offset it is off at first order in its size, by at most
+        // 2 (a / R) tan φ in r², as the frame's scale changes across it.
+        let c = 16_384;
+        let frame = BlockFrame::new(c);
+        let mh = 300.0;
+        for lat in [30.0f64, 55.0, 70.0] {
+            let at = (100.0, frame.z_of_lat(lat));
+            let around = Around::new(frame, mh, at.0, at.1);
+            let cos = lat.to_radians().cos();
+            for (axes, trend) in [((6000.0, 4000.0), 35.0), ((1500.0, 1500.0), 90.0)] {
+                let (first, second, yaw) = outline_blocks(&frame, mh, at, axes, trend);
+                let mut f = blank(0, Kind::Stock, at.0, at.1, 0, 0.0);
+                f.azimuth_deg = azimuth_of(yaw.cos(), yaw.sin()) as f32;
+                (f.half_along, f.half_across) = (first as f32, second as f32);
+                let along = direction(f64::from(f.azimuth_deg));
+                let across = direction(f64::from(f.azimuth_deg) + 90.0);
+                // The trend's unit vector on the planet, east and south.
+                let (sa, ca) = trend.to_radians().sin_cos();
+                let (te, ts) = (sa, -ca);
+                for k in 0..72 {
+                    let t = f64::from(k) * 5f64.to_radians();
+                    let (u, v) = (
+                        f64::from(f.half_along) * t.cos(),
+                        f64::from(f.half_across) * t.sin(),
+                    );
+                    let x = at.0 + u * along[0] + v * across[0];
+                    let z = at.1 + u * along[1] + v * across[1];
+                    let r2 = |(e, s): (f64, f64)| {
+                        let (pu, pv) = (e * te + s * ts, -e * ts + s * te);
+                        (pu / axes.0).powi(2) + (pv / axes.1).powi(2)
+                    };
+                    let plane = r2(((x - at.0) * cos * mh, (z - at.1) * mh / cos));
+                    assert!(
+                        (plane - 1.0).abs() < 1e-5,
+                        "{lat}°, {axes:?} at {k}: r2 {plane}"
+                    );
+                    let sphere = r2(around.offset(x, z));
+                    let first_order = 2.0 * axes.0 / around.radius_m() * lat.to_radians().tan();
+                    assert!(
+                        (sphere - 1.0).abs() < first_order,
+                        "{lat}°, {axes:?} at {k}: r2 {sphere}"
+                    );
+                }
+                let area = first * second * mh * mh;
+                assert!(
+                    (area / (axes.0 * axes.1) - 1.0).abs() < 1e-9,
+                    "{lat}°: area"
+                );
+            }
+        }
+    }
 
     #[test]
     fn stocks_rise_in_the_orogen_and_dykes_follow_the_rift() {
@@ -333,8 +439,10 @@ mod tests {
                     // In the collision belt itself, not the foreland; granite.
                     assert!((55..=64).contains(&i), "stock at column {i}");
                     assert_eq!(f.rock, index("granite"));
-                    let r_km = f64::from(f.half_across) * 0.3;
-                    assert!((1.99..=10.01).contains(&r_km), "{r_km}");
+                    // Drawn on the planet: its Lambert axes keep the outline's area, so their
+                    // geometric mean is between its radius and 1.6 times it (DEF-043).
+                    let r_km = (f64::from(f.half_along) * f64::from(f.half_across)).sqrt() * 0.3;
+                    assert!((1.99..=10.01 * 1.6f64.sqrt()).contains(&r_km), "{r_km}");
                     assert!((-4.01..=60.01).contains(&f.depth) && f.rise == 0.0);
                 }
                 Kind::Dyke => {

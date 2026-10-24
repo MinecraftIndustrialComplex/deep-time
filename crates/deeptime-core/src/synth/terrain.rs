@@ -28,6 +28,17 @@ pub trait Terrain: Sync {
         None
     }
 
+    /// Whether the terrain writes a `floodplain` layer (HYD-152).
+    fn writes_floodplain(&self) -> bool {
+        false
+    }
+
+    /// The `floodplain` layer at block (x, z): the ground's move there, blocks, or `None` off the
+    /// plain. Asked only where [`Terrain::writes_floodplain`] holds.
+    fn floodplain(&self, _x: i64, _z: i64) -> Option<f64> {
+        None
+    }
+
     /// Latitude φ = asin(z/R), R = C/2π (the Lambert projection, `deeptime_format::projection`;
     /// south positive here), clamped to ±π/2 beyond the poles (`AnalyticTestTerrain.latitude`;
     /// its own formula, twinned in Java).
@@ -482,7 +493,9 @@ impl Terrain for RiverTest {
 /// down to the apex at x 0 and its share's half-width 7 and depth 5.5 below it. Two distributaries
 /// leave the river's vertex at the apex (`from` 0): chain 1 runs south-east to (64, 64) and east
 /// along z 64 to x 160, chain 2 the same to the north along z -64, half-width 7 and depth 5.5, their
-/// surface the sea's. Every number here is a test fixture's (game-choice: agent, 2026-10-23).
+/// surface the sea's. A floodplain (the `floodplain` layer, HYD-152, a move of 0) covers the river's
+/// reach on the upstream plain, x -400 to -270 and |z| up to 40, for the levee texture (HYD-153).
+/// Every number here is a test fixture's (game-choice: agent, 2026-10-23).
 pub struct DeltaTest {
     pub c: u32,
 }
@@ -512,6 +525,9 @@ impl DeltaTest {
     pub const BRANCH_Q: f64 = 200.0;
     /// Where the distributaries turn east, |z| (and x).
     pub const BRANCH_Z: f64 = 64.0;
+    /// The floodplain's east end (it starts at the river's source, x -400) and half-width in z.
+    pub const FLOODPLAIN_TO_X: f64 = -270.0;
+    pub const FLOODPLAIN_HALF_WIDTH: f64 = 40.0;
 
     fn wrap_x(&self, x: f64) -> f64 {
         let c = f64::from(self.c);
@@ -616,7 +632,8 @@ impl DeltaTest {
                 {"chain": 1, "from": 0, "turn": [Self::BRANCH_Z, Self::BRANCH_Z], "z": Self::BRANCH_Z, "to_x": Self::RIVER_TO_X},
                 {"chain": 2, "from": 0, "turn": [Self::BRANCH_Z, -Self::BRANCH_Z], "z": -Self::BRANCH_Z, "to_x": Self::RIVER_TO_X}
             ],
-            "branch": {"half_width": Self::BRANCH_HALF_WIDTH, "depth": Self::BRANCH_DEPTH}
+            "branch": {"half_width": Self::BRANCH_HALF_WIDTH, "depth": Self::BRANCH_DEPTH},
+            "floodplain": {"from_x": Self::RIVER_FROM_X, "to_x": Self::FLOODPLAIN_TO_X, "half_width": Self::FLOODPLAIN_HALF_WIDTH}
         })
     }
 }
@@ -660,6 +677,387 @@ impl Terrain for DeltaTest {
             Self::PLAIN_Y
         }
     }
+
+    fn writes_floodplain(&self) -> bool {
+        true
+    }
+
+    fn floodplain(&self, x: i64, z: i64) -> Option<f64> {
+        let x = self.wrap_x(x as f64);
+        let on = (Self::RIVER_FROM_X..=Self::FLOODPLAIN_TO_X).contains(&x)
+            && (z as f64).abs() <= Self::FLOODPLAIN_HALF_WIDTH;
+        on.then_some(0.0)
+    }
+}
+
+/// The meander-test world (V1 gap 5, stage 3; `deeptime synth --kind meander-test`, the Java
+/// `MeanderGameTests`): ground by |x| alone, a plain at y 70.5 for |x| <= 400 falling to a sea
+/// floor at y 45.5 by |x| 440. A straight river (chain 0) runs east along z 0 from x -380 into the
+/// sea at x 430, half-width 3, depth 2.5 and 100 m³/s, its surface 69.9 falling to 69.1 at x 380
+/// and to the sea's 63.0 at x 412, where the ground passes the sea level. A floodplain (the
+/// `floodplain` layer, HYD-152, a move of 0, laid at y 70.5: its top block 70 a block over the
+/// river's top water block 69) covers x -380 to 390 and |z| up to 60. The file holds the river as
+/// the bake leaves it after the meanders (HYD-155 to HYD-159, [`crate::hydro::meander`]) on that
+/// plain. Every number here is a test fixture's (game-choice: agent, 2026-10-24).
+pub struct MeanderTest {
+    pub c: u32,
+}
+
+impl MeanderTest {
+    pub const PLAIN_Y: f64 = 70.5;
+    pub const SEA_FLOOR_Y: f64 = 45.5;
+    /// |x| where the plain starts falling and where the sea floor starts.
+    pub const SLOPE_FROM_X: f64 = 400.0;
+    pub const SEA_FROM_X: f64 = 440.0;
+    pub const SEA_W: f64 = 63.0;
+
+    pub const RIVER_FROM_X: f64 = -380.0;
+    pub const RIVER_TO_X: f64 = 430.0;
+    pub const SPACING: f64 = 2.0;
+    pub const SOURCE_W: f64 = 69.9;
+    /// The surface where the plain's reach ends, and that x.
+    pub const PLAIN_END_W: f64 = 69.1;
+    pub const PLAIN_END_X: f64 = 380.0;
+    /// Where the surface reaches the sea's (the ground passes y 63 there).
+    pub const SEA_W_FROM_X: f64 = 412.0;
+    pub const HALF_WIDTH: f64 = 3.0;
+    pub const DEPTH: f64 = 2.5;
+    pub const Q: f64 = 100.0;
+    pub const FLOODPLAIN_TO_X: f64 = 390.0;
+    pub const FLOODPLAIN_HALF_WIDTH: f64 = 60.0;
+
+    fn wrap_x(&self, x: f64) -> f64 {
+        let c = f64::from(self.c);
+        x - c * (x / c).round_ties_even()
+    }
+
+    /// The river's surface at x.
+    pub fn river_w(x: f64) -> f64 {
+        if x <= Self::PLAIN_END_X {
+            Self::SOURCE_W
+                - (Self::SOURCE_W - Self::PLAIN_END_W) * (x - Self::RIVER_FROM_X)
+                    / (Self::PLAIN_END_X - Self::RIVER_FROM_X)
+        } else if x < Self::SEA_W_FROM_X {
+            Self::PLAIN_END_W
+                - (Self::PLAIN_END_W - Self::SEA_W) * (x - Self::PLAIN_END_X)
+                    / (Self::SEA_W_FROM_X - Self::PLAIN_END_X)
+        } else {
+            Self::SEA_W
+        }
+    }
+
+    /// Whether block (x, z) is on the floodplain.
+    fn on_plain(&self, x: f64, z: f64) -> bool {
+        let x = self.wrap_x(x);
+        (Self::RIVER_FROM_X..=Self::FLOODPLAIN_TO_X).contains(&x)
+            && z.abs() <= Self::FLOODPLAIN_HALF_WIDTH
+    }
+
+    /// The river as drawn, straight along z 0, indexed.
+    pub fn straight(&self) -> Rivers {
+        let mut r = Rivers::empty(self.c);
+        let n = ((Self::RIVER_TO_X - Self::RIVER_FROM_X) / Self::SPACING).round() as u32;
+        for k in 0..=n {
+            let x = Self::RIVER_FROM_X + f64::from(k) * Self::SPACING;
+            r.vertices.push(RiverVertex {
+                x: x as f32,
+                z: 0.0,
+                w: Self::river_w(x) as f32,
+                hw: Self::HALF_WIDTH as f32,
+                depth: Self::DEPTH as f32,
+                q: Self::Q as f32,
+            });
+        }
+        r.chains.push(Chain::new(0, n + 1, Mouth::Sea, u32::MAX));
+        r.build_index();
+        r
+    }
+
+    /// The river meandered on the plain, and `stats.meanders` of that pass.
+    pub fn rivers(&self) -> (Rivers, serde_json::Value) {
+        let mut r = self.straight();
+        let level = (Self::PLAIN_Y * 16.0).round() as i32;
+        let plain = |x: f64, z: f64| self.on_plain(x, z).then_some(level);
+        let scale = deeptime_format::Scale::default_for(self.c);
+        let stats = crate::hydro::meander::apply(
+            &mut r,
+            &crate::hydro::meander::Input {
+                plain: &plain,
+                lambert: Some(deeptime_format::Projection::of(f64::from(self.c))),
+                m_per_block_h: scale.m_per_block_h,
+                m_per_block_v: scale.m_per_block_v,
+            },
+        );
+        (r, stats)
+    }
+
+    /// The geometry, for `manifest.json` `notes.meander`, with the meander pass's record.
+    pub fn notes(&self, stats: &serde_json::Value) -> serde_json::Value {
+        let straight = self.straight();
+        serde_json::json!({
+            "profile": "ground by |x| alone (periodic): plain y 70.5 for |x| <= 400; linear to the sea floor y 45.5 at |x| 440; sea floor beyond",
+            "plain_y": Self::PLAIN_Y,
+            "sea_w": Self::SEA_W,
+            "river": {
+                "chain": 0,
+                "z": 0.0,
+                "from_x": Self::RIVER_FROM_X,
+                "to_x": Self::RIVER_TO_X,
+                "half_width": Self::HALF_WIDTH,
+                "depth": Self::DEPTH,
+                "q": Self::Q,
+                "w": {"from": Self::SOURCE_W, "plain_end": Self::PLAIN_END_W, "plain_end_x": Self::PLAIN_END_X, "sea_from_x": Self::SEA_W_FROM_X}
+            },
+            "floodplain": {"from_x": Self::RIVER_FROM_X, "to_x": Self::FLOODPLAIN_TO_X, "half_width": Self::FLOODPLAIN_HALF_WIDTH},
+            "straight_vertices": straight.vertices.len(),
+            "stats": stats
+        })
+    }
+}
+
+impl Terrain for MeanderTest {
+    fn circumference(&self) -> u32 {
+        self.c
+    }
+
+    fn height(&self, x: i64, _z: i64) -> f64 {
+        let ax = self.wrap_x(x as f64).abs();
+        if ax <= Self::SLOPE_FROM_X {
+            Self::PLAIN_Y
+        } else if ax < Self::SEA_FROM_X {
+            Self::PLAIN_Y
+                + (Self::SEA_FLOOR_Y - Self::PLAIN_Y) * (ax - Self::SLOPE_FROM_X)
+                    / (Self::SEA_FROM_X - Self::SLOPE_FROM_X)
+        } else {
+            Self::SEA_FLOOR_Y
+        }
+    }
+
+    fn writes_floodplain(&self) -> bool {
+        true
+    }
+
+    fn floodplain(&self, x: i64, z: i64) -> Option<f64> {
+        self.on_plain(x as f64, z as f64).then_some(0.0)
+    }
+}
+
+/// The fan-test world (V1 gap 5, stage 4; `deeptime synth --kind fan-test`, the Java
+/// `FanGameTests`): a range running north and south along x -265 (its crest y 119, its flanks
+/// falling 0.5 a block) and at its foot an alluvial fan, a cone about the apex (-200, 0) falling
+/// 0.1 a block of planet from y 86.5 to the plain's y 70.5 at 160 blocks of planet (the planet's
+/// distance on the Lambert frame, as [`crate::hydro::fan`] measures it, so the cone is round on
+/// the planet). The plain at y 70.5 for |x| <= 400 falls to a sea floor at y 45.5 by |x| 440, as
+/// on the meander-test world. A river (chain 0) leaves the range at the apex and runs east along
+/// z 0 down the cone, across the plain and into the sea at x 430: half-width 4, depth 2 and
+/// 50 m³/s, its surface 1.25 blocks under the cone's, then 69.25 at the fan's toe (x -40) falling
+/// to 69.1 at x 380 and to the sea's 63.0 at x 412. The file holds the river as the bake leaves it
+/// after the braids (HYD-171 to HYD-175, [`crate::hydro::braid`]) on the fan: the course and a
+/// thread around each island, its water 1.25 blocks under the cone where it runs. Every number here is a test fixture's (game-choice: agent,
+/// 2026-10-24).
+pub struct FanTest {
+    pub c: u32,
+}
+
+impl FanTest {
+    pub const PLAIN_Y: f64 = 70.5;
+    pub const SEA_FLOOR_Y: f64 = 45.5;
+    /// |x| where the plain starts falling and where the sea floor starts.
+    pub const SLOPE_FROM_X: f64 = 400.0;
+    pub const SEA_FROM_X: f64 = 440.0;
+    pub const SEA_W: f64 = 63.0;
+
+    /// The range's crest line, its height and its flanks' fall per block.
+    pub const RIDGE_X: f64 = -265.0;
+    pub const RIDGE_TOP_Y: f64 = 119.0;
+    pub const RIDGE_FALL: f64 = 0.5;
+
+    /// The fan's apex (at the range's foot), its height, the cone's fall per block of planet and
+    /// its radius (blocks of planet; the cone meets the plain there).
+    pub const APEX_X: f64 = -200.0;
+    pub const APEX_Z: f64 = 0.0;
+    pub const APEX_Y: f64 = 86.5;
+    pub const FAN_FALL: f64 = 0.1;
+    pub const FAN_RADIUS: f64 = 160.0;
+
+    pub const RIVER_TO_X: f64 = 430.0;
+    pub const SPACING: f64 = 2.0;
+    /// The river's surface under the cone's, blocks.
+    pub const UNDER_CONE: f64 = 1.25;
+    /// The surface at the fan's toe, where the plain's reach ends and that x.
+    pub const TOE_W: f64 = 69.25;
+    pub const PLAIN_END_W: f64 = 69.1;
+    pub const PLAIN_END_X: f64 = 380.0;
+    /// Where the surface reaches the sea's (the ground passes y 63 there).
+    pub const SEA_W_FROM_X: f64 = 412.0;
+    pub const HALF_WIDTH: f64 = 4.0;
+    pub const DEPTH: f64 = 2.0;
+    pub const Q: f64 = 50.0;
+
+    /// The x of the fan's toe on the river's line.
+    pub fn toe_x() -> f64 {
+        Self::APEX_X + Self::FAN_RADIUS
+    }
+
+    fn wrap_x(&self, x: f64) -> f64 {
+        let c = f64::from(self.c);
+        x - c * (x / c).round_ties_even()
+    }
+
+    fn projection(&self) -> deeptime_format::Projection {
+        deeptime_format::Projection::of(f64::from(self.c))
+    }
+
+    /// The planet's distance from the apex to block (x, z), blocks of planet: the Lambert metric
+    /// at the middle latitude, as [`crate::hydro::fan`] takes it.
+    pub fn apex_dist(&self, x: f64, z: f64) -> f64 {
+        let cs = self
+            .projection()
+            .cos_lat(0.5 * (Self::APEX_Z + z))
+            .max(0.05);
+        (self.wrap_x(x - Self::APEX_X) * cs).hypot((z - Self::APEX_Z) / cs)
+    }
+
+    /// The cone's height at block (x, z) (below the plain past its radius).
+    pub fn cone(&self, x: f64, z: f64) -> f64 {
+        Self::APEX_Y - Self::FAN_FALL * self.apex_dist(x, z)
+    }
+
+    fn ridge(&self, x: f64) -> f64 {
+        Self::RIDGE_TOP_Y - Self::RIDGE_FALL * (self.wrap_x(x) - Self::RIDGE_X).abs()
+    }
+
+    fn base(&self, x: f64) -> f64 {
+        let ax = self.wrap_x(x).abs();
+        if ax <= Self::SLOPE_FROM_X {
+            Self::PLAIN_Y
+        } else if ax < Self::SEA_FROM_X {
+            Self::PLAIN_Y
+                + (Self::SEA_FLOOR_Y - Self::PLAIN_Y) * (ax - Self::SLOPE_FROM_X)
+                    / (Self::SEA_FROM_X - Self::SLOPE_FROM_X)
+        } else {
+            Self::SEA_FLOOR_Y
+        }
+    }
+
+    /// Whether block (x, z) is on the fan: the cone stands over the plain and the range there.
+    pub fn on_fan(&self, x: f64, z: f64) -> bool {
+        let h = self.cone(x, z);
+        h > Self::PLAIN_Y && h > self.ridge(x)
+    }
+
+    /// The river's surface at x.
+    pub fn river_w(x: f64) -> f64 {
+        let toe = Self::toe_x();
+        if x <= toe {
+            Self::APEX_Y - Self::FAN_FALL * (x - Self::APEX_X) - Self::UNDER_CONE
+        } else if x <= Self::PLAIN_END_X {
+            Self::TOE_W - (Self::TOE_W - Self::PLAIN_END_W) * (x - toe) / (Self::PLAIN_END_X - toe)
+        } else if x < Self::SEA_W_FROM_X {
+            Self::PLAIN_END_W
+                - (Self::PLAIN_END_W - Self::SEA_W) * (x - Self::PLAIN_END_X)
+                    / (Self::SEA_W_FROM_X - Self::PLAIN_END_X)
+        } else {
+            Self::SEA_W
+        }
+    }
+
+    /// The river as drawn, straight along z 0 from the apex, indexed.
+    pub fn straight(&self) -> Rivers {
+        let mut r = Rivers::empty(self.c);
+        let n = ((Self::RIVER_TO_X - Self::APEX_X) / Self::SPACING).round() as u32;
+        for k in 0..=n {
+            let x = Self::APEX_X + f64::from(k) * Self::SPACING;
+            r.vertices.push(RiverVertex {
+                x: x as f32,
+                z: 0.0,
+                w: Self::river_w(x) as f32,
+                hw: Self::HALF_WIDTH as f32,
+                depth: Self::DEPTH as f32,
+                q: Self::Q as f32,
+            });
+        }
+        r.chains.push(Chain::new(0, n + 1, Mouth::Sea, u32::MAX));
+        r.build_index();
+        r
+    }
+
+    /// The river braided on the fan, and `stats.braids` of that pass.
+    pub fn rivers(&self) -> (Rivers, serde_json::Value) {
+        let mut r = self.straight();
+        let plain = |_: f64, _: f64| None;
+        let fan = |x: f64, z: f64| self.on_fan(x, z).then(|| self.cone(x, z));
+        let scale = deeptime_format::Scale::default_for(self.c);
+        let stats = crate::hydro::braid::apply(
+            &mut r,
+            &crate::hydro::braid::Input {
+                plain: &plain,
+                fan: &fan,
+                lambert: Some(self.projection()),
+                m_per_block_h: scale.m_per_block_h,
+                m_per_block_v: scale.m_per_block_v,
+            },
+        );
+        (r, stats)
+    }
+
+    /// Columns on the fan every 10 blocks, with the cone's height there: `[x, z, height]`.
+    pub fn cone_samples(&self) -> Vec<[f64; 3]> {
+        let mut out = Vec::new();
+        for i in 0..=16 {
+            let x = Self::APEX_X + 10.0 + 10.0 * f64::from(i);
+            for j in -16..=16 {
+                let z = 10.0 * f64::from(j);
+                if self.on_fan(x, z) && self.cone(x, z) > Self::PLAIN_Y + 0.5 {
+                    out.push([x, z, self.height(x as i64, z as i64)]);
+                }
+            }
+        }
+        out
+    }
+
+    /// The geometry, for `manifest.json` `notes.fan`, with the braid pass's record.
+    pub fn notes(&self, stats: &serde_json::Value) -> serde_json::Value {
+        let straight = self.straight();
+        serde_json::json!({
+            "profile": "plain y 70.5 for |x| <= 400 (periodic), linear to the sea floor y 45.5 at |x| 440; a range along x -265 (crest y 119, flanks 0.5 a block); a cone about (-200, 0) from y 86.5 falling 0.1 a block of planet to the plain at 160 blocks of planet; the ground is the highest of the three",
+            "plain_y": Self::PLAIN_Y,
+            "sea_w": Self::SEA_W,
+            "ridge": {"x": Self::RIDGE_X, "top_y": Self::RIDGE_TOP_Y, "fall": Self::RIDGE_FALL},
+            "fan": {
+                "apex_x": Self::APEX_X,
+                "apex_z": Self::APEX_Z,
+                "apex_y": Self::APEX_Y,
+                "fall": Self::FAN_FALL,
+                "radius": Self::FAN_RADIUS,
+                "toe_x": Self::toe_x()
+            },
+            "river": {
+                "chain": 0,
+                "z": 0.0,
+                "from_x": Self::APEX_X,
+                "to_x": Self::RIVER_TO_X,
+                "half_width": Self::HALF_WIDTH,
+                "depth": Self::DEPTH,
+                "q": Self::Q,
+                "w": {"under_cone": Self::UNDER_CONE, "toe": Self::TOE_W, "plain_end": Self::PLAIN_END_W, "plain_end_x": Self::PLAIN_END_X, "sea_from_x": Self::SEA_W_FROM_X}
+            },
+            "cone_samples": self.cone_samples(),
+            "straight_vertices": straight.vertices.len(),
+            "stats": stats
+        })
+    }
+}
+
+impl Terrain for FanTest {
+    fn circumference(&self) -> u32 {
+        self.c
+    }
+
+    fn height(&self, x: i64, z: i64) -> f64 {
+        let (x, z) = (x as f64, z as f64);
+        self.base(x).max(self.ridge(x)).max(self.cone(x, z))
+    }
 }
 
 #[cfg(test)]
@@ -687,6 +1085,86 @@ mod tests {
             assert_eq!(last.x, 160.0);
             assert_eq!(last.z.abs(), 64.0);
         }
+    }
+
+    #[test]
+    fn meander_test_profile_and_network() {
+        let t = MeanderTest { c: 1024 };
+        assert_eq!(t.height(0, 50), 70.5);
+        assert_eq!(t.height(-400, 0), 70.5);
+        assert_eq!(t.height(420, 0), 58.0);
+        assert_eq!(t.height(500, 0), 45.5);
+        assert_eq!(t.floodplain(0, 60), Some(0.0));
+        assert_eq!(t.floodplain(395, 0), None);
+        assert!((MeanderTest::river_w(412.0) - 63.0).abs() < 1e-12);
+        let straight = t.straight();
+        let (r, stats) = t.rivers();
+        r.validate().unwrap();
+        assert_eq!(r.chains.len(), 1);
+        let v = &r.vertices;
+        assert!(v.len() > straight.vertices.len(), "{stats}");
+        assert_eq!(v[0], straight.vertices[0]);
+        assert_eq!(
+            v[v.len() - 1],
+            straight.vertices[straight.vertices.len() - 1]
+        );
+        assert!(v.windows(2).all(|p| p[1].w <= p[0].w));
+        let off = v.iter().fold(0.0f32, |m, p| m.max(p.z.abs()));
+        assert!(
+            (15.0..=MeanderTest::FLOODPLAIN_HALF_WIDTH as f32 - 3.0).contains(&off),
+            "{off}: {stats}"
+        );
+        let k = stats["reach_sinuosity"].as_f64().unwrap();
+        assert!(k >= 1.5, "{stats}");
+        // Off the plain, down the slope into the sea, the course is the straight one.
+        assert!(v.iter().filter(|p| p.x > 392.0).all(|p| p.z == 0.0));
+    }
+
+    #[test]
+    fn fan_test_profile_and_network() {
+        let t = FanTest { c: 2048 };
+        assert_eq!(t.height(-265, 0), 119.0);
+        assert_eq!(t.height(-200, 0), 86.5);
+        assert!((t.height(-100, 0) - 76.5).abs() < 1e-9);
+        assert_eq!(t.height(0, 0), 70.5);
+        assert_eq!(t.height(500, 0), 45.5);
+        assert!(t.on_fan(-150.0, 30.0) && !t.on_fan(-210.0, 0.0) && !t.on_fan(-30.0, 0.0));
+        // The cone is round on the planet: 100 blocks of planet east and south stand alike.
+        let p = deeptime_format::Projection::of(2048.0);
+        let mut dz = 100.0;
+        for _ in 0..20 {
+            dz = 100.0 * p.cos_lat(0.5 * dz);
+        }
+        assert!((t.cone(-100.0, 0.0) - t.cone(-200.0, dz)).abs() < 1e-9);
+        assert!((FanTest::river_w(FanTest::toe_x()) - FanTest::TOE_W).abs() < 1e-12);
+        assert!((FanTest::river_w(412.0) - 63.0).abs() < 1e-12);
+        let straight = t.straight();
+        let (r, stats) = t.rivers();
+        r.validate().unwrap();
+        let threads: Vec<usize> = (1..r.chains.len()).collect();
+        assert!(threads.len() >= 2, "{stats}");
+        assert_eq!(r.chains[0].count, straight.chains[0].count);
+        let mut sides = Vec::new();
+        for &k in &threads {
+            let ch = r.chains[k];
+            assert_eq!((ch.from, ch.into, ch.mouth), (0, 0, Mouth::River));
+            let v = &r.vertices[ch.first as usize..(ch.first + ch.count) as usize];
+            assert!(v.windows(2).all(|p| p[1].w <= p[0].w));
+            // On the fan, around an island, and its water 1.25 blocks under the cone where it runs
+            // (the cone falls away from the course; to the block, 0.1 of 0.71 of a block).
+            assert!(v.iter().all(|q| t.on_fan(f64::from(q.x), f64::from(q.z))));
+            let far = v
+                .iter()
+                .fold(0.0f32, |m, q| if q.z.abs() > m.abs() { q.z } else { m });
+            assert!((10.0..=25.0).contains(&far.abs()), "{far}: {stats}");
+            for q in v {
+                let ground = t.height(q.x.round() as i64, q.z.round() as i64);
+                assert!(ground - f64::from(q.w) > 1.15, "{q:?}: ground {ground}");
+            }
+            sides.push(far.signum());
+        }
+        assert!(sides.windows(2).all(|p| p[0] != p[1]));
+        assert!(!t.cone_samples().is_empty());
     }
 
     #[test]

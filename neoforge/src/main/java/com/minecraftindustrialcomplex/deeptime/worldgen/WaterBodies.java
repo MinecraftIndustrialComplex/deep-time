@@ -50,7 +50,8 @@ import net.minecraft.world.level.material.Fluids;
  *       beside a river the highest water it holds with its steps, HYD-124), lowered to their
  *       {@code maxGround} (a 1:1 slope from the channel), and
  *       air between the neighbours' beds and {@code minGround} is sealed, so no water finds a way
- *       out. A bank keeps its top block (grass on a raised or lowered bank).</li>
+ *       out. A bank keeps its top block (grass on a raised or lowered bank), except a river's bank on
+ *       its floodplain, whose soil top is the levee's sand ({@link #LEVEE}, HYD-153).</li>
  *   <li><b>Fills.</b> Whatever the pass fills (a raised bank, ground under a channel's bed, a
  *       sealed or plugged cave) is soil, or a channel's sediment, in its top {@link #SOIL_BLOCKS}
  *       blocks and the column's own rock below (HYD-079). The router keeps cave mouths away from
@@ -84,8 +85,8 @@ public final class WaterBodies {
     private WaterBodies() {}
 
     /** What one chunk's pass did. */
-    public record Stats(int water, int cut, int filled, int flowing, int shielded) {
-        public static final Stats NONE = new Stats(0, 0, 0, 0, 0);
+    public record Stats(int water, int cut, int filled, int flowing, int shielded, int levee) {
+        public static final Stats NONE = new Stats(0, 0, 0, 0, 0, 0);
     }
 
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
@@ -114,6 +115,23 @@ public final class WaterBodies {
      */
     public static BlockState underWater(BlockState s) {
         return s.getBlock() instanceof SpreadingSnowyDirtBlock ? DIRT : s;
+    }
+
+    /**
+     * A river bank's levee (ledger: HYD-153): where a bank column beside a river lies on the floodplain
+     * ({@link WorldData#onFloodplain}), its top block, when it is soil ({@link #levees}), becomes sand. Natural
+     * levees are highest and coarsest at the channel's margin (Smith et al. 2009); levee and proximal floodbasin
+     * sediment runs from very fine sand to medium silt (Filgueira-Rivera et al. 2007), and sand is the block for its
+     * coarse end. The band is the bank zone the column rule already draws (the rivers file's bank zone plus its bank
+     * ratio times the half-width, HYD-024; game-choice: no new width). That is 0.27 to 0.96 of the drawn channel's
+     * width, inside the 0.15 to 1.07 levee widths per channel width of the Upper Columbia (Adams et al. 2004); real
+     * levees run from a fraction of a channel width to over ten.
+     */
+    static final BlockState LEVEE = Blocks.SAND.defaultBlockState();
+
+    /** Soil a levee covers: grass, podzol and mycelium (snowy or not), dirt, coarse and rooted dirt; never mud, snow, sand, gravel or clay. */
+    public static boolean levees(BlockState s) {
+        return s.getBlock() instanceof SpreadingSnowyDirtBlock || s.is(Blocks.DIRT) || s.is(Blocks.COARSE_DIRT) || s.is(Blocks.ROOTED_DIRT);
     }
 
     /** A top block worth keeping on a bank that moves: soil, sand, gravel, snow. */
@@ -241,7 +259,8 @@ public final class WaterBodies {
     private static final java.util.concurrent.atomic.LongAdder CHUNKS = new java.util.concurrent.atomic.LongAdder(),
             WORKED = new java.util.concurrent.atomic.LongAdder(), NANOS = new java.util.concurrent.atomic.LongAdder(),
             WORKED_NANOS = new java.util.concurrent.atomic.LongAdder(), SHIELDED = new java.util.concurrent.atomic.LongAdder(),
-            WOKEN = new java.util.concurrent.atomic.LongAdder(), DRAINED = new java.util.concurrent.atomic.LongAdder();
+            WOKEN = new java.util.concurrent.atomic.LongAdder(), DRAINED = new java.util.concurrent.atomic.LongAdder(),
+            LEVEES = new java.util.concurrent.atomic.LongAdder();
     static final long LOG_EVERY = 512;
 
     /** Applies the pass to {@code chunk} with the generator's noise cell width. */
@@ -254,15 +273,16 @@ public final class WaterBodies {
             WORKED.increment();
             WORKED_NANOS.add(dt);
             SHIELDED.add(s.shielded());
+            LEVEES.add(s.levee());
         }
         CHUNKS.increment();
         if (CHUNKS.sum() % LOG_EVERY == 0) {
             long n = CHUNKS.sum(), w = WORKED.sum();
             com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(
                     "[deeptime] water pass: {} chunks, {} with water or coast, {} µs a chunk on average ({} µs where it worked); "
-                            + "{} water blocks kept from the carvers, {} columns woken over carved beds, {} sea blocks drained from closed basins",
+                            + "{} water blocks kept from the carvers, {} columns woken over carved beds, {} sea blocks drained from closed basins, {} levee tops of sand",
                     n, w, String.format("%.1f", NANOS.sum() / 1000.0 / n), String.format("%.1f", w == 0 ? 0.0 : WORKED_NANOS.sum() / 1000.0 / w),
-                    SHIELDED.sum(), WOKEN.sum(), DRAINED.sum());
+                    SHIELDED.sum(), WOKEN.sum(), DRAINED.sum(), LEVEES.sum());
         }
         return s;
     }
@@ -288,6 +308,9 @@ public final class WaterBodies {
         boolean closed = wd.has(WorldData.CLOSED_BASIN)
                 && PlayaPass.anySalt(wd.layer(WorldData.CLOSED_BASIN), x0, z0, x0 + 15, z0 + 15);
         int seaTop = spec.seaLevel() - 1, drained = 0;
+        // Floodplains in the world (HYD-152): the river banks on them get their levee's sand (ledger: HYD-153).
+        boolean plains = wd.has(WorldData.FLOODPLAIN);
+        int levee = 0;
         for (int lz = 0; lz < 16; lz++) {
             for (int lx = 0; lx < 16; lx++) {
                 Water.Column col = reg.column(lx + 1, lz + 1);
@@ -447,6 +470,14 @@ public final class WaterBodies {
                                     filled++;
                                 }
                         }
+                        // A river's bank on its floodplain: the levee's sand on its soil top (ledger: HYD-153).
+                        if (plains && col.river() != null && g >= minY && g <= maxY && wd.onFloodplain(x, z)) {
+                            BlockState b = chunk.getBlockState(pos.set(x, g, z));
+                            if (levees(b)) {
+                                chunk.setBlockState(pos, LEVEE, false);
+                                levee++;
+                            }
+                        }
                     }
                     default -> {}
                 }
@@ -486,7 +517,7 @@ public final class WaterBodies {
             }
         }
         DRAINED.add(drained);
-        return new Stats(water, cut + drained, filled, flowing, shielded);
+        return new Stats(water, cut + drained, filled, flowing, shielded, levee);
     }
 
     /**
