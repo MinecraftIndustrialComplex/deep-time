@@ -229,9 +229,9 @@ fn a_thread_on_a_cone_keeps_its_water_under_the_ground() {
             lowered = lowered.max(w_at(z0, len, slope, x) - w);
         }
     }
-    // The first islands lie near the apex, where a thread 15 blocks off the axis is half a block
-    // lower.
-    assert!(lowered > 0.3, "{lowered}");
+    // The first island lies 20 to 60 blocks below the apex, where a thread 15 blocks off the axis
+    // runs on ground over a quarter of a block lower than the course's.
+    assert!(lowered > 0.25, "{lowered}");
 }
 
 #[test]

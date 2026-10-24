@@ -101,11 +101,10 @@ struct Pt {
     q: f64,
 }
 
-/// One island: its chain's vertex span [a, b], how far each vertex inside it is along the island
+/// One island: the chain's vertex it starts at, how far each vertex inside it is along the island
 /// (0 to 1), and the new thread's vertices.
 struct Island {
     a: usize,
-    b: usize,
     along: Vec<f64>,
     thread: Vec<RiverVertex>,
 }
@@ -352,7 +351,6 @@ impl Net<'_> {
                         let along = (a + 1..b).map(|i| (u[i] - ua) / (ub - ua)).collect();
                         islands.push(Island {
                             a,
-                            b,
                             along,
                             thread,
                         });
