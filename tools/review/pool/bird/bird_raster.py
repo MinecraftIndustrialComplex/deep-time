@@ -4,6 +4,14 @@
 on its side of the nearest boundary step; then the pool's `boundgeom` measure (the same code the model's
 maps go through) and the dynamics record's estimator (one spacing per boundary sample over 1.043).
 
+Flags within one spacing of a step, as the model's maps carry them: TRENCH on the subducting side of a
+SUB step, DIVERGENT on both sides of OSR and CRB, the front flags of crust_budget.rs on the overriding
+side of a SUB step (256, both sides where the step has no polarity) and on both sides of a CCB step
+(512: Bird's continental convergent boundaries are unpolarised, "-"). The model's front is the boundary
+mix's subduction and collision fronts together, so it reads against SUB + CCB (Bird 2003 Table 3:
+51,310 + 23,003 km; plates.md, "Step 7"). The `_k7` numbers put this raster through the model's
+one-lattice step (measure_boundgeom.k7).
+
     python3 -I bird_raster.py <bird data dir> <bird scripts dir> <pool tools dir> [n]
 """
 import json
@@ -126,6 +134,10 @@ for n_, (jj, dd) in enumerate(zip(j, dist)):
     under = right if sym == "/" else (left if sym == "\\" else None)
     if cls == "SUB" and under is not None and names.get(under) == plate[n_]:
         flags[n_] |= mg.TRENCH
+    if cls == "SUB" and (under is None or names.get(under) != plate[n_]):
+        flags[n_] |= mg.FRONT_SUB
+    if cls == "CCB":
+        flags[n_] |= mg.FRONT_COLL
     if cls in ("OSR", "CRB"):
         flags[n_] |= mg.DIVERGENT
 worst_plates("cleaned")
@@ -158,5 +170,14 @@ out["rec_estimator_bnd_km"] = sum(P.values()) / 2.0
 out["rec_estimator_excess"] = sum(P.values()) / sum(pc.values())
 out["pcap_sum_km"] = sum(pc.values())
 out["trench_samples"] = int(np.sum(flags & mg.TRENCH != 0))
+out["front_sub_samples"] = int(np.sum(flags & mg.FRONT_SUB != 0))
+out["front_coll_samples"] = int(np.sum(flags & mg.FRONT_COLL != 0))
+out["sub_unpolarised_steps"] = sum(1 for r_ in step_rows if r_[5] == "SUB" and r_[4] not in "/\\")
+# The front by the TRENCH flag alone (SUB only, as boundgeom version 2 measured PB2002).
+trench_only = mg.measure(xyz, plate, flags & ~mg.FRONT, kind)
+out["front_trench_l77"] = trench_only["front_l77"]
+out["front_trench_l380"] = trench_only["front_l380"]
+out["tau_front_trench_sum_l77"] = trench_only.get("tau_front_sum_l77")
 out.update(mg.measure(xyz, plate, flags, kind))
+out.update(mg.measure_k7(xyz, plate, flags, kind))
 print(json.dumps({k: (round(v, 4) if isinstance(v, float) else v) for k, v in out.items()}, indent=1))
