@@ -924,11 +924,13 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     // The braids on the fans and the steep reaches of the plain, after the meanders (HYD-171 to
     // HYD-175).
     let braided = if params.braids && (!fp.is_empty() || !fans.fans.is_empty()) {
-        let mut on_fan = vec![false; grid.cells()];
-        for cell in fans.cells() {
-            on_fan[cell as usize] = true;
-        }
-        let fan = |x: f64, z: f64| cell_at(x, z).is_some_and(|cl| on_fan[cl]);
+        // The fan's ground (its highest cone) on each fan cell, blocks.
+        let ground = fans.ground();
+        let fan = |x: f64, z: f64| -> Option<f64> {
+            let cl = cell_at(x, z)? as u32;
+            let i = ground.binary_search_by_key(&cl, |e| e.0).ok()?;
+            Some(f64::from(ground[i].1) / 16.0)
+        };
         Some(hydro::braid::apply(
             &mut result.rivers,
             &hydro::braid::Input {

@@ -1766,7 +1766,8 @@ layout changes: the course stays one chain, narrowed (0.9 of its width) and shal
 depth) around each island and carrying half the flow there; each island's other thread is a chain
 of its own appended after the old chains, with `from` and `into` both the course's chain and mouth
 `River`, its first and last vertices copies of two of the course's vertices, and its water surface
-the course's at the same distance down it.
+the course's at the same distance down it, lowered on a fan by as much as the cone under the thread
+lies below the cone under the course, and never rising.
 `notes.bake.water.params` holds the parameters (`deltas`, `delta_area_mult`, `delta_shape_k`,
 `delta_max_mouths`, `delta_mouth_spacing`, `floodplains`, `meanders`, `fans`, `braids`), `stats.deltas` the counts, areas, the largest deltas
 and Earth's figures beside them, `stats.floodplains` the plain's cells, km² and share of the land
