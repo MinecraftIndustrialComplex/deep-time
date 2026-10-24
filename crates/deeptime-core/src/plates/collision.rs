@@ -19,11 +19,11 @@
 //!   (its samples move into a new rigid group of that plate with the rotation they already had),
 //!   once the collision has shortened by `collision_threshold_km` or stalled; the overriding plate
 //!   takes the area-weighted mean of its rotation and the terrane's;
-//! - with `tectonics.transference` (on by default; Stern 2004's transference; ledger PLT-516), a
-//!   continent whose collision has not stalled also moves alone, once its subduction has failed
-//!   (the contact's slab is gone), its plate has gone on converging on it by the critical
-//!   convergence since, and the collision's push on it over its margin against its own plate's
-//!   ocean floor is enough to start a new subduction zone there ([`transference_due`]).
+//! - with `tectonics.transference` (Stern 2004's transference; ledger PLT-516), a continent whose
+//!   collision has not stalled also moves alone, once its subduction has failed (the contact's
+//!   slab is gone), its plate has gone on converging on it by the critical convergence since, and
+//!   the collision's push on it over its margin against its own plate's ocean floor is enough to
+//!   start a new subduction zone there ([`transference_due`]).
 //!
 //! No uplift is applied here: the belt is built while the collision lasts. (Until tasks 3 and 4
 //! a collision raised everything within up to 2,000 km of the contact by one surge in the step it
