@@ -6258,22 +6258,24 @@ continents 11.56 and 6.74. What is off:
 
 - Sediment subduction is Earth's in both arms, and so is the loss at sutures under T (0.86
   against 0.7). Base3's 2.18 was three times Earth's: the long collisions closed its book.
-- The arcs add 1.7 to 2.5 times Earth's, and not by their rate: per geodesic km of front (the
-  lattice front over 1.84, `measure_boundary.py`) island arcs add about 130 km3/km/Myr against
-  Stern & Scholl's 100 (Clift et al. 2009: 125), continental arcs about 29 against 35. The
-  fronts are long: 47,823 and 107,334 lattice km under T, about 26,000 and 58,000 geodesic km,
-  against Earth's 14,500 and 27,500. The plate check's subducting share of the boundary is 36.6 %
-  (dock-c3 33.8 %) against Bird 2003's 19.7 % and fails in every run of both arms: the arcs'
-  surplus is the subduction zones' length, gap 2's boundary organisation
-  (`physics-gap-audit.md`), with or without T. Base3 hid it under the excess loss at sutures;
-  under T nothing offsets it, so the volume grows by about 4 km3 a year and the crust thickens.
+- The arcs add 1.7 to 2.5 times Earth's, and not by their rate: per km of front (the lattice
+  front, one spacing a front sample, over 1.12; see "The front's length on the lattice" below)
+  island arcs add about 79 km3/km/Myr against Stern & Scholl's 100 at full convergence (Clift et
+  al. 2009: 125), continental arcs about 18 against 35; the slow plates' convergence factor g is
+  0.57 on the oceanic fronts. The fronts are long: 47,823 and 107,334 lattice km under T, about
+  42,700 and 95,800 km, against Earth's 14,500 and 27,500. The plate check's subducting share of
+  the boundary is 36.6 % (dock-c3 33.8 %) against Bird 2003's 19.7 % and fails in every run of
+  both arms, and the whole boundary is about 1.65 times Bird's: the arcs' surplus is the
+  subduction zones' length, gap 2's boundary organisation (`physics-gap-audit.md`), with or
+  without T. Base3 hid it under the excess loss at sutures; under T nothing offsets it, so the
+  volume grows by about 4 km3 a year and the crust thickens.
 - Subduction erosion takes 0.6 of Earth's, for two reasons. Its erosive fronts are 16,888 lattice
-  km (about 9,200 geodesic) against Clift & Vannucchi's 22,925, because few slabs come in at the
+  km (about 15,100 km) against Clift & Vannucchi's 22,925, because few slabs come in at the
   60 mm/yr PLT-442 asks for (the plates' area-weighted RMS speed is about 29 mm/yr, the plate
   check's band 40 to 100, failing in both arms). And the band runs out: PLT-441 takes its volume
   from the samples within 200 km of the front, nearest first, each down to an ocean floor's
   7 km, and the front stays where it is in the overriding plate's frame, so a margin that erodes
-  for long has nothing left to give (`short`).
+  for long has nothing left to give (`short`): it takes about 55 km3/km/Myr of its 90.
 - Foundering is 0, and delaminating a lower crust takes it from below, so it would make or
   consume no area on Earth either; it is not in the area book.
 - The volume grows faster under T because the drowned continents erode less (6.74 against
@@ -6315,11 +6317,12 @@ sources go) 0.36 by extension plus the arcs' against about 0.51. What is off:
   retreat.
 - The collisions consume 0.30 km2 a year under T (the book's two sinks, all of them at
   collision fronts, since nothing else consumes continental area; the area crossing the fronts
-  is 0.251 on the lattice front, about 0.14 on the geodesic one; dock-c3 0.585 on the lattice
-  front), against Bird's 0.43 for today and about half of it for a long-term suturing length.
-  Base3's was above Earth's; T's is between the two.
-- The arcs' maturing makes 0.26 km2 a year on fronts twice Earth's length, and extension
-  (collapse and the rate part, 0.10) makes less than Bird's CRB. The first is gap 2's again.
+  is 0.251, PLT-222's Voronoi crossing, which is exact on a jagged front; dock-c3 0.585), against
+  Bird's 0.43 for today and about half of it for a long-term suturing length. Base3's was above
+  Earth's; T's is between the two.
+- The arcs' maturing makes 0.26 km2 a year on island-arc fronts about three times Earth's
+  length, and extension (collapse and the rate part, 0.10) makes less than Bird's CRB. The first
+  is gap 2's again.
 
 **Why one plate grows past half the planet.** Under T one plate holds over half the planet in a
 median 16.5 % of the steps (8.6 to 26.8 by run; dock-c3 0 in 8 of 8; the plate check's band at
@@ -6354,15 +6357,79 @@ arm with T on against dock-c3 per stage:
 1. **S1, the trench's retreat under subduction erosion.** An erosive margin truncates the
    overriding plate: the front sample's whole column goes down and the sample leaves its plate,
    so the front, the forearc and the arc move inboard. On Earth's numbers it is small for the
-   area: 2.5 km/Myr on the model's 9,200 geodesic km of erosive front is about 0.023 km2 a
-   year, a third of it under continental crust, against the +0.076 to close. It is the missing
+   area: 2.5 km/Myr on the model's 15,100 km of erosive front is about 0.038 km2 a year, a
+   quarter of it under continental crust, against the +0.076 to close. It is the missing
    physics all the same, and the arm says what it does to the arcs' maturing (an eroded
    island-arc forearc no longer matures).
 2. What comes after S1 is decided on its arm: the collisional consumption (T ends a collision by
    moving the subducting plate's whole connected continent onto the overriding plate, a median
    5,528 samples, after which nothing shortens it, where India has gone on converging with Asia
    for 50 Myr) or the arcs' maturing threshold against Earth's continental area per km3 of arc
-   crust.
+   crust. (Read below: neither; the lane stops after S1.)
 
 Not this lane's: the subduction zones' length and the plates' slowness (gap 2), the belts
 spreading inland (a later lane, the coordinator's call).
+
+**Arm dock-TS1: T and S1** (`pool.sh run dock-TS1 --length 1000 --seeds 1,2,3,4 --set
+tectonics.transference=true --set tectonics.erosion_retreat=true +DEEPTIME_CRUST_BUDGET=1`, key
+f2c8da8b0dd4, argkey 295dc57c, 8 runs, both starts; with S1 off the key is bit-identical to
+base3, `pool.sh alias`, seed 1, 1000 Myr). Medians, dock-T to dock-TS1:
+
+- The retreat does what it was built to do: 2.44 to 2.60 km/Myr per lattice km of continental
+  erosive front in every run (2.7 to 2.9 per km of front, by the lattice's 1.12 below), taking
+  0.011 km2 of continental area a year (0.022 of the planet over the run; a quarter of the erosive
+  front is under continental crust). Subduction erosion's volume falls from 0.83 to 0.61 km3 a
+  year: the retreat replaces the band's thinning, and an island-arc forearc's column is thinner
+  than a continent's.
+- The continental area does not fall: 0.571 to 0.621 at the end (higher in 6 of 8 seeds;
+  Mann-Whitney U 7 of 64, p about 0.01), and the sea stands 2,024 m over the datum (1,730). By the area book's means over
+  the runs: the retreat -0.022, the fronts' hiding -0.412 to -0.380, the collapse +0.144 to
+  +0.171, the arcs' maturing +0.506 to +0.518, the sum +0.153 to +0.201. The fronts' change is
+  the supercontinent start's (-0.390 to -0.330; the scattered start's -0.434 and -0.430), and one
+  part moves more from run to run within an arm (the fronts -0.34 to -0.48 in dock-T) than S1's
+  own -0.022. The rise is not traced further: whichever way it is read, S1 is a sink of 0.011
+  km2 a year against a surplus of 0.076.
+- The plate check against dock-c3 (runs passing of 8), failing more as under T: the arcs'
+  continental heights (p50 7 to 0, p90 8 to 0; medians 567 and 1,727 m), one plate above half
+  (8 to 3, 13.5 % of steps), rifts welded back within 50 Myr (7 to 2), the largest land gain
+  (4 to 0), the speed-area rank (8 to 4), the largest plate's median share (8 to 6), the big
+  plates' median speed (8 to 6). Against dock-T it passes more on one plate above half (1 to 3),
+  the largest plate's share (4 to 6), the plates above 5 % (5 to 7) and the collisions'
+  convergence ratio (3 to 6), and fewer on the speed-area rank (7 to 4) and the collisions per
+  100 Myr (8 to 6). The guard: no step beyond 2 Earth reliefs and `guard_bind_steps` 0 in 8 of
+  8; its worst 15,042 m from the sea (dock-c3 12,061, the sea higher). The V1 census: land
+  0.065 (dock-c3 0.319), continental crust under the sea 0.897, criteria met 4 (5).
+- So S1 does not make T and the sink correct on the pool.
+
+**The front's length on the lattice.** The rates per km of front (the arcs, PLT-045; subduction
+erosion, PLT-441; the retreat, PLT-522) book one lattice spacing (76.7 km on the quick lattice) per
+front sample. Counted that way a straight boundary is 1.12 times its length (1.08 to 1.21 over 40
+random great circles on a 100,000-point Fibonacci lattice, `build/dock/zigzag.py`, the agent's
+script; a hexagonal lattice gives about 1.10). The factor 1.84 used earlier on this page and in
+`measure_boundary.py` is the model's whole boundary in lattice km (480,054) over Bird's 260,487
+km, which assumes the model's boundary is as long as Earth's; it is not the lattice's zigzag. The
+model's boundary is about 428,600 km, 1.65 times Earth's with 24 plates against 52 (gap 2). The
+collision fronts' lengths and crossings (PLT-222) are straight lengths already. So each per-km
+rate is about 12 % over its source per km of the model's own front: the retreat's 2.5 is 2.8,
+inside Scholl & von Huene's 1 to 5 and Clift & Vannucchi's 0.9 to 4.7. One change would serve all
+three: each front sample's share of the straight front, its crossing sum along the boundary's
+normal (`shortening::crossing_sum`, `boundary_normal`). It is not made here, because through the
+arcs it changes the default planet.
+
+**What comes after S1: nothing in this lane.** With the lengths read right, no flux left in this
+lane is off Earth's numbers in the direction that would close the area:
+
+- the collisions consume 0.25 to 0.30 km2 a year, against Earth's long-term of about 0.2 and
+  today's 0.43, so making them consume more would take them off the long-term;
+- extension (collapse and the rate part) makes 0.10, below Bird's CRB of 0.36, so righting it
+  adds area;
+- the retreat is in (S1), at Earth's rate;
+- the arcs mature at Cloos's 15 km (PLT-047), a sourced threshold.
+
+What is off is the island-arc front's length, about three times Earth's, and the plates'
+slowness (the erosive front is 0.66 of Earth's): gap 2's boundary organisation, which Ben deferred
+until after V1 item 1. On Earth's 14,500 km of island arc the maturing would make about 0.09 km2 a
+year, and the book would stand at about 0.21 made against 0.31 consumed (an inference from the
+book's parts, not a run). The lane stops here: the coordinator's step 3 stops when a stage makes
+T and the sink correct, and never tunes to a V1 number. T and S1 stay off by default, both built
+and correct.
