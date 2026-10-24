@@ -18,9 +18,10 @@ Rain that does not evaporate runs downhill, gathers into rivers and fills hollow
 | [HYD](ledger/HYD.md) | the sea's one rule (below, "The sea's one rule", 2026-10-21) | HYD-106 to HYD-109 (4) |
 | [HYD](ledger/HYD.md) | river channels in the game (below, "River channels cut to the bake's depth", 2026-10-22) | HYD-120 to HYD-124 (5) |
 | [HYD](ledger/HYD.md) | deltas and distributaries (below, "Deltas and distributaries", 2026-10-23) | HYD-130 to HYD-144, HYD-146, HYD-147 (17) |
+| [HYD](ledger/HYD.md) | floodplains and levees (below, "Floodplains and levees", 2026-10-24) | HYD-150 to HYD-153 (4) |
 | [BIO](ledger/BIO.md) | land on a delta plain (below, "Stage 1b on the D5 world"; biomes.md, "Land on a delta plain") | BIO-185 (1) |
 
-Rows by status (114 active, 1 `merged`): `verified` 6, `cited-unverified` 12, `from-memory` 5, `abstract-only` 3, `calibrated` 1, `game-choice` 64, `uncited` 23.
+Rows by status (118 active, 1 `merged`): `verified` 7, `cited-unverified` 12, `from-memory` 5, `abstract-only` 3, `calibrated` 1, `game-choice` 67, `uncited` 23.
 
 ## Material for the stage 2 writer
 
@@ -265,6 +266,47 @@ What a player would see before Ben looks at a world: (1) the Petroff-Guyou world
 - **The cost of (2).** The sea's columns beside the plain read the plain's land record bilinear: 2,947 of the 4,587 sea cells (L3) within an L2 cell of its dry cells read a coast or land continentalness (386 in stage 1), about 1,020 km², 0.044 % of the land. That is the water's edge of a wetland; the sea there is the sea's water whatever biome it carries.
 - **Wetland.** 65 % of the plain's dry columns lie in the swamp band, where the valley slice is swamp or mangrove swamp: the plains are wetlands, as deltas are. Left as it is.
 - **Cost.** The projection ran in 6.77 s at the branch head against 8.07 s for stage 1 (noise: no measurable cost).
+
+## Floodplains and levees (2026-10-24, HYD-150 to HYD-153)
+
+V1 gap 5, stage 2 of four: the flat valley floors beside rivers that floods build, and the levees along their banks. Meanders (stage 3) and fans and braids (stage 4) are not in this section.
+
+### Design
+
+**Which ground is a floodplain (HYD-150, HYD-152).** GFPLAIN's rule (Nardi et al. 2019, read; the values from its code, `03-GFPLAIN.py`, read, and only read: the code is GPL and nothing of it is ported): a cell is floodplain where its ground lies at most a flood depth h over the channel cell it drains to, with h = a A^b metres, a = 0.01, b = 0.30 and A the area draining to that channel cell in m² (h is about 2 m at 50 km², 5 m at 1,000 km², 10 m at 10,000 km² and 20 m at 100,000 km²). The bake runs it in the last network run of the water part, on the hydrology's grid (Lambert L3, 2 blocks a cell): each land cell's drain is the first river cell down its receivers, none where the way meets the sea, a lake a block deep or a sink first; its height above that drain (HAND) is the difference of the two cells' filled heights. A cell is plain when HAND is at most h. Not plain: lake and sea cells, the delta plains (laid already, stage 1), and the floor of a basin that holds no lake (ground a block or more under its filled surface: laying a plain there would fill the basin the lake balance left dry; 138 cells on D5). A river cell beside the plain is part of it, so the channel is cut into it.
+
+**Where it is laid (HYD-151).** h is under one 35 m block for every river on the planet, so the plain's cells already stand within a block of their river. What the plain changes is that it is flat and stands where a bank stands: each plain cell takes its drain's bank level, the drain's filled height but at least one block over its water (the plain's top block one above the water's top block, as the column rule's banks stand, HYD-124). A cell lower than that level (a hollow a fraction of a block deep beside the channel) is filled to it, as overbank deposition fills a floodplain; a cell higher (by at most h) is lowered to it. The detail amplitude is set to 0 on the plain (a floodplain is flat), and the layer `floodplain` keeps what the plain moved the ground by (i16, 1/16 block, NODATA off the plain), so a re-run of the water part takes it off first and ends where it ended (checked on D5: the re-run's `elevation`, `floodplain`, `delta`, `detail/amplitude`, `water_level` and horizon stacks hash the same). On a Lambert world the horizon stacks' first tops are raised over the cells the plain raised, as for the deltas; a projected world resamples `floodplain` by the nearest cell (a categorical layer, as `delta`, HYD-146).
+
+**Levees (HYD-153).** Natural levees are low wedge-shaped ridges of channel-borne sediment, "typically highest and coarsest at the channel margins", and their widths "vary from a fraction to over 10 times the channel width" (Smith et al. 2009, read); levee and proximal floodbasin sediment ranges from very fine sand to medium silt (Filgueira-Rivera et al. 2007, read). In the game a river's bank columns (the column rule's bank zone, HYD-024: within the channel's half-width plus one block plus half the half-width, or beside its water) that lie on the floodplain get sand for a soil top (grass, podzol, mycelium, dirt, coarse or rooted dirt; never mud, snow, sand, gravel or clay). The band is the bank zone the rule already draws (game-choice: no new width): 1 + hw/2 blocks beyond a channel of half-width hw, so 0.27 to 0.96 of the drawn channel's width (from the widest channel, 64 blocks, to the smallest river's 1.4, HYD-001, HYD-009), inside the 0.15 to 1.07 levee widths per channel width of the Upper Columbia and under the Lower Saskatchewan's 0.41 to 25.96 (Adams et al. 2004, read, Table 1). No levee ridge is raised: the plain is one block over the water, and a ridge a block higher than the plain would be 35 m. Far terrain (Distant Horizons) does not draw the sand (left for later).
+
+**What is written.** The layer `floodplain` (FORMAT.md), `notes.bake.water.params.floodplains` (preset key `hydro.floodplains`, on by default) and `notes.bake.water.stats.floodplains`. Java reads the layer through `WorldData.onFloodplain`; `WaterBodies` lays the levee's sand. `DeltaGameTests.leveesAreSandOnTheFloodplainOnly` checks it on the delta-test world, which now writes a floodplain over its river's upstream reach.
+
+### On the D5 world (measured 2026-10-24)
+
+**How.** As for the deltas: the D5 world's Lambert bake (`rivers-d5/lam` on the test VM) had its water part run again at the branch head with `--set hydro.floodplains=false` (before) and with the defaults (after), and each was projected to Petroff-Guyou (`deeptime project`; both chose λc 120.25). This is not a simulation (the water part reads the cached bake's ground). `build/deltas/fp_census.py` (not committed) counts the projected worlds; the bake's own record is `notes.bake.water.stats.floodplains`. The review page is the private space "deeptime-floodplains".
+
+| Measure | D5 | Earth |
+|---|---|---|
+| Floodplain, km² (the bake) | 167,243 | 13,394,139 (GFPLAIN, basins over 1,000 km², 60°N to 60°S; the figure as Lane et al. 2023 quote it, read: GFPLAIN's own table did not load) |
+| Share of the land | 7.2 % (6.5 % within 60° of the equator) | about 11.5 % for GFPLAIN (its area over the land between 60°N and 60°S, the land area from memory); 19.7 % in Lane et al. 2023's own map (26.6 million km², read), and about 21 % for their map cut to GFPLAIN's latitudes with a 20 km² minimum drain (24.2 million km², read; the planet's rivers start at 50 km²) |
+| Share of the land, drains of at least 1,000 km² | 4.97 % (plain 5.3 km wide per km of channel) | GFPLAIN's cut-off |
+| ... at least 10,000 km² | 2.78 % (14.9 km) | |
+| ... at least 100,000 km² | 0.28 % (13.5 km) | |
+| River cells in the plain | 60,383 | |
+| Delta plain cells left out | 26,197 | |
+| Cells raised (overbank fill) / lowered | 302,210 (at most 2.31 blocks) / 90,586 (at most 0.75) | |
+| Top block moved: up 1 / unmoved / down 1 / up 2 or more | 243,204 / 214,003 / 7,146 / 212 | |
+| Plain cells whose noise was cleared | 99,906 | |
+| The projected world: plain cells, km² | 481,777 cells, 167,256 km² (7.25 % of its land) | |
+| ... detail amplitude on the plain, mean blocks (before, after) | 0.024, 0.006 (zero on 77.5 % and 94.2 %) | |
+| ... where the plain lies: under a drawn channel / in its bank zone / beyond | 27.0 % / 18.3 % / 54.6 % (91,352 km²) | |
+| ... plain cells within 8 blocks of a bank zone whose top block stands over the channel's water top block by at most 0 / 1 / 2 / 3 or more, before | 125,559 / 92,990 / 3,909 / 613 | |
+| ... after | 12,334 / 208,004 / 2,121 / 612 | |
+
+- **Against Earth.** The planet's floodplains are about half of GFPLAIN's share by the same rule, and a third of Lane et al.'s with a minimum drain near the planet's. The rule is GFPLAIN's own and nothing was tuned to an Earth figure (decisions log 2026-10-23); the planet's rivers drain smaller areas than Earth's (h depends on A only) and its valleys come from the stream-power solve, so a smaller share is what the physics gives.
+- **The raise.** HAND is under a sixteenth of a block on 276,448 cells: flats and hollows at their drain's filled level, flush with the river's water before. Laying the plain one block over the water lifts them by up to a block (2.31 at most, the fill of a hollow), and 243,204 cells' top block rises by one. That is the change a player sees: before, 56 % of the plain beside a channel stood flush with the water or under it (the bank rule then raised a one-column bank); after, 93 % stands one block over it, as a bank does.
+- **Stacks.** On the Lambert bake the horizon stacks' tops were raised on 2,924 cells, by up to 34 blocks measured from each stack's old top (the existing `raise_world_tops` behaviour also seen for the deltas, whose maximum is 58); the plain itself raises the ground by at most 2.31 blocks.
+- **Cost.** The floodplain step took 1.24 s of the water part on the VM.
 
 ## Navigable rivers and deltas on the D5 world (measured 2026-10-22)
 

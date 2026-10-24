@@ -1606,6 +1606,51 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Library: not fetched.
 - Read so far (by the project): at second hand only (Edmonds et al. 2021), 2026-10-23.
 
+### Nardi2019
+- Reference: Nardi, F., Annis, A., Di Baldassarre, G., Vivoni, E. R. and Grimaldi, S. (2019). GFPLAIN250m, a global high-resolution dataset of Earth's floodplains. Scientific Data 6:180309. Code: GFPLAIN, github.com/fnardi/GFPLAIN (GPL; read for two values only, nothing ported).
+- DOI or URL: 10.1038/sdata.2018.309
+- Cited as: "Nardi et al. 2019" and "GFPLAIN" (hydro/network.rs; bake/water.rs; rivers-and-lakes.md).
+- Ledger ids: HYD-150
+- Access: open access (CC BY 4.0).
+- Library: not fetched (the HTML text read is in the floodplain agent's scratch folder, not the library).
+- Read so far (by the project): 2026-10-24, the floodplain agent, the article's HTML text: Eq. 1 h ∝ A^b, the floodplain as the cells draining to a channel cell whose elevations are lower than H = z + h, "a constant parameterization at the global scale with b = 0.30", SRTM at 250 m between 60°N and 60°S for basins over 1,000 km². Table 1 did not load. a = 0.01 read in the code (`03-GFPLAIN.py`).
+
+### Lane2023
+- Reference: Lane, C. R., D'Amico, E., Christensen, J. R., Golden, H. E., Wu, Q. and Rajib, A. (2023). Mapping global non-floodplain wetlands. Earth System Science Data 15:2927-2955 (the title and the author list from memory).
+- DOI or URL: 10.5194/essd-15-2927-2023
+- Cited as: "Lane et al. 2023" (rivers-and-lakes.md, the Earth figures beside the D5 floodplains).
+- Ledger ids: none (doc claim beside HYD-150)
+- Access: open access.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the floodplain agent, through a page fetch (its first 100,000 characters), Section 3.3.1: "Nardi et al. (2019) calculated a global floodplain extent of 13 394 139 km2" with a 250 m pixel size, a 1,000 km² minimum contributing area and 60°N to 60°S; their own map, "Floodplains were estimated to cover 26.6×10^6 km2 (Table 5), or 19.7 % of the global landmass"; with Nardi's latitudes, 90 m data and a 20 km² minimum, about 24.2 million km².
+
+### Smith2009
+- Reference: Smith, N. D. et al. (2009). A paper on natural levees. Earth Surface Processes and Landforms 34:1060-1068 (the title and the co-authors were not recorded when it was read; the first author, year, venue and pages as read).
+- DOI or URL: 10.1002/esp.1792; the copy read at ftp.ems.psu.edu/pub/geosc/sling/PUBLICATIONS_SLINGERLAND/2001-2010/Smithetal2009.pdf (the host's certificate does not match).
+- Cited as: "Smith et al. 2009" (WaterBodies.java LEVEE; rivers-and-lakes.md).
+- Ledger ids: HYD-153
+- Access: paywalled (Wiley); an author's group copy (Penn State).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the floodplain agent, the Penn State copy, p. 1060: natural levees are "low wedge-shaped ridges" of "mainly channel-borne sediment", "typically highest and coarsest at the channel margins and gradually tapering and fining towards the adjacent floodbasin"; "Widths vary from a fraction to over 10 times the channel width".
+
+### Adams2004
+- Reference: Adams, P. N., Slingerland, R. L. and Smith, N. D. (2004). Variations in natural levee morphology in anastomosed channel flood plain complexes. Geomorphology 61:127-142 (the title and pages from memory).
+- DOI or URL: 10.1016/j.geomorph.2003.10.005; the copy read at ftp.ems.psu.edu/pub/geosc/sling/PUBLICATIONS_SLINGERLAND/2001-2010/AdamsSlingSmith2004.pdf.
+- Cited as: "Adams et al. 2004" (WaterBodies.java LEVEE; rivers-and-lakes.md).
+- Ledger ids: HYD-153
+- Access: paywalled (Elsevier); an author's group copy (Penn State).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the floodplain agent, the Penn State copy, Table 1 and Figs. 3 and 4: dimensionless levee width WL/WC about 0.15 to 1.07 on the Upper Columbia ("levee width typically less than channel width") and 0.41 to 25.96 on the Lower Saskatchewan ("broad widths typically several times channel width").
+
+### FilgueiraRivera2007
+- Reference: Filgueira-Rivera, M., Smith, N. D. and Slingerland, R. L. (2007). Controls on natural levée development in the Columbia River, British Columbia, Canada. Sedimentology 54:905-919 (the title from memory).
+- DOI or URL: 10.1111/j.1365-3091.2007.00865.x; the copy read at ftp.ems.psu.edu/pub/geosc/sling/PUBLICATIONS_SLINGERLAND/2001-2010/Filgueira-riveraetal2007.pdf.
+- Cited as: "Filgueira-Rivera et al. 2007" (WaterBodies.java LEVEE; rivers-and-lakes.md).
+- Ledger ids: HYD-153
+- Access: paywalled (Wiley); an author's group copy (Penn State).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the floodplain agent, the Penn State copy, p. 907 (the study area): "Levée and proximal floodbasin sediments typically range in size from very fine sand to medium silt (d50 = 0.15-0.014 mm)".
+
 ### Mentioned for later, not implemented (no ledger ids)
 Each verified only as a bibliographic record (OpenAlex), not read.
 - Cordonnier2019: Cordonnier, Guillaume; Bovy, Benoit; Braun, Jean. 2019. A versatile, linear complexity algorithm for flow routing in topographies with depressions. Earth Surface Dynamics 7(2):549-562. https://doi.org/10.5194/esurf-7-549-2019 (open access journal). The project's "Cordonnier et al. 2019 basin graph and cost anchor" fits this paper; the "100-400 s per call at 16,384^2" figure is not checked.

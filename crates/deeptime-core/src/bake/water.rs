@@ -786,7 +786,13 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
 
     let note = json!({
         "enabled": true,
-        "method": if params.deltas { "hyd-130" } else { "hyd-100" },
+        "method": if params.floodplains {
+            "hyd-150"
+        } else if params.deltas {
+            "hyd-130"
+        } else {
+            "hyd-100"
+        },
         "params": params,
         "width_scale": s.feature_scale.rivers,
         "grid": grid.name,
