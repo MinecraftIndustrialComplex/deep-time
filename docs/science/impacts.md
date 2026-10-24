@@ -347,7 +347,25 @@ on the full 16k planet's two runs).
   and the resurge features themselves are not modelled. Water depth is read from a grid with
   4.8 km cells.
 - **Rim heights of complex craters are overstated.** CMM05's rim law is for simple craters.
-- **Craters are round.** No oblique shapes, no secondary craters, no rays.
+- **Craters are round.** No oblique shapes, no secondary craters, no rays. Round in the
+  simulation's Lambert blocks, not on the planet: the amplifier's crater shape, the impact bodies
+  and their footprints all work in Lambert blocks, so on the planet a crater is long north–south and
+  narrow east–west by 1 / cos² of its latitude (3.4 to 1 at 57°), the same limit as the
+  simulation's other features near the poles (seamless-world.md, "Simplifications and limits"), and
+  on the Petroff–Guyou world it is a further ellipse in world blocks. The GameTest
+  `aCraterIsABowlOverBreccia` measures its floor, rim and the ground around it round in that frame.
+- **Small craters far from the equator are smoothed away.** The projection's footprint is round on
+  the planet and at least the source grid's north–south spacing across (SCL-090), so along the
+  parallel it averages over a cell · tan² φ or more of Lambert blocks; a crater narrower than that
+  east–west loses its bowl into its walls. On the 4,096-block test planet of 2026-10-23, crater 572
+  (2.6 km across at 57°, averaged over 0.56 of its radius) showed 0.31 of its relief. A crater shows
+  whole only where its diameter is at least about 2 · cell · tan² φ (with that planet's 600 m cells,
+  1.2 km at 45° and 2.9 km at 57°). Drawing craters in the world's own frame, after the projection, would remove this
+  and the stretch above.
+- **The soil stays over the breccia.** A body never replaces what the surface rules laid (one block
+  of gravel under the sea, up to five of dirt under a pond, plan §7.5), so a lens thinner than its
+  soil shows no breccia at the surface: 572's lens of 3.7 blocks lay wholly in its 5 blocks of
+  dirt.
 - **Ageing is a blur plus a budget.** Soil creep is a smoothing filter with an unsourced
   diffusivity; river erosion and sedimentation enter only as their average inside the rim.
 - **No effect on anything else.** An impact does nothing to the climate or to life, and craters are
