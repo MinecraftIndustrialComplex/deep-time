@@ -7867,3 +7867,39 @@ slab pull's spacings (`plates/slab_front_lattice_km_myr`), their part along the 
 band's width (`plates/arc_band_km_myr`), against the arcs' straight front
 (`plates/arc_front_straight_km_myr`). The test `the_fronts_by_the_slab_pull_and_the_arcs` prints
 them on a 100-Myr run.
+
+**The ocean-continent dip, from the records** (base7's 24 runs, every step after the first 100 Myr,
+by Myr since the last resampling; no simulation). The boundary mix is taken before a step's
+resampling, so the resampling step's row is the end of a cycle and "1 to 2" is the first step on a
+new lattice. km:
+
+| Myr since the resampling | 0 | 1 to 2 | 3 to 4 | 7 to 8 | 13 to 20 |
+|---|---|---|---|---|---|
+| ocean-continent front | 61,071 | 44,564 | 49,114 | 52,661 | 60,099 |
+| of it, normal convergence 40 mm/yr or more | 37,888 | 23,656 | 25,167 | 28,285 | 37,012 |
+| of it, slab 600 km or longer | 50,149 | 32,174 | 35,487 | 39,596 | 49,044 |
+| of it, contact 50 Myr or older | 42,297 | 27,457 | 30,466 | 33,296 | 41,244 |
+| ocean-ocean front | 37,013 | 38,166 | 39,457 | 39,836 | 37,794 |
+| collision front | 20,536 | 20,932 | 20,308 | 20,224 | 20,097 |
+| judged a transform (other, less converging with no contact) | 67,862 | 82,352 | 79,301 | 72,261 | 65,417 |
+| rift | 17,458 | 7,779 | 10,316 | 12,802 | 17,056 |
+| ridge | 100,517 | 108,089 | 108,450 | 107,654 | 101,020 |
+
+The dip is the mature, fast margins': 14,200 of the 16,500 km lost lie at 40 mm/yr or more of
+normal convergence, 18,000 km on slabs of 600 km or longer, 14,800 km on contacts 50 Myr or older,
+while the slower ocean-continent fronts, the ocean-ocean fronts and the collisions hold. The plates
+do not slow (the visible-weighted speed 23.0 mm/yr at the end of a cycle, 22.4 at 1 to 2 Myr, 22.6
+at 13 to 20), and the length does not shift to slower bands: it goes to the boundary judged a
+transform (Bird's 20 degrees, `shortening::is_transform`, on the crossing sums' normal), which
+gains 14,500 km at 1 to 2 Myr, and comes back step by step through the whole cycle, not within 2
+to 4 Myr as the contacts' dip did before the carry. Between resamplings the lattice's adjacency is
+fixed and the boundary normal is read in each sample's own plate's frame, so a sample's class can
+change only through its or a neighbour's plate, its hiding, its contact's state or the plates'
+relative motion; the records do not say which one turns these fronts back on through the cycle.
+The rifts show the same saw the other way: a rift opened between resamplings keeps its
+continental samples as lattice neighbours across the new ocean, and is called a rift until the
+next resampling fills it with ocean floor (rift 17,500 km at the end of a cycle, 7,800 after it,
+ridge the mirror). The probe that would name the ocean-continent cause is a unit test: the
+two-plate planet with a fast ocean-continent margin through a resampling, each front sample's
+normal, transform test and contact before and after. Not run here (the coordinator's call: records
+and maps first, no simulation).

@@ -185,7 +185,10 @@ const GLOBALS: [(&str, &str); 56] = [
     ("cone_mafic", super::CONE_MAFIC_GLOBAL),
     ("slab", super::ridges::SLAB_GLOBAL),
     // The fronts' lengths as the arcs and the slab pull count them (ledger: PLT-530, PLT-554).
-    ("front_straight", super::subduction::ARC_FRONT_STRAIGHT_GLOBAL),
+    (
+        "front_straight",
+        super::subduction::ARC_FRONT_STRAIGHT_GLOBAL,
+    ),
     ("arc_band", super::subduction::ARC_BAND_GLOBAL),
     ("slab_lattice", super::forces::SLAB_FRONT_LATTICE_GLOBAL),
     ("slab_normal", super::forces::SLAB_FRONT_NORMAL_GLOBAL),
