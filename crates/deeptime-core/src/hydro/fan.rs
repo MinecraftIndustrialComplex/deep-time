@@ -186,9 +186,7 @@ impl Fans {
         self.ponds.clear();
         (self.pond_raise_raw, self.pond_max_raw) = (0, 0);
         for (c, e) in elev.iter_mut().enumerate() {
-            if fa[c] > fb[c]
-                && fa[c] > *e
-                && kind.get(c).is_none_or(|&k| k == network::kind::NONE)
+            if fa[c] > fb[c] && fa[c] > *e && kind.get(c).is_none_or(|&k| k == network::kind::NONE)
             {
                 let d = fa[c] - *e;
                 self.pond_raise_raw += i64::from(d);
@@ -266,7 +264,16 @@ fn spill(g: &GridDesc, elev: &[i16], sea_raw: i32, closed_basin: &[u8]) -> Vec<i
             heap.push(Reverse((fill[c], c as u32)));
         }
     }
-    let steps = [(1i64, 0i64), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
+    let steps = [
+        (1i64, 0i64),
+        (-1, 0),
+        (0, 1),
+        (0, -1),
+        (1, 1),
+        (1, -1),
+        (-1, 1),
+        (-1, -1),
+    ];
     let mut rest: Vec<u32> = Vec::new();
     let mut next = 0usize;
     loop {

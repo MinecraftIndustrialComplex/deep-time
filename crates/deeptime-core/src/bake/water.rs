@@ -539,7 +539,9 @@ fn lay_fans(
         let (i, j) = (c as usize % wh, c as usize / wh);
         for dj in 0..f {
             for di in 0..f {
-                let t = top.entry((j * f + dj) * w3 + i * f + di).or_insert(i16::MIN);
+                let t = top
+                    .entry((j * f + dj) * w3 + i * f + di)
+                    .or_insert(i16::MIN);
                 *t = (*t).max(lvl);
             }
         }
