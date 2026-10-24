@@ -260,6 +260,76 @@ public final class RasterSampler {
         return Math.copySign(m, near);
     }
 
+    /**
+     * The physical values of the four cells a {@link #bilinear} read at block (bx, bz) blends, {v00, v10, v01, v11}
+     * (on a cube grid on the block centre's face, resolved across its seams; NaN past the net's corners).
+     */
+    public double[] bilinearCells(double bx, double bz) {
+        if (grid.isCube()) {
+            GridDesc.CubeSpot s = grid.cubeSpotOfBlock(bx, bz);
+            if (s == null)
+                return new double[]{Double.NaN, Double.NaN, Double.NaN, Double.NaN};
+            long i0 = (long) Math.floor(s.a()), j0 = (long) Math.floor(s.b());
+            CubeLayout.Face f = s.face();
+            return new double[]{getFace(f, i0, j0), getFace(f, i0 + 1, j0), getFace(f, i0, j0 + 1), getFace(f, i0 + 1, j0 + 1)};
+        }
+        double u = (bx - (double) grid.originBlockX()) / (double) grid.r();
+        double v = (bz - (double) grid.originBlockZ()) / (double) grid.r();
+        long i0 = (long) Math.floor(u), j0 = (long) Math.floor(v);
+        return new double[]{get(i0, j0), get(i0 + 1, j0), get(i0, j0 + 1), get(i0 + 1, j0 + 1)};
+    }
+
+    /**
+     * Whether any cell a read in the block box [x0, x1] × [z0, z1] can touch holds a value {@code test} accepts: the
+     * chunk passes' quick "is there anything here" checks. On the polar grids the cells floorDiv(x0 − ox, r) to
+     * floorDiv(x1 − ox, r) + 1 (and so in z); on a cube grid the box is carried by its centre's fold onto the centre's
+     * face and its cells, one more each way, read there across the seams ({@link #getFace}); false past the net's
+     * corners.
+     */
+    public boolean anyInBox(long x0, long z0, long x1, long z1, java.util.function.DoublePredicate test) {
+        if (grid.isCube()) {
+            long[] box = cubeCellBox(x0, z0, x1, z1, 0);
+            if (box == null)
+                return false;
+            CubeLayout.Face f = CubeLayout.Face.fromIndex((int) box[0]);
+            for (long i = box[1]; i <= box[2]; i++)
+                for (long j = box[3]; j <= box[4]; j++)
+                    if (test.test(getFace(f, i, j)))
+                        return true;
+            return false;
+        }
+        int r = grid.r();
+        long i0 = Math.floorDiv(x0 - grid.originBlockX(), r), i1 = Math.floorDiv(x1 - grid.originBlockX(), r) + 1;
+        long j0 = Math.floorDiv(z0 - grid.originBlockZ(), r), j1 = Math.floorDiv(z1 - grid.originBlockZ(), r) + 1;
+        for (long i = i0; i <= i1; i++)
+            for (long j = j0; j <= j1; j++)
+                if (test.test(get(i, j)))
+                    return true;
+        return false;
+    }
+
+    /**
+     * A cube grid's face cells under the block box [x0, x1] × [z0, z1] carried by the motion of its centre's fold,
+     * widened by {@code extra} cells: {face index, i0, i1, j0, j1} in the face's local cells (one cell past the box's
+     * corners each way, as a bilinear read reaches); null past the net's corners.
+     */
+    public long[] cubeCellBox(long x0, long z0, long x1, long z1, long extra) {
+        CubeLayout cube = grid.cube();
+        double cx = ((double) x0 + (double) x1 + 1.0) * 0.5, cz = ((double) z0 + (double) z1 + 1.0) * 0.5;
+        CubeLayout.PointOnFace p = cube.foldPoint(cx, cz);
+        if (p == null)
+            return null;
+        double[] c = p.iso().point(cx, cz);
+        double shift = p.x() - c[0];
+        double[] a = p.iso().point((double) x0, (double) z0), b = p.iso().point((double) x1 + 1.0, (double) z1 + 1.0);
+        double ox = (double) cube.faceOriginX(p.face()) - shift, oz = (double) cube.faceOriginZ(p.face());
+        double rr = grid.r();
+        double amin = (Math.min(a[0], b[0]) - ox) / rr - 0.5, amax = (Math.max(a[0], b[0]) - ox) / rr - 0.5;
+        double bmin = (Math.min(a[1], b[1]) - oz) / rr - 0.5, bmax = (Math.max(a[1], b[1]) - oz) / rr - 0.5;
+        return new long[]{p.face().index(), (long) Math.floor(amin) - extra, (long) Math.floor(amax) + 1 + extra,
+                (long) Math.floor(bmin) - extra, (long) Math.floor(bmax) + 1 + extra};
+    }
+
     /** Horizons in each stack (K); 0 for scalar layers. */
     public int stackDepth() {
         return desc.stackDepth();

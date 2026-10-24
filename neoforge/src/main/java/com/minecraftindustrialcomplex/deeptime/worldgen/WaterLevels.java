@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
-import com.minecraftindustrialcomplex.deeptime.worlddata.GridDesc;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 
 /**
@@ -22,15 +21,7 @@ public final class WaterLevels {
 
     /** Whether any cell whose block position lies in the box [x0, x1] × [z0, z1] (or next to it) is wet. */
     public static boolean anyWet(RasterSampler levels, int x0, int z0, int x1, int z1) {
-        GridDesc g = levels.desc().grid();
-        int r = g.r();
-        long i0 = Math.floorDiv(x0 - g.originBlockX(), r), i1 = Math.floorDiv(x1 - g.originBlockX(), r) + 1;
-        long j0 = Math.floorDiv(z0 - g.originBlockZ(), r), j1 = Math.floorDiv(z1 - g.originBlockZ(), r) + 1;
-        for (long i = i0; i <= i1; i++)
-            for (long j = j0; j <= j1; j++)
-                if (!Double.isNaN(levels.get(i, j)))
-                    return true;
-        return false;
+        return levels.anyInBox(x0, z0, x1, z1, v -> !Double.isNaN(v));
     }
 
     /**

@@ -39,9 +39,12 @@ The brief keeps section 7.4's deletions for later, so the game reads both kinds 
   `north` from the map's Jacobian turned by the fold, the index frame origin (−3s/2, −3s/2) and span
   (4s, 3s). `WorldProjection.of` builds it from the layout block.
 - **Spatial indexes** (sites, bodies, structure, rivers, the far columns) keep their window-frame
-  buckets as the bake writes them. A query at a block **folds the block first**, so a block outside
-  the planet reads its partner's data and planet blocks read exactly what Rust's column evaluator
-  reads (parity). Neighbourhood queries that would reach across a turning seam (a body, a structure
+  buckets as the bake writes them. Their buckets take x modulo their own period, so a query at a
+  window block (x anywhere in the wrapped window, as Columns.sample and Rust's
+  `ColumnWorld::sample` pass it after the plain x wrap by C) finds what Rust's evaluator finds;
+  the rasters fold inside the samplers. Neither evaluator folds the block before its queries (the
+  same algorithm on both sides keeps parity), so a block outside the planet is not read through
+  the readers at all: its blocks are the G5 fill, a copy of the partner chunk. Neighbourhood queries that would reach across a turning seam (a body, a structure
   window or a river channel cut by the seam) are G1's second step: the query point's image under
   each nearby edge's motion is queried too, in Java and in Rust's evaluator together so parity
   holds. Stage 1 leaves them out; the cut is at most the reach of one record, along the seams only.

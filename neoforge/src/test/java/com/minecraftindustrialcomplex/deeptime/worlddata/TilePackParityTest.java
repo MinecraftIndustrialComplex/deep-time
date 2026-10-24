@@ -28,11 +28,13 @@ class TilePackParityTest {
     private static final int MAX_REPORTED = 10;
 
     @ParameterizedTest
-    @ValueSource(strings = {"wrap1024", "lake1024"})
+    @ValueSource(strings = {"wrap1024", "lake1024", "cube1024"})
     void cellsMatchTheWriter(String fixture) {
         WorldData wd = WorldData.open(Fixtures.world(fixture));
         JsonObject dump = Fixtures.samples(fixture);
-        assertEquals(FormatVersion.CURRENT, wd.manifest().formatVersion());
+        // 0.6 on the polar worlds, 0.7 on the cube (FormatVersion.forKind).
+        assertEquals(dump.get("format_version").getAsString(), wd.manifest().formatVersion());
+        assertEquals(wd.manifest().cube() ? FormatVersion.CUBE : FormatVersion.CURRENT, wd.manifest().formatVersion());
         assertEquals(dump.get("circumference").getAsInt(), wd.circumference());
         wd.verify();
 
@@ -61,9 +63,12 @@ class TilePackParityTest {
             RasterSampler s = wd.layer(e.getKey());
             for (JsonElement p : e.getValue().getAsJsonArray()) {
                 JsonArray a = p.getAsJsonArray();
-                double bx = a.get(0).getAsDouble(), bz = a.get(1).getAsDouble(), want = a.get(2).getAsDouble();
+                // null: past a cube net's corners, no planet (NaN on both sides).
+                double bx = a.get(0).getAsDouble(), bz = a.get(1).getAsDouble();
+                double want = a.get(2).isJsonNull() ? Double.NaN : a.get(2).getAsDouble();
                 double got = s.bilinear(bx, bz);
-                if (got != want && bad.size() < MAX_REPORTED)
+                boolean same = got == want || (Double.isNaN(got) && Double.isNaN(want));
+                if (!same && bad.size() < MAX_REPORTED)
                     bad.add(e.getKey() + " bilinear(" + bx + ", " + bz + "): rust " + want + ", java " + got);
             }
         }

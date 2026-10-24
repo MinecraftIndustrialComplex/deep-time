@@ -38,6 +38,9 @@ public final class Playa {
         if (layer == null)
             return false;
         var grid = layer.desc().grid();
+        // A cube grid: the cells under the window carried onto its centre's face (a cell wider than the nearest cells).
+        if (grid.isCube())
+            return layer.anyInBox((long) x - margin, (long) z - margin, (long) x + margin, (long) z + margin, v -> v > 0);
         double r = grid.r();
         // The cell nearest a block is floor(u + 0.5) and grows with the block, so the cells nearest the window's
         // blocks are those from its first block's to its last block's.
