@@ -691,10 +691,10 @@ pub(in crate::plates) mod tests {
     /// plate, equal the parent's before the split. Plate 1 (x ≥ 0) turns about the z axis at 50
     /// mm/yr: into plate 0 on the y > 0 half of their border (a trench with a full slab, fed this
     /// step) and away from it on the y < 0 half (a ridge). Each plate splits across the trench
-    /// (z = 0: both pieces hold a stretch of it) and along it (y = 0: the new piece borders the
-    /// other plate only across the ridge, and its copy of the slab pulls nothing). A slab that hung
-    /// with no front hangs on along each piece's own stretch of the border, with the parent's pull
-    /// between them. ledger: PLT-534
+    /// (z = 0: both pieces hold a stretch of it) and along it (y < -0.3 is the new piece, which
+    /// borders the other plate only across the ridge, away from the trench's ends at the poles,
+    /// and its copy of the slab pulls nothing). A slab that hung with no front hangs on along each
+    /// piece's own stretch of the border, with the parent's pull between them. ledger: PLT-534
     #[test]
     fn a_split_plates_pieces_pull_with_the_parents_slab_force() {
         use crate::plates::forces::slab_torques;
@@ -707,9 +707,9 @@ pub(in crate::plates) mod tests {
         let cases: [Case; 5] = [
             (1, |p| p.z < 0.0, false, true),
             (0, |p| p.z < 0.0, false, true),
-            (0, |p| p.y < 0.0, false, false),
-            (1, |p| p.y < 0.0, false, false),
-            (1, |p| p.y < 0.0, true, true),
+            (0, |p| p.y < -0.3, false, false),
+            (1, |p| p.y < -0.3, false, false),
+            (1, |p| p.y < -0.3, true, true),
         ];
         for (i, (parent, side, hung, pulls)) in cases.into_iter().enumerate() {
             let mut st = one_plate(&geo, 5, |_| old_floor());
@@ -766,7 +766,11 @@ pub(in crate::plates) mod tests {
                 assert_eq!(after[p].1, DVec3::ZERO, "case {i}: plate {p} has suction");
             }
             let piece = if parent == 1 { after[2].0 } else { after[2].1 };
-            assert_eq!(piece != DVec3::ZERO, pulls, "case {i}: the new piece's share {piece}");
+            assert_eq!(
+                piece != DVec3::ZERO,
+                pulls,
+                "case {i}: the new piece's share {piece}"
+            );
         }
     }
 }
