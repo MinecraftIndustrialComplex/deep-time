@@ -22,6 +22,7 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import com.minecraftindustrialcomplex.deeptime.worldgen.ActiveWorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataRef;
+import com.minecraftindustrialcomplex.deeptime.wrap.CubeBorder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -149,14 +150,14 @@ public final class ServerMaps {
             MapFrame f = MapFrame.of(active.projection(), MapFrame.DEFAULT_WIDTH);
             Map<MapLayer, CompletableFuture<Built>> pictures = new EnumMap<>(MapLayer.class);
             for (MapLayer layer : DRAW_ORDER)
-                pictures.put(layer, CompletableFuture.supplyAsync(() -> draw(layer, active.folder(), f, dim), WORKER));
+                pictures.put(layer, CompletableFuture.supplyAsync(() -> draw(layer, active.folder(), active.projection(), f, dim), WORKER));
             return new LevelMaps(f, String.format(Locale.ROOT, "frame %dx%d, %.1f blocks/px", f.w(), f.h(),
                     f.blocksPerPx()), Collections.unmodifiableMap(pictures));
         });
     }
 
     /** Draws one picture of the frame and deflates it; never throws (a failure is the picture's note). */
-    private static Built draw(MapLayer layer, Path folder, MapFrame f, String dim) {
+    private static Built draw(MapLayer layer, Path folder, WorldProjection projection, MapFrame f, String dim) {
         long t0 = System.nanoTime();
         try {
             int[] px;
@@ -166,7 +167,8 @@ public final class ServerMaps {
                 int threads = Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4));
                 NativeWorldMap.Picture pic = NativeWorldMap.render(folder, NativeWorldMap.SATELLITE, f.x0(), f.z0(),
                         f.blocksPerPx(), f.w(), f.h(), threads);
-                px = pic.abgr();
+                // A cube's void, where the natives draw the copies the fold brings in, is left clear.
+                px = BaseImage.maskVoid(pic.abgr(), f, projection);
                 what = "true colour from the bake, the workbench's look";
                 DevMap.LOGGER.info("[devmap] satellite of {} from the natives: {}", dim, pic.info());
             } else {
@@ -322,8 +324,18 @@ public final class ServerMaps {
                 dataWet ? "water" : "land", wet == dataWet ? "AGREE" : "DIFFER");
     }
 
-    /** Where a teleport to (x, z) lands, {x, z}: canonical, and inside the edge border or the pole stop. */
+    /**
+     * Where a teleport to (x, z) lands, {x, z}: canonical, and inside the edge border or the pole
+     * stop; on a cube the nearest point at least the border's inset and {@link #EDGE_MARGIN} inside
+     * its segments ({@code CubeBorder.nearest}: the nearest point of the planet, never a void copy).
+     */
     static double[] target(WorldProjection p, WorldDataRef ref, double borderInset, double x, double z) {
+        WorldProjection.Cube cube = PlanetGeometry.cube(p);
+        if (cube != null) {
+            double inset = Double.isNaN(borderInset) ? 0.0 : borderInset;
+            double[] n = CubeBorder.of(cube.side()).nearest(cube.wrapX(x), z, inset + EDGE_MARGIN);
+            return new double[]{cube.wrapX(n[0]), n[1]};
+        }
         double[] c = p.canonical(x, z);
         double lo, hi;
         if (PlanetGeometry.petroffGuyou(p)) {

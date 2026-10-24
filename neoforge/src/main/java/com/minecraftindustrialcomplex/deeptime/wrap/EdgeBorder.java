@@ -45,7 +45,8 @@ import java.util.UUID;
  * point of the planet that is the inset inside every segment. A player who arrives more than
  * {@link #FOLD_DEPTH} blocks outside the planet (a teleport, a pearl, a portal) is folded onto the
  * partner block instead, the heading turned by the edge's motion: the terrain there is the same as
- * where they landed, turned. Sable ships on a cube world are not stopped yet.
+ * where they landed, turned. A Sable ship whose bounds leave that region loses its outward velocity
+ * and is blown back ({@code SablePoleCap.tickCube}), never teleported.
  */
 public final class EdgeBorder {
 
@@ -157,6 +158,8 @@ public final class EdgeBorder {
             for (Entity v : vehicles.keySet())
                 if (c.border().zone(v.getX(), v.getZ(), c.inset(), WARN_BLOCKS) == 2)
                     stopVehicleCube(level, c, v);
+        if (sable)
+            SablePoleCap.tickCube(level, c.border(), c.inset());
     }
 
     /** The cube world's action-bar line (plain text fallbacks match en_us.json). */

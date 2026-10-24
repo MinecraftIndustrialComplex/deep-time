@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.devmap.model;
 
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 
 import java.util.ArrayList;
@@ -12,6 +13,11 @@ import java.util.List;
  * cut into polylines wherever the projection jumps (a Petroff–Guyou line crossing a turning edge
  * comes back in at the mirrored point). Across the x wrap a line is not cut: its points are
  * unwrapped (x may run past ±period/2), and the map draws every polyline once per period.
+ *
+ * <p>On a cube a line is cut exactly where it crosses a turning seam: where two consecutive samples
+ * lie on faces the net does not keep side by side ({@link #netJoined}; N or S against F1, F2 or
+ * F3). Within a face, across the five sides the net joins and across the slide (F2 against F3,
+ * unwrapped like the x wrap) it runs on.
  */
 public final class Graticule {
 
@@ -69,8 +75,8 @@ public final class Graticule {
             if (prev == null) {
                 cur.add(q);
             } else {
-                double[] cand = {prev[0] + p.wrapX(q[0] - prev[0]), q[1]};
-                if (jumps(p, prev, cand, prevLl, ll)) {
+                double[] cand = {prev[0] + PlanetGeometry.wrapCentred(p, q[0] - prev[0]), q[1]};
+                if (cuts(p, prev, cand, prevLl, ll)) {
                     flush(out, kind, value, cur);
                     cur = new ArrayList<>();
                     cand = q;
@@ -85,6 +91,46 @@ public final class Graticule {
     }
 
     /**
+     * Whether the line is cut between two consecutive samples: on a cube where they lie on faces the
+     * net does not join (a sample on no face, past rounding, falls back to {@link #jumps}); else
+     * where the projection jumps.
+     */
+    static boolean cuts(WorldProjection p, double[] a, double[] b, double[] llA, double[] llB) {
+        WorldProjection.Cube c = PlanetGeometry.cube(p);
+        if (c == null)
+            return jumps(p, a, b, llA, llB);
+        CubeLayout.LocalPoint fa = c.cube().localOfPoint(a[0], a[1]), fb = c.cube().localOfPoint(b[0], b[1]);
+        if (fa == null || fb == null)
+            return jumps(p, a, b, llA, llB);
+        return !netJoined(fa.face(), fb.face());
+    }
+
+    /**
+     * Whether two faces of a cube meet side by side in the net, or across the slide, or are the same
+     * face: F3 | F0 | F1 | F2 | F3 round the equator, N and S on F0. The other six pairs that share a
+     * cube edge (N or S against F1, F2, F3) meet only through a turning seam.
+     */
+    static boolean netJoined(CubeLayout.Face a, CubeLayout.Face b) {
+        if (a == b)
+            return true;
+        boolean polarA = a == CubeLayout.Face.N || a == CubeLayout.Face.S;
+        boolean polarB = b == CubeLayout.Face.N || b == CubeLayout.Face.S;
+        if (polarA || polarB)
+            return (polarA ? b : a) == CubeLayout.Face.F0 && !(polarA && polarB);
+        // Two equatorial faces: neighbours round the ring F3 F0 F1 F2 (all four pairs but F0 F2, F1 F3).
+        return ring(a) % 2 != ring(b) % 2;
+    }
+
+    private static int ring(CubeLayout.Face f) {
+        return switch (f) {
+            case F3 -> 0;
+            case F0 -> 1;
+            case F1 -> 2;
+            default -> 3;
+        };
+    }
+
+    /**
      * Whether the projection jumps between two consecutive samples: the point halfway along the line
      * (in latitude and longitude) is not near the middle of the chord. On a continuous stretch the
      * midpoint sits on the chord to well under a quarter of its length; across a jump it lands near
@@ -95,7 +141,7 @@ public final class Graticule {
         dLon -= 360.0 * Math.round(dLon / 360.0);
         double[] m = PlanetGeometry.blockOf(p, 0.5 * (llA[0] + llB[0]), llA[1] + 0.5 * dLon);
         double mx = 0.5 * (a[0] + b[0]), mz = 0.5 * (a[1] + b[1]);
-        double off = Math.hypot(p.wrapX(m[0] - mx), m[1] - mz);
+        double off = Math.hypot(PlanetGeometry.wrapCentred(p, m[0] - mx), m[1] - mz);
         double chord = Math.hypot(b[0] - a[0], b[1] - a[1]);
         return off > 0.25 * chord + 2.0;
     }

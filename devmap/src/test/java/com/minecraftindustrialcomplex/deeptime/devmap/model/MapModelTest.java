@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.devmap.model;
 
 import com.minecraftindustrialcomplex.deeptime.screen.model.Ramps;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import org.junit.jupiter.api.Test;
@@ -14,10 +15,16 @@ import static com.minecraftindustrialcomplex.deeptime.devmap.model.PlanetGeometr
 import static com.minecraftindustrialcomplex.deeptime.devmap.model.PlanetGeometryTest.PG;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
-/** The dev map's view transform, image codec, base image and graticule. */
+/**
+ * The dev map's view transform, image codec, base image and graticule; on a cube (cube plan G14) the
+ * view wraps 4s, the pictures leave the void clear (the synthetic cube world's own elevation picture
+ * among them) and the graticule is cut only at the turning seams.
+ */
 class MapModelTest {
 
     @Test
@@ -224,5 +231,149 @@ class MapModelTest {
                 assertTrue(meridians + parallels > 35, "pieces " + (meridians + parallels));
             }
         }
+    }
+
+    // ---- the cube (cube plan G14) ----
+
+    @Test
+    void viewTransformWrapsACubesPeriod() {
+        double s = PlanetGeometryTest.S, h = s / 2, period = 4 * s;
+        ViewTransform v = new ViewTransform(period, -3 * h - 10, 0, 0.5);
+        v.viewport(0, 0, 800, 600);
+        // The centre is kept in Toroidal World's frame [-2s, 2s): -3h - 10 is in it, -4h - 10 is not.
+        assertEquals(-3 * h - 10, v.cx(), 1e-9);
+        // A drag of h + 10 blocks to the right moves the centre west to -4h - 20, which wraps to 4h - 20.
+        v.pan(0.5 * (h + 10), 0);
+        assertEquals(4 * h - 20, v.cx(), 1e-9, "wrapped past -2s");
+        v.pan(-0.5 * 30, 0);
+        assertEquals(-4 * h + 10, v.cx(), 1e-9, "wrapped past 2s");
+        // The copies drawn from the window's west side cover the view, zoomed out to three laps.
+        v.scale(800.0 / (3 * period));
+        double w0 = PlanetGeometry.west(PlanetGeometryTest.CUBE);
+        int k0 = v.firstCopy(w0, w0 + period), k1 = v.lastCopy(w0, w0 + period);
+        assertTrue(v.screenX(w0 + k0 * period) <= 0, "left covered");
+        assertTrue(v.screenX(w0 + period + k1 * period) >= 800, "right covered");
+    }
+
+    @Test
+    void aCubesBaseImageLeavesTheVoidClear() {
+        WorldProjection.Cube c = PlanetGeometryTest.CUBE;
+        MapFrame f = MapFrame.of(c, 256);
+        Ramps.Ramp land = new Ramps.Ramp(new double[]{0, 200}, new int[]{0x000000, 0xffffff});
+        Ramps.Ramp lake = new Ramps.Ramp(new double[]{0, 200}, new int[]{0x0000ff, 0x0000ff});
+        // Land north of the equator, sea south of it, read at the canonical point.
+        int[] px = BaseImage.render(f, c, (x, z) -> c.latLon(x, z)[0] > 0 ? 100 : 20, (x, z) -> Double.NaN, 63, land, lake);
+        int faces = 0, wrong = 0;
+        for (int j = 0; j < f.h(); j++)
+            for (int i = 0; i < f.w(); i++) {
+                double x = f.blockX(i + 0.5), z = f.blockZ(j + 0.5);
+                boolean on = PlanetGeometry.onPlanet(c, x, z);
+                int want = !on ? 0 : land.abgr(c.latLon(x, z)[0] > 0 ? 100 : 20);
+                faces += on ? 1 : 0;
+                if (px[j * f.w() + i] != want)
+                    wrong++;
+            }
+        assertEquals(0, wrong);
+        assertEquals(f.w() * f.h() / 2, faces, "six faces of the twelve squares in the window");
+        // The satellite's mask clears the same pixels and keeps the rest.
+        int[] sat = new int[f.w() * f.h()];
+        java.util.Arrays.fill(sat, 0xff123456);
+        BaseImage.maskVoid(sat, f, c);
+        for (int k = 0; k < sat.length; k++)
+            assertEquals(px[k] == 0, sat[k] == 0, "pixel " + k);
+        // Nothing to mask on a polar world.
+        MapFrame pf = MapFrame.of(PG, 64);
+        int[] all = new int[pf.w() * pf.h()];
+        java.util.Arrays.fill(all, 7);
+        BaseImage.maskVoid(all, pf, PG);
+        for (int v : all)
+            assertEquals(7, v);
+        // The latitude/longitude picture finds a face for every pixel.
+        int w = 360, hh = Projection.pictureHeight(w);
+        int[] pic = BaseImage.latLonPicture(px, f, c, w, hh);
+        int holes = 0;
+        for (int v : pic)
+            holes += v == 0 ? 1 : 0;
+        assertEquals(0, holes, "transparent pixels in the globe's picture");
+    }
+
+    @Test
+    void theCubeFixturesElevationPictureCoversItsFaces() {
+        java.nio.file.Path dir = java.nio.file.Path.of(System.getProperty("deeptime.testWorlds")).resolve("cube1024");
+        com.minecraftindustrialcomplex.deeptime.worlddata.WorldData wd = com.minecraftindustrialcomplex.deeptime.worlddata.WorldData.open(dir,
+                new com.minecraftindustrialcomplex.deeptime.worlddata.TileCache(16L << 20));
+        WorldProjection p = wd.projection();
+        assertTrue(p instanceof WorldProjection.Cube, "cube1024 is " + p.kind());
+        MapFrame f = MapFrame.of(p, 512);
+        Ramps ramps = Ramps.builtin();
+        int[] px = BaseImage.render(f, p, wd::height, wd::waterLevel, wd.manifest().seaLevelY(),
+                ramps.forLayer(com.minecraftindustrialcomplex.deeptime.worlddata.WorldData.ELEVATION),
+                ramps.forLayer(com.minecraftindustrialcomplex.deeptime.worlddata.WorldData.WATER_LEVEL));
+        int clear = 0, opaque = 0, wrong = 0;
+        for (int j = 0; j < f.h(); j++)
+            for (int i = 0; i < f.w(); i++) {
+                boolean on = PlanetGeometry.onPlanet(p, f.blockX(i + 0.5), f.blockZ(j + 0.5));
+                int v = px[j * f.w() + i];
+                if (on != ((v >>> 24) != 0))
+                    wrong++;
+                clear += v == 0 ? 1 : 0;
+                opaque += (v >>> 24) == 0xff ? 1 : 0;
+            }
+        assertEquals(0, wrong, "void pixels drawn or face pixels clear");
+        assertEquals(f.w() * f.h() / 2, clear);
+        assertEquals(f.w() * f.h() / 2, opaque);
+    }
+
+    @Test
+    void aCubesGraticuleIsCutOnlyAtTurningSeams() {
+        for (WorldProjection.Cube c : PlanetGeometryTest.cubes()) {
+            double h = c.side() / 2.0;
+            List<Graticule.Line> lines = Graticule.lines(c, 15.0, 0.5);
+            int pieces = 0;
+            boolean acrossTheSlide = false;
+            for (Graticule.Line l : lines) {
+                pieces++;
+                for (int i = 0; i < l.size(); i++) {
+                    double x = l.xs()[i], z = l.zs()[i];
+                    assertTrue(PlanetGeometry.onPlanet(c, x, z), "a graticule point off the faces at " + x + ", " + z);
+                    double[] ll = PlanetGeometry.displayLatLon(c, x, z);
+                    if (l.kind() == Graticule.Kind.PARALLEL)
+                        assertEquals(l.value(), ll[0], PlanetGeometry.FORWARD_TOLERANCE_DEG);
+                    if (i == 0)
+                        continue;
+                    // Never across the void: consecutive points on one face or on faces the net joins.
+                    var a = c.cube().localOfPoint(l.xs()[i - 1], l.zs()[i - 1]);
+                    var b = c.cube().localOfPoint(x, z);
+                    assertTrue(Graticule.netJoined(a.face(), b.face()), l.kind() + " " + l.value() + ": " + a.face() + " to " + b.face());
+                    double step = Math.hypot(x - l.xs()[i - 1], z - l.zs()[i - 1]);
+                    assertTrue(step < 0.05 * c.side(), l.kind() + " " + l.value() + ": a " + step + "-block step");
+                    // Onto or past the slide's line at x = 5h (or -3h): a sample can fall on the line itself.
+                    acrossTheSlide |= (l.xs()[i - 1] < 5 * h) != (x < 5 * h) || (l.xs()[i - 1] > -3 * h) != (x > -3 * h);
+                }
+            }
+            if (!acrossTheSlide) {
+                StringBuilder why = new StringBuilder("no line runs on across the slide on the cube of side " + c.side() + ":");
+                for (Graticule.Line l : lines)
+                    if (l.kind() == Graticule.Kind.PARALLEL && Math.abs(l.value()) < 1e-9 || l.kind() == Graticule.Kind.MERIDIAN && l.value() == -180.0) {
+                        double lo = Double.POSITIVE_INFINITY, hi = Double.NEGATIVE_INFINITY;
+                        for (double x : l.xs()) {
+                            lo = Math.min(lo, x);
+                            hi = Math.max(hi, x);
+                        }
+                        why.append(String.format(java.util.Locale.ROOT, " [%s %.0f: %d points, x %.1f to %.1f, from (%.1f, %.1f) to (%.1f, %.1f)]",
+                                l.kind(), l.value(), l.size(), lo, hi, l.xs()[0], l.zs()[0], l.xs()[l.size() - 1], l.zs()[l.size() - 1]));
+                    }
+                fail(why.toString());
+            }
+            // 24 meridians and 11 parallels, each cut where it crosses a turning seam.
+            assertTrue(pieces > 35, "pieces " + pieces);
+        }
+        // The pairs the net joins.
+        CubeLayout.Face f0 = CubeLayout.Face.F0, f1 = CubeLayout.Face.F1, f2 = CubeLayout.Face.F2, f3 = CubeLayout.Face.F3,
+                n = CubeLayout.Face.N, s = CubeLayout.Face.S;
+        for (CubeLayout.Face[] q : new CubeLayout.Face[][]{{f3, f0}, {f0, f1}, {f1, f2}, {f2, f3}, {n, f0}, {f0, s}, {f1, f1}})
+            assertTrue(Graticule.netJoined(q[0], q[1]) && Graticule.netJoined(q[1], q[0]), q[0] + " " + q[1]);
+        for (CubeLayout.Face[] q : new CubeLayout.Face[][]{{n, f1}, {n, f2}, {n, f3}, {s, f1}, {s, f2}, {s, f3}, {f0, f2}, {f1, f3}, {n, s}})
+            assertFalse(Graticule.netJoined(q[0], q[1]) || Graticule.netJoined(q[1], q[0]), q[0] + " " + q[1]);
     }
 }
