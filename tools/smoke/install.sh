@@ -29,6 +29,8 @@
 #                                 sets compared side by side (Q10: mic vs mic-ev) need the same seed,
 #                                 or vanilla's features, caves and scatter differ between them
 #       [--clean]                 throw the server away first
+#       [--cube]                  with --preset: the cube level type whatever the preset's map (the
+#                                 server bakes a preset of its notional size as a cube; cube plan G12)
 #
 # DEEPTIME_PACK=<dir> installs mic/mic-ev from that pack checkout instead of ../../pack (a git
 # checkout with a .git directory: its HEAD, or its working tree with --pack-worktree).
@@ -79,7 +81,7 @@ GAME_PORT=25665
 RCON_PORT=25675
 
 PROFILE="${1:-}"; shift || true
-SIZE=16384; SYNTH=""; STRATA=placeholder; DATAPACK=""; TEST_TERRAIN=""; PRESET=""; CLEAN=0; PACK_WORKTREE=0; SEED=""
+SIZE=16384; SYNTH=""; STRATA=placeholder; DATAPACK=""; TEST_TERRAIN=""; PRESET=""; CLEAN=0; PACK_WORKTREE=0; SEED=""; CUBE=0
 START=""; LENGTH_MYR=""; MEMORY_CAP_GIB=4
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -94,13 +96,14 @@ while [ $# -gt 0 ]; do
         --memory-cap-gib) MEMORY_CAP_GIB="$2"; shift 2 ;;
         --seed) SEED="$2"; shift 2 ;;
         --clean) CLEAN=1; shift ;;
+        --cube) CUBE=1; shift ;;
         --pack-worktree) PACK_WORKTREE=1; shift ;;
         *) echo "install.sh: unknown argument '$1'" >&2; exit 2 ;;
     esac
 done
 case "$PROFILE" in
     standalone|mic|mic-ev|mic-lite|terrablender|ee|ev|ev-client|dh|dh-next) ;;
-    *) echo "usage: install.sh <standalone|mic|mic-ev|mic-lite|terrablender|ee|ev|ev-client|dh|dh-next> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N]] [--seed N] [--clean]" >&2; exit 2 ;;
+    *) echo "usage: install.sh <standalone|mic|mic-ev|mic-lite|terrablender|ee|ev|ev-client|dh|dh-next> [--size N] [--synth K] [--strata S] [--datapack DIR] [--test-terrain K] [--preset P [--start S] [--length-myr N] [--memory-cap-gib N] [--cube]] [--seed N] [--clean]" >&2; exit 2 ;;
 esac
 # The sets installed from the MIC pack (packwiz-installer); the others are their pin files alone.
 case "$PROFILE" in mic|mic-ev|mic-lite) FROM_PACK=1 ;; *) FROM_PACK=0 ;; esac
@@ -113,6 +116,7 @@ if [ -n "$PRESET" ]; then
     WORLD=petroff_guyou
     if [ -f "$PRESET" ] && grep -q '"projection": *"lambert"' "$PRESET"; then WORLD=lambert; fi
     if [ -f "$PRESET" ] && grep -q '"projection": *"cube"' "$PRESET"; then WORLD=cube; fi
+    if [ "$CUBE" = 1 ]; then WORLD=cube; fi
 fi
 case "$SIZE/$WORLD" in
     16384/petroff_guyou) LEVEL_TYPE='deeptime\:planet' ;;

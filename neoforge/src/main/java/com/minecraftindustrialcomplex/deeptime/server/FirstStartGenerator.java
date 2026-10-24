@@ -179,6 +179,17 @@ public final class FirstStartGenerator {
                             + "), a preset file or a share code (DT1.…).");
         }
         Presets.Info info = Presets.info(preset);
+        // A cube level type (cube plan G12; opt-in until section 7.4, when every world is a cube): the
+        // level type chooses the map, so a preset made for another map of the same notional size, the
+        // built-ins among them, is baked as a cube.
+        boolean asCube = "cube".equals(projection) && !"cube".equals(info.projection()) && info.circumference().isPresent()
+                && Presets.worldCircumference(info.circumference().getAsInt(), "cube") == c;
+        if (asCube) {
+            DeepTime.LOGGER.info("[deeptime] the level type makes a cube world: the preset {} ({}) is baked as a cube",
+                    info.name().orElse(resolved.label()), info.projection());
+            preset = Presets.withProjection(preset, "cube");
+            info = Presets.info(preset);
+        }
         Presets.Timeline timeline;
         if (config.timeline().isPresent()) {
             timeline = config.timeline().get();
@@ -208,8 +219,8 @@ public final class FirstStartGenerator {
                             + world.getFileName() + "\n(it holds no world yet, but its level.dat already records the old level-type).");
 
         // 3. The natives (plan §6.6).
-        String cli = "deeptime run --preset " + quote(config.preset()) + " --start " + timeline.start()
-                + " --length-myr " + timeline.lengthMyr() + " --out " + quote(dir.toString());
+        String cli = "deeptime run --preset " + quote(config.preset()) + (asCube ? " --set scale.projection=cube" : "")
+                + " --start " + timeline.start() + " --length-myr " + timeline.lengthMyr() + " --out " + quote(dir.toString());
         NativeStatus natives = NativeLoader.status().orElse(null);
         if (natives == null || !natives.isOk() || !NativeLoader.isLinked()) {
             String block = natives == null ? "Deep Time natives were not loaded." : natives.describe();
@@ -424,12 +435,13 @@ public final class FirstStartGenerator {
         return String.format(Locale.ROOT, "%,d-block %s world", c, map);
     }
 
-    private static String presetsFor(int c, String projection) {
+    /** The built-in presets a level type takes: those of its size and map, and on a cube level type every one of its notional size. */
+    static String presetsFor(int c, String projection) {
         List<String> names = new ArrayList<>();
         for (String n : Presets.BUILTIN) {
             Presets.builtin(n).map(Presets::parseObject).map(Presets::info)
-                    .filter(i -> i.worldCircumference().isPresent() && i.worldCircumference().getAsInt() == c
-                            && i.projection().equals(projection))
+                    .filter(i -> i.circumference().isPresent() && (i.projection().equals(projection) || "cube".equals(projection))
+                            && Presets.worldCircumference(i.circumference().getAsInt(), projection) == c)
                     .ifPresent(i -> names.add(n));
         }
         return names.isEmpty() ? "no built-in preset has that size" : String.join(", ", names);
