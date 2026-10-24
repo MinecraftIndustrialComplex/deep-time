@@ -206,7 +206,7 @@ def main():
             if a.cube_4k:
                 failures += cube_probes(rcon, os.path.join(RUN, "world", "deeptime"))
             for spec in a.run:
-                failures += run_tests(spec, rcon, a.timeout, a.size)
+                failures += run_tests(spec, rcon, a.timeout, period(a))
             for scenario in a.scenario:
                 failures += SCENARIOS[scenario](a, srv, rcon)
     finally:
@@ -216,6 +216,12 @@ def main():
 
 
 CUBE_4K_SIDE = 1024
+
+
+def period(a):
+    """Toroidal World's x period: 4s on the 4k cube (cube plan T6: forceload folds at the cube's
+    period, so a box across Toroidal World's seam in F2 is split there), else the size."""
+    return 4 * CUBE_4K_SIDE if a.cube_4k else a.size
 # Columns on every face of the 4k cube (TW frame [-2s, 2s)): F0's centre and off it, F1, F3, F2 on
 # both sides of the slide, N and S, and one by each of F0's corners inside the border.
 CUBE_4K_COLUMNS = [(0, 0), (40, 25), (1024, -100), (-1100, 200), (2030, 10), (-2030, 10), (100, -1200),
@@ -362,7 +368,7 @@ def scenario_sable_straddle(a, srv, rcon):
     /deeptime probe sable, saves, stops, starts the same world again and waits until the same
     sub-level id is back; prints `sable_straddle: OK` or the difference.
     """
-    c = a.size
+    c = period(a)
     z = 0
     # The hull and its neighbourhood stay loaded before and after the restart (forced chunks
     # persist in the world), so the sub-level's holding chunk loads with the world.
