@@ -25,7 +25,10 @@
 //! also writes the visible samples there (`t<Myr>.bin`, little-endian f32 records of
 //! [`MAP_FIELDS`]: latitude and longitude in degrees, elevation (m), thickness (m), kind (0
 //! oceanic, 1 continental), orogeny (0 none, 1 Andean, 2 Himalayan), the orogeny's age (Myr), the
-//! island-arc and continental-arc magma (m), the plate group, the flags) for
+//! island-arc and continental-arc magma (m), the plate group, the flags: the sample's, with
+//! [`MAP_FRONT_SUBDUCTION`] or [`MAP_FRONT_COLLISION`] added on the overriding side of the step's
+//! fronts as the dynamics record's boundary mix classed them, when the record is on and the
+//! snapshot is not at a resampling) for
 //! `tools/review/continent-budget.py`, and the same samples' plate ids to
 //! `plate/t<Myr>.bin` (little-endian u32, one per record; [`CrustBudget::write_plates`]) for the
 //! front lane's boundary geometry (`tools/review/pool/measure_boundgeom.py`). Each snapshot also splits the land by the origin of its
@@ -394,8 +397,16 @@ impl CrustBudget {
         }
     }
 
+    /// Whether the snapshots write maps ([`MAPS_ENV`]).
+    pub fn maps_on(&self) -> bool {
+        self.maps.is_some()
+    }
+
     /// Records the budget at `t_myr`: the samples at `pos`, a sample's area `area_km2`
-    /// (Earth-normalized), the climate's sea level `sea_m`, the world's globals.
+    /// (Earth-normalized), the climate's sea level `sea_m`, the world's globals. `fronts` (one
+    /// per sample, the boundary mix's classes, `dynamics::boundary_mix`) marks the fronts in the
+    /// map's flags ([`MAP_FRONT_SUBDUCTION`], [`MAP_FRONT_COLLISION`]).
+    #[allow(clippy::too_many_arguments)]
     pub fn snapshot(
         &mut self,
         samples: &[Sample],
@@ -404,6 +415,7 @@ impl CrustBudget {
         area_km2: f64,
         sea_m: f64,
         globals: &BTreeMap<String, f64>,
+        fronts: Option<&[u8]>,
     ) {
         let (z_0, g) = (self.z_0, self.gravity);
         let s = stocks(samples);
@@ -582,7 +594,7 @@ impl CrustBudget {
         }
         self.lines.push(line);
         if let Some(dir) = &self.maps {
-            write_map(dir, samples, pos, t_myr);
+            write_map(dir, samples, pos, t_myr, fronts);
         }
     }
 
@@ -635,14 +647,42 @@ pub const MAP_FIELDS: [&str; 11] = [
     "flags",
 ];
 
+/// The map's flag (above the sample flags' eight bits) of a sample on the overriding side of a
+/// subduction front, as the dynamics record's boundary mix classed it (`dynamics::mix`'s
+/// ocean-ocean and ocean-continent classes): the front Bird 2003 calls a subduction zone (SUB).
+pub const MAP_FRONT_SUBDUCTION: u16 = 256;
+/// … of a front whose subducting side is continental crust (`dynamics::mix::COLLISION`): Bird's
+/// continental convergent boundary (CCB).
+pub const MAP_FRONT_COLLISION: u16 = 512;
+
+/// A map record's flags: the sample's own and, from the boundary mix's class (`fronts`, the
+/// class plus one), the front's.
+fn map_flags(s: &Sample, front: u8) -> u16 {
+    let front = match front.checked_sub(1).map(usize::from) {
+        Some(super::dynamics::mix::OCEAN_OCEAN | super::dynamics::mix::OCEAN_CONTINENT) => {
+            MAP_FRONT_SUBDUCTION
+        }
+        Some(super::dynamics::mix::COLLISION) => MAP_FRONT_COLLISION,
+        _ => 0,
+    };
+    u16::from(s.flags) | front
+}
+
 /// Writes the visible samples to `<dir>/t<Myr>.bin` (measurement only; a failure is reported and
 /// ignored).
-fn write_map(dir: &std::path::Path, samples: &[Sample], pos: &[DVec3], t_myr: f64) {
+fn write_map(
+    dir: &std::path::Path,
+    samples: &[Sample],
+    pos: &[DVec3],
+    t_myr: f64,
+    fronts: Option<&[u8]>,
+) {
     if pos.len() != samples.len() {
         return;
     }
+    let fronts = fronts.filter(|f| f.len() == samples.len());
     let mut buf: Vec<u8> = Vec::with_capacity(samples.len() * 4 * MAP_FIELDS.len());
-    for (s, p) in samples.iter().zip(pos) {
+    for (i, (s, p)) in samples.iter().zip(pos).enumerate() {
         if s.is_hidden() {
             continue;
         }
@@ -660,7 +700,7 @@ fn write_map(dir: &std::path::Path, samples: &[Sample], pos: &[DVec3], t_myr: f6
             s.arc_oceanic_m,
             s.arc_continental_m,
             s.group as f32,
-            f32::from(s.flags),
+            f32::from(map_flags(s, fronts.map_or(0, |f| f[i]))),
         ] {
             buf.extend_from_slice(&x.to_le_bytes());
         }
@@ -684,6 +724,25 @@ mod tests {
         s.thickness_m = s.pools.iter().sum();
         s.elevation_m = z;
         s
+    }
+
+    /// A map record's flags carry the boundary mix's fronts above the sample's own eight bits: a
+    /// subduction front (ocean-ocean, ocean-continent) and a collision front apart, nothing for
+    /// the other classes or no class.
+    #[test]
+    fn the_map_flags_mark_the_fronts() {
+        use crate::plates::dynamics::mix;
+        let mut s = column(CONTINENTAL, 500.0);
+        s.flags = crate::plates::state::ARC;
+        let own = u16::from(s.flags);
+        let f = |class: usize| map_flags(&s, class as u8 + 1);
+        assert_eq!(f(mix::OCEAN_OCEAN), own | MAP_FRONT_SUBDUCTION);
+        assert_eq!(f(mix::OCEAN_CONTINENT), own | MAP_FRONT_SUBDUCTION);
+        assert_eq!(f(mix::COLLISION), own | MAP_FRONT_COLLISION);
+        for class in [mix::RIDGE, mix::RIFT, mix::OTHER] {
+            assert_eq!(f(class), own, "class {class}");
+        }
+        assert_eq!(map_flags(&s, 0), own);
     }
 
     /// Each change lands in the part it was booked to, and the moves are counted once.
@@ -710,7 +769,7 @@ mod tests {
         assert_eq!(b.parts[Part::Subduction as usize][CONT_HIDDEN], 1.0);
         assert_eq!(b.parts[Part::Erosion as usize][DRY], -1.0);
         let pos = vec![DVec3::X, DVec3::Y, DVec3::Z, -DVec3::X];
-        b.snapshot(&samples, &pos, 2.0, 1.0, 0.0, &BTreeMap::new());
+        b.snapshot(&samples, &pos, 2.0, 1.0, 0.0, &BTreeMap::new(), None);
         let out = b.lines();
         assert!(out.contains("cb_t t=2"), "{out}");
         assert!(out.contains("collapse=[o2c="), "{out}");

@@ -567,6 +567,17 @@ pub struct TectonicParams {
     /// under shows again where that plate moves off it (plates.md, "The overlaps' hiding"). On
     /// by default since 2026-10-24 (plates.md, "Step 6"). ledger: PLT-542
     pub one_way_subduction: bool,
+    /// A subduction zone goes on through a resampling (the front lane, 2026-10-24;
+    /// `Contact::carried`, `subduction::carry`): a contact active when the lattice is rebuilt
+    /// stays active, with its fronts, arcs and slab, until its overlap is seen again, its
+    /// boundary stops converging (no front) or `contact_timeout_myr` passes. The rebuild is a
+    /// numerical step, not a geological event, but it gives every plate fresh crust with no
+    /// overlap, and the overlap that makes a contact active takes a few steps to form again. Off,
+    /// a contact is active only at steps its overlap is seen, so every resampling switches off
+    /// the subduction zones for 2 to 4 Myr (the record's subducting length falls from 99,000 to
+    /// 63,000 km in the first 2 Myr after one, the converging boundary with no contact rises
+    /// from 6,000 to 37,000; plates.md, "Step 7"). ledger: PLT-550
+    pub contact_carry: bool,
     /// Orogenic collapse (`plates/collapse.rs`): continental crust thicker than
     /// `collapse_thickness_km` that no orogeny is raising any more thins by spreading, with this
     /// e-folding time of its excess thickness, Myr; the crust it loses fills the nearest thin
@@ -1028,6 +1039,7 @@ impl Default for TectonicParams {
             weld_after_myr: 10.0,             // ledger: PLT-246
             reversal_by_arc_crust: true,      // ledger: PLT-371 (on since 2026-10-23)
             one_way_subduction: true,         // ledger: PLT-542 (on since 2026-10-24)
+            contact_carry: true,              // ledger: PLT-550 (on since 2026-10-24)
             collapse_myr: 15.0,               // ledger: PLT-255
             collapse_thickness_km: 50.0,      // ledger: PLT-256
             collapse_quiet_myr: 10.0,         // ledger: PLT-259

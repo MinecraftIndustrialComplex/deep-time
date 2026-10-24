@@ -2119,6 +2119,78 @@ fn a_contact_whose_plates_slide_past_has_no_arc_front() {
     assert_eq!(sliding, 0);
 }
 
+/// A subduction zone goes on through a resampling (`tectonics.contact_carry`, PLT-550; plates.md,
+/// "Step 7"). The resampling gives both plates of [`converging_plates`] fresh crust with no
+/// overlap, so at the next step, before the plates move, the contact sees none. Carried, it keeps
+/// its front as it had it before the resampling; off, it has none until the overlap forms again
+/// (the record's subducting length fell from 99,000 to 63,000 km in the first 2 Myr after a
+/// resampling, base6 seeds 1 to 4). A carried contact whose plates part has no front and is
+/// carried no more; one whose overlap is seen again is active by it, not carried.
+#[test]
+fn a_subduction_zone_goes_on_through_a_resampling() {
+    let p0 = preset(20_000, 20.0, "supercontinent", 5);
+    let run = |on: bool| {
+        let mut p = p0.clone();
+        p.tectonics.contact_carry = on;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let (mut st, geo, pos) = converging_plates(&p, &env);
+        assert_eq!(st.contacts.len(), 1);
+        assert!(!st.contacts[0].carried);
+        let before = subduction::fronts_begin(&st, &geo, &pos, &env).front_count();
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        subduction::carry(&mut st, env.step, on);
+        assert_eq!(st.contacts[0].carried, on);
+        let tree = Tree::over(&pos, |_| true);
+        let geo = ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env).unwrap();
+        let pos = geometry::positions(&st, &geo);
+        let env2 = stage.env(&p.tectonics, 2);
+        let tree = Tree::over(&pos, |_| true);
+        let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+        subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
+        let after = subduction::fronts_begin(&st, &geo, &pos, &env2).front_count();
+        (st, geo, pos, world, before, after)
+    };
+    let (_, _, _, _, before_off, after_off) = run(false);
+    let (st, geo, pos, world, before, after) = run(true);
+    eprintln!("fronts: before {before} / {before_off}, after on {after}, off {after_off}");
+    assert_eq!(st.contacts.len(), 1);
+    assert_eq!(st.contacts[0].last_step, 1, "overlap seen after the resampling");
+    assert!(before > 20 && before == before_off, "{before} {before_off}");
+    assert_eq!(after_off, 0, "a front without its overlap, off");
+    assert!(
+        after > before / 2 && after <= 2 * before,
+        "{after} fronts carried, {before} before"
+    );
+    let p = p0.clone();
+    let stage = PlatesStage::new(p.clone());
+    let env2 = stage.env(&p.tectonics, 2);
+    // The plates part: no front, and the carry ends.
+    let mut parted = st.clone();
+    parted.plates[1].omega = (DVec3::X * -env2.norm.omega_of_speed(50.0)).to_array();
+    let mut cones = vec![[0.0; 2]; parted.samples.len()];
+    subduction::fronts_and_uplift(&mut parted, &geo, &pos, &env2, &mut cones, 0.0);
+    assert!(!parted.contacts[0].carried, "carried with no front");
+    // Converging on: the carry holds while the fronts stand.
+    let mut held = st.clone();
+    subduction::fronts_and_uplift(&mut held, &geo, &pos, &env2, &mut cones, 0.0);
+    assert!(held.contacts[0].carried, "the carry ended with fronts standing");
+    // The ocean moves under the continent: the overlap is seen, and the contact is active by it.
+    let mut world = world;
+    let env3 = stage.env(&p.tectonics, 3);
+    for g in held.groups.iter_mut().filter(|g| g.plate == 1) {
+        let q = glam::DQuat::from_rotation_x(0.05);
+        g.rot = [q.x, q.y, q.z, q.w];
+    }
+    let pos3 = geometry::positions(&held, &geo);
+    let tree = Tree::over(&pos3, |_| true);
+    let overlaps = subduction::detect(&held, &geo, &pos3, &tree);
+    subduction::resolve(&mut held, &mut world, &geo, &overlaps, &pos3, &env3).unwrap();
+    let c = &held.contacts[0];
+    assert_eq!((c.last_step, c.carried), (3, false));
+    assert!(c.active(3));
+}
+
 /// Plate task 8: the volcano stage's felsic cones over an arc (already in the pools as volcanic
 /// rock) count inside the arc's own rate, so the arc adds that much less crust and its magma is
 /// counted once; the cones it counted are cleared for the hotspots.
