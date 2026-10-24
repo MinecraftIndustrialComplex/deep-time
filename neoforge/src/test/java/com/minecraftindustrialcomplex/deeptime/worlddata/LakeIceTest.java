@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -46,6 +47,46 @@ class LakeIceTest {
         assertNull(LakeIce.of(wd));
         assertFalse(LakeIce.keepsOpen(wd, 4, 0, 119, 0));
         assertFalse(LakeIce.ices(wd, 4, 0, 119, 0));
+    }
+
+    /**
+     * The rule answers for a lake's own columns alone (ledger HYD-072). The shore rule gives a lake's level to the dry
+     * columns within its reach too, and a dry one there (a bank, or a hot-spring pool's ground standing over the lake's
+     * top) holds no lake: on the real test planet, at the top block of the level each column within reach of a lake
+     * cell takes, the rule says yes (keeps it open or ices it) exactly where the water pass puts a lake
+     * ({@link Water#core}). Until 2026-10-23 it said yes in the dry columns too, and on master 4ab29084's planet kept
+     * open five blocks of a hot-spring pool's water one block under the pool's surface.
+     */
+    @Test
+    void theRuleIsTheLakeColumnsAlone() {
+        WorldData wd = WorldData.open(Fixtures.world("planet4k"));
+        assertNotNull(LakeIce.of(wd), "the test planet records the lake ice rule");
+        int reach = Columns.NOISE_CELL;
+        Water.Spec spec = Water.Spec.of(wd, reach);
+        RasterSampler levels = wd.layer(WorldData.WATER_LEVEL);
+        int c = wd.circumference();
+        long z0 = (long) Math.ceil(wd.projection().zMin()), z1 = (long) Math.floor(wd.projection().zMax());
+        int lake = 0, dry = 0, wrong = 0;
+        StringBuilder first = new StringBuilder();
+        for (long z = z0; z <= z1; z++)
+            for (long x = -c / 2; x < c / 2; x++) {
+                double level = Water.levelAt(levels, x, z, reach);
+                if (!Double.isFinite(level))
+                    continue;
+                int t = Water.topBlock(level);
+                boolean holds = Water.core(wd, spec, x, z).kind() == Water.Kind.LAKE;
+                boolean says = LakeIce.keepsOpen(wd, reach, (int) x, t, (int) z) || LakeIce.ices(wd, reach, (int) x, t, (int) z);
+                if (holds)
+                    lake++;
+                else
+                    dry++;
+                if (says != holds && wrong++ < 5)
+                    first.append(String.format(" (%d, %d, %d: %s, the rule says %s)", x, t, z, holds ? "lake" : "dry", says));
+            }
+        System.out.printf("[LakeIceTest] planet4k: %d lake columns and %d dry columns within reach of a lake%n", lake, dry);
+        assertEquals(0, wrong, wrong + " columns where the rule and the water pass disagree:" + first);
+        assertTrue(lake > 0, "the test planet has no lake column");
+        assertTrue(dry > 0, "the test planet has no dry column within reach of a lake: nothing tells the rule apart");
     }
 
     @Test
