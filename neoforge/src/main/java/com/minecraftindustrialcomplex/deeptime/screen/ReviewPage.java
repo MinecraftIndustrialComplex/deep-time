@@ -52,11 +52,11 @@ final class ReviewPage implements PlanetEditorScreen.Page {
         int top = 22, bottom = s.height - 30;
         int columnW = s.width >= 420 ? 150 : 110;
         int columnX = s.width - columnW - 6;
-        var net = model.ready() ? model.net().orElse(null) : null;
-        laidOutAsNet = net != null;
-        int[] side = net != null ? MapWidget.fit(columnX - 12, bottom - top - 12 - 24, 4, 3) : MapWidget.fit(columnX - 12, bottom - top - 12);
+        var netView = model.ready() ? model.net().orElse(null) : null;
+        laidOutAsNet = netView != null;
+        int[] side = netView != null ? MapWidget.fit(columnX - 12, bottom - top - 12 - 24, 4, 3) : MapWidget.fit(columnX - 12, bottom - top - 12);
         int fullW = s.width - 12;
-        int[] stack = net != null ? MapWidget.fit(fullW, Math.max(20, bottom - top - STACK_TEXT_H), 4, 3)
+        int[] stack = netView != null ? MapWidget.fit(fullW, Math.max(20, bottom - top - STACK_TEXT_H), 4, 3)
                 : MapWidget.fit(fullW, Math.max(20, bottom - top - STACK_TEXT_H));
         // As on the generation page: stacked when that makes the map much larger (2000x1500 at GUI
         // scale 3), else the summary beside it (1920x1080).
@@ -69,8 +69,8 @@ final class ReviewPage implements PlanetEditorScreen.Page {
         sideX = stacked ? mapX : columnX;
         sideW = stacked ? (mapW - 12) / 2 : columnW;
         textY = stacked ? mapY + mapH + 4 + 20 + 6 : mapY;
-        if (net != null)
-            s.add(new MapWidget(mapX, mapY, mapW, mapH, texture, this::spawnMarker, net, hintsTexture, () -> hints));
+        if (netView != null)
+            s.add(new MapWidget(mapX, mapY, mapW, mapH, texture, this::spawnMarker, netView, hintsTexture, () -> hints));
         else
             s.add(new MapWidget(mapX, mapY, mapW, mapH, texture, this::spawnMarker, this::provinceBoxes));
         int by = s.height - 24;
