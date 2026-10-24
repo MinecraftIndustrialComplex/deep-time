@@ -20,9 +20,10 @@ Rain that does not evaporate runs downhill, gathers into rivers and fills hollow
 | [HYD](ledger/HYD.md) | deltas and distributaries (below, "Deltas and distributaries", 2026-10-23) | HYD-130 to HYD-144, HYD-146, HYD-147 (17) |
 | [HYD](ledger/HYD.md) | floodplains and levees (below, "Floodplains and levees", 2026-10-24) | HYD-150 to HYD-153 (4) |
 | [HYD](ledger/HYD.md) | meanders (below, "Meanders", 2026-10-24) | HYD-155 to HYD-159 (5) |
+| [HYD](ledger/HYD.md) | alluvial fans and braided reaches (below, "Fans and braids", 2026-10-24) | HYD-165 to HYD-175 (11) |
 | [BIO](ledger/BIO.md) | land on a delta plain (below, "Stage 1b on the D5 world"; biomes.md, "Land on a delta plain") | BIO-185 (1) |
 
-Rows by status (123 active, 1 `merged`): `verified` 12, `cited-unverified` 12, `from-memory` 4, `abstract-only` 3, `calibrated` 1, `game-choice` 68, `uncited` 23.
+Rows by status (134 active, 1 `merged`): `verified` 18, `cited-unverified` 12, `from-memory` 4, `abstract-only` 3, `calibrated` 1, `game-choice` 73, `uncited` 23.
 
 ## Material for the stage 2 writer
 

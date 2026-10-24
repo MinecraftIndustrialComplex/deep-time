@@ -6,7 +6,8 @@
 //! river's channel as its edge.
 
 use deeptime_format::rivers::Rivers;
-use deeptime_format::{GridDesc, Projection, ZEdges};
+use deeptime_format::raster::ZEdges;
+use deeptime_format::{GridDesc, Projection};
 use serde_json::Value;
 
 use super::fan::{self, Fans, Input};

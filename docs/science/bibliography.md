@@ -1310,10 +1310,10 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Leopold, Luna B. and Wolman, M. Gordon. 1957. River channel patterns: braided, meandering, and straight. U.S. Geological Survey Professional Paper 282-B, pp. 39-85.
 - DOI or URL: https://doi.org/10.3133/pp282B ; open PDF https://pubs.usgs.gov/pp/0282b/report.pdf
 - Cited as: "Leopold & Wolman 1957" (hydro/meander.rs BRAID_SLOPE_COEF; rivers-and-lakes.md, "Meanders").
-- Ledger ids: HYD-158; HYD-027 (the meander's sinuosity); HYD-155 (beside LW1960)
+- Ledger ids: HYD-158; HYD-027 (the meander's sinuosity); HYD-155 (beside LW1960); HYD-171 to HYD-175 (braids)
 - Access: open access (USGS)
 - Library (the project's source library, not distributed): fetched (PDF, 50 pages, text layer, 147,959 characters). From: https://pubs.usgs.gov/pp/0282b/report.pdf. Text file: Leopold1957.txt.
-- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 3), the USGS PDF: p. 60, equation (1) from the page image (the text layer lost it), "the braided channels are separated from the meanders by a line described by the equation s=0.06 Q^-.44", Q the bankfull discharge in cfs (Fig. 46); a meander is a reach whose sinuosity is "equal to or greater than 1.5", an arbitrary line; p. 58, Fig. 45B, λ = 6.5 w^1.1 ft, the ratio of wavelength to width "from about 7 for small streams" to 15 for rivers over 1,000 feet wide; the abstract's 7 to 12 widths between riffles.
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 3), the USGS PDF: p. 60, equation (1) from the page image (the text layer lost it), "the braided channels are separated from the meanders by a line described by the equation s=0.06 Q^-.44", Q the bankfull discharge in cfs (Fig. 46); a meander is a reach whose sinuosity is "equal to or greater than 1.5", an arbitrary line; p. 58, Fig. 45B, λ = 6.5 w^1.1 ft, the ratio of wavelength to width "from about 7 for small streams" to 15 for rivers over 1,000 feet wide; the abstract's 7 to 12 widths between riffles. 2026-10-24, the deltas lane (gap 5 stage 4), the same PDF: p. 53, "A braided river is one which flows in two or more anastomosing channels around alluvial islands. This study indicates that braided reaches taken as a whole are steeper, wider, and shallower than undivided reaches carrying the same flow"; p. 50, the divided channels' widths sum to "1.6 to 2.0 times that of the undivided one" in the three natural comparisons (1.05 to 1.70 in the flume) and their mean depth is 0.6 to 0.9 of the undivided reach's; p. 41, Horse Creek: two channels "about equal in width, 30 to 40 feet" against 50 feet undivided, and a central bar "nearly 250 feet down the center of the channel"; p. 44, the island "is considerably wider than the new gravel bar"; the abstract (p. 39): an island begins as "the deposition of a central bar", and "at a given discharge, meanders occur at smaller values of slope than do braids"; p. 60, the Green River's 425 ft³/s divided into 305 and 120.
 - Read in this pass: full text fetched (OCR text layer; the sections on sinuosity and Figure 46)
 - Reference check: matches (authors, year, series). Values: see HYD-158 and HYD-027.
 
@@ -1610,10 +1610,10 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Ganti, V., Chu, Z., Lamb, M. P., Nittrouer, J. A. and Parker, G. (2014). Testing morphodynamic controls on the location and frequency of river avulsions on fans versus deltas: Huanghe (Yellow River), China. Geophysical Research Letters 41(22):7882-7890.
 - DOI or URL: 10.1002/2014GL061918
 - Cited as: "Ganti et al. 2014" (rivers-and-lakes.md; physics-gap-audit.md).
-- Ledger ids: HYD-137
-- Access: paywalled (Wiley 403 on 2026-10-23); not fetched.
+- Ledger ids: HYD-137, HYD-167
+- Access: paywalled (Wiley 403 on 2026-10-23); an author's group copy at https://lamb.caltech.edu/documents/19648/Ganti_et_al_GRL_2014.pdf.
 - Library: not fetched.
-- Read so far (by the project): the abstract as quoted in search results, 2026-10-23: where the river debouches from the Loess Plateau, avulsions occur at an abrupt decrease in bed slope and recur about every 607 years; the key points say fans and deltas have different drivers for avulsion and delta lobe size scales with the backwater length. The abstract's delta sentences were cut off.
+- Read so far (by the project): the abstract as quoted in search results, 2026-10-23: where the river debouches from the Loess Plateau, avulsions occur at an abrupt decrease in bed slope and recur about every 607 years; the key points say fans and deltas have different drivers for avulsion and delta lobe size scales with the backwater length. 2026-10-24, the deltas lane (gap 5 stage 4), the Caltech copy in full: p. 7882, "avulsions occur at an abrupt decrease in bed slope"; p. 7883, "channel filling is thought to be focused where upland channel confinement ceases (e.g., at a canyon-fan transition) so that channel bed and water surface slopes reduce", and L_b = h_c/S; p. 7884, a tenfold change in bed slope upstream of Huayuankou, 1.3 × 10^−3 at 960 km to 2.0 × 10^−4 at 760 km (the exponents' signs from the page image), the node about 700 km from the shoreline, 10 avulsions in 5,000 years; p. 7885, the recurrence 607 ± 121 years, and at the delta node the backwater length 21 to 54 km and 7 ± 2 years; p. 7889, fan avulsion sites "are driven by a topographic slope break".
 
 ### Canestrelli2014
 - Reference: Canestrelli, A., Nardin, W., Edmonds, D., Fagherazzi, S. and Slingerland, R. (2014). Importance of frictional effects and jet instability on the morphodynamics of river mouth bars and levees. Journal of Geophysical Research: Oceans 119 (the reference from memory).
@@ -1668,6 +1668,33 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Access: paywalled (Wiley); an author's group copy (Penn State).
 - Library: not fetched.
 - Read so far (by the project): 2026-10-24, the floodplain agent, the Penn State copy, p. 907 (the study area): "Levée and proximal floodbasin sediments typically range in size from very fine sand to medium silt (d50 = 0.15-0.014 mm)".
+
+### Bull1964
+- Reference: Bull, William B. (1964). Geomorphology of segmented alluvial fans in western Fresno County, California. U.S. Geological Survey Professional Paper 352-E, pp. 89-129.
+- DOI or URL: https://pubs.usgs.gov/pp/0352e/report.pdf (the DOI 10.3133/pp352E from memory).
+- Cited as: "Bull 1964" (hydro/fan.rs; hydro/braid.rs; rivers-and-lakes.md, "Fans and braids").
+- Ledger ids: HYD-165, HYD-166, HYD-167, HYD-169, HYD-171
+- Access: open access (USGS)
+- Library: not fetched (read from the USGS PDF, 2026-10-24).
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 4), the USGS PDF (printed page = PDF page + 82): p. 93, the definition ("a segment of a cone that radiates downslope from the point where the stream channel emerges from a mountainous area") and the braided distributary channels "about 1-3 feet deep" below the fanhead trench; p. 94, the fans "range in size from 0.4 to 260 square miles" and "in overall slope from 0.0035 (0°12') to 0.029 (1°40')", the radii "restricted by adjacent fans, and by stream deposits at the toe of the fan", the lines drawn without statistical fitting, segmented profiles; Fig. 54 (p. 95, the page image): A_F = 2.4 A_D^0.88 (mudstone and shale basins) and 1.3 A_D^0.88 (sandstone), S_F = 0.023 A_D^−0.16 and 0.022 A_D^−0.32, S_F = 0.034 A_F^−0.28 and 0.025 A_F^−0.34; p. 98, the foothill fans' segment slopes; p. 100, "steep fans form at the mouths of canyons having steep longitudinal profiles"; p. 114, "an alluvial fan is part of a gently sloping cone"; p. 126, the summary's equations and basins of 0.2 to 296 square miles.
+
+### Stock2008
+- Reference: Stock, J. D., Schmidt, K. M. and Miller, D. M. (2008). Controls on alluvial fan long-profiles. Geological Society of America Bulletin 120(5/6):619-640.
+- DOI or URL: 10.1130/B26208.1; the copy read at https://web.gps.caltech.edu/~mpl/Ge126_Reading_List/Stock_et_al_alluvial_fans.pdf (a course reading list's copy).
+- Cited as: "Stock et al. 2008" (hydro/fan.rs FREE_SECTOR_RAD; rivers-and-lakes.md, "Fans and braids").
+- Ledger ids: HYD-165 (Table 1 only), HYD-168
+- Access: paywalled (GSA); a copy on a Caltech course page.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 4): Table 2 (p. 623, the page image): the four field fans' areas (Globe 9.7/17.1, Lucy Gray 64.9, Sheep Creek 20.2/22.3, Hanaupah 16.0/45.3 km², the second the pre-Holocene fan), arc lengths (6,500, 8,200, 5,800 and 5,800 m, "Straight line from fan head to margin along central axis"), catchment areas 12.39, 44.29, 20.60 and 74.05 km², fan-head slopes 0.060, 0.057, 0.068 and 0.062; Table 1 (p. 622), the literature's relations, "Afan = cAdrainage" and "Savg = cA^n" without coefficients; the abstract: channel slopes "decrease downfan from ~0.10-0.04 to ~0.01".
+
+### NansonCroke1992
+- Reference: Nanson, G. C. and Croke, J. C. (1992). A genetic classification of floodplains. Geomorphology 4(6):459-486.
+- DOI or URL: 10.1016/0169-555X(92)90039-Q (from memory); the copy read at https://calsalmon.org/sites/default/files/files/Nanson_and_Croke_1992_genetic_classification_floodplains.pdf (an author copy without the printed page numbers).
+- Cited as: "Nanson & Croke 1992" (rivers-and-lakes.md, "Fans and braids").
+- Ledger ids: HYD-171 (context; not used as a rule)
+- Access: paywalled (Elsevier); a re-typed copy on a watershed group's site.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 4), section "Floodplain classes": specific stream power at bankfull, class A over 300 W m⁻², class B 10 to 300 W m⁻² (B1 braided river floodplains: "an abundant silt to gravel size load, moderately steep gradients and usually easily erodible banks"; B3 meandering), class C under 10 W m⁻² (C2 anastomosing, "low gradients (commonly less than 0.0002)").
 
 ### Mentioned for later, not implemented (no ledger ids)
 Each verified only as a bibliographic record (OpenAlex), not read.
