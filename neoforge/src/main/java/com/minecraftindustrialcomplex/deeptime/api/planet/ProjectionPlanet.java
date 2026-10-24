@@ -31,7 +31,7 @@ final class ProjectionPlanet implements DeepTimePlanet {
     ProjectionPlanet(WorldProjection p, double mPerBlockH) {
         this.p = p;
         this.mPerBlockH = mPerBlockH;
-        this.radiusM = p.radius() * mPerBlockH; // ledger: SCL-216
+        this.radiusM = p.radius() * mPerBlockH; // ledger: SCL-240
         this.lambert = p instanceof WorldProjection.Lambert;
     }
 
