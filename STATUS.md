@@ -140,6 +140,55 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-23: Deltas stage 1b, and the red gate's riverbiomes: BoP's rare region paints fungal jungle over the valley slice, and the red gate's planet had every wide channel in one province dealt to that region (not the deltas, not a race; the test now counts a region's own paint); on the D5 world the projected plains stand above the sea as on the bake (97.0 %), no plain land carries an ocean biome, and the 8 plains "with no path" are fronts the main stem already holds (coordinator's tasks after the stage 1 merge; agent worktree .claude/worktrees/agent-a9e4e25c4744d5a75, branch worktree-agent-a9e4e25c4744d5a75, master 2fde68f7 merged in at 360e4760; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **riverbiomes (-PwithTerraBlender), the cause.** The gate on master 84fb7d7c failed with `only 0 river and 0 swamp of 24 wide-channel samples`.
+  - Not a race. 5 ms is the test's usual time, since it only asks the biome source (7 ms on 10-18). The result also repeats exactly. Master 84fb7d7c with the test fix cherry-picked, riverbiomes alone on the VM, bakes the gate's planet (52 provinces dealt as primary 18, rare 3, secondary 14, vanilla 17) and gets the same 24 samples: 0 river, 0 swamp, all 24 `biomesoplenty:fungal_jungle` in region 3, BoP's rare region.
+  - BoP 21.1.0.14 (decompiled with cfr on the VM) puts fungal jungle in the warm, wettest cell of `RARE_BIOMES_BOP` (temperature 3, humidity 4). Its `pickRiverBiomeBOP` and `pickSwampBiomeBOP` return the rare biome before the river or the swamp, so that region paints its own biome over the valley slice. The test assumed every region's valley slice is a river or a swamp, which that region breaks.
+  - Not the deltas. On the same commit with `hydro.deltas=false`, the planet has the same 52 provinces and again 0 river and 0 swamp of 24, all in region 3 (22 fungal jungle, 2 volcanic plains). The planet moved with 4b607445 (the heat-flow pass on) and 7c0acb9f (gap 4 stages 2 and 3 on), both merged between the green gate (bf8477b2) and 84fb7d7c. Its wide channels lie in one province (x -645 to -585, z 90 to 105), and the deal gives that province to the rare region.
+- **The fix** (8d1a19ff, test only: `RiverGameTests.riverBiomes` and `TerraBlenderChecks.vanillaRegionBiome`). Under TerraBlender, a sample that is neither river nor swamp counts as painted when its region is a mod region and vanilla's region 0 has a river or a swamp at the same climate point. The log line names each sample's region and biome.
+  - On 84fb7d7c: 23 of 24 painted, PASS.
+  - At this branch's head (28 provinces since the flexure merge): 9 river, 20 swamp and 3 painted of 34, PASS. With the deltas off: 5, 21 and 4 of 32, PASS.
+  - The standalone profile at the head passed 103 of 103 (riverBiomes: 27 river and 5 swamp of 34).
+- **Stage 1b, measured** as for stage 1. The D5 bake's water part was run again at the head (`deeptime hydro`), projected to Petroff-Guyou (`deeptime project`) and counted by `tools/review/delta_census.py`. This is a bake rerun, not a simulation. "Stage 1" is 84fb7d7c.
+
+  | measure | Lambert bake | stage 1, PG | stage 1b, PG |
+  |---|---|---|---|
+  | plain cells | 23,481 | 29,927 | 24,313 |
+  | ... above the sea | 97.1 % | 66.9 % | 97.0 % |
+  | plain, km² | 8,453.2 | 10,389.6 | 8,440.6 |
+  | dry plain columns with an ocean biome | 90.6 % | 752 of 29,473 | 0 of 24,313 |
+  | distributaries; rivers that split | 632; 233 | 632; 233 | 632; 233 |
+  | 25 largest rivers with a plain; split | 24; 15 | 24; 15 | 24; 15 |
+
+  The full table is in rivers-and-lakes.md, "Stage 1b on the D5 world".
+- **(1) The plain under the sea (HYD-146).** The projection's footprint mean blended the plain's seaward edge with the beach band and the sea beside it, a trace cell by cell over the stage 1 world:
+  - 3,534 plain cells ended under the sea, by 0.10 blocks at the median and 0.37 at p90. 3,191 of them lie beside the open sea, and 3,493 came from 2 to 4 samples.
+  - 1,048 more cells had a mean above the sea and ended at or under it in the written layer.
+  - The mean of `delta` spread onto 5,747 cells beside the plain, which the census then counted as plain.
+
+  Now a world cell whose nearest bake cell is on a plain takes that cell's `elevation` and `detail/amplitude`, and `delta` is resampled by the nearest cell everywhere.
+- **(2) Ocean biomes on plain land (BIO-185).** The biome bake runs before the water part lays the plains, so the bake's nodes over a plain hold the sea's record. The land call (BIO-170) reads the ground at a node's block only, while the game reads four nodes bilinear. The land call now runs a second time, with every node within one L2 cell of a dry plain cell counted dry (4,417 nodes; 271 of them, 1,505 km², took the land's record).
+  - The cost: 2,947 of the 4,587 sea cells beside the plain read a coast or land continentalness (386 in stage 1). That is about 1,020 km², 0.044 % of the land, at the water's edge of a wetland.
+  - A Lambert world has no land call, so its plains keep the ocean record. This is left as it is, since the play worlds are Petroff-Guyou.
+- **(3) The 8 plains with no path (HYD-147).** None lacked a path: in each, the main stem already covers every front cell of the half the split heads for.
+  - The 10th largest river (Q 304 m³/s) runs over all 55 front cells of its plain. The second network brings it onto the plain off a different land cell than the one the plain's course was built from (HYD-134, HYD-136), so the fix there is not local.
+  - The other 7 are Q 4 to 14 m³/s strips with fronts of 3 to 8 cells.
+  - The split is unchanged. The record now counts the causes apart (`split_fails`, `fit_unsplit_plains`), and the census finds a plain anywhere along the stem.
+- **Files:**
+  - `bake/project.rs` and `bake/project_cube.rs`: `PLAIN_NEAREST`, `plain_rule`, `delta` by the nearest cell, and the plain nodes' second land call with `notes.bake.projection.biome_land.delta_plain`.
+  - `hydro/delta.rs`: the split counters and the front cells on the stem.
+  - `hydro/mod.rs`: HYD-141's comment.
+  - `tools/review/delta_census.py`: the biome inputs read as the game reads them, and a plain anywhere along the stem.
+  - The ledger (HYD-146, HYD-147, BIO-185; claims.md recounted), rivers-and-lakes.md, biomes.md ("Land on a delta plain"), FORMAT.md and physics-gap-audit.md.
+  - The two GameTest files above.
+- **Calls:** the area multiplier stays 32 (HYD-141, for the river widths, not tuned to Earth's share; 48 was not run). The wave and tide gate is left for later.
+- **Tests** on the VM at adb25b56 (the merged head):
+  - `cargo fmt --check` and `clippy -D warnings` are clean, and `cargo test --workspace` passed everything (deeptime-core 945 passed, 6 ignored).
+  - `./gradlew build test`: BUILD SUCCESSFUL, 492 tests, 0 failures, 2 skipped.
+  - GameTests: as above (the coordinator allowed riverbiomes under TerraBlender and one standalone run).
+- **Page:** https://spacesheep.dev/@benmac/deeptime-deltas (republished with stage 1b).
+- **Next:** the coordinator merges and re-gates -PwithTerraBlender. After that come stages 2 to 4 (floodplains and levees, meanders, fans and braids) and the wave and tide gate (HYD-143).
+
 ### 2026-10-23: The flexure faults: the oceanic carry peaks and the trench floors were one integrator (the surface held an offset over the plate model's height and the plate model's feedback added it back each step), ended by the held offsets (ISO-125); the water load by basin, not by `h ≤ sea` (ISO-126); both and the yield (ISO-120, 380 mGal) on by default under Ben's rule; the solve on the sphere's metric (ISO-127) is right for one solve but its preconditioner does not converge where the rigidity changes along a row near a pole, so it is off (coordinator's task, brief build/coord/briefs/flexure-faults.md; agent worktree .claude/worktrees/agent-a90cfbd93f4cea604, branch worktree-agent-a90cfbd93f4cea604 from master 049c4278; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Trace** (flexure.md "The held offsets"; scattered 1 with the yield, `DEEPTIME_PEAK_TRACE=10000` and the new floor trace `DEEPTIME_FLOOR_TRACE=11000`, surface/floors.rs, measurement only).
   - 17 peak lines, all ocean samples at a ridge 10.0 to 14.7 km high, 9 on the polar rows; 0.2 to 0.99 of their cells in a gap between plates, which handed the sample 0.7 to 2.8 km in the step, what it rose by.

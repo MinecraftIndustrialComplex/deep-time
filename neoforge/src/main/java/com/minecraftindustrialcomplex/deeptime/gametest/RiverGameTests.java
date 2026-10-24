@@ -514,8 +514,9 @@ public final class RiverGameTests {
      * slice reached the channel, and the region chose what grows on it. Biomes O' Plenty's rare
      * region does so (21.1.0.14, {@code BOPRareOverworldBiomeBuilder.pickRiverBiomeBOP} and
      * {@code pickSwampBiomeBOP} return the rare biome of the climate cell before any river or swamp):
-     * its rare biomes fill their cells, rivers included, so the hot wettest cell is fungal jungle
-     * over every channel. The planet of master 84fb7d7c put all 24 samples there.
+     * its rare biomes fill their cells, rivers included, so its warm, wettest cell (temperature 3,
+     * humidity 4) is fungal jungle over every channel. The planet of master 84fb7d7c put all 24
+     * samples there.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 600)
     public static void riverBiomes(GameTestHelper helper) {
