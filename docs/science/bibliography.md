@@ -1132,7 +1132,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Cogley, J. G. (1984). Continental margins and the extent and number of the continents. Reviews of Geophysics 22(2):101-122.
 - DOI or URL: 10.1029/RG022i002p00101.
 - Cited as: (ERO, ISO, HYP) "Cogley 1984 (continental crust 41 % of the surface)". (PLT) "Cogley 1984, Rev. Geophys. 22:101-122" (29 percent land on 41 percent continental crust).
-- Ledger ids: RLC-030 (2026-10-23: the 41 % crust share, as the realism-checks page uses it); HYP-012, HYP-013, PLT-158, PLT-159, PLT-205; HYP-035 (2026-10-20: the 41 % share as the stand-in contour for the continental edge); HYP-042 (2026-10-22: the 30.6 % submerged against the drowned-crust target)
+- Ledger ids: PLT-516 (2026-10-23: the 41 % against the transference arm's continental share); RLC-030 (2026-10-23: the 41 % crust share, as the realism-checks page uses it); HYP-012, HYP-013, PLT-158, PLT-159, PLT-205; HYP-035 (2026-10-20: the 41 % share as the stand-in contour for the continental edge); HYP-042 (2026-10-22: the 30.6 % submerged against the drowned-crust target)
 - Access: paywalled; not fetched. [other sections: paywalled (abstract only).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
