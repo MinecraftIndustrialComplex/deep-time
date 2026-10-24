@@ -554,6 +554,37 @@ class GeothermalTest {
     }
 
     @Test
+    void theHeatFlowOddsFollowTheGroundAFieldMayStandOn() {
+        // GEO-064: the odds read the fields' own gates on the fields' own cells. The hot box of 720,000 km2 is about
+        // 75 cells of 9,600 km2 (25 by 8 on the planet): a field is all but certain.
+        Geothermal.HeatFlowOdds hot = Geothermal.heatFlowOdds(GeothermalRules.DEFAULT, (x, z) -> 75.0, DRY,
+                heatEnv(120, 1200, 15, (x, z) -> 0), C, SEA, MH, 4);
+        assertEquals(200, hot.cells());
+        assertEquals(720_000.0, hot.hotDryKm2(), 0.02 * 720_000.0, hot.toString());
+        assertTrue(hot.expected() > 60 && hot.expected() < 100, hot.toString());
+        assertTrue(hot.pNone() < 1e-30, hot.toString());
+        assertEquals(hot.samples(), hot.continental(), "the layer has a value on every column here");
+        // Under the setting: no ground, no odds. Iced or wet ground is no place either: half the box is iced, and
+        // ground under MIN_ABOVE_SEA + 2 blocks over the sea is the coast's.
+        Geothermal.HeatFlowOdds cool = Geothermal.heatFlowOdds(GeothermalRules.DEFAULT, (x, z) -> 75.0, DRY,
+                heatEnv(99, 1200, 15, (x, z) -> 0), C, SEA, MH, 4);
+        assertEquals(0.0, cool.hotDryKm2());
+        assertEquals(0.0, cool.expected());
+        assertEquals(1.0, cool.pNone());
+        Geothermal.HeatFlowOdds half = Geothermal.heatFlowOdds(GeothermalRules.DEFAULT, (x, z) -> 75.0, DRY,
+                heatEnv(120, 1200, 15, (x, z) -> x > 0 ? 1 : 0), C, SEA, MH, 4);
+        assertEquals(360_000.0, half.hotDryKm2(), 0.02 * 360_000.0, half.toString());
+        Geothermal.HeatFlowOdds low = Geothermal.heatFlowOdds(GeothermalRules.DEFAULT, (x, z) -> SEA + Geothermal.MIN_ABOVE_SEA + 1.5,
+                DRY, heatEnv(120, 1200, 15, (x, z) -> 0), C, SEA, MH, 4);
+        assertEquals(0.0, low.hotDryKm2());
+        // A world without the layer: no column has a heat flow (the GameTest's wiring check).
+        assertEquals(0, Geothermal.heatFlowOdds(GeothermalRules.DEFAULT, (x, z) -> 75.0, DRY, WET_WARM, C, SEA, MH, 4).continental());
+        // A field stands only where the odds see ground: the build on the same world agrees.
+        assertTrue(heatBuild(GeothermalRules.DEFAULT, heatEnv(99, 1200, 15, (x, z) -> 0), DRY).sites().isEmpty());
+        assertFalse(heatBuild(GeothermalRules.DEFAULT, heatEnv(120, 1200, 15, (x, z) -> 0), DRY).sites().isEmpty());
+    }
+
+    @Test
     void theSameWorldGivesTheSameHeatFlowFields() {
         Geothermal a = heatBuild(GeothermalRules.DEFAULT, heatEnv(120, 1200, 15, (x, z) -> 0), DRY);
         Geothermal b = heatBuild(GeothermalRules.DEFAULT, heatEnv(120, 1200, 15, (x, z) -> 0), DRY);
