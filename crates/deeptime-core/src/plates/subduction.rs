@@ -84,7 +84,7 @@ use super::events::{self, SUBDUCTION_ONSET};
 use super::geometry::{Cover, Geo, Tree, cover, dijkstra_parts};
 use super::kinematics::{quat, tangent, to_group, to_world};
 use super::pools::isostatic_change_m;
-use super::shortening::{boundary_normal, is_transform};
+use super::shortening::{boundary_normal, front_share_rad, is_transform};
 use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
     OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
@@ -726,6 +726,10 @@ pub const FRONT_G_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_km_myr";
 /// The same two over the fronts under continental overriding crust, km × Myr.
 pub const FRONT_G_CONTINENTAL_FULL_GLOBAL: &str = "plates/arc_front_g_full_continental_km_myr";
 pub const FRONT_G_CONTINENTAL_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_continental_km_myr";
+/// World global: the oceanic fronts over the run by each front sample's share of the straight
+/// front, km × Myr, whatever `front_share` (measurement: the `arc_front_*` globals over this are
+/// the lattice's count of a front against its straight length while it is off). ledger: PLT-530
+pub const ARC_FRONT_STRAIGHT_GLOBAL: &str = "plates/arc_front_straight_km_myr";
 /// World global: crust shortened into the arcs' cordilleras over the run, km³ (moved, not made).
 pub const CORDILLERA_GLOBAL: &str = "plates/cordillera_shortened_km3";
 
@@ -752,6 +756,9 @@ pub struct Pull {
     /// The same two over the fronts under continental overriding crust (the continental arcs and
     /// their cordilleras), km × Myr.
     pub front_g_continental_km_myr: [f64; 2],
+    /// Oceanic fronts this step by their share of the straight front, km × Myr, whatever
+    /// `front_share` (measurement; PLT-530).
+    pub front_straight_km_myr: f64,
     /// The step's erosive fronts and their forearcs ([`erode_forearcs`]); `None` while the rule is
     /// off.
     pub forearcs: Option<Forearcs>,
@@ -767,6 +774,9 @@ pub struct Forearcs {
     pub continental: Vec<bool>,
     /// Per front: the front sample (overriding plate) and the slab's sample across from it.
     pub front: Vec<[u32; 2]>,
+    /// Per front: its length of front, km (a lattice spacing, or its share of the straight front
+    /// with `front_share` on; PLT-530).
+    pub front_km: Vec<f64>,
     /// The fronts' distance field ([`fronts_reach`]): distances (rad), labels, the reached samples.
     dist: Vec<f64>,
     label: Vec<u32>,
@@ -915,6 +925,9 @@ pub struct FrontsBegun {
     /// Per front sample: the boundary's unit normal towards the front's other plate
     /// ([`boundary_normal`]); zero elsewhere.
     normals: Vec<DVec3>,
+    /// Per front sample: its share of the straight front, radians ([`front_share_rad`],
+    /// PLT-530); zero elsewhere.
+    shares: Vec<f64>,
     /// The fronts as the distance field's sources (sample, 0, the front's number).
     sources: Vec<(u32, f64, u32)>,
     /// Per sample: its group, with [`HIDDEN_KEY`] added when it is hidden.
@@ -1019,6 +1032,24 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
             *nrm = DVec3::ZERO;
         }
     }
+    // Each front sample's share of the straight front (measured whether or not `front_share`
+    // counts by it: the `plates/arc_front_straight_km_myr` global). ledger: PLT-530
+    let shares: Vec<f64> = (0..n)
+        .into_par_iter()
+        .map(|v| match boundary[v].front {
+            Some((u, ..)) => front_share_rad(
+                geo,
+                pos,
+                &rots,
+                samples,
+                &plate_of,
+                v,
+                plate_of[u as usize],
+                normals[v],
+            ),
+            None => 0.0,
+        })
+        .collect();
     let mut sources: Vec<(u32, f64, u32)> = Vec::new();
     for (v, b) in boundary.iter().enumerate() {
         if b.front.is_some() {
@@ -1034,6 +1065,7 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
         plate_of,
         boundary,
         normals,
+        shares,
         sources,
         key,
     }
@@ -1073,6 +1105,7 @@ pub fn fronts_finish(
         plate_of,
         boundary,
         normals,
+        shares,
         ..
     } = begun;
     let (dist, label, reached) = reach;
@@ -1083,6 +1116,16 @@ pub fn fronts_finish(
     let (mut front_continental, mut front_oceanic) = (0.0_f64, 0.0_f64);
     let front_km = norm.km(norm.spacing_rad());
     let arc_steps = (k.arc_distance_km / front_km).floor() as u32;
+    // A front sample's length of front, km: its share of the straight front with `front_share`
+    // on, one lattice spacing off (which counts a straight front about 1.04 times). ledger: PLT-530
+    let length_km = |v: usize| {
+        if k.front_share {
+            norm.km(shares[v])
+        } else {
+            front_km
+        }
+    };
+    let mut straight_km_myr = 0.0_f64;
     for (v, b) in boundary.iter().enumerate() {
         let s = &mut state.samples[v];
         if b.divergent {
@@ -1097,8 +1140,9 @@ pub fn fronts_finish(
     let (mut g_full_km_myr, mut g_normal_km_myr) = (0.0_f64, 0.0_f64);
     let mut g_continental_km_myr = [0.0_f64; 2];
     // Subduction erosion's fronts (PLT-441, PLT-442), in the order of the distance field's labels.
-    let erosion_km3 = k.subduction_erosion_km3_per_km_myr * front_km * env.dt_myr; // ledger: PLT-441
+    let erosion_rate = k.subduction_erosion_km3_per_km_myr; // ledger: PLT-441
     let (mut loss_km3, mut loss_continental, mut loss_front) = (Vec::new(), Vec::new(), Vec::new());
+    let mut loss_km = Vec::new();
     for (v, b) in boundary.iter().enumerate() {
         if let Some((u, c, rel, out)) = b.front {
             let su = state.samples[u as usize];
@@ -1107,23 +1151,32 @@ pub fn fronts_finish(
             // the sample's along the boundary's normal. ledger: PLT-312
             let normal = normals[v];
             let across = (-rel.dot(normal)).max(0.0);
-            if erosion_km3 > 0.0 {
+            let len_km = length_km(v);
+            if erosion_rate > 0.0 {
                 // An oceanic slab coming in fast under little sediment: an erosive margin.
                 // ledger: PLT-442
                 let cover = f64::from(su.pools[pool::SEDIMENT] + su.pools[pool::SEDIMENTARY]);
                 let erosive = su.kind != CONTINENTAL
                     && across >= k.subduction_erosion_min_mm_yr
                     && cover < k.subduction_erosion_max_sediment_m;
-                loss_km3.push(if erosive { erosion_km3 } else { 0.0 });
+                // At least a sliver of front where the share is 0, so the front is still
+                // marked erosive (its retreat's chance and its volume are then 0).
+                loss_km3.push(if erosive {
+                    (erosion_rate * len_km * env.dt_myr).max(f64::MIN_POSITIVE)
+                } else {
+                    0.0
+                });
                 loss_continental.push(state.samples[v].kind == CONTINENTAL);
                 loss_front.push([v as u32, u]);
+                loss_km.push(len_km);
             }
             if su.kind != CONTINENTAL {
-                g_full_km_myr += front_km * env.dt_myr * (speed / v0).min(1.0);
-                g_normal_km_myr += front_km * env.dt_myr * (across / v0).min(1.0);
+                straight_km_myr += norm.km(shares[v]) * env.dt_myr;
+                g_full_km_myr += len_km * env.dt_myr * (speed / v0).min(1.0);
+                g_normal_km_myr += len_km * env.dt_myr * (across / v0).min(1.0);
                 if state.samples[v].kind == CONTINENTAL {
-                    g_continental_km_myr[0] += front_km * env.dt_myr * (speed / v0).min(1.0);
-                    g_continental_km_myr[1] += front_km * env.dt_myr * (across / v0).min(1.0);
+                    g_continental_km_myr[0] += len_km * env.dt_myr * (speed / v0).min(1.0);
+                    g_continental_km_myr[1] += len_km * env.dt_myr * (across / v0).min(1.0);
                 }
             }
             let (conv, facing) = if by_normal {
@@ -1160,9 +1213,9 @@ pub fn fronts_finish(
                 if continent_within(state, geo, v as u32, arc_steps, |u| {
                     state.samples[u].is_hidden()
                 }) {
-                    front_continental += front_km * env.dt_myr;
+                    front_continental += len_km * env.dt_myr;
                 } else {
-                    front_oceanic += front_km * env.dt_myr;
+                    front_oceanic += len_km * env.dt_myr;
                 }
             }
         }
@@ -1486,10 +1539,12 @@ pub fn fronts_finish(
         front_g_full_km_myr: g_full_km_myr,
         front_g_normal_km_myr: g_normal_km_myr,
         front_g_continental_km_myr: g_continental_km_myr,
-        forearcs: (erosion_km3 > 0.0).then_some(Forearcs {
+        front_straight_km_myr: straight_km_myr,
+        forearcs: (erosion_rate > 0.0).then_some(Forearcs {
             loss_km3,
             continental: loss_continental,
             front: loss_front,
+            front_km: loss_km,
             dist,
             label,
             reached,
@@ -1508,13 +1563,17 @@ pub fn erode_forearcs(state: &mut PlateState, env: &Env, forearcs: &Forearcs) ->
     let norm = env.norm;
     let area = norm.sample_area_km2();
     let mut out = Eroded::default();
-    let front_myr = norm.km(norm.spacing_rad()) * env.dt_myr;
-    for (loss, &continental) in forearcs.loss_km3.iter().zip(&forearcs.continental) {
+    for ((loss, &continental), km) in forearcs
+        .loss_km3
+        .iter()
+        .zip(&forearcs.continental)
+        .zip(&forearcs.front_km)
+    {
         if *loss > 0.0 {
             if continental {
-                out.front_continental_km_myr += front_myr;
+                out.front_continental_km_myr += km * env.dt_myr;
             } else {
-                out.front_oceanic_km_myr += front_myr;
+                out.front_oceanic_km_myr += km * env.dt_myr;
             }
         }
     }
@@ -1599,16 +1658,14 @@ fn retreat_forearcs(
 ) -> Eroded {
     let norm = env.norm;
     let area = norm.sample_area_km2();
-    let chance = retreat_chance(
-        RETREAT_KM_PER_MYR * env.dt_myr, // ledger: PLT-522
-        norm.km(norm.spacing_rad()),
-        area,
-    );
+    let retreat_km = RETREAT_KM_PER_MYR * env.dt_myr; // ledger: PLT-522
     let mut twins: BTreeMap<(u32, u32), u32> = BTreeMap::new();
     for (f, &[v, u]) in forearcs.front.iter().enumerate() {
         if forearcs.loss_km3[f] <= 0.0 {
             continue;
         }
+        // The sample's length of front: a spacing, or its straight share (PLT-530).
+        let chance = retreat_chance(retreat_km, forearcs.front_km[f], area);
         let (vi, ui) = (v as usize, u as usize);
         let s = state.samples[vi];
         let under = state.plate_of(ui);
@@ -1725,7 +1782,7 @@ mod tests {
         let per_km = RETREAT_KM_PER_MYR * continental_m() / 1000.0;
         assert!((per_km - 90.0).abs() < 0.1 * 90.0, "{per_km} km³/km/Myr");
         assert!((20.0..=139.4).contains(&per_km));
-        let (front_km, area_km2) = (76.7, 5100.0);
+        let (front_km, area_km2) = (71.4, 5100.0);
         let p = retreat_chance(5.0, front_km, area_km2);
         assert!((p - 5.0 * front_km / area_km2).abs() < 1e-12);
         assert_eq!(retreat_chance(5_000.0, front_km, area_km2), 1.0);

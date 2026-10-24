@@ -3236,7 +3236,10 @@ steps after the first 100 Myr):
 
 The model's boundary is 480,054 lattice km a step against Bird's 260,487 km: a boundary on the
 lattice zigzags, so its lattice length is 1.84 times the geodesic one, and Earth's 14,500 km of
-island arc is about 26,700 lattice km.
+island arc is about 26,700 lattice km. (Corrected 2026-10-24, the front lane, PLT-530: the 1.84
+was this ratio itself, which assumes the model's boundary is as long as Earth's. One spacing per
+boundary sample counts a straight boundary 1.04 times, so the model's boundary is about 460,300
+km, 1.77 times Bird's, and Earth's island arc is about 15,100 lattice km.)
 
 ### What makes the gap
 
@@ -3330,7 +3333,16 @@ By the crust the arc stands on, the model's island-arc front is 1.7 times Earth'
 times, and its continental-arc front 2.0 times: both near the subducting share's 1.76 times
 (0.347 against 0.197). The rates per km of each kind of arc now sit near Stern & Scholl's. So the
 island arcs' crust (3.22 km³ a year against 1.5) is 1.7 times from the front's length and 1.3
-times from the rate, and the front's length is the orientation above. On the plate-check table the
+times from the rate, and the front's length is the orientation above.
+
+(Corrected 2026-10-24, the front lane, PLT-530: the lattice counts a straight front 1.04 times,
+not 1.84. Earth's arcs are about 15,100 and 28,700 lattice km; the branch's island-arc front,
+45,275 lattice km, is about 43,400 km, 3.0 times Earth's 14,500, and its continental-arc front
+about 96,800 km, 3.5 times Earth's 27,500 (master's 5.6 and 2.1 times); the rates per km become
+about 74 and 17 km³/km/Myr on the branch (master 40 and 28), below Stern & Scholl's 100 and 35.
+So the island arcs' crust is about 3.0 times from the front's length and 0.74 times from the
+rate, and the length is the whole boundary's 1.77 times Bird's times the subducting share's
+1.76: "The front's length: why the plates are ragged (2026-10-24)" below.) On the plate-check table the
 reported share of ocean-ocean subduction moves from 56.7 % to 29.5 % (after the first 100 Myr) and
 from 65.6 % to 50.2 % (the first 50 Myr).
 
@@ -3400,7 +3412,8 @@ the counters' total (about 146,200 lattice km a step) and the subducting share (
 same on master and the branch. What the arc-front task measured as an island-arc front 2.9 times
 Earth's was 85,095 lattice km named by the front sample's crust; by the arc's crust it is 45,275,
 1.7 times Earth's 14,500 km on the lattice's 1.84. The remaining excess is the subducting
-share's, which PLT-330 could not move either (32.1 to 34.4 % there).
+share's, which PLT-330 could not move either (32.1 to 34.4 % there). (On the lattice's 1.04,
+PLT-530, 2026-10-24: 3.0 times, the subducting share's 1.76 times the whole boundary's 1.77.)
 
 ### Against c24ff793 and master
 
@@ -5658,14 +5671,26 @@ boundary's length over the steps after the first 100 Myr (PLT-500):
 The lattice's boundary is about 1.84 times a geodesic one (PLT-213), so in Earth's terms the
 model has about 82,300 km of subducting boundary against Bird's 51,310, 86,800 km of spreading
 against 94,810 and 51,100 km of transform against 73,915; the total, about 241,000 km, is close
-to Bird's 260,487. What the table says:
+to Bird's 260,487.
+
+(Corrected 2026-10-24, the front lane, PLT-530: the 1.84 was the model's lattice boundary over
+Bird's, so it assumed the totals equal. One spacing per boundary sample counts a straight
+boundary 1.04 times (`shortening::crossing_sum` over great and small circles, the test
+`the_straight_shares_add_up_to_the_boundarys_length`). In Earth's terms the model has about
+145,200 km of subducting boundary against Bird's 51,310 (2.8 times), 153,100 km of spreading
+against 94,810 (1.6 times) and 90,200 km of transform against 73,915 (1.2 times); the total,
+about 425,400 km, is 1.63 times Bird's with 23 plates against 52. The shares below stand; the
+lengths are all long, and the subducting boundary most. Why: "The front's length: why the plates
+are ragged (2026-10-24)" below.) What the table says:
 
 - **The trenches already face their convergence.** The convergence across the oceanic front is
   Bird's to the millimetre a year (53.1 against 53.2), and the capped ratio is 0.80 (the cap at
   v_0 lifts it, so the plain ratio is lower still) against Bird's 0.854. The audit's "orient
   trenches" is answered by this measurement: no law is needed for it (PLT-501).
 - **The excess of subduction is not obliquity but a shortage of transform**: the model has 1.6
-  times Earth's trench and 0.7 times its transform, and its spreading boundary is Earth's.
+  times Earth's trench and 0.7 times its transform, and its spreading boundary is Earth's. (By
+  share, 1.74 times Earth's subducting share and 0.75 times its transform share; by length, on
+  the corrected 1.04, 2.8 and 1.2 times.)
 - **More than half of the coast at a subduction front is at a front that a subduction
   initiation made** (0.173 of the coast, of 0.312), and most of that has the continent
   overriding. `rifting::initiate` splits the plate's old floor off along a Voronoi line, keeping
@@ -6034,7 +6059,11 @@ make 55.7 sutures per 100 Myr (27.0 of terranes of 50 samples or more) against M
 2019's 19 per 100 Myr over the Phanerozoic and 39 in the last 100 Myr (their table of 104
 ophiolite-bearing arc-continent sutures); suture length 39,715 km per 100 Myr against their 23,235
 over the Phanerozoic and 50,919 over 0 to 100 Ma. The model's sutures are shorter (median 271 km,
-Earth's 1,019) and 1.4 to 2.9 times as many: inside Earth's range by length.
+Earth's 1,019) and 1.4 to 2.9 times as many: inside Earth's range by length. (Corrected
+2026-10-24, the front lane: the measure divided the collision fronts, straight lengths already
+(PLT-222), by 1.84. Version 3 does not: 73,076 km per 100 Myr, 1.4 to 3.1 times Macdonald's, and
+the median suture 499 km, half his. So by length too the sutures are more than Earth's, and
+shorter; PLT-512.)
 
 **What stands at the fronts in the last 30 Myr** (the collision regime's window, so what makes
 the collision high coast; medians of 24, share of the front-time):
@@ -6049,7 +6078,8 @@ the collision high coast; medians of 24, share of the front-time):
 | parted, reversed, closed | 0.006, 0.012, 0.001 |
 | open, the incoming plate with 3,000 or more continental samples / 500 to 3,000 | 0.569 / 0.110 |
 
-At the end of a run 16 collision states are open (27,554 km of front, geodesic), 0.81 of that
+At the end of a run 16 collision states are open (27,554 km of front, geodesic; 50,700 km by
+version 3, the fronts not divided by 1.84), 0.81 of that
 front on contacts over 60 Myr old. The 134 open states 30 Myr or older (5.6 a run) have gone on
 70 Myr (median), shortened 1,089 km across 3,186 km of front, crossed 3.6 million km2 of crust and
 peaked at 2.8 km and 31 mm/yr. Gap 2's boundary measure says the same at the plate scale: 18,950 km
@@ -6149,7 +6179,7 @@ before (34 Myr, 1.1 mm/yr).
 
 | measure | base3 | dock-T | p | Earth |
 |---|---|---|---|---|
-| collisions open at the end: front, geodesic km | 27,554 | 9,399 | | |
+| collisions open at the end: front, geodesic km (version 3, not over 1.84: 50,700 / about 17,300) | 27,554 | 9,399 | | |
 | collisions open at the end: how long they have gone on, Myr | 90 | 20 | | |
 | last 30 Myr's front-time on partings (open collisions included) | 0.776 | 0.487 | | |
 | collision length p50 / p90, Myr | 48 / 143 | 33 / 77 | | 15 to 50 / at most 120 |
@@ -6267,7 +6297,9 @@ continents 11.56 and 6.74. What is off:
   the boundary is 36.6 % (dock-c3 33.8 %) against Bird 2003's 19.7 % and fails in every run of
   both arms, and the whole boundary is about 1.65 times Bird's: the arcs' surplus is the
   subduction zones' length, gap 2's boundary organisation (`physics-gap-audit.md`), with or
-  without T. Base3 hid it under the excess loss at sutures; under T nothing offsets it, so the
+  without T. (Corrected 2026-10-24, PLT-530: over 1.04, not 1.12, the rates are about 74 and 17
+  km3/km/Myr, the fronts about 45,900 and 102,900 km, and the boundary 1.63 to 1.77 times Bird's.)
+  Base3 hid it under the excess loss at sutures; under T nothing offsets it, so the
   volume grows by about 4 km3 a year and the crust thickens.
 - Subduction erosion takes 0.6 of Earth's, for two reasons. Its erosive fronts are 16,888 lattice
   km (about 15,100 km) against Clift & Vannucchi's 22,925, because few slabs come in at the
@@ -6376,7 +6408,8 @@ f2c8da8b0dd4, argkey 295dc57c, 8 runs, both starts; with S1 off the key is bit-i
 base3, `pool.sh alias`, seed 1, 1000 Myr). Medians, dock-T to dock-TS1:
 
 - The retreat does what it was built to do: 2.44 to 2.60 km/Myr per lattice km of continental
-  erosive front in every run (2.7 to 2.9 per km of front, by the lattice's 1.12 below), taking
+  erosive front in every run (2.7 to 2.9 per km of front, by the lattice's 1.12 below; 2.55 to
+  2.71 by the corrected 1.04, PLT-530), taking
   0.011 km2 of continental area a year (0.022 of the planet over the run; a quarter of the erosive
   front is under continental crust). Subduction erosion's volume falls from 0.83 to 0.61 km3 a
   year: the retreat replaces the band's thinning, and an island-arc forearc's column is thinner
@@ -6416,6 +6449,19 @@ three: each front sample's share of the straight front, its crossing sum along t
 normal (`shortening::crossing_sum`, `boundary_normal`). It is not made here, because through the
 arcs it changes the default planet.
 
+(Corrected 2026-10-24, the front lane, PLT-530. The spacing the counters book is sqrt(4 pi / N)
+R, 71.4 km on the quick lattice; `zigzag.py` took the hexagonal neighbour distance, 76.7 km, so
+its 1.12 is 1.04 on the counters' own spacing, and the crossing sums agree: on great and small
+circles each side's straight shares add up to the circle's length within 1.5 % and 4 %, and the
+lattice counts it 1.043 times (the test `the_straight_shares_add_up_to_the_boundarys_length`).
+So each per-km rate is about 4 % over its source, not 12 %: the retreat's 2.44 to 2.60 per
+lattice km is 2.55 to 2.71 per km. Under T the fronts are about 45,900 and 102,900 km, not 42,700
+and 95,800, against Earth's 14,500 and 27,500; on master's base the boundary is about 425,000 to
+460,000 km, 1.63 to 1.77 times Bird's (the gap 2 section's base 1.63, the plate geometry's
+c790d1f3 1.77). The collision fronts are straight lengths, so `measure_sutures.py` no longer
+divides them by 1.84 (version 3, PLT-512). The change named here is built: "The front's length:
+why the plates are ragged (2026-10-24)".)
+
 **What comes after S1: nothing in this lane.** With the lengths read right, no flux left in this
 lane is off Earth's numbers in the direction that would close the area:
 
@@ -6427,9 +6473,264 @@ lane is off Earth's numbers in the direction that would close the area:
 - the arcs mature at Cloos's 15 km (PLT-047), a sourced threshold.
 
 What is off is the island-arc front's length, about three times Earth's, and the plates'
-slowness (the erosive front is 0.66 of Earth's): gap 2's boundary organisation, which Ben deferred
-until after V1 item 1. On Earth's 14,500 km of island arc the maturing would make about 0.09 km2 a
+slowness (the erosive front is 0.66 of Earth's): gap 2's boundary organisation. (Corrected
+2026-10-24: this said Ben deferred it until after V1 item 1. He did not: gap 2 was his scope and
+it is built; holding the plate count and the lattice was the coordinator's call.) On Earth's 14,500 km of island arc the maturing would make about 0.09 km2 a
 year, and the book would stand at about 0.21 made against 0.31 consumed (an inference from the
 book's parts, not a run). The lane stops here: the coordinator's step 3 stops when a stage makes
 T and the sink correct, and never tunes to a V1 number. T and S1 stay off by default, both built
 and correct.
+
+## The front's length: why the plates are ragged (2026-10-24)
+
+The coordinator's brief for the front lane: the island-arc front is about three times Earth's
+(45,900 km under T against Stern & Scholl's 14,500) and the whole boundary is about 1.65 times
+Bird's with 24 plates against 52. Fewer plates with a longer boundary points at the boundary's
+shape, not the count. Four steps: read the fronts' rates per km of straight front (step 1);
+diagnose the length from cached runs, with measures in a registry and no new simulations (step 2);
+build the physics the diagnosis names, behind switches with unit tests against their sources
+(step 3); T and S1 again on top, as one cumulative arm (step 4).
+
+### Step 1: the fronts' rates per km of straight front (PLT-530)
+
+`tectonics.front_share` gives each front sample its share of the straight front: its lattice
+edges' crossings on the boundary's normal (`shortening::crossing_sum`, PLT-310), which along a
+front add up to the front's length with the lattice's zigzag taken out, as a collision front's
+length is measured (PLT-222). Subduction erosion (PLT-441), the trench's retreat (PLT-522, PLT-523)
+and the fronts' km x Myr globals take it. The arcs' magma does not: it is an areal field over the
+distance from the fronts (PLT-045's band, `w_arc_of`), so per km of the band, and the switch leaves
+it alone. Counted one spacing a sample (the rule it replaces), a straight boundary is 1.043 times
+its length on the lattice (the test `the_straight_shares_add_up_to_the_boundarys_length`), not 1.12
+or 1.84 as this page said before ("The front's length on the lattice" above, corrected).
+
+Arm fl-share against dock-c3 (base3's seeds 1 to 4, `earthlike_quick_16k`, 1000 Myr, both starts,
+8 runs each; key 73dd051b08e8): on the model's own fronts one spacing a sample counts 1.32 times
+the straight front (the extra 0.27 over the lattice's 1.04 is the fronts' raggedness at the
+lattice's scale, which the share does not count); subduction erosion is 30 to 45 % lower; the arcs'
+crust is almost unchanged; land 0.313 (p 0.80); the V1 census's 5 criteria met in both; no step
+beyond 2 reliefs, the worst 12,588 m against 12,061 (p 0.13); the plate check passes 210 against
+207, `guard_bind_steps` 0. It is correct, so it is on by default and one spacing a sample is off.
+
+### Step 2: the boundary against Bird's
+
+Two pool measures over fl-share's 8 runs (registry `tools/review/pool/measures_front.json`, ledger
+PLT-531): `front` from the dynamics record (each plate's perimeter against a spherical cap of its
+area, split by size, age, origin, speed, crust and the speed guard), and `boundgeom` from the crust
+budget's plate maps every 50 Myr (the boundary as Bird drew PB2002's: Voronoi chains between the
+plates, triple junctions, pieces from junction to junction, Bird's divider walks at a 77 km and a
+380 km chord, each piece's tortuosity over the great circle between its ends). PB2002 is measured
+the same way from Bird's own files (`tools/review/pool/bird/bird.py`) and rasterised on the 16k
+lattice (`bird_raster.py`), so what the lattice alone adds to Earth's numbers can be read off.
+Medians over the runs, snapshots after the first 100 Myr:
+
+| | fl-share | PB2002 on the lattice | PB2002 |
+|---|---|---|---|
+| boundary at a 77 km chord, km | 525,500 | 273,631 | 246,541 |
+| at a 380 km chord, km | 347,200 | 236,679 | 231,009 |
+| perimeters over caps' perimeters, 77 km | 3.43 | 1.58 | 1.42 |
+| at 380 km | 2.27 | 1.37 | 1.27 |
+| each plate's at 380 km, area-weighted | 2.34 | 1.40 | 1.32 |
+| triple junctions | 292 | 98 | 100 |
+| pieces between junctions | 438 | 147 | 150 |
+| closed loops | 250 | 1 | 0 |
+| tortuosity (sum over sum), 77 km | 1.86 | 1.32 | 1.22 |
+| at 380 km | 1.38 | 1.15 | 1.14 |
+| the subduction pieces', 77 km | 2.21 | 1.20 | 1.15 |
+| at 380 km | 1.52 | 1.10 | 1.11 |
+| subduction front at 77 km, km | 216,500 | 52,564 | 51,310 |
+| at 380 km, km | 141,200 | 48,406 | |
+
+What it says:
+
+- **The plates are not too few for the boundary; their outlines are too long.** 22.7 plates
+  against 52 have less cap perimeter between them than Earth's, yet the boundary is 1.9 times
+  PB2002's on the lattice at 77 km and 1.5 times at 380 km, and each plate's perimeter is 2.3 times
+  a cap's at 380 km against Earth's 1.3. The lattice itself adds 11 % at 77 km and 2 % at 380 km
+  to Earth's map.
+- **The map is not a plate map.** Plates meeting three at a time with no islands have
+  2 (P - 2) triple junctions and 3 (P - 2) boundaries (Bird 2003 [110]): 41 and 62 for 22.7 plates.
+  The model has 292 and 438, and 250 closed loops, where every one of PB2002's 150 boundaries runs
+  from a junction to a junction ([112]: "all are of type 1"). A plate here is on average 18
+  connected pieces (`comps_per_plate`), and 7 % of the visible samples lie outside their plate's
+  largest piece (`frag_samples`).
+- **It grows with age.** The perimeters over the caps' at 380 km are 2.19 in the first snapshot
+  after 100 Myr and 2.31 in the last; by the plates' age (`front`, at the lattice's scale) 2.37 for
+  plates under 50 Myr old and 3.35 for those 200 Myr or older.
+- **What it is not.** The speed guard holds no plate (its share of the perimeters 0); slow plates
+  (under 20 mm/yr, 2.93) are no more ragged than fast ones (3.06); continental plates (3.10) and
+  oceanic ones (2.93) alike; plates born of a rift (2.92) less so than the start's (3.18). By size:
+  under 0.0377 sr 2.17, up to 0.5 sr 2.81, larger 3.17 (PB2002 at 77 km 1.38, 1.35, 1.47).
+- **The front by plate size.** The plates under 0.0377 sr subduct 3.6 % of the front (PB2002 11.2
+  %), those over 0.5 sr 41 % (55 %); per subducting plate the front is 0.45 of its cap's perimeter
+  (area-weighted; PB2002 0.19).
+
+### The fragments and the plates' main bodies
+
+A plate in the model is the set of samples that carry its id, and nothing in the step keeps them
+together. `boundgeom` version 2 finds each plate's connected pieces (through Delaunay edges between
+its own samples) and measures the boundary twice: as it is, and with every piece outside a plate's
+largest given to the plate that most of its neighbours in a plate's largest piece belong to (`clean`:
+the boundary as it would be with each plate one body). Medians over fl-share's 8 runs (ledger
+PLT-533):
+
+| | fl-share | each plate one body | PB2002 on the lattice |
+|---|---|---|---|
+| boundary at a 77 km chord, km | 525,500 | 332,700 | 273,631 |
+| at a 380 km chord, km | 347,200 | 256,100 | 236,679 |
+| perimeters over caps' perimeters, 77 km | 3.43 | 2.14 | 1.58 |
+| at 380 km | 2.27 | 1.65 | 1.37 |
+| each plate's at 380 km, area-weighted | 2.34 | 1.76 | 1.40 |
+| triple junctions | 292 | 40 | 98 |
+| pieces between junctions | 438 | 60 | 147 |
+| closed loops | 250 | 0.6 | 1 |
+| tortuosity (sum over sum), 77 km | 1.86 | 1.86 | 1.32 |
+| at 380 km | 1.38 | 1.44 | 1.15 |
+| the subduction pieces', 77 km | 2.21 | 2.34 | 1.20 |
+| at 380 km | 1.52 | 1.66 | 1.10 |
+| subduction front at 77 km, km | 216,500 | 116,200 | 52,564 |
+| at 380 km, km | 141,200 | 80,500 | 48,406 |
+
+- **The fragments are 7 % of the crust and 37 % of the boundary.** 7.1 % of the visible samples
+  lie outside their plate's largest piece (quartiles over the runs 5.5 to 7.7 %): 5.3 % in pieces of
+  over 100 samples (510,000 km² or more; PLT-091's floor for a plate is 1.53 million km²), 1.1 % in
+  pieces of 11 to 100 and 0.7 % in pieces of 1 to 10. Around them runs 37 % of the boundary at 77 km
+  and 46 % of the subduction front (the island-arc front, where the overriding sample is oceanic:
+  120,600 km at 77 km, 65,700 with each plate one body; a chain of the map, not the front samples'
+  count over time that gives the 45,900 km above).
+  With them given to the plates around them the map becomes a plate map: 40 triple junctions where
+  plates meeting three at a time have 2 (P - 2) = 41, 60 pieces for 3 (P - 2) = 62, and under one
+  closed loop.
+- **They are whole regions of a plate, far from it.** A one-off look at one run (fl-share's
+  supercontinent start, seed 1, every 200 Myr): the fragments hold 7.0 % of the samples at 200 Myr
+  (530 pieces), 13.6 % at 400, 9.3 % at 600, 4.2 % at 800 and 4.0 % at 1,000; three fifths or more
+  of their samples are in pieces of over 100 samples, and two thirds or more lie more than 12
+  Delaunay steps (about 850 km) from their plate's largest piece; about half carry the
+  subduction-zone flag, a quarter to two fifths the divergent one, and an eighth to a third are
+  continental. They are pieces of active boundary that move with the rotation the force balance
+  sets for their plate as a whole, a body they no longer touch.
+- **The groups cannot say where they came from.** Every fragment's samples belong to rigid groups
+  that also hold samples of its plate's largest piece (`frag_cut` 7.09 %, `frag_own` 0.04 %), which
+  read alone says the pieces were cut off their plate rather than handed to it. But a resampling
+  (about every 20 Myr) gives each plate one unrotated group, so a terrane handed to a plate before the
+  last resampling reads the same. The cut trace below tells them apart.
+- **The main bodies are still too ragged, and most at the trench.** With each plate one body the
+  boundary is 1.22 times PB2002's on the lattice at 77 km and 1.08 times at 380 km, with 23 plates
+  against 52; each plate's perimeter is 1.76 times its cap's (area-weighted, 380 km) against Earth's
+  1.40. On Earth the subduction pieces are straighter than the boundary as a whole (tortuosity 1.20
+  against 1.32 at 77 km, 1.10 against 1.15 at 380 km); in the model they are the most tortuous
+  (2.34 against 1.86, 1.66 against 1.44). The two maps' pieces differ in length (about 4,200 km
+  between junctions at 380 km against 1,600 on Earth), and a longer piece of the same curve is more
+  tortuous, so the tortuosities are read within each map, not across them. The front is 35 % of the cleaned
+  boundary at 77 km against PB2002's 19 % (the plate check's subducting share, 36.6 % against Bird's
+  19.7 %, fails in every run): after the fragments, the front's excess is its raggedness and its share
+  of the boundary.
+
+### What cuts the plates
+
+`plates/cut_trace.rs` (measurement, off unless a test turns it on; the ignored test
+`where_the_plates_are_cut` runs the quick preset at 40,000 samples for 300 Myr from each start)
+counts each plate's samples outside its largest connected piece (over lattice edges between visible
+samples, `geometry::cut_samples`) before and after every part of the step and books what each part
+cut and joined; a collision's outcome is split by the plate it changes (the subducting plate and
+the overriding one). Between resamplings the lattice edges between two groups are the last
+resampling's, so a part's cut can be transient; the resampling's own count is what the true
+positions join or cut again. Samples cut, net over 300 Myr:
+
+| part of the step | supercontinent, seed 1 | scattered continents, seed 2 |
+|---|---|---|
+| collision, terrane transfer: the overriding plate | +2,440 | +3,641 |
+| the same: the subducting plate | +686 | +764 |
+| overlaps resolved (`subduction::resolve`), net (cut, joined) | +1,448 (7,761, 6,313) | -594 (9,029, 9,623) |
+| subduction initiation | +301 | +151 |
+| rifts | -58 | -103 |
+| welds | none | 0 (the subducting plate +76, the overriding -76) |
+| the resampling (new crust in the gaps, every sample to its nearest lattice point) | -2,478 (705, 3,183) | -153 (2,871, 3,024) |
+| every other part (motion, shortening, belts, fronts, forearcs, collapse, flow, forces, heal, burial) | 0 | 0 |
+| the share cut off at 300 Myr | 5.8 % | 9.3 % |
+
+- **The collision's terrane transfer cuts the plates.** It moves the subducting plate's continent
+  connected to the contact into the overriding plate as groups of their own and leaves the stacked
+  strip hidden with the subducting plate (`plates/collision.rs`). The terrane joins the overriding
+  plate across the subducting plate's hidden strip, so the overriding plate gains a piece that
+  touches it nowhere, and the subducting plate keeps ocean cut off behind the terrane.
+- **The overlaps churn.** Hiding the overridden samples cuts and joins almost as much
+  (7,761 against 6,313, 9,029 against 9,623): an overlap hides a neck of a plate and the next step's
+  motion opens it again.
+- **Nothing makes a plate whole.** The resampling joins more than it cuts, but only where the true
+  positions touch again; `connect_plates` runs only at the start and in rifts
+  (`geometry.rs`). A piece once cut stays a part of its plate, with its plate's rotation, until an
+  overlap or collision happens to rejoin it or it is subducted.
+- **What it is not.** Rifts join more than they cut. The parts that hand no sample to another
+  plate and hide none (the motion, the shortening, the belts, the fronts, the force balance and
+  its speed guard) cannot cut on the lattice; what the motion does to the true positions shows at
+  the resampling, which joins more than it cuts.
+
+### What Earth does
+
+- Gordon 1998 (full text): "The central assumption of plate tectonics is that the plates are
+  rigid." A plate moves as one body because it is one: its pieces carry its stresses to each other.
+- Bird 2003 (full text): PB2002's plates file "contains 52 segments", each "a closed curve
+  outlining that plate" ([123]), so every plate is one region; all 150 boundaries run from a
+  junction to a junction ([112]), and none of its plates is an island: "The Shetland plate comes
+  closest to being an 'island' plate (type 2) because it is almost surrounded by the Antarctica
+  plate, but it also has a short boundary with the Scotia plate" ([112]). "The term 'microplate'
+  has not been precisely defined, but in practice is used most often for a plate of 100–500 km
+  dimensions which appears spontaneously in the center of an ocean spreading system" ([79]).
+- Stock & Lee 1994 (full text): the Farallon plate's last pieces off Baja California and
+  California broke into microplates down to about 100 km across as the Pacific-Farallon ridge
+  neared the trench. "If a small fragment breaks off a large plate, then it may lose its slab-pull
+  force and become driven entirely by different conditions." The Monterey, Arguello, Guadalupe and
+  Magdalena microplates "became attached to the Pacific plate when their ridge boundaries with the Pacific plate stopped spreading", and "None of
+  these microplates became attached to the North America plate"; in general "a very small
+  microplate with insufficient slab-pull force may stagnate or attach itself mainly to the
+  overriding plate".
+- Wang et al. 2013 (full text), of the same margin: "Some fragments were incorporated into the
+  Pacific plate as subduction and spreading ceased."
+- Nicholson et al. 1994 (abstract only): the Monterey microplate captured by the Pacific plate at
+  about 20 Ma.
+- Lonsdale 2005 (abstract only): the Farallon plate split into the Cocos and Nazca plates at about
+  23 Ma, driven by the "divergence of slab-pull stresses".
+- Mallard et al. 2016 (full text, read 2026-10-21): "the stresses caused by the bending of trenches
+  break plates into smaller fragments".
+
+No source we read states that a plate must be one connected region, but none describes one that
+is not: a piece cut off a plate either moves as a plate of its own (fission) or joins a plate it
+adjoins (capture).
+
+### The diagnosis
+
+The boundary is too long for two reasons, in this order:
+
+1. **The plates are not one body each.** 7 % of the crust lies in pieces cut off their plates,
+   chiefly by the collision's terrane transfer and the overlaps' hiding, and nothing makes a plate
+   whole again. These pieces carry 37 % of the boundary and 46 % of the subduction front and turn a
+   map of 23 plates into one of 292 junctions and 250 loops. Earth has no such pieces: a cut-off
+   piece becomes a plate or joins its neighbour (above). This is step 3's law.
+2. **The main bodies are ragged, most at their trenches, and more so with age.** Without the
+   pieces the boundary is still 1.2 times Earth's on the lattice at 77 km with fewer than half the
+   plates, the front is 35 % of it against 19 %, and the subduction pieces are the model's most
+   tortuous where they are Earth's straightest. Not the speed guard, not slow plates, not rifts
+   (above and "Step 2"). Which part of the step roughens a trench is left to the arm with step 3 on:
+   with every plate one body, the trace and the measures can be read on a plate map.
+
+### Step 3: one plate, one body (PLT-532)
+
+`tectonics.plate_fission`: right after each resampling (`ridges::bury`, when every group shares
+the lattice and is unrotated), each plate keeps its largest connected piece of visible crust. Every
+other piece of PLT-091's floor for a plate (`min_plate_area_frac`, 0.003 of the planet) or more
+becomes a plate of its own with the parent's rotation, its birth recorded with origin "fission"
+(the force balance sets its motion from the next step); every smaller piece joins the plate most of
+its lattice neighbours belong to, as a plate below the floor is absorbed. No new constant: the size
+that separates fission from capture is the model's own floor for a plate. The unit test
+`a_plate_cut_in_two_splits_and_a_cut_off_patch_is_captured` (`ridges.rs`): a plate cut in two by a
+band of another, with a patch of it inside the band; on, its larger piece stays, the other becomes a
+plate with its rotation and its id as parent, the patch joins the band's plate, every plate is then
+one piece and no sample moves; off, the plate keeps its three pieces.
+
+The cut trace with it on: the share cut off at every 50 Myr is at most 1.0 % (off up to 11.7 %, and
+5.8 and 9.3 % at 300 Myr);
+15 and 23 plates are born of fission in 300 Myr, taking 4,298 and 6,886 samples, and 5,584 and 5,629
+samples are captured; 23 and 26 plates at 300 Myr against 17 and 22 off (the scattered start peaks at
+34). The step still cuts between resamplings, more than off (the terrane transfer +5,532 and +4,054,
+the overlaps +4,394 and +7,264), and each resampling makes the plates whole again (it joins 10,456
+and 11,637).

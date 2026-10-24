@@ -14,7 +14,7 @@
         {"key": "coll", "label": "in collision (Bird CCB 0.088)", "target": [0.05, 0.13], "digits": 3},
         {"key": "nocontact", "label": "converging, no slab (Bird OCB 0.067)", "target": null, "digits": 3},
         {"key": "oo_of_sub", "label": "ocean-ocean share of subducting (Stern & Scholl 0.35)", "target": null, "digits": 3},
-        {"key": "sub_km", "key2": "total_km", "label": "subducting / all boundary, lattice km (Bird 51,310 / 260,487 geodesic; lattice 1.84x)", "target": null, "digits": 0, "pair": true},
+        {"key": "sub_km", "key2": "total_km", "label": "subducting / all boundary, lattice km (Bird 51,310 / 260,487 geodesic, 53,500 / 271,700 on the lattice at 1.04x, PLT-530)", "target": null, "digits": 0, "pair": true},
         {"key": "facing", "key2": "facing_cont", "label": "trench convergence across / full, capped (Bird SUB 0.854): all / continental", "target": null, "digits": 3, "pair": true},
         {"key": "slow_front", "key2": "fast_front", "label": "oceanic front under 10 / at 80 or more mm/yr across", "target": null, "digits": 3, "pair": true},
         {"key": "across_mm_yr", "label": "mean convergence across the oceanic front, mm/yr (Bird SUB 53.2)", "target": null, "digits": 1},

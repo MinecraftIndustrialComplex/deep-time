@@ -821,6 +821,31 @@ pub struct TectonicParams {
     /// the retreat times the column; PLT-441's volume rate and its floor at an ocean's column are
     /// off while it is on. Off, the forearc thins and the front stays. ledger: PLT-523
     pub erosion_retreat: bool,
+    /// The subduction fronts' length by each front sample's share of the straight front (the
+    /// front lane, 2026-10-24): its lattice edges' Voronoi crossings (`shortening::crossing_sum`)
+    /// on the boundary's normal (PLT-310), which along a front sum to its length with the
+    /// lattice's zigzag taken out, as a collision front's length is measured (PLT-222). The
+    /// per-km rates of the fronts (subduction erosion, PLT-441; the trench's retreat, PLT-522)
+    /// and the fronts' km × Myr globals then meet their sources per km. On by default since
+    /// 2026-10-24 (arm fl-share against base3: no guard failure, the plate check 210 passes
+    /// against 207). Off, each front sample counts one lattice spacing, which counts a straight
+    /// front about 1.04 times and the model's own fronts 1.32 times. ledger: PLT-530
+    pub front_share: bool,
+    /// A plate is one rigid body (the front lane, 2026-10-24; Gordon 1998: "The central
+    /// assumption of plate tectonics is that the plates are rigid"; Bird 2003 [123]: PB2002's
+    /// plates file "contains 52 segments", each "a closed curve outlining that plate", and
+    /// [112]: each of its 150 boundaries runs from a junction to a junction; Stock & Lee 1994, a
+    /// fragment broken off a plate "may lose its slab-pull force and become driven entirely by
+    /// different conditions", and microplates that "became attached to the Pacific plate";
+    /// Lonsdale 2005, the Farallon plate's fission): right after a resampling
+    /// each plate's visible crust cut into pieces that meet only through other plates
+    /// (`geometry::pieces`) keeps its largest piece; every other piece of `min_plate_area_frac`
+    /// (PLT-091) or more becomes a plate of its own with the parent's rotation (fission; the force
+    /// balance moves it from the next step), and every smaller piece joins the plate most of its
+    /// lattice neighbours belong to (capture), as a plate below that size is absorbed
+    /// (`ridges::bury`). Off, a plate's pieces keep one rotation however far apart they lie.
+    /// ledger: PLT-532
+    pub plate_fission: bool,
     /// Hotspots at the start.
     pub hotspots_initial: u32,
     /// New hotspots per 100 Myr (Poisson).
@@ -1024,6 +1049,8 @@ impl Default for TectonicParams {
             subduction_erosion_min_mm_yr: 60.0, // ledger: PLT-442
             subduction_erosion_max_sediment_m: 1000.0, // ledger: PLT-442
             erosion_retreat: false,          // ledger: PLT-523
+            front_share: true,               // ledger: PLT-530
+            plate_fission: false,            // ledger: PLT-532
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
