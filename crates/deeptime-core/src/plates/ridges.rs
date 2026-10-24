@@ -1429,14 +1429,23 @@ mod tests {
             };
             let (mut st, pos) = build();
             let mut world = WorldState::new(1, 16_384, 0.0);
-            bury(&mut st, &mut world, Some(&geo), &pos, &env, &BTreeMap::new()).unwrap();
+            bury(
+                &mut st,
+                &mut world,
+                Some(&geo),
+                &pos,
+                &env,
+                &BTreeMap::new(),
+            )
+            .unwrap();
             assert_eq!(positions(&st, &geo), pos, "no sample moved");
             (st, world)
         };
         let pts = geo.points();
         let patch_n = (0..N).filter(|&i| patch(pts[i])).count();
         assert!(
-            patch_n > 3 && (patch_n as f64) < TectonicParams::default().min_plate_area_frac * N as f64,
+            patch_n > 3
+                && (patch_n as f64) < TectonicParams::default().min_plate_area_frac * N as f64,
             "the patch is below the smallest plate: {patch_n}"
         );
         let labels = |st: &PlateState| (0..N).map(|i| st.plate_of(i)).collect::<Vec<u32>>();
@@ -1455,15 +1464,15 @@ mod tests {
         assert_eq!(born.omega, omega, "the parent's rotation");
         assert_eq!(born.born_myr, 50.0);
         assert_eq!(born.samples as usize, north);
-        for i in 0..N {
-            let want = if patch(pts[i]) || band(pts[i]) {
+        for (i, &q) in pts.iter().enumerate() {
+            let want = if patch(q) || band(q) {
                 1
-            } else if pts[i].z >= 0.3 {
+            } else if q.z >= 0.3 {
                 2
             } else {
                 0
             };
-            assert_eq!(on.plate_of(i), want, "sample {i} at {}", pts[i]);
+            assert_eq!(on.plate_of(i), want, "sample {i} at {q}");
         }
         assert_eq!(cut_samples(&geo, &labels(&on), |_| true), 0);
         let births: Vec<_> = world
