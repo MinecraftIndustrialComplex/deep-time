@@ -140,34 +140,28 @@ class VolcanicZonesTest {
     }
 
     /**
-     * On a Petroff–Guyou world a cone's zones are its circle in the simulation's frame (east–west the
-     * radius times the longitude difference, north–south the radius times the unit vector's z difference),
-     * which the projection stretches into an ellipse; measured against that frame along 72 rays. The old
-     * discs fail it: at 55° the frame's circle is about three times (1/cos²) longer one way than the other.
+     * A cone's zones on world {@code p} at (x, z) are its circle on the planet (ledger SCL-230, BIO-182): measured
+     * along 72 rays by the great-circle distance from the vent in planet blocks (the planet's radius in
+     * {@code radius()} blocks times the angle between the unit vectors), the crater and cone hold 0.45 R, the ash
+     * field reaches R and nothing lies beyond. Returns the cone zone.
      */
-    @Test
-    void onAPetroffGuyouWorldTheZonesAreTheConesCircleInTheSimulationFrame() {
-        var pg = new PetroffGuyou(6656, 100.5);
-        double[] at = pg.blockOf(55.0, 150.0);
-        // The rays stop past 1.1 R (88 simulation blocks, a few hundred world blocks at most): clear of the z edge.
-        assertTrue(Math.abs(at[1]) < pg.zMax() - 500, "the test point is well inside the world's z range: " + at[1]);
-        var v = volcano(1, "stratovolcano", at[0], at[1], 80, 0.8, 6, false);
-        var z = VolcanicZones.build(List.of(v), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, (int) pg.period(), pg);
-        VolcanicZones.Zone cone = z.zones().stream().filter(zn -> zn.role() == Role.CONE).findFirst().orElseThrow();
-        assertTrue(cone.radius() > 2.0 * cone.minor(), cone.toString());
-        int vx = (int) Math.round(at[0]), vz = (int) Math.round(at[1]);
-        double rr = pg.radius();
-        double[] u0 = pg.unit(vx, vz);
-        double lon0 = Math.atan2(u0[1], u0[0]);
+    private static VolcanicZones.Zone assertRoundOnThePlanet(WorldProjection p, double x, double z) {
+        var v = volcano(1, "stratovolcano", x, z, 80, 0.8, 6, false);
+        var zs = VolcanicZones.build(List.of(v), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, (int) p.period(), p);
+        VolcanicZones.Zone cone = zs.zones().stream().filter(zn -> zn.role() == Role.CONE).findFirst().orElseThrow();
+        int vx = (int) Math.round(x), vz = (int) Math.round(z);
+        double rr = p.radius();
+        double[] u0 = p.unit(vx, vz);
         int[] seen = new int[3];
         for (int k = 0; k < 72; k++) {
             double th = k * Math.PI / 36.0;
             for (int d = 1; d < 5000; d++) {
-                int x = vx + (int) Math.round(d * Math.cos(th)), zz = vz + (int) Math.round(d * Math.sin(th));
-                double[] u = pg.unit(x, zz);
-                double f = Math.hypot(rr * Math.IEEEremainder(Math.atan2(u[1], u[0]) - lon0, 2.0 * Math.PI), rr * (u[2] - u0[2]));
-                Role r = first(z, x, zz);
-                String where = "ray " + k + ", " + d + " blocks out, " + f + " simulation blocks; " + cone;
+                int bx = vx + (int) Math.round(d * Math.cos(th)), bz = vz + (int) Math.round(d * Math.sin(th));
+                double[] u = p.unit(bx, bz);
+                double cx = u[1] * u0[2] - u[2] * u0[1], cy = u[2] * u0[0] - u[0] * u0[2], cz = u[0] * u0[1] - u[1] * u0[0];
+                double f = rr * Math.atan2(Math.sqrt(cx * cx + cy * cy + cz * cz), u[0] * u0[0] + u[1] * u0[1] + u[2] * u0[2]);
+                Role r = first(zs, bx, bz);
+                String where = "ray " + k + ", " + d + " blocks out, " + f + " planet blocks; " + cone;
                 if (f < 0.9 * 36) {                                    // 0.45 R = 36
                     assertTrue(r == Role.CRATER || r == Role.CONE, where + ": " + r);
                     seen[0]++;
@@ -176,24 +170,59 @@ class VolcanicZonesTest {
                     seen[1]++;
                 } else if (f > 1.1 * 80) {
                     assertEquals(null, r, where);
-                    assertTrue(z.outsideSurfaceZones(x, zz) > 0.0, where);
+                    assertTrue(zs.outsideSurfaceZones(bx, bz) > 0.0, where);
                     seen[2]++;
                     break;
                 }
             }
         }
         assertTrue(seen[0] > 100 && seen[1] > 100 && seen[2] == 72, java.util.Arrays.toString(seen));
+        return cone;
     }
 
+    /**
+     * On a Petroff–Guyou world a cone's zones are its circle on the planet, which this equal-area (not conformal) map
+     * draws with its own local shape stretch: the cone zone's long over short axis is the map's stretch at the vent.
+     * The old zones fail it: they were the cone's circle in the simulation's Lambert blocks, which at 55° is about
+     * three times (1/cos²) longer one way than the other on the planet.
+     */
     @Test
-    void onALambertWorldTheZonesAreTheDiscsOfAWorldWithoutAProjection() {
-        var v = volcano(1, "stratovolcano", 1000, 2000, 80, 0.8, 6, false);
-        var c = volcano(2, "caldera_complex", -1000, -2500, 60, 0.9, 20, true);
+    void onAPetroffGuyouWorldTheZonesAreTheConesCircleOnThePlanet() {
+        var pg = new PetroffGuyou(6656, 100.5);
+        double[] at = pg.blockOf(55.0, 150.0);
+        // The rays stop past 1.1 R (88 planet blocks, a few hundred world blocks at most): clear of the z edge.
+        assertTrue(Math.abs(at[1]) < pg.zMax() - 500, "the test point is well inside the world's z range: " + at[1]);
+        VolcanicZones.Zone cone = assertRoundOnThePlanet(pg, at[0], at[1]);
+        VolcanicZones.Stretch st = VolcanicZones.stretch(pg, at[0], at[1]);
+        double want = st.major() / st.minor();
+        assertEquals(want, cone.radius() / cone.minor(), 0.02 * want, cone + " " + st);
+    }
+
+    /**
+     * On a Lambert world the zones are the planet's circles as Lambert draws them: at 55° wide east–west by
+     * 1/cos φ and narrow north–south by cos φ (the cone's 36 blocks are 62.8 by 20.6); at the equator discs, as a
+     * world without a projection has. The old zones (discs on Lambert) fail it.
+     */
+    @Test
+    void onALambertWorldTheZonesAreThePlanetsCirclesWideEastWest() {
+        WorldProjection lambert = WorldProjection.of(null, C);
+        double z55 = -lambert.radius() * Math.sin(Math.toRadians(55.0));
+        VolcanicZones.Zone cone = assertRoundOnThePlanet(lambert, 1000, z55);
+        double cos = Math.cos(Math.toRadians(55.0));
+        assertEquals(36.0 / cos, cone.radius(), 0.5, cone.toString());
+        assertEquals(36.0 * cos, cone.minor(), 0.5, cone.toString());
+        assertEquals(1.0, Math.abs(cone.ax()), 1e-6, cone.toString());
+        var v = volcano(1, "stratovolcano", 1000, 0, 80, 0.8, 6, false);
+        var c = volcano(2, "caldera_complex", -1000, 0, 60, 0.9, 20, true);
         var plain = VolcanicZones.build(List.of(v, c), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C);
-        var lambert = VolcanicZones.build(List.of(v, c), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C, WorldProjection.of(null, C));
-        assertEquals(plain.zones(), lambert.zones());
-        for (VolcanicZones.Zone zn : lambert.zones())
-            assertEquals(zn.radius(), zn.minor(), zn.toString());
+        var equator = VolcanicZones.build(List.of(v, c), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, C, lambert);
+        assertEquals(plain.zones().size(), equator.zones().size());
+        for (int i = 0; i < plain.zones().size(); i++) {
+            VolcanicZones.Zone a = plain.zones().get(i), b = equator.zones().get(i);
+            assertEquals(a.role(), b.role());
+            assertEquals(a.radius(), b.radius(), 1e-3, b.toString());
+            assertEquals(a.minor(), b.minor(), 1e-3, b.toString());
+        }
     }
 
     /**

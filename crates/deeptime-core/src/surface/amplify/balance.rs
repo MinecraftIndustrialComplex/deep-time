@@ -86,6 +86,7 @@ pub fn apply(
         params,
         width_scale: s.feature_scale.rivers,
         mouths: false,
+        floodplains: None,
     });
     let young_lake_cells = level.lake_z.iter().filter(|s| s.is_finite()).count();
     let to_m = |raw: i16| (sea + (f64::from(raw) / 16.0 - sea_y) * mv) as f32;
