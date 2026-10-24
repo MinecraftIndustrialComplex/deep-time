@@ -813,11 +813,13 @@ public final class CubeWorldGameTests {
                 }
             }
         }
-        // Four chunks further out than the other cube tests' ocean chunk, which they take to FULL (beyond
-        // N-top's corner, x in [h, 3h): the net's x and Toroidal World's agree there).
+        // 24 chunks further out than the other cube tests' ocean chunk, which they take to FULL (beyond
+        // N-top's corner, x in [h, 3h): the net's x and Toroidal World's agree there), and out of the
+        // view of cubeBorderStopsAndFolds' player past the corners at (h + 64, -3h - 64): 4 chunks out,
+        // a run that put that test first (-PwithMic) found the chunk taken to FULL and compared none.
         ChunkPos first = oceanChunk(cube);
         helper.assertTrue(first != null, "a chunk past the net's corners");
-        ChunkPos ocean = new ChunkPos(first.x, first.z - 4);
+        ChunkPos ocean = new ChunkPos(first.x, first.z - 24);
         for (int lx = 0; lx < 16; lx += 15)
             for (int lz = 0; lz < 16; lz += 15)
                 helper.assertTrue(cube.fold(ocean.getMinBlockX() + lx, ocean.getMinBlockZ() + lz) instanceof CubeLayout.Ocean,

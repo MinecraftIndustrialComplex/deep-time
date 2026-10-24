@@ -65,7 +65,10 @@ import java.util.Map;
  * answers as the partner's region does, Deep Time's passes, the air carvers as
  * {@code NoiseBasedChunkGenerator.applyCarvers} runs them and the water's wake. The columns are then
  * copied block for block, each state turned by {@link BlockState#rotate}, and the fluid updates the
- * fill and the carvers asked for carried over. Columns past the net's corners are deep ocean.
+ * fill and the carvers asked for carried over. Columns past the net's corners are deep ocean. Every
+ * biome search of a cube world's chunks starts cold ({@code ColdBiomeSearch}, the generator's
+ * {@code createBiomes}, {@code buildSurface} and {@code applyCarvers}), so at a climate tie a copy
+ * holds its partner's biome.
  *
  * <p>Not copied: the terrain a structure adapts round its pieces (the partner's structure starts are
  * not known here) and features (trees, ores placed as features, springs). A wholly outside chunk
