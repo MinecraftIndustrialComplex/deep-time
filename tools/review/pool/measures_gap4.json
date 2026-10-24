@@ -9,7 +9,7 @@
       "needs": ["fields"],
       "fields": ["elevation", "regime", "plates/crust_type", "plates/orogeny_type", "plates/orogeny_age_myr", "plates/thickness_m"],
       "columns": [
-        {"key": "coast_hi", "label": "coast with high ground", "target": [null, 0.15], "digits": 3},
+        {"key": "coast_hi", "label": "coast with high ground", "target": [null, 0.11], "digits": 3},
         {"key": "hi_collision", "key2": "rate_collision", "label": "collision belt: share of the high coasts / rate on its coast", "target": null, "digits": 3, "pair": true},
         {"key": "hi_arc", "key2": "rate_arc", "label": "arc: share / rate", "target": null, "digits": 3, "pair": true},
         {"key": "hi_rifted", "key2": "rate_rifted", "label": "rifted margin: share / rate", "target": null, "digits": 3, "pair": true},

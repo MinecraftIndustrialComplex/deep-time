@@ -11,7 +11,7 @@
       "columns": [
         {"key": "cont_cells", "label": "continental cells", "target": null, "digits": 0},
         {"key": "under55_cells", "label": "continental cells under 54.9 mW/m2", "target": null, "digits": 0},
-        {"key": "q_min", "label": "continental heat flow, minimum, mW/m2", "target": [54.9, null], "digits": 1},
+        {"key": "q_min", "label": "continental heat flow, minimum, mW/m2 (the thermal state's craton floor 41 since 2026-10-23)", "target": [40.9, null], "digits": 1},
         {"key": "q_p01", "label": "1st percentile", "target": null, "digits": 1},
         {"key": "q_median", "label": "median", "target": null, "digits": 1}
       ]
