@@ -556,6 +556,17 @@ pub struct TectonicParams {
     /// overlap, PLT-370; the default and every built-in preset since 2026-10-23, V1 gap 2) rather
     /// than by its crust in the overlap (`false`, PLT-056's old judgement; ledger PLT-371).
     pub reversal_by_arc_crust: bool,
+    /// One-way subduction (the front lane, 2026-10-24): ocean floor hidden under an overriding
+    /// plate's forearc (a cover within `arc_distance_km`, PLT-042, of a subduction front as the
+    /// last step's fronts left it, plus one lattice spacing) is the slab: it stays hidden until
+    /// the next resampling consumes it, whatever that plate does next, and a point of the new
+    /// lattice that only such crust covers is a gap and gets new ocean floor
+    /// (`subduction::resolve`, `ridges::resample`). Continental crust is never held (it is
+    /// buoyant and comes back up, PLT-061), nor is crust a collision brings up. Off, a sample is
+    /// hidden exactly while it lies under an overriding plate's cover, so old crust that went
+    /// under shows again where that plate moves off it (plates.md, "The overlaps' hiding"). On
+    /// by default since 2026-10-24 (plates.md, "Step 6"). ledger: PLT-542
+    pub one_way_subduction: bool,
     /// Orogenic collapse (`plates/collapse.rs`): continental crust thicker than
     /// `collapse_thickness_km` that no orogeny is raising any more thins by spreading, with this
     /// e-folding time of its excess thickness, Myr; the crust it loses fills the nearest thin
@@ -1029,6 +1040,7 @@ impl Default for TectonicParams {
             weld_speed_mm_yr: 5.0,            // ledger: PLT-246
             weld_after_myr: 10.0,             // ledger: PLT-246
             reversal_by_arc_crust: true,      // ledger: PLT-371 (on since 2026-10-23)
+            one_way_subduction: true,         // ledger: PLT-542 (on since 2026-10-24)
             collapse_myr: 15.0,               // ledger: PLT-255
             collapse_thickness_km: 50.0,      // ledger: PLT-256
             collapse_quiet_myr: 10.0,         // ledger: PLT-259

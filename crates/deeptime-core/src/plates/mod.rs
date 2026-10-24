@@ -72,6 +72,7 @@ pub mod ridges;
 pub mod rifting;
 pub mod settle;
 pub mod shortening;
+pub mod shown;
 pub mod state;
 pub mod stats;
 pub mod subduction;
@@ -800,7 +801,9 @@ impl PlatesStage {
         let resampling =
             ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step);
         if resampling {
+            shown::resampling(st, env.t_myr);
             let geo = ridges::resample(st, world, &pos, &tree, &cache.geo, &env)?;
+            shown::resampled(st);
             if let Some(b) = cb.borrow_mut().as_mut() {
                 b.book_lattice(&st.samples, gap_budget::Part::ResampleBlend);
             }

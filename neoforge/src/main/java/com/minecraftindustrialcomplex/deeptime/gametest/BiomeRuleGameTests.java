@@ -241,8 +241,10 @@ public final class BiomeRuleGameTests {
      * rule decided holds one of that rule's candidates in one of its Köppen classes (as the census reads the
      * class); an exclusive candidate (ice cap, salt lakes, tsingy, black beach, glacial cliffs, Tibesti) never
      * comes from the climate search; volcanic roles answer with Expanded Ecosphere's biomes; and where the planet
-     * has cold wetland, at least {@link #MIN_PEAT_SHARE} of it is on a peatland biome. The census (rules section)
-     * is logged in full.
+     * has cold wetland the rules decide, at least {@link #MIN_PEAT_SHARE} of it is on a peatland biome. That is the
+     * flag where the biome query reads it and where the ordinary rules run (on land at the quart's centre), outside
+     * the columns a volcano's zone decided, which outranks the peatland rule by design (BIO-113; set apart and
+     * logged, ledger BIO-189). The census (rules section) is logged in full.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void expandedEcosphereBiomesFollowTheirRules(GameTestHelper helper) throws Exception {
@@ -267,10 +269,14 @@ public final class BiomeRuleGameTests {
             for (String b : rc.biomes(e.getKey()).keySet())
                 helper.assertTrue(b.startsWith("wythers:"), "volcanic role " + e.getKey() + " placed " + b + ", not an Expanded Ecosphere biome");
         }
+        // Cold wetland a volcano's zone decided is set apart, not counted (BIO-189; 20 of the 29 cold-wetland columns of
+        // the 2026-10-24 test planet: an oceanic shield's coastal flat inside its cone zone, beaches in lava fields).
+        DeepTime.LOGGER.info("[gametest] expandedEcosphereBiomesFollowTheirRules: {} cold-wetland columns the rules decide, {} on a peatland"
+                + " biome; {} more a volcano's zone decided, set apart", rc.coldWetland(), rc.coldWetlandPeat(), rc.coldWetlandVolcanic());
         if (rc.coldWetland() >= MIN_COLD_WETLAND) {
             double share = rc.coldWetlandPeat() / (double) rc.coldWetland();
             helper.assertTrue(share >= MIN_PEAT_SHARE, "only " + rc.coldWetlandPeat() + " of " + rc.coldWetland()
-                    + " cold-wetland columns are on a peatland biome");
+                    + " cold-wetland columns are on a peatland biome: " + rc.coldWetlandBy());
         } else {
             DeepTime.LOGGER.info("[gametest] expandedEcosphereBiomesFollowTheirRules: {} cold-wetland columns (fewer than {}): peatland share logged only",
                     rc.coldWetland(), MIN_COLD_WETLAND);
