@@ -133,7 +133,7 @@ assert.ok(/data-fam="coal_seam" aria-pressed="false"/.test(leg) && /data-fam="mv
 assert.ok(leg.includes('data-fam="glow_stone"'), 'a datapack family is listed');
 const rows = D.factRows(m.byId.get(3), m, { where: '12.0° N · 30° E', age: '312.4 Myr ago' }).map(r => r[0]);
 assert.deepStrictEqual(rows.slice(0, 3), ['Family', 'Size', 'Formed']);
-// The card's block is the world's (`block`, a Petroff-Guyou bake's centre), not the simulation's
+// The card's block is the world's (`block`, a cube bake's centre), not the simulation's
 // x and z the overlay is drawn at; without one, x and z.
 const blockRow = s => D.factRows(s, m, {}).find(r => r[0] === 'Block x, z')[1];
 assert.strictEqual(blockRow(m.byId.get(3)), '4000, 900');
