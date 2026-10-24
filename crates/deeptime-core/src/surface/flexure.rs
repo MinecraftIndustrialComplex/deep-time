@@ -2379,18 +2379,6 @@ pub fn step(
             ));
         }
         out.solve = Some(report);
-        if std::env::var_os("DEEPTIME_ISO133_TRACE").is_some() {
-            let (k, m) = dw.iter().enumerate().fold((0, 0.0f64), |(k, m), (c, &v)| {
-                if v.abs() > m { (c, v.abs()) } else { (k, m) }
-            });
-            let top = frame_dh.iter().fold(0.0f64, |a, &v| a.max(v.abs()));
-            eprintln!(
-                "iso133 framed {} max |frame dh| {top:.0} m | solve max |dw| {m:.0} m at ({}, {})",
-                framed.len(),
-                k % ws,
-                k / ws
-            );
-        }
         if let Some(faces) = x.sin_faces.filter(|s| s.len() == hgt + 1)
             && std::env::var_os(METRIC_TRACE_ENV).is_some()
         {
@@ -3614,12 +3602,17 @@ mod tests {
                     assert_eq!(plate[c], 1.0, "cell ({i}, {j}) is not the carrying plate's");
                     assert!(j <= 19 + 6, "cell ({i}, {j}) beyond the reach");
                 }
+                // Every cell of the carrying plate within two rows of the belt is in reach.
                 None => assert!(
-                    plate[c] != 1.0 || j > 25,
+                    plate[c] != 1.0 || j > 21,
                     "cell ({i}, {j}) of the carrying plate within reach left out"
                 ),
             }
         }
+        // The reach goes through the carrying plate's crust: around the third plate (7, 25) is
+        // 7 cells from the belt, (6, 25) and (5, 24) on the way round 6 and 5.
+        assert!(at(25 * w + 7).is_none(), "the reach goes round the third plate");
+        assert!(at(25 * w + 6).is_some() && at(24 * w + 5).is_some(), "the way round");
         assert!(at(20 * w).is_some(), "the wedge");
         assert!(at(20 * w + 15).is_some() && at(21 * w + 2).is_some(), "across the wrap");
         assert!(at(17 * w).is_none(), "the over plate behind the belt");
