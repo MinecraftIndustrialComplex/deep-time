@@ -564,8 +564,8 @@ pub struct TectonicParams {
     /// (`subduction::resolve`, `ridges::resample`). Continental crust is never held (it is
     /// buoyant and comes back up, PLT-061), nor is crust a collision brings up. Off, a sample is
     /// hidden exactly while it lies under an overriding plate's cover, so old crust that went
-    /// under shows again where that plate moves off it (plates.md, "The overlaps' hiding").
-    /// ledger: PLT-542
+    /// under shows again where that plate moves off it (plates.md, "The overlaps' hiding"). On
+    /// by default since 2026-10-24 (plates.md, "Step 6"). ledger: PLT-542
     pub one_way_subduction: bool,
     /// Orogenic collapse (`plates/collapse.rs`): continental crust thicker than
     /// `collapse_thickness_km` that no orogeny is raising any more thins by spreading, with this
@@ -1027,7 +1027,7 @@ impl Default for TectonicParams {
             weld_speed_mm_yr: 5.0,            // ledger: PLT-246
             weld_after_myr: 10.0,             // ledger: PLT-246
             reversal_by_arc_crust: true,      // ledger: PLT-371 (on since 2026-10-23)
-            one_way_subduction: false,        // ledger: PLT-542
+            one_way_subduction: true,         // ledger: PLT-542 (on since 2026-10-24)
             collapse_myr: 15.0,               // ledger: PLT-255
             collapse_thickness_km: 50.0,      // ledger: PLT-256
             collapse_quiet_myr: 10.0,         // ledger: PLT-259

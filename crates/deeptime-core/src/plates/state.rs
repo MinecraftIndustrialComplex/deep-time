@@ -584,10 +584,11 @@ pub struct OneWay {
 }
 
 impl OneWay {
-    /// Whether sample `i` is held crust (and still hidden: a collision that brought it up let it
-    /// go).
+    /// Whether sample `i` is held crust: still hidden (a collision that brought it up let it go)
+    /// and still ocean floor (crust a rule turned continental since is judged as continental
+    /// crust).
     pub fn holds(&self, i: usize, s: &Sample) -> bool {
-        self.held.get(i).copied().unwrap_or(false) && s.is_hidden()
+        self.held.get(i).copied().unwrap_or(false) && s.is_hidden() && s.kind != CONTINENTAL
     }
 }
 
