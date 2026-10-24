@@ -1250,6 +1250,7 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     let strip = |mut w: WorldState| {
         let st = w.plates.as_mut().unwrap();
         st.dynamics = None;
+        st.shown = None;
         for c in &mut st.contacts {
             c.cont_in = 0;
         }
