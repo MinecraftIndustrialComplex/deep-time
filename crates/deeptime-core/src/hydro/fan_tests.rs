@@ -3,7 +3,8 @@
 //! leaves a ridge for flat ground on a window of the D5 planet's Lambert frame (1 block a cell):
 //! the fan at the slope break, round on the planet at 0° and at 55° (and three times as wide as
 //! long on the grid there), Bull's area unless hemmed in, none on a smooth profile, a larger
-//! river's channel as its edge, and no cone over ground that falls away faster than the fan.
+//! river's channel as its edge, no cone over ground that falls away faster than the fan, and a
+//! tributary from beyond the fan as its edge where one rising on it is buried.
 
 use deeptime_format::raster::ZEdges;
 use deeptime_format::rivers::Rivers;
@@ -378,4 +379,60 @@ fn ground_falling_away_faster_than_the_fan_ends_it() {
     // (64 blocks of planet for Bull's 1,171 km²); west, on the flat plain, it reaches it.
     assert!(east < 32.0, "east to {east}");
     assert!(west < -55.0, "west to {west}");
+}
+
+/// A river from the east, a quarter of the fan's drainage, joining the fan's river 40 blocks of
+/// planet south of the apex; its head `head_e` blocks of planet east of the apex's meridian.
+fn with_tributary(head_e: i32) -> (Window, Vec<i16>, Fans) {
+    let win = window(0.0, 260, 400, 180);
+    let elev = win.elev(&|_, _| None);
+    let (x0, zj) = win.at_south(40.0);
+    let cos = proj().cos_lat(zj);
+    let mut trib = FlowWalk::default();
+    for e in (0..=head_e).rev() {
+        let c = win.cell(x0 + f64::from(e) / cos, zj);
+        if trib.cells.last() != Some(&c) {
+            trib.cells.push(c);
+            trib.area_km2.push((DRAINAGE / 4.0) as f32);
+            trib.fill.push(elev[c as usize]);
+        }
+    }
+    let main = win.walk(&elev, SOUTH);
+    assert!(main.cells.contains(trib.cells.last().unwrap()));
+    let net = output(elev.len(), vec![main, trib]);
+    let fans = find(&win, &elev, &net);
+    (win, elev, fans)
+}
+
+#[test]
+fn a_river_from_beyond_the_fan_bounds_it_and_one_rising_on_it_is_buried() {
+    // From the window's east edge (129 blocks of planet, beyond the cone's reach): its channel
+    // and the fan's river below the junction bound the fan, so nothing of it lies south-east of
+    // the junction.
+    let (win, _, fans) = with_tributary(129);
+    assert_eq!(fans.fans.len(), 1, "{}", fan::stats(&fans, 1, 0.09, M_V));
+    let f = &fans.fans[0];
+    let mut south_west = 0;
+    for &c in &f.cells {
+        let (x, z) = win.pos(c as usize);
+        let (e, s) = win.planet(x, z);
+        assert!(!(e > 0.5 && s > 40.5), "a fan cell at {e}, {s}");
+        south_west += usize::from(e < -0.5 && s > 40.5);
+    }
+    // West of the fan's river it still runs south past the junction.
+    assert!(south_west > 100, "{south_west}");
+    // Rising 30 blocks of planet east, under the cone: it is the fan's own runoff, buried, and
+    // the fan covers the south-east too.
+    let (win, _, fans) = with_tributary(30);
+    assert_eq!(fans.fans.len(), 1);
+    let south_east = fans.fans[0]
+        .cells
+        .iter()
+        .filter(|&&c| {
+            let (x, z) = win.pos(c as usize);
+            let (e, s) = win.planet(x, z);
+            e > 0.5 && s > 40.5
+        })
+        .count();
+    assert!(south_east > 100, "{south_east}");
 }

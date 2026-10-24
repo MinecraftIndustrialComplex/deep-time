@@ -15,16 +15,18 @@
 //!   at an abrupt decrease in bed slope), both measured over the fan's free length (below).
 //!   Along a chain the apexes are taken where the cone would stand thickest, a fan's length apart.
 //! - **Extent** (HYD-168, HYD-169). The cone is laid where it stands over the ground, on the cells
-//!   joined to its apex across land that is no lake, playa, delta plain or channel of a larger
-//!   river ("the radii of a fan are restricted by adjacent fans, and by stream deposits at the toe
-//!   of the fan", Bull 1964, p. 94), and nowhere thicker than over its apex: where the ground falls
-//!   away from the apex faster than the fan (off a plateau's edge, into a deeper valley) the fan
-//!   ends, as the cone would otherwise bury lower ground far below it. Its height over the apex is
-//!   found so that it covers A_F, but
-//!   at most the height of a free fan: the cone of A_F spread over a quarter circle on flat ground
-//!   (the median sector of Stock et al.'s 2008 four fans), so a fan hemmed in by higher ground is
-//!   smaller than Bull's. A fan less than a block high at its apex is not drawn (HYD-170).
-//!   Overlapping fans take the higher cone.
+//!   joined to its apex across land that is no lake, playa, delta plain or channel of a river from
+//!   beyond the fan ("the radii of a fan are restricted by adjacent fans, and by stream deposits at
+//!   the toe of the fan", Bull 1964, p. 94): one that drains more than the fan's own or rises where
+//!   the cone does not stand, and the fan's own river below where the first such river joins it. A
+//!   river that rises on the fan is buried and runs down the cone. The fan is also nowhere thicker
+//!   than over its apex: where the ground falls away from the apex faster than the fan (off a
+//!   plateau's edge, into a deeper valley) the fan ends, as the cone would otherwise bury lower
+//!   ground far below it. Its height over the apex is found so that it covers A_F, but at most the
+//!   height of a free fan: the cone of A_F spread over a quarter circle on flat ground (the median
+//!   sector of Stock et al.'s 2008 four fans), so a fan hemmed in by higher ground is smaller than
+//!   Bull's. A fan less than a block high at its apex is not drawn (HYD-170). Overlapping fans take
+//!   the higher cone.
 //! - **The planet's metric.** Distances are the planet's: on a Lambert frame a block east is cos φ
 //!   of the planet's and a block south 1 / cos φ, so a fan is round on the planet
 //!   (round-features.md, SCL-230). The frame's cells are of equal area, so a fan's area is its
@@ -242,6 +244,20 @@ pub fn find(inp: &Input<'_>, net: &network::Output) -> Fans {
             on.insert(wk.cells[i], (k as u32, i as u32, wk.area_km2[i]));
         }
     }
+    // Each chain's head, and per chain the chains that end on it with the place they join it.
+    let heads: Vec<Option<u32>> = walks
+        .iter()
+        .map(|wk| wk.cells.get(usize::from(wk.lead)).copied())
+        .collect();
+    let mut joins: Vec<Vec<(u32, u32, f32)>> = vec![Vec::new(); walks.len()];
+    for (k, wk) in walks.iter().enumerate() {
+        if let Some(&(p, i, _)) = wk.cells.last().and_then(|e| on.get(e))
+            && p as usize != k
+        {
+            let a = wk.area_km2[wk.cells.len().saturating_sub(2)];
+            joins[p as usize].push((i, k as u32, a));
+        }
+    }
     let cell_km2 = (r * mh).powi(2) / 1e6;
     let free = |cu: usize| -> bool {
         net.kind.get(cu).is_none_or(|&k| k == network::kind::NONE)
@@ -286,6 +302,8 @@ pub fn find(inp: &Input<'_>, net: &network::Output) -> Fans {
     // Candidate apexes per chain, the thickest a free length apart.
     struct Cand {
         chain: u32,
+        /// The apex's place on its chain's walk.
+        idx: u32,
         cell: u32,
         drainage: f64,
         slope: f64,
@@ -337,6 +355,7 @@ pub fn find(inp: &Input<'_>, net: &network::Output) -> Fans {
                     i,
                     Cand {
                         chain: k as u32,
+                        idx: (i + usize::from(wk.lead)) as u32,
                         cell,
                         drainage: a,
                         slope: sf,
@@ -371,6 +390,21 @@ pub fn find(inp: &Input<'_>, net: &network::Output) -> Fans {
         // Nowhere thicker than over the apex: the ground no lower than a cone of the fan's slope
         // through the apex's ground.
         let cap = top - f64::from(inp.elev[cd.cell as usize]);
+        // A river that drains more than the fan's own, or rises where the cone does not stand,
+        // brings water from beyond the fan: its channel bounds the fan, and so does the fan's own
+        // river below the first place such a river joins it (it is then the river at the toe).
+        let under =
+            |cell: u32| top - fall * dist(apex, pos(cell)) > f64::from(inp.elev[cell as usize]);
+        let foreign = |k: u32, a: f32| {
+            k != cd.chain
+                && (f64::from(a) > cd.drainage || heads[k as usize].is_none_or(|hd| !under(hd)))
+        };
+        let cut = joins[cd.chain as usize]
+            .iter()
+            .filter(|&&(i, k, a)| i > cd.idx && foreign(k, a))
+            .map(|&(i, _, _)| i)
+            .min()
+            .unwrap_or(u32::MAX);
         let mut seen: HashMap<u32, ()> = HashMap::new();
         let mut queue = VecDeque::from([cd.cell]);
         seen.insert(cd.cell, ());
@@ -381,9 +415,8 @@ pub fn find(inp: &Input<'_>, net: &network::Output) -> Fans {
             if cone <= e || cone - e > cap || !free(cu) {
                 continue;
             }
-            if let Some(&(k, _, a)) = on.get(&cell)
-                && k != cd.chain
-                && f64::from(a) > cd.drainage
+            if let Some(&(k, i, a)) = on.get(&cell)
+                && (foreign(k, a) || (k == cd.chain && i >= cut))
             {
                 continue;
             }
