@@ -58,6 +58,7 @@ pub mod forces;
 pub mod gap_budget;
 pub mod geometry;
 pub mod hotspots;
+pub mod inherit;
 pub mod init;
 pub mod kinematics;
 pub mod l1;
