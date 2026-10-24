@@ -8,6 +8,8 @@ import com.google.gson.JsonParser;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.api.climate.ClimateSample;
 import com.minecraftindustrialcomplex.deeptime.api.climate.DeepTimeClimate;
+import com.minecraftindustrialcomplex.deeptime.api.planet.DeepTimePlanet;
+import com.minecraftindustrialcomplex.deeptime.api.planet.LocalFrame;
 import com.minecraftindustrialcomplex.deeptime.net.WorldInfoPayload;
 import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.CubeWorld;
@@ -110,7 +112,7 @@ public final class ClimateApiGameTests {
                 lapsed++;
         }
         // API 5 on an equal-area world: north is -z along the equator, the scale is the nominal one.
-        String kind = DeepTimeClimate.projectionKind(level);
+        String kind = t.data().projection().kind().id();
         double nominal = t.data().manifest().mPerBlockH(), worstNorth = 0;
         int scaled = 0;
         for (int i = 0; i < 40; i++) {
@@ -121,6 +123,22 @@ public final class ClimateApiGameTests {
                 scaled++;
         }
         helper.assertTrue(kind.equals("petroff_guyou") || kind.equals("lambert"), "the real planet's projection: " + kind);
+        // The planet API on the real planet: one object per world, the equal-area sphere's radius, and
+        // the climate API's geometry its answers.
+        DeepTimePlanet planet = DeepTimePlanet.of(level).orElse(null);
+        double radius = t.data().projection().radius() * nominal;
+        helper.assertTrue(planet != null && DeepTimePlanet.of(level).orElseThrow() == planet
+                        && Math.abs(planet.radiusMetres() - radius) <= 1e-9 * radius,
+                "the real planet's sphere: " + planet + " vs R " + radius + " m");
+        int same = 0;
+        for (int i = 0; i < 40; i++) {
+            double x = -c / 2.0 + i * c / 40.0 + 7.5, z = ((i * 37) % (2 * (int) t.zHalf())) - t.zHalf() + 0.5;
+            LocalFrame f = planet.frame(x, z).orElseThrow();
+            if (planet.latitudeDeg(x, z) == DeepTimeClimate.latitudeDeg(level, x, z) && planet.longitudeDeg(x, z) == DeepTimeClimate.longitudeDeg(level, x, z)
+                    && f.northBearingDeg() == DeepTimeClimate.northBearingDeg(level, x, z) && f.metresPerBlock() == DeepTimeClimate.metresPerBlock(level, x, z))
+                same++;
+        }
+        helper.assertTrue(same == 40, "the climate API's geometry is the planet API's at " + same + " of 40");
         helper.assertTrue(worstNorth < 0.1, "north on the equator is -z within " + worstNorth + "°");
         helper.assertTrue(scaled == 40 && nominal > 0, "the equal-area scale is the nominal " + nominal + " at " + scaled + " of 40");
         DeepTime.LOGGER.info("[gametest] climateApiOnTheRealPlanet fixture={} equal={} tropics={} meanC={} "
@@ -147,25 +165,28 @@ public final class ClimateApiGameTests {
         helper.assertTrue(o.isDeepTimeLevel() == deep, "the overworld is " + (deep ? "" : "not ") + "Deep Time's");
         if (!deep)
             helper.assertTrue(o.at(BlockPos.ZERO).isEmpty() && Double.isNaN(o.lapseRateCPerKm()), "nothing outside Deep Time");
-        // API 2: the planet's geometry, on the server from the generator (the synthetic level is a planet
-        // too; a level Deep Time did not generate is not).
-        int c = DeepTimeClimate.circumferenceBlocks(synthetic);
-        int expected = synthetic.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g ? g.dataRef().circumferenceBlocks() : -1;
-        helper.assertTrue(c > 0 && c == expected, "the synthetic planet's circumference " + c + " vs its generator's " + expected);
-        helper.assertTrue(deep || DeepTimeClimate.circumferenceBlocks(overworld) == 0, "a level Deep Time did not generate has no circumference");
-        helper.assertTrue(DeepTimeClimate.circumferenceBlocks(null) == 0, "no level, no circumference");
-        // The synthetic planet is a Lambert world: latitude from z, north -z, the nominal scale (API 5).
-        String kind = DeepTimeClimate.projectionKind(synthetic);
+        // The planet API and the climate API's geometry through it, on the server from the generator (the
+        // synthetic level is a planet too; a level Deep Time did not generate is not).
+        GeologicChunkGenerator sg = synthetic.getChunkSource().getGenerator() instanceof GeologicChunkGenerator gen ? gen : null;
+        int c = sg == null ? -1 : sg.dataRef().circumferenceBlocks();
+        double nominal = sg != null && sg.terrain() instanceof WorldDataTerrain wt ? wt.data().manifest().mPerBlockH() : Double.NaN;
+        DeepTimePlanet planet = DeepTimePlanet.of(synthetic).orElse(null);
+        helper.assertTrue(c > 0 && planet != null && DeepTimePlanet.of(synthetic).orElseThrow() == planet
+                        && Math.abs(planet.radiusMetres() - c / (2 * Math.PI) * nominal) <= 1e-9 * planet.radiusMetres(),
+                "the synthetic planet: C " + c + ", " + planet + " at " + nominal + " m per block");
+        helper.assertTrue(deep || DeepTimePlanet.of(overworld).isEmpty(), "a level Deep Time did not generate is not a planet");
+        helper.assertTrue(DeepTimePlanet.of(null).isEmpty(), "no level, no planet");
+        // The synthetic planet is a Lambert world: latitude from z, north -z, the nominal scale (API 5),
+        // nothing past the poles.
+        String kind = sg == null ? "" : sg.dataRef().projection();
         helper.assertTrue(kind.equals("lambert"), "the synthetic planet is a Lambert world: " + kind);
         double pole = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);
         helper.assertTrue(DeepTimeClimate.latitudeDeg(synthetic, 17, -pole) == 90.0
                         && Math.abs(DeepTimeClimate.latitudeDeg(synthetic, -300, pole / 2) + 30.0) < 1e-9
-                        && DeepTimeClimate.latitudeDeg(synthetic, 5, -c / 4.0) == 90.0
+                        && Double.isNaN(DeepTimeClimate.latitudeDeg(synthetic, 5, -c / 4.0)) && !planet.isOnPlanet(5, -c / 4.0)
                         && DeepTimeClimate.latitudeDeg(synthetic, 0, 0) == 0.0
                         && Double.isNaN(DeepTimeClimate.latitudeDeg(overworld, 0, 100)) == !deep,
-                "latitude: north is -z, sin φ = -z/R (Lambert), the poles at |z| = R = C/2π");
-        double nominal = synthetic.getChunkSource().getGenerator() instanceof GeologicChunkGenerator gg
-                && gg.terrain() instanceof WorldDataTerrain wt ? wt.data().manifest().mPerBlockH() : Double.NaN;
+                "latitude: north is -z, sin φ = -z/R (Lambert), the poles at |z| = R = C/2π, off the planet past them");
         for (double[] q : new double[][]{{0, 0}, {-400, 100}, {300, -150}}) {
             helper.assertTrue(DeepTimeClimate.northBearingDeg(synthetic, q[0], q[1]) == 0.0,
                     "north is -z on a Lambert world: " + DeepTimeClimate.northBearingDeg(synthetic, q[0], q[1]));
@@ -226,8 +247,9 @@ public final class ClimateApiGameTests {
         CubeWorld w = wp.world();
         double r = wp.radius(), nominal = t.data().manifest().mPerBlockH();
         long s = cube.side();
-        helper.assertTrue(DeepTimeClimate.projectionKind(level).equals("cube") && DeepTimeClimate.circumferenceBlocks(level) == 4 * s,
-                "kind " + DeepTimeClimate.projectionKind(level) + ", period " + DeepTimeClimate.circumferenceBlocks(level));
+        DeepTimePlanet planet = DeepTimePlanet.of(level).orElse(null);
+        helper.assertTrue(planet != null && Math.abs(planet.radiusMetres() - r * nominal) <= 1e-9 * r * nominal,
+                "the cube planet's sphere: " + planet + " vs R " + r * nominal + " m");
 
         // The face centres: the turned face normals, and north there from the face frame.
         WorldInfoPayload info = WorldInfoPayload.forLevel(level);
