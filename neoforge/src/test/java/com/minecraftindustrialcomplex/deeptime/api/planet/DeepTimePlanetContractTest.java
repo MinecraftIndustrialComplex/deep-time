@@ -338,7 +338,7 @@ class DeepTimePlanetContractTest {
         ProjectionPlanet pl = w.planet();
         WorldProjection p = w.p();
         boolean conformal = p instanceof WorldProjection.Cube || p instanceof WorldProjection.Lambert;
-        double rM = w.r(), degPerM = Math.toDegrees(1.0 / rM), h = 0.5, hb = 1.0;
+        double rM = w.r(), degPerM = Math.toDegrees(1.0 / rM), h = 0.5, hb = 0.5;   // hb: within half a block, a crease the kink probes miss cannot pass (they reach a block along x and z)
         SplittableRandom rnd = new SplittableRandom(19);
         int n = 3000, tested = 0, kinked = 0, nearSingular = 0, polar = 0;
         double worstStep = 0, worstBearing = 0, worstArea = 0, worstEast = 0, worstNorth = 0, worstLon = 0, worstGrad = 0, worstGradNorth = 0;
