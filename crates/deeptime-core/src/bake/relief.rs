@@ -33,7 +33,7 @@ use std::path::Path;
 use rayon::prelude::*;
 use serde_json::{Value, json};
 
-use deeptime_format::raster::{RasterRead, ZEdges, bilinear_weights};
+use deeptime_format::raster::{RasterRead, bilinear_weights};
 use deeptime_format::rivers::Rivers;
 use deeptime_format::{GridDesc, LayerDesc, LoadedLayer};
 
@@ -1071,6 +1071,7 @@ impl<M: SimFrame> OnWorld<'_, M> {
 mod tests {
     use super::*;
     use deeptime_format::DType;
+    use deeptime_format::raster::ZEdges;
     
     const MH: f64 = 300.0;
 

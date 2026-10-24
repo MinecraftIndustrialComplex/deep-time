@@ -238,7 +238,6 @@ fn take_off_floodplains(out: &mut Out<'_>) -> Result<(), CoreError> {
 /// height (HYD-151). Writes what that moved as [`FLOODPLAIN_LAYER`], zeroes `detail/amplitude` on
 /// the plain (it is flat). Returns the record.
 fn lay_floodplains(
-    p: &PlanetPreset,
     out: &mut Out<'_>,
     l3: &GridDesc,
     hydro_grid: &GridDesc,
@@ -339,7 +338,6 @@ struct Laid {
 /// coarser): each L3 cell of a plain cell is at least the plain's height. Writes the raise as
 /// [`DELTA_LAYER`] and zeroes `detail/amplitude` on the raised cells.
 fn lay_plains(
-    p: &PlanetPreset,
     out: &mut Out<'_>,
     l3: &GridDesc,
     hydro_grid: &GridDesc,
@@ -416,7 +414,6 @@ fn lay_plains(
 /// at L3's spacing too). Writes the raise as [`FAN_LAYER`], zeroes `detail/amplitude` on the
 /// raised cells (the cone is the fan's surface). Returns the record.
 fn lay_fans(
-    p: &PlanetPreset,
     out: &mut Out<'_>,
     l3: &GridDesc,
     hydro_grid: &GridDesc,
@@ -784,18 +781,17 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         let laid = if plains.plains.is_empty() {
             None
         } else {
-            Some(lay_plains(p, out, &l3, &grid, halvings, &plains)?)
+            Some(lay_plains(out, &l3, &grid, halvings, &plains)?)
         };
         let fan_laid = if fans.fans.is_empty() {
             None
         } else {
-            Some(lay_fans(p, out, &l3, &grid, halvings, &fans)?)
+            Some(lay_fans(out, &l3, &grid, halvings, &fans)?)
         };
         (second, splits, laid, fan_laid)
     };
     let flood_laid = if params.floodplains && !result.floodplain.is_empty() {
         Some(lay_floodplains(
-            p,
             out,
             &l3,
             &grid,
