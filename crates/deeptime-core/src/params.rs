@@ -556,6 +556,14 @@ pub struct TectonicParams {
     /// overlap, PLT-370; the default and every built-in preset since 2026-10-23, V1 gap 2) rather
     /// than by its crust in the overlap (`false`, PLT-056's old judgement; ledger PLT-371).
     pub reversal_by_arc_crust: bool,
+    /// One-way subduction (the front lane, 2026-10-24): a sample hidden under an overriding plate
+    /// stays hidden until the next resampling consumes it, whatever that plate does next, and a
+    /// point of the new lattice that only hidden crust covers is a gap and gets new ocean floor
+    /// (`subduction::resolve`, `ridges::resample`). Lithosphere that went down a trench is the
+    /// slab and does not come back to the surface. Off, a sample is hidden exactly while it lies
+    /// under an overriding plate's cover, so old crust that went under shows again where that
+    /// plate moves off it (plates.md, "The overlaps' hiding"). ledger: PLT-542
+    pub one_way_subduction: bool,
     /// Orogenic collapse (`plates/collapse.rs`): continental crust thicker than
     /// `collapse_thickness_km` that no orogeny is raising any more thins by spreading, with this
     /// e-folding time of its excess thickness, Myr; the crust it loses fills the nearest thin
@@ -1016,6 +1024,7 @@ impl Default for TectonicParams {
             weld_speed_mm_yr: 5.0,            // ledger: PLT-246
             weld_after_myr: 10.0,             // ledger: PLT-246
             reversal_by_arc_crust: true,      // ledger: PLT-371 (on since 2026-10-23)
+            one_way_subduction: false,        // ledger: PLT-542
             collapse_myr: 15.0,               // ledger: PLT-255
             collapse_thickness_km: 50.0,      // ledger: PLT-256
             collapse_quiet_myr: 10.0,         // ledger: PLT-259
