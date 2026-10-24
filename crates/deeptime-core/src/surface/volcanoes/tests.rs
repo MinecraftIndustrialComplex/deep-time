@@ -656,7 +656,8 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         "no active arc volcano: {stratos} in the catalogue, {:?}",
         st.counts
     );
-    // Active ones keep the spacing (they were placed apart and ride their plates together).
+    // Active ones keep the spacing (they were placed apart and ride their plates together). The
+    // spacing is a great-circle distance (ledger: SCL-232), and so is the check.
     let live: Vec<&Volcano> = st
         .volcanoes
         .iter()
@@ -665,7 +666,7 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
     let mut close = 0;
     for (a, va) in live.iter().enumerate() {
         for vb in &live[a + 1..] {
-            let d = (frame.wrap_x(va.x - vb.x) * 300.0).hypot((va.z - vb.z) * 300.0);
+            let d = Around::new(frame, 300.0, va.x, va.z).distance_m(vb.x, vb.z);
             if d < 0.5 * p.arc_spacing_km * 1000.0 {
                 close += 1;
             }
@@ -706,8 +707,10 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         }
         let hs = plates.hotspots.iter().find(|x| x.id == h).unwrap();
         let (px, pz) = frame.block(DVec3::from_array(hs.pos));
+        // On the planet, as the stage measures it (ledger: SCL-232).
+        let plume = Around::new(frame, 300.0, px, pz);
         for v in vs.iter().filter(|v| v.active() && v.gone.is_none()) {
-            let d = (frame.wrap_x(v.x - px) * 300.0).hypot((v.z - pz) * 300.0);
+            let d = plume.distance_m(v.x, v.z);
             assert!(
                 d <= p.hotspot_spacing_km * 1000.0 + 1.0,
                 "{d} m from its plume"

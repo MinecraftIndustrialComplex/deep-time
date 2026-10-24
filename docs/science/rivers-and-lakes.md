@@ -19,9 +19,10 @@ Rain that does not evaporate runs downhill, gathers into rivers and fills hollow
 | [HYD](ledger/HYD.md) | river channels in the game (below, "River channels cut to the bake's depth", 2026-10-22) | HYD-120 to HYD-124 (5) |
 | [HYD](ledger/HYD.md) | deltas and distributaries (below, "Deltas and distributaries", 2026-10-23) | HYD-130 to HYD-144, HYD-146, HYD-147 (17) |
 | [HYD](ledger/HYD.md) | floodplains and levees (below, "Floodplains and levees", 2026-10-24) | HYD-150 to HYD-153 (4) |
+| [HYD](ledger/HYD.md) | meanders (below, "Meanders", 2026-10-24) | HYD-155 to HYD-159 (5) |
 | [BIO](ledger/BIO.md) | land on a delta plain (below, "Stage 1b on the D5 world"; biomes.md, "Land on a delta plain") | BIO-185 (1) |
 
-Rows by status (118 active, 1 `merged`): `verified` 7, `cited-unverified` 12, `from-memory` 5, `abstract-only` 3, `calibrated` 1, `game-choice` 67, `uncited` 23.
+Rows by status (123 active, 1 `merged`): `verified` 12, `cited-unverified` 12, `from-memory` 4, `abstract-only` 3, `calibrated` 1, `game-choice` 68, `uncited` 23.
 
 ## Material for the stage 2 writer
 
@@ -307,6 +308,24 @@ V1 gap 5, stage 2 of four: the flat valley floors beside rivers that floods buil
 - **The raise.** HAND is under a sixteenth of a block on 276,448 cells: flats and hollows at their drain's filled level, flush with the river's water before. Laying the plain one block over the water lifts them by up to a block (2.31 at most, the fill of a hollow), and 243,204 cells' top block rises by one. That is the change a player sees: before, 56 % of the plain beside a channel stood flush with the water or under it (the bank rule then raised a one-column bank); after, 93 % stands one block over it, as a bank does.
 - **Stacks.** On the Lambert bake the horizon stacks' tops were raised on 2,924 cells, by up to 34 blocks measured from each stack's old top (the existing `raise_world_tops` behaviour also seen for the deltas, whose maximum is 58); the plain itself raises the ground by at most 2.31 blocks.
 - **Cost.** The floodplain step took 1.24 s of the water part on the VM.
+
+## Meanders (2026-10-24, HYD-155 to HYD-159)
+
+V1 gap 5, stage 3 of four: a river on a floodplain winds across it. Fans and braids (stage 4) are not in this section.
+
+### Design
+
+**Why.** The network's chains follow the drainage grid's cells, smoothed: straight down every valley (sinuosity 1.035 at the median before this stage, HYD-027), where Leopold & Wolman's rivers have sinuosities "dominantly between 1.1 and 2.0" (Langbein & Leopold 1966, read) and a reach of 1.5 or more is what they call a meander (Leopold & Wolman 1957, read).
+
+**Where (HYD-158, HYD-159).** The bake's water part redraws, after the floodplains, each stretch of a chain whose channel lies on the floodplain with its water no higher than the plain's top block (the plain is laid at the bank, HYD-151), whose course over a wavelength is gentler than Leopold & Wolman's (1957) line between meandering and braided channels, s = 0.06 Q^−0.44 with Q in ft³/s (0.0125 Q^−0.44 in m³/s: 0.0055 at 10 m³/s, 0.0020 at 100, 0.00071 at 1,000), and that keeps away from both ends of its chain and from a distributary's start. Q is the network's mean discharge, standing in for the bankfull discharge the line was drawn for, and the slope is the valley's, standing in for the channel's (both below, open questions). Across the course the plain's room is probed, 1 block of planet a step, to the plain's edge or half way to another river's bank zone (a direct tributary within its join radius does not count); the two bounds are eroded over a wavelength and averaged over half of one, and the belt is placed inside them as close to the old course as the room allows. A stretch at least a wavelength long with at least a block of amplitude is drawn, tapered back to the old course over half a wavelength at each end.
+
+**Shape (HYD-156, HYD-157).** Langbein & Leopold's (1966) sine-generated curve: the channel's direction off the valley's is φ = ω sin(2π s / M) along its own length s, M = k λ for a downvalley wavelength λ; the sinuosity is k = 1 / J₀(ω) and the half amplitude across the valley a = λ H₀(ω) / (4 J₀(ω)). The code integrates the curve once into a table of its offset by phase and ω; the unit test checks it against the paper's table of ω and k (0.5, 1.0, 1.5 and 1.75 rad give 1.066, 1.307, 1.954 and 2.710 against the printed 1.06, 1.30, 1.96 and 2.67; the last is 1.5 % over the printed value, the others agree to the paper's rounding). The amplitude is what the room allows, up to sinuosity 2 (ω = 1.52 rad, a = 0.36 λ, a full amplitude of 7.8 drawn widths): Leopold & Wolman (1960) found the amplitude "determined more by erosion characteristics of stream banks and by other local factors than by simple hydraulic principles", with "a limit to the amplitude of meanders ... provided by the formation of cut-offs", so it is not tied to the width here.
+
+**Wavelength (HYD-155).** λ = 10.9 w (Leopold & Wolman 1960, Table 1: L = 10.9 w^1.01; the text's "7 to 10 times the channel width"; Leopold & Wolman 1957, Fig. 45B: 7 for small streams to 15 for large rivers). w is the drawn width, 2 hw: the channels are drawn wider than a 300 m block would give, so a wavelength from the true width would be a few blocks; from the drawn width the bends keep their proportion to the channel a player sees (a game choice, below).
+
+**The planet's metric.** Everything is measured on the planet: on a Lambert folder a block east is cos φ of the planet's and a block south 1 / cos φ (round-features.md, SCL-230), so a belt is as wide and its wavelength as long at 55° as at the equator (the unit test `the_belt_is_the_same_on_the_planet_at_the_equator_and_at_55_degrees`). A projected folder's own grid is the world's, and its metric is the identity.
+
+**What changes.** Only the river file: the chains keep their order and get more vertices (a 40th of a wavelength apart, 1 to 6 blocks); the water surface along a redrawn stretch is the old course's at the same downvalley distance, so it never rises downstream. No layer and no ground change: the plain is one block over the water wherever the new channel runs, and the old course is plain like the rest (the game cuts channels from the river file). A tributary whose parent moved under its mouth is cut where it first meets the parent's new channel, or carried on to it, and ends on a vertex of the new channel; distributaries stay as they were. `hydro.meanders` is on by default (with the floodplains); `notes.bake.water.stats.meanders` is the record (FORMAT.md). The meander-test synthetic world (`deeptime synth --kind meander-test`: a straight river down a wide flat plain) and `MeanderGameTests` check the game's side: the river winds, its channel holds its water at the plain's top block less one, and the old course is dry plain.
 
 ## Navigable rivers and deltas on the D5 world (measured 2026-10-22)
 

@@ -251,6 +251,43 @@ fn the_plain_bounds_the_belt_and_a_narrow_one_keeps_the_course() {
     }
 }
 
+/// Two rivers 40 blocks apart on one plain that ends 3 blocks outside each: both belts are pushed
+/// towards the other, and each keeps to its half of the gap (the other is seen past the most
+/// the belt can use: 34.4 blocks here, the other's bank zone 36 away), so they do not cross.
+#[test]
+fn neighbours_pushed_together_keep_to_their_halves() {
+    let c = 16_384;
+    let (gap, hw) = (40.0, 2.0);
+    let mut r = Rivers::empty(c);
+    for z in [-0.5 * gap, 0.5 * gap] {
+        line(
+            &mut r,
+            (-1500.0, z),
+            (1500.0, z),
+            2.0,
+            hw,
+            50.0,
+            (69.9, 69.1),
+            Mouth::Sea,
+            u32::MAX,
+        );
+    }
+    let plain = move |_: f64, z: f64| (z.abs() <= 0.5 * gap + 3.0).then_some(bank(69.9));
+    let s = run(&mut r, &plain);
+    let zs = |k: usize| chain(&r, k).iter().map(|p| f64::from(p.z)).collect::<Vec<_>>();
+    let (north, south) = (zs(0), zs(1));
+    let north_max = north.iter().fold(f64::MIN, |m, &z| m.max(z));
+    let south_min = south.iter().fold(f64::MAX, |m, &z| m.min(z));
+    assert!(
+        north_max + 0.5 * gap >= 5.0 && 0.5 * gap - south_min >= 5.0,
+        "both meander towards the middle: {north_max}, {south_min}: {s}"
+    );
+    assert!(
+        north_max + 2.0 * hw <= south_min,
+        "the channels meet: the northern reaches z {north_max}, the southern {south_min}: {s}"
+    );
+}
+
 #[test]
 fn a_reach_steeper_than_the_braided_line_keeps_its_course() {
     let c = 16_384;

@@ -19,7 +19,8 @@
 //!   course's slope over a wavelength is under Leopold & Wolman's (1957) line between meandering
 //!   and braided channels, s = 0.0125 Q^−0.44 (HYD-158; Q stands for the bankfull discharge), and
 //!   away from both ends of its chain and from a distributary's start. Across the course the
-//!   plain's room is probed to its edge (or half way to another river's bank zone); the bounds
+//!   plain's room is probed to its edge (or half way to another river's bank zone, which is
+//!   looked for twice as far as the belt can reach, so two neighbours cannot cross); the bounds
 //!   are eroded over a wavelength and averaged over half of one, and the belt is placed inside
 //!   them, as close to the old course as the room allows. Reaches at least a wavelength long with
 //!   at least [`MIN_AMPLITUDE_BLOCKS`] of amplitude are drawn (HYD-159), tapered to the old course
@@ -574,6 +575,10 @@ impl Net<'_> {
             cand[j] = true;
         }
         // The room across the course: to the plain's edge, or half way to another chain's bank.
+        // The belt can use at most `reach` of it (shifted to one side, the cap's full amplitude);
+        // another chain is looked for twice as far, past the plain's edge too, so that two
+        // neighbours, each taking at most half the gap between them, cannot cross however their
+        // belts are shifted.
         let own = k as u32;
         let a_cap: Vec<f64> = lam.iter().map(|&l| l * self.ratio_cap).collect();
         let bounds: Vec<(f64, f64)> = (0..n)
@@ -583,24 +588,27 @@ impl Net<'_> {
                     return (0.0, 0.0);
                 }
                 let p = &pts[j];
-                let t_max = 2.0 * a_cap[j] + p.hw + PROBE;
+                let reach = 2.0 * a_cap[j] + p.hw + PROBE;
                 let (ex, ez) = self.scales(p.z);
                 let side = |sgn: f64| -> f64 {
                     let (ne, ns) = (sgn * nrm[j].0, sgn * nrm[j].1);
                     let mut t = PROBE;
                     let mut last = 0.0;
-                    while t <= t_max {
+                    let mut room: Option<f64> = None;
+                    while t <= 2.0 * reach {
                         let (x, z) = (p.x + t * ne / ex, p.z + t * ns / ez);
-                        if !self.on_plain(x, z, p.w) {
-                            return last;
+                        if room.is_none() && (t > reach || !self.on_plain(x, z, p.w)) {
+                            room = Some(last);
                         }
                         if self.blocked(own, x, z) {
-                            return 0.5 * t;
+                            return room.unwrap_or(last).min(0.5 * t);
                         }
-                        last = t;
+                        if room.is_none() {
+                            last = t;
+                        }
                         t += PROBE;
                     }
-                    last
+                    room.unwrap_or(last)
                 };
                 let (left, right) = (side(1.0), side(-1.0));
                 let mut hi = left - p.hw;

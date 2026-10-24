@@ -1309,13 +1309,31 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 ### Leopold1957
 - Reference: Leopold, Luna B. and Wolman, M. Gordon. 1957. River channel patterns: braided, meandering, and straight. U.S. Geological Survey Professional Paper 282-B, pp. 39-85.
 - DOI or URL: https://doi.org/10.3133/pp282B ; open PDF https://pubs.usgs.gov/pp/0282b/report.pdf
-- Cited as: not cited by the project. Proposed as the citable source for the meandering threshold (HYD-027).
-- Ledger ids: HYD-027; notes: proposed
+- Cited as: "Leopold & Wolman 1957" (hydro/meander.rs BRAID_SLOPE_COEF; rivers-and-lakes.md, "Meanders").
+- Ledger ids: HYD-158; HYD-027 (the meander's sinuosity); HYD-155 (beside LW1960)
 - Access: open access (USGS)
 - Library (the project's source library, not distributed): fetched (PDF, 50 pages, text layer, 147,959 characters). From: https://pubs.usgs.gov/pp/0282b/report.pdf. Text file: Leopold1957.txt.
-- Read so far (by the project): not read (project wrote the Earth figure "from memory, not sourced")
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 3), the USGS PDF: p. 60, equation (1) from the page image (the text layer lost it), "the braided channels are separated from the meanders by a line described by the equation s=0.06 Q^-.44", Q the bankfull discharge in cfs (Fig. 46); a meander is a reach whose sinuosity is "equal to or greater than 1.5", an arbitrary line; p. 58, Fig. 45B, λ = 6.5 w^1.1 ft, the ratio of wavelength to width "from about 7 for small streams" to 15 for rivers over 1,000 feet wide; the abstract's 7 to 12 widths between riffles.
 - Read in this pass: full text fetched (OCR text layer; the sections on sinuosity and Figure 46)
-- Reference check: n/a (new source). Values: see Part 2, HYD-027.
+- Reference check: matches (authors, year, series). Values: see HYD-158 and HYD-027.
+
+### Leopold1960
+- Reference: Leopold, Luna B. and Wolman, M. Gordon. 1960. River meanders. Geological Society of America Bulletin 71(6):769-794.
+- DOI or URL: 10.1130/0016-7606(1960)71[769:RM]2.0.CO;2 (the DOI from memory); the copy read at https://cpb-us-e1.wpmucdn.com/blogs.uoregon.edu/dist/5/10896/files/2015/04/Leopold_Wolman_1960-1wypmnk.pdf (a course page's copy of the GSA PDF).
+- Cited as: "Leopold & Wolman 1960" (hydro/meander.rs WAVELENGTH_PER_WIDTH, MAX_SINUOSITY; rivers-and-lakes.md, "Meanders").
+- Ledger ids: HYD-155, HYD-157
+- Access: paywalled (GSA); a copy on a University of Oregon course page.
+- Library: not fetched (the text read is in the lane's scratch folder).
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 3): Table 1 (p. 773), L = 10.9 w^1.01, A = 2.7 w^1.1, L = 4.7 rm^0.98 (feet); p. 774, "L = 10.9w^1.01 = 4.7rm^0.98" with the exponents taken as unity (rm/w = 2.3); p. 772, meander length "ranges from 7 to 10 times the channel width"; p. 773, the amplitude "is determined more by erosion characteristics of stream banks and by other local factors than by simple hydraulic principles" and "a limit to the amplitude of meanders is provided by the formation of cut-offs"; p. 774, wavelength and radius of curvature "are to a great extent independent of bed and bank materials".
+
+### Langbein1966
+- Reference: Langbein, W. B. and Leopold, Luna B. 1966. River meanders: theory of minimum variance. U.S. Geological Survey Professional Paper 422-H, 15 p.
+- DOI or URL: https://doi.org/10.3133/pp422H (the DOI from memory); open PDF https://pubs.usgs.gov/pp/0422h/report.pdf
+- Cited as: "Langbein & Leopold 1966" (hydro/meander.rs, the sine-generated curve; rivers-and-lakes.md, "Meanders").
+- Ledger ids: HYD-156, HYD-157, HYD-027
+- Access: open access (USGS).
+- Library: not fetched (the text read is in the lane's scratch folder).
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 3), the USGS PDF: eq. 10 (p. H5), φ = ω sin (s/M) 2π, the sine-generated curve; the table of ω against sinuosity k (p. H5, footnote 2: 0.5 rad 1.06, 1.0 1.30, 1.5 1.96, 1.75 2.67) and the radius of curvature (0.22 λ at k = 2); "a maximum of 125° for 'gooseneck' meanders"; Leopold & Wolman's 1960 rivers "sinuosities were dominantly between 1.1 and 2.0", their mean meander length 4.7 radii of curvature (0.213 λ).
 
 ### Schumm1963
 - Reference: Schumm, Stanley A. 1963. Sinuosity of alluvial rivers on the Great Plains. Geological Society of America Bulletin 74(9):1089-1100.

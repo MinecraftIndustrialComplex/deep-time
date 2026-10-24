@@ -1739,11 +1739,22 @@ is 0 there, and the raster **`floodplain`** (i16, 1/16 block, on the `elevation`
 off the plains) holds what the plain moved the ground by, which a re-run takes off first. The game
 reads it as a category (on a plain or not): a river's bank column on a plain gets sand for its soil
 top (the levee, HYD-153).
+**Meanders** (since "hyd-155", 2026-10-24; rivers-and-lakes.md "Meanders", HYD-155 to HYD-159): after
+the floodplains, each reach of a chain that lies on a plain, is gentler than Leopold & Wolman's (1957)
+braided line and has room is redrawn as a sine-generated curve about its course (wavelength 10.9 drawn
+widths, sinuosity up to 2, measured on the planet through the Lambert metric). Nothing in the layout
+changes: the chains keep their order and get more vertices (spaced a 40th of the wavelength, 1 to 6
+blocks), the water surface along a redrawn reach is the old course's at the same distance down the
+valley, a tributary whose parent moved ends on a vertex of the parent's new channel, and
+distributaries are left as they were.
 `notes.bake.water.params` holds the parameters (`deltas`, `delta_area_mult`, `delta_shape_k`,
-`delta_max_mouths`, `delta_mouth_spacing`, `floodplains`), `stats.deltas` the counts, areas, the largest deltas
-and Earth's figures beside them, and `stats.floodplains` the plain's cells, km² and share of the land
+`delta_max_mouths`, `delta_mouth_spacing`, `floodplains`, `meanders`), `stats.deltas` the counts, areas, the largest deltas
+and Earth's figures beside them, `stats.floodplains` the plain's cells, km² and share of the land
 (within 60° too), the same by the area its river drains, how far it moved the ground and each cell's
-top block, the heights above the drains and the cells left out. `notes.bake.water`: `enabled`, `method`, `params`,
+top block, the heights above the drains and the cells left out, and `stats.meanders` the network's
+length before and after (km of planet), the course on a plain, too steep, too narrow or too short,
+the reaches redrawn, their axis and path length and sinuosity (with a histogram), the mean amplitude
+and largest offset, the same by discharge class, the vertex counts and the joins cut, carried or moved. `notes.bake.water`: `enabled`, `method`, `params`,
 `width_scale`, `grid`, `halved`, `climate`, `seasons`, `rivers_file`, `rivers_bytes`, `stats`
 (counts, lengths, largest discharge and width, milliseconds per step; since "p1-22b" also
 `lake_share_of_land`, `basins` (candidates, full, below_rim, playa, dry, merged, nested_too_deep),
@@ -1756,7 +1767,7 @@ since "hyd-100" also `below_sea`: `open_km2` (ground at or under sea level the s
 `closed_km2`, `closed_share_of_land`, the closed ground's `lake_km2`, `playa_km2`, `dry_km2` and
 `dry_share_of_land`, `lakes_below_sea_level` and their km², and `closed_basin_radius_cells`).
 `method` is "p1-22" in a folder baked before the water balance, "p1-22b" since, "hyd-100" since
-format 0.6, "hyd-130" since the deltas and "hyd-150" since the floodplains; the game does not read it. `notes.bake.water.closed_basin` is `{layer, reach_blocks}`.
+format 0.6, "hyd-130" since the deltas, "hyd-150" since the floodplains and "hyd-155" since the meanders; the game does not read it. `notes.bake.water.closed_basin` is `{layer, reach_blocks}`.
 
 ## Water columns (P1-22)
 
