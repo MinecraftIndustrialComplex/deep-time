@@ -1227,6 +1227,8 @@ Each lane takes its own ledger id range so concurrent agents do not collide.
 
 ### 7.4 What to delete (recommendation, the coordinator's call)
 
+**Decided 2026-10-24** (decisions log): Ben chose the cube only, "Cube only (Recommended)"; item 1 below is carried out now.
+
 1. **When phase 2 lands, delete both old world shapes.**
    - **The Lambert world.** `scale.projection lambert`; the level types `planet_lambert` and
      `planet_lambert_32k`; the pole cap, polar storm, `BeyondPoleDensity` and `PoleCapCurve`; the

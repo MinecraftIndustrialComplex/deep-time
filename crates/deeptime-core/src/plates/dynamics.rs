@@ -1043,11 +1043,21 @@ impl MixUnits {
 
 /// The length of plate boundary by kind, km ([`mix`]), at the plates' positions `pos` and the
 /// motion the step's fronts were found with (call it after `fronts_and_uplift`, before the
-/// motion is updated). All zeros when the record is off.
-pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) -> Mix {
+/// motion is updated). All zeros when the record is off. With `classes` (one per sample), each
+/// visible boundary sample's class is stored there as the [`mix`] class plus one (0: on no
+/// boundary, or on the subducting side of a front), for the crust budget's maps (measurement
+/// only).
+pub fn boundary_mix(
+    st: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    env: &Env<'_>,
+    classes: Option<&[std::sync::atomic::AtomicU8]>,
+) -> Mix {
     if st.dynamics.is_none() {
         return Mix::default();
     }
+    let classes = classes.filter(|c| c.len() == st.samples.len());
     let samples = &st.samples;
     let plate_of: Vec<u32> = (0..samples.len()).map(|i| st.plate_of(i)).collect();
     let omega: Vec<DVec3> = st
@@ -1057,10 +1067,11 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
         .collect();
     let rots: Vec<_> = st.groups.iter().map(|g| quat(g.rot)).collect();
     let pts = geo.points();
+    // The working subduction zones, as the fronts found them (ledger: PLT-550).
     let active: BTreeSet<(u32, u32)> = st
         .contacts
         .iter()
-        .filter(|c| c.last_step == env.step)
+        .filter(|c| c.active(env.step))
         .map(|c| (c.under, c.over))
         .collect();
     // Each active contact's slab length, km, and age, Myr (the bands, measurement only).
@@ -1069,7 +1080,7 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
     let contact_of: BTreeMap<(u32, u32), (f64, f64)> = st
         .contacts
         .iter()
-        .filter(|c| c.last_step == env.step)
+        .filter(|c| c.active(env.step))
         .map(|c| {
             let key = (c.under, c.over);
             let km = slab_km.get(&key).copied().unwrap_or(0.0);
@@ -1205,6 +1216,9 @@ pub fn boundary_mix(st: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env<'_>) ->
                 } else {
                     class
                 };
+                if let Some(c) = classes {
+                    c[v].store(class as u8 + 1, std::sync::atomic::Ordering::Relaxed);
+                }
                 acc.km[class] += u64::from(half);
                 let setting = match class {
                     mix::OCEAN_OCEAN => Some(0),
