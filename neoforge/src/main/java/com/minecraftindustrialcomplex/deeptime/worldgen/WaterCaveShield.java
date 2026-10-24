@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.GridDesc;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Rivers;
@@ -91,7 +92,7 @@ public final class WaterCaveShield {
     }
 
     private static boolean sameGrid(GridDesc a, GridDesc b) {
-        return a.r() == b.r() && a.originBlockX() == b.originBlockX() && a.originBlockZ() == b.originBlockZ();
+        return a.r() == b.r() && a.originBlockX() == b.originBlockX() && a.originBlockZ() == b.originBlockZ() && a.zEdges() == b.zEdges();
     }
 
     /** 1 at or within {@link #FULL_BLOCKS} of the water's edge, 0 from {@link #FADE_BLOCKS}, smoothstep between. */
@@ -158,6 +159,8 @@ public final class WaterCaveShield {
      */
     private double nearestCell(RasterSampler layer, long x, long z, double radius, boolean sea) {
         GridDesc g = layer.desc().grid();
+        if (g.isCube())
+            return nearestCubeCell(layer, x, z, radius, sea);
         int r = g.r();
         long rad = (long) Math.ceil(radius);
         long i0 = Math.floorDiv(x - rad - g.originBlockX(), r), i1 = Math.floorDiv(x + rad - g.originBlockX(), r) + 1;
@@ -184,6 +187,55 @@ public final class WaterCaveShield {
                                 : amplitude.nearest(g.originBlockX() + i * (double) r, g.originBlockZ() + j * (double) r);
                         hit = v - (Double.isNaN(a) ? 0.0 : a) <= seaTop
                                 && (closed == null || closed.nearest(g.originBlockX() + i * (double) r, g.originBlockZ() + j * (double) r) != 1.0);
+                    }
+                } else {
+                    hit = !Double.isNaN(v);
+                }
+                if (hit) {
+                    best2 = d2;
+                    found = true;
+                }
+            }
+        }
+        return found ? Math.sqrt(best2) : Double.POSITIVE_INFINITY;
+    }
+
+    /**
+     * {@link #nearestCell} on a cube grid: the cells round the block centre's spot on its face, read across the seams
+     * ({@link RasterSampler#getFace}), each at its distance from the block centre on the face.
+     */
+    private double nearestCubeCell(RasterSampler layer, long x, long z, double radius, boolean sea) {
+        GridDesc g = layer.desc().grid();
+        GridDesc.CubeSpot s = g.cubeSpotOfBlock((double) x, (double) z);
+        if (s == null)
+            return Double.POSITIVE_INFINITY;
+        double r = g.r();
+        double span = Math.ceil(radius) / r;
+        long i0 = (long) Math.floor(s.a() - span), i1 = (long) Math.ceil(s.a() + span);
+        long j0 = (long) Math.floor(s.b() - span), j1 = (long) Math.ceil(s.b() + span);
+        CubeLayout cube = g.cube();
+        double ox = cube.faceOriginX(s.face()), oz = cube.faceOriginZ(s.face());
+        double best2 = radius * radius;
+        boolean found = false;
+        for (long j = j0; j <= j1; j++) {
+            double dz = ((double) j - s.b()) * r;
+            if (dz * dz > best2)
+                continue;
+            for (long i = i0; i <= i1; i++) {
+                double dx = ((double) i - s.a()) * r;
+                double d2 = dx * dx + dz * dz;
+                if (d2 > best2 || (found && d2 >= best2))
+                    continue;
+                double v = layer.getFace(s.face(), i, j);
+                boolean hit;
+                if (sea) {
+                    if (Double.isNaN(v) || v - MAX_AMPLITUDE > seaTop) {
+                        hit = false;
+                    } else {
+                        // The cell's centre as a block the samplers read (they add half a block).
+                        double px = ox + ((double) i + 0.5) * r - 0.5, pz = oz + ((double) j + 0.5) * r - 0.5;
+                        double a = amplitude == null ? 0.0 : sameGrid ? amplitude.getFace(s.face(), i, j) : amplitude.nearest(px, pz);
+                        hit = v - (Double.isNaN(a) ? 0.0 : a) <= seaTop && (closed == null || closed.nearest(px, pz) != 1.0);
                     }
                 } else {
                     hit = !Double.isNaN(v);
