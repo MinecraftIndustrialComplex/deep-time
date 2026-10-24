@@ -309,7 +309,7 @@ impl Net<'_> {
         // The islands down each run of samples that braid, on alternate sides.
         let own = k as u32;
         let mut islands = Vec::new();
-        let mut side = if k % 2 == 0 { 1.0 } else { -1.0 };
+        let mut side = if k.is_multiple_of(2) { 1.0 } else { -1.0 };
         let mut j = 0;
         while j < n {
             if !cand[j] {

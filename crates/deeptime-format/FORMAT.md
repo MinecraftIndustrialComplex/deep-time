@@ -1753,7 +1753,8 @@ distributaries are left as they were.
 the first network's chains are searched for apexes, cells where the river's surface falls at least
 Bull's (1964) fan slope S_F = 0.022 A_D^−0.32 over the fan's free length upstream and less than it
 downstream; at each, a cone of that slope (measured on the planet) is laid where it stands over
-the ground and the land is no lake, playa, delta plain or larger river's channel, high enough to
+the ground and the land is no lake, playa, delta plain or larger river's channel (and nowhere
+thicker than over the apex), high enough to
 cover Bull's area A_F = 1.3 A_D^0.88 (square miles) and at most as high as a free fan (a quarter
 circle of that area). `detail/amplitude` is 0 there, and the raster **`fan`** (i16, 1/16 block, on
 the `elevation` grid; 0 off the fans) holds what the cones added, which a re-run takes off first.

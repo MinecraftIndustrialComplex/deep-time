@@ -2,8 +2,8 @@
 //! The alluvial fans (HYD-165 to HYD-170): Bull's (1964) laws in square miles, and a canyon that
 //! leaves a ridge for flat ground on a window of the D5 planet's Lambert frame (1 block a cell):
 //! the fan at the slope break, round on the planet at 0° and at 55° (and three times as wide as
-//! long on the grid there), Bull's area unless hemmed in, none on a smooth profile, and a larger
-//! river's channel as its edge.
+//! long on the grid there), Bull's area unless hemmed in, none on a smooth profile, a larger
+//! river's channel as its edge, and no cone over ground that falls away faster than the fan.
 
 use deeptime_format::rivers::Rivers;
 use deeptime_format::raster::ZEdges;
@@ -340,4 +340,32 @@ fn a_larger_rivers_channel_is_the_fans_edge() {
     assert_eq!(fans.hemmed, 0);
     let area = f.cells.len() as f64 * (M_H / 1000.0).powi(2);
     assert!((area / f.bull_km2 - 1.0).abs() < 0.01);
+}
+
+#[test]
+fn ground_falling_away_faster_than_the_fan_ends_it() {
+    let win = window(0.0, 260, 400, 180);
+    // East of 20 blocks of planet from the apex's meridian the plain falls 0.01 m/m (the fan's
+    // slope is 0.0026), to 10 blocks lower: the cone would stand over all of it, deeper the
+    // further east; the fan ends where the ground lies lower than its slope below the apex's.
+    let drop = 0.01 * M_H / M_V * 16.0;
+    let elev = win.elev(&|e, _| {
+        (e > 20.0).then(|| (f64::from(PLAIN) - (drop * (e - 20.0)).min(160.0)).round() as i32)
+    });
+    let net = output(elev.len(), vec![win.walk(&elev, SOUTH)]);
+    let fans = find(&win, &elev, &net);
+    assert_eq!(fans.fans.len(), 1, "{}", fan::stats(&fans, 1, 0.09, M_V));
+    let f = &fans.fans[0];
+    let apex_raise = f.top_raw - f64::from(elev[f.apex as usize]);
+    let (mut east, mut west) = (f64::MIN, f64::MAX);
+    for (&c, &h) in f.cells.iter().zip(&f.height) {
+        let (x, z) = win.pos(c as usize);
+        let (e, _) = win.planet(x, z);
+        (east, west) = (east.max(e), west.min(e));
+        assert!(f64::from(h) - f64::from(elev[c as usize]) <= apex_raise + 1.0);
+    }
+    // Where the ground falls faster than the cone the fan stops short of the free fan's radius
+    // (64 blocks of planet for Bull's 1,171 km²); west, on the flat plain, it reaches it.
+    assert!(east < 45.0, "east to {east}");
+    assert!(west < -55.0, "west to {west}");
 }
