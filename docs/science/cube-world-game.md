@@ -141,6 +141,22 @@ the game uses them:
     `config/deeptime/server.json`. If the preset's size does not match the level type, the first
     start stops with the presets that fit. The other level types still need a preset of their own
     map.
+12. **The Create World screen** (`screen/model/CubeOutline`, `screen/model/NetView`, cube plan G13).
+    The timelapse's pictures stay the simulation's latitude-longitude pictures, so the map and the
+    globe work as on the other worlds while the planet's history runs. The cube is turned on the
+    planet when the world data is baked, on the final land, so a cube world's edges are known only
+    when the run is done. From then on the globe draws the cube's twelve edges over the planet. The
+    six edges the border closes are thick orange-red lines, and the other six (five joined in the
+    net, and the slide) are thin white ones. Each edge is sampled 48 times along its face side
+    through the world's own map, so the line is where the world's faces meet. The eight corners
+    are dots: white for the four touching F0, which a player can reach, and orange-red for the four
+    behind the border. The review page's final map is the net as it is played: the window of 4s by
+    3s blocks drawn 4 : 3, 512 by 384 pixels (8 blocks a pixel at 4k), north (-z) up. The faces
+    carry the world data's elevation, the void around N and S is transparent, and the border's
+    twelve lines are drawn over it with the five joined face sides. The ore-province hints keep
+    their latitude-longitude cells and are painted over the faces. The spawn marker sits at its
+    point on its face, and hovering shows the latitude, longitude and face. The editor keeps its
+    `projection` and `lambda_c_deg` fields until section 7.4.
 
 ## Equations and constants
 
@@ -220,6 +236,8 @@ Java give the same pinned values. The seam steps it gives the bake are on the ba
   scale σ varies across a face the noise's texture is stretched with it on the planet, as the
   plain noise's is on the other projections; in blocks it is the same everywhere.
 - Sable ships are not stopped by the cube border yet.
+- The timelapse cannot show the cube's edges while the run is going: the cube's turn is chosen on
+  the final land when the world data is baked.
 
 ## Game choices
 
