@@ -2155,7 +2155,10 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
     let (st, geo, pos, world, before, after) = run(true);
     eprintln!("fronts: before {before} / {before_off}, after on {after}, off {after_off}");
     assert_eq!(st.contacts.len(), 1);
-    assert_eq!(st.contacts[0].last_step, 1, "overlap seen after the resampling");
+    assert_eq!(
+        st.contacts[0].last_step, 1,
+        "overlap seen after the resampling"
+    );
     assert!(before > 20 && before == before_off, "{before} {before_off}");
     assert_eq!(after_off, 0, "a front without its overlap, off");
     assert!(
@@ -2174,7 +2177,10 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
     // Converging on: the carry holds while the fronts stand.
     let mut held = st.clone();
     subduction::fronts_and_uplift(&mut held, &geo, &pos, &env2, &mut cones, 0.0);
-    assert!(held.contacts[0].carried, "the carry ended with fronts standing");
+    assert!(
+        held.contacts[0].carried,
+        "the carry ended with fronts standing"
+    );
     // The ocean moves under the continent: the overlap is seen, and the contact is active by it.
     let mut world = world;
     let env3 = stage.env(&p.tectonics, 3);
