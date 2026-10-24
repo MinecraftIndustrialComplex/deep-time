@@ -1158,8 +1158,9 @@ traced run of scattered continents seed 2):
    through the belt's frame brings its whole column into the unsolved residual each step, and
    the solve gives most of it back: frame changes up to 46 km in a step, net changes up to 12 km.
    With a source's corners on the bending plate's own crust only (not the belt's footprint) the
-   frame's largest change halved (18 to 24 km) but the step's largest stayed at 9 to 10 km
-   against the base's 7 to 8.
+   frame's largest change halved (18 to 24 km), but over the whole run (scattered continents
+   seed 2) the largest rise of a cell in a step was 12.4 km, against 15.9 with the switch as it
+   is and 8.0 on base7, and the guard's worst 12.6 km against 16.2 and 10.3.
 
 So the switch stays off, and the fall in land above 2 km is not taken as its effect: it comes
 with the frame's noise, not with a basin. What would bring the basin: the belt's own deflection
