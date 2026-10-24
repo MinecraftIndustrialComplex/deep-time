@@ -1,13 +1,14 @@
 # Geothermal features
 
 Status of this page: `stage 2 (written 2026-10-02, WP-16), extended the same day with the heat-flow
-fields, and on 2026-10-20 with the rule that a pool's water never freezes (GEO-062)`. Of the 62 rows, `verified` ones are the sinter and travertine rule (GEO-022), the Earth
+fields, on 2026-10-20 with the rule that a pool's water never freezes (GEO-062), and on 2026-10-24 with the
+GameTest's heat-flow odds and the thermal state's heat flow (GEO-064)`. Of the 63 rows, `verified` ones are the sinter and travertine rule (GEO-022), the Earth
 heat-flow figures (GEO-059), the model-against-Earth arithmetic (GEO-060) and the threshold hint
 (GEO-057); the rest are `game-choice` or `uncited`. Almost nothing in the feature's numbers comes from
 a source: the sources checked below support the kinds of feature and the order in which they occur,
 and (for the heat-flow threshold) the level of young extended crust, not a size or a count.
 
-Ledger ids on this page: `GEO-001` to `GEO-062` ([ledger/GEO.md](ledger/GEO.md)). The editor hints
+Ledger ids on this page: `GEO-001` to `GEO-062` and `GEO-064` ([ledger/GEO.md](ledger/GEO.md)). The editor hints
 that describe these settings are rows GEO-047 to GEO-051. The geothermal gradient (the rise of
 temperature with depth that drives metamorphism and the oil window) is a different thing and is
 ledgered under rock and metamorphism and under deposits.
@@ -173,11 +174,33 @@ no geothermal behaviour was changed.
 | Terrace rock | travertine where water rises through limestone (Mammoth); silica sinter in the geyser basins | NPS page above (read); USGS Yellowstone Volcano Observatory page (read through a page-fetch tool) | travertine over carbonate rock, else sinter | P2-14 build log: 1 of 23 pools was travertine |
 | Native sulfur | forms at fumaroles; solid only below 115 degC | USGS Hawaiian Volcano Observatory, Volcano Watch (read through a page-fetch tool) | a yellow-concrete crust around every vent | - |
 | Size of a spring | not read in a source | - | main pool 4 to 10 blocks across, 1.2 to 3 km | - |
-| Mean heat flow of the continents | 70.9 mW/m2 (area 2.073e14 m2, 14.7 TW) | Davies and Davies 2010, Table 7 (full text, read) | the model's continental values run 55 to 200; 72 % of the quick 16k planet's dry land is at 70 or more | measured 2026-10-02, one baked planet (below) |
+| Mean heat flow of the continents | 70.9 mW/m2 (area 2.073e14 m2, 14.7 TW) | Davies and Davies 2010, Table 7 (full text, read) | with the old proxy (thermal state off) the model's continental values run 55 to 200 and 72 % of the quick 16k planet's dry land is at 70 or more; with the thermal state on (the default since 2026-10-23) a craton gives 41, and on the 4k test planet 4 % of the continental samples are at 70 or more (below) | measured 2026-10-02, one baked planet (below) |
 | Heat flow of young extended crust | Cenozoic extensional geology 102.4 mW/m2 (standard deviation 29.0; 16 observations); Quaternary 82.0; Tertiary 77.3; arc margins 73.8 | same, Table 3 | threshold 100: reached by an arc, a hotspot or a young rift in the model, not by a young orogen alone (90 at its start) | same |
-| Heat flow against age | q = 102 - 2.25 sqrt(t), t in Myr, continents excluding the Precambrian | same, Eq. 2 (an empirical fit to category means, R squared 0.75) | 55 + 35 e^(-t/60) (+40 arc, +40 hotspot, +30 divergent): 90 at t = 0 against 102, 62 at 100 Myr against 79.5 | arithmetic, GEO-060 |
+| Heat flow against age | q = 102 - 2.25 sqrt(t), t in Myr, continents excluding the Precambrian | same, Eq. 2 (an empirical fit to category means, R squared 0.75) | thermal state off: 55 + 35 e^(-t/60) (+40 arc, +40 hotspot, +30 divergent): 90 at t = 0 against 102, 62 at 100 Myr against 79.5; thermal state on (the default since 2026-10-23): 26 + 3,375 / L for the lithosphere's depth L in km (PLT-467), 41 at 225 km, 53 at 125, 82 at 60, +40 arc, +40 hotspot (PLT-468) | arithmetic, GEO-060 |
 | Share of dry land hot enough | not read | - | at or over 70 / 80 / 90 / 100 / 120 / 150 mW/m2: 0.715 / 0.628 / 0.092 / 0.047 / 0.015 / 0.0002 | quick 16k planet, seed 1, 500 Myr, scattered continents (`tools/review/impacts-census.sh`, `GeothermalCensusTest`); another planet of the same preset gave 0.486 / 0.301 / 0.092 / 0.058 / 0.024 / 0 before the resampling fix below |
 | Sites by heat source | - | - | volcanoes only: 170 (11 pools, 97 vents, 62 patches; 24 of 63 volcanoes); with hot ground: 267, the 97 new ones 11 pools, 51 vents, 35 patches | same planet, same code with `geothermal_heat_density` 0 and 1 |
+| Continental heat flow with the thermal state | continents' mean 70.9 mW/m2 (above) | Davies and Davies 2010, Table 7 | continental samples at or over 41 / 45 / 50 / 55 / 60 / 70 / 80 / 100 mW/m2: 1.00 / 0.294 / 0.193 / 0.127 / 0.080 / 0.041 / 0.017 / 0.002; dry land (oceanic crust under land included) at or over 50: 0.081 | the 4k GameTest planet (`planet_world_4k`), master db81be49, `GeothermalCensusTest` on a 16-block grid |
+
+### The GameTest's heat-flow odds (2026-10-24, GEO-064)
+
+The GameTest planet's preset puts the threshold at the setting's floor, 50 mW/m2, and the field density at its
+maximum, 4 (GEO-061). Its GameTest used to ask for at least one heat-flow field, on the premise that every
+continental cell qualifies at 50. With the thermal state on that premise is gone, and the front_share merge
+(a2713229, PLT-530) left the planet with too little hot ground to be sure of a field. The test now asks the world
+what the fields could find (`Geothermal.heatFlowOdds`). For each of the fields' cells it samples, on a 4-block grid,
+the share f of the ground a draw could take: a heat flow at or over the threshold, dry land at least 5 blocks above the
+sea, no ice. With six uniform draws a cell finds a place with probability 1 − (1 − f)^6. The test fails when no
+field was made and the chance of that was under 1 in 1,000.
+
+| Planet | Hot dry ground | Cells with some | Cells expected to find a place | Chance of none | Heat-flow sites |
+|---|---|---|---|---|---|
+| master 193c6387 | 2,818 km2 | 21 of 200 | 5.26 | 0.0005 | some (the GameTest passed) |
+| master db81be49 | 1,508 km2 | 9 of 200 | 2.64 | 0.0163 | 0 |
+
+On db81be49 the fields' draws missed the hot ground, a miss a planet with that much hot ground makes about once
+in 60. The old test failed there, and the new one passes. A world whose fields stopped working on ample hot ground
+(a chance of none under 0.001) still fails it. The volcanoes' 37 sites are read back as before. The heat-flow fields' blocks are
+not read back on this planet, because it has none; `GeothermalTest` checks them on synthetic ground.
 
 ## Simplifications and limits
 
@@ -188,6 +211,13 @@ no geothermal behaviour was changed.
   simple sum (GEO-060) that is cooler than Davies and Davies's fit for young crust, and a young
   orogen alone reaches only 90 mW/m2, under the default threshold of 100, so collision belts get
   fields only where an arc, a rift or a hotspot also heats them.
+  With the lithosphere's thermal state on (the default since 2026-10-23, PLT-467) the heat flow
+  is a conductive law of the lithosphere's depth: a planet's start is cratons at 41 mW/m2, so most
+  of a young planet's continental ground is under 50, the setting's floor, and the default of 100
+  is reached only on an arc, a hotspot or lithosphere thinned under about 46 km. A small young
+  planet can then have no heat-flow field at all (the 4k test planet of 2026-10-24 has none;
+  above). That is the model's answer, not a fault, and Earth's continents, at 70.9 on average,
+  are hotter than the model's start.
 - **No geysers, no steam, no boiling, no temperature** (GEO-026). Yellowstone alone has more than 500
   geysers. Water in the pools is plain still water; vanilla Minecraft has no hot water.
 - **Sizes are not true scale.** A block cannot be smaller than 300 m across, so a pool of even four

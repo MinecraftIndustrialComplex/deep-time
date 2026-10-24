@@ -143,10 +143,6 @@ public final class Geothermal {
         double meanC(int x, int z);
 
         /**
-         * The plate model's heat flow at the column, mW/m2, on continental crust; NaN on oceanic
-         * crust and in a world without the layer (then the ground has no heat of its own).
-         */
-        /**
          * The half-extent of the world in z, blocks: the poles of a Lambert world (R), the turning
          * edges of a Petroff–Guyou one (b/2); NaN to take the Lambert poles of the circumference.
          */
@@ -154,6 +150,10 @@ public final class Geothermal {
             return Double.NaN;
         }
 
+        /**
+         * The plate model's heat flow at the column, mW/m2, on continental crust; NaN on oceanic
+         * crust and in a world without the layer (then the ground has no heat of its own).
+         */
         default double heatFlowMwM2(int x, int z) {
             return Double.NaN;
         }
@@ -478,31 +478,98 @@ public final class Geothermal {
      * heat-flow field is never in a summit zone, so it is hot springs wherever those allow.
      */
     private static void heatFlowFields(Ctx c) {
-        GeothermalRules rules = c.rules;
-        if (rules.heatDensity() <= 0.0 || c.circumference <= 0)
+        HeatGrid grid = HeatGrid.of(c);
+        if (grid == null)
             return;
-        double side = Math.sqrt(HEAT_FIELD_AREA_KM2 / rules.heatDensity()) * 1000.0 / c.mH;   // blocks
-        double pole = Double.isNaN(c.env.zHalf())
-                ? com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c.circumference) : c.env.zHalf();
-        int nx = Math.max(1, (int) Math.round(c.circumference / side)), nz = Math.max(1, (int) Math.round(2 * pole / side));
-        double wx = (double) c.circumference / nx, wz = 2 * pole / nz;
-        double z0 = -pole;
-        for (int gz = 0; gz < nz; gz++)
-            for (int gx = 0; gx < nx; gx++) {
+        for (int gz = 0; gz < grid.nz; gz++)
+            for (int gx = 0; gx < grid.nx; gx++) {
                 long seed = PaletteRules.mix(0x4EA7_F10EL ^ ((long) gx << 32) ^ (gz & 0xFFFFFFFFL));
                 SplittableRandom rng = new SplittableRandom(seed);
                 for (int draw = 0; draw < HEAT_DRAWS; draw++) {
-                    int fx = c.wrap((int) Math.round(-c.circumference / 2.0 + (gx + rng.nextDouble()) * wx));
-                    int fz = (int) Math.round(z0 + (gz + rng.nextDouble()) * wz);
-                    double q = c.env.heatFlowMwM2(fx, fz);
-                    if (!(q >= rules.heatFlowMinMwM2()))
-                        continue;
-                    if (Magma.top(c.h(fx, fz)) < c.seaLevel + MIN_ABOVE_SEA + 2 || c.wet.at(fx, fz) || c.env.iced(fx, fz))
+                    int fx = c.wrap((int) Math.round(-c.circumference / 2.0 + (gx + rng.nextDouble()) * grid.wx));
+                    int fz = (int) Math.round(grid.z0 + (gz + rng.nextDouble()) * grid.wz);
+                    if (!heatFlowSpot(c, fx, fz))
                         continue;
                     field(c, new Source(HEAT_FLOW_SOURCE, false), rng, fx, fz, 1.0);
                     break;
                 }
             }
+    }
+
+    /**
+     * The heat-flow fields' grid: {@code nx} by {@code nz} cells of {@code wx} by {@code wz} blocks from z
+     * {@code z0}, over the circumference and the world's z span; null when the world takes no such fields.
+     */
+    private record HeatGrid(int nx, int nz, double wx, double wz, double z0) {
+        static HeatGrid of(Ctx c) {
+            if (c.rules.heatDensity() <= 0.0 || c.circumference <= 0)
+                return null;
+            double side = Math.sqrt(HEAT_FIELD_AREA_KM2 / c.rules.heatDensity()) * 1000.0 / c.mH;   // blocks
+            double pole = Double.isNaN(c.env.zHalf())
+                    ? com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c.circumference) : c.env.zHalf();
+            int nx = Math.max(1, (int) Math.round(c.circumference / side)), nz = Math.max(1, (int) Math.round(2 * pole / side));
+            return new HeatGrid(nx, nz, (double) c.circumference / nx, 2 * pole / nz, -pole);
+        }
+    }
+
+    /** Whether a heat-flow field may stand at (fx, fz): the heat flow at the setting, dry land, clear of ice. */
+    private static boolean heatFlowSpot(Ctx c, int fx, int fz) {
+        double q = c.env.heatFlowMwM2(fx, fz);
+        if (!(q >= c.rules.heatFlowMinMwM2()))
+            return false;
+        return !(Magma.top(c.h(fx, fz)) < c.seaLevel + MIN_ABOVE_SEA + 2 || c.wet.at(fx, fz) || c.env.iced(fx, fz));
+    }
+
+    /**
+     * What the heat-flow fields could find on a world: the ground where a field may stand ({@link #heatFlowSpot}),
+     * sampled every {@code step} blocks in each of the fields' cells, and from each cell's share {@code f} of it the
+     * fields' odds, the draws being {@link #HEAT_DRAWS} uniform points of the cell: the expected count of cells that
+     * find a place, {@code sum(1 - (1 - f)^draws)}, and the chance that none does, {@code prod((1 - f)^draws)}
+     * (ledger: GEO-064). A place found can still be refused by the placement (a slope, a crater, water), so the
+     * fields' count can only be lower. {@code samples} and {@code continental} count the grid points and those with a
+     * heat flow (continental crust).
+     */
+    public record HeatFlowOdds(long samples, long continental, double hotDryKm2, int cells, int hotCells, double expected,
+                               double pNone) {
+        @Override
+        public String toString() {
+            return String.format("hot dry ground %.0f km2 in %d of %d cells (%d of %d samples with a heat flow), "
+                    + "expected cells with a field %.2f, P(none) %.4f", hotDryKm2, hotCells, cells, continental, samples, expected, pNone);
+        }
+    }
+
+    /** See {@link HeatFlowOdds}; the arguments are {@link #build}'s. */
+    public static HeatFlowOdds heatFlowOdds(GeothermalRules rules, Magma.Heights heights, Magma.Wet wet, Env env, int circumference,
+                                            int seaLevel, double mH, int step) {
+        Ctx c = new Ctx(rules, null, heights, wet, env, circumference, seaLevel, mH, new ArrayList<>());
+        HeatGrid grid = HeatGrid.of(c);
+        if (grid == null)
+            return new HeatFlowOdds(0, 0, 0.0, 0, 0, 0.0, 1.0);
+        double cellKm2 = grid.wx * grid.wz * (mH / 1000.0) * (mH / 1000.0), km2 = 0.0, expected = 0.0, logNone = 0.0;
+        long samples = 0, continental = 0;
+        int hotCells = 0;
+        for (int gz = 0; gz < grid.nz; gz++)
+            for (int gx = 0; gx < grid.nx; gx++) {
+                long all = 0, good = 0;
+                double zEnd = grid.z0 + (gz + 1) * grid.wz, xEnd = -circumference / 2.0 + (gx + 1) * grid.wx;
+                for (double bz = grid.z0 + gz * grid.wz + step / 2.0; bz < zEnd; bz += step)
+                    for (double bx = -circumference / 2.0 + gx * grid.wx + step / 2.0; bx < xEnd; bx += step) {
+                        int fx = c.wrap((int) Math.round(bx)), fz = (int) Math.round(bz);
+                        all++;
+                        if (!Double.isNaN(env.heatFlowMwM2(fx, fz)))
+                            continental++;
+                        if (heatFlowSpot(c, fx, fz))
+                            good++;
+                    }
+                samples += all;
+                double f = all == 0 ? 0.0 : (double) good / all;
+                if (good > 0)
+                    hotCells++;
+                km2 += f * cellKm2;
+                expected += 1.0 - Math.pow(1.0 - f, HEAT_DRAWS);
+                logNone += f >= 1.0 ? Double.NEGATIVE_INFINITY : HEAT_DRAWS * Math.log1p(-f);
+            }
+        return new HeatFlowOdds(samples, continental, km2, grid.nx * grid.nz, hotCells, expected, Math.exp(logNone));
     }
 
     private static void volcano(Ctx c, Volcanoes.Volcano v) {
