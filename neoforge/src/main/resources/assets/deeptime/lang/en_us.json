@@ -3,6 +3,8 @@
   "generator.deeptime.planet_32k": "Deep Time Planet (32k)",
   "generator.deeptime.planet_lambert": "Deep Time Planet (Lambert map)",
   "generator.deeptime.planet_lambert_32k": "Deep Time Planet (Lambert map, 32k)",
+  "generator.deeptime.planet_cube": "Deep Time Planet (cube)",
+  "generator.deeptime.planet_cube_32k": "Deep Time Planet (cube, 32k)",
 
   "deeptime.editor.title": "Deep Time: your planet",
   "deeptime.editor.section.preset": "Preset",
@@ -349,6 +351,7 @@
   "deeptime.editor.option.steering_shape.late": "Late",
   "deeptime.editor.option.projection.petroff_guyou": "Petroff–Guyou (seamless)",
   "deeptime.editor.option.projection.lambert": "Lambert (pole caps)",
+  "deeptime.editor.option.projection.cube": "Cube (six faces)",
   "deeptime.editor.option.edge_border.stop": "Stop (temporary)",
   "deeptime.editor.option.edge_border.none": "None",
   "deeptime.editor.option.climate_model.per_cell": "Per cell",
@@ -892,6 +895,8 @@
   "deeptime.polecap.stop": "You cannot go any further: %s is the edge of the world",
   "deeptime.edgeborder.near": "Near the world's %s edge: a temporary border stops you here until the seam is built",
   "deeptime.edgeborder.stop": "The world's %s edge is closed for now: the seam that joins it is not built yet",
+  "deeptime.edgeborder.cube.near": "Near a turning edge of the world: a temporary border stops you here until the seam is built",
+  "deeptime.edgeborder.cube.stop": "This edge of the world is closed for now: the seam that joins it is not built yet",
 
   "deeptime.wrap.create.refused.custom_kinetic": "Belts, chain conveyors and gantries cannot connect across a turning seam yet",
   "deeptime.wrap.create.refused.belt": "Belts cannot cross or touch a turning seam yet",

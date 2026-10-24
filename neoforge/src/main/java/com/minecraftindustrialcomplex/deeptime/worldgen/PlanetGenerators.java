@@ -41,6 +41,14 @@ public final class PlanetGenerators {
             ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet_lambert"));
     public static final ResourceKey<WorldPreset> PLANET_LAMBERT_32K = ResourceKey.create(Registries.WORLD_PRESET,
             ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet_lambert_32k"));
+    /**
+     * The cube world (format 0.7, docs/plans/cube-world-plan.md; opt-in while both shapes are kept,
+     * docs/design/cube-game.md section 6): 4s = 15,360 at 16k and 29,696 at 32k.
+     */
+    public static final ResourceKey<WorldPreset> PLANET_CUBE = ResourceKey.create(Registries.WORLD_PRESET,
+            ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet_cube"));
+    public static final ResourceKey<WorldPreset> PLANET_CUBE_32K = ResourceKey.create(Registries.WORLD_PRESET,
+            ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet_cube_32k"));
 
     private PlanetGenerators() {}
 
@@ -52,7 +60,7 @@ public final class PlanetGenerators {
 
     /**
      * The dimensions with the overworld bound to staging folder {@code stagingId}, the world's x period
-     * {@code circumference} and its {@code projection} ({@code petroff_guyou} or {@code lambert}: the
+     * {@code circumference} and its {@code projection} ({@code petroff_guyou}, {@code cube} or {@code lambert}: the
      * accepted run's, {@link com.minecraftindustrialcomplex.deeptime.preset.Presets.Info#worldCircumference}).
      * The biome source and noise settings are the current Deep Time overworld's, else those of the
      * {@code deeptime:planet} world preset.

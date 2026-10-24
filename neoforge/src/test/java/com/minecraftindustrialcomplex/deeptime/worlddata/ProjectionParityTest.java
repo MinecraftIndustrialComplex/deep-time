@@ -15,6 +15,7 @@ import java.util.SplittableRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -339,28 +340,90 @@ class ProjectionParityTest {
         assertEquals(1536, PetroffGuyou.hemisphereFor(4096));
     }
 
+    /** A cube layout block of face side 1,024 (FORMAT.md "The cube world's layout"), map and version as given. */
+    private static String cubeLayoutJson(int layoutVersion, String mapName, String sha256) {
+        return """
+                {"kind": "cube", "layout_version": %d, "face_blocks": 1024,
+                 "map": {"name": "%s", "sha256": "%s"},
+                 "rotation": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+                 "domain": {"x_min": -1536.0, "x_max": 2560.0, "z_min": -1536.0, "z_max": 1536.0, "period_x": 4096.0},
+                 "edges": [{"name": "N-east", "seam": "ne", "kind": "quarter_turn", "axis": "x", "side": "max", "coord": 512,
+                            "span": [-1536, -512], "iso": [1, 0, -1024], "pivot": [512, -512], "partner": "F1-top",
+                            "owner": "wrap_engine"}],
+                 "cone_points": [{"name": "n0", "cone_deg": 270.0, "faces": ["F0", "F1", "N"], "cube": [1, 1, 1],
+                                  "lat_deg": 35.26, "lon_deg": 45.0, "reachable": true, "images": [[512, -512]]}],
+                 "poles": [{"name": "north_pole", "face": "N", "u": 0.0, "v": 0.0, "images": [[0.0, -1024.0]]}],
+                 "border": {"kind": "edge_stop", "inset_blocks": 8.0, "temporary": true, "segments": ["N-east"]}}"""
+                .formatted(layoutVersion, mapName, sha256);
+    }
+
     /**
-     * The kind "cube" is known (W1) but is not a WorldProjection yet (phase 2): the two factories
-     * that read a manifest's kind refuse it with a message, never fall back to Lambert.
+     * The kind "cube" (format 0.7, layout version 2) is a WorldProjection from phase 2: the layout block
+     * parses with its seams, cone points, poles and border segments, and the factory builds the cube
+     * world the bake wrote, refusing a map this jar does not ship (Rust's message) and a polar layout
+     * version.
      */
     @Test
-    void theCubeKindIsKnownButRefusedByTheFactoriesUntilPhase2() {
+    void theCubeKindParsesAndBuildsTheCubeWorld() {
         assertEquals(WorldProjection.Kind.CUBE, WorldProjection.Kind.parse("cube"));
         assertEquals("cube", WorldProjection.Kind.CUBE.id());
         // Every kind still parses from its own id.
         for (WorldProjection.Kind k : WorldProjection.Kind.values())
             assertEquals(k, WorldProjection.Kind.parse(k.id()));
-        String json = """
-                {"kind": "cube", "layout_version": 1,
-                 "domain": {"x_min": -1536.0, "x_max": 2560.0, "z_min": -1536.0, "z_max": 1536.0}, "edges": []}""";
-        IllegalArgumentException fromJson = org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-                () -> WorldLayout.fromJson(JsonParser.parseString(json).getAsJsonObject()));
-        assertTrue(fromJson.getMessage().contains("cube"), fromJson.getMessage());
-        WorldLayout cube = new WorldLayout(WorldProjection.Kind.CUBE, 1, 0, 0.0, -1536, 2560, -1536, 1536,
-                java.util.List.of(), java.util.List.of(), java.util.List.of(), null);
-        IllegalArgumentException of = org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-                () -> WorldProjection.of(cube, 4096));
-        assertTrue(of.getMessage().contains("cube"), of.getMessage());
+        String sha = CubeMap.world().sha256Hex();
+        WorldLayout layout = WorldLayout.fromJson(JsonParser.parseString(cubeLayoutJson(2, CubeMap.WORLD_MAP, sha)).getAsJsonObject());
+        assertEquals(WorldProjection.Kind.CUBE, layout.kind());
+        assertEquals(2, layout.layoutVersion());
+        assertEquals(1024, layout.cube().faceBlocks());
+        assertEquals(CubeMap.WORLD_MAP, layout.cube().mapName());
+        WorldLayout.Edge ne = layout.edge("N-east");
+        assertEquals("ne", ne.seam());
+        assertEquals("F1-top", ne.partner());
+        assertEquals(1, ne.quarterTurns());
+        assertTrue(layout.border().stops("N-east"));
+        assertFalse(layout.border().stops("F3-west"));
+        WorldLayout.ConePoint n0 = layout.conePoints().get(0);
+        assertTrue(n0.reachable());
+        assertEquals(List.of("F0", "F1", "N"), n0.faces());
+        assertTrue(Double.isNaN(n0.landDistanceDeg()));
+        assertEquals("N", layout.poles().get(0).face());
+        assertEquals(-1024.0, layout.poles().get(0).images().get(0)[1]);
+
+        WorldProjection p = WorldProjection.of(layout, 4096);
+        WorldProjection.Cube cube = assertInstanceOf(WorldProjection.Cube.class, p);
+        assertEquals(1024, cube.side());
+        assertEquals(4096.0, p.period());
+        assertEquals(-1536.0, p.zMin());
+        assertEquals(1536.0, p.zMax());
+        assertEquals(-1536, p.indexOriginBlockX());
+        assertEquals(3072, p.indexSpanBlockZ());
+        assertEquals(1024.0 * Math.sqrt(1.5 / Math.PI), p.radius());
+        // x wraps into the window, not into [−C/2, C/2).
+        assertEquals(2000.0, p.wrapX(2000.0));
+        assertEquals(2000.0, p.wrapX(2000.0 - 4096.0));
+        GridDesc g = p.grid("L3", 4);
+        assertTrue(g.isCube());
+        assertEquals(256, g.w());
+        assertEquals(6 * 256, g.h());
+        assertEquals(4096, g.circumference());
+        // Past the net's corners (beyond F1 and N both, more than a face out) there is no planet.
+        assertTrue(Double.isNaN(p.latLon(1536.0 + 1100.0, -1536.0 - 1100.0)[0]));
+        // The identity turn puts F0's centre at latitude 0, longitude 0.
+        double[] ll = p.latLon(0.0, 0.0);
+        assertEquals(0.0, ll[0], 1e-9);
+
+        // A layout version 1 cube is a polar layout's number, refused.
+        IllegalArgumentException v1 = assertThrows(IllegalArgumentException.class,
+                () -> WorldLayout.fromJson(JsonParser.parseString(cubeLayoutJson(1, CubeMap.WORLD_MAP, sha)).getAsJsonObject()));
+        assertTrue(v1.getMessage().contains("layout_version 1"), v1.getMessage());
+        // A map this jar does not ship, by name or by sha256: Rust's refusal.
+        for (String[] bad : new String[][]{{"conformal-n1025", sha}, {CubeMap.WORLD_MAP, "00" + sha.substring(2)}}) {
+            WorldLayout other = WorldLayout.fromJson(JsonParser.parseString(cubeLayoutJson(2, bad[0], bad[1])).getAsJsonObject());
+            WorldDataException e = assertThrows(WorldDataException.class, () -> WorldProjection.of(other, 4096));
+            assertTrue(e.getMessage().startsWith("world data needs cube map " + bad[0] + " (sha256 " + bad[1]
+                    + "); this Deep Time has "), e.getMessage());
+            assertTrue(e.getMessage().contains(CubeMap.WORLD_MAP + " (sha256 " + sha + ")"), e.getMessage());
+        }
         // The unknown kinds stay unknown.
         assertNull(WorldProjection.Kind.parse("cubes"));
     }

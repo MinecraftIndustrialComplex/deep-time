@@ -107,14 +107,18 @@ public final class WrapEngine {
     }
 
     /**
-     * On server start, with the flag and {@code -Ddeeptime.wrapengine.cube=<s>} set: the cube on the
-     * overworld, in the mode {@link CubeInstall#decide} picks from its Toroidal World shape.
+     * On server start, with the flag set and either a cube world (format 0.7) on the overworld or
+     * {@code -Ddeeptime.wrapengine.cube=<s>} (dev; it wins): the cube on the overworld, in the mode
+     * {@link CubeInstall#decide} picks from its Toroidal World shape.
      */
     private static void installCube(MinecraftServer server) {
         int s;
         int d;
         try {
             s = CubeInstall.side();
+            if (s == 0 && server.overworld().getChunkSource().getGenerator()
+                    instanceof com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator g && g.dataRef().cube())
+                s = g.dataRef().faceBlocks();   // the manifest's face side (cube plan E3's reader)
             if (s == 0)
                 return;
             d = CubeInstall.depth(s);

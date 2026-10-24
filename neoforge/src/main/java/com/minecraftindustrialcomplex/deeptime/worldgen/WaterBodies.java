@@ -154,15 +154,7 @@ public final class WaterBodies {
 
     /** Whether any cell of {@code layer} in (or next to) block box [x0, x1] × [z0, z1] is below {@code level}. */
     static boolean anyBelow(com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler layer, int x0, int z0, int x1, int z1, double level) {
-        var g = layer.desc().grid();
-        int r = g.r();
-        long i0 = Math.floorDiv(x0 - g.originBlockX(), r), i1 = Math.floorDiv(x1 - g.originBlockX(), r) + 1;
-        long j0 = Math.floorDiv(z0 - g.originBlockZ(), r), j1 = Math.floorDiv(z1 - g.originBlockZ(), r) + 1;
-        for (long i = i0; i <= i1; i++)
-            for (long j = j0; j <= j1; j++)
-                if (layer.get(i, j) < level)
-                    return true;
-        return false;
+        return layer.anyInBox(x0, z0, x1, z1, v -> v < level);
     }
 
     /**
