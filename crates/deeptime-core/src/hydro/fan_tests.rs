@@ -5,8 +5,8 @@
 //! long on the grid there), Bull's area unless hemmed in, none on a smooth profile, a larger
 //! river's channel as its edge, and no cone over ground that falls away faster than the fan.
 
-use deeptime_format::rivers::Rivers;
 use deeptime_format::raster::ZEdges;
+use deeptime_format::rivers::Rivers;
 use deeptime_format::{GridDesc, Projection};
 use serde_json::Value;
 
@@ -259,7 +259,10 @@ fn a_fan_is_round_on_the_planet_at_55_degrees() {
         );
         // Its radius from its area, π ρ² less the slot.
         let rho = (f.bull_km2 * 1e6 / std::f64::consts::PI).sqrt() / M_H;
-        assert!((pe / (2.0 * rho) - 1.0).abs() < 0.08, "at {lat}°: {pe} for ρ {rho}");
+        assert!(
+            (pe / (2.0 * rho) - 1.0).abs() < 0.08,
+            "at {lat}°: {pe} for ρ {rho}"
+        );
         let cos2 = proj().cos_lat(win.apex.1).powi(2);
         let grid = gz / gx;
         assert!(

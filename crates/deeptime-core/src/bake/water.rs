@@ -817,8 +817,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     } else {
         hydro::fan::Fans::default()
     };
-    let (mut result, splits, laid, fan_laid) = if plains.plains.is_empty() && fans.fans.is_empty()
-    {
+    let (mut result, splits, laid, fan_laid) = if plains.plains.is_empty() && fans.fans.is_empty() {
         (first, Vec::new(), None, None)
     } else {
         drop(first);
@@ -897,7 +896,10 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     let (gw, gh, wraps) = (i64::from(grid.w), i64::from(grid.h), grid.wraps_x);
     // The hydrology's cell at block (x, z), None off the grid.
     let cell_at = move |x: f64, z: f64| -> Option<usize> {
-        let (i, j) = (((x - ox) / gr).round() as i64, ((z - oz) / gr).round() as i64);
+        let (i, j) = (
+            ((x - ox) / gr).round() as i64,
+            ((z - oz) / gr).round() as i64,
+        );
         if j < 0 || j >= gh || (!wraps && (i < 0 || i >= gw)) {
             return None;
         }

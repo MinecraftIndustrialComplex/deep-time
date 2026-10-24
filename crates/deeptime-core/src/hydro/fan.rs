@@ -161,7 +161,11 @@ impl Fans {
 
     /// Every fan cell, sorted.
     pub fn cells(&self) -> Vec<u32> {
-        let mut v: Vec<u32> = self.fans.iter().flat_map(|f| f.cells.iter().copied()).collect();
+        let mut v: Vec<u32> = self
+            .fans
+            .iter()
+            .flat_map(|f| f.cells.iter().copied())
+            .collect();
         v.sort_unstable();
         v.dedup();
         v
@@ -347,10 +351,7 @@ pub fn find(inp: &Input<'_>, net: &network::Output) -> Fans {
             let mut kept: Vec<(f64, f64, Cand)> = Vec::new();
             for (_, i, cd) in cands {
                 let (si, li) = (p.s[i], cd.free_m / mh);
-                if kept
-                    .iter()
-                    .all(|(s, l, _)| (si - s).abs() >= li.max(*l))
-                {
+                if kept.iter().all(|(s, l, _)| (si - s).abs() >= li.max(*l)) {
                     kept.push((si, li, cd));
                 }
             }
