@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * The dev map's view transform, image codec, base image and graticule; on a cube (cube plan G14) the
@@ -346,10 +347,24 @@ class MapModelTest {
                     assertTrue(Graticule.netJoined(a.face(), b.face()), l.kind() + " " + l.value() + ": " + a.face() + " to " + b.face());
                     double step = Math.hypot(x - l.xs()[i - 1], z - l.zs()[i - 1]);
                     assertTrue(step < 0.05 * c.side(), l.kind() + " " + l.value() + ": a " + step + "-block step");
-                    acrossTheSlide |= (x - 5 * h) * (l.xs()[i - 1] - 5 * h) < 0 || (x + 3 * h) * (l.xs()[i - 1] + 3 * h) < 0;
+                    // Onto or past the slide's line at x = 5h (or -3h): a sample can fall on the line itself.
+                    acrossTheSlide |= (l.xs()[i - 1] < 5 * h) != (x < 5 * h) || (l.xs()[i - 1] > -3 * h) != (x > -3 * h);
                 }
             }
-            assertTrue(acrossTheSlide, "no line runs on across the slide");
+            if (!acrossTheSlide) {
+                StringBuilder why = new StringBuilder("no line runs on across the slide on the cube of side " + c.side() + ":");
+                for (Graticule.Line l : lines)
+                    if (l.kind() == Graticule.Kind.PARALLEL && Math.abs(l.value()) < 1e-9 || l.kind() == Graticule.Kind.MERIDIAN && l.value() == -180.0) {
+                        double lo = Double.POSITIVE_INFINITY, hi = Double.NEGATIVE_INFINITY;
+                        for (double x : l.xs()) {
+                            lo = Math.min(lo, x);
+                            hi = Math.max(hi, x);
+                        }
+                        why.append(String.format(java.util.Locale.ROOT, " [%s %.0f: %d points, x %.1f to %.1f, from (%.1f, %.1f) to (%.1f, %.1f)]",
+                                l.kind(), l.value(), l.size(), lo, hi, l.xs()[0], l.zs()[0], l.xs()[l.size() - 1], l.zs()[l.size() - 1]));
+                    }
+                fail(why.toString());
+            }
             // 24 meridians and 11 parallels, each cut where it crosses a turning seam.
             assertTrue(pieces > 35, "pieces " + pieces);
         }
