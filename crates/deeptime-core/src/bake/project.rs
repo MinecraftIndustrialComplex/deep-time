@@ -47,11 +47,13 @@ use deeptime_format::tilepack::write_stored_tiles;
 use deeptime_format::{DType, FileEntry, GridDesc, LayerDesc, LoadedLayer, Manifest, Written};
 
 use crate::bake::biomes;
+use crate::bake::project_cube::project_body_exact;
 use crate::bake::strata::{Moved, key_shift};
 use crate::bake::{load_layer, stored_tiles};
 use crate::error::CoreError;
 use crate::hydro;
 use crate::params::{EdgeBorder, LAMBDA_C_AUTO, PlanetPreset};
+use crate::sphere::around::conjugate_axes;
 use crate::structure::bake_horizons::Horizons;
 
 /// The version of the pass's record (`notes.bake.projection.version`).
@@ -124,8 +126,9 @@ const MAX_SAMPLES_Z: usize = 64;
 /// `delta` (2026-10-23) is a number too, what a delta plain added to the ground, but it says where
 /// the plain is: the world's plain is the nearest cell's ([`PLAIN_NEAREST`]), and a footprint mean
 /// spread the layer over 5,747 cells beside the D5 world's plains, 4,808 of them not above the
-/// sea's level (HYD-146).
-const CATEGORICAL: [&str; 9] = [
+/// sea's level (HYD-146). `floodplain` (2026-10-24) likewise says where a floodplain is, with nodata
+/// off it, which a mean would spread or drop (HYD-152).
+const CATEGORICAL: [&str; 10] = [
     "climate/koppen",
     "climate/koppen_l2",
     "climate/wetland",
@@ -135,6 +138,7 @@ const CATEGORICAL: [&str; 9] = [
     "meta/province",
     "strata/lift",
     crate::bake::water::DELTA_LAYER,
+    crate::bake::water::FLOODPLAIN_LAYER,
 ];
 
 /// The layers a world cell on a delta plain (its nearest simulation cell's `delta` above 0) takes
@@ -692,11 +696,13 @@ pub fn lambda_note(choice: Option<&LambdaChoice>, search: LambdaSearch) -> Value
 
 /// Bytes per cell of the layers the bake writes on each grid (level, name, bytes), summed over the
 /// layers (the pass loads all of one grid's layers at once): L1 holds the horizon stacks, L2 and L3
-/// a few scalars (L3's 9 include the delta plains' raise, 2 B, `water::DELTA_LAYER`). Measured on a
+/// a few scalars (L3's 13 include the delta plains' raise, 2 B, `water::DELTA_LAYER`, the
+/// floodplains' change, 2 B, `water::FLOODPLAIN_LAYER`, and the fans' raise, 2 B,
+/// `water::FAN_LAYER`). Measured on a
 /// baked planet (`the_projection_estimate_covers_the_baked_layers` fails if the bake outgrows
 /// them); a figure of the memory model, not a physical one.
 pub(crate) const LAYER_BYTES_PER_CELL: [(u32, &str, u64); 3] =
-    [(1, "L1", 288), (2, "L2", 16), (3, "L3", 9)];
+    [(1, "L1", 288), (2, "L2", 16), (3, "L3", 13)];
 
 /// Of L3's bytes a cell, the water's layers (`water_level` 2 B, `playa` and `closed_basin` 1 B
 /// each): they are on the hydrology's grid, which is L3 halved where L3 is over
@@ -1797,7 +1803,10 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
             .iter()
             .enumerate()
             .map(|(i, b)| {
-                let mut nb = project_body(&map, b);
+                // The exact image of its ellipse (SCL-130's rule, on this world too since
+                // 2026-10-23, ledger: SCL-236): a pluton drawn on the planet at its strike
+                // (SCL-235) is the planet's ellipse here, where SCL-091 misdrew it.
+                let mut nb = project_body_exact(&map, b);
                 let ground = new.height(nb.center[0], nb.center[2]);
                 let dy = ground - old.height(b.center[0], b.center[2]);
                 let host = strata_body(b).then(|| body_host_dy.get(i).copied().unwrap_or(0.0));
@@ -2503,7 +2512,10 @@ pub fn project_rivers(
 }
 
 /// A structural event in the world: the window's centre through the projection, its axes and
-/// sizes through the local Jacobian; a fault's slip and plane turned and stretched with them.
+/// sizes through the local Jacobian; a fault's slip and plane turned and stretched with them. An
+/// intrusion's window is the exact image of the ellipse it holds (ledger: SCL-236), so a stock or
+/// a plug drawn round on the planet (SCL-235) is round in a conformal world (the cube) and drawn
+/// with the map's own shape stretch in an equal-area one (Petroff–Guyou).
 pub fn project_structure(
     map: &impl WorldMap,
     st: &deeptime_format::structure::Structure,
@@ -2516,6 +2528,30 @@ pub fn project_structure(
         let (wx, wz) = map.to_world(cx, cz);
         let a = apply(&j, (w.along[0], w.along[1]));
         let c = apply(&j, (w.across[0], w.across[1]));
+        if matches!(e.shape, Shape::Intrusion { .. }) {
+            // The ellipsoid's plan. Stretching each axis by its own image (the rule below) keeps
+            // them perpendicular where the Lambert grid's shear turns their images off it, which
+            // misdraws a yawed ellipse (a 1.6 : 1 stock yawed 35° at 55°, 16 % in radius).
+            let (first, second, yaw) = conjugate_axes(
+                (a.0 * w.half_along, a.1 * w.half_along),
+                (c.0 * w.half_across, c.1 * w.half_across),
+            );
+            if first.is_finite() && second.is_finite() && first > 0.0 && second > 0.0 {
+                let d = (yaw.cos(), yaw.sin());
+                // Across on the side the old across axis went, as the rule below keeps it.
+                let s = if c.1 * d.0 - c.0 * d.1 < 0.0 {
+                    -1.0
+                } else {
+                    1.0
+                };
+                w.centre = [wx, wz];
+                w.along = [d.0, d.1];
+                w.across = [-s * d.1, s * d.0];
+                w.half_along = first;
+                w.half_across = second;
+                continue;
+            }
+        }
         let (la, lc) = (a.0.hypot(a.1).max(1e-9), c.0.hypot(c.1).max(1e-9));
         let along = (a.0 / la, a.1 / la);
         // Across stays perpendicular to along, on the side the Jacobian takes it.
@@ -3162,6 +3198,181 @@ mod tests {
         }
     }
 
+    /// SCL-236: an intrusion's window goes to the world as the exact image of its ellipse. A plug drawn round on the
+    /// planet (its window the circle's ellipse in Lambert blocks, SCL-235) is, on the Petroff–Guyou world at 30, 55
+    /// and 70°, the image of that circle (each point of the circle through the Lambert metric and the Jacobian lies on
+    /// the window's edge; the world is equal-area, not conformal, so the window is the map's own stretch of a circle,
+    /// not a disc), and a yawed 1.5 : 1 stock's edge lies on its projected window's ellipse, each point through the
+    /// Jacobian (exactly) and through the projection itself (to the curvature over its few blocks). Each axis
+    /// stretched by its own image, the rule the other events keep, misses that edge by more than 5 % in radius (at 55° here).
+    #[test]
+    fn an_intrusion_window_is_the_exact_image_of_its_ellipse() {
+        use deeptime_format::structure::{StructEvent, Structure, Window};
+        let c_sim = 4096;
+        let g = PetroffGuyou::new(PetroffGuyou::hemisphere_for(c_sim), 30.0);
+        let map = Mapping::new(g, c_sim, 16);
+        let frame = crate::sphere::BlockFrame::new(c_sim);
+        let mh = 300.0;
+        let event =
+            |x: f64, z: f64, (first, second, yaw): (f64, f64, f64), shape: Shape| StructEvent {
+                id: 1,
+                key: 0,
+                t_years: 0.0,
+                window: Window {
+                    centre: [x, z],
+                    along: [yaw.cos(), yaw.sin()],
+                    across: [-yaw.sin(), yaw.cos()],
+                    half_along: first,
+                    half_across: second,
+                },
+                shape,
+            };
+        let intrusion = Shape::Intrusion {
+            y: 0.0,
+            half_height: 10.0,
+            class: 1,
+        };
+        // r² of world point `q` in window `w`'s ellipse.
+        let r2 = |w: &Window, q: (f64, f64)| {
+            let ((qx, qz), _) = map.nearest_image((w.centre[0], w.centre[1]), q);
+            let (dx, dz) = (qx - w.centre[0], qz - w.centre[1]);
+            ((dx * w.along[0] + dz * w.along[1]) / w.half_along).powi(2)
+                + ((dx * w.across[0] + dz * w.across[1]) / w.half_across).powi(2)
+        };
+        let mut worst_old = 0.0f64;
+        for (lat, x) in [(30.0f64, 300.0), (55.0, -500.0), (70.0, 200.0)] {
+            let z = frame.z_of_lat(lat);
+            let at = crate::sphere::Around::new(frame, mh, x, z);
+            let plug = event(x, z, at.ellipse_blocks(1500.0, 1500.0, 0.0), intrusion);
+            let stock = event(x, z, at.ellipse_blocks(900.0, 600.0, 0.6), intrusion);
+            let st = Structure {
+                events: vec![plug, stock],
+                profiles: Vec::new(),
+                margin: 64.0,
+            };
+            let out = project_structure(&map, &st);
+            let j = map.jacobian(x, z);
+            let (wx, wz) = map.to_world(x, z);
+            let w = &out.events[0].window;
+            let cos = lat.to_radians().cos();
+            for k in 0..72 {
+                let t = f64::from(k) * 5f64.to_radians();
+                // A point of the plug's 1.5 km circle on the planet, m east and south, in Lambert blocks.
+                let d = (1500.0 * t.cos() / (mh * cos), 1500.0 * t.sin() * cos / mh);
+                let lin = apply(&j, d);
+                let r = r2(w, (wx + lin.0, wz + lin.1));
+                assert!((r - 1.0).abs() < 1e-9, "{lat}° plug at {k}: r2 {r} {w:?}");
+            }
+            let (src, w) = (&st.events[1].window, &out.events[1].window);
+            for k in 0..72 {
+                let t = f64::from(k) * 5f64.to_radians();
+                let (u, v) = (src.half_along * t.cos(), src.half_across * t.sin());
+                let d = (
+                    u * src.along[0] + v * src.across[0],
+                    u * src.along[1] + v * src.across[1],
+                );
+                let lin = apply(&j, d);
+                let exact = r2(w, (wx + lin.0, wz + lin.1));
+                assert!(
+                    (exact - 1.0).abs() < 1e-9,
+                    "{lat}° stock at {k}: linear r2 {exact}"
+                );
+                let far = r2(w, map.to_world(x + d.0, z + d.1));
+                assert!(
+                    (far - 1.0).abs() < 3e-2,
+                    "{lat}° stock at {k}: projected r2 {far}"
+                );
+                // The old rule: each axis stretched by its own image, kept perpendicular.
+                let (a, c) = (
+                    apply(&j, (src.along[0], src.along[1])),
+                    apply(&j, (src.across[0], src.across[1])),
+                );
+                let (la, lc) = (a.0.hypot(a.1), c.0.hypot(c.1));
+                let (al, ac) = ((a.0 / la, a.1 / la), (-a.1 / la, a.0 / la));
+                let (pa, pc) = (lin.0 * al.0 + lin.1 * al.1, lin.0 * ac.0 + lin.1 * ac.1);
+                let old =
+                    (pa / (src.half_along * la)).powi(2) + (pc / (src.half_across * lc)).powi(2);
+                worst_old = worst_old.max((old.sqrt() - 1.0).abs());
+            }
+            // A pluton's body, its plan drawn on the planet at a strike (SCL-235), goes to this
+            // world by the same exact image (SCL-130's rule, project_body_exact).
+            let (a, c, yaw) = at.ellipse_blocks(4800.0, 3000.0, 0.6);
+            let b = deeptime_format::Body::new(
+                1,
+                None,
+                deeptime_format::bodies::Shape::Blanket,
+                "granite",
+                [x, 40.0, z],
+                [a as f32, 30.0, c as f32],
+                yaw as f32,
+                0.0,
+                deeptime_format::bodies::NO_CLIP,
+            );
+            let nb = project_body_exact(&map, &b);
+            let (sy, cy) = f64::from(nb.yaw).sin_cos();
+            let (bs, bc) = (
+                f64::from(b.yaw).sin_cos(),
+                (f64::from(b.axes[0]), f64::from(b.axes[2])),
+            );
+            for k in 0..72 {
+                let t = f64::from(k) * 5f64.to_radians();
+                let (u, v) = (bc.0 * t.cos(), bc.1 * t.sin());
+                let lin = apply(&j, (u * bs.1 - v * bs.0, u * bs.0 + v * bs.1));
+                let (pa, pc) = (lin.0 * cy + lin.1 * sy, -lin.0 * sy + lin.1 * cy);
+                let r2 =
+                    (pa / f64::from(nb.axes[0])).powi(2) + (pc / f64::from(nb.axes[2])).powi(2);
+                assert!(
+                    (r2 - 1.0).abs() < 1e-5,
+                    "{lat}° pluton body at {k}: r2 {r2}"
+                );
+            }
+        }
+        // The old rule misses the stock's edge by more than 5 % in radius somewhere (55° here).
+        assert!(
+            worst_old > 0.05,
+            "the old rule was already right ({worst_old})"
+        );
+    }
+
+    /// A measurement, not a check (docs/science/round-features.md): the shape ratio (long axis over short) in
+    /// Petroff–Guyou world blocks of a circle on the planet (as features are drawn since 2026-10-23) and of a circle in
+    /// Lambert blocks (before), at 0, 30, 55 and 70° over 72 longitudes of a 16,384-block planet. Run with
+    /// `--ignored --nocapture`; it prints min, median, p90 and max.
+    #[test]
+    #[ignore]
+    fn petroff_guyou_shape_ratio_of_round_features() {
+        let c_sim = 16_384;
+        let g = PetroffGuyou::new(PetroffGuyou::hemisphere_for(c_sim), 30.0);
+        let map = Mapping::new(g, c_sim, 64);
+        let frame = crate::sphere::BlockFrame::new(c_sim);
+        for lat in [0.0f64, 30.0, 55.0, 70.0] {
+            let z = frame.z_of_lat(lat);
+            let (mut now, mut before) = (Vec::new(), Vec::new());
+            for i in 0..72 {
+                let x = -8192.0 + 113.0 * f64::from(i) + 7.0;
+                let j = map.jacobian(x, z);
+                let at = crate::sphere::Around::new(frame, 300.0, x, z);
+                let (a, c, yaw) = at.ellipse_blocks(3000.0, 3000.0, 0.0);
+                let (sy, cy) = yaw.sin_cos();
+                let (p, q) = (apply(&j, (cy * a, sy * a)), apply(&j, (-sy * c, cy * c)));
+                let (f, s, _) = conjugate_axes(p, q);
+                now.push(f.max(s) / f.min(s));
+                let (p, q) = (apply(&j, (10.0, 0.0)), apply(&j, (0.0, 10.0)));
+                let (f, s, _) = conjugate_axes(p, q);
+                before.push(f.max(s) / f.min(s));
+            }
+            let stat = |v: &mut Vec<f64>| {
+                v.sort_by(f64::total_cmp);
+                (v[0], v[v.len() / 2], v[v.len() * 9 / 10], v[v.len() - 1])
+            };
+            eprintln!(
+                "SURVEY lat {lat}: now (min, median, p90, max) {:?}; before {:?}",
+                stat(&mut now),
+                stat(&mut before)
+            );
+        }
+    }
+
     /// A body anywhere on the simulation's grid, the pole rows and the rows past them included, projects to a body the
     /// format accepts (positive finite semi-axes): an Earth-proportioned test planet's bake died on one at a singular spot.
     #[test]
@@ -3187,12 +3398,13 @@ mod tests {
                     0.0,
                     deeptime_format::bodies::NO_CLIP,
                 );
-                let p = project_body(&map, &b);
-                assert!(
-                    p.axes.iter().all(|v| v.is_finite() && *v > 0.0),
-                    "{x} {z}: {:?}",
-                    p.axes
-                );
+                for p in [project_body(&map, &b), project_body_exact(&map, &b)] {
+                    assert!(
+                        p.axes.iter().all(|v| v.is_finite() && *v > 0.0),
+                        "{x} {z}: {:?}",
+                        p.axes
+                    );
+                }
             }
         }
     }

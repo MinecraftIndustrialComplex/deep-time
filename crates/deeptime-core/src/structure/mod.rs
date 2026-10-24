@@ -798,6 +798,7 @@ impl StructureStage {
                     .as_ref()
                     .map_or(&[][..], |v| v.volcanoes.as_slice()),
                 &p.deformation,
+                s.circumference_blocks,
                 s.m_per_block_h,
                 self.st.next_feature,
             );
@@ -1255,7 +1256,9 @@ impl StructureStage {
         let now = aureoles.now_myr;
         for (pl, &y) in self.st.plutons.iter().zip(surface_y) {
             let id = world.next_body_id();
-            if let Some(b) = plutons::to_body(pl, id, y, mh, mv, s.min_y, now) {
+            if let Some(b) =
+                plutons::to_body(pl, id, y, s.circumference_blocks, mh, mv, s.min_y, now)
+            {
                 world.add_body(b)?;
                 bodies += 1;
             }
@@ -1542,7 +1545,7 @@ impl StructureStage {
             .map_init(
                 || (Vec::new(), Vec::new()),
                 |(baked, cands), (pl, &y)| {
-                    let mut a = plutons::Aureole::of_pluton(pl, y, mh, mv, now);
+                    let mut a = plutons::Aureole::of_pluton(pl, y, circ, mh, mv, now);
                     if a.width_m > 0.0 {
                         hosts.units(pl.x, pl.z, y, s.min_y, mv, baked);
                         mask(&a, None, cands, baked);
@@ -1569,6 +1572,7 @@ impl StructureStage {
                         axes,
                         yaw,
                         width_m: 0.0,
+                        plan: None,
                         surface_y,
                         bands: Vec::new(),
                         hollow: true,

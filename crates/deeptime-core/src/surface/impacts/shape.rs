@@ -2,9 +2,11 @@
 //! Crater shapes (P2-08): the radial profile of a crater in metres above the ground it struck, and
 //! how the profile ages.
 //!
-//! Distances are block-metric (block offsets × `m_per_block_h`), so a crater is round in the world
-//! whatever its latitude, like the volcanoes (`volcanoes/shape.rs`), whose rendering onto grids
-//! (`cell_weight`, `blurred`, `Radial`) this module reuses. The profile is a function of
+//! Distances are the planet's (great-circle distances from the centre, `sphere::Around`, ledger
+//! SCL-230), so a crater is round on the planet whatever its latitude, and so in the world, like
+//! the volcanoes (`volcanoes/shape.rs`), whose rendering onto grids (`cell_weight`, `blurred`,
+//! `Radial`) this module reuses. Until 2026-10-23 they were block-metric (block offsets ×
+//! `m_per_block_h`), which drew a crater long north–south by 1 / cos² of its latitude. The profile is a function of
 //! ρ = r / E, where E is the crater's **extent**: its rim radius R times `ejecta_radii`, where
 //! the ejecta blanket ends. The rim is at ρ_r = R / E.
 //!

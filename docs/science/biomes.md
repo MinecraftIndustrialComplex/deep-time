@@ -320,10 +320,12 @@ game choices but the vanilla depth band of BIO-112):
   Plenty puts its volcanic plains in vanilla's mushroom-fields slot (land surrounded by deep sea), and the
   next-nearest biome of its region there is the lukewarm ocean; with TerraBlender such a slot takes the
   vanilla region's biome instead (measured below).
-- **Put in.** Zones are circles in the simulation's frame around the active volcanoes of the baked list, their
-  craters and calderas, their hot-spring pools and their magma (FORMAT.md, "Volcanic biomes"): discs on a Lambert
-  world, and on a Petroff-Guyou world the ellipse the projection makes of each circle at the vent (BIO-182, since
-  2026-10-22; the hot-spring fields and thermal caves stay discs). In priority order:
+- **Put in.** Zones are circles on the planet around the active volcanoes of the baked list, their craters and
+  calderas, their hot-spring pools and their magma (FORMAT.md, "Volcanic biomes"), each drawn as the ellipse the
+  world's projection makes of its circle at the vent (BIO-182, since 2026-10-22; the circle on the planet since
+  2026-10-23, SCL-230): a disc on the conformal cube world, the map's own stretch on the equal-area Petroff-Guyou
+  world (1.78 to 1 at the median), wide east-west on a Lambert world. The hot-spring fields and thermal caves stay
+  discs. In priority order:
 
 | Role | Shipped tag order (first the pack has) | Where |
 |---|---|---|
@@ -410,6 +412,16 @@ A zone's area changes by the projection's areal scale at its vent (the cones by 
 more (by half) because each axis is held to at least 8 blocks and given the 4-block margin; five ash fields fall
 out as rings under 8 blocks wide along an axis.
 The hot-spring fields and thermal caves are unchanged (discs: the terrain draws no cone there).
+
+**Since 2026-10-23 the circle is the planet's** (SCL-230, [round-features.md](round-features.md)). The volcano stage
+and the amplifier now draw a cone round on the planet, as the ellipse the Lambert grid makes of a circle, so the
+zones take the stretch from world blocks to the planet's tangent plane at the vent (east and south, the azimuthal
+equidistant frame) instead of to Lambert's blocks. On the conformal cube world that stretch is the same on both
+axes up to the curvature over a block, so the zones are discs scaled by the projection's local scale; on the
+equal-area Petroff-Guyou world they are the map's own ellipse at the vent (1.4 to 2.7 to 1, where the old Lambert
+circle reached 8 to 1 at 55° and 22 to 1 at 70°); on a Lambert world (a test layout) they are ellipses wide
+east-west by 1/cos of the latitude and narrow north-south by cos. The census above was taken before this change; it
+has not been retaken.
 
 ## Expanded Ecosphere and the biome rules
 

@@ -51,15 +51,15 @@ public final class ImpactGameTests {
     static final double POLAR_WIDEN_FROM_COS = 0.52;   // ledger: SCL-090 (game-choice)
 
     /**
-     * How far the bake's projection pass may average a crater along its parallel for the crater to be
-     * read, as a share of its rim radius: the footprint's half-width beyond the bilinear read
-     * ({@link #footprintAlongParallelM}) at most half the radius, so the floor the test reads (the
-     * columns within half the rim radius) is not averaged with the rim. Equatorward of
-     * {@link #POLAR_WIDEN_FROM_COS} too the footprint is round on the planet at the source grid's
-     * north–south spacing or wider, and a crater the simulation drew round in its Lambert blocks is
-     * narrow east–west there, so a small crater at a high latitude is averaged into its walls: on the
-     * planet of master 4ab29084 (2026-10-23) crater 572 (2.6 km across at 57°, 7.8 blocks of relief)
-     * was averaged over 0.56 of its radius and its floor stood 2.4 blocks under its rim.
+     * How far the bake's projection pass may average a crater for the crater to be read, as a share of
+     * its rim radius: the footprint's half-width beyond the bilinear read ({@link #footprintBeyondReadM})
+     * at most half the radius, so the floor the test reads (the columns within half the rim radius) is
+     * not averaged with the rim. Equatorward of {@link #POLAR_WIDEN_FROM_COS} too the footprint is round
+     * on the planet at the source grid's north–south spacing or wider, where the bilinear read spans
+     * only cos φ of a cell along the parallel, so a small crater at a high latitude is averaged into its
+     * walls. On the planet of master 4ab29084 (2026-10-23), when the simulation drew craters round in its
+     * Lambert blocks (narrow east–west on the planet), crater 572 (2.6 km across at 57°, 7.8 blocks of
+     * relief) was averaged over 0.56 of its radius and its floor stood 2.4 blocks under its rim.
      */
     static final double FOOTPRINT_SHARE = 0.5;   // game-choice (agent, 2026-10-23): the test's tolerance; the footprint itself is ledger SCL-090
 
@@ -85,7 +85,7 @@ public final class ImpactGameTests {
         private static final double[] RINGS = {1.25, 1.5, 1.75, 2.0};
         private static final int POINTS = 32;
 
-        static Ground around(WorldDataTerrain t, InLambert s, double rimRadius) {
+        static Ground around(WorldDataTerrain t, OnSphere s, double rimRadius) {
             double x0 = s.x0(), z0 = s.z0();
             int n = RINGS.length * POINTS;
             double[] dx = new double[n], dz = new double[n], h = new double[n];
@@ -131,7 +131,7 @@ public final class ImpactGameTests {
          * so a complex crater's central peak does not stand for it), its rim (the mean of sixteen
          * points on it) and the floor's column count.
          */
-        double[] floorAndRim(WorldDataTerrain t, InLambert s, double rimRadius) {
+        double[] floorAndRim(WorldDataTerrain t, OnSphere s, double rimRadius) {
             double floor = 0, rim = 0;
             int columns = 0;
             for (int[] q : s.within(rimRadius / 2)) {
@@ -147,42 +147,51 @@ public final class ImpactGameTests {
     }
 
     /**
-     * A crater's surroundings measured in the frame the simulation draws it in, its Lambert cylinder
-     * (the amplifier's crater shape, the impact bodies and their footprints all work in Lambert
-     * blocks), where a crater is round. Lengths are in the world's blocks of the equal-area sphere
+     * A crater's surroundings measured on the planet, where the simulation draws it round (ledger
+     * SCL-230; the amplifier's crater shape, the impact bodies and their footprints all measure
+     * great-circle distances from the centre). Lengths are in blocks of the equal-area sphere
      * ({@code WorldProjection.radius()}), so a crater {@code D} metres across has a rim radius of
-     * {@code D / 2 / mPerBlockH} of them: a distance is {@code radius · hypot(Δλ, Δ sin φ)}, and a
-     * bearing is an angle from east toward north. On the planet such a crater is long north–south and
-     * narrow east–west, by 1 / cos² of its latitude (seamless-world.md, "Simplifications and limits"),
-     * and on the Petroff–Guyou world it is a further ellipse in world blocks. Read as a circle in world
-     * blocks (until 2026-10-23) or on the sphere, a crater far from the equator has its rim taken on
-     * its walls one way and beyond it the other: on the planet of master 4ab29084 crater 537 (8.9 km
-     * across at 55° south) showed a bowl of 1.5 blocks measured round on the sphere and 3.3 in this
-     * frame.
+     * {@code D / 2 / mPerBlockH} of them: a distance is {@code radius} times the angle between the unit
+     * vectors, and a bearing an angle from east toward north. On the conformal cube world such a circle
+     * is a circle in world blocks too, of that radius times the projection's local scale (the plain world
+     * frame up to that scale); on the Petroff–Guyou world, which is equal-area and not conformal (the
+     * 4,096-block test planet here is one), it is the map's own ellipse there (1.78 : 1 at the median,
+     * up to 2.67 : 1), so the plain world frame would read it wrong; on a Lambert world it is wide
+     * east–west by 1 / cos² φ. This frame follows it on all three. From 2026-10-23 to the sphere fix
+     * the same day this read the simulation's Lambert blocks, where it then drew its craters round
+     * (crater 537 of master 4ab29084, 8.9 km across at 55° south, showed a bowl of 1.5 blocks read round
+     * on the sphere and 3.3 in Lambert's frame); before that, a circle in world blocks.
      *
      * @param x0 the centre, world blocks
      * @param z0 the centre, world blocks
+     * @param u0 the centre's unit vector; {@code e} and {@code n} the planet's east and north there
      */
-    record InLambert(WorldProjection p, double x0, double z0, double lat0, double lon0) {
+    record OnSphere(WorldProjection p, double x0, double z0, double[] u0, double[] e, double[] n) {
 
-        static InLambert at(WorldProjection p, double x0, double z0) {
-            double[] ll = p.latLon(x0, z0);
-            return new InLambert(p, x0, z0, ll[0], ll[1]);
+        static OnSphere at(WorldProjection p, double x0, double z0) {
+            double[] u = p.unit(x0, z0);
+            double c = Math.max(1e-12, Math.sqrt(u[0] * u[0] + u[1] * u[1]));
+            double[] e = {-u[1] / c, u[0] / c, 0.0};
+            double[] n = {-u[2] * u[0] / c, -u[2] * u[1] / c, c};
+            return new OnSphere(p, x0, z0, u, e, n);
         }
 
-        /** The distance from the centre to the point (x, z) on the cylinder, blocks. */
+        /** The great-circle distance from the centre to the point (x, z), blocks of the sphere. */
         double distance(double x, double z) {
-            double[] ll = p.latLon(x, z);
-            double dl = Math.toRadians(ll[1] - lon0);
-            dl -= 2 * Math.PI * Math.floor(dl / (2 * Math.PI) + 0.5);
-            return p.radius() * Math.hypot(dl, Math.sin(Math.toRadians(ll[0])) - Math.sin(Math.toRadians(lat0)));
+            double[] u = p.unit(x, z);
+            double cx = u[1] * u0[2] - u[2] * u0[1], cy = u[2] * u0[0] - u[0] * u0[2], cz = u[0] * u0[1] - u[1] * u0[0];
+            return p.radius() * Math.atan2(Math.sqrt(cx * cx + cy * cy + cz * cz), u[0] * u0[0] + u[1] * u0[1] + u[2] * u0[2]);
         }
 
         /** The world point {x, z} at {@code s} blocks from the centre on bearing {@code a} (radians from east toward north); x unwrapped about the centre. */
         double[] point(double s, double a) {
-            double lon = lon0 + Math.toDegrees(s / p.radius() * Math.cos(a));
-            double sl = Math.max(-1, Math.min(1, Math.sin(Math.toRadians(lat0)) + s / p.radius() * Math.sin(a)));
-            double[] q = p.blockOf(Math.toDegrees(Math.asin(sl)), ((lon % 360) + 360) % 360);
+            double d = s / p.radius(), cd = Math.cos(d), sd = Math.sin(d), ca = Math.cos(a), sa = Math.sin(a);
+            double[] u = new double[3];
+            for (int i = 0; i < 3; i++)
+                u[i] = cd * u0[i] + sd * (ca * e[i] + sa * n[i]);
+            double lat = Math.toDegrees(Math.asin(Math.max(-1, Math.min(1, u[2]))));
+            double lon = Math.toDegrees(Math.atan2(u[1], u[0]));
+            double[] q = p.blockOf(lat, ((lon % 360) + 360) % 360);
             return new double[]{x0 + p.wrapX(q[0] - x0), q[1]};
         }
 
@@ -206,15 +215,17 @@ public final class ImpactGameTests {
     }
 
     /**
-     * The half-width of the bake's projection footprint at world point (x, z) along the parallel,
-     * beyond the bilinear read, in metres of the Lambert cylinder (as a crater's radius is):
-     * (d / cos φ − cell) / 2 with d = max(stretch · cell, cell / cos φ), the footprint's diameter on
-     * the planet (SCL-090, {@code bake::project::Mapping::footprint}; stretch the largest metres on the
-     * planet per metre of world block there). The source grid's cell is taken as the world elevation
-     * grid's: the simulation's block is about 6% shorter than the Petroff–Guyou world's, so this is a
-     * little wide.
+     * The half-width of the bake's projection footprint at world point (x, z) beyond the bilinear read,
+     * in metres of the planet (as a crater's radius is), along the parallel where that read is
+     * narrowest: (d − cell · cos φ) / 2 with d = max(stretch · cell, cell / cos φ), the footprint's
+     * diameter on the planet (SCL-090, {@code bake::project::Mapping::footprint}; stretch the largest
+     * metres on the planet per metre of world block there), and cell · cos φ the planet's metres of one
+     * source cell along the parallel. The source grid's cell is taken as the world elevation grid's: the
+     * simulation's block is about 6% shorter than the Petroff–Guyou world's, so this is a little wide.
+     * Until the sphere fix of 2026-10-23 it was (d / cos φ − cell) / 2, in the Lambert metres the
+     * simulation then drew craters in.
      */
-    static double footprintAlongParallelM(WorldData wd, double x, double z) {
+    static double footprintBeyondReadM(WorldData wd, double x, double z) {
         WorldProjection p = wd.projection();
         double cell = wd.manifest().grids().get(wd.manifest().layer(WorldData.ELEVATION).grid()).r() * wd.manifest().mPerBlockH();
         double cos = Math.max(1e-6, Math.cos(Math.toRadians(p.latitudeDeg(x, z))));
@@ -228,7 +239,7 @@ public final class ImpactGameTests {
         }
         double stretch = Math.sqrt(0.5 * (a + b) + Math.sqrt(0.25 * (a - b) * (a - b) + ab * ab)) * p.radius();
         double d = Math.max(stretch * cell, cell / cos);
-        return Math.max(0, d / cos - cell) / 2;
+        return Math.max(0, d - cell * cos) / 2;
     }
 
     /**
@@ -248,7 +259,7 @@ public final class ImpactGameTests {
      *       deep, and until then the test read nothing there; on that of master 4ab29084, 2026-10-23,
      *       the two on land were 572, too small for its footprint at 57°, and 568, whose 2 blocks
      *       wanted lay in ground spread over 14);</li>
-     *   <li>measured round in the simulation's frame ({@link InLambert}), over the plane of that
+     *   <li>measured round on the planet ({@link OnSphere}), over the plane of that
      *       ground, its floor (the mean of the columns within half its rim radius) lies below the mean
      *       of sixteen points on its rim by at least a third of the relief the simulation says it has
      *       left;</li>
@@ -300,12 +311,12 @@ public final class ImpactGameTests {
                 .filter(k -> Math.cos(Math.toRadians(wd.projection().latitudeDeg(k.x(), k.z()))) >= POLAR_WIDEN_FROM_COS)
                 .toList();
         List<Craters.Crater> resolved = clear.stream()
-                .filter(k -> footprintAlongParallelM(wd, k.x(), k.z()) <= FOOTPRINT_SHARE * k.diameterM() / 2)
+                .filter(k -> footprintBeyondReadM(wd, k.x(), k.z()) <= FOOTPRINT_SHARE * k.diameterM() / 2)
                 .toList();
-        Map<Craters.Crater, InLambert> frames = new HashMap<>();
+        Map<Craters.Crater, OnSphere> frames = new HashMap<>();
         Map<Craters.Crater, Ground> grounds = new HashMap<>();
         for (Craters.Crater k : resolved) {
-            frames.put(k, InLambert.at(wd.projection(), k.x(), k.z()));
+            frames.put(k, OnSphere.at(wd.projection(), k.x(), k.z()));
             grounds.put(k, Ground.around(t, frames.get(k), k.diameterM() / 2 / mH));
         }
         List<Craters.Crater> readable = resolved.stream().filter(k -> k.reliefM() / mV / 3 >= grounds.get(k).rms()).toList();
@@ -333,7 +344,7 @@ public final class ImpactGameTests {
         double floor = fr[0], rim = fr[1], centre = t.height(cx, cz), bowl = rim - floor, want = best.reliefM() / mV / 3;
         int floorColumns = (int) fr[2];
         String placed = String.format("latitude %.1f°, footprint %.2f of its radius", wd.projection().latitudeDeg(best.x(), best.z()),
-                footprintAlongParallelM(wd, best.x(), best.z()) / (best.diameterM() / 2));
+                footprintBeyondReadM(wd, best.x(), best.z()) / (best.diameterM() / 2));
         StringBuilder others = new StringBuilder();
         for (Craters.Crater k : candidates)
             if (k != best) {

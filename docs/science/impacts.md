@@ -347,21 +347,29 @@ on the full 16k planet's two runs).
   and the resurge features themselves are not modelled. Water depth is read from a grid with
   4.8 km cells.
 - **Rim heights of complex craters are overstated.** CMM05's rim law is for simple craters.
-- **Craters are round.** No oblique shapes, no secondary craters, no rays. Round in the
-  simulation's Lambert blocks, not on the planet: the amplifier's crater shape, the impact bodies
-  and their footprints all work in Lambert blocks, so on the planet a crater is long north–south and
-  narrow east–west by 1 / cos² of its latitude (3.4 to 1 at 57°), the same limit as the
-  simulation's other features near the poles (seamless-world.md, "Simplifications and limits"), and
-  on the Petroff–Guyou world it is a further ellipse in world blocks. The GameTest
-  `aCraterIsABowlOverBreccia` measures its floor, rim and the ground around it round in that frame.
+- **Craters are round.** No oblique shapes, no secondary craters, no rays. Round on the planet:
+  the impact stage's imprint and overprint, the breccia lens and its footprint, and the
+  amplifier's crater shape all measure the great-circle distance from the crater's centre
+  (`sphere::Around`, ledger SCL-230 and SCL-233; [round-features.md](round-features.md)), so a
+  crater drawn on the simulation's Lambert grid is the ellipse that grid makes of a circle (wide
+  east–west in Lambert blocks by 1 / cos² of its latitude), and the conformal cube world draws it
+  round again; the equal-area Petroff–Guyou world draws it with its own stretch (1.4 to 2.7 to 1,
+  as every shape there). Until 2026-10-23 every one of them was round in Lambert blocks, so on the
+  planet and on the cube a crater was long north–south by 1 / cos² φ (3.0 to 1 at 55°), and on
+  Petroff–Guyou up to 8 to 1 at 55° and 22 to 1 at 70°. The GameTest `aCraterIsABowlOverBreccia`
+  measures its floor, rim and the ground around it by the great-circle distance on the planet: its
+  4,096-block test planet is a Petroff–Guyou world, where the plain world frame would read the
+  map's stretch, and on the cube that distance is the world frame up to the local scale.
 - **Small craters far from the equator are smoothed away.** The projection's footprint is round on
-  the planet and at least the source grid's north–south spacing across (SCL-090), so along the
-  parallel it averages over a cell · tan² φ or more of Lambert blocks; a crater narrower than that
-  east–west loses its bowl into its walls. On the 4,096-block test planet of 2026-10-23, crater 572
-  (2.6 km across at 57°, averaged over 0.56 of its radius) showed 0.31 of its relief. A crater shows
-  whole only where its diameter is at least about 2 · cell · tan² φ (with that planet's 600 m cells,
-  1.2 km at 45° and 2.9 km at 57°). Drawing craters in the world's own frame, after the projection, would remove this
-  and the stretch above.
+  the planet and at least the source grid's north–south spacing across (SCL-090): cell / cos φ on
+  the planet, where the grid's east–west spacing is cell · cos φ, so it averages over
+  cell · sin φ · tan φ more than the grid holds. A crater narrower than that loses its bowl into its
+  walls. A crater shows whole only where its diameter is at least about 2 · cell · sin φ · tan φ
+  (with the 4,096-block test planet's 600 m cells, 0.85 km at 45°, 1.55 km at 57° and 3.1 km at
+  70°; 2 · cell · tan² φ, 2.9 km at 57°, while craters were round in Lambert blocks). On the test
+  planet of 2026-10-23, crater 572 (2.6 km across at 57°) showed 0.31 of its relief when it was
+  still drawn in Lambert blocks. Drawing craters in the world's own frame, after the projection,
+  would remove this.
 - **The soil stays over the breccia.** A body never replaces what the surface rules laid (one block
   of gravel under the sea, up to five of dirt under a pond, plan §7.5), so a lens thinner than its
   soil shows no breccia at the surface: 572's lens of 3.7 blocks lay wholly in its 5 blocks of

@@ -31,6 +31,11 @@ public final class WorldData {
      * "Water columns", step 3; HYD-100). Absent in a world without hydrology: the sea stands on all such ground.
      */
     public static final String CLOSED_BASIN = "closed_basin";
+    /**
+     * A floodplain cell's move of the ground, blocks, NODATA off the plain (FORMAT.md, "floodplain.dtr"; HYD-152): the
+     * ground within the flood depth of its river, laid at that river's bank. Absent in a world without floodplains.
+     */
+    public static final String FLOODPLAIN = "floodplain";
     public static final String HORIZONS = "strata/horizons";
     /** How far each strata cell's stack rose after the history (FORMAT.md, "The lift"); the structure's heights do not include it. */
     public static final String LIFT = "strata/lift";
@@ -297,6 +302,14 @@ public final class WorldData {
      */
     public boolean closedBasin(double x, double z) {
         return has(CLOSED_BASIN) && layer(CLOSED_BASIN).nearest(x, z) == 1.0;
+    }
+
+    /**
+     * Whether block (x, z) lies on a floodplain: the {@link #FLOODPLAIN} layer's nearest cell holds a value (x folded);
+     * false without the layer. The bank's levee texture reads this (HYD-153).
+     */
+    public boolean onFloodplain(double x, double z) {
+        return has(FLOODPLAIN) && !Double.isNaN(layer(FLOODPLAIN).nearest(x, z));
     }
 
     /** Water surface above the terrain at block (x, z), NaN where there is none (nearest cell). */

@@ -1309,13 +1309,31 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 ### Leopold1957
 - Reference: Leopold, Luna B. and Wolman, M. Gordon. 1957. River channel patterns: braided, meandering, and straight. U.S. Geological Survey Professional Paper 282-B, pp. 39-85.
 - DOI or URL: https://doi.org/10.3133/pp282B ; open PDF https://pubs.usgs.gov/pp/0282b/report.pdf
-- Cited as: not cited by the project. Proposed as the citable source for the meandering threshold (HYD-027).
-- Ledger ids: HYD-027; notes: proposed
+- Cited as: "Leopold & Wolman 1957" (hydro/meander.rs BRAID_SLOPE_COEF; rivers-and-lakes.md, "Meanders").
+- Ledger ids: HYD-158; HYD-027 (the meander's sinuosity); HYD-155 (beside LW1960); HYD-171 to HYD-175 (braids)
 - Access: open access (USGS)
 - Library (the project's source library, not distributed): fetched (PDF, 50 pages, text layer, 147,959 characters). From: https://pubs.usgs.gov/pp/0282b/report.pdf. Text file: Leopold1957.txt.
-- Read so far (by the project): not read (project wrote the Earth figure "from memory, not sourced")
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 3), the USGS PDF: p. 60, equation (1) from the page image (the text layer lost it), "the braided channels are separated from the meanders by a line described by the equation s=0.06 Q^-.44", Q the bankfull discharge in cfs (Fig. 46); a meander is a reach whose sinuosity is "equal to or greater than 1.5", an arbitrary line; p. 58, Fig. 45B, λ = 6.5 w^1.1 ft, the ratio of wavelength to width "from about 7 for small streams" to 15 for rivers over 1,000 feet wide; the abstract's 7 to 12 widths between riffles. 2026-10-24, the deltas lane (gap 5 stage 4), the same PDF: p. 53, "A braided river is one which flows in two or more anastomosing channels around alluvial islands. This study indicates that braided reaches taken as a whole are steeper, wider, and shallower than undivided reaches carrying the same flow"; p. 50, the divided channels' widths sum to "1.6 to 2.0 times that of the undivided one" in the three natural comparisons (1.05 to 1.70 in the flume) and their mean depth is 0.6 to 0.9 of the undivided reach's; p. 41, Horse Creek: two channels "about equal in width, 30 to 40 feet" against 50 feet undivided, and a central bar "nearly 250 feet down the center of the channel"; p. 44, the island "is considerably wider than the new gravel bar"; the abstract (p. 39): an island begins as "the deposition of a central bar", and "at a given discharge, meanders occur at smaller values of slope than do braids"; p. 60, the Green River's 425 ft³/s divided into 305 and 120.
 - Read in this pass: full text fetched (OCR text layer; the sections on sinuosity and Figure 46)
-- Reference check: n/a (new source). Values: see Part 2, HYD-027.
+- Reference check: matches (authors, year, series). Values: see HYD-158 and HYD-027.
+
+### Leopold1960
+- Reference: Leopold, Luna B. and Wolman, M. Gordon. 1960. River meanders. Geological Society of America Bulletin 71(6):769-794.
+- DOI or URL: 10.1130/0016-7606(1960)71[769:RM]2.0.CO;2 (the DOI from memory); the copy read at https://cpb-us-e1.wpmucdn.com/blogs.uoregon.edu/dist/5/10896/files/2015/04/Leopold_Wolman_1960-1wypmnk.pdf (a course page's copy of the GSA PDF).
+- Cited as: "Leopold & Wolman 1960" (hydro/meander.rs WAVELENGTH_PER_WIDTH, MAX_SINUOSITY; rivers-and-lakes.md, "Meanders").
+- Ledger ids: HYD-155, HYD-157
+- Access: paywalled (GSA); a copy on a University of Oregon course page.
+- Library: not fetched (the text read is in the lane's scratch folder).
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 3): Table 1 (p. 773), L = 10.9 w^1.01, A = 2.7 w^1.1, L = 4.7 rm^0.98 (feet); p. 774, "L = 10.9w^1.01 = 4.7rm^0.98" with the exponents taken as unity (rm/w = 2.3); p. 772, meander length "ranges from 7 to 10 times the channel width"; p. 773, the amplitude "is determined more by erosion characteristics of stream banks and by other local factors than by simple hydraulic principles" and "a limit to the amplitude of meanders is provided by the formation of cut-offs"; p. 774, wavelength and radius of curvature "are to a great extent independent of bed and bank materials".
+
+### Langbein1966
+- Reference: Langbein, W. B. and Leopold, Luna B. 1966. River meanders: theory of minimum variance. U.S. Geological Survey Professional Paper 422-H, 15 p.
+- DOI or URL: https://doi.org/10.3133/pp422H (the DOI from memory); open PDF https://pubs.usgs.gov/pp/0422h/report.pdf
+- Cited as: "Langbein & Leopold 1966" (hydro/meander.rs, the sine-generated curve; rivers-and-lakes.md, "Meanders").
+- Ledger ids: HYD-156, HYD-157, HYD-027
+- Access: open access (USGS).
+- Library: not fetched (the text read is in the lane's scratch folder).
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 3), the USGS PDF: eq. 10 (p. H5), φ = ω sin (s/M) 2π, the sine-generated curve; the table of ω against sinuosity k (p. H5, footnote 2: 0.5 rad 1.06, 1.0 1.30, 1.5 1.96, 1.75 2.67) and the radius of curvature (0.22 λ at k = 2); "a maximum of 125° for 'gooseneck' meanders"; Leopold & Wolman's 1960 rivers "sinuosities were dominantly between 1.1 and 2.0", their mean meander length 4.7 radii of curvature (0.213 λ).
 
 ### Schumm1963
 - Reference: Schumm, Stanley A. 1963. Sinuosity of alluvial rivers on the Great Plains. Geological Society of America Bulletin 74(9):1089-1100.
@@ -1592,10 +1610,10 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Reference: Ganti, V., Chu, Z., Lamb, M. P., Nittrouer, J. A. and Parker, G. (2014). Testing morphodynamic controls on the location and frequency of river avulsions on fans versus deltas: Huanghe (Yellow River), China. Geophysical Research Letters 41(22):7882-7890.
 - DOI or URL: 10.1002/2014GL061918
 - Cited as: "Ganti et al. 2014" (rivers-and-lakes.md; physics-gap-audit.md).
-- Ledger ids: HYD-137
-- Access: paywalled (Wiley 403 on 2026-10-23); not fetched.
+- Ledger ids: HYD-137, HYD-167
+- Access: paywalled (Wiley 403 on 2026-10-23); an author's group copy at https://lamb.caltech.edu/documents/19648/Ganti_et_al_GRL_2014.pdf.
 - Library: not fetched.
-- Read so far (by the project): the abstract as quoted in search results, 2026-10-23: where the river debouches from the Loess Plateau, avulsions occur at an abrupt decrease in bed slope and recur about every 607 years; the key points say fans and deltas have different drivers for avulsion and delta lobe size scales with the backwater length. The abstract's delta sentences were cut off.
+- Read so far (by the project): the abstract as quoted in search results, 2026-10-23: where the river debouches from the Loess Plateau, avulsions occur at an abrupt decrease in bed slope and recur about every 607 years; the key points say fans and deltas have different drivers for avulsion and delta lobe size scales with the backwater length. 2026-10-24, the deltas lane (gap 5 stage 4), the Caltech copy in full: p. 7882, "avulsions occur at an abrupt decrease in bed slope"; p. 7883, "channel filling is thought to be focused where upland channel confinement ceases (e.g., at a canyon-fan transition) so that channel bed and water surface slopes reduce", and L_b = h_c/S; p. 7884, a tenfold change in bed slope upstream of Huayuankou, 1.3 × 10^−3 at 960 km to 2.0 × 10^−4 at 760 km (the exponents' signs from the page image), the node about 700 km from the shoreline, 10 avulsions in 5,000 years; p. 7885, the recurrence 607 ± 121 years, and at the delta node the backwater length 21 to 54 km and 7 ± 2 years; p. 7889, fan avulsion sites "are driven by a topographic slope break".
 
 ### Canestrelli2014
 - Reference: Canestrelli, A., Nardin, W., Edmonds, D., Fagherazzi, S. and Slingerland, R. (2014). Importance of frictional effects and jet instability on the morphodynamics of river mouth bars and levees. Journal of Geophysical Research: Oceans 119 (the reference from memory).
@@ -1605,6 +1623,78 @@ RichDEM and Barnes2013-Depressions (software, "were not opened", not relied on);
 - Access: not checked.
 - Library: not fetched.
 - Read so far (by the project): at second hand only (Edmonds et al. 2021), 2026-10-23.
+
+### Nardi2019
+- Reference: Nardi, F., Annis, A., Di Baldassarre, G., Vivoni, E. R. and Grimaldi, S. (2019). GFPLAIN250m, a global high-resolution dataset of Earth's floodplains. Scientific Data 6:180309. Code: GFPLAIN, github.com/fnardi/GFPLAIN (GPL; read for two values only, nothing ported).
+- DOI or URL: 10.1038/sdata.2018.309
+- Cited as: "Nardi et al. 2019" and "GFPLAIN" (hydro/network.rs; bake/water.rs; rivers-and-lakes.md).
+- Ledger ids: HYD-150
+- Access: open access (CC BY 4.0).
+- Library: not fetched (the HTML text read is in the floodplain agent's scratch folder, not the library).
+- Read so far (by the project): 2026-10-24, the floodplain agent, the article's HTML text: Eq. 1 h ∝ A^b, the floodplain as the cells draining to a channel cell whose elevations are lower than H = z + h, "a constant parameterization at the global scale with b = 0.30", SRTM at 250 m between 60°N and 60°S for basins over 1,000 km². Table 1 did not load. a = 0.01 read in the code (`03-GFPLAIN.py`).
+
+### Lane2023
+- Reference: Lane, C. R., D'Amico, E., Christensen, J. R., Golden, H. E., Wu, Q. and Rajib, A. (2023). Mapping global non-floodplain wetlands. Earth System Science Data 15:2927-2955 (the title and the author list from memory).
+- DOI or URL: 10.5194/essd-15-2927-2023
+- Cited as: "Lane et al. 2023" (rivers-and-lakes.md, the Earth figures beside the D5 floodplains).
+- Ledger ids: none (doc claim beside HYD-150)
+- Access: open access.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the floodplain agent, through a page fetch (its first 100,000 characters), Section 3.3.1: "Nardi et al. (2019) calculated a global floodplain extent of 13 394 139 km2" with a 250 m pixel size, a 1,000 km² minimum contributing area and 60°N to 60°S; their own map, "Floodplains were estimated to cover 26.6×10^6 km2 (Table 5), or 19.7 % of the global landmass"; with Nardi's latitudes, 90 m data and a 20 km² minimum, about 24.2 million km².
+
+### Smith2009
+- Reference: Smith, N. D. et al. (2009). A paper on natural levees. Earth Surface Processes and Landforms 34:1060-1068 (the title and the co-authors were not recorded when it was read; the first author, year, venue and pages as read).
+- DOI or URL: 10.1002/esp.1792; the copy read at ftp.ems.psu.edu/pub/geosc/sling/PUBLICATIONS_SLINGERLAND/2001-2010/Smithetal2009.pdf (the host's certificate does not match).
+- Cited as: "Smith et al. 2009" (WaterBodies.java LEVEE; rivers-and-lakes.md).
+- Ledger ids: HYD-153
+- Access: paywalled (Wiley); an author's group copy (Penn State).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the floodplain agent, the Penn State copy, p. 1060: natural levees are "low wedge-shaped ridges" of "mainly channel-borne sediment", "typically highest and coarsest at the channel margins and gradually tapering and fining towards the adjacent floodbasin"; "Widths vary from a fraction to over 10 times the channel width".
+
+### Adams2004
+- Reference: Adams, P. N., Slingerland, R. L. and Smith, N. D. (2004). Variations in natural levee morphology in anastomosed channel flood plain complexes. Geomorphology 61:127-142 (the title and pages from memory).
+- DOI or URL: 10.1016/j.geomorph.2003.10.005; the copy read at ftp.ems.psu.edu/pub/geosc/sling/PUBLICATIONS_SLINGERLAND/2001-2010/AdamsSlingSmith2004.pdf.
+- Cited as: "Adams et al. 2004" (WaterBodies.java LEVEE; rivers-and-lakes.md).
+- Ledger ids: HYD-153
+- Access: paywalled (Elsevier); an author's group copy (Penn State).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the floodplain agent, the Penn State copy, Table 1 and Figs. 3 and 4: dimensionless levee width WL/WC about 0.15 to 1.07 on the Upper Columbia ("levee width typically less than channel width") and 0.41 to 25.96 on the Lower Saskatchewan ("broad widths typically several times channel width").
+
+### FilgueiraRivera2007
+- Reference: Filgueira-Rivera, M., Smith, N. D. and Slingerland, R. L. (2007). Controls on natural levée development in the Columbia River, British Columbia, Canada. Sedimentology 54:905-919 (the title from memory).
+- DOI or URL: 10.1111/j.1365-3091.2007.00865.x; the copy read at ftp.ems.psu.edu/pub/geosc/sling/PUBLICATIONS_SLINGERLAND/2001-2010/Filgueira-riveraetal2007.pdf.
+- Cited as: "Filgueira-Rivera et al. 2007" (WaterBodies.java LEVEE; rivers-and-lakes.md).
+- Ledger ids: HYD-153
+- Access: paywalled (Wiley); an author's group copy (Penn State).
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the floodplain agent, the Penn State copy, p. 907 (the study area): "Levée and proximal floodbasin sediments typically range in size from very fine sand to medium silt (d50 = 0.15-0.014 mm)".
+
+### Bull1964
+- Reference: Bull, William B. (1964). Geomorphology of segmented alluvial fans in western Fresno County, California. U.S. Geological Survey Professional Paper 352-E, pp. 89-129.
+- DOI or URL: https://pubs.usgs.gov/pp/0352e/report.pdf (the DOI 10.3133/pp352E from memory).
+- Cited as: "Bull 1964" (hydro/fan.rs; hydro/braid.rs; rivers-and-lakes.md, "Fans and braids").
+- Ledger ids: HYD-165, HYD-166, HYD-167, HYD-169, HYD-171
+- Access: open access (USGS)
+- Library: not fetched (read from the USGS PDF, 2026-10-24).
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 4), the USGS PDF (printed page = PDF page + 82): p. 93, the definition ("a segment of a cone that radiates downslope from the point where the stream channel emerges from a mountainous area") and the braided distributary channels "about 1-3 feet deep" below the fanhead trench; p. 94, the fans "range in size from 0.4 to 260 square miles" and "in overall slope from 0.0035 (0°12') to 0.029 (1°40')", the radii "restricted by adjacent fans, and by stream deposits at the toe of the fan", the lines drawn without statistical fitting, segmented profiles; Fig. 54 (p. 95, the page image): A_F = 2.4 A_D^0.88 (mudstone and shale basins) and 1.3 A_D^0.88 (sandstone), S_F = 0.023 A_D^−0.16 and 0.022 A_D^−0.32, S_F = 0.034 A_F^−0.28 and 0.025 A_F^−0.34; p. 98, the foothill fans' segment slopes; p. 100, "steep fans form at the mouths of canyons having steep longitudinal profiles"; p. 114, "an alluvial fan is part of a gently sloping cone"; p. 126, the summary's equations and basins of 0.2 to 296 square miles.
+
+### Stock2008
+- Reference: Stock, J. D., Schmidt, K. M. and Miller, D. M. (2008). Controls on alluvial fan long-profiles. Geological Society of America Bulletin 120(5/6):619-640.
+- DOI or URL: 10.1130/B26208.1; the copy read at https://web.gps.caltech.edu/~mpl/Ge126_Reading_List/Stock_et_al_alluvial_fans.pdf (a course reading list's copy).
+- Cited as: "Stock et al. 2008" (hydro/fan.rs FREE_SECTOR_RAD; rivers-and-lakes.md, "Fans and braids").
+- Ledger ids: HYD-165 (Table 1 only), HYD-168
+- Access: paywalled (GSA); a copy on a Caltech course page.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 4): Table 2 (p. 623, the page image): the four field fans' areas (Globe 9.7/17.1, Lucy Gray 64.9, Sheep Creek 20.2/22.3, Hanaupah 16.0/45.3 km², the second the pre-Holocene fan), arc lengths (6,500, 8,200, 5,800 and 5,800 m, "Straight line from fan head to margin along central axis"), catchment areas 12.39, 44.29, 20.60 and 74.05 km², fan-head slopes 0.060, 0.057, 0.068 and 0.062; Table 1 (p. 622), the literature's relations, "Afan = cAdrainage" and "Savg = cA^n" without coefficients; the abstract: channel slopes "decrease downfan from ~0.10-0.04 to ~0.01".
+
+### NansonCroke1992
+- Reference: Nanson, G. C. and Croke, J. C. (1992). A genetic classification of floodplains. Geomorphology 4(6):459-486.
+- DOI or URL: 10.1016/0169-555X(92)90039-Q (from memory); the copy read at https://calsalmon.org/sites/default/files/files/Nanson_and_Croke_1992_genetic_classification_floodplains.pdf (an author copy without the printed page numbers).
+- Cited as: "Nanson & Croke 1992" (rivers-and-lakes.md, "Fans and braids").
+- Ledger ids: HYD-171 (context; not used as a rule)
+- Access: paywalled (Elsevier); a re-typed copy on a watershed group's site.
+- Library: not fetched.
+- Read so far (by the project): 2026-10-24, the deltas lane (gap 5 stage 4), section "Floodplain classes": specific stream power at bankfull, class A over 300 W m⁻², class B 10 to 300 W m⁻² (B1 braided river floodplains: "an abundant silt to gravel size load, moderately steep gradients and usually easily erodible banks"; B3 meandering), class C under 10 W m⁻² (C2 anastomosing, "low gradients (commonly less than 0.0002)").
 
 ### Mentioned for later, not implemented (no ledger ids)
 Each verified only as a bibliographic record (OpenAlex), not read.
@@ -5671,8 +5761,8 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 ### Snyder1987
 - Reference: Snyder, J. P. (1987). Map Projections: A Working Manual. U.S. Geological Survey Professional Paper 1395. Washington, D.C.: U.S. Government Printing Office. ix + 385 pp.
 - DOI or URL: 10.3133/pp1395; https://pubs.usgs.gov/pp/1395/report.pdf
-- Cited as: "Snyder 1987" (the cylindrical equal-area projection's scale factors)
-- Ledger ids: ISO-127
+- Cited as: "Snyder 1987" (the cylindrical equal-area projection's scale factors; the azimuthal equidistant projection, ch. 25, for measuring a feature's distance on the planet)
+- Ledger ids: ISO-127, SCL-230 (ch. 25, from memory: not re-read for it), SCL-231 (ch. 10's equal-area property)
 - Access: open (USGS).
 - Library (the project's source library, not distributed): not filed; read in the USGS PDF.
 - Read so far (by the project): chapter 10, "Cylindrical Equal-Area Projection" (pp. 76 to 85), chapter 4 (p. 21) and the table footnote on p. 27, by a Sonnet sub-agent of the flexure-faults agent, 2026-10-23, the equations checked on the rendered page image. P. 77, "FORMULAS FOR THE SPHERE": x = R (λ − λ0) cos φs (10-1), y = R sin φ / cos φs (10-2), h = cos φ / cos φs (10-2a), k = 1/h (10-2b), "where φs is the standard parallel (N. or S.), or the Equator in Lambert's original form"; "There is no distortion of area anywhere on the projections"; "the parallels are spaced from the Equator in proportion to the sine of the latitude". P. 21: the scale factor "along the meridian is called h and along the parallel, k".

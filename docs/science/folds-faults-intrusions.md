@@ -249,6 +249,17 @@ built twice, before (stretch 1, the old intrusion sizes and relief 1) and after;
   batholiths, the aureoles and the stocks' roots are bodies and are not offset by younger faults.
 - **Structures are drawn from strain, not computed from stress.** The rates per area are design
   values; the counts are not compared with any count on Earth.
+- **Round on the planet, linear in Lambert blocks.** Plutons, stocks and plugs are drawn round
+  (or, for a stock, as its elongated ellipse, DEF-043) on the planet since 2026-10-23: their
+  semi-axes are the planet's metres and a stock's trend is an azimuth on the planet, and each is
+  stamped as the ellipse the simulation's Lambert grid makes of that outline (ledger SCL-235,
+  [round-features.md](round-features.md)); the bake projects an intrusion's window exactly
+  (SCL-236), so the conformal cube world shows it as drawn and the equal-area Petroff–Guyou world
+  with its own stretch, as it draws every shape. Before, all three were round in Lambert blocks, so
+  on the planet and on the cube they were long north–south by 1 / cos² of their latitude (3.0 to 1
+  at 55°). Dykes, folds and faults keep their Lambert trend and
+  length: a fold train or a fault far from the equator is stretched north–south on the planet by
+  the same factor across its length.
 
 ## Game choices
 
