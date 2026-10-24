@@ -181,6 +181,11 @@ public final class FarTerrain {
         return terrain.data();
     }
 
+    /** A cube world's net, or null on a polar world. */
+    public CubeLayout cube() {
+        return cube;
+    }
+
     private static final class Scratch {
         FarColumn.Shape[] shapes = new FarColumn.Shape[0];
         final FarColumn.Layers layers = new FarColumn.Layers();

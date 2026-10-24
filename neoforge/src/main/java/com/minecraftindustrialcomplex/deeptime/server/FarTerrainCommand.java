@@ -224,6 +224,11 @@ public final class FarTerrainCommand {
                 if (!b.registered())
                     l.addProperty("message", b.message());
                 l.addProperty("circumference", b.terrain().data().circumference());
+                // A cube world's slide (its F2 to F3 edge, cube plan G6) in Toroidal World's frame, which
+                // tools/client/dh-client-check.sh also crosses; Toroidal World's seam sits inside F2.
+                var cube = b.terrain().cube();
+                if (cube != null)
+                    l.addProperty("slide_x", com.minecraftindustrialcomplex.deeptime.worldgen.CubeFill.twX(cube, cube.edges().get(0).coord()));
                 // Toroidal World's guard (TwDhGuard): passed, left to TW (and why), or never asked.
                 TwDhGuardRule.Verdict guard = TwDhGuard.seen(key.location().toString());
                 l.addProperty("tw_guard", guard == null ? "not asked" : !guard.guarded() ? "not needed" : guard.pass() ? "passed" : "left to Toroidal World");
