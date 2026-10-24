@@ -343,7 +343,7 @@ impl ColumnWorld {
             let mut class: Option<&str> = horizon_at(&horizons, y)
                 .and_then(|h| self.classes.get(usize::from(horizons[h].1)))
                 .map(String::as_str);
-            // Bodies paint in id order and a painted block is no longer the horizon's, so where
+            // Bodies paint in id order and a block a body has taken is not painted again, so where
             // two bodies name a class at a block the first by id keeps it, as the game's strata
             // pass (`StrataPass.paintBodies`) and the workbench's rock views leave it
             // (docs/science/strata.md, "Bodies are painted where they are").
