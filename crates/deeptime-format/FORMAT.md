@@ -454,9 +454,10 @@ whose pass above is unchanged byte for byte. The differences from that pass:
 - **Topology** (SCL-122): the closed-basin redraw, the biome layers' fills and distances, and the
   relief's neighbours run on the cube's own cells across every seam (the open sea is an
   8-connected body over the six faces; distances are great-circle). Nothing is glued.
-- **Relief** (SCL-123, SCL-125): the cone gullies and the steep-ground texture are drawn on each
+- **Relief** (SCL-123, SCL-215): the cone gullies and the steep-ground texture are drawn on each
   face, in world blocks, across the seams; a cone's angles are taken on the planet in the vent's
-  tangent frame. The noise they read is blended across the turning seams within its reach.
+  tangent frame. The noise they read is the cube's surface noise ("The detail layer"), which runs on
+  through the turning seams (it replaced SCL-125's blend there).
 - **Vector data**: positions through the inverse map, sizes and directions through the analytic
   Jacobian. A river chain that crosses a turning seam is cut there into two chains whose ends
   meet under the seam's fold, the upstream part ending with `Mouth::Seam` (SCL-126; "Rivers");
@@ -1491,6 +1492,26 @@ carry the youth and fold strength it read (`amplify/youth`, `amplify/fold`, L1).
 m = N at (−x, −b − z) north or (−x, b − z) south, S = 0.5·(N + m), t = d / 32, w = t·t·(3 − 2t),
 result S + (N − S)·w (in that order). On the edge the result is the same at both images of a planet
 point, so the detail term is continuous through the seam. Lambert and synthetic worlds: N as below.
+
+**Cube worlds (0.7).** N is read on the cube's surface (`DetailSpec::cube_noise`, Java
+`DetailNoise.cubeAt`; SCL-215), not in net coordinates, whose axes turn at the turning seams. N at
+block (x, z) is taken at the block's centre p = (x + ½, z + ½): the block (⌊p⌋) is folded
+(`Cube::fold`, Java `CubeLayout.fold`, "The world's layout"), and on a face the point's local coordinates are
+(u, v) = (i + (pₓ − ⌊pₓ⌋), j + (p_z − ⌊p_z⌋)) with (i, j) the block's cell; past a net edge the point
+is moved by the fold's motion (`iso`, k quarter turns then the translation), giving r, and
+(u, v) = (i + (rₓ − qₓ), j + (r_z − q_z)) with q the block the fold shows and (i, j) its cell; past
+the net's corners N = 0. With half = s/2 and the face's frame [c, e_u, e_v] (`Face::frame`), the
+surface point is P = half·c + (u − half)·e_u + (v − half)·e_v (each component summed in that order),
+on the face whose axis a is the non-zero component of c. Value noise of wavelength λ there:
+m = max(1, round(s/λ)) cells along every cube edge; on the two free axes a₁ < a₂ the index is
+l = (P + half)·m/s (in that order), the corners are (⌊l₁⌋, ⌊l₂⌋) … (⌊l₁⌋ + 1, ⌊l₂⌋ + 1) and the fixed
+axis's index is m when c's component is +1 and 0 otherwise; the lattice value is
+h₃(salt, i_x, i_y, i_z) = ((mix(mix(mix(mix(seed ⊕ salt·0x9E3779B97F4A7C15) ⊕ i_x·0xD6E8FEB86659FD93) ⊕
+i_y·0xA0761D6478BD642F) ⊕ i_z·0xE7037ED1A0B428DB) >> 11) · 2⁻⁵² − 1, blended with the fade along a₁
+first (a = h₀₀ + (h₁₀ − h₀₀)·t₁, b = h₀₁ + (h₁₁ − h₀₁)·t₁, a + (b − a)·t₂). The octaves sum as below.
+Two faces share the lattice points of their common edge, so N is one function on the cube's
+surface, continuous through every seam and corner, and a block off the faces reads exactly its
+fold partner's N.
 
 
 `deeptime:terrain` (plan §7.1) adds **A(x, z) · N(x, z)** to the L3 height, where A is this layer
