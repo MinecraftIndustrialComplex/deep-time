@@ -167,7 +167,14 @@ and that the model does not have as physics.
   erosion, PLT-441, thins the edge but never consumes it; nothing turns continental crust
   oceanic). PLT-064's clearance is not replaced. Held off because with it alone the plate check
   fails in 8 of 8 runs (PLT-159's continental share, the arcs' continental heights, the largest
-  land gain): T's own physics is correct, the planet under it is not yet.
+  land gain): T's own physics is correct, the planet under it is not yet. Then the sink: the
+  trench's retreat under subduction erosion (stage S1, PLT-522 and PLT-523, Scholl & von Huene
+  2010's 2.5 km/Myr), correct by its tests and on the pool, off by default; with T (arm dock-TS1)
+  it takes 0.011 km2 of continental area a year against a surplus of 0.076, and the share still
+  ends at 0.621. What is left is this gap's: the island-arc front is about three times Earth's
+  length (42,700 km against 14,500; the lattice counts a straight front 1.12 times, not 1.84,
+  plates.md "The front's length on the lattice") and its maturing makes the area. T and S1 wait
+  for this gap's boundary work.
 - **State (2026-10-23, later).** Every stage on by default on the lane's branch, not merged
   (plates.md, "The arms"). Under Ben's rule of 2026-10-23 each cumulative 8-run arm on the new
   base (key 15660e3c5636, base2's seeds 1 to 4 as the control) was read for divergence and the

@@ -542,6 +542,18 @@ impl PlatesStage {
             ] {
                 *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
             }
+            // The trench's retreat (PLT-523): its globals only while it is on.
+            if env.k.erosion_retreat {
+                for (name, x) in [
+                    (
+                        subduction::RETREAT_CONTINENTAL_GLOBAL,
+                        e.retreat_continental_km2,
+                    ),
+                    (subduction::RETREAT_OTHER_GLOBAL, e.retreat_other_km2),
+                ] {
+                    *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
+                }
+            }
             lap(&mut clock, "forearcs");
         }
         // The boundary mix (measurement only) on the same samples as the fronts, before the

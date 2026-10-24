@@ -52,6 +52,16 @@ the game uses them:
    partner, so it is the same terrain. Its columns are copied block for block, each block state
    turned (stairs, logs, rails face the right way after the turn). The chunk then gets no
    structure starts, features or mobs of its own.
+
+   Every biome search of a cube world's chunks (the biome step on and off the faces, and the surface
+   and carver steps) starts cold (`climate/ColdBiomeSearch`), so a quart's biome depends on the
+   quart alone. Vanilla's search starts from the entry the thread found last and keeps it when
+   another entry is exactly as near, so at a climate tie a chunk holds whatever its thread met
+   first. A chunk off the faces asks its partner's quarts in another order (turned), so at a tie it
+   held the other biome: under Expanded Ecosphere, 2 of the test's 18,432 quarts at depth 9,500
+   (y = -96) sat exactly between Wythers' underground and deep underground (fitness 250,000 to
+   each), and the copy held deep underground where the partner held underground. The polar worlds
+   keep vanilla's warm search.
 3. **Deep ocean past the corners** (SCL-211). Columns in no band are the level's default rock up
    to 64 blocks below sea level and water above, in the deep ocean biome.
 4. **The border** (`wrap/CubeBorder`, `wrap/EdgeBorder`, POL-031 with POL-022 and POL-023). The
@@ -123,6 +133,14 @@ the game uses them:
     The walk is a distance in the net, in blocks. The planet distance runs across faces the border
     closes: from N's centre to F1's it is a quarter of the way round the planet, while the walk
     goes through F0's corner.
+11. **The presets** (`preset/Presets.withProjection`, `server/FirstStartGenerator`, cube plan G12).
+    The level type chooses the map. On a cube level type any preset of that size bakes as a cube,
+    the built-ins too: the first start bakes a copy of the preset with `scale.projection` set to
+    `cube`, and its log says so. A dedicated server sets `level-type=deeptime:planet_cube` (or
+    `deeptime:planet_cube_32k`) in `server.properties` and names a 16k (or 32k) preset in
+    `config/deeptime/server.json`. If the preset's size does not match the level type, the first
+    start stops with the presets that fit. The other level types still need a preset of their own
+    map.
 
 ## Equations and constants
 
