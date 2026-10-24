@@ -448,6 +448,7 @@ pub fn resolve(
                     centroid: centroid.to_array(),
                     cont_in: 0,
                     reversed: false,
+                    carried: false,
                 });
                 let k = state.contacts.len() - 1;
                 index.insert((lo, hi), k);
@@ -456,6 +457,8 @@ pub fn resolve(
         };
         let c = &mut state.contacts[k];
         c.last_step = step;
+        // Overlap seen again: the contact is active by it, not carried (ledger: PLT-550).
+        c.carried = false;
         c.samples = agg.count;
         c.centroid = centroid.to_array();
         if c.onset_event.is_none()
@@ -1027,9 +1030,11 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
         .collect();
     let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
     let pts = geo.points();
+    // The working subduction zones: overlap seen this step, or carried through a resampling
+    // (ledger: PLT-550).
     let mut active: BTreeMap<(u32, u32), usize> = BTreeMap::new();
     for (i, c) in state.contacts.iter().enumerate() {
-        if c.last_step == step {
+        if c.active(step) {
             active.insert((c.under, c.over), i);
         }
     }
@@ -1178,6 +1183,19 @@ pub fn fronts_finish(
         ..
     } = begun;
     let (dist, label, reached) = reach;
+    // A contact carried through a resampling whose boundary has no front this step (its plates no
+    // longer converge across it) is no working subduction zone (ledger: PLT-550).
+    if state.contacts.iter().any(|c| c.carried) {
+        let mut fronted = vec![false; state.contacts.len()];
+        for b in &boundary {
+            if let Some((_, c, ..)) = b.front {
+                fronted[c] = true;
+            }
+        }
+        for (c, f) in state.contacts.iter_mut().zip(fronted) {
+            c.carried &= f;
+        }
+    }
     // One-way subduction: the forearc and arc that the next step's hiding reads, within the arc's
     // distance of a front and one lattice spacing for where the front falls, as PLT-503's reach
     // (ledger: PLT-542, PLT-042).
@@ -1780,6 +1798,15 @@ fn retreat_forearcs(
 /// The arc band's weight at `d_km` from the front (Gaussian, centred `arc_distance_km` from it).
 fn w_arc_of(d_km: f64, k: &crate::params::TectonicParams) -> f64 {
     (-((d_km - k.arc_distance_km) / k.arc_width_km).powi(2)).exp()
+}
+
+/// At a resampling, with `on` (`tectonics.contact_carry`; ledger PLT-550): every contact active at
+/// `step` is carried through it ([`super::state::Contact::carried`]), the subduction zone going
+/// on while the new lattice's overlap forms again. Off, none is.
+pub fn carry(state: &mut PlateState, step: u64, on: bool) {
+    for c in &mut state.contacts {
+        c.carried = on && c.active(step);
+    }
 }
 
 /// Closes contacts unseen for longer than `contact_timeout_myr` (or all of them when `all`), writing an
