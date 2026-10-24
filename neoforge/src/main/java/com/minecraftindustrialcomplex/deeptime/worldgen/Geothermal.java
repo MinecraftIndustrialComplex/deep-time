@@ -143,10 +143,6 @@ public final class Geothermal {
         double meanC(int x, int z);
 
         /**
-         * The plate model's heat flow at the column, mW/m2, on continental crust; NaN on oceanic
-         * crust and in a world without the layer (then the ground has no heat of its own).
-         */
-        /**
          * The half-extent of the world in z, blocks: the poles of a Lambert world (R), the turning
          * edges of a Petroff–Guyou one (b/2); NaN to take the Lambert poles of the circumference.
          */
@@ -154,6 +150,10 @@ public final class Geothermal {
             return Double.NaN;
         }
 
+        /**
+         * The plate model's heat flow at the column, mW/m2, on continental crust; NaN on oceanic
+         * crust and in a world without the layer (then the ground has no heat of its own).
+         */
         default double heatFlowMwM2(int x, int z) {
             return Double.NaN;
         }
