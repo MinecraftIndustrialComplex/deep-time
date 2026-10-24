@@ -29,6 +29,7 @@ import net.minecraft.world.level.GameRules;
 import net.neoforged.fml.ModLoader;
 import net.neoforged.fml.ModLoadingIssue;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.neoforge.client.loading.ClientModLoader;
 import net.neoforged.neoforge.common.NeoForge;
 
@@ -68,7 +69,8 @@ import java.util.List;
  * and draw ({@code 11-vista-<n>}). A sixth field picks the overlay for that shot: 0
  * hides the HUD, 1 shows the F3 debug screen (Deep Time's line names the face and north's bearing).
  * {@code settle=<s>} is how long a vista waits once the chunk ahead is loaded (default 15; Distant
- * Horizons' far terrain needs minutes). {@code open=<save>} skips the walk: the client opens that
+ * Horizons' far terrain needs minutes); {@code vistafrom=<n>} starts at vista n, keeping the numbers
+ * (a rerun of the last few). {@code open=<save>} skips the walk: the client opens that
  * folder of {@code saves/} (a server's world copied in, {@code vm-client.sh --save}) and goes
  * straight to the in-world shot and the vistas, so two worlds baked elsewhere are shot alike.
  *
@@ -117,8 +119,12 @@ final class ScreenshotDriver {
     private static final int VISTA_SETTLE_TICKS = 20 * Integer.getInteger(PROP + ".settle", 15);
     /** … and shoots anyway after this long (155 s more than the settle; the step timeout follows it). */
     private static final int VISTA_MAX_TICKS = VISTA_SETTLE_TICKS + 20 * 155;
-    private static int vista;
+    /** The first vista shot ({@code .vistafrom}, default 0): a rerun of some vistas keeps their numbers. */
+    private static int vista = Integer.getInteger(PROP + ".vistafrom", 0);
     private static int vistaLoadedAt = -1;
+    /** Frames drawn so far, and the frame count when a vista's overlay changed (-1: not changed). */
+    private static int frames;
+    private static int overlayFrame = -1;
     /** The overlay before a vista's shot changed it: the HUD hidden, the debug screen shown. */
     private static boolean hudWasHidden;
     private static boolean debugWasShown;
@@ -141,6 +147,7 @@ final class ScreenshotDriver {
             return;
         DeepTime.LOGGER.warn("[deeptime-shot] screenshot driver active (-D{}=true): the client drives itself", PROP);
         NeoForge.EVENT_BUS.addListener(ClientTickEvent.Post.class, e -> tick());
+        NeoForge.EVENT_BUS.addListener(RenderFrameEvent.Post.class, e -> frames++);
     }
 
     private static void go(Step next) {
@@ -969,8 +976,14 @@ final class ScreenshotDriver {
                         vistaLoadedAt = stepTicks;
                     boolean due = (vistaLoadedAt >= 0 && stepTicks >= vistaLoadedAt + VISTA_SETTLE_TICKS) || stepTicks >= VISTA_MAX_TICKS;
                     if (due && v.length > 5 && overlayFor(mc, v[5])) {
-                        // the overlay changed this tick: shoot on the next, once it has drawn
+                        // The overlay changed this tick: shoot once two frames have drawn it. A slow
+                        // client (llvmpipe with Distant Horizons) runs several ticks per frame, so the
+                        // next tick can come before any frame does.
+                        overlayFrame = frames;
+                    } else if (due && overlayFrame >= 0 && frames < overlayFrame + 2) {
+                        // waiting for the frames
                     } else if (due) {
+                        overlayFrame = -1;
                         DeepTime.LOGGER.info("[deeptime-shot] vista {}: ahead chunk loaded at tick {}", vista, vistaLoadedAt);
                         shot("11-vista-" + vista);
                         if (v.length > 5)
