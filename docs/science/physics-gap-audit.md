@@ -149,6 +149,25 @@ and that the model does not have as physics.
   plate-geometry merge). That row judged that none of the seven criteria needs it. This audit
   disagrees for M4 and M5. The docs' own list of what is left names this first (plates.md:2486,
   "The extent of young orogen is the high ground").
+- **State (2026-10-23, the docking lane).** V1 item 1 on base3 (key 88c144b6c2cb): the high coast
+  is held by a few long continent-continent collisions that never end (states 60 Myr or older,
+  0.482 of the last 30 Myr's front-time), not by the count of dockings (55.7 sutures per 100 Myr,
+  Macdonald et al. 2019's 19 to 39; plates.md "Docking: what stands at the collision fronts").
+  Their incoming plates are the largest, pulled on by slabs elsewhere after their own broke off,
+  and PLT-078 let a continent weld only on a stall that never came. Built: Stern 2004's
+  transference with Gurnis et al. 2004's force (3 × 10^12 N/m) and critical convergence (100 km)
+  (PLT-516 to PLT-518), correct by its unit tests and off by default (held off by the
+  coordinator until the area sink below lands with it); off is bit-identical to base3. Arm
+  dock-T (8 runs): no guard failure; collisions 33 / 77 Myr at p50 / p90 against 48 / 143, coast
+  with high ground 0.354 to 0.114 and land above 2 km 0.153 to 0.053 (both near Earth). But the
+  long collisions were also the model's sink of continental area: without them the crust grows
+  from 0.42 to 0.57 of the planet (Cogley 1984: 0.41), the sea rises about 900 m, the land falls
+  to 0.129 and the largest landmass to 0.021, and one plate holds half the planet in 16.5 % of
+  the steps. Next, on the same branch: the missing area sink of continental crust (the forearc's
+  erosion, PLT-441, thins the edge but never consumes it; nothing turns continental crust
+  oceanic). PLT-064's clearance is not replaced. Held off because with it alone the plate check
+  fails in 8 of 8 runs (PLT-159's continental share, the arcs' continental heights, the largest
+  land gain): T's own physics is correct, the planet under it is not yet.
 - **State (2026-10-23, later).** Every stage on by default on the lane's branch, not merged
   (plates.md, "The arms"). Under Ben's rule of 2026-10-23 each cumulative 8-run arm on the new
   base (key 15660e3c5636, base2's seeds 1 to 4 as the control) was read for divergence and the
