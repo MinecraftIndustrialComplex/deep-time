@@ -471,7 +471,9 @@ public final class WaterBodies {
                                 }
                         }
                         // A river's bank on its floodplain: the levee's sand on its soil top (ledger: HYD-153).
-                        if (plains && col.river() != null && g >= minY && g <= maxY && wd.onFloodplain(x, z)) {
+                        // The bank is a river's bank zone, where the rule caps the ground (maxGround);
+                        // col.river() is the covering channel, which a bank column never has.
+                        if (plains && maxG != null && g >= minY && g <= maxY && wd.onFloodplain(x, z)) {
                             BlockState b = chunk.getBlockState(pos.set(x, g, z));
                             if (levees(b)) {
                                 chunk.setBlockState(pos, LEVEE, false);
