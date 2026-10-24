@@ -827,7 +827,7 @@ pub struct TectonicParams {
     /// lattice's zigzag taken out, as a collision front's length is measured (PLT-222). The
     /// per-km rates of the fronts (subduction erosion, PLT-441; the trench's retreat, PLT-522)
     /// and the fronts' km × Myr globals then meet their sources per km. Off, each front sample
-    /// counts one lattice spacing, which counts a straight front about 1.12 times. ledger: PLT-530
+    /// counts one lattice spacing, which counts a straight front about 1.04 times. ledger: PLT-530
     pub front_share: bool,
     /// Hotspots at the start.
     pub hotspots_initial: u32,
