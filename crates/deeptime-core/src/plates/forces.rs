@@ -942,7 +942,8 @@ fn balance_step(
     let pts = geo.points();
     let mut active: BTreeMap<(u32, u32), usize> = BTreeMap::new();
     for (i, c) in st.contacts.iter().enumerate() {
-        if c.last_step == env.step {
+        // Overlap seen this step, or carried through a resampling (ledger: PLT-550).
+        if c.active(env.step) {
             active.insert((c.under, c.over), i);
         }
     }

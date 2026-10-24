@@ -791,7 +791,9 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 1, 2, 3, 6, 11, 14, 15, 20 and 21, seeds 12 and 19 no more; this test passes on all 9, seed
     // 11 since; 11 of seeds 1 to 24 with a split's latent slab copies, PLT-534, the same day: 1,
     // 2, 8, 11 to 14, 16, 20, 22 and 23, seed 12 again since; 12 of seeds 1 to 24 with the level
-    // set on by default, PLT-536, the same day: 1, 2, 4, 5, 7, 9, 12, 15, 17 to 19 and 21).
+    // set on by default, PLT-536, the same day: 1, 2, 4, 5, 7, 9, 12, 15, 17 to 19 and 21; 12 of
+    // seeds 1 to 24 with the contact carry on by default, PLT-550, the same day: 1, 4, 5, 7, 8,
+    // 10 to 12, 18, 20, 23 and 24, seed 1 three times, seeds 2, 9, 15, 17, 19 and 21 no more).
     let p = preset(8000, 300.0, "scattered_continents", 12);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
@@ -937,8 +939,10 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // "the front lane"; seed 19 still does not weld with a split's latent slab copies, PLT-534,
     // the same day, so seed 20, the next seed that welds, stays: the seed is chosen by its weld,
     // and the guard asserted below binds on welding seed 16; seed 19 again since the level set
-    // went on by default, PLT-536, the same day, when seed 19 welds again and seed 20 no more).
-    let p = preset(8000, 300.0, "scattered_continents", 19);
+    // went on by default, PLT-536, the same day, when seed 19 welds again and seed 20 no more;
+    // seed 20 again since the contact carry went on by default, PLT-550, the same day, when seed
+    // 19 no longer welds: all 12 welding seeds pass).
+    let p = preset(8000, 300.0, "scattered_continents", 20);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -2117,6 +2121,84 @@ fn a_contact_whose_plates_slide_past_has_no_arc_front() {
     let sliding = fronts(DVec3::Z);
     assert!(head_on > 20, "{head_on}");
     assert_eq!(sliding, 0);
+}
+
+/// A subduction zone goes on through a resampling (`tectonics.contact_carry`, PLT-550; plates.md,
+/// "Step 7"). The resampling gives both plates of [`converging_plates`] fresh crust with no
+/// overlap, so at the next step, before the plates move, the contact sees none. Carried, it keeps
+/// its front as it had it before the resampling; off, it has none until the overlap forms again
+/// (the record's subducting length fell from 99,000 to 63,000 km in the first 2 Myr after a
+/// resampling, base6 seeds 1 to 4). A carried contact whose plates slide past has no front and is
+/// carried no more; one whose overlap is seen again is active by it, not carried.
+#[test]
+fn a_subduction_zone_goes_on_through_a_resampling() {
+    let p0 = preset(20_000, 20.0, "supercontinent", 5);
+    let run = |on: bool| {
+        let mut p = p0.clone();
+        p.tectonics.contact_carry = on;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let (mut st, geo, pos) = converging_plates(&p, &env);
+        assert_eq!(st.contacts.len(), 1);
+        assert!(!st.contacts[0].carried);
+        let before = subduction::fronts_begin(&st, &geo, &pos, &env).front_count();
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        subduction::carry(&mut st, env.step, on);
+        assert_eq!(st.contacts[0].carried, on);
+        let tree = Tree::over(&pos, |_| true);
+        let geo = ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env).unwrap();
+        let pos = geometry::positions(&st, &geo);
+        let env2 = stage.env(&p.tectonics, 2);
+        let tree = Tree::over(&pos, |_| true);
+        let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+        subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
+        let after = subduction::fronts_begin(&st, &geo, &pos, &env2).front_count();
+        (st, geo, pos, world, before, after)
+    };
+    let (_, _, _, _, before_off, after_off) = run(false);
+    let (st, geo, pos, world, before, after) = run(true);
+    eprintln!("fronts: before {before} / {before_off}, after on {after}, off {after_off}");
+    assert_eq!(st.contacts.len(), 1);
+    assert_eq!(
+        st.contacts[0].last_step, 1,
+        "overlap seen after the resampling"
+    );
+    assert!(before > 20 && before == before_off, "{before} {before_off}");
+    assert_eq!(after_off, 0, "a front without its overlap, off");
+    assert!(
+        after > before / 2 && after <= 2 * before,
+        "{after} fronts carried, {before} before"
+    );
+    let p = p0.clone();
+    let stage = PlatesStage::new(p.clone());
+    let env2 = stage.env(&p.tectonics, 2);
+    // The plates slide past each other (about z, along the equator): no front, and the carry ends.
+    let mut sliding = st.clone();
+    sliding.plates[1].omega = (DVec3::Z * env2.norm.omega_of_speed(50.0)).to_array();
+    let mut cones = vec![[0.0; 2]; sliding.samples.len()];
+    subduction::fronts_and_uplift(&mut sliding, &geo, &pos, &env2, &mut cones, 0.0);
+    assert!(!sliding.contacts[0].carried, "carried with no front");
+    // Converging on: the carry holds while the fronts stand.
+    let mut held = st.clone();
+    subduction::fronts_and_uplift(&mut held, &geo, &pos, &env2, &mut cones, 0.0);
+    assert!(
+        held.contacts[0].carried,
+        "the carry ended with fronts standing"
+    );
+    // The ocean moves under the continent: the overlap is seen, and the contact is active by it.
+    let mut world = world;
+    let env3 = stage.env(&p.tectonics, 3);
+    for g in held.groups.iter_mut().filter(|g| g.plate == 1) {
+        let q = glam::DQuat::from_rotation_x(0.05);
+        g.rot = [q.x, q.y, q.z, q.w];
+    }
+    let pos3 = geometry::positions(&held, &geo);
+    let tree = Tree::over(&pos3, |_| true);
+    let overlaps = subduction::detect(&held, &geo, &pos3, &tree);
+    subduction::resolve(&mut held, &mut world, &geo, &overlaps, &pos3, &env3).unwrap();
+    let c = &held.contacts[0];
+    assert_eq!((c.last_step, c.carried), (3, false));
+    assert!(c.active(3));
 }
 
 /// Plate task 8: the volcano stage's felsic cones over an arc (already in the pools as volcanic

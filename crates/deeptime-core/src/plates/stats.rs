@@ -253,11 +253,12 @@ pub fn margin_classes(
         .collect();
     let vis = Tree::over(pos, |i| !samples[i].is_hidden());
     let adjacent = MARGIN_ADJACENT_SPACINGS * norm.spacing_rad();
-    // Confirmed subduction zones seen in the last step.
+    // Confirmed subduction zones seen in the last step or carried through a resampling (ledger:
+    // PLT-550).
     let live: Vec<(u32, u32)> = state
         .contacts
         .iter()
-        .filter(|c| c.onset_event.is_some() && c.last_step + 1 >= state.step)
+        .filter(|c| c.onset_event.is_some() && (c.carried || c.last_step + 1 >= state.step))
         .map(|c| (c.under, c.over))
         .collect();
     let omega: Vec<DVec3> = state
