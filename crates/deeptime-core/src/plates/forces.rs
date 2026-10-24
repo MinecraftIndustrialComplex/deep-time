@@ -30,7 +30,11 @@
 //!   thickness factor ([`slab_weight`]), `L` the contact's tracked slab length and `D`
 //!   `slab_depth_km`. Continental crust in the trench pulls nothing.
 //! - **Slab suction** (drives the overriding plate, towards the trench): `slab_suction_share` of
-//!   that pull.
+//!   that pull. With `suction_saturates` (PLT-540) it is a traction towards the flow the sinking
+//!   slab drives, `k (v_t − u)`: `u` the overriding plate's speed towards the trench, `v_t` the
+//!   slab's terminal velocity (its pull over its slab resistance, Forsyth & Uyeda 1975), `k v_t`
+//!   the share of the pull. At rest it is the share; it falls to nothing as the plate catches up
+//!   with the slab, so no overriding plate is drawn faster than the slab sinks.
 //! - **Edge energy** (ridge push and the weight of high ground): at every boundary sample of a
 //!   plate, `(U(edge) − Ū) · edge_energy / EDGE_ENERGY_PHYSICAL` per metre, pushing the plate
 //!   away from the edge when the edge stands high ([`column_energy`]: the gravitational
@@ -220,6 +224,8 @@ pub struct Coeffs {
     /// Slab pull per metre of trench of the reference slab, N/m (with `slab_pull` and gravity).
     pub pull_n_m: f64,
     pub suction_share: f64,
+    /// The suction saturates at the slab's terminal velocity (`suction_saturates`, PLT-540).
+    pub suction_saturates: bool,
     /// The edge energy's multiplier (`edge_energy / EDGE_ENERGY_PHYSICAL`).
     pub edge_scale: f64,
     /// The multiplier of the collision's buoyancy (`collision_buoyancy`).
@@ -275,6 +281,7 @@ impl Coeffs {
             spacing_m,
             pull_n_m: f_ref * k.slab_pull,
             suction_share: k.slab_suction_share,
+            suction_saturates: k.suction_saturates,
             edge_scale: k.edge_energy / EDGE_ENERGY_PHYSICAL,
             buoyancy: k.collision_buoyancy,
             drag,
@@ -318,6 +325,8 @@ pub enum Resist {
     Slab,
     Boundary,
     Collision,
+    /// The saturating suction's speed-dependent part (booked with the suction, PLT-540).
+    Suction,
 }
 
 /// The mantle as the other side of a link.
@@ -460,6 +469,29 @@ impl Balance {
         self.links.push(l);
     }
 
+    /// The suction of a slab pulling with `pull` (N) on the overriding plate `p` at `x`, `dir`
+    /// pointing across the trench towards the subducting plate. A fixed share of the pull (PLT-186);
+    /// with `suction_saturates` (PLT-540) that share is the traction at rest of `k (v_t − u)`, `u`
+    /// the plate's speed along `dir`, `v_t = pull / (slab_res ℓ)` the slab's terminal velocity, so
+    /// `k = share × slab_res × ℓ`: a link to the mantle along `dir`.
+    pub fn add_suction(&mut self, p: u32, x: DVec3, dir: DVec3, pull: f64) {
+        if pull <= 0.0 {
+            return;
+        }
+        let c = self.c;
+        self.add_force(p, x, dir * (pull * c.suction_share), Drive::Suction);
+        if c.suction_saturates && c.slab_res > 0.0 {
+            self.add_link(Link {
+                a: p,
+                b: MANTLE,
+                x,
+                n: Some(dir),
+                k: c.suction_share * c.slab_res * c.spacing_m, // ledger: PLT-540
+                term: Resist::Suction,
+            });
+        }
+    }
+
     /// Plates in the system: those with visible samples.
     fn index(&self) -> (Vec<usize>, Vec<Option<usize>>) {
         let mut idx = vec![None; self.acc.len()];
@@ -545,7 +577,8 @@ impl Balance {
     pub fn answers(&self, w: &[DVec3]) -> Vec<Option<PlateAnswer>> {
         let r = self.c.radius_m;
         let np = self.acc.len();
-        let (mut t_slab, mut t_bnd, mut t_col) = (
+        let (mut t_slab, mut t_bnd, mut t_col, mut t_sat) = (
+            vec![DVec3::ZERO; np],
             vec![DVec3::ZERO; np],
             vec![DVec3::ZERO; np],
             vec![DVec3::ZERO; np],
@@ -575,6 +608,7 @@ impl Balance {
                     Resist::Slab => t_slab[p] += t,
                     Resist::Boundary => t_bnd[p] += t,
                     Resist::Collision => t_col[p] += t,
+                    Resist::Suction => t_sat[p] += t,
                 }
                 moment[p] += self.offset(p, l.x).dot(f);
             };
@@ -593,8 +627,10 @@ impl Balance {
                 let wp = w[p];
                 let t_drag = -(a.drag * wp);
                 let body = -wp.dot(a.drag_moment) + a.flow_moment;
+                // The suction net of its saturation (PLT-540; nothing without it).
+                let t_suck = a.t_suck + t_sat[p];
                 let terms = [
-                    a.t_pull, a.t_suck, a.t_edge, a.t_flow, t_drag, t_slab[p], t_bnd[p], t_col[p],
+                    a.t_pull, t_suck, a.t_edge, a.t_flow, t_drag, t_slab[p], t_bnd[p], t_col[p],
                 ];
                 let sum: DVec3 = terms.iter().copied().sum();
                 let largest = terms.iter().map(|t| t.length()).fold(0.0, f64::max);
@@ -603,7 +639,7 @@ impl Balance {
                 Some(PlateAnswer {
                     omega: w_yr,
                     slab_pull: a.t_pull.length(),
-                    slab_suction: a.t_suck.length(),
+                    slab_suction: t_suck.length(),
                     edge_energy: a.t_edge.length(),
                     mantle_flow: a.t_flow.length(),
                     basal_drag: t_drag.length(),
@@ -1159,7 +1195,7 @@ fn balance_step(
                 * ell;
             if pull > 0.0 {
                 bal.add_force(under, x, towards * pull, Drive::SlabPull);
-                bal.add_force(p, x, dir * (pull * c.suction_share), Drive::Suction);
+                bal.add_suction(p, x, dir, pull);
             }
             bal.add_link(Link {
                 a: under,
@@ -1495,6 +1531,95 @@ mod tests {
         let w = push.solve().unwrap();
         let a = push.answers(&w)[0].unwrap();
         assert!(a.stress_mpa < 0.0 && a.speed_mm_yr < 0.5, "{a:?}");
+    }
+
+    /// The saturating suction (PLT-540) against the fixed share (PLT-186). A plate drawn only by
+    /// the suction of a straight trench, with nothing at its edges or, for the reference plate,
+    /// boundary resistance all round. The fixed share's speed `u_f` (the share over the plate's
+    /// resistance) becomes `u_f / (1 + u_f / v_t)`, `v_t` the slab's terminal velocity: its pull
+    /// over its slab resistance (PLT-185; Forsyth & Uyeda 1975, p. 178: "effectively the terminal
+    /// velocity of the dense slab falling in a viscous medium"). So a plate the share
+    /// draws slowly keeps most of its speed, and a small plate (Earth's Tonga microplate, Bevis
+    /// et al. 1995) that the share would draw several times faster than the slab sinks follows
+    /// the slab at most. At rest the suction is the share.
+    #[test]
+    fn the_suction_draws_no_overriding_plate_faster_than_its_slab_sinks() {
+        // (speed towards the trench at the centroid, mm/yr; the suction's torque at rest; the
+        // fixed share's torque; v_t, mm/yr)
+        let run = |r_deg: f64, trench_km: f64, edges: bool, saturates: bool| {
+            let k = TectonicParams {
+                suction_saturates: saturates,
+                ..quiet()
+            };
+            let c = coeffs(&k);
+            let (pts, rim) = cap(&c, r_deg);
+            let mut bal = Balance::new(c, &[DVec3::Z]);
+            for &x in &pts {
+                bal.add_area(0, x, false);
+            }
+            // The trench: rim points nearest +X, `trench_km` of them, the slab across it towards +X.
+            let pull = c.pull_n_m * c.spacing_m;
+            let mut rim_sorted = rim.clone();
+            rim_sorted.sort_by(|a, b| b.0.x.total_cmp(&a.0.x));
+            let mut fixed = DVec3::ZERO;
+            let mut len = 0.0;
+            for &(x, _) in &rim_sorted {
+                if len >= trench_km * 1000.0 {
+                    break;
+                }
+                let dir = tangent(x, DVec3::X).normalize();
+                bal.add_suction(0, x, dir, pull);
+                fixed += x.cross(dir * pull * c.suction_share) * c.radius_m;
+                len += c.spacing_m;
+            }
+            if edges {
+                for &(x, _) in &rim {
+                    bal.add_link(Link {
+                        a: 0,
+                        b: MANTLE,
+                        x,
+                        n: None,
+                        k: c.boundary_res * c.spacing_m,
+                        term: Resist::Boundary,
+                    });
+                }
+            }
+            let w = bal.solve().expect("solvable");
+            let ans = bal.answers(&w)[0].expect("plate 0");
+            assert!(ans.residual < 1e-6, "{}", ans.residual);
+            let v = w[0].cross(DVec3::Z) * c.radius_m * 1.0e3 * YEAR_S;
+            assert!(v.x > 0.0 && v.x > 5.0 * v.y.abs(), "{v:?}");
+            let at_rest = bal.answers(&[DVec3::ZERO])[0].unwrap().slab_suction;
+            let v_t = c.pull_n_m / c.slab_res * 1.0e3 * YEAR_S;
+            (v.x, at_rest, fixed.length(), v_t)
+        };
+        // A small plate (about 70 samples of the 100k lattice, the size the speed guard held:
+        // plates.md, "The speed guard") with a trench along a third of its edge.
+        for (r_deg, trench_km, edges, tol) in [(3.0, 700.0, false, 0.03), (31.0, 3000.0, true, 0.1)]
+        {
+            let (u_f, rest_f, fixed, v_t) = run(r_deg, trench_km, edges, false);
+            let (u_s, rest_s, _, v_t2) = run(r_deg, trench_km, edges, true);
+            assert_eq!(v_t, v_t2);
+            // About 105 mm/yr at Earth's settings: 45 × (1 + 3 + 3) / 3.
+            assert!((100.0..110.0).contains(&v_t), "{v_t}");
+            assert!((rest_f / fixed - 1.0).abs() < 1e-9 && (rest_s / fixed - 1.0).abs() < 1e-9);
+            let expect = u_f / (1.0 + u_f / v_t);
+            eprintln!(
+                "r {r_deg}: fixed {u_f:.1}, saturating {u_s:.1}, expected {expect:.1}, v_t {v_t:.1}"
+            );
+            assert!(
+                (u_s / expect - 1.0).abs() < tol && u_s < v_t,
+                "r {r_deg}: fixed {u_f:.1}, saturating {u_s:.1}, expected {expect:.1}, v_t {v_t:.1}"
+            );
+            if r_deg < 10.0 {
+                assert!(
+                    u_f > 2.0 * v_t,
+                    "the share draws the small plate fast: {u_f}"
+                );
+            } else {
+                assert!(u_f < 0.5 * v_t && u_s > 0.7 * u_f, "{u_f} {u_s}");
+            }
+        }
     }
 
     /// Two plates side by side, one pulled by a trench, the other free: with boundary resistance
