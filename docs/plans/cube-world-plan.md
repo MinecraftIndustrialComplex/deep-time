@@ -698,9 +698,13 @@ section 7.4 is deleted yet.
   corner, fill, biome, ocean, block-state and border GameTests (`CubeWorldGameTests`, on the 4k test
   planet baked as a cube) and the reachability flood fill (`CubeBorderTest`), with the dev planet
   server on that cube (`gametest-planet.sh --boot-only --cube-4k`, its probes on every face against
-  `inspect-column`) and the smoke's cube presets at 16k and 32k.
-- Left: G3 (the detail noise across turning seams, Rust and Java together), G6 (far terrain and
-  Distant Horizons), G9 (climate API 5), G10's `NetworkGameTests` F3 test, the rest of G11 (the
+  `inspect-column`) and the smoke's cube presets at 16k and 32k. Stage 2: G6 (`FarTerrain` folds
+  an area off the faces column by column through `CubeLayout.fold`, turns its block states, reads
+  the fill's biomes and draws deep ocean past the corners; Distant Horizons' sphere is the
+  equal-area radius; the guard checks 4s; `/deeptime probe dh` gives the slide's x, and
+  `dh-client-check.sh` and the smoke's `--dh` checks cover both sides of the slide as of Toroidal
+  World's seam).
+- Left: G3 (the detail noise across turning seams, Rust and Java together), G9 (climate API 5), G10's `NetworkGameTests` F3 test, the rest of G11 (the
   `pole`, `tw` and `column` probes, `SiteCommands.distance`), G12 (the presets themselves; the smoke
   uses `tools/smoke/presets/*_cube.json`), the rest of G13 and G14, G16, the Sable border, and the
   section 7.4 deletions with the rewrites of the Petroff-Guyou tests they bring.

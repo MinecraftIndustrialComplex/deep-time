@@ -5,6 +5,8 @@ import com.minecraftindustrialcomplex.deeptime.climate.ColdBiomeSearch;
 import com.minecraftindustrialcomplex.deeptime.rock.PaletteRules;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Columns;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
+import com.minecraftindustrialcomplex.deeptime.worldgen.CubeFill;
 import com.minecraftindustrialcomplex.deeptime.worlddata.FarColumn;
 import com.minecraftindustrialcomplex.deeptime.worlddata.IceCover;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
@@ -28,7 +30,9 @@ import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 
 import java.util.List;
 import java.util.Optional;
@@ -62,7 +66,11 @@ import java.util.Optional;
  * <p><b>Wrapping.</b> Every sample folds x into the canonical lap first, as Toroidal World folds
  * the chunks it generates, so an area on any lap, or across the seam, is the planet's terrain.
  * Past the pole edge (Lambert) the rasters clamp, past a Petroff–Guyou world's turning edges they fold
- * (GridDesc.cell), exactly as the real generator reads them.
+ * (GridDesc.cell), exactly as the real generator reads them. On a cube world (cube plan G6) a column
+ * off the six faces is drawn as the generator draws it there ({@code worldgen/CubeFill}): the planet
+ * column its block folds onto, sampled there with its blocks turned by the fold's quarter turns, and
+ * deep ocean past the net's corners; the biome of any quart is the one the fill stores
+ * ({@link CubeFill#foldedBiome}). An area wholly on the faces takes the plain path.
  *
  * <p><b>What is not here.</b> Trees and other features, caves, and the parts of the pack's surface
  * rules that read a chunk (its noise, its heightmap). Thread-safe: one scratch per thread, everything
@@ -98,6 +106,12 @@ public final class FarTerrain {
     private final int cell;
     /** The active volcanoes' lava flows, which top dry ground as {@code LavaFlowPass} paints them near. */
     private final LavaFlows flows;
+    /** A cube world's net, or null on a polar world. */
+    private final CubeLayout cube;
+    /** Past a cube net's corners: the biome, the floor's block, the water and sea level (CubeFill.ocean). */
+    private final Holder<Biome> deepOcean;
+    private final BlockState oceanRock, oceanWater;
+    private final int seaLevel;
 
     private FarTerrain(ServerLevel level, GeologicChunkGenerator generator, WorldDataTerrain terrain, FarSurface surface) {
         this.level = level;
@@ -106,6 +120,12 @@ public final class FarTerrain {
         Climate.Sampler climate = level.getChunkSource().randomState().sampler();
         this.biomes = source;
         this.sampler = climate;
+        this.cube = generator.cubeLayout();
+        NoiseGeneratorSettings settings = generator.sourceSettings().value();
+        this.deepOcean = cube == null ? null : CubeFill.deepOcean(source);
+        this.oceanRock = settings.defaultBlock();
+        this.oceanWater = settings.defaultFluid();
+        this.seaLevel = settings.seaLevel();
         this.surface = surface;
         this.levelMinY = level.getMinBuildHeight();
         this.levelMaxY = level.getMaxBuildHeight() - 1;
@@ -128,6 +148,8 @@ public final class FarTerrain {
     private Holder<Biome> noiseBiome(int qx, int qy, int qz) {
         ColdBiomeSearch.begin();
         try {
+            if (cube != null)
+                return CubeFill.foldedBiome(cube, biomes, sampler, deepOcean, qx, qy, qz);
             return biomes.getNoiseBiome(qx, qy, qz, sampler);
         } finally {
             ColdBiomeSearch.end();
@@ -159,6 +181,11 @@ public final class FarTerrain {
         return terrain.data();
     }
 
+    /** A cube world's net, or null on a polar world. */
+    public CubeLayout cube() {
+        return cube;
+    }
+
     private static final class Scratch {
         FarColumn.Shape[] shapes = new FarColumn.Shape[0];
         final FarColumn.Layers layers = new FarColumn.Layers();
@@ -169,6 +196,10 @@ public final class FarTerrain {
         Holder<Biome>[] biomeCache;
         int[] biomeCacheY = new int[0];
         final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        /** A cube world's folded area: each grid position's planet block, its quarter turns and whether it is deep ocean. */
+        long[] fx = new long[0], fz = new long[0];
+        int[] fk = new int[0];
+        boolean[] ocean = new boolean[0];
 
         @SuppressWarnings("unchecked")
         void size(int m, int biomeCells) {
@@ -176,6 +207,12 @@ public final class FarTerrain {
                 shapes = new FarColumn.Shape[m * m];
                 for (int i = 0; i < shapes.length; i++)
                     shapes[i] = new FarColumn.Shape();
+            }
+            if (fx.length < m * m) {
+                fx = new long[m * m];
+                fz = new long[m * m];
+                fk = new int[m * m];
+                ocean = new boolean[m * m];
             }
             if (biomeCacheY.length < biomeCells) {
                 biomeCache = new Holder[biomeCells];
@@ -223,23 +260,49 @@ public final class FarTerrain {
         WorldData wd = terrain.data();
         Water.Spec spec = Water.Spec.of(wd, cell);   // the real chunk's own constants (WaterBodies)
         int m = n + 2;
+        int half = step / 2;
+        Scratch s = SCRATCH.get();
         // Columns of one quart cell share a biome lookup while they share its y.
         boolean quartCache = step < 4 && Math.floorMod(x0, 4) == 0 && Math.floorMod(z0, 4) == 0;
         int perQuart = 4 / Math.min(step, 4), quarts = quartCache ? (n + perQuart - 1) / perQuart : 0;
-        Scratch s = SCRATCH.get();
         s.size(m, quarts * quarts);
-        FarColumn.grid(wd, spec, x0, z0, step, n, s.shapes);
+        // A cube world's area that reaches off the faces: every column at the planet block it shows
+        // (whose quarts need not share a lookup).
+        boolean folded = cube != null && fold(x0, z0, step, m, half, s);
+        quartCache &= !folded;
+        if (folded) {
+            FarColumn.gridAt(wd, spec, step, s.fx, s.fz, s.ocean, m * m, s.shapes);
+            for (int k = 0; k < m * m; k++)
+                if (s.ocean[k])
+                    oceanShape(s.shapes[k]);
+        } else {
+            FarColumn.grid(wd, spec, x0, z0, step, n, s.shapes);
+        }
 
         RasterSampler strata = wd.has(WorldData.HORIZONS) ? wd.layer(WorldData.HORIZONS) : null;
         PaletteRules.Result<BlockState>[] rocks = strata == null ? null : RockPalette.get().forClasses(wd.classes());
         Cover cover = Cover.of(wd);
         LavaFlowPalette flowPalette = LavaFlowPalette.get();
-        int half = step / 2;
         FarColumn.Layers layers = s.layers;
         for (int j = 0; j < n; j++) {
             for (int i = 0; i < n; i++) {
-                FarColumn.Shape shape = s.shapes[(j + 1) * m + (i + 1)];
+                int at = (j + 1) * m + (i + 1);
+                FarColumn.Shape shape = s.shapes[at];
                 int x = x0 + i * step + half, z = z0 + j * step + half;
+                // The block whose quart gives the biome: the fill stores each of its quarts the
+                // partner quart's biome (CubeFill.foldedBiome), so it is read where the column stands.
+                int bx = x, bz = z;
+                Rotation turn = Rotation.NONE;
+                if (folded) {
+                    if (s.ocean[at]) {
+                        oceanColumn(i, j, sink, s);
+                        continue;
+                    }
+                    // The planet block the column shows; its blocks turn back by the fold (CubeFill.copy).
+                    x = (int) s.fx[at];
+                    z = (int) s.fz[at];
+                    turn = CubeFill.rotation(s.fk[at]);
+                }
                 int wx = terrain.wrapX(x);
                 int topY = Math.max(spec.minY(), shape.water() ? Math.min(shape.waterTop, spec.maxY()) : shape.ground);
 
@@ -247,12 +310,12 @@ public final class FarTerrain {
                 if (quartCache) {
                     int q = (j / perQuart) * quarts + (i / perQuart), qy = QuartPos.fromBlock(topY);
                     if (s.biomeCacheY[q] != qy) {
-                        s.biomeCache[q] = biomeAt(wx, topY, z);
+                        s.biomeCache[q] = biomeAt(bx, topY, bz);
                         s.biomeCacheY[q] = qy;
                     }
                     biome = s.biomeCache[q];
                 } else {
-                    biome = biomeAt(wx, topY, z);
+                    biome = biomeAt(bx, topY, bz);
                 }
                 FarSurface.Choice soil = surface.of(biome);
                 // The top block where the part of the level's surface rule run here decides it: on
@@ -320,7 +383,8 @@ public final class FarTerrain {
                 int waterDepth = (shape.water() ? Math.min(shape.waterTop, spec.maxY()) - shape.ground : 0)
                         + (painted ? 1 : 0);
                 for (int k = 0; k < layers.count; k++) {
-                    s.blocks[k] = block(layers, k, soil, packTop, seaBed, cover, rocks);
+                    BlockState b = block(layers, k, soil, packTop, seaBed, cover, rocks);
+                    s.blocks[k] = turn == Rotation.NONE ? b : b.rotate(turn);
                     int light;
                     if (k > topSolid)
                         light = 15;
@@ -333,6 +397,80 @@ public final class FarTerrain {
                 sink.column(i, j, layers.count, layers.bottom, layers.top, s.blocks, layers.material, s.light, biome);
             }
         }
+    }
+
+    /**
+     * A cube world's area: the planet block each of its m × m grid positions shows ({@link CubeLayout#fold}
+     * of the block a column samples, in Toroidal World's lap), its quarter turns, and whether it lies
+     * past the net's corners. False, and nothing to use, when every position is on a face.
+     */
+    private boolean fold(int x0, int z0, int step, int m, int half, Scratch s) {
+        boolean off = false;
+        for (int j = 0; j < m; j++) {
+            for (int i = 0; i < m; i++) {
+                int k = j * m + i;
+                long x = x0 + (long) (i - 1) * step + half, z = z0 + (long) (j - 1) * step + half;
+                CubeLayout.Fold f = cube.fold(x, z);
+                s.ocean[k] = false;
+                if (f instanceof CubeLayout.OnFace) {
+                    s.fx[k] = terrain.wrapX((int) x);
+                    s.fz[k] = z;
+                    s.fk[k] = 0;
+                } else if (f instanceof CubeLayout.Outside o) {
+                    s.fx[k] = terrain.wrapX((int) o.x());
+                    s.fz[k] = o.z();
+                    s.fk[k] = o.iso().k();
+                    off = true;
+                } else {
+                    s.ocean[k] = true;
+                    off = true;
+                }
+            }
+        }
+        return off;
+    }
+
+    /** The shape of a column past a cube net's corners ({@code CubeFill.ocean}): the floor {@link CubeFill#OCEAN_DEPTH} under the sea. */
+    private void oceanShape(FarColumn.Shape out) {
+        out.kind = Water.Kind.SEA;
+        out.ground = seaLevel - CubeFill.OCEAN_DEPTH - 1;
+        out.waterTop = seaLevel - 1;
+        out.channel = false;
+        out.wideRiver = false;
+        out.sealed = false;
+        out.ice = 0;
+    }
+
+    /** Sends the column past a cube net's corners: the level's default block, then its fluid up to the sea, then air. */
+    private void oceanColumn(int i, int j, Sink sink, Scratch s) {
+        FarColumn.Layers l = s.layers;
+        l.count = 0;
+        int floor = Math.max(levelMinY, seaLevel - CubeFill.OCEAN_DEPTH), sea = Math.max(floor, Math.min(seaLevel, levelMaxY + 1));
+        int n = 0;
+        int[] bottom = l.bottom, top = l.top, material = l.material;
+        if (floor > levelMinY) {
+            bottom[n] = levelMinY;
+            top[n] = floor;
+            material[n] = FarColumn.ROCK;
+            s.blocks[n] = oceanRock;
+            s.light[n] = 0;
+            n++;
+        }
+        if (sea > floor) {
+            bottom[n] = floor;
+            top[n] = sea;
+            material[n] = FarColumn.WATER;
+            s.blocks[n] = oceanWater;
+            s.light[n] = 15;
+            n++;
+        }
+        bottom[n] = sea;
+        top[n] = levelMaxY + 1;
+        material[n] = FarColumn.AIR;
+        s.blocks[n] = AIR;
+        s.light[n] = 15;
+        n++;
+        sink.column(i, j, n, bottom, top, s.blocks, material, s.light, deepOcean != null ? deepOcean : biomeAt(0, seaLevel, 0));
     }
 
     /** Layer k's block; {@code packTop}, when not null, is the top block the level's surface rule gives (dry ground, sea bed, lake bed), {@code seaBed} the sea bed's otherwise (BAK-050). */
