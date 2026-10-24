@@ -71,8 +71,18 @@ public final class RasterSampler {
         return desc.physical(raw(i, j));
     }
 
-    /** The physical value of the cell nearest block (bx, bz). */
+    /** The physical value of a cube grid's face {@code face}, local cell (i, j) resolved off the face (Rust {@code get_face}). */
+    public double getFace(CubeLayout.Face face, long i, long j) {
+        long c = grid.faceCell(face, i, j);
+        return desc.physical(rawCell(GridDesc.cellI(c), GridDesc.cellJ(c)));
+    }
+
+    /** The physical value of the cell nearest block (bx, bz); on a cube grid the cell under the block's centre (NaN past the net's corners). */
     public double nearest(double bx, double bz) {
+        if (grid.isCube()) {
+            GridDesc.CubeSpot s = grid.cubeSpotOfBlock(bx, bz);
+            return s == null ? Double.NaN : getFace(s.face(), (long) Math.floor(s.a() + 0.5), (long) Math.floor(s.b() + 0.5));
+        }
         double u = (bx - (double) grid.originBlockX()) / (double) grid.r();
         double v = (bz - (double) grid.originBlockZ()) / (double) grid.r();
         return get((long) Math.floor(u + 0.5), (long) Math.floor(v + 0.5));
@@ -84,6 +94,21 @@ public final class RasterSampler {
      * (i0, j0)'s value as the tops are. Rust {@code RasterRead::column_spline}, the same operations.
      */
     public double columnSpline(long x, long z) {
+        if (grid.isCube()) {
+            GridDesc.CubeSpot s = grid.cubeSpotOfBlock((double) x, (double) z);
+            if (s == null)
+                return Double.NaN;
+            long i0 = (long) Math.floor(s.a()), j0 = (long) Math.floor(s.b());
+            double[] bu = Columns.bspline(s.a() - (double) i0), bv = Columns.bspline(s.b() - (double) j0);
+            double base = getFace(s.face(), i0, j0);
+            double sum = 0.0;
+            for (int b = 0; b < 4; b++)
+                for (int a = 0; a < 4; a++) {
+                    double w = bu[a] * bv[b];
+                    sum += w * (getFace(s.face(), i0 - 1 + a, j0 - 1 + b) - base);
+                }
+            return base + sum;
+        }
         long c = (long) grid.w() * grid.r();
         long wx = Math.floorMod(x + c / 2, c) - c / 2;
         double u = (double) (wx - grid.originBlockX()) / grid.r();
@@ -105,6 +130,8 @@ public final class RasterSampler {
      * cell, x not folded first (the cell index wraps).
      */
     public double cellValue(long x, long z) {
+        if (grid.isCube())
+            return nearest((double) x, (double) z);
         long i = (long) Math.floor((double) (x - grid.originBlockX()) / grid.r() + 0.5);
         long j = (long) Math.floor((double) (z - grid.originBlockZ()) / grid.r() + 0.5);
         return get(i, j);
@@ -112,6 +139,21 @@ public final class RasterSampler {
 
     /** Bilinear interpolation of physical values at block (bx, bz); NaN if a corner is nodata. */
     public double bilinear(double bx, double bz) {
+        if (grid.isCube()) {
+            GridDesc.CubeSpot s = grid.cubeSpotOfBlock(bx, bz);
+            if (s == null)
+                return Double.NaN;
+            double fi = Math.floor(s.a()), fj = Math.floor(s.b());
+            double fu = s.a() - fi, fv = s.b() - fj;
+            long i0 = (long) fi, j0 = (long) fj;
+            double v00 = getFace(s.face(), i0, j0);
+            double v10 = getFace(s.face(), i0 + 1, j0);
+            double v01 = getFace(s.face(), i0, j0 + 1);
+            double v11 = getFace(s.face(), i0 + 1, j0 + 1);
+            double a = v00 + (v10 - v00) * fu;
+            double b = v01 + (v11 - v01) * fu;
+            return a + (b - a) * fv;
+        }
         double u = (bx - (double) grid.originBlockX()) / (double) grid.r();
         double v = (bz - (double) grid.originBlockZ()) / (double) grid.r();
         double fi = Math.floor(u);
@@ -136,6 +178,18 @@ public final class RasterSampler {
      * rounded to blocks covered every block where the blend passed half a block, most of a cell past a thick margin.
      */
     public double cover(double bx, double bz) {
+        if (grid.isCube()) {
+            GridDesc.CubeSpot s = grid.cubeSpotOfBlock(bx, bz);
+            if (s == null)
+                return 0;
+            double fi = Math.floor(s.a()), fj = Math.floor(s.b());
+            double fu = s.a() - fi, fv = s.b() - fj;
+            long i0 = (long) fi, j0 = (long) fj;
+            CubeLayout.Face f = s.face();
+            return coverOf(nearest(bx, bz),
+                    new double[] {getFace(f, i0, j0), getFace(f, i0 + 1, j0), getFace(f, i0, j0 + 1), getFace(f, i0 + 1, j0 + 1)},
+                    new double[] {(1 - fu) * (1 - fv), fu * (1 - fv), (1 - fu) * fv, fu * fv});
+        }
         double u = (bx - (double) grid.originBlockX()) / (double) grid.r();
         double v = (bz - (double) grid.originBlockZ()) / (double) grid.r();
         double fi = Math.floor(u);
@@ -173,17 +227,32 @@ public final class RasterSampler {
      * the river-valley slice).
      */
     public double bilinearOdd(double bx, double bz) {
-        double u = (bx - (double) grid.originBlockX()) / (double) grid.r();
-        double v = (bz - (double) grid.originBlockZ()) / (double) grid.r();
-        double fi = Math.floor(u);
-        double fj = Math.floor(v);
-        double fu = u - fi;
-        double fv = v - fj;
-        long i0 = (long) fi, j0 = (long) fj;
-        double v00 = get(i0, j0);
-        double v10 = get(i0 + 1, j0);
-        double v01 = get(i0, j0 + 1);
-        double v11 = get(i0 + 1, j0 + 1);
+        double fu, fv, v00, v10, v01, v11;
+        if (grid.isCube()) {
+            GridDesc.CubeSpot s = grid.cubeSpotOfBlock(bx, bz);
+            if (s == null)
+                return Double.NaN;
+            double fi = Math.floor(s.a()), fj = Math.floor(s.b());
+            fu = s.a() - fi;
+            fv = s.b() - fj;
+            long i0 = (long) fi, j0 = (long) fj;
+            v00 = getFace(s.face(), i0, j0);
+            v10 = getFace(s.face(), i0 + 1, j0);
+            v01 = getFace(s.face(), i0, j0 + 1);
+            v11 = getFace(s.face(), i0 + 1, j0 + 1);
+        } else {
+            double u = (bx - (double) grid.originBlockX()) / (double) grid.r();
+            double v = (bz - (double) grid.originBlockZ()) / (double) grid.r();
+            double fi = Math.floor(u);
+            double fj = Math.floor(v);
+            fu = u - fi;
+            fv = v - fj;
+            long i0 = (long) fi, j0 = (long) fj;
+            v00 = get(i0, j0);
+            v10 = get(i0 + 1, j0);
+            v01 = get(i0, j0 + 1);
+            v11 = get(i0 + 1, j0 + 1);
+        }
         double a = Math.abs(v00) + (Math.abs(v10) - Math.abs(v00)) * fu;
         double b = Math.abs(v01) + (Math.abs(v11) - Math.abs(v01)) * fu;
         double m = a + (b - a) * fv;
@@ -198,36 +267,65 @@ public final class RasterSampler {
 
     /** Horizon k's top in blocks at cell (i, j) (x wrapped, z clamped or folded); NaN if unused. */
     public double horizonTop(long i, long j, int k) {
-        long cell = grid.cell(i, j);
+        return horizonTopAt(grid.cell(i, j), k);
+    }
+
+    /** Horizon k's raw top (1/16 block) at cell (i, j). */
+    public short horizonTopRaw(long i, long j, int k) {
+        return horizonTopRawAt(grid.cell(i, j), k);
+    }
+
+    /** Horizon k's class index at cell (i, j); 255 if unused. */
+    public int horizonClass(long i, long j, int k) {
+        return horizonClassAt(grid.cell(i, j), k);
+    }
+
+    /** Horizon k's stratigraphic key top at cell (i, j) (format 0.2); 65535 if unused. */
+    public int horizonKeyTop(long i, long j, int k) {
+        return horizonKeyTopAt(grid.cell(i, j), k);
+    }
+
+    /** Horizon k's stratigraphic key base at cell (i, j) (format 0.2); 65535 if unused. */
+    public int horizonKeyBase(long i, long j, int k) {
+        return horizonKeyBaseAt(grid.cell(i, j), k);
+    }
+
+    /**
+     * The stored cell a stack reader reads for cell (i, j) of {@code face} (a cube grid: the face's local cell
+     * resolved off it, {@link GridDesc#faceCell}) or of the grid (face null: {@link GridDesc#cell}), packed. Rust
+     * {@code strata::spline_cell_at}.
+     */
+    public long cellAt(CubeLayout.Face face, long i, long j) {
+        return face != null ? grid.faceCell(face, i, j) : grid.cell(i, j);
+    }
+
+    /** Horizon k's top in blocks at a packed stored cell ({@link #cellAt}); NaN if unused. */
+    public double horizonTopAt(long cell, int k) {
         int ci = GridDesc.cellI(cell), cj = GridDesc.cellJ(cell);
         short top = tileFor(ci, cj).horizonTop(ci % tile, cj % tile, k);
         return top == Short.MIN_VALUE ? Double.NaN : top * desc.scale() + desc.offset();
     }
 
-    /** Horizon k's raw top (1/16 block) at cell (i, j). */
-    public short horizonTopRaw(long i, long j, int k) {
-        long cell = grid.cell(i, j);
+    /** Horizon k's raw top (1/16 block) at a packed stored cell. */
+    public short horizonTopRawAt(long cell, int k) {
         int ci = GridDesc.cellI(cell), cj = GridDesc.cellJ(cell);
         return tileFor(ci, cj).horizonTop(ci % tile, cj % tile, k);
     }
 
-    /** Horizon k's class index at cell (i, j); 255 if unused. */
-    public int horizonClass(long i, long j, int k) {
-        long cell = grid.cell(i, j);
+    /** Horizon k's class index at a packed stored cell; 255 if unused. */
+    public int horizonClassAt(long cell, int k) {
         int ci = GridDesc.cellI(cell), cj = GridDesc.cellJ(cell);
         return tileFor(ci, cj).horizonClass(ci % tile, cj % tile, k);
     }
 
-    /** Horizon k's stratigraphic key top at cell (i, j) (format 0.2); 65535 if unused. */
-    public int horizonKeyTop(long i, long j, int k) {
-        long cell = grid.cell(i, j);
+    /** Horizon k's stratigraphic key top at a packed stored cell; 65535 if unused. */
+    public int horizonKeyTopAt(long cell, int k) {
         int ci = GridDesc.cellI(cell), cj = GridDesc.cellJ(cell);
         return tileFor(ci, cj).horizonKeyTop(ci % tile, cj % tile, k);
     }
 
-    /** Horizon k's stratigraphic key base at cell (i, j) (format 0.2); 65535 if unused. */
-    public int horizonKeyBase(long i, long j, int k) {
-        long cell = grid.cell(i, j);
+    /** Horizon k's stratigraphic key base at a packed stored cell; 65535 if unused. */
+    public int horizonKeyBaseAt(long cell, int k) {
         int ci = GridDesc.cellI(cell), cj = GridDesc.cellJ(cell);
         return tileFor(ci, cj).horizonKeyBase(ci % tile, cj % tile, k);
     }

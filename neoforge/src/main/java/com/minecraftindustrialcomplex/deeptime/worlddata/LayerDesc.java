@@ -82,6 +82,8 @@ public record LayerDesc(String name, DType dtype, double scale, double offset, S
     private void validate() {
         if (grid.w() <= 0 || grid.h() <= 0 || grid.r() <= 0 || tile <= 0)
             throw new WorldDataException("layer " + name + ": empty grid or tile");
+        if (grid.isCube() && (grid.h() != 6 * grid.w() || grid.wrapsX() || grid.w() % tile != 0))
+            throw new WorldDataException("layer " + name + ": cube grid " + grid + " needs H = 6W, no x wrap and a tile edge dividing W");
         if ((dtype == DType.HORIZON_STACK) != (stackDepth > 0))
             throw new WorldDataException("layer " + name + ": stack_depth " + stackDepth + " with dtype " + dtype);
         if (tongueBandKeys <= 0 || !(tongueMinorShare >= 0 && tongueMinorShare < 0.5))
