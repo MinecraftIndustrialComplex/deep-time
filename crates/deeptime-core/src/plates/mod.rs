@@ -49,6 +49,7 @@ pub mod check;
 pub mod collapse;
 pub mod collision;
 pub mod crust_budget;
+pub mod dock_tally;
 pub mod dynamics;
 pub mod events;
 pub mod flow;
@@ -288,6 +289,7 @@ impl PlatesStage {
         if self.record_crust_budget && cb.is_none() {
             let z_0 = 0.5 * (k.continent_elevation_m[0] + k.continent_elevation_m[1]);
             let mut b = crust_budget::CrustBudget::start(&st.samples, z_0, env.gravity);
+            b.dock.start(st.t_myr);
             let geo = &self.cache.as_ref().expect("built above").geo;
             let pos0 = geometry::positions(st, geo);
             b.snapshot(
@@ -389,6 +391,20 @@ impl PlatesStage {
             || subduction::fronts_reach(geo, &begun, &env),
         );
         book(st, gap_budget::Part::Belts);
+        // The fronts by what stands on either side (`dock_tally.rs`, measurement only).
+        if let Some(b) = cb.borrow_mut().as_mut() {
+            for (&c, s) in &stacked {
+                if let Some(col) = st.contacts[c].collision.as_ref() {
+                    b.dock.add(
+                        env.t_myr,
+                        env.t_myr - col.onset_myr,
+                        s.length_km * env.dt_myr,
+                        col.convergence_mm_yr,
+                        &s.sides,
+                    );
+                }
+            }
+        }
         // The collisions' crust budget: what crossed their fronts and what the belts and wedges
         // kept of it, km³ (Earth-normalized).
         let (crossed, kept) = stacked.values().fold((0.0, 0.0), |a, s| {
