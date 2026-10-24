@@ -5670,8 +5670,8 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 ### Snyder1987
 - Reference: Snyder, J. P. (1987). Map Projections: A Working Manual. U.S. Geological Survey Professional Paper 1395. Washington, D.C.: U.S. Government Printing Office. ix + 385 pp.
 - DOI or URL: 10.3133/pp1395; https://pubs.usgs.gov/pp/1395/report.pdf
-- Cited as: "Snyder 1987" (the cylindrical equal-area projection's scale factors)
-- Ledger ids: ISO-127
+- Cited as: "Snyder 1987" (the cylindrical equal-area projection's scale factors; the azimuthal equidistant projection, ch. 25, for measuring a feature's distance on the planet)
+- Ledger ids: ISO-127, SCL-230 (ch. 25, from memory: not re-read for it), SCL-231 (ch. 10's equal-area property)
 - Access: open (USGS).
 - Library (the project's source library, not distributed): not filed; read in the USGS PDF.
 - Read so far (by the project): chapter 10, "Cylindrical Equal-Area Projection" (pp. 76 to 85), chapter 4 (p. 21) and the table footnote on p. 27, by a Sonnet sub-agent of the flexure-faults agent, 2026-10-23, the equations checked on the rendered page image. P. 77, "FORMULAS FOR THE SPHERE": x = R (λ − λ0) cos φs (10-1), y = R sin φ / cos φs (10-2), h = cos φ / cos φs (10-2a), k = 1/h (10-2b), "where φs is the standard parallel (N. or S.), or the Equator in Lambert's original form"; "There is no distortion of area anywhere on the projections"; "the parallels are spaced from the Equator in proportion to the sine of the latitude". P. 21: the scale factor "along the meridian is called h and along the parallel, k".

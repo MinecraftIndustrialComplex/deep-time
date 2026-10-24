@@ -18,12 +18,17 @@
 //! deposition at that place have left it (`Crater::kept`): a crater in an eroding range or under
 //! a growing delta fades to nothing, and one on a quiet craton keeps a subdued bowl. The thinned
 //! preview the stage keeps gets the same shaping, so the keyframes show the craters.
+//!
+//! A crater's distances are the planet's (`sphere::Around`, ledger SCL-230): its bowl and ejecta
+//! are round on the planet, so round in the world, at every latitude (a circle in Lambert blocks
+//! until 2026-10-23, which the world drew 3× long north–south at 55°).
 
 use deeptime_format::GridDesc;
 
 use super::tiles::{TileOut, TileSink};
 use crate::error::CoreError;
 use crate::params::PlanetPreset;
+use crate::sphere::{Around, BlockFrame};
 use crate::surface::impacts::{Crater, ImpactState};
 use crate::surface::volcanoes::shape::Radial;
 use crate::world::WorldState;
@@ -34,8 +39,12 @@ const MIN_CHANGE_M: f64 = 2.0;
 /// One crater's change of the last grid.
 #[derive(Clone, Debug)]
 struct Item {
-    x: f64,
-    z: f64,
+    /// The planet's metric about its centre.
+    at: Around,
+    /// The Lambert box its shape reaches: half-width in x and the z range, blocks.
+    hw: f64,
+    z0: f64,
+    z1: f64,
     /// Where its ejecta end, m.
     extent_m: f64,
     /// Metres at ρ = r / extent.
@@ -46,7 +55,6 @@ struct Item {
 #[derive(Clone, Debug, Default)]
 pub struct Shaper {
     items: Vec<Item>,
-    mh: f64,
     circumference: u32,
 }
 
@@ -82,6 +90,8 @@ impl Shaper {
     pub fn from_world(world: &WorldState, p: &PlanetPreset) -> Option<Shaper> {
         let st: &ImpactState = world.impacts.as_ref()?;
         let mh = p.scale.m_per_block_h;
+        let circumference = p.scale.circumference_blocks;
+        let frame = BlockFrame::new(circumference);
         let dx1 = f64::from(p.resolution.l1_r) * mh;
         let items = st
             .craters
@@ -90,18 +100,24 @@ impl Shaper {
             .filter_map(|c| {
                 let table = residual(c, dx1);
                 let most = table.v.iter().fold(0.0f32, |m, v| m.max(v.abs()));
-                (f64::from(most) >= MIN_CHANGE_M).then(|| Item {
-                    x: c.x,
-                    z: c.z,
-                    extent_m: c.extent_m(),
-                    table,
+                (f64::from(most) >= MIN_CHANGE_M).then(|| {
+                    let at = Around::new(frame, mh, c.x, c.z);
+                    let extent_m = c.extent_m();
+                    let (hw, z0, z1) = at.bounds(table.reach() * extent_m);
+                    Item {
+                        at,
+                        hw,
+                        z0,
+                        z1,
+                        extent_m,
+                        table,
+                    }
                 })
             })
             .collect();
         Some(Shaper {
             items,
-            mh,
-            circumference: p.scale.circumference_blocks,
+            circumference,
         })
     }
 
@@ -116,14 +132,14 @@ impl Shaper {
 
     /// The items whose reach overlaps the block rectangle [x0, x1] × [z0, z1] (x wraps).
     fn near(&self, x0: f64, x1: f64, z0: f64, z1: f64) -> Vec<&Item> {
-        let frame = crate::sphere::BlockFrame::new(self.circumference);
+        let frame = BlockFrame::new(self.circumference);
         let (cx, hw) = (0.5 * (x0 + x1), 0.5 * (x1 - x0));
-        let (cz, hh) = (0.5 * (z0 + z1), 0.5 * (z1 - z0));
         self.items
             .iter()
             .filter(|it| {
-                let reach = it.table.reach() * it.extent_m / self.mh;
-                frame.wrap_x(it.x - cx).abs() <= hw + reach && (it.z - cz).abs() <= hh + reach
+                frame.wrap_x(it.at.centre().0 - cx).abs() <= hw + it.hw
+                    && it.z0 <= z1
+                    && it.z1 >= z0
             })
             .collect()
     }
@@ -145,7 +161,6 @@ impl Shaper {
         let r = f64::from(grid.r);
         let bx = |i: usize| grid.origin_block_x as f64 + ((x0 + i * stride) as f64) * r;
         let bz = |j: usize| grid.origin_block_z as f64 + ((y0 + j * stride) as f64) * r;
-        let frame = crate::sphere::BlockFrame::new(self.circumference);
         // Bands of rows in parallel; within a band, blocks of columns each with the craters that
         // reach them.
         const B: usize = 64;
@@ -161,15 +176,17 @@ impl Shaper {
                     if near.is_empty() {
                         continue;
                     }
+                    let mut row = Vec::with_capacity(near.len());
                     for dj in 0..nrows {
                         let zb = bz(j0 + dj);
+                        row.clear();
+                        row.extend(near.iter().map(|it| it.at.row(zb)));
                         for i in i0..i1 {
                             let xb = bx(i);
                             let mut add = 0.0;
-                            for it in &near {
-                                let dx = frame.wrap_x(xb - it.x) * self.mh;
-                                let dz = (zb - it.z) * self.mh;
-                                add += it.table.at(dx.hypot(dz) / it.extent_m);
+                            for (it, &r) in near.iter().zip(&row) {
+                                let d = it.at.distance_of(r, it.at.column(xb));
+                                add += it.table.at(d / it.extent_m);
                             }
                             rows[dj * w + i] += add as f32;
                         }
@@ -292,6 +309,46 @@ mod tests {
         assert!(z[7] > z[10] && z[10] > 0.0);
         assert_eq!(z[16], 0.0);
         assert_eq!(z[39], 0.0);
+    }
+
+    #[test]
+    fn a_crater_is_round_on_the_planet_at_high_latitude() {
+        // A 12-km simple crater at 30°, 55° and 70° N: its rim crest and the end of its ejecta lie
+        // as far east as north on the planet (a circle in Lambert blocks, until 2026-10-23, put
+        // them 1 / cos² φ farther north: 3× at 55°).
+        let g3 = GridDesc::for_planet("L3", 16_384, 2).unwrap();
+        let frame = BlockFrame::new(16_384);
+        for lat in [30.0f64, 55.0, 70.0] {
+            let j = ((frame.z_of_lat(lat) - g3.origin_block_z as f64) / 2.0).round() as usize;
+            let i = ((0.0 - g3.origin_block_x as f64) / 2.0).round() as usize;
+            let x = g3.origin_block_x as f64 + 2.0 * i as f64;
+            let z = g3.origin_block_z as f64 + 2.0 * j as f64;
+            let mut c = crater(x, 6000.0, Morphology::Simple);
+            c.z = z;
+            let (world, preset) = world_with(vec![c]);
+            let sh = Shaper::from_world(&world, &preset).unwrap();
+            // 18 km east is 88 L3 cells at 70°; north, 31 at 30°.
+            const N: usize = 160;
+            const S: usize = 48;
+            let mut east = vec![0.0f32; N];
+            sh.shape_block(&g3, i, j, N, 1, &mut east);
+            let mut north = vec![0.0f32; S];
+            sh.shape_block(&g3, i, j + 1 - S, 1, 1, &mut north);
+            north.reverse();
+            let at = Around::of(16_384, preset.scale.m_per_block_h, x, z);
+            let d_east = |k: usize| at.distance_m(x + 2.0 * k as f64, z);
+            let d_north = |k: usize| at.distance_m(x, z - 2.0 * k as f64);
+            let crest =
+                |v: &[f32]| (0..v.len()).max_by(|&a, &b| v[a].total_cmp(&v[b])).unwrap();
+            let end = |v: &[f32]| (0..v.len()).rev().find(|&k| v[k] != 0.0).unwrap();
+            // One L3 cell north–south is 600 / cos φ m of the planet (1.75 km at 70°).
+            let cell = 600.0 / lat.to_radians().cos() + 1.0;
+            let (ce, cn) = (d_east(crest(&east)), d_north(crest(&north)));
+            assert!((ce - 6000.0).abs() < cell && (cn - 6000.0).abs() < cell, "{lat}°: rim {ce} {cn}");
+            let (ee, en) = (d_east(end(&east)), d_north(end(&north)));
+            assert!((ee - en).abs() < cell, "{lat}°: ejecta end {ee} east, {en} north");
+            assert!((ee - 18_000.0).abs() < cell, "{lat}°: ejecta end {ee}");
+        }
     }
 
     #[test]
