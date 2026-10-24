@@ -162,7 +162,10 @@ impl Shape {
         let dt = TAU / T_STEPS as f64;
         let (mut xs, mut ys) = (vec![0.0; T_STEPS + 1], vec![0.0; T_STEPS + 1]);
         for s in 0..T_STEPS {
-            let (a, b) = (omega * (s as f64 * dt).cos(), omega * ((s + 1) as f64 * dt).cos());
+            let (a, b) = (
+                omega * (s as f64 * dt).cos(),
+                omega * ((s + 1) as f64 * dt).cos(),
+            );
             xs[s + 1] = xs[s] + 0.5 * dt * (a.cos() + b.cos());
             ys[s + 1] = ys[s] + 0.5 * dt * (a.sin() + b.sin());
         }
@@ -214,7 +217,10 @@ impl Shape {
         if r >= self.ratio_max() {
             return self.omega_max;
         }
-        let i = self.ratio.partition_point(|&q| q <= r).clamp(1, OMEGA_STEPS);
+        let i = self
+            .ratio
+            .partition_point(|&q| q <= r)
+            .clamp(1, OMEGA_STEPS);
         let (r0, r1) = (self.ratio[i - 1], self.ratio[i]);
         let f = if r1 > r0 { (r - r0) / (r1 - r0) } else { 0.0 };
         self.omega_max * ((i - 1) as f64 + f) / OMEGA_STEPS as f64
@@ -468,9 +474,7 @@ impl Net<'_> {
             return keep(tally);
         }
         let n = (total / STEP).floor() as usize + 1;
-        let pts: Vec<Pt> = (0..n)
-            .map(|j| Self::at(v, &u, j as f64 * STEP))
-            .collect();
+        let pts: Vec<Pt> = (0..n).map(|j| Self::at(v, &u, j as f64 * STEP)).collect();
         let samples = |len: f64| (len / STEP).round().max(0.0) as usize;
         // Box means over ±h samples, by prefix sums.
         let boxed = |a: &[f64], half: &dyn Fn(usize) -> usize, lo: usize, hi: usize| -> Vec<f64> {
@@ -497,7 +501,10 @@ impl Net<'_> {
         let quarter = |j: usize| samples(lam[j] / 4.0).max(2);
         let xs: Vec<f64> = pts.iter().map(|p| p.x).collect();
         let zs: Vec<f64> = pts.iter().map(|p| p.z).collect();
-        let (xs, zs) = (boxed(&xs, &quarter, 0, n - 1), boxed(&zs, &quarter, 0, n - 1));
+        let (xs, zs) = (
+            boxed(&xs, &quarter, 0, n - 1),
+            boxed(&zs, &quarter, 0, n - 1),
+        );
         // The valley's direction (planet metric) and the normal to its left (+90° from east to
         // south), from the smoothed course.
         let mut tan = vec![(1.0, 0.0); n];
@@ -625,7 +632,10 @@ impl Net<'_> {
             let len = r1 - r0 + 1;
             let lo: Vec<f64> = (r0..=r1).map(|i| bounds[i].0).collect();
             let hi: Vec<f64> = (r0..=r1).map(|i| bounds[i].1).collect();
-            let (lo_t, hi_t) = (SparseTable::new(&lo, f64::max), SparseTable::new(&hi, f64::min));
+            let (lo_t, hi_t) = (
+                SparseTable::new(&lo, f64::max),
+                SparseTable::new(&hi, f64::min),
+            );
             let mut lo_e = Vec::with_capacity(len);
             let mut hi_e = Vec::with_capacity(len);
             for i in 0..len {
@@ -644,7 +654,14 @@ impl Net<'_> {
                     continue;
                 }
                 amp[r0 + i] = a;
-                cen[r0 + i] = 0.0f64.clamp(lo_s[i] + a, hi_s[i] - a);
+                // The belt as near the old course as it fits (when the room is just the belt, its
+                // middle: the two ends can cross by a rounding).
+                let (c0, c1) = (lo_s[i] + a, hi_s[i] - a);
+                cen[r0 + i] = if c0 < c1 {
+                    0.0f64.clamp(c0, c1)
+                } else {
+                    0.5 * (lo_s[i] + hi_s[i])
+                };
             }
         }
         // Reaches: runs of drawable samples, snapped to the course's vertices.
@@ -696,7 +713,11 @@ impl Net<'_> {
         for (ri, &(a, b)) in reaches.iter().enumerate() {
             out.extend_from_slice(&v[next..=a]);
             let (ua, ub) = (u[a], u[b]);
-            let sgn = if (k + ri) % 2 == 0 { 1.0 } else { -1.0 };
+            let sgn = if (k + ri).is_multiple_of(2) {
+                1.0
+            } else {
+                -1.0
+            };
             let th_a = lerp(&theta, ua);
             let eval = |s: f64| -> (Pt, f64) {
                 let lam_s = lerp(&lam, s);
@@ -762,9 +783,10 @@ impl Net<'_> {
                 }
             }
             path += self.dist(last.x, last.z, vb.x, vb.z);
-            for j in samples(ua)..=samples(ub).min(n - 1) {
-                amp_len += amp[j] * STEP;
-            }
+            amp_len += amp[samples(ua)..=samples(ub).min(n - 1)]
+                .iter()
+                .sum::<f64>()
+                * STEP;
             let axis = ub - ua;
             let k_reach = path / axis.max(1e-9);
             tally.reaches += 1;
@@ -774,7 +796,10 @@ impl Net<'_> {
             let qc = q_class(lerp(&q_s, 0.5 * (ua + ub)));
             tally.by_q[qc][2] += axis;
             tally.by_q[qc][3] += path;
-            let bin = SINUOSITY_EDGES.iter().take_while(|&&e| k_reach >= e).count();
+            let bin = SINUOSITY_EDGES
+                .iter()
+                .take_while(|&&e| k_reach >= e)
+                .count();
             tally.hist[bin] += 1;
             next = b;
         }
@@ -875,10 +900,7 @@ pub fn apply(rivers: &mut Rivers, inp: &Input<'_>) -> Value {
     }
     net.join = joins;
     net.fixed = fixed;
-    let plans: Vec<Plan> = (0..k_chains)
-        .into_par_iter()
-        .map(|k| net.plan(k))
-        .collect();
+    let plans: Vec<Plan> = (0..k_chains).into_par_iter().map(|k| net.plan(k)).collect();
     let mut total = Tally::default();
     for p in &plans {
         total.add(&p.tally);
@@ -947,8 +969,18 @@ pub fn apply(rivers: &mut Rivers, inp: &Input<'_>) -> Value {
             if let Some((pre, at)) = &cut[p] {
                 let i = (0..pre.len())
                     .min_by(|&a, &b| {
-                        let da = net.dist(f64::from(pre[a].x), f64::from(pre[a].z), f64::from(end.x), f64::from(end.z));
-                        let db = net.dist(f64::from(pre[b].x), f64::from(pre[b].z), f64::from(end.x), f64::from(end.z));
+                        let da = net.dist(
+                            f64::from(pre[a].x),
+                            f64::from(pre[a].z),
+                            f64::from(end.x),
+                            f64::from(end.z),
+                        );
+                        let db = net.dist(
+                            f64::from(pre[b].x),
+                            f64::from(pre[b].z),
+                            f64::from(end.x),
+                            f64::from(end.z),
+                        );
                         da.total_cmp(&db)
                     })
                     .unwrap_or(0);
@@ -978,7 +1010,10 @@ pub fn apply(rivers: &mut Rivers, inp: &Input<'_>) -> Value {
         let reach = radius + 2.0 * hw_near + 8.0;
         let mut segs: Vec<usize> = (0..pv.len().saturating_sub(1))
             .filter(|&i| {
-                let (a, b) = (local(f64::from(pv[i].x), f64::from(pv[i].z)), local(f64::from(pv[i + 1].x), f64::from(pv[i + 1].z)));
+                let (a, b) = (
+                    local(f64::from(pv[i].x), f64::from(pv[i].z)),
+                    local(f64::from(pv[i + 1].x), f64::from(pv[i + 1].z)),
+                );
                 a.0.hypot(a.1) <= reach || b.0.hypot(b.1) <= reach
             })
             .collect();
@@ -990,7 +1025,10 @@ pub fn apply(rivers: &mut Rivers, inp: &Input<'_>) -> Value {
             let (px, pz) = local(x, z);
             let mut best = (f64::INFINITY, 1.0);
             for &i in &segs {
-                let (a, b) = (local(f64::from(pv[i].x), f64::from(pv[i].z)), local(f64::from(pv[i + 1].x), f64::from(pv[i + 1].z)));
+                let (a, b) = (
+                    local(f64::from(pv[i].x), f64::from(pv[i].z)),
+                    local(f64::from(pv[i + 1].x), f64::from(pv[i + 1].z)),
+                );
                 let (ex, ez) = (b.0 - a.0, b.1 - a.1);
                 let l2 = ex * ex + ez * ez;
                 let tt = if l2 > 0.0 {
@@ -1000,7 +1038,10 @@ pub fn apply(rivers: &mut Rivers, inp: &Input<'_>) -> Value {
                 };
                 let d = (px - a.0 - tt * ex).hypot(pz - a.1 - tt * ez);
                 if d < best.0 {
-                    best = (d, f64::from(pv[i].hw) + (f64::from(pv[i + 1].hw) - f64::from(pv[i].hw)) * tt);
+                    best = (
+                        d,
+                        f64::from(pv[i].hw) + (f64::from(pv[i + 1].hw) - f64::from(pv[i].hw)) * tt,
+                    );
                 }
             }
             best
@@ -1075,7 +1116,12 @@ pub fn apply(rivers: &mut Rivers, inp: &Input<'_>) -> Value {
             chains[k].into = into_now[k];
         }
         for w in nv.windows(2) {
-            length_after += net.dist(f64::from(w[0].x), f64::from(w[0].z), f64::from(w[1].x), f64::from(w[1].z));
+            length_after += net.dist(
+                f64::from(w[0].x),
+                f64::from(w[0].z),
+                f64::from(w[1].x),
+                f64::from(w[1].z),
+            );
         }
         vertices.extend_from_slice(nv);
     }

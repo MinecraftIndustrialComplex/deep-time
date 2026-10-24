@@ -122,7 +122,10 @@ fn the_curve_matches_langbein_and_leopolds_table() {
     // 1.307, 1.954 and 2.710: within 2 % of the paper's numbers (its 2.67 is 1.5 % under).
     for (omega, k) in [(0.5, 1.06), (1.0, 1.30), (1.5, 1.96), (1.75, 2.67)] {
         let got = meander::sinuosity(omega);
-        assert!((got / k - 1.0).abs() < 0.02, "ω {omega}: k {got}, the table {k}");
+        assert!(
+            (got / k - 1.0).abs() < 0.02,
+            "ω {omega}: k {got}, the table {k}"
+        );
     }
     // J₀'s first zero and Struve's H₀ against its series (2/π) Σ (−1)^n x^(2n+1) / (1·3···(2n+1))².
     assert!(meander::bessel_j0(2.404_825_557_7).abs() < 1e-9);
@@ -151,7 +154,10 @@ fn the_curve_matches_langbein_and_leopolds_table() {
 fn the_shape_is_a_sine_when_gentle_and_odd_about_each_crossing() {
     for i in 0..32 {
         let th = i as f64 * PI / 16.0;
-        assert!((meander::y_hat(th, 1e-4) - th.sin()).abs() < 1e-3, "gentle at {th}");
+        assert!(
+            (meander::y_hat(th, 1e-4) - th.sin()).abs() < 1e-3,
+            "gentle at {th}"
+        );
         let cap = meander::ratio_cap();
         let (a, b) = (meander::y_hat(th, cap), meander::y_hat(th + PI, cap));
         assert!((a + b).abs() < 2e-3, "odd at {th}: {a} {b}");
@@ -168,7 +174,17 @@ fn the_shape_is_a_sine_when_gentle_and_odd_about_each_crossing() {
 fn a_straight_river_on_a_wide_plain_meanders_at_ten_point_nine_widths() {
     let c = 16_384;
     let mut r = Rivers::empty(c);
-    line(&mut r, (-2000.0, 0.0), (2000.0, 0.0), 2.0, 5.0, 100.0, (69.9, 69.1), Mouth::Sea, u32::MAX);
+    line(
+        &mut r,
+        (-2000.0, 0.0),
+        (2000.0, 0.0),
+        2.0,
+        5.0,
+        100.0,
+        (69.9, 69.1),
+        Mouth::Sea,
+        u32::MAX,
+    );
     let before = chain(&r, 0).to_vec();
     let plain = |_: f64, _: f64| Some(bank(69.9));
     let s = run(&mut r, &plain);
@@ -177,13 +193,22 @@ fn a_straight_river_on_a_wide_plain_meanders_at_ten_point_nine_widths() {
     assert_eq!(v[v.len() - 1], before[before.len() - 1]);
     let k = s["reach_sinuosity"].as_f64().unwrap();
     assert!((1.8..=2.05).contains(&k), "sinuosity {k}: {s}");
-    let (len, axis) = (planet_len(f64::from(c), v), planet_len(f64::from(c), &before));
+    let (len, axis) = (
+        planet_len(f64::from(c), v),
+        planet_len(f64::from(c), &before),
+    );
     let (off, crossings) = across(f64::from(c), v, (-2000.0, 0.0), (1.0, 0.0));
     // Two crossings a wavelength; λ = 10.9 × the width 10.
     let lambda = 2.0 * axis / crossings as f64;
-    assert!((lambda / 109.0 - 1.0).abs() < 0.1, "wavelength {lambda} (axis {axis}, length {len})");
+    assert!(
+        (lambda / 109.0 - 1.0).abs() < 0.1,
+        "wavelength {lambda} (axis {axis}, length {len})"
+    );
     let cap = 109.0 * meander::ratio_cap();
-    assert!(off <= cap * 1.02 && off >= cap * 0.9, "offset {off}, the cap {cap}");
+    assert!(
+        off <= cap * 1.02 && off >= cap * 0.9,
+        "offset {off}, the cap {cap}"
+    );
     assert!(len / axis > 1.7, "length {len} over {axis}");
 }
 
@@ -194,14 +219,31 @@ fn the_plain_bounds_the_belt_and_a_narrow_one_keeps_the_course() {
     // under a block of amplitude.
     for (half, moves) in [(20.0, true), (3.5, false)] {
         let mut r = Rivers::empty(c);
-        line(&mut r, (-1500.0, 0.0), (1500.0, 0.0), 2.0, 3.0, 50.0, (69.9, 69.1), Mouth::Sea, u32::MAX);
+        line(
+            &mut r,
+            (-1500.0, 0.0),
+            (1500.0, 0.0),
+            2.0,
+            3.0,
+            50.0,
+            (69.9, 69.1),
+            Mouth::Sea,
+            u32::MAX,
+        );
         let before = r.vertices.clone();
         let plain = move |_: f64, z: f64| (z.abs() <= half).then_some(bank(69.9));
         let s = run(&mut r, &plain);
         if moves {
-            let off = r.vertices.iter().fold(0.0f64, |m, p| m.max(f64::from(p.z).abs()));
+            let off = r
+                .vertices
+                .iter()
+                .fold(0.0f64, |m, p| m.max(f64::from(p.z).abs()));
             assert!(off >= 10.0, "offset {off}: {s}");
-            assert!(off + 3.0 <= half + 1.0, "the channel's edge {} past the plain's {half}", off + 3.0);
+            assert!(
+                off + 3.0 <= half + 1.0,
+                "the channel's edge {} past the plain's {half}",
+                off + 3.0
+            );
         } else {
             assert_eq!(r.vertices, before, "{s}");
             assert!(s["narrow_km"].as_f64().unwrap() > 0.0, "{s}");
@@ -214,16 +256,39 @@ fn a_reach_steeper_than_the_braided_line_keeps_its_course() {
     let c = 16_384;
     let mut r = Rivers::empty(c);
     // 3,000 blocks falling 150: s = 150 × 35 / (3,000 × 300) = 0.0058, over 0.0125 × 100^-0.44 = 0.0016.
-    line(&mut r, (-1500.0, 0.0), (1500.0, 0.0), 2.0, 5.0, 100.0, (219.0, 69.0), Mouth::Sea, u32::MAX);
+    line(
+        &mut r,
+        (-1500.0, 0.0),
+        (1500.0, 0.0),
+        2.0,
+        5.0,
+        100.0,
+        (219.0, 69.0),
+        Mouth::Sea,
+        u32::MAX,
+    );
     let before = r.vertices.clone();
     let w_at = |x: f64| 219.0 - 150.0 * (x + 1500.0) / 3000.0;
     let plain = move |x: f64, _: f64| Some(bank(w_at(x)));
     let s = run(&mut r, &plain);
     assert_eq!(r.vertices, before);
-    assert!(s["steep_km"].as_f64().unwrap() > 0.8 * s["plain_km"].as_f64().unwrap(), "{s}");
+    assert!(
+        s["steep_km"].as_f64().unwrap() > 0.8 * s["plain_km"].as_f64().unwrap(),
+        "{s}"
+    );
     // The same reach, gentle: it meanders.
     let mut r = Rivers::empty(c);
-    line(&mut r, (-1500.0, 0.0), (1500.0, 0.0), 2.0, 5.0, 100.0, (70.9, 69.1), Mouth::Sea, u32::MAX);
+    line(
+        &mut r,
+        (-1500.0, 0.0),
+        (1500.0, 0.0),
+        2.0,
+        5.0,
+        100.0,
+        (70.9, 69.1),
+        Mouth::Sea,
+        u32::MAX,
+    );
     let w_at = |x: f64| 70.9 - 1.8 * (x + 1500.0) / 3000.0;
     let plain = move |x: f64, _: f64| Some(bank(w_at(x)));
     let s = run(&mut r, &plain);
@@ -244,25 +309,52 @@ fn the_belt_is_the_same_on_the_planet_at_the_equator_and_at_55_degrees() {
     let cases = [
         ((-half, 0.0), (1.0, 0.0), (half, 0.0), 2.0),
         ((-half / ex, z55), (1.0, 0.0), (half / ex, z55), 2.0 / ex),
-        ((0.0, z55 - half / ez), (0.0, 1.0), (0.0, z55 + half / ez), 2.0 / ez),
+        (
+            (0.0, z55 - half / ez),
+            (0.0, 1.0),
+            (0.0, z55 + half / ez),
+            2.0 / ez,
+        ),
     ];
     let mut got = Vec::new();
     for (a, dir, b, spacing) in cases {
         let mut r = Rivers::empty(c);
-        line(&mut r, a, b, spacing, 4.0, 100.0, (69.9, 69.1), Mouth::Sea, u32::MAX);
+        line(
+            &mut r,
+            a,
+            b,
+            spacing,
+            4.0,
+            100.0,
+            (69.9, 69.1),
+            Mouth::Sea,
+            u32::MAX,
+        );
         let before = chain(&r, 0).to_vec();
         let s = run(&mut r, &plain);
         let v = chain(&r, 0);
-        let (len, axis) = (planet_len(f64::from(c), v), planet_len(f64::from(c), &before));
+        let (len, axis) = (
+            planet_len(f64::from(c), v),
+            planet_len(f64::from(c), &before),
+        );
         let (off, crossings) = across(f64::from(c), v, a, dir);
         assert!(s["reaches"].as_u64().unwrap() >= 1, "{s}");
         got.push((len / axis, off, 2.0 * axis / crossings as f64, s));
     }
     let (k0, off0, l0, _) = &got[0];
     for (k, off, l, s) in &got[1..] {
-        assert!((k / k0 - 1.0).abs() < 0.02, "sinuosity {k} against {k0} at the equator: {s}");
-        assert!((off / off0 - 1.0).abs() < 0.03, "offset {off} against {off0}: {s}");
-        assert!((l / l0 - 1.0).abs() < 0.05, "wavelength {l} against {l0}: {s}");
+        assert!(
+            (k / k0 - 1.0).abs() < 0.02,
+            "sinuosity {k} against {k0} at the equator: {s}"
+        );
+        assert!(
+            (off / off0 - 1.0).abs() < 0.03,
+            "offset {off} against {off0}: {s}"
+        );
+        assert!(
+            (l / l0 - 1.0).abs() < 0.05,
+            "wavelength {l} against {l0}: {s}"
+        );
     }
     // In the grid's blocks the belt on the parallel is narrower north-south by cos 55°.
     assert!((ex - 55f64.to_radians().cos()).abs() < 1e-9);
@@ -272,9 +364,29 @@ fn the_belt_is_the_same_on_the_planet_at_the_equator_and_at_55_degrees() {
 fn a_tributary_ends_on_a_vertex_of_its_parents_new_channel() {
     let c = 16_384;
     let mut r = Rivers::empty(c);
-    let parent = line(&mut r, (-1500.0, 0.0), (1500.0, 0.0), 2.0, 5.0, 200.0, (69.9, 69.1), Mouth::Sea, u32::MAX);
+    let parent = line(
+        &mut r,
+        (-1500.0, 0.0),
+        (1500.0, 0.0),
+        2.0,
+        5.0,
+        200.0,
+        (69.9, 69.1),
+        Mouth::Sea,
+        u32::MAX,
+    );
     // From the north onto the parent's vertex at x 0 (vertex 750).
-    let trib = line(&mut r, (0.0, -400.0), (0.0, 0.0), 2.0, 2.0, 20.0, (69.95, 69.5), Mouth::River, parent);
+    let trib = line(
+        &mut r,
+        (0.0, -400.0),
+        (0.0, 0.0),
+        2.0,
+        2.0,
+        20.0,
+        (69.95, 69.5),
+        Mouth::River,
+        parent,
+    );
     let plain = |_: f64, _: f64| Some(bank(69.95));
     let s = run(&mut r, &plain);
     assert!(s["reaches"].as_u64().unwrap() >= 1, "{s}");
@@ -282,12 +394,20 @@ fn a_tributary_ends_on_a_vertex_of_its_parents_new_channel() {
     let tv = chain(&r, trib as usize);
     assert_eq!(r.chains[trib as usize].into, parent);
     let end = tv[tv.len() - 1];
-    assert!(pv.iter().any(|q| q.x == end.x && q.z == end.z), "the tributary ends off its parent: {end:?} {s}");
+    assert!(
+        pv.iter().any(|q| q.x == end.x && q.z == end.z),
+        "the tributary ends off its parent: {end:?} {s}"
+    );
     // Up to its mouth the tributary stays out of the parent's channel.
     let dist = |p: &RiverVertex| {
         pv.windows(2)
             .map(|w| {
-                let (ax, az, bx, bz) = (f64::from(w[0].x), f64::from(w[0].z), f64::from(w[1].x), f64::from(w[1].z));
+                let (ax, az, bx, bz) = (
+                    f64::from(w[0].x),
+                    f64::from(w[0].z),
+                    f64::from(w[1].x),
+                    f64::from(w[1].z),
+                );
                 let (px, pz) = (f64::from(p.x), f64::from(p.z));
                 let (ex, ez) = (bx - ax, bz - az);
                 let t = (((px - ax) * ex + (pz - az) * ez) / (ex * ex + ez * ez)).clamp(0.0, 1.0);
@@ -296,28 +416,62 @@ fn a_tributary_ends_on_a_vertex_of_its_parents_new_channel() {
             .fold(f64::INFINITY, f64::min)
     };
     for p in &tv[..tv.len() - 1] {
-        assert!(dist(p) > 4.0, "a tributary vertex {p:?} in the parent's channel");
+        assert!(
+            dist(p) > 4.0,
+            "a tributary vertex {p:?} in the parent's channel"
+        );
     }
-    assert!(tv[0] == RiverVertex { x: 0.0, z: -400.0, ..tv[0] });
+    assert!(
+        tv[0]
+            == RiverVertex {
+                x: 0.0,
+                z: -400.0,
+                ..tv[0]
+            }
+    );
 }
 
 #[test]
 fn distributaries_and_chains_off_the_plain_stay_as_they_were() {
     let c = 16_384;
     let mut r = Rivers::empty(c);
-    let stem = line(&mut r, (-1500.0, 0.0), (1500.0, 0.0), 2.0, 5.0, 200.0, (69.9, 69.1), Mouth::Sea, u32::MAX);
+    let stem = line(
+        &mut r,
+        (-1500.0, 0.0),
+        (1500.0, 0.0),
+        2.0,
+        5.0,
+        200.0,
+        (69.9, 69.1),
+        Mouth::Sea,
+        u32::MAX,
+    );
     // A distributary leaving the stem's vertex at x 600 (vertex 1050), and a river far away.
     let first = r.vertices.len() as u32;
     let apex = chain(&r, 0)[1050];
     let mut v = vec![apex];
     for i in 1..=100 {
-        v.push(RiverVertex { x: apex.x + 2.0 * i as f32, z: 2.0 * i as f32, ..apex });
+        v.push(RiverVertex {
+            x: apex.x + 2.0 * i as f32,
+            z: 2.0 * i as f32,
+            ..apex
+        });
     }
     r.vertices.extend_from_slice(&v);
     let mut d = Chain::new(first, v.len() as u32, Mouth::Sea, u32::MAX);
     d.from = stem;
     r.chains.push(d);
-    let far = line(&mut r, (-1500.0, 1500.0), (1500.0, 1500.0), 2.0, 5.0, 200.0, (69.9, 69.1), Mouth::Sea, u32::MAX);
+    let far = line(
+        &mut r,
+        (-1500.0, 1500.0),
+        (1500.0, 1500.0),
+        2.0,
+        5.0,
+        200.0,
+        (69.9, 69.1),
+        Mouth::Sea,
+        u32::MAX,
+    );
     let dist_before = chain(&r, 1).to_vec();
     let far_before = chain(&r, far as usize).to_vec();
     let plain = |_: f64, z: f64| (z < 800.0).then_some(bank(69.9));
@@ -328,5 +482,5 @@ fn distributaries_and_chains_off_the_plain_stay_as_they_were() {
     assert_eq!(r.chains[1].from, stem);
     assert_eq!(r.chains[0].from, NO_CHAIN);
     // The stem still holds the apex.
-    assert!(chain(&r, 0).iter().any(|q| *q == apex));
+    assert!(chain(&r, 0).contains(&apex));
 }
