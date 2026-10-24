@@ -157,6 +157,26 @@ the game uses them:
     their latitude-longitude cells and are painted over the faces. The spawn marker sits at its
     point on its face, and hovering shows the latitude, longitude and face. The editor keeps its
     `projection` and `lambda_c_deg` fields until section 7.4.
+13. **The developer map** (`devmap/`, never shipped; `devmap/model/PlanetGeometry`, cube plan G14).
+    The dev map reads a cube world as its net. Its picture is the window of 4s by 3s blocks from
+    x = -3s/2, and the void around N and S is transparent and cannot be clicked: the server clears
+    the void in the satellite picture after the natives draw it, and the elevation picture skips
+    it. The seam is the slide (x = -3s/2, the same line as 5s/2, for |z| up to s/2), dashed. The
+    edges are the border's 12 segments, drawn as one outline with the border's inset dashed inside
+    it, and the five face sides the net joins are faint dashed lines. The two poles are single points
+    inside N and S. The cone points are the eight corners at their twelve images in the window: a
+    cross in the cone colour on the four corners of F0, which a player can stand on, and in
+    orange-red on the four the border keeps a player off. The readout names the face and gives the
+    distance to the slide and to the nearest border segment; the minimap's second line reads
+    `F0  slide N  border N`. Distances and the player markers wrap x in Toroidal World's frame
+    (-2s to 2s), not the window, so a delta across the slide is short. The graticule is cut only
+    where a line crosses a turning seam (two faces the net does not join); across the slide and
+    the five joined sides it runs on. A teleport by right-click lands at the nearest point at
+    least the border's inset and the edge margin inside the segments (`CubeBorder.nearest`), never
+    on a copy in the void. The globe draws the cube's outline as the Create World screen does
+    (item 12). The shot driver's places on a cube: the spawn, 25 blocks onto F3 from the slide,
+    40 blocks inside N's east segment (a quarter-turn seam's border), the north pole, beside F0's
+    north-east corner and 40 blocks under the F1, F2 and N corner.
 
 ## Equations and constants
 
