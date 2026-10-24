@@ -47,7 +47,8 @@ this block and the text below disagree, this block wins:
   worst planet, and the median is about 310 m per block at s = 3,840. The face size stays.
 - **Detail noise** is sampled at the world block, not the planet point (study §6). The seamless
   projection survey's line 249 says otherwise and is wrong. G3 picks either a partition of unity
-  across turning seams or 3D noise at the planet point.
+  across turning seams or 3D noise at the planet point. (G3 took a third way, 2026-10-23: value
+  noise on a lattice laid on the cube's surface, SCL-215; see G3.)
 
 **How to read this plan.** Each work item has an id (W, M, B, S, G, T, E, D) and a "Check" line,
 the acceptance check that closes it. Section 7 orders the items into phases and lanes, and section 8
@@ -703,8 +704,9 @@ section 7.4 is deleted yet.
   the fill's biomes and draws deep ocean past the corners; Distant Horizons' sphere is the
   equal-area radius; the guard checks 4s; `/deeptime probe dh` gives the slide's x, and
   `dh-client-check.sh` and the smoke's `--dh` checks cover both sides of the slide as of Toroidal
-  World's seam).
-- Left: G3 (the detail noise across turning seams, Rust and Java together), G9 (climate API 5), G10's `NetworkGameTests` F3 test, the rest of G11 (the
+  World's seam), G3 (the detail noise on the cube's surface lattice in Rust and Java, the bake's
+  relief noises with it; the seam blend SCL-125 is retired for SCL-215).
+- Left: G9 (climate API 5), G10's `NetworkGameTests` F3 test, the rest of G11 (the
   `pole`, `tw` and `column` probes, `SiteCommands.distance`), G12 (the presets themselves; the smoke
   uses `tools/smoke/presets/*_cube.json`), the rest of G13 and G14, G16, the Sable border, and the
   section 7.4 deletions with the rewrites of the Petroff-Guyou tests they bring.
@@ -746,6 +748,14 @@ section 7.4 is deleted yet.
   three faces' noises are blended by a partition of unity.
   Check: the noise at an outside block equals the noise at its fold partner exactly, for every
   seam. The height step across each seam is within the face's own distribution (as B1).
+  Built otherwise (2026-10-23, the agent's design, accepted by the coordinator): no blend. On a cube
+  world the noise is value noise on a lattice laid on the cube's surface, m = max(1, round(s/λ))
+  cells along every cube edge, so the edges are lattice lines and neighbouring faces share their
+  lattice points; a block's centre reaches the surface through the fold. The noise is one function
+  on the surface, continuous through every seam and corner, and an outside block equals its fold
+  partner bit for bit (SCL-215, FORMAT.md "The detail layer"). The bake's jag and cliff-band
+  levels read the same noise, so the bake's seam blend (SCL-125, `seam_blend`) is gone.
+  Petroff-Guyou and Lambert keep the plain noise byte for byte.
 - **G4. Block states.** Fill copies and later the engine turn stairs, logs, rails and other directional
   blocks with vanilla `BlockState.rotate`.
   Check: a GameTest with a turned structure in the fill matches the original turned.

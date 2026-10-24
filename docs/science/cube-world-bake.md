@@ -3,7 +3,7 @@
 Status of this page: `stage 1 (written with the code, cube plan phase 1, 2026-10-22; measured on
 real bakes, nothing checked against a source)`.
 
-Ledger ids on this page: `SCL-120` to `SCL-130` (see [claims.md](claims.md)); it relies on the
+Ledger ids on this page: `SCL-120` to `SCL-130` and `SCL-215` (see [claims.md](claims.md)); it relies on the
 cube's geometry and maps, `SCL-078` to `SCL-081` and `SCL-100` to `SCL-108`, described on
 [seamless-world.md](seamless-world.md) ("The cube world").
 
@@ -53,13 +53,16 @@ The pass runs after the Lambert bake, on the finished world folder, and rewrites
    the biome layers' fills and distances, the relief's slopes) take a cell's neighbours on the
    planet, across every seam, and measure distances as great circles. A basin that lies across a
    turning seam is one basin with one level.
-4. **The relief** (SCL-123, SCL-125). The block-scale relief (gullies on cones, the jagged
+4. **The relief** (SCL-123, SCL-215). The block-scale relief (gullies on cones, the jagged
    steep-ground texture, the cliff bands) is drawn on each face in world blocks. Its constants are
    block sizes the game's 4-block noise corners need (gullies at least 8 blocks apart, cliff bands
    at most 24 blocks), so they keep their sizes in blocks; only what a block means in metres
-   varies with the map's local scale σ. The noises they read are written in net coordinates, which
-   turn at a turning seam; within one wavelength of such a seam the bake mixes each noise with its
-   value on the far side, half and half on the seam itself, so both sides read the same value.
+   varies with the map's local scale σ. The noises they read (the jag, the cliff bands' levels)
+   are the cube's surface noise, the same noise the game's detail term reads: value noise on a
+   lattice laid on the cube's surface, whose lines meet the cube's edges, so it runs on through
+   every seam and corner and both sides of a seam read one value with nothing blended. (Until cube
+   plan G3 the noises were written in net coordinates and blended within one wavelength of a
+   turning seam, SCL-125, now retired.)
 5. **Rivers, bodies and points** (SCL-126 to SCL-128, SCL-130). Positions go through the inverse
    map, sizes and directions through the Jacobian. A deposit body's ellipse is the exact image of
    its planet ellipse under the Jacobian at its centre (its semi-axes the map's singular values),
@@ -85,7 +88,8 @@ The pass runs after the Lambert bake, on the finished world folder, and rewrites
 | SCL-122 | topology | neighbours on the planet across all 12 seams; great-circle distances | none | geometry | `game-choice` |
 | SCL-123 | relief in world blocks | gullies 8 to 12 blocks apart, jag 32 blocks, cliff bands 24 blocks, σ recorded | blocks | none | `game-choice` |
 | SCL-124 | raster footprint | D_k = r_w √λ_k / r_s; width r_s √(D_k² − 1), dropped under 0.25 r_s, at most C/12 | blocks | none | `game-choice` |
-| SCL-125 | noise seam blend | reach one wavelength (32 and 512 blocks), smoothstep, ½ on the seam | blocks | none | `game-choice` |
+| SCL-125 | noise seam blend (retired with G3) | reach one wavelength (32 and 512 blocks), smoothstep, ½ on the seam | blocks | none | `merged` into SCL-215 |
+| SCL-215 | surface noise | value noise on the cube's surface lattice, m = max(1, round(s/λ)) cells per cube edge, fade f²(3 − 2f) | blocks | none | `game-choice` |
 | SCL-126 | rivers | cut on turning seams (mouth 3); width / σ; jump 256 blocks | blocks | none | `game-choice` |
 | SCL-127 | spawn margins | 256 from a corner, 64 from a turning edge | blocks | none | `game-choice` |
 | SCL-128 | structures on seams | kept and counted | count | none | `game-choice` |
@@ -135,6 +139,7 @@ first step beside each kind of seam on both of its faces (the same ground's cont
 |---|---|---|---|---|---|
 | 16k seed 1 | 4.56 | 3.94 | 3.0 (3.0) | 5.56 (5.63) | 3.25 (3.25) |
 | 4k seed 11 | 3.94 | 3.38 | 3.5 (3.44) | 2.56 (2.44) | 3.94 (3.5) |
+| 4k test planet, G3 | 3.94 | 2.69 | 3.38 (3.44) | 3.38 (3.38) | 2.31 (2.25) |
 
 Every kind of seam steps no more than the inside of a face. At 16k each also steps no more than
 the ground beside it: the slide's 5.56 is the band's own steep ground there (5.63 beside it), not
@@ -144,6 +149,15 @@ of a face; the 4k planet has 3,072 turning-seam pairs, a quarter of the 16k's sa
 The largest steps: 40.6 blocks inside a face against 6.2, 7.4 and 5.6 across the direct seams, the
 slide and the turning seams (16k). The detail layer's amplitude steps are 0.375 inside a face and
 0.25 to 0.625 across seams (p99, 16k).
+
+The first two rows were measured with the phase-1 seam blend (SCL-125, retired). The third is the
+4k test planet (`planet_world_4k` baked as a cube, s = 1,024) after G3, with the detail noise on
+the cube's surface lattice and no blend (SCL-215; `build/cube2/g3-checks.sh` on the VM,
+2026-10-23): every kind of seam steps no more than the ground beside it, give or take one sixteenth
+of a block, and less than the inside of a face. The largest steps are 12.6 blocks inside a face
+against 4.06, 3.56 and 4.25 across the direct seams, the slide and the turning seams. The detail
+layer's amplitude steps (p99) are 0.375 inside a face and 0.25, 0.1875 and 0.3125 across the
+direct seams, the slide and the turning seams, each the same as beside them.
 
 **The footprint (B2).** The share of L3 cells and the record's checkerboard leak by D along the
 cell's long axis (simulation cells per world cell; L1 and L2 within 0.1 % of the same shares):
