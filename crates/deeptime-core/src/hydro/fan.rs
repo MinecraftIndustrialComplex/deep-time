@@ -203,8 +203,9 @@ pub fn find(inp: &Input<'_>, net: &network::Output) -> Fans {
         g.origin_block_z as f64,
         f64::from(g.r),
     );
-    let c = g.circumference() as f64;
+    // The planet's circumference (a window of a Lambert frame is narrower than it).
     let lambert = inp.lambert;
+    let c = lambert.map_or(g.circumference() as f64, |p| p.circumference());
     let pos = |cell: u32| -> (f64, f64) {
         let cu = cell as usize;
         (ox + (cu % w) as f64 * r, oz + (cu / w) as f64 * r)

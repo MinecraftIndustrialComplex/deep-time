@@ -696,12 +696,13 @@ pub fn lambda_note(choice: Option<&LambdaChoice>, search: LambdaSearch) -> Value
 
 /// Bytes per cell of the layers the bake writes on each grid (level, name, bytes), summed over the
 /// layers (the pass loads all of one grid's layers at once): L1 holds the horizon stacks, L2 and L3
-/// a few scalars (L3's 11 include the delta plains' raise, 2 B, `water::DELTA_LAYER`, and the
-/// floodplains' change, 2 B, `water::FLOODPLAIN_LAYER`). Measured on a
+/// a few scalars (L3's 13 include the delta plains' raise, 2 B, `water::DELTA_LAYER`, the
+/// floodplains' change, 2 B, `water::FLOODPLAIN_LAYER`, and the fans' raise, 2 B,
+/// `water::FAN_LAYER`). Measured on a
 /// baked planet (`the_projection_estimate_covers_the_baked_layers` fails if the bake outgrows
 /// them); a figure of the memory model, not a physical one.
 pub(crate) const LAYER_BYTES_PER_CELL: [(u32, &str, u64); 3] =
-    [(1, "L1", 288), (2, "L2", 16), (3, "L3", 11)];
+    [(1, "L1", 288), (2, "L2", 16), (3, "L3", 13)];
 
 /// Of L3's bytes a cell, the water's layers (`water_level` 2 B, `playa` and `closed_basin` 1 B
 /// each): they are on the hydrology's grid, which is L3 halved where L3 is over
