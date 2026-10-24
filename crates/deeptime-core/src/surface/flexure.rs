@@ -2462,10 +2462,11 @@ mod tests {
         assert!(w0m < w0);
     }
 
-    /// A line load on the end of a broken plate (Turcotte & Schubert's broken plate): stiff at `te_km`
-    /// from the load's row on, all but rigidity-free (`soft_km`) before it. The depth under the
-    /// load, the first zero crossing and the bulge's place and height, m, and the plate's α.
-    fn broken_line_load(te_km: f64, soft_km: f64, dx: f64) -> (f64, f64, f64, f64, f64) {
+    /// A line load on the end of a broken plate: stiff at `te_km` from the load's row on, all but
+    /// rigidity-free (`soft_km`) before it. The depth under the load, the first zero crossing,
+    /// the bulge's place and height, m, the plate's α, and the share of the load the stiff plate
+    /// carries (the rest the soft side holds up locally beside the break).
+    fn broken_line_load(te_km: f64, soft_km: f64, dx: f64) -> (f64, f64, f64, f64, f64, f64) {
         let (w, h) = (16usize, 1024usize);
         let mut sv = Solver::new(w, h, dx);
         let row = h / 2;
@@ -2488,50 +2489,48 @@ mod tests {
             .iter()
             .enumerate()
             .fold((0, 0.0), |a, (i, &v)| if v < a.1 { (i, v) } else { a });
-        (profile[0], zero, kb as f64 * dx, wb, alpha)
+        let stiff = profile.iter().sum::<f64>() * dx * RHO_MANTLE / per_m;
+        (profile[0], zero, kb as f64 * dx, wb, alpha, stiff)
     }
 
-    /// The broken plate's line load (Turcotte & Schubert's, the foreland basin's model
-    /// since Jordan 1981 and Lyon-Caen & Molnar 1983): w = w₀ e^(−x/α) cos(x/α), w₀ = V α³ / 4D,
-    /// twice the continuous plate's; the basin's edge at πα/2 and the bulge at 3πα/4,
-    /// e^(−3π/4) cos(3π/4) = −6.7 % of the depth. The variable-stiffness solve gives it with a
-    /// plate whose rigidity drops 3,375-fold at the load.
+    /// The broken plate's line load, the foreland basin's model since Jordan 1981 and
+    /// Lyon-Caen & Molnar 1983 (Turcotte & Schubert's broken plate): a load V on the end of a
+    /// semi-infinite plate bends it as w = w₀ e^(−x/α) cos(x/α), the end free of moment, with
+    /// w₀ = 2V / (ρ_m g α) = V α³ / 2D (the end's buoyancy, ρ_m g w₀ α / 2, carries V); the
+    /// basin's edge at πα/2, not the continuous plate's 3πα/4, and the bulge at 3πα/4 with
+    /// e^(−3π/4) cos(3π/4) = −6.7 % of the depth. The variable-stiffness solve gives it on a plate
+    /// whose rigidity drops 3,375-fold at the load (the soft side holds a little of the load up
+    /// beside the break; the end's depth is checked against what the stiff plate carries).
     // ledger: ISO-131
     #[test]
     fn a_line_load_on_a_broken_plate_gives_the_analytic_profile() {
         let dx = 5000.0;
         let te = 30.0;
-        let (w0, zero, bulge_at, bulge, alpha) = broken_line_load(te, 2.0, dx);
+        let (w0, zero, bulge_at, bulge, alpha, stiff) = broken_line_load(te, 2.0, dx);
         let pi = std::f64::consts::PI;
-        let analytic = 1.0e10 / (RHO_MANTLE * alpha);
-        eprintln!(
-            "broken: w0 {w0} vs {analytic}; zero {zero} vs {}; bulge at {bulge_at} vs {}; bulge {} vs {}",
-            0.5 * pi * alpha,
-            0.75 * pi * alpha,
-            bulge / w0,
-            (-0.75 * pi).exp() * (0.75 * pi).cos()
+        let analytic = 2.0 * stiff * 1.0e10 / (RHO_MANTLE * alpha);
+        assert!(stiff > 0.65 && stiff <= 1.0, "the stiff plate carries {stiff}");
+        assert!(
+            (w0 / analytic - 1.0).abs() < 0.05,
+            "{w0} against {analytic} (stiff share {stiff})"
         );
         assert!(
-            (w0 / analytic - 1.0).abs() < 0.08,
-            "{w0} against {analytic}"
-        );
-        assert!(
-            (zero / (0.5 * pi * alpha) - 1.0).abs() < 0.08,
+            (zero / (0.5 * pi * alpha) - 1.0).abs() < 0.05,
             "zero crossing at {zero}, πα/2 = {}",
             0.5 * pi * alpha
         );
         assert!(
-            (bulge_at - 0.75 * pi * alpha).abs() <= 2.0 * dx,
+            (bulge_at - 0.75 * pi * alpha).abs() <= 1.5 * dx,
             "bulge at {bulge_at}, 3πα/4 = {}",
             0.75 * pi * alpha
         );
         let want = (-0.75 * pi).exp() * (0.75 * pi).cos();
         assert!(
-            (bulge / w0 - want).abs() < 0.01,
+            (bulge / w0 - want).abs() < 0.005,
             "bulge height {} of the depth against {want}",
             bulge / w0
         );
-        // A broken plate's basin is narrower than a continuous one's (3πα/4) and twice as deep.
+        // Against the continuous plate under the same load: narrower and much deeper.
         let (c0, czero, ..) = line_load(te, G, dx);
         assert!(
             w0 > 1.8 * c0 && zero < 0.75 * czero,
@@ -3080,9 +3079,8 @@ mod tests {
     /// ISO-131: the same collision with the incoming plate's lithosphere under the belt and the
     /// wedge (`plates/carrier_plate_id`). The range is then a load on the end of the stiff
     /// incoming plate, broken behind the belt (Lyon-Caen & Molnar 1983): the foreland basin is
-    /// deeper and wider than when only the wedge loads it, its edge lies about πα/2 of the
-    /// incoming plate beyond the load's front, and the overriding plate behind the belt is still
-    /// left alone.
+    /// twice as deep as when only the wedge loads it, as wide (its width is the incoming plate's
+    /// α), and the overriding plate behind the belt is left alone.
     #[test]
     fn a_belt_carried_by_the_incoming_plate_bends_a_wide_foreland_basin() {
         let p = on();
@@ -3143,25 +3141,29 @@ mod tests {
             (j as f64 - 1.0 + f[j - 1] / (f[j - 1] - f[j]) - 127.5) * rows_km
         };
         let alpha_km = flexural_parameter_m(rigidity_per_g(80.0, G)) / 1000.0;
-        eprintln!(
-            "off: basin {} edge {} km; on: basin {} edge {} km; πα/2 {} km; te off {:?} on {:?}",
-            basin(&off),
-            edge(&off),
-            basin(&on),
-            edge(&on),
-            0.5 * std::f64::consts::PI * alpha_km,
-            &te_off[112..140],
-            &te_on[112..140]
-        );
-        eprintln!("on profile {:?}", &on[110..200]);
-        eprintln!("off profile {:?}", &off[110..200]);
+        let quarter = 0.5 * std::f64::consts::PI * alpha_km;
+        // The belt's weight now bends the foreland too: the basin is twice as deep (2.1 times
+        // here). Its edge is the incoming plate's, set by that plate's α either way: beyond πα/2
+        // of the front (the load is spread over the wedge and the belt), and in the same place.
         assert!(
             basin(&on) < 1.5 * basin(&off),
             "{} {}",
             basin(&on),
             basin(&off)
         );
-        assert!(edge(&on) > edge(&off), "{} {}", edge(&on), edge(&off));
+        for f in [&on, &off] {
+            assert!(
+                edge(f) > quarter && edge(f) < 2.0 * quarter,
+                "edge {} km, πα/2 {quarter} km",
+                edge(f)
+            );
+        }
+        assert!(
+            (edge(&on) - edge(&off)).abs() < rows_km,
+            "{} {}",
+            edge(&on),
+            edge(&off)
+        );
         // The belt rests on the stiff plate: its Te is the incoming plate's, not the floor.
         assert!(
             te_on[123] > 50.0 && te_off[123] < 10.0,
