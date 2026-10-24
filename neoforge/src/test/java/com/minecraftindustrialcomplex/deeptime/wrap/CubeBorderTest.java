@@ -127,6 +127,43 @@ class CubeBorderTest {
     }
 
     /**
+     * Cube plan G11, the walk under the border: straight wherever the segment stays on the planet
+     * (in the band, through the slide, from N to S through F0, through an inner corner exactly), bent
+     * round the inner corners (±h, ±h) otherwise; symmetric and never shorter than the straight line.
+     */
+    @Test
+    void theWalkGoesStraightOrRoundTheInnerCorners() {
+        assertEquals(0.0, B.walkDistance(17, 23, 17, 23), 1e-9);
+        assertEquals(Math.hypot(3000, 350), B.walkDistance(-1000, 50, 2000, -300), 1e-9, "in the band");
+        assertEquals(200.0, B.walkDistance(2 * S - 100, 0, -2 * S + 100, 0), 1e-9, "through the slide");
+        assertEquals(4 * H, B.walkDistance(0, -2 * H, 0, 2 * H), 1e-9, "N to S through F0");
+        assertEquals(Math.hypot(400, 4.7 * H), B.walkDistance(100, -2.5 * H, -300, 2.2 * H), 1e-9, "down the column");
+        assertEquals(2 * Math.sqrt(2) * H, B.walkDistance(0, -2 * H, 2 * H, 0), 1e-6, "N to F1 through the corner exactly");
+        assertEquals((Math.sqrt(2) + Math.hypot(1, 0.5)) * H, B.walkDistance(0, -2 * H, 2 * H, -H / 2), 1e-6,
+                "N to F1 round the corner");
+        assertEquals((Math.sqrt(2) + Math.sqrt(10)) * H, B.walkDistance(0, -2 * H, 4 * H, 0), 1e-6,
+                "N to F2's centre round either corner");
+        assertEquals((Math.sqrt(2) + Math.sqrt(10)) * H, B.walkDistance(0, 2 * H, -4 * H, 0), 1e-6,
+                "S to F2's centre, the other way round");
+        // The straight line leaves N's column at z = -h/2, inside the band, so it cuts inside the corner.
+        assertEquals(Math.hypot(2 * H, 3 * H), B.walkDistance(0, -2 * H, 2 * H, H), 1e-6, "N to F1's lower half, straight");
+        assertTrue(Double.isNaN(B.walkDistance(H + 5, -H - 5, 0, 0)), "from off the planet");
+        java.util.SplittableRandom rnd = new java.util.SplittableRandom(11);
+        int pairs = 0;
+        while (pairs < 300) {
+            double ax = rnd.nextDouble(-2 * S, 2 * S), az = rnd.nextDouble(-3 * H, 3 * H);
+            double bx = rnd.nextDouble(-2 * S, 2 * S), bz = rnd.nextDouble(-3 * H, 3 * H);
+            if (!B.inside(ax, az, 0) || !B.inside(bx, bz, 0))
+                continue;
+            double w = B.walkDistance(ax, az, bx, bz), dx = Math.abs(B.frameX(bx) - B.frameX(ax));
+            double straight = Math.hypot(Math.min(dx, 4 * S - dx), bz - az);
+            assertTrue(w >= straight - 1e-6 && w < 4 * S + 6 * H, "the walk " + w + " against the straight " + straight);
+            assertEquals(w, B.walkDistance(bx, bz, ax, az), 1e-6, "symmetric");
+            pairs++;
+        }
+    }
+
+    /**
      * Cube plan G15, reachability: a flood fill of the net at chunk resolution, through the chunks
      * whose centre is inside the stop line (x wrapping through Toroidal World's frame), reaches all
      * six faces from spawn at (0, 0), and every chunk of every face whose centre is inside.

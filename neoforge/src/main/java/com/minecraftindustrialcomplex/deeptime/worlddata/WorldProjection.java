@@ -143,6 +143,20 @@ public interface WorldProjection {
         return 1.0;
     }
 
+    /**
+     * The great-circle distance between (x0, z0) and (x1, z1) on the planet, in blocks of the
+     * equal-area sphere ({@link #radius}; times {@code m_per_block_h} it is metres, SCL-107): the angle
+     * between their unit vectors, atan2(|a × b|, a · b), which keeps near and far points exact. NaN
+     * when either point is off the planet.
+     */
+    default double greatCircleBlocks(double x0, double z0, double x1, double z1) {
+        double[] a = unit(x0, z0), b = unit(x1, z1);
+        if (Double.isNaN(a[0]) || Double.isNaN(b[0]))
+            return Double.NaN;
+        double cx = a[1] * b[2] - a[2] * b[1], cy = a[2] * b[0] - a[0] * b[2], cz = a[0] * b[1] - a[1] * b[0];
+        return Math.atan2(Math.sqrt(cx * cx + cy * cy + cz * cz), a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) * radius();
+    }
+
     /** The bearing in degrees [0, 360) of the block-frame direction (dx, dz), clockwise from −z seen from above. */
     static double bearingDeg(double dx, double dz) {
         double b = Math.toDegrees(Math.atan2(dx, -dz));

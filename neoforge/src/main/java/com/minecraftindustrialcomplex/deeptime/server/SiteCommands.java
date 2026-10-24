@@ -10,9 +10,12 @@ import com.minecraftindustrialcomplex.deeptime.compat.SiteChunks;
 import com.minecraftindustrialcomplex.deeptime.ore.ClaimOresBiomeModifier;
 import com.minecraftindustrialcomplex.deeptime.ore.ClaimRules;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Body;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import com.minecraftindustrialcomplex.deeptime.worldgen.DepositFeature;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LevelSites;
+import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
+import com.minecraftindustrialcomplex.deeptime.wrap.CubeBorder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.BlockPos;
@@ -149,7 +152,15 @@ public final class SiteCommands {
 
     /** {@code /deeptime sites near <x> <z> <radius>}: the sites whose centre lies within the radius, nearest first. */
     public static int sitesNear(CommandSourceStack source, int x, int z, int radius) {
-        ServerLevel level = source.getLevel();
+        return DeepTimeCommands.emit(source, sitesNearJson(source.getLevel(), x, z, radius));
+    }
+
+    /**
+     * {@link #sitesNear}'s answer: each site's {@code distance} in the block frame (x wrapping), and on
+     * a cube world also {@code distance_km} on the planet and {@code walk}, the blocks walked to it
+     * under the border.
+     */
+    public static JsonObject sitesNearJson(ServerLevel level, int x, int z, int radius) {
         DeepTimeSites sites = DeepTimeSites.of(level);
         JsonObject o = new JsonObject();
         o.addProperty("probe", "sites-near");
@@ -159,6 +170,14 @@ public final class SiteCommands {
         o.addProperty("radius", radius);
         o.addProperty("deepTimeLevel", sites.isDeepTimeLevel());
         int c = level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g ? g.dataRef().circumferenceBlocks() : 0;
+        // A cube world (cube plan G11): each site's planet distance and the walk to it under the border too.
+        WorldProjection.Cube cubeWorld = null;
+        double mPerBlock = Double.NaN;
+        if (level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator gg && gg.terrain() instanceof WorldDataTerrain t
+                && t.data().projection() instanceof WorldProjection.Cube wp) {
+            cubeWorld = wp;
+            mPerBlock = t.data().manifest().mPerBlockH();
+        }
         List<Map.Entry<Double, Site>> found = new ArrayList<>();
         for (Site s : sites.within(new AABB(x - radius, -1e6, z - radius, x + radius, 1e6, z + radius))) {
             double d = distance(c, x, z, s.center().getX(), s.center().getZ());
@@ -170,6 +189,14 @@ public final class SiteCommands {
         for (var e : found) {
             JsonObject so = siteJson(e.getValue());
             so.addProperty("distance", Math.round(e.getKey() * 10) / 10.0);
+            if (cubeWorld != null) {
+                double cx = e.getValue().center().getX() + 0.5, cz = e.getValue().center().getZ() + 0.5;
+                double km = planetDistanceKm(cubeWorld, mPerBlock, x + 0.5, z + 0.5, cx, cz);
+                double walk = CubeBorder.of(cubeWorld.cube().side()).walkDistance(x + 0.5, z + 0.5, cx, cz);
+                // NaN (an end off the planet) stays NaN, not a rounded 0.
+                so.addProperty("distance_km", Double.isNaN(km) ? km : Math.round(km * 100) / 100.0);
+                so.addProperty("walk", Double.isNaN(walk) ? walk : Math.round(walk * 10) / 10.0);
+            }
             // P1-16: the chunk its ore body fills most (the chunk to probe with `probe coe` / `probe cdg`).
             if (sites instanceof LevelSites ls) {
                 var best = SiteChunks.footprint(ls, e.getValue()).best();
@@ -184,10 +211,14 @@ public final class SiteCommands {
         }
         o.addProperty("count", found.size());
         o.add("sites", arr);
-        return DeepTimeCommands.emit(source, o);
+        return o;
     }
 
-    /** Horizontal distance on a planet of circumference c (x wraps; c = 0: no wrap). */
+    /**
+     * Horizontal distance in the block frame on a planet of east-west period c (x wraps; c = 0: no
+     * wrap). On a cube world that is the distance in the net; {@link #planetDistanceKm} gives the
+     * planet's and {@link CubeBorder#walkDistance} the walk under the border.
+     */
     public static double distance(int c, double x0, double z0, double x1, double z1) {
         double dx = x1 - x0;
         if (c > 0) {
@@ -195,6 +226,16 @@ public final class SiteCommands {
             dx = Math.min(dx, c - dx);
         }
         return Math.hypot(dx, z1 - z0);
+    }
+
+    /**
+     * The great-circle distance between two points of the world on the planet, km (cube plan G11):
+     * {@link WorldProjection#greatCircleBlocks} (through the fold and the map on a cube world) times
+     * the nominal metres per block, which makes the equal-area sphere's radius the planet's in metres
+     * (SCL-107). NaN when either point is off the planet.
+     */
+    public static double planetDistanceKm(WorldProjection p, double mPerBlockH, double x0, double z0, double x1, double z1) {
+        return p.greatCircleBlocks(x0, z0, x1, z1) * mPerBlockH / 1000.0;   // ledger: SCL-107
     }
 
     /** {@code /deeptime why <siteId>}: the site, its forming event and the cause chain (4 links). */

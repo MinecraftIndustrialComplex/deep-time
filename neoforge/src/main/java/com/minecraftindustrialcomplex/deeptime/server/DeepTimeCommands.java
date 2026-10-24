@@ -4,6 +4,7 @@ package com.minecraftindustrialcomplex.deeptime.server;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.api.climate.DeepTimeClimate;
 import com.minecraftindustrialcomplex.deeptime.climate.BiomeCensus;
 import com.minecraftindustrialcomplex.deeptime.climate.RegionCensus;
 import com.minecraftindustrialcomplex.deeptime.compat.sable.SableTestOps;
@@ -11,7 +12,12 @@ import com.minecraftindustrialcomplex.deeptime.gametest.DeepTimeTestReporter;
 import com.minecraftindustrialcomplex.deeptime.gametest.GameTestSupport;
 import com.minecraftindustrialcomplex.deeptime.net.DeepTimeNetwork;
 import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
+import com.minecraftindustrialcomplex.deeptime.wrap.CubeBorder;
+import com.minecraftindustrialcomplex.deeptime.wrap.EdgeBorder;
 import com.minecraftindustrialcomplex.deeptime.wrap.PoleCap;
 import com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve;
 import com.mojang.brigadier.CommandDispatcher;
@@ -49,9 +55,9 @@ public final class DeepTimeCommands {
                                         .executes(DeepTimeCommands::probeColumn))))
                 .then(Commands.literal("tw").executes(DeepTimeCommands::probeTw))
                 .then(Commands.literal("pole")
-                        .executes(c -> probePole(c.getSource(), c.getSource().getPosition().z))
+                        .executes(c -> probePole(c.getSource(), c.getSource().getPosition().x, c.getSource().getPosition().z))
                         .then(Commands.argument("z", IntegerArgumentType.integer())
-                                .executes(c -> probePole(c.getSource(), IntegerArgumentType.getInteger(c, "z")))))
+                                .executes(c -> probePole(c.getSource(), c.getSource().getPosition().x, IntegerArgumentType.getInteger(c, "z")))))
                 .then(Commands.literal("network").executes(c -> probeNetwork(c.getSource())))
                 .then(Commands.literal("palette").executes(c -> probePalette(c.getSource())))
                 // Where the level has lava: the active volcanoes' magma, the lava features refused, the distances.
@@ -139,9 +145,17 @@ public final class DeepTimeCommands {
     }
 
     private static int probeColumn(CommandContext<CommandSourceStack> ctx) {
-        ServerLevel level = ctx.getSource().getLevel();
-        int x = IntegerArgumentType.getInteger(ctx, "x");
-        int z = IntegerArgumentType.getInteger(ctx, "z");
+        return emit(ctx.getSource(), columnJson(ctx.getSource().getLevel(), IntegerArgumentType.getInteger(ctx, "x"),
+                IntegerArgumentType.getInteger(ctx, "z")));
+    }
+
+    /**
+     * {@code /deeptime probe column <x> <z>}'s answer: the generator's numbers at the column, its
+     * latitude and longitude, and the loaded chunk's surface. On a cube world also where the block
+     * folds to ({@code fold}: its face and cell, the turning edge it lies past with the planet block
+     * it shows, or the ocean past the corners), north's bearing and the metres a block spans there.
+     */
+    public static JsonObject columnJson(ServerLevel level, int x, int z) {
         JsonObject o = new JsonObject();
         o.addProperty("probe", "column");
         o.addProperty("level", level.dimension().location().toString());
@@ -161,6 +175,31 @@ public final class DeepTimeCommands {
                     level.getChunkSource().randomState()) - 1);
             for (String layer : new String[]{"temperature", "vegetation", "continents", "erosion", "ridges"})
                 o.addProperty(layer, terrain.raster("climate/" + layer, x, z));
+            if (g.dataRef().cube()) {
+                // The cube world (cube plan G11): where the block folds to, and the local geometry.
+                CubeLayout cube = g.cubeLayout();
+                o.addProperty("faceBlocks", cube.side());
+                JsonObject f = new JsonObject();
+                switch (cube.fold(x, z)) {
+                    case CubeLayout.OnFace on -> {
+                        f.addProperty("kind", "face");
+                        f.addProperty("face", on.face().name());
+                        f.addProperty("i", on.i());
+                        f.addProperty("j", on.j());
+                    }
+                    case CubeLayout.Outside out -> {
+                        f.addProperty("kind", "outside");
+                        f.addProperty("edge", cube.edges().get(out.edge()).name());
+                        f.addProperty("x", out.x());
+                        f.addProperty("z", out.z());
+                        f.addProperty("quarterTurns", out.iso().k());
+                    }
+                    case CubeLayout.Ocean ocean -> f.addProperty("kind", "ocean");
+                }
+                o.add("fold", f);
+                o.addProperty("northBearing", DeepTimeClimate.northBearingDeg(level, x + 0.5, z + 0.5));
+                o.addProperty("metresPerBlock", DeepTimeClimate.metresPerBlock(level, x + 0.5, z + 0.5));
+            }
         }
         // The loaded chunk's own heightmap, without loading anything (null when not loaded).
         var chunk = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
@@ -169,11 +208,19 @@ public final class DeepTimeCommands {
             o.addProperty("worldSurface", chunk.getHeight(Heightmap.Types.WORLD_SURFACE, x & 15, z & 15));
         var biome = level.getBiome(new BlockPos(x, generator.getSeaLevel(), z));
         o.addProperty("biome", biome.unwrapKey().map(k -> k.location().toString()).orElse("?"));
-        return emit(ctx.getSource(), o);
+        return o;
     }
 
     private static int probeTw(CommandContext<CommandSourceStack> ctx) {
-        ServerLevel level = ctx.getSource().getLevel();
+        return emit(ctx.getSource(), twJson(ctx.getSource().getLevel()));
+    }
+
+    /**
+     * {@code /deeptime probe tw}'s answer: Toroidal World's shape of the level, and on a planet the
+     * generator's east-west period beside it ({@code periodBlocks}: C on Lambert, 2b on Petroff–Guyou,
+     * 4s on a cube) with {@code widthIsPeriod}, whether Toroidal World wraps at it.
+     */
+    public static JsonObject twJson(ServerLevel level) {
         JsonObject o = new JsonObject();
         o.addProperty("probe", "tw");
         o.addProperty("level", level.dimension().location().toString());
@@ -190,10 +237,19 @@ public final class DeepTimeCommands {
             o.addProperty("minChunkX", s.minChunk(net.minecraft.core.Direction.Axis.X));
             o.addProperty("maxChunkX", s.maxChunk(net.minecraft.core.Direction.Axis.X));
         });
+        if (generator instanceof GeologicChunkGenerator g) {
+            int period = g.dataRef().circumferenceBlocks();
+            o.addProperty("projection", g.dataRef().projection());
+            o.addProperty("periodBlocks", period);
+            if (g.dataRef().cube())
+                o.addProperty("faceBlocks", g.cubeLayout().side());
+            shape.ifPresent(s -> o.addProperty("widthIsPeriod",
+                    s.loops(net.minecraft.core.Direction.Axis.X) && 16L * s.widthChunks(net.minecraft.core.Direction.Axis.X) == period));
+        }
         // TW's climate compression matches vanilla's climate density functions only; Deep Time's
         // climate is deeptime:raster, so compression cannot apply.
         o.addProperty("climateCompression", "off");
-        return emit(ctx.getSource(), o);
+        return o;
     }
 
     /**
@@ -288,12 +344,19 @@ public final class DeepTimeCommands {
         return emit(ctx.getSource(), o);
     }
 
+    private static int probePole(CommandSourceStack source, double x, double z) {
+        return emit(source, poleJson(source.getLevel(), x, z));
+    }
+
     /**
-     * The pole cap (plan §7.11) of the source's level at block z (default: the source's own z):
-     * the lines, the latitude and what the cap does there.
+     * {@code /deeptime probe pole [z]}'s answer: the pole cap (plan §7.11) of the level at block z
+     * (default: the source's own z), the lines, the latitude and what the cap does there; the edge
+     * border of a Petroff–Guyou world. On a cube world (cube plan G11) the poles lie inside N and S:
+     * each pole's face and block, its latitude, whether the border lets a player reach it, and from
+     * the source's (x, z) the planet distance to it (km, through the map) and the walk under the
+     * border (blocks); the source's own latitude, longitude, north and scale, and its border zone.
      */
-    private static int probePole(CommandSourceStack source, double z) {
-        ServerLevel level = source.getLevel();
+    public static JsonObject poleJson(ServerLevel level, double x, double z) {
         JsonObject o = new JsonObject();
         o.addProperty("probe", "pole");
         o.addProperty("level", level.dimension().location().toString());
@@ -324,7 +387,38 @@ public final class DeepTimeCommands {
                 o.addProperty("edgeZone", com.minecraftindustrialcomplex.deeptime.wrap.EdgeBorder.zone(stop, z));
             }
         }
-        return emit(source, o);
+        if (level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g && g.dataRef().cube()
+                && g.terrain() instanceof WorldDataTerrain t && t.data().projection() instanceof WorldProjection.Cube wp) {
+            CubeLayout cube = wp.cube();
+            CubeBorder border = CubeBorder.of(cube.side());
+            EdgeBorder.CubeStop stop = EdgeBorder.cubeStop(level);
+            double mPerBlock = t.data().manifest().mPerBlockH();
+            o.addProperty("projection", g.dataRef().projection());
+            o.addProperty("x", x);
+            o.addProperty("z", z);
+            o.addProperty("latitude", wp.latitudeDeg(x, z));
+            o.addProperty("longitude", wp.longitudeDeg(x, z));
+            o.addProperty("northBearing", wp.northBearingDeg(x, z));
+            o.addProperty("metresPerBlock", mPerBlock * wp.scale(x, z));   // ledger: SCL-107
+            o.addProperty("cubeBorder", stop != null);
+            if (stop != null)
+                o.addProperty("borderZone", border.zone(x, z, stop.inset(), EdgeBorder.WARN_BLOCKS));
+            double inset = stop != null ? stop.inset() : 0.0;
+            for (boolean north : new boolean[]{true, false}) {
+                CubeLayout.LocalPoint lp = north ? wp.world().northPole() : wp.world().southPole();
+                double[] at = cube.pointOfLocal(lp.face(), lp.u(), lp.v());
+                JsonObject p = new JsonObject();
+                p.addProperty("face", lp.face().name());
+                p.addProperty("x", border.frameX(at[0]));   // Toroidal World's frame, where /tp goes
+                p.addProperty("z", at[1]);
+                p.addProperty("latitude", wp.latitudeDeg(at[0], at[1]));
+                p.addProperty("reachable", border.inside(at[0], at[1], inset));
+                p.addProperty("distanceKm", SiteCommands.planetDistanceKm(wp, mPerBlock, x, z, at[0], at[1]));
+                p.addProperty("walkBlocks", border.walkDistance(x, z, at[0], at[1]));
+                o.add(north ? "northPole" : "southPole", p);
+            }
+        }
+        return o;
     }
 
     /**
