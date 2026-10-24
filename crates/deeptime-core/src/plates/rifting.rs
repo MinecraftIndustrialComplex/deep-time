@@ -42,8 +42,9 @@ const MIN_RIFT_SAMPLES: u32 = 64;
 const WEAK_MIN_KM: f64 = 20.0;
 
 /// The stress weight of V1 gap 2's stage C2 (ledger PLT-504, PLT-505): each plate's
-/// e^(sign·σ/σ_s) over its mean across the plates `candidates` names with their weights `w`
-/// (area), so the hazard's expected count over them is unchanged and only where it falls moves.
+/// e^(sign·σ/σ_s) over its mean across the plates `candidates` names, weighted by the hazard `w`
+/// each has unweighted, so the hazard's expected count over them is unchanged (to first order in
+/// the hazard) and only where it falls moves.
 /// σ is the plate's mean in-plane stress from the step's force balance (FRC-022, MPa, tension
 /// positive); a plate without one (not in the balance, or born this step) weighs 1. `None` when
 /// the rule is off (`scale_mpa` 0) or no candidate has a stress.
@@ -97,14 +98,29 @@ pub fn maybe_rift(
     let area = env.norm.sample_area_km2();
     let min = (k.min_plate_area_frac * f64::from(state.n) * 8.0).max(f64::from(MIN_RIFT_SAMPLES));
     let ids: Vec<u32> = state.alive().map(|p| p.id).collect();
+    let a0 = state.a0_km2;
+    // A plate's rift hazard λ (Cortial's: continental weight, area, plume boost).
+    let hazard = |p: &Plate| {
+        let x = p.continental_frac;
+        let f = k.rift_ocean_weight + (1.0 - k.rift_ocean_weight) * x * x;
+        let boost = if env.t_myr < p.lip_until_myr {
+            k.lip_rift_boost
+        } else {
+            1.0
+        };
+        // ledger: PLT-082, PLT-083 (per Myr, so the step's λ_0 scales with its length)
+        let lambda0 = k.rift_per_myr * env.dt_myr;
+        lambda0 * f * f64::from(p.samples) * area / a0 * boost
+    };
     // Rifts under tension (V1 gap 2's stage C2): the plates the edge forces pull apart rift
-    // more, the others less, at the same expected count. ledger: PLT-504
+    // more, the others less, at the same expected count (the weights' mean is taken over the
+    // plates' hazards). ledger: PLT-504
     let weights = if k.rift_stress_mpa > 0.0 {
         let candidates: Vec<(u32, f64)> = ids
             .iter()
             .map(|&id| &state.plates[id as usize])
             .filter(|p| f64::from(p.samples) >= min)
-            .map(|p| (p.id, f64::from(p.samples)))
+            .map(|p| (p.id, hazard(p)))
             .collect();
         stress_weights(stress, &candidates, k.rift_stress_mpa, 1.0)
     } else {
@@ -119,16 +135,7 @@ pub fn maybe_rift(
         if f64::from(p.samples) < min {
             continue;
         }
-        let x = p.continental_frac;
-        let f = k.rift_ocean_weight + (1.0 - k.rift_ocean_weight) * x * x;
-        let boost = if env.t_myr < p.lip_until_myr {
-            k.lip_rift_boost
-        } else {
-            1.0
-        };
-        // ledger: PLT-082, PLT-083 (per Myr, so the step's λ_0 scales with its length)
-        let lambda0 = k.rift_per_myr * env.dt_myr;
-        let mut lambda = lambda0 * f * f64::from(p.samples) * area / state.a0_km2 * boost;
+        let mut lambda = hazard(p);
         if let Some(w) = weights.as_ref().and_then(|w| w.get(&id)) {
             lambda *= w;
         }
@@ -200,9 +207,9 @@ pub fn rift(
     let member = membership(&members, n);
     // Rifts along weak lithosphere (V1 gap 2's stage C2): each fragment grows from its centre
     // through the plate with every edge's cost its length times (L_cold / L)^m, L the
-    // lithosphere's depth (`thermal.rs`), so the fragments meet where it is thin. Off (m = 0),
-    // the distance is the great circle's. ledger: PLT-506
-    let grown: Option<Vec<Vec<f64>>> = (k.rift_weakness > 0.0).then(|| {
+    // lithosphere's depth (`thermal.rs`), so the fragments meet where it is thin. Off (m = 0, or
+    // no thermal state), the distance is the great circle's. ledger: PLT-506
+    let grown: Option<Vec<Vec<f64>>> = (k.rift_weakness > 0.0 && k.thermal_state).then(|| {
         let depth = |i: u32| {
             let l = f64::from(state.samples[i as usize].lithosphere_km);
             if l > 0.0 {
@@ -223,14 +230,19 @@ pub fn rift(
     let mut label = vec![u32::MAX; n];
     for &i in &members {
         let p = pos[i as usize];
+        // A sample some fragment reached through the plate goes by the grown distances (one no
+        // fragment reached is beyond them all); one none reached (a part of the plate cut off on
+        // the lattice) by the great circle to every centre.
+        let reached = grown
+            .as_ref()
+            .is_some_and(|g| g.iter().any(|d| d[i as usize].is_finite()));
         label[i as usize] = (0..fragments)
             .map(|f| {
                 let noise = warp * fbm(p, 4.0, 3, seed.wrapping_add(u64::from(f) * 31));
-                let d = grown
-                    .as_ref()
-                    .map(|g| g[f as usize][i as usize])
-                    .filter(|d| d.is_finite())
-                    .unwrap_or_else(|| p.angle_between(centres[f as usize]));
+                let d = match grown.as_ref() {
+                    Some(g) if reached => g[f as usize][i as usize],
+                    _ => p.angle_between(centres[f as usize]),
+                };
                 (f, d + noise)
             })
             .fold((0, f64::INFINITY), |a, b| if b.1 < a.1 { b } else { a })
