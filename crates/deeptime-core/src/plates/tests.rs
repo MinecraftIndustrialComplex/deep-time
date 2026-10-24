@@ -1373,6 +1373,91 @@ fn continental_area_through_resampling(turn: f64, tries: u64) -> (PlateState, f6
     (st, before, after)
 }
 
+/// Measurement (ignored; the front lane, 2026-10-24): whether resamplings alone roughen a plate
+/// boundary. The two-plate planet resampled 40 times with nothing else in the step: static, and
+/// with the ocean turned under the continent by `turn` between resamplings (a trench where y > 0,
+/// a ridge where y < 0). After each resampling, per stretch of boundary: its samples' offset from
+/// the equator and their spread about it, in lattice spacings, and the boundary's lattice edges
+/// per spacing of the stretch's length (a straight boundary's count).
+#[test]
+#[ignore]
+fn how_resamplings_roughen_a_boundary() {
+    let p = preset(40_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let spacing = env.norm.spacing_rad();
+    for (turn, label) in [(0.0, "static"), (0.02, "converging")] {
+        let (mut st, mut geo, mut pos) = two_plates(&p, &env, turn);
+        for k in 1..=40 {
+            let mut world = WorldState::new(1, 16_384, p.t_start_years());
+            let tree = Tree::over(&pos, |_| true);
+            geo = ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env).unwrap();
+            let pts = geo.points();
+            // Plate 0's visible samples with a visible plate-1 neighbour, by stretch.
+            let mut stretch: [Vec<f64>; 2] = [Vec::new(), Vec::new()];
+            let mut edges = [0usize; 2];
+            for (i, q) in pts.iter().enumerate() {
+                if st.samples[i].is_hidden() || st.plate_of(i) != 0 {
+                    continue;
+                }
+                let n_other = geo
+                    .edges(i as u32)
+                    .filter(|&(j, _)| {
+                        !st.samples[j as usize].is_hidden() && st.plate_of(j as usize) == 1
+                    })
+                    .count();
+                if n_other == 0 {
+                    continue;
+                }
+                let w = if turn == 0.0 || q.y > 0.3 {
+                    0
+                } else if q.y < -0.3 {
+                    1
+                } else {
+                    continue;
+                };
+                stretch[w].push(q.z.asin() / spacing);
+                edges[w] += n_other;
+            }
+            if [1, 2, 5, 10, 20, 30, 40].contains(&k) {
+                for (w, name) in [(0, "trench"), (1, "ridge")] {
+                    if turn == 0.0 && w == 1 {
+                        continue;
+                    }
+                    let v = &stretch[w];
+                    let len = v.len().max(1) as f64;
+                    let mean = v.iter().sum::<f64>() / len;
+                    let rms = (v.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / len).sqrt();
+                    // The stretch's length: the whole equator, or each arc with |y| > 0.3.
+                    let arc = if turn == 0.0 {
+                        std::f64::consts::TAU
+                    } else {
+                        std::f64::consts::PI - 2.0 * 0.3f64.asin()
+                    };
+                    eprintln!(
+                        "{label} {name} after {k} resamplings: {} samples, offset {mean:+.2} \
+                         spacings, spread {rms:.2}, edges per spacing {:.2}",
+                        v.len(),
+                        edges[w] as f64 / (arc / spacing)
+                    );
+                }
+            }
+            // The step's motion: the ocean turned under the continent, overlaps resolved.
+            let q = glam::DQuat::from_rotation_x(turn);
+            for g in &mut st.groups {
+                if g.plate == 1 {
+                    g.rot = [q.x, q.y, q.z, q.w];
+                }
+            }
+            pos = geometry::positions(&st, &geo);
+            st.recount(&pos);
+            let tree = Tree::over(&pos, |_| true);
+            let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+            subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
+        }
+    }
+}
+
 /// A resampling moves the crust onto a new lattice and must neither make nor destroy continental
 /// area beyond the lattice's own noise: on a static planet, and where an ocean runs under a
 /// continent (before 2026-10-02 the continent's outer half-spacing went to the subducting plate at

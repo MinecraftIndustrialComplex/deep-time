@@ -1058,8 +1058,8 @@ impl Default for TectonicParams {
             subduction_erosion_max_sediment_m: 1000.0, // ledger: PLT-442
             erosion_retreat: false,          // ledger: PLT-523
             front_share: true,               // ledger: PLT-530
-            plate_fission: false,            // ledger: PLT-532
-            split_inheritance: false,        // ledger: PLT-534
+            plate_fission: true,             // ledger: PLT-532
+            split_inheritance: true,         // ledger: PLT-534
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
