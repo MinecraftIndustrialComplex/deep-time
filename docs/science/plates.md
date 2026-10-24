@@ -7802,11 +7802,189 @@ stand 100 to 280 m higher through the whole cycle, and a share over a threshold 
 volumes (the arcs' 8 %, the belts' 2.5 %). The census was flattered by the artefact; no knob is
 added to take it back (the foreland basins of gap 6 are the lane expected to lower both).
 
+On 24 runs (base7, master 1b56529d, the carry on, against base6's 24) the rise is smaller and no
+longer significant: land above 2 km 0.128 to 0.141 (p 0.23), coast with high ground 0.228 to
+0.266 (p 0.059), the largest landmass 0.156 to 0.210; the guard's worst 10,140 m, no step beyond
+2 reliefs. fl-carry's 0.174 and 0.282 were seeds 1 to 4's draw.
+
 **The two lattices after the carry.** The front on the model's own samples is 1.45 times its
 length on one lattice at 77 km and 1.27 at 380 km, where PB2002's raster is 1.02 and 1.01: the
 part the carry cannot touch, as large as before it (fl-ls2's raw over one-lattice, 1.39 at 77 km).
 The record's own subducting length (the boundary mix, 93,743 lattice km) is 1.32 times the
 one-lattice subduction front, so the boundary criteria (the subducting share 0.301 against Bird's
-0.197) still read a front inflated by the subducting plate's edge row reaching into the overriding
-plate's before it goes under (`geometry::cover`, part 2 above). Whether the laws that count front
-samples (the slab pull's length, the arcs) see the same inflation is not measured.
+0.197) read a front 1.32 times its straight length. Corrected in step 8: that 1.32 is not the
+edge row reaching in. The boundary mix counts one spacing per overriding sample on its own
+plate's lattice, which is PLT-530's count on the model's ragged fronts (1.3175 times their
+straight length, arm fl-share), on lattice adjacency, which the two lattices' interleaving does
+not reach; the edge row reaching in is in the raw maps' front over the one-lattice front (part 2
+above). Whether the laws that count front samples see either is measured in step 8.
+
+### Step 8: a sample goes under at the outline (PLT-553), and what the slab pull and the arcs count (PLT-554) (2026-10-24)
+
+Step 7's part 2 left the front on the model's own samples 1.45 times its length on one lattice at
+77 km, where PB2002's raster is 1.02: the subducting plate's edge row reaches into the overriding
+plate's before it goes under, because `geometry::cover` hides a subducting sample only once a
+whole lattice triangle of the overriding group holds it. The resampling footprint already
+counts the crust finer than that: since step 3c a new lattice point belongs to the group that
+weighs the most in the old triangle by the interpolated signed distance (PLT-536), so the
+outline lies between the samples, about half a spacing in from the hull of the group's
+triangles where two groups meet.
+
+**The law** (`tectonics.outline_cover`, on by default; `level_set::cover`,
+`level_set::distances_now`, `subduction::overlaps`; ledger PLT-553). A sample lies on another
+group's surface where the resampling would give that group the point: in a triangle of the
+group's own lattice, in its own frame, where that group weighs the most by `level_set::margin`
+(weights renormalised to the group's corners). The distances are the level set's where the
+neighbours' groups are as at the last resampling, half a spacing where not, which is the old
+midpoint rule. So a sample goes under the step it crosses the overriding plate's outline. Off,
+the hull rule as before. The overlaps feed `resolve` unchanged: an existing contact hides what
+overlaps it each step, a new contact needs `MIN_CONTACT` overlaps and convergence. No constant of
+its own.
+
+**The unit tests.** `a_sample_goes_under_where_it_crosses_the_outline`: the two-plate planet
+(20,000 samples, the outline the equator, held exactly by the level set), the ocean turned under
+the continent by a third of a spacing on one half. 63 samples lie past the outline; the outline
+rule finds all 63 and none short of it, the hull rule none (19 lie within 0.1 spacings of it, 30
+within 0.1 to 0.2, 14 within 0.2 to 0.35). By the hull rule a sample a third of a spacing past
+the outline (24 km on the quick lattice, a quarter of a 2-Myr step at 50 mm/yr) is still on top.
+`what_the_outline_cover_finds_at_a_transform` is the risk: the same plates sliding past each other,
+which no sample crosses. On the exact outline neither rule finds an overlap. On a lattice's outline
+(the midpoints of the edges between the plates, as a cut leaves it until a resampling) the outline
+rule finds up to 0.22 overlaps per spacing of transform once the plates have slid a spacing (0.27
+after one resampling, 0.16 after five), up to 0.48 spacings from the boundary, where the hull rule
+finds up to 0.04: one plate's zigzag outline no longer nests in the other's. An overlap at a
+transform hides a sample only where a contact between the two plates already stands, and starts
+none without convergence, so the arm reads hiding and consumption, not only the fronts.
+
+**What the slab pull and the arcs count** (measurement only; PLT-554). The slab pull
+(`forces::balance_step`) acts at each overriding edge sample with a front, one spacing of trench
+each (`pull_n_m` is per metre, FRC-002); so do the slab resistance (FRC-017), the boundary
+resistance and the edge forces. The arcs' magma is an areal field over the distance from the
+fronts (`w_arc_of`, PLT-045) and does not count samples. The record now books, in km × Myr: the
+slab pull's spacings (`plates/slab_front_lattice_km_myr`), their part along the boundary's normal
+(`plates/slab_front_normal_km_myr`), the same samples' shares of the straight front
+(`plates/slab_front_straight_km_myr`, PLT-530's crossings), and the arcs' band weight over the
+band's width (`plates/arc_band_km_myr`), against the arcs' straight front
+(`plates/arc_front_straight_km_myr`). The test `the_fronts_by_the_slab_pull_and_the_arcs` prints
+them on a 100-Myr run.
+
+**The ocean-continent dip, from the records** (base7's 24 runs, every step after the first 100 Myr,
+by Myr since the last resampling; no simulation). The boundary mix is taken before a step's
+resampling, so the resampling step's row is the end of a cycle and "1 to 2" is the first step on a
+new lattice. km:
+
+| Myr since the resampling | 0 | 1 to 2 | 3 to 4 | 7 to 8 | 13 to 20 |
+|---|---|---|---|---|---|
+| ocean-continent front | 61,071 | 44,564 | 49,114 | 52,661 | 60,099 |
+| of it, normal convergence 40 mm/yr or more | 37,888 | 23,656 | 25,167 | 28,285 | 37,012 |
+| of it, slab 600 km or longer | 50,149 | 32,174 | 35,487 | 39,596 | 49,044 |
+| of it, contact 50 Myr or older | 42,297 | 27,457 | 30,466 | 33,296 | 41,244 |
+| ocean-ocean front | 37,013 | 38,166 | 39,457 | 39,836 | 37,794 |
+| collision front | 20,536 | 20,932 | 20,308 | 20,224 | 20,097 |
+| judged a transform (other, less converging with no contact) | 67,862 | 82,352 | 79,301 | 72,261 | 65,417 |
+| rift | 17,458 | 7,779 | 10,316 | 12,802 | 17,056 |
+| ridge | 100,517 | 108,089 | 108,450 | 107,654 | 101,020 |
+
+The dip is the mature, fast margins': 14,200 of the 16,500 km lost lie at 40 mm/yr or more of
+normal convergence, 18,000 km on slabs of 600 km or longer, 14,800 km on contacts 50 Myr or older,
+while the slower ocean-continent fronts, the ocean-ocean fronts and the collisions hold. The plates
+do not slow (the visible-weighted speed 23.0 mm/yr at the end of a cycle, 22.4 at 1 to 2 Myr, 22.6
+at 13 to 20), and the length does not shift to slower bands: it goes to the boundary judged a
+transform (Bird's 20 degrees, `shortening::is_transform`, on the crossing sums' normal), which
+gains 14,500 km at 1 to 2 Myr, and comes back step by step through the whole cycle, not within 2
+to 4 Myr as the contacts' dip did before the carry. Between resamplings the lattice's adjacency is
+fixed and the boundary normal is read in each sample's own plate's frame, so a sample's class can
+change only through its or a neighbour's plate, its hiding, its contact's state or the plates'
+relative motion; the records do not say which one turns these fronts back on through the cycle.
+The rifts show the same saw the other way: a rift opened between resamplings keeps its
+continental samples as lattice neighbours across the new ocean, and is called a rift until the
+next resampling fills it with ocean floor (rift 17,500 km at the end of a cycle, 7,800 after it,
+ridge the mirror). The probe that would name the ocean-continent cause is a unit test: the
+two-plate planet with a fast ocean-continent margin through a resampling, each front sample's
+normal, transform test and contact before and after. Not run here (the coordinator's call: records
+and maps first, no simulation).
+
+**The arm** (fl-outline: master 1b56529d with the outline cover on, both starts × seeds 1 to 4, 1000
+Myr, `+DEEPTIME_CRUST_BUDGET=1` with its maps; key e6bdf186ab78, argkey cd665cef; `pool.sh
+measure` v1census, guard, front, boundgeom, shown, hiding, boundary, sutures; `build/front`'s
+records-only scripts for the mix by phase, the plate check, the area book and the PLT-554 globals).
+Read against base7's same eight runs (fl-carry's: same key and argkey) and base7's 24; two-sided
+Mann-Whitney p against the eight in brackets unless said.
+
+- **What it is for.** The front on the raw maps 109,350 km at 77 km against 126,931, 95,030 at 380
+  km against 96,237; over the one-lattice map 1.16 and 1.14 times its length, from 1.45 and 1.27
+  (PB2002's raster 1.02 and 1.01). Cut-off pieces of the plates 20.3 a snapshot against 63.2, and
+  0.85 of the cut samples lie beside their own hidden samples against 0.71 (p < 0.001): what is
+  cut off is now mostly an edge that has just gone under. The resamplings stop eating the
+  continents: in the area book the resampling's blend takes 0.015 of the planet's area of
+  continental crust over the run against 0.137, the fronts' hiding 0.892 against 0.722 (the loss
+  moves from a numerical step to the law that books it); the continental crust ends at 0.378 of
+  the planet against 0.365, its volume 7.08 against 6.82 (units of the book), the land 0.333
+  against 0.313. Converging boundary with no contact in the first 2 Myr after a rebuild: 137 km
+  against 5,557 (the new lattice's overlaps are found at once).
+- **The risk at transforms did not show.** The boundary judged a transform 0.233 against 0.236 (p
+  0.96); converging with no slab 0.005 against 0.013 (p < 0.001); subduction initiations 10.05
+  per 100 Myr against 11.80, polarity reversals 9.1 against 9.5 (p 0.53). The crust that went
+  under 3.34 km² a year against 3.15, the resamplings consumed 3.17 against 2.99; what showed
+  again because the cover moved off it 4.2 % of what went under against 3.8 %, what escaped the
+  resamplings 3.9 % against 3.4 %.
+- **The record's fronts did not lengthen.** The subduction front 84,364 straight km a step against
+  85,882 (p 0.44), the boundary mix's subducting length 91,822 lattice km against 93,743. The
+  one-lattice map's front did: 94,515 km against 87,550 at 77 km, 83,037 against 75,693 at 380
+  km (1.21 and 1.15 times PB2002's through the same step, from 1.12 and 1.05), and its TRENCH
+  flags' front 125,350 against 98,604. A reading, not traced: the one-lattice point takes its
+  flags from its plate's nearest sample, and the subducting plate's flagged edge row, reaching
+  into the overriding plate's samples, lost the 7-sample vote, so the map's boundary ran beside
+  the subducting plate's unflagged second row; with the overlap gone the flagged row is the
+  visible edge. If so, step 7's 1.12 and 1.05 were low by the overlap, and 1.21 and 1.15 is the
+  like-for-like figure (subduction alone 1.49 and 1.41 times SUB).
+- **Fewer plates.** 24.5 alive a step against 27.9 (p 0.014; PB2002 52), the boundary 288,044
+  straight km against 308,120 (p 0.015), E 1.818 against 1.801 (p 0.16); rifts 1.85 per 100 Myr
+  against 2.45, fission births 44 a run against 47.5, a plate's median life 65.5 Myr against
+  59.5. The subducting share of the boundary 0.312 against 0.301 (p 0.028; Bird 0.197), from the
+  shorter boundary, not a longer front. The mean convergence across the oceanic front 41.4 mm/yr
+  against 43.4 (p 0.015), the visible-weighted plate speed 2 to 4 % lower through the cycle (22.5
+  against 23.0 mm/yr at a rebuild, 21.8 against 22.6 at 13 to 20 Myr). Not traced to a cause.
+- **The V1 census**, against the eight and base7's 24 (p against the 24 second): land 0.323
+  against 0.298 and 0.302 (0.38, 0.25); the largest landmass 0.208 against 0.178 and 0.210;
+  land above 2 km 0.118 against 0.174 and 0.141 (0.083, 0.51); coast with high ground 0.254
+  against 0.282 and 0.266 (0.19, 0.78); collisions 1.75 per 100 Myr against 1.45 and 1.65; the
+  criteria met 5.12 a run against 4.88 and 5.04. Nothing significant.
+- **The guard.** The worst 10,272 m from the sea against 10,236 (p 0.79) and base7's 10,140 (p
+  0.094); no step beyond 2 Earth reliefs, `guard_bind_steps` 0 in all 8 runs. All 8 ran (1,150 s
+  each at 2 threads, as before).
+- **The plate check** (the V1 dynamics criteria): 182 passes against 183. Moved: a supercontinent's
+  tenure 83 Myr against 35 and its period 264 against 199; the collisions' p90 length 201 Myr
+  against 143; the speed-area rank correlation -0.43 against -0.38 (2 of 8 in the band against 5).
+- **The ocean-continent dip is not this one's.** The ocean-continent front still falls by a quarter
+  in the first 2 Myr after a rebuild (58,012 to 43,739 km, against 61,635 to 44,673), into the
+  boundary judged a transform.
+
+**The slab pull and the arcs on the arm** (PLT-554; the 8 runs' medians, each run's time mean).
+The slab pull counts 131,600 km of trench a step, one spacing per pulling sample: 1.108 times the
+same samples' straight front (1.093 to 1.114 over the runs; the test's 8,000 samples 1.106 with
+the outline cover and 1.138 without, one run each), 0.708 of it along the boundary's normal. Its
+fronts are not the arcs': the arcs' straight front is 0.648 of the pull samples' (0.868 and 0.869
+on the test planet, with and without). The force balance's front (`forces.rs`, `Edge::front`) is
+still every lattice edge converging on an active contact, the rule PLT-330 took from the arcs on
+2026-10-20 because a zigzag boundary converges along half its edges where the plates slide past
+each other; so the pull also acts along the contacts' strike-slip stretches. In all it counts 1.71
+times the arcs' straight front in spacings, and 1.21 times it along the normal. So the slab pull
+does see an inflation, larger than the one the two lattices make and of another kind: the count
+(1.11) and the old front (1.54). The forces scale with both. The speeds see less of it, because
+the slab resistance (FRC-017) counts the same samples and the drag (FRC-016) was calibrated on a
+straight reference trench; how much less depends on each plate's resistances and was not
+measured. The arcs make their crust over their band, not their samples (`plan.magma_m` is the
+axis rate × `w_arc_of` × g at each sample the band reaches), and the band is 1.316 times the
+straight front they book (1.119 and 1.151 on the test planet, where 250-km spacings barely
+resolve a 60-km band). A reading, not measured: the band 200 km behind a front wraps round both
+its ends, so a front of length L gets about L + π · 200 km of band, 1.3 times L for pieces near
+2,000 km; Earth's arcs stop near the slab's edge. Neither is changed here.
+
+**Recommendation: the outline cover on by default** (it is). It is built from the resampling's own
+rule, its unit tests hold, all eight runs ran, the guard did not bind and the risk it was read for
+(hiding and spurious contacts at transforms) did not show. What it changes in the realism checks
+(fewer plates, a little slower convergence, the census unmoved within its noise) is the physics'
+answer, not a reason to keep the hull rule. The two inflations left are the slab pull's (its old
+front and its count, a step of its own: give the pull the arcs' fronts and their straight shares,
+along the normal) and the arcs' band ends (a unit test on a straight front of known length first).
