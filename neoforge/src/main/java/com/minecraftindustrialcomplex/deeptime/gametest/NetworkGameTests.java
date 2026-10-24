@@ -6,8 +6,11 @@ import com.minecraftindustrialcomplex.deeptime.net.DeepTimeNetwork;
 import com.minecraftindustrialcomplex.deeptime.net.PlanetDebugLine;
 import com.minecraftindustrialcomplex.deeptime.net.PoleStormPayload;
 import com.minecraftindustrialcomplex.deeptime.net.WorldInfoPayload;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.FormatVersion;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Manifest;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
+import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataRef;
 import io.netty.buffer.Unpooled;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -17,6 +20,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -30,6 +34,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -157,7 +163,10 @@ public final class NetworkGameTests {
         helper.succeed();
     }
 
-    /** The F3 line's text (the client adds it to the debug screen). */
+    /**
+     * The F3 line's text (the client adds it to the debug screen) on a Lambert planet, the strings that
+     * go with the Lambert world (cube plan section 7.4); {@link #planetDebugLineOnTheCube} has the cube's.
+     */
     @GameTest(template = GameTestSupport.TEMPLATE)
     public static void planetDebugLine(GameTestHelper helper) {
         WorldInfoPayload info = new WorldInfoPayload(true, "minecraft:overworld", "0.0", 16384, 300, 20, 75, 80, "wrap-test");
@@ -168,6 +177,97 @@ public final class NetworkGameTests {
         helper.assertTrue("Deep Time: 79.036° S 180.000° W · wrap-test (C 16384, 300 m/block) · polar storm 62%".equals(south), "south: " + south);
         helper.assertTrue(PlanetDebugLine.format(WorldInfoPayload.notAPlanet("minecraft:the_nether"), 0, 0, 0) == null, "a line outside a planet");
         DeepTime.LOGGER.info("[gametest] planetDebugLine '{}' / '{}'", north, south);
+        helper.succeed();
+    }
+
+    /** The cube line's numbers: latitude, longitude, the face, north's bearing and the metres a block spans. */
+    private static final Pattern CUBE_LINE = Pattern.compile(
+            "Deep Time: (\\d+\\.\\d{3})° ([NS]) (\\d+\\.\\d{3})° ([EW]) · face (\\w+)( \\(folded\\))? · north (\\d+\\.\\d)° · (\\d+) m/block here · (.+) \\(C (\\d+), (\\d+) m/block\\)");
+
+    /**
+     * The F3 line on a cube world (cube plan G10), from the planet info alone as the client has it: a
+     * synthetic 4k cube (s = 1,024, the shipped map, no turn, 300 m a block). At F0's centre north is
+     * -z (the planet's +Z read in F0's frame) and a block spans 300 m times the conformal map's scale
+     * there, 1.1241 (337 m). On every face the line's latitude, longitude, bearing and scale are the
+     * projection's; past each turning edge it names the face it folds onto and its north and scale run
+     * on from the point just inside; past the corners it says "off the planet", and with another map
+     * table "map mismatch".
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE)
+    public static void planetDebugLineOnTheCube(GameTestHelper helper) {
+        com.minecraftindustrialcomplex.deeptime.worlddata.CubeMap map = com.minecraftindustrialcomplex.deeptime.worlddata.CubeMap.world();
+        List<Double> identity = List.of(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+        WorldInfoPayload info = new WorldInfoPayload(true, "minecraft:overworld", FormatVersion.CUBE, 4096, 300, 20, 0f, 0f,
+                "cube-test", WorldDataRef.CUBE, 0.0, map.name(), map.sha256Hex(), identity);
+        helper.assertTrue(info.cube() && info.worldProjection() instanceof WorldProjection.Cube, "a cube info: " + info);
+        WorldProjection.Cube wp = (WorldProjection.Cube) info.worldProjection();
+        CubeLayout cube = wp.cube();
+
+        double[] c0 = cube.pointOfLocal(CubeLayout.Face.F0, 0.0, 0.0);
+        String centre = PlanetDebugLine.format(info, c0[0], c0[1], 0f);
+        helper.assertTrue(centre != null && centre.startsWith("Deep Time: ")
+                        && centre.endsWith(" · face F0 · north 0.0° · 337 m/block here · cube-test (C 4096, 300 m/block)"),
+                "F0's centre: " + centre);
+
+        // Every face: the line reads the projection's own numbers.
+        StringBuilder log = new StringBuilder();
+        for (CubeLayout.Face f : CubeLayout.Face.all()) {
+            double[] at = cube.pointOfLocal(f, 0.3, -0.2);
+            String line = PlanetDebugLine.format(info, at[0], at[1], 0f);
+            Matcher m = line == null ? null : CUBE_LINE.matcher(line);
+            helper.assertTrue(m != null && m.matches(), "face " + f + ": " + line);
+            double[] ll = wp.latLon(at[0], at[1]);
+            double lon = ll[1] >= 180.0 ? ll[1] - 360.0 : ll[1];
+            double lat = Double.parseDouble(m.group(1)) * ("N".equals(m.group(2)) ? 1 : -1);
+            double lonShown = Double.parseDouble(m.group(3)) * ("E".equals(m.group(4)) ? 1 : -1);
+            helper.assertTrue(Math.abs(lat - ll[0]) < 6e-4 && Math.abs(lonShown - lon) < 6e-4,
+                    "face " + f + ": latitude and longitude " + ll[0] + ", " + lon + " vs " + line);
+            helper.assertTrue(m.group(5).equals(f.name()) && m.group(6) == null, "face " + f + ": the face in " + line);
+            double north = wp.northBearingDeg(at[0], at[1]), shown = Double.parseDouble(m.group(7));
+            double d = Math.abs(north - shown) % 360.0;
+            helper.assertTrue(Math.min(d, 360.0 - d) < 0.06, "face " + f + ": north " + north + " vs " + line);
+            helper.assertTrue(Math.abs(Long.parseLong(m.group(8)) - 300.0 * wp.scale(at[0], at[1])) <= 0.5,
+                    "face " + f + ": the scale " + 300.0 * wp.scale(at[0], at[1]) + " vs " + line);
+            helper.assertTrue("cube-test".equals(m.group(9)) && "4096".equals(m.group(10)) && "300".equals(m.group(11)),
+                    "face " + f + ": the planet in " + line);
+            log.append(String.format(java.util.Locale.ROOT, " %s(north %s, %s m)", f, m.group(7), m.group(8)));
+        }
+
+        // Past each turning edge, half a block out: the face folded onto, north and scale as just inside.
+        int folded = 0;
+        double worstTurn = 0, worstScale = 0;
+        List<CubeLayout.NetEdge> edges = cube.edges();
+        for (int k = 2; k < edges.size(); k++) {
+            CubeLayout.NetEdge e = edges.get(k);
+            double along = (e.spanFrom() + e.spanTo()) / 2.0 + 0.5, n = e.coord();
+            double in = e.beyond() == CubeLayout.Side.MAX ? n - 0.5 : n + 0.5, out = e.beyond() == CubeLayout.Side.MAX ? n + 0.5 : n - 0.5;
+            boolean ax = e.axis() == CubeLayout.Axis.X;
+            Matcher mi = CUBE_LINE.matcher(String.valueOf(PlanetDebugLine.format(info, ax ? in : along, ax ? along : in, 0f)));
+            String outLine = PlanetDebugLine.format(info, ax ? out : along, ax ? along : out, 0f);
+            Matcher mo = CUBE_LINE.matcher(String.valueOf(outLine));
+            helper.assertTrue(mi.matches() && mo.matches(), e.name() + ": " + outLine);
+            String partner = edges.get(e.partner()).face().name();
+            helper.assertTrue(mo.group(5).equals(partner) && mo.group(6) != null, e.name() + ": folds onto " + partner + ": " + outLine);
+            double d = Math.abs(Double.parseDouble(mi.group(7)) - Double.parseDouble(mo.group(7))) % 360.0;
+            worstTurn = Math.max(worstTurn, Math.min(d, 360.0 - d));
+            worstScale = Math.max(worstScale, Math.abs(Long.parseLong(mi.group(8)) - Long.parseLong(mo.group(8))));
+            folded++;
+        }
+        helper.assertTrue(folded == 12 && worstTurn < 1.0 && worstScale <= 1,
+                "across the turning edges: " + folded + " checked, north turns up to " + worstTurn + "°, the scale steps up to " + worstScale + " m");
+
+        ChunkPos ocean = CubeWorldGameTests.oceanChunk(cube);
+        helper.assertTrue(ocean != null, "a chunk past the net's corners");
+        String off = PlanetDebugLine.format(info, ocean.getMiddleBlockX() + 0.5, ocean.getMiddleBlockZ() + 0.5, 0f);
+        helper.assertTrue("Deep Time: off the planet · cube-test (C 4096, 300 m/block)".equals(off), "past the corners: " + off);
+
+        WorldInfoPayload other = new WorldInfoPayload(true, "minecraft:overworld", FormatVersion.CUBE, 4096, 300, 20, 0f, 0f,
+                "cube-test", WorldDataRef.CUBE, 0.0, map.name(), "0".repeat(64), identity);
+        String mismatch = PlanetDebugLine.format(other, c0[0], c0[1], 0f);
+        helper.assertTrue(("Deep Time: map mismatch (" + map.name() + ") · cube-test (C 4096, 300 m/block)").equals(mismatch),
+                "another map table: " + mismatch);
+        DeepTime.LOGGER.info("[gametest] planetDebugLineOnTheCube centre '{}' faces{} edges {} (north turns up to {}°, scale steps up to {} m) off '{}' mismatch '{}'",
+                centre, log, folded, worstTurn, worstScale, off, mismatch);
         helper.succeed();
     }
 
