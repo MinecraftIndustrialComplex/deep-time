@@ -2341,7 +2341,7 @@ pub fn step(
                     - f64::from(st.unsolved_m[c]))
         }
     });
-    let mut let_go: Vec<f64> = (0..ws * hs)
+    let let_go: Vec<f64> = (0..ws * hs)
         .into_par_iter()
         .map(|c| {
             let ratio = d_now[c] / d_prev[c];
