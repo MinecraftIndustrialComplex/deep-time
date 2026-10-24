@@ -11,7 +11,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | plate setup | PLT-001 to PLT-021, PLT-203, PLT-205, PLT-209 to PLT-211 (26) |
 | [PLT](ledger/PLT.md) | plate motion | PLT-022 to PLT-028 (7) |
 | [PLT](ledger/PLT.md) | subduction | PLT-029 to PLT-067, PLT-206 to PLT-207, PLT-229, PLT-251 to PLT-252, PLT-285 to PLT-286, PLT-289, PLT-312, PLT-320 (49; PLT-320 the cordillera at Earth's typical arc, with no convergence factor, the crust budget against Stern & Scholl, 2026-10-20; PLT-312 the arcs on the convergence normal to the front, an experiment kept off, the land-shape task, 2026-10-20; PLT-289 ocean floor as thick as a continent turns continental, the resampling lumps, 2026-10-18; PLT-285 and PLT-286 the continental arcs and the cones as rock, plate task 8, 2026-10-17) |
-| [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250, PLT-253, PLT-290 to PLT-292, PLT-400 (35; PLT-400 the wedge's crust crosses whole, a switch kept off, the crust flux into collision fronts, 2026-10-21; PLT-290 to PLT-292 the crust a collision took counted once, the resampling lumps, 2026-10-18; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
+| [PLT](ledger/PLT.md) | collisions | PLT-068 to PLT-081, PLT-222 to PLT-227, PLT-241 to PLT-250, PLT-253, PLT-290 to PLT-292, PLT-400, PLT-546 (36; PLT-546 the incoming plate under the belt, V1 gap 6, 2026-10-24; PLT-400 the wedge's crust crosses whole, a switch kept off, the crust flux into collision fronts, 2026-10-21; PLT-290 to PLT-292 the crust a collision took counted once, the resampling lumps, 2026-10-18; PLT-069 to PLT-075 and PLT-227 retired 2026-10-02) |
 | [PLT](ledger/PLT.md) | rifting | PLT-082 to PLT-091 (10) |
 | [PLT](ledger/PLT.md) | ridges and ocean crust | PLT-092 to PLT-107, PLT-204, PLT-212, PLT-228, PLT-293, PLT-350 to PLT-355 (26; PLT-293 ocean crust keeps its own rock at resamplings and in the L1 sampling, 2026-10-19; PLT-350 to PLT-353 the floor's GDH1 rate with the sea from the ocean's volume, 2026-10-21, PLT-354 the gap's floor held in place and PLT-355 GDH1's curve between other ridge and abyssal depths, on [sea-level.md](sea-level.md)) |
 | [PLT](ledger/PLT.md) | hotspots | PLT-108 to PLT-120 (13) |
@@ -403,7 +403,9 @@ coupling to the mantle two to five times (Conrad and Lithgow-Bertelloni 2006).
 The design's 1.5° "taper" is a surface slope. In the theory of critical wedges the taper is the
 surface slope plus the dip of the fault beneath; the Himalayan front has a taper of 6–7.5° made
 mostly of that dip. The foreland line-load profile of the design (PLT-193) will not be built: the
-general flexure already bends the plate under every load (decisions log 2026-10-02).
+general flexure already bends the plate under every load (decisions log 2026-10-02). Its setting,
+the belt on the end of the stiff incoming plate, is built since 2026-10-24 (PLT-546, ISO-131; "The
+incoming plate under the belt", below).
 
 **Earth's figures for the targets.**
 
