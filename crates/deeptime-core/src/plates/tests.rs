@@ -948,6 +948,7 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     let (mut balance_steps, mut longest_slab) = (0u64, 0.0f64);
     let mut deaths_before = 0;
     let mut prev_omega: BTreeMap<u32, glam::DVec3> = BTreeMap::new();
+    let (mut pending, mut escaped, mut consumed) = (0i64, 0u64, 0u64);
     let with = run_stage(&p, |stage, _, st| {
         life.step(st);
         let d = st.dynamics.as_ref().expect("recording is on by default");
@@ -1092,8 +1093,27 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
             assert!((0.0..=p.tectonics.slab_depth_km).contains(&km), "{km}");
             longest_slab = longest_slab.max(km);
         }
+        // The crust shown again (`shown.rs`, measurement only): what went under less what showed
+        // again since the last resampling is what lies hidden, and what the resampling consumes.
+        let sh = &step.shown;
+        pending += i64::from(sh.under) - sh.shown.iter().map(|&x| i64::from(x)).sum::<i64>();
+        assert!(sh.shown_cont.iter().zip(&sh.shown).all(|(c, n)| c <= n));
+        assert!(sh.escaped_cont.iter().zip(&sh.escaped).all(|(c, n)| c <= n));
+        if st.resample_step == st.step {
+            assert_eq!(pending, i64::from(sh.consumed), "step {}", st.step);
+            assert!(sh.escaped_ocean <= sh.ocean && sh.consumed_cont <= sh.consumed);
+            pending = 0;
+            escaped += u64::from(sh.escaped.iter().sum::<u32>());
+            consumed += u64::from(sh.consumed);
+        } else {
+            let hidden = st.samples.iter().filter(|s| s.is_hidden()).count() as i64;
+            assert_eq!(pending, hidden, "step {}", st.step);
+            assert_eq!(sh.consumed + sh.escaped.iter().sum::<u32>(), 0);
+        }
         checked += 1;
     });
+    eprintln!("shown again: {escaped} samples escaped the resamplings, {consumed} consumed");
+    assert!(consumed > 0 && escaped > 0);
     assert_eq!(checked, total);
     assert_eq!(balance_steps, total, "a balance every step");
     // The switch (force-balance design, task 7): the balance was solved every step and the speed

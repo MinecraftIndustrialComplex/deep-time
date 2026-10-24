@@ -261,11 +261,11 @@ pub fn resolve(
     env: &Env,
 ) -> Result<Resolved, CoreError> {
     let (step, t_myr) = (env.step, env.t_myr);
-    // Measurement only: which samples were already hidden last step (for `Contact::cont_in`).
-    let was_hidden: Option<Vec<bool>> = state
-        .dynamics
-        .is_some()
-        .then(|| state.samples.iter().map(|s| s.is_hidden()).collect());
+    // Measurement only: which samples were already hidden last step (for `Contact::cont_in` and
+    // the crust shown again, `shown.rs`).
+    let was_hidden: Option<Vec<bool>> = super::shown::begin(state);
+    // Measurement only: the pairs whose contact reverses this step (`shown.rs`).
+    let mut reversed_now: Vec<(u32, u32)> = Vec::new();
     // ledger: PLT-371 (the reversal judged by the crust the arc stands on), PLT-370 (the reach):
     // the arc's footing is the crust visible as the step starts, since the flags are set again
     // below.
@@ -368,6 +368,7 @@ pub fn resolve(
                 && reverses([frac(u), frac(o)], near(o), [lock(u), lock(o)], by_arc)
             {
                 reverse(state, world, env, k)?;
+                reversed_now.push((lo, hi));
             }
         }
         let k = match index.get(&(lo, hi)) {
@@ -486,6 +487,31 @@ pub fn resolve(
     }
     for s in &mut state.samples {
         s.stacked &= s.is_hidden();
+    }
+    // Measurement only (`shown.rs`): why each sample hidden as the step began shows again.
+    if let Some(was) = &was_hidden {
+        let mut cover = vec![super::shown::LEFT as u8; state.samples.len()];
+        for o in overlaps {
+            let i = o.i as usize;
+            if !was[i] || state.samples[i].is_hidden() {
+                continue;
+            }
+            let a = state.plate_of(i);
+            let b = state.groups[o.group as usize].plate;
+            let key = (a.min(b), a.max(b));
+            let c = match index.get(&key) {
+                Some(&k) if state.contacts[k].last_step == step => {
+                    if reversed_now.contains(&key) {
+                        super::shown::REVERSAL
+                    } else {
+                        super::shown::ON_TOP
+                    }
+                }
+                _ => super::shown::UNSEEN,
+            };
+            cover[i] = cover[i].min(c as u8);
+        }
+        super::shown::end_resolve(state, was, &cover);
     }
     for list in seeds.values_mut() {
         list.sort_unstable();

@@ -783,6 +783,7 @@ mod tests {
             dynamics: None,
             gap_budget: None,
             limits: None,
+            shown: None,
             level_set: None,
         };
         let all: Vec<u32> = (0..n as u32).collect();

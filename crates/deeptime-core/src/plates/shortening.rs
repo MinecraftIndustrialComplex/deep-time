@@ -716,6 +716,7 @@ mod tests {
             dynamics: None,
             gap_budget: None,
             limits: None,
+            shown: None,
             level_set: None,
         }
     }
