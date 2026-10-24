@@ -2221,10 +2221,10 @@ impl Session {
                 write_atomic(&dir.join(MANIFEST), &bytes)?;
             }
         }
-        // The world's projection (Ben, decisions log 2026-10-04: Petroff–Guyou; "Bake only",
-        // 2026-10-03): the last step rewrites the finished Lambert folder in the preset's world
-        // projection, reading it as the game would (`bake::project`). A Lambert preset only gets
-        // its layout block.
+        // The world's projection (Ben, decisions log 2026-10-24: "Cube only"; "Bake only",
+        // 2026-10-03): the last step rewrites the finished Lambert folder as the cube world,
+        // reading it as the game would (`bake::project`). An unbaked planet folder only gets the
+        // Lambert layout block.
         if let crate::preset::PresetBody::Planet(p) = &self.preset.body {
             let baked = m
                 .notes
