@@ -171,7 +171,9 @@ public final class WorldDataTerrain implements TerrainSource {
                             return LavaFlows.sphereMetric(projection, x, z, mH);
                         }
                     };
-                    lavaFlows = new LavaFlows(wd.volcanoes().list(), env, wd.circumference(), projection.zMin(), projection.zMax(), mH,
+                    // a cube world's flows cross its seams (cube plan G16); its z range is the net window's
+                    var cube = projection instanceof com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Cube cp ? cp.cube() : null;
+                    lavaFlows = new LavaFlows(wd.volcanoes().list(), env, cube, wd.circumference(), projection.zMin(), projection.zMax(), mH,
                             wd.manifest().mPerBlockV(), line -> DeepTime.LOGGER.info("[deeptime] lava flows: {}", line));
                     DeepTime.LOGGER.info("[deeptime] lava flows: {} active volcanoes indexed ({} climate); each traces its flows on first use",
                             lavaFlows.size(), precip == null ? "no" : "the baked");

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 import org.junit.jupiter.api.Test;
 
@@ -8,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.function.BiPredicate;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -19,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The lava flows ({@link LavaFlows}; review fix 8, 2026-10-22): the paths and the paint, on cones built here
  * in closed form so nothing depends on a planet. The chunk pass and far terrain only read {@link LavaFlows#code}.
+ * The cube tests (cube plan G16) put a cone by a seam of a 1024-block cube and compare its flows with a flat world's.
  */
 class LavaFlowsTest {
 
@@ -538,5 +541,220 @@ class LavaFlowsTest {
                 assertTrue(Math.abs(LavaFlows.wander(seed, x, z + 0.01) - w0) < 0.03);
                 assertEquals(w0, LavaFlows.wander(seed, x, z));
             }
+    }
+
+    // ---- a cube world's seams (cube plan G16) ----
+
+    /** A 1024-block cube: h = 512, faces F3 [-1536, -512], F0 [-512, 512], F1, F2 [1536, 2560] in x; N above F0. */
+    private static final CubeLayout CUBE = CubeLayout.of(1_024);
+
+    private static double dist2(double[] a, double[] b) {
+        double dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    /**
+     * A shield on the cube: its cone falls with the straight-line distance on the cube from the vent (so it bends
+     * where the cube does), and the ground tilts 0.02 blocks a block down across the edge from {@code near} to
+     * {@code far} ({@code P · (n_near − n_far)}, the signed distance from the edge on either face). Every height is
+     * a function of the point on the cube, so a column past an edge has its partner's height, as in the game.
+     */
+    private static final class CubeCone implements LavaFlows.Env {
+        final Volcanoes.Volcano v;
+        final double[] v3, w = new double[3];
+        double[] metric = ISO;
+
+        CubeCone(Volcanoes.Volcano v, CubeLayout.Face near, CubeLayout.Face far) {
+            this.v = v;
+            this.v3 = LavaFlows.surfacePoint(CUBE, v.x(), v.z());
+            double[] a = near.frame()[0], b = far.frame()[0];
+            for (int k = 0; k < 3; k++)
+                w[k] = a[k] - b[k];
+        }
+
+        @Override
+        public double height(double x, double z) {
+            double[] p = LavaFlows.surfacePoint(CUBE, x, z);
+            if (p == null)
+                return BASE - 50.0;
+            double d = Math.sqrt(dist2(p, v3));
+            double rB = v.radiusM() / MH, cB = v.craterRadiusM() / MH, top = BASE + v.heightM() / MV;
+            double here = d < cB ? top - v.craterDepthM() / MV * (1.0 - d / cB)
+                    : Math.max(BASE + (top - BASE) * (rB - d) / (rB - cB), BASE - 0.05 * (d - rB));
+            return here + 0.02 * (p[0] * w[0] + p[1] * w[1] + p[2] * w[2]);
+        }
+
+        @Override
+        public boolean wet(int x, int z) {
+            return false;
+        }
+
+        @Override
+        public double precipMm(double x, double z) {
+            return 1_000.0;
+        }
+
+        @Override
+        public double[] metric(double x, double z) {
+            return metric.clone();
+        }
+    }
+
+    @Test
+    void theCubesSurfacePointIsTheNetFoldedOntoTheCube() {
+        double h = 512.0;
+        Random rng = new Random(7);
+        // on the cube's surface, and a face's own distances in the plane
+        for (int n = 0; n < 2_000; n++) {
+            double x = -1_536 + rng.nextDouble() * 4_096, z = -1_536 + rng.nextDouble() * 3_072;
+            CubeLayout.LocalPoint a = CUBE.localOfPoint(x, z);
+            if (a == null)
+                continue;
+            double[] p = LavaFlows.surfacePoint(CUBE, x, z);
+            double m = Math.max(Math.abs(p[0]), Math.max(Math.abs(p[1]), Math.abs(p[2])));
+            assertEquals(h, m, 1e-9, "on the cube at " + x + ", " + z);
+            double dx = rng.nextDouble() * 6 - 3, dz = rng.nextDouble() * 6 - 3;
+            CubeLayout.LocalPoint b = CUBE.localOfPoint(x + dx, z + dz);
+            if (b != null && a.face() == b.face())
+                assertEquals(dx * dx + dz * dz, dist2(p, LavaFlows.surfacePoint(CUBE, x + dx, z + dz)), 1e-6);
+        }
+        // across an edge: A on the near face da from the edge, Q in the void dp past it (the partner's copy), t
+        // apart along it; the faces meet at a right angle, so |A − Q|² = da² + dp² + t²
+        record Seam(String name, double edge, boolean alongX, double sign, double mid) {}
+        for (Seam s : List.of(new Seam("slide F2 east", 2_560, true, 1, 0), new Seam("quarter turn N east", 512, true, 1, -1_024),
+                new Seam("half turn N top", -1_536, false, -1, 0), new Seam("quarter turn S west", -512, true, -1, 1_024))) {
+            for (int n = 0; n < 500; n++) {
+                double da = 0.01 + rng.nextDouble() * 200, dp = 0.01 + rng.nextDouble() * 200;
+                double ta = s.mid() + (rng.nextDouble() - 0.5) * 400, tq = s.mid() + (rng.nextDouble() - 0.5) * 400;
+                double[] a = s.alongX() ? new double[]{s.edge() - s.sign() * da, ta} : new double[]{ta, s.edge() - s.sign() * da};
+                double[] q = s.alongX() ? new double[]{s.edge() + s.sign() * dp, tq} : new double[]{tq, s.edge() + s.sign() * dp};
+                double want = da * da + dp * dp + (ta - tq) * (ta - tq);
+                double got = dist2(LavaFlows.surfacePoint(CUBE, a[0], a[1]), LavaFlows.surfacePoint(CUBE, q[0], q[1]));
+                assertEquals(want, got, 1e-6 * want, s.name() + " at " + a[0] + ", " + a[1] + " and " + q[0] + ", " + q[1]);
+                // and the path over the edge is never shorter than the straight line
+                assertTrue(got <= (da + dp) * (da + dp) + (ta - tq) * (ta - tq) + 1e-6);
+            }
+        }
+    }
+
+    @Test
+    void turnIsTheCubesQuarterTurns() {
+        for (int k = 0; k < 4; k++) {
+            double[] want = new CubeLayout.Iso(k, 0, 0).vector(0.3, -0.7), got = LavaFlows.turn(k, 0.3, -0.7);
+            assertArrayEquals(want, got, 0.0, "k = " + k);
+            assertArrayEquals(new double[]{0.3, -0.7}, LavaFlows.turn(-k, got[0], got[1]), 0.0);
+        }
+    }
+
+    /**
+     * A flow across a seam paints, through the fold, the columns a flow on the flat development paints: the cube's
+     * flows against a polar world's (no cube, x period 4s, no z edge) on the same ground, read over the box round
+     * the vent where the box's columns past the edge are the partner's copy. Membership (−1 or not) is exact and so
+     * is each code, except that an old flow's oxidized patches (a hash of the column) may land on other columns
+     * past a turning edge, where the cube keys the partner's column and the flat world the copy's.
+     */
+    private static void flowsCrossTheSeam(String name, double vx, double vz, CubeLayout.Face near, CubeLayout.Face far, double[] metric,
+                                          BiPredicate<Double, Double> past, boolean turning) {
+        Volcanoes.Volcano v = shield(1, vx, vz, 1.0);
+        CubeCone env = new CubeCone(v, near, far);
+        env.metric = metric;
+        LavaFlows onCube = new LavaFlows(List.of(v), env, CUBE, C, -1e9, 1e9, MH, MV, null, true);
+        LavaFlows flat = new LavaFlows(List.of(v), env, C, -1e9, 1e9, MH, MV, null, true);
+        assertEquals(flat.flows(0).size(), onCube.flows(0).size(), name);
+        int crossing = 0;
+        for (LavaFlows.Flow fl : flat.flows(0)) {
+            boolean over = false;
+            for (double[] p : fl.path()) {
+                assertTrue(Math.abs(p[0] - vx) < 250 && Math.abs(p[1] - vz) < 250, name + ": a flat flow leaves the box " + fl);
+                over |= past.test(p[0], p[1]);
+            }
+            if (over)
+                crossing++;
+        }
+        assertTrue(crossing >= 10, name + ": flows across the edge " + crossing + " of " + flat.flows(0).size());
+        int painted = 0, paintedPast = 0, oxidizedSwaps = 0;
+        int oxidized = LavaFlows.Paint.OXIDIZED.code();
+        for (int z = (int) vz - 260; z <= (int) vz + 260; z++)
+            for (int x = (int) vx - 260; x <= (int) vx + 260; x++) {
+                int a = flat.code(x, z), b = onCube.code(x, z);
+                boolean beyond = past.test(x + 0.5, z + 0.5);
+                assertEquals(a >= 0, b >= 0, name + ": painted on one and not the other at " + x + ", " + z + (beyond ? " (past the edge)" : ""));
+                if (a != b) {
+                    assertTrue(turning && beyond && (a == 0 || a == oxidized) && (b == 0 || b == oxidized),
+                            name + ": codes " + a + " and " + b + " at " + x + ", " + z);
+                    oxidizedSwaps++;
+                }
+                if (b < 0)
+                    continue;
+                painted++;
+                if (beyond) {
+                    paintedPast++;
+                    // the column past the edge answers as its partner on the planet (what far terrain reads)
+                    CubeLayout.Fold f = CUBE.fold(x, z);
+                    long px, pz;
+                    if (f instanceof CubeLayout.Outside o) {
+                        px = o.x();
+                        pz = o.z();
+                    } else {
+                        CubeLayout.OnFace o = (CubeLayout.OnFace) f;
+                        px = CUBE.blockX(o.face(), o.i());
+                        pz = CUBE.blockZ(o.face(), o.j());
+                    }
+                    assertEquals(b, onCube.code((int) px, (int) pz), name + ": the partner of " + x + ", " + z);
+                }
+            }
+        assertTrue(paintedPast > 100, name + ": columns painted past the edge " + paintedPast + " of " + painted);
+        System.out.println("[g16] " + name + ": " + crossing + " of " + flat.flows(0).size() + " flows cross, " + painted + " columns painted, "
+                + paintedPast + " past the edge, " + oxidizedSwaps + " oxidized patches moved");
+        // every chunk with a painted column is one the cube's flows touch: on the vent's face, past the edge (in the
+        // void, its corners folded) and on the partner face
+        for (int cz = Math.floorDiv((int) vz - 260, 16); cz <= Math.floorDiv((int) vz + 260, 16); cz++)
+            for (int cx = Math.floorDiv((int) vx - 260, 16); cx <= Math.floorDiv((int) vx + 260, 16); cx++) {
+                boolean any = false;
+                for (int z = cz * 16; z < cz * 16 + 16 && !any; z++)
+                    for (int x = cx * 16; x < cx * 16 + 16 && !any; x++)
+                        any = onCube.code(x, z) >= 0;
+                if (any)
+                    assertTrue(onCube.touches(cx * 16, cz * 16, cx * 16 + 15, cz * 16 + 15), name + ": chunk " + cx + ", " + cz);
+            }
+        assertFalse(onCube.touches(-16, 1_000, -1, 1_015), name + ": a chunk on S, far away");
+    }
+
+    @Test
+    void aFlowCrossesTheSlide() {
+        // F2's east edge (x = 2,560) is F3's west edge (x = −1,536) one lap on: a plain x wrap
+        flowsCrossTheSeam("slide", 2_540, 0, CubeLayout.Face.F2, CubeLayout.Face.F3, ISO, (x, z) -> x > 2_560, false);
+    }
+
+    @Test
+    void aFlowCrossesAQuarterTurnAndTurnsItsMetric() {
+        // N's east edge (x = 512) is F1's top, a quarter turn about (512, −512); the metric is anisotropic, so the
+        // flow past the edge goes the flat flow's way only if its metric turns with it
+        flowsCrossTheSeam("quarter turn", 492, -1_024, CubeLayout.Face.N, CubeLayout.Face.F1,
+                new double[]{4 * MH * MH, MH * MH, 2 * MH * MH}, (x, z) -> x > 512, true);
+    }
+
+    @Test
+    void aFlowCrossesAHalfTurn() {
+        // N's top edge (z = −1,536) is F2's top, a half turn about (1,024, −1,024)
+        flowsCrossTheSeam("half turn", 0, -1_516, CubeLayout.Face.N, CubeLayout.Face.F2,
+                new double[]{2 * MH * MH, -0.5 * MH * MH, 1.5 * MH * MH}, (x, z) -> z < -1_536, true);
+    }
+
+    @Test
+    void farFromTheEdgesTheCubesFlowsAreAFlatWorlds() {
+        Volcanoes.Volcano v = shield(1, 0, 0, 1.0);
+        CubeCone env = new CubeCone(v, CubeLayout.Face.F0, CubeLayout.Face.F1);
+        LavaFlows onCube = new LavaFlows(List.of(v), env, CUBE, C, -1e9, 1e9, MH, MV, null, true);
+        LavaFlows flat = new LavaFlows(List.of(v), env, C, -1e9, 1e9, MH, MV, null, true);
+        assertArrayEquals(box(flat, -260, -260, 260, 260), box(onCube, -260, -260, 260, 260));
+        int any = 0;
+        for (int c : box(onCube, -260, -260, 260, 260))
+            if (c >= 0)
+                any++;
+        assertTrue(any > 1_000, "painted " + any);
+        // a lap on is the same column
+        for (int x = -200; x <= 200; x += 7)
+            assertEquals(onCube.code(x, 20), onCube.code(x + 4_096, 20));
     }
 }
