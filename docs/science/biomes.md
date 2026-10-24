@@ -1101,6 +1101,33 @@ alike): the water bake changed 68 of its own nodes beside its 190 playa cells, a
 then passes standalone and with MIC: 24 playa columns read, every one salt (calcite), 2 of them under a neighbour's
 canopy, none wrong.
 
+## Land on a delta plain (2026-10-23, BIO-185)
+
+A delta plain (rivers-and-lakes.md, "Deltas and distributaries") is laid by the bake's water part, after the climate
+stage and the biome bake have run. The bake's L2 nodes over it therefore hold the sea's record: on the D5 world's
+Lambert bake 90.6 % of the plain's columns read an ocean continentalness. On a Petroff-Guyou or cube world the land
+call (BIO-170 to BIO-172) gives the world's land nodes the land's record, but it reads the ground at a node's block
+only, and the game reads the biome inputs bilinear between a column's four nodes. A plain is a few L2 cells across,
+so its columns beside the sea still read a sea node: on the D5 world as stage 1 merged it (master 84fb7d7c), 752 of
+the 29,473 dry plain columns (2.6 %) had an ocean biome. A fix on the bake's nodes would not hold: the biome bake's
+sea fill and the land call's donors put the sea's record back (BIO-178, "How the swamp got there").
+
+**What the projection pass does now** (BIO-185). After the land call, on the world's own L2 nodes: a node is the
+plain's when a world L3 cell within one L2 cell less one L3 cell of it, in x and in z, is on a plain (the world's
+`delta` above 0, resampled by the nearest cell, HYD-146) and dry by the world's sea rule (HYD-106). The land call
+then runs again with those nodes counted dry, so a plain node the sea still held takes the land's record by the land
+call's own laws: the nearest land node's class, wetland, temperature, humidity, erosion and ridges (BIO-171), and the
+continentalness by the distance to the world's sea (BIO-172). `notes.bake.projection.biome_land.delta_plain` counts
+the plain's nodes and those that took the land's record. A Lambert world has no land call, so its plains keep the
+bake's record.
+
+**Measured** on the D5 world (the hydro rerun of its Lambert bake projected to Petroff-Guyou,
+`tools/review/delta_census.py`): 4,417 nodes are the plain's and 271 of them (1,505 km²) took the land's record;
+0 of the 24,313 dry plain columns read an ocean biome. The cost is at the water's edge: of the 4,587 sea cells within
+an L2 cell of the plain's dry cells, 2,947 now read a coast or land continentalness (386 before), about 1,020 km²,
+0.044 % of the land. 65 % of the plain's dry columns lie in the swamp band E6, where vanilla puts swamp or mangrove
+swamp (BIO-178: whatever the flag says); a delta plain is a wetland, so that is left as it is.
+
 ## The snow line (2026-10-22, BIO-180, BIO-181)
 
 **What was wrong.** A temperate mountain carried snow in its own mild climate: frozen peaks, jagged peaks or snowy
