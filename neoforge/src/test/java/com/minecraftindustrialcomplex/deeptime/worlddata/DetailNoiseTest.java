@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@link DetailNoise} is Rust's {@code deeptime_format::detail::Noise} bit for bit: the values Rust's
- * {@code detail::tests::known_values} pins (a change of either is a change of the world-data
- * contract), the periodicity in x and the range.
+ * {@code detail::tests::known_values} and {@code cube_known_values} pin (a change of either is a change
+ * of the world-data contract), the periodicity in x and the range, and on a cube world the fold.
  */
 class DetailNoiseTest {
 
@@ -34,6 +34,47 @@ class DetailNoiseTest {
                 assertTrue(Math.abs(a - n.at(x + c, z)) < 1e-9, "one lap east");
             }
         }
+    }
+
+    /** The 4k test cube's net (s = 1024), as Rust's {@code detail::tests::cube_fixture}. */
+    private static DetailNoise cubeNoise() {
+        return new DetailNoise(0xDEAD_BEEF_0123_4567L, 4096, 1729, 3, 32.0, 0L, CubeLayout.shared(1024));
+    }
+
+    /** A cube world's noise (cube plan G3): the values Rust's {@code detail::tests::cube_known_values} pins. */
+    @Test
+    void cubeKnownValuesMatchRust() {
+        DetailNoise n = cubeNoise();
+        assertEquals(LATTICE3, n.lattice3(7, -3, 11, 5));
+        double[][] at = {{100.0, -50.0}, {-900.0, 300.0}, {10.0, -900.0}, {-200.0, 1000.0}, {2000.0, 100.0}, {-600.0, -700.0}};
+        for (int k = 0; k < at.length; k++)
+            assertEquals(CUBE_VALUES[k], n.at(at[k][0], at[k][1]), "(" + at[k][0] + ", " + at[k][1] + ")");
+        assertEquals(0.0, n.at(1000.0, -1600.0), "deep ocean past the corners");
+    }
+
+    private static final double LATTICE3 = -0.016565307453047184;
+    private static final double[] CUBE_VALUES = {
+            -0.16032818137761118, 0.2689732692952809, 0.15544098362422432,
+            0.23472733008415383, 0.03172617598775018, 0.017139648300822326};
+
+    /** A block off the cube's faces reads its fold partner's noise exactly, a lap east the same block's. */
+    @Test
+    void theCubeNoiseIsItsFoldPartners() {
+        DetailNoise n = cubeNoise();
+        CubeLayout cube = n.cube();
+        int outside = 0;
+        for (long x = -1536; x < 2560; x += 23) {
+            for (long z = -1700; z < 1700; z += 23) {
+                double here = n.at(x, z);
+                assertTrue(here >= -1 && here <= 1, "in range: " + here);
+                if (cube.fold(x, z) instanceof CubeLayout.Outside o) {
+                    outside++;
+                    assertEquals(n.at(o.x(), o.z()), here, "(" + x + ", " + z + ") shows (" + o.x() + ", " + o.z() + ")");
+                }
+                assertEquals(here, n.at(x + 4096, z), "a lap east");
+            }
+        }
+        assertTrue(outside > 5_000, "blocks off the faces: " + outside);
     }
 
     @Test
