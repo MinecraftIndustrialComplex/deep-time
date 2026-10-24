@@ -546,6 +546,16 @@ fn lay_fans(
             el.bytes[at..at + 2].copy_from_slice(&h.to_le_bytes());
         }
     }
+    // The hollows the cones close, at their spill (HYD-177).
+    for &(c, lvl) in &fans.ponds {
+        let (i, j) = (c as usize % wh, c as usize / wh);
+        for dj in 0..f {
+            for di in 0..f {
+                let t = top.entry((j * f + dj) * w3 + i * f + di).or_insert(i16::MIN);
+                *t = (*t).max(lvl);
+            }
+        }
+    }
     drop(top);
     out.layer_bytes(el.desc.clone(), &el.bytes)?;
     tally_once(out, "elevation");
@@ -800,7 +810,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     // The alluvial fans where the first network's rivers leave steep ground, off the delta plains
     // (HYD-165 to HYD-170).
     let lambert = lambert_frame(out.m).then(|| deeptime_format::Projection::of(c));
-    let fans = if params.fans {
+    let mut fans = if params.fans {
         let taken = |cell: u32| on_plains.binary_search(&cell).is_ok();
         hydro::fan::find(
             &hydro::fan::Input {
@@ -823,6 +833,8 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         drop(first);
         plains.apply(&mut elev);
         fans.apply(&mut elev);
+        // No hollow on a fan: the deposit fills what the cones close (HYD-177).
+        fans.fill_ponds(&grid, &mut elev);
         // No floodplain on a delta plain or a fan: both are laid already.
         let mut skip = on_plains.clone();
         skip.extend(fans.cells());

@@ -3,7 +3,8 @@
 //! leaves a ridge for flat ground on a window of the D5 planet's Lambert frame (1 block a cell):
 //! the fan at the slope break, round on the planet at 0° and at 55° (and three times as wide as
 //! long on the grid there), Bull's area unless hemmed in, none on a smooth profile, a larger
-//! river's channel as its edge, and no cone over ground that falls away faster than the fan.
+//! river's channel as its edge, and no cone over ground that falls away faster than the fan; and
+//! a hollow the cones close filled to its spill.
 
 use deeptime_format::raster::ZEdges;
 use deeptime_format::rivers::Rivers;
@@ -207,7 +208,7 @@ fn a_canyon_leaving_a_ridge_builds_bulls_fan_at_the_slope_break() {
     let win = window(0.0, 260, 400, 180);
     let elev = win.elev(&|_, _| None);
     let net = output(elev.len(), vec![win.walk(&elev, SOUTH)]);
-    let fans = find(&win, &elev, &net);
+    let mut fans = find(&win, &elev, &net);
     assert_eq!(fans.fans.len(), 1, "{}", fan::stats(&fans, 1, 0.09, M_V));
     let f = &fans.fans[0];
     // The apex where the canyon meets the plain.
@@ -238,6 +239,83 @@ fn a_canyon_leaving_a_ridge_builds_bulls_fan_at_the_slope_break() {
     fans.apply(&mut raised);
     assert!(raised.iter().zip(&elev).all(|(a, b)| a >= b));
     assert!(raised.iter().zip(&elev).filter(|(a, b)| a > b).count() > 10_000);
+    // A cone on open ground closes no hollow.
+    let before = raised.clone();
+    fans.fill_ponds(&win.grid, &mut raised);
+    assert!(fans.ponds.is_empty() && raised == before);
+}
+
+/// A hollow the cones close is filled to its spill, and one with a way off the fan below it is
+/// not (HYD-177): a 5 × 5 fan whose rim stands at y 50 round an inner 3 × 3 at y 20, on ground at
+/// y 100 except one cell north of the rim at y 0 (and, the second time, the middle cell off the
+/// fan at y 0).
+#[test]
+fn a_hollow_the_cones_close_is_filled_to_its_spill() {
+    let grid = GridDesc {
+        name: "L3".into(),
+        w: 9,
+        h: 9,
+        r: 1,
+        wraps_x: false,
+        origin_block_x: 0,
+        origin_block_z: 0,
+        z_edges: ZEdges::Clamp,
+    };
+    let run = |hole: bool| -> (Fans, Vec<i16>) {
+        let mut elev = vec![100 * 16i16; 81];
+        elev[9 + 4] = 0;
+        let (mut cells, mut height) = (Vec::new(), Vec::new());
+        for j in 2..=6usize {
+            for i in 2..=6usize {
+                let c = j * 9 + i;
+                elev[c] = 0;
+                if hole && (i, j) == (4, 4) {
+                    continue;
+                }
+                let inner = (3..=5).contains(&i) && (3..=5).contains(&j);
+                cells.push(c as u32);
+                height.push(if inner { 20 * 16 } else { 50 * 16 });
+            }
+        }
+        let mut fans = Fans::default();
+        fans.fans.push(fan::Fan {
+            chain: 0,
+            apex: cells[0],
+            x: 0.0,
+            z: 0.0,
+            drainage_km2: 1.0,
+            bull_km2: 1.0,
+            slope: 0.01,
+            slope_up: 0.02,
+            slope_down: 0.0,
+            thickness_m: M_V,
+            free_thickness_m: M_V,
+            top_raw: 0.0,
+            fall_raw: 0.0,
+            cells,
+            height,
+            volume_km3: 0.0,
+        });
+        fans.apply(&mut elev);
+        fans.fill_ponds(&grid, &mut elev);
+        (fans, elev)
+    };
+    let inner: Vec<usize> = (3..=5)
+        .flat_map(|j| (3..=5).map(move |i| j * 9 + i))
+        .collect();
+    let (fans, elev) = run(false);
+    assert_eq!(fans.ponds.len(), 9, "{:?}", fans.ponds);
+    assert!(fans.ponds.iter().all(|&(c, l)| l == 50 * 16 && inner.contains(&(c as usize))));
+    assert!(inner.iter().all(|&c| elev[c] == 50 * 16));
+    assert_eq!((fans.pond_max_raw, fans.pond_raise_raw), (30 * 16, 9 * 30 * 16));
+    assert!(fans.ground().iter().all(|&(_, h)| h == 50 * 16));
+    // Re-applied, the fill stays.
+    let mut again = vec![0i16; 81];
+    fans.apply(&mut again);
+    assert!(inner.iter().all(|&c| again[c] == 50 * 16));
+    let (fans, elev) = run(true);
+    assert!(fans.ponds.is_empty(), "{:?}", fans.ponds);
+    assert!(inner.iter().all(|&c| c == 4 * 9 + 4 || elev[c] == 20 * 16));
 }
 
 #[test]
