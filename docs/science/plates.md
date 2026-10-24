@@ -6734,3 +6734,13 @@ samples are captured; 23 and 26 plates at 300 Myr against 17 and 22 off (the sca
 34). The step still cuts between resamplings, more than off (the terrane transfer +5,532 and +4,054,
 the overlaps +4,394 and +7,264), and each resampling makes the plates whole again (it joins 10,456
 and 11,637).
+
+**The plate count against Earth's.** The model's floor for a plate (PLT-091, 0.0377 sr) is the
+count to read the model's plates against, not PB2002's 52: 19 of PB2002's plates are at or above it
+in Bird's table (20 on the lattice, where the Caroline plate, 0.03765 sr against the floor's 0.03770,
+rasterises to 0.0382; `bird_raster.py`'s `plates_at_floor`), and they hold 97.9 % of the planet.
+
+**A known limit: no microplates.** PB2002's 33 plates under the floor (2.1 % of the planet; Bird's
+microplates are "100–500 km" across, [79]) have no counterpart: a piece under the floor is captured,
+and nothing in the model makes a plate that small. Fission splits off only pieces of the floor's
+size or more, so the law cannot make them either.
