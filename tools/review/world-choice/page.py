@@ -26,6 +26,7 @@ a = ap.parse_args()
 os.makedirs(f"{a.out}/img", exist_ok=True)
 C = json.load(open(f"{a.cmp}/compare.json"))
 missing = []
+size = {}  # img/<name> -> (width, height), written on each <img> so the layout holds while pictures load
 
 
 def put(src, name, width=1280, png=False):
@@ -38,6 +39,7 @@ def put(src, name, width=1280, png=False):
     if im.width > width:
         im = im.resize((width, round(im.height * width / im.width)), Image.LANCZOS)
     path = f"img/{name}.{'png' if png else 'jpg'}"
+    size[path] = im.size
     if png:
         im.save(f"{a.out}/{path}", optimize=True)
     else:
@@ -48,8 +50,8 @@ def put(src, name, width=1280, png=False):
 def fig(path, tag, cap="", alt=""):
     if path is None:
         return f'<figure><span class="tag">{tag}</span><p class="cap">(not shot)</p></figure>'
-    return (f'<figure><span class="tag">{tag}</span><a href="{path}"><img src="{path}" alt="{html.escape(alt or tag)}" '
-            f'loading="lazy"></a>{f"<figcaption class=cap>{cap}</figcaption>" if cap else ""}</figure>')
+    return (f'<figure><span class="tag">{tag}</span><a href="{path}"><img src="{path}" width="{size[path][0]}" '
+            f'height="{size[path][1]}" alt="{html.escape(alt or tag)}" loading="lazy"></a>{f"<figcaption class=cap>{cap}</figcaption>" if cap else ""}</figure>')
 
 
 def f2(v):

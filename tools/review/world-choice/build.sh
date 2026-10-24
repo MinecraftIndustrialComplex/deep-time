@@ -18,12 +18,19 @@ du -sh "$OUT/page"; find "$OUT/page" -type f -size +9M
 # Fonts for headless Chromium (the VM has none of its own).
 FC=$(nix build --no-link --print-out-paths --impure --expr \
   'with (builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux; makeFontsConf { fontDirectories = [ dejavu_fonts noto-fonts ]; }')
-# One shot per section: headless Chromium repeats the page past 8,192 pixels of window.
+# One shot per section: headless Chromium repeats the page past 8,192 pixels of window, and its
+# --screenshot takes the document's top whatever a #fragment scrolled to, so each section is shot
+# from a copy of the page that shows only that section (removed before publishing).
+for sec in glance maps numbers places edges far gates cost decide; do
+  sed "s|</head>|<style>main > *:not(#$sec) { display: none !important; }</style></head>|" \
+    "$OUT/page/index.html" > "$OUT/page/look-$sec.html"
+done
 for w in 390 1280; do
   for sec in top glance maps numbers places edges far gates cost decide; do
-    path="index.html#$sec"; [ "$sec" = top ] && path=index.html
+    path="look-$sec.html"; [ "$sec" = top ] && path=index.html
     FONTCONFIG_FILE="$FC" deeptime-admit run --kind auto -- python3 -I tools/review/shot-page.py "$OUT/page" \
       "$OUT/look/w$w-$sec.png" --width "$w" --height 8000 --path "$path"
   done
 done
+rm -f "$OUT"/page/look-*.html
 echo "build done"
