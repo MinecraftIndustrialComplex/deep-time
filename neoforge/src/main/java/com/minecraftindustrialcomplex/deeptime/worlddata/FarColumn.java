@@ -431,6 +431,32 @@ public final class FarColumn {
     }
 
     /**
+     * As {@link #grid}, with each of the first {@code count} shapes sampled at its own block
+     * ({@code xs[k]}, {@code zs[k]}, any lap): the columns of a cube world's area that reaches off the
+     * faces, each taken at the planet block it shows (cube plan G6: off the faces the generator draws
+     * the partner's columns, {@code worldgen/CubeFill}). A shape with {@code skip[k]} is left as it is.
+     * {@code step} 1 evaluates {@link Water#column} at each block, which equals {@link Water.Region}'s
+     * column there; a wider step {@link Water#core}, as {@link #grid} does.
+     */
+    public static void gridAt(WorldData wd, Water.Spec spec, int step, long[] xs, long[] zs, boolean[] skip, int count, Shape[] out) {
+        IceCover ice = wd.iceCover().orElse(null);
+        int minY = spec.minY(), maxY = spec.maxY();
+        Rivers rivers = wd.rivers();
+        for (int k = 0; k < count; k++) {
+            if (skip[k])
+                continue;
+            long wx = wrapX(wd, xs[k]), z = zs[k];
+            int cover = ice == null ? 0 : ice.blocks((int) wx, (int) z);
+            if (step == 1) {
+                shape(Water.column(wd, spec, wx, z), cover, minY, maxY, out[k]);
+            } else {
+                Rivers.Sample rs = rivers == null ? Rivers.Sample.NONE : rivers.sample(wx, z);
+                shape(Water.core(wd, spec, wx, z, wd.height(wx, z), rs), cover, minY, maxY, out[k]);
+            }
+        }
+    }
+
+    /**
      * How far below its soil column (i, j) of a {@link #grid} shows its side: the drop from its
      * ground to its lowest neighbour's (water surfaces count as the neighbour's top: what is under
      * water beside a column is not seen from afar), 0 where no neighbour is lower.

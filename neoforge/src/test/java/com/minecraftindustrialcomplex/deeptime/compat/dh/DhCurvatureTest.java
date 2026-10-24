@@ -44,6 +44,24 @@ class DhCurvatureTest {
     }
 
     @Test
+    void aCubeWorldCurvesAsItsNominalSphere() {
+        // Cube plan G6: the sphere a cube world's blocks stand for has the nominal radius s √(1.5 / π)
+        // (6 s² = 4 π R², SCL-078; 2,653 blocks at 16k), not its 4s period over 2π; ClientPlanetState
+        // hands Distant Horizons 2πR.
+        double[] expected = {2653.4, 5129.9};
+        int[] sides = {3840, 7424};
+        for (int i = 0; i < sides.length; i++) {
+            com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout cube = com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout.of(sides[i]);
+            double r = cube.radius();
+            assertEquals(expected[i], r, 0.05);
+            int ratio = DhCurvature.ratioFor(Math.round(2 * Math.PI * r));
+            assertEquals(r, DhCurvature.radiusOfRatio(ratio), r * 0.5 / ratio + 1e-9, sides[i] + ": DH draws the cube's sphere");
+            // The period's sphere (C = 4s) would be smaller, so more curved.
+            assertTrue(DhCurvature.ratioFor(cube.period()) > ratio, sides[i] + ": the period is not the sphere");
+        }
+    }
+
+    @Test
     void theDropIsTheShadersCosineAndAboutADSquaredOverTwoR() {
         double r16 = DhCurvature.radiusOfRatio(DhCurvature.ratioFor(16_384)), r32 = DhCurvature.radiusOfRatio(DhCurvature.ratioFor(32_768));
         for (double r : new double[]{r16, r32}) {
