@@ -2124,7 +2124,7 @@ fn a_contact_whose_plates_slide_past_has_no_arc_front() {
 /// overlap, so at the next step, before the plates move, the contact sees none. Carried, it keeps
 /// its front as it had it before the resampling; off, it has none until the overlap forms again
 /// (the record's subducting length fell from 99,000 to 63,000 km in the first 2 Myr after a
-/// resampling, base6 seeds 1 to 4). A carried contact whose plates part has no front and is
+/// resampling, base6 seeds 1 to 4). A carried contact whose plates slide past has no front and is
 /// carried no more; one whose overlap is seen again is active by it, not carried.
 #[test]
 fn a_subduction_zone_goes_on_through_a_resampling() {
@@ -2165,12 +2165,12 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
     let p = p0.clone();
     let stage = PlatesStage::new(p.clone());
     let env2 = stage.env(&p.tectonics, 2);
-    // The plates part: no front, and the carry ends.
-    let mut parted = st.clone();
-    parted.plates[1].omega = (DVec3::X * -env2.norm.omega_of_speed(50.0)).to_array();
-    let mut cones = vec![[0.0; 2]; parted.samples.len()];
-    subduction::fronts_and_uplift(&mut parted, &geo, &pos, &env2, &mut cones, 0.0);
-    assert!(!parted.contacts[0].carried, "carried with no front");
+    // The plates slide past each other (about z, along the equator): no front, and the carry ends.
+    let mut sliding = st.clone();
+    sliding.plates[1].omega = (DVec3::Z * env2.norm.omega_of_speed(50.0)).to_array();
+    let mut cones = vec![[0.0; 2]; sliding.samples.len()];
+    subduction::fronts_and_uplift(&mut sliding, &geo, &pos, &env2, &mut cones, 0.0);
+    assert!(!sliding.contacts[0].carried, "carried with no front");
     // Converging on: the carry holds while the fronts stand.
     let mut held = st.clone();
     subduction::fronts_and_uplift(&mut held, &geo, &pos, &env2, &mut cones, 0.0);
