@@ -24,6 +24,16 @@
 //! centroid keeps it, the others get the contact without one. A boundary no piece borders any
 //! more stays with the parent and closes as before; a pair inside one split plate (the slab a
 //! subduction initiation plants under its fracture) is not touched.
+//!
+//! The slab is one sheet along the trench, and its pull is counted per front edge
+//! (`forces.rs`), so the pieces' fronts pull with the parent's force between them. Where the
+//! trench lies along a split plate's border cannot be told at a split (a resampling has consumed
+//! the hidden samples and reset the flags), so a piece bordering the other plate across a ridge or
+//! a transform gets a copy too. A copy of a slab that was at a front is latent
+//! (`SlabTrack::latent`): it pulls only at its piece's own fronts and never hangs along the
+//! piece's border, so it adds nothing where its piece has no trench. A copy of a slab that hung
+//! (no front for a step or more) hangs like it, along its own piece's stretch of the border, so
+//! the pieces again pull with the parent's force between them.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -308,9 +318,12 @@ pub fn inherit(
             if p == owner || !held.insert(p) {
                 continue;
             }
+            // A slab with no step off a front since it was last fed (`idle_myr` 0) pulls only at
+            // fronts, and so does its copy: at its piece's own (ledger: PLT-534).
             new_slabs.push(SlabTrack {
                 under: p.0,
                 over: p.1,
+                latent: s.latent || s.idle_myr == 0.0,
                 ..s.clone()
             });
             out.slabs_copied += 1;
@@ -422,6 +435,7 @@ pub(in crate::plates) mod tests {
             km,
             blocked_myr: 0.0,
             idle_myr: 2.0,
+            latent: false,
         }
     }
 
@@ -669,5 +683,90 @@ pub(in crate::plates) mod tests {
         assert_eq!((st.contacts.clone(), st.slabs.clone()), before);
         let got = inherit(&mut st, &pos, &env(&k), &[(1, vec![])]);
         assert_eq!(got, Inherited::default());
+    }
+
+    /// A split hands the slab's pull to its pieces and adds none: the slab is one sheet along the
+    /// trench and pulls per metre of its front (`forces.rs`), so the pull's torque summed over
+    /// the pieces of a split subducting plate, and the suction's over those of a split overriding
+    /// plate, equal the parent's before the split. Plate 1 (x ≥ 0) turns about the z axis at 50
+    /// mm/yr: into plate 0 on the y > 0 half of their border (a trench with a full slab, fed this
+    /// step) and away from it on the y < 0 half (a ridge). Each plate splits across the trench
+    /// (z = 0: both pieces hold a stretch of it) and along it (y = 0: the new piece borders the
+    /// other plate only across the ridge, and its copy of the slab pulls nothing). A slab that hung
+    /// with no front hangs on along each piece's own stretch of the border, with the parent's pull
+    /// between them. ledger: PLT-534
+    #[test]
+    fn a_split_plates_pieces_pull_with_the_parents_slab_force() {
+        use crate::plates::forces::slab_torques;
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let k = TectonicParams::default();
+        let e = env(&k);
+        let w = DVec3::Z * e.norm.omega_of_speed(50.0);
+        // (the plate that splits, the new piece's side, the slab hung, the new piece pulls)
+        type Case = (u32, fn(DVec3) -> bool, bool, bool);
+        let cases: [Case; 5] = [
+            (1, |p| p.z < 0.0, false, true),
+            (0, |p| p.z < 0.0, false, true),
+            (0, |p| p.y < 0.0, false, false),
+            (1, |p| p.y < 0.0, false, false),
+            (1, |p| p.y < 0.0, true, true),
+        ];
+        for (i, (parent, side, hung, pulls)) in cases.into_iter().enumerate() {
+            let mut st = one_plate(&geo, 5, |_| old_floor());
+            add_plate(&mut st, &geo, 1, |p| p.x >= 0.0);
+            st.plates[1].omega = w.to_array();
+            let mut c = contact(1, 0, DVec3::Y);
+            let mut s = slab(1, 0, k.slab_depth_km);
+            if hung {
+                c.last_step = e.step - 1;
+            } else {
+                s.idle_myr = 0.0;
+            }
+            st.contacts.push(c);
+            st.slabs.push(s);
+            let pos = positions(&st, &geo);
+            let before = slab_torques(&st, &geo, &pos, &e);
+
+            let mut p2 = st.plates[parent as usize].clone();
+            p2.id = 2;
+            p2.parent = Some(parent);
+            st.plates.push(p2);
+            st.groups.push(Group {
+                plate: 2,
+                rot: [0.0, 0.0, 0.0, 1.0],
+            });
+            for (j, &x) in geo.points().iter().enumerate() {
+                if st.plate_of(j) == parent && side(x) {
+                    st.samples[j].group = 2;
+                }
+            }
+            let pos = positions(&st, &geo);
+            st.recount(&pos);
+            inherit(&mut st, &pos, &e, &[(parent, vec![2])]);
+            let after = slab_torques(&st, &geo, &pos, &e);
+
+            let (under, over) = if parent == 1 {
+                (vec![1, 2], vec![0])
+            } else {
+                (vec![1], vec![0, 2])
+            };
+            let pull: DVec3 = under.iter().map(|&p| after[p].0).sum();
+            let suck: DVec3 = over.iter().map(|&p| after[p].1).sum();
+            assert!(before[1].0.length() > 0.0, "case {i}: the slab pulls");
+            for (got, want, what) in [(pull, before[1].0, "pull"), (suck, before[0].1, "suction")] {
+                assert!(
+                    (got - want).length() <= 1e-9 * want.length(),
+                    "case {i}: the pieces' {what} {got} against the parent's {want}"
+                );
+            }
+            for &p in &over {
+                assert_eq!(after[p].0, DVec3::ZERO, "case {i}: plate {p} is pulled");
+            }
+            for &p in &under {
+                assert_eq!(after[p].1, DVec3::ZERO, "case {i}: plate {p} has suction");
+            }
+            let piece = if parent == 1 { after[2].0 } else { after[2].1 };
+            assert_eq!(piece != DVec3::ZERO, pulls, "case {i}: the new piece's share {piece}");
+        }
     }
 }
