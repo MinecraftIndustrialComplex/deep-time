@@ -348,13 +348,17 @@ public final class CubeWorldGameTests {
                     LevelChunk partner = level.getChunk((int) Math.floorDiv(px, 16), (int) Math.floorDiv(pz, 16));
                     for (int qy = minQ; qy < maxQ; qy += 4) {
                         Holder<Biome> got = chunk.getNoiseBiome(qx, qy, qz);
-                        Holder<Biome> want = partner.getNoiseBiome((int) Math.floorDiv(px, 4), qy, (int) Math.floorDiv(pz, 4));
+                        int pqx = (int) Math.floorDiv(px, 4), pqz = (int) Math.floorDiv(pz, 4);
+                        Holder<Biome> want = partner.getNoiseBiome(pqx, qy, pqz);
                         compared++;
                         if (!got.equals(want)) {
                             mismatched++;
+                            String why = climateTie(g.getBiomeSource(), level.getChunkSource().randomState().sampler(), pqx, qy, pqz, got, want);
+                            DeepTime.LOGGER.info("[gametest] cubeFillBiomesAreThePartners {} quart ({}, {}, {}) {} against partner quart ({}, {}, {}) {}{}",
+                                    entry.getKey(), qx, qy, qz, got.getRegisteredName(), pqx, qy, pqz, want.getRegisteredName(), why);
                             if (first == null)
                                 first = entry.getKey() + " quart (" + qx + ", " + qy + ", " + qz + "): " + got.getRegisteredName()
-                                        + "; its partner's " + want.getRegisteredName();
+                                        + "; its partner's " + want.getRegisteredName() + why;
                         }
                     }
                 }
@@ -363,6 +367,54 @@ public final class CubeWorldGameTests {
                 chunks.size(), compared, mismatched, first == null ? "" : "; first " + first);
         helper.assertTrue(compared > 0 && mismatched == 0, mismatched + " of " + compared + " quarts differ; first " + first);
         helper.succeed();
+    }
+
+    /**
+     * Why quart (qx, qy, qz) can hold either of two biomes: the climate point's fitness to the nearest
+     * entry of the parameter list and to the nearest entry of each biome ("a tie" when both are the
+     * nearest), and the biome a search that starts cold gives ({@code climate.ColdBiomeSearch}).
+     */
+    static String climateTie(net.minecraft.world.level.biome.BiomeSource source, net.minecraft.world.level.biome.Climate.Sampler sampler,
+                             int qx, int qy, int qz, Holder<Biome> a, Holder<Biome> b) {
+        if (!(source instanceof net.minecraft.world.level.biome.MultiNoiseBiomeSource m))
+            return "";
+        net.minecraft.world.level.biome.Climate.TargetPoint t = sampler.sample(qx, qy, qz);
+        long best = Long.MAX_VALUE, fa = Long.MAX_VALUE, fb = Long.MAX_VALUE;
+        int atBest = 0;
+        for (var e : m.parameters().values()) {
+            long f = fitness(e.getFirst(), t);
+            if (f < best) {
+                best = f;
+                atBest = 0;
+            }
+            if (f == best)
+                atBest++;
+            if (e.getSecond().equals(a))
+                fa = Math.min(fa, f);
+            if (e.getSecond().equals(b))
+                fb = Math.min(fb, f);
+        }
+        Holder<Biome> cold;
+        com.minecraftindustrialcomplex.deeptime.climate.ColdBiomeSearch.begin();
+        try {
+            cold = source.getNoiseBiome(qx, qy, qz, sampler);
+        } finally {
+            com.minecraftindustrialcomplex.deeptime.climate.ColdBiomeSearch.end();
+        }
+        return " (climate point " + t + ": nearest entry " + best + " (" + atBest + " entries at it), " + a.getRegisteredName() + " " + fa
+                + ", " + b.getRegisteredName() + " " + fb + (fa == best && fb == best ? ", a tie" : "") + "; a cold search gives "
+                + cold.getRegisteredName() + ")";
+    }
+
+    /** {@code Climate.ParameterPoint.fitness}, which is package private. */
+    static long fitness(net.minecraft.world.level.biome.Climate.ParameterPoint p, net.minecraft.world.level.biome.Climate.TargetPoint t) {
+        return sq(p.temperature().distance(t.temperature())) + sq(p.humidity().distance(t.humidity()))
+                + sq(p.continentalness().distance(t.continentalness())) + sq(p.erosion().distance(t.erosion()))
+                + sq(p.depth().distance(t.depth())) + sq(p.weirdness().distance(t.weirdness())) + sq(p.offset());
+    }
+
+    private static long sq(long v) {
+        return v * v;
     }
 
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
