@@ -7225,3 +7225,105 @@ seeds with it (Step 3b, "The speed guard"), small plates held by a fixed suction
 as without it; that is the suction law's known limit, not the level set's. What it does not do:
 the front stays 1.7 times Bird's (89,331 against 51,310 straight km), since the trenches are
 moved every step by the overlaps' hiding and the collisions, which it does not touch.
+
+### The overlaps' hiding: what it hides and why it cuts (2026-10-24)
+
+The coordinator's item, before anything more is built: what the overlaps' hiding in
+`subduction::resolve` hides, why it cuts the plates, and what the physics should do instead, from
+fl-ls2's 8 cached runs only (no simulation). The measure is `hiding` in
+`tools/review/pool/measures_front.json` (`measure_hiding.py`): the crust budget's maps every 50
+Myr after the first 100, without those taken at a resampling (13 to 16 a run), and the runs'
+records. Ranges below are over the 8 runs, each a mean over its snapshots.
+
+**What it hides.** Each step `resolve` clears every sample's flags and hides each sample of a
+contact's subducting plate that lies inside one of the overriding plate's triangles
+(`geometry::cover`, a group's own triangles), if the contact is seen that step (a new pair needs
+`MIN_CONTACT`, 3 such overlaps; a known pair needs one). Nothing carries over from the step
+before: a sample is hidden exactly while it lies under the overriding plate's cover. The
+resampling consumes what is hidden at that moment (its pools go to the crust on top: PLT-276,
+PLT-292, PLT-440). In the records the step is 2 Myr and a resampling comes every 16 to 17 Myr (58
+to 63 a run: the schedule's 20 Myr, PLT-098, and one after each weld). Between resamplings 5.1 to
+6.4 % of the samples are hidden on average, and the planet's visible count never rises from one
+step to the next (0 steps in any run).
+
+**What it cuts.**
+
+- 0.74 to 1.72 % of the visible samples lie in pieces cut off their plate's largest, 84 to 144
+  pieces a snapshot, the median piece one sample.
+- 69 to 80 % of the cut samples are in pieces beside their own hidden samples (the TRENCH flag),
+  and those pieces' trench edges face the overriding plate's subduction zone (within 800 km of
+  its front) as often as the main bodies' trenches do: 0.87 to 0.90 of the edges for the small
+  pieces and 0.73 to 0.98 for those of the fission floor or more (PLT-091, 300 samples), against
+  0.95. The share whose other side moves away (DIVERGENT) is the main bodies' too (0.42 to 0.51
+  against 0.43 to 0.47). The hiding cuts at ordinary trenches.
+- By shape, shares of the cut samples: a thin hidden band, at most 3 spacings from the plate's
+  largest piece, 0.28 to 0.44 (necks); farther, with one plate between, 0.17 to 0.32; farther,
+  across two plates or more, 0.07 to 0.14; enclosed by one plate, 1 to 3 samples 0.08 to 0.21
+  (holes), more 0.11 to 0.21 (islands).
+- Pieces of the fission floor or more: 0.33 to 1.08 a snapshot, 14 to 36 % of the cut samples, 75
+  to 100 % of them beside their own slab, all necks or with one plate between (two in a run's
+  snapshots across two plates).
+- Seams: 7.5 to 17 % of the enclosed pieces touch a seam between two groups of the plate around
+  them, about ten times chance (0.17 to 0.30 % of the visible samples are seam samples, about 1 %
+  of a piece's six neighbours by chance). A seam's triangles belong to no group, so they hide
+  nothing. This is 3 to 7 % of the cut samples.
+
+**What the pieces cost.** `boundgeom` over the same runs (Step 3c, at 77 km): the subduction front
+is 139,771 km with the pieces and 115,979 km with each piece given to the plate around it, the
+boundary 353,285 and 325,644 km. The pieces carry 17 % of the front and 8 % of the boundary. On
+the lattice the front is 2.66 times PB2002's (52,564 km) with them and 2.21 times without, so the
+main bodies' outline at their trenches holds most of the excess.
+
+**What becomes of them.** Fission makes 55 to 86 plates a run of them (median 77). They live a
+median 26 to 40 Myr, about two resamplings, and of those absorbed only 2 to 9 % go back into their
+parent; the rest join a neighbour.
+
+**Why it cuts.** Three ways, from the code:
+
+1. *A neck under the overriding plate.* Where the overriding plate's cover reaches across a narrow
+   part of the subducting plate, from one of its boundaries to another, the visible crust is in
+   two. The plates' outlines are ragged at 1 to 3 spacings (the front's tortuosity 1.92 at 77 km
+   with each plate one body, PB2002's 1.20 on the lattice), so such necks are common and a band
+   that thin hides them. This is the measured majority: the necks and most pieces with one plate
+   between, all at ordinary trenches.
+2. *Crust that went under shows again.* The flag is set again every step, so a sample shows again
+   whenever it leaves the overriding plate's triangles before the next resampling: behind a
+   corner of the overriding plate that has swept past it, beyond an overriding plate narrower
+   than the slab's travel since the resampling (at 50 mm/yr, 830 km or 12 spacings in 16.7 Myr),
+   in a step the contact is not seen, and when the contact reverses (`reverse` swaps the plates:
+   the old slab shows at once and the old overriding plate's crust on it is hidden). The cut
+   trace books this among the overlaps' joins (1,771 to 2,772 samples per 300 Myr at 40,000
+   samples, against 5,304 to 10,207 cut, Step 3c's table). The records cannot size it: their
+   counts are net, and what a plate hides at one edge hides what it shows at another. What shows
+   again is old crust that went down a trench, at a place where the ground has opened.
+3. *Seam holes* (above), 3 to 7 % of the cut samples.
+
+**What Earth does.** Subduction is one way: the lithosphere that goes down a trench is the slab
+whose weight is the slab pull the force balance applies (`forces.rs`, Forsyth & Uyeda 1975), and
+none of it comes back to the surface. Where an overriding plate moves away from the trench, or
+past a stretch of it, the ground between opens and takes new crust (back-arc spreading; from
+memory, no source read for this page). A subducting plate cut through by a trench is torn, and
+its pieces move on their own or join a neighbour (Stock & Lee 1994, "What Earth does" above), as
+fission and capture already do.
+
+**What the physics should do.**
+
+- *One-way subduction* (for way 2). A sample once hidden under a contact stays hidden until the
+  resampling consumes it, whatever the overriding plate does next, and holds no ground at the
+  resampling: the ground it leaves is a gap and gets new crust from the gap fill (PLT-502). It
+  is not built. It would not shorten the front: it keeps consumed necks consumed instead of
+  letting them show again, so it may cut a little more. What it corrects is the crust behind
+  narrow overriding plates and after reversals, which would be new instead of recycled. To size
+  it first: a counter of the samples shown again per step, by cause (left the cover, contact not
+  seen, reversal), on one arm.
+- *Necks* (way 1) are physical: a neck consumed whole is a tear, and fission or capture follows.
+  Their number follows the plates' raggedness at their trenches, the 2.21 times above, which is
+  the next thing to diagnose: what roughens the overriding plates' outlines between resamplings
+  (the arcs' growth, the terranes, the collisions' fronts).
+- *Seams* (way 3) are geometry, not physics: a triangle whose corners are all one plate's, in
+  two of its groups, should cover for that plate. Minor.
+
+So the hiding is not more urgent than the saturating suction (Step 3b, "The speed guard"): its
+pieces carry 17 % of the front, one-way subduction would not shorten it, and the guard's binds on
+the 8k planet are the open fault in the physics. Next: step 4 (T and S1 on base4), then the
+saturating suction, then one-way subduction with its counter.
