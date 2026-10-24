@@ -110,6 +110,7 @@ Only what is Ben's to decide stays here (his rule of 2026-10-16): architecture, 
 
 | Date | Task | Question | Asked how |
 |---|---|---|---|
+| 2026-10-24 | Cube phase 2, section 7.4 | Which world shape ships: A the cube only, Petroff-Guyou and the Lambert world deleted (recommended); B the cube as default, Petroff-Guyou kept until phase 5; C Petroff-Guyou stays default, decide after playing a cube world. Ben said on 2026-10-04 he would make the swap himself. | Not asked yet (Ben asleep); to ask when he is back, with the page https://spacesheep.dev/@benmac/deeptime-world-choice |
 
 ## Follow-ups from decided questions
 Work left behind by questions decided under Ben's rule of 2026-10-16 (decide what can be undone, then tell; decisions log 2026-10-16). Each line is a task for whoever next touches that area; remove the line when it lands. Sizes: small is under a day, medium is one to three days, large is more.
