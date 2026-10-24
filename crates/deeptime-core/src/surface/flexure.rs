@@ -2494,46 +2494,54 @@ mod tests {
     }
 
     /// The broken plate's line load, the foreland basin's model since Jordan 1981 and
-    /// Lyon-Caen & Molnar 1983 (Turcotte & Schubert's broken plate): a load V on the end of a
-    /// semi-infinite plate bends it as w = w₀ e^(−x/α) cos(x/α), the end free of moment, with
-    /// w₀ = 2V / (ρ_m g α) = V α³ / 2D (the end's buoyancy, ρ_m g w₀ α / 2, carries V); the
+    /// Lyon-Caen & Molnar 1983 (Turcotte & Schubert's broken plate; Angevine et al. 1990 eq.
+    /// 5.8): a load V on the end of a semi-infinite plate bends it as w = w₀ e^(−x/α) cos(x/α),
+    /// the end free of moment, with w₀ = 2V / (ρ_m g α) = V α³ / 2D (the end's buoyancy,
+    /// ρ_m g w₀ α / 2, carries V; the textbooks' V α³ / 4D shares V between two broken ends); the
     /// basin's edge at πα/2, not the continuous plate's 3πα/4, and the bulge at 3πα/4 with
     /// e^(−3π/4) cos(3π/4) = −6.7 % of the depth. The variable-stiffness solve gives it on a plate
-    /// whose rigidity drops 3,375-fold at the load (the soft side holds a little of the load up
-    /// beside the break; the end's depth is checked against what the stiff plate carries).
+    /// whose rigidity drops 216,000-fold at the load: the soft side holds a little of the load up
+    /// beside the break (the end's depth is checked against what the stiff plate carries), and
+    /// the end's depth converges on the analytic one at first order in dx / α.
     // ledger: ISO-131
     #[test]
     fn a_line_load_on_a_broken_plate_gives_the_analytic_profile() {
-        let dx = 5000.0;
         let te = 30.0;
-        let (w0, zero, bulge_at, bulge, alpha, stiff) = broken_line_load(te, 2.0, dx);
+        let soft = 0.5;
         let pi = std::f64::consts::PI;
-        let analytic = 2.0 * stiff * 1.0e10 / (RHO_MANTLE * alpha);
-        assert!(stiff > 0.65 && stiff <= 1.0, "the stiff plate carries {stiff}");
+        let error = |dx: f64| {
+            let (w0, _, _, _, alpha, stiff) = broken_line_load(te, soft, dx);
+            w0 / (2.0 * stiff * 1.0e10 / (RHO_MANTLE * alpha)) - 1.0
+        };
+        let (coarse, fine) = (error(5000.0), error(2500.0));
+        assert!(fine.abs() < 0.06, "the end's depth {fine} off the analytic");
         assert!(
-            (w0 / analytic - 1.0).abs() < 0.05,
-            "{w0} against {analytic} (stiff share {stiff})"
+            (fine / coarse - 0.5).abs() < 0.1,
+            "first order: {coarse} at 5 km, {fine} at 2.5 km"
         );
+        let dx = 2500.0;
+        let (w0, zero, bulge_at, bulge, alpha, stiff) = broken_line_load(te, soft, dx);
+        assert!(stiff > 0.85 && stiff <= 1.0, "the stiff plate carries {stiff}");
         assert!(
-            (zero / (0.5 * pi * alpha) - 1.0).abs() < 0.05,
+            (zero / (0.5 * pi * alpha) - 1.0).abs() < 0.015,
             "zero crossing at {zero}, πα/2 = {}",
             0.5 * pi * alpha
         );
         assert!(
-            (bulge_at - 0.75 * pi * alpha).abs() <= 1.5 * dx,
+            (bulge_at - 0.75 * pi * alpha).abs() <= 2.0 * dx,
             "bulge at {bulge_at}, 3πα/4 = {}",
             0.75 * pi * alpha
         );
         let want = (-0.75 * pi).exp() * (0.75 * pi).cos();
         assert!(
-            (bulge / w0 - want).abs() < 0.005,
+            (bulge / w0 - want).abs() < 0.002,
             "bulge height {} of the depth against {want}",
             bulge / w0
         );
         // Against the continuous plate under the same load: narrower and much deeper.
         let (c0, czero, ..) = line_load(te, G, dx);
         assert!(
-            w0 > 1.8 * c0 && zero < 0.75 * czero,
+            w0 > 3.0 * c0 && zero < 0.7 * czero,
             "{w0} {c0} {zero} {czero}"
         );
     }
