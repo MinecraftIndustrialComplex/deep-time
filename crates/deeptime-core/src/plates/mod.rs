@@ -518,6 +518,10 @@ impl PlatesStage {
                 subduction::FRONT_G_CONTINENTAL_NORMAL_GLOBAL,
                 pull.front_g_continental_km_myr[1],
             ),
+            (
+                subduction::ARC_FRONT_STRAIGHT_GLOBAL,
+                pull.front_straight_km_myr,
+            ),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
