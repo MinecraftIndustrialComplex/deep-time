@@ -32,6 +32,10 @@
 //! mask — no young-peak sharpening, no rounding — and soft gullies (`youth_keep`; Ben,
 //! 2026-09-30, "Smooth young, rugged old"), so cones stay clean and shields domed; it returns on
 //! the crater's clock as a dead volcano erodes.
+//!
+//! Every distance from a vent is the planet's (`sphere::Around`, ledger SCL-230), so a cone, its
+//! crater and a caldera's rim are round on the planet, and so in the world, at every latitude (a
+//! circle in Lambert blocks until 2026-10-23, which the world drew 3× long north–south at 55°).
 
 use deeptime_format::GridDesc;
 
@@ -39,6 +43,7 @@ use super::resample::Level;
 use super::tiles::{TileOut, TileSink};
 use crate::error::CoreError;
 use crate::params::PlanetPreset;
+use crate::sphere::{Around, BlockFrame};
 use crate::surface::volcanoes::shape::{self, Radial};
 use crate::surface::volcanoes::{self as vol, VolcanoState};
 use crate::world::WorldState;
@@ -48,6 +53,12 @@ use crate::world::WorldState;
 struct Item {
     x: f64,
     z: f64,
+    /// The planet's metric about the vent, and the Lambert box the last grid's change reaches
+    /// (half-width in x, z range; blocks).
+    sphere: Around,
+    hw: f64,
+    z0: f64,
+    z1: f64,
     radius_m: f64,
     /// Metres at ρ, for the young grid (before erosion): the cone put in (`tp`) and the young
     /// landscape's coarse bump of it taken out (`rem`) …
@@ -89,7 +100,7 @@ impl Shaper {
         let dx2 = f64::from(p.resolution.l2_r) * mh;
         let fade = st.fade_myr.max(1e-3);
         let young = world.fields.get(crate::surface::young::field::ELEVATION_M);
-        let frame = crate::sphere::BlockFrame::new(p.scale.circumference_blocks);
+        let frame = BlockFrame::new(p.scale.circumference_blocks);
         let items = st
             .volcanoes
             .iter()
@@ -105,6 +116,12 @@ impl Shaper {
                 let s = v.shape();
                 let body = |r: f64| s.body(r);
                 let r = v.radius_m;
+                let sphere = Around::new(frame, mh, v.x, v.z);
+                // The point `d_m` from the vent on bearing `th` (from east toward south).
+                let ring = |d_m: f64, th: f64| {
+                    let (bx, bz) = sphere.block_at(d_m * th.cos(), d_m * th.sin());
+                    (frame.wrap_x(bx), bz)
+                };
                 // The bump the young landscape holds of it: the body blurred by the deep-time
                 // grid (cell-averaged rendering, bilinear advection, the interpolation to L2:
                 // about a tent 1.5 L1 cells wide), and its measured relief there.
@@ -113,15 +130,15 @@ impl Shaper {
                 let expected = a * e0;
                 let top = young.map(|f| sample(f, v.x, v.z));
                 let held = young.zip(top).map_or(expected, |(f, top)| {
-                    let rr = 1.1 * r / mh;
-                    let ring: f64 = (0..24)
+                    let around: f64 = (0..24)
                         .map(|k| {
                             let th = std::f64::consts::TAU * f64::from(k) / 24.0;
-                            sample(f, frame.wrap_x(v.x + rr * th.cos()), v.z + rr * th.sin())
+                            let (bx, bz) = ring(1.1 * r, th);
+                            sample(f, bx, bz)
                         })
                         .sum::<f64>()
                         / 24.0;
-                    top - ring
+                    top - around
                 });
                 let removed = held.clamp(0.0, expected);
                 // The ground the vent stands on: the young landscape there less the bump it holds
@@ -151,8 +168,8 @@ impl Shaper {
                     let mut sum = 0.0;
                     for k in 0..32 {
                         let th = std::f64::consts::TAU * f64::from(k) / 32.0;
-                        let bx = frame.wrap_x(v.x + rim_m * th.cos() / mh);
-                        let z = sample(f, bx, v.z + rim_m * th.sin() / mh);
+                        let (bx, bz) = ring(rim_m, th);
+                        let z = sample(f, bx, bz);
                         sum += onlap(z, d.rho, tp.at(d.rho), rem.at(d.rho), at, vent_ground);
                     }
                     let rim = sum / 32.0;
@@ -164,9 +181,14 @@ impl Shaper {
                         2.3 * h + 1.0,
                     ))
                 });
+                let (hw, z0, z1) = sphere.bounds(l3.reach().max(1.2) * r);
                 Item {
                     x: v.x,
                     z: v.z,
+                    sphere,
+                    hw,
+                    z0,
+                    z1,
                     radius_m: r,
                     tp,
                     rem,
@@ -275,12 +297,9 @@ impl Shaper {
     /// The last-grid change at block (bx, bz) of a cell of terrain `z` (m): the volcanoes' sharp
     /// summits and depressions, then the flood-basalt steps.
     fn fine_at(&self, near: &[&Item], bx: f64, bz: f64, z: f32) -> f32 {
-        let frame = crate::sphere::BlockFrame::new(self.circumference);
         let mut out = f64::from(z);
         for it in near {
-            let dx = frame.wrap_x(bx - it.x) * self.mh;
-            let dz = (bz - it.z) * self.mh;
-            let rho = dx.hypot(dz) / it.radius_m;
+            let rho = it.sphere.distance_m(bx, bz) / it.radius_m;
             out += it.l3.at(rho);
         }
         // Calderas: a flat floor inside a slightly irregular, steep-walled rim (only ever lowers).
@@ -288,11 +307,10 @@ impl Shaper {
             let Some((rc, floor, p2, p3)) = it.caldera else {
                 continue;
             };
-            let dx = frame.wrap_x(bx - it.x) * self.mh;
-            let dz = (bz - it.z) * self.mh;
-            let th = dz.atan2(dx);
+            let (de, ds) = it.sphere.offset(bx, bz);
+            let th = ds.atan2(de);
             let rim = rc * (1.0 + 0.1 * (2.0 * th + p2).sin() + 0.05 * (3.0 * th + p3).sin()); // ledger: VOL-066
-            let x = dx.hypot(dz) / it.radius_m / rim;
+            let x = de.hypot(ds) / it.radius_m / rim;
             if x < 1.0 {
                 let inside = 1.0 - smooth(0.78, 1.0, x); // ledger: VOL-066
                 out = out.min(out + (floor - out) * inside);
@@ -325,15 +343,11 @@ impl Shaper {
 
     /// The items whose reach overlaps the block rectangle [x0, x1] × [z0, z1] (x wraps).
     fn near(&self, x0: f64, x1: f64, z0: f64, z1: f64) -> Vec<&Item> {
-        let frame = crate::sphere::BlockFrame::new(self.circumference);
+        let frame = BlockFrame::new(self.circumference);
         let (cx, hw) = (0.5 * (x0 + x1), 0.5 * (x1 - x0));
-        let (cz, hh) = (0.5 * (z0 + z1), 0.5 * (z1 - z0));
         self.items
             .iter()
-            .filter(|it| {
-                let reach = it.l3.reach().max(1.2) * it.radius_m / self.mh;
-                frame.wrap_x(it.x - cx).abs() <= hw + reach && (it.z - cz).abs() <= hh + reach
-            })
+            .filter(|it| frame.wrap_x(it.x - cx).abs() <= hw + it.hw && it.z0 <= z1 && it.z1 >= z0)
             .collect()
     }
 
@@ -587,6 +601,40 @@ mod tests {
             "crater floor {centre} not below the rim {rim}"
         );
         assert!(rim > 0.0, "the sharp summit adds height");
+    }
+
+    #[test]
+    fn a_cone_is_round_on_the_planet_at_high_latitude() {
+        // At 30°, 55° and 70° N the last grid's change (the sharp summit and the crater) is the
+        // same at a given distance from the vent on every bearing (SCL-230), and the box that
+        // finds the volcanoes near a tile holds its whole reach east and north alike.
+        let frame = BlockFrame::new(16_384);
+        for lat in [30.0f64, 55.0, 70.0] {
+            let (world, preset) = world_with(vec![strato(0.0, frame.z_of_lat(lat), None)]);
+            let sh = Shaper::from_world(&world, &preset).unwrap();
+            let it = &sh.items[0];
+            let near: Vec<&Item> = sh.items.iter().collect();
+            for d in [300.0, 2_000.0, 6_000.0, 12_000.0] {
+                let v: Vec<f32> = (0..8)
+                    .map(|k| {
+                        let th = std::f64::consts::TAU * f64::from(k) / 8.0;
+                        let (bx, bz) = it.sphere.block_at(d * th.cos(), d * th.sin());
+                        sh.fine_at(&near, frame.wrap_x(bx), bz, 0.0)
+                    })
+                    .collect();
+                let lo = v.iter().copied().fold(f32::MAX, f32::min);
+                let hi = v.iter().copied().fold(f32::MIN, f32::max);
+                assert!(hi - lo < 1e-3 * hi.abs().max(1.0), "{lat}° at {d} m: {v:?}");
+                if d == 300.0 {
+                    assert!(lo < -1.0, "{lat}°: the crater at the vent: {v:?}");
+                }
+            }
+            let reach = it.l3.reach().max(1.2) * it.radius_m;
+            for (e, s) in [(reach, 0.0), (0.0, -reach), (-reach, 0.0), (0.0, reach)] {
+                let (bx, bz) = it.sphere.block_at(0.999 * e, 0.999 * s);
+                assert_eq!(sh.near(bx, bx, bz, bz).len(), 1, "{lat}°: {e} {s}");
+            }
+        }
     }
 
     #[test]

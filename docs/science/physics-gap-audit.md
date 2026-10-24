@@ -338,6 +338,34 @@ what a player meets most.
   97 % of its cells (67 % in stage 1; HYD-146), no plain column carries an ocean biome (752 did;
   BIO-185), and the 8 plains counted as having no path are fronts the main stem already holds
   (HYD-147, not changed). Floodplains and levees, meanders, fans and braids remain.
+- **State (2026-10-24).** Stage 2 of 4 is built on branch worktree-agent-a9e4e25c4744d5a75, on by
+  default (`hydro.floodplains`), not merged: GFPLAIN's floodplains (h = 0.01 A^0.30 m over the drain,
+  HYD-150) laid flat at the river's bank, one block over its water (HYD-151, HYD-152), and the
+  levee's sand on the bank columns on a plain (HYD-153). On the D5 bake the plain is 167,243 km²,
+  7.2 % of the land (6.5 % within 60°), against GFPLAIN's 11.5 % and Lane et al.'s 19.7 % on Earth
+  (reported, not aimed at); beside a channel, 93 % of the plain now stands one block over the water
+  (42 % before), 54.6 % of it beyond the bank zone (rivers-and-lakes.md, "Floodplains and levees").
+  Meanders, fans and braids remain.
+- **State (2026-10-24, later).** Stage 3 of 4 is built on the same branch, on by default
+  (`hydro.meanders`), not merged: a reach on the floodplain gentler than Leopold & Wolman's braided
+  line (HYD-158) is redrawn as Langbein & Leopold's sine-generated curve, its wavelength 10.9 drawn
+  widths (HYD-155 to HYD-157), its amplitude what the plain's room allows up to sinuosity 2
+  (HYD-159), measured on the planet. On the D5 bake 6,762 km of the 39,298 km of plain course
+  meander (196 chains), at a reach sinuosity of 1.57 (Earth's meandering rivers: 1.1 to 2.0), the
+  wavelength within 4 % of 10.9 widths at every latitude; no river of 1,000 m³/s or more meanders
+  (its belt does not fit between the plain's edges and its tributaries; an open question). The
+  whole network's sinuosity goes from 1.0 to 1.04 (rivers-and-lakes.md, "Meanders"). Fans and
+  braids remain.
+- **State (2026-10-24, latest).** Stage 4 of 4 is built on the same branch, on by default
+  (`hydro.fans`, `hydro.braids`), not merged: where a river's surface falls faster than Bull's fan
+  slope above a cell and slower below it, a cone of Bull's area and slope for its drainage
+  (HYD-165 to HYD-170) is laid, round on the planet, and the hollows the cones close are filled to
+  their spill (HYD-177); a reach on a fan, or on the plain and steeper than Leopold & Wolman's
+  braided line, divides around islands 5 widths long on alternate sides (HYD-171 to HYD-175). On
+  the D5 bake 818 fans cover 206,323 km² (8.9 % of the land), the median fan 0.82 of Bull's area
+  (517 hemmed in, none larger), and 2,048 km braid (2,028 km on fans); the lakes change by
+  +212 km² and fewer rivers end in water under a block deep (35 against 53). Every stage of gap 5
+  is built (rivers-and-lakes.md, "Fans and braids").
 
 ### Gap 6: flexural foreland basins
 

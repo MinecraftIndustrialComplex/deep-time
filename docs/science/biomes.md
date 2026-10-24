@@ -6,7 +6,7 @@ fixed. The band edges of Minecraft's biome builder were read in its source. The 
 biome is a game choice throughout and is labelled so. The climate that feeds the classifier (monthly
 temperature and rain) is being rewritten and is not checked here.
 
-Ledger ids on this page: `BIO-001` to `BIO-137`, `BIO-170` to `BIO-174` ("The land call on the world's ground", 2026-10-21), `BIO-180` and `BIO-181` ("The snow line", 2026-10-22) `BIO-182` (the volcanic zones on a Petroff-Guyou world, 2026-10-22) and `BIO-187` ("The biome inputs on the world's ground", 2026-10-24) (see [ledger/BIO.md](ledger/BIO.md)); the same section's `BAK-057` to `BAK-059` are in [ledger/BAK.md](ledger/BAK.md) and `HYD-106` to `HYD-109` in [ledger/HYD.md](ledger/HYD.md) (rivers-and-lakes.md "The sea's one rule").
+Ledger ids on this page: `BIO-001` to `BIO-137`, `BIO-170` to `BIO-174` ("The land call on the world's ground", 2026-10-21), `BIO-180` and `BIO-181` ("The snow line", 2026-10-22) `BIO-182` (the volcanic zones on a Petroff-Guyou world, 2026-10-22) and `BIO-187` ("The biome inputs on the world's ground", 2026-10-24) and `BIO-189` ("The peatland share on the cold wetland the rules decide", 2026-10-24) (see [ledger/BIO.md](ledger/BIO.md)); the same section's `BAK-057` to `BAK-059` are in [ledger/BAK.md](ledger/BAK.md) and `HYD-106` to `HYD-109` in [ledger/HYD.md](ledger/HYD.md) (rivers-and-lakes.md "The sea's one rule").
 
 ## What you see in the world
 
@@ -320,10 +320,12 @@ game choices but the vanilla depth band of BIO-112):
   Plenty puts its volcanic plains in vanilla's mushroom-fields slot (land surrounded by deep sea), and the
   next-nearest biome of its region there is the lukewarm ocean; with TerraBlender such a slot takes the
   vanilla region's biome instead (measured below).
-- **Put in.** Zones are circles in the simulation's frame around the active volcanoes of the baked list, their
-  craters and calderas, their hot-spring pools and their magma (FORMAT.md, "Volcanic biomes"): discs on a Lambert
-  world, and on a Petroff-Guyou world the ellipse the projection makes of each circle at the vent (BIO-182, since
-  2026-10-22; the hot-spring fields and thermal caves stay discs). In priority order:
+- **Put in.** Zones are circles on the planet around the active volcanoes of the baked list, their craters and
+  calderas, their hot-spring pools and their magma (FORMAT.md, "Volcanic biomes"), each drawn as the ellipse the
+  world's projection makes of its circle at the vent (BIO-182, since 2026-10-22; the circle on the planet since
+  2026-10-23, SCL-230): a disc on the conformal cube world, the map's own stretch on the equal-area Petroff-Guyou
+  world (1.78 to 1 at the median), wide east-west on a Lambert world. The hot-spring fields and thermal caves stay
+  discs. In priority order:
 
 | Role | Shipped tag order (first the pack has) | Where |
 |---|---|---|
@@ -410,6 +412,16 @@ A zone's area changes by the projection's areal scale at its vent (the cones by 
 more (by half) because each axis is held to at least 8 blocks and given the 4-block margin; five ash fields fall
 out as rings under 8 blocks wide along an axis.
 The hot-spring fields and thermal caves are unchanged (discs: the terrain draws no cone there).
+
+**Since 2026-10-23 the circle is the planet's** (SCL-230, [round-features.md](round-features.md)). The volcano stage
+and the amplifier now draw a cone round on the planet, as the ellipse the Lambert grid makes of a circle, so the
+zones take the stretch from world blocks to the planet's tangent plane at the vent (east and south, the azimuthal
+equidistant frame) instead of to Lambert's blocks. On the conformal cube world that stretch is the same on both
+axes up to the curvature over a block, so the zones are discs scaled by the projection's local scale; on the
+equal-area Petroff-Guyou world they are the map's own ellipse at the vent (1.4 to 2.7 to 1, where the old Lambert
+circle reached 8 to 1 at 55° and 22 to 1 at 70°); on a Lambert world (a test layout) they are ellipses wide
+east-west by 1/cos of the latitude and narrow north-south by cos. The census above was taken before this change; it
+has not been retaken.
 
 ## Expanded Ecosphere and the biome rules
 
@@ -1198,6 +1210,44 @@ as the projection pass's footprint does on a Petroff-Guyou world. The bake still
 frame. The projection pass that follows resamples the layers and settles land and sea on the world's own nodes
 (BIO-170 to BIO-172).
 
+## The peatland share on the cold wetland the rules decide (2026-10-24, BIO-189)
+
+The GameTest `expandedEcosphereBiomesFollowTheirRules` asks that cold wetland take a peatland biome where the pack
+has one (BIO-129): at least 0.9 of the cold-wetland columns, once the test planet has 20 of them (BIO-130). Before
+2026-10-24 the 4k test planet never had 20, so the share was logged and not asserted. BIO-187 moved the wetland
+flag onto the world's ground, and the planet of master 7d16c5a7 had 29 at the census's step 6 (its parent 0f29c66f,
+the same simulation on the young ground, had 0). Of the 29, 7 were on a peatland, and the test failed. The
+census's decisions say why:
+
+| Cold-wetland columns | Decided by | Biome | Where |
+|---|---|---|---|
+| 13 | the icy volcano's role rule (cone zone) | icy volcano | oceanic shield 228's coastal flat |
+| 5 | the black beach rule (`"volcanic": true`) | black beach | shield 228's cone zone and lava field |
+| 2 | the black beach rule | black beach | shield 96's lava field |
+| 2 | the climate search (no rule ran) | sand dunes | the waterline, the quart's centre under the sea |
+| 7 | the peatland rule | fen | boreal lowland |
+
+The share counted two kinds of columns the peatland rule never decides. The first is the zones. The first role whose
+zone holds a column wins (BIO-113, Ben's decision 2026-10-03, "Tie them to real volcanoes"), the role rules are tried
+before the ordinary ones, and the files are tried in the order of their ids, so Expanded Ecosphere's black beach comes
+before the peatland rule. Shield 228 (vent at x -531, z 536 on the test planet) is an oceanic shield whose island
+stands 10.8 blocks above the sea at the vent. Its record's basal radius is 70.2 km (220 blocks), so its cone zone
+(BIO-106: 0.45 of that) reaches 99 blocks, past its coast about 96 blocks to the north and 112 to the east and west.
+The cold wetland there is the island's flat coastal ground, 0 to 4 blocks above the sea. The second kind is the
+waterline. The query reads its column's facts at the centre of its quart (block `4q + 2`) and runs the ordinary
+rules only where the ground there is land. The census tested land at its own block, so a dry block whose quart's
+centre lies under the sea (by 0.08 and 0.14 blocks on the two dune columns) counted as cold wetland the rules failed.
+
+So the fault was the test's, not the world's. The census now reads the flag, the surface and the land test where the
+query reads them, at the quart's centre (`VolcanicBiomes.queryBlock`, `rulesAt`, `onLand`, shared with the query).
+It counts the cold-wetland columns a volcano's zone decided apart, as `cold_wetland_volcanic` with their decisions,
+and the test logs that count beside the share. The two bounds (BIO-130) are unchanged. On the 7d16c5a7 planet 7
+columns are left, all on a fen. That is under 20, so the share is logged, not asserted.
+
+A world finding stays open (see "Open questions"): an oceanic shield's cone zone is sized on its record's basal
+radius, measured on the sea floor, so it can cover the whole island down to its coast. Cone zones held 1,722 of the
+planet's 7,504 land columns (23 %).
+
 ## The snow line (2026-10-22, BIO-180, BIO-181)
 
 **What was wrong.** A temperate mountain carried snow in its own mild climate: frozen peaks, jagged peaks or snowy
@@ -1364,7 +1414,9 @@ pack's own share and not an area ("Ice spikes and the rare variants"). The snow 
 lines, its two tags and the choice of a game-side rule) and the volcanic zones drawn as ellipses on a Petroff-Guyou
 world (BIO-182) are the coordinator's calls (2026-10-22, after Ben's report on volcano 27476). The ice cover taken
 off the world's sea (BIO-177) and the wetland kept off a playa and its rim (BIO-178) are the coordinator's calls
-(2026-10-23, the gate on master 57558f0a); BIO-178's margin is the agent's.
+(2026-10-23, the gate on master 57558f0a); BIO-178's margin is the agent's. What the peatland share counts (BIO-189:
+the cold wetland the ordinary rules decide, at the quart's centre, the volcanic zones' columns apart) is the
+coordinator's call (2026-10-24, the -PwithEe gate on master 7d16c5a7).
 
 ## Open questions
 
@@ -1391,6 +1443,11 @@ off the world's sea (BIO-177) and the wetland kept off a playa and its rim (BIO-
   thick enough to rest on the sea floor (up to 10 blocks of cover over about 50 m of water on the 2026-10-23 gate
   planet). Drawing it needs the ice pass to build ice up from a sea floor under the sea's water: a game-side feature,
   not taken.
+- An oceanic shield's volcanic zones are sized on its record's basal radius (BIO-106), measured on the sea floor, not
+  on the island the world draws above the sea. On the 2026-10-24 test planet shield 228's cone zone (99 blocks)
+  covers its whole island, coastal flat included, and cone zones hold 23 % of the land ("The peatland share on the
+  cold wetland the rules decide"). Sizing the zones on the world's ground (the subaerial radius) would leave the coast
+  to the climate's own biome; a change to the volcanic biomes' design, not taken.
 - The Holdridge biotemperature upper cut-off at 30 °C (HYD-030) is missing from the hydrology code.
   Confirmed in Holdridge's text (see the sources) and left to the rivers and lakes package, which
   owns that row.

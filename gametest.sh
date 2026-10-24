@@ -101,6 +101,14 @@ dev cargo run --release -q -p deeptime-cli -- synth --kind river-test --size 102
 # with a river and two distributaries leaving it at the apex (DeltaGameTests).
 dev cargo run --release -q -p deeptime-cli -- synth --kind delta-test --size 1024 --out "$RUN"/world/deeptime-delta \
     || { echo "FAILED: deeptime synth delta-test"; exit 1; }
+# World data for the test_meander level (V1 gap 5, HYD-155 to HYD-159): a straight river on a floodplain,
+# meandered as the bake meanders it (MeanderGameTests).
+dev cargo run --release -q -p deeptime-cli -- synth --kind meander-test --size 1024 --out "$RUN"/world/deeptime-meander \
+    || { echo "FAILED: deeptime synth meander-test"; exit 1; }
+# World data for the test_fan level (V1 gap 5, HYD-165 to HYD-175): a river leaving a range down an alluvial
+# fan, braided on it as the bake braids it (FanGameTests).
+dev cargo run --release -q -p deeptime-cli -- synth --kind fan-test --size 2048 --out "$RUN"/world/deeptime-fan \
+    || { echo "FAILED: deeptime synth fan-test"; exit 1; }
 
 # The set's jars, copied for this run (an install.sh refreshing smoke/<set> meanwhile cannot change
 # them), and this job's voice-chat port (Simple Voice Chat binds one even in a GameTest server).

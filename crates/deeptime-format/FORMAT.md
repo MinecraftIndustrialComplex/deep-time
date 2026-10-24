@@ -125,6 +125,8 @@ format versions live together for a while:
   rivers/rivers.dtrv            optional: the river network (P1-22, "Rivers")
   rasters/detail/amplitude.dtr  L3, u8, 1/16 block: amplitude of the sub-cell detail term (P1-06)
   rasters/delta.dtr             L3, i16, 1/16 block: what the delta plains added to elevation ("Rivers", deltas)
+  rasters/floodplain.dtr        L3, i16, 1/16 block, nodata −32768: what the floodplains moved elevation by ("Rivers", floodplains)
+  rasters/fan.dtr               L3, i16, 1/16 block: what the alluvial fans added to elevation ("Rivers", fans)
   rasters/climate/<name>.dtr    L2, i16, vanilla parameter × 10,000
                                 (<name> ∈ temperature, vegetation, continents, erosion, ridges)
   rasters/climate/t_mean_c.dtr  L1, i16, 0.01 °C            ┐
@@ -233,6 +235,8 @@ own scale. The layers (grids from `resolution`: L1 = C / `l1_r` wide, L2 = C / `
 | `water_level` | L3 (L3h: L3 averaged 2 × 2 when L3 has more than 40 M cells, 32k full) | i16 | 1/16, block | −32768 | each lake's cells hold its surface, nodata elsewhere (P1-22, "Rivers"): its basin's rim when the lake is full, the level of its water balance, below the rim, when it is not (2026-10-01; a reader does not tell them apart); all nodata when `hydro.enabled` is false |
 | `playa` | as `water_level` | u8 | 1, block | — | blocks of salt on a playa's floor, 0 elsewhere ("Playas"); absent when `hydro.enabled` is false |
 | `closed_basin` | as `water_level` | u8 | 1, flag | - | 1 where no sea stands on ground below sea level: a closed basin the open sea does not reach, with an 8-block halo ("Rivers", "Water columns" step 3; HYD-100, HYD-102), 0 elsewhere; absent when `hydro.enabled` is false (the sea then stands on all ground below sea level) |
+| `floodplain` | L3 (the `elevation` grid) | i16 | 1/16, block | −32768 | what laying the floodplains moved `elevation` by on each plain cell, nodata off the plains ("Rivers", floodplains; HYD-150 to HYD-152; added 2026-10-24); the game reads it as a category, on a plain or not (the levee, HYD-153), and the projection pass takes the nearest cell; absent without `hydro.floodplains` |
+| `fan` | L3 (the `elevation` grid) | i16 | 1/16, block | — | what the alluvial fans added to `elevation` on each fan cell, 0 off the fans ("Rivers", fans; HYD-165 to HYD-170; added 2026-10-24); a re-run of the water bake takes it off first; the game does not read it, and the projection pass resamples it as a number (bilinear); absent without `hydro.fans` or with no fan |
 | `strata/horizons` | L1 | horizon_stack | 1/16 | — | P1-07's stacks with key spans, smoothed ("The 0.2 bake"), the first top raised ("The P1-08 bake") |
 | `strata/lift` | L1 (the grid of `strata/horizons`) | i16 | 1/16, blocks | none | how far every horizon of the cell's stack rose after the history (the bake's whole-stack lift, ledger STR-052; ≥ 0), which the structure file's heights do not include: the deformed column rule adds it ("Structural events", "The lift"; added 2026-10-20). A companion of the stacks: the projection pass takes the nearest cell, as it does theirs |
 | `climate/t_mean_c` | L1 | i16 | 0.01, degC | — | mean annual temperature |
@@ -285,9 +289,9 @@ baked and gets a Lambert layout block.
   blocks, so its polar terrain has the grid's shape (long north–south, thin east–west on the
   planet), which an isotropic footprint only shortens. Categories (`climate/koppen`,
   `climate/koppen_l2`, `climate/wetland`, `surface/class_top`, `meta/plate_id`, `meta/crust_type`,
-  `meta/province`, `delta`, and any layer whose `units` is `flag`), horizon stacks and any footprint touching no-data take the
+  `meta/province`, `delta`, `floodplain`, and any layer whose `units` is `flag`), horizon stacks and any footprint touching no-data take the
   nearest cell (`climate/koppen_l2` only since 2026-10-18: averaged as a number, a class border named
-  a class neither side had; `delta` since 2026-10-23, HYD-146). A world cell whose nearest cell is
+  a class neither side had; `delta` since 2026-10-23, HYD-146; `floodplain` since 2026-10-24, HYD-152). A world cell whose nearest cell is
   on a delta plain (`delta` above 0) also takes that cell's `elevation` and `detail/amplitude`: the
   plain stands at most a block over the sea, and a mean or a bilinear read blended its edge with the
   sea beside it and took it under the sea (HYD-146). The
@@ -348,7 +352,8 @@ baked and gets a Lambert layout block.
   crossing a turning edge is split there, the parts before the edge ending as at the sea, and
   confluences re-pointed; the index rebuilt in the world's frame), structural events (the window's
   centre through the projection, its axes, sizes, a fold's wavelength and a fault's slip and plane
-  through the local Jacobian), bodies (centre, horizontal axes and yaw through the Jacobian, and
+  through the local Jacobian; an intrusion's window the exact image of its ellipse, ledger SCL-236),
+  bodies (centre, and the exact image of the horizontal ellipse under the Jacobian, SCL-130 and SCL-236, and
   moved up or down by the change of the drawn terrain height between their old and new column, so a
   crater's lens stays under the drawn floor), sites (centre; box from their bodies; the index in the
   world's frame), `volcanoes/active.json`, `volcanoes/standing.json` and `impacts/craters.json` (`x`, `z`), and
@@ -1727,9 +1732,61 @@ front), its `detail/amplitude` is 0, and the raster **`delta`** (i16, 1/16 block
 `elevation` grid; 0 off the plains) holds what the plain added, which a re-run of the water bake
 takes off first. The second run drains the raised ground, and its main stem across each plain
 splits at the apex (where the main stem comes onto the plain, HYD-137) into distributaries (`from`).
+**Floodplains** (since "hyd-150", 2026-10-24; rivers-and-lakes.md "Floodplains and levees", HYD-150 to
+HYD-153): the second run also finds GFPLAIN's floodplains, the land cells (no lake, sea, delta plain or
+dry basin floor) whose filled height lies at most h = 0.01 A^0.30 m (A in m², the area draining to the
+cell's drain, its first river cell downstream) over their drain's, and the bake lays each at its
+drain's bank level, the drain's filled height but at least one block over its water; `detail/amplitude`
+is 0 there, and the raster **`floodplain`** (i16, 1/16 block, on the `elevation` grid; nodata −32768
+off the plains) holds what the plain moved the ground by, which a re-run takes off first. The game
+reads it as a category (on a plain or not): a river's bank column on a plain gets sand for its soil
+top (the levee, HYD-153).
+**Meanders** (since "hyd-155", 2026-10-24; rivers-and-lakes.md "Meanders", HYD-155 to HYD-159): after
+the floodplains, each reach of a chain that lies on a plain, is gentler than Leopold & Wolman's (1957)
+braided line and has room is redrawn as a sine-generated curve about its course (wavelength 10.9 drawn
+widths, sinuosity up to 2, measured on the planet through the Lambert metric). Nothing in the layout
+changes: the chains keep their order and get more vertices (spaced a 40th of the wavelength, 1 to 6
+blocks), the water surface along a redrawn reach is the old course's at the same distance down the
+valley, a tributary whose parent moved ends on a vertex of the parent's new channel, and
+distributaries are left as they were.
+**Fans** (since "hyd-165", 2026-10-24; rivers-and-lakes.md "Fans and braids", HYD-165 to HYD-170,
+HYD-177):
+the first network's chains are searched for apexes, cells where the river's surface falls at least
+Bull's (1964) fan slope S_F = 0.022 A_D^−0.32 over the fan's free length upstream and less than it
+downstream; at each, a cone of that slope (measured on the planet) is laid where it stands over
+the ground and the land is no lake, playa, delta plain or larger river's channel (and nowhere
+thicker than over the apex), high enough to
+cover Bull's area A_F = 1.3 A_D^0.88 (square miles) and at most as high as a free fan (a quarter
+circle of that area); a cell whose spill level (from the open sea and the grid's end rows) the
+fans raised over its ground, on a fan or behind one, is filled to it unless the first network had a
+lake or playa there (HYD-177), and on L3 a filled cell's cells stand at the spill. `detail/amplitude` is 0 there, and the raster **`fan`** (i16, 1/16 block, on
+the `elevation` grid; 0 off the fans) holds what the cones and the fill added, which a re-run takes
+off first.
+The second network run (which then runs when there are fans and no delta plain too) drains down
+the cones; no floodplain is laid on a fan.
+**Braids** (since "hyd-165", 2026-10-24; rivers-and-lakes.md "Fans and braids", HYD-171 to
+HYD-175): after the meanders, a reach on a fan, or on a plain and steeper than Leopold & Wolman's
+braided line, divides around islands 5 channel widths long, on alternate sides. Nothing in the
+layout changes: the course stays one chain, narrowed (0.9 of its width) and shallowed (0.75 of its
+depth) around each island and carrying half the flow there; each island's other thread is a chain
+of its own appended after the old chains, with `from` and `into` both the course's chain and mouth
+`River`, its first and last vertices copies of two of the course's vertices, and its water surface
+the course's at the same distance down it, lowered on a fan by as much as the cone under the thread
+lies below the cone under the course, and never rising.
 `notes.bake.water.params` holds the parameters (`deltas`, `delta_area_mult`, `delta_shape_k`,
-`delta_max_mouths`, `delta_mouth_spacing`) and `stats.deltas` the counts, areas, the largest deltas
-and Earth's figures beside them. `notes.bake.water`: `enabled`, `method`, `params`,
+`delta_max_mouths`, `delta_mouth_spacing`, `floodplains`, `meanders`, `fans`, `braids`), `stats.deltas` the counts, areas, the largest deltas
+and Earth's figures beside them, `stats.floodplains` the plain's cells, km² and share of the land
+(within 60° too), the same by the area its river drains, how far it moved the ground and each cell's
+top block, the heights above the drains and the cells left out, and `stats.meanders` the network's
+length before and after (km of planet), the course on a plain, too steep, too narrow or too short,
+the reaches redrawn, their axis and path length and sinuosity (with a histogram), the mean amplitude
+and largest offset, the same by discharge class, the vertex counts and the joins cut, carried or moved,
+`stats.fans` the fans, the candidates and those too thin or hemmed in, their cells, km², share of the
+land and volume, their area over Bull's, thickness, area, drainage area and slope (percentiles), the
+fans past Bull's range of drainage areas, and `laid` (the L3 cells raised, the largest raise, the
+amplitude cells zeroed, the horizon stacks' cells raised and their largest raise), and `stats.braids` the threads added, islands and islands with no room, the
+network's km, the km on fans, steep on a plain, too narrow, braided and braided on fans, the same
+by discharge class, and the milliseconds. `notes.bake.water`: `enabled`, `method`, `params`,
 `width_scale`, `grid`, `halved`, `climate`, `seasons`, `rivers_file`, `rivers_bytes`, `stats`
 (counts, lengths, largest discharge and width, milliseconds per step; since "p1-22b" also
 `lake_share_of_land`, `basins` (candidates, full, below_rim, playa, dry, merged, nested_too_deep),
@@ -1742,7 +1799,7 @@ since "hyd-100" also `below_sea`: `open_km2` (ground at or under sea level the s
 `closed_km2`, `closed_share_of_land`, the closed ground's `lake_km2`, `playa_km2`, `dry_km2` and
 `dry_share_of_land`, `lakes_below_sea_level` and their km², and `closed_basin_radius_cells`).
 `method` is "p1-22" in a folder baked before the water balance, "p1-22b" since, "hyd-100" since
-format 0.6 and "hyd-130" since the deltas; the game does not read it. `notes.bake.water.closed_basin` is `{layer, reach_blocks}`.
+format 0.6, "hyd-130" since the deltas, "hyd-150" since the floodplains, "hyd-155" since the meanders and "hyd-165" since the fans and braids; the game does not read it. `notes.bake.water.closed_basin` is `{layer, reach_blocks}`.
 
 ## Water columns (P1-22)
 
@@ -2095,9 +2152,12 @@ TerraBlender, `compat.terrablender.RegionBiomeSourceMixin`).
   touched.
 - **Roles**, in priority order, each a disc in blocks around its centre (R the basal radius
   `radius_m` / `m_per_block_h`, at least 6; r = `volcanic_biome_reach`); no disc is under 8 blocks in radius.
-  On a Petroff-Guyou world a volcano's crater, caldera, cone and field zones are instead the ellipse the
-  projection makes of that circle in the simulation's frame at the vent (semi-axes from the projection's
-  Jacobian there, each at least 8 blocks; ledger BIO-182); hot-spring fields and thermal caves stay discs:
+  On a projected world a volcano's crater, caldera, cone and field zones are instead the ellipse the
+  projection makes of that circle on the planet at the vent (since 2026-10-23, SCL-230; the simulation's
+  Lambert frame before), semi-axes from the projection's Jacobian there, each at least 8 blocks (ledger
+  BIO-182): discs on the conformal cube, the map's own stretch on Petroff–Guyou, wide east-west on a
+  Lambert world; hot-spring fields and
+  thermal caves stay discs:
   `hot_spring_field` (every hot-spring pool, from a volcano or hot ground: its reach + 4),
   `caldera` (a crater with `caldera: true`: 0.9 of its rim radius), `crater` (any other crater: its rim
   radius + 4), `cone` (stratovolcanoes and shields: 0.45 R · r), `ash_field` (stratovolcanoes and caldera
