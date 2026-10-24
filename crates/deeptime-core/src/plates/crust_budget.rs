@@ -114,7 +114,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 50] = [
+const GLOBALS: [(&str, &str); 51] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -180,6 +180,7 @@ const GLOBALS: [(&str, &str); 50] = [
     ("rate_capped", super::rate::CAPPED_GLOBAL),
     ("accreted_visible", super::ridges::ACCRETED_VISIBLE_GLOBAL),
     ("cone_mafic", super::CONE_MAFIC_GLOBAL),
+    ("slab", super::ridges::SLAB_GLOBAL),
 ];
 
 /// Earth's radius, km: the distances to the coast are Earth-normalized.
