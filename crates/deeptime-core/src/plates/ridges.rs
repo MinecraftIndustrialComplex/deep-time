@@ -318,7 +318,10 @@ fn wrap(x: f64) -> f64 {
 /// edge) follows its distance from the segment as Cortial's follows the distance from the
 /// midline. A band whose points nearest a do not lie on the +φ side of those nearest b (a
 /// converging rotation, or a band too thin to tell) keeps the midline: `None` there, as for
-/// every point not between two plates. Returns, per sample, the plate and α the segments give.
+/// every point not between two plates; so does a point whose band's meridian lies beyond the
+/// other plate's edge (where an oblique gap is narrower than its offset across the band, the
+/// segment ends inside the band) or more than a quarter turn round the pole from it. Returns, per
+/// sample, the plate and α the segments give.
 fn segment_ridges(
     gap: &[bool],
     best: &[[(f64, u32); 2]],
@@ -409,11 +412,26 @@ fn segment_ridges(
             continue;
         }
         let dphi = wrap(phi - b.phi);
+        // More than a quarter turn round the pole from the band's meridian (a band that wraps
+        // round the pole of the pair's frame), the distance below is to the opposite meridian.
+        if dphi.abs() >= std::f64::consts::FRAC_PI_2 {
+            continue;
+        }
         let q = if dphi > 0.0 { key.0 } else { key.1 };
         let [(d1, l1), (d2, _)] = best[i];
-        let own = if plate_new[l1 as usize] == q { d1 } else { d2 };
+        let (own, other) = if plate_new[l1 as usize] == q {
+            (d1, d2)
+        } else {
+            (d2, d1)
+        };
         // The great-circle distance from the point to the segment's meridian.
         let to_ridge = (theta.sin() * dphi.sin().abs()).min(1.0).asin();
+        // The meridian beyond the other plate's edge: the segment does not cross this part of
+        // the gap (at a band's end, where an oblique gap is narrower than its offset across the
+        // band), so the point keeps the midline rather than going whole to one side.
+        if to_ridge > other {
+            continue;
+        }
         let alpha = (to_ridge / (to_ridge + own).max(1e-12)).clamp(0.0, 1.0);
         out[i] = Some((q, alpha));
     }
@@ -1001,9 +1019,10 @@ mod tests {
         assert!((wrap(2.0 * PI + 0.25) - 0.25).abs() < 1e-12);
     }
 
-    /// A gap 6° wide and 35° oblique to the spreading (Earth's envelope, plates.md "Earth's ridges
-    /// and transforms") between plate a, turning about ẑ, and plate b, still; points `step` apart
-    /// in the pair's frame, the gap points first and one sample of each plate last.
+    /// A gap `2 half_deg` wide and 35° oblique to the spreading (Earth's envelope, plates.md
+    /// "Earth's ridges and transforms") between plate a, turning about ẑ, and plate b, still;
+    /// points `step` apart in the pair's frame, the gap points first and one sample of each plate
+    /// last.
     struct Gap {
         gap: Vec<bool>,
         best: Vec<[(f64, u32); 2]>,
@@ -1026,19 +1045,20 @@ mod tests {
         }
     }
 
-    fn oblique_gap(omega_a: DVec3) -> Gap {
+    fn oblique_gap(omega_a: DVec3, half_deg: f64) -> Gap {
         use std::f64::consts::FRAC_PI_2;
         let e = DVec3::Z;
         let f = e.any_orthogonal_vector().normalize();
         let g = e.cross(f);
         let at =
             |theta: f64, phi: f64| (f * phi.cos() + g * phi.sin()) * theta.sin() + e * theta.cos();
-        let (half, step) = (3f64.to_radians(), 0.2f64.to_radians());
+        let (half, step) = (half_deg.to_radians(), 0.2f64.to_radians());
+        let columns = (2.0 * half_deg / 0.2).round() as i32;
         let mid = |theta: f64| 35f64.to_radians().tan() * (theta - FRAC_PI_2);
         let mut grid = Vec::new();
         for r in -50..=50 {
             let theta = FRAC_PI_2 + f64::from(r) * step;
-            for c in 0..30 {
+            for c in 0..columns {
                 grid.push((theta, mid(theta) - half + (f64::from(c) + 0.5) * step));
             }
         }
@@ -1083,7 +1103,7 @@ mod tests {
     fn ridge_segments_stand_normal_to_the_motion_with_transforms_along_it() {
         let norm = Norm::new(6370.0, 782.0, 100_000);
         let spread = DVec3::Z * norm.omega_of_speed(50.0);
-        let gap = oblique_gap(spread);
+        let gap = oblique_gap(spread, 3.0);
         let m = gap.gap.iter().filter(|&&g| g).count();
         let seg = 4f64.to_radians();
         let out = gap.segments(&norm, seg);
@@ -1151,11 +1171,73 @@ mod tests {
         assert!(alphas.iter().copied().fold(f64::INFINITY, f64::min) < 0.05);
         assert!(alphas.iter().copied().fold(0.0, f64::max) > 0.9);
         // A converging pair (a turning the other way) keeps the midline; so does the switch off.
-        let back = oblique_gap(-spread).segments(&norm, seg);
+        let back = oblique_gap(-spread, 3.0).segments(&norm, seg);
         assert!(
             back.iter().all(Option::is_none),
             "a converging pair keeps the midline"
         );
         assert!(gap.segments(&norm, 0.0).iter().all(Option::is_none));
+    }
+
+    /// The same envelope with a gap 2° wide, narrower than its offset across a 4° band (tan 35° of
+    /// 4°, 2.8°): the band's meridian leaves the gap at the band's ends. A segment never hands a
+    /// point to one side with the meridian beyond the other plate's edge (a row of the gap whole to
+    /// one plate, with no ridge in it); those rows keep the midline, the rest take the segment.
+    /// ledger: PLT-502
+    #[test]
+    fn a_segment_ends_where_its_meridian_leaves_the_gap() {
+        let norm = Norm::new(6370.0, 782.0, 100_000);
+        let gap = oblique_gap(DVec3::Z * norm.omega_of_speed(50.0), 1.0);
+        let m = gap.gap.iter().filter(|&&g| g).count();
+        let seg = 4f64.to_radians();
+        let out = gap.segments(&norm, seg);
+        let e = DVec3::Z;
+        let f = e.any_orthogonal_vector().normalize();
+        let g = e.cross(f);
+        let offset = band_offset(0, 1);
+        let frame = |p: DVec3| {
+            let theta = p.dot(e).clamp(-1.0, 1.0).acos();
+            (theta, p.dot(g).atan2(p.dot(f)))
+        };
+        // Each band's meridian as `segment_ridges` puts it: the circular mean of its points' φ.
+        let mut sums: BTreeMap<i64, (f64, f64)> = BTreeMap::new();
+        for p in &gap.pts[..m] {
+            let (theta, phi) = frame(*p);
+            let s = sums
+                .entry((theta / seg + offset).floor() as i64)
+                .or_default();
+            s.0 += phi.cos();
+            s.1 += phi.sin();
+        }
+        let (mut on, mut off) = (0, 0);
+        let mut rows: BTreeMap<i64, [usize; 2]> = BTreeMap::new();
+        for (i, p) in gap.pts[..m].iter().enumerate() {
+            let (theta, phi) = frame(*p);
+            let row = (theta.to_degrees() * 5.0).round() as i64;
+            let Some((q, _)) = out[i] else {
+                off += 1;
+                continue;
+            };
+            on += 1;
+            rows.entry(row).or_default()[q as usize] += 1;
+            let (c, s) = sums[&((theta / seg + offset).floor() as i64)];
+            let dphi = wrap(phi - s.atan2(c));
+            let to_ridge = (theta.sin() * dphi.sin().abs()).asin();
+            let [(d1, l1), (d2, _)] = gap.best[i];
+            let other = if gap.plate_new[l1 as usize] == q {
+                d2
+            } else {
+                d1
+            };
+            assert!(
+                to_ridge <= other + 1e-12,
+                "point {i}: the meridian {to_ridge} rad off, the other plate's edge {other}"
+            );
+        }
+        assert!(off > 0, "some rows lie beyond their band's meridian");
+        assert!(on > m / 2, "{on} of {m} points on a segment");
+        // Most rows on a segment hold the ridge between both plates' points.
+        let both = rows.values().filter(|c| c[0] > 0 && c[1] > 0).count();
+        assert!(both * 4 >= rows.len() * 3, "{both} of {} rows", rows.len());
     }
 }

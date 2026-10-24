@@ -255,6 +255,15 @@ pub fn resolve(
         .dynamics
         .is_some()
         .then(|| state.samples.iter().map(|s| s.is_hidden()).collect());
+    // ledger: PLT-371 (the reversal judged by the crust the arc stands on), PLT-370 (the reach):
+    // the arc's footing is the crust visible as the step starts, since the flags are set again
+    // below.
+    let by_arc = env.k.reversal_by_arc_crust;
+    let hidden_before: Vec<bool> = if by_arc {
+        state.samples.iter().map(|s| s.is_hidden()).collect()
+    } else {
+        Vec::new()
+    };
     for s in &mut state.samples {
         s.flags &=
             !(HIDDEN | TRENCH | ARC | HOTSPOT | DIVERGENT | SUBDUCTION_ZONE | EMERGED | FORELAND);
@@ -295,8 +304,6 @@ pub fn resolve(
         })
         .collect();
     let mut aggs: BTreeMap<(u32, u32), Agg> = BTreeMap::new();
-    // ledger: PLT-371 (the reversal judged by the crust the arc stands on), PLT-370 (the reach).
-    let by_arc = env.k.reversal_by_arc_crust;
     let arc_steps = (env.k.arc_distance_km / env.norm.km(env.norm.spacing_rad())).floor() as u32;
     for o in overlaps {
         let a = state.plate_of(o.i as usize);
@@ -310,7 +317,7 @@ pub fn resolve(
         for (side, idx) in [(sa, o.i), (sb, o.cover.major())] {
             let s = &state.samples[idx as usize];
             e.seen[side] += 1;
-            if by_arc && continent_within(state, geo, idx, arc_steps) {
+            if by_arc && continent_within(state, geo, idx, arc_steps, |v| hidden_before[v]) {
                 e.near[side] += 1;
             }
             if s.kind == CONTINENTAL {
@@ -348,12 +355,7 @@ pub fn resolve(
             let (u, o) = (under_side, 1 - under_side);
             let near = |s: usize| f64::from(agg.near[s]) / f64::from(agg.seen[s].max(1));
             if agg.count >= MIN_CONTACT
-                && reverses(
-                    [frac(u), frac(o)],
-                    near(o),
-                    [lock(u), lock(o)],
-                    by_arc,
-                )
+                && reverses([frac(u), frac(o)], near(o), [lock(u), lock(o)], by_arc)
             {
                 reverse(state, world, env, k)?;
             }
@@ -517,12 +519,19 @@ pub(super) fn locked_against(
 }
 
 /// Whether visible continental crust of sample `i`'s plate lies within `steps` lattice steps of it
-/// through that plate's visible samples (itself included): an arc behind a front there would stand
-/// on continental crust. The boundary mix measures the same distance (`dynamics`, PLT-370).
+/// through that plate's visible samples (itself included; `hidden` says which are not visible):
+/// an arc behind a front there would stand on continental crust. The boundary mix measures the
+/// same distance (`dynamics`, PLT-370).
 /// The arc-front counters measure with it, and the polarity reversal judges the overriding side
 /// by it with `reversal_by_arc_crust` (off by default; plates.md, "The plate geometry" and "The
 /// crust flux into collision fronts", 2026-10-21; ledger: PLT-371).
-fn continent_within(state: &PlateState, geo: &Geo, i: u32, steps: u32) -> bool {
+fn continent_within(
+    state: &PlateState,
+    geo: &Geo,
+    i: u32,
+    steps: u32,
+    hidden: impl Fn(usize) -> bool,
+) -> bool {
     let p = state.plate_of(i as usize);
     let mut seen = vec![i];
     let mut frontier = vec![i];
@@ -530,17 +539,14 @@ fn continent_within(state: &PlateState, geo: &Geo, i: u32, steps: u32) -> bool {
         let mut next = Vec::new();
         for &v in &frontier {
             let s = &state.samples[v as usize];
-            if s.kind == CONTINENTAL && !s.is_hidden() {
+            if s.kind == CONTINENTAL && !hidden(v as usize) {
                 return true;
             }
             if depth == steps {
                 continue;
             }
             for (u, _) in geo.edges(v) {
-                if !seen.contains(&u)
-                    && state.plate_of(u as usize) == p
-                    && !state.samples[u as usize].is_hidden()
-                {
+                if !seen.contains(&u) && state.plate_of(u as usize) == p && !hidden(u as usize) {
                     seen.push(u);
                     next.push(u);
                 }
@@ -1110,7 +1116,9 @@ pub fn fronts_finish(
                 front_len[under] += front_km;
                 // Measurement only: by the crust the arc stands on, as the boundary mix counts it
                 // (ledger: PLT-370).
-                if continent_within(state, geo, v as u32, arc_steps) {
+                if continent_within(state, geo, v as u32, arc_steps, |u| {
+                    state.samples[u].is_hidden()
+                }) {
                     front_continental += front_km * env.dt_myr;
                 } else {
                     front_oceanic += front_km * env.dt_myr;
@@ -1663,7 +1671,15 @@ mod tests {
         use crate::plates::rifting::tests::{N, continental, old_floor, one_plate};
         let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
         let cap = |p: DVec3| p.z > 0.5;
-        let mut state = one_plate(&geo, 3, |p| if cap(p) { continental() } else { old_floor() });
+        let mut state = one_plate(
+            &geo,
+            3,
+            |p| if cap(p) { continental() } else { old_floor() },
+        );
+        let hid = |st: &PlateState| {
+            let h: Vec<bool> = st.samples.iter().map(|s| s.is_hidden()).collect();
+            move |v: usize| h[v]
+        };
         // Lattice distance to the cap by breadth first search (the edges are symmetric).
         let mut dist = vec![u32::MAX; N];
         let mut frontier: Vec<u32> = (0..N as u32)
@@ -1686,24 +1702,29 @@ mod tests {
             }
             frontier = next;
         }
+        let vis = hid(&state);
         for steps in [0, 1, 3] {
             let mut near = 0;
             for i in (0..N as u32).step_by(7) {
                 let want = dist[i as usize] <= steps;
                 near += usize::from(want && dist[i as usize] > 0);
                 assert_eq!(
-                    continent_within(&state, &geo, i, steps),
+                    continent_within(&state, &geo, i, steps, &vis),
                     want,
                     "sample {i}, {steps} steps, distance {}",
                     dist[i as usize]
                 );
             }
-            assert!(steps == 0 || near > 0, "{steps} steps: no ocean sample in reach");
+            assert!(
+                steps == 0 || near > 0,
+                "{steps} steps: no ocean sample in reach"
+            );
         }
         for s in state.samples.iter_mut().filter(|s| s.kind == CONTINENTAL) {
             s.flags |= crate::plates::state::HIDDEN;
         }
-        assert!((0..N as u32).all(|i| !continent_within(&state, &geo, i, 3)));
+        let vis = hid(&state);
+        assert!((0..N as u32).all(|i| !continent_within(&state, &geo, i, 3, &vis)));
 
         // A continent arriving under an oceanic fringe whose plate's continent is within the arc's
         // reach: the overlap's crust reverses it, the arc's does not.
