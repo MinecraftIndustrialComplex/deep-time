@@ -1342,7 +1342,7 @@ pub fn run(inp: &Input<'_>) -> Output {
 /// valley floor `fill`, but at least one block over its water `w_raw` (the plain's top block one
 /// above the water's, HYD-151), and spreads over the cells draining to it whose ground lies at
 /// most the flood depth over that floor (HYD-150).
-fn bank_of(fill: i16, w_raw: i32, area_km2: f32, m_per_block_v: f64) -> (i16, f32) {
+pub(super) fn bank_of(fill: i16, w_raw: i32, area_km2: f32, m_per_block_v: f64) -> (i16, f32) {
     // The plain's top block is ⌈H⌉ − 1 and the water's ⌈w⌉ − 1: H in (⌈w⌉, ⌈w⌉ + 1] blocks.
     let lowest = (w_raw + 15).div_euclid(16) * 16 + 1;
     let level = i32::from(fill)
@@ -1414,10 +1414,19 @@ impl FloodAt<'_> {
             }
         }
         let skip = |c: usize| self.fp.skip.binary_search(&(c as u32)).is_ok();
+        // A basin's floor: ground a block or more under its filled surface that holds no lake (a
+        // basin the balance left dry or shrank). No floodplain: laying one would fill the basin.
+        let elev = self.inp.elev;
+        let basin_floor = |c: usize| i32::from(fill[c]) - i32::from(elev[c]) >= 16;
         // The height above the cell's drain, 1/16 block (HAND; GFPLAIN's elevation difference).
         let hand = |c: usize| -> Option<(u32, i32)> {
             let d = drain[c];
-            if d == NO || d as usize == c || state[c] & (LAKE | SEA) != 0 || skip(c) {
+            if d == NO
+                || d as usize == c
+                || state[c] & (LAKE | SEA) != 0
+                || skip(c)
+                || basin_floor(c)
+            {
                 None
             } else {
                 Some((d, i32::from(fill[c]) - i32::from(fill[d as usize])))
@@ -1458,8 +1467,16 @@ impl FloodAt<'_> {
         let proj = deeptime_format::Projection::of(self.inp.grid.circumference() as f64);
         let (mut land60, mut fp60) = (0u64, 0u64);
         let (mut raised, mut lowered, mut max_up, mut max_down) = (0u64, 0u64, 0i32, 0i32);
+        // How far laying the plain moves each cell's top block (the ground's ⌈H⌉ − 1): −2 or
+        // less, −1, 0, +1, +2 or more.
+        let mut top_moved = [0u64; 5];
+        let top = |h: i32| (h + 15).div_euclid(16) - 1;
+        let mut basin_floors = 0u64;
         let mut cells = 0u64;
         for c in 0..n {
+            if state[c] & (LAKE | SEA) == 0 && drain[c] != NO && basin_floor(c) {
+                basin_floors += 1;
+            }
             let z = self.inp.grid.origin_block_z as f64 + (c / g.w) as f64 * g.r;
             let in60 = proj.lat_deg(z).abs() <= 60.0;
             if in60 && state[c] & SEA == 0 {
@@ -1484,6 +1501,8 @@ impl FloodAt<'_> {
                 }
             }
             let dz = i32::from(lv) - i32::from(self.inp.elev[c]);
+            let dt = top(i32::from(lv)) - top(i32::from(self.inp.elev[c]));
+            top_moved[(dt.clamp(-2, 2) + 2) as usize] += 1;
             if dz > 0 {
                 raised += 1;
                 max_up = max_up.max(dz);
@@ -1546,6 +1565,14 @@ impl FloodAt<'_> {
             "lowered_cells": lowered,
             "max_raise_blocks": f64::from(max_up) / 16.0,
             "max_lowering_blocks": f64::from(max_down) / 16.0,
+            "top_block_moved": {
+                "down_2_or_more": top_moved[0],
+                "down_1": top_moved[1],
+                "none": top_moved[2],
+                "up_1": top_moved[3],
+                "up_2_or_more": top_moved[4],
+            },
+            "basin_floor_cells": basin_floors,
             "skipped_cells": self.fp.skip.len(),
         });
         (level, stats)
