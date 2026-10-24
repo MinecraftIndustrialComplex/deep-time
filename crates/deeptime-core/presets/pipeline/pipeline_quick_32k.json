@@ -491,7 +491,8 @@
     "delta_shape_k": 1.0,
     "delta_max_mouths": 8,
     "delta_mouth_spacing": 2.0,
-    "floodplains": true
+    "floodplains": true,
+    "meanders": true
   },
   "underground": {
     "lava_floor_blocks": 10,

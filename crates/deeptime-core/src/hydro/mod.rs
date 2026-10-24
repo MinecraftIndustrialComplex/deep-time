@@ -60,12 +60,15 @@
 //! What the game does with it is `deeptime_format::water` (and FORMAT.md, "Water columns").
 
 pub mod delta;
+pub mod meander;
 pub mod network;
 
 #[cfg(test)]
 mod delta_tests;
 #[cfg(test)]
 mod floodplain_tests;
+#[cfg(test)]
+mod meander_tests;
 #[cfg(test)]
 mod tests;
 
@@ -587,6 +590,10 @@ pub struct HydroParams {
     /// Floodplains along the rivers (GFPLAIN, HYD-150 to HYD-152; V1 gap 5, stage 2): flats at the
     /// river's bank, one block over its water, where the ground lies within the flood depth of it.
     pub floodplains: bool,
+    /// Meanders on the floodplains ([`meander`], HYD-155 to HYD-159; V1 gap 5, stage 3): a river
+    /// on a plain, not steep enough to braid, winds across it as a sine-generated curve of
+    /// wavelength 10.9 channel widths, as far as the plain's room allows. Needs `floodplains`.
+    pub meanders: bool,
 }
 
 impl Default for HydroParams {
@@ -621,6 +628,7 @@ impl Default for HydroParams {
             delta_max_mouths: 8,      // ledger: HYD-138 (game-choice)
             delta_mouth_spacing: 2.0, // ledger: HYD-138
             floodplains: true,
+            meanders: true,
         }
     }
 }

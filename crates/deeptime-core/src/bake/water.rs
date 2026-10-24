@@ -631,7 +631,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
         delta::Plains::default()
     };
     let first_chains = first.rivers.chains.len();
-    let (result, splits, laid) = if plains.plains.is_empty() {
+    let (mut result, splits, laid) = if plains.plains.is_empty() {
         (first, Vec::new(), None)
     } else {
         drop(first);
@@ -688,6 +688,41 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     } else {
         None
     };
+    // The meanders on the plain just laid (after the distributaries, which index the stem's
+    // vertices by its cells; HYD-155 to HYD-159).
+    let meandered = if params.meanders && params.floodplains && !result.floodplain.is_empty() {
+        let (ox, oz, r) = (
+            grid.origin_block_x as f64,
+            grid.origin_block_z as f64,
+            f64::from(grid.r),
+        );
+        let (gw, gh, wraps) = (i64::from(grid.w), i64::from(grid.h), grid.wraps_x);
+        let fp = &result.floodplain;
+        let plain = move |x: f64, z: f64| -> Option<i32> {
+            let (i, j) = (((x - ox) / r).round() as i64, ((z - oz) / r).round() as i64);
+            if j < 0 || j >= gh || (!wraps && (i < 0 || i >= gw)) {
+                return None;
+            }
+            let v = fp[(j * gw + i.rem_euclid(gw)) as usize];
+            (v != network::NODATA).then_some(i32::from(v))
+        };
+        let lambert = out
+            .m
+            .projection
+            .is_none()
+            .then(|| deeptime_format::Projection::of(c));
+        Some(hydro::meander::apply(
+            &mut result.rivers,
+            &hydro::meander::Input {
+                plain: &plain,
+                lambert,
+                m_per_block_h: s.m_per_block_h,
+                m_per_block_v: s.m_per_block_v,
+            },
+        ))
+    } else {
+        None
+    };
     let mut stats = result.stats.clone();
     stats["chains"] = json!(result.rivers.chains.len());
     stats["vertices"] = json!(result.rivers.vertices.len());
@@ -708,6 +743,9 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     }
     if let Some(l) = flood_laid {
         stats["floodplains"]["laid"] = l;
+    }
+    if let Some(m) = meandered {
+        stats["meanders"] = m;
     }
     // How much of the frozen lake area the game's frozen biomes cover (the temperature layer's
     // frozen band, below its upper edge −0.45): there vanilla's `freeze_top_layer` ices the water.
@@ -786,7 +824,9 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
 
     let note = json!({
         "enabled": true,
-        "method": if params.floodplains {
+        "method": if params.floodplains && params.meanders {
+            "hyd-155"
+        } else if params.floodplains {
             "hyd-150"
         } else if params.deltas {
             "hyd-130"
