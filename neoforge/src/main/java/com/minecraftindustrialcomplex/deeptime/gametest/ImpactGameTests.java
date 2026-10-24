@@ -221,6 +221,28 @@ public final class ImpactGameTests {
                 double[] f = o.floorAndRim(t, k.diameterM() / 2 / mH);
                 others.append(String.format(" %d (%.1f blocks of relief, ground spread %.1f, bowl %.1f)", k.id(), k.reliefM() / mV, o.rms(), f[1] - f[0]));
             }
+        // Diagnostic (2026-10-23): the projection's local scale at the crater and the lens bodies the bake placed under it.
+        StringBuilder diag = new StringBuilder();
+        {
+            var p = wd.projection();
+            double r = wd.circumference() / (2 * Math.PI);
+            double[] ax = p.unit(best.x() - 0.5, best.z()), bx = p.unit(best.x() + 0.5, best.z());
+            double[] az = p.unit(best.x(), best.z() - 0.5), bz = p.unit(best.x(), best.z() + 0.5);
+            double sx = Math.sqrt(Math.pow(ax[0] - bx[0], 2) + Math.pow(ax[1] - bx[1], 2) + Math.pow(ax[2] - bx[2], 2)) * r;
+            double sz = Math.sqrt(Math.pow(az[0] - bz[0], 2) + Math.pow(az[1] - bz[1], 2) + Math.pow(az[2] - bz[2], 2)) * r;
+            diag.append(String.format("; latitude %.1f, planet blocks a world block %.3f along x and %.3f along z (%s)",
+                    p.latitudeDeg(best.x(), best.z()), sx, sz, p.kind()));
+            diag.append("; heights along x");
+            for (int d = -10; d <= 10; d++)
+                diag.append(String.format(" %.1f", t.height(cx + d, cz)));
+            diag.append("; along z");
+            for (int d = -10; d <= 10; d++)
+                diag.append(String.format(" %.1f", t.height(cx, cz + d)));
+            for (var b : wd.deposits().bodiesIn(cx - 12, level.getMinBuildHeight(), cz - 12, cx + 12, level.getMaxBuildHeight() - 1, cz + 12))
+                if ("impact_breccia".equals(b.rockClass()) || "impact_breccia".equals(b.role()))
+                    diag.append(String.format("; lens body %d at (%.1f, %.2f, %.1f) axes (%.2f, %.2f, %.2f) y %d..%d",
+                            b.id(), b.center()[0], b.center()[1], b.center()[2], b.axes()[0], b.axes()[1], b.axes()[2], b.min()[1], b.max()[1]));
+        }
         var result = RockPalette.get().result("impact_breccia").orElse(null);
         if (result == null || result.blocks().isEmpty()) {
             helper.fail("the palette has no block for impact_breccia");
@@ -264,7 +286,7 @@ public final class ImpactGameTests {
                     String.format("%.1f", ground.a()), String.format("%.2f", Math.hypot(ground.bx(), ground.bz())),
                     String.format("%.1f", ground.rms()), String.format("%.1f", floor), floorColumns, String.format("%.1f", rim),
                     String.format("%.1f", bowl), String.format("%.1f", want), blocks, columns, FLOOR_COLUMNS.length, read[0],
-                    result.blocks().stream().map(StrataGameTests::id).toList(), seen, profile, others.isEmpty() ? " none" : others);
+                    result.blocks().stream().map(StrataGameTests::id).toList(), seen, profile, (others.isEmpty() ? " none" : others) + diag.toString());
             if (bowl < want)
                 helper.fail("crater " + best.id() + ": its floor is " + bowl + " blocks below its rim over the ground around it, " + want + " wanted");
             if (columns == 0)
