@@ -6936,6 +6936,13 @@ plate.
   edges; on seed 14 (the inheritance alone) a piece of 3 samples being consumed, the same bind as
   before the fix. Seed 16's one plate-step is not in the step records, which list the plates alive
   at the step's end, so it was a plate removed in the step it bound.
+- **With the level set on as well** (Step 3c; the sweep on seeds 1 to 24 with all three on) the
+  guard binds on 3 of 24: seed 2 for 7 plate-steps, 17 for 1 and 24 for 7. They are of the same
+  kind: on seed 2 a plate of 47 to 50 samples born of a subduction initiation 46 Myr before, with
+  a plate subducting under it along 14 front edges; on seed 24 a plate of 32 to 38 samples born of
+  a split 56 Myr before, with its parent's slab (moved to it at the split) under it along 12 to 16
+  edges, then another along 8; on seed 17 a plate of 23 samples between a trench on either side
+  (5 and 6 edges). The 16k planet of the pool never binds with it (arms fl-ls and fl-ls2, Step 3c).
 - **What the guard holds: small plates ringed by trenches.** Every bind, before the fix and after,
   is a plate of at most 131 visible samples (1.6 % of the sphere; the floor is 24, PLT-091) with
   other plates subducting beneath it along 30 % to all of its boundary (10 to 33 front edges).
@@ -6956,10 +6963,12 @@ plate.
   back) would bound these plates by the physics, not by the guard. It is not built: the
   coordinator's call.
 - **The weld tests' seeds.** With the fix, 11 of seeds 1 to 24 weld (1, 2, 8, 11 to 14, 16, 20,
-  22 and 23). The collisions test is on its original seed 12 again. The recording test stays on
-  seed 20: its original seed 19 still does not weld, and its seed is the next that welds, chosen by
+  22 and 23). The collisions test is on its original seed 12 again. The recording test stayed on
+  seed 20: its original seed 19 still did not weld, and its seed is the next that welds, chosen by
   the weld, not by the guard (on welding seed 16 the guard binds once, which that test asserts
-  against).
+  against). With the level set on by default (Step 3c) 12 of 24 weld (1, 2, 4, 5, 7, 9, 12, 15,
+  17 to 19 and 21): seed 19 welds again and 20 no more, so the recording test is back on its
+  original seed 19, and the collisions test stays on 12; the guard binds on neither.
 
 **Known limit: merges.** When two plates merge (a healed rift, a weld, a plate absorbed under the
 floor), the dead plate's contacts with third plates still close. That is the same law in reverse,
@@ -7133,5 +7142,86 @@ the loss read over the first 20 (the plate of radius 3 is gone by the 40th):
   extrapolated from each corner, s ≈ Σ w_k [s_k + ½ ∇s_k · (q - p_k)]) would cut the drift to
   the order of h³; it is not built.
 
-**On by default?** Not yet. `tectonics.level_set_membership` is off until its arm (fl-ls, on
-top of fl-fission2) is judged on the plate check, the guard and divergence.
+**Arm fl-ls** (the level set on top of fl-fission2, 8 runs, `earthlike_quick_16k`, 1000 Myr, key
+85a1e1cdbf45, argkey 029ca01a; with the level set off the step takes fl-fission2's code path, so
+fl-fission2 is its control). Against fl-fission2, medians with the Mann-Whitney p:
+
+- **The guard.** Its worst is 10,530 m against 10,490 (p 0.51). No step goes beyond 2 reliefs,
+  and `guard_bind_steps` is 0 in every run.
+- **The V1 census.** It meets its 5 criteria in both arms (land 0.320, p 0.72).
+- **The boundary.** It is 323,059 lattice km against 352,268, and 326,556 straight km per step
+  against 353,140 (p 0.002; Bird 260,487). E, the perimeters over their caps', is 1.929 against
+  2.013 (p < 0.001; Bird 1.510). The subduction front is 91,750 straight km per step against
+  98,984 (p 0.005; Bird 51,310), and the front in collision 21,038 km against 24,217 (p 0.005).
+  With each plate one body (`boundgeom`, 77 km), the front's tortuosity is 1.925 against 2.026
+  (PB2002 1.20 on the lattice).
+- **The plates.** 27.1 alive per step against 27.8 (p 0.38). Over the run they go from 23.2 in
+  the first window to 31.4 in the last, against 24.9 to 27.6, so the boundary grows too (290,272
+  to 371,939 km against 309,152 to 352,067).
+- **Fission's churn.** Fissions per run 65 against 64.5. Fission-born plates live 20 / 36 / 72.5
+  Myr (p25 / p50 / p75) against 20 / 40 / 80; the other plates 22 / 76 / 144 against
+  20 / 74 / 152.
+- **The sutures.** 40.9 per 100 Myr against 42.4, and 37,228 km per 100 Myr against 41,589
+  (p 0.038; Macdonald 23,235 to 50,919).
+- **The plate check.** It passes 191 measures against 187.
+
+So the level set shortens the boundary and the front by 7 to 8 % and the front's tortuosity by
+5 %. That is far less than the test's static boundary gains without it (twice its length in 40
+resamplings). In the runs the ridges are drawn again by the gap fill at each resampling either
+way, and the trenches are moved every step by the overlaps' hiding and the collisions (below),
+which the level set does not touch. The front is still 1.8 times Bird's, and its tortuosity 1.6
+times PB2002's.
+
+**What still cuts the plates, with the level set.** `where_the_plates_are_cut` (40,000 samples,
+300 Myr, fission on; samples cut off their plate's largest piece, summed over the run):
+
+| part of the step | supercontinent 1, off | supercontinent 1, on | scattered 2, off | scattered 2, on |
+|---|---|---|---|---|
+| overlaps resolved (`subduction::resolve`): cut / joined | 5,304 / 1,771 | 8,800 / 2,751 | 7,379 / 2,772 | 10,207 / 2,328 |
+| the collision's terrane transfer: cut (the overriding plate, the subducting one) | 5,038 (3,016, 2,022) | 2,734 (1,817, 917) | 3,660 (2,045, 1,615) | 2,556 (1,748, 808) |
+| subduction initiation: cut | 3 | 256 | 74 | 39 |
+| the resampling: cut / joined | 0 / 8,299 | 0 / 8,866 | 0 / 8,209 | 0 / 9,215 |
+| fissions | 14 | 18 | 16 | 18 |
+
+- **The resampling cuts nothing either way.** With fission each cut piece becomes a plate or is
+  captured at the resampling, which books it as joined.
+- **The overlaps' hiding is the main cut, and more of it with the level set.** Hiding the
+  overridden samples cuts a plate's neck that the next step's motion opens again. The terrane
+  transfers cut less with the level set. Each case is one run of a chaotic planet, so these
+  moves are readings, not a law.
+
+**Arm fl-ls2** (the level set with the latent slab copies of Step 3b, on top of fl-fission2, 8
+runs; key dce14248713c, argkey 029ca01a, `--set tectonics.level_set_membership=true`). Against
+fl-fission2, medians with the Mann-Whitney p:
+
+- **The guard.** Its worst is 10,240 m against 10,490 (p 0.16). No step goes beyond 2 reliefs,
+  and `guard_bind_steps` is 0 in every run.
+- **The V1 census.** It meets its 5 criteria (land 0.304).
+- **The boundary.** It is 326,139 lattice km against 352,268, and 327,874 straight km per step
+  (p 0.002). E is 1.908 against 2.013 (p < 0.001). The front is 89,331 straight km per step
+  (p 0.002), and the front in collision 19,668 km against 24,217 (p 0.002). With each plate one
+  body (77 km) the front's tortuosity is 1.924 against 2.026; its length there is the same
+  (115,979 km against 115,544).
+- **The plates.** 27.5 alive per step against 27.8 (p 0.72), from 21.9 in the first window to
+  25.9 in the last (against 24.9 to 27.6), 25.5 at the end against 27.
+- **Fission's churn.** Fissions per run 77 against 64.5 (p about 0.23). Fission-born plates live
+  20 / 40 / 72.5 Myr (p25 / p50 / p75) against 20 / 40 / 80; the other plates 18 / 72 / 154
+  against 20 / 74 / 152. Per run the splits moved 215 to 278 slabs and copied 284 to 342, moved
+  245 to 316 contacts and copied 287 to 344, and moved 33 to 57 collisions.
+- **The sutures.** 40.6 per 100 Myr against 42.4, and 37,382 km per 100 Myr against 41,589
+  (p 0.050).
+- **The plate check.** It passes 189 measures against 187.
+
+Against fl-ls (the level set without the latent copies) no measure differs at p < 0.05, so the
+latent copies of Step 3b change the planet little, as their 1.3 to 3.2 % of the slab force
+foretold.
+
+**On by default.** `tectonics.level_set_membership` is on (2026-10-24), with fission and the
+split inheritance. Its unit tests pass against their source (the great circle exact, the
+reinitialisation keeping it, the boundary no longer roughened by the resampling), both arms on
+the pool show no divergence and no guard binding, the census keeps its 5 criteria, and the plate
+check passes 189 to 191 measures against 187. On the 8k test planet the guard binds on 3 of 24
+seeds with it (Step 3b, "The speed guard"), small plates held by a fixed suction, the same kind
+as without it; that is the suction law's known limit, not the level set's. What it does not do:
+the front stays 1.7 times Bird's (89,331 against 51,310 straight km), since the trenches are
+moved every step by the overlaps' hiding and the collisions, which it does not touch.
