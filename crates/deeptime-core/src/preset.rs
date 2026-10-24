@@ -636,12 +636,13 @@ fn parse_header(obj: &Map<String, Value>, planet: bool) -> Result<PresetHeader, 
         let s = v
             .as_object()
             .ok_or_else(|| CoreError::preset("$.scale", "expected a JSON object"))?;
-        // A planet preset's scale carries more keys (`params::ScaleParams` checks them). Any
-        // preset may name its world's projection; a synthetic world (not a planet) is Lambert, and
-        // says so for the game, which reads the key to know the world's east–west period.
+        // A planet preset's scale carries more keys (`params::ScaleParams` checks them); a planet
+        // is the cube world. A synthetic world (not a planet) is laid out in the simulation's
+        // Lambert frame and may say so for the game, which reads the key to know the world's
+        // east–west period.
         if let Some(k) = s.keys().find(|k| {
             k.as_str() != "circumference_blocks"
-                && k.as_str() != "projection"
+                && !(!planet && k.as_str() == "projection")
                 && !(planet && SCALE_KEYS.contains(&k.as_str()))
         }) {
             return Err(CoreError::preset(format!("$.scale.{k}"), "unknown key"));

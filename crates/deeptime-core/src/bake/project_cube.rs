@@ -10,9 +10,9 @@
 //! - **Rasters** ([`resample_cube`]): every world cell is a point sample at its centre. The
 //!   cell's footprint on the simulation's grid comes from the composed Jacobian (world cell →
 //!   planet → Lambert): where it spans more than one simulation cell along an axis, a Gaussian
-//!   along that axis averages it; else the bilinear read alone (SCL-124). This replaces the
-//!   Petroff–Guyou pass's polar widening (SCL-090) on the cube. Categories, horizon stacks and
-//!   cover take the nearest cell as there.
+//!   along that axis averages it; else the bilinear read alone (SCL-124). This replaced the
+//!   retired Petroff–Guyou pass's polar widening (SCL-090). Categories, horizon stacks and cover
+//!   take the nearest cell.
 //! - **Topology**: the closed basins, the biomes' fills and distances and the relief run on the
 //!   cube's own neighbours, across every seam, with great-circle distances (SCL-122, SCL-123).
 //! - **Vector data**: positions through the inverse map, directions and sizes through the
@@ -69,7 +69,7 @@ pub const FOOT_MIN_SIGMA_CELLS: f64 = 0.25; // ledger: SCL-124 (game-choice)
 pub const FOOT_MAX_SIGMA_SHARE: f64 = 1.0 / 12.0; // ledger: SCL-124 (game-choice)
 
 /// The most samples a footprint takes each side of its centre along its long and short axes
-/// (2,049 and 65 in all; the Petroff–Guyou pass's 2,048 and 64).
+/// (2,049 and 65 in all; the retired Petroff–Guyou pass took 2,048 and 64).
 const FOOT_MAX_STEPS: (i64, i64) = (1024, 32);
 
 /// The bilinear read's response to a checkerboard at the simulation's resolution, projected on
@@ -84,7 +84,7 @@ const D_BANDS: [f64; 6] = [1.0, 1.1, 1.2, 1.5, 2.0, 4.0];
 pub const SPAWN_CORNER_MARGIN: f64 = 256.0; // ledger: SCL-127 (game-choice)
 
 /// The longest step a river chain takes in the world before it is cut as at the sea, blocks (the
-/// Petroff–Guyou pass's).
+/// retired Petroff–Guyou pass's figure).
 const RIVER_JUMP_BLOCKS: f64 = 256.0;
 
 #[inline]
@@ -1191,8 +1191,8 @@ impl RiverStats {
 /// Jacobian J. The image of the ellipse R(yaw) diag(a, c) has the singular values of
 /// J R diag(a, c) as its semi-axes, so its area is |det J| a c even where the Lambert grid's shear
 /// turns the two axes' images off the perpendicular. SCL-091 stretches each axis by the length of
-/// its own image, which overstates the area there (by 25 % for a body yawed 45° at 45° latitude);
-/// the Petroff-Guyou world uses this one too since 2026-10-23 (SCL-236). The new first axis is
+/// its own image, which overstates the area there (by 25 % for a body yawed 45° at 45° latitude;
+/// SCL-236). The new first axis is
 /// the singular direction nearest the old first axis's image, sign included, so a dip keeps its
 /// side.
 pub(crate) fn project_body_exact(
@@ -1309,8 +1309,8 @@ fn corner_and_edge_distance(cube: &Cube, x: f64, z: f64) -> (f64, f64) {
     (corner, edge)
 }
 
-/// The spawn candidates on the cube (SCL-127): as the Petroff–Guyou pass's, each ranked one moved
-/// to the L3 cell under its image (its surface read there), the unranked ones picked again on the
+/// The spawn candidates on the cube (SCL-127): each ranked one moved to the L3 cell under its
+/// image (its surface read there), the unranked ones picked again on the
 /// world's own grids (`synth::spawn_candidates`); any within [`SPAWN_CORNER_MARGIN`] of a cube
 /// corner's image or [`SPAWN_EDGE_MARGIN`] of a turning net edge, or past the simulation's pole, are
 /// dropped.
@@ -1385,7 +1385,7 @@ fn window_crosses(cube: &Cube, w: &deeptime_format::structure::Window) -> bool {
 
 // --- the pass ----------------------------------------------------------------------------------------
 
-/// Rewrites the Lambert world folder `dir` (its manifest `m`) as a cube world (format 0.7).
+/// Rewrites the Lambert-frame world folder `dir` (its manifest `m`) as a cube world (format 0.7).
 /// Returns `notes.bake.projection`; its `stats` are the land under the cube
 /// (`notes.bake.stats`, [`cube_turn::land_stats`]).
 pub fn project_folder_cube(
@@ -2622,5 +2622,76 @@ mod tests {
         let (im, kind) = m.nearest_image(p, q);
         assert!(matches!(kind, Image::Turn(_)));
         assert!((im.0 - p.0).hypot(im.1 - p.1) < 20.0, "{im:?} vs {p:?}");
+    }
+
+    /// A site's centre goes to the world block that holds its centre block's centre (moved here
+    /// from the Petroff–Guyou pass's tests, cube plan §7.4).
+    #[test]
+    fn a_projected_site_centre_is_the_block_holding_the_centre() {
+        use crate::bake::project::project_site;
+        let m = mapping(1024, 4096, turned());
+        for (x, z) in [(100, 200), (-1500, 500), (1900, -600), (-7, -3)] {
+            let s = deeptime_format::Site {
+                id: 7,
+                kind: deeptime_format::sites::SiteKind::Deposit,
+                deposit_type: "deeptime:mvt_zn_pb".into(),
+                center: [x, 40, z],
+                lat_lon: [0.0, 0.0],
+                aabb: [[x - 3, 37, z - 3], [x + 3, 43, z + 3]],
+                body: None,
+                products: Vec::new(),
+                forming_event: deeptime_format::EventId(1),
+                parent: None,
+                extraction: deeptime_format::Extraction::default(),
+            };
+            let out = project_site(&m, &s, &[], 0);
+            let (wx, wz) = m.to_world(f64::from(x) + 0.5, f64::from(z) + 0.5);
+            assert_eq!(
+                (out.center[0], out.center[2]),
+                (wx.floor() as i32, wz.floor() as i32)
+            );
+            assert_eq!(out.center[1], 40);
+            // A stratabound site's host rose 3 blocks in the world's top raise: so does it.
+            let up = project_site(&m, &s, &[], 3);
+            assert_eq!((up.center[1], up.aabb[0][1], up.aabb[1][1]), (43, 40, 46));
+        }
+    }
+
+    /// A body anywhere on the simulation's grid, the pole rows and the rows past them included,
+    /// projects to a body the format accepts (positive finite semi-axes): an Earth-proportioned
+    /// test planet's bake died on one at a singular spot (moved here from the Petroff–Guyou pass's
+    /// tests, cube plan §7.4).
+    #[test]
+    fn a_projected_body_always_has_positive_axes() {
+        use crate::bake::project::project_body;
+        let c_sim = 4096;
+        let m = mapping(1024, c_sim, turned());
+        let pole = Projection::new(c_sim).pole_z();
+        for iz in -12..=12 {
+            for ix in -8..8 {
+                let (x, z) = (
+                    f64::from(ix) * 256.0 + 3.0,
+                    f64::from(iz) / 12.0 * (pole + 64.0),
+                );
+                let b = Body::new(
+                    1,
+                    None,
+                    Shape::Blanket,
+                    "ore",
+                    [x, 40.0, z],
+                    [6.0, 30.0, 9.0],
+                    0.7,
+                    0.0,
+                    NO_CLIP,
+                );
+                for p in [project_body(&m, &b), project_body_exact(&m, &b)] {
+                    assert!(
+                        p.axes.iter().all(|v| v.is_finite() && *v > 0.0),
+                        "{x} {z}: {:?}",
+                        p.axes
+                    );
+                }
+            }
+        }
     }
 }

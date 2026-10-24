@@ -6,8 +6,7 @@
 //! block east–west is cos φ blocks of the planet and a block north–south 1/cos φ of them. A shape
 //! drawn round in Lambert blocks (its offsets in blocks times `m_per_block_h`) is therefore an
 //! ellipse on the planet, long north–south by 1/cos² φ (1.33 at 30°, 3.04 at 55°, 8.55 at 70°),
-//! which the conformal cube world draws faithfully (the equal-area Petroff–Guyou world adds its own
-//! shape stretch to it).
+//! which the conformal cube world draws faithfully.
 //!
 //! [`Around`] measures on the sphere instead. A block's offset from the centre is its position in
 //! the azimuthal equidistant frame at the centre (Snyder 1987, *Map Projections: A Working
