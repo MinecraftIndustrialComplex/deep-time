@@ -1222,7 +1222,8 @@ fn balance_step(
                 // (PLT-530), so the pull's count can be read against the front's length.
                 if e.front.is_some() {
                     let pu = plate_of[u as usize];
-                    let normal = shortening::boundary_normal(geo, pos, &rots, samples, &plate_of, v, pu);
+                    let normal =
+                        shortening::boundary_normal(geo, pos, &rots, samples, &plate_of, v, pu);
                     let share = shortening::front_share_rad(
                         geo, pos, &rots, samples, &plate_of, v, pu, normal,
                     );
