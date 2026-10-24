@@ -52,6 +52,8 @@ library's Bird2003/PB2002_geometry.json; ledger PLT-531).
                    touches a TRENCH sample (on the subducting plate at the trench), which marks
                    collisions' fronts as well
   front_sub_l77, front_sub_l380   of it, the subduction front alone (the 256 flag; Bird SUB 51,310)
+  front_trench_l77, front_trench_l380   on flagged maps, the front as older maps give it (TRENCH), to read
+                   an arm with the flags against one without
   arcfront_l77     of it, where the overriding sample is oceanic crust (Stern & Scholl 2010's 14,500 km of
                    intra-oceanic arc)
   front_flagged    the share of the snapshots measured whose front came from the 256 / 512 flags
@@ -67,7 +69,7 @@ library's Bird2003/PB2002_geometry.json; ledger PLT-531).
                    front_sub and arcfront_l77 on the map with every cut-off piece given the plate most of its
                    neighbours in a plate's largest piece carry (what the boundary would be with each
                    plate one connected body; `clean`)
-  <key>_k7         bnd, e, front, front_sub, arcfront_l77 and the tortuosities on one lattice: the
+  <key>_k7         bnd, e, front, front_sub, front_trench, arcfront_l77 and the tortuosities on one lattice: the
                    cleaned map put on a fixed Fibonacci lattice of 100,000 points (`k7`), each point the
                    commonest plate of its 7 nearest visible samples and the flags of the nearest
                    sample of that plate. The model's visible samples sit on two lattices or more at a
@@ -183,6 +185,7 @@ def measure(xyz, plate, flags, kind):
     fl = flags[eu] | flags[ev]
     flagged = bool(np.any((flags & FRONT) != 0))
     div = (fl & DIVERGENT) != 0
+    trench = (fl & TRENCH) != 0
     if flagged:
         front = (fl & FRONT) != 0
         sub = (fl & FRONT_SUB) != 0
@@ -257,6 +260,7 @@ def measure(xyz, plate, flags, kind):
             masks = [("front", front[pe]), ("arc", arc[pe])]
             if sub is not None:
                 masks.append(("sub", sub[pe]))
+                masks.append(("trench", trench[pe]))
             for name, mask in masks:
                 tot = {r: 0.0 for r in RES}
                 i = 0
@@ -286,6 +290,7 @@ def measure(xyz, plate, flags, kind):
         res["arcfront_" + tag] = sum(p["runs"]["arc"][r] for p in out_pieces)
         if sub is not None:
             res["front_sub_" + tag] = sum(p["runs"]["sub"][r] for p in out_pieces)
+            res["front_trench_" + tag] = sum(p["runs"]["trench"][r] for p in out_pieces)
     rat = [perim[380.0][i] / cap_perimeter(area[i]) for i in area]
     res["ppcap_aw_l380"] = wmean(rat, [area[i] for i in area])
     pp = [p for p in out_pieces if p["kind"] == "piece"]
@@ -367,8 +372,8 @@ def k7(xyz, plate, flags, kind, n=K7_N, k=K7_K):
 
 
 K7_KEYS = ["bnd_l77", "bnd_l380", "e_l77", "e_l380", "front_l77", "front_l380", "front_sub_l77",
-           "front_sub_l380", "arcfront_l77", "tau_sum_l77", "tau_sum_l380", "tau_front_sum_l77",
-           "tau_front_sum_l380"]
+           "front_sub_l380", "front_trench_l77", "front_trench_l380", "arcfront_l77", "tau_sum_l77",
+           "tau_sum_l380", "tau_front_sum_l77", "tau_front_sum_l380"]
 
 
 def measure_k7(xyz, plate, flags, kind):
