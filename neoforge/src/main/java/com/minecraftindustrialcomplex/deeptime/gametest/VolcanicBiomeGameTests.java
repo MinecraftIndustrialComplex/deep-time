@@ -4,6 +4,9 @@ package com.minecraftindustrialcomplex.deeptime.gametest;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.climate.VolcanicBiomes;
 import com.minecraftindustrialcomplex.deeptime.climate.VolcanicCensus;
+import com.minecraftindustrialcomplex.deeptime.worlddata.LakeIce;
+import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.Geothermal;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LakeFreeze;
@@ -173,17 +176,15 @@ public final class VolcanicBiomeGameTests {
                             if (LakeFreeze.keepsOpen(level, under)) {
                                 n[10]++;
                                 if (under10.length() < 900) {
+                                    // Which rule says so, and the column's water and lake level (master 4ab29084's five were the lake
+                                    // rule's, in dry columns within a lake's reach: HYD-072).
                                     var wd = t.data();
-                                    double lake = wd.has(com.minecraftindustrialcomplex.deeptime.worlddata.WorldData.WATER_LEVEL)
-                                            ? com.minecraftindustrialcomplex.deeptime.worlddata.Water.levelAt(
-                                                    wd.layer(com.minecraftindustrialcomplex.deeptime.worlddata.WorldData.WATER_LEVEL), x, z, g.waterReach())
-                                            : Double.NaN;
-                                    var spec = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Spec.of(wd, g.waterReach());
+                                    double lake = wd.has(WorldData.WATER_LEVEL)
+                                            ? Water.levelAt(wd.layer(WorldData.WATER_LEVEL), x, z, g.waterReach()) : Double.NaN;
+                                    var spec = Water.Spec.of(wd, g.waterReach());
                                     under10.append(String.format(" (%d,%d,%d pool %d level %d ground %.2f lake level %.3f water %s lakeRule %s poolRule %s)",
-                                            x, under.getY(), z, s.id(), s.level(), t.height(x, z), lake,
-                                            com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, x, z).kind(),
-                                            com.minecraftindustrialcomplex.deeptime.worlddata.LakeIce.keepsOpen(wd, g.waterReach(), x, under.getY(), z),
-                                            geo.poolSurface(x, under.getY(), z)));
+                                            x, under.getY(), z, s.id(), s.level(), t.height(x, z), lake, Water.column(wd, spec, x, z).kind(),
+                                            LakeIce.keepsOpen(wd, g.waterReach(), x, under.getY(), z), geo.poolSurface(x, under.getY(), z)));
                                 }
                             }
                         }
