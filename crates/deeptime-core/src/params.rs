@@ -578,6 +578,16 @@ pub struct TectonicParams {
     /// 63,000 km in the first 2 Myr after one, the converging boundary with no contact rises
     /// from 6,000 to 37,000; plates.md, "Step 7"). ledger: PLT-550
     pub contact_carry: bool,
+    /// A sample goes under another plate where it crosses that plate's outline (the front lane's
+    /// step 8, 2026-10-24; `subduction::detect`, `level_set::cover`): the zero line of the
+    /// interpolated distance the resampling already gives the plates' ground by
+    /// (`level_set_membership`, PLT-536; with that off, the midpoint of every edge between two
+    /// plates), so the overlap and the resampling read one outline. Off, a sample overlaps only
+    /// inside a lattice triangle whose three corners are the other plate's, half a spacing inside
+    /// its outline on average, and the subducting plate's edge row reaches in among the
+    /// overriding plate's before it goes under (43 % of the fronts' trench samples have another
+    /// plate's sample within half a spacing; plates.md, "Step 7"). ledger: PLT-553
+    pub outline_cover: bool,
     /// Orogenic collapse (`plates/collapse.rs`): continental crust thicker than
     /// `collapse_thickness_km` that no orogeny is raising any more thins by spreading, with this
     /// e-folding time of its excess thickness, Myr; the crust it loses fills the nearest thin
@@ -1056,6 +1066,7 @@ impl Default for TectonicParams {
             reversal_by_arc_crust: true,      // ledger: PLT-371 (on since 2026-10-23)
             one_way_subduction: true,         // ledger: PLT-542 (on since 2026-10-24)
             contact_carry: true,              // ledger: PLT-550 (on since 2026-10-24)
+            outline_cover: true,              // ledger: PLT-553 (on since 2026-10-24)
             collapse_myr: 15.0,               // ledger: PLT-255
             collapse_thickness_km: 50.0,      // ledger: PLT-256
             collapse_quiet_myr: 10.0,         // ledger: PLT-259
