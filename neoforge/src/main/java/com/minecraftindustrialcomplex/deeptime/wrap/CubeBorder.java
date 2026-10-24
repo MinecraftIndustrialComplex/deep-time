@@ -150,6 +150,108 @@ public final class CubeBorder {
         return Math.hypot(p[0] - x, p[1] - z);
     }
 
+    /**
+     * The shortest walk from (x0, z0) to (x1, z1) on the planet under the border, blocks (cube plan
+     * G11): the shortest path inside A(0), the band and the polar column, which the border's segments
+     * bound, x through every period image. A(0) is a cross whose four inner corners (±h, ±h) are its
+     * only reflex corners, so the path is straight or bends only there: the shortest path in the
+     * graph of the two points and those corners (in five period images), joined where the segment
+     * between them lies in A(0). NaN when either point is off the planet.
+     */
+    public double walkDistance(double x0, double z0, double x1, double z1) {
+        if (!inside(x0, z0, 0.0) || !inside(x1, z1, 0.0))
+            return Double.NaN;
+        double sx = frameX(x0), tx = frameX(x1);
+        List<double[]> nodes = new ArrayList<>();
+        nodes.add(new double[]{sx, z0});
+        for (int k = -2; k <= 2; k++)
+            for (int sxn = -1; sxn <= 1; sxn += 2)
+                for (int szn = -1; szn <= 1; szn += 2)
+                    nodes.add(new double[]{k * period + sxn * h, szn * h});
+        int firstTarget = nodes.size();
+        for (int k = -1; k <= 1; k++)
+            nodes.add(new double[]{tx + k * period, z1});
+        int n = nodes.size();
+        double[] dist = new double[n];
+        boolean[] done = new boolean[n];
+        java.util.Arrays.fill(dist, Double.POSITIVE_INFINITY);
+        dist[0] = 0.0;
+        for (int round = 0; round < n; round++) {
+            int u = -1;
+            for (int i = 0; i < n; i++)
+                if (!done[i] && (u < 0 || dist[i] < dist[u]))
+                    u = i;
+            if (u < 0 || dist[u] == Double.POSITIVE_INFINITY)
+                break;
+            done[u] = true;
+            if (u >= firstTarget)
+                continue;   // a target is an end, never a corner to bend round
+            double[] a = nodes.get(u);
+            for (int v = 1; v < n; v++) {
+                if (done[v])
+                    continue;
+                double[] b = nodes.get(v);
+                double len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+                if (dist[u] + len < dist[v] && segmentOnPlanet(a[0], a[1], b[0], b[1]))
+                    dist[v] = dist[u] + len;
+            }
+        }
+        double best = Double.POSITIVE_INFINITY;
+        for (int i = firstTarget; i < n; i++)
+            best = Math.min(best, dist[i]);
+        return best;
+    }
+
+    /**
+     * Whether the segment from (ax, az) to (bx, bz) (x in any period) lies in A(0): the parts of it in
+     * the band and in each period image of the polar column are intervals of its parameter, and they
+     * must cover [0, 1].
+     */
+    private boolean segmentOnPlanet(double ax, double az, double bx, double bz) {
+        List<double[]> parts = new ArrayList<>();
+        double[] band = clip(ax, az, bx, bz, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY, -h, h);
+        if (band != null)
+            parts.add(band);
+        double lo = Math.min(ax, bx), hi = Math.max(ax, bx);
+        for (long k = (long) Math.floor((lo - h) / period); k <= (long) Math.ceil((hi + h) / period); k++) {
+            double[] col = clip(ax, az, bx, bz, k * period - h, k * period + h, -3 * h, 3 * h);
+            if (col != null)
+                parts.add(col);
+        }
+        parts.sort((p, q) -> Double.compare(p[0], q[0]));
+        double reach = 0.0, eps = 1e-9;
+        for (double[] p : parts) {
+            if (p[0] > reach + eps)
+                return false;
+            reach = Math.max(reach, p[1]);
+        }
+        return reach >= 1.0 - eps;
+    }
+
+    /** The parameter interval {t0, t1} of the segment inside the box (Liang–Barsky, edges included, 1e-9 slack), or null. */
+    private static double[] clip(double ax, double az, double bx, double bz, double x0, double x1, double z0, double z1) {
+        double t0 = 0.0, t1 = 1.0, eps = 1e-9;
+        double[] p = {-(bx - ax), bx - ax, -(bz - az), bz - az};
+        double[] q = {ax - (x0 - eps), (x1 + eps) - ax, az - (z0 - eps), (z1 + eps) - az};
+        for (int i = 0; i < 4; i++) {
+            if (Double.isInfinite(q[i]))
+                continue;
+            if (p[i] == 0.0) {
+                if (q[i] < 0.0)
+                    return null;
+                continue;
+            }
+            double r = q[i] / p[i];
+            if (p[i] < 0.0)
+                t0 = Math.max(t0, r);
+            else
+                t1 = Math.min(t1, r);
+            if (t0 > t1)
+                return null;
+        }
+        return new double[]{t0, t1};
+    }
+
     /** The yaw of a heading turned by a net motion (yaw 0 faces +z, 90 faces −x), in [−180, 180). */
     public static float turnYaw(float yaw, CubeLayout.Iso iso) {
         double r = Math.toRadians(yaw);
