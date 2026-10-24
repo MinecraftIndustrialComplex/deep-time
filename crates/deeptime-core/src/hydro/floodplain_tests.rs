@@ -95,7 +95,10 @@ fn top(h: i32) -> i32 {
 fn gfplains_flood_depth_follows_its_code() {
     // h = 0.01 A^0.30, A in m².
     let close = |a: f64, b: f64| (a - b).abs() <= 1e-9 * b.abs();
-    assert!(close(network::flood_depth_m(1_000.0), 0.01 * 1e9f64.powf(0.3)));
+    assert!(close(
+        network::flood_depth_m(1_000.0),
+        0.01 * 1e9f64.powf(0.3)
+    ));
     assert!((network::flood_depth_m(1_000.0) - 5.012).abs() < 0.001);
     assert!((network::flood_depth_m(100_000.0) - 19.953).abs() < 0.001);
     assert_eq!(network::flood_depth_m(0.0), 0.0);
@@ -112,7 +115,11 @@ fn the_bank_stands_a_block_over_the_water() {
     for w in [1008, 1009, 1015, 1016, 1030] {
         let (level, _) = network::bank_of(w as i16, w, 1_000.0, 35.0);
         assert_eq!(top(i32::from(level)), top(w) + 1, "water {w}");
-        assert_eq!(top(i32::from(level) - 1), top(w), "water {w}: not the lowest such height");
+        assert_eq!(
+            top(i32::from(level) - 1),
+            top(w),
+            "water {w}: not the lowest such height"
+        );
     }
     // A floor higher than that keeps its height.
     let (level, _) = network::bank_of(1040, 1008, 1_000.0, 35.0);

@@ -6,12 +6,15 @@ import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Rivers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
+import com.minecraftindustrialcomplex.deeptime.worldgen.WaterBodies;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -26,7 +29,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * ({@code from} in the river file). The world here is that result written by hand: a plain at y 63.5,
  * a river that reaches it and two distributaries that leave the river's vertex at the apex, every
  * channel's surface the sea's. The game carves the distributaries as it carves every chain; the
- * plain between them stays dry land.
+ * plain between them stays dry land. Upstream, a floodplain layer over the river's reach on the
+ * high plain gives its banks the levee's sand (HYD-153), and the slope below it keeps soil.
  */
 @GameTestHolder(GameTestSupport.NS)
 @PrefixGameTestTemplate(false)
@@ -214,6 +218,78 @@ public final class DeltaGameTests {
         helper.assertTrue(columns >= 1000, "only " + columns + " plain columns checked");
         helper.assertTrue(wetCount == 0, wetCount + " of " + columns + " plain columns hold water:" + bad);
         helper.assertTrue(off == 0, off + " of " + columns + " plain columns are not at the plain's ground block " + ground + ":" + bad);
+        helper.succeed();
+    }
+
+    /** The highest ground block of column (x, z) under {@code fromY} (plants, logs and leaves skipped), or null where water tops it. */
+    private static BlockState ground(ServerLevel level, int x, int z, int fromY) {
+        LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int y = fromY; y > level.getMinBuildHeight(); y--) {
+            BlockState s = chunk.getBlockState(pos.set(x, y, z));
+            if (!s.getFluidState().isEmpty())
+                return null;
+            if (s.isSolid() && !s.is(BlockTags.LOGS) && !s.is(BlockTags.LEAVES))
+                return s;
+        }
+        return null;
+    }
+
+    /**
+     * The levee (HYD-153): the river's first dry columns beside its water on the floodplain written over
+     * the upstream reach ({@code notes.delta.floodplain}) are sand; on the slope below it, off the plain,
+     * the banks keep their soil. Counts each side's first two dry columns within the bank zone.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
+    public static void leveesAreSandOnTheFloodplainOnly(GameTestHelper helper) {
+        World wld = world(helper);
+        if (wld == null)
+            return;
+        JsonObject plain = wld.note().getAsJsonObject("floodplain");
+        if (plain == null || !wld.wd().has(WorldData.FLOODPLAIN)) {
+            helper.fail("the delta-test world has no floodplain layer or no notes.delta.floodplain");
+            return;
+        }
+        double hw = wld.note().getAsJsonObject("river").get("half_width").getAsDouble();
+        int fromY = (int) Math.ceil(wld.note().get("plain_y").getAsDouble()) + 12;
+        int reach = (int) Math.ceil(hw + 1.0 + 0.5 * hw) + 2;   // the bank zone (Rivers) and a margin
+        int[] onPlain = new int[3], offPlain = new int[3];   // columns, sand tops, soil tops
+        StringBuilder bad = new StringBuilder();
+        int plainFrom = (int) Math.round(plain.get("from_x").getAsDouble()) + 15;
+        int plainTo = (int) Math.round(plain.get("to_x").getAsDouble()) - 15;
+        int slopeFrom = (int) Math.round(wld.note().getAsJsonObject("delta").get("from_x").getAsDouble()) - 185;
+        int slopeTo = (int) Math.round(wld.note().getAsJsonObject("delta").get("from_x").getAsDouble()) - 45;
+        for (int pass = 0; pass < 2; pass++) {
+            int[] tally = pass == 0 ? onPlain : offPlain;
+            int x0 = pass == 0 ? plainFrom : slopeFrom, x1 = pass == 0 ? plainTo : slopeTo;
+            for (int x = x0; x <= x1; x++) {
+                for (int side : new int[] {1, -1}) {
+                    int found = 0;
+                    for (int d = 1; d <= reach && found < 2; d++) {
+                        int z = side * d;
+                        BlockState top = ground(wld.level(), x, z, fromY);
+                        if (top == null)
+                            continue;   // the channel's water
+                        found++;
+                        tally[0]++;
+                        if (top.is(Blocks.SAND))
+                            tally[1]++;
+                        else if (WaterBodies.levees(top))
+                            tally[2]++;
+                        if (pass == 0 && !top.is(Blocks.SAND) && bad.length() < 600)
+                            bad.append(String.format(" (%d,%d) %s;", x, z, top.getBlock().getDescriptionId()));
+                    }
+                }
+            }
+        }
+        DeepTime.LOGGER.info("[gametest] leveesAreSandOnTheFloodplainOnly plain columns={} sand={} soil={}; slope columns={} sand={} soil={}{}",
+                onPlain[0], onPlain[1], onPlain[2], offPlain[0], offPlain[1], offPlain[2], bad.length() == 0 ? "" : " not sand on the plain:" + bad);
+        helper.assertTrue(onPlain[0] >= 300, "only " + onPlain[0] + " bank columns checked on the plain");
+        helper.assertTrue(offPlain[0] >= 300, "only " + offPlain[0] + " bank columns checked on the slope");
+        helper.assertTrue(onPlain[2] == 0, onPlain[2] + " of " + onPlain[0] + " bank columns on the floodplain keep a soil top:" + bad);
+        helper.assertTrue(onPlain[1] >= WITHIN_SHARE * onPlain[0], onPlain[1] + " of " + onPlain[0] + " bank columns on the floodplain are sand:" + bad);
+        helper.assertTrue(offPlain[2] >= 0.5 * offPlain[0], "only " + offPlain[2] + " of " + offPlain[0]
+                + " bank columns off the floodplain keep a soil top (" + offPlain[1] + " sand)");
         helper.succeed();
     }
 }
