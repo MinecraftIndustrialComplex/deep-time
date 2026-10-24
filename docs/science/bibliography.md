@@ -4142,13 +4142,14 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Lonsdale, P. (2005). Creation of the Cocos and Nazca plates by fission of the Farallon plate. Tectonophysics 404(3-4):237-264.
 - DOI or URL: 10.1016/j.tecto.2005.05.011.
 - Cited as: "Lonsdale 2005, Tectonophysics 404:237-264".
-- Ledger ids: PLT-146
+- Ledger ids: PLT-146, PLT-532 (2026-10-24)
 - Access: paywalled.
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Read so far (by the project): not stated.
 - Read in this pass: metadata only.
 - Reference check: correct; the design cites it for Farallon and not for lifetime statistics (the paper is about a plate fission event).
+- Read 2026-10-24 (the front lane, PLT-532; abstract only, the Scripps Scholars page through the lane's research agent): the Farallon plate's fission into the Cocos and Nazca plates at about 23 Ma, by the "divergence of slab-pull stresses".
 
 ### Wilson1966
 - Reference: Wilson, J. T. (1966). Did the Atlantic close and then re-open? Nature 211(5050):676-681.
@@ -5779,13 +5780,14 @@ with pdftotext; the others are abstracts on the publisher's or the laboratory's 
 - Reference: Bird, P. (2003). An updated digital model of plate boundaries. Geochemistry, Geophysics, Geosystems 4(3):1027.
 - DOI or URL: 10.1029/2001GC000252; full text http://peterbird.name/publications/2003_PB2002/2001GC000252.pdf
 - Cited as: "Bird 2003, Table 3"
-- Ledger ids: PLT-213 (and PLT-214, PLT-221 by reference), PLT-401 (2026-10-21: the CCB's length, speed and area), PLT-500 and PLT-501 (2026-10-23: the boundary measure's shares and the trenches' facing), PLT-502 (2026-10-23: PB2002_steps.dat's segments). The same work is under `Bird2003` in the plate tectonics and climate sections for other claims.
+- Ledger ids: PLT-213 (and PLT-214, PLT-221 by reference), PLT-401 (2026-10-21: the CCB's length, speed and area), PLT-500 and PLT-501 (2026-10-23: the boundary measure's shares and the trenches' facing), PLT-502 (2026-10-23: PB2002_steps.dat's segments), PLT-531 (2026-10-24: the boundary's geometry, its pieces, junctions, tortuosity and the plates' perimeters), PLT-532 (2026-10-24: a plate is one region, [112] and [123]). The same work is under `Bird2003` in the plate tectonics and climate sections for other claims.
 - Access: open (the author's site).
 - Read so far (by the project): full text, 2026-10-02: Table 3 "Collective Properties of Plate Boundaries by Class": CCB 23,003 km (8.8 %), CTF 26,132 (10.0 %), CRB 27,472 (10.5 %), OSR 67,338 (25.8 %), OTF 47,783 (18.3 %), OCB 17,449 (6.7 %), SUB 51,310 (19.7 %), total 260,487 km (100 %); paragraph 126 defines SUB as convergent steps "with a Benioff zone of intermediate to deep earthquakes and/or a parallel volcanic arc with Quaternary activity", "not divided into continental and oceanic types"; 5,819 steps of mean length 44.7 km. 2026-10-23 (V1 gap 2): SUB's area flux 0.086516 m2/s over 51,310 km is 53.2 mm/yr across the trench, against a mean relative speed of 62.3 (the agent's arithmetic on Table 3); and PB2002_steps.dat (the steps file beside the paper, `Bird2003/PB2002_steps.dat`) read with a lane script: OSR runs median 75 km and 165 km length-weighted, transform runs 0.71 of the ridge's length, 82 % of the ridge and 49 % of the subduction zones within 20 degrees of orthogonal to the relative motion.
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct.
 - Read again 2026-10-21 (the crust flux into collision fronts, PLT-401; the library copy `Bird2003/Bird2003.txt`): Table 3's other columns for the continental convergent boundary, "23,003 (8.8%)" km, mean velocity "26.2" mm/a, area production "0.013616 (12.6%)" m2/s (consumed: 0.43 km2 a year; over the length, 18.7 mm/yr of normal convergence, against the full vector's 26.2); paragraph 127: "Continental plate boundary steps are any that are not oceanic. (Thus, transitional steps are considered continental.)", oceanic steps being those "within seafloor whose age is known from linear magnetic anomalies to be less than 180 Ma" and/or "at water depths exceeding 2000 m", and SUB steps classed first, so a CCB step is a convergent step on continental or transitional lithosphere with no Benioff zone or arc.
 - Read again 2026-10-23 (the docking lane's diagnosis, plates.md "What transference exposes"; the library copy `Bird2003/Bird2003.txt`): Table 3's area production by class, m2/s: CRB +0.011502 (continental rift boundaries: +0.36 km2 a year made, against the CCB's 0.013616, 0.43 km2 a year consumed), SUB 0.086516, OSR +0.095348, OCB 0.007141, CTF 0.000599, OTF +0.001022.
+- Read again 2026-10-24 (the front lane, plates.md "The front's length: why the plates are ragged"; the paper's text and its auxiliary files `PB2002_boundaries.dig`, `PB2002_plates.dig` and `PB2002_steps.dat`, kept in the library's `Bird2003/` with the lane's output `PB2002_geometry.json`): [110] "plates + junctions = boundaries + 2", and with triple junctions only and no island plates "junctions = 2 x (plates - 2), and boundaries = 3 x (plates - 2)"; [111] "52 plates ... Together they exactly cover the Earth, with no gaps or overlaps. There are 100 triple-junction points"; [112] "A plate boundary is a continuous simply-connected curve on the surface of the Earth which everywhere separates the same two different plates, and either (1) begins at a junction and ends at a junction, or (2) closes on itself in an isolated loop. There are 150 plate boundaries in model PB2002, and all are of type 1", the Pacific with 23 neighbours, 6 small plates with 2; [118] the soft limit of plate size near Africa's, "The plate width at which this soft limit occurs is about one Earth radius", mantle convection exerting tractions on larger plates "that tend to break them up"; [122] the boundaries file, 6,048 points in 229 segments; [123] the plates file (52 closed outlines) and "5,819 steps in model PB2002, with mean length of 44.7 km and length range from 1 km to 109 km". Measured from the files with the lane's scripts (`tools/review/pool/bird/bird.py`, Bird's divider walk of a fixed chord, and `bird_raster.py`, PB2002 on the model's 100,000-point lattice): the boundary 246,541 km at a 77 km chord and 231,009 at 380 km, the plates' perimeters over their spherical caps' 1.418 and 1.274, tortuosity (a piece's length over the great circle between its junctions) sum over sum 1.220 and 1.143, the mostly-SUB pieces' 1.145 and 1.110 (ledger PLT-531 has the rest). Also for PLT-532 the same day: [123] PB2002_plates.dig "contains 52 segments, each titled with the two-letter identifier of a plate. Each segment is a closed curve outlining that plate"; [112] "The Shetland plate comes closest to being an 'island' plate (type 2) because it is almost surrounded by the Antarctica plate, but it also has a short boundary with the Scotia plate"; [79] "The term 'microplate' has not been precisely defined, but in practice is used most often for a plate of 100–500 km dimensions which appears spontaneously in the center of an ocean spreading system, and rotates rapidly with respect to its neighboring plates".
 
 ### Hildreth2007_pp1744
 - Reference: Hildreth, W. (2007). Quaternary magmatism in the Cascades: geologic perspectives. U.S. Geological Survey Professional Paper 1744.
@@ -8667,3 +8669,43 @@ The sources of V1 gap 2 (build log 2026-10-23 "Gap 2"; plates.md, the section "P
 - Access: paywalled (HAL holds a notice only).
 - Library: not kept (the abstract from the HAL API).
 - Read so far (by the project): abstract, 2026-10-23: "roughly only 8% of the plate boundaries total length shows a very low obliquity (ranging from 0 to 10 deg, sub-orthogonal to the plate displacement)".
+
+## The front's length: one plate, one body (PLT-530 to PLT-533), added 2026-10-24
+
+The sources of the front lane's diagnosis (plates.md "The front's length: why the plates are ragged", "What Earth does"). Bird 2003 is under `Bird2003_Table3` (read again the same day), Lonsdale 2005 under `Lonsdale2005` and Mallard et al. 2016 under `Mallard2016`.
+
+### StockLee1994
+- Reference: Stock, J. M. and Lee, J. (1994). Do microplates in subduction zones leave a geological record? Tectonics 13(6):1472-1487 (the title from memory; the running head reads "Microplates in subduction zones").
+- DOI or URL: 10.1029/94TC01808; CaltechAUTHORS https://authors.library.caltech.edu/records/mdth9-4yp93/files/tect936.pdf
+- Cited as: "Stock & Lee 1994".
+- Ledger ids: PLT-532
+- Access: open copy (the authors' institutional repository).
+- Library (the project's source library, not distributed): fetched 2026-10-24. Files: `StockLee1994/tect936.pdf` (a scan with a text layer), `tect936.txt` (pdftotext -layout).
+- Read so far (by the project): full text, 2026-10-24 (the lane's research agent, then the quotes checked in the library's text). Introduction: "As a spreading center approaches a trench in a subduction setting, the intervening subducted plate may fragment into smaller pieces down to linear dimensions of ~100 km (microplates)"; "However, if a small fragment breaks off a large plate, then it may lose its slab-pull force and become driven entirely by different conditions." "Styles of Microplate Death": the Monterey, Arguello, Guadalupe and Magdalena plates "became attached to the Pacific plate when their ridge boundaries with the Pacific plate stopped spreading"; "None of these microplates became attached to the North America plate." Conclusions: "a very small microplate with insufficient slab-pull force may stagnate or attach itself mainly to the overriding plate".
+
+### Gordon1998
+- Reference: Gordon, R. G. (1998). The plate tectonic approximation: plate nonrigidity, diffuse plate boundaries, and global plate reconstructions. Annual Review of Earth and Planetary Sciences 26:615-642.
+- DOI or URL: 10.1146/annurev.earth.26.1.615
+- Cited as: "Gordon 1998".
+- Ledger ids: PLT-532
+- Access: paywalled; the full text was read from a copy on a third-party site (2026-10-24).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-24 (the lane's research agent): "The central assumption of plate tectonics is that the plates are rigid."
+
+### Wang2013
+- Reference: Wang, Y., Forsyth, D. W., Rau, C. J., Carriero, N., Schmandt, B., Gaherty, J. B. and Savage, B. (2013). Fossil slabs attached to unsubducted fragments of the Farallon plate. Proceedings of the National Academy of Sciences 110(14):5342-5346 (authors, title and pages from memory).
+- DOI or URL: 10.1073/pnas.1214880110 (open access).
+- Cited as: "Wang et al. 2013".
+- Ledger ids: PLT-532
+- Access: open.
+- Library: not kept (the publisher's page returned a page shell to the VM's fetch, 2026-10-24).
+- Read so far (by the project): full text, 2026-10-24 (the lane's research agent): "Some fragments were incorporated into the Pacific plate as subduction and spreading ceased."
+
+### Nicholson1994
+- Reference: Nicholson, C., Sorlien, C. C., Atwater, T., Crowell, J. C. and Luyendyk, B. P. (1994). Microplate capture, rotation of the western Transverse Ranges, and initiation of the San Andreas transform as a low-angle fault system. Geology 22:491-495 (authors and title from memory).
+- DOI or URL: not checked.
+- Cited as: "Nicholson et al. 1994".
+- Ledger ids: PLT-532
+- Access: paywalled.
+- Library: not kept.
+- Read so far (by the project): abstract only, 2026-10-24 (the lane's research agent): the Monterey microplate captured by the Pacific plate at about 20 Ma.

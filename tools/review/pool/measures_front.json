@@ -1,0 +1,72 @@
+{
+  "_doc": "The front lane's measures (2026-10-24): why the plate boundary and the subduction front are longer than Earth's. `front` splits the boundary into the plates' sizes (the sum of their spherical-cap perimeters) and their shapes (E, the sum of perimeters over the sum of cap perimeters), from the dynamics record alone; `boundgeom` measures the boundary's pieces between triple junctions, their tortuosity and the plates' perimeters with Bird 2003's own divider method, from the crust budget's maps (runs made with +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps). Pass it with --registry tools/review/pool/measures_front.json. Bird 2003's PB2002 numbers are tools/review/pool/bird/bird.py's over PB2002_plates.dig, PB2002_boundaries.dig and PB2002_steps.dat (the source library's Bird2003/, its output Bird2003/PB2002_geometry.json; ledger PLT-531). Definitions in measure_front.py and measure_boundgeom.py.",
+  "measures": {
+    "front": {
+      "version": 1,
+      "doc": "the boundary as plate sizes times plate shapes, the front by the subducting plate's size and over time, and the shapes' excess by the plate's age, origin, speed guard, crust and speed; definitions in measure_front.py",
+      "command": ["{py}", "-I", "{tools}/measure_front.py", "{run}"],
+      "python": "numpy",
+      "needs": ["rec"],
+      "columns": [
+        {"key": "plates", "label": "plates alive per step (Bird 52)", "target": null, "digits": 1},
+        {"key": "bnd_km", "label": "boundary, straight km per step (Bird 260,487)", "target": null, "digits": 0},
+        {"key": "pcap_sum_km", "label": "sum of cap perimeters, km (Bird 345,081)", "target": null, "digits": 0},
+        {"key": "excess", "label": "E = sum of perimeters / sum of cap perimeters (Bird 1.510, at 77 km 1.418)", "target": null, "digits": 3},
+        {"key": "ppcap_p50", "key2": "ppcap_aw", "label": "P / P_cap: median / area-weighted", "target": null, "digits": 3, "pair": true},
+        {"key": "excess_small", "key2": "excess_mid", "label": "E under 0.0377 sr / 0.0377 to 0.5 sr (Bird 1.459 / 1.424)", "target": null, "digits": 3, "pair": true},
+        {"key": "excess_large", "label": "E at 0.5 sr or more (Bird 1.579)", "target": null, "digits": 3},
+        {"key": "bnd_small", "key2": "bnd_large", "label": "share of perimeters, small / large plates (Bird 0.180 / 0.535)", "target": null, "digits": 3, "pair": true},
+        {"key": "front_km", "label": "subduction front, straight km per step (Bird SUB 51,310)", "target": null, "digits": 0},
+        {"key": "oo_front_km", "label": "ocean-ocean front, straight km per step", "target": null, "digits": 0},
+        {"key": "front_small", "key2": "front_large", "label": "front by subducting plate: small / large (Bird 0.112 / 0.549)", "target": null, "digits": 3, "pair": true},
+        {"key": "front_per_pcap", "label": "front over the subducting plate's P_cap, area-weighted (Bird 0.194)", "target": null, "digits": 3},
+        {"key": "excess_t1", "key2": "excess_t9", "label": "E in 100 to 200 / 900 to 1000 Myr", "target": null, "digits": 3, "pair": true},
+        {"key": "bnd_t1", "key2": "bnd_t9", "label": "boundary km, first / last window", "target": null, "digits": 0, "pair": true},
+        {"key": "plates_t1", "key2": "plates_t9", "label": "plates, first / last window", "target": null, "digits": 1, "pair": true},
+        {"key": "excess_young", "key2": "excess_old", "label": "E of plates under 50 / 200 or more Myr old", "target": null, "digits": 3, "pair": true},
+        {"key": "excess_initial", "key2": "excess_rift", "label": "E by origin: the start's / a rift's", "target": null, "digits": 3, "pair": true},
+        {"key": "excess_init", "label": "E by origin: a subduction initiation's", "target": null, "digits": 3},
+        {"key": "excess_guard", "key2": "excess_free", "label": "E held by the speed guard / free", "target": null, "digits": 3, "pair": true},
+        {"key": "share_guard", "label": "guard-held plates' share of the perimeters", "target": null, "digits": 3},
+        {"key": "excess_cont", "key2": "excess_ocean", "label": "E with continental share 0.3 or more / less", "target": null, "digits": 3, "pair": true},
+        {"key": "excess_slow", "key2": "excess_fast", "label": "E under / over 20 mm/yr", "target": null, "digits": 3, "pair": true}
+      ]
+    },
+    "boundgeom": {
+      "version": 2,
+      "doc": "the boundary's pieces between triple junctions, their tortuosity, the plates' perimeters against spherical caps, the subduction front's runs and the plates' fragments, measured with Bird 2003's divider walks at 77 and 380 km on the visible samples' Delaunay triangulation; needs the crust budget's maps (+DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps). The labels give PB2002 rasterised on the same 100,000-point lattice and put through the same code (tools/review/pool/bird/bird_raster.py), then Bird's own divider numbers; definitions in measure_boundgeom.py (ledger PLT-531)",
+      "command": ["{py}", "-I", "{tools}/measure_boundgeom.py", "{run}"],
+      "python": "numpy",
+      "needs": ["rec"],
+      "columns": [
+        {"key": "plates", "label": "plates (PB2002 52)", "target": null, "digits": 1},
+        {"key": "bnd_l77", "key2": "bnd_l380", "label": "boundary at 77 / 380 km, km (PB2002 on the lattice 273,631 / 236,679; Bird 246,541 / 231,009)", "target": null, "digits": 0, "pair": true},
+        {"key": "e_l77", "key2": "e_l380", "label": "perimeters over cap perimeters at 77 / 380 km (lattice 1.578 / 1.365; Bird 1.418 / 1.274)", "target": null, "digits": 3, "pair": true},
+        {"key": "ppcap_aw_l380", "label": "P / P_cap at 380 km, area-weighted (lattice 1.396; Bird 1.324)", "target": null, "digits": 3},
+        {"key": "junctions", "key2": "junctions_euler", "label": "triple junctions / 2(N-2) (lattice 98 / 100; Bird 100)", "target": null, "digits": 1, "pair": true},
+        {"key": "pieces", "key2": "loops", "label": "pieces / closed loops (lattice 147 / 1; Bird 150 / 0)", "target": null, "digits": 1, "pair": true},
+        {"key": "stub_share", "key2": "loop_share", "label": "pieces with ends under 77 km apart / loops' share of the boundary (lattice 0.020 / 0.031)", "target": null, "digits": 3, "pair": true},
+        {"key": "piece_p50_l77", "key2": "piece_wmean_l77", "label": "piece length at 77 km: median / length-weighted, km (lattice 1,000 / 4,498; Bird 899 / 1,644)", "target": null, "digits": 0, "pair": true},
+        {"key": "tau_sum_l77", "key2": "tau_sum_l380", "label": "tortuosity, sum of lengths over sum of chords, 77 / 380 km (lattice 1.323 / 1.151; Bird 1.220 / 1.143)", "target": null, "digits": 3, "pair": true},
+        {"key": "tau_wmean_l77", "key2": "tau_wmean_l380", "label": "tortuosity, length-weighted mean, 77 / 380 km (lattice 1.400 / 1.212; Bird 1.290 / 1.205)", "target": null, "digits": 3, "pair": true},
+        {"key": "tau_front_sum_l77", "key2": "tau_front_sum_l380", "label": "tortuosity of mostly-front pieces, 77 / 380 km (lattice 1.199 / 1.100; Bird SUB 1.145 / 1.110)", "target": null, "digits": 3, "pair": true},
+        {"key": "tau_div_sum_l77", "key2": "tau_other_sum_l77", "label": "tortuosity at 77 km, mostly divergent / the rest (lattice 1.388 / 1.319)", "target": null, "digits": 3, "pair": true},
+        {"key": "share_front", "key2": "share_div", "label": "share of the boundary in mostly-front / mostly-divergent pieces (lattice 0.198 / 0.461)", "target": null, "digits": 3, "pair": true},
+        {"key": "front_l77", "key2": "front_l380", "label": "subduction front at 77 / 380 km, km (lattice 52,564 / 48,406; Bird SUB 51,310)", "target": null, "digits": 0, "pair": true},
+        {"key": "arcfront_l77", "label": "front under oceanic overriding crust at 77 km, km (Stern & Scholl 14,500 of island arc)", "target": null, "digits": 0},
+        {"key": "comps_per_plate", "key2": "frag_samples", "label": "connected pieces per plate / samples outside their plate's largest (PB2002 1 / 0)", "target": null, "digits": 3, "pair": true},
+        {"key": "e_l380_first", "key2": "e_l380_last", "label": "perimeters over cap perimeters at 380 km, first / last snapshot", "target": null, "digits": 3, "pair": true},
+        {"key": "frag_small", "key2": "frag_mid", "label": "samples in cut-off pieces of 1 to 10 / 11 to 100 samples, share", "target": null, "digits": 4, "pair": true},
+        {"key": "frag_big", "label": "samples in cut-off pieces over 100 samples, share", "target": null, "digits": 4},
+        {"key": "frag_cut", "key2": "frag_own", "label": "samples in cut-off pieces cut off their plate's own groups / terranes of their own, share", "target": null, "digits": 4, "pair": true},
+        {"key": "bnd_l77_clean", "key2": "bnd_l380_clean", "label": "each plate one body: boundary at 77 / 380 km, km (lattice 273,631 / 236,679)", "target": null, "digits": 0, "pair": true},
+        {"key": "e_l77_clean", "key2": "e_l380_clean", "label": "each plate one body: perimeters over caps at 77 / 380 km (lattice 1.578 / 1.365)", "target": null, "digits": 3, "pair": true},
+        {"key": "junctions_clean", "key2": "loops_clean", "label": "each plate one body: junctions / loops (lattice 98 / 1)", "target": null, "digits": 1, "pair": true},
+        {"key": "tau_sum_l77_clean", "key2": "tau_sum_l380_clean", "label": "each plate one body: tortuosity at 77 / 380 km (lattice 1.323 / 1.151)", "target": null, "digits": 3, "pair": true},
+        {"key": "tau_front_sum_l77_clean", "key2": "tau_front_sum_l380_clean", "label": "each plate one body: the front's tortuosity at 77 / 380 km (lattice 1.199 / 1.100)", "target": null, "digits": 3, "pair": true},
+        {"key": "front_l77_clean", "key2": "front_l380_clean", "label": "each plate one body: the front at 77 / 380 km, km (lattice 52,564 / 48,406)", "target": null, "digits": 0, "pair": true},
+        {"key": "arcfront_l77_clean", "label": "each plate one body: the front under oceanic crust at 77 km, km", "target": null, "digits": 0}
+      ]
+    }
+  }
+}
