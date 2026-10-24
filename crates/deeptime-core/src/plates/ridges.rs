@@ -38,6 +38,10 @@
 //!   profile at the sample's age (the preset's age–depth law, `pools::floor_at`).
 //!   The crust's age is α times the time since the last resampling, and its ridge direction is
 //!   r = p × (s_i − s_j) normalised (parallel to the ridge, perpendicular to spreading).
+//!   With `ridge_segment_km` (on by default since 2026-10-23, ledger PLT-502) the gap between
+//!   two diverging plates is cut into ridge segments normal to their motion
+//!   (`segment_ridges`): which plate a point goes to and its α follow its band's segment, and
+//!   the nearest plate and the midline above hold only where a band keeps them.
 //! - The first crust made between two plates emits a ridge_birth event (caused by the rift that
 //!   separated them, when one did) once max(3, n/2000) samples of new crust lie between them; a
 //!   pair's ridge is born once. Plates left without samples die; plates smaller than
