@@ -26,6 +26,7 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.chunk.UpgradeData;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Aquifer;
 import net.minecraft.world.level.levelgen.Beardifier;
 import net.minecraft.world.level.levelgen.GenerationStep;
@@ -169,10 +170,14 @@ public final class CubeFill {
         NoiseChunk noise = NoiseChunk.forChunk(c, random, none, settings, g.globalFluidPicker.get(), Blender.empty());
         c.getOrCreateNoiseChunk(x -> noise);
         g.doCreateBiomes(Blender.empty(), random, structures, c);
+        // Each step's status as the chunk pipeline would set it: ProtoChunk.getNoiseBiome refuses
+        // before BIOMES, and the surface rules read the chunk's own quarts.
+        c.setPersistedStatus(ChunkStatus.BIOMES);
         NoiseSettings ns = settings.noiseSettings().clampToHeightAccessor(c.getHeightAccessorForGeneration());
         int cellCountY = Mth.floorDiv(ns.height(), ns.getCellHeight());
         if (cellCountY > 0)
             g.doFill(Blender.empty(), structures, random, c, Mth.floorDiv(ns.minY(), ns.getCellHeight()), cellCountY);
+        c.setPersistedStatus(ChunkStatus.NOISE);
         // The partner's region answers its own quarts from the chunk, its neighbours' as they hold them.
         BiomeSource source = g.getBiomeSource();
         Holder<Biome> ocean = deepOcean(source);
@@ -182,8 +187,10 @@ public final class CubeFill {
                 BiomeManager.obfuscateSeed(region.getSeed()));
         g.buildSurface(c, new WorldGenerationContext(g, level), random, structures, manager, biomes, Blender.empty());
         g.deepTimeSurface(c);
+        c.setPersistedStatus(ChunkStatus.SURFACE);
         carve(g, region.registryAccess(), region.getSeed(), random, c, noise);
         g.afterCarvers(c);
+        c.setPersistedStatus(ChunkStatus.CARVERS);
         return c;
     }
 
