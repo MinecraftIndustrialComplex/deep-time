@@ -111,6 +111,7 @@ fn net(elev: &[i16], params: &HydroParams) -> Output {
         params,
         width_scale: 1.0,
         mouths: true,
+        floodplains: None,
     })
 }
 

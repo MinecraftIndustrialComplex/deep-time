@@ -126,8 +126,9 @@ const MAX_SAMPLES_Z: usize = 64;
 /// `delta` (2026-10-23) is a number too, what a delta plain added to the ground, but it says where
 /// the plain is: the world's plain is the nearest cell's ([`PLAIN_NEAREST`]), and a footprint mean
 /// spread the layer over 5,747 cells beside the D5 world's plains, 4,808 of them not above the
-/// sea's level (HYD-146).
-const CATEGORICAL: [&str; 9] = [
+/// sea's level (HYD-146). `floodplain` (2026-10-24) likewise says where a floodplain is, with nodata
+/// off it, which a mean would spread or drop (HYD-152).
+const CATEGORICAL: [&str; 10] = [
     "climate/koppen",
     "climate/koppen_l2",
     "climate/wetland",
@@ -137,6 +138,7 @@ const CATEGORICAL: [&str; 9] = [
     "meta/province",
     "strata/lift",
     crate::bake::water::DELTA_LAYER,
+    crate::bake::water::FLOODPLAIN_LAYER,
 ];
 
 /// The layers a world cell on a delta plain (its nearest simulation cell's `delta` above 0) takes
@@ -694,11 +696,12 @@ pub fn lambda_note(choice: Option<&LambdaChoice>, search: LambdaSearch) -> Value
 
 /// Bytes per cell of the layers the bake writes on each grid (level, name, bytes), summed over the
 /// layers (the pass loads all of one grid's layers at once): L1 holds the horizon stacks, L2 and L3
-/// a few scalars (L3's 9 include the delta plains' raise, 2 B, `water::DELTA_LAYER`). Measured on a
+/// a few scalars (L3's 11 include the delta plains' raise, 2 B, `water::DELTA_LAYER`, and the
+/// floodplains' change, 2 B, `water::FLOODPLAIN_LAYER`). Measured on a
 /// baked planet (`the_projection_estimate_covers_the_baked_layers` fails if the bake outgrows
 /// them); a figure of the memory model, not a physical one.
 pub(crate) const LAYER_BYTES_PER_CELL: [(u32, &str, u64); 3] =
-    [(1, "L1", 288), (2, "L2", 16), (3, "L3", 9)];
+    [(1, "L1", 288), (2, "L2", 16), (3, "L3", 11)];
 
 /// Of L3's bytes a cell, the water's layers (`water_level` 2 B, `playa` and `closed_basin` 1 B
 /// each): they are on the hydrology's grid, which is L3 halved where L3 is over

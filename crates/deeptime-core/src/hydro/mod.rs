@@ -582,6 +582,9 @@ pub struct HydroParams {
     pub delta_max_mouths: u32,
     /// How many channel widths apart a delta's mouths lie along its front (HYD-138).
     pub delta_mouth_spacing: f64,
+    /// Floodplains along the rivers (GFPLAIN, HYD-150 to HYD-152; V1 gap 5, stage 2): flats at the
+    /// river's bank, one block over its water, where the ground lies within the flood depth of it.
+    pub floodplains: bool,
 }
 
 impl Default for HydroParams {
@@ -615,6 +618,7 @@ impl Default for HydroParams {
             delta_shape_k: 1.0,       // ledger: HYD-135 (game-choice)
             delta_max_mouths: 8,      // ledger: HYD-138 (game-choice)
             delta_mouth_spacing: 2.0, // ledger: HYD-138
+            floodplains: true,
         }
     }
 }

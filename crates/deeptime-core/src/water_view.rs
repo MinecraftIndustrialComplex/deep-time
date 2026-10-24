@@ -603,6 +603,7 @@ fn derive_with_rivers(
         params: &view.hydro,
         width_scale: view.rivers_scale,
         mouths: false,
+        floodplains: None,
     });
     // Lake cells a block deep or more: a shallower one is dry ground in the game (and, on a cell
     // of 4.8 km, a margin of the flat a lake fills, which draws as streaks).

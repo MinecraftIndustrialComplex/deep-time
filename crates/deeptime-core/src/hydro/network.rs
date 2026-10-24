@@ -83,6 +83,30 @@ pub struct Input<'a> {
     /// Whether to find the sea mouths and their catchments ([`Output::mouths`], for the delta
     /// stage); without, `mouths` is empty.
     pub mouths: bool,
+    /// Whether to find the floodplains ([`Output::floodplain`], HYD-150 to HYD-152); without,
+    /// `floodplain` is empty.
+    pub floodplains: Option<Floodplains<'a>>,
+}
+
+/// What finding the floodplains needs.
+#[derive(Clone, Copy, Debug)]
+pub struct Floodplains<'a> {
+    /// Metres per block vertically: the flood depth is in metres.
+    pub m_per_block_v: f64,
+    /// Cells that are no floodplain whatever their height, sorted (the delta plains, which are
+    /// laid already).
+    pub skip: &'a [u32],
+}
+
+/// GFPLAIN's flood depth over a channel cell, h = a A^b metres with A the area draining to it in
+/// m² (Nardi et al. 2019, "GFPLAIN250m, a global high-resolution dataset of Earth's floodplains",
+/// Sci. Data 6:180309; the values from its code, `03-GFPLAIN.py`).
+pub const FLOOD_DEPTH_A: f64 = 0.01; // ledger: HYD-150
+pub const FLOOD_DEPTH_B: f64 = 0.30; // ledger: HYD-150
+
+/// [`FLOOD_DEPTH_A`] A^[`FLOOD_DEPTH_B`], metres, for a drainage area in km².
+pub fn flood_depth_m(area_km2: f64) -> f64 {
+    FLOOD_DEPTH_A * (area_km2.max(0.0) * 1e6).powf(FLOOD_DEPTH_B)
 }
 
 /// One lake.
@@ -156,6 +180,10 @@ pub struct Output {
     pub rivers: Rivers,
     /// The rivers that reach the open sea, in chain order.
     pub mouths: Vec<SeaMouth>,
+    /// The floodplain's height per cell, 1/16 block ([`NODATA`] elsewhere; empty without
+    /// [`Input::floodplains`]): the bank of the river it drains to, one block over the river's
+    /// water (HYD-151).
+    pub floodplain: Vec<i16>,
     /// Counts and timings for `notes.bake.water`.
     pub stats: Value,
 }
@@ -1165,6 +1193,30 @@ pub fn run(inp: &Input<'_>) -> Output {
             }
         }
     }
+    // 8b. Floodplains (HYD-150 to HYD-152): each river cell's bank, one block over its water,
+    // and the flood depth over it.
+    let (floodplain, flood_stats) = match &inp.floodplains {
+        Some(fp) => {
+            let bank: HashMap<u32, (i16, f32)> = river_cells
+                .iter()
+                .map(|&d| {
+                    let du = d as usize;
+                    let w_raw = (surface(du) * 16.0).round() as i32;
+                    (d, bank_of(fill[du], w_raw, area[du], fp.m_per_block_v))
+                })
+                .collect();
+            let at = FloodAt {
+                g: &g,
+                inp,
+                fp,
+                state: &state,
+                fill: &fill,
+                area: &area,
+            };
+            at.find(&to, &bank, &river_cells, land, cell_km2, cell_m)
+        }
+        None => (Vec::new(), Value::Null),
+    };
     rivers.build_index();
     // The sea mouths, for the delta stage.
     let mut mouths: Vec<SeaMouth> = Vec::new();
@@ -1269,6 +1321,7 @@ pub fn run(inp: &Input<'_>) -> Output {
             "max_discharge_m3s": (q_max * 10.0).round() / 10.0,
             "widest_blocks": (w_max * 10.0).round() / 10.0,
             "below_sea": below_sea,
+            "floodplains": flood_stats,
             "millis": Value::Object(millis),
         }),
     );
@@ -1280,7 +1333,222 @@ pub fn run(inp: &Input<'_>) -> Output {
         lakes,
         rivers,
         mouths,
+        floodplain,
         stats,
+    }
+}
+
+/// A river cell's bank and flood depth (both 1/16 block): the floodplain beside it stands at its
+/// valley floor `fill`, but at least one block over its water `w_raw` (the plain's top block one
+/// above the water's, HYD-151), and spreads over the cells draining to it whose ground lies at
+/// most the flood depth over that floor (HYD-150).
+fn bank_of(fill: i16, w_raw: i32, area_km2: f32, m_per_block_v: f64) -> (i16, f32) {
+    // The plain's top block is ⌈H⌉ − 1 and the water's ⌈w⌉ − 1: H in (⌈w⌉, ⌈w⌉ + 1] blocks.
+    let lowest = (w_raw + 15).div_euclid(16) * 16 + 1;
+    let level = i32::from(fill)
+        .max(lowest)
+        .clamp(i32::from(i16::MIN) + 1, i32::from(i16::MAX)) as i16;
+    let h = flood_depth_m(f64::from(area_km2)) / m_per_block_v * 16.0;
+    (level, h as f32)
+}
+
+/// What finding the floodplains reads.
+struct FloodAt<'a> {
+    g: &'a Grid,
+    inp: &'a Input<'a>,
+    fp: &'a Floodplains<'a>,
+    state: &'a [u8],
+    fill: &'a [i16],
+    area: &'a [f32],
+}
+
+impl FloodAt<'_> {
+    /// The floodplain (GFPLAIN, HYD-150, HYD-152): a land cell, not a lake's, that drains to a
+    /// river cell (its first one downstream) and whose filled height is at most the flood depth
+    /// over that cell's takes the cell's bank level (HYD-151); a river cell beside such a cell
+    /// takes its own. Returns the layer and `stats.floodplains`.
+    fn find(
+        &self,
+        to: &(dyn Fn(usize) -> Option<usize> + Sync),
+        bank: &HashMap<u32, (i16, f32)>,
+        river_cells: &[u32],
+        land: usize,
+        cell_km2: f64,
+        cell_m: f64,
+    ) -> (Vec<i16>, Value) {
+        const UNSET: u32 = u32::MAX - 1;
+        const NO: u32 = u32::MAX;
+        let (state, fill, area) = (self.state, self.fill, self.area);
+        let n = fill.len();
+        let deep = |c: usize| is_deep(state, fill, self.inp.elev, c);
+        // Each cell's first river cell downstream: none past the sea, a lake a block deep, a sink.
+        let mut drain = vec![UNSET; n];
+        let mut path: Vec<usize> = Vec::new();
+        for c in 0..n {
+            if drain[c] != UNSET {
+                continue;
+            }
+            path.clear();
+            let mut cur = c;
+            let d = loop {
+                if drain[cur] != UNSET {
+                    break drain[cur];
+                }
+                if state[cur] & RIVER != 0 {
+                    break cur as u32;
+                }
+                if state[cur] & SEA != 0 || deep(cur) {
+                    break NO;
+                }
+                path.push(cur);
+                match to(cur) {
+                    Some(r) => cur = r,
+                    None => break NO,
+                }
+            };
+            if drain[cur] == UNSET {
+                drain[cur] = d;
+            }
+            for &q in &path {
+                drain[q] = d;
+            }
+        }
+        let skip = |c: usize| self.fp.skip.binary_search(&(c as u32)).is_ok();
+        // The height above the cell's drain, 1/16 block (HAND; GFPLAIN's elevation difference).
+        let hand = |c: usize| -> Option<(u32, i32)> {
+            let d = drain[c];
+            if d == NO || d as usize == c || state[c] & (LAKE | SEA) != 0 || skip(c) {
+                None
+            } else {
+                Some((d, i32::from(fill[c]) - i32::from(fill[d as usize])))
+            }
+        };
+        let mut level: Vec<i16> = (0..n)
+            .into_par_iter()
+            .map(|c| match hand(c) {
+                Some((d, hd)) => {
+                    let (lv, h) = bank[&d];
+                    if hd as f32 <= h { lv } else { NODATA }
+                }
+                None => NODATA,
+            })
+            .collect();
+        // The river cells beside the plain are part of it (the channel is cut into it).
+        let g = self.g;
+        let beside: Vec<u32> = river_cells
+            .iter()
+            .copied()
+            .filter(|&d| {
+                let du = d as usize;
+                state[du] & LAKE == 0
+                    && !skip(du)
+                    && (0..8).any(|k| g.nb(du, k).is_some_and(|nb| level[nb] != NODATA))
+            })
+            .collect();
+        for &d in &beside {
+            level[d as usize] = bank[&d].0;
+        }
+
+        // The record: the plain against the land, by the area its river drains, the heights above
+        // the drains, and how far laying it moves the ground.
+        const AREAS: [f64; 4] = [0.0, 1_000.0, 10_000.0, 100_000.0];
+        const HAND_EDGES: [i32; 9] = [0, 1, 2, 4, 8, 16, 32, 64, 128];
+        let mut hand_hist = [0u64; 10];
+        let (mut fp_by, mut ch_by) = ([0u64; 4], [0u64; 4]);
+        let proj = deeptime_format::Projection::of(self.inp.grid.circumference() as f64);
+        let (mut land60, mut fp60) = (0u64, 0u64);
+        let (mut raised, mut lowered, mut max_up, mut max_down) = (0u64, 0u64, 0i32, 0i32);
+        let mut cells = 0u64;
+        for c in 0..n {
+            let z = self.inp.grid.origin_block_z as f64 + (c / g.w) as f64 * g.r;
+            let in60 = proj.lat_deg(z).abs() <= 60.0;
+            if in60 && state[c] & SEA == 0 {
+                land60 += 1;
+            }
+            if let Some((_, hd)) = hand(c) {
+                let b = HAND_EDGES.iter().take_while(|&&e| hd >= e).count();
+                hand_hist[b] += 1;
+            }
+            let lv = level[c];
+            if lv == NODATA {
+                continue;
+            }
+            cells += 1;
+            if in60 {
+                fp60 += 1;
+            }
+            let d = drain[c] as usize;
+            for (k, &a) in AREAS.iter().enumerate() {
+                if f64::from(area[d]) >= a {
+                    fp_by[k] += 1;
+                }
+            }
+            let dz = i32::from(lv) - i32::from(self.inp.elev[c]);
+            if dz > 0 {
+                raised += 1;
+                max_up = max_up.max(dz);
+            } else if dz < 0 {
+                lowered += 1;
+                max_down = max_down.max(-dz);
+            }
+        }
+        for &d in river_cells {
+            for (k, &a) in AREAS.iter().enumerate() {
+                if f64::from(area[d as usize]) >= a {
+                    ch_by[k] += 1;
+                }
+            }
+        }
+        let share = |x: u64, of: u64| {
+            if of > 0 {
+                (x as f64 / of as f64 * 1e5).round() / 1e5
+            } else {
+                0.0
+            }
+        };
+        let km2 = |x: u64| (x as f64 * cell_km2).round();
+        let a_min = self.inp.params.river_min_area_km2;
+        let by_area: Vec<Value> = AREAS
+            .iter()
+            .enumerate()
+            .map(|(k, &a)| {
+                let channel_km = ch_by[k] as f64 * cell_m / 1000.0;
+                json!({
+                    "drain_min_km2": a,
+                    "flood_depth_m": (flood_depth_m(a.max(a_min)) * 10.0).round() / 10.0,
+                    "km2": km2(fp_by[k]),
+                    "share_of_land": share(fp_by[k], land as u64),
+                    "channel_cells": ch_by[k],
+                    "width_km": if channel_km > 0.0 {
+                        (fp_by[k] as f64 * cell_km2 / channel_km * 100.0).round() / 100.0
+                    } else {
+                        0.0
+                    },
+                })
+            })
+            .collect();
+        let edges = std::iter::once("below_0".to_string()).chain(
+            HAND_EDGES
+                .iter()
+                .map(|e| format!("from_{}", f64::from(*e) / 16.0)),
+        );
+        let hist: serde_json::Map<String, Value> =
+            edges.zip(hand_hist).map(|(k, v)| (k, json!(v))).collect();
+        let stats = json!({
+            "cells": cells,
+            "km2": km2(cells),
+            "share_of_land": share(cells, land as u64),
+            "share_of_land_within_60": share(fp60, land60),
+            "by_drain_area": by_area,
+            "river_cells_in_plain": beside.len(),
+            "hand_blocks": hist,
+            "raised_cells": raised,
+            "lowered_cells": lowered,
+            "max_raise_blocks": f64::from(max_up) / 16.0,
+            "max_lowering_blocks": f64::from(max_down) / 16.0,
+            "skipped_cells": self.fp.skip.len(),
+        });
+        (level, stats)
     }
 }
 
