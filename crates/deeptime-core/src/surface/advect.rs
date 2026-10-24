@@ -103,7 +103,10 @@ pub fn sources_with(
             let rot = rotation(DVec3::from_array(om), -dt_yr);
             let z = grid.block_z(j as i64) as f64;
             let (sp, cp) = (proj.sin_lat(z), proj.cos_lat(z));
-            let (sl, cl) = proj.lon_deg(grid.block_x(i as i64) as f64).to_radians().sin_cos();
+            let (sl, cl) = proj
+                .lon_deg(grid.block_x(i as i64) as f64)
+                .to_radians()
+                .sin_cos();
             let q = DVec3::new(cp * cl, cp * sl, sp);
             let (x, z) = frame.block(rot * q);
             [(x - ox) / r, (z - oz) / r]

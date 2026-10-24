@@ -2312,7 +2312,13 @@ pub fn step(
         }
         pf
     };
-    let wet = pick(&|c| if h[c] + fdh(c) <= x.sea_at(c) { 1.0 } else { 0.0 });
+    let wet = pick(&|c| {
+        if h[c] + fdh(c) <= x.sea_at(c) {
+            1.0
+        } else {
+            0.0
+        }
+    });
     let d_prev = pick(&|c| {
         if cells[c].fresh {
             f64::NAN
@@ -3611,10 +3617,19 @@ mod tests {
         }
         // The reach goes through the carrying plate's crust: around the third plate (7, 25) is
         // 7 cells from the belt, (6, 25) and (5, 24) on the way round 6 and 5.
-        assert!(at(25 * w + 7).is_none(), "the reach goes round the third plate");
-        assert!(at(25 * w + 6).is_some() && at(24 * w + 5).is_some(), "the way round");
+        assert!(
+            at(25 * w + 7).is_none(),
+            "the reach goes round the third plate"
+        );
+        assert!(
+            at(25 * w + 6).is_some() && at(24 * w + 5).is_some(),
+            "the way round"
+        );
         assert!(at(20 * w).is_some(), "the wedge");
-        assert!(at(20 * w + 15).is_some() && at(21 * w + 2).is_some(), "across the wrap");
+        assert!(
+            at(20 * w + 15).is_some() && at(21 * w + 2).is_some(),
+            "across the wrap"
+        );
         assert!(at(17 * w).is_none(), "the over plate behind the belt");
     }
 
