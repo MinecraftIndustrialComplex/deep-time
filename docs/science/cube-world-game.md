@@ -30,6 +30,8 @@ deep.
 A player who arrives far outside the planet (a teleport, an ender pearl, a portal exit more than
 16 blocks out) is moved to the place the copy under them shows, with their heading turned the same
 way; one who walks into the border is put back at the nearest point inside it. Spectators pass.
+A Sable ship that reaches the border loses its speed outward and is blown back inside; it is never
+moved, so the players on its deck stay on it.
 The world spawn keeps 64 blocks from any turning edge and 256 blocks from any corner of the cube.
 
 ## The model in plain words
@@ -69,7 +71,13 @@ the game uses them:
    adventure or creative player (or the vehicle they ride) outside A(1) is moved to the nearest
    point of A(1.05); a player more than 16 blocks outside the planet is first folded to their
    partner point instead. Within 24 blocks of a turning edge (measured through every east-west
-   period image) the action bar warns.
+   period image) the action bar warns. A Sable ship is held by its bounds: when a corner of its
+   global bounds is outside A(1), the part of its velocity that points out of the planet is taken
+   away and it gets 1 block/s back each tick (POL-011's wind at the stop line), every tick until
+   the bounds are inside again (`CubeBorder.outward`, `SablePoleCap.tickCube`). The way out is the
+   sum of the outside corners' offsets from their nearest points of A(1), so a ship that runs
+   diagonally into F0's corner is pushed straight back out of the void square, and one held at the
+   end of a segment slides on along the other side.
 5. **Spawn** (`server/SpawnHandler`, SCL-127, POL-024). A spawn candidate must lie in A(64), 64
    blocks from every turning edge, and 256 blocks from every image of a cube corner in the net.
 6. **Far terrain** (`farterrain/FarTerrain`, Distant Horizons' level of detail). An area wholly on
@@ -242,6 +250,19 @@ at most 1.05 blocks apart on the sphere (R 707.6 blocks); the border puts a play
 or past the corners back on the planet (4.55 and 92.7 blocks), folds one 100 blocks past N-east
 onto F1 with its yaw turned 90°, and leaves both poles and the face centres alone.
 
+Sable ships (W3, 2026-10-24, the dev planet server on the 4k cube: `gametest-planet.sh --cube-4k`
+with `sableHullStoppedAtCubeBorder`, `jetCrossesSeam` and the `sable_straddle` scenario,
+`build/cube2/sable-test.sh` and `sable-seam.sh`; two runs). Hulls of 10 blocks launched outward at
+60 blocks/s from 12 blocks inside the stop line reach at most 2.91 blocks past it at N's east
+segment, 1.91 at F1's top segment and 2.91 at S's bottom segment (one tick at 60 blocks/s is 3), and
+after 40 ticks are back inside, moving away from the segment at 8.7 to 10.5 blocks/s. A hull run
+diagonally from F0 into its north-east corner reaches 2.63 blocks into the void square's edge, is
+turned along F1's top segment, and ends 71 blocks east, inside and moving away from it. A hull at
+rest 20 blocks inside N's east segment is not moved. Across the slide (Toroidal World's seam in F2,
+C = 4,096) a hull pushed at 40 blocks/s crosses in 20 of 20 attempts, whole (10 of 10 blocks) and
+folded to x = -2,043.8, and a hull across the seam is the same sub-level, at the same x, after a
+save, stop and start.
+
 Far terrain (stage 2, 2026-10-23, the 4k cube, `farTerrainMatchesTheCube` with the other 13 cube and
 far terrain tests): against the chunks the game generated, 168 columns in the 16 blocks inside the
 turning edges (167 at the same ground height, all within 1 block), 168 past them (165 exact, all
@@ -291,7 +312,8 @@ matches the cube's development across four seams: |A - Q|² = da² + dp² + t² 
 - The surface noise's lattice is square on each face in net blocks, so where the map's local
   scale σ varies across a face the noise's texture is stretched with it on the planet, as the
   plain noise's is on the other projections; in blocks it is the same everywhere.
-- Sable ships are not stopped by the cube border yet.
+- The Sable border reads a ship's global bounds, a box in x and z, so a ship turned at an angle
+  is stopped when the box's corner reaches the line, up to a few blocks before its own blocks do.
 - The timelapse cannot show the cube's edges while the run is going: the cube's turn is chosen on
   the final land when the world data is baked.
 
