@@ -767,18 +767,6 @@ pub struct Rock<'a> {
     pub at: &'a (dyn Fn(f64, f64) -> (f64, f64) + Sync),
     /// Metres per block, vertically.
     pub m_per_block_v: f64,
-    /// A cube world's net: its noise is blended across the turning seams
-    /// ([`crate::bake::project_cube::seam_blend`]); none on any other world.
-    pub seams: Option<&'a deeptime_format::cube::Cube>,
-}
-
-/// `f` at world point (x, z), blended across a cube's turning seams within `reach` blocks
-/// ([`Rock::seams`]).
-fn blended(rock: &Rock, x: f64, z: f64, reach: f64, f: impl Fn(f64, f64) -> f64) -> f64 {
-    match rock.seams {
-        Some(cube) => crate::bake::project_cube::seam_blend(cube, x, z, reach, f),
-        None => f(x, z),
-    }
 }
 
 /// The ridged jag noise at world point (x, z), centred: (1 − |n|)² less its mean.
@@ -888,11 +876,8 @@ pub fn steep_texture(e: &mut Elev, g: &Ground, rock: &Rock, calm: &[u8]) -> Valu
                 if jag_w > 0.0 {
                     // ledger: AMP-080, AMP-081
                     let a = (JAG_GAIN * s).min(JAG_MAX_BLOCKS) * jag_w;
-                    y += wt
-                        * a
-                        * blended(rock, x, z, JAG_WAVELENGTH, |x, z| {
-                            jag_noise(&jag_spec, rock.noise, x, z)
-                        });
+                    // A cube world's noise runs on through its seams (SCL-215).
+                    y += wt * a * jag_noise(&jag_spec, rock.noise, x, z);
                 }
                 if band_w > 0.0 {
                     // ledger: AMP-082
@@ -904,9 +889,7 @@ pub fn steep_texture(e: &mut Elev, g: &Ground, rock: &Rock, calm: &[u8]) -> Valu
                     let k = u.floor();
                     let tb = band_min * k.exp2();
                     // One shift for every height, so the levels nest.
-                    let level = blended(rock, x, z, BAND_WAVELENGTH, |x, z| {
-                        level_spec.noise(rock.noise, x, z)
-                    });
+                    let level = level_spec.noise(rock.noise, x, z);
                     let off = band_top * 0.5 * (1.0 + level);
                     let mix = smooth(0.5 - 0.5 * BAND_BLEND, 0.5 + 0.5 * BAND_BLEND, u - k);
                     let mut t = terrace(y, tb, off);
@@ -1126,7 +1109,6 @@ impl<M: SimFrame> OnWorld<'_, M> {
                     noise,
                     at: &rock_at,
                     m_per_block_v: self.m_per_block_v,
-                    seams: cube.then(|| self.grid.cube()),
                 };
                 let mut note = steep_texture(&mut e, &ground, &rock, &calm);
                 note["millis"] = json!(t.elapsed().as_secs_f64() * 1000.0 - gullies_ms);
@@ -1511,7 +1493,6 @@ mod tests {
             noise,
             at: rock_at,
             m_per_block_v: 35.0,
-            seams: None,
         };
         let note = steep_texture(&mut e, g, &rock, calm);
         (after, note)
