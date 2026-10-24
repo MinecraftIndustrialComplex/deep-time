@@ -1563,9 +1563,11 @@ answers for every column (`ColumnParityTest`):
    min_y) located at block (wx, y, z) ("Bodies", step 1–3); each maximal run of inside blocks is
    `[body id, top y, bottom y]`.
 5. `rock`: for y from `top_y` down to min_y, the class name of the horizon holding y (none above the
-   first top, or for an index outside `strata/classes.json`), then for each body of step 4 in order
-   that holds block (wx, y, z), its `rock_class`, a zone's where one applies (the last zone that
-   applies and names one); a body naming none leaves the class as it is. Runs of equal class are
+   first top, or for an index outside `strata/classes.json`), then the first body of step 4 (by
+   ascending id) that holds block (wx, y, z) and names a class there: its `rock_class`, a zone's
+   where one applies (the last zone that applies and names one); a body naming none leaves the
+   class to the next. Where bodies overlap the lowest id keeps the block (the strata pass paints
+   in id order and never paints a block a body has taken). Runs of equal class are
    `[top y, bottom y, class or null]`.
 6. `hydro` (P1-22): the column's water as "Water columns" decides it: `{"kind", "surface", "ground",
    "level", "top", "bed", "min_ground", "max_ground", "seal_from", "river_biome", "river"}`, `river`
@@ -2497,7 +2499,7 @@ dimension, `structure.aureole_carbonate_factor` times that in a carbonate host).
 `aureole`, no material, density 0) hold the baked rock band by band down the column: each zone's
 `rock_class` is skarn or hornfels and its v range the depths of a host horizon older than the
 intrusion, read on the column at the intrusion's centre as the strata pass paints it (the column rule over `strata/horizons`) and by the structural
-events' test (a horizon whose top key is at least the intrusion's); a pluton's zones span d ∈ [0, 1], so the pluton body, painted later, keeps its own
+events' test (a horizon whose top key is at least the intrusion's); a pluton's zones span d ∈ [0, 1], and the pluton body, whose id is lower, keeps its own
 rock inside. A stock's aureole is hollow: the stock is a structural event, which bodies paint
 over, so its zones are cut into eight horizontal slabs whose d range starts at the stock's wall
 in that slab. The centre's column also holds the other intrusion events that reach the inner half
@@ -2508,9 +2510,13 @@ crystalline and a younger one's is younger than the aureole, so no zone paints o
 aureole goes unbaked at those depths all round). **Stock roots**: a stock rooted on a pluton (`structure::deform::intrude::
 root_on_plutons`) also gets an ellipsoid body of role `stock`, its own ellipsoid, with one zone
 `root` (its rock class, no material) from the top of the pluton's aureole down, so the stock's
-rock reads through the aureole it rises across. Ids: every aureole first, then the stock roots,
-then the plutons, then any deposit body the deposit stage adds later, so where they overlap the
-later body wins (a body with a higher id paints over a lower one). `notes.structure.aureoles`
+rock reads through the aureole it rises across. Ids (since 2026-10-24): the plutons first (the
+later-emplaced first), then the stock roots, then the aureoles (of the stocks, then of the
+plutons, each list backwards), then any deposit body the deposit stage adds later; where bodies
+overlap, the one with the lower id keeps the block ("Columns", step 5), so each
+intrusion keeps its own rock through its aureole and of two overlapping plutons the younger keeps
+the overlap. Until then the order was the reverse and was read as "a higher id paints over a lower
+one", which no evaluator did. `notes.structure.aureoles`
 counts them: `plutons`, `stocks`, `zones`, `median_width_m` [pluton, stock] and `stock_roots`;
 `notes.structure.deformation.stocks_rooted` the stocks rooted on a pluton and `stocks_under_cover`
 the stocks whose top was taken down to the base of younger cover.

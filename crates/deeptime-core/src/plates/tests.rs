@@ -1326,6 +1326,37 @@ fn the_crust_budget_changes_nothing() {
     same_world(&with, &without);
 }
 
+/// The fronts' lengths as the slab pull and the arcs count them (measurement only, PLT-554; the
+/// front lane, step 8, 2026-10-24), over a 100-Myr run: the slab pull's one spacing per
+/// overriding sample that pulls, the part of each along the boundary's normal, and the same
+/// samples' shares of the straight front (PLT-530); and the arcs' bands by their length against
+/// the arcs' straight front. Measured (2026-10-24, 8,000 samples): the pull's spacings are 1.106
+/// times the same samples' straight front, 0.820 of them along the normal; the arcs' band 1.119
+/// times the arcs' straight front, which is 0.868 of the pull's.
+#[test]
+fn the_fronts_by_the_slab_pull_and_the_arcs() {
+    let p = preset(8000, 100.0, "scattered_continents", 6);
+    let w = run_stage_with(PlatesStage::new(p.clone()), &p, |_, _, _| {});
+    let g = |key: &str| w.globals.get(key).copied().unwrap_or(0.0);
+    let lattice = g(forces::SLAB_FRONT_LATTICE_GLOBAL);
+    let normal = g(forces::SLAB_FRONT_NORMAL_GLOBAL);
+    let straight = g(forces::SLAB_FRONT_STRAIGHT_GLOBAL);
+    let band = g(subduction::ARC_BAND_GLOBAL);
+    let arcs = g(subduction::ARC_FRONT_STRAIGHT_GLOBAL);
+    eprintln!(
+        "slab pull: {lattice:.0} km Myr by the lattice, {:.3} of it along the normal, {:.3} by \
+         the straight front; arcs: band {band:.0} km Myr, {:.3} of their straight front \
+         {arcs:.0}, which is {:.3} of the slab pull's straight front",
+        normal / lattice,
+        straight / lattice,
+        band / arcs,
+        arcs / straight
+    );
+    assert!(lattice > 0.0 && arcs > 0.0 && band > 0.0);
+    assert!(normal > 0.3 * lattice && normal <= lattice);
+    assert!(straight > 0.3 * lattice && straight < 1.1 * lattice);
+}
+
 /// Two plates on the preset's planet: the northern hemisphere continental (plate 0), the southern
 /// oceanic (plate 1), the southern turned by `turn` radians about the x axis since the last
 /// resampling, so it runs under the continent where y > 0 and opens a gap where y < 0. Overlaps
@@ -1341,6 +1372,23 @@ fn plates_split(
     turn: f64,
     north: impl Fn(DVec3) -> bool,
 ) -> (PlateState, Geo, Vec<DVec3>) {
+    let (mut st, geo) = plates_unresolved(p, env, glam::DQuat::from_rotation_x(turn), north);
+    let pos = geometry::positions(&st, &geo);
+    st.recount(&pos);
+    let tree = Tree::over(&pos, |_| true);
+    let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, env);
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, env).unwrap();
+    (st, geo, pos)
+}
+
+/// The planet of `plates_split` before its overlaps are found: plate 1's group turned by `q`.
+fn plates_unresolved(
+    p: &PlanetPreset,
+    env: &Env<'_>,
+    q: glam::DQuat,
+    north: impl Fn(DVec3) -> bool,
+) -> (PlateState, Geo) {
     let (mut st, geo) = init::initial_state(p, env).unwrap();
     let pts = geo.points();
     for (i, s) in st.samples.iter_mut().enumerate() {
@@ -1357,7 +1405,6 @@ fn plates_split(
         }
         s.thickness_m = pools::thickness(&s.pools);
     }
-    let q = glam::DQuat::from_rotation_x(turn);
     st.groups = vec![
         state::Group {
             plate: 0,
@@ -1375,13 +1422,213 @@ fn plates_split(
     st.contacts.clear();
     st.ridges.clear();
     st.rift_links.clear();
-    let pos = geometry::positions(&st, &geo);
+    (st, geo)
+}
+
+/// The outline of `plates_unresolved`'s planet at its last resampling, the equator, held exactly
+/// by the level set: every sample's sine distance from it (a great circle, PLT-536).
+fn equator_level_set(st: &mut PlateState, geo: &Geo) {
+    st.level_set = Some(level_set::LevelSet {
+        phi: geo.points().iter().map(|p| p.z.abs() as f32).collect(),
+        member: st.samples.iter().map(|s| s.group).collect(),
+    });
+}
+
+/// The planet's overlaps with its groups turned as they stand, by the rule `env` sets.
+fn overlaps_now(
+    st: &mut PlateState,
+    geo: &Geo,
+    env: &Env<'_>,
+) -> (Vec<DVec3>, Vec<subduction::Overlap>) {
+    let pos = geometry::positions(st, geo);
     st.recount(&pos);
     let tree = Tree::over(&pos, |_| true);
-    let overlaps = subduction::detect(&st, &geo, &pos, &tree);
-    let mut world = WorldState::new(1, 16_384, p.t_start_years());
-    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, env).unwrap();
-    (st, geo, pos)
+    let overlaps = subduction::overlaps(st, geo, &pos, &tree, env);
+    (pos, overlaps)
+}
+
+/// A sample goes under another plate where it crosses that plate's outline
+/// (`tectonics.outline_cover`, PLT-553; the front lane, step 8, 2026-10-24). The two-plate planet
+/// with its outline, the equator, held exactly by the level set, and the ocean turned under the
+/// continent by a third of a spacing where y > 0 (away from it where y < 0). Each sample's depth
+/// past the other plate's outline is its signed distance from the equator in that plate's frame.
+/// The outline rule finds only samples past the outline and every one past it by more than a
+/// fiftieth of a spacing; the hull rule (off: a whole lattice triangle of the other plate must
+/// hold the sample, `geometry::cover`) finds a subset of them, few of the shallow ones. Turned by
+/// nothing, neither finds any. Measured (2026-10-24): 63 samples past the outline, the outline
+/// rule finds all 63, the hull rule none (19 of them lie within 0.1 spacings, 30 within 0.1 to
+/// 0.2, 14 within 0.2 to 0.35): a third of a spacing of convergence is not yet a subduction
+/// zone by the hull rule.
+#[test]
+fn a_sample_goes_under_where_it_crosses_the_outline() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let mut hull = p.tectonics.clone();
+    hull.outline_cover = false;
+    let spacing = stage.norm().spacing_rad();
+    for turn in [0.0, 0.35] {
+        let q = glam::DQuat::from_rotation_x(turn * spacing);
+        // (rule, overlapping samples, every sample's depth past the other plate's outline).
+        let mut seen: Vec<(bool, std::collections::BTreeSet<u32>, Vec<f64>)> = Vec::new();
+        for (outline, k) in [(true, &p.tectonics), (false, &hull)] {
+            let env = stage.env(k, 1);
+            let (mut st, geo) = plates_unresolved(&p, &env, q, |x| x.z > 0.0);
+            equator_level_set(&mut st, &geo);
+            let (pos, overlaps) = overlaps_now(&mut st, &geo, &env);
+            let depth: Vec<f64> = (0..pos.len())
+                .map(|i| {
+                    let z = if st.samples[i].group == 1 {
+                        pos[i].z
+                    } else {
+                        -(q.inverse() * pos[i]).z
+                    };
+                    z.clamp(-1.0, 1.0).asin() / spacing
+                })
+                .collect();
+            for o in &overlaps {
+                let i = o.i as usize;
+                assert_ne!(st.samples[i].group, o.group);
+                assert!(
+                    depth[i] > -1e-4,
+                    "outline {outline}, turn {turn}: sample {i} overlaps outside the outline \
+                     ({:.4} spacings)",
+                    depth[i]
+                );
+            }
+            let found = overlaps.iter().map(|o| o.i).collect();
+            seen.push((outline, found, depth));
+        }
+        let (_, by_outline, depth) = &seen[0];
+        let (_, by_hull, _) = &seen[1];
+        let past: Vec<usize> = (0..depth.len()).filter(|&i| depth[i] > 0.0).collect();
+        let missed: Vec<usize> = past
+            .iter()
+            .copied()
+            .filter(|&i| depth[i] > 0.02 && !by_outline.contains(&(i as u32)))
+            .collect();
+        let bins = [0.0, 0.1, 0.2, 0.35];
+        let share: Vec<String> = bins
+            .windows(2)
+            .map(|b| {
+                let inb: Vec<usize> = past
+                    .iter()
+                    .copied()
+                    .filter(|&i| depth[i] > b[0] && depth[i] <= b[1])
+                    .collect();
+                let hull = inb
+                    .iter()
+                    .filter(|&&i| by_hull.contains(&(i as u32)))
+                    .count();
+                format!("{}-{}: {hull} of {}", b[0], b[1], inb.len())
+            })
+            .collect();
+        eprintln!(
+            "turn {turn} spacings: {} samples past the other plate's outline; the outline rule \
+             finds {} (missed {} deeper than 0.02), the hull rule {} (by depth, spacings: {})",
+            past.len(),
+            by_outline.len(),
+            missed.len(),
+            by_hull.len(),
+            share.join(", ")
+        );
+        assert!(missed.is_empty(), "missed {missed:?}");
+        assert!(by_hull.is_subset(by_outline));
+        if turn == 0.0 {
+            assert!(by_outline.is_empty() && by_hull.is_empty());
+        } else {
+            assert!(by_outline.len() > 2 * by_hull.len().max(1));
+        }
+    }
+}
+
+/// Bounds of `what_the_outline_cover_finds_at_a_transform` (numerical; the front lane, step 8,
+/// 2026-10-24): overlaps per spacing of a transform, and how far from the boundary, spacings
+/// (measured at most 0.27 and 0.48).
+const TRANSFORM_OVERLAPS: [f64; 2] = [0.35, 0.6];
+
+/// What the outline rule finds at a transform (PLT-553): the two plates of
+/// `a_sample_goes_under_where_it_crosses_the_outline` sliding past each other along the equator
+/// (plate 1 turned about the z axis), which no sample crosses. Three outlines: the equator held
+/// exactly; the one a lattice draws with no level set (the midpoints of the edges between the
+/// plates: a cut's outline until a resampling, `level_set::STALE_SPACINGS`); and that outline
+/// carried by the level set through one and five resamplings. Per outline and slide, the
+/// overlaps per spacing of boundary length by each rule and the farthest from the equator.
+/// Measured (2026-10-24): none on the exact outline; on the lattice's, the outline rule finds up
+/// to 0.22 per spacing (0.27 after one resampling, 0.16 after five) once the plates have slid a
+/// spacing, up to 0.48 spacings from the equator, where the hull rule finds up to 0.04: one
+/// plate's zigzag outline no longer nests in the other's. Bounded by [`TRANSFORM_OVERLAPS`].
+#[test]
+fn what_the_outline_cover_finds_at_a_transform() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let mut hull = p.tectonics.clone();
+    hull.outline_cover = false;
+    let spacing = stage.norm().spacing_rad();
+    let length = std::f64::consts::TAU / spacing;
+    for (label, resamplings) in [
+        ("exact", None),
+        ("stale", Some(0)),
+        ("resampled 1", Some(1)),
+        ("resampled 5", Some(5)),
+    ] {
+        let env = stage.env(&p.tectonics, 1);
+        let (mut st, mut geo) = plates_unresolved(&p, &env, glam::DQuat::IDENTITY, |x| x.z > 0.0);
+        match resamplings {
+            None => equator_level_set(&mut st, &geo),
+            Some(n) => {
+                st.level_set = None;
+                for _ in 0..n {
+                    let pos = geo.points().to_vec();
+                    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+                    let tree = Tree::over(&pos, |_| true);
+                    geo = ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env).unwrap();
+                    level_set::reinit(&mut st, &geo, spacing);
+                }
+            }
+        }
+        for slide in [0.25, 0.5, 1.0, 2.37] {
+            let q = glam::DQuat::from_rotation_z(slide * spacing);
+            let mut line = Vec::new();
+            for (outline, k) in [(true, &p.tectonics), (false, &hull)] {
+                let env = stage.env(k, 1);
+                let mut s2 = st.clone();
+                for g in &mut s2.groups {
+                    g.rot = if g.plate == 1 {
+                        [q.x, q.y, q.z, q.w]
+                    } else {
+                        [0.0, 0.0, 0.0, 1.0]
+                    };
+                }
+                let (pos, overlaps) = overlaps_now(&mut s2, &geo, &env);
+                let far = overlaps
+                    .iter()
+                    .map(|o| pos[o.i as usize].z.abs().asin() / spacing)
+                    .fold(0.0, f64::max);
+                line.push(format!(
+                    "{} {:.3} per spacing (farthest {far:.2} spacings)",
+                    if outline { "outline" } else { "hull" },
+                    overlaps.len() as f64 / length
+                ));
+                if resamplings.is_none() {
+                    assert!(
+                        overlaps.is_empty(),
+                        "{label}, slide {slide}: {}",
+                        overlaps.len()
+                    );
+                }
+                assert!(
+                    overlaps.len() as f64 / length < TRANSFORM_OVERLAPS[0]
+                        && far < TRANSFORM_OVERLAPS[1],
+                    "{label}, slide {slide}, outline {outline}: {} overlaps, farthest {far}",
+                    overlaps.len()
+                );
+            }
+            eprintln!(
+                "{label} outline, slide {slide} spacings: {}",
+                line.join(", ")
+            );
+        }
+    }
 }
 
 /// Continental area (visible continental samples × sample area) of the two-plate planet before a
@@ -1529,7 +1776,7 @@ fn how_resamplings_roughen_a_boundary() {
                 pos = geometry::positions(&st, &geo);
                 st.recount(&pos);
                 let tree = Tree::over(&pos, |_| true);
-                let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+                let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
                 subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
             }
         }
@@ -1870,7 +2117,7 @@ fn one_way_subduction_keeps_the_slab_down() {
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
         let env2 = stage.env(&p.tectonics, 2);
         let tree = Tree::over(&pos, |_| true);
-        let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+        let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env2);
         subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
         let held = st
             .one_way
@@ -1880,7 +2127,7 @@ fn one_way_subduction_keeps_the_slab_down() {
         let pos = geometry::positions(&st, &geo);
         let env3 = stage.env(&p.tectonics, 3);
         let tree = Tree::over(&pos, |_| true);
-        let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+        let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env3);
         subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env3).unwrap();
         let shown = under
             .iter()
@@ -1965,7 +2212,7 @@ fn ocean_floor_as_thick_as_a_continent_turns_continental_at_a_contact() {
         s.thickness_m = pools::thickness(&s.pools);
     }
     let tree = Tree::over(&pos, |_| true);
-    let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+    let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
     subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
     for &(i, crust, turns) in &cases {
@@ -2150,7 +2397,7 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
         let pos = geometry::positions(&st, &geo);
         let env2 = stage.env(&p.tectonics, 2);
         let tree = Tree::over(&pos, |_| true);
-        let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+        let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env2);
         subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
         let after = subduction::fronts_begin(&st, &geo, &pos, &env2).front_count();
         (st, geo, pos, world, before, after)
@@ -2194,7 +2441,7 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
     }
     let pos3 = geometry::positions(&held, &geo);
     let tree = Tree::over(&pos3, |_| true);
-    let overlaps = subduction::detect(&held, &geo, &pos3, &tree);
+    let overlaps = subduction::overlaps(&held, &geo, &pos3, &tree, &env3);
     subduction::resolve(&mut held, &mut world, &geo, &overlaps, &pos3, &env3).unwrap();
     let c = &held.contacts[0];
     assert_eq!((c.last_step, c.carried), (3, false));
