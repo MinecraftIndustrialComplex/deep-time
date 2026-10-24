@@ -959,9 +959,10 @@ pub struct TectonicParams {
     /// sinking slab drives, the share of the pull at rest falling to nothing as the overriding
     /// plate's speed towards the trench reaches the slab's terminal velocity (its pull over its
     /// slab resistance, PLT-185; Forsyth & Uyeda 1975), so no overriding plate is drawn faster
-    /// than its slab sinks (`forces::Balance::add_suction`). Off, the suction is the fixed share
-    /// however fast the plate already moves, and a small plate with trenches along much of its
-    /// edge is drawn on until the speed guard (PLT-022) holds it. ledger: PLT-540
+    /// than its slab sinks (`forces::Balance::add_suction`). On by default (2026-10-24). Off, the
+    /// suction is the fixed share however fast the plate already moves, and a small plate with
+    /// trenches along much of its edge is drawn on until the speed guard (PLT-022) holds it.
+    /// ledger: PLT-540
     pub suction_saturates: bool,
     /// Edge energy (ridge push and the weight of high ground), relative to its physical size:
     /// 0.1 is the gravitational potential energy as computed (a ridge's push is then about 0.1 of
@@ -1109,7 +1110,7 @@ impl Default for TectonicParams {
             slab_breakoff_myr: 10.0,       // ledger: PLT-184
             slab_resistance: 3.0,          // ledger: PLT-185
             slab_suction_share: 0.3,       // ledger: PLT-186
-            suction_saturates: false,      // ledger: PLT-540
+            suction_saturates: true,       // ledger: PLT-540
             edge_energy: 0.1,              // ledger: PLT-187
             collision_buoyancy: 1.0,       // ledger: PLT-275
             keel_drag: 3.0,                // ledger: PLT-188
