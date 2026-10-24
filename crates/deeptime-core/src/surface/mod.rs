@@ -884,13 +884,10 @@ impl SurfaceStage {
                 // ledger: ISO-133
                 let frame_src = match (&pf.carrier_plate_id, p.flexure.active()) {
                     (Some(car), true) => {
-                        let cell_m = std::f64::consts::TAU
-                            * self.preset.tectonics.model_radius_km
-                            * 1000.0
-                            / w as f64;
-                        let reach = (p
-                            .flexure
-                            .belt_reach_m(self.preset.planet.gravity_m_s2)
+                        let cell_m =
+                            std::f64::consts::TAU * self.preset.tectonics.model_radius_km * 1000.0
+                                / w as f64;
+                        let reach = (p.flexure.belt_reach_m(self.preset.planet.gravity_m_s2)
                             / cell_m)
                             .ceil() as usize;
                         let near = flexure::belt_reach(w, hgt, &pf.plate_id, car, reach);
