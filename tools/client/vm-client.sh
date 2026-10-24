@@ -32,6 +32,11 @@
 #   --rock-tags DIR  the MIC rock-tag datapack (e.g. /data/ban/mic/Docs/datapacks/deeptime-mic-rock-tags): its
 #                  data/deeptime/ is copied into the game dir's kubejs/data/deeptime unless that already holds
 #                  files (a stage's own), as tools/remote/play-client-apply.py does for Ben's full instance
+#   --save DIR     a world baked elsewhere (a folder with level.dat and deeptime/, e.g. a smoke server's
+#                  planet/ copied out) put into the game dir's saves/ as saves/<basename DIR> before the main
+#                  pass (hard links where the file system allows: the game replaces the files it writes
+#                  there, level.dat and the climate mapping, by a new file, so the original is kept), for
+#                  --prop open=<basename DIR>: the walk skips Create World, opens it and shoots the vistas
 #   --timeout S    per client pass (default 7200: a 1,000-Myr quick planet's ETA was ~2 h on the
 #                  loaded VM; --prop length=300 takes a fraction of that)
 #   --threads N    processors the client JVM sees (-XX:ActiveProcessorCount; default 8): the editor
@@ -52,7 +57,7 @@ REPO="$PWD"
 ADMIT="${DEEPTIME_ADMIT:-/usr/local/lib/deeptime/admit.py}"
 
 NAME=vm-client; BUILD=1; GUIDANCE=1; CREATE=true; WSIZE=1280x720; TIMEOUT=7200; THREADS=8; PROPS=()
-GUISCALE=2; RUNSET=""; GRADLE_SET=(); STAGE_DIR=""; ROCK_TAGS=""
+GUISCALE=2; RUNSET=""; GRADLE_SET=(); STAGE_DIR=""; ROCK_TAGS=""; SAVE=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -65,6 +70,7 @@ while [ $# -gt 0 ]; do
         --mods) RUNSET="$2"; shift 2 ;;
         --stage) STAGE_DIR="$2"; shift 2 ;;
         --rock-tags) ROCK_TAGS="$2"; shift 2 ;;
+        --save) SAVE="$2"; shift 2 ;;
         --timeout) TIMEOUT="$2"; shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
         --prop) [[ "$2" =~ ^[a-z]+=[-0-9.,\;:a-z_/]+$ ]] || { echo "vm-client: bad --prop $2" >&2; exit 2; }
@@ -77,6 +83,8 @@ done
 [[ "$WSIZE" =~ ^[0-9]+x[0-9]+$ ]] || { echo "vm-client: --size is WxH" >&2; exit 2; }
 [[ "$GUISCALE" =~ ^[0-9]$ ]] || { echo "vm-client: --gui-scale is 0 (auto) to 9" >&2; exit 2; }
 [ -z "$ROCK_TAGS" ] || [ -d "$ROCK_TAGS/data/deeptime" ] || { echo "vm-client: --rock-tags $ROCK_TAGS has no data/deeptime/" >&2; exit 2; }
+[ -z "$SAVE" ] || { [ -f "$SAVE/level.dat" ] && [[ "$(basename "$SAVE")" =~ ^[a-z0-9_-]+$ ]]; } \
+    || { echo "vm-client: --save $SAVE has no level.dat or its name is not one plain lower-case word" >&2; exit 2; }
 if [ -n "$STAGE_DIR" ]; then
     [ -d "$STAGE_DIR/mods" ] || { echo "vm-client: --stage $STAGE_DIR has no mods/" >&2; exit 2; }
     # DEEPTIME_RUN_MODS replaces smoke/<set>/server/mods in the Gradle link step (neoforge/build.gradle);
@@ -232,6 +240,12 @@ run_pass() {
     local pass="$1"; shift
     local log="$OUT/client-$pass.log" start now last=0 st=""
     rm -rf "$GAMEDIR/screenshots" "$GAMEDIR/saves" "$GAMEDIR/deeptime/staging" "$GAMEDIR/crash-reports"
+    if [ -n "$SAVE" ] && [ "$pass" = main ]; then
+        mkdir -p "$GAMEDIR/saves"
+        cp -al "$SAVE" "$GAMEDIR/saves/" 2>/dev/null || cp -a "$SAVE" "$GAMEDIR/saves/" \
+            || { say "pass $pass: could not copy $SAVE into saves/"; return 1; }
+        say "pass $pass: saves/$(basename "$SAVE") from $SAVE"
+    fi
     write_options
     say "pass $pass: launching ($*)"
     (cd "$GAMEDIR" && exec "$JAVA" "-Xmx$XMX" "-XX:ActiveProcessorCount=$THREADS" "-Djava.io.tmpdir=$WORK/tmp" "$@" \

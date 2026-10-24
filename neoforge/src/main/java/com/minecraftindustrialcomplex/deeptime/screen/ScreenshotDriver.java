@@ -63,7 +63,12 @@ import java.util.List;
  * {@code continue=<Myr>} (default 50; {@code 07c-continued}), and {@code vista=x,y,z,yaw,pitch[;…]}
  * adds, after the in-world shot, one screenshot per viewpoint: the player is put there in spectator
  * mode, the render distance raised to 16 chunks, and the shot taken once the terrain around has had
- * time to generate and draw ({@code 11-vista-<n>}).
+ * time to generate and draw ({@code 11-vista-<n>}). A sixth field picks the overlay for that shot: 0
+ * hides the HUD, 1 shows the F3 debug screen (Deep Time's line names the face and north's bearing).
+ * {@code settle=<s>} is how long a vista waits once the chunk ahead is loaded (default 15; Distant
+ * Horizons' far terrain needs minutes). {@code open=<save>} skips the walk: the client opens that
+ * folder of {@code saves/} (a server's world copied in, {@code vm-client.sh --save}) and goes
+ * straight to the in-world shot and the vistas, so two worlds baked elsewhere are shot alike.
  *
  * <p>{@code epochclick=true} walks the epoch button instead of the tabs and layers
  * (docs/design/playability-steering.md §4 and §6). The scrubber and the button are clicked through
@@ -106,12 +111,15 @@ final class ScreenshotDriver {
     private static TimelapseModel clickBefore;
     private static TimelapseModel cancelledRun;
 
-    /** A vista waits until the chunk 160 blocks ahead is loaded, then this long for it to draw … */
-    private static final int VISTA_SETTLE_TICKS = 20 * 15;
-    /** … and shoots anyway after this long (the step timeout is 180 s). */
-    private static final int VISTA_MAX_TICKS = 20 * 170;
+    /** A vista waits until the chunk 160 blocks ahead is loaded, then this long for it to draw ({@code .settle}, s) … */
+    private static final int VISTA_SETTLE_TICKS = 20 * Integer.getInteger(PROP + ".settle", 15);
+    /** … and shoots anyway after this long (155 s more than the settle; the step timeout follows it). */
+    private static final int VISTA_MAX_TICKS = VISTA_SETTLE_TICKS + 20 * 155;
     private static int vista;
     private static int vistaLoadedAt = -1;
+    /** The overlay before a vista's shot changed it: the HUD hidden, the debug screen shown. */
+    private static boolean hudWasHidden;
+    private static boolean debugWasShown;
 
     private static Step step = Step.TITLE;
     private static int ticks;
@@ -273,7 +281,7 @@ final class ScreenshotDriver {
         Screen screen = mc.screen;
         ticks++;
         stepTicks++;
-        if (stepTicks > STEP_TIMEOUT_TICKS && step != Step.QUIT) {
+        if (stepTicks > (step == Step.VISTA ? VISTA_MAX_TICKS + 20 * 10 : STEP_TIMEOUT_TICKS) && step != Step.QUIT) {
             DeepTime.LOGGER.error("[deeptime-shot] FAILED: step {} timed out (screen {})", step, screen == null ? "none" : screen.getClass().getName());
             shot("zz-timeout-" + step.name().toLowerCase());
             go(Step.QUIT);
@@ -296,6 +304,15 @@ final class ScreenshotDriver {
                                         .map(i -> i.translationKey() + (i.cause() == null ? "" : " " + i.cause())).toList());
                         shot("zz-mod-loading-failed");
                         go(Step.QUIT);
+                    } else if (titleReadyTicks > 40 && !System.getProperty(PROP + ".open", "").isEmpty()) {
+                        String save = System.getProperty(PROP + ".open");
+                        DeepTime.LOGGER.info("[deeptime-shot] opening saves/{}", save);
+                        parkPointer(mc);
+                        mc.createWorldOpenFlows().openWorld(save, () -> {
+                            DeepTime.LOGGER.error("[deeptime-shot] FAILED: could not open saves/{}", save);
+                            go(Step.QUIT);
+                        });
+                        go(Step.CREATING);
                     } else if (titleReadyTicks > 40) {
                         parkPointer(mc);
                         CreateWorldScreen.openFresh(mc, screen);
@@ -880,6 +897,11 @@ final class ScreenshotDriver {
                                 break;
                             }
                     }
+                    // An opened world with a custom generator asks once whether to back it up (open=).
+                    if (screen instanceof net.minecraft.client.gui.screens.BackupConfirmScreen b && stepTicks % 20 == 0) {
+                        DeepTime.LOGGER.info("[deeptime-shot] the backup question: loading without a backup");
+                        press(b, "selectWorld.backupJoinSkipButton");
+                    }
                     if (mc.level != null && mc.player != null)
                         go(Step.IN_WORLD);
                 }
@@ -913,6 +935,8 @@ final class ScreenshotDriver {
                     }
                     double[] v = vs.get(vista);
                     if (stepTicks == 1) {
+                        hudWasHidden = mc.options.hideGui;
+                        debugWasShown = mc.getDebugOverlay().showDebugScreen();
                         mc.options.renderDistance().set(16);
                         var server = mc.getSingleplayerServer();
                         var uuid = mc.player.getUUID();
@@ -935,9 +959,14 @@ final class ScreenshotDriver {
                     if (vistaLoadedAt < 0 && stepTicks > 100 && mc.level != null
                             && mc.level.getChunkSource().hasChunk(ax >> 4, az >> 4))
                         vistaLoadedAt = stepTicks;
-                    if ((vistaLoadedAt >= 0 && stepTicks == vistaLoadedAt + VISTA_SETTLE_TICKS) || stepTicks == VISTA_MAX_TICKS) {
+                    boolean due = (vistaLoadedAt >= 0 && stepTicks >= vistaLoadedAt + VISTA_SETTLE_TICKS) || stepTicks >= VISTA_MAX_TICKS;
+                    if (due && v.length > 5 && overlayFor(mc, v[5])) {
+                        // the overlay changed this tick: shoot on the next, once it has drawn
+                    } else if (due) {
                         DeepTime.LOGGER.info("[deeptime-shot] vista {}: ahead chunk loaded at tick {}", vista, vistaLoadedAt);
                         shot("11-vista-" + vista);
+                        if (v.length > 5)
+                            restoreOverlay(mc);
                         vista++;
                         stepTicks = 0;
                     }
@@ -974,15 +1003,39 @@ final class ScreenshotDriver {
         DeepTime.LOGGER.info("[deeptime-shot] settings: preset {}, length {} Myr", model.presetName(), System.getProperty(PROP + ".length", "300"));
     }
 
-    /** The {@code .vista} viewpoints: x, y, z, yaw, pitch each. */
+    /**
+     * Sets a vista's overlay, mode 0 the HUD hidden, 1 the HUD with the F3 debug screen; true when
+     * something changed this tick (the shot then waits a tick for it to draw).
+     */
+    private static boolean overlayFor(Minecraft mc, double mode) {
+        boolean hide = mode == 0, debug = mode == 1, changed = false;
+        if (mc.options.hideGui != hide) {
+            mc.options.hideGui = hide;
+            changed = true;
+        }
+        if (mc.getDebugOverlay().showDebugScreen() != debug) {
+            mc.getDebugOverlay().toggleOverlay();
+            changed = true;
+        }
+        return changed;
+    }
+
+    /** Puts the overlay back as it was before the vista. */
+    private static void restoreOverlay(Minecraft mc) {
+        mc.options.hideGui = hudWasHidden;
+        if (mc.getDebugOverlay().showDebugScreen() != debugWasShown)
+            mc.getDebugOverlay().toggleOverlay();
+    }
+
+    /** The {@code .vista} viewpoints: x, y, z, yaw, pitch each, and the overlay as a sixth when given. */
     private static List<double[]> vistas() {
         String p = System.getProperty(PROP + ".vista", "");
         List<double[]> out = new java.util.ArrayList<>();
         for (String v : p.split(";")) {
             String[] f = v.trim().split(",");
-            if (f.length == 5) {
-                double[] d = new double[5];
-                for (int i = 0; i < 5; i++)
+            if (f.length == 5 || f.length == 6) {
+                double[] d = new double[f.length];
+                for (int i = 0; i < f.length; i++)
                     d[i] = Double.parseDouble(f[i].trim());
                 out.add(d);
             }
