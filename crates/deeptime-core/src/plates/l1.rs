@@ -654,8 +654,40 @@ pub(super) fn sample_with(
             .collect();
         out.push((THERMAL_AGE_FIELD, age));
     }
+    // The lithosphere under an active collision's footprint (`collision_underthrust`, the nearest
+    // sample's; NaN elsewhere and in gaps): the plate it belongs to and its thermal age (NaN
+    // without the thermal state). The flexure takes the footprint as part of that plate, at that
+    // lithosphere's strength (ledger: PLT-546, ISO-131).
+    if env.k.collision_underthrust {
+        let (plate, age): (Vec<f32>, Vec<f32>) = (0..cells)
+            .into_par_iter()
+            .map(|c| {
+                let s = &samples[links[c].nearest as usize];
+                if info[c].mode == GAP || s.carrier == 0 {
+                    return (f32::NAN, f32::NAN);
+                }
+                let age = if s.carrier_lithosphere_km > 0.0 {
+                    super::thermal::thermal_age_myr(f64::from(s.carrier_lithosphere_km)).min(1.0e4)
+                        as f32
+                } else {
+                    f32::NAN
+                };
+                ((s.carrier - 1) as f32, age)
+            })
+            .unzip();
+        out.push((CARRIER_PLATE_FIELD, plate));
+        out.push((CARRIER_AGE_FIELD, age));
+    }
     out
 }
+
+/// The L1 field of the plate whose lithosphere is under an active collision's footprint (the
+/// incoming plate's, `collision_underthrust`; NaN elsewhere), written only with that switch.
+pub const CARRIER_PLATE_FIELD: &str = "plates/carrier_plate_id";
+
+/// The L1 field of that lithosphere's thermal age, Myr (NaN elsewhere, or without the thermal
+/// state), written only with `tectonics.collision_underthrust`.
+pub const CARRIER_AGE_FIELD: &str = "plates/carrier_thermal_age_myr";
 
 /// The L1 field of the lithosphere's thermal age on continental crust, Myr (10,000: a craton at
 /// its full depth, whose age is infinite; NaN: ocean floor or a gap), written only with

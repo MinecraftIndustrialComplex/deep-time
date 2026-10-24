@@ -722,8 +722,44 @@ fn stack_front(
         }
     }
     let (conv, shortened) = (side.conv.max(0.0) as f32, side.shortening_km as f32);
+    // ledger: PLT-546
+    // The incoming plate's lithosphere goes on under the front (`collision_underthrust`): the
+    // footprint's continental columns carry it, at the depth of its foreland's lithosphere (the
+    // median over the foreland, else over the wedge; 0 without the thermal state). Where two
+    // collisions meet, the faster one's.
+    let carried = k.collision_underthrust.then(|| {
+        let lith = |want_foreland: bool| -> Vec<f32> {
+            let mut v: Vec<f32> = marks
+                .iter()
+                .filter(|&&(i, fl)| {
+                    let x = &state.samples[i];
+                    fl == want_foreland
+                        && plate_of[i] == side.under
+                        && x.kind == CONTINENTAL
+                        && x.lithosphere_km > 0.0
+                })
+                .map(|&(i, _)| state.samples[i].lithosphere_km)
+                .collect();
+            v.sort_by(f32::total_cmp);
+            v
+        };
+        let mut v = lith(true);
+        if v.is_empty() {
+            v = lith(false);
+        }
+        let median = if v.is_empty() { 0.0 } else { v[v.len() / 2] };
+        (side.under + 1, median)
+    });
     for (i, foreland) in marks {
         let s = &mut state.samples[i];
+        if let Some((carrier, lith)) = carried
+            && !foreland
+            && s.kind == CONTINENTAL
+            && (s.carrier == 0 || conv > s.collision_mm_yr)
+        {
+            s.carrier = carrier;
+            s.carrier_lithosphere_km = lith;
+        }
         let was_belt = s.collision_mm_yr > 0.0 && s.flags & FORELAND == 0;
         s.collision_mm_yr = s.collision_mm_yr.max(conv);
         s.shortening_km = s.shortening_km.max(shortened);
@@ -1074,6 +1110,8 @@ mod tests {
                 s.flags &= !FORELAND;
                 s.collision_mm_yr = 0.0;
                 s.shortening_km = 0.0;
+                s.carrier = 0;
+                s.carrier_lithosphere_km = 0.0;
             }
             st.contacts[0].last_step = step;
             let env = self.env(step);
