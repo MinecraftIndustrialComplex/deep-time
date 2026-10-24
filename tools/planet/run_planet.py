@@ -111,6 +111,10 @@ def main():
     ap.add_argument("--boot-only", action="store_true")
     ap.add_argument("--size", type=int, default=16384, choices=(16384, 32768))
     ap.add_argument("--test-terrain", default="wrap-test")
+    ap.add_argument("--cube-4k", action="store_true",
+                    help="the overworld is planet_world_4k baked as a cube world (format 0.7, s = 1,024, period "
+                         "4,096; cube plan phase 2) under the gametest level type deeptime:test_planet_cube_4k, "
+                         "with the probes compared against inspect-column on every face")
     ap.add_argument("--run", action="append", default=[], metavar="TEST[,TEST...]@X,Y,Z[~DX,DZ]",
                     help="run tests by name (lower-case method names) positioned at X,Y,Z, forceloading "
                          "X±DX, Z±DZ (default 32,32) (repeatable)")
@@ -149,6 +153,15 @@ def main():
     # The analytic test terrains are Lambert worlds (C itself): the Lambert level types (format 0.5;
     # deeptime:planet[_32k] are the Petroff-Guyou worlds, 13,312 / 26,112 blocks round).
     level_type = "deeptime\\:planet_lambert" if a.size == 16384 else "deeptime\\:planet_lambert_32k"
+    if a.cube_4k:
+        # World data, not a test terrain: the bake writes world/deeptime before the server starts.
+        level_type, a.test_terrain = "deeptime\\:test_planet_cube_4k", ""
+        dev = [] if os.environ.get("IN_NIX_SHELL") else ["nix", "develop", "-c"]
+        bake = subprocess.run([*dev, "cargo", "run", "--release", "-q", "-p", "deeptime-cli", "--", "run", "--preset",
+                               "crates/deeptime-core/tests/presets/planet_world_4k.json", "--set", "scale.projection=cube",
+                               "--out", os.path.join(RUN, "world", "deeptime")], cwd=REPO)
+        if bake.returncode != 0:
+            sys.exit("run_planet.py: the 4k cube bake failed")
     open(os.path.join(RUN, "server.properties"), "w").write(
         "# Written by tools/planet/run_planet.py\n"
         f"server-port={GAME_PORT}\nenable-rcon=true\nrcon.port={RCON_PORT}\nrcon.password={pw}\n"
@@ -187,6 +200,8 @@ def main():
             print(f"   probe tw: {m.group(1) if m else out}", flush=True)
             if not m:
                 failures.append("probe tw did not answer")
+            if a.cube_4k:
+                failures += cube_probes(rcon, os.path.join(RUN, "world", "deeptime"))
             for spec in a.run:
                 failures += run_tests(spec, rcon, a.timeout, a.size)
             for scenario in a.scenario:
@@ -195,6 +210,36 @@ def main():
         srv.stop(rcon)
     print("PASS" if not failures else "FAIL: " + "; ".join(failures), flush=True)
     sys.exit(0 if not failures else 1)
+
+
+CUBE_4K_SIDE = 1024
+# Columns on every face of the 4k cube (TW frame [-2s, 2s)): F0's centre and off it, F1, F3, F2 on
+# both sides of the slide, N and S, and one by each of F0's corners inside the border.
+CUBE_4K_COLUMNS = [(0, 0), (40, 25), (1024, -100), (-1100, 200), (2030, 10), (-2030, 10), (100, -1200),
+                   (-200, 1300), (400, -400), (-400, 400)]
+
+
+def cube_probes(rcon, world_data):
+    """`/deeptime probe column` on the cube's faces against the CLI's `inspect-column --parity` (the
+    Rust reader the bake was written by): the ground height must be the same number."""
+    cli = os.path.join(REPO, "target", "release", "deeptime")
+    failures, rows = [], []
+    for x, z in CUBE_4K_COLUMNS:
+        out = rcon(f"deeptime probe column {x} {z}")
+        m = PROBE.search(out)
+        ref = subprocess.run([cli, "inspect-column", "--world-data", world_data, "--parity", str(x), str(z)],
+                             capture_output=True, text=True)
+        if not m or ref.returncode != 0:
+            failures.append(f"cube probe ({x},{z}) no answer: {out[:80] or ref.stderr[:80]}")
+            continue
+        probe, col = json.loads(m.group(1)), json.loads(ref.stdout)
+        h_java, h_rust = probe.get("terrainH"), col.get("surface")
+        same = h_java is not None and h_rust is not None and abs(h_java - h_rust) <= 0.01
+        rows.append(f"({x},{z}) terrainH {h_java} vs {h_rust}, surfaceY {probe.get('surfaceY')} vs top_y {col.get('top_y')}")
+        if not same:
+            failures.append("cube probe " + rows[-1])
+    print("   cube probes: " + "; ".join(rows), flush=True)
+    return failures
 
 
 def forceload(rcon, c, x0, z0, x1, z1, wait=180, points=()):

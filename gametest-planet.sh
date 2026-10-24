@@ -13,6 +13,8 @@
 #   ./gametest-planet.sh --scenario refuse_client    clients without Deep Time are refused (real TCP logins)
 #   ./gametest-planet.sh --size 32768 ...            the 32k preset
 #   ./gametest-planet.sh --test-terrain wrap-test    the analytic terrain (the default until P0-10)
+#   ./gametest-planet.sh --boot-only --cube-4k       planet_world_4k baked as a cube world (cube plan phase 2), its
+#                                                    probes on every face against inspect-column
 #   ./gametest-planet.sh ... -- -PwithMic            extra Gradle arguments after --
 #
 # Needs the standalone server set (tools/smoke/install.sh standalone), whose jars Gradle links
