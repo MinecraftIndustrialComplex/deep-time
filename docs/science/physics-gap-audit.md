@@ -356,6 +356,16 @@ what a player meets most.
   (its belt does not fit between the plain's edges and its tributaries; an open question). The
   whole network's sinuosity goes from 1.0 to 1.04 (rivers-and-lakes.md, "Meanders"). Fans and
   braids remain.
+- **State (2026-10-24, latest).** Stage 4 of 4 is built on the same branch, on by default
+  (`hydro.fans`, `hydro.braids`), not merged: where a river's surface falls faster than Bull's fan
+  slope above a cell and slower below it, a cone of Bull's area and slope for its drainage
+  (HYD-165 to HYD-170) is laid, round on the planet, and the hollows the cones close are filled to
+  their spill (HYD-177); a reach on a fan, or on the plain and steeper than Leopold & Wolman's
+  braided line, divides around islands 5 widths long on alternate sides (HYD-171 to HYD-175). On
+  the D5 bake 818 fans cover 206,323 km² (8.9 % of the land), the median fan 0.82 of Bull's area
+  (517 hemmed in, none larger), and 2,048 km braid (2,028 km on fans); the lakes change by
+  +212 km² and fewer rivers end in water under a block deep (35 against 53). Every stage of gap 5
+  is built (rivers-and-lakes.md, "Fans and braids").
 
 ### Gap 6: flexural foreland basins
 
