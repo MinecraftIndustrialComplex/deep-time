@@ -443,6 +443,7 @@ pub fn step_collision(
             normal: [0.0; 3],
             continental_over: 0.0,
             stalled_since_myr: None,
+            jam_km: None,
             belt: super::state::Belt::default(),
         });
     }
@@ -521,6 +522,27 @@ pub fn advance(
             Change::Began => state.counters.collision_onsets += 1,
             Change::Parted => end(state, k, dynamics::PARTED),
             Change::None | Change::Continued => {}
+        }
+    }
+    // Transference (ledger PLT-516): a collision's subduction has failed once its contact has no
+    // slab left (it broke off, PLT-184, or never grew); from the step that is first seen the
+    // plate pushes the continent, and the shortening since counts towards the critical
+    // convergence (`collision::transference_due`). The slabs are those of the last balance.
+    if env.k.transference {
+        let live: std::collections::BTreeSet<(u32, u32)> = state
+            .slabs
+            .iter()
+            .filter(|s| s.km > 0.0)
+            .map(|s| (s.under, s.over))
+            .collect();
+        for c in &mut state.contacts {
+            let key = (c.under, c.over);
+            if let Some(col) = c.collision.as_mut()
+                && col.jam_km.is_none()
+                && !live.contains(&key)
+            {
+                col.jam_km = Some(col.shortening_km);
+            }
         }
     }
     // ledger: PLT-068 (the threshold, for terrane transfers), PLT-246 (the weld on stall).

@@ -154,13 +154,24 @@ mod tests {
         t.add(-950.0, 5.0, 100.0, 20.0, &s);
         assert_eq!(t.km_myr, [[0.0; 4]; 4]);
         t.add(-800.0, 5.0, 100.0, 20.0, &s);
-        t.add(-700.0, 75.0, 300.0, 40.0, &Sides { over_oceanic: 0.1, ..s });
+        t.add(
+            -700.0,
+            75.0,
+            300.0,
+            40.0,
+            &Sides {
+                over_oceanic: 0.1,
+                ..s
+            },
+        );
         assert_eq!(t.km_myr[0][3], 100.0);
         assert_eq!(t.km_myr[3][0], 300.0);
         assert!((t.sums[3][4] / 300.0 - 40.0).abs() < 1e-12);
         assert!((t.sums[0][2] / 100.0 - 0.25).abs() < 1e-12);
         let l = t.lines();
-        assert!(l.contains("dock_age=0 km_myr=0,0,0,100 means=0.500,1.000,0.250,1.000,20.000,4.000"));
+        assert!(
+            l.contains("dock_age=0 km_myr=0,0,0,100 means=0.500,1.000,0.250,1.000,20.000,4.000")
+        );
         assert!(l.contains("dock_age=10 km_myr=0,0,0,0 means=nan"));
     }
 }

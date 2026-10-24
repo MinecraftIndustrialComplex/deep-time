@@ -1460,6 +1460,7 @@ fn a_collision() -> state::Collision {
         normal: [0.0, 1.0, 0.0],
         continental_over: 1.0,
         stalled_since_myr: None,
+        jam_km: None,
         belt: Default::default(),
     }
 }
