@@ -7225,3 +7225,169 @@ seeds with it (Step 3b, "The speed guard"), small plates held by a fixed suction
 as without it; that is the suction law's known limit, not the level set's. What it does not do:
 the front stays 1.7 times Bird's (89,331 against 51,310 straight km), since the trenches are
 moved every step by the overlaps' hiding and the collisions, which it does not touch.
+
+### The overlaps' hiding: what it hides and why it cuts (2026-10-24)
+
+The coordinator's item, before anything more is built: what the overlaps' hiding in
+`subduction::resolve` hides, why it cuts the plates, and what the physics should do instead, from
+fl-ls2's 8 cached runs only (no simulation). The measure is `hiding` in
+`tools/review/pool/measures_front.json` (`measure_hiding.py`): the crust budget's maps every 50
+Myr after the first 100, without those taken at a resampling (13 to 16 a run), and the runs'
+records. Ranges below are over the 8 runs, each a mean over its snapshots.
+
+**What it hides.** Each step `resolve` clears every sample's flags and hides each sample of a
+contact's subducting plate that lies inside one of the overriding plate's triangles
+(`geometry::cover`, a group's own triangles), if the contact is seen that step (a new pair needs
+`MIN_CONTACT`, 3 such overlaps; a known pair needs one). Nothing carries over from the step
+before: a sample is hidden exactly while it lies under the overriding plate's cover. The
+resampling consumes what is hidden at that moment (its pools go to the crust on top: PLT-276,
+PLT-292, PLT-440). In the records the step is 2 Myr and a resampling comes every 16 to 17 Myr (58
+to 63 a run: the schedule's 20 Myr, PLT-098, and one after each weld). Between resamplings 5.1 to
+6.4 % of the samples are hidden on average, and the planet's visible count never rises from one
+step to the next (0 steps in any run).
+
+**What it cuts.**
+
+- 0.74 to 1.72 % of the visible samples lie in pieces cut off their plate's largest, 84 to 144
+  pieces a snapshot, the median piece one sample.
+- 69 to 80 % of the cut samples are in pieces beside their own hidden samples (the TRENCH flag),
+  and those pieces' trench edges face the overriding plate's subduction zone (within 800 km of
+  its front) as often as the main bodies' trenches do: 0.87 to 0.90 of the edges for the small
+  pieces and 0.73 to 0.98 for those of the fission floor or more (PLT-091, 300 samples), against
+  0.95. The share whose other side moves away (DIVERGENT) is the main bodies' too (0.42 to 0.51
+  against 0.43 to 0.47). The hiding cuts at ordinary trenches.
+- By shape, shares of the cut samples: a thin hidden band, at most 3 spacings from the plate's
+  largest piece, 0.28 to 0.44 (necks); farther, with one plate between, 0.17 to 0.32; farther,
+  across two plates or more, 0.07 to 0.14; enclosed by one plate, 1 to 3 samples 0.08 to 0.21
+  (holes), more 0.11 to 0.21 (islands).
+- Pieces of the fission floor or more: 0.33 to 1.08 a snapshot, 14 to 36 % of the cut samples, 75
+  to 100 % of them beside their own slab, all necks or with one plate between (two in a run's
+  snapshots across two plates).
+- Seams: 7.5 to 17 % of the enclosed pieces touch a seam between two groups of the plate around
+  them, about ten times chance (0.17 to 0.30 % of the visible samples are seam samples, about 1 %
+  of a piece's six neighbours by chance). A seam's triangles belong to no group, so they hide
+  nothing. This is 3 to 7 % of the cut samples.
+
+**What the pieces cost.** `boundgeom` over the same runs (Step 3c, at 77 km): the subduction front
+is 139,771 km with the pieces and 115,979 km with each piece given to the plate around it, the
+boundary 353,285 and 325,644 km. The pieces carry 17 % of the front and 8 % of the boundary. On
+the lattice the front is 2.66 times PB2002's (52,564 km) with them and 2.21 times without, so the
+main bodies' outline at their trenches holds most of the excess.
+
+**What becomes of them.** Fission makes 55 to 86 plates a run of them (median 77). They live a
+median 26 to 40 Myr, about two resamplings, and of those absorbed only 2 to 9 % go back into their
+parent; the rest join a neighbour.
+
+**Why it cuts.** Three ways, from the code:
+
+1. *A neck under the overriding plate.* Where the overriding plate's cover reaches across a narrow
+   part of the subducting plate, from one of its boundaries to another, the visible crust is in
+   two. The plates' outlines are ragged at 1 to 3 spacings (the front's tortuosity 1.92 at 77 km
+   with each plate one body, PB2002's 1.20 on the lattice), so such necks are common and a band
+   that thin hides them. This is the measured majority: the necks and most pieces with one plate
+   between, all at ordinary trenches.
+2. *Crust that went under shows again.* The flag is set again every step, so a sample shows again
+   whenever it leaves the overriding plate's triangles before the next resampling: behind a
+   corner of the overriding plate that has swept past it, beyond an overriding plate narrower
+   than the slab's travel since the resampling (at 50 mm/yr, 830 km or 12 spacings in 16.7 Myr),
+   in a step the contact is not seen, and when the contact reverses (`reverse` swaps the plates:
+   the old slab shows at once and the old overriding plate's crust on it is hidden). The cut
+   trace books this among the overlaps' joins (1,771 to 2,772 samples per 300 Myr at 40,000
+   samples, against 5,304 to 10,207 cut, Step 3c's table). The records cannot size it: their
+   counts are net, and what a plate hides at one edge hides what it shows at another. What shows
+   again is old crust that went down a trench, at a place where the ground has opened.
+3. *Seam holes* (above), 3 to 7 % of the cut samples.
+
+**What Earth does.** Subduction is one way: the lithosphere that goes down a trench is the slab
+whose weight is the slab pull the force balance applies (`forces.rs`, Forsyth & Uyeda 1975), and
+none of it comes back to the surface. Where an overriding plate moves away from the trench, or
+past a stretch of it, the ground between opens and takes new crust (back-arc spreading; from
+memory, no source read for this page). A subducting plate cut through by a trench is torn, and
+its pieces move on their own or join a neighbour (Stock & Lee 1994, "What Earth does" above), as
+fission and capture already do.
+
+**What the physics should do.**
+
+- *One-way subduction* (for way 2). A sample once hidden under a contact stays hidden until the
+  resampling consumes it, whatever the overriding plate does next, and holds no ground at the
+  resampling: the ground it leaves is a gap and gets new crust from the gap fill (PLT-502). It
+  is not built. It would not shorten the front: it keeps consumed necks consumed instead of
+  letting them show again, so it may cut a little more. What it corrects is the crust behind
+  narrow overriding plates and after reversals, which would be new instead of recycled. To size
+  it first: a counter of the samples shown again per step, by cause (left the cover, contact not
+  seen, reversal), on one arm.
+- *Necks* (way 1) are physical: a neck consumed whole is a tear, and fission or capture follows.
+  Their number follows the plates' raggedness at their trenches, the 2.21 times above, which is
+  the next thing to diagnose: what roughens the overriding plates' outlines between resamplings
+  (the arcs' growth, the terranes, the collisions' fronts).
+- *Seams* (way 3) are geometry, not physics: a triangle whose corners are all one plate's, in
+  two of its groups, should cover for that plate. Minor.
+
+So the hiding is not more urgent than the saturating suction (Step 3b, "The speed guard"): its
+pieces carry 17 % of the front, one-way subduction would not shorten it, and the guard's binds on
+the 8k planet are the open fault in the physics. Next: step 4 (T and S1 on base4), then the
+saturating suction, then one-way subduction with its counter.
+
+### Step 4: T and S1 on the new planet (arm fl-ts1, 2026-10-24)
+
+The front lane's step 4: T (transference) and S1 (the trench's retreat, PLT-522, PLT-523) together
+as one cumulative arm on master b75d0b7f's default, which has fission, the latent copies and the
+level set on (`pool.sh run fl-ts1 --length 1000 --seeds 1,2,3,4 --threads 2 --set
+tectonics.transference=true --set tectonics.erosion_retreat=true +DEEPTIME_CRUST_BUDGET=1
++DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`, key e5cf2bf81f88, argkey 482ecb22, 8 runs, both starts).
+It is read against base4, master's 24-run base (argkey 2a53566b), and against base4-14, an arm
+file holding base4's own seeds 1 to 4 (the same runs, no new simulation). Medians, base4-14 to
+fl-ts1, with Mann-Whitney p:
+
+- **The V1 census.** Land 0.304 to 0.151 (p 0.003), the largest landmass 0.180 to 0.026,
+  continental crust under the sea 0.220 to 0.733, land above 2 km 0.146 to 0.038, coast with high
+  ground 0.278 to 0.102, ice 0.093 to 0.107, collisions per 100 Myr 1.30 to 4.85, criteria met 5
+  to 4. The continental crust's net change over the run goes from -0.029 to +0.136 of the planet
+  (0.4225 at the start, 0.393 to 0.558 at the end), and the sea stands 1,659 m over the datum at
+  the end (723).
+- **The area book** (`build/dock/areabook.py`'s parts, shares of the planet over the run): the
+  fronts' hiding (`subduction`) -0.935 to -0.408, the collapse +0.423 to +0.151, the arcs'
+  maturing (`finish`) +0.390 to +0.361, `founder` +0.148 to +0.059, the resampling's blend
+  -0.169 to -0.094, the retreat -0.013. T hands the subducting plate's continents to the
+  overriding plate instead of letting the front consume them, so the fronts take less than half
+  as much continental crust, while the arcs' maturing barely moves.
+- **The guard.** No step beyond 2 Earth reliefs in any run. The worst is 12,807 m from the sea
+  against 10,240 (the sea 936 m higher). `guard_bind_steps` is 4 in one run (supercontinent-3);
+  base4 has 4 in one of its 24 (supercontinent-8).
+- **The plate check** passes 189 measures against 189. In fewer runs of 8: the arcs' continental
+  heights (p50 8 to 0, 1,476 to 632 m: drowned; p90 8 to 3), the highest continental share (6 to
+  0, 0.441 to 0.558), the largest land gain (6 to 0), one plate above half (8 to 3, 12 % of the
+  steps), the plates above 5 % (8 to 4), the largest plate's share (8 to 6), the rotation change
+  (8 to 4), the speed-area rank (7 to 3), the collisions' convergence ratio (2 to 0). In more:
+  the collisions per 100 Myr (1 to 6), their lengths (p50 1 to 8, p90 0 to 8), the lowest
+  continental share (2 to 8), the oceanic over continental speed (2 to 8), the slab-pulled over
+  free speed (1 to 6), rifts alive and not welded back after 50 Myr (3 to 7, 4 to 7), the
+  supercontinent's tenure (0 to 2).
+- **The front.** It does not get shorter. The straight front per step is 89,331 to 99,333 km (p
+  0.002; Bird's SUB 51,310), E 1.91 to 2.17. In `boundgeom` at 77 km against fl-ls2 (master's
+  maps): 139,771 to 131,265 km with the cut pieces, 115,979 to 100,151 with each plate one body;
+  under oceanic overriding crust 66,822 to 60,592 km one body, against Stern & Scholl's 14,500 km
+  of island arc.
+- **Sutures** 40.6 to 47.2 per 100 Myr (Macdonald's 19 to 39), 37,382 to 44,960 km per 100 Myr
+  (inside Macdonald's 23,235 to 50,919).
+
+**The verdict: it does not pass.** By this lane's reading (no judged measure passes in fewer runs,
+one run of noise allowed, and no guard step), ten measures fall by more than one run and one run
+binds the guard. The coordinator's ruling makes the plate check a realism check, not a gate, but
+the census shows the planet drowned: the continental crust grows to 0.558 of the planet and the
+sea rises over it. This is dock-TS1's failure on base3 again ("So S1 does not make T and the sink
+correct on the pool", above). What is still off is the same: under T the fronts no longer consume
+continental crust at a collision, and nothing else consumes it in their place. The arcs' maturing
+stays on an island-arc front four times Stern & Scholl's, and step 3 left that front's length
+where it was. T and S1 stay off by default, both built.
+
+What could close the book, from what has been measured, without a knob:
+
+1. The island-arc front's length (the main bodies' outline at their trenches, 2.21 times PB2002 at
+   77 km: "The overlaps' hiding" above). On Earth's length the maturing would make about a third
+   of what it makes now (0.09 km2 a year against 0.26, "What comes after S1" above).
+2. T's own consumption: after T moves the subducting plate's continent onto the overriding plate,
+   nothing shortens it, where India has gone on converging with Asia for 50 Myr (Stage 2's first
+   candidate, above).
+
+Neither is built in this lane. The saturating suction comes next.

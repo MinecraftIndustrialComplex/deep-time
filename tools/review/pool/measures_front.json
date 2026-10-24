@@ -67,6 +67,24 @@
         {"key": "front_l77_clean", "key2": "front_l380_clean", "label": "each plate one body: the front at 77 / 380 km, km (lattice 52,564 / 48,406)", "target": null, "digits": 0, "pair": true},
         {"key": "arcfront_l77_clean", "label": "each plate one body: the front under oceanic crust at 77 km, km", "target": null, "digits": 0}
       ]
+    },
+    "hiding": {
+      "version": 1,
+      "doc": "what the overlaps' hiding (subduction::resolve) cuts off the plates between resamplings, by the cut pieces' shape and what borders them, and what fission makes of them; from the crust budget's maps (+DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps) and the record; definitions in measure_hiding.py (plates.md, 'The overlaps' hiding')",
+      "command": ["{py}", "-I", "{tools}/measure_hiding.py", "{run}"],
+      "python": "numpy",
+      "needs": ["rec"],
+      "columns": [
+        {"key": "cut_share", "key2": "pieces", "label": "visible samples in cut pieces, share / cut pieces per snapshot", "target": null, "digits": 4, "pair": true},
+        {"key": "trench_share", "label": "cut samples in pieces beside their own hidden samples", "target": null, "digits": 3},
+        {"key": "neck", "key2": "across", "label": "cut samples: a thin band (3 spacings or less) / farther, one plate between", "target": null, "digits": 3, "pair": true},
+        {"key": "far", "key2": "hole", "label": "cut samples: farther, two plates or more / enclosed, 1 to 3 samples", "target": null, "digits": 3, "pair": true},
+        {"key": "island", "key2": "enclosed_at_seam", "label": "cut samples: enclosed, more / enclosed ones at a seam of the plate around", "target": null, "digits": 3, "pair": true},
+        {"key": "big_pieces", "key2": "big_share", "label": "pieces of the fission floor or more per snapshot / their share of the cut samples", "target": null, "digits": 3, "pair": true},
+        {"key": "small_nb_sz", "key2": "main_nb_sz", "label": "trench edges facing a subduction zone: small cut pieces / main bodies", "target": null, "digits": 3, "pair": true},
+        {"key": "fissions", "key2": "fission_life_p50", "label": "fission births per run / their median life, Myr", "target": null, "digits": 1, "pair": true},
+        {"key": "fission_into_parent", "key2": "hidden_mean", "label": "absorbed fission-born plates taken back by the parent / hidden share between resamplings", "target": null, "digits": 3, "pair": true}
+      ]
     }
   }
 }
