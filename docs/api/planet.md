@@ -95,9 +95,10 @@ one position:
   the squares beside its corners. Positions either side of a cut show points that are far apart,
   and the distance calls say so. Never assume that one block is a short step on the ground; ask
   `distanceMetres`.
-- **North is not uphill in latitude.** North is where a short step goes due north. On a map that
-  keeps angles (Lambert, the cube) that is also the direction in which latitude climbs fastest; on
-  an equal-area map that shears (Petroff-Guyou) the two can differ by tens of degrees (up to 44.9
+- **North is not uphill in latitude.** North is where a short step goes due north. On a map whose
+  meridians and parallels cross at right angles (Lambert's cylinder, and the cube, which keeps
+  angles) that is also the direction in which latitude climbs fastest; on an equal-area map that
+  shears (Petroff-Guyou) the two can differ by tens of degrees (up to 44.9
   degrees in the contract test), though the latitude gradient is always perpendicular to east. Use
   `northX/northZ` to walk north and `step` for any other heading.
 - **Read the frame where you stand.** The frame changes smoothly except where the map is creased
