@@ -248,7 +248,10 @@ fn a_canyon_leaving_a_ridge_builds_bulls_fan_at_the_slope_break() {
     for &(c, l) in &fans.ponds {
         let (x, z) = win.pos(c as usize);
         let (e, s) = win.planet(x, z);
-        assert!(s < 0.0 && e.abs() <= FLOOR_HALF + 1.0, "a hollow at ({e}, {s})");
+        assert!(
+            s < 0.0 && e.abs() <= FLOOR_HALF + 1.0,
+            "a hollow at ({e}, {s})"
+        );
         assert!(f64::from(l) <= top_raw && f64::from(l) > f64::from(elev[c as usize]));
     }
 }
@@ -316,9 +319,16 @@ fn a_hollow_the_fans_close_is_filled_to_its_spill() {
         .collect();
     let (fans, elev) = run(false);
     assert_eq!(fans.ponds.len(), 9, "{:?}", fans.ponds);
-    assert!(fans.ponds.iter().all(|&(c, l)| l == 50 * 16 && inner.contains(&(c as usize))));
+    assert!(
+        fans.ponds
+            .iter()
+            .all(|&(c, l)| l == 50 * 16 && inner.contains(&(c as usize)))
+    );
     assert!(inner.iter().all(|&c| elev[c] == 50 * 16));
-    assert_eq!((fans.pond_max_raw, fans.pond_raise_raw), (10 * 16, 9 * 10 * 16));
+    assert_eq!(
+        (fans.pond_max_raw, fans.pond_raise_raw),
+        (10 * 16, 9 * 10 * 16)
+    );
     assert!(fans.ground().iter().all(|&(_, h)| h == 50 * 16));
     // Re-applied, the fill stays.
     let mut again = vec![0i16; 81];
