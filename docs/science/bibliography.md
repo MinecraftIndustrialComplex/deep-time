@@ -8669,6 +8669,15 @@ The sources of the front lane's diagnosis (plates.md "The front's length: why th
 
 The sources of the front lane's inheritance law (plates.md "Step 3b"). Stock & Lee 1994 and Wang et al. 2013 are above.
 
+### Bevis1995
+- Reference: Bevis, M., Taylor, F. W., Schutz, B. E., Recy, J., Isacks, B. L., Helu, S., Singh, R., Kendrick, E., Stowell, J., Taylor, B. and Calmant, S. (1995). Geodetic observations of very rapid convergence and back-arc extension at the Tonga arc. Nature 374:249-251 (authors, title, year and venue read on the Semantic Scholar record; the pages from a search summary of the Nature page).
+- DOI or URL: 10.1038/374249a0
+- Cited as: "Bevis et al. 1995".
+- Ledger ids: none (context for the speed guard's binds, plates.md Step 3b "The speed guard"; no constant rests on it).
+- Access: paywalled (the Nature page asks for a login; the Semantic Scholar record has no abstract).
+- Library: not kept.
+- Read so far (by the project): not read, 2026-10-24 (the front lane): the abstract as a web search summarised the Nature page, "Convergence rates across the Tonga trench increase northwards to a maximum of ∼240 mm yr−1", the Lau basin "opening at a rate which increases northwards to a maximum of ∼160 mm yr−1", and "No straining is observed within the northern Tonga ridge, suggesting that it comprises part of a rigid microplate".
+
 ### Ishizuka2010
 - Reference: Ishizuka, O., Yuasa, M., Tamura, Y., Shukuno, H., Stern, R. J., Naka, J., Joshima, M. and Taylor, R. N. (2010). Migrating shoshonitic magmatism tracks Izu-Bonin-Mariana intra-oceanic arc rift propagation. Earth and Planetary Science Letters 294:111-122 (title, authors and pages read on the copy's first page).
 - DOI or URL: not checked.
