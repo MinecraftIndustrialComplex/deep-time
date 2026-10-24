@@ -139,6 +139,7 @@ first step beside each kind of seam on both of its faces (the same ground's cont
 |---|---|---|---|---|---|
 | 16k seed 1 | 4.56 | 3.94 | 3.0 (3.0) | 5.56 (5.63) | 3.25 (3.25) |
 | 4k seed 11 | 3.94 | 3.38 | 3.5 (3.44) | 2.56 (2.44) | 3.94 (3.5) |
+| 4k test planet, G3 | 3.94 | 2.69 | 3.38 (3.44) | 3.38 (3.38) | 2.31 (2.25) |
 
 Every kind of seam steps no more than the inside of a face. At 16k each also steps no more than
 the ground beside it: the slide's 5.56 is the band's own steep ground there (5.63 beside it), not
@@ -148,6 +149,15 @@ of a face; the 4k planet has 3,072 turning-seam pairs, a quarter of the 16k's sa
 The largest steps: 40.6 blocks inside a face against 6.2, 7.4 and 5.6 across the direct seams, the
 slide and the turning seams (16k). The detail layer's amplitude steps are 0.375 inside a face and
 0.25 to 0.625 across seams (p99, 16k).
+
+The first two rows were measured with the phase-1 seam blend (SCL-125, retired). The third is the
+4k test planet (`planet_world_4k` baked as a cube, s = 1,024) after G3, with the detail noise on
+the cube's surface lattice and no blend (SCL-215; `build/cube2/g3-checks.sh` on the VM,
+2026-10-23): every kind of seam steps no more than the ground beside it, give or take one sixteenth
+of a block, and less than the inside of a face. The largest steps are 12.6 blocks inside a face
+against 4.06, 3.56 and 4.25 across the direct seams, the slide and the turning seams. The detail
+layer's amplitude steps (p99) are 0.375 inside a face and 0.25, 0.1875 and 0.3125 across the
+direct seams, the slide and the turning seams, each the same as beside them.
 
 **The footprint (B2).** The share of L3 cells and the record's checkerboard leak by D along the
 cell's long axis (simulation cells per world cell; L1 and L2 within 0.1 % of the same shares):
