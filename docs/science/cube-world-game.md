@@ -89,15 +89,18 @@ the game uses them:
    corner with no blend, and a block off the faces reads its partner's value exactly. The bake's
    own relief noises (the jag, the cliff bands' levels) are the same function, so the bake and the
    game agree on the ground at a seam. Petroff-Guyou and Lambert worlds keep the plain noise.
-8. **The climate API** (`api/climate/DeepTimeClimate`, version 5, cube plan G9). Other mods read
-   the planet's geometry from it on the server and on the client. On a cube world
-   `projectionKind` is `"cube"` and `circumferenceBlocks` is the period 4s. `latitudeDeg` and
-   `longitudeDeg` go through the fold and the map, so a block off the faces reads its partner's
-   place. Two calls are new. `northBearingDeg` gives the direction of north in the block frame,
-   in degrees clockwise from -z. It runs smoothly over a face and on into the copy past its
-   edge, and goes all the way round each pole. `metresPerBlock` gives the planet's metres per
-   block there. Both are NaN past the corners. The old static `latitudeDeg(z, C)` was right on
-   Lambert worlds only and is gone.
+8. **The planet and climate APIs** (`api/planet/DeepTimePlanet`, version 1, and
+   `api/climate/DeepTimeClimate`, version 6; docs/api/planet.md). Other mods read the planet's
+   geometry on the server and on the client as a sphere, with no projection named: latitude and
+   longitude, the local frame (north, east and the metres per block along each), great-circle
+   distance, bearing and destination, and the canonical position. On a cube world latitude and
+   longitude go through the fold and the map, so a block off the faces reads its partner's place;
+   north (`northBearingDeg`, degrees clockwise from -z) runs smoothly over a face and on into the
+   copy past its edge, and goes all the way round each pole; distances and bearings run on
+   across every edge and corner. Past the corners there is no planet: the calls answer NaN or
+   empty. The climate API's `latitudeDeg`, `longitudeDeg`, `northBearingDeg` and `metresPerBlock`
+   are shorthands for the planet API; `projectionKind` and `circumferenceBlocks` are gone (API
+   6).
 9. **The F3 line** (`net/PlanetDebugLine`, cube plan G10). On a cube world the debug screen reads
    `Deep Time: 10.144° N 100.920° E · face F0 · north 7.8° · 311 m/block here · <planet> (C 4096,
    276 m/block)`: latitude and longitude, the face (`F1 (folded)` off the faces, for the face the
@@ -141,6 +144,58 @@ the game uses them:
     `config/deeptime/server.json`. If the preset's size does not match the level type, the first
     start stops with the presets that fit. The other level types still need a preset of their own
     map.
+12. **The Create World screen** (`screen/model/CubeOutline`, `screen/model/NetView`, cube plan G13).
+    The timelapse's pictures stay the simulation's latitude-longitude pictures, so the map and the
+    globe work as on the other worlds while the planet's history runs. The cube is turned on the
+    planet when the world data is baked, on the final land, so a cube world's edges are known only
+    when the run is done. From then on the globe draws the cube's twelve edges over the planet. The
+    six edges the border closes are thick orange-red lines, and the other six (five joined in the
+    net, and the slide) are thin white ones. Each edge is sampled 48 times along its face side
+    through the world's own map, so the line is where the world's faces meet. The eight corners
+    are dots: white for the four touching F0, which a player can reach, and orange-red for the four
+    behind the border. The review page's final map is the net as it is played: the window of 4s by
+    3s blocks drawn 4 : 3, 512 by 384 pixels (8 blocks a pixel at 4k), north (-z) up. The faces
+    carry the world data's elevation, the void around N and S is transparent, and the border's
+    twelve lines are drawn over it with the five joined face sides. The ore-province hints keep
+    their latitude-longitude cells and are painted over the faces. The spawn marker sits at its
+    point on its face, and hovering shows the latitude, longitude and face. The editor keeps its
+    `projection` and `lambda_c_deg` fields until section 7.4.
+13. **The developer map** (`devmap/`, never shipped; `devmap/model/PlanetGeometry`, cube plan G14).
+    The dev map reads a cube world as its net. Its picture is the window of 4s by 3s blocks from
+    x = -3s/2, and the void around N and S is transparent and cannot be clicked: the server clears
+    the void in the satellite picture after the natives draw it, and the elevation picture skips
+    it. The natives (`deeptime-tiles`, the workbench's renderer) read a cube world's layers, stored
+    as six face planes, as the net window's flat raster: each net cell is its face's cell, a void
+    cell the cell under the fold of its centre, x wrapping with the period 4s; read as one flat
+    raster from F0's corner, S showed F1's plane and F2 F1's east column. The seam is the slide
+    (x = -3s/2, the same line as 5s/2, for |z| up to s/2), dashed. The edges are the border's 12
+    segments, drawn as one outline with the border's inset dashed inside it, and the five face sides
+    the net joins are faint dashed lines. The two poles are single points inside N and S. The cone points are the eight corners at their twelve images in the window: a
+    cross in the cone colour on the four corners of F0, which a player can stand on, and in
+    orange-red on the four the border keeps a player off. The readout names the face and gives the
+    distance to the slide and to the nearest border segment; the minimap's second line reads
+    `F0  slide N  border N`. Distances and the player markers wrap x in Toroidal World's frame
+    (-2s to 2s), not the window, so a delta across the slide is short. The graticule is cut only
+    where a line crosses a turning seam (two faces the net does not join); across the slide and
+    the five joined sides it runs on. A teleport by right-click lands at the nearest point at
+    least the border's inset and the edge margin inside the segments (`CubeBorder.nearest`), never
+    on a copy in the void. The globe draws the cube's outline as the Create World screen does
+    (item 12). The shot driver's places on a cube: the spawn, 25 blocks onto F3 from the slide,
+    40 blocks inside N's east segment (a quarter-turn seam's border), the north pole, beside F0's
+    north-east corner and 40 blocks under the F1, F2 and N corner.
+14. **Lava flows across the seams** (`worldgen/LavaFlows`, cube plan G16; the flows themselves are
+    [volcanoes-and-magma.md](volcanoes-and-magma.md), item 11). A flow steps half a block at a time
+    down the ground. On a cube world each step goes through the net's fold. At the slide, x just
+    wraps. A step that ends past a turning edge goes onto the partner face by the edge's motion,
+    and the flow's heading, its pond heading and its metric turn with it, so the flow runs on as the
+    copy past the edge showed it. The smooth wander that turns a flow is read where the flow would
+    be if the faces were laid flat from its vent, so it does not jump at an edge. A painted column
+    is kept as the planet block it shows, and every column asked for (by a chunk, by a copy off the
+    faces, by far terrain) answers through the same fold, so a column past an edge shows its
+    partner's paint. Which volcanoes can reach a column is decided by the straight line between them
+    on the cube: a path over the surface is never shorter, so the test holds across edges and round
+    corners. A flow that reaches past the net's corners stops there. On Lambert and Petroff-Guyou
+    worlds nothing changes.
 
 ## Equations and constants
 
@@ -206,6 +261,21 @@ edges (the slide and the twelve turning edges) and steps across them no more tha
 line inside a face, that an outside block reads its fold partner's value exactly, and that Rust and
 Java give the same pinned values. The seam steps it gives the bake are on the bake page (B1).
 
+Lava flows (G16, 2026-10-24, `LavaFlowsTest` on the VM, `build/cube2/g16-test.sh`). The test puts a
+shield 20 blocks from an edge of a 1,024-block cube, on ground that is a function of the point on the
+cube (a cone by the straight-line distance from the vent, tilted 0.02 blocks a block down across the
+edge). It compares the flows with those of a flat world on the same ground, where the box round the
+vent past the edge is the partner's copy laid flat. Whether a column is painted agrees in every column
+of the 521 by 521 box at the slide (54 of 150 flows cross it, 4,161 of 11,610 painted columns lie
+past it, every code equal), at N's east edge (a quarter turn, with an anisotropic metric that must
+turn with the flow; 39 of 172 flows cross, 1,227 of 6,030 columns past) and at N's top edge (a half
+turn; 61 of 157 cross, 2,853 of 7,012 past). Past a turning edge 83 and 647 old columns swap
+oxidised and covered: those patches are a hash of the column, and the cube keys the partner's column
+where the flat world keys the copy's. Every column past an edge answers as its partner, and every
+chunk with paint is one the flows touch, on both faces and in the void. Away from the edges the
+cube's flows equal the flat world's column for column. The surface point used for the reach
+matches the cube's development across four seams: |A - Q|² = da² + dp² + t² to 1e-6.
+
 ## Simplifications and limits
 
 - The copy off the faces has no structures and no features: trees, ore veins placed as features,
@@ -213,13 +283,17 @@ Java give the same pinned values. The seam steps it gives the bake are on the ba
   (cube plan E3) shows the partner's real chunks instead and supersedes the fill there.
 - Terrain that a structure adapts round its pieces (the beardifier) is not copied: the scratch
   chunk does not know the partner's structure starts.
-- Lava flows (G16) do not yet cross turning seams.
+- A lava flow that runs into the void square past a corner of the net stops there, and the
+  oxidised patches of an old flow past an edge are not the ones a flat world would draw (both are
+  hashes of the column).
 - Far terrain past a turning edge is the fill's ground, so it has no trees or structures either;
   the area is drawn column by column there (its cost there was not measured apart).
 - The surface noise's lattice is square on each face in net blocks, so where the map's local
   scale σ varies across a face the noise's texture is stretched with it on the planet, as the
   plain noise's is on the other projections; in blocks it is the same everywhere.
 - Sable ships are not stopped by the cube border yet.
+- The timelapse cannot show the cube's edges while the run is going: the cube's turn is chosen on
+  the final land when the world data is baked.
 
 ## Game choices
 

@@ -718,8 +718,24 @@ section 7.4 is deleted yet.
   the dedicated-server first start on the cube is G6's 16k smoke run), G12's opt-in part (a cube
   level type takes every built-in preset of its size and bakes it as a cube: `Presets.withProjection`,
   `FirstStartGenerator.presetsFor`, the `server.json` template, `install.sh --cube`; the 16k smoke's
-  first start bakes `earthlike_quick_16k` on `deeptime:planet_cube`).
-- Left: the rest of G13 and G14, G16, the Sable border, and section 7.4 with what waits for it: G12's
+  first start bakes `earthlike_quick_16k` on `deeptime:planet_cube`), G13's globe and review (a
+  finished cube run's globe draws the cube's twelve edges, the border's six apart, and its eight
+  corners, the four a player can reach apart, `screen/model/CubeOutline`; the review's final map is
+  the net as it is played, 4 : 3, with the border's lines and the hints over the faces,
+  `screen/model/NetView`; `CubeNetViewsTest`, a cube run in `RealRunWiringTest`, the Create World
+  walk's `06d-generation-globe-cube` and `08-review` shots), G14 (the dev map reads the net: the
+  frame is the window with the void clear and not clickable, the seam is the slide, the edges the
+  border's 12 segments, the poles points in N and S, the cone points the 8 corners at 12 images,
+  deltas in Toroidal World's centred frame, the graticule cut at turning seams, the satellite's
+  void masked, teleports to `CubeBorder.nearest`, the cube places in the shot driver;
+  `deeptime-tiles` reads a cube world's layers on the net, so the satellite draws every face;
+  `PlanetGeometryTest` and `MapModelTest` on hand-made cubes and the `cube1024` fixture,
+  `devmap-shots.sh` on the 16k cube with the level type from the manifest), G16 (lava flows cross
+  the seams: each step through `CubeLayout.foldPoint`, the heading, pond heading and metric turned at
+  a turning edge, the wander read unfolded, columns kept and asked for as planet blocks, the reach
+  and grid index by the straight line on the cube; `LavaFlowsTest`'s slide, quarter-turn and
+  half-turn cases against a flat world's flows on the same ground, membership exact).
+- Left: the Sable border, and section 7.4 with what waits for it: G12's
   preset edits (`planet` and `planet_32k` made cubes, `planet_lambert*` deleted, the Rust presets'
   projection keys, the deposits fixtures as cubes), G13's `editor_fields.json` keys, and the
   deletions with the rewrites of the Petroff-Guyou tests they bring.
@@ -858,6 +874,10 @@ section 7.4 is deleted yet.
   - The globe adds the cube's edges and corners. `ReviewModel`'s final-world view draws the net with
     the border.
 
+  Phase 2 builds the globe and the review (coordinator's call, 2026-10-23: G13's editor follows
+  G12's rule). The cube's turn is chosen on the final land when the world data is baked, so the
+  globe draws the edges once the run is done. The `editor_fields.json` edits wait for section 7.4.
+
   Check: `EditorModelGameTests`; the Create World walk on the VM (`tools/client/vm-client.sh`) with
   screenshots of the globe and the final world.
 - **G14. The dev map** (`devmap/`, never shipped).
@@ -873,6 +893,18 @@ section 7.4 is deleted yet.
     and a border corner.
 
   Check: `PlanetGeometryTest` and `MapModelTest` on a cube manifest; `tools/client/devmap-shots.sh`.
+
+  Built in phase 2. The void is transparent and cannot be clicked: `Cube.canonical` folds a void
+  point near a face onto its copy, so the map asks `PlanetGeometry.onPlanet` (a face under the
+  point) instead. Deltas and the readout's x wrap into Toroidal World's centred frame [-2s, 2s),
+  since `Cube.wrapX` wraps into the window. The graticule is cut where consecutive samples lie on
+  faces the net does not join, not by the projection's jump test. The F3 longitude on a cube is
+  the simulation's folded to [-180, 180), as on Petroff-Guyou. The satellite needed
+  `deeptime-tiles` to read a cube world (B10 had given it only the slope metric): its L3 window,
+  its L1 and L2 fields and its mips read the six stacked face planes as one flat raster from F0's
+  corner, so S drew F1's plane, F2 was F1's east column smeared east, and the climate, rock and
+  ice fields repeated F0's columns. They now read the net window's flat raster (each net cell its
+  face's cell, the void's through the fold). The pyramid's 4:3 net (T2) is still to come.
 - **G15. New GameTests.**
   - **Seams, bit for bit.** For each of the 7 seams, a chunk outside the planet next to the seam
     equals its partner chunk turned, block for block with states turned. The height step across the

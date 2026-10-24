@@ -215,7 +215,9 @@ catalogue of individual volcanoes that ride on their plates.
     over older ones. A volcano's flows are traced once, when any column within their reach is
     first asked for, from the volcano list, the drawn height, the water and the rain, so chunks and
     far terrain (Distant Horizons) show the same flows. In the volcanic biomes the pack's noise
-    stripes of blackstone and smooth basalt are left out (VOL-163).
+    stripes of blackstone and smooth basalt are left out (VOL-163). On a cube world a flow runs on
+    across the net's seams onto the next face, turned with it, and a volcano by an edge paints
+    both faces; see [cube-world-game.md](cube-world-game.md), item 14.
 
 ## Equations and constants
 

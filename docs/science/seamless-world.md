@@ -36,11 +36,12 @@ Near the north and south edges the action bar says the edge is closed for now (2
 stop line), and at the line a player, the vehicle they ride or a Sable ship is put back inside;
 spectators pass. There is no polar storm and no pole cap on this world: the poles are not stretched,
 so nothing needs closing off there (POL-022, POL-023). New players never spawn within 64 blocks of
-those edges (POL-024). The F3 line and Deep Time's climate API (version 4: `latitudeDeg(level, x,
-z)`, `longitudeDeg`, `projectionKind`) give each block's true latitude and longitude, which on this
-world depend on both x and z. Version 5 adds `northBearingDeg` (north is -z along the equator and
-turns towards the poles on the north and south edges) and `metresPerBlock` (the manifest's
-m_per_block_h everywhere, since the map is equal-area). The Lambert world stays available: a preset's `scale.projection`
+those edges (POL-024). The F3 line and Deep Time's planet API (`api/planet/DeepTimePlanet`, docs/api/planet.md) give each
+block's true latitude and longitude, which on this world depend on both x and z, and read the folded
+world as one sphere: distances and bearings run on across the x wrap and through the half-turns at
+the north and south edges. North is -z along the equator and turns towards the poles on those edges;
+the metres per block are the manifest's m_per_block_h everywhere on area (the map is equal-area),
+though east and north stretch differently away from the equator. The Lambert world stays available: a preset's `scale.projection`
 `lambert` (the planet editor's "World map") bakes it, played on the level types
 `deeptime:planet_lambert` and `deeptime:planet_lambert_32k`.
 

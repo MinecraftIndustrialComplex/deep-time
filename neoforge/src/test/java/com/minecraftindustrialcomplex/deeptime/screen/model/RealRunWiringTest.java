@@ -162,6 +162,63 @@ class RealRunWiringTest {
     }
 
     /**
+     * Cube plan G13 on a real run: the real 4k planet with the editor's projection set to the cube
+     * (what a cube world type picks), cut to 50 Myr. The finished run has the cube's outline for the
+     * globe (twelve edges, six of them the border); the review's final map is the net, 4 : 3, from the
+     * world data, with the void transparent, the hints as a picture over it and the spawn on a face;
+     * Accept binds a cube world of period 4,096.
+     */
+    @Test
+    void aCubeRunThroughTheEditor() throws Exception {
+        EditorModel m = editor();
+        assertTrue(m.importShareCode(ShareCode.encode(planet4k())).isEmpty(), "the real preset imports");
+        m.setChoice(EditorFields.byId("projection"), "cube");
+        m.setStart("supercontinent");
+        m.setLengthText("50");
+        m.refreshEstimate();
+        assertTrue(m.estimateError().isEmpty(), "the core accepts it: " + m.estimateError().orElse(""));
+        TimelapseModel run = m.startRun().orElseThrow(() -> new AssertionError("launch failed: " + m.problems()));
+        pollUntilStopped(run, 900);
+        assertEquals(TimelapseModel.State.DONE, run.state(), run.failure().orElse(""));
+
+        CubeOutline o = run.cubeOutline().orElseThrow(() -> new AssertionError("a finished cube run has its outline"));
+        assertEquals(12, o.edges().size());
+        assertEquals(6, o.edges().stream().filter(e -> e.kind() == CubeOutline.Kind.BORDER).count());
+        assertEquals(4, o.corners().stream().filter(CubeOutline.Corner::reachable).count());
+
+        ReviewModel review = m.openReview();
+        assertTrue(review.ready() && review.error().isEmpty(), "review: " + review.error().orElse(""));
+        NetView net = review.net().orElseThrow(() -> new AssertionError("the review of a cube world is the net"));
+        ReviewModel.MapImage map = review.map().orElseThrow();
+        assertEquals("world_data", map.source());
+        assertEquals(NetView.W, map.w());
+        assertEquals(NetView.H, map.h());
+        int onFaces = 0, painted = 0;
+        for (int y = 0; y < map.h(); y++)
+            for (int x = 0; x < map.w(); x++) {
+                int c = map.abgr()[y * map.w() + x];
+                if (net.faceAt((x + 0.5) / map.w(), (y + 0.5) / map.h()) == null) {
+                    assertEquals(0, c, "the void at " + x + "," + y + " is transparent");
+                } else {
+                    onFaces++;
+                    painted += c != 0 ? 1 : 0;
+                }
+            }
+        assertEquals(6 * 128 * 128, onFaces);
+        assertEquals(onFaces, painted, "every face pixel has the world's elevation");
+        ReviewModel.MapImage hints = review.hintsOverlay().orElseThrow();
+        assertEquals(map.w(), hints.w());
+        double[] sp = review.spawn().orElseThrow(() -> new AssertionError("a spawn marker"));
+        double[] f = net.fractionOfLatLon(sp[0], sp[1]);
+        assertTrue(net.faceAt(f[0], f[1]) != null, "the spawn is on a face: " + f[0] + "," + f[1]);
+
+        EditorModel.Accepted a = m.accept();
+        assertEquals("cube", a.projection());
+        assertEquals(4096, a.worldCircumference());
+        m.abandon();
+    }
+
+    /**
      * Cancel, restart and leaving the Create World screen. Cancel keeps Run disabled until the run
      * stopped, then deletes its folder. Leaving the screen cancels a run nobody accepted; a run a
      * new Create World screen starts meanwhile waits for it (a player's machine never holds two

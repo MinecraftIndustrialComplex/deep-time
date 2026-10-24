@@ -624,6 +624,19 @@ final class ScreenshotDriver {
                     } else if (stepTicks == 100) {
                         shot("06c-ore-favourability");
                         run.setLayer(LayerCatalog.defaultLayer(run.layers()));
+                        run.cubeOutline().ifPresent(o -> {
+                            // A finished cube world's globe draws its edges and corners (cube plan G13).
+                            DeepTime.LOGGER.info("[deeptime-shot] cube outline: {} edges ({} border), corners {}", o.edges().size(),
+                                    o.edges().stream().filter(e -> e.kind() == com.minecraftindustrialcomplex.deeptime.screen.model.CubeOutline.Kind.BORDER).count(),
+                                    o.corners().stream().map(c -> c.name() + (c.reachable() ? "+" : "-")).toList());
+                            GenerationPage.setGlobe(true);
+                            ed.refresh();
+                        });
+                    } else if (stepTicks == 115) {
+                        if (run.cubeOutline().isPresent()) {
+                            shot("06d-generation-globe-cube");
+                            GenerationPage.setGlobe(false);
+                        }
                         run.scrubTo(run.frameCount() / 2);
                         GenerationPage.setTab(GenerationPage.Tab.HISTORY);
                         ed.refresh();
@@ -827,11 +840,13 @@ final class ScreenshotDriver {
                     }
                 }
                 case REVIEW -> {
-                    if (screen instanceof PlanetEditorScreen ed && model.review().map(r -> r.ready()).orElse(false) && stepTicks > 20) {
+                    if (screen instanceof PlanetEditorScreen ed && model.review().map(r -> r.ready()).orElse(false) && stepTicks > 20
+                            && ed.page().orElse(null) instanceof ReviewPage rp && rp.settled()) {
                         shot("08-review");
-                        DeepTime.LOGGER.info("[deeptime-shot] review: spawn={} provinces={} error={}",
+                        DeepTime.LOGGER.info("[deeptime-shot] review: spawn={} provinces={} error={} net={}",
                                 model.review().get().spawn().map(p -> p[0] + "," + p[1]).orElse("none"),
-                                model.review().get().provinces().size(), model.review().get().error().orElse("none"));
+                                model.review().get().provinces().size(), model.review().get().error().orElse("none"),
+                                model.review().get().net().map(n -> n.lines().size() + " lines").orElse("no"));
                         if (Boolean.getBoolean(PROP + ".create")) {
                             DeepTime.LOGGER.info("[deeptime-shot] Play");
                             ed.play();

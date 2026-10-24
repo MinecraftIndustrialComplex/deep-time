@@ -94,6 +94,78 @@ public final class GlobeProjection {
         }
     }
 
+    /** The border's edges on the globe, ABGR (orange-red). */
+    public static final int BORDER_ABGR = 0xff2050ff;
+    /** The cube's other edges, ABGR (white, drawn at half strength over the planet). */
+    public static final int EDGE_ABGR = 0xffffffff;
+    /** A corner a player can reach, ABGR (white), and one behind the border (orange-red). */
+    public static final int CORNER_ABGR = 0xffffffff, CORNER_BLOCKED_ABGR = BORDER_ABGR;
+
+    /**
+     * Draws a cube world's edges and corners ({@link CubeOutline}) over a globe {@link #render}ed into
+     * {@code dst} ({@code size × size}, ABGR), on the near side only: the border's edges two pixels
+     * wide in {@link #BORDER_ABGR}, the others one pixel wide in white at half strength, and each
+     * visible corner as a dot ringed in black, white when a player can reach it, orange-red when the
+     * border keeps them off it.
+     */
+    public void drawOutline(CubeOutline outline, int[] dst, int size) {
+        double[] uv = new double[2];
+        double half = size / 2.0;
+        for (CubeOutline.Edge e : outline.edges()) {
+            boolean border = e.kind() == CubeOutline.Kind.BORDER;
+            double px = Double.NaN, py = Double.NaN;
+            for (double[] ll : e.latLon()) {
+                if (forward(ll[0], ll[1], uv) == null) {
+                    px = Double.NaN;
+                    continue;
+                }
+                double x = half + uv[0] * half - 0.5, y = half - uv[1] * half - 0.5;
+                if (!Double.isNaN(px)) {
+                    int n = (int) Math.ceil(Math.max(Math.abs(x - px), Math.abs(y - py)));
+                    for (int k = 0; k <= n; k++) {
+                        double t = n == 0 ? 1.0 : (double) k / n;
+                        int ix = (int) Math.round(px + (x - px) * t), iy = (int) Math.round(py + (y - py) * t);
+                        if (border) {
+                            for (int dy = 0; dy <= 1; dy++)
+                                for (int dx = 0; dx <= 1; dx++)
+                                    put(dst, size, ix + dx, iy + dy, BORDER_ABGR);
+                        } else {
+                            blend(dst, size, ix, iy, EDGE_ABGR);
+                        }
+                    }
+                }
+                px = x;
+                py = y;
+            }
+        }
+        for (CubeOutline.Corner c : outline.corners()) {
+            if (forward(c.lat(), c.lon(), uv) == null)
+                continue;
+            int cx = (int) Math.round(half + uv[0] * half - 0.5), cy = (int) Math.round(half - uv[1] * half - 0.5);
+            for (int dy = -2; dy <= 2; dy++)
+                for (int dx = -2; dx <= 2; dx++)
+                    put(dst, size, cx + dx, cy + dy, Math.abs(dx) == 2 || Math.abs(dy) == 2 ? 0xff000000
+                            : c.reachable() ? CORNER_ABGR : CORNER_BLOCKED_ABGR);
+        }
+    }
+
+    private static void put(int[] dst, int size, int x, int y, int abgr) {
+        if (x >= 0 && y >= 0 && x < size && y < size && dst[y * size + x] != 0)
+            dst[y * size + x] = abgr;
+    }
+
+    /** Half {@code abgr} over the pixel (on the disk only). */
+    private static void blend(int[] dst, int size, int x, int y, int abgr) {
+        if (x < 0 || y < 0 || x >= size || y >= size)
+            return;
+        int at = y * size + x, c = dst[at];
+        if (c == 0)
+            return;
+        int b = (((c >> 16) & 0xff) + ((abgr >> 16) & 0xff)) / 2, g = (((c >> 8) & 0xff) + ((abgr >> 8) & 0xff)) / 2,
+                r = ((c & 0xff) + (abgr & 0xff)) / 2;
+        dst[at] = 0xff000000 | b << 16 | g << 8 | r;
+    }
+
     /** Scales an ABGR colour's RGB by {@code f}; alpha kept (nodata stays transparent). */
     static int shade(int abgr, double f) {
         int a = abgr >>> 24;

@@ -7,9 +7,11 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
  * Where the map's pictures (satellite and elevation) sit in block space: pixel column i covers block x in
  * [x0 + i·s, x0 + (i + 1)·s), row j block z in [z0 + j·s, z0 + (j + 1)·s), s blocks a pixel. The
  * image covers the world's whole domain: x over one period from the seam (−period/2), z from the
- * world's north limit (the north pole on Lambert, the north edge on Petroff–Guyou) south.
+ * world's north limit (the north pole on Lambert, the north edge on Petroff–Guyou) south. On a cube
+ * it covers the net's window, 4s by 3s from (−3s/2, −3s/2) ({@link PlanetGeometry#west}), and the
+ * pictures leave the void off the faces transparent ({@link BaseImage#maskVoid}).
  *
- * @param x0          block x of the image's west side (the seam)
+ * @param x0          block x of the image's west side (the seam, or a cube window's west side)
  * @param z0          block z of its north side
  * @param blocksPerPx s, blocks a pixel (the same east–west and north–south)
  * @param w           width, pixels
@@ -31,7 +33,7 @@ public record MapFrame(double x0, double z0, double blocksPerPx, int w, int h) {
         double s = period / width;
         double span = p.zMax() - p.zMin();
         int h = Math.max(1, (int) Math.ceil(span / s - 1e-9));
-        return new MapFrame(-period / 2.0, p.zMin(), s, width, h);
+        return new MapFrame(PlanetGeometry.west(p), p.zMin(), s, width, h);
     }
 
     /** Block x at pixel coordinate {@code px} (continuous: column i spans [i, i + 1)). */
