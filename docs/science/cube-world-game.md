@@ -62,6 +62,13 @@ the game uses them:
    period image) the action bar warns.
 5. **Spawn** (`server/SpawnHandler`, SCL-127, POL-024). A spawn candidate must lie in A(64), 64
    blocks from every turning edge, and 256 blocks from every image of a cube corner in the net.
+6. **Far terrain** (`farterrain/FarTerrain`, Distant Horizons' level of detail). An area wholly on
+   one face is drawn from the world data as on any world. An area that reaches off the faces is
+   drawn column by column at the planet block each column shows (the same fold), its block states
+   turned and its biomes those the fill stores, so the far view past a turning edge is the fill's
+   ground; columns past the corners are the same deep ocean. Distant Horizons' curvature takes the
+   radius of the sphere with the six faces' area, s·sqrt(3/(2π)) (SCL-078: 2,653 blocks at 16k,
+   5,130 at 32k), not the period's 4s/(2π), and Toroidal World's guard checks the period 4s.
 
 ## Equations and constants
 
@@ -97,6 +104,17 @@ at most 1.05 blocks apart on the sphere (R 707.6 blocks); the border puts a play
 or past the corners back on the planet (4.55 and 92.7 blocks), folds one 100 blocks past N-east
 onto F1 with its yaw turned 90°, and leaves both poles and the face centres alone.
 
+Far terrain (stage 2, 2026-10-24, the 4k cube, `farTerrainMatchesTheCube` with the other 13 cube and
+far terrain tests): against the chunks the game generated, 168 columns in the 16 blocks inside the
+turning edges (167 at the same ground height, all within 1 block), 168 past them (165 exact, all
+within 1), 40 across the slide and 132 across Toroidal World's seam (all exact), and the 4 corners of
+a chunk past the net's corners (deep ocean, exact); water and biome agree in every column. At 16k
+(the smoke's `--dh` checks on `earthlike_quick_16k_cube.json`, then `dh-client-check.sh`, the VM's
+private Xvfb): Distant Horizons held 400 of 400 columns on each side of the slide (x = -5,760)
+with ground within 2 blocks of the generated chunk in 390 and 398 of them, water or dry as
+generated in all 800 and the biome in all 800; the real client then received 2,001 far sections, 378
+and 228 of them in the 2,048 blocks west and east of the slide and 210 and 362 beside the seam.
+
 ## Simplifications and limits
 
 - The copy off the faces has no structures and no features: trees, ore veins placed as features,
@@ -104,7 +122,9 @@ onto F1 with its yaw turned 90°, and leaves both poles and the face centres alo
   (cube plan E3) shows the partner's real chunks instead and supersedes the fill there.
 - Terrain that a structure adapts round its pieces (the beardifier) is not copied: the scratch
   chunk does not know the partner's structure starts.
-- Lava flows (G16) and the far terrain of Distant Horizons (G6) do not yet cross turning seams.
+- Lava flows (G16) do not yet cross turning seams.
+- Far terrain past a turning edge is the fill's ground, so it has no trees or structures either;
+  the area is drawn column by column there (its cost there was not measured apart).
 - The detail noise (G3) is not yet blended across turning seams, so the ground can step by the
   detail term's amplitude at a turning edge (the bake blends its own relief noises, SCL-125).
 - Sable ships are not stopped by the cube border yet.
