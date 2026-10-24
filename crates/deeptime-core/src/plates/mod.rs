@@ -643,7 +643,15 @@ impl PlatesStage {
         for f in &fired {
             let (under, over) = (st.contacts[f.contact].under, st.contacts[f.contact].over);
             let done = collision::collide(
-                st, world, &cache.geo, &pos, &env, f.contact, &f.seeds, f.stalled,
+                st,
+                world,
+                &cache.geo,
+                &pos,
+                &env,
+                f.contact,
+                &f.seeds,
+                f.stalled,
+                balance.collision_n.get(&f.contact).copied(),
             )?;
             if let Some(ev) = done.event {
                 causes.insert(under, ev);

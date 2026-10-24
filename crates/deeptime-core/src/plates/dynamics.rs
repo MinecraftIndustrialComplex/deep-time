@@ -555,6 +555,9 @@ pub struct CollisionRec {
     /// It ended because its convergence had stalled (else: a terrane transfer on shortening).
     #[serde(default)]
     pub stalled: bool,
+    /// A continent moved alone by transference (`collision::transference_due`, ledger PLT-516).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub transference: bool,
     /// First and last step of the collision state, Myr: when continental crust first converged
     /// at the front, and when the terrane was transferred or the plates welded.
     pub start_myr: f64,
