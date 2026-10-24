@@ -161,10 +161,13 @@ the game uses them:
     The dev map reads a cube world as its net. Its picture is the window of 4s by 3s blocks from
     x = -3s/2, and the void around N and S is transparent and cannot be clicked: the server clears
     the void in the satellite picture after the natives draw it, and the elevation picture skips
-    it. The seam is the slide (x = -3s/2, the same line as 5s/2, for |z| up to s/2), dashed. The
-    edges are the border's 12 segments, drawn as one outline with the border's inset dashed inside
-    it, and the five face sides the net joins are faint dashed lines. The two poles are single points
-    inside N and S. The cone points are the eight corners at their twelve images in the window: a
+    it. The natives (`deeptime-tiles`, the workbench's renderer) read a cube world's layers, stored
+    as six face planes, as the net window's flat raster: each net cell is its face's cell, a void
+    cell the cell under the fold of its centre, x wrapping with the period 4s; read as one flat
+    raster from F0's corner, S showed F1's plane and F2 F1's east column. The seam is the slide
+    (x = -3s/2, the same line as 5s/2, for |z| up to s/2), dashed. The edges are the border's 12
+    segments, drawn as one outline with the border's inset dashed inside it, and the five face sides
+    the net joins are faint dashed lines. The two poles are single points inside N and S. The cone points are the eight corners at their twelve images in the window: a
     cross in the cone colour on the four corners of F0, which a player can stand on, and in
     orange-red on the four the border keeps a player off. The readout names the face and gives the
     distance to the slide and to the nearest border segment; the minimap's second line reads
