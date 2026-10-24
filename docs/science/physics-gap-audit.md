@@ -338,6 +338,14 @@ what a player meets most.
   97 % of its cells (67 % in stage 1; HYD-146), no plain column carries an ocean biome (752 did;
   BIO-185), and the 8 plains counted as having no path are fronts the main stem already holds
   (HYD-147, not changed). Floodplains and levees, meanders, fans and braids remain.
+- **State (2026-10-24).** Stage 2 of 4 is built on branch worktree-agent-a9e4e25c4744d5a75, on by
+  default (`hydro.floodplains`), not merged: GFPLAIN's floodplains (h = 0.01 A^0.30 m over the drain,
+  HYD-150) laid flat at the river's bank, one block over its water (HYD-151, HYD-152), and the
+  levee's sand on the bank columns on a plain (HYD-153). On the D5 bake the plain is 167,243 km²,
+  7.2 % of the land (6.5 % within 60°), against GFPLAIN's 11.5 % and Lane et al.'s 19.7 % on Earth
+  (reported, not aimed at); beside a channel, 93 % of the plain now stands one block over the water
+  (42 % before), 54.6 % of it beyond the bank zone (rivers-and-lakes.md, "Floodplains and levees").
+  Meanders, fans and braids remain.
 
 ### Gap 6: flexural foreland basins
 

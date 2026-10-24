@@ -123,8 +123,9 @@ public final class WaterBodies {
      * levees are highest and coarsest at the channel's margin (Smith et al. 2009); levee and proximal floodbasin
      * sediment runs from very fine sand to medium silt (Filgueira-Rivera et al. 2007), and sand is the block for its
      * coarse end. The band is the bank zone the column rule already draws (the rivers file's bank zone plus its bank
-     * ratio times the half-width; game-choice: no new width, though real levees run from a fraction of a channel
-     * width to over ten).
+     * ratio times the half-width, HYD-024; game-choice: no new width). That is 0.27 to 0.96 of the drawn channel's
+     * width, inside the 0.15 to 1.07 levee widths per channel width of the Upper Columbia (Adams et al. 2004); real
+     * levees run from a fraction of a channel width to over ten.
      */
     static final BlockState LEVEE = Blocks.SAND.defaultBlockState();
 
