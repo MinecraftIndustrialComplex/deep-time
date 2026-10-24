@@ -184,10 +184,10 @@ public final class WorldDataTerrain implements TerrainSource {
 
     /**
      * The |z| up to which a volcano may hold a crater lava lake: the pole cap's line on a Lambert world;
-     * the whole world on a Petroff–Guyou one (no pole cap there: its poles are ordinary ground).
+     * the whole world on a Petroff–Guyou or cube one (no pole cap there: its poles are ordinary ground).
      */
     private int lakeMaxAbsZ(WorldData wd) {
-        if (ref.petroffGuyou())
+        if (ref.petroffGuyou() || ref.cube())
             return (int) Math.ceil(wd.projection().zMax()) + 1;
         return (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(wd.circumference(), ref.poleCapDeg()));
     }
@@ -334,7 +334,12 @@ public final class WorldDataTerrain implements TerrainSource {
 
     @Override
     public boolean seamless() {
-        return ref.petroffGuyou();
+        return ref.petroffGuyou() || ref.cube();
+    }
+
+    @Override
+    public boolean cube() {
+        return ref.cube();
     }
 
     @Override

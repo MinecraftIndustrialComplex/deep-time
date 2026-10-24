@@ -676,6 +676,33 @@ PROBE_COLUMNS = [(0.0, 0.0), (0.0625, 0.03), (-0.1875, -0.05), (0.4995, 0.01), (
                  (0.31, -0.12), (-0.42, 0.14), (0.2, 0.2)]
 
 
+# On a cube world (format 0.7) the same in fractions of the face side s, all on the faces (the
+# chunks off them are copies, not the world data): F0's centre and near it, F1, F3, F2 on both
+# sides of the east-west slide (x = +-2s), N and S.
+CUBE_PROBE_COLUMNS = [(0.0, 0.0), (0.03, 0.02), (0.9, -0.1), (-1.1, 0.2), (1.99, 0.01), (-1.99, 0.01),
+                      (0.1, -1.2), (-0.2, 1.3)]
+
+
+def cube_side(world_data):
+    """The face side s of a cube world's data (manifest notes.bake.projection.face_blocks), or None."""
+    try:
+        m = json.load(open(os.path.join(world_data, "manifest.json")))
+    except (OSError, ValueError):
+        return None
+
+    def find(o):
+        if isinstance(o, dict):
+            if o.get("kind") == "cube" and isinstance(o.get("face_blocks"), int):
+                return o["face_blocks"]
+            o = list(o.values())
+        if isinstance(o, list):
+            for v in o:
+                if (s := find(v)) is not None:
+                    return s
+        return None
+    return find(m)
+
+
 MAX_CARVED_COLUMNS = 2   # of PROBE_COLUMNS: cave mouths are a few percent of a planet's columns
 
 
@@ -692,8 +719,10 @@ def probe_consistency(steps, rcon, server, world_data, size):
         steps.record("probes agree with the world data", f"skipped: {cli} not built (install.sh builds it)")
         return
     bad, rows, carved = [], [], []
-    for fx, fz in PROBE_COLUMNS:
-        x, z = round(fx * size), round(fz * size)
+    side = cube_side(world_data)
+    columns = [(round(fx * side), round(fz * side)) for fx, fz in CUBE_PROBE_COLUMNS] if side \
+        else [(round(fx * size), round(fz * size)) for fx, fz in PROBE_COLUMNS]
+    for x, z in columns:
         probe, out = probe_json(server, rcon, f"deeptime probe column {x} {z}", wait=0.5)
         ref = subprocess.run([cli, "inspect-column", "--world-data", world_data, "--parity", str(x), str(z)],
                              capture_output=True, text=True)
@@ -722,9 +751,9 @@ def probe_consistency(steps, rcon, server, world_data, size):
             bad.append(rows[-1])
     if len(carved) > MAX_CARVED_COLUMNS:
         bad.extend(carved)
-    steps.check("probe column agrees with the world data (inspect-column)", f"{len(PROBE_COLUMNS)} of {len(PROBE_COLUMNS)}",
-                f"{len(PROBE_COLUMNS) - len(bad)} of {len(PROBE_COLUMNS)}" + (": " + "; ".join(bad)[:400] if bad else ""),
-                not bad, note="; ".join(rows)[:600])
+    steps.check("probe column agrees with the world data (inspect-column)", f"{len(columns)} of {len(columns)}",
+                f"{len(columns) - len(bad)} of {len(columns)}" + (": " + "; ".join(bad)[:400] if bad else ""),
+                not bad, note=("cube world, s = " + str(side) + "; " if side else "") + "; ".join(rows)[:600])
 
 
 # A scenario boots a world without data and expects Deep Time to stop the server before
@@ -833,9 +862,12 @@ def run_scenario(name, a, smoke, server_dir, world, install, tools):
                 why = f"not JSON: {e}"
         steps.check("the template is valid JSON", "valid JSON", why, ok)
     elif name == "first_start_circumference_mismatch":
-        line = next((l for l in server.lines if "circumference mismatch" in l), "")
-        both = f"C = {other}" in line and f"C = {size}" in line
-        steps.check("the message names both circumferences", f"C = {other} … C = {size}", line.strip()[:220] or "absent", both)
+        # FirstStartGenerator's "world shape mismatch" (the circumference and the projection): the
+        # preset's C and the level type's world (its x period and map, e.g. "15,360-block cube world").
+        line = next((l for l in server.lines if "world shape mismatch" in l or "circumference mismatch" in l), "")
+        both = f"C = {other}" in line and "but this world's level-type gives a" in line
+        steps.check("the message names both world shapes", f"C = {other} … this world's level-type gives a …",
+                    line.strip()[:220] or "absent", both)
     elif name == "first_start_native_failure":
         guidance = "Deep Time natives failed to load: UNSUPPORTED_PLATFORM" in text
         steps.check("the natives' guidance block", "UNSUPPORTED_PLATFORM + what to do", "present" if guidance else "absent",

@@ -103,6 +103,22 @@ public final class GameTestSupport {
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_planet_real"));
 
     /**
+     * The real test planet baked as a cube world (cube plan G15; format 0.7, s = 1,024, period 4,096,
+     * folder {@code deeptime-cube}; gametest.sh writes it with {@code --set scale.projection=cube}):
+     * the pack's biomes and surface rules, no caves.
+     */
+    public static final ResourceKey<Level> TEST_PLANET_CUBE =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_planet_cube"));
+
+    /**
+     * {@link #TEST_PLANET_CUBE}'s world data with the full router (noise caves and the aquifer) under
+     * the bare biome (no carvers, no features): a chunk on a face is then all the generator's work, so
+     * {@code CubeWorldGameTests} compares the fill off the faces with it block for block.
+     */
+    public static final ResourceKey<Level> TEST_CUBE_BARE =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_cube_bare"));
+
+    /**
      * The real planet's world data again (folder {@code deeptime-real}) with the lake level's bare
      * biome, no carvers, no features and no caves (P1-22): only the generator's passes touch its
      * rivers and lakes, so {@code RiverGameTests.riversHold} sees exactly what the water pass built.

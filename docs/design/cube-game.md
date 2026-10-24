@@ -128,8 +128,8 @@ on the border (n1, n2, s1, s2), which no player reaches; their mixes add there. 
   block, its heading turned by the motion (`CubeLayout.Iso.point`, yaw + 90° × k). The portal search
   takes the folded position; other arrivals are folded by the border tick.
 - **W5.** `SpawnHandler` passes over a candidate within 64 blocks of a border segment (POL-024,
-  generalised) or 256 blocks of any image of a cube corner (POL-030, game-choice; the bake drops the
-  same, SCL-127).
+  generalised) or 256 blocks of any image of a cube corner (SCL-127, game-choice: the bake drops the
+  same candidates).
 
 ## 6. Level types and presets (G12 in part)
 
