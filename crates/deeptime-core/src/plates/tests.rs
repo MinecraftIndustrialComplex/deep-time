@@ -786,7 +786,12 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 2026-10-23: 4, 12, 14, 17, 18, 19 and 21, seed 17 twice, seed 2 no more; 11 of seeds 1 to
     // 24 with the fronts by their straight share on by default, PLT-530, 2026-10-24, the sweep
     // `weld_seed_sweep`: 2, 6, 9, 11 to 13, 15, 16 and 18 to 20, seeds 12, 15 and 19 twice, seeds
-    // 4, 14, 17 and 21 no more; this test and the recording test pass on all 11).
+    // 4, 14, 17 and 21 no more; this test and the recording test pass on all 11; 9 of seeds 1 to
+    // 24 with fission and the split inheritance on by default, PLT-532 and PLT-534, the same day:
+    // 1, 2, 3, 6, 11, 14, 15, 20 and 21, seeds 12 and 19 no more; this test passes on all 9, seed
+    // 11 since; 11 of seeds 1 to 24 with a split's latent slab copies, PLT-534, the same day: 1,
+    // 2, 8, 11 to 14, 16, 20, 22 and 23, seed 12 again since; 12 of seeds 1 to 24 with the level
+    // set on by default, PLT-536, the same day: 1, 2, 4, 5, 7, 9, 12, 15, 17 to 19 and 21).
     let p = preset(8000, 300.0, "scattered_continents", 12);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
@@ -925,7 +930,14 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // V1 gap 2's stages went on by default, 2026-10-23, then seed 4: of the welding seeds 4, 12,
     // 14, 19 and 21 pass, 17 puts the mix's fronts 32 % over the plates' in one step and 18 fails
     // another check; seed 19 since the fronts by their straight share went on by default,
-    // PLT-530, 2026-10-24, when seed 4 no longer welds: all 11 welding seeds pass).
+    // PLT-530, 2026-10-24, when seed 4 no longer welds: all 11 welding seeds pass; seed 20 since
+    // fission and the split inheritance went on by default, PLT-532 and PLT-534, the same day,
+    // when seed 19 no longer welds: of the 9 welding seeds 1, 6, 11, 20 and 21 pass, and on 2, 3,
+    // 14 and 15 the speed guard binds for 1 to 3 plate-steps in 300 Myr: build log 2026-10-24,
+    // "the front lane"; seed 19 still does not weld with a split's latent slab copies, PLT-534,
+    // the same day, so seed 20, the next seed that welds, stays: the seed is chosen by its weld,
+    // and the guard asserted below binds on welding seed 16; seed 19 again since the level set
+    // went on by default, PLT-536, the same day, when seed 19 welds again and seed 20 no more).
     let p = preset(8000, 300.0, "scattered_continents", 19);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
@@ -1294,10 +1306,20 @@ fn the_crust_budget_changes_nothing() {
 /// resampling, so it runs under the continent where y > 0 and opens a gap where y < 0. Overlaps
 /// are resolved (the ocean subducts, its crust hidden) as a step would.
 fn two_plates(p: &PlanetPreset, env: &Env<'_>, turn: f64) -> (PlateState, Geo, Vec<DVec3>) {
+    plates_split(p, env, turn, |q| q.z > 0.0)
+}
+
+/// The planet of `two_plates` with plate 0, the continent, where `north` holds.
+fn plates_split(
+    p: &PlanetPreset,
+    env: &Env<'_>,
+    turn: f64,
+    north: impl Fn(DVec3) -> bool,
+) -> (PlateState, Geo, Vec<DVec3>) {
     let (mut st, geo) = init::initial_state(p, env).unwrap();
     let pts = geo.points();
     for (i, s) in st.samples.iter_mut().enumerate() {
-        let north = pts[i].z > 0.0;
+        let north = north(pts[i]);
         *s = state::Sample::blank(u32::from(!north));
         if north {
             s.kind = CONTINENTAL;
@@ -1371,6 +1393,224 @@ fn continental_area_through_resampling(turn: f64, tries: u64) -> (PlateState, f6
         })
         .collect();
     (st, before, after)
+}
+
+/// Bounds of the level-set tests below (numerical; the front lane, 2026-10-24). With the level set
+/// the boundary's spread after 10 to 40 resamplings stayed at or below its first and its edges
+/// per spacing within 4 % of their first (without it, by the 40th resampling, they rose by 0.92
+/// to 1.29 spacings and by 58 to 107 %). The converging trench's offset moved 0.2 spacings
+/// landward in 40 resamplings (0.9 seaward without the level set; 2.1 landward before a group
+/// with no corner in the triangle took its distance outside the others' outline,
+/// `level_set::margin`).
+const SPREAD_SLACK: f64 = 0.15;
+const EDGE_SLACK: f64 = 1.15;
+const OFFSET_SLACK: f64 = 0.5;
+/// The round plate's loss with the level set, samples per resampling: a closed convex outline
+/// loses the same area at every radius (the linear interpolation's error is a drift of the
+/// outline towards its centre of curvature in proportion to its curvature, and the curvature of a
+/// closed outline integrates to 2π), measured at 0.75 to 0.85.
+const ROUND_LOSS: [f64; 2] = [0.4, 1.4];
+
+/// Plate outlines below the lattice spacing (`tectonics.level_set_membership`, PLT-536; the front
+/// lane, 2026-10-24): resamplings alone must not roughen a plate boundary. The two-plate planet
+/// resampled 40 times with nothing else in the step: static, and with the ocean turned under the
+/// continent by `turn` between resamplings (a trench where y > 0, a ridge where y < 0). After
+/// each resampling, per stretch of boundary: its samples' offset from the equator and their
+/// spread about it, in lattice spacings, and the boundary's lattice edges per spacing of the
+/// stretch's length (a straight boundary's count). Without the level set the static boundary's
+/// samples spread from 0.44 to 1.73 spacings and its edges per spacing rise from 2.25 to 4.65 in
+/// 40 resamplings (a random walk: every turned lattice moves the outline up to half a spacing);
+/// with it, a great circle's outline lands where it was on every lattice (Osher & Sethian 1988;
+/// Sussman, Smereka & Osher 1994).
+#[test]
+fn how_resamplings_roughen_a_boundary() {
+    let p0 = preset(40_000, 20.0, "supercontinent", 5);
+    // (level set, planet, stretch, resamplings, spread, edges per spacing, offset).
+    let mut seen: Vec<(bool, &str, &str, usize, f64, f64, f64)> = Vec::new();
+    for on in [false, true] {
+        let mut p = p0.clone();
+        p.tectonics.level_set_membership = on;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let spacing = env.norm.spacing_rad();
+        for (turn, label) in [(0.0, "static"), (0.02, "converging")] {
+            let (mut st, mut geo, mut pos) = two_plates(&p, &env, turn);
+            for k in 1..=40 {
+                let mut world = WorldState::new(1, 16_384, p.t_start_years());
+                let tree = Tree::over(&pos, |_| true);
+                geo = ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env).unwrap();
+                if on {
+                    level_set::reinit(&mut st, &geo, spacing);
+                }
+                let pts = geo.points();
+                // Plate 0's visible samples with a visible plate-1 neighbour, by stretch.
+                let mut stretch: [Vec<f64>; 2] = [Vec::new(), Vec::new()];
+                let mut edges = [0usize; 2];
+                for (i, q) in pts.iter().enumerate() {
+                    if st.samples[i].is_hidden() || st.plate_of(i) != 0 {
+                        continue;
+                    }
+                    let n_other = geo
+                        .edges(i as u32)
+                        .filter(|&(j, _)| {
+                            !st.samples[j as usize].is_hidden() && st.plate_of(j as usize) == 1
+                        })
+                        .count();
+                    if n_other == 0 {
+                        continue;
+                    }
+                    let w = if turn == 0.0 || q.y > 0.3 {
+                        0
+                    } else if q.y < -0.3 {
+                        1
+                    } else {
+                        continue;
+                    };
+                    stretch[w].push(q.z.asin() / spacing);
+                    edges[w] += n_other;
+                }
+                if [1, 2, 5, 10, 20, 30, 40].contains(&k) {
+                    for (w, name) in [(0, "trench"), (1, "ridge")] {
+                        if turn == 0.0 && w == 1 {
+                            continue;
+                        }
+                        let v = &stretch[w];
+                        let len = v.len().max(1) as f64;
+                        let mean = v.iter().sum::<f64>() / len;
+                        let rms = (v.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / len).sqrt();
+                        // The stretch's length: the whole equator, or each arc with |y| > 0.3.
+                        let arc = if turn == 0.0 {
+                            std::f64::consts::TAU
+                        } else {
+                            std::f64::consts::PI - 2.0 * 0.3f64.asin()
+                        };
+                        let per = edges[w] as f64 / (arc / spacing);
+                        eprintln!(
+                            "level set {on}: {label} {name} after {k} resamplings: {} samples, \
+                             offset {mean:+.2} spacings, spread {rms:.2}, edges per spacing \
+                             {per:.2}",
+                            v.len(),
+                        );
+                        seen.push((on, label, name, k, rms, per, mean));
+                    }
+                }
+                // The step's motion: the ocean turned under the continent, overlaps resolved.
+                let q = glam::DQuat::from_rotation_x(turn);
+                for g in &mut st.groups {
+                    if g.plate == 1 {
+                        g.rot = [q.x, q.y, q.z, q.w];
+                    }
+                }
+                pos = geometry::positions(&st, &geo);
+                st.recount(&pos);
+                let tree = Tree::over(&pos, |_| true);
+                let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+                subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
+            }
+        }
+    }
+    let at = |on: bool, label: &str, name: &str, k: usize| {
+        seen.iter()
+            .find(|s| s.0 == on && s.1 == label && s.2 == name && s.3 == k)
+            .map(|s| (s.4, s.5, s.6))
+            .unwrap()
+    };
+    // Without the level set the static boundary walks: its spread grows and so does its length.
+    let (s1, e1, _) = at(false, "static", "trench", 1);
+    let (s40, e40, _) = at(false, "static", "trench", 40);
+    assert!(
+        s40 > 2.0 * s1 && e40 > 1.5 * e1,
+        "{s1} → {s40}, {e1} → {e40}"
+    );
+    // With it, the static boundary and the trench (the overriding plate's outline) stay as
+    // straight as the lattice draws them after one resampling, and where they were.
+    for (label, name) in [("static", "trench"), ("converging", "trench")] {
+        let (s1, e1, o1) = at(true, label, name, 1);
+        for k in [10, 20, 30, 40] {
+            let (s, e, o) = at(true, label, name, k);
+            assert!(
+                s < s1 + SPREAD_SLACK && e < e1 * EDGE_SLACK && (o - o1).abs() < OFFSET_SLACK,
+                "{label} {name} after {k}: spread {s1} → {s}, edges per spacing {e1} → {e}, \
+                 offset {o1} → {o}"
+            );
+        }
+    }
+}
+
+/// The level set's cost (PLT-536; the front lane, 2026-10-24): the interpolated distance is exact
+/// for a great circle only. A curved outline's distance is not linear in the position, and its
+/// linear interpolation (and the reinitialisation's chords) moves the outline towards its centre
+/// of curvature by about the spacing squared times the curvature at each resampling: a numerical
+/// curvature flow. Its area loss integrates the curvature along the outline, 2π for a closed
+/// convex one, so a round plate loses the same number of samples per resampling whatever its
+/// radius. A round plate of 3, 6 and 12 spacings' radius on a static planet, resampled 40 times
+/// with and without the level set: its samples after each, against its samples at the start.
+/// Without the level set the count wanders (by +5, -7 and -12 samples after 20 resamplings);
+/// with it, it falls by 0.75 to 0.85 samples per resampling at each radius.
+#[test]
+fn a_small_round_plate_through_resamplings() {
+    let p0 = preset(40_000, 20.0, "supercontinent", 5);
+    let mut seen: Vec<(bool, f64, f64)> = Vec::new();
+    for on in [false, true] {
+        let mut p = p0.clone();
+        p.tectonics.level_set_membership = on;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let spacing = env.norm.spacing_rad();
+        for radius in [3.0, 6.0, 12.0] {
+            let centre = DVec3::new(0.2, -0.4, 0.7).normalize();
+            let cos_r = (radius * spacing).cos();
+            let (mut st, mut geo, pos) = plates_split(&p, &env, 0.0, |q| q.dot(centre) > cos_r);
+            let count = |st: &PlateState| {
+                (0..st.samples.len())
+                    .filter(|&i| st.plate_of(i) == 0)
+                    .count()
+            };
+            let start = count(&st);
+            let mut pos = pos;
+            let mut counts = Vec::new();
+            for _ in 1..=40 {
+                let mut world = WorldState::new(1, 16_384, p.t_start_years());
+                let tree = Tree::over(&pos, |_| true);
+                geo = ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env).unwrap();
+                if on {
+                    level_set::reinit(&mut st, &geo, spacing);
+                }
+                pos = geo.points().to_vec();
+                counts.push(count(&st));
+            }
+            let mean_last: f64 = counts[30..].iter().map(|&c| c as f64).sum::<f64>() / 10.0;
+            let change = mean_last / start as f64 - 1.0;
+            eprintln!(
+                "level set {on}: radius {radius} spacings, {start} samples at the start, after \
+                 1, 10, 20, 40 resamplings {} {} {} {} (last ten's mean {:+.1} %)",
+                counts[0],
+                counts[9],
+                counts[19],
+                counts[39],
+                change * 100.0
+            );
+            let lost = (start as f64 - counts[19] as f64) / 20.0;
+            eprintln!(
+                "level set {on}: radius {radius} spacings, lost {lost:.2} samples per resampling"
+            );
+            seen.push((on, radius, lost));
+        }
+    }
+    let on: Vec<f64> = seen.iter().filter(|s| s.0).map(|s| s.2).collect();
+    for &(_, radius, lost) in seen.iter().filter(|s| s.0) {
+        assert!(
+            lost > ROUND_LOSS[0] && lost < ROUND_LOSS[1],
+            "radius {radius}: {lost} samples per resampling"
+        );
+    }
+    let (lo, hi) = on
+        .iter()
+        .fold((f64::MAX, 0.0f64), |(a, b), &x| (a.min(x), b.max(x)));
+    assert!(
+        hi < 2.0 * lo,
+        "the loss should not depend on the radius: {on:?}"
+    );
 }
 
 /// A resampling moves the crust onto a new lattice and must neither make nor destroy continental
@@ -2294,19 +2534,22 @@ fn the_final_heat_flow_pass_lifts_only_low_continental_samples() {
 /// ragged"): which part of the step cuts the plates into pieces, over the quick preset's
 /// defaults. A diagnosis, not a check: it prints each part's samples cut off their plate and
 /// joined back, and the share cut off at the end of every 50 Myr; then the same with
-/// `plate_fission` (PLT-532) on, and its globals.
+/// `plate_fission` (PLT-532) on, and its globals; then with the level set (PLT-536) on as well.
 #[test]
 #[ignore = "diagnosis: 300 Myr at 40k samples; run with --release -- --ignored --nocapture"]
 fn where_the_plates_are_cut() {
     cut_trace::enable(true);
-    for (start, seed, fission) in [
-        ("supercontinent", 1, false),
-        ("scattered_continents", 2, false),
-        ("supercontinent", 1, true),
-        ("scattered_continents", 2, true),
+    for (start, seed, fission, level_set) in [
+        ("supercontinent", 1, false, false),
+        ("scattered_continents", 2, false, false),
+        ("supercontinent", 1, true, false),
+        ("scattered_continents", 2, true, false),
+        ("supercontinent", 1, true, true),
+        ("scattered_continents", 2, true, true),
     ] {
         let mut p = preset(40_000, 300.0, start, seed);
         p.tectonics.plate_fission = fission;
+        p.tectonics.level_set_membership = level_set;
         let _ = cut_trace::take();
         let mut shares = Vec::new();
         let mut next = 50.0;
@@ -2321,7 +2564,8 @@ fn where_the_plates_are_cut() {
         });
         let parts = cut_trace::take();
         eprintln!(
-            "{start} seed {seed} fission {fission}: cut share, plates every 50 Myr {shares:.3?}"
+            "{start} seed {seed} fission {fission} level set {level_set}: cut share, plates every \
+             50 Myr {shares:.3?}"
         );
         let g = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
         eprintln!(
