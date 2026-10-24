@@ -2521,7 +2521,10 @@ mod tests {
         );
         let dx = 2500.0;
         let (w0, zero, bulge_at, bulge, alpha, stiff) = broken_line_load(te, soft, dx);
-        assert!(stiff > 0.85 && stiff <= 1.0, "the stiff plate carries {stiff}");
+        assert!(
+            stiff > 0.85 && stiff <= 1.0,
+            "the stiff plate carries {stiff}"
+        );
         assert!(
             (zero / (0.5 * pi * alpha) - 1.0).abs() < 0.015,
             "zero crossing at {zero}, πα/2 = {}",
