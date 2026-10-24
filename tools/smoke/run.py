@@ -1062,10 +1062,16 @@ def main():
                 steps.check("/deeptime probe tw answers", "[deeptime-probe] JSON", out[:200] if not m else m.group(1), m is not None)
                 if m:
                     tw = json.loads(m.group(1))
-                    for k in ("stamped", "loopsX", "loopsZ", "widthChunks", "climateCompression"):
-                        steps.record(f"tw.{k}", json.dumps(tw.get(k)).strip('"'))
-                    print("   probe tw: " + " ".join(f"{k}={json.dumps(tw.get(k)).strip(chr(34))}" for k in
-                                                     ("stamped", "loopsX", "loopsZ", "widthChunks", "climateCompression")), flush=True)
+                    keys = ("stamped", "loopsX", "loopsZ", "widthChunks", "climateCompression", "projection", "periodBlocks", "faceBlocks")
+                    for k in keys:
+                        if k in tw:
+                            steps.record(f"tw.{k}", json.dumps(tw.get(k)).strip('"'))
+                    print("   probe tw: " + " ".join(f"{k}={json.dumps(tw.get(k)).strip(chr(34))}" for k in keys if k in tw), flush=True)
+                    # Toroidal World wraps at the generator's east-west period (C, 2b or 4s; cube plan G11).
+                    if "widthIsPeriod" in tw:
+                        steps.check("Toroidal World's width is the planet's period", f"{tw.get('periodBlocks')} blocks",
+                                    f"{16 * int(tw.get('widthChunks') or 0)} blocks, loops x {tw.get('loopsX')}",
+                                    tw["widthIsPeriod"] is True)
                 out = rcon("deeptime probe column 0 0", check=False)
                 m = PROBE.search(out)
                 steps.check("/deeptime probe column 0 0 answers", "[deeptime-probe] JSON", out[:200], m is not None)

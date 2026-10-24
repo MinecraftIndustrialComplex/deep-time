@@ -88,6 +88,41 @@ the game uses them:
    edge, and goes all the way round each pole. `metresPerBlock` gives the planet's metres per
    block there. Both are NaN past the corners. The old static `latitudeDeg(z, C)` was right on
    Lambert worlds only and is gone.
+9. **The F3 line** (`net/PlanetDebugLine`, cube plan G10). On a cube world the debug screen reads
+   `Deep Time: 10.144° N 100.920° E · face F0 · north 7.8° · 311 m/block here · <planet> (C 4096,
+   276 m/block)`: latitude and longitude, the face (`F1 (folded)` off the faces, for the face the
+   block folds onto), north's bearing and the metres a block spans there, the numbers the climate
+   API gives, then the nominal scale. Past the corners it says "off the planet", and a client whose
+   jar lacks the server's map table says "map mismatch". The client works it out from the planet
+   info alone.
+10. **The commands** (`server/DeepTimeCommands`, `server/SiteCommands`, cube plan G11).
+    - `/deeptime probe pole` names both poles. The cube is turned freely, so they lie somewhere
+      inside N and S. For each pole it gives the block (x in Toroidal World's frame, where `/tp`
+      goes), whether the border lets a player reach it, the planet distance to it in km, and the
+      walk to it under the border. It also gives the source's own latitude, longitude, north,
+      metres per block and border zone.
+    - `/deeptime probe column` adds where a block folds to: its face and cell, the turning edge it
+      lies past with the planet block it shows, or the ocean past the corners. It also gives north
+      and the metres a block spans.
+    - `/deeptime probe tw` gives the east-west period 4s, the face side, and whether Toroidal
+      World wraps at that period. The smoke run checks the last.
+    - `/deeptime sites near` gives each site's planet distance in km and its walk, as well as its
+      distance in the net.
+
+    The planet distance is the great circle on the equal-area sphere times the nominal metres per
+    block. The equal-area sphere's six faces of s² blocks are its whole area, so its radius is
+    R = s·√(3/(2π)), 707.6 blocks at s = 1,024. The nominal metres per block make R the planet's
+    radius in metres (SCL-107).
+
+    The walk is the shortest path inside A(0), the band and the polar column, whose boundary is
+    the border's 12 segments. A(0) is a cross. Its only reflex corners are the four inner corners
+    (±h, ±h) of F0, so the shortest path is straight or bends at those corners. It is found
+    exactly, as the shortest path through the two ends and those corners in five period images
+    (`CubeBorder.walkDistance`).
+
+    The walk is a distance in the net, in blocks. The planet distance runs across faces the border
+    closes: from N's centre to F1's it is a quarter of the way round the planet, while the walk
+    goes through F0's corner.
 
 ## Equations and constants
 

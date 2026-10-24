@@ -202,6 +202,36 @@ class NorthBearingAndScaleTest {
         }
     }
 
+    /**
+     * {@link WorldProjection#greatCircleBlocks} (cube plan G11's planet distance): along Lambert's
+     * equator the arc is the x step; on the cube the poles are πR apart, every point's distances to
+     * the two poles add up to πR, and a block step is the local scale long.
+     */
+    @Test
+    void greatCircleDistancesOnThePlanet() {
+        WorldProjection l = new WorldProjection.Lambert(4096);
+        assertEquals(700.0, l.greatCircleBlocks(-200, 0, 500, 0), 1e-9);
+        SplittableRandom rnd = new SplittableRandom(5);
+        for (WorldProjection.Cube p : cubes()) {
+            double r = p.radius();
+            CubeLayout.LocalPoint np = p.world().northPole(), sp = p.world().southPole();
+            double[] n = p.cube().pointOfLocal(np.face(), np.u(), np.v()), s = p.cube().pointOfLocal(sp.face(), sp.u(), sp.v());
+            assertEquals(Math.PI * r, p.greatCircleBlocks(n[0], n[1], s[0], s[1]), 1e-6 * r, "pole to pole");
+            for (Face f : Face.all())
+                for (int i = 0; i < 5; i++) {
+                    double[] at = p.cube().pointOfLocal(f, rnd.nextDouble(-0.95, 0.95), rnd.nextDouble(-0.95, 0.95));
+                    double sum = p.greatCircleBlocks(at[0], at[1], n[0], n[1]) + p.greatCircleBlocks(at[0], at[1], s[0], s[1]);
+                    assertEquals(Math.PI * r, sum, 1e-6 * r, "to both poles from " + f);
+                    assertEquals(1.0, p.greatCircleBlocks(at[0], at[1], at[0] + 1.0, at[1]) / p.scale(at[0] + 0.5, at[1]), 5e-3,
+                            "a block step on " + f);
+                }
+        }
+        WorldProjection.Cube c = cubes().get(0);
+        long h = S / 2;
+        assertTrue(c.cube().fold(h + 40, -3 * h - 40) instanceof CubeLayout.Ocean);
+        assertTrue(Double.isNaN(c.greatCircleBlocks(0, 0, h + 40.5, -3 * h - 40.5)), "past the corners");
+    }
+
     @Test
     void pastTheCubesCornersThereIsNoNorthAndNoScale() {
         WorldProjection.Cube p = cubes().get(2);
