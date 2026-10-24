@@ -88,7 +88,14 @@ does under the motion.
 
 Nothing physical is modelled, so there is nothing to compare with Earth. The GameTests
 (`CubeWorldGameTests` on the 4k test planet baked as a cube, s = 1,024) check that the fill equals
-its partners block for block and biome for biome; their numbers go in the build log.
+its partners block for block and biome for biome. On 2026-10-23 (the VM, `./gametest.sh
+-PgametestOnly=...` with the seven tests): 29 chunks off the faces, 8,257,536 blocks against their
+partners turned, 0 differ, and 256 columns past the corners deep ocean; 16 chunks, 18,432 biome quarts,
+0 differ; 99 chunks at the face centres, seams and corners (53 off the faces) generate with no hole
+to the floor; a point just inside each turning edge and the fold of the point just outside it are
+at most 1.05 blocks apart on the sphere (R 707.6 blocks); the border puts a player in a void square
+or past the corners back on the planet (4.55 and 92.7 blocks), folds one 100 blocks past N-east
+onto F1 with its yaw turned 90°, and leaves both poles and the face centres alone.
 
 ## Simplifications and limits
 
