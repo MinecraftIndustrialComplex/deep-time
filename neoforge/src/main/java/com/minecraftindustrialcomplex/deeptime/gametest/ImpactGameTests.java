@@ -144,18 +144,29 @@ public final class ImpactGameTests {
      * @param x0 the centre, world blocks
      * @param z0 the centre, world blocks
      */
-    record OnSphere(WorldProjection p, double x0, double z0, double[] u0, double[] east, double[] north) {
+    record OnSphere(WorldProjection p, double x0, double z0, double[] u0, double[] east, double[] north, boolean lambert, double lat0, double lon0) {
 
         static OnSphere at(WorldProjection p, double x0, double z0) {
+            return at(p, x0, z0, false);
+        }
+
+        static OnSphere at(WorldProjection p, double x0, double z0, boolean lambert) {
             double[] u = p.unit(x0, z0);
             double h = Math.hypot(u[0], u[1]);
             double[] e = h > 1e-12 ? new double[]{-u[1] / h, u[0] / h, 0.0} : new double[]{0.0, 1.0, 0.0};
             double[] n = {u[1] * e[2] - u[2] * e[1], u[2] * e[0] - u[0] * e[2], u[0] * e[1] - u[1] * e[0]};
-            return new OnSphere(p, x0, z0, u, e, n);
+            double[] ll = p.latLon(x0, z0);
+            return new OnSphere(p, x0, z0, u, e, n, lambert, ll[0], ll[1]);
         }
 
         /** The great-circle distance from the centre to the point (x, z), sphere blocks. */
         double distance(double x, double z) {
+            if (lambert) {
+                double[] ll = p.latLon(x, z);
+                double dl = Math.toRadians(ll[1] - lon0);
+                dl -= 2 * Math.PI * Math.floor(dl / (2 * Math.PI) + 0.5);
+                return p.radius() * Math.hypot(dl, Math.sin(Math.toRadians(ll[0])) - Math.sin(Math.toRadians(lat0)));
+            }
             double[] u = p.unit(x, z);
             double d = Math.sqrt(Math.pow(u[0] - u0[0], 2) + Math.pow(u[1] - u0[1], 2) + Math.pow(u[2] - u0[2], 2));
             return 2 * Math.asin(Math.min(1.0, d / 2)) * p.radius();
@@ -163,6 +174,12 @@ public final class ImpactGameTests {
 
         /** The world point {x, z} at {@code s} sphere blocks from the centre on bearing {@code a} (radians from east toward north); x unwrapped about the centre. */
         double[] point(double s, double a) {
+            if (lambert) {
+                double lon = lon0 + Math.toDegrees(s / p.radius() * Math.cos(a));
+                double sl = Math.max(-1, Math.min(1, Math.sin(Math.toRadians(lat0)) + s / p.radius() * Math.sin(a)));
+                double[] q = p.blockOf(Math.toDegrees(Math.asin(sl)), ((lon % 360) + 360) % 360);
+                return new double[]{x0 + p.wrapX(q[0] - x0), q[1]};
+            }
             double d = s / p.radius(), c = Math.cos(d), sn = Math.sin(d), ca = Math.cos(a), sa = Math.sin(a);
             double[] v = new double[3];
             for (int i = 0; i < 3; i++)
@@ -294,6 +311,22 @@ public final class ImpactGameTests {
                     wd.projection().latitudeDeg(best.x(), best.z()), rb, ex[0] - best.x(), ex[1] - best.z(), nz[0] - best.x(), nz[1] - best.z()));
             for (int[] q : sphere.within(rb / 2))
                 diag.append(String.format(" %d,%d", q[0] - cx, q[1] - cz));
+            diag.append("; bowls of the deep craters clear of the edges, by latitude (relief; sphere: spread, centre, floor, rim, bowl; lambert: the same)");
+            List<Craters.Crater> edgeClear = deep.stream()
+                    .filter(k -> Math.abs(k.z()) < wd.projection().zMax() - 64 - 3 * k.diameterM() / mH)
+                    .sorted(Comparator.comparingDouble((Craters.Crater k) -> Math.abs(wd.projection().latitudeDeg(k.x(), k.z())))).toList();
+            for (Craters.Crater k : edgeClear) {
+                double r = k.diameterM() / 2 / mH;
+                diag.append(String.format("; %d %.1f° %.1f km %s %.1f |", k.id(), wd.projection().latitudeDeg(k.x(), k.z()), k.diameterM() / 1000,
+                        t.height((int) Math.round(k.x()), (int) Math.round(k.z())) > sea + 2 ? "land" : "sea", k.reliefM() / mV));
+                for (boolean lam : new boolean[]{false, true}) {
+                    OnSphere s = OnSphere.at(wd.projection(), k.x(), k.z(), lam);
+                    Ground gk = Ground.around(t, s, r);
+                    double[] f = gk.floorAndRim(t, s, r);
+                    diag.append(String.format(" %.1f %.1f %.1f %.1f %.2f%s", gk.rms(), gk.over(t, (int) Math.round(k.x()), (int) Math.round(k.z())),
+                            f[0], f[1], f[1] - f[0], lam ? "" : " |"));
+                }
+            }
         }
         StringBuilder lenses = new StringBuilder();
         var result = RockPalette.get().result("impact_breccia").orElse(null);
