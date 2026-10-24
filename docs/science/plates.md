@@ -7391,3 +7391,62 @@ What could close the book, from what has been measured, without a knob:
    candidate, above).
 
 Neither is built in this lane. The saturating suction comes next.
+
+### Step 5: the saturating suction (PLT-540, 2026-10-24)
+
+The speed guard's binds on the 8k test planet ("The speed guard" in Step 3b) are all small plates
+with other plates subducting under them along much of their edge, drawn by a suction that was a
+fixed 0.3 of the slab pull (PLT-186) however fast the plate already moved. This step makes the
+suction saturate (`tectonics.suction_saturates`, `forces::Balance::add_suction`).
+
+**The law.** The suction is the traction on the overriding plate of the mantle flow its sinking
+slab drives (Conrad & Lithgow-Bertelloni 2002, PLT-186). A viscous traction grows with the
+difference between the flow's speed and the plate's, and the flow's speed at the trench is the
+slab's sinking speed, so the overriding plate is drawn at most as fast as the slab sinks (the
+premise is from memory; no source was read for it). At each front sample the suction becomes
+`share × pull × (1 − u / v_t)`: `u` the overriding plate's speed along the slab's direction across
+the trench, `v_t = pull / (slab_res ℓ)` that slab's terminal velocity, the speed at which its pull
+and its slab resistance balance (PLT-185; Forsyth & Uyeda 1975, p. 178: plates attached to slabs
+move at "effectively the terminal velocity of the dense slab falling in a viscous medium"). At
+rest it is the old share; at the slab's terminal velocity it is nothing; faster, it resists, the
+plate then pushing the slab back through the mantle. In the balance this is the old force plus a
+link from the plate to the mantle along that direction with `k = share × slab_res × ℓ`, so the law
+adds no constant: its share is PLT-186's and its speed PLT-185's. With Earth's settings `v_t` is
+105 mm/yr for an old slab at full length (45 × (1 + 3 + 3) / 3), less for a young or short one.
+For a straight trench and a plate in translation, a plate the fixed share draws at `u_f` now moves
+at `u_f / (1 + u_f / v_t)`: a slow plate keeps most of its speed and a fast one is held below
+`v_t` whatever its size. A hanging slab (PLT-271) sucks the same way.
+
+The speed that saturates it is the slab's free sinking speed, not the speed at which the trench
+actually consumes the subducting plate. Coupling the two plates through the trench (the
+subduction rate as the subducting plate's advance plus the overriding plate's) would make the
+suction depend on the subducting plate's speed as well, and would load the subducting plate with
+the overriding plate's resistance, which Earth's fast subducting plates do not show (PLT-186's
+four times). It is not built.
+
+**The unit test** (`the_suction_draws_no_overriding_plate_faster_than_its_slab_sinks`,
+`forces.rs`). A cap drawn only by a straight trench's suction: at rest the suction's torque is the
+share's to 1e-9, and the plate moves at `u_f / (1 + u_f / v_t)` within the test's tolerance (the
+trench is a few rim points, so the plate turns a little as well as translates). A cap of 3°
+(about 70 samples of the 100k lattice, the size the guard held) with a trench along a third of its
+edge and nothing else at its edges: 2,060 mm/yr with the fixed share, 99.8 saturating (expected
+99.9; `v_t` 105). A cap of 31° with boundary resistance all round and a 3,000 km trench: 27.8 and
+22.1 (expected 22.0).
+
+**The guard sweep** (the 8k test planet, scattered continents, 300 Myr, seeds 1 to 24, master's
+default with the fixed suction and with the saturating one; the ignored test of Step 3b, appended
+on the VM only):
+
+| | fixed | saturating |
+|---|---|---|
+| seeds on which the guard binds | 3 (2 for 7 plate-steps, 17 for 1, 24 for 7) | 0 |
+| top plate speed, range over the seeds | 135 to 210 mm/yr | 127 to 161 mm/yr |
+| plate speed p50, median over the seeds | 48.3 mm/yr | 37.3 mm/yr |
+| plate speed p90, median over the seeds | 97.5 mm/yr | 89.3 mm/yr |
+| seeds with a plate over 200 mm/yr | 2 | 0 |
+| seeds that weld | 12 | 11 |
+
+No small plate reaches the guard any more, and the plates as a whole move about a fifth slower
+(the speeds are each plate's on each step, all plates alike). The weld tests' seeds still weld:
+the collisions test's 12 and the recording test's 19 weld with both laws (with the saturating
+suction 1, 2, 4, 8, 10, 12, 18, 19 and 22 to 24 weld).
