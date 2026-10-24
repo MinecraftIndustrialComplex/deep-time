@@ -89,15 +89,18 @@ the game uses them:
    corner with no blend, and a block off the faces reads its partner's value exactly. The bake's
    own relief noises (the jag, the cliff bands' levels) are the same function, so the bake and the
    game agree on the ground at a seam. Petroff-Guyou and Lambert worlds keep the plain noise.
-8. **The climate API** (`api/climate/DeepTimeClimate`, version 5, cube plan G9). Other mods read
-   the planet's geometry from it on the server and on the client. On a cube world
-   `projectionKind` is `"cube"` and `circumferenceBlocks` is the period 4s. `latitudeDeg` and
-   `longitudeDeg` go through the fold and the map, so a block off the faces reads its partner's
-   place. Two calls are new. `northBearingDeg` gives the direction of north in the block frame,
-   in degrees clockwise from -z. It runs smoothly over a face and on into the copy past its
-   edge, and goes all the way round each pole. `metresPerBlock` gives the planet's metres per
-   block there. Both are NaN past the corners. The old static `latitudeDeg(z, C)` was right on
-   Lambert worlds only and is gone.
+8. **The planet and climate APIs** (`api/planet/DeepTimePlanet`, version 1, and
+   `api/climate/DeepTimeClimate`, version 6; docs/api/planet.md). Other mods read the planet's
+   geometry on the server and on the client as a sphere, with no projection named: latitude and
+   longitude, the local frame (north, east and the metres per block along each), great-circle
+   distance, bearing and destination, and the canonical position. On a cube world latitude and
+   longitude go through the fold and the map, so a block off the faces reads its partner's place;
+   north (`northBearingDeg`, degrees clockwise from -z) runs smoothly over a face and on into the
+   copy past its edge, and goes all the way round each pole; distances and bearings run on
+   across every edge and corner. Past the corners there is no planet: the calls answer NaN or
+   empty. The climate API's `latitudeDeg`, `longitudeDeg`, `northBearingDeg` and `metresPerBlock`
+   are shorthands for the planet API; `projectionKind` and `circumferenceBlocks` are gone (API
+   6).
 9. **The F3 line** (`net/PlanetDebugLine`, cube plan G10). On a cube world the debug screen reads
    `Deep Time: 10.144° N 100.920° E · face F0 · north 7.8° · 311 m/block here · <planet> (C 4096,
    276 m/block)`: latitude and longitude, the face (`F1 (folded)` off the faces, for the face the
