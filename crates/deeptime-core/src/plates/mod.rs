@@ -300,6 +300,7 @@ impl PlatesStage {
                 sea_m(world),
                 &world.globals,
             );
+            b.write_plates(&st.samples, |i| st.plate_of(i), st.t_myr);
             cb = Some(b);
         }
         // The settling (`settle.rs`) reads the flexure too.
@@ -829,6 +830,7 @@ impl PlatesStage {
                     sea_m(world),
                     &world.globals,
                 );
+                b.write_plates(&st.samples, |i| st.plate_of(i), env.t_myr);
             }
             if step >= self.total {
                 world.notes.insert(CRUST_BUDGET_NOTE.to_owned(), b.lines());
