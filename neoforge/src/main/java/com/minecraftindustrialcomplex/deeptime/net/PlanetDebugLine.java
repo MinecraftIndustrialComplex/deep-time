@@ -8,9 +8,12 @@ import java.util.Locale;
 /**
  * The F3 line (plan §7.15): {@code Deep Time: 12.345° N 67.890° W · <planet> (C 16384, 300 m/block)},
  * plus {@code · polar storm 62%} inside the cap band; on a cube world
- * {@code Deep Time: 12.345° N 67.890° W · face F1 · <planet> (C 16384, 300 m/block)}, with
- * {@code F1 (folded)} past a turning seam. Common code, so a GameTest can check the text;
- * the client-only overlay ({@code client/DeepTimeClient}) adds it to the debug screen's left column.
+ * {@code Deep Time: 12.345° N 67.890° W · face F1 · north 352.2° · 337 m/block here · <planet> (C 16384, 300 m/block)},
+ * with {@code F1 (folded)} past a turning seam: north's bearing (degrees clockwise from −z, {@link
+ * com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection#northBearingDeg}) and the metres a
+ * block spans there (the nominal {@code m_per_block_h} times the conformal map's scale, SCL-107), as
+ * climate API 5 answers them (cube plan G10). Common code, so a GameTest can check the text; the
+ * client-only overlay ({@code client/DeepTimeClient}) adds it to the debug screen's left column.
  */
 public final class PlanetDebugLine {
 
@@ -45,8 +48,12 @@ public final class PlanetDebugLine {
                 var p = cube.foldPoint(x, z);
                 face = p == null ? "?" : p.face().name() + " (folded)";
             }
-            return String.format(Locale.ROOT, "Deep Time: %.3f° %s %.3f° %s · face %s · %s (C %d, %.0f m/block)",
-                    Math.abs(lat), lat >= 0 ? "N" : "S", Math.abs(lon), lon >= 0 ? "E" : "W", face,
+            // North and the local scale (cube plan G10): smooth from a face into the copy past its edge,
+            // so a folded block reads what the player walking there sees.
+            double north = wp.northBearingDeg(x, z), here = info.mPerBlockH() * wp.scale(x, z);   // ledger: SCL-107
+            String bearing = Double.isNaN(north) ? "-" : String.format(Locale.ROOT, "%.1f°", north >= 359.95 ? 0.0 : north);
+            return String.format(Locale.ROOT, "Deep Time: %.3f° %s %.3f° %s · face %s · north %s · %.0f m/block here · %s (C %d, %.0f m/block)",
+                    Math.abs(lat), lat >= 0 ? "N" : "S", Math.abs(lon), lon >= 0 ? "E" : "W", face, bearing, here,
                     info.planetName(), c, info.mPerBlockH());
         } else if (info.petroffGuyou()) {
             // The seamless world: latitude and longitude depend on x and z (FORMAT.md "The world's

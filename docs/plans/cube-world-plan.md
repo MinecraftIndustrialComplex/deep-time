@@ -708,9 +708,15 @@ section 7.4 is deleted yet.
   relief noises with it; the seam blend SCL-125 is retired for SCL-215), G9 (climate API 5:
   `projectionKind` `"cube"`, the period 4s, latitude and longitude through the map, the new
   `northBearingDeg` and `metresPerBlock` on both sides, the static `latitudeDeg(z, C)` deleted;
-  `ClimateApiGameTests.climateApiOnTheCube` and `NorthBearingAndScaleTest`).
-- Left: G10's bearing and scale on the F3 line and its `NetworkGameTests` F3 test, the rest of G11 (the
-  `pole`, `tw` and `column` probes, `SiteCommands.distance`), G12 (the presets themselves; the smoke
+  `ClimateApiGameTests.climateApiOnTheCube` and `NorthBearingAndScaleTest`), G10's bearing and
+  scale on the F3 line (`north 7.8° · 311 m/block here`; `NetworkGameTests.planetDebugLineOnTheCube`
+  beside the Lambert strings' `planetDebugLine`), the rest of G11 (`probe pole` names both poles in
+  N and S with the planet distance in km, the walk under the border and whether each is reachable;
+  `probe column` gives the fold, north and metres per block; `probe tw` the period 4s, the face side
+  and whether Toroidal World wraps at it, which the smoke checks; `sites near` adds km and the walk;
+  `CubeBorder.walkDistance`, `WorldProjection.greatCircleBlocks`, `CubeWorldGameTests.cubeCommandProbes`;
+  the dedicated-server first start on the cube is G6's 16k smoke run).
+- Left: G12 (the presets themselves; the smoke
   uses `tools/smoke/presets/*_cube.json`), the rest of G13 and G14, G16, the Sable border, and the
   section 7.4 deletions with the rewrites of the Petroff-Guyou tests they bring.
 

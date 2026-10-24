@@ -160,6 +160,8 @@ pub struct Stacked {
     pub mean_m: f64,
     /// The foreland basin, when the surface's flexure was given.
     pub foredeep: Option<Foredeep>,
+    /// What stands on either side of the front (measurement only, `dock_tally.rs`).
+    pub sides: super::dock_tally::Sides,
 }
 
 /// Stacks this step's shortened crust of every collision with a front (see the module docs) and
@@ -219,6 +221,7 @@ pub fn stack(
         let (under, over) = (state.contacts[c].under, state.contacts[c].over);
         let col = state.contacts[c].collision.as_ref().expect("in collision");
         let (conv, normal) = (col.convergence_mm_yr, DVec3::from_array(col.normal));
+        let sides = read_sides(state, env, f, &fields, sea_m);
         let step = stack_front(
             state,
             geo,
@@ -238,7 +241,8 @@ pub fn stack(
             fields,
             sea_m,
         );
-        let applied = step.stacked;
+        let mut applied = step.stacked;
+        applied.sides = sides;
         let col = state.contacts[c].collision.as_mut().expect("in collision");
         let b = &mut col.belt;
         b.height_m = applied.height_m;
@@ -264,6 +268,44 @@ pub fn stack(
         out.insert(c, applied);
     }
     out
+}
+
+/// What stands on either side of a front, from its distance fields (measurement only,
+/// `dock_tally.rs`, ledger PLT-515): read before the stacking changes any sample.
+fn read_sides(
+    state: &PlateState,
+    env: &Env,
+    f: &Front,
+    fields: &Fields,
+    sea_m: f64,
+) -> super::dock_tally::Sides {
+    let s = &state.samples;
+    let share = |n: usize, of: usize| if of > 0 { n as f64 / of as f64 } else { 0.0 };
+    let cont = |v: u32| s[v as usize].kind == CONTINENTAL;
+    let dry = |v: u32| f64::from(s[v as usize].elevation_m) > sea_m;
+    let near = env.norm.rad(super::dock_tally::NEAR_KM);
+    let near_n = fields.under.iter().filter(|e| e.1 <= near).count();
+    super::dock_tally::Sides {
+        over_oceanic: share(
+            fields.over.iter().filter(|e| !cont(e.0)).count(),
+            fields.over.len(),
+        ),
+        under_continental: share(
+            fields.under.iter().filter(|e| cont(e.0)).count(),
+            fields.under.len(),
+        ),
+        under_near: share(
+            fields
+                .under
+                .iter()
+                .filter(|e| e.1 <= near && cont(e.0))
+                .count(),
+            near_n,
+        ),
+        crust_n: f.crust.len() as u32,
+        crust_dry: share(f.crust.iter().filter(|&&v| dry(v)).count(), f.crust.len()),
+        edge_dry: share(f.edge.iter().filter(|&&v| dry(v)).count(), f.edge.len()),
+    }
 }
 
 /// A front's distance fields ([`dijkstra_sorted`]: the reached samples ascending, with their
@@ -960,6 +1002,7 @@ mod tests {
                 andean: false,
                 centroid: [0.0, 1.0, 0.0],
                 cont_in: 0,
+                reversed: false,
             }],
             hotspots: Vec::new(),
             ridges: Vec::new(),
@@ -1531,13 +1574,13 @@ mod tests {
             .collect();
         let env = fx.env(1);
         let not_yet = crate::plates::collision::collide(
-            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, false,
+            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, false, None,
         )
         .unwrap();
         assert!(not_yet.deferred && !not_yet.sutured);
         assert!(st.plates.iter().all(|p| p.alive) && st.contacts[0].collision.is_some());
         let done = crate::plates::collision::collide(
-            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, true,
+            &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, true, None,
         )
         .unwrap();
         assert!(done.sutured && !done.deferred);
@@ -1547,6 +1590,147 @@ mod tests {
         );
         assert!(st.groups.iter().all(|g| g.plate == 1));
         assert_eq!(st.counters.sutures, 1);
+    }
+
+    /// Transference's thresholds are Gurnis et al. 2004's (ledger PLT-517, PLT-518): 3 × 10^12
+    /// N/m over the margin ("typically ranging from 2 to 3 × 10^12 N/m for cases that become
+    /// self-sustaining", the top taken), scaled with gravity, and 100 km of convergence (the
+    /// critical convergence "only varies between 100 and 130 km"); no margin, no new zone.
+    #[test]
+    fn transference_thresholds_are_gurnis_et_al_s() {
+        use crate::plates::collision::{TRANSFERENCE_FORCE_N_M, TRANSFERENCE_KM, transference_due};
+        assert_eq!(TRANSFERENCE_FORCE_N_M, 3.0e12);
+        assert_eq!(TRANSFERENCE_KM, 100.0);
+        let margin_m = 500.0e3;
+        let at = 3.0e12 * margin_m;
+        assert!(transference_due(at, margin_m, 100.0, 1.0));
+        assert!(transference_due(at, margin_m, 130.0, 1.0));
+        assert!(!transference_due(at * 0.99, margin_m, 100.0, 1.0));
+        assert!(!transference_due(at, margin_m, 99.0, 1.0));
+        assert!(!transference_due(at, 0.0, 100.0, 1.0));
+        // At half Earth's gravity the slab pull is half, and so is the force a new zone needs.
+        assert!(transference_due(at * 0.5, margin_m, 100.0, 0.5));
+        assert!(!transference_due(at * 0.49, margin_m, 100.0, 0.5));
+    }
+
+    /// Transference (ledger PLT-516): a continent pushed into a collision whose slab is gone moves
+    /// alone to the overriding plate once its plate has converged on it by the critical
+    /// convergence since and the push over its margin against its own ocean floor reaches the
+    /// force that starts a new subduction zone; its plate keeps its ocean floor. It waits with
+    /// the switch off, with a live slab, short of the convergence or short of the force; a
+    /// stalled collision still welds.
+    #[test]
+    fn a_pushed_continent_moves_alone_by_transference() {
+        use crate::plates::collision::{TRANSFERENCE_FORCE_N_M, TRANSFERENCE_KM, collide};
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.transference = true;
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+        // A live slab of the pair: the subduction has not failed, so no jam is marked.
+        st.slabs.push(SlabTrack {
+            under: 1,
+            over: 0,
+            km: 200.0,
+            blocked_myr: 0.0,
+            idle_myr: 0.0,
+        });
+        fx.step(&mut st, 1, None);
+        let col = st.contacts[0].collision.as_ref().expect("a collision");
+        assert!(col.jam_km.is_none(), "a live slab is no jam");
+        // The slab broke off: the jam is the shortening of the step it is first seen.
+        st.slabs.clear();
+        fx.step(&mut st, 2, None);
+        let col = st.contacts[0].collision.as_ref().unwrap();
+        let jam = col.jam_km.expect("the jam is marked once the slab is gone");
+        assert_eq!(jam, col.shortening_km);
+        fx.step(&mut st, 3, None);
+        assert_eq!(st.contacts[0].collision.as_ref().unwrap().jam_km, Some(jam));
+        // The jam is kept through a checkpoint (postcard: a field skipped when written cannot be
+        // read back).
+        let bytes = postcard::to_stdvec(&st).unwrap();
+        assert_eq!(postcard::from_bytes::<PlateState>(&bytes).unwrap(), st);
+        let mut none = st.clone();
+        none.contacts[0].collision.as_mut().unwrap().jam_km = None;
+        let bytes = postcard::to_stdvec(&none).unwrap();
+        assert_eq!(postcard::from_bytes::<PlateState>(&bytes).unwrap(), none);
+
+        let mut world = crate::world::WorldState::new(1, 16_384, 0.0);
+        let pos = positions(&st, &fx.geo);
+        let terrane: Vec<u32> = (0..N as u32)
+            .filter(|&i| st.plate_of(i as usize) == 1 && st.samples[i as usize].is_continental())
+            .collect();
+        let seeds: Vec<u32> = terrane.iter().copied().take(5).collect();
+        let ocean: Vec<u32> = (0..N as u32)
+            .filter(|&i| st.plate_of(i as usize) == 1 && !st.samples[i as usize].is_continental())
+            .collect();
+        // The margin against plate 1's own ocean floor, and the push that just starts a zone.
+        let margin = terrane
+            .iter()
+            .filter(|&&i| {
+                !st.samples[i as usize].is_hidden()
+                    && fx.geo.edges(i).any(|(u, _)| {
+                        let o = &st.samples[u as usize];
+                        st.plate_of(u as usize) == 1 && !o.is_continental() && !o.is_hidden()
+                    })
+            })
+            .count();
+        assert!(
+            margin > 10,
+            "the cap has a margin on its own plate: {margin}"
+        );
+        let margin_m = fx.norm.km(margin as f64 * fx.norm.spacing_rad()) * 1000.0;
+        let enough = TRANSFERENCE_FORCE_N_M * margin_m * 1.01;
+        let set_since = |st: &mut PlateState, km: f64| {
+            st.contacts[0].collision.as_mut().unwrap().shortening_km = jam + km;
+        };
+        let run =
+            |fx: &Fixture, st: &mut PlateState, world: &mut crate::world::WorldState, push| {
+                collide(st, world, &fx.geo, &pos, &fx.env(3), 0, &seeds, false, push).unwrap()
+            };
+
+        // Short of the critical convergence, or of the force, or with no push recorded: it waits.
+        set_since(&mut st, TRANSFERENCE_KM - 1.0);
+        assert!(run(&fx, &mut st, &mut world, Some(enough)).deferred);
+        set_since(&mut st, TRANSFERENCE_KM);
+        assert!(run(&fx, &mut st, &mut world, Some(enough / 1.02)).deferred);
+        assert!(run(&fx, &mut st, &mut world, None).deferred);
+        // With the switch off it waits for the stall, whatever the push.
+        fx.preset.tectonics.transference = false;
+        assert!(run(&fx, &mut st, &mut world, Some(enough * 100.0)).deferred);
+        fx.preset.tectonics.transference = true;
+        // A stalled collision still welds the plates (PLT-246).
+        let mut stalled = st.clone();
+        let welded = collide(
+            &mut stalled,
+            &mut world,
+            &fx.geo,
+            &pos,
+            &fx.env(3),
+            0,
+            &seeds,
+            true,
+            Some(enough),
+        )
+        .unwrap();
+        assert!(welded.sutured);
+        assert_eq!(stalled.counters.transferences, 0);
+        assert!(st.plates.iter().all(|p| p.alive));
+        assert!(st.contacts[0].collision.is_some());
+        assert_eq!(st.counters.transferences, 0);
+
+        // Enough of both: the continent moves alone, and its plate keeps its ocean floor.
+        let done = run(&fx, &mut st, &mut world, Some(enough));
+        assert!(!done.deferred && !done.sutured);
+        assert!(st.plates.iter().all(|p| p.alive));
+        assert!(st.contacts[0].collision.is_none());
+        assert_eq!((st.counters.transferences, st.counters.sutures), (1, 0));
+        for &i in &terrane {
+            if !st.samples[i as usize].stacked {
+                assert_eq!(st.plate_of(i as usize), 0, "{i} moved with the continent");
+            }
+        }
+        for &i in &ocean {
+            assert_eq!(st.plate_of(i as usize), 1, "{i} stayed with its plate");
+        }
     }
 
     /// Only continental crust takes the belt's stack (ledger PLT-290): the overriding plate's
@@ -1623,7 +1807,7 @@ mod tests {
                 .collect();
             let env = fx.env(1);
             let done = crate::plates::collision::collide(
-                &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, true,
+                &mut st, &mut world, &fx.geo, &pos, &env, 0, &seeds, true, None,
             )
             .unwrap();
             assert_eq!(done.sutured, weld);
