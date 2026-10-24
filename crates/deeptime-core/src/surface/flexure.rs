@@ -3187,6 +3187,97 @@ mod tests {
         assert!(behind < 0.1 * basin(&on).abs(), "{behind} behind the belt");
     }
 
+    /// The foreland basin when the incoming plate slides under a belt that stands still: `v`
+    /// rows a step towards the front (row 128), the belt (rows 118 to 127, on plate 0, carried
+    /// by plate 1) rising for `steps` steps. Column 3's elevation, flexure and deflection.
+    fn sliding_foreland(v: f64, steps: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+        let p = on();
+        let (w, h) = (32usize, 256usize);
+        let n = w * h;
+        let sea = -1.0e6;
+        let mut wd = World::new(w, h, 300.0);
+        for c in 0..n {
+            if c / w >= 128 {
+                wd.plate[c] = 1.0;
+            }
+        }
+        let (mut sv, mut st) = started(&mut wd, &p, sea);
+        let mut ids = vec![f32::NAN; n];
+        let mut ages = vec![f32::NAN; n];
+        for c in 0..n {
+            let j = c / w;
+            if (118..128).contains(&j) {
+                let x = (127 - j) as f64 / 10.0;
+                wd.uplift[c] = (0.1 * (1.0 - x * x)) as f32;
+                wd.orogeny[c] = 0.0;
+                wd.regime[c] = f32::from(regime::COLLISION);
+                ids[c] = 1.0;
+                ages[c] = 1.0e4;
+            }
+        }
+        wd.carrier = Some((ids, ages));
+        let plate = wd.plate.clone();
+        let src: Vec<[f64; 2]> = (0..n)
+            .map(|c| {
+                let (i, j) = ((c % w) as f64, (c / w) as f64);
+                if plate[c] == 1.0 { [i, j + v] } else { [i, j] }
+            })
+            .collect();
+        let still = vec![0.0f32; n];
+        let plate_elev = vec![300.0f32; n];
+        let parents = [None, None];
+        let mut last = StepOut::default();
+        for _ in 0..steps {
+            let elev: Vec<f32> = wd.h.iter().map(|&z| z as f32).collect();
+            let carry = Carry {
+                w,
+                h,
+                src: &src,
+                prev_elevation: &elev,
+                prev_plate: Some(&plate),
+                prev_group: None,
+                plate: &plate,
+                group: None,
+                plate_elevation: &plate_elev,
+                uplift_mm_yr: &still,
+                gap: None,
+                prev_gap: None,
+                prev_offset: None,
+                prev_held_offset: None,
+                flags: None,
+                regime: None,
+                parents: &parents,
+                known_plates: 2,
+                dt_yr: 2.0e6,
+                blur_ref_yr: 2.0e6,
+            };
+            st.as_mut().unwrap().carry(&carry, &elev);
+            let (carried, _) = advect::carried_elevation(&carry);
+            wd.h = carried.iter().map(|&z| f64::from(z)).collect();
+            last = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
+            assert!(last.solve.as_ref().unwrap().converged, "{:?}", last.solve);
+        }
+        let col = |f: &dyn Fn(usize) -> f64| (0..h).map(|j| f(j * w + 3)).collect::<Vec<f64>>();
+        let s = st.as_ref().unwrap();
+        (
+            col(&|c| wd.h[c]),
+            col(&|c| f64::from(last.flexure_m[c])),
+            col(&|c| f64::from(s.deflection_m[c])),
+        )
+    }
+
+    #[test]
+    fn diag_sliding_foreland() {
+        let (z0, f0, d0) = sliding_foreland(0.0, 20);
+        let (z1, f1, d1) = sliding_foreland(0.5, 20);
+        for j in (110..200).step_by(2) {
+            eprintln!(
+                "row {j}: still z {:.0} F {:.0} w {:.0} | sliding z {:.0} F {:.0} w {:.0}",
+                z0[j], f0[j], d0[j], z1[j], f1[j], d1[j]
+            );
+        }
+    }
+
     /// Under the sea the roots' part of the split is their bending only, as on land: crust the
     /// plate model raised everywhere alike (nothing to bend) leaves the roots' and the loads'
     /// answers nil, the sea water it pushed aside going with the roots.
