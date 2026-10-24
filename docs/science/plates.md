@@ -6734,3 +6734,494 @@ samples are captured; 23 and 26 plates at 300 Myr against 17 and 22 off (the sca
 34). The step still cuts between resamplings, more than off (the terrane transfer +5,532 and +4,054,
 the overlaps +4,394 and +7,264), and each resampling makes the plates whole again (it joins 10,456
 and 11,637).
+
+**Arm fl-fission** (fission on top of fl-share, base3's seeds 1 to 4, `earthlike_quick_16k`, 1000
+Myr, both starts, 8 runs; key c94090963380, argkey 686beee0). Against fl-share, medians:
+
+- the guard's worst is 10,348 m against 12,588 (p < 0.001), with no step beyond 2 reliefs, and the
+  V1 census meets its 5 criteria in both arms (land 0.327 against 0.313, p 0.80);
+- 27.2 plates against 22.7 (`boundgeom`), with 0.9 % of the visible samples outside their plate's
+  largest piece at the 50-Myr snapshots against 7.1 % (the pieces left are cut between
+  resamplings);
+- the boundary at a 77 / 380 km chord is 382,434 / 284,518 km against 525,489 / 347,237, with 113
+  triple junctions against 292 and 91 closed loops against 250;
+- the subduction front at 77 km is 147,193 km against 216,472;
+- the plate check passes 201 measures against 210.
+
+But 162 collision states parted within two steps of a fission of one of their plates, which is
+the defect Step 3b mends.
+
+**The plate count against Earth's.** The model's floor for a plate (PLT-091, 0.0377 sr) is the
+count to read the model's plates against, not PB2002's 52: 19 of PB2002's plates are at or above it
+in Bird's table (20 on the lattice, where the Caroline plate, 0.03765 sr against the floor's 0.03770,
+rasterises to 0.0382; `bird_raster.py`'s `plates_at_floor`), and they hold 97.9 % of the planet.
+
+**A known limit: no microplates.** PB2002's 33 plates under the floor (2.1 % of the planet; Bird's
+microplates are "100–500 km" across, [79]) have no counterpart: a piece under the floor is captured,
+and nothing in the model makes a plate that small. Fission splits off only pieces of the floor's
+size or more, so the law cannot make them either.
+
+### Step 3b: a boundary belongs to the lithosphere on its two sides (PLT-534)
+
+Arm fl-fission (fission on top of fl-share, 8 runs) found the defect that fission exposed. The
+state of a boundary is kept per pair of plates: a contact (polarity, onset, onset event), a slab
+(its length down the dip) and a collision state. When a plate splits, the parent keeps its id and
+every such state stays keyed to the parent, wherever its lithosphere went. A piece that holds a
+trench starts a new contact with no slab and no onset, and a collision it carried parts once its
+front is gone: 162 collision states parted within two steps of a fission of one of their plates.
+Rifts and subduction initiations split plates in the same way, so the defect is older than
+fission.
+
+What Earth does. Plate identity is bookkeeping, and the boundary goes with the lithosphere on its
+two sides.
+
+- **A subducting plate that splits keeps subducting on both pieces.** Stock & Lee 1994: "The
+  fragmentation of a subducting plate creates a new triple junction, two limbs of which are along
+  the trench". Of the Cocos and Rivera plates, the triple junction "has not moved much with respect
+  to the North America plate since its inception because subduction of both plates has been nearly
+  orthogonal to the trench".
+- **The slabs stay with their pieces.** Wang et al. 2013: "Some fragments of the Farallon plate
+  still exist as separate plates subducting beneath North America, including the Cocos and Juan de
+  Fuca plates, which subsequently further fragmented generating the actively subducting Rivera,
+  Gorda, and Explorer microplates", and high-velocity anomalies "which we interpret as the fossil
+  slabs still attached to the remnant oceanic microplates".
+- **An overriding plate that splits leaves the trench with the piece beside it.** In a back-arc
+  basin, the arc keeps the trench and the remnant arc is left behind. Ishizuka et al. 2010: "The
+  West Mariana Ridge (WMR) is a remnant arc (Karig, 1972) that separated from the magmatic arc by
+  opening of the Mariana Trough". Stern, Fouch & Klemperer 2003: the trough "is bounded to the east
+  by the active Mariana arc, to the west by the remnant arc of the West Mariana Ridge [Karig, 1972],
+  and to the south by the Challenger Deep part of the Mariana Trench".
+- **The rift line can fall on either side of the arc.** Taylor & Karner 1983 (abstract): rifting
+  "may occur on either side of the line of active volcanoes (±50 km)". So the piece that keeps the
+  trench must be found from the geometry, not from which side of the rift it is on.
+- **A continent.** As South America separated from Africa, the Nazca subduction system kept rolling
+  back at its margin "during the opening of the Southern Atlantic for almost ~100 Myr" (Faccenna et
+  al. 2017). That this is because only South America borders the Nazca plate is our reading, from
+  memory.
+
+None of these sources states the rule as a rule, and none contradicts it.
+
+The law, `tectonics.split_inheritance` (`plates/inherit.rs`). It runs after every split: a fission
+(`ridges::split_cut_plates`), a rift (`rifting::rift`), and a subduction initiation's new plate
+(`rifting::initiate`). Each contact, slab and collision state that the parent had with another plate
+goes to the pieces that border that plate.
+
+- **Bordering.** A piece borders a plate when at least 3 of its samples (`MIN_CONTACT`), hidden
+  ones included, have a sample of that plate within 1.5 lattice spacings of their true positions.
+  1.5 spacings takes a lattice neighbour, about 1.07 spacings away, and not the ring behind it, at
+  about 1.86. True positions are used because mid-step the lattice's edges between plates are
+  stale.
+- **Contacts and slabs.** Every bordering pair keeps the contact and the slab, the subducting side
+  staying the subducting side. The slab is one sheet along the trench, so a copy of a slab that
+  was at a front is latent (`SlabTrack::latent`): it pulls only at its own piece's fronts and does
+  not hang, and its first front makes it a slab like any other; a copy that reaches no front is
+  gone after `slab_breakoff_myr` (PLT-184). A copy of a slab that hung hangs on, along its own
+  piece's stretch. (Added after the guard chase below.)
+- **The collision.** It goes with its front, to the pair whose border lies nearest the collision's
+  front centroid. The other pairs get the contact without the collision.
+- **What stays.** A boundary that no piece borders stays with the parent and closes as before. A
+  pair inside one split plate is not touched, such as the slab an initiation plants under its
+  fracture (PLT-270).
+
+There are no new physical constants: 1.5 spacings and 3 samples are how the lattice is read. Seven
+unit tests cover the law and each of its paths:
+
+- in `inherit.rs`:
+  - a subducting plate split in two: both halves keep the trench and its slab, the collision stays
+    with the half at its front (or moves to the other half when the front is there), and a trench
+    that only one half borders moves to it whole;
+  - an overriding plate split behind its arc: the strip beside the trench takes the trench, slab
+    and collision, and the polar part keeps nothing;
+  - a boundary that no piece borders is untouched;
+  - `a_split_plates_pieces_pull_with_the_parents_slab_force`: the slab pull and suction summed over
+    the pieces equal the parent's (the guard chase below);
+- `a_fission_hands_the_cut_off_piece_the_trench_it_borders` (`ridges.rs`);
+- `the_fragments_of_a_rifted_plate_keep_the_trench_they_border` (`rifting.rs`);
+- `an_initiation_hands_the_sinking_plate_the_trench_it_borders` (`rifting.rs`).
+
+**Arm fl-fission2** (fission and the inheritance on top of fl-share, 8 runs, `earthlike_quick_16k`,
+1000 Myr, key 0fc579, argkey a8641acb). Against fl-share, medians with the Mann-Whitney p:
+
+- **The defect.** The collision states parted within two steps of a fission fall from 162 to 58.
+  Per run, the splits moved 238 to 309 contacts and copied 276 to 353; they moved 37 to 53
+  collisions, and moved 205 to 266 slabs and copied 262 to 355.
+- **The guard.** The guard's worst is 10,490 m against 12,588 (p < 0.001) and dock-c3's 12,061
+  (p 0.015). No step goes beyond 2 reliefs, and `guard_bind_steps` is 0.
+- **The V1 census.** It meets its 5 criteria in both arms (land 0.322, p 0.72). Its collisions
+  per 100 Myr fall from 2.0 to 0.9 (p 0.002).
+- **The boundary.** It is 352,268 lattice km against 478,669 (Bird 260,487, or 271,700 on the
+  lattice). Its subducting part is 109,741 km against 159,426 (Bird 51,310), and the subducting
+  share is 0.314 against 0.331 (Bird 0.197). The boundary criteria meet 3 per run against 2
+  (p 0.017).
+- **Its geometry (`boundgeom`).**
+  - 27.6 plates against 22.7.
+  - At a 77 / 380 km chord the boundary is 387,493 / 288,070 km, and the perimeters over the
+    caps' at 380 km are 1.646 against 2.266 (PB2002 on the lattice 1.365).
+  - There are 115 triple junctions against 292, and 96 closed loops against 250. With each plate
+    one body, 50 junctions (2 (P - 2) = 51) and 0.5 loops.
+  - With each plate one body, the front at 77 km is 115,544 km against PB2002's 52,564 on the
+    lattice, and its tortuosity is 2.03 against 1.20.
+- **The sutures.** 42.4 per 100 Myr against 51.8 (Macdonald 19 to 39), and 41,589 km per 100 Myr
+  against 68,397 (Macdonald 23,235 to 50,919). The front in collision is 24,217 km against 36,100
+  (Stern & Scholl 6,000 to 12,000).
+- **Fission's churn.** 56 to 90 plates are born of fission per run (median 64.5). Of the 531 born
+  in the 8 runs, 478 died: 425 absorbed under the floor, 44 consumed and 9 sutured. Plates born of
+  a subduction initiation, 78 to 124 per run (fl-share 69 to 103), die absorbed as well: 548 of 639
+  deaths. The resampling's own roughening (below) is the likely feed, since every resampling cuts
+  a ragged plate's thin necks again.
+
+The plate check passes 187 measures against 210. The coordinator's ruling (2026-10-24): its
+targets are realism checks, not a gate, and correctness is judged on the unit tests, divergence
+and the guard. Its moves against fl-share (passes of 8 and the median), each with its target's
+ledger status:
+
+| measure | fl-share | fl-fission2 | the target's source |
+|---|---|---|---|
+| `speed_oceanic_over_continental` | 5/8, 2.18 | 1/8, 1.72 | CHK-024, verified (Zahirovic et al.); fl-fission still 5/8, so the drop comes with the inheritance |
+| `supercontinent_tenure_myr` | 1/8, 57.5 | 0/8, 23.5 | CHK-035, verified |
+| `largest_share_p50` | 8/8, 0.234 | 7/8, 0.169 | CHK-001, verified |
+| `ocean_old180_pct` | 0/8 | 1/8 | CHK-033, verified (up) |
+| `plate_life_p50_myr` | 7/8, 107 | 0/8, 68.5 | PLT-146, abstract only |
+| `rift_alive_50_pct` | 7/8 | 5/8 | CHK-006, abstract only |
+| `collision_length_p50_myr` | 2/8, 56 | 1/8, 73.5 | CHK-012, abstract only |
+| `collision_convergence_ratio_20myr` | 5/8, 0.40 | 2/8, 0.62 | CHK-037, abstract only |
+| `continental_min` | 2/8 | 0/8 | CHK-016, cited, not verified |
+| `collisions_per_100myr` | 4/8, 2.0 | 0/8, 0.9 | CHK-015, uncited; it counts welds of terranes of 0.1 of a plate or more |
+| `dead_within_20_pct` | 1/8, 20.8 | 0/8, 29.1 | uncited |
+| `rift_welded_back_50_pct` | 7/8, 3.9 | 5/8, 9.5 | uncited |
+| `land_gain_max_pct` | 6/8 | 8/8 | up |
+| `continental_max` | 3/8 | 5/8 | up |
+| `speed_big_p90_mm_yr` | 6/8 | 8/8 | up |
+| `arc_continental_p50_m` | 7/8 | 8/8 | up |
+
+Fission and the inheritance are correct by the lane's rule: their unit tests pass against their
+sources, the runs do not diverge and the guard does not fail. So `plate_fission` and
+`split_inheritance` are on by default from 2026-10-24 (the coordinator's call, the same day).
+
+**The speed guard (the guard chase, 2026-10-24).** On the 8k test planet (8,000 samples,
+scattered continents, 300 Myr) the speed guard (250 mm/yr at a plate's farthest point, PLT-022)
+bound on 5 of seeds 1 to 24 with fission and the inheritance (seeds 2, 3, 9, 14 and 15, for 1 to 6
+plate-steps each), on 2 with fission alone (5 and 15) and on none with neither. The inheritance
+alone bound on all 5 of the seeds it was run on (3, 11, 14, 18 and 23, 1 to 5 plate-steps). On the
+16k planet of the pool, fl-fission2's 8 runs never bind. The coordinator held the merge on it, his
+suspect being the slab counted twice: both pieces keep the whole slab where both border the other
+plate.
+
+- **The pull is not counted twice at the fronts.** A slab pulls per front edge (`forces.rs`): the
+  pull on a front sample is the slab's weight times its length down the dip over 700 km, times one
+  spacing of trench. The length is not a share of the trench, so each piece keeps all of it and
+  pulls only along its own stretch, and the pieces' front edges are the parent's. A trace of every
+  slab force (a test-only patch, 24 seeds) shows it at the binds: on seed 2, the plate the guard
+  held was pulled by a copied slab along 21 front edges and a moved one along 11, which were
+  the parent's 32.
+- **A smaller over-count was there.** A piece that borders the other plate only across a ridge or
+  a transform also took a copy, and with no front it hung along the piece's whole border (a slab
+  with no front hangs, PLT-271) for up to `slab_breakoff_myr`. Of the 27 to 71 slabs copied per
+  run, 6 to 25 never reached a front; the copies' hanging pull was 1.3 to 3.2 % of a run's slab
+  force (median 2.1 %, though part of it is the copies of slabs that hung before the split, which
+  rightly hang on). No bind was at one. The fix: a copy of a slab that was at a front is latent
+  (`SlabTrack::latent`) and pulls only at its own piece's fronts until its first one; a copy of a
+  slab that hung hangs on along its own piece's stretch. The unit test
+  `a_split_plates_pieces_pull_with_the_parents_slab_force` (`inherit.rs`) checks that the pull's
+  and the suction's torques summed over a split plate's pieces equal the parent's to 1e-9, for a
+  split across the trench and along it, on either plate, and for a hanging slab; without the
+  latent copy the splits along the trench fail it.
+- **The sweep again, with the fix.** With fission and the inheritance the guard binds on 2 of
+  seeds 1 to 24 (15 for 2 plate-steps, 16 for 1), against 5 before; the inheritance alone on 2 of
+  its 5 (11 for 3, 14 for 2), against 5. The planet is chaotic, so part of the drop is a reshuffle
+  of the runs, not the fix: no bind before it was at a hanging copy. The binds that remain are of
+  the same kind (traced as above): on seed 15 a plate of 37 samples born of plate 14 36 Myr
+  before, which subducts under it along 10 front edges; on seed 11 (the inheritance alone) one of
+  the starting plates, down to 28 to 35 samples, with a plate subducting under it along 10 to 13
+  edges; on seed 14 (the inheritance alone) a piece of 3 samples being consumed, the same bind as
+  before the fix. Seed 16's one plate-step is not in the step records, which list the plates alive
+  at the step's end, so it was a plate removed in the step it bound.
+- **With the level set on as well** (Step 3c; the sweep on seeds 1 to 24 with all three on) the
+  guard binds on 3 of 24: seed 2 for 7 plate-steps, 17 for 1 and 24 for 7. They are of the same
+  kind: on seed 2 a plate of 47 to 50 samples born of a subduction initiation 46 Myr before, with
+  a plate subducting under it along 14 front edges; on seed 24 a plate of 32 to 38 samples born of
+  a split 56 Myr before, with its parent's slab (moved to it at the split) under it along 12 to 16
+  edges, then another along 8; on seed 17 a plate of 23 samples between a trench on either side
+  (5 and 6 edges). The 16k planet of the pool never binds with it (arms fl-ls and fl-ls2, Step 3c).
+- **What the guard holds: small plates ringed by trenches.** Every bind, before the fix and after,
+  is a plate of at most 131 visible samples (1.6 % of the sphere; the floor is 24, PLT-091) with
+  other plates subducting beneath it along 30 % to all of its boundary (10 to 33 front edges).
+  Most are plates born of a split whose parent subducts under them, so with the inheritance they
+  take the parent's other trenches at once; two are tiny plates being consumed (3 and 21 samples).
+  The overriding plate's slab suction is a fixed 0.3 of the slab pull per metre of trench
+  (PLT-186), against the basal drag of its area, so its speed grows as its trench over its area,
+  about 1/√area for a round plate.
+- **Earth's fast small plates are of this kind.** Bevis et al. 1995 (the abstract, as a search
+  summary gave it; not read): convergence across the Tonga trench rises northwards to about
+  240 mm/yr, and the Lau basin behind it opens at up to about 160 mm/yr, the northern Tonga ridge
+  moving as a rigid microplate. So a small plate on a trench reaching the guard's 250 mm/yr is not
+  unphysical in itself; that the model's small plates reach it with a fixed suction is the open
+  question.
+- **What it would take.** The suction is a force that does not depend on how fast the trench
+  retreats: a small overriding plate is drawn on whatever the slab's rollback. A suction that
+  saturates with the trench's retreat (the overriding plate drawn no faster than the hinge rolls
+  back) would bound these plates by the physics, not by the guard. It is not built: the
+  coordinator's call.
+- **The weld tests' seeds.** With the fix, 11 of seeds 1 to 24 weld (1, 2, 8, 11 to 14, 16, 20,
+  22 and 23). The collisions test is on its original seed 12 again. The recording test stayed on
+  seed 20: its original seed 19 still did not weld, and its seed is the next that welds, chosen by
+  the weld, not by the guard (on welding seed 16 the guard binds once, which that test asserts
+  against). With the level set on by default (Step 3c) 12 of 24 weld (1, 2, 4, 5, 7, 9, 12, 15,
+  17 to 19 and 21): seed 19 welds again and 20 no more, so the recording test is back on its
+  original seed 19, and the collisions test stays on 12; the guard binds on neither.
+
+**Known limit: merges.** When two plates merge (a healed rift, a weld, a plate absorbed under the
+floor), the dead plate's contacts with third plates still close. That is the same law in reverse,
+and this step does not build it.
+
+### What still roughens the plates: the resampling's random walk
+
+With every plate one body, the main bodies are still too ragged, and most at their trenches (the
+front's tortuosity with each plate one body is 2.03 at 77 km against PB2002's 1.20 on the
+lattice). The resampling is one cause, and it shows on a planet where nothing else happens.
+
+**How the resampling decides membership.** It turns the lattice at random each time (Cortial et al.
+2019, §4.3). Each new point takes the plate of the old footprint cell that covers it: the old
+lattice's triangles are split between their corners by the largest barycentric weight, which is a
+nearest-cell rule. So every boundary is rounded to the new lattice at each resampling. The
+rounding errors of successive resamplings are independent, and nothing pulls the boundary back,
+so they add up as a random walk. At a contact the overriding plate wins the cover (visible crust
+first, then the overriding plate), so the trench is the overriding plate's footprint edge, rounded
+in the same way. A ridge is drawn again by the gap fill at each resampling (Cortial's ridge
+profile, the segments of PLT-502), so it does not walk.
+
+**The measurement.** The test `how_resamplings_roughen_a_boundary` (`plates/tests.rs`; the table
+below is its run with the level set of Step 3c off) takes the two-plate planet (40,000 samples, the boundary on the equator) and resamples it 40 times
+with nothing else in the step. In one case the planet is static. In the other, the ocean is turned
+under the continent by 0.02 rad between resamplings, which makes a trench where y > 0 and a ridge
+where y < 0, with the overlaps resolved as in the step. After each resampling it reads, per stretch
+of boundary:
+
+- the offset of plate 0's boundary samples from the equator;
+- their spread about that offset, in lattice spacings;
+- the boundary's lattice edges per spacing of the stretch's length.
+
+| resamplings | static: spread, spacings | static: edges per spacing | the trench: spread | the trench: edges | the ridge: edges |
+|---|---|---|---|---|---|
+| 1 | 0.44 | 2.25 | 0.43 | 2.14 | 2.23 |
+| 2 | 0.50 | 2.39 | 0.49 | 2.34 | 2.12 |
+| 5 | 0.68 | 2.78 | 0.67 | 2.69 | 2.36 |
+| 10 | 0.92 | 3.24 | 0.86 | 2.87 | 2.46 |
+| 20 | 1.21 | 3.85 | 1.05 | 3.09 | 2.37 |
+| 30 | 1.46 | 4.16 | 1.15 | 3.25 | 2.51 |
+| 40 | 1.73 | 4.65 | 1.35 | 3.39 | 2.48 |
+
+- **The static boundary walks.** Its spread's variance grows by about 0.07 spacing² per
+  resampling, and its length on the lattice doubles in 40 resamplings. A 1000-Myr run resamples
+  about 50 times (PLT-098), which is enough to account for a spread of one to two spacings and a
+  boundary twice its straight length at the lattice's scale.
+- **The trench walks as well, a little slower.** The ridge does not: its edges per spacing stay at
+  2.1 to 2.5. Its spread grows only because the ridge migrates and tilts (its offset reaches -16.7
+  spacings by the 40th resampling).
+- **What it is not.** This is the scheme, not the physics: the same boundary, not moving, comes out
+  of each resampling longer than it went in.
+
+The fix is a sub-lattice boundary carried through the resampling (Step 3c).
+
+### Step 3c: the outline between the samples (PLT-536)
+
+`tectonics.level_set_membership` (`plates/level_set.rs`, the footprint in `ridges::resample`)
+carries each plate's outline below the lattice spacing, so that a resampling moves it only where
+the physics moves it.
+
+**The source.** Osher & Sethian 1988 follow a front as the zero level set of a function carried
+with the flow: "the front can also be passively advected by an underlying flow", and "By viewing
+the surface as a level set, topological complexities and changes in the moving front are handled
+naturally". They initialise the function from the distance to the front (§III.D: "ψ(x , 0) = 1 ±
+d 2, where d is the distance from the point x to the initial surface, and the plus (minus) sign is
+chosen if x is inside (outside) the initial surface"). Sussman, Smereka & Osher 1994 (abstract
+read) describe an interface as "the zero level set of a smooth function"; their reinitialisation,
+which keeps that function a signed distance by setting it again from its zero level set, is the
+method as we remember it, not read.
+
+**The law.**
+
+- **What a sample carries.** Each sample keeps ψ, the sine of its angular distance to its group's
+  outline, capped at 2 spacings. Only a sample with a lattice neighbour of another group is ever
+  read, and it lies within one edge of the outline, so the cap is numerical, not physical.
+- **Who holds a new lattice point.** In each group's old triangle (in the group's own frame, as
+  before), every group present weighs its own corners' ψ by the point's barycentric weights,
+  A = Σ w ψ. The group holds the point where its A is the largest, so the outline is where two
+  groups weigh the same: the zero line of the interpolated signed distance. Before, the corner
+  with the largest weight decided, which puts the outline halfway between two samples whatever
+  their distances.
+- **Why it is exact for a great circle.** The weights are gnomonic (the point where the ray meets
+  the triangle's plane), and a great circle's signed distance n·p is linear in the position, so it
+  interpolates exactly: a great-circle outline lands where it was on every turned lattice.
+- **The new samples' distances.** A covered point takes its distance inside the top group's
+  outline, or its distance outside the outline of a group of another plate that would be on top of
+  it, where that is nearer (in front of a trench, the overriding plate's outline is the
+  boundary). A point in a ridge's gap takes its distance from the midline, half the difference of
+  its distances from the two plates' edges, or from the ridge segment (PLT-502). An orphan takes
+  half a spacing.
+- **Reinitialisation.** After the resampling and `ridges::bury` (fission, capture, the
+  absorptions under the floor), every sample's ψ is set again from the outline: the zero crossing
+  on each lattice edge between two groups (t = ψ_u / (ψ_u + ψ_v)), joined inside each triangle into
+  great-circle arcs. A triangle with three groups gets three arcs that meet where the three weigh
+  the same. Each sample takes its distance to the nearest arc of its group among its own and its
+  neighbours' triangles.
+- **New boundaries.** A boundary drawn since the last resampling (a rift, a fission, a suture, a
+  twin group) has no outline to keep. A sample whose neighbours' membership changed since the last
+  reinitialisation gets half a spacing on every corner, which splits its triangles as the old rule
+  does. A run's first resampling is the same.
+
+Membership is by group, not by plate, everywhere, as the footprint is.
+
+**A trench's distances.** In front of a trench the ocean's own outline lies under the continent,
+since the slab goes on below it. In the first build a new ocean sample whose triangle in the
+continent's frame had no continental corner took its distance inside the ocean's outline, which
+is too far from the trench, and the reinitialisation's crossings then moved the trench landward,
+by 2.1 spacings in 40 resamplings. A group with no corner in a triangle now lies outside it by
+the other groups' interpolated distance from their own outline (`level_set::margin`), so such a
+sample takes its distance outside the continent's outline, the trench. The test
+`a_triangle_without_the_group_lies_its_distance_outside` checks it on a great circle, to 1e-12.
+
+**The test, with and without the level set** (`how_resamplings_roughen_a_boundary`, as in the
+table above; the offset in spacings, positive landward at the trench):
+
+| resamplings | static, off: spread, edges | static, on: spread, edges | trench, off: offset, spread, edges | trench, on: offset, spread, edges |
+|---|---|---|---|---|
+| 1 | 0.44, 2.25 | 0.41, 2.17 | +0.51, 0.43, 2.14 | +0.53, 0.42, 2.11 |
+| 2 | 0.50, 2.39 | 0.39, 2.15 | +0.58, 0.49, 2.34 | +0.58, 0.41, 2.24 |
+| 5 | 0.68, 2.78 | 0.35, 2.20 | +0.62, 0.67, 2.69 | +0.59, 0.38, 2.37 |
+| 10 | 0.92, 3.24 | 0.35, 2.04 | +0.63, 0.86, 2.87 | +0.54, 0.36, 2.02 |
+| 20 | 1.21, 3.85 | 0.34, 2.03 | +0.29, 1.05, 3.09 | +0.64, 0.36, 2.15 |
+| 30 | 1.46, 4.16 | 0.35, 2.24 | +0.10, 1.15, 3.25 | +0.61, 0.33, 1.99 |
+| 40 | 1.73, 4.65 | 0.32, 2.13 | -0.37, 1.35, 3.39 | +0.71, 0.33, 2.19 |
+
+- **The boundary stays where it was drawn.** With the level set the spread does not grow (0.32
+  to 0.42 spacings at every count) and the edges per spacing stay within 4 % of the first
+  resampling's. The trench moves 0.2 spacings in 40 resamplings, against 0.9 without it.
+- **The ridge is unchanged.** It is drawn again by the gap fill at each resampling either way:
+  its edges per spacing stay at 2.0 to 2.4 with the level set (2.1 to 2.5 without), and its
+  offset reaches -16.8 spacings (-16.7) as it migrates.
+- **The test asserts it.** With the level set, after 10 to 40 resamplings, the spread stays
+  within 0.15 spacings of the first, the edges per spacing within 15 % and the offset within 0.5
+  spacings; without it, the static spread must more than double and its edges grow by half, so
+  the test fails if either side stops showing what it measures.
+
+**The cost: a numerical curvature flow.** The interpolated distance is exact only for a great
+circle. A curved outline's distance is not linear in the position, and its linear interpolation
+(and the reinitialisation's chords) moves the outline towards its centre of curvature at each
+resampling, by about c h² κ, where h = √(4π/n) is the lattice spacing (a sample's area is h²)
+and κ the outline's geodesic curvature. Its area loss is that drift integrated along the outline.
+For a closed convex outline the curvature integrates to 2π (Gauss-Bonnet, less the enclosed area
+on the unit sphere, which is small here), so a small round plate loses the same number of
+samples per resampling whatever its radius, about 2πc. The test
+`a_small_round_plate_through_resamplings` measures it on a static planet, resampled 40 times,
+the loss read over the first 20 (the plate of radius 3 is gone by the 40th):
+
+| radius, spacings | samples at the start | off: after 1, 10, 20, 40 | off: lost per resampling | on: after 1, 10, 20, 40 | on: lost per resampling |
+|---|---|---|---|---|---|
+| 3 | 28 | 28, 32, 33, 45 | -0.25 | 28, 21, 12, 0 | 0.80 |
+| 6 | 113 | 116, 107, 106, 87 | 0.35 | 114, 109, 98, 81 | 0.75 |
+| 12 | 452 | 446, 445, 440, 438 | 0.60 | 447, 442, 435, 422 | 0.85 |
+
+- **The loss does not depend on the radius.** 0.75 to 0.85 samples per resampling at radii of 3
+  to 12 spacings, so c is about 0.13. Without the level set the count wanders instead, by +5, -7
+  and -12 samples after 20 resamplings.
+- **What it costs a plate.** The floor of plates (PLT-091) is 0.003 of the samples, 300 on the
+  100,000-sample planet, a radius of about 9.8 spacings. A plate at the floor, round and alone,
+  would lose about 40 samples in the 50 resamplings of a 1000-Myr run (13 %); a larger plate
+  loses the same 40, a smaller fraction. A microplate of 28 samples is gone in 35 resamplings,
+  but it is under the floor and absorbed long before.
+- **In a mosaic.** A plate's outline is not closed and convex: its arcs meet its neighbours' at
+  triple junctions, and the drift moves each arc towards its own centre of curvature, so one
+  plate's loss is its neighbour's gain. For a curvature flow in a plane foam this is von
+  Neumann's law (from memory, not read: a cell's area changes in proportion to its number of
+  sides less six), so plates with few neighbours shrink and plates with many grow, at a rate of
+  the order of a sample per resampling.
+- **The test asserts it.** The loss with the level set must lie between 0.4 and 1.4 samples per
+  resampling at each radius, and the largest within twice the smallest. If it grows, a
+  second-order interpolation (each sample's distance gradient stored and the distance
+  extrapolated from each corner, s ≈ Σ w_k [s_k + ½ ∇s_k · (q - p_k)]) would cut the drift to
+  the order of h³; it is not built.
+
+**Arm fl-ls** (the level set on top of fl-fission2, 8 runs, `earthlike_quick_16k`, 1000 Myr, key
+85a1e1cdbf45, argkey 029ca01a; with the level set off the step takes fl-fission2's code path, so
+fl-fission2 is its control). Against fl-fission2, medians with the Mann-Whitney p:
+
+- **The guard.** Its worst is 10,530 m against 10,490 (p 0.51). No step goes beyond 2 reliefs,
+  and `guard_bind_steps` is 0 in every run.
+- **The V1 census.** It meets its 5 criteria in both arms (land 0.320, p 0.72).
+- **The boundary.** It is 323,059 lattice km against 352,268, and 326,556 straight km per step
+  against 353,140 (p 0.002; Bird 260,487). E, the perimeters over their caps', is 1.929 against
+  2.013 (p < 0.001; Bird 1.510). The subduction front is 91,750 straight km per step against
+  98,984 (p 0.005; Bird 51,310), and the front in collision 21,038 km against 24,217 (p 0.005).
+  With each plate one body (`boundgeom`, 77 km), the front's tortuosity is 1.925 against 2.026
+  (PB2002 1.20 on the lattice).
+- **The plates.** 27.1 alive per step against 27.8 (p 0.38). Over the run they go from 23.2 in
+  the first window to 31.4 in the last, against 24.9 to 27.6, so the boundary grows too (290,272
+  to 371,939 km against 309,152 to 352,067).
+- **Fission's churn.** Fissions per run 65 against 64.5. Fission-born plates live 20 / 36 / 72.5
+  Myr (p25 / p50 / p75) against 20 / 40 / 80; the other plates 22 / 76 / 144 against
+  20 / 74 / 152.
+- **The sutures.** 40.9 per 100 Myr against 42.4, and 37,228 km per 100 Myr against 41,589
+  (p 0.038; Macdonald 23,235 to 50,919).
+- **The plate check.** It passes 191 measures against 187.
+
+So the level set shortens the boundary and the front by 7 to 8 % and the front's tortuosity by
+5 %. That is far less than the test's static boundary gains without it (twice its length in 40
+resamplings). In the runs the ridges are drawn again by the gap fill at each resampling either
+way, and the trenches are moved every step by the overlaps' hiding and the collisions (below),
+which the level set does not touch. The front is still 1.8 times Bird's, and its tortuosity 1.6
+times PB2002's.
+
+**What still cuts the plates, with the level set.** `where_the_plates_are_cut` (40,000 samples,
+300 Myr, fission on; samples cut off their plate's largest piece, summed over the run):
+
+| part of the step | supercontinent 1, off | supercontinent 1, on | scattered 2, off | scattered 2, on |
+|---|---|---|---|---|
+| overlaps resolved (`subduction::resolve`): cut / joined | 5,304 / 1,771 | 8,800 / 2,751 | 7,379 / 2,772 | 10,207 / 2,328 |
+| the collision's terrane transfer: cut (the overriding plate, the subducting one) | 5,038 (3,016, 2,022) | 2,734 (1,817, 917) | 3,660 (2,045, 1,615) | 2,556 (1,748, 808) |
+| subduction initiation: cut | 3 | 256 | 74 | 39 |
+| the resampling: cut / joined | 0 / 8,299 | 0 / 8,866 | 0 / 8,209 | 0 / 9,215 |
+| fissions | 14 | 18 | 16 | 18 |
+
+- **The resampling cuts nothing either way.** With fission each cut piece becomes a plate or is
+  captured at the resampling, which books it as joined.
+- **The overlaps' hiding is the main cut, and more of it with the level set.** Hiding the
+  overridden samples cuts a plate's neck that the next step's motion opens again. The terrane
+  transfers cut less with the level set. Each case is one run of a chaotic planet, so these
+  moves are readings, not a law.
+
+**Arm fl-ls2** (the level set with the latent slab copies of Step 3b, on top of fl-fission2, 8
+runs; key dce14248713c, argkey 029ca01a, `--set tectonics.level_set_membership=true`). Against
+fl-fission2, medians with the Mann-Whitney p:
+
+- **The guard.** Its worst is 10,240 m against 10,490 (p 0.16). No step goes beyond 2 reliefs,
+  and `guard_bind_steps` is 0 in every run.
+- **The V1 census.** It meets its 5 criteria (land 0.304).
+- **The boundary.** It is 326,139 lattice km against 352,268, and 327,874 straight km per step
+  (p 0.002). E is 1.908 against 2.013 (p < 0.001). The front is 89,331 straight km per step
+  (p 0.002), and the front in collision 19,668 km against 24,217 (p 0.002). With each plate one
+  body (77 km) the front's tortuosity is 1.924 against 2.026; its length there is the same
+  (115,979 km against 115,544).
+- **The plates.** 27.5 alive per step against 27.8 (p 0.72), from 21.9 in the first window to
+  25.9 in the last (against 24.9 to 27.6), 25.5 at the end against 27.
+- **Fission's churn.** Fissions per run 77 against 64.5 (p about 0.23). Fission-born plates live
+  20 / 40 / 72.5 Myr (p25 / p50 / p75) against 20 / 40 / 80; the other plates 18 / 72 / 154
+  against 20 / 74 / 152. Per run the splits moved 215 to 278 slabs and copied 284 to 342, moved
+  245 to 316 contacts and copied 287 to 344, and moved 33 to 57 collisions.
+- **The sutures.** 40.6 per 100 Myr against 42.4, and 37,382 km per 100 Myr against 41,589
+  (p 0.050).
+- **The plate check.** It passes 189 measures against 187.
+
+Against fl-ls (the level set without the latent copies) no measure differs at p < 0.05, so the
+latent copies of Step 3b change the planet little, as their 1.3 to 3.2 % of the slab force
+foretold.
+
+**On by default.** `tectonics.level_set_membership` is on (2026-10-24), with fission and the
+split inheritance. Its unit tests pass against their source (the great circle exact, the
+reinitialisation keeping it, the boundary no longer roughened by the resampling), both arms on
+the pool show no divergence and no guard binding, the census keeps its 5 criteria, and the plate
+check passes 189 to 191 measures against 187. On the 8k test planet the guard binds on 3 of 24
+seeds with it (Step 3b, "The speed guard"), small plates held by a fixed suction, the same kind
+as without it; that is the suction law's known limit, not the level set's. What it does not do:
+the front stays 1.7 times Bird's (89,331 against 51,310 straight km), since the trenches are
+moved every step by the overlaps' hiding and the collisions, which it does not touch.

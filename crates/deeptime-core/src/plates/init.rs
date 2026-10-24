@@ -461,6 +461,7 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         dynamics: None,
         gap_budget: None,
         limits: None,
+        level_set: None,
     };
     let mut state = state;
     state.slabs = earlier_slabs(&geo, &plate, &state.samples, &omega, k, t0, &norm);
