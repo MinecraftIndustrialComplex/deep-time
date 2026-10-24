@@ -1537,9 +1537,8 @@ mod tests {
     /// the suction of a straight trench, with nothing at its edges or, for the reference plate,
     /// boundary resistance all round. The fixed share's speed `u_f` (the share over the plate's
     /// resistance) becomes `u_f / (1 + u_f / v_t)`, `v_t` the slab's terminal velocity: its pull
-    /// over its slab resistance, the speed at which "the driving force of slab pull and the
-    /// resistance on the slab nearly balance" (Forsyth & Uyeda 1975, p. 178: "effectively the
-    /// terminal velocity of the dense slab falling in a viscous medium"). So a plate the share
+    /// over its slab resistance (PLT-185; Forsyth & Uyeda 1975, p. 178: "effectively the terminal
+    /// velocity of the dense slab falling in a viscous medium"). So a plate the share
     /// draws slowly keeps most of its speed, and a small plate (Earth's Tonga microplate, Bevis
     /// et al. 1995) that the share would draw several times faster than the slab sinks follows
     /// the slab at most. At rest the suction is the share.
@@ -1605,12 +1604,18 @@ mod tests {
             assert!((100.0..110.0).contains(&v_t), "{v_t}");
             assert!((rest_f / fixed - 1.0).abs() < 1e-9 && (rest_s / fixed - 1.0).abs() < 1e-9);
             let expect = u_f / (1.0 + u_f / v_t);
+            eprintln!(
+                "r {r_deg}: fixed {u_f:.1}, saturating {u_s:.1}, expected {expect:.1}, v_t {v_t:.1}"
+            );
             assert!(
                 (u_s / expect - 1.0).abs() < tol && u_s < v_t,
                 "r {r_deg}: fixed {u_f:.1}, saturating {u_s:.1}, expected {expect:.1}, v_t {v_t:.1}"
             );
             if r_deg < 10.0 {
-                assert!(u_f > 2.0 * v_t, "the share draws the small plate fast: {u_f}");
+                assert!(
+                    u_f > 2.0 * v_t,
+                    "the share draws the small plate fast: {u_f}"
+                );
             } else {
                 assert!(u_f < 0.5 * v_t && u_s > 0.7 * u_f, "{u_f} {u_s}");
             }
