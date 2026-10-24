@@ -358,6 +358,10 @@ pub struct Contact {
     /// plate that went under since the contact began or last collided, each counted once, when
     /// it is first hidden. Counted only while the dynamics record is on.
     pub cont_in: u32,
+    /// Measurement only (no rule reads it): this polarity came from reversing a confirmed
+    /// subduction zone (`subduction::reverse`), and is not confirmed yet itself.
+    #[serde(default)]
+    pub reversed: bool,
 }
 
 /// A collision: the state of a [`Contact`] from the step continental crust of the subducting
@@ -404,6 +408,13 @@ pub struct Collision {
     /// Since when the convergence across the front has stayed below `weld_speed_mm_yr`, Myr (the
     /// first such step's end); `None` while it converges faster. Steps with no front leave it.
     pub stalled_since_myr: Option<f64>,
+    /// The collision's shortening when its contact's slab was first found broken off, km: the
+    /// subduction has failed and from then on the plate pushes the continent (transference,
+    /// `collision::transference_due`; set only with `tectonics.transference`, ledger PLT-516).
+    /// Always written: the checkpoint's postcard has no field names, so a skipped field cannot
+    /// be read back.
+    #[serde(default)]
+    pub jam_km: Option<f64>,
     /// The belt this collision has built (`belts.rs`).
     pub belt: Belt,
 }
@@ -528,10 +539,17 @@ pub struct Counters {
     pub accretions: u32,
     /// Subduction initiations at old oceanic lithosphere.
     pub initiations: u32,
-    /// Subduction polarity reversals.
+    /// Subduction polarity reversals: every flip of a contact's polarity.
     pub reversals: u32,
+    /// Reversals a geologist could map (measurement only, ledger PLT-514): a confirmed
+    /// subduction zone whose reversed polarity was confirmed in turn (`subduction::confirm`).
+    #[serde(default)]
+    pub reversals_confirmed: u32,
     /// Collisions that sutured the subducting plate whole to the receiving one (P1-27).
     pub sutures: u32,
+    /// Continents moved alone to the overriding plate by transference (ledger PLT-516).
+    #[serde(default)]
+    pub transferences: u32,
     /// Rifts that did not open and healed (`rifting::heal`).
     #[serde(default)]
     pub healed: u32,

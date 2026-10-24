@@ -410,6 +410,7 @@ pub fn resolve(
                     andean: false,
                     centroid: centroid.to_array(),
                     cont_in: 0,
+                    reversed: false,
                 });
                 let k = state.contacts.len() - 1;
                 index.insert((lo, hi), k);
@@ -621,6 +622,9 @@ fn reverse(
     c.cont_in = 0;
     c.max_uplift_mm_yr = 0.0;
     c.andean = false;
+    // A reversal a geologist could map is one of a subduction zone that was confirmed, counted
+    // when the new polarity is confirmed in turn (`confirm`; measurement, ledger PLT-514).
+    c.reversed = old.onset_event.is_some();
     state.counters.reversals += 1;
     Ok(())
 }
@@ -668,6 +672,9 @@ pub fn confirm(
     let id = world.emit(e)?;
     state.contacts[k].onset_event = Some(id);
     state.counters.subduction_onsets += 1;
+    if std::mem::take(&mut state.contacts[k].reversed) {
+        state.counters.reversals_confirmed += 1;
+    }
     Ok(id)
 }
 
