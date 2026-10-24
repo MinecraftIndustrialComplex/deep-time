@@ -104,6 +104,17 @@ public final class Water {
         return ground < seaLevel - 1 && !closed.getAsBoolean();
     }
 
+    /**
+     * Step 2's test, the one place the lake's rule is written (Rust {@code water::core}'s lake
+     * branch): a lake stands on a column whose top block {@code ground} is under the top block of
+     * the {@code level} the shore rule gives it ({@link #levelAt}). The shore rule gives a level to
+     * the dry columns within its reach of a lake cell too; this says which columns hold the lake.
+     * {@link #core} and {@link LakeIce} read it.
+     */
+    public static boolean lakeCovers(int ground, double level) {
+        return Double.isFinite(level) && ground < topBlock(level);
+    }
+
     static long wrap(WorldData wd, long x) {
         long c = wd.circumference();
         return Math.floorMod(x + c / 2, c) - c / 2;
@@ -218,13 +229,10 @@ public final class Water {
         Rivers.Hit deep = rivers.deep();
         boolean channel = deep != null;
         int f = channel ? (int) Math.floor(deep.floor()) : 0;
-        if (Double.isFinite(level)) {
-            int t = topBlock(level);
-            if (ground < t) {
-                // A channel crossing lake water less than a block deep keeps its bed (ledger: HYD-122).
-                int bed = channel && level - surface < SHALLOW_LAKE ? Math.min(ground, f) : ground;
-                return new Core(Kind.LAKE, surface, ground, level, t, bed, rivers);
-            }
+        if (lakeCovers(ground, level)) {
+            // A channel crossing lake water less than a block deep keeps its bed (ledger: HYD-122).
+            int bed = channel && level - surface < SHALLOW_LAKE ? Math.min(ground, f) : ground;
+            return new Core(Kind.LAKE, surface, ground, level, topBlock(level), bed, rivers);
         }
         // No sea in a closed basin below sea level (HYD-100; Rust WaterSource::closed).
         if (seaCovers(ground, spec.seaLevel(), () -> wd.closedBasin(wx, z))) {
