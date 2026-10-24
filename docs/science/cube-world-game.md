@@ -126,6 +126,14 @@ with ground within 2 blocks of the generated chunk in 390 and 398 of them, water
 generated in all 800 and the biome in all 800; the real client then received 2,001 far sections, 378
 and 228 of them in the 2,048 blocks west and east of the slide and 210 and 362 beside the seam.
 
+The surface noise (G3, 2026-10-23, `build/cube2/g3-checks.sh` on the VM): the 14 cube and far
+terrain GameTests above pass with it, and `gametest-planet.sh --cube-4k` reads the same ground
+height (to 0.01 block) from the game and from the bake's Rust reader in the 10 probe columns on every
+face. Its unit tests check that the noise reads one value from both sides of each of the 14 net
+edges (the slide and the twelve turning edges) and steps across them no more than across a lattice
+line inside a face, that an outside block reads its fold partner's value exactly, and that Rust and
+Java give the same pinned values. The seam steps it gives the bake are on the bake page (B1).
+
 ## Simplifications and limits
 
 - The copy off the faces has no structures and no features: trees, ore veins placed as features,
