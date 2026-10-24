@@ -86,7 +86,7 @@ use crate::params::PlanetPreset;
 use crate::plates::events::{HOTSPOT_TRACK, LARGE_IGNEOUS_PROVINCE};
 use crate::plates::kinematics::rotation;
 use crate::plates::state::{ARC, CONTINENTAL};
-use crate::sphere::BlockFrame;
+use crate::sphere::{Around, BlockFrame};
 use crate::stage::{Stage, StageContext, StageEstimate, from_state, to_state};
 use crate::surface::lithology::index;
 use crate::surface::strata_log::{IN_SITU, LIP_FLOW};
@@ -425,8 +425,12 @@ fn l1_grid(preset: &PlanetPreset) -> Result<GridDesc, CoreError> {
     )?)
 }
 
-/// Where cells lie relative to a point, on a grid: calls `f(cell, dx_m, dz_m)` for every cell
-/// whose centre is within `reach_m` (block metric) of block (x, z).
+/// Where cells lie relative to a point, on a grid: calls `f(cell, east_m, south_m)` for every
+/// cell whose centre is within `reach_m` of block (x, z) on the planet (ledger: SCL-230), its
+/// offset the great-circle distance along the bearing ([`Around::offset`]: a shape drawn as a
+/// function of `east_m.hypot(south_m)` is round on the planet, where one drawn in the Lambert
+/// grid's blocks was long north–south by 1 / cos² of its latitude until 2026-10-23). Rows come in
+/// order, and each row's cells from west to east.
 pub fn for_cells(
     grid: &GridDesc,
     mh: f64,
@@ -437,29 +441,69 @@ pub fn for_cells(
 ) {
     let r = f64::from(grid.r);
     let frame = BlockFrame::new(grid.circumference() as u32);
+    let at = Around::new(frame, mh, x, z);
     let (ox, oz) = (grid.origin_block_x as f64, grid.origin_block_z as f64);
-    let reach_b = reach_m / mh;
-    let (fi, fj) = ((x - ox) / r, (z - oz) / r);
-    let span = (reach_b / r).ceil() as i64 + 1;
-    let (ci, cj) = (fi.round() as i64, fj.round() as i64);
-    let w = grid.w as usize;
-    for j in cj - span..=cj + span {
-        if j < 0 || j >= i64::from(grid.h) {
-            continue;
-        }
-        let bz = oz + j as f64 * r;
-        let dz = (bz - z) * mh;
-        if dz.abs() > reach_m {
-            continue;
-        }
-        for i in ci - span..=ci + span {
-            let bx = ox + i as f64 * r;
-            let dx = frame.wrap_x(bx - x) * mh;
-            if dx.hypot(dz) <= reach_m {
-                f(j as usize * w + grid.wrap_i(i) as usize, dx, dz);
+    let (hw, z0, z1) = at.bounds(reach_m);
+    let (w, h) = (i64::from(grid.w), i64::from(grid.h));
+    let j0 = (((z0 - oz) / r).floor().max(-1.0) as i64).max(0);
+    let j1 = (((z1 - oz) / r).ceil().min(h as f64) as i64).min(h - 1);
+    // The columns, west to east, at most once each; their longitude offsets are every row's.
+    let (i0, i1) = if 2.0 * hw >= frame.circumference() {
+        let i0 = ((x - ox) / r).round() as i64 - w / 2;
+        (i0, i0 + w - 1)
+    } else {
+        let i0 = ((x - hw - ox) / r).floor() as i64;
+        let i1 = (((x + hw - ox) / r).ceil() as i64).min(i0 + w - 1);
+        (i0, i1)
+    };
+    let cols: Vec<(usize, (f64, f64))> = (i0..=i1)
+        .map(|i| (grid.wrap_i(i) as usize, at.column(ox + i as f64 * r)))
+        .collect();
+    for j in j0..=j1 {
+        let row = at.row(oz + j as f64 * r);
+        let base = j as usize * w as usize;
+        for &(i, col) in &cols {
+            if let Some((e, s)) = at.offset_within(row, col, reach_m) {
+                f(base + i, e, s);
             }
         }
     }
+}
+
+/// The true extent of a cell of `grid`'s row `j` on the planet, m: (east–west, north–south). The
+/// row spans its z ± r/2 north–south (its latitudes' arc, through the poles' clamp), and the cell
+/// keeps its Lambert area, (r · `mh`)² (the projection is equal-area), so it is narrow east–west
+/// by as much as it is tall (ledger: SCL-231).
+pub fn cell_extent_m(grid: &GridDesc, mh: f64, j: usize) -> (f64, f64) {
+    let r = f64::from(grid.r);
+    let p = deeptime_format::Projection::new(grid.circumference() as u32);
+    let z = grid.origin_block_z as f64 + j as f64 * r;
+    let lat = |z: f64| p.sin_lat(z).asin();
+    let tall = p.radius() * mh * (lat(z - 0.5 * r) - lat(z + 0.5 * r));
+    let cell = r * mh;
+    if tall > 0.0 {
+        (cell * cell / tall, tall)
+    } else {
+        (cell, cell)
+    }
+}
+
+/// How far past a shape's reach (m) a footprint must look for every cell whose
+/// [`shape::cell_weight`] points (3/8 of the cell's extent either way from its centre) reach into
+/// it: one Lambert cell side (as before 2026-10-23), or the half-diagonal of those points in the
+/// tallest cell the cap round block (x, z) holds, if larger (poleward of about 68°; ledger:
+/// SCL-231).
+pub fn cell_pad_m(grid: &GridDesc, mh: f64, x: f64, z: f64, reach_m: f64) -> f64 {
+    let r = f64::from(grid.r);
+    let at = Around::new(BlockFrame::new(grid.circumference() as u32), mh, x, z);
+    let (_, z0, z1) = at.bounds(reach_m);
+    let far = |z: f64| {
+        let zc = z.clamp(-at.radius_m() / mh, at.radius_m() / mh);
+        let j = ((zc - grid.origin_block_z as f64) / r).round();
+        let (w, t) = cell_extent_m(grid, mh, j.clamp(0.0, f64::from(grid.h - 1)) as usize);
+        0.375 * w.hypot(t)
+    };
+    (r * mh).max(far(z0)).max(far(z1))
 }
 
 /// Bilinear value of an L1 array at block (x, z).
@@ -547,21 +591,16 @@ impl L1<'_> {
         reach: f64,
         prof: &dyn Fn(f64) -> f64,
     ) -> Vec<(usize, f64)> {
-        let cm = self.cell_m;
+        let (g, mh) = (self.grid, self.mh);
+        let gw = g.w as usize;
         let mut out = Vec::new();
-        for_cells(
-            self.grid,
-            self.mh,
-            x,
-            z,
-            radius_m * reach + cm,
-            |c, dx, dz| {
-                let w = shape::cell_weight(prof, dx, dz, cm, radius_m);
-                if w > 0.0 {
-                    out.push((c, w));
-                }
-            },
-        );
+        let pad = cell_pad_m(g, mh, x, z, radius_m * reach);
+        for_cells(g, mh, x, z, radius_m * reach + pad, |c, dx, dz| {
+            let w = shape::cell_weight(prof, dx, dz, cell_extent_m(g, mh, c / gw), radius_m);
+            if w > 0.0 {
+                out.push((c, w));
+            }
+        });
         out
     }
 
@@ -574,7 +613,7 @@ impl L1<'_> {
         let fj = (z - g.origin_block_z as f64) / r;
         let (i0, j0) = (fi.floor(), fj.floor());
         let (ti, tj) = (fi - i0, fj - j0);
-        let frame = BlockFrame::new(g.circumference() as u32);
+        let at = Around::new(BlockFrame::new(g.circumference() as u32), self.mh, x, z);
         let mut s = 0.0;
         for (di, dj, w) in [
             (0.0, 0.0, (1.0 - ti) * (1.0 - tj)),
@@ -584,9 +623,9 @@ impl L1<'_> {
         ] {
             let bx = g.origin_block_x as f64 + (i0 + di) * r;
             let bz = g.origin_block_z as f64 + (j0 + dj) * r;
-            let dx = frame.wrap_x(bx - x) * self.mh;
-            let dz = (bz - z) * self.mh;
-            s += w * shape::cell_weight(prof, dx, dz, self.cell_m, radius_m);
+            let (dx, dz) = at.offset(bx, bz);
+            let j = (j0 + dj).clamp(0.0, f64::from(g.h - 1)) as usize;
+            s += w * shape::cell_weight(prof, dx, dz, cell_extent_m(g, self.mh, j), radius_m);
         }
         s
     }
@@ -809,6 +848,7 @@ impl VolcanoStage {
                 let sh = v.shape();
                 let prof = |r: f64| sh.body(r);
                 let mut cells = Vec::new();
+                let gw = grid.w as usize;
                 for_cells(
                     &grid,
                     mh,
@@ -816,7 +856,8 @@ impl VolcanoStage {
                     v.z,
                     1.3 * v.radius_m + cell_m, // ledger: VOL-033
                     |c, dx, dz| {
-                        cells.push((c, shape::cell_weight(&prof, dx, dz, cell_m, v.radius_m)));
+                        let ext = cell_extent_m(&grid, mh, c / gw);
+                        cells.push((c, shape::cell_weight(&prof, dx, dz, ext, v.radius_m)));
                     },
                 );
                 v.kept_m = (v.kept_m + fit_change(&cells, m)).clamp(0.0, v.peak_m);
@@ -883,8 +924,9 @@ impl VolcanoStage {
                 (id, (x, z, uplift))
             })
             .collect();
+        // Great-circle distances (ledger: SCL-232; the Lambert block metric until 2026-10-23).
         let dist_m =
-            |x0: f64, z0: f64, x1: f64, z1: f64| (frame.wrap_x(x1 - x0) * mh).hypot((z1 - z0) * mh);
+            |x0: f64, z0: f64, x1: f64, z1: f64| Around::new(frame, mh, x0, z0).distance_m(x1, z1);
         for v in &mut st.volcanoes {
             if !v.active() {
                 continue;
@@ -2156,12 +2198,16 @@ pub fn place_arcs(
         let bz = grid.block_z(j) as f64 + (rng.uniform() - 0.5) * r;
         let need = spacing_m * range(rng, 0.8, 1.2);
         let (kx, kz) = key(bx, bz);
+        // The spacing is a great-circle distance (ledger: SCL-232): poleward it spans more
+        // buckets east–west than the bucket's side (a Lambert block is cos φ of the planet's).
+        let at = Around::new(frame, mh, bx, bz);
+        let nx = ((at.bounds(need).0 / bucket).ceil() as i64).clamp(1, nbx);
         let mut clash = false;
         'scan: for dz in -1..=1 {
-            for dx in -1..=1 {
+            for dx in -nx..=nx {
                 if let Some(pts) = grid_pts.get(&((kx + dx).rem_euclid(nbx), kz + dz)) {
                     for &(ox, oz) in pts {
-                        let d = (frame.wrap_x(bx - ox) * mh).hypot((bz - oz) * mh);
+                        let d = at.distance_m(ox, oz);
                         if d < need {
                             clash = true;
                             break 'scan;

@@ -78,6 +78,69 @@ fn arcs_line_up_along_the_front_at_the_spacing() {
 }
 
 #[test]
+fn arcs_are_spaced_on_the_planet_at_high_latitude() {
+    // SCL-232: the spacing is a great-circle distance, so an arc at 60° N (a Lambert block east
+    // is half a block of the planet there) gets as many volcanoes as its length on the planet
+    // holds, not twice as many.
+    let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
+    let (w, n) = (grid.w as usize, grid.cells());
+    let frame = BlockFrame::new(16_384);
+    let mh = 300.0;
+    let row = (0..grid.h as i64)
+        .min_by(|&a, &b| {
+            let d = |j: i64| (frame.lat_deg(grid.block_z(j) as f64) - 60.0).abs();
+            d(a).total_cmp(&d(b))
+        })
+        .unwrap() as usize;
+    let mut flux = vec![0.0f64; n];
+    for i in 100..600 {
+        flux[(row - 1) * w + i] = 0.8;
+        flux[row * w + i] = 1.0;
+        flux[(row + 1) * w + i] = 0.8;
+    }
+    let spacing = 60_000.0;
+    let born = place_arcs(
+        &grid,
+        mh,
+        &flux,
+        0.25,
+        spacing,
+        &mut Vec::new(),
+        &mut Rng::stream(5, "test"),
+    );
+    let pts: Vec<(f64, f64)> = born.iter().map(|&(x, z, _)| (x, z)).collect();
+    let mut nn = Vec::new();
+    for (a, &(x, z)) in pts.iter().enumerate() {
+        let at = Around::new(frame, mh, x, z);
+        let best = (pts.iter().enumerate())
+            .filter(|&(b, _)| b != a)
+            .map(|(_, &(ox, oz))| at.distance_m(ox, oz) / 1000.0)
+            .fold(f64::INFINITY, f64::min);
+        assert!(best >= 0.8 * 60.0 - 1e-6, "{best} km on the planet");
+        nn.push(best);
+    }
+    let mean = nn.iter().sum::<f64>() / nn.len() as f64;
+    assert!(
+        (48.0..=80.0).contains(&mean),
+        "mean neighbour distance {mean} km"
+    );
+    // 500 cells of 16 blocks at cos 60° are 1,200 km on the planet: 15 to 25 at 48 to 80 km.
+    let len_km = 500.0
+        * 16.0
+        * frame
+            .lat_deg(grid.block_z(row as i64) as f64)
+            .to_radians()
+            .cos()
+        * mh
+        / 1000.0;
+    let count = born.len() as f64;
+    assert!(
+        (len_km / 80.0 - 1.0..=len_km / 48.0 + 1.0).contains(&count),
+        "{count} volcanoes on {len_km} km of arc"
+    );
+}
+
+#[test]
 fn the_front_is_the_middle_of_the_arc_band() {
     let grid = GridDesc::for_planet("L1", 16_384, 16).unwrap();
     let (w, n) = (grid.w as usize, grid.cells());
@@ -593,7 +656,8 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         "no active arc volcano: {stratos} in the catalogue, {:?}",
         st.counts
     );
-    // Active ones keep the spacing (they were placed apart and ride their plates together).
+    // Active ones keep the spacing (they were placed apart and ride their plates together). The
+    // spacing is a great-circle distance (ledger: SCL-232), and so is the check.
     let live: Vec<&Volcano> = st
         .volcanoes
         .iter()
@@ -602,7 +666,7 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
     let mut close = 0;
     for (a, va) in live.iter().enumerate() {
         for vb in &live[a + 1..] {
-            let d = (frame.wrap_x(va.x - vb.x) * 300.0).hypot((va.z - vb.z) * 300.0);
+            let d = Around::new(frame, 300.0, va.x, va.z).distance_m(vb.x, vb.z);
             if d < 0.5 * p.arc_spacing_km * 1000.0 {
                 close += 1;
             }
@@ -643,8 +707,10 @@ fn the_pipeline_puts_volcanoes_where_the_plates_say() {
         }
         let hs = plates.hotspots.iter().find(|x| x.id == h).unwrap();
         let (px, pz) = frame.block(DVec3::from_array(hs.pos));
+        // On the planet, as the stage measures it (ledger: SCL-232).
+        let plume = Around::new(frame, 300.0, px, pz);
         for v in vs.iter().filter(|v| v.active() && v.gone.is_none()) {
-            let d = (frame.wrap_x(v.x - px) * 300.0).hypot((v.z - pz) * 300.0);
+            let d = plume.distance_m(v.x, v.z);
             assert!(
                 d <= p.hotspot_spacing_km * 1000.0 + 1.0,
                 "{d} m from its plume"
