@@ -26,7 +26,13 @@
 //! **On the ground.** A placer with no channel within reach (an old one, far from today's rivers
 //! or under today's sea) keeps its place and direction and becomes a **bench**: the ribbon cut
 //! into pieces of at most [`MAX_PIECE_BLOCKS`], each laid with its top at the finished ground (the
-//! bed under water) at its centre, at least [`MIN_GRAVEL_BLOCKS`] thick.
+//! bed under water) at its centre, at least [`MIN_GRAVEL_BLOCKS`] thick. A bench that would reach
+//! past the world's top or bottom edge (the poles, in the simulation's Lambert frame where the
+//! pass runs) slides along z by whole blocks until every piece lies inside (ORE-283): past the
+//! edge there is no ground, and the cube projection reads a body's shape from the map's Jacobian
+//! at its centre, which is singular at the pole (on master 7f53dabe's 4k test planet a piece at
+//! z −658.4, past the pole at 651.9, became a needle 1.3e10 blocks long whose box hung the game's
+//! site chunk count).
 //!
 //! The bodies keep the rock class (gravel) and the zones (the pay streak in the lower half, at the
 //! base of the gravel). In the game the strata pass paints the gravel, the water pass cuts the
@@ -286,21 +292,29 @@ fn bars(r: &Rivers, site: u32, at: usize, rb: &Ribbon) -> Bars {
     }
 }
 
-/// The bench of a placer without a channel: the ribbon at (x, z) along `yaw`, in pieces laid on
-/// the finished ground.
+/// The bench of a placer without a channel: the ribbon along `yaw` with its middle at (x, z), in
+/// pieces laid on the finished ground, and the z its middle went to. A ribbon that would reach
+/// past the world's top or bottom edge (`z_range`: the poles, in the simulation's Lambert frame)
+/// slides along z by whole blocks until every piece lies inside (ORE-283).
 fn bench(
     c: f64,
     site: u32,
     (x, z): (f64, f64),
     yaw: f32,
     rb: &Ribbon,
+    z_range: (f64, f64),
     ground: &dyn Fn(i64, i64) -> i32,
-) -> Vec<Body> {
+) -> (Vec<Body>, f64) {
     let n = (rb.length / MAX_PIECE_BLOCKS).ceil().max(1.0);
     let piece = rb.length / n;
     let (sy, cy) = f64::from(yaw).sin_cos();
     let half = (rb.thickness.max(MIN_GRAVEL_BLOCKS) / 2.0).max(0.5);
-    (0..n as usize)
+    let along = (OVERLAP * piece / 2.0).max(2.0);
+    let across = (rb.width / 2.0).max(0.5);
+    // How far the end pieces' boxes reach in z from the ribbon's middle.
+    let reach = (rb.length / 2.0 - piece / 2.0 + along) * sy.abs() + across * cy.abs();
+    let z = inside(z, reach, z_range);
+    let pieces = (0..n as usize)
         .map(|i| {
             let off = (i as f64 + 0.5) * piece - rb.length / 2.0;
             let (px, pz) = (fold(c, x + off * cy), z + off * sy);
@@ -311,28 +325,38 @@ fn bench(
                 Shape::Channel,
                 "ore",
                 [px, top + 1.0 - half, pz],
-                [
-                    (OVERLAP * piece / 2.0).max(2.0) as f32,
-                    half as f32,
-                    (rb.width / 2.0).max(0.5) as f32,
-                ],
+                [along as f32, half as f32, across as f32],
                 yaw,
                 0.0,
                 NO_CLIP,
             )
         })
-        .collect()
+        .collect();
+    (pieces, z)
+}
+
+/// z (a whole block) moved by whole blocks, as little as it can, so that `z ± reach` lies inside
+/// `(lo, hi)`; the range's middle block when it is too narrow. Whole blocks, so the site's centre
+/// (an integer) is the ribbon's middle and settling again lays the same pieces.
+fn inside(z: f64, reach: f64, (lo, hi): (f64, f64)) -> f64 {
+    let (a, b) = ((lo + reach).ceil(), (hi - reach).floor());
+    if a > b {
+        ((lo + hi) / 2.0).round()
+    } else {
+        z.clamp(a, b)
+    }
 }
 
 /// Puts the placers of `sites` where the finished world has their gravel: into the channels of
 /// `rivers` as bars, or on the ground as benches (module docs). `ribbon(site)` is the site's
 /// [`Ribbon`] (None: not a placer type; the site is left alone); `ground(x, z)` the top solid
-/// block of a column (the bed under water). Sites and bodies that are not placers come back
-/// unchanged, in their order.
+/// block of a column (the bed under water); `z_range` the world's z range, which a bench keeps
+/// inside. Sites and bodies that are not placers come back unchanged, in their order.
 pub fn settle(
     sites: &[Site],
     bodies: &[Body],
     rivers: &Rivers,
+    z_range: (f64, f64),
     ribbon: &dyn Fn(&Site) -> Option<Ribbon>,
     ground: &dyn Fn(i64, i64) -> i32,
 ) -> Settled {
@@ -341,6 +365,7 @@ pub fn settle(
     let mut id = next_id(bodies);
     let c = f64::from(rivers.c);
     let (mut placers, mut moved, mut benches, mut pieces_total) = (0u32, 0u32, 0u32, 0u32);
+    let mut slid = 0u32;
     let (mut moves, mut lengths, mut lifts) = (Vec::new(), Vec::new(), Vec::new());
     for s in &mut out_sites {
         if s.kind != SiteKind::Placer {
@@ -373,13 +398,13 @@ pub fn settle(
                 (b.pieces, [x.round() as i32, bed as i32, v.z.round() as i32])
             }
             None => {
-                let top = ground(s.center[0].into(), s.center[2].into());
+                let (pieces, mz) = bench(c, s.id, (sx, sz), model.yaw, &rb, z_range, ground);
+                let mz = mz as i32;
+                slid += u32::from(mz != s.center[2]);
+                let top = ground(s.center[0].into(), mz.into());
                 benches += 1;
                 lifts.push(f64::from(top - s.center[1]));
-                (
-                    bench(c, s.id, (sx, sz), model.yaw, &rb, ground),
-                    [s.center[0], top, s.center[2]],
-                )
+                (pieces, [s.center[0], top, mz])
             }
         };
         let drop: Vec<u32> = own.iter().map(|b| b.id).collect();
@@ -414,6 +439,7 @@ pub fn settle(
             "placers": placers,
             "in_channels": moved,
             "benches": benches,
+            "benches_slid_off_the_edge": slid,
             "pieces": pieces_total,
             "median_move_blocks": median(&mut moves),
             "median_length_blocks": median(&mut lengths),
@@ -464,6 +490,7 @@ pub fn settle_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<V
         &sites,
         &bodies,
         &rivers,
+        m.world_projection().z_range(),
         &|site| ribbon_of(&types, &sc, site),
         &ground,
     );
@@ -505,6 +532,9 @@ mod tests {
     use deeptime_format::bodies::Zone;
     use deeptime_format::rivers::{Chain, RiverVertex};
     use deeptime_format::sites::Extraction;
+
+    /// A world whose top and bottom edges lie far from every test placer.
+    const FAR: (f64, f64) = (-4096.0, 4096.0);
 
     /// A tributary running east along z = 100 for 80 blocks into a larger river that runs
     /// south-east from (60, 70) through the confluence at (90, 100).
@@ -635,6 +665,7 @@ mod tests {
             std::slice::from_ref(&s),
             &[other.clone(), b.clone()],
             &r,
+            FAR,
             &reach,
             &hill,
         );
@@ -689,7 +720,7 @@ mod tests {
     fn the_bars_keep_the_volume_and_follow_confluences() {
         let r = river();
         let (s, b) = placer(3, 60.0, 104.0);
-        let out = settle(&[s], std::slice::from_ref(&b), &r, &reach, &hill);
+        let out = settle(&[s], std::slice::from_ref(&b), &r, FAR, &reach, &hill);
         let len = out.note["median_length_blocks"].as_f64().unwrap();
         assert!(
             (MIN_LENGTH_BLOCKS..=MAX_STRETCH * 79.4).contains(&len),
@@ -697,7 +728,7 @@ mod tests {
         );
         // A tiny placer still gets the shortest run.
         let (s2, b2) = placer(4, 60.0, 104.0);
-        let out = settle(&[s2], &[b2], &r, &tiny, &hill);
+        let out = settle(&[s2], &[b2], &r, FAR, &tiny, &hill);
         let len = out.note["median_length_blocks"].as_f64().unwrap();
         assert!(
             (MIN_LENGTH_BLOCKS..MIN_LENGTH_BLOCKS + 4.0).contains(&len),
@@ -712,7 +743,7 @@ mod tests {
             })
         };
         let (s3, b3) = placer(5, 88.0, 101.0);
-        let out = settle(&[s3], &[b3], &r, &big, &hill);
+        let out = settle(&[s3], &[b3], &r, FAR, &big, &hill);
         let south = out
             .bodies
             .iter()
@@ -736,8 +767,8 @@ mod tests {
         let r = river();
         for (x, z) in [(50.0, 140.0), (900.0, 900.0)] {
             let (s, b) = placer(3, x, z);
-            let once = settle(&[s], std::slice::from_ref(&b), &r, &reach, &hill);
-            let twice = settle(&once.sites, &once.bodies, &r, &reach, &hill);
+            let once = settle(&[s], std::slice::from_ref(&b), &r, FAR, &reach, &hill);
+            let twice = settle(&once.sites, &once.bodies, &r, FAR, &reach, &hill);
             assert_eq!(once.sites[0].center, twice.sites[0].center);
             assert_eq!(once.sites[0].aabb, twice.sites[0].aabb);
             assert_eq!(once.bodies.len(), twice.bodies.len());
@@ -777,6 +808,7 @@ mod tests {
             std::slice::from_ref(&s),
             std::slice::from_ref(&b),
             &r,
+            FAR,
             &reach,
             &hill,
         );
@@ -806,6 +838,52 @@ mod tests {
         // The pieces lie along the ribbon's direction, on a rising hill: their heights differ.
         let ys: Vec<f64> = pieces.iter().map(|p| p.center[1]).collect();
         assert!(ys.iter().any(|y| *y != ys[0]), "{ys:?}");
+        assert_eq!(out.note["benches_slid_off_the_edge"], 0);
+    }
+
+    /// A bench by the pole of a 4,096-block Lambert world (z range ±651.9) slides along z by whole
+    /// blocks until every piece lies inside the range, at both poles; the site's centre is the
+    /// ribbon's new middle, and settling again lays the same pieces. Master 7f53dabe's 4k test
+    /// planet had a bench piece at z −658.4, past the pole, which the cube projection made a
+    /// needle 1.3e10 blocks long (ORE-283).
+    #[test]
+    fn a_bench_by_the_pole_stays_inside_the_world() {
+        let r = river();
+        let half = deeptime_format::Projection::of(4096.0).pole_z();
+        let range = (-half, half);
+        for (z, want) in [(640.0, 634), (-640.0, -634)] {
+            let (s, b) = placer(3, 900.0, z);
+            let out = settle(&[s], std::slice::from_ref(&b), &r, range, &reach, &hill);
+            assert_eq!(out.note["benches"], 1);
+            assert_eq!(out.note["benches_slid_off_the_edge"], 1);
+            let site = &out.sites[0];
+            assert_eq!((site.center[0], site.center[2]), (900, want), "{z}");
+            let pieces: Vec<&Body> = out.bodies.iter().filter(|x| x.site == Some(3)).collect();
+            assert_eq!(pieces.len(), 4);
+            for p in &pieces {
+                assert!(p.center[2].abs() < half, "{:?}", p.center);
+                assert!(
+                    f64::from(p.aabb[0][2]) >= (-half).floor()
+                        && f64::from(p.aabb[1][2]) <= half.ceil(),
+                    "{:?} past ±{half}",
+                    p.aabb
+                );
+            }
+            let mid = pieces.iter().map(|p| p.center[2]).sum::<f64>() / pieces.len() as f64;
+            assert!((mid - f64::from(want)).abs() < 1e-6, "{mid}");
+            let twice = settle(&out.sites, &out.bodies, &r, range, &reach, &hill);
+            assert_eq!(twice.sites[0].center, site.center);
+            for (a, b) in out.bodies.iter().zip(&twice.bodies) {
+                assert_eq!((a.center, a.axes, a.yaw), (b.center, b.axes, b.yaw));
+            }
+        }
+        // Inside the range a bench keeps its place.
+        let (s, b) = placer(3, 900.0, 600.0);
+        let out = settle(&[s], std::slice::from_ref(&b), &r, range, &reach, &hill);
+        assert_eq!(out.sites[0].center[2], 600);
+        assert_eq!(out.note["benches_slid_off_the_edge"], 0);
+        // A range narrower than the ribbon: its middle block.
+        assert_eq!(inside(5.0, 30.0, (-20.0, 21.0)), 1.0);
     }
 
     /// Another kind of site, or a type without placer rules: unchanged.
@@ -818,6 +896,7 @@ mod tests {
             std::slice::from_ref(&s2),
             std::slice::from_ref(&b2),
             &r,
+            FAR,
             &reach,
             &hill,
         );
@@ -829,6 +908,7 @@ mod tests {
             std::slice::from_ref(&s2),
             std::slice::from_ref(&b2),
             &r,
+            FAR,
             &reach,
             &hill,
         );
