@@ -534,6 +534,16 @@ fn lay_fans(
             }
         }
     }
+    // The hollows the fans close, at their spill (HYD-177).
+    for &(c, lvl) in &fans.ponds {
+        let (i, j) = (c as usize % wh, c as usize / wh);
+        for dj in 0..f {
+            for di in 0..f {
+                let t = top.entry((j * f + dj) * w3 + i * f + di).or_insert(i16::MIN);
+                *t = (*t).max(lvl);
+            }
+        }
+    }
     let mut raise = vec![0i16; l3.cells()];
     let (mut cells, mut max_raw) = (0u64, 0i16);
     for (&c3, &h) in &top {
@@ -544,16 +554,6 @@ fn lay_fans(
             max_raw = max_raw.max(h - old);
             cells += 1;
             el.bytes[at..at + 2].copy_from_slice(&h.to_le_bytes());
-        }
-    }
-    // The hollows the cones close, at their spill (HYD-177).
-    for &(c, lvl) in &fans.ponds {
-        let (i, j) = (c as usize % wh, c as usize / wh);
-        for dj in 0..f {
-            for di in 0..f {
-                let t = top.entry((j * f + dj) * w3 + i * f + di).or_insert(i16::MIN);
-                *t = (*t).max(lvl);
-            }
         }
     }
     drop(top);
