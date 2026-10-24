@@ -88,6 +88,13 @@ the game uses them:
    edge, and goes all the way round each pole. `metresPerBlock` gives the planet's metres per
    block there. Both are NaN past the corners. The old static `latitudeDeg(z, C)` was right on
    Lambert worlds only and is gone.
+9. **The F3 line** (`net/PlanetDebugLine`, cube plan G10). On a cube world the debug screen reads
+   `Deep Time: 10.144° N 100.920° E · face F0 · north 7.8° · 311 m/block here · <planet> (C 4096,
+   276 m/block)`: latitude and longitude, the face (`F1 (folded)` off the faces, for the face the
+   block folds onto), north's bearing and the metres a block spans there, the numbers the climate
+   API gives, then the nominal scale. Past the corners it says "off the planet", and a client whose
+   jar lacks the server's map table says "map mismatch". The client works it out from the planet
+   info alone.
 
 ## Equations and constants
 
