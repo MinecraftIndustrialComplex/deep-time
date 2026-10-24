@@ -605,6 +605,9 @@ pub struct PlateState {
     /// every resampling while `tectonics.level_set_membership` is on, absent while it is off.
     #[serde(default)]
     pub level_set: Option<super::level_set::LevelSet>,
+    /// The crust shown again (`shown.rs`): measurement only, kept while the dynamics record is.
+    #[serde(default)]
+    pub shown: Option<super::shown::Track>,
     /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
     /// kept in checkpoints.
     #[serde(skip)]
