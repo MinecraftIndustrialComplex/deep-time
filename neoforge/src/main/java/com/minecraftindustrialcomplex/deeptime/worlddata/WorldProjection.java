@@ -15,9 +15,8 @@ public interface WorldProjection {
         LAMBERT("lambert"),
         PETROFF_GUYOU("petroff_guyou"),
         /**
-         * The cube world (docs/plans/cube-world-plan.md): six faces in a net, {@link CubeLayout},
-         * {@link CubeMap}, {@link CubeWorld}. Not a {@link WorldProjection} yet (phase 2), so
-         * {@link #of} and {@code WorldLayout.fromJson} refuse it instead of falling back to Lambert.
+         * The cube world (docs/plans/cube-world-plan.md, format 0.7): six faces in a net, {@link CubeLayout},
+         * {@link CubeMap}, {@link CubeWorld}; the projection {@link Cube}.
          */
         CUBE("cube");
 
@@ -152,14 +151,172 @@ public interface WorldProjection {
         return new double[]{lat, lon};
     }
 
-    /** The projection a manifest's layout block describes; null (no block) is Lambert of circumference {@code c}. */
+    /**
+     * The projection a manifest's layout block describes; null (no block) is Lambert of circumference {@code c}.
+     *
+     * @throws WorldDataException on a cube layout whose map this jar does not ship (by name and sha256) or whose
+     *                            rotation is not one (Rust {@code WorldProjection::try_from_spec})
+     */
     static WorldProjection of(WorldLayout layout, int c) {
         if (layout != null && layout.kind() == Kind.CUBE)
-            throw new IllegalArgumentException("projection kind 'cube' is not a WorldProjection yet (phase 2 of "
-                    + "docs/plans/cube-world-plan.md); use CubeWorld for the cube world's geometry");
+            return Cube.of(layout);
         if (layout != null && layout.kind() == Kind.PETROFF_GUYOU)
             return new PetroffGuyou(layout.hemisphereBlocks() > 0 ? layout.hemisphereBlocks() : c / 2, layout.lambdaCDeg());
         return new Lambert(c);
+    }
+
+    /**
+     * A cube world (format 0.7, FORMAT.md "The cube world's layout"): the net {@link CubeLayout} of face
+     * side s, drawn on the planet through {@link CubeWorld} at one block a block (the radius in blocks of
+     * the equal-area sphere, as Rust's {@code WorldProjection::Cube}, so a Jacobian is planet blocks per
+     * net block). x wraps with period 4s into the window [−3s/2, 5s/2), z spans [−3s/2, 3s/2]; a point
+     * off the faces is folded through the nearest net edge, and past the net's corners every answer is
+     * NaN.
+     */
+    record Cube(CubeWorld world) implements WorldProjection {
+
+        /**
+         * The cube world a layout block describes (Rust {@code WorldProjection::try_from_spec}).
+         *
+         * @throws WorldDataException when the map table is not one this jar ships, by name and sha256,
+         *                            or the rotation is not a rotation
+         */
+        public static Cube of(WorldLayout layout) {
+            WorldLayout.CubeSpec spec = layout.cube();
+            if (spec == null)
+                throw new WorldDataException("cube layout without face_blocks");
+            return new Cube(new CubeWorld(CubeLayout.shared(spec.faceBlocks()), mapNamed(spec.mapName(), spec.mapSha256()),
+                    CubeTurn.fromRows(spec.rotation()), 1.0));
+        }
+
+        /**
+         * The shipped cube map {@code name}, checked against {@code sha256} (lowercase hex). The refusal is
+         * FORMAT.md's and Rust's {@code cube_map_named}: "world data needs cube map NAME (sha256 HASH); this
+         * Deep Time has NAMES".
+         */
+        public static CubeMap mapNamed(String name, String sha256) {
+            CubeMap m = CubeMap.builtin(name);
+            if (m != null && m.sha256Hex().equals(sha256.toLowerCase(java.util.Locale.ROOT)))
+                return m;
+            StringBuilder has = new StringBuilder();
+            for (String n : CubeMap.builtinNames()) {
+                if (!has.isEmpty())
+                    has.append(", ");
+                has.append(n).append(" (sha256 ").append(CubeMap.builtin(n).sha256Hex()).append(')');
+            }
+            throw new WorldDataException("world data needs cube map " + name + " (sha256 " + sha256 + "); this Deep Time has " + has);
+        }
+
+        /** The net. */
+        public CubeLayout cube() {
+            return world.cube();
+        }
+
+        /** s, the face side in blocks. */
+        public long side() {
+            return world.cube().side();
+        }
+
+        @Override
+        public Kind kind() {
+            return Kind.CUBE;
+        }
+
+        @Override
+        public double period() {
+            return (double) cube().period();
+        }
+
+        @Override
+        public double radius() {
+            return cube().radius();
+        }
+
+        @Override
+        public double zMin() {
+            return cube().window()[2];
+        }
+
+        @Override
+        public double zMax() {
+            return cube().window()[3];
+        }
+
+        /** x wrapped into the window [−3s/2, 5s/2) (not the polar worlds' [−period/2, period/2)). */
+        @Override
+        public double wrapX(double x) {
+            return cube().wrapXPoint(x);
+        }
+
+        @Override
+        public double[] canonical(double x, double z) {
+            CubeLayout.PointOnFace p = cube().foldPoint(x, z);
+            return p == null ? new double[]{Double.NaN, Double.NaN} : new double[]{p.x(), p.z()};
+        }
+
+        /** Whether the fold turns the point half round (a half-turn edge); a quarter turn is not a flip. */
+        @Override
+        public boolean flipped(double x, double z) {
+            CubeLayout.PointOnFace p = cube().foldPoint(x, z);
+            return p != null && p.iso().k() == 2;
+        }
+
+        /**
+         * The block brought onto the planet ({@link CubeLayout#fold}): {x, z, quarter turns} (on a cube the
+         * third number counts quarter turns, not half-turns); a block past the net's corners is returned
+         * x-wrapped with 0.
+         */
+        @Override
+        public long[] foldCell(long bx, long bz) {
+            CubeLayout.Fold f = cube().fold(bx, bz);
+            if (f instanceof CubeLayout.Outside o)
+                return new long[]{o.x(), o.z(), o.iso().k()};
+            return new long[]{cube().wrapX(bx), bz, 0};
+        }
+
+        @Override
+        public double[] unit(double x, double z) {
+            double[] v = world.unit(x, z);
+            return v == null ? new double[]{Double.NaN, Double.NaN, Double.NaN} : v;
+        }
+
+        @Override
+        public double[] latLon(double x, double z) {
+            double[] ll = world.latLon(x, z);
+            return ll == null ? new double[]{Double.NaN, Double.NaN} : ll;
+        }
+
+        @Override
+        public double[] blockOf(double latDeg, double lonDeg) {
+            return world.pointOfLatLon(latDeg, lonDeg);
+        }
+
+        @Override
+        public GridDesc grid(String name, int r) {
+            return GridDesc.forCube(name, side(), r);
+        }
+
+        @Override
+        public long indexOriginBlockX() {
+            return -3 * side() / 2;
+        }
+
+        @Override
+        public long indexOriginBlockZ() {
+            return -3 * side() / 2;
+        }
+
+        @Override
+        public long indexSpanBlockZ() {
+            return 3 * side();
+        }
+
+        /** Geographic north through the map's Jacobian and the fold's turn ({@link CubeWorld#north}); (0, −1) past the corners. */
+        @Override
+        public double[] north(double x, double z) {
+            double[] n = world.north(x, z);
+            return n == null ? new double[]{0.0, -1.0} : n;
+        }
     }
 
     /** Lambert's cylindrical equal-area world of circumference C ({@link Projection}'s formulas). */

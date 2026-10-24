@@ -576,6 +576,16 @@ public final class CubeLayout {
         return new CubeLayout(s);
     }
 
+    private static final java.util.concurrent.ConcurrentHashMap<Long, CubeLayout> SHARED = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** The net of face side {@code s}, one per side for the process's life (Rust {@code Cube::shared}). */
+    public static CubeLayout shared(long s) {
+        CubeLayout c = SHARED.get(s);
+        if (c != null)
+            return c;
+        return SHARED.computeIfAbsent(s, k -> of(Math.toIntExact(k)));
+    }
+
     /** The net for a planet {@code circumference} blocks round ({@link #faceFor}). */
     public static CubeLayout forCircumference(int circumference) {
         return of(faceFor(circumference));

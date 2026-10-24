@@ -402,17 +402,26 @@ public final class FirstStartGenerator {
 
     /** The built-in level type of a world shape (x period and projection). */
     static String levelTypeFor(int c, String projection) {
-        boolean lambert = "lambert".equals(projection);
+        String base = switch (projection) {
+            case "lambert" -> "deeptime:planet_lambert";
+            case "cube" -> "deeptime:planet_cube";
+            default -> "deeptime:planet";
+        };
         if (c == Presets.worldCircumference(16_384, projection))
-            return lambert ? "deeptime:planet_lambert" : "deeptime:planet";
+            return base;
         if (c == Presets.worldCircumference(32_768, projection))
-            return lambert ? "deeptime:planet_lambert_32k" : "deeptime:planet_32k";
+            return base + "_32k";
         return "a Deep Time world preset with circumference_blocks " + c + " and projection " + projection;
     }
 
-    /** "13,312-block Petroff–Guyou world" / "16,384-block Lambert world". */
+    /** "13,312-block Petroff–Guyou world" / "16,384-block Lambert world" / "15,360-block cube world". */
     static String describe(int c, String projection) {
-        return String.format(Locale.ROOT, "%,d-block %s world", c, "lambert".equals(projection) ? "Lambert" : "Petroff–Guyou");
+        String map = switch (projection) {
+            case "lambert" -> "Lambert";
+            case "cube" -> "cube";
+            default -> "Petroff–Guyou";
+        };
+        return String.format(Locale.ROOT, "%,d-block %s world", c, map);
     }
 
     private static String presetsFor(int c, String projection) {

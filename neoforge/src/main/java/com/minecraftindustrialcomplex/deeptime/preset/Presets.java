@@ -90,7 +90,7 @@ public final class Presets {
 
         /**
          * The world's x period in blocks, what the level type's {@code circumference_blocks} and Toroidal
-         * World's loop hold: C on a Lambert world, 2b on a Petroff–Guyou one (Rust
+         * World's loop hold: C on a Lambert world, 2b on a Petroff–Guyou one, 4s on a cube (Rust
          * {@code ScaleParams::world_circumference}); empty when the preset names no circumference.
          */
         public OptionalInt worldCircumference() {
@@ -101,10 +101,17 @@ public final class Presets {
     /** The preset's default projection (Rust {@code ProjectionKind::default}; Ben, decisions log 2026-10-04). */
     public static final String DEFAULT_PROJECTION = "petroff_guyou";
 
-    /** The world's x period for a simulation circumference C and a projection (see {@link Info#worldCircumference}). */
+    /**
+     * The world's x period for a simulation circumference C and a projection (see {@link Info#worldCircumference}):
+     * C on Lambert, 2b on Petroff–Guyou, 4s on the cube (s = {@code face_for(C)}, Rust
+     * {@code ScaleParams::world_circumference}).
+     */
     public static int worldCircumference(int c, String projection) {
-        return "lambert".equals(projection) ? c
-                : 2 * com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou.hemisphereFor(c);
+        if ("lambert".equals(projection))
+            return c;
+        if ("cube".equals(projection))
+            return 4 * com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout.faceFor(c);
+        return 2 * com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou.hemisphereFor(c);
     }
 
     /** A resolved preset argument: where it came from, and its JSON. */

@@ -50,8 +50,20 @@ class WorldDataTest {
                 .replace("\"format_version\": \"" + FormatVersion.CURRENT + "\"", "\"format_version\": \"0.9\"");
         Files.writeString(manifest, text);
         WorldDataException e = assertThrows(WorldDataException.class, () -> WorldData.open(w));
-        assertEquals("world data 0.9, this Deep Time reads " + FormatVersion.CURRENT
+        assertEquals("world data 0.9, this Deep Time reads 0.6 (polar worlds) and 0.7 (cube worlds)"
                 + "; before 1.0 worlds are not migrated", e.getMessage());
+    }
+
+    /** A polar world that says 0.7 is refused: only a cube world is 0.7 (Rust {@code Manifest::read}). */
+    @Test
+    void refusesAPolarWorldThatSaysTheCubesVersion(@TempDir Path tmp) throws IOException {
+        Path w = copyWorld(tmp.resolve("w"));
+        Path manifest = w.resolve(Manifest.FILE);
+        String text = Files.readString(manifest)
+                .replace("\"format_version\": \"" + FormatVersion.CURRENT + "\"", "\"format_version\": \"" + FormatVersion.CUBE + "\"");
+        Files.writeString(manifest, text);
+        WorldDataException e = assertThrows(WorldDataException.class, () -> WorldData.open(w));
+        assertTrue(e.getMessage().contains("format_version 0.7 on a lambert world, which is 0.6"), e.getMessage());
     }
 
     @Test

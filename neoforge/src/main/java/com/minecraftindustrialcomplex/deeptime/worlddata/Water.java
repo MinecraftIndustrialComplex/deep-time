@@ -140,6 +140,34 @@ public final class Water {
         if (!Double.isNaN(own) || reach <= 0)
             return own;
         GridDesc g = levels.desc().grid();
+        if (g.isCube()) {
+            // On the block centre's face, the cells round it read across the seams, each at its distance from the
+            // block centre (Rust water_level_at's cube branch, the same operations).
+            GridDesc.CubeSpot s = g.cubeSpotOfBlock((double) x, (double) z);
+            if (s == null)
+                return Double.NaN;
+            double rr = g.r();
+            double span = (double) reach / rr;
+            long ci0 = (long) Math.floor(s.a() - span), ci1 = (long) Math.ceil(s.a() + span);
+            long cj0 = (long) Math.floor(s.b() - span), cj1 = (long) Math.ceil(s.b() + span);
+            double best = Double.NaN;
+            double bestD2 = (double) ((long) reach * reach + 1);
+            for (long i = ci0; i <= ci1; i++) {
+                double dx = ((double) i - s.a()) * rr;
+                for (long j = cj0; j <= cj1; j++) {
+                    double dz = ((double) j - s.b()) * rr;
+                    double d2 = dx * dx + dz * dz;
+                    if (d2 >= bestD2)
+                        continue;
+                    double v = levels.getFace(s.face(), i, j);
+                    if (!Double.isNaN(v)) {
+                        best = v;
+                        bestD2 = d2;
+                    }
+                }
+            }
+            return best;
+        }
         int r = g.r();
         long i0 = Math.floorDiv(x - reach - g.originBlockX(), r), i1 = Math.floorDiv(x + reach - g.originBlockX(), r) + 1;
         long j0 = Math.floorDiv(z - reach - g.originBlockZ(), r), j1 = Math.floorDiv(z + reach - g.originBlockZ(), r) + 1;

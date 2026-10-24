@@ -38,7 +38,9 @@
 #                  runs the simulation on N - 1 of them, as on a player's 8-core machine
 #   --prop K=V     a ScreenshotDriver property for the main pass (repeatable), as
 #                  -Ddeeptime.dev.screenshots.K=V: preset=<built-in family>, start=<start>,
-#                  length=<Myr>, layers=<a,b,...>, vista=x,y,z,yaw,pitch[;...]
+#                  length=<Myr>, layers=<a,b,...>, vista=x,y,z,yaw,pitch[;...],
+#                  worldtype=<preset id> (e.g. deeptime:planet_cube), projection=<id>
+#                  (lower-case names; values may hold a colon)
 #
 # The whole client run is one job of the VM's admission tool (kind client:editor, a server job: it
 # gets its own X display; the integrated server binds no port). The Gradle step before it is its own
@@ -65,7 +67,7 @@ while [ $# -gt 0 ]; do
         --rock-tags) ROCK_TAGS="$2"; shift 2 ;;
         --timeout) TIMEOUT="$2"; shift 2 ;;
         --threads) THREADS="$2"; shift 2 ;;
-        --prop) [[ "$2" =~ ^[a-z]+=[-0-9.,\;a-z_/]+$ ]] || { echo "vm-client: bad --prop $2" >&2; exit 2; }
+        --prop) [[ "$2" =~ ^[a-z]+=[-0-9.,\;:a-z_/]+$ ]] || { echo "vm-client: bad --prop $2" >&2; exit 2; }
                 PROPS+=("-Ddeeptime.dev.screenshots.$2"); shift 2 ;;
         -h|--help) sed -n '2,/^set -uo/p' "$0" | sed 's/^# \{0,1\}//' | sed '$d'; exit 0 ;;
         *) echo "vm-client: unknown argument $1 (see --help)" >&2; exit 2 ;;

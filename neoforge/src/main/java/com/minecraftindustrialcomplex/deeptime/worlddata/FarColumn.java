@@ -353,17 +353,28 @@ public final class FarColumn {
     /** The stack of the strata cell nearest block (wx, z), as stored (no blend between cells). */
     static void cellStack(RasterSampler strata, long wx, long z, Columns.Stack out) {
         GridDesc g = strata.desc().grid();
-        long i = (long) Math.floor((double) (wx - g.originBlockX()) / g.r() + 0.5);
-        long j = (long) Math.floor((double) (z - g.originBlockZ()) / g.r() + 0.5);
+        long cell;
+        if (g.isCube()) {
+            // The cell under the block's centre on its face (RasterSampler.nearest's cell).
+            GridDesc.CubeSpot s = g.cubeSpotOfBlock((double) wx, (double) z);
+            out.count = 0;
+            if (s == null)
+                return;
+            cell = g.faceCell(s.face(), (long) Math.floor(s.a() + 0.5), (long) Math.floor(s.b() + 0.5));
+        } else {
+            long i = (long) Math.floor((double) (wx - g.originBlockX()) / g.r() + 0.5);
+            long j = (long) Math.floor((double) (z - g.originBlockZ()) / g.r() + 0.5);
+            cell = g.cell(i, j);
+        }
         double scale = strata.desc().scale(), offset = strata.desc().offset();
         out.count = 0;
         int k = strata.stackDepth();
         for (int h = 0; h < k; h++) {
-            int cls = strata.horizonClass(i, j, h);
-            short top = strata.horizonTopRaw(i, j, h);
+            int cls = strata.horizonClassAt(cell, h);
+            short top = strata.horizonTopRawAt(cell, h);
             if (cls == 255 || top == Short.MIN_VALUE)
                 break;
-            out.emit(top * scale + offset, cls, strata.horizonKeyTop(i, j, h));
+            out.emit(top * scale + offset, cls, strata.horizonKeyTopAt(cell, h));
         }
     }
 
