@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.gametest;
 
 import com.minecraftindustrialcomplex.deeptime.climate.VolcanicBiomes;
+import com.minecraftindustrialcomplex.deeptime.compat.terrablender.RegionTrees;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.RegionSource;
 import com.minecraftindustrialcomplex.deeptime.worldgen.RegionSpawnTarget;
@@ -27,12 +28,32 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * The TerraBlender half of {@code TerraBlenderGameTests.regionsFollowProvinces}: it names
- * TerraBlender's classes, so the holder calls it only when TerraBlender is installed.
+ * The TerraBlender half of {@code TerraBlenderGameTests.regionsFollowProvinces} and of
+ * {@code RiverGameTests.riverBiomes}: it names TerraBlender's classes, so the holders call it only
+ * when TerraBlender is installed.
  */
 final class TerraBlenderChecks {
 
     private TerraBlenderChecks() {}
+
+    /** A column's TerraBlender region (−1 where the level has no province source) and vanilla's region 0 biome there. */
+    record RegionBiome(int region, Holder<Biome> vanilla) {}
+
+    /**
+     * For {@code RiverGameTests.riverBiomes}: the region of block column (x, z) and the biome vanilla's
+     * region 0 places at the climate point of block (x, y, z), so a channel whose region paints the valley
+     * slice with its own biome can be told from one the slice does not reach.
+     */
+    static RegionBiome vanillaRegionBiome(ServerLevel level, int x, int y, int z) {
+        var sampler = level.getChunkSource().randomState().sampler();
+        MultiNoiseBiomeSource biomeSource = (MultiNoiseBiomeSource) level.getChunkSource().getGenerator().getBiomeSource();
+        int region = sampler.spawnTarget() instanceof RegionSpawnTarget m && m.source().isPresent() ? m.source().get().regionAt(x, z) : -1;
+        var target = sampler.sample(QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z));
+        Holder<Biome> vanilla = RegionTrees.ready(biomeSource.parameters())
+                ? RegionTrees.find(biomeSource.parameters(), RegionSource.DEFAULT_REGION, target)
+                : biomeSource.parameters().findValue(target);
+        return new RegionBiome(region, vanilla);
+    }
 
     /** What one run over a level found. */
     record Result(int samples, int provincesSeen, int regionsSeen, int outsideItsRegion, int perProvinceMismatch,
