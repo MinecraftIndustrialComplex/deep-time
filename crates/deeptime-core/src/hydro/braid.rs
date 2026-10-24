@@ -96,12 +96,18 @@ struct Pt {
     q: f64,
 }
 
-/// One island: its chain's vertex span [a, b], its side (+1 left of the course), and the new
-/// thread's vertices.
+/// One island: its chain's vertex span [a, b], how far each vertex inside it is along the island
+/// (0 to 1), and the new thread's vertices.
 struct Island {
     a: usize,
     b: usize,
+    along: Vec<f64>,
     thread: Vec<RiverVertex>,
+}
+
+/// The island's lens across at `f` of its length: 0 at its ends, 1 at its middle.
+fn lens(f: f64) -> f64 {
+    (std::f64::consts::PI * f.clamp(0.0, 1.0)).sin()
 }
 
 #[derive(Default, Clone)]
@@ -169,9 +175,12 @@ impl Net<'_> {
         (self.inp.fan)(x, z) || (self.inp.plain)(x, z).is_some_and(|lv| lv >= flush_level(w))
     }
 
-    /// Whether (x, z) lies in the channel or bank zone of another chain, or of chain `own`'s
-    /// segments outside the vertex span [lo, hi) (grid distance, as the index is built).
-    fn blocked(&self, own: u32, lo: usize, hi: usize, x: f64, z: f64) -> bool {
+    /// Whether (x, z), `t` blocks across the course of chain `own` (vertices from `first`, their
+    /// distances down it `u`) from its point at distance `s`, lies in the channel or bank zone of
+    /// another chain, or of the course itself where it comes back (a segment further along it
+    /// than the probe is across it plus its reach; grid distance, as the index is built).
+    #[allow(clippy::too_many_arguments)]
+    fn blocked(&self, own: u32, first: usize, u: &[f64], s: f64, t: f64, x: f64, z: f64) -> bool {
         let r = self.r;
         let (xi, zi) = (x.round() as i64, z.round() as i64);
         let ci = i64::from(r.c);
@@ -182,21 +191,26 @@ impl Net<'_> {
             if k == u32::MAX || self.chain_of.get(su + 1) != Some(&k) {
                 continue;
             }
-            if k == own && (lo..hi).contains(&su) {
-                continue;
-            }
             let (a, b) = (&r.vertices[su], &r.vertices[su + 1]);
+            let reach = r.reach_of(f64::from(a.hw.max(b.hw)));
+            if k == own {
+                let i = su - first;
+                let (u0, u1) = (u[i], u[i + 1]);
+                if (0.5 * (u0 + u1) - s).abs() <= t + reach + 0.5 * (u1 - u0) {
+                    continue;
+                }
+            }
             let (ax, az) = (f64::from(a.x), f64::from(a.z));
             let px = ax + self.dx(ax, x);
             let (ex, ez) = (f64::from(b.x) - ax, f64::from(b.z) - az);
             let l2 = ex * ex + ez * ez;
-            let t = if l2 > 0.0 {
+            let f = if l2 > 0.0 {
                 (((px - ax) * ex + (z - az) * ez) / l2).clamp(0.0, 1.0)
             } else {
                 0.0
             };
-            let d = (px - ax - t * ex).hypot(z - az - t * ez);
-            if d <= r.reach_of(f64::from(a.hw.max(b.hw))) {
+            let d = (px - ax - f * ex).hypot(z - az - f * ez);
+            if d <= reach {
                 return true;
             }
         }
@@ -329,7 +343,13 @@ impl Net<'_> {
                             tally.braided_fan += ub - ua;
                         }
                         tally.by_q[q_class(p.q)][1] += ub - ua;
-                        islands.push(Island { a, b, thread });
+                        let along = (a + 1..b).map(|i| (u[i] - ua) / (ub - ua)).collect();
+                        islands.push(Island {
+                            a,
+                            b,
+                            along,
+                            thread,
+                        });
                         side = -sg;
                         s = ub;
                     }
@@ -359,7 +379,7 @@ impl Net<'_> {
         sg: f64,
     ) -> Option<Vec<RiverVertex>> {
         let len = ub - ua;
-        let span = |s: f64| (std::f64::consts::PI * ((s - ua) / len).clamp(0.0, 1.0)).sin();
+        let span = |s: f64| lens((s - ua) / len);
         let tangent = |s: f64| -> (f64, f64) {
             let h = (0.25 * len).max(STEP);
             let (p0, p1) = (
@@ -371,8 +391,6 @@ impl Net<'_> {
             let l = te.hypot(ts).max(1e-9);
             (te / l, ts / l)
         };
-        let lo = first + a.saturating_sub(1);
-        let hi = first + (b + 1).min(v.len() - 1);
         let steps = (len / STEP).ceil().max(2.0) as usize;
         let mut out: Vec<RiverVertex> = Vec::with_capacity(steps + 1);
         let mut prev_dir: Option<(f64, f64)> = None;
@@ -397,7 +415,7 @@ impl Net<'_> {
                     if t <= reach && !self.room(x, z, p.w) {
                         return None;
                     }
-                    if self.blocked(own, lo, hi, x, z) {
+                    if self.blocked(own, first, u, s, t, x, z) {
                         return None;
                     }
                     t += STEP;
@@ -481,18 +499,14 @@ pub fn apply(rivers: &mut Rivers, inp: &Input<'_>) -> Value {
         total.add(&tally);
         let first = rivers.chains[k].first as usize;
         for isl in islands {
-            // The course narrows and shallows around the island.
-            let (ua, ub) = {
-                let (pa, pb) = (&rivers.vertices[first + isl.a], &rivers.vertices[first + isl.b]);
-                (*pa, *pb)
-            };
-            let _ = (ua, ub);
-            let n = isl.b - isl.a;
-            for i in 1..n {
-                let f = (std::f64::consts::PI * i as f64 / n as f64).sin();
-                let vtx = &mut rivers.vertices[first + isl.a + i];
+            // The course narrows and shallows around the island, and carries the other share of
+            // the flow.
+            for (i, &al) in isl.along.iter().enumerate() {
+                let f = lens(al);
+                let vtx = &mut rivers.vertices[first + isl.a + 1 + i];
                 vtx.hw = (f64::from(vtx.hw) * (1.0 - (1.0 - THREAD_WIDTH_SHARE) * f)) as f32;
                 vtx.depth = (f64::from(vtx.depth) * (1.0 - (1.0 - THREAD_DEPTH_SHARE) * f)) as f32;
+                vtx.q = (f64::from(vtx.q) * (1.0 - THREAD_Q_SHARE)) as f32;
             }
             let start = rivers.vertices.len() as u32;
             let count = isl.thread.len() as u32;

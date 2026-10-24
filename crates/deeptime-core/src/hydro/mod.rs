@@ -59,12 +59,18 @@
 //!
 //! What the game does with it is `deeptime_format::water` (and FORMAT.md, "Water columns").
 
+pub mod braid;
 pub mod delta;
+pub mod fan;
 pub mod meander;
 pub mod network;
 
 #[cfg(test)]
+mod braid_tests;
+#[cfg(test)]
 mod delta_tests;
+#[cfg(test)]
+mod fan_tests;
 #[cfg(test)]
 mod floodplain_tests;
 #[cfg(test)]
@@ -594,6 +600,14 @@ pub struct HydroParams {
     /// on a plain, not steep enough to braid, winds across it as a sine-generated curve of
     /// wavelength 10.9 channel widths, as far as the plain's room allows. Needs `floodplains`.
     pub meanders: bool,
+    /// Alluvial fans ([`fan`], HYD-165 to HYD-170; V1 gap 5, stage 4): where a river leaves
+    /// ground steeper than its fan for gentler, a cone of Bull's (1964) area and slope for its
+    /// drainage area, as far as the ground around lets it spread.
+    pub fans: bool,
+    /// Braided reaches ([`braid`], HYD-171 to HYD-175; V1 gap 5, stage 4): a river on a fan, or
+    /// on a floodplain and steeper than Leopold & Wolman's braided line, divides around islands
+    /// into two threads.
+    pub braids: bool,
 }
 
 impl Default for HydroParams {
@@ -629,6 +643,8 @@ impl Default for HydroParams {
             delta_mouth_spacing: 2.0, // ledger: HYD-138
             floodplains: true,
             meanders: true,
+            fans: true,
+            braids: true,
         }
     }
 }
