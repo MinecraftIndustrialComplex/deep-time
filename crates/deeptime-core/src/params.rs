@@ -871,6 +871,14 @@ pub struct TectonicParams {
     /// 20 is the default (since 2026-10-23). game-choice (agent 2026-10-23), as
     /// `rift_stress_mpa`. ledger: PLT-505
     pub initiation_stress_mpa: f64,
+    /// Transference (V1 item 1, the docking lane's stage T; Stern 2004): a continent in a
+    /// collision whose slab has broken off, and on which its plate has gone on converging for the
+    /// critical convergence since, moves alone to the overriding plate once the collision's force
+    /// over its margin against its own plate's ocean floor reaches the force that starts a new
+    /// subduction zone there (Gurnis et al. 2004). Off, such a continent waits for its collision
+    /// to stall and then welds its whole plate (PLT-078, PLT-246). `collision::transference_due`.
+    /// ledger: PLT-516
+    pub transference: bool,
     /// Contacts unseen for longer than this are closed, Myr (12 steps at the 2-Myr step).
     /// Ledger PLT-059.
     pub contact_timeout_myr: f64,
@@ -1026,6 +1034,7 @@ impl Default for TectonicParams {
             initiation_slab_km: 150.0,            // ledger: PLT-270
             subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
+            transference: false,         // ledger: PLT-516
             contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
