@@ -14,8 +14,9 @@ import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
  * The one-click Create World flow (Ben, 2026-10-19: "it should default to deeptime, you click
  * create"; docs/design/create-world-ux.md), called from {@code mixin.client.CreateWorldScreenMixin}:
  * <ol>
- *   <li>{@link #fresh}: a new Create World screen starts on {@code deeptime:planet} (the client
- *       setting {@code defaultWorldType}, on by default), unless the natives did not load here, in
+ *   <li>{@link #fresh}: a new Create World screen starts on {@code deeptime:planet_cube} (the cube is the
+ *       only world shape that ships, decisions log 2026-10-24; the client setting {@code defaultWorldType},
+ *       on by default), unless the natives did not load here, in
  *       which case the game's own default stays so Create still works.</li>
  *   <li>{@link #interceptCreate}: Create on a Deep Time world that has no world data yet opens the
  *       generation screen, which simulates the planet with the default settings at once; its Play
@@ -33,10 +34,10 @@ public final class CreateWorldFlow {
             return;
         WorldCreationUiState ui = screen.getUiState();
         ui.getNormalPresetList().stream()
-                .filter(e -> e.preset() != null && e.preset().is(PlanetGenerators.PLANET))
+                .filter(e -> e.preset() != null && e.preset().is(PlanetGenerators.PLANET_CUBE))
                 .findFirst()
                 .ifPresentOrElse(ui::setWorldType,
-                        () -> DeepTime.LOGGER.warn("Deep Time: deeptime:planet is not among the world types; Create World keeps the game's default"));
+                        () -> DeepTime.LOGGER.warn("Deep Time: deeptime:planet_cube is not among the world types; Create World keeps the game's default"));
     }
 
     /**
