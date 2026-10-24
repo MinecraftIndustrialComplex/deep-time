@@ -826,8 +826,10 @@ pub struct TectonicParams {
     /// on the boundary's normal (PLT-310), which along a front sum to its length with the
     /// lattice's zigzag taken out, as a collision front's length is measured (PLT-222). The
     /// per-km rates of the fronts (subduction erosion, PLT-441; the trench's retreat, PLT-522)
-    /// and the fronts' km × Myr globals then meet their sources per km. Off, each front sample
-    /// counts one lattice spacing, which counts a straight front about 1.04 times. ledger: PLT-530
+    /// and the fronts' km × Myr globals then meet their sources per km. On by default since
+    /// 2026-10-24 (arm fl-share against base3: no guard failure, the plate check 210 passes
+    /// against 207). Off, each front sample counts one lattice spacing, which counts a straight
+    /// front about 1.04 times and the model's own fronts 1.32 times. ledger: PLT-530
     pub front_share: bool,
     /// Hotspots at the start.
     pub hotspots_initial: u32,
@@ -1032,7 +1034,7 @@ impl Default for TectonicParams {
             subduction_erosion_min_mm_yr: 60.0, // ledger: PLT-442
             subduction_erosion_max_sediment_m: 1000.0, // ledger: PLT-442
             erosion_retreat: false,          // ledger: PLT-523
-            front_share: false,              // ledger: PLT-530
+            front_share: true,               // ledger: PLT-530
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
