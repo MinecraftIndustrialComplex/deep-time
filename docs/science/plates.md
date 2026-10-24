@@ -6218,3 +6218,149 @@ land gain) and one plate holds over half the planet in 16.5 % of the steps, and 
 master would move every GameTest planet and every deployed world for the other lanes. So
 `tectonics.transference` stays off by default (off is bit-identical to base3) until it can go
 on together with the sink of continental area it exposes; that sink is this lane's next stage.
+
+### What transference exposes: the crust's fluxes against Earth's (2026-10-23)
+
+The coordinator's next question for this lane: under transference the continental crust grows
+from 0.42 of the planet to 0.57 and the sea stands 1,729 m over the datum at the end (base3
+830 m); which of the model's fluxes are off Earth's, in area as well as in volume, and why does
+one plate grow past half the planet? The numbers are the crust budget's
+(`DEEPTIME_CRUST_BUDGET`, `crust_budget.rs`) over arm `dock-T`'s 8 runs and `dock-c3`'s (base3's
+own seeds 1 to 4, both starts): means of the runs for a flux, medians for a share. Earth's are
+the sources' (the bibliography has what was read).
+
+**The course.** The area does not run away; it moves to a new level early and holds there. The
+medians of dock-T's runs: continental share 0.422 at the start, 0.503 after 300 Myr, 0.548 after
+500, then 0.565 to 0.589 to the end (base3 0.418 to 0.453 throughout). The volume grows steadily,
+7.56 to 9.41 to 11.44 (10^9 km3) at the same times, the mean crust from 35.1 to 39.6 km; the sea
+over the datum 0, 1,190, 1,730 m. At the end 0.644 of the continental area is 40 to 45 km thick,
+its median 1,536 m over the datum and 0.18 of it dry: the continents are thick enough, the sea
+stands over them because the ocean basins are 0.43 of the planet instead of 0.58.
+
+**Volume** (km3 a year over the 1000 Myr; Earth: Stern & Scholl 2010 Table 1):
+
+| flux | dock-c3 | dock-T | Earth |
+|---|---|---|---|
+| added: island arcs | 3.82 | 3.38 | 1.5 |
+| added: continental arcs | 1.66 | 1.71 | 1.0 |
+| added: at sutures | 0 | 0 | 0.2 |
+| added: rifts, hotspots, rifted margins | 0.04 | 0.04 | 0.5 |
+| lost: sediment subduction (PLT-440) | 1.19 | 1.00 | 1.1 |
+| lost: subduction erosion (PLT-441) | 0.89 | 0.83 | 1.4 |
+| of it continental crust | 0.30 | 0.32 | |
+| lost: at sutures, all three (PLT-242, the belts' room) | 2.18 | 0.86 | 0.7 |
+| lost: foundering | 0.00 | 0.00 | unknown |
+| the stock's change, every process | +0.27 | +3.99 | 0, or a loss |
+
+The model's own rows: the ocean floor's crust made continental 0.16 and 0.12, pelagic sediment
+1.35 and 1.11, the resampling's drops 0.55 and 0.55, and the surface stage's move off the
+continents 11.56 and 6.74. What is off:
+
+- Sediment subduction is Earth's in both arms, and so is the loss at sutures under T (0.86
+  against 0.7). Base3's 2.18 was three times Earth's: the long collisions closed its book.
+- The arcs add 1.7 to 2.5 times Earth's, and not by their rate: per geodesic km of front (the
+  lattice front over 1.84, `measure_boundary.py`) island arcs add about 130 km3/km/Myr against
+  Stern & Scholl's 100 (Clift et al. 2009: 125), continental arcs about 29 against 35. The
+  fronts are long: 47,823 and 107,334 lattice km under T, about 26,000 and 58,000 geodesic km,
+  against Earth's 14,500 and 27,500. The plate check's subducting share of the boundary is 36.6 %
+  (dock-c3 33.8 %) against Bird 2003's 19.7 % and fails in every run of both arms: the arcs'
+  surplus is the subduction zones' length, gap 2's boundary organisation
+  (`physics-gap-audit.md`), with or without T. Base3 hid it under the excess loss at sutures;
+  under T nothing offsets it, so the volume grows by about 4 km3 a year and the crust thickens.
+- Subduction erosion takes 0.6 of Earth's, for two reasons. Its erosive fronts are 16,888 lattice
+  km (about 9,200 geodesic) against Clift & Vannucchi's 22,925, because few slabs come in at the
+  60 mm/yr PLT-442 asks for (the plates' area-weighted RMS speed is about 29 mm/yr, the plate
+  check's band 40 to 100, failing in both arms). And the band runs out: PLT-441 takes its volume
+  from the samples within 200 km of the front, nearest first, each down to an ocean floor's
+  7 km, and the front stays where it is in the overriding plate's frame, so a margin that erodes
+  for long has nothing left to give (`short`).
+- Foundering is 0, and delaminating a lower crust takes it from below, so it would make or
+  consume no area on Earth either; it is not in the area book.
+- The volume grows faster under T because the drowned continents erode less (6.74 against
+  11.56 moved off them) while the arcs add as before: it follows the area.
+
+**Area** (continental crust, share of the planet over the run, medians; times 0.51 for km2 a
+year: a share over 1000 Myr of the planet's 510 million km2):
+
+| part (`cb_parts`) | base3 | dock-T | dock-T, km2 a year |
+|---|---|---|---|
+| made: arcs maturing (`finish`, PLT-047) | 0.587 | 0.515 | 0.26 |
+| made: collapse | 0.415 | 0.146 | 0.074 |
+| made: founder | 0.141 | 0.033 | 0.017 |
+| made: rate | 0.107 | 0.057 | 0.029 |
+| consumed: hidden at the fronts (`subduction`) | 0.983 | 0.395 | 0.20 |
+| consumed: resampling | 0.306 | 0.192 | 0.098 |
+| net, every part | -0.019 | +0.149 | +0.076 |
+
+Earth's continental area fluxes, from the sources:
+
+- consumed by shortening at continental convergent boundaries: Bird 2003 Table 3's CCB, an
+  area production of 0.013616 m2/s, 0.43 km2 a year, on 23,003 km at 18.7 mm/yr across. That
+  is today, in the Tethys' closing; Stern & Scholl put today's suturing at 12,000 km against a
+  long-term 6,000.
+- made by extension at continental rift boundaries: Table 3's CRB, +0.011502 m2/s, +0.36 km2 a
+  year.
+- consumed by subduction erosion: the trench migrates inboard at about 2.5 km/Myr (Scholl & von
+  Huene 2010, 1 to 5), a median 3.0 on Clift & Vannucchi's erosive margins (Table 2, 0.9 to
+  4.7), so about 0.06 km2 a year on their 22,925 km.
+- consumed by the subduction of rifted margins in collisions: Clift et al. 2009's 0.43 km3 a
+  year at 18 km, about 0.024 km2 a year.
+
+So the model's book under T is 0.38 made against 0.30 consumed, Earth's (as far as these
+sources go) 0.36 by extension plus the arcs' against about 0.51. What is off:
+
+- Subduction erosion consumes no area. PLT-441 thins the forearc and never removes it
+  (`forearc` takes volume only; continental crust never turns oceanic, `c2o` 0 in every
+  process): about 0.06 km2 a year on Earth, none here. This is missing physics, the trench's
+  retreat.
+- The collision fronts consume 0.251 km2 a year under T (the area crossing them; dock-c3
+  0.585), against Bird's 0.43 for today and about half of it for a long-term suturing length.
+  Base3's was above Earth's; T's is near the long-term.
+- The arcs' maturing makes 0.26 km2 a year on fronts twice Earth's length, and extension
+  (collapse and the rate part, 0.10) makes less than Bird's CRB. The first is gap 2's again.
+
+**Why one plate grows past half the planet.** Under T one plate holds over half the planet in a
+median 16.5 % of the steps (8.6 to 26.8 by run; dock-c3 0 in 8 of 8; the plate check's band at
+most 10). At those steps its own crust is 0.679 continental (median) and it holds 0.730 of all
+the continental crust: it is the plate of an assembled supercontinent about 0.4 of the planet
+across. Base3's rare ones were the same (0.542 and 0.676). The rift hazard (PLT-083, gap 2's
+stress weights on) splits it as it should: its λ per 2-Myr step is a median 0.052, a rift in
+about 39 Myr, far from the λe^-λ roll-off; the 47 episodes above half last a median 14 Myr (p90
+70); the plate check counts 3 to 12 rifts of a plate above 40 % per run, after 20 to 63 Myr
+above it (medians by run), and 20 to 100 % of those rifts are still apart 50 Myr later. What
+regrows it is mostly the same lineage, by its ridges and the small plates absorbed into it, and
+in some episodes a docked continent of 20,000 to 40,000 samples. With continents 0.57 of the
+planet a broken supercontinent's pieces are big and few (`continent_pieces_p50` 3 to 4 against
+base3's 5 to 10), so they meet again soon. The megaplate follows from the area; breakup is not
+what is missing, and no rift law changes.
+
+**The plate check, dock-T against dock-c3** (runs passing of 8). Failing more under T, and
+following from the area or the sea: the arcs' continental heights (p50 7 to 0, p90 8 to 0;
+medians 1,494 to 608 m and 3,299 to 1,897 m: drowned), one plate above half (8 to 1), the
+highest continental share (1 to 0; 0.467 to 0.580), the largest land gain (4 to 0), the largest
+plate's median share (8 to 4), the plates above 5 % (8 to 5). Failing more and T's own, to be
+read again when the area is right: the collisions' convergence ratio after 20 Myr (7 to 3) and
+rifts welded back within 50 Myr (7 to 4). Passing more under T: the collision count and
+lengths, the lowest continental share, the slab-pulled plates' speeds. Failing in both: the
+subducting share, the active margins, the RMS speed, the supercontinent period, the wedge and
+the foredeep. This lane reads "the plate check passes" as: no judged measure passes in fewer
+runs than in dock-c3 (one run of noise allowed), with no guard step.
+
+**The stages.** Each behind a switch with unit tests against its sources, one cumulative 8-run
+arm with T on against dock-c3 per stage:
+
+1. **S1, the trench's retreat under subduction erosion.** An erosive margin truncates the
+   overriding plate: the front sample's whole column goes down and the sample leaves its plate,
+   so the front, the forearc and the arc move inboard. On Earth's numbers it is small for the
+   area: 2.5 km/Myr on the model's 9,200 geodesic km of erosive front is about 0.023 km2 a
+   year, a third of it under continental crust, against the +0.076 to close. It is the missing
+   physics all the same, and the arm says what it does to the arcs' maturing (an eroded
+   island-arc forearc no longer matures).
+2. What comes after S1 is decided on its arm: the collisional consumption (T ends a collision by
+   moving the subducting plate's whole connected continent onto the overriding plate, a median
+   5,528 samples, after which nothing shortens it, where India has gone on converging with Asia
+   for 50 Myr) or the arcs' maturing threshold against Earth's continental area per km3 of arc
+   crust.
+
+Not this lane's: the subduction zones' length and the plates' slowness (gap 2), the belts
+spreading inland (a later lane, the coordinator's call).
