@@ -2446,15 +2446,16 @@ fn a_front_of_known_length(
 /// change; plates.md, "Step 9"). The arcs make their crust over a band `arc_distance_km` behind
 /// the front (`w_arc_of`, PLT-045, a Gaussian of `arc_width_km` whose integral across the arc is
 /// √π · `arc_width_km`), on the lattice distance from the nearest front sample (`fronts_reach`).
-/// Past a front's end that distance runs round the end, so a front of length L would have a band
-/// of L + π · `arc_distance_km` (a quarter circle at each end, on the overriding side only), where
+/// Past a front's end that distance runs round the end, so a front of length L has a band of
+/// L + π · `arc_distance_km` (a quarter circle at each end, on the overriding side only), where
 /// Earth's arcs stop near the slab's edge. Fronts of 10 to 60 degrees of a great circle, on the
-/// equator and on a great circle tilted 60 degrees from it: the band against the straight front
-/// is a line, band = a + b · L. Its intercept `a` is the ends' part, its slope `b` the band per km
-/// along the front, which the lattice's distance sets: a path along the lattice's edges is longer
-/// than the straight line across the band (up to 2/√3 on a hexagonal lattice, by the edges'
-/// direction), so the band is narrower than its width and holds less than its length. Measured
-/// (2026-10-24, 40,000 samples): see plates.md, "Step 9".
+/// equator and on a great circle tilted 60 degrees from it: the band split at the meridians of
+/// the front's ends into the part along the front and the part past its ends. The ends' part is
+/// about the two quarter circles whatever the length; the part along the front is short of its
+/// length by the lattice's distance, which runs longer than the straight line across the band (up
+/// to 2/√3 on a hexagonal lattice, by the edges' direction, which turns along the Fibonacci
+/// lattice's spiral), so the band is narrower than its width. Measured (2026-10-24, 40,000
+/// samples): see plates.md, "Step 9".
 #[test]
 fn the_arcs_band_runs_round_a_fronts_ends() {
     let p = preset(40_000, 20.0, "supercontinent", 5);
@@ -2462,60 +2463,326 @@ fn the_arcs_band_runs_round_a_fronts_ends() {
     let env = stage.env(&p.tectonics, 1);
     let k = &p.tectonics;
     let wrap = std::f64::consts::PI * k.arc_distance_km;
+    let per_sample = env.norm.sample_area_km2() / (std::f64::consts::PI.sqrt() * k.arc_width_km);
     for (name, frame) in [
         ("equator", glam::DQuat::IDENTITY),
         ("tilted", glam::DQuat::from_rotation_y(60f64.to_radians())),
     ] {
-        let mut rows = Vec::new();
+        let to_frame = frame.inverse();
         for lon_deg in [10.0_f64, 20.0, 40.0, 60.0] {
             let (mut st, geo, pos) =
                 a_front_of_known_length(&p, &env, frame, lon_deg, 15.0, 0.02, 50.0);
             let length = env.norm.km(lon_deg.to_radians());
+            // The band by where it lies: between the meridians of the front's ends, or past them.
+            let begun = subduction::fronts_begin(&st, &geo, &pos, &env);
+            let (dist, _, reached) = subduction::fronts_reach(&geo, &begun, &env);
+            let (mut along, mut ends) = (0.0, 0.0);
+            for &i in &reached {
+                let i = i as usize;
+                if !dist[i].is_finite() || st.samples[i].is_hidden() {
+                    continue;
+                }
+                let w = subduction::w_arc_of(env.norm.km(dist[i]), k) * per_sample;
+                let x = to_frame * pos[i];
+                let lon = x.y.atan2(x.x).to_degrees();
+                if (0.0..=lon_deg).contains(&lon) {
+                    along += w;
+                } else {
+                    ends += w;
+                }
+            }
             let mut cones = vec![[0.0; 2]; st.samples.len()];
             let pull = subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
             let straight = pull.front_straight_km_myr / env.dt_myr;
             let band = pull.arc_band_km_myr / env.dt_myr;
             eprintln!(
                 "{name}, front of {lon_deg} degrees, {length:.0} km: straight {straight:.0} km \
-                 ({:.3}), band {band:.0} km ({:.3} of the straight front)",
+                 ({:.3}), band {band:.0} km ({:.3} of the straight front): along the front \
+                 {along:.0} km ({:.3} of the straight front), past its ends {ends:.0} km ({:.2} \
+                 of pi times the arc's distance)",
                 straight / length,
                 band / straight,
+                along / straight,
+                ends / wrap,
             );
             assert!(
                 (straight / length - 1.0).abs() < 0.05,
                 "{name}: the straight front {straight:.0} km of {length:.0}"
             );
-            rows.push((straight, band));
+            // The split is the measure's band.
+            assert!(
+                ((along + ends) / band - 1.0).abs() < 0.01,
+                "{name}, {lon_deg} degrees: {along:.0} + {ends:.0} km against {band:.0}"
+            );
+            // Past the ends: about the two quarter circles, at any length.
+            assert!(
+                (0.6..1.2).contains(&(ends / wrap)),
+                "{name}, {lon_deg} degrees: past the ends {ends:.0} km"
+            );
+            // Along the front: no more than its length, and no less than a hexagonal lattice's
+            // longest path across allows.
+            assert!(
+                (0.8..1.03).contains(&(along / straight)),
+                "{name}, {lon_deg} degrees: along the front {along:.0} km"
+            );
         }
-        // Least squares: band = a + b · straight.
-        let m = rows.len() as f64;
-        let (sx, sy) = rows
-            .iter()
-            .fold((0.0, 0.0), |(a, b), &(x, y)| (a + x / m, b + y / m));
-        let (cov, var) = rows.iter().fold((0.0, 0.0), |(c, v), &(x, y)| {
-            (c + (x - sx) * (y - sy), v + (x - sx).powi(2))
-        });
-        let b = cov / var;
-        let a = sy - b * sx;
-        let worst = rows
-            .iter()
-            .map(|&(x, y)| (y - a - b * x).abs())
-            .fold(0.0_f64, f64::max);
-        eprintln!(
-            "{name}: band = {a:.0} km + {b:.3} L ({:.2} of pi times the arc's distance at the \
-             ends; the lattice's distance {:.3} times the straight one across the band); worst \
-             residual {worst:.0} km",
-            a / wrap,
-            1.0 / b
-        );
-        // A line: the ends and a rate along the front, nothing else.
-        assert!(worst < 0.15 * wrap, "{name}: {rows:?}");
-        // The ends: about the two quarter circles.
-        assert!((0.6..1.3).contains(&(a / wrap)), "{name}: ends {a:.0} km");
-        // Along the front: no more than its length, and no less than a hexagonal lattice's
-        // longest path across allows.
-        assert!((0.85..1.01).contains(&b), "{name}: {b:.3} per km");
     }
+}
+
+/// The slab pull at the arcs' fronts (`tectonics.front_pull`, PLT-560; plates.md, "Step 9"), on
+/// [`a_front_of_known_length`]'s front of 40 degrees, plate 1 converging at 50 mm/yr at an angle
+/// θ to the front's normal. On, a full-length slab's pull has the torque of the reference pull
+/// per metre (FRC-002, by the slab's age, FRC-004) over the front's straight length along its
+/// normal, whatever θ while the plates converge beyond Bird's 20 degrees of a transform (PLT-311),
+/// and a slab grows from nothing by the convergence along the normal; at θ = 80 and 90 degrees no
+/// slab forms. Off (the old law), the pull follows each sample's fastest-converging lattice edge,
+/// one spacing per sample, the slab grows by the convergence along that edge, and a transform's
+/// zigzag still feeds a slab.
+#[test]
+fn the_slab_pull_takes_the_arcs_fronts_along_their_normal() {
+    let lon_deg = 40.0_f64;
+    let half = 0.5 * lon_deg.to_radians();
+    let thetas = [0.0_f64, 45.0, 60.0, 80.0, 90.0];
+    for (name, frame) in [
+        ("equator", glam::DQuat::IDENTITY),
+        ("tilted", glam::DQuat::from_rotation_y(60f64.to_radians())),
+    ] {
+        // (the pull's torque on plate 1, N m; the slab fed from nothing, km/Myr) by θ, on and off.
+        let mut got: Vec<Vec<(DVec3, f64)>> = Vec::new();
+        let mut want = DVec3::ZERO;
+        for on in [true, false] {
+            let mut p = preset(40_000, 20.0, "supercontinent", 5);
+            p.tectonics.front_pull = on;
+            let stage = PlatesStage::new(p.clone());
+            let env = stage.env(&p.tectonics, 1);
+            let k = &p.tectonics;
+            let mut row = Vec::new();
+            for &theta in &thetas {
+                let (mut st, geo, pos) =
+                    a_front_of_known_length(&p, &env, frame, lon_deg, 15.0, 0.02, 50.0);
+                let t = theta.to_radians();
+                let axis = frame
+                    * (DVec3::new(half.sin(), -half.cos(), 0.0) * t.cos() + DVec3::Z * t.sin());
+                st.plates[1].omega = (axis * env.norm.omega_of_speed(50.0)).to_array();
+                st.contacts.retain(|c| (c.under, c.over) == (1, 0));
+                assert_eq!(st.contacts.len(), 1, "{name}: the contact");
+                // The slab as it grows from nothing in one step …
+                let mut grown = st.clone();
+                grown.slabs.clear();
+                forces::step(&mut grown, &geo, &pos, &env, DVec3::Z, 0.0);
+                let fed = grown
+                    .slabs
+                    .iter()
+                    .find(|s| (s.under, s.over) == (1, 0))
+                    .map_or(0.0, |s| s.km)
+                    / env.dt_myr;
+                // … and the pull of a full-length one.
+                st.slabs = vec![state::SlabTrack {
+                    under: 1,
+                    over: 0,
+                    km: k.slab_depth_km,
+                    ..state::SlabTrack::default()
+                }];
+                let torque = forces::slab_torques(&st, &geo, &pos, &env)[1].0;
+                if on && theta == 0.0 {
+                    // The reference pull per metre over the front along its normal (north, in
+                    // the frame): R x × ẑ over the equator from 0 to `lon_deg`.
+                    let c =
+                        forces::Coeffs::new(k, &env.norm, env.gravity, st.a0_km2, DVec3::Z, 0.0);
+                    let age = (0..st.samples.len())
+                        .find(|&i| st.plate_of(i) == 1)
+                        .map(|i| st.samples[i].age_myr(env.t_myr))
+                        .unwrap();
+                    let per_m = c.pull_n_m * forces::slab_weight(age);
+                    let d = lon_deg.to_radians();
+                    want = frame * DVec3::new(1.0 - d.cos(), -d.sin(), 0.0)
+                        * (per_m * c.radius_m * c.radius_m);
+                }
+                row.push((torque, fed));
+            }
+            got.push(row);
+        }
+        for (j, &theta) in thetas.iter().enumerate() {
+            let [(t_on, fed_on), (t_off, fed_off)] = [got[0][j], got[1][j]];
+            let angle = |t: DVec3| t.angle_between(want).to_degrees();
+            eprintln!(
+                "{name}, {theta} degrees from the normal: on, the pull {:.3} of the front's along \
+                 its normal ({:.1} degrees off), the slab fed {fed_on:.1} km/Myr ({:.3} of the \
+                 convergence across the front's middle); off, {:.3} ({:.1} degrees off), \
+                 {fed_off:.1} km/Myr ({:.3})",
+                t_on.length() / want.length(),
+                angle(t_on),
+                fed_on / (50.0 * theta.to_radians().cos()),
+                t_off.length() / want.length(),
+                angle(t_off),
+                fed_off / (50.0 * theta.to_radians().cos()),
+            );
+            if theta < 70.0 {
+                // The front's straight length along its normal, whatever the motion's angle.
+                assert!(
+                    (0.95..1.03).contains(&(t_on.length() / want.length())),
+                    "{name}, {theta} degrees: {t_on} against {want}"
+                );
+                assert!(angle(t_on) < 2.0, "{name}, {theta} degrees: {t_on}");
+                assert!(
+                    (t_on - got[0][0].0).length() <= 1e-9 * want.length(),
+                    "{name}, {theta} degrees: {t_on} against the normal front's {}",
+                    got[0][0].0
+                );
+                // Fed by the convergence along the normal (cos 20° at the front's ends).
+                let across = fed_on / (50.0 * theta.to_radians().cos());
+                assert!((0.93..1.0).contains(&across), "{name}, {theta} degrees: {across}");
+            } else {
+                // Within Bird's 20 degrees of a transform: no front, no slab.
+                assert_eq!(fed_on, 0.0, "{name}, {theta} degrees");
+            }
+        }
+        // The old law: a slab at a transform, and an oblique front's slab fed faster than the
+        // plates converge across it.
+        assert!(got[1][4].1 > 0.0, "{name}: the old law feeds no slab at a transform");
+        assert!(got[1][1].1 > got[0][1].1, "{name}: {:?}", got);
+    }
+}
+
+/// FRC-016's reference plate on the lattice: plate 1, oceanic floor of 80 Myr (a slab of weight 1,
+/// FRC-004), a cap of the average starting plate's area about +X; plate 0 beyond the stretch of
+/// its rim `trench_km` long about its northern point, plate 2 the rest, both continental. Plate
+/// 1's group is turned `turn` rad north (about −Y), so the rim overlaps plate 0 there (the active
+/// contact (1, 0)), and it moves north at `mm_yr`; the other contacts are cleared and a
+/// full-length slab hangs from plate 1 under plate 0. Returns the trench's angle about the cap's
+/// centre, rad, with the cap's angular radius.
+fn a_reference_plate(
+    p: &PlanetPreset,
+    env: &Env<'_>,
+    trench_km: f64,
+    turn: f64,
+    mm_yr: f64,
+) -> (PlateState, Geo, Vec<DVec3>, f64, f64) {
+    let (mut st, geo) = init::initial_state(p, env).unwrap();
+    let pts = geo.points();
+    let r_km = env.norm.model_km;
+    let cos_r = 1.0 - st.a0_km2 / (2.0 * std::f64::consts::PI * r_km * r_km);
+    let r = cos_r.acos();
+    let alpha = trench_km / (r_km * r.sin());
+    // The rim's points at an angle β about the centre from its northern point lie at
+    // z = sin r cos β: the trench is the rim above its ends.
+    let z_end = r.sin() * (0.5 * alpha).cos();
+    for (i, s) in st.samples.iter_mut().enumerate() {
+        let x = pts[i];
+        let plate = if x.x > cos_r {
+            1
+        } else if x.z > z_end {
+            0
+        } else {
+            2
+        };
+        *s = state::Sample::blank(plate);
+        if plate == 1 {
+            s.pools = pools::oceanic_column();
+            s.elevation_m = -4000.0;
+            s.formed_myr = (env.t_myr - forces::SLAB_AGE_REF_MYR) as f32;
+        } else {
+            s.kind = CONTINENTAL;
+            s.pools = pools::continental_column();
+            s.elevation_m = 400.0;
+        }
+        s.thickness_m = pools::thickness(&s.pools);
+    }
+    let q = glam::DQuat::from_axis_angle(-DVec3::Y, turn);
+    let still = [0.0, 0.0, 0.0, 1.0];
+    st.groups = (0..3)
+        .map(|g| state::Group {
+            plate: g,
+            rot: if g == 1 { [q.x, q.y, q.z, q.w] } else { still },
+        })
+        .collect();
+    for (k, pl) in st.plates.iter_mut().enumerate() {
+        pl.alive = k < 3;
+        pl.omega = [0.0; 3];
+    }
+    st.plates[1].omega = (-DVec3::Y * env.norm.omega_of_speed(mm_yr)).to_array();
+    st.contacts.clear();
+    st.ridges.clear();
+    st.rift_links.clear();
+    st.slabs.clear();
+    let pos = geometry::positions(&st, &geo);
+    st.recount(&pos);
+    let tree = Tree::over(&pos, |_| true);
+    let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, env);
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, env).unwrap();
+    st.contacts.retain(|c| (c.under, c.over) == (1, 0));
+    assert_eq!(st.contacts.len(), 1, "the reference trench's contact");
+    st.slabs = vec![state::SlabTrack {
+        under: 1,
+        over: 0,
+        km: p.tectonics.slab_depth_km,
+        ..state::SlabTrack::default()
+    }];
+    (st, geo, pos, alpha, r)
+}
+
+/// FRC-016's drag calibration on the slab pull's own count (the front lane, step 9; plates.md,
+/// "Step 9"): the reference plate ([`a_reference_plate`]: the average starting plate's area, a
+/// 3,000 km trench of a full-length 80-Myr slab, its neighbours held still by their keels, no
+/// mantle flow) on the lattice, through the force balance. With `front_pull` (PLT-560) its pull's
+/// torque is the reference pull per metre over the trench along its normal, the definition's own
+/// count, so the drag the definition gives moves the plate at the speed of the same plate on the
+/// analytic ring (`forces.rs`, `the_reference_plate_moves_at_the_speed_scale`, which counts the
+/// trench exactly) and nothing in it needs recalibrating. Measured (2026-10-24, 40,000 samples):
+/// see plates.md, "Step 9".
+#[test]
+fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
+    let mut speeds = Vec::new();
+    for on in [true, false] {
+        let mut p = preset(40_000, 20.0, "supercontinent", 5);
+        p.tectonics.front_pull = on;
+        p.tectonics.mantle_flow_mm_yr = 0.0;
+        p.tectonics.keel_drag = 1.0e4;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let k = &p.tectonics;
+        let (mut st, geo, pos, alpha, r) =
+            a_reference_plate(&p, &env, forces::REF_TRENCH_KM, 0.02, k.plate_speed_scale_mm_yr);
+        let torque = forces::slab_torques(&st, &geo, &pos, &env)[1].0;
+        let ans = forces::step(&mut st, &geo, &pos, &env, DVec3::Z, 0.0);
+        assert!(ans.solved);
+        let w = ans.omega[1].expect("plate 1 in the balance");
+        let centroid = DVec3::from_array(st.plates[1].centroid);
+        let speed = env.norm.velocity_mm_yr(w, centroid).length();
+        let held = ans.omega[0]
+            .map_or(0.0, |w0| env.norm.velocity_mm_yr(w0, centroid).length());
+        // The reference pull per metre over the rim's trench along its outward normal.
+        let c = forces::Coeffs::new(k, &env.norm, env.gravity, st.a0_km2, DVec3::Z, 0.0);
+        let steps = 2000;
+        let mut want = DVec3::ZERO;
+        for j in 0..steps {
+            let beta = alpha * ((j as f64 + 0.5) / steps as f64 - 0.5);
+            let x = DVec3::X * r.cos() + (DVec3::Z * beta.cos() + DVec3::Y * beta.sin()) * r.sin();
+            let out = (x * r.cos() - DVec3::X).normalize();
+            want += x.cross(out) * (alpha / steps as f64);
+        }
+        want *= c.pull_n_m * c.radius_m * c.radius_m * r.sin();
+        eprintln!(
+            "front_pull {on}: the reference plate moves at {speed:.1} mm/yr (the speed scale \
+             {:.0}; its overriding neighbour {held:.2}); the pull {:.3} of the trench's along its \
+             normal ({:.1} degrees off)",
+            k.plate_speed_scale_mm_yr,
+            torque.length() / want.length(),
+            torque.angle_between(want).to_degrees(),
+        );
+        assert!(held < 0.01 * speed, "the neighbours move: {held}");
+        if on {
+            assert!(
+                (0.96..1.05).contains(&(torque.length() / want.length())),
+                "{torque} against {want}"
+            );
+            assert!(torque.angle_between(want).to_degrees() < 2.0);
+        }
+        speeds.push(speed);
+    }
+    // The analytic ring's plate, with the same definitions (its own test's bounds).
+    assert!((25.0..70.0).contains(&speeds[0]), "{speeds:?}");
 }
 
 /// A subduction zone goes on through a resampling (`tectonics.contact_carry`, PLT-550; plates.md,
