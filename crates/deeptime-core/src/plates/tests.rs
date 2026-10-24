@@ -829,6 +829,34 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     );
 }
 
+/// The sweep behind the seeds of the two tests that need a weld (this one and
+/// `recording_does_not_change_the_world_and_matches_the_run`): seeds 1 to 24 from scattered
+/// continents at 8000 samples over 300 Myr and each one's welds. Run it when a default changes
+/// the planet: `cargo test -p deeptime-core --release -- --ignored --nocapture weld_seed_sweep`.
+#[test]
+#[ignore]
+fn weld_seed_sweep() {
+    use rayon::prelude::*;
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(4)
+        .build()
+        .unwrap();
+    let welds: Vec<(u64, usize)> = pool.install(|| {
+        (1..=24u64)
+            .into_par_iter()
+            .map(|seed| {
+                let p = preset(8000, 300.0, "scattered_continents", seed);
+                let world = run_stage(&p, |_, _, _| {});
+                let d = world.plates.as_ref().unwrap().dynamics.as_ref().unwrap();
+                (seed, d.collisions.iter().filter(|c| c.sutured).count())
+            })
+            .collect()
+    });
+    let welding: Vec<u64> = welds.iter().filter(|w| w.1 > 0).map(|w| w.0).collect();
+    println!("welds per seed {welds:?}");
+    println!("seeds that weld {welding:?}");
+}
+
 /// Plate task 6: a collision's footprint (`Sample::collision_mm_yr`, `shortening_km` and the
 /// FORELAND flag, the L1 fields `plates/collision_mm_yr` and `plates/shortening`) is there while
 /// a collision has a front, carries both numbers together, and is gone the step after it ends:
@@ -2256,4 +2284,42 @@ fn the_final_heat_flow_pass_lifts_only_low_continental_samples() {
         s.heat_flow_mw_m2 = 0.0;
     }
     assert_eq!(flat, was, "no field but heat flow moved");
+}
+
+/// The front lane's cut trace (2026-10-24, plates.md "The front's length: why the plates are
+/// ragged"): which part of the step cuts the plates into pieces, over the quick preset's
+/// defaults. A diagnosis, not a check: it prints each part's samples cut off their plate and
+/// joined back, and the share cut off at the end of every 50 Myr.
+#[test]
+#[ignore = "diagnosis: 300 Myr at 40k samples; run with --release -- --ignored --nocapture"]
+fn where_the_plates_are_cut() {
+    cut_trace::enable(true);
+    for (start, seed) in [("supercontinent", 1), ("scattered_continents", 2)] {
+        let p = preset(40_000, 300.0, start, seed);
+        let _ = cut_trace::take();
+        let mut shares = Vec::new();
+        let mut next = 50.0;
+        run_stage(&p, |stage, _, st| {
+            if st.t_myr - p.t_start_years() / 1.0e6 >= next {
+                let geo = &stage.cache.as_ref().unwrap().geo;
+                let visible = st.samples.iter().filter(|s| !s.is_hidden()).count();
+                let cut = cut_trace::count(st, geo);
+                shares.push((next, cut as f64 / visible as f64, st.alive().count()));
+                next += 50.0;
+            }
+        });
+        let parts = cut_trace::take();
+        eprintln!("{start} seed {seed}: cut share, plates every 50 Myr {shares:.3?}");
+        for part in &parts {
+            eprintln!(
+                "  {:<15} cut {:>8} joined {:>8} net {:>+8} marks {}",
+                part.what,
+                part.cut,
+                part.joined,
+                part.cut as i64 - part.joined as i64,
+                part.marks
+            );
+        }
+    }
+    cut_trace::enable(false);
 }
