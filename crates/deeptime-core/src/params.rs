@@ -1049,12 +1049,12 @@ impl Default for TectonicParams {
             collapse_sheet_viscosity_pa_s: 1.0e22,
             // ledger: PLT-415
             collapse_sheet_strength_myr: 62.8,
-            thermal_state: true,         // ledger: PLT-460 (on since 2026-10-23)
-            thermal_isostasy_m: 0.0,     // ledger: ISO-110 (off: an open fault; 1,600 m when on)
-            thermal_reference_km: 225.0, // ledger: ISO-111
-            thermal_strength: true,      // ledger: ISO-112 (on since 2026-10-23)
+            thermal_state: true,          // ledger: PLT-460 (on since 2026-10-23)
+            thermal_isostasy_m: 0.0,      // ledger: ISO-110 (off: an open fault; 1,600 m when on)
+            thermal_reference_km: 225.0,  // ledger: ISO-111
+            thermal_strength: true,       // ledger: ISO-112 (on since 2026-10-23)
             collision_underthrust: false, // ledger: PLT-546, ISO-131
-            thermal_backstop: false,     // ledger: PLT-470 (off: a stand-in, not physics)
+            thermal_backstop: false,      // ledger: PLT-470 (off: a stand-in, not physics)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
             heat_flow_refresh: true, // ledger: PLT-469 (game-choice: on since 2026-10-23, the coordinator's call)
             initial_plates: 14,
