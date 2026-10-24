@@ -783,8 +783,10 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 15, 16, 18 to 20, 22 and 23, seeds 12, 18 and 19 twice, seeds 7, 9, 10 and 24 no more; 7
     // of seeds 1 to 24 with V1 gap 2's ridge segments, initiation off the passive margin, stress
     // weights, rifts along thin lithosphere and the reversal by the arc's crust on by default,
-    // 2026-10-23: 4, 12, 14, 17, 18, 19 and 21, seed 17 twice, seed 2 no more).
-    let p = preset(8000, 300.0, "scattered_continents", 17);
+    // 2026-10-23: 4, 12, 14, 17, 18, 19 and 21, seed 17 twice, seed 2 no more; 4 of seeds 1 to
+    // 24 with transference on by default, PLT-516, 2026-10-23: 6, 11, 12 and 14, one weld each,
+    // seed 11 with 5 transferences, seed 17 no more: a pushed continent moves alone instead).
+    let p = preset(8000, 300.0, "scattered_continents", 11);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -893,8 +895,9 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // `collisions_weld_on_stall_and_transfer_on_shortening` says which seeds weld; seed 2 until
     // V1 gap 2's stages went on by default, 2026-10-23, then seed 4: of the welding seeds 4, 12,
     // 14, 19 and 21 pass, 17 puts the mix's fronts 32 % over the plates' in one step and 18 fails
-    // another check).
-    let p = preset(8000, 300.0, "scattered_continents", 4);
+    // another check; seed 14 since transference went on by default, PLT-516, the same day: the
+    // welding seeds are 6, 11, 12 and 14, seed 4 no more).
+    let p = preset(8000, 300.0, "scattered_continents", 14);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -2158,3 +2161,4 @@ fn the_final_heat_flow_pass_lifts_only_low_continental_samples() {
     }
     assert_eq!(flat, was, "no field but heat flow moved");
 }
+
