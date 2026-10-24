@@ -174,9 +174,16 @@ public final class FanGameTests {
 
     /**
      * Where a thread runs at least {@value #THREAD_OFF} blocks off the course, its centre column holds
-     * water with its top block at the thread's water surface (at least {@value #WITHIN_SHARE} of the
-     * columns), and the island's middle, halfway between the course and the thread where the thread
-     * stands furthest off, is dry ground above that water.
+     * the thread's own water with its top block at the thread's water surface there (at least
+     * {@value #WITHIN_SHARE} of the columns), and the island's middle, halfway between the course and
+     * the thread where the thread stands furthest off, is dry ground above that water.
+     *
+     * <p>The surface at a column is the column rule's (FORMAT.md, "the hit is the covering segment
+     * with the lowest w"), not the thread's surface at the point walked: on a fan, falling 0.1 a block,
+     * the round end of the next segment down covers a centre column with water up to a third of a
+     * block lower, so a column whose surface lies just over a whole block holds its top block one
+     * lower than the walked point's (the first run of this test, on master 1e27a44f, asked for that
+     * one and failed 119 of 144 columns that the rule had drawn right).
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void threadsHoldWaterAroundDryIslands(GameTestHelper helper) {
@@ -198,14 +205,20 @@ public final class FanGameTests {
                 for (int s = 0; s < steps; s++) {
                     double t = (double) s / steps;
                     int x = (int) Math.floor(ax + t * (bx - ax)), z = (int) Math.floor(az + t * (bz - az));
-                    double w = r.vertexW(i) + t * (r.vertexW(i + 1) - r.vertexW(i));
-                    int top = (int) Math.ceil(w) - 1;
+                    // The column rule's surface there: its lowest covering segment's, which must be the thread's own.
+                    Rivers.Hit hit = r.sample(x, z).hit();
+                    double w = hit == null ? Double.NaN : hit.w();
+                    boolean own = hit != null && hit.seg() >= f && hit.seg() < f + m - 1;
+                    int top = (int) Math.ceil(r.vertexW(i) + t * (r.vertexW(i + 1) - r.vertexW(i))) - 1;
+                    if (own)
+                        top = (int) Math.ceil(w) - 1;
                     int[] got = water(wld.level(), x, z, top + 6, top - (int) Math.ceil(depth) - 6);
                     columns++;
-                    if (got[0] == top && got[1] >= 1)
+                    if (own && got[0] == top && got[1] >= 1)
                         ok++;
                     else if (bad.length() < 600)
-                        bad.append(String.format(" (%d,%d) top %d (w %.2f) holds %d;", x, z, got[0], w, got[1]));
+                        bad.append(String.format(" (%d,%d) top %d (w %.2f%s) holds %d;", x, z, got[0], w,
+                                own ? "" : hit == null ? ", no channel" : ", segment " + hit.seg() + " not the thread's", got[1]));
                 }
             }
             int far = farthest(r, k);
