@@ -34,8 +34,8 @@
 #                  files (a stage's own), as tools/remote/play-client-apply.py does for Ben's full instance
 #   --save DIR     a world baked elsewhere (a folder with level.dat and deeptime/, e.g. a smoke server's
 #                  planet/ copied out) put into the game dir's saves/ as saves/<basename DIR> before the main
-#                  pass (hard links where the file system allows: the game replaces the files it writes
-#                  there, level.dat and the climate mapping, by a new file, so the original is kept), for
+#                  pass (a copy, since the game writes region files in place; only the world data, deeptime/,
+#                  is hard-linked where the file system allows, as the mod replaces its files there by moves), for
 #                  --prop open=<basename DIR>: the walk skips Create World, opens it and shoots the vistas
 #   --timeout S    per client pass (default 7200: a 1,000-Myr quick planet's ETA was ~2 h on the
 #                  loaded VM; --prop length=300 takes a fraction of that)
@@ -241,8 +241,13 @@ run_pass() {
     local log="$OUT/client-$pass.log" start now last=0 st=""
     rm -rf "$GAMEDIR/screenshots" "$GAMEDIR/saves" "$GAMEDIR/deeptime/staging" "$GAMEDIR/crash-reports"
     if [ -n "$SAVE" ] && [ "$pass" = main ]; then
-        mkdir -p "$GAMEDIR/saves"
-        cp -al "$SAVE" "$GAMEDIR/saves/" 2>/dev/null || cp -a "$SAVE" "$GAMEDIR/saves/" \
+        local dst
+        dst="$GAMEDIR/saves/$(basename "$SAVE")"
+        mkdir -p "$dst"
+        # Minecraft writes region files in place, so a link would change the world at SAVE: copy the world
+        # and link only its world data (deeptime/, which the mod replaces by moves, never rewrites in place).
+        find "$SAVE" -mindepth 1 -maxdepth 1 ! -name deeptime -exec cp -a --reflink=auto -t "$dst/" {} + \
+            && { [ ! -d "$SAVE/deeptime" ] || cp -al "$SAVE/deeptime" "$dst/" 2>/dev/null || cp -a "$SAVE/deeptime" "$dst/"; } \
             || { say "pass $pass: could not copy $SAVE into saves/"; return 1; }
         say "pass $pass: saves/$(basename "$SAVE") from $SAVE"
     fi
