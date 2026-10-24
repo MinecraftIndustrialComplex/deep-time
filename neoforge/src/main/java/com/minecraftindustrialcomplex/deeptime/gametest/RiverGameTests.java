@@ -524,7 +524,9 @@ public final class RiverGameTests {
      * Expanded Ecosphere 3.4.7 puts its sandy jungle at erosion 0.57 to 1 (E6), temperature 0.275 to
      * 0.57 and humidity 0.3 to 1 across weirdness 0 (its {@code resources/ee_default} overworld.json,
      * read 2026-10-24), in vanilla's mangrove swamp slot. The planet of master 25941ca5 put 5 of its
-     * 11 samples there.
+     * 11 samples there (4 where vanilla's list has mangrove swamp, 1 river). An ocean biome is never
+     * counted so: that planet's one EE ocean over a channel (minecraft:ocean where vanilla's list has a
+     * river) stands above the sea.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 600)
     public static void riverBiomes(GameTestHelper helper) {
@@ -580,9 +582,10 @@ public final class RiverGameTests {
             }
             // The pack's own list may give vanilla's valley slot a biome of its own (Expanded Ecosphere's sandy jungle
             // on the flattest, wettest warm ground): the slice reached the channel and the pack chose what grows on it.
+            // Not an ocean biome: a sample is a channel above the sea, and an ocean there is no valley's.
             var vanilla = biomes.getHolderOrThrow(vanillaList.findValue(
                     sampler.sample(QuartPos.fromBlock(x), QuartPos.fromBlock(y), QuartPos.fromBlock(z))));
-            if (valley(vanilla) > 0) {
+            if (valley(vanilla) > 0 && !b.is(BiomeTags.IS_OCEAN)) {
                 packOwn++;
                 byPack.merge(b.getRegisteredName() + " for " + vanilla.getRegisteredName(), 1, Integer::sum);
                 continue;
