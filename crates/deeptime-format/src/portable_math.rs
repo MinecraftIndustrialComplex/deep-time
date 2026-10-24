@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! Trigonometry that gives the **same bits** in Rust, Java and JS: the seamless world's projection
-//! ([`crate::petroff`], [`crate::projection::PetroffGuyou`]) runs on it in all three languages, so the
-//! bake, the game and the workbench agree on every block's latitude and longitude bit for bit
+//! Trigonometry that gives the **same bits** in Rust, Java and JS: the world's projection (the cube's
+//! turn, [`crate::cube::CubeTurn`], and the latitude and longitude of its points,
+//! [`crate::projection::lat_lon_of_unit`]) runs on it in all three languages, so the bake, the game
+//! and the workbench agree on every block's latitude and longitude bit for bit
 //! (Java twin `worlddata/PortableMath.java`, JS twin `DTMath` in
 //! `deeptime-viewer/assets/projection.js`).
 //!

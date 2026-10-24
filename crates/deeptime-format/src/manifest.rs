@@ -106,8 +106,8 @@ impl FileEntry {
     }
 }
 
-/// The format version of a world of projection `kind` (`None`: Lambert): [`CUBE_FORMAT_VERSION`]
-/// for a cube world, [`FORMAT_VERSION`] otherwise.
+/// The format version of a world of projection `kind` (`None`: the Lambert frame):
+/// [`CUBE_FORMAT_VERSION`] for a cube world, [`FORMAT_VERSION`] otherwise.
 pub fn version_for(kind: Option<ProjectionKind>) -> &'static str {
     if kind == Some(ProjectionKind::Cube) {
         CUBE_FORMAT_VERSION
@@ -172,8 +172,8 @@ impl Manifest {
     }
 
     /// Sets the layout block and the format version that goes with it: [`CUBE_FORMAT_VERSION`]
-    /// for a cube world, [`FORMAT_VERSION`] for the rest (FORMAT.md "Polar and cube worlds side by
-    /// side").
+    /// for a cube world, [`FORMAT_VERSION`] for the rest (FORMAT.md "Lambert-frame and cube worlds
+    /// side by side").
     pub fn set_projection(&mut self, spec: Option<ProjectionSpec>) {
         self.format_version = version_for(spec.as_ref().map(|s| s.kind)).to_owned();
         self.projection = spec;
@@ -209,8 +209,8 @@ impl Manifest {
             what: what(),
             source,
         })?;
-        // A cube world is 0.7 and only a cube world is (FORMAT.md "Polar and cube worlds side by
-        // side"); its map table and rotation must be ones this crate can draw.
+        // A cube world is 0.7 and only a cube world is (FORMAT.md "Lambert-frame and cube worlds
+        // side by side"); its map table and rotation must be ones this crate can draw.
         let kind = m.projection.as_ref().map(|s| s.kind);
         let want = version_for(kind);
         if found != want {
@@ -316,20 +316,23 @@ mod tests {
 
     #[test]
     fn the_layout_block_round_trips_and_names_the_projection() {
-        use crate::projection::{EdgeKind, PetroffGuyou, ProjectionKind};
-        let g = PetroffGuyou::new(6_656, 31.25);
-        let mut m = Manifest::new("test", Writer::this("unit"), Scale::default_for(13_312));
+        use crate::cube::CubeTurn;
+        use crate::cube_map::{CubeMap, WORLD_MAP};
+        use crate::projection::{EdgeKind, ProjectionKind, WorldProjection};
+        let map = CubeMap::builtin_static(WORLD_MAP).expect("the world map");
+        let wp = WorldProjection::cube(1_024, map, CubeTurn::polar(31.25));
+        let mut m = Manifest::new("test", Writer::this("unit"), Scale::default_for(4_096));
         assert_eq!(
             m.world_projection().kind(),
             ProjectionKind::Lambert,
-            "absent: Lambert"
+            "absent: the Lambert frame"
         );
-        m.projection = Some(g.spec(None));
+        m.projection = Some(wp.spec(None));
         let json = String::from_utf8(m.to_json_bytes().unwrap()).unwrap();
-        assert!(json.contains("\"kind\": \"petroff_guyou\""), "{json}");
+        assert!(json.contains("\"kind\": \"cube\""), "{json}");
         let back: Manifest = serde_json::from_str(&json).unwrap();
-        // serde_json's default parser may land a float one ulp off (the cone points' latitudes and
-        // longitudes): everything else is compared exactly, those to 1e-12.
+        // serde_json's default parser may land a float one ulp off (the corners' and faces'
+        // latitudes and longitudes): everything else is compared exactly, those to 1e-12.
         let (a, b) = (
             back.projection.as_ref().unwrap(),
             m.projection.as_ref().unwrap(),
@@ -338,28 +341,22 @@ mod tests {
             (&a.edges, &a.poles, &a.domain, &a.border, a.kind),
             (&b.edges, &b.poles, &b.domain, &b.border, b.kind)
         );
-        assert_eq!(
-            (a.hemisphere_blocks, a.lambda_c_deg),
-            (b.hemisphere_blocks, b.lambda_c_deg)
-        );
+        assert_eq!((a.face_blocks, &a.map), (b.face_blocks, &b.map));
         for (p, q) in a.cone_points.iter().zip(&b.cone_points) {
             assert_eq!((&p.name, &p.images), (&q.name, &q.images));
             assert!((p.lat_deg - q.lat_deg).abs() < 1e-12 && (p.lon_deg - q.lon_deg).abs() < 1e-12);
         }
         let spec = back.projection.as_ref().unwrap();
-        assert_eq!(spec.edges.len(), 4);
+        assert_eq!(spec.edges.len(), 14);
         assert_eq!(
             spec.edges
                 .iter()
-                .filter(|e| e.kind == EdgeKind::HalfTurn)
+                .filter(|e| e.kind == EdgeKind::Slide)
                 .count(),
             2
         );
         match back.world_projection() {
-            crate::projection::WorldProjection::PetroffGuyou(p) => {
-                assert_eq!(p.hemisphere(), 6_656);
-                assert_eq!(p.lambda_c_deg(), 31.25);
-            }
+            WorldProjection::Cube(v) => assert_eq!(v.cube.side(), 1_024),
             other => panic!("{other:?}"),
         }
     }

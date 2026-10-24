@@ -45,7 +45,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::cube::{Cube, CubeTurn, EdgeMotion, Face};
 use crate::cube_map::{CubeMap, CubeView};
-use crate::petroff::Petroff;
 use crate::portable_math as pm;
 
 /// The largest quantum of the grids' z extent, blocks ([`Projection::quantum`]).
@@ -383,21 +382,21 @@ pub fn wrap_deg(a: f64) -> f64 {
 }
 
 // ------------------------------------------------------------------------------------------------
-// The seamless world: Petroff's equal-area square in the Guyou 2:1 layout.
+// World layouts: the cube world, and the Lambert frame of the synthetic test worlds.
 // ------------------------------------------------------------------------------------------------
 
 /// Which projection a world uses (manifest `projection.kind`, FORMAT.md "The world's layout").
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ProjectionKind {
-    /// Lambert's cylindrical equal-area projection: one east–west slide, pole caps.
+    /// The simulation's own frame, Lambert's cylindrical equal-area grid, laid out as it is: the
+    /// synthetic test worlds (`deeptime synth`, the deposit and river fixtures), which have one
+    /// east–west slide and stop at their first and last rows. No planet is laid out this way: the
+    /// cube is the only world (Ben, decisions log 2026-10-24, "Cube only"; cube plan §7.4).
     Lambert,
-    /// Petroff's equal-area square in the Guyou 2:1 layout: one east–west slide, two half-turn
-    /// edges (Ben, decisions log 2026-10-04: "We'll proceed w/ Petroff–Guyou").
-    #[default]
-    PetroffGuyou,
     /// The cube world: six faces in a cross, drawn through a map table and turned freely onto the
     /// planet (Ben, decisions log 2026-10-22; format 0.7, FORMAT.md "The cube world's layout").
+    #[default]
     Cube,
 }
 
@@ -406,7 +405,6 @@ impl ProjectionKind {
     pub fn name(self) -> &'static str {
         match self {
             ProjectionKind::Lambert => "lambert",
-            ProjectionKind::PetroffGuyou => "petroff_guyou",
             ProjectionKind::Cube => "cube",
         }
     }
@@ -415,7 +413,6 @@ impl ProjectionKind {
     pub fn parse(s: &str) -> Option<ProjectionKind> {
         match s {
             "lambert" => Some(ProjectionKind::Lambert),
-            "petroff_guyou" => Some(ProjectionKind::PetroffGuyou),
             "cube" => Some(ProjectionKind::Cube),
             _ => None,
         }
@@ -428,15 +425,10 @@ pub const LAYOUT_VERSION: u32 = 1;
 /// The cube world's layout block version (`projection.layout_version` of a `cube` world).
 pub const CUBE_LAYOUT_VERSION: u32 = 2;
 
-/// The hemisphere square's side is a multiple of this many blocks: the world's x period 2b is
-/// then a multiple of 512 (a region file, what `WorldDataRef` and Toroidal World's loop take),
-/// every grid's r (up to 256) divides b, and the half-turn pivots sit on chunk corners.
-pub const HEMISPHERE_QUANTUM: u32 = 256; // ledger: SCL-084 (game-choice)
-
-/// The cube world's face side is a multiple of this many blocks, for the same reasons as
-/// [`HEMISPHERE_QUANTUM`]: every grid's r (up to 256) divides s, the east-west period 4s is a
-/// multiple of 512, and every turn pivot (s/2 from a face centre) sits on a chunk corner
-/// (docs/plans/cube-world-plan.md §1.1).
+/// The cube world's face side is a multiple of this many blocks: every grid's r (up to 256)
+/// divides s, the east-west period 4s is a multiple of 512 (a region file, what `WorldDataRef` and
+/// Toroidal World's loop take), and every turn pivot (s/2 from a face centre) sits on a chunk
+/// corner (docs/plans/cube-world-plan.md §1.1).
 pub const FACE_QUANTUM: u32 = 256; // ledger: SCL-100 (game-choice)
 
 /// The cube world's face side s for a planet `circumference` blocks round at today's scale: the
@@ -455,8 +447,8 @@ pub fn face_for(circumference: u32) -> u32 {
 pub enum EdgeKind {
     /// A translation (the east–west wrap).
     Slide,
-    /// A half-turn about a point of the edge (the edge is glued onto itself), or on a cube world
-    /// about the centre of a void square (the edge is glued onto its partner).
+    /// A half-turn about the centre of a void square of the cube's net (the edge is glued onto
+    /// its partner).
     HalfTurn,
     /// A quarter turn about one of F0's corners (cube worlds: k = 1 or 3).
     QuarterTurn,
@@ -517,8 +509,7 @@ pub struct EdgeSpec {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ConePoint {
     pub name: String,
-    /// The world's angle round the point, degrees (180: half a turn missing; 270 at a cube's
-    /// corner).
+    /// The world's angle round the point, degrees (270 at a cube's corner).
     pub cone_deg: f64,
     /// The three faces that meet there (cube worlds only).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -551,14 +542,14 @@ pub struct PoleSpec {
     pub u: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub v: Option<f64>,
-    /// The points that are the pole: block corners on the polar layouts (written as integers),
-    /// any net point on a cube world; empty when the pole is outside the world (Lambert).
+    /// The points that are the pole: any net point on a cube world; empty when the pole is
+    /// outside the world (the Lambert frame).
     #[serde(serialize_with = "points_as_written")]
     pub images: Vec<[f64; 2]>,
 }
 
 impl PoleSpec {
-    /// A pole of a polar layout: its images are block corners.
+    /// A pole whose images are block corners (the Lambert frame's: none).
     pub fn corners(name: &str, images: &[[i64; 2]]) -> PoleSpec {
         PoleSpec {
             name: name.into(),
@@ -570,8 +561,7 @@ impl PoleSpec {
     }
 }
 
-/// Writes whole coordinates as integers (the polar layouts' block corners, as format 0.5 wrote
-/// them) and the rest as floats.
+/// Writes whole coordinates as integers (block corners) and the rest as floats.
 fn points_as_written<S: serde::Serializer>(
     points: &[[f64; 2]],
     ser: S,
@@ -603,9 +593,6 @@ pub struct BorderSpec {
     /// `edge_stop`: players, their vehicles and Sable ships are stopped `inset_blocks` inside
     /// the named edges until the wrap engine joins them.
     pub kind: String,
-    /// The polar layouts' bordered edges (empty on a cube world, which names `segments`).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub edges: Vec<String>,
     pub inset_blocks: f64,
     /// Always true: the border goes when the wrap engine installs the layout's topology.
     pub temporary: bool,
@@ -632,13 +619,6 @@ pub struct Domain {
 pub struct ProjectionSpec {
     pub kind: ProjectionKind,
     pub layout_version: u32,
-    /// b, the hemisphere square's side (petroff_guyou).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hemisphere_blocks: Option<u32>,
-    /// λc, the longitude (degrees, the simulation's frame) of the western hemisphere's centre
-    /// (petroff_guyou).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub lambda_c_deg: Option<f64>,
     /// s, the face side in blocks (cube).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub face_blocks: Option<u32>,
@@ -680,445 +660,6 @@ pub struct FaceSpec {
     /// The planet point at the face's centre through the rotation, degrees.
     pub centre_lat_deg: f64,
     pub centre_lon_deg: f64,
-}
-
-/// Where a point landed after [`PetroffGuyou::fold`]: the canonical point and the number of
-/// half-turns taken (odd: a heading there points the other way).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Fold {
-    pub x: f64,
-    pub z: f64,
-    pub half_turns: u32,
-}
-
-/// Petroff's equal-area square in the Guyou 2:1 layout: the seamless world (Ben, decisions log
-/// 2026-10-04; `docs/design/seamless-wrapping.md`, `docs/research/notes/seamless-projection-survey.md`).
-///
-/// # The layout
-/// Two hemisphere squares of side b side by side: block x in [−b, b), z in [−b/2, b/2]. The
-/// western square (x < 0) holds the hemisphere centred on the equator at longitude λc, the eastern
-/// one the other. The equator is the line z = 0; north is −z along it.
-/// - **Edges.** West and east (x = ∓b) slide onto each other (period 2b, Toroidal World's wrap).
-///   North (z = −b/2) and south (z = b/2) are each glued onto themselves by a half-turn about their
-///   midpoint (0, ∓b/2): the point (x, −b/2 − d) beyond the north edge is (−x, −b/2 + d).
-/// - **Poles** on the long edges at x = ∓b/2 (each appears twice there, the half-turn's images).
-/// - **Cone points** (the four places where a turn of planet is drawn in half a turn of world):
-///   the long edges' midpoints (0, ∓b/2) and the corners (±b, ∓b/2), at ±45° latitude on the
-///   meridians λc ± 90°.
-///
-/// # The map
-/// Tile coordinates X = 2x/b + 1 ∈ [−1, 3), Y = −2z/b ∈ [−1, 1] (Y up = north). The western tile
-/// is Petroff's northern hemisphere in polar aspect, (u, v) = (X, Y) ↦ Petroff's square point
-/// ((u + v)/2, (v − u)/2) (its diamond, so the tile edges are the polar-aspect equator); the
-/// eastern tile is the mirrored southern one, (u, v) = (2 − X, Y) with φ ↦ −φ. A rotation of the
-/// sphere then takes the polar-aspect pole (the western tile's centre) to (0°, λc) and the western
-/// tile's top-edge midpoint to the north pole (the survey's `guyou`). Every edge is the
-/// polar-aspect equator drawn the same way from both sides, so the glued edges map the same sphere
-/// points exactly. Equal-area (Petroff), smooth across all three seams, slight creases
-/// (≤ 5°) on the tiles' midlines and diagonals (survey §3.2).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PetroffGuyou {
-    b: i64,
-    lambda_c_deg: f64,
-    pet: Petroff,
-    /// The polar-aspect frame (a, e, f) and the world frame (a2, e2, f2): v_world =
-    /// a2·(a·v) + e2·(e·v) + f2·(f·v).
-    a: [f64; 3],
-    e: [f64; 3],
-    f: [f64; 3],
-    a2: [f64; 3],
-    e2: [f64; 3],
-    f2: [f64; 3],
-}
-
-#[inline]
-fn dot3(p: [f64; 3], q: [f64; 3]) -> f64 {
-    p[0] * q[0] + p[1] * q[1] + p[2] * q[2]
-}
-
-/// The unit vector of (λ, φ) in radians, on the portable functions.
-#[inline]
-fn unit_pm(lambda: f64, phi: f64) -> [f64; 3] {
-    let (sp, cp) = (pm::sin(phi), pm::cos(phi));
-    [cp * pm::cos(lambda), cp * pm::sin(lambda), sp]
-}
-
-impl PetroffGuyou {
-    /// The hemisphere side b for a planet `circumference` blocks round at today's scale: the
-    /// world's 2b² blocks cover the planet's 4πR² (R = C/2π, so b = C/√(2π)), rounded to the
-    /// nearest multiple of [`HEMISPHERE_QUANTUM`] (game choice, ledger SCL-084). 16k: 6,656 (the
-    /// planet drawn 1.8 % larger across); 32k: 13,056 (0.1 % smaller).
-    pub fn hemisphere_for(circumference: u32) -> u32 {
-        let exact = f64::from(circumference) / (2.0 * PI).sqrt();
-        let q = f64::from(HEMISPHERE_QUANTUM);
-        (((exact / q).round().max(1.0)) * q) as u32
-    }
-
-    /// The world of hemisphere side `b` (a multiple of [`HEMISPHERE_QUANTUM`]) with the western
-    /// hemisphere centred on longitude `lambda_c_deg`.
-    pub fn new(b: u32, lambda_c_deg: f64) -> PetroffGuyou {
-        let pet = Petroff::new();
-        // The western tile's top-edge midpoint (u, v) = (0, 1) in polar aspect: on the equator.
-        let (le, _) = pet.inverse(0.5, 0.5);
-        let e = [pm::cos(le), pm::sin(le), 0.0];
-        let a = [0.0, 0.0, 1.0];
-        let f = [-e[1], e[0], 0.0]; // a × e
-        let lc = pm::to_radians(lambda_c_deg);
-        let a2 = [pm::cos(lc), pm::sin(lc), 0.0];
-        let e2 = [0.0, 0.0, 1.0];
-        let f2 = [a2[1], -a2[0], 0.0]; // a2 × e2
-        PetroffGuyou {
-            b: i64::from(b),
-            lambda_c_deg,
-            pet,
-            a,
-            e,
-            f,
-            a2,
-            e2,
-            f2,
-        }
-    }
-
-    /// b, blocks.
-    pub fn hemisphere(&self) -> i64 {
-        self.b
-    }
-
-    /// λc, degrees.
-    pub fn lambda_c_deg(&self) -> f64 {
-        self.lambda_c_deg
-    }
-
-    /// The world's east–west period 2b, blocks (what `scale.circumference_blocks` holds for this
-    /// world, and Toroidal World's loop).
-    pub fn period(&self) -> i64 {
-        2 * self.b
-    }
-
-    /// The radius of the sphere the world's blocks stand for at equal area, blocks: 2b² = 4πR².
-    pub fn radius(&self) -> f64 {
-        self.b as f64 / (2.0 * PI).sqrt()
-    }
-
-    /// The fundamental domain.
-    pub fn domain(&self) -> Domain {
-        let b = self.b as f64;
-        Domain {
-            x_min: -b,
-            x_max: b,
-            z_min: -b / 2.0,
-            z_max: b / 2.0,
-            period_x: None,
-        }
-    }
-
-    /// Whether the point (x, z) lies in the domain (x wraps, so only z decides).
-    pub fn on_world(&self, _x: f64, z: f64) -> bool {
-        z.abs() <= self.b as f64 / 2.0
-    }
-
-    /// Wraps x into [−b, b).
-    pub fn wrap_x(&self, x: f64) -> f64 {
-        let p = self.period() as f64;
-        let t = (x + 0.5 * p).rem_euclid(p);
-        (if t >= p { 0.0 } else { t }) - 0.5 * p
-    }
-
-    /// Brings any point into the domain through the edges: x wraps; past the north or south
-    /// edge the half-turn about its midpoint (repeated for points more than a world away).
-    pub fn fold(&self, x: f64, z: f64) -> Fold {
-        let (half, b) = (self.b as f64 / 2.0, self.b as f64);
-        let (mut x, mut z, mut n) = (x, z, 0u32);
-        for _ in 0..64 {
-            if z < -half {
-                x = -x;
-                z = -b - z;
-                n += 1;
-            } else if z > half {
-                x = -x;
-                z = b - z;
-                n += 1;
-            } else {
-                break;
-            }
-        }
-        Fold {
-            x: self.wrap_x(x),
-            z: z.clamp(-half, half),
-            half_turns: n,
-        }
-    }
-
-    /// The block cell (bx, bz) brought into the domain, the wrap engine's cell arithmetic
-    /// (`CellIsometry`): x wraps into [−b, b); a cell north of z = −b/2 is (−bx − 1, −b − bz − 1),
-    /// south of z = b/2 (−bx − 1, b − bz − 1). Returns the cell and the half-turns taken.
-    pub fn fold_cell(&self, bx: i64, bz: i64) -> (i64, i64, u32) {
-        let (half, b) = (self.b / 2, self.b);
-        let (mut x, mut z, mut n) = (bx, bz, 0u32);
-        for _ in 0..64 {
-            if z < -half {
-                x = -x - 1;
-                z = -b - z - 1;
-                n += 1;
-            } else if z >= half {
-                x = -x - 1;
-                z = b - z - 1;
-                n += 1;
-            } else {
-                break;
-            }
-        }
-        let p = 2 * b;
-        let x = (x + b).rem_euclid(p) - b;
-        (x, z, n)
-    }
-
-    /// Polar-aspect unit vector → world unit vector.
-    #[inline]
-    fn polar_to_world(&self, v: [f64; 3]) -> [f64; 3] {
-        let (pa, pe, pf) = (dot3(self.a, v), dot3(self.e, v), dot3(self.f, v));
-        [
-            self.a2[0] * pa + self.e2[0] * pe + self.f2[0] * pf,
-            self.a2[1] * pa + self.e2[1] * pe + self.f2[1] * pf,
-            self.a2[2] * pa + self.e2[2] * pe + self.f2[2] * pf,
-        ]
-    }
-
-    /// World unit vector → polar-aspect unit vector.
-    #[inline]
-    fn world_to_polar(&self, v: [f64; 3]) -> [f64; 3] {
-        let (pa, pe, pf) = (dot3(self.a2, v), dot3(self.e2, v), dot3(self.f2, v));
-        [
-            self.a[0] * pa + self.e[0] * pe + self.f[0] * pf,
-            self.a[1] * pa + self.e[1] * pe + self.f[1] * pf,
-            self.a[2] * pa + self.e[2] * pe + self.f[2] * pf,
-        ]
-    }
-
-    /// The unit vector of the point (x, z) (any point: it is folded into the domain first).
-    pub fn unit(&self, x: f64, z: f64) -> [f64; 3] {
-        let p = self.fold(x, z);
-        self.unit_in_tile(p.x, p.z)
-    }
-
-    /// The unit vector of a point of the closed domain x ∈ [−b, b], z ∈ [−b/2, b/2] drawn from
-    /// its own tile, without wrapping x (x ≤ 0 the western tile, x > 0 the eastern one, so x = b is
-    /// drawn from the eastern tile's edge): the seam tests compare the two drawings of an edge.
-    pub fn unit_unfolded(&self, x: f64, z: f64) -> [f64; 3] {
-        let (b, h) = (self.b as f64, self.b as f64 / 2.0);
-        self.unit_in_tile(x.clamp(-b, b), z.clamp(-h, h))
-    }
-
-    fn unit_in_tile(&self, x: f64, z: f64) -> [f64; 3] {
-        let b = self.b as f64;
-        let tx = 2.0 * x / b + 1.0;
-        let ty = -2.0 * z / b;
-        let (u, v, south) = if tx <= 1.0 {
-            (tx, ty, false)
-        } else {
-            (2.0 - tx, ty, true)
-        };
-        let (lam, phi) = self.pet.inverse(0.5 * (u + v), 0.5 * (v - u));
-        let phi = if south { -phi } else { phi };
-        self.polar_to_world(unit_pm(lam, phi))
-    }
-
-    /// The canonical point (x, z) of a unit vector (any length > 0): x in [−b, b), z in
-    /// [−b/2, b/2].
-    pub fn point_of_unit(&self, v: [f64; 3]) -> (f64, f64) {
-        let q = self.world_to_polar(v);
-        let phi = pm::atan2(q[2], (q[0] * q[0] + q[1] * q[1]).sqrt());
-        let lam = pm::atan2(q[1], q[0]);
-        let south = phi < 0.0;
-        let (xm, ym) = self.pet.forward(lam, if south { -phi } else { phi });
-        let (u, v) = (xm - ym, xm + ym);
-        let tx = if south { 2.0 - u } else { u };
-        let b = self.b as f64;
-        let x = (tx - 1.0) * b / 2.0;
-        let z = -v * b / 2.0;
-        (self.wrap_x(x), z.clamp(-b / 2.0, b / 2.0))
-    }
-
-    /// (latitude, longitude) of the point (x, z), degrees; longitude in [0, 360) in the
-    /// simulation's frame (`unit_of_lat_lon`).
-    pub fn lat_lon(&self, x: f64, z: f64) -> (f64, f64) {
-        lat_lon_of_unit(self.unit(x, z))
-    }
-
-    /// The canonical point of a latitude and longitude (degrees).
-    pub fn block_of(&self, lat_deg: f64, lon_deg: f64) -> (f64, f64) {
-        let lat = pm::to_radians(lat_deg.clamp(-90.0, 90.0));
-        let lon = pm::to_radians(lon_deg);
-        self.point_of_unit(unit_pm(lon, lat))
-    }
-
-    /// The layout block for `manifest.json` (FORMAT.md "The world's layout"), with the border
-    /// `border` (or none).
-    pub fn spec(&self, border: Option<BorderSpec>) -> ProjectionSpec {
-        let (b, h) = (self.b, self.b / 2);
-        let edge = |name: &str,
-                    kind: EdgeKind,
-                    axis: Axis,
-                    side: Side,
-                    coord: i64,
-                    span: [i64; 2],
-                    iso: [i64; 3],
-                    pivot: Option<[i64; 2]>,
-                    owner: &str| EdgeSpec {
-            name: name.into(),
-            seam: None,
-            kind,
-            axis,
-            side,
-            coord,
-            span,
-            iso,
-            pivot,
-            partner: None,
-            owner: owner.into(),
-        };
-        let edges = vec![
-            edge(
-                "west",
-                EdgeKind::Slide,
-                Axis::X,
-                Side::Min,
-                -b,
-                [-h, h],
-                [0, 2 * b, 0],
-                None,
-                "toroidal_world",
-            ),
-            edge(
-                "east",
-                EdgeKind::Slide,
-                Axis::X,
-                Side::Max,
-                b,
-                [-h, h],
-                [0, -2 * b, 0],
-                None,
-                "toroidal_world",
-            ),
-            edge(
-                "north",
-                EdgeKind::HalfTurn,
-                Axis::Z,
-                Side::Min,
-                -h,
-                [-b, b],
-                [2, 0, -b],
-                Some([0, -h]),
-                "wrap_engine",
-            ),
-            edge(
-                "south",
-                EdgeKind::HalfTurn,
-                Axis::Z,
-                Side::Max,
-                h,
-                [-b, b],
-                [2, 0, b],
-                Some([0, h]),
-                "wrap_engine",
-            ),
-        ];
-        let cone = |name: &str, images: Vec<[i64; 2]>| {
-            let (lat, lon) = self.lat_lon(images[0][0] as f64, images[0][1] as f64);
-            ConePoint {
-                name: name.into(),
-                cone_deg: 180.0,
-                faces: None,
-                cube: None,
-                lat_deg: lat,
-                lon_deg: lon,
-                land_distance_deg: None,
-                reachable: None,
-                images,
-            }
-        };
-        ProjectionSpec {
-            kind: ProjectionKind::PetroffGuyou,
-            layout_version: LAYOUT_VERSION,
-            hemisphere_blocks: Some(b as u32),
-            lambda_c_deg: Some(self.lambda_c_deg),
-            face_blocks: None,
-            map: None,
-            rotation: None,
-            domain: self.domain(),
-            faces: None,
-            edges,
-            cone_points: vec![
-                cone("north-midpoint", vec![[0, -h]]),
-                cone("north-corner", vec![[-b, -h], [b, -h]]),
-                cone("south-midpoint", vec![[0, h]]),
-                cone("south-corner", vec![[-b, h], [b, h]]),
-            ],
-            poles: vec![
-                PoleSpec::corners("north", &[[-h, -h], [h, -h]]),
-                PoleSpec::corners("south", &[[-h, h], [h, h]]),
-            ],
-            border,
-        }
-    }
-
-    /// The world's grid of `r` blocks a cell (`r` divides b): W = 2b/r columns from x = −b, H =
-    /// b/r + 1 rows from the north edge to the south edge inclusive, rows past them folded by the
-    /// half-turns ([`crate::GridDesc::cell`]).
-    pub fn grid(&self, name: &str, r: u32) -> crate::Result<crate::GridDesc> {
-        let r64 = i64::from(r.max(1));
-        if self.b % r64 != 0 {
-            return Err(crate::FormatError::Invalid(format!(
-                "hemisphere {} is not a multiple of r = {r}",
-                self.b
-            )));
-        }
-        Ok(crate::GridDesc {
-            name: name.to_owned(),
-            w: (2 * self.b / r64) as u32,
-            h: (self.b / r64 + 1) as u32,
-            r,
-            wraps_x: true,
-            origin_block_x: -self.b,
-            origin_block_z: -self.b / 2,
-            z_edges: crate::raster::ZEdges::HalfTurn,
-        })
-    }
-
-    /// The local Jacobian of the map at the point (x, z): the planet's displacement (blocks of
-    /// the equal-area sphere of [`PetroffGuyou::radius`]) per block of x and per block of z, as
-    /// [[east, north] per x, [east, north] per z] (central differences of `h` blocks, taken
-    /// through the fold so they work at the edges).
-    pub fn jacobian(&self, x: f64, z: f64, h: f64) -> [[f64; 2]; 2] {
-        let v0 = self.unit(x, z);
-        let (east, north) = local_frame(v0);
-        let rr = self.radius();
-        let d = |dx: f64, dz: f64| {
-            let p = self.unit(x + dx, z + dz);
-            let m = self.unit(x - dx, z - dz);
-            let dv = [p[0] - m[0], p[1] - m[1], p[2] - m[2]];
-            [
-                dot3(dv, east) * rr / (2.0 * h),
-                dot3(dv, north) * rr / (2.0 * h),
-            ]
-        };
-        [d(h, 0.0), d(0.0, h)]
-    }
-
-    /// The unit vector of north in block space at the point (x, z), as (dx, dz).
-    pub fn north(&self, x: f64, z: f64) -> (f64, f64) {
-        let j = self.jacobian(x, z, 0.5);
-        // Solve J·(dx, dz) = (0, 1) (north): dx·j[0] + dz·j[1] = (0, 1).
-        let det = j[0][0] * j[1][1] - j[1][0] * j[0][1];
-        if det == 0.0 || !det.is_finite() {
-            return (0.0, -1.0);
-        }
-        let dx = -j[1][0] / det;
-        let dz = j[0][0] / det;
-        let n = dx.hypot(dz);
-        (dx / n, dz / n)
-    }
 }
 
 /// (latitude, longitude) of a unit vector, degrees, on the portable functions; longitude in
@@ -1171,15 +712,12 @@ impl IndexFrame {
 }
 
 /// A world's projection: what its world data is laid out in (manifest `projection`).
-// Copy on purpose (it is passed by value everywhere); the Petroff–Guyou variant's constants make it
-// a few hundred bytes, which is fine for a value made once per world. The cube's net and map table
-// are shared for the process's life ([`Cube::shared`], [`CubeMap::builtin_static`]), so its view is
-// Copy too.
-#[allow(clippy::large_enum_variant)]
+// Copy on purpose (it is passed by value everywhere). The cube's net and map table are shared for
+// the process's life ([`Cube::shared`], [`CubeMap::builtin_static`]), so its view is Copy too.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum WorldProjection {
+    /// The simulation's Lambert frame as it is (the synthetic test worlds, [`ProjectionKind::Lambert`]).
     Lambert(Projection),
-    PetroffGuyou(PetroffGuyou),
     /// A cube world (format 0.7). Its view's radius is in blocks of the equal-area sphere
     /// ([`Cube::radius`]), so its Jacobians are planet blocks per net block: times
     /// `scale.m_per_block_h` for metres.
@@ -1198,10 +736,6 @@ impl WorldProjection {
     /// (by name and sha256), whose rotation is not one, or whose face side is not even.
     pub fn try_from_spec(spec: Option<&ProjectionSpec>, c: u32) -> crate::Result<WorldProjection> {
         Ok(match spec {
-            Some(s) if s.kind == ProjectionKind::PetroffGuyou => {
-                let b = s.hemisphere_blocks.unwrap_or(c / 2);
-                WorldProjection::PetroffGuyou(PetroffGuyou::new(b, s.lambda_c_deg.unwrap_or(0.0)))
-            }
             Some(s) if s.kind == ProjectionKind::Cube => {
                 let bad = |m: String| crate::FormatError::Invalid(m);
                 let face = s
@@ -1239,7 +773,6 @@ impl WorldProjection {
     pub fn kind(&self) -> ProjectionKind {
         match self {
             WorldProjection::Lambert(_) => ProjectionKind::Lambert,
-            WorldProjection::PetroffGuyou(_) => ProjectionKind::PetroffGuyou,
             WorldProjection::Cube(_) => ProjectionKind::Cube,
         }
     }
@@ -1248,7 +781,6 @@ impl WorldProjection {
     pub fn period(&self) -> f64 {
         match self {
             WorldProjection::Lambert(p) => p.circumference(),
-            WorldProjection::PetroffGuyou(g) => g.period() as f64,
             WorldProjection::Cube(c) => c.cube.period() as f64,
         }
     }
@@ -1257,7 +789,6 @@ impl WorldProjection {
     pub fn radius(&self) -> f64 {
         match self {
             WorldProjection::Lambert(p) => p.radius(),
-            WorldProjection::PetroffGuyou(g) => g.radius(),
             WorldProjection::Cube(c) => c.cube.radius(),
         }
     }
@@ -1266,7 +797,6 @@ impl WorldProjection {
     pub fn unit(&self, x: f64, z: f64) -> [f64; 3] {
         match self {
             WorldProjection::Lambert(p) => p.unit(x, z),
-            WorldProjection::PetroffGuyou(g) => g.unit(x, z),
             WorldProjection::Cube(c) => c.unit(x, z).unwrap_or([f64::NAN; 3]),
         }
     }
@@ -1275,7 +805,6 @@ impl WorldProjection {
     pub fn lat_lon(&self, x: f64, z: f64) -> (f64, f64) {
         match self {
             WorldProjection::Lambert(p) => p.lat_lon(x, z),
-            WorldProjection::PetroffGuyou(g) => g.lat_lon(x, z),
             WorldProjection::Cube(c) => c.lat_lon(x, z).unwrap_or((f64::NAN, f64::NAN)),
         }
     }
@@ -1284,7 +813,6 @@ impl WorldProjection {
     pub fn block_of(&self, lat_deg: f64, lon_deg: f64) -> (f64, f64) {
         match self {
             WorldProjection::Lambert(p) => p.block_of(lat_deg, lon_deg),
-            WorldProjection::PetroffGuyou(g) => g.block_of(lat_deg, lon_deg),
             WorldProjection::Cube(c) => c.point_of_lat_lon(lat_deg, lon_deg),
         }
     }
@@ -1294,10 +822,6 @@ impl WorldProjection {
     pub fn canonical(&self, x: f64, z: f64) -> (f64, f64) {
         match self {
             WorldProjection::Lambert(p) => (p.wrap_x(x), p.clamp_z(z)),
-            WorldProjection::PetroffGuyou(g) => {
-                let f = g.fold(x, z);
-                (f.x, f.z)
-            }
             WorldProjection::Cube(c) => match c.cube.fold_point(x, z) {
                 Some(p) => (p.x, p.z),
                 None => (f64::NAN, f64::NAN),
@@ -1305,15 +829,15 @@ impl WorldProjection {
         }
     }
 
-    /// The world's z range on the planet: [−R, R] (Lambert), [−b/2, b/2] (Petroff–Guyou) or
-    /// the cube's window [−3s/2, 3s/2].
+    /// The world's z range on the planet: [−R, R] (Lambert) or the cube's window [−3s/2, 3s/2].
     pub fn z_range(&self) -> (f64, f64) {
-        let d = match self {
-            WorldProjection::Lambert(p) => return (-p.pole_z(), p.pole_z()),
-            WorldProjection::PetroffGuyou(g) => g.domain(),
-            WorldProjection::Cube(c) => c.cube.window(),
-        };
-        (d.z_min, d.z_max)
+        match self {
+            WorldProjection::Lambert(p) => (-p.pole_z(), p.pole_z()),
+            WorldProjection::Cube(c) => {
+                let d = c.cube.window();
+                (d.z_min, d.z_max)
+            }
+        }
     }
 
     /// The world grid of `r` blocks a cell.
@@ -1322,7 +846,6 @@ impl WorldProjection {
             WorldProjection::Lambert(p) => {
                 crate::GridDesc::for_planet(name, p.circumference() as u32, r)
             }
-            WorldProjection::PetroffGuyou(g) => g.grid(name, r),
             WorldProjection::Cube(c) => crate::GridDesc::for_cube(name, c.cube.side() as u32, r),
         }
     }
@@ -1332,7 +855,6 @@ impl WorldProjection {
     pub fn index_origin_blocks(&self) -> (i64, i64) {
         match self {
             WorldProjection::Lambert(p) => p.index_origin_blocks(),
-            WorldProjection::PetroffGuyou(g) => (-g.hemisphere(), -g.hemisphere() / 2),
             WorldProjection::Cube(c) => (-3 * c.cube.side() / 2, -3 * c.cube.side() / 2),
         }
     }
@@ -1341,7 +863,6 @@ impl WorldProjection {
     pub fn index_span_blocks(&self) -> (i64, i64) {
         match self {
             WorldProjection::Lambert(p) => p.index_span_blocks(),
-            WorldProjection::PetroffGuyou(g) => (g.period(), g.hemisphere() + 1),
             WorldProjection::Cube(c) => (c.cube.period(), 3 * c.cube.side()),
         }
     }
@@ -1359,7 +880,6 @@ impl WorldProjection {
     pub fn spec(&self, border: Option<BorderSpec>) -> ProjectionSpec {
         match self {
             WorldProjection::Lambert(p) => lambert_spec(p),
-            WorldProjection::PetroffGuyou(g) => g.spec(border),
             WorldProjection::Cube(c) => cube_spec(c, border, None),
         }
     }
@@ -1389,7 +909,6 @@ pub fn cube_map_named(name: &str, sha256: &str) -> crate::Result<&'static CubeMa
 pub fn cube_border(cube: &Cube, inset_blocks: f64) -> BorderSpec {
     BorderSpec {
         kind: "edge_stop".into(),
-        edges: Vec::new(),
         inset_blocks,
         temporary: true,
         segments: cube
@@ -1510,8 +1029,6 @@ pub fn cube_spec(
     ProjectionSpec {
         kind: ProjectionKind::Cube,
         layout_version: CUBE_LAYOUT_VERSION,
-        hemisphere_blocks: None,
-        lambda_c_deg: None,
         face_blocks: Some(s as u32),
         map: Some(MapSpec {
             name: view.map.name().into(),
@@ -1530,8 +1047,8 @@ pub fn cube_spec(
     }
 }
 
-/// The layout block of a Lambert world: the slide, no cone points, the poles outside the
-/// domain's z range (the pole cap, not a border, ends the world there).
+/// The layout block of the Lambert frame (the synthetic test worlds): the slide, no cone points,
+/// the poles outside the domain's z range (the world's first and last rows end it there).
 pub fn lambert_spec(p: &Projection) -> ProjectionSpec {
     let c = p.circumference() as i64;
     let zo = p.grid_half_extent(1);
@@ -1551,8 +1068,6 @@ pub fn lambert_spec(p: &Projection) -> ProjectionSpec {
     ProjectionSpec {
         kind: ProjectionKind::Lambert,
         layout_version: LAYOUT_VERSION,
-        hemisphere_blocks: None,
-        lambda_c_deg: None,
         face_blocks: None,
         map: None,
         rotation: None,
@@ -1860,139 +1375,6 @@ mod tests {
         assert_eq!(grid.wrap_i(-1), grid.w - 1);
         assert_eq!(grid.clamp_j(i64::from(grid.h) + 5), grid.h - 1);
     }
-}
-
-/// Petroff–Guyou: round trips, equal area, seams, folds and landmarks (ledger: SCL-086).
-#[cfg(test)]
-mod petroff_guyou_tests {
-    use super::*;
-
-    /// SplitMix64, for property tests without a dependency.
-    struct Rng(u64);
-    impl Rng {
-        fn f(&mut self) -> f64 {
-            self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
-            let mut z = self.0;
-            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-            ((z ^ (z >> 31)) >> 11) as f64 / (1u64 << 53) as f64
-        }
-    }
-
-    fn angle(a: [f64; 3], b: [f64; 3]) -> f64 {
-        let c = [
-            a[1] * b[2] - a[2] * b[1],
-            a[2] * b[0] - a[0] * b[2],
-            a[0] * b[1] - a[1] * b[0],
-        ];
-        let s = (c[0] * c[0] + c[1] * c[1] + c[2] * c[2]).sqrt();
-        s.atan2(a[0] * b[0] + a[1] * b[1] + a[2] * b[2])
-    }
-
-    fn sub(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-        [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-    }
-
-    fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
-        [
-            a[1] * b[2] - a[2] * b[1],
-            a[2] * b[0] - a[0] * b[2],
-            a[0] * b[1] - a[1] * b[0],
-        ]
-    }
-
-    fn norm(a: [f64; 3]) -> f64 {
-        (a[0] * a[0] + a[1] * a[1] + a[2] * a[2]).sqrt()
-    }
-
-    /// The hemisphere sides of the 16k and 32k worlds and a small test world, with a λc each.
-    const WORLDS: [(u32, f64); 3] = [(6_656, 31.0), (13_056, 200.25), (1_536, 0.0)];
-
-    /// Exact inputs on the lines where Petroff's forward is degenerate (ledger: SCL-083), for the
-    /// round trip below and the parity fixture: the equator every `step` degrees of longitude; the
-    /// meridians λc, λc ± 90° and λc + 180° (the tiles' midlines and edges) every `step` degrees of
-    /// latitude; the four cone points; the eight 67.5° vertices of Petroff's square (the equator at
-    /// λc ± 22.5° and λc + 180° ± 22.5°, latitude ±22.5° on λc and λc + 180°); the two tile centres
-    /// and the poles.
-    pub(super) fn diagonal_inputs(lc: f64, step: f64) -> Vec<(f64, f64)> {
-        let mut p = Vec::new();
-        let n = (360.0 / step).round() as i32;
-        for k in 0..n {
-            p.push((0.0, f64::from(k) * step));
-        }
-        let m = (90.0 / step).round() as i32;
-        for k in 1 - m..m {
-            for d in [0.0, 90.0, 180.0, 270.0] {
-                p.push((f64::from(k) * step, wrap_deg(lc + d)));
-            }
-        }
-        for lat in [45.0, -45.0] {
-            for d in [90.0, 270.0] {
-                p.push((lat, wrap_deg(lc + d)));
-            }
-        }
-        for d in [0.0, 180.0] {
-            for o in [22.5, -22.5] {
-                p.push((0.0, wrap_deg(lc + d + o)));
-                p.push((o, wrap_deg(lc + d)));
-            }
-            p.push((0.0, wrap_deg(lc + d)));
-        }
-        p.push((90.0, 0.0));
-        p.push((-90.0, 0.0));
-        p
-    }
-
-    #[test]
-    fn exact_inputs_on_the_diagonals_round_trip() {
-        // Sphere → block → sphere on the forward's degenerate lines (SCL-083). Before 2026-10-20
-        // the forward lost its last angle there: up to 1.6° off on the equator and 10.5° at the
-        // cone points of the play world (6656, λc 146), whose cone points clamped to (616, −3328).
-        for (b, lc) in WORLDS.into_iter().chain([(6_656, 146.0), (6_656, 31.25)]) {
-            let g = PetroffGuyou::new(b, lc);
-            let (bf, h) = (f64::from(b), f64::from(b) / 2.0);
-            let pts = diagonal_inputs(lc, 0.1);
-            let mut worst: f64 = 0.0;
-            for &(lat, lon) in &pts {
-                let (x, z) = g.block_of(lat, lon);
-                assert!(
-                    (-bf..bf).contains(&x) && z.abs() <= h,
-                    "b {b} λc {lc}: ({lat}, {lon}) -> ({x}, {z})"
-                );
-                let d = angle(g.unit(x, z), unit_of_lat_lon(lat, lon)).to_degrees();
-                worst = worst.max(d);
-                assert!(
-                    d < 1e-5,
-                    "b {b} λc {lc}: ({lat}, {lon}) -> ({x}, {z}) is {d}° off"
-                );
-                if lat == 0.0 {
-                    assert!(z.abs() < 1e-6, "b {b} λc {lc}: equator at {lon} -> z {z}");
-                }
-            }
-            eprintln!(
-                "b {b} λc {lc}: {} exact inputs, worst round trip {worst:e}°",
-                pts.len()
-            );
-        }
-    }
-
-    #[test]
-    fn the_sizes_follow_the_planet() {
-        assert_eq!(PetroffGuyou::hemisphere_for(16_384), 6_656);
-        assert_eq!(PetroffGuyou::hemisphere_for(32_768), 13_056);
-        assert_eq!(PetroffGuyou::hemisphere_for(4_096), 1_536);
-        for c in [1_024u32, 4_096, 16_384, 32_768] {
-            let b = PetroffGuyou::hemisphere_for(c);
-            assert_eq!(b % HEMISPHERE_QUANTUM, 0);
-            assert_eq!((2 * b) % 512, 0, "the x period is whole region files");
-            // Within half a quantum of the equal-area side C/√(2π).
-            let exact = f64::from(c) / (2.0 * std::f64::consts::PI).sqrt();
-            assert!(
-                (f64::from(b) - exact).abs() <= 128.0,
-                "C {c}: b {b} vs {exact}"
-            );
-        }
-    }
 
     #[test]
     fn the_cube_face_follows_the_planet() {
@@ -2012,353 +1394,16 @@ mod petroff_guyou_tests {
             );
         }
     }
-
-    #[test]
-    fn landmarks_and_orientation() {
-        for (b, lc) in WORLDS {
-            let g = PetroffGuyou::new(b, lc);
-            let (bf, h) = (f64::from(b), f64::from(b) / 2.0);
-            // The western hemisphere's centre is (0°, λc); the eastern one's (0°, λc + 180°).
-            let (lat, lon) = g.lat_lon(-h, 0.0);
-            assert!(lat.abs() < 1e-9, "{lat}");
-            assert!(
-                (wrap_deg(lon - lc + 180.0) - 180.0).abs() < 1e-9,
-                "{lon} vs {lc}"
-            );
-            let (lat, lon) = g.lat_lon(h, 0.0);
-            assert!(lat.abs() < 1e-9);
-            assert!((wrap_deg(lon - lc) - 180.0).abs() < 1e-9, "{lon}");
-            // The poles on the long edges at x = ∓b/2, each twice.
-            for x in [-h, h] {
-                assert!(
-                    (g.lat_lon(x, -h).0 - 90.0).abs() < 1e-9,
-                    "north pole at ({x}, {})",
-                    -h
-                );
-                assert!(
-                    (g.lat_lon(x, h).0 + 90.0).abs() < 1e-9,
-                    "south pole at ({x}, {h})"
-                );
-            }
-            // The equator is the line z = 0.
-            for k in 0..100 {
-                let x = -bf + 2.0 * bf * f64::from(k) / 100.0;
-                assert!(g.lat_lon(x, 0.0).0.abs() < 1e-6, "x {x}");
-            }
-            // East is +x and north −z along the equator; not mirrored anywhere (the map keeps
-            // orientation: (∂v/∂x × ∂v/∂z) points inwards, as east × south does).
-            let (_, l0) = g.lat_lon(-h, 0.0);
-            let (_, l1) = g.lat_lon(-h + 1.0, 0.0);
-            assert!(wrap_deg(l1 - l0 + 180.0) - 180.0 > 0.0, "east is +x");
-            assert!(g.lat_lon(-h, -1.0).0 > 0.0, "north is −z");
-            let mut rng = Rng(u64::from(b));
-            for _ in 0..2_000 {
-                let (x, z) = ((rng.f() - 0.5) * 2.0 * bf, (rng.f() - 0.5) * bf);
-                let v = g.unit(x, z);
-                let vx = sub(g.unit(x + 0.01, z), g.unit(x - 0.01, z));
-                let vz = sub(g.unit(x, z + 0.01), g.unit(x, z - 0.01));
-                let n = cross(vx, vz);
-                assert!(
-                    n[0] * v[0] + n[1] * v[1] + n[2] * v[2] < 0.0,
-                    "orientation at ({x}, {z})"
-                );
-            }
-            // North along the equator is (0, −1).
-            let (nx, nz) = g.north(-h, 0.0);
-            assert!(nx.abs() < 1e-6 && (nz + 1.0).abs() < 1e-6, "{nx} {nz}");
-        }
-    }
-
-    #[test]
-    fn round_trips() {
-        for (b, lc) in WORLDS {
-            let g = PetroffGuyou::new(b, lc);
-            let (bf, h) = (f64::from(b), f64::from(b) / 2.0);
-            let mut rng = Rng(0xC0DE ^ u64::from(b));
-            let mut worst_s: f64 = 0.0;
-            let mut worst_b: f64 = 0.0;
-            for _ in 0..100_000 {
-                // Sphere → block → sphere.
-                let lat = (2.0 * rng.f() - 1.0).asin().to_degrees();
-                let lon = 360.0 * rng.f();
-                let (x, z) = g.block_of(lat, lon);
-                assert!(
-                    (-bf..bf).contains(&x) && z.abs() <= h,
-                    "({lat}, {lon}) -> ({x}, {z})"
-                );
-                let d = angle(g.unit(x, z), unit_of_lat_lon(lat, lon));
-                worst_s = worst_s.max(d);
-                assert!(d < 1e-8, "({lat}, {lon}) -> ({x}, {z}): {d} rad");
-                // Block → sphere → block.
-                let (x, z) = ((rng.f() - 0.5) * 2.0 * bf, (rng.f() - 0.5) * bf);
-                let (x2, z2) = g.point_of_unit(g.unit(x, z));
-                let e = g.wrap_x(x2 - x).abs().max((z2 - z).abs());
-                worst_b = worst_b.max(e);
-                assert!(e < 1e-6, "({x}, {z}) -> ({x2}, {z2})");
-            }
-            eprintln!("b {b}: worst sphere round trip {worst_s:e} rad, block {worst_b:e} blocks");
-        }
-    }
-
-    #[test]
-    fn equal_area() {
-        // The area a block stands for, from the Jacobian at random points away from the four cone
-        // points: second-order one-sided differences (step 1/20 block) on each side of the point, the
-        // best of the four combinations (Petroff's creases, slope jumps of up to 9 % on the tiles'
-        // midlines and diagonals, spoil a difference that straddles one), and the sum of the
-        // spherical quads of a whole grid against 4π.
-        let tri = |a: [f64; 3], b: [f64; 3], c: [f64; 3]| {
-            // Van Oosterom–Strackee.
-            let num = a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
-                + a[2] * (b[0] * c[1] - b[1] * c[0]);
-            let den = 1.0
-                + (a[0] * b[0] + a[1] * b[1] + a[2] * b[2])
-                + (b[0] * c[0] + b[1] * c[1] + b[2] * c[2])
-                + (c[0] * a[0] + c[1] * a[1] + c[2] * a[2]);
-            2.0 * num.atan2(den)
-        };
-        for (b, lc) in WORLDS {
-            let g = PetroffGuyou::new(b, lc);
-            let (bf, h) = (f64::from(b), f64::from(b) / 2.0);
-            let rr = g.radius();
-            let mut rng = Rng(0xA4EA ^ u64::from(b));
-            let (mut worst, mut n): (f64, usize) = (0.0, 0);
-            for _ in 0..50_000 {
-                let (x, z) = ((rng.f() - 0.5) * 2.0 * bf, (rng.f() - 0.5) * (bf - 1.0));
-                let near_cone = [(0.0, -h), (0.0, h), (-bf, -h), (-bf, h), (bf, -h), (bf, h)]
-                    .iter()
-                    .any(|&(cx, cz)| (x - cx).hypot(z - cz) < 0.01 * bf);
-                if near_cone {
-                    continue;
-                }
-                let s = 0.05;
-                let v0 = g.unit(x, z);
-                let one_sided = |dx: f64, dz: f64| {
-                    let v1 = g.unit(x + dx * s, z + dz * s);
-                    let v2 = g.unit(x + 2.0 * dx * s, z + 2.0 * dz * s);
-                    let k = (dx + dz) / (2.0 * s);
-                    [
-                        (-3.0 * v0[0] + 4.0 * v1[0] - v2[0]) * k,
-                        (-3.0 * v0[1] + 4.0 * v1[1] - v2[1]) * k,
-                        (-3.0 * v0[2] + 4.0 * v1[2] - v2[2]) * k,
-                    ]
-                };
-                let (xp, xm) = (one_sided(1.0, 0.0), one_sided(-1.0, 0.0));
-                let (zp, zm) = (one_sided(0.0, 1.0), one_sided(0.0, -1.0));
-                let e = [(xp, zp), (xp, zm), (xm, zp), (xm, zm)]
-                    .iter()
-                    .map(|&(vx, vz)| (norm(cross(vx, vz)) * rr * rr - 1.0).abs())
-                    .fold(f64::MAX, f64::min);
-                worst = worst.max(e);
-                n += 1;
-            }
-            eprintln!("b {b}: area per block within {worst:e} of 1 at {n} points");
-            assert!(worst < 1e-5, "b {b}: area off by {worst}");
-            // The whole world covers the sphere once: spherical quads of a 256 × 128 grid.
-            let (nx, nz) = (256, 128);
-            let mut total = 0.0;
-            let mut cell_areas = Vec::new();
-            for j in 0..nz {
-                for i in 0..nx {
-                    let x0 = -bf + 2.0 * bf * f64::from(i) / f64::from(nx);
-                    let x1 = -bf + 2.0 * bf * f64::from(i + 1) / f64::from(nx);
-                    let z0 = -h + bf * f64::from(j) / f64::from(nz);
-                    let z1 = -h + bf * f64::from(j + 1) / f64::from(nz);
-                    // Subdivide each cell 4 × 4 so the quads' straight edges follow the map.
-                    let mut a = 0.0;
-                    for sj in 0..4 {
-                        for si in 0..4 {
-                            let xa = x0 + (x1 - x0) * f64::from(si) / 4.0;
-                            let xb = x0 + (x1 - x0) * f64::from(si + 1) / 4.0;
-                            let za = z0 + (z1 - z0) * f64::from(sj) / 4.0;
-                            let zb = z0 + (z1 - z0) * f64::from(sj + 1) / 4.0;
-                            // Corners in the cell's own tile: nudge off the tile line x = 0.
-                            let u = |x: f64, z: f64| g.unit_unfolded(x, z);
-                            let (p00, p10, p11, p01) = (u(xa, za), u(xb, za), u(xb, zb), u(xa, zb));
-                            a += -(tri(p00, p10, p11) + tri(p00, p11, p01));
-                        }
-                    }
-                    // Leave out the cells next to a cone point (the quads' straight edges cannot
-                    // follow the map there).
-                    let (cx, cz) = ((x0 + x1) / 2.0, (z0 + z1) / 2.0);
-                    let near = [(0.0, -h), (0.0, h), (-bf, -h), (-bf, h), (bf, -h), (bf, h)]
-                        .iter()
-                        .any(|&(px, pz)| {
-                            (cx - px).abs() < 3.0 * (x1 - x0) && (cz - pz).abs() < 3.0 * (z1 - z0)
-                        });
-                    if !near {
-                        cell_areas.push(a);
-                    }
-                    total += a;
-                }
-            }
-            let sphere = 4.0 * std::f64::consts::PI;
-            assert!((total / sphere - 1.0).abs() < 1e-9, "b {b}: {total} vs 4π");
-            let mean = sphere / f64::from(nx * nz);
-            let spread = cell_areas
-                .iter()
-                .map(|a| (a / mean - 1.0).abs())
-                .fold(0.0f64, f64::max);
-            eprintln!("b {b}: grid cells within {spread:e} of the mean area");
-            assert!(spread < 5e-3, "b {b}: a cell off by {spread}");
-        }
-    }
-
-    #[test]
-    fn every_glued_edge_maps_the_same_sphere_points() {
-        for (b, lc) in WORLDS {
-            let g = PetroffGuyou::new(b, lc);
-            let (bf, h) = (f64::from(b), f64::from(b) / 2.0);
-            let mut worst: f64 = 0.0;
-            for k in 0..=4_000 {
-                let t = f64::from(k) / 4_000.0;
-                // The slide: x = −b and x = b (drawn from the western and eastern tiles).
-                let z = -h + bf * t;
-                worst = worst.max(angle(g.unit_unfolded(-bf, z), g.unit_unfolded(bf, z)));
-                // The half-turns: (x, ∓b/2) and (−x, ∓b/2).
-                let x = -bf + 2.0 * bf * t;
-                worst = worst.max(angle(g.unit_unfolded(x, -h), g.unit_unfolded(-x, -h)));
-                worst = worst.max(angle(g.unit_unfolded(x, h), g.unit_unfolded(-x, h)));
-                // The tile line x = 0 inside the world: both tiles agree on it.
-                let z = -h + bf * t;
-                worst = worst.max(angle(g.unit_unfolded(-1e-12, z), g.unit_unfolded(1e-12, z)));
-            }
-            assert!(worst <= 1e-8, "b {b}: seam closure {worst} rad");
-            eprintln!("b {b}: seams close to {worst:e} rad");
-        }
-    }
-
-    #[test]
-    fn the_map_continues_smoothly_through_every_seam() {
-        // Beyond an edge the fold gives the glued inside; the planet points there continue the
-        // inside's run with no kink: v(p − d·n) − 2·v(p) + v(fold(p + d·n)) is second order in d.
-        for (b, lc) in WORLDS {
-            let g = PetroffGuyou::new(b, lc);
-            let (bf, h) = (f64::from(b), f64::from(b) / 2.0);
-            let d = 0.5;
-            let mut worst: f64 = 0.0;
-            for k in 1..400 {
-                let t = f64::from(k) / 400.0;
-                let x = -bf + 2.0 * bf * t;
-                // Skip the cone points (x = 0, ±b) on the long edges.
-                let cone = (x.abs() < 0.02 * bf) || (bf - x.abs() < 0.02 * bf);
-                let z = -h + bf * t;
-                let corner = h - z.abs() < 0.02 * bf;
-                let mut pairs = Vec::new();
-                if !corner {
-                    pairs.push(((-bf + d, z), (-bf - d, z)));
-                    pairs.push(((bf - d, z), (bf + d, z)));
-                }
-                if !cone {
-                    pairs.push(((x, -h + d), (x, -h - d)));
-                    pairs.push(((x, h - d), (x, h + d)));
-                }
-                for ((xi, zi), (xo, zo)) in pairs {
-                    let on = g.unit((xi + xo) / 2.0, (zi + zo) / 2.0);
-                    let inside = g.unit(xi, zi);
-                    let outside = g.unit(xo, zo);
-                    let second = [
-                        inside[0] - 2.0 * on[0] + outside[0],
-                        inside[1] - 2.0 * on[1] + outside[1],
-                        inside[2] - 2.0 * on[2] + outside[2],
-                    ];
-                    let first = norm(sub(outside, inside));
-                    worst = worst.max(norm(second) / first.max(1e-300));
-                }
-            }
-            // A kink would make the second difference as large as the first (ratio ~ 1).
-            assert!(worst < 1e-2, "b {b}: second/first difference {worst}");
-            eprintln!("b {b}: second over first difference across seams ≤ {worst:e}");
-        }
-    }
-
-    #[test]
-    fn folds_match_the_wrap_engine() {
-        let g = PetroffGuyou::new(6_656, 31.0);
-        let (b, h) = (6_656i64, 3_328i64);
-        // CellIsometry.halfTurnAbout(0, −b/2): (x, z) → (−x − 1, −b − z − 1).
-        for (x, z) in [(10, -h - 1), (-6_000, -h - 40), (0, -h - 1), (-1, -h - 16)] {
-            let (fx, fz, n) = g.fold_cell(x, z);
-            assert_eq!(
-                (fx, fz, n),
-                (g_wrap(-x - 1, b), -b - z - 1, 1),
-                "({x}, {z})"
-            );
-        }
-        for (x, z) in [(10, h), (-6_000, h + 40)] {
-            let (fx, fz, n) = g.fold_cell(x, z);
-            assert_eq!((fx, fz, n), (g_wrap(-x - 1, b), b - z - 1, 1));
-        }
-        assert_eq!(g.fold_cell(b, 0), (-b, 0, 0), "the slide");
-        assert_eq!(g.fold_cell(-b - 1, 5), (b - 1, 5, 0));
-        // The point fold and the sphere agree: a point beyond is the planet point of its image.
-        let mut rng = Rng(77);
-        for _ in 0..2_000 {
-            let x = (rng.f() - 0.5) * 2.0 * b as f64;
-            let d = rng.f() * 3_000.0;
-            let f = g.fold(x, -(h as f64) - d);
-            assert!((f.x - g.wrap_x(-x)).abs() < 1e-9 && (f.z - (-(h as f64) + d)).abs() < 1e-9);
-            assert_eq!(f.half_turns, 1);
-        }
-    }
-
-    fn g_wrap(x: i64, b: i64) -> i64 {
-        (x + b).rem_euclid(2 * b) - b
-    }
-
-    #[test]
-    fn cone_points_sit_at_45_degrees_on_the_boundary_meridians() {
-        for (b, lc) in WORLDS {
-            let g = PetroffGuyou::new(b, lc);
-            let spec = g.spec(None);
-            assert_eq!(spec.cone_points.len(), 4);
-            for c in &spec.cone_points {
-                assert!(
-                    (c.lat_deg.abs() - 45.0).abs() < 1e-6,
-                    "{}: {} {}",
-                    c.name,
-                    c.lat_deg,
-                    c.lon_deg
-                );
-                let dl = wrap_deg(c.lon_deg - lc);
-                assert!(
-                    (dl - 90.0).abs() < 1e-6 || (dl - 270.0).abs() < 1e-6,
-                    "{}: lon {} vs λc {lc}",
-                    c.name,
-                    c.lon_deg
-                );
-                for im in &c.images[1..] {
-                    let d = angle(
-                        g.unit(im[0] as f64, im[1] as f64),
-                        g.unit(c.images[0][0] as f64, c.images[0][1] as f64),
-                    );
-                    assert!(d < 1e-8);
-                }
-            }
-            for p in &spec.poles {
-                for im in &p.images {
-                    let lat = g.lat_lon(im[0], im[1]).0;
-                    assert!(
-                        (lat.abs() - 90.0).abs() < 1e-9,
-                        "{} at {im:?}: {lat}",
-                        p.name
-                    );
-                }
-            }
-        }
-    }
 }
 
 /// The cross-language parity fixture (`tests/data/projection_parity.json`): inputs and outputs of
-/// the portable trigonometry, Petroff's square and two Petroff–Guyou worlds (random points and
-/// exact inputs on the forward's degenerate lines) and the cube world (`"cube"`,
-/// [`crate::cube_map::parity`]), every number as the hex of its bits. Java's `ProjectionParityTest` and the pages' `tools/viewer/projection-check.js`
+/// the portable trigonometry and the cube world (`"cube"`, [`crate::cube_map::parity`]), every
+/// number as the hex of its bits. Java's `ProjectionParityTest` and the pages' `tools/viewer/projection-check.js`
 /// read it and must give the same bits. `DEEPTIME_WRITE_PARITY=1 cargo test -p deeptime-format
 /// parity_fixture` rewrites it after a deliberate change.
 #[cfg(test)]
 mod parity_fixture {
     use super::*;
-    use crate::petroff::Petroff;
 
     fn hx(v: f64) -> String {
         format!("\"{:016x}\"", v.to_bits())
@@ -2404,96 +1449,7 @@ mod parity_fixture {
         }
         out.push_str(&rows.join(",\n"));
         out.push_str("\n  ],\n");
-        // Petroff's square.
-        let p = Petroff::new();
-        out.push_str("  \"petroff\": [\n");
-        let mut rows = Vec::new();
-        for _ in 0..200 {
-            let (x, y) = (g.f() * 2.0 - 1.0, g.f() * 2.0 - 1.0);
-            let (l, f) = p.inverse(x, y);
-            let lam = g.f() * 2.0 * PI;
-            let phi = pm::asin(g.f() * 2.0 - 1.0);
-            let (fx, fy) = p.forward(lam, phi);
-            rows.push(format!(
-                "    {{\"x\": {}, \"y\": {}, \"lambda\": {}, \"phi\": {}, \"lam_in\": {}, \"phi_in\": {}, \"x_out\": {}, \"y_out\": {}}}",
-                hx(x),
-                hx(y),
-                hx(l),
-                hx(f),
-                hx(lam),
-                hx(phi),
-                hx(fx),
-                hx(fy)
-            ));
-        }
-        out.push_str(&rows.join(",\n"));
-        out.push_str("\n  ],\n");
-        // Two worlds.
-        out.push_str("  \"worlds\": [\n");
-        let mut worlds = Vec::new();
-        for (b, lc) in [(6_656u32, 31.25f64), (1_536, 0.0)] {
-            let w = PetroffGuyou::new(b, lc);
-            let (bf, h) = (f64::from(b), f64::from(b) / 2.0);
-            let mut pts = Vec::new();
-            for k in 0..200 {
-                // Points inside, on the edges and a few past them (folded).
-                let x = (g.f() - 0.5) * 2.0 * bf;
-                let z = match k % 10 {
-                    0 => -h,
-                    1 => h,
-                    2 => -h - g.f() * 50.0,
-                    _ => (g.f() - 0.5) * bf,
-                };
-                let v = w.unit(x, z);
-                let (lat, lon) = w.lat_lon(x, z);
-                pts.push(format!(
-                    "        {{\"x\": {}, \"z\": {}, \"v\": [{}, {}, {}], \"lat\": {}, \"lon\": {}}}",
-                    hx(x),
-                    hx(z),
-                    hx(v[0]),
-                    hx(v[1]),
-                    hx(v[2]),
-                    hx(lat),
-                    hx(lon)
-                ));
-            }
-            let mut inv = Vec::new();
-            for _ in 0..200 {
-                let lat = pm::to_degrees(pm::asin(g.f() * 2.0 - 1.0));
-                let lon = g.f() * 360.0;
-                let (x, z) = w.block_of(lat, lon);
-                inv.push(format!(
-                    "        {{\"lat\": {}, \"lon\": {}, \"x\": {}, \"z\": {}}}",
-                    hx(lat),
-                    hx(lon),
-                    hx(x),
-                    hx(z)
-                ));
-            }
-            // Exact inputs on the forward's degenerate lines (SCL-083; no draws from `g`, so the
-            // rows above keep their inputs).
-            let mut exact = Vec::new();
-            for (lat, lon) in super::petroff_guyou_tests::diagonal_inputs(lc, 2.5) {
-                let (x, z) = w.block_of(lat, lon);
-                exact.push(format!(
-                    "        {{\"lat\": {}, \"lon\": {}, \"x\": {}, \"z\": {}}}",
-                    hx(lat),
-                    hx(lon),
-                    hx(x),
-                    hx(z)
-                ));
-            }
-            worlds.push(format!(
-                "    {{\"b\": {b}, \"lambda_c_deg\": {}, \"points\": [\n{}\n      ], \"inverse\": [\n{}\n      ], \"exact\": [\n{}\n      ]}}",
-                hx(lc),
-                pts.join(",\n"),
-                inv.join(",\n"),
-                exact.join(",\n")
-            ));
-        }
-        out.push_str(&worlds.join(",\n"));
         // The cube world's geometry and maps (crate::cube_map::parity, plan M5).
-        out.push_str("\n  ],\n");
         out.push_str(&crate::cube_map::parity::section());
         out.push_str("\n}\n");
         out
