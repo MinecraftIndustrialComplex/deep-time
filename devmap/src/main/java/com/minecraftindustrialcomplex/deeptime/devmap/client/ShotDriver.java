@@ -27,7 +27,9 @@ import java.util.Locale;
 /**
  * Development only: with {@code -Ddeeptime_devmap.shots=true} the client, once in a world, walks
  * the dev map on its own and quits ({@code tools/client/devmap-shots.sh}). For each place (the
- * player's own spot, beside the wrap seam, beside the north pole; {@code
+ * player's own spot, beside the wrap seam, beside the north pole; on a cube the spawn, beside the
+ * slide, inside a quarter-turn border segment, the north pole, beside a corner a player can reach
+ * and under one the border keeps a player off; {@code
  * -Ddeeptime_devmap.shots.places=name:x:z;...} overrides; {@code .settle=<seconds>}, default 25,
  * is how long it waits there for the terrain) it right-clicks the place on the map
  * (the operator teleport), waits for the terrain, checks the readout against Deep Time's own F3
@@ -157,7 +159,7 @@ final class ShotDriver {
             }
             case ARRIVE -> {
                 Place pl = places.get(place);
-                double dx = c.projection().wrapX(mc.player.getX() - pl.x), dz = mc.player.getZ() - pl.z;
+                double dx = PlanetGeometry.wrapCentred(c.projection(), mc.player.getX() - pl.x), dz = mc.player.getZ() - pl.z;
                 if (Math.hypot(dx, dz) < 8) {
                     log("place {}: arrived at {} {} {} ({} blocks from the asked point; the server keeps a margin from the border)",
                             pl.name, mc.player.getX(), mc.player.getY(), mc.player.getZ(), Math.hypot(dx, dz));
@@ -201,7 +203,10 @@ final class ShotDriver {
                     screen.setLayer(MapLayer.DEFAULT);
                     if (place == 0) {
                         screen.showWholeWorld();
-                        screen.centreOn(mc.player.getX(), 0.5 * (c.projection().zMin() + c.projection().zMax()));
+                        // A cube's whole net, centred on its window; a polar world's strip from the player.
+                        WorldProjection p = c.projection();
+                        double x = PlanetGeometry.cube(p) != null ? PlanetGeometry.west(p) + p.period() / 2.0 : mc.player.getX();
+                        screen.centreOn(x, 0.5 * (p.zMin() + p.zMax()));
                     }
                 }
                 if (stepTicks == 10 && place == 0) {
@@ -276,7 +281,13 @@ final class ShotDriver {
         shot(name);
     }
 
-    /** The places: the player's own spot, beside the seam, beside the north pole (or the property's list). */
+    /**
+     * The places: the player's own spot, beside the seam, beside the north pole (or the property's
+     * list). On a cube (plan G14): the spawn, 25 blocks onto F3 from the slide, 40 inside the N-east
+     * segment (a quarter-turn seam's border), the north pole, beside F0's north-east corner (n0, which
+     * a player can stand on) and 40 blocks under the F1/F2/N corner (n1, which the border keeps a
+     * player off).
+     */
     private static List<Place> places(WorldProjection p) {
         List<Place> out = new ArrayList<>();
         String prop = System.getProperty(PROP + ".places", "");
@@ -290,6 +301,17 @@ final class ShotDriver {
         }
         Minecraft mc = Minecraft.getInstance();
         out.add(new Place("spawn", Math.floor(mc.player.getX()) + 0.5, Math.floor(mc.player.getZ()) + 0.5));
+        WorldProjection.Cube cube = PlanetGeometry.cube(p);
+        if (cube != null) {
+            double h = cube.side() / 2.0;
+            out.add(new Place("slide", -3 * h + 25.5, 0.5));
+            out.add(new Place("border-ne", h - 40.5, -2 * h + 0.5));
+            double[] n = PlanetGeometry.poles(p).get(0).images().get(0);
+            out.add(new Place("north-pole", Math.floor(n[0]) + 0.5, Math.floor(n[1]) + 0.5));
+            out.add(new Place("corner-n0", h - 2.5, -h + 2.5));
+            out.add(new Place("corner-n1", 3 * h + 0.5, -h + 40.5));
+            return out;
+        }
         out.add(new Place("seam", p.period() / 2 - 25.5, 0.5 * (p.zMin() + p.zMax()) + 0.5));
         PlanetGeometry.Pole north = PlanetGeometry.poles(p).stream().filter(q -> q.latDeg() > 0).findFirst().orElseThrow();
         double[] n = north.images().get(0);
@@ -319,7 +341,7 @@ final class ShotDriver {
         double[] s = screen.mapScreenPos(x, z);
         double[] b = screen.blockAt(s[0], s[1]);
         double[] want = c.projection().canonical(x, z);
-        double d = b == null ? Double.NaN : Math.hypot(c.projection().wrapX(b[0] - want[0]), b[1] - want[1]);
+        double d = b == null ? Double.NaN : Math.hypot(PlanetGeometry.wrapCentred(c.projection(), b[0] - want[0]), b[1] - want[1]);
         log("{}: map marker at screen {} {} reads back block {} (player {} {}): {} blocks off", placeName(), s[0], s[1],
                 b == null ? "none" : String.format(Locale.ROOT, "%.3f %.3f", b[0], b[1]), want[0], want[1], d);
         if (!(d < 0.01))
@@ -346,7 +368,7 @@ final class ShotDriver {
             }
             double sx = g[3] + h[0] * g[2], sy = g[4] - h[1] * g[2];
             double[] b = screen.blockAt(sx, sy);
-            double d = b == null ? Double.NaN : Math.hypot(p.wrapX(b[0] - want[0]), b[1] - want[1]);
+            double d = b == null ? Double.NaN : Math.hypot(PlanetGeometry.wrapCentred(p, b[0] - want[0]), b[1] - want[1]);
             // Mirror images on the Petroff-Guyou edge are the same point.
             if (b != null && d > 0.5 && PlanetGeometry.petroffGuyou(p))
                 d = Math.min(d, Math.hypot(p.wrapX(b[0] + want[0]), b[1] - want[1]));

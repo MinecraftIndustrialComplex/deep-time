@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.gametest;
 
 import com.minecraftindustrialcomplex.deeptime.api.climate.DeepTimeClimate;
+import com.minecraftindustrialcomplex.deeptime.api.planet.DeepTimePlanet;
 import com.minecraftindustrialcomplex.deeptime.net.WorldInfoPayload;
 import com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
@@ -73,7 +74,15 @@ public final class SeamlessWorldGameTests {
         }
         // No pole cap, nothing beyond a pole; latitude depends on x and z.
         helper.assertTrue(PoleCap.capOf(level) == null, "a Petroff–Guyou world has no pole cap");
-        helper.assertTrue("petroff_guyou".equals(DeepTimeClimate.projectionKind(level)), "the climate API names the projection");
+        // The planet API reads the folded world as one sphere: past the north edge is the glued inside.
+        DeepTimePlanet planet = DeepTimePlanet.of(level).orElse(null);
+        double radius = pg.radius() * wd.manifest().mPerBlockH();
+        helper.assertTrue(planet != null && Math.abs(planet.radiusMetres() - radius) <= 1e-9 * radius,
+                "the planet API's sphere: " + planet + " vs R " + radius + " m");
+        double fold = planet.distanceMetres(-b + 37.5, -h2 - 9.5, b - 37.5, -h2 + 9.5);
+        helper.assertTrue(fold < 1e-3 && planet.canonical(-b + 37.5, -h2 - 9.5).equals(planet.canonical(b - 37.5, -h2 + 9.5)),
+                "(x, -b/2 - d) and (-x, -b/2 + d) are one place: " + fold + " m apart, canonical "
+                        + planet.canonical(-b + 37.5, -h2 - 9.5) + " and " + planet.canonical(b - 37.5, -h2 + 9.5));
         double northPole = DeepTimeClimate.latitudeDeg(level, -b / 2.0, -h2 + 0.01);
         double equator = DeepTimeClimate.latitudeDeg(level, -b / 2.0 - 300, 0);
         helper.assertTrue(northPole > 89 && Math.abs(equator) < 1e-6, "latitudes: pole " + northPole + ", equator " + equator);

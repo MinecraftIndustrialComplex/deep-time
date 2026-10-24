@@ -28,6 +28,10 @@ import java.util.function.BiFunction;
  *   <li><b>Province hints.</b> {@link ProvinceHints} over the site registry.</li>
  * </ul>
  *
+ * On a cube world (cube plan G13) the final map is the net as it is played ({@link NetView}: the
+ * window 4 : 3, the void transparent, the border's lines drawn by the page), and the province hints,
+ * latitude and longitude cells, are painted over it as a second picture ({@link #hintsOverlay}).
+ *
  * The pack's biome names over the map (plan §7.2, the climate mapping computed here and staged)
  * come with P1-09.
  */
@@ -44,6 +48,8 @@ public final class ReviewModel {
     private final Path dir;
     private final int circumference;
     private volatile MapImage map;
+    private volatile NetView net;
+    private volatile MapImage hintsOverlay;
     private volatile Optional<double[]> spawn = Optional.empty();
     private volatile List<ProvinceHints.Cell> provinces = List.of();
     private volatile Summary summary;
@@ -71,7 +77,10 @@ public final class ReviewModel {
             if (m.layer(WorldData.ELEVATION) != null)
                 wd = WorldData.open(dir);
             com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection wp = m.projection();
-            if (wd != null) {
+            NetView nv = wp instanceof com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Cube c ? new NetView(c) : null;
+            if (wd != null && nv != null) {
+                map = netElevationMap(nv, wd, ramps.forLayer(WorldData.ELEVATION));
+            } else if (wd != null) {
                 map = elevationMap(wd, ramps.forLayer(WorldData.ELEVATION));
             } else if (lastFrame.isPresent()) {
                 KeyframeInfo f = lastFrame.get();
@@ -81,6 +90,10 @@ public final class ReviewModel {
             spawn = SpawnCandidates.firstDry(dir, m.seaLevelY())
                     .map(c -> wp.latLon(c.x(), c.z()));
             provinces = ProvinceHints.compute(SiteRecords.read(dir));
+            if (nv != null && map != null && "world_data".equals(map.source())) {
+                hintsOverlay = hintsOverlay(nv, provinces, map.w(), map.h());
+                net = nv;
+            }
         } catch (RuntimeException e) {
             error = e.getMessage() == null ? e.toString() : e.getMessage();
         } finally {
@@ -108,6 +121,44 @@ public final class ReviewModel {
             }
         }
         return new MapImage(MAP_W, MAP_H, px, "world_data");
+    }
+
+    /** The net picture of a cube world's elevation, {@link NetView#W} × {@link NetView#H}. */
+    static MapImage netElevationMap(NetView nv, WorldData wd, Ramps.Ramp ramp) {
+        return new MapImage(NetView.W, NetView.H, nv.picture(NetView.W, NetView.H, (x, z) -> ramp.abgr(wd.height(x, z))), "world_data");
+    }
+
+    /**
+     * The province hints over the net: each pixel on a face in a hinted cell takes the cell's type
+     * colour at the alpha the Lambert map's boxes use (0x50), ABGR; the rest transparent.
+     */
+    static MapImage hintsOverlay(NetView nv, List<ProvinceHints.Cell> cells, int w, int h) {
+        java.util.Map<Integer, Integer> byCell = new java.util.HashMap<>();
+        for (ProvinceHints.Cell c : cells) {
+            int rgb = ProvinceHints.colour(c.type());
+            // ARGB 0x50RRGGBB as ABGR.
+            int abgr = 0x50 << 24 | (rgb & 0xff) << 16 | (rgb & 0xff00) | (rgb >> 16 & 0xff);
+            byCell.put(c.row() * ProvinceHints.COLS + c.col(), abgr);
+        }
+        int[] px = byCell.isEmpty() ? new int[w * h] : nv.picture(w, h, (x, z) -> {
+            double[] ll = nv.projection().latLon(x, z);
+            if (Double.isNaN(ll[0]))
+                return 0;
+            int col = Math.floorMod((int) Math.floor(ll[1] / (360.0 / ProvinceHints.COLS)), ProvinceHints.COLS);
+            int row = Math.max(0, Math.min(ProvinceHints.ROWS - 1, (int) Math.floor((90.0 - ll[0]) / (180.0 / ProvinceHints.ROWS))));
+            return byCell.getOrDefault(row * ProvinceHints.COLS + col, 0);
+        });
+        return new MapImage(w, h, px, "hints");
+    }
+
+    /** A cube world's net view (when its final map is the net), else empty. */
+    public Optional<NetView> net() {
+        return Optional.ofNullable(net);
+    }
+
+    /** A cube world's province hints as a picture over the net (see {@link #net}), else empty. */
+    public Optional<MapImage> hintsOverlay() {
+        return Optional.ofNullable(hintsOverlay);
     }
 
     public Path dir() {

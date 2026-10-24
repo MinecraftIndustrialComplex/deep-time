@@ -51,7 +51,7 @@ public final class ClientPlanetState {
     /**
      * The circumference of the planet {@code level} is, as the server last said, or 0 when the info
      * is for another level, is not a planet, or has not arrived. Allocation-free and safe from any
-     * thread (the public face is {@code api.climate.DeepTimeClimate.circumferenceBlocks}).
+     * thread (internal: other mods see the planet through {@code api.planet.DeepTimePlanet}).
      */
     public static int circumference(Level level) {
         Planet p = planet;
