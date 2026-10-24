@@ -52,7 +52,7 @@ import java.util.List;
  *
  * <p>Properties ({@code -Ddeeptime.dev.screenshots.<name>}): {@code length=<Myr>} (the only setting
  * changed by default, so a walk takes minutes), {@code start=<start>} and {@code preset=<family>}
- * (left at the defaults unless given), {@code worldType=<preset id>} picks that world type from the
+ * (left at the defaults unless given), {@code worldtype=<preset id>} picks that world type from the
  * list before Customize (e.g. {@code deeptime:planet_cube}, cube plan G13; default {@code deeptime:planet}),
  * {@code projection=<id>} sets the editor's projection, {@code customize=false} skips the Customize shots,
  * {@code layers=a,b,…} the layers shot while the run goes (default plates, Köppen climate, rock,
@@ -326,7 +326,7 @@ final class ScreenshotDriver {
                             DeepTime.LOGGER.error("[deeptime-shot] FAILED: Create World did not open on deeptime:planet");
                         shot("00-create-world-fresh");
                         worldTab(cws);
-                        String wanted = System.getProperty(PROP + ".worldType", PlanetGenerators.PLANET.location().toString());
+                        String wanted = System.getProperty(PROP + ".worldtype", PlanetGenerators.PLANET.location().toString());
                         boolean onWanted = ui.getWorldType().preset() != null
                                 && ui.getWorldType().preset().unwrapKey().map(k -> k.location().toString().equals(wanted)).orElse(false);
                         if (!onWanted)
