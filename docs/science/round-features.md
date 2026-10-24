@@ -168,8 +168,14 @@ Not a calibration: a feature is round on the planet by construction, and the uni
   crater with the map's stretch (1.4 to 2.7 to 1); the sphere's frame is the right one there, and on the cube world it
   is the plain world frame up to the local scale.
 
-The pool's check that the planet's history did not go wrong with the change (8 runs, base3, 2026-10-23) is in the
-build log (STATUS.md).
+The pool's check that the planet's history did not go wrong with the change (2026-10-24): arm `round-sphere`, key
+917f0bd7dfb8 (the branch merged with master 2ec3a38a, whose own changes since base3 are built and off), seeds 1 to 4,
+both starts, earthlike_quick_16k, 1000 Myr, 2 threads, `+DEEPTIME_CRUST_BUDGET=1`. All 8 runs ran, none failed. The
+guard: 0 steps beyond 2 Earth reliefs in any run, the worst 12,157 m from the sea (base3 12,282), no continental
+plate cell 5 km over Airy. Against base3's seeds 1 to 4 (matched seeds, two-sided Mann-Whitney), no V1 measure moved
+past the seed spread (every p at least 0.19): land 0.322 (base3 0.319), largest landmass 0.162 (0.236, p 0.28), land
+above 2 km 0.119 (0.146), coast with high ground 0.301 (0.330), land under ice 0.086 (0.099), collisions per 100 Myr
+1.80 (1.95), criteria met per run 5 (5).
 
 ## Simplifications and limits
 
