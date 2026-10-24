@@ -17,8 +17,11 @@ normal over two rings of samples, Bird's 20 degree transform window, PLT-310 and
   transform    transform (the motion within 20 degrees of the boundary)       OTF + CTF 28.3 %
   nocontact    converging with no contact yet                      OCB 6.7 %
   oo_of_sub    the ocean-ocean share of the subducting boundary (PLT-370)  about 35 % (Stern & Scholl)
-  sub_km, total_km   the subducting and the whole boundary, lattice km per step (the lattice's boundary
-               is about 1.84 times a geodesic one: Bird's 51,310 km of SUB is about 94,400 lattice km)
+  sub_km, total_km   the subducting and the whole boundary, lattice km per step (one sample spacing per
+               boundary sample counts a straight boundary about 1.04 times, the share test in
+               plates/shortening.rs, ledger PLT-530: Bird's 51,310 km of SUB is about 53,500 lattice km
+               and his 260,487 km about 271,700. Until 2026-10-24 this said 1.84, the model's boundary
+               over Bird's, which took the model's boundary to be as long as Earth's)
 
 How the trenches face their convergence (the plates step's own globals over the whole run):
 
