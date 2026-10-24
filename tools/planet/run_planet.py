@@ -181,7 +181,8 @@ def main():
     log_path = os.path.join(LOG_DIR, "planet.log")
     open(log_path, "w").close()
     srv = Planet(a.gradle_args, log_path)
-    print(f"== planet server: C={a.size}, test terrain {a.test_terrain}", flush=True)
+    print("== planet server: planet_world_4k as a cube (C = 4096, s = 1024)" if a.cube_4k
+          else f"== planet server: C={a.size}, test terrain {a.test_terrain}", flush=True)
     srv.start()
     ok = srv.wait_done(a.timeout)
     failures = []
