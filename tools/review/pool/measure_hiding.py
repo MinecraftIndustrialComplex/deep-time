@@ -52,9 +52,18 @@ Keys (means over the snapshots; counts per snapshot):
   *_own_sz                    the piece's samples in a subduction zone (the piece overrides)
   main_nb_sz, main_nb_dv      the same two shares for the main pieces' TRENCH samples (the
                               ordinary trench, for comparison)
+  seam_share                  visible samples beside a sample of their own plate in another group
+  enclosed_at_seam            of the hole and island samples, the share in pieces that touch a
+                              seam sample of the plate around them (`enclosed_pieces_at_seam` by
+                              pieces): the cover is a group's triangles, so a seam between two
+                              groups of one plate hides nothing (`geometry::cover`)
   fissions                    plates born of fission over the run (the record)
   fission_into_parent         of those that died absorbed, the share absorbed into their parent
   fission_life_p50            their median life, Myr (those that died)
+  resamplings                 steps with every sample visible (the record)
+  hidden_mean                 the hidden share of the samples in the other steps, mean
+  rise_steps                  steps whose visible count rose over the step before's, with no
+                              resampling between (what shows again outpacing what is hidden)
 """
 import json
 import math
@@ -81,7 +90,7 @@ def read_snapshot(map_path, plate_path):
         return None
     lat, lon = np.radians(a[:, 0]), np.radians(a[:, 1])
     xyz = np.stack([np.cos(lat) * np.cos(lon), np.cos(lat) * np.sin(lon), np.sin(lat)], axis=1)
-    return xyz, p, a[:, 10].astype(np.int64), a[:, 4] > 0.5
+    return xyz, p, a[:, 10].astype(np.int64), a[:, 4] > 0.5, a[:, 9].astype(np.int64)
 
 
 def edges(xyz):
@@ -106,7 +115,7 @@ def slerp_path(a, b, step):
     return np.array(out), ang
 
 
-def measure(xyz, plate, flags, kind, h):
+def measure(xyz, plate, flags, kind, group, h):
     n = len(plate)
     e = edges(xyz)
     au, av = e[:, 0], e[:, 1]
@@ -139,6 +148,15 @@ def measure(xyz, plate, flags, kind, h):
                 base[0] += 1
                 base[1] += bool(flags[b_] & SZ)
                 base[2] += bool(flags[b_] & DIVERGENT)
+    # A seam sample: a neighbour of its own plate in another group (the plate's groups meet there).
+    seam = np.zeros(n, dtype=bool)
+    sg = same & (group[au] != group[av])
+    seam[au[sg]] = True
+    seam[av[sg]] = True
+    nbs = {}
+    for u, v in zip(au[diff].tolist(), av[diff].tolist()):
+        nbs.setdefault(lab[u], []).append(bool(seam[v]))
+        nbs.setdefault(lab[v], []).append(bool(seam[u]))
     tree_all = cKDTree(xyz)
     members = {}
     for i, c in enumerate(lab.tolist()):
@@ -189,9 +207,14 @@ def measure(xyz, plate, flags, kind, h):
             "nb_sz": int(np.sum(nf & SZ > 0)),
             "nb_dv": int(np.sum(nf & DIVERGENT > 0)),
             "own_sz": float(np.mean(flags[idx] & SZ > 0)),
+            "at_seam": any(nbs.get(ci, [])),
         })
     cut = sum(r["size"] for r in rows)
-    out = {"cut_share": cut / n, "pieces": len(rows)}
+    out = {"cut_share": cut / n, "pieces": len(rows), "seam_share": float(seam.mean())}
+    enc = [r for r in rows if r["cls"] in ("hole", "island")]
+    if enc:
+        out["enclosed_at_seam"] = sum(r["size"] for r in enc if r["at_seam"]) / sum(r["size"] for r in enc)
+        out["enclosed_pieces_at_seam"] = sum(1 for r in enc if r["at_seam"]) / len(enc)
     if base[0]:
         out["main_nb_sz"] = base[1] / base[0]
         out["main_nb_dv"] = base[2] / base[0]
@@ -223,6 +246,30 @@ def measure(xyz, plate, flags, kind, h):
         out["width_p50"] = float(np.median([r["width"] for r in rows]))
         out["cont_share"] = sum(r["cont"] for r in rows) / cut
     return out
+
+
+def record_stats(rec):
+    """The record's visible counts: a resampling makes every sample visible again (visible ==
+    samples); between two, the planet's count falls by what a step hides and rises by what it
+    shows again (net)."""
+    n = rec.get("samples", 0)
+    steps = rec.get("steps", [])
+    res, hid, rises = 0, [], 0
+    prev = None
+    for s in steps:
+        v = s["visible"]
+        if v == n:
+            res += 1
+        else:
+            hid.append(1.0 - v / n)
+            if prev is not None and prev != n and v > prev:
+                rises += 1
+        prev = v
+    return {
+        "resamplings": res,
+        "hidden_mean": sum(hid) / len(hid) if hid else None,
+        "rise_steps": rises,
+    }
 
 
 def fission_stats(rec):
@@ -268,6 +315,7 @@ def main():
             xs = [r[k] for r in rows if r.get(k) is not None]
             out[k] = sum(xs) / len(xs) if xs else None
     out.update(fission_stats(rec))
+    out.update(record_stats(rec))
     print(json.dumps({k: (round(v, 5) if isinstance(v, float) else v) for k, v in out.items()}))
 
 
