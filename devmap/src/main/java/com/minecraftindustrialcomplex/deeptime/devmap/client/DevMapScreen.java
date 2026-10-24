@@ -9,6 +9,7 @@ import com.minecraftindustrialcomplex.deeptime.devmap.model.ViewTransform;
 import com.minecraftindustrialcomplex.deeptime.devmap.net.PlayersPayload;
 import com.minecraftindustrialcomplex.deeptime.devmap.net.TeleportPayload;
 import com.minecraftindustrialcomplex.deeptime.net.PlanetDebugLine;
+import com.minecraftindustrialcomplex.deeptime.screen.model.CubeOutline;
 import com.minecraftindustrialcomplex.deeptime.screen.model.GlobeProjection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import net.minecraft.client.Minecraft;
@@ -21,6 +22,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -44,6 +46,14 @@ import java.util.Locale;
  * The readout under the view gives the player's block, latitude and longitude (the F3 line's
  * convention, with Deep Time's own F3 line beside it for comparison), the distances to the seam,
  * the edge and the nearest pole, the projection and the picture.
+ *
+ * <p>On a cube world (cube plan G14) the map is the net's window, 4s by 3s, with the void off the
+ * faces left dark: the seam is the slide (magenta, F2's east side against F3's west), the edges are
+ * the border's twelve segments (orange, the stop line dashed inside them), the five sides the net
+ * joins are faint, and the cone points are the eight cube corners at their twelve images (yellow
+ * where a player can stand, on F0's corners; red where the border keeps one off). The globe draws
+ * the cube's twelve edges and eight corners the same way ({@code screen.model.CubeOutline}, the
+ * Create World globe's).
  */
 public final class DevMapScreen extends Screen {
 
@@ -51,7 +61,8 @@ public final class DevMapScreen extends Screen {
 
     static final int GRATICULE = 0x70FFFFFF, GRATICULE_MAIN = 0xD0FFFFFF, SEAM = 0xFFFF3CFF, EDGE = 0xFFFFA020,
             BORDER = 0xA0FFA020, POLE = 0xFF40FFFF, CONE = 0xFFFFFF40, SPAWN = 0xFFFFFFFF, OTHER = 0xFF40C0FF,
-            SELF = 0xFFFF3030, OUTLINE = 0xFF000000, PANEL = 0xC0000000, TEXT = 0xFFE0E0E0, DIM = 0xFFA0A0A0;
+            SELF = 0xFFFF3030, OUTLINE = 0xFF000000, PANEL = 0xC0000000, TEXT = 0xFFE0E0E0, DIM = 0xFFA0A0A0,
+            JOINED = 0x60FFFFFF, CORNER_BLOCKED = 0xFFFF5040;
 
     private static final int TOP = 22, LINE_H = 10, READOUT_LINES = 8;
     /** The button row: Map, Globe, Centre, HUD, the picture; the header text starts after it. */
@@ -150,9 +161,12 @@ public final class DevMapScreen extends Screen {
         MapContext c = MapContext.current();
         if (view == null || c.projection() == null)
             return;
-        double s = Math.min(vw / c.projection().period(), vh / (c.projection().zMax() - c.projection().zMin()));
+        WorldProjection p = c.projection();
+        double s = Math.min(vw / p.period(), vh / (p.zMax() - p.zMin()));
         view.scale(s);
-        view.centre(view.cx(), 0.5 * (c.projection().zMin() + c.projection().zMax()));
+        // A cube's whole net, centred on its window; a polar world's strip from the player's x.
+        double x = PlanetGeometry.cube(p) != null ? PlanetGeometry.west(p) + p.period() / 2.0 : view.cx();
+        view.centre(x, 0.5 * (p.zMin() + p.zMax()));
         globeRadius = Math.min(vw, vh) * 0.46;
     }
 
@@ -208,8 +222,9 @@ public final class DevMapScreen extends Screen {
         if (p == null || sx < vl || sx > vl + vw || sy < vt || sy > vt + vh)
             return null;
         if (mode == Mode.MAP) {
-            double bz = view.blockZ(sy);
-            return bz < p.zMin() || bz > p.zMax() ? null : p.canonical(view.blockX(sx), bz);
+            double bz = view.blockZ(sy), bx = view.blockX(sx);
+            // Off a cube's faces is the void: nothing to stand on there.
+            return bz < p.zMin() || bz > p.zMax() || !PlanetGeometry.onPlanet(p, bx, bz) ? null : p.canonical(bx, bz);
         }
         double u = (sx - (vl + vw / 2.0)) / globeRadius, v = ((vt + vh / 2.0) - sy) / globeRadius;
         double[] ll = new GlobeProjection(globeLat, globeLon).inverse(u, v, new double[2]);
@@ -240,8 +255,7 @@ public final class DevMapScreen extends Screen {
         MapContext c = MapContext.current();
         if (view == null || c.projection() == null)
             return null;
-        double P = c.projection().period();
-        double dx = c.projection().wrapX(x - view.cx());
+        double dx = PlanetGeometry.wrapCentred(c.projection(), x - view.cx());
         return new double[]{view.screenX(view.cx() + dx), view.screenY(z)};
     }
 
@@ -371,7 +385,9 @@ public final class DevMapScreen extends Screen {
         view.viewport(vl, vt, vw, vh);
         float px = Draw.px();
         Draw.rect(g, vl, vt, vl + vw, vt + vh, 0xFF101418);
-        int k0 = view.firstCopy(-P / 2, P / 2) - 1, k1 = view.lastCopy(-P / 2, P / 2) + 1;
+        double w0 = PlanetGeometry.west(p);
+        boolean cube = PlanetGeometry.cube(p) != null;
+        int k0 = view.firstCopy(w0, w0 + P) - 1, k1 = view.lastCopy(w0, w0 + P) + 1;
         if (MapTextures.map(c.image())) {
             MapFrame f = c.image().frame();
             for (int k = k0; k <= k1; k++) {
@@ -382,7 +398,8 @@ public final class DevMapScreen extends Screen {
             }
         } else {
             for (int k = k0; k <= k1; k++)
-                Draw.rect(g, view.screenX(-P / 2 + k * P), view.screenY(zMin), view.screenX(P / 2 + k * P), view.screenY(zMax), 0xFF2A4A6A);
+                for (double[] r : PlanetGeometry.pieces(p))
+                    Draw.rect(g, view.screenX(r[0] + k * P), view.screenY(r[1]), view.screenX(r[2] + k * P), view.screenY(r[3]), 0xFF2A4A6A);
             g.flush();
         }
         // The graticule.
@@ -393,22 +410,41 @@ public final class DevMapScreen extends Screen {
             for (int k = k0; k <= k1; k++)
                 polyline(g, line.xs(), line.zs(), k * P, w, col);
         }
-        // The seam, the edges or pole lines, the edge border.
-        for (int k = k0; k <= k1; k++) {
-            double sx = view.screenX(P / 2 + k * P);
-            Draw.dashed(g, sx, view.screenY(zMin), sx, view.screenY(zMax), 2 * px, 4, SEAM);
-        }
-        double xa = view.blockX(vl) - 1, xb = view.blockX(vl + vw) + 1;
-        for (double ze : new double[]{zMin, zMax})
-            Draw.line(g, view.screenX(xa), view.screenY(ze), view.screenX(xb), view.screenY(ze), 2 * px, EDGE);
         double inset = c.devInfo() != null ? c.devInfo().borderInset() : Double.NaN;
-        if (!Double.isNaN(inset) && inset > 0)
-            for (double ze : new double[]{zMin + inset, zMax - inset})
-                Draw.dashed(g, view.screenX(xa), view.screenY(ze), view.screenX(xb), view.screenY(ze), px, 3, BORDER);
+        if (cube) {
+            // The slide, the sides the net joins, the border's segments and its stop line.
+            for (int k = k0; k <= k1; k++) {
+                for (PlanetGeometry.Polyline l : PlanetGeometry.joinedSides(p))
+                    dashedPolyline(g, l, k * P, px, 3, JOINED);
+                dashedPolyline(g, PlanetGeometry.slide(p), k * P, 2 * px, 4, SEAM);
+                for (PlanetGeometry.Polyline l : PlanetGeometry.borderOutline(p, 0.0))
+                    polyline(g, l.xs(), l.zs(), k * P, 2 * px, EDGE);
+                if (!Double.isNaN(inset) && inset > 0)
+                    for (PlanetGeometry.Polyline l : PlanetGeometry.borderOutline(p, inset))
+                        dashedPolyline(g, l, k * P, px, 3, BORDER);
+            }
+        } else {
+            // The seam, the edges or pole lines, the edge border.
+            for (int k = k0; k <= k1; k++) {
+                double sx = view.screenX(P / 2 + k * P);
+                Draw.dashed(g, sx, view.screenY(zMin), sx, view.screenY(zMax), 2 * px, 4, SEAM);
+            }
+            double xa = view.blockX(vl) - 1, xb = view.blockX(vl + vw) + 1;
+            for (double ze : new double[]{zMin, zMax})
+                Draw.line(g, view.screenX(xa), view.screenY(ze), view.screenX(xb), view.screenY(ze), 2 * px, EDGE);
+            if (!Double.isNaN(inset) && inset > 0)
+                for (double ze : new double[]{zMin + inset, zMax - inset})
+                    Draw.dashed(g, view.screenX(xa), view.screenY(ze), view.screenX(xb), view.screenY(ze), px, 3, BORDER);
+        }
         // Cone points and poles.
         for (int k = k0; k <= k1; k++) {
-            for (double[] cp : PlanetGeometry.conePoints(p))
-                Draw.cross(g, view.screenX(cp[0] + k * P), view.screenY(cp[1]), 4, 2 * px, CONE);
+            if (cube) {
+                for (PlanetGeometry.Corner cp : PlanetGeometry.corners(p))
+                    Draw.cross(g, view.screenX(cp.x() + k * P), view.screenY(cp.z()), 4, 2 * px, cp.reachable() ? CONE : CORNER_BLOCKED);
+            } else {
+                for (double[] cp : PlanetGeometry.conePoints(p))
+                    Draw.cross(g, view.screenX(cp[0] + k * P), view.screenY(cp[1]), 4, 2 * px, CONE);
+            }
             for (PlanetGeometry.Pole pole : PlanetGeometry.poles(p)) {
                 if (pole.line())
                     continue;
@@ -450,6 +486,11 @@ public final class DevMapScreen extends Screen {
                     label(g, pole.name().equals("north") ? "N pole" : "S pole", view.screenX(im[0] + k * P) + 7,
                             view.screenY(im[1]) + (pole.latDeg() > 0 ? 3 : -11), POLE);
             }
+            if (cube) {
+                double sx = view.screenX(w0 + k * P);
+                label(g, "slide x = " + Math.round(w0) + " = " + Math.round(w0 + P), sx + 3, view.screenY(PlanetGeometry.slide(p).zs()[0]) - 11, SEAM);
+                continue;
+            }
             double sx = view.screenX(P / 2 + k * P);
             // At the top of the view: on the equator's row it sat under the player's own label.
             label(g, "seam x = ±" + Math.round(P / 2), sx + 3, vt + 4, SEAM);
@@ -488,6 +529,12 @@ public final class DevMapScreen extends Screen {
         }
     }
 
+    private void dashedPolyline(GuiGraphics g, PlanetGeometry.Polyline l, double dx, double w, double dash, int col) {
+        double[] xs = l.xs(), zs = l.zs();
+        for (int i = 1; i < xs.length; i++)
+            Draw.dashed(g, view.screenX(xs[i - 1] + dx), view.screenY(zs[i - 1]), view.screenX(xs[i] + dx), view.screenY(zs[i]), w, dash, col);
+    }
+
     private void label(GuiGraphics g, String s, double x, double y, int col) {
         int w = font.width(s);
         g.fill((int) x - 1, (int) y - 1, (int) x + w + 1, (int) y + 9, 0x90000000);
@@ -520,23 +567,40 @@ public final class DevMapScreen extends Screen {
                 pts.add(new double[]{lat, i});
             globeLine(g, gp, pts, lat == 0 ? 2 * px : px, lat == 0 ? GRATICULE_MAIN : GRATICULE);
         }
-        // The seam and the edges, through the projection's latLon.
-        double P = p.period(), zMin = p.zMin(), zMax = p.zMax();
-        List<double[]> seam = new ArrayList<>();
-        for (int i = 0; i <= 400; i++)
-            seam.add(p.latLon(P / 2 - 1e-6, zMin + (zMax - zMin) * i / 400.0));
-        globeLine(g, gp, seam, 2 * px, SEAM);
-        for (double ze : new double[]{zMin, zMax}) {
-            List<double[]> edge = new ArrayList<>();
-            for (int i = 0; i <= 800; i++)
-                edge.add(p.latLon(-P / 2 + P * i / 800.0, ze));
-            globeLine(g, gp, edge, 2 * px, EDGE);
-        }
         double[] uv = new double[2];
-        for (double[] cp : PlanetGeometry.conePoints(p)) {
-            double[] ll = p.latLon(cp[0], cp[1]);
-            if (gp.forward(ll[0], ll[1], uv) != null)
-                Draw.cross(g, cx + uv[0] * R, cy - uv[1] * R, 4, 2 * px, CONE);
+        CubeOutline outline = outline(p);
+        if (outline != null) {
+            // The cube's twelve edges (the slide, the border's six, the five the net joins) and its
+            // eight corners, as the Create World globe draws them.
+            for (CubeOutline.Edge e : outline.edges()) {
+                int col = switch (e.kind()) {
+                    case SLIDE -> SEAM;
+                    case BORDER -> EDGE;
+                    case JOINED -> JOINED;
+                };
+                globeLine(g, gp, Arrays.asList(e.latLon()), e.kind() == CubeOutline.Kind.JOINED ? px : 2 * px, col);
+            }
+            for (CubeOutline.Corner k : outline.corners())
+                if (gp.forward(k.lat(), k.lon(), uv) != null)
+                    Draw.cross(g, cx + uv[0] * R, cy - uv[1] * R, 4, 2 * px, k.reachable() ? CONE : CORNER_BLOCKED);
+        } else {
+            // The seam and the edges, through the projection's latLon.
+            double P = p.period(), zMin = p.zMin(), zMax = p.zMax();
+            List<double[]> seam = new ArrayList<>();
+            for (int i = 0; i <= 400; i++)
+                seam.add(p.latLon(P / 2 - 1e-6, zMin + (zMax - zMin) * i / 400.0));
+            globeLine(g, gp, seam, 2 * px, SEAM);
+            for (double ze : new double[]{zMin, zMax}) {
+                List<double[]> edge = new ArrayList<>();
+                for (int i = 0; i <= 800; i++)
+                    edge.add(p.latLon(-P / 2 + P * i / 800.0, ze));
+                globeLine(g, gp, edge, 2 * px, EDGE);
+            }
+            for (double[] cp : PlanetGeometry.conePoints(p)) {
+                double[] ll = p.latLon(cp[0], cp[1]);
+                if (gp.forward(ll[0], ll[1], uv) != null)
+                    Draw.cross(g, cx + uv[0] * R, cy - uv[1] * R, 4, 2 * px, CONE);
+            }
         }
         for (PlanetGeometry.Pole pole : PlanetGeometry.poles(p))
             if (gp.forward(pole.latDeg(), 0, uv) != null)
@@ -579,6 +643,21 @@ public final class DevMapScreen extends Screen {
             label(g, l[0], Double.parseDouble(l[1]), Double.parseDouble(l[2]), Integer.parseInt(l[3]));
         label(g, String.format(Locale.ROOT, "centre %s", PlanetGeometry.formatLatLon(globeLat, PlanetGeometry.displayLon(p, globeLon))),
                 vl + 4, vt + vh - 12, TEXT);
+    }
+
+    private static WorldProjection outlineOf;
+    private static CubeOutline outline;
+
+    /** A cube world's outline on the globe (made once per projection), or null on a polar world. */
+    static synchronized CubeOutline outline(WorldProjection p) {
+        WorldProjection.Cube c = PlanetGeometry.cube(p);
+        if (c == null)
+            return null;
+        if (p != outlineOf) {
+            outline = CubeOutline.of(c);
+            outlineOf = p;
+        }
+        return outline;
     }
 
     /**
@@ -630,7 +709,7 @@ public final class DevMapScreen extends Screen {
         if (!Double.isNaN(hoverX)) {
             double[] ll = PlanetGeometry.displayLatLon(c.projection(), hoverX, hoverZ);
             lines.add(String.format(Locale.ROOT, "Cursor: block %.0f / %.0f   %s   seam %.0f   %s", hoverX, hoverZ,
-                    PlanetGeometry.formatLatLon(ll[0], ll[1]), PlanetGeometry.seamDistance(c.projection(), hoverX),
+                    PlanetGeometry.formatLatLon(ll[0], ll[1]), PlanetGeometry.seamDistance(c.projection(), hoverX, hoverZ),
                     c.canTeleport() ? "(right-click: teleport)" : ""));
         } else {
             lines.add("Cursor: off the map");
