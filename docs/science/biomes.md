@@ -548,7 +548,7 @@ columns, `tools/review/terralith_emulate.py`):
 | Class | Change | Why (Terralith's slot) |
 |---|---|---|
 | Am (monsoon forest) | humidity band 4.05 and up | Terralith's jungles sit in the wettest band; band 3 is its brushland and shrubland |
-| Csa, Csb, Csc (Mediterranean) | humidity squeezed into 0.1 … 0.6 | Terralith's shrubland, a dry scrub, is the driest part of the dry band (humidity below −0.585); plains and its alpine highlands are above |
+| Csa, Csb, Csc (Mediterranean) | humidity squeezed into 0.1 … 0.6; erosion held to 0.38 and below (since 2026-10-23) | Terralith's shrubland, a dry scrub, is the driest part of the dry band (humidity below −0.585); plains and its alpine highlands are above. Near the coast its erosion slot 0.40 to 0.565 is windswept savanna and savanna badlands at every dry humidity, and its shrublands end at 0.40; MIC's climate mapping turns 0.38 into 0.30 |
 | BSk (cold steppe) | the same dry humidity, erosion held to 0.12 … 0.4 | Terralith's steppe needs erosion 0.05 to 0.40 in the pack's own units; MIC's climate mapping (Tectonic's router) turns 0.12 … 0.4 into about 0.12 … 0.33 |
 | ET (tundra) | the positive branch of the variant noise | in the frozen band's humidity band 1 the negative branch is vanilla's snowy plains, the positive Terralith's gravel desert (and frozen peaks, not jagged ones). Holding ET's humidity at 1.5, the survey's proposal, was measured and changed nothing: most ET is in band 1 already |
 | Cfb, Cwb, Cfc, Cwc below 25° latitude, above 1,000 m, P/PET above 1 | rule `cloud_forest`: the cold band, humidity 3.05 and up, erosion 0.62 and up, far inland | Terralith's cloud forest has one slot: cold band, humid, the swamp band's erosion, far inland |
@@ -672,6 +672,27 @@ master f43d1e1a's MIC test planet that strip took Am's share over all its 52 col
 its 21 misses lay beside the sea (desert oasis 10, windswept forest 3), and inside Am cells 27 of 33 columns were on
 its jungles. The strip is real in the game (a desert oasis fringe on a monsoon coast, at most one L2 cell wide, since
 the blend reaches one cell) and is not the table's to fix; the census logs the border's columns and their biomes apart.
+
+Since 2026-10-23 the table also holds Mediterranean land's erosion (BIO-141). The bake reads erosion from the rank of
+the local relief, so a share of every class's land lies in each erosion band whatever its climate. Near the coast
+(continentalness −0.2 to 0.03), Terralith 2.6.2's slots at erosion 0.40 to 0.565 hold windswept savanna for the
+temperate band (temperature −0.155 to 0.2) and the hottest (0.55 and up) at every humidity up to 0.3, and savanna
+badlands for the warm band (0.2 to 0.55) at humidity up to 0.1. That holds on both branches of the variant noise.
+Its shrubland, hot shrubland and steppe all end at 0.40. Mediterranean land is coastal, so the humidity squeeze alone
+left part of it on savanna. The flexure merge (master 2fde68f7) moved the MIC test planet so that much of its Cs
+land lay there. On master 378a0af3 Cs on shrubland and steppe read 38 of 96 columns (0.396, under its 0.5), with
+windswept savanna on 56 and savanna badlands on 2, and 44 % of Csa's columns were windswept savanna. The numbers
+were the same on 2fde68f7 and with the deltas off, so stage 1b of the deltas did not move it. Holding Cs to
+erosion 0.38 and below (reference units) puts it in the shrublands' slots. MIC's climate mapping (Tectonic's router)
+turns 0.38 into 0.30, and Terralith's 0.40 edge is reference 0.425 there. The limit is 0.38, not BSk's 0.4, to keep
+a margin where a pack's mapping is the identity (Terralith without Tectonic's router), because 0.4 would tie the two
+slots there. The same 378a0af3 planet then reads 98 of 99 (0.99), with Csa 86 % shrubland and Csb's windswept
+savanna gone (8 % before). On master 4ab29084 (V1 gap 2 on, which moved the test planet again: Csa 934 columns instead of
+151, Csb 178 instead of 98) Cs read 277 of 298 (0.93) without the limit and the same with it. The limit took the 6 windswept savanna columns off the
+class border with the sea. Oceanic land (Cfb) keeps windswept savanna in that slot (14 % of the 378a0af3 planet's
+Cfb columns): vanilla does the same at temperature index 2 and up below humidity index 4, on the positive branch
+(`OverworldBiomeBuilder.maybePickWindsweptSavannaBiome`: `temperature > 1 && humidity < 4 && param.max() >= 0`,
+read in Minecraft 1.21.1's decompiled sources, 2026-10-23), and no table entry asks otherwise.
 
 The geology gate (the rule file `deeptime:rock_named`), the census's plain search (no gate, no volcanic layer)
 against the level's. Without the table 1,564 sampled land columns carried a rock-named biome and 844 of them stood
