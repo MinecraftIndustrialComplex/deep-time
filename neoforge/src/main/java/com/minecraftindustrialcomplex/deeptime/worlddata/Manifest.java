@@ -57,6 +57,7 @@ public record Manifest(String formatVersion, String source, String createdUtc, i
         if (fv == null || !fv.isJsonPrimitive())
             throw new WorldDataException(file + ": no format_version");
         FormatVersion.require(fv.getAsString());
+        Manifest m;
         try {
             JsonObject scale = o.getAsJsonObject("scale");
             Map<String, GridDesc> grids = new LinkedHashMap<>();
@@ -75,7 +76,7 @@ public record Manifest(String formatVersion, String source, String createdUtc, i
                     files.add(new FileEntry(f.get("path").getAsString(), f.get("bytes").getAsLong(),
                             f.get("crc32").getAsLong()));
                 }
-            return new Manifest(
+            m = new Manifest(
                     fv.getAsString(),
                     o.get("source").getAsString(),
                     o.get("created_utc").getAsString(),
@@ -93,6 +94,18 @@ public record Manifest(String formatVersion, String source, String createdUtc, i
         } catch (RuntimeException e) {
             throw new WorldDataException(file + ": malformed manifest: " + e.getMessage(), e);
         }
+        // A cube world is 0.7 and only a cube world is (FORMAT.md "Polar and cube worlds side by side"; Rust
+        // Manifest::read).
+        WorldProjection.Kind kind = m.layout() == null ? WorldProjection.Kind.LAMBERT : m.layout().kind();
+        String want = FormatVersion.forKind(kind);
+        if (!want.equals(m.formatVersion()))
+            throw new WorldDataException(file + ": format_version " + m.formatVersion() + " on a " + kind.id()
+                    + " world, which is " + want);
+        // Its map table and rotation must be ones this jar can draw, refused before any layer is read (Rust
+        // WorldProjection::try_from_spec in Manifest::read).
+        if (kind == WorldProjection.Kind.CUBE)
+            m.projection();
+        return m;
     }
 
     /**
@@ -105,12 +118,21 @@ public record Manifest(String formatVersion, String source, String createdUtc, i
     }
 
     /**
-     * The world's projection ({@code projection}, FORMAT.md "The world's layout"): Petroff–Guyou or
-     * Lambert; a manifest without the block is a Lambert world of {@link #circumference}. A new object
-     * per call: keep it ({@link WorldData#projection} does).
+     * The world's projection ({@code projection}, FORMAT.md "The world's layout"): Petroff–Guyou,
+     * Lambert or the cube ({@link WorldProjection.Cube}); a manifest without the block is a Lambert
+     * world of {@link #circumference}. A new object per call: keep it ({@link WorldData#projection}
+     * does).
+     *
+     * @throws WorldDataException on a cube world whose map table this jar does not ship (by name and
+     *                            sha256) or whose rotation is not one
      */
     public WorldProjection projection() {
         return WorldProjection.of(layout, circumference);
+    }
+
+    /** Whether this is a cube world (format 0.7, {@code projection.kind} {@code cube}). */
+    public boolean cube() {
+        return layout != null && layout.kind() == WorldProjection.Kind.CUBE;
     }
 
     /** The entry of layer {@code name}, or null. */
