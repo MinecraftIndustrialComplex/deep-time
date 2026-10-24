@@ -886,10 +886,16 @@ mod tests {
         let v = &r.vertices;
         assert!(v.len() > straight.vertices.len(), "{stats}");
         assert_eq!(v[0], straight.vertices[0]);
-        assert_eq!(v[v.len() - 1], straight.vertices[straight.vertices.len() - 1]);
+        assert_eq!(
+            v[v.len() - 1],
+            straight.vertices[straight.vertices.len() - 1]
+        );
         assert!(v.windows(2).all(|p| p[1].w <= p[0].w));
         let off = v.iter().fold(0.0f32, |m, p| m.max(p.z.abs()));
-        assert!((15.0..=MeanderTest::FLOODPLAIN_HALF_WIDTH as f32 - 3.0).contains(&off), "{off}: {stats}");
+        assert!(
+            (15.0..=MeanderTest::FLOODPLAIN_HALF_WIDTH as f32 - 3.0).contains(&off),
+            "{off}: {stats}"
+        );
         let k = stats["reach_sinuosity"].as_f64().unwrap();
         assert!(k >= 1.5, "{stats}");
         // Off the plain, down the slope into the sea, the course is the straight one.
