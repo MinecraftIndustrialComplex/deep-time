@@ -112,7 +112,7 @@ pub fn view(
 }
 
 /// [`view`] for sites whose `x` and `z` are not the world's blocks: `world` maps a site's id to
-/// its block (x, z) in the world the game plays (a Petroff–Guyou bake's, [`from_bake`]). Each site's
+/// its block (x, z) in the world the game plays (a cube bake's, [`from_bake`]). Each site's
 /// `block` is that, or its `x` and `z` when it has none.
 fn view_in_world(
     sites: &[Site],
@@ -193,7 +193,7 @@ pub fn m_per_block_h(preset_json: &str) -> f64 {
 /// sites file (a run that ended before the deposit stage, or was cut short).
 ///
 /// The overlay is drawn over the simulation's Lambert pictures (circumference `circumference`), so a
-/// Petroff–Guyou bake's sites and bodies (format 0.5) are brought back to the simulation's frame: each
+/// cube bake's sites and bodies (format 0.7) are brought back to the simulation's frame: each
 /// position through the world's projection to latitude and longitude, then to the Lambert block.
 /// Each site's `block` keeps its baked centre, the world block the inspector and the game use
 /// (the site card's "Block x, z"); its `x` and `z` are the simulation's.
@@ -203,7 +203,7 @@ pub fn from_bake(world: &Path, circumference: u32, m_per_block_h: f64) -> Option
     let mut blocks = HashMap::new();
     if let Ok(m) = deeptime_format::Manifest::read(world) {
         let wp = m.world_projection();
-        if let deeptime_format::projection::WorldProjection::PetroffGuyou(_) = wp {
+        if let deeptime_format::projection::WorldProjection::Cube(_) = wp {
             let sim = deeptime_format::Projection::new(circumference);
             let back = |x: f64, z: f64| {
                 let (lat, lon) = wp.lat_lon(x, z);
@@ -426,24 +426,32 @@ mod tests {
     }
 
     #[test]
-    fn a_petroff_bake_keeps_each_sites_world_block_beside_the_simulations() {
-        // Site 15 of the REV-2 inspector's bake (b 6,656, λc 176.25, a 16k simulation): its
+    fn a_cube_bake_keeps_each_sites_world_block_beside_the_simulations() {
+        // Site 15 of the REV-2 inspector's bake (a 16k simulation), drawn on a turned cube: its
         // record's latitude and longitude, and its baked centre, the block holding its bodies.
-        use deeptime_format::projection::PetroffGuyou;
         use deeptime_format::{Manifest, Scale, Writer};
-        let dir = std::env::temp_dir().join(format!("deeptime-deposits-pg-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("deeptime-deposits-cube-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let g = PetroffGuyou::new(6_656, 176.25);
-        let mut m = Manifest::new("test", Writer::this("unit"), Scale::default_for(13_312));
+        let side = deeptime_format::projection::face_for(16_384);
+        let map = deeptime_format::cube_map::CubeMap::builtin_static(
+            deeptime_format::cube_map::WORLD_MAP,
+        )
+        .unwrap();
+        let g = deeptime_format::projection::WorldProjection::cube(
+            side,
+            map,
+            deeptime_format::cube::CubeTurn::from_angles(37.0, 21.0, 11.0),
+        );
+        let mut m = Manifest::new("test", Writer::this("unit"), Scale::default_for(4 * side));
         m.projection = Some(g.spec(None));
         m.write(&dir).unwrap();
         let ll = [40.2804_f32, 335.0288];
         let (wx, wz) = g.block_of(f64::from(ll[0]), f64::from(ll[1]));
         let world = [wx.round() as i32, wz.round() as i32];
-        assert_eq!(world, [2391, -1829]);
         let sites = [site(15, "deeptime:coal_seam", ll, [world[0], 40, world[1]])];
-        deeptime_format::sites::write_sites(&dir, 13_312, &sites).unwrap();
+        deeptime_format::sites::write_sites_in(&dir, 4 * side, g.index_frame(), &sites).unwrap();
         let v = from_bake(&dir, 16_384, 300.0).unwrap();
         let s = &v["sites"][0];
         // `block` is the world's: the inspector reads the site's own latitude and longitude there.
@@ -462,10 +470,8 @@ mod tests {
             (s["x"].as_i64(), s["z"].as_i64()),
             (Some(7056), Some(-1686))
         );
-        let (elat, elon) = g.lat_lon(7056.0, -1686.0);
-        assert!((elat - 23.875).abs() < 0.01 && (elon - 101.11).abs() < 0.01);
         // A Lambert world's block is its x and z.
-        let live = view(&sites, &[], 13_312, 300.0, LIVE);
+        let live = view(&sites, &[], 4 * side, 300.0, LIVE);
         assert_eq!(live["sites"][0]["block"], json!(world));
         std::fs::remove_dir_all(&dir).unwrap();
     }

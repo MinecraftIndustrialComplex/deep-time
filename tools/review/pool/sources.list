@@ -44,7 +44,6 @@ ignore crates/deeptime-tiles
 ignore crates/deeptime-inspect
 ignore crates/deeptime-jni
 ignore crates/deeptime-cpuprobe
-ignore crates/deeptime-quincuncial
 
 # The mod's other data folders are read by the game, not by the CLI's runs.
 ignore neoforge/src/main/resources/data/deeptime/deeptime/biome_rules

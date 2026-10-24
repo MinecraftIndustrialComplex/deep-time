@@ -95,8 +95,8 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     let info = json_of(&route(&wb, "/api/runs/baked/rock", "").unwrap());
     assert_eq!(info["available"], true, "{info}");
     assert_eq!(
-        info["circumference"], 3072,
-        "the Petroff–Guyou world's x period 2b"
+        info["circumference"], 4096,
+        "the cube world's x period, four faces of 1,024"
     );
     assert_eq!(info["depths"][0], 0);
     assert_eq!(info["depths"].as_array().unwrap().last().unwrap(), "floor");
@@ -137,8 +137,8 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     );
     assert_eq!(
         u32::from_be_bytes(slice.body[20..24].try_into().unwrap()),
-        64,
-        "the world's aspect, 2 : 1 (the Petroff–Guyou world)"
+        96,
+        "the world's aspect, 4 : 3 (the cube's window)"
     );
     assert!(kept(&dir, "slice-d60-w128.png"), "the slice is kept");
     let again = route(&wb, "/api/runs/baked/rock/slice.png", q).unwrap();
