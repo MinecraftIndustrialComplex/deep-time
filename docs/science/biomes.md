@@ -6,7 +6,7 @@ fixed. The band edges of Minecraft's biome builder were read in its source. The 
 biome is a game choice throughout and is labelled so. The climate that feeds the classifier (monthly
 temperature and rain) is being rewritten and is not checked here.
 
-Ledger ids on this page: `BIO-001` to `BIO-137`, `BIO-170` to `BIO-174` ("The land call on the world's ground", 2026-10-21), `BIO-180` and `BIO-181` ("The snow line", 2026-10-22) and `BIO-182` (the volcanic zones on a Petroff-Guyou world, 2026-10-22) (see [ledger/BIO.md](ledger/BIO.md)); the same section's `BAK-057` to `BAK-059` are in [ledger/BAK.md](ledger/BAK.md) and `HYD-106` to `HYD-109` in [ledger/HYD.md](ledger/HYD.md) (rivers-and-lakes.md "The sea's one rule").
+Ledger ids on this page: `BIO-001` to `BIO-137`, `BIO-170` to `BIO-174` ("The land call on the world's ground", 2026-10-21), `BIO-180` and `BIO-181` ("The snow line", 2026-10-22) `BIO-182` (the volcanic zones on a Petroff-Guyou world, 2026-10-22) and `BIO-187` ("The biome inputs on the world's ground", 2026-10-24) (see [ledger/BIO.md](ledger/BIO.md)); the same section's `BAK-057` to `BAK-059` are in [ledger/BAK.md](ledger/BAK.md) and `HYD-106` to `HYD-109` in [ledger/HYD.md](ledger/HYD.md) (rivers-and-lakes.md "The sea's one rule").
 
 ## What you see in the world
 
@@ -574,8 +574,8 @@ valley (10) and plains (7).
 Why those columns missed the slot showed on the next planet. The P1-26 rain merge (master 68d95f44, the same
 day) changed the test planet: its census holds 11,574 land columns instead of 7,228 and 1,252 volcano cone columns
 instead of 450. The census's ground fell to 34 columns, 8 on the cloud forest (0.235), with 90 left out as volcanic and
-84 as dry. The bake decides the rule per L2 cell (8 blocks on the 4k planet) on the young landscape's height and that
-height's P/PET. The level does not carry that height, so the census's block heights only estimate it, and amplified
+84 as dry. The bake decides the rule per L2 cell (8 blocks on the 4k planet) on the young landscape's height (the world's own
+ground since 2026-10-24, BIO-187) and that height's P/PET. The level does not carry that height, so the census's block heights only estimate it, and amplified
 relief puts single blocks above 1,000 m in cells below it and the reverse. The bake marks every cell where the rule
 fired: it clamps the cell's erosion and continentalness to the rule's floors (0.62 and 0.35, continentalness inland
 of the beach strip). Of the 34 columns, only 5 lay in such a cell, and 4 of those 5 were on the cloud forest. Of the
@@ -1022,8 +1022,8 @@ coordinator's batch).
 ## The ice cover off the world's sea (2026-10-23, BIO-177)
 
 The ice cover (BIO-157 to BIO-159) is laid on the **simulation's** L2 ground: a cell of the young stage's elevation
-above sea level whose nearest L1 climate cell holds at least 1 m of ice. The game draws it with `IcePass`, which
-stands the cover's blocks on a column's ground and leaves alone a column whose top block is a fluid. On a
+(since 2026-10-24 the world's `elevation` averaged onto L2 in the Lambert frame, BIO-187) above sea level whose
+nearest L1 climate cell holds at least 1 m of ice. The game draws it with `IcePass`, which stands the cover's blocks on a column's ground and leaves alone a column whose top block is a fluid. On a
 Petroff-Guyou world the ground the game stands on is another one: the projection's footprint mean of the height,
 which past about 59° of latitude smooths features smaller than its footprint. A covered coastal cell of the
 simulation can then be world sea. There the game has sea water and lays no ice, the land call (BIO-170, BIO-171)
@@ -1148,6 +1148,55 @@ bake's record.
 an L2 cell of the plain's dry cells, 2,947 now read a coast or land continentalness (386 before), about 1,020 km²,
 0.044 % of the land. 65 % of the plain's dry columns lie in the swamp band E6, where vanilla puts swamp or mangrove
 swamp (BIO-178: whatever the flag says); a delta plain is a wetland, so that is left as it is.
+
+## The biome inputs on the world's ground (2026-10-24, BIO-187)
+
+The climate part of the bake decides every L2 node's biome inputs (temperature, humidity, continentalness, erosion,
+ridges), its Köppen class (`koppen_l2`), its wetland flag, its ice cover and whether it is a closed basin below sea
+level, each from one height per node. Until 2026-10-24 that height was the young landscape's (`young/elevation_m`).
+The world does not stand on the young landscape. The amplifier reshapes it before the terrain part writes the
+`elevation` layer, and that layer is what the game's columns stand on, what its biome rules lapse their monthly
+temperatures to (BIO-018, BIO-180) and what the climate API reads. Since 2026-10-24 the bake uses that layer: each
+L2 node takes the mean of the world's ground over its own footprint, in metres (`sea_m + (y − sea_y) ×
+m_per_block_v`). A bake without the layer falls back to the young landscape, and `notes.bake.climate.ground` says which
+ground was used.
+
+The two grounds part most on volcanoes. The amplifier's volcano shaper (`amplify/volcano.rs`) sets a shield's ground
+well below the young landscape's. On the 4k test planet (master db81be49, the amplify checkpoint in the simulation's
+frame, land L3 cells) the young ground stands this far above the world's:
+
+| Ground (the `volcanoes/map` code) | Cells | Young minus world, mean | Cells over 1.5 km |
+|---|---|---|---|
+| active shield (3) | 874 | 769 m | 179 |
+| dead shield or seamount (4) | 339 | 796 m | 14 |
+| dead stratovolcano (2) | 114 | 387 m | 4 |
+| caldera (6) | 14 | 372 m | 0 |
+| flood basalt (7) | 264 | 148 m | 0 |
+| active stratovolcano (1) | 64 | 37 m | 0 |
+| no volcano | 3,079 | 169 m | 2 |
+
+At 6.5 °C a kilometre, 0.8 km is about 5 °C. The bake lapsed a shield's months to the young height and called much of
+it a cold desert (BWk with a cold temperature parameter, under −0.15). The game reads the column's own climate on the
+world's ground, about 5 °C warmer, and there Expanded Ecosphere's dry rules put sand biomes. `ColdDesertCensusTest`
+counts it on a 4-block grid:
+
+| Bake | BWk columns | Cold (parameter under −0.15) | Cold with the column's lapsed annual mean at 10 °C or more | Near a shield |
+|---|---|---|---|---|
+| master 193c6387 (young ground) | 708 | 220 | 147 | all 147 within one radius |
+| master db81be49 (young ground) | 1,382 | 380 | 300 (13 to 25 °C) | 162 within one radius, 126 more within three |
+| this fix (the world's ground) | 852 | 81 | 0 | - |
+
+The fault was already there on 193c6387, but `climateConsistent`'s sample found only 1 of 26 cold BWk columns on sand
+(0.038, under its ceiling of 0.100). The front_share merge (a2713229, PLT-530) changed the test planet, and with
+-PwithEe the share rose to 0.452 of 42 columns. On the fix's bake it reads 0.0 of 8. The cold desert is still there:
+the 81 cold columns left are cold on the world's ground too. The BWk land shrinks from 1,382 to 852 columns: on the
+world's lower ground the shields' deserts are warmer, so part of them falls past the classifier's 18 °C line between
+BWk and BWh (BIO-006). The BWh count was not taken.
+
+The footprint mean, not a bilinear read, is the agent's choice: an L2 node then stands for the ground its cell covers,
+as the projection pass's footprint does on a Petroff-Guyou world. The bake still runs in the simulation's (Lambert)
+frame. The projection pass that follows resamples the layers and settles land and sea on the world's own nodes
+(BIO-170 to BIO-172).
 
 ## The snow line (2026-10-22, BIO-180, BIO-181)
 
