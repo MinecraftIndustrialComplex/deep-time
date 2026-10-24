@@ -509,8 +509,17 @@ public final class BiomeCensus {
                 if (land && !untagged && rules != null) {
                     if (ruleCensus == null)
                         ruleCensus = new RuleCensus(rules.rules());
-                    boolean ruleColdWet = wetFlag != null ? wetFlag.nearest(x, z) >= 1.5
+                    // Cold wetland as the biome rules see it (ledger: BIO-189): the flag where the query reads its column's
+                    // facts, the centre of the column's quart (VolcanicBiomes.find), and only where the ordinary rules may
+                    // decide there: at the surface, off a river's channel and on land. At the waterline the census's own
+                    // column can be dry while its quart's centre is under the sea, where no rule runs (2 of 29 cold-wetland
+                    // columns of the 2026-10-24 test planet, both on the pack's dunes).
+                    int qx = VolcanicBiomes.queryBlock(QuartPos.fromBlock(x)), qz = VolcanicBiomes.queryBlock(QuartPos.fromBlock(z));
+                    boolean flagged = wetFlag != null ? wetFlag.nearest(qx, qz) >= 1.5
                             : wetland && BiomeRules.COLD_WETLAND_CLASSES.contains(KOPPEN[k]);
+                    boolean ruleColdWet = flagged
+                            && VolcanicBiomes.rulesAt(sampler.sample(QuartPos.fromBlock(x), QuartPos.fromBlock((int) Math.floor(y)), QuartPos.fromBlock(z)))
+                            && VolcanicBiomes.onLand(rules.terrain(), rules.seaLevel(), qx, qz, rules.terrain().height(qx, qz));
                     ruleCensus.add(b, decision, KOPPEN[k], ruleColdWet);
                 }
                 if (land && !untagged) {
