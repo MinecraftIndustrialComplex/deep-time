@@ -911,11 +911,13 @@ pub const CAPTURED_SAMPLES_GLOBAL: &str = "plates/captured_samples";
 /// unrotated), each plate's visible crust that the step's overlaps and the resampling's
 /// footprints have cut into pieces meeting only through other plates (`geometry::pieces`) keeps
 /// its largest piece as the plate. Every other piece of `min_plate_area_frac` of the planet
-/// (PLT-091) or more becomes a plate of its own, with the parent's rotation (fission, as the
-/// Farallon plate split into the Cocos and Nazca plates; Lonsdale 2005): the force balance moves
-/// it from the next step. Every smaller piece joins the plate most of its lattice neighbours
-/// belong to (capture: Stock & Lee 1994; Nicholson et al. 1994), as a plate below that size is
-/// absorbed below. Returns (plates born, samples to them, samples captured).
+/// (PLT-091) or more becomes a plate of its own, with the parent's rotation (fission: Stock & Lee
+/// 1994, "if a small fragment breaks off a large plate, then it may lose its slab-pull force and
+/// become driven entirely by different conditions"; the Farallon plate's, Lonsdale 2005): the
+/// force balance moves it from the next step. Every smaller piece joins the plate most of its
+/// lattice neighbours belong to (capture: Stock & Lee 1994, microplates that "became attached to
+/// the Pacific plate"; Nicholson et al. 1994), as a plate below that size is absorbed below.
+/// Returns (plates born, samples to them, samples captured).
 fn split_cut_plates(
     state: &mut PlateState,
     world: &mut WorldState,
@@ -1376,14 +1378,15 @@ mod tests {
         assert!(both * 4 >= rows.len() * 3, "{both} of {} rows", rows.len());
     }
 
-    /// A plate is one rigid body (Bird 2003 [110]: a plate is a region "of the lithosphere
-    /// that moves as a rigid body"; Lonsdale 2005: the Farallon plate broke into the Cocos and
-    /// Nazca plates; Stock & Lee 1994, Nicholson et al. 1994: a small piece cut off its plate is
-    /// captured by the plate around it). Plate 0 is cut in two by a band of plate 1 (0 < z < 0.3)
-    /// and keeps one small patch inside the band. With `plate_fission` its southern piece (the
-    /// larger) stays plate 0, its northern piece becomes plate 2 with plate 0's rotation and
-    /// parent, and the patch joins plate 1; every plate is then one connected piece and no sample
-    /// moved. Off, plate 0 keeps all three pieces. ledger: PLT-532
+    /// A plate is one rigid body (Gordon 1998: "The central assumption of plate tectonics is that
+    /// the plates are rigid"; Bird 2003 [123]: PB2002's 52 plates are 52 segments, each "a
+    /// closed curve outlining that plate"; Stock & Lee 1994: a fragment broken off a plate "may
+    /// lose its slab-pull force and become driven entirely by different conditions", and
+    /// microplates "became attached to the Pacific plate"). Plate 0 is cut in two by a band of
+    /// plate 1 (0 < z < 0.3) and keeps one small patch inside the band. With `plate_fission` its
+    /// southern piece (the larger) stays plate 0, its northern piece becomes plate 2 with plate
+    /// 0's rotation and parent, and the patch joins plate 1; every plate is then one connected
+    /// piece and no sample moved. Off, plate 0 keeps all three pieces. ledger: PLT-532
     #[test]
     fn a_plate_cut_in_two_splits_and_a_cut_off_patch_is_captured() {
         use crate::params::TectonicParams;

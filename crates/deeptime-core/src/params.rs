@@ -831,9 +831,13 @@ pub struct TectonicParams {
     /// against 207). Off, each front sample counts one lattice spacing, which counts a straight
     /// front about 1.04 times and the model's own fronts 1.32 times. ledger: PLT-530
     pub front_share: bool,
-    /// A plate is one rigid body (the front lane, 2026-10-24; Bird 2003 [110] to [112]: plates
-    /// tile the sphere and each boundary runs from junction to junction; Lonsdale 2005, the
-    /// Farallon plate's fission; Stock & Lee 1994, microplate capture): right after a resampling
+    /// A plate is one rigid body (the front lane, 2026-10-24; Gordon 1998: "The central
+    /// assumption of plate tectonics is that the plates are rigid"; Bird 2003 [123]: PB2002's
+    /// plates file "contains 52 segments", each "a closed curve outlining that plate", and
+    /// [112]: each of its 150 boundaries runs from a junction to a junction; Stock & Lee 1994, a
+    /// fragment broken off a plate "may lose its slab-pull force and become driven entirely by
+    /// different conditions", and microplates that "became attached to the Pacific plate";
+    /// Lonsdale 2005, the Farallon plate's fission): right after a resampling
     /// each plate's visible crust cut into pieces that meet only through other plates
     /// (`geometry::pieces`) keeps its largest piece; every other piece of `min_plate_area_frac`
     /// (PLT-091) or more becomes a plate of its own with the parent's rotation (fission; the force
