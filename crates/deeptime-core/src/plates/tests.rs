@@ -1341,6 +1341,23 @@ fn plates_split(
     turn: f64,
     north: impl Fn(DVec3) -> bool,
 ) -> (PlateState, Geo, Vec<DVec3>) {
+    let (mut st, geo) = plates_unresolved(p, env, glam::DQuat::from_rotation_x(turn), north);
+    let pos = geometry::positions(&st, &geo);
+    st.recount(&pos);
+    let tree = Tree::over(&pos, |_| true);
+    let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, env);
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, env).unwrap();
+    (st, geo, pos)
+}
+
+/// The planet of `plates_split` before its overlaps are found: plate 1's group turned by `q`.
+fn plates_unresolved(
+    p: &PlanetPreset,
+    env: &Env<'_>,
+    q: glam::DQuat,
+    north: impl Fn(DVec3) -> bool,
+) -> (PlateState, Geo) {
     let (mut st, geo) = init::initial_state(p, env).unwrap();
     let pts = geo.points();
     for (i, s) in st.samples.iter_mut().enumerate() {
@@ -1357,7 +1374,6 @@ fn plates_split(
         }
         s.thickness_m = pools::thickness(&s.pools);
     }
-    let q = glam::DQuat::from_rotation_x(turn);
     st.groups = vec![
         state::Group {
             plate: 0,
@@ -1375,13 +1391,7 @@ fn plates_split(
     st.contacts.clear();
     st.ridges.clear();
     st.rift_links.clear();
-    let pos = geometry::positions(&st, &geo);
-    st.recount(&pos);
-    let tree = Tree::over(&pos, |_| true);
-    let overlaps = subduction::detect(&st, &geo, &pos, &tree);
-    let mut world = WorldState::new(1, 16_384, p.t_start_years());
-    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, env).unwrap();
-    (st, geo, pos)
+    (st, geo)
 }
 
 /// Continental area (visible continental samples × sample area) of the two-plate planet before a
@@ -1529,7 +1539,7 @@ fn how_resamplings_roughen_a_boundary() {
                 pos = geometry::positions(&st, &geo);
                 st.recount(&pos);
                 let tree = Tree::over(&pos, |_| true);
-                let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+                let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
                 subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
             }
         }
@@ -1870,7 +1880,7 @@ fn one_way_subduction_keeps_the_slab_down() {
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
         let env2 = stage.env(&p.tectonics, 2);
         let tree = Tree::over(&pos, |_| true);
-        let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+        let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env2);
         subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
         let held = st
             .one_way
@@ -1880,7 +1890,7 @@ fn one_way_subduction_keeps_the_slab_down() {
         let pos = geometry::positions(&st, &geo);
         let env3 = stage.env(&p.tectonics, 3);
         let tree = Tree::over(&pos, |_| true);
-        let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+        let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env3);
         subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env3).unwrap();
         let shown = under
             .iter()
@@ -1965,7 +1975,7 @@ fn ocean_floor_as_thick_as_a_continent_turns_continental_at_a_contact() {
         s.thickness_m = pools::thickness(&s.pools);
     }
     let tree = Tree::over(&pos, |_| true);
-    let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+    let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
     let mut world = WorldState::new(1, 16_384, p.t_start_years());
     subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
     for &(i, crust, turns) in &cases {
@@ -2150,7 +2160,7 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
         let pos = geometry::positions(&st, &geo);
         let env2 = stage.env(&p.tectonics, 2);
         let tree = Tree::over(&pos, |_| true);
-        let overlaps = subduction::detect(&st, &geo, &pos, &tree);
+        let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env2);
         subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
         let after = subduction::fronts_begin(&st, &geo, &pos, &env2).front_count();
         (st, geo, pos, world, before, after)
@@ -2194,7 +2204,7 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
     }
     let pos3 = geometry::positions(&held, &geo);
     let tree = Tree::over(&pos3, |_| true);
-    let overlaps = subduction::detect(&held, &geo, &pos3, &tree);
+    let overlaps = subduction::overlaps(&held, &geo, &pos3, &tree, &env3);
     subduction::resolve(&mut held, &mut world, &geo, &overlaps, &pos3, &env3).unwrap();
     let c = &held.contacts[0];
     assert_eq!((c.last_step, c.carried), (3, false));

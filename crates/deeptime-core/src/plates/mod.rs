@@ -369,7 +369,8 @@ impl PlatesStage {
         let tree = Tree::over(&pos, |_| true);
         lap(&mut clock, "motion");
         cut_trace::mark(st, &cache.geo, "motion");
-        let overlaps = subduction::detect(st, &cache.geo, &pos, &tree);
+        // ledger: PLT-553 (the overlaps read the outline the resampling gives the ground by)
+        let overlaps = subduction::overlaps(st, &cache.geo, &pos, &tree, &env);
         book(st, gap_budget::Part::Other);
         lap(&mut clock, "detect");
         let resolved = subduction::resolve(st, world, &cache.geo, &overlaps, &pos, &env)?;

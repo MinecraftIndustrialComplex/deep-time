@@ -5,7 +5,10 @@
 //! **Overlaps.** Every step, each sample looks at its 8 nearest samples (all plates, current
 //! positions); for each other plate among them it asks whether it lies inside one of that plate's
 //! lattice triangles (three vertices of one rigid group, located in the group's frame). Such a
-//! sample overlaps the other plate: the plates interpenetrate there.
+//! sample overlaps the other plate: the plates interpenetrate there. With `outline_cover` (on by
+//! default, PLT-553) it asks whether it lies inside that plate's outline instead, the zero line
+//! of the interpolated distance the resampling gives the ground by (`level_set::cover`): a
+//! triangle with corners of other groups holds it on the group's side of that line.
 //!
 //! **Collisions.** `resolve` also lists, per contact, the subducting plate's continental crust in
 //! the overlap (the seeds of a terrane). Whether a contact is in collision, how much it has
@@ -83,6 +86,7 @@ use super::collapse::{iso_height, toward};
 use super::events::{self, SUBDUCTION_ONSET};
 use super::geometry::{Cover, Geo, Tree, cover, dijkstra_parts};
 use super::kinematics::{quat, tangent, to_group, to_world};
+use super::level_set;
 use super::pools::isostatic_change_m;
 use super::shortening::{boundary_normal, front_share_rad, is_transform};
 use super::state::{
@@ -113,8 +117,35 @@ pub struct Overlap {
     pub cover: Cover,
 }
 
-/// Finds every overlap (parallel over samples).
-pub fn detect(state: &PlateState, geo: &Geo, pos: &[DVec3], tree: &Tree) -> Vec<Overlap> {
+/// The step's overlaps as `env`'s switches have them ([`detect`], with the outline when
+/// `tectonics.outline_cover` is on; ledger PLT-553).
+pub fn overlaps(
+    state: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    tree: &Tree,
+    env: &Env,
+) -> Vec<Overlap> {
+    let outline = env
+        .k
+        .outline_cover
+        .then(|| level_set::distances_now(state, geo, env.norm.spacing_rad()));
+    detect(state, geo, pos, tree, outline.as_deref())
+}
+
+/// Finds every overlap (parallel over samples). With `outline` (each sample's distance from its
+/// group's outline, `level_set::distances_now`; `tectonics.outline_cover`, ledger PLT-553) a
+/// sample overlaps another plate where it lies inside that plate's outline
+/// (`level_set::cover`); without, only inside a lattice triangle whose corners are all one of
+/// that plate's groups (`geometry::cover`).
+pub fn detect(
+    state: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    tree: &Tree,
+    outline: Option<&[f64]>,
+) -> Vec<Overlap> {
+    let outline = outline.filter(|o| o.len() == state.samples.len());
     let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
     let plate_of: Vec<u32> = (0..state.samples.len())
         .into_par_iter()
@@ -139,7 +170,12 @@ pub fn detect(state: &PlateState, geo: &Geo, pos: &[DVec3], tree: &Tree) -> Vec<
                 }
                 tried[nt] = g;
                 nt += 1;
-                if let Some(c) = cover(geo, state, g, rots[g as usize], pos[i], j) {
+                let rot = rots[g as usize];
+                let found = match outline {
+                    Some(phi) => level_set::cover(geo, state, phi, g, rot, pos[i], j),
+                    None => cover(geo, state, g, rot, pos[i], j),
+                };
+                if let Some(c) = found {
                     return Some(Overlap {
                         i: i as u32,
                         group: g,

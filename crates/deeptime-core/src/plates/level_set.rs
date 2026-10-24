@@ -29,11 +29,11 @@
 //! A plate's outline still moves where the physics moves it (a ridge's new crust, a trench's
 //! overriding plate on top, an accretion), and only there.
 
-use glam::DVec3;
+use glam::{DQuat, DVec3};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::geometry::Geo;
+use super::geometry::{Cover, Geo};
 use super::state::PlateState;
 
 /// Each sample's distance to its group's outline, as it stood at the last resampling.
@@ -119,6 +119,64 @@ pub fn margin(groups: [u32; 3], w: [f64; 3], phi: [f64; 3], corners: [DVec3; 3],
         Some(r) => (own - r) / len,
         None => own / len,
     }
+}
+
+/// Every sample's distance from its group's outline between resamplings, for the overlaps
+/// ([`cover`]): [`old_distances`] with the groups as they stand now, on the lattice `geo` the
+/// samples stand on (spacing `spacing` rad).
+pub fn distances_now(state: &PlateState, geo: &Geo, spacing: f64) -> Vec<f64> {
+    let groups: Vec<u32> = state.samples.iter().map(|s| s.group).collect();
+    old_distances(state.level_set.as_ref(), &groups, geo, spacing)
+}
+
+/// Where the mantle-frame direction `q` falls inside group `group`'s outline
+/// (`tectonics.outline_cover`, ledger PLT-553): the lattice triangle holding `q` in the group's
+/// frame (`rot`, located from a triangle of `hint`), when the group holds `q` there by [`margin`]
+/// with the corners' distances `phi` ([`distances_now`]), the rule the resampling gives a new
+/// point its group by (`ridges::footprint_level_set`). A triangle whose three corners are the
+/// group's holds `q` whole, as [`geometry::cover`] has it; one with corners of other groups holds
+/// it on the group's side of the zero line, where [`geometry::cover`] holds nothing. The weights
+/// are the group's own corners', summing to 1, so [`Cover::major`] is one of its samples. `None`
+/// outside the outline or with no corner of the group.
+///
+/// [`geometry::cover`]: super::geometry::cover
+pub fn cover(
+    geo: &Geo,
+    state: &PlateState,
+    phi: &[f64],
+    group: u32,
+    rot: DQuat,
+    q: DVec3,
+    hint: u32,
+) -> Option<Cover> {
+    let local = rot.inverse() * q;
+    let h = geo.mesh.vertex_triangle(hint).unwrap_or(0);
+    let t = geo.mesh.locate(local, h);
+    let tri = geo.mesh.triangles()[t as usize];
+    let groups = tri.map(|v| state.samples[v as usize].group);
+    let own = groups.map(|g| g == group);
+    if !own.contains(&true) {
+        return None;
+    }
+    let mut w = geo.mesh.barycentric(t, local);
+    if own.contains(&false) {
+        let pts = geo.points();
+        let d = margin(
+            groups,
+            w,
+            tri.map(|v| phi[v as usize]),
+            tri.map(|v| pts[v as usize]),
+            group,
+        );
+        let sum: f64 = (0..3).filter(|&k| own[k]).map(|k| w[k]).sum();
+        if d <= 0.0 || sum <= 0.0 {
+            return None;
+        }
+        for k in 0..3 {
+            w[k] = if own[k] { w[k] / sum } else { 0.0 };
+        }
+    }
+    Some(Cover { t, tri, w })
 }
 
 /// The sine of the angular distance from `p` to the great-circle arc from `a` to `b` (the
