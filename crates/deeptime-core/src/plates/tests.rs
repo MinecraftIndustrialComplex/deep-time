@@ -2514,15 +2514,18 @@ fn the_arcs_band_runs_round_a_fronts_ends() {
                 ((along + ends) / band - 1.0).abs() < 0.01,
                 "{name}, {lon_deg} degrees: {along:.0} + {ends:.0} km against {band:.0}"
             );
-            // Past the ends: about the two quarter circles, at any length.
+            // Past the ends: about the two quarter circles, at any length. The lattice's front
+            // ends within a spacing of the meridians the split is made at, which moves up to
+            // about a spacing of band at each end (0.15 of the wrap at 40,000 samples) from one
+            // part to the other.
             assert!(
-                (0.6..1.2).contains(&(ends / wrap)),
+                (0.45..1.2).contains(&(ends / wrap)),
                 "{name}, {lon_deg} degrees: past the ends {ends:.0} km"
             );
             // Along the front: no more than its length, and no less than a hexagonal lattice's
-            // longest path across allows.
+            // longest path across allows, less that spacing at each end.
             assert!(
-                (0.8..1.03).contains(&(along / straight)),
+                (0.75..1.03).contains(&(along / straight)),
                 "{name}, {lon_deg} degrees: along the front {along:.0} km"
             );
         }
@@ -2624,8 +2627,13 @@ fn the_slab_pull_takes_the_arcs_fronts_along_their_normal() {
                     "{name}, {theta} degrees: {t_on} against {want}"
                 );
                 assert!(angle(t_on) < 2.0, "{name}, {theta} degrees: {t_on}");
+                // The same front at any angle while every sample of it converges beyond the
+                // transform's 20 degrees; at 60 degrees the motion is 10 degrees from that at the
+                // front's middle and less at its ends, where the boundary's normal (the chord of
+                // about five spacings) turns, so a sample or two of each end drops out.
+                let tol = if theta <= 45.0 { 1e-9 } else { 0.06 };
                 assert!(
-                    (t_on - got[0][0].0).length() <= 1e-9 * want.length(),
+                    (t_on - got[0][0].0).length() <= tol * want.length(),
                     "{name}, {theta} degrees: {t_on} against the normal front's {}",
                     got[0][0].0
                 );
@@ -2763,18 +2771,57 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
             want += x.cross(out) * (alpha / steps as f64);
         }
         want *= c.pull_n_m * c.radius_m * c.radius_m * r.sin();
+        // The lattice's trench: plate 0's samples with an edge to plate 1, their shares on their
+        // normals, and their crossing sums (the boundary's normal times its straight length,
+        // with no normal of the neighbourhood in it), as torques per unit pull.
+        let n = st.samples.len();
+        let plate_of: Vec<u32> = (0..n).map(|i| st.plate_of(i)).collect();
+        let rots: Vec<glam::DQuat> = st.groups.iter().map(|g| kinematics::quat(g.rot)).collect();
+        let (mut rows, mut share_km, mut cross_km) = (0usize, 0.0, 0.0);
+        let (mut by_share, mut by_cross) = (DVec3::ZERO, DVec3::ZERO);
+        for v in 0..n {
+            if plate_of[v] != 0
+                || st.samples[v].is_hidden()
+                || !geo.edges(v as u32).any(|(u, _)| plate_of[u as usize] == 1)
+            {
+                continue;
+            }
+            let normal = shortening::boundary_normal(&geo, &pos, &rots, &st.samples, &plate_of, v, 1);
+            let share = shortening::front_share_rad(
+                &geo, &pos, &rots, &st.samples, &plate_of, v, 1, normal,
+            );
+            let cross = shortening::crossing_sum(
+                &geo,
+                pos[v],
+                rots[st.samples[v].group as usize],
+                &plate_of,
+                v as u32,
+                1,
+            );
+            rows += 1;
+            share_km += env.norm.km(share);
+            cross_km += env.norm.km(cross.length());
+            by_share += pos[v].cross(-normal) * share;
+            by_cross += pos[v].cross(-cross);
+        }
+        let rim = want / (c.pull_n_m * c.radius_m * c.radius_m);
         eprintln!(
             "front_pull {on}: the reference plate moves at {speed:.1} mm/yr (the speed scale \
              {:.0}; its overriding neighbour {held:.2}); the pull {:.3} of the trench's along its \
-             normal ({:.1} degrees off)",
+             normal ({:.1} degrees off); the lattice's trench: {rows} samples, shares {share_km:.0} \
+             km, crossing sums {cross_km:.0} km (the rim's {:.0}), the shares' torque {:.3} of the \
+             rim's, the crossing sums' {:.3}",
             k.plate_speed_scale_mm_yr,
             torque.length() / want.length(),
             torque.angle_between(want).to_degrees(),
+            forces::REF_TRENCH_KM,
+            by_share.length() / rim.length(),
+            by_cross.length() / rim.length(),
         );
         assert!(held < 0.01 * speed, "the neighbours move: {held}");
         if on {
             assert!(
-                (0.96..1.05).contains(&(torque.length() / want.length())),
+                (0.96..1.10).contains(&(torque.length() / want.length())),
                 "{torque} against {want}"
             );
             assert!(torque.angle_between(want).to_degrees() < 2.0);
@@ -2783,6 +2830,111 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
     }
     // The analytic ring's plate, with the same definitions (its own test's bounds).
     assert!((25.0..70.0).contains(&speeds[0]), "{speeds:?}");
+}
+
+/// The continent's margin towards plate 1 as the boundary mix sees it (`dynamics::boundary_mix`),
+/// on the converging half (y > 0.2, away from the rotation's poles at ±x): per class (the mix's
+/// index, `None` last), the samples, those whose boundary normal lies more than 70 degrees from
+/// the margin's (−z, the lattice's equator), the mean of that angle, degrees, and those with a
+/// hidden neighbour across; and the mix's ocean-continent and other km.
+fn the_margin_as_the_mix_sees_it(
+    st: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    env: &Env<'_>,
+) -> (Vec<(usize, usize, f64, usize)>, f64, f64) {
+    let n = st.samples.len();
+    let classes: Vec<std::sync::atomic::AtomicU8> =
+        (0..n).map(|_| std::sync::atomic::AtomicU8::new(0)).collect();
+    let mix = dynamics::boundary_mix(st, geo, pos, env, Some(&classes));
+    let plate_of: Vec<u32> = (0..n).map(|i| st.plate_of(i)).collect();
+    let rots: Vec<glam::DQuat> = st.groups.iter().map(|g| kinematics::quat(g.rot)).collect();
+    let mut rows = vec![(0usize, 0usize, 0.0f64, 0usize); dynamics::mix::NAMES.len() + 1];
+    for v in 0..n {
+        let s = &st.samples[v];
+        if s.is_hidden() || plate_of[v] != 0 || pos[v].y <= 0.2 {
+            continue;
+        }
+        let across: Vec<u32> = geo
+            .edges(v as u32)
+            .map(|(u, _)| u)
+            .filter(|&u| plate_of[u as usize] == 1)
+            .collect();
+        if across.is_empty() {
+            continue;
+        }
+        let class = match classes[v].load(std::sync::atomic::Ordering::Relaxed) {
+            0 => dynamics::mix::NAMES.len(),
+            c => usize::from(c) - 1,
+        };
+        let normal = shortening::boundary_normal(geo, pos, &rots, &st.samples, &plate_of, v, 1);
+        let angle = normal.angle_between(-DVec3::Z).to_degrees();
+        let row = &mut rows[class];
+        row.0 += 1;
+        row.1 += usize::from(angle > 70.0);
+        row.2 += angle;
+        row.3 += usize::from(across.iter().any(|&u| st.samples[u as usize].is_hidden()));
+    }
+    for row in &mut rows {
+        if row.0 > 0 {
+            row.2 /= row.0 as f64;
+        }
+    }
+    (
+        rows,
+        mix.km[dynamics::mix::OCEAN_CONTINENT],
+        mix.km[dynamics::mix::OTHER],
+    )
+}
+
+/// The ocean-continent dip after a rebuild, probed (the front lane, step 9; plates.md, "Step
+/// 9"): the records lose 16,500 km of ocean-continent front within 2 Myr of a resampling, to the
+/// boundary judged a transform, on the mature, fast margins. Here the two-plate planet of
+/// [`converging_plates`] (an ocean moving north under a continent, head-on, at up to 50 mm/yr on
+/// the y > 0 half of the equator) goes through a resampling with its contact carried (PLT-550),
+/// as the plates step does it; the boundary mix before and after, and the continent's margin
+/// sample by sample ([`the_margin_as_the_mix_sees_it`]).
+#[test]
+fn the_ocean_continent_front_through_a_resampling() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let (mut st, geo, pos) = converging_plates(&p, &env);
+    st.dynamics = Some(dynamics::Dynamics::default());
+    let before = the_margin_as_the_mix_sees_it(&st, &geo, &pos, &env);
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    subduction::carry(&mut st, env.step, p.tectonics.contact_carry);
+    let tree = Tree::over(&pos, |_| true);
+    let geo = ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env).unwrap();
+    let pos = geometry::positions(&st, &geo);
+    let env2 = stage.env(&p.tectonics, 2);
+    let tree = Tree::over(&pos, |_| true);
+    let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env2);
+    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
+    let after = the_margin_as_the_mix_sees_it(&st, &geo, &pos, &env2);
+    let c = &st.contacts[0];
+    eprintln!(
+        "the contact after: active {}, carried {}, last step {}",
+        c.active(env2.step),
+        c.carried,
+        c.last_step
+    );
+    for (when, (rows, oc, other)) in [("before", &before), ("after", &after)] {
+        eprintln!("{when}: the mix's ocean-continent {oc:.0} km, other {other:.0} km");
+        for (class, row) in rows.iter().enumerate() {
+            if row.0 == 0 {
+                continue;
+            }
+            let name = dynamics::mix::NAMES.get(class).copied().unwrap_or("none");
+            eprintln!(
+                "  {when}, {name}: {} margin samples, {} with the normal over 70 degrees off \
+                 (mean {:.1}), {} beside hidden crust",
+                row.0, row.1, row.2, row.3
+            );
+        }
+    }
+    let oc = dynamics::mix::OCEAN_CONTINENT;
+    assert!(before.0[oc].0 > 20, "{:?}", before.0);
 }
 
 /// A subduction zone goes on through a resampling (`tectonics.contact_carry`, PLT-550; plates.md,

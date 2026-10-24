@@ -695,7 +695,9 @@ pub(in crate::plates) mod tests {
     /// (z = 0: both pieces hold a stretch of it) and along it (y < -0.3 is the new piece, which
     /// borders the other plate only across the ridge, away from the trench's ends at the poles,
     /// and its copy of the slab pulls nothing). A slab that hung with no front hangs on along each
-    /// piece's own stretch of the border, with the parent's pull between them. ledger: PLT-534
+    /// piece's own stretch of the border, with the parent's pull between them. With `front_pull`
+    /// (PLT-560) a split across the trench holds to about a spacing of it (see the tolerance).
+    /// ledger: PLT-534
     #[test]
     fn a_split_plates_pieces_pull_with_the_parents_slab_force() {
         use crate::plates::forces::slab_torques;
@@ -754,9 +756,24 @@ pub(in crate::plates) mod tests {
             let pull: DVec3 = under.iter().map(|&p| after[p].0).sum();
             let suck: DVec3 = over.iter().map(|&p| after[p].1).sum();
             assert!(before[1].0.length() > 0.0, "case {i}: the slab pulls");
+            // With `front_pull` (PLT-560) a split across the trench (cases 0 and 1) puts a
+            // junction of the pieces on it: there an overriding sample's front takes one piece,
+            // its share counts its crossing to that piece alone, and the boundary's normals of
+            // the samples beside it are the chords of their own piece's stretch, so the pieces'
+            // pull may differ from the parent's by about a spacing of the trench (the y > 0 half
+            // of a great circle, π rad) at each junction.
+            let tol = if k.front_pull && i < 2 {
+                2.0 * e.norm.spacing_rad() / std::f64::consts::PI
+            } else {
+                1e-9
+            };
             for (got, want, what) in [(pull, before[1].0, "pull"), (suck, before[0].1, "suction")] {
+                eprintln!(
+                    "case {i}: the pieces' {what} differs from the parent's by {:.2e} of it",
+                    (got - want).length() / want.length()
+                );
                 assert!(
-                    (got - want).length() <= 1e-9 * want.length(),
+                    (got - want).length() <= tol * want.length(),
                     "case {i}: the pieces' {what} {got} against the parent's {want}"
                 );
             }
