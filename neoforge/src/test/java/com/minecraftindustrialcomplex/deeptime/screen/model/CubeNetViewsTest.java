@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class CubeNetViewsTest {
 
-    static final long S = 1024;
+    static final int S = 1024;
 
     static List<WorldProjection.Cube> cubes() {
         return List.of(
