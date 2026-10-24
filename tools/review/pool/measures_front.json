@@ -85,6 +85,25 @@
         {"key": "fissions", "key2": "fission_life_p50", "label": "fission births per run / their median life, Myr", "target": null, "digits": 1, "pair": true},
         {"key": "fission_into_parent", "key2": "hidden_mean", "label": "absorbed fission-born plates taken back by the parent / hidden share between resamplings", "target": null, "digits": 3, "pair": true}
       ]
+    },
+    "shown": {
+      "version": 1,
+      "doc": "the crust that went down a trench and showed again before a resampling consumed it, by cause (plate, reversal, on_top, unseen, left, collision), and what escaped the resamplings, from the record's steps[].shown (plates/shown.rs, runs from 2026-10-24 on); it sizes one-way subduction (plates.md, 'Step 6: the crust shown again'); definitions in measure_shown.py",
+      "command": ["{py}", "-I", "{tools}/measure_shown.py", "{run}"],
+      "needs": ["rec"],
+      "columns": [
+        {"key": "under_km2_yr", "key2": "consumed_km2_yr", "label": "crust that went under / the resamplings consumed, km2/yr", "target": null, "digits": 3, "pair": true},
+        {"key": "shown_all", "key2": "escaped", "label": "shown again, share of what went under / escaped the resamplings, share of what went under since the last", "target": null, "digits": 4, "pair": true},
+        {"key": "shown_left", "key2": "shown_unseen", "label": "shown again: left the cover / no contact seen", "target": null, "digits": 4, "pair": true},
+        {"key": "shown_reversal", "key2": "shown_on_top", "label": "shown again: reversal / now overriding", "target": null, "digits": 4, "pair": true},
+        {"key": "shown_plate", "key2": "shown_collision", "label": "shown again: a rift moved it / a collision brought it up", "target": null, "digits": 4, "pair": true},
+        {"key": "esc_left", "key2": "esc_unseen", "label": "escaped: left the cover / no contact seen", "target": null, "digits": 4, "pair": true},
+        {"key": "esc_reversal", "key2": "esc_on_top", "label": "escaped: reversal / now overriding", "target": null, "digits": 4, "pair": true},
+        {"key": "esc_plate", "key2": "esc_collision", "label": "escaped: a rift moved it / a collision brought it up", "target": null, "digits": 4, "pair": true},
+        {"key": "esc_planet", "key2": "esc_cont", "label": "escaped per resampling, share of the planet / continental share of the escaped", "target": null, "digits": 4, "pair": true},
+        {"key": "esc_age", "key2": "cons_age", "label": "mean age of the escaped / the consumed ocean floor, Myr", "target": null, "digits": 1, "pair": true},
+        {"key": "ocean_age", "key2": "ocean_age_oneway", "label": "visible ocean floor's mean age at the resamplings / with the escaped made new, Myr", "target": null, "digits": 1, "pair": true}
+      ]
     }
   }
 }
