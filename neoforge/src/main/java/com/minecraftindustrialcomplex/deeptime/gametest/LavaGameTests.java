@@ -85,7 +85,7 @@ public final class LavaGameTests {
         // Sites from the world data: the deepest sea, a sea about 150 blocks deep, a coast, high ground.
         int c = t.circumference();
         Site deepest = null, deep = null, coast = null, high = null;
-        int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
+        int zp = (int) t.zHalf();   // the net's outer edges on the cube (3s/2), the poles on a Lambert-frame world
         for (int z = -zp + 64; z < zp - 64; z += 16)
             for (int x = -c / 2; x < c / 2; x += 16) {
                 double h = t.height(x, z);
@@ -394,7 +394,7 @@ public final class LavaGameTests {
         // that lies under the sea.
         List<int[]> chunks = new ArrayList<>();
         int[][] ring = {{skin, 0}, {-skin, 0}, {0, skin}, {0, -skin}, {skin, skin}, {-skin, -skin}, {skin, -skin}, {-skin, skin}};
-        int pole = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
+        int pole = (int) t.zHalf();   // the net's outer edges on the cube (3s/2), the poles on a Lambert-frame world
         for (int z = -pole; z < pole && chunks.size() < 6; z += 16)
             for (int x = -c / 2; x < c / 2 && chunks.size() < 6; x += 16) {
                 int own = (int) Math.ceil(t.height(x, z)) - 1;

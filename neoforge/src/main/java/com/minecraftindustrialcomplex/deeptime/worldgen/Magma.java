@@ -36,7 +36,7 @@ import java.util.List;
  *       <b>crater lava lake</b> instead of the plug: lava up to one block under the lowest ground
  *       of the ring around it, the ground above its surface opened to the sky (baked summits are
  *       seldom bowls at this scale, so the lake usually sits in a pit a few blocks deep), the
- *       conduit opening into its floor. Volcanoes beyond the pole cap's line get none.</li>
+ *       conduit opening into its floor.</li>
  * </ul>
  * Every body is sealed: open space (air, cave water, the sea) within a block or two of magma
  * becomes basalt, so lava never touches water and never hangs over a cave. A volcano whose summit
@@ -70,7 +70,7 @@ public final class Magma {
      * the flanks of a lens much wider than tall: with the half-height capped at 5 blocks, from a
      * radius of 46 blocks up a lava block faced the open rock above it, and noise caves there.) A
      * lens's shell also takes every block with a face on the lens ({@code Deep.touchesLens}, the
-     * same leak's fix on the Lambert branch), so it seals by construction as well.
+     * same leak's fix on the plain branch), so it seals by construction as well.
      */
     static boolean inShell(long d2, int dy, double rh, double rv) {
         double d = Math.max(0.0, Math.sqrt((double) d2) - SHELL), h = Math.max(0.0, Math.abs(dy) - SHELL) / rv;
@@ -504,17 +504,15 @@ public final class Magma {
      * @param lavaFloorY open space below this is the lava floor ({@link LavaRules#floodY})
      * @param minY       the world's floor (the level's {@code min_y}): the column stops short of its bedrock
      * @param mH         metres per block across, {@code mV} up
-     * @param lakeMaxAbsZ crater lakes only at volcanoes with |z| up to this (the pole cap's line: nobody
-     *                   reaches a volcano beyond it)
      */
     public static Magma build(List<Volcanoes.Volcano> volcanoes, MagmaRules rules, Heights heights, Wet wet, int circumference,
-                              int seaLevel, int lavaFloorY, double mH, double mV, int lakeMaxAbsZ) {
-        return build(volcanoes, rules, heights, wet, circumference, seaLevel, lavaFloorY, lavaFloorY - 10, mH, mV, lakeMaxAbsZ);
+                              int seaLevel, int lavaFloorY, double mH, double mV) {
+        return build(volcanoes, rules, heights, wet, circumference, seaLevel, lavaFloorY, lavaFloorY - 10, mH, mV);
     }
 
-    /** As {@link #build(List, MagmaRules, Heights, Wet, int, int, int, double, double, int)} with the world's floor given. */
+    /** As {@link #build(List, MagmaRules, Heights, Wet, int, int, int, double, double)} with the world's floor given. */
     public static Magma build(List<Volcanoes.Volcano> volcanoes, MagmaRules rules, Heights heights, Wet wet, int circumference,
-                              int seaLevel, int lavaFloorY, int minY, double mH, double mV, int lakeMaxAbsZ) {
+                              int seaLevel, int lavaFloorY, int minY, double mH, double mV) {
         if (rules.chamberSize() <= 0.0 || volcanoes.isEmpty())
             return new Magma(List.of(), circumference);
         List<Draft> drafts = new ArrayList<>();
@@ -545,7 +543,7 @@ public final class Magma {
             int r = v.craterRadiusM() > 0.0
                     ? Math.clamp(Math.round(0.5 * v.craterRadiusM() / mH), LAKE_MIN_RADIUS, LAKE_MAX_RADIUS) : LAKE_MIN_RADIUS;
             int lakeTop = Integer.MAX_VALUE;
-            boolean fits = rh > 0 && !submerged && Math.abs(z) <= lakeMaxAbsZ;
+            boolean fits = rh > 0 && !submerged;
             for (int dx = -r - 2; dx <= r + 2 && fits; dx++)
                 for (int dz = -r - 2; dz <= r + 2 && fits; dz++) {
                     int d2 = dx * dx + dz * dz;

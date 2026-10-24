@@ -65,8 +65,8 @@ import java.util.Optional;
  *
  * <p><b>Wrapping.</b> Every sample folds x into the canonical lap first, as Toroidal World folds
  * the chunks it generates, so an area on any lap, or across the seam, is the planet's terrain.
- * Past the pole edge (Lambert) the rasters clamp, past a Petroff–Guyou world's turning edges they fold
- * (GridDesc.cell), exactly as the real generator reads them. On a cube world (cube plan G6) a column
+ * Past the pole edge (a Lambert-frame test world) the rasters clamp (GridDesc.cell), exactly as the
+ * real generator reads them. On a cube world (cube plan G6) a column
  * off the six faces is drawn as the generator draws it there ({@code worldgen/CubeFill}): the planet
  * column its block folds onto, sampled there with its blocks turned by the fold's quarter turns, and
  * deep ocean past the net's corners; the biome of any quart is the one the fill stores

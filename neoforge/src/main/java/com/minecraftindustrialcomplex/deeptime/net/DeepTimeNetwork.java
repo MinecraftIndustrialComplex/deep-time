@@ -34,10 +34,10 @@ import java.util.Optional;
 public final class DeepTimeNetwork {
 
     /** The channel version: bump it whenever a codec or a handler's meaning changes. */
-    public static final String VERSION = "1";
+    public static final String VERSION = "2"; // 2: the pole storm and the pole cap's fields went (cube plan §7.4)
 
     /** Deep Time's payload types, in registration order. */
-    public static final List<CustomPacketPayload.Type<?>> TYPES = List.of(WorldInfoPayload.TYPE, PoleStormPayload.TYPE);
+    public static final List<CustomPacketPayload.Type<?>> TYPES = List.of(WorldInfoPayload.TYPE);
 
     private DeepTimeNetwork() {}
 
@@ -51,8 +51,7 @@ public final class DeepTimeNetwork {
     private static void register(RegisterPayloadHandlersEvent event) {
         // Required (no .optional()): a client without Deep Time cannot join.
         event.registrar(VERSION)
-                .playToClient(WorldInfoPayload.TYPE, WorldInfoPayload.STREAM_CODEC, ClientHandlers::onWorldInfo)
-                .playToClient(PoleStormPayload.TYPE, PoleStormPayload.STREAM_CODEC, ClientHandlers::onPoleStorm);
+                .playToClient(WorldInfoPayload.TYPE, WorldInfoPayload.STREAM_CODEC, ClientHandlers::onWorldInfo);
     }
 
     private static void sendWorldInfo(net.minecraft.world.entity.player.Player player) {

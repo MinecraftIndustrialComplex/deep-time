@@ -31,19 +31,11 @@ import java.util.Optional;
  */
 public final class PlanetGenerators {
 
-    /** The world presets whose Customize button opens the planet editor. */
-    public static final ResourceKey<WorldPreset> PLANET = ResourceKey.create(Registries.WORLD_PRESET,
-            ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet"));
-    public static final ResourceKey<WorldPreset> PLANET_32K = ResourceKey.create(Registries.WORLD_PRESET,
-            ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet_32k"));
-    /** Lambert's map (Ben, 2026-10-04: Petroff–Guyou by default, Lambert kept as a setting). */
-    public static final ResourceKey<WorldPreset> PLANET_LAMBERT = ResourceKey.create(Registries.WORLD_PRESET,
-            ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet_lambert"));
-    public static final ResourceKey<WorldPreset> PLANET_LAMBERT_32K = ResourceKey.create(Registries.WORLD_PRESET,
-            ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet_lambert_32k"));
     /**
-     * The cube world (format 0.7, docs/plans/cube-world-plan.md; opt-in while both shapes are kept,
-     * docs/design/cube-game.md section 6): 4s = 15,360 at 16k and 29,696 at 32k.
+     * The Deep Time world types, whose Customize button opens the planet editor: the cube world (format
+     * 0.7, docs/plans/cube-world-plan.md), 4s = 15,360 at 16k and 29,696 at 32k. The only two since the
+     * Lambert and Petroff–Guyou types went (cube plan §7.4, decisions log 2026-10-24: "Cube only"); the
+     * ids keep their {@code _cube} names.
      */
     public static final ResourceKey<WorldPreset> PLANET_CUBE = ResourceKey.create(Registries.WORLD_PRESET,
             ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "planet_cube"));
@@ -60,10 +52,10 @@ public final class PlanetGenerators {
 
     /**
      * The dimensions with the overworld bound to staging folder {@code stagingId}, the world's x period
-     * {@code circumference} and its {@code projection} ({@code petroff_guyou}, {@code cube} or {@code lambert}: the
-     * accepted run's, {@link com.minecraftindustrialcomplex.deeptime.preset.Presets.Info#worldCircumference}).
+     * {@code circumference} and its {@code projection} ({@code cube}, or {@code lambert} for a synthetic
+     * test world: the accepted run's, {@link com.minecraftindustrialcomplex.deeptime.preset.Presets.Info#worldCircumference}).
      * The biome source and noise settings are the current Deep Time overworld's, else those of the
-     * {@code deeptime:planet} world preset.
+     * {@code deeptime:planet_cube} world preset.
      */
     public static WorldDimensions withStaging(RegistryAccess registries, WorldDimensions dims, String stagingId, int circumference,
                                               String projection) {
@@ -71,18 +63,17 @@ public final class PlanetGenerators {
             throw new IllegalArgumentException("not a staging id: " + stagingId);
         GeologicChunkGenerator base = overworld(dims).orElseGet(() -> presetOverworld(registries));
         WorldDataRef old = base.dataRef();
-        // The pole cap lines stay the world preset's (P1-18); folder likewise.
-        WorldDataRef ref = new WorldDataRef(old.folder(), circumference, Optional.empty(), Optional.of(stagingId),
-                old.poleCapDeg(), old.poleStopDeg(), projection);
+        // The folder stays the world preset's.
+        WorldDataRef ref = new WorldDataRef(old.folder(), circumference, Optional.empty(), Optional.of(stagingId), projection);
         ChunkGenerator generator = new GeologicChunkGenerator(base.getBiomeSource(), base.sourceSettings(), ref);
         return dims.replaceOverworldGenerator(registries, generator);
     }
 
     private static GeologicChunkGenerator presetOverworld(RegistryAccess registries) {
-        WorldPreset preset = registries.registryOrThrow(Registries.WORLD_PRESET).getOrThrow(PLANET);
+        WorldPreset preset = registries.registryOrThrow(Registries.WORLD_PRESET).getOrThrow(PLANET_CUBE);
         return preset.overworld().map(LevelStem::generator).filter(GeologicChunkGenerator.class::isInstance)
                 .map(GeologicChunkGenerator.class::cast)
-                .orElseThrow(() -> new IllegalStateException(PLANET.location() + " has no Deep Time overworld"));
+                .orElseThrow(() -> new IllegalStateException(PLANET_CUBE.location() + " has no Deep Time overworld"));
     }
 
     /** Why a world cannot be created yet. */

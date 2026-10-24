@@ -56,7 +56,7 @@ import java.util.List;
  * changed by default, so a walk takes minutes), {@code start=<start>} and {@code preset=<family>}
  * (left at the defaults unless given), {@code worldtype=<preset id>} picks that world type from the
  * list before Customize (e.g. {@code deeptime:planet_cube}, cube plan G13; default {@code deeptime:planet_cube}, the type Create World opens on),
- * {@code projection=<id>} sets the editor's projection, {@code customize=false} skips the Customize shots,
+ * {@code customize=false} skips the Customize shots,
  * {@code layers=a,b,…} the layers shot while the run goes (default plates, Köppen climate, rock,
  * provinces), {@code cancel=false} skips the cancel-and-create-again at the start (by default the
  * first run is cancelled once it has a frame, which returns to Create World; its staging folder must
@@ -1017,9 +1017,6 @@ final class ScreenshotDriver {
         String start = System.getProperty(PROP + ".start", "");
         if (!start.isEmpty())
             model.setStart(start);
-        String projection = System.getProperty(PROP + ".projection", "");
-        if (!projection.isEmpty())
-            model.setChoice(EditorFields.byId("projection"), projection);
         model.setLengthText(System.getProperty(PROP + ".length", "300"));
         DeepTime.LOGGER.info("[deeptime-shot] settings: preset {}, length {} Myr", model.presetName(), System.getProperty(PROP + ".length", "300"));
     }

@@ -126,7 +126,7 @@ public final class VolcanicCensus {
         Side now = new Side(), plain = new Side();
         Map<String, Integer> replaced = new HashMap<>();
         int holes = 0, differ = 0, differByRules = 0;
-        int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
+        int zp = (int) t.zHalf();   // the net's outer edges on the cube (3s/2), the poles on a Lambert-frame world
         TagKey<Biome> ocean = c("is_ocean"), river = c("is_river"), cave = c("is_cave"), underground = c("is_underground");
         for (int z = -zp + step / 2; z < zp; z += step) {
             if (Math.abs(z) > zp - poleMargin)

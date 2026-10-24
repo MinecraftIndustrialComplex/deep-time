@@ -34,7 +34,7 @@ import java.nio.file.Path;
  * climate fixture ({@code parity/climate.json}, written by {@code deeptime parity} in gametest.sh)
  * exactly, the tropics are warmer than the high latitudes and the lapse rate applies with height;
  * on a synthetic world-data level it reports no climate, and on a level Deep Time did not generate
- * it reports nothing at all. The planet's geometry (API 2, 4 and 5) on Lambert, Petroff–Guyou and
+ * it reports nothing at all. The planet's geometry (API 2, 4 and 5) on a Lambert-frame level and
  * the cube world: latitude, longitude, north's bearing and the metres per block.
  */
 @GameTestHolder(GameTestSupport.NS)
@@ -94,7 +94,7 @@ public final class ClimateApiGameTests {
         int nt = 0, nh = 0, land = 0, lapsed = 0, n = 400;
         for (int i = 0; i < n; i++) {
             int x = -c / 2 + (i * 97) % c;
-            int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
+            int zp = (int) t.zHalf();   // the net's outer edges on the cube (3s/2), the poles on a Lambert-frame world
             int z = ((i * 61) % (2 * zp)) - zp;
             double lat = DeepTimeClimate.latitudeDeg(level, x, z);
             int y = Math.max((int) Math.ceil(t.height(x, z)), sea);
@@ -180,7 +180,7 @@ public final class ClimateApiGameTests {
         // nothing past the poles.
         String kind = sg == null ? "" : sg.dataRef().projection();
         helper.assertTrue(kind.equals("lambert"), "the synthetic planet is a Lambert world: " + kind);
-        double pole = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);
+        double pole = com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Lambert.radius(c);
         helper.assertTrue(DeepTimeClimate.latitudeDeg(synthetic, 17, -pole) == 90.0
                         && Math.abs(DeepTimeClimate.latitudeDeg(synthetic, -300, pole / 2) + 30.0) < 1e-9
                         && Double.isNaN(DeepTimeClimate.latitudeDeg(synthetic, 5, -c / 4.0)) && !planet.isOnPlanet(5, -c / 4.0)

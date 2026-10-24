@@ -23,7 +23,6 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.PlanetGenerators;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataRef;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import com.minecraftindustrialcomplex.deeptime.wrap.PlanetShape;
-import com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve;
 import com.mojang.serialization.JsonOps;
 import com.toroidalworld.api.v1.shape.LoopSpans;
 import com.toroidalworld.api.v1.shape.ShapeDimensions;
@@ -95,7 +94,7 @@ public final class EditorModelGameTests {
     }
 
     static WorldDimensions planetDimensions(RegistryAccess registries) {
-        return registries.registryOrThrow(Registries.WORLD_PRESET).getOrThrow(PlanetGenerators.PLANET).createWorldDimensions();
+        return registries.registryOrThrow(Registries.WORLD_PRESET).getOrThrow(PlanetGenerators.PLANET_CUBE).createWorldDimensions();
     }
 
     /** Copies the synthetic world data gametest.sh wrote into a new staging folder; returns its id. */
@@ -135,7 +134,7 @@ public final class EditorModelGameTests {
             throw new IllegalStateException("not generating from world data: " + g.terrain());
         AnalyticTestTerrain analytic = AnalyticTestTerrain.of(AnalyticTestTerrain.WRAP_TEST, c);
         double worst = 0;
-        int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);   // the poles (the planet's projection)
+        int zp = (int) com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Lambert.radius(c);   // the poles (the planet's projection)
         for (int i = 0; i < 64; i++) {
             int x = -c / 2 + (i * 37) % c, z = ((i * 53) % (2 * zp - 16)) - zp + 8;
             worst = Math.max(worst, Math.abs(t.height(x, z) - analytic.height(x, z)));
@@ -202,8 +201,7 @@ public final class EditorModelGameTests {
         Path world = helper.getLevel().getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
         String id = stageTestWorld(helper);
         Path staging = Staging.dir(gameDir(), id);
-        WorldDataRef ref = new WorldDataRef("deeptime-staged", 1024, Optional.empty(), Optional.of(id),
-                PoleCapCurve.DEFAULT_CAP_DEG, PoleCapCurve.DEFAULT_STOP_DEG);
+        WorldDataRef ref = new WorldDataRef("deeptime-staged", 1024, Optional.empty(), Optional.of(id));
         Path target = world.resolve(ref.folder());
         try {
             Staging.deleteTree(target);
@@ -278,8 +276,7 @@ public final class EditorModelGameTests {
             // The world's start: move the staged data into a world folder and bind it.
             Path world = helper.getLevel().getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
             WorldDataRef ref = new WorldDataRef("deeptime-e2e", accepted.dataRef().circumferenceBlocks(), Optional.empty(),
-                    accepted.dataRef().stagingId(), accepted.dataRef().poleCapDeg(), accepted.dataRef().poleStopDeg(),
-                    accepted.dataRef().projection());
+                    accepted.dataRef().stagingId(), accepted.dataRef().projection());
             try {
                 Staging.deleteTree(world.resolve(ref.folder()));
                 var r = WorldDataBinder.moveStaged(gameDir(), world, ref, false).orElseThrow();
@@ -359,15 +356,14 @@ public final class EditorModelGameTests {
             RegistryAccess registries = helper.getLevel().getServer().registryAccess();
             WorldDimensions dims = PlanetGenerators.withStaging(registries, planetDimensions(registries), a.stagingId(), a.worldCircumference(), a.projection());
             GeologicChunkGenerator accepted = PlanetGenerators.overworld(dims).orElseThrow();
-            // The world's x period: the planet's 4,096 drawn as a Petroff–Guyou world of two 1,536-block squares.
-            helper.assertTrue(accepted.dataRef().circumferenceBlocks() == a.worldCircumference() && a.worldCircumference() == 3072,
+            // The world's x period: the planet's 4,096 drawn as the cube world of four 1,024-block band faces.
+            helper.assertTrue(accepted.dataRef().circumferenceBlocks() == a.worldCircumference() && a.worldCircumference() == 4096,
                     "bound at the world's period: " + accepted.dataRef().circumferenceBlocks());
             helper.assertTrue(PlanetGenerators.createBlock(dims, gameDir(), true) == PlanetGenerators.CreateBlock.NONE, "Create enabled");
 
             Path world = helper.getLevel().getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
             WorldDataRef ref = new WorldDataRef("deeptime-e2e-real", accepted.dataRef().circumferenceBlocks(), Optional.empty(),
-                    accepted.dataRef().stagingId(), accepted.dataRef().poleCapDeg(), accepted.dataRef().poleStopDeg(),
-                    accepted.dataRef().projection());
+                    accepted.dataRef().stagingId(), accepted.dataRef().projection());
             try {
                 Staging.deleteTree(world.resolve(ref.folder()));
                 var r = WorldDataBinder.moveStaged(gameDir(), world, ref, false).orElseThrow();
@@ -382,9 +378,9 @@ public final class EditorModelGameTests {
                 return;
             }
             int sea = t.data().manifest().seaLevelY(), land = 0, n = 0;
-            int c = t.circumference(), zp = (int) t.zHalf();   // the turning edges of the Petroff–Guyou world
+            int c = t.circumference(), s = c / 4;   // the cube's four band faces, z in (-s/2, s/2)
             for (int i = 0; i < 400; i++) {
-                int x = -c / 2 + (i * 97) % c, z = ((i * 61) % (2 * zp - 32)) - zp + 16;
+                int x = -c / 2 + (i * 97) % c, z = ((i * 61) % (s - 32)) - s / 2 + 16;
                 double h = t.height(x, z);
                 helper.assertTrue(Double.isFinite(h), "height at " + x + "," + z);
                 n++;

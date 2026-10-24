@@ -383,7 +383,7 @@ public final class BiomeGameTests {
         // layer and the synthetic chunk of icePassLaysTheCover are checked.)
         int c = t.circumference(), sea = g.getSeaLevel();
         java.util.List<int[]> columns = new java.util.ArrayList<>();
-        int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
+        int zp = (int) t.zHalf();   // the net's outer edges on the cube (3s/2), the poles on a Lambert-frame world
         // Every covered column is of the cover's class, EF (BIO-158), read as the biome rules and the census read
         // it: the cover and the class both take the nearest cell (BIO-159; the bilinear read put the cover on Cfb
         // and BWk ground beside the sheet, and L2 cells under an L1 sheet kept their own class).

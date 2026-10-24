@@ -90,28 +90,30 @@ public final class Presets {
 
         /**
          * The world's x period in blocks, what the level type's {@code circumference_blocks} and Toroidal
-         * World's loop hold: C on a Lambert world, 2b on a Petroff–Guyou one, 4s on a cube (Rust
-         * {@code ScaleParams::world_circumference}); empty when the preset names no circumference.
+         * World's loop hold: 4s on the cube (Rust {@code ScaleParams::world_circumference}), C on a
+         * synthetic world laid out in the Lambert frame; empty when the preset names no circumference.
          */
         public OptionalInt worldCircumference() {
             return circumference.isEmpty() ? circumference : OptionalInt.of(Presets.worldCircumference(circumference.getAsInt(), projection));
         }
     }
 
-    /** The preset's default projection (Rust {@code ProjectionKind::default}; Ben, decisions log 2026-10-04). */
-    public static final String DEFAULT_PROJECTION = "petroff_guyou";
+    /**
+     * A preset's projection: a planet is always the cube world (Ben, decisions log 2026-10-24: "Cube
+     * only"; a planet preset has no {@code scale.projection}). Only a synthetic world says
+     * {@code lambert} there (Rust {@code preset::header}).
+     */
+    public static final String DEFAULT_PROJECTION = "cube";
 
     /**
      * The world's x period for a simulation circumference C and a projection (see {@link Info#worldCircumference}):
-     * C on Lambert, 2b on Petroff–Guyou, 4s on the cube (s = {@code face_for(C)}, Rust
-     * {@code ScaleParams::world_circumference}).
+     * 4s on the cube (s = {@code face_for(C)}, Rust {@code ScaleParams::world_circumference}), C on a
+     * Lambert-frame synthetic world.
      */
     public static int worldCircumference(int c, String projection) {
         if ("lambert".equals(projection))
             return c;
-        if ("cube".equals(projection))
-            return 4 * com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout.faceFor(c);
-        return 2 * com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou.hemisphereFor(c);
+        return 4 * com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout.faceFor(c);
     }
 
     /** A resolved preset argument: where it came from, and its JSON. */
@@ -226,18 +228,6 @@ public final class Presets {
         if (preset.has("scale") && preset.get("scale").isJsonObject())
             projection = string(preset.getAsJsonObject("scale"), "projection").orElse(DEFAULT_PROJECTION);
         return new Info(name, placeholder, c, timeline, string(preset, "description"), projection);
-    }
-
-    /**
-     * A copy of the preset with {@code scale.projection} set (cube plan G12: a cube level type bakes a
-     * preset of another map as a cube; Rust {@code ProjectionKind}'s names).
-     */
-    public static JsonObject withProjection(JsonObject preset, String projection) {
-        JsonObject copy = preset.deepCopy();
-        if (!copy.has("scale") || !copy.get("scale").isJsonObject())
-            copy.add("scale", new JsonObject());
-        copy.getAsJsonObject("scale").addProperty("projection", projection);
-        return copy;
     }
 
     /** Sets {@code timeline} in a preset and returns its canonical JSON. */

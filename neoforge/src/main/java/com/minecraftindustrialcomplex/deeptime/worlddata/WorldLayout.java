@@ -50,10 +50,6 @@ public record WorldLayout(WorldProjection.Kind kind, int layoutVersion,
             this(name, kind, axisX, sideMin, coord, spanFrom, spanTo, quarterTurns, tx, tz, pivot, owner, null, null);
         }
 
-        public boolean halfTurn() {
-            return "half_turn".equals(kind);
-        }
-
         public boolean slide() {
             return "slide".equals(kind);
         }

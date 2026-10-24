@@ -199,7 +199,9 @@ def main():
     dim = dict(dim, min_y=MIN_Y, height=HEIGHT, logical_height=HEIGHT)
     write("deeptime/dimension_type/planet_overworld.json", dim)
 
-    for name, c in (("planet", 16384), ("planet_32k", 32768)):
+    # The cube world's two sizes (cube plan §7.4, decisions log 2026-10-24: "Cube only"): the
+    # x period 4s of a 16k and a 32k planet (WorldDataRef.faceFor: s = 3,840 and 7,424).
+    for name, c in (("planet_cube", 15360), ("planet_cube_32k", 29696)):
         dims = copy.deepcopy(normal["dimensions"])
         dims["minecraft:overworld"] = {
             "type": "deeptime:planet_overworld",
@@ -207,14 +209,11 @@ def main():
                 "type": "deeptime:geologic",
                 "biome_source": {"type": "minecraft:multi_noise", "preset": "minecraft:overworld"},
                 "settings": "deeptime:planet",
-                # The pole cap's lines (plan §7.11, P1-18): the defaults, written out so a
-                # datapack sees where to change them.
-                "world_data": {"folder": "deeptime", "circumference_blocks": c,
-                               "pole_cap_deg": 70.0, "pole_stop_deg": 80.0},
+                "world_data": {"folder": "deeptime", "circumference_blocks": c, "projection": "cube"},
             },
         }
         write(f"deeptime/worldgen/world_preset/{name}.json", {"dimensions": dims})
-    write("minecraft/tags/worldgen/world_preset/normal.json", {"replace": False, "values": ["deeptime:planet"]})
+    write("minecraft/tags/worldgen/world_preset/normal.json", {"replace": False, "values": ["deeptime:planet_cube"]})
     write("terrablender/tags/dimension_type/overworld_regions.json",
           {"replace": False, "values": [{"id": "deeptime:planet_overworld", "required": False}]})
 
