@@ -158,7 +158,8 @@ public final class CubeWorldGameTests {
             DeepTime.LOGGER.info("[gametest] cubeWorldLayout face {} centre ({}, {}): {}", f, x, z, line);
             helper.assertTrue(!Double.isNaN(a[0]) && Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9,
                     "face " + f + " centre: the server's and the client's lat/lon agree: " + a[0] + "," + a[1] + " vs " + b[0] + "," + b[1]);
-            helper.assertTrue(line != null && line.contains("°") && !line.contains("mismatch"), "the debug line at face " + f + ": " + line);
+            helper.assertTrue(line != null && line.contains("°") && line.contains("face " + f.name() + " ") && !line.contains("mismatch"),
+                    "the debug line at face " + f + ": " + line);
         }
         ChunkPos ocean = oceanChunk(cube);
         helper.assertTrue(ocean != null, "a chunk past the net's corners");
