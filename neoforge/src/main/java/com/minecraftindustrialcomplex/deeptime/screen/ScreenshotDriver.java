@@ -25,6 +25,7 @@ import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.WorldCreationUiState;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.world.level.GameRules;
 import net.neoforged.fml.ModLoader;
 import net.neoforged.fml.ModLoadingIssue;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
@@ -62,8 +63,9 @@ import java.util.List;
  * frame's epoch once the run is done ({@code 07b-epoch-picked}) and keeps going by
  * {@code continue=<Myr>} (default 50; {@code 07c-continued}), and {@code vista=x,y,z,yaw,pitch[;…]}
  * adds, after the in-world shot, one screenshot per viewpoint: the player is put there in spectator
- * mode, the render distance raised to 16 chunks, and the shot taken once the terrain around has had
- * time to generate and draw ({@code 11-vista-<n>}). A sixth field picks the overlay for that shot: 0
+ * mode, the render distance raised to 16 chunks, the overworld held at noon in clear weather (so shots
+ * minutes apart are lit alike), and the shot taken once the terrain around has had time to generate
+ * and draw ({@code 11-vista-<n>}). A sixth field picks the overlay for that shot: 0
  * hides the HUD, 1 shows the F3 debug screen (Deep Time's line names the face and north's bearing).
  * {@code settle=<s>} is how long a vista waits once the chunk ahead is loaded (default 15; Distant
  * Horizons' far terrain needs minutes). {@code open=<save>} skips the walk: the client opens that
@@ -946,6 +948,12 @@ final class ScreenshotDriver {
                                 sp.setGameMode(net.minecraft.world.level.GameType.SPECTATOR);
                                 sp.teleportTo(sp.serverLevel(), v[0], v[1], v[2], (float) v[3], (float) v[4]);
                             }
+                            // Noon and clear skies, held: a pass of vistas runs for many game days.
+                            var ow = server.overworld();
+                            ow.getGameRules().getRule(GameRules.RULE_DAYLIGHT).set(false, server);
+                            ow.getGameRules().getRule(GameRules.RULE_WEATHER_CYCLE).set(false, server);
+                            ow.setDayTime(6000L);
+                            ow.setWeatherParameters(20 * 60 * 60, 0, false, false);
                         });
                         DeepTime.LOGGER.info("[deeptime-shot] vista {} at {},{},{} yaw {} pitch {}", vista, v[0], v[1], v[2], v[3], v[4]);
                     }
