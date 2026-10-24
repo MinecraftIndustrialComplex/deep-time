@@ -30,7 +30,12 @@
 #                 are used (default: this checkout's smoke/{standalone,terrablender}/server, then the
 #                 main checkout's /data/ban/mic/mods/deep-time/smoke/terrablender/server)
 #   --settle S    seconds the driver waits at each place for the terrain (default 60)
-#   --places P    the driver's places, name:x:z;... (default: spawn, beside the seam, beside the north pole)
+#   --places P    the driver's places, name:x:z;... (default: spawn, beside the seam, beside the north pole;
+#                 on a cube world spawn, beside the slide, inside a quarter-turn border, the north pole,
+#                 beside a reachable corner and under a border corner)
+#   --level-type T  the server's level type (default: from the world data's manifest, its projection
+#                 and circumference: deeptime:planet[_32k], deeptime:planet_cube[_32k] or
+#                 deeptime:planet_lambert[_32k], the 32k types above a period of 20,000 blocks)
 #
 # Output: review/out/<N>/devmap-*.png, shots.txt (the driver's lines), server.txt (the server's
 # [devmap] lines), index.html, client.log (the game's log), launcher.log, console.log (the server's). Exit 0
@@ -41,7 +46,7 @@ cd "$(dirname "$0")/../.."
 REPO="$PWD"
 ADMIT="${DEEPTIME_ADMIT:-/usr/local/lib/deeptime/admit.py}"
 ARGS=("$@")
-NAME=devmap-shots; WORLD=""; SET=""; SETTLE=60; PLACES=""
+NAME=devmap-shots; WORLD=""; SET=""; SETTLE=60; PLACES=""; LEVEL_TYPE=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --name) NAME="$2"; shift 2 ;;
@@ -49,7 +54,8 @@ while [ $# -gt 0 ]; do
         --set) SET="$2"; shift 2 ;;
         --settle) SETTLE="$2"; shift 2 ;;
         --places) PLACES="$2"; shift 2 ;;
-        *) echo "usage: devmap-shots.sh [--name N] [--world DIR] [--set DIR] [--settle S] [--places name:x:z;...]" >&2; exit 2 ;;
+        --level-type) LEVEL_TYPE="$2"; shift 2 ;;
+        *) echo "usage: devmap-shots.sh [--name N] [--world DIR] [--set DIR] [--settle S] [--places name:x:z;...] [--level-type T]" >&2; exit 2 ;;
     esac
 done
 [[ "$NAME" =~ ^[0-9A-Za-z._-]+$ ]] || { echo "devmap-shots: odd --name" >&2; exit 2; }
@@ -69,6 +75,19 @@ if [ -z "$WORLD" ]; then
     WORLD="$PLAY_DIR/planet/deeptime"
 fi
 [ -f "$WORLD/manifest.json" ] || { echo "devmap-shots: no world data at $WORLD" >&2; exit 1; }
+if [ -z "$LEVEL_TYPE" ]; then
+    # The level type of the world data's map and size (the server refuses world data of another map).
+    LEVEL_TYPE=$(python3 - "$WORLD/manifest.json" <<'PY'
+import json, sys
+m = json.load(open(sys.argv[1]))
+proj = m.get("projection")
+kind = proj.get("kind") if isinstance(proj, dict) else "lambert"
+big = "_32k" if int((m.get("scale") or {}).get("circumference_blocks", 0)) > 20000 else ""
+print({"cube": "deeptime:planet_cube", "lambert": "deeptime:planet_lambert"}.get(kind, "deeptime:planet") + big)
+PY
+)
+fi
+[[ "$LEVEL_TYPE" =~ ^[a-z0-9_]+:[a-z0-9_/]+$ ]] || { echo "devmap-shots: odd level type '$LEVEL_TYPE'" >&2; exit 2; }
 if [ -z "$SET" ]; then
     for s in "$REPO/smoke/standalone/server" "$REPO/smoke/terrablender/server" /data/ban/mic/mods/deep-time/smoke/terrablender/server; do
         [ -d "$s/mods" ] && { SET="$s"; break; }
@@ -93,7 +112,7 @@ PMCDIR="${DEEPTIME_PMC_DIR:-/data/ban/deeptime-cache/pmc-devmap}"
 rm -rf "$OUT"; mkdir -p "$OUT" "$WORK"
 LOG="$OUT/runner.log"
 say() { echo "devmap-shots: $*" | tee -a "$LOG"; }
-say "world $WORLD; set $SET (NeoForge $NEO); jars $(basename "$DT") $(basename "$DM") $(basename "$TW")"
+say "world $WORLD ($LEVEL_TYPE); set $SET (NeoForge $NEO); jars $(basename "$DT") $(basename "$DM") $(basename "$TW")"
 
 # 1. The server: the set's NeoForge in the job's folder, three mods, the world data copied (keyframes linked).
 rm -rf "$SRV"
@@ -117,7 +136,7 @@ enable-rcon=true
 rcon.port=$RCONP
 rcon.password=$PW
 online-mode=false
-level-type=deeptime:planet
+level-type=$LEVEL_TYPE
 level-name=planet
 level-seed=54324317120568257
 spawn-protection=0
