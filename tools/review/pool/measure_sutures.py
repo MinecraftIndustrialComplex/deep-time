@@ -14,7 +14,7 @@ of the subducting plate stands at a front and ends in a hand-off (a transfer or 
 closed ocean between an arc and a margin (median 1,019 km long), active over its exhumation
 interval. In the model one contact carries a train of states: a hand-off at 100 km of shortening
 (PLT-068) is followed by a new state the next step on the same contact, so one suture is counted
-2.7 times on average. A suture here is the states on one contact (its two plates and its onset)
+about twice. A suture here is the states on one contact (its two plates and its onset)
 whose gaps are at most `shortening::GRACE_MYR` (6 Myr, PLT-225: the model's own time for a
 front to come back), with at least one hand-off; its length is its longest front over 1.84 (the
 lattice boundary's excess over a geodesic one, `measure_boundary.py`).
@@ -43,13 +43,23 @@ crust growth in place); a terrane is of the kind holding half or more of that su
   made, received, endowed, mixed     shares of the transferred samples
   origin_rift, origin_initiation, origin_initial
                                      the subducting plate's origin, shares of the samples
+  ride_myr_med       how long the docked crust rode the subducting plate: the hand-off's time less
+                     its supply's mean time of arrival (birth, receipt, making), median by samples
+  under_age_myr_med  the subducting plate's age at the hand-off, median by samples
+  ft30_made, ft30_received, ft30_endowed, ft30_mixed, ft30_weld, ft30_parting
+                     the last 30 Myr's front-time (`collision_orogeny_myr`: the collisions whose
+                     belts the final fields still mark as collision) by the transfer's kind, the
+                     welds and the partings: each kind's share of what holds the collision coast
 
 The collisions under way at the end (`open` partings):
   open_front_km        their longest fronts, summed, geodesic km
-  open_old60           the share of that front on contacts older than 60 Myr
+  open_old60           the share of that front on contacts older than 60 Myr (the contact's age
+                       counts its subduction before the collision)
+  open_train_myr_med   how long the collisions open at the end have gone on (the train of states
+                       on the contact with gaps of at most the grace), median by front
   open_conv_med        their median peak convergence, mm/yr
 
-Plain Python. Version 1.
+Plain Python. Version 2.
 """
 import json
 import statistics as st
@@ -131,8 +141,9 @@ def front_time(rec, t0, t_end):
     return {k: ft[k] / tot for k in ("ft_small", "ft_mid", "ft_large", "ft_weld", "ft_parting")}
 
 
-def provenance(rec, t0):
-    """Per plate, from the steps' continental counts: endowment at birth, received, made in place."""
+def ledger(rec):
+    """Per plate and step, from the steps' continental counts: the samples endowed at birth,
+    received and made in place so far, and each part's mean time of arrival."""
     steps = rec["steps"]
     tix = {round(s["t"], 6): i for i, s in enumerate(steps)}
     cont = defaultdict(dict)
@@ -152,9 +163,7 @@ def provenance(rec, t0):
         else:
             ins[(c["over"], i)] += c["terrane_samples"]
             outs[(c["under"], i)] += c["terrane_samples"]
-    life_of = defaultdict(list)
     for L in rec["plates"]:
-        life_of[L["id"]].append(L)
         i = tix.get(round(L["born_myr"], 6))
         if i is not None and L.get("parent") is not None:
             rift_out[(L["parent"], i)] += cont[L["id"]].get(i, 0)
@@ -163,50 +172,122 @@ def provenance(rec, t0):
         idx = sorted(series)
         if not idx:
             continue
+        t0 = steps[idx[0]]["t"]
         e_, r_, g_ = float(series[idx[0]]), 0.0, 0.0
+        et, rt, gt = e_ * t0, 0.0, 0.0
         hist, prev = {}, None
         for i in idx:
+            t = steps[i]["t"]
             if prev is not None and i == prev + 1:
-                g = series[i] - series[prev] - ins[(pid, i)] + outs[(pid, i)] + rift_out[(pid, i)]
+                g = max(series[i] - series[prev] - ins[(pid, i)] + outs[(pid, i)] + rift_out[(pid, i)], 0.0)
                 r_ += ins[(pid, i)]
-                g_ += max(g, 0.0)
+                rt += ins[(pid, i)] * t
+                g_ += g
+                gt += g * t
             elif prev is not None:
                 e_ += series[i]
-            hist[i] = (e_, r_, g_)
+                et += series[i] * t
+            hist[i] = (e_, r_, g_, et + rt + gt)
             prev = i
         led[pid] = hist
-    kinds, origins = defaultdict(float), defaultdict(float)
+    return tix, led
+
+
+def kind_of(h):
+    e_, r_, g_, _ = h
+    supply = max(e_ + r_ + g_, 1e-9)
+    if g_ / supply >= 0.5:
+        return "made"
+    if r_ / supply >= 0.5:
+        return "received"
+    if e_ / supply >= 0.5:
+        return "endowed"
+    return "mixed"
+
+
+def wmedian(pairs):
+    pairs = sorted(p for p in pairs if p[1] > 0)
+    tot = sum(w for _v, w in pairs)
+    if tot <= 0:
+        return None
+    acc = 0.0
+    for v, w in pairs:
+        acc += w
+        if acc >= 0.5 * tot:
+            return v
+    return pairs[-1][0]
+
+
+def provenance(rec, t0, t_end):
+    """What docked: each transfer's kind (the subducting plate's supply at the hand-off), the
+    plate's origin, the crust's ride (the hand-off's time less the supply's mean arrival) and the
+    plate's age; and the last 30 Myr's front-time by the kind of collision."""
+    tix, led = ledger(rec)
+    life_of = defaultdict(list)
+    for L in rec["plates"]:
+        life_of[L["id"]].append(L)
+    dt = rec["dt_myr"]
+    kinds, origins, ride, age = defaultdict(float), defaultdict(float), [], []
+    recent = defaultdict(float)
     for c in rec["collisions"]:
-        if c["end_myr"] < t0 or c["sutured"]:
+        if c["end_myr"] < t0:
+            continue
+        held = (min(c["end_myr"], t_end) - max(c["start_myr"], t_end - 30.0) + dt) * c["front_km"]
+        if c["sutured"]:
+            if c["end_myr"] >= t_end - 30.0:
+                recent["weld"] += held
             continue
         i = tix.get(round(c["end_myr"], 6))
         h = led.get(c["under"], {}).get(i - 1) if i is not None else None
         if h is None:
             continue
-        e_, r_, g_ = h
-        supply = max(e_ + r_ + g_, 1e-9)
-        k = "made" if g_ / supply >= 0.5 else "received" if r_ / supply >= 0.5 else "endowed" if e_ / supply >= 0.5 else "mixed"
+        k = kind_of(h)
         w = float(c["terrane_samples"])
         kinds[k] += w
+        if c["end_myr"] >= t_end - 30.0:
+            recent[k] += held
+        supply = max(h[0] + h[1] + h[2], 1e-9)
+        ride.append((c["end_myr"] - h[3] / supply, w))
+        age.append((c["end_myr"] - c["under_born_myr"], w))
         life = [x for x in life_of[c["under"]] if abs(x["born_myr"] - c["under_born_myr"]) < 1e-6]
         o = life[0].get("origin") if life else None
         o = {"rift": "origin_rift", "subduction_initiation": "origin_initiation", "initial": "origin_initial"}.get(o)
         if o:
             origins[o] += w
-    tk, to = sum(kinds.values()) or 1e-9, sum(origins.values()) or 1e-9
+    for p in rec["partings"]:
+        if p["end_myr"] >= t_end - 30.0:
+            recent["parting"] += (min(p["end_myr"], t_end) - max(p["start_myr"], t_end - 30.0) + dt) * p["front_km"]
+    tk, to, tr = sum(kinds.values()) or 1e-9, sum(origins.values()) or 1e-9, sum(recent.values()) or 1e-9
     out = {k: kinds[k] / tk for k in ("made", "received", "endowed", "mixed")}
     out.update({k: origins[k] / to for k in ("origin_rift", "origin_initiation", "origin_initial")})
+    out["ride_myr_med"] = wmedian(ride)
+    out["under_age_myr_med"] = wmedian(age)
+    out.update({f"ft30_{k}": recent[k] / tr for k in ("made", "received", "endowed", "mixed", "weld", "parting")})
     return out
 
 
 def open_states(rec, t_end):
-    opens = [p for p in rec["partings"] if p.get("reason") == "open"]
-    tot = sum(p["front_km"] for p in opens) / LATTICE
-    old = sum(p["front_km"] for p in opens if t_end - p["contact_onset_myr"] >= 60.0) / LATTICE
-    conv = [p["peak_convergence_mm_yr"] for p in opens]
+    by = defaultdict(list)
+    for c in rec["collisions"]:
+        by[key(c)].append((c["start_myr"], c["end_myr"]))
+    for q in rec["partings"]:
+        by[key(q)].append((q["start_myr"], q["end_myr"]))
+    opens = [q for q in rec["partings"] if q.get("reason") == "open"]
+    train = []
+    for q in opens:
+        # the start of the train of states on this contact that the open state ends
+        s0 = q["start_myr"]
+        for s, e in sorted(by[key(q)], reverse=True):
+            if e <= s0 + 1e-6 and s0 - e <= GRACE_MYR + 1e-6:
+                s0 = min(s0, s)
+        train.append((t_end - s0, q["front_km"]))
+    tot = sum(q["front_km"] for q in opens) / LATTICE
+    old = sum(q["front_km"] for q in opens if t_end - q["contact_onset_myr"] >= 60.0) / LATTICE
+    conv = [q["peak_convergence_mm_yr"] for q in opens]
     return {
         "open_front_km": tot,
         "open_old60": old / tot if tot > 0 else None,
+        "open_train_myr_med": wmedian(train),
         "open_conv_med": st.median(conv) if conv else None,
     }
 
@@ -219,7 +300,7 @@ def main():
     span = max(t_end - t0, 1e-9)
     out = sutures(rec, t0, span)
     out.update(front_time(rec, t0, t_end))
-    out.update(provenance(rec, t0))
+    out.update(provenance(rec, t0, t_end))
     out.update(open_states(rec, t_end))
     print(json.dumps({k: (None if v is None else float(v)) for k, v in out.items()}, sort_keys=True))
 
