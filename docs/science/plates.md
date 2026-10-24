@@ -7417,6 +7417,14 @@ For a straight trench and a plate in translation, a plate the fixed share draws 
 at `u_f / (1 + u_f / v_t)`: a slow plate keeps most of its speed and a fast one is held below
 `v_t` whatever its size. A hanging slab (PLT-271) sucks the same way.
 
+How to read the speed-dependent part. In a linear viscous mantle the traction on a plate is the
+traction of the slab's flow with the plate held still (the fixed share) plus the drag of the
+plate's own motion, and that drag is already the basal drag. What the link adds is something
+else: an overriding plate that advances on its trench, with no back-arc opening behind it, makes
+the trench retreat as fast, so the slab's hinge must move back through the mantle, and a slab
+cannot roll back faster than it sinks. The link is that resistance, sized so that it cancels the
+suction at the slab's terminal velocity (from memory; no source on rollback was read for it).
+
 The speed that saturates it is the slab's free sinking speed, not the speed at which the trench
 actually consumes the subducting plate. Coupling the two plates through the trench (the
 subduction rate as the subducting plate's advance plus the overriding plate's) would make the
@@ -7450,3 +7458,57 @@ No small plate reaches the guard any more, and the plates as a whole move about 
 (the speeds are each plate's on each step, all plates alike). The weld tests' seeds still weld:
 the collisions test's 12 and the recording test's 19 weld with both laws (with the saturating
 suction 1, 2, 4, 8, 10, 12, 18, 19 and 22 to 24 weld).
+
+**The arm** (`pool.sh run fl-sat --length 1000 --seeds 1,2,3,4 --threads 2 --set
+tectonics.suction_saturates=true +DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`,
+key 4e350ff878b3, argkey e4cd5c3b, 8 runs, both starts; master 43d96c7c's simulation with the
+switch set). Read against base4-14 (base4's own seeds 1 to 4) and base4's 24; medians, base4-14
+to fl-sat, Mann-Whitney p in brackets:
+
+- **The V1 census.** Land 0.304 to 0.315 (p 0.96), the largest landmass 0.180 to 0.220,
+  continental crust under the sea 0.220 to 0.263, land above 2 km 0.146 to 0.113, coast with high
+  ground 0.278 to 0.224, ice 0.093 to 0.104, collisions per 100 Myr 1.30 to 1.40, criteria met 5
+  to 5. The continental crust's net change over the run is -0.029 to -0.017 of the planet, and
+  the sea ends 961 m over the datum (723). Against base4's 24 nothing moves at p < 0.05 (the
+  collisions 1.15 to 1.40, p 0.052).
+- **The guard.** No step beyond 2 Earth reliefs; the worst is 10,590 m from the sea against
+  10,240 (p 0.10). `guard_bind_steps` is 0 in all 8 runs (base4: 4 in one run of 24).
+- **The area book** (shares of the planet over the run): the fronts' hiding -0.935 to -0.732, the
+  collapse +0.423 to +0.319, the arcs' maturing +0.390 to +0.315, `founder` +0.148 to +0.122, the
+  resampling's blend -0.169 to -0.156. Slower plates turn the crust over less, in step.
+- **The plate check** passes 175 measures against 189. In fewer runs of 8: the large plates'
+  median speed (8 to 0, 35.9 to 25.3 mm/yr against the band's 30 to 60) and their p90 (8 to 4,
+  73.4 to 70.1), the ocean's p90 age (8 to 2, 201.5 to 247.1 Myr against at most 230) and its
+  median (8 to 7, 66.6 to 76.2), the ocean over 180 and over 250 Myr (1 to 0 each), the largest
+  land gain (6 to 3), the highest continental share (6 to 4), the speed-area rank (7 to 5), the
+  rifts welded back (4 to 1), the arcs' continental p50 (8 to 6), the collisions' convergence
+  ratio (2 to 1). In more: the slab-pulled over free speed (1 to 6, 2.05 to 3.01; PLT-186's
+  sources say subducting plates move about four times faster), the oceanic over continental speed
+  (2 to 6, 1.83 to 2.30), the lowest continental share (2 to 5), the active continental margin (0
+  to 3, 0.449 to 0.413), the supercontinent's tenure (0 to 3), the collisions per 100 Myr (1 to
+  2), their p90 length (0 to 2).
+- **The boundary.** The subducting share 0.309 to 0.292 (p 0.015; Bird 0.197), the mean
+  convergence across the oceanic front 52.1 to 44.3 mm/yr (p < 0.001; Bird 53.2), the boundary
+  criteria met per run 2.62 to 3.25 on average (p 0.034).
+- **The front.** 89,331 to 86,745 straight km per step (p 0.28; against base4's 24, 91,083, p
+  0.046), E 1.908 to 1.876; the initiations' plates' E 1.902 to 1.811 (p 0.005). In `boundgeom`
+  against fl-ls2, the front under oceanic overriding crust with each plate one body stays at
+  66,822 to 67,813 km.
+- **Sutures** 40.6 to 36.5 per 100 Myr (inside Macdonald's 19 to 39 now), 37,382 to 32,666 km.
+  Fissions per run 77 to 58.5; plates per step 27.5 to 28.4.
+
+**On by default** (2026-10-24). The law passes its unit test against its source, the pool shows
+no divergence and no guard binding, and the 8k planet's binds are gone (3 seeds of 24 to none).
+The suction of a fixed share goes off with it. What it costs is in the plate check's speeds: the
+plates the fixed share drew towards their trenches, mostly the large overriding ones, now move
+more slowly, the large plates' median at 25 mm/yr under the band's 30, and with slower spreading
+the ocean grows older (its p90 age 247 Myr against at most 230). Subducting plates now outrun
+the others three times over, nearer the four times PLT-186's sources give. These are realism
+checks, not a gate (decisions log 2026-10-23), and nothing is tuned for them. One thing is open:
+PLT-186's share is the open-loop test's 0.3, set against speed targets with the fixed law, where
+Conrad & Lithgow-Bertelloni's suction over pull is 0.43 to 0.67 (their suction acting on both
+plates, so not the same quantity). That is a question about PLT-186, not this law. The weld
+tests' seeds still weld (12 and 19). One test's planet is held on the fixed suction: the epochs
+nudge test (`the_nudges_reach_their_targets_gently`) is about the climate's nudges, and with the
+saturating suction its steered planet warms past the band's top in its last step and the
+outgassing turns back once.
