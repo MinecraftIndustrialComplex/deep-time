@@ -123,6 +123,14 @@ the game uses them:
     The walk is a distance in the net, in blocks. The planet distance runs across faces the border
     closes: from N's centre to F1's it is a quarter of the way round the planet, while the walk
     goes through F0's corner.
+11. **The presets** (`preset/Presets.withProjection`, `server/FirstStartGenerator`, cube plan G12).
+    The level type chooses the map. On a cube level type any preset of that size bakes as a cube,
+    the built-ins too: the first start bakes a copy of the preset with `scale.projection` set to
+    `cube`, and its log says so. A dedicated server sets `level-type=deeptime:planet_cube` (or
+    `deeptime:planet_cube_32k`) in `server.properties` and names a 16k (or 32k) preset in
+    `config/deeptime/server.json`. If the preset's size does not match the level type, the first
+    start stops with the presets that fit. The other level types still need a preset of their own
+    map.
 
 ## Equations and constants
 
