@@ -700,7 +700,10 @@ fn stack_front(
     // belt or wedge sample is never a foreland one.
     // ledger: PLT-260 (the footprint); PLT-249 (the basin's reach).
     // Over the samples either field reached, ascending (P1-19: over every sample before).
-    let mut marks: Vec<(usize, bool)> = Vec::with_capacity(d_over.len() + d_under.len());
+    // Each mark: the sample, whether it is foreland, and whether the incoming plate's lithosphere
+    // is under it (the wedge; the belt as far behind the front as the collision has shortened:
+    // the incoming plate went under by what crossed the front, PLT-546).
+    let mut marks: Vec<(usize, bool, bool)> = Vec::with_capacity(d_over.len() + d_under.len());
     let (mut a, mut b) = (d_over.iter().peekable(), d_under.iter().peekable());
     loop {
         let i = match (a.peek(), b.peek()) {
@@ -712,33 +715,35 @@ fn stack_front(
         let over_d = a.next_if(|x| x.0 == i).map(|x| x.1);
         let under_d = b.next_if(|y| y.0 == i).map(|y| y.1);
         let i = i as usize;
-        if over_d.is_some_and(|d| d < w_rad) {
-            marks.push((i, false));
+        if let Some(d) = over_d.filter(|&d| d < w_rad) {
+            marks.push((i, false, norm.km(d) <= side.shortening_km));
         } else if let Some(d) = under_d
             && plate_of[i] == side.under
             && !state.samples[i].is_hidden()
         {
-            marks.push((i, norm.km(d) > wedge_km));
+            let foreland = norm.km(d) > wedge_km;
+            marks.push((i, foreland, !foreland));
         }
     }
     let (conv, shortened) = (side.conv.max(0.0) as f32, side.shortening_km as f32);
     // ledger: PLT-546
     // The incoming plate's lithosphere goes on under the front (`collision_underthrust`): the
-    // footprint's continental columns carry it, at the depth of its foreland's lithosphere (the
-    // median over the foreland, else over the wedge; 0 without the thermal state). Where two
-    // collisions meet, the faster one's.
+    // footprint's continental columns carry it (the wedge, and the belt within the collision's
+    // shortening of the front), at the depth of its foreland's lithosphere (the median over the
+    // foreland, else over the wedge; 0 without the thermal state). Where two collisions meet, the
+    // faster one's.
     let carried = k.collision_underthrust.then(|| {
         let lith = |want_foreland: bool| -> Vec<f32> {
             let mut v: Vec<f32> = marks
                 .iter()
-                .filter(|&&(i, fl)| {
+                .filter(|&&(i, fl, _)| {
                     let x = &state.samples[i];
                     fl == want_foreland
                         && plate_of[i] == side.under
                         && x.kind == CONTINENTAL
                         && x.lithosphere_km > 0.0
                 })
-                .map(|&(i, _)| state.samples[i].lithosphere_km)
+                .map(|&(i, _, _)| state.samples[i].lithosphere_km)
                 .collect();
             v.sort_by(f32::total_cmp);
             v
@@ -750,10 +755,10 @@ fn stack_front(
         let median = if v.is_empty() { 0.0 } else { v[v.len() / 2] };
         (side.under + 1, median)
     });
-    for (i, foreland) in marks {
+    for (i, foreland, under) in marks {
         let s = &mut state.samples[i];
         if let Some((carrier, lith)) = carried
-            && !foreland
+            && under
             && s.kind == CONTINENTAL
             && (s.carrier == 0 || conv > s.collision_mm_yr)
         {
@@ -1336,6 +1341,77 @@ mod tests {
             in_belt > 3 && in_foreland > 10,
             "{in_belt} {in_wedge} {in_foreland}"
         );
+    }
+
+    /// PLT-546: with `collision_underthrust` the incoming plate's lithosphere is under the wedge
+    /// and under the belt as far behind the front as the collision has shortened; those samples
+    /// carry the incoming plate (its id + 1) and its foreland's lithosphere. The foreland, the belt
+    /// beyond the shortening and the overriding plate beyond the belt carry nothing; off, nothing
+    /// does.
+    #[test]
+    fn the_footprint_carries_the_incoming_plates_lithosphere() {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        // A belt wide against this planet's samples (about 180 km apart), so the belt has samples
+        // well within the shortening and well beyond it.
+        fx.preset.tectonics.collision_belt_km = 1200.0;
+        for on in [false, true] {
+            fx.preset.tectonics.collision_underthrust = on;
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+            // The incoming plate's lithosphere 180 km deep, the overriding plate's 120 km.
+            for s in &mut st.samples {
+                s.lithosphere_km = if s.group == 1 { 180.0 } else { 120.0 };
+            }
+            // Until the collision has shortened by some 400 km, a third of the belt's width.
+            for step in 1..=20 {
+                fx.step(&mut st, step, None);
+                if st.contacts[0]
+                    .collision
+                    .as_ref()
+                    .is_some_and(|c| c.shortening_km > 400.0)
+                {
+                    break;
+                }
+            }
+            let col = st.contacts[0].collision.clone().expect("in collision");
+            let short = col.shortening_km;
+            let belt_km = fx.preset.tectonics.collision_belt_km;
+            assert!(short > 400.0 && short < belt_km - 400.0, "{short}");
+            let spacing = fx.norm.km(fx.norm.spacing_rad());
+            let wedge_km = col.belt.wedge_km;
+            let pts = fx.geo.points();
+            let (mut near, mut far) = (0, 0);
+            for (i, s) in st.samples.iter().enumerate() {
+                let p = pts[i];
+                if !arc(p) || p.y < 0.95 || s.is_hidden() {
+                    continue;
+                }
+                let x = fx.norm.km(p.x.asin());
+                let carried = s.carrier != 0;
+                if !on {
+                    assert!(!carried, "carried with the switch off at {x} km");
+                    continue;
+                }
+                if carried {
+                    assert_eq!(s.carrier, 2, "at {x} km");
+                    assert_eq!(s.carrier_lithosphere_km, 180.0, "at {x} km");
+                }
+                if x < 0.0 && -x < short - spacing {
+                    assert!(carried, "belt within the shortening at {x} km: {s:?}");
+                    near += 1;
+                } else if x < 0.0 && -x > short + spacing {
+                    assert!(!carried, "belt beyond the shortening at {x} km");
+                    far += usize::from(-x < belt_km - spacing);
+                } else if x >= 0.0 && x < wedge_km - spacing {
+                    assert!(carried, "wedge at {x} km");
+                } else if x > wedge_km + spacing {
+                    assert!(!carried, "foreland at {x} km");
+                }
+            }
+            if on {
+                assert!(near > 0 && far > 0, "{near} {far}");
+            }
+        }
     }
 
     /// Continental crust made from ocean floor keeps the floor's own crust under it as its

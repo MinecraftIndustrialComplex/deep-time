@@ -541,6 +541,12 @@ struct PlateFields {
     /// age (`plates::l1::THERMAL_AGE_FIELD`, written only with `tectonics.thermal_strength`) gives
     /// one (ledger: ISO-112). `None`: the orogeny's age throughout.
     te_age: Option<Vec<f32>>,
+    /// The plate carrying a collision's footprint and its lithosphere's thermal age
+    /// (`plates::l1::CARRIER_PLATE_FIELD`, `CARRIER_AGE_FIELD`, written only with
+    /// `tectonics.collision_underthrust`; ledger: PLT-546, ISO-131). `None`: every cell on its own
+    /// plate.
+    carrier_plate_id: Option<Vec<f32>>,
+    carrier_age: Option<Vec<f32>>,
 }
 
 impl PlateFields {
@@ -586,6 +592,8 @@ impl PlateFields {
             gap: get(crate::plates::l1::GAP_FIELD).ok(),
             crust_uplift: get(crate::plates::l1::CRUST_UPLIFT_FIELD).ok(),
             te_age,
+            carrier_plate_id: get(crate::plates::l1::CARRIER_PLATE_FIELD).ok(),
+            carrier_age: get(crate::plates::l1::CARRIER_AGE_FIELD).ok(),
         })
     }
 }
@@ -2092,6 +2100,8 @@ impl SurfaceStage {
                 orogeny_age_myr: pf.te_age.as_deref().unwrap_or(&pf.orogeny_age),
                 regime: &pf.regime,
                 plate_id: &pf.plate_id,
+                carrier_plate_id: pf.carrier_plate_id.as_deref(),
+                carrier_age_myr: pf.carrier_age.as_deref(),
                 ice_m: ice,
                 rock_share: p.isostasy,
                 parts: budget,

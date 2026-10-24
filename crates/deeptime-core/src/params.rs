@@ -629,8 +629,9 @@ pub struct TectonicParams {
     /// kept for tests that isolate one law (ledger ISO-112, ISO-051).
     pub thermal_strength: bool,
     /// The collision's underthrust lithosphere (gap 6): in an active continental collision the
-    /// incoming plate's lithosphere goes on under the front, so under the footprint (the belt on
-    /// the overriding plate and the wedge) the lithosphere that bends is the incoming plate's. The
+    /// incoming plate's lithosphere goes on under the front, so under the footprint (the wedge,
+    /// and the belt on the overriding plate as far behind the front as the collision has
+    /// shortened) the lithosphere that bends is the incoming plate's. The
     /// flexure then takes the footprint as part of the incoming plate (the break, ISO-055, moves
     /// from the front to the belt's back edge) and the incoming lithosphere's elastic thickness
     /// there, from its foreland's thermal age (with the belt's own as a decoupled layer above
