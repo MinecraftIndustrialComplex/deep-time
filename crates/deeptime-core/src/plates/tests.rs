@@ -1326,6 +1326,35 @@ fn the_crust_budget_changes_nothing() {
     same_world(&with, &without);
 }
 
+/// The fronts' lengths as the slab pull and the arcs count them (measurement only, PLT-554; the
+/// front lane, step 8, 2026-10-24), over a 100-Myr run: the slab pull's one spacing per
+/// overriding sample that pulls, the part of each along the boundary's normal, and the same
+/// samples' shares of the straight front (PLT-530); and the arcs' bands by their length against
+/// the arcs' straight front.
+#[test]
+fn the_fronts_by_the_slab_pull_and_the_arcs() {
+    let p = preset(8000, 100.0, "scattered_continents", 6);
+    let w = run_stage_with(PlatesStage::new(p.clone()), &p, |_, _, _| {});
+    let g = |key: &str| w.globals.get(key).copied().unwrap_or(0.0);
+    let lattice = g(forces::SLAB_FRONT_LATTICE_GLOBAL);
+    let normal = g(forces::SLAB_FRONT_NORMAL_GLOBAL);
+    let straight = g(forces::SLAB_FRONT_STRAIGHT_GLOBAL);
+    let band = g(subduction::ARC_BAND_GLOBAL);
+    let arcs = g(subduction::ARC_FRONT_STRAIGHT_GLOBAL);
+    eprintln!(
+        "slab pull: {lattice:.0} km Myr by the lattice, {:.3} of it along the normal, {:.3} by \
+         the straight front; arcs: band {band:.0} km Myr, {:.3} of their straight front \
+         {arcs:.0}, which is {:.3} of the slab pull's straight front",
+        normal / lattice,
+        straight / lattice,
+        band / arcs,
+        arcs / straight
+    );
+    assert!(lattice > 0.0 && arcs > 0.0 && band > 0.0);
+    assert!(normal > 0.3 * lattice && normal <= lattice);
+    assert!(straight > 0.3 * lattice && straight < 1.1 * lattice);
+}
+
 /// Two plates on the preset's planet: the northern hemisphere continental (plate 0), the southern
 /// oceanic (plate 1), the southern turned by `turn` radians about the x axis since the last
 /// resampling, so it runs under the continent where y > 0 and opens a gap where y < 0. Overlaps

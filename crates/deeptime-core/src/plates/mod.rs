@@ -533,6 +533,8 @@ impl PlatesStage {
                 subduction::ARC_FRONT_STRAIGHT_GLOBAL,
                 pull.front_straight_km_myr,
             ),
+            // ledger: PLT-554 (measurement only)
+            (subduction::ARC_BAND_GLOBAL, pull.arc_band_km_myr),
         ] {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
@@ -668,6 +670,17 @@ impl PlatesStage {
             sea,
         );
         book(st, gap_budget::Part::Other);
+        // Measurement only: the slab pull's fronts (ledger: PLT-554).
+        for (name, x) in [
+            forces::SLAB_FRONT_LATTICE_GLOBAL,
+            forces::SLAB_FRONT_NORMAL_GLOBAL,
+            forces::SLAB_FRONT_STRAIGHT_GLOBAL,
+        ]
+        .into_iter()
+        .zip(balance.slab_front_km)
+        {
+            *world.globals.entry(name.to_owned()).or_insert(0.0) += x * env.dt_myr;
+        }
         if !balance.solved {
             *world
                 .globals

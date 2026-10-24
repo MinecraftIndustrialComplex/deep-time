@@ -117,7 +117,7 @@ pub const EDGES_KM: [f64; 10] = [
 ];
 
 /// The globals each snapshot copies (cumulative over the run, km³ or km² Earth-normalized).
-const GLOBALS: [(&str, &str); 51] = [
+const GLOBALS: [(&str, &str); 56] = [
     ("flow_steps", super::flow::STEPS_GLOBAL),
     ("flow_substeps", super::flow::SUBSTEPS_GLOBAL),
     ("flow_short_myr", super::flow::SHORT_GLOBAL),
@@ -184,6 +184,12 @@ const GLOBALS: [(&str, &str); 51] = [
     ("accreted_visible", super::ridges::ACCRETED_VISIBLE_GLOBAL),
     ("cone_mafic", super::CONE_MAFIC_GLOBAL),
     ("slab", super::ridges::SLAB_GLOBAL),
+    // The fronts' lengths as the arcs and the slab pull count them (ledger: PLT-530, PLT-554).
+    ("front_straight", super::subduction::ARC_FRONT_STRAIGHT_GLOBAL),
+    ("arc_band", super::subduction::ARC_BAND_GLOBAL),
+    ("slab_lattice", super::forces::SLAB_FRONT_LATTICE_GLOBAL),
+    ("slab_normal", super::forces::SLAB_FRONT_NORMAL_GLOBAL),
+    ("slab_straight", super::forces::SLAB_FRONT_STRAIGHT_GLOBAL),
 ];
 
 /// Earth's radius, km: the distances to the coast are Earth-normalized.
