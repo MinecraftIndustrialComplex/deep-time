@@ -54,7 +54,11 @@ public final class SableCubeBorderGameTests {
         UUID id;
         Vec3 start;
         double maxDepth;
+        /** The last way out the border gave it (from {@link CubeBorder#outward}), or null. */
+        double[] lastOut;
         int pushes;
+        Vec3 lastPos;
+        long lastSeen = -1;
 
         Run(String name, BlockPos anchor, double ux, double uz) {
             this.name = name;
@@ -92,8 +96,9 @@ public final class SableCubeBorderGameTests {
      * void square by its north-east corner, where two segments end. Each is held: its footprint is
      * never more than {@value #ALLOWED_DEPTH} blocks outside A(inset) (the planet the inset inside
      * every segment), and after {@value #RUN_TICKS} ticks it is back inside, moving away from the
-     * border. A fifth hull at rest in N's warning band, 20 blocks inside the segment, is not moved in x
-     * or z.
+     * segment that last held it (the corner's hull meets F1's top segment and slides on east along
+     * it, as a player would along a wall). A fifth hull at rest in N's warning band, 20 blocks inside
+     * the segment, is not moved in x or z.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 1200)
     public static void sableHullStoppedAtCubeBorder(GameTestHelper helper) {
@@ -123,17 +128,22 @@ public final class SableCubeBorderGameTests {
         runs.put("corner", new Run("corner", new BlockPos(h - 14, y, -h + 14), r, -r));
         runs.put("warned", new Run("warned", new BlockPos(h - 20, y, -s + 40), 0, 0));
 
+        // The chunks round each hull's flight: from its anchor to where the launch would carry it
+        // unstopped (a hull held at a segment's end slides on along the other side, as the corner's does).
+        double reach = SPEED * RUN_TICKS / 20.0;
         List<long[]> forced = new ArrayList<>();
         List<BlockPos> spots = new ArrayList<>();
         for (Run run : runs.values()) {
             BlockPos a = run.anchor;
-            for (int cx = (a.getX() - 24) >> 4; cx <= (a.getX() + 24) >> 4; cx++)
-                for (int cz = (a.getZ() - 24) >> 4; cz <= (a.getZ() + 24) >> 4; cz++) {
+            BlockPos far = a.offset((int) Math.round(run.ux * reach), 0, (int) Math.round(run.uz * reach));
+            for (int cx = (Math.min(a.getX(), far.getX()) - 24) >> 4; cx <= (Math.max(a.getX(), far.getX()) + 24) >> 4; cx++)
+                for (int cz = (Math.min(a.getZ(), far.getZ()) - 24) >> 4; cz <= (Math.max(a.getZ(), far.getZ()) + 24) >> 4; cz++) {
                     level.setChunkForced(cx, cz, true);
                     forced.add(new long[]{cx, cz});
                 }
             spots.add(a);
             spots.add(a.offset((int) Math.round(run.ux * 20), 0, (int) Math.round(run.uz * 20)));
+            spots.add(far);
         }
         long[] startedAt = {-1};
         boolean[] done = {false};
@@ -179,6 +189,8 @@ public final class SableCubeBorderGameTests {
                 Vec3 pos = SableTestOps.position(level, run.id);
                 if (pos == null)
                     continue;
+                run.lastPos = pos;
+                run.lastSeen = ran;
                 Vec3 v = SableTestOps.velocity(level, run.id);
                 // As in jetCrossesSeam: if the body joined the physics pipeline after the first push, push once more.
                 if (run.moving() && ran == 1 && run.pushes < 2 && v != null && v.x * run.ux + v.z * run.uz < SPEED / 2) {
@@ -187,8 +199,10 @@ public final class SableCubeBorderGameTests {
                     run.pushes++;
                 }
                 double[] out = border.outward(footprint(SableTestOps.bounds(level, run.id), pos), inset);
-                if (out != null)
+                if (out != null) {
                     run.maxDepth = Math.max(run.maxDepth, out[2]);
+                    run.lastOut = out;
+                }
             }
             if (ran < RUN_TICKS)
                 return;
@@ -200,14 +214,16 @@ public final class SableCubeBorderGameTests {
                     Vec3 pos = SableTestOps.position(level, run.id);
                     Vec3 v = SableTestOps.velocity(level, run.id);
                     if (pos == null || run.start == null) {
-                        problems.add(run.name + ": the hull vanished");
+                        problems.add(run.name + ": the hull vanished (last seen at tick " + run.lastSeen + " at " + run.lastPos + ")");
                         continue;
                     }
                     double[] end = border.outward(footprint(SableTestOps.bounds(level, run.id), pos), inset);
-                    double along = v == null ? Double.NaN : v.x * run.ux + v.z * run.uz;
-                    d.append(String.format(Locale.ROOT, " %s: start=(%.2f,%.2f) end=(%.2f,%.2f) maxDepth=%.3f endDepth=%s vOut=%.3f pushes=%d;",
-                            run.name, run.start.x, run.start.z, pos.x, pos.z, run.maxDepth,
-                            end == null ? "0" : String.format(Locale.ROOT, "%.3f", end[2]), along, run.pushes));
+                    // Outward speed across the segment that last held it (the launch direction before that).
+                    double nx = run.lastOut != null ? run.lastOut[0] : run.ux, nz = run.lastOut != null ? run.lastOut[1] : run.uz;
+                    double along = v == null ? Double.NaN : v.x * nx + v.z * nz;
+                    d.append(String.format(Locale.ROOT, " %s: start=(%.2f,%.2f) end=(%.2f,%.2f) v=(%.3f,%.3f) maxDepth=%.3f endDepth=%s lastOut=(%.3f,%.3f) vOut=%.3f pushes=%d;",
+                            run.name, run.start.x, run.start.z, pos.x, pos.z, v == null ? Double.NaN : v.x, v == null ? Double.NaN : v.z,
+                            run.maxDepth, end == null ? "0" : String.format(Locale.ROOT, "%.3f", end[2]), nx, nz, along, run.pushes));
                     if (run.moving()) {
                         if (!(run.maxDepth > 0))
                             problems.add(run.name + ": never reached the stop line");
