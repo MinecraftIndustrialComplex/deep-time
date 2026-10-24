@@ -72,7 +72,7 @@
         {"key": "e_l77_k7", "key2": "e_l380_k7", "label": "one lattice: perimeters over cap perimeters at 77 / 380 km (PB2002 1.503 / 1.345; Bird 1.418 / 1.274)", "target": null, "digits": 3, "pair": true},
         {"key": "front_l77_k7", "key2": "front_l380_k7", "label": "one lattice: the front, subduction and collision, at 77 / 380 km, km (PB2002 SUB + CCB 77,844 / 72,060; Bird 74,313)", "target": null, "digits": 0, "pair": true},
         {"key": "front_sub_l77_k7", "key2": "front_sub_l380_k7", "label": "one lattice: subduction alone at 77 / 380 km, km (PB2002 SUB 51,614 / 47,982; Bird 51,310)", "target": null, "digits": 0, "pair": true},
-        {"key": "front_trench_l77_k7", "key2": "front_trench_l380_k7", "label": "one lattice: the front as maps without the flags give it (TRENCH), at 77 / 380 km, km (PB2002 SUB 51,614 / 47,982)", "target": null, "digits": 0, "pair": true},
+        {"key": "front_trench_l77_k7", "key2": "front_trench_l380_k7", "label": "one lattice: the front as maps without the flags give it (TRENCH), at 77 / 380 km, km (PB2002 SUB, its subducting side flagged, 51,812 / 48,094)", "target": null, "digits": 0, "pair": true},
         {"key": "tau_front_sum_l77_k7", "key2": "tau_front_sum_l380_k7", "label": "one lattice: tortuosity of mostly-front pieces at 77 / 380 km (PB2002 SUB + CCB 1.247 / 1.138)", "target": null, "digits": 3, "pair": true},
         {"key": "front_flagged", "key2": "resampled", "label": "snapshots whose front came from the mix's flags, share / snapshots skipped at a resampling", "target": null, "digits": 2, "pair": true}
       ]
