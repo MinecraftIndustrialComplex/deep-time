@@ -791,6 +791,9 @@ enum SynthKind {
     /// A delta plain at y 63.5 (top block 63, a block over the sea's water) with a river and two
     /// distributaries leaving it at the apex, with their network (rivers/rivers.dtrv).
     DeltaTest,
+    /// A river (half-width 3) on a floodplain at y 70.5 into the sea, meandered as the bake
+    /// meanders it, with its network (rivers/rivers.dtrv).
+    MeanderTest,
     /// A cube world (format 0.7) of a planet --size blocks round: sphere-defined continents, a
     /// ridge across a quarter-turn seam, a cone on a reachable corner, a lake across a half-turn
     /// seam.
@@ -1537,6 +1540,7 @@ fn main() -> ExitCode {
                     SynthKind::LakeTest => synth::Kind::LakeTest,
                     SynthKind::RiverTest => synth::Kind::RiverTest,
                     SynthKind::DeltaTest => synth::Kind::DeltaTest,
+                    SynthKind::MeanderTest => synth::Kind::MeanderTest,
                     SynthKind::Cube => synth::Kind::Cube,
                 },
                 strata: match strata {

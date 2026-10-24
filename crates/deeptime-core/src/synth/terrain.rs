@@ -690,6 +690,158 @@ impl Terrain for DeltaTest {
     }
 }
 
+/// The meander-test world (V1 gap 5, stage 3; `deeptime synth --kind meander-test`, the Java
+/// `MeanderGameTests`): ground by |x| alone, a plain at y 70.5 for |x| <= 400 falling to a sea
+/// floor at y 45.5 by |x| 440. A straight river (chain 0) runs east along z 0 from x -380 into the
+/// sea at x 430, half-width 3, depth 2.5 and 100 m³/s, its surface 69.9 falling to 69.1 at x 380
+/// and to the sea's 63.0 at x 412, where the ground passes the sea level. A floodplain (the
+/// `floodplain` layer, HYD-152, a move of 0, laid at y 70.5: its top block 70 a block over the
+/// river's top water block 69) covers x -380 to 390 and |z| up to 60. The file holds the river as
+/// the bake leaves it after the meanders (HYD-155 to HYD-159, [`crate::hydro::meander`]) on that
+/// plain. Every number here is a test fixture's (game-choice: agent, 2026-10-24).
+pub struct MeanderTest {
+    pub c: u32,
+}
+
+impl MeanderTest {
+    pub const PLAIN_Y: f64 = 70.5;
+    pub const SEA_FLOOR_Y: f64 = 45.5;
+    /// |x| where the plain starts falling and where the sea floor starts.
+    pub const SLOPE_FROM_X: f64 = 400.0;
+    pub const SEA_FROM_X: f64 = 440.0;
+    pub const SEA_W: f64 = 63.0;
+
+    pub const RIVER_FROM_X: f64 = -380.0;
+    pub const RIVER_TO_X: f64 = 430.0;
+    pub const SPACING: f64 = 2.0;
+    pub const SOURCE_W: f64 = 69.9;
+    /// The surface where the plain's reach ends, and that x.
+    pub const PLAIN_END_W: f64 = 69.1;
+    pub const PLAIN_END_X: f64 = 380.0;
+    /// Where the surface reaches the sea's (the ground passes y 63 there).
+    pub const SEA_W_FROM_X: f64 = 412.0;
+    pub const HALF_WIDTH: f64 = 3.0;
+    pub const DEPTH: f64 = 2.5;
+    pub const Q: f64 = 100.0;
+    pub const FLOODPLAIN_TO_X: f64 = 390.0;
+    pub const FLOODPLAIN_HALF_WIDTH: f64 = 60.0;
+
+    fn wrap_x(&self, x: f64) -> f64 {
+        let c = f64::from(self.c);
+        x - c * (x / c).round_ties_even()
+    }
+
+    /// The river's surface at x.
+    pub fn river_w(x: f64) -> f64 {
+        if x <= Self::PLAIN_END_X {
+            Self::SOURCE_W
+                - (Self::SOURCE_W - Self::PLAIN_END_W) * (x - Self::RIVER_FROM_X)
+                    / (Self::PLAIN_END_X - Self::RIVER_FROM_X)
+        } else if x < Self::SEA_W_FROM_X {
+            Self::PLAIN_END_W
+                - (Self::PLAIN_END_W - Self::SEA_W) * (x - Self::PLAIN_END_X)
+                    / (Self::SEA_W_FROM_X - Self::PLAIN_END_X)
+        } else {
+            Self::SEA_W
+        }
+    }
+
+    /// Whether block (x, z) is on the floodplain.
+    fn on_plain(&self, x: f64, z: f64) -> bool {
+        let x = self.wrap_x(x);
+        (Self::RIVER_FROM_X..=Self::FLOODPLAIN_TO_X).contains(&x)
+            && z.abs() <= Self::FLOODPLAIN_HALF_WIDTH
+    }
+
+    /// The river as drawn, straight along z 0, indexed.
+    pub fn straight(&self) -> Rivers {
+        let mut r = Rivers::empty(self.c);
+        let n = ((Self::RIVER_TO_X - Self::RIVER_FROM_X) / Self::SPACING).round() as u32;
+        for k in 0..=n {
+            let x = Self::RIVER_FROM_X + f64::from(k) * Self::SPACING;
+            r.vertices.push(RiverVertex {
+                x: x as f32,
+                z: 0.0,
+                w: Self::river_w(x) as f32,
+                hw: Self::HALF_WIDTH as f32,
+                depth: Self::DEPTH as f32,
+                q: Self::Q as f32,
+            });
+        }
+        r.chains.push(Chain::new(0, n + 1, Mouth::Sea, u32::MAX));
+        r.build_index();
+        r
+    }
+
+    /// The river meandered on the plain, and `stats.meanders` of that pass.
+    pub fn rivers(&self) -> (Rivers, serde_json::Value) {
+        let mut r = self.straight();
+        let level = (Self::PLAIN_Y * 16.0).round() as i32;
+        let plain = |x: f64, z: f64| self.on_plain(x, z).then_some(level);
+        let scale = deeptime_format::Scale::default_for(self.c);
+        let stats = crate::hydro::meander::apply(
+            &mut r,
+            &crate::hydro::meander::Input {
+                plain: &plain,
+                lambert: Some(deeptime_format::Projection::of(f64::from(self.c))),
+                m_per_block_h: scale.m_per_block_h,
+                m_per_block_v: scale.m_per_block_v,
+            },
+        );
+        (r, stats)
+    }
+
+    /// The geometry, for `manifest.json` `notes.meander`, with the meander pass's record.
+    pub fn notes(&self, stats: &serde_json::Value) -> serde_json::Value {
+        let straight = self.straight();
+        serde_json::json!({
+            "profile": "ground by |x| alone (periodic): plain y 70.5 for |x| <= 400; linear to the sea floor y 45.5 at |x| 440; sea floor beyond",
+            "plain_y": Self::PLAIN_Y,
+            "sea_w": Self::SEA_W,
+            "river": {
+                "chain": 0,
+                "z": 0.0,
+                "from_x": Self::RIVER_FROM_X,
+                "to_x": Self::RIVER_TO_X,
+                "half_width": Self::HALF_WIDTH,
+                "depth": Self::DEPTH,
+                "q": Self::Q,
+                "w": {"from": Self::SOURCE_W, "plain_end": Self::PLAIN_END_W, "plain_end_x": Self::PLAIN_END_X, "sea_from_x": Self::SEA_W_FROM_X}
+            },
+            "floodplain": {"from_x": Self::RIVER_FROM_X, "to_x": Self::FLOODPLAIN_TO_X, "half_width": Self::FLOODPLAIN_HALF_WIDTH},
+            "straight_vertices": straight.vertices.len(),
+            "stats": stats
+        })
+    }
+}
+
+impl Terrain for MeanderTest {
+    fn circumference(&self) -> u32 {
+        self.c
+    }
+
+    fn height(&self, x: i64, _z: i64) -> f64 {
+        let ax = self.wrap_x(x as f64).abs();
+        if ax <= Self::SLOPE_FROM_X {
+            Self::PLAIN_Y
+        } else if ax < Self::SEA_FROM_X {
+            Self::PLAIN_Y
+                + (Self::SEA_FLOOR_Y - Self::PLAIN_Y) * (ax - Self::SLOPE_FROM_X)
+                    / (Self::SEA_FROM_X - Self::SLOPE_FROM_X)
+        } else {
+            Self::SEA_FLOOR_Y
+        }
+    }
+
+    fn writes_floodplain(&self) -> bool {
+        true
+    }
+
+    fn floodplain(&self, x: i64, z: i64) -> Option<f64> {
+        self.on_plain(x as f64, z as f64).then_some(0.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -715,6 +867,33 @@ mod tests {
             assert_eq!(last.x, 160.0);
             assert_eq!(last.z.abs(), 64.0);
         }
+    }
+
+    #[test]
+    fn meander_test_profile_and_network() {
+        let t = MeanderTest { c: 1024 };
+        assert_eq!(t.height(0, 50), 70.5);
+        assert_eq!(t.height(-400, 0), 70.5);
+        assert_eq!(t.height(420, 0), 58.0);
+        assert_eq!(t.height(500, 0), 45.5);
+        assert_eq!(t.floodplain(0, 60), Some(0.0));
+        assert_eq!(t.floodplain(395, 0), None);
+        assert!((MeanderTest::river_w(412.0) - 63.0).abs() < 1e-12);
+        let straight = t.straight();
+        let (r, stats) = t.rivers();
+        r.validate().unwrap();
+        assert_eq!(r.chains.len(), 1);
+        let v = &r.vertices;
+        assert!(v.len() > straight.vertices.len(), "{stats}");
+        assert_eq!(v[0], straight.vertices[0]);
+        assert_eq!(v[v.len() - 1], straight.vertices[straight.vertices.len() - 1]);
+        assert!(v.windows(2).all(|p| p[1].w <= p[0].w));
+        let off = v.iter().fold(0.0f32, |m, p| m.max(p.z.abs()));
+        assert!((15.0..=MeanderTest::FLOODPLAIN_HALF_WIDTH as f32 - 3.0).contains(&off), "{off}: {stats}");
+        let k = stats["reach_sinuosity"].as_f64().unwrap();
+        assert!(k >= 1.5, "{stats}");
+        // Off the plain, down the slope into the sea, the course is the straight one.
+        assert!(v.iter().filter(|p| p.x > 392.0).all(|p| p.z == 0.0));
     }
 
     #[test]
