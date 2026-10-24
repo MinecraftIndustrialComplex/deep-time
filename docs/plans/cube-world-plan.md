@@ -688,7 +688,7 @@ Petroff-Guyou kind. Each line below is a place to change, grouped into work item
 section 7.4 is deleted yet.
 
 - Done: G1 (readers, the cube manifest through `WorldDataRef`, `WorldProjection.Cube`, the indexes on
-  net coordinates), G2 (the generator on the cube: period 4s, `zHalf` 3C/8 for the censuses, the
+  net coordinates, the river file's seam mouth, code 3, SCL-126), G2 (the generator on the cube: period 4s, `zHalf` 3C/8 for the censuses, the
   level types; the static Lambert helpers stay until section 7.4), G4 (block states turned in the
   fill), G5 (`worldgen/CubeFill`: partners' biomes and terrain copied and turned, deep ocean past the
   corners, SCL-210, SCL-211), G7's border part (W3), G8 and W5 (spawn), W3 and W4 (`wrap/CubeBorder`,
@@ -696,7 +696,9 @@ section 7.4 is deleted yet.
   longitude; bearing and scale wait for G9), G11's `ServerConfig` and `FirstStartGenerator` text,
   G13's level-type registration and the editor's `cube` projection option, and G15's layout, seam,
   corner, fill, biome, ocean, block-state and border GameTests (`CubeWorldGameTests`, on the 4k test
-  planet baked as a cube) and the reachability flood fill (`CubeBorderTest`).
+  planet baked as a cube) and the reachability flood fill (`CubeBorderTest`), with the dev planet
+  server on that cube (`gametest-planet.sh --boot-only --cube-4k`, its probes on every face against
+  `inspect-column`) and the smoke's cube presets at 16k and 32k.
 - Left: G3 (the detail noise across turning seams, Rust and Java together), G6 (far terrain and
   Distant Horizons), G9 (climate API 5), G10's `NetworkGameTests` F3 test, the rest of G11 (the
   `pole`, `tw` and `column` probes, `SiteCommands.distance`), G12 (the presets themselves; the smoke

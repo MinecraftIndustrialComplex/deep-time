@@ -140,6 +140,54 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-23: The cube world, phase 2 stage 1: a cube world is playable end to end behind two opt-in level types, `deeptime:planet_cube` and `deeptime:planet_cube_32k` (the Java readers on format 0.7, the generator on the net, the chunks off the faces filled from their partners turned, deep ocean past the corners, the border at the 12 turning edges with arrivals folded, spawn kept off the corners, F3 naming the face); Petroff-Guyou unchanged, nothing of section 7.4 deleted (coordinator's task, brief build/coord/briefs/cube-phase2.md; agent worktree .claude/worktrees/agent-a19e057e8770be0a9, branch worktree-agent-a19e057e8770be0a9 from master 2fde68f7; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What** (design note docs/design/cube-game.md; state block in docs/plans/cube-world-plan.md section 4; paths under `neoforge/.../deeptime/`):
+  - G1, the readers: `worlddata/Manifest`, `GridDesc`, `LayerDesc`, `FormatVersion` read 0.7 cube manifests; `WorldProjection.Cube`; `RasterSampler` reads across the seams (`getFace`, `bilinearCells`, `anyInBox`); `Columns`, `Water`, `WaterLevels`, `FarColumn`, `Playa` work on net coordinates; `Rivers` takes the seam mouth (code 3, SCL-126). Rust: `column.rs` `water_level_at` has the cube branch Java's `Water.levelAt` mirrors; `deeptime parity` and a synthetic `cube1024` fixture feed `ColumnParityTest.theCubeWorldIsEqual`.
+  - G2, the generator: `WorldLayout` and `GeologicChunkGenerator` on the net (period 4s, `zHalf` 3C/8 for the censuses); world presets `planet_cube` and `planet_cube_32k`, `planet_cube` in the `normal` tag.
+  - G4 and G5: `worldgen/CubeFill`. A chunk wholly off the faces takes its partners' biomes and terrain turned, block states rotated with the fold (SCL-210). Past the net's corners it draws deep ocean (SCL-211, `OCEAN_DEPTH` 64). Its scratch partner chunks carry their status (`ProtoChunk.getNoiseBiome` refuses before BIOMES).
+  - W3 and W4, the border: `wrap/CubeBorder`, `EdgeBorder.tickCube`. It stops players and their vehicles at the 12 turning edges; an arrival more than 16 blocks out is folded onto its partner block (POL-031). A level whose world data is not bound has no border (the dev planet server's GameTest dimensions).
+  - W5 and G8, spawn: no candidate within 256 blocks of a corner's image or 64 of a turning edge (SCL-127). `FirstStartGenerator` and `ServerConfig` name the cube.
+  - G10: `WorldInfoPayload` carries the cube; the F3 line reads "face F3" (or "(folded)") with latitude and longitude.
+  - G13: the editor's `cube` projection option; the cube world type picks it.
+  - G15, the tests: `CubeWorldGameTests` (7 tests, levels `test_planet_cube` and `test_cube_bare`, `gametest.sh` bakes `planet_world_4k` as a cube), `CubeBorderTest`, `gametest-planet.sh --boot-only --cube-4k` (probes on every face against `inspect-column`), the smoke's cube presets (`tools/smoke/presets/earthlike_quick_{16k,32k}_cube.json`) and run.py's cube probes. The walk's driver takes `worldtype=<preset id>`; `vm-client.sh --prop` accepts a colon in the value.
+- **Measured** (cube-world-game.md "Earth against the mod"; the 4k test planet as a cube, s = 1,024):
+  - The fill: 29 chunks off the faces, 8,257,536 blocks against their partners turned, 0 differ; 18,432 biome quarts, 0 differ.
+  - 256 columns past the corners are deep ocean. 99 chunks at the face centres, seams and corners (53 off the faces) generate with no hole to the floor.
+  - Across each turning edge: at most 1.05 blocks on the sphere (R 707.6).
+  - The border puts a player back on the planet from a void square (4.55 blocks) and from past the corners (92.7). It folds one 100 blocks past N-east onto F1, yaw turned 90°.
+  - The dev planet server on the 4k cube: 10 of 10 probe columns on all six faces (both sides of the slide) equal `inspect-column`'s ground height.
+- **Gates** (VM, admitted):
+  - cargo `fmt --check`, `clippy -D warnings` and `test --workspace --no-fail-fast`: 1,258 passed, 0 failed, 7 ignored. No Rust changed after this run.
+  - `./gradlew build test` at a7d48ad8: 503 tests, 0 failures, 0 errors, 2 skipped.
+  - GameTests standalone: 110 of 110 at a4a65d95. The later commits touch only the river reader's mouth code, the border's unbound-data guard and tools.
+  - GameTests `-PwithMic` at 77e0e5b7: 109 of 110. `packTableClassesReachTheirBiomes` fails with "terralith:Cs_scrub 0.396 < 0.500 (96 columns)". Master 2fde68f7 alone (the test by itself, `-PwithMic`) fails with the same census: 38 of 96, 56 of the misses `minecraft:windswept_savanna`. It is master's, from the planet the flexure merge made.
+  - `tools/smoke/first-start-acceptance.sh` at 16k on the cube (`earthlike_quick_16k_cube.json`):
+    - standalone: the three refusal scenarios OK; the fresh start PASS (generation 383 s, native peak 3.1 of 4.0 GiB); 8 of 8 probe columns equal `inspect-column`, including both sides of the slide at x ±7,642 and both poles; the restart does not regenerate.
+    - mic (158 mods): the same, generation 421 s; the COE, CDG and Distant Horizons guard mixins applied.
+    - The first 16k run found a reader fault: rivers.dtrv's seam-cut chains (mouth 3) failed the Java reader at the spawn search. The 4k test cube has no seam-cut chain.
+  - 32k: see below.
+  - `gametest-planet.sh --boot-only --cube-4k` PASS. The first run crashed a second after Done: the border read the GameTest dimensions' unbound world data, fixed at 5668725f.
+  - The Create World walk (`vm-client.sh --name cube-walk2 --prop length=300 --prop worldtype=deeptime:planet_cube`, the VM's private Xvfb): 28 screenshots. World type "Deep Time Planet Cube"; the bake is "projection cube s=3840"; the world binds format 0.7, C = 15,360; the player stands in world on the cube's generator; the guidance pass runs too.
+  - Not run: `tools/client/dh-client-check.sh`. Far terrain on the cube is G6, not built, so there is no cube far terrain to check across the slide.
+- **Docs:** docs/design/cube-game.md (new); docs/science/cube-world-game.md (new) and its README row; pole-cap.md's POL row; ledger SCL-210, SCL-211 (new), SCL-127 (the spawn margins' game side), POL-031 (new); claims.md recounted (2,857); FORMAT.md's cube reader notes; the plan's state block.
+- **Choices** (the agent's, undoable):
+  - The cube is opt-in: level types `planet_cube` and `planet_cube_32k`, `planet_cube` listed in the normal tag; the editor's `cube` option, picked by the cube world type.
+  - The numbers: `FOLD_DEPTH` 16 (POL-031), `CORNER_MARGIN` 256 and `EDGE_MARGIN` 64 (SCL-127), `zHalf` 3C/8, `OCEAN_DEPTH` 64 (SCL-211).
+  - In the fill: no features, structures or carvers off the faces (SCL-210), and an empty Beardifier in the scratch chunk.
+  - New test levels, not a conversion of `test_planet_real`.
+  - Deferred: G3 and the Sable border.
+  - The smoke's cube presets as files; the `test_planet_cube_4k` world preset for the dev planet server; run.py's mismatch scenario fixed for two world shapes.
+  - The F3 face format; the screenshot driver's lower-case `worldtype` property.
+- **Questions** (design note section 7):
+  - E3's gate restated as pre-feature terrain (recommended: yes).
+  - Features in the fill: skip them off the faces in stage 1 (recommended).
+  - The level type names: `planet_cube` and `planet_cube_32k` now, then `planet` and `planet_32k` after the section 7.4 deletions (recommended).
+- **Next:**
+  - G3 (the detail noise across turning seams, Rust and Java together); G6 (far terrain and Distant Horizons on the cube); G9 (climate API 5 with `northBearingDeg` and `metresPerBlock`).
+  - G10's NetworkGameTests F3 test; the rest of G11 to G14; G16; the Sable border.
+  - Then the section 7.4 deletions.
+  - The GameTest server's heap sits at its 6 GiB cap on master too (live 6,088 of 6,144 MB); the cube tests load about 21k chunks.
+
 ### 2026-10-23: The flexure faults: the oceanic carry peaks and the trench floors were one integrator (the surface held an offset over the plate model's height and the plate model's feedback added it back each step), ended by the held offsets (ISO-125); the water load by basin, not by `h ≤ sea` (ISO-126); both and the yield (ISO-120, 380 mGal) on by default under Ben's rule; the solve on the sphere's metric (ISO-127) is right for one solve but its preconditioner does not converge where the rigidity changes along a row near a pole, so it is off (coordinator's task, brief build/coord/briefs/flexure-faults.md; agent worktree .claude/worktrees/agent-a90cfbd93f4cea604, branch worktree-agent-a90cfbd93f4cea604 from master 049c4278; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **Trace** (flexure.md "The held offsets"; scattered 1 with the yield, `DEEPTIME_PEAK_TRACE=10000` and the new floor trace `DEEPTIME_FLOOR_TRACE=11000`, surface/floors.rs, measurement only).
   - 17 peak lines, all ocean samples at a ridge 10.0 to 14.7 km high, 9 on the polar rows; 0.2 to 0.99 of their cells in a gap between plates, which handed the sample 0.7 to 2.8 km in the step, what it rose by.
