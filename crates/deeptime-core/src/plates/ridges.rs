@@ -314,6 +314,11 @@ pub const MAFIC_DROPPED_GLOBAL: &str = "plates/resample_mafic_dropped_km3";
 /// slab at resamplings instead of accreting (`sediment_subduction_share`, PLT-440), km³
 /// (Earth-normalized; the crust budget's sediment subduction against Stern & Scholl 2010).
 pub const SEDIMENT_SUBDUCTED_GLOBAL: &str = "plates/sediment_subducted_km3";
+/// World global (one-way subduction, `tectonics.one_way_subduction`, only while it is on): the
+/// conserved pools of crust that went down a trench and that only held crust covered at a
+/// resampling, gone down with the slab (the point became new sea floor), km³ (Earth-normalized).
+/// Its sediment is in [`SEDIMENT_SUBDUCTED_GLOBAL`] too. ledger: PLT-542
+pub const SLAB_GLOBAL: &str = "plates/resample_slab_km3";
 
 /// A pair's frame for the ridge segments: its relative rotation's pole ê and two unit vectors
 /// f̂, ĝ with f̂ × ĝ = ê, and the pair's band offset in [0, 1).
@@ -552,14 +557,19 @@ pub fn resample(
         let groups: Vec<u32> = src.iter().map(|s| s.group).collect();
         level_set::old_distances(state.level_set.as_ref(), &groups, old, spacing)
     });
-    // On top: visible, then the overriding plate of a subduction contact, then continental, then
-    // higher, then the lower group id.
+    // Held crust (one-way subduction, `subduction::resolve`; none with the switch off): the slab,
+    // never on top of the new lattice (ledger: PLT-542).
+    let one_way = state.one_way.as_ref();
+    let slab = |m: u32| one_way.is_some_and(|ow| ow.holds(m as usize, &src[m as usize]));
+    // On top: crust that is not the slab, then visible, then the overriding plate of a subduction
+    // contact, then continental, then higher, then the lower group id.
     // Each side is a group and the old sample its crust is judged by (a cover's major corner).
     let rank = |(ga, ma): (u32, u32), (gb, mb): (u32, u32)| {
         let key = |g: u32, m: u32| {
+            let held = slab(m);
             let m = &src[m as usize];
             (
-                !m.is_hidden(),
+                (!held, !m.is_hidden()),
                 group_plate[g as usize],
                 m.kind == CONTINENTAL,
                 m.elevation_m,
@@ -621,6 +631,11 @@ pub fn resample(
             if covers.is_empty() {
                 return ((None, covers), 0.0);
             }
+            // One-way subduction: where only crust that went down a trench covers the point, the
+            // slab took it; the point is a gap and gets new sea floor below (ledger: PLT-542).
+            if covers.iter().all(|(_, c)| slab(c.major())) {
+                return ((None, covers), 0.0);
+            }
             let best = (0..covers.len())
                 .max_by(|&a, &b| {
                     rank(
@@ -658,7 +673,7 @@ pub fn resample(
     // belt or went down with the slab (`belts.rs`): it is consumed here, not accreted a second
     // time (ledger: PLT-276, PLT-292). Both are counted, m of rock per new sample.
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
-    let mut tally: Vec<[f64; 8]> = vec![[0.0; 8]; n];
+    let mut tally: Vec<[f64; 9]> = vec![[0.0; 9]; n];
     let sediment_share = k.sediment_subduction_share as f32; // ledger: PLT-440
     // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
     let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
@@ -673,7 +688,21 @@ pub fn resample(
         .zip(traces.par_iter_mut())
         .zip(limits.par_iter_mut())
         .map(|(((((top, others), pl), tally), trace), lim)| match top {
-            None => Sample::blank(0),
+            None => {
+                // One-way subduction's gap (the covers are all held crust; none elsewhere): its
+                // conserved pools went down with the slab, its sediment counted as subducted
+                // sediment too (ledger: PLT-542, PLT-440).
+                for (g2, c2) in others {
+                    let u = interpolate(src, c2, rots[*g2 as usize]);
+                    tally[8] += u.pools[..pool::CONSERVED]
+                        .iter()
+                        .map(|&x| f64::from(x))
+                        .sum::<f64>();
+                    tally[7] += f64::from(u.pools[pool::SEDIMENT].max(0.0))
+                        + f64::from(u.pools[pool::SEDIMENTARY].max(0.0));
+                }
+                Sample::blank(0)
+            }
             Some((g, c)) => {
                 let mut s = interpolate(src, c, rots[*g as usize]);
                 *pl = group_plate[*g as usize];
@@ -793,6 +822,9 @@ pub fn resample(
             .globals
             .entry(SEDIMENT_SUBDUCTED_GLOBAL.to_owned())
             .or_insert(0.0) += sum(7);
+    }
+    if k.one_way_subduction {
+        *world.globals.entry(SLAB_GLOBAL.to_owned()).or_insert(0.0) += sum(8);
     }
 
     // Gaps: fresh oceanic crust between diverging plates.
@@ -964,6 +996,12 @@ pub fn resample(
         l
     });
     state.samples = samples;
+    // The held crust is consumed or under new crust, and the old lattice's forearc is the next
+    // step's to find: the new lattice starts with neither.
+    if let Some(ow) = state.one_way.as_mut() {
+        ow.held.clear();
+        ow.forearc.clear();
+    }
     state.limits = new_limits;
     if let Some(gb) = state.gap_budget.as_mut() {
         // Gap points became new sea floor: born now.

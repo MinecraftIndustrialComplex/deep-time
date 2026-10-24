@@ -87,7 +87,7 @@ use super::pools::isostatic_change_m;
 use super::shortening::{boundary_normal, front_share_rad, is_transform};
 use super::state::{
     ARC, CONTINENTAL, Contact, DIVERGENT, EMERGED, FORELAND, HIDDEN, HOTSPOT, OROGENY_ANDEAN,
-    OROGENY_HIMALAYAN, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
+    OROGENY_HIMALAYAN, OneWay, PlateState, SUBDUCTION_ZONE, TRENCH, pool,
 };
 use super::transition::{continental_m, crust_per_metre, crystalline_m, held_floor_m, oceanic_m};
 use crate::error::CoreError;
@@ -275,14 +275,34 @@ pub fn resolve(
     } else {
         Vec::new()
     };
-    // One-way subduction: crust that went under stays under until the resampling consumes it
-    // (ledger: PLT-542); off, the hiding is found again each step.
-    let held = if env.k.one_way_subduction { HIDDEN } else { 0 };
-    for s in &mut state.samples {
-        let keep = s.flags & held;
+    // One-way subduction (ledger: PLT-542): ocean floor that went down a trench stays under until
+    // the resampling consumes it (held, and still hidden: a collision that brought it up let it
+    // go); off, the hiding is found again each step. The trench's reach is the forearc and arc
+    // the last step's fronts left (`fronts_and_uplift`), read here before they are found again.
+    let mut one_way: Option<OneWay> = if env.k.one_way_subduction {
+        let n = state.samples.len();
+        let mut ow = state.one_way.take().unwrap_or_default();
+        if ow.held.len() != n {
+            ow.held = vec![false; n];
+        }
+        if ow.forearc.len() != n {
+            ow.forearc = vec![false; n];
+        }
+        Some(ow)
+    } else {
+        state.one_way = None;
+        None
+    };
+    for (i, s) in state.samples.iter_mut().enumerate() {
+        let keep = one_way.as_ref().is_some_and(|ow| ow.holds(i, s));
         s.flags &=
             !(HIDDEN | TRENCH | ARC | HOTSPOT | DIVERGENT | SUBDUCTION_ZONE | EMERGED | FORELAND);
-        s.flags |= keep;
+        if let Some(ow) = one_way.as_mut() {
+            ow.held[i] = keep;
+            if keep {
+                s.flags |= HIDDEN;
+            }
+        }
         // The collisions' footprint is stamped again each step they have a front (`belts.rs`).
         // `stacked` stays while the crust stays under (below).
         s.collision_mm_yr = 0.0;
@@ -482,6 +502,16 @@ pub fn resolve(
             if s.kind == CONTINENTAL && !locked_against(s, t_myr, env, own) {
                 seeds.entry(k).or_default().push(o.i);
             }
+            // Ocean floor under the overriding plate's forearc or arc went down its trench and
+            // stays down (one-way subduction, ledger: PLT-542). Continental crust is too buoyant
+            // to stay down (Cloos 1993, PLT-047): it collides, or shows again where the
+            // overriding plate leaves it, as before.
+            if let Some(ow) = one_way.as_mut()
+                && s.kind != CONTINENTAL
+                && ow.forearc[o.cover.major() as usize]
+            {
+                ow.held[o.i as usize] = true;
+            }
         } else {
             let m = o.cover.major();
             let s = &state.samples[m as usize];
@@ -492,6 +522,14 @@ pub fn resolve(
     }
     for s in &mut state.samples {
         s.stacked &= s.is_hidden();
+    }
+    // Held ocean floor that turned continental this step (`make_continental` above) is let go:
+    // from the next step on it is judged as continental crust.
+    if let Some(mut ow) = one_way {
+        for (h, s) in ow.held.iter_mut().zip(&state.samples) {
+            *h &= s.kind != CONTINENTAL;
+        }
+        state.one_way = Some(ow);
     }
     // Measurement only (`shown.rs`): why each sample hidden as the step began shows again.
     if let Some(was) = &was_hidden {
@@ -1140,6 +1178,17 @@ pub fn fronts_finish(
         ..
     } = begun;
     let (dist, label, reached) = reach;
+    // One-way subduction: the forearc and arc that the next step's hiding reads, within the arc's
+    // distance of a front and one lattice spacing for where the front falls, as PLT-503's reach
+    // (ledger: PLT-542, PLT-042).
+    if let Some(ow) = state.one_way.as_mut() {
+        let reach_km = k.arc_distance_km + norm.km(norm.spacing_rad());
+        ow.forearc = dist
+            .iter()
+            .zip(&state.samples)
+            .map(|(&d, s)| d.is_finite() && !s.is_hidden() && norm.km(d) <= reach_km)
+            .collect();
+    }
     let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
     let pts = geo.points();
     let mut info: Vec<Source> = Vec::new();

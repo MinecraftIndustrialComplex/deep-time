@@ -570,6 +570,27 @@ pub struct Counters {
     pub resamplings: u32,
 }
 
+/// One-way subduction (`tectonics.one_way_subduction`, ledger PLT-542), per sample of the lattice
+/// since the last resampling.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct OneWay {
+    /// Ocean floor that went down a trench: hidden until the resampling consumes it
+    /// (`subduction::resolve`, `ridges::resample`).
+    pub held: Vec<bool>,
+    /// Visible crust within `arc_distance_km` (PLT-042) of a subduction front as the last step's
+    /// fronts left it (`subduction::fronts_and_uplift`): the forearc and the arc, under which the
+    /// slab goes down. Empty until a step's fronts have been found.
+    pub forearc: Vec<bool>,
+}
+
+impl OneWay {
+    /// Whether sample `i` is held crust (and still hidden: a collision that brought it up let it
+    /// go).
+    pub fn holds(&self, i: usize, s: &Sample) -> bool {
+        self.held.get(i).copied().unwrap_or(false) && s.is_hidden()
+    }
+}
+
 /// Everything the plate model keeps between steps.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PlateState {
@@ -608,6 +629,10 @@ pub struct PlateState {
     /// The crust shown again (`shown.rs`): measurement only, kept while the dynamics record is.
     #[serde(default)]
     pub shown: Option<super::shown::Track>,
+    /// One-way subduction's state (`tectonics.one_way_subduction`, ledger PLT-542); absent while
+    /// the switch is off.
+    #[serde(default)]
+    pub one_way: Option<OneWay>,
     /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
     /// kept in checkpoints.
     #[serde(skip)]

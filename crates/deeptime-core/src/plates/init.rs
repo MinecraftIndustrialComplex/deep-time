@@ -462,6 +462,7 @@ pub fn initial_state(preset: &PlanetPreset, env: &Env) -> Result<(PlateState, Ge
         gap_budget: None,
         limits: None,
         shown: None,
+        one_way: None,
         level_set: None,
     };
     let mut state = state;

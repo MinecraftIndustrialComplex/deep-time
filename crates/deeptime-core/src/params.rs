@@ -556,13 +556,16 @@ pub struct TectonicParams {
     /// overlap, PLT-370; the default and every built-in preset since 2026-10-23, V1 gap 2) rather
     /// than by its crust in the overlap (`false`, PLT-056's old judgement; ledger PLT-371).
     pub reversal_by_arc_crust: bool,
-    /// One-way subduction (the front lane, 2026-10-24): a sample hidden under an overriding plate
-    /// stays hidden until the next resampling consumes it, whatever that plate does next, and a
-    /// point of the new lattice that only hidden crust covers is a gap and gets new ocean floor
-    /// (`subduction::resolve`, `ridges::resample`). Lithosphere that went down a trench is the
-    /// slab and does not come back to the surface. Off, a sample is hidden exactly while it lies
-    /// under an overriding plate's cover, so old crust that went under shows again where that
-    /// plate moves off it (plates.md, "The overlaps' hiding"). ledger: PLT-542
+    /// One-way subduction (the front lane, 2026-10-24): ocean floor hidden under an overriding
+    /// plate's forearc (a cover within `arc_distance_km`, PLT-042, of a subduction front as the
+    /// last step's fronts left it, plus one lattice spacing) is the slab: it stays hidden until
+    /// the next resampling consumes it, whatever that plate does next, and a point of the new
+    /// lattice that only such crust covers is a gap and gets new ocean floor
+    /// (`subduction::resolve`, `ridges::resample`). Continental crust is never held (it is
+    /// buoyant and comes back up, PLT-061), nor is crust a collision brings up. Off, a sample is
+    /// hidden exactly while it lies under an overriding plate's cover, so old crust that went
+    /// under shows again where that plate moves off it (plates.md, "The overlaps' hiding").
+    /// ledger: PLT-542
     pub one_way_subduction: bool,
     /// Orogenic collapse (`plates/collapse.rs`): continental crust thicker than
     /// `collapse_thickness_km` that no orogeny is raising any more thins by spreading, with this
