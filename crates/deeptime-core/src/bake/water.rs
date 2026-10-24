@@ -41,6 +41,11 @@
 //!   level on the plain (each L3 cell of a plain cell), `detail/amplitude` is zeroed there, and the
 //!   layer [`FLOODPLAIN_LAYER`] keeps what the plain moved the ground by, so a re-run takes it off
 //!   first. The delta plains are left as they were laid.
+//! - **Meanders** (V1 gap 5, stage 3; HYD-155 to HYD-159; [`hydro::meander`]). With
+//!   `hydro.meanders` (and the floodplains) each reach of a chain on the plain just laid that is
+//!   gentler than the braided line and has room is redrawn as a sine-generated curve, measured on
+//!   the planet (the Lambert metric on a Lambert folder). Only the river file changes: no layer,
+//!   no ground; the plain is already one block over the water wherever the new channel runs.
 
 use std::path::Path;
 
@@ -129,6 +134,16 @@ pub const DELTA_LAYER: &str = "delta";
 /// What the floodplains moved `elevation` by, 1/16 block, on its grid (nodata off the plains; 0 on a
 /// plain cell whose ground was at the plain's level already).
 pub const FLOODPLAIN_LAYER: &str = "floodplain";
+
+/// Whether the folder being drained is in the simulation's Lambert frame, so lengths on it go
+/// through the Lambert metric: a fresh bake's manifest has no layout block yet (the session writes
+/// it when the bake ends), and a baked Lambert folder that `deeptime hydro` drains again has one
+/// of kind `lambert`. Testing only for a missing block measured a re-run in the grid's blocks.
+pub(crate) fn lambert_frame(m: &deeptime_format::Manifest) -> bool {
+    m.projection
+        .as_ref()
+        .is_none_or(|s| s.kind == ProjectionKind::Lambert)
+}
 
 /// Drops every listing of `name` in `out.layers` but the first (`Out::layer` tallies a rewritten
 /// layer again).
@@ -706,11 +721,7 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
             let v = fp[(j * gw + i.rem_euclid(gw)) as usize];
             (v != network::NODATA).then_some(i32::from(v))
         };
-        let lambert = out
-            .m
-            .projection
-            .is_none()
-            .then(|| deeptime_format::Projection::of(c));
+        let lambert = lambert_frame(out.m).then(|| deeptime_format::Projection::of(c));
         Some(hydro::meander::apply(
             &mut result.rivers,
             &hydro::meander::Input {
@@ -895,7 +906,7 @@ fn dry_beside_playas(
     let reach = super::biomes::PLAYA_WETLAND_MARGIN_BLOCKS
         + 2.0 * f64::from(wet.desc.grid.r)
         + f64::from(grid.r);
-    let lambert = out.m.projection.is_none().then_some(circumference);
+    let lambert = lambert_frame(out.m).then_some(circumference);
     let cleared = super::biomes::dry_beside_playas(
         &mut wet.bytes,
         &mut ero.bytes,

@@ -661,7 +661,50 @@ fn a_lambert_preset_keeps_the_cylinder() {
     assert_eq!(spec.edges.len(), 2);
     assert!(spec.border.is_none());
     assert_eq!(m.notes["bake"]["projection"]["kind"], "lambert");
+    // The water part drained again over the baked folder (`deeptime hydro`; its layout block is
+    // there now) writes the river network the bake wrote: the meanders are measured on the planet
+    // both times.
+    let rivers = std::fs::read(dir.join(deeptime_format::rivers::RIVERS_PATH)).unwrap();
+    let json = std::fs::read_to_string(dir.join("preset.json")).unwrap();
+    let preset = crate::preset::Preset::from_json(&json).unwrap();
+    let crate::preset::PresetBody::Planet(p) = &preset.body else {
+        panic!("a planet preset");
+    };
+    let mut m = Manifest::read(&dir).unwrap();
+    let mut out = super::Out {
+        dir: &dir,
+        m: &mut m,
+        bytes: 0,
+        layers: Vec::new(),
+    };
+    let w = super::water::bake(p, &mut out).unwrap();
+    let again = std::fs::read(dir.join(deeptime_format::rivers::RIVERS_PATH)).unwrap();
+    assert!(
+        rivers == again,
+        "the river network changed on a re-run: {}",
+        w.note["stats"]["meanders"]
+    );
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// A fresh bake's folder (no layout block yet) and a baked Lambert one (`deeptime hydro`) are both
+/// drained in the Lambert metric; a projected world's is not.
+#[test]
+fn the_water_part_knows_a_baked_lambert_folder() {
+    use deeptime_format::projection::{ProjectionKind, lambert_spec};
+    let c = 16_384;
+    let mut m = Manifest::new(
+        "test",
+        deeptime_format::Writer::this("test"),
+        deeptime_format::Scale::default_for(c),
+    );
+    assert!(super::water::lambert_frame(&m));
+    let mut spec = lambert_spec(&deeptime_format::Projection::new(c));
+    m.projection = Some(spec.clone());
+    assert!(super::water::lambert_frame(&m));
+    spec.kind = ProjectionKind::PetroffGuyou;
+    m.projection = Some(spec);
+    assert!(!super::water::lambert_frame(&m));
 }
 
 /// The projection pass's memory estimate (`project::estimate_bytes`) rests on the bytes per cell
