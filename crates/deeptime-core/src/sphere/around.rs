@@ -268,14 +268,20 @@ mod tests {
             for (x, z) in [(cx + 40.0, cz), (cx, cz - 25.0), (cx - 300.0, cz + 90.0)] {
                 let (e, s) = a.offset(x, z);
                 let want = MH * f.projection().radius() * c.angle_between(f.unit(x, z));
-                assert!((e.hypot(s) - want).abs() < 1e-6 * want, "{lat}: {e} {s} {want}");
+                assert!(
+                    (e.hypot(s) - want).abs() < 1e-6 * want,
+                    "{lat}: {e} {s} {want}"
+                );
                 assert!((a.distance_m(x, z) - want).abs() < 1e-6 * want);
             }
             // A step east is east, bent poleward by the parallel's curvature: the parallel leaves
             // the great circle east by e² tan φ / 2R. A step north (−z) is north.
             let (e, s) = a.offset(cx + 1.0, cz);
             let bend = -e * e * f64::to_radians(lat).tan() / (2.0 * a.radius_m());
-            assert!(e > 0.0 && (s - bend).abs() < 1e-3 * bend.abs() + 1e-9, "{lat}: {e} {s} {bend}");
+            assert!(
+                e > 0.0 && (s - bend).abs() < 1e-3 * bend.abs() + 1e-9,
+                "{lat}: {e} {s} {bend}"
+            );
             if lat < 85.0 {
                 let (e, s) = a.offset(cx, cz - 1.0);
                 assert!(s < 0.0 && e.abs() < 1e-9, "{lat}: {e} {s}");
@@ -287,11 +293,22 @@ mod tests {
     fn block_at_inverts_the_offset() {
         for lat in [0.0, 30.0, -55.0, 70.0] {
             let a = at_lat(lat);
-            for (e, s) in [(5_000.0, 0.0), (0.0, -12_000.0), (-30_000.0, 40_000.0), (2.0, 3.0)] {
+            for (e, s) in [
+                (5_000.0, 0.0),
+                (0.0, -12_000.0),
+                (-30_000.0, 40_000.0),
+                (2.0, 3.0),
+            ] {
                 let (x, z) = a.block_at(e, s);
                 let (e2, s2) = a.offset(x, z);
-                assert!((e2 - e).abs() < 1e-6 * e.hypot(s) + 1e-9, "{lat}: {e} → {e2}");
-                assert!((s2 - s).abs() < 1e-6 * e.hypot(s) + 1e-9, "{lat}: {s} → {s2}");
+                assert!(
+                    (e2 - e).abs() < 1e-6 * e.hypot(s) + 1e-9,
+                    "{lat}: {e} → {e2}"
+                );
+                assert!(
+                    (s2 - s).abs() < 1e-6 * e.hypot(s) + 1e-9,
+                    "{lat}: {s} → {s2}"
+                );
             }
         }
     }
@@ -319,7 +336,10 @@ mod tests {
             let a = at_lat(lat);
             let (ew, ns) = extents(&a, 3_000.0);
             let ratio = ew / ns;
-            assert!((ratio / want - 1.0).abs() < 0.01, "{lat}°: {ratio} vs {want}");
+            assert!(
+                (ratio / want - 1.0).abs() < 0.01,
+                "{lat}°: {ratio} vs {want}"
+            );
         }
     }
 
@@ -335,7 +355,10 @@ mod tests {
                     let (x, z) = a.block_at(r_m * th.cos(), r_m * th.sin());
                     let dx = BlockFrame::new(C).wrap_x(x - cx).abs();
                     assert!(dx <= hw + 1e-6, "{lat} {r_m}: {dx} > {hw}");
-                    assert!(z >= z0 - 1e-6 && z <= z1 + 1e-6, "{lat} {r_m}: {z} not in {z0}..{z1}");
+                    assert!(
+                        z >= z0 - 1e-6 && z <= z1 + 1e-6,
+                        "{lat} {r_m}: {z} not in {z0}..{z1}"
+                    );
                 }
             }
         }
@@ -350,14 +373,28 @@ mod tests {
         // SCL-234: at and next to a pole the ellipse spans at most half the circumference
         // east–west, keeps its area and its minor axis (no cancellation to zero).
         let f = BlockFrame::new(C);
-        for z in [f.z_of_lat(89.99), f.z_of_lat(90.0), f.z_of_lat(-90.0) + 3.0, -f.projection().radius() - 40.0] {
+        for z in [
+            f.z_of_lat(89.99),
+            f.z_of_lat(90.0),
+            f.z_of_lat(-90.0) + 3.0,
+            -f.projection().radius() - 40.0,
+        ] {
             let a = Around::new(f, MH, 10.0, z);
             for (am, cm, yaw) in [(6_000.0, 4_000.0, 0.6), (1_500.0, 1_500.0, 0.0)] {
                 let (p, q, y) = a.ellipse_blocks(am, cm, yaw);
-                assert!(p.is_finite() && q.is_finite() && y.is_finite(), "{z}: {p} {q} {y}");
+                assert!(
+                    p.is_finite() && q.is_finite() && y.is_finite(),
+                    "{z}: {p} {q} {y}"
+                );
                 assert!(p > 0.0 && q > 0.0, "{z}: {p} {q}");
-                assert!(p.max(q) <= 0.5 * f64::from(C) * (1.0 + 1e-9), "{z}: {p} {q}");
-                assert!((p * q * MH * MH / (am * cm) - 1.0).abs() < 1e-9, "{z}: area {p} {q}");
+                assert!(
+                    p.max(q) <= 0.5 * f64::from(C) * (1.0 + 1e-9),
+                    "{z}: {p} {q}"
+                );
+                assert!(
+                    (p * q * MH * MH / (am * cm) - 1.0).abs() < 1e-9,
+                    "{z}: area {p} {q}"
+                );
             }
         }
     }
@@ -376,7 +413,10 @@ mod tests {
             // (the same semi-axes and area).
             let (am, cm, ym) = (9_000.0, 4_000.0, 0.6);
             let (p, q, yaw) = a.ellipse_blocks(am, cm, ym);
-            assert!((p * q * MH * MH - am * cm).abs() < 1e-6 * am * cm, "{lat}: area");
+            assert!(
+                (p * q * MH * MH - am * cm).abs() < 1e-6 * am * cm,
+                "{lat}: area"
+            );
             let back = |t: f64| {
                 let (u, v) = (p * t.cos(), q * t.sin());
                 let (sy, cy) = yaw.sin_cos();
@@ -389,7 +429,10 @@ mod tests {
                 lo = lo.min(e.hypot(s));
                 hi = hi.max(e.hypot(s));
             }
-            assert!((hi - am).abs() < 1e-3 * am && (lo - cm).abs() < 1e-3 * cm, "{lat}: {lo} {hi}");
+            assert!(
+                (hi - am).abs() < 1e-3 * am && (lo - cm).abs() < 1e-3 * cm,
+                "{lat}: {lo} {hi}"
+            );
         }
     }
 }

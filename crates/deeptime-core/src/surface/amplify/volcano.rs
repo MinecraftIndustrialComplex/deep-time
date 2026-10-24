@@ -347,9 +347,7 @@ impl Shaper {
         let (cx, hw) = (0.5 * (x0 + x1), 0.5 * (x1 - x0));
         self.items
             .iter()
-            .filter(|it| {
-                frame.wrap_x(it.x - cx).abs() <= hw + it.hw && it.z0 <= z1 && it.z1 >= z0
-            })
+            .filter(|it| frame.wrap_x(it.x - cx).abs() <= hw + it.hw && it.z0 <= z1 && it.z1 >= z0)
             .collect()
     }
 

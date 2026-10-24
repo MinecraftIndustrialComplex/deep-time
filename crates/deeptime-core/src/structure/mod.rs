@@ -1256,7 +1256,9 @@ impl StructureStage {
         let now = aureoles.now_myr;
         for (pl, &y) in self.st.plutons.iter().zip(surface_y) {
             let id = world.next_body_id();
-            if let Some(b) = plutons::to_body(pl, id, y, s.circumference_blocks, mh, mv, s.min_y, now) {
+            if let Some(b) =
+                plutons::to_body(pl, id, y, s.circumference_blocks, mh, mv, s.min_y, now)
+            {
                 world.add_body(b)?;
                 bodies += 1;
             }

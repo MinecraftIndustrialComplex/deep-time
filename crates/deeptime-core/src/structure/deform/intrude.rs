@@ -279,7 +279,11 @@ fn outline_blocks(
     // Clockwise from north is (sin, cos) east and north, so south is −cos: the yaw from east
     // toward south that `ellipse_blocks` takes.
     let (sa, ca) = azimuth_deg.to_radians().sin_cos();
-    Around::new(*frame, m_per_block_h, at.0, at.1).ellipse_blocks(along_m, across_m, (-ca).atan2(sa))
+    Around::new(*frame, m_per_block_h, at.0, at.1).ellipse_blocks(
+        along_m,
+        across_m,
+        (-ca).atan2(sa),
+    )
 }
 
 /// The plugs of the extinct volcanoes on land in `volcanoes`: the solid conduit up each cone's
@@ -317,7 +321,8 @@ pub fn plugs(
         );
         // Blocks of the planet: the window is the circle's ellipse in Lambert blocks.
         let r_m = radius * m_per_block_h;
-        let (first, second, yaw) = outline_blocks(&frame, m_per_block_h, (v.x, v.z), (r_m, r_m), 90.0);
+        let (first, second, yaw) =
+            outline_blocks(&frame, m_per_block_h, (v.x, v.z), (r_m, r_m), 90.0);
         f.azimuth_deg = azimuth_of(yaw.cos(), yaw.sin()) as f32;
         f.half_along = first as f32;
         f.half_across = second as f32;
@@ -372,7 +377,10 @@ mod tests {
                 let (te, ts) = (sa, -ca);
                 for k in 0..72 {
                     let t = f64::from(k) * 5f64.to_radians();
-                    let (u, v) = (f64::from(f.half_along) * t.cos(), f64::from(f.half_across) * t.sin());
+                    let (u, v) = (
+                        f64::from(f.half_along) * t.cos(),
+                        f64::from(f.half_across) * t.sin(),
+                    );
                     let x = at.0 + u * along[0] + v * across[0];
                     let z = at.1 + u * along[1] + v * across[1];
                     let r2 = |(e, s): (f64, f64)| {
@@ -380,13 +388,22 @@ mod tests {
                         (pu / axes.0).powi(2) + (pv / axes.1).powi(2)
                     };
                     let plane = r2(((x - at.0) * cos * mh, (z - at.1) * mh / cos));
-                    assert!((plane - 1.0).abs() < 1e-5, "{lat}°, {axes:?} at {k}: r2 {plane}");
+                    assert!(
+                        (plane - 1.0).abs() < 1e-5,
+                        "{lat}°, {axes:?} at {k}: r2 {plane}"
+                    );
                     let sphere = r2(around.offset(x, z));
                     let first_order = 2.0 * axes.0 / around.radius_m() * lat.to_radians().tan();
-                    assert!((sphere - 1.0).abs() < first_order, "{lat}°, {axes:?} at {k}: r2 {sphere}");
+                    assert!(
+                        (sphere - 1.0).abs() < first_order,
+                        "{lat}°, {axes:?} at {k}: r2 {sphere}"
+                    );
                 }
                 let area = first * second * mh * mh;
-                assert!((area / (axes.0 * axes.1) - 1.0).abs() < 1e-9, "{lat}°: area");
+                assert!(
+                    (area / (axes.0 * axes.1) - 1.0).abs() < 1e-9,
+                    "{lat}°: area"
+                );
             }
         }
     }

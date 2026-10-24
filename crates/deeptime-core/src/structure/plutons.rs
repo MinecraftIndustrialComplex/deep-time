@@ -438,7 +438,11 @@ pub fn to_body(
         return None;
     }
     let [a, c, yaw] = pl.plan_blocks(circumference, m_per_block_h, 0.0);
-    let axes = [a.max(0.5) as f32, b_blocks.max(0.5) as f32, c.max(0.5) as f32];
+    let axes = [
+        a.max(0.5) as f32,
+        b_blocks.max(0.5) as f32,
+        c.max(0.5) as f32,
+    ];
     let mut body = Body::new(
         id,
         None,
@@ -1130,21 +1134,42 @@ mod tests {
                 let (i, j) = (cell % grid.w as usize, cell / grid.w as usize);
                 let bx = grid.block_x(i as i64) as f64;
                 let (e, s) = at.offset(bx, grid.block_z(j as i64) as f64);
-                assert!(((e.hypot(s) / 30_000.0).powi(2) - r2).abs() < 1e-9, "{lat}°: r2 {r2}");
+                assert!(
+                    ((e.hypot(s) / 30_000.0).powi(2) - r2).abs() < 1e-9,
+                    "{lat}°: r2 {r2}"
+                );
                 east = east.max(e.abs());
                 north = north.max(s.abs());
             });
             // An L1 cell is 4.8 km of the planet east–west times cos φ, north–south over it.
-            assert!(east <= 30_000.0 && east > 30_000.0 - 4800.0 * cos, "{lat}°: east {east}");
-            assert!(north <= 30_000.0 && north > 30_000.0 - 4800.0 / cos, "{lat}°: north {north}");
+            assert!(
+                east <= 30_000.0 && east > 30_000.0 - 4800.0 * cos,
+                "{lat}°: east {east}"
+            );
+            assert!(
+                north <= 30_000.0 && north > 30_000.0 - 4800.0 / cos,
+                "{lat}°: north {north}"
+            );
             let b = to_body(&pl, 1, 100.0, c, mh, mv, -352, 40.0).unwrap();
-            assert!((f64::from(b.axes[0]) * cos * mh / 30_000.0 - 1.0).abs() < 1e-3, "{lat}°");
-            assert!((f64::from(b.axes[2]) * mh / cos / 30_000.0 - 1.0).abs() < 1e-3, "{lat}°");
+            assert!(
+                (f64::from(b.axes[0]) * cos * mh / 30_000.0 - 1.0).abs() < 1e-3,
+                "{lat}°"
+            );
+            assert!(
+                (f64::from(b.axes[2]) * mh / cos / 30_000.0 - 1.0).abs() < 1e-3,
+                "{lat}°"
+            );
             let a = Aureole::of_pluton(&pl, 100.0, c, mh, mv, 40.0);
             let g = a.grown(mh, mv);
             let w = 30_000.0 + f64::from(pl.aureole_m);
-            assert!((g[0] * cos * mh / w - 1.0).abs() < 1e-3, "{lat}°: aureole {g:?}");
-            assert!((g[2] * mh / cos / w - 1.0).abs() < 1e-3, "{lat}°: aureole {g:?}");
+            assert!(
+                (g[0] * cos * mh / w - 1.0).abs() < 1e-3,
+                "{lat}°: aureole {g:?}"
+            );
+            assert!(
+                (g[2] * mh / cos / w - 1.0).abs() < 1e-3,
+                "{lat}°: aureole {g:?}"
+            );
         }
         // A yawed one keeps its outline on the planet: every point of its body's plan, drawn in
         // Lambert blocks, lies on the planet's 6 × 4 km ellipse at its strike.
@@ -1156,7 +1181,10 @@ mod tests {
         for k in 0..72 {
             let t = f64::from(k) * 5f64.to_radians();
             let (u, v) = (a * t.cos(), b * t.sin());
-            let (x, z) = (pl.x + yaw.cos() * u - yaw.sin() * v, pl.z + yaw.sin() * u + yaw.cos() * v);
+            let (x, z) = (
+                pl.x + yaw.cos() * u - yaw.sin() * v,
+                pl.z + yaw.sin() * u + yaw.cos() * v,
+            );
             let (e, s) = at.offset(x, z);
             let r2 = ((cy * e + sy * s) / 6000.0).powi(2) + ((-sy * e + cy * s) / 4000.0).powi(2);
             assert!((r2 - 1.0).abs() < 1e-2, "at {k}: r2 {r2}");

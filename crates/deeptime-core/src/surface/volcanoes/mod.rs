@@ -925,9 +925,8 @@ impl VolcanoStage {
             })
             .collect();
         // Great-circle distances (ledger: SCL-232; the Lambert block metric until 2026-10-23).
-        let dist_m = |x0: f64, z0: f64, x1: f64, z1: f64| {
-            Around::new(frame, mh, x0, z0).distance_m(x1, z1)
-        };
+        let dist_m =
+            |x0: f64, z0: f64, x1: f64, z1: f64| Around::new(frame, mh, x0, z0).distance_m(x1, z1);
         for v in &mut st.volcanoes {
             if !v.active() {
                 continue;
