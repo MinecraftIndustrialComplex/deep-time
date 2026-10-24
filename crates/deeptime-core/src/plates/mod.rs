@@ -49,6 +49,7 @@ pub mod check;
 pub mod collapse;
 pub mod collision;
 pub mod crust_budget;
+pub mod cut_trace;
 pub mod dock_tally;
 pub mod dynamics;
 pub mod events;
@@ -363,16 +364,19 @@ impl PlatesStage {
         st.recount(&pos);
         let tree = Tree::over(&pos, |_| true);
         lap(&mut clock, "motion");
+        cut_trace::mark(st, &cache.geo, "motion");
         let overlaps = subduction::detect(st, &cache.geo, &pos, &tree);
         book(st, gap_budget::Part::Other);
         lap(&mut clock, "detect");
         let resolved = subduction::resolve(st, world, &cache.geo, &overlaps, &pos, &env)?;
         book(st, gap_budget::Part::Subduction);
         lap(&mut clock, "resolve");
+        cut_trace::mark(st, &cache.geo, "resolve");
         let (fronts, fired) =
             shortening::advance(st, &cache.geo, &pos, &tree, &env, resolved.seeds);
         book(st, gap_budget::Part::Shortening);
         lap(&mut clock, "shortening");
+        cut_trace::mark(st, &cache.geo, "shortening");
         // The arcs' fronts and distance field read nothing the belts change: found beside them
         // (P1-19).
         let begun = subduction::fronts_begin(st, &cache.geo, &pos, &env);
@@ -486,6 +490,7 @@ impl PlatesStage {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
         lap(&mut clock, "belts");
+        cut_trace::mark(st, &cache.geo, "belts");
         let pull = subduction::fronts_finish(st, &cache.geo, &env, &mut cones, begun, arcs, sea);
         book(st, gap_budget::Part::Arcs);
         *world
@@ -527,6 +532,7 @@ impl PlatesStage {
             *world.globals.entry(name.to_owned()).or_insert(0.0) += x;
         }
         lap(&mut clock, "fronts");
+        cut_trace::mark(st, &cache.geo, "fronts");
         // Subduction erosion (PLT-441): its globals only while the rule is on, so a run without
         // it keeps its record.
         if let Some(forearcs) = &pull.forearcs {
@@ -560,6 +566,7 @@ impl PlatesStage {
                 }
             }
             lap(&mut clock, "forearcs");
+            cut_trace::mark(st, &cache.geo, "forearcs");
         }
         // The boundary mix (measurement only) on the same samples as the fronts, before the
         // collapse below turns any crust over.
@@ -597,6 +604,7 @@ impl PlatesStage {
             .entry(collapse::UNPLACED_GLOBAL.to_owned())
             .or_insert(0.0) += quiet.unplaced_km2_m / 1000.0;
         lap(&mut clock, "collapse");
+        cut_trace::mark(st, &cache.geo, "collapse");
         // Thickened crust spreads through its lower crust (`flow.rs`).
         let flowed = flow::step(st, &cache.geo, &env);
         book(st, gap_budget::Part::Flow);
@@ -615,6 +623,7 @@ impl PlatesStage {
             }
         }
         lap(&mut clock, "flow");
+        cut_trace::mark(st, &cache.geo, "flow");
         // Rifted margins taper from continent to ocean over Earth's width (`transition.rs`).
         let taper = transition::step(st, &cache.geo, &pos, &env);
         book(st, gap_budget::Part::Transition);
@@ -652,6 +661,7 @@ impl PlatesStage {
                 .or_insert(0.0) += 1.0;
         }
         lap(&mut clock, "forces");
+        cut_trace::mark(st, &cache.geo, "forces");
         let mut causes: BTreeMap<u32, EventId> = BTreeMap::new();
         let mut sutured = false;
         // Plates whose motion a weld or a healed rift set this step (the balance takes over at
@@ -677,12 +687,14 @@ impl PlatesStage {
             merged.extend([under, over]);
         }
         book(st, gap_budget::Part::Collision);
+        cut_trace::mark(st, &cache.geo, "collision");
         // Rifts whose two sides never moved apart heal (design §3.4).
         let healed = rifting::heal(st, world, &cache.geo, &pos, &env)?;
         book(st, gap_budget::Part::Rifting);
         sutured |= !healed.is_empty();
         merged.extend(healed);
         lap(&mut clock, "collision");
+        cut_trace::mark(st, &cache.geo, "heal");
         hotspots::step(st, world, &pos, &tree, &env, &mut cones)?;
         book(st, gap_budget::Part::Hotspots);
         lap(&mut clock, "hotspots");
@@ -713,6 +725,7 @@ impl PlatesStage {
         book(st, gap_budget::Part::Finish);
         let arcs = dynamics::arc_heights(st, sea);
         lap(&mut clock, "surface_finish");
+        cut_trace::mark(st, &cache.geo, "surface_finish");
 
         // Motion for the next step: each plate's rotation relaxes towards the balance's
         // (`motion_relax_myr`), under the speed guard on the plate's own fastest point, which is
@@ -750,7 +763,9 @@ impl PlatesStage {
         }
         book(st, gap_budget::Part::Other);
         rifting::maybe_rift(st, world, &cache.geo, &pos, &env, &balance.stress_mpa)?;
+        cut_trace::mark(st, &cache.geo, "rift");
         rifting::maybe_initiate_subduction(st, world, &cache.geo, &pos, &env, &balance.stress_mpa)?;
+        cut_trace::mark(st, &cache.geo, "initiate");
         book(st, gap_budget::Part::Rifting);
         lap(&mut clock, "motion_rifting");
 
@@ -760,9 +775,11 @@ impl PlatesStage {
         for (under, ev) in subduction::close_contacts(st, world, &env, false)? {
             causes.entry(under).or_insert(ev);
         }
+        cut_trace::mark(st, &cache.geo, "close_contacts");
         ridges::bury(st, world, None, &pos, &env, &causes)?;
         book(st, gap_budget::Part::Bury);
         lap(&mut clock, "close_bury");
+        cut_trace::mark(st, &cache.geo, "bury");
 
         // Resample when due, and once at the end so the final crust has no gaps or hidden slabs.
         // A suture resamples at once, so the welded plate's subducted slab is consumed (hidden
@@ -802,6 +819,7 @@ impl PlatesStage {
                 coupling: None,
             };
             lap(&mut clock, "resample");
+            cut_trace::mark(st, &cache.geo, "resample");
         }
         rate::end(st);
         // Crust made continental after `finish_samples` set the heat flow (ledger: PLT-469).

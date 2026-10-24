@@ -831,6 +831,17 @@ pub struct TectonicParams {
     /// against 207). Off, each front sample counts one lattice spacing, which counts a straight
     /// front about 1.04 times and the model's own fronts 1.32 times. ledger: PLT-530
     pub front_share: bool,
+    /// A plate is one rigid body (the front lane, 2026-10-24; Bird 2003 [110] to [112]: plates
+    /// tile the sphere and each boundary runs from junction to junction; Lonsdale 2005, the
+    /// Farallon plate's fission; Stock & Lee 1994, microplate capture): right after a resampling
+    /// each plate's visible crust cut into pieces that meet only through other plates
+    /// (`geometry::pieces`) keeps its largest piece; every other piece of `min_plate_area_frac`
+    /// (PLT-091) or more becomes a plate of its own with the parent's rotation (fission; the force
+    /// balance moves it from the next step), and every smaller piece joins the plate most of its
+    /// lattice neighbours belong to (capture), as a plate below that size is absorbed
+    /// (`ridges::bury`). Off, a plate's pieces keep one rotation however far apart they lie.
+    /// ledger: PLT-532
+    pub plate_fission: bool,
     /// Hotspots at the start.
     pub hotspots_initial: u32,
     /// New hotspots per 100 Myr (Poisson).
@@ -1035,6 +1046,7 @@ impl Default for TectonicParams {
             subduction_erosion_max_sediment_m: 1000.0, // ledger: PLT-442
             erosion_retreat: false,          // ledger: PLT-523
             front_share: true,               // ledger: PLT-530
+            plate_fission: false,            // ledger: PLT-532
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],

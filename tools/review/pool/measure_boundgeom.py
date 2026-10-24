@@ -47,8 +47,16 @@ library's Bird2003/PB2002_geometry.json; ledger PLT-531).
   comps_per_plate  connected pieces of each plate (through its own samples' Delaunay edges), mean
   frag_samples     the share of samples outside their plate's largest piece
   e_l380_first, e_l380_last   e_l380 in the first snapshot after 100 Myr and in the last
+  frag_small, frag_mid, frag_big   the plates' cut-off pieces (connected pieces outside each plate's
+                   largest) by size, shares of the samples: 1 to 10 samples, 11 to 100, over 100
+  frag_cut, frag_own   the same by what they are: mostly of rigid groups that also have samples in
+                   the plate's largest piece (cut off it), or of groups of their own (terranes)
+  <key>_clean      bnd, e, ppcap_aw_l380, junctions, pieces, loops, tau_sum, tau_front_sum, front and
+                   arcfront_l77 on the map with every cut-off piece given the plate most of its
+                   neighbours in a plate's largest piece carry (what the boundary would be with each
+                   plate one connected body; `clean`)
 
-Version 1.
+Version 2 (2026-10-24: the fragments' classes and the cleaned map's numbers).
 """
 import json
 import math
@@ -296,7 +304,79 @@ def read_snapshot(map_path, plate_path):
         return None
     lat, lon = np.radians(a[:, 0]), np.radians(a[:, 1])
     xyz = np.stack([np.cos(lat) * np.cos(lon), np.cos(lat) * np.sin(lon), np.sin(lat)], axis=1)
-    return xyz, p, a[:, 10].astype(np.int64), a[:, 4] > 0.5
+    return xyz, p, a[:, 10].astype(np.int64), a[:, 4] > 0.5, a[:, 9].astype(np.int64)
+
+
+CLEAN_KEYS = ["bnd_l77", "bnd_l380", "e_l77", "e_l380", "ppcap_aw_l380", "junctions", "pieces", "loops",
+              "tau_sum_l77", "tau_sum_l380", "tau_front_sum_l77", "tau_front_sum_l380", "front_l77", "front_l380",
+              "arcfront_l77"]
+
+
+def _pieces(plate, au, av, n):
+    same = plate[au] == plate[av]
+    g = coo_matrix((np.ones(int(same.sum())), (au[same], av[same])), shape=(n, n))
+    nc, lab = connected_components(g, directed=False)
+    size = np.bincount(lab, minlength=nc)
+    first = np.zeros(nc, dtype=np.int64)
+    first[lab[::-1]] = np.arange(n)[::-1]
+    cp = plate[first]
+    main_of = {}
+    for ci in np.argsort(-size, kind="stable").tolist():
+        main_of.setdefault(int(cp[ci]), ci)
+    main = np.isin(lab, list(main_of.values()))
+    return lab, size, cp, main_of, main
+
+
+def clean(xyz, plate, group):
+    """The plates' cut-off pieces and the map without them. A fragment is a connected piece of a
+    plate (through Delaunay edges between its own samples) outside the plate's largest. Returns the
+    map with each fragment sample given the commonest plate among its neighbours in a plate's
+    largest piece (repeated inwards until none is left), and the fragments' shares of the samples:
+    by size (frag_small 1 to 10 samples, frag_mid 11 to 100, frag_big over 100) and by what they are
+    (frag_cut: pieces whose samples are mostly of rigid groups that also have samples in the plate's
+    largest piece, so cut off it; the rest, frag_own, crust the plate holds as groups of their own,
+    terranes handed to it)."""
+    n = len(plate)
+    h = ConvexHull(xyz).simplices
+    au = np.concatenate([h[:, 0], h[:, 1], h[:, 2], h[:, 1], h[:, 2], h[:, 0]])
+    av = np.concatenate([h[:, 1], h[:, 2], h[:, 0], h[:, 0], h[:, 1], h[:, 2]])
+    lab, size, cp, main_of, main = _pieces(plate, au, av, n)
+    out = {"frag_small": 0.0, "frag_mid": 0.0, "frag_big": 0.0, "frag_cut": 0.0, "frag_own": 0.0}
+    if main.all():
+        return plate, out
+    main_groups = {}
+    for p_, ci in main_of.items():
+        main_groups[p_] = np.unique(group[lab == ci])
+    order = np.argsort(lab, kind="stable")
+    bounds = np.searchsorted(lab[order], np.arange(len(size) + 1))
+    for ci in range(len(size)):
+        p_ = int(cp[ci])
+        if main_of[p_] == ci:
+            continue
+        idx = order[bounds[ci]:bounds[ci + 1]]
+        sz = len(idx)
+        out["frag_small" if sz <= 10 else ("frag_mid" if sz <= 100 else "frag_big")] += sz / n
+        shared = float(np.mean(np.isin(group[idx], main_groups[p_])))
+        out["frag_cut" if shared > 0.5 else "frag_own"] += sz / n
+    cleaned = plate.copy()
+    for _ in range(200):
+        stray = ~main
+        if not stray.any():
+            break
+        sel = stray[au] & main[av]
+        if not sel.any():
+            break
+        s_, t_ = au[sel], cleaned[av[sel]]
+        pairs, counts = np.unique(np.stack([s_, t_], axis=1), axis=0, return_counts=True)
+        # The commonest neighbouring plate per stray sample (ties to the lower plate id).
+        best = {}
+        for (si, ti), c in zip(pairs.tolist(), counts.tolist()):
+            if si not in best or c > best[si][1]:
+                best[si] = (ti, c)
+        for si, (ti, _) in best.items():
+            cleaned[si] = ti
+            main[si] = True
+    return cleaned, out
 
 
 def main():
@@ -317,7 +397,17 @@ def main():
         snap = read_snapshot(f, maps / "plate" / f.name)
         if snap is None:
             continue
-        rows.append(measure(*snap))
+        xyz, plate, flags, kind, group = snap
+        row = measure(xyz, plate, flags, kind)
+        cleaned, frag = clean(xyz, plate, group)
+        row.update(frag)
+        if row["frag_samples"] > 0.0:
+            cl = measure(xyz, cleaned, flags, kind)
+        else:
+            cl = row
+        for k in CLEAN_KEYS:
+            row[k + "_clean"] = cl.get(k)
+        rows.append(row)
     out = {"snaps": len(rows)}
     if rows:
         keys = sorted({k for r in rows for k in r})

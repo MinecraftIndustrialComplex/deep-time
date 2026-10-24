@@ -33,7 +33,7 @@
       ]
     },
     "boundgeom": {
-      "version": 1,
+      "version": 2,
       "doc": "the boundary's pieces between triple junctions, their tortuosity, the plates' perimeters against spherical caps, the subduction front's runs and the plates' fragments, measured with Bird 2003's divider walks at 77 and 380 km on the visible samples' Delaunay triangulation; needs the crust budget's maps (+DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps). The labels give PB2002 rasterised on the same 100,000-point lattice and put through the same code (tools/review/pool/bird/bird_raster.py), then Bird's own divider numbers; definitions in measure_boundgeom.py (ledger PLT-531)",
       "command": ["{py}", "-I", "{tools}/measure_boundgeom.py", "{run}"],
       "python": "numpy",
@@ -55,7 +55,17 @@
         {"key": "front_l77", "key2": "front_l380", "label": "subduction front at 77 / 380 km, km (lattice 52,564 / 48,406; Bird SUB 51,310)", "target": null, "digits": 0, "pair": true},
         {"key": "arcfront_l77", "label": "front under oceanic overriding crust at 77 km, km (Stern & Scholl 14,500 of island arc)", "target": null, "digits": 0},
         {"key": "comps_per_plate", "key2": "frag_samples", "label": "connected pieces per plate / samples outside their plate's largest (PB2002 1 / 0)", "target": null, "digits": 3, "pair": true},
-        {"key": "e_l380_first", "key2": "e_l380_last", "label": "perimeters over cap perimeters at 380 km, first / last snapshot", "target": null, "digits": 3, "pair": true}
+        {"key": "e_l380_first", "key2": "e_l380_last", "label": "perimeters over cap perimeters at 380 km, first / last snapshot", "target": null, "digits": 3, "pair": true},
+        {"key": "frag_small", "key2": "frag_mid", "label": "samples in cut-off pieces of 1 to 10 / 11 to 100 samples, share", "target": null, "digits": 4, "pair": true},
+        {"key": "frag_big", "label": "samples in cut-off pieces over 100 samples, share", "target": null, "digits": 4},
+        {"key": "frag_cut", "key2": "frag_own", "label": "samples in cut-off pieces cut off their plate's own groups / terranes of their own, share", "target": null, "digits": 4, "pair": true},
+        {"key": "bnd_l77_clean", "key2": "bnd_l380_clean", "label": "each plate one body: boundary at 77 / 380 km, km (lattice 273,631 / 236,679)", "target": null, "digits": 0, "pair": true},
+        {"key": "e_l77_clean", "key2": "e_l380_clean", "label": "each plate one body: perimeters over caps at 77 / 380 km (lattice 1.578 / 1.365)", "target": null, "digits": 3, "pair": true},
+        {"key": "junctions_clean", "key2": "loops_clean", "label": "each plate one body: junctions / loops (lattice 98 / 1)", "target": null, "digits": 1, "pair": true},
+        {"key": "tau_sum_l77_clean", "key2": "tau_sum_l380_clean", "label": "each plate one body: tortuosity at 77 / 380 km (lattice 1.323 / 1.151)", "target": null, "digits": 3, "pair": true},
+        {"key": "tau_front_sum_l77_clean", "key2": "tau_front_sum_l380_clean", "label": "each plate one body: the front's tortuosity at 77 / 380 km (lattice 1.199 / 1.100)", "target": null, "digits": 3, "pair": true},
+        {"key": "front_l77_clean", "key2": "front_l380_clean", "label": "each plate one body: the front at 77 / 380 km, km (lattice 52,564 / 48,406)", "target": null, "digits": 0, "pair": true},
+        {"key": "arcfront_l77_clean", "label": "each plate one body: the front under oceanic crust at 77 km, km", "target": null, "digits": 0}
       ]
     }
   }
