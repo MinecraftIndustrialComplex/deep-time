@@ -733,12 +733,17 @@ at least that large. Ids count from 0 in the order of each province's first cell
 preset's `provinces` section sets `min_area_km2` (default 50,000), `orogen_max_age_myr` (500: a
 collision belt stays an orogen this long), `andean_max_age_myr` (50) and `andean_min_elevation_m`
 (1,500); all four are recorded in `notes.bake.meta.provinces.params`. The notes also hold
-`classes` (the class names), `rule`, `count`, `province` (per id: `class`, `cells`, `km2`) and
-`shares`: `classified` and `provinces`, each with `planet` and `continental` (each class's share by
+`classes` (the class names), `rule`, `count`, `province` (per id: `class`, `cells`, `km2`; in a
+projected world also `world_cells`), `dropped_by_projection` and `shares`: `classified` and `provinces`, each with `planet` and `continental` (each class's share by
 true area as the rules classed the cells, and as the provinces hold them after the small regions
 were absorbed), and `absorbed_cells` (how many cells changed class by it). The classified share is
 the one to set against Earth's (orogens and arcs about 0.17 of the continents); absorption thins
-belts (orogens, the young sea-floor bands) and fattens the coastal extended-crust ring.
+belts (orogens, the young sea-floor bands) and fattens the coastal extended-crust ring. The
+projection pass takes the layer onto the world's grid by the nearest cell, and a province no world
+cell's centre lands in is not in the world: it moves from `province` to `dropped_by_projection`,
+and the remaining provinces are numbered again in order, in the layer and the list together, so
+`count` is the number of provinces the world's layer holds (`notes.bake.projection.provinces`: how
+many were listed, kept and dropped). `cells` and `km2` stay the simulation's (true area).
 
 The game gives every province one TerraBlender region (plan §7.3) when TerraBlender is installed.
 The first start with TerraBlender deals the provinces out to its registered overworld regions in
