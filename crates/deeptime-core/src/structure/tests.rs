@@ -198,8 +198,9 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
         assert!(b.age_ma.is_some_and(|a| a >= 0.0), "a pluton has its age");
         b.validate().unwrap();
     }
-    // Their aureoles: bodies of hornfels and skarn zones, counted in the note, before the
-    // plutons (a pluton paints over its aureole's inner part).
+    // Their aureoles: bodies of hornfels and skarn zones, counted in the note, after the
+    // plutons (the first body by id keeps a block, so a pluton keeps its own rock inside its
+    // aureole).
     let aureoles: Vec<&deeptime_format::Body> = world
         .bodies
         .iter()
@@ -220,10 +221,10 @@ fn the_pipeline_bakes_ordered_block_thick_valid_stacks() {
         b.validate().unwrap();
     }
     if let (Some(a), Some(p)) = (
-        aureoles.last(),
-        world.bodies.iter().find(|b| b.role == "pluton"),
+        aureoles.first(),
+        world.bodies.iter().rfind(|b| b.role == "pluton"),
     ) {
-        assert!(a.id < p.id, "aureoles come before the plutons");
+        assert!(p.id < a.id, "the plutons come before the aureoles");
     }
     assert_eq!(note["horizons"]["check"], "ok");
     // Keyframe layers exist with valid values.
