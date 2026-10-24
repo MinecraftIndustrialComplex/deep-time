@@ -13,8 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The geometry behind climate API 5 (cube plan G9): {@link WorldProjection#northBearingDeg} and
- * {@link WorldProjection#scale}. The bearing's convention; Lambert and Petroff–Guyou (north is −z on
- * Lambert and along Petroff–Guyou's equator, the scale 1 on both equal-area maps); and the cube world
+ * {@link WorldProjection#scale}. The bearing's convention; the simulation's Lambert frame (north is
+ * −z, the scale 1 on the equal-area map); and the cube world
  * under three turns (none, the polar turn, and a free one that puts the poles off the face centres),
  * where north is checked against the face frames at the centres, against latitude stepped along and
  * across it, and around each pole, the scale against great-circle distances, and both across every
@@ -43,22 +43,6 @@ class NorthBearingAndScaleTest {
             assertEquals(0.0, p.northBearingDeg(q[0], q[1]));
             assertEquals(1.0, p.scale(q[0], q[1]));
         }
-    }
-
-    @Test
-    void petroffGuyouNorthIsMinusZOnTheEquatorAndItsScaleIsOne() {
-        long b = 2048;
-        WorldProjection p = new PetroffGuyou(b, 0.0);
-        for (double x = -b + 37.5; x < b; x += 211.0) {
-            double n = p.northBearingDeg(x, 0.0);
-            assertTrue(Math.min(n, 360.0 - n) < 0.1, "north on the equator at x " + x + ": " + n);
-            assertEquals(1.0, p.scale(x, 300.0));
-        }
-        // Off the equator it turns towards the poles at x = -b/2: the bearing at a point
-        // west of that pole and north of the equator points east of -z, and the other way round.
-        double west = p.northBearingDeg(-b / 2.0 - 400.0, -600.0), east = p.northBearingDeg(-b / 2.0 + 400.0, -600.0);
-        assertTrue(west > 0.0 && west < 90.0, "west of the pole north leans east: " + west);
-        assertTrue(east > 270.0 && east < 360.0, "east of the pole north leans west: " + east);
     }
 
     private static List<WorldProjection.Cube> cubes() {

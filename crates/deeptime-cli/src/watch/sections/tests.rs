@@ -187,7 +187,7 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     assert!(compared > 1000);
 
     // A section: JSON along the line, kept, and each column is what the evaluator says.
-    // (Inside the 3,072-block world's half period, so the line does not take the short way round.)
+    // (Inside the 4,096-block world's half period, so the line does not take the short way round.)
     let q = "x0=-700&z0=-400&x1=700&z1=500";
     let sec = route(&wb, "/api/runs/baked/rock/section", q).unwrap();
     assert_eq!(sec.status, 200, "{}", String::from_utf8_lossy(&sec.body));
@@ -393,10 +393,10 @@ fn rock_at_depth_and_sections_agree_with_the_column_evaluator() {
     .unwrap();
     let v = json_of(&r);
     assert_eq!(
-        v["length_blocks"], 72.0,
-        "the world's period 3,072: 1500 to -1500 is 72 blocks east: {v}"
+        v["length_blocks"], 1096.0,
+        "the world's period 4,096: 1500 to -1500 is 1,096 blocks east: {v}"
     );
-    assert_eq!(v["b"]["x"], 1572);
+    assert_eq!(v["b"]["x"], 2596);
     assert_eq!(v["n"], 64);
     let r = route(&wb, "/api/runs/baked/rock/section", "x0=a&z0=0&x1=1&z1=1").unwrap();
     assert_eq!(r.status, 400);

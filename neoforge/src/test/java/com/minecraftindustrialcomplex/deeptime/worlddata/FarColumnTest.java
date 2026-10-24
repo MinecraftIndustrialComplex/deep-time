@@ -56,7 +56,7 @@ class FarColumnTest {
     static List<long[]> areas(WorldData wd, int step) {
         int c = wd.circumference();
         long span = 64L * step;
-        long pole = (long) Projection.poleZ(c);   // the pole edge (the planet's projection)
+        long pole = (long) WorldProjection.Lambert.radius(c);   // the pole edge (the planet's projection)
         List<long[]> out = new ArrayList<>();
         for (long z : new long[]{0, c / 8, -c / 8, pole - span / 2, -pole - span / 2, pole + 64}) {
             out.add(new long[]{0, z});
@@ -255,7 +255,7 @@ class FarColumnTest {
         Water.Spec spec = spec(planet);
         for (int step : new int[]{1, 4, 32}) {
             FarColumn.Shape[] a = shapes(64), b = shapes(64), d = shapes(64);
-            long pole = (long) Projection.poleZ(c);
+            long pole = (long) WorldProjection.Lambert.radius(c);
             for (long z0 : new long[]{-64, pole - 32, pole + 640}) {
                 long x0 = c / 2 - 32L * step;   // the area straddles the seam
                 FarColumn.grid(planet, spec, x0, z0, step, 64, a);
@@ -283,7 +283,7 @@ class FarColumnTest {
                 assertEquals(Math.max(spec.minY() - 1, Math.min(spec.maxY(), col.ground())), s.ground, "column " + x + " across the seam");
         }
         // Past the pole edge the rasters clamp: far terrain is what the column evaluator says there.
-        long z = (long) Projection.poleZ(c) + 200;
+        long z = (long) WorldProjection.Lambert.radius(c) + 200;
         FarColumn.grid(planet, spec, 96, z, 1, 64, grid);
         for (int i = 0; i < 64; i += 7) {
             Columns.Sample sample = Columns.sample(planet, 96 + i, (int) z + 9);

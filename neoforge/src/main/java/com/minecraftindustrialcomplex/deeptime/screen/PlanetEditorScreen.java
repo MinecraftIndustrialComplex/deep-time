@@ -25,7 +25,7 @@ import java.util.concurrent.Executors;
 /**
  * The Deep Time planet editor (plan §7.12; docs/design/create-world-ux.md): the generation page
  * (the timelapse, opened by Create World's Create button through {@link #generate}), the Customize
- * page (opened by the World tab's Customize button for {@code deeptime:planet}) and the review page,
+ * page (opened by the World tab's Customize button for {@code deeptime:planet_cube}) and the review page,
  * or the guidance panel when the natives did not load (plan §6.6). All state lives in an
  * {@link EditorModel}, one per Create World screen, so leaving and coming back keeps the run, the
  * timelapse and the accepted result.
@@ -70,10 +70,9 @@ public final class PlanetEditorScreen extends Screen {
         this.model = model;
     }
 
-    /** The {@code PresetEditor} of {@code deeptime:planet}. */
+    /** The {@code PresetEditor} of the Deep Time world types. */
     public static Screen create(CreateWorldScreen parent, WorldCreationContext context) {
         EditorModel m = model(parent.getUiState());
-        followWorldType(parent.getUiState(), m);
         // The dimensions lost the accepted binding (the world type was switched away and back): restore it.
         m.accepted().ifPresent(a -> {
             boolean bound = PlanetGenerators.overworld(context.selectedDimensions())
@@ -91,25 +90,8 @@ public final class PlanetEditorScreen extends Screen {
      */
     static Screen generate(CreateWorldScreen parent) {
         EditorModel m = model(parent.getUiState());
-        followWorldType(parent.getUiState(), m);
         m.generate();
         return create(parent, parent.getUiState().getSettings());
-    }
-
-    /**
-     * A cube world type ({@code deeptime:planet_cube[_32k]}, cube plan G13) picks the cube projection
-     * in the editor when Customize opens or Create is pressed, so the world type a player chose is the
-     * world they get; the editor's own projection field still decides (as for Lambert), and nothing
-     * is changed while a run is accepted.
-     */
-    static void followWorldType(WorldCreationUiState ui, EditorModel m) {
-        var type = ui.getWorldType().preset();
-        if (type == null || !(type.is(PlanetGenerators.PLANET_CUBE) || type.is(PlanetGenerators.PLANET_CUBE_32K))
-                || m.accepted().isPresent())
-            return;
-        var projection = com.minecraftindustrialcomplex.deeptime.screen.model.EditorFields.byId("projection");
-        if (!m.choice(projection).filter("cube"::equals).isPresent())
-            m.setChoice(projection, "cube");
     }
 
     /** The model of a Create World screen (created on first use). */

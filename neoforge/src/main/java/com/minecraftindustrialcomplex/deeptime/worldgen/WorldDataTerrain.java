@@ -112,8 +112,7 @@ public final class WorldDataTerrain implements TerrainSource {
                     magma = Magma.build(wd.volcanoes().list(), magmaRules(), (x, z) -> wd.height(wrapX(x), z),
                             (x, z) -> com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, wrapX(x), z).kind() != none,
                             wd.circumference(), seaLevel, lava().floodY(minY, seaLevel), minY, wd.manifest().mPerBlockH(),
-                            wd.manifest().mPerBlockV(),
-                            lakeMaxAbsZ(wd));
+                            wd.manifest().mPerBlockV());
                     long lakes = magma.bodies().stream().filter(Magma.Body::lake).count();
                     long molten = magma.bodies().stream().filter(b -> b.chamberRh() > 0).count();
                     com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(
@@ -182,16 +181,6 @@ public final class WorldDataTerrain implements TerrainSource {
             }
         }
         return f;
-    }
-
-    /**
-     * The |z| up to which a volcano may hold a crater lava lake: the pole cap's line on a Lambert world;
-     * the whole world on a Petroff–Guyou or cube one (no pole cap there: its poles are ordinary ground).
-     */
-    private int lakeMaxAbsZ(WorldData wd) {
-        if (ref.petroffGuyou() || ref.cube())
-            return (int) Math.ceil(wd.projection().zMax()) + 1;
-        return (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(wd.circumference(), ref.poleCapDeg()));
     }
 
     /** The world's settings for geothermal features. */
@@ -346,11 +335,6 @@ public final class WorldDataTerrain implements TerrainSource {
     @Override
     public int circumference() {
         return ref.circumferenceBlocks();
-    }
-
-    @Override
-    public boolean seamless() {
-        return ref.petroffGuyou() || ref.cube();
     }
 
     @Override

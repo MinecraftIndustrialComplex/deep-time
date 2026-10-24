@@ -5,7 +5,6 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.CubeMap;
 import com.minecraftindustrialcomplex.deeptime.worlddata.CubeTurn;
 import com.minecraftindustrialcomplex.deeptime.worlddata.CubeWorld;
-import com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -26,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The planet API's contract (package-info, docs/api/planet.md), one suite run on every projection:
- * Lambert, Petroff-Guyou (two sizes and centres) and the cube world (three turns). Nothing here names
+ * the simulation's Lambert frame and the cube world (three turns). Nothing here names
  * a projection's formulas: each check is a property of a sphere seen through a map, so a new or
  * changed projection must pass it unchanged.
  *
@@ -35,8 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       block centres, the same for every position of one point); what is on the planet.</li>
  *   <li>The local frame against the distance call over short steps, in eight directions; east and
  *       north against the latitude gradient; the frame's area against the scale.</li>
- *   <li>Every seam (the x wrap, Petroff-Guyou's turning edges, the cube's 14 net edges) and every
- *       singular point (the cube's corners, Petroff-Guyou's cone points): distances and bearings run
+ *   <li>Every seam (the x wrap, the cube's 14 net edges) and every
+ *       singular point (the cube's corners): distances and bearings run
  *       on, destinations land, the frame runs on where the map is smooth.</li>
  *   <li>Long range: symmetric distances, destination inverting distance and bearing, the pole
  *       convention, off-planet answers.</li>
@@ -78,8 +77,6 @@ class DeepTimePlanetContractTest {
         int s = 1024;
         return List.of(
                 world("lambert 16384", new WorldProjection.Lambert(16384), 300.0, 75.0),
-                world("petroff-guyou b 4096 lc 37.25", new PetroffGuyou(4096, 37.25), 35.0, 80.0),
-                world("petroff-guyou b 1536 lc 0", new PetroffGuyou(1536, 0.0), 35.0, 80.0),
                 world("cube 1024 identity", cube(s, CubeTurn.IDENTITY), 35.0, 80.0),
                 world("cube 1024 polar 30", cube(s, CubeTurn.polar(30.0)), 35.0, 80.0),
                 world("cube 1024 free turn", cube(s, CubeTurn.fromRows(rotation(1, 2, 3, 40.0))), 35.0, 80.0));
@@ -87,13 +84,7 @@ class DeepTimePlanetContractTest {
 
     private static World world(String name, WorldProjection p, double m, double latMax) {
         List<double[]> units = new ArrayList<>(), at = new ArrayList<>();
-        if (p instanceof PetroffGuyou pg) {
-            double b = pg.hemisphere();
-            for (double[] q : new double[][]{{0, -b / 2}, {-b, -b / 2}, {b, -b / 2}, {0, b / 2}, {-b, b / 2}, {b, b / 2}}) {
-                at.add(new double[]{q[0], q[1], units.size()});
-                units.add(pg.unit(q[0], q[1]));
-            }
-        } else if (p instanceof WorldProjection.Cube c) {
+        if (p instanceof WorldProjection.Cube c) {
             for (CubeLayout.Corner k : c.cube().corners()) {
                 for (long[] im : k.images())
                     at.add(new double[]{im[0], im[1], units.size()});
@@ -183,14 +174,7 @@ class DeepTimePlanetContractTest {
     /** Positions that show the same planet point as (x, z) by the map's own gluing, besides (x, z). */
     private static List<double[]> images(World w, double x, double z) {
         double per = w.p().period();
-        List<double[]> out = new ArrayList<>(List.of(new double[]{x + per, z}, new double[]{x - per, z}, new double[]{x + 3 * per, z}));
-        if (w.p() instanceof PetroffGuyou pg) {
-            double b = pg.hemisphere();
-            out.add(new double[]{-x, -b - z});   // through the north edge's half-turn
-            out.add(new double[]{-x, b - z});    // through the south edge's
-            out.add(new double[]{-x + per, -b - z});
-        }
-        return out;
+        return new ArrayList<>(List.of(new double[]{x + per, z}, new double[]{x - per, z}, new double[]{x + 3 * per, z}));
     }
 
     private static void report(String what, World w, String fmt, Object... args) {
@@ -449,19 +433,6 @@ class DeepTimePlanetContractTest {
                 out.add(new Crossing("x wrap east", c / 2 - 0.5, z, c / 2 + 0.5, z));
                 out.add(new Crossing("x wrap west", -c / 2 + 0.5, z, -c / 2 - 0.5, z));
             }
-        } else if (p instanceof PetroffGuyou pg) {
-            double b = pg.hemisphere(), hz = b / 2.0;
-            for (int i = -40; i <= 40; i++) {
-                double z = 0.98 * hz * i / 40.0 + 0.25;
-                out.add(new Crossing("x wrap east", b - 0.5, z, b + 0.5, z));
-                out.add(new Crossing("x wrap west", -b + 0.5, z, -b - 0.5, z));
-                out.add(new Crossing("hemispheres", -0.5, z, 0.5, z));
-            }
-            for (int i = 0; i < 160; i++) {
-                double x = -b + 2 * b * (i + 0.37) / 160.0;
-                out.add(new Crossing("north edge", x, -hz + 0.5, x, -hz - 0.5));
-                out.add(new Crossing("south edge", x, hz - 0.5, x, hz + 0.5));
-            }
         } else if (p instanceof WorldProjection.Cube cube) {
             List<CubeLayout.NetEdge> edges = cube.cube().edges();
             assertEquals(14, edges.size(), "the cube net's edges");
@@ -526,7 +497,7 @@ class DeepTimePlanetContractTest {
                 assertTrue(pl.distanceMetres(there.x(), there.z(), fp[0], fp[1]) < 1e-3 * w.m(), "destination from past the seam lands at " + c);
             }
             double[] j = jumps.computeIfAbsent(c.seam(), k -> new double[7]);
-            if (Math.abs(latIn) < w.latMax()) {   // east and north turn fast near a pole, which Petroff-Guyou's edges cross
+            if (Math.abs(latIn) < w.latMax()) {   // east and north turn fast near a pole
                 // North turns across the seam (j[0]) against how it turns over the block before it (j[6]).
                 LocalFrame f2 = pl.frame(2 * c.xi() - c.xo(), 2 * c.zi() - c.zo()).orElseThrow();
                 j[0] = Math.max(j[0], turnDiff(fi.northBearingDeg(), fo.northBearingDeg()));
@@ -539,17 +510,14 @@ class DeepTimePlanetContractTest {
             j[5]++;
         }
         assertTrue(checked > cs.size() / 2, "crossings checked " + checked + " of " + cs.size());
-        boolean pg = w.p() instanceof PetroffGuyou;
         for (var e : jumps.entrySet()) {
             double[] j = e.getValue();
             report("seam", w, "%-12s n %3.0f: north turns %.4f deg across (%.4f over the block before), metres east %.3g, north %.3g; step vs distance %.3g; destination off %.3g of the step",
                     e.getKey(), j[5], j[0], j[6], j[1], j[2], j[3], j[4]);
             assertTrue(j[3] < 0.05, e.getKey() + ": a block across is a block on the ground: " + j[3]);
             assertTrue(j[4] < 0.05, e.getKey() + ": the frame's step across lands past the seam: " + j[4]);
-            if (!pg) {
-                assertTrue(j[0] < 1.0, e.getKey() + ": north runs on: " + j[0]);
-                assertTrue(j[1] < 2e-2 && j[2] < 2e-2, e.getKey() + ": the scale runs on: " + j[1] + ", " + j[2]);
-            }
+            assertTrue(j[0] < 1.0, e.getKey() + ": north runs on: " + j[0]);
+            assertTrue(j[1] < 2e-2 && j[2] < 2e-2, e.getKey() + ": the scale runs on: " + j[1] + ", " + j[2]);
         }
     }
 
@@ -706,13 +674,6 @@ class DeepTimePlanetContractTest {
                         found++;
                     }
             assertEquals(40, found, "ocean past the corners");
-        } else {
-            // Petroff-Guyou folds every finite position onto the planet.
-            SplittableRandom rnd = new SplittableRandom(31);
-            for (int i = 0; i < 2000; i++) {
-                double x = rnd.nextDouble(-1e6, 1e6), z = rnd.nextDouble(-1e5, 1e5);
-                assertTrue(pl.isOnPlanet(x, z), "every finite position is on a folded world: " + x + ", " + z);
-            }
         }
         double[] on = randomPosition(w, new SplittableRandom(37));
         for (double[] q : off) {

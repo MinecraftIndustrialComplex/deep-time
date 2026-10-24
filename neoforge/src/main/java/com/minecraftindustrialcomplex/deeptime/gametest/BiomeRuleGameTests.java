@@ -87,7 +87,7 @@ public final class BiomeRuleGameTests {
         dp.register(LevelStem.OVERWORLD, datapackOverworld, net.minecraft.core.RegistrationInfo.BUILT_IN);
         Registry<LevelStem> stems = dp.freeze();
 
-        WorldDimensions planet = access.registryOrThrow(Registries.WORLD_PRESET).getOrThrow(PlanetGenerators.PLANET).createWorldDimensions();
+        WorldDimensions planet = access.registryOrThrow(Registries.WORLD_PRESET).getOrThrow(PlanetGenerators.PLANET_CUBE).createWorldDimensions();
         OverworldOverride.Result r = OverworldOverride.apply(planet, stems);
         LevelStem ow = r.dims().dimensions().get(LevelStem.OVERWORLD);
         helper.assertTrue(ow != null && ow.generator() instanceof GeologicChunkGenerator,

@@ -4,6 +4,6 @@
     "type": "deeptime:geologic",
     "biome_source": {"type": "minecraft:multi_noise", "preset": "minecraft:overworld"},
     "settings": "deeptime:planet_nocaves",
-    "world_data": {"folder": "deeptime-real", "circumference_blocks": 3072, "projection": "petroff_guyou"}
+    "world_data": {"folder": "deeptime-real", "circumference_blocks": 4096, "projection": "cube"}
   }
 }

@@ -4,7 +4,6 @@ package com.minecraftindustrialcomplex.deeptime.gametest;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.net.DeepTimeNetwork;
 import com.minecraftindustrialcomplex.deeptime.net.PlanetDebugLine;
-import com.minecraftindustrialcomplex.deeptime.net.PoleStormPayload;
 import com.minecraftindustrialcomplex.deeptime.net.WorldInfoPayload;
 import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.FormatVersion;
@@ -67,8 +66,10 @@ public final class NetworkGameTests {
     @GameTest(template = GameTestSupport.TEMPLATE)
     public static void worldInfoRoundTrip(GameTestHelper helper) {
         List<WorldInfoPayload> cases = List.of(
-                new WorldInfoPayload(true, "minecraft:overworld", "0.0", 32768, 300.0, 20.0, 75f, 80f, "earthlike_quick_32k"),
-                new WorldInfoPayload(true, "deeptime:test_planet", "0.0", 1024, 123.456789, 7.25, 60.5f, 89.75f, "Ærde — 地球 ✓"),
+                new WorldInfoPayload(true, "minecraft:overworld", "0.0", 32768, 300.0, 20.0, "earthlike_quick_32k"),
+                new WorldInfoPayload(true, "deeptime:test_planet", "0.0", 1024, 123.456789, 7.25, "Ærde — 地球 ✓"),
+                new WorldInfoPayload(true, "minecraft:overworld", FormatVersion.CUBE, 15360, 300.0, 20.0, "earthlike_quick_16k",
+                        WorldDataRef.CUBE, "world", "ab".repeat(32), List.of(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)),
                 WorldInfoPayload.notAPlanet("minecraft:the_nether"));
         for (WorldInfoPayload p : cases) {
             WorldInfoPayload back = roundTrip(WorldInfoPayload.STREAM_CODEC, p, helper);
@@ -76,106 +77,27 @@ public final class NetworkGameTests {
         }
         String longName = "x".repeat(WorldInfoPayload.MAX_STRING + 50);
         WorldInfoPayload cut = roundTrip(WorldInfoPayload.STREAM_CODEC,
-                new WorldInfoPayload(true, "minecraft:overworld", "0.0", 16384, 300, 20, 75, 80, longName), helper);
+                new WorldInfoPayload(true, "minecraft:overworld", "0.0", 16384, 300, 20, longName), helper);
         helper.assertTrue(cut.planetName().length() == WorldInfoPayload.MAX_STRING, "long name not cut: " + cut.planetName().length());
-        helper.assertTrue(cut.poleCap() != null && cut.poleCap().stopZ() > 2567 && cut.poleCap().stopZ() < 2569,
-                "poleCap() of a 16k planet (stop line R·sin 80°, R = C/2π): " + cut.poleCap());
-        helper.assertTrue(WorldInfoPayload.notAPlanet("minecraft:the_end").poleCap() == null, "a non-planet has a cap");
+        helper.assertTrue(WorldInfoPayload.notAPlanet("minecraft:the_end").worldProjection() == null, "a non-planet has a projection");
         DeepTime.LOGGER.info("[gametest] worldInfoRoundTrip {} cases ok, id {}", cases.size() + 1, WorldInfoPayload.TYPE.id());
         helper.succeed();
     }
 
-    /** PoleStormPayload survives encode → decode; NaN and out-of-range values are clamped on arrival. */
-    @GameTest(template = GameTestSupport.TEMPLATE)
-    public static void poleStormRoundTrip(GameTestHelper helper) {
-        for (PoleStormPayload p : List.of(PoleStormPayload.CALM, new PoleStormPayload(0.6156f, 0.0354f), new PoleStormPayload(1f, 0.1f))) {
-            PoleStormPayload back = roundTrip(PoleStormPayload.STREAM_CODEC, p, helper);
-            helper.assertTrue(p.equals(back), "round trip changed " + p + " into " + back);
-        }
-        // What a hostile or broken server could send: raw floats, decoded through the codec.
-        FriendlyByteBuf buf = new FriendlyByteBuf(Unpooled.buffer());
-        try {
-            buf.writeFloat(Float.NaN);
-            buf.writeFloat(1e9f);
-            PoleStormPayload bad = PoleStormPayload.STREAM_CODEC.decode(buf);
-            helper.assertTrue(bad.storm() == 0f && bad.push() == PoleStormPayload.PUSH_LIMIT, "not clamped: " + bad);
-            buf.clear();
-            buf.writeFloat(7f);
-            buf.writeFloat(-3f);
-            bad = PoleStormPayload.STREAM_CODEC.decode(buf);
-            helper.assertTrue(bad.storm() == 1f && bad.push() == 0f, "not clamped: " + bad);
-        } finally {
-            buf.release();
-        }
-        DeepTime.LOGGER.info("[gametest] poleStormRoundTrip ok, id {}", PoleStormPayload.TYPE.id());
-        helper.succeed();
-    }
-
     /**
-     * Deep Time's channels are registered as NeoForge holds them (read from NeoForge's registry):
-     * play phase, clientbound, version {@value DeepTimeNetwork#VERSION}, and <b>not optional</b>.
-     * Fed to NeoForge's own negotiator with the server's channel list: a client offering every
-     * channel but Deep Time's is refused, naming exactly Deep Time's channels; a client offering
-     * all of them is accepted; a client with none (vanilla, or NeoForge without the mods) is refused.
-     */
-    @GameTest(template = GameTestSupport.TEMPLATE)
-    public static void worldInfoChannelRequired(GameTestHelper helper) {
-        List<DeepTimeNetwork.Channel> all = DeepTimeNetwork.registrations();
-        Set<ResourceLocation> ours = DeepTimeNetwork.TYPES.stream().map(t -> t.id()).collect(Collectors.toSet());
-        StringBuilder d = new StringBuilder();
-        for (ResourceLocation id : ours) {
-            DeepTimeNetwork.Channel c = all.stream().filter(ch -> ch.id().equals(id)).findFirst().orElse(null);
-            helper.assertTrue(c != null, id + " is not registered");
-            helper.assertTrue(c.protocol() == ConnectionProtocol.PLAY, id + " is registered for " + c.protocol());
-            helper.assertTrue(!c.optional(), id + " is OPTIONAL: a client without Deep Time could join");
-            helper.assertTrue(c.flow().equals(Optional.of(PacketFlow.CLIENTBOUND)), id + " flow " + c.flow());
-            helper.assertTrue(DeepTimeNetwork.VERSION.equals(c.version()), id + " version " + c.version());
-            d.append(' ').append(id).append("(required,").append(c.version()).append(')');
-        }
-        long deeptimeChannels = all.stream().filter(c -> DeepTimeNetwork.ours(c.id())).count();
-        helper.assertTrue(deeptimeChannels == ours.size(), "unexpected Deep Time channels: " + all);
-
-        for (ConnectionProtocol protocol : List.of(ConnectionProtocol.CONFIGURATION, ConnectionProtocol.PLAY)) {
-            List<NegotiableNetworkComponent> server = new ArrayList<>();
-            for (DeepTimeNetwork.Channel c : all)
-                if (c.protocol() == protocol)
-                    server.add(new NegotiableNetworkComponent(c.id(), c.version(), c.flow(), c.optional()));
-            List<NegotiableNetworkComponent> withoutUs = server.stream().filter(c -> !DeepTimeNetwork.ours(c.id())).toList();
-
-            NegotiationResult full = NetworkComponentNegotiator.negotiate(server, server);
-            helper.assertTrue(full.success(), protocol + ": a client with every channel was refused: " + full.failureReasons());
-
-            NegotiationResult lacking = NetworkComponentNegotiator.negotiate(server, withoutUs);
-            Set<ResourceLocation> expected = protocol == ConnectionProtocol.PLAY ? ours : Set.of();
-            helper.assertTrue(lacking.success() == expected.isEmpty(),
-                    protocol + ": a client without Deep Time " + (lacking.success() ? "was accepted" : "was refused"));
-            helper.assertTrue(lacking.failureReasons().keySet().equals(expected),
-                    protocol + ": refusal names " + lacking.failureReasons().keySet() + ", expected " + expected);
-
-            NegotiationResult none = NetworkComponentNegotiator.negotiate(server, List.of());
-            if (protocol == ConnectionProtocol.PLAY)
-                helper.assertTrue(!none.success() && none.failureReasons().keySet().containsAll(ours),
-                        "PLAY: a client with no channels was not refused for Deep Time's: " + none.failureReasons().keySet());
-            d.append(String.format(" %s: server=%d full=%s withoutDeepTime=%s%s none=%s", protocol, server.size(), full.success(),
-                    lacking.success(), lacking.failureReasons().keySet(), none.success()));
-        }
-        DeepTime.LOGGER.info("[gametest] worldInfoChannelRequired channels={}{}", all.size(), d);
-        helper.succeed();
-    }
-
-    /**
-     * The F3 line's text (the client adds it to the debug screen) on a Lambert planet, the strings that
-     * go with the Lambert world (cube plan section 7.4); {@link #planetDebugLineOnTheCube} has the cube's.
+     * The F3 line's text (the client adds it to the debug screen) on a Lambert-frame test level (the
+     * analytic test terrains): the simulation's latitude and longitude, the longitude from the seam at
+     * x = −C/2 shown in [−180°, 180°). {@link #planetDebugLineOnTheCube} has the cube's.
      */
     @GameTest(template = GameTestSupport.TEMPLATE)
     public static void planetDebugLine(GameTestHelper helper) {
-        WorldInfoPayload info = new WorldInfoPayload(true, "minecraft:overworld", "0.0", 16384, 300, 20, 75, 80, "wrap-test");
-        // The Lambert projection: φ = asin(−z / R), R = 16384 / 2π = 2,607.6.
-        String north = PlanetDebugLine.format(info, 4096, -2540, 0f);
-        String south = PlanetDebugLine.format(info, -8192, 2560, 0.62f);
-        helper.assertTrue("Deep Time: 76.926° N 90.000° E · wrap-test (C 16384, 300 m/block)".equals(north), "north: " + north);
-        helper.assertTrue("Deep Time: 79.036° S 180.000° W · wrap-test (C 16384, 300 m/block) · polar storm 62%".equals(south), "south: " + south);
-        helper.assertTrue(PlanetDebugLine.format(WorldInfoPayload.notAPlanet("minecraft:the_nether"), 0, 0, 0) == null, "a line outside a planet");
+        WorldInfoPayload info = new WorldInfoPayload(true, "minecraft:overworld", "0.0", 16384, 300, 20, "wrap-test");
+        // The Lambert frame: φ = asin(−z / R), R = 16384 / 2π = 2,607.6; λ = 360°·(x + C/2)/C.
+        String north = PlanetDebugLine.format(info, 4096, -2540);
+        String south = PlanetDebugLine.format(info, -8192, 2560);
+        helper.assertTrue("Deep Time: 76.926° N 90.000° W · wrap-test (C 16384, 300 m/block)".equals(north), "north: " + north);
+        helper.assertTrue("Deep Time: 79.036° S 0.000° E · wrap-test (C 16384, 300 m/block)".equals(south), "south: " + south);
+        helper.assertTrue(PlanetDebugLine.format(WorldInfoPayload.notAPlanet("minecraft:the_nether"), 0, 0) == null, "a line outside a planet");
         DeepTime.LOGGER.info("[gametest] planetDebugLine '{}' / '{}'", north, south);
         helper.succeed();
     }
@@ -197,14 +119,14 @@ public final class NetworkGameTests {
     public static void planetDebugLineOnTheCube(GameTestHelper helper) {
         com.minecraftindustrialcomplex.deeptime.worlddata.CubeMap map = com.minecraftindustrialcomplex.deeptime.worlddata.CubeMap.world();
         List<Double> identity = List.of(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
-        WorldInfoPayload info = new WorldInfoPayload(true, "minecraft:overworld", FormatVersion.CUBE, 4096, 300, 20, 0f, 0f,
-                "cube-test", WorldDataRef.CUBE, 0.0, map.name(), map.sha256Hex(), identity);
+        WorldInfoPayload info = new WorldInfoPayload(true, "minecraft:overworld", FormatVersion.CUBE, 4096, 300, 20,
+                "cube-test", WorldDataRef.CUBE, map.name(), map.sha256Hex(), identity);
         helper.assertTrue(info.cube() && info.worldProjection() instanceof WorldProjection.Cube, "a cube info: " + info);
         WorldProjection.Cube wp = (WorldProjection.Cube) info.worldProjection();
         CubeLayout cube = wp.cube();
 
         double[] c0 = cube.pointOfLocal(CubeLayout.Face.F0, 0.0, 0.0);
-        String centre = PlanetDebugLine.format(info, c0[0], c0[1], 0f);
+        String centre = PlanetDebugLine.format(info, c0[0], c0[1]);
         helper.assertTrue(centre != null && centre.startsWith("Deep Time: ")
                         && centre.endsWith(" · face F0 · north 0.0° · 337 m/block here · cube-test (C 4096, 300 m/block)"),
                 "F0's centre: " + centre);
@@ -213,7 +135,7 @@ public final class NetworkGameTests {
         StringBuilder log = new StringBuilder();
         for (CubeLayout.Face f : CubeLayout.Face.all()) {
             double[] at = cube.pointOfLocal(f, 0.3, -0.2);
-            String line = PlanetDebugLine.format(info, at[0], at[1], 0f);
+            String line = PlanetDebugLine.format(info, at[0], at[1]);
             Matcher m = line == null ? null : CUBE_LINE.matcher(line);
             helper.assertTrue(m != null && m.matches(), "face " + f + ": " + line);
             double[] ll = wp.latLon(at[0], at[1]);
@@ -242,8 +164,8 @@ public final class NetworkGameTests {
             double along = (e.spanFrom() + e.spanTo()) / 2.0 + 0.5, n = e.coord();
             double in = e.beyond() == CubeLayout.Side.MAX ? n - 0.5 : n + 0.5, out = e.beyond() == CubeLayout.Side.MAX ? n + 0.5 : n - 0.5;
             boolean ax = e.axis() == CubeLayout.Axis.X;
-            Matcher mi = CUBE_LINE.matcher(String.valueOf(PlanetDebugLine.format(info, ax ? in : along, ax ? along : in, 0f)));
-            String outLine = PlanetDebugLine.format(info, ax ? out : along, ax ? along : out, 0f);
+            Matcher mi = CUBE_LINE.matcher(String.valueOf(PlanetDebugLine.format(info, ax ? in : along, ax ? along : in)));
+            String outLine = PlanetDebugLine.format(info, ax ? out : along, ax ? along : out);
             Matcher mo = CUBE_LINE.matcher(String.valueOf(outLine));
             helper.assertTrue(mi.matches() && mo.matches(), e.name() + ": " + outLine);
             String partner = edges.get(e.partner()).face().name();
@@ -258,12 +180,12 @@ public final class NetworkGameTests {
 
         ChunkPos ocean = CubeWorldGameTests.oceanChunk(cube);
         helper.assertTrue(ocean != null, "a chunk past the net's corners");
-        String off = PlanetDebugLine.format(info, ocean.getMiddleBlockX() + 0.5, ocean.getMiddleBlockZ() + 0.5, 0f);
+        String off = PlanetDebugLine.format(info, ocean.getMiddleBlockX() + 0.5, ocean.getMiddleBlockZ() + 0.5);
         helper.assertTrue("Deep Time: off the planet · cube-test (C 4096, 300 m/block)".equals(off), "past the corners: " + off);
 
-        WorldInfoPayload other = new WorldInfoPayload(true, "minecraft:overworld", FormatVersion.CUBE, 4096, 300, 20, 0f, 0f,
-                "cube-test", WorldDataRef.CUBE, 0.0, map.name(), "0".repeat(64), identity);
-        String mismatch = PlanetDebugLine.format(other, c0[0], c0[1], 0f);
+        WorldInfoPayload other = new WorldInfoPayload(true, "minecraft:overworld", FormatVersion.CUBE, 4096, 300, 20,
+                "cube-test", WorldDataRef.CUBE, map.name(), "0".repeat(64), identity);
+        String mismatch = PlanetDebugLine.format(other, c0[0], c0[1]);
         helper.assertTrue(("Deep Time: map mismatch (" + map.name() + ") · cube-test (C 4096, 300 m/block)").equals(mismatch),
                 "another map table: " + mismatch);
         DeepTime.LOGGER.info("[gametest] planetDebugLineOnTheCube centre '{}' faces{} edges {} (north turns up to {}°, scale steps up to {} m) off '{}' mismatch '{}'",
@@ -274,7 +196,7 @@ public final class NetworkGameTests {
     /**
      * A player gets the world info on login and again on every dimension change (plan §7.15): a
      * mock player logs into the flat overworld (not a planet), is moved to the analytic test planet
-     * (C = 16,384, the default 70°/80° cap), to the world-data test planet (C = 1,024, its manifest's
+     * (C = 16,384), to the world-data test planet (C = 1,024, its manifest's
      * scales and name) and back. Its own batch: a logged-in player must not disturb other tests.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, batch = "network_player", timeoutTicks = 200)
@@ -294,8 +216,8 @@ public final class NetworkGameTests {
             m.player.teleportTo(planet, 0.5, 200, 0.5, 0, 0);
             WorldInfoPayload onPlanet = m.last(WorldInfoPayload.class);
             helper.assertTrue(onPlanet != null, "no world info after moving to the test planet");
-            helper.assertTrue(onPlanet.planet() && onPlanet.circumference() == 16384 && onPlanet.poleCapDeg() == 70f
-                            && onPlanet.poleStopDeg() == 80f && onPlanet.dimension().equals(GameTestSupport.TEST_PLANET.location().toString())
+            helper.assertTrue(onPlanet.planet() && onPlanet.circumference() == 16384
+                            && onPlanet.dimension().equals(GameTestSupport.TEST_PLANET.location().toString())
                             && onPlanet.formatVersion().equals(FormatVersion.CURRENT) && onPlanet.planetName().startsWith("wrap-test"),
                     "test planet: " + onPlanet);
 

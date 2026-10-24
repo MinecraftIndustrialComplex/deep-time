@@ -445,7 +445,7 @@ mod tests {
             deeptime_format::cube::CubeTurn::from_angles(37.0, 21.0, 11.0),
         );
         let mut m = Manifest::new("test", Writer::this("unit"), Scale::default_for(4 * side));
-        m.projection = Some(g.spec(None));
+        m.set_projection(Some(g.spec(None)));
         m.write(&dir).unwrap();
         let ll = [40.2804_f32, 335.0288];
         let (wx, wz) = g.block_of(f64::from(ll[0]), f64::from(ll[1]));
