@@ -794,6 +794,10 @@ enum SynthKind {
     /// A river (half-width 3) on a floodplain at y 70.5 into the sea, meandered as the bake
     /// meanders it, with its network (rivers/rivers.dtrv).
     MeanderTest,
+    /// A range with an alluvial fan at its foot (a cone round on the planet, y 86.5 to the plain's
+    /// 70.5) and a river (half-width 4) down it into the sea, braided on the fan as the bake braids
+    /// it, with its network (rivers/rivers.dtrv).
+    FanTest,
     /// A cube world (format 0.7) of a planet --size blocks round: sphere-defined continents, a
     /// ridge across a quarter-turn seam, a cone on a reachable corner, a lake across a half-turn
     /// seam.
@@ -1541,6 +1545,7 @@ fn main() -> ExitCode {
                     SynthKind::RiverTest => synth::Kind::RiverTest,
                     SynthKind::DeltaTest => synth::Kind::DeltaTest,
                     SynthKind::MeanderTest => synth::Kind::MeanderTest,
+                    SynthKind::FanTest => synth::Kind::FanTest,
                     SynthKind::Cube => synth::Kind::Cube,
                 },
                 strata: match strata {
