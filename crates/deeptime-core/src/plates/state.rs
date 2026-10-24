@@ -358,6 +358,10 @@ pub struct Contact {
     /// plate that went under since the contact began or last collided, each counted once, when
     /// it is first hidden. Counted only while the dynamics record is on.
     pub cont_in: u32,
+    /// Measurement only (no rule reads it): this polarity came from reversing a confirmed
+    /// subduction zone (`subduction::reverse`), and is not confirmed yet itself.
+    #[serde(default)]
+    pub reversed: bool,
 }
 
 /// A collision: the state of a [`Contact`] from the step continental crust of the subducting
@@ -528,8 +532,12 @@ pub struct Counters {
     pub accretions: u32,
     /// Subduction initiations at old oceanic lithosphere.
     pub initiations: u32,
-    /// Subduction polarity reversals.
+    /// Subduction polarity reversals: every flip of a contact's polarity.
     pub reversals: u32,
+    /// Reversals a geologist could map (measurement only, ledger PLT-514): a confirmed
+    /// subduction zone whose reversed polarity was confirmed in turn (`subduction::confirm`).
+    #[serde(default)]
+    pub reversals_confirmed: u32,
     /// Collisions that sutured the subducting plate whole to the receiving one (P1-27).
     pub sutures: u32,
     /// Rifts that did not open and healed (`rifting::heal`).

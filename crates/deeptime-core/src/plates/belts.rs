@@ -160,6 +160,8 @@ pub struct Stacked {
     pub mean_m: f64,
     /// The foreland basin, when the surface's flexure was given.
     pub foredeep: Option<Foredeep>,
+    /// What stands on either side of the front (measurement only, `dock_tally.rs`).
+    pub sides: super::dock_tally::Sides,
 }
 
 /// Stacks this step's shortened crust of every collision with a front (see the module docs) and
@@ -219,6 +221,7 @@ pub fn stack(
         let (under, over) = (state.contacts[c].under, state.contacts[c].over);
         let col = state.contacts[c].collision.as_ref().expect("in collision");
         let (conv, normal) = (col.convergence_mm_yr, DVec3::from_array(col.normal));
+        let sides = read_sides(state, env, f, &fields, sea_m);
         let step = stack_front(
             state,
             geo,
@@ -238,7 +241,8 @@ pub fn stack(
             fields,
             sea_m,
         );
-        let applied = step.stacked;
+        let mut applied = step.stacked;
+        applied.sides = sides;
         let col = state.contacts[c].collision.as_mut().expect("in collision");
         let b = &mut col.belt;
         b.height_m = applied.height_m;
@@ -264,6 +268,40 @@ pub fn stack(
         out.insert(c, applied);
     }
     out
+}
+
+/// What stands on either side of a front, from its distance fields (measurement only,
+/// `dock_tally.rs`, ledger PLT-515): read before the stacking changes any sample.
+fn read_sides(
+    state: &PlateState,
+    env: &Env,
+    f: &Front,
+    fields: &Fields,
+    sea_m: f64,
+) -> super::dock_tally::Sides {
+    let s = &state.samples;
+    let share = |n: usize, of: usize| if of > 0 { n as f64 / of as f64 } else { 0.0 };
+    let cont = |v: u32| s[v as usize].kind == CONTINENTAL;
+    let dry = |v: u32| f64::from(s[v as usize].elevation_m) > sea_m;
+    let near = env.norm.rad(super::dock_tally::NEAR_KM);
+    let near_n = fields.under.iter().filter(|e| e.1 <= near).count();
+    super::dock_tally::Sides {
+        over_oceanic: share(
+            fields.over.iter().filter(|e| !cont(e.0)).count(),
+            fields.over.len(),
+        ),
+        under_continental: share(
+            fields.under.iter().filter(|e| cont(e.0)).count(),
+            fields.under.len(),
+        ),
+        under_near: share(
+            fields.under.iter().filter(|e| e.1 <= near && cont(e.0)).count(),
+            near_n,
+        ),
+        crust_n: f.crust.len() as u32,
+        crust_dry: share(f.crust.iter().filter(|&&v| dry(v)).count(), f.crust.len()),
+        edge_dry: share(f.edge.iter().filter(|&&v| dry(v)).count(), f.edge.len()),
+    }
 }
 
 /// A front's distance fields ([`dijkstra_sorted`]: the reached samples ascending, with their
@@ -960,6 +998,7 @@ mod tests {
                 andean: false,
                 centroid: [0.0, 1.0, 0.0],
                 cont_in: 0,
+                reversed: false,
             }],
             hotspots: Vec::new(),
             ridges: Vec::new(),

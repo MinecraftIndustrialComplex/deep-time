@@ -279,6 +279,9 @@ pub struct CrustBudget {
     /// The snapshots' lines.
     lines: Vec<String>,
     maps: Option<PathBuf>,
+    /// The collision fronts by what stands on either side (`dock_tally.rs`, measurement only),
+    /// printed after the budget's lines.
+    pub dock: super::dock_tally::DockTally,
 }
 
 impl CrustBudget {
@@ -293,6 +296,7 @@ impl CrustBudget {
             moves: vec![[0.0; NX]; PARTS],
             lines: Vec::new(),
             maps: std::env::var_os(MAPS_ENV).map(PathBuf::from),
+            dock: Default::default(),
         }
     }
 
@@ -591,7 +595,7 @@ impl CrustBudget {
         for l in &self.lines {
             out += l;
         }
-        out
+        out + &self.dock.lines()
     }
 }
 
