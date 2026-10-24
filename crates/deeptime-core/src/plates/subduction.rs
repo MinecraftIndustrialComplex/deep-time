@@ -343,6 +343,8 @@ pub fn resolve(
         // `stacked` stays while the crust stays under (below).
         s.collision_mm_yr = 0.0;
         s.shortening_km = 0.0;
+        s.carrier = 0;
+        s.carrier_lithosphere_km = 0.0;
     }
     // Ocean floor at a plate contact with at least a normal continental column's crystalline
     // crust (T_n, 33 km, the transition's PLT-261) is continental crust, whatever stacked it there

@@ -660,6 +660,22 @@ pub struct TectonicParams {
     /// nothing without `thermal_state`. On by default since 2026-10-23; off = the orogeny's age,
     /// kept for tests that isolate one law (ledger ISO-112, ISO-051).
     pub thermal_strength: bool,
+    /// The collision's underthrust lithosphere (gap 6): in an active continental collision the
+    /// incoming plate's lithosphere goes on under the front, so under the footprint (the wedge,
+    /// and the belt on the overriding plate as far behind the front as the collision has
+    /// shortened) the lithosphere that bends is the incoming plate's. The
+    /// flexure then takes the footprint as part of the incoming plate (the break, ISO-055, moves
+    /// from the front to the belt's back edge) and the incoming lithosphere's elastic thickness
+    /// there, from its foreland's thermal age (with the belt's own as a decoupled layer above
+    /// it): the range is a load on the edge of a stiff plate, which bends into the foreland basin
+    /// in front of it (Beaumont 1981; Jordan 1981; Lyon-Caen & Molnar 1983). Off, the belt is a
+    /// load on the overriding plate across a break from the incoming one, and the incoming plate
+    /// feels only its wedge. Needs `thermal_state` for the incoming lithosphere's age (without
+    /// it only the break moves). Off (2026-10-24): on the pool it brought no foredeep beyond the
+    /// wedge, whose width the foreland's flexural length hardly passes, and the foreland's frame
+    /// (ISO-133) doubled the largest change of a step (flexure.md "Foreland basins").
+    /// ledger: PLT-546, ISO-131
+    pub collision_underthrust: bool,
     /// The cordillera's back-arc source from the state: the crust behind an arc's range gives
     /// its share of the range's shortening in proportion to its weakness, the thin sheet's
     /// η_0 / η at its thermal age, so a cold, keeled craton is a backstop that hardly thins and a
@@ -1071,11 +1087,12 @@ impl Default for TectonicParams {
             collapse_sheet_viscosity_pa_s: 1.0e22,
             // ledger: PLT-415
             collapse_sheet_strength_myr: 62.8,
-            thermal_state: true,         // ledger: PLT-460 (on since 2026-10-23)
-            thermal_isostasy_m: 0.0,     // ledger: ISO-110 (off: an open fault; 1,600 m when on)
-            thermal_reference_km: 225.0, // ledger: ISO-111
-            thermal_strength: true,      // ledger: ISO-112 (on since 2026-10-23)
-            thermal_backstop: false,     // ledger: PLT-470 (off: a stand-in, not physics)
+            thermal_state: true,          // ledger: PLT-460 (on since 2026-10-23)
+            thermal_isostasy_m: 0.0,      // ledger: ISO-110 (off: an open fault; 1,600 m when on)
+            thermal_reference_km: 225.0,  // ledger: ISO-111
+            thermal_strength: true,       // ledger: ISO-112 (on since 2026-10-23)
+            collision_underthrust: false, // ledger: PLT-546, ISO-131 (off: no foredeep on the pool)
+            thermal_backstop: false,      // ledger: PLT-470 (off: a stand-in, not physics)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
             heat_flow_refresh: true, // ledger: PLT-469 (game-choice: on since 2026-10-23, the coordinator's call)
             initial_plates: 14,
