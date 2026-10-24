@@ -1024,7 +1024,8 @@ solve that converges at the poles is the cure; the growth is its symptom.
 ## Foreland basins
 
 Added 2026-10-24 (ISO-131, PLT-546), V1 gap 6 ([physics-gap-audit.md](physics-gap-audit.md),
-"Gap 6"). The switch is `tectonics.collision_underthrust`; MEASURED-DEFAULT.
+"Gap 6"). The switch is `tectonics.collision_underthrust`, off: on the pool it brought no foredeep
+beyond the wedge ("On the pool", below).
 
 **What Earth does.** A thrust belt is a load on the edge of the stiff plate that goes under it, and
 that plate bends down into a foredeep in front of the belt, with a forebulge beyond: foredeeps are
@@ -1122,7 +1123,51 @@ cell it lies on.
   the shortening of the front carry the incoming plate and its foreland's lithosphere; the belt
   beyond the shortening, the foreland and the overriding plate carry nothing; off, nothing does.
 
-MEASURED-POOL
+**On the pool** (2026-10-24; arm `g6-frame1`: both starts x seeds 1 to 4, 1,000 Myr, the
+switch on, on master 1b56529d, against base7's 24 runs and its same 8, `g6-base7-s1to4`;
+Mann-Whitney p against the 24, then the 8). Nothing diverged and no step passed one Earth relief
+(19.8 km), but the foreland basin did not come:
+
+| | base7, 24 runs | base7, the same 8 | switch on, 8 |
+|---|---|---|---|
+| land above 2 km | 0.141 | 0.174 | 0.107 (p 0.12; 0.005) |
+| coast with high ground | 0.266 | 0.282 | 0.261 (p 0.95; 0.28) |
+| criteria met per run, mean | 5.04 | 4.88 | 5.12 |
+| record: belts above 3 km with a foredeep | | 0.42 | 0.21 |
+| record: foredeep width, median, km | | 18 | 0 (p 0.20) |
+| the guard's worst, km from the sea | | 10.2 | 13.9 (p < 0.001) |
+| largest rise / fall of a cell in a step, km | | 7.8 / 7.3 | 15.4 / 12.4 |
+
+In the final frames the flexure just beyond the footprint's toe stands above local isostasy at
+the median (+100 to +200 m in the first 40 km: the forebulge), with the switch on, off, and with
+ISO-131 alone (the earlier arm `gap6-ut1`), so the measure finds no foredeep beyond the toe in any
+of them. Two causes, found on the runs (`build/gap6/profile1.py` over the final frames, and a
+traced run of scattered continents seed 2):
+
+1. **The foreland is not stiff enough for its wedge.** Near the front `Te` is 20 to 35 km (the
+   footprint's cells within 40 km of the toe and the foreland's first 40 km, three runs), so α is
+   50 to 76 km and the broken plate's deflection crosses zero (`πα/2`) 78 to 119 km from the
+   load, about the wedge's width (96 km at the median in the record). The basin lies under the
+   wedge and the toe stands near the forebulge. Earth's wide foredeeps lie on plates of `Te` 50
+   to 90 km (the Ganges 80 to 90, the Appalachians 50 to 60, Watts & Burov 2003, pp. 117 and 118).
+2. **The frame's split of the deflection does not hold on the runs.** The local roots a crust
+   carries (`FlexState::local_m`: the plate model's root less the part the plate bends, summed
+   step by step as the crust moves over the grid) wander at the cell scale: the cell whose frame
+   change was the largest carried −15 km of them under 31 km of load. The frame swaps a place's
+   local part for its crust's, so a coast or a thick block of the incoming plate that moves
+   through the belt's frame brings its whole column into the unsolved residual each step, and
+   the solve gives most of it back: frame changes up to 46 km in a step, net changes up to 12 km.
+   With a source's corners on the bending plate's own crust only (not the belt's footprint) the
+   frame's largest change halved (18 to 24 km) but the step's largest stayed at 9 to 10 km
+   against the base's 7 to 8.
+
+So the switch stays off, and the fall in land above 2 km is not taken as its effect: it comes
+with the frame's noise, not with a basin. What would bring the basin: the belt's own deflection
+kept apart (the plate is linear: the deflection is the sum of that under the belt's loads, which
+moves with the belt, and that under the rest, which moves with the crust; the belt's increments
+solved apart on steps with a collision and that part carried in the belt's frame would swap a
+field as smooth as α, with no load to solve again), and a foreland as stiff as its lithosphere's
+age makes it (the carrier's `Te` from its foreland's thermal age, ISO-051 and PLT-546).
 
 **Simplifications.**
 

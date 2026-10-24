@@ -661,7 +661,10 @@ pub struct TectonicParams {
     /// in front of it (Beaumont 1981; Jordan 1981; Lyon-Caen & Molnar 1983). Off, the belt is a
     /// load on the overriding plate across a break from the incoming one, and the incoming plate
     /// feels only its wedge. Needs `thermal_state` for the incoming lithosphere's age (without
-    /// it only the break moves). ledger: PLT-546, ISO-131
+    /// it only the break moves). Off (2026-10-24): on the pool it brought no foredeep beyond the
+    /// wedge, whose width the foreland's flexural length hardly passes, and the foreland's frame
+    /// (ISO-133) doubled the largest change of a step (flexure.md "Foreland basins").
+    /// ledger: PLT-546, ISO-131
     pub collision_underthrust: bool,
     /// The cordillera's back-arc source from the state: the crust behind an arc's range gives
     /// its share of the range's shortening in proportion to its weakness, the thin sheet's
@@ -1077,7 +1080,7 @@ impl Default for TectonicParams {
             thermal_isostasy_m: 0.0,      // ledger: ISO-110 (off: an open fault; 1,600 m when on)
             thermal_reference_km: 225.0,  // ledger: ISO-111
             thermal_strength: true,       // ledger: ISO-112 (on since 2026-10-23)
-            collision_underthrust: false, // ledger: PLT-546, ISO-131
+            collision_underthrust: false, // ledger: PLT-546, ISO-131 (off: no foredeep on the pool)
             thermal_backstop: false,      // ledger: PLT-470 (off: a stand-in, not physics)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
             heat_flow_refresh: true, // ledger: PLT-469 (game-choice: on since 2026-10-23, the coordinator's call)

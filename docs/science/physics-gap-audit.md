@@ -387,6 +387,15 @@ what a player meets most.
   settling it locally. The wedge (PLT-192) sits on the plate edge. Sediment from the range,
   already a flexure load, fills the foredeep. Best done after gap 1, which changes how belts
   thicken.
+- **State (2026-10-24).** Built behind `tectonics.collision_underthrust` and off: the belt stands
+  on the incoming plate's end with that plate's stiffness (ISO-131, PLT-546), and the foreland
+  slides under it in the belt's frame (ISO-133); the unit tests hold the broken plate's profile
+  and a plate sliding under a standing load bends as one at rest. On the pool (8 runs against
+  base7's same 8) no foredeep came beyond the wedge: the foreland's `Te` near the front, 20 to
+  35 km, puts the deflection's first zero about a wedge's width from the belt, and the frame's
+  split of the deflection into a bent and a local part does not hold on the runs (the largest
+  change of a step doubled). Next: the belt's own deflection solved and carried apart, and the
+  foreland's stiffness from its lithosphere's age (flexure.md "Foreland basins", "On the pool").
 
 ### Recommended order, and why
 
