@@ -181,7 +181,8 @@ public final class StrataPass {
      * a rock class, the crust or horizon rock at that block becomes the class's block (one member
      * per body, {@link #bodyKey}). A zone's class wins over the body's; of several zones the last
      * that applies. Soil, sand, water and anything the surface rules placed stay, as for horizons,
-     * except over an exposed gossan, which crops out as bare rock ({@link GossanSkin}).
+     * except over an exposed gossan, which crops out as bare rock ({@link GossanSkin}). Of two
+     * bodies that hold a block, the first by id keeps it, whatever its block.
      */
     static void paintBodies(ChunkAccess chunk, WorldData wd, int k, int[] runTop, int[] runBottom,
                             BlockState[] runBlock, int[] runs) {
@@ -192,6 +193,13 @@ public final class StrataPass {
             return;
         int c = wd.circumference();
         RockPalette palette = RockPalette.get();
+        // The blocks a body has taken (painted, or found holding its block already): the first body
+        // by id keeps a block, as both column evaluators decide (Columns.sample, Rust
+        // ColumnWorld::sample). The replace test alone cannot tell a body's block from the horizon's
+        // when they are the same block (hornfels and basalt are both smooth basalt in the vanilla
+        // stand-ins), and until 2026-10-24 a later body painted over it there.
+        int height = maxY - minY + 1;
+        long[] taken = bodies.size() > 1 ? new long[(256 * height + 63) >>> 6] : null;
         for (var b : bodies) {
             boolean anyClass = b.rockClass() != null;
             for (var z : b.zones())
@@ -219,12 +227,18 @@ public final class StrataPass {
                         BlockState rock = palette.block(cls, key);
                         if (rock == null)
                             continue;
+                        int bit = ci * height + (y - minY);
+                        if (taken != null && (taken[bit >>> 6] & (1L << bit)) != 0)
+                            continue;
                         LevelChunkSection section = chunk.getSection(chunk.getSectionIndex(y));
                         BlockState here = section.getBlockState(lx, y & 15, lz);
-                        if (here == rock)
-                            continue;
-                        if (isCrust(here) || here == horizonBlock(ci, y, k, runTop, runBottom, runBlock, runs))
+                        boolean take = here == rock;
+                        if (!take && (isCrust(here) || here == horizonBlock(ci, y, k, runTop, runBottom, runBlock, runs))) {
                             section.setBlockState(lx, y & 15, lz, rock, false);
+                            take = true;
+                        }
+                        if (take && taken != null)
+                            taken[bit >>> 6] |= 1L << bit;
                     }
                 }
             }
@@ -240,7 +254,8 @@ public final class StrataPass {
      *
      * <p>Bodies paint in id order and a body only replaces crust or the horizon's own block, so of
      * two bodies that hold a block the first to paint keeps it (a gossan's ironstone under a later
-     * placer's gravel stays ironstone), unless its rock is itself crust or the horizon's block.
+     * placer's gravel stays ironstone), even where its rock is itself crust or the horizon's block
+     * (since 2026-10-24: {@link #paintBodies} marks the blocks a body has taken).
      *
      * <p>Not the skin: the leached cap an exposed gossan paints onto the ground ({@link GossanSkin})
      * follows the generated surface, which this pure prediction cannot see. The cap's blocks are
@@ -255,7 +270,6 @@ public final class StrataPass {
             if (h.isPresent())
                 horizon = palette.block(h.get().rockClass(), h.get().key());
         }
-        BlockState rock = horizon;
         int c = wd.circumference();
         for (var b : wd.deposits().bodiesIn(x, y, z, x, y, z)) {
             var at = b.locate(c, x, y, z);
@@ -268,10 +282,10 @@ public final class StrataPass {
             if (cls == null)
                 continue;
             BlockState r = palette.block(cls, bodyKey(b.id()));
-            if (r != null && (rock == null || isCrust(rock) || rock == horizon))
-                rock = r;
+            if (r != null)
+                return r;
         }
-        return rock;
+        return horizon;
     }
 
     /** The block the horizon runs put at (column ci, y), or null. */

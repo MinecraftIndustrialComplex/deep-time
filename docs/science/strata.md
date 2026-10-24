@@ -339,7 +339,11 @@ trench width and the hadal area are a separate task.
   halos and gossans are bodies painted over the horizons (an exposed gossan also replaces the soil
   over it, so it crops out as bare rock: DEP-211, and the deposit's ore is not placed in that cap:
   DEP-212). Bodies paint in id order and a body only replaces crust or the horizon's own block, so
-  where two bodies overlap the first to paint keeps the block.
+  where two bodies overlap the first to paint keeps the block. The strata pass marks the blocks a
+  body has taken, so this holds even where the first body's block is the horizon's own (hornfels and
+  basalt share smooth basalt in the vanilla stand-ins; until 2026-10-24 a later body painted over it
+  there, and the game and the column evaluators disagreed). The structure stage writes each pluton
+  and stock root before the aureoles, so an intrusion keeps its own rock inside its aureole.
 - **The cover depth of a deposit reads the undeformed stack,** not the folded one (P2-01 stage B, left open).
 - **Grade order is a rule of the look.** In real orogens inverted sequences occur (ophiolite soles, thrust
   zones, the Himalaya), and metamorphic bodies a few hundred metres thick are real. The rule keeps cover on
