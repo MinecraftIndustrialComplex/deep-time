@@ -1845,7 +1845,7 @@ fn retreat_forearcs(
 }
 
 /// The arc band's weight at `d_km` from the front (Gaussian, centred `arc_distance_km` from it).
-fn w_arc_of(d_km: f64, k: &crate::params::TectonicParams) -> f64 {
+pub(super) fn w_arc_of(d_km: f64, k: &crate::params::TectonicParams) -> f64 {
     (-((d_km - k.arc_distance_km) / k.arc_width_km).powi(2)).exp()
 }
 

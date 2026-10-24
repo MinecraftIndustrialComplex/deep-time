@@ -23,7 +23,14 @@
 //!
 //! # The terms (SI on the plate model's Earth-normalized sphere of radius R)
 //! A force `f` (N) at the unit position `x` has the torque `R x × f`. Lengths are one sample
-//! spacing per boundary sample (as the record's `boundary_km`), areas one sample's area.
+//! spacing per boundary sample (as the record's `boundary_km`), areas one sample's area, except
+//! at a subduction front with `front_pull` (PLT-560): there the front is the arcs'
+//! (`subduction::fronts_begin`: the plates converge across the boundary, beyond Bird's 20 degrees
+//! of a transform), and the pull, the suction, the slab resistance and a collision's resistance
+//! act along the boundary's normal over each sample's share of the straight front
+//! (`shortening::front_share_rad`), the per-metre sizes' own count (a straight trench, the pull
+//! normal to it: [`Coeffs::new`]). Without it every lattice edge converging on an active contact
+//! was a front, each overriding sample pulling one spacing along that edge.
 //! - **Slab pull** (drives the subducting plate, towards the trench): per metre of trench where
 //!   the subducting crust is oceanic, `F_sp · slab_pull · s(age) · min(L, D)/D`, with `F_sp` the
 //!   reference pull ([`SLAB_PULL_N_M`] at Earth's gravity, scaled with gravity), `s` the slab's
@@ -68,7 +75,8 @@
 //!
 //! # Slabs
 //! A subduction zone keeps one slab length ([`SlabTrack`], in `PlateState::slabs`), known by its
-//! two plates: it grows by the convergence at the contact's oceanic front each step, up to
+//! two plates: it grows by the convergence at the contact's oceanic front each step (along the
+//! boundary's normal with `front_pull`), up to
 //! `slab_depth_km`, and breaks off (length 0) when continental crust has held at least half of
 //! the contact's front for `slab_breakoff_myr` (design §3.3, option 5.3a). A contact that flickers
 //! off and on keeps its slab (task 5 found the restarts to be the main source of noise); a
@@ -478,12 +486,13 @@ impl Balance {
         self.links.push(l);
     }
 
-    /// The suction of a slab pulling with `pull` (N) on the overriding plate `p` at `x`, `dir`
-    /// pointing across the trench towards the subducting plate. A fixed share of the pull (PLT-186);
-    /// with `suction_saturates` (PLT-540) that share is the traction at rest of `k (v_t − u)`, `u`
-    /// the plate's speed along `dir`, `v_t = pull / (slab_res ℓ)` the slab's terminal velocity, so
-    /// `k = share × slab_res × ℓ`: a link to the mantle along `dir`.
-    pub fn add_suction(&mut self, p: u32, x: DVec3, dir: DVec3, pull: f64) {
+    /// The suction of a slab pulling with `pull` (N) on the overriding plate `p` at `x` over `len_m`
+    /// of trench, `dir` pointing across the trench towards the subducting plate. A fixed share of
+    /// the pull (PLT-186); with `suction_saturates` (PLT-540) that share is the traction at rest of
+    /// `k (v_t − u)`, `u` the plate's speed along `dir`, `v_t = pull / (slab_res ℓ)` the slab's
+    /// terminal velocity (`ℓ = len_m`), so `k = share × slab_res × ℓ`: a link to the mantle along
+    /// `dir`.
+    pub fn add_suction(&mut self, p: u32, x: DVec3, dir: DVec3, pull: f64, len_m: f64) {
         if pull <= 0.0 {
             return;
         }
@@ -495,7 +504,7 @@ impl Balance {
                 b: MANTLE,
                 x,
                 n: Some(dir),
-                k: c.suction_share * c.slab_res * c.spacing_m, // ledger: PLT-540
+                k: c.suction_share * c.slab_res * len_m, // ledger: PLT-540
                 term: Resist::Suction,
             });
         }
@@ -729,16 +738,38 @@ struct Edge {
     out: DVec3,
     others: [u32; 6],
     n_others: u8,
-    /// The front this sample overrides: the subducting neighbour, the contact, the outward
-    /// direction towards it and the convergence, mm/yr.
-    front: Option<(u32, usize, DVec3, f64)>,
+    /// The front this sample overrides.
+    front: Option<SlabFront>,
     /// A neighbour of a plate whose slab hangs under this sample's plate (a slab with no front
-    /// this step, or one a subduction initiation planted): the neighbour and the direction
-    /// towards it.
-    hang: Option<(u32, DVec3)>,
+    /// this step, or one a subduction initiation planted): the neighbour, the direction towards
+    /// it the slab pulls along and the length of trench the sample stands for, m (as at a
+    /// front).
+    hang: Option<(u32, DVec3, f64)>,
     /// The sample is continental on the subducting side of an active contact, converging: the
     /// incoming side of a collision.
     incoming: bool,
+}
+
+/// A subduction front at one overriding sample: where the slab pull, the suction, the slab
+/// resistance and a collision's resistance act.
+#[derive(Clone, Copy, Debug)]
+struct SlabFront {
+    /// The subducting neighbour and the contact.
+    u: u32,
+    contact: usize,
+    /// The direction across the trench towards the subducting plate the forces act along, the
+    /// convergence along it (mm/yr) and the length of trench the sample stands for (m): the
+    /// boundary's normal, the convergence along it and the sample's share of the straight front
+    /// with `front_pull` (PLT-560), else the converging lattice edge's direction, the
+    /// convergence along it and one sample spacing.
+    dir: DVec3,
+    conv: f64,
+    len_m: f64,
+    /// The converging lattice edge's direction, the boundary's normal and the sample's share of
+    /// the straight front, rad (the PLT-554 measure's).
+    edge_dir: DVec3,
+    normal: DVec3,
+    share_rad: f64,
 }
 
 /// One contact's front this step: its front samples with oceanic and with continental crust on
@@ -976,6 +1007,8 @@ fn balance_step(
         .filter(|s| s.km > 0.0 && !s.latent)
         .map(|s| (s.under, s.over))
         .collect();
+    // The length of boundary one boundary sample stands for, m (`Coeffs::spacing_m`).
+    let ell = norm.km(norm.spacing_rad()) * 1000.0;
 
     // The boundary, sample by sample (the tests of `subduction::fronts_and_uplift`).
     let edges: Vec<Edge> = (0..n)
@@ -1020,7 +1053,7 @@ fn balance_step(
                     e.n_others += 1;
                 }
                 if e.hang.is_none() && !su.is_hidden() && hanging.contains(&(pu, pv)) {
-                    e.hang = Some((u, dir));
+                    e.hang = Some((u, dir, ell));
                 }
                 let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
                 let along = rel.dot(dir);
@@ -1029,11 +1062,60 @@ fn balance_step(
                         && -along > best
                     {
                         best = -along;
-                        e.front = Some((u, c, dir, -along));
+                        e.front = Some(SlabFront {
+                            u,
+                            contact: c,
+                            dir,
+                            conv: -along,
+                            len_m: ell,
+                            edge_dir: dir,
+                            normal: DVec3::ZERO,
+                            share_rad: 0.0,
+                        });
                     } else if active.contains_key(&(pv, pu)) && sv.kind == CONTINENTAL {
                         e.incoming = true;
                     }
                 }
+            }
+            // The boundary's normal (PLT-310) and the sample's share of the straight front
+            // (PLT-530) at a front: the PLT-554 measure's, and with `front_pull` the front's.
+            if let Some(f) = e.front.as_mut() {
+                let pu = plate_of[f.u as usize];
+                f.normal = shortening::boundary_normal(geo, pos, &rots, samples, &plate_of, v, pu);
+                f.share_rad = shortening::front_share_rad(
+                    geo, pos, &rots, samples, &plate_of, v, pu, f.normal,
+                );
+            }
+            if k.front_pull {
+                // The arcs' fronts (`subduction::fronts_begin`): the plates converge across the
+                // boundary, beyond Bird's 20 degrees of a transform (PLT-330's rule); one
+                // lattice edge's direction is no azimuth, and a contact's strike-slip stretches
+                // converge along half the edges of their zigzag. At a front the forces act along
+                // the boundary's normal over the sample's share of the straight front, the slab
+                // fed by the convergence along that normal. ledger: PLT-560
+                let front = e.front.and_then(|f| {
+                    let pu = plate_of[f.u as usize];
+                    let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
+                    let conv = -rel.dot(f.normal);
+                    (!shortening::is_transform(rel, f.normal) && conv > 0.0).then_some(SlabFront {
+                        dir: f.normal,
+                        conv,
+                        len_m: norm.km(f.share_rad) * 1000.0,
+                        ..f
+                    })
+                });
+                e.front = front;
+                // A hanging slab pulls the same way, along the whole shared boundary (no front
+                // feeds it, so no relative motion selects its stretches).
+                e.hang = e.hang.filter(|_| e.front.is_none()).map(|(u, _, _)| {
+                    let pu = plate_of[u as usize];
+                    let normal =
+                        shortening::boundary_normal(geo, pos, &rots, samples, &plate_of, v, pu);
+                    let share = shortening::front_share_rad(
+                        geo, pos, &rots, samples, &plate_of, v, pu, normal,
+                    );
+                    (u, normal, norm.km(share) * 1000.0)
+                });
             }
             any.then_some(e)
         })
@@ -1044,13 +1126,13 @@ fn balance_step(
     // boundary for `slab_breakoff_myr` and is then gone.
     let mut fronts: BTreeMap<usize, FrontSum> = BTreeMap::new();
     for e in &edges {
-        if let Some((u, c, _, conv)) = e.front {
-            let f = fronts.entry(c).or_default();
-            if samples[u as usize].kind == CONTINENTAL {
+        if let Some(sf) = e.front {
+            let f = fronts.entry(sf.contact).or_default();
+            if samples[sf.u as usize].kind == CONTINENTAL {
                 f.continental += 1;
             } else {
                 f.oceanic += 1;
-                f.conv_sum += conv;
+                f.conv_sum += sf.conv;
             }
         }
     }
@@ -1145,7 +1227,7 @@ fn balance_step(
         .map(|&(s, m)| if m > 0 { s / f64::from(m) } else { 0.0 })
         .collect();
 
-    let ell = c.spacing_m;
+    debug_assert_eq!(ell, c.spacing_m);
     // Measurement only: the oceanic fronts' length the slab pull acts along, km (ledger: PLT-554).
     let mut slab_front_km = [0.0_f64; 3];
     // The collision drag's convergence floor (design §3.4 linearises with the weld speed; it sits
@@ -1161,7 +1243,8 @@ fn balance_step(
         // The slab under this sample, at its front or hanging with no front: the subducting
         // plate, the neighbour, the direction towards it, the slab's length.
         let slab = match e.front {
-            Some((u, ci, dir, conv)) => {
+            Some(sf) => {
+                let (u, ci) = (sf.u, sf.contact);
                 let su = &samples[u as usize];
                 let under = st.contacts[ci].under;
                 if su.kind == CONTINENTAL {
@@ -1181,66 +1264,65 @@ fn balance_step(
                                 f64::from(su.thickness_m),
                                 shortened,
                             ))
-                        * ell;
-                    let speed = conv.max(floor) * 1.0e-3 / YEAR_S;
+                        * sf.len_m;
+                    let speed = sf.conv.max(floor) * 1.0e-3 / YEAR_S;
                     if force > 0.0 {
                         *collision_n.entry(ci).or_default() += force;
                         bal.add_link(Link {
                             a: under,
                             b: p,
                             x,
-                            n: Some(-dir),
+                            n: Some(-sf.dir),
                             k: force / speed,
                             term: Resist::Collision,
                         });
                     }
                     None
                 } else {
-                    Some((under, u, dir, slab_km.get(&ci).copied().unwrap_or(0.0)))
+                    let km = slab_km.get(&ci).copied().unwrap_or(0.0);
+                    Some((under, u, sf.dir, sf.len_m, km))
                 }
             }
-            None => e.hang.and_then(|(u, dir)| {
+            None => e.hang.and_then(|(u, dir, len_m)| {
                 let under = plate_of[u as usize];
                 (samples[u as usize].kind != CONTINENTAL)
-                    .then(|| hang_km.get(&(under, p)).map(|&km| (under, u, dir, km)))
+                    .then(|| hang_km.get(&(under, p)).map(|&km| (under, u, dir, len_m, km)))
                     .flatten()
             }),
         };
-        if let Some((under, u, dir, len)) = slab {
+        if let Some((under, u, dir, len_m, len)) = slab {
             let su = &samples[u as usize];
             let towards = -dir;
-            let pull = c.pull_n_m
+            let per_m = c.pull_n_m
                 * slab_weight(su.age_myr(env.t_myr))
-                * (len / c.slab_depth_km).clamp(0.0, 1.0)
-                * ell;
+                * (len / c.slab_depth_km).clamp(0.0, 1.0);
+            let pull = per_m * len_m;
             if pull > 0.0 {
                 bal.add_force(under, x, towards * pull, Drive::SlabPull);
-                bal.add_suction(p, x, dir, pull);
-                // Measurement only (ledger: PLT-554): at a front, the one spacing this sample
-                // pulls along, the part of it along the boundary's normal (the pull's direction
-                // is towards its neighbour across), and its share of the straight front
-                // (PLT-530), so the pull's count can be read against the front's length.
-                if e.front.is_some() {
-                    let pu = plate_of[u as usize];
-                    let normal =
-                        shortening::boundary_normal(geo, pos, &rots, samples, &plate_of, v, pu);
-                    let share = shortening::front_share_rad(
-                        geo, pos, &rots, samples, &plate_of, v, pu, normal,
-                    );
-                    let km = ell / 1000.0;
-                    slab_front_km[0] += km;
-                    slab_front_km[1] += km * dir.dot(normal);
-                    slab_front_km[2] += norm.km(share);
-                }
+                bal.add_suction(p, x, dir, pull, len_m);
             }
-            bal.add_link(Link {
-                a: under,
-                b: MANTLE,
-                x,
-                n: Some(towards),
-                k: c.slab_res * ell,
-                term: Resist::Slab,
-            });
+            // Measurement only (ledger: PLT-554): at a front that pulls, one spacing for the
+            // sample, the part of it along the boundary's normal (by the converging lattice
+            // edge's direction, the old law's), and its share of the straight front (PLT-530), so
+            // the pull's count can be read against the front's length.
+            if per_m > 0.0
+                && let Some(sf) = e.front
+            {
+                let km = ell / 1000.0;
+                slab_front_km[0] += km;
+                slab_front_km[1] += km * sf.edge_dir.dot(sf.normal);
+                slab_front_km[2] += norm.km(sf.share_rad);
+            }
+            if len_m > 0.0 {
+                bal.add_link(Link {
+                    a: under,
+                    b: MANTLE,
+                    x,
+                    n: Some(towards),
+                    k: c.slab_res * len_m,
+                    term: Resist::Slab,
+                });
+            }
         }
         if !collision {
             let out = e.out.normalize_or_zero();
@@ -1492,6 +1574,10 @@ mod tests {
         }
         let w = bal.solve().expect("solvable");
         let ans = bal.answers(&w)[0].expect("plate 0");
+        eprintln!(
+            "the reference plate on the ring moves at {:.1} mm/yr (the speed scale {:.0})",
+            ans.speed_mm_yr, k.plate_speed_scale_mm_yr
+        );
         // The sphere's cap is not flat, so the factor of the reference only holds roughly.
         assert!(
             (25.0..70.0).contains(&ans.speed_mm_yr),
@@ -1605,7 +1691,7 @@ mod tests {
                     break;
                 }
                 let dir = tangent(x, DVec3::X).normalize();
-                bal.add_suction(0, x, dir, pull);
+                bal.add_suction(0, x, dir, pull, c.spacing_m);
                 fixed += x.cross(dir * pull * c.suction_share) * c.radius_m;
                 len += c.spacing_m;
             }
