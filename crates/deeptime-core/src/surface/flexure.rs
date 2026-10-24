@@ -1637,7 +1637,11 @@ impl StepIn<'_> {
     /// The plate whose lithosphere carries cell `c` and that lithosphere's thermal age (NaN:
     /// unknown), where a collision's footprint stands on an underthrust plate; None: its own.
     fn carrier(&self, c: usize) -> Option<(f32, f32)> {
-        let id = self.carrier_plate_id?.get(c).copied().filter(|v| v.is_finite())?;
+        let id = self
+            .carrier_plate_id?
+            .get(c)
+            .copied()
+            .filter(|v| v.is_finite())?;
         let age = self
             .carrier_age_myr
             .and_then(|a| a.get(c).copied())
@@ -2529,7 +2533,10 @@ mod tests {
         );
         // A broken plate's basin is narrower than a continuous one's (3πα/4) and twice as deep.
         let (c0, czero, ..) = line_load(te, G, dx);
-        assert!(w0 > 1.8 * c0 && zero < 0.75 * czero, "{w0} {c0} {zero} {czero}");
+        assert!(
+            w0 > 1.8 * c0 && zero < 0.75 * czero,
+            "{w0} {c0} {zero} {czero}"
+        );
     }
 
     fn patchy(w: usize, h: usize, lo: f64, hi: f64) -> Vec<f64> {
@@ -3117,7 +3124,9 @@ mod tests {
             }
             let out = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
             assert!(out.solve.as_ref().unwrap().converged, "{:?}", out.solve);
-            let flex: Vec<f64> = (0..h).map(|j| f64::from(out.flexure_m[j * w + 3])).collect();
+            let flex: Vec<f64> = (0..h)
+                .map(|j| f64::from(out.flexure_m[j * w + 3]))
+                .collect();
             let te: Vec<f64> = (0..h)
                 .map(|j| f64::from(out.elastic_thickness_km[j * w + 3]))
                 .collect();
@@ -3146,10 +3155,20 @@ mod tests {
         );
         eprintln!("on profile {:?}", &on[110..200]);
         eprintln!("off profile {:?}", &off[110..200]);
-        assert!(basin(&on) < 1.5 * basin(&off), "{} {}", basin(&on), basin(&off));
+        assert!(
+            basin(&on) < 1.5 * basin(&off),
+            "{} {}",
+            basin(&on),
+            basin(&off)
+        );
         assert!(edge(&on) > edge(&off), "{} {}", edge(&on), edge(&off));
         // The belt rests on the stiff plate: its Te is the incoming plate's, not the floor.
-        assert!(te_on[123] > 50.0 && te_off[123] < 10.0, "{} {}", te_on[123], te_off[123]);
+        assert!(
+            te_on[123] > 50.0 && te_off[123] < 10.0,
+            "{} {}",
+            te_on[123],
+            te_off[123]
+        );
         // Behind the belt the overriding plate is still a plate of its own.
         let behind = (60..105).map(|j| on[j].abs()).fold(0.0f64, f64::max);
         assert!(behind < 0.1 * basin(&on).abs(), "{behind} behind the belt");
