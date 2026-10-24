@@ -74,8 +74,9 @@
  * on the ground as a block along the other ({@code metresPerBlockNorth} and {@code
  * metresPerBlockEast} can differ); use {@code step} and {@code bearingOfStep} for any other
  * direction. North is where a short step goes due north, which is not always the direction in which
- * latitude climbs fastest: the two agree only where the map keeps angles, though the latitude
- * gradient is always perpendicular to east. {@code metresPerBlock} is the square root of one
+ * latitude climbs fastest: the two agree only where the map's meridians and parallels cross at
+ * right angles (any map that keeps angles, and Lambert's cylinder), though the latitude gradient is
+ * always perpendicular to east. {@code metresPerBlock} is the square root of one
  * block's ground area. The frame is
  * exact in the limit of short steps; over long distances use the distance calls. It is empty off
  * the planet and at the isolated points or zero-area lines where the map has no derivative (a pole

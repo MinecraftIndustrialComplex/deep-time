@@ -337,7 +337,8 @@ class DeepTimePlanetContractTest {
     void theFrameAgreesWithDistanceAndLatitudeOverShortSteps(World w) {
         ProjectionPlanet pl = w.planet();
         WorldProjection p = w.p();
-        boolean conformal = p instanceof WorldProjection.Cube || p instanceof WorldProjection.Lambert;
+        // Meridians cross parallels at right angles: the cube keeps angles, Lambert's cylinder is equal-area but orthogonal.
+        boolean orthogonal = p instanceof WorldProjection.Cube || p instanceof WorldProjection.Lambert;
         double rM = w.r(), degPerM = Math.toDegrees(1.0 / rM), h = 0.5, hb = 0.5;   // hb: within half a block, a crease the kink probes miss cannot pass (they reach a block along x and z)
         SplittableRandom rnd = new SplittableRandom(19);
         int n = 3000, tested = 0, kinked = 0, nearSingular = 0, polar = 0;
@@ -401,7 +402,7 @@ class DeepTimePlanetContractTest {
             assertEquals(0.0, turnDiff(0.0, f.bearingOfStep(f.northX(), f.northZ())), 1e-6, "north's geographic bearing");
             // North against latitude: a step east keeps it, a step north raises it by the step's
             // metres over R and keeps the longitude, the latitude gradient is across east and along
-            // north's side (exactly along north where the map is conformal).
+            // north's side (exactly along north where meridians cross parallels at right angles).
             double latE = pl.latitudeDeg(x + h * f.eastX(), z + h * f.eastZ()) - pl.latitudeDeg(x - h * f.eastX(), z - h * f.eastZ());
             worstEast = Math.max(worstEast, Math.abs(latE) / (2 * h * f.metresPerBlockEast() * degPerM));
             double latN = pl.latitudeDeg(x + h * f.northX(), z + h * f.northZ()) - pl.latitudeDeg(x - h * f.northX(), z - h * f.northZ());
@@ -428,8 +429,8 @@ class DeepTimePlanetContractTest {
         assertTrue(worstNorth < TOL, "a step north raises it by its metres over R: " + worstNorth);
         assertTrue(worstLon < TOL, "a step north keeps the longitude: " + worstLon);
         assertTrue(worstGrad < TOL, "the latitude gradient is across east: " + worstGrad);
-        if (conformal)
-            assertTrue(worstGradNorth < 1e-2, "on a conformal map the gradient is along north: " + worstGradNorth + " deg");
+        if (orthogonal)
+            assertTrue(worstGradNorth < 1e-2, "where meridians cross parallels at right angles the gradient is along north: " + worstGradNorth + " deg");
         assertTrue(worstKinkedStep < 0.05, "short steps near a crease: " + worstKinkedStep);
     }
 
