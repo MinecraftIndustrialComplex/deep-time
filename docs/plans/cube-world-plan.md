@@ -734,8 +734,13 @@ section 7.4 is deleted yet.
   the seams: each step through `CubeLayout.foldPoint`, the heading, pond heading and metric turned at
   a turning edge, the wander read unfolded, columns kept and asked for as planet blocks, the reach
   and grid index by the straight line on the cube; `LavaFlowsTest`'s slide, quarter-turn and
-  half-turn cases against a flat world's flows on the same ground, membership exact).
-- Left: the Sable border, and section 7.4 with what waits for it: G12's
+  half-turn cases against a flat world's flows on the same ground, membership exact), the Sable
+  border (W3 and G7's `SablePoleCap.tickEdge` generalised: `SablePoleCap.tickCube` holds a hull whose
+  bounds leave A(inset) by its velocity along `CubeBorder.outward`, from `EdgeBorder.tickCube`;
+  `SableCubeBorderGameTests.sableHullStoppedAtCubeBorder` at three segments and F0's corner, and
+  `jetCrossesSeam` and `sable_straddle` across the slide, on the 4k cube's planet server, whose
+  `forceload` now folds at 4s, T6's part).
+- Left: section 7.4 with what waits for it: G12's
   preset edits (`planet` and `planet_32k` made cubes, `planet_lambert*` deleted, the Rust presets'
   projection keys, the deposits fixtures as cubes), G13's `editor_fields.json` keys, and the
   deletions with the rewrites of the Petroff-Guyou tests they bring.
