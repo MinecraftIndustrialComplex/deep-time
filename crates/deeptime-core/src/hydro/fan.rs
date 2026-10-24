@@ -25,11 +25,11 @@
 //!   (the median sector of Stock et al.'s 2008 four fans), so a fan hemmed in by higher ground is
 //!   smaller than Bull's. A fan less than a block high at its apex is not drawn (HYD-170).
 //!   Overlapping fans take the higher cone.
-//! - **No hollow on a fan** (HYD-177). The cone falls with the straight distance from its apex, not
-//!   along the ground's drainage, so where the way off part of a fan turns back towards the apex
-//!   (a river bending round a spur, a lobe behind a hill) the cone stands higher on that way out
-//!   than on the part, and closes a hollow there. Each such hollow is filled to its spill
-//!   ([`Fans::fill_ponds`]): the fan's deposit fills it.
+//! - **No hollow on or behind a fan** (HYD-177). The cone falls from its apex in every direction,
+//!   upstream too, and with the straight distance, not along the ground's drainage, so it closes
+//!   hollows: in the canyon above its apex, where a river bends back towards the apex, and where it
+//!   buries the way out of lower ground beside it. Each such hollow is filled to its spill
+//!   ([`Fans::fill_ponds`]): the fan's deposit, and the river's behind it, fills it.
 //! - **The planet's metric.** Distances are the planet's: on a Lambert frame a block east is cos φ
 //!   of the planet's and a block south 1 / cos φ, so a fan is round on the planet
 //!   (round-features.md, SCL-230). The frame's cells are of equal area, so a fan's area is its
@@ -136,9 +136,9 @@ pub struct Fans {
     pub thin: u64,
     /// Fans whose cone met higher ground or a blocker before Bull's area.
     pub hemmed: u64,
-    /// The fan cells in a hollow the cones close, with its spill, 1/16 block, sorted by cell
-    /// ([`Fans::fill_ponds`], HYD-177); and how much they were raised, 1/16 block, in all and at
-    /// most.
+    /// The cells of the hollows the fans close, on a fan or behind one, with their spill, 1/16
+    /// block, sorted by cell ([`Fans::fill_ponds`], HYD-177); and how much they were raised, 1/16
+    /// block, in all and at most.
     pub ponds: Vec<(u32, i16)>,
     pub pond_raise_raw: i64,
     pub pond_max_raw: i16,
@@ -162,100 +162,54 @@ impl Fans {
         }
     }
 
-    /// Fills the hollows the cones close (HYD-177) on `elev`, the ground with the fans (and the
-    /// delta plains) on it, and keeps them in [`Fans::ponds`]: a Priority-Flood of the fan cells
-    /// alone (8-connected, as the network drains) from the land around them, each cell beside it
-    /// starting at the higher of its own ground and its lowest neighbour off the fans (the grid's
-    /// first and last rows at their own, the network's outlets there), gives each fan cell its
-    /// spill level towards the land off the fans; a cell under it is raised to it.
-    pub fn fill_ponds(&mut self, g: &GridDesc, elev: &mut [i16]) {
-        let cells = self.cells();
-        let (w, h) = (g.w as usize, g.h as usize);
-        let idx = |c: usize| cells.binary_search(&(c as u32)).ok();
-        let nb8 = |c: usize| -> [Option<usize>; 8] {
-            let (i, j) = ((c % w) as i64, (c / w) as i64);
-            let mut out = [None; 8];
-            let steps = [(1i64, 0i64), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
-            for (o, (di, dj)) in out.iter_mut().zip(steps) {
-                let nj = j + dj;
-                if nj < 0 || nj >= h as i64 {
-                    continue;
-                }
-                let ni = if g.wraps_x {
-                    (i + di).rem_euclid(w as i64)
-                } else if (0..w as i64).contains(&(i + di)) {
-                    i + di
-                } else {
-                    continue;
-                };
-                *o = Some(nj as usize * w + ni as usize);
-            }
-            out
-        };
-        let mut best = vec![i16::MAX; cells.len()];
-        let mut heap: BinaryHeap<Reverse<(i16, u32)>> = BinaryHeap::new();
-        for (k, &c) in cells.iter().enumerate() {
-            let cu = c as usize;
-            let ground = elev[cu];
-            let row = cu / w;
-            let start = if row == 0 || row + 1 == h {
-                Some(ground)
-            } else {
-                nb8(cu)
-                    .into_iter()
-                    .flatten()
-                    .filter(|&nb| idx(nb).is_none())
-                    .map(|nb| elev[nb])
-                    .min()
-                    .map(|off| off.max(ground))
-            };
-            if let Some(s) = start {
-                best[k] = s;
-                heap.push(Reverse((s, k as u32)));
-            }
-        }
-        while let Some(Reverse((lvl, k))) = heap.pop() {
-            if lvl > best[k as usize] {
-                continue;
-            }
-            for nb in nb8(cells[k as usize] as usize).into_iter().flatten() {
-                let Some(j) = idx(nb) else { continue };
-                let cand = lvl.max(elev[nb]);
-                if cand < best[j] {
-                    best[j] = cand;
-                    heap.push(Reverse((cand, j as u32)));
-                }
-            }
-        }
+    /// Fills the hollows the fans close (HYD-177): on the ground before the fans (`before`, the
+    /// delta plains laid) and on `elev`, the ground with them, a Priority-Flood from the open sea
+    /// (ground under the sea's level outside a closed basin, at the sea's level) and the grid's
+    /// first and last rows (the network's outlets there; land neither reaches drains to its lowest
+    /// cell) gives each cell its spill level. A cell whose spill the fans raised over its ground
+    /// is in a hollow they closed (on a fan, or behind one), and is raised to its spill, unless
+    /// the first network had a lake or a playa on it (that lake only rises). The cells raised are
+    /// kept in [`Fans::ponds`] and `elev` is raised.
+    pub fn fill_ponds(
+        &mut self,
+        g: &GridDesc,
+        before: &[i16],
+        elev: &mut [i16],
+        sea_raw: i32,
+        closed_basin: &[u8],
+        kind: &[u8],
+    ) {
+        let (fb, fa) = rayon::join(
+            || spill(g, before, sea_raw, closed_basin),
+            || spill(g, elev, sea_raw, closed_basin),
+        );
         self.ponds.clear();
         (self.pond_raise_raw, self.pond_max_raw) = (0, 0);
-        for (k, &c) in cells.iter().enumerate() {
-            let e = &mut elev[c as usize];
-            if best[k] != i16::MAX && best[k] > *e {
-                let d = best[k] - *e;
+        for (c, e) in elev.iter_mut().enumerate() {
+            if fa[c] > fb[c]
+                && fa[c] > *e
+                && kind.get(c).is_none_or(|&k| k == network::kind::NONE)
+            {
+                let d = fa[c] - *e;
                 self.pond_raise_raw += i64::from(d);
                 self.pond_max_raw = self.pond_max_raw.max(d);
-                self.ponds.push((c, best[k]));
-                *e = best[k];
+                self.ponds.push((c as u32, fa[c]));
+                *e = fa[c];
             }
         }
     }
 
-    /// Every fan cell with its highest cone, or its hollow's spill (the ground there once
-    /// applied), 1/16 block, sorted by cell.
+    /// Every fan cell with its highest cone, and every cell of a hollow the fans closed with its
+    /// spill (the ground there once applied), 1/16 block, sorted by cell.
     pub fn ground(&self) -> Vec<(u32, i16)> {
         let mut v: Vec<(u32, i16)> = self
             .fans
             .iter()
             .flat_map(|f| f.cells.iter().copied().zip(f.height.iter().copied()))
             .collect();
+        v.extend(self.ponds.iter().copied());
         v.sort_unstable_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
         v.dedup_by_key(|e| e.0);
-        for &(c, h) in &self.ponds {
-            if let Ok(i) = v.binary_search_by_key(&c, |e| e.0) {
-                v[i].1 = v[i].1.max(h);
-            }
-        }
         v
     }
 
@@ -289,6 +243,82 @@ fn planet_dist(c: f64, lambert: Option<&Projection>, ax: f64, az: f64, bx: f64, 
         None => (1.0, 1.0),
     };
     (dx * ex).hypot((bz - az) * ez)
+}
+
+/// Each cell's spill level, 1/16 block: a Priority-Flood (8-connected, as the network drains)
+/// from the open sea (ground under the sea's level outside a closed basin, at the sea's level) and
+/// the grid's first and last rows (at their own ground); land neither reaches drains to its
+/// lowest cell.
+fn spill(g: &GridDesc, elev: &[i16], sea_raw: i32, closed_basin: &[u8]) -> Vec<i16> {
+    let (w, h) = (g.w as usize, g.h as usize);
+    let n = w * h;
+    let sea = sea_raw.clamp(i32::from(i16::MIN), i32::from(i16::MAX)) as i16;
+    let mut fill = vec![0i16; n];
+    let mut seen = vec![false; n];
+    let mut heap: BinaryHeap<Reverse<(i16, u32)>> = BinaryHeap::new();
+    let mut pit: VecDeque<u32> = VecDeque::new();
+    for c in 0..n {
+        let row = c / w;
+        let open = i32::from(elev[c]) < sea_raw && closed_basin.get(c).is_none_or(|&b| b == 0);
+        if open || row == 0 || row + 1 == h {
+            seen[c] = true;
+            fill[c] = if open { sea } else { elev[c] };
+            heap.push(Reverse((fill[c], c as u32)));
+        }
+    }
+    let steps = [(1i64, 0i64), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)];
+    let mut rest: Vec<u32> = Vec::new();
+    let mut next = 0usize;
+    loop {
+        let c = if let Some(c) = pit.pop_front() {
+            c as usize
+        } else if let Some(Reverse((_, c))) = heap.pop() {
+            c as usize
+        } else {
+            // Land no outlet reaches: its lowest cell drains it.
+            if rest.is_empty() && next == 0 {
+                rest = (0..n as u32).filter(|&c| !seen[c as usize]).collect();
+                rest.sort_unstable_by_key(|&c| (elev[c as usize], c));
+            }
+            while next < rest.len() && seen[rest[next] as usize] {
+                next += 1;
+            }
+            let Some(&c) = rest.get(next) else { break };
+            let c = c as usize;
+            seen[c] = true;
+            fill[c] = elev[c];
+            heap.push(Reverse((fill[c], c as u32)));
+            continue;
+        };
+        let fc = fill[c];
+        let (i, j) = ((c % w) as i64, (c / w) as i64);
+        for (di, dj) in steps {
+            let nj = j + dj;
+            if nj < 0 || nj >= h as i64 {
+                continue;
+            }
+            let ni = if g.wraps_x {
+                (i + di).rem_euclid(w as i64)
+            } else if (0..w as i64).contains(&(i + di)) {
+                i + di
+            } else {
+                continue;
+            };
+            let nb = nj as usize * w + ni as usize;
+            if seen[nb] {
+                continue;
+            }
+            seen[nb] = true;
+            if elev[nb] <= fc {
+                fill[nb] = fc;
+                pit.push_back(nb as u32);
+            } else {
+                fill[nb] = elev[nb];
+                heap.push(Reverse((elev[nb], nb as u32)));
+            }
+        }
+    }
+    fill
 }
 
 /// A walk's profile: the cells and, per cell, its position along the course (blocks of planet)

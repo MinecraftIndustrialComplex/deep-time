@@ -4,7 +4,7 @@
 //! the fan at the slope break, round on the planet at 0° and at 55° (and three times as wide as
 //! long on the grid there), Bull's area unless hemmed in, none on a smooth profile, a larger
 //! river's channel as its edge, and no cone over ground that falls away faster than the fan; and
-//! a hollow the cones close filled to its spill.
+//! a hollow the fans close (the canyon above the apex) filled to its spill.
 
 use deeptime_format::raster::ZEdges;
 use deeptime_format::rivers::Rivers;
@@ -239,18 +239,26 @@ fn a_canyon_leaving_a_ridge_builds_bulls_fan_at_the_slope_break() {
     fans.apply(&mut raised);
     assert!(raised.iter().zip(&elev).all(|(a, b)| a >= b));
     assert!(raised.iter().zip(&elev).filter(|(a, b)| a > b).count() > 10_000);
-    // A cone on open ground closes no hollow.
-    let before = raised.clone();
-    fans.fill_ponds(&win.grid, &mut raised);
-    assert!(fans.ponds.is_empty() && raised == before);
+    // The cone closes one hollow only: in the canyon above the apex, where it falls upstream
+    // while the canyon floor rises; the fan's deposit fills it to the cone's top there.
+    let top_raw = f.top_raw;
+    let none = vec![kind::NONE; elev.len()];
+    fans.fill_ponds(&win.grid, &elev, &mut raised, 63 * 16, &[], &none);
+    assert!(!fans.ponds.is_empty());
+    for &(c, l) in &fans.ponds {
+        let (x, z) = win.pos(c as usize);
+        let (e, s) = win.planet(x, z);
+        assert!(s < 0.0 && e.abs() <= FLOOR_HALF + 1.0, "a hollow at ({e}, {s})");
+        assert!(f64::from(l) <= top_raw && f64::from(l) > f64::from(elev[c as usize]));
+    }
 }
 
-/// A hollow the cones close is filled to its spill, and one with a way off the fan below it is
-/// not (HYD-177): a 5 × 5 fan whose rim stands at y 50 round an inner 3 × 3 at y 20, on ground at
-/// y 100 except one cell north of the rim at y 0 (and, the second time, the middle cell off the
-/// fan at y 0).
+/// A hollow the fans close is filled to its spill, and one with a way out below it is not
+/// (HYD-177): a 5 × 5 fan on ground at y 30 whose rim stands at y 50 round an inner 3 × 3 at y 40,
+/// in ground at y 100 but for two cells of sea north of it (the sea at y 10), and the second time
+/// a channel off the fan (at y 30) from its middle to the sea.
 #[test]
-fn a_hollow_the_cones_close_is_filled_to_its_spill() {
+fn a_hollow_the_fans_close_is_filled_to_its_spill() {
     let grid = GridDesc {
         name: "L3".into(),
         w: 9,
@@ -261,20 +269,21 @@ fn a_hollow_the_cones_close_is_filled_to_its_spill() {
         origin_block_z: 0,
         z_edges: ZEdges::Clamp,
     };
-    let run = |hole: bool| -> (Fans, Vec<i16>) {
-        let mut elev = vec![100 * 16i16; 81];
-        elev[9 + 4] = 0;
+    let run = |channel: bool| -> (Fans, Vec<i16>) {
+        let mut before = vec![100 * 16i16; 81];
+        before[4] = 0;
+        before[9 + 4] = 0;
         let (mut cells, mut height) = (Vec::new(), Vec::new());
         for j in 2..=6usize {
             for i in 2..=6usize {
                 let c = j * 9 + i;
-                elev[c] = 0;
-                if hole && (i, j) == (4, 4) {
+                before[c] = 30 * 16;
+                if channel && i == 4 && j <= 4 {
                     continue;
                 }
                 let inner = (3..=5).contains(&i) && (3..=5).contains(&j);
                 cells.push(c as u32);
-                height.push(if inner { 20 * 16 } else { 50 * 16 });
+                height.push(if inner { 40 * 16 } else { 50 * 16 });
             }
         }
         let mut fans = Fans::default();
@@ -296,8 +305,10 @@ fn a_hollow_the_cones_close_is_filled_to_its_spill() {
             height,
             volume_km3: 0.0,
         });
+        let mut elev = before.clone();
         fans.apply(&mut elev);
-        fans.fill_ponds(&grid, &mut elev);
+        let none = vec![kind::NONE; 81];
+        fans.fill_ponds(&grid, &before, &mut elev, 10 * 16, &[], &none);
         (fans, elev)
     };
     let inner: Vec<usize> = (3..=5)
@@ -307,15 +318,16 @@ fn a_hollow_the_cones_close_is_filled_to_its_spill() {
     assert_eq!(fans.ponds.len(), 9, "{:?}", fans.ponds);
     assert!(fans.ponds.iter().all(|&(c, l)| l == 50 * 16 && inner.contains(&(c as usize))));
     assert!(inner.iter().all(|&c| elev[c] == 50 * 16));
-    assert_eq!((fans.pond_max_raw, fans.pond_raise_raw), (30 * 16, 9 * 30 * 16));
+    assert_eq!((fans.pond_max_raw, fans.pond_raise_raw), (10 * 16, 9 * 10 * 16));
     assert!(fans.ground().iter().all(|&(_, h)| h == 50 * 16));
     // Re-applied, the fill stays.
     let mut again = vec![0i16; 81];
     fans.apply(&mut again);
     assert!(inner.iter().all(|&c| again[c] == 50 * 16));
+    // With a way out below the rim, nothing is filled.
     let (fans, elev) = run(true);
     assert!(fans.ponds.is_empty(), "{:?}", fans.ponds);
-    assert!(inner.iter().all(|&c| c == 4 * 9 + 4 || elev[c] == 20 * 16));
+    assert!(inner.iter().all(|&c| c % 9 == 4 || elev[c] == 40 * 16));
 }
 
 #[test]

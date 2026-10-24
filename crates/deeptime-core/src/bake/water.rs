@@ -830,11 +830,21 @@ pub fn bake(p: &PlanetPreset, out: &mut Out<'_>) -> Result<Water, CoreError> {
     let (mut result, splits, laid, fan_laid) = if plains.plains.is_empty() && fans.fans.is_empty() {
         (first, Vec::new(), None, None)
     } else {
-        drop(first);
         plains.apply(&mut elev);
-        fans.apply(&mut elev);
-        // No hollow on a fan: the deposit fills what the cones close (HYD-177).
-        fans.fill_ponds(&grid, &mut elev);
+        if !fans.fans.is_empty() {
+            // No hollow on or behind a fan: the deposit fills what the cones close (HYD-177).
+            let before = elev.clone();
+            fans.apply(&mut elev);
+            fans.fill_ponds(
+                &grid,
+                &before,
+                &mut elev,
+                sea_raw,
+                &first.closed_basin,
+                &first.kind,
+            );
+        }
+        drop(first);
         // No floodplain on a delta plain or a fan: both are laid already.
         let mut skip = on_plains.clone();
         skip.extend(fans.cells());
