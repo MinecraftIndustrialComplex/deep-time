@@ -184,8 +184,24 @@ pub struct Output {
     /// [`Input::floodplains`]): the bank of the river it drains to, one block over the river's
     /// water (HYD-151).
     pub floodplain: Vec<i16>,
+    /// The cells each chain of [`Output::rivers`] was walked along, in chain order, with the
+    /// drainage area and the filled surface on each (the alluvial fans' apexes are looked for on
+    /// them, [`super::fan`]).
+    pub walks: Vec<FlowWalk>,
     /// Counts and timings for `notes.bake.water`.
     pub stats: Value,
+}
+
+/// The cells one chain was walked along: its head first (a lake cell first when it leaves a
+/// lake, `lead`), and last the cell it ends in (the sea, a lake, or its parent's cell).
+#[derive(Clone, Debug, Default)]
+pub struct FlowWalk {
+    pub cells: Vec<u32>,
+    /// Drainage area on each cell, km².
+    pub area_km2: Vec<f32>,
+    /// The filled surface on each cell, 1/16 block.
+    pub fill: Vec<i16>,
+    pub lead: bool,
 }
 
 struct Grid {
@@ -1250,6 +1266,15 @@ pub fn run(inp: &Input<'_>) -> Output {
         });
     }
     drop(catchments);
+    let walks: Vec<FlowWalk> = walks
+        .into_iter()
+        .map(|wk| FlowWalk {
+            area_km2: wk.cells.iter().map(|&c| area[c as usize]).collect(),
+            fill: wk.cells.iter().map(|&c| fill[c as usize]).collect(),
+            cells: wk.cells,
+            lead: wk.lead,
+        })
+        .collect();
     millis.insert("rivers".into(), json!(ms(t)));
 
     // 8. Where the game puts no sea (HYD-100, HYD-102), and what the ground a block or more below
@@ -1334,6 +1359,7 @@ pub fn run(inp: &Input<'_>) -> Output {
         rivers,
         mouths,
         floodplain,
+        walks,
         stats,
     }
 }
