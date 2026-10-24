@@ -195,9 +195,21 @@ def ship_rock_tags(a, inst, stage_cache):
 
 
 def refuse_if_running(inst):
-    ps = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True).stdout
-    if any(inst in line and "java" in line for line in ps.splitlines()):
-        sys.exit("play-client-apply: a Minecraft process has this instance open; close the game first")
+    # Prism's java command line names the instance's natives folder (<root>/natives), not its minecraft/, and
+    # runs with minecraft/ as the working directory: match the instance root in the args, or the cwd (2026-10-24:
+    # the minecraft/ match alone missed a running game and the jars were swapped under it).
+    root = os.path.dirname(os.path.abspath(inst)) + os.sep
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as f:
+                args = f.read().replace(b"\0", b" ").decode(errors="replace")
+            cwd = os.readlink(f"/proc/{pid}/cwd") + os.sep
+        except OSError:
+            continue
+        if "java" in args and (root in args or cwd.startswith(root)):
+            sys.exit(f"play-client-apply: a Minecraft process (pid {pid}) has this instance open; close the game first")
 
 
 def run_rock_tags_only(a, inst, stage):
