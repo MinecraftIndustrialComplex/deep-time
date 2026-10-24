@@ -270,7 +270,7 @@ public final class BiomeRuleGameTests {
         if (rc.coldWetland() >= MIN_COLD_WETLAND) {
             double share = rc.coldWetlandPeat() / (double) rc.coldWetland();
             helper.assertTrue(share >= MIN_PEAT_SHARE, "only " + rc.coldWetlandPeat() + " of " + rc.coldWetland()
-                    + " cold-wetland columns are on a peatland biome");
+                    + " cold-wetland columns are on a peatland biome: " + rc.coldWetlandBy());
         } else {
             DeepTime.LOGGER.info("[gametest] expandedEcosphereBiomesFollowTheirRules: {} cold-wetland columns (fewer than {}): peatland share logged only",
                     rc.coldWetland(), MIN_COLD_WETLAND);
