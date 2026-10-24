@@ -4,8 +4,9 @@
 //! and `base`), in the cube's metric (plan §7.3: a cone's radius in metres on the sphere, not
 //! block metric).
 //!
-//! On Lambert a volcano is a block position, and a cell's offset from it is the block offset
-//! times `m_per_block_h` (the game's flat world), so a cone is round in the world. On the cube the
+//! On Lambert a volcano is a block position, and since 2026-10-23 a cell's offset from it is the
+//! same azimuthal equidistant frame (`sphere::Around`, ledger SCL-230; the block offset times
+//! `m_per_block_h` before, which the world drew long north–south by 1 / cos² φ). On the cube the
 //! simulation's metric is the sphere's:
 //! - a volcano is a unit vector (cube frame), its basal radius metres on the sphere;
 //! - a cell's distance from it is the great-circle arc R·θ between the volcano and the cell's
@@ -16,8 +17,9 @@
 //!   0.91 to 1.01 of the mean), so the plain mean is close to the area mean; the weight follows
 //!   the cell's true shape and size on a face, on a seam or at a corner (a cone's volume is the
 //!   same within 0.5 % at a corner, `a_cone_has_the_same_volume_anywhere`);
-//! - a cell's size is the square root of its own area ([`cell_m`]), where Lambert takes
-//!   `r · m_per_block_h` for every cell.
+//! - a cell's size is the square root of its own area ([`cell_m`]), where Lambert takes its
+//!   planet extent, `r · m_per_block_h` times cos φ east–west and 1 / cos φ north–south
+//!   (`volcanoes::cell_extent_m`, SCL-231).
 //!
 //! The shapes themselves (`volcanoes::shape`: the profiles, the depressions, the blurs) are
 //! functions of ρ = r / R and need no change. The footprint is found by a walk over the

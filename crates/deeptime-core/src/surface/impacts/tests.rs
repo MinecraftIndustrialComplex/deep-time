@@ -280,7 +280,7 @@ fn fields_map_and_bodies_come_from_the_catalogue() {
     assert_eq!(at(&m, -3000.0, 500.0), code::ROOTS);
     assert!(at(&m, 1000.0, 1000.0).is_nan());
     // The small crater's lens as a body: an ellipsoid of breccia about its floor.
-    let b = to_body(&small, 7, 100.0, mh, 20.0, -352).expect("a lens five blocks thick");
+    let b = to_body(&small, 7, 100.0, 16_384, mh, 20.0, -352).expect("a lens five blocks thick");
     assert_eq!(b.role, "impact_breccia");
     assert_eq!(b.rock_class.as_deref(), Some("impact_breccia"));
     assert_eq!(b.center, [2000.0, 100.0, 0.0]);
@@ -290,13 +290,50 @@ fn fields_map_and_bodies_come_from_the_catalogue() {
     assert!(b.validate().is_ok());
     // A complex crater's body carries its melt sheet on the floor.
     let mid = crater(30.0, 1.0);
-    let b = to_body(&mid, 8, 60.0, mh, 20.0, -352).unwrap();
+    let b = to_body(&mid, 8, 60.0, 16_384, mh, 20.0, -352).unwrap();
     assert_eq!(b.zones.len(), 1);
     assert_eq!(b.zones[0].rock_class.as_deref(), Some("impact_melt"));
     assert!(b.zones[0].v[0] == 0.5 && b.zones[0].v[1] > 0.5 && b.zones[0].v[1] <= 1.0);
     assert!(b.validate().is_ok());
     // Below the world: nothing.
-    assert!(to_body(&small, 9, -5000.0, mh, 20.0, -352).is_none());
+    assert!(to_body(&small, 9, -5000.0, 16_384, mh, 20.0, -352).is_none());
+    // At 30°, 55° and 70° N the lens is round on the planet (SCL-233): wide in Lambert x by
+    // 1 / cos φ and narrow in z by cos φ, so each semi-axis reaches 0.95 of the rim radius east and
+    // north alike on the tangent plane at its centre (to f32's digits), and its plan keeps the
+    // circle's area. By the great-circle offset the east reach is the same and the north reach
+    // is off at first order, by at most (r / R) tan φ, as the frame's north–south scale changes
+    // across the lens.
+    for lat in [30.0f64, 55.0, 70.0] {
+        let mut north = small.clone();
+        north.z = BlockFrame::new(16_384).z_of_lat(lat);
+        let b = to_body(&north, 10, 100.0, 16_384, mh, 20.0, -352).unwrap();
+        let round = Around::of(16_384, mh, north.x, north.z);
+        let want = 0.95 * small.radius_m();
+        let (cos, tan) = (lat.to_radians().cos(), lat.to_radians().tan());
+        let (pe, pn) = (
+            f64::from(b.axes[0]) * cos * mh,
+            f64::from(b.axes[2]) * mh / cos,
+        );
+        assert!(
+            (pe / want - 1.0).abs() < 1e-5,
+            "{lat}°: east {pe} of {want}"
+        );
+        assert!(
+            (pn / want - 1.0).abs() < 1e-5,
+            "{lat}°: north {pn} of {want}"
+        );
+        let (e, _) = round.offset(north.x + f64::from(b.axes[0]), north.z);
+        let (_, s) = round.offset(north.x, north.z - f64::from(b.axes[2]));
+        assert!((e / want - 1.0).abs() < 1e-4, "{lat}°: east {e} of {want}");
+        let first_order = want / round.radius_m() * tan;
+        assert!(
+            (-s / want - 1.0).abs() < first_order,
+            "{lat}°: north {s} of {want}"
+        );
+        let area = f64::from(b.axes[0]) * f64::from(b.axes[2]) * mh * mh;
+        assert!((area / (want * want) - 1.0).abs() < 1e-3, "{lat}°: area");
+        assert_eq!(b.yaw, 0.0);
+    }
     // The present-day list.
     let st = ImpactState {
         craters,

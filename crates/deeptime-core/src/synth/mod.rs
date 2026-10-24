@@ -18,7 +18,7 @@ use deeptime_format::{
 };
 use serde_json::{Value, json};
 
-use terrain::{DeltaTest, LakeTest, RiverTest, Terrain, WrapTest};
+use terrain::{DeltaTest, FanTest, LakeTest, MeanderTest, RiverTest, Terrain, WrapTest};
 
 /// Blocks per cell of each grid in the synthetic worlds (the "16k quick" ladder of plan §5.2 at
 /// every size: L3 r 2, L2 r 4 — the climate layers' vanilla quart grid — and L1 r 16).
@@ -186,6 +186,12 @@ pub enum Kind {
     /// A delta plain at the sea's level with a river and two distributaries leaving it
     /// (`terrain::DeltaTest`).
     DeltaTest,
+    /// A straight river on a floodplain, meandered as the bake meanders it
+    /// (`terrain::MeanderTest`).
+    MeanderTest,
+    /// A river leaving a range down an alluvial fan, braided on it as the bake braids it
+    /// (`terrain::FanTest`).
+    FanTest,
     /// A synthetic deposit world's terrain (P1-15): the deposit history's present elevation
     /// (`crate::deposits::synthetic::HistoryTerrain`). Needs the history, so it is baked through
     /// [`build_with`] only and is not in [`Kind::ALL`].
@@ -197,11 +203,13 @@ pub enum Kind {
 
 impl Kind {
     /// The kinds [`build`] makes from a name alone.
-    pub const ALL: [Kind; 4] = [
+    pub const ALL: [Kind; 6] = [
         Kind::WrapTest,
         Kind::LakeTest,
         Kind::RiverTest,
         Kind::DeltaTest,
+        Kind::MeanderTest,
+        Kind::FanTest,
     ];
 
     pub fn name(self) -> &'static str {
@@ -210,12 +218,15 @@ impl Kind {
             Kind::LakeTest => "lake-test",
             Kind::RiverTest => "river-test",
             Kind::DeltaTest => "delta-test",
+            Kind::MeanderTest => "meander-test",
+            Kind::FanTest => "fan-test",
             Kind::DepositHistory => "deposit-history",
             Kind::Cube => "cube",
         }
     }
 
-    /// The kind called `name` (`wrap-test`, `lake-test`, `river-test`, `delta-test`).
+    /// The kind called `name` (`wrap-test`, `lake-test`, `river-test`, `delta-test`,
+    /// `meander-test`, `fan-test`).
     pub fn from_name(name: &str) -> Option<Kind> {
         Kind::ALL.into_iter().find(|k| k.name() == name)
     }
@@ -259,6 +270,8 @@ pub fn build(kind: Kind, strata: Strata, c: u32, codec: Codec) -> Result<SynthWo
         Kind::LakeTest => Box::new(LakeTest { c }),
         Kind::RiverTest => Box::new(RiverTest { c }),
         Kind::DeltaTest => Box::new(DeltaTest { c }),
+        Kind::MeanderTest => Box::new(MeanderTest { c }),
+        Kind::FanTest => Box::new(FanTest { c }),
         Kind::DepositHistory => {
             return Err(FormatError::Invalid(
                 "deposit-history needs its history: bake it with build_with".into(),
@@ -349,6 +362,23 @@ pub fn build_with(
         );
         d.units = "flag".into();
         layers.push(LoadedLayer::new(d, flag)?);
+    }
+
+    // A floodplain (HYD-152), where the terrain writes one: the ground's move, NODATA off the plain.
+    if terrain.writes_floodplain() {
+        let plain = sample_i16(&l3, |x, z| match terrain.floodplain(x, z) {
+            Some(m) => quantise(m * 16.0),
+            None => NODATA_I16,
+        });
+        layers.push(layer_i16(
+            crate::bake::water::FLOODPLAIN_LAYER,
+            "block",
+            1.0 / 16.0,
+            Some(NODATA_I16),
+            &l3,
+            codec,
+            &plain,
+        )?);
     }
 
     let strata_kind = strata;
@@ -462,6 +492,32 @@ impl SynthWorld {
                 crc32,
             });
             manifest.notes.insert("delta".into(), DeltaTest::notes());
+        }
+        if self.kind == Kind::MeanderTest {
+            let t = MeanderTest { c };
+            let (rivers, stats) = t.rivers();
+            let (bytes, crc32) = write_rivers(out, &rivers)?;
+            total += bytes;
+            manifest.files.retain(|f| f.path != RIVERS_PATH);
+            manifest.files.push(FileEntry {
+                path: RIVERS_PATH.to_owned(),
+                bytes,
+                crc32,
+            });
+            manifest.notes.insert("meander".into(), t.notes(&stats));
+        }
+        if self.kind == Kind::FanTest {
+            let t = FanTest { c };
+            let (rivers, stats) = t.rivers();
+            let (bytes, crc32) = write_rivers(out, &rivers)?;
+            total += bytes;
+            manifest.files.retain(|f| f.path != RIVERS_PATH);
+            manifest.files.push(FileEntry {
+                path: RIVERS_PATH.to_owned(),
+                bytes,
+                crc32,
+            });
+            manifest.notes.insert("fan".into(), t.notes(&stats));
         }
         Ok(total)
     }

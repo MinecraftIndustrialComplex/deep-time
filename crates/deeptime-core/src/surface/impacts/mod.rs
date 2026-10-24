@@ -79,12 +79,12 @@ use crate::error::CoreError;
 use crate::params::PlanetPreset;
 use crate::plates::kinematics::rotation;
 use crate::plates::state::CONTINENTAL;
-use crate::sphere::BlockFrame;
+use crate::sphere::{Around, BlockFrame};
 use crate::stage::{Stage, StageContext, StageEstimate, from_state, to_state};
 use crate::surface::lithology::index;
 use crate::surface::strata_log::IN_SITU;
 use crate::surface::volcanoes::shape::cell_weight;
-use crate::surface::volcanoes::{cell_of, for_cells};
+use crate::surface::volcanoes::{cell_extent_m, cell_of, cell_pad_m, for_cells};
 use crate::world::{Field, WorldState};
 
 /// The stage's name in a pipeline (`deeptime stage impacts`).
@@ -576,11 +576,16 @@ pub fn map(grid: &GridDesc, mh: f64, craters: &[Crater]) -> Vec<f32> {
 
 /// A crater's breccia lens (and melt sheet) as a body: an ellipsoid about the original floor,
 /// `floor_y` (blocks), so its lower half is the lens under the floor and its upper half lines
-/// the walls. `None` when it is thinner than a block or lies below the world.
+/// the walls. `None` when it is thinner than a block or lies below the world. Its plan is round
+/// on the planet (0.95 of the rim radius), so in the Lambert blocks of a planet `circumference`
+/// blocks round it is wide east–west by 1 / cos φ and narrow north–south by cos φ (ledger:
+/// SCL-233; a circle in Lambert blocks until 2026-10-23), which the world's projection draws
+/// round again.
 pub fn to_body(
     c: &Crater,
     id: u32,
     floor_y: f64,
+    circumference: u32,
     m_per_block_h: f64,
     m_per_block_v: f64,
     min_y: i32,
@@ -589,15 +594,17 @@ pub fn to_body(
     if b < 1.0 || floor_y + b < f64::from(min_y) {
         return None;
     }
-    let a = (0.95 * c.radius_m() / m_per_block_h).max(1.0);
+    let a_m = 0.95 * c.radius_m();
+    let at = Around::of(circumference, m_per_block_h, c.x, c.z);
+    let (ax, az, yaw) = at.ellipse_blocks(a_m, a_m, 0.0);
     let mut body = Body::new(
         id,
         None,
         Shape::Lens,
         "impact_breccia",
         [c.x, floor_y, c.z],
-        [a as f32, b as f32, a as f32],
-        0.0,
+        [ax.max(1.0) as f32, b as f32, az.max(1.0) as f32],
+        yaw as f32,
         0.0,
         NO_CLIP,
     );
@@ -652,7 +659,15 @@ pub fn seat_bodies(
             continue;
         }
         let floor_y = lens_floor_y(c, y, s.m_per_block_v);
-        match to_body(c, id, floor_y, s.m_per_block_h, s.m_per_block_v, s.min_y) {
+        match to_body(
+            c,
+            id,
+            floor_y,
+            s.circumference_blocks,
+            s.m_per_block_h,
+            s.m_per_block_v,
+            s.min_y,
+        ) {
             Some(b) => {
                 moved += usize::from((b.center[1] - bodies[at].center[1]).abs() >= 1.0);
                 bodies[at] = b;
@@ -1000,9 +1015,11 @@ impl ImpactStage {
             st.next_id += 1;
             // A new crater destroys the smaller ones inside it.
             let r_new = c.radius_m();
+            let at = Around::new(frame, mh, x, z);
             let mut survivors = Vec::with_capacity(st.craters.len());
             for mut old in std::mem::take(&mut st.craters) {
-                let d = (frame.wrap_x(old.x - x) * mh).hypot((old.z - z) * mh);
+                // On the planet (ledger: SCL-230; the Lambert block metric until 2026-10-23).
+                let d = at.distance_m(old.x, old.z);
                 if old.diameter_m < c.diameter_m && d < 0.8 * r_new {
                     old.gone = Some(Gone::Overprinted);
                     st.counts.overprinted[size_class(old.diameter_m / 1000.0)] += 1;
@@ -1016,8 +1033,11 @@ impl ImpactStage {
                 st.counts.imprinted += 1;
                 let extent = c.extent_m();
                 let prof = |rho: f64| profile.at(rho);
-                for_cells(&grid, mh, x, z, extent + cell_m, |cc, dx, dz| {
-                    delta[cc] += cell_weight(&prof, dx, dz, cell_m, extent) as f32;
+                let pad = cell_pad_m(&grid, mh, x, z, extent);
+                let gw = grid.w as usize;
+                for_cells(&grid, mh, x, z, extent + pad, |cc, dx, dz| {
+                    let ext = cell_extent_m(&grid, mh, cc / gw);
+                    delta[cc] += cell_weight(&prof, dx, dz, ext, extent) as f32;
                     let xr = dx.hypot(dz) / r_new;
                     if xr < 1.0 {
                         // The target is gone down to the base of the lens; the lens (thinning to
@@ -1279,7 +1299,15 @@ impl ImpactStage {
         }
         for (c, floor_y) in bodies {
             let id = world.next_body_id();
-            if let Some(b) = to_body(&c, id, floor_y, s.m_per_block_h, mv, s.min_y) {
+            if let Some(b) = to_body(
+                &c,
+                id,
+                floor_y,
+                s.circumference_blocks,
+                s.m_per_block_h,
+                mv,
+                s.min_y,
+            ) {
                 world.add_body(b)?;
                 st.bodies += 1;
                 st.lens_bodies.push((c.id, id));

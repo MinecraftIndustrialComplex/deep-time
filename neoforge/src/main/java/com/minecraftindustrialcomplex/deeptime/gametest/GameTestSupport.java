@@ -154,6 +154,24 @@ public final class GameTestSupport {
             ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_delta"));
 
     /**
+     * The meander-test world (C = 1,024, folder {@code deeptime-meander}; gametest.sh writes it with
+     * {@code deeptime synth --kind meander-test}) under the bare biome with no caves: a river on a
+     * floodplain, meandered as the bake meanders it ({@code MeanderGameTests}; V1 gap 5, HYD-155 to
+     * HYD-159).
+     */
+    public static final ResourceKey<Level> TEST_MEANDER =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_meander"));
+
+    /**
+     * The fan-test world (C = 2,048, folder {@code deeptime-fan}; gametest.sh writes it with
+     * {@code deeptime synth --kind fan-test}) under the bare biome with no caves: a river leaving a
+     * range down an alluvial fan, braided on it as the bake braids it ({@code FanGameTests}; V1 gap 5,
+     * HYD-165 to HYD-175).
+     */
+    public static final ResourceKey<Level> TEST_FAN =
+            ResourceKey.create(Registries.DIMENSION, ResourceLocation.fromNamespaceAndPath(DeepTime.MODID, "test_fan"));
+
+    /**
      * The real planet's world data (folder {@code deeptime-real}) with the full router,
      * {@code deeptime:planet} (noise caves and aquifers; every other test level uses
      * {@code planet_nocaves}), under the bare biome: {@code LavaGameTests.lavaStaysAtTheFloor}

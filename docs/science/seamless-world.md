@@ -136,7 +136,7 @@ reference there. The inverse is unchanged.
 | SCL-088 | temporary border | 1 block inside the north and south edges | blocks | — | `game-choice` |
 | SCL-089 | detail noise at the edges | blend over 32 blocks to the half-turn-symmetric mean | blocks | — | `game-choice` |
 | SCL-090 | footprint | D = max(stretch·r, r / cos φ), stretch ≤ 8; along the parallel × min(8, max(1, (0.52 / cos φ)⁴)) | blocks | — | `game-choice` |
-| SCL-091 | a body's semi-axes through the projection | each axis x the mapping's local scale along it; where that scale is not finite or not > 0 (a body on or past the pole row) the source axis is kept | blocks | the format refuses a zero axis | `game-choice` |
+| SCL-091 | a body's semi-axes through the projection | each axis x the mapping's local scale along it; where that scale is not finite or not > 0 (a body on or past the pole row) the source axis is kept; since 2026-10-23 the fallback of the exact image (SCL-130, SCL-236) | blocks | the format refuses a zero axis | `game-choice` |
 | POL-022 | the game's edge border; no pole cap | stop 1 block inside the north and south edges; spectators pass; off when the wrap engine joins the edges | blocks | — | `game-choice` |
 | POL-023 | the border's warning | 24 blocks before the stop line, every 40 ticks | blocks, ticks | — | `game-choice` |
 | POL-024 | spawn clear of the edges | candidates within 64 blocks of an edge are passed over | blocks | — | `game-choice` |
@@ -179,6 +179,15 @@ On the earlier bake of the same preset the isotropic footprint alone gave 13.4 a
   point sample to 3–4; at 80–88° from 47–78 to 1.4–1.8, the mid-latitudes' 1.3–1.4). The same striation is in
   the Lambert world, where it runs north–south. Removing it needs solvers that work in the planet's
   metric (the sphere-native grids research, decisions log 2026-10-04).
+- Features the simulation stamps with a radius are drawn round on the planet, not in Lambert blocks
+  (since 2026-10-23, [round-features.md](round-features.md), SCL-230 to SCL-236): craters, volcanic
+  cones and calderas, the flood-basalt provinces, the arc and hotspot spacing, plutons, stocks and
+  plugs. Each is the ellipse the Lambert grid makes of its circle, which this projection draws round
+  again. An intrusion's window and every body are projected as the exact image of their ellipse
+  (SCL-236, the cube world's rule SCL-130); SCL-091's rule of stretching each axis by the length of
+  its image, exact for the axis-aligned ellipse of a round feature and off by 15 to 28 % in radius
+  for a yawed ellipse at 55 to 70°, is now only the fallback where that image is not finite. The solvers' kernels (diffusion, flexure, the isostasy
+  smoothing) and the linear features (dykes, folds, faults) still work in Lambert blocks.
 - River chains crossing the north or south edge are cut there; a river does not yet continue through
   the seam.
 - Until the wrap engine joins the north and south edges, the poles are reachable only up to the
