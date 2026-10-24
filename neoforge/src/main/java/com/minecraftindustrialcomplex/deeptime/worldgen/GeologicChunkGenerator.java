@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.climate.ColdBiomeSearch;
 import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.DeepTimeDensity;
 import com.mojang.serialization.MapCodec;
@@ -172,17 +173,34 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
         return lo > hi ? "none" : lo + ".." + hi;
     }
 
+    /**
+     * A cube world's chunk biomes, on the faces and off them ({@link CubeFill#biomes}), are searched
+     * cold ({@link ColdBiomeSearch}), as are the biome searches of its surface and carver steps: a
+     * quart's biome is then a function of the quart alone. Vanilla's search starts from the entry the
+     * thread found last, so where a climate point is equally near two entries a chunk holds whichever
+     * its thread met first; a chunk off the faces asks its partner's quarts in another order (turned) on
+     * another thread, and at such a tie it held the other biome (-PwithEe: Wythers' deep underground
+     * against underground, 2 of 18,432 quarts). The polar worlds keep vanilla's warm search.
+     */
     @Override
     public CompletableFuture<net.minecraft.world.level.chunk.ChunkAccess> createBiomes(net.minecraft.world.level.levelgen.RandomState random,
             net.minecraft.world.level.levelgen.blending.Blender blender, net.minecraft.world.level.StructureManager structures,
             net.minecraft.world.level.chunk.ChunkAccess chunk) {
         CubeLayout cube = cubeLayout();
-        if (cube == null || !CubeFill.outside(cube, chunk.getPos()))
+        if (cube == null)
             return super.createBiomes(random, blender, structures, chunk);
-        return CompletableFuture.supplyAsync(() -> {
-            CubeFill.biomes(this, cube, random, chunk);
+        return CompletableFuture.supplyAsync(net.minecraft.Util.wrapThreadWithTaskName("init_biomes", () -> {
+            ColdBiomeSearch.begin();
+            try {
+                if (CubeFill.outside(cube, chunk.getPos()))
+                    CubeFill.biomes(this, cube, random, chunk);
+                else
+                    doCreateBiomes(blender, random, structures, chunk);
+            } finally {
+                ColdBiomeSearch.end();
+            }
             return chunk;
-        }, net.minecraft.Util.backgroundExecutor());
+        }), net.minecraft.Util.backgroundExecutor());
     }
 
     /** A cube world's chunk off the faces is filled at its surface step, from its partners ({@link CubeFill}). */
@@ -200,10 +218,17 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
                              net.minecraft.world.level.levelgen.RandomState random, net.minecraft.world.level.chunk.ChunkAccess chunk) {
         CubeLayout cube = cubeLayout();
         boolean off = cube != null && CubeFill.outside(cube, chunk.getPos());
-        if (off)
-            CubeFill.surface(this, cube, region, structures, random, chunk);   // the partners' copies, their passes included
-        else
-            super.buildSurface(region, structures, random, chunk);   // the pack's surface rules repaint the default block
+        if (cube != null)
+            ColdBiomeSearch.begin();   // a cube world's biome searches start cold (createBiomes)
+        try {
+            if (off)
+                CubeFill.surface(this, cube, region, structures, random, chunk);   // the partners' copies, their passes included
+            else
+                super.buildSurface(region, structures, random, chunk);   // the pack's surface rules repaint the default block
+        } finally {
+            if (cube != null)
+                ColdBiomeSearch.end();
+        }
         CHUNKS_SURFACED.increment();
         CHUNK_X_MIN.accumulateAndGet(chunk.getPos().x, Math::min);
         CHUNK_X_MAX.accumulateAndGet(chunk.getPos().x, Math::max);
@@ -240,7 +265,15 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
                              net.minecraft.world.level.chunk.ChunkAccess chunk, net.minecraft.world.level.levelgen.GenerationStep.Carving step) {
         if (offFaces(chunk.getPos()))
             return;   // the partners' copies were carved (ledger SCL-210)
-        super.applyCarvers(region, seed, random, biomes, structures, chunk, step);
+        boolean cube = cubeLayout() != null;
+        if (cube)
+            ColdBiomeSearch.begin();   // the carvers' biomes as the scratch partner's carvers find them (createBiomes)
+        try {
+            super.applyCarvers(region, seed, random, biomes, structures, chunk, step);
+        } finally {
+            if (cube)
+                ColdBiomeSearch.end();
+        }
         if (step == net.minecraft.world.level.levelgen.GenerationStep.Carving.AIR)
             afterCarvers(chunk);
     }

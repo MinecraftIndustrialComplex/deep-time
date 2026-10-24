@@ -7,8 +7,10 @@ package com.minecraftindustrialcomplex.deeptime.climate;
  * <p>Vanilla's biome search ({@code Climate.RTree.search}) starts from the entry it found last on
  * the thread and keeps it when another entry is exactly as near (it replaces the best only when a
  * nearer one turns up). So where a climate point is equally near two entries, which biome a query
- * gets depends on what the thread asked before. A chunk's biomes carry that order in them; far
- * terrain, which builds the same area on whichever thread asks and in any order, must not. Between
+ * gets depends on what the thread asked before. A polar world's chunks carry that order in their
+ * biomes; far terrain, which builds the same area on whichever thread asks and in any order, must
+ * not, and neither must a cube world's chunks, whose copies off the faces ask their partners' quarts
+ * in another order ({@code GeologicChunkGenerator.createBiomes}). Between
  * {@link #begin()} and {@link #end()} every search on the thread starts cold
  * ({@code mixin.ClimateRTreeMixin}): a tie goes to the first of the entries in the tree's order, the
  * same on every thread. Nests; nothing changes for searches outside.
