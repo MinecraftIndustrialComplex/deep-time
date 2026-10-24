@@ -80,6 +80,11 @@ public final class SiteChunks {
         return (Math.floorMod((cx << 4) + half, c) - half) >> 4;
     }
 
+    /** The x extent of {@code b}'s box sampled: its own, at most one period {@code c}. */
+    private static long spanX(int c, Body b) {
+        return Math.min((long) b.max()[0] - b.min()[0] + 1, c);
+    }
+
     /** The footprint of {@code site} in the level's world data. */
     public static Footprint footprint(LevelSites sites, Site site) {
         Deposits d = sites.deposits();
@@ -95,22 +100,28 @@ public final class SiteChunks {
         // A site's ore bodies are disjoint (one per seam of a stacked deposit, FORMAT.md "Bodies"),
         // so each is sampled over its own bounds and the counts add. The lattice step is set by
         // the bounds' total volume: a stack of thin seams is not one tall box.
+        // The loops run on long and over at most one period in x (the world wraps there): a body's box can
+        // reach the int range's ends (2026-10-24: a placer piece past the pole made a box of ±2^31, and the
+        // int loop overflowed and never ended on the server thread).
         double box = 0;
         for (Body b : ore)
-            box += (double) (b.max()[0] - b.min()[0] + 1) * (b.max()[1] - b.min()[1] + 1) * (b.max()[2] - b.min()[2] + 1);
+            box += (double) spanX(c, b) * ((long) b.max()[1] - b.min()[1] + 1) * ((long) b.max()[2] - b.min()[2] + 1);
         int stride = (int) Math.max(1, Math.ceil(Math.cbrt(box / MAX_SAMPLES)));
         double weight = (double) stride * stride * stride;
         Map<Long, Double> out = new HashMap<>();
         double total = 0;
         for (Body b : ore) {
             int[] min = b.min(), max = b.max();
-            for (int x = min[0]; x <= max[0]; x += stride) {
+            long xEnd = (long) min[0] + spanX(c, b) - 1;
+            for (long xl = min[0]; xl <= xEnd; xl += stride) {
+                int x = xl <= Integer.MAX_VALUE ? (int) xl : (int) Math.floorMod(xl, (long) c);  // Body wraps x itself
                 int cx = canonicalChunkX(c, x >> 4);
-                for (int z = min[2]; z <= max[2]; z += stride) {
+                for (long zl = min[2]; zl <= max[2]; zl += stride) {
+                    int z = (int) zl;
                     long key = ChunkPos.asLong(cx, z >> 4);
                     double column = 0;
-                    for (int y = min[1]; y <= max[1]; y += stride)
-                        if (b.aabbContains(c, x, y, z) && b.locate(c, x, y, z) != null)
+                    for (long yl = min[1]; yl <= max[1]; yl += stride)
+                        if (b.aabbContains(c, x, (int) yl, z) && b.locate(c, x, (int) yl, z) != null)
                             column += weight;
                     if (column > 0) {
                         out.merge(key, column, Double::sum);
