@@ -144,7 +144,14 @@ pub fn voronoi_edge_rad(geo: &Geo, v: u32, u: u32) -> f64 {
 /// Voronoi edge is square to its lattice edge, so along a chain of boundary samples these sums
 /// add up to the chord of that stretch of the boundary turned a right angle: its normal times its
 /// straight length, however the lattice zigzags. Zero where `v` has no neighbour on `pu`.
-fn crossing_sum(geo: &Geo, x: DVec3, rot: DQuat, plate_of: &[u32], v: u32, pu: u32) -> DVec3 {
+pub(crate) fn crossing_sum(
+    geo: &Geo,
+    x: DVec3,
+    rot: DQuat,
+    plate_of: &[u32],
+    v: u32,
+    pu: u32,
+) -> DVec3 {
     let pts = geo.points();
     let mut sum = DVec3::ZERO;
     for (u, _) in geo.edges(v) {
@@ -193,6 +200,29 @@ pub fn boundary_normal(
         n += crossing_sum(geo, pos[wi], rot, plate_of, w, pu);
     }
     tangent(pos[v], n).normalize_or_zero()
+}
+
+/// Sample `v`'s share of the straight boundary to plate `pu`, radians: its crossing sum
+/// ([`crossing_sum`]) on the boundary's unit normal `normal` ([`boundary_normal`]), at least 0.
+/// Along a boundary the crossing sums add up to its normal times its straight length, so the
+/// shares of one side's samples add up to the boundary's length with the lattice's zigzag taken
+/// out (where one sample spacing per sample counts a straight boundary about 1.04 times on the
+/// Fibonacci lattice). ledger: PLT-530
+#[allow(clippy::too_many_arguments)]
+pub fn front_share_rad(
+    geo: &Geo,
+    pos: &[DVec3],
+    rots: &[DQuat],
+    samples: &[Sample],
+    plate_of: &[u32],
+    v: usize,
+    pu: u32,
+    normal: DVec3,
+) -> f64 {
+    let rot = rots[samples[v].group as usize];
+    crossing_sum(geo, pos[v], rot, plate_of, v as u32, pu)
+        .dot(normal)
+        .max(0.0)
 }
 
 /// Bird's test of a transform: a boundary whose relative motion lies within 20 degrees of its
@@ -1029,6 +1059,70 @@ mod tests {
         }
         let sphere = 4.0 * std::f64::consts::PI;
         assert!((area / sphere - 1.0).abs() < 0.01, "cells cover {area}");
+    }
+
+    /// A boundary's length by its samples' straight shares (PLT-530): on great circles cut
+    /// across the lattice at random, the shares of either side's boundary samples add up to the
+    /// circle's length within 1.5 %. On a small circle the concave side reads short and the convex
+    /// side long (a crossing edge meets the boundary's normal at a wider angle at its inner end,
+    /// where the radii converge; about ±1.5 % at 30 degrees' radius, ±3 % at 15), and their mean
+    /// is within 1.5 %. One sample spacing per boundary sample (the count before) is the lattice's
+    /// factor over the straight length: 1.04 on average (printed). So a per-km rate laid on the
+    /// shares (subduction erosion's 90 km³/km/Myr, PLT-441; the retreat's 2.5 km/Myr, PLT-522)
+    /// gives its source's rate per km of the boundary.
+    #[test]
+    fn the_straight_shares_add_up_to_the_boundarys_length() {
+        let fx = Fixture::new();
+        let mut st = two_plates(&fx.geo, DVec3::ZERO, |_| false);
+        let rots: Vec<DQuat> = st.groups.iter().map(|g| quat(g.rot)).collect();
+        let spacing = fx.norm.spacing_rad();
+        let mut rng = crate::sphere::SplitMix64::new(7);
+        let mut count_ratio = Vec::new();
+        // Great circles (cos 0) and small circles of 60, 30 and 15 degrees' radius.
+        for cos in [0.0_f64, 0.0, 0.0, 0.0, 0.5, 0.5, 0.866, 0.966] {
+            let axis = rng.unit_vector();
+            let length = 2.0 * std::f64::consts::PI * (1.0 - cos * cos).sqrt();
+            for (i, p) in fx.geo.points().iter().enumerate() {
+                st.samples[i].group = u32::from(p.dot(axis) >= cos);
+            }
+            let pos = crate::plates::geometry::positions(&st, &fx.geo);
+            let plate_of: Vec<u32> = (0..st.samples.len()).map(|i| st.plate_of(i)).collect();
+            let mut ratio = [0.0; 2];
+            for side in 0..2u32 {
+                let (mut share, mut count) = (0.0, 0usize);
+                for i in 0..pos.len() {
+                    let edge = fx
+                        .geo
+                        .edges(i as u32)
+                        .any(|(u, _)| plate_of[u as usize] == 1 - side);
+                    if plate_of[i] != side || !edge {
+                        continue;
+                    }
+                    let other = 1 - side;
+                    let n = boundary_normal(&fx.geo, &pos, &rots, &st.samples, &plate_of, i, other);
+                    share +=
+                        front_share_rad(&fx.geo, &pos, &rots, &st.samples, &plate_of, i, other, n);
+                    count += 1;
+                }
+                ratio[side as usize] = share / length;
+                count_ratio.push(count as f64 * spacing / length);
+                println!(
+                    "circle cos {cos} side {side}: shares / length {:.4}, count {:.4}",
+                    share / length,
+                    count as f64 * spacing / length
+                );
+            }
+            let mean = 0.5 * (ratio[0] + ratio[1]);
+            assert!((mean - 1.0).abs() < 0.015, "circle cos {cos}: {ratio:?}");
+            let tol = if cos == 0.0 { 0.015 } else { 0.04 };
+            assert!(
+                ratio.iter().all(|r| (r - 1.0).abs() < tol),
+                "circle cos {cos}: {ratio:?}"
+            );
+        }
+        let mean = count_ratio.iter().sum::<f64>() / count_ratio.len() as f64;
+        println!("one spacing per boundary sample over the straight length: mean {mean:.3}");
+        assert!((1.0..1.1).contains(&mean), "the count's factor {mean:.3}");
     }
 
     /// The life cycle: nothing begins without a live contact, a long enough front and convergence;
