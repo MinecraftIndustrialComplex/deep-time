@@ -275,9 +275,14 @@ pub fn resolve(
     } else {
         Vec::new()
     };
+    // One-way subduction: crust that went under stays under until the resampling consumes it
+    // (ledger: PLT-542); off, the hiding is found again each step.
+    let held = if env.k.one_way_subduction { HIDDEN } else { 0 };
     for s in &mut state.samples {
+        let keep = s.flags & held;
         s.flags &=
             !(HIDDEN | TRENCH | ARC | HOTSPOT | DIVERGENT | SUBDUCTION_ZONE | EMERGED | FORELAND);
+        s.flags |= keep;
         // The collisions' footprint is stamped again each step they have a front (`belts.rs`).
         // `stacked` stays while the crust stays under (below).
         s.collision_mm_yr = 0.0;
