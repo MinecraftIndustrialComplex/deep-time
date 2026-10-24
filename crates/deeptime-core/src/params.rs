@@ -1071,7 +1071,7 @@ impl Default for TectonicParams {
             front_share: true,               // ledger: PLT-530
             plate_fission: true,             // ledger: PLT-532
             split_inheritance: true,         // ledger: PLT-534
-            level_set_membership: false,     // ledger: PLT-536
+            level_set_membership: true,      // ledger: PLT-536
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
