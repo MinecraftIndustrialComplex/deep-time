@@ -10,7 +10,7 @@
 //! and 96 blocks under it (−1 where there is none), the number of horizons, the second horizon's
 //! top, and the water kind (0 none, 1 bank, 2 river, 3 lake, 4 sea), then with `--scale` the
 //! ground distance one block spans there in metres (`m_per_block`: the projection's local scale, so
-//! real slopes can be read off a Petroff-Guyou world, whose scale varies; SCL-075) and the block's
+//! real slopes can be read off a cube world, whose scale varies; SCL-075) and the block's
 //! latitude and longitude (degrees, the simulation's frame: where it lies on the run's own grids).
 //! `<out>.json` says which channel is which.
 
