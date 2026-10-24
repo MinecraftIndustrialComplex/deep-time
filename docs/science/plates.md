@@ -6812,14 +6812,18 @@ goes to the pieces that border that plate.
   about 1.86. True positions are used because mid-step the lattice's edges between plates are
   stale.
 - **Contacts and slabs.** Every bordering pair keeps the contact and the slab, the subducting side
-  staying the subducting side.
+  staying the subducting side. The slab is one sheet along the trench, so a copy of a slab that
+  was at a front is latent (`SlabTrack::latent`): it pulls only at its own piece's fronts and does
+  not hang, and its first front makes it a slab like any other; a copy that reaches no front is
+  gone after `slab_breakoff_myr` (PLT-184). A copy of a slab that hung hangs on, along its own
+  piece's stretch. (Added after the guard chase below.)
 - **The collision.** It goes with its front, to the pair whose border lies nearest the collision's
   front centroid. The other pairs get the contact without the collision.
 - **What stays.** A boundary that no piece borders stays with the parent and closes as before. A
   pair inside one split plate is not touched, such as the slab an initiation plants under its
   fracture (PLT-270).
 
-There are no new physical constants: 1.5 spacings and 3 samples are how the lattice is read. Six
+There are no new physical constants: 1.5 spacings and 3 samples are how the lattice is read. Seven
 unit tests cover the law and each of its paths:
 
 - in `inherit.rs`:
@@ -6829,6 +6833,8 @@ unit tests cover the law and each of its paths:
   - an overriding plate split behind its arc: the strip beside the trench takes the trench, slab
     and collision, and the polar part keeps nothing;
   - a boundary that no piece borders is untouched;
+  - `a_split_plates_pieces_pull_with_the_parents_slab_force`: the slab pull and suction summed over
+    the pieces equal the parent's (the guard chase below);
 - `a_fission_hands_the_cut_off_piece_the_trench_it_borders` (`ridges.rs`);
 - `the_fragments_of_a_rifted_plate_keep_the_trench_they_border` (`rifting.rs`);
 - `an_initiation_hands_the_sinking_plate_the_trench_it_borders` (`rifting.rs`).
@@ -6891,6 +6897,69 @@ ledger status:
 Fission and the inheritance are correct by the lane's rule: their unit tests pass against their
 sources, the runs do not diverge and the guard does not fail. So `plate_fission` and
 `split_inheritance` are on by default from 2026-10-24 (the coordinator's call, the same day).
+
+**The speed guard (the guard chase, 2026-10-24).** On the 8k test planet (8,000 samples,
+scattered continents, 300 Myr) the speed guard (250 mm/yr at a plate's farthest point, PLT-022)
+bound on 5 of seeds 1 to 24 with fission and the inheritance (seeds 2, 3, 9, 14 and 15, for 1 to 6
+plate-steps each), on 2 with fission alone (5 and 15) and on none with neither. The inheritance
+alone bound on all 5 of the seeds it was run on (3, 11, 14, 18 and 23, 1 to 5 plate-steps). On the
+16k planet of the pool, fl-fission2's 8 runs never bind. The coordinator held the merge on it, his
+suspect being the slab counted twice: both pieces keep the whole slab where both border the other
+plate.
+
+- **The pull is not counted twice at the fronts.** A slab pulls per front edge (`forces.rs`): the
+  pull on a front sample is the slab's weight times its length down the dip over 700 km, times one
+  spacing of trench. The length is not a share of the trench, so each piece keeps all of it and
+  pulls only along its own stretch, and the pieces' front edges are the parent's. A trace of every
+  slab force (a test-only patch, 24 seeds) shows it at the binds: on seed 2, the plate the guard
+  held was pulled by a copied slab along 21 front edges and a moved one along 11, which were
+  the parent's 32.
+- **A smaller over-count was there.** A piece that borders the other plate only across a ridge or
+  a transform also took a copy, and with no front it hung along the piece's whole border (a slab
+  with no front hangs, PLT-271) for up to `slab_breakoff_myr`. Of the 27 to 71 slabs copied per
+  run, 6 to 25 never reached a front; the copies' hanging pull was 1.3 to 3.2 % of a run's slab
+  force (median 2.1 %, though part of it is the copies of slabs that hung before the split, which
+  rightly hang on). No bind was at one. The fix: a copy of a slab that was at a front is latent
+  (`SlabTrack::latent`) and pulls only at its own piece's fronts until its first one; a copy of a
+  slab that hung hangs on along its own piece's stretch. The unit test
+  `a_split_plates_pieces_pull_with_the_parents_slab_force` (`inherit.rs`) checks that the pull's
+  and the suction's torques summed over a split plate's pieces equal the parent's to 1e-9, for a
+  split across the trench and along it, on either plate, and for a hanging slab; without the
+  latent copy the splits along the trench fail it.
+- **The sweep again, with the fix.** With fission and the inheritance the guard binds on 2 of
+  seeds 1 to 24 (15 for 2 plate-steps, 16 for 1), against 5 before; the inheritance alone on 2 of
+  its 5 (11 for 3, 14 for 2), against 5. The planet is chaotic, so part of the drop is a reshuffle
+  of the runs, not the fix: no bind before it was at a hanging copy. The binds that remain are of
+  the same kind (traced as above): on seed 15 a plate of 37 samples born of plate 14 36 Myr
+  before, which subducts under it along 10 front edges; on seed 11 (the inheritance alone) one of
+  the starting plates, down to 28 to 35 samples, with a plate subducting under it along 10 to 13
+  edges; on seed 14 (the inheritance alone) a piece of 3 samples being consumed, the same bind as
+  before the fix. Seed 16's one plate-step is not in the step records, which list the plates alive
+  at the step's end, so it was a plate removed in the step it bound.
+- **What the guard holds: small plates ringed by trenches.** Every bind, before the fix and after,
+  is a plate of at most 131 visible samples (1.6 % of the sphere; the floor is 24, PLT-091) with
+  other plates subducting beneath it along 30 % to all of its boundary (10 to 33 front edges).
+  Most are plates born of a split whose parent subducts under them, so with the inheritance they
+  take the parent's other trenches at once; two are tiny plates being consumed (3 and 21 samples).
+  The overriding plate's slab suction is a fixed 0.3 of the slab pull per metre of trench
+  (PLT-186), against the basal drag of its area, so its speed grows as its trench over its area,
+  about 1/√area for a round plate.
+- **Earth's fast small plates are of this kind.** Bevis et al. 1995 (the abstract, as a search
+  summary gave it; not read): convergence across the Tonga trench rises northwards to about
+  240 mm/yr, and the Lau basin behind it opens at up to about 160 mm/yr, the northern Tonga ridge
+  moving as a rigid microplate. So a small plate on a trench reaching the guard's 250 mm/yr is not
+  unphysical in itself; that the model's small plates reach it with a fixed suction is the open
+  question.
+- **What it would take.** The suction is a force that does not depend on how fast the trench
+  retreats: a small overriding plate is drawn on whatever the slab's rollback. A suction that
+  saturates with the trench's retreat (the overriding plate drawn no faster than the hinge rolls
+  back) would bound these plates by the physics, not by the guard. It is not built: the
+  coordinator's call.
+- **The weld tests' seeds.** With the fix, 11 of seeds 1 to 24 weld (1, 2, 8, 11 to 14, 16, 20,
+  22 and 23). The collisions test is on its original seed 12 again. The recording test stays on
+  seed 20: its original seed 19 still does not weld, and its seed is the next that welds, chosen by
+  the weld, not by the guard (on welding seed 16 the guard binds once, which that test asserts
+  against).
 
 **Known limit: merges.** When two plates merge (a healed rift, a weld, a plate absorbed under the
 floor), the dead plate's contacts with third plates still close. That is the same law in reverse,
