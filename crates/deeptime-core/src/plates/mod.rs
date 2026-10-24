@@ -683,6 +683,16 @@ impl PlatesStage {
             if let Some(ev) = done.event {
                 causes.insert(under, ev);
             }
+            if cut_trace::on() {
+                let what = if done.sutured {
+                    ["weld:under", "weld:over", "weld:other"]
+                } else if done.deferred {
+                    ["deferred:under", "deferred:over", "deferred:other"]
+                } else {
+                    ["transfer:under", "transfer:over", "transfer:other"]
+                };
+                cut_trace::mark_pair(st, &cache.geo, what, under, over);
+            }
             sutured |= done.sutured;
             merged.extend([under, over]);
         }

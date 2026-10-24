@@ -783,8 +783,11 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 15, 16, 18 to 20, 22 and 23, seeds 12, 18 and 19 twice, seeds 7, 9, 10 and 24 no more; 7
     // of seeds 1 to 24 with V1 gap 2's ridge segments, initiation off the passive margin, stress
     // weights, rifts along thin lithosphere and the reversal by the arc's crust on by default,
-    // 2026-10-23: 4, 12, 14, 17, 18, 19 and 21, seed 17 twice, seed 2 no more).
-    let p = preset(8000, 300.0, "scattered_continents", 17);
+    // 2026-10-23: 4, 12, 14, 17, 18, 19 and 21, seed 17 twice, seed 2 no more; 11 of seeds 1 to
+    // 24 with the fronts by their straight share on by default, PLT-530, 2026-10-24, the sweep
+    // `weld_seed_sweep`: 2, 6, 9, 11 to 13, 15, 16 and 18 to 20, seeds 12, 15 and 19 twice, seeds
+    // 4, 14, 17 and 21 no more; this test and the recording test pass on all 11).
+    let p = preset(8000, 300.0, "scattered_continents", 12);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -921,8 +924,9 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // `collisions_weld_on_stall_and_transfer_on_shortening` says which seeds weld; seed 2 until
     // V1 gap 2's stages went on by default, 2026-10-23, then seed 4: of the welding seeds 4, 12,
     // 14, 19 and 21 pass, 17 puts the mix's fronts 32 % over the plates' in one step and 18 fails
-    // another check).
-    let p = preset(8000, 300.0, "scattered_continents", 4);
+    // another check; seed 19 since the fronts by their straight share went on by default,
+    // PLT-530, 2026-10-24, when seed 4 no longer welds: all 11 welding seeds pass).
+    let p = preset(8000, 300.0, "scattered_continents", 19);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
@@ -2289,17 +2293,24 @@ fn the_final_heat_flow_pass_lifts_only_low_continental_samples() {
 /// The front lane's cut trace (2026-10-24, plates.md "The front's length: why the plates are
 /// ragged"): which part of the step cuts the plates into pieces, over the quick preset's
 /// defaults. A diagnosis, not a check: it prints each part's samples cut off their plate and
-/// joined back, and the share cut off at the end of every 50 Myr.
+/// joined back, and the share cut off at the end of every 50 Myr; then the same with
+/// `plate_fission` (PLT-532) on, and its globals.
 #[test]
 #[ignore = "diagnosis: 300 Myr at 40k samples; run with --release -- --ignored --nocapture"]
 fn where_the_plates_are_cut() {
     cut_trace::enable(true);
-    for (start, seed) in [("supercontinent", 1), ("scattered_continents", 2)] {
-        let p = preset(40_000, 300.0, start, seed);
+    for (start, seed, fission) in [
+        ("supercontinent", 1, false),
+        ("scattered_continents", 2, false),
+        ("supercontinent", 1, true),
+        ("scattered_continents", 2, true),
+    ] {
+        let mut p = preset(40_000, 300.0, start, seed);
+        p.tectonics.plate_fission = fission;
         let _ = cut_trace::take();
         let mut shares = Vec::new();
         let mut next = 50.0;
-        run_stage(&p, |stage, _, st| {
+        let world = run_stage(&p, |stage, _, st| {
             if st.t_myr - p.t_start_years() / 1.0e6 >= next {
                 let geo = &stage.cache.as_ref().unwrap().geo;
                 let visible = st.samples.iter().filter(|s| !s.is_hidden()).count();
@@ -2309,7 +2320,16 @@ fn where_the_plates_are_cut() {
             }
         });
         let parts = cut_trace::take();
-        eprintln!("{start} seed {seed}: cut share, plates every 50 Myr {shares:.3?}");
+        eprintln!(
+            "{start} seed {seed} fission {fission}: cut share, plates every 50 Myr {shares:.3?}"
+        );
+        let g = |k: &str| world.globals.get(k).copied().unwrap_or(0.0);
+        eprintln!(
+            "  fission births {} samples {} captured {}",
+            g(ridges::FISSION_GLOBAL),
+            g(ridges::FISSION_SAMPLES_GLOBAL),
+            g(ridges::CAPTURED_SAMPLES_GLOBAL)
+        );
         for part in &parts {
             eprintln!(
                 "  {:<15} cut {:>8} joined {:>8} net {:>+8} marks {}",
