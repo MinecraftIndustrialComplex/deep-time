@@ -107,47 +107,6 @@ fn angle(a: [f64; 3], b: [f64; 3]) -> f64 {
 
 // --- the seams -------------------------------------------------------------------------------------
 
-/// `f` at net point (x, z), blended across the cube's turning seams (ledger: SCL-125): within
-/// `reach` blocks of a turning net edge, inside its face, `f` is mixed with its value at the point
-/// beyond the partner edge that shows the same planet point (where the other face's net
-/// coordinates go on), half and half on the seam and fading to the point's own value at `reach`
-/// (a smoothstep). Both faces then read the same value on the seam, so a pattern drawn in net
-/// coordinates (noise) runs on across it. Away from the turning seams, and past the net, `f` alone.
-/// Near a corner the nearer edge's partner is taken.
-pub fn seam_blend(cube: &Cube, x: f64, z: f64, reach: f64, f: impl Fn(f64, f64) -> f64) -> f64 {
-    let here = f(x, z);
-    if reach <= 0.0 {
-        return here;
-    }
-    let xw = cube.wrap_x_point(x);
-    let edges = cube.edges();
-    let mut best: Option<(usize, f64)> = None;
-    for (k, e) in edges.iter().enumerate().skip(2) {
-        let (n, t) = match e.axis {
-            Axis::X => (xw, z),
-            Axis::Z => (z, xw),
-        };
-        if t < e.span[0] as f64 || t > e.span[1] as f64 {
-            continue;
-        }
-        // How far inside the face (the planet's side of the line).
-        let d = match e.beyond {
-            Side::Min => n - e.coord as f64,
-            Side::Max => e.coord as f64 - n,
-        };
-        if (0.0..reach).contains(&d) && best.is_none_or(|(_, bd)| d < bd) {
-            best = Some((k, d));
-        }
-    }
-    let Some((k, d)) = best else {
-        return here;
-    };
-    let (px, pz) = edges[edges[k].partner].iso.inverse().point(xw, z);
-    let t = d / reach;
-    let w = 0.5 * (1.0 - t * t * (3.0 - 2.0 * t));
-    (1.0 - w) * here + w * f(px, pz)
-}
-
 /// Which seam a step between two faces crosses: `direct` (neighbours in the net: F3|F0, F0|F1,
 /// F1|F2, N|F0, S|F0), `slide` (F2|F3, the east-west wrap) or `turning` (glued by a quarter or a
 /// half turn), or `none` on one face.
@@ -2213,50 +2172,6 @@ mod tests {
             ((f64::from(a) + 0.5) * r - half) / half,
             ((f64::from(b) + 0.5) * r - half) / half,
         )
-    }
-
-    /// SCL-125: on every turning seam both faces read the same blended value, and a point
-    /// away from the turning seams reads the field itself.
-    #[test]
-    fn seam_blend_agrees_across_every_turning_seam() {
-        let cube = Cube::shared(256);
-        let f = |x: f64, z: f64| (x * 0.031).sin() + (z * 0.017).cos() + 0.001 * x;
-        let reach = 32.0;
-        let mut checked = 0;
-        for (k, e) in cube.edges().iter().enumerate().skip(2) {
-            let partner = &cube.edges()[e.partner];
-            for step in 1..8 {
-                let t = e.span[0] as f64 + (e.span[1] - e.span[0]) as f64 * f64::from(step) / 8.0;
-                let p = match e.axis {
-                    Axis::X => (e.coord as f64, t),
-                    Axis::Z => (t, e.coord as f64),
-                };
-                // The same planet point seen from the partner's face.
-                let q = partner.iso.inverse().point(p.0, p.1);
-                assert_eq!(edge_under(cube, q, 1e-9), Some(e.partner), "edge {k}");
-                let a = seam_blend(cube, p.0, p.1, reach, f);
-                let b = seam_blend(cube, q.0, q.1, reach, f);
-                assert!((a - b).abs() < 1e-9, "edge {k} at {p:?}: {a} vs {b}");
-                // Half and half on the seam.
-                assert!((a - 0.5 * (f(p.0, p.1) + f(q.0, q.1))).abs() < 1e-9);
-                checked += 1;
-            }
-        }
-        assert_eq!(checked, 12 * 7);
-        // F1's centre: no turning seam within reach.
-        assert_eq!(seam_blend(cube, 256.0, 0.0, reach, f), f(256.0, 0.0));
-        // At the reach the blend has faded out.
-        let e = &cube.edges()[2];
-        let mid = 0.5 * (e.span[0] + e.span[1]) as f64;
-        let inward = match e.beyond {
-            Side::Min => reach,
-            Side::Max => -reach,
-        };
-        let p = match e.axis {
-            Axis::X => (e.coord as f64 + inward, mid),
-            Axis::Z => (mid, e.coord as f64 + inward),
-        };
-        assert_eq!(seam_blend(cube, p.0, p.1, reach, f), f(p.0, p.1));
     }
 
     /// SCL-122: the settle's distances are great-circle distances to the nearest source, found

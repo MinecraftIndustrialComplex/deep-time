@@ -3,7 +3,7 @@
 Status of this page: `stage 1 (written with the feature, cube plan phase 2, 2026-10-23; nothing here
 is physical, every row is a game choice)`.
 
-Ledger ids on this page: `SCL-210`, `SCL-211`, `POL-031`, with `SCL-108`, `SCL-127` and `POL-022`
+Ledger ids on this page: `SCL-210`, `SCL-211`, `SCL-215`, `POL-031`, with `SCL-108`, `SCL-127` and `POL-022`
 to `POL-024` from earlier pages (see [claims.md](claims.md)).
 
 ## What you see in the world
@@ -69,6 +69,16 @@ the game uses them:
    ground; columns past the corners are the same deep ocean. Distant Horizons' curvature takes the
    radius of the sphere with the six faces' area, s·sqrt(3/(2π)) (SCL-078: 2,653 blocks at 16k,
    5,130 at 32k), not the period's 4s/(2π), and Toroidal World's guard checks the period 4s.
+7. **The detail noise** (`worlddata/DetailNoise`, Rust's `detail::DetailSpec::cube_noise`,
+   SCL-215). The game adds a small noise term to the baked ground (the detail layer's amplitude
+   times a noise of 32-block wavelength). On a cube world that noise is laid on the cube's surface,
+   not on the net: a block's centre goes to its face by the fold (a block off the faces to its
+   partner's point), and the noise is value noise on a lattice drawn on the cube, whose lines meet
+   the cube's edges (m = max(1, round(s/λ)) cells along each edge, so 32 at s = 1,024). Two faces
+   meeting at an edge share the lattice points on it, so the noise runs on through every seam and
+   corner with no blend, and a block off the faces reads its partner's value exactly. The bake's
+   own relief noises (the jag, the cliff bands' levels) are the same function, so the bake and the
+   game agree on the ground at a seam. Petroff-Guyou and Lambert worlds keep the plain noise.
 
 ## Equations and constants
 
@@ -77,6 +87,7 @@ the game uses them:
 | SCL-108 | bands beyond the turning edges | a face width deep, nearer edge wins, ties to the earlier edge | blocks | cube-world-plan.md section 1.4 | `game-choice` |
 | SCL-210 | the fill off the faces | partners' biomes; partners' terrain copied and turned at the surface step; no starts, features or mobs | rule | docs/design/cube-game.md section 2 | `game-choice` |
 | SCL-211 | deep ocean past the corners | OCEAN_DEPTH = 64 below sea level | blocks | docs/design/cube-game.md section 2 | `game-choice` |
+| SCL-215 | the detail noise on the cube's surface | value noise on a surface lattice, m = max(1, round(s/λ)) cells per cube edge, fade f²(3 − 2f), octaves as the plain noise | blocks | cube-world-plan.md G3; FORMAT.md "The detail layer" | `game-choice` |
 | POL-022 | the stop line's inset | 1 block inside each turning edge; put back 0.05 block inside it | blocks | FORMAT.md "The world's layout" | `game-choice` |
 | POL-023 | the warning band | 24 blocks, every 40 ticks | blocks, ticks | code | `game-choice` |
 | POL-031 | arrivals folded | FOLD_DEPTH = 16 outside the planet | blocks | docs/design/cube-game.md section 5 | `game-choice` |
@@ -104,7 +115,7 @@ at most 1.05 blocks apart on the sphere (R 707.6 blocks); the border puts a play
 or past the corners back on the planet (4.55 and 92.7 blocks), folds one 100 blocks past N-east
 onto F1 with its yaw turned 90°, and leaves both poles and the face centres alone.
 
-Far terrain (stage 2, 2026-10-24, the 4k cube, `farTerrainMatchesTheCube` with the other 13 cube and
+Far terrain (stage 2, 2026-10-23, the 4k cube, `farTerrainMatchesTheCube` with the other 13 cube and
 far terrain tests): against the chunks the game generated, 168 columns in the 16 blocks inside the
 turning edges (167 at the same ground height, all within 1 block), 168 past them (165 exact, all
 within 1), 40 across the slide and 132 across Toroidal World's seam (all exact), and the 4 corners of
@@ -125,8 +136,9 @@ and 228 of them in the 2,048 blocks west and east of the slide and 210 and 362 b
 - Lava flows (G16) do not yet cross turning seams.
 - Far terrain past a turning edge is the fill's ground, so it has no trees or structures either;
   the area is drawn column by column there (its cost there was not measured apart).
-- The detail noise (G3) is not yet blended across turning seams, so the ground can step by the
-  detail term's amplitude at a turning edge (the bake blends its own relief noises, SCL-125).
+- The surface noise's lattice is square on each face in net blocks, so where the map's local
+  scale σ varies across a face the noise's texture is stretched with it on the planet, as the
+  plain noise's is on the other projections; in blocks it is the same everywhere.
 - Sable ships are not stopped by the cube border yet.
 
 ## Game choices
