@@ -28,6 +28,8 @@ public final class ClientSetup {
         modBus.addListener(RegisterPresetEditorsEvent.class, e -> {
             e.register(PlanetGenerators.PLANET, PlanetEditorScreen::create);
             e.register(PlanetGenerators.PLANET_32K, PlanetEditorScreen::create);
+            e.register(PlanetGenerators.PLANET_CUBE, PlanetEditorScreen::create);
+            e.register(PlanetGenerators.PLANET_CUBE_32K, PlanetEditorScreen::create);
         });
         modBus.addListener(FMLClientSetupEvent.class, e -> {
             cleanupInBackground();

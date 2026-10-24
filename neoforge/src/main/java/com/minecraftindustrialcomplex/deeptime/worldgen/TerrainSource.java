@@ -28,19 +28,27 @@ public interface TerrainSource {
     }
 
     /**
-     * Whether the level is a seamless Petroff–Guyou world (format 0.5): its north and south edges are
-     * glued by half-turns and the terrain past them is the folded inside (no pole caps, nothing
+     * Whether the level is a seamless world, Petroff–Guyou (format 0.5) or the cube (0.7): its turning
+     * edges are glued by turns and the terrain past them is the folded inside (no pole caps, nothing
      * "beyond the pole"). False on a Lambert world and on the analytic test terrains.
      */
     default boolean seamless() {
         return false;
     }
 
+    /** Whether the level is the cube world (format 0.7, docs/design/cube-game.md). */
+    default boolean cube() {
+        return false;
+    }
+
     /**
      * The half-extent of the world in z, blocks: the poles R = C/2π of a Lambert world, the turning
-     * edges b/2 of a seamless one. The z range a census or a probe walks.
+     * edges b/2 of a Petroff–Guyou one, the net's 3s/2 (the polar faces' outer edges) on the cube.
+     * The z range a census or a probe walks.
      */
     default double zHalf() {
+        if (cube())
+            return 3.0 * circumference() / 8.0;
         return seamless() ? circumference() / 4.0 : com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(circumference());
     }
 

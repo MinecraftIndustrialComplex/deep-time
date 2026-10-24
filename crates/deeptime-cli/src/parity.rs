@@ -18,6 +18,10 @@
 //! A world with folds and faults (P2-01) gets 25 % inside the windows of random structural events,
 //! half of them within a few blocks of the event's centre line (a fault's trace), and the
 //! fixture says how many of its columns the events change (`deformed_columns`).
+//! On a cube world (format 0.7) the seam and pole shares become columns within 40 blocks of the
+//! net's face lines (every edge, both sides of it) and within 48 blocks of the net's vertices (the
+//! cone points), the random share covers the window, and a column past the net's corners (no
+//! planet point) is drawn again until it lands on the planet.
 
 use std::path::Path;
 
@@ -35,21 +39,48 @@ pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
     let c = w.c;
     // The world's z range (the poles on Lambert, the turning edges on Petroff–Guyou), taken
     // symmetric about the equator.
-    let (z0, z1) = w.manifest.world_projection().z_range();
+    let wp = w.manifest.world_projection();
+    let (z0, z1) = wp.z_range();
     let zp = (z1.min(-z0)) as i64;
+    // A cube world's face side (`None`: a polar world).
+    let side = match &wp {
+        deeptime_format::projection::WorldProjection::Cube(v) => Some(v.cube.side()),
+        _ => None,
+    };
     let mut rng = SplitMix(seed);
     let mut out = Vec::with_capacity(n);
     let (seam, poles, bodies) = (n / 10, n / 10, if w.bodies.is_empty() { 0 } else { n / 5 });
-    for _ in 0..seam {
-        let dx = rng.below(80) as i64 - 40;
-        let z = rng.below(2 * zp as u64) as i64 - zp;
-        out.push((c / 2 + dx, z));
-    }
-    for k in 0..poles {
-        let x = rng.below(c as u64) as i64 - c / 2;
-        let d = rng.below(96) as i64 - 32;
-        let z = if k % 2 == 0 { -zp + d } else { zp - 1 - d };
-        out.push((x, z));
+    if let Some(s) = side {
+        // The net's face lines lie at -3s/2 + k s on both axes.
+        let line = |rng: &mut SplitMix, lines: u64| -3 * s / 2 + s * rng.below(lines) as i64;
+        for k in 0..seam {
+            let d = rng.below(80) as i64 - 40;
+            if k % 2 == 0 {
+                let z = rng.below(3 * s as u64) as i64 - 3 * s / 2;
+                out.push((line(&mut rng, 5) + d, z));
+            } else {
+                let x = rng.below(4 * s as u64) as i64 - 3 * s / 2;
+                out.push((x, line(&mut rng, 4) + d));
+            }
+        }
+        for _ in 0..poles {
+            let dx = rng.below(96) as i64 - 48;
+            let dz = rng.below(96) as i64 - 48;
+            let (x, z) = (line(&mut rng, 5), line(&mut rng, 4));
+            out.push((x + dx, z + dz));
+        }
+    } else {
+        for _ in 0..seam {
+            let dx = rng.below(80) as i64 - 40;
+            let z = rng.below(2 * zp as u64) as i64 - zp;
+            out.push((c / 2 + dx, z));
+        }
+        for k in 0..poles {
+            let x = rng.below(c as u64) as i64 - c / 2;
+            let d = rng.below(96) as i64 - 32;
+            let z = if k % 2 == 0 { -zp + d } else { zp - 1 - d };
+            out.push((x, z));
+        }
     }
     for _ in 0..bodies {
         let b = &w.bodies[rng.below(w.bodies.len() as u64) as usize];
@@ -123,6 +154,18 @@ pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
         let x = rng.below(2 * c as u64) as i64 - c;
         let z = rng.below(2 * zp as u64) as i64 - zp;
         out.push((x, z));
+    }
+    if side.is_some() {
+        // Past the net's corners there is no planet: draw such a column again on the planet.
+        let off = |p: (i64, i64)| wp.canonical(p.0 as f64 + 0.5, p.1 as f64 + 0.5).0.is_nan();
+        for p in out.iter_mut() {
+            while off(*p) {
+                *p = (
+                    rng.below(2 * c as u64) as i64 - c,
+                    rng.below(2 * zp as u64) as i64 - zp,
+                );
+            }
+        }
     }
     out
 }

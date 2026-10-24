@@ -52,7 +52,9 @@ import java.util.List;
  *
  * <p>Properties ({@code -Ddeeptime.dev.screenshots.<name>}): {@code length=<Myr>} (the only setting
  * changed by default, so a walk takes minutes), {@code start=<start>} and {@code preset=<family>}
- * (left at the defaults unless given), {@code customize=false} skips the Customize shots,
+ * (left at the defaults unless given), {@code worldtype=<preset id>} picks that world type from the
+ * list before Customize (e.g. {@code deeptime:planet_cube}, cube plan G13; default {@code deeptime:planet}),
+ * {@code projection=<id>} sets the editor's projection, {@code customize=false} skips the Customize shots,
  * {@code layers=a,b,…} the layers shot while the run goes (default plates, Köppen climate, rock,
  * provinces), {@code cancel=false} skips the cancel-and-create-again at the start (by default the
  * first run is cancelled once it has a frame, which returns to Create World; its staging folder must
@@ -324,11 +326,18 @@ final class ScreenshotDriver {
                             DeepTime.LOGGER.error("[deeptime-shot] FAILED: Create World did not open on deeptime:planet");
                         shot("00-create-world-fresh");
                         worldTab(cws);
-                        if (!deepTime)
+                        String wanted = System.getProperty(PROP + ".worldtype", PlanetGenerators.PLANET.location().toString());
+                        boolean onWanted = ui.getWorldType().preset() != null
+                                && ui.getWorldType().preset().unwrapKey().map(k -> k.location().toString().equals(wanted)).orElse(false);
+                        if (!onWanted)
                             ui.getNormalPresetList().stream()
-                                    .filter(e -> e.preset() != null && e.preset().is(PlanetGenerators.PLANET)).findFirst()
+                                    .filter(e -> e.preset() != null
+                                            && e.preset().unwrapKey().map(k -> k.location().toString().equals(wanted)).orElse(false))
+                                    .findFirst()
                                     .ifPresentOrElse(ui::setWorldType,
-                                            () -> DeepTime.LOGGER.error("[deeptime-shot] FAILED: deeptime:planet is not in the world type list"));
+                                            () -> DeepTime.LOGGER.error("[deeptime-shot] FAILED: {} is not in the world type list", wanted));
+                        DeepTime.LOGGER.info("[deeptime-shot] world type: {}", ui.getWorldType().preset() == null ? "custom"
+                                : ui.getWorldType().preset().unwrapKey().map(Object::toString).orElse("?"));
                     } else if (stepTicks == 35) {
                         DeepTime.LOGGER.info("[deeptime-shot] create button blocked: {}", CreateWorldGuard.block(cws.getUiState()));
                         shot("01-create-world-deeptime");
@@ -943,6 +952,9 @@ final class ScreenshotDriver {
         String start = System.getProperty(PROP + ".start", "");
         if (!start.isEmpty())
             model.setStart(start);
+        String projection = System.getProperty(PROP + ".projection", "");
+        if (!projection.isEmpty())
+            model.setChoice(EditorFields.byId("projection"), projection);
         model.setLengthText(System.getProperty(PROP + ".length", "300"));
         DeepTime.LOGGER.info("[deeptime-shot] settings: preset {}, length {} Myr", model.presetName(), System.getProperty(PROP + ".length", "300"));
     }

@@ -31,7 +31,11 @@ public final class Rivers {
     /** The smallest half-width a channel has. */
     public static final double MIN_HALF_WIDTH = 0.71;
 
-    public static final int MOUTH_SEA = 0, MOUTH_LAKE = 1, MOUTH_RIVER = 2;
+    /**
+     * A chain's mouth: the sea, lake {@code into}, chain {@code into}, or (a cube world, format 0.7,
+     * SCL-126) a turning seam, where chain {@code into} runs on from the partner edge.
+     */
+    public static final int MOUTH_SEA = 0, MOUTH_LAKE = 1, MOUTH_RIVER = 2, MOUTH_SEAM = 3;
 
     private final int c, tile, tilesX, tilesZ;
     /** Block x and z of the index's first tile: the world projection's index frame (format 0.5). */
@@ -115,7 +119,7 @@ public final class Rivers {
             mouth[k] = cs.get(a + 8) & 0xFF;
             into[k] = cs.getInt(a + 12);
             from[k] = cs.getInt(a + 16);
-            if (first[k] != next || count[k] < 2 || mouth[k] > MOUTH_RIVER)
+            if (first[k] != next || count[k] < 2 || mouth[k] > MOUTH_SEAM)
                 throw Sectioned.corrupt(path, "chain " + k + " is out of order, short or has an unknown mouth");
             next = first[k] + count[k];
         }

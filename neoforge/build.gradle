@@ -775,11 +775,12 @@ tasks.named('test', Test) {
 
 // ---------------------------------------------------------------------------
 // World-data fixtures for the JUnit parity tests (P0-09): `deeptime synth` at C = 1,024 writes
-// build/test-worlds/{wrap1024,lake1024} and their sample dumps. Plain `cargo`, never
+// build/test-worlds/{wrap1024,lake1024,cube1024} and their sample dumps (cube1024: the synthetic
+// cube world, format 0.7, cube phase 2 G1). Plain `cargo`, never
 // `nix develop` (cold-read review 2, gap 15): the dev shell provides it locally, rustup in CI.
 // ---------------------------------------------------------------------------
 def testWorldsDir = layout.buildDirectory.dir('test-worlds')
-def testWorldTasks = [wrap1024: 'wrap-test', lake1024: 'lake-test'].collect { name, kind ->
+def testWorldTasks = [wrap1024: 'wrap-test', lake1024: 'lake-test', cube1024: 'cube'].collect { name, kind ->
     tasks.register("testWorld${name.capitalize()}", Exec) {
         description = "Writes the ${kind} world-data fixture (C = 1024) with deeptime synth."
         inputs.files(fileTree(new File(repoRoot, 'crates')) { exclude '**/target/**' })
@@ -803,6 +804,18 @@ def lakeWorldParity = tasks.register('testWorldLake1024Parity', Exec) {
     dependsOn 'testWorldLake1024'
     def world = testWorldsDir.map { it.dir('lake1024') }
     def fixture = testWorldsDir.map { it.file('lake1024/parity/columns.json') }
+    outputs.file fixture
+    workingDir repoRoot
+    commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
+            'parity', '--world-data', world.get().asFile.absolutePath, '--columns', '300'
+}
+// Cube phase 2 G1: Rust's column evaluator on the synthetic cube world (the net's face lines and
+// vertices among the columns), for ColumnParityTest.theCubeWorldIsEqual.
+def cubeWorldParity = tasks.register('testWorldCube1024Parity', Exec) {
+    description = "Writes Rust's column evaluator on 300 columns of the cube fixture (cube1024/parity/columns.json)."
+    dependsOn 'testWorldCube1024'
+    def world = testWorldsDir.map { it.dir('cube1024') }
+    def fixture = testWorldsDir.map { it.file('cube1024/parity/columns.json') }
     outputs.file fixture
     workingDir repoRoot
     commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
@@ -866,6 +879,7 @@ def testWorlds = tasks.register('testWorlds') {
     dependsOn depositWorldDump
     dependsOn planetWorldParity
     dependsOn lakeWorldParity
+    dependsOn cubeWorldParity
 }
 tasks.named('test', Test) {
     dependsOn testWorlds

@@ -109,11 +109,11 @@ format versions live together for a while:
   sha256, or whose rotation is not one, before anything else is read. Their version refusal names
   both: `world data 0.9, this Deep Time reads 0.6 (polar worlds) and 0.7 (cube worlds); before 1.0
   worlds are not migrated`.
-- The game (Java) still reads 0.6 only, so it refuses a cube world by its version with the usual
-  message, and refuses `projection.kind` `cube` too should a manifest claim 0.6.
-- Phase 2 moves everything to 0.7 (the workspace's `format_version`, every header's minor), makes
-  the game read cube worlds and drops the polar layouts; 0.6 worlds are then refused. No world is
-  migrated.
+- The game (Java, `worlddata/FormatVersion`) reads both since cube plan G1 (phase 2), with the
+  same pairing rule and the same refusal message: a cube world through the level types
+  `deeptime:planet_cube` and `deeptime:planet_cube_32k` (opt-in), a polar world as before.
+- Phase 2's end moves everything to 0.7 (the workspace's `format_version`, every header's minor)
+  and drops the polar layouts (plan §7.4); 0.6 worlds are then refused. No world is migrated.
 
 ## Folder layout
 
