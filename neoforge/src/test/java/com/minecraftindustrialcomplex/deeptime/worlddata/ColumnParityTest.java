@@ -181,9 +181,14 @@ class ColumnParityTest {
     @Test
     void theProjectionIsRusts() throws IOException {
         JsonObject doc = fixture();
+        checkProjection(doc, WorldData.open(world()).projection());
+    }
+
+    /** {@link #theProjectionIsRusts} on a fixture's {@code projection} object. */
+    static void checkProjection(JsonObject doc, WorldProjection wp) {
         JsonObject p = doc.getAsJsonObject("projection");
-        WorldProjection wp = WorldData.open(world()).projection();
         assertEquals(p.get("kind").getAsString(), wp.kind().id(), "the projection");
+        boolean cube = wp instanceof WorldProjection.Cube;
         boolean exact = wp instanceof PetroffGuyou;
         double tol = exact ? 0.0 : 1e-9;
         JsonArray zr = p.getAsJsonArray("z_range");
@@ -210,6 +215,20 @@ class ColumnParityTest {
             // At a pole every longitude is the same point: compare the planet points then.
             if (Math.abs(q.get(0).getAsDouble()) == 90.0 && !exact)
                 continue;
+            if (cube) {
+                // A point on a cube edge has two images in the net: either is Rust's answer when both
+                // are the lattice point.
+                double rx = q.get(2).getAsDouble(), rz = q.get(3).getAsDouble();
+                if (Math.abs(rx - b[0]) <= 1e-6 && Math.abs(rz - b[1]) <= 1e-6)
+                    continue;
+                for (double[] img : new double[][] {b, {rx, rz}}) {
+                    double[] ll = wp.latLon(img[0], img[1]);
+                    assertEquals(q.get(0).getAsDouble(), ll[0], 1e-6, "latitude of the image " + img[0] + ", " + img[1] + " of " + q);
+                    double dl = Math.abs(q.get(1).getAsDouble() - ll[1]);
+                    assertTrue(Math.min(dl, 360 - dl) <= 1e-6, "longitude of the image " + img[0] + ", " + img[1] + " of " + q);
+                }
+                continue;
+            }
             assertEquals(q.get(2).getAsDouble(), b[0], exact ? 0.0 : 1e-6, "x of " + q);
             assertEquals(q.get(3).getAsDouble(), b[1], exact ? 0.0 : 1e-6, "z of " + q);
         }
@@ -296,6 +315,41 @@ class ColumnParityTest {
         System.out.println("[junit] ColumnParityTest lake1024 columns=" + cols.size() + " equal=" + equal + " lake=" + lakes + " bank=" + banks);
         assertTrue(bad.isEmpty(), (cols.size() - equal) + " columns differ:\n" + String.join("\n", bad));
         assertTrue(lakes > 0, "the fixture reaches the lake");
+    }
+
+    /**
+     * Phase 2 G1 on the synthetic cube world ({@code cube1024}, format 0.7): Rust's column
+     * evaluator and the Java reader's agree on every column of the fixture, the net's face lines and
+     * vertices included (the reads folded through every edge), and the projection is Rust's.
+     */
+    @Test
+    void theCubeWorldIsEqual() throws IOException {
+        Path w = Fixtures.world("cube1024");
+        JsonObject doc = JsonParser.parseString(Files.readString(w.resolve("parity/columns.json"), StandardCharsets.UTF_8))
+                .getAsJsonObject();
+        WorldData wd = WorldData.open(w);
+        assertEquals(FormatVersion.CUBE, doc.get("format_version").getAsString());
+        assertTrue(wd.manifest().cube(), "the cube fixture's manifest is a cube world");
+        checkProjection(doc, wd.projection());
+        int equal = 0, water = 0;
+        List<String> bad = new ArrayList<>();
+        JsonArray cols = doc.getAsJsonArray("columns");
+        for (JsonElement e : cols) {
+            JsonObject r = e.getAsJsonObject();
+            int x = r.get("x").getAsInt(), z = r.get("z").getAsInt();
+            Columns.Sample s = Columns.sample(wd, x, z);
+            List<String> diff = differences(s, r);
+            if (diff.isEmpty())
+                equal++;
+            else if (bad.size() < 10)
+                bad.add("(" + x + ", " + z + "): " + String.join("; ", diff));
+            if (!Double.isNaN(s.water()))
+                water++;
+            assertTrue(!Double.isNaN(s.surface()), "(" + x + ", " + z + ") is on the planet");
+        }
+        System.out.println("[junit] ColumnParityTest cube1024 columns=" + cols.size() + " equal=" + equal + " withWater=" + water);
+        assertTrue(bad.isEmpty(), (cols.size() - equal) + " columns differ:\n" + String.join("\n", bad));
+        assertEquals(300, cols.size(), "the cube fixture's columns");
     }
 
     /** The terrain height the generator reads is the evaluator's surface. */

@@ -837,12 +837,10 @@ public final class BiomeCensus {
      * inputs the game reads bilinear ({@code WorldData.raster}) mix two classes' values.
      */
     static String classBorder(RasterSampler kp, int x, int z, int k) {
-        var grid = kp.desc().grid();
-        double u = (x - (double) grid.originBlockX()) / grid.r(), v = (z - (double) grid.originBlockZ()) / grid.r();
-        long i0 = (long) Math.floor(u), j0 = (long) Math.floor(v);
+        double[] cells = kp.bilinearCells(x, z);
         java.util.TreeSet<String> other = new java.util.TreeSet<>();
         for (int d = 0; d < 4; d++) {
-            double cv = kp.get(i0 + (d & 1), j0 + (d >> 1));
+            double cv = cells[d];
             int ck = Double.isNaN(cv) ? 31 : (int) Math.round(cv);
             if (ck != k)
                 other.add(ck >= 0 && ck < KOPPEN.length ? KOPPEN[ck] : "?" + ck);

@@ -53,6 +53,21 @@ public final class SpawnHandler {
      */
     public static final int EDGE_MARGIN = 64; // ledger: POL-024 (game-choice)
 
+    /**
+     * On a cube world a candidate this close to any image of a cube corner is passed over, blocks (cube
+     * plan W5): the corners are cone points where three faces meet at 270° and the border's segments
+     * end, and the bake keeps them at sea. The same margin as the bake's (SCL-127). Game choice.
+     */
+    public static final int CORNER_MARGIN = 256; // ledger: SCL-127 (game-choice)
+
+    /**
+     * Whether a cube world's candidate block (x, z) is fit to spawn on: on the planet, at least
+     * {@link #EDGE_MARGIN} from every border segment and {@link #CORNER_MARGIN} from every corner image.
+     */
+    public static boolean cubeSpawnOk(com.minecraftindustrialcomplex.deeptime.wrap.CubeBorder border, int x, int z) {
+        return border.spawnOk(x, z, EDGE_MARGIN, CORNER_MARGIN);
+    }
+
     /** The chosen spawn and the candidate record it came from. */
     public record Choice(BlockPos pos, com.google.gson.JsonObject candidate) {}
 
@@ -68,10 +83,12 @@ public final class SpawnHandler {
             int sea = generator.getSeaLevel();
             double zLimit = wd.projection() instanceof com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou pg
                     ? pg.hemisphere() / 2.0 - EDGE_MARGIN : Double.MAX_VALUE;
+            var cube = wd.projection() instanceof com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Cube cw
+                    ? com.minecraftindustrialcomplex.deeptime.wrap.CubeBorder.of(cw.side()) : null;
             for (var e : root.getAsJsonArray("candidates")) {
                 var c = e.getAsJsonObject();
                 int x = c.get("x").getAsInt(), z = c.get("z").getAsInt();
-                if (Math.abs(z) > zLimit)
+                if (Math.abs(z) > zLimit || (cube != null && !cubeSpawnOk(cube, x, z)))
                     continue;
                 int y = generator.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, level.getChunkSource().randomState());
                 if (y > sea)

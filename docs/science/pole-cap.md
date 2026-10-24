@@ -17,6 +17,7 @@ engine joins them (POL-022 to POL-024).
 | [POL](ledger/POL.md) | pole cap | POL-001 to POL-016 (16) |
 | [POL](ledger/POL.md) | projection | POL-017 to POL-021 (5) |
 | [POL](ledger/POL.md) | seamless world's edge border (game side) | POL-022 to POL-024 (3) |
+| [POL](ledger/POL.md) | cube world's border (game side; page [cube-world-game.md](cube-world-game.md)) | POL-031 (1) |
 
 Rows by status: `game-choice` 21, `uncited` 3.
 

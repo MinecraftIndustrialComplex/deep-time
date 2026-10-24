@@ -41,6 +41,7 @@ public final class Columns {
         // The cached stencil: the layer and square it was built for.
         private RasterSampler cachedLayer;
         private long cachedI0 = Long.MIN_VALUE, cachedJ0 = Long.MIN_VALUE;
+        private CubeLayout.Face cachedFace;
         private int cachedMinY;
         private int m;                         // keys
         private int[] keys = new int[64];
@@ -137,8 +138,11 @@ public final class Columns {
             return s1 <= cKb[cn][h] ? h : -1;
         }
 
-        /** Reads the 16 stacks of the square (i0, j0) and everything the columns in it share. */
-        private void build(RasterSampler strata, int minY, long i0, long j0) {
+        /**
+         * Reads the 16 stacks of the square (i0, j0) (on {@code face} of a cube grid, its cells resolved across the
+         * seams; null on the polar grids) and everything the columns in it share.
+         */
+        private void build(RasterSampler strata, int minY, CubeLayout.Face face, long i0, long j0) {
             int k = strata.stackDepth();
             int total = 0;
             for (int b = 0; b < 4; b++) {
@@ -152,15 +156,16 @@ public final class Columns {
                         cKb[cn] = new int[k];
                     }
                     int n = 0;
+                    long cell = strata.cellAt(face, i, j);
                     for (int h = 0; h < k; h++) {
-                        int cls = strata.horizonClass(i, j, h);
-                        short top = strata.horizonTopRaw(i, j, h);
+                        int cls = strata.horizonClassAt(cell, h);
+                        short top = strata.horizonTopRawAt(cell, h);
                         if (cls == 255 || top == Short.MIN_VALUE)
                             break;
                         cTop[cn][n] = top;
                         cClass[cn][n] = cls;
-                        cKt[cn][n] = strata.horizonKeyTop(i, j, h);
-                        cKb[cn][n] = strata.horizonKeyBase(i, j, h);
+                        cKt[cn][n] = strata.horizonKeyTopAt(cell, h);
+                        cKb[cn][n] = strata.horizonKeyBaseAt(cell, h);
                         n++;
                     }
                     cN[cn] = n;
@@ -196,6 +201,7 @@ public final class Columns {
                     over[q * CELLS + cn] = horizonOver(cn, keys[q], keys[q + 1]);
             cachedLayer = strata;
             cachedMinY = minY;
+            cachedFace = face;
             cachedI0 = i0;
             cachedJ0 = j0;
         }
@@ -212,18 +218,36 @@ public final class Columns {
         void fill(WorldData wd, RasterSampler strata, int x, int z) {
             count = 0;
             var grid = strata.desc().grid();
-            long c = (long) grid.w() * grid.r();
-            long wxl = Math.floorMod(x + c / 2, c) - c / 2;
-            double u = (double) (wxl - grid.originBlockX()) / grid.r();
-            double v = (double) ((long) z - grid.originBlockZ()) / grid.r();
-            long i0 = (long) Math.floor(u), j0 = (long) Math.floor(v);
-            double[] bu = bspline(u - i0), bv = bspline(v - j0);
+            // Rust strata::spline_cell: on a cube grid the block's centre on its face, else x folded.
+            CubeLayout.Face face = null;
+            long i0, j0;
+            double fu, fv;
+            if (grid.isCube()) {
+                GridDesc.CubeSpot spot = grid.cubeSpotOfBlock((double) x, (double) z);
+                if (spot == null)
+                    return;
+                face = spot.face();
+                i0 = (long) Math.floor(spot.a());
+                j0 = (long) Math.floor(spot.b());
+                fu = spot.a() - (double) i0;
+                fv = spot.b() - (double) j0;
+            } else {
+                long c = (long) grid.w() * grid.r();
+                long wxl = Math.floorMod(x + c / 2, c) - c / 2;
+                double u = (double) (wxl - grid.originBlockX()) / grid.r();
+                double v = (double) ((long) z - grid.originBlockZ()) / grid.r();
+                i0 = (long) Math.floor(u);
+                j0 = (long) Math.floor(v);
+                fu = u - i0;
+                fv = v - j0;
+            }
+            double[] bu = bspline(fu), bv = bspline(fv);
             for (int b = 0; b < 4; b++)
                 for (int a = 0; a < 4; a++)
                     w[b * 4 + a] = bu[a] * bv[b];
             int minY = wd.manifest().minY();
-            if (cachedLayer != strata || cachedI0 != i0 || cachedJ0 != j0 || cachedMinY != minY)
-                build(strata, minY, i0, j0);
+            if (cachedLayer != strata || cachedI0 != i0 || cachedJ0 != j0 || cachedMinY != minY || cachedFace != face)
+                build(strata, minY, face, i0, j0);
             if (m == 0)
                 return;
             if (m == 1) {

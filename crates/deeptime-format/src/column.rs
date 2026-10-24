@@ -675,6 +675,35 @@ pub fn water_level_at(levels: &impl RasterRead, x: i64, z: i64, reach: i64) -> f
         return own;
     }
     let g = &levels.desc().grid;
+    if g.is_cube() {
+        // On the block centre's face, the cells round it read across the seams, each at its
+        // distance from the block centre (Java `Water.levelAt`'s cube branch, the same operations).
+        let Some(s) = g.cube_spot_of_block(x as f64, z as f64) else {
+            return f64::NAN;
+        };
+        let rr = f64::from(g.r);
+        let span = reach as f64 / rr;
+        let (ci0, ci1) = ((s.a - span).floor() as i64, (s.a + span).ceil() as i64);
+        let (cj0, cj1) = ((s.b - span).floor() as i64, (s.b + span).ceil() as i64);
+        let mut best = f64::NAN;
+        let mut best_d2 = (reach * reach + 1) as f64;
+        for i in ci0..=ci1 {
+            let dx = (i as f64 - s.a) * rr;
+            for j in cj0..=cj1 {
+                let dz = (j as f64 - s.b) * rr;
+                let d2 = dx * dx + dz * dz;
+                if d2 >= best_d2 {
+                    continue;
+                }
+                let v = levels.get_face(s.face, i, j);
+                if !v.is_nan() {
+                    best = v;
+                    best_d2 = d2;
+                }
+            }
+        }
+        return best;
+    }
     let r = i64::from(g.r);
     let (ox, oz) = (g.origin_block_x, g.origin_block_z);
     let i0 = (x - reach - ox).div_euclid(r);

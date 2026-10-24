@@ -73,6 +73,7 @@ public final class PlanetEditorScreen extends Screen {
     /** The {@code PresetEditor} of {@code deeptime:planet}. */
     public static Screen create(CreateWorldScreen parent, WorldCreationContext context) {
         EditorModel m = model(parent.getUiState());
+        followWorldType(parent.getUiState(), m);
         // The dimensions lost the accepted binding (the world type was switched away and back): restore it.
         m.accepted().ifPresent(a -> {
             boolean bound = PlanetGenerators.overworld(context.selectedDimensions())
@@ -90,8 +91,25 @@ public final class PlanetEditorScreen extends Screen {
      */
     static Screen generate(CreateWorldScreen parent) {
         EditorModel m = model(parent.getUiState());
+        followWorldType(parent.getUiState(), m);
         m.generate();
         return create(parent, parent.getUiState().getSettings());
+    }
+
+    /**
+     * A cube world type ({@code deeptime:planet_cube[_32k]}, cube plan G13) picks the cube projection
+     * in the editor when Customize opens or Create is pressed, so the world type a player chose is the
+     * world they get; the editor's own projection field still decides (as for Lambert), and nothing
+     * is changed while a run is accepted.
+     */
+    static void followWorldType(WorldCreationUiState ui, EditorModel m) {
+        var type = ui.getWorldType().preset();
+        if (type == null || !(type.is(PlanetGenerators.PLANET_CUBE) || type.is(PlanetGenerators.PLANET_CUBE_32K))
+                || m.accepted().isPresent())
+            return;
+        var projection = com.minecraftindustrialcomplex.deeptime.screen.model.EditorFields.byId("projection");
+        if (!m.choice(projection).filter("cube"::equals).isPresent())
+            m.setChoice(projection, "cube");
     }
 
     /** The model of a Create World screen (created on first use). */
