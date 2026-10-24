@@ -362,6 +362,23 @@ pub struct Contact {
     /// subduction zone (`subduction::reverse`), and is not confirmed yet itself.
     #[serde(default)]
     pub reversed: bool,
+    /// The contact was active when the lattice was last rebuilt and no overlap has been seen
+    /// since (`tectonics.contact_carry`, PLT-550): a resampling gives every plate fresh,
+    /// unoverlapped crust, so the overlap that makes a contact active takes a few steps to form
+    /// again, but the subduction zone goes on. Set at a resampling ([`super::subduction::carry`]),
+    /// cleared when overlap is seen again (`subduction::resolve`) or the contact has no front
+    /// (`subduction::fronts_finish`).
+    #[serde(default)]
+    pub carried: bool,
+}
+
+impl Contact {
+    /// Whether the contact counts as a working subduction zone at `step`: its overlap was seen at
+    /// this step, or it is carried through a resampling ([`Contact::carried`]). The rules that
+    /// act on the overlap itself (the hiding, a collision's onset) read `last_step` instead.
+    pub fn active(&self, step: u64) -> bool {
+        self.last_step == step || self.carried
+    }
 }
 
 /// A collision: the state of a [`Contact`] from the step continental crust of the subducting

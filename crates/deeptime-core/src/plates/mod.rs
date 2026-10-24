@@ -303,6 +303,7 @@ impl PlatesStage {
                 env.norm.sample_area_km2(),
                 sea_m(world),
                 &world.globals,
+                None,
             );
             b.write_plates(&st.samples, |i| st.plate_of(i), st.t_myr);
             cb = Some(b);
@@ -573,7 +574,16 @@ impl PlatesStage {
         }
         // The boundary mix (measurement only) on the same samples as the fronts, before the
         // collapse below turns any crust over.
-        let mix = dynamics::boundary_mix(st, &cache.geo, &pos, &env);
+        // At a step the crust budget maps, each sample's class too (the maps' front flags).
+        let snapshot_due = step >= self.total
+            || step.is_multiple_of((GAP_SNAPSHOT_MYR / env.dt_myr).round().max(1.0) as u64);
+        let classes: Option<Vec<std::sync::atomic::AtomicU8>> =
+            (snapshot_due && cb.borrow().as_ref().is_some_and(|b| b.maps_on())).then(|| {
+                (0..st.samples.len())
+                    .map(|_| std::sync::atomic::AtomicU8::new(0))
+                    .collect()
+            });
+        let mix = dynamics::boundary_mix(st, &cache.geo, &pos, &env, classes.as_deref());
         book(st, gap_budget::Part::Other);
         lap(&mut clock, "boundary_mix");
         // Crust beyond the thickest column goes down; thickened crust that nothing raises any
@@ -802,6 +812,8 @@ impl PlatesStage {
             ridges::due(st, &env) || ((final_step || sutured) && st.resample_step != st.step);
         if resampling {
             shown::resampling(st, env.t_myr);
+            // The subduction zones go on through the new lattice (ledger: PLT-550).
+            subduction::carry(st, step, env.k.contact_carry);
             let geo = ridges::resample(st, world, &pos, &tree, &cache.geo, &env)?;
             shown::resampled(st);
             if let Some(b) = cb.borrow_mut().as_mut() {
@@ -858,8 +870,11 @@ impl PlatesStage {
         }
         let mut cb = cb.into_inner();
         if let Some(b) = cb.as_mut() {
-            let every = (GAP_SNAPSHOT_MYR / env.dt_myr).round().max(1.0) as u64;
-            if step >= self.total || step.is_multiple_of(every) {
+            if snapshot_due {
+                // The fronts were found on the lattice a resampling has since replaced: none.
+                let fronts: Option<Vec<u8>> = classes
+                    .filter(|_| !resampling)
+                    .map(|c| c.into_iter().map(|x| x.into_inner()).collect());
                 b.snapshot(
                     &st.samples,
                     &pos,
@@ -867,6 +882,7 @@ impl PlatesStage {
                     env.norm.sample_area_km2(),
                     sea_m(world),
                     &world.globals,
+                    fronts.as_deref(),
                 );
                 b.write_plates(&st.samples, |i| st.plate_of(i), env.t_myr);
             }
