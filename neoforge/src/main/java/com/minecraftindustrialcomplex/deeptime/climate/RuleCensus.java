@@ -20,7 +20,10 @@ import java.util.TreeMap;
  * candidates and lies in one of its Köppen classes (read by the census itself, from the layer the rules read:
  * {@code climate/koppen_l2} when the bake wrote it, else {@code climate/koppen}); an
  * exclusive candidate appears only where a rule put it; and the share of cold wetland that took a peatland
- * biome where the pack has one.
+ * biome where the pack has one. That share is of the cold wetland the peatland rule is there to decide (ledger:
+ * BIO-189): a column whose biome a volcano's zone decided (a role's biome, a role's rule, or a rule that holds only
+ * inside a zone, the black beach's) is counted apart, since a volcanic role outranks every ordinary rule (BIO-113)
+ * and the zone's rules come first in the files' order.
  */
 public final class RuleCensus {
 
@@ -28,8 +31,12 @@ public final class RuleCensus {
     private final Map<String, BiomeRules.Bound> byId = new HashMap<>();
     private final Map<String, Map<String, Integer>> decided = new TreeMap<>();
     private final Map<String, Integer> seen = new TreeMap<>();
-    private int columns, notCandidate, wrongClass, exclusiveLeaked, coldWetland, coldWetlandPeat;
+    private int columns, notCandidate, wrongClass, exclusiveLeaked, coldWetland, coldWetlandPeat, coldWetlandVolcanic;
     private final List<String> examples = new java.util.ArrayList<>();
+    /** Cold-wetland columns per decision and biome ("&lt;decision&gt; &lt;biome&gt;"), so a low peatland share names its cause. */
+    private final Map<String, Integer> coldWetlandBy = new TreeMap<>();
+    /** The cold-wetland columns a volcano's zone decided, likewise. */
+    private final Map<String, Integer> coldWetlandVolcanicBy = new TreeMap<>();
 
     public RuleCensus(BiomeRules.Set_ rules) {
         this.rules = rules;
@@ -45,7 +52,8 @@ public final class RuleCensus {
      *
      * @param decision what decided it ({@link VolcanicBiomes#lastDecision()}), null for the climate search
      * @param koppen   its Köppen code as the census read it
-     * @param coldWet  whether it is cold wetland (the census's own reading of the bake's flag or rule)
+     * @param coldWet  whether it is cold wetland the biome rules may decide (the census's reading of the bake's flag or
+     *                 rule where the query reads its facts, and only where the ordinary rules run)
      */
     public void add(Holder<Biome> b, String decision, String koppen, boolean coldWet) {
         columns++;
@@ -71,11 +79,28 @@ public final class RuleCensus {
                 seen.merge(name, 1, Integer::sum);
                 break;
             }
-        if (coldWet) {
+        if (coldWet && byVolcano(decision, r)) {
+            coldWetlandVolcanic++;
+            coldWetlandVolcanicBy.merge(key + " " + name, 1, Integer::sum);
+        } else if (coldWet) {
             coldWetland++;
             if (b.is(PEATLAND))
                 coldWetlandPeat++;
+            coldWetlandBy.merge(key + " " + name, 1, Integer::sum);
         }
+    }
+
+    /**
+     * Whether a volcano's zone decided a column (ledger: BIO-189): a role's biome ("role:&lt;id&gt;"), a rule of a role
+     * (tried only inside that role's zones, before every ordinary rule), or an ordinary rule that holds only inside a
+     * zone ({@code "volcanic": true}).
+     */
+    private static boolean byVolcano(String decision, BiomeRules.Bound r) {
+        if (decision == null)
+            return false;
+        if (decision.startsWith("role:"))
+            return true;
+        return r != null && (r.rule().role() != null || Boolean.TRUE.equals(r.rule().volcanic()));
     }
 
     static final net.minecraft.tags.TagKey<Biome> PEATLAND = net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BIOME,
@@ -116,6 +141,16 @@ public final class RuleCensus {
 
     public int coldWetlandPeat() {
         return coldWetlandPeat;
+    }
+
+    /** Cold-wetland columns per decision and biome, keyed "&lt;decision&gt; &lt;biome&gt;". */
+    public Map<String, Integer> coldWetlandBy() {
+        return coldWetlandBy;
+    }
+
+    /** The cold-wetland columns a volcano's zone decided ({@link #byVolcano}), not in {@link #coldWetland()}. */
+    public int coldWetlandVolcanic() {
+        return coldWetlandVolcanic;
     }
 
     /** Columns per biome of the rules' candidates (every rule's, role rules included). */
@@ -175,6 +210,13 @@ public final class RuleCensus {
         o.addProperty("exclusive_leaked", exclusiveLeaked);
         o.addProperty("cold_wetland_columns", coldWetland);
         o.addProperty("cold_wetland_on_peatland", coldWetlandPeat);
+        JsonObject cw = new JsonObject();
+        coldWetlandBy.forEach(cw::addProperty);
+        o.add("cold_wetland_by", cw);
+        o.addProperty("cold_wetland_volcanic", coldWetlandVolcanic);
+        JsonObject cv = new JsonObject();
+        coldWetlandVolcanicBy.forEach(cv::addProperty);
+        o.add("cold_wetland_volcanic_by", cv);
         JsonArray ex = new JsonArray();
         examples.forEach(ex::add);
         o.add("examples", ex);

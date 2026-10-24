@@ -386,12 +386,12 @@ public final class VolcanicBiomes {
         if (!r.active)
             return null;
         Climate.TargetPoint t = sampler.sample(qx, qy, qz);
-        Query q = new Query(level, r, source, t, QuartPos.toBlock(qx) + 2, QuartPos.toBlock(qz) + 2);
+        Query q = new Query(level, r, source, t, queryBlock(qx), queryBlock(qz));
         Holder<Biome> b = role(q);
         if (b != null)
             return b;
-        // The biome rules: on land at the surface, never on a river's channel (the variant input is exactly 0 there).
-        if (!r.rules.ordinary().isEmpty() && q.surface() && t.weirdness() != 0L && q.land()) {
+        // The biome rules: on land at the surface, never on a river's channel.
+        if (!r.rules.ordinary().isEmpty() && rulesAt(t) && q.land()) {
             BiomeRules.Column facts = q.facts();
             for (BiomeRules.Bound rule : r.rules.ordinary()) {
                 if (!rule.rule().matches(facts))
@@ -404,6 +404,29 @@ public final class VolcanicBiomes {
             }
         }
         return q.plain();
+    }
+
+    /** The block a biome query at quart coordinate {@code q} reads its column's facts at: the quart's centre. */
+    public static int queryBlock(int q) {
+        return QuartPos.toBlock(q) + 2;
+    }
+
+    /**
+     * Whether the ordinary biome rules may decide a query of target point {@code t} on land ({@link #onLand}): at the
+     * surface, and off a river's channel (the variant input is exactly 0 there). {@link #find} asks it, and so does
+     * the census, which counts the cold wetland the rules decide (ledger: BIO-189).
+     */
+    public static boolean rulesAt(Climate.TargetPoint t) {
+        return t.depth() < SURFACE_DEPTH_Q && t.weirdness() != 0L;
+    }
+
+    /**
+     * Land for a biome query at block column (x, z) whose terrain height is {@code height}: at or above sea level, or in
+     * a closed basin below it (no sea there, HYD-100; ledger: HYD-104). Its own threshold, not {@code Water.seaCovers}
+     * (HYD-109).
+     */
+    public static boolean onLand(WorldDataTerrain terrain, int seaLevel, int x, int z, double height) {
+        return height >= seaLevel || terrain.closedBasin(x, z);
     }
 
     /** One biome query: its column's facts and its plain answer, each computed on first use. */
@@ -437,12 +460,9 @@ public final class VolcanicBiomes {
             return height;
         }
 
-        /**
-         * At or above sea level, or in a closed basin below it (no sea there, HYD-100; ledger: HYD-104). Its own
-         * threshold, not {@code Water.seaCovers} (HYD-109).
-         */
+        /** Land ({@link #onLand}). */
         boolean land() {
-            return height() >= level.seaLevel() || level.terrain().closedBasin(x, z);
+            return onLand(level.terrain(), level.seaLevel(), x, z, height());
         }
 
         /**
