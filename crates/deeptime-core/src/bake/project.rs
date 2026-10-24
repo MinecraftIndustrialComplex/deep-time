@@ -13,7 +13,6 @@
 //! before the cube (SCL-083 to SCL-090) left with the Lambert and Petroff–Guyou worlds (cube plan
 //! §7.4).
 
-use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
@@ -21,26 +20,17 @@ use std::time::Instant;
 use rayon::prelude::*;
 use serde_json::{Value, json};
 
-use deeptime_format::bodies::{read_bodies, write_bodies};
-use deeptime_format::column::CLOSED_BASIN;
 use deeptime_format::fsutil::Flusher;
-use deeptime_format::projection::{
-    BorderSpec, PetroffGuyou, Projection, ProjectionKind, WorldProjection, lat_lon_of_unit,
-};
 use deeptime_format::raster::{RasterRead, bilinear_weights, cover_of};
-use deeptime_format::rivers::{Chain, Mouth, RiverVertex, Rivers, read_rivers, write_rivers};
-use deeptime_format::sites::{read_sites, write_sites_in};
-use deeptime_format::structure::{Shape, read_structure, write_structure};
+use deeptime_format::structure::Shape;
 use deeptime_format::tilepack::write_stored_tiles;
-use deeptime_format::{DType, FileEntry, GridDesc, LayerDesc, LoadedLayer, Manifest, Written};
+use deeptime_format::{DType, GridDesc, LayerDesc, LoadedLayer, Manifest, Written};
 
 use crate::bake::biomes;
-use crate::bake::project_cube::project_body_exact;
 use crate::bake::strata::{Moved, key_shift};
-use crate::bake::{load_layer, stored_tiles};
+use crate::bake::stored_tiles;
 use crate::error::CoreError;
-use crate::hydro;
-use crate::params::{EdgeBorder, LAMBDA_C_AUTO, PlanetPreset};
+use crate::params::PlanetPreset;
 use crate::sphere::around::conjugate_axes;
 use crate::structure::bake_horizons::Horizons;
 
@@ -1303,6 +1293,7 @@ pub fn summary_line(v: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use deeptime_format::column::CLOSED_BASIN;
 
     /// MVT's bodies move through the projection only with their host horizon (by the world
     /// raise of the stacks, not the drawn ground); a porphyry's move with the drawn ground.
