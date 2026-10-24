@@ -10,10 +10,11 @@ the settling's feedback (ISO-061 rewritten, ISO-091 to ISO-093 added; twelve run
 release's pace (ISO-099 added, ISO-056 amended), and the same day for the flexure faults: the
 plate's yield (ISO-120) on by default, the held offsets (ISO-125) and water by basin (ISO-126)
 added and on by default, the solve on the sphere's metric (ISO-127) added and off (it diverges);
-and 2026-10-24 for the foreland basins (ISO-131 added, with PLT-546 in the plate model).
+and 2026-10-24 for the foreland basins (ISO-131 and ISO-133 added, ISO-068 amended, with PLT-546
+in the plate model).
 
 Ledger ids on this page: `ISO-040` to `ISO-077`, `ISO-088` (merged), `ISO-091` to `ISO-093`,
-`ISO-096`, `ISO-097`, `ISO-099`, `ISO-120`, `ISO-125` to `ISO-127`, `ISO-131` (see
+`ISO-096`, `ISO-097`, `ISO-099`, `ISO-120`, `ISO-125` to `ISO-127`, `ISO-131`, `ISO-133` (see
 [ledger/ISO.md](ledger/ISO.md)).
 
 ## What you see in the world
@@ -57,7 +58,10 @@ and the spreading of over-thick crust.
    boundary between two plates is a break: one plate does not hold the other up.
 3. **The solve.** The shell is treated as a thin elastic plate floating on a fluid. The plate
    carried from the last step is in balance with the load it carries; the stage solves only for
-   how far it sinks or rises under this step's change of load. The plate model's uplift counts
+   how far it sinks or rises under this step's change of load. One place is not carried with
+   its crust: beside a collision's belt the plate thrust under it slides through a deflection that
+   stays with the belt, and there the state stays with the belt ("Foreland basins"). The plate
+   model's uplift counts
    only as far as the plate model resolves it: its samples are about 71 km apart (in the plate
    model's Earth-sized kilometres), and what changes from cell to cell below that is left to float
    on its own, as the plate model made it. Crust moved by the spreading floats on its own
@@ -125,6 +129,7 @@ The plate equation, as coded (ISO-040):
 | ISO-125 | The held offsets | cells whose offset the surface holds (gaps between plates, trench rows) hand the plate model's feedback no offset; they count as 0 at their full weight; on by default | – | none (numerics) | `game-choice` |
 | ISO-126 | Water by basin | the open sea at the sea level, a lake at its water balance's level, other ground dry, for the water load and `C`; on by default | – | none (the balance: HYD-050, HYD-057, HYD-100, HYD-101) | `game-choice` |
 | ISO-127 | The solve on the sphere's metric | the Laplacian's east-west coupling 1 / cos²φ at a row's middle, north-south cos²φ at a row boundary; off (the step diverges at the poles) | – | Snyder 1987, eqs. 10-1 to 10-2b | `verified` |
+| ISO-133 | A belt's foreland in the belt's frame | on the carrying plate's crust within `2πα` of a belt it carries, the state is the place's a step ago in the belt's frame; the crust keeps its load and local roots, its load over the place's waits in the unsolved residual | m | the thin plate's equilibrium (ISO-040 to ISO-042): the deflection is set by the load and the plate, not by the plate's past (Beaumont 1981; Flemings & Jordan 1989) | `game-choice` (numerical) |
 | ISO-131 | A belt on the incoming plate | where a collision's footprint carries the incoming plate (PLT-546) the break (ISO-055) takes the carrier as the cell's plate; `Te` = `(Te_own³ + Te_carrier³)^⅓` on the overriding plate's cells, the larger on the wedge, the carrier's from ISO-051 at its lithosphere's thermal age | km | Lyon-Caen & Molnar 1983 (abstract), Burov & Diament 1995 p. 3915, Beaumont 1981, DeCelles & Giles 1996, Watts & Burov 2003, Angevine et al. 1990 eq. 5.8 | `abstract-only` (the composite read in full; the setting from an abstract) |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
@@ -1068,6 +1073,23 @@ of that lithosphere, ISO-110 to ISO-112, which the `Te` law reads). The flexure 
   larger of the two. The carrier's `Te` is the continental law (ISO-051) at its lithosphere's
   thermal age, not floored as orogenic crust: the plate under the belt is not reheated by the
   shortening above it.
+- **keeps the foreland in the belt's frame** (ISO-133). The flexure carries the plate's state with
+  its crust and takes it to be in balance ("Increments, not the whole load", in the code's module
+  notes), which holds where the loads move with the plate. Beside a belt they do not: the belt
+  moves with the overriding plate, and the incoming plate it bends slides under it. Carried with
+  its crust, the foreland's deflection went into the front, so the basin held only what the last
+  few steps' loads had bent, and crust from the forebulge arrived beside the front. Now, on the
+  incoming plate's crust within one flexural wavelength of the belt (`2πα` of the stiffest plate,
+  885 km), the state is the place's a step ago in the belt's frame: the place keeps its deflection
+  and the load the plate held. The crust that slides through keeps its own load and the roots
+  local isostasy put under it, and its load over what the place answered is solved with the
+  step's loads. A plate sliding under a load that stands still then bends as one at rest, as an
+  elastic plate must (the deflection is set by the load and the plate, not by the plate's past),
+  and the foreland's crust subsides as it nears the front (Beaumont 1981; Flemings & Jordan
+  1989). Two other forms were tried and dropped: carrying the plate's bending force with the crust
+  diverged on every pool run (the rigidity jumps of the floor bands), and the footprint carried
+  with the incoming plate moved the break behind the belt through the plate and the belts' local
+  roots with it (14 to 56 km a step).
 
 The basin's fill needed nothing new: what the surface stage lays in the basin is a load as before
 (ISO-061 to ISO-064), and with the stiff plate under the belt it bends the foreland, not only the
@@ -1086,6 +1108,16 @@ cell it lies on.
   plate, its wedge and a foreland of `Te` 80 km. Carried, the basin is 2.07 times as deep; its edge
   is between `πα/2` and `πα` of the front either way, in the same place within a row (the
   incoming plate's `α` sets the width); the overriding plate behind the belt is left alone.
+- `a_foreland_sliding_under_its_belt_bends_as_one_at_rest`: the belt stands still and the
+  foreland slides under it at 0.5 and 1.5 rows a step (10 and 30 km/Myr) for 20 steps of a belt
+  rising by up to 200 m a step. The flexure and the elevation are those of the case at rest to
+  the metre over the belt and the basin (measured the same after 10, 40 and 80 steps), and
+  within 0.5 % of the basin's depth beyond the reach. Carried with the crust, at 10 km/Myr, the
+  basin by the front was 2.5 km deep against 10.3 and ended about 80 km nearer the front, with
+  the forebulge's crust beside it.
+- `a_belts_foreland_is_the_carrying_plates_crust_within_reach`: the reach takes the carrying
+  plate's crust and the wedge within its cells of a belt, across the wrap, and leaves the belt,
+  the overriding plate behind it and a third plate's crust out.
 - `the_footprint_carries_the_incoming_plates_lithosphere` (plates): the wedge and the belt within
   the shortening of the front carry the incoming plate and its foreland's lithosphere; the belt
   beyond the shortening, the foreland and the overriding plate carry nothing; off, nothing does.
