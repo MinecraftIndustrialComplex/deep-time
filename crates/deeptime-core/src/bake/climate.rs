@@ -538,7 +538,10 @@ mod tests {
         assert_eq!(nearest_nodes(-124, -128, 8, 32, true), [(0, 0.5), (1, 0.5)]);
         assert_eq!(nearest_nodes(-123, -128, 8, 32, true), [(1, 1.0), (1, 0.0)]);
         assert_eq!(nearest_nodes(124, -128, 8, 32, true), [(31, 0.5), (0, 0.5)]);
-        assert_eq!(nearest_nodes(126, -64, 8, 16, false), [(15, 1.0), (15, 0.0)]);
+        assert_eq!(
+            nearest_nodes(126, -64, 8, 16, false),
+            [(15, 1.0), (15, 0.0)]
+        );
         assert_eq!(nearest_nodes(-70, -64, 8, 16, false), [(0, 1.0), (0, 0.0)]);
     }
 

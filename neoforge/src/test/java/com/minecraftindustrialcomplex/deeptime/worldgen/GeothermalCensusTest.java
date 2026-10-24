@@ -145,34 +145,9 @@ class GeothermalCensusTest {
             }
         System.out.println("CENSUS fields cells=" + cells + " (" + nx + "x" + nz + ", side " + Math.round(side) + " blocks) draws=" + draws
                 + " continental=" + cont + " atThreshold=" + hot + " atThresholdDry=" + hotDry + " cellsWithOne=" + hotCells);
-        // What the draws could find: each cell's share f of hot dry ground (a 4-block grid), the cells' expected count
-        // of fields sum(1 - (1 - f)^draws) and the chance that no cell finds any, prod((1 - f)^draws).
-        int fine = 4;
-        double expected = 0.0, logNone = 0.0, hotDryKm2 = 0.0, cellKm2 = wx * wz * Math.pow(wd.manifest().mPerBlockH() / 1000.0, 2);
-        int hotCellsAny = 0;
-        for (int gz = 0; gz < nz; gz++)
-            for (int gx = 0; gx < nx; gx++) {
-                long all = 0, good = 0;
-                for (double bz = -pole + gz * wz + fine / 2.0; bz < -pole + (gz + 1) * wz; bz += fine)
-                    for (double bx = -c / 2.0 + gx * wx + fine / 2.0; bx < -c / 2.0 + (gx + 1) * wx; bx += fine) {
-                        int fx = Math.floorMod((int) Math.round(bx) + c / 2, c) - c / 2, fz = (int) Math.round(bz);
-                        all++;
-                        double q = env.heatFlowMwM2(fx, fz);
-                        if (!(q >= rules.heatFlowMinMwM2()))
-                            continue;
-                        if (Magma.top(h.at(fx, fz)) < sea + Geothermal.MIN_ABOVE_SEA + 2 || wet.at(fx, fz) || env.iced(fx, fz))
-                            continue;
-                        good++;
-                    }
-                double f = all == 0 ? 0.0 : (double) good / all;
-                if (good > 0)
-                    hotCellsAny++;
-                hotDryKm2 += f * cellKm2;
-                expected += 1.0 - Math.pow(1.0 - f, Geothermal.HEAT_DRAWS);
-                logNone += Geothermal.HEAT_DRAWS * Math.log1p(-Math.min(f, 0.999999));
-            }
-        System.out.println(String.format("CENSUS hot dry ground %.0f km2 in %d cells; expected cells with a field %.2f; P(none) %.4f",
-                hotDryKm2, hotCellsAny, expected, Math.exp(logNone)));
+        // What the draws could find (Geothermal.heatFlowOdds, the GameTest's figure): each cell's share of hot dry
+        // ground on a 4-block grid, the expected count of cells with a field and the chance that none has one.
+        System.out.println("CENSUS " + Geothermal.heatFlowOdds(rules, h, wet, env, c, sea, wd.manifest().mPerBlockH(), 4));
         // Each active volcano: its crust (the volcano list's flag and whether the heat-flow layer has data there), the
         // heat flow at its summit and the hottest within its base, and the summit's height above the sea.
         for (var v : wd.volcanoes().list()) {
