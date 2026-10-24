@@ -379,6 +379,11 @@ pub fn rift(
             });
         }
     }
+    // The fragments take the boundaries they border (ledger: PLT-534).
+    if k.split_inheritance {
+        let born: Vec<u32> = pids.iter().copied().filter(|&p| p != id).collect();
+        super::inherit::inherit(state, pos, env, &[(id, born)]).book(world);
+    }
     Ok(())
 }
 
@@ -669,6 +674,11 @@ fn initiate(
     state.plates[new_id as usize].birth_event = Some(birth);
     state.counters.plate_births += 1;
     state.counters.initiations += 1;
+    // The sinking plate takes the boundaries it borders (ledger: PLT-534); the slab planted
+    // under the fracture is inside the split and stays.
+    if k.split_inheritance {
+        super::inherit::inherit(state, pos, env, &[(id, vec![new_id])]).book(world);
+    }
     Ok(())
 }
 
@@ -900,6 +910,7 @@ pub(in crate::plates) mod tests {
             dynamics: None,
             gap_budget: None,
             limits: None,
+            level_set: None,
         };
         let pos = positions(&st, geo);
         st.recount(&pos);
@@ -1035,5 +1046,121 @@ pub(in crate::plates) mod tests {
         let (plain, weak) = (split(0.0), split(2.0));
         assert!(plain < 0.3, "the bisector mostly misses the belt: {plain}");
         assert!(weak > 0.8, "the fracture runs in the thin belt: {weak}");
+    }
+
+    /// The plate under a trench, as `inherit`'s tests build it: plate 0 (old floor) subducts under
+    /// plate 1 (z > 0.5) in a collision whose front is at +x, with a slab of 300 km.
+    fn under_a_trench(geo: &Geo, seed: u64) -> (PlateState, DVec3) {
+        use crate::plates::inherit::tests::{add_plate, collision_at, contact};
+        let front = DVec3::new(0.87, 0.0, 0.5).normalize();
+        let mut st = one_plate(geo, seed, |_| old_floor());
+        add_plate(&mut st, geo, 1, |p| p.z > 0.5);
+        let mut c = contact(0, 1, front);
+        c.collision = Some(collision_at(front));
+        st.contacts.push(c);
+        st.slabs.push(SlabTrack {
+            under: 0,
+            over: 1,
+            km: 300.0,
+            ..SlabTrack::default()
+        });
+        (st, front)
+    }
+
+    /// A rift of a subducting plate (Stock & Lee 1994: "The fragmentation of a subducting plate
+    /// creates a new triple junction, two limbs of which are along the trench"; the Farallon
+    /// plate's fission into the Cocos and Nazca plates, whose trench both kept): with
+    /// `split_inheritance` every fragment that borders the overriding plate keeps subducting
+    /// under it with the slab, the collision goes with its front, and a fragment away from the
+    /// trench gets nothing. Off, the parent keeps the one contact and slab. ledger: PLT-534
+    #[test]
+    fn the_fragments_of_a_rifted_plate_keep_the_trench_they_border() {
+        use crate::plates::inherit::tests::assert_inherited;
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let run = |on: bool| {
+            let k = TectonicParams {
+                split_inheritance: on,
+                ..Default::default()
+            };
+            let (mut st, front) = under_a_trench(&geo, 3);
+            let pos = positions(&st, &geo);
+            let mut world = WorldState::new(1, 16_384, 0.0);
+            rift(&mut st, &mut world, &geo, &pos, &env(&k), 0, 3).unwrap();
+            let pieces: Vec<u32> = std::iter::once(0)
+                .chain(
+                    st.plates
+                        .iter()
+                        .filter(|p| p.parent == Some(0))
+                        .map(|p| p.id),
+                )
+                .collect();
+            assert_eq!(pieces.len(), 3, "the plate rifted in three");
+            (st, pos, front, pieces, world)
+        };
+        let k = TectonicParams::default();
+        let (st, pos, front, pieces, world) = run(true);
+        let bordering = assert_inherited(&st, &pos, &env(&k), &pieces, 1, front, 300.0);
+        assert!(
+            bordering.len() >= 2,
+            "two fragments at the trench: {bordering:?}"
+        );
+        assert!(world.globals[crate::plates::inherit::COPIED_GLOBAL] >= 1.0);
+        let (st, ..) = run(false);
+        assert_eq!(st.contacts.len(), 1);
+        assert_eq!((st.contacts[0].under, st.contacts[0].over), (0, 1));
+        assert_eq!(st.slabs.len(), 1);
+    }
+
+    /// A subduction initiation's new plate is a split too: the old floor that sinks takes the
+    /// part of the trench it borders, its slab and the collision at its edge, the parent keeps
+    /// the part it still borders, and the slab planted under the fracture (PLT-270) stays.
+    /// ledger: PLT-534
+    #[test]
+    fn an_initiation_hands_the_sinking_plate_the_trench_it_borders() {
+        use crate::plates::inherit::tests::assert_inherited;
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let k = TectonicParams {
+            split_inheritance: true,
+            ..Default::default()
+        };
+        let (mut st, front) = under_a_trench(&geo, 3);
+        let pos = positions(&st, &geo);
+        let old: Vec<u32> = (0..N as u32)
+            .filter(|&i| st.plate_of(i as usize) == 0 && pos[i as usize].z > 0.0)
+            .collect();
+        let at = DVec3::new(0.95, 0.0, 0.31).normalize();
+        let seed = *old
+            .iter()
+            .min_by(|&&a, &&b| {
+                at.angle_between(pos[a as usize])
+                    .total_cmp(&at.angle_between(pos[b as usize]))
+            })
+            .unwrap();
+        let mut world = WorldState::new(1, 16_384, 0.0);
+        initiate(
+            &mut st,
+            &mut world,
+            &geo,
+            &pos,
+            &env(&k),
+            0,
+            seed,
+            &old,
+            None,
+        )
+        .unwrap();
+        assert_eq!(st.plates.len(), 3, "an initiation");
+        let bordering = assert_inherited(&st, &pos, &env(&k), &[0, 2], 1, front, 300.0);
+        assert_eq!(bordering, vec![0, 2], "both border the trench");
+        assert!(
+            crate::plates::inherit::tests::find(&st, 2, 1)
+                .unwrap()
+                .collision
+                .is_some()
+        );
+        assert_eq!(
+            crate::plates::inherit::tests::slab_of(&st, 2, 0).map(|s| s.km),
+            Some(k.initiation_slab_km)
+        );
     }
 }
