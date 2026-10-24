@@ -6,10 +6,9 @@ import com.google.gson.JsonObject;
 /**
  * A raster in block space, laid out by the world's projection (plan §5.2, FORMAT.md "Grids"). Cell
  * (i, j) is the point sample at block (originBlockX + i·r, originBlockZ + j·r); x wraps with period
- * w·r. Rows past the first or the last clamp ({@link ZEdges#CLAMP}: the simulation's grids and Lambert
- * worlds) or fold through the north and south edges' half-turns ({@link ZEdges#HALF_TURN}: a
- * Petroff–Guyou world, where row −k is row k and row h − 1 + k is row h − 1 − k, both at column
- * w − i). Every reader samples through {@link #cellI}/{@link #cellJ} (Rust {@code GridDesc::cell}).
+ * w·r. Rows past the first or the last clamp ({@link ZEdges#CLAMP}: the simulation's grids and the
+ * Lambert-frame synthetic worlds). Every reader samples through {@link #cellI}/{@link #cellJ} (Rust
+ * {@code GridDesc::cell}).
  *
  * <p>A cube world's grid ({@link #forCube}, {@link ZEdges#CUBE}) is six planes of n × n cells, one per
  * face in the format's order, stacked down the rows (w = n, h = 6n, no x wrap, origin F0's north-west
@@ -22,12 +21,11 @@ public record GridDesc(String name, int w, int h, int r, boolean wrapsX, long or
     /** {@code z_edges}: what a row past the first or the last means. */
     public enum ZEdges {
         CLAMP,
-        HALF_TURN,
         /** A cube world's six stacked faces: an index off a face resolves through the face adjacency ({@link #faceCell}). */
         CUBE
     }
 
-    /** A clamping grid (the simulation's grids, Lambert worlds, synthetic worlds). */
+    /** A clamping grid (the simulation's grids, the Lambert-frame synthetic worlds). */
     public GridDesc(String name, int w, int h, int r, boolean wrapsX, long originBlockX, long originBlockZ) {
         this(name, w, h, r, wrapsX, originBlockX, originBlockZ, ZEdges.CLAMP);
     }
@@ -59,7 +57,6 @@ public record GridDesc(String name, int w, int h, int r, boolean wrapsX, long or
             String s = o.get("z_edges").getAsString();
             z = switch (s) {
                 case "clamp" -> ZEdges.CLAMP;
-                case "half_turn" -> ZEdges.HALF_TURN;
                 default -> throw new IllegalArgumentException("unknown z_edges '" + s + "'");
             };
         }
@@ -89,7 +86,7 @@ public record GridDesc(String name, int w, int h, int r, boolean wrapsX, long or
         return CubeLayout.shared(faceBlocks());
     }
 
-    /** The x period w·r (C on a Lambert world, 2b on a Petroff–Guyou one, 4s on a cube grid). */
+    /** The x period w·r (C on a Lambert-frame world, 4s on a cube grid). */
     public long circumference() {
         return isCube() ? 4L * w * r : (long) w * r;
     }
@@ -112,43 +109,26 @@ public record GridDesc(String name, int w, int h, int r, boolean wrapsX, long or
 
     /** Wraps a column index into [0, w). */
     public int wrapI(long i) {
-        return Projection.wrapColumn(i, w);
+        return (int) Math.floorMod(i, (long) w);
     }
 
     /** Clamps a row index into [0, h − 1]. */
     public int clampJ(long j) {
-        return Projection.clampRow(j, h);
+        return (int) Math.max(0, Math.min(h - 1L, j));
     }
 
     /**
-     * The stored cell of any index pair, packed: {@code (long) row << 32 | column}. Columns wrap; rows
-     * clamp, or fold through the half-turns; on a cube grid the row's plane (clamped to the six) is the
-     * face and the local cell resolves off it ({@link #faceCell}). Use {@link #cellI}/{@link #cellJ} to
-     * unpack.
+     * The stored cell of any index pair, packed: {@code (long) row << 32 | column}. Columns wrap and
+     * rows clamp; on a cube grid the row's plane (clamped to the six) is the face and the local cell
+     * resolves off it ({@link #faceCell}). Use {@link #cellI}/{@link #cellJ} to unpack.
      */
     public long cell(long i, long j) {
-        if (zEdges == ZEdges.CLAMP)
-            return ((long) clampJ(j) << 32) | wrapI(i);
         if (zEdges == ZEdges.CUBE) {
             long n = w;
             int k = (int) Math.max(0, Math.min(5, Math.floorDiv(j, Math.max(n, 1))));
             return faceCell(CubeLayout.Face.fromIndex(k), i, j - k * n);
         }
-        long last = h - 1L;
-        if (last <= 0)
-            return wrapI(i);
-        for (int k = 0; k < 64; k++) {
-            if (j < 0) {
-                j = -j;
-                i = w - i;
-            } else if (j > last) {
-                j = 2 * last - j;
-                i = w - i;
-            } else {
-                break;
-            }
-        }
-        return ((long) (int) Math.max(0, Math.min(last, j)) << 32) | wrapI(i);
+        return ((long) clampJ(j) << 32) | wrapI(i);
     }
 
     /**

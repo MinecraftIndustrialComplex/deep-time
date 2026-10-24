@@ -131,7 +131,7 @@ public final class WorldData {
         return manifest.layout();
     }
 
-    /** C, the east-west period in blocks (2b on a Petroff–Guyou world). */
+    /** C, the east-west period in blocks (4s on a cube world). */
     public int circumference() {
         return manifest.circumference();
     }
