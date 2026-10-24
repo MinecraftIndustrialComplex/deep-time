@@ -783,6 +783,7 @@ mod tests {
             dynamics: None,
             gap_budget: None,
             limits: None,
+            level_set: None,
         };
         let all: Vec<u32> = (0..n as u32).collect();
         let coast = (0..n)

@@ -564,6 +564,7 @@ mod tests {
             dynamics: None,
             gap_budget: None,
             limits: None,
+            level_set: None,
         };
         let pos = positions(&st, geo);
         st.recount(&pos);

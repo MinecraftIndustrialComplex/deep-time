@@ -522,6 +522,11 @@ pub struct SlabTrack {
     pub km: f64,
     pub blocked_myr: f64,
     pub idle_myr: f64,
+    /// A copy a split handed to a piece of a plate (`inherit.rs`, ledger PLT-534) that has had no
+    /// front of its own yet: it pulls only at that piece's fronts and does not hang, so a piece
+    /// that borders the other plate off the trench holds none of the slab, and it is gone after
+    /// `slab_breakoff_myr` with no front. Its first front makes it a slab like any other.
+    pub latent: bool,
 }
 
 /// Counters for the run summary.
@@ -596,6 +601,10 @@ pub struct PlateState {
     pub slabs: Vec<SlabTrack>,
     /// The dynamics record (`dynamics.rs`): measurement only, absent when switched off.
     pub dynamics: Option<super::dynamics::Dynamics>,
+    /// Each sample's distance from its group's outline (`level_set.rs`, ledger PLT-536): set at
+    /// every resampling while `tectonics.level_set_membership` is on, absent while it is off.
+    #[serde(default)]
+    pub level_set: Option<super::level_set::LevelSet>,
     /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
     /// kept in checkpoints.
     #[serde(skip)]

@@ -72,7 +72,10 @@
 //! the subducting plate's samples beside the overriding plate (with suction and slab resistance
 //! as at a front) and is gone after `slab_breakoff_myr` without a front. A subduction initiation
 //! plants a slab of `initiation_slab_km` (`rifting.rs`), which pulls the new plate towards its
-//! parent until the trench forms.
+//! parent until the trench forms. A copy of a slab that a split handed to a piece of a plate
+//! (`inherit.rs`, `SlabTrack::latent`) pulls only at that piece's own fronts until its first one:
+//! the pull of a split plate's pieces is then the parent's, front edge by front edge, and a piece
+//! that borders the other plate across a ridge or a transform hangs none of it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -821,6 +824,7 @@ pub fn step(
         collision_n,
         solved,
         out,
+        ..
     } = balance_step(st, geo, pos, env, flow, sea_m, &mut slabs);
     st.slabs = slabs;
     let recorded = st.dynamics.as_mut().map(|d| {
@@ -860,6 +864,22 @@ struct Balanced {
     collision_n: BTreeMap<usize, f64>,
     solved: bool,
     out: Recorded,
+    /// Each plate's slab pull and suction torques (N m, about the planet's centre, by plate id).
+    #[cfg(test)]
+    torques: Vec<(DVec3, DVec3)>,
+}
+
+/// The slab pull's and the suction's torque on each plate (N m, about the planet's centre, by
+/// plate id) at a balance of `st` as it stands, its slabs left as they are.
+#[cfg(test)]
+pub(in crate::plates) fn slab_torques(
+    st: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    env: &Env<'_>,
+) -> Vec<(DVec3, DVec3)> {
+    let mut slabs = st.slabs.clone();
+    balance_step(st, geo, pos, env, DVec3::Z, 0.0, &mut slabs).torques
 }
 
 fn balance_step(
@@ -899,7 +919,7 @@ fn balance_step(
     });
     let hanging: BTreeSet<(u32, u32)> = slabs
         .iter()
-        .filter(|s| s.km > 0.0)
+        .filter(|s| s.km > 0.0 && !s.latent)
         .map(|s| (s.under, s.over))
         .collect();
 
@@ -999,6 +1019,8 @@ fn balance_step(
             over: c.over,
             ..SlabTrack::default()
         });
+        // A split's copy holds the slab from its first front on (ledger: PLT-534).
+        s.latent = false;
         if grow_slab(s, f, env.dt_myr, k.slab_depth_km, k.slab_breakoff_myr) {
             breakoffs += 1;
         }
@@ -1015,10 +1037,11 @@ fn balance_step(
         }
     }
     by_key.retain(|_, s| s.km > 0.0 && s.idle_myr < k.slab_breakoff_myr - 1e-9);
-    // Slabs that pull along the boundary this step without a front.
+    // Slabs that pull along the boundary this step without a front (a split's copy that has had
+    // no front yet does not, ledger: PLT-534).
     let hang_km: BTreeMap<(u32, u32), f64> = by_key
         .iter()
-        .filter(|(key, _)| !fronted.contains(key))
+        .filter(|(key, s)| !fronted.contains(key) && !s.latent)
         .map(|(&key, s)| (key, s.km))
         .collect();
     *slabs = by_key.into_values().collect();
@@ -1212,6 +1235,8 @@ fn balance_step(
             slabs_km,
             breakoffs,
         },
+        #[cfg(test)]
+        torques: bal.acc.iter().map(|a| (a.t_pull, a.t_suck)).collect(),
     }
 }
 
