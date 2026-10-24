@@ -92,4 +92,22 @@ class ServerConfigTest {
         assertEquals("15,360-block cube world", FirstStartGenerator.describe(15_360, "cube"));
         assertTrue(ServerConfig.template().contains("deeptime:planet_cube"));
     }
+
+    @Test
+    void aCubeLevelTypeTakesEveryBuiltInOfItsSize() {
+        // Cube plan G12: the level type chooses the map, so a cube level type bakes the built-ins of
+        // its notional size as cubes; the other level types take only presets of their own map.
+        assertEquals("earthlike_quick_16k, earthlike_full_16k", FirstStartGenerator.presetsFor(15_360, "cube"));
+        assertEquals("earthlike_quick_32k, earthlike_full_32k", FirstStartGenerator.presetsFor(29_696, "cube"));
+        assertEquals("earthlike_quick_16k, earthlike_full_16k", FirstStartGenerator.presetsFor(13_312, "petroff_guyou"));
+        assertEquals("no built-in preset has that size", FirstStartGenerator.presetsFor(16_384, "lambert"));
+        for (String n : Presets.BUILTIN) {
+            var p = Presets.parseObject(Presets.builtin(n).orElseThrow());
+            var cube = Presets.info(Presets.withProjection(p, "cube"));
+            assertEquals("cube", cube.projection(), n);
+            assertEquals(Presets.info(p).circumference(), cube.circumference(), n);
+            assertEquals(n.endsWith("32k") ? 29_696 : 15_360, cube.worldCircumference().getAsInt(), n);
+            assertEquals("petroff_guyou", Presets.info(p).projection(), n + ": the copy leaves the built-in alone");
+        }
+    }
 }
