@@ -53,12 +53,14 @@ class GeothermalCensusTest {
             System.out.println("CENSUS heatDensity=" + heatDensity + " sites=" + g.sites().size() + " heatFlowSites=" + g.heatFlowSites()
                     + " volcanoesWithSites=" + volcanoes + " by=" + by + " buildMs=" + ms);
         }
-        // The hot ground: the share of land columns (a coarse grid) at each heat-flow level.
+        // The hot ground: the share of land columns (a coarse grid) at each heat-flow level, over the world's own
+        // z span (the projection's, as the fields use; the Lambert pole is not the Petroff-Guyou planet's edge).
         int step = 16;
         long land = 0, withData = 0;
-        long[] over = new long[6];
-        double[] bars = {70, 80, 90, 100, 120, 150};
-        int pole = (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);
+        double[] bars = {41, 45, 50, 55, 60, 70, 80, 100, 120, 150};
+        long[] over = new long[bars.length];
+        double qMax = Double.NEGATIVE_INFINITY;
+        int pole = (int) (Double.isNaN(env.zHalf()) ? com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c) : env.zHalf());
         for (int z = -pole + step / 2; z < pole; z += step)
             for (int x = -c / 2 + step / 2; x < c / 2; x += step) {
                 if (Magma.top(h.at(x, z)) < sea + 5 || wet.at(x, z))
@@ -68,13 +70,85 @@ class GeothermalCensusTest {
                 if (Double.isNaN(q))
                     continue;
                 withData++;
+                qMax = Math.max(qMax, q);
                 for (int k = 0; k < bars.length; k++)
                     if (q >= bars[k])
                         over[k]++;
             }
-        StringBuilder sb = new StringBuilder("CENSUS dry land samples=" + land + " continental=" + withData);
+        StringBuilder sb = new StringBuilder("CENSUS dry land samples=" + land + " continental=" + withData + " zHalf=" + pole
+                + String.format(" qMax=%.1f", qMax));
         for (int k = 0; k < bars.length; k++)
             sb.append(String.format(" >=%.0f:%.4f", bars[k], land == 0 ? 0.0 : (double) over[k] / land));
         System.out.println(sb);
+        // The layer itself, on every land and sea column with data (the four corners of its bilinear read continental).
+        long any = 0, nan = 0;
+        long[] layerOver = new long[bars.length];
+        for (int z = -pole + step / 2; z < pole; z += step)
+            for (int x = -c / 2 + step / 2; x < c / 2; x += step) {
+                double q = env.heatFlowMwM2(x, z);
+                if (Double.isNaN(q)) {
+                    nan++;
+                    continue;
+                }
+                any++;
+                for (int k = 0; k < bars.length; k++)
+                    if (q >= bars[k])
+                        layerOver[k]++;
+            }
+        sb = new StringBuilder("CENSUS layer samples=" + (any + nan) + " continental=" + any);
+        for (int k = 0; k < bars.length; k++)
+            sb.append(String.format(" >=%.0f:%.4f", bars[k], any == 0 ? 0.0 : (double) layerOver[k] / any));
+        System.out.println(sb);
+        // The fields' own funnel (Geothermal.heatFlowFields' cells and draws, read here): of the draws, those on
+        // continental crust, at the threshold, and also dry land clear of ice; the cells with one such draw.
+        double side = Math.sqrt(Geothermal.HEAT_FIELD_AREA_KM2 / rules.heatDensity()) * 1000.0 / wd.manifest().mPerBlockH();
+        int nx = Math.max(1, (int) Math.round(c / side)), nz = Math.max(1, (int) Math.round(2.0 * pole / side));
+        double wx = (double) c / nx, wz = 2.0 * pole / nz;
+        long draws = 0, cont = 0, hot = 0, hotDry = 0, cells = 0, hotCells = 0;
+        for (int gz = 0; gz < nz; gz++)
+            for (int gx = 0; gx < nx; gx++) {
+                java.util.SplittableRandom rng = new java.util.SplittableRandom(
+                        com.minecraftindustrialcomplex.deeptime.rock.PaletteRules.mix(0x4EA7_F10EL ^ ((long) gx << 32) ^ (gz & 0xFFFFFFFFL)));
+                boolean got = false;
+                for (int draw = 0; draw < Geothermal.HEAT_DRAWS; draw++) {
+                    int fx = Math.floorMod((int) Math.round(-c / 2.0 + (gx + rng.nextDouble()) * wx) + c / 2, c) - c / 2;
+                    int fz = (int) Math.round(-pole + (gz + rng.nextDouble()) * wz);
+                    draws++;
+                    double q = env.heatFlowMwM2(fx, fz);
+                    if (Double.isNaN(q))
+                        continue;
+                    cont++;
+                    if (!(q >= rules.heatFlowMinMwM2()))
+                        continue;
+                    hot++;
+                    if (Magma.top(h.at(fx, fz)) < sea + Geothermal.MIN_ABOVE_SEA + 2 || wet.at(fx, fz) || env.iced(fx, fz))
+                        continue;
+                    hotDry++;
+                    got = true;
+                }
+                cells++;
+                if (got)
+                    hotCells++;
+            }
+        System.out.println("CENSUS fields cells=" + cells + " (" + nx + "x" + nz + ", side " + Math.round(side) + " blocks) draws=" + draws
+                + " continental=" + cont + " atThreshold=" + hot + " atThresholdDry=" + hotDry + " cellsWithOne=" + hotCells);
+        // Each active volcano: its crust (the volcano list's flag and whether the heat-flow layer has data there), the
+        // heat flow at its summit and the hottest within its base, and the summit's height above the sea.
+        for (var v : wd.volcanoes().list()) {
+            if (!(v.activity() > 0.0))
+                continue;
+            int vx = Math.floorMod((int) Math.round(v.x()) + c / 2, c) - c / 2, vz = (int) Math.round(v.z());
+            double r = Math.max(6.0, v.radiusM() / wd.manifest().mPerBlockH());
+            double q0 = env.heatFlowMwM2(vx, vz), qm = Double.NaN;
+            for (int dz = (int) -r; dz <= r; dz += 4)
+                for (int dx = (int) -r; dx <= r; dx += 4)
+                    if (dx * dx + dz * dz <= r * r) {
+                        double q = env.heatFlowMwM2(Math.floorMod(vx + dx + c / 2, c) - c / 2, vz + dz);
+                        if (!Double.isNaN(q) && !(q <= qm))
+                            qm = q;
+                    }
+            System.out.println(String.format("CENSUS volcano id=%d kind=%s at=(%d,%d) activity=%.2f oceanic=%s r=%.0f q=%.1f qMaxInBase=%.1f top=%d",
+                    v.id(), v.kind(), vx, vz, v.activity(), v.oceanic(), r, q0, qm, Magma.top(h.at(vx, vz)) - sea));
+        }
     }
 }
