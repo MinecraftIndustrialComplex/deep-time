@@ -8633,7 +8633,7 @@ The sources of the front lane's diagnosis (plates.md "The front's length: why th
 - Reference: Stock, J. M. and Lee, J. (1994). Do microplates in subduction zones leave a geological record? Tectonics 13(6):1472-1487 (the title from memory; the running head reads "Microplates in subduction zones").
 - DOI or URL: 10.1029/94TC01808; CaltechAUTHORS https://authors.library.caltech.edu/records/mdth9-4yp93/files/tect936.pdf
 - Cited as: "Stock & Lee 1994".
-- Ledger ids: PLT-532
+- Ledger ids: PLT-532, PLT-534 (2026-10-24: "The fragmentation of a subducting plate creates a new triple junction, two limbs of which are along the trench"; the Cocos-Rivera-North America triple junction "has not moved much with respect to the North America plate since its inception because subduction of both plates has been nearly orthogonal to the trench", both checked in `tect936.txt`)
 - Access: open copy (the authors' institutional repository).
 - Library (the project's source library, not distributed): fetched 2026-10-24. Files: `StockLee1994/tect936.pdf` (a scan with a text layer), `tect936.txt` (pdftotext -layout).
 - Read so far (by the project): full text, 2026-10-24 (the lane's research agent, then the quotes checked in the library's text). Introduction: "As a spreading center approaches a trench in a subduction setting, the intervening subducted plate may fragment into smaller pieces down to linear dimensions of ~100 km (microplates)"; "However, if a small fragment breaks off a large plate, then it may lose its slab-pull force and become driven entirely by different conditions." "Styles of Microplate Death": the Monterey, Arguello, Guadalupe and Magdalena plates "became attached to the Pacific plate when their ridge boundaries with the Pacific plate stopped spreading"; "None of these microplates became attached to the North America plate." Conclusions: "a very small microplate with insufficient slab-pull force may stagnate or attach itself mainly to the overriding plate".
@@ -8651,10 +8651,10 @@ The sources of the front lane's diagnosis (plates.md "The front's length: why th
 - Reference: Wang, Y., Forsyth, D. W., Rau, C. J., Carriero, N., Schmandt, B., Gaherty, J. B. and Savage, B. (2013). Fossil slabs attached to unsubducted fragments of the Farallon plate. Proceedings of the National Academy of Sciences 110(14):5342-5346 (authors, title and pages from memory).
 - DOI or URL: 10.1073/pnas.1214880110 (open access).
 - Cited as: "Wang et al. 2013".
-- Ledger ids: PLT-532
+- Ledger ids: PLT-532, PLT-534 (2026-10-24)
 - Access: open.
-- Library: not kept (the publisher's page returned a page shell to the VM's fetch, 2026-10-24).
-- Read so far (by the project): full text, 2026-10-24 (the lane's research agent): "Some fragments were incorporated into the Pacific plate as subduction and spreading ceased."
+- Library (the project's source library, not distributed): fetched 2026-10-24 from an authors' institutional copy (the publisher's page had returned a page shell). Files: `Wang2013/wang.pdf`, `wang.txt`.
+- Read so far (by the project): full text, 2026-10-24 (the lane's research agent): "Some fragments were incorporated into the Pacific plate as subduction and spreading ceased." For PLT-534 (checked in `wang.txt`): "Some fragments of the Farallon plate still exist as separate plates subducting beneath North America, including the Cocos and Juan de Fuca plates, which subsequently further fragmented generating the actively subducting Rivera, Gorda, and Explorer microplates" (p. 5342); high-velocity anomalies "which we interpret as the fossil slabs still attached to the remnant oceanic microplates" (p. 5342); "there is no high-velocity anomaly beneath northern Baja California where the spreading center intersected the trench and a slab gap formed" (p. 5343).
 
 ### Nicholson1994
 - Reference: Nicholson, C., Sorlien, C. C., Atwater, T., Crowell, J. C. and Luyendyk, B. P. (1994). Microplate capture, rotation of the western Transverse Ranges, and initiation of the San Andreas transform as a low-angle fault system. Geology 22:491-495 (authors and title from memory).
@@ -8664,3 +8664,83 @@ The sources of the front lane's diagnosis (plates.md "The front's length: why th
 - Access: paywalled.
 - Library: not kept.
 - Read so far (by the project): abstract only, 2026-10-24 (the lane's research agent): the Monterey microplate captured by the Pacific plate at about 20 Ma.
+
+## A boundary belongs to the lithosphere on its two sides (PLT-534), added 2026-10-24
+
+The sources of the front lane's inheritance law (plates.md "Step 3b"). Stock & Lee 1994 and Wang et al. 2013 are above.
+
+### Bevis1995
+- Reference: Bevis, M., Taylor, F. W., Schutz, B. E., Recy, J., Isacks, B. L., Helu, S., Singh, R., Kendrick, E., Stowell, J., Taylor, B. and Calmant, S. (1995). Geodetic observations of very rapid convergence and back-arc extension at the Tonga arc. Nature 374:249-251 (authors, title, year and venue read on the Semantic Scholar record; the pages from a search summary of the Nature page).
+- DOI or URL: 10.1038/374249a0
+- Cited as: "Bevis et al. 1995".
+- Ledger ids: none (context for the speed guard's binds, plates.md Step 3b "The speed guard"; no constant rests on it).
+- Access: paywalled (the Nature page asks for a login; the Semantic Scholar record has no abstract).
+- Library: not kept.
+- Read so far (by the project): not read, 2026-10-24 (the front lane): the abstract as a web search summarised the Nature page, "Convergence rates across the Tonga trench increase northwards to a maximum of ∼240 mm yr−1", the Lau basin "opening at a rate which increases northwards to a maximum of ∼160 mm yr−1", and "No straining is observed within the northern Tonga ridge, suggesting that it comprises part of a rigid microplate".
+
+### Ishizuka2010
+- Reference: Ishizuka, O., Yuasa, M., Tamura, Y., Shukuno, H., Stern, R. J., Naka, J., Joshima, M. and Taylor, R. N. (2010). Migrating shoshonitic magmatism tracks Izu-Bonin-Mariana intra-oceanic arc rift propagation. Earth and Planetary Science Letters 294:111-122 (title, authors and pages read on the copy's first page).
+- DOI or URL: not checked.
+- Cited as: "Ishizuka et al. 2010".
+- Ledger ids: PLT-534
+- Access: paywalled; an open copy on a co-author's institutional site (utdallas.edu).
+- Library (the project's source library, not distributed): fetched 2026-10-24. Files: `Ishizuka2010/ishizuka2010.pdf`, `ishizuka2010.txt`.
+- Read so far (by the project): full text, 2026-10-24 (the lane's research agent; the quote checked in the library's text): section 2, "The West Mariana Ridge (WMR) is a remnant arc (Karig, 1972) that separated from the magmatic arc by opening of the Mariana Trough."
+
+### SternFouchKlemperer2003
+- Reference: Stern, R. J., Fouch, M. J. and Klemperer, S. L. (2003). An overview of the Izu-Bonin-Mariana subduction factory. In: Eiler, J. (ed.), Inside the Subduction Factory, AGU Geophysical Monograph 138:175-222 (the volume, editor and pages from memory; the copy read is the authors' preprint, titled "An Overview of the Izu-Bonin-Mariana Subduction Factory").
+- DOI or URL: not checked.
+- Cited as: "Stern, Fouch & Klemperer 2003".
+- Ledger ids: PLT-534
+- Access: an open preprint.
+- Library (the project's source library, not distributed): fetched 2026-10-24. Files: `Stern2003IBM/stern2003.pdf`, `stern2003.txt`.
+- Read so far (by the project): full text, 2026-10-24 (the lane's research agent; the quote checked in the library's text): the Mariana Trough "is bounded to the east by the active Mariana arc, to the west by the remnant arc of the West Mariana Ridge [Karig, 1972], and to the south by the Challenger Deep part of the Mariana Trench"; the Palau-Kyushu Ridge is "arc crust rifted from the IBM by formation of the Shikoku and Parece-Vela basins".
+
+### Karig1971
+- Reference: Karig, D. E. (1971). Origin and development of marginal basins in the western Pacific. Journal of Geophysical Research 76(11):2542-2561.
+- DOI or URL: 10.1029/JB076i011p02542
+- Cited as: "Karig 1971".
+- Ledger ids: PLT-534
+- Access: paywalled (abstract only, through OpenAlex).
+- Library: not kept.
+- Read so far (by the project): abstract only, 2026-10-24 (the lane's research agent): "the portion of the Benioff zone shallower than 150 km, and lying between the volcanic chain and the trench, remains relatively undeformed along the trend of arc systems"; "as the inter-arc basin opens, the trench is forced to migrate and the Benioff zone is flattened, except in areas where crust can be consumed in a second trench behind the extensional zone."
+
+### TaylorKarner1983
+- Reference: Taylor, B. and Karner, G. D. (1983). On the evolution of marginal basins. Reviews of Geophysics 21(8):1727-1741 (the last page from memory).
+- DOI or URL: 10.1029/RG021i008p01727
+- Cited as: "Taylor & Karner 1983".
+- Ledger ids: PLT-534
+- Access: paywalled (abstract only).
+- Library: not kept.
+- Read so far (by the project): abstract only, 2026-10-24 (the lane's research agent): "(5) rifting of the volcanic arc may occur on either side of the line of active volcanoes (±50 km) and may vary from one side to the other along strike; (6) a remnant arc is not always developed".
+
+### Faccenna2017
+- Reference: Faccenna, C., Oncken, O., Holt, A. F. and Becker, T. W. (2017). Initiation of the Andean orogeny by lower mantle subduction. Earth and Planetary Science Letters 463:189-201 (authors from memory).
+- DOI or URL: not checked.
+- Cited as: "Faccenna et al. 2017".
+- Ledger ids: PLT-534
+- Access: an open preprint (the University of Texas Institute for Geophysics).
+- Library (the project's source library, not distributed): fetched 2026-10-24. Files: `Faccenna2017/f.pdf`, `f.txt`.
+- Read so far (by the project): full text, 2026-10-24 (the lane's research agent): section 3, "At ~130 Ma, the South Atlantic ocean basin started opening, with the separation of South America from Africa"; the introduction, a model "unable to explain why the Nazca subduction system rolled back during the opening of the Southern Atlantic for almost ~100 Myr". That the Andean trench stays with South America because only it borders the Nazca plate is PLT-534's reading, not the paper's (from-memory).
+
+## The outline between the samples (PLT-536), added 2026-10-24
+
+The sources of the front lane's level-set membership (plates.md "Step 3c").
+
+### OsherSethian1988
+- Reference: Osher, S. and Sethian, J. A. (1988). Fronts propagating with curvature-dependent speed: algorithms based on Hamilton-Jacobi formulations. Journal of Computational Physics 79(1):12-49 (the volume and pages from memory; the title and authors read on the copy's first page).
+- DOI or URL: 10.1016/0021-9991(88)90002-2; the authors' copy at https://math.berkeley.edu/~sethian/Papers/sethian.osher.88.pdf
+- Cited as: "Osher & Sethian 1988".
+- Ledger ids: PLT-536
+- Access: an open copy (the author's page).
+- Library (the project's source library, not distributed): fetched 2026-10-24. Files: `OsherSethian1988/os88.pdf`, `os88.txt` (pdftotext -layout).
+- Read so far (by the project): full text, 2026-10-24 (the front lane). Abstract: "We devise new numerical algorithms, called PSC algorithms, for following fronts propagating with curvature-dependent speed ... the front can also be passively advected by an underlying flow ... The algorithms handle topological merging and breaking naturally"; "By viewing the surface as a level set, topological complexities and changes in the moving front are handled naturally"; section III.D: "we initialize ψ by taking ψ(x , 0) = 1 ± d 2, where d is the distance from the point x to the initial surface, and the plus (minus) sign is chosen if x is inside (outside) the initial surface".
+
+### SussmanSmerekaOsher1994
+- Reference: Sussman, M., Smereka, P. and Osher, S. (1994). A level set approach for computing solutions to incompressible two-phase flow. Journal of Computational Physics 114(1):146-159 (authors, title, volume and pages from memory).
+- DOI or URL: 10.1006/jcph.1994.1155
+- Cited as: "Sussman, Smereka & Osher 1994".
+- Ledger ids: PLT-536
+- Access: paywalled; the UCLA CAM report copy did not answer (2026-10-24).
+- Library: not kept.
+- Read so far (by the project): abstract only, 2026-10-24 (the OSTI record): "The interface between the two fluids is considered to be sharp and is described as the zero level set of a smooth function." That the level-set function is kept a signed distance by reinitialising it from its zero level set, which PLT-536 does after every resampling, is the paper's method as the lane remembers it (from-memory).

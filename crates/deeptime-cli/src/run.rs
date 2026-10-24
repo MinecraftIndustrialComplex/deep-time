@@ -267,7 +267,7 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
     };
     Some(
         format!(
-            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} rate_capped_km3={:.3e} rate_lost_km3={:.3e} rate_held_km3={:.3e} collision_crossed_km3={:.3e} collision_kept_km3={:.3e} resample_accreted_km3={:.3e} resample_stacked_km3={:.3e} resample_accreted_continent_km3={:.3e} resample_accreted_visible_km3={:.3e} resample_accreted_rise_km3={:.3e} arc_continental_km3={:.3e} arc_oceanic_km3={:.3e} arc_front_continental_km_myr={:.3e} arc_front_oceanic_km_myr={:.3e} cordillera_shortened_km3={:.3e} hotspot_magma_km3={:.3e} cone_felsic_km3={:.3e} cone_mafic_km3={:.3e} continental_volume_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1}",
+            "{} collapse_km3={:.3e} collapse_gained_km2={:.3e} foundered_km3={:.3e} rate_capped_km3={:.3e} rate_lost_km3={:.3e} rate_held_km3={:.3e} collision_crossed_km3={:.3e} collision_kept_km3={:.3e} resample_accreted_km3={:.3e} resample_stacked_km3={:.3e} resample_accreted_continent_km3={:.3e} resample_accreted_visible_km3={:.3e} resample_accreted_rise_km3={:.3e} arc_continental_km3={:.3e} arc_oceanic_km3={:.3e} arc_front_continental_km_myr={:.3e} arc_front_oceanic_km_myr={:.3e} cordillera_shortened_km3={:.3e} hotspot_magma_km3={:.3e} cone_felsic_km3={:.3e} cone_mafic_km3={:.3e} continental_volume_km3={:.3e} continental_thickness_km_p10/50/90/99={:.1}/{:.1}/{:.1}/{:.1} fission_births={:.0} split_contacts_moved/copied={:.0}/{:.0} split_collisions_moved={:.0} split_slabs_moved/copied={:.0}/{:.0}",
             deeptime_core::plates::stats::summary(st).line(),
             global(collapse::MOVED_GLOBAL),
             global(collapse::GAINED_GLOBAL),
@@ -295,6 +295,12 @@ pub(crate) fn plates_line(world: &deeptime_core::world::WorldState) -> Option<St
             q(0.5),
             q(0.9),
             q(0.99),
+            global(deeptime_core::plates::ridges::FISSION_GLOBAL),
+            global(deeptime_core::plates::inherit::MOVED_GLOBAL),
+            global(deeptime_core::plates::inherit::COPIED_GLOBAL),
+            global(deeptime_core::plates::inherit::COLLISIONS_GLOBAL),
+            global(deeptime_core::plates::inherit::SLABS_MOVED_GLOBAL),
+            global(deeptime_core::plates::inherit::SLABS_COPIED_GLOBAL),
         ) + &crust_bins(st)
             + &st
                 .gap_budget

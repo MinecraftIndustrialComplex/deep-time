@@ -1019,6 +1019,7 @@ mod tests {
             dynamics: None,
             gap_budget: None,
             limits: None,
+            level_set: None,
         };
         let pos = positions(&st, geo);
         st.recount(&pos);
@@ -1632,6 +1633,7 @@ mod tests {
             km: 200.0,
             blocked_myr: 0.0,
             idle_myr: 0.0,
+            latent: false,
         });
         fx.step(&mut st, 1, None);
         let col = st.contacts[0].collision.as_ref().expect("a collision");

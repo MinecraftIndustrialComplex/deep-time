@@ -134,6 +134,14 @@ worst = max(abs(area[nm] - table[nm]["area_sr"]) for nm in area)
 out = {"plates": len(names), "area_worst_sr": worst,
        "area_worst_rel_large": max(abs(area[nm] - table[nm]["area_sr"]) / table[nm]["area_sr"]
                                    for nm in area if table[nm]["area_sr"] > 0.0377)}
+# PB2002's plates at or above the model's floor for a plate (PLT-091, 0.003 of the planet), on the
+# lattice and in Bird's table: the model's plate count reads against this, not against all 52.
+FLOOR_SR = 0.003 * 4.0 * math.pi
+out["plates_at_floor"] = sum(1 for a_ in area.values() if a_ >= FLOOR_SR)
+out["plates_at_floor_table"] = sum(1 for nm in area if table[nm]["area_sr"] >= FLOOR_SR)
+out["floor_area_share"] = sum(a_ for a_ in area.values() if a_ >= FLOOR_SR) / (4.0 * math.pi)
+out["floor_differs"] = sorted(f"{nm} {area[nm]:.4f} (table {table[nm]['area_sr']})" for nm in area
+                              if (area[nm] >= FLOOR_SR) != (table[nm]["area_sr"] >= FLOOR_SR))
 # The dynamics record's estimator: one spacing per sample with a Delaunay neighbour of another plate.
 hull = ConvexHull(xyz)
 tri = hull.simplices
