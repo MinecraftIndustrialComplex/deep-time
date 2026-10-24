@@ -710,7 +710,9 @@ pub struct Months<'a> {
 
 /// What the mapping needs besides the climate.
 pub struct Ground<'a> {
-    /// L2 ground elevation, m (the young landscape's, or the surface's resampled).
+    /// L2 ground elevation, m: the world's own ground, the baked `elevation` layer averaged onto
+    /// L2 (`climate::world_ground_l2`, BIO-187), or in a bake without one the young landscape's or
+    /// the surface's resampled.
     pub elevation_m: &'a [f32],
     pub sea_level_m: f64,
     pub l1: &'a GridDesc,
