@@ -16,8 +16,9 @@ interval. In the model one contact carries a train of states: a hand-off at 100 
 (PLT-068) is followed by a new state the next step on the same contact, so one suture is counted
 about twice. A suture here is the states on one contact (its two plates and its onset)
 whose gaps are at most `shortening::GRACE_MYR` (6 Myr, PLT-225: the model's own time for a
-front to come back), with at least one hand-off; its length is its longest front over 1.84 (the
-lattice boundary's excess over a geodesic one, `measure_boundary.py`).
+front to come back), with at least one hand-off; its length is its longest front (a collision
+front's length, `shortening::Front::length_km`, is already the straight length: the edge's crossing
+sums along the front's normal, PLT-222).
 
   states_per100        hand-off states per 100 Myr (collcoast's hand-off count, all sizes)
   sutures_per100       sutures per 100 Myr (Macdonald et al. 2019: 104 in 540 Myr, 19 per 100 Myr,
@@ -59,7 +60,9 @@ The collisions under way at the end (`open` partings):
                        on the contact with gaps of at most the grace), median by front
   open_conv_med        their median peak convergence, mm/yr
 
-Plain Python. Version 2.
+Plain Python. Version 3 (version 2 divided the fronts by 1.84, taken for the lattice boundary's
+excess over a geodesic one; the collision fronts are straight lengths already, and the lattice's own
+factor is 1.04, PLT-530).
 """
 import json
 import statistics as st
@@ -67,7 +70,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-LATTICE = 1.84  # the lattice boundary over a geodesic one (measure_boundary.py)
+LATTICE = 1.0  # collision fronts are straight lengths (PLT-222); ledger: PLT-512
 GRACE_MYR = 6.0  # shortening::GRACE_MYR, ledger PLT-225
 
 
