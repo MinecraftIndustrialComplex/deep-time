@@ -95,6 +95,22 @@ final class LevelClimate implements DeepTimeClimate {
         return null;
     }
 
+    /**
+     * The nominal horizontal metres per block of {@code level}: its manifest's {@code m_per_block_h} on
+     * a server (the default on a test terrain, as the planet info sends), the planet info's on a
+     * client; NaN for anything else.
+     */
+    static double mPerBlockH(Level level) {
+        if (level == null)
+            return Double.NaN;
+        if (level.isClientSide())
+            return ClientPlanetState.mPerBlockH(level);
+        if (level instanceof ServerLevel server && server.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g)
+            return g.terrain() instanceof WorldDataTerrain t ? t.data().manifest().mPerBlockH()
+                    : com.minecraftindustrialcomplex.deeptime.worlddata.Manifest.DEFAULT_M_PER_BLOCK_H;
+        return Double.NaN;
+    }
+
     @Override
     public boolean isDeepTimeLevel() {
         return deepTime;
