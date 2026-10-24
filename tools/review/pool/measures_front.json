@@ -33,8 +33,8 @@
       ]
     },
     "boundgeom": {
-      "version": 2,
-      "doc": "the boundary's pieces between triple junctions, their tortuosity, the plates' perimeters against spherical caps, the subduction front's runs and the plates' fragments, measured with Bird 2003's divider walks at 77 and 380 km on the visible samples' Delaunay triangulation; needs the crust budget's maps (+DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps). The labels give PB2002 rasterised on the same 100,000-point lattice and put through the same code (tools/review/pool/bird/bird_raster.py), then Bird's own divider numbers; definitions in measure_boundgeom.py (ledger PLT-531)",
+      "version": 3,
+      "doc": "the boundary's pieces between triple junctions, their tortuosity, the plates' perimeters against spherical caps, the convergent front's runs and the plates' fragments, measured with Bird 2003's divider walks at 77 and 380 km on the visible samples' Delaunay triangulation, skipping the snapshots taken at a resampling; the _k7 columns put each map on one fixed lattice first (the model's samples sit on two lattices or more at a boundary, PB2002's raster on one); needs the crust budget's maps (+DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps). The front is the boundary mix's subduction and collision fronts together (the maps' 256 and 512 flags since 2026-10-24; before, the TRENCH flag, which marked collisions' fronts too), so it reads against PB2002's SUB plus CCB, not SUB alone: Bird 2003 classes a continental convergent boundary (CCB, 23,003 km, unpolarised) apart from a subduction zone (SUB, 51,310 km) by the crust on both sides (Table 3, [127]), while the model's mix counts a front wherever an active contact converges, whatever the crust; front_sub is the like-for-like SUB column. Mallard et al. 2016 give Earth's trench length (48,000 km) as context. A like-for-like fix of the measure, not a moved target (plates.md, 'Step 7'; ledger PLT-531). The labels give PB2002 rasterised on the same 100,000-point lattice and put through the same code (tools/review/pool/bird/bird_raster.py), then Bird's own divider numbers; definitions in measure_boundgeom.py",
       "command": ["{py}", "-I", "{tools}/measure_boundgeom.py", "{run}"],
       "python": "numpy",
       "needs": ["rec"],
@@ -49,10 +49,11 @@
         {"key": "piece_p50_l77", "key2": "piece_wmean_l77", "label": "piece length at 77 km: median / length-weighted, km (lattice 1,000 / 4,498; Bird 899 / 1,644)", "target": null, "digits": 0, "pair": true},
         {"key": "tau_sum_l77", "key2": "tau_sum_l380", "label": "tortuosity, sum of lengths over sum of chords, 77 / 380 km (lattice 1.323 / 1.151; Bird 1.220 / 1.143)", "target": null, "digits": 3, "pair": true},
         {"key": "tau_wmean_l77", "key2": "tau_wmean_l380", "label": "tortuosity, length-weighted mean, 77 / 380 km (lattice 1.400 / 1.212; Bird 1.290 / 1.205)", "target": null, "digits": 3, "pair": true},
-        {"key": "tau_front_sum_l77", "key2": "tau_front_sum_l380", "label": "tortuosity of mostly-front pieces, 77 / 380 km (lattice 1.199 / 1.100; Bird SUB 1.145 / 1.110)", "target": null, "digits": 3, "pair": true},
+        {"key": "tau_front_sum_l77", "key2": "tau_front_sum_l380", "label": "tortuosity of mostly-front pieces, 77 / 380 km (lattice SUB + CCB 1.263 / 1.142, SUB alone 1.199; Bird SUB 1.145 / 1.110)", "target": null, "digits": 3, "pair": true},
         {"key": "tau_div_sum_l77", "key2": "tau_other_sum_l77", "label": "tortuosity at 77 km, mostly divergent / the rest (lattice 1.388 / 1.319)", "target": null, "digits": 3, "pair": true},
-        {"key": "share_front", "key2": "share_div", "label": "share of the boundary in mostly-front / mostly-divergent pieces (lattice 0.198 / 0.461)", "target": null, "digits": 3, "pair": true},
-        {"key": "front_l77", "key2": "front_l380", "label": "subduction front at 77 / 380 km, km (lattice 52,564 / 48,406; Bird SUB 51,310)", "target": null, "digits": 0, "pair": true},
+        {"key": "share_front", "key2": "share_div", "label": "share of the boundary in mostly-front / mostly-divergent pieces (lattice SUB + CCB 0.289 / 0.461)", "target": null, "digits": 3, "pair": true},
+        {"key": "front_l77", "key2": "front_l380", "label": "convergent front, subduction and collision, at 77 / 380 km, km (lattice SUB + CCB 79,608 / 72,965; Bird SUB + CCB 74,313)", "target": null, "digits": 0, "pair": true},
+        {"key": "front_sub_l77", "key2": "front_sub_l380", "label": "of it, subduction alone at 77 / 380 km, km (lattice SUB 52,743 / 48,619; Bird SUB 51,310)", "target": null, "digits": 0, "pair": true},
         {"key": "arcfront_l77", "label": "front under oceanic overriding crust at 77 km, km (Stern & Scholl 14,500 of island arc)", "target": null, "digits": 0},
         {"key": "comps_per_plate", "key2": "frag_samples", "label": "connected pieces per plate / samples outside their plate's largest (PB2002 1 / 0)", "target": null, "digits": 3, "pair": true},
         {"key": "e_l380_first", "key2": "e_l380_last", "label": "perimeters over cap perimeters at 380 km, first / last snapshot", "target": null, "digits": 3, "pair": true},
@@ -63,9 +64,17 @@
         {"key": "e_l77_clean", "key2": "e_l380_clean", "label": "each plate one body: perimeters over caps at 77 / 380 km (lattice 1.578 / 1.365)", "target": null, "digits": 3, "pair": true},
         {"key": "junctions_clean", "key2": "loops_clean", "label": "each plate one body: junctions / loops (lattice 98 / 1)", "target": null, "digits": 1, "pair": true},
         {"key": "tau_sum_l77_clean", "key2": "tau_sum_l380_clean", "label": "each plate one body: tortuosity at 77 / 380 km (lattice 1.323 / 1.151)", "target": null, "digits": 3, "pair": true},
-        {"key": "tau_front_sum_l77_clean", "key2": "tau_front_sum_l380_clean", "label": "each plate one body: the front's tortuosity at 77 / 380 km (lattice 1.199 / 1.100)", "target": null, "digits": 3, "pair": true},
-        {"key": "front_l77_clean", "key2": "front_l380_clean", "label": "each plate one body: the front at 77 / 380 km, km (lattice 52,564 / 48,406)", "target": null, "digits": 0, "pair": true},
-        {"key": "arcfront_l77_clean", "label": "each plate one body: the front under oceanic crust at 77 km, km", "target": null, "digits": 0}
+        {"key": "tau_front_sum_l77_clean", "key2": "tau_front_sum_l380_clean", "label": "each plate one body: the front's tortuosity at 77 / 380 km (lattice SUB + CCB 1.263 / 1.142)", "target": null, "digits": 3, "pair": true},
+        {"key": "front_l77_clean", "key2": "front_l380_clean", "label": "each plate one body: the front at 77 / 380 km, km (lattice SUB + CCB 79,608 / 72,965)", "target": null, "digits": 0, "pair": true},
+        {"key": "front_sub_l77_clean", "key2": "front_sub_l380_clean", "label": "each plate one body: subduction alone at 77 / 380 km, km (lattice SUB 52,743 / 48,619)", "target": null, "digits": 0, "pair": true},
+        {"key": "arcfront_l77_clean", "label": "each plate one body: the front under oceanic crust at 77 km, km", "target": null, "digits": 0},
+        {"key": "bnd_l77_k7", "key2": "bnd_l380_k7", "label": "one lattice: boundary at 77 / 380 km, km (PB2002 through the same step 259,814 / 232,613; Bird 246,541 / 231,009)", "target": null, "digits": 0, "pair": true},
+        {"key": "e_l77_k7", "key2": "e_l380_k7", "label": "one lattice: perimeters over cap perimeters at 77 / 380 km (PB2002 1.503 / 1.345; Bird 1.418 / 1.274)", "target": null, "digits": 3, "pair": true},
+        {"key": "front_l77_k7", "key2": "front_l380_k7", "label": "one lattice: the front, subduction and collision, at 77 / 380 km, km (PB2002 SUB + CCB 77,844 / 72,060; Bird 74,313)", "target": null, "digits": 0, "pair": true},
+        {"key": "front_sub_l77_k7", "key2": "front_sub_l380_k7", "label": "one lattice: subduction alone at 77 / 380 km, km (PB2002 SUB 51,614 / 47,982; Bird 51,310)", "target": null, "digits": 0, "pair": true},
+        {"key": "front_trench_l77_k7", "key2": "front_trench_l380_k7", "label": "one lattice: the front as maps without the flags give it (TRENCH), at 77 / 380 km, km (PB2002 SUB, its subducting side flagged, 51,812 / 48,094)", "target": null, "digits": 0, "pair": true},
+        {"key": "tau_front_sum_l77_k7", "key2": "tau_front_sum_l380_k7", "label": "one lattice: tortuosity of mostly-front pieces at 77 / 380 km (PB2002 SUB + CCB 1.247 / 1.138)", "target": null, "digits": 3, "pair": true},
+        {"key": "front_flagged", "key2": "resampled", "label": "snapshots whose front came from the mix's flags, share / snapshots skipped at a resampling", "target": null, "digits": 2, "pair": true}
       ]
     },
     "hiding": {

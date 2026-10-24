@@ -762,7 +762,7 @@ pub fn heal(
     let touching: std::collections::BTreeSet<(u32, u32)> = state
         .contacts
         .iter()
-        .filter(|c| c.last_step + 1 >= env.step)
+        .filter(|c| c.carried || c.last_step + 1 >= env.step) // ledger: PLT-550
         .map(|c| (c.under.min(c.over), c.under.max(c.over)))
         .collect();
     let mut due: Vec<(u32, u32, EventId)> = Vec::new();
