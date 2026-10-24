@@ -9,10 +9,11 @@ the settling's feedback (ISO-061 rewritten, ISO-091 to ISO-093 added; twelve run
 2026-10-23 for the trench rows (ISO-096 and ISO-097 added, ISO-088 merged into ISO-096) and the
 release's pace (ISO-099 added, ISO-056 amended), and the same day for the flexure faults: the
 plate's yield (ISO-120) on by default, the held offsets (ISO-125) and water by basin (ISO-126)
-added and on by default, the solve on the sphere's metric (ISO-127) added and off (it diverges).
+added and on by default, the solve on the sphere's metric (ISO-127) added and off (it diverges);
+and 2026-10-24 for the foreland basins (ISO-131 added, with PLT-546 in the plate model).
 
 Ledger ids on this page: `ISO-040` to `ISO-077`, `ISO-088` (merged), `ISO-091` to `ISO-093`,
-`ISO-096`, `ISO-097`, `ISO-099`, `ISO-120`, `ISO-125` to `ISO-127` (see
+`ISO-096`, `ISO-097`, `ISO-099`, `ISO-120`, `ISO-125` to `ISO-127`, `ISO-131` (see
 [ledger/ISO.md](ledger/ISO.md)).
 
 ## What you see in the world
@@ -29,8 +30,9 @@ shallow ring of deeper water round it. In the one planet looked at closely, 14 %
 stood more than 100 m (5 blocks) away from its floating level and 1.6 % more than 500 m.
 
 Inside wide mountain belts nothing is different: their crust is young and weak and floats locally,
-as before. Deep basins in front of mountain ranges (the Ganges plain) do not appear yet. They need
-the plate model to build a range as a wedge on the edge of a stiff plate, which is later work.
+as before. Since 2026-10-24 a range in an active collision stands on the end of the stiff plate
+that goes under it, which bends down into a basin in front of it (the Ganges plain): see "Foreland
+basins".
 
 ## The model in plain words
 
@@ -123,6 +125,7 @@ The plate equation, as coded (ISO-040):
 | ISO-125 | The held offsets | cells whose offset the surface holds (gaps between plates, trench rows) hand the plate model's feedback no offset; they count as 0 at their full weight; on by default | – | none (numerics) | `game-choice` |
 | ISO-126 | Water by basin | the open sea at the sea level, a lake at its water balance's level, other ground dry, for the water load and `C`; on by default | – | none (the balance: HYD-050, HYD-057, HYD-100, HYD-101) | `game-choice` |
 | ISO-127 | The solve on the sphere's metric | the Laplacian's east-west coupling 1 / cos²φ at a row's middle, north-south cos²φ at a row boundary; off (the step diverges at the poles) | – | Snyder 1987, eqs. 10-1 to 10-2b | `verified` |
+| ISO-131 | A belt on the incoming plate | where a collision's footprint carries the incoming plate (PLT-546) the break (ISO-055) takes the carrier as the cell's plate; `Te` = `(Te_own³ + Te_carrier³)^⅓` on the overriding plate's cells, the larger on the wedge, the carrier's from ISO-051 at its lithosphere's thermal age | km | Lyon-Caen & Molnar 1983 (abstract), Burov & Diament 1995 p. 3915, Beaumont 1981, DeCelles & Giles 1996, Watts & Burov 2003, Angevine et al. 1990 eq. 5.8 | `abstract-only` (the composite read in full; the setting from an abstract) |
 
 Numerical choices (smoothing of `Te`, the solve's cell size, tolerance, the preconditioner) are
 ISO-054 and ISO-057 to ISO-060, all `game-choice`.
@@ -1013,6 +1016,94 @@ unconverged solve, the load a weakening plate lets go (ISO-056), which counts th
 as held, and the surface's answer to a pole that sinks. Each feeds on the unconverged solve, so a
 solve that converges at the poles is the cure; the growth is its symptom.
 
+## Foreland basins
+
+Added 2026-10-24 (ISO-131, PLT-546), V1 gap 6 ([physics-gap-audit.md](physics-gap-audit.md),
+"Gap 6"). The switch is `tectonics.collision_underthrust`; MEASURED-DEFAULT.
+
+**What Earth does.** A thrust belt is a load on the edge of the stiff plate that goes under it, and
+that plate bends down into a foredeep in front of the belt, with a forebulge beyond: foredeeps are
+100 to 300 km wide and hold 2 to 8 km of fill, forebulges 60 to 470 km wide (DeCelles & Giles
+1996, p. 110), for flexural parameters of 26 to 150 km (rigidities 10²¹ to 10²⁴ N m, p. 111). The
+plate under the Ganges basin and the Lesser Himalaya has a rigidity of about 0.7 × 10²⁵ N m, a
+hundred times or more that under the Greater Himalaya, and Lyon-Caen & Molnar 1983 (abstract) fit
+the gravity with the Indian plate bent under the mountains and the Ganga sediments by the range's
+weight and a moment on its end. Its `Te` is 80 to 90 km, the Appalachians' 50 to 60 km (Watts &
+Burov 2003, pp. 117 and 118); forelands are wide where the loads stand on old cratons and narrow on
+young plates such as the Apennines and Taiwan (p. 127). Beaumont 1981 models the Alberta basin on
+a plate continuous under the orogen, with D = 10²⁵ N m (his Fig. 9: `Te` about 83 km), and calls a
+broken plate a "worst case" that would "increase the subsidence immediately beneath the fold-thrust
+belt" (p. 327); Flemings & Jordan 1990 (the full text; their 1989 paper's abstract only) use an
+unbroken plate of `Te` 25 km, Jordan 1981 (abstract) a rigidity of about 10²³ N m. In all of them
+the basin's fill is a load too: the range's sediment fills the basin it bends and bends it deeper
+(DeCelles & Giles 1996: topographic, sediment and subduction loads, p. 111), and Molnar & Lyon-Caen
+1988 (abstract) find some ranges too light for their foredeeps.
+
+**What the model did.** In the four runs of base5 (seeds 1 to 4) the plate check's foredeep in
+front of belts above 3 km was 0 to 36 km wide and 17 to 134 m deep. Two causes:
+
+1. The belt's load stood on the overriding plate, across the plate boundary's break (ISO-055) from
+   the stiff incoming plate, so only the wedge (the incoming plate's own shortened edge) bent the
+   foreland.
+2. Belt and wedge are young orogenic crust: their `Te` is at the floor, 5 km (ISO-051 counts
+   from the orogeny, ISO-055 floors the boundary's cells), so their load floated where it stood.
+
+**The law** (PLT-546, ISO-131). In an active collision the incoming plate's lithosphere goes on
+under the front. The plate model marks the footprint's continental samples that have it under them:
+the wedge, and the belt as far behind the front as the collision has shortened (what crossed the
+front went under it; the belt beyond is the overriding plate's own). Each takes the incoming
+plate's id and the thickness of its foreland's lithosphere (the median over the foreland's
+continental samples, else over the wedge's); where two collisions mark a sample, the faster one's.
+L1 carries them as `plates/carrier_plate_id` and `plates/carrier_thermal_age_myr` (the thermal age
+of that lithosphere, ISO-110 to ISO-112, which the `Te` law reads). The flexure then:
+
+- **moves the break behind the belt.** For the plate boundary's break (ISO-055) a carried cell
+  belongs to its carrying plate, so the break runs between the carried belt and the overriding
+  plate behind it, and the suture itself is no break: the belt and the wedge stand on the end of
+  the incoming plate, a broken plate loaded at its end (Lyon-Caen & Molnar 1983).
+- **gives a carried cell both plates' stiffness.** On the belt's cells, the overriding plate's own
+  lithosphere over the underthrust one, two layers that bend together without a bond:
+  `Te = (Te_own³ + Te_carrier³)^⅓` (decoupled layers, Burov & Diament 1995, p. 3915; welded layers
+  would add, their Eq. 15). On the wedge, the incoming plate's own crust on its own lithosphere, the
+  larger of the two. The carrier's `Te` is the continental law (ISO-051) at its lithosphere's
+  thermal age, not floored as orogenic crust: the plate under the belt is not reheated by the
+  shortening above it.
+
+The basin's fill needed nothing new: what the surface stage lays in the basin is a load as before
+(ISO-061 to ISO-064), and with the stiff plate under the belt it bends the foreland, not only the
+cell it lies on.
+
+**Unit tests.**
+
+- `a_line_load_on_a_broken_plate_gives_the_analytic_profile`: a line load on the end of a plate
+  whose `Te` drops from 30 to 0.5 km at the load. The broken plate bends as
+  `w = w₀ e^(−x/α) cos(x/α)` with `w₀ = 2V / (ρ_m g α) = V α³ / 2D` when the whole load is on its
+  end (the textbooks' `V α³ / 4D`, Angevine et al. 1990 eq. 5.8, shares `V` between the two broken
+  ends). The end's depth is within 6 % of it on 2.5 km cells and converges at first order (the
+  error halves with the cell), the first zero within 1.5 % of `πα/2` (the continuous plate's is at
+  `3πα/4`), the bulge within two cells of `3πα/4` at −6.7 % of the depth (within 0.2 %).
+- `a_belt_carried_by_the_incoming_plate_bends_a_wide_foreland_basin`: a belt on the overriding
+  plate, its wedge and a foreland of `Te` 80 km. Carried, the basin is 2.07 times as deep; its edge
+  is between `πα/2` and `πα` of the front either way, in the same place within a row (the
+  incoming plate's `α` sets the width); the overriding plate behind the belt is left alone.
+- `the_footprint_carries_the_incoming_plates_lithosphere` (plates): the wedge and the belt within
+  the shortening of the front carry the incoming plate and its foreland's lithosphere; the belt
+  beyond the shortening, the foreland and the overriding plate carry nothing; off, nothing does.
+
+MEASURED-POOL
+
+**Simplifications.**
+
+- The carried lithosphere lasts as long as the collision: when the front stops converging the
+  carrier goes, the belt's `Te` falls back to its own and the plate lets go of what the carrier held
+  (ISO-056, at ISO-099's pace). On Earth the underthrust plate stays under the belt (India under
+  southern Tibet).
+- Its reach is the collision's shortening, not a slab's geometry: the dip and the end of the
+  underthrust plate are not followed, and a long collision carries the whole belt.
+- One lithosphere thickness per front (its foreland's median).
+- Behind a carried belt the break separates the belt from the overriding plate, so no retro-foreland
+  basin forms there (the Himalaya's case; the Andes' retroarc basins are a subduction setting).
+
 ## Game choices
 
 - **Flexural lengths are Earth-normalized** (ISO-057): the plate's kilometres are the plate
@@ -1106,5 +1197,11 @@ By their keys in [bibliography.md](bibliography.md), section "Lithospheric flexu
 - `CODATA2022_G`: NIST's value page for G, read 2026-10-23 by the polar-peaks agent (ISO-120).
 - `Snyder1987` (chapter 10, chapter 4), `Hetenyi1946` (chapter 1): full text, read 2026-10-23 by a
   Sonnet sub-agent of the flexure-faults agent, the equations checked on page images (ISO-127).
+- `Beaumont1981`, `DeCellesGiles1996_flexure`, `BurovDiament1995`, `WattsBurov2003`,
+  `FlemingsJordan1990`, `Angevine1990` (chapter 5): full text; `Jordan1981`, `FlemingsJordan1989`,
+  `LyonCaenMolnar1983`, `MolnarLyonCaen1988`: abstracts. Read 2026-10-24 by a Sonnet sub-agent of
+  the gap 6 agent (ISO-131, PLT-546); the broken plate's end depth (Angevine et al. eq. 5.8) checked
+  by the agent. Watts 2001 (the book) was not obtained; Watts & Burov 2003 stands in for its
+  forelands' `Te`.
 
 The sources from `TurcotteSchubert_Geodynamics` to `DeCellesGiles1996_flexure` were read by a sub-agent on 2026-10-02, not by the agent that wrote the code.
