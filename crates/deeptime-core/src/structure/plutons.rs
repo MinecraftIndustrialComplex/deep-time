@@ -41,8 +41,10 @@
 //!   strata pass paints it ([`HostColumns`]: a pile of one rock laid over an unconformity is one
 //!   horizon, cover as a whole): the cover laid on an unroofed pluton is not. A stock lies in the rock older than
 //!   itself: under younger cover its top goes down to the cover's base ([`cover_m`]). The
-//!   aureole body's ids come before the
-//!   plutons', so a pluton paints over the aureole's inner part; a stock's aureole (`deform`'s
+//!   plutons' body ids come before their
+//!   aureoles', and where bodies overlap the first by id keeps the block (the strata pass and the
+//!   column evaluators), so a pluton keeps its own rock inside its aureole (until 2026-10-24 the
+//!   aureoles came first and every pluton was hornfels or skarn inside); a stock's aureole (`deform`'s
 //!   stocks are structural events, not bodies) leaves the stock's own volume alone instead
 //!   ([`Aureole::hollow`]). Bodies are not moved by the faults younger than them, so an aureole
 //!   stays where its intrusion was emplaced.
@@ -739,7 +741,8 @@ pub struct Aureole {
     pub surface_y: f64,
     pub bands: Vec<Band>,
     /// Its zones leave the intrusion's own volume alone (a stock, which is a structural event
-    /// that no body paints over); a pluton's aureole is solid and the pluton paints over it.
+    /// that no body paints over); a pluton's aureole is solid, and the pluton, a body with a
+    /// lower id, keeps its own volume.
     pub hollow: bool,
     /// Myr before the end of the history (its intrusion's age).
     pub age_ma: Option<f32>,
@@ -918,8 +921,9 @@ pub fn stock_size_m(axes: [f64; 3], m_per_block_h: f64, m_per_block_v: f64) -> f
 }
 
 /// The part of a stock rooted on a pluton from `from_y` down: the stock's rock written as a body
-/// (role `stock`), since the pluton's aureole, a body, would otherwise paint over the stock where
-/// it rises through that aureole (a stock itself is a structural event, under every body).
+/// (role `stock`, its id before the aureoles'), since the pluton's aureole, a body, would
+/// otherwise paint over the stock where it rises through that aureole (a stock itself is a
+/// structural event, under every body).
 #[derive(Clone, Debug, PartialEq)]
 pub struct StockRoot {
     pub centre: [f64; 3],
