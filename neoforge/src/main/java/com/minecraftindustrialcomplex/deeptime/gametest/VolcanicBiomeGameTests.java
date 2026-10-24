@@ -140,7 +140,7 @@ public final class VolcanicBiomeGameTests {
         // under a surface that is also water, and its yeses (must be some where the probe can say yes at all); 9, 10 the mod's own
         // rule (LakeFreeze.keepsOpen, what the Biome mixin asks) at each water surface (must say yes) and at the control (no).
         int[] n = new int[11];
-        StringBuilder detail = new StringBuilder();
+        StringBuilder detail = new StringBuilder(), under10 = new StringBuilder();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         ChunkSampling.forEach(helper, pools.size(), i -> {
             Geothermal.Site s = pools.get(i);
@@ -170,8 +170,22 @@ public final class VolcanicBiomeGameTests {
                             n[7]++;
                             if (cold.shouldFreeze(level, under, false))
                                 n[8]++;
-                            if (LakeFreeze.keepsOpen(level, under))
+                            if (LakeFreeze.keepsOpen(level, under)) {
                                 n[10]++;
+                                if (under10.length() < 900) {
+                                    var wd = t.data();
+                                    double lake = wd.has(com.minecraftindustrialcomplex.deeptime.worlddata.WorldData.WATER_LEVEL)
+                                            ? com.minecraftindustrialcomplex.deeptime.worlddata.Water.levelAt(
+                                                    wd.layer(com.minecraftindustrialcomplex.deeptime.worlddata.WorldData.WATER_LEVEL), x, z, g.waterReach())
+                                            : Double.NaN;
+                                    var spec = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Spec.of(wd, g.waterReach());
+                                    under10.append(String.format(" (%d,%d,%d pool %d level %d ground %.2f lake level %.3f water %s lakeRule %s poolRule %s)",
+                                            x, under.getY(), z, s.id(), s.level(), t.height(x, z), lake,
+                                            com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, x, z).kind(),
+                                            com.minecraftindustrialcomplex.deeptime.worlddata.LakeIce.keepsOpen(wd, g.waterReach(), x, under.getY(), z),
+                                            geo.poolSurface(x, under.getY(), z)));
+                                }
+                            }
                         }
                     } else {
                         n[3]++;
@@ -192,7 +206,7 @@ public final class VolcanicBiomeGameTests {
             // The mod's own rule is what keeps the water open (the Biome mixin asks it before vanilla's), so it is asserted directly: yes at
             // every surface, no one block under (the rule is the surface block's alone), whatever the pack's climate mods do to vanilla's.
             helper.assertTrue(n[9] == n[1], (n[1] - n[9]) + " of " + n[1] + " pool water surfaces are not kept open by LakeFreeze.keepsOpen");
-            helper.assertTrue(n[10] == 0, n[10] + " of " + n[7] + " blocks of water under a pool's surface are kept open: the rule is the surface's alone");
+            helper.assertTrue(n[10] == 0, n[10] + " of " + n[7] + " blocks of water under a pool's surface are kept open: the rule is the surface's alone:" + under10);
             // The probe above is only worth something if vanilla's rule can say yes at all. A seasons mod can stop it everywhere (Serene
             // Seasons redirects Biome.warmEnoughToRain inside shouldFreeze to a seasonal temperature, so snowy plains does not freeze in
             // the season the test runs in): then it is inconclusive, which the direct assertions above cover; anywhere else it must say yes.
