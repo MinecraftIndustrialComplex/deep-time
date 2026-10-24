@@ -28,7 +28,8 @@ import java.util.OptionalDouble;
  * Time did not generate, {@link #isDeepTimeLevel()} is false and every query is empty. A Deep Time
  * level without a simulated climate (the analytic test terrains) has {@link #hasClimate()} false.
  * Thread-safe; lookups are cached per block column, so calling it from a tick is cheap. The one
- * exception is the planet's geometry ({@link #circumferenceBlocks(Level)}, {@link #latitudeDeg}),
+ * exception is the planet's geometry ({@link #circumferenceBlocks(Level)}, {@link #projectionKind},
+ * {@link #latitudeDeg}, {@link #longitudeDeg}, {@link #northBearingDeg}, {@link #metresPerBlock}),
  * which a client knows too.
  *
  * <pre>{@code
@@ -52,15 +53,18 @@ public interface DeepTimeClimate {
 
     /**
      * This interface's version: 1 = P1-25; 2 adds the planet's geometry on both sides
-     * ({@link #circumferenceBlocks(Level)}, {@link #latitudeDeg}); 3 adds the warm-ground signal of the
-     * geothermal features ({@link #geothermalWarmthC}); 4 adds the seamless world (format 0.5):
-     * {@link #projectionKind}, {@link #latitudeDeg(Level, double, double)} and
+     * ({@link #circumferenceBlocks(Level)} and a Lambert-only latitude from z, removed in 5); 3 adds the
+     * warm-ground signal of the geothermal features ({@link #geothermalWarmthC}); 4 adds the seamless
+     * world (format 0.5): {@link #projectionKind}, {@link #latitudeDeg(Level, double, double)} and
      * {@link #longitudeDeg(Level, double, double)}, whose answers depend on x and z on a Petroff–Guyou
-     * world. A caller compiled against a newer
+     * world; 5 adds the cube world (format 0.7, projection {@code "cube"}): {@link #northBearingDeg}
+     * and {@link #metresPerBlock}, and removes the static {@code latitudeDeg(double z, int
+     * circumferenceBlocks)}, which was right on a Lambert world only (call {@link
+     * #latitudeDeg(Level, double, double)} instead). A caller compiled against a newer
      * version than the installed Deep Time gets a {@link NoSuchMethodError} from a newer method; read
      * this field reflectively (javac inlines it) or catch that error.
      */
-    int API_VERSION = 4;
+    int API_VERSION = 5;
 
     /** Months in the simulated year. */
     int MONTHS = 12;
@@ -81,9 +85,11 @@ public interface DeepTimeClimate {
     }
 
     /**
-     * The planet's circumference C in blocks (API 2): its east-west period, and the scale of latitude,
-     * φ = asin(−z / R), R = C / 2π ({@link #latitudeDeg}). A positive C means {@code level} is a Deep Time planet
-     * (a real one or an analytic test terrain); any other level answers 0.
+     * The planet's x period C in blocks (API 2): on a Lambert world its circumference and the scale of
+     * latitude, φ = asin(−z / R), R = C / 2π; on a Petroff–Guyou world the width 2b of its two squares;
+     * on a cube world 4s, the four equatorial faces of side s. A positive C means {@code level} is a Deep
+     * Time planet (a real one or an analytic test terrain); any other level answers 0. Latitude and
+     * longitude depend on the projection: use {@link #latitudeDeg(Level, double, double)}.
      *
      * <p>Unlike the rest of this interface it answers on both sides. On the server it is the level's
      * generator's; on a client it is the planet info the server sends at login, respawn and dimension
@@ -99,9 +105,12 @@ public interface DeepTimeClimate {
      * The projection the planet {@code level} is laid out in (API 4): {@code "petroff_guyou"} (the
      * seamless world, the default from format 0.5: two hemisphere squares of side b side by side, x in
      * [−b, b), z in [−b/2, b/2], the north and south edges glued by half-turns; latitude depends on x
-     * and z), {@code "lambert"} (Lambert's equal-area cylinder: latitude from z alone, {@link
-     * #latitudeDeg(double, int)}), or {@code ""} for a level that is not a Deep Time planet. Both sides,
-     * like {@link #circumferenceBlocks(Level)}.
+     * and z), {@code "lambert"} (Lambert's equal-area cylinder: latitude from z alone, φ = asin(−z / R)
+     * with R = C / 2π), {@code "cube"} (API 5; format 0.7: the planet on a cube's six faces of side s
+     * laid out as a cross, x in [−2s, 2s), the four equatorial faces in a row and the polar faces N
+     * above and S below one of them; walking off a face's free edge brings a player onto the face it
+     * meets, turned, and north turns with it, see {@link #northBearingDeg}), or {@code ""} for a level
+     * that is not a Deep Time planet. Both sides, like {@link #circumferenceBlocks(Level)}.
      */
     static String projectionKind(Level level) {
         return LevelClimate.projectionKind(level);
@@ -110,8 +119,9 @@ public interface DeepTimeClimate {
     /**
      * Latitude in degrees at block (x, z) of the planet {@code level} (API 4), by its projection,
      * north positive; NaN for a level that is not a planet (or on a client before the planet info
-     * arrived). Both sides; allocates a little on a Petroff–Guyou world (a few hundred nanoseconds), so
-     * cache it per column if you call it per block.
+     * arrived), and on a cube world past the corners of its cross, where there is no planet. Both
+     * sides; allocates a little on a Petroff–Guyou or cube world (a few hundred nanoseconds), so cache
+     * it per column if you call it per block.
      */
     static double latitudeDeg(Level level, double x, double z) {
         com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection p = LevelClimate.projection(level);
@@ -128,15 +138,34 @@ public interface DeepTimeClimate {
     }
 
     /**
-     * Latitude in degrees at block {@code z} on a <b>Lambert</b> planet of circumference {@code circumferenceBlocks}
-     * (API 2; on a Petroff–Guyou world, {@link #projectionKind} {@code "petroff_guyou"}, latitude depends
-     * on x too: use {@link #latitudeDeg(Level, double, double)}), by the planet's projection ({@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection}: Lambert's
-     * equal-area cylinder): φ = asin(−z / R) with R = C / 2π, north (−z) positive, the equator at z = 0
-     * and the poles at |z| = R, clamped to ±90° past them. NaN when
-     * the circumference is not positive (not a planet).
+     * The direction of north at block (x, z) of the planet {@code level} (API 5), as a bearing in
+     * degrees in [0, 360) in the block frame, clockwise seen from above from −z: 0 when north is −z
+     * (always on a Lambert world), 90 when it is +x, 180 when it is +z, 270 when it is −x. On a
+     * Petroff–Guyou world it is −z along the equator and turns towards the poles, which lie on the
+     * north and south edges at x = ∓b/2. On a cube world it varies smoothly over each face and on
+     * into the copy of the neighbouring face drawn past a free edge; the same planet point on that
+     * face itself reads it turned by the edge's quarter or half turn, as a player's heading turns
+     * when the border brings them there. It goes all the way round each pole, which lies on a face
+     * where the map's turn put it, and is not defined at the pole itself. NaN as {@link
+     * #latitudeDeg(Level, double, double)}. Both sides; allocates a little, so cache it per column.
      */
-    static double latitudeDeg(double z, int circumferenceBlocks) {
-        return circumferenceBlocks > 0 ? com.minecraftindustrialcomplex.deeptime.worlddata.Projection.latitudeDeg(circumferenceBlocks, z) : Double.NaN;
+    static double northBearingDeg(Level level, double x, double z) {
+        com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection p = LevelClimate.projection(level);
+        return p == null ? Double.NaN : p.northBearingDeg(x, z);
+    }
+
+    /**
+     * The planet's horizontal metres per block at block (x, z) of {@code level} (API 5): the world
+     * data's nominal scale (its manifest's {@code m_per_block_h}, e.g. about 300 m) times the map's
+     * local scale there. Lambert's cylinder and Petroff–Guyou's squares are equal-area maps, so on
+     * those worlds it is the nominal scale everywhere (an area of blocks is that planet area; lengths
+     * along and across a meridian differ by inverse factors there); on a cube world it is the square
+     * root of the map's areal scale at the block, the nominal scale times a factor near 1 that varies
+     * across each face. NaN as {@link #latitudeDeg(Level, double, double)}. Both sides.
+     */
+    static double metresPerBlock(Level level, double x, double z) {
+        com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection p = LevelClimate.projection(level);
+        return p == null ? Double.NaN : LevelClimate.mPerBlockH(level) * p.scale(x, z); // ledger: SCL-107
     }
 
     /** Year fraction [0, 1) at solar longitude {@code degrees} (0° = northern spring equinox). */
