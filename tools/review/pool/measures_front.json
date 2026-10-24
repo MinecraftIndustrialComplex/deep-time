@@ -1,5 +1,5 @@
 {
-  "_doc": "The front lane's measures (2026-10-24): why the plate boundary and the subduction front are longer than Earth's. `front` splits the boundary into the plates' sizes (the sum of their spherical-cap perimeters) and their shapes (E, the sum of perimeters over the sum of cap perimeters), from the dynamics record alone; `boundgeom` measures the boundary's pieces between triple junctions, their tortuosity and the plates' perimeters with Bird 2003's own divider method, from the crust budget's maps (runs made with +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps). Pass it with --registry tools/review/pool/measures_front.json. Bird 2003's PB2002 numbers are build/front/bird/results.json's (bird.py over PB2002_plates.dig, PB2002_boundaries.dig and PB2002_steps.dat; ledger PLT-531). Definitions in measure_front.py and measure_boundgeom.py.",
+  "_doc": "The front lane's measures (2026-10-24): why the plate boundary and the subduction front are longer than Earth's. `front` splits the boundary into the plates' sizes (the sum of their spherical-cap perimeters) and their shapes (E, the sum of perimeters over the sum of cap perimeters), from the dynamics record alone; `boundgeom` measures the boundary's pieces between triple junctions, their tortuosity and the plates' perimeters with Bird 2003's own divider method, from the crust budget's maps (runs made with +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps). Pass it with --registry tools/review/pool/measures_front.json. Bird 2003's PB2002 numbers are tools/review/pool/bird/bird.py's over PB2002_plates.dig, PB2002_boundaries.dig and PB2002_steps.dat (the source library's Bird2003/, its output Bird2003/PB2002_geometry.json; ledger PLT-531). Definitions in measure_front.py and measure_boundgeom.py.",
   "measures": {
     "front": {
       "version": 1,
@@ -34,7 +34,7 @@
     },
     "boundgeom": {
       "version": 1,
-      "doc": "the boundary's pieces between triple junctions, their tortuosity, the plates' perimeters against spherical caps, the subduction front's runs and the plates' fragments, measured with Bird 2003's divider walks at 77 and 380 km on the visible samples' Delaunay triangulation; needs the crust budget's maps (+DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps). The labels give PB2002 rasterised on the same 100,000-point lattice and put through the same code (build/front/bird_raster.py), then Bird's own divider numbers; definitions in measure_boundgeom.py (ledger PLT-531)",
+      "doc": "the boundary's pieces between triple junctions, their tortuosity, the plates' perimeters against spherical caps, the subduction front's runs and the plates' fragments, measured with Bird 2003's divider walks at 77 and 380 km on the visible samples' Delaunay triangulation; needs the crust budget's maps (+DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps). The labels give PB2002 rasterised on the same 100,000-point lattice and put through the same code (tools/review/pool/bird/bird_raster.py), then Bird's own divider numbers; definitions in measure_boundgeom.py (ledger PLT-531)",
       "command": ["{py}", "-I", "{tools}/measure_boundgeom.py", "{run}"],
       "python": "numpy",
       "needs": ["rec"],

@@ -15,7 +15,8 @@ junctions (or a closed loop with none: an island of one plate in another), as Bi
 from junction to junction ([111], [112]). Lengths are Bird's divider walks (`bird.py`): a fixed
 great-circle chord of 77 km (about the lattice's spacing, 71.4 km: it takes out the Voronoi chain's
 zigzag) and 380 km (the shape at the scale of a plate's arcs). Tortuosity is a piece's length over the
-great circle between its ends. Bird's values are build/front/bird/results.json's (ledger PLT-531).
+great circle between its ends. Bird's values are tools/review/pool/bird/bird.py's over PB2002 (its output is the source
+library's Bird2003/PB2002_geometry.json; ledger PLT-531).
 
   snaps            snapshots measured
   plates           plates with visible samples, per snapshot
@@ -79,7 +80,7 @@ def unit(x, y, z):
 
 
 def divider(P, L):
-    """Bird's divider walk (build/front/bird/scripts/bird.py): the polyline P of unit vectors walked
+    """Bird's divider walk (tools/review/pool/bird/bird.py): the polyline P of unit vectors walked
     with a fixed great-circle chord L km, n L plus the chord from the last divider point to the end."""
     th = L / R
     n = len(P)

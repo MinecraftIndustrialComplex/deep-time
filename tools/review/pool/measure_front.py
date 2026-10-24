@@ -8,7 +8,7 @@ object on stdout. It splits the boundary's length into the plates' sizes and the
 
 where P_cap is the perimeter of a spherical cap of the plate's area (the shortest closed curve round that
 area) and E = sum of perimeters / sum of P_cap is how far the plates' outlines are from caps. Bird 2003's
-PB2002 (52 plates, from PB2002_plates.dig, build/front/bird/results.json): sum of P_cap 345,081 km,
+PB2002 (52 plates, from PB2002_plates.dig, Bird2003/PB2002_geometry.json): sum of P_cap 345,081 km,
 E 1.510 at full resolution, 1.418 measured with a 77 km divider and 1.274 with a 380 km one.
 
     python3 -I measure_front.py <run folder>
@@ -30,7 +30,7 @@ the first 100 Myr; each step's plates pooled over the run. Plates under 10 sampl
   front_km         the subduction fronts, km per step (the plates' `front_km` over the lattice's factor;
                    Bird's SUB 51,310)
   front_small, front_mid, front_large   its shares by the subducting plate's size (Bird: SUB by
-                   subducting plate in build/front/bird/results.json C.per_plate: 0.112 / 0.339 / 0.549)
+                   subducting plate in Bird2003/PB2002_geometry.json C.per_plate: 0.112 / 0.339 / 0.549)
   oo_front_km      the ocean-ocean (island-arc) front, km per step (the boundary mix's ocean-ocean class,
                    counted on the overriding side, over the lattice's factor)
   excess_t1 ... excess_t9   E in each 100 Myr after the first (t0 + 100 to 200, ..., 900 to 1000)
