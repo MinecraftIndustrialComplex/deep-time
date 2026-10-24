@@ -18,7 +18,8 @@ class TwDhGuardRuleTest {
 
     @Test
     void passesOnAPlanetWhoseLoopIsTheWorldDataCircumference() {
-        for (int c : new int[]{4096, 16384, 32768}) {
+        // Polar worlds' C, and a cube world's period 4s (cube plan G6: 15,360 at 16k, 29,696 at 32k).
+        for (int c : new int[]{4096, 15360, 16384, 29696, 32768}) {
             TwDhGuardRule.Verdict v = TwDhGuardRule.verdict(OW, OW, true, true, c, false, c);
             assertTrue(v.pass() && v.guarded(), c + ": " + v.reason());
         }
