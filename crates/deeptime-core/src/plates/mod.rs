@@ -62,6 +62,7 @@ pub mod inherit;
 pub mod init;
 pub mod kinematics;
 pub mod l1;
+pub mod level_set;
 pub mod noise;
 pub mod normalise;
 pub mod peaks;
@@ -824,6 +825,11 @@ impl PlatesStage {
                 .filter_map(|c| c.onset_event.map(|e| (c.under, e)))
                 .collect();
             ridges::bury(st, world, Some(&geo), &pos, &env, &doomed)?;
+            // Every sample's distance from its plate's outline as the resampling and the burial
+            // left it (ledger: PLT-536).
+            if env.k.level_set_membership {
+                level_set::reinit(st, &geo, env.norm.spacing_rad());
+            }
             book(st, gap_budget::Part::Bury);
             *cache = Cache {
                 geo,

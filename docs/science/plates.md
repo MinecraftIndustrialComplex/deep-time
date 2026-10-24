@@ -6735,6 +6735,22 @@ samples are captured; 23 and 26 plates at 300 Myr against 17 and 22 off (the sca
 the overlaps +4,394 and +7,264), and each resampling makes the plates whole again (it joins 10,456
 and 11,637).
 
+**Arm fl-fission** (fission on top of fl-share, base3's seeds 1 to 4, `earthlike_quick_16k`, 1000
+Myr, both starts, 8 runs; key c94090963380, argkey 686beee0). Against fl-share, medians:
+
+- the guard's worst is 10,348 m against 12,588 (p < 0.001), with no step beyond 2 reliefs, and the
+  V1 census meets its 5 criteria in both arms (land 0.327 against 0.313, p 0.80);
+- 27.2 plates against 22.7 (`boundgeom`), with 0.9 % of the visible samples outside their plate's
+  largest piece at the 50-Myr snapshots against 7.1 % (the pieces left are cut between
+  resamplings);
+- the boundary at a 77 / 380 km chord is 382,434 / 284,518 km against 525,489 / 347,237, with 113
+  triple junctions against 292 and 91 closed loops against 250;
+- the subduction front at 77 km is 147,193 km against 216,472;
+- the plate check passes 201 measures against 210.
+
+But 162 collision states parted within two steps of a fission of one of their plates, which is
+the defect Step 3b mends.
+
 **The plate count against Earth's.** The model's floor for a plate (PLT-091, 0.0377 sr) is the
 count to read the model's plates against, not PB2002's 52: 19 of PB2002's plates are at or above it
 in Bird's table (20 on the lattice, where the Caroline plate, 0.03765 sr against the floor's 0.03770,
@@ -6817,6 +6833,236 @@ unit tests cover the law and each of its paths:
 - `the_fragments_of_a_rifted_plate_keep_the_trench_they_border` (`rifting.rs`);
 - `an_initiation_hands_the_sinking_plate_the_trench_it_borders` (`rifting.rs`).
 
+**Arm fl-fission2** (fission and the inheritance on top of fl-share, 8 runs, `earthlike_quick_16k`,
+1000 Myr, key 0fc579, argkey a8641acb). Against fl-share, medians with the Mann-Whitney p:
+
+- **The defect.** The collision states parted within two steps of a fission fall from 162 to 58.
+  Per run, the splits moved 238 to 309 contacts and copied 276 to 353; they moved 37 to 53
+  collisions, and moved 205 to 266 slabs and copied 262 to 355.
+- **The guard.** The guard's worst is 10,490 m against 12,588 (p < 0.001) and dock-c3's 12,061
+  (p 0.015). No step goes beyond 2 reliefs, and `guard_bind_steps` is 0.
+- **The V1 census.** It meets its 5 criteria in both arms (land 0.322, p 0.72). Its collisions
+  per 100 Myr fall from 2.0 to 0.9 (p 0.002).
+- **The boundary.** It is 352,268 lattice km against 478,669 (Bird 260,487, or 271,700 on the
+  lattice). Its subducting part is 109,741 km against 159,426 (Bird 51,310), and the subducting
+  share is 0.314 against 0.331 (Bird 0.197). The boundary criteria meet 3 per run against 2
+  (p 0.017).
+- **Its geometry (`boundgeom`).**
+  - 27.6 plates against 22.7.
+  - At a 77 / 380 km chord the boundary is 387,493 / 288,070 km, and the perimeters over the
+    caps' at 380 km are 1.646 against 2.266 (PB2002 on the lattice 1.365).
+  - There are 115 triple junctions against 292, and 96 closed loops against 250. With each plate
+    one body, 50 junctions (2 (P - 2) = 51) and 0.5 loops.
+  - With each plate one body, the front at 77 km is 115,544 km against PB2002's 52,564 on the
+    lattice, and its tortuosity is 2.03 against 1.20.
+- **The sutures.** 42.4 per 100 Myr against 51.8 (Macdonald 19 to 39), and 41,589 km per 100 Myr
+  against 68,397 (Macdonald 23,235 to 50,919). The front in collision is 24,217 km against 36,100
+  (Stern & Scholl 6,000 to 12,000).
+- **Fission's churn.** 56 to 90 plates are born of fission per run (median 64.5). Of the 531 born
+  in the 8 runs, 478 died: 425 absorbed under the floor, 44 consumed and 9 sutured. Plates born of
+  a subduction initiation, 78 to 124 per run (fl-share 69 to 103), die absorbed as well: 548 of 639
+  deaths. The resampling's own roughening (below) is the likely feed, since every resampling cuts
+  a ragged plate's thin necks again.
+
+The plate check passes 187 measures against 210. The coordinator's ruling (2026-10-24): its
+targets are realism checks, not a gate, and correctness is judged on the unit tests, divergence
+and the guard. Its moves against fl-share (passes of 8 and the median), each with its target's
+ledger status:
+
+| measure | fl-share | fl-fission2 | the target's source |
+|---|---|---|---|
+| `speed_oceanic_over_continental` | 5/8, 2.18 | 1/8, 1.72 | CHK-024, verified (Zahirovic et al.); fl-fission still 5/8, so the drop comes with the inheritance |
+| `supercontinent_tenure_myr` | 1/8, 57.5 | 0/8, 23.5 | CHK-035, verified |
+| `largest_share_p50` | 8/8, 0.234 | 7/8, 0.169 | CHK-001, verified |
+| `ocean_old180_pct` | 0/8 | 1/8 | CHK-033, verified (up) |
+| `plate_life_p50_myr` | 7/8, 107 | 0/8, 68.5 | PLT-146, abstract only |
+| `rift_alive_50_pct` | 7/8 | 5/8 | CHK-006, abstract only |
+| `collision_length_p50_myr` | 2/8, 56 | 1/8, 73.5 | CHK-012, abstract only |
+| `collision_convergence_ratio_20myr` | 5/8, 0.40 | 2/8, 0.62 | CHK-037, abstract only |
+| `continental_min` | 2/8 | 0/8 | CHK-016, cited, not verified |
+| `collisions_per_100myr` | 4/8, 2.0 | 0/8, 0.9 | CHK-015, uncited; it counts welds of terranes of 0.1 of a plate or more |
+| `dead_within_20_pct` | 1/8, 20.8 | 0/8, 29.1 | uncited |
+| `rift_welded_back_50_pct` | 7/8, 3.9 | 5/8, 9.5 | uncited |
+| `land_gain_max_pct` | 6/8 | 8/8 | up |
+| `continental_max` | 3/8 | 5/8 | up |
+| `speed_big_p90_mm_yr` | 6/8 | 8/8 | up |
+| `arc_continental_p50_m` | 7/8 | 8/8 | up |
+
+Fission and the inheritance are correct by the lane's rule: their unit tests pass against their
+sources, the runs do not diverge and the guard does not fail. So `plate_fission` and
+`split_inheritance` are on by default from 2026-10-24 (the coordinator's call, the same day).
+
 **Known limit: merges.** When two plates merge (a healed rift, a weld, a plate absorbed under the
 floor), the dead plate's contacts with third plates still close. That is the same law in reverse,
 and this step does not build it.
+
+### What still roughens the plates: the resampling's random walk
+
+With every plate one body, the main bodies are still too ragged, and most at their trenches (the
+front's tortuosity with each plate one body is 2.03 at 77 km against PB2002's 1.20 on the
+lattice). The resampling is one cause, and it shows on a planet where nothing else happens.
+
+**How the resampling decides membership.** It turns the lattice at random each time (Cortial et al.
+2019, §4.3). Each new point takes the plate of the old footprint cell that covers it: the old
+lattice's triangles are split between their corners by the largest barycentric weight, which is a
+nearest-cell rule. So every boundary is rounded to the new lattice at each resampling. The
+rounding errors of successive resamplings are independent, and nothing pulls the boundary back,
+so they add up as a random walk. At a contact the overriding plate wins the cover (visible crust
+first, then the overriding plate), so the trench is the overriding plate's footprint edge, rounded
+in the same way. A ridge is drawn again by the gap fill at each resampling (Cortial's ridge
+profile, the segments of PLT-502), so it does not walk.
+
+**The measurement.** The test `how_resamplings_roughen_a_boundary` (`plates/tests.rs`; the table
+below is its run with the level set of Step 3c off) takes the two-plate planet (40,000 samples, the boundary on the equator) and resamples it 40 times
+with nothing else in the step. In one case the planet is static. In the other, the ocean is turned
+under the continent by 0.02 rad between resamplings, which makes a trench where y > 0 and a ridge
+where y < 0, with the overlaps resolved as in the step. After each resampling it reads, per stretch
+of boundary:
+
+- the offset of plate 0's boundary samples from the equator;
+- their spread about that offset, in lattice spacings;
+- the boundary's lattice edges per spacing of the stretch's length.
+
+| resamplings | static: spread, spacings | static: edges per spacing | the trench: spread | the trench: edges | the ridge: edges |
+|---|---|---|---|---|---|
+| 1 | 0.44 | 2.25 | 0.43 | 2.14 | 2.23 |
+| 2 | 0.50 | 2.39 | 0.49 | 2.34 | 2.12 |
+| 5 | 0.68 | 2.78 | 0.67 | 2.69 | 2.36 |
+| 10 | 0.92 | 3.24 | 0.86 | 2.87 | 2.46 |
+| 20 | 1.21 | 3.85 | 1.05 | 3.09 | 2.37 |
+| 30 | 1.46 | 4.16 | 1.15 | 3.25 | 2.51 |
+| 40 | 1.73 | 4.65 | 1.35 | 3.39 | 2.48 |
+
+- **The static boundary walks.** Its spread's variance grows by about 0.07 spacing² per
+  resampling, and its length on the lattice doubles in 40 resamplings. A 1000-Myr run resamples
+  about 50 times (PLT-098), which is enough to account for a spread of one to two spacings and a
+  boundary twice its straight length at the lattice's scale.
+- **The trench walks as well, a little slower.** The ridge does not: its edges per spacing stay at
+  2.1 to 2.5. Its spread grows only because the ridge migrates and tilts (its offset reaches -16.7
+  spacings by the 40th resampling).
+- **What it is not.** This is the scheme, not the physics: the same boundary, not moving, comes out
+  of each resampling longer than it went in.
+
+The fix is a sub-lattice boundary carried through the resampling (Step 3c).
+
+### Step 3c: the outline between the samples (PLT-536)
+
+`tectonics.level_set_membership` (`plates/level_set.rs`, the footprint in `ridges::resample`)
+carries each plate's outline below the lattice spacing, so that a resampling moves it only where
+the physics moves it.
+
+**The source.** Osher & Sethian 1988 follow a front as the zero level set of a function carried
+with the flow: "the front can also be passively advected by an underlying flow", and "By viewing
+the surface as a level set, topological complexities and changes in the moving front are handled
+naturally". They initialise the function from the distance to the front (§III.D: "ψ(x , 0) = 1 ±
+d 2, where d is the distance from the point x to the initial surface, and the plus (minus) sign is
+chosen if x is inside (outside) the initial surface"). Sussman, Smereka & Osher 1994 (abstract
+read) describe an interface as "the zero level set of a smooth function"; their reinitialisation,
+which keeps that function a signed distance by setting it again from its zero level set, is the
+method as we remember it, not read.
+
+**The law.**
+
+- **What a sample carries.** Each sample keeps ψ, the sine of its angular distance to its group's
+  outline, capped at 2 spacings. Only a sample with a lattice neighbour of another group is ever
+  read, and it lies within one edge of the outline, so the cap is numerical, not physical.
+- **Who holds a new lattice point.** In each group's old triangle (in the group's own frame, as
+  before), every group present weighs its own corners' ψ by the point's barycentric weights,
+  A = Σ w ψ. The group holds the point where its A is the largest, so the outline is where two
+  groups weigh the same: the zero line of the interpolated signed distance. Before, the corner
+  with the largest weight decided, which puts the outline halfway between two samples whatever
+  their distances.
+- **Why it is exact for a great circle.** The weights are gnomonic (the point where the ray meets
+  the triangle's plane), and a great circle's signed distance n·p is linear in the position, so it
+  interpolates exactly: a great-circle outline lands where it was on every turned lattice.
+- **The new samples' distances.** A covered point takes its distance inside the top group's
+  outline, or its distance outside the outline of a group of another plate that would be on top of
+  it, where that is nearer (in front of a trench, the overriding plate's outline is the
+  boundary). A point in a ridge's gap takes its distance from the midline, half the difference of
+  its distances from the two plates' edges, or from the ridge segment (PLT-502). An orphan takes
+  half a spacing.
+- **Reinitialisation.** After the resampling and `ridges::bury` (fission, capture, the
+  absorptions under the floor), every sample's ψ is set again from the outline: the zero crossing
+  on each lattice edge between two groups (t = ψ_u / (ψ_u + ψ_v)), joined inside each triangle into
+  great-circle arcs. A triangle with three groups gets three arcs that meet where the three weigh
+  the same. Each sample takes its distance to the nearest arc of its group among its own and its
+  neighbours' triangles.
+- **New boundaries.** A boundary drawn since the last resampling (a rift, a fission, a suture, a
+  twin group) has no outline to keep. A sample whose neighbours' membership changed since the last
+  reinitialisation gets half a spacing on every corner, which splits its triangles as the old rule
+  does. A run's first resampling is the same.
+
+Membership is by group, not by plate, everywhere, as the footprint is.
+
+**A trench's distances.** In front of a trench the ocean's own outline lies under the continent,
+since the slab goes on below it. In the first build a new ocean sample whose triangle in the
+continent's frame had no continental corner took its distance inside the ocean's outline, which
+is too far from the trench, and the reinitialisation's crossings then moved the trench landward,
+by 2.1 spacings in 40 resamplings. A group with no corner in a triangle now lies outside it by
+the other groups' interpolated distance from their own outline (`level_set::margin`), so such a
+sample takes its distance outside the continent's outline, the trench. The test
+`a_triangle_without_the_group_lies_its_distance_outside` checks it on a great circle, to 1e-12.
+
+**The test, with and without the level set** (`how_resamplings_roughen_a_boundary`, as in the
+table above; the offset in spacings, positive landward at the trench):
+
+| resamplings | static, off: spread, edges | static, on: spread, edges | trench, off: offset, spread, edges | trench, on: offset, spread, edges |
+|---|---|---|---|---|
+| 1 | 0.44, 2.25 | 0.41, 2.17 | +0.51, 0.43, 2.14 | +0.53, 0.42, 2.11 |
+| 2 | 0.50, 2.39 | 0.39, 2.15 | +0.58, 0.49, 2.34 | +0.58, 0.41, 2.24 |
+| 5 | 0.68, 2.78 | 0.35, 2.20 | +0.62, 0.67, 2.69 | +0.59, 0.38, 2.37 |
+| 10 | 0.92, 3.24 | 0.35, 2.04 | +0.63, 0.86, 2.87 | +0.54, 0.36, 2.02 |
+| 20 | 1.21, 3.85 | 0.34, 2.03 | +0.29, 1.05, 3.09 | +0.64, 0.36, 2.15 |
+| 30 | 1.46, 4.16 | 0.35, 2.24 | +0.10, 1.15, 3.25 | +0.61, 0.33, 1.99 |
+| 40 | 1.73, 4.65 | 0.32, 2.13 | -0.37, 1.35, 3.39 | +0.71, 0.33, 2.19 |
+
+- **The boundary stays where it was drawn.** With the level set the spread does not grow (0.32
+  to 0.42 spacings at every count) and the edges per spacing stay within 4 % of the first
+  resampling's. The trench moves 0.2 spacings in 40 resamplings, against 0.9 without it.
+- **The ridge is unchanged.** It is drawn again by the gap fill at each resampling either way:
+  its edges per spacing stay at 2.0 to 2.4 with the level set (2.1 to 2.5 without), and its
+  offset reaches -16.8 spacings (-16.7) as it migrates.
+- **The test asserts it.** With the level set, after 10 to 40 resamplings, the spread stays
+  within 0.15 spacings of the first, the edges per spacing within 15 % and the offset within 0.5
+  spacings; without it, the static spread must more than double and its edges grow by half, so
+  the test fails if either side stops showing what it measures.
+
+**The cost: a numerical curvature flow.** The interpolated distance is exact only for a great
+circle. A curved outline's distance is not linear in the position, and its linear interpolation
+(and the reinitialisation's chords) moves the outline towards its centre of curvature at each
+resampling, by about c h² κ, where h = √(4π/n) is the lattice spacing (a sample's area is h²)
+and κ the outline's geodesic curvature. Its area loss is that drift integrated along the outline.
+For a closed convex outline the curvature integrates to 2π (Gauss-Bonnet, less the enclosed area
+on the unit sphere, which is small here), so a small round plate loses the same number of
+samples per resampling whatever its radius, about 2πc. The test
+`a_small_round_plate_through_resamplings` measures it on a static planet, resampled 40 times,
+the loss read over the first 20 (the plate of radius 3 is gone by the 40th):
+
+| radius, spacings | samples at the start | off: after 1, 10, 20, 40 | off: lost per resampling | on: after 1, 10, 20, 40 | on: lost per resampling |
+|---|---|---|---|---|---|
+| 3 | 28 | 28, 32, 33, 45 | -0.25 | 28, 21, 12, 0 | 0.80 |
+| 6 | 113 | 116, 107, 106, 87 | 0.35 | 114, 109, 98, 81 | 0.75 |
+| 12 | 452 | 446, 445, 440, 438 | 0.60 | 447, 442, 435, 422 | 0.85 |
+
+- **The loss does not depend on the radius.** 0.75 to 0.85 samples per resampling at radii of 3
+  to 12 spacings, so c is about 0.13. Without the level set the count wanders instead, by +5, -7
+  and -12 samples after 20 resamplings.
+- **What it costs a plate.** The floor of plates (PLT-091) is 0.003 of the samples, 300 on the
+  100,000-sample planet, a radius of about 9.8 spacings. A plate at the floor, round and alone,
+  would lose about 40 samples in the 50 resamplings of a 1000-Myr run (13 %); a larger plate
+  loses the same 40, a smaller fraction. A microplate of 28 samples is gone in 35 resamplings,
+  but it is under the floor and absorbed long before.
+- **In a mosaic.** A plate's outline is not closed and convex: its arcs meet its neighbours' at
+  triple junctions, and the drift moves each arc towards its own centre of curvature, so one
+  plate's loss is its neighbour's gain. For a curvature flow in a plane foam this is von
+  Neumann's law (from memory, not read: a cell's area changes in proportion to its number of
+  sides less six), so plates with few neighbours shrink and plates with many grow, at a rate of
+  the order of a sample per resampling.
+- **The test asserts it.** The loss with the level set must lie between 0.4 and 1.4 samples per
+  resampling at each radius, and the largest within twice the smallest. If it grows, a
+  second-order interpolation (each sample's distance gradient stored and the distance
+  extrapolated from each corner, s ≈ Σ w_k [s_k + ½ ∇s_k · (q - p_k)]) would cut the drift to
+  the order of h³; it is not built.
+
+**On by default?** Not yet. `tectonics.level_set_membership` is off until its arm (fl-ls, on
+top of fl-fission2) is judged on the plate check, the guard and divergence.

@@ -8713,3 +8713,25 @@ The sources of the front lane's inheritance law (plates.md "Step 3b"). Stock & L
 - Access: an open preprint (the University of Texas Institute for Geophysics).
 - Library (the project's source library, not distributed): fetched 2026-10-24. Files: `Faccenna2017/f.pdf`, `f.txt`.
 - Read so far (by the project): full text, 2026-10-24 (the lane's research agent): section 3, "At ~130 Ma, the South Atlantic ocean basin started opening, with the separation of South America from Africa"; the introduction, a model "unable to explain why the Nazca subduction system rolled back during the opening of the Southern Atlantic for almost ~100 Myr". That the Andean trench stays with South America because only it borders the Nazca plate is PLT-534's reading, not the paper's (from-memory).
+
+## The outline between the samples (PLT-536), added 2026-10-24
+
+The sources of the front lane's level-set membership (plates.md "Step 3c").
+
+### OsherSethian1988
+- Reference: Osher, S. and Sethian, J. A. (1988). Fronts propagating with curvature-dependent speed: algorithms based on Hamilton-Jacobi formulations. Journal of Computational Physics 79(1):12-49 (the volume and pages from memory; the title and authors read on the copy's first page).
+- DOI or URL: 10.1016/0021-9991(88)90002-2; the authors' copy at https://math.berkeley.edu/~sethian/Papers/sethian.osher.88.pdf
+- Cited as: "Osher & Sethian 1988".
+- Ledger ids: PLT-536
+- Access: an open copy (the author's page).
+- Library (the project's source library, not distributed): fetched 2026-10-24. Files: `OsherSethian1988/os88.pdf`, `os88.txt` (pdftotext -layout).
+- Read so far (by the project): full text, 2026-10-24 (the front lane). Abstract: "We devise new numerical algorithms, called PSC algorithms, for following fronts propagating with curvature-dependent speed ... the front can also be passively advected by an underlying flow ... The algorithms handle topological merging and breaking naturally"; "By viewing the surface as a level set, topological complexities and changes in the moving front are handled naturally"; section III.D: "we initialize ψ by taking ψ(x , 0) = 1 ± d 2, where d is the distance from the point x to the initial surface, and the plus (minus) sign is chosen if x is inside (outside) the initial surface".
+
+### SussmanSmerekaOsher1994
+- Reference: Sussman, M., Smereka, P. and Osher, S. (1994). A level set approach for computing solutions to incompressible two-phase flow. Journal of Computational Physics 114(1):146-159 (authors, title, volume and pages from memory).
+- DOI or URL: 10.1006/jcph.1994.1155
+- Cited as: "Sussman, Smereka & Osher 1994".
+- Ledger ids: PLT-536
+- Access: paywalled; the UCLA CAM report copy did not answer (2026-10-24).
+- Library: not kept.
+- Read so far (by the project): abstract only, 2026-10-24 (the OSTI record): "The interface between the two fluids is considered to be sharp and is described as the zero level set of a smooth function." That the level-set function is kept a signed distance by reinitialising it from its zero level set, which PLT-536 does after every resampling, is the paper's method as the lane remembers it (from-memory).

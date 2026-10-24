@@ -60,6 +60,7 @@ use super::gap_budget;
 use super::geometry::{Cover, Geo, Tree, connect_plates, dijkstra_two, pieces};
 use super::init::random_rotation;
 use super::kinematics::{arr, quat, to_world};
+use super::level_set;
 use super::normalise::Norm;
 use super::pools::{
     accrete, floor_at, isostatic_change_m, ocean_heat_flow, oceanic_column, thickness,
@@ -238,6 +239,56 @@ fn footprint(
     Some(Cover { t, tri, w })
 }
 
+/// Group `group`'s footprint as `footprint` finds it, with the outline below the lattice spacing
+/// (`tectonics.level_set_membership`, ledger PLT-536; `level_set.rs`): in the old triangle holding
+/// `q` in the group's frame, the group holds `q` when its corners' distances `phi` from their
+/// groups' outlines, weighed with `q`'s barycentric weights, outweigh every other group's
+/// (`level_set::margin`), not when its corner has the largest weight. Returns the cover (the
+/// weights of the group's own corners, as `footprint`'s) when the triangle has a corner of the
+/// group, and `q`'s sine distance from the group's outline, negative outside it.
+fn footprint_level_set(
+    geo: &Geo,
+    src: &[Sample],
+    phi: &[f64],
+    group: u32,
+    rot: DQuat,
+    q: DVec3,
+    hint: u32,
+) -> (Option<Cover>, f64) {
+    let local = rot.inverse() * q;
+    let h = geo.mesh.vertex_triangle(hint).unwrap_or(0);
+    let t = geo.mesh.locate(local, h);
+    let tri = geo.mesh.triangles()[t as usize];
+    let mut w = geo.mesh.barycentric(t, local);
+    let groups = tri.map(|v| src[v as usize].group);
+    let pts = geo.points();
+    let d = level_set::margin(
+        groups,
+        w,
+        tri.map(|v| phi[v as usize]),
+        tri.map(|v| pts[v as usize]),
+        group,
+    );
+    let own = groups.map(|g| g == group);
+    if !own.contains(&true) {
+        return (None, d);
+    }
+    if own.contains(&false) {
+        let sum: f64 = (0..3).filter(|&k| own[k]).map(|k| w[k]).sum();
+        if sum > 0.0 {
+            for k in 0..3 {
+                w[k] = if own[k] { w[k] / sum } else { 0.0 };
+            }
+        } else {
+            // `q` on the edge facing the group's only corners: that corner's crust.
+            let k = (0..3).find(|&k| own[k]).unwrap_or(0);
+            w = [0.0; 3];
+            w[k] = 1.0;
+        }
+    }
+    (Some(Cover { t, tri, w }), d)
+}
+
 /// `WorldState::globals`: crust accreted at resamplings to the column on top (hidden and
 /// overridden crust, its conserved pools), km³ …
 pub const ACCRETED_GLOBAL: &str = "plates/resample_accreted_km3";
@@ -325,7 +376,7 @@ fn wrap(x: f64) -> f64 {
 /// every point not between two plates; so does a point whose band's meridian lies beyond the
 /// other plate's edge (where an oblique gap is narrower than its offset across the band, the
 /// segment ends inside the band) or more than a quarter turn round the pole from it. Returns, per
-/// sample, the plate and α the segments give.
+/// sample, the plate and α the segments give, and its angular distance from the segment, rad.
 fn segment_ridges(
     gap: &[bool],
     best: &[[(f64, u32); 2]],
@@ -334,7 +385,7 @@ fn segment_ridges(
     omega: &[DVec3],
     norm: &Norm,
     seg_rad: f64,
-) -> Vec<Option<(u32, f64)>> {
+) -> Vec<Option<(u32, f64, f64)>> {
     let n = gap.len();
     let mut out = vec![None; n];
     if seg_rad.is_nan() || seg_rad <= 0.0 {
@@ -437,7 +488,7 @@ fn segment_ridges(
             continue;
         }
         let alpha = (to_ridge / (to_ridge + own).max(1e-12)).clamp(0.0, 1.0);
-        out[i] = Some((q, alpha));
+        out[i] = Some((q, alpha, to_ridge));
     }
     out
 }
@@ -493,10 +544,52 @@ pub fn resample(
         .limits
         .as_ref()
         .filter(|l| l.ceiling_m.len() == src.len() && l.top_m.len() == src.len());
-    let found: Vec<Found> = new_pts
+    // The outline below the lattice spacing (ledger: PLT-536): every old sample's distance from
+    // its group's outline, and the cap on the new samples' distances.
+    let spacing = norm.spacing_rad();
+    let cap = level_set::CAP_SPACINGS * spacing;
+    let old_phi: Option<Vec<f64>> = k.level_set_membership.then(|| {
+        let groups: Vec<u32> = src.iter().map(|s| s.group).collect();
+        level_set::old_distances(state.level_set.as_ref(), &groups, old, spacing)
+    });
+    // On top: visible, then the overriding plate of a subduction contact, then continental, then
+    // higher, then the lower group id.
+    // Each side is a group and the old sample its crust is judged by (a cover's major corner).
+    let rank = |(ga, ma): (u32, u32), (gb, mb): (u32, u32)| {
+        let key = |g: u32, m: u32| {
+            let m = &src[m as usize];
+            (
+                !m.is_hidden(),
+                group_plate[g as usize],
+                m.kind == CONTINENTAL,
+                m.elevation_m,
+                g,
+            )
+        };
+        let (ka, kb) = (key(ga, ma), key(gb, mb));
+        ka.0.cmp(&kb.0)
+            .then_with(|| {
+                if overrides(ka.1, kb.1) {
+                    std::cmp::Ordering::Greater
+                } else if overrides(kb.1, ka.1) {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            })
+            .then(ka.2.cmp(&kb.2))
+            .then(ka.3.total_cmp(&kb.3))
+            .then(kb.4.cmp(&ka.4))
+    };
+    let (found, mut phi_new): (Vec<Found>, Vec<f32>) = new_pts
         .par_iter()
         .map(|&q| {
             let mut covers: Vec<(u32, Cover)> = Vec::new();
+            // With the level set: each cover's distance inside its group's outline, and the
+            // groups near `q` that do not hold it, with the old sample their crust is judged by
+            // and `q`'s distance outside their outlines.
+            let mut inside: Vec<f64> = Vec::new();
+            let mut outside: Vec<(u32, u32, f64)> = Vec::new();
             let mut tried: Vec<u32> = Vec::with_capacity(8);
             let near = tree.nearest_n(q, 8);
             for &(j, _) in &near {
@@ -505,48 +598,61 @@ pub fn resample(
                     continue;
                 }
                 tried.push(g);
-                if let Some(c) = footprint(old, src, g, rots[g as usize], q, j) {
-                    covers.push((g, c));
+                match &old_phi {
+                    None => {
+                        if let Some(c) = footprint(old, src, g, rots[g as usize], q, j) {
+                            covers.push((g, c));
+                        }
+                    }
+                    Some(phi) => {
+                        match footprint_level_set(old, src, phi, g, rots[g as usize], q, j) {
+                            (Some(c), d) if d >= 0.0 => {
+                                covers.push((g, c));
+                                inside.push(d);
+                            }
+                            (Some(c), d) => outside.push((g, c.major(), d)),
+                            // No corner of the group in the triangle: judged by its old sample
+                            // nearest `q`.
+                            (None, d) => outside.push((g, j, d)),
+                        }
+                    }
                 }
             }
             if covers.is_empty() {
-                return (None, covers);
+                return ((None, covers), 0.0);
             }
-            // On top: visible, then the overriding plate of a subduction contact, then
-            // continental, then higher, then the lower group id.
-            let key = |i: usize| {
-                let (g, c) = &covers[i];
-                let m = &src[c.major() as usize];
-                (
-                    !m.is_hidden(),
-                    group_plate[*g as usize],
-                    m.kind == CONTINENTAL,
-                    m.elevation_m,
-                    *g,
-                )
-            };
             let best = (0..covers.len())
                 .max_by(|&a, &b| {
-                    let (ka, kb) = (key(a), key(b));
-                    ka.0.cmp(&kb.0)
-                        .then_with(|| {
-                            if overrides(ka.1, kb.1) {
-                                std::cmp::Ordering::Greater
-                            } else if overrides(kb.1, ka.1) {
-                                std::cmp::Ordering::Less
-                            } else {
-                                std::cmp::Ordering::Equal
-                            }
-                        })
-                        .then(ka.2.cmp(&kb.2))
-                        .then(ka.3.total_cmp(&kb.3))
-                        .then(kb.4.cmp(&ka.4))
+                    rank(
+                        (covers[a].0, covers[a].1.major()),
+                        (covers[b].0, covers[b].1.major()),
+                    )
                 })
                 .unwrap_or(0);
+            // The new sample's distance from its plate's new outline: from the top group's own
+            // outline, or from that of a group of another plate that would be on top of it and
+            // whose outline `q` lies just outside (a trench: the subducting plate's samples in
+            // front of the overriding plate lie the overriding plate's outline away from the
+            // boundary).
+            let phi_q = if old_phi.is_some() {
+                let (tg, tm) = (covers[best].0, covers[best].1.major());
+                let tp = group_plate[tg as usize];
+                let mut d = inside[best];
+                for &(g, m, dg) in &outside {
+                    if group_plate[g as usize] != tp
+                        && rank((g, m), (tg, tm)) == std::cmp::Ordering::Greater
+                    {
+                        d = d.min(-dg);
+                    }
+                }
+                d.clamp(0.0, cap) as f32
+            } else {
+                0.0
+            };
             let top = covers.swap_remove(best);
-            (Some(top), covers)
+            ((Some(top), covers), phi_q)
         })
-        .collect();
+        .unzip();
 
     // Covered samples. Continental crust a collision took across its front was stacked into its
     // belt or went down with the slab (`belts.rs`): it is consumed here, not accreted a second
@@ -756,12 +862,21 @@ pub fn resample(
         } else {
             (1.0, z1, None)
         };
-        if let Some((q, a)) = segment.as_ref().and_then(|s| s[i]) {
+        // The new ridge is the outline between the gap's two plates (ledger: PLT-536): a gap
+        // point's distance from it is half the difference of its distances from the two plates'
+        // edges on the midline, or its distance from the segment.
+        phi_new[i] = if l2 != u32::MAX {
+            (0.5 * (d2 - d1)).clamp(0.0, cap) as f32
+        } else {
+            cap as f32
+        };
+        if let Some((q, a, to_ridge)) = segment.as_ref().and_then(|s| s[i]) {
             if q != p1 {
                 p2 = Some(p1);
                 p1 = q;
             }
             alpha = a;
+            phi_new[i] = to_ridge.sin().clamp(0.0, cap) as f32;
         }
         let age = alpha * since;
         let p = new_pts[i];
@@ -798,6 +913,7 @@ pub fn resample(
         s.formed_myr = t as f32;
         samples[i] = s;
         plate_new[i] = group_plate[state.samples[j as usize].group as usize];
+        phi_new[i] = (level_set::STALE_SPACINGS * spacing) as f32;
     }
 
     // One unrotated group per plate.
@@ -859,6 +975,14 @@ pub fn resample(
         gb.resampled(&state.samples, &traces);
     }
     state.groups = groups;
+    if old_phi.is_some() {
+        // The new samples' distances, until `level_set::reinit` sets them from the outline the
+        // plates have once `bury` is done (ledger: PLT-536).
+        state.level_set = Some(level_set::LevelSet {
+            phi: phi_new,
+            member: state.samples.iter().map(|s| s.group).collect(),
+        });
+    }
     state.lattice = lattice;
     state.resample_step = state.step;
     state.resample_myr = t;
@@ -1191,6 +1315,9 @@ mod tests {
                 norm,
                 seg_rad,
             )
+            .into_iter()
+            .map(|o| o.map(|(q, a, _)| (q, a)))
+            .collect()
         }
     }
 

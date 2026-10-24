@@ -854,6 +854,17 @@ pub struct TectonicParams {
     /// are along the trench") and the collision going with its front. Off, every such state stays
     /// keyed to the parent, wherever its lithosphere went. ledger: PLT-534
     pub split_inheritance: bool,
+    /// A plate's outline lies between the lattice's samples (the front lane, 2026-10-24;
+    /// `plates/level_set.rs`): every sample carries its distance from its plate's outline, a
+    /// resampling gives a new point the plate whose corners' distances, weighed with its
+    /// barycentric weights, outweigh the others' (the zero level set of the interpolated signed
+    /// distance; Osher & Sethian 1988, Sussman, Smereka & Osher 1994), and the distances are set
+    /// again from the new outline after it. A great-circle outline lands where it was on any
+    /// lattice. Off, a new point takes the plate of the old corner with the largest weight, which
+    /// moves an outline up to half a spacing at random at every resampling, so a boundary that
+    /// does not move roughens (`plates::tests::how_resamplings_roughen_a_boundary`). ledger:
+    /// PLT-536
+    pub level_set_membership: bool,
     /// Hotspots at the start.
     pub hotspots_initial: u32,
     /// New hotspots per 100 Myr (Poisson).
@@ -1060,6 +1071,7 @@ impl Default for TectonicParams {
             front_share: true,               // ledger: PLT-530
             plate_fission: true,             // ledger: PLT-532
             split_inheritance: true,         // ledger: PLT-534
+            level_set_membership: false,     // ledger: PLT-536
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],

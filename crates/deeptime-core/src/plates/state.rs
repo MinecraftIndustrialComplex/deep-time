@@ -596,6 +596,10 @@ pub struct PlateState {
     pub slabs: Vec<SlabTrack>,
     /// The dynamics record (`dynamics.rs`): measurement only, absent when switched off.
     pub dynamics: Option<super::dynamics::Dynamics>,
+    /// Each sample's distance from its group's outline (`level_set.rs`, ledger PLT-536): set at
+    /// every resampling while `tectonics.level_set_membership` is on, absent while it is off.
+    #[serde(default)]
+    pub level_set: Option<super::level_set::LevelSet>,
     /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
     /// kept in checkpoints.
     #[serde(skip)]
