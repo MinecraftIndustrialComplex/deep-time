@@ -47,8 +47,8 @@ use deeptime_format::tilepack::write_stored_tiles;
 use deeptime_format::{DType, FileEntry, GridDesc, LayerDesc, LoadedLayer, Manifest, Written};
 
 use crate::bake::biomes;
-use crate::bake::strata::{Moved, key_shift};
 use crate::bake::project_cube::project_body_exact;
+use crate::bake::strata::{Moved, key_shift};
 use crate::bake::{load_layer, stored_tiles};
 use crate::error::CoreError;
 use crate::hydro;
@@ -2535,7 +2535,11 @@ pub fn project_structure(
             if first.is_finite() && second.is_finite() && first > 0.0 && second > 0.0 {
                 let d = (yaw.cos(), yaw.sin());
                 // Across on the side the old across axis went, as the rule below keeps it.
-                let s = if c.1 * d.0 - c.0 * d.1 < 0.0 { -1.0 } else { 1.0 };
+                let s = if c.1 * d.0 - c.0 * d.1 < 0.0 {
+                    -1.0
+                } else {
+                    1.0
+                };
                 w.centre = [wx, wz];
                 w.along = [d.0, d.1];
                 w.across = [-s * d.1, s * d.0];
@@ -3205,19 +3209,20 @@ mod tests {
         let map = Mapping::new(g, c_sim, 16);
         let frame = crate::sphere::BlockFrame::new(c_sim);
         let mh = 300.0;
-        let event = |x: f64, z: f64, (first, second, yaw): (f64, f64, f64), shape: Shape| StructEvent {
-            id: 1,
-            key: 0,
-            t_years: 0.0,
-            window: Window {
-                centre: [x, z],
-                along: [yaw.cos(), yaw.sin()],
-                across: [-yaw.sin(), yaw.cos()],
-                half_along: first,
-                half_across: second,
-            },
-            shape,
-        };
+        let event =
+            |x: f64, z: f64, (first, second, yaw): (f64, f64, f64), shape: Shape| StructEvent {
+                id: 1,
+                key: 0,
+                t_years: 0.0,
+                window: Window {
+                    centre: [x, z],
+                    along: [yaw.cos(), yaw.sin()],
+                    across: [-yaw.sin(), yaw.cos()],
+                    half_along: first,
+                    half_across: second,
+                },
+                shape,
+            };
         let intrusion = Shape::Intrusion {
             y: 0.0,
             half_height: 10.0,
@@ -3258,18 +3263,31 @@ mod tests {
             for k in 0..72 {
                 let t = f64::from(k) * 5f64.to_radians();
                 let (u, v) = (src.half_along * t.cos(), src.half_across * t.sin());
-                let d = (u * src.along[0] + v * src.across[0], u * src.along[1] + v * src.across[1]);
+                let d = (
+                    u * src.along[0] + v * src.across[0],
+                    u * src.along[1] + v * src.across[1],
+                );
                 let lin = apply(&j, d);
                 let exact = r2(w, (wx + lin.0, wz + lin.1));
-                assert!((exact - 1.0).abs() < 1e-9, "{lat}° stock at {k}: linear r2 {exact}");
+                assert!(
+                    (exact - 1.0).abs() < 1e-9,
+                    "{lat}° stock at {k}: linear r2 {exact}"
+                );
                 let far = r2(w, map.to_world(x + d.0, z + d.1));
-                assert!((far - 1.0).abs() < 3e-2, "{lat}° stock at {k}: projected r2 {far}");
+                assert!(
+                    (far - 1.0).abs() < 3e-2,
+                    "{lat}° stock at {k}: projected r2 {far}"
+                );
                 // The old rule: each axis stretched by its own image, kept perpendicular.
-                let (a, c) = (apply(&j, (src.along[0], src.along[1])), apply(&j, (src.across[0], src.across[1])));
+                let (a, c) = (
+                    apply(&j, (src.along[0], src.along[1])),
+                    apply(&j, (src.across[0], src.across[1])),
+                );
                 let (la, lc) = (a.0.hypot(a.1), c.0.hypot(c.1));
                 let (al, ac) = ((a.0 / la, a.1 / la), (-a.1 / la, a.0 / la));
                 let (pa, pc) = (lin.0 * al.0 + lin.1 * al.1, lin.0 * ac.0 + lin.1 * ac.1);
-                let old = (pa / (src.half_along * la)).powi(2) + (pc / (src.half_across * lc)).powi(2);
+                let old =
+                    (pa / (src.half_along * la)).powi(2) + (pc / (src.half_across * lc)).powi(2);
                 worst_old = worst_old.max((old.sqrt() - 1.0).abs());
             }
             // A pluton's body, its plan drawn on the planet at a strike (SCL-235), goes to this
@@ -3288,18 +3306,28 @@ mod tests {
             );
             let nb = project_body_exact(&map, &b);
             let (sy, cy) = f64::from(nb.yaw).sin_cos();
-            let (bs, bc) = (f64::from(b.yaw).sin_cos(), (f64::from(b.axes[0]), f64::from(b.axes[2])));
+            let (bs, bc) = (
+                f64::from(b.yaw).sin_cos(),
+                (f64::from(b.axes[0]), f64::from(b.axes[2])),
+            );
             for k in 0..72 {
                 let t = f64::from(k) * 5f64.to_radians();
                 let (u, v) = (bc.0 * t.cos(), bc.1 * t.sin());
                 let lin = apply(&j, (u * bs.1 - v * bs.0, u * bs.0 + v * bs.1));
                 let (pa, pc) = (lin.0 * cy + lin.1 * sy, -lin.0 * sy + lin.1 * cy);
-                let r2 = (pa / f64::from(nb.axes[0])).powi(2) + (pc / f64::from(nb.axes[2])).powi(2);
-                assert!((r2 - 1.0).abs() < 1e-5, "{lat}° pluton body at {k}: r2 {r2}");
+                let r2 =
+                    (pa / f64::from(nb.axes[0])).powi(2) + (pc / f64::from(nb.axes[2])).powi(2);
+                assert!(
+                    (r2 - 1.0).abs() < 1e-5,
+                    "{lat}° pluton body at {k}: r2 {r2}"
+                );
             }
         }
         // The old rule misses the stock's edge by more than 5 % in radius somewhere (55° here).
-        assert!(worst_old > 0.05, "the old rule was already right ({worst_old})");
+        assert!(
+            worst_old > 0.05,
+            "the old rule was already right ({worst_old})"
+        );
     }
 
     /// A measurement, not a check (docs/science/round-features.md): the shape ratio (long axis over short) in
@@ -3333,7 +3361,11 @@ mod tests {
                 v.sort_by(f64::total_cmp);
                 (v[0], v[v.len() / 2], v[v.len() * 9 / 10], v[v.len() - 1])
             };
-            eprintln!("SURVEY lat {lat}: now (min, median, p90, max) {:?}; before {:?}", stat(&mut now), stat(&mut before));
+            eprintln!(
+                "SURVEY lat {lat}: now (min, median, p90, max) {:?}; before {:?}",
+                stat(&mut now),
+                stat(&mut before)
+            );
         }
     }
 

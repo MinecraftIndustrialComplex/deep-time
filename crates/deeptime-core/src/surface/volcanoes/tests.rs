@@ -99,7 +99,15 @@ fn arcs_are_spaced_on_the_planet_at_high_latitude() {
         flux[(row + 1) * w + i] = 0.8;
     }
     let spacing = 60_000.0;
-    let born = place_arcs(&grid, mh, &flux, 0.25, spacing, &mut Vec::new(), &mut Rng::stream(5, "test"));
+    let born = place_arcs(
+        &grid,
+        mh,
+        &flux,
+        0.25,
+        spacing,
+        &mut Vec::new(),
+        &mut Rng::stream(5, "test"),
+    );
     let pts: Vec<(f64, f64)> = born.iter().map(|&(x, z, _)| (x, z)).collect();
     let mut nn = Vec::new();
     for (a, &(x, z)) in pts.iter().enumerate() {
@@ -112,11 +120,24 @@ fn arcs_are_spaced_on_the_planet_at_high_latitude() {
         nn.push(best);
     }
     let mean = nn.iter().sum::<f64>() / nn.len() as f64;
-    assert!((48.0..=80.0).contains(&mean), "mean neighbour distance {mean} km");
+    assert!(
+        (48.0..=80.0).contains(&mean),
+        "mean neighbour distance {mean} km"
+    );
     // 500 cells of 16 blocks at cos 60° are 1,200 km on the planet: 15 to 25 at 48 to 80 km.
-    let len_km = 500.0 * 16.0 * frame.lat_deg(grid.block_z(row as i64) as f64).to_radians().cos() * mh / 1000.0;
+    let len_km = 500.0
+        * 16.0
+        * frame
+            .lat_deg(grid.block_z(row as i64) as f64)
+            .to_radians()
+            .cos()
+        * mh
+        / 1000.0;
     let count = born.len() as f64;
-    assert!((len_km / 80.0 - 1.0..=len_km / 48.0 + 1.0).contains(&count), "{count} volcanoes on {len_km} km of arc");
+    assert!(
+        (len_km / 80.0 - 1.0..=len_km / 48.0 + 1.0).contains(&count),
+        "{count} volcanoes on {len_km} km of arc"
+    );
 }
 
 #[test]

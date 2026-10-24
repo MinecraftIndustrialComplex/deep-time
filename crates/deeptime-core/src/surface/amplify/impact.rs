@@ -338,15 +338,20 @@ mod tests {
             let at = Around::of(16_384, preset.scale.m_per_block_h, x, z);
             let d_east = |k: usize| at.distance_m(x + 2.0 * k as f64, z);
             let d_north = |k: usize| at.distance_m(x, z - 2.0 * k as f64);
-            let crest =
-                |v: &[f32]| (0..v.len()).max_by(|&a, &b| v[a].total_cmp(&v[b])).unwrap();
+            let crest = |v: &[f32]| (0..v.len()).max_by(|&a, &b| v[a].total_cmp(&v[b])).unwrap();
             let end = |v: &[f32]| (0..v.len()).rev().find(|&k| v[k] != 0.0).unwrap();
             // One L3 cell north–south is 600 / cos φ m of the planet (1.75 km at 70°).
             let cell = 600.0 / lat.to_radians().cos() + 1.0;
             let (ce, cn) = (d_east(crest(&east)), d_north(crest(&north)));
-            assert!((ce - 6000.0).abs() < cell && (cn - 6000.0).abs() < cell, "{lat}°: rim {ce} {cn}");
+            assert!(
+                (ce - 6000.0).abs() < cell && (cn - 6000.0).abs() < cell,
+                "{lat}°: rim {ce} {cn}"
+            );
             let (ee, en) = (d_east(end(&east)), d_north(end(&north)));
-            assert!((ee - en).abs() < cell, "{lat}°: ejecta end {ee} east, {en} north");
+            assert!(
+                (ee - en).abs() < cell,
+                "{lat}°: ejecta end {ee} east, {en} north"
+            );
             assert!((ee - 18_000.0).abs() < cell, "{lat}°: ejecta end {ee}");
         }
     }

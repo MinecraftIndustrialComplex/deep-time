@@ -362,6 +362,9 @@ mod tests {
         let f = |r: f64| Shape::profile(Kind::Shield, r);
         let w = cell_weight(&f, 0.0, 0.0, (100.0, 100.0), 10_000.0);
         assert!(w > 0.99 && w <= 1.0);
-        assert_eq!(cell_weight(&f, 20_000.0, 0.0, (100.0, 100.0), 10_000.0), 0.0);
+        assert_eq!(
+            cell_weight(&f, 20_000.0, 0.0, (100.0, 100.0), 10_000.0),
+            0.0
+        );
     }
 }

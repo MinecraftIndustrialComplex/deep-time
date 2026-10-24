@@ -2398,9 +2398,9 @@ mod tests {
                 let c = m.view.turn.to_cube(m.src.unit(x, z));
                 let near = [-1.0f64, 1.0].iter().any(|&a| {
                     [-1.0f64, 1.0].iter().any(|&b| {
-                        [-1.0f64, 1.0].iter().any(|&d| {
-                            (a * c[0] + b * c[1] + d * c[2]) / 3f64.sqrt() > corner_cos
-                        })
+                        [-1.0f64, 1.0]
+                            .iter()
+                            .any(|&d| (a * c[0] + b * c[1] + d * c[2]) / 3f64.sqrt() > corner_cos)
                     })
                 });
                 if near {
@@ -2438,7 +2438,10 @@ mod tests {
                 let w = &out.events[1].window;
                 let old = w.half_along.max(w.half_across) / w.half_along.min(w.half_across);
                 let cos2 = lat.to_radians().cos().powi(2);
-                assert!((old * cos2 - 1.0).abs() < 0.01, "{lat}° x {x}: the Lambert circle {old}");
+                assert!(
+                    (old * cos2 - 1.0).abs() < 0.01,
+                    "{lat}° x {x}: the Lambert circle {old}"
+                );
                 let b = Body::new(
                     1,
                     None,

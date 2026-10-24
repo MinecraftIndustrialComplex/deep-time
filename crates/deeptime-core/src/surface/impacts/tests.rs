@@ -310,14 +310,26 @@ fn fields_map_and_bodies_come_from_the_catalogue() {
         let round = Around::of(16_384, mh, north.x, north.z);
         let want = 0.95 * small.radius_m();
         let (cos, tan) = (lat.to_radians().cos(), lat.to_radians().tan());
-        let (pe, pn) = (f64::from(b.axes[0]) * cos * mh, f64::from(b.axes[2]) * mh / cos);
-        assert!((pe / want - 1.0).abs() < 1e-5, "{lat}°: east {pe} of {want}");
-        assert!((pn / want - 1.0).abs() < 1e-5, "{lat}°: north {pn} of {want}");
+        let (pe, pn) = (
+            f64::from(b.axes[0]) * cos * mh,
+            f64::from(b.axes[2]) * mh / cos,
+        );
+        assert!(
+            (pe / want - 1.0).abs() < 1e-5,
+            "{lat}°: east {pe} of {want}"
+        );
+        assert!(
+            (pn / want - 1.0).abs() < 1e-5,
+            "{lat}°: north {pn} of {want}"
+        );
         let (e, _) = round.offset(north.x + f64::from(b.axes[0]), north.z);
         let (_, s) = round.offset(north.x, north.z - f64::from(b.axes[2]));
         assert!((e / want - 1.0).abs() < 1e-4, "{lat}°: east {e} of {want}");
         let first_order = want / round.radius_m() * tan;
-        assert!((-s / want - 1.0).abs() < first_order, "{lat}°: north {s} of {want}");
+        assert!(
+            (-s / want - 1.0).abs() < first_order,
+            "{lat}°: north {s} of {want}"
+        );
         let area = f64::from(b.axes[0]) * f64::from(b.axes[2]) * mh * mh;
         assert!((area / (want * want) - 1.0).abs() < 1e-3, "{lat}°: area");
         assert_eq!(b.yaw, 0.0);
