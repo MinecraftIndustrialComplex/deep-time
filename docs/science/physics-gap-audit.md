@@ -346,6 +346,16 @@ what a player meets most.
   (reported, not aimed at); beside a channel, 93 % of the plain now stands one block over the water
   (42 % before), 54.6 % of it beyond the bank zone (rivers-and-lakes.md, "Floodplains and levees").
   Meanders, fans and braids remain.
+- **State (2026-10-24, later).** Stage 3 of 4 is built on the same branch, on by default
+  (`hydro.meanders`), not merged: a reach on the floodplain gentler than Leopold & Wolman's braided
+  line (HYD-158) is redrawn as Langbein & Leopold's sine-generated curve, its wavelength 10.9 drawn
+  widths (HYD-155 to HYD-157), its amplitude what the plain's room allows up to sinuosity 2
+  (HYD-159), measured on the planet. On the D5 bake 6,762 km of the 39,298 km of plain course
+  meander (196 chains), at a reach sinuosity of 1.57 (Earth's meandering rivers: 1.1 to 2.0), the
+  wavelength within 4 % of 10.9 widths at every latitude; no river of 1,000 m³/s or more meanders
+  (its belt does not fit between the plain's edges and its tributaries; an open question). The
+  whole network's sinuosity goes from 1.0 to 1.04 (rivers-and-lakes.md, "Meanders"). Fans and
+  braids remain.
 
 ### Gap 6: flexural foreland basins
 
