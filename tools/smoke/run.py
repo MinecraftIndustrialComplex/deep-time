@@ -454,7 +454,8 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
        terrain agrees with the chunks generated afterwards at the same columns.
     4. The seam: 2 and 3 again with a pregeneration on each side of x = C/2, inside the lap (DH asked
        nothing for a square past the seam), checked on 160 blocks either side of the seam.
-    5. `/deeptime probe far bench`: the time a section takes without Distant Horizons' storing.
+    5. On a cube world, 2 and 3 across the slide (the net's F2 to F3 edge, cube plan G6).
+    6. `/deeptime probe far bench`: the time a section takes without Distant Horizons' storing.
     """
     st, out = probe_json(server, rcon, "deeptime probe dh")
     if not steps.check("dh: /deeptime probe dh answers", "[deeptime-probe] JSON", "ok" if st else out[:200], st is not None):
@@ -574,6 +575,36 @@ def dh_checks(steps, server, rcon, smoke, radius_chunks=32):
     level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
     steps.record("dh across the seam: sections asked of the override", level.get("sections", 0) - before,
                  note=f"{radius_seam}-chunk square centred on x = {across_x}, z = {sz + 1024}, crossing x = {half}: 257 sections")
+
+    # A cube world's slide (its F2 to F3 edge, cube plan G6; the probe's slide_x): a pregeneration
+    # square across it, then what DH holds against the chunks on the 160 blocks either side. Toroidal
+    # World's seam lies inside F2 on a cube, so the slide is no lap end and one square spans it.
+    slide = level.get("slide_x")
+    if slide is not None:
+        best = None
+        for z in (0, 768, -768, 1536, -1536):
+            zz = z // 64 * 64
+            shares = []
+            for x in (slide - 128, slide + 64):
+                land, _ = probe_json(server, rcon, f"deeptime probe far land {x // 64 * 64} {zz}", wait=0.5)
+                shares.append((land or {}).get("land_share", 0.0))
+            share = sum(shares) / len(shares)
+            if best is None or share > best[0]:
+                best = (share, zz)
+            if share >= 0.95:
+                break
+        slide_land, lz = best
+        steps.record("dh slide: area checked", f"x = {slide} (the cube's F2 to F3 edge), z = {lz} "
+                                               f"({100 * slide_land:.0f} % land either side), pregen radius {radius_seam} chunks across it")
+        before = level.get("sections", 0)
+        dh_pregen(steps, rcon, slide, lz, radius_seam, "slide ")
+        st, out = probe_json(server, rcon, "deeptime probe dh")
+        level = next((l for l in (st or {}).get("levels", []) if l.get("level") == "minecraft:overworld"), {}) if st else {}
+        steps.check("dh slide: Distant Horizons asked the override for the slide's sections", "> 0 more",
+                    level.get("sections", 0) - before, level.get("sections", 0) > before)
+        steps.check("dh slide: no section failed", "0", level.get("failures"), level.get("failures") == 0)
+        dh_area_check(steps, server, rcon, smoke, slide - 16 * seam_side, lz - 80, seam_side, "slide west ", "dh-check-slide-west.json", st)
+        dh_area_check(steps, server, rcon, smoke, slide, lz - 80, seam_side, "slide east ", "dh-check-slide-east.json", st)
 
     for detail in (0, 3, 6):
         b, out = probe_json(server, rcon, f"deeptime probe far bench {cx} {cz} {detail} 64", wait=2.0)
