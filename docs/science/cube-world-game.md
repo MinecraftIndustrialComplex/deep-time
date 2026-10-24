@@ -183,6 +183,19 @@ the game uses them:
     (item 12). The shot driver's places on a cube: the spawn, 25 blocks onto F3 from the slide,
     40 blocks inside N's east segment (a quarter-turn seam's border), the north pole, beside F0's
     north-east corner and 40 blocks under the F1, F2 and N corner.
+14. **Lava flows across the seams** (`worldgen/LavaFlows`, cube plan G16; the flows themselves are
+    [volcanoes-and-magma.md](volcanoes-and-magma.md), item 11). A flow steps half a block at a time
+    down the ground. On a cube world each step goes through the net's fold. At the slide, x just
+    wraps. A step that ends past a turning edge goes onto the partner face by the edge's motion,
+    and the flow's heading, its pond heading and its metric turn with it, so the flow runs on as the
+    copy past the edge showed it. The smooth wander that turns a flow is read where the flow would
+    be if the faces were laid flat from its vent, so it does not jump at an edge. A painted column
+    is kept as the planet block it shows, and every column asked for (by a chunk, by a copy off the
+    faces, by far terrain) answers through the same fold, so a column past an edge shows its
+    partner's paint. Which volcanoes can reach a column is decided by the straight line between them
+    on the cube: a path over the surface is never shorter, so the test holds across edges and round
+    corners. A flow that reaches past the net's corners stops there. On Lambert and Petroff-Guyou
+    worlds nothing changes.
 
 ## Equations and constants
 
@@ -248,6 +261,21 @@ edges (the slide and the twelve turning edges) and steps across them no more tha
 line inside a face, that an outside block reads its fold partner's value exactly, and that Rust and
 Java give the same pinned values. The seam steps it gives the bake are on the bake page (B1).
 
+Lava flows (G16, 2026-10-24, `LavaFlowsTest` on the VM, `build/cube2/g16-test.sh`). The test puts a
+shield 20 blocks from an edge of a 1,024-block cube, on ground that is a function of the point on the
+cube (a cone by the straight-line distance from the vent, tilted 0.02 blocks a block down across the
+edge). It compares the flows with those of a flat world on the same ground, where the box round the
+vent past the edge is the partner's copy laid flat. Whether a column is painted agrees in every column
+of the 521 by 521 box at the slide (54 of 150 flows cross it, 4,161 of 11,610 painted columns lie
+past it, every code equal), at N's east edge (a quarter turn, with an anisotropic metric that must
+turn with the flow; 39 of 172 flows cross, 1,227 of 6,030 columns past) and at N's top edge (a half
+turn; 61 of 157 cross, 2,853 of 7,012 past). Past a turning edge 83 and 647 old columns swap
+oxidised and covered: those patches are a hash of the column, and the cube keys the partner's column
+where the flat world keys the copy's. Every column past an edge answers as its partner, and every
+chunk with paint is one the flows touch, on both faces and in the void. Away from the edges the
+cube's flows equal the flat world's column for column. The surface point used for the reach
+matches the cube's development across four seams: |A - Q|² = da² + dp² + t² to 1e-6.
+
 ## Simplifications and limits
 
 - The copy off the faces has no structures and no features: trees, ore veins placed as features,
@@ -255,7 +283,9 @@ Java give the same pinned values. The seam steps it gives the bake are on the ba
   (cube plan E3) shows the partner's real chunks instead and supersedes the fill there.
 - Terrain that a structure adapts round its pieces (the beardifier) is not copied: the scratch
   chunk does not know the partner's structure starts.
-- Lava flows (G16) do not yet cross turning seams.
+- A lava flow that runs into the void square past a corner of the net stops there, and the
+  oxidised patches of an old flow past an edge are not the ones a flat world would draw (both are
+  hashes of the column).
 - Far terrain past a turning edge is the fill's ground, so it has no trees or structures either;
   the area is drawn column by column there (its cost there was not measured apart).
 - The surface noise's lattice is square on each face in net blocks, so where the map's local

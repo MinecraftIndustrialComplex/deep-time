@@ -730,8 +730,12 @@ section 7.4 is deleted yet.
   void masked, teleports to `CubeBorder.nearest`, the cube places in the shot driver;
   `deeptime-tiles` reads a cube world's layers on the net, so the satellite draws every face;
   `PlanetGeometryTest` and `MapModelTest` on hand-made cubes and the `cube1024` fixture,
-  `devmap-shots.sh` on the 16k cube with the level type from the manifest).
-- Left: G16, the Sable border, and section 7.4 with what waits for it: G12's
+  `devmap-shots.sh` on the 16k cube with the level type from the manifest), G16 (lava flows cross
+  the seams: each step through `CubeLayout.foldPoint`, the heading, pond heading and metric turned at
+  a turning edge, the wander read unfolded, columns kept and asked for as planet blocks, the reach
+  and grid index by the straight line on the cube; `LavaFlowsTest`'s slide, quarter-turn and
+  half-turn cases against a flat world's flows on the same ground, membership exact).
+- Left: the Sable border, and section 7.4 with what waits for it: G12's
   preset edits (`planet` and `planet_32k` made cubes, `planet_lambert*` deleted, the Rust presets'
   projection keys, the deposits fixtures as cubes), G13's `editor_fields.json` keys, and the
   deletions with the rewrites of the Petroff-Guyou tests they bring.
