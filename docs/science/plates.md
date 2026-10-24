@@ -7802,11 +7802,68 @@ stand 100 to 280 m higher through the whole cycle, and a share over a threshold 
 volumes (the arcs' 8 %, the belts' 2.5 %). The census was flattered by the artefact; no knob is
 added to take it back (the foreland basins of gap 6 are the lane expected to lower both).
 
+On 24 runs (base7, master 1b56529d, the carry on, against base6's 24) the rise is smaller and no
+longer significant: land above 2 km 0.128 to 0.141 (p 0.23), coast with high ground 0.228 to
+0.266 (p 0.059), the largest landmass 0.156 to 0.210; the guard's worst 10,140 m, no step beyond
+2 reliefs. fl-carry's 0.174 and 0.282 were seeds 1 to 4's draw.
+
 **The two lattices after the carry.** The front on the model's own samples is 1.45 times its
 length on one lattice at 77 km and 1.27 at 380 km, where PB2002's raster is 1.02 and 1.01: the
 part the carry cannot touch, as large as before it (fl-ls2's raw over one-lattice, 1.39 at 77 km).
 The record's own subducting length (the boundary mix, 93,743 lattice km) is 1.32 times the
 one-lattice subduction front, so the boundary criteria (the subducting share 0.301 against Bird's
-0.197) still read a front inflated by the subducting plate's edge row reaching into the overriding
-plate's before it goes under (`geometry::cover`, part 2 above). Whether the laws that count front
-samples (the slab pull's length, the arcs) see the same inflation is not measured.
+0.197) read a front 1.32 times its straight length. Corrected in step 8: that 1.32 is not the
+edge row reaching in. The boundary mix counts one spacing per overriding sample on its own
+plate's lattice, which is PLT-530's count on the model's ragged fronts (1.3175 times their
+straight length, arm fl-share), on lattice adjacency, which the two lattices' interleaving does
+not reach; the edge row reaching in is in the raw maps' front over the one-lattice front (part 2
+above). Whether the laws that count front samples see either is measured in step 8.
+
+### Step 8: a sample goes under at the outline (PLT-553), and what the slab pull and the arcs count (PLT-554) (2026-10-24)
+
+Step 7's part 2 left the front on the model's own samples 1.45 times its length on one lattice at
+77 km, where PB2002's raster is 1.02: the subducting plate's edge row reaches into the overriding
+plate's before it goes under, because `geometry::cover` hides a subducting sample only once a
+whole lattice triangle of the overriding group holds it. The resampling footprint already
+counts the crust finer than that: since step 3c a new lattice point belongs to the group that
+weighs the most in the old triangle by the interpolated signed distance (PLT-536), so the
+outline lies between the samples, about half a spacing in from the hull of the group's
+triangles where two groups meet.
+
+**The law** (`tectonics.outline_cover`, on by default; `level_set::cover`,
+`level_set::distances_now`, `subduction::overlaps`; ledger PLT-553). A sample lies on another
+group's surface where the resampling would give that group the point: in a triangle of the
+group's own lattice, in its own frame, where that group weighs the most by `level_set::margin`
+(weights renormalised to the group's corners). The distances are the level set's where the
+neighbours' groups are as at the last resampling, half a spacing where not, which is the old
+midpoint rule. So a sample goes under the step it crosses the overriding plate's outline. Off,
+the hull rule as before. The overlaps feed `resolve` unchanged: an existing contact hides what
+overlaps it each step, a new contact needs `MIN_CONTACT` overlaps and convergence. No constant of
+its own.
+
+**The unit tests.** `a_sample_goes_under_where_it_crosses_the_outline`: the two-plate planet
+(20,000 samples, the outline the equator, held exactly by the level set), the ocean turned under
+the continent by a third of a spacing on one half. 63 samples lie past the outline; the outline
+rule finds all 63 and none short of it, the hull rule none (19 lie within 0.1 spacings of it, 30
+within 0.1 to 0.2, 14 within 0.2 to 0.35). By the hull rule a sample a third of a spacing past
+the outline (24 km on the quick lattice, a quarter of a 2-Myr step at 50 mm/yr) is still on top.
+`what_the_outline_cover_finds_at_a_transform` is the risk: the same plates sliding past each other,
+which no sample crosses. On the exact outline neither rule finds an overlap. On a lattice's outline
+(the midpoints of the edges between the plates, as a cut leaves it until a resampling) the outline
+rule finds up to 0.22 overlaps per spacing of transform once the plates have slid a spacing (0.27
+after one resampling, 0.16 after five), up to 0.48 spacings from the boundary, where the hull rule
+finds up to 0.04: one plate's zigzag outline no longer nests in the other's. An overlap at a
+transform hides a sample only where a contact between the two plates already stands, and starts
+none without convergence, so the arm reads hiding and consumption, not only the fronts.
+
+**What the slab pull and the arcs count** (measurement only; PLT-554). The slab pull
+(`forces::balance_step`) acts at each overriding edge sample with a front, one spacing of trench
+each (`pull_n_m` is per metre, FRC-002); so do the slab resistance (FRC-017), the boundary
+resistance and the edge forces. The arcs' magma is an areal field over the distance from the
+fronts (`w_arc_of`, PLT-045) and does not count samples. The record now books, in km × Myr: the
+slab pull's spacings (`plates/slab_front_lattice_km_myr`), their part along the boundary's normal
+(`plates/slab_front_normal_km_myr`), the same samples' shares of the straight front
+(`plates/slab_front_straight_km_myr`, PLT-530's crossings), and the arcs' band weight over the
+band's width (`plates/arc_band_km_myr`), against the arcs' straight front
+(`plates/arc_front_straight_km_myr`). The test `the_fronts_by_the_slab_pull_and_the_arcs` prints
+them on a 100-Myr run.

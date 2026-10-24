@@ -28,6 +28,15 @@
 //! triangle into great-circle arcs, and each sample's distance to the nearest arc of its group.
 //! A plate's outline still moves where the physics moves it (a ridge's new crust, a trench's
 //! overriding plate on top, an accretion), and only there.
+//!
+//! The same outline decides what goes under (`tectonics.outline_cover`, the front lane's step 8,
+//! 2026-10-24; ledger PLT-553): [`cover`] says a sample lies on another group's surface where the
+//! resampling would give that group the point (a triangle of the group's own lattice, in its own
+//! frame, where the group weighs the most by [`margin`]), so a subducting sample goes under the
+//! step it crosses the overriding plate's outline, not once a whole triangle of that plate's
+//! lattice holds it. The distances are [`distances_now`]: the kept ψ where the neighbours'
+//! groups are as they were at the last resampling, half a spacing where not, which is the
+//! lattice midpoint rule.
 
 use glam::{DQuat, DVec3};
 use rayon::prelude::*;
