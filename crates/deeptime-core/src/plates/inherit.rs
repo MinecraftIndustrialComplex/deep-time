@@ -400,6 +400,7 @@ pub(in crate::plates) mod tests {
             centroid: at.normalize().to_array(),
             cont_in: 0,
             reversed: false,
+            carried: false,
         }
     }
 

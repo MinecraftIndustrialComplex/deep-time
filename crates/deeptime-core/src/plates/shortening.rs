@@ -700,6 +700,7 @@ mod tests {
                 centroid: [0.0, 1.0, 0.0],
                 cont_in: 0,
                 reversed: false,
+                carried: false,
             }],
             hotspots: Vec::new(),
             ridges: Vec::new(),

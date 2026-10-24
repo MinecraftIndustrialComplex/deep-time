@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * <ul>
  *   <li>{@code openFresh} (Singleplayer, Create New World; not {@code createFromExisting}, which
  *       recreates a world with its own type) hands its new screen to
- *       {@link CreateWorldFlow#fresh}, which selects {@code deeptime:planet} the way the World tab's
+ *       {@link CreateWorldFlow#fresh}, which selects {@code deeptime:planet_cube} the way the World tab's
  *       button does ({@code WorldCreationUiState.setWorldType}, which also sets the dimensions);</li>
  *   <li>{@code onCreate} (the Create button and Enter) asks {@link CreateWorldFlow#interceptCreate}
  *       first: a Deep Time world without world data opens the generation screen instead.</li>

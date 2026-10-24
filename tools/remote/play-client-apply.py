@@ -52,6 +52,12 @@ play time, and JoinServerOnLaunch=false: no lite play server runs by default), m
 Ben's options.txt and config/DistantHorizons.toml. No saves, screenshots or logs. The new folder is built next
 to the instances (a hidden folder with no instance.cfg until the end) and renamed into place, so Prism never
 sees half an instance; nothing else of Prism's is touched. Run again later to update it like the full one.
+
+A new instance of either set (Ben, 2026-10-24: "load up a new prism instance with the most recent changes"):
+--instance naming the minecraft folder of an instance that does not exist yet creates it the same way, from the
+same template, so a build can sit next to the instances Ben already has (the full set with
+--instance ".../instances/MIC Deep Time 2026-10-24/minecraft"). Every new instance starts with
+JoinServerOnLaunch=false: the play server serves an older world than a new build's.
 """
 import argparse
 import filecmp
@@ -73,10 +79,11 @@ TEMPLATE_NAME = "MIC Deep Time Test"
 TEMPLATE_FILES = ("options.txt", "config/DistantHorizons.toml")
 # instance.cfg keys a new instance does not inherit (play time and launch history) and its UI section.
 CFG_RESET = ("lastLaunchTime", "lastTimePlayed", "totalTimePlayed", "name", "uuid")
-# instance.cfg keys a new LITE instance gets instead of the template's (Ben's coordinator, 2026-10-22: no lite
-# play server exists, so the full instance's join-on-launch would show a failed join on every launch). Only a
-# new instance is seeded with them: a later apply never rewrites instance.cfg, so a change of Ben's stays.
-LITE_CFG = {"JoinServerOnLaunch": "false"}
+# instance.cfg keys a NEW instance gets instead of the template's (Ben's coordinator, 2026-10-22: no lite play
+# server exists, so the full instance's join-on-launch would show a failed join on every launch; 2026-10-24: a
+# new full instance holds a newer build than the play server's world). Only a new instance is seeded with them:
+# a later apply never rewrites instance.cfg, so a change of Ben's stays.
+NEW_CFG = {"JoinServerOnLaunch": "false"}
 # Files of the instance that the pack also ships as defaults (the pack's options.txt) and the player owns.
 KEEP = {"options.txt", "servers.dat", "optionsof.txt", "optionsshaders.txt"}
 # Where KubeJS reads Deep Time's rock tags in a game folder (the pack's own path for them).
@@ -122,7 +129,7 @@ def seed_instance(root, template_root, name):
     mc = os.path.join(root, "minecraft")
     os.makedirs(mc)
     with open(os.path.join(root, "instance.cfg"), "w") as f:
-        f.write(new_instance_cfg(os.path.join(template_root, "instance.cfg"), name, LITE_CFG))
+        f.write(new_instance_cfg(os.path.join(template_root, "instance.cfg"), name, NEW_CFG))
     shutil.copy2(os.path.join(template_root, "mmc-pack.json"), os.path.join(root, "mmc-pack.json"))
     with open(os.path.join(mc, "packwiz.json"), "w") as f:
         json.dump({"cachedFiles": {}}, f)
@@ -188,9 +195,21 @@ def ship_rock_tags(a, inst, stage_cache):
 
 
 def refuse_if_running(inst):
-    ps = subprocess.run(["ps", "-eo", "args"], capture_output=True, text=True).stdout
-    if any(inst in line and "java" in line for line in ps.splitlines()):
-        sys.exit("play-client-apply: a Minecraft process has this instance open; close the game first")
+    # Prism's java command line names the instance's natives folder (<root>/natives), not its minecraft/, and
+    # runs with minecraft/ as the working directory: match the instance root in the args, or the cwd (2026-10-24:
+    # the minecraft/ match alone missed a running game and the jars were swapped under it).
+    root = os.path.dirname(os.path.abspath(inst)) + os.sep
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as f:
+                args = f.read().replace(b"\0", b" ").decode(errors="replace")
+            cwd = os.readlink(f"/proc/{pid}/cwd") + os.sep
+        except OSError:
+            continue
+        if "java" in args and (root in args or cwd.startswith(root)):
+            sys.exit(f"play-client-apply: a Minecraft process (pid {pid}) has this instance open; close the game first")
 
 
 def run_rock_tags_only(a, inst, stage):
@@ -219,9 +238,10 @@ def main():
     ap.add_argument("--set", choices=("full", "lite"), default="full",
                     help="the full stage into the full instance (default), or the lite stage into \"MIC Deep Time Lite\" (created when missing)")
     ap.add_argument("--instance", default=None,
-                    help="the instance's minecraft folder (default: the full instance's, or the lite one's with --set lite)")
+                    help="the instance's minecraft folder (default: the full instance's, or the lite one's with --set lite); "
+                         "an instance that does not exist yet is created from --template")
     ap.add_argument("--template", default=os.path.join(PRISM_INSTANCES, TEMPLATE_NAME),
-                    help="--set lite: the instance (its root folder) a new lite instance copies its Java settings, "
+                    help="the instance (its root folder) a new instance copies its Java settings, "
                          "mmc-pack.json, options.txt and DistantHorizons.toml from; only read")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--devmap", action="store_true",
@@ -253,13 +273,13 @@ def main():
             sys.exit(f"play-client-apply: --rock-tags-only: no instance at {inst}")
         run_rock_tags_only(a, inst, stage)
         return
-    if lite and not os.path.exists(root):
-        create_lite(a, inst, root, stage, play_folder)
+    if not os.path.exists(root):
+        create_instance(a, inst, root, stage, play_folder)
         return
     run_apply(a, inst, stage, play_folder)
 
 
-def create_lite(a, inst, root, stage, play_folder):
+def create_instance(a, inst, root, stage, play_folder):
     template = os.path.abspath(a.template)
     for f in ("instance.cfg", "mmc-pack.json"):
         if not os.path.isfile(os.path.join(template, f)):
@@ -273,7 +293,7 @@ def create_lite(a, inst, root, stage, play_folder):
     print(f"creating the instance {name!r} at {root}" + (" (dry run: in a scratch folder, nothing is created)" if a.dry_run else ""))
     # A hidden folder beside the instances, without instance.cfg until the end, renamed in place when complete
     # (one atomic rename on one filesystem): Prism lists a folder only if it holds instance.cfg.
-    build = tempfile.mkdtemp(prefix="dt-lite-new-") if a.dry_run else os.path.join(parent, f".{name}.deeptime-new")
+    build = tempfile.mkdtemp(prefix="dt-instance-new-") if a.dry_run else os.path.join(parent, f".{name}.deeptime-new")
     try:
         if a.dry_run:
             seed_root = os.path.join(build, "instance")
