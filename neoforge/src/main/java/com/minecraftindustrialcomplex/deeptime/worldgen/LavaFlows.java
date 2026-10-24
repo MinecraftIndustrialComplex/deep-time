@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 
@@ -39,6 +40,16 @@ import java.util.function.Consumer;
  * ({@link #sphereMetric}: the projection's unit sphere), so nothing here is tied to the projection's frame.
  *
  * <p><b>What a flow paints.</b> One block wide, two where the ground is gentle, and a small lobe at its toe.
+ *
+ * <p><b>On a cube world</b> (cube plan G16) a flow carries on across the net's seams. The slide is a plain x
+ * wrap, as on the polar worlds. A step that ends past a turning edge is brought onto the partner face by the
+ * edge's motion ({@link CubeLayout#foldPoint}), and the flow's heading, its pond heading and its metric turn
+ * with it, so the flow runs on as the copy past the edge showed it. The wander is read at the flow's unfolded
+ * position, so it does not jump at a seam. A painted column is kept as the planet block it shows
+ * ({@link CubeLayout#fold}), and a column is asked for through the same fold, so a column past an edge answers
+ * as its partner. A volcano's reach is the set of planet columns within its reach of the vent along the
+ * cube's surface, found through the straight line between them on the cube (never longer than a path on the
+ * surface), so the index and the reach test hold across edges and round corners.
  *
  * <p>Deterministic: everything comes from the world data (the volcano list, the drawn height, the water,
  * the rain) and seeds of each volcano's id and position, so a column's answer is the same whatever asks it
@@ -197,8 +208,11 @@ public final class LavaFlows {
         }
     }
 
-    /** A volcano's reach: every column it can paint lies within {@code r} blocks of (cx, cz), x wrapped. */
-    private record Reach(double cx, double cz, double r, Metric metric) {}
+    /**
+     * A volcano's reach: every column it can paint lies within {@code r} blocks of (cx, cz), x wrapped; on a cube
+     * world within {@code r} blocks of {@code at3}, the vent's point on the cube's surface ({@link #surfacePoint}).
+     */
+    private record Reach(double cx, double cz, double r, Metric metric, double[] at3) {}
 
     /** A volcano's flows, as sorted column keys with their code and age. */
     private record Built(long[] keys, byte[] codes, float[] ages, Summary summary, List<Flow> flows) {}
@@ -207,6 +221,8 @@ public final class LavaFlows {
     private final Env env;
     private final int circumference, half;
     private final double zMin, zMax, mH, mV;
+    /** A cube world's net, or null on a polar world (Lambert, Petroff–Guyou). */
+    private final CubeLayout cube;
     private final boolean keepPaths;
     private final Consumer<String> log;
     private final Reach[] reach;
@@ -226,12 +242,27 @@ public final class LavaFlows {
         this(volcanoes, env, circumference, zMin, zMax, mH, mV, log, false);
     }
 
+    /**
+     * The flows of a cube world ({@code cube} non-null: the period is its 4s and the flows cross its seams) or, with
+     * {@code cube} null, of a polar world of x period {@code circumference} and z range [{@code zMin}, {@code zMax}].
+     */
+    public LavaFlows(List<Volcanoes.Volcano> volcanoes, Env env, CubeLayout cube, int circumference, double zMin, double zMax,
+                     double mH, double mV, Consumer<String> log) {
+        this(volcanoes, env, cube, circumference, zMin, zMax, mH, mV, log, false);
+    }
+
     LavaFlows(List<Volcanoes.Volcano> volcanoes, Env env, int circumference, double zMin, double zMax, double mH, double mV,
               Consumer<String> log, boolean keepPaths) {
+        this(volcanoes, env, null, circumference, zMin, zMax, mH, mV, log, keepPaths);
+    }
+
+    LavaFlows(List<Volcanoes.Volcano> volcanoes, Env env, CubeLayout cube, int circumference, double zMin, double zMax, double mH,
+              double mV, Consumer<String> log, boolean keepPaths) {
         this.volcanoes = List.copyOf(volcanoes);
         this.env = env;
-        this.circumference = circumference;
-        this.half = circumference / 2;
+        this.cube = cube;
+        this.circumference = cube == null ? circumference : (int) cube.period();
+        this.half = this.circumference / 2;
         this.zMin = zMin;
         this.zMax = zMax;
         this.mH = mH;
@@ -252,7 +283,12 @@ public final class LavaFlows {
             double start = Math.max(rimCap(v) + RIM_PAST, g == Group.BASALTIC ? FLANK_MAX_SHARE * v.radiusM() / m.mMin : 0.0) + 1.0;
             double r = start + lMax / m.mMin + SIDE_OFFSET + LOBE_RADIUS + 2.0;
             double cx = wrap(v.x());
-            reach[i] = new Reach(cx, v.z(), r, m);
+            double[] at3 = cube == null ? null : surfacePoint(cube, v.x(), v.z());
+            reach[i] = new Reach(cx, v.z(), r, m, at3);
+            if (at3 != null) {
+                indexOnTheCube(cells, i, at3, r + 2.0);
+                continue;
+            }
             for (double x = cx - r; ; x = Math.min(x + GRID / 2.0, cx + r)) {
                 for (double z = v.z() - r; ; z = Math.min(z + GRID / 2.0, v.z() + r)) {
                     cells.computeIfAbsent(gridKey(wrap((int) Math.floor(x)), (int) Math.floor(z)), k -> new LinkedHashSet<>()).add(i);
@@ -278,6 +314,14 @@ public final class LavaFlows {
      * vegetation, −1 where no flow lies. Where flows of several volcanoes meet, the youngest answers.
      */
     public int code(int x, int z) {
+        if (cube != null) {
+            // A column past a turning edge answers as the planet block it shows.
+            long q = planetKey(x, z);
+            if (q == OFF)
+                return -1;
+            x = (int) (q >> 32);
+            z = (int) q;
+        }
         int wx = wrap(x);
         int[] list = grid.get(gridKey(wx, z));
         if (list == null)
@@ -285,9 +329,11 @@ public final class LavaFlows {
         long key = key(wx, z);
         int best = -1;
         float bestAge = Float.POSITIVE_INFINITY;
+        double[] at3 = cube == null ? null : surfacePoint(cube, wx + 0.5, z + 0.5);
         for (int i : list) {
             Reach r = reach[i];
-            if (Math.abs(delta(wx + 0.5 - r.cx)) > r.r + 1.0 || Math.abs(z + 0.5 - r.cz) > r.r + 1.0)
+            if (at3 != null ? !near(r, at3, 1.0)
+                    : Math.abs(delta(wx + 0.5 - r.cx)) > r.r + 1.0 || Math.abs(z + 0.5 - r.cz) > r.r + 1.0)
                 continue;
             Built b = built(i);
             int k = Arrays.binarySearch(b.keys, key);
@@ -304,8 +350,14 @@ public final class LavaFlows {
         return Paint.of(code(x, z));
     }
 
-    /** Whether any volcano's reach meets block box [x0, x1] × [z0, z1] (a chunk; at most 256 blocks a side), x on any lap. */
+    /**
+     * Whether any volcano's reach meets block box [x0, x1] × [z0, z1] (a chunk; at most 256 blocks a side), x on any
+     * lap. On a cube world the box is one on a face (a chunk on the planet); a box off the faces answers whether
+     * any volcano is indexed where its corners fold to.
+     */
     public boolean touches(int x0, int z0, int x1, int z1) {
+        if (cube != null)
+            return touchesOnTheCube(x0, z0, x1, z1);
         double cxBox = 0.5 * (x0 + x1 + 1), czBox = 0.5 * (z0 + z1 + 1), hx = 0.5 * (x1 - x0 + 1), hz = 0.5 * (z1 - z0 + 1);
         for (int x : new int[]{x0, x1})
             for (int z : new int[]{z0, z1}) {
@@ -317,6 +369,26 @@ public final class LavaFlows {
                     if (Math.abs(delta(wrap(cxBox) - r.cx)) <= r.r + hx + 1.0 && Math.abs(czBox - r.cz) <= r.r + hz + 1.0)
                         return true;
                 }
+            }
+        return false;
+    }
+
+    private boolean touchesOnTheCube(int x0, int z0, int x1, int z1) {
+        double[] centre = surfacePoint(cube, 0.5 * (x0 + x1 + 1), 0.5 * (z0 + z1 + 1));
+        double pad = Math.hypot(0.5 * (x1 - x0 + 1), 0.5 * (z1 - z0 + 1)) + 1.0;
+        for (int x : new int[]{x0, x1})
+            for (int z : new int[]{z0, z1}) {
+                long q = planetKey(x, z);
+                if (q == OFF)
+                    continue;
+                int[] list = grid.get(gridKey((int) (q >> 32), (int) q));
+                if (list == null)
+                    continue;
+                if (centre == null)
+                    return true;
+                for (int i : list)
+                    if (near(reach[i], centre, pad))
+                        return true;
             }
         return false;
     }
@@ -353,6 +425,8 @@ public final class LavaFlows {
         final Volcanoes.Volcano v;
         final Group group;
         final Metric met;
+        /** The metric turned by an odd number of quarter turns (a cube world's seams), made when first needed. */
+        Metric metTurned;
         final double riftAz;
         final Map<Long, Long> cells = new HashMap<>();
         final int[] byCode = new int[Paint.values().length + 1];
@@ -470,7 +544,26 @@ public final class LavaFlows {
         double thick = (c.group == Group.BASALTIC ? BASALT_THICK_M : VISCOUS_THICK_M) / mV;
         double x = x0, z = z0;
         List<double[]> path = keepPaths ? new ArrayList<>() : null;
-        if (z < zMin || z > zMax || env.wet(floor(x), floor(z)))
+        // On a cube world: the quarter turns from the vent's frame to the face the flow is on, and the flow's
+        // position unfolded into the vent's frame (where the wander is read).
+        int turns = 0;
+        double ux = x0, uz = z0;
+        if (cube != null) {
+            CubeLayout.PointOnFace p = cube.foldPoint(x, z);
+            if (p == null)
+                return new Flow(age, length, flank, aaFromVent, x0, z0, x, z, 0.0, 0, "edge", path == null ? List.of() : path);
+            if (p.edge() >= 0) {
+                // a vent near a turning edge whose flow starts past it
+                x = p.x();
+                z = p.z();
+                turns = p.iso().k();
+                double[] o = turn(turns, ox, oz);
+                ox = o[0];
+                oz = o[1];
+                met = metric(c, turns);
+            }
+        }
+        if (cube == null && (z < zMin || z > zMax) || env.wet(floor(x), floor(z)))
             return new Flow(age, length, flank, aaFromVent, x0, z0, x, z, 0.0, 0, "wet-start", path == null ? List.of() : path);
         boolean aa = aaFromVent;
         double travelled = 0.0;
@@ -510,7 +603,7 @@ public final class LavaFlows {
                 double dn = Math.hypot(d[0], d[1]);
                 dx = d[0] / dn;
                 dz = d[1] / dn;
-                double phi = WANDER_MAX_RAD * wander(seed, x, z);
+                double phi = WANDER_MAX_RAD * (cube == null ? wander(seed, x, z) : wander(seed, ux, uz));
                 double cs = StrictMath.cos(phi), sn = StrictMath.sin(phi);
                 double rx = dx * cs - dz * sn, rz = dx * sn + dz * cs;
                 if (rx * gx + rz * gz < 0.0) {   // still downhill
@@ -539,7 +632,20 @@ public final class LavaFlows {
                 pond = false;
             }
             double nx = x + STEP * dx, nz = z + STEP * dz;
-            if (nz < zMin || nz > zMax) {
+            int k = 0;   // quarter turns of a cube seam this step crosses
+            if (cube != null) {
+                CubeLayout.PointOnFace p = cube.foldPoint(nx, nz);
+                if (p == null) {
+                    stop = "edge";
+                    break;
+                }
+                if (p.edge() >= 0) {
+                    // past a turning edge: on the partner face, the copy the edge showed
+                    nx = p.x();
+                    nz = p.z();
+                    k = p.iso().k();
+                }
+            } else if (nz < zMin || nz > zMax) {
                 stop = "edge";
                 break;
             }
@@ -567,6 +673,25 @@ public final class LavaFlows {
                 break;
             }
             travelled += STEP * met.length(dx, dz);
+            if (cube != null) {
+                double[] u = turn(-turns, dx, dz);   // the step in the vent's frame
+                ux += STEP * u[0];
+                uz += STEP * u[1];
+                if (k != 0) {
+                    // the heading, the pond's heading and the metric turn with the seam
+                    double[] t = turn(k, dx, dz);
+                    dx = t[0];
+                    dz = t[1];
+                    t = turn(k, pondX, pondZ);
+                    pondX = t[0];
+                    pondZ = t[1];
+                    t = turn(k, ox, oz);
+                    ox = t[0];
+                    oz = t[1];
+                    turns = (turns + k) & 3;
+                    met = metric(c, turns);
+                }
+            }
             x = nx;
             z = nz;
             px = dx;
@@ -584,8 +709,8 @@ public final class LavaFlows {
         for (int dzc = -r; dzc <= r; dzc++)
             for (int dxc = -r; dxc <= r; dxc++) {
                 int cx = floor(x) + dxc, cz = floor(z) + dzc;
-                if (Math.hypot(cx + 0.5 - x, cz + 0.5 - z) <= LOBE_RADIUS && cz >= zMin && cz <= zMax && !env.wet(cx, cz))
-                    mark(c, cx, cz, paint(c, aa, age, seed, cx, cz), age);
+                if (Math.hypot(cx + 0.5 - x, cz + 0.5 - z) <= LOBE_RADIUS)
+                    paintBeside(c, cx, cz, aa, age, seed);
             }
         return new Flow(age, length, flank, aaFromVent, x0, z0, x, z, travelled, steps, stop, path == null ? List.of() : path);
     }
@@ -593,17 +718,46 @@ public final class LavaFlows {
     /** Paints the column under (x, z) and, on gentle ground, the one beside it. */
     private void paintStep(Ctx c, double x, double z, double slope, double dx, double dz, int side, boolean aa, double age, long seed) {
         int cx = floor(x), cz = floor(z);
-        mark(c, cx, cz, paint(c, aa, age, seed, cx, cz), age);
+        if (cube == null)
+            mark(c, cx, cz, paint(c, aa, age, seed, cx, cz), age);
+        else
+            paintOnTheCube(c, cx, cz, aa, age, seed, false);
         if (slope < TAN_WIDE && (dx != 0.0 || dz != 0.0)) {
             int sx = floor(x - side * SIDE_OFFSET * dz), sz = floor(z + side * SIDE_OFFSET * dx);
-            if ((sx != cx || sz != cz) && sz >= zMin && sz <= zMax && !env.wet(sx, sz))
-                mark(c, sx, sz, paint(c, aa, age, seed, sx, sz), age);
+            if (sx != cx || sz != cz)
+                paintBeside(c, sx, sz, aa, age, seed);
         }
+    }
+
+    /** Paints column (x, z) beside a flow's path (its second column, its toe) where it is on the world and dry. */
+    private void paintBeside(Ctx c, int x, int z, boolean aa, double age, long seed) {
+        if (cube != null)
+            paintOnTheCube(c, x, z, aa, age, seed, true);
+        else if (z >= zMin && z <= zMax && !env.wet(x, z))
+            mark(c, x, z, paint(c, aa, age, seed, x, z), age);
+    }
+
+    /**
+     * On a cube world, paints column (x, z) as the planet block it shows ({@link CubeLayout#fold}): a column past a
+     * turning edge beside a path is its partner, whose water and rain decide it; nothing past the net's corners.
+     */
+    private void paintOnTheCube(Ctx c, int x, int z, boolean aa, double age, long seed, boolean dryOnly) {
+        long q = planetKey(x, z);
+        if (q == OFF)
+            return;
+        int qx = (int) (q >> 32), qz = (int) q;
+        if (dryOnly && env.wet(qx, qz))
+            return;
+        markKey(c, q, paint(c, aa, age, seed, qx, qz), age);
     }
 
     /** Puts a column's code unless a younger flow (or this one) already lies there. */
     private void mark(Ctx c, int x, int z, int code, double age) {
-        long k = key(wrap(x), z);
+        markKey(c, key(wrap(x), z), code, age);
+    }
+
+    /** {@link #mark} by the column's key. */
+    private void markKey(Ctx c, long k, int code, double age) {
         if (c.cells.containsKey(k))
             return;
         c.cells.put(k, ((long) Float.floatToIntBits((float) age) << 32) | (code & 0xffL));
@@ -801,6 +955,121 @@ public final class LavaFlows {
             double bz = qz / l22;
             return new double[]{(qx - l21 * bz) / l11, bz};
         }
+    }
+
+    // ---- a cube world's seams (cube plan G16) ----
+
+    /** {@link #planetKey}'s answer past the net's corners. */
+    private static final long OFF = Long.MIN_VALUE;
+
+    /** Each cube face's frame ({@link CubeLayout.Face#frame}), by the face's ordinal. */
+    private static final double[][][] FACE_FRAMES = faceFrames();
+
+    private static double[][][] faceFrames() {
+        CubeLayout.Face[] all = CubeLayout.Face.all();
+        double[][][] out = new double[all.length][][];
+        for (CubeLayout.Face face : all)
+            out[face.ordinal()] = face.frame();
+        return out;
+    }
+
+    /**
+     * The key of the planet column that column (x, z) of a cube world shows ({@link CubeLayout#fold}: itself on a
+     * face, its partner past an edge), x in [−C/2, C/2) as {@link #wrap(int)} folds it; {@link #OFF} past the
+     * net's corners.
+     */
+    private long planetKey(long x, long z) {
+        CubeLayout.Fold f = cube.fold(x, z);
+        if (f instanceof CubeLayout.OnFace o)
+            return key(wrap((int) cube.blockX(o.face(), o.i())), (int) cube.blockZ(o.face(), o.j()));
+        if (f instanceof CubeLayout.Outside o)
+            return key(wrap((int) o.x()), (int) o.z());
+        return OFF;
+    }
+
+    /**
+     * The point (x, z) of a cube world's net on the cube's surface, {X, Y, Z} in blocks from the cube's centre in
+     * the cube frame ({@link CubeLayout.Face#frame}; a face is s blocks a side, so a step of a block on a face is a
+     * block in space). Null past the net's corners. Two columns a path joins over the surface are never further
+     * apart in space than the path is long (the straight line is the shortest), whatever seams it crosses.
+     */
+    static double[] surfacePoint(CubeLayout cube, double x, double z) {
+        CubeLayout.PointOnFace p = cube.foldPoint(x, z);
+        if (p == null)
+            return null;
+        double[][] f = FACE_FRAMES[p.face().ordinal()];
+        double h = 0.5 * (double) cube.side();
+        double[] out = new double[3];
+        for (int k = 0; k < 3; k++)
+            out[k] = h * (f[0][k] + p.u() * f[1][k] + p.v() * f[2][k]);
+        return out;
+    }
+
+    /** Whether a cube world's point {@code at3} ({@link #surfacePoint}) lies within reach {@code r} (plus {@code pad}) of the vent. */
+    private static boolean near(Reach r, double[] at3, double pad) {
+        if (r.at3 == null)
+            return true;
+        double dx = at3[0] - r.at3[0], dy = at3[1] - r.at3[1], dz = at3[2] - r.at3[2];
+        double lim = r.r + pad;
+        return dx * dx + dy * dy + dz * dz <= lim * lim;
+    }
+
+    /**
+     * Indexes volcano {@code i} of a cube world in every grid cell of every face that holds a point within {@code reach}
+     * blocks of the vent in space ({@code at3}): on each face, the disc where the sphere of that radius cuts the
+     * face's plane, as its bounding box clipped to the face.
+     */
+    private void indexOnTheCube(Map<Long, Set<Integer>> cells, int i, double[] at3, double reach) {
+        double h = 0.5 * (double) cube.side();
+        for (CubeLayout.Face face : CubeLayout.Face.all()) {
+            double[][] f = FACE_FRAMES[face.ordinal()];
+            // the vent against the face's plane: its height above it, and its foot in the face's local blocks
+            double dn = at3[0] * f[0][0] + at3[1] * f[0][1] + at3[2] * f[0][2] - h;
+            if (Math.abs(dn) > reach)
+                continue;
+            double rho = Math.sqrt(reach * reach - dn * dn);
+            double fu = at3[0] * f[1][0] + at3[1] * f[1][1] + at3[2] * f[1][2];
+            double fv = at3[0] * f[2][0] + at3[1] * f[2][1] + at3[2] * f[2][2];
+            double ox = (double) cube.faceCentreX(face), oz = (double) cube.faceCentreZ(face);
+            double xLo = Math.max(ox - h, ox + fu - rho), xHi = Math.min(ox + h - 1.0, ox + fu + rho);
+            double zLo = Math.max(oz - h, oz + fv - rho), zHi = Math.min(oz + h - 1.0, oz + fv + rho);
+            if (xLo > xHi || zLo > zHi)
+                continue;
+            for (double x = xLo; ; x = Math.min(x + GRID / 2.0, xHi)) {
+                for (double z = zLo; ; z = Math.min(z + GRID / 2.0, zHi)) {
+                    cells.computeIfAbsent(gridKey(wrap((int) Math.floor(x)), (int) Math.floor(z)), k -> new LinkedHashSet<>()).add(i);
+                    if (z >= zHi)
+                        break;
+                }
+                if (x >= xHi)
+                    break;
+            }
+        }
+    }
+
+    /** A direction (dx, dz) turned by {@code k} clockwise quarter turns ({@link CubeLayout.Iso#vector}). */
+    static double[] turn(int k, double dx, double dz) {
+        return switch (Math.floorMod(k, 4)) {
+            case 1 -> new double[]{-dz, dx};
+            case 2 -> new double[]{-dx, -dz};
+            case 3 -> new double[]{dz, -dx};
+            default -> new double[]{dx, dz};
+        };
+    }
+
+    /**
+     * The volcano's metric in a frame {@code turns} quarter turns from the vent's: G' = R G Rᵀ, which a half turn
+     * leaves as it is and a quarter turn either way makes {g_zz, −g_xz, g_xx}.
+     */
+    private static Metric metric(Ctx c, int turns) {
+        if ((turns & 1) == 0)
+            return c.met;
+        Metric m = c.metTurned;
+        if (m == null) {
+            m = new Metric(new double[]{c.met.gzz, -c.met.gxz, c.met.gxx});
+            c.metTurned = m;
+        }
+        return m;
     }
 
     // ---- keys, wrapping, hashing ----
