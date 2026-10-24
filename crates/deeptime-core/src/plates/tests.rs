@@ -2370,6 +2370,154 @@ fn a_contact_whose_plates_slide_past_has_no_arc_front() {
     assert_eq!(sliding, 0);
 }
 
+/// Three plates for a front of known length (the front lane, step 9), in the planet's frame
+/// turned by `frame`: plate 0 the northern hemisphere, continental; plate 1 oceanic, the box of longitudes 0 to `lon_deg` and latitudes
+/// `-box_deg` to 0; plate 2 the rest of the south, oceanic. Plate 1's group is turned `turn`
+/// radians north about the equator's axis square to the box's middle, so its edge on the equator
+/// runs under the continent along its whole length (its southern edge parts from plate 2, its
+/// sides slide past it), and it moves on north at `mm_yr`. Overlaps resolved as in
+/// [`plates_split`]. The front is the equator from longitude 0 to `lon_deg`, straight and normal
+/// to the convergence, which falls off as the cosine of the distance from the box's middle.
+#[allow(clippy::too_many_arguments)]
+fn a_front_of_known_length(
+    p: &PlanetPreset,
+    env: &Env<'_>,
+    frame: glam::DQuat,
+    lon_deg: f64,
+    box_deg: f64,
+    turn: f64,
+    mm_yr: f64,
+) -> (PlateState, Geo, Vec<DVec3>) {
+    let (mut st, geo) = init::initial_state(p, env).unwrap();
+    let pts = geo.points();
+    let half = 0.5 * lon_deg.to_radians();
+    // Rotation about `axis` carries the box's middle (cos half, sin half, 0) north.
+    let axis = frame * DVec3::new(half.sin(), -half.cos(), 0.0);
+    let q = glam::DQuat::from_axis_angle(axis, turn);
+    let to_frame = frame.inverse();
+    for (i, s) in st.samples.iter_mut().enumerate() {
+        let x = to_frame * pts[i];
+        let lon = x.y.atan2(x.x).to_degrees();
+        let lat = x.z.clamp(-1.0, 1.0).asin().to_degrees();
+        let plate = if x.z > 0.0 {
+            0
+        } else if (0.0..lon_deg).contains(&lon) && lat > -box_deg {
+            1
+        } else {
+            2
+        };
+        *s = state::Sample::blank(plate);
+        if plate == 0 {
+            s.kind = CONTINENTAL;
+            s.pools = pools::continental_column();
+            s.elevation_m = 400.0;
+        } else {
+            s.pools = pools::oceanic_column();
+            s.elevation_m = -4000.0;
+            s.formed_myr = (env.t_myr - 60.0) as f32;
+        }
+        s.thickness_m = pools::thickness(&s.pools);
+    }
+    let still = [0.0, 0.0, 0.0, 1.0];
+    st.groups = (0..3)
+        .map(|g| state::Group {
+            plate: g,
+            rot: if g == 1 { [q.x, q.y, q.z, q.w] } else { still },
+        })
+        .collect();
+    for (k, pl) in st.plates.iter_mut().enumerate() {
+        pl.alive = k < 3;
+        pl.omega = [0.0; 3];
+    }
+    st.plates[1].omega = (axis * env.norm.omega_of_speed(mm_yr)).to_array();
+    st.contacts.clear();
+    st.ridges.clear();
+    st.rift_links.clear();
+    let pos = geometry::positions(&st, &geo);
+    st.recount(&pos);
+    let tree = Tree::over(&pos, |_| true);
+    let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, env);
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, env).unwrap();
+    (st, geo, pos)
+}
+
+/// The arcs' band on a straight front of known length (the front lane, step 9, before any law
+/// change; plates.md, "Step 9"). The arcs make their crust over a band `arc_distance_km` behind
+/// the front (`w_arc_of`, PLT-045, a Gaussian of `arc_width_km` whose integral across the arc is
+/// √π · `arc_width_km`), on the lattice distance from the nearest front sample (`fronts_reach`).
+/// Past a front's end that distance runs round the end, so a front of length L would have a band
+/// of L + π · `arc_distance_km` (a quarter circle at each end, on the overriding side only), where
+/// Earth's arcs stop near the slab's edge. Fronts of 10 to 60 degrees of a great circle, on the
+/// equator and on a great circle tilted 60 degrees from it: the band against the straight front
+/// is a line, band = a + b · L. Its intercept `a` is the ends' part, its slope `b` the band per km
+/// along the front, which the lattice's distance sets: a path along the lattice's edges is longer
+/// than the straight line across the band (up to 2/√3 on a hexagonal lattice, by the edges'
+/// direction), so the band is narrower than its width and holds less than its length. Measured
+/// (2026-10-24, 40,000 samples): see plates.md, "Step 9".
+#[test]
+fn the_arcs_band_runs_round_a_fronts_ends() {
+    let p = preset(40_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let k = &p.tectonics;
+    let wrap = std::f64::consts::PI * k.arc_distance_km;
+    for (name, frame) in [
+        ("equator", glam::DQuat::IDENTITY),
+        ("tilted", glam::DQuat::from_rotation_y(60f64.to_radians())),
+    ] {
+        let mut rows = Vec::new();
+        for lon_deg in [10.0_f64, 20.0, 40.0, 60.0] {
+            let (mut st, geo, pos) =
+                a_front_of_known_length(&p, &env, frame, lon_deg, 15.0, 0.02, 50.0);
+            let length = env.norm.km(lon_deg.to_radians());
+            let mut cones = vec![[0.0; 2]; st.samples.len()];
+            let pull = subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+            let straight = pull.front_straight_km_myr / env.dt_myr;
+            let band = pull.arc_band_km_myr / env.dt_myr;
+            eprintln!(
+                "{name}, front of {lon_deg} degrees, {length:.0} km: straight {straight:.0} km \
+                 ({:.3}), band {band:.0} km ({:.3} of the straight front)",
+                straight / length,
+                band / straight,
+            );
+            assert!(
+                (straight / length - 1.0).abs() < 0.05,
+                "{name}: the straight front {straight:.0} km of {length:.0}"
+            );
+            rows.push((straight, band));
+        }
+        // Least squares: band = a + b · straight.
+        let m = rows.len() as f64;
+        let (sx, sy) = rows
+            .iter()
+            .fold((0.0, 0.0), |(a, b), &(x, y)| (a + x / m, b + y / m));
+        let (cov, var) = rows.iter().fold((0.0, 0.0), |(c, v), &(x, y)| {
+            (c + (x - sx) * (y - sy), v + (x - sx).powi(2))
+        });
+        let b = cov / var;
+        let a = sy - b * sx;
+        let worst = rows
+            .iter()
+            .map(|&(x, y)| (y - a - b * x).abs())
+            .fold(0.0_f64, f64::max);
+        eprintln!(
+            "{name}: band = {a:.0} km + {b:.3} L ({:.2} of pi times the arc's distance at the \
+             ends; the lattice's distance {:.3} times the straight one across the band); worst \
+             residual {worst:.0} km",
+            a / wrap,
+            1.0 / b
+        );
+        // A line: the ends and a rate along the front, nothing else.
+        assert!(worst < 0.15 * wrap, "{name}: {rows:?}");
+        // The ends: about the two quarter circles.
+        assert!((0.6..1.3).contains(&(a / wrap)), "{name}: ends {a:.0} km");
+        // Along the front: no more than its length, and no less than a hexagonal lattice's
+        // longest path across allows.
+        assert!((0.85..1.01).contains(&b), "{name}: {b:.3} per km");
+    }
+}
+
 /// A subduction zone goes on through a resampling (`tectonics.contact_carry`, PLT-550; plates.md,
 /// "Step 7"). The resampling gives both plates of [`converging_plates`] fresh crust with no
 /// overlap, so at the next step, before the plates move, the contact sees none. Carried, it keeps
