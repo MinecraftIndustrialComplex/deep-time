@@ -790,7 +790,8 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 24 with fission and the split inheritance on by default, PLT-532 and PLT-534, the same day:
     // 1, 2, 3, 6, 11, 14, 15, 20 and 21, seeds 12 and 19 no more; this test passes on all 9, seed
     // 11 since; 11 of seeds 1 to 24 with a split's latent slab copies, PLT-534, the same day: 1,
-    // 2, 8, 11 to 14, 16, 20, 22 and 23, seed 12 again since).
+    // 2, 8, 11 to 14, 16, 20, 22 and 23, seed 12 again since; 12 of seeds 1 to 24 with the level
+    // set on by default, PLT-536, the same day: 1, 2, 4, 5, 7, 9, 12, 15, 17 to 19 and 21).
     let p = preset(8000, 300.0, "scattered_continents", 12);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
@@ -935,8 +936,9 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // 14 and 15 the speed guard binds for 1 to 3 plate-steps in 300 Myr: build log 2026-10-24,
     // "the front lane"; seed 19 still does not weld with a split's latent slab copies, PLT-534,
     // the same day, so seed 20, the next seed that welds, stays: the seed is chosen by its weld,
-    // and the guard asserted below binds on welding seed 16).
-    let p = preset(8000, 300.0, "scattered_continents", 20);
+    // and the guard asserted below binds on welding seed 16; seed 19 again since the level set
+    // went on by default, PLT-536, the same day, when seed 19 welds again and seed 20 no more).
+    let p = preset(8000, 300.0, "scattered_continents", 19);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
