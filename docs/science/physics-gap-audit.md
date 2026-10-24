@@ -266,13 +266,16 @@ This gap gets its own section below, "Rivers and deltas". In short: nothing in t
 delta, distributary, floodplain, levee, meander, fan or braid. It moves none of M1 to M7, but it is
 what a player meets most.
 
-- **State (2026-10-23).** Stage 1 of 4 is built on branch worktree-agent-a9e4e25c4744d5a75 (not
-  merged): delta plains above the sea at river mouths, sized by the BQART load and the Nienhuis
-  area fit against the shelf's room, and distributaries across them as new chains in the river
-  file (its layout 2, `from`). On the D5 bake 359 of 1,054 loaded mouths get a plain, 0.39 % of
-  the land (Earth 0.57 %), and 233 rivers split into 632 distributaries; 23 of the 25 largest
-  rivers have a plain and 15 split (rivers-and-lakes.md, "Stage 1 on the D5 bake"). Floodplains
-  and levees, meanders, fans and braids remain.
+- **State (2026-10-23).** Stage 1 of 4 is merged (master 84fb7d7c): delta plains above the sea at
+  river mouths, sized by the BQART load and the Nienhuis area fit against the shelf's room, and
+  distributaries across them as new chains in the river file (its layout 2, `from`). On the D5
+  bake 359 of 1,054 loaded mouths get a plain, 0.39 % of the land (Earth's 0.57 % is reported
+  beside it, not aimed at), and 233 rivers split into 632 distributaries; 24 of the 25 largest
+  rivers have a plain and 15 split (rivers-and-lakes.md, "Stage 1 on the D5 bake"). Stage 1b, on
+  branch worktree-agent-a9e4e25c4744d5a75: the projected world's plain stands above the sea on
+  97 % of its cells (67 % in stage 1; HYD-146), no plain column carries an ocean biome (752 did;
+  BIO-185), and the 8 plains counted as having no path are fronts the main stem already holds
+  (HYD-147, not changed). Floodplains and levees, meanders, fans and braids remain.
 
 ### Gap 6: flexural foreland basins
 

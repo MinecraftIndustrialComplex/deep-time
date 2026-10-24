@@ -50,9 +50,9 @@ use crate::bake::load_layer;
 use crate::bake::project::{
     BORDER_INSET_BLOCKS, BiomeGround, BodyY, Drawn, Held, ICE_COVER, Kind, ROW_BAND,
     SPAWN_EDGE_MARGIN, Src, VERSION, WorldMap, apply, area_share, body_y, drawn_detail, err,
-    is_biome_layer, kind_of, ms, project_body, project_site, project_structure, put_raw,
-    raise_world_tops, settle_biome_layers, stratabound_sites, world_ground, world_raise_shifts,
-    write_deferred, write_json,
+    is_biome_layer, kind_of, ms, on_plain, plain_rule, project_body, project_site,
+    project_structure, put_raw, raise_world_tops, settle_biome_layers, stratabound_sites,
+    world_ground, world_raise_shifts, write_deferred, write_json,
 };
 use crate::bake::relief::{Frame, SimFrame};
 use crate::error::CoreError;
@@ -646,6 +646,8 @@ fn resample_cube(cm: &CubeMapping, srcs: &[Src], wg: &GridDesc) -> (Vec<Vec<u8>>
     let half = f64::from(wg.face_blocks()) / 2.0;
     let mut outs: Vec<Vec<u8>> = srcs.iter().map(|s| vec![0u8; w * h * s.cb]).collect();
     let mut stats = FootStats::default();
+    let (plain_takes, delta) = plain_rule(srcs);
+    let delta = delta.map(|d| &srcs[d]);
     let nodata = |s: &Src, v: f64| {
         if v.is_nan() {
             s.layer.desc.nodata.unwrap_or(0.0)
@@ -668,13 +670,20 @@ fn resample_cube(cm: &CubeMapping, srcs: &[Src], wg: &GridDesc) -> (Vec<Vec<u8>>
                     let (f, _) = cm.foot(face, u, v, r_w, r_s);
                     f.samples(r_s, &mut samp);
                     st.add(&f, samp.len(), r_s);
-                    for (s, out) in srcs.iter().zip(row.iter_mut()) {
+                    let plain = on_plain(delta, f.xs, f.zs);
+                    for ((s, out), &takes) in srcs.iter().zip(row.iter_mut()).zip(&plain_takes) {
                         let cell = &mut out[i * s.cb..(i + 1) * s.cb];
                         let nearest = || {
                             let (ci, cj) = s.nearest_cell(f.xs, f.zs);
                             s.raw(i64::from(ci), i64::from(cj))
                         };
-                        match s.kind {
+                        // A delta plain's ground is its nearest cell's (HYD-146).
+                        let kind = if plain && takes {
+                            Kind::Categorical
+                        } else {
+                            s.kind
+                        };
+                        match kind {
                             Kind::Stack => {
                                 let (ci, cj) = s.nearest_cell(f.xs, f.zs);
                                 let g = &s.layer.desc.grid;
@@ -1523,6 +1532,8 @@ pub fn project_folder_cube(
     let mut world_closed: Option<LoadedLayer> = None;
     // The world's playa layer: no swamp beside its salt (BIO-178), after the land call.
     let mut world_playa: Option<LoadedLayer> = None;
+    // The world's delta plains: no ocean biome on them (BIO-185), after the land call.
+    let mut world_delta: Option<LoadedLayer> = None;
     let mut held_biomes: Vec<Held> = Vec::new();
     let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
     let mut shares = serde_json::Map::new();
@@ -1702,6 +1713,7 @@ pub fn project_folder_cube(
                 "water_level" => world_water = Some(world),
                 CLOSED_BASIN => world_closed = Some(world),
                 crate::bake::water::PLAYA_LAYER => world_playa = Some(world),
+                crate::bake::water::DELTA_LAYER => world_delta = Some(world),
                 "surface/class_top" => world_class = Some(world),
                 _ => {}
             }
@@ -1732,6 +1744,7 @@ pub fn project_folder_cube(
                 elevation: we,
                 closed: world_closed.as_ref(),
                 playa: world_playa.as_ref(),
+                delta: world_delta.as_ref(),
                 cube: Some((&cm.view, rs)),
             };
             let params = p.biomes.clone().unwrap_or_default();

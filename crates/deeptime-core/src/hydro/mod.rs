@@ -572,7 +572,8 @@ pub struct HydroParams {
     /// How many times Earth's delta area for a river's load its plain is drawn (HYD-141,
     /// game-choice: agent, 2026-10-23). The rivers are drawn about 40 times their physical
     /// width (HYD-001), so a plain of Earth's area is barely wider than its own channel and holds
-    /// no second one; 32 puts D5's plains at 0.39 % of its land, against Earth's 0.57 % (HYD-143).
+    /// no second one; 32 keeps the plains in scale with the drawn rivers. It is not tuned to
+    /// Earth's delta share (HYD-143 is reported beside the world's, not aimed at).
     pub delta_area_mult: f64,
     /// How strongly a plain grows forward of its mouth rather than along the coast: a cell's
     /// distance is weighted 1 + k (1 − cos θ), θ from the outflow direction (HYD-135).

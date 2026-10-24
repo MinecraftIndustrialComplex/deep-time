@@ -508,6 +508,15 @@ public final class RiverGameTests {
      * planet's own biomes, or swamp where vanilla's valley slice is swamp (any biome of
      * {@code #c:is_swamp}, so a pack's own swamp there counts). Logged per sample; a floor, since
      * vanilla's parameter list keeps rivers out of mid- and far-inland mountains (erosion E0–E1).
+     *
+     * <p>Under TerraBlender a sample counts too where its province's region gives the valley slice a
+     * biome of its own and vanilla's region 0 has a river or swamp at the same climate point: the
+     * slice reached the channel, and the region chose what grows on it. Biomes O' Plenty's rare
+     * region does so (21.1.0.14, {@code BOPRareOverworldBiomeBuilder.pickRiverBiomeBOP} and
+     * {@code pickSwampBiomeBOP} return the rare biome of the climate cell before any river or swamp):
+     * its rare biomes fill their cells, rivers included, so its warm, wettest cell (temperature 3,
+     * humidity 4) is fungal jungle over every channel. The planet of master 84fb7d7c put all 24
+     * samples there.
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 600)
     public static void riverBiomes(GameTestHelper helper) {
@@ -520,8 +529,10 @@ public final class RiverGameTests {
         }
         var sampler = level.getChunkSource().randomState().sampler();
         var g = level.getChunkSource().getGenerator();
-        int sampled = 0, river = 0, swamp = 0;
+        boolean regions = net.neoforged.fml.ModList.get().isLoaded("terrablender");
+        int sampled = 0, river = 0, swamp = 0, painted = 0;
         StringBuilder seen = new StringBuilder();
+        java.util.Map<String, Integer> byRegion = new java.util.TreeMap<>();
         for (int i = 0; i < r.vertexCount() && sampled < 200; i += 3) {
             int x = Math.round(r.vertexX(i)), z = Math.round(r.vertexZ(i));
             // At sea level the channel is the river's mouth, over the sea's own biomes.
@@ -535,19 +546,42 @@ public final class RiverGameTests {
             // lowland (seed 16: 21 of 37 samples) has swamp along them, as vanilla would. A pack may
             // put its own swamp in that slot (Biomes O' Plenty's wetland, under TerraBlender: 12 of 14
             // samples on the planet of 2026-10-02), so any biome of the common tag #c:is_swamp counts.
-            if (b.is(BiomeTags.IS_RIVER))
+            int region = -1;
+            if (regions) {
+                var a = TerraBlenderChecks.vanillaRegionBiome(level, x, y, z);
+                region = a.region();
+                byRegion.merge(region + ":" + b.getRegisteredName(), 1, Integer::sum);
+                if (valley(b) == 0 && region > 0 && valley(a.vanilla()) > 0) {
+                    painted++;
+                    continue;
+                }
+            }
+            int v = valley(b);
+            if (v == 1)
                 river++;
-            else if (b.is(net.neoforged.neoforge.common.Tags.Biomes.IS_SWAMP) || b.is(net.minecraft.world.level.biome.Biomes.SWAMP)
-                    || b.is(net.minecraft.world.level.biome.Biomes.MANGROVE_SWAMP))
+            else if (v == 2)
                 swamp++;
             else if (seen.length() < 400)
-                seen.append(' ').append(b.getRegisteredName());
+                seen.append(' ').append(b.getRegisteredName()).append(region >= 0 ? "@" + region : "")
+                        .append('(').append(x).append(',').append(z).append(')');
         }
-        DeepTime.LOGGER.info("[gametest] riverBiomes sampled={} river={} swamp={} share={} others:{}", sampled, river, swamp,
-                sampled == 0 ? "n/a" : String.format("%.3f", (river + swamp) / (double) sampled), seen);
+        DeepTime.LOGGER.info("[gametest] riverBiomes sampled={} river={} swamp={} paintedByRegion={} share={} byRegion={} others:{}", sampled,
+                river, swamp, painted, sampled == 0 ? "n/a" : String.format("%.3f", (river + swamp + painted) / (double) sampled),
+                byRegion, seen);
         if (sampled > 0)
-            helper.assertTrue(river + swamp >= sampled / 2, "only " + river + " river and " + swamp + " swamp of " + sampled
-                    + " wide-channel samples: the valley slice is not reaching the channels");
+            helper.assertTrue(river + swamp + painted >= sampled / 2, "only " + river + " river and " + swamp + " swamp of " + sampled
+                    + " wide-channel samples (" + painted + " more where a TerraBlender region paints the valley slice):"
+                    + " the valley slice is not reaching the channels");
         helper.succeed();
+    }
+
+    /** 1 for a river biome, 2 for a swamp (any of {@code #c:is_swamp}, vanilla's swamp or mangrove swamp), else 0. */
+    private static int valley(Holder<Biome> b) {
+        if (b.is(BiomeTags.IS_RIVER))
+            return 1;
+        if (b.is(net.neoforged.neoforge.common.Tags.Biomes.IS_SWAMP) || b.is(net.minecraft.world.level.biome.Biomes.SWAMP)
+                || b.is(net.minecraft.world.level.biome.Biomes.MANGROVE_SWAMP))
+            return 2;
+        return 0;
     }
 }

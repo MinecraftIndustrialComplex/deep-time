@@ -121,7 +121,11 @@ const MAX_SAMPLES_Z: usize = 64;
 /// 1 at a coast would be no crust at all. `strata/lift` (2026-10-20) is a number but travels with
 /// the horizon stacks, which are the nearest cell's ([`Kind::Stack`]): the deformed column rule
 /// takes it for how far that cell's stack rose, so it must be the same cell's (STR-055).
-const CATEGORICAL: [&str; 8] = [
+/// `delta` (2026-10-23) is a number too, what a delta plain added to the ground, but it says where
+/// the plain is: the world's plain is the nearest cell's ([`PLAIN_NEAREST`]), and a footprint mean
+/// spread the layer over 5,747 cells beside the D5 world's plains, 4,808 of them not above the
+/// sea's level (HYD-146).
+const CATEGORICAL: [&str; 9] = [
     "climate/koppen",
     "climate/koppen_l2",
     "climate/wetland",
@@ -130,7 +134,40 @@ const CATEGORICAL: [&str; 8] = [
     "meta/crust_type",
     "meta/province",
     "strata/lift",
+    crate::bake::water::DELTA_LAYER,
 ];
+
+/// The layers a world cell on a delta plain (its nearest simulation cell's `delta` above 0) takes
+/// from that cell, as `delta` itself does. The plain is flat ground one block over the sea, its
+/// height in (sea level, sea level + 1] and its river's course a block under it (HYD-136); the
+/// bilinear read and the footprint mean blend its edge with the beach band and the sea beside it,
+/// which lie a fraction of a block under the sea. On the D5 world 3,534 of the 24,313 world cells
+/// on a plain fell under the sea that way (the mean 0.10 blocks under it at the median) and 1,048
+/// more whose mean stood over it ended at or under it, so 79 % stood above the sea against the
+/// bake's 97 %. The amplitude is 0 on the plain (`water`), and the world's is too. ledger: HYD-146
+pub(crate) const PLAIN_NEAREST: [&str; 2] = ["elevation", "detail/amplitude"];
+
+/// Per source of one grid, whether a world cell on a delta plain takes its nearest cell
+/// ([`PLAIN_NEAREST`]), and the grid's `delta` source; all false and none without a plain layer.
+pub(crate) fn plain_rule(srcs: &[Src]) -> (Vec<bool>, Option<usize>) {
+    let delta = srcs
+        .iter()
+        .position(|s| s.layer.desc.name == crate::bake::water::DELTA_LAYER);
+    let takes = srcs
+        .iter()
+        .map(|s| delta.is_some() && PLAIN_NEAREST.contains(&s.layer.desc.name.as_str()))
+        .collect();
+    (takes, delta)
+}
+
+/// Whether simulation block (xs, zs) lies on a delta plain: its nearest cell of `delta` is raised.
+#[inline]
+pub(crate) fn on_plain(delta: Option<&Src>, xs: f64, zs: f64) -> bool {
+    delta.is_some_and(|d| {
+        let (ci, cj) = d.nearest_cell(xs, zs);
+        d.raw(i64::from(ci), i64::from(cj)) > 0.0
+    })
+}
 
 /// How a layer is resampled.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -800,6 +837,8 @@ fn resample_grid(map: &Mapping, srcs: &[Src], wg: &GridDesc) -> Vec<Vec<u8>> {
     let r_w = f64::from(wg.r);
     let r_s = f64::from(srcs[0].layer.desc.grid.r);
     let mut outs: Vec<Vec<u8>> = srcs.iter().map(|s| vec![0u8; w * h * s.cb]).collect();
+    let (plain_takes, delta) = plain_rule(srcs);
+    let delta = delta.map(|d| &srcs[d]);
     // Rows in parallel, a band of them at a time: each task fills its row of every layer, and a
     // band's rows are copied into the layers' arrays and dropped before the next band starts, so
     // the pass never holds a second copy of the whole output beside it (bake memory, 2026-10-05).
@@ -815,9 +854,16 @@ fn resample_grid(map: &Mapping, srcs: &[Src], wg: &GridDesc) -> Vec<Vec<u8>> {
                     let f = map.footprint(x, z, r_w, r_s);
                     let nx = (1 + (2.0 * f.hx / r_s).ceil() as usize).min(MAX_SAMPLES_X);
                     let nz = (1 + (2.0 * f.hz / r_s).ceil() as usize).min(MAX_SAMPLES_Z);
-                    for (s, out) in srcs.iter().zip(row.iter_mut()) {
+                    let plain = on_plain(delta, f.xs, f.zs);
+                    for ((s, out), &takes) in srcs.iter().zip(row.iter_mut()).zip(&plain_takes) {
                         let cell = &mut out[i * s.cb..(i + 1) * s.cb];
-                        match s.kind {
+                        // A delta plain's ground is its nearest cell's (HYD-146).
+                        let kind = if plain && takes {
+                            Kind::Categorical
+                        } else {
+                            s.kind
+                        };
+                        match kind {
                             Kind::Stack => {
                                 let (ci, cj) = s.nearest_cell(f.xs, f.zs);
                                 let g = &s.layer.desc.grid;
@@ -1323,6 +1369,8 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     let mut world_closed: Option<LoadedLayer> = None;
     // The world's playa layer: no swamp beside its salt (BIO-178), after the land call.
     let mut world_playa: Option<LoadedLayer> = None;
+    // The world's delta plains: no ocean biome on them (BIO-185), after the land call.
+    let mut world_delta: Option<LoadedLayer> = None;
     let mut held_biomes: Vec<Held> = Vec::new();
     // The world's horizon stacks (entry, descriptor, cells), raised over the world's terrain below.
     let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
@@ -1490,6 +1538,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 "water_level" => world_water = Some(world),
                 CLOSED_BASIN => world_closed = Some(world),
                 crate::bake::water::PLAYA_LAYER => world_playa = Some(world),
+                crate::bake::water::DELTA_LAYER => world_delta = Some(world),
                 "surface/class_top" => world_class = Some(world),
                 _ => {}
             }
@@ -1521,6 +1570,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                 elevation: we,
                 closed: world_closed.as_ref(),
                 playa: world_playa.as_ref(),
+                delta: world_delta.as_ref(),
                 cube: None,
             };
             let params = p.biomes.clone().unwrap_or_default();
@@ -1959,6 +2009,8 @@ pub(crate) struct BiomeGround<'a> {
     pub(crate) closed: Option<&'a LoadedLayer>,
     /// The world's `playa` layer, if the bake has the hydrology: no swamp beside its salt (BIO-178).
     pub(crate) playa: Option<&'a LoadedLayer>,
+    /// The world's `delta` layer, if the bake has delta plains: no ocean biome on them (BIO-185).
+    pub(crate) delta: Option<&'a LoadedLayer>,
     /// A cube world's view and the simulation's radius (bake blocks): the land call's fills and
     /// distances run across the faces' seams, on the planet (SCL-122).
     pub(crate) cube: Option<(&'a deeptime_format::cube_map::CubeView<'static>, f64)>,
@@ -2042,18 +2094,62 @@ pub(crate) fn settle_biome_layers(
     let cube = ground.cube.map(|(view, rs)| {
         crate::bake::project_cube::CubeSettle::new(&wg, view, rs / blocks_per_cell)
     });
-    let settled = match &cube {
+    let settle = |cells: &mut biomes::BiomeCells, sea: &[bool]| match &cube {
         Some(cs) => biomes::settle_to_ground_by(
-            &mut cells,
-            &sea,
+            cells,
+            sea,
             &depth_m,
             blocks_per_cell,
             params,
             &|v, src| cs.fill(v, src),
             &|land, to_sea| cs.dist(land, to_sea),
         ),
-        None => biomes::settle_to_ground(&mut cells, w, h, &sea, &depth_m, blocks_per_cell, params),
+        None => biomes::settle_to_ground(cells, w, h, sea, &depth_m, blocks_per_cell, params),
     };
+    let settled = settle(&mut cells, &sea);
+    // No ocean biome on a delta plain's land, on the world's own nodes after the land call
+    // (BIO-185). The land call reads the ground at a node's block, and the game reads the biome
+    // inputs bilinear between a column's four nodes: a plain is a few L2 cells across, so the
+    // plain's columns beside the sea read a sea node's continentalness and drew an ocean biome on
+    // dry ground. A node is the plain's when a dry column of a plain lies within a cell of it
+    // either way (the columns whose read it reaches, at the plain's cells); the land call runs
+    // again with those nodes dry, so the ones the sea still held take the land's record by its
+    // own law (the nearest land node's, the continentalness by the distance to the sea), and the
+    // sea's columns beside the plain read the coast's. ledger: BIO-185
+    let (mut plain_nodes, mut plain_settled) = (0usize, biomes::Settled::default());
+    if let Some(dl) = ground.delta {
+        let r2 = f64::from(wg.r);
+        let r3 = f64::from(dl.desc.grid.r);
+        let reach = ((r2 / r3).round() as i64 - 1).max(0);
+        let dry_plain = |x: f64, z: f64| {
+            dl.nearest(x, z) > 0.0
+                && !deeptime_format::water::sea_covers_height(
+                    ground.elevation.nearest(x, z),
+                    ground.sea_level_y,
+                    || ground.closed.is_some_and(|c| c.nearest(x, z) >= 0.5),
+                )
+        };
+        let at: Vec<bool> = (0..n)
+            .into_par_iter()
+            .map(|k| {
+                let (i, j) = (k % w, k / w);
+                let (x, z) = if wg.is_cube() {
+                    let (px, pz) = wg.cube_point(i as u32, j as u32);
+                    (px - 0.5, pz - 0.5)
+                } else {
+                    (wg.block_x(i as i64) as f64, wg.block_z(j as i64) as f64)
+                };
+                (-reach..=reach).any(|a| {
+                    (-reach..=reach).any(|b| dry_plain(x + a as f64 * r3, z + b as f64 * r3))
+                })
+            })
+            .collect();
+        plain_nodes = at.iter().filter(|&&a| a).count();
+        if plain_nodes > 0 {
+            let dry: Vec<bool> = sea.iter().zip(&at).map(|(&s, &a)| s && !a).collect();
+            plain_settled = settle(&mut cells, &dry);
+        }
+    }
     // No swamp on or beside a playa, on the world's own nodes after the land call (BIO-178): the
     // projection's reads and the land call's donors bring a swamp's erosion and flag onto ground
     // the bake's own clearing (`water`, on the Lambert nodes) did not see. A node holds a playa
@@ -2098,6 +2194,8 @@ pub(crate) fn settle_biome_layers(
         .to_sea
         .iter()
         .chain(&settled.to_land)
+        .chain(&plain_settled.to_sea)
+        .chain(&plain_settled.to_land)
         .chain(&dried)
         .copied()
         .collect();
@@ -2185,6 +2283,11 @@ pub(crate) fn settle_biome_layers(
             "reach_blocks": reach_blocks,
             "nodes": dried.len(),
             "km2": km2(dried.len()),
+        },
+        "delta_plain": {
+            "plain_nodes": plain_nodes,
+            "to_land": plain_settled.to_land.len(),
+            "to_land_km2": km2(plain_settled.to_land.len()),
         },
         "bake_blocks_per_world_block": ground.bake_blocks_per_world_block,
     })
@@ -3323,6 +3426,7 @@ mod tests {
             elevation: &elevation,
             closed: Some(&closed),
             playa: None,
+            delta: None,
             cube: None,
         };
         let note = settle_biome_layers(&mut held, &ground, &biomes::BiomeParams::default());
@@ -3480,6 +3584,7 @@ mod tests {
             elevation: &elevation,
             closed: None,
             playa: Some(&playa),
+            delta: None,
             cube: None,
         };
         let note = settle_biome_layers(&mut held, &ground, &biomes::BiomeParams::default());

@@ -285,9 +285,12 @@ baked and gets a Lambert layout block.
   blocks, so its polar terrain has the grid's shape (long north–south, thin east–west on the
   planet), which an isotropic footprint only shortens. Categories (`climate/koppen`,
   `climate/koppen_l2`, `climate/wetland`, `surface/class_top`, `meta/plate_id`, `meta/crust_type`,
-  `meta/province`, and any layer whose `units` is `flag`), horizon stacks and any footprint touching no-data take the
+  `meta/province`, `delta`, and any layer whose `units` is `flag`), horizon stacks and any footprint touching no-data take the
   nearest cell (`climate/koppen_l2` only since 2026-10-18: averaged as a number, a class border named
-  a class neither side had). The
+  a class neither side had; `delta` since 2026-10-23, HYD-146). A world cell whose nearest cell is
+  on a delta plain (`delta` above 0) also takes that cell's `elevation` and `detail/amplitude`: the
+  plain stands at most a block over the sea, and a mean or a bilinear read blended its edge with the
+  sea beside it and took it under the sea (HYD-146). The
   `climate/ice_cover` takes the **cover rule** (BIO-159, "The ice cover"): the world cell is covered
   where its nearest Lambert cell is, the cell the categories beside it read (so a covered world cell
   is EF in `climate/koppen_l2`), at the mean depth of the footprint's samples that are covered, each
@@ -333,7 +336,11 @@ baked and gets a Lambert layout block.
   settle no wetland stands on or beside the world's playas ("The wetland flag", BIO-178): a node holds a
   playa when a cell of the world's `playa` layer lies in its square, and every node within 20 blocks plus
   two L2 cells plus one `playa` cell of such a node (the settle's own distance in cells) is dried
-  (`biome_land.playa_dried`: `playa_nodes`, `reach_blocks`, `nodes`, `km2`). The
+  (`biome_land.playa_dried`: `playa_nodes`, `reach_blocks`, `nodes`, `km2`). Between the settle and
+  that rule no ocean biome is left on a delta plain's land (BIO-185): a node within one L2 cell less one `delta` cell of a
+  world cell that is on a plain and dry by the sea rule, in x and in z, is the plain's, and the settle
+  runs again with those nodes counted dry (`biome_land.delta_plain`: `plain_nodes`, `to_land`,
+  `to_land_km2`). The
   first horizon of every stack cell is then raised to
   the bake's top rule over the world's own terrain (`notes.bake.projection.top_raise`): the stacks
   come from the nearest cell and the terrain from the footprint mean.
@@ -1698,7 +1705,7 @@ and beach cells near its mouth, taken in a lobe ahead of the channel, until the 
 front), its `detail/amplitude` is 0, and the raster **`delta`** (i16, 1/16 block, on the
 `elevation` grid; 0 off the plains) holds what the plain added, which a re-run of the water bake
 takes off first. The second run drains the raised ground, and its main stem across each plain
-splits at the apex (the backwater length upstream of the shoreline) into distributaries (`from`).
+splits at the apex (where the main stem comes onto the plain, HYD-137) into distributaries (`from`).
 `notes.bake.water.params` holds the parameters (`deltas`, `delta_area_mult`, `delta_shape_k`,
 `delta_max_mouths`, `delta_mouth_spacing`) and `stats.deltas` the counts, areas, the largest deltas
 and Earth's figures beside them. `notes.bake.water`: `enabled`, `method`, `params`,

@@ -697,14 +697,23 @@ pub struct Split {
     /// The plain's front (cells beside the sea's water, the beach band or the open sea), the
     /// mouths that fit along it (HYD-138) and the mouths it holds.
     pub front_cells: u32,
+    /// The front's cells the main stem itself runs over (a stem along the plain's seaward edge).
+    pub front_on_stem: u32,
     pub fit: u32,
     pub mouths: u32,
     /// Chains added.
     pub added: u32,
-    /// Splits given up: [the split point at a branch's last cell on the plain, no front cell of
-    /// the half it heads for reached across the plain, none of those with a free way to the
-    /// open sea] (HYD-144).
-    pub fails: [u32; 3],
+    /// Splits given up: [the split point at a branch's last cell on the plain, every front cell of
+    /// the half it heads for taken by a channel, none of the others reached across the plain,
+    /// none of those with a free way to the open sea] (HYD-144, HYD-147).
+    pub fails: [u32; 4],
+    /// The stem's discharge at its mouth and its cells on the plain; the discharge of the mouth
+    /// the plain's own river reaches in the second network (the one whose stem passes the land
+    /// cell the plain's course comes off; -1 for none) and whether that stem crosses the plain.
+    pub stem_q: f64,
+    pub stem_on_plain: u32,
+    pub river_q: f64,
+    pub river_on_plain: bool,
 }
 
 /// Splits each plain's main stem in the second network (`second`, run on the raised ground) into
@@ -743,6 +752,25 @@ pub fn distributaries(
             let best = &second.mouths[*e];
             if m.q > best.q || (m.q == best.q && m.chain < best.chain) {
                 *e = k;
+            }
+        }
+    }
+    // Where each plain's own river meets the sea in the second network: the mouth with the most
+    // discharge whose stem passes the land cell the plain's course comes off (the record only).
+    let land_of: HashMap<u32, u32> = plains
+        .plains
+        .iter()
+        .enumerate()
+        .filter_map(|(o, pl)| pl.land.map(|l| (l, o as u32)))
+        .collect();
+    let mut river_of: HashMap<u32, usize> = HashMap::new();
+    for (k, m) in second.mouths.iter().enumerate() {
+        for c in &m.stem {
+            if let Some(&o) = land_of.get(c) {
+                let e = river_of.entry(o).or_insert(k);
+                if m.q > second.mouths[*e].q {
+                    *e = k;
+                }
             }
         }
     }
@@ -814,10 +842,20 @@ pub fn distributaries(
             },
             backwater_inside: backwater_m < run_m,
             front_cells: front.len() as u32,
+            front_on_stem: front
+                .iter()
+                .filter(|f| mouth.stem[apex..].contains(&f.1))
+                .count() as u32,
             fit: mouths_n as u32,
             mouths: 1,
             added: 0,
-            fails: [0; 3],
+            fails: [0; 4],
+            stem_q: mouth.q,
+            stem_on_plain: (exit - apex + 1) as u32,
+            river_q: river_of.get(&o).map_or(-1.0, |&k| second.mouths[k].q),
+            river_on_plain: river_of
+                .get(&o)
+                .is_some_and(|&k| second.mouths[k].stem.iter().any(|&c| on(c))),
         };
         if mouths_n < 2 || front.len() < mouths_n {
             out.push(split);
@@ -868,13 +906,14 @@ pub fn distributaries(
             let mut order: Vec<usize> = in_half.collect();
             order.sort_by_key(|&i| (i.abs_diff(mid_i), i));
             let prev = paths_from(&geo, start, |c| on(c) || c == start, &used);
-            let mut reached = false;
+            let (mut free, mut reached) = (false, false);
             let mut found = None;
             for i in order {
                 let goal = front[i].1;
                 if used.contains(&goal) {
                     continue;
                 }
+                free = true;
                 let Some(mut path) = path_to(&prev, start, goal) else {
                     continue;
                 };
@@ -892,7 +931,13 @@ pub fn distributaries(
                 }
             }
             let Some((path, plain_len, t_seg)) = found else {
-                split.fails[if reached { 2 } else { 1 }] += 1;
+                split.fails[if reached {
+                    3
+                } else if free {
+                    2
+                } else {
+                    1
+                }] += 1;
                 continue;
             };
             let span = (hi - lo) as f64;
@@ -1113,7 +1158,7 @@ pub fn stats(plains: &Plains, splits: &[Split], land_cells: u64, cell_km2: f64) 
     let mouths_hist = hist(|s| s.mouths);
     let fit_hist = hist(|s| s.fit);
     let fails = |keep: fn(&Split) -> bool| {
-        let mut f = [0u32; 3];
+        let mut f = [0u32; 4];
         for s in splits.iter().filter(|s| keep(s)) {
             for (a, b) in f.iter_mut().zip(s.fails) {
                 *a += b;
@@ -1154,7 +1199,27 @@ pub fn stats(plains: &Plains, splits: &[Split], land_cells: u64, cell_km2: f64) 
                 "backwater_m": s.map_or(-1.0, |s| s.backwater_m),
                 "front_cells": s.map_or(0, |s| s.front_cells),
                 "fit": s.map_or(0, |s| s.fit),
-                "fails": s.map_or([0; 3], |s| s.fails),
+                "fails": s.map_or([0; 4], |s| s.fails),
+            })
+        })
+        .collect();
+    // The plains that fit 2 mouths or more and hold 1, each (HYD-147).
+    let r1 = |v: f64| (v * 10.0).round() / 10.0;
+    let unsplit: Vec<Value> = splits
+        .iter()
+        .filter(|s| s.fit >= 2 && s.added == 0)
+        .map(|s| {
+            json!({
+                "plain": s.plain,
+                "q_m3s": r1(plains.plains[s.plain as usize].q_m3s),
+                "stem_q_m3s": r1(s.stem_q),
+                "stem_on_plain": s.stem_on_plain,
+                "river_q_m3s": r1(s.river_q),
+                "river_on_plain": s.river_on_plain,
+                "front_cells": s.front_cells,
+                "front_on_stem": s.front_on_stem,
+                "fit": s.fit,
+                "fails": s.fails,
             })
         })
         .collect();
@@ -1175,11 +1240,13 @@ pub fn stats(plains: &Plains, splits: &[Split], land_cells: u64, cell_km2: f64) 
         "deltas_by_mouths": mouths_hist,
         "deltas_by_mouths_fit": fit_hist,
         "backwater_inside_plain": splits.iter().filter(|s| s.backwater_inside).count(),
-        // Splits given up, [stem end, no path, no tail]: over all plains, and the plains that fit
-        // 2 mouths or more and hold 1.
+        // Splits given up, [stem end, the half's front taken, no path, no tail]: over all plains,
+        // and the plains that fit 2 mouths or more and hold 1.
         "split_fails": fails(|_| true),
         "fit_unsplit": splits.iter().filter(|s| s.fit >= 2 && s.added == 0).count(),
         "fit_unsplit_fails": fails(|s| s.fit >= 2 && s.added == 0),
+        "fit_unsplit_plains": unsplit,
+        "plains_without_stem": plains.plains.len().saturating_sub(splits.len()),
         "earth": {
             "delta_share_of_land": 0.0057,
             "delta_area_km2": 847_936,
