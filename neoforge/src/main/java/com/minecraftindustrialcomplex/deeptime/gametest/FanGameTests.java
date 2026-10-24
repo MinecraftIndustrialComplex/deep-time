@@ -6,6 +6,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Rivers;
+import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
@@ -43,7 +44,7 @@ public final class FanGameTests {
 
     private FanGameTests() {}
 
-    private record World(ServerLevel level, WorldData wd, JsonObject note) {}
+    private record World(ServerLevel level, WorldData wd, JsonObject note, Water.Spec spec) {}
 
     private static World world(GameTestHelper helper) {
         ServerLevel level = helper.getLevel().getServer().getLevel(GameTestSupport.TEST_FAN);
@@ -61,7 +62,7 @@ public final class FanGameTests {
             helper.fail("world data " + wd.folder() + " has no notes.fan or no rivers (not a fan-test world?)");
             return null;
         }
-        return new World(level, wd, note);
+        return new World(level, wd, note, Water.Spec.of(wd, g.waterReach()));
     }
 
     /** The chains that leave chain 0 (the threads around its islands). */
@@ -184,7 +185,9 @@ public final class FanGameTests {
      * block lower (0.31 at (-184, 13): w 82.84 against the walked point's 83.15), so a column whose
      * surface lies just over a whole block holds its top block one lower than the walked point's
      * (the first run of this test, on master 1e27a44f, asked for that one and failed 119 of 144
-     * columns, the one it named drawn as the rule says).
+     * columns, the one it named drawn as the rule says). The top block wanted is what the column
+     * holds with the river's steps ({@code Water.held}, HYD-124): its own, or a water neighbour's
+     * one higher, whose water spreads into it (11 of the 144 on that world).
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void threadsHoldWaterAroundDryIslands(GameTestHelper helper) {
@@ -193,7 +196,7 @@ public final class FanGameTests {
             return;
         Rivers r = wld.wd().rivers();
         double depth = wld.note().getAsJsonObject("river").get("depth").getAsDouble();
-        int columns = 0, ok = 0, islands = 0, dryIslands = 0;
+        int columns = 0, ok = 0, stepped = 0, islands = 0, dryIslands = 0;
         StringBuilder bad = new StringBuilder();
         boolean[] wet = new boolean[1];
         for (int k : threads(r)) {
@@ -211,14 +214,24 @@ public final class FanGameTests {
                     double w = hit == null ? Double.NaN : hit.w();
                     boolean own = hit != null && hit.seg() >= f && hit.seg() < f + m - 1;
                     int top = (int) Math.ceil(r.vertexW(i) + t * (r.vertexW(i + 1) - r.vertexW(i))) - 1;
-                    if (own)
-                        top = (int) Math.ceil(w) - 1;
+                    // What the column holds with the river's steps: its own top or a higher water
+                    // neighbour's, whose water the pass spreads into it (Water.held, ledger: HYD-124).
+                    Water.Core core = Water.core(wld.wd(), wld.spec(), x, z);
+                    Water.Core[] n = new Water.Core[4];
+                    for (int q = 0; q < 4; q++)
+                        n[q] = Water.core(wld.wd(), wld.spec(), x + Water.NEIGHBOURS[q][0], z + Water.NEIGHBOURS[q][1]);
+                    int held = Water.held(core, n);
+                    if (own && held != Integer.MIN_VALUE) {
+                        top = held;
+                        if (held > (int) Math.ceil(w) - 1)
+                            stepped++;
+                    }
                     int[] got = water(wld.level(), x, z, top + 6, top - (int) Math.ceil(depth) - 6);
                     columns++;
-                    if (own && got[0] == top && got[1] >= 1)
+                    if (own && held != Integer.MIN_VALUE && got[0] == top && got[1] >= 1)
                         ok++;
                     else if (bad.length() < 600)
-                        bad.append(String.format(" (%d,%d) top %d (w %.2f%s) holds %d;", x, z, got[0], w,
+                        bad.append(String.format(" (%d,%d) top %d, held %d (w %.2f%s) holds %d;", x, z, got[0], held, w,
                                 own ? "" : hit == null ? ", no channel" : ", segment " + hit.seg() + " not the thread's", got[1]));
                 }
             }
@@ -232,8 +245,8 @@ public final class FanGameTests {
             else if (bad.length() < 900)
                 bad.append(String.format(" island (%d,%d) y %d%s, water top %d;", x, z, y, wet[0] ? " wet" : "", top));
         }
-        DeepTime.LOGGER.info("[gametest] threadsHoldWaterAroundDryIslands columns={} ok={} islands={} dry={}{}",
-                columns, ok, islands, dryIslands, bad.length() == 0 ? "" : " outside:" + bad);
+        DeepTime.LOGGER.info("[gametest] threadsHoldWaterAroundDryIslands columns={} ok={} (a neighbour's step above the own top: {}) islands={} dry={}{}",
+                columns, ok, stepped, islands, dryIslands, bad.length() == 0 ? "" : " outside:" + bad);
         helper.assertTrue(islands >= 2, "only " + islands + " islands");
         helper.assertTrue(columns >= 60, "only " + columns + " thread columns checked");
         helper.assertTrue(ok >= WITHIN_SHARE * columns, ok + " of " + columns + " thread columns hold water at the thread's surface:" + bad);
