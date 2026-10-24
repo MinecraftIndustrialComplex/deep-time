@@ -191,6 +191,38 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 - **Again after master 802f6bd1 (cube phase 2 stage 1) merged in** (a5d7a694; deeptime-core unchanged, so the same test planet): cargo placement 16 passed; Gradle 503 tests, 0 failures, 2 skipped; `./gametest.sh` 108 of 110 and `./gametest.sh -PwithMic` 108 of 110, the same two reds with the same numbers; Cs_scrub 277 of 298 (0.93), BSk_steppe 0.986, ET 0.0.
 - **Follow-ups (not done).** BSk's erosion max 0.4 ties Terralith's 0.40 edge where a pack's mapping is the identity (under MIC it is 0.328, safe). Oceanic land (Cfb) keeps windswept savanna on the same slot (14 % of 378a0af3's Cfb columns), which is vanilla's own rule (`maybePickWindsweptSavannaBiome`), so it was left.
 - **Next step:** the coordinator merges this branch; the two reds above (hot spring pools, crater bowl) are master's since 4ab29084 at the latest and go to their owners.
+### 2026-10-23: The docking lane (V1 item 1): the dockings are Earth's within 1.4 to 2.9 by count and inside its range by length; the high coast is long continent collisions pushed on by the incoming plate's other slabs; transference (Stern 2004, Gurnis et al. 2004) built and correct, but held off by default: on, coast with high ground falls 0.354 to 0.114 and land above 2 km 0.153 to 0.053, but the continents grow to 0.57 of the planet and drown (land 0.129), since those collisions were the model's only sink of continental area (task docking-rate, brief build/coord/briefs/docking-rate.md; agent worktree .claude/worktrees/agent-aeaabcd72dfe5f0b8, branch worktree-agent-aeaabcd72dfe5f0b8 from master 802f6bd1; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **The count** (measures `sutures`, PLT-512, and `coastwalk`, PLT-513, in `tools/review/pool/measures_docking.json`, over base3's cached runs). Collcoast's hand-offs (101.3 per 100 Myr) count one suture about twice, since a collision state hands off every 100 km of shortening (PLT-068) and a new one starts on the same contact. Joined per contact they are 55.7 sutures per 100 Myr (27.0 of 50 samples or more) against Macdonald et al. 2019's 19 (Phanerozoic) to 39 (last 100 Myr); 39,715 km of suture per 100 Myr against their 23,235 to 50,919. Confirmed reversals (PLT-514, run summary): 5.8 per 100 Myr on seed 1 against Crameri et al. 2020's 4 in 104 Myr; the 146 flips `reversals` counts are mostly of contacts no geologist would map.
+- **The diagnosis** (plates.md "Docking: what stands at the collision fronts"). By front-time in the last 30 Myr, 0.482 is collision states 60 Myr old or more that never end, and 0.569 has an incoming plate with 3,000 or more continental samples. Those plates are the planet's largest (0.12 of the surface each). The collision's own slab broke off long ago, and slabs elsewhere pull the plate on at 12 to 16 mm/yr, never under the weld speed. PLT-078 lets such a continent weld only on a stall that never comes. The belt is built on an overriding continent about as wide as the belt (400 km, PLT-241), so its far side is a coast: 0.832 of the high coasts are collision belts.
+- **Stage T, transference** (`tectonics.transference`, PLT-516; force PLT-517 3 × 10^12 N/m × g/9.81 and convergence PLT-518 100 km, both Gurnis et al. 2004, `verified`; crates/deeptime-core/src/plates/collision.rs, shortening.rs, forces.rs, state.rs, stats.rs, belts.rs tests). Once a contact's slab has gone, its plate has converged 100 km more and the push over the margin reaches the force, the continent moves alone to the overriding plate as a terrane does. Off is bit-identical (`pool.sh alias`, seed 1, 1000 Myr). It went on by default in 0db1ad71 and **off again** in a67caafd (the coordinator's call: Ben's rule wants the planet correct on the pool, and under T alone the plate check fails in 8 of 8 runs and one plate holds over half the planet in 16.5 % of steps; a drowned master would move every GameTest planet and deployed world). The code is 87dcdea4's again, key d06e5e058b69, the alias-checked key. PLT-078's stall weld stays for a stalled or marginless continent; PLT-064 is not replaced.
+- **Arm dock-T** (`tools/review/pool/pool.sh run dock-T --set tectonics.transference=true +DEEPTIME_CRUST_BUDGET=1 --seeds 1,2,3,4 ...`, key d06e5e058b69, argkey a63e0dfd, 8 runs, both starts, earthlike_quick_16k, 1000 Myr). Read against base3's 24 and against its own seeds 1 to 4 (arm `dock-c3`, cached); scripts are build/dock/tablesT.sh and tablesC.sh. Medians, p against base3:
+  - The collisions end:
+    - collision length p50 / p90 48 / 143 to 33 / 77 Myr, which passes the plate check in 8 of 8;
+    - front in collision 34,862 to 16,455 km (p < 0.001);
+    - 30 transferences a run;
+    - coast with high ground 0.354 to 0.114 (p < 0.001; the control 0.330);
+    - land above 2 km 0.153 to 0.053 (p < 0.001);
+    - collisions per 100 Myr 2.10 to 4.25.
+  - The guard has its worst at 12,669 m (p 0.19; against the control 12,061, p 0.050), with no step beyond 2 Earth reliefs.
+  - The continents grow and drown:
+    - continental share 0.404 to 0.571 (highest step 0.580; the plate check's 0.45 fails in 8 of 8);
+    - the sea over the datum 830 to 1,729 m;
+    - under the sea 0.259 to 0.780;
+    - land 0.319 to 0.129;
+    - largest landmass 0.232 to 0.021;
+    - V1 criteria met 5 to 4;
+    - largest plate 0.220 to 0.351, above half the planet in 16.5 % of steps;
+    - in-collision boundary share 0.041 (Bird 0.05 to 0.13);
+    - arc_continental heights fail in 8 of 8.
+  - The crust budget gives the cause. Subduction hid 0.983 of continental area in base3 against 0.395 under T: the long collisions were the model's area sink. Forearc erosion (PLT-441) only thins the edge and continental crust never turns oceanic (`c2o` 0).
+- **Tests** on the VM (build/dock/fulltest.sh): fmt and clippy `-D warnings` clean; `cargo test --workspace --no-fail-fast` passed with T on after reseeding two seed-specific plates tests (a81d03e5; with T off again they are back on master's seeds 17 and 4, and the off head's run is below). 87dcdea4 fixed a postcard trap: `skip_serializing_if` on a checkpoint field made plate-check exit 2 on every run.
+- **Docs**:
+  - plates.md (the diagnosis and arm dock-T);
+  - ledger PLT-512 to PLT-518 and PLT-078's claim;
+  - bibliography (Gurnis 2004, Hall 2003, Stern 2004, Crameri 2020, Macdonald 2019, Tozer 2019, Cogley 1984);
+  - claims counts;
+  - physics-gap-audit.md gap 2's state line.
+- **Next.** With T off the branch is merge-ready (no new base: key d06e5e058b69 is base3's planet). The lane goes on on the same branch: which of the crust's fluxes T exposes as off Earth's, in area as well as volume, and why one plate grows past half the planet; then that physics behind switches, one cumulative 8-run arm per stage with T on against `dock-c3`, until T and the sink pass the plate check together.
 
 ### 2026-10-23: Master's new base (`base3`) with V1 gap 2 on: every run finished, no step beyond 2 Earth reliefs; collisions up a little, the two realism checks that fire unmoved (coordinator)
 - **What ran.** Pool arm `base3` on master 4ab29084 (key 88c144, argkey 2a53566b): earthlike_quick_16k, 1,000 Myr, both starts, seeds 1 to 12 (24 runs), 2 threads, +DEEPTIME_CRUST_BUDGET=1 (`tools/review/pool/pool.sh run base3 --preset earthlike_quick_16k --length 1000 --seeds 1,...,12 --threads 2 +DEEPTIME_CRUST_BUDGET=1`, log build/coord/pool-base3-4ab29084.log). Its default adds gap 2's six switches (PLT-502 to PLT-506, PLT-371) to base2's. It is the base the next lanes build on.

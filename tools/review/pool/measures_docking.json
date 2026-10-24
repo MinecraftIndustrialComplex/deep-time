@@ -1,0 +1,47 @@
+{
+  "_doc": "V1 item 1's measures (the docking lane, 2026-10-23): the collision record counted as Macdonald et al. 2019's sutures, what docked, which collisions hold the front, and what stands behind a high coast. Pass it with --registry tools/review/pool/measures_docking.json (or DEEPTIME_POOL_MEASURES) and --measures sutures,coastwalk, next to measures_boundary.json's collcoast and measures_gap4.json's coastset. Definitions in measure_sutures.py (ledger PLT-512) and measure_coastwalk.py (ledger PLT-513). Macdonald 2019's arc-continent sutures: 19 per 100 Myr over the Phanerozoic, 39 over 0 to 100 Ma; 23,235 and 50,919 km per 100 Myr; median 1,019 km (ledger PLT-157).",
+  "measures": {
+    "sutures": {
+      "version": 2,
+      "doc": "collision states merged per contact at the 6 Myr grace into sutures, their count, length and duration; the front-time held by each kind of collision; the docked terranes' provenance; the collisions open at the end; definitions in measure_sutures.py (ledger PLT-512)",
+      "command": ["{py}", "-I", "{tools}/measure_sutures.py", "{run}"],
+      "python": "numpy",
+      "needs": ["rec"],
+      "columns": [
+        {"key": "states_per100", "key2": "sutures_per100", "label": "hand-off states / sutures per 100 Myr (Macdonald 19 to 39 sutures)", "target": null, "digits": 1, "pair": true},
+        {"key": "sutures_ge50_per100", "key2": "parting_eps_per100", "label": "sutures of 50 samples or more / episodes with no hand-off, per 100 Myr", "target": null, "digits": 1, "pair": true},
+        {"key": "suture_km_per100", "label": "suture length per 100 Myr, geodesic km (Macdonald 23,235 to 50,919)", "target": null, "digits": 0},
+        {"key": "suture_km_med", "key2": "suture_myr_med", "label": "a suture's median length, km (Macdonald 1,019) / duration, Myr", "target": null, "digits": 0, "pair": true},
+        {"key": "states_per_suture", "label": "states per suture, mean", "target": null, "digits": 2},
+        {"key": "ft_small", "key2": "ft_mid", "label": "front-time: terranes under 50 / 50 to 1000 samples", "target": null, "digits": 3, "pair": true},
+        {"key": "ft_large", "key2": "ft_weld", "label": "front-time: terranes of 1000 or more / welds", "target": null, "digits": 3, "pair": true},
+        {"key": "ft_parting", "label": "front-time: partings (open at the end included)", "target": null, "digits": 3},
+        {"key": "made", "key2": "received", "label": "docked samples: made by the subducting plate / received by it", "target": null, "digits": 3, "pair": true},
+        {"key": "endowed", "key2": "mixed", "label": "docked samples: its endowment at birth / mixed", "target": null, "digits": 3, "pair": true},
+        {"key": "origin_rift", "key2": "origin_initiation", "label": "docked samples from plates born in a rift / an initiation", "target": null, "digits": 3, "pair": true},
+        {"key": "ride_myr_med", "key2": "under_age_myr_med", "label": "docked crust's ride on the subducting plate / that plate's age, median Myr", "target": null, "digits": 0, "pair": true},
+        {"key": "ft30_made", "key2": "ft30_received", "label": "last 30 Myr's front-time: made / received crust docking", "target": null, "digits": 3, "pair": true},
+        {"key": "ft30_endowed", "key2": "ft30_mixed", "label": "last 30 Myr's front-time: endowed / mixed crust docking", "target": null, "digits": 3, "pair": true},
+        {"key": "ft30_weld", "key2": "ft30_parting", "label": "last 30 Myr's front-time: welds / partings", "target": null, "digits": 3, "pair": true},
+        {"key": "open_front_km", "key2": "open_old60", "label": "collisions open at the end: front, geodesic km / share on contacts over 60 Myr old", "target": null, "digits": 2, "pair": true},
+        {"key": "open_train_myr_med", "key2": "open_conv_med", "label": "collisions open at the end: how long they have gone on, Myr / median peak convergence, mm/yr", "target": null, "digits": 1, "pair": true}
+      ]
+    },
+    "coastwalk": {
+      "version": 1,
+      "doc": "what stands behind a coast: the land across, the crust behind, the sea in front and a trench nearby, for the collision high coasts and for all coast; definitions in measure_coastwalk.py (ledger PLT-513)",
+      "command": ["{py}", "-I", "{tools}/measure_coastwalk.py", "{run}"],
+      "python": "numpy",
+      "needs": ["fields"],
+      "fields": ["elevation", "regime", "plates/crust_type"],
+      "columns": [
+        {"key": "chc_share", "key2": "hc_other", "label": "collision high coasts, share of high coasts / the other high coasts' share of coast", "target": null, "digits": 3, "pair": true},
+        {"key": "chc_across_km", "key2": "all_across_km", "label": "land across, median km: collision high coasts / all coast (Earth 600)", "target": null, "digits": 0, "pair": true},
+        {"key": "chc_across_le600", "key2": "all_across_le600", "label": "600 km or less across: collision high coasts / all coast (Earth 0.51)", "target": null, "digits": 3, "pair": true},
+        {"key": "chc_to_oceanic_km", "key2": "chc_faces_depth_m", "label": "collision high coasts: oceanic crust inland, median km / the facing sea's depth, m", "target": null, "digits": 0, "pair": true},
+        {"key": "chc_faces_oceanic", "key2": "all_faces_oceanic", "label": "facing oceanic crust: collision high coasts / all coast", "target": null, "digits": 3, "pair": true},
+        {"key": "chc_trench300", "key2": "all_trench300", "label": "a trench or arc within 300 km: collision high coasts / all coast", "target": null, "digits": 3, "pair": true}
+      ]
+    }
+  }
+}
