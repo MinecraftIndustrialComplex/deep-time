@@ -1606,6 +1606,12 @@ pub struct StepIn<'a> {
     pub regime: &'a [f32],
     /// `plates/plate_id`: plates are separate plates, with no strength across their boundaries.
     pub plate_id: &'a [f32],
+    /// `plates/carrier_plate_id` (PLT-546, with `tectonics.collision_underthrust`): where an active
+    /// collision's belt or wedge stands on the incoming plate's underthrust lithosphere, that
+    /// plate's id; NaN elsewhere. None: every cell rests on its own plate (`ledger: ISO-131`).
+    pub carrier_plate_id: Option<&'a [f32]>,
+    /// `plates/carrier_thermal_age_myr`: the thermal age of that lithosphere, Myr (NaN: none).
+    pub carrier_age_myr: Option<&'a [f32]>,
     /// Land ice, m (`climate/ice_thickness_m`), when a climate stage publishes it.
     pub ice_m: Option<&'a [f32]>,
     /// The `isostasy` setting: the density of eroded and deposited rock over the mantle's.
@@ -1625,6 +1631,24 @@ impl StepIn<'_> {
         self.water_z
             .and_then(|w| w.get(c))
             .map_or(self.sea_level_m, |&z| z)
+    }
+
+    // ledger: ISO-131
+    /// The plate whose lithosphere carries cell `c` and that lithosphere's thermal age (NaN:
+    /// unknown), where a collision's footprint stands on an underthrust plate; None: its own.
+    fn carrier(&self, c: usize) -> Option<(f32, f32)> {
+        let id = self.carrier_plate_id?.get(c).copied().filter(|v| v.is_finite())?;
+        let age = self
+            .carrier_age_myr
+            .and_then(|a| a.get(c).copied())
+            .unwrap_or(f32::NAN);
+        Some((id, age))
+    }
+
+    /// The plate cell `c`'s flexure takes as its own for the breaks at plate boundaries
+    /// (ISO-055): the carrying plate where a footprint is carried, else the cell's plate.
+    fn break_id(&self, c: usize) -> f32 {
+        self.carrier(c).map_or(self.plate_id[c], |(id, _)| id)
     }
 }
 
@@ -1931,12 +1955,30 @@ pub fn step(
         .into_par_iter()
         .map(|c| {
             let reg = x.regime[c] as u8;
-            let target = p.elastic_thickness_km(
+            let own = p.elastic_thickness_km(
                 x.crust_type[c] as u8 == OCEANIC,
                 f64::from(x.crust_age_myr[c]),
                 f64::from(x.orogeny_age_myr[c]),
                 reg == regime::ARC || reg == regime::RIFT,
             );
+            // ledger: ISO-131
+            // A collision's belt and wedge stand on the incoming plate's lithosphere, thrust
+            // under them, and that plate bends under their weight (Lyon-Caen & Molnar 1983;
+            // Molnar & Lyon-Caen 1988). Under the belt the over plate's own crust and the
+            // underthrust plate are two layers without a bond: they bend together with the
+            // rigidity of their sum, Te = (Te₁³ + Te₂³)^⅓. The wedge is the incoming plate's own
+            // crust on its own lithosphere: the stronger of the two. Neither weakens a cell.
+            let target = match x.carrier(c) {
+                Some((id, age)) if age.is_finite() => {
+                    let car = p.elastic_thickness_km(false, -1.0, f64::from(age), false);
+                    if id == x.plate_id[c] {
+                        own.max(car)
+                    } else {
+                        (own.powi(3) + car.powi(3)).cbrt()
+                    }
+                }
+                _ => own,
+            };
             let was = if cells[c].fresh {
                 f64::NAN
             } else {
@@ -1951,7 +1993,9 @@ pub fn step(
     box_blur(&ds, &mut te, 2, 2); // ledger: ISO-054 (game-choice: numerical)
     // ledger: ISO-055
     // A plate boundary is a break: a trench's subducting plate does not hold up the arc beside
-    // it. The cells along a boundary are at the floor, the next row half way to it.
+    // it. The cells along a boundary are at the floor, the next row half way to it. A carried
+    // footprint belongs to its carrying plate (ISO-131): the break lies behind the belt, where
+    // the underthrust plate ends, not at the suture.
     let neighbours = |c: usize| {
         let (i, j) = (c % w, c / w);
         [
@@ -1962,9 +2006,8 @@ pub fn step(
         ]
     };
     let edge = |c: usize| {
-        neighbours(c)
-            .iter()
-            .any(|&m| x.plate_id[m] != x.plate_id[c])
+        let me = x.break_id(c);
+        neighbours(c).iter().any(|&m| x.break_id(m) != me)
     };
     let floor = p.te_min_km * p.elastic_thickness_scale;
     // The break as the grid can carry it. A boundary steps from row to row on the raster; a
@@ -2415,6 +2458,80 @@ mod tests {
         assert!(w0m < w0);
     }
 
+    /// A line load on the end of a broken plate (Turcotte & Schubert's broken plate): stiff at `te_km`
+    /// from the load's row on, all but rigidity-free (`soft_km`) before it. The depth under the
+    /// load, the first zero crossing and the bulge's place and height, m, and the plate's α.
+    fn broken_line_load(te_km: f64, soft_km: f64, dx: f64) -> (f64, f64, f64, f64, f64) {
+        let (w, h) = (16usize, 1024usize);
+        let mut sv = Solver::new(w, h, dx);
+        let row = h / 2;
+        let d: Vec<f64> = (0..w * h)
+            .map(|c| rigidity_per_g(if c / w >= row { te_km } else { soft_km }, G))
+            .collect();
+        let c = vec![RHO_MANTLE; w * h];
+        let alpha = flexural_parameter_m(rigidity_per_g(te_km, G));
+        let per_m = 1.0e10; // kg per metre of line
+        let mut b = vec![0.0; w * h];
+        for i in 0..w {
+            b[row * w + i] = per_m / dx;
+        }
+        let (x, rep) = sv.solve(&d, &c, &b, 1e-6, 400);
+        assert!(rep.converged, "{rep:?}");
+        let profile: Vec<f64> = (row..h).map(|j| x[j * w]).collect();
+        let k = profile.iter().position(|&v| v < 0.0).expect("a bulge");
+        let zero = (k as f64 - 1.0 + profile[k - 1] / (profile[k - 1] - profile[k])) * dx;
+        let (kb, wb) = profile
+            .iter()
+            .enumerate()
+            .fold((0, 0.0), |a, (i, &v)| if v < a.1 { (i, v) } else { a });
+        (profile[0], zero, kb as f64 * dx, wb, alpha)
+    }
+
+    /// The broken plate's line load (Turcotte & Schubert's, the foreland basin's model
+    /// since Jordan 1981 and Lyon-Caen & Molnar 1983): w = w₀ e^(−x/α) cos(x/α), w₀ = V α³ / 4D,
+    /// twice the continuous plate's; the basin's edge at πα/2 and the bulge at 3πα/4,
+    /// e^(−3π/4) cos(3π/4) = −6.7 % of the depth. The variable-stiffness solve gives it with a
+    /// plate whose rigidity drops 3,375-fold at the load.
+    // ledger: ISO-131
+    #[test]
+    fn a_line_load_on_a_broken_plate_gives_the_analytic_profile() {
+        let dx = 5000.0;
+        let te = 30.0;
+        let (w0, zero, bulge_at, bulge, alpha) = broken_line_load(te, 2.0, dx);
+        let pi = std::f64::consts::PI;
+        let analytic = 1.0e10 / (RHO_MANTLE * alpha);
+        eprintln!(
+            "broken: w0 {w0} vs {analytic}; zero {zero} vs {}; bulge at {bulge_at} vs {}; bulge {} vs {}",
+            0.5 * pi * alpha,
+            0.75 * pi * alpha,
+            bulge / w0,
+            (-0.75 * pi).exp() * (0.75 * pi).cos()
+        );
+        assert!(
+            (w0 / analytic - 1.0).abs() < 0.08,
+            "{w0} against {analytic}"
+        );
+        assert!(
+            (zero / (0.5 * pi * alpha) - 1.0).abs() < 0.08,
+            "zero crossing at {zero}, πα/2 = {}",
+            0.5 * pi * alpha
+        );
+        assert!(
+            (bulge_at - 0.75 * pi * alpha).abs() <= 2.0 * dx,
+            "bulge at {bulge_at}, 3πα/4 = {}",
+            0.75 * pi * alpha
+        );
+        let want = (-0.75 * pi).exp() * (0.75 * pi).cos();
+        assert!(
+            (bulge / w0 - want).abs() < 0.01,
+            "bulge height {} of the depth against {want}",
+            bulge / w0
+        );
+        // A broken plate's basin is narrower than a continuous one's (3πα/4) and twice as deep.
+        let (c0, czero, ..) = line_load(te, G, dx);
+        assert!(w0 > 1.8 * c0 && zero < 0.75 * czero, "{w0} {c0} {zero} {czero}");
+    }
+
     fn patchy(w: usize, h: usize, lo: f64, hi: f64) -> Vec<f64> {
         // Stiff "cratons" in a soft plate, smoothed as the stage smooths Te.
         let mut te: Vec<f64> = (0..w * h)
@@ -2631,6 +2748,9 @@ mod tests {
         sin_faces: Option<Vec<f64>>,
         /// The water over each cell (`StepIn::water_z`), None: the sea over every cell under it.
         water_z: Option<Vec<f64>>,
+        /// The carrying plate and its lithosphere's thermal age (`StepIn::carrier_plate_id`,
+        /// `StepIn::carrier_age_myr`), None: every cell on its own plate.
+        carrier: Option<(Vec<f32>, Vec<f32>)>,
     }
 
     impl World {
@@ -2652,6 +2772,7 @@ mod tests {
                 crust_share: 1.0,
                 sin_faces: None,
                 water_z: None,
+                carrier: None,
             }
         }
 
@@ -2720,6 +2841,8 @@ mod tests {
                     orogeny_age_myr: &self.orogeny,
                     regime: &self.regime,
                     plate_id: &self.plate,
+                    carrier_plate_id: self.carrier.as_ref().map(|c| c.0.as_slice()),
+                    carrier_age_myr: self.carrier.as_ref().map(|c| c.1.as_slice()),
                     ice_m: Some(&self.ice),
                     rock_share: 0.8,
                     parts: true,
@@ -2945,6 +3068,91 @@ mod tests {
         // The overriding plate behind its belt does not feel the incoming plate's bending.
         let behind = (60..110).map(|j| flex(j).abs()).fold(0.0f64, f64::max);
         assert!(behind < 0.5 * basin.abs(), "{behind} behind the belt");
+    }
+
+    /// ISO-131: the same collision with the incoming plate's lithosphere under the belt and the
+    /// wedge (`plates/carrier_plate_id`). The range is then a load on the end of the stiff
+    /// incoming plate, broken behind the belt (Lyon-Caen & Molnar 1983): the foreland basin is
+    /// deeper and wider than when only the wedge loads it, its edge lies about πα/2 of the
+    /// incoming plate beyond the load's front, and the overriding plate behind the belt is still
+    /// left alone.
+    #[test]
+    fn a_belt_carried_by_the_incoming_plate_bends_a_wide_foreland_basin() {
+        let p = on();
+        let (w, h) = (32usize, 256usize);
+        let n = w * h;
+        let sea = -1.0e6;
+        let run = |carried: bool| {
+            let mut wd = World::new(w, h, 300.0);
+            for c in 0..n {
+                if c / w >= 128 {
+                    wd.plate[c] = 1.0;
+                }
+            }
+            let (mut sv, mut st) = started(&mut wd, &p, sea);
+            let mut ids = vec![f32::NAN; n];
+            let mut ages = vec![f32::NAN; n];
+            for c in 0..n {
+                let j = c / w;
+                let u = if (118..128).contains(&j) {
+                    let x = (127 - j) as f64 / 10.0;
+                    1.0 - x * x
+                } else if (128..133).contains(&j) {
+                    1.0 - (j - 128) as f64 / 5.0
+                } else {
+                    0.0
+                };
+                if u > 0.0 {
+                    wd.uplift[c] = u as f32;
+                    wd.orogeny[c] = 0.0;
+                    wd.regime[c] = f32::from(regime::COLLISION);
+                    // The incoming plate's lithosphere, a craton's (its thermal age past any
+                    // recovery), under the belt and the wedge.
+                    ids[c] = 1.0;
+                    ages[c] = 1.0e4;
+                }
+            }
+            if carried {
+                wd.carrier = Some((ids, ages));
+            }
+            let out = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
+            assert!(out.solve.as_ref().unwrap().converged, "{:?}", out.solve);
+            let flex: Vec<f64> = (0..h).map(|j| f64::from(out.flexure_m[j * w + 3])).collect();
+            let te: Vec<f64> = (0..h)
+                .map(|j| f64::from(out.elastic_thickness_km[j * w + 3]))
+                .collect();
+            (flex, te)
+        };
+        let (off, te_off) = run(false);
+        let (on, te_on) = run(true);
+        let rows_km = 39.0;
+        // The basin in front of the wedge's toe (row 133 on): its depth and where it ends.
+        let basin = |f: &[f64]| (133..200).map(|j| f[j]).fold(f64::MAX, f64::min);
+        let edge = |f: &[f64]| {
+            let k = (133..250).find(|&j| f[j] < 0.0).expect("a basin");
+            let j = (k..250).find(|&j| f[j] >= 0.0).expect("an edge");
+            (j as f64 - 1.0 + f[j - 1] / (f[j - 1] - f[j]) - 127.5) * rows_km
+        };
+        let alpha_km = flexural_parameter_m(rigidity_per_g(80.0, G)) / 1000.0;
+        eprintln!(
+            "off: basin {} edge {} km; on: basin {} edge {} km; πα/2 {} km; te off {:?} on {:?}",
+            basin(&off),
+            edge(&off),
+            basin(&on),
+            edge(&on),
+            0.5 * std::f64::consts::PI * alpha_km,
+            &te_off[112..140],
+            &te_on[112..140]
+        );
+        eprintln!("on profile {:?}", &on[110..200]);
+        eprintln!("off profile {:?}", &off[110..200]);
+        assert!(basin(&on) < 1.5 * basin(&off), "{} {}", basin(&on), basin(&off));
+        assert!(edge(&on) > edge(&off), "{} {}", edge(&on), edge(&off));
+        // The belt rests on the stiff plate: its Te is the incoming plate's, not the floor.
+        assert!(te_on[123] > 50.0 && te_off[123] < 10.0, "{} {}", te_on[123], te_off[123]);
+        // Behind the belt the overriding plate is still a plate of its own.
+        let behind = (60..105).map(|j| on[j].abs()).fold(0.0f64, f64::max);
+        assert!(behind < 0.1 * basin(&on).abs(), "{behind} behind the belt");
     }
 
     /// Under the sea the roots' part of the split is their bending only, as on land: crust the
@@ -3523,6 +3731,8 @@ mod tests {
                     orogeny_age_myr: &orogeny,
                     regime: &reg,
                     plate_id: &plate,
+                    carrier_plate_id: None,
+                    carrier_age_myr: None,
                     ice_m: None,
                     rock_share: 0.8,
                     parts: false,
