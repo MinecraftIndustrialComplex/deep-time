@@ -6164,7 +6164,11 @@ before (34 Myr, 1.1 mm/yr).
 The plate check's collision lengths pass in all 8 runs (base3: p50 in 13 of 24, p90 in 7), and
 so do its collision count (16 of 24) and the lowest continental share (9 of 24). The guard is
 unchanged (its worst 12,669 m from the sea against 12,282, p 0.19; no step beyond 2 Earth
-reliefs in either). The lane's question is answered: the high coast was the long collisions'.
+reliefs in either). Against base3's own seeds 1 to 4 (arm `dock-c3`, the same cached runs) every
+reading holds: coast with high ground 0.330 to 0.114 and land above 2 km 0.146 to 0.053 (both
+p < 0.001), the front in collision 33,751 to 16,455 km, the guard's worst 12,061 to 12,669 m
+(p 0.050) with still no step beyond 2 Earth reliefs. The lane's question is answered: the high
+coast was the long collisions'.
 
 **The continents grow and drown.** The same runs:
 
