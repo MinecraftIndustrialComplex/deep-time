@@ -2537,10 +2537,16 @@ fn the_arcs_band_runs_round_a_fronts_ends() {
 /// θ to the front's normal. On, a full-length slab's pull has the torque of the reference pull
 /// per metre (FRC-002, by the slab's age, FRC-004) over the front's straight length along its
 /// normal, whatever θ while the plates converge beyond Bird's 20 degrees of a transform (PLT-311),
-/// and a slab grows from nothing by the convergence along the normal; at θ = 80 and 90 degrees no
-/// slab forms. Off (the old law), the pull follows each sample's fastest-converging lattice edge,
+/// and a slab grows from nothing by the convergence along the normal; at θ = 80 and 90 degrees the
+/// box's edge has no front (a corner sample or two may). Off (the old law), the pull follows each
+/// sample's fastest-converging lattice edge,
 /// one spacing per sample, the slab grows by the convergence along that edge, and a transform's
-/// zigzag still feeds a slab.
+/// zigzag still feeds a slab. Measured (2026-10-24, 40,000 samples): on, the pull 0.988 and 0.996
+/// of the front's (equator, tilted) at 0 and 45 degrees and 0.956 and 0.964 at 60, within a degree
+/// of the normal, the slab fed 0.97 to 0.99 of the convergence across the front's middle; off,
+/// 1.095 and 1.052 at 0 degrees, 18 to 24 degrees off the normal at 45 and 60, the slab fed up to
+/// 1.30 times the convergence at 60, and on the equator at 90 degrees (a transform) 0.46 of the
+/// front's pull and a slab fed at 43.5 km/Myr.
 #[test]
 fn the_slab_pull_takes_the_arcs_fronts_along_their_normal() {
     let lon_deg = 40.0_f64;
@@ -2641,8 +2647,15 @@ fn the_slab_pull_takes_the_arcs_fronts_along_their_normal() {
                 let across = fed_on / (50.0 * theta.to_radians().cos());
                 assert!((0.93..1.0).contains(&across), "{name}, {theta} degrees: {across}");
             } else {
-                // Within Bird's 20 degrees of a transform: no front, no slab.
-                assert_eq!(fed_on, 0.0, "{name}, {theta} degrees");
+                // Within Bird's 20 degrees of a transform: no front along the box's edge. At its
+                // corners the boundary turns towards plate 2's side, and the normal there (the
+                // chord of the corner's crossings to plate 1) can face the motion: a corner sample
+                // or two may still converge (tilted, 80 degrees: 0.068 of the front's pull), so
+                // the slab fed is theirs, not the front's.
+                assert!(
+                    t_on.length() < 0.1 * want.length(),
+                    "{name}, {theta} degrees: {t_on} against {want}"
+                );
             }
         }
         // The old law: a slab at a transform, and an oblique front's slab fed faster than the
@@ -2734,16 +2747,21 @@ fn a_reference_plate(
 /// "Step 9"): the reference plate ([`a_reference_plate`]: the average starting plate's area, a
 /// 3,000 km trench of a full-length 80-Myr slab, its neighbours held still by their keels, no
 /// mantle flow) on the lattice, through the force balance. With `front_pull` (PLT-560) its pull's
-/// torque is the reference pull per metre over the trench along its normal, the definition's own
-/// count, so the drag the definition gives moves the plate at the speed of the same plate on the
-/// analytic ring (`forces.rs`, `the_reference_plate_moves_at_the_speed_scale`, which counts the
-/// trench exactly) and nothing in it needs recalibrating. Measured (2026-10-24, 40,000 samples):
-/// see plates.md, "Step 9".
+/// torque is the reference pull per metre over the trench's shares along their normals, the
+/// definition's own count (a straight trench along its normal), so the drag the definition gives
+/// moves the plate, per the definition's trench, at the speed of the analytic ring's plate
+/// (`forces.rs`, `the_reference_plate_moves_at_the_speed_scale`), and c_b needs no change.
+/// Measured (2026-10-24, 40,000 samples): the lattice's trench 32 samples, shares 3,193 km for
+/// the rim's 3,000 (crossing sums 3,358 km); on, the pull 1.060 of the rim's along its normal (0.5
+/// degrees off), the plate at 53.2 mm/yr, 50.2 per the rim's trench (the ring 49.5 for the scale's
+/// 45); off, the pull 1.235 of the rim's (11.0 degrees off), the plate at 55.4 mm/yr.
 #[test]
 fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
     let mut speeds = Vec::new();
+    let mut scale = 0.0;
     for on in [true, false] {
         let mut p = preset(40_000, 20.0, "supercontinent", 5);
+        scale = p.tectonics.plate_speed_scale_mm_yr;
         p.tectonics.front_pull = on;
         p.tectonics.mantle_flow_mm_yr = 0.0;
         p.tectonics.keel_drag = 1.0e4;
@@ -2806,11 +2824,13 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
         }
         let rim = want / (c.pull_n_m * c.radius_m * c.radius_m);
         eprintln!(
-            "front_pull {on}: the reference plate moves at {speed:.1} mm/yr (the speed scale \
+            "front_pull {on}: the reference plate moves at {speed:.1} mm/yr ({:.1} per the rim's \
+             trench; the speed scale \
              {:.0}; its overriding neighbour {held:.2}); the pull {:.3} of the trench's along its \
              normal ({:.1} degrees off); the lattice's trench: {rows} samples, shares {share_km:.0} \
              km, crossing sums {cross_km:.0} km (the rim's {:.0}), the shares' torque {:.3} of the \
              rim's, the crossing sums' {:.3}",
+            speed * rim.length() / by_share.length(),
             k.plate_speed_scale_mm_yr,
             torque.length() / want.length(),
             torque.angle_between(want).to_degrees(),
@@ -2820,16 +2840,35 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
         );
         assert!(held < 0.01 * speed, "the neighbours move: {held}");
         if on {
+            // The pull is the trench's shares along their normals, exactly …
+            let shares = by_share * (c.pull_n_m * c.radius_m * c.radius_m);
             assert!(
-                (0.96..1.10).contains(&(torque.length() / want.length())),
-                "{torque} against {want}"
+                (torque - shares).length() <= 1e-4 * torque.length(),
+                "{torque} against the shares' {shares}"
+            );
+            // … and the shares are the rim's trench, but for where the lattice's trench ends:
+            // plate 0's samples end at z = sin r cos(α/2), a cut at α/2 to the rim (a shallow
+            // angle), so each end lies within about a spacing over sin(α/2) of the rim's.
+            assert!(
+                (0.94..1.08).contains(&(by_share.length() / rim.length())),
+                "the shares' torque {by_share} against the rim's {rim}"
             );
             assert!(torque.angle_between(want).to_degrees() < 2.0);
         }
-        speeds.push(speed);
+        // The speed per the definition's trench. With the pull counted as the definition counts
+        // it (on), the drag the definition gives moves the plate at the speed scale but for the
+        // sphere's cap (the ring's 49.5 mm/yr for its 45, its own test's reading).
+        let per_trench = speed * rim.length() / by_share.length();
+        speeds.push((speed, per_trench));
     }
-    // The analytic ring's plate, with the same definitions (its own test's bounds).
-    assert!((25.0..70.0).contains(&speeds[0]), "{speeds:?}");
+    let (on, off) = (speeds[0], speeds[1]);
+    assert!(
+        (0.95 * scale..1.25 * scale).contains(&on.1),
+        "the reference plate per its trench {:.1} mm/yr, the scale {scale}",
+        on.1
+    );
+    // The old count's pull is larger and moves the plate faster.
+    assert!(off.0 > on.0, "{speeds:?}");
 }
 
 /// The continent's margin towards plate 1 as the boundary mix sees it (`dynamics::boundary_mix`),
@@ -2919,7 +2958,24 @@ fn the_ocean_continent_front_through_a_resampling() {
         c.carried,
         c.last_step
     );
-    for (when, (rows, oc, other)) in [("before", &before), ("after", &after)] {
+    // A step on, as the records' "1 to 2 Myr" row: the plates move on the new lattice and the
+    // overlaps form again.
+    kinematics::advance(&mut st, env2.dt_yr);
+    let pos = geometry::positions(&st, &geo);
+    st.recount(&pos);
+    let env3 = stage.env(&p.tectonics, 3);
+    let tree = Tree::over(&pos, |_| true);
+    let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env3);
+    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env3).unwrap();
+    let on = the_margin_as_the_mix_sees_it(&st, &geo, &pos, &env3);
+    let c = &st.contacts[0];
+    eprintln!(
+        "the contact a step on: active {}, carried {}, last step {}",
+        c.active(env3.step),
+        c.carried,
+        c.last_step
+    );
+    for (when, (rows, oc, other)) in [("before", &before), ("after", &after), ("a step on", &on)] {
         eprintln!("{when}: the mix's ocean-continent {oc:.0} km, other {other:.0} km");
         for (class, row) in rows.iter().enumerate() {
             if row.0 == 0 {
