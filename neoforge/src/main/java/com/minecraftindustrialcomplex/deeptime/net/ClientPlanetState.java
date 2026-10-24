@@ -18,9 +18,13 @@ public final class ClientPlanetState {
     /** The planet the info describes, resolved once so per-block readers do not parse or allocate. */
     private static volatile Planet planet;
 
-    /** A planet level, its x period and projection, from a {@link WorldInfoPayload} with {@code planet} set. */
+    /**
+     * A planet level, its x period, projection and nominal metres per block, from a {@link
+     * WorldInfoPayload} with {@code planet} set.
+     */
     private record Planet(ResourceKey<Level> dimension, int circumference,
-                          com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection projection) {}
+                          com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection projection,
+                          double mPerBlockH) {}
 
     private ClientPlanetState() {}
 
@@ -55,12 +59,21 @@ public final class ClientPlanetState {
     }
 
     /**
-     * The world projection of the planet {@code level} is (Lambert or Petroff–Guyou), or null when the
-     * info is for another level, is not a planet, or has not arrived. Safe from any thread.
+     * The world projection of the planet {@code level} is (Lambert, Petroff–Guyou or the cube), or null
+     * when the info is for another level, is not a planet, or has not arrived. Safe from any thread.
      */
     public static com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection projection(Level level) {
         Planet p = planet;
         return p != null && level != null && p.dimension() == level.dimension() ? p.projection() : null;
+    }
+
+    /**
+     * The nominal horizontal metres per block of the planet {@code level} is (the manifest's {@code
+     * m_per_block_h}), or NaN as {@link #projection} is null. Safe from any thread.
+     */
+    public static double mPerBlockH(Level level) {
+        Planet p = planet;
+        return p != null && level != null && p.dimension() == level.dimension() ? p.mPerBlockH() : Double.NaN;
     }
 
     /**
@@ -80,7 +93,8 @@ public final class ClientPlanetState {
             return null;
         ResourceLocation id = ResourceLocation.tryParse(info.dimension());
         // ResourceKey.create interns, so the level's own key is this same instance.
-        return id == null ? null : new Planet(ResourceKey.create(Registries.DIMENSION, id), info.circumference(), info.worldProjection());
+        return id == null ? null : new Planet(ResourceKey.create(Registries.DIMENSION, id), info.circumference(), info.worldProjection(),
+                info.mPerBlockH());
     }
 
     public static void reset() {

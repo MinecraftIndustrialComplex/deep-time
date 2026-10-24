@@ -705,8 +705,11 @@ section 7.4 is deleted yet.
   equal-area radius; the guard checks 4s; `/deeptime probe dh` gives the slide's x, and
   `dh-client-check.sh` and the smoke's `--dh` checks cover both sides of the slide as of Toroidal
   World's seam), G3 (the detail noise on the cube's surface lattice in Rust and Java, the bake's
-  relief noises with it; the seam blend SCL-125 is retired for SCL-215).
-- Left: G9 (climate API 5), G10's `NetworkGameTests` F3 test, the rest of G11 (the
+  relief noises with it; the seam blend SCL-125 is retired for SCL-215), G9 (climate API 5:
+  `projectionKind` `"cube"`, the period 4s, latitude and longitude through the map, the new
+  `northBearingDeg` and `metresPerBlock` on both sides, the static `latitudeDeg(z, C)` deleted;
+  `ClimateApiGameTests.climateApiOnTheCube` and `NorthBearingAndScaleTest`).
+- Left: G10's bearing and scale on the F3 line and its `NetworkGameTests` F3 test, the rest of G11 (the
   `pole`, `tw` and `column` probes, `SiteCommands.distance`), G12 (the presets themselves; the smoke
   uses `tools/smoke/presets/*_cube.json`), the rest of G13 and G14, G16, the Sable border, and the
   section 7.4 deletions with the rewrites of the Petroff-Guyou tests they bring.

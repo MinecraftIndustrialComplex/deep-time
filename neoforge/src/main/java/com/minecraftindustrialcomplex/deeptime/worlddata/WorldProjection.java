@@ -122,6 +122,35 @@ public interface WorldProjection {
         return new double[]{dx / n, dz / n};
     }
 
+    /**
+     * The bearing of geographic north at (x, z) in the block frame ({@link #north}), degrees clockwise
+     * from the block frame's north (−z) seen from above, in [0, 360): 0 where north is −z (everywhere on
+     * a Lambert world), 90 where it is +x, 180 where it is +z. NaN off the planet.
+     */
+    default double northBearingDeg(double x, double z) {
+        double[] n = north(x, z);
+        return bearingDeg(n[0], n[1]);
+    }
+
+    /**
+     * The local linear scale at (x, z): blocks of the equal-area sphere ({@link #radius}) per world
+     * block, √|det J| of the map's Jacobian. 1 on the equal-area Lambert and Petroff–Guyou worlds (a
+     * block's area is the same everywhere there, though it can be longer one way and shorter the
+     * other); a cube world's conformal map has one scale in every direction, which varies across each
+     * face. Times the manifest's {@code m_per_block_h} it is metres per block. NaN off the planet.
+     */
+    default double scale(double x, double z) {
+        return 1.0;
+    }
+
+    /** The bearing in degrees [0, 360) of the block-frame direction (dx, dz), clockwise from −z seen from above. */
+    static double bearingDeg(double dx, double dz) {
+        double b = Math.toDegrees(Math.atan2(dx, -dz));
+        if (b < 0.0)
+            b += 360.0;
+        return b >= 360.0 ? 0.0 : b;
+    }
+
     private double[] jacobianColumn(double x, double z, double dx, double dz, double[] east, double[] north, double rr) {
         double h = dx != 0 ? dx : dz;
         double[] p = unit(x + dx, z + dz);
@@ -316,6 +345,23 @@ public interface WorldProjection {
         public double[] north(double x, double z) {
             double[] n = world.north(x, z);
             return n == null ? new double[]{0.0, -1.0} : n;
+        }
+
+        /**
+         * North's bearing through the fold's turn: smooth from a face on into the copy past its edge, where
+         * the same planet point on its own face reads it turned by the edge's motion. NaN past the corners.
+         */
+        @Override
+        public double northBearingDeg(double x, double z) {
+            double[] n = world.north(x, z);
+            return n == null ? Double.NaN : WorldProjection.bearingDeg(n[0], n[1]);
+        }
+
+        /** The conformal map's local scale through the fold ({@link CubeWorld.WorldJacobian#sigma}); NaN past the corners. */
+        @Override
+        public double scale(double x, double z) {
+            CubeWorld.WorldJacobian j = world.jacobian(x, z);
+            return j == null ? Double.NaN : j.sigma();
         }
     }
 
