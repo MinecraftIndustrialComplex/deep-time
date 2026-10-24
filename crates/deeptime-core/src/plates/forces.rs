@@ -91,9 +91,18 @@ use super::dynamics::PlateForces;
 use super::geometry::Geo;
 use super::kinematics::{quat, tangent};
 use super::normalise::Norm;
+use super::shortening;
 use super::state::{CONTINENTAL, PlateState, SlabTrack};
 use crate::params::TectonicParams;
 use crate::sphere::SplitMix64;
+
+/// World globals (measurement only): the oceanic fronts the slab pull acts along over the run,
+/// km × Myr (Earth-normalized): one lattice spacing per overriding sample that pulls, as the pull
+/// counts them; the part of each along the boundary's normal; and the samples' shares of the
+/// straight front (PLT-530). ledger: PLT-554
+pub const SLAB_FRONT_LATTICE_GLOBAL: &str = "plates/slab_front_lattice_km_myr";
+pub const SLAB_FRONT_NORMAL_GLOBAL: &str = "plates/slab_front_normal_km_myr";
+pub const SLAB_FRONT_STRAIGHT_GLOBAL: &str = "plates/slab_front_straight_km_myr";
 
 /// Seconds in a year (Julian): the balance is solved in SI.
 pub const YEAR_S: f64 = 3.155_76e7;
@@ -798,6 +807,11 @@ pub struct Answer {
     pub collision_n: BTreeMap<usize, f64>,
     pub solved: bool,
     pub recorded: Option<Recorded>,
+    /// Measurement only: the oceanic fronts the slab pull acts along this step, km
+    /// (Earth-normalized): one spacing per overriding sample that pulls, the part of each along
+    /// the boundary's normal, and the samples' shares of the straight front (PLT-530). ledger:
+    /// PLT-554
+    pub slab_front_km: [f64; 3],
 }
 
 /// Four significant digits (the record's precision for forces).
@@ -860,6 +874,7 @@ pub fn step(
         collision_n,
         solved,
         out,
+        slab_front_km,
         ..
     } = balance_step(st, geo, pos, env, flow, sea_m, &mut slabs);
     st.slabs = slabs;
@@ -889,6 +904,7 @@ pub fn step(
         collision_n,
         solved,
         recorded,
+        slab_front_km,
     }
 }
 
@@ -900,6 +916,7 @@ struct Balanced {
     collision_n: BTreeMap<usize, f64>,
     solved: bool,
     out: Recorded,
+    slab_front_km: [f64; 3],
     /// Each plate's slab pull and suction torques (N m, about the planet's centre, by plate id).
     #[cfg(test)]
     torques: Vec<(DVec3, DVec3)>,
@@ -1129,6 +1146,8 @@ fn balance_step(
         .collect();
 
     let ell = c.spacing_m;
+    // Measurement only: the oceanic fronts' length the slab pull acts along, km (ledger: PLT-554).
+    let mut slab_front_km = [0.0_f64; 3];
     // The collision drag's convergence floor (design §3.4 linearises with the weld speed; it sits
     // under it, so a held collision stalls).
     let floor = COLLISION_FLOOR_MM_YR.min(k.weld_speed_mm_yr); // ledger: FRC-011
@@ -1197,6 +1216,21 @@ fn balance_step(
             if pull > 0.0 {
                 bal.add_force(under, x, towards * pull, Drive::SlabPull);
                 bal.add_suction(p, x, dir, pull);
+                // Measurement only (ledger: PLT-554): at a front, the one spacing this sample
+                // pulls along, the part of it along the boundary's normal (the pull's direction
+                // is towards its neighbour across), and its share of the straight front
+                // (PLT-530), so the pull's count can be read against the front's length.
+                if e.front.is_some() {
+                    let pu = plate_of[u as usize];
+                    let normal = shortening::boundary_normal(geo, pos, &rots, samples, &plate_of, v, pu);
+                    let share = shortening::front_share_rad(
+                        geo, pos, &rots, samples, &plate_of, v, pu, normal,
+                    );
+                    let km = ell / 1000.0;
+                    slab_front_km[0] += km;
+                    slab_front_km[1] += km * dir.dot(normal);
+                    slab_front_km[2] += norm.km(share);
+                }
             }
             bal.add_link(Link {
                 a: under,
@@ -1272,6 +1306,7 @@ fn balance_step(
             slabs_km,
             breakoffs,
         },
+        slab_front_km,
         #[cfg(test)]
         torques: bal.acc.iter().map(|a| (a.t_pull, a.t_suck)).collect(),
     }

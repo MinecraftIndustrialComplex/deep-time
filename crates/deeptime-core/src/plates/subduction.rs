@@ -838,6 +838,10 @@ pub const FRONT_G_CONTINENTAL_NORMAL_GLOBAL: &str = "plates/arc_front_g_normal_c
 /// front, km × Myr, whatever `front_share` (measurement: the `arc_front_*` globals over this are
 /// the lattice's count of a front against its straight length while it is off). ledger: PLT-530
 pub const ARC_FRONT_STRAIGHT_GLOBAL: &str = "plates/arc_front_straight_km_myr";
+/// World global: the oceanic slabs' arc bands over the run by their length, km × Myr
+/// ([`Pull::arc_band_km_myr`]; measurement: the arcs' crust is made over this length, against the
+/// straight front above). ledger: PLT-554
+pub const ARC_BAND_GLOBAL: &str = "plates/arc_band_km_myr";
 /// World global: crust shortened into the arcs' cordilleras over the run, km³ (moved, not made).
 pub const CORDILLERA_GLOBAL: &str = "plates/cordillera_shortened_km3";
 
@@ -867,6 +871,11 @@ pub struct Pull {
     /// Oceanic fronts this step by their share of the straight front, km × Myr, whatever
     /// `front_share` (measurement; PLT-530).
     pub front_straight_km_myr: f64,
+    /// The oceanic slabs' arc bands this step by their length, km × Myr: the band's weight summed
+    /// over the samples its fronts reach, times a sample's area, over the band's integral across
+    /// the arc (√π · `arc_width_km`); a straight front's band gives its length (measurement;
+    /// ledger: PLT-554).
+    pub arc_band_km_myr: f64,
     /// The step's erosive fronts and their forearcs ([`erode_forearcs`]); `None` while the rule is
     /// off.
     pub forearcs: Option<Forearcs>,
@@ -1451,6 +1460,8 @@ pub fn fronts_finish(
     }
     let axis_gap_km = &axis_gap_km;
     let mut budget = vec![Budget::default(); contacts.len()];
+    // Measurement only: the arc bands' weight over the samples they reach (ledger: PLT-554).
+    let mut band_weight = 0.0_f64;
     // Over the reached samples, ascending (P1-19: over every sample before; the others add
     // nothing).
     for &i in &reached {
@@ -1464,6 +1475,7 @@ pub fn fronts_finish(
         if !src.oceanic_slab {
             continue;
         }
+        band_weight += w_arc_of(norm.km(dist[i]), k);
         let b = &mut budget[src.contact];
         let share = if s.kind == CONTINENTAL {
             CONTINENTAL_VOLCANIC_SHARE
@@ -1674,6 +1686,7 @@ pub fn fronts_finish(
         front_g_normal_km_myr: g_normal_km_myr,
         front_g_continental_km_myr: g_continental_km_myr,
         front_straight_km_myr: straight_km_myr,
+        arc_band_km_myr: band_weight * area / band_km * env.dt_myr,
         forearcs: (erosion_rate > 0.0).then_some(Forearcs {
             loss_km3,
             continental: loss_continental,
