@@ -3,8 +3,8 @@ package com.minecraftindustrialcomplex.deeptime.wrapengine;
 
 /**
  * Installs the cube on the overworld behind the engine's flag (docs/design/wrap-engine.md §12.3 and
- * §12.7). Until phase 2's manifest reader exists the layout comes only from
- * {@code -Ddeeptime.wrapengine.cube=<s>} (dev); the band depth from
+ * §12.7). The face side is a cube world's own (format 0.7, the manifest's {@code cube.face_blocks})
+ * or {@code -Ddeeptime.wrapengine.cube=<s>} (dev, which wins); the band depth comes from
  * {@code -Ddeeptime.wrapengine.depth=<D>}, default {@link #DEFAULT_DEPTH}.
  *
  * <p>Toroidal World keeps the slide when it loops the level (Ben, 2026-10-03, "TW slides, engine

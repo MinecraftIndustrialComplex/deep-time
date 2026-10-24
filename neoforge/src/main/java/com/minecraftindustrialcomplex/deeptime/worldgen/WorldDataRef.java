@@ -23,21 +23,24 @@ import java.util.Optional;
  *                            §7.11; default 70°, Ben 2026-10-03)
  * @param poleStopDeg         where the soft cap becomes a hard stop ({@code pole_stop_deg}; default 80°)
  * @param projection          the world's projection ({@code projection}: {@code petroff_guyou}, the
- *                            seamless world of format 0.5, or {@code lambert}, the default here so
- *                            the synthetic test worlds need not say it); the world data's manifest
- *                            must agree. On a Petroff–Guyou world {@code circumferenceBlocks} is the
- *                            x period 2b and the pole cap gives way to the edge border
+ *                            seamless world of format 0.5, {@code cube}, the cube world of format 0.7,
+ *                            or {@code lambert}, the default here so the synthetic test worlds need not
+ *                            say it); the world data's manifest must agree. On a Petroff–Guyou world
+ *                            {@code circumferenceBlocks} is the x period 2b and on a cube world the
+ *                            period 4s; on both the pole cap gives way to the edge border
  */
 public record WorldDataRef(String folder, int circumferenceBlocks, Optional<String> testTerrain,
                            Optional<String> stagingId, double poleCapDeg, double poleStopDeg, String projection) {
 
     public static final String LAMBERT = "lambert";
     public static final String PETROFF_GUYOU = "petroff_guyou";
+    /** The cube world (format 0.7, docs/plans/cube-world-plan.md; phase 2 opt-in level types). */
+    public static final String CUBE = "cube";
 
     /**
      * The cube world's face side is a multiple of this many blocks (ledger SCL-100, game choice; the
-     * Rust {@code projection::FACE_QUANTUM}); the cube is not an accepted {@code projection} here yet
-     * (phase 2 of docs/plans/cube-world-plan.md), so the constructor still refuses "cube".
+     * Rust {@code projection::FACE_QUANTUM}), so a cube world's circumference 4s is a multiple of 4 ×
+     * this.
      */
     public static final int FACE_QUANTUM = CubeLayout.FACE_QUANTUM; // ledger: SCL-100 (game-choice)
 
@@ -70,8 +73,21 @@ public record WorldDataRef(String folder, int circumferenceBlocks, Optional<Stri
     public WorldDataRef {
         if (circumferenceBlocks % 512 != 0)
             throw new IllegalArgumentException("circumference_blocks must be a multiple of 512 (a region file), got " + circumferenceBlocks);
-        if (!LAMBERT.equals(projection) && !PETROFF_GUYOU.equals(projection))
-            throw new IllegalArgumentException("projection must be lambert or petroff_guyou, got " + projection);
+        if (!LAMBERT.equals(projection) && !PETROFF_GUYOU.equals(projection) && !CUBE.equals(projection))
+            throw new IllegalArgumentException("projection must be lambert, petroff_guyou or cube, got " + projection);
+        if (CUBE.equals(projection) && circumferenceBlocks % (4 * FACE_QUANTUM) != 0)
+            throw new IllegalArgumentException("a cube world's circumference_blocks is 4s, s a multiple of " + FACE_QUANTUM
+                    + ", got " + circumferenceBlocks);
+    }
+
+    /** Whether the world is the cube world (format 0.7). */
+    public boolean cube() {
+        return CUBE.equals(projection);
+    }
+
+    /** s, the face side of a cube world (a quarter of the x period); 0 on the polar worlds. */
+    public int faceBlocks() {
+        return cube() ? circumferenceBlocks / 4 : 0;
     }
 
     /** Whether the world is the seamless Petroff–Guyou world (format 0.5). */
@@ -84,10 +100,10 @@ public record WorldDataRef(String folder, int circumferenceBlocks, Optional<Stri
         return petroffGuyou() ? circumferenceBlocks / 2 : 0;
     }
 
-    /** The pole cap of this level (plan §7.11); null on a Petroff–Guyou world, whose poles are ordinary
-     *  ground (its north and south edges have the temporary edge border instead, {@code wrap/EdgeBorder}). */
+    /** The pole cap of this level (plan §7.11); null on a Petroff–Guyou or cube world, whose poles are
+     *  ordinary ground (their turning edges have the edge border instead, {@code wrap/EdgeBorder}). */
     public PoleCapCurve poleCap() {
-        return petroffGuyou() ? null : new PoleCapCurve(circumferenceBlocks, poleCapDeg, poleStopDeg);
+        return petroffGuyou() || cube() ? null : new PoleCapCurve(circumferenceBlocks, poleCapDeg, poleStopDeg);
     }
 
     /** This reference with another world shape (the period and projection of an accepted run). */

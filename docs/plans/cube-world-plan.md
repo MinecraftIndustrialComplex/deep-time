@@ -682,6 +682,27 @@ The Java sweep found every place that assumes a 2:1 world, a Lambert row, a symm
 Petroff-Guyou kind. Each line below is a place to change, grouped into work items. Paths are under
 `neoforge/src/main/java/com/minecraftindustrialcomplex/deeptime/`.
 
+**State, 2026-10-23 (phase 2, stage 1, branch `worktree-agent-a19e057e8770be0a9`; design note
+`docs/design/cube-game.md`).** A cube world is playable end to end behind two opt-in level types,
+`deeptime:planet_cube` and `deeptime:planet_cube_32k`; Petroff-Guyou is unchanged and nothing of
+section 7.4 is deleted yet.
+
+- Done: G1 (readers, the cube manifest through `WorldDataRef`, `WorldProjection.Cube`, the indexes on
+  net coordinates), G2 (the generator on the cube: period 4s, `zHalf` 3C/8 for the censuses, the
+  level types; the static Lambert helpers stay until section 7.4), G4 (block states turned in the
+  fill), G5 (`worldgen/CubeFill`: partners' biomes and terrain copied and turned, deep ocean past the
+  corners, SCL-210, SCL-211), G7's border part (W3), G8 and W5 (spawn), W3 and W4 (`wrap/CubeBorder`,
+  `EdgeBorder.tickCube`, arrivals folded, POL-031), G10's payload and F3 line (face, latitude and
+  longitude; bearing and scale wait for G9), G11's `ServerConfig` and `FirstStartGenerator` text,
+  G13's level-type registration and the editor's `cube` projection option, and G15's layout, seam,
+  corner, fill, biome, ocean, block-state and border GameTests (`CubeWorldGameTests`, on the 4k test
+  planet baked as a cube) and the reachability flood fill (`CubeBorderTest`).
+- Left: G3 (the detail noise across turning seams, Rust and Java together), G6 (far terrain and
+  Distant Horizons), G9 (climate API 5), G10's `NetworkGameTests` F3 test, the rest of G11 (the
+  `pole`, `tw` and `column` probes, `SiteCommands.distance`), G12 (the presets themselves; the smoke
+  uses `tools/smoke/presets/*_cube.json`), the rest of G13 and G14, G16, the Sable border, and the
+  section 7.4 deletions with the rewrites of the Petroff-Guyou tests they bring.
+
 **The work.**
 
 - **G1. Readers.**

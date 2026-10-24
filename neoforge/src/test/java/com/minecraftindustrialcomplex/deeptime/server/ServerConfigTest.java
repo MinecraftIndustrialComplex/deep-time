@@ -86,5 +86,10 @@ class ServerConfigTest {
         assertEquals("deeptime:planet", FirstStartGenerator.levelTypeFor(13_312, "petroff_guyou"));
         assertEquals("deeptime:planet_lambert_32k", FirstStartGenerator.levelTypeFor(32_768, "lambert"));
         assertEquals("13,312-block Petroff–Guyou world", FirstStartGenerator.describe(13_312, "petroff_guyou"));
+        // A cube world's x period is 4s (cube plan phase 2, G1): s = 3,840 at 16k, 7,424 at 32k.
+        assertEquals("deeptime:planet_cube", FirstStartGenerator.levelTypeFor(15_360, "cube"));
+        assertEquals("deeptime:planet_cube_32k", FirstStartGenerator.levelTypeFor(29_696, "cube"));
+        assertEquals("15,360-block cube world", FirstStartGenerator.describe(15_360, "cube"));
+        assertTrue(ServerConfig.template().contains("deeptime:planet_cube"));
     }
 }

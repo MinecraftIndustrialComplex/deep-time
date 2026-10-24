@@ -2,6 +2,7 @@
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.DeepTimeDensity;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -10,6 +11,8 @@ import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Deep Time's chunk generator (plan §7.1): vanilla's noise generator with Deep Time's router.
@@ -36,6 +39,10 @@ import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
  * <p><b>TerraBlender's regions</b> follow the world's geologic provinces (P1-10): the bound settings'
  * spawn-target list carries the level's {@link RegionSource} ({@link RegionSpawnTarget}), which
  * {@code mixin.compat.terrablender.RegionBiomeSourceMixin} finds on the level's climate sampler.
+ *
+ * <p><b>A cube world</b> (format 0.7) generates its chunks off the six faces as copies of their
+ * partners ({@link CubeFill}): their biomes, noise fill, surface, carvers, structure starts, features
+ * and mobs are this class's overrides below, and chunks on the faces are generated as on any world.
  */
 public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
 
@@ -65,17 +72,31 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
     }
 
     /**
-     * The inset of the temporary edge border of a Petroff–Guyou world (its manifest's layout block,
-     * {@code border.inset_blocks}), or NaN when the level has none: a Lambert world, a test terrain, or
-     * a world whose preset asked for no border ({@code scale.edge_border = none}).
+     * The inset of the temporary edge border of a Petroff–Guyou or cube world (its manifest's layout
+     * block, {@code border.inset_blocks}), or NaN when the level has none: a Lambert world, a test
+     * terrain, or a world whose preset asked for no border ({@code scale.edge_border = none}). A cube
+     * world's border stops at its segments, the 12 turning net edges ({@code wrap/CubeBorder}).
      */
     public double borderInset() {
-        if (!dataRef.petroffGuyou() || !(terrain() instanceof WorldDataTerrain w))
+        if (!(dataRef.petroffGuyou() || dataRef.cube()) || !(terrain() instanceof WorldDataTerrain w))
             return Double.NaN;
         var layout = w.data().layout();
-        if (layout == null || layout.border() == null || !layout.border().stops("north"))
+        if (layout == null || layout.border() == null)
             return Double.NaN;
-        return layout.border().insetBlocks();
+        var b = layout.border();
+        boolean stops = dataRef.cube() ? "edge_stop".equals(b.kind()) && !b.edges().isEmpty() : b.stops("north");
+        return stops ? b.insetBlocks() : Double.NaN;
+    }
+
+    /** The net of a cube world (format 0.7), or null on a polar world. */
+    public CubeLayout cubeLayout() {
+        return dataRef.cube() ? CubeLayout.shared(dataRef.faceBlocks()) : null;
+    }
+
+    /** Whether chunk {@code pos} is a cube world's chunk wholly off the faces ({@link CubeFill}). */
+    private boolean offFaces(net.minecraft.world.level.ChunkPos pos) {
+        CubeLayout cube = cubeLayout();
+        return cube != null && CubeFill.outside(cube, pos);
     }
 
     /** The level's terrain source, chosen on first use (plan §7.1, "Terrain source"). */
@@ -148,12 +169,46 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
     }
 
     @Override
+    public CompletableFuture<net.minecraft.world.level.chunk.ChunkAccess> createBiomes(net.minecraft.world.level.levelgen.RandomState random,
+            net.minecraft.world.level.levelgen.blending.Blender blender, net.minecraft.world.level.StructureManager structures,
+            net.minecraft.world.level.chunk.ChunkAccess chunk) {
+        CubeLayout cube = cubeLayout();
+        if (cube == null || !CubeFill.outside(cube, chunk.getPos()))
+            return super.createBiomes(random, blender, structures, chunk);
+        return CompletableFuture.supplyAsync(() -> {
+            CubeFill.biomes(this, cube, random, chunk);
+            return chunk;
+        }, net.minecraft.Util.backgroundExecutor());
+    }
+
+    /** A cube world's chunk off the faces is filled at its surface step, from its partners ({@link CubeFill}). */
+    @Override
+    public CompletableFuture<net.minecraft.world.level.chunk.ChunkAccess> fillFromNoise(net.minecraft.world.level.levelgen.blending.Blender blender,
+            net.minecraft.world.level.levelgen.RandomState random, net.minecraft.world.level.StructureManager structures,
+            net.minecraft.world.level.chunk.ChunkAccess chunk) {
+        if (offFaces(chunk.getPos()))
+            return CompletableFuture.completedFuture(chunk);
+        return super.fillFromNoise(blender, random, structures, chunk);
+    }
+
+    @Override
     public void buildSurface(net.minecraft.server.level.WorldGenRegion region, net.minecraft.world.level.StructureManager structures,
                              net.minecraft.world.level.levelgen.RandomState random, net.minecraft.world.level.chunk.ChunkAccess chunk) {
-        super.buildSurface(region, structures, random, chunk);   // the pack's surface rules repaint the default block
+        CubeLayout cube = cubeLayout();
+        boolean off = cube != null && CubeFill.outside(cube, chunk.getPos());
+        if (off)
+            CubeFill.surface(this, cube, region, structures, random, chunk);   // the partners' copies, their passes included
+        else
+            super.buildSurface(region, structures, random, chunk);   // the pack's surface rules repaint the default block
         CHUNKS_SURFACED.increment();
         CHUNK_X_MIN.accumulateAndGet(chunk.getPos().x, Math::min);
         CHUNK_X_MAX.accumulateAndGet(chunk.getPos().x, Math::max);
+        if (!off)
+            deepTimeSurface(chunk);
+    }
+
+    /** Deep Time's passes after the pack's surface rules: a chunk's own, or a cube world's scratch partner's ({@link CubeFill}). */
+    void deepTimeSurface(net.minecraft.world.level.chunk.ChunkAccess chunk) {
         if (terrain() instanceof WorldDataTerrain w) {
             // No cave of any kind reaches the underwater face of a sea cliff: a wall of rock is kept (before the strata).
             SeaCliffPass.apply(chunk, w::height, sourceSettings.value().seaLevel(), w.cliffRules());
@@ -179,9 +234,45 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
     public void applyCarvers(net.minecraft.server.level.WorldGenRegion region, long seed, net.minecraft.world.level.levelgen.RandomState random,
                              net.minecraft.world.level.biome.BiomeManager biomes, net.minecraft.world.level.StructureManager structures,
                              net.minecraft.world.level.chunk.ChunkAccess chunk, net.minecraft.world.level.levelgen.GenerationStep.Carving step) {
+        if (offFaces(chunk.getPos()))
+            return;   // the partners' copies were carved (ledger SCL-210)
         super.applyCarvers(region, seed, random, biomes, structures, chunk, step);
-        if (step == net.minecraft.world.level.levelgen.GenerationStep.Carving.AIR && terrain() instanceof WorldDataTerrain w)
+        if (step == net.minecraft.world.level.levelgen.GenerationStep.Carving.AIR)
+            afterCarvers(chunk);
+    }
+
+    /** After the air carvers: the water's wake ({@link WaterBodies#wake}), a chunk's own or a scratch partner's. */
+    void afterCarvers(net.minecraft.world.level.chunk.ChunkAccess chunk) {
+        if (terrain() instanceof WorldDataTerrain w)
             WaterBodies.wake(chunk, w.data(), waterReach());
+    }
+
+    /** No structure starts in a cube world's chunk off the faces (ledger SCL-210; the wrap engine's band shows the partner's). */
+    @Override
+    public void createStructures(net.minecraft.core.RegistryAccess access,
+                                 net.minecraft.world.level.chunk.ChunkGeneratorStructureState state,
+                                 net.minecraft.world.level.StructureManager structures, net.minecraft.world.level.chunk.ChunkAccess chunk,
+                                 net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager templates) {
+        if (offFaces(chunk.getPos()))
+            return;
+        super.createStructures(access, state, structures, chunk, templates);
+    }
+
+    /** No features in a cube world's chunk off the faces (ledger SCL-210). */
+    @Override
+    public void applyBiomeDecoration(net.minecraft.world.level.WorldGenLevel level, net.minecraft.world.level.chunk.ChunkAccess chunk,
+                                     net.minecraft.world.level.StructureManager structures) {
+        if (offFaces(chunk.getPos()))
+            return;
+        super.applyBiomeDecoration(level, chunk, structures);
+    }
+
+    /** No mobs placed with a cube world's chunk off the faces (ledger SCL-210). */
+    @Override
+    public void spawnOriginalMobs(net.minecraft.server.level.WorldGenRegion region) {
+        if (offFaces(region.getCenter()))
+            return;
+        super.spawnOriginalMobs(region);
     }
 
     /**

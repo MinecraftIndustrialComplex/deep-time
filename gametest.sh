@@ -85,6 +85,11 @@ dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/
     || { echo "FAILED: deeptime run planet_world_4k"; exit 1; }
 dev cargo run --release -q -p deeptime-cli -- parity --world-data "$RUN"/world/deeptime-real \
     || { echo "FAILED: deeptime parity"; exit 1; }
+# World data for the test_planet_cube and test_cube_bare levels (cube plan G15): the same planet baked as a
+# cube world (format 0.7; s = 1,024, period 4,096), for CubeWorldGameTests.
+dev cargo run --release -q -p deeptime-cli -- run --preset crates/deeptime-core/tests/presets/planet_world_4k.json "${planet_sets[@]}" \
+    --set scale.projection=cube --out "$RUN"/world/deeptime-cube \
+    || { echo "FAILED: deeptime run planet_world_4k as a cube"; exit 1; }
 # World data for the test_lake level (P0-13): a basin and a closed channel holding water at y 120.
 dev cargo run --release -q -p deeptime-cli -- synth --kind lake-test --size 1024 --out "$RUN"/world/deeptime-lake \
     || { echo "FAILED: deeptime synth lake-test"; exit 1; }

@@ -20,7 +20,20 @@ public final class PlanetDebugLine {
             return null;
         int c = info.circumference();
         double lat, lon;
-        if (info.petroffGuyou()) {
+        if (info.cube()) {
+            // The cube world: latitude and longitude through the map table (FORMAT.md "The cube
+            // world's layout"); off the planet (past the net's corners) or with another table, none.
+            var wp = info.worldProjection();
+            if (wp == null)
+                return String.format(Locale.ROOT, "Deep Time: map mismatch (%s) · %s (C %d, %.0f m/block)", info.cubeMap(),
+                        info.planetName(), c, info.mPerBlockH());
+            double[] ll = wp.latLon(x, z);
+            if (Double.isNaN(ll[0]))
+                return String.format(Locale.ROOT, "Deep Time: off the planet · %s (C %d, %.0f m/block)", info.planetName(), c,
+                        info.mPerBlockH());
+            lat = ll[0];
+            lon = ll[1] >= 180.0 ? ll[1] - 360.0 : ll[1];
+        } else if (info.petroffGuyou()) {
             // The seamless world: latitude and longitude depend on x and z (FORMAT.md "The world's
             // layout"); the longitude in the simulation's frame, shown in [−180°, 180°).
             double[] ll = info.worldProjection().latLon(x, z);

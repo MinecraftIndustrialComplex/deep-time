@@ -8,7 +8,9 @@
 #       [--size 16384|32768]      the planet's circumference -> level-type deeptime:planet[_32k] (a
 #                                 Petroff-Guyou world 13,312 / 26,112 blocks round, format 0.5) for a
 #                                 --preset run, deeptime:planet_lambert[_32k] (C itself) for synthetic
-#                                 worlds, test terrains and Lambert presets
+#                                 worlds, test terrains and Lambert presets, deeptime:planet_cube[_32k]
+#                                 (a cube world, period 4s = 15,360 / 29,696 blocks, format 0.7) for a
+#                                 cube preset file (tools/smoke/presets/earthlike_quick_*_cube.json)
 #       [--synth <kind>]          write synthetic world data before the first start (P0-09+)
 #       [--strata <kind>]         the synthetic horizons: placeholder (default), every-class (P1-12) or basin
 #       [--datapack <folder>]     copy a datapack folder into the world's datapacks/ (e.g. the MIC
@@ -104,17 +106,21 @@ esac
 case "$PROFILE" in mic|mic-ev|mic-lite) FROM_PACK=1 ;; *) FROM_PACK=0 ;; esac
 case "$SEED" in ''|-[0-9]*|[0-9]*) ;; *) echo "install.sh: --seed must be a number" >&2; exit 2 ;; esac
 # A planet preset's world is Petroff-Guyou (the default since format 0.5) unless the preset says
-# lambert; synthetic worlds and test terrains are Lambert. Their level types differ in circumference.
+# lambert or cube (a cube world, format 0.7, cube plan phase 2: tools/smoke/presets/*_cube.json);
+# synthetic worlds and test terrains are Lambert. Their level types differ in circumference.
 WORLD=lambert
 if [ -n "$PRESET" ]; then
     WORLD=petroff_guyou
     if [ -f "$PRESET" ] && grep -q '"projection": *"lambert"' "$PRESET"; then WORLD=lambert; fi
+    if [ -f "$PRESET" ] && grep -q '"projection": *"cube"' "$PRESET"; then WORLD=cube; fi
 fi
 case "$SIZE/$WORLD" in
     16384/petroff_guyou) LEVEL_TYPE='deeptime\:planet' ;;
     32768/petroff_guyou) LEVEL_TYPE='deeptime\:planet_32k' ;;
     16384/lambert) LEVEL_TYPE='deeptime\:planet_lambert' ;;
     32768/lambert) LEVEL_TYPE='deeptime\:planet_lambert_32k' ;;
+    16384/cube) LEVEL_TYPE='deeptime\:planet_cube' ;;
+    32768/cube) LEVEL_TYPE='deeptime\:planet_cube_32k' ;;
     *) echo "install.sh: --size must be 16384 or 32768" >&2; exit 2 ;;
 esac
 
@@ -381,7 +387,14 @@ if [ -n "$PRESET" ]; then
     [ -n "$START" ] || START=supercontinent
     [ -n "$LENGTH_MYR" ] || LENGTH_MYR=1000
     mkdir -p "$SERVER/config/deeptime"
-    python3 - "$SERVER/config/deeptime/server.json" "$PRESET" "$START" "$LENGTH_MYR" "$MEMORY_CAP_GIB" <<'PY'
+    # A preset file goes beside server.json (the mod resolves a file relative to config/deeptime/),
+    # so the server's private copy (tools/smoke/instance.py) carries it.
+    CONFIG_PRESET="$PRESET"
+    if [ -f "$PRESET" ]; then
+        cp "$PRESET" "$SERVER/config/deeptime/"
+        CONFIG_PRESET="$(basename "$PRESET")"
+    fi
+    python3 - "$SERVER/config/deeptime/server.json" "$CONFIG_PRESET" "$START" "$LENGTH_MYR" "$MEMORY_CAP_GIB" <<'PY'
 import json, sys
 path, preset, start, length, cap = sys.argv[1:]
 cfg = {"_about": "Written by deep-time/tools/smoke/install.sh (P1-13 smoke).",
