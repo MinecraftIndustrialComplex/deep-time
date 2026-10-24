@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The cube world's temporary border (cube plan W3 to W5, docs/design/cube-game.md section 5). */
@@ -76,6 +77,61 @@ class CubeBorderTest {
         assertEquals(0, B.zone(0, -H, D, EdgeBorder.WARN_BLOCKS));
         assertEquals(0, B.zone(H, 0, D, EdgeBorder.WARN_BLOCKS));
         assertEquals(Math.sqrt(2) * H, B.distanceToSegment(0, 0), 1e-9);
+    }
+
+    /** The four corners of the box [x0, x1] × [z0, z1], as SablePoleCap's footprint gives them. */
+    private static double[] box(double x0, double z0, double x1, double z1) {
+        return new double[]{x0, z0, x1, z0, x0, z1, x1, z1};
+    }
+
+    /**
+     * The Sable border (cube plan W3): a hull's way out is the unit vector off the planet at the
+     * segment it crosses, diagonal into F0's corner when its leading corner is in the void square,
+     * none in the band (the slide included) or on the faces, the same in every period; the velocity
+     * rule takes the outward part away and pushes back in.
+     */
+    @Test
+    void aHullsWayOutPointsOffThePlanet() {
+        double[][] free = {box(-5, -5, 5, 5), box(2 * S - 2, -3, 2 * S + 2, 3), box(-3 * H - 2, -3, -3 * H + 2, 3),
+                box(H - 4, -2 * H - 2, H - 1, -2 * H + 2), box(H - 2, -H + 1, H + 2, -H + 3), {0, -S}};
+        for (double[] f : free)
+            assertNull(B.outward(f, D), "no way out for " + java.util.Arrays.toString(f));
+        // N's east segment, stop line x = H - 1: the box reaches 2 past it.
+        double[] e = B.outward(box(H - 2, -2 * H - 1, H + 1, -2 * H + 1), D);
+        assertEquals(1.0, e[0], 1e-12);
+        assertEquals(0.0, e[1], 1e-12);
+        assertEquals(2.0, e[2], 1e-12);
+        // The same 4s along (another period) and as a single point (a hull whose bounds are unset).
+        double[] e4 = B.outward(box(4 * S + H - 2, -2 * H - 1, 4 * S + H + 1, -2 * H + 1), D);
+        assertEquals(e[0], e4[0], 1e-12);
+        assertEquals(e[2], e4[2], 1e-9);
+        double[] p = B.outward(new double[]{H + 1, -2 * H}, D);
+        assertEquals(1.0, p[0], 1e-12);
+        assertEquals(2.0, p[2], 1e-12);
+        // F1's top segment, stop line z = -H + 1: out is -z.
+        double[] t = B.outward(box(S - 1, -H - 1, S + 1, -H + 2), D);
+        assertEquals(0.0, t[0], 1e-12);
+        assertEquals(-1.0, t[1], 1e-12);
+        assertEquals(2.0, t[2], 1e-12);
+        // F0's north-east corner: only the leading corner is off, in the void square, nearest to (H, -H).
+        double[] c = B.outward(box(H - 2, -H - 2, H + 2, -H + 2), D);
+        assertEquals(Math.sqrt(0.5), c[0], 1e-12);
+        assertEquals(-Math.sqrt(0.5), c[1], 1e-12);
+        assertEquals(Math.sqrt(8), c[2], 1e-12);
+        // Two corners off at once (by the corner, on N and on F1) point out between the two segments.
+        double[] two = B.outward(box(H - 3, -H - 3, H + 0.5, -H + 0.5), D);
+        assertTrue(two[0] > 0 && two[1] < 0 && Math.abs(Math.hypot(two[0], two[1]) - 1) < 1e-12, java.util.Arrays.toString(two));
+
+        // The velocity: outward speed taken away, the push added inward; inward speed kept.
+        double[] dv = CubeBorder.stopVelocity(60, 5, e, PoleCapCurve.WIND_MAX);
+        assertEquals(-60 - PoleCapCurve.WIND_MAX, dv[0], 1e-12);
+        assertEquals(0.0, dv[1], 1e-12);
+        double[] back = CubeBorder.stopVelocity(-3, 5, e, PoleCapCurve.WIND_MAX);
+        assertEquals(-PoleCapCurve.WIND_MAX, back[0], 1e-12);
+        assertEquals(0.0, back[1], 1e-12);
+        double[] diag = CubeBorder.stopVelocity(30, -30, c, PoleCapCurve.WIND_MAX);
+        assertEquals(-30 - PoleCapCurve.WIND_MAX * Math.sqrt(0.5), diag[0], 1e-9);
+        assertEquals(30 + PoleCapCurve.WIND_MAX * Math.sqrt(0.5), diag[1], 1e-9);
     }
 
     @Test
