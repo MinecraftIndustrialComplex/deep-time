@@ -1212,9 +1212,17 @@ impl StructureStage {
         Ok(())
     }
 
-    /// The last step's end: the aureoles, the stocks' roots and the plutons as bodies (in that
-    /// order, so each paints over the one before), the folds and faults as the world's structure
-    /// and its events, and the stage's note.
+    /// The last step's end: the plutons, the stocks' roots and the aureoles as bodies, the folds
+    /// and faults as the world's structure and its events, and the stage's note.
+    ///
+    /// Where bodies overlap, the first by id keeps the block (the strata pass and both column
+    /// evaluators, docs/science/strata.md "Bodies are painted where they are"), so the bodies are
+    /// given their ids in the reverse of the order in which each is meant to paint over the one
+    /// before: the aureoles (of the plutons, then of the stocks), the roots, the plutons, each
+    /// list in its own order. A pluton keeps its own rock inside its aureole, a root keeps the
+    /// stock's rock through the aureole it rises across, and of two plutons the later keeps the
+    /// overlap. Until 2026-10-24 the ids ran the other way and every pluton was its aureole's
+    /// hornfels or skarn inside.
     #[allow(clippy::too_many_arguments)]
     fn finish(
         &mut self,
@@ -1231,37 +1239,40 @@ impl StructureStage {
         let mut written = [0u64; 3];
         let mut zones = 0u64;
         let mut widths: [Vec<f64>; 2] = [Vec::new(), Vec::new()];
+        // In painting order (each over the one before); ids are given from the end.
+        let mut order: Vec<deeptime_format::Body> = Vec::new();
         for (k, list) in [&aureoles.plutons, &aureoles.stocks]
             .into_iter()
             .enumerate()
         {
             for a in list {
-                let id = world.next_body_id();
-                if let Some(b) = a.to_body(id, mh, mv, s.min_y) {
+                if let Some(b) = a.to_body(0, mh, mv, s.min_y) {
                     zones += b.zones.len() as u64;
                     widths[k].push(a.width_m);
-                    world.add_body(b)?;
+                    order.push(b);
                     written[k] += 1;
                 }
             }
         }
         for r in &aureoles.roots {
-            let id = world.next_body_id();
-            if let Some(b) = r.to_body(id, s.min_y) {
-                world.add_body(b)?;
+            if let Some(b) = r.to_body(0, s.min_y) {
+                order.push(b);
                 written[2] += 1;
             }
         }
         let mut bodies = 0u64;
         let now = aureoles.now_myr;
         for (pl, &y) in self.st.plutons.iter().zip(surface_y) {
-            let id = world.next_body_id();
             if let Some(b) =
-                plutons::to_body(pl, id, y, s.circumference_blocks, mh, mv, s.min_y, now)
+                plutons::to_body(pl, 0, y, s.circumference_blocks, mh, mv, s.min_y, now)
             {
-                world.add_body(b)?;
+                order.push(b);
                 bodies += 1;
             }
+        }
+        for mut b in order.into_iter().rev() {
+            b.id = world.next_body_id();
+            world.add_body(b)?;
         }
         let median = |v: &mut Vec<f64>| {
             v.sort_by(f64::total_cmp);

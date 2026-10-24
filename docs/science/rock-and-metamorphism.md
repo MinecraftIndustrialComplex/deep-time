@@ -66,7 +66,9 @@ The structure stage runs each step after the surface stage has laid down or stri
    intrusion. Another stock that reaches the inner half of the intrusion's plan is part of that column: a stock emplaced
    inside or beside an older one bakes none of the older granite, and a younger stock through it is not painted over
    (the aureole then goes unbaked at those depths all round, since its bands are depth layers). Each aureole is a body of
-   its own in the world data (role `aureole`), written before the intrusions so the intrusion paints over it; a stock's
+   its own in the world data (role `aureole`), written after the plutons and stock roots, since where bodies overlap the
+   first by id keeps the block (strata.md), so the intrusion keeps its own rock inside (until 2026-10-24 the aureoles
+   came first and every pluton was its aureole's hornfels or skarn inside, RCK-053); a stock's
    aureole is hollow, cut into slabs that stop at the stock's wall, so the stock itself stays intact. A typical 3 km thick
    pluton has a 900 m aureole, about 26 blocks of height at 16k scale and 3 blocks of width.
 7. **Blocks.** Each class resolves to a block through the rock tags of the pack, else a vanilla stand-in (RCK-074 to RCK-084).

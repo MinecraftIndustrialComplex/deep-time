@@ -518,8 +518,8 @@ public final class Columns {
                 int idx = st.classes[h];
                 cls = idx < classes.size() ? classes.get(idx) : null;
             }
-            // Bodies paint in id order and a painted block is no longer the horizon's, so the first
-            // body naming a class keeps the block, as StrataPass.paintBodies leaves it.
+            // Bodies paint in id order and a block a body has taken is not painted again, so the
+            // first body naming a class keeps the block, as StrataPass.paintBodies leaves it.
             for (Body b : near) {
                 Body.Location at = b.locate(c, wx, y, z);
                 if (at == null)
