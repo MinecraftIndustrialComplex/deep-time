@@ -6744,3 +6744,79 @@ rasterises to 0.0382; `bird_raster.py`'s `plates_at_floor`), and they hold 97.9 
 microplates are "100–500 km" across, [79]) have no counterpart: a piece under the floor is captured,
 and nothing in the model makes a plate that small. Fission splits off only pieces of the floor's
 size or more, so the law cannot make them either.
+
+### Step 3b: a boundary belongs to the lithosphere on its two sides (PLT-534)
+
+Arm fl-fission (fission on top of fl-share, 8 runs) found the defect that fission exposed. The
+state of a boundary is kept per pair of plates: a contact (polarity, onset, onset event), a slab
+(its length down the dip) and a collision state. When a plate splits, the parent keeps its id and
+every such state stays keyed to the parent, wherever its lithosphere went. A piece that holds a
+trench starts a new contact with no slab and no onset, and a collision it carried parts once its
+front is gone: 162 collision states parted within two steps of a fission of one of their plates.
+Rifts and subduction initiations split plates in the same way, so the defect is older than
+fission.
+
+What Earth does. Plate identity is bookkeeping, and the boundary goes with the lithosphere on its
+two sides.
+
+- **A subducting plate that splits keeps subducting on both pieces.** Stock & Lee 1994: "The
+  fragmentation of a subducting plate creates a new triple junction, two limbs of which are along
+  the trench". Of the Cocos and Rivera plates, the triple junction "has not moved much with respect
+  to the North America plate since its inception because subduction of both plates has been nearly
+  orthogonal to the trench".
+- **The slabs stay with their pieces.** Wang et al. 2013: "Some fragments of the Farallon plate
+  still exist as separate plates subducting beneath North America, including the Cocos and Juan de
+  Fuca plates, which subsequently further fragmented generating the actively subducting Rivera,
+  Gorda, and Explorer microplates", and high-velocity anomalies "which we interpret as the fossil
+  slabs still attached to the remnant oceanic microplates".
+- **An overriding plate that splits leaves the trench with the piece beside it.** In a back-arc
+  basin, the arc keeps the trench and the remnant arc is left behind. Ishizuka et al. 2010: "The
+  West Mariana Ridge (WMR) is a remnant arc (Karig, 1972) that separated from the magmatic arc by
+  opening of the Mariana Trough". Stern, Fouch & Klemperer 2003: the trough "is bounded to the east
+  by the active Mariana arc, to the west by the remnant arc of the West Mariana Ridge [Karig, 1972],
+  and to the south by the Challenger Deep part of the Mariana Trench".
+- **The rift line can fall on either side of the arc.** Taylor & Karner 1983 (abstract): rifting
+  "may occur on either side of the line of active volcanoes (±50 km)". So the piece that keeps the
+  trench must be found from the geometry, not from which side of the rift it is on.
+- **A continent.** As South America separated from Africa, the Nazca subduction system kept rolling
+  back at its margin "during the opening of the Southern Atlantic for almost ~100 Myr" (Faccenna et
+  al. 2017). That this is because only South America borders the Nazca plate is our reading, from
+  memory.
+
+None of these sources states the rule as a rule, and none contradicts it.
+
+The law, `tectonics.split_inheritance` (`plates/inherit.rs`). It runs after every split: a fission
+(`ridges::split_cut_plates`), a rift (`rifting::rift`), and a subduction initiation's new plate
+(`rifting::initiate`). Each contact, slab and collision state that the parent had with another plate
+goes to the pieces that border that plate.
+
+- **Bordering.** A piece borders a plate when at least 3 of its samples (`MIN_CONTACT`), hidden
+  ones included, have a sample of that plate within 1.5 lattice spacings of their true positions.
+  1.5 spacings takes a lattice neighbour, about 1.07 spacings away, and not the ring behind it, at
+  about 1.86. True positions are used because mid-step the lattice's edges between plates are
+  stale.
+- **Contacts and slabs.** Every bordering pair keeps the contact and the slab, the subducting side
+  staying the subducting side.
+- **The collision.** It goes with its front, to the pair whose border lies nearest the collision's
+  front centroid. The other pairs get the contact without the collision.
+- **What stays.** A boundary that no piece borders stays with the parent and closes as before. A
+  pair inside one split plate is not touched, such as the slab an initiation plants under its
+  fracture (PLT-270).
+
+There are no new physical constants: 1.5 spacings and 3 samples are how the lattice is read. Six
+unit tests cover the law and each of its paths:
+
+- in `inherit.rs`:
+  - a subducting plate split in two: both halves keep the trench and its slab, the collision stays
+    with the half at its front (or moves to the other half when the front is there), and a trench
+    that only one half borders moves to it whole;
+  - an overriding plate split behind its arc: the strip beside the trench takes the trench, slab
+    and collision, and the polar part keeps nothing;
+  - a boundary that no piece borders is untouched;
+- `a_fission_hands_the_cut_off_piece_the_trench_it_borders` (`ridges.rs`);
+- `the_fragments_of_a_rifted_plate_keep_the_trench_they_border` (`rifting.rs`);
+- `an_initiation_hands_the_sinking_plate_the_trench_it_borders` (`rifting.rs`).
+
+**Known limit: merges.** When two plates merge (a healed rift, a weld, a plate absorbed under the
+floor), the dead plate's contacts with third plates still close. That is the same law in reverse,
+and this step does not build it.

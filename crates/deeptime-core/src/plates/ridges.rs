@@ -995,6 +995,18 @@ fn split_cut_plates(
         return Ok((0, 0, captured));
     }
     state.recount(pos);
+    // The new plates take the boundaries they border (ledger: PLT-534).
+    if env.k.split_inheritance {
+        let mut splits: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
+        for &c in &big {
+            splits
+                .entry(sizes[c as usize].0)
+                .or_default()
+                .push(new_of[&c]);
+        }
+        let splits: Vec<(u32, Vec<u32>)> = splits.into_iter().collect();
+        super::inherit::inherit(state, pos, env, &splits).book(world);
+    }
     let norm = &env.norm;
     for &c in &big {
         let id = new_of[&c];
@@ -1494,5 +1506,102 @@ mod tests {
         assert_eq!(world.globals[CAPTURED_SAMPLES_GLOBAL], patch_n as f64);
         assert_eq!(on.counters.plate_births, 1);
         assert!(on.groups.iter().all(|g| g.rot == [0.0, 0.0, 0.0, 1.0]));
+    }
+
+    /// A fission hands the cut-off piece the boundaries it borders (Stock & Lee 1994: "The
+    /// fragmentation of a subducting plate creates a new triple junction, two limbs of which are
+    /// along the trench"). Plate 0 is cut by a band of plate 1 (0 < z < 0.3) into its southern
+    /// half and a northern ring (0.3 ≤ z ≤ 0.9) around plate 2's polar cap; it subducts under
+    /// both, each contact in a collision with a slab, the front with plate 1 on the band's
+    /// southern edge. With `plate_fission` and `split_inheritance` the ring (plate 3) takes the
+    /// trench under plate 2 whole, and both pieces keep subducting under plate 1 with the
+    /// collision staying with the southern half at its front. With fission alone every state
+    /// stays with plate 0. ledger: PLT-534
+    #[test]
+    fn a_fission_hands_the_cut_off_piece_the_trench_it_borders() {
+        use crate::params::TectonicParams;
+        use crate::plates::geometry::positions;
+        use crate::plates::inherit::tests::{
+            add_plate, assert_inherited, collision_at, contact, find, slab_of,
+        };
+        use crate::plates::rifting::tests::{N, continental, one_plate};
+        use crate::plates::state::SlabTrack;
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let front1 = DVec3::new(1.0, 0.0, 0.0);
+        let front2 = DVec3::new(0.0, 0.43, 0.9).normalize();
+        let run = |inherit: bool| {
+            let k = TectonicParams {
+                plate_fission: true,
+                split_inheritance: inherit,
+                ..Default::default()
+            };
+            let env = Env {
+                k: &k,
+                norm: Norm::new(6370.0, 6371.0, N),
+                dt_myr: 2.0,
+                dt_yr: 2.0e6,
+                gravity: 9.81,
+                step: 1,
+                t_myr: 50.0,
+            };
+            let mut st = one_plate(&geo, 3, |_| continental());
+            add_plate(&mut st, &geo, 1, |p| p.z > 0.0 && p.z < 0.3);
+            add_plate(&mut st, &geo, 2, |p| p.z > 0.9);
+            for (other, front, km) in [(1, front1, 300.0), (2, front2, 200.0)] {
+                let mut c = contact(0, other, front);
+                c.collision = Some(collision_at(front));
+                st.contacts.push(c);
+                st.slabs.push(SlabTrack {
+                    under: 0,
+                    over: other,
+                    km,
+                    ..SlabTrack::default()
+                });
+            }
+            let pos = positions(&st, &geo);
+            let mut world = WorldState::new(1, 16_384, 0.0);
+            bury(
+                &mut st,
+                &mut world,
+                Some(&geo),
+                &pos,
+                &env,
+                &BTreeMap::new(),
+            )
+            .unwrap();
+            assert_eq!(st.plates.len(), 4, "the ring became a plate");
+            assert_eq!(st.plates[3].parent, Some(0));
+            (st, pos, world)
+        };
+        let k = TectonicParams::default();
+        let env = Env {
+            k: &k,
+            norm: Norm::new(6370.0, 6371.0, N),
+            dt_myr: 2.0,
+            dt_yr: 2.0e6,
+            gravity: 9.81,
+            step: 1,
+            t_myr: 50.0,
+        };
+        let (on, pos, world) = run(true);
+        let ring = find(&on, 3, 2).expect("the ring takes the trench under plate 2");
+        assert!(ring.collision.is_some());
+        assert_eq!(slab_of(&on, 3, 2).map(|s| s.km), Some(200.0));
+        assert!(find(&on, 0, 2).is_none() && slab_of(&on, 0, 2).is_none());
+        // Under plate 1, without the ring's collision.
+        let mut under1 = on.clone();
+        under1.contacts.retain(|c| c.over == 1);
+        let both = assert_inherited(&under1, &pos, &env, &[0, 3], 1, front1, 300.0);
+        assert_eq!(both, vec![0, 3]);
+        assert_eq!(
+            world.globals[crate::plates::inherit::COLLISIONS_GLOBAL],
+            1.0
+        );
+
+        let (off, ..) = run(false);
+        let pairs: Vec<(u32, u32)> = off.contacts.iter().map(|c| (c.under, c.over)).collect();
+        assert_eq!(pairs, vec![(0, 1), (0, 2)]);
+        assert!(off.contacts.iter().all(|c| c.collision.is_some()));
+        assert_eq!(off.slabs.len(), 2);
     }
 }

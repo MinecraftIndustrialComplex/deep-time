@@ -846,6 +846,14 @@ pub struct TectonicParams {
     /// (`ridges::bury`). Off, a plate's pieces keep one rotation however far apart they lie.
     /// ledger: PLT-532
     pub plate_fission: bool,
+    /// A boundary belongs to the lithosphere on its two sides (the front lane, 2026-10-24;
+    /// `plates/inherit.rs`): when a plate splits (a fission, a rift, a subduction initiation's
+    /// new plate), each contact, slab and collision state it had goes to the pieces that border
+    /// the other plate, every bordering piece keeping the contact and the slab (Stock & Lee 1994:
+    /// "The fragmentation of a subducting plate creates a new triple junction, two limbs of which
+    /// are along the trench") and the collision going with its front. Off, every such state stays
+    /// keyed to the parent, wherever its lithosphere went. ledger: PLT-534
+    pub split_inheritance: bool,
     /// Hotspots at the start.
     pub hotspots_initial: u32,
     /// New hotspots per 100 Myr (Poisson).
@@ -1051,6 +1059,7 @@ impl Default for TectonicParams {
             erosion_retreat: false,          // ledger: PLT-523
             front_share: true,               // ledger: PLT-530
             plate_fission: false,            // ledger: PLT-532
+            split_inheritance: false,        // ledger: PLT-534
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
