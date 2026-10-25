@@ -25,7 +25,9 @@ import java.util.Map;
  * 2026-10-23; a circle in its Lambert blocks before), which a Lambert-frame world shows wide east–west
  * and the conformal cube round; a volcano's zones take the projection's local stretch at the vent
  * ({@link #stretch}), so they lie on the cone, its crater and its flanks as the terrain draws them.
- * Every number here is a game choice (ledger BIO-104 to BIO-113, BIO-182).
+ * An oceanic volcano's zones are sized on the part of its edifice above the sea, not on its basal radius on the
+ * sea floor ({@link #subaerialShare}; ledger BIO-196). Every number here is a game choice (ledger BIO-104 to
+ * BIO-113, BIO-182).
  */
 public final class VolcanicZones {
 
@@ -71,9 +73,12 @@ public final class VolcanicZones {
     public static final int MIN_RADIUS = 8; // ledger: BIO-105 (game-choice)
     /** A ring narrower than this beyond the zone inside it is left out, blocks. */
     public static final int MIN_RING = 8; // ledger: BIO-105 (game-choice)
-    /** The cone zone: summit and upper flanks, as a share of the basal radius (times the reach setting). */
+    /**
+     * The cone zone: summit and upper flanks, as a share of the basal radius (times the reach setting); of an
+     * oceanic volcano's radius above the sea ({@link #subaerialShare}, ledger: BIO-196).
+     */
     public static final double CONE_SHARE = 0.45; // ledger: BIO-106 (game-choice)
-    /** The ash and lava fields reach this share of the basal radius (times the reach setting). */
+    /** The ash and lava fields reach this share of the basal radius (an oceanic volcano's above the sea), times the reach setting. */
     public static final double FIELD_SHARE = 1.0; // ledger: BIO-107 (game-choice)
     /** The least activity of a volcano with a fresh-ash field. */
     public static final double ASH_MIN_ACTIVITY = 0.75; // ledger: BIO-108 (game-choice)
@@ -292,6 +297,9 @@ public final class VolcanicZones {
             // World blocks per planet block along the stretch's two axes (equal on the conformal cube).
             Stretch st = stretch(projection, v.x(), v.z()); // ledger: BIO-182 (game-choice)
             double basal = Math.max(6.0, v.radiusM() / mH);
+            // An oceanic volcano's biomes lie on the part of the edifice above the sea (ledger: BIO-196).
+            if (v.oceanic() && ground != null)
+                basal = Math.max(6.0, subaerialShare(v, x, z, ground) * v.radiusM() / mH);
             double crater = v.craterRadiusM() / mH;
             String kind = v.kind();
             boolean shield = "shield".equals(kind);
@@ -333,6 +341,34 @@ public final class VolcanicZones {
             if (b.chamberRh() > 0)
                 out.add(new Zone(Role.THERMAL_CAVES, b.id(), b.x(), b.z(), Math.max(MIN_RADIUS, CAVE_SHARE * b.chamberRh())));
         return new VolcanicZones(out, circumference);
+    }
+
+    /**
+     * The share of an oceanic volcano's basal radius that stands above the sea (ledger: BIO-196): its radial profile
+     * (the simulation's, {@code Shape::profile}: stratovolcano (1 - rho)^1.5, shield (1 - rho^2)^1.5, caldera complex
+     * (1 - rho^2)^2; ledger VOL-016 to VOL-018) scaled so that its summit, the vent, stands {@code heightM} over the
+     * foot, and cut at the sea. The vent's height over the sea is the world's ground there ({@code ground}); the sea
+     * is the profile's value f = (H - h) / H at ρ, H the edifice's height and h the vent's over the sea, so ρ is the
+     * profile inverted at f. 0 with the vent at or under the sea, 1 with the vent no lower than the whole edifice
+     * (the foot lies at the sea) or with no height to the record. The crater's bowl, which truncates the summit, is
+     * left out: the vent then stands lower than the profile's summit, and the share errs small (a smaller zone).
+     */
+    static double subaerialShare(Volcanoes.Volcano v, int x, int z, Ground ground) {
+        double height = v.heightM() / ground.mV();
+        if (!(height > 0.0))
+            return 1.0;
+        double above = ground.heights().at(x, z) - ground.seaLevel();
+        if (!(above > 0.0))
+            return 0.0;
+        double f = (height - above) / height;
+        if (!(f > 0.0))
+            return 1.0;
+        return switch (v.kind()) {
+            case stratovolcano -> 1.0 - Math.pow(f, 1.0 / 1.5);
+            case shield -> Math.sqrt(1.0 - Math.pow(f, 1.0 / 1.5));
+            case caldera_complex -> Math.sqrt(1.0 - Math.sqrt(f));
+            default -> 1.0;
+        };
     }
 
     /**
