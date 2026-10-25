@@ -9,7 +9,7 @@ import com.google.gson.JsonObject;
  * {@code underground}; plain Java). {@link VolcanicZones} draws the volcanic biomes' places from it.
  *
  * @param reach how far a volcano's own biomes reach down its flanks, as a multiple of the built-in
- *              shares of its basal radius (the cone zone 0.45, the ash and lava fields 1.0); 0: no
+ *              shares of its radius (the cone zone 0.45, the ash and lava fields 1.0; the basal radius, an oceanic volcano's above the sea); 0: no
  *              volcanic biome is placed anywhere (they stay kept out of the rest of the world)
  *              ({@code volcanic_biome_reach})
  */
