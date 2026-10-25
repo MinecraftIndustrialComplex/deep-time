@@ -9782,3 +9782,107 @@ floor each resampling takes is 0.81 of the standing mean age against 0.75. The a
 snapshots from -500 Myr, against fl-agemap's 33, base15's seeds 1 and 2): older than 180 Myr 0.202
 of the ocean against 0.234, 0.791 of it in the margin zone against 0.809; the margin zone holds
 0.419 of all the floor against 0.440.
+
+### Law 2: a subduction zone propagates along a passive margin (PLT-656 to PLT-659)
+
+The age map's answer (above): the old floor is passive-margin floor that no trench reaches along the
+margin. Zhou, Li, Gerya & Stern 2020 model how one does: "With increasing slab pull, the subduction
+zone propagates laterally and leads to SI in neighboring passive continental margins", at "about 17
+cm/year", because "slab pull is partially applied to bend the adjacent region". Hall 2019 reads Banda
+the same way: the Java trench propagated "into an oceanic embayment by tearing along a former
+ocean-continent boundary. The earlier subducted slab provided the driving force". Govers & Wortel
+2005 give the tear at a slab's end, the STEP fault. The model had no such law; PLT-064's 1,000 km
+clearance stood in for the missing propagation by keeping new zones away from working ones, which
+Crameri et al. 2020 contradict (new zones start within 500 km of working ones).
+
+With `tectonics.margin_propagation` (on by default; `propagation.rs`, run after the step's
+initiations):
+
+- **Where.** A plate U's trench (its visible floor with a hidden neighbour of its own group, so U is
+  the plate going under) within 1.5 spacings (PLT-534) of U's own coast floor (its visible floor
+  beside its own continental crust), on floor at least 10 Myr old (FRC-005), with U's slab under the
+  overriding plate O active and past the critical convergence (100 km, PLT-611).
+- **The force test.** The slab's pull across the margin, FRC-002 (3 × 10^13 N/m) × `slab_pull` ×
+  FRC-004's weight at the trench floor's age × min(L, 700 km) / 700 km × max(cos θ, 0), where θ is
+  the angle between the pull (towards O) and the margin's inward normal at the end of the stretch to
+  break (towards U's continent), against the margin's strength there (PLT-658, below). A pull along
+  the coast does not break it.
+- **The start (geometry A, the coordinator's choice).** The stretch's end P is U's coast floor within
+  1.6 spacings of the trench sample, the farthest from U's trench. A tear runs from P along the
+  great circle away from the continent to the first sample of another plate. The continent C and the
+  floor beyond the tear become a new plate K' with U's motion (plate_birth, `origin`
+  `margin_propagation`); U keeps the trench, the slab that pulls and the floor between the trench and
+  the tear. The cut must leave K' in one piece, U with at most one piece more, at least
+  max(32, `min_plate_area_frac` × n) samples on each side, and its broken stretch short (PLT-659);
+  otherwise it is a stall.
+- **The advance.** U now converges on K' along the broken stretch. The convergence across the margin
+  at the tip is summed; at each critical convergence (100 km), the pull of the slab U forms under K'
+  (its length, the age of U's floor beside the tip, the cosine between U's pull and the margin's
+  normal at the tip) is tested against the strength at the tip, and if it wins the next stretch of
+  K''s margin floor goes to U: its end is K''s coast floor within 1.6 spacings of the tip, the
+  farthest from U, and K''s floor from the tip to a tear from that end, away from C, changes plate.
+  C stays on K'. The tip moves to the stretch's end and rides K''s rotation between steps. A propagation ends when U or K' dies (absorbed, sutured) or no
+  tip is found; a passed test the lattice cannot cut is a stall and ends it.
+- **PLT-064 replaced.** With law 2 on, an initiation may start anywhere beyond one lattice spacing of
+  a trench, in place of 1,000 km (Crameri et al. 2020 source both together). The records count
+  `initiations_near_fronts`, the initiations the old clearance would have refused.
+
+Records: `propagation_starts`, `propagations` (starts and advances) and `propagation_stalls` (the
+counters and the stats line), and the world globals `plates/propagation_km` (margin broken, planet
+km) and `plates/propagation_myr` (Myr summed over live propagations; the ratio is the mean speed).
+
+**The margin's strength is a fallback (PLT-658).** The coordinator's order (2026-10-25) was to use a
+verified integrated N/m strength of a passive margin if the sources give one. They do not: Cloetingh,
+Wortel & Vlaar 1989's Fig. 5 is a tensional failure force (about 0.6, 1.4 and 2.0 × 10^13 N/m at 30,
+70 and 100 Ma, read off the plot), with compression "even higher"; Mueller & Phillips 1991's
+3 × 10^13 N/m was seen only as Niu et al. 2003's citation; Nikolaeva et al. 2010 give no figure in
+their abstract; Candioti et al. 2022's 14 to 15 TN/m was a fetch summary. All of them are the
+failure of a whole lithosphere under far-field stress, not a margin pulled down beside a working
+trench, for which Zhou et al. give no force. So the strength is PLT-517's Gurnis value, 3 × 10^12
+N/m, scaled with the floor's elastic thickness by law 3: 1.4 × 10^12 at 10 Myr, 5.9 at 80, 10.4 at
+180 Myr. **Under it, Zhou et al.'s age dependence (old slabs propagate, 30 Myr slabs break off) does
+not appear**: the strength grows with age as the slab's weight does, so the slab length a start needs
+grows with age (114 km at 30 Myr, 138 at 80, 162 at 180, for a pull straight across the margin), and
+the oldest margins are the hardest to break. No strength is to be picked to bring the dependence
+back.
+
+**Limits.**
+
+- Zhou et al.'s margins propagate only with a preexisting weak zone ("SP is never predicted ... for
+  passive continental margins lacking a lithospheric weak zone"). The model has no weak zones: every
+  margin is taken as weak enough, and the strength stands in for the difference.
+- A step breaks about one lattice spacing of margin (about 180 km on the quick lattice), so the
+  propagation's speed is about one spacing per 100 km of convergence: set by the lattice and the
+  critical convergence, not resolved below them, and different on another lattice.
+- Stern & Gerya 2018 find no Cenozoic subduction zone formed at a passive margin, and Puysegur has
+  not propagated in 11 Myr: Earth's rate of the process is low or unknown, and the law is checked
+  against its sources' mechanism, not a rate.
+
+Tests (`propagation.rs`, on the 16,000-sample lattice): `a_trench_that_reaches_its_margin_cuts_it_off`
+(a trench along the equator meeting a continent end on: K' takes all of C and the floor east of a
+tear that runs straight south to U's boundary, U keeps the trench and the slab, one plate_birth with
+the origin, no orphan samples), `a_pull_along_the_margin_or_a_short_slab_starts_nothing` (a trench
+meeting the margin at a right angle, the switch off, slabs of 60 and 120 km: no start; 160 km: a
+start, at 80 Myr where the threshold is 138 km), `the_convergence_moves_the_tip_along_the_margin` (U
+converging on K' at 40 mm/yr: no advance after one step's 76 km, one after the second, K' gives U
+floor, C stays on K', the tip moves east, nothing when diverging) and
+`an_absorbed_sliver_ends_its_propagation_cleanly` (K' buried below the minimum plate area: the
+propagation ends, no sample on a dead plate or cut off its plate).
+
+### Law 3: the incipient front's resistance grows with the plate's thickness (PLT-657)
+
+Gurnis, Hall & Lavier 2004 ([46]): "Case 1, with an age of 30 Myr, He ... is 15 km. For 7 Myr
+lithosphere, this thickness is 8.5 km. With both friction and cohesion, the force required ...
+increases by a factor of 2.2 as He increases (Figure 9a)". PLT-612 took the middle of their 2 to 3 ×
+10^12 N/m at every age. With `tectonics.incipient_resistance_by_thickness` (on by default) the
+resistance is Case 1's 3 × 10^12 N/m × (Te(age) / Te(30 Myr))^n × g / 9.81, with n = ln 2.2 /
+ln(15 / 8.5) ≈ 1.39 and Te the model's own flexure law, min(2.7 √age, 40) km (ISO-048, ISO-049):
+0.47 times Case 1 at 10 Myr, 1.98 at 80, 3.46 at 180 and 3.98 from 219 Myr. Floor younger than 10 Myr
+keeps the ridge's 5 × 10^11 N/m (PLT-613). The same scale sets law 2's margin strength. The power
+law through Gurnis's two thicknesses and its use past 30 Myr are the agent's: the model's Te grows √3
+= 1.73 times from 10 to 30 Myr, Gurnis's He 1.76 times from 7 to 30 Myr. Open: [59] and [64] read the
+peak at a fracture zone of two ages, where it may follow the younger or the overriding plate; the
+model reads the subducting floor's age. Test: `law_3_scales_the_incipient_resistance_with_the_elastic_thickness`
+(`forces.rs`: Case 1 at 30 Myr, the 2.2 factor between the two thicknesses, the ridge below 10 Myr,
+the cap, off as PLT-612; law 2's strength, PLT-517 at 30 Myr and constant off, and its pull, FRC-002
+for a full 80 Myr slab straight across the margin).
