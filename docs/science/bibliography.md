@@ -6756,7 +6756,7 @@ not open is listed under "Not read". Bradley 2008 (above) was read in full in th
 - Reference: Brune, S., Heine, C., Pérez-Gussinyé, M. and Sobolev, S. V. (2014). Rift migration explains continental margin asymmetry and crustal hyper-extension. Nature Communications 5:4014.
 - DOI or URL: 10.1038/ncomms5014
 - Cited as: "Brune et al. 2014" (hyper-extended crust up to 200 km wide).
-- Ledger ids: PLT-261, PLT-262
+- Ledger ids: PLT-261, PLT-262; PLT-661 and PLT-662 (2026-10-25, the M5 lane: the margin's sediment and the spread's rock continental, the 10 km of hyper-extended crust)
 - Access: open access.
 - Read so far (by the project): full text, 2026-10-04: "up to 200 km wide areas of hyper-extended continental crust"; "hyper-extended (with a thickness <10 km) crustal slivers that vary in widths between 70 km offshore Iberia and 200 km off Angola".
 
@@ -7970,7 +7970,7 @@ Straume2019, Harris2014, SternScholl2010.
 - Reference: von Huene, R. and Scholl, D. W. (1991). Observations at convergent margins concerning sediment subduction, subduction erosion, and the growth of continental crust. Reviews of Geophysics 29(3):279-316.
 - DOI or URL: 10.1029/91RG00969 (from memory); abstract at https://www.usgs.gov/publications/observations-convergent-margins-concerning-sediment-subduction-subduction-erosion-and
 - Cited as: "von Huene & Scholl 1991".
-- Ledger ids: HYP-045, PLT-440, PLT-441 (2026-10-22, the trench budget)
+- Ledger ids: HYP-045, PLT-440, PLT-441 (2026-10-22, the trench budget); PLT-660 (2026-10-25, the M5 lane: all of the pile at type 2 margins)
 - Access: paywalled; the abstract open (USGS).
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22 (a research sub-agent): sediment subduction at 43,500 km of margin about 1.5 km^3 a year of solid, 1.0 over the long term; about 20 % of the incoming sediment accreted at margins with small to medium prisms, about 70 % subducted at margins with large prisms; subduction erosion about 1.1 km^3 a year.
@@ -8339,7 +8339,7 @@ The sources of the trench budget (build log 2026-10-22 "The trench budget"; plat
 - Reference: Clift, P. and Vannucchi, P. (2004). Controls on tectonic accretion versus erosion in subduction zones: implications for the origin and recycling of the continental crust. Reviews of Geophysics 42(2):RG2001.
 - DOI or URL: 10.1029/2003RG000127; repository copy https://repository.lsu.edu/cgi/viewcontent.cgi?article=1495&context=geo_pubs (read through the Wayback Machine's copy).
 - Cited as: "Clift & Vannucchi 2004".
-- Ledger ids: PLT-440, PLT-441, PLT-442; PLT-522 and PLT-523 (2026-10-23, the trench's retreat: Table 2's retreat range and the global 90 km3/km/Myr as the check on the volume it takes); PLT-562 (2026-10-24, the forearc eroded at the plate interface, so over the slab).
+- Ledger ids: PLT-440, PLT-441, PLT-442; PLT-660 (2026-10-25, the M5 lane: [34]'s 1 km and 76 mm/yr, [53]'s 83 %, as the share by the margin's type); PLT-522 and PLT-523 (2026-10-23, the trench's retreat: Table 2's retreat range and the global 90 km3/km/Myr as the check on the volume it takes); PLT-562 (2026-10-24, the forearc eroded at the plate interface, so over the slab).
 - Access: paywalled at the publisher; the repository copy open.
 - Library: not kept.
 - Read so far (by the project): full text with Tables 1 and 2, 2026-10-22 (research sub-agent). Abstract: "Tectonic erosion is favored in regions where convergence rates exceed 6 ± 0.1 cm yr-1 and where the sedimentary cover is <1 km. Accretion preferentially occurs in regions of slow convergence (<7.6 cm yr-1) and/or trench sediment thicknesses >1 km." Body: "erosive plate margins do not appear to form in regions where the orthogonal convergence rate is <6.3 cm yr-1, while accretionary margins do not form in regions where the orthogonal convergence rate exceeds 7.6 cm yr-1. The Philippine Trench is the exception"; [34] "accretion appears to be an effective process when convergent rates are <76 mm yr-1 and where the sedimentary cover is >1 km thick"; [40] "a global average rate of crustal loss of 90 km3 m.y.-1 km-1 calculated in this study"; [38] at erosive margins "only 12-48% (median 22%) of the total material subducted below the forearc is derived from the sediments in the subducting plate"; [39] "Only 7-37% of the sediment reaching the trenches appears to be added to the accretionary complexes, with the bulk subducted to depth", "Globally, the median proportion of the rock delivered as sediment to the trench that is accreted from the subducting plate is only 17%"; [53] "57% of the global active margins seem to be of the erosive type", "Even at the accretionary margins, typically 83% of the incoming sedimentary pile is subducted beneath the forearc wedge", "eroded forearc basement constitutes approximately 55% of the crustal material subducted to depth". No global flux in km3/yr is printed. The sub-agent's arithmetic on Tables 1 and 2 (not the paper's): basement erosion on the 19 erosive margins 20.0 (Mariana) to 139.4 (Peru) km3 per km and Myr, length-weighted 86.8, about 1.99 km3 a year in all; erosive margins 22,925 km of the 40,225 km tabulated (57.0 %); sediment delivered 1.90 km3 a year, 1.62 subducted and 0.28 accreted (14.6 %); trench retreat 0.9 to 4.7 km/Myr, median 3.0.
