@@ -750,7 +750,8 @@ manifest notes):
   under the sea skipped while another exists), at the region's inland point nearest the spawn,
   anchored like the rest (below), with a `deeptime:guaranteed_occurrence` of its own caused by the
   template's. The same top-up covers the natural sources the bake left without ore and the
-  CLI's `deeptime project`, which reruns the projection on a Lambert run's folder. A first version
+  CLI's `deeptime project`, which reruns the projection on a Lambert run's folder (command and projection
+  retired 2026-10-24 with the Petroff-Guyou world, cube plan 7.4). A first version
   (2026-10-20, never merged) had the stage choose λc and the projection draw the world with it;
   since the young landscape and the amplifier redraw the land, that put the cone points 0.1 to 2.7
   degrees nearer the final land on all seven planets measured, and the coordinator's review asked
