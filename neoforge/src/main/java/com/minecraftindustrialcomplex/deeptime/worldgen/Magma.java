@@ -130,7 +130,7 @@ public final class Magma {
     public interface Faces {
         boolean on(int x, int z);
 
-        /** A world with no ground off its planet (Lambert and Petroff-Guyou worlds, and the tests). */
+        /** A world with no ground off its planet (a projection that is not a cube, and the tests). */
         Faces ALL = (x, z) -> true;
     }
 

@@ -3,8 +3,8 @@
 Status of this page: `stage 1 (written with the feature, cube plan phase 2, 2026-10-23; nothing here
 is physical, every row is a game choice)`.
 
-Ledger ids on this page: `SCL-210`, `SCL-211`, `SCL-215`, `POL-031`, with `SCL-108`, `SCL-127` and `POL-023`
-to `POL-024` from earlier pages (see [claims.md](claims.md)).
+Ledger ids on this page: `SCL-210`, `SCL-211`, `SCL-215`, `POL-031`, with `SCL-108`, `SCL-127`, `POL-023`
+to `POL-024`, and item 15's `MAG-059`, `SCL-200`, `BIO-182`, `GEO-017` and `GEO-064` from other pages (see [claims.md](claims.md)).
 
 ## What you see in the world
 
@@ -204,6 +204,28 @@ the game uses them:
     on the cube: a path over the surface is never shorter, so the test holds across edges and round
     corners. A flow that reaches past the net's corners stops there. On Lambert and Petroff-Guyou
     worlds nothing changes.
+15. **What stays on the faces** (2026-10-25). A column off the faces shows its partner's ground,
+    and every world-data read there folds to the partner, so anything placed or counted by the net
+    plane must keep to the faces or count a planet column twice:
+    - *Geothermal sites* (`worldgen/Geothermal`, GEO-017, GEO-064): every draw and footprint column
+      on the faces (`Geothermal.Env.onPlanet`).
+    - *Magma bodies* (`worldgen/Magma`, MAG-059). A vent is on a face, but a lens, the mush or a lake
+      ring can reach past a turning edge. The body is cut at the edge and sealed on its own face:
+      no part off the faces, and within `SEAM_GAP` (2) columns of the edge its lava, conduit and
+      lake are shell (basalt where open), its plug and mush left out. Its vent's water test and its
+      lake ring read its own face only. `LavaGameTests.magmaSealedAtTurningSeams` fails on lava or
+      mush beside an open column within the band. Across the slide x only wraps, and nothing is cut.
+    - *Volcanic biome zones* (`worldgen/VolcanicZones`, BIO-182). A zone is a disc on the net plane
+      round its source; a query off the faces folds to the partner column, as
+      `CubeFill.foldedBiome` does for the biome there, and past the net's corners answers no zone.
+    - *The censuses* (`climate/RegionCensus`, `GeologyCensus`, `VolcanicCensus`, `BiomeCensus`).
+      Shares and counts are over the faces only (`WorldDataTerrain.onFaces`); the maps they draw
+      stay whole.
+    - *Structure burial* (`worldgen/StructureBurial.onFaces`, SCL-200). A void chunk places no
+      piece (SCL-210), so the least ground under a start's box is taken over its columns on the
+      faces; a box wholly off them is left as it is.
+    - *Site chunks* (`compat/SiteChunks`). A site's chunk volumes count columns on the faces only,
+      so a void chunk is never a site's best chunk and never deflates the shares of its real ones.
 
 ## Equations and constants
 
@@ -304,6 +326,11 @@ matches the cube's development across four seams: |A - Q|² = da² + dp² + t² 
   (cube plan E3) shows the partner's real chunks instead and supersedes the fill there.
 - Terrain that a structure adapts round its pieces (the beardifier) is not copied: the scratch
   chunk does not know the partner's structure starts.
+- A magma body cut at a turning edge does not go on under the partner face, and a volcanic zone
+  does not either: both are drawn round their own face's source, so the partner face's ground past
+  the edge shows none of them (lava flows fold across, item 14). The magma and geothermal probes
+  (`/deeptime probe magma` and `probe geothermal`) measure a point's distance to a volcano or site on the net plane with x
+  wrapped, so a pair across a turning edge reads farther apart than on the planet.
 - A lava flow that runs into the void square past a corner of the net stops there, and the
   oxidised patches of an old flow past an edge are not the ones a flat world would draw (both are
   hashes of the column).
