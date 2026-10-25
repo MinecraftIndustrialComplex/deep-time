@@ -3,7 +3,7 @@
 // (crates/deeptime-viewer/assets/worldmap.js, `DTWorldMap.frameOf`) hands the core its 2 : 1 tile
 // pyramid, and the core must pick the same tile zoom and draw the same tiles in the same places as
 // the view's own loop did before the move (worldmap.js at master b1b7336a, `tileZoom` and
-// `drawLayer`, restated below). Random views on three planet sizes and both projections. Run on the
+// `drawLayer`, restated below). Random views on three planet sizes in the Lambert frame. Run on the
 // test VM (nothing heavy on the laptop):
 //
 //   tools/remote/mac.sh -- 'nix shell nixpkgs#nodejs -c node tools/viewer/worldmap-check.js'
@@ -60,7 +60,8 @@ let seed = 12345;
 const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
 let views = 0, tiles = 0;
 for (const C of [4096, 13312, 32768]) {
-  for (const projection of [null, { kind: 'petroff_guyou', layout_version: 1, hemisphere_blocks: C / 2, lambda_c_deg: 71.5 }]) {
+  // The Lambert frame (a cube world's joins with plan T1, when DTProj.world builds it).
+  for (const projection of [null]) {
     const info = { circumference: C, max_zoom: Math.round(Math.log2(C / 512)) + 1, projection };
     const f = frameOf(info);
     const pyr = f.pyramid;

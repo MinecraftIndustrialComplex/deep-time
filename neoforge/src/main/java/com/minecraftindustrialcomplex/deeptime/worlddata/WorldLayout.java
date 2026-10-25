@@ -10,14 +10,12 @@ import java.util.List;
 
 /**
  * {@code manifest.json} {@code projection}: the world's projection and how its edges are glued
- * (FORMAT.md "The world's layout", format 0.5, layout version 1; "The cube world's layout", format
- * 0.7, layout version 2; Rust {@code deeptime_format::projection::ProjectionSpec}). The contract the
- * wrap engine reads to install its topology; the game reads the border from it.
+ * (FORMAT.md "The world's layout", layout version 1 on a Lambert-frame world; "The cube world's
+ * layout", format 0.7, layout version 2; Rust {@code deeptime_format::projection::ProjectionSpec}).
+ * The contract the wrap engine reads to install its topology; the game reads the border from it.
  *
  * @param kind             the projection
- * @param layoutVersion    the block's schema version (1 on the polar worlds, 2 on a cube world)
- * @param hemisphereBlocks b (Petroff–Guyou; 0 otherwise)
- * @param lambdaCDeg       λc, the western square's centre longitude (Petroff–Guyou; 0 otherwise)
+ * @param layoutVersion    the block's schema version (1 on a Lambert-frame world, 2 on a cube world)
  * @param xMin             the fundamental domain: x in [xMin, xMax), z in [zMin, zMax]
  * @param edges            one entry per domain edge
  * @param conePoints       the layout's cone points (none on Lambert)
@@ -25,22 +23,15 @@ import java.util.List;
  * @param border           the temporary border at edges nothing joins yet, or null
  * @param cube             a cube world's net, map and turn (layout version 2), else null
  */
-public record WorldLayout(WorldProjection.Kind kind, int layoutVersion, int hemisphereBlocks, double lambdaCDeg,
+public record WorldLayout(WorldProjection.Kind kind, int layoutVersion,
                           double xMin, double xMax, double zMin, double zMax, List<Edge> edges,
                           List<ConePoint> conePoints, List<Pole> poles, Border border, CubeSpec cube) {
 
-    /** The schema version of the polar layouts (Lambert, Petroff–Guyou). */
+    /** The schema version of a Lambert-frame world's layout. */
     public static final int LAYOUT_VERSION = 1;
 
     /** The schema version of the cube world's layout (Rust {@code CUBE_LAYOUT_VERSION}). */
     public static final int CUBE_LAYOUT_VERSION = 2;
-
-    /** A polar layout (no cube block). */
-    public WorldLayout(WorldProjection.Kind kind, int layoutVersion, int hemisphereBlocks, double lambdaCDeg,
-                       double xMin, double xMax, double zMin, double zMax, List<Edge> edges,
-                       List<ConePoint> conePoints, List<Pole> poles, Border border) {
-        this(kind, layoutVersion, hemisphereBlocks, lambdaCDeg, xMin, xMax, zMin, zMax, edges, conePoints, poles, border, null);
-    }
 
     /**
      * One edge (the wrap engine's {@code WrapEdge}): {@code axis} x (east/west, the line x = coord) or z;
@@ -48,19 +39,15 @@ public record WorldLayout(WorldProjection.Kind kind, int layoutVersion, int hemi
      * beyond → inside as {@code [quarterTurns, tx, tz]} ({@code CellIsometry}); {@code pivot} the
      * turn's centre or null; {@code owner} {@code toroidal_world} or {@code wrap_engine}. On a cube
      * world {@code seam} names the cube edge ({@code east_west}, {@code ne}, ...) and {@code partner}
-     * the other net edge of it; both null on the polar layouts.
+     * the other net edge of it; both null on a Lambert-frame layout.
      */
     public record Edge(String name, String kind, boolean axisX, boolean sideMin, long coord, long spanFrom, long spanTo,
                        int quarterTurns, long tx, long tz, long[] pivot, String owner, String seam, String partner) {
 
-        /** A polar layout's edge (no seam, no partner). */
+        /** A Lambert-frame layout's edge (no seam, no partner). */
         public Edge(String name, String kind, boolean axisX, boolean sideMin, long coord, long spanFrom, long spanTo,
                     int quarterTurns, long tx, long tz, long[] pivot, String owner) {
             this(name, kind, axisX, sideMin, coord, spanFrom, spanTo, quarterTurns, tx, tz, pivot, owner, null, null);
-        }
-
-        public boolean halfTurn() {
-            return "half_turn".equals(kind);
         }
 
         public boolean slide() {
@@ -77,19 +64,19 @@ public record WorldLayout(WorldProjection.Kind kind, int layoutVersion, int hemi
      * A cone point: {@code images} are block corners {x, z}. On a cube world also the three
      * {@code faces} that meet there, the corner's cube-frame direction {@code cube}, the corner
      * search's {@code landDistanceDeg} (NaN when the manifest has none) and whether a player can stand
-     * on it ({@code reachable}); null, NaN and false on the polar layouts.
+     * on it ({@code reachable}); null, NaN and false on a Lambert-frame layout.
      */
     public record ConePoint(String name, double coneDeg, double latDeg, double lonDeg, List<long[]> images,
                             List<String> faces, int[] cube, double landDistanceDeg, boolean reachable) {
 
-        /** A polar layout's cone point. */
+        /** A Lambert-frame layout's cone point. */
         public ConePoint(String name, double coneDeg, double latDeg, double lonDeg, List<long[]> images) {
             this(name, coneDeg, latDeg, lonDeg, images, null, null, Double.NaN, false);
         }
     }
 
     /**
-     * A pole's images: {x, z} net points (block corners on the polar layouts, any point on a cube
+     * A pole's images: {x, z} net points (block corners on a Lambert-frame layout, any point on a cube
      * world), and on a cube world the face and local (u, v) it lies at (null, NaN otherwise).
      */
     public record Pole(String name, List<double[]> images, String face, double u, double v) {}
@@ -206,8 +193,6 @@ public record WorldLayout(WorldProjection.Kind kind, int layoutVersion, int hemi
         }
         CubeSpec cube = kind == WorldProjection.Kind.CUBE ? cubeSpec(o) : null;
         return new WorldLayout(kind, version,
-                o.has("hemisphere_blocks") && !o.get("hemisphere_blocks").isJsonNull() ? o.get("hemisphere_blocks").getAsInt() : 0,
-                o.has("lambda_c_deg") && !o.get("lambda_c_deg").isJsonNull() ? o.get("lambda_c_deg").getAsDouble() : 0.0,
                 d.get("x_min").getAsDouble(), d.get("x_max").getAsDouble(), d.get("z_min").getAsDouble(), d.get("z_max").getAsDouble(),
                 List.copyOf(edges), List.copyOf(cones), List.copyOf(poles), border, cube);
     }

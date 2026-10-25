@@ -686,11 +686,12 @@ Petroff-Guyou kind. Each line below is a place to change, grouped into work item
 **State, 2026-10-23 (phase 2, stage 1, branch `worktree-agent-a19e057e8770be0a9`; design note
 `docs/design/cube-game.md`).** A cube world is playable end to end behind two opt-in level types,
 `deeptime:planet_cube` and `deeptime:planet_cube_32k`; Petroff-Guyou is unchanged and nothing of
-section 7.4 is deleted yet.
+section 7.4 is deleted yet. (Since 2026-10-24 section 7.4's item 1 is done and the two cube types are
+the only Deep Time world types; see the note under 7.4.)
 
 - Done: G1 (readers, the cube manifest through `WorldDataRef`, `WorldProjection.Cube`, the indexes on
   net coordinates, the river file's seam mouth, code 3, SCL-126), G2 (the generator on the cube: period 4s, `zHalf` 3C/8 for the censuses, the
-  level types; the static Lambert helpers stay until section 7.4), G4 (block states turned in the
+  level types; the static Lambert helpers stayed until section 7.4, which deleted them on 2026-10-24), G4 (block states turned in the
   fill), G5 (`worldgen/CubeFill`: partners' biomes and terrain copied and turned, deep ocean past the
   corners, SCL-210, SCL-211), G7's border part (W3), G8 and W5 (spawn), W3 and W4 (`wrap/CubeBorder`,
   `EdgeBorder.tickCube`, arrivals folded, POL-031), G10's payload and F3 line (face, latitude and
@@ -743,7 +744,8 @@ section 7.4 is deleted yet.
 - Left: section 7.4 with what waits for it: G12's
   preset edits (`planet` and `planet_32k` made cubes, `planet_lambert*` deleted, the Rust presets'
   projection keys, the deposits fixtures as cubes), G13's `editor_fields.json` keys, and the
-  deletions with the rewrites of the Petroff-Guyou tests they bring.
+  deletions with the rewrites of the Petroff-Guyou tests they bring. (2026-10-24: done but for the
+  deposits fixtures and the `lambda0_deg` rename; see the note under 7.4.)
 
 **The work.**
 
@@ -813,6 +815,10 @@ section 7.4 is deleted yet.
     `SablePoleCap.tickEdge` becomes the Sable border.
   - Ledger rows POL-001 to 015 are retired, not deleted.
 
+  Done 2026-10-24 (section 7.4): the pole classes are deleted, `SablePoleCap` is `SableBorder`, and
+  POL-001 to POL-015 and POL-022 are retired; what the border kept from the cap (the Sable push, the
+  put-back's inset and its y search) is POL-031.
+
   Check: as W3. `PoleCapGameTests` is deleted, and `SableSeamGameTests` is rewritten for segments.
 - **G8. Spawn.** `SpawnHandler.EDGE_MARGIN` and its |z| test become W5.
 - **G9. Climate API 5** (question Q2). `DeepTimeClimate.API_VERSION` goes to 5.
@@ -864,6 +870,17 @@ section 7.4 is deleted yet.
   `presetsFor` lists the built-ins for it. Petroff-Guyou and Lambert keep their path. The renames,
   the deletions, the Rust preset keys and the deposits fixtures wait for section 7.4.
 
+  Section 7.4 (2026-10-24) deleted the world presets `planet`, `planet_32k`, `planet_lambert` and
+  `planet_lambert_32k` and kept the ids `planet_cube` and `planet_cube_32k` (coordinator: no
+  rename). A planet preset is always the cube and refuses `scale.projection`; only a synthetic
+  preset may name it (`lambert`, the simulation's frame). The synthetic fixtures laid out in that
+  frame (`deposits_world_4k`, `deposits_world_16k`, `wrap-test`, `lake-test` and the river, delta,
+  fan, meander and deposits GameTest dimensions) keep it until phase 4 deletes the Lambert grid
+  (coordinator's call, 2026-10-24); a first start on one runs on the dev level types
+  `deeptime:test_planet_lambert` and `_32k` (GameTest resources and
+  `tools/smoke/datapacks/deeptime-lambert-frame`). `lambda_c_deg` keeps its name: the rename to
+  `lambda0_deg` (here and in G13) is still open.
+
   Check: `Presets` JUnit; `FirstStartGenerator` on both level types.
 - **G13. The Create World screen.**
   - `ClientSetup` registers the editor for the two cube level types. Today it registers it only for
@@ -882,6 +899,8 @@ section 7.4 is deleted yet.
   Phase 2 builds the globe and the review (coordinator's call, 2026-10-23: G13's editor follows
   G12's rule). The cube's turn is chosen on the final land when the world data is baked, so the
   globe draws the edges once the run is done. The `editor_fields.json` edits wait for section 7.4.
+  (2026-10-24: `projection` is gone and `lambda_c_deg`'s hint describes the cube's turn; the rename
+  is still open.)
 
   Check: `EditorModelGameTests`; the Create World walk on the VM (`tools/client/vm-client.sh`) with
   screenshots of the globe and the final world.
@@ -927,7 +946,9 @@ section 7.4 is deleted yet.
   - **Spawn.** As W5.
 
   The tests whose fixtures change:
-  - `SeamlessWorldGameTests` is rewritten for the cube;
+  - `SeamlessWorldGameTests` is rewritten for the cube (done 2026-10-24, section 7.4: deleted with
+    the Petroff-Guyou world; `CubeWorldGameTests.cubeWorldLayout`, `cubeFillIsThePartnerTurned` and
+    `cubeBorderStopsAndFolds` test the cube's layout, fold and border);
   - `RealPlanetGameTests`;
   - `FarTerrainGameTests`, which uses Lambert `poleZ` on the Petroff-Guyou planet today;
   - `EditorModelGameTests`, `ImpactGameTests` and `SeamGameTests`;
@@ -1087,6 +1108,10 @@ part of done"):
   It is SW-1's page (`tools/review/seamless-world/page.py`, hard-coded 2:1 today) rebuilt for 4:3. It
   is published as a private Spacesheep page through `tools/review/publish.sh`.
 
+  Section 7.4 (2026-10-24) deleted the SW-1 tools (`seamless-world/page.py` and
+  `seamless-evidence.sh`) with Petroff-Guyou rather than rebuild them; D10's page needs a new tool
+  on the cube's manifest.
+
 ## 7. Order of work
 
 ### 7.1 Phases
@@ -1137,7 +1162,9 @@ part of done"):
   - `CubeWorld` (M4).
   - `DTProj.world` picks it for `kind === 'cube'`.
   - `tileFrameZ` and the π:1 picture helpers stay for keyframe pictures.
-  - `Petroff`, `PetroffGuyou` and `LambertWorld` are deleted with section 7.4.
+  - `Petroff`, `PetroffGuyou` and `LambertWorld` are deleted with section 7.4. (2026-10-24: `Petroff`
+    and `PetroffGuyou` are deleted; `LambertWorld` stays until `CubeWorld` and `DTProj.world` take
+    its place here, since the viewer still draws Lambert-frame test worlds with it.)
 - **T2. `worldmap.js`.** `frameOf` draws a 4:3 net pyramid with void tiles empty, the border and the
   corners; `Wp`, `zLim` and the 3D click handler work by face.
 
@@ -1176,6 +1203,7 @@ part of done"):
 - **T7. Review tools.**
   - `tools/review/seamless-evidence.sh`: a cube world in place of the pg/lambert pair.
   - `seamless-world/page.py` (D10).
+  - (2026-10-24: section 7.4 deleted both rather than port them; D10 needs a new page tool.)
   - `phase1_vm.py:170` and `phase1_scale.py` (sizes).
   - `ice-spikes.sh` (level type from `manifest.projection.kind`).
   - The Lambert-L1 scripts `continent-bisect.py`, `margins.py`, `percell_metrics.py` and
@@ -1228,6 +1256,19 @@ Each lane takes its own ledger id range so concurrent agents do not collide.
 ### 7.4 What to delete (recommendation, the coordinator's call)
 
 **Decided 2026-10-24** (decisions log): Ben chose the cube only, "Cube only (Recommended)"; item 1 below is carried out now.
+
+**Item 1 done 2026-10-24** (branch `worktree-agent-a19e057e8770be0a9`; STATUS.md build log). Deleted:
+the Lambert world's level types, world presets and pole code, `scale.projection` on planet presets
+and the bake's `pole_cap_deg`, the Lambert branches of the game's terrain, geothermal, magma and
+far-terrain paths, `Projection.java`; Petroff-Guyou in Rust (`petroff.rs`, the pass in
+`project.rs`, `choose_lambda_c`, SCL-090's widening, the parity fixture's `petroff` and `worlds`
+sections), Java (`Petroff`, `PetroffGuyou`), JS (projection.js) and the CLI (`deeptime project`);
+the world types `deeptime:planet` and `deeptime:planet_32k`; the SW-1 tools (deleted, not rebuilt:
+D10 needs a new tool); `crates/deeptime-quincuncial` and `tools/proto/quincuncial`. Kept on purpose:
+`ProjectionKind::Lambert` and `WorldProjection.Lambert` for the simulation's frame and the
+synthetic test levels laid out in it (with item 2), JS `LambertWorld` until T1, and the research
+tools (item 3). Rows retired: SCL-070 to 077, 083, 084, 086, 087, 089, 090; POL-001 to 015, 022;
+PRS-033, 073.
 
 1. **When phase 2 lands, delete both old world shapes.**
    - **The Lambert world.** `scale.projection lambert`; the level types `planet_lambert` and

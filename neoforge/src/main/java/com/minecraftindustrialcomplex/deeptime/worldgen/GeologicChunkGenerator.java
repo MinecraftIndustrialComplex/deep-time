@@ -73,24 +73,23 @@ public class GeologicChunkGenerator extends NoiseBasedChunkGenerator {
     }
 
     /**
-     * The inset of the temporary edge border of a Petroff–Guyou or cube world (its manifest's layout
-     * block, {@code border.inset_blocks}), or NaN when the level has none: a Lambert world, a test
-     * terrain, or a world whose preset asked for no border ({@code scale.edge_border = none}). A cube
-     * world's border stops at its segments, the 12 turning net edges ({@code wrap/CubeBorder}). NaN too
+     * The inset of the temporary edge border of a cube world (its manifest's layout block,
+     * {@code border.inset_blocks}), or NaN when the level has none: a Lambert-frame test world, a test
+     * terrain, or a world whose preset asked for no border ({@code scale.edge_border = none}). The
+     * border stops at its segments, the 12 turning net edges ({@code wrap/CubeBorder}). NaN too
      * on a level whose world data is not bound: the dev planet server's GameTest dimensions when it
      * runs on world data ({@code run_planet.py --cube-4k}), whose folders it does not bake. The
      * border reads this every tick of every level; such a level's chunks still refuse to generate.
      */
     public double borderInset() {
-        if (!(dataRef.petroffGuyou() || dataRef.cube()) || !(terrain() instanceof WorldDataTerrain w)
+        if (!dataRef.cube() || !(terrain() instanceof WorldDataTerrain w)
                 || !ActiveWorldData.has(dataRef.folder()))
             return Double.NaN;
         var layout = w.data().layout();
         if (layout == null || layout.border() == null)
             return Double.NaN;
         var b = layout.border();
-        boolean stops = dataRef.cube() ? "edge_stop".equals(b.kind()) && !b.edges().isEmpty() : b.stops("north");
-        return stops ? b.insetBlocks() : Double.NaN;
+        return "edge_stop".equals(b.kind()) && !b.edges().isEmpty() ? b.insetBlocks() : Double.NaN;
     }
 
     /** The net of a cube world (format 0.7), or null on a polar world. */

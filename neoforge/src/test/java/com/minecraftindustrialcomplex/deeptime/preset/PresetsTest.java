@@ -35,9 +35,9 @@ class PresetsTest {
             assertFalse(info.placeholder(), name + " is a simulated planet since P1-08");
             assertTrue(info.timeline().isEmpty(), name + " names no timeline (no default story)");
             assertEquals(name.endsWith("_32k") ? 32_768 : 16_384, info.circumference().getAsInt(), name);
-            // The seamless world by default (format 0.5): the level type's x period is 2b.
-            assertEquals("petroff_guyou", info.projection(), name);
-            assertEquals(name.endsWith("_32k") ? 26_112 : 13_312, info.worldCircumference().getAsInt(), name);
+            // Every planet is the cube world (decisions log 2026-10-24): the level type's x period is 4s.
+            assertEquals("cube", info.projection(), name);
+            assertEquals(name.endsWith("_32k") ? 29_696 : 15_360, info.worldCircumference().getAsInt(), name);
         }
         assertTrue(Presets.builtin("earthlike_huge_64k").isEmpty());
     }

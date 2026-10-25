@@ -41,7 +41,7 @@
 #
 # server.properties is Ben's (2026-10-18): port 25765 on 127.0.0.1 (the laptop's deeptime-play-tunnel
 # forwards to it), RCON 25775, creative with force-gamemode, peaceful, no spawn protection, offline
-# mode, view 10 / simulation 6, level-type deeptime:planet (a Petroff-Guyou world 13,312 blocks round), JVM -Xmx12G,
+# mode, view 10 / simulation 6, level-type deeptime:planet_cube (the cube world, 15,360 blocks round), JVM -Xmx12G,
 # Simple Voice Chat on 24464. The rcon password is generated once into <hash>/rcon.pw (mode 600, never
 # committed). The JDK path is kept in /data/ban/play/tools.env and GC-rooted there.
 set -euo pipefail

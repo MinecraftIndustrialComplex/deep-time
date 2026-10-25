@@ -34,7 +34,7 @@ use crate::sphere::{SampleTree, SplitMix64, fibonacci_sphere};
 
 /// Signed distances to the coast are clamped to ± this, degrees: beyond it every corner is as
 /// good, and the sum decides.
-pub const CLAMP_DEG: f64 = 20.0; // ledger: SCL-120 (the λc search's LAND_SEARCH_DEG, SCL-087)
+pub const CLAMP_DEG: f64 = 20.0; // ledger: SCL-120 (the retired λc search's LAND_SEARCH_DEG, SCL-087)
 
 /// The weight of the corners' summed distance in the score (the least distance leads).
 pub const SUM_WEIGHT: f64 = 0.001; // ledger: SCL-120 (game-choice, study §5.4 item 3)

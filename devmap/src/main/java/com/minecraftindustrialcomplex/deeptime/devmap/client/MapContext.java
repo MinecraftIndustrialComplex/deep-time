@@ -9,7 +9,6 @@ import com.minecraftindustrialcomplex.deeptime.devmap.net.MapInfoPayload;
 import com.minecraftindustrialcomplex.deeptime.devmap.net.TeleportPayload;
 import com.minecraftindustrialcomplex.deeptime.net.ClientPlanetState;
 import com.minecraftindustrialcomplex.deeptime.net.WorldInfoPayload;
-import com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
@@ -84,15 +83,12 @@ record MapContext(String dimension, WorldProjection projection, WorldInfoPayload
     String projectionName() {
         if (projection == null)
             return "none";
-        if (projection instanceof PetroffGuyou pg)
-            return String.format(Locale.ROOT, "Petroff-Guyou (b %d, lambda_c %.2f°, x period %d, z %.0f..%.0f)",
-                    pg.hemisphere(), pg.lambdaCDeg(), (long) pg.period(), pg.zMin(), pg.zMax());
         if (projection instanceof WorldProjection.Cube cube) {
             double[] w = cube.cube().window();
             return String.format(Locale.ROOT, "Cube (face %d, x period %d, net x %.0f..%.0f, z %.0f..%.0f)",
                     cube.side(), (long) cube.period(), w[0], w[1], w[2], w[3]);
         }
-        return String.format(Locale.ROOT, "Lambert cylindrical equal-area (C %d, poles at z = ±%.1f)",
+        return String.format(Locale.ROOT, "Lambert frame, a test level (C %d, poles at z = ±%.1f)",
                 (long) projection.period(), projection.zMax());
     }
 
@@ -109,14 +105,13 @@ record MapContext(String dimension, WorldProjection projection, WorldInfoPayload
                 : String.format(Locale.ROOT, "Block %.0f / %.0f%s   %s", wx, z, unwrapped, PlanetGeometry.formatLatLon(ll[0], ll[1])));
         double seam = PlanetGeometry.seamDistance(projection, x, z);
         double edge = PlanetGeometry.edgeDistance(projection, x, z);
-        boolean pg = PlanetGeometry.petroffGuyou(projection);
         if (PlanetGeometry.cube(projection) != null) {
             double w0 = PlanetGeometry.west(projection);
             out.add(String.format(Locale.ROOT, "Face %s   Slide (x = %.0f = %.0f): %.0f blocks   Border: %.0f blocks",
                     PlanetGeometry.faceName(projection, x, z), w0, w0 + projection.period(), seam, edge));
         } else {
-            out.add(String.format(Locale.ROOT, "Seam (x = ±%.0f): %.0f blocks   %s: %.0f blocks", projection.period() / 2,
-                    seam, pg ? "Edge (z = ±" + Math.round(projection.zMax()) + ")" : "Pole line", edge));
+            out.add(String.format(Locale.ROOT, "Seam (x = ±%.0f): %.0f blocks   Pole line: %.0f blocks", projection.period() / 2,
+                    seam, edge));
         }
         PlanetGeometry.NearestPole np = PlanetGeometry.nearestPole(projection, x, z);
         String km = mPerBlock > 0 ? String.format(Locale.ROOT, " = %.0f km", np.arcBlocks() * mPerBlock / 1000.0) : "";

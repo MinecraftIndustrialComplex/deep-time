@@ -107,7 +107,7 @@ public final class EditorModel {
     /**
      * An accepted run: its staging folder, the simulation's circumference (the preset's), the preset, a
      * label, and the world's shape as the run's bake wrote it (manifest {@code scale.circumference_blocks},
-     * the x period 2b of a Petroff–Guyou world, and {@code projection.kind}): what the level's generator
+     * the cube's x period 4s, and {@code projection.kind}): what the level's generator
      * and Toroidal World's loop take.
      */
     public record Accepted(String stagingId, int circumference, String presetJson, String label, int worldCircumference,

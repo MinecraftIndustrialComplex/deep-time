@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use deeptime_format::{ColumnWorld, DetailSpec, FORMAT_VERSION, Manifest, Noise, RasterRead};
+use deeptime_format::{CUBE_FORMAT_VERSION, ColumnWorld, DetailSpec, Manifest, Noise, RasterRead};
 use serde_json::{Value, json};
 
 use crate::params::planet_builtin;
@@ -80,8 +80,8 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     run_to_folder(&small_planet(100.0), &dir);
     let m = Manifest::read(&dir).unwrap();
     m.verify(&dir).unwrap();
-    assert_eq!(m.format_version, FORMAT_VERSION);
-    assert_eq!(FORMAT_VERSION, "0.6");
+    assert_eq!(m.format_version, CUBE_FORMAT_VERSION);
+    assert_eq!(CUBE_FORMAT_VERSION, "0.7");
     for name in [
         "elevation",
         "detail/amplitude",
@@ -154,31 +154,29 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
     let detail = DetailSpec::of(&m).unwrap().expect("a detail term");
     assert_eq!(detail.seed().unwrap(), 5);
     assert_eq!(detail.salt, super::DETAIL_SALT);
-    // The world is Petroff–Guyou (the default): 13,312 × 6,656 blocks for the 16k planet, its
-    // grids edge to edge at the simulation's cell sizes.
+    // The world is the cube (the only one, decisions log 2026-10-24): its loop four faces of
+    // side face_for(C), its grids face by face at the simulation's cell sizes.
     let wp = m.world_projection();
-    assert_eq!(
-        wp.kind(),
-        deeptime_format::projection::ProjectionKind::PetroffGuyou
-    );
-    assert_eq!(m.scale.circumference_blocks, 13_312);
+    assert_eq!(wp.kind(), deeptime_format::projection::ProjectionKind::Cube);
+    let side = deeptime_format::projection::face_for(16_384);
+    assert_eq!(m.scale.circumference_blocks, 4 * side);
     assert_eq!(m.grids["L1"], wp.grid("L1", 64).unwrap());
     assert_eq!(m.grids["L2"], wp.grid("L2", 32).unwrap());
     assert_eq!(m.grids["L3"], wp.grid("L3", 16).unwrap());
-    assert_eq!(m.grids["L1"].w, 208);
     let proj = &bake["projection"];
-    assert_eq!(proj["hemisphere_blocks"], 6_656);
-    // Equal area: the map's land share is the planet's (to the resampling's few cells).
+    assert_eq!(proj["face_blocks"], side);
+    // The world's land share, its cells weighted by their planet area, is the planet's (to the
+    // resampling's few cells).
     let (lm, lt) = (
-        proj["shares"]["land_map"].as_f64().unwrap(),
+        proj["shares"]["land_world_planet"].as_f64().unwrap(),
         proj["shares"]["land_true"].as_f64().unwrap(),
     );
     assert!(
         (lm - lt).abs() < 0.01,
-        "land on the map {lm}, on the planet {lt}"
+        "land on the world {lm}, on the planet {lt}"
     );
-    // The spawn candidates are distinct places of the world, clear of the turning edges (none
-    // collapsed onto a pole from the Lambert rows past it).
+    // The spawn candidates are distinct places of the world (none collapsed onto a pole from the
+    // Lambert rows past it).
     let cands: Value =
         serde_json::from_slice(&std::fs::read(dir.join("spawn/candidates.json")).unwrap()).unwrap();
     let list = cands["candidates"].as_array().unwrap();
@@ -190,13 +188,9 @@ fn a_planet_run_bakes_every_chunk_time_layer() {
             seen.insert((x, z)),
             "a repeated candidate ({x}, {z}): {cands}"
         );
-        assert!(
-            z.abs() <= 6_656 / 2 - 64,
-            "({x}, {z}) is within 64 blocks of an edge"
-        );
     }
     let spec = m.projection.as_ref().expect("the layout block");
-    assert_eq!(spec.edges.len(), 4);
+    assert_eq!(spec.edges.len(), 14);
     assert!(spec.border.as_ref().is_some_and(|b| b.temporary));
     // The climate layers carry the vanilla range.
     let t = deeptime_format::TilePackReader::open(&dir.join("rasters/climate/temperature.dtr"))
@@ -465,12 +459,40 @@ fn a_craters_lens_is_seated_under_the_drawn_floor() {
         if !matches!(c["fate"].as_str(), Some("fresh" | "degraded")) {
             continue;
         }
-        let drawn = w.height(b.center[0].round() as i64, b.center[2].round() as i64);
-        let want = drawn - c["cover_m"].as_f64().unwrap() / mv;
+        // The block the centre is in: a cube world draws the block (⌊x⌋, ⌊z⌋) at its centre
+        // (`project::Drawn`), which the pass moved the body by. The file rounds the centre to a
+        // tenth of a block, so a centre on a block line may be in the block before it.
+        let blocks = |v: f64| {
+            let k = v.floor() as i64;
+            if (v - v.round()).abs() < 0.051 && v.round() as i64 == k {
+                vec![k, k - 1]
+            } else {
+                vec![k]
+            }
+        };
+        let cover = c["cover_m"].as_f64().unwrap() / mv;
+        let (bx, bz) = (blocks(b.center[0]), blocks(b.center[2]));
+        let wants: Vec<f64> = bx
+            .iter()
+            .flat_map(|&x| bz.iter().map(move |&z| (x, z)))
+            .map(|(x, z)| w.height(x, z) - cover)
+            .collect();
+        let want = wants
+            .iter()
+            .copied()
+            .min_by(|p, q| (b.center[1] - p).abs().total_cmp(&(b.center[1] - q).abs()))
+            .unwrap();
+        let drawn = want + cover;
         seated += 1;
         eprintln!(
-            "crater {} lens at y {:.2}, drawn floor {:.2}, wanted {:.2}",
-            c["id"], b.center[1], drawn, want
+            "crater {} at ({:.1}, {:.1}): lens at y {:.2}, drawn floor {:.2}, wanted {:.2}, off {:.2}",
+            c["id"],
+            b.center[0],
+            b.center[2],
+            b.center[1],
+            drawn,
+            want,
+            b.center[1] - want
         );
         // Exact up to the file's rounding of the cover (to a metre) and of the centre (0.1 block).
         if (b.center[1] - want).abs() > 0.15 {
@@ -514,11 +536,11 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
     let mut m = Manifest::read(&dir).unwrap();
     m.verify(&dir).unwrap();
     let wf = &m.notes[crate::deposits::STAGE_NAME]["world_frame"];
-    assert_eq!(wf["projection"], "petroff_guyou", "{wf}");
+    assert_eq!(wf["projection"], "cube", "{wf}");
     assert_eq!(wf["forecast"], true, "{wf}");
     let proj = &m.notes["bake"]["projection"];
-    assert_eq!(proj["lambda_c"]["chosen"], true, "{proj}");
-    assert!(proj["lambda_c"].get("chosen_by").is_none(), "{proj}");
+    assert_eq!(proj["turn"]["chosen"], true, "{proj}");
+    assert!(proj["turn"].get("set_by").is_none(), "{proj}");
     let note = m.notes["bake"]["guaranteed"].clone();
     let n = note["guaranteed"].as_u64().unwrap();
     assert!(n >= 3, "{note}");
@@ -598,15 +620,21 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
     let sea = f64::from(m.scale.sea_level_y);
     let (zlo, zhi) = wp.z_range();
     let step = anchor::TOP_UP_STEP_BLOCKS;
+    // The top-up's lattice: x from the cube window's west edge, the void past the net's faces
+    // never land (SCL-129).
+    let deeptime_format::projection::WorldProjection::Cube(view) = &wp else {
+        panic!("a cube world");
+    };
+    let x0 = wp.index_frame().origin.0;
     for ess in &p.deposits.as_ref().unwrap().essentials {
         let r =
             crate::deposits::playability::Regions::in_frame(wp.index_frame(), ess.region_blocks);
         let mut land = std::collections::BTreeSet::new();
         let mut z = zlo.ceil() as i64;
         while z <= zhi.floor() as i64 {
-            let mut x = -world.c / 2;
-            while x < world.c / 2 {
-                if world.height(x, z) >= sea {
+            let mut x = x0;
+            while x < x0 + world.c {
+                if view.cube.face_of_block(x, z).is_some() && world.height(x, z) >= sea {
                     land.insert(r.index(x as f64, z as f64));
                 }
                 x += step;
@@ -639,56 +667,8 @@ fn guaranteed_deposits_hold_ore_in_the_world() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// `scale.projection: "lambert"` keeps the cylinder (Ben may swap back, decisions log 2026-10-04):
-/// the folder is the simulation's Lambert grids, with a Lambert layout block and no border.
-#[test]
-fn a_lambert_preset_keeps_the_cylinder() {
-    let dir = temp_dir("lambert");
-    let mut v: serde_json::Value = serde_json::from_str(&small_planet(20.0)).unwrap();
-    v["scale"]["projection"] = json!("lambert");
-    v.as_object_mut().unwrap().remove("deposits");
-    run_to_folder(&v.to_string(), &dir);
-    let m = Manifest::read(&dir).unwrap();
-    m.verify(&dir).unwrap();
-    assert_eq!(m.scale.circumference_blocks, 16_384);
-    assert_eq!(m.grids["L1"].w, 256);
-    assert_eq!(m.grids["L3"].w, 1024);
-    let spec = m.projection.as_ref().expect("a layout block");
-    assert_eq!(
-        spec.kind,
-        deeptime_format::projection::ProjectionKind::Lambert
-    );
-    assert_eq!(spec.edges.len(), 2);
-    assert!(spec.border.is_none());
-    assert_eq!(m.notes["bake"]["projection"]["kind"], "lambert");
-    // The water part drained again over the baked folder (`deeptime hydro`; its layout block is
-    // there now) writes the river network the bake wrote: the meanders are measured on the planet
-    // both times.
-    let rivers = std::fs::read(dir.join(deeptime_format::rivers::RIVERS_PATH)).unwrap();
-    let json = std::fs::read_to_string(dir.join("preset.json")).unwrap();
-    let preset = crate::preset::Preset::from_json(&json).unwrap();
-    let crate::preset::PresetBody::Planet(p) = &preset.body else {
-        panic!("a planet preset");
-    };
-    let mut m = Manifest::read(&dir).unwrap();
-    let mut out = super::Out {
-        dir: &dir,
-        m: &mut m,
-        bytes: 0,
-        layers: Vec::new(),
-    };
-    let w = super::water::bake(p, &mut out).unwrap();
-    let again = std::fs::read(dir.join(deeptime_format::rivers::RIVERS_PATH)).unwrap();
-    assert!(
-        rivers == again,
-        "the river network changed on a re-run: {}",
-        w.note["stats"]["meanders"]
-    );
-    std::fs::remove_dir_all(&dir).unwrap();
-}
-
-/// A fresh bake's folder (no layout block yet) and a baked Lambert one (`deeptime hydro`) are both
-/// drained in the Lambert metric; a projected world's is not.
+/// A fresh bake's folder (no layout block yet) and a synthetic Lambert-frame one (`deeptime
+/// hydro`) are both drained in the Lambert metric; a cube world's is not.
 #[test]
 fn the_water_part_knows_a_baked_lambert_folder() {
     use deeptime_format::projection::{ProjectionKind, lambert_spec};
@@ -702,7 +682,7 @@ fn the_water_part_knows_a_baked_lambert_folder() {
     let mut spec = lambert_spec(&deeptime_format::Projection::new(c));
     m.projection = Some(spec.clone());
     assert!(super::water::lambert_frame(&m));
-    spec.kind = ProjectionKind::PetroffGuyou;
+    spec.kind = ProjectionKind::Cube;
     m.projection = Some(spec);
     assert!(!super::water::lambert_frame(&m));
 }
@@ -728,7 +708,7 @@ fn the_projection_estimate_covers_the_baked_layers() {
         );
     }
     // The estimate is the larger of what the pass holds on each grid: more than the biggest
-    // grid's two copies of its layers, and nothing for a Lambert preset.
+    // grid's two copies of its layers.
     let crate::preset::PresetBody::Planet(p) =
         crate::preset::Preset::from_json(&json).unwrap().body
     else {
@@ -741,14 +721,9 @@ fn the_projection_estimate_covers_the_baked_layers() {
         .max()
         .unwrap();
     assert!(super::project::estimate_bytes(&p) >= biggest);
-    // The bake's figure is the largest of its parts': at least the pass's, and the strata's and
-    // the water's on a Lambert world (amp-est, 2026-10-23).
+    // The bake's figure is the largest of its parts': at least the pass's (amp-est, 2026-10-23).
     let (bake, projection) = super::estimate_bytes(&p);
     assert_eq!(projection, super::project::estimate_bytes(&p));
     assert!(bake >= projection);
-    let mut lambert = (*p).clone();
-    lambert.scale.projection = deeptime_format::projection::ProjectionKind::Lambert;
-    assert_eq!(super::project::estimate_bytes(&lambert), 0);
-    assert!(super::estimate_bytes(&lambert).0 > 0);
     std::fs::remove_dir_all(&dir).unwrap();
 }

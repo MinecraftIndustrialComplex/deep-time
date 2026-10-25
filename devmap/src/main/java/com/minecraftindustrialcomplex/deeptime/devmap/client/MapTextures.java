@@ -6,7 +6,7 @@ import com.minecraftindustrialcomplex.deeptime.devmap.model.BaseImage;
 import com.minecraftindustrialcomplex.deeptime.devmap.model.MapLayer;
 import com.minecraftindustrialcomplex.deeptime.devmap.net.DevMapState;
 import com.minecraftindustrialcomplex.deeptime.screen.model.GlobeProjection;
-import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
+import com.minecraftindustrialcomplex.deeptime.worlddata.MapPicture;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.minecraft.client.Minecraft;
@@ -89,7 +89,7 @@ final class MapTextures {
         if (built != null && built.of() == im)
             return built.abgr();
         if (BUILDING.add(im)) {
-            int w = PICTURE_W, h = Projection.pictureHeight(w);
+            int w = PICTURE_W, h = MapPicture.height(w);
             Thread t = new Thread(() -> {
                 try {
                     long t0 = System.nanoTime();
@@ -115,7 +115,7 @@ final class MapTextures {
     static void globe(int[] pic, double lat, double lon, int size) {
         Object source = pic == null ? PLAIN : pic;
         int w = pic == null ? 8 : PICTURE_W;
-        int h = pic == null ? 3 : Projection.pictureHeight(PICTURE_W);
+        int h = pic == null ? 3 : MapPicture.height(PICTURE_W);
         if (globe != null && globeSize == size && globeLat == lat && globeLon == lon && globeSource == source)
             return;
         if (globe == null || globeSize != size) {

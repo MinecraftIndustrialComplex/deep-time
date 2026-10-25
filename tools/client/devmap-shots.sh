@@ -34,8 +34,10 @@
 #                 on a cube world spawn, beside the slide, inside a quarter-turn border, the north pole,
 #                 beside a reachable corner and under a border corner)
 #   --level-type T  the server's level type (default: from the world data's manifest, its projection
-#                 and circumference: deeptime:planet[_32k], deeptime:planet_cube[_32k] or
-#                 deeptime:planet_lambert[_32k], the 32k types above a period of 20,000 blocks)
+#                 and circumference: deeptime:planet_cube[_32k] for a cube world, the dev type
+#                 deeptime:test_planet_lambert[_32k] with its datapack (tools/smoke/datapacks/
+#                 deeptime-lambert-frame) for a Lambert-frame one, the 32k types above a period of
+#                 20,000 blocks)
 #
 # Output: review/out/<N>/devmap-*.png, shots.txt (the driver's lines), server.txt (the server's
 # [devmap] lines), index.html, client.log (the game's log), launcher.log, console.log (the server's). Exit 0
@@ -83,7 +85,7 @@ m = json.load(open(sys.argv[1]))
 proj = m.get("projection")
 kind = proj.get("kind") if isinstance(proj, dict) else "lambert"
 big = "_32k" if int((m.get("scale") or {}).get("circumference_blocks", 0)) > 20000 else ""
-print({"cube": "deeptime:planet_cube", "lambert": "deeptime:planet_lambert"}.get(kind, "deeptime:planet") + big)
+print(("deeptime:planet_cube" if kind == "cube" else "deeptime:test_planet_lambert") + big)
 PY
 )
 fi
@@ -120,6 +122,11 @@ python3 "$REPO/tools/smoke/instance.py" make --set "$SET" --dest "$SRV" >/dev/nu
 rm -rf "$SRV/mods" "$SRV/planet" "$SRV/world" "$SRV/config/voicechat"; mkdir -p "$SRV/mods" "$SRV/planet"
 cp "$DT" "$DM" "$TW" "$SRV/mods/"
 rsync -a --exclude=/keyframes/ --exclude=/epochs/ "$WORLD/" "$SRV/planet/deeptime/"
+case "$LEVEL_TYPE" in deeptime:test_planet_lambert*)
+    # The dev Lambert-frame level types' world presets (a world datapack, enabled at the first start).
+    mkdir -p "$SRV/planet/datapacks"
+    cp -R "$REPO/tools/smoke/datapacks/deeptime-lambert-frame" "$SRV/planet/datapacks/" ;;
+esac
 if [ -d "$WORLD/keyframes" ]; then
     ln -s "$WORLD/keyframes" "$SRV/planet/deeptime/keyframes"
     # Minecraft refuses a world folder with a symlink unless the server's allowed_symlinks.txt lists

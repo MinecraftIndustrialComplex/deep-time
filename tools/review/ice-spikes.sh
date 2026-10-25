@@ -64,8 +64,8 @@ case "${1:-}" in
         name="${2:?name}"; world="${3:?world-data folder}"
         bin="$REPO/target/release/deeptime"
         [ -x "$bin" ] || CARGO_BUILD_JOBS=8 cargo build --release -q -p deeptime-cli
-        # The census's grid (BiomeCensus: step 16, x0 = -C/2 + 8, z0 = -zp + 8; zp the projection's z edge, C/4 on
-        # Petroff-Guyou, the pole C/2pi on Lambert).
+        # The census's grid (BiomeCensus: step 16, x0 = -C/2 + 8, z0 = -zp + 8; zp the projection's z edge, 3s/2 on
+        # the cube, the pole C/2pi on a Lambert-frame world).
         read -r c zp < <(python3 -c 'import json, math, sys; m = json.load(open(sys.argv[1])); c = m["scale"]["circumference_blocks"]
 d = m.get("projection", {}).get("domain")
 print(c, int(d["z_max"]) if d else int(c / (2 * math.pi)))' "$world/manifest.json")
@@ -80,15 +80,20 @@ print(c, int(d["z_max"]) if d else int(c / (2 * math.pi)))' "$world/manifest.jso
         profile="${2:?profile}"; name="${3:?name}"; world="${4:?world-data folder}"
         [ -d "$world" ] || { echo "no world data at $world" >&2; exit 1; }
         tools/smoke/install.sh "$profile" --size 16384
-        # The world data's own level type (install.sh without a preset picks Lambert): Petroff-Guyou worlds
-        # are deeptime:planet (13,312 blocks round), Lambert ones deeptime:planet_lambert (16,384).
+        # The world data's own level type: a cube world is deeptime:planet_cube (period 15,360; the only
+        # world since cube plan §7.4), a Lambert-frame one (a synthetic world) the dev type
+        # deeptime:test_planet_lambert (16,384) of the repo datapack deeptime-lambert-frame.
         level_type=$(python3 -c 'import json,sys; m = json.load(open(sys.argv[1])); c = m["scale"]["circumference_blocks"]
-pg = m.get("projection", {}).get("kind") == "petroff_guyou"
-print("deeptime:planet" + ("" if pg else "_lambert") + ("" if c <= 16384 else "_32k"))' "$world/manifest.json")
+cube = (m.get("projection") or {}).get("kind") == "cube"
+print(("deeptime:planet_cube" if cube else "deeptime:test_planet_lambert") + ("" if c <= 16384 else "_32k"))' "$world/manifest.json")
         server="smoke/$profile/server"
         rm -rf "$server/planet"
         mkdir -p "$server/planet"
         cp -R "$world" "$server/planet/deeptime"
+        case "$level_type" in deeptime:test_planet_lambert*)
+            mkdir -p "$server/planet/datapacks"
+            cp -R tools/smoke/datapacks/deeptime-lambert-frame "$server/planet/datapacks/" ;;
+        esac
         rm -rf "$server/planet/deeptime/epochs"
         # The server runs in a private copy of its set: the probes write where the mod is told to.
         PROBE="$RUNS/probe-$profile-$name"; rm -rf "$PROBE"; mkdir -p "$PROBE"

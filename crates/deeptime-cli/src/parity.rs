@@ -37,7 +37,7 @@ pub const DEFAULT_SEED: u64 = 0x5EED_0C01_0B0E;
 /// The columns to sample.
 pub fn pick(w: &ColumnWorld, n: usize, seed: u64) -> Vec<(i64, i64)> {
     let c = w.c;
-    // The world's z range (the poles on Lambert, the turning edges on Petroff–Guyou), taken
+    // The world's z range (the poles on a synthetic Lambert world, the window on a cube), taken
     // symmetric about the equator.
     let wp = w.manifest.world_projection();
     let (z0, z1) = wp.z_range();

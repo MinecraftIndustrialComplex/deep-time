@@ -13,14 +13,12 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.CustomizeGuiOverlayEvent;
-import net.neoforged.neoforge.client.event.ViewportEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
 /**
- * Deep Time's client side (plan §7.11, §7.15): the F3 latitude/longitude line and the polar storm
- * ({@link PolarStorm}). Loaded only on a physical client ({@code DeepTime} checks
+ * Deep Time's client side (plan §7.15): the F3 latitude/longitude line, the client settings and
+ * Distant Horizons' curvature. Loaded only on a physical client ({@code DeepTime} checks
  * {@code FMLEnvironment.dist}); everything it shows comes from {@link ClientPlanetState}.
  *
  * <p>Nothing here can be checked by the headless tests (plan §9.8): it compiles against the client
@@ -32,12 +30,8 @@ public final class DeepTimeClient {
 
     public static void init(IEventBus modBus) {
         NeoForge.EVENT_BUS.addListener(CustomizeGuiOverlayEvent.DebugText.class, DeepTimeClient::onDebugText);
-        NeoForge.EVENT_BUS.addListener(ClientTickEvent.Pre.class, PolarStorm::onClientTick);
-        NeoForge.EVENT_BUS.addListener(ViewportEvent.RenderFog.class, PolarStorm::onRenderFog);
-        NeoForge.EVENT_BUS.addListener(ViewportEvent.ComputeFogColor.class, PolarStorm::onFogColor);
         NeoForge.EVENT_BUS.addListener(ClientPlayerNetworkEvent.LoggingOut.class, e -> {
             ClientPlanetState.reset();
-            PolarStorm.reset();
             DhCurvatureClient.release();
         });
         // Client settings and their screen (Mods, Deep Time, Config); Distant Horizons' curvature follows the planet,
@@ -61,7 +55,7 @@ public final class DeepTimeClient {
         Entity camera = mc.getCameraEntity();
         if (camera == null || !onPlanet(mc, info))
             return;
-        String line = PlanetDebugLine.format(info, camera.getX(), camera.getZ(), PolarStorm.shown());
+        String line = PlanetDebugLine.format(info, camera.getX(), camera.getZ());
         if (line != null)
             event.getLeft().add(line);
     }
