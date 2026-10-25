@@ -139,10 +139,12 @@ class Reach(unittest.TestCase):
         p, x, y = patch(0.0, 0.0, 1500.0)
         z = np.full(x.size, 500.0)
         z[y > 300.0] = -1000.0
-        z[(np.abs(x) < 40.0) & (y > 255.0)] = -1000.0
-        z[(x >= 46.0) & (x <= 150.0) & (y >= 200.0) & (y <= 330.0)] = 3000.0
+        west = np.zeros(x.size, bool)
+        for x0 in (-800.0, -400.0, 0.0, 400.0, 800.0):  # five notches along the shore
+            z[(np.abs(x - x0) < 40.0) & (y > 255.0)] = -1000.0
+            z[(x - x0 >= 46.0) & (x - x0 <= 150.0) & (y >= 200.0) & (y <= 330.0)] = 3000.0
+            west |= (x - x0 < -46.0) & (x - x0 > -85.0) & (y > 265.0) & (y < 300.0)
         new = cc.coast_geometry(p, z, SP)
-        west = (x < -46.0) & (x > -80.0) & (y > 272.0) & (y < 295.0)
         self.assertTrue(new["coast"][west].all())
         self.assertGreater(west.sum(), 5)
         self.assertTrue(new["has"][west].all())
