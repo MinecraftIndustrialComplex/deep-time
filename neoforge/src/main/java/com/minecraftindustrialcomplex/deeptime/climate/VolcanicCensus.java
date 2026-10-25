@@ -126,7 +126,7 @@ public final class VolcanicCensus {
         Side now = new Side(), plain = new Side();
         Map<String, Integer> replaced = new HashMap<>();
         int holes = 0, differ = 0, differByRules = 0, land = 0;
-        int[] landInRole = new int[VolcanicZones.Role.values().length];   // land columns inside a zone of each role (ledger: BIO-196)
+        int[] landInRole = new int[VolcanicZones.Role.values().length];   // land columns inside a zone of each role (ledger: BIO-198)
         int zp = (int) t.zHalf();   // the net's outer edges on the cube (3s/2), the poles on a Lambert-frame world
         TagKey<Biome> ocean = c("is_ocean"), river = c("is_river"), cave = c("is_cave"), underground = c("is_underground");
         for (int z = -zp + step / 2; z < zp; z += step) {
@@ -211,7 +211,7 @@ public final class VolcanicCensus {
         }
         o.add("zones", zj);
         // The land columns each role's zones hold (all land columns sampled, zones overlap): an oceanic volcano's zones
-        // lie on the part of its edifice above the sea (BIO-196), so a cone zone is a share of the land, not a coast.
+        // lie on the part of its edifice above the sea (BIO-198), so a cone zone is a share of the land, not a coast.
         JsonObject lz = new JsonObject();
         lz.addProperty("land_columns", land);
         for (VolcanicZones.Role role : VolcanicZones.Role.values()) {
