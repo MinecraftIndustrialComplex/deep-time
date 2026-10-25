@@ -4139,7 +4139,9 @@ mod tests {
             te[32 * w + 3]
         );
         // Off, the law before: a craton's 80 km where no orogeny reached it.
-        let te_off = run(&on(), false);
+        let mut off = on();
+        off.te_geotherm = false;
+        let te_off = run(&off, false);
         assert!(
             f64::from(te_off[32 * w + 3]) > 79.9,
             "{}",
@@ -4153,7 +4155,7 @@ mod tests {
             "{} against {want}",
             te_belt[24 * w + 3]
         );
-        assert!(p.belt_reach_m(G) > on().belt_reach_m(G) * 1.3);
+        assert!(p.belt_reach_m(G) > off.belt_reach_m(G) * 1.3);
     }
 
     /// A belt's foreland is the carrying plate's own crust within the reach of the belt, the

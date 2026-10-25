@@ -396,6 +396,20 @@ what a player meets most.
   split of the deflection into a bent and a local part does not hold on the runs (the largest
   change of a step doubled). Next: the belt's own deflection solved and carried apart, and the
   foreland's stiffness from its lithosphere's age (flexure.md "Foreland basins", "On the pool").
+- **State (2026-10-25, gap 6b).** Both built. The continental `Te` from the lithosphere's geotherm
+  (ISO-137, ISO-138: Burov & Diament 1995's decoupled layers on the plate model's own geotherm) is
+  on by default: alone it neither diverged nor moved the guard or the steps (arm `g6b-te3` against
+  base10). The superposition (ISO-136: the belt's own increments solved apart on collision steps,
+  that part carried in the belt's frame, nothing solved again) brought the foredeep, 179 km wide
+  at the median against none, with 452 m of flexure below local isostasy against 80 (arm
+  `g6b-both2` against base9), but the largest change of a cell in a step doubled (7.2 to 14.4 km)
+  and the guard's worst rose by 5 km; four rules from the traces took that down by a third, not
+  to the base's. It stays off. Why: where a belt stands its `Te` is low and α about a cell, so the
+  belt's part is the belt's own root, 30 to 49 km, at the cell scale, and the two parts of the
+  split drift into large opposite fields; every change of the frame's geometry moves a step of 20
+  to 27 km that the yield takes back. What would work is the belt's part as the deflection under
+  its present load, a solve of the belt's whole load each collision step, which the brief ruled
+  out (flexure.md "The superposition and the foreland's stiffness (gap 6b)").
 
 ### Recommended order, and why
 
