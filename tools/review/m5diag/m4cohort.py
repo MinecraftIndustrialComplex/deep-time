@@ -17,8 +17,12 @@ when the run has it, with the keel split (K >= 100 km at each end), else the cru
 the runs and the snapshot pairs (each pair weighted by the smaller cohort): pairs, samples at the start, the share
 left at the end, the mean T at the start (km), the crust loss rate E_c (m/Myr, thinning positive), the mean height
 over the sea at the start (m) and its loss rate (m/Myr), and E_c against Pinet & Souriau 1988's law for old
-orogens, Ds = 61e-6 H m/kyr (0.061 H m/Myr, H the mean height, read by a Sonnet sub-agent), at the cohort's mean
-height over the interval.
+orogens, Ds = 61e-6 H m/kyr (0.061 H m/Myr, H the mean basin elevation; abstract read 2026-10-25), at the cohort's
+mean height over the interval, and the same paper's law for basins of orogenies younger than 250 Ma,
+Ds = 419e-6 H - 0.245 m/kyr (0.419 H - 245 m/Myr), as its rate there (`young`).
+
+Untagged columns have no orogeny clock; those the trace saw cross 45 km keep the time they crossed (`cross_t`, frozen
+once they drop under 45 km), so with the trace they are followed by Myr since that crossing (`untagged x`).
 
 With the trace, also the part that took thick columns (they crossed 45 km since the trace began) below 45 km during
 each interval (`touch_part` freezes when the column drops under 45 km; a gap_budget::Part id), by tag and keel.
@@ -31,6 +35,7 @@ import numpy as np
 
 AGES = [0, 10, 20, 30, 50, 100, 150, 250, 1e9]
 PS = 0.061  # m/Myr per m of mean height, Pinet & Souriau 1988 (old orogens)
+PS_YOUNG = (0.419, 245.0)  # m/Myr per m, m/Myr: Pinet & Souriau 1988 (orogenies younger than 250 Ma)
 PART_NAMES = ["birth", "erosion", "rebound", "water", "flexure", "roots", "released", "flexrest", "spread", "later",
               "carry", "subduction", "shortening", "belts", "arcs", "forearc", "founder", "collapse", "flow",
               "transition", "collision", "rifting", "hotspots", "settle", "rate", "plate_surface", "finish", "bury",
@@ -98,6 +103,22 @@ def main():
                         for p in np.rint(s1["touch"][m]).astype(int):
                             dd[p] = dd.get(p, 0) + 1
             if tr:
+                # Untagged columns the trace saw cross 45 km, by Myr since the crossing.
+                for kname, kf in (("keel", lambda s: s["K"] >= 100), ("no keel", lambda s: s["K"] < 100)):
+                    c0 = s0["t"] - s0["cross_t"]
+                    c1 = s1["t"] - s1["cross_t"]
+                    for a0, a1 in zip(AGES[:-1], AGES[1:]):
+                        m0 = (s0["tag"] == 0) & kf(s0) & np.isfinite(c0) & (c0 >= a0) & (c0 < a1)
+                        m1 = (s1["tag"] == 0) & kf(s1) & np.isfinite(c1) & (c1 >= a0 + dt) & (c1 < a1 + dt)
+                        n0, n1 = int(m0.sum()), int(m1.sum())
+                        if n0 < 10 or n1 < 10:
+                            continue
+                        w = min(n0, n1)
+                        h0 = np.maximum(s0["z"][m0] - s0["sea"], 0.0).mean()
+                        h1 = np.maximum(s1["z"][m1] - s1["sea"], 0.0).mean()
+                        d = acc.setdefault((0, kname, a0), np.zeros(9))
+                        d += [1, n0, n1, w, w * s0["T"][m0].mean(), w * (s0["T"][m0].mean() - s1["T"][m1].mean()) / dt,
+                              w * h0, w * (h0 - h1) / dt, w * (h0 + h1) / 2]
                 # The same for untagged columns.
                 m = (s1["tag"] == 0) & (s1["T"] < 45_000) & np.isfinite(s1["cross_t"]) \
                     & (s1["touch_t"] > s0["t"]) & (s1["touch_t"] <= s1["t"])
@@ -108,8 +129,9 @@ def main():
                         dd[p] = dd.get(p, 0) + 1
     print(f"{len(runs)} runs ({'front trace' if traced else 'crust-budget maps'})")
     print("tag, keel, start age Myr: pairs, n start, share left, T start km, E_c m/Myr (thinning +), H start m,"
-          " dH m/Myr (lowering +), 0.061 H m/Myr, E_c / PS, H e-fold Myr at dH")
-    for tag, tname in ((2, "collision"), (1, "andean")):
+          " dH m/Myr (lowering +), 0.061 H m/Myr, E_c / PS, the young law's rate m/Myr, H e-fold Myr at dH, dH / E_c"
+          " (Airy 1/7.02 = 0.142)")
+    for tag, tname in ((2, "collision"), (1, "andean"), (0, "untagged x")):
         for key in sorted(k for k in acc if k[0] == tag):
             _, kname, a0 = key
             p, n0, n1, w, wT, wE, wH, wdH, wHm = acc[key]
@@ -117,7 +139,8 @@ def main():
             ec, hm, dh = wE / w, wHm / w, wdH / w
             print(f"  {tname:9s} {kname:7s} {a0:g}-{a1:g}: pairs {int(p):3d}  n {int(n0):7d}  left {n1 / n0:4.2f}"
                   f"  T {wT / w / 1000:5.1f}  E_c {ec:6.1f}  H {wH / w:6.0f}  dH {dh:6.1f}  PS {PS * hm:6.1f}"
-                  f"  E_c/PS {ec / max(PS * hm, 1e-9):5.2f}  e-fold {hm / dh if dh > 0 else float('inf'):7.0f}")
+                  f"  E_c/PS {ec / max(PS * hm, 1e-9):5.2f}  young {max(PS_YOUNG[0] * hm - PS_YOUNG[1], 0.0):6.1f}"
+                  f"  e-fold {hm / dh if dh > 0 else float('inf'):7.0f}  dH/E_c {dh / ec if ec != 0 else float('nan'):5.3f}")
     if drops:
         print("\nthick columns gone under 45 km in an interval, by the part that took them under: tag, keel: n; "
               "top parts (share)")
