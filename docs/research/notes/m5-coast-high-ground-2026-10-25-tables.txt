@@ -1,0 +1,516 @@
+runs 24; maps rows 240
+Earth: grid = the census's Lambert grid (332,800 cells), fib = Fibonacci 332,800, f100k = Fibonacci 100,000; no_sheets = Antarctica and Greenland kept out of the shares
+
+== Headline (census grid)
+M5                                     all 0.2478 [0.2108, 0.3063]  sc 0.2668  scat 0.2436  MW p 0.751  | Earth grid 0.0840 fib 0.0776 f100k 0.0715 grid_all 0.0929
+M4                                     all 0.1281 [0.0868, 0.1492]  sc 0.1004  scat 0.1333  MW p 0.436  | Earth grid 0.0552 fib 0.0552 f100k 0.0562 grid_all 0.1014
+cached M5 agrees                       all 0.0000 [0.0000, 0.0000]  sc 0.0000  scat 0.0000  MW p nan
+M5/M4                                  all 1.943 [1.706, 2.574]  sc 2.170  scat 1.882  MW p 0.194  | Earth grid 1.5228 fib 1.4054 f100k 1.2723 grid_all 0.9153
+f_near                                 all 0.2649 [0.2245, 0.3292]  sc 0.2865  scat 0.2527  MW p 0.665  | Earth grid 0.1151 fib 0.1065 f100k 0.0885 grid_all 0.0736
+kappa                                  all 0.0918 [0.0834, 0.1069]  sc 0.0926  scat 0.0896  MW p 1.000  | Earth grid 0.0979 fib 0.0975 f100k 0.1504 grid_all 0.0949
+s                                      all 0.7498 [0.6643, 0.8291]  sc 0.7710  scat 0.6938  MW p 0.175  | Earth grid 1.2951 fib 1.2860 f100k 2.1628 grid_all 1.1801
+land_within_50                         all 0.0618 [0.0572, 0.0724]  sc 0.0625  scat 0.0606  MW p 0.931  | Earth grid 0.0693 fib 0.0879 f100k 0.0000 grid_all 0.0679
+land_within_100                        all 0.1524 [0.1408, 0.1805]  sc 0.1524  scat 0.1526  MW p 1.000  | Earth grid 0.1565 fib 0.1668 f100k 0.1403 grid_all 0.1525
+land_within_200                        all 0.3030 [0.2822, 0.3540]  sc 0.3030  scat 0.3039  MW p 0.977  | Earth grid 0.2920 fib 0.2928 f100k 0.2671 grid_all 0.2917
+map align (kind agreement)             all 0.9959 [0.9953, 0.9964]  sc 0.9956  scat 0.9959  MW p 0.401
+orogeny agree on hi (map vs field)     all 0.9912 [0.9903, 0.9923]  sc 0.9915  scat 0.9906  MW p 0.078
+
+== Q1: the qualified coast by the class of its nearest qualifying high ground (share of M5)
+by_nearest/M5 coll_young               all 0.4600 [0.3858, 0.5313]  sc 0.4524  scat 0.4680  MW p 0.470
+by_nearest/M5 coll_old                 all 0.1361 [0.1061, 0.1722]  sc 0.1299  scat 0.1628  MW p 0.069
+by_nearest/M5 andean_young             all 0.1107 [0.0876, 0.1610]  sc 0.1180  scat 0.1092  MW p 0.931
+by_nearest/M5 andean_old               all 0.0615 [0.0438, 0.0765]  sc 0.0565  scat 0.0645  MW p 0.885
+by_nearest/M5 u_Tc                     all 0.0118 [0.0090, 0.0172]  sc 0.0129  scat 0.0118  MW p 0.885
+by_nearest/M5 u_ocean                  all 0.0305 [0.0227, 0.0411]  sc 0.0283  scat 0.0333  MW p 0.931
+by_nearest/M5 u_volc                   all 0.0231 [0.0159, 0.0386]  sc 0.0221  scat 0.0243  MW p 0.885
+by_nearest/M5 u_rift                   all 0.0109 [0.0037, 0.0185]  sc 0.0080  scat 0.0120  MW p 0.419
+by_nearest/M5 u_thick                  all 0.0209 [0.0138, 0.0273]  sc 0.0219  scat 0.0189  MW p 0.341
+by_nearest/M5 u_other                  all 0.0795 [0.0637, 0.0964]  sc 0.0772  scat 0.0929  MW p 0.260
+-- M5 left without the class (absolute)
+without coll_young                     all 0.1751 [0.1354, 0.2221]  sc 0.1852  scat 0.1725  MW p 1.000
+without coll_old                       all 0.2256 [0.1906, 0.2863]  sc 0.2480  scat 0.2180  MW p 0.665
+without andean_young                   all 0.2231 [0.1801, 0.2852]  sc 0.2486  scat 0.2181  MW p 0.707
+without andean_old                     all 0.2395 [0.2083, 0.3029]  sc 0.2582  scat 0.2328  MW p 0.795
+without u_Tc                           all 0.2472 [0.2097, 0.3038]  sc 0.2664  scat 0.2427  MW p 0.707
+without u_ocean                        all 0.2446 [0.2104, 0.3058]  sc 0.2643  scat 0.2404  MW p 0.751
+without u_volc                         all 0.2453 [0.2091, 0.3045]  sc 0.2623  scat 0.2422  MW p 0.751
+without u_rift                         all 0.2439 [0.2102, 0.3062]  sc 0.2659  scat 0.2401  MW p 0.795
+without u_thick                        all 0.2473 [0.2108, 0.3053]  sc 0.2659  scat 0.2430  MW p 0.751
+without u_other                        all 0.2359 [0.1993, 0.2901]  sc 0.2596  scat 0.2312  MW p 0.795
+-- M4 by class (share of M4)
+m4_by/M4 coll_young                    all 0.4960 [0.4413, 0.5956]  sc 0.5157  scat 0.4960  MW p 0.665
+m4_by/M4 coll_old                      all 0.1425 [0.1387, 0.1853]  sc 0.1393  scat 0.1750  MW p 0.053
+m4_by/M4 andean_young                  all 0.0657 [0.0532, 0.0921]  sc 0.0622  scat 0.0725  MW p 0.507
+m4_by/M4 andean_old                    all 0.0761 [0.0533, 0.0931]  sc 0.0740  scat 0.0761  MW p 0.707
+m4_by/M4 u_Tc                          all 0.0366 [0.0188, 0.0903]  sc 0.0544  scat 0.0321  MW p 0.583
+m4_by/M4 u_ocean                       all 0.0086 [0.0057, 0.0113]  sc 0.0092  scat 0.0082  MW p 0.403
+m4_by/M4 u_volc                        all 0.0152 [0.0093, 0.0190]  sc 0.0152  scat 0.0154  MW p 0.977
+m4_by/M4 u_rift                        all 0.0011 [0.0006, 0.0018]  sc 0.0009  scat 0.0016  MW p 0.299
+m4_by/M4 u_thick                       all 0.0355 [0.0261, 0.0471]  sc 0.0346  scat 0.0435  MW p 0.089
+m4_by/M4 u_other                       all 0.0401 [0.0210, 0.0559]  sc 0.0400  scat 0.0401  MW p 0.707
+-- the young collision part by stamp age (absolute, part of M5)
+coll_young age -1e+09-2                all 0.0874 [0.0699, 0.1029]  sc 0.0932  scat 0.0825  MW p 0.260
+coll_young age 2-5                     all 0.0179 [0.0098, 0.0253]  sc 0.0144  scat 0.0232  MW p 0.194
+coll_young age 5-10                    all 0.0113 [0.0081, 0.0148]  sc 0.0092  scat 0.0121  MW p 0.470
+-- the parked untagged columns (u_Tc) on high ground
+u_Tc hi island arc share               all 0.1101 [0.0429, 0.2363]  sc 0.0885  scat 0.1656  MW p 0.707
+u_Tc hi regime back_arc                all 0.3204 [0.1085, 0.4371]  sc 0.2568  scat 0.4123  MW p 0.525
+u_Tc hi regime craton                  all 0.6625 [0.5096, 0.8722]  sc 0.7243  scat 0.5703  MW p 0.312
+-- the coast by the nearest plate front (map flags)
+sub200 coast share                     all 0.3168 [0.2848, 0.3663]  sc 0.3072  scat 0.3455  MW p 0.371
+sub200 M5 inside                       all 0.4957 [0.4318, 0.5276]  sc 0.5087  scat 0.4724  MW p 0.175
+sub200 part of M5 (abs)                all 0.1640 [0.1326, 0.1862]  sc 0.1652  scat 0.1627  MW p 0.885
+coll200 coast share                    all 0.1214 [0.1044, 0.1377]  sc 0.1171  scat 0.1243  MW p 0.977
+coll200 M5 inside                      all 0.5274 [0.4535, 0.6076]  sc 0.5781  scat 0.5033  MW p 0.194
+coll200 part of M5 (abs)               all 0.0683 [0.0487, 0.0778]  sc 0.0707  scat 0.0629  MW p 0.707
+neither coast share                    all 0.5632 [0.5107, 0.5801]  sc 0.5690  scat 0.5293  MW p 0.583
+neither M5 inside                      all 0.0472 [0.0332, 0.0918]  sc 0.0568  scat 0.0472  MW p 1.000
+neither part of M5 (abs)               all 0.0275 [0.0170, 0.0426]  sc 0.0302  scat 0.0275  MW p 0.885
+-- the coast by setting: within 200 km of a trench (model regime 2; Earth PB2002 SUB), else of a collision (model regime 5; Earth PB2002 CCB or OCB), else neither
+trench200 coast_share                  all 0.2438 [0.2153, 0.2620]  sc 0.2438  scat 0.2431  MW p 0.470  | Earth grid 0.1221 fib 0.1210
+trench200 m5_in                        all 0.5703 [0.5213, 0.6019]  sc 0.5750  scat 0.5611  MW p 0.214  | Earth grid 0.2740 fib 0.2616
+trench200 m5_part                      all 0.1411 [0.1107, 0.1644]  sc 0.1411  scat 0.1366  MW p 1.000  | Earth grid 0.0335 fib 0.0317
+trench200 part by coll_young           all 0.0805 [0.0614, 0.1000]  sc 0.0835  scat 0.0746  MW p 0.583
+trench200 part by coll_old             all 0.0194 [0.0135, 0.0266]  sc 0.0175  scat 0.0269  MW p 0.061
+trench200 part by andean_young         all 0.0147 [0.0111, 0.0248]  sc 0.0161  scat 0.0142  MW p 1.000
+trench200 part by andean_old           all 0.0062 [0.0051, 0.0074]  sc 0.0061  scat 0.0064  MW p 0.403
+trench200 part by u_other              all 0.0041 [0.0028, 0.0060]  sc 0.0039  scat 0.0046  MW p 0.341
+coll200 coast_share                    all 0.1590 [0.1349, 0.1778]  sc 0.1623  scat 0.1546  MW p 0.583  | Earth grid 0.0930 fib 0.0886
+coll200 m5_in                          all 0.5173 [0.4563, 0.5800]  sc 0.5638  scat 0.4832  MW p 0.260  | Earth grid 0.1347 fib 0.1168
+coll200 m5_part                        all 0.0764 [0.0629, 0.0928]  sc 0.0821  scat 0.0757  MW p 0.470  | Earth grid 0.0125 fib 0.0104
+coll200 part by coll_young             all 0.0380 [0.0313, 0.0486]  sc 0.0406  scat 0.0337  MW p 0.214
+coll200 part by coll_old               all 0.0160 [0.0080, 0.0205]  sc 0.0116  scat 0.0175  MW p 0.312
+coll200 part by andean_young           all 0.0048 [0.0030, 0.0061]  sc 0.0050  scat 0.0048  MW p 0.544
+coll200 part by andean_old             all 0.0025 [0.0013, 0.0032]  sc 0.0026  scat 0.0025  MW p 0.525
+coll200 part by u_other                all 0.0037 [0.0022, 0.0069]  sc 0.0033  scat 0.0055  MW p 0.112
+neither coast_share                    all 0.6004 [0.5470, 0.6431]  sc 0.6066  scat 0.6001  MW p 0.624  | Earth grid 0.7849 fib 0.7903
+neither m5_in                          all 0.0609 [0.0421, 0.0989]  sc 0.0718  scat 0.0609  MW p 1.000  | Earth grid 0.0485 fib 0.0450
+neither m5_part                        all 0.0389 [0.0253, 0.0548]  sc 0.0420  scat 0.0389  MW p 0.885  | Earth grid 0.0381 fib 0.0356
+neither part by coll_young             all 0.0000 [0.0000, 0.0000]  sc 0.0000  scat 0.0000  MW p 1.000
+neither part by coll_old               all 0.0021 [0.0004, 0.0049]  sc 0.0021  scat 0.0021  MW p 0.750
+neither part by andean_young           all 0.0074 [0.0043, 0.0131]  sc 0.0046  scat 0.0082  MW p 0.260
+neither part by andean_old             all 0.0059 [0.0036, 0.0085]  sc 0.0059  scat 0.0056  MW p 0.751
+neither part by u_other                all 0.0123 [0.0064, 0.0190]  sc 0.0129  scat 0.0114  MW p 0.977
+-- the qualifying high point's own setting (fields' regime; 3 arc, 4 back_arc, 5 collision, 8 craton, 9 passive_margin)
+coll_young hi regime 2                 all 0.0039 [0.0014, 0.0138]  sc 0.0049  scat 0.0039  MW p 0.400
+coll_young hi regime 3                 all 0.0000 [0.0000, 0.0003]  sc 0.0000  scat 0.0000  MW p 0.820
+coll_young hi regime 4                 all 0.0021 [0.0000, 0.0056]  sc 0.0028  scat 0.0000  MW p 0.150
+coll_young hi regime 5                 all 0.9854 [0.9785, 0.9909]  sc 0.9895  scat 0.9828  MW p 0.285
+coll_young hi regime 6                 all 0.0000 [0.0000, 0.0000]  sc 0.0000  scat 0.0000  MW p 0.359
+coll_young hi regime 8                 all 0.0000 [0.0000, 0.0000]  sc 0.0000  scat 0.0000  MW p 0.286
+coll_young hi regime 9                 all 0.0000 [0.0000, 0.0000]  sc 0.0000  scat 0.0000  MW p 0.581
+coll_young hi on active collision      all 0.0000 [0.0000, 0.6801]  sc 0.0000  scat 0.0000  MW p 1.000
+coll_old hi regime 2                   all 0.0111 [0.0013, 0.0289]  sc 0.0129  scat 0.0098  MW p 0.839
+coll_old hi regime 3                   all 0.0016 [0.0000, 0.0109]  sc 0.0023  scat 0.0009  MW p 0.738
+coll_old hi regime 4                   all 0.1181 [0.0671, 0.1791]  sc 0.1011  scat 0.1369  MW p 0.544
+coll_old hi regime 5                   all 0.7146 [0.5770, 0.8057]  sc 0.6770  scat 0.7348  MW p 0.885
+coll_old hi regime 6                   all 0.0210 [0.0000, 0.0459]  sc 0.0089  scat 0.0339  MW p 0.066
+coll_old hi regime 8                   all 0.0452 [0.0231, 0.1208]  sc 0.0711  scat 0.0452  MW p 0.370
+coll_old hi regime 9                   all 0.0086 [0.0000, 0.0556]  sc 0.0054  scat 0.0166  MW p 0.744
+coll_old hi on active collision        all 0.0000 [0.0000, 0.0476]  sc 0.0000  scat 0.0000  MW p 0.918
+andean_young hi regime 2               all 0.0000 [0.0000, 0.0011]  sc 0.0000  scat 0.0000  MW p 0.519
+andean_young hi regime 3               all 0.4951 [0.3612, 0.6128]  sc 0.5134  scat 0.4403  MW p 0.341
+andean_young hi regime 4               all 0.4179 [0.3712, 0.4920]  sc 0.4277  scat 0.4094  MW p 0.507
+andean_young hi regime 5               all 0.0000 [0.0000, 0.0131]  sc 0.0000  scat 0.0000  MW p 0.857
+andean_young hi regime 6               all 0.0000 [0.0000, 0.0377]  sc 0.0039  scat 0.0000  MW p 0.777
+andean_young hi regime 8               all 0.0000 [0.0000, 0.0660]  sc 0.0000  scat 0.0075  MW p 0.384
+andean_young hi regime 9               all 0.0000 [0.0000, 0.0000]  sc 0.0000  scat 0.0000  MW p 0.328
+andean_young hi on active collision    all 0.0000 [0.0000, 0.0045]  sc 0.0000  scat 0.0000  MW p 1.000
+u_other hi regime 2                    all 0.0000 [0.0000, 0.0106]  sc 0.0000  scat 0.0000  MW p 0.491
+u_other hi regime 3                    all 0.0000 [0.0000, 0.0000]  sc 0.0000  scat 0.0000  MW p nan
+u_other hi regime 4                    all 0.3836 [0.2619, 0.4719]  sc 0.3020  scat 0.4690  MW p 0.007
+u_other hi regime 5                    all 0.0030 [0.0000, 0.0157]  sc 0.0000  scat 0.0102  MW p 0.241
+u_other hi regime 6                    all 0.0000 [0.0000, 0.0000]  sc 0.0000  scat 0.0000  MW p nan
+u_other hi regime 8                    all 0.2023 [0.1259, 0.2760]  sc 0.1780  scat 0.2288  MW p 0.507
+u_other hi regime 9                    all 0.2682 [0.1755, 0.3511]  sc 0.3414  scat 0.2434  MW p 0.035
+u_other hi on active collision         all 0.0000 [0.0000, 0.0916]  sc 0.0000  scat 0.0000  MW p 0.863
+all hi regime 2                        all 0.0035 [0.0026, 0.0065]  sc 0.0038  scat 0.0035  MW p 0.214
+all hi regime 3                        all 0.0237 [0.0130, 0.0329]  sc 0.0237  scat 0.0249  MW p 1.000
+all hi regime 4                        all 0.1897 [0.1504, 0.2069]  sc 0.1951  scat 0.1873  MW p 0.840
+all hi regime 5                        all 0.6614 [0.5353, 0.6954]  sc 0.6588  scat 0.6676  MW p 0.840
+all hi regime 6                        all 0.0029 [0.0017, 0.0040]  sc 0.0026  scat 0.0033  MW p 0.436
+all hi regime 8                        all 0.1122 [0.0629, 0.2275]  sc 0.1130  scat 0.1122  MW p 0.885
+all hi regime 9                        all 0.0050 [0.0041, 0.0064]  sc 0.0058  scat 0.0042  MW p 0.089
+all hi on active collision             all 0.0000 [0.0000, 0.3289]  sc 0.0000  scat 0.0000  MW p 0.973
+-- the coast by landmass size (Mkm2)
+landmass 0-1 coast share               all 0.1321 [0.1110, 0.1635]  sc 0.1361  scat 0.1277  MW p 1.000
+landmass 0-1 M5 inside                 all 0.1556 [0.0779, 0.2257]  sc 0.2049  scat 0.1203  MW p 0.260
+landmass 1-10 coast share              all 0.1569 [0.1280, 0.1889]  sc 0.1473  scat 0.1713  MW p 0.371
+landmass 1-10 M5 inside                all 0.2355 [0.1355, 0.3456]  sc 0.2355  scat 0.2357  MW p 0.544
+landmass 10-30 coast share             all 0.1221 [0.0732, 0.1985]  sc 0.1149  scat 0.1293  MW p 0.622
+landmass 10-30 M5 inside               all 0.2372 [0.0000, 0.3203]  sc 0.2372  scat 0.1990  MW p 0.661
+landmass 30-1e+09 coast share          all 0.5491 [0.4587, 0.6562]  sc 0.5391  scat 0.5519  MW p 0.977
+landmass 30-1e+09 M5 inside            all 0.2758 [0.2430, 0.3626]  sc 0.3028  scat 0.2672  MW p 0.840
+
+== Q2: distance from the qualified coast to its nearest qualifying high point (share of M5)
+dist self                              all 0.1569 [0.1309, 0.1795]  sc 0.1464  scat 0.1748  MW p 0.112  | Earth grid 0.0267 fib 0.0077 f100k 0.0717 grid_all 0.0235
+dist 0-50                              all 0.1601 [0.1469, 0.1833]  sc 0.1609  scat 0.1601  MW p 0.707  | Earth grid 0.0999 fib 0.1104 f100k 0.0000 grid_all 0.0951
+dist 50-100                            all 0.2699 [0.2463, 0.2868]  sc 0.2857  scat 0.2558  MW p 0.019  | Earth grid 0.2813 fib 0.3083 f100k 0.3692 grid_all 0.2782
+dist 100-150                           all 0.2081 [0.1942, 0.2413]  sc 0.2081  scat 0.2047  MW p 0.707  | Earth grid 0.2883 fib 0.2960 f100k 0.2652 grid_all 0.3005
+dist 150-200                           all 0.1856 [0.1683, 0.2011]  sc 0.1807  scat 0.1934  MW p 0.194  | Earth grid 0.3038 fib 0.2776 f100k 0.2939 grid_all 0.3028
+-- by class (share of that class's part)
+coll_young dist self                   all 0.2386 [0.1835, 0.2682]  sc 0.2207  scat 0.2533  MW p 0.194
+coll_young dist 0-50                   all 0.1616 [0.1455, 0.1882]  sc 0.1769  scat 0.1578  MW p 0.840
+coll_young dist 50-100                 all 0.2580 [0.2333, 0.2805]  sc 0.2721  scat 0.2531  MW p 0.100
+coll_young dist 100-150                all 0.1813 [0.1601, 0.2033]  sc 0.1765  scat 0.1856  MW p 1.000
+coll_young dist 150-200                all 0.1489 [0.1299, 0.1674]  sc 0.1411  scat 0.1504  MW p 0.885
+andean_young dist self                 all 0.0184 [0.0071, 0.0302]  sc 0.0084  scat 0.0235  MW p 0.174
+andean_young dist 0-50                 all 0.0845 [0.0635, 0.1103]  sc 0.0777  scat 0.0992  MW p 0.285
+andean_young dist 50-100               all 0.2488 [0.2087, 0.2792]  sc 0.2632  scat 0.2439  MW p 0.624
+andean_young dist 100-150              all 0.3350 [0.2793, 0.3810]  sc 0.3573  scat 0.3174  MW p 0.175
+andean_young dist 150-200              all 0.3012 [0.2772, 0.3465]  sc 0.2889  scat 0.3085  MW p 0.341
+coll_old dist self                     all 0.1774 [0.0987, 0.2107]  sc 0.1552  scat 0.2080  MW p 0.061
+coll_old dist 0-50                     all 0.1825 [0.1518, 0.2111]  sc 0.1598  scat 0.1913  MW p 0.403
+coll_old dist 50-100                   all 0.2600 [0.2216, 0.3132]  sc 0.2694  scat 0.2344  MW p 0.053
+coll_old dist 100-150                  all 0.1866 [0.1508, 0.2354]  sc 0.2007  scat 0.1585  MW p 0.141
+coll_old dist 150-200                  all 0.1735 [0.1567, 0.2112]  sc 0.1735  scat 0.1690  MW p 0.707
+-- the qualifying high point's own distance to the sea
+hi own sea -1-50                       all 0.1672 [0.1379, 0.1856]  sc 0.1507  scat 0.1700  MW p 0.214  | Earth grid 0.0436 fib 0.0337 f100k 0.0000 grid_all 0.0423
+hi own sea 50-100                      all 0.4697 [0.4366, 0.5179]  sc 0.4745  scat 0.4484  MW p 0.371  | Earth grid 0.3460 fib 0.3282 f100k 0.1505 grid_all 0.3063
+hi own sea 100-200                     all 0.3323 [0.2927, 0.3630]  sc 0.3326  scat 0.3251  MW p 0.931  | Earth grid 0.5359 fib 0.5844 f100k 0.6703 grid_all 0.5657
+hi own sea 200-400                     all 0.0222 [0.0152, 0.0279]  sc 0.0184  scat 0.0258  MW p 0.069  | Earth grid 0.0745 fib 0.0537 f100k 0.1792 grid_all 0.0857
+hi own sea 400-1e+09                   all 0.0000 [0.0000, 0.0000]  sc 0.0000  scat 0.0000  MW p nan  | Earth grid 0.0000 fib 0.0000 f100k 0.0000 grid_all 0.0000
+
+== Matched M4: M5 with the level at the quantile putting the target share of land above it
+M5 at M4=0.047                         all 0.1085 [0.0805, 0.1282]  sc 0.1188  scat 0.1036  MW p 0.285  | Earth grid 0.0752 fib 0.0638
+  level m at M4=0.047                  all 3403 [2960, 3736]  sc 3315  scat 3511  MW p 0.665  | Earth grid 2175
+  f_near at M4=0.047                   all 0.2455 [0.1896, 0.2892]  sc 0.2518  scat 0.2141  MW p 0.624  | Earth grid 0.1109
+  s at M4=0.047                        all 0.8773 [0.7531, 0.9852]  sc 0.8883  scat 0.8412  MW p 0.624  | Earth grid 1.4133
+M5 at M4=0.055                         all 0.1172 [0.0905, 0.1499]  sc 0.1349  scat 0.1132  MW p 0.260  | Earth grid 0.0839 fib 0.0773
+  level m at M4=0.055                  all 3222 [2688, 3575]  sc 3086  scat 3288  MW p 0.707  | Earth grid 2004
+  f_near at M4=0.055                   all 0.2388 [0.1922, 0.2955]  sc 0.2574  scat 0.2240  MW p 0.665  | Earth grid 0.1147
+  s at M4=0.055                        all 0.8148 [0.7341, 0.9471]  sc 0.8529  scat 0.7806  MW p 0.470  | Earth grid 1.3028
+M5 at M4=0.0617                        all 0.1274 [0.0979, 0.1670]  sc 0.1442  scat 0.1264  MW p 0.371  | Earth grid 0.0988 fib 0.0834
+  level m at M4=0.0617                 all 3057 [2515, 3446]  sc 2904  scat 3103  MW p 0.707  | Earth grid 1879
+  f_near at M4=0.0617                  all 0.2451 [0.1917, 0.2984]  sc 0.2631  scat 0.2324  MW p 0.751  | Earth grid 0.1187
+  s at M4=0.0617                       all 0.7939 [0.7238, 0.9517]  sc 0.8046  scat 0.7633  MW p 0.544  | Earth grid 1.3207
+M5 at M4=0.07                          all 0.1409 [0.1075, 0.1838]  sc 0.1571  scat 0.1407  MW p 0.507  | Earth grid 0.1086 fib 0.1076
+  level m at M4=0.07                   all 2857 [2351, 3264]  sc 2705  scat 2880  MW p 0.665  | Earth grid 1750
+  f_near at M4=0.07                    all 0.2532 [0.1975, 0.3031]  sc 0.2560  scat 0.2417  MW p 0.751  | Earth grid 0.1232
+  s at M4=0.07                         all 0.7746 [0.7049, 0.9086]  sc 0.7782  scat 0.7709  MW p 0.470  | Earth grid 1.2336
+M5 at M4=0.1                           all 0.2046 [0.1680, 0.2542]  sc 0.2234  scat 0.1795  MW p 0.126  | Earth grid 0.1719 fib 0.1825
+  level m at M4=0.1                    all 2253 [1815, 2695]  sc 2047  scat 2368  MW p 0.470  | Earth grid 1450
+  f_near at M4=0.1                     all 0.2668 [0.2202, 0.3322]  sc 0.2675  scat 0.2576  MW p 0.624  | Earth grid 0.1327
+  s at M4=0.1                          all 0.7553 [0.6806, 0.8304]  sc 0.7780  scat 0.7264  MW p 0.341  | Earth grid 1.2688
+fib M5 at M4=0.055                     all 0.1287 [0.0994, 0.1534]  sc 0.1351  scat 0.1210  MW p 0.341
+-- Earth with the level lowered to put the model's share of land above it
+   Earth grid no_sheets: 0.047:0.0752@2175m(f_near 0.111, s 1.413) 0.055:0.0839@2004m(f_near 0.115, s 1.303) 0.0617:0.0988@1879m(f_near 0.119, s 1.321) 0.07:0.1086@1750m(f_near 0.123, s 1.234) 0.1:0.1719@1450m(f_near 0.133, s 1.269) 0.128:0.2296@1279m(f_near 0.138, s 1.277) 0.15:0.2810@1177m(f_near 0.141, s 1.299)
+   Earth fib no_sheets: 0.047:0.0638@2170m(f_near 0.099, s 1.340) 0.055:0.0773@2004m(f_near 0.107, s 1.282) 0.0617:0.0834@1886m(f_near 0.110, s 1.200) 0.07:0.1076@1760m(f_near 0.116, s 1.290) 0.1:0.1825@1447m(f_near 0.129, s 1.384) 0.128:0.2450@1277m(f_near 0.136, s 1.374) 0.15:0.2877@1175m(f_near 0.140, s 1.337)
+   Earth grid all: 0.047:0.0180@3032m(f_near 0.045, s 0.805) 0.055:0.0229@2844m(f_near 0.045, s 0.875) 0.0617:0.0298@2692m(f_near 0.046, s 0.989) 0.07:0.0379@2523m(f_near 0.048, s 1.081) 0.1:0.0925@2017m(f_near 0.073, s 1.208) 0.128:0.1336@1685m(f_near 0.095, s 1.039) 0.15:0.1782@1490m(f_near 0.113, s 0.998)
+levels 2500 m M5                       all 0.1747 [0.1486, 0.2488]  sc 0.1975  scat 0.1644  MW p 0.665
+levels 3000 m M5                       all 0.1224 [0.1041, 0.1692]  sc 0.1380  scat 0.1176  MW p 0.751
+   Earth grid no_sheets at 1500 m 0.1587, 1000 m 0.3527
+
+== Q5: measure checks
+fib M5 (same count)                    all 0.2717 [0.2089, 0.3127]  sc 0.2837  scat 0.2606  MW p 0.931  | Earth grid 0.0840 fib 0.0776 f100k 0.0715 grid_all 0.0929
+fib M5 / grid M5                       all 1.0621 [1.0214, 1.0883]  sc 1.0672  scat 1.0576  MW p 0.885  | Earth 0.923
+fib M4                                 all 0.1296 [0.0869, 0.1511]  sc 0.1000  scat 0.1333  MW p 0.403
+fib f_near                             all 0.2709 [0.2333, 0.3363]  sc 0.2899  scat 0.2556  MW p 0.665  | Earth 0.1065
+fib kappa                              all 0.0917 [0.0853, 0.1107]  sc 0.0917  scat 0.0922  MW p 1.000  | Earth 0.0975
+fib s                                  all 0.7929 [0.7237, 0.8260]  sc 0.8151  scat 0.7442  MW p 0.112  | Earth 1.2860
+fib ratio                              all 2.1203 [1.8640, 2.6795]  sc 2.2138  scat 2.0616  MW p 0.214  | Earth 1.4054
+n_comp census                          all 357 [270, 394]  sc 356  scat 357  MW p 0.795  | Earth 480 grid8 133
+n_comp grid8                           all 74 [59, 89]  sc 76  scat 66  MW p 0.312
+grid8 M5                               all 0.2668 [0.2159, 0.3153]  sc 0.2891  scat 0.2583  MW p 0.795  | Earth grid 0.0851
+lat 0-30 land_share                    all 0.4918 [0.3960, 0.5743]  sc 0.5030  scat 0.4653  MW p 0.977  | Earth 0.4983
+lat 0-30 coast_per_land_grid           all 0.1061 [0.0813, 0.1228]  sc 0.1030  scat 0.1076  MW p 0.795  | Earth 0.0912 fib 0.0836
+lat 0-30 coast_per_land_fib            all 0.0980 [0.0768, 0.1148]  sc 0.0951  scat 0.0994  MW p 0.885
+lat 0-30 m5_grid                       all 0.2438 [0.1960, 0.3614]  sc 0.2355  scat 0.2485  MW p 0.624  | Earth 0.1316 fib 0.1229
+lat 0-30 m5_fib                        all 0.2306 [0.1938, 0.3536]  sc 0.2241  scat 0.2416  MW p 0.751
+lat 0-30 coast_share_grid              all 0.4935 [0.4541, 0.5380]  sc 0.4935  scat 0.4964  MW p 0.665
+lat 30-45 land_share                   all 0.2161 [0.1918, 0.2290]  sc 0.2180  scat 0.2042  MW p 0.260  | Earth 0.2146
+lat 30-45 coast_per_land_grid          all 0.1025 [0.0869, 0.1135]  sc 0.1030  scat 0.1006  MW p 0.931  | Earth 0.1132 fib 0.1009
+lat 30-45 coast_per_land_fib           all 0.0948 [0.0789, 0.1049]  sc 0.0949  scat 0.0931  MW p 0.977
+lat 30-45 m5_grid                      all 0.2733 [0.2224, 0.3352]  sc 0.3139  scat 0.2627  MW p 0.436  | Earth 0.0881 fib 0.0915
+lat 30-45 m5_fib                       all 0.2668 [0.2219, 0.3400]  sc 0.3042  scat 0.2574  MW p 0.507
+lat 30-45 coast_share_grid             all 0.2293 [0.1985, 0.2420]  sc 0.2341  scat 0.2227  MW p 0.312
+lat 45-52 land_share                   all 0.0799 [0.0641, 0.0905]  sc 0.0769  scat 0.0817  MW p 0.840  | Earth 0.0897
+lat 45-52 coast_per_land_grid          all 0.0927 [0.0712, 0.1327]  sc 0.0924  scat 0.0988  MW p 0.665  | Earth 0.0760 fib 0.0828
+lat 45-52 coast_per_land_fib           all 0.1036 [0.0796, 0.1447]  sc 0.1016  scat 0.1111  MW p 0.624
+lat 45-52 m5_grid                      all 0.2938 [0.1836, 0.3412]  sc 0.2938  scat 0.2704  MW p 0.371  | Earth 0.0153 fib 0.0308
+lat 45-52 m5_fib                       all 0.3124 [0.1772, 0.3644]  sc 0.3124  scat 0.2828  MW p 0.260
+lat 45-52 coast_share_grid             all 0.0801 [0.0709, 0.1000]  sc 0.0827  scat 0.0783  MW p 0.885
+lat 52-60 land_share                   all 0.0791 [0.0593, 0.1025]  sc 0.0756  scat 0.0845  MW p 0.707  | Earth 0.0888
+lat 52-60 coast_per_land_grid          all 0.0731 [0.0551, 0.0896]  sc 0.0731  scat 0.0747  MW p 0.665  | Earth 0.0787 fib 0.0910
+lat 52-60 coast_per_land_fib           all 0.0934 [0.0697, 0.1124]  sc 0.0884  scat 0.1007  MW p 1.000
+lat 52-60 m5_grid                      all 0.1696 [0.1293, 0.2503]  sc 0.1805  scat 0.1439  MW p 0.175  | Earth 0.0000 fib 0.0103
+lat 52-60 m5_fib                       all 0.2533 [0.1965, 0.3496]  sc 0.3171  scat 0.2249  MW p 0.175
+lat 52-60 coast_share_grid             all 0.0632 [0.0482, 0.0792]  sc 0.0632  scat 0.0605  MW p 0.885
+lat 60-70 land_share                   all 0.0786 [0.0515, 0.1023]  sc 0.0730  scat 0.0994  MW p 0.624  | Earth 0.0927
+lat 60-70 coast_per_land_grid          all 0.0819 [0.0610, 0.1014]  sc 0.0812  scat 0.0819  MW p 0.977  | Earth 0.0814 fib 0.1096
+lat 60-70 coast_per_land_fib           all 0.1173 [0.0808, 0.1427]  sc 0.1016  scat 0.1219  MW p 0.931
+lat 60-70 m5_grid                      all 0.1570 [0.0965, 0.2676]  sc 0.1840  scat 0.1524  MW p 0.795  | Earth 0.0000 fib 0.0169
+lat 60-70 m5_fib                       all 0.3217 [0.1628, 0.3880]  sc 0.3354  scat 0.2714  MW p 0.624
+lat 60-70 coast_share_grid             all 0.0680 [0.0493, 0.0813]  sc 0.0695  scat 0.0652  MW p 0.751
+lat 70-90 land_share                   all 0.0671 [0.0401, 0.0869]  sc 0.0696  scat 0.0591  MW p 1.000  | Earth 0.0159
+lat 70-90 coast_per_land_grid          all 0.1055 [0.0645, 0.1578]  sc 0.1055  scat 0.1204  MW p 0.583  | Earth 0.4278 fib 0.4769
+lat 70-90 coast_per_land_fib           all 0.1196 [0.0775, 0.1782]  sc 0.1196  scat 0.1343  MW p 0.665
+lat 70-90 m5_grid                      all 0.1149 [0.0335, 0.2209]  sc 0.0582  scat 0.1228  MW p 0.525  | Earth 0.0000 fib 0.0000
+lat 70-90 m5_fib                       all 0.1638 [0.0631, 0.3456]  sc 0.1227  scat 0.2425  MW p 0.285
+lat 70-90 coast_share_grid             all 0.0615 [0.0505, 0.0776]  sc 0.0540  scat 0.0694  MW p 0.175
+   Earth grid sea bodies: {"n_ge1": 2, "n_lt1": 47, "area_lt1_share_of_sea": 0.003904331182140015, "largest_share_of_sea": 0.989205921710114, "bodies_ge0.1_Mkm2": [0.46, 0.68, 2.49]}
+sea bodies n_ge1                       all 1.0000 [1.0000, 2.0000]  sc 1.0000  scat 1.0000  MW p 0.687
+sea bodies n_lt1                       all 48.5000 [35.5000, 71.0000]  sc 54.5000  scat 38.5000  MW p 0.707
+sea bodies area_lt1_share_of_sea       all 0.0041 [0.0031, 0.0054]  sc 0.0041  scat 0.0037  MW p 0.371
+sea bodies largest_share_of_sea        all 0.9953 [0.9914, 0.9963]  sc 0.9954  scat 0.9951  MW p 0.977
+coast on body < 0.1 Mkm2               all 0.0668 [0.0561, 0.1097]  sc 0.0801  scat 0.0625  MW p 0.885
+M5 inside coast on body < 0.1          all 0.5300 [0.4053, 0.6088]  sc 0.5475  scat 0.5261  MW p 0.840
+M5 with bodies < 0.1 as land           all 0.2268 [0.1929, 0.2839]  sc 0.2472  scat 0.2193  MW p 0.624  | Earth grid 0.0840
+M4 with bodies < 0.1 as land           all 0.1278 [0.0865, 0.1482]  sc 0.0998  scat 0.1330  MW p 0.436
+coast on body < 1 Mkm2                 all 0.1082 [0.0843, 0.1461]  sc 0.1151  scat 0.1066  MW p 0.544
+M5 inside coast on body < 1            all 0.4979 [0.4166, 0.5531]  sc 0.4979  scat 0.5049  MW p 0.885
+M5 with bodies < 1 as land             all 0.2143 [0.1827, 0.2729]  sc 0.2335  scat 0.2111  MW p 0.665  | Earth grid 0.0760
+M4 with bodies < 1 as land             all 0.1273 [0.0862, 0.1465]  sc 0.0990  scat 0.1324  MW p 0.436
+line crosses sea                       all 0.0878 [0.0770, 0.1009]  sc 0.0875  scat 0.0889  MW p 0.885  | Earth grid 0.0338 fib 0.0429
+M5 if crossing dropped                 all 0.2241 [0.1931, 0.2746]  sc 0.2429  scat 0.2224  MW p 0.751  | Earth grid 0.0812
+fixed measure fib M5                   all 0.2717 [0.2089, 0.3127]  sc 0.2837  scat 0.2606  MW p 0.931  | Earth grid no_sheets 0.0771 all 0.1111
+fixed measure fib M4                   all 0.1296 [0.0869, 0.1511]  sc 0.1000  scat 0.1333  MW p 0.403  | Earth grid no_sheets 0.0551 all 0.1035
+fixed measure fib_bodies M5            all 0.2389 [0.1906, 0.2852]  sc 0.2456  scat 0.2363  MW p 0.977  | Earth grid no_sheets 0.0708 all 0.1076
+fixed measure fib_bodies M4            all 0.1287 [0.0862, 0.1478]  sc 0.0986  scat 0.1324  MW p 0.403  | Earth grid no_sheets 0.0546 all 0.1025
+fixed measure fib_bodies_inland M5     all 0.2186 [0.1750, 0.2647]  sc 0.2230  scat 0.2180  MW p 0.885  | Earth grid no_sheets 0.0680 all 0.1032
+fixed measure fib_bodies_inland M4     all 0.1287 [0.0862, 0.1478]  sc 0.0986  scat 0.1324  MW p 0.403  | Earth grid no_sheets 0.0546 all 0.1025
+elev - surface p50 land                all 0.0000 [0.0000, 0.0000]  sc 0.0000  scat 0.0000  MW p nan
+hi iced share                          all 0.4525 [0.3510, 0.5897]  sc 0.4674  scat 0.4525  MW p 1.000
+M4 rock + ice                          all 0.1347 [0.0976, 0.1801]  sc 0.1143  scat 0.1467  MW p 0.341
+M5 with ice >= 1 m kept out            all 0.2258 [0.1931, 0.2876]  sc 0.2416  scat 0.2206  MW p 0.840
+M4 with ice >= 1 m kept out            all 0.0634 [0.0459, 0.1033]  sc 0.0581  scat 0.0769  MW p 0.436
+M5 with ice >= 100 m kept out          all 0.2296 [0.1946, 0.2906]  sc 0.2487  scat 0.2242  MW p 0.840
+M4 with ice >= 100 m kept out          all 0.0710 [0.0527, 0.1079]  sc 0.0608  scat 0.0824  MW p 0.436
+seam equal cols                        all 0.0000 [0.0000, 0.0000]  sc 0.0000  scat 0.0000  MW p nan
+seam col 0 coast/mean                  all 0.7733 [0.4937, 1.0869]  sc 0.7829  scat 0.7700  MW p 0.795
+seam col 0 land/mean                   all 0.7678 [0.5007, 1.3276]  sc 0.7678  scat 0.9004  MW p 0.795
+seam col 1 coast/mean                  all 0.7958 [0.5623, 1.3011]  sc 0.8083  scat 0.7841  MW p 0.507
+seam col 1 land/mean                   all 0.8049 [0.4959, 1.3206]  sc 0.7960  scat 0.9495  MW p 0.885
+seam col 2 coast/mean                  all 0.8237 [0.5470, 1.0641]  sc 0.9022  scat 0.7458  MW p 0.299
+seam col 2 land/mean                   all 0.9265 [0.4839, 1.3182]  sc 0.8058  scat 1.0571  MW p 0.885
+seam col 3 coast/mean                  all 0.8002 [0.6221, 1.2401]  sc 0.8644  scat 0.6979  MW p 0.112
+seam col 3 land/mean                   all 0.9537 [0.4962, 1.3206]  sc 0.8195  scat 1.1299  MW p 1.000
+seam col 512 coast/mean                all 0.8052 [0.4830, 1.4976]  sc 0.8052  scat 0.7848  MW p 0.624
+seam col 512 land/mean                 all 0.9265 [0.7473, 1.7430]  sc 0.8623  scat 1.4253  MW p 0.126
+seam col 1020 coast/mean               all 0.7269 [0.4060, 1.4481]  sc 0.6260  scat 0.8462  MW p 0.977
+seam col 1020 land/mean                all 0.7451 [0.4826, 1.2445]  sc 0.6924  scat 0.8662  MW p 0.583
+seam col 1021 coast/mean               all 0.9276 [0.4266, 1.2632]  sc 0.9276  scat 0.9340  MW p 0.885
+seam col 1021 land/mean                all 0.7956 [0.4772, 1.2358]  sc 0.7529  scat 0.9084  MW p 0.624
+seam col 1022 coast/mean               all 0.6640 [0.4182, 1.3263]  sc 0.6554  scat 0.7806  MW p 0.507
+seam col 1022 land/mean                all 0.8141 [0.5037, 1.2711]  sc 0.7815  scat 0.9081  MW p 0.751
+seam col 1023 coast/mean               all 0.6908 [0.3949, 1.4182]  sc 0.6821  scat 0.8488  MW p 0.707
+seam col 1023 land/mean                all 0.7609 [0.5007, 1.3157]  sc 0.7580  scat 0.8968  MW p 0.751
+seam land flips / mean flips           all 0.6420 [0.4472, 1.2422]  sc 0.8643  scat 0.5956  MW p 0.507
+plate_z M5                             all 0.2283 [0.2033, 0.2856]  sc 0.2402  scat 0.2280  MW p 0.931
+plate_z M4                             all 0.1314 [0.0901, 0.1534]  sc 0.1019  scat 0.1389  MW p 0.470
+
+== Spearman over the 24 runs: M5 against
+   M4                               rho +0.681 p 0.0003
+   f_near                           rho +0.088 p 0.6832
+   kappa                            rho -0.190 p 0.3750
+   s                                rho -0.443 p 0.0300
+   land_within_200                  rho -0.131 p 0.5408
+   coll_young part                  rho +0.777 p 0.0000
+   andean_young part                rho +0.444 p 0.0296
+   coll200 coast share              rho +0.227 p 0.2862
+   sub200 coast share               rho +0.718 p 0.0001
+   trench200 coast share            rho +0.753 p 0.0000
+   largest landmass coast share     rho +0.339 p 0.1050
+   M5 at M4=0.055                   rho -0.037 p 0.8623
+   collisions per 100 Myr: median 1.60
+   collisions vs M5                       rho +0.035 p 0.8698
+   collisions vs M4                       rho +0.045 p 0.8333
+   collisions vs coll_young part          rho -0.048 p 0.8238
+   collisions vs trench200 coast share    rho -0.050 p 0.8159
+   M5@0.055 vs f_near               rho +0.590 p 0.0024
+   M5@0.055 vs kappa                rho -0.074 p 0.7314
+   M5@0.055 vs s                    rho +0.325 p 0.1210
+
+== Q4: the maps (100,000 Fibonacci points, plate elevation before the surface stage)
+   Earth f100k no_sheets: M5 0.0715 M4 0.0562 ratio 1.272 f_near 0.088 kappa 0.1504 s 2.163 M5@0.055 0.0707
+-- t -900: 24 runs
+M5                                     all 0.1609 [0.0900, 0.2153]  sc 0.0879  scat 0.2164  MW p 0.001
+M4                                     all 0.0177 [0.0054, 0.0586]  sc 0.0052  scat 0.0601  MW p 0.000
+M5/M4                                  all 6.955 [3.838, 16.319]  sc 16.430  scat 3.734  MW p 0.000
+M5 at M4=0.055                         all 0.2663 [0.2182, 0.3072]  sc 0.2888  scat 0.2138  MW p 0.019
+M5 at M4=0.07                          all 0.3077 [0.2718, 0.3516]  sc 0.3250  scat 0.2754  MW p 0.061
+f_near                                 all 0.4356 [0.2808, 0.5949]  sc 0.5959  scat 0.3119  MW p 0.006
+kappa                                  all 0.0914 [0.0729, 0.1067]  sc 0.0727  scat 0.0978  MW p 0.026
+s                                      all 1.5211 [1.3010, 1.8440]  sc 1.6843  scat 1.2942  MW p 0.006
+land_within_200                        all 0.1799 [0.1429, 0.2072]  sc 0.1416  scat 0.1880  MW p 0.019
+land                                   all 0.3577 [0.3480, 0.3761]  sc 0.3786  scat 0.3477  MW p 0.001
+largest landmass of land               all 0.5130 [0.4108, 0.6282]  sc 0.5559  scat 0.4342  MW p 0.089
+by_nearest/M5 coll_young               all 0.2541 [0.0958, 0.3838]  sc 0.0832  scat 0.2860  MW p 0.053
+by_nearest/M5 coll_old                 all 0.0583 [0.0156, 0.0845]  sc 0.0129  scat 0.0779  MW p 0.022
+by_nearest/M5 andean_young             all 0.3875 [0.2985, 0.5465]  sc 0.5251  scat 0.3688  MW p 0.194
+by_nearest/M5 andean_old               all 0.0930 [0.0550, 0.1569]  sc 0.1152  scat 0.0775  MW p 0.175
+by_nearest/M5 u_Tc                     all 0.0149 [0.0000, 0.0301]  sc 0.0000  scat 0.0256  MW p 0.002
+by_nearest/M5 u_volc                   all 0.0000 [0.0000, 0.0042]  sc 0.0000  scat 0.0023  MW p 0.013
+without coll_young                     all 0.1365 [0.0739, 0.1691]  sc 0.0742  scat 0.1661  MW p 0.003
+-- t -700: 24 runs
+M5                                     all 0.2301 [0.1961, 0.2672]  sc 0.2189  scat 0.2403  MW p 0.126
+M4                                     all 0.1391 [0.1154, 0.1721]  sc 0.1226  scat 0.1765  MW p 0.001
+M5/M4                                  all 1.747 [1.231, 1.963]  sc 1.912  scat 1.224  MW p 0.002
+M5 at M4=0.055                         all 0.1063 [0.0970, 0.1362]  sc 0.1287  scat 0.1009  MW p 0.061
+M5 at M4=0.07                          all 0.1293 [0.1125, 0.1562]  sc 0.1494  scat 0.1154  MW p 0.019
+f_near                                 all 0.1851 [0.1571, 0.2468]  sc 0.2323  scat 0.1572  MW p 0.023
+kappa                                  all 0.1380 [0.1269, 0.1536]  sc 0.1303  scat 0.1447  MW p 0.214
+s                                      all 1.1595 [1.0991, 1.2537]  sc 1.1421  scat 1.2064  MW p 0.544
+land_within_200                        all 0.2562 [0.2320, 0.2791]  sc 0.2457  scat 0.2689  MW p 0.175
+land                                   all 0.3008 [0.2888, 0.3097]  sc 0.3037  scat 0.2980  MW p 0.260
+largest landmass of land               all 0.5208 [0.3756, 0.6986]  sc 0.5208  scat 0.5160  MW p 0.751
+by_nearest/M5 coll_young               all 0.5191 [0.4054, 0.6081]  sc 0.5359  scat 0.5034  MW p 0.403
+by_nearest/M5 coll_old                 all 0.1245 [0.0855, 0.1768]  sc 0.1381  scat 0.1048  MW p 0.260
+by_nearest/M5 andean_young             all 0.1056 [0.0705, 0.1505]  sc 0.0732  scat 0.1289  MW p 0.009
+by_nearest/M5 andean_old               all 0.0449 [0.0333, 0.0618]  sc 0.0361  scat 0.0551  MW p 0.061
+by_nearest/M5 u_Tc                     all 0.0469 [0.0318, 0.0700]  sc 0.0415  scat 0.0544  MW p 0.931
+by_nearest/M5 u_volc                   all 0.0073 [0.0047, 0.0123]  sc 0.0074  scat 0.0072  MW p 0.977
+without coll_young                     all 0.1259 [0.1048, 0.1578]  sc 0.1130  scat 0.1493  MW p 0.046
+-- t -500: 24 runs
+M5                                     all 0.2245 [0.1763, 0.2558]  sc 0.2381  scat 0.2034  MW p 0.312
+M4                                     all 0.1636 [0.1058, 0.2019]  sc 0.1797  scat 0.1448  MW p 0.470
+M5/M4                                  all 1.413 [1.234, 1.716]  sc 1.316  scat 1.504  MW p 0.707
+M5 at M4=0.055                         all 0.0984 [0.0753, 0.1023]  sc 0.0955  scat 0.0989  MW p 0.751
+M5 at M4=0.07                          all 0.1121 [0.0944, 0.1276]  sc 0.1152  scat 0.1114  MW p 0.795
+f_near                                 all 0.1894 [0.1750, 0.2194]  sc 0.1887  scat 0.1988  MW p 0.840
+kappa                                  all 0.1780 [0.1560, 0.2046]  sc 0.1780  scat 0.1778  MW p 0.707
+s                                      all 1.3040 [1.1598, 1.3811]  sc 1.3040  scat 1.2998  MW p 0.583
+land_within_200                        all 0.3227 [0.2826, 0.3591]  sc 0.3227  scat 0.3181  MW p 0.583
+land                                   all 0.2964 [0.2754, 0.3070]  sc 0.2934  scat 0.2989  MW p 0.507
+largest landmass of land               all 0.5325 [0.4463, 0.6311]  sc 0.5467  scat 0.5317  MW p 0.583
+by_nearest/M5 coll_young               all 0.5211 [0.4657, 0.5568]  sc 0.5363  scat 0.5136  MW p 0.885
+by_nearest/M5 coll_old                 all 0.1311 [0.0914, 0.1798]  sc 0.1681  scat 0.1091  MW p 0.175
+by_nearest/M5 andean_young             all 0.1241 [0.1013, 0.1564]  sc 0.1224  scat 0.1290  MW p 0.795
+by_nearest/M5 andean_old               all 0.0376 [0.0232, 0.0583]  sc 0.0317  scat 0.0387  MW p 0.624
+by_nearest/M5 u_Tc                     all 0.0324 [0.0212, 0.0420]  sc 0.0338  scat 0.0324  MW p 0.751
+by_nearest/M5 u_volc                   all 0.0098 [0.0047, 0.0203]  sc 0.0091  scat 0.0135  MW p 0.751
+without coll_young                     all 0.1293 [0.1005, 0.1519]  sc 0.1365  scat 0.1047  MW p 0.175
+-- t -400: 24 runs
+M5                                     all 0.2143 [0.1944, 0.2572]  sc 0.2095  scat 0.2211  MW p 0.665
+M4                                     all 0.1473 [0.1143, 0.1823]  sc 0.1363  scat 0.1487  MW p 0.312
+M5/M4                                  all 1.471 [1.242, 1.922]  sc 1.613  scat 1.358  MW p 0.194
+M5 at M4=0.055                         all 0.0886 [0.0791, 0.1137]  sc 0.0914  scat 0.0873  MW p 0.237
+M5 at M4=0.07                          all 0.1082 [0.1010, 0.1422]  sc 0.1082  scat 0.1090  MW p 0.371
+f_near                                 all 0.2460 [0.1624, 0.2829]  sc 0.2496  scat 0.2358  MW p 0.751
+kappa                                  all 0.1784 [0.1535, 0.2117]  sc 0.1860  scat 0.1759  MW p 0.795
+s                                      all 1.2405 [1.1826, 1.3586]  sc 1.2962  scat 1.2201  MW p 0.078
+land_within_200                        all 0.3279 [0.2762, 0.3844]  sc 0.3418  scat 0.3246  MW p 0.977
+land                                   all 0.2897 [0.2661, 0.3066]  sc 0.2908  scat 0.2779  MW p 0.507
+largest landmass of land               all 0.5059 [0.3990, 0.6145]  sc 0.4624  scat 0.5364  MW p 0.751
+by_nearest/M5 coll_young               all 0.5120 [0.4209, 0.6100]  sc 0.5109  scat 0.5366  MW p 0.840
+by_nearest/M5 coll_old                 all 0.1279 [0.0924, 0.1742]  sc 0.1226  scat 0.1374  MW p 0.285
+by_nearest/M5 andean_young             all 0.1291 [0.1031, 0.1739]  sc 0.1570  scat 0.1148  MW p 0.470
+by_nearest/M5 andean_old               all 0.0419 [0.0224, 0.0671]  sc 0.0384  scat 0.0478  MW p 0.977
+by_nearest/M5 u_Tc                     all 0.0299 [0.0195, 0.0462]  sc 0.0268  scat 0.0417  MW p 0.312
+by_nearest/M5 u_volc                   all 0.0148 [0.0102, 0.0239]  sc 0.0152  scat 0.0141  MW p 0.665
+without coll_young                     all 0.1209 [0.1022, 0.1705]  sc 0.1153  scat 0.1332  MW p 0.583
+-- t -300: 24 runs
+M5                                     all 0.2568 [0.2016, 0.2922]  sc 0.2367  scat 0.2769  MW p 0.312
+M4                                     all 0.1532 [0.1419, 0.1825]  sc 0.1497  scat 0.1681  MW p 0.194
+M5/M4                                  all 1.657 [1.418, 1.820]  sc 1.657  scat 1.657  MW p 0.931
+M5 at M4=0.055                         all 0.0964 [0.0755, 0.1089]  sc 0.0867  scat 0.1013  MW p 0.470
+M5 at M4=0.07                          all 0.1238 [0.0967, 0.1364]  sc 0.1188  scat 0.1272  MW p 0.544
+f_near                                 all 0.2339 [0.1878, 0.2845]  sc 0.2386  scat 0.2339  MW p 0.470
+kappa                                  all 0.1726 [0.1646, 0.1989]  sc 0.1899  scat 0.1675  MW p 0.214
+s                                      all 1.2430 [1.1869, 1.2947]  sc 1.2582  scat 1.2312  MW p 0.840
+land_within_200                        all 0.3094 [0.2978, 0.3503]  sc 0.3360  scat 0.3045  MW p 0.141
+land                                   all 0.2951 [0.2801, 0.3151]  sc 0.2904  scat 0.2997  MW p 0.341
+largest landmass of land               all 0.6248 [0.5159, 0.7189]  sc 0.5724  scat 0.6613  MW p 0.260
+by_nearest/M5 coll_young               all 0.5528 [0.4817, 0.5806]  sc 0.5608  scat 0.5175  MW p 0.624
+by_nearest/M5 coll_old                 all 0.1299 [0.1063, 0.1560]  sc 0.1210  scat 0.1314  MW p 0.260
+by_nearest/M5 andean_young             all 0.1295 [0.0961, 0.1486]  sc 0.1346  scat 0.1154  MW p 0.795
+by_nearest/M5 andean_old               all 0.0342 [0.0210, 0.0433]  sc 0.0297  scat 0.0344  MW p 0.312
+by_nearest/M5 u_Tc                     all 0.0293 [0.0139, 0.0469]  sc 0.0302  scat 0.0264  MW p 0.977
+by_nearest/M5 u_volc                   all 0.0188 [0.0121, 0.0241]  sc 0.0193  scat 0.0174  MW p 0.312
+without coll_young                     all 0.1445 [0.1134, 0.1601]  sc 0.1309  scat 0.1504  MW p 0.341
+-- t -200: 24 runs
+M5                                     all 0.2143 [0.1927, 0.2349]  sc 0.2240  scat 0.2126  MW p 0.312
+M4                                     all 0.1319 [0.1025, 0.1628]  sc 0.1585  scat 0.1171  MW p 0.141
+M5/M4                                  all 1.611 [1.311, 1.880]  sc 1.453  scat 1.703  MW p 0.112
+M5 at M4=0.055                         all 0.0965 [0.0872, 0.1116]  sc 0.0938  scat 0.1103  MW p 0.126
+M5 at M4=0.07                          all 0.1216 [0.1110, 0.1407]  sc 0.1163  scat 0.1374  MW p 0.069
+f_near                                 all 0.2311 [0.1747, 0.2742]  sc 0.2142  scat 0.2326  MW p 0.707
+kappa                                  all 0.1753 [0.1516, 0.1939]  sc 0.1726  scat 0.1753  MW p 0.840
+s                                      all 1.2859 [1.1589, 1.3892]  sc 1.2299  scat 1.3567  MW p 0.214
+land_within_200                        all 0.3149 [0.2719, 0.3314]  sc 0.3154  scat 0.3120  MW p 0.665
+land                                   all 0.3048 [0.2928, 0.3204]  sc 0.3052  scat 0.3033  MW p 0.931
+largest landmass of land               all 0.5729 [0.4516, 0.7105]  sc 0.5191  scat 0.6389  MW p 0.795
+by_nearest/M5 coll_young               all 0.5170 [0.4521, 0.5969]  sc 0.4993  scat 0.5218  MW p 0.931
+by_nearest/M5 coll_old                 all 0.1240 [0.1067, 0.1742]  sc 0.1457  scat 0.1178  MW p 0.977
+by_nearest/M5 andean_young             all 0.1322 [0.1069, 0.1666]  sc 0.1322  scat 0.1337  MW p 0.977
+by_nearest/M5 andean_old               all 0.0303 [0.0146, 0.0465]  sc 0.0243  scat 0.0333  MW p 0.436
+by_nearest/M5 u_Tc                     all 0.0283 [0.0172, 0.0474]  sc 0.0416  scat 0.0197  MW p 0.006
+by_nearest/M5 u_volc                   all 0.0111 [0.0062, 0.0205]  sc 0.0111  scat 0.0118  MW p 0.840
+without coll_young                     all 0.1324 [0.1030, 0.1550]  sc 0.1464  scat 0.1080  MW p 0.260
+-- t -150: 24 runs
+M5                                     all 0.2028 [0.1697, 0.2706]  sc 0.2266  scat 0.1740  MW p 0.214
+M4                                     all 0.1313 [0.0847, 0.1497]  sc 0.1416  scat 0.1080  MW p 0.112
+M5/M4                                  all 1.835 [1.511, 2.051]  sc 1.698  scat 1.878  MW p 0.312
+M5 at M4=0.055                         all 0.1083 [0.0953, 0.1195]  sc 0.1028  scat 0.1150  MW p 0.470
+M5 at M4=0.07                          all 0.1362 [0.1202, 0.1546]  sc 0.1331  scat 0.1432  MW p 0.436
+f_near                                 all 0.2294 [0.1816, 0.2843]  sc 0.1999  scat 0.2368  MW p 0.470
+kappa                                  all 0.1651 [0.1485, 0.1794]  sc 0.1637  scat 0.1661  MW p 0.885
+s                                      all 1.2758 [1.1918, 1.4197]  sc 1.3056  scat 1.2108  MW p 0.312
+land_within_200                        all 0.3010 [0.2702, 0.3310]  sc 0.3034  scat 0.3010  MW p 0.707
+land                                   all 0.3153 [0.2985, 0.3328]  sc 0.3153  scat 0.3143  MW p 0.751
+largest landmass of land               all 0.5819 [0.4860, 0.7296]  sc 0.5819  scat 0.5798  MW p 0.470
+by_nearest/M5 coll_young               all 0.5694 [0.4994, 0.6305]  sc 0.5287  scat 0.5835  MW p 0.285
+by_nearest/M5 coll_old                 all 0.1086 [0.0688, 0.1498]  sc 0.1291  scat 0.0851  MW p 0.214
+by_nearest/M5 andean_young             all 0.1200 [0.0855, 0.1800]  sc 0.1172  scat 0.1427  MW p 0.665
+by_nearest/M5 andean_old               all 0.0247 [0.0161, 0.0357]  sc 0.0247  scat 0.0242  MW p 0.840
+by_nearest/M5 u_Tc                     all 0.0207 [0.0090, 0.0446]  sc 0.0179  scat 0.0261  MW p 0.840
+by_nearest/M5 u_volc                   all 0.0115 [0.0061, 0.0187]  sc 0.0102  scat 0.0123  MW p 0.624
+without coll_young                     all 0.0991 [0.0834, 0.1425]  sc 0.1173  scat 0.0910  MW p 0.194
+-- t -100: 24 runs
+M5                                     all 0.2185 [0.1943, 0.2451]  sc 0.2079  scat 0.2278  MW p 0.751
+M4                                     all 0.1380 [0.1001, 0.1509]  sc 0.1289  scat 0.1387  MW p 0.931
+M5/M4                                  all 1.690 [1.522, 2.181]  sc 1.722  scat 1.661  MW p 0.665
+M5 at M4=0.055                         all 0.1069 [0.0911, 0.1456]  sc 0.1051  scat 0.1128  MW p 0.507
+M5 at M4=0.07                          all 0.1381 [0.1210, 0.1630]  sc 0.1432  scat 0.1381  MW p 0.544
+f_near                                 all 0.2315 [0.1808, 0.2991]  sc 0.2082  scat 0.2560  MW p 0.285
+kappa                                  all 0.1672 [0.1490, 0.1931]  sc 0.1610  scat 0.1771  MW p 0.624
+s                                      all 1.3196 [1.2210, 1.4023]  sc 1.3238  scat 1.3013  MW p 0.624
+land_within_200                        all 0.3036 [0.2682, 0.3396]  sc 0.2892  scat 0.3112  MW p 0.665
+land                                   all 0.3138 [0.3004, 0.3334]  sc 0.3157  scat 0.3138  MW p 0.312
+largest landmass of land               all 0.5289 [0.4603, 0.5765]  sc 0.5206  scat 0.5497  MW p 0.931
+by_nearest/M5 coll_young               all 0.5295 [0.4721, 0.6329]  sc 0.4875  scat 0.5585  MW p 0.194
+by_nearest/M5 coll_old                 all 0.1304 [0.0861, 0.1568]  sc 0.1462  scat 0.1206  MW p 0.078
+by_nearest/M5 andean_young             all 0.1502 [0.1057, 0.2015]  sc 0.1658  scat 0.1320  MW p 0.624
+by_nearest/M5 andean_old               all 0.0310 [0.0174, 0.0478]  sc 0.0383  scat 0.0255  MW p 0.371
+by_nearest/M5 u_Tc                     all 0.0198 [0.0136, 0.0459]  sc 0.0207  scat 0.0184  MW p 0.312
+by_nearest/M5 u_volc                   all 0.0117 [0.0043, 0.0136]  sc 0.0127  scat 0.0065  MW p 0.148
+without coll_young                     all 0.1089 [0.0942, 0.1420]  sc 0.1153  scat 0.1023  MW p 0.341
+-- t -50: 24 runs
+M5                                     all 0.2249 [0.1670, 0.2683]  sc 0.1933  scat 0.2490  MW p 0.089
+M4                                     all 0.1188 [0.0885, 0.1507]  sc 0.1101  scat 0.1250  MW p 0.260
+M5/M4                                  all 1.695 [1.506, 2.290]  sc 1.755  scat 1.695  MW p 0.840
+M5 at M4=0.055                         all 0.1183 [0.0862, 0.1332]  sc 0.1146  scat 0.1183  MW p 0.885
+M5 at M4=0.07                          all 0.1424 [0.1090, 0.1689]  sc 0.1419  scat 0.1448  MW p 0.624
+f_near                                 all 0.2298 [0.1970, 0.2903]  sc 0.2199  scat 0.2422  MW p 0.544
+kappa                                  all 0.1584 [0.1439, 0.1797]  sc 0.1617  scat 0.1584  MW p 0.840
+s                                      all 1.2585 [1.1444, 1.3835]  sc 1.3854  scat 1.1982  MW p 0.010
+land_within_200                        all 0.2861 [0.2654, 0.3175]  sc 0.2902  scat 0.2861  MW p 1.000
+land                                   all 0.3272 [0.3088, 0.3359]  sc 0.3236  scat 0.3336  MW p 0.840
+largest landmass of land               all 0.5816 [0.4712, 0.6337]  sc 0.5816  scat 0.5775  MW p 0.931
+by_nearest/M5 coll_young               all 0.6256 [0.5108, 0.6829]  sc 0.5209  scat 0.6762  MW p 0.089
+by_nearest/M5 coll_old                 all 0.1240 [0.0772, 0.1578]  sc 0.1299  scat 0.1162  MW p 0.470
+by_nearest/M5 andean_young             all 0.1035 [0.0709, 0.1435]  sc 0.1263  scat 0.0900  MW p 0.285
+by_nearest/M5 andean_old               all 0.0306 [0.0167, 0.0500]  sc 0.0479  scat 0.0218  MW p 0.026
+by_nearest/M5 u_Tc                     all 0.0208 [0.0129, 0.0311]  sc 0.0258  scat 0.0159  MW p 0.194
+by_nearest/M5 u_volc                   all 0.0109 [0.0084, 0.0209]  sc 0.0106  scat 0.0162  MW p 0.908
+without coll_young                     all 0.1113 [0.0714, 0.1550]  sc 0.1008  scat 0.1191  MW p 0.544
+-- t 0: 24 runs
+M5                                     all 0.2645 [0.2187, 0.3013]  sc 0.2583  scat 0.2691  MW p 0.840
+M4                                     all 0.1357 [0.0930, 0.1541]  sc 0.1046  scat 0.1409  MW p 0.341
+M5/M4                                  all 2.006 [1.647, 2.606]  sc 2.168  scat 1.914  MW p 0.436
+M5 at M4=0.055                         all 0.1282 [0.1021, 0.1589]  sc 0.1442  scat 0.1123  MW p 0.089
+M5 at M4=0.07                          all 0.1525 [0.1270, 0.1951]  sc 0.1696  scat 0.1439  MW p 0.341
+f_near                                 all 0.2799 [0.2373, 0.3396]  sc 0.2960  scat 0.2598  MW p 0.751
+kappa                                  all 0.1535 [0.1440, 0.1817]  sc 0.1529  scat 0.1553  MW p 0.795
+s                                      all 1.2203 [1.1134, 1.2616]  sc 1.2371  scat 1.1788  MW p 0.403
+land_within_200                        all 0.2844 [0.2649, 0.3257]  sc 0.2802  scat 0.2873  MW p 0.885
+land                                   all 0.3209 [0.3037, 0.3331]  sc 0.3221  scat 0.3194  MW p 0.751
+largest landmass of land               all 0.5919 [0.4563, 0.7030]  sc 0.6245  scat 0.5749  MW p 0.795
+by_nearest/M5 coll_young               all 0.5198 [0.4210, 0.6044]  sc 0.5568  scat 0.4665  MW p 0.078
+by_nearest/M5 coll_old                 all 0.1428 [0.1165, 0.1951]  sc 0.1228  scat 0.1805  MW p 0.078
+by_nearest/M5 andean_young             all 0.1514 [0.1097, 0.1863]  sc 0.1409  scat 0.1514  MW p 0.751
+by_nearest/M5 andean_old               all 0.0445 [0.0279, 0.0601]  sc 0.0353  scat 0.0561  MW p 0.112
+by_nearest/M5 u_Tc                     all 0.0183 [0.0136, 0.0268]  sc 0.0196  scat 0.0183  MW p 1.000
+by_nearest/M5 u_volc                   all 0.0153 [0.0098, 0.0217]  sc 0.0171  scat 0.0130  MW p 0.341
+without coll_young                     all 0.1596 [0.1290, 0.1988]  sc 0.1451  scat 0.1755  MW p 0.312
+   map M5 at 0 vs field M5: rho +0.950 p 0.0000; map/field median 1.028; map / field plate_z 1.066

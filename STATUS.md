@@ -148,6 +148,31 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-25: M5 lane: why the coast with high ground reads 0.248 against Earth's 0.084; 80 % to 89 % goes with M4's level, the rest is young collision belts at convergent coasts reaching the shore; three measure defects, proposed and not applied (coordinator's task; agent worktree .claude/worktrees/agent-a447f975b05e919a2, branch worktree-agent-a447f975b05e919a2 from master efcab1d7; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **What was measured** (diagnosis only, no law changed, no simulation run): base12's 24 cached runs (master 830e231a, key 4f5b17199a21, `/data/ban/deeptime-runs/pool/5cf16ecd76cd/earthlike_quick_16k-1000/cd665cef/`) through the census's own coast and high-ground helpers, with the nearest qualifying high point kept per coast point. Inputs: each run's final dump on the L1 grid and the crust budget's maps at ten times. Earth is SRTM15+ 15' on the census's Lambert grid and on Fibonacci points, with Bird's PB2002 steps for its settings. Scripts in tools/review/m5diag/ (m5fields.sh, m5maps.sh, m5earth.sh, m5table.sh on the VM through detach.sh); the tables are in docs/research/notes/m5-coast-high-ground-2026-10-25-tables.txt. The note is docs/research/notes/m5-coast-high-ground-2026-10-25.md.
+- **Findings:**
+  - M5 reads 0.248 [0.211, 0.306] and M4 0.128, against Earth's 0.084 and 0.055 on the same grid. PLT-360's 0.076 is on Fibonacci points.
+  - At matched M4 (0.055) M5 reads 0.117. So 80 % to 89 % of the excess goes with M4's level, and 0.018 to 0.033 is M5's own. With M4 at its 0.07 target, M5 still reads 0.141.
+  - The iced half of the high ground is inland: keeping it out takes M4 to 0.063 but M5 only to 0.226.
+  - Young collision belts (stamps under 10 Myr, 98.5 % in the collision regime) are 46 % of M5 and half of M4. Without them M5 reads 0.175.
+  - The excess is all at convergent coasts: +0.108 within 200 km of a trench (coast share 0.244 against PB2002's 0.122, M5 inside 0.570 against 0.274) and +0.064 within 200 km of a collision. The rest of the coast reads Earth's (+0.001).
+  - The high ground reaches the shore: 0.157 of the qualified coast is itself above 2 km, against 0.027. The young Andean cordillera has Earth's distances.
+  - The coast's geometry is Earth's: 1,524 km of coast per Mkm² against 1,565, and 0.303 of the land within 200 km against 0.292. The published 100 km share (OECD 2021 after the UN 2017, 20 %, read) is above SRTM15+'s 0.157 to 0.167 at this resolution.
+  - M5 is about three times Earth's from −700 Myr on; its own part grows over the last 150 Myr.
+  - The collisions per 100 Myr (1.60) do not track M5 (rho +0.04).
+- **Measure defects** (proposed, not applied):
+  - The Lambert grid splits coasts and landmasses above about 51°: resample to Fibonacci points.
+  - Closed bodies under 1 Mkm² are 10.8 % of the coast: count them as land.
+  - 8.8 % of the qualified coast reaches its high ground across the sea: use an over-land reach.
+  - All three together: the model 0.219 against Earth's 0.068, still 3.2 times. Seam: no double count. Ice: z is rock, no defect.
+  - realism-checks.md's "about 25 km" band is 62.6 km.
+- **Recommendation** (ranked; front lane):
+  - PLT-243's belt profile (`game-choice`, highest at the front): build the belt's surface from the critical taper PLT-244 and PLT-192 already cite.
+  - The trench coast share (subduction margins).
+  - Then the three measure fixes, coordinator's call.
+  - No overlap with the force balance lane was found.
+- **Traps:** maps/t0000.bin is a fresh lattice with no flags (use the fields' regime at the end); scattered_continents-5's dump has no plates/collision_mm_yr.
+- **Next:** the coordinator's call on the measure fixes and on handing PLT-243's profile to the front lane.
 ### 2026-10-25: Plate speed lane: why CHK-020's speed RMS reads about 26 mm/yr against 40 to 100; the open-loop calibration's level after merges that each added resistance, not a bug and not one merge; a recommendation, nothing applied (coordinator's task; agent worktree .claude/worktrees/agent-af2497025ff6f97e2, branch worktree-agent-af2497025ff6f97e2 from master e6d69d82, masters 52f23f5e, 830e231a and e10d986b merged in; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **The bisection** (cached pool runs only, build/speed/speedlevel.py `pairs`: each run's `speed_rms_mm_yr`, medians, two-sided Mann-Whitney on the matched runs): trench-base883 37.0 to base10 27.4 (12 runs, p < 0.001), spread over six steps at p < 0.05: base2 to base3 (V1 gap 2) 36.0 to 34.4 (p 0.038), **base4 to base5 (PLT-540) 33.8 to 28.9 (p < 0.001; only the plates without a slab fell, 30.6 to 23.7)**, base5 to base6 (gap 5) 28.9 to 27.1 (p 0.019), base7 to base8 (PLT-553) 28.1 to 26.8 (p 0.023), base8 to base9 (PLT-560) 26.8 to 25.9 (p 0.005), base9 to base10 (PLT-561) 25.9 to 27.0 (p 0.019); the rest at p 0.08 to 1.0. base4 to fl-sat (PLT-540 alone) 34.1 to 27.5 (p 0.001). Before the pool the crust budget took 41.6 to 36.5 (2026-10-17).
 - **The reference plate term by term** (`the_reference_plate_on_the_lattice_term_by_term`, a new test in plates/tests.rs, 40,000 samples): the lattice moves FRC-016's reference plate at 53.2 mm/yr, the continuous cap of the definition at 48.7 (scale 45); the record over the cap at the lattice's answer: basal 0.977, slab resistance 1.055, the pull 1.060, boundary resistance 0.875 (its metres 0.886 of the rim). The lattice is faster than the definition, so no counting bug slows the planet.
