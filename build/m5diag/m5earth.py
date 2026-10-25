@@ -61,6 +61,14 @@ def metrics(p, z, sp, lat, sheets, grid_lab=None):
                                                                         d_sea=det["d_sea"], keep=keep))
                              for lev in (1500.0, 1000.0)}
         qual = np.isfinite(dmin)
+        jn = det["J"][:, 0]
+        cr, qi = m5lib.crossing(p, det["land"], det["ci"], jn, qual)
+        kq = kc[qi]
+        o["line_crosses_sea"] = float(cr[kq].mean()) if kq.any() else 0.0
+        o["m5_if_crossing_dropped_upper"] = float((kq & ~cr).sum() / max(kc.sum(), 1))
+        dh = det["d_sea"][jn[qual & kc]]
+        o["hi_own_sea_km_hist"] = {f"{a_:g}-{b_:g}": float(((dh > a_) & (dh <= b_)).mean()) if dh.size else 0.0
+                                   for a_, b_ in ((-1, 50), (50, 100), (100, 200), (200, 400), (400, 1e9))}
         band = {}
         L = int((det["land"] & keep).sum())
         for a_, b_ in zip(LAT_BANDS[:-1], LAT_BANDS[1:]):
@@ -107,6 +115,14 @@ def main():
                                  "area_lt1_share_of_sea": float(ssz[(ssz > 0) & (ssz < 1)].sum() / ssz.sum()),
                                  "largest_share_of_sea": float(ssz.max() / ssz.sum()),
                                  "bodies_ge0.1_Mkm2": sorted([round(float(x), 2) for x in ssz if 0.1 <= x < 50])}
+    sea_ok = slab[ok]
+    for lim in (0.1, 1.0):
+        zl = z.copy()
+        zl[(~(z > 0)) & (ssz[sea_ok] < lim)] = 1.0
+        for name, keep in (("no_sheets", ~sh), ("all", np.ones(z.size, bool))):
+            dl = m5lib.coast_detail(p, zl, sp, keep=keep)
+            res["grid"][name][f"m5_bodies_lt{lim:g}_as_land"] = m5lib.m5_of(dl)
+            res["grid"][name][f"m4_bodies_lt{lim:g}_as_land"] = float((zl[(zl > 0) & keep] > 2000).mean())
     for npts in (n, 100_000):
         flat, flon = m5lib.fib(npts)
         zf, flon_s = sample(zg, la, lo, flat, flon)
@@ -120,7 +136,7 @@ def main():
             print(f"{k:>10} {s:>9}: M4 {o['M4']:.4f} M5 {o['M5']:.4f} ratio {fa['ratio']:.2f} f_near {fa['f_near']:.3f}"
                   f" kappa {fa['kappa']:.4f} s {fa['s']:.3f} land<=200 {fa['land_within_200']:.3f}"
                   f" grid8 {o.get('grid8_M5', float('nan')):.4f} curve "
-                  + " ".join(f"{t:g}:{m:.3f}@{lv:.0f}" for t, lv, m in o["curve"]))
+                  + " ".join(f"{t:g}:{m:.3f}@{lv:.0f}" for t, lv, m, *_ in o["curve"]))
     print("M5EARTH_DONE")
 
 
