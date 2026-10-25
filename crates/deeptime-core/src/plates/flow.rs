@@ -62,7 +62,8 @@ pub const SHORT_GLOBAL: &str = "plates/channel_flow_short_myr";
 /// `WorldState::globals`: the outermost-ring columns left with a channel ([`Flow::edge`]).
 pub const EDGE_GLOBAL: &str = "plates/channel_flow_edge";
 
-/// The channel thickness at which K₀ holds, m (Clark & Royden 2000's channel; from memory).
+/// The channel thickness at which K₀ holds, m (Clark & Royden 2000, p. 705: "We chose a channel
+/// thickness of 15 km").
 // ledger: PLT-301
 const CHANNEL_REF_M: f64 = 15_000.0;
 /// The thickest channel counted, in [`CHANNEL_REF_M`] (K ≤ 8 K₀). ledger: PLT-301

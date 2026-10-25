@@ -100,6 +100,11 @@ A resampling copies both numbers from the nearest corner of the sample's kind (`
   as a new arc. It is not a strength envelope: it bounds no stress, so a stiffer craton holds more
   load. The bound is the plate's yield (ISO-120, `surface.flexure.yield_anomaly_mgal`), a separate
   switch ("Measured" has the two together).
+- **The sheet's gate** (`tectonics.collapse_sheet_thermal`, PLT-581, on by default since
+  2026-10-25; needs the strength): the thin sheet no longer asks whether an orogeny raised the
+  crust, only how hot its lithosphere is. Crust the founder or the lower-crustal flow thickened
+  over a hot lithosphere thins on as an orogen's does; a craton at L_cold stays rigid because its
+  thermal age is infinite (plates.md "The collapse reads the thermal state").
 
 - **The backstop** (`tectonics.thermal_backstop`; off by default, a stand-in: "On by default"): an
   arc's cordillera grows by crust shortened
