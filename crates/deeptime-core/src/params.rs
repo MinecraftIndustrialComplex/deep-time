@@ -775,6 +775,17 @@ pub struct TectonicParams {
     pub arc_distance_km: f64,
     /// … and its half-width, km.
     pub arc_width_km: f64,
+    /// The arcs' band stops at the slab's ends (the front lane's step 10, 2026-10-24;
+    /// `subduction::fronts_finish`): a sample the arcs' distance field reaches makes arc magma only
+    /// where it lies over its front's slab, between the ends of the front its nearest front sample
+    /// stands on, measured along that front's line (each front sample covering its share of the
+    /// straight front, PLT-530, centred on it). An arc stands over its slab where the slab has sunk
+    /// to about 100 km, and past the slab's edge there is no slab to melt above. On by default
+    /// (2026-10-24). Off, the band runs round each end of a front as the distance field does, a
+    /// quarter circle of `arc_distance_km` on the overriding side at each: a front of length L gets
+    /// about L + π · `arc_distance_km` of band (1.32 times the arcs' straight front on arm
+    /// fl-outline, PLT-554). ledger: PLT-561
+    pub arc_slab_ends: bool,
     /// New crust an island arc (an arc on oceanic crust) adds per km of arc per Myr at
     /// v = v_0, km³ (Earth-normalized): magma intruded and erupted, spread across the arc band
     /// (`arc_width_km`). Stern & Scholl (2010) put the long-term average of the intra-oceanic
@@ -1105,10 +1116,11 @@ impl Default for TectonicParams {
             ridge_segment_km: 600.0, // ledger: PLT-502 (on since 2026-10-23)
             arc_distance_km: 200.0,
             arc_width_km: 60.0,
-            island_arc_km3_per_km_myr: 100.0,     // ledger: PLT-045
+            arc_slab_ends: true, // ledger: PLT-561 (on since 2026-10-24)
+            island_arc_km3_per_km_myr: 100.0, // ledger: PLT-045
             continental_arc_km3_per_km_myr: 35.0, // ledger: PLT-285
-            arc_mature_crust_km: 15.0,            // ledger: PLT-047
-            cordillera_shortening_mm_yr: 0.0,     // ledger: PLT-048
+            arc_mature_crust_km: 15.0, // ledger: PLT-047
+            cordillera_shortening_mm_yr: 0.0, // ledger: PLT-048
             cordillera_width_km: 120.0,
             cordillera_height_m: 2500.0,       // ledger: PLT-050
             trench_half_life_myr: 2.0,         // ledger: PLT-053
