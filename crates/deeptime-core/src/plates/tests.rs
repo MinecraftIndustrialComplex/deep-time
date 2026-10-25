@@ -3113,6 +3113,9 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
         let mut p = preset(40_000, 20.0, "supercontinent", 5);
         scale = p.tectonics.plate_speed_scale_mm_yr;
         p.tectonics.front_pull = on;
+        // The speed scale's own law (PLT-585 off), with the suction it was measured with.
+        p.tectonics.forsyth_uyeda_balance = false;
+        p.tectonics.suction_saturates = true;
         p.tectonics.mantle_flow_mm_yr = 0.0;
         p.tectonics.keel_drag = 1.0e4;
         let stage = PlatesStage::new(p.clone());
@@ -3260,6 +3263,9 @@ fn outer(x: DVec3) -> glam::DMat3 {
 fn the_reference_plate_on_the_lattice_term_by_term() {
     let mut p = preset(40_000, 20.0, "supercontinent", 5);
     p.tectonics.front_pull = true;
+    // The speed scale's own law (PLT-585 off), with the suction it was measured with.
+    p.tectonics.forsyth_uyeda_balance = false;
+    p.tectonics.suction_saturates = true;
     p.tectonics.mantle_flow_mm_yr = 0.0;
     p.tectonics.keel_drag = 1.0e4;
     let stage = PlatesStage::new(p.clone());
@@ -3482,9 +3488,17 @@ fn what_sets_the_planets_plate_speed() {
         k.slab_suction_share = 0.50 / 6.43;
         k.suction_saturates = false;
     }
+    // Forsyth & Uyeda's balance as built (PLT-585): the friction is linearised about the motion,
+    // so these rows solve again from their own answer until it settles (`ITERATED` solves),
+    // the fixed point the plates' motion relaxes to.
+    fn balance(k: &mut TectonicParams) {
+        k.forsyth_uyeda_balance = true;
+        k.suction_saturates = false;
+    }
+    const ITERATED: usize = 16;
     // c_b ∝ 1/((1 + s + b) v): a resistance set to 0 with the speed scale raised to match keeps it.
-    let variants: [(&str, Tweak); 12] = [
-        ("defaults", |_| {}),
+    let variants: [(&str, Tweak); 14] = [
+        ("defaults (the old law, PLT-585 off)", |_| {}),
         ("suction unsaturated (PLT-540 off)", |k| {
             k.suction_saturates = false;
         }),
@@ -3516,9 +3530,22 @@ fn what_sets_the_planets_plate_speed() {
         ("F&U Table 6's ratios, the speed scale kept", |k| {
             fu(k, true)
         }),
+        ("F&U's balance with friction (PLT-585), iterated", balance),
+        ("PLT-585 at Table 6's ridge push, iterated", |k| {
+            balance(k);
+            // Table 6's ridge push is 0.36 / 6.43 of the pull; the column energy's at the
+            // preset's ridge and old floor is C d² (FRC-012).
+            let d = k.ridge_elevation_m - k.oceanic_floor_elevation_m;
+            let push = forces::ridge_coefficient(forces::G_EARTH) * d * d;
+            k.edge_energy *= 0.36 / 6.43 * forces::SLAB_PULL_N_M / push;
+        }),
     ];
     for (start, seed) in [("supercontinent", 1), ("scattered_continents", 2)] {
-        let p = builtin_preset(&name, n, myr, start, seed);
+        let mut p = builtin_preset(&name, n, myr, start, seed);
+        // The planet of the old law (as the diagnosis measured it, 2026-10-25), each row's
+        // change made on one step of it.
+        p.tectonics.forsyth_uyeda_balance = false;
+        p.tectonics.suction_saturates = true;
         let t0 = p.t_start_years() / 1.0e6;
         let mut boundary_km = 0.0;
         // Per variant: Σ RMS² over the planet, the pulled plates and the rest, Σ pulled share.
@@ -3580,8 +3607,20 @@ fn what_sets_the_planets_plate_speed() {
                 let mut kv = p.tectonics.clone();
                 tweak(&mut kv);
                 let env = stage.env(&kv, base.step);
-                let mut s2 = base.clone();
-                let ans = forces::step(&mut s2, geo, &pos, &env, forces::flow_axis(p.seed), sea);
+                let solves = if kv.forsyth_uyeda_balance { ITERATED } else { 1 };
+                let mut cur = base.clone();
+                let mut ans = None;
+                for _ in 0..solves {
+                    let mut s2 = cur.clone();
+                    let a = forces::step(&mut s2, geo, &pos, &env, forces::flow_axis(p.seed), sea);
+                    for (id, w) in a.omega.iter().enumerate() {
+                        if let Some(w) = w {
+                            cur.plates[id].omega = w.to_array();
+                        }
+                    }
+                    ans = Some(a);
+                }
+                let ans = ans.expect("a solve");
                 if v == 0 {
                     for f in &ans.recorded.as_ref().expect("the record").forces {
                         pulled[f.id as usize] = f.slab_pull > 0.0;

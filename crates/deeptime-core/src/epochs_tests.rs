@@ -405,13 +405,15 @@ fn the_free_choice_is_the_unsteered_run_and_steering_changes_only_the_tail() {
 /// flip-flopping: the sea level moves one way by at most its rate a step, outgassing too.
 #[test]
 fn the_nudges_reach_their_targets_gently() {
-    // The planet this test was tuned on moves its plates with the fixed slab suction (PLT-186).
-    // With the saturating suction (PLT-540, on by default since 2026-10-24) the steered run warms
-    // past the band's top in its last step (16.8 °C against 16.0) and the outgassing turns back
-    // once; the test is about the nudges, not the plates, so it keeps its planet.
+    // The planet this test was tuned on moves its plates with the fixed slab suction (PLT-186)
+    // under the 2026-10-02 force balance. With the saturating suction (PLT-540, on by default
+    // from 2026-10-24 to 2026-10-25) the steered run warmed past the band's top in its last step
+    // (16.8 °C against 16.0) and the outgassing turned back once; the test is about the nudges,
+    // not the plates, so it keeps its planet (Forsyth & Uyeda's balance, PLT-585, off too).
     let fixed_suction = |planet: String| {
         let mut v: Value = serde_json::from_str(&planet).unwrap();
         v["tectonics"]["suction_saturates"] = json!(false);
+        v["tectonics"]["forsyth_uyeda_balance"] = json!(false);
         v.to_string()
     };
     let plain = fixed_suction(small_planet(60.0, None));
