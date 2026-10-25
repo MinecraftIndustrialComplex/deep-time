@@ -8641,9 +8641,13 @@ above). The change at a resampling falls from −29.7 % to −3.4 % at two spaci
 keep more of the band (−10.3 %).
 
 The query runs on the step's tree of every sample, the one the overlaps search. It is asked only of
-samples that have such a neighbour, and once per plate met. The mix drops the neighbour by the same
-test, so a sample with nothing else across it is no boundary. The full adjacency rebuild (the
-lattice's edges from the current geometry) stays a follow-up, for a residue the trace can see.
+samples that have such a neighbour, and once per plate met. The mix drops a converging neighbour by
+the same test, so a sample with nothing else across it is no boundary. It asks nothing of an
+opening or a transform between the same two plates: the gap an opening leaves between resamplings
+is the opening's, which the next resampling fills, and the boundary is there (the arm below found
+the mix asking every neighbour, and `an_opening_boundary_of_a_subducting_plate_stays_in_the_mix`
+holds it to this). The full adjacency rebuild (the lattice's edges from the current geometry) stays
+a follow-up, for a residue the trace can see; the arm found none.
 
 *The plate asked.* The trace's rule asked for a visible sample of any other plate; the code asks for
 the subducting plate itself. A third plate's crust beside an overriding sample is no slab of the
@@ -8681,6 +8685,67 @@ overlap the continent. The fronts per step, off and on:
 - **On**, the fronts fall as the slab's trailing edge reaches the trench, and are gone once it is
   under; the mix has 0 km.
 - The live margin of the first steps keeps all 24 fronts either way.
+
+`an_opening_boundary_of_a_subducting_plate_stays_in_the_mix` holds the mix to the fronts' reading.
+On the plates of `converging_plates`, the ocean has turned 4 spacings about the x axis, so it runs
+under the continent on one half and opens a gap on the other. The contact is active. The mix's rift
+is 21,556 km with the rule off. With the rule asking every neighbour of the subducting plate, as
+the arm ran it, the rift was 12,774 km. Asking only a converging neighbour, it is 21,556 km, and the
+ocean-continent front is 21,715 km either way.
+
+### The stage's arm: the collapse and the front (2026-10-25, PLT-581 and PLT-582)
+
+The arm `fl-n2th` (source key d9242330d508) ran both switches on, as one stage: both starts, seeds 1
+to 4, 1,000 Myr, with the crust-budget env. It is read against base12's matched 8
+(`ct-base12-s1to4`). The table gives medians, with the Mann-Whitney p in brackets:
+
+| measure | base12, matched 8 | arm |
+|---|---|---|
+| land | 0.309 | 0.311 (0.96) |
+| largest landmass | 0.204 | 0.199 (0.96) |
+| continental crust under the sea | 0.198 | 0.186 (0.51) |
+| land above 2 km | 0.128 | 0.114 (0.80) |
+| coast with high ground | 0.230 | 0.218 (0.72) |
+| land under ice | 0.100 | 0.126 (0.38) |
+| collisions per 100 Myr | 1.95 | 1.60 (0.46) |
+| crust's net change | −0.065 | −0.072 (0.80) |
+| the guard's worst, m | 10,105 | 10,632 (0.28) |
+| plate excess over Airy, m | 2,782 | 2,641 (0.65) |
+
+- **Against base12's 24 runs**, land above 2 km goes from 0.128 to 0.114 (p 0.56), and coast with
+  high ground from 0.229 to 0.218 (p 0.48).
+- Both arms meet 5 criteria per run. Neither has a step beyond two Earth reliefs.
+- The sea over the datum is 250 m after 100 Myr and 352 m at the end, against 297 m and 442 m.
+
+Nothing moved significantly, so the switches were not split into separate arms.
+
+*The collapse.* Continental columns at T_c (49 to 51 km of crust) that no orogeny raised, on the
+t = 0 map, are the founder's parked receivers. base12's runs have 262 such samples (the mean; the
+median is 274), 0.84 % of the land. The arm has 149 (median 110), 0.47 % of the land. Most of them
+stand above 2 km in both arms: 244 of base12's and 145 of the arm's.
+
+*The front at a resampling.* This is the mix's ocean-continent boundary at the step of a resampling
+and the steps after it, over 378 resamplings (base12) and 379 (the arm).
+
+- **base12.** 55,829 km at the resampling, then −21.9 % one step later and −14.0 % three steps
+  later. Through a cycle it grows from 43,868 km (1 to 2 Myr after a resampling) to 56,073 km at the
+  next (+28 %). The loss at a resampling is in fast-converging fronts (40 mm/yr or more across the
+  boundary: −11,051 km), the band reading a neighbour that went under and on.
+- **The arm.** 38,806 km at the resampling, then +5.8 % and +12.5 %. Through a cycle it runs from
+  41,311 km to 38,997 km (−6 %). The fast-converging change is +164 km.
+
+What the arm gains at a resampling is new contacts, with no slab yet: +3,078 km, where base12 gains
++3,187 km. So the band is gone, and nothing is left that calls for the full adjacency rebuild.
+
+*Trench share of the coast.* M5's attribution reads the share of the coast within 200 km of a
+trench on the t = 0 maps. It is 0.238 for base12's matched 8 and 0.256 for the arm (medians,
+p 0.33). Earth's is 0.122, so the rule leaves the excess where it was.
+
+*The mix's records.* Through each cycle, the arm's records lost a fifth of the ridge length: from
+103,703 km at 1 to 2 Myr after a resampling to 84,222 km at the next, where base12 held 108,000 to
+116,000 km. The mix had asked the rule of every neighbour of a subducting plate, including one that
+opens. It now asks only a converging neighbour. The mix is measurement only, so the arm's planet
+stands as measured, but its records' ridge, rift and other lengths are the old reading's.
 
 
 ## Plate speed (2026-10-25)

@@ -1047,9 +1047,9 @@ impl MixUnits {
 /// motion is updated). All zeros when the record is off. With `classes` (one per sample), each
 /// visible boundary sample's class is stored there as the [`mix`] class plus one (0: on no
 /// boundary, or on the subducting side of a front), for the crust budget's maps (measurement
-/// only). `tree` holds every sample at `pos`: with `front_current_geometry` a neighbour of a
-/// plate subducting under this one is a boundary only while a visible sample of that plate stands
-/// within `subduction::trench_row_rad` now, as the fronts take it (ledger: PLT-582).
+/// only). `tree` holds every sample at `pos`: with `front_current_geometry` a converging neighbour
+/// of a plate subducting under this one is a boundary only while a visible sample of that plate
+/// stands within `subduction::trench_row_rad` now, as the fronts take it (ledger: PLT-582).
 pub fn boundary_mix(
     st: &PlateState,
     geo: &Geo,
@@ -1187,11 +1187,6 @@ pub fn boundary_mix(
                 if pu == pv || n == buf.len() {
                     continue;
                 }
-                // A plate subducting here with none of its crust beside this sample now: the
-                // frozen lattice's neighbour went under and on, and this is no boundary (PLT-582).
-                if active.contains(&(pu, pv)) && !beside.has(samples, &plate_of, tree, x, pu) {
-                    continue;
-                }
                 let out = tangent(x, rot * (pts[u as usize] - pts[v])).normalize_or_zero();
                 let rel = norm.velocity_mm_yr(omega[pu as usize] - omega[pv as usize], x);
                 let slot = normals
@@ -1210,6 +1205,16 @@ pub fn boundary_mix(
                 } else {
                     rel.dot(nrm)
                 };
+                // A plate subducting here, converging, with none of its crust beside this sample
+                // now: the frozen lattice's neighbour went under and on, and this is no boundary
+                // (PLT-582). An opening or a transform of the same plate is asked nothing: its gap
+                // is the opening's, which the next resampling fills.
+                if across < 0.0
+                    && active.contains(&(pu, pv))
+                    && !beside.has(samples, &plate_of, tree, x, pu)
+                {
+                    continue;
+                }
                 buf[n] = Neighbour {
                     along: rel.dot(out),
                     normal: across,
