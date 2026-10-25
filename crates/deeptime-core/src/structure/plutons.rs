@@ -204,8 +204,9 @@ pub fn aureole_width_m(p: &StructureParams, t: &Tables, size_m: f64, host: Optio
 /// Draws this step's new plutons. `host_at(c, depth)` gives the host class at depth `depth`
 /// (m) below the surface of cell `c` (for the aureole's width). A pluton drawn past a pole (the
 /// grid's rows run on past it, and the row that straddles it is drawn from over its whole cell)
-/// is not emplaced, after all its random draws, so the stream and every other pluton stay as they
-/// were; it is counted in `counts.past_pole` (ledger: RCK-097).
+/// is not emplaced, after all its random draws, so the stream and every other pluton's place and
+/// size stay as they were (ids after it shift down by one); it is counted in `counts.past_pole`
+/// (ledger: RCK-097).
 #[allow(clippy::too_many_arguments)]
 pub fn emplace(
     grid: &GridDesc,
@@ -272,7 +273,7 @@ pub fn emplace(
         let roof_km =
             p.pluton_roof_km[0] + rng.uniform() * (p.pluton_roof_km[1] - p.pluton_roof_km[0]);
         let yaw = rng.uniform() * std::f64::consts::PI;
-        if !frame.projection().inside_poles(bz) && std::env::var_os("DT_PASTPOLE_OFF").is_none() {
+        if !frame.projection().inside_poles(bz) {
             // Drawn past the pole: no ground there, and the cube bake's Jacobian, singular at the
             // pole, turns a body centred at or past it into a window of 10^7 to 10^10 blocks (a
             // 6 by 4 km pluton comes out 1.4e7 by 5e8 blocks; one centred 0.1 block inside the
