@@ -3607,7 +3607,11 @@ fn what_sets_the_planets_plate_speed() {
                 let mut kv = p.tectonics.clone();
                 tweak(&mut kv);
                 let env = stage.env(&kv, base.step);
-                let solves = if kv.forsyth_uyeda_balance { ITERATED } else { 1 };
+                let solves = if kv.forsyth_uyeda_balance {
+                    ITERATED
+                } else {
+                    1
+                };
                 let mut cur = base.clone();
                 let mut ans = None;
                 for _ in 0..solves {

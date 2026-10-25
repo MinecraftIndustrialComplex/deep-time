@@ -1183,21 +1183,21 @@ impl Default for TectonicParams {
             contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
-            forsyth_uyeda_balance: true,   // ledger: PLT-585 (on since 2026-10-25)
+            forsyth_uyeda_balance: true, // ledger: PLT-585 (on since 2026-10-25)
             plate_speed_scale_mm_yr: 45.0, // ledger: PLT-181
-            slab_pull: 1.0,                // ledger: PLT-182
-            slab_depth_km: 700.0,          // ledger: PLT-184
-            slab_breakoff_myr: 10.0,       // ledger: PLT-184
-            slab_resistance: 3.0,          // ledger: PLT-185
-            slab_suction_share: 0.3,       // ledger: PLT-186
-            suction_saturates: false,      // ledger: PLT-540 (off since 2026-10-25)
-            front_pull: true,              // ledger: PLT-560 (on since 2026-10-24)
-            edge_energy: 0.1,              // ledger: PLT-187
-            collision_buoyancy: 1.0,       // ledger: PLT-275
-            keel_drag: 3.0,                // ledger: PLT-188
-            boundary_resistance: 3.0,      // ledger: PLT-189
-            mantle_flow_mm_yr: 5.0,        // ledger: PLT-190
-            motion_relax_myr: 6.0,         // ledger: PLT-191
+            slab_pull: 1.0,              // ledger: PLT-182
+            slab_depth_km: 700.0,        // ledger: PLT-184
+            slab_breakoff_myr: 10.0,     // ledger: PLT-184
+            slab_resistance: 3.0,        // ledger: PLT-185
+            slab_suction_share: 0.3,     // ledger: PLT-186
+            suction_saturates: false,    // ledger: PLT-540 (off since 2026-10-25)
+            front_pull: true,            // ledger: PLT-560 (on since 2026-10-24)
+            edge_energy: 0.1,            // ledger: PLT-187
+            collision_buoyancy: 1.0,     // ledger: PLT-275
+            keel_drag: 3.0,              // ledger: PLT-188
+            boundary_resistance: 3.0,    // ledger: PLT-189
+            mantle_flow_mm_yr: 5.0,      // ledger: PLT-190
+            motion_relax_myr: 6.0,       // ledger: PLT-191
         }
     }
 }
