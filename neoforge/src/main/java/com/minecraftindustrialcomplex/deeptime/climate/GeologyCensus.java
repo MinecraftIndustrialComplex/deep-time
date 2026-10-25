@@ -79,7 +79,11 @@ public final class GeologyCensus {
         return b.unwrapKey().map(k -> k.location().toString()).orElse("?");
     }
 
-    /** Samples every {@code step} blocks inside the world's z edge ({@code zHalf}) less {@code poleMargin}. */
+    /**
+     * Samples every {@code step} blocks inside the world's z edge ({@code zHalf}) less {@code poleMargin}; on a cube
+     * world the faces only ({@link WorldDataTerrain#onFaces}: a void column shows its partner's, so each planet column
+     * counts once).
+     */
     public static Result run(ServerLevel level, int step, int poleMargin) {
         if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g) || !(g.terrain() instanceof WorldDataTerrain t))
             throw new IllegalStateException(level.dimension().location() + " is not a Deep Time level on world data");
@@ -102,6 +106,8 @@ public final class GeologyCensus {
             if (Math.abs(z) > zp - poleMargin)
                 continue;
             for (int x = -c / 2 + step / 2; x < c / 2; x += step) {
+                if (!t.onFaces(x, z))
+                    continue;
                 double y = t.height(x, z);
                 if (y <= sea)
                     continue;

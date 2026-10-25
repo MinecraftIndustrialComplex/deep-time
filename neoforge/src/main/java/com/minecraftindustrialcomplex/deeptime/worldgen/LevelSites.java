@@ -8,6 +8,7 @@ import com.minecraftindustrialcomplex.deeptime.api.Product;
 import com.minecraftindustrialcomplex.deeptime.api.Site;
 import com.minecraftindustrialcomplex.deeptime.api.SiteKind;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Body;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Deposits;
 import com.minecraftindustrialcomplex.deeptime.worlddata.EventData;
 import com.minecraftindustrialcomplex.deeptime.worlddata.SiteData;
@@ -35,16 +36,19 @@ public final class LevelSites implements DeepTimeSites {
 
     // CONVERTED first: NONE's constructor uses it.
     private static final Map<Deposits, List<Site>> CONVERTED = Collections.synchronizedMap(new WeakHashMap<>());
-    private static final LevelSites NONE = new LevelSites(null, Deposits.empty(1024));
+    private static final LevelSites NONE = new LevelSites(null, Deposits.empty(1024), null);
 
     /** The level's circumference, or null outside Deep Time levels. */
     private final Integer circumference;
     private final Deposits deposits;
     private final List<Site> sites;
+    /** A cube world's net, or null. */
+    private final CubeLayout cube;
 
-    private LevelSites(Integer circumference, Deposits deposits) {
+    private LevelSites(Integer circumference, Deposits deposits, CubeLayout cube) {
         this.circumference = circumference;
         this.deposits = deposits;
+        this.cube = cube;
         this.sites = CONVERTED.computeIfAbsent(deposits, LevelSites::convert);
     }
 
@@ -58,12 +62,17 @@ public final class LevelSites implements DeepTimeSites {
     public static LevelSites of(GeologicChunkGenerator g) {
         int c = g.dataRef().circumferenceBlocks();
         if (g.terrain() instanceof WorldDataTerrain w)
-            return new LevelSites(c, w.data().deposits());
-        return new LevelSites(c, Deposits.empty(c));
+            return new LevelSites(c, w.data().deposits(), g.cubeLayout());
+        return new LevelSites(c, Deposits.empty(c), g.cubeLayout());
     }
 
     public Deposits deposits() {
         return deposits;
+    }
+
+    /** The net of a cube world, whose chunks wholly off the faces place no ore ({@code CubeFill}), or null. */
+    public CubeLayout cube() {
+        return cube;
     }
 
     private static List<Site> convert(Deposits d) {

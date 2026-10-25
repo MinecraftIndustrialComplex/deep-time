@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.worldgen;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 import org.junit.jupiter.api.Test;
 
@@ -168,6 +169,107 @@ class MagmaTest {
                     }
                 }
         return molten;
+    }
+
+    /** A cube world of C blocks round: its face N spans x in [−512, 512) and z in [−1536, −512); west of it is a void square. */
+    private static final CubeLayout CUBE = CubeLayout.of(C / 4);
+    private static final Magma.Faces FACES = (x, z) -> CUBE.faceOfBlock(x, z) != null;
+    private static final int N_WEST = -C / 8, N_Z = -1000;
+
+    /** Whether a column lies off the faces or within {@link Magma#SEAM_GAP} columns of them, corners included. */
+    private static boolean nearOff(int x, int z) {
+        for (int ex = -Magma.SEAM_GAP; ex <= Magma.SEAM_GAP; ex++)
+            for (int ez = -Magma.SEAM_GAP; ez <= Magma.SEAM_GAP; ez++)
+                if (!FACES.on(x + ex, z + ez))
+                    return true;
+        return false;
+    }
+
+    /**
+     * A body by a turning edge of a cube world's net is cut there and sealed on its own face
+     * ({@link Magma.Seam}): off the faces a chunk is a turned copy of the partner face's
+     * ({@code CubeFill}), which holds none of the body's shell. So no part of it lies off the faces,
+     * nothing but its shell lies within {@link Magma#SEAM_GAP} columns of them (no lava, no plug, no
+     * mush), every molten block still faces only the body, and away from the edge the body is the
+     * whole one. The GameTest planet's volcano 303 of 2026-10-25 stood 8 blocks inside face S's west
+     * edge with its lenses reaching past it (the GameTest {@code magmaSealedAtTurningSeams}).
+     */
+    @Test
+    void aBodyByATurningEdgeIsCutAndSealedOnItsFace() {
+        int vx = N_WEST + 8;
+        var v = new Volcanoes.Volcano(1, "shield", vx, N_Z, 45_000, 2_000, 1.0, true, false, 3_600, 120, false);
+        Magma.Heights h = cone(vx, N_Z, 182, 70);
+        Magma.Body whole = Magma.build(List.of(v), COLUMN, h, DRY, C, SEA, LAVA_FLOOR, LAVA_FLOOR - 10, MH, MV).bodies().get(0);
+        Magma.Body cut = Magma.build(List.of(v), COLUMN, h, DRY, C, SEA, LAVA_FLOOR, LAVA_FLOOR - 10, MH, MV, FACES).bodies().get(0);
+        assertNull(whole.seam(), "a world with no ground off its planet");
+        assertNotNull(cut.seam(), "the body's reach crosses the edge");
+        assertEquals(whole.reach(), cut.reach());
+        assertEquals(whole.chamberRh(), cut.chamberRh(), "the cut keeps the body's size");
+        long moltenOff = 0, sealedInBand = 0, kept = 0;
+        int r = cut.reach();
+        for (int dx = -r; dx <= r; dx++)
+            for (int dz = -r; dz <= r; dz++) {
+                int x = vx + dx, z = N_Z + dz;
+                boolean off = !FACES.on(x, z), band = !off && nearOff(x, z);
+                for (int y = cut.minY(); y <= cut.maxY(); y++) {
+                    Magma.Part w = whole.at(dx, dz, y), p = cut.at(dx, dz, y);
+                    String at = " at (" + x + ", " + y + ", " + z + ")";
+                    if (off) {
+                        moltenOff += w.molten() ? 1 : 0;
+                        assertEquals(Magma.Part.NONE, p, "off the faces" + at);
+                        assertFalse(cut.mush(dx, dz, y), "mush off the faces" + at);
+                    } else if (band) {
+                        assertFalse(p.molten() || p == Magma.Part.PLUG || cut.mush(dx, dz, y), p + " in the seam band" + at);
+                        if (w.molten()) {
+                            assertNotEquals(Magma.Part.NONE, p, "the cut's shell" + at);
+                            sealedInBand++;
+                        }
+                    } else {
+                        assertEquals(w, p, "away from the edge" + at);
+                        assertEquals(whole.mush(dx, dz, y), cut.mush(dx, dz, y), "the mush away from the edge" + at);
+                        kept += p.molten() ? 1 : 0;
+                    }
+                }
+            }
+        assertTrue(moltenOff > 10_000, "the whole body's lava reaches past the edge: " + moltenOff);
+        assertTrue(sealedInBand > 1_000, "the band seals lava of the whole body: " + sealedInBand);
+        long all = molten(whole);
+        assertTrue(kept > all / 3, "a third of the body or more is kept: " + kept + " of " + all);
+        assertEquals(kept, molten(cut));
+        sealed(cut);
+        int[] counts = cut.seam().counts();
+        assertTrue(counts[0] > 0 && counts[1] > 0, "columns off the faces and in the band: " + counts[0] + ", " + counts[1]);
+    }
+
+    /**
+     * A body by a turning edge is shaped from its own face's ground and water: a crater lake needs its
+     * ring and the seam band round it on the faces (else the volcano keeps its plug), water off the
+     * faces (the partner's, which the world's reads fold to) does not make it submerged, and a vent off
+     * the faces gets no magma.
+     */
+    @Test
+    void aBodyByATurningEdgeReadsOnlyItsOwnFace() {
+        MagmaRules lakes = new MagmaRules(3.0, 1.0, 1.0, true).withoutColumn();
+        java.util.function.BiFunction<Volcanoes.Volcano, Magma.Faces, Magma.Body> build = (v, faces) -> Magma.build(List.of(v), lakes,
+                cone((int) v.x(), (int) v.z(), 182, 70), DRY, C, SEA, LAVA_FLOOR, LAVA_FLOOR - 10, MH, MV, faces).bodies().get(0);
+        // A lake 6 blocks in radius 8 blocks inside the edge: its ring (8) and band (10) cross it.
+        Magma.Body flat = build.apply(volcano(1, N_WEST + 8, N_Z, 0.9), Magma.Faces.ALL);
+        assertTrue(flat.lake(), "with no edge it holds a lake");
+        assertEquals(6, flat.lakeRadius());
+        assertFalse(build.apply(volcano(1, N_WEST + 8, N_Z, 0.9), FACES).lake(), "by the edge it keeps its plug");
+        assertTrue(build.apply(volcano(1, N_WEST + 11, N_Z, 0.9), FACES).lake(), "11 blocks in, ring and band stay on the face");
+        // The partner's sea beyond the edge, a block from the vent.
+        Magma.Wet partnerSea = (x, z) -> !FACES.on(x, z);
+        var edge = volcano(2, N_WEST + 1, N_Z, 0.5);
+        assertTrue(Magma.build(List.of(edge), lakes, cone(N_WEST + 1, N_Z, 182, 70), partnerSea, C, SEA, LAVA_FLOOR, MH, MV)
+                .bodies().get(0).submerged());
+        Magma.Body dry = Magma.build(List.of(edge), lakes, cone(N_WEST + 1, N_Z, 182, 70), partnerSea, C, SEA, LAVA_FLOOR,
+                LAVA_FLOOR - 10, MH, MV, FACES).bodies().get(0);
+        assertFalse(dry.submerged(), "the water off the face is not this vent's");
+        assertEquals(Magma.Part.CONDUIT_SHELL, dry.at(0, 0, dry.conduitTop()), "a vent in the band: its conduit is shell");
+        assertEquals(Magma.Part.NONE, dry.at(0, 0, dry.floorY()), "and it has no plug");
+        // A vent off the faces.
+        assertEquals(0, build.apply(volcano(3, N_WEST - 5, N_Z, 0.9), FACES).chamberRh());
     }
 
     @Test
