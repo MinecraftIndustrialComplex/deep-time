@@ -36,6 +36,18 @@
 //!    plateau, and erosion wears it down. (The plate-only presets keep their isostatic ceiling,
 //!    `uplift_ceiling_m`.)
 //!
+//!    With `collision_belt_taper` the belt's surface is the critical taper's instead (ledger
+//!    PLT-600, PLT-601). The front is the toe of the orogenic wedge: in a collision the plate
+//!    boundary surfaces at the deformation front, the wedge on its hanging wall (the Himalaya's
+//!    Main Frontal Thrust). The surface rises from the front's height at `wedge_slope_deg`,
+//!    `z(d) = z_front + d · tan α`, up to the strength height, where a wide wedge stops rising
+//!    (the brittle–plastic transition; the break in slope at the edge of the Tibetan Plateau,
+//!    Dahlen 1990) and widens as a plateau. The step's crust raises the ground under it nearest
+//!    the front first, so the belt widens behind its toe as a critical wedge grows ("at
+//!    constant taper", Davis, Suppe & Dahlen 1983), and once it is full to `collision_belt_km`
+//!    the surface rises in place (the toe advances). The share a narrow overriding plate keeps
+//!    is the sliver rule's above, and the step's crust is the same: only where it lands moves.
+//!
 //! Both are stamped as a collision orogeny where they rose by more than 5 m/Myr (the subduction
 //! fronts' rule): the `collision` regime the structure stage folds and thrusts, the orogen
 //! provinces, the young-orogen weakness of the flexure. The fold direction is the shortening
@@ -614,9 +626,17 @@ fn stack_front(
             // was (its profile measures the room behind the front): only where the kept crust
             // lands changes.
             let keep = (belt.iter().map(|&(_, w)| w).sum::<f64>() * area / belt_weight).min(1.0);
-            let d_km: Vec<f64> = belt_d.iter().map(|&(_, _, d)| norm.km(d)).collect();
+            // The field lists its samples by index: the fill takes them nearest the front first.
+            let mut order: Vec<usize> = (0..belt_d.len()).collect();
+            order.sort_by(|&a, &b| belt_d[a].2.total_cmp(&belt_d[b].2).then(a.cmp(&b)));
+            let d_km: Vec<f64> = order.iter().map(|&j| norm.km(belt_d[j].2)).collect();
+            let z_near: Vec<f64> = order.iter().map(|&j| z_of[j]).collect();
             let kept_km2_m = keep * belt_rise_km2_m;
-            let given = fill_taper(&d_km, &z_of, z_front, tan, kept_km2_m, area, cap_m);
+            let near = fill_taper(&d_km, &z_near, z_front, tan, kept_km2_m, area, cap_m);
+            let mut given = vec![0.0f64; belt_d.len()];
+            for (&j, g) in order.iter().zip(near) {
+                given[j] = g;
+            }
             sliver_km2_m = (belt_rise_km2_m - kept_km2_m) * COLUMN_ISOSTATIC_FACTOR;
             capped_km2_m = (kept_km2_m - given.iter().sum::<f64>() * area).max(0.0)
                 * COLUMN_ISOSTATIC_FACTOR;
@@ -865,19 +885,89 @@ fn fill_belt(
     given
 }
 
-/// The belt's fill under the critical taper (`collision_belt_taper`). Not yet built: the test
-/// comes first.
-// ledger: PLT-600, PLT-601.
+/// The belt's fill under the critical taper (`collision_belt_taper`, the module docs): `d_km`
+/// are the belt's samples' distances behind the front, ascending, `z` their elevations, m;
+/// `z_front` the front's height, m, where the surface starts; `tan` its slope; `rise_km2_m` the
+/// step's crust to place (km² × m of Airy rise) on samples of `area` km²; `cap_m` the strength
+/// height (≤ 0: no limit). Returns each sample's rise, m.
+///
+/// The surface is `min(cap, z_front + d tan α)`. Ground under it is raised to it nearest the
+/// front first, samples at the same distance alike, until the step's crust runs out: a critical
+/// wedge keeps its taper as it grows, so the crust coming in at the toe widens it, its width
+/// growing as the square root of the crust taken in (Dahlen 1990, eq. 1–3), and at the strength
+/// height it widens as a plateau (the brittle–plastic transition limits a wide wedge's height,
+/// the break in slope at the edge of the Tibetan Plateau; Dahlen 1990). When the whole belt is
+/// under the surface and crust is left, the surface rises in place, `min(cap, H + d tan α)` with
+/// `H` by bisection: the toe advances onto the incoming plate (ledger PLT-601). What the belt
+/// cannot hold with every sample at the strength height is not placed (the caller sends it down
+/// with the slab).
+// ledger: PLT-600 (the surface and its fill), PLT-601 (the toe advances).
 fn fill_taper(
     d_km: &[f64],
-    _z: &[f64],
-    _z_front: f64,
-    _tan: f64,
-    _rise_km2_m: f64,
-    _area: f64,
-    _cap_m: f64,
+    z: &[f64],
+    z_front: f64,
+    tan: f64,
+    rise_km2_m: f64,
+    area: f64,
+    cap_m: f64,
 ) -> Vec<f64> {
-    vec![0.0; d_km.len()]
+    let n = d_km.len();
+    let mut given = vec![0.0f64; n];
+    if n == 0 || rise_km2_m <= 0.0 || area <= 0.0 {
+        return given;
+    }
+    debug_assert!(d_km.windows(2).all(|w| w[0] <= w[1]), "distances ascending");
+    let surface = |h: f64, d: f64| {
+        let s = h + 1000.0 * d * tan;
+        if cap_m > 0.0 { s.min(cap_m) } else { s }
+    };
+    let deficit = |h: f64, j: usize| (surface(h, d_km[j]) - z[j]).max(0.0);
+    // Nearest the front first, in groups of equal distance.
+    let total = rise_km2_m / area;
+    let mut left = total;
+    let mut j = 0;
+    while j < n {
+        let k = j + d_km[j..].iter().take_while(|&&d| d == d_km[j]).count();
+        let need: f64 = (j..k).map(|i| deficit(z_front, i)).sum();
+        if need >= left {
+            let f = left / need;
+            for (i, g) in given.iter_mut().enumerate().take(k).skip(j) {
+                *g = f * deficit(z_front, i);
+            }
+            return given;
+        }
+        for (i, g) in given.iter_mut().enumerate().take(k).skip(j) {
+            *g = deficit(z_front, i);
+        }
+        left -= need;
+        j = k;
+    }
+    // The belt is full under the surface: it rises in place.
+    let fill = |h: f64| (0..n).map(|i| deficit(h, i)).sum::<f64>();
+    let mut hi = if cap_m > 0.0 {
+        cap_m
+    } else {
+        z.iter().copied().fold(z_front, f64::max) + total / n as f64 + 1.0
+    };
+    if fill(hi) > total {
+        let mut lo = z_front;
+        for _ in 0..200 {
+            let mid = 0.5 * (lo + hi);
+            if mid <= lo || mid >= hi {
+                break;
+            }
+            if fill(mid) > total {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        }
+        hi = 0.5 * (lo + hi);
+    }
+    for (i, g) in given.iter_mut().enumerate() {
+        *g = deficit(hi, i);
+    }
+    given
 }
 
 /// Distance (rad) to km and the bin width of the foreland's profile.
