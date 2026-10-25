@@ -318,6 +318,7 @@ impl PlatesStage {
                 None,
             );
             b.write_plates(&st.samples, |i| st.plate_of(i), st.t_myr);
+            b.write_ages(&st.samples, st.t_myr);
             cb = Some(b);
         }
         // The settling (`settle.rs`) reads the flexure too.
@@ -986,6 +987,7 @@ impl PlatesStage {
                     fronts.as_deref(),
                 );
                 b.write_plates(&st.samples, |i| st.plate_of(i), env.t_myr);
+                b.write_ages(&st.samples, env.t_myr);
             }
             if step >= self.total {
                 world.notes.insert(CRUST_BUDGET_NOTE.to_owned(), b.lines());
