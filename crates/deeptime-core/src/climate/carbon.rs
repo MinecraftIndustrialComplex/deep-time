@@ -365,35 +365,55 @@ impl Weathering {
         }
     }
 
+    /// The kinetic weathering of one unit of kernel (km²·m/yr) at `ppm`, mol C/yr: Earth's land
+    /// share of D₀ over [`KERNEL_EARTH`] × `strength` × (CO₂/280 ppm)^β.
+    pub fn kinetic_per_kernel(&self, ppm: f64) -> f64 {
+        DEGASSING_EARTH_MOL_YR * self.strength * (1.0 - self.seafloor) / KERNEL_EARTH
+            * (ppm.max(1e-6) / CO2_REF_PPM).powf(self.beta)
+    }
+
+    /// Band `b`'s silicate weathering, mol C/yr (`scale`: [`Weathering::kinetic_per_kernel`]).
+    #[inline]
+    fn band_flux(&self, k: &Kernel, b: usize, kb: f64, t_land: &[f64], ice: &[f64], scale: f64) -> f64 {
+        if kb <= 0.0 {
+            return 0.0;
+        }
+        let dt = t_land.get(b).copied().unwrap_or(0.0) - k.ref_t_land.get(b).copied().unwrap_or(0.0);
+        let free = 1.0 - ice.get(b).copied().unwrap_or(0.0).clamp(0.0, 1.0);
+        let kin = scale * kb * climate_factor(dt, self.k_t, self.k_r) * free;
+        match k.supply.get(b) {
+            // Fresh rock comes with the erosion, and the erosion with the runoff: the
+            // supply follows GEOCARB's runoff term, 1 + k_r·ΔT (×2.5 at +40 K), not the
+            // kinetics' exponential.
+            Some(&s) => {
+                // ledger: CLM-157
+                supply_limited(kin, s * free * (1.0 + self.k_r * dt).clamp(0.1, 10.0))
+            }
+            None => kin,
+        }
+    }
+
     /// Silicate weathering, mol C/yr, of kernel `k` with each band's land at `t_land` °C and
     /// `ice` of its land under ice, at `ppm`: each band's kinetic flux, limited by its supply of
     /// fresh rock where the kernel has one (`supply_limited`).
     pub fn flux(&self, k: &Kernel, t_land: &[f64], ice: &[f64], ppm: f64) -> f64 {
-        let scale = DEGASSING_EARTH_MOL_YR * self.strength * (1.0 - self.seafloor) / KERNEL_EARTH
-            * (ppm.max(1e-6) / CO2_REF_PPM).powf(self.beta);
+        let scale = self.kinetic_per_kernel(ppm);
         k.band
             .iter()
             .enumerate()
-            .map(|(b, &kb)| {
-                if kb <= 0.0 {
-                    return 0.0;
-                }
-                let dt = t_land.get(b).copied().unwrap_or(0.0)
-                    - k.ref_t_land.get(b).copied().unwrap_or(0.0);
-                let free = 1.0 - ice.get(b).copied().unwrap_or(0.0).clamp(0.0, 1.0);
-                let kin = scale * kb * climate_factor(dt, self.k_t, self.k_r) * free;
-                match k.supply.get(b) {
-                    // Fresh rock comes with the erosion, and the erosion with the runoff: the
-                    // supply follows GEOCARB's runoff term, 1 + k_r·ΔT (×2.5 at +40 K), not the
-                    // kinetics' exponential.
-                    Some(&s) => {
-                        // ledger: CLM-157
-                        supply_limited(kin, s * free * (1.0 + self.k_r * dt).clamp(0.1, 10.0))
-                    }
-                    None => kin,
-                }
-            })
+            .map(|(b, &kb)| self.band_flux(k, b, kb, t_land, ice, scale))
             .sum()
+    }
+
+    /// Each band's silicate weathering, mol C/yr: the terms [`Weathering::flux`] adds, in its
+    /// order (their sum is `flux` to the bit).
+    pub fn flux_by_band(&self, k: &Kernel, t_land: &[f64], ice: &[f64], ppm: f64) -> Vec<f64> {
+        let scale = self.kinetic_per_kernel(ppm);
+        k.band
+            .iter()
+            .enumerate()
+            .map(|(b, &kb)| self.band_flux(k, b, kb, t_land, ice, scale))
+            .collect()
     }
 
     /// The supply of fresh rock of the land not under ice, mol C/yr (0 without a supply limit).
@@ -409,6 +429,101 @@ impl Weathering {
 /// One cell's kernel term: true area (km², Earth-normalized) × runoff (m/yr) × e^(k_T (T − 15)).
 pub fn cell_kernel(area_km2: f64, runoff_m_yr: f64, t_c: f64, k_t: f64) -> f64 {
     area_km2 * runoff_m_yr.max(0.0) * (k_t * (t_c - KERNEL_T_REF_C)).exp()
+}
+
+/// One cell's part in placing its band's dissolved load ([`place_dissolved`]). Sea cells have
+/// `area_km2` 0.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DissolvedCell {
+    /// The cell's EBM band.
+    pub band: usize,
+    /// True area, km² (Earth-normalized: the kernel's and the supply's).
+    pub area_km2: f64,
+    /// The cell's kinetic weathering at the step's end climate, mol C/yr
+    /// ([`Weathering::kinetic_per_kernel`] × its kernel term).
+    pub kin: f64,
+    /// Its supply of fresh rock, mol C/yr (unused without a supply limit).
+    pub supply: f64,
+    /// Under land ice at the step's end.
+    pub iced: bool,
+}
+
+/// What [`place_dissolved`] took off the land.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Dissolved {
+    /// Rock taken into solution, m (at [`ROCK_KG_M3`]), per cell.
+    pub thickness_m: Vec<f64>,
+    /// The weathered Ca + Mg placed, mol.
+    pub placed_mol: f64,
+    /// The weathered Ca + Mg of bands with no land at the step's end, mol (not placed).
+    pub unplaced_mol: f64,
+}
+
+/// Chemical denudation: the rock the land's silicate weathering took into solution, cell by cell.
+/// Each band's weathered Ca + Mg over the step (`mol_by_band`, the clock's
+/// [`super::clock::Output::land_mol_by_band`]) is the mass the carbon cycle already weathered, so
+/// the dissolved load is that mass and no new rate: `kg_per_mol` of rock leaves in solution per
+/// mol of Ca + Mg. Within a band it goes where the weathering is, by each cell's own supply-limited
+/// flux, S·(1 − e^(−K/S)) (`supply_limited`; its kinetic flux without a supply limit), over the
+/// cells not under ice; a band whose land is all under ice spreads it over that land by the same
+/// weights, then by area. The thickness of a cell is its mass over ρ_rock × its true area, so on
+/// supply-limited ground it is (denudation) × `weathering_rock_mol_kg` × `kg_per_mol` ×
+/// `weathering_supply_scale` whatever the area's normalization. Every placed mol is taken off:
+/// Σ thickness × area × ρ_rock = `kg_per_mol` × Σ mol of the bands with land.
+pub fn place_dissolved(
+    mol_by_band: &[f64],
+    cells: &[DissolvedCell],
+    kg_per_mol: f64,
+    limited: bool,
+) -> Dissolved {
+    let bands = mol_by_band.len();
+    let weight = |c: &DissolvedCell| -> f64 {
+        if limited {
+            supply_limited(c.kin, c.supply)
+        } else {
+            c.kin.max(0.0)
+        }
+    };
+    // Per band: the free cells' weights, all the land's weights, the land's area.
+    let mut sums = vec![[0.0f64; 3]; bands];
+    for c in cells.iter().filter(|c| c.area_km2 > 0.0 && c.band < bands) {
+        let w = weight(c);
+        let s = &mut sums[c.band];
+        if !c.iced {
+            s[0] += w;
+        }
+        s[1] += w;
+        s[2] += c.area_km2;
+    }
+    let mut out = Dissolved {
+        thickness_m: vec![0.0; cells.len()],
+        ..Dissolved::default()
+    };
+    for (b, &m) in mol_by_band.iter().enumerate() {
+        if m <= 0.0 {
+            continue;
+        }
+        if sums[b][2] > 0.0 {
+            out.placed_mol += m;
+        } else {
+            out.unplaced_mol += m;
+        }
+    }
+    for (c, t) in cells.iter().zip(out.thickness_m.iter_mut()) {
+        if c.area_km2 <= 0.0 || c.band >= bands || mol_by_band[c.band] <= 0.0 {
+            continue;
+        }
+        let [free, all, area] = sums[c.band];
+        let share = if free > 0.0 {
+            if c.iced { 0.0 } else { weight(c) / free }
+        } else if all > 0.0 {
+            weight(c) / all
+        } else {
+            c.area_km2 / area
+        };
+        *t = mol_by_band[c.band] * share * kg_per_mol / (ROCK_KG_M3 * c.area_km2 * 1.0e6);
+    }
+    out
 }
 
 #[cfg(test)]
@@ -553,5 +668,163 @@ mod tests {
         assert!((land + sf - DEGASSING_EARTH_MOL_YR).abs() < 1e-3 * DEGASSING_EARTH_MOL_YR);
         // 1 km² eroding 50 m/Myr of rock with 1.2 mol/kg of Ca + Mg: 162,000 mol/yr.
         assert!((cell_supply(1.0, 50.0, 2.0, 1.2) - 1.62e5).abs() < 1.0);
+    }
+
+    #[test]
+    fn the_bands_weathering_adds_up_to_the_flux_to_the_bit() {
+        let wp = Weathering::from(&super::super::ClimateParams::default());
+        let k = Kernel {
+            band: vec![0.0, 3.0e6, 1.2e7, 5.0e5, 2.0e6],
+            ref_t_land: vec![-20.0, 5.0, 25.0, 12.0, -3.0],
+            supply: vec![1.0e11, 2.0e11, 4.0e12, 3.0e10, 1.0e11],
+        };
+        let ice = [0.9, 0.1, 0.0, 0.3, 1.0];
+        for (dt, ppm) in [(0.0, 280.0), (4.0, 900.0), (-6.0, 180.0)] {
+            let t: Vec<f64> = k.ref_t_land.iter().map(|x| x + dt).collect();
+            let by = wp.flux_by_band(&k, &t, &ice, ppm);
+            assert_eq!(by.len(), 5);
+            assert_eq!(by[0], 0.0);
+            assert_eq!(by.iter().sum::<f64>().to_bits(), wp.flux(&k, &t, &ice, ppm).to_bits());
+            let kin = Kernel {
+                supply: Vec::new(),
+                ..k.clone()
+            };
+            let by = wp.flux_by_band(&kin, &t, &ice, ppm);
+            assert_eq!(by.iter().sum::<f64>().to_bits(), wp.flux(&kin, &t, &ice, ppm).to_bits());
+        }
+    }
+
+    /// Cells of four bands: two with free land (one partly under ice), one all under ice, one with
+    /// no land; sea cells among them.
+    fn dissolved_cells() -> Vec<DissolvedCell> {
+        (0..400)
+            .map(|c| {
+                let band = c % 4;
+                if band == 3 || c % 7 == 0 {
+                    return DissolvedCell {
+                        band,
+                        ..DissolvedCell::default()
+                    };
+                }
+                DissolvedCell {
+                    band,
+                    area_km2: 1000.0 + (c as f64 * 37.0) % 900.0,
+                    kin: 1.0e6 * (1.0 + (c % 13) as f64),
+                    supply: 3.0e6 * (1.0 + (c % 5) as f64),
+                    iced: band == 2 || (band == 1 && c % 3 == 0),
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_dissolved_load_is_the_weathered_mass() {
+        // Every placed mol leaves as kg_per_mol of rock (Σ thickness × area × ρ), on land only,
+        // not under ice while the band has free land; a band all under ice still loses its
+        // weathered mass; a band with no land keeps it unplaced.
+        let cells = dissolved_cells();
+        let mol = [2.0e15, 7.0e14, 3.0e14, 5.0e14];
+        let kg_per_mol = 0.15;
+        for limited in [true, false] {
+            let d = place_dissolved(&mol, &cells, kg_per_mol, limited);
+            assert_eq!(d.thickness_m.len(), cells.len());
+            assert_eq!(d.placed_mol, mol[0] + mol[1] + mol[2]);
+            assert_eq!(d.unplaced_mol, mol[3]);
+            for b in 0..4 {
+                let kg: f64 = d
+                    .thickness_m
+                    .iter()
+                    .zip(&cells)
+                    .filter(|(_, c)| c.band == b)
+                    .map(|(t, c)| t * c.area_km2 * 1.0e6 * ROCK_KG_M3)
+                    .sum();
+                let want = if b == 3 { 0.0 } else { mol[b] * kg_per_mol };
+                assert!((kg - want).abs() <= 1e-12 * want.max(1.0), "band {b}: {kg} kg, {want}");
+            }
+            for (t, c) in d.thickness_m.iter().zip(&cells) {
+                let none = c.area_km2 == 0.0 || (c.band == 1 && c.iced);
+                assert_eq!(*t == 0.0, none, "{c:?}: {t}");
+            }
+        }
+        // Nothing weathered, nothing taken.
+        let d = place_dissolved(&[0.0; 4], &cells, kg_per_mol, true);
+        assert!(d.thickness_m.iter().all(|&t| t == 0.0) && d.placed_mol == 0.0);
+    }
+
+    #[test]
+    fn the_dissolved_load_goes_where_the_weathering_is() {
+        // Two free cells of one band, equal area: one supply-limited (ample kinetics), one
+        // kinetic (ample supply). Each loses its own flux's share.
+        let a = DissolvedCell {
+            band: 0,
+            area_km2: 100.0,
+            kin: 1.0e9,
+            supply: 1.0e6,
+            iced: false,
+        };
+        let b = DissolvedCell {
+            kin: 2.0e6,
+            supply: 1.0e12,
+            ..a
+        };
+        let d = place_dissolved(&[1.0e12], &[a, b], 0.15, true);
+        let (wa, wb) = (supply_limited(a.kin, a.supply), supply_limited(b.kin, b.supply));
+        assert!((d.thickness_m[0] / d.thickness_m[1] - wa / wb).abs() < 1e-9);
+        // Without a supply limit, by the kinetics alone.
+        let d = place_dissolved(&[1.0e12], &[a, b], 0.15, false);
+        assert!((d.thickness_m[0] / d.thickness_m[1] - a.kin / b.kin).abs() < 1e-9);
+    }
+
+    #[test]
+    fn a_craton_sinks_at_west_2005s_chemical_rates() {
+        // West, Galy & Bickle 2005 (EPSL 235: 211), Table 2, the five cratons: mean annual
+        // temperature (°C), runoff (mm/yr), total denudation TDR and silicate cations SCDR plus
+        // dissolved SiO₂ (t/km²/yr); the silicate chemical denudation is (SCDR + SiO₂)/ρ_rock.
+        // ledger: ERO-207
+        let west = [
+            ("Slave", 4.0, 100.0, 3.2, 0.25 + 0.18),
+            ("Siberia", 2.0, 270.0, 15.0, 0.77 + 1.61),
+            ("Africa", 24.1, 250.0, 10.0, 0.80 + 2.96),
+            ("Grenville", 4.5, 580.0, 13.0, 1.14 + 2.63),
+            ("Guyana", 25.0, 1680.0, 35.0, 2.40 + 10.18),
+        ];
+        let p = super::super::ClimateParams::default();
+        let wp = Weathering::from(&p);
+        let area = 1.0e4;
+        let m_myr = |t_km2_yr: f64| t_km2_yr * 1.0e3 / ROCK_KG_M3; // t/km²/yr → m/Myr
+        let lo = west.iter().map(|r| m_myr(r.4)).fold(f64::INFINITY, f64::min);
+        let hi = west.iter().map(|r| m_myr(r.4)).fold(0.0, f64::max);
+        // Each craton's sink, m/Myr, through the model's chain: its kernel and supply (eroding at
+        // `e` m/Myr), its band's weathering at 280 ppm over 1 Myr, placed on the one cell.
+        let sink = |t: f64, runoff_mm: f64, e: f64| -> f64 {
+            let k = Kernel {
+                band: vec![cell_kernel(area, runoff_mm / 1000.0, t, p.weathering_temp_per_k)],
+                ref_t_land: vec![t],
+                supply: vec![
+                    cell_supply(area, e, p.weathering_min_denudation_m_myr, p.weathering_rock_mol_kg)
+                        * p.weathering_supply_scale,
+                ],
+            };
+            let mol = wp.flux_by_band(&k, &[t], &[0.0], CO2_REF_PPM)[0] * 1.0e6;
+            let cell = DissolvedCell {
+                band: 0,
+                area_km2: area,
+                kin: wp.kinetic_per_kernel(CO2_REF_PPM) * k.band[0],
+                supply: k.supply[0],
+                iced: false,
+            };
+            place_dissolved(&[mol], &[cell], p.dissolved_kg_per_mol, true).thickness_m[0]
+        };
+        for (name, t, runoff, tdr, chem) in west {
+            // Eroding at the craton's own denudation: within a factor of 2.5 of its measured rate.
+            let (model, want) = (sink(t, runoff, m_myr(tdr)), m_myr(chem));
+            assert!(
+                model > want / 2.5 && model < want * 2.5,
+                "{name}: {model:.2} m/Myr against West's {want:.2}"
+            );
+            // Flat and not eroding (the supply's least denudation): inside the cratons' range.
+            let flat = sink(t, runoff, 0.0);
+            assert!(flat >= lo && flat <= hi, "{name} flat: {flat:.2} m/Myr, West {lo:.2} to {hi:.2}");
+        }
     }
 }
