@@ -8156,9 +8156,10 @@ Mann-Whitney p in brackets, against base8 unless said.
   oceanic 44.6 to 53.0 against 58.5 to 65.3: their rate follows the convergence), what went under
   14,960 against 16,880. The same crust, slower plates, smaller belts, more of it under the sea; a
   supercontinent's tenure 38 Myr against fl-outline's 83 (one run of eight in the band each).
-- **The guard.** The worst 10,102 m from the sea against fl-outline's 10,272 (p 0.32); no step
-  beyond 2 Earth reliefs, `guard_bind_steps` 0 in all 8 runs. All 8 ran (about 890 s each at 2
-  threads).
+- **The guard.** The worst 10,102 m from the sea against base8's 10,272 (p 0.33; fl-outline's
+  eight the same median, p 0.32), the largest rise and fall of a cell in a step 7,160 and 7,354 m
+  against 7,418 and 7,296; no step beyond 2 Earth reliefs, `guard_bind_steps` 0 in all 8 runs. All
+  8 ran (about 890 s each at 2 threads).
 - **The plate check:** 181 passes against fl-outline's 182 (base8's alias folder holds only one
   run's `plate.json`). Moved: the median speed 0 of 8 runs in its band against 2; slab over free 7
   against 4; collisions per 100 Myr 4 against 3; the collisions' p90 length 176 Myr against 201.
