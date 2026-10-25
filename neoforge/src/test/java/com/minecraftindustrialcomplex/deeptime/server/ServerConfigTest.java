@@ -85,8 +85,10 @@ class ServerConfigTest {
         assertEquals("0 Ma", FirstStartGenerator.ma(0));
         // A cube world's x period is 4s (cube plan phase 2, G1): s = 3,840 at 16k, 7,424 at 32k. The
         // cube types are the only Deep Time world types (cube plan section 7.4).
-        assertEquals("deeptime:planet_cube", FirstStartGenerator.levelTypeFor(15_360));
-        assertEquals("deeptime:planet_cube_32k", FirstStartGenerator.levelTypeFor(29_696));
+        assertEquals("deeptime:planet_cube", FirstStartGenerator.levelTypeFor(15_360, "cube"));
+        assertEquals("deeptime:planet_cube_32k", FirstStartGenerator.levelTypeFor(29_696, "cube"));
+        // A synthetic Lambert-frame preset runs on the dev level types of the test resources.
+        assertEquals("deeptime:test_planet_lambert", FirstStartGenerator.levelTypeFor(16_384, "lambert"));
         assertEquals("15,360-block cube world", FirstStartGenerator.describe(15_360, "cube"));
         assertEquals("16,384-block Lambert-frame world", FirstStartGenerator.describe(16_384, "lambert"));
         assertTrue(ServerConfig.template().contains("deeptime:planet_cube"));
@@ -97,9 +99,9 @@ class ServerConfigTest {
     void aCubeLevelTypeTakesEveryBuiltInOfItsSize() {
         // Every planet is the cube world (decisions log 2026-10-24, "Cube only"): a level type takes the
         // built-ins of its size.
-        assertEquals("earthlike_quick_16k, earthlike_full_16k", FirstStartGenerator.presetsFor(15_360));
-        assertEquals("earthlike_quick_32k, earthlike_full_32k", FirstStartGenerator.presetsFor(29_696));
-        assertEquals("no built-in preset has that size", FirstStartGenerator.presetsFor(16_384));
+        assertEquals("earthlike_quick_16k, earthlike_full_16k", FirstStartGenerator.presetsFor(15_360, "cube"));
+        assertEquals("earthlike_quick_32k, earthlike_full_32k", FirstStartGenerator.presetsFor(29_696, "cube"));
+        assertEquals("no built-in preset has that size", FirstStartGenerator.presetsFor(16_384, "cube"));
         for (String n : Presets.BUILTIN) {
             var info = Presets.info(Presets.parseObject(Presets.builtin(n).orElseThrow()));
             assertEquals("cube", info.projection(), n);

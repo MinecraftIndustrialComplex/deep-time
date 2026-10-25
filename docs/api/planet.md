@@ -1,8 +1,8 @@
 # The planet API (`api/planet`, version 1)
 
-Deep Time lays its planet out in blocks with a map: Lambert's cylinder (the simulation's frame and
-the analytic test terrains), Petroff's square in the Guyou layout (the seamless world, format 0.5)
-or a cube net (format 0.7). Each map has its own seams, edges, corners, wraps and creases, and more
+Deep Time lays its planet out in blocks with a map: Lambert's cylinder (the simulation's frame, the
+analytic test terrains and the synthetic test levels) or a cube net (format 0.7, the world the game
+plays; Petroff's square in the Guyou layout, format 0.5, went on 2026-10-24, cube plan §7.4). Each map has its own seams, edges, corners, wraps and creases, and more
 may come. The planet API lets another mod read any Deep Time world as the sphere it stands for, so
 it never needs to know which map is in use or where its seams are (Ben, 2026-10-24: "call our world
 as if it were a stable sphere regardless of what projections, seams, etc, we implement").
@@ -97,12 +97,12 @@ one position:
   `distanceMetres`.
 - **North is not uphill in latitude.** North is where a short step goes due north. On a map whose
   meridians and parallels cross at right angles (Lambert's cylinder, and the cube, which keeps
-  angles) that is also the direction in which latitude climbs fastest; on an equal-area map that
-  shears (Petroff-Guyou) the two can differ by tens of degrees (up to 44.9
-  degrees in the contract test), though the latitude gradient is always perpendicular to east. Use
+  angles) that is also the direction in which latitude climbs fastest; on a map that shears the
+  two can differ by tens of degrees (up to 44.9 degrees on the Petroff-Guyou world the contract test
+  ran until 2026-10-24), though the latitude gradient is always perpendicular to east. Use
   `northX/northZ` to walk north and `step` for any other heading.
 - **Read the frame where you stand.** The frame changes smoothly except where the map is creased
-  (Petroff's map is piecewise) or at an edge. How much it turns there is the map's business, so
+  (the cube's turning seams) or at an edge. How much it turns there is the map's business, so
   never carry a frame from one position to another; ask again.
 - **Threads and cost.** Every object is immutable and safe from any thread. The calls are pure
   arithmetic over the map, a fraction of a microsecond each; cache per column if you call them per
@@ -168,8 +168,8 @@ rows past its poles (they used to read as the pole).
 ## How the contract is tested
 
 `neoforge/src/test/java/com/minecraftindustrialcomplex/deeptime/api/planet/DeepTimePlanetContractTest.java`
-runs the whole contract on seven worlds: Lambert 16,384; Petroff-Guyou b 4,096 at lambda_c 37.25
-and b 1,536 at 0; the cube with face 1,024 at three orientations (the identity, a polar tilt of 30
+runs the whole contract on four worlds (seven until the Petroff-Guyou world went on 2026-10-24):
+Lambert 16,384 and the cube with face 1,024 at three orientations (the identity, a polar tilt of 30
 degrees and a general rotation). It checks round trips (position to latitude and longitude and
 back, exact canonical block centres over every image a position has), the frame against distance
 and latitude over half-block steps in eight directions, distances, bearings and destinations

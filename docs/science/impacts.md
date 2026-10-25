@@ -358,10 +358,13 @@ on the full 16k planet's two runs).
   planet and on the cube a crater was long north–south by 1 / cos² φ (3.0 to 1 at 55°), and on
   Petroff–Guyou up to 8 to 1 at 55° and 22 to 1 at 70°. The GameTest `aCraterIsABowlOverBreccia`
   measures its floor, rim and the ground around it by the great-circle distance on the planet: its
-  4,096-block test planet is a Petroff–Guyou world, where the plain world frame would read the
+  4,096-block test planet was a Petroff–Guyou world when this was written (a cube world since
+  2026-10-24), where the plain world frame would read the
   map's stretch, and on the cube that distance is the world frame up to the local scale.
-- **Small craters far from the equator are smoothed away.** The projection's footprint is round on
-  the planet and at least the source grid's north–south spacing across (SCL-090): cell / cos φ on
+- **Small craters far from the equator are smoothed away.** (Written for the Petroff–Guyou pass,
+  deleted 2026-10-24; the cube pass's footprint follows the Jacobian, SCL-124, and the source grid's
+  north–south spacing of cell / cos φ still bounds what a world can show.) The projection's footprint
+  was round on the planet and at least the source grid's north–south spacing across (SCL-090): cell / cos φ on
   the planet, where the grid's east–west spacing is cell · cos φ, so it averages over
   cell · sin φ · tan φ more than the grid holds. A crater narrower than that loses its bowl into its
   walls. A crater shows whole only where its diameter is at least about 2 · cell · sin φ · tan φ
