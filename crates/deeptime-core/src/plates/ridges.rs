@@ -74,6 +74,33 @@ use crate::world::WorldState;
 /// What covers one new point: the group on top (if any) and the others.
 type Found = (Option<(u32, Cover)>, Vec<(u32, Cover)>);
 
+/// Clift & Vannucchi (2004) §34: accretion "appears to be an effective process when convergent
+/// rates are <76 mm yr-1 and where the sedimentary cover is >1 km thick" …
+pub const ACCRETIONARY_PILE_M: f64 = 1000.0;
+/// … (the convergence, mm/yr) …
+pub const ACCRETIONARY_MAX_MM_YR: f64 = 76.0;
+/// … and §53: "Even at the accretionary margins, typically 83% of the incoming sedimentary pile
+/// is subducted beneath the forearc wedge" (the median accreted, §39, is 17 %).
+pub const ACCRETIONARY_SUBDUCTED: f64 = 0.83;
+
+/// Sediment subduction by margin type (`sediment_subduction_sourced`, PLT-660): the share of the
+/// incoming sedimentary pile `pile_m` (the subducted floor's sediment and sedimentary rock, m)
+/// that goes down with the slab at a convergence of `convergence_mm_yr` (the overriding side's,
+/// trench-normal, `Sample::convergence_mm_yr`). An accretionary margin (a pile over 1 km and
+/// convergence under 76 mm/yr) subducts 0.83 of it (Clift & Vannucchi 2004); any other margin is
+/// erosive and subducts all of it (Clift & Vannucchi 2004; von Huene & Scholl 1991's type 2
+/// margins, where "effectively all incoming sediment is subducted"). The rule does not ask what
+/// the overriding plate is made of: an intra-oceanic margin with a thin pelagic cover (the
+/// Marianas, Tonga) is erosive, one fed by a thick fan (the Lesser Antilles) accretes.
+// ledger: PLT-660
+pub fn sediment_subducted_share(pile_m: f64, convergence_mm_yr: f64) -> f64 {
+    if pile_m > ACCRETIONARY_PILE_M && convergence_mm_yr.abs() < ACCRETIONARY_MAX_MM_YR {
+        ACCRETIONARY_SUBDUCTED
+    } else {
+        1.0
+    }
+}
+
 /// Whether a resampling is due after this step.
 pub fn due(state: &PlateState, env: &Env) -> bool {
     let k = env.k;
@@ -676,6 +703,8 @@ pub fn resample(
     let mut plate_new: Vec<u32> = vec![u32::MAX; n];
     let mut tally: Vec<[f64; 9]> = vec![[0.0; 9]; n];
     let sediment_share = k.sediment_subduction_share as f32; // ledger: PLT-440
+    // By margin type instead of one share (ledger: PLT-660).
+    let sourced = k.sediment_subduction_sourced;
     // How each new sample was blended, for the gap budget (`gap_budget.rs`) when it is on.
     let mut traces: Vec<Option<gap_budget::Trace>> = vec![None; n];
     // The step's limits (`rate.rs`) on the new lattice: a covered sample's ceiling and top are
@@ -746,14 +775,25 @@ pub fn resample(
                             // Sediment subduction: of ocean floor that went under (hidden, or
                             // of a plate the top overrides), the share of its sediment and
                             // sedimentary rock the slab takes down past the margin; the rest
-                            // accretes. ledger: PLT-440
+                            // accretes. ledger: PLT-440; with `sediment_subduction_sourced`
+                            // the share follows the margin's type (PLT-660).
                             let mut subducted = 0.0_f64;
-                            if sediment_share > 0.0
+                            if (sourced || sediment_share > 0.0)
                                 && under.kind != CONTINENTAL
                                 && (under.is_hidden() || (p2 != *pl && overrides(*pl, p2)))
                             {
+                                let share = if sourced {
+                                    let pile = u.pools[pool::SEDIMENT].max(0.0)
+                                        + u.pools[pool::SEDIMENTARY].max(0.0);
+                                    sediment_subducted_share(
+                                        f64::from(pile),
+                                        f64::from(s.convergence_mm_yr),
+                                    ) as f32
+                                } else {
+                                    sediment_share
+                                };
                                 for kp in [pool::SEDIMENT, pool::SEDIMENTARY] {
-                                    let down = u.pools[kp].max(0.0) * sediment_share;
+                                    let down = u.pools[kp].max(0.0) * share;
                                     u.pools[kp] -= down;
                                     subducted += f64::from(down);
                                 }
@@ -818,7 +858,7 @@ pub fn resample(
         *world.globals.entry(name.to_owned()).or_insert(0.0) += sum(k);
     }
     // Only with the rule on, so a run with it off keeps the state it had before it existed.
-    if sediment_share > 0.0 {
+    if sourced || sediment_share > 0.0 {
         *world
             .globals
             .entry(SEDIMENT_SUBDUCTED_GLOBAL.to_owned())
@@ -1327,6 +1367,30 @@ pub fn bury(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// PLT-660, Clift & Vannucchi (2004): an accretionary margin (a pile over 1 km, convergence
+    /// under 76 mm/yr) subducts 83 % of the incoming pile; an erosive one (a thinner pile or a
+    /// faster convergence) all of it (von Huene & Scholl 1991's type 2). The bounds are strict,
+    /// as the sources word them, and the convergence's sign does not enter.
+    #[test]
+    fn sediment_goes_down_by_the_margins_type() {
+        for (pile, conv, want) in [
+            (1500.0, 50.0, 0.83),
+            (8000.0, 10.0, 0.83),
+            (1500.0, -50.0, 0.83),
+            (1500.0, 90.0, 1.0),
+            (1500.0, 76.0, 1.0),
+            (1000.0, 50.0, 1.0),
+            (300.0, 20.0, 1.0),
+            (0.0, 0.0, 1.0),
+        ] {
+            assert_eq!(
+                sediment_subducted_share(pile, conv),
+                want,
+                "{pile} m at {conv} mm/yr"
+            );
+        }
+    }
 
     #[test]
     fn band_offsets_are_fractions_and_wrap_folds_into_a_turn() {

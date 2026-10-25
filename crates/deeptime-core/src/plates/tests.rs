@@ -4817,6 +4817,75 @@ fn a_resampling_subducts_its_share_of_the_slabs_sediment() {
     assert!(((kept.0 - sent.0) - down).abs() < 1e-3 * down);
 }
 
+/// Sediment subduction by margin type (PLT-660): at a resampling the slab takes 83 % of a pile
+/// over 1 km under slow convergence (Clift & Vannucchi 2004's accretionary margin) and all of a
+/// thinner pile or one under fast convergence (the erosive margin), whatever the overriding
+/// plate's crust: an oceanic top (an intra-oceanic margin) keeps none of a thin pile, where
+/// PLT-440's 0.12 left it 88 %. Measured against the share-1 run of the old rule, which sends
+/// down every covered sample's whole pile.
+#[test]
+fn a_resampling_subducts_sediment_by_the_margins_type() {
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    let stage = PlatesStage::new(p.clone());
+    let (st0, geo, pos) = two_plates(&p, &stage.env(&p.tectonics, 1), 0.1);
+    let subducted = |p: &PlanetPreset, st: &PlateState| -> f64 {
+        let env = stage.env(&p.tectonics, 1);
+        let mut s2 = st.clone();
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        ridges::resample(
+            &mut s2,
+            &mut world,
+            &pos,
+            &Tree::over(&pos, |_| true),
+            &geo,
+            &env,
+        )
+        .unwrap();
+        world
+            .globals
+            .get(ridges::SEDIMENT_SUBDUCTED_GLOBAL)
+            .copied()
+            .expect("the subducted global")
+    };
+    // (sediment, sedimentary, the top's convergence mm/yr, an oceanic top, the share expected)
+    for (sed, sedr, conv, oceanic_top, want) in [
+        (100.0, 400.0, 0.0, false, 1.0),
+        (100.0, 1400.0, 50.0, false, 0.83),
+        (100.0, 1400.0, 90.0, false, 1.0),
+        (100.0, 400.0, 0.0, true, 1.0),
+        (100.0, 1400.0, 50.0, true, 0.83),
+    ] {
+        let mut st = st0.clone();
+        for s in st.samples.iter_mut() {
+            if s.is_hidden() {
+                s.pools[state::pool::SEDIMENT] = sed;
+                s.pools[state::pool::SEDIMENTARY] = sedr;
+                s.thickness_m = pools::thickness(&s.pools);
+            } else {
+                s.convergence_mm_yr = conv;
+                if oceanic_top && s.kind == CONTINENTAL {
+                    s.kind = state::OCEANIC;
+                    s.pools = pools::oceanic_column();
+                    s.thickness_m = pools::thickness(&s.pools);
+                    s.basement_m = 0.0;
+                }
+            }
+        }
+        p.tectonics.sediment_subduction_sourced = false;
+        p.tectonics.sediment_subduction_share = 1.0;
+        let all = subducted(&p, &st);
+        assert!(all > 0.0);
+        p.tectonics.sediment_subduction_sourced = true;
+        // The flat share is not read with the rule on.
+        p.tectonics.sediment_subduction_share = 0.12;
+        let sourced = subducted(&p, &st);
+        assert!(
+            (sourced / all - want).abs() < 1e-4,
+            "{sed} + {sedr} m at {conv} mm/yr, oceanic top {oceanic_top}: {sourced} of {all} km³"
+        );
+    }
+}
+
 /// Plate task 8 (the gap budget's recommendation 1): continental crust a resampling accretes
 /// raises the surface by its Airy height, never past the column's, and the surface gets the rise
 /// as uplift; crust a collision already stacked is consumed and raises far less.

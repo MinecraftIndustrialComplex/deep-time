@@ -104,8 +104,28 @@
 //! its own side, through its own plate), and a stretch balances its sources against its sinks
 //! (a narrow peninsula has more ocean than continent: its continent thins to the profile and the
 //! ocean beside it gets what there is).
+//!
+//! # The margin's sediment (the M5 lane, 2026-10-25)
+//! The taper is centred on the model's boundary between the crusts, so its ocean side
+//! (−W/2 < d < 0, T* from 20 km to 7 km, β from 1.65 to 4.7) is where Earth's rifted margins
+//! have their necking and hyper-extended domains: continental crust thinned to under 10 km over
+//! 70 to 200 km (Brune et al. 2014). The plate model labels it ocean floor. With
+//! `margin_sediment_continental` (off by default) a sample there that holds rock from the
+//! continents, sediment and sedimentary rock beyond the pelagic rain for the floor's age
+//! (`pelagic_m_per_myr`; the surface brings every other metre down from the land), becomes
+//! continental crust over its own ocean crust (its basement, PLT-331), so the continent's own
+//! processes act on it: erosion, settling, and being carried into collisions instead of
+//! subducted or stacked under the oceanic label at a resampling.
+//!
+//! Such a column is still the taper's ocean side: a continental column with less than 10 km of
+//! its own crystalline crust ([`hyper_extended`], Brune et al. 2014's limit) takes part as the
+//! ocean side does and is no boundary sample of the continental side, so the boundary, the
+//! targets and the taper stay where the continent's own crust ends and a converted ring does not
+//! become the margin of the next (the ratchet that turned ten times as many samples when buoyant
+//! crust converted at 15 km, `subduction::resolve`). Off, the taper is the one above.
 // ledger: PLT-261 (the rule), PLT-475 (the profile), PLT-476 (the lithosphere), PLT-262 (the
-// width), PLT-263 (τ), PLT-264 (the height line), PLT-294 (the ocean side's rock).
+// width), PLT-263 (τ), PLT-264 (the height line), PLT-294 (the ocean side's rock), PLT-661 (the
+// margin's sediment).
 
 use std::collections::HashMap;
 
@@ -115,10 +135,32 @@ use rayon::prelude::*;
 use super::Env;
 use super::geometry::{Geo, dijkstra_sparse};
 use super::pools::{continental_column, oceanic_column};
-use super::state::{ARC, CONTINENTAL, HIDDEN, OCEANIC, PlateState, SUBDUCTION_ZONE, TRENCH, pool};
+use super::state::{
+    ARC, CONTINENTAL, HIDDEN, OCEANIC, PlateState, SUBDUCTION_ZONE, Sample, TRENCH, pool,
+};
 
 /// `WorldState::globals`: crust moved by the transition over the run, km³.
 pub const MOVED_GLOBAL: &str = "plates/transition_km3";
+
+/// Brune et al. (2014): rifted margins hold "hyper-extended (with a thickness <10 km) crustal
+/// slivers", m of crystalline crust. ledger: PLT-661
+pub const HYPER_EXTENDED_M: f64 = 10_000.0;
+
+/// Whether `s` is hyper-extended continental crust: continental, with less than
+/// [`HYPER_EXTENDED_M`] of its own crystalline crust (the column's less its ocean basement,
+/// [`Sample::own_pools`]). With `margin_sediment_continental` the taper takes it as its ocean
+/// side (the module docs, "The margin's sediment"). ledger: PLT-661
+pub fn hyper_extended(s: &Sample) -> bool {
+    s.kind == CONTINENTAL && crystalline_m(&s.own_pools()) < HYPER_EXTENDED_M
+}
+
+/// Whether ocean floor `s` holds rock from the continents at `t_myr`: sediment and sedimentary
+/// rock beyond the pelagic rain of `pelagic_m_per_myr` over its age. ledger: PLT-661
+pub fn holds_terrigenous(s: &Sample, t_myr: f64, pelagic_m_per_myr: f64) -> bool {
+    let pile = f64::from(s.pools[pool::SEDIMENT].max(0.0))
+        + f64::from(s.pools[pool::SEDIMENTARY].max(0.0));
+    s.kind == OCEANIC && pile > pelagic_m_per_myr.max(0.0) * s.age_myr(t_myr)
+}
 
 /// The pools that count as crystalline crust (not sediment or sedimentary rock).
 const CRYSTALLINE: [usize; 5] = [
@@ -183,6 +225,9 @@ pub struct Transition {
     /// Per sample: the floor an oceanic sample of the zone cools towards (`held_floor_m`), NaN
     /// elsewhere; `pools::surface_step` reads it.
     pub floor_m: Vec<f32>,
+    /// Ocean floor of the zone's ocean side turned continental this step for the continents'
+    /// rock it holds (`margin_sediment_continental`; ledger: PLT-661).
+    pub margins: u32,
 }
 
 /// The transition's width W as an angle on the unit sphere: `transition_width_km` is a length on
@@ -263,6 +308,19 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         .par_iter()
         .map(|s| groups[s.group as usize].plate)
         .collect();
+    // The side of the taper each sample is on: its crust's, but with the margin's sediment on,
+    // hyper-extended continental crust is the ocean side (the module docs; ledger: PLT-661).
+    let margins = k.margin_sediment_continental;
+    let side: Vec<u8> = samples
+        .par_iter()
+        .map(|s| {
+            if margins && hyper_extended(s) {
+                OCEANIC
+            } else {
+                s.kind
+            }
+        })
+        .collect();
     // Who takes part: visible, not at a trench, in a subduction zone or on an arc; continental
     // crust not raised by an orogeny lately (an active margin or a belt is not a rifted margin);
     // oceanic crust no thicker than the continent's (the plate model keeps crust stacked at
@@ -270,9 +328,10 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
     // master: that is not the ocean floor beside a rifted margin, and it neither gives nor takes).
     let eligible: Vec<bool> = samples
         .par_iter()
-        .map(|s| {
+        .zip(side.par_iter())
+        .map(|(s, &side)| {
             s.flags & (HIDDEN | TRENCH | SUBDUCTION_ZONE | ARC) == 0
-                && if s.kind == OCEANIC {
+                && if side == OCEANIC {
                     crystalline_m(&s.pools) <= t_n
                 } else {
                     s.orogeny_myr < quiet_before
@@ -287,9 +346,9 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         .into_par_iter()
         .filter(|&v| {
             eligible[v as usize]
-                && geo.edges(v).any(|(u, _)| {
-                    same(v, u) && samples[u as usize].kind != samples[v as usize].kind
-                })
+                && geo
+                    .edges(v)
+                    .any(|(u, _)| same(v, u) && side[u as usize] != side[v as usize])
         })
         .collect();
     if boundary.is_empty() {
@@ -341,20 +400,20 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         let src: Vec<(u32, f64, u32)> = boundary
             .iter()
             .zip(&seed_at)
-            .filter(|&(&v, _)| samples[v as usize].kind == kind)
+            .filter(|&(&v, _)| side[v as usize] == kind)
             .map(|(&v, &seed)| (v, 0.0, seed))
             .collect();
         dijkstra_sparse(
             geo,
             &src,
-            |a, b| same(a, b) && samples[b as usize].kind == kind,
+            |a, b| same(a, b) && side[b as usize] == kind,
             reach,
         )
     };
     let (reach_c, reach_o) = rayon::join(|| side(CONTINENTAL), || side(OCEANIC));
 
     // The zone: signed distance and target, per sample, in sample order (a sample reached from
-    // the continental side is continental, from the oceanic side oceanic).
+    // the continental side is on the continental side, from the oceanic side on the oceanic).
     struct Member {
         i: usize,
         seed: u32,
@@ -446,13 +505,19 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         // With `transition_ocean_crust`, ocean floor thickens with ocean crust, the lavas and
         // gabbro of a volcanic margin, never with the continent's granite and gneiss; otherwise,
         // and on a continental sink, with the sources' rock. ledger: PLT-294.
-        let (add, sum) = if k.transition_ocean_crust && s.kind == OCEANIC {
+        let ocean_rock = k.transition_ocean_crust && side[m.i] == OCEANIC;
+        let (add, sum) = if ocean_rock {
             (&ocean, ocean_total)
         } else {
             (acc, total)
         };
         for (x, a) in s.pools.iter_mut().zip(add.iter()) {
             *x += (g * a / sum) as f32;
+        }
+        // A margin turned continental (PLT-661) takes ocean crust under its own: the lavas and
+        // gabbro join its basement, so the taper never builds it a crust of its own.
+        if ocean_rock && s.kind == CONTINENTAL {
+            s.basement_m += g as f32;
         }
         s.thickness_m = s.pools.iter().sum();
         s.elevation_m = (f64::from(s.elevation_m) + g / f).clamp(lo, hi) as f32;
@@ -463,6 +528,20 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
         let s = &state.samples[m.i];
         if s.kind == OCEANIC {
             out.floor_m[m.i] = held_floor_m(crystalline_m(&s.pools), m.target, z_f, f) as f32;
+        }
+    }
+    // The margin's sediment: ocean floor of the ocean side holding the continents' rock is the
+    // distal margin's continental crust (the module docs; ledger: PLT-661). The zone was found
+    // from the samples as the step began, so a column turned now is the ocean side's next step
+    // too and the next ring out is no margin of it.
+    if margins {
+        for m in &members {
+            let s = &mut state.samples[m.i];
+            if holds_terrigenous(s, env.t_myr, k.pelagic_m_per_myr) {
+                // Its own ocean crust stays under it as its basement (ledger: PLT-331).
+                s.make_continental();
+                out.margins += 1;
+            }
         }
     }
     out
@@ -928,6 +1007,89 @@ mod tests {
             };
             assert_eq!(width_rad(&env), 200.0 / 6370.0);
         }
+    }
+
+    /// The margin's sediment (PLT-661): ocean floor on the taper's ocean side (within W/2 of its
+    /// plate's continent) holding sediment beyond the pelagic rain for its age turns continental
+    /// over its own ocean crust, hyper-extended (Brune et al. 2014); floor beyond W/2, floor
+    /// with the rain alone and floor in a subduction zone stay oceanic. The taper does not see
+    /// the label: over 30 steps every sample's crust and height are those of the run with the
+    /// switch off, and no ring beyond the first zone turns (no ratchet). Off, nothing turns.
+    #[test]
+    fn the_margins_sediment_turns_its_distal_margin_continental() {
+        let base = Fx::new(MODEL_KM).k;
+        let k = TectonicParams {
+            transition_ocean_crust: true,
+            pelagic_m_per_myr: 5.0,
+            ..base
+        };
+        let on = Fx::with(TectonicParams {
+            margin_sediment_continental: true,
+            ..k.clone()
+        });
+        let off = Fx::with(k);
+        let w = on.k.transition_width_km;
+        // The floor formed at −200 Myr: 1,010 m of rain at the first step's 2 Myr. Every third
+        // sample holds 1,000 m (the rain alone), the others 2,500 m.
+        let rain_only = |i: usize| i % 3 == 0;
+        let load = |st: &mut PlateState| {
+            for (i, s) in st.samples.iter_mut().enumerate() {
+                if s.kind == OCEANIC {
+                    s.pools[pool::SEDIMENTARY] = if rain_only(i) { 1000.0 } else { 2500.0 };
+                    s.thickness_m = s.pools.iter().sum();
+                }
+            }
+        };
+        let mut st = planet(&on.geo, 0.4);
+        load(&mut st);
+        let before = st.samples.clone();
+        let first = on.run(&mut st, 1);
+        let mut turned = 0;
+        let mut kept_in_zone = 0;
+        for (i, s) in st.samples.iter().enumerate() {
+            let b = &before[i];
+            if b.kind != OCEANIC {
+                continue;
+            }
+            let p = on.geo.points()[i];
+            let d = inland_km(p);
+            if s.kind == CONTINENTAL {
+                turned += 1;
+                assert_eq!(st.plate_of(i), 0, "plate 1's margin is active: {i}");
+                assert!(d > -0.5 * w, "turned at {d:.0} km");
+                assert!(!rain_only(i), "the rain alone turned {i}");
+                assert_eq!(s.basement(), 7000.0);
+                assert!(hyper_extended(s));
+            } else if st.plate_of(i) == 0 && p.x < -0.2 && !rain_only(i) && d > -0.35 * w {
+                kept_in_zone += 1;
+            }
+        }
+        assert!(turned > 50, "{turned}");
+        assert_eq!(turned, first.margins);
+        assert_eq!(
+            kept_in_zone, 0,
+            "the zone's ocean side with the continents' rock turns"
+        );
+        // Thirty steps on: the taper's crust and heights are the switch-off run's, and nothing
+        // beyond the first zone turned.
+        let mut a = planet(&on.geo, 0.4);
+        let mut b = planet(&off.geo, 0.4);
+        load(&mut a);
+        load(&mut b);
+        let kinds: Vec<u8> = b.samples.iter().map(|s| s.kind).collect();
+        on.run(&mut a, 30);
+        off.run(&mut b, 30);
+        let mut later = 0;
+        for (i, (x, y)) in a.samples.iter().zip(&b.samples).enumerate() {
+            assert_eq!(x.pools, y.pools, "{i}");
+            assert_eq!(x.elevation_m, y.elevation_m, "{i}");
+            assert_eq!(y.kind, kinds[i], "off, nothing turns: {i}");
+            if x.kind != y.kind {
+                later += 1;
+                assert!(inland_km(on.geo.points()[i]) > -0.5 * w, "a ratchet at {i}");
+            }
+        }
+        assert!(later >= turned, "{later} {turned}");
     }
 
     /// Stage 2's profile holds the step's crust as the old linear taper did (both are symmetric
