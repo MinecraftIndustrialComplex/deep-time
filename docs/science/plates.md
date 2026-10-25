@@ -8451,6 +8451,10 @@ run-checks against fl-ends' 195 (base10 567 of 792).
 **Recommendation.** On by default (done in this branch): the law is the margin standing over its
 slab, as the arc does; the test bounds hold, nothing diverges or binds on the pool, and no V1 measure
 moves. The cordillera's lost crust is the range that stood round the slab's ends, not to be made up
-with a knob. Left on the whole distance field, and a question for the coordinator: the
-subduction-zone flag and the convergence, obliquity and slab age written on each reached sample
-(their readers, the volcanoes and the deposits, would see a subduction zone past a front's ends).
+with a knob.
+
+**Open item, for a later step.** The subduction-zone flag and the convergence, obliquity and slab
+age written on each reached sample still run on the whole distance field, so their readers (the
+volcanoes and the deposits) see a subduction zone past a front's ends. They make no relief or crust
+of their own; the coordinator's call (2026-10-25): leave them until those readers are checked, then
+stop them at the slab's ends in a step of their own.
