@@ -85,12 +85,14 @@ pub const ACCRETIONARY_SUBDUCTED: f64 = 0.83;
 
 /// Sediment subduction by margin type (`sediment_subduction_sourced`, PLT-660): the share of the
 /// incoming sedimentary pile `pile_m` (the subducted floor's sediment and sedimentary rock, m)
-/// that goes down with the slab at a convergence of `convergence_mm_yr` (the overriding side's,
-/// trench-normal, `Sample::convergence_mm_yr`). An accretionary margin (a pile over 1 km and
-/// convergence under 76 mm/yr) subducts 0.83 of it (Clift & Vannucchi 2004); any other margin is
-/// erosive and subducts all of it (Clift & Vannucchi 2004; von Huene & Scholl 1991's type 2
-/// margins, where "effectively all incoming sediment is subducted"). The rule does not ask what
-/// the overriding plate is made of: an intra-oceanic margin with a thin pelagic cover (the
+/// that goes down with the slab at a convergence of `convergence_mm_yr` (the overriding side's
+/// `Sample::convergence_mm_yr`: the plates' whole relative speed at the front, the component
+/// normal to it only with `DEEPTIME_ARC_NORMAL=1`, PLT-312; Clift & Vannucchi's rate is the
+/// orthogonal one, so an oblique margin reads faster here). An accretionary margin (a pile over
+/// 1 km and convergence under 76 mm/yr) subducts 0.83 of it (Clift & Vannucchi 2004); any other
+/// margin is erosive and subducts all of it (Clift & Vannucchi 2004; von Huene & Scholl 1991's
+/// type 2 margins, where "effectively all incoming sediment is subducted"). The rule does not ask
+/// what the overriding plate is made of: an intra-oceanic margin with a thin pelagic cover (the
 /// Marianas, Tonga) is erosive, one fed by a thick fan (the Lesser Antilles) accretes.
 // ledger: PLT-660
 pub fn sediment_subducted_share(pile_m: f64, convergence_mm_yr: f64) -> f64 {
