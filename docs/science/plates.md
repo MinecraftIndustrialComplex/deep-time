@@ -9955,3 +9955,124 @@ it; what changes is the obliquity the samples carry out of the plate stage: the 
 porphyry deposits' obliquity curve (ORE-033, peak near 15°) read. Both now get the angle CRE-018 and
 the deposit field's description (`deeptime:obliquity_deg`, "convergence obliquity to the trench
 normal") already said they got.
+
+## The sea floor's age and the initiation's polarity (2026-10-25)
+
+The floor-age diagnosis (build log 2026-10-25, "Front lane: why floor older than 180 Myr does not go
+under on base15") found 0.24 of base15's ocean older than 180 Myr late in the runs (Earth 0.006), from
+two causes of about equal weight: slow turnover, and consumption blind to age. Where the old floor sat
+could not be read from the cache, and in about three initiations of four the trench took the opposite
+polarity to the slab planted under the fracture. The coordinator's order (2026-10-25): an age map
+first, then the polarity, then the sourced constants, then a design for propagation.
+
+### The age map (measurement only)
+
+With `DEEPTIME_CRUST_BUDGET_MAPS` set, every crust-budget snapshot also writes `maps/age/t<Myr>.bin`:
+one little-endian f32 per record of the snapshot's map (`maps/t<Myr>.bin`, the visible samples in
+order), the floor's age at the snapshot (`Sample::age_myr`) on oceanic crust and NaN on continental
+crust (`crust_budget.rs`, `write_ages` and `age_records`; the test
+`the_age_records_are_the_ocean_ages`: the oceanic records, sorted, are `dynamics::ocean_ages`, which
+the dynamics record's age quantiles read). Nothing reads it in the model.
+`tools/review/floorage/floorage_age.py` reads it with the map and `maps/plate/`.
+
+#### Where the old floor sits (2026-10-25)
+
+Four pool runs carry the map (arm fl-agemap, key b95402b27d42: seeds 1 and 2, both starts, base15's
+environment, 2 threads). Each run's state and record hashes equal base15's: the map measures and does
+not act. On master 1b210fac (arm fl-agemap-1b21, key 153f5de6d52c) the records are base15's too and
+the world differs in one field of 109, the trap structure, which DEF-081 (structures drawn past a
+pole are not started) changes on purpose. `floorage_age.py` reads the 33 snapshots from -500 Myr on (none at a resampling, where the
+map hides nothing and flags no front) and checks each against the record: the map's oceanic count is
+the record's, and its count older than 180 Myr is the record's `old180`. Pooled over the four runs:
+
+- **Floor older than 180 Myr is 0.234 of the ocean.** Of it, 0.809 lies in the margin zone, within
+  331 km of its own plate's continent (PLT-503's reach plus one spacing: the floor an initiation keeps
+  on the parent); 0.546 lies farther than 1,000 km from every trench (PLT-064's clearance); 0.325 sits
+  on plates over a fifth of the planet; 0.067 on plates with no trench; 0.007 on plates with no
+  convergent front at all.
+- **Exclusively**, margin 0.809, beyond the margin and the clearance 0.074, open floor within 1,000 km
+  of a trench 0.116. The margin's share rises with age: 0.165 of the floor at 0 to 10 Myr, 0.356 at
+  60 to 100, 0.549 at 150 to 180, 0.668 at 180 to 250, and 0.900 at 250 Myr and over (0.143 of the
+  ocean).
+- **Its own plate goes down far from it.** The old margin floor's distance to the nearest trench of
+  its own plate: 0.147 within 500 km, 0.153 at 500 to 1,000 km, 0.269 at 1,000 to 2,000 km, 0.388
+  beyond, 0.044 on plates with none. The floor its plate feeds that trench is of any age: 0.215
+  younger than 30 Myr, 0.369 older than 180.
+- **Initiation's view.** Floor older than 150 Myr (PLT-062's gate): within 1,000 km of a trench 0.482,
+  kept by the margin (PLT-503) 0.417, exposed to initiation 0.093, too few samples or no seed 0.009.
+  With Crameri et al. 2020's oldest initiation age, 117.4 Myr, as the gate, the exposed floor goes
+  from 0.027 to 0.045 of the ocean. This status reads the map's end-of-step flags, without the hidden
+  trench samples the clearance also sees, so it is close, not exact.
+- **By start.** The supercontinent start keeps 1.13 plates over a fifth of the planet per snapshot
+  against the scattered start's 0.67, and 0.42 of its old floor on them against 0.24; the margin's
+  share is the same in both (0.81).
+
+So the old floor is passive-margin floor that no trench reaches along the margin, not interior floor
+beyond the clearance, nor floor on plates that never go down, and the age gate holds back little.
+This points at how a trench comes to a margin (propagation along strike) more than at the gate's age
+(PLT-062) or incipient subduction's strength (PLT-612), which acts only at a front between two plates,
+where the margin's floor is not.
+
+### Law 1: the older side of the fracture goes under (PLT-655)
+
+An initiation (PLT-062 to PLT-067, PLT-503) splits the old floor off its plate and plants a slab under
+the fracture (PLT-270), always on the split. The trench that formed a few steps later took its
+polarity from the rule of a new contact, which reads the overlap's crust and ages, and on base15 it
+put the parent under in 1,494 of the 1,998 such contacts the records hold, at a median 6 Myr after the
+split: the planted slab and the trench's slab then pulled against each other. Gurnis, Hall & Lavier
+2004 settle which side goes down at a fracture zone in compression: "the older plate is thrust beneath
+the younger" ([60]), and with an asymmetry in age "the weak zone overlies the thicker plate or where
+the negative buoyancy is localized" ([78]).
+
+With `tectonics.initiation_polarity_by_age` (on by default):
+
+- **The fracture's sides.** The visible samples of the parent with a lattice neighbour of the same
+  rigid group, visible, on the other side of the split: one spacing each side (about 180 km on the
+  quick lattice), the nearest floor the lattice resolves.
+- **Which goes under.** A side whose fracture samples are half or more continental crust does not
+  (the rule of a new contact's reading of an overlap); otherwise the side whose fracture floor is
+  older on the mean, the split on a tie, with both sides continental, or with no fracture found.
+- **The slab and the trench agree.** The planted slab hangs from that side, the split's or the
+  parent's. The contact the two plates form later takes the planted slab's polarity
+  (`subduction::planted_polarity`: a new contact between a plate and its parent with a slab one way
+  between them), not the overlap's.
+
+No value of its own. Tests: `the_older_side_of_the_fracture_goes_under` (`rifting.rs`: a plate of old
+floor split at x = 0, the slab hangs from the parent where its side is older, from the split where the
+split's is, on a tie, or where the parent's side of the fracture is continental; off, from the split)
+and `an_initiations_contact_takes_its_planted_slab` (`plates/tests.rs`: two oceanic plates, the
+older turned under the younger; with the younger's slab planted under the older and the older split
+from it, the contact puts the younger under; off, with no split, or with no slab, the older).
+
+**On the pool (arm fl-law1, key fdb71fad7135, argkey cd665cef: seeds 1 to 4, both starts, base15's
+settings and the age maps, 2 threads; against base15's 24 runs, medians, Mann-Whitney p in brackets).**
+
+| | base15 | fl-law1 |
+|---|---|---|
+| land (0.13 to 0.36) | 0.213 | 0.226 (0.54) |
+| largest landmass (≥ 0.06) | 0.069 | 0.095 (0.48) |
+| continental crust under the sea (≤ 0.56) | 0.510 | 0.448 (0.22) |
+| land above 2 km (≤ 0.07) | 0.025 | 0.031 (0.72) |
+| coast with high ground (≤ 0.11) | 0.109 | 0.099 (0.65) |
+| land under ice (≤ 0.32) | 0.067 | 0.079 (0.92) |
+| collisions per 100 Myr (≤ 6) | 5.10 | 4.25 (0.020) |
+| criteria met per run, median and mean | 6, 5.79 | 6, 6.12 (0.53) |
+| sea over the datum, after 100 Myr / end, m | 500 / 697 | 428 / 564 |
+| the guard's worst, m from the sea | 10,106 | 10,014 (0.18); no step beyond 2 Earth reliefs |
+
+No V1 measure breaches its target; only the collisions move beyond chance. In the records (polarity.py),
+the contacts between an initiated plate and its parent still put the parent under in 0.75 of them
+(710 of 947), at a median 6 Myr after the split, as on base15 (0.75): the parent's side of the
+fracture is the older because the floor the initiation leaves on it is the margin's kept floor
+(PLT-503). What the law changes is that the planted slab now hangs on the same side, so the trench
+forms on a slab that pulls with it. The initiated plates die younger less often (dead within 20 Myr
+0.13 of those born after -900 Myr, against 0.22), reach a front within 20 Myr more often (0.70
+against 0.65) and keep more of the trench: the subduction front is 79,042 km against 68,762, its
+flux 3.04 km²/yr against 2.64, the area-weighted plate speed 22.5 mm/yr against 20.8. The floor is
+younger as a result, though no rule reads its age to that end: late mean age (from -500 Myr, the
+records) 112 Myr against 126 (p < 0.001), older than 180 Myr 0.197 of the ocean against 0.244
+(p < 0.001); the hazard of going down stays flat to 220 Myr instead of falling after 200, and the
+floor each resampling takes is 0.81 of the standing mean age against 0.75. The age maps (67
+snapshots from -500 Myr, against fl-agemap's 33, base15's seeds 1 and 2): older than 180 Myr 0.202
+of the ocean against 0.234, 0.791 of it in the margin zone against 0.809; the margin zone holds
+0.419 of all the floor against 0.440.
