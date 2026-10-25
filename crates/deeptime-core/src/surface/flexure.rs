@@ -53,9 +53,11 @@
 //! slides (Beaumont 1981; Flemings & Jordan 1989), so the belt's deflection stays with the belt.
 //! The plate is linear, and on a step with a belt its own increments (its loads and roots, the
 //! residual it carries, the load it let go) are solved apart as well: that answer is the belt's
-//! part of the step's deflection, kept as `FlexState::belt_m`. Over the foreland, within a
-//! flexural wavelength of the belt, that part moves with the belt, and the rest (the crust's own
-//! loads, its local roots, where it yielded) moves with the crust. Nothing is solved again: the
+//! part of the step's deflection, kept as `FlexState::belt_m`; where the belt bends the plate
+//! past what it holds, the plate's yield there is the belt's too. Over the foreland, within a
+//! flexural wavelength of the belt and nearer to it than to any other belt, that part moves with
+//! the belt, and the rest (the crust's own loads, its local roots, its own yield) moves with the
+//! crust. Crust that comes into a belt's foreland moves nothing as it does. Nothing is solved again: the
 //! step's change is the whole solve's, and a place in the foreland takes the change of the
 //! belt's part as the crust slides under it, with the sea that change lets in, which the belt's
 //! solve already counted. Carried with its crust, the foredeep's deflection went with the crust
@@ -599,11 +601,20 @@ pub struct FlexState {
     /// that carried it, in cell order.
     #[serde(default)]
     pub footprint: Vec<(u32, f32)>,
+    /// Whose the belt's part each cell's crust carries is, as of the last step (ISO-136): the
+    /// belt's plate over a belt's foreland, [`BELT_ROOT`] where the crust stood under a belt
+    /// (its belt's part is that belt's root; it stays so until the crust comes into a foreland),
+    /// NaN elsewhere (beyond any foreland: the belts' far field, carried with the crust).
+    /// Carried with the crust (its nearest source of the same crust). Crust that comes into a
+    /// belt's foreland from under a belt or from another belt's takes the belt's part of the
+    /// place and moves nothing, as new crust does. Kept with `belt_m`.
+    #[serde(default)]
+    pub belt_of: Vec<f32>,
     /// The belts' part of the deflection over their forelands in the belts' frame (ISO-136): per
-    /// foreland cell of this step, what the place had a step ago, moved with its belt. Set by
-    /// [`FlexState::carry_frame`] and taken by the next step, in cell order.
+    /// foreland cell of this step, what the place had a step ago, moved with its belt, and the
+    /// belt's plate. Set by [`FlexState::carry_frame`] and taken by the next step, in cell order.
     #[serde(skip)]
-    pub framed: Vec<(u32, f32)>,
+    pub framed: Vec<(u32, f32, f32)>,
     /// The surface's elevation before the step at the crust's source, m (the carry's corners,
     /// [`FlexState::carry`]); NaN where the crust is new at the place. The step's start less this
     /// is the plate model's move of the ground as the carry made it ([`booked`]). Set by the
@@ -626,6 +637,7 @@ impl FlexState {
             since_solve: 0,
             belt_m: Vec::new(),
             footprint: Vec::new(),
+            belt_of: Vec::new(),
             framed: Vec::new(),
             from_m: Vec::new(),
         }
@@ -634,16 +646,17 @@ impl FlexState {
     // ledger: ISO-133, ISO-136
     /// Before [`FlexState::carry`]: the belt's part of the deflection (`belt_m`) each foreland
     /// cell of a belt had a step ago in the belt's frame ([`belt_reach`]). `frame` lists the
-    /// foreland's cells, each with the plate that bends it (the belt's carrying plate) and its
-    /// source under the belt's plate's rotation. A source's corners count where, before the
-    /// step, they held a state and belonged to the bending plate: its own crust (`prev_plate`)
-    /// or the footprint it carried at the last step. A cell without such a corner is left out:
-    /// its crust carries the belt's part as anywhere.
+    /// foreland's cells, each with the plate that bends it (the belt's carrying plate), the
+    /// belt's plate and its source under the belt's plate's rotation. A source's corners count
+    /// where, before the step, they held a state and belonged to the bending plate: its own
+    /// crust (`prev_plate`) or the footprint it carried at the last step. A cell without such a
+    /// corner (or a step with no belt's part yet) gets NaN: its crust carries the belt's part
+    /// as anywhere, and it is in the belt's frame from the next step on.
     pub fn carry_frame(
         &mut self,
         w: usize,
         h: usize,
-        frame: &[(usize, f32, [f64; 2])],
+        frame: &[(usize, f32, f32, [f64; 2])],
         prev_plate: Option<&[f32]>,
     ) {
         let n = w * h;
@@ -651,7 +664,14 @@ impl FlexState {
         let Some(prev_plate) = prev_plate.filter(|v| v.len() == n) else {
             return;
         };
-        if frame.is_empty() || self.belt_m.len() != n || self.water_m.len() != n {
+        if frame.is_empty() {
+            return;
+        }
+        if self.belt_m.len() != n || self.water_m.len() != n {
+            self.framed = frame
+                .iter()
+                .map(|&(c, _, belt_plate, _)| (c as u32, f32::NAN, belt_plate))
+                .collect();
             return;
         }
         let footprint = &self.footprint;
@@ -665,7 +685,7 @@ impl FlexState {
         let belt = &self.belt_m;
         let framed = frame
             .par_iter()
-            .filter_map(|&(c, id, [fi, fj])| {
+            .map(|&(c, id, belt_plate, [fi, fj])| {
                 let fj = fj.clamp(0.0, (h - 1) as f64);
                 let (i0, j0) = (fi.floor(), fj.floor());
                 let (ti, tj) = (fi - i0, fj - j0);
@@ -687,7 +707,12 @@ impl FlexState {
                         weight += wt;
                     }
                 }
-                (weight > 1e-9).then(|| (c as u32, (sum / weight) as f32))
+                let bf = if weight > 1e-9 {
+                    (sum / weight) as f32
+                } else {
+                    f32::NAN
+                };
+                (c as u32, bf, belt_plate)
             })
             .collect();
         self.framed = framed;
@@ -790,6 +815,23 @@ impl FlexState {
         } else {
             self.belt_m = Vec::new();
         }
+        // ledger: ISO-136
+        // Which belt's frame the crust was in: a name, not a quantity, so the nearest source
+        // gives it, where that held the same crust.
+        if self.belt_of.len() == n {
+            let was = std::mem::take(&mut self.belt_of);
+            self.belt_of = x
+                .src
+                .par_iter()
+                .enumerate()
+                .map(|(c, &[fi, fj])| {
+                    let s = advect::nearest(x.w, x.h, fi, fj);
+                    if x.same(c, s) { was[s] } else { f32::NAN }
+                })
+                .collect();
+        } else {
+            self.belt_of = Vec::new();
+        }
         // ledger: ISO-096
         self.from_m = moved
             .into_par_iter()
@@ -806,7 +848,9 @@ impl FlexState {
 /// cells (8-connected, through that plate's crust) from a belt it carries (a footprint cell of
 /// another plate's crust, `carrier` its carrying plate, NaN off footprints), with the carrying
 /// plate and the belt's plate, the nearest belt's. The wedge (a footprint cell of the carrying
-/// plate's own crust) is foreland too. In cell order; x wraps.
+/// plate's own crust) is foreland too. A cell nearer (over any crust) to another belt than to
+/// its own is that belt's to bend, not its own's: a plate that carries one belt and stands under
+/// another keeps the second's bending with its crust (ISO-136). In cell order; x wraps.
 pub fn belt_reach(
     w: usize,
     h: usize,
@@ -815,40 +859,56 @@ pub fn belt_reach(
     reach: usize,
 ) -> Vec<(usize, f32, f32)> {
     let n = w * h;
-    let mut dist = vec![u32::MAX; n];
-    let mut label = vec![(f32::NAN, f32::NAN); n];
-    let mut queue = std::collections::VecDeque::new();
+    let mut sources = Vec::new();
     for c in 0..n.min(plate.len()).min(carrier.len()) {
         let k = carrier[c];
         if k.is_finite() && plate[c] != k {
-            dist[c] = 0;
-            label[c] = (k, plate[c]);
-            queue.push_back(c);
+            sources.push((c, (k, plate[c])));
         }
     }
-    if queue.is_empty() {
+    if sources.is_empty() {
         return Vec::new();
     }
-    while let Some(c) = queue.pop_front() {
-        let d = dist[c];
-        if d as usize >= reach {
-            continue;
+    // Multi-source breadth-first labels, each cell the nearest belt's (8-connected), through
+    // the carrying plate's own crust or (`any`) through every crust.
+    let spread = |any: bool| {
+        let mut dist = vec![u32::MAX; n];
+        let mut label = vec![(f32::NAN, f32::NAN); n];
+        let mut queue = std::collections::VecDeque::new();
+        for &(c, l) in &sources {
+            dist[c] = 0;
+            label[c] = l;
+            queue.push_back(c);
         }
-        let (k, belt) = label[c];
-        let (i, j) = (c % w, c / w);
-        for jj in j.saturating_sub(1)..(j + 2).min(h) {
-            for ii in [i + w - 1, i, i + 1] {
-                let m = jj * w + ii % w;
-                if dist[m] == u32::MAX && plate[m] == k {
-                    dist[m] = d + 1;
-                    label[m] = (k, belt);
-                    queue.push_back(m);
+        while let Some(c) = queue.pop_front() {
+            let d = dist[c];
+            if d as usize >= reach {
+                continue;
+            }
+            let (k, belt) = label[c];
+            let (i, j) = (c % w, c / w);
+            for jj in j.saturating_sub(1)..(j + 2).min(h) {
+                for ii in [i + w - 1, i, i + 1] {
+                    let m = jj * w + ii % w;
+                    if dist[m] == u32::MAX && (any || plate[m] == k) {
+                        dist[m] = d + 1;
+                        label[m] = (k, belt);
+                        queue.push_back(m);
+                    }
                 }
             }
         }
-    }
+        (dist, label)
+    };
+    let (dist, label) = spread(false);
+    let (_, nearest) = spread(true);
     (0..n)
-        .filter(|&c| dist[c] != u32::MAX && dist[c] > 0)
+        .filter(|&c| {
+            dist[c] != u32::MAX
+                && dist[c] > 0
+                && nearest[c].0 == label[c].0
+                && nearest[c].1 == label[c].1
+        })
         .map(|c| (c, label[c].0, label[c].1))
         .collect()
 }
@@ -1991,6 +2051,9 @@ pub fn local_answers(
 /// the block metric's from it, m. No rule reads it, and the world it makes is the same.
 pub const METRIC_TRACE_ENV: &str = "DEEPTIME_FLEX_METRIC_TRACE";
 
+/// `FlexState::belt_of` where the crust stood under a belt (no plate's id: those are 0 or more).
+pub const BELT_ROOT: f32 = -1.0;
+
 /// One solve's [`METRIC_TRACE_ENV`] line; `system` is the solve's (d, c, r).
 fn metric_trace(
     sv: &Solver,
@@ -2092,7 +2155,12 @@ pub fn step(
     // move lets in or out is the belt's too: the belt's increments were solved with the water
     // they let into the basin (the restoring density under the sea), so it joins the load and
     // its reference as answered. Crust new at the place starts with the belt's part where it is,
-    // as it starts with the rest of its state: it moves nothing.
+    // as it starts with the rest of its state: it moves nothing. So does crust that comes into
+    // the belt's frame from under a belt or from another belt's frame (`FlexState::belt_of`):
+    // what it carries as the belt's part is not this belt's bending of the place (it is a belt's
+    // own root, where the belt stood, or another belt's bending), and the difference is no move
+    // of the belt. Crust from beyond any foreland carries the belts' far field with it, as the
+    // crust in the frame carries its own part between steps, and takes the change as it does.
     let framed = std::mem::take(&mut st.framed);
     let mut frame_dh = Vec::new();
     let fresh_at = |st: &FlexState, c: usize| {
@@ -2101,6 +2169,7 @@ pub fn step(
     };
     if x.carrier_plate_id.is_none() {
         st.belt_m = Vec::new();
+        st.belt_of = Vec::new();
     } else if st.belt_m.len() != n {
         st.belt_m = vec![0.0; n];
     } else {
@@ -2110,14 +2179,41 @@ pub fn step(
             }
         }
     }
+    let was_of = if x.carrier_plate_id.is_some() {
+        let was = std::mem::take(&mut st.belt_of);
+        let was = if was.len() == n {
+            was
+        } else {
+            vec![f32::NAN; n]
+        };
+        st.belt_of = (0..n)
+            .into_par_iter()
+            .map(|c| {
+                let under = x.carrier(c).is_some_and(|(id, _)| id != x.plate_id[c]);
+                if under || was[c] == BELT_ROOT {
+                    BELT_ROOT
+                } else {
+                    f32::NAN
+                }
+            })
+            .collect();
+        was
+    } else {
+        Vec::new()
+    };
     if !framed.is_empty() && st.belt_m.len() == n {
         frame_dh = vec![0.0f64; n];
-        for &(c, bf) in &framed {
+        for &(c, bf, belt_plate) in &framed {
             let c = c as usize;
             if c >= n {
                 continue;
             }
-            if fresh_at(st, c) {
+            st.belt_of[c] = belt_plate;
+            if bf.is_nan() {
+                continue;
+            }
+            let entering = !was_of[c].is_nan() && was_of[c] != belt_plate;
+            if fresh_at(st, c) || entering {
                 st.belt_m[c] = bf;
                 continue;
             }
@@ -2627,6 +2723,18 @@ pub fn step(
                     hr[i] -= p.strength * sink;
                     cr[i] -= p.strength * sink;
                     w_new += sink;
+                    // ledger: ISO-136
+                    // Off the belt the belt's part holds −ρ_m × itself (it bends the place
+                    // with no load of its own there). Where that pushes the same way as the
+                    // whole, it yields its share, all of it where the rest pushes the other
+                    // way: the plate yields where the belt bends it, and that stays with the belt.
+                    if keep_belt && !is_belt(c) {
+                        let held_belt = -RHO_MANTLE * f64::from(ar[i]);
+                        if held_belt * holds > 0.0 {
+                            let share = (held_belt / holds).min(1.0);
+                            ar[i] = (f64::from(ar[i]) + sink * share) as f32;
+                        }
+                    }
                     holds -= RHO_MANTLE * sink;
                     yr[i] = sink as f32;
                 }
@@ -3607,11 +3715,11 @@ mod tests {
             .collect();
         // The foreland in the belt's frame: the belt stands still.
         let reach = (p.belt_reach_m(G) / wd.norm_dx).ceil() as usize;
-        let frame: Vec<(usize, f32, [f64; 2])> = {
+        let frame: Vec<(usize, f32, f32, [f64; 2])> = {
             let car: Vec<f32> = wd.carrier.as_ref().unwrap().0.clone();
             belt_reach(w, h, &plate, &car, reach)
                 .into_iter()
-                .map(|(c, k, _)| (c, k, [(c % w) as f64, (c / w) as f64]))
+                .map(|(c, k, belt)| (c, k, belt, [(c % w) as f64, (c / w) as f64]))
                 .collect()
         };
         let still = vec![0.0f32; n];
@@ -3864,6 +3972,67 @@ mod tests {
         }
     }
 
+    /// ISO-136, ISO-120: where the belt bends its foreland past what the plate holds, the plate
+    /// yields there, and the yield is the belt's: over the foreland, where the belt alone bends
+    /// the plate, the belt's part is still the whole deflection, yielded or not. (Left with the
+    /// crust, the belt's part kept the elastic answer, up to several times what the plate holds,
+    /// and the frame moved that over the crust each step for the yield to take back: agent
+    /// 2026-10-24, the gap 6b traces.)
+    #[test]
+    fn where_a_belt_bends_its_foreland_past_its_strength_the_yield_is_the_belts() {
+        let p = FlexureParams {
+            yield_anomaly_mgal: 380.0,
+            ..on()
+        };
+        let (w, h) = (32usize, 256usize);
+        let n = w * h;
+        let sea = -1.0e6;
+        let mut wd = World::new(w, h, 300.0);
+        for c in 0..n {
+            if c / w >= 128 {
+                wd.plate[c] = 1.0;
+            }
+        }
+        let (mut sv, mut st) = started(&mut wd, &p, sea);
+        let mut ids = vec![f32::NAN; n];
+        let mut ages = vec![f32::NAN; n];
+        for c in 0..n {
+            let j = c / w;
+            if (118..128).contains(&j) {
+                let x = (127 - j) as f64 / 10.0;
+                wd.uplift[c] = (3.0 * (1.0 - x * x)) as f32;
+                wd.orogeny[c] = 0.0;
+                wd.regime[c] = f32::from(regime::COLLISION);
+                ids[c] = 1.0;
+                ages[c] = 1.0e4;
+            }
+        }
+        wd.carrier = Some((ids, ages));
+        let out = wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
+        let s = st.unwrap();
+        let foreland_yielded = (128..h)
+            .filter(|&j| {
+                let c = j * w + 3;
+                let held = RHO_MANTLE * (f64::from(s.load_m[c]) - f64::from(s.deflection_m[c]));
+                held.abs() > 0.999 * p.yield_held_kg_m2().unwrap()
+            })
+            .count();
+        assert!(
+            out.yielded_cells > 0 && foreland_yielded > 0,
+            "the foreland yields: {} cells, {foreland_yielded} rows",
+            out.yielded_cells
+        );
+        for j in 128..h {
+            let c = j * w + 3;
+            assert!(
+                (s.belt_m[c] - s.deflection_m[c]).abs() < 0.05,
+                "row {j}: the belt's part {} of the foreland's {}",
+                s.belt_m[c],
+                s.deflection_m[c]
+            );
+        }
+    }
+
     /// ISO-137, ISO-138: the continental Te from the geotherm. The plate model's steady geotherm
     /// (its crust's and its mantle's heat flow, T_m at the lithosphere's base, h_r 10 km) puts
     /// the 300 °C isotherm of a craton's 225 km at 37 km and its 750 °C at 117 km (by hand:
@@ -4061,6 +4230,120 @@ mod tests {
             "across the wrap"
         );
         assert!(at(17 * w).is_none(), "the over plate behind the belt");
+    }
+
+    /// ISO-136: a plate that carries one belt and stands under another. Plate 1 carries belt A
+    /// (rows 18 and 19, on plate 0's crust) and is the over plate of belt B (rows 40 to 44, its
+    /// own crust, carried by plate 2). Its crust nearer belt B than belt A (rows 30 to 39) is
+    /// not belt A's foreland, though belt A's reach (20 rows through plate 1's crust) covers it:
+    /// belt B bends it, and belt B's bending there goes with that crust. Plate 2's crust is belt
+    /// B's foreland.
+    #[test]
+    fn a_belts_foreland_ends_where_another_belt_is_nearer() {
+        let (w, h) = (8usize, 64usize);
+        let n = w * h;
+        let mut plate = vec![0.0f32; n];
+        let mut carrier = vec![f32::NAN; n];
+        for c in 0..n {
+            let j = c / w;
+            plate[c] = match j {
+                0..20 => 0.0,
+                20..45 => 1.0,
+                _ => 2.0,
+            };
+            if (18..20).contains(&j) {
+                carrier[c] = 1.0;
+            }
+            if (40..45).contains(&j) {
+                carrier[c] = 2.0;
+            }
+        }
+        let near = belt_reach(w, h, &plate, &carrier, 20);
+        let at = |c: usize| near.iter().find(|e| e.0 == c).map(|e| (e.1, e.2));
+        for j in 0..h {
+            let got = at(j * w + 3);
+            let want = match j {
+                20..30 => Some((1.0, 0.0)),
+                45..64 => Some((2.0, 1.0)),
+                _ => None,
+            };
+            assert_eq!(got, want, "row {j}");
+        }
+    }
+
+    /// ISO-136: crust that comes into a belt's frame from under a belt or from another belt's
+    /// frame moves nothing. Rows 140 to 144 of the foreland carry 3 km as the belt's part, and
+    /// the belt's part at the place a step ago is nil. Crust that was in the belt's frame at the
+    /// last step takes the change: it rises by the 3 km; so does crust from beyond any foreland,
+    /// which carried the belts' far field with it. Crust that stood under a belt (the 3 km its
+    /// own root) or in another belt's frame does not move; it takes the place's belt part, and
+    /// the rest of its deflection is its own. All are in the belt's frame after the step.
+    #[test]
+    fn crust_coming_into_a_belts_frame_moves_nothing() {
+        let p = on();
+        let (w, h) = (32usize, 256usize);
+        let n = w * h;
+        let sea = -1.0e6;
+        let run = |was: f32| {
+            let mut wd = World::new(w, h, 300.0);
+            for c in 0..n {
+                if c / w >= 128 {
+                    wd.plate[c] = 1.0;
+                }
+            }
+            let (mut sv, mut st) = started(&mut wd, &p, sea);
+            let mut ids = vec![f32::NAN; n];
+            let ages = vec![1.0e4f32; n];
+            for (c, id) in ids.iter_mut().enumerate() {
+                if (118..128).contains(&(c / w)) {
+                    *id = 1.0;
+                }
+            }
+            wd.carrier = Some((ids, ages));
+            let stale = |c: usize| (140..145).contains(&(c / w));
+            {
+                let s = st.as_mut().unwrap();
+                // At rest under a load of its own: its root.
+                s.belt_m = (0..n)
+                    .map(|c| if stale(c) { 3000.0 } else { 0.0 })
+                    .collect();
+                s.deflection_m = s.belt_m.clone();
+                s.load_m = s.belt_m.clone();
+                s.belt_of = (0..n)
+                    .map(|c| if c / w >= 128 { was } else { f32::NAN })
+                    .collect();
+                s.framed = (128 * w..200 * w).map(|c| (c as u32, 0.0, 0.0)).collect();
+            }
+            let before = wd.h.clone();
+            wd.step(&p, &mut sv, &mut st, &vec![0.0; n], sea);
+            let s = st.unwrap();
+            for c in 128 * w..200 * w {
+                assert_eq!(s.belt_m[c], 0.0, "cell {c} takes the place's belt part");
+                assert_eq!(s.belt_of[c], 0.0, "cell {c} is in the belt's frame");
+            }
+            for c in 118 * w..128 * w {
+                assert_eq!(s.belt_of[c], BELT_ROOT, "cell {c} is under the belt");
+            }
+            (0..h)
+                .map(|j| wd.h[j * w + 3] - before[j * w + 3])
+                .collect::<Vec<f64>>()
+        };
+        for (was, moves, what) in [
+            (0.0, true, "in the frame"),
+            (f32::NAN, true, "from beyond any foreland"),
+            (BELT_ROOT, false, "from under a belt"),
+            (5.0, false, "from another belt's frame"),
+        ] {
+            let change = run(was);
+            for (j, &dz) in change.iter().enumerate() {
+                let want = if moves && (140..145).contains(&j) {
+                    3000.0
+                } else {
+                    0.0
+                };
+                assert!((dz - want).abs() < 0.5, "row {j}: {dz} {what}");
+            }
+        }
     }
 
     /// Under the sea the roots' part of the split is their bending only, as on land: crust the
