@@ -434,7 +434,7 @@ pub fn maybe_initiate_subduction(
     } else {
         old_clearance
     };
-    // An initiation the old clearance would have refused (counted, PLT-660).
+    // An initiation the old clearance would have refused (counted, PLT-064).
     let near_front = |i: usize| {
         trench_tree.as_ref().is_some_and(|tr| {
             tr.nearest(pos[i])

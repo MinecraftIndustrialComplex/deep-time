@@ -596,7 +596,7 @@ pub struct Counters {
     pub hotspots: u32,
     pub lips: u32,
     pub resamplings: u32,
-    /// Margin propagations begun (law 2, `propagation.rs`, ledger PLT-656/PLT-660): each cut a
+    /// Margin propagations begun (law 2, `propagation.rs`, ledger PLT-656): each cut a
     /// passive margin off its continent and made a new plate.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub propagation_starts: u32,
@@ -608,7 +608,7 @@ pub struct Counters {
     #[serde(default, skip_serializing_if = "is_zero")]
     pub propagation_stalls: u32,
     /// Subduction initiations whose seed lay within PLT-064's old clearance (1,000 km) of a
-    /// trench: possible only with law 2's one-spacing clearance (measurement, PLT-660).
+    /// trench: possible only with law 2's one-spacing clearance (measurement, PLT-064).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub initiations_near_fronts: u32,
 }
