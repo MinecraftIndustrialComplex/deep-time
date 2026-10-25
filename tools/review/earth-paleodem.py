@@ -24,9 +24,13 @@ helpers, not a copy), on a grid that is 111 km at the equator instead of the cen
   above_2km  land above 2 km, a share of the land (area-weighted on the grid)
   coast_hi   N Fibonacci points sampled from the grid at their nearest node (earth-coast.py's way);
              continents_census.coast_metrics: the coast is land within 1.6 point spacings of the sea, and
-             the share of it with land above 2 km on the same landmass within 200 km inland. At N = 40,000
-             the spacing is 113 km, so the coast band is 181 km wide where the census's is about 25 km:
-             compare maps with each other and with the control, not with the census's own numbers.
+             the share of it with land above 2 km within 200 km inland, over land. Since 2026-10-25
+             (RLC-055) the sea is the world ocean (a closed body of sea is land) and the 200 km are a
+             path over land; coast_hi_old is the first version's rule (any sea, the straight line within
+             one landmass), coast_hi_ocean the world ocean with the straight line. At N = 40,000 the
+             spacing is 113 km, so the coast band is 181 km wide where the census's (N = 332,800, spacing
+             39.1 km) is 62.6 km: compare maps with each other and with the control, not with the
+             census's own numbers, or run N = 332,800 (a 1 degree map then has several points a node).
 
 The PaleoDEM files are a "first draft" by their author's own words (the highest ranges "likely
 overestimated", young features on old maps); this is a published model of Earth's past, not
@@ -99,11 +103,15 @@ def measure(z, lat, lon, n):
     import io
     with contextlib.redirect_stdout(io.StringIO()):
         coast = cc.coast_metrics(p, zp, sp)
+        old = cc.coast_metrics(p, zp, sp, closed_as_land=False, over_land=False)
+        ocean = cc.coast_metrics(p, zp, sp, over_land=False)
     return {
         "land": land_share,
         "largest": float(sizes.max()),
         "above_2km": float(w[land & (zg > 2000)].sum() / max(land_share, 1e-9)),
         "coast_hi": float(coast["coast_with_hi"]),
+        "coast_hi_old": float(old["coast_with_hi"]),
+        "coast_hi_ocean": float(ocean["coast_with_hi"]),
         "land_pts": float(coast["land"]),
         "zmax": float(z.max()),
     }
@@ -119,12 +127,25 @@ def main():
         print(__doc__)
         sys.exit(2)
     n = int(sys.argv[3]) if len(sys.argv) > 3 else 40_000
-    head = "Ma      land  largest  Mkm2   >2km  coast_hi  zmax"
+    head = "Ma      land  largest  Mkm2   >2km  coast_hi  old(v1)  ocean  zmax"
     if sys.argv[1] == "relief":
         z, lat, lon = read_grid(sys.argv[2])
         r = measure(z, lat, lon, n)
         print(f"relief N={n}: land {r['land']:.4f}; largest {r['largest']:.4f}; above 2 km {r['above_2km']:.4f};"
-              f" coast with high ground {r['coast_hi']:.4f}; max {r['zmax']:.0f} m")
+              f" coast with high ground {r['coast_hi']:.4f} (version 1 rule {r['coast_hi_old']:.4f}, world ocean with"
+              f" the straight line {r['coast_hi_ocean']:.4f}); max {r['zmax']:.0f} m")
+        # By rock: the two ice sheets (Antarctica, Greenland) kept out of the shares, as PLT-360's control.
+        import contextlib
+        import io
+        plat, plon = cc.fib_points(n)
+        sheets = cc.ice_sheets(plat, plon)
+        zp = z[np.clip(np.searchsorted(lat, plat), 0, lat.size - 1), np.clip(np.searchsorted(lon, plon), 0, lon.size - 1)]
+        sp = float(np.sqrt(cc.EARTH_KM2 / n))
+        with contextlib.redirect_stdout(io.StringIO()):
+            rock = cc.coast_metrics(cc.xyz(plat, plon), zp, sp, exclude=sheets)
+            rock_old = cc.coast_metrics(cc.xyz(plat, plon), zp, sp, exclude=sheets, closed_as_land=False, over_land=False)
+        print(f"relief N={n} by rock (without Antarctica and Greenland): above 2 km {rock['hi_of_land']:.4f};"
+              f" coast with high ground {rock['coast_with_hi']:.4f} (version 1 rule {rock_old['coast_with_hi']:.4f})")
     elif sys.argv[1] == "paleodem":
         files = sorted((p for p in Path(sys.argv[2]).glob("*.nc") if age_of(p) is not None), key=age_of)
         print(f"PaleoDEMs of {sys.argv[2]}, N={n} (spacing {np.sqrt(cc.EARTH_KM2 / n):.0f} km)")
@@ -133,7 +154,8 @@ def main():
             z, lat, lon = read_grid(p)
             r = measure(z, lat, lon, n)
             print(f"{age_of(p):5.1f} {r['land']:7.4f} {r['largest']:8.4f} {r['largest'] * PLANET_MKM2:6.1f}"
-                  f" {r['above_2km']:7.4f} {r['coast_hi']:9.4f} {r['zmax']:6.0f}")
+                  f" {r['above_2km']:7.4f} {r['coast_hi']:9.4f} {r['coast_hi_old']:8.4f} {r['coast_hi_ocean']:6.4f}"
+                  f" {r['zmax']:6.0f}")
     else:
         print(__doc__)
         sys.exit(2)
