@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.worldgen;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 import org.junit.jupiter.api.Test;
 
@@ -589,6 +590,117 @@ class GeothermalTest {
         Geothermal a = heatBuild(GeothermalRules.DEFAULT, heatEnv(120, 1200, 15, (x, z) -> 0), DRY);
         Geothermal b = heatBuild(GeothermalRules.DEFAULT, heatEnv(120, 1200, 15, (x, z) -> 0), DRY);
         assertEquals(a.sites(), b.sites());
+    }
+
+    /**
+     * A cube world's raster reads off its six faces return the partner's values, so its whole net window looks like
+     * ground, while a chunk there is {@code CubeFill}'s turned copy of its partner's, which never holds a site of
+     * the outside place. Its hot ground and volcanoes near a cut seam take sites on the faces only, wholly. Until
+     * 2026-10-25 a heat-flow vent drawn in the void square north of F2 (site 43 at (-1902, -1026) of master
+     * c47f3056's GameTest planet) stood there unbuilt: 13 of its 59 ground columns held their block by chance.
+     */
+    @Test
+    void aCubeWorldsSitesStandWhollyOnItsFaces() {
+        int s = 1024, c = 4 * s;
+        CubeLayout cube = CubeLayout.of(s);
+        // Volcanoes on face N 20 blocks inside its west and east edges, both cut seams with a void square beyond.
+        List<Volcanoes.Volcano> vs = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            double x = i % 2 == 0 ? -s / 2.0 + 20 : s / 2.0 - 20, z = -s / 2.0 - 60 - 110.0 * i;
+            vs.add(new Volcanoes.Volcano(i + 1, "stratovolcano", x, z, 18_000, 2_000, 1.0, false, false, 600, 60, false));
+        }
+        Magma.Heights flat = (x, z) -> 75.0;
+        Magma magma = Magma.build(vs, MagmaRules.DEFAULT, flat, DRY, c, SEA, LAVA_FLOOR, MH, MV);
+        Geothermal.Env open = heatEnv(120, 1200, 15, (x, z) -> 0);
+        Geothermal.Env faces = new Geothermal.Env() {
+            @Override
+            public double precipMm(int x, int z) {
+                return open.precipMm(x, z);
+            }
+
+            @Override
+            public double meanC(int x, int z) {
+                return open.meanC(x, z);
+            }
+
+            @Override
+            public double heatFlowMwM2(int x, int z) {
+                return 120.0;   // hot on every column, the void squares included (they read the partners' ground)
+            }
+
+            @Override
+            public double zHalf() {
+                return cube.window()[3];
+            }
+
+            @Override
+            public boolean iced(int x, int z) {
+                return false;
+            }
+
+            @Override
+            public boolean carbonate(int x, int z, int groundY) {
+                return false;
+            }
+
+            @Override
+            public boolean onPlanet(int x, int z) {
+                return cube.faceOfBlock(x, z) != null;
+            }
+        };
+        Geothermal g = Geothermal.build(vs, GeothermalRules.DEFAULT, magma, flat, DRY, faces, c, SEA, MH);
+        assertTrue(g.heatFlowSites() > 30, g.heatFlowSites() + " sites from the hot ground of 6 s2");
+        assertTrue(g.sites().size() - g.heatFlowSites() > 5,(g.sites().size() - g.heatFlowSites()) + " sites from the volcanoes by the seams");
+        assertEquals(0, offFaces(g, cube), "every column of every site on the faces");
+        // The same world taking every column as ground puts sites in the void squares: the check bites.
+        Geothermal.Env window = new Geothermal.Env() {
+            @Override
+            public double precipMm(int x, int z) {
+                return faces.precipMm(x, z);
+            }
+
+            @Override
+            public double meanC(int x, int z) {
+                return faces.meanC(x, z);
+            }
+
+            @Override
+            public double heatFlowMwM2(int x, int z) {
+                return 120.0;
+            }
+
+            @Override
+            public double zHalf() {
+                return faces.zHalf();
+            }
+
+            @Override
+            public boolean iced(int x, int z) {
+                return false;
+            }
+
+            @Override
+            public boolean carbonate(int x, int z, int groundY) {
+                return false;
+            }
+        };
+        assertTrue(offFaces(Geothermal.build(vs, GeothermalRules.DEFAULT, magma, flat, DRY, window, c, SEA, MH), cube) > 10);
+        // The odds see the faces' ground only: 6 of the window's 12 s2, at 0.3 km a block.
+        Geothermal.HeatFlowOdds odds = Geothermal.heatFlowOdds(GeothermalRules.DEFAULT, flat, DRY, faces, c, SEA, MH, 8);
+        double facesKm2 = 6.0 * (s * MH / 1000.0) * (s * MH / 1000.0);
+        assertEquals(facesKm2, odds.hotDryKm2(), 0.02 * facesKm2, odds.toString());
+        assertEquals(odds.samples(), 2 * odds.continental(), 0.01 * odds.samples(), "half the window's samples are on the faces");
+    }
+
+    /** The sites of {@code g} with a column off the faces of {@code cube}. */
+    private static long offFaces(Geothermal g, CubeLayout cube) {
+        return g.sites().stream().filter(s -> {
+            for (int dx = -s.reach(); dx <= s.reach(); dx++)
+                for (int dz = -s.reach(); dz <= s.reach(); dz++)
+                    if (s.part(dx, dz) != Geothermal.Part.NONE && cube.faceOfBlock(s.x() + dx, s.z() + dz) == null)
+                        return true;
+            return false;
+        }).count();
     }
 
     @Test

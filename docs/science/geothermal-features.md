@@ -85,17 +85,23 @@ features.
 2. **Where.** The first field is 0.08 to 0.35 of R from the summit, the others 0.25 to 1.0 of R, all
    multiplied by the reach setting, in a random direction. A field is drawn again, up to twelve
    times, until its centre is dry ground at least 5 blocks above the sea with no water column and no
-   ice. (GEO-015 to GEO-017)
+   ice, on the planet: on a cube world, on one of its six faces (item 4). (GEO-015 to GEO-017)
 3. **What kind.** A field is hot springs when it is at least 0.35 of R from the summit, the rain at
    the centre is at least the spring-rain setting, and the mean temperature is at least 3 degC. A
    world without climate layers counts as warm and wet. Otherwise it is a fumarole field.
    (GEO-018 to GEO-021)
 4. **Sites.** Each field is made of sites: pools, vents and patches, each with a radius, an outline
    that wobbles by up to a quarter, and a seed for its stains. A site is refused where a column of it
-   is wet, iced or less than 3 blocks above the sea, where it would come within 3 blocks plus its own
-   hard radius of a magma body's open lake or plug, where it touches another site's pool, rim or
-   vent, or (for a pool) where the ground is more than 6 blocks above or below the pool's level, the
-   mean ground height of its footprint. (GEO-027 to GEO-032, GEO-034, GEO-036, GEO-042)
+   is off a cube world's six faces, wet, iced or less than 3 blocks above the sea, where it would
+   come within 3 blocks plus its own hard radius of a magma body's open lake or plug, where it
+   touches another site's pool, rim or vent, or (for a pool) where the ground is more than 6 blocks
+   above or below the pool's level, the mean ground height of its footprint. (GEO-027 to GEO-032,
+   GEO-034, GEO-036, GEO-042)
+   The faces rule (2026-10-25) is geometry, not geology: a chunk off the faces is a turned copy of
+   its partner chunk on them (`CubeFill`, SCL-210), so nothing of a site placed there is ever built,
+   and the rasters there read the partner's ground, so its heat, height and ice cannot refuse it.
+   Until then the cells of item 7 covered the whole net window, half of it those void squares, and
+   took fields there; a site across a cut seam would also have been built in part.
 5. **Rock of the terrace.** Travertine if carbonate rock (limestone, dolostone, chalk, marble or
    travertine) lies within 150 blocks below the site in the strata horizons, else sinter.
    (GEO-022 to GEO-024)
@@ -113,8 +119,8 @@ features.
 7. **Fields on hot ground** (2026-10-02; GEO-052 to GEO-056). Beyond the volcanoes, the world is cut
    into cells of 10,000 km2 (100 km across at the default density); each cell tries up to six random
    points and puts one field at the first where the baked heat flow is at least 100 mW/m2 (the setting)
-   and the place is dry land at least 5 blocks above the sea, with no water column and no ice. The
-   field is then built exactly as a volcano's is, as one "away from the summit": hot springs where
+   and the place is dry land at least 5 blocks above the sea, with no water column and no ice, on a
+   cube world's faces (item 4). The field is then built exactly as a volcano's is, as one "away from the summit": hot springs where
    the rain and the temperature allow, else fumaroles; no cinnabar. At most one field for each
    10,000 km2 cell, so the fields follow the hot ground: a broad hot province takes about one for
    each 10,000 km2, a thin belt a field in most of the cells it crosses.
@@ -201,6 +207,17 @@ On db81be49 the fields' draws missed the hot ground, a miss a planet with that m
 in 60. The old test failed there, and the new one passes. A world whose fields stopped working on ample hot ground
 (a chance of none under 0.001) still fails it. The volcanoes' 37 sites are read back as before. The heat-flow fields' blocks are
 not read back on this planet, because it has none; `GeothermalTest` checks them on synthetic ground.
+
+On master c47f3056 (2026-10-25) the planet had heat-flow fields again, and the test read back the first one's
+site: site 43, a vent at (-1902, -1026), and only 13 of its 59 ground columns held their block. That place is in
+the void square north of F2, off the cube's faces, where the chunk is `CubeFill`'s turned copy of its partner on
+face N across the F2-N seam (SCL-210), and the site was never built: all 59 columns held the partner column's top
+block at its height, and the 13 were chance matches.
+In all, 38 of the planet's 99 sites (heat-flow ones) stood off the faces. The cells had been drawing over the whole net window
+and taking fields there, because the rasters there read the partner's hot dry ground. Fields now go on the faces
+only, wholly (item 4), the odds count the faces' ground only (a cube world's odds before 2026-10-25 counted the
+void squares too, so their hot dry ground and expected counts were up to twice the faces'), and the test fails
+first if any site has a column off the faces.
 
 ## Simplifications and limits
 
