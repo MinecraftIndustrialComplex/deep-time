@@ -23,6 +23,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -72,10 +73,19 @@ public final class LakeGameTests {
                 return null;
             if (above.is(BlockTags.LOGS))
                 return "tree-on-salt:" + BuiltInRegistries.BLOCK.getKey(above.getBlock());
-            if (salt == null || top != salt)
+            if (salt == null || top != salt && !packSalt(top))
                 return "not-salt:" + BuiltInRegistries.BLOCK.getKey(top.getBlock());
             return "";
         }
+    }
+
+    /**
+     * The pack's own salt laid over Deep Time's: Expanded Ecosphere's {@code salt} patch turns calcite (halite's vanilla
+     * stand-in) under air at y 62 into white concrete powder, the salt of its salt lakes (its surface rules use the same
+     * block). Salt over salt, so the flat is still salt (41b11137's test planet, -752 62 198).
+     */
+    static boolean packSalt(BlockState top) {
+        return ModList.get().isLoaded(BiomeRuleGameTests.EE) && (top.is(Blocks.WHITE_CONCRETE_POWDER) || top.is(Blocks.WHITE_CONCRETE));
     }
 
     private static Ground ground(ServerLevel level, int x, int z) {
