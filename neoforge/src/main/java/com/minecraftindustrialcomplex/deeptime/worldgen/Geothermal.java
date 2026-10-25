@@ -46,6 +46,8 @@ import java.util.SplittableRandom;
  * Nothing stands in or beside water (the sea, a lake, a river, a bank), under ice, within a few
  * blocks of a magma body's open crater or plug, or where a pool on a slope would need more than
  * {@link #CUT} blocks of ground cut away uphill or {@link #DAM} blocks of dam built downhill to sit level.
+ * On a cube world every column of a site is on the six faces ({@link Env#onPlanet}): a site off them would
+ * never be built, and one across a cut seam would be cut in two.
  *
  * <p><b>Water safety.</b> A pool's water is bounded on every side by its rim, its bed or the rock
  * under it, and every block of a pool and its rim is in the chunk's carving masks. It lies at
@@ -160,6 +162,17 @@ public final class Geothermal {
 
         /** Whether the column lies under glacial ice. */
         boolean iced(int x, int z);
+
+        /**
+         * Whether column (x, z) is the planet's own ground, where a site is built: on a cube world a column of one of
+         * its six faces. Off them a chunk is a turned copy of its partner's ground ({@code CubeFill}, ledger SCL-210),
+         * made by the partner's own passes at the partner's place, so the geothermal pass never paints a site at the
+         * outside place, while the world's rasters there read the partner's values (so a draw there finds the
+         * partner's hot dry ground). Every column of any other world.
+         */
+        default boolean onPlanet(int x, int z) {
+            return true;
+        }
 
         /** Whether carbonate rock lies under the column within {@link Geothermal#CARBONATE_WINDOW} blocks of the ground. */
         boolean carbonate(int x, int z, int groundY);
@@ -512,8 +525,14 @@ public final class Geothermal {
         }
     }
 
-    /** Whether a heat-flow field may stand at (fx, fz): the heat flow at the setting, dry land, clear of ice. */
+    /**
+     * Whether a heat-flow field may stand at (fx, fz): the planet's own ground ({@link Env#onPlanet}: a cube world's
+     * cells cover its whole net window, whose void squares read their partners' ground), the heat flow at the setting,
+     * dry land, clear of ice.
+     */
     private static boolean heatFlowSpot(Ctx c, int fx, int fz) {
+        if (!c.env.onPlanet(fx, fz))
+            return false;
         double q = c.env.heatFlowMwM2(fx, fz);
         if (!(q >= c.rules.heatFlowMinMwM2()))
             return false;
@@ -526,8 +545,9 @@ public final class Geothermal {
      * fields' odds, the draws being {@link #HEAT_DRAWS} uniform points of the cell: the expected count of cells that
      * find a place, {@code sum(1 - (1 - f)^draws)}, and the chance that none does, {@code prod((1 - f)^draws)}
      * (ledger: GEO-064). A place found can still be refused by the placement (a slope, a crater, water), so the
-     * fields' count can only be lower. {@code samples} and {@code continental} count the grid points and those with a
-     * heat flow (continental crust).
+     * fields' count can only be lower. {@code samples} and {@code continental} count the grid points and those on the
+     * planet's own ground ({@link Env#onPlanet}) with a heat flow (continental crust). On a cube world the cells cover
+     * the whole net window and half of it is void squares, which hold no field.
      */
     public record HeatFlowOdds(long samples, long continental, double hotDryKm2, int cells, int hotCells, double expected,
                                double pNone) {
@@ -555,8 +575,8 @@ public final class Geothermal {
                 for (double bz = grid.z0 + gz * grid.wz + step / 2.0; bz < zEnd; bz += step)
                     for (double bx = -circumference / 2.0 + gx * grid.wx + step / 2.0; bx < xEnd; bx += step) {
                         int fx = c.wrap((int) Math.round(bx)), fz = (int) Math.round(bz);
-                        all++;
-                        if (!Double.isNaN(env.heatFlowMwM2(fx, fz)))
+                        all++;   // the draws are uniform over the cell, its part off the planet included
+                        if (env.onPlanet(fx, fz) && !Double.isNaN(env.heatFlowMwM2(fx, fz)))
                             continental++;
                         if (heatFlowSpot(c, fx, fz))
                             good++;
@@ -582,13 +602,14 @@ public final class Geothermal {
         double expected = rules.density() * (0.7 + 2.3 * activity) * Math.clamp(Math.sqrt(radius / 45.0), 0.6, 2.2);
         int fields = (int) Math.floor(expected + rng.nextDouble());
         for (int i = 0; i < fields; i++) {
-            // A field goes on dry land that is not under ice: the first of a dozen draws that is.
+            // A field goes on the planet's dry land that is not under ice: the first of a dozen draws that is.
             for (int attempt = 0; attempt < 12; attempt++) {
                 double frac = i == 0 ? 0.08 + 0.27 * rng.nextDouble() : 0.25 + 0.75 * Math.sqrt(rng.nextDouble());
                 double angle = 2.0 * Math.PI * rng.nextDouble();
                 double rad = frac * radius * rules.reach();
                 int fx = c.wrap((int) Math.round(sx + rad * Math.cos(angle))), fz = (int) Math.round(sz + rad * Math.sin(angle));
-                if (Magma.top(c.h(fx, fz)) < c.seaLevel + MIN_ABOVE_SEA + 2 || c.wet.at(fx, fz) || c.env.iced(fx, fz))
+                if (!c.env.onPlanet(fx, fz) || Magma.top(c.h(fx, fz)) < c.seaLevel + MIN_ABOVE_SEA + 2 || c.wet.at(fx, fz)
+                        || c.env.iced(fx, fz))
                     continue;
                 field(c, new Source(v.id(), v.silicic()), rng, fx, fz, rad / radius);
                 break;
@@ -708,7 +729,8 @@ public final class Geothermal {
             if (d < o.hard() + hard + 1)
                 return null;
         }
-        // Dry ground, not iced, above the coast; the pool's footprint decides its level.
+        // Every column on the planet's own ground (a cube world's faces); dry ground, not iced, above the coast; the
+        // pool's footprint decides its level.
         int lowest = Integer.MAX_VALUE, highest = Integer.MIN_VALUE, count = 0;
         long sum = 0;
         for (int dx = -reach; dx <= reach; dx++)
@@ -716,10 +738,12 @@ public final class Geothermal {
                 Geothermal.Part p = s.part(dx, dz);
                 if (p == Part.NONE)
                     continue;
+                int x = c.wrap(s.x + dx), z = s.z + dz;
+                if (!c.env.onPlanet(x, z))
+                    return null;   // off a cube's faces: that column would never be built (Env#onPlanet)
                 boolean exact = p.pool() || p == Part.RIM || p == Part.VENT || p == Part.SULFUR;
                 if (!exact && ((dx & 1) != 0 || (dz & 1) != 0))
                     continue;
-                int x = c.wrap(s.x + dx), z = s.z + dz;
                 if (c.wet.at(x, z))
                     return null;
                 if (c.env.iced(x, z))
