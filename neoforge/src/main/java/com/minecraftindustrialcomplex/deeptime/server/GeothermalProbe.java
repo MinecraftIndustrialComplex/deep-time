@@ -18,7 +18,7 @@ import java.util.SplittableRandom;
 /**
  * {@code /deeptime probe geothermal} (P2-14): the settings, the palette, every site
  * ({@link Geothermal}), and what it means for a player: from {@link #POINTS} land columns drawn
- * evenly over the planet inside the pole cap's soft line (the seed {@code probe magma} uses, so the
+ * evenly over the playable planet (the seed {@code probe magma} uses, so the
  * two reports describe the same points), the distance to the nearest site of any kind, to the nearest
  * hot-spring pool, to the nearest vent, and, for comparison, to the nearest active volcano on land,
  * as 10th percentile, median and 90th percentile.

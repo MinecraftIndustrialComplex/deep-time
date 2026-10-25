@@ -3614,7 +3614,10 @@ impl DepositStage {
                 json!({"projection": "lambert", "why": "no essentials"}),
             );
         }
-        let Some(p) = self.planet.as_deref() else {
+        // A Lambert-frame preset (the synthetic deposit world) keeps the simulation's frame.
+        let Some(p) = self.planet.as_deref().filter(|p| {
+            p.scale.projection == deeptime_format::projection::ProjectionKind::Cube
+        }) else {
             return (WorldFrame::Lambert(src), json!({"projection": "lambert"}));
         };
         // No wall-clock time in the note: the census must not differ between two runs (the
