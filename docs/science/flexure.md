@@ -1409,6 +1409,16 @@ superposition's. Alone, the stiffness brings no foredeep: with the superposition
 carried (ISO-131 is under `tectonics.collision_underthrust`), so it stands on the overriding plate
 across the break, and the foreland's stiffness does not reach it.
 
+On master e87dbfae's planet (the front lane's PLT-562 on) the branch's defaults, `te_geotherm` on,
+ran again as arm `g6b-te4` against master's same 8 (`fl-margin`): no divergence, the guard's worst
+10.1 km against 10.0 (p 0.51), the largest rise and fall of a cell in a step 7.3 / 7.3 km against
+6.9 / 7.3, no V1 number moved (land 0.309 against 0.285, p 0.23; land above 2 km 0.128 against
+0.133; coast with high ground 0.231 against 0.233). The record's small foredeep went: the share of
+belts above 3 km with one 0.40 against 0.62 and its width 0 against 71 km at the median (p 0.077;
+`g6b-te3` had 0 against 36, p 0.18). Not traced; the agent's reading is that a stiffer foreland
+bends longer, so the shallow basin the base's belts bent lies under the wedge, as gap 6's
+`profile1.py` found for the carried belt.
+
 **The four rules, both on** (arm `g6b-both3`, 2026-10-25: both switches on, the superposition with
 the four rules, both starts x seeds 1 to 4, 1,000 Myr, on master 2dd50093, against base10's same 8,
 `fl-ends`, and base10's 24; Mann-Whitney p against the same 8, then the 24):
