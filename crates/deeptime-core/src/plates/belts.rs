@@ -649,15 +649,14 @@ fn stack_front(
             order.sort_by(|&a, &b| belt_d[a].2.total_cmp(&belt_d[b].2).then(a.cmp(&b)));
             let d_km: Vec<f64> = order.iter().map(|&j| norm.km(belt_d[j].2)).collect();
             let z_near: Vec<f64> = order.iter().map(|&j| z_of[j]).collect();
-            let (near, toe) =
-                fill_taper(&d_km, &z_near, z_front, tan, kept_km2_m, area, cap_m);
+            let (near, toe) = fill_taper(&d_km, &z_near, z_front, tan, kept_km2_m, area, cap_m);
             toe_km2_m = toe * COLUMN_ISOSTATIC_FACTOR;
             let mut given = vec![0.0f64; belt_d.len()];
             for (&j, g) in order.iter().zip(near) {
                 given[j] = g;
             }
-            capped_km2_m += (kept_km2_m - given.iter().sum::<f64>() * area).max(0.0)
-                * COLUMN_ISOSTATIC_FACTOR;
+            capped_km2_m +=
+                (kept_km2_m - given.iter().sum::<f64>() * area).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
             given
         } else {
             old
