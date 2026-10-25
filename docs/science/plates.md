@@ -8958,6 +8958,72 @@ km"); the arc's distance is PLT-042's 200 km, which is `uncited`, so the column 
 - `incipient_subduction_changes_nothing_past_its_stage`: with a full slab the balance, the slab,
   the mix and the arcs are the same on and off, bit for bit; off, a 40-km slab has no incipient
   front.
+- `an_incipient_front_takes_no_forsyth_uyeda_friction` (the guard with PLT-585, below): with both
+  switches on, plate 1 under plate 0 on a 3,258 km front, the incipient front takes no friction
+  between the pair (0 N either way) and the incipient resistance alone (8.1446 × 10^18 N, the same
+  with PLT-585 off); once mature, the front takes F_CR × its length (2.432 × 10^18 N, F_CR 7.465 ×
+  10^11 N/m) and no incipient resistance. The other pairs' friction is the same in both cases.
+
+**With Forsyth & Uyeda's balance (PLT-585).** That lane landed first, so the guard is this lane's
+(plate-forces.md "With incipient subduction", FRC-035): while a contact is incipient its oceanic
+front samples take the incipient resistance alone, and the loop over the other boundaries skips an
+incipient partner from either side. A continental sample on an incipient front keeps its friction:
+it is a collision's drag, as at a mature contact (the agent's choice, 2026-10-25). With the switch
+off the set of incipient pairs is empty, so the guard changes nothing.
+
+**On by default** (2026-10-25, the rule that physics goes on once it is correct). The flip moved
+which seeds weld on stall: the release sweep (`weld_seed_sweep`, 8,000 samples, 300 Myr, 24 seeds
+per start) welds on 9 scattered seeds and 8 supercontinent seeds with incipient subduction on
+(11 and 5 before), so `collisions_weld_on_stall_and_transfer_on_shortening` now uses scattered 2
+and `sutures_and_initiations_keep_continents_whole` supercontinent 5; the five fixture tests that
+build a front with no slab pin the switch off, as their geometry is a working subduction zone.
+
+The pool arm `fl-incip` (8 runs, seeds 1 to 4 on both starts, `earthlike_quick_16k`, 1000 Myr,
+`+DEEPTIME_CRUST_BUDGET=1`, key a963c9ac56ee: this branch on master 17ab80b7, PLT-585 off and
+PLT-540 on) against base13 (24 runs, key 89e867370c1f), medians and the two-sided Mann-Whitney p
+(`pool.sh table --base base13 --arm fl-incip`, measures `v1census`, `guard` and `boundary` version
+3). Every run ran its 1000 Myr; no step beyond 2 Earth reliefs on any run.
+
+| Measure | base13 | fl-incip | p |
+|---|---|---|---|
+| land | 0.313 | 0.310 | 0.95 |
+| largest landmass | 0.166 | 0.177 | 1.0 |
+| continental crust under the sea | 0.214 | 0.215 | 0.98 |
+| land above 2 km (realism ≤ 0.07) | 0.097 | 0.077 | 0.40 |
+| coast with high ground (≤ 0.11) | 0.196 | 0.187 | 0.51 |
+| land under ice | 0.083 | 0.098 | 0.85 |
+| collisions per 100 Myr | 1.70 | 1.55 | 0.60 |
+| V1 criteria met per run (median, mean) | 5, 5.38 | 5.5, 5.50 | 0.42 |
+| the guard's worst, m | 10,047 | 10,020 | 0.65 |
+| plate cells' largest excess over Airy, m | 2,411 | 2,511 | 0.27 |
+| subducting, share of boundary (Bird SUB 0.197) | 0.291 | 0.250 | < 0.001 |
+| incipient fronts | | 0.035 | |
+| converging with no subduction zone (Bird OCB 0.067) | 0.006 | 0.041 | |
+| slab 100 km under the arc, column (B) (Bird SUB 0.197) | | 0.224 | |
+| oceanic front under 10 / at 80 or more mm/yr | 0.130 / 0.073 | 0.087 / 0.082 | |
+| convergence across the oceanic front, mm/yr (Bird 53.2) | 38.3 | 41.1 | < 0.001 |
+| active share of continental margin (0.25 to 0.40) | 0.379 | 0.337 | < 0.001 |
+| boundary criteria met per run (median, mean) | 2, 1.88 | 2.5, 2.75 | 0.004 |
+
+Base13's `incipient` and `sub_benioff` are blank: its record has no such bands. The M4 lane's split
+(`tools/review/m5diag/m4split.sh`, the land above 2 km by class, means over the runs; Earth's from
+its table on base13) reads where the high ground went:
+
+| Class, share of the land | base13 | fl-incip | Earth |
+|---|---|---|---|
+| all above 2 km | 0.0978 | 0.0833 | |
+| collision belts under 10 Myr | 0.0368 | 0.0405 | 0.026 |
+| Andean margins under 10 Myr | 0.0137 | 0.0090 | 0.0085 |
+| older Andean margins and untagged arcs | 0.0159 | 0.0116 | about 0.0055 |
+
+The young Andean high ground falls to Earth's: a new front builds no arc until its slab reaches
+100 km. The collision belts do not move (8 runs against 24), and the older
+Andean margins and arcs stay about twice Earth's.
+
+Off, the planet is base13's bit for bit: one pool run of the merged head (b935cea7, key
+ac619d59fdab, `--set tectonics.incipient_subduction=false`, supercontinent 1, base13's other
+arguments) has the state_sha256 (adf20d4c...) and fields_sha256 of base13's run. Its rec_sha256
+differs, as it should: the record gains the `incipient` and `benioff` front bands.
 
 
 ## Plate speed (2026-10-25)
