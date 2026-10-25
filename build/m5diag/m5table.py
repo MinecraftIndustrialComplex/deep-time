@@ -92,6 +92,16 @@ def main():
         row(f"{k} coast share", F, lambda r, k=k: r["coast_by_front"][k]["coast_share"])
         row(f"{k} M5 inside", F, lambda r, k=k: r["coast_by_front"][k]["m5_in"])
         row(f"{k} part of M5 (abs)", F, lambda r, k=k: r["coast_by_front"][k]["m5_part"])
+    print("-- the coast by setting: within 200 km of a trench (model regime 2; Earth PB2002 SUB), else of a"
+          " collision (model regime 5; Earth PB2002 CCB or OCB), else neither")
+    for k in ("trench200", "coll200", "neither"):
+        ek = {"coll200": "conv200"}.get(k, k)
+        es = {nm: (e.get("coast_by_setting") or {}).get(ek, {}) for nm, e in (("grid", eg), ("fib", ef))}
+        for q in ("coast_share", "m5_in", "m5_part"):
+            row(f"{k} {q}", F, lambda r, k=k, q=q: r["coast_by_setting"][k][q],
+                " ".join(f"{nm} {v.get(q, float('nan')):.4f}" for nm, v in es.items()))
+        for c in ("coll_young", "coll_old", "andean_young", "andean_old", "u_other"):
+            row(f"{k} part by {c}", F, lambda r, k=k, c=c: r["coast_by_setting"][k]["by_class"][c])
     print("-- the qualifying high point's own setting (fields' regime; 3 arc, 4 back_arc, 5 collision, 8 craton,"
           " 9 passive_margin)")
     for c in ("coll_young", "coll_old", "andean_young", "u_other"):
@@ -197,6 +207,7 @@ def main():
             "andean_young part": lambda r: r["m5_by_nearest"]["andean_young"],
             "coll200 coast share": lambda r: r["coast_by_front"]["coll200"]["coast_share"],
             "sub200 coast share": lambda r: r["coast_by_front"]["sub200"]["coast_share"],
+            "trench200 coast share": lambda r: r["coast_by_setting"]["trench200"]["coast_share"],
             "largest landmass coast share": lambda r: r["coast_by_landmass_Mkm2"]["30-1e+09"]["coast_share"],
             "M5 at M4=0.055": lambda r: r["curve"][1][2]}
     for k, g in cand.items():
