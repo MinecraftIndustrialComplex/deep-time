@@ -157,7 +157,7 @@ public final class VolcanicZones {
 
     private final List<Zone> zones;
     private final int circumference;
-    /** A cube world's net, whose off-face columns a query folds onto the partner they show; null on Lambert. */
+    /** A cube world's net, whose off-face columns a query folds onto the partner they show; null on a world that is not a cube. */
     private final CubeLayout cube;
     private final int nx;
     private final double cellW;
@@ -211,7 +211,7 @@ public final class VolcanicZones {
     }
 
     /**
-     * Column (x, z) as a query reads it: itself on Lambert and on a cube face; off a cube world's faces the
+     * Column (x, z) as a query reads it: itself on a cube face (and on a world that is not a cube); off a cube world's faces the
      * partner column it shows ({@link CubeLayout#fold}, as {@code CubeFill.foldedBiome} reads the biome
      * there); null past the net's corners, where no zone lies. A zone is a disc on the net plane round
      * its own face's source, so the part of it past a turning edge is not the planet's and is never read.
