@@ -1072,7 +1072,7 @@ mod tests {
     use super::*;
     use deeptime_format::DType;
     use deeptime_format::raster::ZEdges;
-    
+
     const MH: f64 = 300.0;
 
     /// A world on a sphere of radius `r` blocks drawn plate carrée round the equator:

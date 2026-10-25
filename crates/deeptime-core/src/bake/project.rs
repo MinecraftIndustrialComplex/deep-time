@@ -27,8 +27,8 @@ use deeptime_format::tilepack::write_stored_tiles;
 use deeptime_format::{DType, GridDesc, LayerDesc, LoadedLayer, Manifest, Written};
 
 use crate::bake::biomes;
-use crate::bake::strata::{Moved, key_shift};
 use crate::bake::stored_tiles;
+use crate::bake::strata::{Moved, key_shift};
 use crate::error::CoreError;
 use crate::params::PlanetPreset;
 use crate::sphere::around::conjugate_axes;
