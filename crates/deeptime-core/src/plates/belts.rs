@@ -1280,6 +1280,10 @@ mod tests {
     fn a_head_on_collision_builds_a_belt_over_many_steps() {
         let mut fx = Fixture::new();
         fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        // PLT-243's profile, highest at the front, so the wedge (PLT-244) grows from the first
+        // step; under the critical taper (the default) it grows only once the toe advances
+        // (ledger: PLT-600, PLT-601), tested in the taper's own tests.
+        fx.preset.tectonics.collision_belt_taper = false;
         // The old default share (0.5), so twelve steps stay under the strength height (PLT-253)
         // and every step's rise shows in the belt's height.
         fx.preset.tectonics.collision_stacking_share = 0.5;
