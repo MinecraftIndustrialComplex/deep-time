@@ -148,6 +148,45 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-25: M5 lane: m4-trace (the keels on base13 hold 2 % of M4 at the end); denudation by class and age (the sim removes crust with its Airy rebound, old belts at 0.06 to 0.2 of Pinet & Souriau's law, low-relief land at a quarter of Montgomery & Brandon's eq. 2 with no chemical term); the cold line (a fixed frame for ISO-110, and on Earth's cold platforms the crust past about 40 km carries almost no height); diagnosis only, no law changed (coordinator's (b) and items 1 and 2; agent worktree .claude/worktrees/agent-a447f975b05e919a2, branch worktree-agent-a447f975b05e919a2, master c5e27599 merged in at 5436d675; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **m4-trace.** The arm ran on master 7f8f3ca0 (key 26ea8ec0342f, argkey 7fceeae3): base13's planet, both starts, seeds 1 to 4, 1000 Myr, the crust-budget env plus `+DEEPTIME_FRONT_TRACE=@RUN@/trace`. Its 8 runs equal base13's seeds 1 to 4.
+  - Read with `m4keel.py` over the 8 runs.
+  - The share of the high ground on a keel (K >= 100 km): 0.63 at -950 Myr, 0.22 to 0.24 from -700 to -450 Myr, 0.05 over the last 150 Myr, 0.02 at the end.
+  - M4 at the end (0.1115 of the continental land) sits on keel-less, hot (L 60 km), 60 to 65 km young collision belts (0.064), keel-less Andean margins (0.025) and keel-less untagged columns (0.020). The keel does not hold M4 up on base13. This corrects the keel bullet of the entry "M4 (land above 2 km) split on base13" below, which was read from one 300 Myr run.
+- **Denudation (item 1).** `m4cohort.py` over the 8 runs gives the crust loss rate E_c of a cohort of samples by tag, age and keel. `m4relief.py` over the final fields gives relief per class against eq. 2. Base13's `erosion_bands` line gives the rate by relief.
+  - The sim removes crust, not only the surface: dH / E_c is 0.138 to 0.154 against Airy's 0.142.
+  - Collision belts, E_c against Pinet & Souriau 1988's 0.061 H:
+    - keeled: 0.92 to 1.03 up to 30 Myr, 0.64 at 50 to 100, 0.47 at 100 to 150, 0.21 at 150 to 250, 0.06 past 250 Myr;
+    - keel-less: 2.8 at 0 to 10 Myr, falling to 0.33 at 100 to 150 and 0.08 at 150 to 250 Myr.
+  - Keel-less belts under 30 Myr come down by collapse (e-folds 48 to 66 Myr).
+  - Old Andean margins and untagged plateaus off a keel aggrade past 50 Myr, at H about 360 to 420 m.
+  - Matmon et al. 2003's Appalachians erode at 30 m/Myr for 180 Myr. The model's old belts erode at 2.5 to 10.6 m/Myr past 150 Myr.
+  - The departure is at low relief. Window relief under 100 m covers 57 % of the land's window-time and erodes at 5.6 m/Myr net, against eq. 2's 22.5 (12.5 without E0). The two causes:
+    - the model has no chemical denudation. M&B's intercept E0, 10 m/Myr, is their "mean chemical denudation rate" of the largest rivers;
+    - below 100 m of relief, n = 2 stream power and the hillslope diffusion set for 9 km hills fall faster than eq. 2. ERO-004 checked only 100 to 1,000 m.
+  - From 100 to 500 m of relief the model matches eq. 2's mechanical part (44.3 against 44, 93.8 against 100).
+  - CLM-156's 9.5 Gt/yr is dated.
+- **The cold line (item 2).** `m4cold.py` reads CRUST1.0 by region and band, run locally under systemd-run.
+  - **The frame.** HC 2011's 1,600 m is relative to the sea. In the model, the physical frame is the fixed datum (L_ref about 125 km with the sea at the datum). The S-tied frame of ISO-111 makes the continents ride with the sea.
+  - **ISO-110 in the datum frame** gives these heights over the datum:
+    - a keeled belt at 50 km: 1,921 m;
+    - a craton at 45, 47.5 and 50 km: 965, 1,321 and 1,678 m, against Earth's 340 m;
+    - Tibet: 4,553 m;
+    - the Urals: 2,105 to 2,348 m, against Earth's 0.5 km mean and 1.8 km at most.
+    - It raises the hot keel-less belts that hold M4 by 630 m.
+  - **CRUST1.0.**
+    - The hot Cordillera stands 1,466 m over the East European platform at 35 to 40 km, which is HC's thermal offset.
+    - On the cold platforms, CRUST1.0's own layers sit within 0 to 150 m of the model's one line at 45 to 55 km. Their lower crust is 2,910 to 2,950 everywhere.
+    - From 35-40 km to 45-55 km, the rock rises 1 m/km on the East European platform, 9 on the Canadian shield, 18 on Australia, 27 on Siberia and 4 on Brazil, against Airy's 142.
+    - CRUST1.0's 1 degree cells do not resolve the Urals' 50 to 56 km root (45 to 50 km at most).
+  - **Reading.** The extra thickness acts as rock of about 3,200 to 3,300 kg/m³. A lithosphere thickening with the crust would need about 13 km of L per km of crust, so it is the crust's base, or a mantle CRUST1.0 does not resolve.
+    - Sources that point at the crust's base: Durrheim & Mooney 1994 (abstract, the >7 km/s basal layer of 40 to 55 km Proterozoic crust), Stadtlander et al. 1999 (abstract) and Hacker 2015 (lowermost crust 3.27).
+    - None of the sources read gives a law for that layer's density, onset or growth. So the datum is reported, and no law is proposed.
+- **Ledger gap.** None was used. PLT-630, ISO-145 and FRC-045 and up stay free.
+- **Next.** Waits on the coordinator.
+  - The proposal: a land chemical denudation term behind a switch, unit tests first. Its rate is supply-limited (West 2005, CLM-155) and it is tied to the carbon cycle's silicate weathering. Its arm is read against base14.
+  - For a cold-line law: a fetch of the full texts of a garnet granulite to eclogite boundary source, Stadtlander et al. 1999, Leech 2001 and Christensen & Mooney 1995.
+
 ### 2026-10-25: Front lane: incipient subduction (PLT-610 to PLT-614) built behind `tectonics.incipient_subduction`, on by default; the Benioff census column (B, PLT-615) beside `sub`; the guard against PLT-585's friction; PLT-063 left as it is (coordinator's approval of (A) and (B); agent worktree .claude/worktrees/agent-aeaabcd72dfe5f0b8, branch front-pull, masters 17ab80b7, bdf8148c and b0c7e8e6 merged in; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What was built** (plates.md "Step 12"): a front whose contact's slab is shorter than 100 km before the step (PLT-611, Gurnis, Hall & Lavier 2004's critical convergence) resists with a plastic 2.5e12 N/m (PLT-612; 5e11 where the floor is under 10 Myr old, PLT-613), linearised as the collision term over max(convergence, 1 mm/yr); it builds no arc and counts as converging boundary with no subduction zone (PLT-614). The census column (B): `front_bands.benioff`, the fronts whose slab reaches 100 km under their arc, `measure_boundary.py` version 3's `sub_benioff` beside `sub` (PLT-615). PLT-063 unchanged, with a ledger note quoting Crameri 2020.
 - **The guard with PLT-585** (`forces.rs`, the friction pass): while a contact is incipient its oceanic front samples take no F&U friction (the incipient resistance alone), and the loop over the other boundaries skips an incipient partner from either side. A continental sample on an incipient front keeps its friction (a collision's drag, as at a mature contact; the agent's choice). Test `an_incipient_front_takes_no_forsyth_uyeda_friction` (both switches on): incipient friction 0 N between the pair and resistance 8.1446e18 N (the same with PLT-585 off); mature, front friction 2.432e18 N = F_CR x 3,258 km and no incipient resistance; the other pairs' friction identical. With the switch off the incipient set is empty, so the guard changes nothing. PLT-585, FRC-035, plates.md and plate-forces.md say so.
@@ -183,7 +222,7 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - other 0.005.
 - **Earth's M4 by region.** From CRUST1.0 (`m4earth.py`, with crust1.rho) it is 0.047 in all: collision 0.026, Andes 0.0085, Cordillera 0.0055.
 - **The decay.** A hot belt's sheet (PLT-414/415) is under 2 km by about age 19 Myr. That matches the Variscan and Bird 1991. Base13's belts come down 3 to 5 times slower.
-- **The keel.** The front-trace run 188b5e2f2852 (300 Myr, one run; `m4keel.py`) shows why. Belts on the start's keel (K 200, L 200, η 450 η0) stay at 45 to 48 km for 100 Myr, under T_c, so neither collapse law acts on them. Belts with no keel come down at the hot pace.
+- **The keel.** The front-trace run 188b5e2f2852 (300 Myr, one run; `m4keel.py`) shows why. Belts on the start's keel (K 200, L 200, η 450 η0) stay at 45 to 48 km for 100 Myr, under T_c, so neither collapse law acts on them. Belts with no keel come down at the hot pace. (Corrected by the m4-trace entry above: on base13's full 1000 Myr runs, keeled belts hold 2 % of M4 at the end.)
 - **Two lines for thick crust.** Earth's hot thick crust (Tibet, Andes) fits the model's one line. Its cold thick crust stands at 340 m at 45 to 55 km. CRUST1.0's layer densities do not explain that, and ISO-110 in HC's frame would close only about 0.5 km of it.
 - **What needs erosion.** Belts over 50 Myr, the old Andean tail, untagged plateaus and the keeled belts.
 - **New scripts.** Under `tools/review/m5diag/`: `m4earth.py`/`.sh`, `m4keel.py` and `ledger_ids.py` (the highest ledger ids on every branch). `m4split.py` and `m4table.py` were extended.
