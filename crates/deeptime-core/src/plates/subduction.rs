@@ -1010,7 +1010,8 @@ pub fn fronts_and_uplift(
     cones: &mut [[f64; 2]],
     sea_m: f64,
 ) -> Pull {
-    let begun = fronts_begin(state, geo, pos, env);
+    let tree = Tree::over(pos, |_| true);
+    let begun = fronts_begin(state, geo, pos, &tree, env);
     let reach = fronts_reach(geo, &begun, env);
     fronts_finish(state, geo, env, cones, begun, reach, sea_m)
 }
@@ -1079,12 +1080,79 @@ impl FrontsBegun {
 /// [`FrontsBegun::key`]'s mark of a hidden sample.
 const HIDDEN_KEY: u32 = 1 << 31;
 
-/// Each sample's boundary and the step's fronts (see [`FrontsBegun`]).
-pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> FrontsBegun {
+/// How near a front sample a visible sample of the subducting plate must stand now for the front
+/// to stand on the current geometry (`tectonics.front_current_geometry`), radians, from the lattice
+/// `spacing` the run has: one spacing for the step to the neighbour across the boundary, one for
+/// the trench's single hidden row, the subducting plate's edge sample that has just gone under the
+/// forearc (the overlaps hide a sample once it crosses the overriding outline, PLT-553, so the
+/// next row in stays visible). Not a tuned length: on a new lattice, where every front's
+/// neighbour is beside it, 97 % of the ocean-continent fronts meet it (the front trace,
+/// plates.md, "What the trace found"). ledger: PLT-582
+pub fn trench_row_rad(spacing: f64) -> f64 {
+    2.0 * spacing
+}
+
+/// Whether a sample's front towards a plate stands on the current geometry (PLT-582): a visible
+/// sample of that plate within [`trench_row_rad`] of it now, asked once per plate met and kept.
+/// With no row (the rule off) every plate counts.
+pub(crate) struct SlabBeside {
+    row: Option<f64>,
+    met: [(u32, bool); 4],
+}
+
+impl SlabBeside {
+    pub(crate) fn new(row: Option<f64>) -> SlabBeside {
+        SlabBeside {
+            row,
+            met: [(u32::MAX, false); 4],
+        }
+    }
+
+    /// Whether a visible sample of `plate` stands within the row of `x` (`tree` holds every
+    /// sample; `plate_of` each sample's plate).
+    pub(crate) fn has(
+        &mut self,
+        samples: &[super::state::Sample],
+        plate_of: &[u32],
+        tree: &Tree,
+        x: DVec3,
+        plate: u32,
+    ) -> bool {
+        let Some(row) = self.row else {
+            return true;
+        };
+        if let Some(&(_, m)) = self.met.iter().find(|&&(p, _)| p == plate) {
+            return m;
+        }
+        let m = tree
+            .within(x, row)
+            .iter()
+            .any(|&(j, _)| plate_of[j as usize] == plate && !samples[j as usize].is_hidden());
+        if let Some(slot) = self.met.iter_mut().find(|(p, _)| *p == u32::MAX) {
+            *slot = (plate, m);
+        }
+        m
+    }
+}
+
+/// Each sample's boundary and the step's fronts (see [`FrontsBegun`]); `tree` holds every
+/// sample at `pos` (the step's), for the front on the current geometry (PLT-582).
+pub fn fronts_begin(
+    state: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    tree: &Tree,
+    env: &Env,
+) -> FrontsBegun {
     let step = env.step;
     let norm = env.norm;
     let n = state.samples.len();
     let plate_of: Vec<u32> = (0..n).into_par_iter().map(|i| state.plate_of(i)).collect();
+    // ledger: PLT-582 (the front on the current geometry)
+    let row = env
+        .k
+        .front_current_geometry
+        .then(|| trench_row_rad(env.norm.spacing_rad()));
     let omega: Vec<DVec3> = state
         .plates
         .iter()
@@ -1118,6 +1186,7 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
             let x = pos[v];
             let rot = rots[sv.group as usize];
             let mut best = 0.0;
+            let mut beside = SlabBeside::new(row);
             for (u, _) in geo.edges(v as u32) {
                 let su = &samples[u as usize];
                 if su.group == sv.group && su.is_hidden() {
@@ -1134,6 +1203,7 @@ pub fn fronts_begin(state: &PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> 
                     b.divergent = true;
                 } else if let Some(&c) = active.get(&(pu, pv))
                     && -along > best
+                    && beside.has(samples, &plate_of, tree, x, pu)
                 {
                     best = -along;
                     b.front = Some((u, c, rel, out));

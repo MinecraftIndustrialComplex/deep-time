@@ -406,7 +406,7 @@ impl PlatesStage {
         cut_trace::mark(st, &cache.geo, "shortening");
         // The arcs' fronts and distance field read nothing the belts change: found beside them
         // (P1-19).
-        let begun = subduction::fronts_begin(st, &cache.geo, &pos, &env);
+        let begun = subduction::fronts_begin(st, &cache.geo, &pos, &tree, &env);
         let traced_fronts = ft.borrow().as_ref().map(|_| begun.traced_fronts());
         let geo = &cache.geo;
         let (stacked, arcs) = rayon::join(
@@ -620,6 +620,7 @@ impl PlatesStage {
             st,
             &cache.geo,
             &pos,
+            &tree,
             &env,
             classes.as_deref().or(traced_classes.as_deref()),
         );

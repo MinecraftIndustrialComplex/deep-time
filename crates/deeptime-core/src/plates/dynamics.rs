@@ -106,10 +106,11 @@ use serde::{Deserialize, Serialize};
 
 use super::Env;
 use super::events::{PLATE_BIRTH, PLATE_DEATH};
-use super::geometry::Geo;
+use super::geometry::{Geo, Tree};
 use super::kinematics::{quat, tangent};
 use super::shortening;
 use super::state::{ARC, CONTINENTAL, OCEANIC, PlateState, Sample};
+use super::subduction;
 use crate::world::WorldState;
 
 /// Set this environment variable and the stage records nothing (to time what recording costs).
@@ -1046,11 +1047,14 @@ impl MixUnits {
 /// motion is updated). All zeros when the record is off. With `classes` (one per sample), each
 /// visible boundary sample's class is stored there as the [`mix`] class plus one (0: on no
 /// boundary, or on the subducting side of a front), for the crust budget's maps (measurement
-/// only).
+/// only). `tree` holds every sample at `pos`: with `front_current_geometry` a neighbour of a
+/// plate subducting under this one is a boundary only while a visible sample of that plate stands
+/// within `subduction::trench_row_rad` now, as the fronts take it (ledger: PLT-582).
 pub fn boundary_mix(
     st: &PlateState,
     geo: &Geo,
     pos: &[DVec3],
+    tree: &Tree,
     env: &Env<'_>,
     classes: Option<&[std::sync::atomic::AtomicU8]>,
 ) -> Mix {
@@ -1144,6 +1148,11 @@ pub fn boundary_mix(
         d
     };
     let spacing_km = norm.km(norm.spacing_rad());
+    // ledger: PLT-582 (the front on the current geometry)
+    let row = env
+        .k
+        .front_current_geometry
+        .then(|| subduction::trench_row_rad(norm.spacing_rad()));
     // An ocean-ocean front whose overriding plate has continental crust within the arc's distance
     // of it, through that plate, builds its arc on that crust: a continental arc, the class
     // Stern & Scholl (2010) split the world's arcs by (the crust the arc stands on), so it counts
@@ -1172,9 +1181,15 @@ pub fn boundary_mix(
             let mut n = 0;
             // The boundary's normal towards each plate met, found once per plate.
             let mut normals: [(u32, DVec3); 4] = [(u32::MAX, DVec3::ZERO); 4];
+            let mut beside = subduction::SlabBeside::new(row);
             for (u, _) in geo.edges(v as u32) {
                 let pu = plate_of[u as usize];
                 if pu == pv || n == buf.len() {
+                    continue;
+                }
+                // A plate subducting here with none of its crust beside this sample now: the
+                // frozen lattice's neighbour went under and on, and this is no boundary (PLT-582).
+                if active.contains(&(pu, pv)) && !beside.has(samples, &plate_of, tree, x, pu) {
                     continue;
                 }
                 let out = tangent(x, rot * (pts[u as usize] - pts[v])).normalize_or_zero();

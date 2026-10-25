@@ -8569,8 +8569,8 @@ would keep:
 | within 3 spacings | 551 | 494 | 558 | −10.3 % |
 
 On a new lattice 97 % of the ocean-continent fronts have a visible sample of another plate within
-2.25 spacings. The two-spacing rule is the one the coordinator approved ("The front on the current
-geometry").
+2.25 spacings. Two spacings is the rule the coordinator took on 2026-10-25 (below, "The front on the
+current geometry").
 
 *The thickening.* At 300 Myr the land above 2 km is 0.125 of the land: 4,113 samples, of them 2,813
 Himalayan, 546 Andean and 754 untagged. 377 untagged columns stand at 49 to 51 km, T_c (50 km in
@@ -8625,6 +8625,63 @@ no orogeny; gated (the switch off), every receiver is still at T_c after 100 Myr
 thins past it; with the switch, the hot receivers thin below T_c − 1 km and the craton's stay at
 T_c. The rate itself: a 15 km excess flows on a 78 km lithosphere, not on L_cold, not without a
 state, not with the switch off.
+
+### The front on the current geometry (2026-10-25, PLT-582)
+
+*The rule.* With `tectonics.front_current_geometry` (on by default), `subduction::fronts_begin` and
+`dynamics::boundary_mix` read an overriding sample's lattice neighbour of a subducting plate (a
+plate with an active contact under the sample's plate) as a front only while a visible sample of
+that plate stands within `subduction::trench_row_rad` of it now. The radius is two lattice spacings,
+computed from the run's spacing: one spacing for the step to the neighbour across the boundary, and
+one for the trench's single hidden row. The overlaps hide the subducting plate's edge sample once it
+crosses the overriding outline (PLT-553), so the sample that has just gone under is hidden and the
+next one in is still visible. The radius is not tuned to a length. On a new lattice, where every
+front's neighbour is beside it, 97 % of the ocean-continent fronts meet 2.25 spacings (the trace
+above). The change at a resampling falls from −29.7 % to −3.4 % at two spacings; three spacings
+keep more of the band (−10.3 %).
+
+The query runs on the step's tree of every sample, the one the overlaps search. It is asked only of
+samples that have such a neighbour, and once per plate met. The mix drops the neighbour by the same
+test, so a sample with nothing else across it is no boundary. The full adjacency rebuild (the
+lattice's edges from the current geometry) stays a follow-up, for a residue the trace can see.
+
+*The plate asked.* The trace's rule asked for a visible sample of any other plate; the code asks for
+the subducting plate itself. A third plate's crust beside an overriding sample is no slab of the
+plate the front reads, and counting it would keep a front where that plate has gone. The difference
+was not measured on the trace (the front lane's call, which can be undone).
+
+*The tests.* `an_oblique_promontory_through_a_resampling` was written first. It drives an ocean at
+50 mm/yr, 30 degrees oblique, onto a continent with a promontory 4 spacings deep and 8 wide, at
+80,000 samples, so that the forearc's reach covers the promontory. The ocean moves 12 spacings and
+the lattice is then resampled. The test was meant to show the band, and found none:
+
+- 137 fronts at every step before the resampling and 131 after it, the same with the rule off and
+  on;
+- the mix's ocean-continent boundary 10,938 km before and 10,459 km after.
+
+The forearc holds the ocean that goes down the trench along the margin (PLT-542). The promontory's
+corner, though, has no front and so no forearc. The ocean passing under it is not held, and the lee
+fills again from the ocean coming in behind, so every front keeps a visible ocean sample beside it.
+At 45 degrees the band was one front of 193 at three steps of eight. So the test holds the rule to
+what it must not do: on a live margin, oblique and irregular, it keeps every front. It does not show
+which of the planet's margins carry the trace's band.
+
+`a_consumed_slab_leaves_no_front` shows the band. It drives an ocean plate 3 spacings deep and 30
+degrees long (`a_front_of_known_length`) north under a continent at 50 mm/yr, at 20,000 samples,
+until all of the plate is under. The contact stays active, because the slab's hidden samples still
+overlap the continent. The fronts per step, off and on:
+
+| step | 1 to 3 | 4 | 5 | 6 to 9 |
+|---|---|---|---|---|
+| off | 24 | 24 | 24 | 24 |
+| on | 24 | 22 | 15 | 0 |
+
+- **Off**, the margin keeps all 24 fronts (3,832 km of ocean-continent boundary in the mix) to the
+  end, 8 Myr after the last of the slab went under.
+- **On**, the fronts fall as the slab's trailing edge reaches the trench, and are gone once it is
+  under; the mix has 0 km.
+- The live margin of the first steps keeps all 24 fronts either way.
+
 
 ## Plate speed (2026-10-25)
 
