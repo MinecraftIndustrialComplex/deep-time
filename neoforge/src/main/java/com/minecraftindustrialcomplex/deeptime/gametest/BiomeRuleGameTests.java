@@ -271,8 +271,10 @@ public final class BiomeRuleGameTests {
         }
         // Cold wetland a volcano's zone decided is set apart, not counted (BIO-189; 20 of the 29 cold-wetland columns of
         // the 2026-10-24 test planet: an oceanic shield's coastal flat inside its cone zone, beaches in lava fields).
+        // Cold wetland on a beach is set apart too (BIO-190; 13 of the 37 on master cc27c9f9's planet, black beaches on basalt).
         DeepTime.LOGGER.info("[gametest] expandedEcosphereBiomesFollowTheirRules: {} cold-wetland columns the rules decide, {} on a peatland"
-                + " biome; {} more a volcano's zone decided, set apart", rc.coldWetland(), rc.coldWetlandPeat(), rc.coldWetlandVolcanic());
+                + " biome; {} more a volcano's zone decided and {} on a beach, set apart", rc.coldWetland(), rc.coldWetlandPeat(),
+                rc.coldWetlandVolcanic(), rc.coldWetlandShore());
         if (rc.coldWetland() >= MIN_COLD_WETLAND) {
             double share = rc.coldWetlandPeat() / (double) rc.coldWetland();
             helper.assertTrue(share >= MIN_PEAT_SHARE, "only " + rc.coldWetlandPeat() + " of " + rc.coldWetland()

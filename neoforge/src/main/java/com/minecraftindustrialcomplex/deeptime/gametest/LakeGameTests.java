@@ -23,6 +23,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -72,10 +73,19 @@ public final class LakeGameTests {
                 return null;
             if (above.is(BlockTags.LOGS))
                 return "tree-on-salt:" + BuiltInRegistries.BLOCK.getKey(above.getBlock());
-            if (salt == null || top != salt)
+            if (salt == null || top != salt && !packSalt(top))
                 return "not-salt:" + BuiltInRegistries.BLOCK.getKey(top.getBlock());
             return "";
         }
+    }
+
+    /**
+     * The pack's own salt laid over Deep Time's: Expanded Ecosphere's {@code salt} patch turns calcite (halite's vanilla
+     * stand-in) under air at y 62 into white concrete powder, the salt of its salt lakes (its surface rules use the same
+     * block). Salt over salt, so the flat is still salt (41b11137's test planet, -752 62 198).
+     */
+    static boolean packSalt(BlockState top) {
+        return ModList.get().isLoaded(BiomeRuleGameTests.EE) && (top.is(Blocks.WHITE_CONCRETE_POWDER) || top.is(Blocks.WHITE_CONCRETE));
     }
 
     private static Ground ground(ServerLevel level, int x, int z) {
@@ -97,6 +107,18 @@ public final class LakeGameTests {
     /** The biome on a column's ground, for the failure's detail. */
     private static String biome(ServerLevel level, int x, int y, int z) {
         return level.getBiome(new BlockPos(x, y + 1, z)).unwrapKey().map(k -> k.location().toString()).orElse("?");
+    }
+
+    /** A salt column's blocks from the top down past its flat's depth, and that depth, so a red names what lies there. */
+    private static String column(ServerLevel level, RasterSampler playa, int x, int y, int z) {
+        double v = playa.nearest(x, z);
+        int n = Double.isNaN(v) ? 0 : (int) Math.round(v);
+        LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
+        StringBuilder b = new StringBuilder(" salt ").append(n).append(" blocks; y ").append(y + 1).append(" down:");
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int k = y + 1; k >= y - n - 1; k--)
+            b.append(' ').append(BuiltInRegistries.BLOCK.getKey(chunk.getBlockState(pos.set(x, k, z)).getBlock()).getPath());
+        return b.toString();
     }
 
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
@@ -195,7 +217,7 @@ public final class LakeGameTests {
             if (!bad.isEmpty()) {
                 wrong++;
                 detail.append(' ').append(bad).append('(').append(s.x()).append(',').append(gr.y()).append(',').append(s.z()).append(' ')
-                        .append(biome(level, s.x(), gr.y(), s.z())).append(')');
+                        .append(biome(level, s.x(), gr.y(), s.z())).append(column(level, playa, s.x(), gr.y(), s.z())).append(')');
             }
         }
         // Round every hot spring by a playa, the flat it does not claim is salt too: no role biome comes within
