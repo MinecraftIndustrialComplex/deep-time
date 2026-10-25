@@ -892,6 +892,23 @@ pub struct TectonicParams {
     /// and every built-in preset's since 2026-10-23; 0 accretes all of it (the model before the
     /// trench budget, 2026-10-22). ledger: PLT-440
     pub sediment_subduction_share: f64,
+    /// Sediment subduction by margin type (the M5 lane, 2026-10-25): `true` replaces
+    /// `sediment_subduction_share` with Clift & Vannucchi's (2004) share for the margin the
+    /// floor goes under (`ridges::sediment_subducted_share`): 0.83 of the incoming pile where it
+    /// is over 1 km and the convergence under 76 mm/yr (an accretionary margin), all of it
+    /// elsewhere (an erosive margin; von Huene & Scholl 1991's type 2), whatever the overriding
+    /// plate is made of. Off by default. ledger: PLT-660
+    pub sediment_subduction_sourced: bool,
+    /// The rifted margin's sediment stays continental (the M5 lane, 2026-10-25;
+    /// `transition::margin_continental`): ocean floor on the ocean side of a margin's taper
+    /// (within W/2, `transition_width_km`, of its plate's continental crust that is not itself
+    /// hyper-extended), not at a trench, in a subduction zone or on an arc, that holds rock from
+    /// the continents (sediment beyond the pelagic rain for its age, or felsic or metamorphic
+    /// rock) is the distal margin's thinned continental crust (Brune et al. 2014) and becomes
+    /// continental crust over its own ocean crust (PLT-331); and ocean floor that crust spread
+    /// from continental columns onto (`collapse::spread`) becomes continental at once rather
+    /// than when filled to the normal column. Off by default. ledger: PLT-661, PLT-662
+    pub margin_sediment_continental: bool,
     /// Subduction erosion: the crust a front's overriding plate loses from below, km³ per km of
     /// front and Myr (Earth-normalized), where the front erodes (the two keys below); taken
     /// from the front sample's crust beyond a normal ocean floor's (`subduction::erode_forearcs`).
@@ -1214,15 +1231,17 @@ impl Default for TectonicParams {
             trench_half_life_myr: 2.0,         // ledger: PLT-053
             trench_release_half_life_myr: 2.0, // ledger: PLT-443 (on since 2026-10-23)
             pelagic_m_per_myr: 5.0,
-            sediment_subduction_share: 0.12, // ledger: PLT-440
+            sediment_subduction_share: 0.12,    // ledger: PLT-440
+            sediment_subduction_sourced: false, // ledger: PLT-660
+            margin_sediment_continental: false, // ledger: PLT-661, PLT-662
             subduction_erosion_km3_per_km_myr: 90.0, // ledger: PLT-441
             subduction_erosion_min_mm_yr: 60.0, // ledger: PLT-442
             subduction_erosion_max_sediment_m: 1000.0, // ledger: PLT-442
-            erosion_retreat: false,          // ledger: PLT-523
-            front_share: true,               // ledger: PLT-530
-            plate_fission: true,             // ledger: PLT-532
-            split_inheritance: true,         // ledger: PLT-534
-            level_set_membership: true,      // ledger: PLT-536
+            erosion_retreat: false,             // ledger: PLT-523
+            front_share: true,                  // ledger: PLT-530
+            plate_fission: true,                // ledger: PLT-532
+            split_inheritance: true,            // ledger: PLT-534
+            level_set_membership: true,         // ledger: PLT-536
             hotspots_initial: 8,
             hotspot_births_per_100myr: 3.0,
             hotspot_lifetime_myr: [40.0, 150.0],
