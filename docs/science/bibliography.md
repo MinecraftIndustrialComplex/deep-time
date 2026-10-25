@@ -8321,7 +8321,7 @@ The sources of the trench budget (build log 2026-10-22 "The trench budget"; plat
 - Reference: Clift, P. and Vannucchi, P. (2004). Controls on tectonic accretion versus erosion in subduction zones: implications for the origin and recycling of the continental crust. Reviews of Geophysics 42(2):RG2001.
 - DOI or URL: 10.1029/2003RG000127; repository copy https://repository.lsu.edu/cgi/viewcontent.cgi?article=1495&context=geo_pubs (read through the Wayback Machine's copy).
 - Cited as: "Clift & Vannucchi 2004".
-- Ledger ids: PLT-440, PLT-441, PLT-442; PLT-522 and PLT-523 (2026-10-23, the trench's retreat: Table 2's retreat range and the global 90 km3/km/Myr as the check on the volume it takes).
+- Ledger ids: PLT-440, PLT-441, PLT-442; PLT-522 and PLT-523 (2026-10-23, the trench's retreat: Table 2's retreat range and the global 90 km3/km/Myr as the check on the volume it takes); PLT-562 (2026-10-24, the forearc eroded at the plate interface, so over the slab).
 - Access: paywalled at the publisher; the repository copy open.
 - Library: not kept.
 - Read so far (by the project): full text with Tables 1 and 2, 2026-10-22 (research sub-agent). Abstract: "Tectonic erosion is favored in regions where convergence rates exceed 6 ± 0.1 cm yr-1 and where the sedimentary cover is <1 km. Accretion preferentially occurs in regions of slow convergence (<7.6 cm yr-1) and/or trench sediment thicknesses >1 km." Body: "erosive plate margins do not appear to form in regions where the orthogonal convergence rate is <6.3 cm yr-1, while accretionary margins do not form in regions where the orthogonal convergence rate exceeds 7.6 cm yr-1. The Philippine Trench is the exception"; [34] "accretion appears to be an effective process when convergent rates are <76 mm yr-1 and where the sedimentary cover is >1 km thick"; [40] "a global average rate of crustal loss of 90 km3 m.y.-1 km-1 calculated in this study"; [38] at erosive margins "only 12-48% (median 22%) of the total material subducted below the forearc is derived from the sediments in the subducting plate"; [39] "Only 7-37% of the sediment reaching the trenches appears to be added to the accretionary complexes, with the bulk subducted to depth", "Globally, the median proportion of the rock delivered as sediment to the trench that is accreted from the subducting plate is only 17%"; [53] "57% of the global active margins seem to be of the erosive type", "Even at the accretionary margins, typically 83% of the incoming sedimentary pile is subducted beneath the forearc wedge", "eroded forearc basement constitutes approximately 55% of the crustal material subducted to depth". No global flux in km3/yr is printed. The sub-agent's arithmetic on Tables 1 and 2 (not the paper's): basement erosion on the 19 erosive margins 20.0 (Mariana) to 139.4 (Peru) km3 per km and Myr, length-weighted 86.8, about 1.99 km3 a year in all; erosive margins 22,925 km of the 40,225 km tabulated (57.0 %); sediment delivered 1.90 km3 a year, 1.62 subducted and 0.28 accreted (14.6 %); trench retreat 0.9 to 4.7 km/Myr, median 3.0.
@@ -8889,7 +8889,7 @@ The sources of the front lane's level-set membership (plates.md "Step 3c").
 
 ## The arcs' ends at the slab's edge (PLT-561), added 2026-10-24
 
-The sources of the front lane's step 10 (plates.md "Step 10"). England, Engdahl & Thatcher 2004 and
+The sources of the front lane's step 10 (plates.md "Step 10"), cited again for step 11's margin (PLT-562, plates.md "Step 11"). England, Engdahl & Thatcher 2004 and
 Syracuse & Abers 2006 are above, read again for this step. A lookup sub-agent of the front lane read
 them on 2026-10-24; the quotes are from that reading, and its downloads were not kept.
 
@@ -8897,7 +8897,7 @@ them on 2026-10-24; the quotes are from that reading, and its downloads were not
 - Reference: Thorkelson, D. J. and Breitsprecher, K. (2005). Partial melting of slab window margins: genesis of adakitic and non-adakitic magmas. Lithos 79(1-2):25-41 (the title from memory).
 - DOI or URL: not checked.
 - Cited as: "Thorkelson & Breitsprecher 2005".
-- Ledger ids: PLT-561
+- Ledger ids: PLT-561; PLT-562 (the margin at the slab's ends, 2026-10-24)
 - Access: an author copy (PDF).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-24 (the front lane's lookup agent): section 2, p. 27, "we show how 'normal' arc volcanism is interrupted in the vicinity of the slab window, and replaced by a broader but possibly less voluminous volcanic field of wide-ranging compositions"; the caption of Fig. 1, p. 26, "Volcanic arc (yellow volcanoes) is interrupted by field of anomalous magmatism".
@@ -8906,7 +8906,7 @@ them on 2026-10-24; the quotes are from that reading, and its downloads were not
 - Reference: Johnston, S. T. and Thorkelson, D. J. (1997). Cocos-Nazca slab window beneath Central America. Earth and Planetary Science Letters 146:465-474 (the title from memory).
 - DOI or URL: not checked.
 - Cited as: "Johnston & Thorkelson 1997".
-- Ledger ids: PLT-561
+- Ledger ids: PLT-561; PLT-562 (the margin at the slab's ends, 2026-10-24)
 - Access: full text read (the lookup agent's copy).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-24 (the front lane's lookup agent): the abstract, p. 465, "The absence of a Wadati-Benioff zone from southeastern Costa Rica through Panama corresponds to the position of the slab window", the basalts there from an ocean-island-type source unlike "the rest of the arc, in Nicaragua, El Salvador and Guatemala".
@@ -8915,7 +8915,7 @@ them on 2026-10-24; the quotes are from that reading, and its downloads were not
 - Reference: Levin, V., Shapiro, N., Park, J. and Ritzwoller, M. (2002). Seismic evidence for catastrophic slab loss beneath Kamchatka. Nature 418:763-767 (the authors and title from memory).
 - DOI or URL: not checked.
 - Cited as: "Levin et al. 2002".
-- Ledger ids: PLT-561
+- Ledger ids: PLT-561; PLT-562 (the margin at the slab's ends, 2026-10-24)
 - Access: paywalled; the abstract on Europe PMC.
 - Library: not kept.
 - Read so far (by the project): abstract only, 2026-10-24 (the front lane's lookup agent): "About 5 to 10 Myr ago, catastrophic slab loss shut down island-arc volcanic activity north of the Aleutian-Kamchatka junction"; "no relict slab underlies the extinct northern Kamchatka volcanic arc".
