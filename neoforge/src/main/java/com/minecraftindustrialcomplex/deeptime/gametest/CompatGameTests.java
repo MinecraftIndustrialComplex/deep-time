@@ -10,6 +10,7 @@ import com.minecraftindustrialcomplex.deeptime.compat.coe.CoeAccess;
 import com.minecraftindustrialcomplex.deeptime.compat.coe.CoeBridge;
 import com.minecraftindustrialcomplex.deeptime.ore.OreData;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Body;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LevelSites;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.gametest.framework.GameTest;
@@ -463,6 +464,86 @@ public final class CompatGameTests {
             notInstalled(helper, "cdgZeroElsewhere", "Create: Diesel Generators", probes.size() + " chunks decided 0");
             return;
         }
+        helper.succeed();
+    }
+
+    /**
+     * On a cube world a site's footprint holds no chunk off the faces: a void chunk is a turned copy
+     * of its partner face's chunk (ledger SCL-210) and places none of the body, so the COE and CDG
+     * hooks must not find the site there. Checked two ways: an ore body built across face S's west
+     * edge on a cube of side 1,024 (its flat count reaches past the edge, its cube count does not,
+     * and the chunks on the face keep their counts), and every site of the cube test planet whose
+     * ore bodies' boxes reach past a turning edge (its footprint chunks all on the faces, its total
+     * at most the flat count's).
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
+    public static void siteFootprintsStayOnTheFaces(GameTestHelper helper) {
+        List<String> problems = new ArrayList<>();
+        // The built body: semi-axes 20, 5, 20, centred 4 blocks inside S's west edge (x = -512).
+        CubeLayout net = CubeLayout.of(1024);
+        int c = 4096, west = -512;
+        double bx = west + 4, bz = 1000;
+        Body b = new Body(1, 3, 0, SiteChunks.ORE_ROLE, new double[]{bx, 0, bz}, new float[]{20, 5, 20}, 0f, 0f, Body.NO_CLIP,
+                new int[]{(int) bx - 20, -5, (int) bz - 20}, new int[]{(int) bx + 20, 5, (int) bz + 20}, "granite", List.of());
+        var flat = SiteChunks.compute(List.of(b), c, null, 3);
+        var cubed = SiteChunks.compute(List.of(b), c, net, 3);
+        if (flat.byChunk().keySet().stream().noneMatch(k -> new ChunkPos(k).x < west >> 4))
+            problems.add("the built body's flat count does not reach past the edge");
+        for (long k : cubed.byChunk().keySet())
+            if (net.faceOfBlock(new ChunkPos(k).getMinBlockX(), new ChunkPos(k).getMinBlockZ()) == null)
+                problems.add("the built body counts the void chunk " + new ChunkPos(k));
+        double onFace = flat.byChunk().entrySet().stream().filter(e -> new ChunkPos(e.getKey()).x >= west >> 4)
+                .mapToDouble(Map.Entry::getValue).sum();
+        if (Math.abs(onFace - cubed.total()) > 1e-6 || !(cubed.total() < flat.total()))
+            problems.add("the built body counts " + cubed.total() + " on the cube, " + onFace + " of its flat " + flat.total() + " on the face");
+        if (cubed.best() == null || cubed.best().x < west >> 4)
+            problems.add("the built body's best chunk is " + cubed.best());
+        // The test planet's sites.
+        ServerLevel level = CubeWorldGameTests.level(helper, GameTestSupport.TEST_PLANET_CUBE);
+        LevelSites sites = LevelSites.of(level);
+        CubeLayout cube = sites.cube();
+        if (cube == null) {
+            helper.fail(level.dimension().location() + " is not a cube world");
+            return;
+        }
+        int pc = sites.deposits().circumference();
+        long half = 2L * cube.side();
+        int scanned = 0, reaching = 0;
+        double flatTotal = 0, cubeTotal = 0;
+        List<String> examples = new ArrayList<>();
+        for (Site s : sites.all()) {
+            List<Body> ore = sites.deposits().bodies().ofSite(s.id()).stream().filter(o -> SiteChunks.ORE_ROLE.equals(o.role())).toList();
+            if (ore.isEmpty())
+                continue;
+            scanned++;
+            boolean past = false;
+            for (Body o : ore) {
+                long x1 = Math.min(o.max()[0], (long) o.min()[0] + pc - 1);
+                long z0 = Math.max(o.min()[2], -half), z1 = Math.min(o.max()[2], half);
+                for (long x = o.min()[0]; x <= x1 + 15 && !past; x += 16)
+                    for (long z = z0; z <= z1 + 15 && !past; z += 16)
+                        past = cube.faceOfBlock((int) Math.floorMod(Math.min(x, x1), (long) pc), (int) Math.min(z, z1)) == null;
+            }
+            if (!past)
+                continue;
+            reaching++;
+            var f = SiteChunks.compute(ore, pc, null, s.id());
+            var fp = SiteChunks.footprint(sites, s);
+            flatTotal += f.total();
+            cubeTotal += fp.total();
+            for (long k : fp.byChunk().keySet())
+                if (cube.faceOfBlock(new ChunkPos(k).getMinBlockX(), new ChunkPos(k).getMinBlockZ()) == null)
+                    problems.add("site " + s.id() + " counts the void chunk " + new ChunkPos(k));
+            if (fp.total() > f.total() + 1e-6)
+                problems.add("site " + s.id() + " counts " + fp.total() + " on the cube, more than its flat " + f.total());
+            if (examples.size() < 4)
+                examples.add("site " + s.id() + " " + s.depositType().getPath() + " " + Math.round(fp.total()) + "/" + Math.round(f.total()));
+        }
+        DeepTime.LOGGER.info("[gametest] siteFootprintsStayOnTheFaces: built body {}/{} blocks ({} on the face); planet: {} sites with ore, {} reach past a turning edge, footprint {} of their flat {} blocks {}; problems {}",
+                Math.round(cubed.total()), Math.round(flat.total()), Math.round(onFace), scanned, reaching,
+                Math.round(cubeTotal), Math.round(flatTotal), examples, problems);
+        helper.assertTrue(scanned > 0, "the test planet has no site with ore");
+        helper.assertTrue(problems.isEmpty(), "problems: " + problems);
         helper.succeed();
     }
 }

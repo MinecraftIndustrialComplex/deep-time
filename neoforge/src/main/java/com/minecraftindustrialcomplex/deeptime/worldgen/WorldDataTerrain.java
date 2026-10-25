@@ -109,10 +109,13 @@ public final class WorldDataTerrain implements TerrainSource {
                     WorldData wd = data();
                     var spec = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Spec.of(wd, cell);
                     var none = com.minecraftindustrialcomplex.deeptime.worlddata.Water.Kind.NONE;
+                    // a cube world's bodies stay on its faces, cut and sealed at a turning edge (Magma.Seam)
+                    Magma.Faces faces = wd.projection() instanceof com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Cube cp
+                            ? (x, z) -> cp.cube().faceOfBlock(x, z) != null : Magma.Faces.ALL;
                     magma = Magma.build(wd.volcanoes().list(), magmaRules(), (x, z) -> wd.height(wrapX(x), z),
                             (x, z) -> com.minecraftindustrialcomplex.deeptime.worlddata.Water.column(wd, spec, wrapX(x), z).kind() != none,
                             wd.circumference(), seaLevel, lava().floodY(minY, seaLevel), minY, wd.manifest().mPerBlockH(),
-                            wd.manifest().mPerBlockV());
+                            wd.manifest().mPerBlockV(), faces);
                     long lakes = magma.bodies().stream().filter(Magma.Body::lake).count();
                     long molten = magma.bodies().stream().filter(b -> b.chamberRh() > 0).count();
                     com.minecraftindustrialcomplex.deeptime.DeepTime.LOGGER.info(
@@ -350,6 +353,16 @@ public final class WorldDataTerrain implements TerrainSource {
     @Override
     public boolean cube() {
         return ref.cube();
+    }
+
+    /**
+     * Whether column (x, z) lies on the planet's faces (x wraps): always on a world that is not a cube. Off a
+     * cube's faces a column shows its partner's (the world data folds there, and {@code CubeFill} copies the
+     * partner's chunk), so a census of columns reads the faces only and counts each planet column once.
+     */
+    public boolean onFaces(int x, int z) {
+        return !(data().projection() instanceof com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Cube c)
+                || c.cube().faceOfBlock(x, z) != null;
     }
 
     @Override

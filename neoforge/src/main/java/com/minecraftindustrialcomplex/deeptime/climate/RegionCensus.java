@@ -44,7 +44,8 @@ public final class RegionCensus {
     }
 
     /**
-     * Samples every {@code step} blocks inside the pole edge (|z| ≤ R = C/2π, {@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection#poleZ}).
+     * Samples every {@code step} blocks inside the pole edge (|z| ≤ R = C/2π, {@link com.minecraftindustrialcomplex.deeptime.worlddata.Projection#poleZ});
+     * on a cube world the land counts read the faces only ({@link WorldDataTerrain#onFaces}), the map the whole window.
      *
      * @param mapFile where to write the whole grid (JSON, base64 arrays), or null
      */
@@ -82,7 +83,8 @@ public final class RegionCensus {
                 int p = src.map(s -> s.provinceAt(x, z)).orElse(-1);
                 province[cell] = (short) p;
                 region[cell] = (short) (int) src.map(s -> s.regionAt(x, z)).orElse(-1);
-                if (y > sea) {
+                // The map holds the whole window; the counts a cube world's faces only (a void column shows its partner's).
+                if (y > sea && t.onFaces(x, z)) {
                     String ns = b.unwrapKey().map(key -> key.location().getNamespace()).orElse("?");
                     landByNamespace.merge(ns, 1, Integer::sum);
                     byProvince.computeIfAbsent(p, k -> new TreeMap<>()).merge(ns, 1, Integer::sum);

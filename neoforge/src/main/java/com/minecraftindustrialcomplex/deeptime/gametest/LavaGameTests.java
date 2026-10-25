@@ -2,11 +2,15 @@
 package com.minecraftindustrialcomplex.deeptime.gametest;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
+import com.minecraftindustrialcomplex.deeptime.worldgen.CubeFill;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LavaFeatures;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LavaRules;
 import com.minecraftindustrialcomplex.deeptime.worldgen.Magma;
+import com.minecraftindustrialcomplex.deeptime.worldgen.MagmaPalette;
 import com.minecraftindustrialcomplex.deeptime.worldgen.SeaCliffGuard;
 import com.minecraftindustrialcomplex.deeptime.worldgen.SeaCliffPass;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
@@ -382,6 +386,200 @@ public final class LavaGameTests {
             DeepTime.LOGGER.info("[gametest] magmaUnderActiveVolcanoes rules={} activeVolcanoes={} withMagma={} craterLakes={} "
                             + "underWater={} read={} chunks={}{}", t.magmaRules(), t.data().volcanoes().list().size(), all.size(), lakes,
                     submerged, picked.size(), jobs.size(), line);
+            if (failure != null)
+                helper.fail(failure);
+            helper.succeed();
+        });
+    }
+
+    /** What was read back along one body's turning seams. */
+    private static final class SeamTally {
+        long off, moltenOff, pairs, lava, lavaOpen, mush, mushOpen;
+        boolean ringOff, wetBoxOff;
+        final StringBuilder detail = new StringBuilder();
+        String section;
+    }
+
+    /** The seam columns of one body in one chunk: {x, z, vx, vz, dx, dz, ux, uz} (vx, vz the neighbour off the faces, one step u away). */
+    private record SeamJob(Magma.Body body, List<int[]> cols) {}
+
+    /** Whether any part of a body's lava lies in column (dx, dz): its lake, chamber, conduit or a lens's disc. */
+    private static boolean moltenColumn(Magma.Body b, int dx, int dz) {
+        long d2 = (long) dx * dx + (long) dz * dz;
+        if (b.lake() && d2 <= (long) b.lakeRadius() * b.lakeRadius())
+            return true;
+        if (d2 <= (long) b.chamberRh() * b.chamberRh() || Math.abs(dx) + Math.abs(dz) <= 1)
+            return true;
+        if (b.deep() != null)
+            for (int[] l : b.deep().lenses()) {
+                long ex = dx - l[3], ez = dz - l[4];
+                if (ex * ex + ez * ez <= (long) l[1] * l[1])
+                    return true;
+            }
+        return false;
+    }
+
+    /** A block for a cross-section: L lava, . air, ~ water, B smooth basalt (the shell), M the mush, m a magma block, # other ground. */
+    private static char glyph(BlockState s, BlockState mush) {
+        if (s.is(Blocks.LAVA))
+            return 'L';
+        if (s.isAir())
+            return '.';
+        if (!s.getFluidState().isEmpty())
+            return '~';
+        if (s.equals(mush))
+            return 'M';
+        if (s.is(Blocks.SMOOTH_BASALT))
+            return 'B';
+        if (s.is(Blocks.MAGMA_BLOCK))
+            return 'm';
+        return '#';
+    }
+
+    /**
+     * A magma body is sealed at a turning seam of a cube world's net ({@link Magma}, cube-world-game.md):
+     * off the faces a chunk is a turned copy of its partner face's chunk ({@code CubeFill}, SCL-210),
+     * which holds none of this body's shell, so a body that reaches past a turning edge must keep its
+     * lava and its altered hot rock off the face's edge columns. On {@code deeptime:test_planet_caves}
+     * every body whose reach crosses off the faces is found, and every pair of a face column and its
+     * neighbour off the faces in its reach is read back through the carving step over the body's
+     * height: {@code lavaOpen} (lava in the face column beside air or water in the copy) and
+     * {@code mushOpen} (the mush's own block there beside air or water) must be 0. The line logs, per
+     * body, its columns off the faces ({@code off}) and those under its lava ({@code moltenOff}), whether
+     * its crater-lake ring or its wet test (two blocks round the vent) would read past the edge, and a
+     * cross-section through the first open lava face (rows from two blocks above it to two below; the
+     * seam between the fourth and fifth glyph). A planet with no body near a turning edge passes with a
+     * line saying so.
+     */
+    @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
+    public static void magmaSealedAtTurningSeams(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel().getServer().getLevel(GameTestSupport.TEST_PLANET_CAVES);
+        if (level == null) {
+            helper.fail("level " + GameTestSupport.TEST_PLANET_CAVES.location() + " does not exist");
+            return;
+        }
+        if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g && g.terrain() instanceof WorldDataTerrain t)) {
+            helper.fail("test_planet_caves is not generating from world data");
+            return;
+        }
+        var settings = g.generatorSettings().value();
+        int minY = settings.noiseSettings().minY(), sea = settings.seaLevel();
+        Magma magma = t.magma(g.waterReach(), minY, sea);
+        int lakeZoneTop = Math.max(t.lava().highestLakeY(minY), t.lava().floodY(minY, sea));
+        List<Magma.Body> all = magma.bodies().stream().filter(b -> b.chamberRh() > 0).toList();
+        CubeLayout cube = t.data().projection() instanceof WorldProjection.Cube cp ? cp.cube() : null;
+        if (cube == null) {
+            DeepTime.LOGGER.info("[gametest] magmaSealedAtTurningSeams the test planet is not a cube world: no turning seam to read");
+            helper.succeed();
+            return;
+        }
+        int[][] n4 = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        List<SeamJob> jobs = new ArrayList<>();
+        java.util.Map<Magma.Body, SeamTally> tallies = new java.util.LinkedHashMap<>();
+        long centreOff = all.stream().filter(b -> cube.faceOfBlock(b.x(), b.z()) == null).count();
+        for (Magma.Body b : all) {
+            int r = b.reach();
+            SeamTally n = new SeamTally();
+            java.util.Map<Long, List<int[]>> byChunk = new java.util.LinkedHashMap<>();
+            for (int dx = -r; dx <= r; dx++)
+                for (int dz = -r; dz <= r; dz++) {
+                    int x = (int) CubeFill.twX(cube, (long) b.x() + dx), z = b.z() + dz;
+                    if (cube.faceOfBlock(x, z) == null) {
+                        n.off++;
+                        if (moltenColumn(b, dx, dz))
+                            n.moltenOff++;
+                        long d2 = (long) dx * dx + (long) dz * dz, ring = b.lakeRadius() + 2;
+                        n.ringOff |= d2 <= ring * ring;
+                        n.wetBoxOff |= Math.abs(dx) <= 2 && Math.abs(dz) <= 2;
+                        continue;
+                    }
+                    for (int[] d : n4) {
+                        int vx = (int) CubeFill.twX(cube, (long) x + d[0]), vz = z + d[1];
+                        if (cube.faceOfBlock(vx, vz) == null)
+                            byChunk.computeIfAbsent(net.minecraft.world.level.ChunkPos.asLong(x >> 4, z >> 4), k -> new ArrayList<>())
+                                    .add(new int[]{x, z, vx, vz, dx, dz, d[0], d[1]});
+                    }
+                }
+            if (n.off == 0)
+                continue;
+            tallies.put(b, n);
+            for (List<int[]> cols : byChunk.values())
+                jobs.add(new SeamJob(b, cols));
+        }
+        if (tallies.isEmpty()) {
+            DeepTime.LOGGER.info("[gametest] magmaSealedAtTurningSeams bodies={} centreOff={} none reaches past a turning edge: nothing to read back",
+                    all.size(), centreOff);
+            helper.succeed();
+            return;
+        }
+        MagmaPalette palette = MagmaPalette.get();
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        int lo0 = level.getMinBuildHeight(), hi0 = level.getMaxBuildHeight() - 1;
+        ChunkSampling.forEach(helper, jobs.size(), i -> {
+            SeamJob job = jobs.get(i);
+            Magma.Body b = job.body();
+            SeamTally n = tallies.get(b);
+            int[] first = job.cols().get(0);
+            ChunkAccess face = level.getChunkSource().getChunk(first[0] >> 4, first[1] >> 4, ChunkStatus.CARVERS, true);
+            int lo = Math.max(lo0, b.minY()), hi = Math.min(hi0, b.maxY());
+            for (int[] c : job.cols()) {
+                int x = c[0], z = c[1], vx = c[2], vz = c[3];
+                ChunkAccess other = level.getChunkSource().getChunk(vx >> 4, vz >> 4, ChunkStatus.CARVERS, true);
+                n.pairs++;
+                for (int y = lo; y <= hi; y++) {
+                    BlockState s = face.getBlockState(pos.set(x, y, z));
+                    boolean lava = s.is(Blocks.LAVA) && y > lakeZoneTop, mush = s.equals(palette.mush(x, y, z));
+                    if (!lava && !mush)
+                        continue;
+                    if (lava)
+                        n.lava++;
+                    else
+                        n.mush++;
+                    BlockState v = other.getBlockState(pos.set(vx, y, vz));
+                    if (!v.isAir() && (v.getFluidState().isEmpty() || v.is(Blocks.LAVA)))
+                        continue;
+                    if (lava)
+                        n.lavaOpen++;
+                    else
+                        n.mushOpen++;
+                    if (n.detail.length() < 400)
+                        n.detail.append(lava ? " lava(" : " mush(").append(x).append(',').append(y).append(',').append(z).append(' ')
+                                .append(b.at(c[4], c[5], y)).append(" by ").append(v.isAir() ? "air" : "water").append(')');
+                    if (n.section == null && lava) {
+                        int ux = c[6], uz = c[7];
+                        StringBuilder sec = new StringBuilder();
+                        BlockPos.MutableBlockPos p2 = new BlockPos.MutableBlockPos();
+                        for (int yy = y + 2; yy >= y - 2; yy--) {
+                            sec.append(" y").append(yy).append(' ');
+                            for (int k = -4; k < 4; k++) {
+                                int sx = (int) CubeFill.twX(cube, (long) x + (long) (k + 1) * ux), sz = z + (k + 1) * uz;
+                                BlockState st = level.getChunkSource().getChunk(sx >> 4, sz >> 4, ChunkStatus.CARVERS, true)
+                                        .getBlockState(p2.set(sx, yy, sz));
+                                sec.append(glyph(st, palette.mush(sx, yy, sz)));
+                            }
+                        }
+                        n.section = sec.toString();
+                    }
+                }
+            }
+            return true;
+        }, () -> {
+            StringBuilder line = new StringBuilder();
+            String failure = null;
+            for (var e : tallies.entrySet()) {
+                Magma.Body b = e.getKey();
+                SeamTally n = e.getValue();
+                var f = cube.faceOfBlock(b.x(), b.z());
+                line.append(String.format(" [id=%d %s at (%d, %d) face=%s reach=%d rh=%d lenses=%d lake=%s off=%d moltenOff=%d ringOff=%s "
+                                + "wetBoxOff=%s pairs=%d lava=%d lavaOpen=%d mush=%d mushOpen=%d%s%s]",
+                        b.id(), b.kind(), b.x(), b.z(), f == null ? "-" : f.face(), b.reach(), b.chamberRh(), b.lensCount(), b.lake(), n.off, n.moltenOff, n.ringOff,
+                        n.wetBoxOff, n.pairs, n.lava, n.lavaOpen, n.mush, n.mushOpen, n.detail, n.section == null ? "" : " section" + n.section));
+                if (failure == null && n.lavaOpen + n.mushOpen > 0)
+                    failure = "volcano " + b.id() + ": at a turning seam its lava faces air or water " + n.lavaOpen + " times and its mush "
+                            + n.mushOpen + " times:" + n.detail;
+            }
+            DeepTime.LOGGER.info("[gametest] magmaSealedAtTurningSeams bodies={} centreOff={} reachPastEdge={} chunks={}{}", all.size(),
+                    centreOff, tallies.size(), jobs.size(), line);
             if (failure != null)
                 helper.fail(failure);
             helper.succeed();
