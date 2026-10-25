@@ -362,6 +362,7 @@ pub fn step(
             continue;
         };
         *world.globals.entry(MYR_GLOBAL.to_owned()).or_insert(0.0) += env.dt_myr;
+        pr.tip = tip.to_array();
         match plan {
             Plan::None => {}
             Plan::Stall => {
@@ -369,11 +370,11 @@ pub fn step(
                 continue;
             }
             Plan::Go(adv) => {
+                // The tip moves to the broken stretch's end.
                 apply_advance(state, world, pos, env, &mut pr, &adv);
                 changed = true;
             }
         }
-        pr.tip = tip.to_array();
         kept.push(pr);
     }
     state.propagations = kept;
@@ -602,30 +603,44 @@ fn carry_on(v: &View, env: &Env, pr: &mut Propagation) -> Option<(Plan<Advance>,
     if pull < strength {
         return Some((Plan::None, x));
     }
-    Some((plan_advance(v, env, kp, u, tip, u_near, inward), x))
+    Some((plan_advance(v, env, kp, u, tip, u_near), x))
 }
 
-/// Plans an advance: K''s floor from the tip back to U, cut off the rest of K' by a tear from
-/// the tip away from the continent (PLT-656).
-fn plan_advance(
-    v: &View,
-    env: &Env,
-    kp: u32,
-    u: u32,
-    tip: usize,
-    u_near: usize,
-    inward: DVec3,
-) -> Plan<Advance> {
+/// Plans an advance: the stretch's end P' is K''s coast floor within [`START_REACH_SPACINGS`]
+/// of the tip, the farthest from U (one lattice step along the margin, as at the start); K''s
+/// floor from the tip to a tear from P' away from the continent goes to U, P' with it
+/// (PLT-656).
+fn plan_advance(v: &View, env: &Env, kp: u32, u: u32, tip: usize, u_near: usize) -> Plan<Advance> {
     let (st, pos) = (v.st, v.pos);
     let n = st.samples.len();
-    let cont = v.continent(tip, kp);
-    let Some(tear) = v.tear(tip, -inward, kp, u_near) else {
+    let u_tree = Tree::over(pos, |i| v.visible(i, u));
+    let to_u = |i: usize| {
+        u_tree
+            .nearest(pos[i])
+            .map_or(f64::INFINITY, |(_, d2)| angle_of_chord2(d2))
+    };
+    let end = v
+        .vis
+        .within(pos[tip], START_REACH_SPACINGS * v.sp)
+        .into_iter()
+        .map(|(i, _)| i as usize)
+        .filter(|&i| v.coast[i] && v.plate[i] == kp)
+        .max_by(|&a, &b| to_u(a).total_cmp(&to_u(b)).then(b.cmp(&a)));
+    let Some(p) = end else {
+        return Plan::Stall;
+    };
+    let Some(inward) = v.toward(pos[p], |j| v.land(j, kp)) else {
+        return Plan::Stall;
+    };
+    let cont = v.continent(p, kp);
+    let Some(tear) = v.tear(p, -inward, kp, u_near) else {
         return Plan::Stall;
     };
     let mut moved = vec![false; n];
     flood(v.geo, &mut moved, &[tip], |a, b| {
         v.visible(b, kp) && !cont[b] && (a == b || !tear.cuts(a, b, pos))
     });
+    moved[p] = true;
     let follow = hidden_follow(v, kp, &moved);
     for (i, m) in moved.iter_mut().enumerate() {
         if v.plate[i] == kp && st.samples[i].is_hidden() {
@@ -652,6 +667,7 @@ fn plan_advance(
     let u_before = count_pieces(v.geo, &v.plate, u, |i| v.plate[i] == u);
     let k_after = count_pieces(v.geo, &lab, kp, |i| lab[i] == kp);
     let u_after = count_pieces(v.geo, &lab, u, |i| lab[i] == u);
+    let reach_stretch = pos[p].angle_between(pos[tip]) + 0.75 * v.sp;
     let clean = moved[tip]
         && left >= min_samples(env, n)
         && k_after <= k_before
@@ -659,12 +675,12 @@ fn plan_advance(
         && !stretch.is_empty()
         && stretch
             .iter()
-            .all(|&i| pos[i].angle_between(pos[tip]) <= v.reach);
+            .all(|&i| pos[i].angle_between(pos[tip]) <= reach_stretch);
     if !clean {
         return Plan::Stall;
     }
     Plan::Go(Advance {
-        tip,
+        tip: p,
         moved: (0..n as u32).filter(|&i| moved[i as usize]).collect(),
         stretch: stretch.len(),
     })
@@ -963,6 +979,38 @@ mod tests {
         st
     }
 
+    /// Prints the plates around the junction (debugging).
+    fn map(st: &PlateState, pos: &[DVec3]) {
+        let mut la = 6.0;
+        while la > -44.0 {
+            let mut row = String::new();
+            let mut lo = -24.0;
+            while lo < 44.0 {
+                let (a, b) = (f64::to_radians(la), f64::to_radians(lo));
+                let x = DVec3::new(a.cos() * b.cos(), a.cos() * b.sin(), a.sin());
+                let i = (0..pos.len())
+                    .min_by(|&i, &j| x.distance(pos[i]).total_cmp(&x.distance(pos[j])))
+                    .unwrap();
+                let s = &st.samples[i];
+                let c = match (st.plate_of(i), s.kind == CONTINENTAL, s.is_hidden()) {
+                    (U, _, true) => 'h',
+                    (U, true, _) => 'L',
+                    (U, _, _) if s.flags & TRENCH != 0 => 't',
+                    (U, _, _) => '.',
+                    (KP, true, _) => 'C',
+                    (KP, _, true) => 'k',
+                    (KP, _, _) => 'K',
+                    (O, _, _) => 'o',
+                    _ => 'x',
+                };
+                row.push(c);
+                lo += 1.6;
+            }
+            eprintln!("{la:6.1} {row}");
+            la -= 1.6;
+        }
+    }
+
     /// Each plate is one lattice piece and every sample's plate is alive.
     fn clean(st: &PlateState, geo: &Geo) {
         let plate: Vec<u32> = (0..N).map(|i| st.plate_of(i)).collect();
@@ -995,6 +1043,7 @@ mod tests {
             (U, KP)
         );
         let sp = Norm::new(6370.0, 6371.0, N).spacing_rad().to_degrees();
+        map(&st, &pos);
         let mut tear_lon: Vec<f64> = Vec::new();
         for (i, &x) in pos.iter().enumerate() {
             let (la, lo) = lat_lon(x);
@@ -1112,6 +1161,7 @@ mod tests {
         assert_eq!(pr.advances, 0, "one step is short of the critical convergence");
         assert!((pr.converged_km - 76.0).abs() < 8.0, "{}", pr.converged_km);
         step(&mut st, &mut world, &geo, &pos, &e).unwrap();
+        map(&st, &pos);
         assert_eq!(st.propagations.len(), 1, "the propagation goes on");
         let pr = &st.propagations[0];
         assert_eq!(pr.advances, 1, "advanced once");
