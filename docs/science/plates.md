@@ -8224,7 +8224,7 @@ through the label square to the front's normals (PLT-310), each weighted by its 
 straight front (PLT-530), and each front sample covers its share along it, centred on it. The arc
 flag, the axis-gap rule (PLT-043), the arcs' budgets (PLT-286) and the band measure (PLT-554) follow
 the magma. The cordillera (PLT-048, PLT-320), the subduction uplift and the forearc (PLT-542) still
-run on the whole distance field. No constant of its own.
+run on the whole distance field (until step 11, below). No constant of its own.
 
 **The unit test first** (`the_arcs_band_stops_at_the_slabs_ends`, which takes over step 9's
 `the_arcs_band_runs_round_a_fronts_ends` as its off half; written and committed before the law,
@@ -8319,3 +8319,138 @@ ends, and it is not to be made up with a knob. What is left between the band and
 the lattice's metric along the front (the band 0.89 of the straight front, 11 % short), which the
 coordinator ruled out of this step.
 
+
+### Step 11: the margin stops at the slab's ends (PLT-562, 2026-10-24)
+
+Step 10 stopped the arcs' magma at the slab's ends and left the cordillera, the subduction uplift
+and the forearc on the whole distance field, so they still ran round each end of a front as the
+arcs had. The coordinator's call: they stop at the slab's ends too, by step 10's test; the unit test
+first on the same straight-front fixture, then the law, on by default if the test holds; one
+cumulative 8-run arm, read against base10 (master's 24 runs on 37c894cc0de0: fl-ends' 8 and 16
+more) and against fl-ends, its matched 8.
+
+**The physics.** Step 10's sources show that past a slab's edge there is no slab (Thorkelson &
+Breitsprecher 2005, p. 27; Johnston & Thorkelson 1997, abstract; Levin et al. 2002, abstract), and
+each process this step stops is driven by the slab in the model's own laws: the subduction uplift is
+Cortial's u = u_0 f(d) g(v) h(z̃), a function of the distance to the front over the slab (PLT-036);
+the cordillera thickens a continental arc above an oceanic slab by crust shortened into it (PLT-048,
+PLT-320); subduction erosion takes the forearc's crust at the plate interface, where the subducting
+plate abrades it (PLT-441, Clift & Vannucchi 2004); one-way subduction holds the slab under the
+forearc (PLT-542). With no slab there is no forearc, no arc crust thickening and no slab-driven
+shortening. No source read states the margin's end at the slab's edge as a rule; it follows from
+each of these standing over the slab, as the arc does (step 10).
+
+**The law** (`tectonics.margin_slab_ends`, on by default; `subduction::fronts_finish`,
+`subduction::erode_forearcs`). A sample the fronts' distance field reaches takes the subduction
+uplift and the folds' increment only where it stands over its front's slab by step 10's test
+(`subduction::over_the_slab`, now computed when either switch is on). The cordillera's range gets
+no demand past the ends, and the crust behind a range past the ends gives none to it, so the
+contact's budget (PLT-048) is met from the sources over the slab alone. The one-way subduction's
+forearc (PLT-542) holds only what lies over the slab, and subduction erosion's band (PLT-441) takes
+only from samples over it. The trench's retreat (PLT-522) is unchanged: it works on the erosive
+front samples themselves. The subduction-zone flag, the convergence, the obliquity and the slab's
+age `fronts_finish` writes on each sample it reaches still run on the whole distance field.
+No constant of its own.
+
+**The test's geometry, and the law's two tiers.** Step 10's test read a front's line over the arc
+band's reach (`arc_distance_km` and two `arc_width_km`, 440 km by default). The uplift and the range
+reach `subduction_distance_km` (1,800 km in the test's preset), and there a sample's label, its
+nearest front sample by the lattice's distance, can lie along the front by some hundreds of km,
+since the lattice's distance runs up to 2/√3 longer than the straight line by the edges' direction.
+Two changes came out of the test. First, a sample's foot: from its label, the law steps front
+sample by front sample (within two lattice edges) to the front sample nearest it on the sphere, and
+reads the front's line there. Second, the line's reach: the lattice gives a front's direction at
+its end only to a few degrees over the band's 440 km, where the normals turn, and that angle moves
+the end's meridian by the sample's distance times it. Read over the band's reach, the uplift and the
+range ran on up to 2.1 spacings past a 40-degree tilted front's end. So a sample within the band's
+reach of the front reads the line over that reach, and one further out reads it over
+`subduction_distance_km`, each with two lattice spacings more. A curved front's far field reads the
+chord of its last `subduction_distance_km`.
+
+**The unit test first** (`the_margin_stops_at_the_slabs_ends`; the switch, off and without its law,
+and the test committed first, 0e01e4bb; the law 23477400). Step 10's fixture (40,000 samples, 113 km
+apart; `a_front_of_known_length`, plate 1 converging at 80 mm/yr under no sediment, an erosive
+margin), fronts of 20 and 40 degrees on the equator and tilted 60 degrees, `arc_slab_ends` on in
+both halves. Two runs per case. The first sets no cordillera, the arc 400 km behind the front (twice
+the default: at this spacing a forearc band to 200 km reaches past the meridians no further than
+the 1.25 spacings the front itself reaches, 0.50 to 1.46 measured, and the test could not tell on
+from off) and an erosion of a hundred columns' spare crust per spacing of front, so that every
+forearc's band goes down to the ocean's column; it measures the uplift, the folds, the forearc's
+loss and the one-way forearc. The second sets the cordillera on and no erosion and measures the
+range (each sample's change of thickness less its arc crust). The farthest change past the
+meridians of the front's ends, in spacings:
+
+| Front | The uplift and the folds, off / on | The forearc's loss, off / on | The one-way forearc, off / on | The range, off / on |
+|---|---|---|---|---|
+| equator, 20 degrees | 13.93 / 0.29 | 2.58 / 0.29 | 3.36 / 0.29 | 13.93 / 0.25 |
+| equator, 40 degrees | 15.80 / 0.48 | 3.08 / 0.22 | 4.07 / 0.41 | 15.80 / 0.48 |
+| tilted, 20 degrees | 13.81 / 0.05 | 2.53 / 0.03 | 3.38 / 0.03 | 13.81 / 0.05 |
+| tilted, 40 degrees | 15.13 / 0.79 | 3.71 / 0.72 | 4.36 / 0.72 | 15.13 / 0.79 |
+
+Off, 266 to 314 samples beyond 1.25 spacings past the meridians take the uplift and the range, and
+7 to 17 the forearc's loss and the one-way hold; on, none. A spacing or more inside the meridians
+the uplift, the folds, the forearc's loss and the one-way forearc are the same sample by sample. The
+range there takes in what it took off (the gain 1.0000 of off's, the worst sample 0.0000 from it),
+and the crust behind it thins 1.52 to 1.95 times as much (equator 20 degrees 1.868, 40 degrees
+1.527; tilted 1.948 and 1.522): the contact's budget no longer draws on the crust round the ends.
+The test bounds: off beyond 1.25 spacings, on none beyond them, the four measures inside unchanged,
+the range's gain inside within 0.05 of off's at its worst sample, and the crust behind it thinned
+no less than off.
+
+The foot and the far tier changed step 10's arcs too. The farthest arc past the meridians in
+`the_arcs_band_stops_at_the_slabs_ends`, step 10's value / now: equator 10 degrees 0.24 / 0.08, 20
+degrees 0.29 / 0.13, 40 degrees 0.41 / 0.41, 60 degrees 1.02 / 0.92; tilted 10 degrees 0.38 / 0.16,
+20 degrees 0.34 / 0.03, 40 degrees 1.01 / 0.72, 60 degrees 0.34 / 0.03. The band is the same to
+three places but for the equator's 20 degrees (0.848 / 0.847 of the straight front). Two collision
+tests' worlds move with the law: the weld test's scattered continents weld on 10 of the first 24
+seeds and the supercontinent on 6 (the test keeps seed 1; the recording test keeps seed 2).
+
+**The arm** (fl-margin, cumulative on step 10: the law on, everything else master's at 2dd50093;
+8 runs, seeds 1 to 4, both starts, 16k samples, 1000 Myr, the same arguments as fl-ends, key
+f42d7b12531b; read against base10, master's 24 runs on 37c894cc0de0, and against fl-ends, its
+matched 8; medians, Mann-Whitney p in brackets):
+
+| Measure | base10 (24) | fl-ends (8) | fl-margin (8), p against base10 / fl-ends |
+|---|---|---|---|
+| Land | 0.294 | 0.294 | 0.285 (0.59 / 0.88) |
+| Largest landmass | 0.150 | 0.132 | 0.166 (1.0 / 0.80) |
+| Continental crust under the sea | 0.246 | 0.205 | 0.252 (0.40 / 0.44) |
+| Land above 2 km | 0.112 | 0.112 | 0.133 (0.070 / 0.23) |
+| Coast with high ground | 0.226 | 0.233 | 0.233 (0.78 / 0.88) |
+| Land under ice | 0.095 | 0.095 | 0.121 (0.59 / 0.80) |
+| Collisions per 100 Myr | 1.80 | 1.65 | 1.85 (0.95 / 0.43) |
+| Continental crust's net change | -0.068 | -0.077 | -0.073 (0.20 / 0.96) |
+| Criteria met per run, median and mean | 5, 5.00 | 5, 5.00 | 5, 5.00 (1.0 / 1.0) |
+| Sea over the datum after 100 Myr / at the end, m | 320 / 472 | 264 / 403 | 243 / 434 |
+| The guard's worst, m from the sea | 10,082 | 10,169 | 9,978 (1.0 / 0.88) |
+| Steps beyond 2 Earth reliefs | 0 | 0 | 0 |
+| Plate cells' largest excess over Airy, m | 2,641 | 2,318 | 2,869 (0.59 / 0.083) |
+
+No census measure moves against base10's 24 runs or against fl-ends (p 0.070 to 1.0); the land above
+2 km comes nearest (0.133 against 0.112, p 0.070 against base10). The guard binds on no step of any
+run and no step goes beyond 2 reliefs.
+
+What the law takes away is the margin round the ends. The crust shortened into the cordilleras over
+a run falls from 0.84 to 0.61 ×10⁹ km³ (medians, fl-ends against fl-margin), down 27 %: the
+cordillera's distance field reached 800 km round each end of a front, a quarter disc beside each
+end, and much of the range stood there. The forearcs' erosion barely moves (continental crust 0.148
+to 0.142 ×10⁹ km³ over a run, other crust 0.245 to 0.243; the area book's `forearc` part -0.142 ×10⁹
+km³ against base10's -0.144), since the band to 200 km reaches little past an end. In the area book (base10's 24
+runs against fl-margin's 8) the collapse's part of the continental area falls from 0.310 to 0.276 and
+the belts' volume over a run from 12.7 to 12.1 ×10⁹ km³. The arcs keep step 10's band (0.888 times the
+arcs' straight front, fl-ends 0.891) and rate (14.4 to 13.9 km³ per km and Myr on continental crust,
+32.4 to 31.3 on oceanic, the convergence factor included). One-way subduction now holds only over the
+slab, so a little more of the crust that went under shows again (0.063 of it against 0.046 on
+fl-ends, mostly where the cover left it: 0.050 against 0.033), and the escaped ocean floor is older
+(74.5 Myr against 62.7). The plates against fl-ends (matched 8): 26.4 alive against 27.3 (p 0.34),
+the sum of perimeters over the cap perimeters 1.763 against 1.758 (p 0.57; Bird 1.510), the
+ocean-ocean share of the subducting front 0.494 against 0.483 (p 0.38), the mean convergence across
+the oceanic front 39.3 mm/yr against 40.4 (p 0.28). The plate check passes 197 of its 264
+run-checks against fl-ends' 195 (base10 567 of 792).
+
+**Recommendation.** On by default (done in this branch): the law is the margin standing over its
+slab, as the arc does; the test bounds hold, nothing diverges or binds on the pool, and no V1 measure
+moves. The cordillera's lost crust is the range that stood round the slab's ends, not to be made up
+with a knob. Left on the whole distance field, and a question for the coordinator: the
+subduction-zone flag and the convergence, obliquity and slab age written on each reached sample
+(their readers, the volcanoes and the deposits, would see a subduction zone past a front's ends).
