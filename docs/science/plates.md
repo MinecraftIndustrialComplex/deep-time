@@ -18,7 +18,7 @@ The planet's outer shell is split into rigid plates that move, pull apart at rid
 | [PLT](ledger/PLT.md) | crust and isostasy (plates) | PLT-121 to PLT-142, PLT-208, PLT-254 to PLT-259, PLT-261 to PLT-264, PLT-277 to PLT-284, PLT-287 to PLT-288, PLT-294 (44; PLT-294 the switch for the transition's ocean side, ocean crust or the continent's rock, 2026-10-19, on in the shipped presets since 2026-10-20; PLT-287 and PLT-288 the fastest thickening and rise, 2026-10-18; PLT-283 the gap budget and PLT-284 the accretion's height, 2026-10-17; PLT-254 to PLT-259 the orogenic collapse and the thickest crust, 2026-10-03; PLT-261 to PLT-264 the ocean–continent transition, 2026-10-04; PLT-277 spreading before foundering, 2026-10-05; PLT-278 to PLT-282 the eclogite root and whole-column isostasy, 2026-10-06) |
 | [PLT](ledger/PLT.md) | plate-check targets | PLT-143 to PLT-173, PLT-213 to PLT-221, PLT-265, PLT-310 to PLT-311 (43; PLT-310 and PLT-311 the boundary's normal and Bird's transform test, the land-shape task, 2026-10-20; PLT-265 Earth's passive margins, the transition's comparison) |
 | [PLT](ledger/PLT.md) | designed, not yet coded | PLT-174 to PLT-180, PLT-191 to PLT-202 (19) |
-| [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190 (10) |
+| [PLT](ledger/PLT.md) | the force balance's settings, coded and recorded, not applied (page [plate-forces.md](plate-forces.md); constants in [FRC](ledger/FRC.md)) | PLT-181 to PLT-190, PLT-585 (11; PLT-585 Forsyth & Uyeda's balance, a switch kept off, section "Plate speed, phase 2", 2026-10-25) |
 | [PLT](ledger/PLT.md) | the continents census's Earth references and measuring choices (`tools/review/continents_census.py`, section "White patches, drowned continents and coastal high ground", 2026-10-21) | PLT-360 to PLT-363 (4) |
 | [PLT](ledger/PLT.md) | the crust flux into collision fronts: the crust budget's measures and Earth's references (section "The crust flux into collision fronts", 2026-10-21) | PLT-401 (1) |
 | [PLT](ledger/PLT.md) | the trench budget: sediment subduction, subduction erosion and where it acts, the trench's release, the measures and Earth's references (section "The trench budget", 2026-10-22; switches, off by default) | PLT-440 to PLT-444 (5) |
@@ -9148,3 +9148,281 @@ What the rows say:
    it is the largest single fall, and it acts as a drag on the plates without a slab. Option 1 takes
    it off. Off on its own it gives about +2 mm/yr in one step's balance, and its row records the
    speed guard binding on 3 of 24 seeds of the 8k test planet with the fixed share.
+
+## Plate speed, phase 2: Forsyth & Uyeda's balance (PLT-585, 2026-10-25)
+
+The coordinator approved recommendation 1 above and held recommendation 2 (the speed scale's
+calibration) for Ben, so `plate_speed_scale_mm_yr` is untouched. The brief: take the drives and
+resistances of Forsyth & Uyeda 1975's Table 6 together; build the transform and colliding
+resistances as speed-independent friction links of the collision link's form, on transforms and
+colliding boundaries only; replace PLT-189's viscous boundary resistance on every boundary, since
+its own citation does not support it; turn PLT-540 off in the same change; and let the level follow
+from their terminal velocity with no gain or knob added. One switch, unit tests first, on by default
+once correct.
+
+The outcome: built, and correct against the paper in its unit tests, but **off by default**. On the
+pool (arm `sp-fu`, below) the speed guard (PLT-022) binds in all 8 runs, against none of base12's
+24, and CLAUDE.md puts physics on by default only with "no divergence or guard failure on the pool".
+
+### What was built
+
+One switch, `tectonics.forsyth_uyeda_balance` (PLT-585). With it, `forces::Coeffs::new` reads none
+of the old law's sizes (`plate_speed_scale_mm_yr`, `slab_resistance`, `boundary_resistance`,
+`keel_drag`, `slab_suction_share`, `suction_saturates`): every size is Table 6's (FRC-033) against
+the model's reference pull F_sp (3 × 10¹³ N/m at Earth's gravity, FRC-002), which stands for their
+6.43 (FRC-034).
+
+| Term | Table 6 (per km; the drags per km² per cm/yr) | In the model |
+|---|---|---|
+| Slab pull F_SP | 6.43 | F_sp per metre of oceanic front, as before (PLT-182) |
+| Slab resistance F_SR | 0.89 per cm/yr | F_sp / v_t per metre of trench, v_t = 6.43 / 0.89 cm/yr = 72.2 mm/yr; on the subducting plate only, against its speed towards the trench (p. 183) |
+| Mantle drag F_DF | 0.82 × 10⁻⁵ per cm/yr | the slab resistance per km of trench times 0.82 × 10⁻⁵ / 0.89 per km²: on FRC-016's reference plate the slab resistance is 8.9 times the basal drag (the old law's 3) |
+| Continental drag F_CD | 5.65 × 10⁻⁵ per cm/yr | beyond the mantle drag: the keel factor (0.82 + 5.65) / 0.82 = 7.89 (the old law's 3) |
+| Suction F_SU | 0.50 | 0.50 / 6.43 = 0.078 of the pull, independent of speed (pp. 170-171, 195; the old law's 0.3; PLT-540 not read) |
+| Transform resistance F_TF | 0.36, against the relative motion | a friction link of 0.36 / 6.43 F_sp per metre on transforms |
+| Colliding resistance F_CR | 0.16, against the relative motion | a friction link of 0.16 / 6.43 F_sp per metre on colliding boundaries, trenches and collision fronts alike ("no distinction between the resisting force at trenches and the resisting force at mountain belts", p. 170) |
+| Ridge push F_RP | 0.36 | not taken: the model's column energy stays (PLT-187), about 0.10 of the pull at the pool preset's ridge and old floor against Table 6's 0.056 |
+| (viscous boundary resistance) | not in their model | none (PLT-189 is not read) |
+
+The collision resistance (the belt's weight and the dragged-down crust's buoyancy, FRC-018, FRC-030)
+and the edge energy are kept: they are the model's physics for what Table 6 lumps into F_CR and F_RP,
+and the brief named only the transform and colliding resistances. The speed guard (PLT-022,
+250 mm/yr) is unchanged.
+
+**The friction links** (FRC-035). Forsyth & Uyeda's F_TF and F_CR are forces per unit length "opp.
+rel. motion" whatever the speed, acting "with equal strength on both plates" (p. 169). Each is a
+link between the two plates at the boundary sample along their relative velocity, of coefficient
+k = F / max(|Δv|, floor) with FRC-011's floor of 1 mm/yr, `Balance::add_friction`, the collision
+link's form: linearised about the step's motion, so the fixed point the motion relaxes to is the
+plastic answer, and a drive smaller than the friction leaves the boundary slipping under the floor.
+
+**Which boundary is which.** Forsyth & Uyeda's own rule, the one their strengths were fitted with
+(p. 183): "We have arbitrarily chosen φ = 60° ... as the dividing point between classifying a
+boundary segment as a convergent boundary, I_CR, or as a transform fault, I_TF", φ = tan⁻¹(V_PAR /
+V_PER) (`forces::fu_transform`). So a segment within 30 degrees of strike-slip is a transform; one
+whose plates converge across it otherwise is colliding; one where they part has no friction (they
+have no ridge resistance). V1 gap 2's boundary types (Bird's 20 degrees, PLT-311) are not used here.
+
+**Where it acts.** A trench's friction is counted once, at the front the overriding sample has, over
+the front's metres (PLT-560's share of the straight front), as its pull and suction are, against the
+plate going under. Every other stretch of boundary with a visible plate beyond it counts from both
+sides, half of its share each (PLT-530), by its own normal (PLT-310); the side going under in an
+active contact skips it, since its front counts it. The first build counted every boundary by the
+visible-neighbour rule alone and missed most trenches: at a mature trench the subducting plate's
+samples beside the trench have gone under and see no other plate, and the overriding plate's front
+sample was skipped as a front, so a small plate over a trench had no friction at all. The force
+record books the friction in its `boundary_resistance` column.
+
+**PLT-540 and the pinned fixtures.** PLT-540 (`suction_saturates`) is not read under PLT-585
+(`Coeffs::new`), so one switch chooses the whole law: Forsyth & Uyeda's suction is independent of
+speed, and PLT-540's premise is `from-memory` and unsupported by the trench-migration studies read
+(above). The brief turned PLT-540 off in the same change; with PLT-585 off by default, turning it
+off by itself would change the default planet with nothing in its place, so it stays on with the
+old law. The lattice reference tests (`the_reference_plate_on_the_lattice_*`, `old_law()`) test the
+speed scale's own law, and the 8k test planet's collision, suture and recording fixtures pin the old
+law (`forsyth_uyeda_balance` false, `suction_saturates` true) whatever the defaults are: under
+PLT-585 the guard binds on that planet (below).
+
+### Unit tests against the paper (`forces.rs`)
+
+- `the_resistances_are_forsyth_and_uyedas_table_6`: the slab's terminal velocity 72.2 mm/yr against
+  the paper's "7.0 cm/yr" (p. 189; their "(= 5.65/0.82)" is the ratio of their two drags, 6.43 /
+  0.89 is 7.2), within 5 %; the continental drag 7.89 times the oceanic ("approximately eight
+  times", p. 189); the suction and the two frictions their shares of the pull; the slab resistance
+  8.9 times the drag on FRC-016's reference plate; none of the old law's settings read, PLT-540
+  included.
+- `the_reference_plate_moves_near_its_slabs_terminal_velocity`: FRC-016's reference plate (the
+  starting plates' mean area, 3,000 km of trench of a full-length 80-Myr slab) moves at 66.3 mm/yr
+  without friction (65.1 by v_t s / (1 + s), s = 9.15, on a flat plate) and at 56.1 mm/yr with
+  friction all round its rim, after 13 solves; Forsyth & Uyeda's plates attached to a slab move at
+  "6-9 cm/year" (p. 178), their terminal velocity "roughly coincident with the average velocity of
+  oceanic plates attached to a slab" (p. 189). On the cap the 60 degree rule makes 84 of the rim's
+  187 samples transforms and 103 colliding; the friction as fixed forces against the motion gives
+  the same answer.
+- `friction_resists_with_its_force_whatever_the_speed`: a drive larger than the friction moves the
+  plate as a fixed force would; a smaller one leaves it under the floor speed.
+- `friction_holds_back_a_plate_with_no_slab`: the runaway the diagnosis found. A plate of the
+  reference plate's size with no slab, pushed by a ridge along the back 140 degrees of its rim at the
+  pool preset's ridge and floor: the old law 19.2 mm/yr; Table 6 without friction 146.2 (the
+  runaway); with friction 37.6; at Table 6's own ridge push (0.36 per km) 0.81, held at the floor
+  ("continental drag is the primary regulator of the velocity of plates not attached to downgoing
+  slabs", p. 190). Continental: the old law 12.5, with friction 4.8.
+
+The terminal-velocity test builds its own trench on a cap and reads no lattice fronts, so it does
+not depend on the front set (the front lane's current-geometry fronts change only the planet's).
+
+### The planet (one step's balance, iterated to its fixed point)
+
+`what_sets_the_planets_plate_speed` again (build/speed/diag7.sh), the same two planets and looks as
+above (`earthlike_quick_16k`, 100,000 samples, the plate stage alone, 11 looks from 100 to 600 Myr),
+the friction iterated to its fixed point at each look:
+
+| Variant | Supercontinent, seed 1: RMS / pulled / rest | Scattered continents, seed 2 |
+|---|---|---|
+| the old law (PLT-585 off, PLT-540 on) | 26.7 / 27.7 / 19.5 | 28.5 / 29.6 / 15.5 |
+| Table 6 without the friction (phase 1's row) | 62.7 / 42.3 / 134.6 | 54.1 / 45.6 / 94.7 |
+| **Forsyth & Uyeda's balance (PLT-585)** | **50.2 / 36.4 / 97.0** | **44.2 / 38.3 / 68.7** |
+| PLT-585 at Table 6's ridge push (the edge energy scaled to 0.056 of the pull) | 41.2 / 32.4 / 69.6 | 33.1 / 34.2 / 21.9 |
+
+The level is in CHK-020's band with no knob, and the pulled plates move at 36 to 38 mm/yr (the old
+law's 28 to 30). The friction takes the plates without a slab from 135 and 95 to 97 and 69 mm/yr,
+but not down to the pulled plates' speed: the contrast Forsyth & Uyeda's Table 1 and Zahirovic et al.
+2015 show (slab plates two to three times the others) is reversed on the planet.
+
+**Why: the overriding oceanic plates.** The rest's RMS² is mostly oceanic plates of 0.1 to 0.5
+starting plates (0.65 and 0.51 of it). They lie over trenches. Table 6's suction draws an overriding
+plate with 0.50 per km of trench, its colliding resistance at the same trench holds it with 0.16, the
+slab resistance acts only on the plate going under ("the component of motion of the plate relative
+to the mantle which is directed perpendicular to the strike of the trench", p. 183, for the
+subducting plate), and nothing else in their model resists the overriding plate's advance but the
+friction on its other boundaries. So 0.34 per km of trench, plus its ridge push, less that friction,
+against the basal drag alone, 0.82 × 10⁻⁵ per km² per cm/yr: its speed goes as its trench length
+over its area, as 1 / R. Forsyth & Uyeda's Earth had one such plate, the Caribbean (Table 1: 3.8 ×
+10⁶ km², no continent, 2.4 cm/yr, 3,700 km of trench it overrides, 4,400 km of transform and 4,400 km
+of convergent boundary), and on Table 6 its friction holds it: 0.36 × 4,400 + 0.16 × 4,400 = 2,288
+against a suction of 0.50 × 3,700 = 1,850, 1.24 times (computed). Their other plates without a slab
+are continental (Eurasia, North America, Africa, Antarctica), held by the continental drag. Their
+own words on the term: "In view of the uncertainty of the nature of F_SU, in the present paper we
+modelled it to be velocity independent and perpendicular to the trench, although F_SU caused by the
+secondary flow may be proportional to the descent rate of the slab" (pp. 170-171); models with the
+suction proportional to the slab's descent or to the convergence gave "similar" results (p. 195);
+"The least understood part of our model is the nature of this suction force" (p. 193). Nothing here
+changes it: the brief was Table 6 as a whole.
+
+### The speed guard
+
+On the 8k test planet (`plates_quick_16k`, whose ridge push is several times Earth's;
+`weld_seed_sweep`, 300 Myr, seeds 1 to 24) the guard binds on all 24 scattered seeds and 22 of 24
+supercontinent seeds, 3 to 146 plate-steps a run (under the old law: 0 of the 24 scattered seeds at
+PLT-540's arm). On `earthlike_quick_16k` at 8,000 samples (`where_the_speed_guard_binds`, 300 Myr)
+it binds 0, 21 and 5 plate-steps on scattered 2, supercontinent 4 and scattered 1. The plates it
+holds are the overriding oceanic plates above: no slab pull, the suction about equal to the basal
+drag, and on the smallest (a few samples) a balance answer above 1,000 mm/yr. The collision, suture
+and recording tests on the 8k test planet keep the old law: only supercontinent 11 of the 48 runs
+both welds and stays clear of the guard, and the recording test asserts the guard never binds.
+
+### The arm (`sp-fu` against base12)
+
+One 8-run arm with the switch on (the default at the arm's commit, pool key b301f884308e, master
+05a2850a merged): `earthlike_quick_16k`, both starts, seeds 1 to 4, 1,000 Myr, 2 threads,
+`+DEEPTIME_CRUST_BUDGET=1 +DEEPTIME_CRUST_BUDGET_MAPS=@RUN@/maps`; read against base12 (24 runs) with
+`pool.sh table --base base12 --arm sp-fu` (v1census version 2) and build/speed/speedlevel.py (the
+plate check's speed measures, medians, Mann-Whitney p):
+
+| Measure | base12 (24) | sp-fu (8) | p |
+|---|---|---|---|
+| RMS plate speed, mm/yr | 27.2 | 31.5 | 0.001 |
+| plates with a slab, mm/yr | 49.0 | 50.5 | |
+| plates without one, mm/yr | 21.2 | 24.4 | |
+| collisions per 100 Myr | 1.60 | 1.55 | 0.71 |
+| collision duration p90, Myr | 177.6 | 204 | |
+| land above 2 km (census) | 0.128 | 0.126 | 0.98 |
+| speed guard, steps that bind | 0 in all 24 | 3 to 15 in all 8 (5, 15, 6, 5; 8, 3, 9, 9) | |
+
+The census moves at no measure with p < 0.05: land 0.312 to 0.329 (p 0.11), the largest landmass
+0.189 to 0.245 (p 0.22), continental crust under the sea 0.190 to 0.175 (p 0.24), coast with high
+ground 0.229 to 0.236 (p 0.98), land under ice 0.107 to 0.085 (p 0.25), the continental crust's net
+change −0.069 to −0.059 (p 0.19), criteria met 5 of 7 in both (means 5.04 and 5.12).
+
+Over a whole run the plates move at 31.5 mm/yr, 0.67 of Earth's 47 (PLT-181), not the one-step
+balance's 44 to 50, and the plates with a slab move at twice the speed of the others (50.5 against
+24.4), so the one-step balance's reversed contrast does not last a run. The one-step looks put the
+new law on planets grown under the old one; why a planet grown under the new law is slower was not
+measured. The guard binds too seldom to explain it (3 to 15 of a run's 500 steps), but on a few
+small plates in every run, which is enough to keep the switch off by CLAUDE.md's rule.
+
+**Again on the front on the current geometry** (`sp-fu2`, the same arm with `--set
+tectonics.forsyth_uyeda_balance=true` on the merge of master 05a60997, whose PLT-582 judges fronts on
+the current geometry and drops the stale fronts read through hidden neighbours; key faf1a3, argkey
+f7a070a5). Its control is the front lane's arm `fl-n2th` (PLT-581 and PLT-582 on, the switch off),
+since base13 does not exist yet:
+
+| Measure | base12 (24) | fl-n2th (8) | sp-fu2 (8) | p, sp-fu2 against fl-n2th |
+|---|---|---|---|---|
+| RMS plate speed, mm/yr | 27.2 | 27.5 | 31.9 | 0.001 |
+| plates with a slab, mm/yr | 49.0 | 49.7 | 50.8 | 0.10 |
+| plates without one, mm/yr | 21.2 | 22.9 | 27.9 | 0.002 |
+| collisions per 100 Myr | 1.60 | 1.60 | 1.30 | (0.042 against base12) |
+| collision duration p90, Myr | 177.6 | 196.2 | 158.9 | |
+| land above 2 km (census) | 0.128 | 0.114 | 0.120 | |
+| speed guard, steps that bind | 0 in all 24 | 0 in all 8 | 0 to 16, in 7 of 8 (9, 13, 16, 5; 10, 0, 4, 6) | |
+
+The census against base12: no measure at p < 0.05 but the collisions per 100 Myr, 1.60 to 1.30 (p
+0.042); coast with high ground 0.229 to 0.195 (p 0.24), continental crust under the sea 0.190 to
+0.160 (p 0.31). The current-geometry fronts do not clear the guard: it binds in 7 of the 8 runs, so
+the switch stays off on the merged head too.
+
+**Against base13** (`sp-fu3`, the same arm on the merge of master c47f3056 and 683166ea: the
+critical-taper belt, PLT-600 and PLT-601, with PLT-581 and PLT-582; key 26ea8ec0342f, argkey
+f7a070a5), read against base13 (master c47f3056, 24 runs) with `pool.py table --base base13`
+(v1census version 2; `--measure guard`, the relief guard) and build/speed/speedlevel.py. The plate
+check's `speed_rms_mm_yr` of every arm against base13:
+
+| Arm (8 runs each) | RMS plate speed, mm/yr | p against base13's 24 (26.9) | p against its matched 8 (27.3) |
+|---|---|---|---|
+| sp-fu (the branch before the merges) | 31.5 | < 0.001 | 0.014 |
+| sp-fu2 (master 05a60997 merged) | 31.9 | < 0.001 | 0.001 |
+| sp-fu3 (master c47f3056 merged) | 32.8 | < 0.001 | 0.001 |
+
+| Measure | base13 (24) | sp-fu3 (8) | p |
+|---|---|---|---|
+| plates with a slab, mm/yr | 50.5 | 51.3 | 0.23 |
+| plates without one, mm/yr | 22.6 | 27.3 | < 0.001 |
+| collisions per 100 Myr | 1.70 | 1.20 | 0.097 |
+| collision duration p90, Myr | 191.8 | 163.2 | |
+| land above 2 km (census) | 0.097 | 0.105 | 0.51 |
+| relief guard's worst, m from the sea | 10,047 | 10,188 | 0.57 |
+| speed guard, steps that bind | 0 in all 24 | 0 to 12, in 7 of 8 (4, 5, 12, 2; 0, 6, 2, 8) | |
+
+The census against base13: continental crust under the sea 0.214 to 0.160 (p 0.041), land 0.313 to
+0.331 (p 0.086), the largest landmass 0.166 to 0.221 (p 0.24), coast with high ground 0.196 to 0.218
+(p 0.45), land under ice 0.083 to 0.128 (p 0.24), the crust's net change −0.042 to −0.049 (p 0.43),
+criteria met 5 of 7 in both (means 5.38 and 5.12); the sea over the datum after 100 Myr and at the
+end 284 / 467 m to 189 / 206 m (not explained). No step passes 2 Earth reliefs in either. The
+collisions per 100 Myr fall in all three arms (1.60 to 1.55 and 1.30 against base12, 1.70 to 1.20
+against base13), none at p < 0.05 against the base it was read on but sp-fu2's 0.042. The speed
+guard binds in 7 of 8 runs again, so the switch stays off on this head. With it off, the head is
+master's planet bit for bit: one run (`sp-off3`, supercontinent 1, base13's arguments) has the
+state_sha256 and rec_sha256 of base13's.
+
+**The boundaries by the 60 degree rule** (a VM-only probe at PLT-585's fixed point on the same two
+planets as above, not committed). Of the planet's boundary, 0.28 to 0.29 is transform, 0.56 to 0.58
+converging and 0.13 to 0.15 diverging; Earth's by Table 1 is 30 % transform, 34 % convergent and 35 %
+ridge (ridge 1,183, transform 1,016, convergent 1,136, × 100 km; computed). So the planet has
+Earth's share of transforms; it has less ridge and more converging boundary. The free oceanic plates
+(0.1 to 0.5 starting plates) hold, all together, 1.11 to 1.23 times their suction in friction, near
+the Caribbean's 1.24; the fast ones hold 0.43 to 0.67 times: long trench and few transforms. Their
+speed is about (0.50 − 0.16) × trench over the basal drag times their area. The probe may count too
+much trench where the overriding plate meets crust it cannot see (a hidden neighbour), so the fast
+plates' ratio is a lower bound.
+
+**What would hold them, with no knob.** On Earth an overriding plate whose trench retreats opens a
+marginal sea behind its arc, and then "the oceanward migration of trench-arc system becomes an
+inefficient means of generating suction on the continental plate behind the marginal sea" (p. 170):
+the arc's sliver moves with the trench and the plate behind it does not. The model's plates are
+rigid and do not split along an arc, so the whole small plate follows the suction. Two physical
+routes, neither built: back-arc opening (an overriding plate splits at its arc when its suction
+outruns its own drag, so the sliver that moves is small and bounded by the new ridge's spreading),
+or a suction law with a source (pp. 170-171: "may be proportional to the descent rate of the slab";
+PLT-540's saturating law is a version of this, but its premise is `from-memory`). Until one of them
+is built, PLT-585 stays a switch that is off.
+
+**With incipient subduction (the front lane's switch).** The front lane is building incipient
+subduction (Gurnis et al. 2004; decisions log 2026-10-25) behind its own switch: a contact stays
+incipient until its slab reaches 100 km, and until then its front resists with a plastic 2.5 × 10¹²
+N/m (5 × 10¹¹ at a ridge), linearised as the collision term is, and builds no arc. That is a
+friction-like resistance on a converging front, and PLT-585's colliding resistance F_CR acts on the
+same front (a trench's friction is counted at the overriding sample's front, above). With both
+switches on, the rule is: **an incipient contact's front takes the incipient resistance alone, and
+PLT-585's friction (F_CR, or F_TF where the 60 degree rule calls the front a transform) only once the
+contact is mature.** Forsyth & Uyeda fitted F_CR on Earth's mature trenches and mountain belts
+("no distinction between the resisting force at trenches and the resisting force at mountain belts",
+p. 170), and the incipient resistance is the whole resistance of a front whose slab has not yet
+formed, so counting both on one front counts that front's resistance twice. In size, F_CR is 0.16 /
+6.43 × 3 × 10¹³ = 7.5 × 10¹¹ N/m (computed), so the incipient front resists 3.4 times as hard as a
+mature one, and 0.67 times at a ridge. The code is two conditions in the friction pass of
+`forces.rs` (`if friction`): the front's link is skipped while its contact is incipient, and the
+loop over the other boundaries skips a plate that holds an incipient contact with the sample's plate
+from either side, so neither side adds a half share in its place. Whichever of the two lanes lands
+second adds them, with a unit test that an incipient front carries one resistance and a mature one
+F_CR alone.
