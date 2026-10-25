@@ -5569,3 +5569,113 @@ fn an_incipient_front_takes_no_forsyth_uyeda_friction() {
         rest(&mature)
     );
 }
+
+/// Only a weld or a transfer sets its plates' motion for the step (PLT-080), so only their two
+/// plates skip the step's relaxation towards the balance (PLT-191). A deferred collision (a
+/// continent converging that has not stalled) sets nothing (the M5 lane, 2026-10-25).
+#[test]
+fn only_a_weld_or_a_transfer_holds_its_plates_motion_for_the_step() {
+    use super::collision::Collided;
+    let weld = Collided {
+        sutured: true,
+        ..Collided::default()
+    };
+    let transfer = Collided::default();
+    let deferred = Collided {
+        deferred: true,
+        ..Collided::default()
+    };
+    assert_eq!(super::motion_set_by(&weld, 3, 5), Some([3, 5]));
+    assert_eq!(super::motion_set_by(&transfer, 3, 5), Some([3, 5]));
+    assert_eq!(super::motion_set_by(&deferred, 3, 5), None);
+}
+
+/// A continental collision past `collision_threshold_km` that has not stalled is handed to
+/// `collision::collide` every step and deferred. Its two plates go on relaxing towards the force
+/// balance, whose collision resistance is what slows and stalls them (force-balance design,
+/// task 7): both rotations change in every such step. Until 2026-10-25 the deferral counted as a
+/// weld's motion and held both rotations until the stall (base14: the long trains' plates frozen
+/// in 0.92 of their steps; build log 2026-10-25, M5 lane).
+#[test]
+fn a_deferred_collision_leaves_both_plates_to_the_balance() {
+    let p = preset(8000, 300.0, "scattered_continents", 2);
+    let threshold = p.tectonics.collision_threshold_km;
+    // The last step's rotations, live plates and collisions (under, over, onset step, handed
+    // over: shortened by the threshold), and how often the balance was unsolved.
+    let mut prev_omega: Vec<[f64; 3]> = Vec::new();
+    let mut prev_alive: Vec<bool> = Vec::new();
+    let mut prev_cols: Vec<(u32, u32, u64, bool)> = Vec::new();
+    let mut prev_unsolved = 0.0;
+    let mut prev_recs = 0usize;
+    let (mut checked, mut frozen) = (0u32, Vec::new());
+    run_stage(&p, |_, world, st| {
+        let unsolved = world.globals.get(UNSOLVED_GLOBAL).copied().unwrap_or(0.0);
+        // The plates of the step's transfers and welds (one record each), whose motion the
+        // transfer set: a deferred collision's plate can take a terrane elsewhere the same step.
+        let recs = st.dynamics.as_ref().map_or(&[][..], |d| &d.collisions[..]);
+        let moved: Vec<u32> = recs[prev_recs.min(recs.len())..]
+            .iter()
+            .flat_map(|r| [r.under, r.over])
+            .collect();
+        let n_recs = recs.len();
+        let cols: Vec<(u32, u32, u64, bool)> = st
+            .contacts
+            .iter()
+            .filter_map(|c| {
+                let col = c.collision.as_ref()?;
+                Some((
+                    c.under,
+                    c.over,
+                    col.onset_step,
+                    col.shortening_km >= threshold,
+                ))
+            })
+            .collect();
+        let goes_on = |&(u, o, on, _): &(u32, u32, u64, bool)| {
+            cols.iter()
+                .any(|&(u2, o2, on2, _)| (u, o, on) == (u2, o2, on2))
+        };
+        let alive: Vec<bool> = st.plates.iter().map(|q| q.alive).collect();
+        // A step that killed a plate (a weld or a healed rift) or left the balance unsolved is
+        // not read; nor are the plates of a collision that ended (a transfer kills no plate).
+        let died = prev_alive.iter().zip(&alive).any(|(&was, &is)| was && !is);
+        if !died && unsolved == prev_unsolved {
+            let ended: Vec<u32> = prev_cols
+                .iter()
+                .filter(|c| !goes_on(c))
+                .flat_map(|&(u, o, _, _)| [u, o])
+                .collect();
+            for c in prev_cols.iter().filter(|c| c.3 && goes_on(c)) {
+                for q in [c.0, c.1] {
+                    let qi = q as usize;
+                    if ended.contains(&q)
+                        || moved.contains(&q)
+                        || qi >= prev_omega.len()
+                        || !alive[qi]
+                    {
+                        continue;
+                    }
+                    checked += 1;
+                    if st.plates[qi].omega == prev_omega[qi] {
+                        frozen.push((st.step, c.0, c.1, q));
+                    }
+                }
+            }
+        }
+        prev_omega = st.plates.iter().map(|q| q.omega).collect();
+        prev_alive = alive;
+        prev_cols = cols;
+        prev_unsolved = unsolved;
+        prev_recs = n_recs;
+    });
+    assert!(
+        checked >= 10,
+        "only {checked} deferred plate-steps in 300 Myr"
+    );
+    assert!(
+        frozen.is_empty(),
+        "{} of {checked} deferred plate-steps kept their rotation (step, under, over, plate): {:?}",
+        frozen.len(),
+        &frozen[..frozen.len().min(20)]
+    );
+}
