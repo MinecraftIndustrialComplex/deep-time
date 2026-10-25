@@ -1029,9 +1029,12 @@ mod tests {
         });
         let off = Fx::with(k);
         let w = on.k.transition_width_km;
+        // The zone is W/2 along the mesh from the boundary samples; the coast's geodesic distance
+        // differs from that by up to a sample spacing (22 km here).
+        let reach = 0.5 * w + on.norm.spacing_rad() * MODEL_KM;
         // The floor formed at −200 Myr: 1,010 m of rain at the first step's 2 Myr. Every third
         // sample holds 1,000 m (the rain alone), the others 2,500 m.
-        let rain_only = |i: usize| i % 3 == 0;
+        let rain_only = |i: usize| i.is_multiple_of(3);
         let load = |st: &mut PlateState| {
             for (i, s) in st.samples.iter_mut().enumerate() {
                 if s.kind == OCEANIC {
@@ -1056,7 +1059,7 @@ mod tests {
             if s.kind == CONTINENTAL {
                 turned += 1;
                 assert_eq!(st.plate_of(i), 0, "plate 1's margin is active: {i}");
-                assert!(d > -0.5 * w, "turned at {d:.0} km");
+                assert!(d > -reach, "turned at {d:.0} km");
                 assert!(!rain_only(i), "the rain alone turned {i}");
                 assert_eq!(s.basement(), 7000.0);
                 assert!(hyper_extended(s));
@@ -1086,7 +1089,7 @@ mod tests {
             assert_eq!(y.kind, kinds[i], "off, nothing turns: {i}");
             if x.kind != y.kind {
                 later += 1;
-                assert!(inland_km(on.geo.points()[i]) > -0.5 * w, "a ratchet at {i}");
+                assert!(inland_km(on.geo.points()[i]) > -reach, "a ratchet at {i}");
             }
         }
         assert!(later >= turned, "{later} {turned}");
