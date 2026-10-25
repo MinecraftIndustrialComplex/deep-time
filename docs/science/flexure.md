@@ -1409,7 +1409,41 @@ superposition's. Alone, the stiffness brings no foredeep: with the superposition
 carried (ISO-131 is under `tectonics.collision_underthrust`), so it stands on the overriding plate
 across the break, and the foreland's stiffness does not reach it.
 
-GAP6B_BOTH3
+**The four rules, both on** (arm `g6b-both3`, 2026-10-25: both switches on, the superposition with
+the four rules, both starts x seeds 1 to 4, 1,000 Myr, on master 2dd50093, against base10's same 8,
+`fl-ends`, and base10's 24; Mann-Whitney p against the same 8, then the 24):
+
+| | base10, 24 | base10, the same 8 | both on, the four rules, 8 |
+|---|---|---|---|
+| land | 0.294 | 0.294 | 0.313 (p 0.038; 0.037) |
+| land above 2 km | 0.112 | 0.112 | 0.147 (p 0.13; 0.026) |
+| coast with high ground | 0.226 | 0.233 | 0.274 (p 0.050; 0.007) |
+| continental crust under the sea | 0.246 | 0.205 | 0.183 (p 0.33; 0.10) |
+| land under ice | 0.095 | 0.095 | 0.115 (p 0.51; 0.45) |
+| collisions per 100 Myr | 1.80 | 1.65 | 1.80 (p 0.63; 0.91) |
+| criteria met per run, median and mean | 5, 5.00 | 5, 5.00 | 5, 5.00 |
+| the guard's worst, km from the sea | 10.1 | 10.2 | 12.1 (p < 0.001; < 0.001) |
+| largest rise / fall of a cell in a step, km | 7.7 / 7.2 | 7.4 / 7.2 | 10.3 / 9.0 |
+| plate cells' largest excess over Airy, km | 2.6 | 2.3 | 3.8 (p 0.002; 0.003) |
+| record: belts above 3 km / share with a foredeep | 7 / 0.37 | 6 / 0.45 | 7 / 0.67 |
+| record: foredeep width, km (plate check 150 to 450) | 0 | 36 | 143 (p 0.037; < 0.001) |
+| record: foredeep flexure below local isostasy, m | 75 | 120 | 291 (p 0.038; 0.001) |
+| record: wedge width, km | 99 | 117 | 95 (p 0.33; 0.38) |
+| final frame: foredeep width to the zero crossing, all / belts above 3 km, km | | | 0 / 0 |
+| final frame: `Te`, footprint / foreland, km | | | 16.2 / 33.3 |
+
+No run diverged and no step passed two Earth reliefs. The foredeep stays, beyond the wedge: 143 km
+wide at the median in the records, just short of the plate check's 150 km, with 291 m of flexure
+below local isostasy where the base had 75 to 120, and two thirds of the belts above 3 km with
+one. The noise stays too. The guard's worst is 12.1 km against the base's 10.1 (p < 0.001), a
+cell's largest rise in a step 10.3 km against 7.4 to 7.7 and its largest fall 9.0 km against 7.2,
+and the plate cells' largest excess over Airy 3.8 km against 2.3 to 2.6. Against `g6b-both2`'s
+excess over its own base (5.2 km of guard, 7.2 km of rise) the four rules took away about 60 per
+cent (1.9 to 2.0 km, 2.6 to 2.9 km), on a different base (base9 against base10), so that is a
+rough reading. The land, the land above 2 km and the coast with high ground rose (p 0.007 to 0.05),
+the last two away from their targets. In the final frames, at 1,000 Myr, the median run held no
+foredeep (`g6b-both2`'s 149 km); that was not traced. So the arm meets the brief's first and third
+conditions and fails the second again: the superposition stays off, for the reasons above.
 
 **Simplifications.**
 

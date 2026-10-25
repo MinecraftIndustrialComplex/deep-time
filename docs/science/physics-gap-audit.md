@@ -403,8 +403,9 @@ what a player meets most.
   that part carried in the belt's frame, nothing solved again) brought the foredeep, 179 km wide
   at the median against none, with 452 m of flexure below local isostasy against 80 (arm
   `g6b-both2` against base9), but the largest change of a cell in a step doubled (7.2 to 14.4 km)
-  and the guard's worst rose by 5 km; four rules from the traces took that down by a third, not
-  to the base's. It stays off. Why: where a belt stands its `Te` is low and α about a cell, so the
+  and the guard's worst rose by 5 km; with four rules from the traces (arm `g6b-both3` against
+  base10) the foredeep stayed (143 km) but so did the noise: the guard's worst 12.1 km against
+  10.1 and the largest rise 10.3 km against 7.4 to 7.7. It stays off. Why: where a belt stands its `Te` is low and α about a cell, so the
   belt's part is the belt's own root, 30 to 49 km, at the cell scale, and the two parts of the
   split drift into large opposite fields; every change of the frame's geometry moves a step of 20
   to 27 km that the yield takes back. What would work is the belt's part as the deflection under
