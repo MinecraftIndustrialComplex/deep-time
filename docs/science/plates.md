@@ -9749,3 +9749,36 @@ split's is, on a tie, or where the parent's side of the fracture is continental;
 and `an_initiations_contact_takes_its_planted_slab` (`plates/tests.rs`: two oceanic plates, the
 older turned under the younger; with the younger's slab planted under the older and the older split
 from it, the contact puts the younger under; off, with no split, or with no slab, the older).
+
+**On the pool (arm fl-law1, key fdb71fad7135, argkey cd665cef: seeds 1 to 4, both starts, base15's
+settings and the age maps, 2 threads; against base15's 24 runs, medians, Mann-Whitney p in brackets).**
+
+| | base15 | fl-law1 |
+|---|---|---|
+| land (0.13 to 0.36) | 0.213 | 0.226 (0.54) |
+| largest landmass (≥ 0.06) | 0.069 | 0.095 (0.48) |
+| continental crust under the sea (≤ 0.56) | 0.510 | 0.448 (0.22) |
+| land above 2 km (≤ 0.07) | 0.025 | 0.031 (0.72) |
+| coast with high ground (≤ 0.11) | 0.109 | 0.099 (0.65) |
+| land under ice (≤ 0.32) | 0.067 | 0.079 (0.92) |
+| collisions per 100 Myr (≤ 6) | 5.10 | 4.25 (0.020) |
+| criteria met per run, median and mean | 6, 5.79 | 6, 6.12 (0.53) |
+| sea over the datum, after 100 Myr / end, m | 500 / 697 | 428 / 564 |
+| the guard's worst, m from the sea | 10,106 | 10,014 (0.18); no step beyond 2 Earth reliefs |
+
+No V1 measure breaches its target; only the collisions move beyond chance. In the records (polarity.py),
+the contacts between an initiated plate and its parent still put the parent under in 0.75 of them
+(710 of 947), at a median 6 Myr after the split, as on base15 (0.75): the parent's side of the
+fracture is the older because the floor the initiation leaves on it is the margin's kept floor
+(PLT-503). What the law changes is that the planted slab now hangs on the same side, so the trench
+forms on a slab that pulls with it. The initiated plates die younger less often (dead within 20 Myr
+0.13 of those born after -900 Myr, against 0.22), reach a front within 20 Myr more often (0.70
+against 0.65) and keep more of the trench: the subduction front is 79,042 km against 68,762, its
+flux 3.04 km²/yr against 2.64, the area-weighted plate speed 22.5 mm/yr against 20.8. The floor is
+younger as a result, though no rule reads its age to that end: late mean age (from -500 Myr, the
+records) 112 Myr against 126 (p < 0.001), older than 180 Myr 0.197 of the ocean against 0.244
+(p < 0.001); the hazard of going down stays flat to 220 Myr instead of falling after 200, and the
+floor each resampling takes is 0.81 of the standing mean age against 0.75. The age maps (67
+snapshots from -500 Myr, against fl-agemap's 33, base15's seeds 1 and 2): older than 180 Myr 0.202
+of the ocean against 0.234, 0.791 of it in the margin zone against 0.809; the margin zone holds
+0.419 of all the floor against 0.440.
