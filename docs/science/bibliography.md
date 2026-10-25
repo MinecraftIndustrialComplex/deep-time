@@ -1037,12 +1037,13 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) metadata only.
 - Reference check: (ERO, ISO, HYP) Crossref matches title, volume 70, issue 2, pages 295-321, and the correction record (volume 73, issue 2, pages 523-532). (PLT) correct. A correction exists (GJRAS 73:523-532, 1983).
 - Read in the high-ground task (2026-10-22, PLT-414): the abstract, from OpenAlex's record (the full text stays paywalled): the lithosphere as "a thin sheet of power law material overlying an inviscid substrate"; "The material flows in response to forces applied to its boundaries (for example, the indenting of one continent by another) and to forces in its interior arising from gradients in crustal thickness"; "In the limit of a very weak medium (Ar > 10) the lithosphere is unable to sustain appreciable crustal elevation contrasts"; "the forces arising from crustal thickness contrasts are great enough to produce net extension in the region of thick crust in front of the influx boundary". Ledger ids added: PLT-414.
+- Cited in the front lane's PLT-652 task (2026-10-25, the overriding plate's share): not read again; the thin viscous sheet the interior's shortening follows. Ledger ids added: PLT-652.
 
 ### MolnarLyonCaen1988
 - Reference: Molnar, P. and Lyon-Caen, H. (1988). Some simple physical aspects of the support, structure, and evolution of mountain belts. In: Clark, S. P., Burchfiel, B. C. and Suppe, J. (eds), Processes in Continental Lithospheric Deformation, Geological Society of America Special Paper 218, pp. 179-208.
 - DOI or URL: 10.1130/SPE218-p179.
 - Cited as: (ERO, ISO, HYP) "Molnar & Lyon-Caen 1988, GSA Special Paper 218:179-207". (PLT) "Molnar & Lyon-Caen 1988 (GSA Spec. Pap. 218)", "pages 179-207" in the force-balance design (Tibet 6-7e12 N/m).
-- Ledger ids: ISO-019, ISO-020, PLT-187, FRC-014
+- Ledger ids: ISO-019, ISO-020, PLT-187, FRC-014, PLT-652 (the belt's push on the overriding plate's interior, as cited: not read)
 - Access: book (not online); paywalled chapter. [other sections: book chapter (abstract visible via OpenAlex; full text not online).]
 - Library (the project's source library, not distributed): not fetched. Reason: book, no open copy named.
 - Merged keys: Molnar1988
@@ -8254,10 +8255,11 @@ Nothing was saved to the library.
 - Reference: Houseman, G. A. and England, P. C. (1986). Finite strain calculations of continental deformation: 1. Method and general results for convergent zones. Journal of Geophysical Research 91(B3):3651-3663.
 - DOI or URL: 10.1029/JB091iB03p03651
 - Cited as: "Houseman & England 1986" (the thin viscous sheet, the Argand number).
-- Ledger ids: PLT-414
+- Ledger ids: PLT-414, PLT-652
 - Access: paywalled; the abstract from OpenAlex's record.
 - Library: not fetched.
 - Read so far (by the project): the abstract, 2026-10-22 (the high-ground task): "the strength of the sheet relative to the gravitational forces (which may be expressed as a dimensionless number: the Argand number Ar)"; "For n > 3 and Ar between 1 and 10 a plateau of thickened crust is formed in front of the indenter"; "the length scale of deformation increases with Ar and time since the start of the collision and decreases with n".
+- Cited in the front lane's PLT-652 task (2026-10-25, the overriding plate's share): not read again; the thin viscous sheet, "a plateau of thickened crust is formed in front of the indenter". Ledger ids added: PLT-652.
 
 ### EnglandHouseman1989
 - Reference: England, P. and Houseman, G. (1989). Extension during continental convergence, with application to the Tibetan Plateau. Journal of Geophysical Research 94(B12):17561-17579.
@@ -8968,6 +8970,36 @@ The sources of the plate speed lane's diagnosis (plates.md "Plate speed (2026-10
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-25 (the plate speed lane): "trench migration is primarily controlled by the subducting plate velocity Vsub, which largely depends on its age at the trench"; "Vt = 0.5Vsub − 2.3 (in cm a−1) in the HS3 reference" frame; in neutral subduction zones the velocity of the trench equals the velocity of the upper plate (Vt = Vup). No limit of rollback by the slab's sinking speed is stated.
 
+## The overriding plate's share (PLT-652), added 2026-10-25
+
+The sources of the front lane's overriding-plate shortening (plates.md "The overriding plate's share (PLT-652, 2026-10-25)"; build log 2026-10-25). The thin viscous sheet is England & McKenzie 1982 and Houseman & England 1986, above (abstracts, PLT-414); the strength law is PLT-415's. Mouthereau 2011 and van Hinsbergen et al. 2011 are the validation readouts, not values in the code; England, Houseman & Sonder 1985 is cited for what the law leaves out.
+
+### Mouthereau2011
+- Reference: Mouthereau, F. (2011). Timing of uplift in the Zagros belt/Iranian plateau and accommodation of late Cenozoic Arabia-Eurasia convergence (title from memory; not checked against Crossref here). Geological Magazine 148(5-6):726-738.
+- DOI or URL: 10.1017/S0016756811000306
+- Cited as: "Mouthereau 2011".
+- Ledger ids: PLT-652 (the validation readout)
+- Access: a full-text copy was read 2026-10-25 for the front lane's diagnosis (agent's scratch, not in the library; the URL was not recorded).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25 (the front lane's collision-front diagnosis): of the Arabia-Eurasia convergence since 22 Ma (440 km), "about 135 km of convergence has been accommodated by frontal accretion in the Zagros Folded Belt (15 km), by duplexing ... (~50 km) and by underthrusting (~70 km) ... A maximum shortening of 180 km ... throughout Central Iran; 50 km were accommodated across the Alborz and 75 km were taken up by subduction of the Caspian Sea." So 31 % in the Zagros, 41 % in Central Iran, 11 % in the Alborz and 17 % by the Caspian's subduction (computed): 52 % in the overriding plate behind the Zagros.
+
+### vanHinsbergen2011Tectonics
+- Reference: van Hinsbergen, D. J. J., Kapp, P., Dupont-Nivet, G., Lippert, P. C., DeCelles, P. G. and Torsvik, T. H. (2011). Restoration of Cenozoic deformation in Asia and the size of Greater India. Tectonics 30:TC5003 (authors after the first and the title from memory; not checked against Crossref here).
+- DOI or URL: 10.1029/2011TC002908
+- Cited as: "van Hinsbergen et al. 2011 (Tectonics)"; not the same paper as their 2011 JGR paper on the convergence rates (10.1029/2010JB008051).
+- Ledger ids: PLT-652 (the validation readout)
+- Access: a full-text copy was read 2026-10-25 for the front lane's diagnosis (agent's scratch, not in the library; the URL was not recorded).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25 (the front lane's collision-front diagnosis): "since 50 Ma ~2400-3200 km (west to east) of India-Asia convergence occurred, much more than the 450-900 km of documented Himalayan shortening" (abstract); 600 to 1,050 km of shortening in Asia, extrusion about 250 km, the Himalaya about 275 km wide ([85]). So Asia took 0.40 to 0.70 of the documented shortening (computed: 600 / 1,500 to 1,050 / 1,500).
+
+### EnglandHousemanSonder1985
+- Reference: England, P., Houseman, G. and Sonder, L. (1985). Length scales for continental deformation in convergent, divergent, and strike-slip environments: analytical and approximate solutions for a thin viscous sheet model. Journal of Geophysical Research 90(B5):3551-3557 (from memory; not checked against Crossref here).
+- DOI or URL: 10.1029/JB090iB05p03551 (from memory)
+- Cited as: "England, Houseman & Sonder 1985".
+- Ledger ids: PLT-652 (from-memory: a thin viscous sheet spreads a boundary's stress over a length scale set by the boundary's wavelength and the sheet's power law, so the 1-D strip, which carries the front's force undiminished to the plate's far side, gives the interior's largest share)
+- Access: not fetched.
+- Library: not fetched.
+- Read so far (by the project): nothing; the claim is from memory.
 ## Chemical denudation (ERO-205 to ERO-207; notes on CLM-153, CLM-155, CLM-156), added 2026-10-25
 
 The sources of the dissolved load the surface stage takes off the land (erosion-and-sediment.md "Chemical denudation (M5 lane, 2026-10-25)"). All were read by a Sonnet sub-agent of the M5 lane on 2026-10-25 (downloads in its scratch, not in the library). Rudnick & Gao 2003 (RudnickGao2003, above) was not readable; a search snippet of an OCR copy gave SiO2 66.6, Al2O3 15.4 and MgO 2.48 wt% (CLM-153's note).
