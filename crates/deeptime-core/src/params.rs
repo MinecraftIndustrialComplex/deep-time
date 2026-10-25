@@ -988,6 +988,18 @@ pub struct TectonicParams {
     /// the trench forms and the slab grows by the convergence (design §3.3). Subduction becomes
     /// self-sustaining once some 100-150 km of slab has gone down (ledger PLT-270, from memory).
     pub initiation_slab_km: f64,
+    /// Incipient subduction (the front lane, 2026-10-25; Gurnis, Hall & Lavier 2004): a
+    /// subduction front whose contact's slab is shorter than the critical convergence
+    /// (`forces::INCIPIENT_SLAB_KM`, 100 km) is not yet self-sustaining. Its plate must push
+    /// against the resistance of bending into the new trench (`forces::INCIPIENT_RESISTANCE_N_M`,
+    /// 2.5 × 10¹² N/m; a ridge's floor `forces::INCIPIENT_RIDGE_N_M`, 5 × 10¹¹), it builds no arc
+    /// (`subduction::fronts_finish`), and the boundary mix and the margins count it as a
+    /// converging boundary, not a subduction zone (Bird 2003's oceanic convergent boundary: no
+    /// Benioff zone, no arc). A subduction initiation's planted slab (`initiation_slab_km`, 150
+    /// km) starts past it, and a contact's slab survives a resampling by its plates, so only a
+    /// new contact of plates that come to converge starts incipient. Off, every front is a working
+    /// subduction zone from its first step. ledger: PLT-610
+    pub incipient_subduction: bool,
     /// Subduction initiation off the passive margin (V1 gap 2's stage C1): the old floor within
     /// the reach of the arc the new trench builds (`arc_distance_km` + `arc_width_km`, and one
     /// lattice spacing for where on the lattice the front falls; great circle) of the plate's
@@ -1216,6 +1228,7 @@ impl Default for TectonicParams {
             subduction_initiation_per_myr: 0.15, // ledger: PLT-063
             subduction_initiation_clearance_km: 1000.0,
             initiation_slab_km: 150.0,            // ledger: PLT-270
+            incipient_subduction: true,           // ledger: PLT-610 (on since 2026-10-25)
             subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: false,         // ledger: PLT-516
