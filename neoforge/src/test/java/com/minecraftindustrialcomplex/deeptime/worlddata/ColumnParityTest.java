@@ -245,7 +245,8 @@ class ColumnParityTest {
     void everyColumnOfTheFixtureIsEqual() throws IOException {
         JsonObject doc = fixture();
         WorldData wd = WorldData.open(world());
-        assertEquals(FormatVersion.CURRENT, doc.get("format_version").getAsString());
+        // The test planet is a cube world, as every planet is since cube plan §7.4.
+        assertEquals(FormatVersion.CUBE, doc.get("format_version").getAsString());
         assertEquals(wd.circumference(), doc.get("circumference").getAsInt());
         assertTrue(wd.detailNoise() != null, "the real planet has a detail term");
         JsonArray cols = doc.getAsJsonArray("columns");

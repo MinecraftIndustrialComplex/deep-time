@@ -320,6 +320,19 @@ class FarColumnTest {
     }
 
     /**
+     * The packed strata cell nearest block (x, z), as {@link FarColumn#cellStack} takes it: on a cube
+     * grid the cell under the block's centre on its face (folded onto the planet), -1 past the net's
+     * corners; on a Lambert-frame grid the nearest cell of the plain grid.
+     */
+    private static long nearestCell(GridDesc g, long x, long z) {
+        if (!g.isCube())
+            return g.cell((long) Math.floor((double) (x - g.originBlockX()) / g.r() + 0.5),
+                    (long) Math.floor((double) (z - g.originBlockZ()) / g.r() + 0.5));
+        GridDesc.CubeSpot s = g.cubeSpotOfBlock((double) x, (double) z);
+        return s == null ? -1 : g.faceCell(s.face(), (long) Math.floor(s.a() + 0.5), (long) Math.floor(s.b() + 0.5));
+    }
+
+    /**
      * A wide column's rock is its nearest strata cell's stack as stored; a column up to
      * {@link FarColumn#FULL_RULE_MAX_STEP} blocks wide gets the column rule itself. Both are read
      * through the world's folds and faults (P2-01): a narrow column is the strata pass's column, a
@@ -332,9 +345,15 @@ class FarColumnTest {
         GridDesc g = strata.desc().grid();
         Columns.Stack got = new Columns.Stack(8), rule = new Columns.Stack(8), cell = new Columns.Stack(8);
         Structure.Scratch scratch = new Structure.Scratch();
-        int c = planet.circumference(), checked = 0, untouched = 0;
+        int c = planet.circumference(), checked = 0, untouched = 0, offPlanet = 0;
+        double scale = strata.desc().scale(), offset = strata.desc().offset();
         for (int n = 0; n < 400; n++) {
             long x = -c / 2 + (n * 97L) % c, z = -c / 4 + (n * 61L) % (c / 2);
+            long cellAt = nearestCell(g, x, z);
+            if (cellAt < 0) {
+                offPlanet++;   // past a cube net's corners: no cell (FarColumn.cellStack gives no rock)
+                continue;
+            }
             for (int step : new int[]{1, 2}) {
                 FarColumn.rock(planet, strata, x, z, step, got);
                 Columns.deformedStack(planet, strata, (int) x, (int) z, rule, scratch);
@@ -346,8 +365,6 @@ class FarColumnTest {
                 }
             }
             FarColumn.rock(planet, strata, x, z, 8, got);
-            long i = Math.round(Math.floor((double) (x - g.originBlockX()) / g.r() + 0.5));
-            long j = Math.round(Math.floor((double) (z - g.originBlockZ()) / g.r() + 0.5));
             assertTrue(got.count > 0, "no rock at column " + x + ", " + z);
             // Top-down, strictly descending tops, and every class is one the cell stores, in its order.
             FarColumn.cellStack(strata, x, z, cell);
@@ -362,14 +379,16 @@ class FarColumnTest {
                     assertTrue(got.tops[q] < got.tops[q - 1], "tops descend at column " + x + ", " + z);
                 if (!same)
                     continue;   // a fold, a fault or an intrusion: rock from elsewhere, or shifted
-                while (h < strata.stackDepth() && strata.horizonClass(i, j, h) != got.classes[q])
+                while (h < strata.stackDepth() && strata.horizonClassAt(cellAt, h) != got.classes[q])
                     h++;
                 assertTrue(h < strata.stackDepth(), "class " + got.classes[q] + " is not in the nearest cell's stack, in order");
             }
-            assertEquals((int) Math.floor(strata.horizonTop(i, j, 0)), got.tops[0], "the first horizon's top at column " + x + ", " + z);
+            assertEquals((int) Math.floor(strata.horizonTopRawAt(cellAt, 0) * scale + offset), got.tops[0],
+                    "the first horizon's top at column " + x + ", " + z);
             checked++;
         }
-        assertEquals(400, checked);
+        assertEquals(400, checked + offPlanet);
+        assertTrue(checked >= 380, "only " + checked + " of 400 columns are on the planet");
         assertTrue(untouched > 100, "only " + untouched + " of 400 wide columns are the cell's own stack");
     }
 

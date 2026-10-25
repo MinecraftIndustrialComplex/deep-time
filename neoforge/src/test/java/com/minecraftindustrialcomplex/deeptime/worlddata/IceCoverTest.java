@@ -96,8 +96,32 @@ class IceCoverTest {
     }
 
     /**
+     * The block at the centre of {@code g}'s cell (i, j), {x, z}: on a Lambert-frame grid the cell's own block; on a cube
+     * grid (the baked planet, cube plan §7.4) the block east and south of the cell's centre on the net (r is even), the
+     * one {@link GridDesc#cubeSpotOfBlock} takes to the cell.
+     */
+    private static int[] centreBlock(GridDesc g, int i, int j) {
+        if (!g.isCube())
+            return new int[]{(int) (g.originBlockX() + (long) i * g.r()), (int) (g.originBlockZ() + (long) j * g.r())};
+        double[] p = g.cubePoint(i, j);
+        return new int[]{(int) Math.floor(p[0]), (int) Math.floor(p[1])};
+    }
+
+    /** Whether cell (i, j) + (di, dj) is a neighbour {@link #checkEdges} reads: on a cube grid only on the same face. */
+    private static boolean neighbourRead(GridDesc g, int i, int j, int di, int dj) {
+        int nj = j + dj;
+        if (nj < 0 || nj >= g.h())
+            return false;
+        if (!g.isCube())
+            return true;
+        int ni = i + di;
+        return ni >= 0 && ni < g.w() && nj / g.w() == j / g.w();
+    }
+
+    /**
      * Checks every edge of {@code layer}'s cover (a covered cell beside a bare one, east, west, north or south; x wraps,
-     * the first and last rows have no neighbour beyond them) and returns how many there are: on the cell's row or column
+     * the first and last rows have no neighbour beyond them; on a cube grid the neighbours on the cell's own face) and
+     * returns how many there are: on the cell's row or column
      * a block short of the half-way line is covered at the cell's own depth, a block past it is bare, and over the cell
      * and its neighbours the nearest cell decides, as it decides the block's class: covered exactly where it is covered.
      */
@@ -112,10 +136,10 @@ class IceCoverTest {
                 int v = (int) layer.get(i, j);
                 if (v == 0)
                     continue;
-                int x = (int) (g.originBlockX() + (long) i * r), z = (int) (g.originBlockZ() + (long) j * r);
+                int[] at0 = centreBlock(g, i, j);
+                int x = at0[0], z = at0[1];
                 for (int[] s : sides) {
-                    int nj = j + s[1];
-                    if (nj < 0 || nj >= g.h() || layer.get(i + s[0], nj) != 0)
+                    if (!neighbourRead(g, i, j, s[0], s[1]) || layer.get(i + s[0], j + s[1]) != 0)
                         continue;
                     edges++;
                     String at = "cell (" + i + ", " + j + ") toward (" + s[0] + ", " + s[1] + ")";
@@ -223,8 +247,8 @@ class IceCoverTest {
                 thickest = Math.max(thickest, v);
                 if (v > 0) {
                     // At a cell's own block the cover rule reads the cell.
-                    int x = (int) (g.originBlockX() + (long) i * g.r()), z = (int) (g.originBlockZ() + (long) j * g.r());
-                    assertEquals(v, cover.get().blocks(x, z), "cell (" + i + ", " + j + ")");
+                    int[] at = centreBlock(g, i, j);
+                    assertEquals(v, cover.get().blocks(at[0], at[1]), "cell (" + i + ", " + j + ")");
                 }
             }
         }
