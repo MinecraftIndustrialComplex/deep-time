@@ -8,7 +8,7 @@
   "measures": {
     "v1census": {
       "version": 2,
-      "doc": "V1 item 1's seven measures on the final frame (decisions log 2026-10-21); since 2026-10-23 they are realism checks whose targets are where each fires, outside Earth's Phanerozoic range (docs/science/realism-checks.md, RLC-014 to RLC-075) plus the crust's net change and the sea over the datum; definitions in measure_v1census.py. Version 2 (2026-10-25, RLC-052): coast_hi on Fibonacci points, the sea the world ocean, the reach over land; coast_hi_old is version 1's value",
+      "doc": "V1 item 1's seven measures on the final frame (decisions log 2026-10-21); since 2026-10-23 they are realism checks whose targets are where each fires, outside Earth's Phanerozoic range (docs/science/realism-checks.md, RLC-014 to RLC-075) plus the crust's net change and the sea over the datum; definitions in measure_v1census.py. Version 2 (2026-10-25, RLC-055): coast_hi on Fibonacci points, the sea the world ocean, the reach over land; coast_hi_old is version 1's value",
       "command": ["{py}", "-I", "{tools}/measure_v1census.py", "{run}"],
       "python": "numpy",
       "needs": ["fields", "plate", "rec"],
