@@ -993,11 +993,14 @@ pub struct TectonicParams {
     /// slab's terminal velocity (6.43 / 0.89 cm/yr), the basal drag and the continental drag their
     /// shares of it, the suction their share of the pull, and their transform and colliding
     /// resistances act as friction (a force whatever the speed, against the relative motion) on
-    /// the boundaries Bird's test calls transforms and on converging ones, in place of the viscous
-    /// boundary resistance all round. The speed level then follows from the forces, so
-    /// `plate_speed_scale_mm_yr`, `slab_resistance`, `slab_suction_share`, `keel_drag` and
-    /// `boundary_resistance` are read only with this off (the 2026-10-02 calibration, FRC-016).
-    /// On by default (2026-10-25). ledger: PLT-585
+    /// the boundaries their own 60 degree rule calls transforms (`forces::fu_transform`) and on
+    /// converging ones, in place of the viscous boundary resistance all round. The speed level
+    /// then follows from the forces, so `plate_speed_scale_mm_yr`, `slab_resistance`,
+    /// `slab_suction_share`, `keel_drag`, `boundary_resistance` and `suction_saturates` are read
+    /// only with this off (the 2026-10-02 calibration, FRC-016). Off by default: built and tested
+    /// against the paper, but on the pool (arm sp-fu, 2026-10-25) the speed guard (PLT-022) binds
+    /// in every run, on small overriding oceanic plates that their speed-independent suction draws
+    /// with nothing but the basal drag to hold them. ledger: PLT-585
     pub forsyth_uyeda_balance: bool,
     /// The overall speed scale of the balance, mm/yr: a reference oceanic plate (the average
     /// starting plate's area, a 3,000 km trench of a full-length 80-Myr slab, its neighbours at
@@ -1019,10 +1022,11 @@ pub struct TectonicParams {
     /// sinking slab drives, the share of the pull at rest falling to nothing as the overriding
     /// plate's speed towards the trench reaches the slab's terminal velocity (its pull over its
     /// slab resistance, PLT-185; Forsyth & Uyeda 1975), so no overriding plate is drawn faster
-    /// than its slab sinks (`forces::Balance::add_suction`). On from 2026-10-24, off by default
-    /// since 2026-10-25 with `forsyth_uyeda_balance`, whose suction does not depend on speed
-    /// (Forsyth & Uyeda 1975, p. 171). Off, the suction is the fixed share however fast the plate
-    /// already moves. ledger: PLT-540
+    /// than its slab sinks (`forces::Balance::add_suction`). On by default (2026-10-24). Off, the
+    /// suction is the fixed share however fast the plate already moves, and a small plate with
+    /// trenches along much of its edge is drawn on until the speed guard (PLT-022) holds it. Not
+    /// read with `forsyth_uyeda_balance`, whose suction does not depend on speed (Forsyth & Uyeda
+    /// 1975, pp. 170-171). ledger: PLT-540
     pub suction_saturates: bool,
     /// The force balance's subduction fronts are the arcs' (the front lane's step 9, 2026-10-24;
     /// `forces::balance_step`): a front sample is one whose plates converge across the boundary
@@ -1183,21 +1187,21 @@ impl Default for TectonicParams {
             contact_timeout_myr: 24.0,   // ledger: PLT-059
             collision_orogeny_myr: 30.0,
             l1_every_steps: 0,
-            forsyth_uyeda_balance: true, // ledger: PLT-585 (on since 2026-10-25)
+            forsyth_uyeda_balance: false, // ledger: PLT-585 (built 2026-10-25, off)
             plate_speed_scale_mm_yr: 45.0, // ledger: PLT-181
-            slab_pull: 1.0,              // ledger: PLT-182
-            slab_depth_km: 700.0,        // ledger: PLT-184
-            slab_breakoff_myr: 10.0,     // ledger: PLT-184
-            slab_resistance: 3.0,        // ledger: PLT-185
-            slab_suction_share: 0.3,     // ledger: PLT-186
-            suction_saturates: false,    // ledger: PLT-540 (off since 2026-10-25)
-            front_pull: true,            // ledger: PLT-560 (on since 2026-10-24)
-            edge_energy: 0.1,            // ledger: PLT-187
-            collision_buoyancy: 1.0,     // ledger: PLT-275
-            keel_drag: 3.0,              // ledger: PLT-188
-            boundary_resistance: 3.0,    // ledger: PLT-189
-            mantle_flow_mm_yr: 5.0,      // ledger: PLT-190
-            motion_relax_myr: 6.0,       // ledger: PLT-191
+            slab_pull: 1.0,               // ledger: PLT-182
+            slab_depth_km: 700.0,         // ledger: PLT-184
+            slab_breakoff_myr: 10.0,      // ledger: PLT-184
+            slab_resistance: 3.0,         // ledger: PLT-185
+            slab_suction_share: 0.3,      // ledger: PLT-186
+            suction_saturates: true,      // ledger: PLT-540
+            front_pull: true,             // ledger: PLT-560 (on since 2026-10-24)
+            edge_energy: 0.1,             // ledger: PLT-187
+            collision_buoyancy: 1.0,      // ledger: PLT-275
+            keel_drag: 3.0,               // ledger: PLT-188
+            boundary_resistance: 3.0,     // ledger: PLT-189
+            mantle_flow_mm_yr: 5.0,       // ledger: PLT-190
+            motion_relax_myr: 6.0,        // ledger: PLT-191
         }
     }
 }
