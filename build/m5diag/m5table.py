@@ -214,6 +214,24 @@ def main():
         x = np.array([g(r) for r in F])
         rho, p = spearmanr(m5, x)
         print(f"   {k:<32} rho {rho:+.3f} p {p:.4f}")
+    from m5fields import ARM, KEY, POOL
+    col = []
+    for r in F:
+        try:
+            col.append(json.loads((POOL / KEY / ARM / r["run"] / "measures" / "v1census.json").read_text())
+                       ["values"]["collisions"])
+        except (OSError, KeyError):
+            col.append(np.nan)
+    col = np.array(col, float)
+    if np.isfinite(col).sum() > 5:
+        ok_ = np.isfinite(col)
+        print(f"   collisions per 100 Myr: median {np.nanmedian(col):.2f}")
+        for k, g in (("M5", lambda r: r["M5"]), ("M4", lambda r: r["M4"]),
+                     ("coll_young part", lambda r: r["m5_by_nearest"]["coll_young"]),
+                     ("trench200 coast share", lambda r: r["coast_by_setting"]["trench200"]["coast_share"])):
+            y = np.array([g(r) for r in F])
+            rho, p = spearmanr(col[ok_], y[ok_])
+            print(f"   collisions vs {k:<24} rho {rho:+.3f} p {p:.4f}")
     x = np.array([r["curve"][1][2] for r in F])
     for k in ("f_near", "kappa", "s"):
         y = np.array([r["factors"][k] for r in F])
