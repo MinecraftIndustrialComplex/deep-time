@@ -350,7 +350,10 @@ game choices but the vanilla depth band of BIO-112):
   disk reaches 6 blocks, and a block takes its biome from a cell up to about 6 blocks off: 6 + 14. A spring
   within the margin keeps its pool, rim and terraces but stands in the flat's biome. The test planet after
   the arc work (master 9c9c2012) has no playa, so the margin read is held by a unit test on a constructed
-  layer (`PlayaTest`) as well as by the GameTest on a planet that has one. "Where the climate
+  layer (`PlayaTest`) as well as by the GameTest on a planet that has one. An active volcano's lava flow
+  that runs onto the flat lies over its salt (VOL-162), so the GameTest reads a column topped by the block the
+  flow paints there as flow, not as a broken flat (since 2026-10-25: on master 56edfd16's test planet a fresh aa
+  flow covers 14 columns of a playa 33 to 35 blocks from the pool at 1874, -97). "Where the climate
   allows" means the climate point
   lies inside that biome's own temperature and humidity ranges in the pack's parameter list (Terralith puts
   ashen savanna on the warm band at dry to middling humidity), so the rule follows whatever biome a pack
