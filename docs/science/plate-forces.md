@@ -195,7 +195,7 @@ Richards' weak asthenosphere "of the order of 10^19 Pa s" against the 2.5 × 10�
 c_b stands for. What moved is the pull on the lattice: the old count's surplus (1.235 times the
 trench on this plate; 1.71 times the arcs' straight front on the default planet, PLT-554) is gone,
 so for the same c_b the planet's plates move more slowly. The run speeds against their sourced
-band are in [plates.md](plates.md), "Step 9".
+band are below, "On the pull's own count", and in [plates.md](plates.md), "Step 9".
 
 ## Earth against the mod
 
@@ -243,6 +243,32 @@ The spread of speeds and the oceanic-continental contrast come out of the forces
 correlation is weaker than Earth's and weaker than the open-loop test's, and the 90th percentile of
 the step-to-step change is still above the design's 20 %. See `docs/design/plate-force-balance.md`
 §13, "Tasks 7 and 8", for the rest.
+
+**On the pull's own count** (PLT-560 on, the front lane's step 9, 2026-10-24; arm fl-pull,
+`earthlike_quick_16k`, 1000 Myr, both starts × seeds 1 to 4, key 822ccd2a2d81, against base8's 24
+runs, master 4dd85fe2, and fl-outline's same 8; the plate check's speed records, medians over the
+runs, two-sided Mann-Whitney p in brackets). Reported, not tuned (the coordinator's call):
+
+| Quantity | Earth | Band (ledger) | fl-pull | base8 (24) | fl-outline (8) |
+|---|---|---|---|---|---|
+| Plate speed, area-weighted RMS | about 47 mm/yr today; 50-100 over 200 Myr | 40 to 100 (CHK-020) | 25.95 (23.8 to 28.6) | 26.79 (0.007) | 27.12 (0.024) |
+| Plate speeds, 10th percentile | 11 | at most 20 (CHK-021) | 6.64 | 8.05 (0.011) | 8.75 (0.007) |
+| Plate speeds, median | 33; 42 over 200 Myr | 30 to 60 (CHK-022) | 23.05 | 26.70 (< 0.001) | 27.65 (0.001) |
+| Plate speeds, 90th percentile | 80; about 85 for the fastest group | 70 to 110 (CHK-023) | 66.35 | 65.15 (0.12) | 65.84 (0.40) |
+| Oceanic over continental plates, median speed | 2-3 | | 2.62 | 2.20 (0.094) | 2.16 (0.10) |
+| Slab-attached over slab-free plates | about 3-4 | | 3.07 | 2.50 (0.008) | 2.50 (0.041) |
+| Speed against area, rank correlation | | | -0.43 | -0.42 (0.37) | -0.43 (0.96) |
+
+What it says: the RMS and the median were under their bands before this step (master's 26.8 and
+26.7 mm/yr), and the pull's own count takes them 3 % and 14 % lower, the 10th percentile with
+them; the 90th percentile does not move, and the slab contrast grows. Plates with real trenches
+keep their speed; the ones that slow lost the pull the old count gave them along their contacts'
+strike-slip stretches. The visible-weighted plate speed is 18.6 to 19.4 mm/yr through a
+resampling cycle against 21.3 to 22.5. The shortfall is not the drag's calibration: the reference
+plate on the lattice meets the definition on this count (above), and c_b is the definition's. Where
+the planet's plates differ from the reference plate (their size, 24.7 plates alive against Bird's
+52; their keels; the collision and boundary resistances; their slabs' lengths and ages) is a
+diagnosis of its own, not traced here.
 
 ## Simplifications and limits
 

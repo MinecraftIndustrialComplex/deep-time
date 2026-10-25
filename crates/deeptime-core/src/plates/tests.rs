@@ -509,8 +509,13 @@ fn sutures_and_initiations_keep_continents_whole() {
     // strength, β and root removal on by default, 2026-10-23, neither supercontinent 4 nor
     // scattered 1 welded, so scattered 12, which welds twice in that test's sweep; with V1 gap
     // 2's stages on by default, 2026-10-23, supercontinent 5, 8, 9, 14 and 19 welded of seeds 1
-    // to 24 and supercontinent 4 not, so supercontinent 5; scattered 12 still welds once).
-    for (start, seed) in [("supercontinent", 5), ("scattered_continents", 12)] {
+    // to 24 and supercontinent 4 not, so supercontinent 5; scattered 12 still welds once; with
+    // the slab pull at the arcs' fronts on by default, PLT-560, 2026-10-24, the sweep
+    // `weld_seed_sweep` over both starts: supercontinent 4, 7, 11, 14, 15, 21, 23 and 24 weld of
+    // seeds 1 to 24, 5 no more, and scattered as in the collisions test below, 12 no more, so
+    // supercontinent 4 and scattered 1; this test passes on the pairs 4 and 1, 7 and 2, 11 and
+    // 3, 14 and 4, 15 and 5, 21 and 6, 23 and 10, 24 and 14).
+    for (start, seed) in [("supercontinent", 4), ("scattered_continents", 1)] {
         let p = preset(8000, 300.0, start, seed);
         let mut seen = 0usize;
         let world = run_stage(&p, |stage, world, st| {
@@ -793,8 +798,12 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // 2, 8, 11 to 14, 16, 20, 22 and 23, seed 12 again since; 12 of seeds 1 to 24 with the level
     // set on by default, PLT-536, the same day: 1, 2, 4, 5, 7, 9, 12, 15, 17 to 19 and 21; 12 of
     // seeds 1 to 24 with the contact carry on by default, PLT-550, the same day: 1, 4, 5, 7, 8,
-    // 10 to 12, 18, 20, 23 and 24, seed 1 three times, seeds 2, 9, 15, 17, 19 and 21 no more).
-    let p = preset(8000, 300.0, "scattered_continents", 12);
+    // 10 to 12, 18, 20, 23 and 24, seed 1 three times, seeds 2, 9, 15, 17, 19 and 21 no more; 13
+    // of seeds 1 to 24 with the slab pull at the arcs' fronts on by default, PLT-560, 2026-10-24,
+    // the sweep `weld_seed_sweep`: 1 to 6, 10, 14, 15, 18, 21, 23 and 24, seed 1 three times,
+    // seeds 2, 6 and 15 twice, seeds 7, 8, 11, 12 and 20 no more; this test and the recording
+    // test pass on all 13, so seed 1).
+    let p = preset(8000, 300.0, "scattered_continents", 1);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
         assert!(stats::summary(st).partition_ok);
@@ -944,8 +953,10 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // and the guard asserted below binds on welding seed 16; seed 19 again since the level set
     // went on by default, PLT-536, the same day, when seed 19 welds again and seed 20 no more;
     // seed 20 again since the contact carry went on by default, PLT-550, the same day, when seed
-    // 19 no longer welds: all 12 welding seeds pass).
-    let p = preset(8000, 300.0, "scattered_continents", 20);
+    // 19 no longer welds: all 12 welding seeds pass; seed 2 since the slab pull at the arcs'
+    // fronts went on by default, PLT-560, the same day, when seed 20 no longer welds: all 13
+    // welding seeds pass, and seed 2 welds twice).
+    let p = preset(8000, 300.0, "scattered_continents", 2);
     let total = PlatesStage::new(p.clone()).total_steps();
     let mut checked = 0u64;
     let mut life = CollisionLives::default();
