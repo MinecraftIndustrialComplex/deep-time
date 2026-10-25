@@ -55,6 +55,7 @@ pub mod dynamics;
 pub mod events;
 pub mod flow;
 pub mod forces;
+pub mod front_trace;
 pub mod gap_budget;
 pub mod geometry;
 pub mod hotspots;
@@ -179,6 +180,9 @@ pub struct PlatesStage {
     /// `DEEPTIME_CRUST_BUDGET` is set, started at the first step.
     record_crust_budget: bool,
     crust_budget: Option<crust_budget::CrustBudget>,
+    /// The front trace (`front_trace.rs`, measurement only): kept while `DEEPTIME_FRONT_TRACE`
+    /// names a folder.
+    front_trace: Option<front_trace::FrontTrace>,
 }
 
 /// `WorldState::notes` key of the continental crust budget's lines (`crust_budget.rs`, when on).
@@ -198,7 +202,15 @@ impl PlatesStage {
             record_gap_budget: gap_budget::enabled(),
             record_crust_budget: crust_budget::enabled(),
             crust_budget: None,
+            front_trace: front_trace::env_dir().map(front_trace::FrontTrace::new),
         }
+    }
+
+    /// The same stage writing the front trace (`front_trace.rs`) into `dir`: the world it makes
+    /// is the same.
+    pub fn with_front_trace(mut self, dir: std::path::PathBuf) -> PlatesStage {
+        self.front_trace = Some(front_trace::FrontTrace::new(dir));
+        self
     }
 
     /// The same stage keeping the continental crust budget (`crust_budget.rs`): the world it
@@ -325,6 +337,13 @@ impl PlatesStage {
         if let Some(b) = cb.as_mut() {
             b.book(&st.samples, gap_budget::Part::Erosion);
         }
+        // The front trace (`front_trace.rs`, measurement only), taken out of the stage for the
+        // step as the crust budget is.
+        let mut ft = self.front_trace.take();
+        if let Some(f) = ft.as_mut() {
+            f.book(&st.samples, gap_budget::Part::Erosion, env.t_myr);
+        }
+        let ft = std::cell::RefCell::new(ft);
         let cb = std::cell::RefCell::new(cb);
         lap(&mut clock, "feedback");
         // The land's gap budget (`gap_budget.rs`, measurement only): each process's change of the
@@ -336,6 +355,9 @@ impl PlatesStage {
             }
             if let Some(b) = cb.borrow_mut().as_mut() {
                 b.book(&st.samples, part);
+            }
+            if let Some(f) = ft.borrow_mut().as_mut() {
+                f.book(&st.samples, part, env.t_myr);
             }
         };
         let flexure = if collisions || settles {
@@ -384,7 +406,8 @@ impl PlatesStage {
         cut_trace::mark(st, &cache.geo, "shortening");
         // The arcs' fronts and distance field read nothing the belts change: found beside them
         // (P1-19).
-        let begun = subduction::fronts_begin(st, &cache.geo, &pos, &env);
+        let begun = subduction::fronts_begin(st, &cache.geo, &pos, &tree, &env);
+        let traced_fronts = ft.borrow().as_ref().map(|_| begun.traced_fronts());
         let geo = &cache.geo;
         let (stacked, arcs) = rayon::join(
             || {
@@ -590,7 +613,31 @@ impl PlatesStage {
                     .map(|_| std::sync::atomic::AtomicU8::new(0))
                     .collect()
             });
-        let mix = dynamics::boundary_mix(st, &cache.geo, &pos, &env, classes.as_deref());
+        // The front trace reads the classes at every step (measurement only).
+        let traced_classes: Option<Vec<std::sync::atomic::AtomicU8>> =
+            (classes.is_none() && traced_fronts.is_some()).then(|| {
+                (0..st.samples.len())
+                    .map(|_| std::sync::atomic::AtomicU8::new(0))
+                    .collect()
+            });
+        let mix = dynamics::boundary_mix(
+            st,
+            &cache.geo,
+            &pos,
+            &tree,
+            &env,
+            classes.as_deref().or(traced_classes.as_deref()),
+        );
+        if let (Some(f), Some(fb)) = (ft.borrow_mut().as_mut(), traced_fronts.as_deref()) {
+            f.dip = front_trace::dip_rows(
+                st,
+                &cache.geo,
+                &pos,
+                &env,
+                fb,
+                classes.as_deref().or(traced_classes.as_deref()),
+            );
+        }
         book(st, gap_budget::Part::Other);
         lap(&mut clock, "boundary_mix");
         // Crust beyond the thickest column goes down; thickened crust that nothing raises any
@@ -832,8 +879,14 @@ impl PlatesStage {
             shown::resampling(st, env.t_myr);
             // The subduction zones go on through the new lattice (ledger: PLT-550).
             subduction::carry(st, step, env.k.contact_carry);
+            let cycle = step.saturating_sub(st.resample_step);
+            front_trace::want_resample(ft.borrow().is_some());
             let geo = ridges::resample(st, world, &pos, &tree, &cache.geo, &env)?;
+            front_trace::want_resample(false);
             shown::resampled(st);
+            if let Some(f) = ft.borrow_mut().as_mut() {
+                f.resampled(&st.samples, env.t_myr, cycle);
+            }
             if let Some(b) = cb.borrow_mut().as_mut() {
                 b.book_lattice(&st.samples, gap_budget::Part::ResampleBlend);
             }
@@ -909,6 +962,19 @@ impl PlatesStage {
             }
         }
         self.crust_budget = cb;
+        let mut ft = ft.into_inner();
+        if let Some(f) = ft.as_mut() {
+            f.end_step(
+                &st.samples,
+                &pos,
+                |i| st.plate_of(i),
+                step,
+                env.t_myr,
+                resampling,
+                snapshot_due,
+            );
+        }
+        self.front_trace = ft;
         dynamics::record_step(
             st,
             world,
