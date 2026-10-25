@@ -1244,6 +1244,16 @@ It counts the cold-wetland columns a volcano's zone decided apart, as `cold_wetl
 and the test logs that count beside the share. The two bounds (BIO-130) are unchanged. On the 7d16c5a7 planet 7
 columns are left, all on a fen. That is under 20, so the share is logged, not asserted.
 
+The same day master cc27c9f9's planet (the front lane's outline cover had moved the plates) had 37 cold-wetland
+columns the rules decide: 23 on a fen and 1 on a snowy fen by the peatland rule, and 13 on Expanded Ecosphere's black
+beach by `black_beach_basalt` (BIO-122), a beach whose top rock is basaltic, outside any volcano's zone. The share was
+0.65 and the test failed. Those 13 were beaches before any rule ran: the black beach rule replaces only the pack's
+beaches. Which biome a cold-wetland beach took followed the order of the rule files' ids, the black beach first, so
+the same beach was black sand with Expanded Ecosphere and a fen with another pack. The shore decides it (BIO-190): the
+beach is where the waves rework the sediment, and peat builds up only where waterlogged plant litter lies still, so
+the peatland rule keeps a column the search made a beach (`"keeps": ["#minecraft:is_beach", "#c:is_beach"]`), and the
+census counts a cold-wetland column on a beach apart, as `cold_wetland_shore` with its decisions.
+
 A world finding stays open (see "Open questions"): an oceanic shield's cone zone is sized on its record's basal
 radius, measured on the sea floor, so it can cover the whole island down to its coast. Cone zones held 1,722 of the
 planet's 7,504 land columns (23 %).
