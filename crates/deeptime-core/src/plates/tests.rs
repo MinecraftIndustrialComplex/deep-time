@@ -3207,8 +3207,29 @@ fn what_sets_the_planets_plate_speed() {
     let n: u32 = var("SPEED_DIAG_N").map_or(100_000, |x| x.parse().unwrap());
     let myr: f64 = var("SPEED_DIAG_MYR").map_or(600.0, |x| x.parse().unwrap());
     type Tweak = fn(&mut TectonicParams);
+    // Forsyth & Uyeda 1975, Table 6 (model X_s, relative strengths): slab pull 6.43 per km of
+    // trench, slab resistance 0.89 per km per cm/yr, the oceanic mantle drag 0.82e-5 per km² per
+    // cm/yr, the continental drag 5.65e-5 more, the suction 0.50 per km. On FRC-016's reference
+    // plate (A0 of the 14 starting plates, 3,000 km of trench) the drag is 0.82e-5 A0 / (0.89 ×
+    // 3,000) of the slab resistance, so slab_resistance = 1 / that; the terminal velocity 6.43 /
+    // 0.89 cm/yr; keel (0.82 + 5.65) / 0.82; suction 0.50 / 6.43, independent of speed (F&U
+    // p. 171). F&U's transform and colliding resistances do not depend on speed and act on
+    // transforms and convergent boundaries only, so boundary_resistance (viscous, all round) is 0.
+    fn fu(k: &mut TectonicParams, keep_scale: bool) {
+        let a0_km2 = 4.0 * std::f64::consts::PI * 6370.0f64.powi(2) / 14.0;
+        let s = 0.89 * 3000.0 / (0.82e-5 * a0_km2);
+        let v_t = 6.43 / 0.89 * 10.0;
+        k.slab_resistance = s;
+        k.boundary_resistance = 0.0;
+        if !keep_scale {
+            k.plate_speed_scale_mm_yr = v_t * s / (1.0 + s);
+        }
+        k.keel_drag = (0.82 + 5.65) / 0.82;
+        k.slab_suction_share = 0.50 / 6.43;
+        k.suction_saturates = false;
+    }
     // c_b ∝ 1/((1 + s + b) v): a resistance set to 0 with the speed scale raised to match keeps it.
-    let variants: [(&str, Tweak); 10] = [
+    let variants: [(&str, Tweak); 12] = [
         ("defaults", |_| {}),
         ("suction unsaturated (PLT-540 off)", |k| {
             k.suction_saturates = false;
@@ -3235,6 +3256,8 @@ fn what_sets_the_planets_plate_speed() {
         ("speed scale x1.5 (c_b / 1.5)", |k| {
             k.plate_speed_scale_mm_yr *= 1.5;
         }),
+        ("F&U Table 6's ratios and terminal velocity", |k| fu(k, false)),
+        ("F&U Table 6's ratios, the speed scale kept", |k| fu(k, true)),
     ];
     for (start, seed) in [("supercontinent", 1), ("scattered_continents", 2)] {
         let p = builtin_preset(&name, n, myr, start, seed);
