@@ -528,8 +528,9 @@ pub struct TectonicParams {
     /// front), and the belt's surface rises from it at `wedge_slope_deg` up to the strength
     /// height, where it widens into a plateau. Each step's stacked crust fills the ground under
     /// that surface nearest the front first; once the belt is full to `collision_belt_km` the
-    /// toe advances (the surface rises in place). The step's crust and the share a narrow
-    /// overriding plate keeps are unchanged: only where the thickening lands moves. `false`: the
+    /// toe advances (the surface rises in place). How much the belt keeps is the old fill's
+    /// (the sliver rule and the strength height's passes): only where the thickening lands
+    /// moves. `false`: the
     /// profile `1 − (d/W)²`, highest at the front (ledger PLT-243). ledger: PLT-600, PLT-601
     pub collision_belt_taper: bool,
     /// Two plates in collision weld into one when the convergence across their front has stayed

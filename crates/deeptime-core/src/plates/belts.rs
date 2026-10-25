@@ -45,8 +45,9 @@
 //!    Dahlen 1990) and widens as a plateau. The step's crust raises the ground under it nearest
 //!    the front first, so the belt widens behind its toe as a critical wedge grows ("at
 //!    constant taper", Davis, Suppe & Dahlen 1983), and once it is full to `collision_belt_km`
-//!    the surface rises in place (the toe advances). The share a narrow overriding plate keeps
-//!    is the sliver rule's above, and the step's crust is the same: only where it lands moves.
+//!    the surface rises in place (the toe advances). How much the belt keeps is the old fill's to
+//!    the metre (the sliver rule above and the strength height's passes): only where it lands
+//!    moves.
 //!
 //! Both are stamped as a collision orogeny where they rose by more than 5 m/Myr (the subduction
 //! fronts' rule): the `collision` regime the structure stage folds and thrusts, the orogen
@@ -627,40 +628,39 @@ fn stack_front(
             .iter()
             .map(|&(i, _)| f64::from(samples[i].elevation_m))
             .collect();
+        // The old fill: how much the belt keeps (PLT-243's room share, PLT-253's passes) and, with
+        // the taper off, where it lands.
+        let old = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
+        let kept_km2_m = old.iter().sum::<f64>() * area;
+        // What was left over, and whether any sample still had room (measurement only).
+        let left = (belt_rise_km2_m - kept_km2_m).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
+        let room = cap_m <= 0.0 || z_of.iter().zip(&old).any(|(z, g)| cap_m - z - g > 1e-6);
+        if room {
+            sliver_km2_m = left;
+        } else {
+            capped_km2_m = left;
+        }
         let given = if k.collision_belt_taper {
             // ledger: PLT-600 (the surface from critical taper), PLT-601 (the toe advances once
-            // the belt is full). The share a narrow overriding plate keeps is PLT-243's, as it
-            // was (its profile measures the room behind the front): only where the kept crust
-            // lands changes.
-            let keep = (belt.iter().map(|&(_, w)| w).sum::<f64>() * area / belt_weight).min(1.0);
+            // the belt is full). The crust kept is the old fill's, to the m: only where it lands
+            // changes. It always fits (the same samples, the same strength height).
             // The field lists its samples by index: the fill takes them nearest the front first.
             let mut order: Vec<usize> = (0..belt_d.len()).collect();
             order.sort_by(|&a, &b| belt_d[a].2.total_cmp(&belt_d[b].2).then(a.cmp(&b)));
             let d_km: Vec<f64> = order.iter().map(|&j| norm.km(belt_d[j].2)).collect();
             let z_near: Vec<f64> = order.iter().map(|&j| z_of[j]).collect();
-            let kept_km2_m = keep * belt_rise_km2_m;
-            let (near, toe) = fill_taper(&d_km, &z_near, z_front, tan, kept_km2_m, area, cap_m);
+            let (near, toe) =
+                fill_taper(&d_km, &z_near, z_front, tan, kept_km2_m, area, cap_m);
             toe_km2_m = toe * COLUMN_ISOSTATIC_FACTOR;
             let mut given = vec![0.0f64; belt_d.len()];
             for (&j, g) in order.iter().zip(near) {
                 given[j] = g;
             }
-            sliver_km2_m = (belt_rise_km2_m - kept_km2_m) * COLUMN_ISOSTATIC_FACTOR;
-            capped_km2_m =
-                (kept_km2_m - given.iter().sum::<f64>() * area).max(0.0) * COLUMN_ISOSTATIC_FACTOR;
+            capped_km2_m += (kept_km2_m - given.iter().sum::<f64>() * area).max(0.0)
+                * COLUMN_ISOSTATIC_FACTOR;
             given
         } else {
-            let given = fill_belt(&belt, &z_of, belt_rise_km2_m, belt_weight, area, cap_m);
-            // What was left over, and whether any sample still had room (measurement only).
-            let left = (belt_rise_km2_m - given.iter().sum::<f64>() * area).max(0.0)
-                * COLUMN_ISOSTATIC_FACTOR;
-            let room = cap_m <= 0.0 || z_of.iter().zip(&given).any(|(z, g)| cap_m - z - g > 1e-6);
-            if room {
-                sliver_km2_m = left;
-            } else {
-                capped_km2_m = left;
-            }
-            given
+            old
         };
         rises.extend(
             belt_d
@@ -1882,7 +1882,10 @@ mod tests {
             let z0: Vec<f32> = st.samples.iter().map(|s| s.elevation_m).collect();
             let (stacked, _) = fx.step(&mut st, 1, None);
             let s = &stacked[&0];
-            kept.push(s.belt_km2_m + s.wedge_km2_m + s.sliver_km2_m + s.capped_km2_m);
+            kept.push((
+                s.belt_km2_m + s.wedge_km2_m + s.clipped_km2_m,
+                s.sliver_km2_m + s.capped_km2_m,
+            ));
             // The overriding plate's rises: on its edge at the front (a neighbour on the incoming
             // plate) and behind it, away from the cap's corners.
             let pts = fx.geo.points();
@@ -1915,9 +1918,50 @@ mod tests {
                 );
             }
         }
+        let close = |a: f64, b: f64| (a - b).abs() <= 1e-6 * (a.abs() + b.abs()).max(1.0);
         assert!(
-            (kept[1] - kept[0]).abs() < 1e-6 * kept[0],
-            "the crust kept or sent down: {kept:?}"
+            close(kept[1].0, kept[0].0) && close(kept[1].1, kept[0].1),
+            "the crust kept, and sent down: {kept:?}"
+        );
+    }
+
+    /// PLT-600: how much the belt keeps is the old fill's to the metre behind a narrow overriding
+    /// continent too, where the sliver rule (PLT-243's floor and the passes of PLT-253) sends part
+    /// of the stack down with the slab: a 2,000 km belt behind a continent one row of samples
+    /// deep.
+    #[test]
+    fn the_taper_keeps_what_the_old_fill_keeps_behind_a_sliver() {
+        let mut out = Vec::new();
+        for taper in [false, true] {
+            let mut fx = Fixture::new();
+            fx.preset.tectonics.collision_threshold_km = 1.0e9;
+            fx.preset.tectonics.collision_belt_km = 2000.0;
+            fx.preset.tectonics.collision_belt_taper = taper;
+            let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+            let pts = fx.geo.points();
+            for (i, s) in st.samples.iter_mut().enumerate() {
+                if s.kind == CONTINENTAL && fx.norm.km(pts[i].x.asin()) < -250.0 {
+                    let mut ocean = Sample::blank(0);
+                    ocean.elevation_m = -4000.0;
+                    *s = ocean;
+                }
+            }
+            let (stacked, _) = fx.step(&mut st, 1, None);
+            let s = &stacked[&0];
+            out.push((
+                s.belt_km2_m + s.wedge_km2_m + s.clipped_km2_m,
+                s.sliver_km2_m + s.capped_km2_m,
+                s.sliver_km2_m,
+            ));
+        }
+        let close = |a: f64, b: f64| (a - b).abs() <= 1e-6 * (a.abs() + b.abs()).max(1.0);
+        assert!(
+            out[0].2 > 0.02 * (out[0].0 + out[0].1),
+            "the sliver rule sends part of the stack down: {out:?}"
+        );
+        assert!(
+            close(out[1].0, out[0].0) && close(out[1].1, out[0].1),
+            "the crust kept, and sent down: {out:?}"
         );
     }
 
