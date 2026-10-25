@@ -7,6 +7,8 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.Playa;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.WorldGenRegion;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -26,6 +28,8 @@ import java.util.List;
  * <p>Runs in {@link GeologicChunkGenerator#buildSurface} after {@link WaterBodies} and before
  * {@link IcePass}. Columns whose surface is fluid, and air, fluid and bedrock blocks, are left as
  * they are. Only the column's own blocks are read.
+ *
+ * <p>No feature lays soil over the salt afterwards ({@link #refusesSoil}, ledger HYD-180).
  */
 public final class PlayaPass {
 
@@ -44,8 +48,7 @@ public final class PlayaPass {
         int x0 = chunk.getPos().getMinBlockX(), z0 = chunk.getPos().getMinBlockZ();
         if (!anySalt(layer, x0, z0, x0 + 15, z0 + 15))
             return 0;
-        PaletteRules.Result<BlockState>[] found = RockPalette.get().forClasses(List.of(Playa.rockClass(wd.manifest().notes())));
-        BlockState salt = found.length == 0 || found[0] == null ? null : found[0].pick(0L);
+        BlockState salt = salt(wd);
         if (salt == null)
             return 0;
         int minY = chunk.getMinBuildHeight();
@@ -73,5 +76,41 @@ public final class PlayaPass {
             }
         }
         return placed;
+    }
+
+    /**
+     * Whether a feature's write of {@code next} at {@code pos} is refused: soil ({@code #minecraft:dirt}:
+     * grass, dirt, podzol, moss, mud, ...) over a salt flat's salt in a Deep Time level (ledger HYD-180). A salt
+     * crust grows no soil; Expanded Ecosphere's {@code cliff_grass} turns any calcite under air, halite's vanilla
+     * stand-in, into grass. Asked by every {@code WorldGenRegion.setBlock} ({@code mixin.WorldGenRegionSaltMixin});
+     * a write that is no soil costs one tag test, and the plants a patch would set on that soil then find none.
+     */
+    public static boolean refusesSoil(WorldGenRegion region, BlockPos pos, BlockState next) {
+        if (!next.is(BlockTags.DIRT))
+            return false;
+        if (!(region.getLevel().getChunkSource().getGenerator() instanceof GeologicChunkGenerator g)
+                || !(g.terrain() instanceof WorldDataTerrain w) || !w.data().has(Playa.LAYER))
+            return false;
+        BlockState salt = salt(w.data());
+        if (salt == null || !region.hasChunk(pos.getX() >> 4, pos.getZ() >> 4) || region.getBlockState(pos) != salt)
+            return false;
+        double v = w.data().layer(Playa.LAYER).nearest(pos.getX(), pos.getZ());
+        return !Double.isNaN(v) && Math.round(v) > 0;
+    }
+
+    private record Salt(WorldData wd, RockPalette palette, BlockState state) {}
+
+    private static volatile Salt saltCache;
+
+    /** The salt's block (the bake's rock class through the palette), kept per world data and palette. */
+    static BlockState salt(WorldData wd) {
+        RockPalette palette = RockPalette.get();
+        Salt s = saltCache;
+        if (s == null || s.wd() != wd || s.palette() != palette) {
+            PaletteRules.Result<BlockState>[] found = palette.forClasses(List.of(Playa.rockClass(wd.manifest().notes())));
+            s = new Salt(wd, palette, found.length == 0 || found[0] == null ? null : found[0].pick(0L));
+            saltCache = s;
+        }
+        return s.state();
     }
 }
