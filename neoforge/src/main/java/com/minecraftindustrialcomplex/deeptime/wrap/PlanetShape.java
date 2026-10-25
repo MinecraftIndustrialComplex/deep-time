@@ -18,7 +18,7 @@ import net.minecraft.world.level.levelgen.WorldDimensions;
  * <p>Toroidal World's own {@code ShapeModule} path only runs from its Create World button and
  * never on a dedicated server (P0-06 lookup of TW 0.19.3), so Deep Time shapes its worlds itself,
  * from {@code WorldDimensions.bake} ({@code WorldDimensionsShapeMixin}). That runs for a new
- * singleplayer world, a server's first start with {@code level-type=deeptime:planet}, and every
+ * singleplayer world, a server's first start with {@code level-type=deeptime:planet_cube}, and every
  * reload. A world that already carries a shape (restored from level.dat by TW) keeps it.
  *
  * <p>Climate compression is left at TW's default: it pattern-matches vanilla's climate density
