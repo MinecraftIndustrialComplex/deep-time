@@ -396,7 +396,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
     // Distances from the boundary on each side, through each side's own crust of the plate (the
     // two sides reach disjoint samples, so they run at once; P1-19).
     let reach = 0.5 * w + half;
-    let side = |kind: u8| -> Vec<(u32, f64, u32)> {
+    let from_side = |kind: u8| -> Vec<(u32, f64, u32)> {
         let src: Vec<(u32, f64, u32)> = boundary
             .iter()
             .zip(&seed_at)
@@ -410,7 +410,7 @@ pub fn step(state: &mut PlateState, geo: &Geo, pos: &[DVec3], env: &Env) -> Tran
             reach,
         )
     };
-    let (reach_c, reach_o) = rayon::join(|| side(CONTINENTAL), || side(OCEANIC));
+    let (reach_c, reach_o) = rayon::join(|| from_side(CONTINENTAL), || from_side(OCEANIC));
 
     // The zone: signed distance and target, per sample, in sample order (a sample reached from
     // the continental side is on the continental side, from the oceanic side on the oceanic).
