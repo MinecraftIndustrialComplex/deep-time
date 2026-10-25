@@ -311,6 +311,23 @@ pub fn backstop_weight(k: &TectonicParams, l_km: f32) -> f64 {
     (-thermal_age_myr(f64::from(l_km)) / tau).exp()
 }
 
+/// The thin sheet's weakness at a lithosphere `l_km` deep, η_0 / η = e^(−t_eq / τ_s) with t_eq
+/// its thermal age and τ_s `collapse_sheet_strength_myr` (`tau_myr`; PLT-415's law with ISO-112's
+/// age, PLT-470's form): 1 for a hot lithosphere at or above L_hot, 0 for a craton at L_cold, and
+/// 1 everywhere when τ_s ≤ 0 (no growth, as in the collapse's sheet). A sample with no state
+/// (`l_km` ≤ 0) has no strength to read and takes no strain: 0. For the overriding plate's share
+/// of a collision (`belts.rs`, PLT-652).
+// ledger: PLT-652, PLT-415, ISO-112
+pub fn sheet_weakness(tau_myr: f64, l_km: f32) -> f64 {
+    if l_km <= 0.0 || l_km.is_nan() {
+        return 0.0;
+    }
+    if tau_myr.is_nan() || tau_myr <= 0.0 {
+        return 1.0;
+    }
+    (-thermal_age_myr(f64::from(l_km)) / tau_myr).exp()
+}
+
 /// The step's update (see the module docs): every oceanic sample's L from its age, every visible
 /// continental sample's L and K from the step's flags. Runs after the hotspots, before the
 /// settling.
