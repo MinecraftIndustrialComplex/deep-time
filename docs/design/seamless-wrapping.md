@@ -1,5 +1,10 @@
 # Seamless wrapping: a quincuncial world joined by Immersive Portals (prototype)
 
+> **Retired (2026-10-24, cube plan 7.4).** The Petroff-Guyou world, its level types (`deeptime:planet`,
+> `deeptime:planet_32k`) and the quincuncial prototype are deleted; the cube is the only world type
+> (`docs/design/cube-game.md`, `docs/science/cube-world-game.md`). This page is the record of the
+> quincuncial design and its measurements. Do not use its level types, commands or tools.
+
 **Production (2026-10-04).** Ben chose Petroff–Guyou (decisions log 2026-10-04: "We'll proceed w/
 Petroff–Guyou, if I think distortion is too bad in gameplay, I'll swap later.") and then paused the
 Immersive Portals track ("Engine only; pause IP"): Deep Time's own wrap engine joins the seams. The

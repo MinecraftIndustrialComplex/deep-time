@@ -371,7 +371,7 @@ final class ScreenshotDriver {
                         if (!NativeLoader.isLinked() || Boolean.parseBoolean(System.getProperty(PROP + ".customize", "true"))) {
                             var editor = cws.getUiState().getPresetEditor();
                             if (editor == null) {
-                                DeepTime.LOGGER.error("[deeptime-shot] FAILED: no preset editor (Customize) for deeptime:planet");
+                                DeepTime.LOGGER.error("[deeptime-shot] FAILED: no preset editor (Customize) for deeptime:planet_cube");
                                 go(Step.QUIT);
                                 return;
                             }
