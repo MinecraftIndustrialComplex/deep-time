@@ -1866,11 +1866,12 @@ fn retreat_forearcs(
 /// Per sample, whether a sample the arcs' distance field reaches stands over its front's slab
 /// (`tectonics.arc_slab_ends`; the front lane's step 10, plates.md "Step 10"; ledger: PLT-561):
 /// between the ends of the front its nearest front sample (its label) stands on, along that
-/// sample's front. The front is the label's own front samples and those joined to it, front by
-/// front, within two lattice edges in the same group (a zigzag boundary's second row, a corner),
-/// out to the band's reach; each covers its share of the straight front (PLT-530), centred on it,
-/// along the label's line (the cross of its position and its boundary normal, PLT-310). A sample
-/// whose distance along that line falls outside the front's extent lies past the slab's end. The
+/// front. The front is the label and the front samples joined to it, one by one, within two
+/// lattice edges in the same group (a zigzag boundary's second row, a corner), out to the band's
+/// reach; its line runs through the label square to the front's normals (PLT-310), each weighted
+/// by its share of the straight front (PLT-530), and each front sample covers its share along the
+/// line, centred on it. A sample whose distance along that line falls outside the front's extent
+/// lies past the slab's end. The
 /// reach is the band's (`arc_distance_km` and two `arc_width_km`, past which its weight is under
 /// e^-4) and two lattice spacings: a sample's label need not be its nearest front sample on the
 /// sphere (the lattice's distance runs up to 2/√3 longer than the straight line, by the edges'
@@ -1918,16 +1919,14 @@ fn over_the_slab(
     let norm = env.norm;
     let reach =
         norm.rad(env.k.arc_distance_km + 2.0 * env.k.arc_width_km) + 2.0 * norm.spacing_rad();
-    // Each front sample's line (its position and direction along the front) and the front's
+    // Each front sample's line (its position and the front's direction there) and the front's
     // extent along it, radians: [lo, hi].
     let extent: Vec<(DVec3, DVec3, f64, f64)> = sources
         .par_iter()
         .enumerate()
         .map(|(l, &(v, ..))| {
-            let v = v as usize;
-            let p = at(v);
-            let t = p.cross(normals[v]).normalize_or_zero();
-            let (mut lo, mut hi) = (-0.5 * shares[v], 0.5 * shares[v]);
+            let p = at(v as usize);
+            // The front within the reach, front sample by front sample.
             let mut seen = std::collections::HashSet::from([l as u32]);
             let mut queue = vec![l as u32];
             let mut next = 0;
@@ -1935,15 +1934,30 @@ fn over_the_slab(
                 next += 1;
                 for &b in &near[a as usize] {
                     let w = sources[b as usize].0 as usize;
-                    let q = at(w) - p;
-                    if q.length() > reach || !seen.insert(b) {
-                        continue;
+                    if (at(w) - p).length() <= reach && seen.insert(b) {
+                        queue.push(b);
                     }
-                    queue.push(b);
-                    let tau = q.dot(t);
-                    lo = lo.min(tau - 0.5 * shares[w]);
-                    hi = hi.max(tau + 0.5 * shares[w]);
                 }
+            }
+            // Its direction: square to its normals, each by its share of the front (one front
+            // sample's own normal turns at a lattice corner, and most at a front's end).
+            let mean: DVec3 = queue
+                .iter()
+                .map(|&b| {
+                    let w = sources[b as usize].0 as usize;
+                    normals[w] * shares[w]
+                })
+                .sum();
+            let mut t = p.cross(mean).normalize_or_zero();
+            if t == DVec3::ZERO {
+                t = p.cross(normals[v as usize]).normalize_or_zero();
+            }
+            let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+            for &b in &queue {
+                let w = sources[b as usize].0 as usize;
+                let tau = (at(w) - p).dot(t);
+                lo = lo.min(tau - 0.5 * shares[w]);
+                hi = hi.max(tau + 0.5 * shares[w]);
             }
             (p, t, lo, hi)
         })
