@@ -1028,6 +1028,18 @@ pub struct TectonicParams {
     /// new contact of plates that come to converge starts incipient. Off, every front is a working
     /// subduction zone from its first step. ledger: PLT-610
     pub incipient_subduction: bool,
+    /// The older side of a subduction initiation's fracture goes under (the floor-age lane,
+    /// 2026-10-25; Gurnis, Hall & Lavier 2004 [60]: at a fracture zone in compression "the older
+    /// plate is thrust beneath the younger", and [78]: with an asymmetry in age, "the weak zone
+    /// overlies the thicker plate"): the mean age of the visible ocean floor on each side within
+    /// one lattice step of the other side sets which plate the planted slab (PLT-270) hangs from,
+    /// the split's or the parent's; a side whose fracture is mostly continental crust never goes
+    /// under; a tie, the split. The contact the two plates form later takes the planted slab's
+    /// polarity, not the rule of a new contact (the overlap's crust and ages,
+    /// `subduction::resolve`). Off, the slab is always the split's and the contact follows the
+    /// overlap, which put the parent under in 1,494 of 1,998 such contacts on base15 (build log
+    /// 2026-10-25). ledger: PLT-655
+    pub initiation_polarity_by_age: bool,
     /// Subduction initiation off the passive margin (V1 gap 2's stage C1): the old floor within
     /// the reach of the arc the new trench builds (`arc_distance_km` + `arc_width_km`, and one
     /// lattice spacing for where on the lattice the front falls; great circle) of the plate's
@@ -1260,6 +1272,7 @@ impl Default for TectonicParams {
             subduction_initiation_clearance_km: 1000.0,
             initiation_slab_km: 150.0,            // ledger: PLT-270
             incipient_subduction: true,           // ledger: PLT-610 (on since 2026-10-25)
+            initiation_polarity_by_age: true,     // ledger: PLT-655
             subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: false,         // ledger: PLT-516

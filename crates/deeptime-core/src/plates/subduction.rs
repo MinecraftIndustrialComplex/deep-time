@@ -449,7 +449,14 @@ pub fn resolve(
                     }
                 };
                 let (c0, c1) = (frac(0) >= 0.5, frac(1) >= 0.5);
-                let under_lo = match (c0, c1) {
+                // A subduction initiation's contact takes the polarity of the slab planted under
+                // its fracture, which the fracture's ages set (ledger: PLT-655).
+                let planted = if env.k.initiation_polarity_by_age {
+                    planted_polarity(state, lo, hi)
+                } else {
+                    None
+                };
+                let under_lo = planted.unwrap_or_else(|| match (c0, c1) {
                     (false, true) => true,
                     (true, false) => false,
                     (false, false) => mean_age(0) >= mean_age(1),
@@ -460,7 +467,7 @@ pub fn resolve(
                         );
                         n0 <= n1
                     }
-                };
+                });
                 let (under, over) = if under_lo { (lo, hi) } else { (hi, lo) };
                 let setting = u8::from(c0) + u8::from(c1);
                 let conv = env.norm.speed_mm_yr(
@@ -676,6 +683,28 @@ fn continent_within(
         frontier = next;
     }
     false
+}
+
+/// The polarity of a new contact between a plate and its parent from the slab already planted
+/// between them (a subduction initiation's, `rifting::initiate`, ledger PLT-655 and PLT-270):
+/// whether `lo` goes under; `None` where neither plate is the other's parent, no slab or a slab
+/// each way hangs between them.
+fn planted_polarity(state: &PlateState, lo: u32, hi: u32) -> Option<bool> {
+    let parent = |a: u32| state.plates.get(a as usize).and_then(|p| p.parent);
+    if parent(lo) != Some(hi) && parent(hi) != Some(lo) {
+        return None;
+    }
+    let hangs = |under: u32, over: u32| {
+        state
+            .slabs
+            .iter()
+            .any(|s| s.under == under && s.over == over)
+    };
+    match (hangs(lo, hi), hangs(hi, lo)) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        _ => None,
+    }
 }
 
 /// A contact reverses when at least this fraction of its subducting side's crust in the overlap
