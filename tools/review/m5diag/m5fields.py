@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""M5 (coast with high ground) on the census's own grid, run by run: m5fields.py <out.jsonl> [workers]
+"""M5 (coast with high ground) on the census's own grid, run by run: m5fields.py <out.jsonl> [workers] [runs]
 
-For each base12 run (pool key 5cf16ecd76cd, earthlike_quick_16k-1000, argkey cd665cef): the final
+For each run of an arm (the folder in M5DIAG_RUNS, default base12's: pool key 5cf16ecd76cd,
+earthlike_quick_16k-1000, argkey cd665cef). M5 here is the version 1 rule (the census grid, closed
+depressions as sea, the reach straight across the sea); v1census version 2 (RLC-055) differs, and
+the cached value it is checked against is whichever version the run holds. For each run: the final
 fields as measure_v1census.py reads them (the L1 grid, z = (elevation - 63) x 35 m), checked
 against the run's cached v1census values, then:
 
@@ -25,6 +28,7 @@ One JSON object per run to <out.jsonl>; m5table.py prints the medians."""
 import contextlib
 import io
 import json
+import os
 import sys
 from multiprocessing import Pool
 from pathlib import Path
@@ -39,6 +43,8 @@ from m5lib import cc  # noqa: E402
 POOL = Path("/data/ban/deeptime-runs/pool")
 KEY = "5cf16ecd76cd"
 ARM = "earthlike_quick_16k-1000/cd665cef"
+# The arm's run folder: <pool>/<key>/<preset>-<length>/<argkey>.
+RUNS = Path(os.environ.get("M5DIAG_RUNS") or POOL / KEY / ARM)
 FIELDS = 11
 CLASSES = ["coll_young", "coll_old", "andean_young", "andean_old", "u_Tc", "u_ocean", "u_volc",
            "u_rift", "u_thick", "u_other"]
@@ -351,7 +357,7 @@ def one(run):
 def main():
     dest = Path(sys.argv[1])
     workers = int(sys.argv[2]) if len(sys.argv) > 2 else 3
-    runs = sorted(p for p in (POOL / KEY / ARM).glob("*-*")
+    runs = sorted(p for p in RUNS.glob("*-*")
                   if p.is_dir() and (p / "fields" / "index.json").exists())
     if len(sys.argv) > 3:
         runs = [p for p in runs if p.name in sys.argv[3].split(",")]
