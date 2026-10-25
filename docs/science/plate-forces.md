@@ -339,7 +339,9 @@ diagnosis of its own, not traced here.
   degree rule that divides transforms from colliding boundaries is theirs (p. 183), so the friction
   does not use V1 gap 2's Bird's 20 degrees (PLT-311). With incipient subduction on as well, an
   incipient contact takes no PLT-585 friction, so its front's resistance is counted once (agent,
-  2026-10-25).
+  2026-10-25; built by the front lane, `an_incipient_front_takes_no_forsyth_uyeda_friction`; a
+  continental sample at the front keeps its friction, since it takes the collision's resistance,
+  not the incipient one).
 
 ## Open questions
 

@@ -9423,6 +9423,11 @@ formed, so counting both on one front counts that front's resistance twice. In s
 mature one, and 0.67 times at a ridge. The code is two conditions in the friction pass of
 `forces.rs` (`if friction`): the front's link is skipped while its contact is incipient, and the
 loop over the other boundaries skips a plate that holds an incipient contact with the sample's plate
-from either side, so neither side adds a half share in its place. Whichever of the two lanes lands
-second adds them, with a unit test that an incipient front carries one resistance and a mature one
-F_CR alone.
+from either side, so neither side adds a half share in its place. The front lane landed second and
+added them (2026-10-25), with the unit test `an_incipient_front_takes_no_forsyth_uyeda_friction`
+(both switches on: an incipient front carries the incipient resistance alone, the same as with
+PLT-585 off, and no friction between its two plates; a mature one F_CR alone, from the overriding
+side, and no incipient resistance; the other boundaries' friction the same in both). The incipient
+contacts are the ones the arcs and the boundary mix read, by the slab before the step's growth. A
+continental sample at an incipient contact's front takes no incipient resistance (it is a
+collision's, PLT-610), so it keeps the front's friction there as at a mature contact.

@@ -1126,8 +1126,12 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
         // exceed the mix's beyond the tolerance; the mix above the plates' by 3.8 to 6.6 % over a
         // run (this seed 5.4 %) and by at most 8 to 32 % in a step (this seed 10.3 %). Until
         // PLT-330 the plates also counted their contacts' transform stretches and held more.
+        // With incipient subduction (PLT-610, PLT-614) the mix counts an incipient front as
+        // converging boundary (`front_bands.incipient`), not in its first two kinds; the plates
+        // record every front.
         assert!(step.mix_km.iter().all(|&x| x.is_finite() && x >= 0.0));
-        let fronts: f64 = step.mix_km[..2].iter().sum();
+        let fronts: f64 =
+            step.mix_km[..2].iter().sum::<f64>() + step.front_bands.incipient.iter().sum::<f64>();
         let recorded: f64 = step.plates.iter().map(|q| q.front_km).sum();
         // (A plate that died in the step, welded or absorbed, has no plate record: its fronts are
         // in the mix only.)
@@ -2625,7 +2629,10 @@ fn a_front_of_known_length(
 /// plates.md, "Step 9" and "Step 10".
 #[test]
 fn the_arcs_band_stops_at_the_slabs_ends() {
-    let base = preset(40_000, 20.0, "supercontinent", 5);
+    let mut base = preset(40_000, 20.0, "supercontinent", 5);
+    // A fixture with no slab, so a working subduction zone only with incipient subduction off
+    // (PLT-610; on, its front is incipient and builds no arc).
+    base.tectonics.incipient_subduction = false;
     let wrap = std::f64::consts::PI * base.tectonics.arc_distance_km;
     // Every case is printed before the test fails on any.
     let mut failed: Vec<String> = Vec::new();
@@ -4033,7 +4040,10 @@ fn the_margin_as_the_mix_sees_it(
 /// other plates nearby) is where to look next.
 #[test]
 fn the_ocean_continent_front_through_a_resampling() {
-    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    // A fixture with no slab: a subduction zone in the mix only with incipient subduction off
+    // (PLT-610, PLT-614).
+    p.tectonics.incipient_subduction = false;
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (mut st, geo, pos) = converging_plates(&p, &env);
@@ -4253,7 +4263,10 @@ fn an_oblique_promontory_through_a_resampling() {
 /// margin of the first step keeps every front. The boundary mix reads the margin the same way.
 #[test]
 fn a_consumed_slab_leaves_no_front() {
-    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    // A fixture with no slab: a subduction zone in the mix only with incipient subduction off
+    // (PLT-610, PLT-614).
+    p.tectonics.incipient_subduction = false;
     let mut off = p.tectonics.clone();
     off.front_current_geometry = false;
     let stage = PlatesStage::new(p.clone());
@@ -4330,7 +4343,10 @@ fn a_consumed_slab_leaves_no_front() {
 /// through each cycle while the rule asked of every neighbour of the subducting plate).
 #[test]
 fn an_opening_boundary_of_a_subducting_plate_stays_in_the_mix() {
-    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    // A fixture with no slab: a subduction zone in the mix only with incipient subduction off
+    // (PLT-610, PLT-614).
+    p.tectonics.incipient_subduction = false;
     let mut off = p.tectonics.clone();
     off.front_current_geometry = false;
     let stage = PlatesStage::new(p.clone());
@@ -4446,7 +4462,9 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
 /// counted once; the cones it counted are cleared for the hotspots.
 #[test]
 fn arc_cones_are_counted_inside_the_arc_rate() {
-    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let mut p = preset(20_000, 20.0, "supercontinent", 5);
+    // A fixture with no slab, so an arc only with incipient subduction off (PLT-610).
+    p.tectonics.incipient_subduction = false;
     let stage = PlatesStage::new(p.clone());
     let env = stage.env(&p.tectonics, 1);
     let (st, geo, pos) = converging_plates(&p, &env);
@@ -5443,4 +5461,106 @@ fn incipient_subduction_changes_nothing_past_its_stage() {
     assert!(short.1.is_empty(), "{:?}", short.1);
     assert_eq!(short.2.bands.incipient, [0.0; 2]);
     assert!(short.2.km[dynamics::mix::OCEAN_CONTINENT] > 0.0);
+}
+
+/// With Forsyth & Uyeda's balance on as well (PLT-585), a trench's resistance is counted once
+/// (PLT-610, FRC-035): while its contact is incipient its front takes the incipient resistance
+/// alone and no friction from either side, and once the contact is mature the front takes its
+/// colliding resistance F_CR (the transform's where the 60 degree rule calls it one) and no
+/// incipient resistance. The reference plate with a 40-km slab and a full one, both switches on:
+/// the front's oceanic metres are the same; at 40 km no friction between the two plates, the
+/// incipient resistance its 2.5 × 10^12 N/m over those metres (as with PLT-585 off); with the
+/// full slab no incipient resistance, the overriding side's friction between the transform's and
+/// F_CR over the front's metres, none from the side going under. The other boundaries' friction
+/// is the same in both.
+#[test]
+fn an_incipient_front_takes_no_forsyth_uyeda_friction() {
+    let full = preset(20_000, 20.0, "supercontinent", 5)
+        .tectonics
+        .slab_depth_km;
+    let terms = |fu: bool, slab_km: f64| {
+        let (mut p, st, geo, pos, _) =
+            an_incipient_reference(true, slab_km, 10.0, forces::SLAB_AGE_REF_MYR);
+        p.tectonics.forsyth_uyeda_balance = fu;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let c = &st.contacts[0];
+        let (under, over) = (c.under, c.over);
+        let t = forces::boundary_terms(&st, &geo, &pos, &env);
+        (t, under, over, env.gravity)
+    };
+    let (young, under, over, g) = terms(true, 40.0);
+    let (mature, ..) = terms(true, full);
+    let (young_off, ..) = terms(false, 40.0);
+    let fr = |t: &forces::BoundaryTerms, a: u32, b: u32| {
+        t.friction_n.get(&(a, b)).copied().unwrap_or(0.0)
+    };
+    let front_m = young.front_m.get(&(over, under)).copied().unwrap_or(0.0);
+    let incip: f64 = young.incipient_n.values().sum();
+    let incip_off: f64 = young_off.incipient_n.values().sum();
+    eprintln!(
+        "plate {under} under {over}: front {:.0} km; F_CR {:.3e}, F_TF {:.3e} N/m; incipient: \
+         friction {:.3e} / {:.3e} N, resistance {incip:.4e} N ({incip_off:.4e} with PLT-585 off); \
+         mature: front friction {:?} / {:.3e} N, resistance {:?}; friction by pair {:?} / {:?}",
+        front_m / 1000.0,
+        young.colliding_n_m,
+        young.transform_n_m,
+        fr(&young, over, under),
+        fr(&young, under, over),
+        mature.front_friction_n.get(&(over, under)),
+        fr(&mature, under, over),
+        mature.incipient_n,
+        young.friction_n,
+        mature.friction_n,
+    );
+    assert!(front_m > 0.0);
+    assert!(young.colliding_n_m > 0.0 && young.transform_n_m > 0.0);
+    assert!(
+        young.front_m == mature.front_m,
+        "{:?} {:?}",
+        young.front_m,
+        mature.front_m
+    );
+    // Incipient: the incipient resistance alone.
+    assert_eq!(fr(&young, over, under), 0.0);
+    assert_eq!(fr(&young, under, over), 0.0);
+    let expect = forces::incipient_resistance_n_m(forces::SLAB_AGE_REF_MYR, g) * front_m;
+    assert!(
+        ((incip - expect) / expect).abs() < 1e-9,
+        "{incip} against {expect}"
+    );
+    assert!(
+        ((incip - incip_off) / incip_off).abs() < 1e-12,
+        "{incip} {incip_off}"
+    );
+    // Mature: the front's friction alone, from the overriding side.
+    assert!(mature.incipient_n.is_empty(), "{:?}", mature.incipient_n);
+    assert_eq!(fr(&mature, under, over), 0.0);
+    let f = mature
+        .front_friction_n
+        .get(&(over, under))
+        .copied()
+        .unwrap_or(0.0);
+    let lo = mature.transform_n_m.min(mature.colliding_n_m) * front_m;
+    let hi = mature.transform_n_m.max(mature.colliding_n_m) * front_m;
+    assert!(
+        f >= lo * (1.0 - 1e-9) && f <= hi * (1.0 + 1e-9),
+        "{f} not in [{lo}, {hi}]"
+    );
+    assert!(fr(&mature, over, under) >= f);
+    // Elsewhere the same.
+    let rest = |t: &forces::BoundaryTerms| -> Vec<((u32, u32), f64)> {
+        t.friction_n
+            .iter()
+            .filter(|(k, _)| **k != (over, under) && **k != (under, over))
+            .map(|(&k, &v)| (k, v))
+            .collect()
+    };
+    assert!(!rest(&mature).is_empty());
+    assert!(
+        rest(&young) == rest(&mature),
+        "{:?} {:?}",
+        rest(&young),
+        rest(&mature)
+    );
 }
