@@ -8104,3 +8104,86 @@ shape and other plates nearby. The probe that would decide is one on a real run'
 run's planet at a resampling, the margin samples that turn transform followed through it (class,
 normal, the transform test's angle, contact). The test asserts what it found (the front within 0.9
 of before, no normal over 70 degrees off at any stage, the contact active).
+
+**The arm** (fl-pull: front-pull at 7121c383, master 4dd85fe2 with `front_pull` on; both starts ×
+seeds 1 to 4, 1000 Myr, `+DEEPTIME_CRUST_BUDGET=1` with its maps; key 822ccd2a2d81, argkey
+cd665cef; `pool.sh measure` v1census, guard, front, boundgeom, shown, hiding, boundary, sutures;
+`build/front`'s records-only scripts for the plate check, the speeds, the area book, the mix by
+phase and the PLT-554 globals). Read against base8 (master 4dd85fe2's 24 runs, key 6b02802a0f21,
+an alias of fl-outline's e6bdf186ab78) and fl-outline's same eight, which base8 holds; two-sided
+Mann-Whitney p in brackets, against base8 unless said.
+
+- **What it is for.** The pull counts 73,500 km of straight front a step along the normal, against
+  the old count's 131,553 km of spacings, 93,140 of them along the normal (0.79). The pulling
+  fronts are now 0.90 of the arcs' straight front, against 1.21 along the normal before; the arcs
+  also count fronts whose slab does not pull (continental crust going under, a slab under 10 Myr
+  old or of no length yet), so the pull's fronts are a part of theirs, as they should be. The
+  pulling samples' spacings are 82,767 km a step, 1.126 times their straight front and 0.845
+  along the normal (PLT-554, which now books the pulling fronts' own metres).
+- **The speeds** (the plate check's records; the sourced bands in the ledger, CHK-020 to CHK-023;
+  reported, not tuned): the area-weighted RMS 25.95 mm/yr (23.8 to 28.6 over the runs) against
+  26.79 (0.007) and fl-outline's 27.12 (0.024), the band 40 to 100 (Forsyth & Uyeda's 47 today,
+  Zahirovic's 50 to 100 over 200 Myr); the median 23.05 against 26.70 (< 0.001), the band 30 to
+  60; the 90th percentile 66.35 against 65.15 (0.12), the band 70 to 110; the 10th 6.64 against
+  8.05 (0.011), at most 20. Slab-attached over slab-free plates 3.07 against 2.50 (0.008; Earth
+  about 3 to 4), oceanic over continental 2.62 against 2.20 (0.094; 2 to 3). The visible-weighted
+  speed 18.6 to 19.4 mm/yr through a resampling cycle against 21.3 to 22.5. The RMS and the median
+  were outside their bands on master already; the pull's own count takes them 3 % and 14 % further
+  below, and leaves the fast plates as they were: the plates that slow are the ones the old count
+  pulled along their contacts' strike-slip stretches. The drag's calibration is not the cause: the
+  reference plate on the lattice meets its definition on this count (above). Full table in
+  [plate-forces.md](plate-forces.md), "On the pull's own count".
+- **The boundary.** Judged a transform 0.209 of the boundary against fl-outline's 0.233 (< 0.001;
+  Bird 0.283, the band 0.22 to 0.34), spreading 0.398 against 0.377 (< 0.001), subducting 0.323
+  against 0.312 (0.065), the boundary criteria met 2.75 a run against 3.75 (0.003): the transform
+  share falls under its band. The mean convergence across the oceanic front 37.6 mm/yr against
+  41.4 (< 0.001; Bird 53.2). A reading, not traced: the old pull at an oblique front ran 18 to 24
+  degrees off the normal (the unit test's 45 and 60 degrees), along the lattice edge, so it drove
+  part of the plates' motion along their boundaries; pulled along the normal they slide past each
+  other less.
+- **The fronts.** The subduction front 89,751 straight km a step against fl-outline's 84,364 (p
+  0.038; Bird SUB 51,310), the ocean-ocean front 42,299 against 37,741 (0.001), the one-lattice
+  map's front 100,789 km against 94,515 at 77 km (PB2002's 77,844 through the same step). Plates
+  24.7 alive a step against 24.5 (0.56), the boundary 298,052 straight km against 288,044 (0.33).
+- **The V1 census.** Land 0.288 against 0.321 (0.009) and fl-outline's 0.323 (0.038); the largest
+  landmass 0.121 against 0.219 (0.004); continental crust under the sea 0.318 against 0.236
+  (0.070); land above 2 km 0.086 against 0.117 (0.046); coast with high ground 0.198 against 0.253
+  (0.012); land under ice 0.083 against 0.105 (0.086); collisions 1.95 per 100 Myr against 1.80
+  (0.21); the criteria met 5 a run (mean 5.12) against 5 (5.08). In the area book the continental
+  crust ends at 0.388 of the planet as on base8 (0.388), but thinner (a mean 35.6 km against 36.1)
+  and lower: the land 0.300 against 0.331, the belts' volume 13,340 units against 14,900, the arcs'
+  793 against 925 (per km of front and Myr, continental arcs 15.8 to 17.9 against 18.5 to 21.4,
+  oceanic 44.6 to 53.0 against 58.5 to 65.3: their rate follows the convergence), what went under
+  14,960 against 16,880. The same crust, slower plates, smaller belts, more of it under the sea; a
+  supercontinent's tenure 38 Myr against fl-outline's 83 (one run of eight in the band each).
+- **The guard.** The worst 10,102 m from the sea against fl-outline's 10,272 (p 0.32); no step
+  beyond 2 Earth reliefs, `guard_bind_steps` 0 in all 8 runs. All 8 ran (about 890 s each at 2
+  threads).
+- **The plate check:** 181 passes against fl-outline's 182 (base8's alias folder holds only one
+  run's `plate.json`). Moved: the median speed 0 of 8 runs in its band against 2; slab over free 7
+  against 4; collisions per 100 Myr 4 against 3; the collisions' p90 length 176 Myr against 201.
+- **The ocean-continent dip is not this one's either.** The ocean-continent front falls from 58,279
+  km at a rebuild to 45,244 in the first 2 Myr after it (fl-outline 58,012 to 43,739).
+
+**The weld seeds.** Three unit tests need a weld or a suture within 300 Myr on the 8,000-sample
+planet, and their seeds no longer had one: `collisions_weld_on_stall_and_transfer_on_shortening`
+(scattered 12), `recording_does_not_change_the_world_and_matches_the_run` (scattered 20) and
+`sutures_and_initiations_keep_continents_whole` (supercontinent 5, scattered 12). The sweep
+(`weld_seed_sweep`, ignored, now over both starts): scattered continents weld on 13 of seeds 1 to
+24 (1 to 6, 10, 14, 15, 18, 21, 23 and 24; 7, 8, 11, 12 and 20 no more), the supercontinent on 8
+(4, 7, 11, 14, 15, 21, 23 and 24; 5 no more). The collisions and recording tests pass on all 13
+welding seeds, the sutures test on each of 8 pairs tried; the tests take scattered 1, scattered 2
+and the pair supercontinent 4 with scattered 1. The seed is chosen by its weld, not by a result.
+
+**Recommendation: the slab pull at the arcs' fronts on by default** (it is). It counts each front
+the way the per-metre forces' definitions do (a straight trench, the pull normal to it), on the
+arcs' fronts by Bird's transform rule; its unit tests hold against the reference pull and the
+reference plate, all eight runs ran and the guard did not bind. What it changes in the realism
+checks (slower plates, the RMS and median speeds further under their sourced bands, the transform
+share just under Bird's band, less land and a smaller largest landmass) is the physics' answer, not
+a reason to keep the old count, and none of it is tuned. The speeds' shortfall is older than this
+step and is not the drag's calibration; it is a diagnosis of its own (the planet's plates against
+the reference plate). Step 10's question is the arcs' band ends (above): stop the band at the
+slab's ends, Earth's arcs stopping near the slab's edge, with a unit test first on the straight
+front of known length. The along-front shortfall is the lattice's metric under every distance
+field and is not the arcs' law.
