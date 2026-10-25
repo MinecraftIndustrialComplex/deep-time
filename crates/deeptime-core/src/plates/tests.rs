@@ -2996,6 +2996,13 @@ fn outer(x: DVec3) -> glam::DMat3 {
 /// energy's (one spacing per edge sample of plate 1), against the rim. The edge energy itself
 /// (ridge push) is zero here (one floor depth over the plate) and checked against Earth's in
 /// `forces.rs` (`the_column_energy_gives_ridge_push_and_plateau_weight_of_earths_size`).
+/// Measured (2026-10-25, 40,000 samples): the lattice moves the plate at 53.2 mm/yr, the
+/// continuous cap at 48.7 (the speed scale 45); the record over the cap at the lattice's answer:
+/// basal drag 0.977 (the plate 0.976 of A0), slab resistance 1.055 and the pull 1.060 (the
+/// trench's shares), boundary resistance 0.875 (its metres 0.886 of the rim's 20,615 km, so the
+/// lattice under-counts it); resisting shares on the lattice 0.150, 0.487, 0.362, on the cap
+/// 0.149, 0.449, 0.402 (the flat plate's 1/7, 3/7, 3/7); the edge energy's metres 1.057 of the
+/// rim. So the lattice moves the reference plate faster than the definition, not slower.
 #[test]
 fn the_reference_plate_on_the_lattice_term_by_term() {
     let mut p = preset(40_000, 20.0, "supercontinent", 5);
@@ -3150,10 +3157,19 @@ fn the_reference_plate_on_the_lattice_term_by_term() {
         (0.95 * k.plate_speed_scale_mm_yr..1.25 * k.plate_speed_scale_mm_yr).contains(&cap_speed),
         "the cap at {cap_speed}"
     );
-    // The lattice's terms are the cap's within its count of the boundary.
-    for (name, x) in [("slab resistance", slab), ("boundary", bnd), ("pull", pull)] {
-        assert!((0.9..1.3).contains(&x), "{name} {x}");
+    // The trench's terms are the cap's over the trench's shares (PLT-560) …
+    for (name, x) in [("slab resistance", slab), ("pull", pull)] {
+        assert!((1.0..1.12).contains(&x), "{name} {x}");
     }
+    // … and the boundary resistance is the cap's over the lattice's count of the rim (the samples
+    // beside plate 1's own hidden rim at the trench have no link, half a spacing per side
+    // elsewhere).
+    assert!(
+        (bnd - bnd_m / rim_len).abs() < 0.05 && (0.8..1.05).contains(&bnd),
+        "boundary {bnd}, its metres {}",
+        bnd_m / rim_len
+    );
+    assert!(speed > cap_speed, "the lattice {speed}, the cap {cap_speed}");
 }
 
 /// What sets the planet's plate speed (the plate speed lane, 2026-10-25; plates.md, "Plate
