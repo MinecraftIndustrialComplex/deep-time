@@ -11,4 +11,4 @@ if [ ! -f "$d/crust1.bnds" ]; then
   f=$(find "$d" -name crust1.bnds | head -1)
   [ -n "$f" ] && [ "$f" != "$d/crust1.bnds" ] && cp "$f" "$d/crust1.bnds"
 fi
-/data/ban/deeptime-runs/pool/.pyenv-numpy/bin/python3 -I tools/review/m5diag/m4earth.py "$d/crust1.bnds"
+/data/ban/deeptime-runs/pool/.pyenv-numpy/bin/python3 -I tools/review/m5diag/m4earth.py "$d/crust1.bnds" "$d/crust1.rho"

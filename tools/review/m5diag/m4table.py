@@ -98,7 +98,7 @@ def main():
         print("\nAfter the stamp (crust-budget maps, continental samples, snapshots from -800 Myr, pooled per run,"
               " p50 over runs): samples, height over the sea p50 / p90, dry, above 2 km, T p50 / p90 km,"
               " Airy >= 2 km, plate over Airy p50")
-        for gn in ("coll", "andean", "untagged_thick", "untagged_thin"):
+        for gn in ("coll", "coll_arc_crust", "coll_no_arc_crust", "andean", "untagged_thick", "untagged_thin"):
             bins = sorted({b for r in mrows for b in r["decay"].get(gn, {})}, key=lambda s: float(s.split("-")[0]))
             print(f"  {gn}")
             for b in bins:

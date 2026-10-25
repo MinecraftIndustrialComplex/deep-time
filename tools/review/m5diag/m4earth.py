@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""Earth's control for the M4 diagnosis: m4earth.py <crust1.bnds>
+"""Earth's control for the M4 diagnosis: m4earth.py <crust1.bnds> [crust1.rho]
 
 CRUST1.0 (Laske, Masters, Ma & Pasyanos 2013; 1 x 1 degree, the boundaries file), read as
 tools/review/earth-crust.py reads it (HYP-040, HYP-041): land is above 0 m with no water on it, the
@@ -60,6 +60,82 @@ def main():
     # Earth's high ground by its crust: the thickness p10/p50/p90 under the land above 2 km by rock.
     print(f"crust under the land above 2 km by rock, km: p10 {wq(T[hi], w[hi], 0.1):.1f} p50 {wq(T[hi], w[hi], 0.5):.1f}"
           f" p90 {wq(T[hi], w[hi], 0.9):.1f}; ice-free {wq(T[hi & ~iced], w[hi & ~iced], 0.5):.1f}")
+    # Earth's M4 by region (boxes of latitude and longitude, the agent's: a stand-in for the model's regime classes).
+    lon = np.tile(np.arange(-179.5, 180, 1.0), 180)
+    boxes = [
+        ("Tibet, Himalaya, Pamir, Karakoram (collision)", (26, 40, 68, 105)),
+        ("Alps to Zagros and Iran (collision)", (28, 48, -10, 68)),
+        ("Tien Shan, Altai, Mongolia (far-field of India-Asia)", (40, 56, 68, 125)),
+        ("Andes (Andean margin)", (-56, 12, -82, -60)),
+        ("North American Cordillera and Mexico", (14, 70, -170, -100)),
+        ("Africa and Arabia (plateaus, rifts)", (-35, 32, -18, 60)),
+        ("Antarctica", (-90, -60, -180, 180)),
+        ("Greenland", (59, 84, -75, -10)),
+    ]
+    taken = np.zeros_like(land)
+    regions = []
+    for name, (la0, la1, lo0, lo1) in boxes:
+        k = land & ~taken & (lat >= la0) & (lat < la1) & (lon >= lo0) & (lon < lo1)
+        taken |= k
+        regions.append((name, k))
+    regions.append(("the rest", land & ~taken))
+    print("Earth's M4 by region (share of all land): M4, of it ice-free; the region's land; crust p50 under its high"
+          " ground; the region's crust of 45 to 55 km (share of all land) and its rock p50")
+    for name, k in regions:
+        kh = k & hi
+        kb = k & (T >= 45) & (T < 55)
+        print(f"  {name:55s} m4 {w[kh].sum() / WL:.4f} ({w[kh & ~iced].sum() / WL:.4f})  land {w[k].sum() / WL:.4f}"
+              f"  T p50 {wq(T[kh], w[kh], 0.5):.1f}  45-55 km {w[kb].sum() / WL:.4f} at {wq(rock[kb], w[kb], 0.5):.0f} m")
+    if len(sys.argv) > 2:
+        densities(b, np.loadtxt(sys.argv[2]), w, land & ~iced, iced, rock, T, WL, w[hi].sum() / WL)
+
+
+def fit(x, y, w):
+    A = np.vstack([x, np.ones_like(x)]).T * np.sqrt(w)[:, None]
+    s, c = np.linalg.lstsq(A, y * np.sqrt(w), rcond=None)[0]
+    return float(s), float(c)
+
+
+def densities(b, rho, w, m, iced_land, rock, T, WL, m4):
+    """Earth's ice-free land against its own crust's buoyancy (CRUST1.0's layer densities, crust1.rho): the crust's
+    mean density by band, the Airy height of each column with its own layers over the model's mantle (3,300) and over
+    CRUST1.0's own mantle, and the rock height against both; then Earth's M4 with every column moved from its own
+    layers' Airy height to the model's (one crustal density 2,830 kg/m3), its residual kept."""
+    assert rho.shape == b.shape, rho.shape
+    t = (b[:, 2:8] - b[:, 3:9])                      # km: three sediment and three crystalline layers
+    r = rho[:, 2:8]                                   # g/cm3
+    Tk = t.sum(axis=1)
+    rbar = np.where(Tk > 0, (t * r).sum(axis=1) / np.maximum(Tk, 1e-9), np.nan)
+    h_own = 1000.0 * (t * (3.30 - r)).sum(axis=1) / 3.30          # m of buoyancy over a 3,300 mantle
+    rm = rho[:, 8]
+    h_own_m = 1000.0 * (t * (rm[:, None] - r)).sum(axis=1) / rm   # over CRUST1.0's own uppermost mantle
+    h_uni = 1000.0 * Tk * (3.30 - 2.83) / 3.30                    # the model's line, PLT-281
+    s_rT, c_rT = fit(T[m], rock[m], w[m])
+    s_hT, _ = fit(T[m], h_own[m], w[m])
+    s_hmT, _ = fit(T[m], h_own_m[m], w[m])
+    s_rh, c_rh = fit(h_own[m], rock[m], w[m])
+    print("\nEarth's ice-free land and its own crust's buoyancy (CRUST1.0 densities):")
+    print(f"  rock height on T: {c_rT:.0f} m + {s_rT:.0f} m/km; the own-layer Airy height on T: {s_hT:.0f} m/km"
+          f" over 3,300 ({s_hmT:.0f} over CRUST1.0's mantle); the model's line 142 m/km")
+    print(f"  rock height on the own-layer Airy height: slope {s_rh:.2f}, intercept {c_rh:.0f} m")
+    print("  band km: land share, crust mean density p50 (p10, p90) kg/m3, mantle p50, rock p50, own-layer Airy p50"
+          " (minus the model line's at the same T), rock minus own-layer Airy p50")
+    for a, c in BANDS + FINE:
+        k = m & (T >= a) & (T < c)
+        if w[k].sum() == 0:
+            continue
+        print(f"  {a:g}-{c:g}: land {w[k].sum() / WL:.4f}  rho {1000 * wq(rbar[k], w[k], 0.5):.0f}"
+              f" ({1000 * wq(rbar[k], w[k], 0.1):.0f}, {1000 * wq(rbar[k], w[k], 0.9):.0f})"
+              f"  mantle {1000 * wq(rm[k], w[k], 0.5):.0f}  rock {wq(rock[k], w[k], 0.5):.0f}"
+              f"  own {wq(h_own[k], w[k], 0.5):.0f} ({wq(h_own[k] - h_uni[k], w[k], 0.5):.0f})"
+              f"  rock-own {wq(rock[k] - h_own[k], w[k], 0.5):.0f}")
+    # Earth's M4 with the model's one density: each ice-free column moves by (h_uni - h_own); iced cells as they are.
+    hi_iced = w[iced_land & (rock > 2000.0)].sum() / WL
+    for name, sh in (("over 3,300", h_uni - h_own), ("over CRUST1.0's mantle", h_uni - h_own_m)):
+        hi2 = m & (rock + sh > 2000.0)
+        print(f"  Earth's M4 with the model's one crustal density ({name}): ice-free land {w[hi2].sum() / WL:.4f}"
+              f" + iced as observed {hi_iced:.4f} = {w[hi2].sum() / WL + hi_iced:.4f}"
+              f" (observed {m4:.4f}, of it ice-free {w[m & (rock > 2000.0)].sum() / WL:.4f})")
 
 
 if __name__ == "__main__":
