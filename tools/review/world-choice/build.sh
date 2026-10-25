@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # Cube phase 2, Ben's world-shape decision: build the page (page.py) from compare.sh's numbers and
 # maps and shots.sh's client passes, then shoot it at a phone's and a desktop's width (shot-page.py)
-# to look at before publishing. Runs on the test VM; pull <out> and publish it from the laptop:
+# to look at before publishing. RETIRED in part (cube plan 7.4): the page is published; its Petroff-Guyou
+# panels read the saved $CMP folder (compare.json, the pg16 maps and cmp-pg-* shots) and cannot be
+# remade. Runs on the test VM; pull <out> and publish it from the laptop:
 #   tools/remote/mac.sh --pull build/world-choice -- bash tools/review/world-choice/build.sh [gates.json]
 #   tools/review/publish.sh world-choice build/world-choice/page
 set -euo pipefail
