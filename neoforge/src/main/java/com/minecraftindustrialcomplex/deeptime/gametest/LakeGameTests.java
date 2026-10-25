@@ -99,6 +99,18 @@ public final class LakeGameTests {
         return level.getBiome(new BlockPos(x, y + 1, z)).unwrapKey().map(k -> k.location().toString()).orElse("?");
     }
 
+    /** A salt column's blocks from the top down past its flat's depth, and that depth, so a red names what lies there. */
+    private static String column(ServerLevel level, RasterSampler playa, int x, int y, int z) {
+        double v = playa.nearest(x, z);
+        int n = Double.isNaN(v) ? 0 : (int) Math.round(v);
+        LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
+        StringBuilder b = new StringBuilder(" salt ").append(n).append(" blocks; y ").append(y + 1).append(" down:");
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int k = y + 1; k >= y - n - 1; k--)
+            b.append(' ').append(BuiltInRegistries.BLOCK.getKey(chunk.getBlockState(pos.set(x, k, z)).getBlock()).getPath());
+        return b.toString();
+    }
+
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 4800)
     public static void lakeIceAndSaltFollowTheClimate(GameTestHelper helper) {
         ServerLevel level = helper.getLevel().getServer().getLevel(GameTestSupport.TEST_PLANET_REAL);
@@ -195,7 +207,7 @@ public final class LakeGameTests {
             if (!bad.isEmpty()) {
                 wrong++;
                 detail.append(' ').append(bad).append('(').append(s.x()).append(',').append(gr.y()).append(',').append(s.z()).append(' ')
-                        .append(biome(level, s.x(), gr.y(), s.z())).append(')');
+                        .append(biome(level, s.x(), gr.y(), s.z())).append(column(level, playa, s.x(), gr.y(), s.z())).append(')');
             }
         }
         // Round every hot spring by a playa, the flat it does not claim is salt too: no role biome comes within

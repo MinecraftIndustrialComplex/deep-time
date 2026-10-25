@@ -989,6 +989,19 @@ pub struct TectonicParams {
     /// trenches along much of its edge is drawn on until the speed guard (PLT-022) holds it.
     /// ledger: PLT-540
     pub suction_saturates: bool,
+    /// The force balance's subduction fronts are the arcs' (the front lane's step 9, 2026-10-24;
+    /// `forces::balance_step`): a front sample is one whose plates converge across the boundary
+    /// beyond Bird's 20 degrees of a transform (PLT-330's rule, `shortening::is_transform`), and
+    /// the slab pull, the suction, the slab resistance and the collision resistance act at it
+    /// along the boundary's normal (PLT-310) over its share of the straight front (PLT-530), with
+    /// the slab fed by the convergence along that normal; a hanging slab pulls the same way.
+    /// Their per-metre sizes (FRC-002, FRC-017, FRC-018) then meet a front's length as the drag's
+    /// definition counts it (FRC-016: a straight trench, the pull normal to it). Off, every
+    /// lattice edge converging on an active contact is a front (the contacts' strike-slip
+    /// stretches too), each overriding sample one lattice spacing along that edge: 1.71 times the
+    /// arcs' straight front on arm fl-outline, 1.21 times it along the normal (PLT-554).
+    /// ledger: PLT-560
+    pub front_pull: bool,
     /// Edge energy (ridge push and the weight of high ground), relative to its physical size:
     /// 0.1 is the gravitational potential energy as computed (a ridge's push is then about 0.1 of
     /// the reference slab pull). PLT-187.
@@ -1140,6 +1153,7 @@ impl Default for TectonicParams {
             slab_resistance: 3.0,          // ledger: PLT-185
             slab_suction_share: 0.3,       // ledger: PLT-186
             suction_saturates: true,       // ledger: PLT-540
+            front_pull: true,              // ledger: PLT-560 (on since 2026-10-24)
             edge_energy: 0.1,              // ledger: PLT-187
             collision_buoyancy: 1.0,       // ledger: PLT-275
             keel_drag: 3.0,                // ledger: PLT-188
