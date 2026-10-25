@@ -397,6 +397,16 @@ pub fn emplace(
             );
             let length = length_blocks(p.fault_length_km, p.fault_length_sigma, km_to_blocks, rng);
             let random_trend = 180.0 * rng.uniform();
+            if !frame.projection().inside_poles(bz) {
+                // Drawn past the pole (the grid's rows run on to ±Zo, past ±R): no ground there,
+                // and the cube bake's Jacobian, singular at the pole, made such a fault a window
+                // 10⁹ blocks long over the whole planet. Dropped after the whole structure is
+                // drawn, so the stream and every other structure stay as they were; dropping
+                // thins the draws to the strain on the planet, the rate it asks for.
+                // ledger: DEF-081
+                counts.past_pole += 1;
+                continue;
+            }
             let covering: Vec<usize> = features
                 .iter()
                 .enumerate()
@@ -1004,21 +1014,31 @@ pub(crate) mod tests {
             core > foreland && foreland > 0.05 && core < 0.2,
             "{core} {foreland}"
         );
-        // Normal faults mostly dip towards the rift's axis (i = 179.5).
+        // Normal faults mostly dip towards the rift's axis (i = 179.5): three in four (DEF-031),
+        // about 2.8 to 1 as counted here. Counted over eight runs: one run gives about 48 faults
+        // away from the axis, which puts the 2:1 bound one standard deviation below the
+        // expected share, and the bound failed on 4 of seeds 1 to 40 (5 of 40 once draws past
+        // the pole were dropped, DEF-081). Over eight runs it is three below.
         let (mut inward, mut outward) = (0, 0);
-        for f in all.iter().filter(|f| f.kind == Kind::Normal) {
-            let axis_x = p.grid.block_x(179) as f64 + 8.0;
-            let dip_dir = direction(f64::from(f.azimuth_deg) + 90.0);
-            let to_axis = axis_x - f.x;
-            // (Within a cell of the axis the side is a coin toss.)
-            if to_axis.abs() < 20.0 {
-                continue;
+        let mut count = |run: &[Feature]| {
+            for f in run.iter().filter(|f| f.kind == Kind::Normal) {
+                let axis_x = p.grid.block_x(179) as f64 + 8.0;
+                let dip_dir = direction(f64::from(f.azimuth_deg) + 90.0);
+                let to_axis = axis_x - f.x;
+                // (Within a cell of the axis the side is a coin toss.)
+                if to_axis.abs() < 20.0 {
+                    continue;
+                }
+                if dip_dir[0] * to_axis > 0.0 {
+                    inward += 1
+                } else {
+                    outward += 1
+                }
             }
-            if dip_dir[0] * to_axis > 0.0 {
-                inward += 1
-            } else {
-                outward += 1
-            }
+        };
+        count(&all);
+        for seed in 8..15 {
+            count(&p.run(&sp, 15, seed).0);
         }
         assert!(inward > 2 * outward, "{inward} inward, {outward} outward");
     }
@@ -1069,6 +1089,50 @@ pub(crate) mod tests {
         }
         // The same seed gives the same structures.
         assert_eq!(p.run(&sp, 25, 3).0, base);
+    }
+
+    /// A structure drawn past a pole is not started (DEF-081). The grid's rows run on past ±R to
+    /// ±Zo (R 651.9 and Zo 704 blocks on this 4,096-block planet), and this planet's belt and rift
+    /// reach the rows wholly past the south pole. On master c78cfb6f's 4k test planet three faults
+    /// drawn at z 657 to 695 baked as windows 10⁹ to 10¹¹ blocks long, their hanging walls read
+    /// from 10⁹ blocks away (FarColumnTest).
+    #[test]
+    fn nothing_is_started_past_the_poles() {
+        let p = Planet::new();
+        let pole = deeptime_format::Projection::new(4096).pole_z();
+        let (w, r) = (p.grid.w as usize, f64::from(p.grid.r));
+        assert!(
+            (0..p.grid.cells()).any(|c| p.regime[c] as u8 == regime::COLLISION
+                && p.grid.block_z((c / w) as i64) as f64 - 0.5 * r > pole),
+            "the fixture's belt reaches a row wholly past the pole"
+        );
+        let mut sp = StructureParams::default();
+        sp.deformation.density = 30.0;
+        sp.deformation.max_overlap = 16;
+        sp.deformation.intrusions = 10.0;
+        let (mut all, mut counts) = p.run(&sp, 15, 7);
+        assert!(counts.past_pole > 0, "{counts:?}");
+        let faults = counts.past_pole;
+        let mut next = all.len() as u32;
+        for s in 0..15u32 {
+            let mut rng = Rng::stream(11 ^ (u64::from(s) << 20), "structure/intrude");
+            super::super::intrude::emplace(
+                &p.inputs(),
+                &sp,
+                &mut all,
+                2.0,
+                -100.0 + 2.0 * f64::from(s),
+                &mut rng,
+                &mut next,
+                &mut counts,
+                &|_, _, _| 0,
+            );
+        }
+        assert!(counts.past_pole > faults, "{counts:?}");
+        assert!(counts.stocks > 10 && counts.dykes > 10, "{counts:?}");
+        for f in &all {
+            assert!(f.z.abs() < pole, "{:?} {} at z {}", f.kind, f.id, f.z);
+        }
     }
 
     /// The stretch (`true_height_share`, here as X times the 1:1 shape on a 300 m by 20 m block)
