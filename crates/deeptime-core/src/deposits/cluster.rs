@@ -554,4 +554,62 @@ mod tests {
             [0, 1, 2, 3]
         );
     }
+
+    /// No deposit is placed past a pole, in either placement. The grid's rows run on past the pole
+    /// R = C / 2π to ±Zo (651.9 and 704 blocks on this 4,096-block planet, rows of 16), `from_cells`
+    /// jitters a draw within its cell, and the draw of a row past the pole is tested against the
+    /// poles and drawn again (the same rule as DEF-081 for structures; there the draw is dropped).
+    /// The tract is the rows from the top edge to the one below the pole's, so most draws land
+    /// past it and the test is not empty.
+    #[test]
+    fn nothing_is_placed_past_the_poles() {
+        let grid = GridDesc::for_planet("L1", 4096, 16).unwrap();
+        let pole = grid.projection().pole_z();
+        let w = grid.w;
+        let straddle = (0..grid.h)
+            .find(|&j| 0.0 < grid.area_share(j) && grid.area_share(j) < 1.0)
+            .unwrap();
+        let cells: Vec<u32> = (0..=straddle + 1)
+            .flat_map(|j| (0..w).map(move |i| j * w + i))
+            .collect();
+        let weights = vec![1.0; cells.len()];
+        let allowed = |_: u32| true;
+        let t = TractSpace {
+            grid: &grid,
+            cells: &cells,
+            weights: &weights,
+            allowed: &allowed,
+        };
+        let semi = vec![[3.0, 2.0]; 12];
+        let radii = vec![3.0; 12];
+        let (mut placed_total, mut near) = (0, 0);
+        for adjoining in [false, true] {
+            let s = Spacing {
+                camp_spacing: 60.0,
+                sigma: 20.0,
+                min_sep: 4.0,
+                per_camp: 4.0,
+                adjoining,
+            };
+            for seed in 0..100 {
+                let mut rng = Rng::new(seed);
+                let mut placed = Vec::new();
+                let fp = adjoining.then_some(&semi[..]);
+                let (out, _) = place(&mut rng, &t, &s, &radii, fp, &mut placed, &mut |_, _| true);
+                for (_, p) in &out {
+                    assert!(
+                        p.z.abs() < pole,
+                        "adjoining {adjoining}, seed {seed}: placed at z {} (pole {pole})",
+                        p.z
+                    );
+                    near += usize::from(p.z.abs() > pole - 8.0);
+                }
+                placed_total += out.len();
+            }
+        }
+        assert!(
+            placed_total > 1000 && near > 100,
+            "{placed_total} placed, {near} in the pole's last 8 blocks"
+        );
+    }
 }
