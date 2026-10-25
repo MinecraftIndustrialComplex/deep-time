@@ -16,7 +16,8 @@ and by place, the places not exclusive:
   nofront   on a plate with no TRENCH, front-subduction or front-collision flag (it touches no convergent front);
   the floor older than 180 Myr in the margin zone and beyond it by its distance to the nearest TRENCH-flagged sample of
   its own plate (where its plate goes down) and of any plate (0-500, 500-1000, 1000-2000, 2000+ km, none), and the
-  age of the floor at that own-plate trench;
+  age of the floor at that own-plate trench; the plates whose own trench comes within 1.5 spacings of their own
+  margin zone's floor (where a propagation along the margin could start), and that floor by age band;
   and two exclusive partitions: margin / interior-not-margin / the rest, and the initiation status of floor older than
   each gate (PLT-062's 150 Myr and Crameri et al. 2020's 117.4 Myr) as rifting.rs maybe_initiate_subduction reads it.
 The status reads the map's end-of-step flags, without hidden trench samples, so it is close, not exact; the ages and the
@@ -131,6 +132,13 @@ def snapshot(run, path, N, step_of):
             d, j = cKDTree(p[mt]).query(p[mo])
             dt_own[mo] = km(d)
             own_age[mo] = age[np.flatnonzero(mt)[j]]
+    # Where a propagation along the margin could start: plates whose own trench comes within 1.5 lattice spacings
+    # of their own margin zone's floor, against the plates with a trench and a margin zone.
+    touch = margin & (dt_own <= 1.5 * spacing_km)
+    has_margin = np.bincount(inv, weights=margin, minlength=len(ids)) > 0
+    out["plates_trench_and_margin"] = int((has_tr & has_margin).sum())
+    out["plates_trench_touches_margin"] = int((np.bincount(inv, weights=touch, minlength=len(ids)) > 0).sum())
+    out["margin_floor_touching"] = bands(age, touch)
     old = oc & (age > 180.0)
     for name, sel in (("margin", old & margin), ("open", old & ~margin)):
         out[f"old180_{name}_dt_own"] = dist_bands(dt_own[sel])
