@@ -251,6 +251,10 @@ pub struct Output {
     /// Carbon the weathering took out beyond the degassing over the plate step (the drawdown's
     /// alkalinity, which precipitates as carbonate: after a snowball, its cap carbonate), mol.
     pub carbonate_excess_mol: f64,
+    /// Each band's land silicate weathering summed over the plate step, mol of Ca + Mg (the mol C
+    /// it drew down): the dissolved load of the chemical denudation (`chemical_denudation`; empty
+    /// when it is off).
+    pub land_mol_by_band: Vec<f64>,
 }
 
 impl Output {
@@ -266,6 +270,13 @@ impl Output {
         self.sea_ice_max = self.sea_ice_max.max(next.sea_ice_max);
         self.steps += next.steps;
         self.carbonate_excess_mol += next.carbonate_excess_mol;
+        if self.land_mol_by_band.is_empty() {
+            self.land_mol_by_band = next.land_mol_by_band;
+        } else {
+            for (a, b) in self.land_mol_by_band.iter_mut().zip(&next.land_mol_by_band) {
+                *a += b;
+            }
+        }
         self
     }
 }
@@ -349,6 +360,11 @@ pub fn run(
         sea_ice_max: 0.0,
         steps: 0,
         carbonate_excess_mol: 0.0,
+        land_mol_by_band: if p.chemical_denudation {
+            vec![0.0; bands]
+        } else {
+            Vec::new()
+        },
     };
     if st.t_land.len() != bands {
         st.t_land = vec![0.0; bands];
@@ -383,6 +399,9 @@ pub fn run(
         //    hothouse's drawdown) the step is halved, down to `MIN_STEP_YEARS`, so the EBM and its
         //    ice feedback follow the change instead of a linear guess.
         let ppm_before = st.ppm();
+        // The CO₂ of the implicit step's last weathering: the land's share of the carbon it drew
+        // down is the chemical denudation's dissolved load.
+        let solved_ppm = std::cell::Cell::new(f64::NAN);
         let (d, carbon_next, fac) = loop {
             let dt = t_next - t;
             st.lips.retain(|&(t0, years, _)| t0 + years > t);
@@ -409,6 +428,7 @@ pub fn run(
             let open = (1.0 - st.sea_ice).clamp(0.0, 1.0); // ledger: CLM-162
             let w_of = |ppm: f64| -> f64 {
                 let ppm = ppm * fac;
+                solved_ppm.set(ppm);
                 let shift = lambda * (ppm.max(1e-9) / ppm_before.max(1e-9)).ln();
                 let t: Vec<f64> = t_land.iter().map(|x| x + shift).collect();
                 wp.flux(kernel, &t, sheet, ppm)
@@ -425,6 +445,14 @@ pub fn run(
             break (d, next, fac);
         };
         let dt = t_next - t;
+        // The land's weathering, band by band, as the implicit step drew it (the land
+        // temperatures at its CO₂, before the EBM moves them).
+        let drawn = (p.chemical_denudation && solved_ppm.get().is_finite()).then(|| {
+            let ppm = solved_ppm.get();
+            let shift = lambda * (ppm.max(1e-9) / ppm_before.max(1e-9)).ln();
+            let t: Vec<f64> = st.t_land.iter().map(|x| x + shift).collect();
+            wp.flux_by_band(&st.kernel, &t, &st.sheet, ppm)
+        });
         out.carbonate_excess_mol += (st.carbon.total() - carbon_next.total()).max(0.0);
         st.carbon = carbon_next;
         st.co2_factor = fac;
@@ -451,6 +479,15 @@ pub fn run(
         let w = wp.flux(&st.kernel, &st.t_land, &st.sheet, ppm)
             + (1.0 - sea_ice_frac(&er, inp.land_frac)).clamp(0.0, 1.0)
                 * wp.seafloor_flux(inp.ridge_rel, er.t_global, ppm);
+        if p.chemical_denudation {
+            // Without the carbon cycle (or under the present's nudge) the reservoirs are held: the
+            // weathering is the step's own, at its end climate.
+            let by =
+                drawn.unwrap_or_else(|| wp.flux_by_band(&st.kernel, &st.t_land, &st.sheet, ppm));
+            for (a, x) in out.land_mol_by_band.iter_mut().zip(by) {
+                *a += x * dt;
+            }
+        }
         st.t_global = er.t_global;
         st.degassing = d;
         st.weathering = w;
@@ -1132,5 +1169,76 @@ mod tests {
         // A warm planet (1,500 ppm): hardly any ice to cycle.
         let (_, hi_w, _) = stats(&ice_age_window(1500.0, 1.0));
         assert!(hi_w < 0.5 * hi, "warm: up to {hi_w:.3} against {hi:.3}");
+    }
+
+    #[test]
+    fn the_dissolved_load_is_the_carbon_the_land_drew_down() {
+        // Chemical denudation: a planet in balance whose weathering then doubles, so CO₂ falls.
+        // With no seafloor sink, the land's weathered Ca + Mg the clock hands on is the carbon
+        // its reservoirs lost beyond the degassing; one stretch run in two parts hands on the
+        // same; with the switch off it hands on nothing and the clock is unchanged to the bit.
+        let p = ClimateParams {
+            seafloor_weathering_share: 0.0,
+            ..params()
+        };
+        let pl = Planet::new(p, |_| 0.3);
+        let d = carbon::DEGASSING_EARTH_MOL_YR;
+        let (st0, ebm0) = pl.start(-10.0e6, d);
+        let go = |chem: bool, cuts: &[f64]| -> (Output, ClockState) {
+            let p = ClimateParams {
+                chemical_denudation: chem,
+                weathering_strength: 2.0,
+                ..pl.p.clone()
+            };
+            let (mut st, mut ebm) = (st0.clone(), ebm0.clone());
+            let mut ice = |_: &IceStep<'_>| -> Vec<f64> { vec![0.0; pl.land.len()] };
+            let mut out: Option<Output> = None;
+            for w in cuts.windows(2) {
+                let inp = Input {
+                    correction: &Default::default(),
+                    p: &p,
+                    tilt_deg: 23.4,
+                    star_flux_rel: 1.0,
+                    t0: w[0],
+                    t1: w[1],
+                    land_frac: &pl.land,
+                    band_lat: &pl.lat,
+                    degassing: d,
+                    ridge_rel: 1.0,
+                    nudge: None,
+                };
+                let o = run(&inp, &mut st, &mut ebm, &mut ice);
+                out = Some(match out {
+                    Some(a) => a.then(o),
+                    None => o,
+                });
+            }
+            (out.expect("one stretch at least"), st)
+        };
+        let whole = [-10.0e6, -8.0e6];
+        let (on, st_on) = go(true, &whole);
+        let drawn = st0.carbon.total() + d * 2.0e6 - st_on.carbon.total();
+        let land: f64 = on.land_mol_by_band.iter().sum();
+        assert_eq!(on.land_mol_by_band.len(), pl.land.len());
+        assert!(
+            drawn > 0.05 * d * 2.0e6,
+            "the doubled weathering drew down {drawn} mol"
+        );
+        assert!(
+            (land / drawn - 1.0).abs() < 1e-9,
+            "dissolved {land} mol, drawn {drawn}"
+        );
+        let (two, st_two) = go(true, &[-10.0e6, -9.0e6, -8.0e6]);
+        let drawn2 = st0.carbon.total() + d * 2.0e6 - st_two.carbon.total();
+        let land2: f64 = two.land_mol_by_band.iter().sum();
+        assert!(
+            (land2 / drawn2 - 1.0).abs() < 1e-9,
+            "in two parts: {land2} mol, drawn {drawn2}"
+        );
+        let (off, st_off) = go(false, &whole);
+        assert!(off.land_mol_by_band.is_empty());
+        assert_eq!(st_off.carbon, st_on.carbon);
+        assert_eq!(st_off.t_land, st_on.t_land);
+        assert_eq!(off.steps, on.steps);
     }
 }

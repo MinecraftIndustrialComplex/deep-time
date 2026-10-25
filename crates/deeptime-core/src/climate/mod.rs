@@ -113,6 +113,14 @@ pub const SEA_LEVEL_GLOBAL: &str = "climate/sea_level_m";
 /// would need more water than it has (the sea is then empty and the ice is kept whole).
 pub const ICE_WATER_SHORT_GLOBAL: &str = "climate/ice_water_short_m";
 
+/// The land's weathered Ca + Mg the step placed as dissolved load (`field::DISSOLVED`), mol, in
+/// `WorldState::globals` (with `chemical_denudation` on).
+pub const DISSOLVED_MOL_GLOBAL: &str = "climate/dissolved_mol";
+
+/// The land's weathered Ca + Mg of bands with no land at the step's end, mol, in
+/// `WorldState::globals`: not placed (with `chemical_denudation` on).
+pub const DISSOLVED_UNPLACED_GLOBAL: &str = "climate/dissolved_unplaced_mol";
+
 /// Fields the stage writes every step.
 pub mod field {
     /// Mean annual surface temperature, °C (the surface stage reads it).
@@ -173,6 +181,11 @@ pub mod field {
     /// where snow builds it (above the equilibrium line, at most what the precipitation allows),
     /// negative where it melts (below the line: the meltwater's source); 0 off the ice.
     pub const ICE_BALANCE: &str = "climate/ice_balance_m_yr";
+    /// Chemical denudation (`chemical_denudation`): the rock the step's land silicate weathering
+    /// took into solution, m (at 2,700 kg/m³), on the land cells at the step's end
+    /// (`carbon::place_dissolved`); written every step while it is on, and the surface stage takes
+    /// it off the ground. Not a keyframe layer.
+    pub const DISSOLVED: &str = "climate/dissolved_m";
 }
 
 /// The ice fields the surface stage's field history records as frame means.
@@ -819,6 +832,10 @@ struct LandTerms {
     ah: f64,
     /// The kernel at the cell's sea-level temperature (its lapse cooling put back).
     ks: f64,
+    /// Every cell's terms, row by row (sea cells zero), and whether the kernel took the
+    /// sea-level ones (`KERNEL_SEA_T_ENV`).
+    cells: Vec<Vec<CellTerms>>,
+    sea_t: bool,
 }
 
 /// One land cell's terms (P1-19: found once, side by side, and added in cell order after).
@@ -948,6 +965,8 @@ fn land_terms(
         kh,
         ah,
         ks,
+        cells,
+        sea_t,
     }
 }
 
@@ -1734,6 +1753,7 @@ impl ClimateStage {
                 sea_ice_max: 0.0,
                 steps: 0,
                 carbonate_excess_mol: 0.0,
+                land_mol_by_band: Vec::new(),
             }
         };
         let IceRun {
@@ -2286,6 +2306,7 @@ impl ClimateStage {
         let mut runoff_mean = f64::NAN;
         let (mut kernel_high, mut land_high, mut t_land_mean) = (f64::NAN, f64::NAN, f64::NAN);
         let mut kernel_sea_t = f64::NAN;
+        let mut dissolved: Option<carbon::Dissolved> = None;
         if let Some(er) = &er_end {
             let t_mean = &world.fields[field::T_MEAN].data;
             let precip = &world.fields[field::PRECIP].data;
@@ -2297,12 +2318,69 @@ impl ClimateStage {
                 .map(|f| f.data.as_slice());
             // The kernel and the notes' sums in one pass (the cell's runoff found once).
             let lt = land_terms(&geo, &land, t_mean, precip, er, &p, erosion, (&h, sea));
+            if p.chemical_denudation {
+                // The step's weathered Ca + Mg, band by band, where this step's end climate
+                // weathers: each cell's own flux at the step's CO₂.
+                let kpk = carbon::Weathering::from(&p).kinetic_per_kernel(ppm);
+                let ice = world
+                    .fields
+                    .get(field::ICE_THICKNESS)
+                    .filter(|f| f.data.len() == n)
+                    .map(|f| f.data.as_slice());
+                let cells: Vec<carbon::DissolvedCell> = lt
+                    .cells
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(j, row)| {
+                        let (band, area) = (geo.band[j], geo.area[j]);
+                        let (land, ice, sea_t, gw) = (&land, ice, lt.sea_t, geo.w);
+                        row.iter().enumerate().map(move |(i, x)| {
+                            let c = j * gw + i;
+                            if !land[c] {
+                                return carbon::DissolvedCell::default();
+                            }
+                            carbon::DissolvedCell {
+                                band,
+                                area_km2: area,
+                                kin: kpk * if sea_t { x.ks } else { x.kc },
+                                supply: x.supply,
+                                iced: ice.is_some_and(|v| v[c] >= ICE_MIN_M),
+                            }
+                        })
+                    })
+                    .collect();
+                dissolved = Some(carbon::place_dissolved(
+                    &out.land_mol_by_band,
+                    &cells,
+                    p.dissolved_kg_per_mol, // ledger: ERO-205
+                    !lt.kernel.supply.is_empty(),
+                ));
+            }
             self.s.clock.kernel = lt.kernel;
             runoff_mean = lt.rs / lt.ra.max(1e-9);
             kernel_high = lt.kh / lt.kt.max(1e-30);
             land_high = lt.ah / lt.ra.max(1e-9);
             t_land_mean = lt.ta / lt.ra.max(1e-9);
             kernel_sea_t = lt.ks / carbon::KERNEL_EARTH;
+        }
+        if p.chemical_denudation {
+            // Every step while it is on, so the surface never takes a stale field off twice.
+            let d = dissolved.unwrap_or_else(|| carbon::Dissolved {
+                thickness_m: vec![0.0; n],
+                placed_mol: 0.0,
+                unplaced_mol: out.land_mol_by_band.iter().sum(),
+            });
+            world
+                .globals
+                .insert(DISSOLVED_MOL_GLOBAL.into(), d.placed_mol);
+            world
+                .globals
+                .insert(DISSOLVED_UNPLACED_GLOBAL.into(), d.unplaced_mol);
+            put(
+                world,
+                field::DISSOLVED,
+                d.thickness_m.iter().map(|&x| x as f32).collect(),
+            );
         }
         self.time("ice", started);
 

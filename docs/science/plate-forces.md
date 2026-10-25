@@ -64,7 +64,15 @@ front), and then sums the forces:
    balance's answer each step, τ = `motion_relax_myr`: a stand-in for the time slabs and mantle
    take to respond, and the smoothing of the step-to-step noise of a balance found on a lattice. A
    speed guard (`max_plate_speed_mm_yr`, 250 mm/yr) caps any plate that would run away and is
-   counted every time it does; it is meant never to bind.
+   counted every time it does; it is meant never to bind. A weld or a terrane transfer sets its
+   two plates' rotations itself (PLT-080), so those two skip that step's relaxation and the
+   balance takes over at the next. A collision that is only deferred (a continent still
+   converging, not stalled) sets nothing, and its plates relax like any other. Until 2026-10-25 a
+   deferred collision counted as a weld here: once a continental collision had shortened by
+   `collision_threshold_km` (100 km) it was handed over every step, and both plates kept their
+   rotation until it stalled. On base14 the plates of collisions longer than 110 Myr were frozen
+   in a median 0.92 of their steps, and 0.35 of all plate-steps were frozen (build log
+   2026-10-25, M5 lane).
 6. **At the start, rifts and welds.** Plates start at rest (the starting ocean floor's ages come
    from an earlier motion drawn for the purpose and not kept). Rift fragments keep their parent's
    motion; the balance decides whether they part. Two plates a rift separated that keep moving
