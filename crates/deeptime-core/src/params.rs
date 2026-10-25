@@ -650,8 +650,12 @@ pub struct TectonicParams {
     /// feels only its wedge. Needs `thermal_state` for the incoming lithosphere's age (without
     /// it only the break moves). Off (2026-10-24): on the pool it brought no foredeep beyond the
     /// wedge, whose width the foreland's flexural length hardly passes, and the foreland's frame
-    /// (ISO-133) doubled the largest change of a step (flexure.md "Foreland basins").
-    /// ledger: PLT-546, ISO-131
+    /// (ISO-133) doubled the largest change of a step (flexure.md "Foreland basins"). Still off
+    /// since gap 6b (2026-10-25): with the belt's part of the deflection carried in its frame
+    /// (ISO-136, which replaced ISO-133's column swap) the foredeep came, 143 to 179 km wide, but
+    /// a cell's largest change in a step rose by 3 to 7 km and the guard's worst by 2 to 5 km
+    /// (flexure.md "The superposition and the foreland's stiffness (gap 6b)").
+    /// ledger: PLT-546, ISO-131, ISO-136
     pub collision_underthrust: bool,
     /// The cordillera's back-arc source from the state: the crust behind an arc's range gives
     /// its share of the range's shortening in proportion to its weakness, the thin sheet's
@@ -1100,7 +1104,7 @@ impl Default for TectonicParams {
             thermal_isostasy_m: 0.0,      // ledger: ISO-110 (off: an open fault; 1,600 m when on)
             thermal_reference_km: 225.0,  // ledger: ISO-111
             thermal_strength: true,       // ledger: ISO-112 (on since 2026-10-23)
-            collision_underthrust: false, // ledger: PLT-546, ISO-131 (off: no foredeep on the pool)
+            collision_underthrust: false, // ledger: PLT-546, ISO-131, ISO-136 (off: step noise on the pool)
             thermal_backstop: false,      // ledger: PLT-470 (off: a stand-in, not physics)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
             heat_flow_refresh: true, // ledger: PLT-469 (game-choice: on since 2026-10-23, the coordinator's call)
