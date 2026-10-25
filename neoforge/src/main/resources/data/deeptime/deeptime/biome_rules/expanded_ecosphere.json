@@ -120,6 +120,14 @@
    "biomes": ["wythers:snowy_tundra"]
   },
   {
+   "id": "cool_desert",
+   "_comment": "Cool desert (BWk with a mean above 0 and under 10 degC, the cold deserts' cool part, BIO-101; the hot and the polar rules above take the rest): the treeless sparse-grass cold plains and highland plains and the two stony canyons. The bake draws these columns as cold-band land, but the temperature the pack's search reads is a bilinear blend of the cold-desert and hot-desert ramps across the 10 degC switch, so a column whose own mean is under 10 degC could read warm and take Expanded Ecosphere's temperate dry biomes (sunflower plains, harvest fields, dry savanna: 57 columns on the 2026-10-24 test planet); this rule reads the column's own mean. Earth's cool deserts (Gobi, Great Basin, Patagonia) are Koppen BWk, mean about 0 to 10 degC, shrub and tuft-grass steppe on gravel or bare-rock plains, plateaus and canyons, with frost and snow in winter (Wikipedia pages read 2026-10-25). Expanded Ecosphere has no cold-desert biome: these four carry grass patches only (no trees, berries or crops), and the stony canyon is its one stone-and-gravel surface in the cool band. Left out: its tundra (trees, berries), highlands (a peak and snow tag), cool plains (marsh grass), badlands (Ben, 2026-10-02: no badlands in the cold deserts) and the desert and dune biomes (no sand below the cold band's top, BWk:cold_not_sand). BIO-195.",
+   "koppen": ["BW"],
+   "t_mean_c": {"max": 10.0},
+   "keeps": ["#c:is_mountain/peak", "#c:is_mountain/slope", "#c:is_beach", "#minecraft:is_beach", "#c:is_stony_shores", "#minecraft:is_river", "#minecraft:is_ocean", "#c:is_swamp"],
+   "biomes": ["wythers:cold_plains", "wythers:highland_plains", "wythers:stony_canyon", "wythers:cool_stony_canyons"]
+  },
+  {
    "id": "dry_tropical_forest",
    "_comment": "The wetter savanna climates (Aw, As with 1,000 mm or more a year): tropical dry forest, which Expanded Ecosphere puts at the hot edge of the warm band, beyond most of Deep Time's Aw. Holdridge's tropical dry forest takes 1,000 to 2,000 mm (Holdridge 1967, from memory); drier Aw keeps the pack's savannas. BIO-126.",
    "koppen": ["Aw", "As"],
