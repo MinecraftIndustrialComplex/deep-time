@@ -596,6 +596,48 @@ pub struct Counters {
     pub hotspots: u32,
     pub lips: u32,
     pub resamplings: u32,
+    /// Margin propagations begun (law 2, `propagation.rs`, ledger PLT-656/PLT-660): each cut a
+    /// passive margin off its continent and made a new plate.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub propagation_starts: u32,
+    /// Margin propagation events: the starts and every later advance along the margin.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub propagations: u32,
+    /// Propagations that passed the force test but whose cut or advance failed a geometry check
+    /// (one piece each side, the plate sizes, the cut along the margin).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub propagation_stalls: u32,
+    /// Subduction initiations whose seed lay within PLT-064's old clearance (1,000 km) of a
+    /// trench: possible only with law 2's one-spacing clearance (measurement, PLT-660).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub initiations_near_fronts: u32,
+}
+
+/// Serde: counters added with law 2 are left out of the state while zero, so a run with the law
+/// off keeps its state hash.
+fn is_zero(x: &u32) -> bool {
+    *x == 0
+}
+
+/// A subduction zone propagating along a passive margin (law 2, `tectonics.margin_propagation`,
+/// `propagation.rs`, ledger PLT-656): plate `under` (U) subducts at a trench that reached its own
+/// continental margin, and the margin's floor was cut off the continent, which with the floor
+/// beyond the cut became plate `over` (K'). Each critical convergence across the margin past the
+/// cut, under the force test, moves the next stretch of K''s margin floor to U.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Propagation {
+    pub under: u32,
+    pub over: u32,
+    /// The propagating end of the cut, a unit position: where the next step will find it (the
+    /// position at the step it was set, carried by K''s rotation for one step).
+    pub tip: [f64; 3],
+    /// Convergence of U on K' across the margin at the tip since the last advance, km.
+    pub converged_km: f64,
+    /// Advances since the start.
+    pub advances: u32,
+    pub born_myr: f64,
+    /// The time of the last advance (the start's at first), Myr.
+    pub last_myr: f64,
 }
 
 /// One-way subduction (`tectonics.one_way_subduction`, ledger PLT-542), per sample of the lattice
@@ -662,6 +704,10 @@ pub struct PlateState {
     /// the switch is off.
     #[serde(default)]
     pub one_way: Option<OneWay>,
+    /// Subduction zones propagating along passive margins (law 2, `propagation.rs`, ledger
+    /// PLT-656); left out of the state while empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub propagations: Vec<Propagation>,
     /// The land's gap budget (`gap_budget.rs`): measurement only, absent unless switched on; not
     /// kept in checkpoints.
     #[serde(skip)]
