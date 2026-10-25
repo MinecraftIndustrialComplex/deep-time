@@ -1198,7 +1198,8 @@ solve took that water's restoring density; without that booking the flexure of a
 sea moved 3.4 m off the case at rest already behind the belt (the bound is 1 m). Crust new at a
 place takes the belt's part where it is and moves nothing.
 
-Three rules came from the first arm's traces (g6b-both2, "On the pool" below):
+Four rules came from the first arm's traces and the singles after it (g6b-both2, "On the pool"
+below):
 
 - **The yield is the belt's too.** Where the belt bends its foreland past what the plate holds
   (ISO-120), the plate yields there, and the belt's part yields with the whole: off the belt it
@@ -1217,6 +1218,11 @@ Three rules came from the first arm's traces (g6b-both2, "On the pool" below):
   overlapped and a place's frame could change from one step to the next. A cell nearer, measured
   over any crust, to another belt than to its own is that belt's to bend, and is in no other's
   frame.
+- **A foreland takes the belt's part from its own crust only.** The place a step ago in the belt's
+  frame counts where it was the bending plate's own crust, not where it was the belt the plate
+  carried: there the belt's part is the belt's root under its own load. Counted, a cell by the
+  front took 16 to 28 km from such corners against the few hundred metres of the foreland's crust
+  beside them, and the yield took most of it back in the same step.
 
 **The foreland's stiffness** (ISO-137, ISO-138). A continental plate's strength is in two layers:
 the upper crust, strong down to about 300 °C (quartz), and the mantle under the Moho, strong down to
@@ -1277,11 +1283,97 @@ depth (B&D's point).
   are named for the belt and the crust under the belt is marked.
 - `a_belts_foreland_ends_where_another_belt_is_nearer`: two belts on three plates; each foreland is
   its carrier's crust within reach and nearer to its own belt than to the other.
+- `a_place_that_held_the_belt_gives_its_foreland_no_belt_part`: a belt's root of 16 km beside a
+  foreland of 1 km; a source between them takes the foreland's 1 km (8.5 km with the belt's
+  corners), a source on the belt alone none.
 - `the_continental_te_follows_its_lithospheres_geotherm`: the isotherms against the geotherm's
   closed form, the table's values (84.4, 80.0, 70.8, 42.4, 21.9 and 11.2 km), `Te` rising with the
   thermal age and falling with the crust, and the belt's reach.
 
-GAP6B_POOL
+**On the pool** (2026-10-24). The cumulative arm `g6b-both2`, both switches on, both starts x seeds
+1 to 4, 1,000 Myr, on master 19fa4077 (the superposition as first built, before the four rules),
+against base9's same 8 (`fl-pull`) and base9's 24 (Mann-Whitney p against the same 8, then the 24):
+
+| | base9, 24 | base9, the same 8 | both on, 8 |
+|---|---|---|---|
+| land | 0.296 | 0.288 | 0.316 (p 0.10; 0.22) |
+| land above 2 km | 0.114 | 0.086 | 0.141 (p 0.050; 0.10) |
+| coast with high ground | 0.249 | 0.198 | 0.319 (p < 0.001; < 0.001) |
+| continental crust under the sea | 0.249 | 0.318 | 0.283 (p 0.38; 0.88) |
+| land under ice | 0.113 | 0.083 | 0.122 (p 0.10; 0.48) |
+| collisions per 100 Myr | 1.90 | 1.95 | 2.20 (p 0.67; 0.16) |
+| criteria met per run, median and mean | 5, 5.08 | 5, 5.12 | 5, 5.12 |
+| the guard's worst, km from the sea | 10.2 | 10.1 | 15.3 (p < 0.001; < 0.001) |
+| largest rise / fall of a cell in a step, km | 7.3 / 7.2 | 7.2 / 7.4 | 14.4 / 11.5 |
+| record: belts above 3 km / share with a foredeep | 9 / 0.41 | 7 / 0.38 | 8 / 0.71 |
+| record: foredeep width, km (plate check 150 to 450) | 0 | 0 | 179 (p 0.001; < 0.001) |
+| record: foredeep flexure below local isostasy, m | 76 | 80 | 452 (p < 0.001; < 0.001) |
+| record: wedge width, km | 96 | 90 | 92 (p 0.96; 0.36) |
+| final frame: foredeep width to the zero crossing, all / belts above 3 km, km | | | 149 / 155 |
+| final frame: `Te`, footprint / foreland, km | | | 16.2 / 33.4 |
+
+No run diverged and no step passed two Earth reliefs. The foredeep came: beyond the wedge, 179 km
+wide at the median in the records, inside the plate check's 150 to 450 km, with 452 m of flexure
+below local isostasy where there were 80. But a cell's largest change in a step doubled, and the
+guard's worst rose by 5 km. So the arm meets the first of the brief's three conditions and fails
+the second.
+
+**The traces.** A run with a trace of every flexure step (`build/gap6b/trace2.py`, scattered
+continents seed 4, the arm's noisiest) put 321 of the 334 rises over 6 km in a step and 215 of the
+222 falls on cells in a belt's frame. The four rules above came from there; each took away a path
+the traces showed. With all four, the singles on that run against the base's same run:
+
+| scattered continents seed 4 | the guard's worst, km | largest rise / fall, km (beyond the polar rows) | polar rows, km | cells that yielded |
+|---|---|---|---|---|
+| base9 (fl-pull's run) | 10.6 | 6.7 / 7.3 | | |
+| as first built, the superposition alone | 12.1 | 11.8 / 10.5 | | 866,123 |
+| the first three rules, the superposition alone | 12.7 | 11.2 / 10.7 | 10.7 / 8.8 | 564,721 |
+| the first three rules, both on | 14.4 | 10.9 / 10.1 | 10.9 / 7.7 | 853,460 |
+| as first built, both on | 15.6 | 16.6 / 12.1 | | 1,197,045 |
+| `te_geotherm` alone | 10.5 | 6.7 / 6.6 | | 10,036 |
+| base10 (master 2dd50093) | 10.1 | 6.9 / 7.2 | 6.2 / 6.5 | 6,096 |
+| the first three rules, the superposition alone, traced | 16.1 | 14.5 / 11.3 | 9.8 / 10.3 | 588,000 |
+| the four rules, the superposition alone, traced | 12.7 | 12.0 / 8.4 | 10.2 / 7.1 | 728,000 |
+| the first three rules, both on, traced | 12.4 | 9.5 / 8.6 | 10.6 / 7.2 | 631,000 |
+
+The first five rows ran on master 19fa4077 (base9's planet), the rest on master 2dd50093
+(base10's). With both on, the first three rules took the largest rise from 16.6 to 10.9 km and the
+guard's worst from 15.6 to 14.4 km; the superposition alone hardly moved with them (12.1 to 12.7 km,
+11.8 to 11.2 km). The fourth took the superposition alone on base10's planet from 16.1 to 12.7 km
+and 14.5 to 12.0 km. None came near the base's 10 and 7 km. On the traced run
+with the first three rules, the frame's move was half the size of the rises over 6 km and 1.34
+times that of the falls; the yield took back 0.53 of the falls. The largest frame moves of a step
+came three ways: from source corners on the belt (bf 27.8 km against the 2.1 km the crust
+carried; the fourth rule ends this), from crust whose mark was lost (it came from beyond any
+foreland, NaN, and carried 26.8 km of the belt's part against 5 m at the place; the crust's carry
+and the belt's part's take their sources apart, and a cell can come from the belt for one and
+from beyond for the other), and inside the frame (26.6 km carried onto 168 m). With the fourth
+rule the last two remain: 22 km carried onto a place with none, and jumps of 21.6 km inside the
+frame.
+
+**Why it does not work.** The superposition moves a field that should be as smooth as α. On the
+runs it is not. Where a belt stands, its `Te` is low: 5 to 15 km on the traced cells, 16.2 km at
+the median over the footprints of the arm's final frames (orogenic crust; the foreland's is 33.4
+km). With E 70 GPa (ISO-041) that is α of 18 to 42 km, about one cell of the quick preset's 39 km.
+The belt's part there is the belt's own root, 30 to 49 km at the largest of a step (35 km at the
+median over the traced steps), and it falls to the foreland's few hundred metres within a cell or
+two. And the two parts are not each small: at a traced cell the belt's part was 22 km and the rest
+−19.7 km. The split books an increment to the belt by where it fell at the time; a cell that
+leaves the footprint keeps the part it gathered, and what the plate model, the surface and the
+yield take off it later is the rest's. So the parts can drift into large and opposite fields with
+the cell-scale shape of the loads (the traces measured the parts, not their history: that the
+drift comes this way is the agent's reading). Any change of the frame's geometry (a
+front that moves, a cell that enters or leaves a foreland, a mark the carry loses) then moves a
+cell-scale step of 20 to 27 km over the crust, and the yield, which holds about 2.75 km of mantle,
+takes most of it back in the same step. That is the step noise.
+
+What would work, not tried: keep the belt's part smooth by construction, the deflection under the
+belt's present load and not the sum of past increments. That is a solve of the belt's whole load
+each collision step, which the brief rules out ("Nothing is solved again"), and its cost is one
+more full solve. A cut-off on the belt's part or a smoothing of it would be a forcing term, so
+neither was tried.
+
+GAP6B_TE
 
 **Simplifications.**
 
