@@ -1074,7 +1074,9 @@ of that lithosphere, ISO-110 to ISO-112, which the `Te` law reads). The flexure 
   larger of the two. The carrier's `Te` is the continental law (ISO-051) at its lithosphere's
   thermal age, not floored as orogenic crust: the plate under the belt is not reheated by the
   shortening above it.
-- **keeps the foreland in the belt's frame** (ISO-133). The flexure carries the plate's state with
+- **keeps the foreland in the belt's frame** (ISO-133; since gap 6b only the belt's own part of
+  the deflection, "The superposition and the foreland's stiffness (gap 6b)" below; what follows is
+  gap 6's column swap, which that replaced). The flexure carries the plate's state with
   its crust and takes it to be in balance ("Increments, not the whole load", in the code's module
   notes), which holds where the loads move with the plate. Beside a belt they do not: the belt
   moves with the overriding plate, and the incoming plate it bends slides under it. Carried with
@@ -1171,6 +1173,86 @@ moves with the belt, and that under the rest, which moves with the crust; the be
 solved apart on steps with a collision and that part carried in the belt's frame would swap a
 field as smooth as α, with no load to solve again), and a foreland as stiff as its lithosphere's
 age makes it (the carrier's `Te` from its foreland's thermal age, ISO-051 and PLT-546).
+
+### The superposition and the foreland's stiffness (gap 6b)
+
+Added 2026-10-24 (ISO-136 to ISO-138), both of what the paragraph above asked for. The
+superposition replaced gap 6's column swap behind `tectonics.collision_underthrust`; the stiffness
+is `surface.flexure.te_geotherm`. GAP6B_VERDICT
+
+**The superposition** (ISO-136). The thin plate is linear: with the step's rigidity and restoring
+density, the deflection under two loads is the sum of the deflections under each. So beside the
+deflection it carries with the crust the flexure keeps the belt's part of it (`FlexState::belt_m`),
+the deflection the belt's own increments bent, carried with the crust like the rest of the state.
+On a solve step the belt's increments are solved apart with the step's operator: on its footprint
+cells only (the over plate's crust that a collision's incoming plate carries; the wedge is the
+incoming plate's own crust and goes with it), its new loads and roots, the residual it carried, the
+bending of its plate root and the load it let go. The step's own solve is the whole one, as
+before, so the step's change of the deflection is unchanged; the belt's is one more solve on
+collision steps, never a load solved again. Over the belt's foreland (ISO-133's cells) a place then
+takes the belt's part where the place was a step ago in the belt's frame, and the crust that slid
+there keeps the rest of its own. What moves is a field as smooth as α, not a column's whole state:
+the local roots, the load and the ice stay with their crust, and nothing goes into the unsolved
+residual. Under the sea the water the move lets in or out is booked as answered, since the belt's
+solve took that water's restoring density; without that booking the flexure of a foreland under the
+sea moved 3.4 m off the case at rest already behind the belt (the bound is 1 m). Crust new at a
+place takes the belt's part where it is and moves nothing.
+
+**The foreland's stiffness** (ISO-137, ISO-138). A continental plate's strength is in two layers:
+the upper crust, strong down to about 300 °C (quartz), and the mantle under the Moho, strong down to
+about 750 °C (olivine) (Burov & Diament 1995, Figure 2's caption). Between them the weak lower
+crust lets them bend without a bond, so `Te = (h₁³ + (h₂ − h_c)³)^⅓` (their eq. 14, after McNutt
+et al. 1988; Watts & Burov 2003's eq. 3, the leaf spring), with h₁ the depth of the 300 °C
+isotherm or the Moho if that is shallower, h₂ that of the 750 °C isotherm and h_c the crust. For
+crust thicker than 20 to 25 km "decoupling should be permanent" (p. 3909), and the decoupled model
+"fits most of the continental data" (Figure 7b), so the model is always decoupled. The isotherms
+are those of the plate model's own steady geotherm: its lithosphere's depth L from the thermal age
+(PLT-460, ISO-112), its heat flow (PLT-467: the crust's 26 mW/m² from sources falling off over
+h_r = 10 km, the mantle's B / L), and T_m = 1,350 °C at L (both from B&D's appendix, ISO-138). The
+conductivity that implies is 2.69 W/m/K, within B&D's 2 to 3.5. Against ISO-051's recovery law
+at the same thermal age (τ_c 203.5 Myr from L_hot to L_cold):
+
+| thermal age, Myr | L, km | 300 °C, km | 750 °C, km | `Te`, 35 km crust | 40 km | 50 km | ISO-051 |
+|---|---|---|---|---|---|---|---|
+| 0 | 60 | 11.2 | 31.5 | 11.2 | 11.2 | 11.2 | 5 (floor) |
+| 50 | 95.9 | 16.9 | 50.1 | 20.2 | 18.0 | 16.9 | 12.3 |
+| 100 | 124.1 | 21.3 | 64.7 | 33.0 | 29.1 | 23.4 | 22.7 |
+| 142 | 142.9 | 24.2 | 74.5 | 42.3 | 38.1 | 30.7 | 30.2 |
+| 250 | 176.7 | 29.4 | 92.1 | 59.6 | 55.1 | 46.4 | 45.2 |
+| 600 | 216.4 | 35.6 | 112.8 | 80.1 | 75.5 | 66.4 | 69.2 |
+| a craton | 225 | 37.0 | 117.3 | 84.4 | 80.0 | 70.8 | 80 |
+
+An old craton under 40 to 50 km of crust gets 71 to 80 km, at the top of B&D's "about 60-75 km" for
+old decoupled lithosphere under 35 to 50 km of crust (p. 3916) and of Watts & Burov 2003's 80 to 90
+km under the Ganges (p. 117). The law is stiffer than ISO-051 where the crust is thin or the
+lithosphere young (a 100 Myr foreland under 35 km of crust: 33 km against 23, α 82 km against 64),
+and the same under 50 km. A belt's footprint is its own crust over the colder of its own and the
+carrier's lithosphere (a craton under 60 km of belt: 62 km), never under its own `Te`; an oceanic
+footprint keeps ISO-131's sum. The belt's reach is now 2πα of a craton's mantle with no crust, `Te`
+117.3 km: 1,180 km. The brief's suggestion, the depth of the 450 to 600 °C isotherm, is the
+oceanic relation (Watts 1978, as B&D cite it, p. 3906); a continent's `Te` is not one isotherm's
+depth (B&D's point).
+
+**Unit tests.**
+
+- `a_belts_increments_solved_apart_add_up_to_the_whole_solve`: on a 192 by 96 plate with patches
+  of `Te` 6 to 70 km (a rigidity varying more than a thousandfold) and the sea over a third of it,
+  a belt's loads and the rest's solved apart add up to the whole solve within 10⁻³ of the peak
+  deflection (over 100 m), and the belt's part reaches beyond the belt (over 1 m within 14 rows).
+- `a_belts_part_of_the_deflection_is_what_its_own_loads_bend`: a belt rising on its footprint and
+  a fill on its foreland, in one step; the belt's part the step keeps is the deflection the belt's
+  uplift alone bends (to 5 cm), the fill alone adds none to it, the two steps' deflections add up
+  to the step with both (to 10 cm), and over the foreland the belt's part is the belt's whole
+  deflection.
+- `a_foreland_sliding_under_its_belt_bends_as_one_at_rest` (gap 6's, now on the superposition) and
+  `a_foreland_under_the_sea_sliding_under_its_belt_bends_as_one_at_rest`: the belt stands still and
+  the foreland slides under it at 10 and 30 km/Myr; the flexure and the elevation are those of the
+  case at rest to the metre within the reach, on land and under the sea.
+- `the_continental_te_follows_its_lithospheres_geotherm`: the isotherms against the geotherm's
+  closed form, the table's values (84.4, 80.0, 70.8, 42.4, 21.9 and 11.2 km), `Te` rising with the
+  thermal age and falling with the crust, and the belt's reach.
+
+GAP6B_POOL
 
 **Simplifications.**
 
