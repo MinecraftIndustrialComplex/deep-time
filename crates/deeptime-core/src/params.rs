@@ -809,6 +809,14 @@ pub struct TectonicParams {
     /// about L + π · `arc_distance_km` of band (1.32 times the arcs' straight front on arm
     /// fl-outline, PLT-554). ledger: PLT-561
     pub arc_slab_ends: bool,
+    /// The overriding margin's deformation stops at the slab's ends too (the front lane's step
+    /// 11, 2026-10-24; `subduction::fronts_finish`, `subduction::erode_forearcs`): the subduction
+    /// uplift, the cordillera (its range and the crust behind it that shortens into it) and the
+    /// forearc (subduction erosion's band and the one-way subduction's hold) act only on the
+    /// samples over their front's slab, by the arcs' test (`arc_slab_ends`). With no slab there is
+    /// no forearc, no arc crust thickening and no slab-driven shortening. Off, they run round each
+    /// end of a front on the whole distance field. ledger: PLT-562
+    pub margin_slab_ends: bool,
     /// New crust an island arc (an arc on oceanic crust) adds per km of arc per Myr at
     /// v = v_0, km³ (Earth-normalized): magma intruded and erupted, spread across the arc band
     /// (`arc_width_km`). Stern & Scholl (2010) put the long-term average of the intra-oceanic
@@ -1140,6 +1148,7 @@ impl Default for TectonicParams {
             arc_distance_km: 200.0,
             arc_width_km: 60.0,
             arc_slab_ends: true, // ledger: PLT-561 (on since 2026-10-24)
+            margin_slab_ends: false, // ledger: PLT-562 (the test first; no law yet)
             island_arc_km3_per_km_myr: 100.0, // ledger: PLT-045
             continental_arc_km3_per_km_myr: 35.0, // ledger: PLT-285
             arc_mature_crust_km: 15.0, // ledger: PLT-047
