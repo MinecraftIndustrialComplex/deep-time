@@ -2635,11 +2635,14 @@ fn the_arcs_band_stops_at_the_slabs_ends() {
 /// arcs). A spacing or more inside the meridians, the uplift, the folds, the forearc's loss and
 /// the one-way forearc are exactly what they were off. The range there takes in what it took off,
 /// within the share its contact's sources meet (`met`), and the crust behind it shortens no less:
-/// it no longer shares the strain with the crust round the ends. The erosion takes thirty
+/// it no longer shares the strain with the crust round the ends. The erosion takes a hundred
 /// columns' spare crust (an ocean's column, 7 km, under a continent's, 35.1 km) per spacing of
-/// front, so every forearc's band goes down to the ocean's column. Fronts of 20 and 40 degrees,
-/// on the equator and on a great circle tilted 60 degrees from it, at 40,000 samples. Measured
-/// (2026-10-24): plates.md, "Step 11".
+/// front, so every forearc's band goes down to the ocean's column, and the uplift's run (with the
+/// folds, the forearc and the one-way forearc) sets the arc 400 km behind the front, twice the
+/// default: at 40,000 samples (113 km apart) a band to 200 km reaches past the meridians no
+/// further than the 1.25 spacings the front itself reaches (measured, 0.50 to 1.46), and the test
+/// could not tell on from off. Fronts of 20 and 40 degrees, on the equator and on a great circle
+/// tilted 60 degrees from it, at 40,000 samples. Measured (2026-10-24): plates.md, "Step 11".
 #[test]
 fn the_margin_stops_at_the_slabs_ends() {
     let base = preset(40_000, 20.0, "supercontinent", 5);
@@ -2650,7 +2653,7 @@ fn the_margin_stops_at_the_slabs_ends() {
             pools::thickness(&pools::continental_column())
                 - pools::thickness(&pools::oceanic_column()),
         ) / 1000.0;
-        30.0 * spare_km * env.norm.sample_area_km2()
+        100.0 * spare_km * env.norm.sample_area_km2()
             / (env.norm.km(env.norm.spacing_rad()) * env.dt_myr)
     };
     const MEASURES: [&str; 5] = [
@@ -2687,6 +2690,9 @@ fn the_margin_stops_at_the_slabs_ends() {
                     p.tectonics.margin_slab_ends = on;
                     p.tectonics.cordillera_shortening_mm_yr = if range { 1.7 } else { 0.0 };
                     p.tectonics.subduction_erosion_km3_per_km_myr = if range { 0.0 } else { rate };
+                    if !range {
+                        p.tectonics.arc_distance_km = 400.0;
+                    }
                     let stage = PlatesStage::new(p.clone());
                     let env = stage.env(&p.tectonics, 1);
                     let spacing_deg = env.norm.spacing_rad().to_degrees();
