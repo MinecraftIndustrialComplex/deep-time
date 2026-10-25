@@ -51,8 +51,10 @@ and the spreading of over-thick crust.
    for the cooling from 2026-10-21, before which old floor sank about 1.45 times GDH1; the rest
    from 2026-10-23, "The trench rows").
 2. **The stiffness.** The effective elastic thickness `Te` says how thick the stiff part of the
-   shell is. Ocean floor stiffens with age. Continental crust is weak just after mountain
-   building and stiffens over a few hundred million years. Volcanic arcs and rifts are weak. A
+   shell is. Ocean floor stiffens with age. A continent's stiffness is that of its strong upper
+   crust and its strong mantle, on its lithosphere's geotherm (since 2026-10-25, "The foreland's
+   stiffness"): weak where the lithosphere is young and hot, 70 to 84 km on an old craton.
+   Volcanic arcs and rifts are weak. A
    plate that the law weakens (an orogeny, an arc, a rift reaching it) has to warm first and
    weakens over tens of millions of years ("The release's pace"). The
    boundary between two plates is a break: one plate does not hold the other up.
@@ -105,7 +107,9 @@ The plate equation, as coded (ISO-040):
 | ISO-048 | Oceanic `Te` | 2.7 × √(age in Myr) | km | Calmant et al. 1990 | `verified` |
 | ISO-049 | Oceanic `Te`, at most | 40 | km | Watts & ten Brink 1989 | `abstract-only` |
 | ISO-050 | Continental `Te` long after an orogeny | 80 | km | Burov & Diament 1995 | `abstract-only` |
-| ISO-051 | Continental recovery | `80 × (1 − e^(−t/300 Myr))` | km | form after Lu et al. 2024; the numbers are the agent's | `uncited` |
+| ISO-051 | Continental recovery | `80 × (1 − e^(−t/300 Myr))`; since 2026-10-25 only where a continental cell has no thermal age (ISO-137 takes the rest) | km | form after Lu et al. 2024; the numbers are the agent's | `uncited` |
+| ISO-137 | Continental `Te` from the geotherm | `(h₁³ + (h₂ − h_c)³)^⅓`, h₁ the 300 °C isotherm or the Moho, h₂ the 750 °C isotherm, on by default since 2026-10-25 | km | Burov & Diament 1995, eq. 14; Watts & Burov 2003, eq. 3 | `verified` |
+| ISO-138 | The geotherm it reads | steady, the crust's heat from sources over h_r 10 km, the mantle's B / L, 1,350 °C at the lithosphere's base | °C, km | Burov & Diament 1995, appendix | `verified` |
 | ISO-052 | Lowest `Te` | 5 | km | Lu et al. 2024 | `abstract-only` |
 | ISO-053 | Arcs and rifts | at the lowest `Te` | km | none | `uncited` |
 | ISO-055 | Plate boundaries | at the lowest `Te`; the boundary cells blurred, the share of stiffness kept `1 − 2.5 × blur` (0, then 0.17 and 0.72 on a straight boundary) | km | none | `uncited` |
@@ -153,14 +157,16 @@ the artifact fixes); the sea-depth row is from the final code (law 2.7, after th
 - The plate is elastic up to its strength, which is a bound on the load a cell's plate holds away
   from local isostasy (since 2026-10-23, on by default: "The plate's yield", ISO-120), not on its
   bending stress. Real lithosphere also depends on whether crust and mantle are coupled and on how
-  sharply the plate is bent (Burov & Diament 1995); neither is modelled.
+  sharply the plate is bent (Burov & Diament 1995): the continents' `Te` takes the two as always
+  decoupled (ISO-137), and the bending's weakening is not modelled.
 - The solve works in the raster's block metric: every cell is a square of the equator's width
   (`norm_dx_m`). On the equal-area raster a cell at latitude φ is cos φ as wide and 1 / cos φ as
   tall on the sphere, so near the poles the plate bends as if it were about 1 / cos⁴ φ too stiff
   north to south and cos⁴ φ too soft east to west (about 300 times each way at 76°). A solve on
   the sphere's metric exists since 2026-10-23 (ISO-127) but is off: its step diverges at the poles
   ("The solve on the sphere's metric").
-- `Te` depends only on the crust's type and thermal age.
+- `Te` depends only on the crust's type, its thermal age and, on continents, the crust's thickness
+  (ISO-137).
 - The plate equation's extra terms for varying rigidity are left out (ISO-040).
 - A step is 2 million years; the ground answers in thousands of years on Earth. The solve gives
   the equilibrium. Ice-age cycles inside a step are not followed: the load is the ice standing at
@@ -1024,8 +1030,9 @@ solve that converges at the poles is the cure; the growth is its symptom.
 ## Foreland basins
 
 Added 2026-10-24 (ISO-131, PLT-546), V1 gap 6 ([physics-gap-audit.md](physics-gap-audit.md),
-"Gap 6"). The switch is `tectonics.collision_underthrust`, off: on the pool it brought no foredeep
-beyond the wedge ("On the pool", below).
+"Gap 6"). The switch is `tectonics.collision_underthrust`, off: on the pool gap 6's form brought no
+foredeep beyond the wedge ("On the pool", below), and gap 6b's brought one with twice the step
+noise ("The superposition and the foreland's stiffness (gap 6b)").
 
 **What Earth does.** A thrust belt is a load on the edge of the stiff plate that goes under it, and
 that plate bends down into a foredeep in front of the belt, with a forebulge beyond: foredeeps are
@@ -1178,7 +1185,10 @@ age makes it (the carrier's `Te` from its foreland's thermal age, ISO-051 and PL
 
 Added 2026-10-24 (ISO-136 to ISO-138), both of what the paragraph above asked for. The
 superposition replaced gap 6's column swap behind `tectonics.collision_underthrust`; the stiffness
-is `surface.flexure.te_geotherm`. GAP6B_VERDICT
+is `surface.flexure.te_geotherm`. The stiffness is on by default since 2026-10-25: on the pool it
+neither diverged nor moved the guard or the steps. The superposition stays off: with it the
+foredeep came, but the largest change of a cell in a step doubled and the guard's worst rose by 2
+to 5 km, and the traces show why ("On the pool", below).
 
 **The superposition** (ISO-136). The thin plate is linear: with the step's rigidity and restoring
 density, the deflection under two loads is the sum of the deflections under each. So beside the
@@ -1373,7 +1383,33 @@ each collision step, which the brief rules out ("Nothing is solved again"), and 
 more full solve. A cut-off on the belt's part or a smoothing of it would be a forcing term, so
 neither was tried.
 
-GAP6B_TE
+**The foreland's stiffness alone** (arm `g6b-te3`, 2026-10-25: `te_geotherm` on, the superposition
+off, both starts x seeds 1 to 4, 1,000 Myr, on master 2dd50093, against base10's same 8, `fl-ends`,
+and base10's 24; Mann-Whitney p against the same 8, then the 24). It is the per-switch arm that
+says which part of `g6b-both2`'s noise is whose:
+
+| | base10, 24 | base10, the same 8 | `te_geotherm` on, 8 |
+|---|---|---|---|
+| land | 0.294 | 0.294 | 0.299 (p 0.87; 1.0) |
+| land above 2 km | 0.112 | 0.112 | 0.137 (p 0.28; 0.15) |
+| coast with high ground | 0.226 | 0.233 | 0.250 (p 0.65; 0.24) |
+| continental crust under the sea | 0.246 | 0.205 | 0.212 (p 0.96; 0.69) |
+| land under ice | 0.095 | 0.095 | 0.119 (p 0.96; 0.59) |
+| collisions per 100 Myr | 1.80 | 1.65 | 1.55 (p 1.0; 0.73) |
+| criteria met per run, median and mean | 5, 5.00 | 5, 5.00 | 5, 5.12 |
+| the guard's worst, km from the sea | 10.1 | 10.2 | 10.1 (p 0.96; 0.98) |
+| largest rise / fall of a cell in a step, km | 7.7 / 7.2 | 7.4 / 7.2 | 7.5 / 7.2 |
+| record: belts above 3 km / share with a foredeep | 7 / 0.37 | 6 / 0.45 | 7.5 / 0.38 |
+| record: foredeep width, km | 0 | 36 | 0 (p 0.18; 0.68) |
+| final frame: `Te`, footprint / foreland, km | | | 11.4 / 34.7 |
+
+No run diverged, no step passed two Earth reliefs, and the guard and the largest steps are the
+base's. No V1 number moved beyond the seeds' spread. The noise of `g6b-both2` is the
+superposition's. Alone, the stiffness brings no foredeep: with the superposition off the belt is not
+carried (ISO-131 is under `tectonics.collision_underthrust`), so it stands on the overriding plate
+across the break, and the foreland's stiffness does not reach it.
+
+GAP6B_BOTH3
 
 **Simplifications.**
 

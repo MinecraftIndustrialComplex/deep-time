@@ -167,8 +167,9 @@ pub struct FlexureParams {
     /// the strong mantle from the Moho down to the 750 °C isotherm of the plate model's own
     /// steady geotherm for that lithosphere, two layers without a bond (Burov & Diament 1995,
     /// eq. 14), in place of `te_craton_km`'s recovery since the last orogeny; under a
-    /// collision's footprint, the colder of its own and the carrying plate's lithosphere. Off by
-    /// default (the rule before: ISO-051 and ISO-131).
+    /// collision's footprint, the colder of its own and the carrying plate's lithosphere. On by
+    /// default since 2026-10-25 (gap 6b's arm: no divergence, the guard and the steps as the
+    /// base's); false is the rule before (ISO-051 and ISO-131).
     pub te_geotherm: bool,
     /// Where the law above lowers a plate's Te (an orogeny, an arc, a rift: heating), the plate
     /// weakens towards it as e^(−t / this), Myr: the time its geotherm takes to warm (the
@@ -217,7 +218,7 @@ impl Default for FlexureParams {
             te_craton_km: 80.0, // ledger: ISO-050
             te_recovery_myr: 300.0, // ledger: ISO-051 (uncited: this agent's choice)
             te_min_km: 5.0, // ledger: ISO-052
-            te_geotherm: false, // ledger: ISO-137 (game-choice: off until the pool says otherwise)
+            te_geotherm: true, // ledger: ISO-137 (on since gap 6b's arm g6b-te3)
             te_weakening_myr: 0.0, // ledger: ISO-099 (game-choice: off by default)
             yield_anomaly_mgal: 380.0, // ledger: ISO-120
             row_metric: false, // ledger: ISO-127
