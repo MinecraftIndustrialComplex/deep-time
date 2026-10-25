@@ -46,17 +46,24 @@
 //! and moved the ground by up to several kilometres a step along margins and near the poles: the
 //! cell-scale zigzag and the polar stripes of the build log, 2026-10-02.)
 //!
-//! One place is not carried with its crust: the foreland of a collision's belt (ISO-133). The
-//! belt and the incoming plate under it bend as one plate, the incoming plate's (ISO-131); the
-//! belt's crust moves with the plate it stands on, and the incoming plate's crust slides towards
-//! it. The deflection there is where the belt's weight puts it, so within a flexural wavelength
-//! of the belt the incoming plate's state stays with the belt: the place keeps its deflection
-//! and the load the plate held, and the crust that slides through brings its own load (the load
-//! over what the place answered waits in the unsolved residual) and the roots local isostasy put
-//! under it. An elastic plate under a load that stands still bends the same however fast it
-//! slides (Beaumont 1981; Flemings & Jordan 1989): carried with its crust, the foredeep's
-//! deflection went with the crust into the front, and the basin was a quarter as deep. Elsewhere
-//! every cell's crust moves with the plate that bends it, and nothing changes.
+//! One part of the deflection is not carried with its crust: a collision belt's own (ISO-136).
+//! The belt and the incoming plate under it bend as one plate, the incoming plate's (ISO-131);
+//! the belt's crust moves with the plate it stands on, and the incoming plate's crust slides
+//! towards it. An elastic plate under a load that stands still bends the same however fast it
+//! slides (Beaumont 1981; Flemings & Jordan 1989), so the belt's deflection stays with the belt.
+//! The plate is linear, and on a step with a belt its own increments (its loads and roots, the
+//! residual it carries, the load it let go) are solved apart as well: that answer is the belt's
+//! part of the step's deflection, kept as `FlexState::belt_m`. Over the foreland, within a
+//! flexural wavelength of the belt, that part moves with the belt, and the rest (the crust's own
+//! loads, its local roots, where it yielded) moves with the crust. Nothing is solved again: the
+//! step's change is the whole solve's, and a place in the foreland takes the change of the
+//! belt's part as the crust slides under it, with the sea that change lets in, which the belt's
+//! solve already counted. Carried with its crust, the foredeep's deflection went with the crust
+//! into the front, and the basin was a quarter as deep; keeping the whole state of the place
+//! with the belt instead (ISO-133, until 2026-10-24) swapped the local roots of the crust, which
+//! vary at the cell scale, into the residual each step, and the solve gave them back: changes of
+//! up to 46 km a step. The belt's part is as smooth as the plate's bending. Elsewhere every
+//! cell's crust moves with the plate that bends it, and nothing changes.
 //!
 //! # A plate that stiffens keeps its shape; one that weakens settles
 //! Rigidity gained by cooling joins stress-free: nothing moves, and later loads meet the stiffer
@@ -153,6 +160,14 @@ pub struct FlexureParams {
     /// Te of arcs, rifts and everything else at least, km (the low end of continental Te: 5 km,
     /// Lu et al. 2024, abstract).
     pub te_min_km: f64,
+    /// Continental Te from the lithosphere's geotherm (ISO-137): where the plates give a thermal
+    /// age (`plates/thermal_age_myr`), the strong upper crust down to the 300 °C isotherm and
+    /// the strong mantle from the Moho down to the 750 °C isotherm of the plate model's own
+    /// steady geotherm for that lithosphere, two layers without a bond (Burov & Diament 1995,
+    /// eq. 14), in place of `te_craton_km`'s recovery since the last orogeny; under a
+    /// collision's footprint, the colder of its own and the carrying plate's lithosphere. Off by
+    /// default (the rule before: ISO-051 and ISO-131).
+    pub te_geotherm: bool,
     /// Where the law above lowers a plate's Te (an orogeny, an arc, a rift: heating), the plate
     /// weakens towards it as e^(−t / this), Myr: the time its geotherm takes to warm (the
     /// lithosphere's thermal time constant: 62.8 Myr, ISO-099). It stiffens at once. 0, the
@@ -200,6 +215,7 @@ impl Default for FlexureParams {
             te_craton_km: 80.0, // ledger: ISO-050
             te_recovery_myr: 300.0, // ledger: ISO-051 (uncited: this agent's choice)
             te_min_km: 5.0, // ledger: ISO-052
+            te_geotherm: false, // ledger: ISO-137 (game-choice: off until the pool says otherwise)
             te_weakening_myr: 0.0, // ledger: ISO-099 (game-choice: off by default)
             yield_anomaly_mgal: 380.0, // ledger: ISO-120
             row_metric: false, // ledger: ISO-127
@@ -301,6 +317,13 @@ impl FlexureParams {
         te.max(self.te_min_km) * self.elastic_thickness_scale
     }
 
+    /// The continental Te of a lithosphere `l_km` deep under crust `crust_km` thick, km, at the
+    /// floor and with the scale as [`FlexureParams::elastic_thickness_km`] (`te_geotherm`).
+    // ledger: ISO-137
+    pub fn geotherm_te_km(&self, l_km: f64, crust_km: f64) -> f64 {
+        geotherm_te_km(l_km, crust_km).max(self.te_min_km) * self.elastic_thickness_scale
+    }
+
     /// The law's Te a plate holds after a step of `dt_myr`, km: the law's value `target` where it
     /// is at or above the Te the plate held, `was` (NaN: crust new at the place); below it, `was`
     /// relaxes towards it as e^(−dt / `te_weakening_myr`).
@@ -313,16 +336,23 @@ impl FlexureParams {
         }
     }
 
-    /// How far a collision belt's foreland reaches, m (ISO-133): one flexural wavelength, 2πα,
-    /// of the stiffest plate the law allows, beyond which the deflection under a line load is
-    /// under e^(−2π) = 0.2 % of the deflection under it (game-choice: numerical, agent
-    /// 2026-10-24; the foreland's frame moves nothing where there is no deflection to move).
-    // ledger: ISO-133
+    /// How far a collision belt's foreland reaches, m (ISO-133, ISO-136): one flexural
+    /// wavelength, 2πα, of the stiffest plate the law allows (with `te_geotherm`, a craton's
+    /// lithosphere with no crust: its 750 °C isotherm), beyond which the deflection under a line
+    /// load is under e^(−2π) = 0.2 % of the deflection under it (game-choice: numerical, agent
+    /// 2026-10-24; the belt's frame moves nothing where there is no deflection to move).
+    // ledger: ISO-133, ISO-136
     pub fn belt_reach_m(&self, gravity_m_s2: f64) -> f64 {
+        let geotherm = if self.te_geotherm {
+            geotherm_te_km(crate::plates::thermal::L_COLD_KM, 0.0)
+        } else {
+            0.0
+        };
         let te = self
             .te_craton_km
             .max(self.te_ocean_max_km)
             .max(self.te_min_km)
+            .max(geotherm)
             * self.elastic_thickness_scale;
         std::f64::consts::TAU * flexural_parameter_m(rigidity_per_g(te, gravity_m_s2))
     }
@@ -349,6 +379,33 @@ pub fn rigidity_per_g(te_km: f64, gravity_m_s2: f64) -> f64 {
 /// The flexural parameter α = (4D / ρ_m g)^¼, m, of a rigidity over gravity.
 pub fn flexural_parameter_m(d_per_g: f64) -> f64 {
     (4.0 * d_per_g / RHO_MANTLE).powf(0.25)
+}
+
+/// The isotherms at the base of the strong upper crust and of the strong mantle, °C: "Isotherms
+/// 250°C-300°C mark the base of the mechanically strong upper crust (quartz). The isotherms
+/// 700°C-750°C mark the base of the competent mantle (olivine)" (Burov & Diament 1995, Figure 2
+/// caption); eq. 14's h₁ and h₂ "do not exactly coincide with the depths to the isotherms 300°C
+/// and 750°C" (p. 3915).
+pub const UPPER_CRUST_BASE_C: f64 = 300.0; // ledger: ISO-137
+pub const MANTLE_BASE_C: f64 = 750.0; // ledger: ISO-137
+
+// ledger: ISO-137
+/// The elastic thickness of a continental lithosphere `l_km` deep under crust `crust_km` thick,
+/// km, before the floor and the scale: the strong upper crust, h₁, to the 300 °C isotherm of the
+/// plate model's steady geotherm (`plates::thermal::isotherm_km`) or the Moho if that is
+/// shallower, and the strong mantle from the Moho to the 750 °C isotherm, h₂ − h_c, bending as
+/// two layers without a bond, Te = (h₁³ + (h₂ − h_c)³)^⅓ (Burov & Diament 1995, eq. 14, after
+/// McNutt et al. 1988; the leaf spring of Watts & Burov 2003, eq. 3). Always decoupled: "For most
+/// commonly assumed quartz-dominated crust, decoupling should be permanent, except when the crust
+/// is very thin (< 20-25 km)" (Burov & Diament 1995, p. 3909), and the decoupled model "fits most
+/// of the continental data" (their Figure 7b). A craton (L 225 km) under 35 to 50 km of crust:
+/// 84 to 71 km; a thinned margin (L 143 km) under 35 km: 42 km.
+pub fn geotherm_te_km(l_km: f64, crust_km: f64) -> f64 {
+    use crate::plates::thermal::isotherm_km;
+    let hc = crust_km.max(0.0);
+    let h1 = isotherm_km(l_km, UPPER_CRUST_BASE_C).min(hc);
+    let mantle = (isotherm_km(l_km, MANTLE_BASE_C) - hc).max(0.0);
+    (h1.powi(3) + mantle.powi(3)).cbrt()
 }
 
 /// Airy share of crust under air and under water: a thickening T sinks k·T. The crust is the
@@ -531,25 +588,22 @@ pub struct FlexState {
     pub seen_elevation_m: Vec<f32>,
     /// Plate steps since the last solve.
     pub since_solve: u32,
-    /// The part of the deflection the plate does not hold, m (ISO-133): the roots the plate model
-    /// leaves locally compensated (below its sample spacing, ISO-069; the plateau spreading's,
-    /// ISO-070) and the sinking where the plate yielded (ISO-120), which local isostasy put under
-    /// their own crust and which go with it through a belt's foreland. Kept from the start of
-    /// the run with the collisions' carrying plates (`StepIn::carrier_plate_id`), empty
-    /// otherwise.
+    /// The part of the deflection the collisions' belts bent, m (ISO-136): the sum of each
+    /// solve's answer to the belts' own increments (their loads, the bending of their roots, the
+    /// load they let go), part of `deflection_m`. Over a belt's foreland it stays with the belt
+    /// ([`FlexState::carry_frame`]); elsewhere it goes with the crust as the rest does. Kept with
+    /// the collisions' carrying plates (`StepIn::carrier_plate_id`), empty otherwise.
     #[serde(default)]
-    pub local_m: Vec<f32>,
+    pub belt_m: Vec<f32>,
     /// A collision's footprint at the last step (ISO-133): each footprint cell and the plate
     /// that carried it, in cell order.
     #[serde(default)]
     pub footprint: Vec<(u32, f32)>,
-    /// A belt's foreland in the belt's frame (ISO-133): per foreland cell of this step, the
-    /// deflection, load, ice, unsolved residual, rigidity and the deflection the plate does not
-    /// hold that the place had a step ago, moved with the belt (the rigidity blended as its
-    /// logarithm, as the carry blends it). Set by [`FlexState::carry_frame`] and taken by the
-    /// next step, in cell order.
+    /// The belts' part of the deflection over their forelands in the belts' frame (ISO-136): per
+    /// foreland cell of this step, what the place had a step ago, moved with its belt. Set by
+    /// [`FlexState::carry_frame`] and taken by the next step, in cell order.
     #[serde(skip)]
-    pub framed: Vec<(u32, [f32; 6])>,
+    pub framed: Vec<(u32, f32)>,
     /// The surface's elevation before the step at the crust's source, m (the carry's corners,
     /// [`FlexState::carry`]); NaN where the crust is new at the place. The step's start less this
     /// is the plate model's move of the ground as the carry made it ([`booked`]). Set by the
@@ -570,20 +624,21 @@ impl FlexState {
             unsolved_m: vec![0.0; n],
             seen_elevation_m: Vec::new(),
             since_solve: 0,
-            local_m: Vec::new(),
+            belt_m: Vec::new(),
             footprint: Vec::new(),
             framed: Vec::new(),
             from_m: Vec::new(),
         }
     }
 
-    // ledger: ISO-133
-    /// Before [`FlexState::carry`]: the state each foreland cell of a belt held a step ago in the
-    /// belt's frame ([`belt_reach`]). `frame` lists the foreland's cells, each with the plate
-    /// that bends it (the belt's carrying plate) and its source under the belt's plate's
-    /// rotation. A source's corners count where, before the step, they held a state and belonged
-    /// to the bending plate: its own crust (`prev_plate`) or the footprint it carried at the last
-    /// step. A cell without such a corner is left out: its crust carries its state as anywhere.
+    // ledger: ISO-133, ISO-136
+    /// Before [`FlexState::carry`]: the belt's part of the deflection (`belt_m`) each foreland
+    /// cell of a belt had a step ago in the belt's frame ([`belt_reach`]). `frame` lists the
+    /// foreland's cells, each with the plate that bends it (the belt's carrying plate) and its
+    /// source under the belt's plate's rotation. A source's corners count where, before the
+    /// step, they held a state and belonged to the bending plate: its own crust (`prev_plate`)
+    /// or the footprint it carried at the last step. A cell without such a corner is left out:
+    /// its crust carries the belt's part as anywhere.
     pub fn carry_frame(
         &mut self,
         w: usize,
@@ -596,7 +651,7 @@ impl FlexState {
         let Some(prev_plate) = prev_plate.filter(|v| v.len() == n) else {
             return;
         };
-        if frame.is_empty() || self.load_m.len() != n || self.water_m.len() != n {
+        if frame.is_empty() || self.belt_m.len() != n || self.water_m.len() != n {
             return;
         }
         let footprint = &self.footprint;
@@ -607,22 +662,7 @@ impl FlexState {
                         .binary_search_by_key(&(s as u32), |e| e.0)
                         .is_ok_and(|k| footprint[k].1 == id))
         };
-        let ln_rigidity: Vec<f32> = self.rigidity.par_iter().map(|&d| d.ln()).collect();
-        let nil;
-        let local: &Vec<f32> = if self.local_m.len() == n {
-            &self.local_m
-        } else {
-            nil = vec![0.0f32; n];
-            &nil
-        };
-        let fields = [
-            &self.deflection_m,
-            &self.load_m,
-            &self.ice_m,
-            &self.unsolved_m,
-            &ln_rigidity,
-            local,
-        ];
+        let belt = &self.belt_m;
         let framed = frame
             .par_iter()
             .filter_map(|&(c, id, [fi, fj])| {
@@ -639,20 +679,15 @@ impl FlexState {
                     (j1u * w + a, (1.0 - ti) * tj),
                     (j1u * w + b, ti * tj),
                 ];
-                let mut sum = [0.0f64; 6];
+                let mut sum = 0.0f64;
                 let mut weight = 0.0f64;
                 for (s, wt) in corners {
-                    if wt > 0.0 && in_system(s, id) && ln_rigidity[s].is_finite() {
-                        for (acc, v) in sum.iter_mut().zip(&fields) {
-                            *acc += wt * f64::from(v[s]);
-                        }
+                    if wt > 0.0 && in_system(s, id) {
+                        sum += wt * f64::from(belt[s]);
                         weight += wt;
                     }
                 }
-                (weight > 1e-9).then(|| {
-                    let [w, q, i, u, l, a] = sum.map(|y| y / weight);
-                    (c as u32, [w, q, i, u, l.exp(), a].map(|y| y as f32))
-                })
+                (weight > 1e-9).then(|| (c as u32, (sum / weight) as f32))
             })
             .collect();
         self.framed = framed;
@@ -746,14 +781,14 @@ impl FlexState {
                 *i = ice;
                 *u = unsolved;
             });
-        // ledger: ISO-133
-        if self.local_m.len() == n {
-            self.local_m = advect::carried_field(x, &self.local_m)
+        // ledger: ISO-136
+        if self.belt_m.len() == n {
+            self.belt_m = advect::carried_field(x, &self.belt_m)
                 .into_par_iter()
                 .map(|v| v.unwrap_or(0.0))
                 .collect();
         } else {
-            self.local_m = Vec::new();
+            self.belt_m = Vec::new();
         }
         // ledger: ISO-096
         self.from_m = moved
@@ -1802,6 +1837,10 @@ pub struct StepIn<'a> {
     pub carrier_plate_id: Option<&'a [f32]>,
     /// `plates/carrier_thermal_age_myr`: the thermal age of that lithosphere, Myr (NaN: none).
     pub carrier_age_myr: Option<&'a [f32]>,
+    /// `plates/thermal_age_myr` (NaN: none) and `plates/thickness_m`, the crust, for the
+    /// continental Te from the geotherm (`te_geotherm`, ISO-137); None: the law before.
+    pub thermal_age_myr: Option<&'a [f32]>,
+    pub crust_thickness_m: Option<&'a [f32]>,
     /// Land ice, m (`climate/ice_thickness_m`), when a climate stage publishes it.
     pub ice_m: Option<&'a [f32]>,
     /// The `isostasy` setting: the density of eroded and deposited rock over the mantle's.
@@ -2046,37 +2085,50 @@ pub fn step(
     let water_share = RHO_WATER / RHO_MANTLE;
     let ice_share = RHO_ICE / RHO_MANTLE;
     let (rock_land, rock_sea) = rock_shares(x.rock_share);
-    // ledger: ISO-133
-    // A belt's foreland in the belt's frame (the module doc): the place keeps the deflection the
-    // plate held there, less the local roots of the crust that was there, plus those of the crust
-    // that is there now; the ground follows (`frame_dh`, m). The load the plate held stays as it
-    // was: what the crust brings over what the place answered (its own load less what its roots
-    // compensate, and its ice) waits in the unsolved residual and is solved with the step's loads.
+    // ledger: ISO-136
+    // The belt's own deflection in the belt's frame (the module doc): over its foreland each
+    // place takes the belt's part of the deflection the place had a step ago, and the crust that
+    // slid there keeps the rest of its own (`frame_dh`, m: the ground follows). The water the
+    // move lets in or out is the belt's too: the belt's increments were solved with the water
+    // they let into the basin (the restoring density under the sea), so it joins the load and
+    // its reference as answered. Crust new at the place starts with the belt's part where it is,
+    // as it starts with the rest of its state: it moves nothing.
     let framed = std::mem::take(&mut st.framed);
     let mut frame_dh = Vec::new();
-    if !framed.is_empty() {
+    let fresh_at = |st: &FlexState, c: usize| {
+        let age = x.crust_age_myr[c];
+        st.water_m[c].is_nan() || (age >= 0.0 && f64::from(age) < x.dt_myr)
+    };
+    if x.carrier_plate_id.is_none() {
+        st.belt_m = Vec::new();
+    } else if st.belt_m.len() != n {
+        st.belt_m = vec![0.0; n];
+    } else {
+        for c in 0..n {
+            if fresh_at(st, c) {
+                st.belt_m[c] = 0.0;
+            }
+        }
+    }
+    if !framed.is_empty() && st.belt_m.len() == n {
         frame_dh = vec![0.0f64; n];
-        for &(c, [wf, qf, i_f, uf, df, lf]) in &framed {
+        for &(c, bf) in &framed {
             let c = c as usize;
             if c >= n {
                 continue;
             }
-            let age = x.crust_age_myr[c];
-            if st.water_m[c].is_nan() || (age >= 0.0 && f64::from(age) < x.dt_myr) {
+            if fresh_at(st, c) {
+                st.belt_m[c] = bf;
                 continue;
             }
-            let local = f64::from(st.local_m.get(c).copied().unwrap_or(0.0));
-            let (wc, qc, ic) = (
-                f64::from(st.deflection_m[c]),
-                f64::from(st.load_m[c]),
-                f64::from(st.ice_m[c]),
-            );
-            let [wf, qf, i_f, uf, lf] = [wf, qf, i_f, uf, lf].map(f64::from);
-            let w_new = wf - lf + local;
-            frame_dh[c] = -p.strength * (w_new - wc);
-            st.deflection_m[c] = w_new as f32;
-            st.unsolved_m[c] = (uf + (qc - local) - (qf - lf) + ice_share * (ic - i_f)) as f32;
-            st.rigidity[c] = df;
+            let d = f64::from(bf) - f64::from(st.belt_m[c]);
+            frame_dh[c] = -p.strength * d;
+            st.deflection_m[c] = (f64::from(st.deflection_m[c]) + d) as f32;
+            st.belt_m[c] = bf;
+            let sea = x.sea_at(c);
+            let let_in = (sea - (h[c] + frame_dh[c])).max(0.0) - (sea - h[c]).max(0.0);
+            st.water_m[c] = (f64::from(st.water_m[c]) + let_in) as f32;
+            st.load_m[c] = (f64::from(st.load_m[c]) + water_share * let_in) as f32;
         }
     }
     let fdh = |c: usize| frame_dh.get(c).copied().unwrap_or(0.0);
@@ -2179,16 +2231,34 @@ pub fn step(
     // fast as the geotherm warms, not in the step the law changed (the savanna pit: a craton the
     // Andean arc's orogeny reached gave up 4.3 km of held load in three steps, build log
     // 2026-10-23). A plate the law stiffens joins stress-free at once, as before.
+    // ledger: ISO-137
+    // With `te_geotherm`, a continental column's Te is its lithosphere's geotherm's: the plates'
+    // thermal age is the depth of the lithosphere (`plates::thermal::lithosphere_km_of_age`), the
+    // crust its own thickness.
+    let geotherm = x
+        .thermal_age_myr
+        .zip(x.crust_thickness_m)
+        .filter(|(a, t)| p.te_geotherm && a.len() == n && t.len() == n);
     let law: Vec<f64> = (0..n)
         .into_par_iter()
         .map(|c| {
             let reg = x.regime[c] as u8;
-            let own = p.elastic_thickness_km(
-                x.crust_type[c] as u8 == OCEANIC,
-                f64::from(x.crust_age_myr[c]),
-                f64::from(x.orogeny_age_myr[c]),
-                reg == regime::ARC || reg == regime::RIFT,
-            );
+            let oceanic = x.crust_type[c] as u8 == OCEANIC;
+            let weak = reg == regime::ARC || reg == regime::RIFT;
+            let column = geotherm.filter(|_| !oceanic).and_then(|(age, crust)| {
+                let l = crate::plates::thermal::lithosphere_km_of_age(f64::from(age[c]));
+                let hc = f64::from(crust[c]) / 1000.0;
+                (l.is_finite() && hc.is_finite()).then_some((l, hc))
+            });
+            let own = match column {
+                Some((l, hc)) if !weak => p.geotherm_te_km(l, hc),
+                _ => p.elastic_thickness_km(
+                    oceanic,
+                    f64::from(x.crust_age_myr[c]),
+                    f64::from(x.orogeny_age_myr[c]),
+                    weak,
+                ),
+            };
             // ledger: ISO-131
             // A collision's belt and wedge stand on the incoming plate's lithosphere, thrust
             // under them, and that plate bends under their weight (Lyon-Caen & Molnar 1983;
@@ -2196,8 +2266,15 @@ pub fn step(
             // underthrust plate are two layers without a bond: they bend together with the
             // rigidity of their sum, Te = (Te₁³ + Te₂³)^⅓. The wedge is the incoming plate's own
             // crust on its own lithosphere: the stronger of the two. Neither weakens a cell.
-            let target = match x.carrier(c) {
-                Some((id, age)) if age.is_finite() => {
+            // ledger: ISO-137
+            // From the geotherm the sum is in the law: the column's crust over the colder of the
+            // two lithospheres, its strong upper crust and the strong mantle under its Moho.
+            let target = match (x.carrier(c), column) {
+                (Some((_, age)), Some((l, hc))) if age.is_finite() => {
+                    let under = crate::plates::thermal::lithosphere_km_of_age(f64::from(age));
+                    own.max(p.geotherm_te_km(l.max(under), hc))
+                }
+                (Some((id, age)), _) if age.is_finite() => {
                     let car = p.elastic_thickness_km(false, -1.0, f64::from(age), false);
                     if id == x.plate_id[c] {
                         own.max(car)
@@ -2301,13 +2378,17 @@ pub fn step(
     // implicit step. That split grows wherever the spreading's step is strong at the cell scale
     // (D·Δt·k² above about 0.4), which the cells of large planets reach: a checkerboard of ±50 km
     // a step on the Earth-sized planet (build log 2026-10-18, the surface divergence).
+    let passes = if x.plate_spacing_m > dxs {
+        // Binomial passes (1, 2, 1)/4: nothing of the two-cell wave survives; their variance
+        // (half a cell² each) reaches that of half the sample spacing.
+        let half = 0.5 * x.plate_spacing_m / dxs;
+        (2.0 * half * half).ceil().max(1.0) as usize
+    } else {
+        0
+    };
     let bend_part = {
         let mut pf = pick(&|c| cells[c].plate_root);
-        if x.plate_spacing_m > dxs {
-            // Binomial passes (1, 2, 1)/4: nothing of the two-cell wave survives; their
-            // variance (half a cell² each) reaches that of half the sample spacing.
-            let half = 0.5 * x.plate_spacing_m / dxs;
-            let passes = (2.0 * half * half).ceil().max(1.0) as usize;
+        if passes > 0 {
             binomial(&mut pf, ws, hs, passes);
         }
         pf
@@ -2337,7 +2418,7 @@ pub fn step(
     // replaces, L((1 − r)·M), is the same force where r is uniform; where r changes from cell to
     // cell, along a plate boundary or the edge of a reheated zone, its curvature made forces of
     // several times the load held: the polar holes and spikes, build log 2026-10-18.)
-    let held = pick(&|c| {
+    let held_at = |c: usize| {
         if cells[c].fresh {
             0.0
         } else {
@@ -2346,19 +2427,34 @@ pub fn step(
                     - f64::from(st.deflection_m[c])
                     - f64::from(st.unsolved_m[c]))
         }
-    });
-    let let_go: Vec<f64> = (0..ws * hs)
-        .into_par_iter()
-        .map(|c| {
-            let ratio = d_now[c] / d_prev[c];
-            if ratio.is_finite() && ratio < 1.0 {
-                (1.0 - ratio) * held[c]
-            } else {
-                0.0
-            }
-        })
-        .collect();
+    };
+    let release = |held: &[f64]| -> Vec<f64> {
+        (0..ws * hs)
+            .into_par_iter()
+            .map(|c| {
+                let ratio = d_now[c] / d_prev[c];
+                if ratio.is_finite() && ratio < 1.0 {
+                    (1.0 - ratio) * held[c]
+                } else {
+                    0.0
+                }
+            })
+            .collect()
+    };
+    let held = pick(&held_at);
+    let let_go = release(&held);
     drop(held);
+    // ledger: ISO-136
+    // The belt: a collision's footprint on the over plate's crust, carried by the incoming plate
+    // (the wedge, the incoming plate's own crust, goes with its crust: its throughput is
+    // restacked onto the belt, PLT-400). Its share of the load let go is its cells'.
+    let is_belt = |c: usize| x.carrier(c).is_some_and(|(id, _)| id != x.plate_id[c]);
+    let belt_on = st.belt_m.len() == n && (0..n).into_par_iter().any(is_belt);
+    let let_go_belt = if belt_on {
+        release(&pick(&|c| if is_belt(c) { held_at(c) } else { 0.0 }))
+    } else {
+        Vec::new()
+    };
     let mut bend_root = vec![0.0; ws * hs];
     sv.bend(&d_now, &bend_part, &mut bend_root);
     let r: Vec<f64> = (0..ws * hs)
@@ -2376,6 +2472,9 @@ pub fn step(
         elastic_thickness_km: te_out,
         ..StepOut::default()
     };
+    // The belt's part of the step's deflection, the bending of its root and its own solve, on
+    // the solve's raster (empty: no belt, or not a solve step).
+    let mut belt_flex: Vec<f64> = Vec::new();
     let (dw, left) = if solve_now {
         st.since_solve = 0;
         let (dw, report) = sv.solve(&d_now, &c_rest, &r, p.tolerance_m, p.max_iterations);
@@ -2385,6 +2484,30 @@ pub fn step(
             ));
         }
         out.solve = Some(report);
+        // ledger: ISO-136
+        // The plate is linear: the belt's own increments (its loads and roots, the residual it
+        // carries, the load it let go) solved apart are its part of the step's deflection, and
+        // the rest of the step's is the rest's. The step's change is the whole solve's as
+        // before; only the belt's part is then kept in the belt's frame.
+        if belt_on {
+            let on_belt = |c: usize, v: f64| if is_belt(c) { v } else { 0.0 };
+            let dq_b = pick(&|c| on_belt(c, cells[c].dq + carried(c, &st.unsolved_m)));
+            let root_b = pick(&|c| on_belt(c, cells[c].root));
+            let mut bend_b = pick(&|c| on_belt(c, cells[c].plate_root));
+            if passes > 0 {
+                binomial(&mut bend_b, ws, hs, passes);
+            }
+            let mut bend_root_b = vec![0.0; ws * hs];
+            sv.bend(&d_now, &bend_b, &mut bend_root_b);
+            let r_b: Vec<f64> = (0..ws * hs)
+                .into_par_iter()
+                .map(|c| RHO_MANTLE * (dq_b[c] - root_b[c]) - bend_root_b[c] + let_go_belt[c])
+                .collect();
+            let (dw_b, _) = sv.solve(&d_now, &c_rest, &r_b, p.tolerance_m, p.max_iterations);
+            if dw_b.iter().all(|v| v.is_finite()) {
+                belt_flex = bend_b.iter().zip(&dw_b).map(|(a, b)| a + b).collect();
+            }
+        }
         if let Some(faces) = x.sin_faces.filter(|s| s.len() == hgt + 1)
             && std::env::var_os(METRIC_TRACE_ENV).is_some()
         {
@@ -2448,17 +2571,11 @@ pub fn step(
     // to 28 km over its Airy height on a stiff plate, and the plate model's settling (ISO-078)
     // followed it (docs/science/plates.md, "The polar peaks").
     let yield_bound = p.yield_held_kg_m2();
-    // ledger: ISO-133
-    // The part of the deflection the plate does not hold, with a carried collision system: the
-    // root less the part of it the plate bends, and what sank where the plate yielded.
-    if x.carrier_plate_id.is_none() {
-        st.local_m = Vec::new();
-    } else if st.local_m.len() != n {
-        st.local_m = vec![0.0; n];
-    }
-    let keep_local = !st.local_m.is_empty();
-    let mut local_rows: Vec<&mut [f32]> = if keep_local {
-        st.local_m.chunks_mut(w).collect()
+    // ledger: ISO-136
+    // The belt's part of the deflection takes the belt's part of the step's.
+    let keep_belt = st.belt_m.len() == n;
+    let mut belt_rows: Vec<&mut [f32]> = if keep_belt {
+        st.belt_m.chunks_mut(w).collect()
     } else {
         (0..hgt).map(|_| <&mut [f32]>::default()).collect()
     };
@@ -2479,7 +2596,7 @@ pub fn step(
         flex.par_chunks_mut(w),
         changes.par_chunks_mut(w),
         yielded_rows.par_iter_mut(),
-        local_rows.par_iter_mut(),
+        belt_rows.par_iter_mut(),
     )
         .into_par_iter()
         .enumerate()
@@ -2496,12 +2613,9 @@ pub fn step(
                 let depth = (sea - hr[i]).max(0.0);
                 let w_prev = if cell.fresh { 0.0 } else { f64::from(dr[i]) };
                 let mut w_new = w_prev + cell.root + delta;
-                let mut local = if keep_local {
-                    let prev = if cell.fresh { 0.0 } else { f64::from(ar[i]) };
-                    prev + cell.root - linear_at(&bend_part, ws, hs, f, i, j)
-                } else {
-                    0.0
-                };
+                if keep_belt && !belt_flex.is_empty() {
+                    ar[i] = (f64::from(ar[i]) + linear_at(&belt_flex, ws, hs, f, i, j)) as f32;
+                }
                 let load = cell.load + water_share * (depth - cell.water);
                 let ice = x.ice_m.map_or(0.0, |v| f64::from(v[c]).max(0.0));
                 let mut holds = RHO_MANTLE * (load + ice_share * ice - w_new);
@@ -2515,10 +2629,6 @@ pub fn step(
                     w_new += sink;
                     holds -= RHO_MANTLE * sink;
                     yr[i] = sink as f32;
-                    local += sink;
-                }
-                if keep_local {
-                    ar[i] = local as f32;
                 }
                 lr[i] = load as f32;
                 dr[i] = w_new as f32;
@@ -3033,6 +3143,9 @@ mod tests {
         /// The carrying plate and its lithosphere's thermal age (`StepIn::carrier_plate_id`,
         /// `StepIn::carrier_age_myr`), None: every cell on its own plate.
         carrier: Option<(Vec<f32>, Vec<f32>)>,
+        /// The lithosphere's thermal age and the crust, m (`StepIn::thermal_age_myr`,
+        /// `StepIn::crust_thickness_m`), None: the law before the geotherm's.
+        geotherm: Option<(Vec<f32>, Vec<f32>)>,
     }
 
     impl World {
@@ -3055,6 +3168,7 @@ mod tests {
                 sin_faces: None,
                 water_z: None,
                 carrier: None,
+                geotherm: None,
             }
         }
 
@@ -3125,6 +3239,8 @@ mod tests {
                     plate_id: &self.plate,
                     carrier_plate_id: self.carrier.as_ref().map(|c| c.0.as_slice()),
                     carrier_age_myr: self.carrier.as_ref().map(|c| c.1.as_slice()),
+                    thermal_age_myr: self.geotherm.as_ref().map(|g| g.0.as_slice()),
+                    crust_thickness_m: self.geotherm.as_ref().map(|g| g.1.as_slice()),
                     ice_m: Some(&self.ice),
                     rock_share: 0.8,
                     parts: true,
@@ -3455,13 +3571,13 @@ mod tests {
     /// The foreland basin when the incoming plate slides under a belt that stands still: `v`
     /// rows a step towards the front (row 128; a row is 39 km, a step 2 Myr), the belt (rows
     /// 118 to 127, on plate 0, carried by plate 1) rising by up to 200 m a step for `steps`
-    /// steps. Column 3's elevation, flexure and deflection.
-    fn sliding_foreland(v: f64, steps: usize) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+    /// steps, on ground at `z0` under the sea at `sea`. Column 3's elevation, flexure and
+    /// deflection.
+    fn sliding_foreland(v: f64, steps: usize, z0: f64, sea: f64) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
         let p = on();
         let (w, h) = (32usize, 256usize);
         let n = w * h;
-        let sea = -1.0e6;
-        let mut wd = World::new(w, h, 300.0);
+        let mut wd = World::new(w, h, z0);
         for c in 0..n {
             if c / w >= 128 {
                 wd.plate[c] = 1.0;
@@ -3499,7 +3615,7 @@ mod tests {
                 .collect()
         };
         let still = vec![0.0f32; n];
-        let plate_elev = vec![300.0f32; n];
+        let plate_elev = vec![z0 as f32; n];
         let parents = [None, None];
         let mut last = StepOut::default();
         for _ in 0..steps {
@@ -3548,17 +3664,17 @@ mod tests {
     /// at rest (elastic: the deflection has no memory of the plate's past). Carried with its
     /// crust (before ISO-133), the foredeep's deflection went with the crust into the front,
     /// and at half a row a step (10 km/Myr) the basin by the front was a quarter as deep (2.5 km
-    /// against 10.3 after 20 steps, and the basin ended a hundred km nearer the front). In the
-    /// belt's frame the two agree to the metre over the belt and the basin at 10 and 30 km/Myr
-    /// (and after 10, 40 and 80 steps, measured); beyond the foreland's reach, one flexural
-    /// wavelength, the crust carries its state again, where there is next to nothing to carry.
+    /// against 10.3 after 20 steps, and the basin ended a hundred km nearer the front). With the
+    /// belt's part in the belt's frame (ISO-136) the two agree to the metre over the belt and
+    /// the basin at 10 and 30 km/Myr; beyond the foreland's reach, one flexural wavelength, the
+    /// crust carries the belt's part again, where there is next to nothing to carry.
     #[test]
     fn a_foreland_sliding_under_its_belt_bends_as_one_at_rest() {
-        let (z0, f0, _) = sliding_foreland(0.0, 20);
+        let (z0, f0, _) = sliding_foreland(0.0, 20, 300.0, -1.0e6);
         let deepest = f0[128];
         assert!(deepest < -5000.0, "{deepest}");
         for v in [0.5, 1.5] {
-            let (z1, f1, _) = sliding_foreland(v, 20);
+            let (z1, f1, _) = sliding_foreland(v, 20, 300.0, -1.0e6);
             for j in 100..220 {
                 let bound = if j < 145 { 1.0 } else { 0.005 * deepest.abs() };
                 assert!(
@@ -3572,6 +3688,320 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Under the sea too (ISO-136): the belt's increments are solved with the water they let
+    /// into the basin, so the water a moving foreland takes in as the belt's part moves under
+    /// it is answered already. Counted again as a load (ISO-133 did), it moved the flexure off
+    /// the one at rest by 3.4 m already behind the belt, where the bound is 1 m (measured with
+    /// the booking taken out, agent 2026-10-24).
+    #[test]
+    fn a_foreland_under_the_sea_sliding_under_its_belt_bends_as_one_at_rest() {
+        let (z0, f0, w0) = sliding_foreland(0.0, 20, -1000.0, 0.0);
+        let deepest = f0[128];
+        assert!(
+            deepest < -2000.0 && w0[128] > 2000.0,
+            "{deepest} {}",
+            w0[128]
+        );
+        assert!(z0[130] < -2000.0, "the basin is under the sea: {}", z0[130]);
+        let (z1, f1, _) = sliding_foreland(0.5, 20, -1000.0, 0.0);
+        for j in 100..220 {
+            let bound = if j < 145 { 1.0 } else { 0.005 * deepest.abs() };
+            assert!(
+                (f1[j] - f0[j]).abs() < bound && (z1[j] - z0[j]).abs() < bound,
+                "row {j}: flexure {} against {} at rest, elevation {} against {}",
+                f1[j],
+                f0[j],
+                z1[j],
+                z0[j]
+            );
+        }
+    }
+
+    /// ISO-136: the plate is linear, so the belt's increments solved apart and the rest solved
+    /// apart add up to the whole solve, on a plate whose stiffness varies more than a
+    /// thousandfold and that lies under the sea in part, to the solve's tolerance.
+    #[test]
+    fn a_belts_increments_solved_apart_add_up_to_the_whole_solve() {
+        let (w, h, dx) = (192usize, 96usize, 39_000.0);
+        let mut sv = Solver::new(w, h, dx);
+        let te = patchy(w, h, 6.0, 70.0);
+        let d: Vec<f64> = te.iter().map(|&t| rigidity_per_g(t, G)).collect();
+        let c: Vec<f64> = (0..w * h)
+            .map(|k| {
+                if (k % w) < w / 3 {
+                    RHO_MANTLE - RHO_WATER
+                } else {
+                    RHO_MANTLE
+                }
+            })
+            .collect();
+        // A belt along a band of rows, and loads of either sign elsewhere.
+        let belt = |k: usize| (40..46).contains(&(k / w)) && (30..150).contains(&(k % w));
+        let r: Vec<f64> = (0..w * h)
+            .map(|k| {
+                let (i, j) = (k % w, k / w);
+                if belt(k) {
+                    RHO_MANTLE * (800.0 + ((k * 13) % 7) as f64 * 100.0)
+                } else if (i % 37 < 3 && j % 29 < 9) || (i + 2 * j) % 61 == 0 {
+                    RHO_MANTLE * (((k * 31) % 17) as f64 - 8.0) * 120.0
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        let r_belt: Vec<f64> = (0..w * h)
+            .map(|k| if belt(k) { r[k] } else { 0.0 })
+            .collect();
+        let r_rest: Vec<f64> = r.iter().zip(&r_belt).map(|(a, b)| a - b).collect();
+        let tol = 1.0e-4;
+        let (whole, a) = sv.solve(&d, &c, &r, tol, 4000);
+        let (part, b) = sv.solve(&d, &c, &r_belt, tol, 4000);
+        let (rest, e) = sv.solve(&d, &c, &r_rest, tol, 4000);
+        assert!(
+            a.converged && b.converged && e.converged,
+            "{a:?} {b:?} {e:?}"
+        );
+        let peak = whole.iter().fold(0.0f64, |m, v| m.max(v.abs()));
+        let worst = (0..w * h)
+            .map(|k| (whole[k] - part[k] - rest[k]).abs())
+            .fold(0.0f64, f64::max);
+        assert!(
+            peak > 100.0 && worst < 1.0e-3 * peak,
+            "{worst} m off the whole solve's {peak} m"
+        );
+        // The belt's part reaches beyond the belt (here onto a stiff patch): its foreland and
+        // its bulge.
+        let beside = (47..60)
+            .map(|j| part[j * w + 108].abs())
+            .fold(0.0f64, f64::max);
+        assert!(beside > 1.0, "{beside}");
+    }
+
+    /// ISO-136: on a step with a belt, the belt's part of the deflection (`belt_m`) is what the
+    /// belt's loads bend alone, and the rest is what the other loads bend alone: the same step
+    /// with the belt's uplift only gives the belt's part, the foreland's deposition only adds
+    /// none, the two steps' deflections add up to the step with both, and over the foreland,
+    /// where none of the belt's roots lie, the belt's part is the whole deflection of the belt.
+    #[test]
+    fn a_belts_part_of_the_deflection_is_what_its_own_loads_bend() {
+        let p = on();
+        let (w, h) = (32usize, 256usize);
+        let n = w * h;
+        let sea = -1.0e6;
+        let run = |belt: bool, fill: bool| {
+            let mut wd = World::new(w, h, 300.0);
+            for c in 0..n {
+                if c / w >= 128 {
+                    wd.plate[c] = 1.0;
+                }
+            }
+            let (mut sv, mut st) = started(&mut wd, &p, sea);
+            let mut ids = vec![f32::NAN; n];
+            let mut ages = vec![f32::NAN; n];
+            for c in 0..n {
+                let j = c / w;
+                if (118..128).contains(&j) {
+                    let x = (127 - j) as f64 / 10.0;
+                    if belt {
+                        wd.uplift[c] = (1.0 - x * x) as f32;
+                    }
+                    wd.orogeny[c] = 0.0;
+                    wd.regime[c] = f32::from(regime::COLLISION);
+                    ids[c] = 1.0;
+                    ages[c] = 1.0e4;
+                }
+            }
+            wd.carrier = Some((ids, ages));
+            let eroded: Vec<f64> = (0..n)
+                .map(|c| {
+                    if fill && (140..150).contains(&(c / w)) {
+                        300.0
+                    } else {
+                        0.0
+                    }
+                })
+                .collect();
+            let out = wd.step(&p, &mut sv, &mut st, &eroded, sea);
+            assert!(out.solve.as_ref().unwrap().converged, "{:?}", out.solve);
+            let s = st.unwrap();
+            let col = |v: &[f32]| {
+                (0..h)
+                    .map(|j| f64::from(v[j * w + 3]))
+                    .collect::<Vec<f64>>()
+            };
+            (col(&s.belt_m), col(&s.deflection_m))
+        };
+        let (belt_both, both) = run(true, true);
+        let (belt_alone, alone) = run(true, false);
+        let (belt_fill, fill) = run(false, true);
+        let deepest = (128..250).map(|j| alone[j]).fold(0.0f64, f64::max);
+        assert!(deepest > 1000.0, "the belt bends its foreland: {deepest}");
+        for j in 0..h {
+            assert!(
+                (belt_both[j] - belt_alone[j]).abs() < 0.05 && belt_fill[j].abs() < 0.05,
+                "row {j}: the belt's part {} with the fill, {} without, {} of the fill alone",
+                belt_both[j],
+                belt_alone[j],
+                belt_fill[j]
+            );
+            assert!(
+                (both[j] - alone[j] - fill[j]).abs() < 0.1,
+                "row {j}: {} against {} + {}",
+                both[j],
+                alone[j],
+                fill[j]
+            );
+            if j >= 128 {
+                assert!(
+                    (belt_alone[j] - alone[j]).abs() < 0.05,
+                    "row {j}: the belt's part {} of the foreland's {}",
+                    belt_alone[j],
+                    alone[j]
+                );
+            }
+        }
+    }
+
+    /// ISO-137, ISO-138: the continental Te from the geotherm. The plate model's steady geotherm
+    /// (its crust's and its mantle's heat flow, T_m at the lithosphere's base, h_r 10 km) puts
+    /// the 300 °C isotherm of a craton's 225 km at 37 km and its 750 °C at 117 km (by hand:
+    /// 15 z + 260 (1 − e^(−z/10)) = 3635 T / 1350), with a conductivity inside Burov &
+    /// Diament's; Te is their eq. 14 on those depths, the same at every L and crust as the
+    /// two-layer sum by hand: a craton under 35 km of crust 84 km, under 40 km 80, under 50 km
+    /// 71; a thinned margin's 143 km under 35 km 42; a hot lithosphere's whole strength in its
+    /// upper crust. Stiffer with a colder lithosphere, softer with a thicker crust. With
+    /// `te_geotherm` the step's law is this, at the floor and with the scale; a collision's
+    /// footprint takes the colder lithosphere under its own crust; the belt's frame reaches
+    /// as far as a craton with no crust bends.
+    #[test]
+    fn the_continental_te_follows_its_lithospheres_geotherm() {
+        use crate::plates::thermal::{
+            CRUST_HEAT_MW_M2, MANTLE_C, MANTLE_HEAT_MW_M2_KM, RADIOGENIC_DEPTH_KM, geotherm_share,
+            isotherm_km, lithosphere_km_of_age, thermal_age_myr,
+        };
+        for l in [60.0, 100.0, 143.0, 225.0] {
+            for t in [300.0, 450.0, 750.0, 1200.0] {
+                let z = isotherm_km(l, t);
+                assert!(
+                    (geotherm_share(l, z) - t / MANTLE_C).abs() < 1e-9 && z > 0.0 && z < l,
+                    "L {l}, {t} °C at {z} km"
+                );
+            }
+            assert!((geotherm_share(l, l) - 1.0).abs() < 1e-12);
+            // The conductivity the geotherm implies, W/m/K (mW/m² × km = W/m).
+            let k = (MANTLE_HEAT_MW_M2_KM
+                + CRUST_HEAT_MW_M2
+                    * RADIOGENIC_DEPTH_KM
+                    * (1.0 - (-l / RADIOGENIC_DEPTH_KM).exp()))
+                / MANTLE_C;
+            assert!((2.0..=3.5).contains(&k), "{k}");
+        }
+        // The thermal age and the lithosphere's depth are each other's inverse.
+        for l in [61.0, 100.0, 143.0, 224.0] {
+            let back = lithosphere_km_of_age(thermal_age_myr(l));
+            assert!((back - l).abs() < 1e-9, "{l} km: {back}");
+        }
+        assert_eq!(lithosphere_km_of_age(-1.0), 60.0);
+        assert!((lithosphere_km_of_age(1.0e4) - 225.0).abs() < 1e-9);
+        assert!(lithosphere_km_of_age(f64::NAN).is_nan());
+        // The craton's isotherms by hand.
+        let heat = |z: f64| 15.0 * z + 260.0 * (1.0 - (-z / 10.0f64).exp());
+        let total = 3375.0 + 260.0 * (1.0 - (-22.5f64).exp());
+        let (z300, z750) = (isotherm_km(225.0, 300.0), isotherm_km(225.0, 750.0));
+        assert!((heat(z300) - total * 300.0 / 1350.0).abs() < 1e-6);
+        assert!(
+            (z300 - 37.0).abs() < 0.5 && (z750 - 117.3).abs() < 0.3,
+            "{z300} {z750}"
+        );
+        // Eq. 14 by hand on the two depths: (min(h₁, h_c)³ + (h₂ − h_c)³)^⅓.
+        let eq14 = |l: f64, hc: f64| {
+            let (h1, h2) = (isotherm_km(l, 300.0), isotherm_km(l, 750.0));
+            (h1.min(hc).powi(3) + (h2 - hc).max(0.0).powi(3)).cbrt()
+        };
+        for (l, hc, want) in [
+            (225.0, 35.0, 84.4),
+            (225.0, 40.0, 80.0),
+            (225.0, 50.0, 70.8),
+            (143.0, 35.0, 42.3),
+            (100.0, 35.0, 21.9),
+            (60.0, 35.0, 11.2),
+        ] {
+            let te = geotherm_te_km(l, hc);
+            assert!(
+                (te - eq14(l, hc)).abs() < 1e-9 && (te - want).abs() < 0.3,
+                "L {l}, crust {hc}: {te} against {want}"
+            );
+        }
+        // A hot lithosphere's 750 °C lies in its crust: all its strength is the upper crust's.
+        assert!((geotherm_te_km(60.0, 35.0) - isotherm_km(60.0, 300.0)).abs() < 1e-9);
+        // With no crust the mantle bends alone to its 750 °C.
+        assert!((geotherm_te_km(225.0, 0.0) - z750).abs() < 1e-9);
+        for hc in [20.0, 35.0, 50.0, 70.0] {
+            let mut last = 0.0;
+            for l in [60.0, 80.0, 120.0, 160.0, 200.0, 225.0] {
+                let te = geotherm_te_km(l, hc);
+                assert!(te >= last, "stiffer as it cools: {te} after {last}");
+                last = te;
+            }
+            assert!(geotherm_te_km(143.0, hc + 5.0) <= geotherm_te_km(143.0, hc));
+        }
+        // In the step: a continent on a 143 km lithosphere under 35 km of crust.
+        let mut p = on();
+        p.te_geotherm = true;
+        let (w, h) = (32usize, 64usize);
+        let n = w * h;
+        let sea = -1.0e6;
+        let run = |p: &FlexureParams, carried: bool| {
+            let mut wd = World::new(w, h, 300.0);
+            let mut thermal = vec![thermal_age_myr(143.0) as f32; n];
+            let mut crust = vec![35_000.0f32; n];
+            if carried {
+                // A belt of 60 km of crust on a hot lithosphere, carried by a craton's.
+                let mut ids = vec![f32::NAN; n];
+                let mut ages = vec![f32::NAN; n];
+                for c in 0..n {
+                    let j = c / w;
+                    if j >= 32 {
+                        wd.plate[c] = 1.0;
+                    } else if j >= 16 {
+                        ids[c] = 1.0;
+                        ages[c] = 1.0e4;
+                        thermal[c] = 0.0;
+                        crust[c] = 60_000.0;
+                    }
+                }
+                wd.carrier = Some((ids, ages));
+            }
+            wd.geotherm = Some((thermal, crust));
+            let (mut sv, mut st) = (None, None);
+            let out = wd.step(p, &mut sv, &mut st, &vec![0.0; n], sea);
+            out.elastic_thickness_km
+        };
+        let te = run(&p, false);
+        let want = p.geotherm_te_km(143.0, 35.0);
+        assert!(
+            (f64::from(te[32 * w + 3]) - want).abs() < 0.01 && (want - 42.3).abs() < 0.3,
+            "{} against {want}",
+            te[32 * w + 3]
+        );
+        // Off, the law before: a craton's 80 km where no orogeny reached it.
+        let te_off = run(&on(), false);
+        assert!(
+            f64::from(te_off[32 * w + 3]) > 79.9,
+            "{}",
+            te_off[32 * w + 3]
+        );
+        // A footprint: its own 60 km of crust over the craton's lithosphere under it.
+        let te_belt = run(&p, true);
+        let want = p.geotherm_te_km(225.0, 60.0);
+        assert!(
+            (f64::from(te_belt[24 * w + 3]) - want).abs() < 0.5 && (want - 61.9).abs() < 0.5,
+            "{} against {want}",
+            te_belt[24 * w + 3]
+        );
+        assert!(p.belt_reach_m(G) > on().belt_reach_m(G) * 1.3);
     }
 
     /// A belt's foreland is the carrying plate's own crust within the reach of the belt, the
@@ -4211,6 +4641,8 @@ mod tests {
                     plate_id: &plate,
                     carrier_plate_id: None,
                     carrier_age_myr: None,
+                    thermal_age_myr: None,
+                    crust_thickness_m: None,
                     ice_m: None,
                     rock_share: 0.8,
                     parts: false,

@@ -353,7 +353,8 @@ struct Moved {
     newborn: Vec<bool>,
     known_plates: usize,
     /// A collision belt's foreland (`flexure::belt_reach`): each cell, the plate that bends it
-    /// and its source had it moved with the belt (ISO-133, `flexure::FlexState::carry_frame`).
+    /// and its source had it moved with the belt (ISO-133, ISO-136,
+    /// `flexure::FlexState::carry_frame`).
     frame_src: Vec<(usize, f32, [f64; 2])>,
 }
 
@@ -544,6 +545,9 @@ struct PlateFields {
     /// age (`plates::l1::THERMAL_AGE_FIELD`, written only with `tectonics.thermal_strength`) gives
     /// one (ledger: ISO-112). `None`: the orogeny's age throughout.
     te_age: Option<Vec<f32>>,
+    /// The plates' thermal age itself (NaN where they give none), kept only for the flexure's
+    /// Te from the geotherm (`surface.flexure.te_geotherm`; ledger: ISO-137).
+    thermal_age: Option<Vec<f32>>,
     /// The plate carrying a collision's footprint and its lithosphere's thermal age
     /// (`plates::l1::CARRIER_PLATE_FIELD`, `CARRIER_AGE_FIELD`, written only with
     /// `tectonics.collision_underthrust`; ledger: PLT-546, ISO-131). `None`: every cell on its own
@@ -553,7 +557,7 @@ struct PlateFields {
 }
 
 impl PlateFields {
-    fn read(world: &WorldState, n: usize) -> Result<PlateFields, CoreError> {
+    fn read(world: &WorldState, n: usize, geotherm: bool) -> Result<PlateFields, CoreError> {
         let get = |name: &str| -> Result<Vec<f32>, CoreError> {
             world
                 .fields
@@ -568,6 +572,11 @@ impl PlateFields {
                 })
         };
         let orogeny_age = get("plates/orogeny_age_myr")?;
+        let thermal_age = if geotherm {
+            get(crate::plates::l1::THERMAL_AGE_FIELD).ok()
+        } else {
+            None
+        };
         let te_age = get(crate::plates::l1::THERMAL_AGE_FIELD).ok().map(|th| {
             th.iter()
                 .zip(&orogeny_age)
@@ -595,6 +604,7 @@ impl PlateFields {
             gap: get(crate::plates::l1::GAP_FIELD).ok(),
             crust_uplift: get(crate::plates::l1::CRUST_UPLIFT_FIELD).ok(),
             te_age,
+            thermal_age,
             carrier_plate_id: get(crate::plates::l1::CARRIER_PLATE_FIELD).ok(),
             carrier_age: get(crate::plates::l1::CARRIER_AGE_FIELD).ok(),
         })
@@ -813,7 +823,11 @@ impl SurfaceStage {
             .collect();
         let parents: Vec<Option<u32>> = plates.plates.iter().map(|p| p.parent).collect();
         let pstep = plates.step;
-        let pf = PlateFields::read(world, n)?;
+        let pf = PlateFields::read(
+            world,
+            n,
+            self.p.flexure.active() && self.p.flexure.te_geotherm,
+        )?;
         let cls = self.classes;
         let p = self.p.clone();
         // The sea level the step stands under (`sea_level.rs`): the climate stage's, else the
@@ -881,7 +895,7 @@ impl SurfaceStage {
                     .map(|f| f.data.as_slice());
                 let mut src = advect::sources(&grid, &pf.plate_id, &omega, dt);
                 advect::hold_gaps(w, &mut src, prev_gap);
-                // ledger: ISO-133
+                // ledger: ISO-133, ISO-136
                 let frame_src = match (&pf.carrier_plate_id, p.flexure.active()) {
                     (Some(car), true) => {
                         let cell_m =
@@ -2127,6 +2141,9 @@ impl SurfaceStage {
                 plate_id: &pf.plate_id,
                 carrier_plate_id: pf.carrier_plate_id.as_deref(),
                 carrier_age_myr: pf.carrier_age.as_deref(),
+                // ledger: ISO-137
+                thermal_age_myr: pf.thermal_age.as_deref(),
+                crust_thickness_m: pf.thermal_age.as_ref().map(|_| &pf.thickness[..]),
                 ice_m: ice,
                 rock_share: p.isostasy,
                 parts: budget,
