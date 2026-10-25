@@ -178,7 +178,7 @@ def one(run):
                              for i, nm in enumerate(("sub200", "coll200", "neither"))}
     # The qualifying high point's own setting, per class: its regime and whether it is on an
     # active collision (plates/collision_mm_yr > 0).
-    coll_v = np.nan_to_num(f["plates/collision_mm_yr"])[ok]
+    coll_v = np.nan_to_num(f["plates/collision_mm_yr"])[ok] if "plates/collision_mm_yr" in f else np.full(z.size, np.nan)
     jq = jn[qual]
     nq = near_cls[qual]
     out["hi_setting_by_class"] = {}
