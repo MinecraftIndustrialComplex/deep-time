@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# M5 diagnosis: M5 through time from base12's crust-budget maps (VM, cached pool folders only).
+# M5 diagnosis: M5 through time from an arm's crust-budget maps (VM, cached pool folders only): m5maps.sh [workers] [out] [runs];
+# M5DIAG_RUNS names the arm's folder (default base12's).
 set -uo pipefail
 cd "$(dirname "$0")/../../.."
 mkdir -p /data/ban/deeptime-runs/m5diag
