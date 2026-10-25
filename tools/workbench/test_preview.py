@@ -4,6 +4,7 @@
 Standard library only: `python3 tools/workbench/test_preview.py`."""
 
 import json
+import math
 import os
 import stat
 import sys
@@ -52,7 +53,8 @@ class Runs(unittest.TestCase):
     def test_a_baked_run_is_found(self):
         d = write_manifest(self.runs, "r1")
         bake, why = preview.run_bake("r1")
-        self.assertEqual((bake["dir"], bake["c"], why), (d, 16384, ""))
+        # run_bake reads through the runs folder's realpath (the VM's TMPDIR is a symlinked disk)
+        self.assertEqual((bake["dir"], bake["c"], why), (os.path.realpath(d), 16384, ""))
 
     def test_no_bake_for_old_running_placeholder_or_odd_runs(self):
         write_manifest(self.runs, "old", format_version="0.0", notes={})
@@ -86,10 +88,13 @@ class Runs(unittest.TestCase):
         self.assertEqual(st["note_kind"], "run")
         self.assertIn("own terrain", st["note"])
         self.assertNotIn("Not run", st["note"])
-        # the box is on the run's planet (C = 32,768): 100° east of the seam is x = 32768·100/360 − 16384
+        # the box is on the run's planet, a Lambert-frame test world (C = 32,768, no cube world: not a
+        # period of one): 100° east of the seam is x = 32768·100/360 − 16384, and z = −R·sin(latitude)
+        # with R = C/2π (Lambert's equal-area cylinder; the plate carrée this once asserted is gone)
         x0, z0, x1, z1 = spec["boxes"][0]
+        r = 32768 / (2 * math.pi)
         self.assertAlmostEqual((x0 + x1) / 2, 32768 * 100.25 / 360 - 16384, delta=2)
-        self.assertAlmostEqual((z0 + z1) / 2, -32768 * 30.25 / 360, delta=2)
+        self.assertAlmostEqual((z0 + z1) / 2, -r * (math.sin(math.radians(30.5)) + math.sin(math.radians(30.0))) / 2, delta=2)
         self.assertLessEqual(max(x1 - x0, z1 - z0), preview.MAX_SIDE)
 
     def test_preview_of_a_run_without_a_bake_keeps_the_test_world(self):
@@ -144,6 +149,77 @@ class Runs(unittest.TestCase):
         self.assertEqual(spec["pick"], [-5563, -1002])
         self.assertEqual(out["note_kind"], "test-world")
 
+    # --- a cube world places latitude and longitude through its world data (cube plan 7.4) ---
+
+    def fake_deeptime_by_mode(self, latlon_lines, why_body):
+        """A deeptime that logs every call's arguments to `calls`, answers `--latlon` with one JSON line per
+        point and records the points it was given on stdin in `stdin`; any other call answers why_body."""
+        calls, stdin = os.path.join(self.tmp, "calls"), os.path.join(self.tmp, "stdin")
+        lines = "\n".join(json.dumps(c) for c in latlon_lines)
+        p = os.path.join(self.tmp, "deeptime")
+        with open(p, "w") as f:
+            f.write("#!/bin/sh\n" f"echo \"$@\" >> {calls}\n" 'case " $* " in\n'
+                    f"*\" --latlon \"*) cat > {stdin}\ncat <<'EOF'\n{lines}\nEOF\n;;\n"
+                    f"*) cat <<'EOF'\n{why_body}\nEOF\n;;\nesac\n")
+        os.chmod(p, os.stat(p).st_mode | stat.S_IXUSR)
+        os.environ[preview.DEEPTIME_ENV] = p
+        return calls, stdin
+
+    def test_a_cube_world_does_not_use_the_lambert_formula(self):
+        # The Lambert frame (a synthetic world: C = 16,384) keeps its closed form; a cube world (15,360 =
+        # the 16k cube's period) has none, so without its world data there is no answer to give, not
+        # Lambert's.
+        self.assertEqual(preview.latlon_to_block(30.0, 100.0, 16384), (round(100 / 360 * 16384 - 8192), round(-16384 / (2 * math.pi) * 0.5)))
+        with self.assertRaises(ValueError):
+            preview.latlon_to_block(30.0, 100.0, 15360)
+        with self.assertRaises(ValueError):
+            preview.box_on_world({"lat_lon": {"north": 31, "south": 30, "west": 100, "east": 101}}, 15360)
+
+    def test_a_cube_world_inspect_by_lat_lon_asks_the_evaluator_for_the_block(self):
+        d = write_manifest(self.runs, "cube", scale={"circumference_blocks": 15360})
+        calls, stdin = self.fake_deeptime_by_mode(
+            [{"x": 7, "z": -3, "face": "F1"}], json.dumps({"surface": 70.0, "top_y": 70, "sites": [], "strata": []}))
+        code, out = preview.workbench_inspect({"run": "cube", "lat": "21.9", "lon": "57.6"})
+        self.assertEqual(code, 200)
+        self.assertEqual(out["column"], {"x": 7, "z": -3})
+        with open(stdin) as f:
+            self.assertEqual(f.read(), "21.9 57.6\n")
+        with open(calls) as f:
+            first, second = [line.split() for line in f.read().splitlines()]
+        self.assertEqual(first, ["inspect-column", "--world-data", os.path.realpath(d), "--points", "-", "--latlon", "--parity"])
+        self.assertEqual(second, ["inspect-column", "--world-data", os.path.realpath(d), "--why", "7", "-3"])
+
+    def test_a_cube_world_inspect_by_lat_lon_reports_a_failing_evaluator_as_itself(self):
+        write_manifest(self.runs, "cube", scale={"circumference_blocks": 15360})
+        self.fake_deeptime("", code=1)
+        with self.assertRaises(ValueError) as cm:
+            preview.workbench_inspect({"run": "cube", "lat": "21.9", "lon": "57.6"})
+        self.assertIn("inspect-column", str(cm.exception))
+        with self.assertRaises(ValueError) as cm:
+            preview.workbench_inspect({"run": "cube", "lat": "north", "lon": "57.6"})
+        self.assertIn("give x and z", str(cm.exception))
+
+    def test_a_cube_world_preview_by_lat_lon_box_is_placed_by_the_evaluator(self):
+        d = write_manifest(self.runs, "cube", scale={"circumference_blocks": 15360})
+        # centre, then the north-west and south-east corners: a 120 x 60 block box round (100, -50)
+        calls, stdin = self.fake_deeptime_by_mode([{"x": 100, "z": -50}, {"x": 40, "z": -80}, {"x": 160, "z": -20}], "{}")
+        code, _ = preview.workbench_preview({"run": "cube", "lat_lon": {"north": 31.0, "south": 30.0, "west": 100.0, "east": 101.0}})
+        self.assertEqual(code, 202)
+        spec = self.submitted[0]
+        self.assertEqual(spec["size"], 15360)
+        self.assertEqual(spec["world"]["world_data"], os.path.realpath(d))
+        self.assertEqual(spec["boxes"][0], [40, -80, 160, -20])
+        with open(stdin) as f:
+            self.assertEqual(f.read().split("\n")[:3], ["30.5 100.5", "31.0 100.0", "30.0 101.0"])
+
+    def test_a_cube_world_preview_by_blocks_asks_nobody(self):
+        write_manifest(self.runs, "cube", scale={"circumference_blocks": 15360})
+        calls, _ = self.fake_deeptime_by_mode([], "{}")
+        code, _ = preview.workbench_preview({"run": "cube", "box": {"x0": 10, "z0": -40, "x1": 90, "z1": 40},
+                                             "lat_lon": {"north": 31.0, "south": 30.0, "west": 100.0, "east": 101.0}})
+        self.assertEqual(code, 202)
+        self.assertEqual(self.submitted[0]["boxes"][0], [10, -40, 90, 40])
+        self.assertFalse(os.path.exists(calls), "the box in blocks wins; the evaluator is not asked")
 
 
 class LevelTypeSpecs(unittest.TestCase):
