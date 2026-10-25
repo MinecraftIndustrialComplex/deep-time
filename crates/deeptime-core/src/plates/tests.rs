@@ -1597,6 +1597,66 @@ fn plates_unresolved(
     (st, geo)
 }
 
+/// A subduction initiation's contact takes the polarity of the slab planted under its fracture
+/// (ledger: PLT-655, PLT-270): two oceanic plates, the southern (plate 1) older, 200 Myr against
+/// 100, and turned under the northern where y > 0. By the rule of a new contact the older floor
+/// in the overlap goes under, plate 1; with plate 1 split from plate 0 and plate 0's slab planted
+/// under plate 1, on, the contact puts plate 0 under; off, or with no split between them, or no
+/// slab, the rule of a new contact.
+#[test]
+fn an_initiations_contact_takes_its_planted_slab() {
+    let p0 = preset(20_000, 20.0, "supercontinent", 5);
+    let run = |on: bool, split: bool, slab: bool| -> (u32, u32) {
+        let mut p = p0.clone();
+        p.tectonics.initiation_polarity_by_age = on;
+        let stage = PlatesStage::new(p.clone());
+        let env = stage.env(&p.tectonics, 1);
+        let (mut st, geo) = plates_unresolved(
+            &p,
+            &env,
+            glam::DQuat::from_rotation_x(0.1),
+            |q| q.z > 0.0,
+        );
+        for s in st.samples.iter_mut() {
+            let age = if s.group == 0 { 100.0 } else { 200.0 };
+            s.kind = OCEANIC;
+            s.pools = pools::oceanic_column();
+            s.thickness_m = pools::thickness(&s.pools);
+            s.elevation_m = -4500.0;
+            s.formed_myr = (env.t_myr - age) as f32;
+        }
+        st.slabs.clear();
+        if split {
+            st.plates[1].parent = Some(0);
+        }
+        if slab {
+            st.slabs.push(state::SlabTrack {
+                under: 0,
+                over: 1,
+                km: p.tectonics.initiation_slab_km,
+                ..Default::default()
+            });
+        }
+        let pos = geometry::positions(&st, &geo);
+        st.recount(&pos);
+        let tree = Tree::over(&pos, |_| true);
+        let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
+        let mut world = WorldState::new(1, 16_384, p.t_start_years());
+        subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
+        let c = st
+            .contacts
+            .iter()
+            .find(|c| c.under.min(c.over) == 0 && c.under.max(c.over) == 1)
+            .expect("a contact");
+        (c.under, c.over)
+    };
+    assert_eq!(run(false, false, false), (1, 0), "the older floor under");
+    assert_eq!(run(true, true, true), (0, 1), "the planted slab's polarity");
+    assert_eq!(run(false, true, true), (1, 0), "off");
+    assert_eq!(run(true, false, true), (1, 0), "no split");
+    assert_eq!(run(true, true, false), (1, 0), "no slab");
+}
+
 /// The outline of `plates_unresolved`'s planet at its last resampling, the equator, held exactly
 /// by the level set: every sample's sine distance from it (a great circle, PLT-536).
 fn equator_level_set(st: &mut PlateState, geo: &Geo) {

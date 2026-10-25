@@ -602,6 +602,9 @@ fn initiate(
     if 2 * cont_split >= split.len() {
         return Ok(());
     }
+    // The older side of the fracture goes under (ledger: PLT-655); off, the split.
+    let split_under = !k.initiation_polarity_by_age
+        || split_goes_under(geo, state, &members, |i| member[i], |i| label[i], t);
     let new_id = state.plates.len() as u32;
     let parent = state.plates[id as usize].clone();
     let mut twin: BTreeMap<u32, u32> = BTreeMap::new();
@@ -623,11 +626,16 @@ fn initiate(
     }
     let c = c.normalize_or(c_old);
     let omega = DVec3::from_array(parent.omega);
-    // The planted slab (design §3.3): the old floor starts to sink under the fracture.
-    // ledger: PLT-270
+    // The planted slab (design §3.3): the old floor starts to sink under the fracture, on its
+    // older side (PLT-655). ledger: PLT-270
+    let (under, over) = if split_under {
+        (new_id, id)
+    } else {
+        (id, new_id)
+    };
     state.slabs.push(SlabTrack {
-        under: new_id,
-        over: id,
+        under,
+        over,
         km: k.initiation_slab_km,
         ..SlabTrack::default()
     });
@@ -680,6 +688,62 @@ fn initiate(
         super::inherit::inherit(state, pos, env, &[(id, vec![new_id])]).book(world);
     }
     Ok(())
+}
+
+/// Whether the split's side of a subduction initiation's fracture goes under (ledger: PLT-655;
+/// Gurnis, Hall & Lavier 2004 [60]: at a fracture zone "the older plate is thrust beneath the
+/// younger"). The fracture's samples are the visible samples of `members` with a lattice
+/// neighbour of the same rigid group, visible and a member, on the other side (`label`, 1 the
+/// split, 0 the parent): the nearest floor the lattice resolves, one spacing each side (about
+/// 180 km on the quick lattice; Gurnis et al.'s older plate underthrusts 100 to 150 km before
+/// subduction sustains itself). As the rule of a new contact (`subduction::resolve`)
+/// reads an overlap: a side whose fracture is mostly continental crust does not go under (both,
+/// the split); otherwise the side with the older mean ocean floor does, the split on a tie or
+/// with no fracture on either side.
+fn split_goes_under(
+    geo: &Geo,
+    state: &PlateState,
+    members: &[u32],
+    member: impl Fn(usize) -> bool,
+    label: impl Fn(usize) -> u32,
+    t: f64,
+) -> bool {
+    let (mut seen, mut cont, mut age) = ([0u32; 2], [0u32; 2], [0.0f64; 2]);
+    for &i in members {
+        let s = &state.samples[i as usize];
+        if s.is_hidden() {
+            continue;
+        }
+        let own = label(i as usize);
+        let on_fracture = geo.edges(i).any(|(u, _)| {
+            let o = &state.samples[u as usize];
+            member(u as usize) && !o.is_hidden() && o.group == s.group && label(u as usize) != own
+        });
+        if !on_fracture {
+            continue;
+        }
+        let side = usize::from(own == 1);
+        seen[side] += 1;
+        if s.kind == CONTINENTAL {
+            cont[side] += 1;
+        } else {
+            age[side] += s.age_myr(t);
+        }
+    }
+    let continental = |s: usize| 2 * cont[s] >= seen[s].max(1);
+    let mean_age = |s: usize| {
+        let oceanic = seen[s] - cont[s];
+        if oceanic == 0 {
+            0.0
+        } else {
+            age[s] / f64::from(oceanic)
+        }
+    };
+    match (continental(1), continental(0)) {
+        (false, true) | (true, true) => true,
+        (true, false) => false,
+        (false, false) => seen[0] == 0 || seen[1] == 0 || mean_age(1) >= mean_age(0),
+    }
 }
 
 fn membership(members: &[u32], n: usize) -> Vec<bool> {
@@ -1111,6 +1175,70 @@ pub(in crate::plates) mod tests {
         assert_eq!(st.contacts.len(), 1);
         assert_eq!((st.contacts[0].under, st.contacts[0].over), (0, 1));
         assert_eq!(st.slabs.len(), 1);
+    }
+
+    /// Gurnis, Hall & Lavier 2004 [60]: at a fracture zone in compression "the older plate is
+    /// thrust beneath the younger"; [78]: with an asymmetry in age, "the weak zone overlies the
+    /// thicker plate". A plate of old floor split at the plane x = 0 (no warp; the old list is
+    /// x > 0, the seed at +x): on, the planted slab hangs from the older side of the fracture, the
+    /// split's or the parent's, and from the split where the parent's side of the fracture is
+    /// continental crust however old the floor beyond it, or where the ages tie; off, from the
+    /// split whatever the ages. ledger: PLT-655, PLT-270
+    #[test]
+    fn the_older_side_of_the_fracture_goes_under() {
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let plant = |on: bool, split_age: f32, parent_age: f32, coast: bool| -> (u32, u32) {
+            let k = TectonicParams {
+                initiation_polarity_by_age: on,
+                rift_warp_rad: 0.0,
+                ..Default::default()
+            };
+            let mut st = one_plate(&geo, 3, |p| {
+                if coast && p.x < 0.0 && p.x > -0.3 {
+                    continental()
+                } else {
+                    let mut s = old_floor();
+                    let age = if p.x > 0.0 { split_age } else { parent_age };
+                    s.formed_myr = -age;
+                    s
+                }
+            });
+            let pos = positions(&st, &geo);
+            let old: Vec<u32> = (0..N as u32).filter(|&i| pos[i as usize].x > 0.0).collect();
+            let seed = *old
+                .iter()
+                .min_by(|&&a, &&b| {
+                    DVec3::X
+                        .angle_between(pos[a as usize])
+                        .total_cmp(&DVec3::X.angle_between(pos[b as usize]))
+                })
+                .unwrap();
+            let mut world = WorldState::new(1, 16_384, 0.0);
+            initiate(
+                &mut st,
+                &mut world,
+                &geo,
+                &pos,
+                &env(&k),
+                0,
+                seed,
+                &old,
+                None,
+            )
+            .unwrap();
+            assert_eq!(st.plates.len(), 2, "an initiation");
+            assert_eq!(st.slabs.len(), 1, "one planted slab");
+            (st.slabs[0].under, st.slabs[0].over)
+        };
+        assert_eq!(plant(true, 200.0, 300.0, false), (0, 1), "the parent's is older");
+        assert_eq!(plant(true, 300.0, 200.0, false), (1, 0), "the split's is older");
+        assert_eq!(plant(true, 250.0, 250.0, false), (1, 0), "a tie: the split");
+        assert_eq!(
+            plant(true, 200.0, 300.0, true),
+            (1, 0),
+            "continental crust at the fracture does not go under"
+        );
+        assert_eq!(plant(false, 200.0, 300.0, false), (1, 0), "off: the split");
     }
 
     /// A subduction initiation's new plate is a split too: the old floor that sinks takes the
