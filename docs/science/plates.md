@@ -9661,3 +9661,58 @@ interiors take a quarter to a third of Earth's two cases, and the 1-D strip alre
 interior's largest share. The law has no free value to close that gap, and none was looked for. On
 by default since this arm: the law is built and tested against its sources, it conserves crust, and
 the guard is clean (the rule of 2026-10-23: the V1 numbers are realism checks, not a gate).
+
+## The sea floor's age and the initiation's polarity (2026-10-25)
+
+The floor-age diagnosis (build log 2026-10-25, "Front lane: why floor older than 180 Myr does not go
+under on base15") found 0.24 of base15's ocean older than 180 Myr late in the runs (Earth 0.006), from
+two causes of about equal weight: slow turnover, and consumption blind to age. Where the old floor sat
+could not be read from the cache, and in about three initiations of four the trench took the opposite
+polarity to the slab planted under the fracture. The coordinator's order (2026-10-25): an age map
+first, then the polarity, then the sourced constants, then a design for propagation.
+
+### The age map (measurement only)
+
+With `DEEPTIME_CRUST_BUDGET_MAPS` set, every crust-budget snapshot also writes `maps/age/t<Myr>.bin`:
+one little-endian f32 per record of the snapshot's map (`maps/t<Myr>.bin`, the visible samples in
+order), the floor's age at the snapshot (`Sample::age_myr`) on oceanic crust and NaN on continental
+crust (`crust_budget.rs`, `write_ages` and `age_records`; the test
+`the_age_records_are_the_ocean_ages`: the oceanic records, sorted, are `dynamics::ocean_ages`, which
+the dynamics record's age quantiles read). Nothing reads it in the model.
+`tools/review/floorage/floorage_age.py` reads it with the map and `maps/plate/`.
+
+#### Where the old floor sits (2026-10-25)
+
+Four pool runs carry the map (arm fl-agemap, key b95402b27d42: seeds 1 and 2, both starts, base15's
+environment, 2 threads). Each run's state and record hashes equal base15's: the map measures and does
+not act. `floorage_age.py` reads the 33 snapshots from -500 Myr on (none at a resampling, where the
+map hides nothing and flags no front) and checks each against the record: the map's oceanic count is
+the record's, and its count older than 180 Myr is the record's `old180`. Pooled over the four runs:
+
+- **Floor older than 180 Myr is 0.234 of the ocean.** Of it, 0.809 lies in the margin zone, within
+  331 km of its own plate's continent (PLT-503's reach plus one spacing: the floor an initiation keeps
+  on the parent); 0.546 lies farther than 1,000 km from every trench (PLT-064's clearance); 0.325 sits
+  on plates over a fifth of the planet; 0.067 on plates with no trench; 0.007 on plates with no
+  convergent front at all.
+- **Exclusively**, margin 0.809, beyond the margin and the clearance 0.074, open floor within 1,000 km
+  of a trench 0.116. The margin's share rises with age: 0.165 of the floor at 0 to 10 Myr, 0.356 at
+  60 to 100, 0.549 at 150 to 180, 0.668 at 180 to 250, and 0.900 at 250 Myr and over (0.143 of the
+  ocean).
+- **Its own plate goes down far from it.** The old margin floor's distance to the nearest trench of
+  its own plate: 0.147 within 500 km, 0.153 at 500 to 1,000 km, 0.269 at 1,000 to 2,000 km, 0.388
+  beyond, 0.044 on plates with none. The floor its plate feeds that trench is of any age: 0.215
+  younger than 30 Myr, 0.369 older than 180.
+- **Initiation's view.** Floor older than 150 Myr (PLT-062's gate): within 1,000 km of a trench 0.482,
+  kept by the margin (PLT-503) 0.417, exposed to initiation 0.093, too few samples or no seed 0.009.
+  With Crameri et al. 2020's oldest initiation age, 117.4 Myr, as the gate, the exposed floor goes
+  from 0.027 to 0.045 of the ocean. This status reads the map's end-of-step flags, without the hidden
+  trench samples the clearance also sees, so it is close, not exact.
+- **By start.** The supercontinent start keeps 1.13 plates over a fifth of the planet per snapshot
+  against the scattered start's 0.67, and 0.42 of its old floor on them against 0.24; the margin's
+  share is the same in both (0.81).
+
+So the old floor is passive-margin floor that no trench reaches along the margin, not interior floor
+beyond the clearance, nor floor on plates that never go down, and the age gate holds back little.
+This points at how a trench comes to a margin (propagation along strike) more than at the gate's age
+(PLT-062) or incipient subduction's strength (PLT-612), which acts only at a front between two plates,
+where the margin's floor is not.
