@@ -461,6 +461,17 @@ def main():
         if tm is not None and to is not None:
             print(f"  T to {thr / 1000:.0f} km: the path at age {tm}, observed at {to}: {(to - 10) / max(tm - 10, 1):.1f}"
                   f" times the path's time")
+    # the same samples split by a held column (quiet time, over T_c) within 200 km now: flow's sources
+    print("\n  by a held column within 200 km now or not: age: path T km / zs m | beside: n, T p50, zs p50, >2 km |"
+          " apart: n, T p50, zs p50, >2 km")
+    for a0 in range(10, 50, 4):
+        k = (r[:, 0] >= a0 - 0.5) & (r[:, 0] < a0 + 3.5)
+        cells = []
+        for kk in (k & (r[:, 10] <= 200), k & (r[:, 10] > 200)):
+            cells.append(f"{int(kk.sum()):6d} {q(r[kk, 1]) / 1000:5.1f} {q(r[kk, 2]):5.0f} {np.mean(r[kk, 2] > 2000):.2f}"
+                         if kk.sum() >= 10 else "     -")
+        p_ = path.get(a0 + 2, float("nan"))
+        print(f"  {a0:3d}-{a0 + 4:<3d}: {p_ / 1000:5.1f} / {float(iso_z(np.array(p_))) - sea:5.0f} | {cells[0]} | {cells[1]}")
 
     # D. the samples still above 2 km against those under, past the quiet time
     print("\nD. past the quiet time, above 2 km over the sea against under: n, T p50 km, L p50 km, eta/eta0 p50,"
