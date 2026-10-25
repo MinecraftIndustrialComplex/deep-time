@@ -4588,6 +4588,15 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Read in this pass: abstract fetched (OpenAlex).
 - Reference check: the citation is correct (authors, year, volume, pages; issue B2). The paper's title was missing in the design. The abstract concerns critical taper and gives no taper angle in degrees.
 - Read in WP-13a (2026-10-02): abstract (OpenAlex): a critical wedge "slides stably, continuing to grow at constant taper"; Taiwan's surface slope and basal dip are in the body, not read (Wiley). Dahlen 1990 (Annu. Rev. Earth Planet. Sci. 18:55-99) is closed too. The Himalayan figures come from DeCelles & Carrapa 2021 instead. PLT-192.
+- Read through Dahlen 1990 (M5 lane, 2026-10-25; see Dahlen1990): Taiwan's steady-state region has "a regional surface slope alpha = 3 deg and a regional basal dip beta = 6 deg (Davis et al 1983)", with a pore-fluid to lithostatic pressure ratio of 0.67. This is Dahlen's account of the paper; the paper itself is still not read.
+
+### Dahlen1990
+- Reference: Dahlen, F. A. (1990). Critical taper model of fold-and-thrust belts and accretionary wedges. Annual Review of Earth and Planetary Sciences 18:55-99.
+- DOI or URL: 10.1146/annurev.ea.18.050190.000415; open copy https://geosci.uchicago.edu/~kite/doc/Dahlen_Annual_Reviews.pdf (a course copy, University of Chicago).
+- Ledger ids: PLT-600, PLT-601.
+- Access: open copy (course page).
+- Library (the project's source library, not distributed): fetched by the M5 lane (2026-10-25; PDF, text layer, kept outside the repository).
+- Read by the M5 lane (2026-10-25), full text: the bulldozer wedge, eq. 1-3 (pp. 59-60). Mass balance is (1/2) rho W^2 tan(alpha + beta) = rho h V t, so W = [2hVt / tan(alpha + beta)]^(1/2): "both the width and the height of a bulldozer wedge grow like t^1/2. The growth is self-similar". The Taiwan values come from Davis et al. 1983 (pp. 84-85). The height limit is on p. 96: a slowly eroding wedge "can only grow self-similarly if the drag on its base is purely frictional. It is thus the existence of a brittle-plastic transition at 10-15 km depth that ultimately limits the height of very wide fold-and-thrust belts and accretionary wedges. This provides a natural explanation for the break in topographic slope of the Higher Himalaya at the edge of the Tibetan Plateau (Figure 20)."
 
 ### Christensen_Mooney1995
 - Reference: Christensen, N. I., Mooney, W. D. (1995). Seismic velocity structure and composition of the continental crust: a global view. Journal of Geophysical Research 100(B6):9761-9788.
@@ -5848,10 +5857,11 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 ### DeCellesCarrapa2021
 - Reference: DeCelles, P. G., Carrapa, B. (2021). Coupled rapid erosion and foreland sedimentation control orogenic wedge kinematics in the Himalayan thrust belt of central Nepal. Journal of Geophysical Research: Solid Earth 126(5):e2020JB021256.
 - DOI or URL: 10.1029/2020JB021256; NSF public access copy https://par.nsf.gov/servlets/purl/10229963.
-- Ledger ids: PLT-192.
+- Ledger ids: PLT-192, PLT-600.
 - Access: open copy (NSF Public Access Repository).
 - Library (the project's source library, not distributed): fetched (PDF, text layer). Text file: DeCellesCarrapa2021.txt.
 - Read in WP-13a (2026-10-02): section 2.4.1 and the conclusions: Lesser Himalayan surface slopes about 0.4-1.6 deg, total taper 6-7.5 deg; foredeep total taper 2.6-3.1 deg; Greater Himalaya surface slopes 5.3-15.8 deg.
+- Read again by the M5 lane (2026-10-25, the NSF copy's text layer): section 2.4.1 measures 16 profiles about 150 km long, 16.5 km apart. In the seven across the Chitwan wedge-top basin (profiles 7-13), alpha is about 0.4-0.55 deg south of the Greater Himalaya and 5.3-15.8 deg (average about 7.6 deg) in it. In "the nine profiles (1-6 and 14-16) outside of the Chitwan region ... the Lesser Himalayan and Greater Himalayan sectors have average alpha values of ~1.6 deg and ~7.4 deg". The summary: alpha is lowest, about 0.3 deg, at Chitwan and about 1.2 deg in the erosional bight, and steepens to more than 7 deg on the high Himalaya. The taper analysis "is limited to the southernmost ~80 km of the orogenic wedge": north of that, "the décollement is located at a depth >18 km below the surface, and brittle behavior of the orogenic wedge and its basal décollement is unlikely". Section 5 gives average alpha 0.5-1.6 deg for the Lesser Himalayan thrust belt; the conclusions give 1-1.6 deg, with total taper about 6-7.5 deg. PLT-192 keeps 1.5 deg, inside that range; the 1.6 deg average outside the bight was measured once (arm ct-taper1, plates.md "The belt from critical taper").
 
 ### vanHunen2011EGU
 - Reference: van Hunen, J., Faccenna, C., Allen, M. (2011). Slab break-off and applications to Tethys subduction. Geophysical Research Abstracts 13, EGU2011-6298 (EGU General Assembly 2011).
