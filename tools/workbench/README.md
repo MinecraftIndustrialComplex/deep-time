@@ -226,7 +226,7 @@ or the bake. A run that has not finished (or has no terrain layer) says so and c
 | The view (own canvas slippy map, no library, nothing from the network) | `crates/deeptime-viewer/assets/worldmap.js` |
 | Lighting and colour rules shared with the frame maps | `crates/deeptime-core/src/satellite.rs` (`colour`, `cover`, `box_filter`, `Light`, `shaded`) |
 | Timing and pyramid size | `tools/workbench/tiles_bench.py` |
-| Finding a volcano or a fjord to look at | `tools/workbench/find_places.py` |
+| Finding a volcano or a river mouth to look at | `tools/workbench/find_places.py` (needs `DEEPTIME_WORLD`; a volcano's block comes from `deeptime inspect-column --latlon`) |
 
 **Using it.** Drag to pan; wheel, double click (Shift: out), pinch, `+`/`-` or the buttons to zoom;
 arrows pan; `0` shows the whole planet; `Esc` closes. The world wraps east-west. The readout gives

@@ -3,6 +3,9 @@
 """Cube phase 2, Ben's world-shape decision: one preset and seed baked as Petroff-Guyou (pg16) and
 as the cube (cube16), compared.
 
+RETIRED in part (cube plan 7.4): the Petroff-Guyou world is deleted, so `plan` only reruns on the maps and
+samples already in <cmp>; nothing here can bake or draw pg16 again.
+
   compare.py box  <cmp> <world>   the heightmap box of a world (x0,z0,x1,z1, its whole domain)
   compare.py plan <cmp>           the distortion of each world (from `deeptime heightmap --scale`
                                   at step 16), the places to shoot, and the client's vista strings
