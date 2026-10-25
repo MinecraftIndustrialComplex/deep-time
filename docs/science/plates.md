@@ -5182,6 +5182,10 @@ What they say:
    the sea falls to 200 to 900 m below the datum, the floor deeper than 6 km to 0.0105 (Earth
    0.0073), deeper than 8 km to Earth's 0.0003 and the 99th percentile to Earth's 6,000 m; but the
    land falls to 0.16 to 0.19 and half the continental crust is under the sea (the next section).
+   Note (the M5 lane, 2026-10-25): these arms ran before the motion fix (PLT-191), on plates a
+   deferred collision held still, so the drowning is not a reading of the share; the section
+   "Sediment by margin type and the margin's sediment" reads Clift & Vannucchi's share again on
+   moving plates (PLT-660).
 3. *Erosion alone* (2 runs) lowers the sea and keeps the land: continental crust under the sea
    0.177 (p 0.044), land 0.328.
 4. *PLT-312* (arcn) on the release, the erosion and the sheet: the arcs' crust falls from 4.25 to
