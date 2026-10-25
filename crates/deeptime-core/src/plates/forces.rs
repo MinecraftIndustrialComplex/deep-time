@@ -65,9 +65,11 @@
 //! - **Transform and colliding resistance** (resist; with `forsyth_uyeda_balance`): Forsyth &
 //!   Uyeda's friction, a force per metre whatever the speed, against the plates' relative motion,
 //!   on both alike ([`Balance::add_friction`]): the transform resistance where the boundary's
-//!   relative motion is within Bird's 20 degrees of strike-slip, the colliding resistance where
-//!   the plates converge across it (trenches and collision fronts both, as theirs), nothing at a
-//!   ridge. Linearised as the collision's resistance is (below).
+//!   relative motion lies more than their 60 degrees from its normal ([`fu_transform`]), the
+//!   colliding resistance where the plates converge across it otherwise (trenches and collision
+//!   fronts both, as theirs), nothing at a ridge. A front's is counted once, at the front over
+//!   its metres as the pull and the suction are; the rest of the boundary from both sides, half
+//!   each. Linearised as the collision's resistance is (below).
 //! - **Collision resistance** (resists): along a collision front (continental crust at the
 //!   subducting side), against the convergence, with the force of the belt's edge energy
 //!   `max(0, U(belt) − U(incoming))` plus the buoyancy of the continental crust the collision has
@@ -179,6 +181,19 @@ pub const FU_COLLIDING: f64 = 0.16; // ledger: FRC-033
 pub const FU_SLAB_RESISTANCE: f64 = 0.89; // ledger: FRC-033
 pub const FU_MANTLE_DRAG: f64 = 0.82e-5; // ledger: FRC-033
 pub const FU_CONTINENTAL_DRAG: f64 = 5.65e-5; // ledger: FRC-033
+/// Forsyth & Uyeda's dividing line between a convergent boundary and a transform fault, the
+/// rule their strengths were fitted with (1975, p. 183): a boundary segment whose relative
+/// motion lies more than this from the boundary's normal (φ = tan⁻¹(V_PAR / V_PER)) is a
+/// transform, so within 30 degrees of strike-slip, where V1 gap 2's boundary types take Bird's
+/// 20 (PLT-311). ledger: FRC-035
+pub const FU_TRANSFORM_PHI_DEG: f64 = 60.0;
+
+/// Whether a boundary segment is a transform fault for Forsyth & Uyeda's resistances: the
+/// relative motion `rel` more than [`FU_TRANSFORM_PHI_DEG`] from the boundary's normal `normal`
+/// (a unit vector; either sense). No motion is no transform. ledger: FRC-035
+pub fn fu_transform(rel: DVec3, normal: DVec3) -> bool {
+    rel.dot(normal).abs() < FU_TRANSFORM_PHI_DEG.to_radians().cos() * rel.length()
+}
 /// Torques are recorded in this unit, N m.
 pub const TORQUE_UNIT_N_M: f64 = 1.0e24;
 
@@ -835,8 +850,9 @@ struct Edge {
     others: [u32; 6],
     n_others: u8,
     /// With `forsyth_uyeda_balance` (PLT-585), each other plate's friction at this sample: the
-    /// force, N (half the transform's or the colliding resistance times the sample's share of
-    /// the boundary, the other half from the other side), and the plates' relative speed, mm/yr.
+    /// force, N (the transform's or the colliding resistance times the front's metres at the
+    /// front this sample overrides; elsewhere times half the sample's share of the boundary, the
+    /// other half from the other side), and the plates' relative speed, mm/yr.
     friction: [(f64, f64); 6],
     /// The front this sample overrides.
     front: Option<SlabFront>,
@@ -1233,22 +1249,43 @@ fn balance_step(
                     (u, normal, norm.km(share) * 1000.0)
                 });
             }
-            // Forsyth & Uyeda's transform and colliding resistances (PLT-585): at every stretch
-            // of boundary with a visible plate beyond it, by the boundary's own normal (PLT-310)
-            // and Bird's test (PLT-311) as the boundary classification's (V1 gap 2, PLT-221): a
-            // transform within 20 degrees of strike-slip, a colliding boundary where the plates
-            // converge across it, nothing where they part (a ridge's resistance is not in their
-            // model). Each side counts half of its share of the boundary (PLT-530).
+            // Forsyth & Uyeda's transform and colliding resistances (PLT-585), by their own
+            // dividing rule, the one their strengths were fitted with (`fu_transform`): a
+            // transform where the relative motion lies more than 60 degrees from the boundary's
+            // normal, a colliding boundary where the plates converge across it otherwise, nothing
+            // where they part (a ridge's resistance is not in their model). A trench's is counted
+            // once, where its pull and suction are: at the front this sample overrides, over the
+            // front's metres, against the plate going under (whose own samples beside the trench
+            // have gone under it and see no other plate). Every other stretch of boundary with a
+            // visible plate beyond it counts from both sides, half of its share each (PLT-530),
+            // by its own normal (PLT-310), except the side going under in an active contact,
+            // which its front counts.
             if friction {
+                let front_q = e.front.map(|f| plate_of[f.u as usize]);
+                if let Some(f) = e.front
+                    && let Some(q) = front_q
+                    && let Some(i) = e.others[..usize::from(e.n_others)]
+                        .iter()
+                        .position(|&o| o == q)
+                {
+                    let rel = norm.velocity_mm_yr(omega[q as usize] - omega[pv as usize], x);
+                    let per_m = if fu_transform(rel, f.normal) {
+                        c.transform_n_m
+                    } else {
+                        c.colliding_n_m
+                    };
+                    e.friction[i] = (per_m * f.len_m, rel.length()); // ledger: FRC-035
+                }
                 for i in 0..usize::from(e.n_others) {
-                    if seen & (1 << i) == 0 {
+                    let q = e.others[i];
+                    if seen & (1 << i) == 0 || Some(q) == front_q || active.contains_key(&(pv, q))
+                    {
                         continue;
                     }
-                    let q = e.others[i];
                     let normal =
                         shortening::boundary_normal(geo, pos, &rots, samples, &plate_of, v, q);
                     let rel = norm.velocity_mm_yr(omega[q as usize] - omega[pv as usize], x);
-                    let per_m = if shortening::is_transform(rel, normal) {
+                    let per_m = if fu_transform(rel, normal) {
                         c.transform_n_m
                     } else if rel.dot(normal) < 0.0 {
                         c.colliding_n_m
@@ -1625,7 +1662,7 @@ mod tests {
 
     /// `base` (plate 0 and everything but friction) solved with friction against the mantle at
     /// the rim points `(x, outward normal, length m)`, classified as the balance step does: by
-    /// Bird's test on the plate's motion against the boundary's normal, a transform, a colliding
+    /// Forsyth & Uyeda's rule on the plate's motion against the boundary's normal, a transform, a colliding
     /// boundary or, where the plate pulls away, nothing. The friction is linearised about the last
     /// answer until the answer stops changing: the fixed point the plates' motion relaxes to. The
     /// rotation (rad/s), the last system and the solves it took.
@@ -1637,7 +1674,7 @@ mod tests {
             for &(x, out, len) in rim {
                 // The mantle side's motion relative to the plate, mm/yr.
                 let rel = -(w.cross(x) * c.radius_m * 1.0e3 * YEAR_S);
-                let per_m = if shortening::is_transform(rel, out) {
+                let per_m = if fu_transform(rel, out) {
                     c.transform_n_m
                 } else if rel.dot(out) < 0.0 {
                     c.colliding_n_m
@@ -1722,7 +1759,7 @@ mod tests {
     /// its slab's terminal velocity, as their oceanic plates attached to a slab do ("roughly
     /// coincident with the average velocity of oceanic plates attached to a slab", p. 189): the
     /// basal drag takes 1 / (1 + 8.9) of it, 65 mm/yr, and the friction on its transforms and its
-    /// colliding front (the trench's own included) about a sixth more (55 mm/yr on a flat plate).
+    /// colliding front (the trench's own included) about a sixth more (56 mm/yr).
     /// At the fixed point the friction is a force whatever the speed: the same plate with fixed
     /// forces in its place has the same answer.
     #[test]
@@ -1781,7 +1818,7 @@ mod tests {
         for &(x, out, len) in &rim3 {
             let dv = w.cross(x) * c.radius_m * 1.0e3 * YEAR_S;
             assert!(dv.length() > c.floor_mm_yr, "{dv}");
-            let per_m = if shortening::is_transform(-dv, out) {
+            let per_m = if fu_transform(-dv, out) {
                 transform += 1;
                 c.transform_n_m
             } else if dv.dot(out) > 0.0 {
@@ -1794,10 +1831,11 @@ mod tests {
         }
         let links = bal.links.iter().filter(|l| l.term == Resist::Friction);
         assert_eq!(links.count(), transform + colliding);
-        // Bird's 20 degrees: on a flat plate 80 degrees of the rim are transforms and 140 the
-        // colliding front; on the cap the rim's motion leans towards its normal (68 and 146).
+        // Forsyth & Uyeda's 60 degrees: on a flat plate 120 degrees of the rim are transforms
+        // and 120 the colliding front; on the cap the rim's motion leans towards its normal (84
+        // and 103 of the rim's samples).
         let share = transform as f64 / (transform + colliding) as f64;
-        assert!((share - 68.0 / 214.0).abs() < 0.03, "{share}");
+        assert!((share - 84.0 / 187.0).abs() < 0.03, "{share}");
         let wf = fixed.solve().unwrap()[0];
         assert!((wf - w).length() < 1e-6 * w.length(), "{wf} {w}");
         // The budget books the friction with the boundary resistance.
@@ -1851,14 +1889,14 @@ mod tests {
 
     /// A plate with no slab, pushed by a ridge along the back of its rim. Without friction,
     /// Table 6's basal drag (half the old law's) and no boundary resistance let it run many times
-    /// the old law's speed (the plate speed lane's diagnosis: the plates with no slab pull at 81
-    /// and 152 mm/yr RMS under Table 6's resistances alone, 15.5 under the old law). The friction
-    /// on its transforms and its colliding front takes most of that away: at Table 6's own ridge
+    /// the old law's speed (the plate speed lane's diagnosis: the plates with no slab pull at 135
+    /// and 95 mm/yr RMS under Table 6's resistances alone, 19.5 and 15.5 under the old law). The
+    /// friction on its transforms and its colliding front takes most of that away: at Table 6's own ridge
     /// push (0.36 per km against the pull's 6.43) the friction about balances the push and the
     /// plate creeps at the floor speed (Forsyth & Uyeda's plates with no slab are slow: "continental
     /// drag is the primary regulator of the velocity of plates not attached to downgoing slabs",
     /// p. 190); at the model's (the column energy at the pool preset's ridge and old floor, about
-    /// 0.1 of the pull) an oceanic plate moves at about two fifths of its frictionless speed,
+    /// 0.1 of the pull) an oceanic plate moves at about a quarter of its frictionless speed,
     /// still faster than under the old law, and a continental one slower than under the old law.
     #[test]
     fn friction_holds_back_a_plate_with_no_slab() {
@@ -1920,7 +1958,7 @@ mod tests {
         );
         assert!(frictionless > 4.0 * old_v, "{frictionless} {old_v}");
         assert!(
-            (0.25..0.5).contains(&(with / frictionless)),
+            (0.2..0.35).contains(&(with / frictionless)),
             "{with} {frictionless}"
         );
         // Held at the floor: the friction is the push to within a few percent on this cap.
