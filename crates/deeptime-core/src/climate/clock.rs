@@ -482,8 +482,8 @@ pub fn run(
         if p.chemical_denudation {
             // Without the carbon cycle (or under the present's nudge) the reservoirs are held: the
             // weathering is the step's own, at its end climate.
-            let by = drawn
-                .unwrap_or_else(|| wp.flux_by_band(&st.kernel, &st.t_land, &st.sheet, ppm));
+            let by =
+                drawn.unwrap_or_else(|| wp.flux_by_band(&st.kernel, &st.t_land, &st.sheet, ppm));
             for (a, x) in out.land_mol_by_band.iter_mut().zip(by) {
                 *a += x * dt;
             }
@@ -1220,12 +1220,21 @@ mod tests {
         let drawn = st0.carbon.total() + d * 2.0e6 - st_on.carbon.total();
         let land: f64 = on.land_mol_by_band.iter().sum();
         assert_eq!(on.land_mol_by_band.len(), pl.land.len());
-        assert!(drawn > 0.05 * d * 2.0e6, "the doubled weathering drew down {drawn} mol");
-        assert!((land / drawn - 1.0).abs() < 1e-9, "dissolved {land} mol, drawn {drawn}");
+        assert!(
+            drawn > 0.05 * d * 2.0e6,
+            "the doubled weathering drew down {drawn} mol"
+        );
+        assert!(
+            (land / drawn - 1.0).abs() < 1e-9,
+            "dissolved {land} mol, drawn {drawn}"
+        );
         let (two, st_two) = go(true, &[-10.0e6, -9.0e6, -8.0e6]);
         let drawn2 = st0.carbon.total() + d * 2.0e6 - st_two.carbon.total();
         let land2: f64 = two.land_mol_by_band.iter().sum();
-        assert!((land2 / drawn2 - 1.0).abs() < 1e-9, "in two parts: {land2} mol, drawn {drawn2}");
+        assert!(
+            (land2 / drawn2 - 1.0).abs() < 1e-9,
+            "in two parts: {land2} mol, drawn {drawn2}"
+        );
         let (off, st_off) = go(false, &whole);
         assert!(off.land_mol_by_band.is_empty());
         assert_eq!(st_off.carbon, st_on.carbon);

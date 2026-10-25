@@ -374,11 +374,20 @@ impl Weathering {
 
     /// Band `b`'s silicate weathering, mol C/yr (`scale`: [`Weathering::kinetic_per_kernel`]).
     #[inline]
-    fn band_flux(&self, k: &Kernel, b: usize, kb: f64, t_land: &[f64], ice: &[f64], scale: f64) -> f64 {
+    fn band_flux(
+        &self,
+        k: &Kernel,
+        b: usize,
+        kb: f64,
+        t_land: &[f64],
+        ice: &[f64],
+        scale: f64,
+    ) -> f64 {
         if kb <= 0.0 {
             return 0.0;
         }
-        let dt = t_land.get(b).copied().unwrap_or(0.0) - k.ref_t_land.get(b).copied().unwrap_or(0.0);
+        let dt =
+            t_land.get(b).copied().unwrap_or(0.0) - k.ref_t_land.get(b).copied().unwrap_or(0.0);
         let free = 1.0 - ice.get(b).copied().unwrap_or(0.0).clamp(0.0, 1.0);
         let kin = scale * kb * climate_factor(dt, self.k_t, self.k_r) * free;
         match k.supply.get(b) {
@@ -684,13 +693,19 @@ mod tests {
             let by = wp.flux_by_band(&k, &t, &ice, ppm);
             assert_eq!(by.len(), 5);
             assert_eq!(by[0], 0.0);
-            assert_eq!(by.iter().sum::<f64>().to_bits(), wp.flux(&k, &t, &ice, ppm).to_bits());
+            assert_eq!(
+                by.iter().sum::<f64>().to_bits(),
+                wp.flux(&k, &t, &ice, ppm).to_bits()
+            );
             let kin = Kernel {
                 supply: Vec::new(),
                 ..k.clone()
             };
             let by = wp.flux_by_band(&kin, &t, &ice, ppm);
-            assert_eq!(by.iter().sum::<f64>().to_bits(), wp.flux(&kin, &t, &ice, ppm).to_bits());
+            assert_eq!(
+                by.iter().sum::<f64>().to_bits(),
+                wp.flux(&kin, &t, &ice, ppm).to_bits()
+            );
         }
     }
 
@@ -730,7 +745,7 @@ mod tests {
             assert_eq!(d.thickness_m.len(), cells.len());
             assert_eq!(d.placed_mol, mol[0] + mol[1] + mol[2]);
             assert_eq!(d.unplaced_mol, mol[3]);
-            for b in 0..4 {
+            for (b, &m) in mol.iter().enumerate() {
                 let kg: f64 = d
                     .thickness_m
                     .iter()
@@ -738,8 +753,11 @@ mod tests {
                     .filter(|(_, c)| c.band == b)
                     .map(|(t, c)| t * c.area_km2 * 1.0e6 * ROCK_KG_M3)
                     .sum();
-                let want = if b == 3 { 0.0 } else { mol[b] * kg_per_mol };
-                assert!((kg - want).abs() <= 1e-12 * want.max(1.0), "band {b}: {kg} kg, {want}");
+                let want = if b == 3 { 0.0 } else { m * kg_per_mol };
+                assert!(
+                    (kg - want).abs() <= 1e-12 * want.max(1.0),
+                    "band {b}: {kg} kg, {want}"
+                );
             }
             for (t, c) in d.thickness_m.iter().zip(&cells) {
                 let none = c.area_km2 == 0.0 || (c.band == 1 && c.iced);
@@ -768,7 +786,10 @@ mod tests {
             ..a
         };
         let d = place_dissolved(&[1.0e12], &[a, b], 0.15, true);
-        let (wa, wb) = (supply_limited(a.kin, a.supply), supply_limited(b.kin, b.supply));
+        let (wa, wb) = (
+            supply_limited(a.kin, a.supply),
+            supply_limited(b.kin, b.supply),
+        );
         assert!((d.thickness_m[0] / d.thickness_m[1] - wa / wb).abs() < 1e-9);
         // Without a supply limit, by the kinetics alone.
         let d = place_dissolved(&[1.0e12], &[a, b], 0.15, false);
@@ -792,17 +813,29 @@ mod tests {
         let wp = Weathering::from(&p);
         let area = 1.0e4;
         let m_myr = |t_km2_yr: f64| t_km2_yr * 1.0e3 / ROCK_KG_M3; // t/km²/yr → m/Myr
-        let lo = west.iter().map(|r| m_myr(r.4)).fold(f64::INFINITY, f64::min);
+        let lo = west
+            .iter()
+            .map(|r| m_myr(r.4))
+            .fold(f64::INFINITY, f64::min);
         let hi = west.iter().map(|r| m_myr(r.4)).fold(0.0, f64::max);
         // Each craton's sink, m/Myr, through the model's chain: its kernel and supply (eroding at
         // `e` m/Myr), its band's weathering at 280 ppm over 1 Myr, placed on the one cell.
         let sink = |t: f64, runoff_mm: f64, e: f64| -> f64 {
             let k = Kernel {
-                band: vec![cell_kernel(area, runoff_mm / 1000.0, t, p.weathering_temp_per_k)],
+                band: vec![cell_kernel(
+                    area,
+                    runoff_mm / 1000.0,
+                    t,
+                    p.weathering_temp_per_k,
+                )],
                 ref_t_land: vec![t],
                 supply: vec![
-                    cell_supply(area, e, p.weathering_min_denudation_m_myr, p.weathering_rock_mol_kg)
-                        * p.weathering_supply_scale,
+                    cell_supply(
+                        area,
+                        e,
+                        p.weathering_min_denudation_m_myr,
+                        p.weathering_rock_mol_kg,
+                    ) * p.weathering_supply_scale,
                 ],
             };
             let mol = wp.flux_by_band(&k, &[t], &[0.0], CO2_REF_PPM)[0] * 1.0e6;
@@ -824,7 +857,10 @@ mod tests {
             );
             // Flat and not eroding (the supply's least denudation): inside the cratons' range.
             let flat = sink(t, runoff, 0.0);
-            assert!(flat >= lo && flat <= hi, "{name} flat: {flat:.2} m/Myr, West {lo:.2} to {hi:.2}");
+            assert!(
+                flat >= lo && flat <= hi,
+                "{name} flat: {flat:.2} m/Myr, West {lo:.2} to {hi:.2}"
+            );
         }
     }
 }
