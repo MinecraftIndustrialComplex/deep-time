@@ -65,6 +65,45 @@
 //! metre of front against the convergence, plastic (linearised with the step's convergence). It
 //! can stop two plates and never push them apart. (Until the switch, 2026-10-04, a cut inside the
 //! old speed law, `collision_resistance_mm_yr`, stood in for it.)
+//!
+//! # The overriding plate's share (PLT-652, `collision_upper_plate_shortening`, on)
+//! On Earth the overriding plate takes much of a collision's convergence as distributed
+//! shortening of its interior: of Arabia's 440 km since 22 Ma about half went into Central Iran
+//! and the Alborz behind the Zagros (Mouthereau 2011), and Asia took 600 to 1,050 km of India's
+//! convergence beside the Himalaya's 450 to 900 (van Hinsbergen et al. 2011). The continental
+//! lithosphere deforms as a thin viscous sheet (England & McKenzie 1982; Houseman & England
+//! 1986), so where it shortens is set by its strength. With the switch the step's crust is
+//! shared before the wedge and the belt take theirs:
+//!
+//! - The belt (the front's orogenic wedge, PLT-600) pushes on the lowland behind it with its
+//!   gravitational potential energy over the lowland's, F per metre of front: the force a range
+//!   exerts on its lowlands (Molnar & Lyon-Caen 1988), FRC-018's edge term read across the belt,
+//!   the belt's continental columns' mean energy over the lowland's (the strip below).
+//! - The overriding plate behind the belt carries that force as a thin sheet: along the strip
+//!   behind the front (the plate's visible continental samples beyond `collision_belt_km`, between
+//!   the front's ends along it) each column shortens at ε̇ = F / (4 η L), the collapse's law
+//!   (PLT-414; L the 100 km lithosphere, FRC-010) with F for ΔU, and η = η_0 e^(t_eq / τ_s) at
+//!   its lithosphere's thermal age (PLT-415, ISO-112; PLT-470's form). The interior shortens at
+//!   v = F / (4 η_0 L) ∫ e^(−t_eq/τ_s) dx along the strip.
+//! - Its share of the convergence is v / v_n, at most all of it. That share of the crust the step
+//!   keeps goes to the strip's columns in proportion to T ε̇ (a thin sheet thickens each column by
+//!   its own strain), the rest to the wedge and the belt as before (their rules, the strength
+//!   height and the taper unchanged). Nothing is created: the crust added is the same.
+//!
+//! No share is set, and the belt sets its own height: a fresh front has no belt and no push, so
+//! the front takes everything; the belt rises until its push drives the interior at the rest of
+//! the convergence, the plateau's growth of a thin sheet (England & Houseman 1986's indenter). A
+//! cold, keeled craton (L near L_cold, t_eq of hundreds of Myr) behind it takes almost none even
+//! under a belt at its strength height, a hot one (L near L_hot) all of it under a low belt. Not
+//! the balance's buoyancy of the continental lithosphere dragged down (FRC-030): that is the
+//! mantle's hold on the slab, a capacity of the plastic resistance that reaches about 9 × 10¹³ N/m
+//! at full depth, an order of magnitude over what a range pushes with. It is kinematic: the balance
+//! still resists as before, and the 1-D strip carries F undiminished to the plate's far side, where
+//! a 2-D sheet would spread it (England, Houseman & Sonder 1985), so it is the interior's largest
+//! share. The interior's columns are stamped as the belt's are (the collision orogeny) but kept
+//! out of the belt's record; the crust is the crossing crust's mix. On the pool (arm
+//! fl-upper-unfreeze against its switch-off twin, 2026-10-25) the interiors took 0.13 of the
+//! crust crossed, a quarter to a third of Arabia's and India's shares.
 
 use std::collections::BTreeMap;
 
@@ -73,12 +112,14 @@ use rayon::prelude::*;
 
 use super::Env;
 use super::collapse::normal_thickness_m;
+use super::forces::{LITHOSPHERE_KM, YEAR_S, belt_push_n_m, column_energy};
 use super::geometry::{Geo, dijkstra_sorted};
 use super::kinematics::{quat, tangent, to_group};
 use super::pools::{COLUMN_ISOSTATIC_FACTOR, isostatic_change_m};
 use super::shortening::Front;
 use super::state::{Belt, CONTINENTAL, FORELAND, OROGENY_HIMALAYAN, PlateState, pool};
 use super::subduction::{MIN_CONTACT, OROGENY_MIN_M_PER_MYR, ceiling};
+use super::thermal::sheet_weakness;
 
 /// The surface's flexure below which ground in front of a wedge counts as the foreland basin, m
 /// (`docs/design/flexure.md` §8: `surface/flexure_m` below about −100 m beside a collision).
@@ -126,6 +167,15 @@ pub const CLIPPED_GLOBAL: &str = "plates/collision_noroom_clipped_km3";
 /// only; ledger: PLT-601): the toe advancing, so whether the width `collision_belt_km` (PLT-241)
 /// bounds the belt at all. Zero without `collision_belt_taper`.
 pub const TOE_GLOBAL: &str = "plates/collision_taper_toe_km3";
+/// The overriding plates' share (`collision_upper_plate_shortening`, PLT-652; measurement only,
+/// written only with the switch): the crust their interiors took instead of the fronts, km³ (in
+/// [`KEPT_GLOBAL`] too) …
+pub const UPPER_GLOBAL: &str = "plates/collision_upper_km3";
+/// … the crossed area times the share of the convergence the interior took, km² (over
+/// [`CROSSED_AREA_GLOBAL`]: the mean share by crust crossed) …
+pub const UPPER_AREA_GLOBAL: &str = "plates/collision_upper_km2";
+/// … and the crossed area of the fronts whose overriding plate took at least half, km².
+pub const UPPER_MOST_GLOBAL: &str = "plates/collision_upper_most_km2";
 /// How young a collision orogeny on the incoming crust counts as raised by this collision's
 /// wedge, Myr (measurement only; the agent's window, ledger: PLT-401).
 const RECENT_MYR: f64 = 30.0;
@@ -170,6 +220,15 @@ pub struct Stacked {
     /// Crust added to the belt and to the wedge, km² × m: Σ added thickness × a sample's area.
     pub belt_km2_m: f64,
     pub wedge_km2_m: f64,
+    /// The overriding plate's interior (`collision_upper_plate_shortening`, PLT-652): the share
+    /// of the convergence it took, the crust it took, km² × m (Σ added thickness × a sample's
+    /// area, beside the belt's and the wedge's), the belt's push per metre of front it was read
+    /// at, N/m, and the interior's shortening rate under it before the cap at the convergence,
+    /// mm/yr. All zero with the switch off.
+    pub upper_share: f64,
+    pub upper_km2_m: f64,
+    pub upper_force_n_m: f64,
+    pub upper_rate_mm_yr: f64,
     /// The largest uplift, m.
     pub max_dz_m: f64,
     /// The wedge's width, km, and the belt's height (mean above sea level) and mean elevation, m,
@@ -562,6 +621,18 @@ fn stack_front(
     } else {
         k.collision_stacking_share * crossed_km2 * thickness_m / COLUMN_ISOSTATIC_FACTOR
     };
+    // ledger: PLT-652. The overriding plate's interior takes its share of the convergence as
+    // distributed shortening (`collision_upper_plate_shortening`, the module docs); the front
+    // stacks the rest, in the wedge and the belt as before.
+    let upper = (upper_applies(k) && rise_km2_m > 0.0)
+        .then(|| upper_plate(state, env, pos, plate_of, &side, f, &d_over, sea_m));
+    let (rise_km2_m, upper_rise_km2_m) = match &upper {
+        Some(u) if u.share > 0.0 => {
+            let up = rise_km2_m * u.share;
+            (rise_km2_m - up, up)
+        }
+        _ => (rise_km2_m, 0.0),
+    };
     let fill = if deficit_km2_m > 0.0 {
         (rise_km2_m / deficit_km2_m).min(1.0)
     } else {
@@ -613,9 +684,9 @@ fn stack_front(
 
     // Each rise with its sample's distance from the front (the wedge's in front, the belt's
     // behind).
-    let mut rises: Vec<(usize, f64, bool, f64)> = wedge
+    let mut rises: Vec<(usize, f64, Part, f64)> = wedge
         .iter()
-        .map(|&(i, x, d)| (i, fill * x, true, d))
+        .map(|&(i, x, d)| (i, fill * x, Part::Wedge, d))
         .collect();
     // Signed distance from the front, km: in front (the wedge) positive, behind negative.
     let across = |d: f64, in_wedge: bool| {
@@ -666,8 +737,22 @@ fn stack_front(
                 .iter()
                 .zip(given)
                 .filter(|&(_, g)| g > 0.0)
-                .map(|(&(i, _, d), g)| (i, g, false, d)),
+                .map(|(&(i, _, d), g)| (i, g, Part::Belt, d)),
         );
+    }
+    // The interior's share, in proportion to T ε̇ on its columns (PLT-652): no strength height
+    // here, the crust above it spreads in the surface stage as a plateau's does.
+    if let Some(u) = &upper
+        && upper_rise_km2_m > 0.0
+    {
+        let total: f64 = u.cells.iter().map(|&(_, tw)| tw).sum::<f64>() * area;
+        if total > 0.0 {
+            rises.extend(
+                u.cells
+                    .iter()
+                    .map(|&(i, tw)| (i, upper_rise_km2_m * tw / total, Part::Upper, 0.0)),
+            );
+        }
     }
     let mut out = FrontStep {
         stacked: Stacked {
@@ -681,6 +766,9 @@ fn stack_front(
             capped_km2_m,
             toe_km2_m,
             wedge_km,
+            upper_share: upper.as_ref().map_or(0.0, |u| u.share),
+            upper_force_n_m: upper.as_ref().map_or(0.0, |u| u.force_n_m),
+            upper_rate_mm_yr: upper.as_ref().map_or(0.0, |u| u.rate_mm_yr),
             ..Default::default()
         },
         lifted10: 0,
@@ -691,7 +779,7 @@ fn stack_front(
         across_sq: 0.0,
     };
     let stamp_m = OROGENY_MIN_M_PER_MYR * env.dt_myr;
-    for (i, raw, in_wedge, d) in rises {
+    for (i, raw, part, d) in rises {
         let rot = quat(state.groups[state.samples[i].group as usize].rot);
         let s = &mut state.samples[i];
         let z = f64::from(s.elevation_m);
@@ -712,11 +800,21 @@ fn stack_front(
         // eclogite root (its mafic crust beyond the eclogite pressure) pulls down. ledger: PLT-278
         let dz = isostatic_change_m(&before, &s.pools, env.gravity);
         s.elevation_m = (z + dz) as f32;
-        if in_wedge {
-            out.stacked.wedge_km2_m += added * area;
-        } else {
-            out.stacked.belt_km2_m += added * area;
+        match part {
+            Part::Wedge => out.stacked.wedge_km2_m += added * area,
+            Part::Belt => out.stacked.belt_km2_m += added * area,
+            Part::Upper => {
+                // The interior's columns: stamped as the belt's are, outside the belt's record.
+                out.stacked.upper_km2_m += added * area;
+                if airy_dz >= stamp_m {
+                    s.orogeny = OROGENY_HIMALAYAN;
+                    s.orogeny_myr = env.t_myr as f32;
+                    s.fold = to_group(rot, tangent(pos[i], side.normal).normalize_or_zero());
+                }
+                continue;
+            }
         }
+        let in_wedge = part == Part::Wedge;
         out.stacked.max_dz_m = out.stacked.max_dz_m.max(dz);
         out.lifted10 += u32::from(dz > 10.0);
         out.lifted100 += u32::from(dz > 100.0);
@@ -978,6 +1076,184 @@ fn fill_taper(
     }
     let toe = (given.iter().sum::<f64>() - full).max(0.0) * area;
     (given, toe)
+}
+
+/// Where a rise of the step's stacking goes: the wedge on the incoming plate, the belt behind the
+/// front, or the overriding plate's interior (PLT-652).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Part {
+    Wedge,
+    Belt,
+    Upper,
+}
+
+/// The overriding plate's interior behind a front (`collision_upper_plate_shortening`, PLT-652,
+/// the module docs).
+struct Upper {
+    /// The share of the convergence the interior takes, in [0, 1].
+    share: f64,
+    /// The belt's push per metre of front, N/m, and the interior's shortening rate under it,
+    /// mm/yr (before the cap at the convergence).
+    force_n_m: f64,
+    rate_mm_yr: f64,
+    /// The interior's continental samples on the strip behind the front, each with T w (m: its
+    /// crust's thickness times its weakness, so in proportion to T ε̇), where the share goes.
+    cells: Vec<(usize, f64)>,
+}
+
+/// The shortening rate, mm/yr, of a thin viscous sheet along a strip under a force `force_n_m`
+/// per metre across it: ∫ ε̇ dx with ε̇ = F / (4 η L) (plane strain in a sheet L = 100 km thick,
+/// the collapse's law with F in place of ΔU) and η = η_0 / w, so F / (4 η_0 L) times
+/// `path_km` = ∫ w dx along the strip, km. 0 for no force, no viscosity or no path.
+// ledger: PLT-652, PLT-414, FRC-010
+fn upper_rate_mm_yr(force_n_m: f64, eta0_pa_s: f64, path_km: f64) -> f64 {
+    if !(force_n_m > 0.0 && eta0_pa_s > 0.0 && eta0_pa_s.is_finite() && path_km > 0.0) {
+        return 0.0;
+    }
+    force_n_m / (4.0 * eta0_pa_s * LITHOSPHERE_KM * 1000.0) * (path_km * 1000.0) * YEAR_S * 1000.0
+}
+
+/// Whether PLT-652 acts: the switch on, and the sheet's strength readable (the thermal state and a
+/// finite positive sheet viscosity). Without them it does nothing, as `thermal_strength` does, so
+/// a preset may turn the state off alone.
+// ledger: PLT-652
+fn upper_applies(k: &crate::params::TectonicParams) -> bool {
+    k.collision_upper_plate_shortening
+        && k.thermal_state
+        && k.collapse_sheet_viscosity_pa_s > 0.0
+        && k.collapse_sheet_viscosity_pa_s.is_finite()
+}
+
+/// The interior's share of a front's convergence `conv_mm_yr` when it shortens at `rate_mm_yr`
+/// under the belt's push: the rate over the convergence, at most all of it.
+// ledger: PLT-652
+fn upper_share(rate_mm_yr: f64, conv_mm_yr: f64) -> f64 {
+    if conv_mm_yr > 0.0 && rate_mm_yr > 0.0 {
+        (rate_mm_yr / conv_mm_yr).min(1.0)
+    } else {
+        0.0
+    }
+}
+
+/// The overriding plate's interior behind front `f` and its share of the convergence
+/// (PLT-652, the module docs): the belt's push per metre (`forces::belt_push_n_m`: the mean
+/// column energy of the belt's continental samples, `d_over` within `collision_belt_km`, over the
+/// strip's; no belt or no strip, no push), and the strip behind the front, the overriding plate's visible continental samples beyond the belt's
+/// zone (`d_over`, the field to `collision_belt_km`) whose position along the front lies between
+/// its ends (the edge samples' extremes along the tangent at the centroid, the strip as wide as
+/// the front) and not ahead of it, each at its thin-sheet weakness w = e^(−t_eq / τ_s)
+/// (`thermal::sheet_weakness`). ∫ w dx along the strip is Σ w × a sample's area over the
+/// strip's width.
+#[allow(clippy::too_many_arguments)]
+fn upper_plate(
+    state: &PlateState,
+    env: &Env,
+    pos: &[DVec3],
+    plate_of: &[u32],
+    side: &Side,
+    f: &Front,
+    d_over: &[(u32, f64, u32)],
+    sea_m: f64,
+) -> Upper {
+    let k = env.k;
+    let norm = env.norm;
+    let s = &state.samples;
+    let none = Upper {
+        share: 0.0,
+        force_n_m: 0.0,
+        rate_mm_yr: 0.0,
+        cells: Vec::new(),
+    };
+    let edge: Vec<u32> = f
+        .edge
+        .iter()
+        .copied()
+        .filter(|&v| plate_of[v as usize] == side.over && !s[v as usize].is_hidden())
+        .collect();
+    if edge.is_empty() || f.crust.is_empty() {
+        return none;
+    }
+    let energy = |v: usize| {
+        column_energy(
+            f64::from(s[v].elevation_m),
+            true,
+            k.ridge_elevation_m,
+            k.oceanic_floor_elevation_m,
+            sea_m,
+            env.gravity,
+        )
+    };
+    // The belt: the overriding plate's continental columns within the belt's zone.
+    let w_rad = norm.rad(k.collision_belt_km);
+    let (mut u_sum, mut n_belt) = (0.0f64, 0usize);
+    for &(i, d, _) in d_over {
+        let i = i as usize;
+        if d <= w_rad && s[i].kind == CONTINENTAL && !s[i].is_hidden() {
+            u_sum += energy(i);
+            n_belt += 1;
+        }
+    }
+    if n_belt == 0 {
+        return none;
+    }
+    let u_belt = u_sum / n_belt as f64;
+    // The strip behind the front: between the front's ends along its tangent, not ahead of it.
+    let (c, n) = (f.centroid(), f.normal());
+    let t = c.cross(n).normalize_or_zero();
+    if t == DVec3::ZERO {
+        return none;
+    }
+    let (mut lo, mut hi, mut ahead) = (f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+    for &v in &edge {
+        let p = pos[v as usize];
+        lo = lo.min(p.dot(t));
+        hi = hi.max(p.dot(t));
+        ahead = ahead.max(p.dot(n));
+    }
+    let width_km = norm
+        .km(hi.clamp(-1.0, 1.0).asin() - lo.clamp(-1.0, 1.0).asin())
+        .max(norm.km(norm.spacing_rad()));
+    let tau = k.collapse_sheet_strength_myr; // ledger: PLT-415
+    // Each strip sample with its weakness, T w and column energy.
+    let strip: Vec<(usize, f64, f64, f64)> = (0..s.len())
+        .into_par_iter()
+        .filter_map(|i| {
+            let x = &s[i];
+            if plate_of[i] != side.over || x.kind != CONTINENTAL || x.is_hidden() {
+                return None;
+            }
+            let p = pos[i];
+            let along = p.dot(t);
+            if along < lo || along > hi || p.dot(n) > ahead {
+                return None;
+            }
+            // The belt's zone is the front's (its wedge on the overriding plate, PLT-600).
+            if d_over.binary_search_by_key(&(i as u32), |e| e.0).is_ok() {
+                return None;
+            }
+            let w = sheet_weakness(tau, x.lithosphere_km);
+            Some((i, w, w * f64::from(x.thickness_m), energy(i)))
+        })
+        .collect();
+    if strip.is_empty() {
+        return none;
+    }
+    // The belt's push per metre on the lowland it drives (Molnar & Lyon-Caen 1988; FRC-018's edge
+    // term read across the belt): the belt's mean column energy over the strip's.
+    let u_strip = strip.iter().map(|e| e.3).sum::<f64>() / strip.len() as f64;
+    let force_n_m = belt_push_n_m(k, u_belt - u_strip);
+    let path_km = strip.iter().map(|e| e.1).sum::<f64>() * norm.sample_area_km2() / width_km;
+    let rate_mm_yr = upper_rate_mm_yr(force_n_m, k.collapse_sheet_viscosity_pa_s, path_km); // ledger: PLT-414
+    Upper {
+        share: upper_share(rate_mm_yr, side.conv),
+        force_n_m,
+        rate_mm_yr,
+        cells: strip
+            .into_iter()
+            .filter(|e| e.2 > 0.0)
+            .map(|(i, _, tw, _)| (i, tw))
+            .collect(),
+    }
 }
 
 /// Distance (rad) to km and the bin width of the foreland's profile.
@@ -1639,6 +1915,327 @@ mod tests {
             let b = &st.contacts[0].collision.as_ref().unwrap().belt;
             assert!((b.stacked_km2_m - share * consumed).abs() < 1e-4 * consumed);
         }
+    }
+
+    /// The overriding plate's lithosphere (its samples' thermal state, PLT-415), km.
+    fn upper_lithosphere(st: &mut PlateState, l_km: f32) {
+        for s in st.samples.iter_mut().filter(|s| s.group == 0) {
+            s.lithosphere_km = l_km;
+        }
+    }
+
+    /// One head-on collision at 30 mm/yr with the overriding plate's lithosphere `l_km` thick,
+    /// `steps` steps with `collision_upper_plate_shortening` set to `on`: the planet after, and
+    /// each step's record of the front.
+    fn upper_run(l_km: f32, on: bool, steps: u64, tune: impl Fn(&mut Fixture)) -> UpperRun {
+        let mut fx = Fixture::new();
+        fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        fx.preset.tectonics.collision_upper_plate_shortening = on;
+        tune(&mut fx);
+        let mut st = two_plates(&fx.geo, 0.0, DVec3::Z * fx.rate(30.0));
+        upper_lithosphere(&mut st, l_km);
+        let z0 = st.samples.iter().map(|s| s.elevation_m).collect();
+        let area = fx.norm.sample_area_km2();
+        let mut fronts = Vec::new();
+        let mut added = Vec::new();
+        let mut zs = Vec::new();
+        for step in 1..=steps {
+            let before = crust_km2_m(&st, area);
+            let (stacked, _) = fx.step(&mut st, step, None);
+            added.push(crust_km2_m(&st, area) - before);
+            fronts.push(stacked[&0].clone());
+            zs.push(st.samples.iter().map(|s| s.elevation_m).collect());
+        }
+        UpperRun {
+            fx,
+            st,
+            z0,
+            fronts,
+            added,
+            zs,
+        }
+    }
+
+    struct UpperRun {
+        fx: Fixture,
+        st: PlateState,
+        z0: Vec<f32>,
+        fronts: Vec<Stacked>,
+        added: Vec<f64>,
+        zs: Vec<Vec<f32>>,
+    }
+
+    /// PLT-652's pieces: the thin sheet's shortening rate under a force (F / (4 η_0 L) ∫ w dx,
+    /// about 158 mm/yr for 2×10¹³ N/m on 1,000 km of a sheet at full weakness and 10²² Pa s),
+    /// the share it takes of the convergence (all of it at most), and the weakness at a
+    /// lithosphere's thermal age (1 for the hot sheet, 0 for the cold limit or no state).
+    #[test]
+    fn the_upper_plates_rate_share_and_weakness_follow_the_thin_sheet() {
+        let v = upper_rate_mm_yr(2.0e13, 1.0e22, 1000.0);
+        assert!((v - 157.8).abs() < 0.1, "{v}");
+        assert!((upper_rate_mm_yr(2.0e13, 1.0e22, 500.0) - 0.5 * v).abs() < 1e-9);
+        assert_eq!(upper_rate_mm_yr(0.0, 1.0e22, 1000.0), 0.0);
+        assert_eq!(upper_rate_mm_yr(2.0e13, 0.0, 1000.0), 0.0);
+        assert_eq!(upper_rate_mm_yr(2.0e13, 1.0e22, 0.0), 0.0);
+        assert!((upper_share(15.0, 30.0) - 0.5).abs() < 1e-12);
+        assert_eq!(upper_share(60.0, 30.0), 1.0);
+        assert_eq!(upper_share(10.0, 0.0), 0.0);
+        let tau = 62.8;
+        assert_eq!(sheet_weakness(tau, 60.0), 1.0);
+        assert_eq!(sheet_weakness(tau, 225.0), 0.0);
+        assert_eq!(sheet_weakness(tau, 0.0), 0.0);
+        let w: Vec<f64> = [60.0, 100.0, 150.0, 180.0, 200.0]
+            .iter()
+            .map(|&l| sheet_weakness(tau, l))
+            .collect();
+        assert!(w.windows(2).all(|p| p[1] < p[0]), "{w:?}");
+        assert!(w[4] < 0.005 && w[1] > 0.3, "{w:?}");
+        // The belt's push: a 5 km belt over crust at the sea, 6.7 × 10¹² N/m (Tibet's 6 to 7);
+        // nothing for a belt lower than the lowland.
+        let fx = Fixture::new();
+        let k = &fx.preset.tectonics;
+        let u = |z: f64| column_energy(z, true, k.ridge_elevation_m, -5000.0, 0.0, 9.81);
+        let f = belt_push_n_m(k, u(5000.0) - u(0.0));
+        assert!((f - 6.7e12).abs() < 0.1e12, "{f}");
+        assert_eq!(belt_push_n_m(k, u(0.0) - u(1000.0)), 0.0);
+        // On by default, it acts only where the sheet's strength can be read: not without the
+        // thermal state or a sheet viscosity, so a preset may turn either off alone.
+        let mut k = fx.preset.tectonics.clone();
+        k.collision_upper_plate_shortening = true;
+        k.thermal_state = true;
+        assert!(upper_applies(&k));
+        k.thermal_state = false;
+        assert!(!upper_applies(&k));
+        k.thermal_state = true;
+        for eta in [0.0, f64::NAN, f64::INFINITY] {
+            k.collapse_sheet_viscosity_pa_s = eta;
+            assert!(!upper_applies(&k), "{eta}");
+        }
+    }
+
+    /// PLT-652 off: the switch adds nothing to the record. On, a plate at the cold limit (225 km
+    /// of lithosphere, weakness 0) takes nothing: the planet is the switch-off planet to the bit
+    /// and the record differs only in the force it read.
+    #[test]
+    fn a_cold_overriding_plate_leaves_the_collision_as_it_was() {
+        let off = upper_run(225.0, false, 6, |_| {});
+        let on = upper_run(225.0, true, 6, |_| {});
+        for (a, b) in off.fronts.iter().zip(&on.fronts) {
+            assert_eq!(
+                (
+                    a.upper_share,
+                    a.upper_km2_m,
+                    a.upper_force_n_m,
+                    a.upper_rate_mm_yr
+                ),
+                (0.0, 0.0, 0.0, 0.0)
+            );
+            assert!(b.upper_force_n_m >= 0.0, "{b:?}");
+            assert_eq!(
+                (b.upper_share, b.upper_km2_m, b.upper_rate_mm_yr),
+                (0.0, 0.0, 0.0)
+            );
+            let mut b = b.clone();
+            b.upper_force_n_m = 0.0;
+            assert_eq!(*a, b);
+        }
+        let same = |a: &Sample, b: &Sample| a == b || format!("{a:?}") == format!("{b:?}");
+        assert!(
+            off.st
+                .samples
+                .iter()
+                .zip(&on.st.samples)
+                .all(|(a, b)| same(a, b))
+        );
+        assert_eq!(
+            format!("{:?}", off.st.contacts),
+            format!("{:?}", on.st.contacts)
+        );
+        // The belt stood and pushed after the first step.
+        assert_eq!(on.fronts[0].upper_force_n_m, 0.0);
+        assert!(on.fronts[1..].iter().all(|s| s.upper_force_n_m > 0.0));
+    }
+
+    /// PLT-652 moves crust and creates none: what the interior took, the wedge and the belt
+    /// are the crust added, and with what found no room and what the ceilings clipped they are
+    /// what stays of the crossing (PLT-242, PLT-400), whatever the share (a hot plate takes all
+    /// of it, a warm one part).
+    #[test]
+    fn the_overriding_plates_share_moves_crust_and_creates_none() {
+        for l_km in [60.0f32, 165.0] {
+            let r = upper_run(l_km, true, 6, |_| {});
+            let k = &r.fx.preset.tectonics;
+            let mut upper = 0.0;
+            for (s, &added) in r.fronts.iter().zip(&r.added) {
+                let kept = s.wedge_km2_m + s.belt_km2_m + s.upper_km2_m;
+                assert!(
+                    (added - kept).abs() < 1e-4 * added.max(1.0),
+                    "{l_km} km: the record is the crust added: {added} vs {kept}"
+                );
+                let stays_m = if k.collision_restack_whole {
+                    k.collision_stacking_share * (s.thickness_m - s.restack_m) + s.restack_m
+                } else {
+                    k.collision_stacking_share * s.thickness_m
+                };
+                let want = s.crossed_km2 * stays_m;
+                let booked = kept + s.sliver_km2_m + s.capped_km2_m + s.clipped_km2_m;
+                assert!(
+                    (booked - want).abs() <= 1e-6 * want,
+                    "{l_km} km: booked {booked}, want {want}, {s:?}"
+                );
+                upper += s.upper_km2_m;
+            }
+            assert!(upper > 0.0, "{l_km} km: the interior took nothing");
+        }
+    }
+
+    /// PLT-652 has no share parameter, and the belt sets its own height: on the same collision a
+    /// fresh front has no belt and no push, so the front takes the first step; then a cold,
+    /// keeled plate (200 km of lithosphere, a start continent's `thermal_keel_km`) takes almost
+    /// none of the convergence under a belt at its strength height, and a hot one (60 km, L_hot)
+    /// most of it under a low belt that pushes it just hard enough (England & Houseman's plateau),
+    /// the share rising with the plate's weakness in between.
+    #[test]
+    fn a_cold_overriding_plate_takes_almost_none_and_a_hot_one_most() {
+        let ls = [200.0f32, 180.0, 165.0, 150.0, 120.0, 60.0];
+        let runs: Vec<Vec<Stacked>> = ls
+            .iter()
+            .map(|&l| upper_run(l, true, 12, |_| {}).fronts)
+            .collect();
+        let last: Vec<&Stacked> = runs.iter().map(|f| &f[f.len() - 1]).collect();
+        let shares: Vec<f64> = last.iter().map(|s| s.upper_share).collect();
+        let forces: Vec<f64> = last.iter().map(|s| s.upper_force_n_m).collect();
+        let took: Vec<(f64, f64)> = runs
+            .iter()
+            .map(|f| {
+                let up: f64 = f.iter().map(|s| s.upper_km2_m).sum();
+                let front: f64 = f.iter().map(|s| s.belt_km2_m + s.wedge_km2_m).sum();
+                (up, front)
+            })
+            .collect();
+        eprintln!("PLT-652 last-step shares by lithosphere {ls:?}: {shares:?}");
+        eprintln!("PLT-652 last-step push {forces:?} N/m");
+        eprintln!(
+            "PLT-652 hot plate by step (share, push N/m): {:?}",
+            runs[5]
+                .iter()
+                .map(|s| (s.upper_share, s.upper_force_n_m))
+                .collect::<Vec<_>>()
+        );
+        eprintln!("PLT-652 (interior, front) km2 m over the run: {took:?}");
+        // The first step: no belt yet, no push, the front takes it all.
+        for f in &runs {
+            assert_eq!((f[0].upper_share, f[0].upper_force_n_m), (0.0, 0.0));
+        }
+        assert!(runs[0].iter().all(|s| s.upper_share < 0.05), "{shares:?}");
+        assert!(shares[5] > 0.5, "{shares:?}");
+        assert!(shares.windows(2).all(|p| p[1] >= p[0]), "{shares:?}");
+        // The belt sets its own height: the weaker the interior, the lower the belt that drives it.
+        assert!(forces[5] < forces[0], "{forces:?}");
+        // The hot interior took most of the crust over the run, the cold one almost none.
+        assert!(took[5].0 > took[5].1, "{took:?}");
+        assert!(took[0].0 < 0.05 * took[0].1, "{took:?}");
+    }
+
+    /// PLT-652 beside the front's own laws: with the interior taking part of the convergence the
+    /// belt still rises from the front at the critical taper (lowest at the front, PLT-600,
+    /// PLT-601) and its fill still stops at the strength height (PLT-253, a weak crust here so it
+    /// binds): every step the belt's ground stands no higher than without the switch, and both
+    /// reach the strength height. The interior rises behind the belt's zone. (The surface can
+    /// stand a little over S / (rho g) with the switch off too: the fill caps the Airy height of
+    /// the crust it adds, and the column's isostasy, PLT-278, raises the crossing's lighter mix a
+    /// little more.)
+    #[test]
+    fn the_front_keeps_its_taper_and_strength_height_beside_the_interiors_share() {
+        let weak = |fx: &mut Fixture| fx.preset.tectonics.crust_strength_mpa = 40.0;
+        let off = upper_run(150.0, false, 12, weak);
+        let r = upper_run(150.0, true, 12, weak);
+        let k = &r.fx.preset.tectonics;
+        assert!(k.collision_belt_taper);
+        let cap = k.strength_height_m(9.81);
+        let shares: Vec<(f64, f64)> = r
+            .fronts
+            .iter()
+            .map(|s| (s.upper_share, s.upper_force_n_m))
+            .collect();
+        eprintln!("PLT-652 (share, push N/m) by step: {shares:?}");
+        // The interior takes part, never all: the front still builds.
+        assert!(
+            r.fronts[1..]
+                .iter()
+                .all(|s| s.upper_share > 0.0 && s.upper_share < 1.0),
+            "{shares:?}"
+        );
+        let pts = r.fx.geo.points();
+        let belt_km = k.collision_belt_km;
+        let spacing = r.fx.norm.km(r.fx.norm.spacing_rad());
+        let x_km = |i: usize| r.fx.norm.km(pts[i].x.asin());
+        let in_belt = |i: usize| x_km(i) < 0.0 && -x_km(i) <= belt_km + spacing;
+        // Step 1 (no belt yet, no push): lowest at the front, within the belt's zone. Every step:
+        // the front's highest ground with the switch at or under the one without it.
+        let front = |i: usize| {
+            r.fx.geo
+                .edges(i as u32)
+                .any(|(v, _)| pts[v as usize].x >= 0.0)
+        };
+        let rose = |z: &[f32], at_front: bool| {
+            (0..pts.len())
+                .filter(|&i| {
+                    let p = pts[i];
+                    arc(p) && p.y >= 0.95 && p.x < 0.0 && in_belt(i) && (!at_front || front(i))
+                })
+                .map(|i| f64::from(z[i] - r.z0[i]))
+                .fold(0.0f64, f64::max)
+        };
+        let (near, all) = (rose(&r.zs[0], true), rose(&r.zs[0], false));
+        assert!(all > 100.0, "the belt rose {all} m");
+        assert!(
+            near < 0.5 * all,
+            "the front rose {near} m, the belt {all} m"
+        );
+        for (step, (a, b)) in off.zs.iter().zip(&r.zs).enumerate() {
+            let (fa, fb) = (rose(a, true), rose(b, true));
+            assert!(
+                fb <= fa + 1e-3,
+                "step {}: the front rose {fb} m with the switch, {fa} m without",
+                step + 1
+            );
+        }
+        // The interior rose behind the belt's zone by the end, and only with the switch.
+        let behind = |z: &[f32]| {
+            (0..pts.len())
+                .filter(|&i| arc(pts[i]) && pts[i].y >= 0.95 && x_km(i) < -(belt_km + spacing))
+                .map(|i| f64::from(z[i] - r.z0[i]))
+                .fold(0.0f64, f64::max)
+        };
+        let (behind_off, behind_on) = (behind(&off.zs[11]), behind(&r.zs[11]));
+        assert!(behind_on > behind_off + 1.0, "{behind_off} {behind_on}");
+        // Every step: the belt's highest ground with the switch at or under the one without it.
+        let top = |z: &[f32]| {
+            (0..pts.len())
+                .filter(|&i| arc(pts[i]) && in_belt(i))
+                .map(|i| f64::from(z[i]))
+                .fold(f64::NEG_INFINITY, f64::max)
+        };
+        let tops: Vec<(f64, f64)> = off
+            .zs
+            .iter()
+            .zip(&r.zs)
+            .map(|(a, b)| (top(a), top(b)))
+            .collect();
+        eprintln!("PLT-652 belt tops (off, on) by step, strength height {cap:.0} m: {tops:?}");
+        for (step, &(a, b)) in tops.iter().enumerate() {
+            assert!(
+                b <= a + 1e-3,
+                "step {}: the belt stands {b} m with the switch, {a} m without",
+                step + 1
+            );
+        }
+        let (a, b) = tops[tops.len() - 1];
+        assert!(
+            a > cap - 50.0 && b > cap - 50.0,
+            "the strength height never bound: {a}, {b} of {cap} m"
+        );
     }
 
     /// Plates sliding past each other shorten nothing, so no collision begins and nothing is
