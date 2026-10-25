@@ -6,6 +6,11 @@ docs/plans/cube-world-plan.md (section 4, items G1 to G16; section 1.3 to 1.5, W
 records the choices it leaves open, each the coordinator's call under Ben's rule of 2026-10-16 (it can
 be undone). Where this note and the plan disagree, the plan's later revision wins.
 
+**Status (2026-10-24, cube plan 7.4).** The deletions this note leaves for later have landed: the game reads
+only cube worlds, and the Petroff-Guyou and playable Lambert worlds, their level types and `deeptime project`
+are gone. Section 1 below is the record of the transition, not the game's state. Question 3 is answered: the
+level types keep the ids `planet_cube` and `planet_cube_32k` (no rename, the coordinator's call).
+
 ## 1. Both shapes side by side
 
 The brief keeps section 7.4's deletions for later, so the game reads both kinds of world:
@@ -145,4 +150,5 @@ s = 3,840) and `deeptime:planet_cube_32k` (s = 7,424), projection `cube`, opt-in
    outside chunk as its partner through a turned `WorldGenLevel` view (later, if DH's view beyond the
    border needs trees)?
 3. The level types' names: `planet_cube` and `planet_cube_32k` until the deletions, then `planet`
-   and `planet_32k` (recommended), or another pair?
+   and `planet_32k` (recommended), or another pair? **Answered (cube plan G12, 2026-10-24): the ids stay
+   `planet_cube` and `planet_cube_32k`; `planet` and `planet_32k` were deleted, not reused.**

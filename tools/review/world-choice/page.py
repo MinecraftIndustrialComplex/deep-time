@@ -3,6 +3,9 @@
 """The world-shape decision page: one planet (earthlike_quick_16k, seed 1, supercontinent start,
 1,000 Myr) baked as Petroff-Guyou and as the cube, side by side in the game.
 
+RETIRED in part (cube plan 7.4): the page is published (decisions log 2026-10-24). The Petroff-Guyou world and
+its shots can no longer be made, so this only rebuilds the page from the saved <dir> and <review/out>.
+
   page.py --cmp <dir> --shots <review/out> --out <folder>
 
 <dir> is what tools/review/world-choice/compare.sh wrote (compare.json, the world maps); <review/out>

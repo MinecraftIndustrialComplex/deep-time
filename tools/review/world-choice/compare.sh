@@ -6,21 +6,16 @@
 # vista strings. Each heavy step admits itself.
 #   tools/remote/mac.sh -- tools/remote/detach.sh start cube2-cmp bash tools/review/world-choice/compare.sh [plan]
 # "plan" reruns only compare.py on the maps and samples already there.
+# RETIRED in part (cube plan 7.4): the drawing and sampling step needs the kept pg16 world, which can
+# no longer be baked (the Petroff-Guyou world is deleted), so only `plan` still runs, on the maps and
+# samples already in $CMP. The finished page is the record of the comparison.
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 CMP=${CMP:-/Volumes/Graphide/ban/deeptime-runs/cube2-cmp}
-BIN="$PWD/target/release/deeptime"
 PY='(builtins.getFlake "nixpkgs").legacyPackages.x86_64-linux.python3.withPackages (p: [p.numpy p.scipy])'
-py() { nix shell --impure --expr "$PY" -c python3 -I tools/review/world-choice/compare.py "$@"; }
-[ "${1:-}" = plan ] || deeptime-admit run --kind cargo:build -- nix develop -c cargo build --release -q -p deeptime-cli
-for w in pg16 cube16; do
-  [ "${1:-}" = plan ] && break
-  [ -f "$CMP/$w/deeptime/manifest.json" ] || { echo "no $w world in $CMP"; exit 1; }
-  deeptime-admit run --kind auto -- "$BIN" world-map --world-data "$CMP/$w/deeptime" --zoom 2 --out "$CMP/$w-map"
-  B=$(py box "$CMP" "$w")
-  echo "$w box $B"
-  deeptime-admit run --kind auto -- "$BIN" heightmap --world-data "$CMP/$w/deeptime" "--box=$B" --step 16 --scale \
-    --out "$CMP/$w-hm.npy"
-done
+if [ "${1:-}" != plan ]; then
+  echo "world-choice/compare.sh: only 'plan' still runs: drawing and sampling needs the pg16 world, and the Petroff-Guyou world is deleted (cube plan 7.4)." >&2
+  exit 2
+fi
 deeptime-admit run --kind auto -- nix shell --impure --expr "$PY" -c python3 -I tools/review/world-choice/compare.py plan "$CMP"
 echo "compare done"
