@@ -196,7 +196,7 @@ def maps_part(run):
     rec = json.loads((run / "rec.json").read_text())
     ts = np.array([s["t"] for s in rec["steps"]])
     seas = np.array([s.get("sea_m", 0.0) or 0.0 for s in rec["steps"]])
-    pooled = {k: [] for k in ("grp", "age", "zs", "T", "exc", "asea")}
+    pooled = {k: [] for k in ("grp", "age", "zs", "T", "exc", "asea", "arc_share")}
     snaps = []
     for path in sorted((run / "maps").glob("t*.bin")):
         t = float(path.stem[1:])
@@ -229,13 +229,19 @@ def maps_part(run):
             pooled["T"].append(T[c])
             pooled["exc"].append((zs - (airy(T) - sea_t))[c])
             pooled["asea"].append((airy(T) - sea_t)[c])
+            # The island-arc magma in the column, a share of its crust: a proxy for crust built on accreted
+            # arcs (ocean-born, so no keel) against the start's continents (keeled, PLT-460, PLT-463).
+            pooled["arc_share"].append((a[:, 7] / np.maximum(T, 1.0))[c])
     P = {k: np.concatenate(v) for k, v in pooled.items()}
     decay = {}
-    for gi, gn in ((2, "coll"), (1, "andean"), (3, "untagged_thick"), (0, "untagged_thin")):
+    arc = P["arc_share"]
+    subsets = {"coll": (2, None), "coll_arc_crust": (2, arc >= 0.2), "coll_no_arc_crust": (2, arc < 0.02),
+               "andean": (1, None), "untagged_thick": (3, None), "untagged_thin": (0, None)}
+    for gn, (gi, sub) in subsets.items():
         rows = {}
         edges = AGE_EDGES if gi in (1, 2) else [0, 1e9]
         for a_, b_ in zip(edges[:-1], edges[1:]):
-            m = P["grp"] == gi
+            m = (P["grp"] == gi) if sub is None else ((P["grp"] == gi) & sub)
             if gi in (1, 2):
                 m = m & (P["age"] >= a_) & (P["age"] < b_)
             n = int(m.sum())
