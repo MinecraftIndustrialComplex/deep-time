@@ -49,7 +49,7 @@ public final class GeothermalGameTests {
     /** What was read back around one site. */
     private static final class Tally {
         long poolBlocks, poolWater, rimColumns, rimSolid, bedColumns, bedSolid, uncut, uncutOpen, leaks, wetNextToMagma, lavaNear,
-                groundColumns, groundRight, ventColumns, ventRight, skipped;
+                groundColumns, groundRight, ventColumns, ventRight, skipped, offFaces, partnerSame;
         final StringBuilder detail = new StringBuilder();
 
         void note(String what, int x, int y, int z) {
@@ -134,6 +134,21 @@ public final class GeothermalGameTests {
         }
         geo.sites().stream().filter(s -> s.volcano() == Geothermal.HEAT_FLOW_SOURCE).findFirst().filter(s -> !picked.contains(s))
                 .ifPresent(picked::add);
+        // Every site stands wholly on the cube's faces: off them a chunk is a turned copy of its partner's ground
+        // (CubeFill), which the geothermal pass never paints at the site's own place, so a site there is never built.
+        var wd = t.data();
+        List<Integer> offFaceSites = new ArrayList<>();
+        for (Geothermal.Site s : geo.sites())
+            footprint:
+            for (int dx = -s.reach(); dx <= s.reach(); dx++)
+                for (int dz = -s.reach(); dz <= s.reach(); dz++)
+                    if (s.part(dx, dz) != Geothermal.Part.NONE && !ChunkSampling.onFaces(wd, s.x() + dx, s.z() + dz)) {
+                        offFaceSites.add(s.id());
+                        break footprint;
+                    }
+        DeepTime.LOGGER.info("[gametest] geothermalAroundActiveVolcanoes sites off the cube's faces: {} of {} {}", offFaceSites.size(),
+                geo.sites().size(), offFaceSites.size() > 20 ? offFaceSites.subList(0, 20) + "..." : offFaceSites);
+        var cube = wd.projection() instanceof com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Cube cp ? cp.cube() : null;
         GeothermalPalette palette = GeothermalPalette.get();
         Set<BlockState> terrace = new java.util.HashSet<>(palette.blocks(Role.TRAVERTINE));
         terrace.addAll(palette.blocks(Role.SINTER));
@@ -216,6 +231,21 @@ public final class GeothermalGameTests {
                         n.groundColumns++;
                         if (ok)
                             n.groundRight++;
+                        else
+                            n.note(part.name().toLowerCase() + "=" + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(b.getBlock()).getPath(),
+                                    x, top, z);
+                        // DIAGNOSTIC (temporary): a column off the faces against its partner's (CubeFill's copy).
+                        if (cube != null && !ChunkSampling.onFaces(wd, x, z)) {
+                            n.offFaces++;
+                            if (cube.fold(x, z) instanceof com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout.Outside o) {
+                                int px = (int) com.minecraftindustrialcomplex.deeptime.worldgen.CubeFill.twX(cube, o.x()), pz = (int) o.z();
+                                ChunkAccess pc = level.getChunkSource().getChunk(px >> 4, pz >> 4, ChunkStatus.SURFACE, true);
+                                int ptop = pc.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, px & 15, pz & 15);
+                                BlockState pb = pc.getBlockState(new BlockPos(px, ptop, pz));
+                                if (ptop == top && pb.getBlock() == b.getBlock())
+                                    n.partnerSame++;
+                            }
+                        }
                         if (part == Geothermal.Part.VENT) {
                             n.ventColumns++;
                             if (ok)
@@ -235,16 +265,20 @@ public final class GeothermalGameTests {
             return true;
         }, () -> {
             StringBuilder line = new StringBuilder();
-            String failure = null;
+            String failure = offFaceSites.isEmpty() ? null : offFaceSites.size() + " of " + geo.sites().size()
+                    + " sites reach off the cube's faces, where nothing of them is built (ids " + offFaceSites + ")";
             for (var e : tallies.entrySet()) {
                 Geothermal.Site s = e.getKey();
                 Tally n = e.getValue();
-                line.append(String.format(" [id=%d %s of volcano %d at (%d, %d) r=%d apron=%d level=%d %s poolWater=%d/%d bed=%d/%d rim=%d/%d "
-                                + "uncutOpen=%d/%d leaks=%d lavaNear=%d ground=%d/%d vents=%d/%d wetNextToVent=%d skippedFaces=%d%s]", s.id(),
-                        s.kind().name().toLowerCase(), s.volcano(), s.x(), s.z(), s.r(), s.apron(), s.level(),
+                line.append(String.format(" [id=%d %s of volcano %d at (%d, %d) face=%s r=%d apron=%d level=%d %s poolWater=%d/%d bed=%d/%d rim=%d/%d "
+                                + "uncutOpen=%d/%d leaks=%d lavaNear=%d ground=%d/%d vents=%d/%d wetNextToVent=%d skippedFaces=%d "
+                                + "offFaceColumns=%d sameAsPartner=%d%s]", s.id(),
+                        s.kind().name().toLowerCase(), s.volcano(), s.x(), s.z(),
+                        cube == null ? "-" : java.util.Optional.ofNullable(cube.faceOfBlock(s.x(), s.z())).map(f -> f.face().name()).orElse("none"),
+                        s.r(), s.apron(), s.level(),
                         s.kind() == Geothermal.Kind.POOL ? (s.sinter() ? "sinter" : "travertine") : "-", n.poolWater, n.poolBlocks,
                         n.bedSolid, n.bedColumns, n.rimSolid, n.rimColumns, n.uncutOpen, n.uncut, n.leaks, n.lavaNear, n.groundRight,
-                        n.groundColumns, n.ventRight, n.ventColumns, n.wetNextToMagma, n.skipped, n.detail));
+                        n.groundColumns, n.ventRight, n.ventColumns, n.wetNextToMagma, n.skipped, n.offFaces, n.partnerSame, n.detail));
                 if (failure == null && n.poolWater < n.poolBlocks)
                     failure = "site " + s.id() + ": only " + n.poolWater + " of " + n.poolBlocks + " pool blocks are water" + n.detail;
                 if (failure == null && n.bedSolid < n.bedColumns)
