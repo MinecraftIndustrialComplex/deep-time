@@ -974,6 +974,22 @@ the dissolved load in it.
 - The dissolved load leaves the planet's mass budget. On Earth it returns to the sea floor as
   carbonate and silica; here the carbon cycle lays only its drawdown beyond the degassing as cap
   carbonate, and the surface stage's carbonate rules are not tied to the carbon budget (above).
+  Checked for a sink to send it to (the coordinator's question, 2026-10-25): none carries it.
+  The cap carbonate (`climate/mod.rs`, CAP_CARBONATE_GLOBAL) is the carbon the reservoirs lost
+  beyond the degassing, so at the balance (weathering equal to degassing) it lays nothing, while
+  the weathering's own carbonate (Urey's reaction) is not laid at all; the neritic, pelagic and
+  periplatform rules are production laws (light, warmth, clarity, a fixed pelagic rain over a
+  fixed CCD) that take nothing from the ocean. Routing the dissolved mass into either would lay
+  the cations' carbonate a second time beside the production laws, which stand for Earth's
+  measured accumulation, so it is not done. On `m5-chemden` supercontinent seed 1 the last step
+  dissolved 9.65e18 mol of Ca + Mg (4.8e12 mol/yr, 1.26 Gt/yr of rock, 0.91 m/Myr spread over
+  the planet, 2.85 m/Myr over its land), while the surface stage laid carbonate, chalk and
+  evaporite at 0.46 m/Myr spread over the planet over the run (3.56e6 km3 on the bake's
+  7.74e6 km2) and the last step's cap carbonate was 0.02 m over the floor above the CCD. By
+  ERO-206's median, about 70 % of the dissolved mass is silica and 30 % cations. A
+  mass-conserving return is a supply-limited ocean (the cations' input buried as carbonate, the
+  pelagic share taking the rest by the CCD's depth, the silica as biogenic silica): a sourced
+  mechanism, but a change to the surface stage's carbonate rules, not a redirect, and not built.
 - Carbonate rock's own dissolution is not modelled: the carbon cycle weathers silicate only.
 - At Earth's balance the land weathers about 5.3e12 mol/yr (degassing 6.65e12 less the seafloor's
   0.2), so the dissolved silicate load is about 1.4 Gt/yr. Earth's rivers carry about 0.37 Gt/yr
