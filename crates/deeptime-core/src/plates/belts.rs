@@ -66,7 +66,7 @@
 //! can stop two plates and never push them apart. (Until the switch, 2026-10-04, a cut inside the
 //! old speed law, `collision_resistance_mm_yr`, stood in for it.)
 //!
-//! # The overriding plate's share (PLT-652, `collision_upper_plate_shortening`, off)
+//! # The overriding plate's share (PLT-652, `collision_upper_plate_shortening`, on)
 //! On Earth the overriding plate takes much of a collision's convergence as distributed
 //! shortening of its interior: of Arabia's 440 km since 22 Ma about half went into Central Iran
 //! and the Alborz behind the Zagros (Mouthereau 2011), and Asia took 600 to 1,050 km of India's
@@ -101,7 +101,9 @@
 //! still resists as before, and the 1-D strip carries F undiminished to the plate's far side, where
 //! a 2-D sheet would spread it (England, Houseman & Sonder 1985), so it is the interior's largest
 //! share. The interior's columns are stamped as the belt's are (the collision orogeny) but kept
-//! out of the belt's record; the crust is the crossing crust's mix.
+//! out of the belt's record; the crust is the crossing crust's mix. On the pool (arm
+//! fl-upper-unfreeze against its switch-off twin, 2026-10-25) the interiors took 0.13 of the
+//! crust crossed, a quarter to a third of Arabia's and India's shares.
 
 use std::collections::BTreeMap;
 
