@@ -167,8 +167,9 @@ def cmd_pick(a):
     # Empty chunks: the spots of a 512-block grid over the planet (a 2026-10-04 run found that the spawn candidates
     # alone had no spot farther than 150 blocks from every site) farthest from every site, at least 600 blocks away
     # and 2,000 apart; the spawn candidates are the fallback.
-    # (A Petroff-Guyou world is c x c/2 blocks, z in +-c/4; the north and south edges carry a border: stay 512 blocks off them.)
-    grid = [{"x": x, "z": z} for x in range(-c // 2, c // 2, 512) for z in range(-c // 4 + 512, c // 4 - 511, 512)]
+    # (A cube world's band of four side faces, |z| <= s/2 with s = c/4, runs the whole period; the polar
+    # faces past it fill only part of each row, so the grid keeps to the band, 512 blocks off its edges.)
+    grid = [{"x": x, "z": z} for x in range(-c // 2, c // 2, 512) for z in range(-c // 8 + 512, c // 8 - 511, 512)]
     far = []
     for cd in grid + cl:
         dmin = min((wdist(c, cd["x"], cd["z"], s["center"][0], s["center"][2]) for s in sites), default=1e9)
@@ -664,7 +665,7 @@ def cmd_scale_stats(a):
                 tot += 1
                 steep += g >= 1.0
         sl.sort()
-        # A Petroff-Guyou world's block is not exactly the preset's m_per_block_h (b is rounded to 256): the manifest has the true one.
+        # A cube world's block is not exactly the preset's m_per_block_h (s is rounded to 256): the manifest has the true one.
         mb = mf["scale"].get("m_per_block_h") or m
         rad = (mf.get("planet") or {}).get("radius_m")
         # Does the world fit the build height? A sane bake has no cell compressed under the ceiling or sunk below the floor; the

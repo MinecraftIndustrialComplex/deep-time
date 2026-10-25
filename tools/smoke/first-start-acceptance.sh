@@ -7,8 +7,8 @@
 # world data, first-start time, peak native memory). Runs where install.sh and run.py run (the test
 # VM); start it detached:
 #   tools/remote/mac.sh [--pack] -- tools/remote/detach.sh start p113-<profile> bash tools/smoke/first-start-acceptance.sh <profile> [preset] [size] [length-myr]
-# A 32k preset needs size 32768 (install.sh's level type); a cube preset is a file, e.g.
-# tools/smoke/presets/earthlike_quick_32k_cube.json 32768 (cube plan phase 2).
+# A 32k preset needs size 32768 (install.sh's level type, deeptime:planet_cube_32k); every planet is
+# the cube world (cube plan §7.4), so the built-ins serve (earthlike_quick_32k 32768).
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 P="${1:?usage: first-start-acceptance.sh <standalone|mic> [preset] [size] [length-myr]}"

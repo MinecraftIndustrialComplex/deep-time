@@ -4,7 +4,7 @@
 # separate deep region. args: <deeptime folder>. From the coordinator's build/coord/trench/trench.py
 # (2026-10-22), kept for the trench budget with the share of the floor deeper than 5 to 10 km added
 # (Earth's: tools/review/earth-deep-floor.py; ledger HYP-050, HYP-051). Shares are of grid cells,
-# not of area: Petroff-Guyou is conformal, not equal-area. Run on the VM (python3 with numpy, lz4).
+# not of area: the cube's cells are not equal-area. Run on the VM (python3 with numpy, lz4).
 import json, struct, sys
 import numpy as np, lz4.block
 d = sys.argv[1]

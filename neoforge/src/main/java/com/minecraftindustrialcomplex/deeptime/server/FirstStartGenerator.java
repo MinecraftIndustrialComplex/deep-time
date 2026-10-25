@@ -132,10 +132,6 @@ public final class FirstStartGenerator {
     private static void generate(MinecraftServer server, WorldDataRef ref, Path world, Path dir) throws Stop {
         int c = ref.circumferenceBlocks();
         String projection = ref.projection();
-        if (!ref.cube())
-            throw new Stop("this level is laid out in the simulation's Lambert frame, which only the test terrains and synthetic worlds use",
-                    "A planet is the cube world (cube plan section 7.4): set level-type=deeptime\\:planet_cube or "
-                            + "deeptime\\:planet_cube_32k in server.properties and delete the world folder " + world.getFileName() + ".");
         if (Files.exists(dir))
             throw new Stop(dir + " exists but has no " + Manifest.FILE,
                     "An incomplete copy of world data? Finish copying it (the manifest is written last), or remove\n"
@@ -157,7 +153,7 @@ public final class FirstStartGenerator {
             throw new Stop("this Deep Time world has no world data and no " + configFile,
                     "Wrote a template to " + configFile + ".\n"
                             + "Fill in \"preset\" and \"timeline\" there (the _ keys explain them), then start the server again.\n"
-                            + "The level-type in server.properties sets the size: " + levelTypeFor(c) + " gives a "
+                            + "The level-type in server.properties sets the size: " + levelTypeFor(c, projection) + " gives a "
                             + describe(c, projection) + ".");
         }
         ServerConfig config;
@@ -206,9 +202,9 @@ public final class FirstStartGenerator {
         if (presetWorldC != c || !info.projection().equals(projection))
             throw new Stop("world shape mismatch: the preset " + name + " makes a " + describe(presetWorldC, info.projection())
                             + " (C = " + presetC + "), but this world's level-type gives a " + describe(c, projection),
-                    "The level-type in server.properties (" + levelTypeFor(c) + ") fixes the world's size before the first start.\n"
-                            + "Either choose a preset for it (" + presetsFor(c) + "),\n"
-                            + "or set level-type=" + levelTypeFor(presetWorldC).replace(":", "\\:") + " in server.properties and delete the world folder "
+                    "The level-type in server.properties (" + levelTypeFor(c, projection) + ") fixes the world's size before the first start.\n"
+                            + "Either choose a preset for it (" + presetsFor(c, projection) + "),\n"
+                            + "or set level-type=" + levelTypeFor(presetWorldC, info.projection()).replace(":", "\\:") + " in server.properties and delete the world folder "
                             + world.getFileName() + "\n(it holds no world yet, but its level.dat already records the old level-type).");
 
         // 3. The natives (plan §6.6).
@@ -405,15 +401,19 @@ public final class FirstStartGenerator {
     }
 
     /**
-     * The built-in level type of a cube world of x period {@code c} (the cube types are Deep Time's only
-     * world types, cube plan section 7.4).
+     * The level type of a world shape: a cube world of x period {@code c} has a built-in one (the cube
+     * types are Deep Time's only world types, cube plan section 7.4); a synthetic world in the
+     * simulation's Lambert frame has the dev types of the repo's datapack
+     * tools/smoke/datapacks/deeptime-lambert-frame, never shipped.
      */
-    static String levelTypeFor(int c) {
-        if (c == Presets.worldCircumference(16_384, WorldDataRef.CUBE))
-            return "deeptime:planet_cube";
-        if (c == Presets.worldCircumference(32_768, WorldDataRef.CUBE))
-            return "deeptime:planet_cube_32k";
-        return "a Deep Time world preset with circumference_blocks " + c + " and projection cube";
+    static String levelTypeFor(int c, String projection) {
+        boolean lambert = "lambert".equals(projection);
+        String base = lambert ? "deeptime:test_planet_lambert" : "deeptime:planet_cube";
+        if (c == Presets.worldCircumference(16_384, projection))
+            return base;
+        if (c == Presets.worldCircumference(32_768, projection))
+            return base + "_32k";
+        return "a Deep Time world preset with circumference_blocks " + c + (lambert ? " and no projection" : " and projection cube");
     }
 
     /** "15,360-block cube world", or "16,384-block Lambert-frame world" for a synthetic preset. */
@@ -421,12 +421,13 @@ public final class FirstStartGenerator {
         return String.format(Locale.ROOT, "%,d-block %s world", c, "lambert".equals(projection) ? "Lambert-frame" : "cube");
     }
 
-    /** The built-in presets a cube level type of x period {@code c} takes: those of its size. */
-    static String presetsFor(int c) {
+    /** The built-in presets a level type of x period {@code c} takes: those of its size and map. */
+    static String presetsFor(int c, String projection) {
         List<String> names = new ArrayList<>();
         for (String n : Presets.BUILTIN) {
             Presets.builtin(n).map(Presets::parseObject).map(Presets::info)
-                    .filter(i -> i.circumference().isPresent() && i.worldCircumference().getAsInt() == c)
+                    .filter(i -> i.circumference().isPresent() && i.projection().equals(projection)
+                            && i.worldCircumference().getAsInt() == c)
                     .ifPresent(i -> names.add(n));
         }
         return names.isEmpty() ? "no built-in preset has that size" : String.join(", ", names);

@@ -1456,6 +1456,9 @@ pub fn project_folder_cube(
     let world_m_h = radius_m * (4.0 * PI / 6.0).sqrt() / f64::from(s);
     let period = cube.period() as u32;
     let stats = cube_turn::land_stats(&wview, &land_pts, &choice);
+    // The search's points and trees are not read again (TURN_BYTES_PER_SAMPLE: 63 B a point
+    // were held through every grid on the memory_estimate test planet).
+    drop(land_pts);
     let turn = cube_turn::turn_note(&choice);
 
     // --- rasters, grid by grid ---------------------------------------------------------------------
