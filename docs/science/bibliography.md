@@ -8422,7 +8422,7 @@ The sources of the release's pace (build log 2026-10-23; flexure.md, the section
 - Reference: Currie, C. A. and Hyndman, R. D. (2006). The thermal structure of subduction zone back arcs. Journal of Geophysical Research 111:B08404.
 - DOI or URL: 10.1029/2005JB004024
 - Cited as: "Currie & Hyndman 2006".
-- Ledger ids: ISO-099, PLT-461, PLT-465, ISO-112 (2026-10-23, the lithosphere's thermal state)
+- Ledger ids: ISO-099, PLT-461, PLT-465, ISO-112 (2026-10-23, the lithosphere's thermal state), HYP-015 (2026-10-25, the width of the subduction margin's band)
 - Access: author copy.
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-23: "uniformly high temperatures in the shallow mantle and a thin lithosphere (1200°C at 60 km depth) over back-arc widths of 250 to >900 km"; "Following subduction termination, we find that the high temperatures decay over a timescale of about 300 Myr"; Te "generally less than 20 km for the Cordillera back arc", the Archean craton "generally greater than 80 km"; "The most rapid cooling occurs in the first 50-100 Myr."
