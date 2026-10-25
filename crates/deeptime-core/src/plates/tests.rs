@@ -30,6 +30,23 @@ fn preset_json(n: u32, myr: f64, start: &str, seed: u64) -> String {
     v.to_string()
 }
 
+/// A built-in planet preset (the game's or a plate preset) at `n` samples (keyframes as
+/// [`preset_json`]'s).
+fn builtin_preset(name: &str, n: u32, myr: f64, start: &str, seed: u64) -> PlanetPreset {
+    let json = crate::preset::builtin(name)
+        .or_else(|| plates_builtin(name))
+        .unwrap_or_else(|| panic!("no built-in preset {name}"));
+    let json = with_timeline(json, Some(start), Some(myr)).unwrap();
+    let mut v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    v["resolution"]["l0_samples"] = serde_json::json!(n);
+    v["keyframes"]["every_myr"] = serde_json::json!(20.0);
+    v["seed"] = serde_json::json!(seed);
+    match Preset::from_json(&v.to_string()).unwrap().body {
+        PresetBody::Planet(p) => *p,
+        other => panic!("not a planet preset: {other:?}"),
+    }
+}
+
 fn preset(n: u32, myr: f64, start: &str, seed: u64) -> PlanetPreset {
     match Preset::from_json(&preset_json(n, myr, start, seed))
         .unwrap()
@@ -3214,6 +3231,401 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
     );
     // The old count's pull is larger and moves the plate faster.
     assert!(off.0 > on.0, "{speeds:?}");
+}
+
+/// `x xᵀ`.
+fn outer(x: DVec3) -> glam::DMat3 {
+    glam::DMat3::from_cols(x * x.x, x * x.y, x * x.z)
+}
+
+/// The reference plate on the lattice term by term (the plate speed lane, 2026-10-25; plates.md,
+/// "Plate speed"): the plate of [`the_reference_plate_on_the_lattice_moves_at_the_speed_scale`]
+/// (front_pull on) through the force balance, each term's torque in the record against the
+/// continuous cap's at the lattice's answer, and the continuous cap's own balance (FRC-016's
+/// definition on the sphere: basal drag over the cap, slab resistance along the trench's normal,
+/// boundary resistance against the full relative velocity all round the rim). It also counts the
+/// lattice's boundary: the boundary resistance's metres between plate 1 and its neighbours (half
+/// a spacing per edge sample on each side, split among the sample's other plates) and the edge
+/// energy's (one spacing per edge sample of plate 1), against the rim. The edge energy itself
+/// (ridge push) is zero here (one floor depth over the plate) and checked against Earth's in
+/// `forces.rs` (`the_column_energy_gives_ridge_push_and_plateau_weight_of_earths_size`).
+/// Measured (2026-10-25, 40,000 samples): the lattice moves the plate at 53.2 mm/yr, the
+/// continuous cap at 48.7 (the speed scale 45); the record over the cap at the lattice's answer:
+/// basal drag 0.977 (the plate 0.976 of A0), slab resistance 1.055 and the pull 1.060 (the
+/// trench's shares), boundary resistance 0.875 (its metres 0.886 of the rim's 20,615 km, so the
+/// lattice under-counts it); resisting shares on the lattice 0.150, 0.487, 0.362, on the cap
+/// 0.149, 0.449, 0.402 (the flat plate's 1/7, 3/7, 3/7); the edge energy's metres 1.057 of the
+/// rim. So the lattice moves the reference plate faster than the definition, not slower.
+#[test]
+fn the_reference_plate_on_the_lattice_term_by_term() {
+    let mut p = preset(40_000, 20.0, "supercontinent", 5);
+    p.tectonics.front_pull = true;
+    p.tectonics.mantle_flow_mm_yr = 0.0;
+    p.tectonics.keel_drag = 1.0e4;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let k = &p.tectonics;
+    let (mut st, geo, pos, alpha, r) = a_reference_plate(
+        &p,
+        &env,
+        forces::REF_TRENCH_KM,
+        0.02,
+        k.plate_speed_scale_mm_yr,
+    );
+    st.dynamics = Some(dynamics::Dynamics::default());
+    let ans = forces::step(&mut st, &geo, &pos, &env, DVec3::Z, 0.0);
+    assert!(ans.solved);
+    let w_yr = ans.omega[1].expect("plate 1 in the balance");
+    let w = w_yr / forces::YEAR_S;
+    let centroid = DVec3::from_array(st.plates[1].centroid);
+    let speed = env.norm.velocity_mm_yr(w_yr, centroid).length();
+    let rec = ans.recorded.as_ref().expect("the dynamics record");
+    let f1 = rec
+        .forces
+        .iter()
+        .find(|f| f.id == 1)
+        .expect("plate 1's budget");
+    let unit = forces::TORQUE_UNIT_N_M;
+    let c = forces::Coeffs::new(k, &env.norm, env.gravity, st.a0_km2, DVec3::Z, 0.0);
+    let big_r = c.radius_m;
+    // The continuous cap about +X of angular radius r: a point at θ from its centre and β about
+    // it from the northern point (+Z towards +Y), and the rim's outward normal.
+    let at = |theta: f64, beta: f64| {
+        DVec3::X * theta.cos() + (DVec3::Z * beta.cos() + DVec3::Y * beta.sin()) * theta.sin()
+    };
+    let tau = std::f64::consts::TAU;
+    let (nt, nb) = (400, 1600);
+    // Basal drag: c_b R⁴ ∫ (I − x xᵀ) dΩ (torque −D Ω).
+    let mut d_basal = glam::DMat3::ZERO;
+    for i in 0..nt {
+        let theta = r * (i as f64 + 0.5) / nt as f64;
+        for j in 0..nb {
+            let x = at(theta, tau * (j as f64 + 0.5) / nb as f64);
+            d_basal += (glam::DMat3::IDENTITY - outer(x)) * (theta.sin() * (r / nt as f64));
+        }
+    }
+    d_basal *= c.drag * big_r.powi(4) * tau / nb as f64;
+    // Boundary resistance all round the rim against the full relative velocity:
+    // b R³ sin r ∮ (I − x xᵀ) dβ; slab resistance along the trench's normal n:
+    // s R³ sin r ∫ (x × n)(x × n)ᵀ dβ; the pull: F R² sin r ∫ x × n dβ.
+    let (mut d_bnd, mut d_slab, mut t_pull) = (glam::DMat3::ZERO, glam::DMat3::ZERO, DVec3::ZERO);
+    let nr = 8000;
+    for j in 0..nr {
+        let beta = tau * ((j as f64 + 0.5) / nr as f64 - 0.5);
+        let x = at(r, beta);
+        d_bnd += glam::DMat3::IDENTITY - outer(x);
+        if beta.abs() < 0.5 * alpha {
+            let n = (x * r.cos() - DVec3::X).normalize();
+            d_slab += outer(x.cross(n));
+            t_pull += x.cross(n);
+        }
+    }
+    let rim_m = big_r * r.sin();
+    let db = tau / nr as f64;
+    d_bnd *= c.boundary_res * big_r * big_r * rim_m * db;
+    d_slab *= c.slab_res * big_r * big_r * rim_m * db;
+    t_pull *= c.pull_n_m * big_r * rim_m * db;
+    // The continuous cap's balance: T = (D_b + D_s + D_n) Ω.
+    let w_cap = (d_basal + d_slab + d_bnd).inverse() * t_pull;
+    let cap_speed = w_cap.cross(DVec3::X).length() * big_r * 1.0e3 * forces::YEAR_S;
+    let share = |d: glam::DMat3, w: DVec3| {
+        let all = [d_basal * w, d_slab * w, d_bnd * w]
+            .iter()
+            .map(|t| t.length())
+            .sum::<f64>();
+        (d * w).length() / all
+    };
+    // The record against the continuous cap at the lattice's answer.
+    let ratio = |rec: f64, want: DVec3| rec * unit / want.length();
+    let (basal, slab, bnd, pull) = (
+        ratio(f1.basal_drag, d_basal * w),
+        ratio(f1.slab_resistance, d_slab * w),
+        ratio(f1.boundary_resistance, d_bnd * w),
+        ratio(f1.slab_pull, t_pull),
+    );
+    let resisting = f1.basal_drag + f1.slab_resistance + f1.boundary_resistance;
+    // The lattice's boundary as the balance counts it.
+    let n = st.samples.len();
+    let plate_of: Vec<u32> = (0..n).map(|i| st.plate_of(i)).collect();
+    let ell = c.spacing_m;
+    let (mut bnd_m, mut edge_m, mut visible) = (0.0, 0.0, 0usize);
+    for v in 0..n {
+        if st.samples[v].is_hidden() {
+            continue;
+        }
+        let pv = plate_of[v];
+        visible += usize::from(pv == 1);
+        let mut others: Vec<u32> = Vec::new();
+        let mut any = false;
+        for (u, _) in geo.edges(v as u32) {
+            let pu = plate_of[u as usize];
+            if pu == pv {
+                any |= st.samples[u as usize].is_hidden();
+                continue;
+            }
+            any = true;
+            if !others.contains(&pu) && others.len() < 6 {
+                others.push(pu);
+            }
+        }
+        if !any {
+            continue;
+        }
+        let m = others.len().max(1) as f64;
+        if pv == 1 {
+            edge_m += ell;
+            bnd_m += 0.5 * ell * others.len() as f64 / m;
+        } else if others.contains(&1) {
+            bnd_m += 0.5 * ell / m;
+        }
+    }
+    let rim_len = tau * rim_m;
+    let area = visible as f64 * c.sample_m2 / (st.a0_km2 * 1.0e6);
+    eprintln!(
+        "the reference plate term by term: the lattice moves it at {speed:.1} mm/yr, the \
+         continuous cap at {cap_speed:.1} (the speed scale {:.0}); the record over the continuous \
+         cap at the lattice's answer: basal drag {basal:.3}, slab resistance {slab:.3}, boundary \
+         resistance {bnd:.3}, the pull {pull:.3}; the resisting shares on the lattice basal \
+         {:.3} slab {:.3} boundary {:.3}, on the cap {:.3} {:.3} {:.3} (the definition's flat \
+         plate 1/7, 3/7, 3/7); the lattice's plate {visible} samples, {area:.3} of A0; the \
+         boundary resistance's metres {:.3} of the rim's {:.0} km, the edge energy's {:.3}",
+        k.plate_speed_scale_mm_yr,
+        f1.basal_drag / resisting,
+        f1.slab_resistance / resisting,
+        f1.boundary_resistance / resisting,
+        share(d_basal, w_cap),
+        share(d_slab, w_cap),
+        share(d_bnd, w_cap),
+        bnd_m / rim_len,
+        rim_len / 1000.0,
+        edge_m / rim_len,
+    );
+    // The lattice's plate is the reference area, and its basal drag the cap's.
+    assert!((0.97..1.03).contains(&area), "area {area}");
+    assert!((0.95..1.05).contains(&basal), "basal drag {basal}");
+    // The definition on the sphere moves the plate near the speed scale (the flat plate's
+    // factors only hold roughly on a cap).
+    assert!(
+        (0.95 * k.plate_speed_scale_mm_yr..1.25 * k.plate_speed_scale_mm_yr).contains(&cap_speed),
+        "the cap at {cap_speed}"
+    );
+    // The trench's terms are the cap's over the trench's shares (PLT-560) …
+    for (name, x) in [("slab resistance", slab), ("pull", pull)] {
+        assert!((1.0..1.12).contains(&x), "{name} {x}");
+    }
+    // … and the boundary resistance is the cap's over the lattice's count of the rim (the samples
+    // beside plate 1's own hidden rim at the trench have no link, half a spacing per side
+    // elsewhere).
+    assert!(
+        (bnd - bnd_m / rim_len).abs() < 0.05 && (0.8..1.05).contains(&bnd),
+        "boundary {bnd}, its metres {}",
+        bnd_m / rim_len
+    );
+    assert!(
+        speed > cap_speed,
+        "the lattice {speed}, the cap {cap_speed}"
+    );
+}
+
+/// What sets the planet's plate speed (the plate speed lane, 2026-10-25; plates.md, "Plate
+/// speed"): two planets of a preset's plate stage (`SPEED_DIAG_PRESET`, default the pool's
+/// `earthlike_quick_16k`; `SPEED_DIAG_N` samples, default 100,000; `SPEED_DIAG_MYR`, default 600;
+/// the plate stage alone, so no erosion and the datum's sea), and every 50 Myr after the first
+/// 100 the force balance solved again on the step's state with one term changed at a time, the
+/// basal drag coefficient c_b kept unless the row says otherwise. A diagnosis of the speed level
+/// CHK-020 reads, not a check, and one step's response only (the motion relaxes towards the
+/// balance; the slabs, fronts and collisions the faster motion would make are not in it). Prints,
+/// per change, the balance's RMS speed over the planet (visible samples' weight, the plates'
+/// centroid speeds, as CHK-020), over the plates with a slab pull and over the rest, and the area
+/// share pulled.
+///
+/// Measured (2026-10-25, the defaults, 100,000 samples, 11 looks from 100 to 600 Myr; the
+/// supercontinent's seed 1, then the scattered continents' seed 2): the motion's RMS 24.9 and
+/// 26.4 mm/yr (the pool reads about 26); the balance 27.3 and 29.3, the pulled plates 29.0 and
+/// 30.6, the rest 15.5 and 15.5, the area pulled 0.851 and 0.901. One term at a time (RMS): the
+/// suction unsaturated 29.4, 31.2 (the rest 22.4, 20.0); no suction 31.5, 34.2; no edge energy
+/// 24.9, 26.8; no keels 28.8, 31.0; no collision buoyancy 28.7, 30.8; no boundary resistance 45.8,
+/// 48.7; no slab resistance 90.2, 101.9; boundary resistance 1 by the definition 25.6, 27.3; the
+/// speed scale ×1.5 40.8, 43.7; F&U's ratios and terminal velocity 51.3, 60.0 (pulled 43.8, 46.8,
+/// the rest 80.8, 151.7); F&U's ratios with the speed scale kept 35.8, 41.8 (30.5, 32.5; 57.0,
+/// 105.9). At 40,000 samples the same pattern (the motion 27.7 and 32.7). `plates_quick_16k`'s
+/// ridge and floor (-1,000 and -10,000 m) give a ridge push several times Earth's, so it is no
+/// guide to the pool's planet (the motion 39.2 and 40.8 at 100,000 samples, 29.7 and 32.8 without
+/// the edge energy).
+#[test]
+#[ignore = "diagnosis: 600 Myr at 100k samples, two planets; run with --release -- --ignored --nocapture"]
+fn what_sets_the_planets_plate_speed() {
+    let var = |k: &str| std::env::var(k).ok();
+    let name = var("SPEED_DIAG_PRESET").unwrap_or_else(|| "earthlike_quick_16k".to_owned());
+    let n: u32 = var("SPEED_DIAG_N").map_or(100_000, |x| x.parse().unwrap());
+    let myr: f64 = var("SPEED_DIAG_MYR").map_or(600.0, |x| x.parse().unwrap());
+    type Tweak = fn(&mut TectonicParams);
+    // Forsyth & Uyeda 1975, Table 6 (model X_s, relative strengths): slab pull 6.43 per km of
+    // trench, slab resistance 0.89 per km per cm/yr, the oceanic mantle drag 0.82e-5 per km² per
+    // cm/yr, the continental drag 5.65e-5 more, the suction 0.50 per km. On FRC-016's reference
+    // plate (A0 of the 14 starting plates, 3,000 km of trench) the drag is 0.82e-5 A0 / (0.89 ×
+    // 3,000) of the slab resistance, so slab_resistance = 1 / that; the terminal velocity 6.43 /
+    // 0.89 cm/yr; keel (0.82 + 5.65) / 0.82; suction 0.50 / 6.43, independent of speed (F&U
+    // p. 171). F&U's transform and colliding resistances do not depend on speed and act on
+    // transforms and convergent boundaries only, so boundary_resistance (viscous, all round) is 0.
+    // The reference plate's area and trench are FRC-016's. ledger: PLT-575
+    fn fu(k: &mut TectonicParams, keep_scale: bool) {
+        let a0_km2 = 4.0 * std::f64::consts::PI * 6370.0f64.powi(2) / 14.0;
+        let s = 0.89 * 3000.0 / (0.82e-5 * a0_km2);
+        let v_t = 6.43 / 0.89 * 10.0;
+        k.slab_resistance = s;
+        k.boundary_resistance = 0.0;
+        if !keep_scale {
+            k.plate_speed_scale_mm_yr = v_t * s / (1.0 + s);
+        }
+        k.keel_drag = (0.82 + 5.65) / 0.82;
+        k.slab_suction_share = 0.50 / 6.43;
+        k.suction_saturates = false;
+    }
+    // c_b ∝ 1/((1 + s + b) v): a resistance set to 0 with the speed scale raised to match keeps it.
+    let variants: [(&str, Tweak); 12] = [
+        ("defaults", |_| {}),
+        ("suction unsaturated (PLT-540 off)", |k| {
+            k.suction_saturates = false;
+        }),
+        ("no suction", |k| k.slab_suction_share = 0.0),
+        ("no edge energy (ridge push, belt weight)", |k| {
+            k.edge_energy = 0.0;
+        }),
+        ("no keels (keel_drag 1)", |k| k.keel_drag = 1.0),
+        ("no collision buoyancy", |k| k.collision_buoyancy = 0.0),
+        ("no boundary resistance, c_b kept", |k| {
+            let (s, b) = (k.slab_resistance, k.boundary_resistance);
+            k.plate_speed_scale_mm_yr *= (1.0 + s + b) / (1.0 + s);
+            k.boundary_resistance = 0.0;
+        }),
+        ("no slab resistance, c_b kept", |k| {
+            let (s, b) = (k.slab_resistance, k.boundary_resistance);
+            k.plate_speed_scale_mm_yr *= (1.0 + s + b) / (1.0 + b);
+            k.slab_resistance = 0.0;
+        }),
+        ("boundary resistance 1, c_b by the definition", |k| {
+            k.boundary_resistance = 1.0;
+        }),
+        ("speed scale x1.5 (c_b / 1.5)", |k| {
+            k.plate_speed_scale_mm_yr *= 1.5;
+        }),
+        ("F&U Table 6's ratios and terminal velocity", |k| {
+            fu(k, false)
+        }),
+        ("F&U Table 6's ratios, the speed scale kept", |k| {
+            fu(k, true)
+        }),
+    ];
+    for (start, seed) in [("supercontinent", 1), ("scattered_continents", 2)] {
+        let p = builtin_preset(&name, n, myr, start, seed);
+        let t0 = p.t_start_years() / 1.0e6;
+        let mut boundary_km = 0.0;
+        // Per variant: Σ RMS² over the planet, the pulled plates and the rest, Σ pulled share.
+        let mut sums = vec![[0.0f64; 4]; variants.len()];
+        let mut motion = 0.0;
+        let mut looks = 0usize;
+        let mut next = 100.0;
+        run_stage(&p, |stage, world, st| {
+            if st.t_myr - t0 < next {
+                return;
+            }
+            next += 50.0;
+            looks += 1;
+            let geo = &stage.cache.as_ref().unwrap().geo;
+            let pos = geometry::positions(st, geo);
+            let sea = world
+                .globals
+                .get(crate::climate::SEA_LEVEL_GLOBAL)
+                .copied()
+                .filter(|z| z.is_finite())
+                .or_else(|| world.surface.as_ref().map(|s| s.sea_level_m))
+                .filter(|z| z.is_finite())
+                .unwrap_or(0.0);
+            let mut base = st.clone();
+            base.recount(&pos);
+            base.dynamics = Some(dynamics::Dynamics::default());
+            let np = base.plates.len();
+            let mut vis = vec![0.0f64; np];
+            for (i, s) in base.samples.iter().enumerate() {
+                if !s.is_hidden() {
+                    vis[base.plate_of(i) as usize] += 1.0;
+                }
+            }
+            let total: f64 = vis.iter().sum();
+            let norm = stage.norm();
+            // The boundary as the boundary resistance counts it: half a spacing per visible
+            // sample beside another plate, from each side.
+            let half = 0.5 * norm.km(norm.spacing_rad());
+            boundary_km += (0..base.samples.len())
+                .filter(|&i| {
+                    !base.samples[i].is_hidden()
+                        && geo
+                            .edges(i as u32)
+                            .any(|(u, _)| base.plate_of(u as usize) != base.plate_of(i))
+                })
+                .count() as f64
+                * half;
+            let speed_of = |w: DVec3, id: usize| {
+                norm.velocity_mm_yr(w, DVec3::from_array(base.plates[id].centroid))
+                    .length()
+            };
+            motion += (0..np)
+                .filter(|&id| base.plates[id].alive)
+                .map(|id| vis[id] * speed_of(DVec3::from_array(base.plates[id].omega), id).powi(2))
+                .sum::<f64>()
+                / total;
+            let mut pulled = vec![false; np];
+            for (v, (_, tweak)) in variants.iter().enumerate() {
+                let mut kv = p.tectonics.clone();
+                tweak(&mut kv);
+                let env = stage.env(&kv, base.step);
+                let mut s2 = base.clone();
+                let ans = forces::step(&mut s2, geo, &pos, &env, forces::flow_axis(p.seed), sea);
+                if v == 0 {
+                    for f in &ans.recorded.as_ref().expect("the record").forces {
+                        pulled[f.id as usize] = f.slab_pull > 0.0;
+                    }
+                }
+                let mut acc = [0.0f64; 4];
+                let (mut w_pull, mut w_free) = (0.0, 0.0);
+                for (id, w) in ans.omega.iter().enumerate() {
+                    let Some(w) = *w else { continue };
+                    let v2 = vis[id] * speed_of(w, id).powi(2);
+                    acc[0] += v2;
+                    if pulled[id] {
+                        acc[1] += v2;
+                        w_pull += vis[id];
+                    } else {
+                        acc[2] += v2;
+                        w_free += vis[id];
+                    }
+                }
+                let s = &mut sums[v];
+                s[0] += (acc[0] / total).sqrt();
+                s[1] += (acc[1] / w_pull.max(1.0)).sqrt();
+                s[2] += (acc[2] / w_free.max(1.0)).sqrt();
+                s[3] += w_pull / total;
+            }
+        });
+        let m = looks.max(1) as f64;
+        eprintln!(
+            "{name} {n} samples, {start} seed {seed}: {looks} looks; the motion's RMS {:.1} mm/yr; \
+             the boundary {:.0} km",
+            (motion / m).sqrt(),
+            boundary_km / m
+        );
+        for (v, (name, _)) in variants.iter().enumerate() {
+            let s = sums[v];
+            eprintln!(
+                "  {name:<48} RMS {:>5.1}  pulled {:>5.1}  free {:>5.1}  pulled share {:.3}",
+                s[0] / m,
+                s[1] / m,
+                s[2] / m,
+                s[3] / m
+            );
+        }
+    }
 }
 
 /// A class's row of [`the_margin_as_the_mix_sees_it`]: samples, normals over 70 degrees off, their

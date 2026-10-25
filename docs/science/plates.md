@@ -8454,3 +8454,192 @@ moves. The cordillera's lost crust is the range that stood round the slab's ends
 with a knob. Left on the whole distance field, and a question for the coordinator: the
 subduction-zone flag and the convergence, obliquity and slab age written on each reached sample
 (their readers, the volcanoes and the deposits, would see a subduction zone past a front's ends).
+
+## Plate speed (2026-10-25)
+
+The coordinator's brief for the plate speed lane: CHK-020's `speed_rms_mm_yr` (the plate check's
+area-weighted RMS plate speed, averaged over steps) reads about 26 mm/yr on master against its
+sourced band of 40 to 100 (Earth about 47 today from Forsyth & Uyeda 1975's Table 1, 50 to 100 over
+the last 200 Myr from Zahirovic et al. 2015). It read 41.4 on 2026-10-05, 28.1 on base7 and about 26
+on base9 and base10. Find why, from cached runs and unit tests (no new simulations), and fix it
+only if the fix is sourced physics or a bug fix: no knob, cap, gain or forcing term (Ben: "Results
+that don't align with earth but are still perfectly playable and physics backed > Results that are
+forced to align with earth by introducing extremely weird forcing functions").
+
+**The answer.** The level is not a bug and not one merge. It is the force balance's open-loop
+calibration of 2026-10-02 (the speed scale 45 mm/yr, PLT-181, which its own row says was "to be
+calibrated in task 8 against CHK-020" and never was; the slab and boundary resistances 3 and 3,
+PLT-185 and PLT-189, chosen against the open-loop speed targets), with each merge since adding a
+resistance or taking a drive away and nothing calibrated again. The largest single fall is the
+saturating suction (PLT-540), whose premise no source read supports. Nothing is changed here; the
+recommendation at the end is the coordinator's and Ben's to take.
+
+### The level as the design sets it
+
+FRC-016 defines the basal drag coefficient c_b by a reference plate: an oceanic plate of the
+average starting plate's area A (a fourteenth of the sphere), pulled by a straight 3,000 km trench
+of a full-length 80-Myr slab, its neighbours at rest, moves at the speed scale v_s:
+(1 + s + b) c_b A v_s = F_sp L, with s = 3 (slab resistance, PLT-185), b = 3 (boundary resistance,
+PLT-189) and v_s = 45 mm/yr. The resistances per metre follow (FRC-017): slab resistance s c_b A / L
+per metre of trench against the speed towards it, boundary resistance b c_b A / (2 √(π A)) per metre
+of boundary against the relative velocity of the two plates. The slab's terminal velocity is then
+v_s (1 + s + b) / s = 105 mm/yr. Every speed in the balance scales with v_s (the drag goes as its
+inverse), so the level is linear in it: the diagnosis below gives ×1.49 for ×1.5.
+
+### The bisection (cached pool runs)
+
+Each run's CHK-020 `speed_rms_mm_yr` from the pool's plate check (`earthlike_quick_16k`, 1000 Myr,
+both starts), medians over the matched runs, two-sided Mann-Whitney p (build/speed/speedlevel.py,
+`pairs`). `v_slab` and `v_free` are the check's speeds of the plates with and without a slab.
+
+| Step (merge) | Runs | RMS, mm/yr | p | What moved |
+|---|---|---|---|---|
+| trench-base883 to base | 12 | 37.0 to 37.4 | 1.0 | |
+| base to base2 | 24 | 37.1 to 36.0 | 0.23 | |
+| base2 to base3 (V1 gap 2) | 24 | 36.0 to 34.4 | 0.038 | v_slab 53.5 to 50 (p < 0.001) |
+| base3 to base4 (front share, fission, level set) | 24 | 34.4 to 35.2 | 0.39 | |
+| **base4 to base5 (PLT-540, the saturating suction)** | 12 | **33.8 to 28.9** | **< 0.001** | **v_free 30.6 to 23.7 (p < 0.001); v_slab unchanged** |
+| base5 to base6 (V1 gap 5, one-way subduction) | 12 | 28.9 to 27.1 | 0.019 | fl-oneway against base5: no change (p 0.89) |
+| base6 to base7 | 24 | 27.3 to 28.1 | 0.08 | |
+| base7 to base8 (PLT-553) | 24 | 28.1 to 26.8 | 0.023 | |
+| base8 to base9 (PLT-560, the pull along the normal) | 24 | 26.8 to 25.9 | 0.005 | v_free 23.3 to 20.0 |
+| base9 to base10 (PLT-561, the arcs' band at the slab's ends) | 24 | 25.9 to 27.0 | 0.019 | |
+| trench-base883 to base10 (the whole span) | 12 | 37.0 to 27.4 | < 0.001 | |
+
+The arms that split the steps: base4 to fl-sat (PLT-540 alone, 8 runs) 34.1 to 27.5 (p 0.001);
+base3 to fl-share 36.8 to 34.1 (p 0.018); fl-fission to fl-fission2 34.1 to 36.2 (p 0.052); dock-c3
+to dock-T 36.8 to 28.9 (p 0.001); base4 to fl-ts1 34.1 to 30.9 (p 0.001). Before the pool the level
+was 41.4 (2026-10-05) and the crust budget took it from 41.6 to 36.5 (2026-10-17).
+
+Within a run (the records' RMS per 100 Myr window, build/speed/timeline.py) base10 falls from 33.0
+in the first 100 Myr to 26.5 by 300 Myr and stays there (25.2 to 26.6); trench-base883 from 40.8 to
+about 35. The boundary per step is 226,000 to 330,000 km on base10 (260,000 to 550,000 on
+trench-base883); late in base10's runs the resisting torques split basal drag 0.12, slab resistance
+0.23, boundary resistance 0.39, collision resistance 0.26.
+
+### The reference plate term by term (the lattice)
+
+`the_reference_plate_on_the_lattice_term_by_term` (plates/tests.rs, 40,000 samples) puts FRC-016's
+reference plate on the lattice with `front_pull` on and compares each term's torque in the record
+with the continuous cap's (FRC-016's definition on the sphere: basal drag over the cap, slab
+resistance along the trench's normal, boundary resistance against the full relative velocity all
+round the rim, by quadrature). The lattice moves the plate at 53.2 mm/yr, the continuous cap at
+48.7 (the scale is 45; the flat definition on a spherical cap). At the lattice's answer the record
+over the cap is: basal drag 0.977 (the plate is 0.976 of A), slab resistance 1.055 and the pull
+1.060 (the trench's shares, PLT-560), boundary resistance 0.875 (its metres 0.886 of the rim's
+20,615 km: the lattice under-counts the rim). The resisting shares on the lattice are 0.150, 0.487
+and 0.362, on the cap 0.149, 0.449 and 0.402 (the flat plate's 1/7, 3/7, 3/7). **The lattice moves
+the reference plate faster than the definition, not slower**: no counting of a term on the lattice
+slows the planet's plates.
+
+### The planet term by term
+
+`what_sets_the_planets_plate_speed` (plates/tests.rs, ignored; build/speed/diag3.sh on the VM): the
+pool's preset `earthlike_quick_16k` at its 100,000 samples, the plate stage alone (no erosion, the
+datum's sea) for 600 Myr on two planets, and every 50 Myr after the first 100 the force balance
+solved again on the step's state with one term changed, c_b kept unless the row says so. One step's
+balance only: the slabs, fronts and collisions a faster motion would make are not in it. The
+balance's RMS as CHK-020 weighs it (visible samples, the plates' centroid speeds), then the plates
+with a slab pull and the rest; means over the 11 looks. The plate stage alone gives the pool's level
+(the motion's RMS 24.9 and 26.4 mm/yr), in about two and a half minutes of test time.
+
+| One change | Supercontinent, seed 1: RMS / pulled / rest | Scattered continents, seed 2 |
+|---|---|---|
+| the defaults | 27.3 / 29.0 / 15.5 | 29.3 / 30.6 / 15.5 |
+| the suction not saturating (PLT-540 off) | 29.4 / 30.5 / 22.4 | 31.2 / 32.3 / 20.0 |
+| no suction | 31.5 / 32.9 / 22.0 | 34.2 / 35.4 / 21.1 |
+| no edge energy (ridge push, belt weight) | 24.9 / 26.5 / 13.7 | 26.8 / 27.9 / 13.3 |
+| no keels (keel drag 1) | 28.8 / 30.4 / 16.9 | 31.0 / 32.2 / 16.9 |
+| no collision buoyancy | 28.7 / 30.4 / 16.6 | 30.8 / 32.1 / 17.7 |
+| no boundary resistance | 45.8 / 46.2 / 44.5 | 48.7 / 49.0 / 53.1 |
+| no slab resistance | 90.2 / 94.7 / 59.3 | 101.9 / 105.5 / 67.2 |
+| boundary resistance 1, c_b by the definition | 25.6 / 26.7 / 18.4 | 27.3 / 28.2 / 19.4 |
+| the speed scale ×1.5 (c_b / 1.5) | 40.8 / 43.2 / 23.3 | 43.7 / 45.6 / 23.1 |
+| Forsyth & Uyeda's Table 6 ratios and terminal velocity | 51.3 / 43.8 / 80.8 | 60.0 / 46.8 / 151.7 |
+| Forsyth & Uyeda's ratios, the speed scale kept | 35.8 / 30.5 / 57.0 | 41.8 / 32.5 / 105.9 |
+
+The area with a slab pull is 0.851 and 0.901 of the planet. At 40,000 samples the pattern is the
+same (the motion 27.7 and 32.7). `plates_quick_16k` is no guide to the pool's planet: its ridge and
+floor (-1,000 and -10,000 m against `earthlike_quick_16k`'s -2,600 and -5,651) give a ridge push
+several times Earth's (the motion 39.2 and 40.8 at 100,000 samples, 29.7 and 32.8 with no edge
+energy).
+
+What the rows say:
+
+- **The contrast is Earth's, the level is not.** The plates with a slab move about twice as fast as
+  the rest (29 to 31 against 15.5), as on Earth (Zahirovic et al. 2015's medians, any subducting
+  7.05 cm/yr against 2.6 with no subduction; Forsyth & Uyeda's Table 1, the slab plates 6.1 to 8.6
+  cm/yr against 0.7 to 4.2 for the others), but both are short: the pulled plates 0.42 of Zahirovic's
+  70.5 mm/yr and the rest 0.60 of 26.
+- **The two resistances of the open-loop calibration hold the planet.** At fixed c_b, no boundary
+  resistance raises the RMS 1.66 to 1.68 times (the reference plate's 7/4) and no slab resistance
+  3.3 to 3.5 times (more than the reference plate's 7/4, since it also takes the suction's link and
+  the slabs' terminal velocity with it). The keels, the collision buoyancy and the edge energy each
+  move the level by under 10 %.
+- **PLT-540 acts mostly as a drag on the plates without a slab.** Not saturating, the suction gives
+  the rest 22.4 and 20.0 mm/yr; saturating, 15.5 and 15.5; with no suction at all, 22.0 and 21.1. So
+  the link that saturates the suction (to the mantle along the slab's direction, k = share × slab
+  resistance × ℓ) slows the overriding plates by more than the whole suction speeds them. That is
+  the pool's base4 to base5 step, where only `v_free` fell.
+- **Forsyth & Uyeda's force strengths alone raise the level into the band but are not a working
+  balance.** Their Table 6 (model X_s, read; PLT-575) put on FRC-016's reference plate gives slab
+  resistance 8.94 times the oceanic drag (against the model's 3, with 3 more for the boundary), the
+  continental drag 7.9 times the oceanic (the model's keel 3, inside Conrad & Lithgow-Bertelloni
+  2006's 2 to 5), the suction 0.078 of the pull and independent of speed (the model's 0.3, saturating),
+  a terminal velocity of 72 mm/yr (6.43 / 0.89 cm/yr) and the reference plate at 65 mm/yr against
+  the model's 45. Their transform resistance (0.36 per km) and colliding resistance (0.16 per km)
+  do not depend on speed and act on transforms and convergent boundaries only; they have no ridge
+  resistance and no viscous resistance between plates, so that variant has no boundary resistance.
+  It moves the planet at 51 to 60 mm/yr, but the plates without a slab outrun the pulled ones (81 and
+  152 against 44 and 47), against Forsyth & Uyeda's own Table 1 and Zahirovic et al.: the
+  speed-independent resistances at transforms and collisions, which the viscous all-round boundary
+  resistance stood in for, are what holds those plates, and the variant leaves them out.
+
+### What it is and what it is not
+
+- Not a lattice or counting bug: the lattice moves the reference plate faster than its definition.
+- Not one merge: the fall from 37 to 27 on the pool is spread over six steps at p < 0.05, five
+  down and one up: the largest PLT-540 (-4.9 mm/yr, p < 0.001), then V1 gap 5 (-1.8), V1 gap 2
+  (-1.6), PLT-553 (-1.3) and PLT-560 (-0.9), with PLT-561 giving 1.1 back. The fall from 41 on
+  2026-10-05 to 37 is the crust budget's.
+- The level is the open-loop calibration's, never redone: v_s 45 was not calibrated against CHK-020
+  (PLT-181), and s and b were chosen against open-loop targets (CHK-021 to CHK-023, CHK-028) on a
+  planet that had none of the fronts, collisions and suction laws since.
+- Three places where the model differs from the sources it cites, each read in this lane:
+  1. PLT-189 cites Forsyth & Uyeda's transform resistance, but theirs is speed-independent, acts on
+     transforms only and has no ridge part; the coded term is viscous and acts on every boundary,
+     ridges and trenches included.
+  2. The resistance ratios are not Forsyth & Uyeda's (above, and PLT-575).
+  3. PLT-540's premise (a slab cannot roll back faster than it sinks, so the mantle resists the
+     trench's migration from rest) is `from-memory`, and the trench-migration studies read do not
+     support it. In them trench motion follows the upper plate's (V_t about V_up): "spontaneous
+     trench rollback related to slab pull is negligible with respect to upper plate motion", and
+     92 % of trenches move within ±50 mm/yr (Heuret & Lallemand 2005). The anchor force "is
+     inefficient to prevent trench migrations up to ±50 mm.y⁻¹" (Lallemand, Heuret & Boutelier 2005,
+     after Heuret & Lallemand). V_t = 0.5 V_sub − 2.3 cm/yr in HS3 (Lallemand et al. 2008), and the
+     mean retreat is 1.33 to 1.51 cm/yr (Schellart, Stegman & Freeman 2008). None states a limit of
+     rollback by the slab's sinking speed, and the first two say the resistance to migration is
+     weak below 50 mm/yr, where PLT-540's resistance has already halved the suction.
+
+### Recommendation (the coordinator's and Ben's; nothing applied)
+
+1. **Physics, recommended: take the force balance's resistances from one source.** As its own lane,
+   take Forsyth & Uyeda's Table 6 as a whole: slab resistance 8.94, the continental drag 7.9 (or
+   Conrad & Lithgow-Bertelloni's range), the suction speed-independent at 0.078 of the pull (PLT-540
+   off). Replace the viscous all-round boundary resistance with their speed-independent transform
+   and colliding resistances on those boundaries only, as friction links of the collision link's
+   form (k = F / max(|Δv|, floor), `forces.rs`) on the boundary types V1 gap 2 classifies. The
+   level then follows from their terminal velocity, and v_s stops being a free number (65 mm/yr on
+   the reference plate). The diagnosis shows the first half alone lifts the level into the band and
+   lets the free plates run, so the second half is what the lane would build and test: a unit test
+   against Forsyth & Uyeda's Table 1 (slab plates 6 to 9 cm/yr, the others 0 to 4) on the lattice,
+   then one cumulative arm.
+2. **Calibration, Ben's decision: PLT-181's own calibration against CHK-020.** The level is linear in
+   v_s: about 68 mm/yr for the band's floor and 80 for Earth's 47. That makes c_b 1.65 to 1.4 ×
+   10¹⁴ Pa s/m, an asthenosphere of 1.4 to 1.7 × 10¹⁹ Pa s over 100 km, inside Lithgow-Bertelloni &
+   Richards 1998's "of the order of 10^19 Pa s". It is a gain on the level, so under Ben's rule it is
+   his to choose, not the lane's.
+3. **PLT-540 either way.** Its premise is unsourced and reads against the trench-migration studies,
+   it is the largest single fall, and it acts as a drag on the plates without a slab. Option 1 takes
+   it off. Off on its own it gives about +2 mm/yr in one step's balance, and its row records the
+   speed guard binding on 3 of 24 seeds of the 8k test planet with the fixed share.
