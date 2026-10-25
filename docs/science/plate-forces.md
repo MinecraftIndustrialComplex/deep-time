@@ -36,7 +36,10 @@ front), and then sums the forces:
    (150 km): that slab pulls the new plate towards its parent and opens the trench.
 2. **Driving forces.** Along each subduction front where the sinking crust is oceanic, slab pull
    draws the sinking plate towards the trench, in proportion to the slab's length and to the square
-   root of the crust's age; crust younger than 10 Myr does not pull. The overriding plate is drawn
+   root of the crust's age; crust younger than 10 Myr does not pull. The front is where the plates
+   converge across their boundary, the same front the arcs see: a stretch of the two plates'
+   boundary where they slide past each other is no trench, and the pull acts across the trench, not
+   along the lattice's zigzag (since 2026-10-24, PLT-560). The overriding plate is drawn
    towards the trench too (slab suction, a share of the pull). At every plate edge, high ground
    pushes the plate away from itself and low ground draws it: a mid-ocean ridge pushes ("ridge
    push"), the edge of a high plateau pushes back. A weak, slow flow of the mantle drags every plate
@@ -89,6 +92,18 @@ definite matrix of 3 rows per plate, solved by Cholesky factorisation.
 
 F_sp the reference pull, a the crust's age at the trench, L the slab's length, D `slab_depth_km`.
 
+**The front and its metres** (`tectonics.front_pull`, on by default since 2026-10-24; ledger
+PLT-560). The pull acts at each overriding edge sample whose plates converge across their
+boundary beyond Bird's 20 degrees of a transform (PLT-311, the rule PLT-330 gave the arcs' fronts),
+along the boundary's normal there (`shortening::boundary_normal`, the chord of about five spacings,
+PLT-310), over the sample's share of the straight front (`shortening::front_share_rad`, PLT-530);
+a slab grows by the convergence along that normal. The slab resistance (FRC-017), the slab suction
+(PLT-540) and the collision resistance (FRC-018) count the same metres along the same normal. A
+slab no front feeds hangs and pulls along the normal over the shares of the whole shared boundary.
+Off (the old law), every lattice edge converging on an active contact was a front, one spacing per
+sample, along that edge: on the default planet that counted 1.71 times the arcs' straight front
+and 1.21 times it along the normal (PLT-554).
+
 **Edge energy** at a plate's boundary sample, per metre, pushing away from the edge:
 
     (U(edge) − Ū) · edge_energy / 0.1
@@ -110,7 +125,9 @@ down the trench, 0.09 / 0.04 = 2.25 times the down-dip pull of the same length o
 (Cloos 1993's density contrasts).
 
 **Basal drag** per square metre: c_b (v − v_flow), times `keel_drag` under continental crust, with
-c_b fixed by the speed scale: (1 + slab_resistance + boundary_resistance) c_b A v_s = F_sp L_ref.
+c_b fixed by the speed scale: (1 + slab_resistance + boundary_resistance) c_b A v_s = F_sp L_ref,
+L_ref a straight 3,000 km trench along its normal, which is how the pull counts its fronts since
+PLT-560 (see "The drag's calibration on the pull's count" below).
 
 **Mean in-plane stress** of a plate: σ = (Σ r·f + ∫ r·b dA) / (2 A h), r a point's offset from the
 plate's centroid, f the edge forces at the balance's answer, b the basal drag, h 100 km.
@@ -135,7 +152,8 @@ plate's centroid, f the edge forces at the balance's answer, b the basal drag, h
 | PLT-188 | Keel drag | 3 | × | Conrad & Lithgow-Bertelloni 2006 (read: 2-5, about 3 on average) | `verified` |
 | PLT-189 | Boundary resistance | 3 × the reference plate's drag per its perimeter | — | Forsyth & Uyeda 1975 (read: transform resistance) | `calibrated` (by the design's open-loop test) |
 | PLT-190, FRC-015 | Mantle flow: degree-2, from two antipodal upwellings | 5 | mm/yr | Ben, decisions log 2026-10-02 | `game-choice` |
-| FRC-016 | Basal drag coefficient c_b (defaults) | 2.5 × 10¹⁴ | Pa s/m | defined by the speed scale | `game-choice` |
+| FRC-016 | Basal drag coefficient c_b (defaults) | 2.5 × 10¹⁴ | Pa s/m | defined by the speed scale; unchanged on the pull's own count (2026-10-24) | `game-choice` |
+| PLT-560 | The pull's front and metres, `front_pull` | on | switch | geometry: the arcs' fronts (PLT-330, Bird's transforms PLT-311), the boundary's normal (PLT-310), the straight share (PLT-530) | `game-choice` |
 | FRC-010 | Lithosphere thickness for the stress | 100 | km | Conrad & Lithgow-Bertelloni 2006's reference (read) | `verified` |
 | FRC-011 | Collision drag's speed floor | 1 | mm/yr | under the weld speed (5), so a held collision can weld | `game-choice` |
 | FRC-028 | Continental lithosphere's buoyancy over 80-Myr slab's weight | 0.09 / 0.04 = 2.25 | ratio | Cloos 1993 (abstract, read) | `abstract-only` |
@@ -151,6 +169,33 @@ on 35 km crust stands at 6.7 × 10¹² N/m (Tibet is quoted at 6-7 × 10¹²). W
 drag coefficient corresponds to an asthenosphere of 2.5 × 10¹⁹ Pa s over 100 km and a basal shear
 stress of 0.35 MPa at 45 mm/yr; Lithgow-Bertelloni & Richards 1998 put a weak asthenosphere "of the
 order of 10^19 Pa s", and Forsyth & Uyeda 1975 found "drag at 8 cm/yr roughly 5 bars" (0.5 MPa).
+
+**The drag's calibration on the pull's count** (FRC-016 redone with PLT-560, the front lane's step
+9, 2026-10-24; the coordinator's call: on the same count as the pull, against the definition's own
+source, the reference plate and its torque balance, not the V1 checks). The definition counts a
+straight 3,000 km trench along its normal. The old pull counted its fronts in lattice spacings
+along lattice edges, so on the lattice the definition and the pull counted different things. The
+test `the_reference_plate_on_the_lattice_moves_at_the_speed_scale` builds the reference plate on
+the 40,000-sample lattice (the average starting plate's area, a 3,000 km stretch of its rim as the
+trench, a full-length 80-Myr slab, its neighbours held by their keels, no mantle flow) and solves
+the balance with each count:
+
+| | The old count (`front_pull` off) | The pull's own count (on) |
+|---|---|---|
+| The pull, over the rim trench's along its normal | 1.235, 11.0 degrees off the normal | 1.060, 0.5 degrees off: exactly the lattice trench's shares, 3,193 km for the rim's 3,000 (the lattice's trench ends where plate 0's samples end, at a shallow cut) |
+| The reference plate's speed | 55.4 mm/yr | 53.2 mm/yr; 50.2 per the rim's 3,000 km |
+
+The same definitions on the analytic ring (`forces.rs`, `the_reference_plate_moves_at_the_speed_scale`,
+the trench counted exactly) give 49.5 mm/yr for the scale's 45: the definition is a flat force
+balance and the plate a cap of the sphere. On the pull's own count the lattice adds nothing but its
+trench's length (50.2 against 49.5 per the definition's trench), so c_b, which the definition gives
+in closed form (`Coeffs::new`), does not move: 2.5 × 10¹⁴ Pa s/m, 0.35 MPa at 45 mm/yr. Forsyth &
+Uyeda's "roughly 5 bars" at 8 cm/yr is a coefficient 0.8 times that; Lithgow-Bertelloni &
+Richards' weak asthenosphere "of the order of 10^19 Pa s" against the 2.5 × 10¹⁹ over 100 km that
+c_b stands for. What moved is the pull on the lattice: the old count's surplus (1.235 times the
+trench on this plate; 1.71 times the arcs' straight front on the default planet, PLT-554) is gone,
+so for the same c_b the planet's plates move more slowly. The run speeds against their sourced
+band are below, "On the pull's own count", and in [plates.md](plates.md), "Step 9".
 
 ## Earth against the mod
 
@@ -198,6 +243,32 @@ The spread of speeds and the oceanic-continental contrast come out of the forces
 correlation is weaker than Earth's and weaker than the open-loop test's, and the 90th percentile of
 the step-to-step change is still above the design's 20 %. See `docs/design/plate-force-balance.md`
 §13, "Tasks 7 and 8", for the rest.
+
+**On the pull's own count** (PLT-560 on, the front lane's step 9, 2026-10-24; arm fl-pull,
+`earthlike_quick_16k`, 1000 Myr, both starts × seeds 1 to 4, key 822ccd2a2d81, against base8's 24
+runs, master 4dd85fe2, and fl-outline's same 8; the plate check's speed records, medians over the
+runs, two-sided Mann-Whitney p in brackets). Reported, not tuned (the coordinator's call):
+
+| Quantity | Earth | Band (ledger) | fl-pull | base8 (24) | fl-outline (8) |
+|---|---|---|---|---|---|
+| Plate speed, area-weighted RMS | about 47 mm/yr today; 50-100 over 200 Myr | 40 to 100 (CHK-020) | 25.95 (23.8 to 28.6) | 26.79 (0.007) | 27.12 (0.024) |
+| Plate speeds, 10th percentile | 11 | at most 20 (CHK-021) | 6.64 | 8.05 (0.011) | 8.75 (0.007) |
+| Plate speeds, median | 33; 42 over 200 Myr | 30 to 60 (CHK-022) | 23.05 | 26.70 (< 0.001) | 27.65 (0.001) |
+| Plate speeds, 90th percentile | 80; about 85 for the fastest group | 70 to 110 (CHK-023) | 66.35 | 65.15 (0.12) | 65.84 (0.40) |
+| Oceanic over continental plates, median speed | 2-3 | | 2.62 | 2.20 (0.094) | 2.16 (0.10) |
+| Slab-attached over slab-free plates | about 3-4 | | 3.07 | 2.50 (0.008) | 2.50 (0.041) |
+| Speed against area, rank correlation | | | -0.43 | -0.42 (0.37) | -0.43 (0.96) |
+
+What it says: the RMS and the median were under their bands before this step (master's 26.8 and
+26.7 mm/yr), and the pull's own count takes them 3 % and 14 % lower, the 10th percentile with
+them; the 90th percentile does not move, and the slab contrast grows. Plates with real trenches
+keep their speed; the ones that slow lost the pull the old count gave them along their contacts'
+strike-slip stretches. The visible-weighted plate speed is 18.6 to 19.4 mm/yr through a
+resampling cycle against 21.3 to 22.5. The shortfall is not the drag's calibration: the reference
+plate on the lattice meets the definition on this count (above), and c_b is the definition's. Where
+the planet's plates differ from the reference plate (their size, 24.7 plates alive against Bird's
+52; their keels; the collision and boundary resistances; their slabs' lengths and ages) is a
+diagnosis of its own, not traced here.
 
 ## Simplifications and limits
 
