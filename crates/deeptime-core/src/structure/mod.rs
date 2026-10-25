@@ -1085,6 +1085,7 @@ impl StructureStage {
             t_end_myr,
             &mut rng,
             &mut self.st.next_id,
+            &mut self.st.counts,
             host_at,
         );
         self.st.counts.emplaced += born.len() as u64;
@@ -1322,6 +1323,8 @@ impl StructureStage {
                 "alive": self.st.plutons.len(),
                 "eroded": self.st.counts.eroded,
                 "subducted": self.st.counts.subducted,
+                // Drawn past a pole, in the row that straddles it, and not emplaced (RCK-097).
+                "past_pole": self.st.counts.past_pole,
                 "bodies": bodies,
             },
             "aureoles": {
