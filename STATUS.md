@@ -147,6 +147,25 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-25: M5 lane: M4 (land above 2 km) split on base13 by belt, age, ice and the Airy level; no class stands above its Airy height, belts on the start's keel hardly thin, Earth's cold thick crust stands about 1.5 km under the model's one line; diagnosis only, no law changed (coordinator's M4 task; agent worktree .claude/worktrees/agent-a447f975b05e919a2, branch worktree-agent-a447f975b05e919a2 at master 683166ea; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Measured.** These are cached runs only: base13 (key 89e867370c1f, argkey cd665cef, 24 runs). The command was `tools/remote/mac.sh -- tools/review/m5diag/m4split.sh <arm folder> base13`. The table is on the VM at `/data/ban/deeptime-runs/m5diag/m4table-base13.txt`.
+- **M4 and the Airy height.** M4 is 0.098 mean.
+  - 0.42 of the high ground is iced. With iced land kept out, M4 is 0.063.
+  - The high ground stands 265 m under its Airy height. The largest excess over Airy sits on oceanic and untagged cells and is worth 0.006 of M4 at most.
+- **M4 by class:**
+  - young collision belts 0.037;
+  - belts older than 10 Myr 0.022;
+  - arcs and Andean margins 0.030;
+  - untagged plateaus 0.004;
+  - other 0.005.
+- **Earth's M4 by region.** From CRUST1.0 (`m4earth.py`, with crust1.rho) it is 0.047 in all: collision 0.026, Andes 0.0085, Cordillera 0.0055.
+- **The decay.** A hot belt's sheet (PLT-414/415) is under 2 km by about age 19 Myr. That matches the Variscan and Bird 1991. Base13's belts come down 3 to 5 times slower.
+- **The keel.** The front-trace run 188b5e2f2852 (300 Myr, one run; `m4keel.py`) shows why. Belts on the start's keel (K 200, L 200, η 450 η0) stay at 45 to 48 km for 100 Myr, under T_c, so neither collapse law acts on them. Belts with no keel come down at the hot pace.
+- **Two lines for thick crust.** Earth's hot thick crust (Tibet, Andes) fits the model's one line. Its cold thick crust stands at 340 m at 45 to 55 km. CRUST1.0's layer densities do not explain that, and ISO-110 in HC's frame would close only about 0.5 km of it.
+- **What needs erosion.** Belts over 50 Myr, the old Andean tail, untagged plateaus and the keeled belts.
+- **New scripts.** Under `tools/review/m5diag/`: `m4earth.py`/`.sh`, `m4keel.py` and `ledger_ids.py` (the highest ledger ids on every branch). `m4split.py` and `m4table.py` were extended.
+- **Next.** This waits on the coordinator's reply. The recommendation is to run the next master base with `+DEEPTIME_FRONT_TRACE=@RUN@/trace`, so that `m4keel.py` can weigh the keel on a full base. No collapse law change is proposed. The cold-line datum goes to the thermal lane, the active area (1.4 to 1.6 times Earth's) to the front and force-balance lanes, and the kept-root classes to the erosion lane. Ledger gap: new rows from PLT-630, ISO-145 and FRC-045.
+
 ### 2026-10-25: M5 lane: the collision belt's surface from critical taper (PLT-600, PLT-601), on by default; it replaces PLT-243's unsourced profile and keeps the old fill's crust to the metre; the physics holds on the pool, the excess over Airy falls a fifth, the coast with high ground does not move (coordinator's task (2) of the M5 lane; agent worktree .claude/worktrees/agent-a447f975b05e919a2, branch worktree-agent-a447f975b05e919a2, masters 05a2850a and 05a60997 merged in; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **What changed.** `plates/belts.rs`: `fill_taper` and the taper branch of `stack_front`. The front is the toe; the surface is S(d) = min(h_s, z_f + d tan α), with α = `wedge_slope_deg` (1.5°, PLT-192) and h_s the strength height (PLT-253). The kept crust fills under S nearest the front first, ties alike. Once the belt is full to `collision_belt_km` (PLT-241), H rises by bisection (the toe advances, PLT-601). How much it keeps is exactly `fill_belt`'s placed total. New global `plates/collision_taper_toe_km3` (crust budget column `taper_toe`, measurement only). `params.rs`: `collision_belt_taper` true by default. No knob was added; `wedge_slope_deg` stays 1.5.
 - **A flaw found and fixed on the way.** The first taper kept PLT-243's room share k. The old fill repeats its pass, so it keeps 1 - (1 - k)^6 behind a narrow overriding continent. ct-taper2 therefore sent 6.8 % of the crossed crust down as sliver loss, against base12's 4.4 % (`tools/review/m5diag/cbfinal.py`). Fixed in 1e4bc9dd, with the test `the_taper_keeps_what_the_old_fill_keeps_behind_a_sliver`.
