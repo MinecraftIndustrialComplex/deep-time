@@ -555,6 +555,19 @@ pub struct TectonicParams {
     /// 63,000 km in the first 2 Myr after one, the converging boundary with no contact rises
     /// from 6,000 to 37,000; plates.md, "Step 7"). ledger: PLT-550
     pub contact_carry: bool,
+    /// A front stands on the current geometry (the front lane, 2026-10-25;
+    /// `subduction::fronts_begin`, `dynamics::boundary_mix`): an overriding sample is a front
+    /// through a lattice neighbour of a subducting plate only while a visible sample of that plate
+    /// stands within `subduction::trench_row_rad` of it now (two lattice spacings: the step to the
+    /// neighbour across the boundary and the trench's one hidden row). Between resamplings the
+    /// lattice is frozen, so the neighbour may have gone under and been carried far on (1,015 km,
+    /// the median, for the fronts off the current boundary on the front trace): the overriding
+    /// samples behind the real front kept a front with no slab beside them, up to a fifth of the
+    /// ocean-continent front late in a cycle, and the new lattice dropped them at every
+    /// resampling (−29.7 %; with this rule −3.4 %; plates.md, "What the trace found"). Off, any
+    /// lattice neighbour of the plate counts, hidden or far. On by default since 2026-10-25.
+    /// ledger: PLT-582
+    pub front_current_geometry: bool,
     /// A sample goes under another plate where it crosses that plate's outline (the front lane's
     /// step 8, 2026-10-24; `subduction::detect`, `level_set::cover`): the zero line of the
     /// interpolated distance the resampling already gives the plates' ground by
@@ -616,6 +629,15 @@ pub struct TectonicParams {
     /// as its lithosphere cools (McKenzie 1978's thermal time, 62.8 Myr); crust no orogeny raised
     /// does not flow. 0 = no growth (ledger PLT-415).
     pub collapse_sheet_strength_myr: f64,
+    /// The sheet reads the column's thermal state, not its orogeny (the front lane, 2026-10-25):
+    /// with `thermal_strength`, crust no orogeny raised flows too, at the viscosity its
+    /// lithosphere's thermal age gives, so a hot column the founder or the lower-crustal flow
+    /// filled to T_c thins on towards the normal column, while a craton at L_cold (an infinite
+    /// thermal age) stays rigid: the lower crust "escapes from beneath thickened, elevated central
+    /// plateau through regions where crust is weak" (Clark & Royden 2000, p. 706). On by default
+    /// since 2026-10-25. Off, or without `thermal_strength`, only crust an orogeny raised flows
+    /// (PLT-415's gate). ledger: PLT-581
+    pub collapse_sheet_thermal: bool,
     /// The lithosphere's thermal state (`plates/thermal.rs`, gap 4): each sample carries the depth
     /// of its thermal lithosphere and its depleted keel; arcs, back-arcs, hotspots and rifts heat
     /// it, elsewhere it cools on McKenzie's time; continental heat flow comes from it (with the
@@ -1079,6 +1101,7 @@ impl Default for TectonicParams {
             reversal_by_arc_crust: true,      // ledger: PLT-371 (on since 2026-10-23)
             one_way_subduction: true,         // ledger: PLT-542 (on since 2026-10-24)
             contact_carry: true,              // ledger: PLT-550 (on since 2026-10-24)
+            front_current_geometry: true,     // ledger: PLT-582 (on since 2026-10-25)
             outline_cover: true,              // ledger: PLT-553 (on since 2026-10-24)
             collapse_myr: 15.0,               // ledger: PLT-255
             collapse_thickness_km: 50.0,      // ledger: PLT-256
@@ -1100,6 +1123,7 @@ impl Default for TectonicParams {
             collapse_sheet_viscosity_pa_s: 1.0e22,
             // ledger: PLT-415
             collapse_sheet_strength_myr: 62.8,
+            collapse_sheet_thermal: true, // ledger: PLT-581 (on since 2026-10-25)
             thermal_state: true,          // ledger: PLT-460 (on since 2026-10-23)
             thermal_isostasy_m: 0.0,      // ledger: ISO-110 (off: an open fault; 1,600 m when on)
             thermal_reference_km: 225.0,  // ledger: ISO-111

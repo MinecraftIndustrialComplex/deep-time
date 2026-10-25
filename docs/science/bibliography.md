@@ -1002,8 +1002,8 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Clark, M. K. and Royden, L. H. (2000). Topographic ooze: Building the eastern margin of Tibet by lower crustal flow. Geology 28(8):703-706.
 - DOI or URL: 10.1130/0091-7613(2000)28<703:TOBTEM>2.0.CO;2.
 - Cited as: (ERO, ISO, HYP) "Clark & Royden 2000, Geology 28(8):703-706" (spread.rs). (PLT) "Clark & Royden 2000, Geology 28:703".
-- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory); PLT-414 (2026-10-22: the channel viscosities, abstract)
-- Access: paywalled (GeoScienceWorld 403); not fetched. [other sections: paywalled (GSA; not tested).]
+- Ledger ids: ISO-018, ISO-020, ISO-022; ISO-070 (from memory: the law is derived with local isostasy); PLT-300, PLT-301 (2026-10-20: the channel flow out of Tibet and its 15 km channel, from memory; verified 2026-10-25, p. 705); PLT-414 (2026-10-22: the channel viscosities, abstract); PLT-581 (2026-10-25: the flow goes where the crust is weak, Fig. 5 caption, p. 706)
+- Access: paywalled (GeoScienceWorld 403). Full text read 2026-10-25 (the front lane, by a Sonnet sub-agent) from a course copy: http://basin.earth.ncu.edu.tw/Course/SeminarII/abstract2014_1/2014.10.02_Sun,%20Yuan-Cheng/Topographic%20ooze%20building%20the%20eastern%20margin%20fo%20Tibet%20by%20low%20crustal%20flow.pdf (not stored in the library). Read: p. 705 "We chose a channel thickness of 15 km"; p. 705, the best fit with the channel "uniformly weak at the initiation of flux into the channel, suggesting that the low-gradient margins of Tibet were already weak before the onset of crustal thickening"; p. 706, Fig. 5 caption, "lower crust escapes from beneath thickened, elevated central plateau through regions where crust is weak"; p. 706, "the strength of the crust beneath the Sichuan Basin inhibits flow of lower crustal material from central Tibet". [other sections: paywalled (GSA; not tested).]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Merged keys: Clark2000
@@ -1080,8 +1080,8 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Reference: Beaumont, C., Jamieson, R. A., Nguyen, M. H. and Lee, B. (2001). Himalayan tectonics explained by extrusion of a low-viscosity crustal channel coupled to focused surface denudation. Nature 414(6865):738-742.
 - DOI or URL: 10.1038/414738a.
 - Cited as: (ERO, ISO, HYP) "Beaumont et al. 2001 (channel flow coupled to erosion), Nature 414:738" (build log only). (PLT) "Beaumont et al. 2001 (Nature 414:738)".
-- Ledger ids: ISO-018, ISO-020; notes: design background for ISO-018
-- Access: paywalled; not fetched. [other sections: paywalled.]
+- Ledger ids: ISO-018, ISO-020; notes: design background for ISO-018; PLT-581 (2026-10-25: hot crust that flowed out of a belt stays hot)
+- Access: paywalled. The authors' manuscript read 2026-10-25 (the front lane, by a Sonnet sub-agent): http://geodynamics.oceanography.dal.ca/channelflow/cb_nature_01_web.pdf. Read: p. 1, the channel's viscosity 10^19 Pa s at 750 °C or more and the plateau's crust "70-75 km thick"; p. 2, "Isotherms are advected pro-ward by channel flow". [other sections: paywalled.]
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
 - Read so far (by the project): (ERO, ISO, HYP) no record. (PLT) not stated; not in code.
