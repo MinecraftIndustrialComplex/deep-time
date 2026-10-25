@@ -616,6 +616,15 @@ pub struct TectonicParams {
     /// as its lithosphere cools (McKenzie 1978's thermal time, 62.8 Myr); crust no orogeny raised
     /// does not flow. 0 = no growth (ledger PLT-415).
     pub collapse_sheet_strength_myr: f64,
+    /// The sheet reads the column's thermal state, not its orogeny (the front lane, 2026-10-25):
+    /// with `thermal_strength`, crust no orogeny raised flows too, at the viscosity its
+    /// lithosphere's thermal age gives, so a hot column the founder or the lower-crustal flow
+    /// filled to T_c thins on towards the normal column, while a craton at L_cold (an infinite
+    /// thermal age) stays rigid: the lower crust "escapes from beneath thickened, elevated central
+    /// plateau through regions where crust is weak" (Clark & Royden 2000, p. 706). On by default
+    /// since 2026-10-25. Off, or without `thermal_strength`, only crust an orogeny raised flows
+    /// (PLT-415's gate). ledger: PLT-581
+    pub collapse_sheet_thermal: bool,
     /// The lithosphere's thermal state (`plates/thermal.rs`, gap 4): each sample carries the depth
     /// of its thermal lithosphere and its depleted keel; arcs, back-arcs, hotspots and rifts heat
     /// it, elsewhere it cools on McKenzie's time; continental heat flow comes from it (with the
@@ -1100,6 +1109,7 @@ impl Default for TectonicParams {
             collapse_sheet_viscosity_pa_s: 1.0e22,
             // ledger: PLT-415
             collapse_sheet_strength_myr: 62.8,
+            collapse_sheet_thermal: true, // ledger: PLT-581 (on since 2026-10-25)
             thermal_state: true,          // ledger: PLT-460 (on since 2026-10-23)
             thermal_isostasy_m: 0.0,      // ledger: ISO-110 (off: an open fault; 1,600 m when on)
             thermal_reference_km: 225.0,  // ledger: ISO-111

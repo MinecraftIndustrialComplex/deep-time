@@ -4651,7 +4651,8 @@ by PLT-413), L the lithosphere's 100 km (FRC-010), and η = η_0 e^(a / τ_s) wi
 the column's last orogenic uplift and τ_s = 62.8 Myr, McKenzie (1978)'s thermal time (PLT-415: the
 exponential form is the model's; η is 100 times η_0 at 290 Myr). A column releases the larger of
 this and the threshold law's q. Crust no orogeny raised (cratons, platforms) does not flow: the
-audit's minimal strength field. At η_0 = 10²² Pa s a 4.2 km column under a sea at the datum
+audit's minimal strength field (since 2026-10-25 the sheet reads the lithosphere's thermal state in
+the tag's place: "The collapse reads the thermal state", PLT-581). At η_0 = 10²² Pa s a 4.2 km column under a sea at the datum
 (ΔU about 5 × 10¹² N/m, England & Houseman's figure) thins 3.9 % per Myr as its orogeny ends
 (an e-fold of 26 Myr), a 2 km one 1.3 % (75 Myr); a 255 m eclogite root pull (PLT-281) brings the
 test column to 3.56 % per Myr.
@@ -8547,3 +8548,80 @@ of the commit against master's key).
   resampling hands each new sample the record of its blend's major corner and books the blend and
   the crust accreted under it (the stack) as two parts of their own. Every 50 Myr a file holds the
   visible continental samples with their record, orogeny tag and age, lithosphere and keel.
+
+#### What the trace found (supercontinent seed 1, 300 Myr, 2026-10-25)
+
+One run (`pool.sh run fl-trace`, key 188b5e2f2852, aliased to master's base12 runs), read with
+`build/front/trdip.py`, `trdip2.py` and `tratt.py` (not kept). The lattice spacing is about 60 km.
+
+*The dip.* The band is real and it is the frozen lattice. Taking "on the boundary" as a visible
+sample of another plate within 1.5 spacings now, 91 % of the off-boundary fronts read a hidden front
+neighbour, and so do 90 % of the on-boundary fronts by a cycle's end; the frozen front neighbour
+stands 1,015 km away now (median) off the boundary and 704 km on it at a cycle's end, against 60 to
+70 km on a new lattice. The ocean-continent fronts per step, and what a rule on the current geometry
+would keep:
+
+| rule | end of a cycle | new lattice | mid-cycle | change at a resampling |
+|---|---|---|---|---|
+| today's (a lattice neighbour of another plate) | 708 | 498 | 590 | −29.7 % |
+| a visible lattice neighbour of another plate | 94 | 97 | 77 | |
+| a visible sample of another plate within 2 spacings now | 485 | 469 | 510 | −3.4 % |
+| within 3 spacings | 551 | 494 | 558 | −10.3 % |
+
+On a new lattice 97 % of the ocean-continent fronts have a visible sample of another plate within
+2.25 spacings. The two-spacing rule is the one the coordinator approved ("The front on the current
+geometry").
+
+*The thickening.* At 300 Myr the land above 2 km is 0.125 of the land: 4,113 samples, of them 2,813
+Himalayan, 546 Andean and 754 untagged. 377 untagged columns stand at 49 to 51 km, T_c (50 km in
+the run), every one above 2 km: 93.6 % crossed 45 km in the founder (`collapse::founder`, the
+excess over `crust_max_km` spread to continental room thinner than T_c, filled up to T_c), and 87 %
+of what they gained since came from it; their peak was 50.0 to 50.3 km. Their lithosphere is 61,
+78 and 137 km (quartiles), keel 0: hot crust, not cratons (the untagged 35 to 45 km columns are at
+225 km). The founder's receivers keep no orogeny, so PLT-415's tag gate leaves them where it put
+them. The coast with high ground (land within 1.6 spacings of the sea with land above 2 km within
+200 km; v1census's landmass test left out) is 0.231: its nearest high ground is Himalayan in 66 %
+(stamped 0, 0 and 14 Myr ago, quartiles), untagged in 22 % (parked at T_c in 5 %) and Andean in 12 %,
+68, 80 and 134 km thick. The coast cells themselves carry no front flag; 20 % carry the foreland
+flag. Coastal high ground is mostly young collision belts running out to the sea, not the parked
+columns.
+
+### The collapse reads the thermal state (2026-10-25, PLT-581)
+
+*Is the tag gate physics?* No: a stand-in. PLT-415 says why crust no orogeny raised does not flow:
+"the audit's minimal strength field: cratons and old belts stay". The tag stood for the crust's
+strength. Since ISO-112 the sheet's viscosity already reads the lithosphere's thermal age in place
+of the orogeny's, so the gate is the last place where the tag stands in for the thermal state, and
+it is wrong where the two part: crust thickened by something other than an orogeny (the founder's
+receivers, the lower-crustal flow of PLT-300, which carries no tag either) over a hot lithosphere.
+Reading the thermal state directly is the cleaner fix than handing the tag on (the coordinator's
+call of 2026-10-25: the thermal reading, not the inheritance).
+
+*The source.* Clark & Royden (2000, full text read 2026-10-25) fit the topography of eastern Tibet
+with flow in a lower-crustal channel and draw where it goes by the crust's strength, not by its
+history. Fig. 5's caption (p. 706): "Areas shaded in dark gray represent regions of cold, strong,
+continental material; light gray area represents intermediate strength; and white areas represent
+weak crustal regions. Thus, lower crust escapes from beneath thickened, elevated central plateau
+through regions where crust is weak." The Sichuan Basin is the strong case (p. 706): "the strength
+of the crust beneath the Sichuan Basin inhibits flow of lower crustal material from central Tibet".
+Their best fit had the channel "uniformly weak at the initiation of flux into the channel,
+suggesting that the low-gradient margins of Tibet were already weak before the onset of crustal
+thickening" (p. 705): the margin's crust flowed because it was weak, before any orogeny thickened
+it. Beaumont et al. (2001, author manuscript read 2026-10-25) tie the weakness to heat: the channel
+is 10¹⁹ Pa s where it is at 750 °C or more (p. 1), and "Isotherms are advected pro-ward by channel
+flow" (p. 2), so hot crust that flowed out of a belt is still hot.
+
+*The law.* With `tectonics.collapse_sheet_thermal` (on by default) and the thermal state and
+strength on, the sheet's gate on the orogeny goes: crust no orogeny raised thins at ε̇ = ΔU / (4 η L)
+too, with η = η_0 e^(t_eq / τ_s) at its lithosphere's thermal age (PLT-414, PLT-415, ISO-112). A
+craton at L_cold has an infinite thermal age, so an infinite η: it stays rigid, as the gate kept it,
+now because it is cold. A sample the state has not reached (L = 0) keeps the gate. Off, or without
+`thermal_strength`, the sheet is PLT-415's as before.
+
+*The test.* `the_founders_receivers_flow_where_the_lithosphere_is_hot` (`plates/collapse.rs`): a
+belt 95 km thick inside a continent on a 78 km lithosphere (the parked columns' median), a craton at
+L_cold beside it and a thinned margin as room. The founder fills its receivers to exactly T_c with
+no orogeny; gated (the switch off), every receiver is still at T_c after 100 Myr while the belt
+thins past it; with the switch, the hot receivers thin below T_c − 1 km and the craton's stay at
+T_c. The rate itself: a 15 km excess flows on a 78 km lithosphere, not on L_cold, not without a
+state, not with the switch off.
