@@ -8038,7 +8038,7 @@ the rule PLT-330 gave the arcs' fronts). The slab pull acts there along the boun
 (`shortening::boundary_normal`, PLT-310) over the sample's share of the straight front
 (`shortening::front_share_rad`, PLT-530), and the slab grows by the convergence along that normal.
 The slab resistance (FRC-017), the slab suction (PLT-540) and the collision resistance (FRC-018)
-count the same metres along the same normal. A slab no front feeds (it hangs, PLT-061) pulls along
+count the same metres along the same normal. A slab no front feeds (it hangs for up to `slab_breakoff_myr`) pulls along
 the normal over the shares of the whole shared boundary. Off, the old law: every lattice edge
 converging on an active contact is a front, one spacing per overriding sample along that edge, the
 slab fed by the convergence along it. No constant of its own.
