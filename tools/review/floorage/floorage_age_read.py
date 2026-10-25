@@ -12,6 +12,7 @@ BANDS = ["0-10", "10-30", "30-60", "60-100", "100-150", "150-180", "180-250", "2
 PLACES = ["margin", "interior", "giant", "notrench", "nofront", "x_interior_rest", "x_neither", "x_giant_notrench",
           "x_margin_notrench"]
 GATES = ["150", "117.4"]
+DIST = ["0-500", "500-1000", "1000-2000", "2000+", "none"]
 
 
 def pooled(runs):
@@ -51,6 +52,17 @@ def show(name, runs, names):
     print(f"{'>180':>8} {old / n:6.3f} " + " ".join(f"{sum(tot[p][6:]) / max(old, 1):12.3f}" for p in PLACES))
     print(f"{'>150':>8} {sum(oc[5:]) / n:6.3f} " + " ".join(f"{sum(tot[p][5:]) / max(sum(oc[5:]), 1):12.3f}"
                                                             for p in PLACES))
+    for key in ("old180_margin_dt_own", "old180_margin_dt_any", "old180_open_dt_own", "old180_open_dt_any",
+                "old180_margin_own_trench_age", "old180_open_own_trench_age"):
+        tot_k = None
+        for r in runs:
+            for s in r["snaps"]:
+                if key in s:
+                    tot_k = s[key] if tot_k is None else [a + b for a, b in zip(tot_k, s[key])]
+        if tot_k:
+            labels = BANDS if key.endswith("_age") else DIST
+            m = max(sum(tot_k), 1)
+            print(f"{key}: " + ", ".join(f"{lab} {x / m:.3f}" for lab, x in zip(labels, tot_k)) + f" (n {sum(tot_k)})")
     for g in GATES:
         s = st[g]
         m = max(sum(s), 1)
