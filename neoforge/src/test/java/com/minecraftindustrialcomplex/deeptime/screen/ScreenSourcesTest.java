@@ -161,8 +161,8 @@ class ScreenSourcesTest {
         }
         for (String k : CustomizeTopics.headingKeys())
             used.add("deeptime." + k);
-        used.add("generator.deeptime.planet");
-        used.add("generator.deeptime.planet_32k");
+        used.add("generator.deeptime.planet_cube");
+        used.add("generator.deeptime.planet_cube_32k");
         List<String> missing = used.stream().filter(k -> !o.has(k)).toList();
         assertEquals(List.of(), missing);
         // Ben's rule: no em dashes in any text the player reads.
