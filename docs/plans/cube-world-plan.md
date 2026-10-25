@@ -946,7 +946,9 @@ the only Deep Time world types; see the note under 7.4.)
   - **Spawn.** As W5.
 
   The tests whose fixtures change:
-  - `SeamlessWorldGameTests` is rewritten for the cube;
+  - `SeamlessWorldGameTests` is rewritten for the cube (done 2026-10-24, section 7.4: deleted with
+    the Petroff-Guyou world; `CubeWorldGameTests.cubeWorldLayout`, `cubeFillIsThePartnerTurned` and
+    `cubeBorderStopsAndFolds` test the cube's layout, fold and border);
   - `RealPlanetGameTests`;
   - `FarTerrainGameTests`, which uses Lambert `poleZ` on the Petroff-Guyou planet today;
   - `EditorModelGameTests`, `ImpactGameTests` and `SeamGameTests`;

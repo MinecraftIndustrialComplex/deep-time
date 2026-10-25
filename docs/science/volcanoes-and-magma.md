@@ -83,10 +83,14 @@ touches water or an open cave: open space within 1.5 blocks of a chamber or lens
 up from its surface, becomes basalt (MAG-011; since 2026-10-03 the shell is that thick everywhere,
 where before it was the ellipsoid's radii plus 1.5 and thinner than a block over the flanks of lenses
 more than about 50 blocks in radius). A cave that reaches the narrow column from above leaves its
-lava capped by magma blocks, except under a lava lake: there the column is lava all the way up into
-the lake's floor, whatever the cave, walled in by its basalt sleeve (MAG-018; since 2026-10-17, when
-a cave entrance in the crater of the test planet's shield, open to the sky down to y 46, 41 blocks
-under the lake's floor, left the column an open shaft with the lake's lava hanging over it).
+lava capped by magma blocks, and the open column above the cap basalt, except under a lava lake:
+there the column is lava all the way up into the lake's floor, whatever the cave, walled in by its
+basalt sleeve (MAG-018; since 2026-10-17, when a cave entrance in the crater of the test planet's
+shield, open to the sky down to y 46, 41 blocks under the lake's floor, left the column an open
+shaft with the lake's lava hanging over it). The column is five blocks across and each of its five
+columns has its own ground, so until 2026-10-24 a cave that opened one of them deeper than the
+others left water beside the others' lava: on the cube test planet a hole in the sea bed over a
+submerged shield, 24 to 33 blocks deep over the conduit's columns, put sea water on 10 faces of its conduit's lava.
 Extinct volcanoes have no magma.
 
 **Lava flows** (since 2026-10-22, review fix 8; VOL-140 to VOL-163). The ground of each active

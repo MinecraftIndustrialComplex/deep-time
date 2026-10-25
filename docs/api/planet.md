@@ -176,5 +176,6 @@ and latitude over half-block steps in eight directions, distances, bearings and 
 across every seam, edge and wrap, rings round every cone point and corner, long-range agreement of
 distance, bearing and destination, the pole convention, empty answers off the planet, and the
 lookup. Each run prints its measurements on lines starting `[contract]`. A new map passes this
-suite before it ships; the GameTests `climateApiOnTheRealPlanet`, `climateApiIsEmptyElsewhere`,
-`climateApiOnTheCube` and `seamlessWorldLayoutAndFold` check the lookup on real levels.
+suite before it ships; the GameTests `climateApiOnTheRealPlanet` (on the cube test planet since
+2026-10-24), `climateApiIsEmptyElsewhere` and `climateApiOnTheCube` check the lookup on real levels
+(`seamlessWorldLayoutAndFold` went with the Petroff-Guyou world).

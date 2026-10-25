@@ -2,6 +2,8 @@
 package com.minecraftindustrialcomplex.deeptime.gametest;
 
 import com.minecraftindustrialcomplex.deeptime.DeepTime;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.MinecraftServer;
@@ -76,6 +78,16 @@ final class ChunkSampling {
                         throw new GameTestAssertException(e.toString());
                     }
                 });
+    }
+
+    /**
+     * Whether block (x, z) lies on the world's faces (x wraps): always on a world that is not a cube.
+     * Off a cube's faces a chunk is a turned copy of its partner up to its carvers ({@code CubeFill}):
+     * at the noise step it is still empty, it has no features of its own, and the void squares'
+     * diagonals join two partners' terrain, so a test of generation reads the faces only.
+     */
+    static boolean onFaces(WorldData wd, long x, long z) {
+        return !(wd.projection() instanceof WorldProjection.Cube cube) || cube.cube().faceOfBlock(x, z) != null;
     }
 
     private static boolean take(MinecraftServer server) {

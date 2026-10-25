@@ -291,8 +291,11 @@ public final class ImpactGameTests {
         List<Craters.Crater> all = wd.craters().list();
         Set<String> fates = Set.of("fresh", "degraded", "buried", "eroded_to_roots");
         for (Craters.Crater k : all) {
+            // A crater stands at a canonical point of the world: on the cube, on a face of the net's
+            // window (x in [−3s/2, 5s/2)), as craters.json gives it.
+            double[] canon = wd.projection().canonical(k.x(), k.z());
             if (!(k.diameterM() > 0) || !fates.contains(k.fate()) || k.reliefM() > 1.01 * k.depthM() + 1 || k.reliefM() < 0
-                    || Math.abs(k.x()) > c / 2.0 || Math.abs(k.z()) > wd.projection().zMax()) {
+                    || !(Math.abs(canon[0] - k.x()) < 1e-6 && Math.abs(canon[1] - k.z()) < 1e-6)) {
                 helper.fail("crater " + k.id() + " is not sane: " + k);
                 return;
             }
@@ -366,7 +369,9 @@ public final class ImpactGameTests {
         StringBuilder profile = new StringBuilder();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         ChunkSampling.forEach(helper, FLOOR_COLUMNS.length, i -> {
-            int x = cx + FLOOR_COLUMNS[i][0], z = cz + FLOOR_COLUMNS[i][1];
+            // The column's block x in Toroidal World's frame [−c/2, c/2), where its chunk is generated
+            // (a crater's x is in the cube net's window, which reaches c/2 past it).
+            int x = Math.floorMod(cx + FLOOR_COLUMNS[i][0] + c / 2, c) - c / 2, z = cz + FLOOR_COLUMNS[i][1];
             ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.SURFACE, true);
             int top = (int) Math.ceil(t.height(x, z));
             if (i == 0)
