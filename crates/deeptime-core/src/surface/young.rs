@@ -1157,7 +1157,10 @@ mod tests {
     /// (2026-10-23) gave every plate `Sample` two more `f32`s (`lithosphere_km`, `keel_km`), 8 B a
     /// sample in the three copies `plates::estimate` lists: 2.3 MiB on quick (100,000 samples) and
     /// 5.7 MiB on full (250,000). The holds below are the 2026-10-19 measures plus that, not
-    /// measured again (quick 947 → 949, full 3,462 → 3,468 MiB); quick lists 1,107 MiB.
+    /// measured again (quick 947 → 949, full 3,462 → 3,468 MiB); quick lists 1,107 MiB. Gap 6
+    /// (2026-10-24) gave it a `u32` and an `f32` more (`carrier`, `carrier_lithosphere_km`), the
+    /// same 8 B in the same three copies, added the same way (quick 949 → 951, full 3,468 → 3,474
+    /// MiB); quick lists 1,109 MiB.
     #[test]
     fn the_estimate_covers_the_measured_hold_closely() {
         const MIB: u64 = 1 << 20;
@@ -1170,8 +1173,8 @@ mod tests {
             .unwrap()
         };
         for (name, held_mib) in [
-            ("earthlike_quick_16k", 949u64),
-            ("earthlike_full_16k", 3468),
+            ("earthlike_quick_16k", 951u64),
+            ("earthlike_full_16k", 3474),
         ] {
             let crate::preset::PresetBody::Planet(p) =
                 crate::preset::Preset::from_json(&json(name)).unwrap().body

@@ -1,0 +1,25 @@
+{
+  "_doc": "Gap 6 (2026-10-24): the flexural foreland basins. `foredeep` reads the plate check's own foredeep from the record (every run) and, on runs made with it asked for, the final frame's basin in front of each active collision's footprint (its width to the flexure's zero crossing, its depth below local isostasy, the forebulge, the fill and the elastic thickness). Pass it with --registry tools/review/pool/measures_foredeep.json and --measures v1census,guard,foredeep. Earth: foredeeps 100 to 300 km wide holding 2 to 8 km of fill, forebulges 60 to 470 km wide (DeCelles & Giles 1996); the plate check asks 150 to 450 km. The depth here is flexure, about a quarter of the fill (measure_foredeep.py). Definitions in measure_foredeep.py.",
+  "measures": {
+    "foredeep": {
+      "version": 1,
+      "doc": "the foreland basin: the record's foredeep in front of belts above 3 km (the plate check's rows) and the final frame's profile beyond the active collisions' footprints; definitions in measure_foredeep.py",
+      "command": ["{py}", "-I", "{tools}/measure_foredeep.py", "{run}"],
+      "python": "numpy",
+      "needs": ["rec"],
+      "fields": ["elevation", "plates/collision_mm_yr", "plates/flags", "plates/plate_id", "surface/flexure_m", "surface/sediment_m", "surface/elastic_thickness_km"],
+      "columns": [
+        {"key": "rec_n_high", "key2": "rec_has_share", "label": "record: belts above 3 km / share with a foredeep", "target": null, "digits": 2, "pair": true},
+        {"key": "rec_width_p50", "label": "record: foredeep width, km (plate check 150 to 450)", "target": [150, 450], "digits": 0},
+        {"key": "rec_depth_p50", "label": "record: foredeep flexure below local isostasy, m", "target": null, "digits": 0},
+        {"key": "rec_wedge_p50", "label": "record: wedge width, km (plate check 100 to 350)", "target": [100, 350], "digits": 0},
+        {"key": "fd_width_km", "key2": "fdh_width_km", "label": "final frame: foredeep width to the zero crossing, all / belts above 3 km, km (Earth 100 to 300)", "target": null, "digits": 0, "pair": true},
+        {"key": "fd_depth_m", "key2": "fdh_depth_m", "label": "final frame: deepest flexure, all / above 3 km, m", "target": null, "digits": 0, "pair": true},
+        {"key": "fd_fill_m", "key2": "fd_fill_far_m", "label": "final frame: strata in the foredeep / beyond it, m (Earth fill 2,000 to 8,000)", "target": null, "digits": 0, "pair": true},
+        {"key": "fd_bulge_m", "key2": "fd_bulge_km", "label": "final frame: forebulge, m / at km", "target": null, "digits": 0, "pair": true},
+        {"key": "fd_te_fp", "key2": "fd_te_fl", "label": "final frame: elastic thickness, footprint / foreland, km", "target": null, "digits": 1, "pair": true},
+        {"key": "fd_n_fp", "key2": "fd_n_fl", "label": "final frame: footprint / foreland cells", "target": null, "digits": 0, "pair": true}
+      ]
+    }
+  }
+}

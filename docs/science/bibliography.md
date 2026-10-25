@@ -1047,7 +1047,7 @@ Ben's decisions log entries (2026-09-29, 09-30, 10-01), docs/deeptime-design-dec
 - Library (the project's source library, not distributed): not fetched. Reason: book, no open copy named.
 - Merged keys: Molnar1988
 - Read so far (by the project): (ERO, ISO, HYP) bibliographic check only. (PLT) not stated.
-- Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) abstract fetched.
+- Read in this pass: (ERO, ISO, HYP) not fetched. (PLT) abstract fetched. Abstract again (OpenAlex) by a Sonnet sub-agent of the gap 6 agent, 2026-10-24, for flexure.md "Foreland basins": the weights of some ranges are not enough for their foredeeps; the Himalaya's geometry and India's rigidity are not in the abstract.
 - Reference check: (ERO, ISO, HYP) title is not written in the code; Crossref gives the title above and pages 179-208. The code has 179-207, a one-page difference (immaterial, but the Crossref end page is 208). The editors are not verified in this pass. (PLT) title and page start correct; the editors and the "6-7e12 N/m" figure are not in the abstract. The abstract does state that more gravitational potential energy is stored in a column with a thick crustal root and that ranges reach a maximum mean elevation; no number.
 
 ### Bird1991
@@ -5336,7 +5336,7 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Library: fetched in WP-14a. Text file: Guilloteau2000.txt.
 - Read in WP-14a: "The scale height of water ... is small (typically 2 km)". Institutional lecture notes, not peer reviewed.
 
-## Lithospheric flexure (ISO-040 to ISO-077, ISO-091 to ISO-093)
+## Lithospheric flexure (ISO-040 to ISO-077, ISO-091 to ISO-093, ISO-131)
 
 ### Calmant1990
 - Reference: Calmant, S., Francheteau, J., Cazenave, A. (1990). Elastic layer thickening with age of the oceanic lithosphere: a tool for prediction of the age of volcanoes or oceanic crust. Geophysical Journal International 100(1):59-67.
@@ -5390,11 +5390,11 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Burov, E. B., Diament, M. (1995). The effective elastic thickness (Te) of continental lithosphere: What does it really mean? Journal of Geophysical Research 100(B3):3905-3927.
 - DOI or URL: 10.1029/94JB02770
 - Cited as: "Burov & Diament 1995"
-- Ledger ids: ISO-050
-- Access: paywalled (abstract visible).
-- Library (the project's source library, not distributed): not fetched. Reason: no copy could be fetched: html not the work (title match 0.09, 1010 chars).
-- Substitute: none found.
-- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: 70-90 km for cratons, 10-20 km at the low end; thermotectonic age is one of at least three controls (with crust-mantle decoupling and plate curvature).
+- Ledger ids: ISO-050, ISO-131
+- Access: paywalled (abstract visible); an open copy on HAL: https://hal-insu.archives-ouvertes.fr/insu-01354129/file/jgrb-100-b3-3905-burov-diament.pdf
+- Library (the project's source library, not distributed): not filed; fetched to the gap 6 agent's build folder, 2026-10-24.
+- Substitute: none needed since 2026-10-24.
+- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: 70-90 km for cratons, 10-20 km at the low end; thermotectonic age is one of at least three controls (with crust-mantle decoupling and plate curvature). Full text by a Sonnet sub-agent of the gap 6 agent, 2026-10-24 (the page image of p. 3915 checked): for decoupled layers the effective thickness is the cube root of the sum of the layers' cubes, Te = (sum of dh_i^3)^(1/3) (p. 3915); for coupled layers it is their sum (Eq. 15). ISO-131 takes the decoupled form for a belt on an underthrust plate.
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct. The model uses the age control only.
 
@@ -5439,11 +5439,11 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 - Reference: Lyon-Caen, H., Molnar, P. (1983). Constraints on the structure of the Himalaya from an analysis of gravity anomalies and a flexural model of the lithosphere. Journal of Geophysical Research 88(B10):8171-8191.
 - DOI or URL: 10.1029/JB088iB10p08171
 - Cited as: "Lyon-Caen & Molnar 1983"
-- Ledger ids: ISO-055
+- Ledger ids: ISO-055, ISO-131, PLT-546
 - Access: paywalled (abstract visible).
 - Library (the project's source library, not distributed): not fetched. Reason: no open copy located by the lookups tried (Crossref licence links, Europe PMC, Semantic Scholar, and OpenAlex for part of the list).
 - Substitute: none found.
-- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: flexural rigidity about 0.7e25 N m under the Ganga basin and Lesser Himalaya, 0.1 to 1.0e23 N m beneath the Greater Himalaya.
+- Read so far (by the project): abstract by a Sonnet sub-agent of the flexure agent on 2026-10-02: flexural rigidity about 0.7e25 N m under the Ganga basin and Lesser Himalaya, 0.1 to 1.0e23 N m beneath the Greater Himalaya. Abstract again (OpenAlex) by a Sonnet sub-agent of the gap 6 agent, 2026-10-24: the Indian plate is flexed under the mountains and the Ganga sediments, with D about 0.7e25 N m (0.2 to 2.0e25) and an end moment of about 0.6e18 N m; the full text (the break's place in km) was not obtained.
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct. It is evidence for a stiff foreland beside a weak belt, not for a break along every plate boundary.
 
@@ -5495,12 +5495,62 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 ### DeCellesGiles1996_flexure
 - Reference: DeCelles, P. G., Giles, K. A. (1996). Foreland basin systems. Basin Research 8(2):105-123. (Also `DeCellesGiles1996` in the Plate tectonics section, where stage 1 saw the abstract only.)
 - DOI or URL: 10.1046/j.1365-2117.1996.01491.x; full text https://pages.uoregon.edu/rdorsey/BasinAnalysis/BasinPapers/DeCelles%20&%20Giles%201996.pdf
-- Cited as: docs/design/flexure.md section 11
-- Ledger ids: none (the acceptance figures of docs/design/plate-force-balance.md).
+- Cited as: docs/design/flexure.md section 11; flexure.md "Foreland basins"
+- Ledger ids: ISO-131 (and the acceptance figures of docs/design/plate-force-balance.md).
 - Access: open copy.
-- Read so far (by the project): full text by a Sonnet sub-agent of the flexure agent on 2026-10-02: "Foredeep depozones are typically 100-300 km wide and 2-8 km thick"; forebulges 60-470 km wide and a few tens to a few hundred metres high, as a flexural prediction.
+- Read so far (by the project): full text by a Sonnet sub-agent of the flexure agent on 2026-10-02: "Foredeep depozones are typically 100-300 km wide and 2-8 km thick"; forebulges 60-470 km wide and a few tens to a few hundred metres high, as a flexural prediction. Full text again by a Sonnet sub-agent of the gap 6 agent, 2026-10-24: the same (p. 110); flexural parameters of 26 to 150 km for rigidities of 1e21 to 1e24 N m, and the foredeep's subsidence from topographic, sediment and subduction loads (p. 111).
 - Read in this pass: not part of stage 1; see "Read so far".
 - Reference check: correct; this settles what stage 1 could not see.
+
+### Beaumont1981
+- Reference: Beaumont, C. (1981). Foreland basins. Geophysical Journal of the Royal Astronomical Society 65(2):291-329.
+- DOI or URL: 10.1111/j.1365-246X.1981.tb02715.x (from memory); publisher PDF https://academic.oup.com/gji/article-pdf/65/2/291/1559384/65-2-291.pdf (bronze open access)
+- Cited as: "Beaumont 1981" (flexure.md "Foreland basins")
+- Ledger ids: ISO-131, PLT-546
+- Access: open copy.
+- Library (the project's source library, not distributed): not filed; fetched to the gap 6 agent's build folder, 2026-10-24.
+- Read so far (by the project): full text by a Sonnet sub-agent of the gap 6 agent, 2026-10-24 (the OCR of the rigidities checked on page images): D = 1e25 N m and a relaxation time of 27.5 Myr fit the Alberta basin (abstract, p. 291; "D = 10^25 N m and tau = 20-35 Myr", p. 326); an apparent rigidity of 1e24 to 1e25 N m (p. 311); plates of about 38, 83 and 178 km for 1e24, 1e25 and 1e26 N m (Fig. 9, p. 311); the plate continuous across the orogen (Fig. 2c, p. 295) and "A uniform plate model is therefore employed" (p. 296); "Simple 'worst case' broken plate models show that lateral thinning of the lithosphere will have no major influence on the stratigraphy of the foreland basin more than 300-600 km to the east. It will, however, increase the subsidence immediately beneath the fold-thrust belt" (p. 327); deposits no more than 200 km beyond the edge of disturbance (p. 307).
+- Reference check: journal, volume and pages as read on the PDF; the DOI from memory.
+
+### Jordan1981
+- Reference: Jordan, T. E. (1981). Thrust loads and foreland basin evolution, Cretaceous, western United States. AAPG Bulletin 65(12):2506-2520.
+- DOI or URL: OSTI record https://www.osti.gov/biblio/5833572
+- Cited as: "Jordan 1981" (flexure.md "Foreland basins")
+- Ledger ids: PLT-546
+- Access: paywalled (abstract on OSTI).
+- Library (the project's source library, not distributed): not fetched. Reason: AAPG Datapages and GeoScienceWorld refused.
+- Read so far (by the project): abstract by a Sonnet sub-agent of the gap 6 agent, 2026-10-24: flexure of an elastic lithosphere by the thrust plates' loads "is sufficient to control the formation of a foreland basin"; D about 1e23 N m; erosion of the thrust plates redistributed the load and widened the subsidence.
+- Reference check: as on the OSTI record.
+
+### FlemingsJordan1989
+- Reference: Flemings, P. B., Jordan, T. E. (1989). A synthetic stratigraphic model of foreland basin development. Journal of Geophysical Research 94(B4):3851-3866.
+- DOI or URL: 10.1029/JB094iB04p03851
+- Cited as: "Flemings & Jordan 1989" (flexure.md "Foreland basins")
+- Ledger ids: none (context for ISO-131)
+- Access: paywalled (abstract on OpenAlex).
+- Library (the project's source library, not distributed): not fetched.
+- Read so far (by the project): abstract by a Sonnet sub-agent of the gap 6 agent, 2026-10-24: wedge thickening, diffusive erosion and deposition, an elastic lithosphere; "Rapid thrusting results in a narrow underfilled basin, while slow thrusting results in a wide overfilled basin". See `FlemingsJordan1990` for the same model in full.
+- Reference check: as on OpenAlex.
+
+### FlemingsJordan1990
+- Reference: Flemings, P. B., Jordan, T. E. (1990). Stratigraphic modeling of foreland basins: interpreting thrust deformation and lithosphere rheology. Geology 18:430-434 (the title's first part from memory).
+- DOI or URL: course copy https://people.uncw.edu/lamaskint/GLY%20445-545%20FALL%202013/Flemings%20and%20Jordan%201990%20GEOLOGY%20Foreland%20Basin%20Modeling.pdf
+- Cited as: "Flemings & Jordan 1990" (flexure.md "Foreland basins")
+- Ledger ids: none (context for ISO-131)
+- Access: a course copy.
+- Library (the project's source library, not distributed): not filed; fetched to the gap 6 agent's build folder, 2026-10-24.
+- Read so far (by the project): full text by a Sonnet sub-agent of the gap 6 agent, 2026-10-24: "the lithosphere is assumed to be unbroken and to have an elastic thickness of 25 km, a value determined by previous modeling studies of retro-arc foreland basins (Jordan, 1981)" (p. 431).
+- Reference check: volume and pages as read; the title's first part from memory.
+
+### Angevine1990
+- Reference: Angevine, C. L., Heller, P. L., Paola, C. (1990). Quantitative Sedimentary Basin Modeling, chapter 5, Flexure. AAPG Continuing Education Course Note Series 32 (the series from memory).
+- DOI or URL: chapter copy https://pages.uoregon.edu/rdorsey/BasinAnalysis/AngevineEtal1990/Chapt%205%20Flexure.pdf
+- Cited as: "Angevine et al. 1990 eq. 5.8" (surface/flexure.rs test a_line_load_on_a_broken_plate_gives_the_analytic_profile; flexure.md "Foreland basins")
+- Ledger ids: ISO-131
+- Access: a course copy.
+- Library (the project's source library, not distributed): not filed; fetched to the gap 6 agent's build folder, 2026-10-24.
+- Read so far (by the project): chapter 5 by a Sonnet sub-agent of the gap 6 agent, 2026-10-24, eq. 5.8 checked by the gap 6 agent: the broken plate's deflection w = w0 e^(-x/alpha) cos(x/alpha) with w0 = V alpha^3 / 4D, the load V shared between the two broken ends; the whole load on one end gives V alpha^3 / 2D.
+- Reference check: authors, title and chapter as on the copy; the series and number from memory.
 
 
 ### StewartJamieson2019
@@ -5662,8 +5712,8 @@ Plan section 8.3, the design decisions log, STATUS.md build log, NOTICE.md, `doc
 ### WattsBurov2003
 - Reference: Watts, A. B., Burov, E. B. (2003). Lithospheric strength and its relationship to the elastic and seismogenic layer thickness. Earth and Planetary Science Letters 213(1-2):113-131.
 - DOI or URL: 10.1016/S0012-821X(03)00289-9; copy https://www.whoi.edu/fileserver.do?id=114324&pt=10&p=75973
-- Cited as: "Watts & Burov 2003" (a plate yields where it is bent hard)
-- Ledger ids: ISO-093, ISO-120
+- Cited as: "Watts & Burov 2003" (a plate yields where it is bent hard; the Te of forelands)
+- Ledger ids: ISO-093, ISO-120, ISO-131
 - Access: paywalled; a copy on WHOI's file server.
 - Library (the project's source library, not distributed): not filed; fetched to /tmp by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22 (pdftotext; its minus signs come out as "3", decoded with the paper's own 5e-6 and 1.3e-6).
 - Read so far (by the project): full text, by a Sonnet sub-agent of the flexure-guard agent, 2026-10-22: "Te slowly decreases with increasing curvature and, hence, bending stress"; for 80 Ma lithosphere at a strain rate of 1e-14 s^-1 the ratio Te(YSE)/Te(elastic) is 1 for K <= 1e-8 m^-1, and "For K = 1e-6 m^-1 the ratio is ~0.5, indicating 50% yielding"; at the northern Chile trench (K = 1.3e-6 m^-1) "Te is 22 +- 2 km" against 34 km from the plate's age; "Ideal elastic materials support any stress level. In the case of real materials, however, stress levels are limited to the rock strength at the corresponding depth"; Byerlee's brittle strength at the Moho (~35 km) 0.6 GPa (tension) to 2.0 GPa (compression).
