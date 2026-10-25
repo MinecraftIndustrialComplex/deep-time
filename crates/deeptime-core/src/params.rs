@@ -1147,8 +1147,8 @@ impl Default for TectonicParams {
             ridge_segment_km: 600.0, // ledger: PLT-502 (on since 2026-10-23)
             arc_distance_km: 200.0,
             arc_width_km: 60.0,
-            arc_slab_ends: true, // ledger: PLT-561 (on since 2026-10-24)
-            margin_slab_ends: false, // ledger: PLT-562 (the test first; no law yet)
+            arc_slab_ends: true,    // ledger: PLT-561 (on since 2026-10-24)
+            margin_slab_ends: true, // ledger: PLT-562 (on since 2026-10-24)
             island_arc_km3_per_km_myr: 100.0, // ledger: PLT-045
             continental_arc_km3_per_km_myr: 35.0, // ledger: PLT-285
             arc_mature_crust_km: 15.0, // ledger: PLT-047
