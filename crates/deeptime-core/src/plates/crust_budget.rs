@@ -31,7 +31,9 @@
 //! snapshot is not at a resampling) for
 //! `tools/review/continent-budget.py`, and the same samples' plate ids to
 //! `plate/t<Myr>.bin` (little-endian u32, one per record; [`CrustBudget::write_plates`]) for the
-//! front lane's boundary geometry (`tools/review/pool/measure_boundgeom.py`). Each snapshot also splits the land by the origin of its
+//! front lane's boundary geometry (`tools/review/pool/measure_boundgeom.py`), and their sea-floor
+//! ages to `age/t<Myr>.bin` (little-endian f32, one per record, NaN on continental crust;
+//! [`CrustBudget::write_ages`]) for the floor-age lane (`tools/review/floorage/`). Each snapshot also splits the land by the origin of its
 //! crust (`cb_origin`: island arc, collision, Andean margin, the rest).
 //!
 //! Off unless [`ON_ENV`] is set; it changes nothing the model does.
@@ -46,7 +48,7 @@ use rayon::prelude::*;
 use super::collapse::iso_height;
 use super::gap_budget::{NAMES, PARTS, Part};
 use super::geometry::Tree;
-use super::state::{OROGENY_ANDEAN, OROGENY_HIMALAYAN, Sample, pool};
+use super::state::{OCEANIC, OROGENY_ANDEAN, OROGENY_HIMALAYAN, Sample, pool};
 
 /// Set to switch the budget on.
 pub const ON_ENV: &str = "DEEPTIME_CRUST_BUDGET";
@@ -630,6 +632,22 @@ impl CrustBudget {
         }
     }
 
+    /// With [`MAPS_ENV`] set, writes the sea-floor age of each visible sample (the records of the
+    /// map the snapshot at `t_myr` wrote, in order; [`age_records`]) to `<dir>/age/t<Myr>.bin` as
+    /// little-endian f32 (measurement only; a failure is reported and ignored).
+    pub fn write_ages(&self, samples: &[Sample], t_myr: f64) {
+        let Some(dir) = &self.maps else { return };
+        let mut buf: Vec<u8> = Vec::with_capacity(samples.len() * 4);
+        for a in age_records(samples, t_myr) {
+            buf.extend_from_slice(&a.to_le_bytes());
+        }
+        let dir = dir.join("age");
+        let path = dir.join(format!("t{:04.0}.bin", t_myr.round()));
+        if let Err(e) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, &buf)) {
+            eprintln!("crust_budget: cannot write {}: {e}", path.display());
+        }
+    }
+
     /// The summary lines for `deeptime run` and `stage`.
     pub fn lines(&self) -> String {
         let mut out = format!(
@@ -644,6 +662,23 @@ impl CrustBudget {
         }
         out + &self.dock.lines()
     }
+}
+
+/// The age file's record of each visible sample, in the map's order: the sea-floor age at `t_myr`
+/// ([`Sample::age_myr`], Myr) of oceanic crust, NaN of continental crust. The ages are the ones
+/// `dynamics::ocean_ages` sorts for the dynamics record's age quantiles.
+pub fn age_records(samples: &[Sample], t_myr: f64) -> Vec<f32> {
+    samples
+        .iter()
+        .filter(|s| !s.is_hidden())
+        .map(|s| {
+            if s.kind == OCEANIC {
+                s.age_myr(t_myr) as f32
+            } else {
+                f32::NAN
+            }
+        })
+        .collect()
 }
 
 /// The f32 fields of a map record, in order.
@@ -757,6 +792,37 @@ mod tests {
             assert_eq!(f(class), own, "class {class}");
         }
         assert_eq!(map_flags(&s, 0), own);
+    }
+
+    /// The age file has one record per visible sample, NaN for each visible continental sample,
+    /// and its oceanic records, sorted, are the dynamics record's sea-floor ages.
+    #[test]
+    fn the_age_records_are_the_ocean_ages() {
+        use crate::plates::dynamics::ocean_ages;
+        use crate::plates::geometry::Geo;
+        use crate::plates::rifting::tests::{N, one_plate};
+        let geo = Geo::build(N, [0.0, 0.0, 0.0, 1.0]).unwrap();
+        let t = 640.0;
+        let mut st = one_plate(&geo, 5, |p| {
+            let mut s = column(u8::from(p.y > 0.5), 0.0);
+            s.formed_myr = (t as f32) * (0.5 + 0.5 * p.x as f32) + 30.0 * p.z as f32;
+            if p.z > 0.8 {
+                s.flags |= HIDDEN;
+            }
+            s
+        });
+        st.t_myr = t;
+        let rec = age_records(&st.samples, t);
+        let visible = st.samples.iter().filter(|s| !s.is_hidden());
+        assert_eq!(rec.len(), visible.clone().count());
+        let continental = visible.filter(|s| s.kind != OCEANIC).count();
+        assert!(continental > 0 && continental < rec.len(), "{continental}");
+        assert_eq!(rec.iter().filter(|a| a.is_nan()).count(), continental);
+        let mut ocean: Vec<f32> = rec.into_iter().filter(|a| !a.is_nan()).collect();
+        ocean.sort_unstable_by(f32::total_cmp);
+        let want: Vec<f32> = ocean_ages(&st, t).into_iter().map(|a| a as f32).collect();
+        assert!(want.iter().any(|&a| a > 0.0) && want.contains(&0.0));
+        assert_eq!(ocean, want);
     }
 
     /// Each change lands in the part it was booked to, and the moves are counted once.
