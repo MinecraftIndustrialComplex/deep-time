@@ -7988,3 +7988,117 @@ rule, its unit tests hold, all eight runs ran, the guard did not bind and the ri
 answer, not a reason to keep the hull rule. The two inflations left are the slab pull's (its old
 front and its count, a step of its own: give the pull the arcs' fronts and their straight shares,
 along the normal) and the arcs' band ends (a unit test on a straight front of known length first).
+
+### Step 9: the slab pull at the arcs' fronts (PLT-560), and the drag's calibration on its count (2026-10-24)
+
+Step 8 measured what the slab pull counts: one lattice spacing at each overriding sample with a
+front, along the fastest-converging lattice edge, where the front is every lattice edge converging
+on an active contact, so 1.71 times the arcs' straight front in spacings and 1.21 times it along
+the normal on the default planet (PLT-554). The coordinator's calls for this step: the pull takes
+the arcs' fronts (PLT-330's filter) and their straight shares, along the normal, as one cumulative
+8-run arm; FRC-016's drag is calibrated again on the same count against its own definition (the
+reference plate and its torque balance, not the V1 checks), and if the speeds then fall outside
+their sourced band that is reported, not tuned; a unit test of the arcs' band ends before any law
+change; the ocean-continent dip probe as a two-plate unit test through a resampling.
+
+**The arcs' band, first** (`the_arcs_band_runs_round_a_fronts_ends`, 40,000 samples, no law
+changed). A straight front of known length (`a_front_of_known_length`: a box of plate 1 under plate
+0, its edge a great-circle arc), on the equator and on a great circle tilted 60 degrees; the band's
+weight over its width (`plates/arc_band_km_myr`, PLT-554) split at the meridians of the front's
+ends into the part along the front and the part past its ends:
+
+| Front | Straight front over its length | Band over the straight front | Along the front, over the straight front | Past the ends, over π × 200 km |
+|---|---|---|---|---|
+| equator, 10 degrees (1,112 km) | 0.971 | 1.371 | 0.839 | 0.91 |
+| equator, 20 degrees (2,224 km) | 0.991 | 1.085 | 0.828 | 0.90 |
+| equator, 40 degrees (4,447 km) | 0.992 | 0.989 | 0.883 | 0.74 |
+| equator, 60 degrees (6,671 km) | 1.002 | 0.994 | 0.911 | 0.89 |
+| tilted, 10 degrees | 0.989 | 1.236 | 0.806 | 0.75 |
+| tilted, 20 degrees | 0.985 | 1.041 | 0.886 | 0.54 |
+| tilted, 40 degrees | 1.001 | 1.008 | 0.896 | 0.79 |
+| tilted, 60 degrees | 0.983 | 0.967 | 0.906 | 0.64 |
+
+Step 8's reading holds in its first half: the band runs round both ends of a front, 0.54 to 0.91
+of the two quarter circles (340 to 574 km) whatever the front's length (the split's meridians lie
+within a spacing of the lattice front's ends, which moves up to 0.15 of the wrap from one part to
+the other at each end). Its second half does not: a front of length L does not get L + π × 200 km
+of band, because the part along the front falls 9 to 19 % short of L. The band is made on the
+lattice distance from the nearest front sample (`fronts_reach`), which runs longer than the
+straight line across the band (up to 2/√3 on a hexagonal lattice, by the edges' direction), so the
+band is narrower than `arc_width_km` says. The two partly cancel: 1.24 to 1.37 times the straight
+front at 1,100 km, 1.04 to 1.09 at 2,200 km, 0.97 to 1.01 from 4,400 km. The planet's 1.316
+(step 8) is about what fronts near 1,000 km get. Not changed here: the ends are a law of their own
+(the coordinator's question for step 10), and the shortfall along the front is the lattice's metric
+under every distance field, not the arcs'.
+
+**The law** (`tectonics.front_pull`, on by default; `forces::balance_step`, the slab feed and the
+hanging slab; ledger PLT-560). A front sample is an overriding edge sample whose plates converge
+across their boundary beyond Bird's 20 degrees of a transform (`shortening::is_transform`, PLT-311,
+the rule PLT-330 gave the arcs' fronts). The slab pull acts there along the boundary's normal
+(`shortening::boundary_normal`, PLT-310) over the sample's share of the straight front
+(`shortening::front_share_rad`, PLT-530), and the slab grows by the convergence along that normal.
+The slab resistance (FRC-017), the slab suction (PLT-540) and the collision resistance (FRC-018)
+count the same metres along the same normal. A slab no front feeds (it hangs, PLT-061) pulls along
+the normal over the shares of the whole shared boundary. Off, the old law: every lattice edge
+converging on an active contact is a front, one spacing per overriding sample along that edge, the
+slab fed by the convergence along it. No constant of its own.
+
+**The unit tests.**
+- `the_slab_pull_takes_the_arcs_fronts_along_their_normal`: the front of 40 degrees, plate 1
+  converging at 50 mm/yr at θ from the front's normal. On, the pull's torque is the reference
+  pull's over the front's straight length along its normal: 0.988 and 0.996 of it (equator,
+  tilted) at 0 and 45 degrees, 0.956 and 0.964 at 60, within a degree of the normal; the slab fed
+  at 0.97 to 0.99 of the convergence across the front's middle. At 80 and 90 degrees the box's
+  edge has no front: none on the equator; on the tilted box a corner front or two, where the
+  boundary turns, pull 0.068 and 0.020 of the front's (asserted below 0.1). Off: 1.095 and 1.052
+  at 0 degrees, 18 to 24 degrees off the normal at 45 and 60, the slab fed up to 1.30 times the
+  convergence at 60, and at 90 degrees (a transform) 0.46 and 0.66 of the front's pull with a slab
+  fed at 36 to 44 km/Myr.
+- `the_reference_plate_on_the_lattice_moves_at_the_speed_scale`: the drag's definition on the
+  lattice (below). On, the pull is exactly the lattice trench's shares along the normal.
+- `a_split_plates_pieces_pull_with_the_parents_slab_force` (inherit.rs, PLT-534): a plate split
+  across its trench keeps its pull and suction. Off, exactly, as before. On, to about a spacing of
+  pull at each junction where the cut meets the trench, because each piece's front share is taken
+  on its own boundary: 0.58 spacings at the weight's cap in case 0, 0.10 in case 1, 0.66 over case
+  4's two junctions, cases 2 and 3 exact; the tolerance is a spacing per junction.
+
+**The drag's calibration on the pull's count** (FRC-016; the full account in
+[plate-forces.md](plate-forces.md), "The drag's calibration on the pull's count"). The definition
+puts a reference oceanic plate (the average starting plate's area, a straight 3,000 km trench of a
+full-length 80-Myr slab, its neighbours at rest) at the speed scale, and c_b follows from it in
+closed form (`Coeffs::new`). The definition counts the trench straight and along its normal, which
+the old pull did not: on the 40,000-sample lattice its pull came to 1.235 times the rim trench's,
+11 degrees off the normal, and the plate to 55.4 mm/yr. On the pull's own count it is 1.060 times
+the rim's, 0.5 degrees off, exactly the lattice trench's shares (3,193 km: the lattice's trench ends
+where the plate's samples end), and the plate 53.2 mm/yr, 50.2 per the definition's 3,000 km,
+against 49.5 for the analytic ring's plate (the flat definition on a spherical cap). So the lattice
+adds nothing but its trench's length, and c_b does not move: 2.5 × 10¹⁴ Pa s/m, 0.35 MPa at 45
+mm/yr (Forsyth & Uyeda's "roughly 5 bars" at 8 cm/yr is a coefficient 0.8 times that). What moved
+is the pull on the planet: the old count's surplus is gone, so the plates move more slowly for the
+same c_b.
+
+**The ocean-continent dip probe** (`the_ocean_continent_front_through_a_resampling`; step 8's
+records: 16,500 km of ocean-continent front lost within 2 Myr of a resampling, to the boundary
+judged a transform, on the mature, fast margins). The two-plate planet of `converging_plates`
+(20,000 samples, an ocean moving north under a continent, head-on, at up to 50 mm/yr) goes through
+a resampling with its contact carried (PLT-550), then a step on, the boundary mix and the
+continent's margin read sample by sample at each stage:
+
+| | Before | After the resampling | A step on |
+|---|---|---|---|
+| ocean-continent front (the mix, km) | 21,715 | 22,993 | 22,993 |
+| other (km) | 80 | 160 | 160 |
+| ocean-continent margin samples | 117 | 131 | 131 |
+| of them, the normal over 70 degrees off the convergence | 0 | 0 | 0 |
+| the normal's mean angle off it (degrees) | 3.3 | 6.2 | 6.2 |
+| of them, beside hidden crust | 117 | 0 | 80 |
+| the contact | active | active, carried | active by its overlap, not carried |
+
+No dip: the head-on margin keeps its class, its normals turn by a few degrees and the contact holds.
+So the records' dip is not the resampling of a head-on margin as such. What this fixture lacks is
+where to look next: obliquity (a margin near 70 degrees of its convergence, which a few degrees of
+the new lattice's normal would tip across Bird's 20), plates of several groups, a real margin's
+shape and other plates nearby. The probe that would decide is one on a real run's state: a base
+run's planet at a resampling, the margin samples that turn transform followed through it (class,
+normal, the transform test's angle, contact). The test asserts what it found (the front within 0.9
+of before, no normal over 70 degrees off at any stage, the contact active).
