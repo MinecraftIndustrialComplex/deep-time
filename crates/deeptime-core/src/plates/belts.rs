@@ -1281,8 +1281,9 @@ mod tests {
         let mut fx = Fixture::new();
         fx.preset.tectonics.collision_threshold_km = 1.0e9;
         // PLT-243's profile, highest at the front, so the wedge (PLT-244) grows from the first
-        // step; under the critical taper (the default) it grows only once the toe advances
-        // (ledger: PLT-600, PLT-601), tested in the taper's own tests.
+        // step and the belt's height within half its width rises every step. Under the critical
+        // taper (the default) the front's edge in this fixture stands at its own height until
+        // the toe advances (ledger: PLT-600, PLT-601); the taper's own tests check it.
         fx.preset.tectonics.collision_belt_taper = false;
         // The old default share (0.5), so twelve steps stay under the strength height (PLT-253)
         // and every step's rise shows in the belt's height.
@@ -1377,6 +1378,11 @@ mod tests {
     fn a_collisions_own_wedge_crosses_whole_with_the_switch() {
         let mut fx = Fixture::new();
         fx.preset.tectonics.collision_threshold_km = 1.0e9;
+        // PLT-243's profile, so the wedge (PLT-244) builds from the first step and its crust
+        // reaches the front within six. Under the critical taper the front's edge in this
+        // fixture stands at its own height until the toe advances, and the wedge waits for it
+        // (ledger: PLT-600, PLT-601).
+        fx.preset.tectonics.collision_belt_taper = false;
         let share = 0.5;
         fx.preset.tectonics.collision_stacking_share = share;
         let mut restacked = false;
@@ -1922,9 +1928,10 @@ mod tests {
                 );
             }
         }
-        let close = |a: f64, b: f64| (a - b).abs() <= 1e-6 * (a.abs() + b.abs()).max(1.0);
+        // Within a millionth of what stays (the taper books its rounding as sent down).
+        let tol = 1e-6 * (kept[0].0 + kept[0].1);
         assert!(
-            close(kept[1].0, kept[0].0) && close(kept[1].1, kept[0].1),
+            (kept[1].0 - kept[0].0).abs() <= tol && (kept[1].1 - kept[0].1).abs() <= tol,
             "the crust kept, and sent down: {kept:?}"
         );
     }
