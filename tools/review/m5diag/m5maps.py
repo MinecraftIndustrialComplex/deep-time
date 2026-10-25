@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 """M5 through time from the crust-budget maps: m5maps.py <out.jsonl> [workers] [runs]
 
-For each base12 run and each map time in TIMES: the visible plate samples (maps/t*.bin, the plate
+For each run of the arm in M5DIAG_RUNS (m5fields.RUNS, default base12) and each map time in TIMES: the visible plate samples (maps/t*.bin, the plate
 model's elevation less the step's sea level from rec.json, before the surface stage) put on
 100,000 Fibonacci points (each the nearest sample; equal-area and the same resolution at every
 time), then the census's M4 and M5 rules (m5lib, cc's helpers), the geometry factors, the split of
@@ -21,7 +21,7 @@ from scipy.spatial import cKDTree
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import m5lib  # noqa: E402
 from m5lib import cc  # noqa: E402
-from m5fields import ARM, CLASSES, FIELDS, KEY, POOL, classify  # noqa: E402
+from m5fields import CLASSES, FIELDS, RUNS, classify  # noqa: E402
 
 TIMES = [-900, -700, -500, -400, -300, -200, -150, -100, -50, 0]
 NPTS = 100_000
@@ -76,7 +76,7 @@ def one(run):
 def main():
     dest = Path(sys.argv[1])
     workers = int(sys.argv[2]) if len(sys.argv) > 2 else 3
-    runs = sorted(p for p in (POOL / KEY / ARM).glob("*-*") if p.is_dir() and (p / "maps" / "t0000.bin").exists())
+    runs = sorted(p for p in RUNS.glob("*-*") if p.is_dir() and (p / "maps" / "t0000.bin").exists())
     if len(sys.argv) > 3:
         runs = [p for p in runs if p.name in sys.argv[3].split(",")]
     print(f"{len(runs)} runs", flush=True)

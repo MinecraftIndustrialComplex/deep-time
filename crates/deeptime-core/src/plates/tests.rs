@@ -1018,8 +1018,10 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // welding seeds pass, and seed 2 welds twice; seed 4 since the collapse's thermal reading and
     // the front on the current geometry went on by default, PLT-581 and PLT-582, 2026-10-25, when
     // seed 2 no longer welds: seed 4 is the first welding seed after seed 1, which the weld test
-    // above takes).
-    let mut p = preset(8000, 300.0, "scattered_continents", 4);
+    // above takes; seed 2 again since the critical-taper belt went on by default with them,
+    // PLT-600, the same day, when seed 4 no longer welds: the sweep's welding seeds 1, 2, 6, 7,
+    // 11, 14, 15, 16, 22 and 24, seed 2 again the first after seed 1).
+    let mut p = preset(8000, 300.0, "scattered_continents", 2);
     // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
     // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
     // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
