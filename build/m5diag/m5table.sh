@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-# M5 diagnosis: the tables from the three outputs (VM).
-set -uo pipefail
-cd "$(dirname "$0")/../.."
-D=/data/ban/deeptime-runs/m5diag
-/data/ban/deeptime-runs/pool/.pyenv-numpy/bin/python3 -I build/m5diag/m5table.py $D/${1:-fields}.jsonl $D/${2:-maps}.jsonl $D/earth.json > $D/table.txt 2>&1
-cat $D/table.txt

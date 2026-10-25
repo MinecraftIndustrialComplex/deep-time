@@ -18,8 +18,9 @@ Antarctica and Greenland are kept out of Earth's shares (cc's `sheets` box). Thi
 stand-in. Earth's settings come from Bird's PB2002 steps (Bird 2003, PB2002_steps.dat; its readme
 was read).
 
-Scripts: `build/m5diag/` (m5lib.py, m5fields.py, m5maps.py, m5earth.py, m5table.py and the `.sh`
-runners). The tables are in `build/m5diag/table.txt`.
+Scripts: `tools/review/m5diag/` (m5lib.py, m5fields.py, m5maps.py, m5earth.py, m5table.py and the
+`.sh` runners). The tables are in
+[`m5-coast-high-ground-2026-10-25-tables.txt`](m5-coast-high-ground-2026-10-25-tables.txt).
 
 ## The answer in short
 
@@ -346,15 +347,16 @@ Not terms:
   not the belt.
 - **PLT-360's Earth figures are on Fibonacci points**, not the census's grid. Compare like with like.
 
-## Commands (VM; build/m5diag/)
+## Commands (VM; tools/review/m5diag/)
 
-- `tools/remote/mac.sh --kind light -- tools/remote/detach.sh start m5fields3 --kind light build/m5diag/m5fields.sh 12 fields3`
+- `tools/remote/mac.sh --kind light -- tools/remote/detach.sh start m5fields3 --kind light tools/review/m5diag/m5fields.sh 12 fields3`
   writes `/data/ban/deeptime-runs/m5diag/fields3.jsonl`. It covers the fields of each run's final
   dump at the census's L1 grid.
-- `... detach.sh start m5maps --kind light build/m5diag/m5maps.sh` writes `maps.jsonl`, the crust
+- `... detach.sh start m5maps --kind light tools/review/m5diag/m5maps.sh` writes `maps.jsonl`, the crust
   budget's maps at ten times.
-- `... detach.sh start m5earth4 --kind light build/m5diag/m5earth.sh` writes `earth.json`. It needs
-  `build/m5diag/earth-data/PB2002_steps.dat.txt` (Bird 2003's PB2002_steps.dat; not committed,
-  downloaded data, a copy is in the front lane's worktree) and SRTM15+ 15' at
-  `/data/ban/deeptime-runs/m5diag/earth/earth_relief_15m_p.grd`.
-- `tools/remote/mac.sh --kind light -- build/m5diag/m5table.sh fields3 maps` writes `table.txt`.
+- `... detach.sh start m5earth4 --kind light tools/review/m5diag/m5earth.sh` writes `earth.json`. It
+  reads SRTM15+ 15' at `/data/ban/deeptime-runs/m5diag/earth/earth_relief_15m_p.grd` and Bird
+  2003's PB2002_steps.dat at `/data/ban/deeptime-runs/m5diag/earth/PB2002_steps.dat.txt` (its first
+  argument overrides that path; downloaded data, not committed).
+- `tools/remote/mac.sh --kind light -- tools/review/m5diag/m5table.sh fields3 maps` writes
+  `/data/ban/deeptime-runs/m5diag/table.txt`, committed as the tables file above.
