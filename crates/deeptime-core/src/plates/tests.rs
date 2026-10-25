@@ -2456,94 +2456,170 @@ fn a_front_of_known_length(
     (st, geo, pos)
 }
 
-/// The arcs' band on a straight front of known length (the front lane, step 9, before any law
-/// change; plates.md, "Step 9"). The arcs make their crust over a band `arc_distance_km` behind
-/// the front (`w_arc_of`, PLT-045, a Gaussian of `arc_width_km` whose integral across the arc is
-/// √π · `arc_width_km`), on the lattice distance from the nearest front sample (`fronts_reach`).
-/// Past a front's end that distance runs round the end, so a front of length L has a band of
-/// L + π · `arc_distance_km` (a quarter circle at each end, on the overriding side only), where
-/// Earth's arcs stop near the slab's edge. Fronts of 10 to 60 degrees of a great circle, on the
-/// equator and on a great circle tilted 60 degrees from it: the band split at the meridians of
-/// the front's ends into the part along the front and the part past its ends. The ends' part is
-/// about the two quarter circles whatever the length; the part along the front is short of its
-/// length by the lattice's distance, which runs longer than the straight line across the band (up
-/// to 2/√3 on a hexagonal lattice, by the edges' direction, which turns along the Fibonacci
-/// lattice's spiral), so the band is narrower than its width. Measured (2026-10-24, 40,000
-/// samples): see plates.md, "Step 9".
+/// The arcs' band on a straight front of known length, and where it stops (the front lane, steps
+/// 9 and 10; plates.md, "Step 9" and "Step 10"). The arcs make their crust over a band
+/// `arc_distance_km` behind the front (`w_arc_of`, PLT-045, a Gaussian of `arc_width_km` whose
+/// integral across the arc is √π · `arc_width_km`), on the lattice distance from the nearest front
+/// sample (`fronts_reach`). With `tectonics.arc_slab_ends` off (PLT-561), past a front's end that
+/// distance runs round the end, so a front of length L has a band of L + π · `arc_distance_km` (a
+/// quarter circle at each end, on the overriding side only), where Earth's arcs stop near the
+/// slab's edge; on, the band stops at the slab's ends. Fronts of 10 to 60 degrees of a great
+/// circle, on the equator and on a great circle tilted 60 degrees from it: the band (the samples
+/// given arc magma, by their weight) split at the meridians of the front's ends into the part
+/// along the front and the part past its ends. Off, the ends' part is about the two quarter
+/// circles whatever the length. On, it is only what the lattice's front reaches past the
+/// meridians, and every sample a spacing or more inside them makes the same magma as off. Along
+/// the front the band is short of its length by the lattice's distance, which runs longer than
+/// the straight line across the band (up to 2/√3 on a hexagonal lattice, by the edges' direction,
+/// which turns along the Fibonacci lattice's spiral), so the band is narrower than its width: the
+/// metric's, not the arcs' law, and left as it is. Measured (2026-10-24, 40,000 samples): see
+/// plates.md, "Step 9" and "Step 10".
 #[test]
-fn the_arcs_band_runs_round_a_fronts_ends() {
-    let p = preset(40_000, 20.0, "supercontinent", 5);
-    let stage = PlatesStage::new(p.clone());
-    let env = stage.env(&p.tectonics, 1);
-    let k = &p.tectonics;
-    let wrap = std::f64::consts::PI * k.arc_distance_km;
-    let per_sample = env.norm.sample_area_km2() / (std::f64::consts::PI.sqrt() * k.arc_width_km);
+fn the_arcs_band_stops_at_the_slabs_ends() {
+    let base = preset(40_000, 20.0, "supercontinent", 5);
+    let wrap = std::f64::consts::PI * base.tectonics.arc_distance_km;
+    // Every case is printed before the test fails on any.
+    let mut failed: Vec<String> = Vec::new();
+    let mut check = |ok: bool, what: String| {
+        if !ok {
+            failed.push(what);
+        }
+    };
     for (name, frame) in [
         ("equator", glam::DQuat::IDENTITY),
         ("tilted", glam::DQuat::from_rotation_y(60f64.to_radians())),
     ] {
         let to_frame = frame.inverse();
         for lon_deg in [10.0_f64, 20.0, 40.0, 60.0] {
-            let (mut st, geo, pos) =
-                a_front_of_known_length(&p, &env, frame, lon_deg, 15.0, 0.02, 50.0);
-            let length = env.norm.km(lon_deg.to_radians());
-            // The band by where it lies: between the meridians of the front's ends, or past them.
-            let begun = subduction::fronts_begin(&st, &geo, &pos, &env);
-            let (dist, _, reached) = subduction::fronts_reach(&geo, &begun, &env);
-            let (mut along, mut ends) = (0.0, 0.0);
-            for &i in &reached {
-                let i = i as usize;
-                if !dist[i].is_finite() || st.samples[i].is_hidden() {
-                    continue;
+            // Off, then on: the band's parts, km, the farthest sample given arc magma past the
+            // meridians, spacings, and each sample's arc magma, m.
+            let mut parts = [[0.0_f64; 4]; 2];
+            let mut farthest = [0.0_f64; 2];
+            let mut spacing_km = 0.0;
+            let mut magma: [Vec<f32>; 2] = Default::default();
+            let mut inside: Vec<bool> = Vec::new();
+            for (j, on) in [false, true].into_iter().enumerate() {
+                let mut p = base.clone();
+                p.tectonics.arc_slab_ends = on;
+                let stage = PlatesStage::new(p.clone());
+                let env = stage.env(&p.tectonics, 1);
+                let k = &p.tectonics;
+                let per_sample =
+                    env.norm.sample_area_km2() / (std::f64::consts::PI.sqrt() * k.arc_width_km);
+                let spacing_deg = env.norm.spacing_rad().to_degrees();
+                spacing_km = env.norm.km(env.norm.spacing_rad());
+                let (mut st, geo, pos) =
+                    a_front_of_known_length(&p, &env, frame, lon_deg, 15.0, 0.02, 50.0);
+                let length = env.norm.km(lon_deg.to_radians());
+                let begun = subduction::fronts_begin(&st, &geo, &pos, &env);
+                let (dist, _, reached) = subduction::fronts_reach(&geo, &begun, &env);
+                let mut cones = vec![[0.0; 2]; st.samples.len()];
+                let pull =
+                    subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+                let straight = pull.front_straight_km_myr / env.dt_myr;
+                let band = pull.arc_band_km_myr / env.dt_myr;
+                // The band by where it lies: between the meridians of the front's ends, or past
+                // them.
+                let (mut along, mut ends) = (0.0, 0.0);
+                inside = vec![false; st.samples.len()];
+                for &i in &reached {
+                    let i = i as usize;
+                    let s = &st.samples[i];
+                    let x = to_frame * pos[i];
+                    let lon = x.y.atan2(x.x).to_degrees();
+                    inside[i] = lon >= spacing_deg && lon <= lon_deg - spacing_deg;
+                    if !dist[i].is_finite()
+                        || s.is_hidden()
+                        || s.arc_continental_m + s.arc_oceanic_m <= 0.0
+                    {
+                        continue;
+                    }
+                    let w = subduction::w_arc_of(env.norm.km(dist[i]), k) * per_sample;
+                    if (0.0..=lon_deg).contains(&lon) {
+                        along += w;
+                    } else {
+                        ends += w;
+                        let past = (-lon).max(lon - lon_deg) / spacing_deg;
+                        farthest[j] = farthest[j].max(past);
+                    }
                 }
-                let w = subduction::w_arc_of(env.norm.km(dist[i]), k) * per_sample;
-                let x = to_frame * pos[i];
-                let lon = x.y.atan2(x.x).to_degrees();
-                if (0.0..=lon_deg).contains(&lon) {
-                    along += w;
-                } else {
-                    ends += w;
-                }
+                magma[j] = st
+                    .samples
+                    .iter()
+                    .map(|s| s.arc_continental_m + s.arc_oceanic_m)
+                    .collect();
+                parts[j] = [straight, band, along, ends];
+                eprintln!(
+                    "{name}, front of {lon_deg} degrees, {length:.0} km, arc_slab_ends {on}: \
+                     straight {straight:.0} km ({:.3}), band {band:.0} km ({:.3} of the straight \
+                     front): along the front {along:.0} km ({:.3} of the straight front), past \
+                     its ends {ends:.0} km ({:.2} of pi times the arc's distance, {:.2} spacings \
+                     of {spacing_km:.0} km), the farthest arc {:.2} spacings past them",
+                    straight / length,
+                    band / straight,
+                    along / straight,
+                    ends / wrap,
+                    ends / spacing_km,
+                    farthest[j],
+                );
+                check(
+                    (straight / length - 1.0).abs() < 0.05,
+                    format!("{name}: the straight front {straight:.0} km of {length:.0}"),
+                );
+                // The split is the measure's band.
+                check(
+                    ((along + ends) / band - 1.0).abs() < 0.01,
+                    format!(
+                        "{name}, {lon_deg} degrees, {on}: {along:.0} + {ends:.0} km against {band:.0}"
+                    ),
+                );
             }
-            let mut cones = vec![[0.0; 2]; st.samples.len()];
-            let pull = subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
-            let straight = pull.front_straight_km_myr / env.dt_myr;
-            let band = pull.arc_band_km_myr / env.dt_myr;
-            eprintln!(
-                "{name}, front of {lon_deg} degrees, {length:.0} km: straight {straight:.0} km \
-                 ({:.3}), band {band:.0} km ({:.3} of the straight front): along the front \
-                 {along:.0} km ({:.3} of the straight front), past its ends {ends:.0} km ({:.2} \
-                 of pi times the arc's distance)",
-                straight / length,
-                band / straight,
-                along / straight,
-                ends / wrap,
-            );
-            assert!(
-                (straight / length - 1.0).abs() < 0.05,
-                "{name}: the straight front {straight:.0} km of {length:.0}"
-            );
-            // The split is the measure's band.
-            assert!(
-                ((along + ends) / band - 1.0).abs() < 0.01,
-                "{name}, {lon_deg} degrees: {along:.0} + {ends:.0} km against {band:.0}"
-            );
-            // Past the ends: about the two quarter circles, at any length. The lattice's front
-            // ends within a spacing of the meridians the split is made at, which moves up to
-            // about a spacing of band at each end (0.15 of the wrap at 40,000 samples) from one
-            // part to the other.
-            assert!(
-                (0.45..1.2).contains(&(ends / wrap)),
-                "{name}, {lon_deg} degrees: past the ends {ends:.0} km"
+            let [[_, _, along_off, ends_off], [_, _, along_on, ends_on]] = parts;
+            let straight = parts[0][0];
+            // Off, past the ends: about the two quarter circles, at any length. The lattice's
+            // front ends within a spacing of the meridians the split is made at, which moves up
+            // to about a spacing of band at each end (0.15 of the wrap at 40,000 samples) from
+            // one part to the other.
+            check(
+                (0.45..1.2).contains(&(ends_off / wrap)),
+                format!("{name}, {lon_deg} degrees: past the ends {ends_off:.0} km"),
             );
             // Along the front: no more than its length, and no less than a hexagonal lattice's
             // longest path across allows, less that spacing at each end.
-            assert!(
-                (0.75..1.03).contains(&(along / straight)),
-                "{name}, {lon_deg} degrees: along the front {along:.0} km"
+            check(
+                (0.75..1.03).contains(&(along_off / straight)),
+                format!("{name}, {lon_deg} degrees: along the front {along_off:.0} km"),
+            );
+            // On, past the ends: only what the lattice's front reaches past the meridians, at
+            // each end up to a spacing (the end sample within half a spacing of its meridian, and
+            // its half share of the front beyond it), and no arc further out.
+            check(
+                ends_on < 2.0 * spacing_km && farthest[1] < 1.25,
+                format!(
+                    "{name}, {lon_deg} degrees: past the ends {ends_on:.0} km with the slab's ends, \
+                 the farthest {:.2} spacings",
+                    farthest[1]
+                ),
+            );
+            // Along the front: the band it was, less what lies within that spacing of the ends.
+            check(
+                along_on <= along_off && along_off - along_on < 0.1 * wrap,
+                format!(
+                    "{name}, {lon_deg} degrees: along the front {along_on:.0} km against \
+                 {along_off:.0}"
+                ),
+            );
+            // A spacing or more inside the meridians, every sample makes the magma it made off.
+            let changed = (0..inside.len())
+                .filter(|&i| inside[i] && magma[0][i] != magma[1][i])
+                .count();
+            check(
+                changed == 0,
+                format!("{name}, {lon_deg} degrees: {changed} samples inside changed"),
             );
         }
     }
+    assert!(failed.is_empty(), "{failed:#?}");
 }
 
 /// The slab pull at the arcs' fronts (`tectonics.front_pull`, PLT-560; plates.md, "Step 9"), on

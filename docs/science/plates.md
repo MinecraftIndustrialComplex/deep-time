@@ -8188,3 +8188,134 @@ the reference plate). Step 10's question is the arcs' band ends (above): stop th
 slab's ends, Earth's arcs stopping near the slab's edge, with a unit test first on the straight
 front of known length. The along-front shortfall is the lattice's metric under every distance
 field and is not the arcs' law.
+
+### Step 10: the arcs' band stops at the slab's ends (PLT-561, 2026-10-24)
+
+Step 9's band test found the band 200 km behind a front running round both its ends, 0.54 to 0.91 of
+π × 200 km whatever the front's length: 1.24 to 1.37 times the straight front at 1,100 km, and on
+the planet 1.316 (fl-outline) and 1.237 (fl-pull) times the arcs' straight front. The coordinator's
+calls for this step: stop the band at the slab's ends, with the unit test first on the same
+straight-front fixture; leave the shortfall along the front, which is the lattice's metric and not
+the arcs' law; one cumulative 8-run arm, read against base9 (master's 24 runs on 06c5e327fcb0).
+
+**The physics.** An arc stands over its slab: "It is generally accepted that the volcanic front at
+subduction zones lies above the place where the slab has reached a critical depth" (England, Engdahl
+& Thatcher 2004, introduction; the depth is 65 to 130 km, "The mean depth is 101 km, with a standard
+deviation of 16 km", section 2.3); Syracuse & Abers (2006, abstract) put it at 72 to 173 km over
+500-km segments, 105 km on average. Where the slab stops there is no arc beyond it: at a slab window
+"'normal' arc volcanism is interrupted" (Thorkelson & Breitsprecher 2005, p. 27); from southeastern
+Costa Rica through Panama "The absence of a Wadati-Benioff zone ... corresponds to the position of
+the slab window" (Johnston & Thorkelson 1997, abstract); "no relict slab underlies the extinct
+northern Kamchatka volcanic arc" (Levin et al. 2002, abstract). Slab edges do have volcanism of
+other kinds, slab-edge melts (Yogodzinski et al. 2001, abstract) and volcanoes at the tear faults at
+a retreating slab's lateral margins (Cocchi et al. 2017); the model has none of them. No source read
+states the arc's end at the slab's edge as a general rule; it follows from the arc standing over the
+slab, and the slab-window and Kamchatka cases show it.
+
+**The law** (`tectonics.arc_slab_ends`, `subduction::over_the_slab`, on by default). A sample the
+arcs' distance field reaches makes arc magma only where it stands over its front's slab: along the
+line of its nearest front sample (its label in `fronts_reach`), between the ends of the front that
+sample stands on. The front is the label and the front samples joined to it one by one within two
+lattice edges in the same group (a zigzag boundary's second row, a corner), out to the band's reach
+(`arc_distance_km` + 2 `arc_width_km`, past which its weight is under e^-4, and two lattice
+spacings, because a sample's label need not be its nearest front sample on the sphere: the lattice's
+distance runs up to 2/√3 longer than the straight line, by the edges' direction). The line runs
+through the label square to the front's normals (PLT-310), each weighted by its share of the
+straight front (PLT-530), and each front sample covers its share along it, centred on it. The arc
+flag, the axis-gap rule (PLT-043), the arcs' budgets (PLT-286) and the band measure (PLT-554) follow
+the magma. The cordillera (PLT-048, PLT-320), the subduction uplift and the forearc (PLT-542) still
+run on the whole distance field. No constant of its own.
+
+**The unit test first** (`the_arcs_band_stops_at_the_slabs_ends`, which takes over step 9's
+`the_arcs_band_runs_round_a_fronts_ends` as its off half; written and committed before the law,
+eba05586). The same fixture, off and on; the band is now the samples given arc magma, by their
+weight, split at the meridians of the front's ends; the farthest arc is the farthest sample given
+arc magma past them, in spacings of 113 km (40,000 samples):
+
+| Front | Band over the straight front, off / on | Along the front over the straight front (both) | Past the ends over π × 200 km, off / on | Farthest arc past the meridians, spacings, off / on |
+|---|---|---|---|---|
+| equator, 10 degrees (1,112 km) | 1.371 / 0.878 | 0.839 | 0.91 / 0.07 | 6.06 / 0.24 |
+| equator, 20 degrees (2,224 km) | 1.085 / 0.848 | 0.828 | 0.90 / 0.07 | 6.04 / 0.29 |
+| equator, 40 degrees (4,447 km) | 0.989 / 0.892 | 0.883 | 0.74 / 0.07 | 7.10 / 0.41 |
+| equator, 60 degrees (6,671 km) | 0.994 / 0.933 | 0.911 | 0.89 / 0.24 | 7.07 / 1.02 |
+| tilted, 10 degrees | 1.236 / 0.947 | 0.806 | 0.75 / 0.25 | 5.80 / 0.38 |
+| tilted, 20 degrees | 1.041 / 0.906 | 0.886 | 0.54 / 0.07 | 5.65 / 0.34 |
+| tilted, 40 degrees | 1.008 / 0.930 | 0.896 | 0.79 / 0.24 | 7.30 / 1.01 |
+| tilted, 60 degrees | 0.967 / 0.912 | 0.906 | 0.64 / 0.07 | 5.75 / 0.34 |
+
+On, the band past the ends is 42 to 156 km (0.37 to 1.38 spacings: what the lattice's front reaches
+past the meridians, the end sample within about half a spacing of its meridian and its half share
+beyond it), against 340 to 574 km off; no sample further than 1.02 spacings past the meridians makes
+arc magma, against 5.7 to 7.3. The part along the front is the same to the km, and every sample a
+spacing or more inside the meridians makes the magma it made off (the test compares them sample by
+sample). The band is now 0.85 to 0.95 times the straight front at any length, the lattice's
+shortfall along the front left as it is. The test bounds: past the ends under two spacings, no arc
+past 1.25, along the front no more than off and within a tenth of the wrap of it, the samples inside
+unchanged.
+
+A first cut read the extent along the label's own line (its position and its own normal). It left
+the band 0.07 to 0.28 of the wrap past the ends but up to 1.64 spacings out: a front's end sample's
+normal turns at the lattice's corner, and the band 200 km behind it slipped past the end by that
+distance times the turn's tangent. The front's line (its share-weighted normals over the reach) does
+not turn at the end, which brought the farthest arc to 1.02 spacings.
+
+**The arm** (fl-ends, cumulative on step 9: the law on, everything else master's at 41b11137; 8
+runs, seeds 1 to 4, both starts, 16k samples, 1000 Myr, key 37c894cc0de0; read against base9,
+master's 24 runs on 06c5e327fcb0, and against fl-pull, its matched 8; medians, Mann-Whitney p in
+brackets):
+
+| Measure | base9 (24) | fl-pull (8) | fl-ends (8), p against base9 / fl-pull |
+|---|---|---|---|
+| Land | 0.296 | 0.288 | 0.294 (0.48 / 0.80) |
+| Largest landmass | 0.115 | 0.121 | 0.132 (0.31 / 0.44) |
+| Continental crust under the sea | 0.249 | 0.318 | 0.205 (0.24 / 0.083) |
+| Land above 2 km | 0.114 | 0.086 | 0.112 (0.88 / 0.028) |
+| Coast with high ground | 0.249 | 0.198 | 0.233 (0.72 / 0.050) |
+| Land under ice | 0.113 | 0.083 | 0.095 (0.72 / 0.38) |
+| Collisions per 100 Myr | 1.90 | 1.95 | 1.65 (0.19 / 0.14) |
+| Continental crust's net change | -0.045 | -0.035 | -0.077 (< 0.001 / 0.001) |
+| Criteria met per run, median and mean | 5, 5.08 | 5, 5.12 | 5, 5.00 (0.44 / 0.38) |
+| Sea over the datum after 100 Myr / at the end, m | 448 / 711 | 470 / 796 | 264 / 403 |
+| The guard's worst, m from the sea | 10,198 | 10,102 | 10,169 (0.54 / 0.88) |
+| Steps beyond 2 Earth reliefs | 0 | 0 | 0 |
+
+The law does on the planet what it does in the test: the arcs' band is 0.891 times the arcs'
+straight front (0.876 to 0.898 by run), against 1.237 on fl-pull (1.221 to 1.245), inside the 0.85
+to 0.95 the test gives a straight front of any length; the band is cut at the ends and nowhere along
+the front. The other front counts stay: the slab pull's spacings 1.124 times their straight front,
+0.845 along the normal, the arcs' straight front 1.112 times the pulling fronts'.
+
+The arcs make less crust. Per km of front and Myr, the continental arcs (35 km³ per km and Myr at
+the reference convergence, PLT-285) went from 17.1 to 14.4 km³ (medians over the runs, the
+convergence factor included), down 16 %; the island arcs (100, PLT-045) from 48.8 to 32.4, down 34
+%. The island arcs lose more than the band (28 %) because the wrap ran round a continental front's
+ends onto the ocean beside it, where each sample makes crust at the island-arc rate, 2.9 times the
+continental. In the area book (base9's 24 runs against fl-ends' 8, medians, shares of the planet's
+area in continental crust) what the step's finish adds, where mature island arcs turn continental
+(`finish_samples`), falls from 0.242 to 0.195 and the net change from -0.045 to -0.077; the
+continental volume at the end from 6.98 to 6.15 (×10⁹ km³), which lowers the sea over the datum (403
+m at the end against 711) and leaves less continental crust drowned (0.205 against 0.249). Before
+this step the arcs made 1.24 times their sourced rate per km of straight front; now 0.89, the
+lattice's shortfall along the front, which the coordinator left as it is.
+
+Read against base9, only the crust's net change moves (p < 0.001); land, the largest landmass, the
+high ground above 2 km and the coast with high ground do not (p 0.31 to 0.88). Against fl-pull the
+high ground above 2 km (0.086 to 0.112, p 0.028) and the coast with high ground (0.198 to 0.233, p
+0.050) rise, but base9's 24 runs (0.114 and 0.249) show that fl-pull's seeds 1 to 4 sat low: the
+step moves neither item 1 check. The plates against fl-pull (matched 8, not read against base9):
+27.3 alive against 24.7 (p 0.021), the sum of perimeters over the cap perimeters 1.758 against 1.806
+(p 0.010; Bird 1.510), spreading 0.408 of the boundary against 0.398 (p 0.007), the ocean-ocean
+share of the subducting front 0.483 against 0.453 (p 0.002; Stern & Scholl 0.35), the mean
+convergence across the oceanic front 40.4 mm/yr against 37.6 (p 0.010; Bird 53.2). The plate check
+passes 195 of its 264 run-checks (33 checks on 8 runs) against fl-pull's 181; `continental_min`
+passes on none of the 8 runs (0.328 against 0.357; band 0.37 or more), the crust loss again. The
+guard: worst 10,169 m, no step beyond 2 reliefs, the plate cells' largest excess over Airy 2,318 m
+against fl-pull's 2,923 and base9's 2,753 (p 0.010 against each).
+
+**Recommendation.** On by default (done in this branch): the law is the arc standing over its slab,
+the test bounds hold, the band on the planet is what the straight-front test gives, and nothing
+diverges or binds. The crust loss it brings is the arcs' wrap no longer making crust past the slab's
+ends, and it is not to be made up with a knob. What is left between the band and the arcs' rate is
+the lattice's metric along the front (the band 0.89 of the straight front, 11 % short), which the
+coordinator ruled out of this step.
+
