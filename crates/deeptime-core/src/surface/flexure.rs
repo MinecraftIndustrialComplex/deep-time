@@ -597,10 +597,6 @@ pub struct FlexState {
     /// the collisions' carrying plates (`StepIn::carrier_plate_id`), empty otherwise.
     #[serde(default)]
     pub belt_m: Vec<f32>,
-    /// A collision's footprint at the last step (ISO-133): each footprint cell and the plate
-    /// that carried it, in cell order.
-    #[serde(default)]
-    pub footprint: Vec<(u32, f32)>,
     /// Whose the belt's part each cell's crust carries is, as of the last step (ISO-136): the
     /// belt's plate over a belt's foreland, [`BELT_ROOT`] where the crust stood under a belt
     /// (its belt's part is that belt's root; it stays so until the crust comes into a foreland),
@@ -636,7 +632,6 @@ impl FlexState {
             seen_elevation_m: Vec::new(),
             since_solve: 0,
             belt_m: Vec::new(),
-            footprint: Vec::new(),
             belt_of: Vec::new(),
             framed: Vec::new(),
             from_m: Vec::new(),
@@ -648,10 +643,13 @@ impl FlexState {
     /// cell of a belt had a step ago in the belt's frame ([`belt_reach`]). `frame` lists the
     /// foreland's cells, each with the plate that bends it (the belt's carrying plate), the
     /// belt's plate and its source under the belt's plate's rotation. A source's corners count
-    /// where, before the step, they held a state and belonged to the bending plate: its own
-    /// crust (`prev_plate`) or the footprint it carried at the last step. A cell without such a
-    /// corner (or a step with no belt's part yet) gets NaN: its crust carries the belt's part
-    /// as anywhere, and it is in the belt's frame from the next step on.
+    /// where, before the step, they held a state and the bending plate's own crust
+    /// (`prev_plate`). Not where they held the belt (the footprint the plate carried): the belt's
+    /// part there was the belt's root under its own load, which no longer stands over the place
+    /// (the gap 6b traces: a foreland cell took 16 to 28 km from such corners against the few
+    /// hundred metres its crust carried, and the yield took most of it back in the same step).
+    /// A cell without such a corner (or a step with no belt's part yet) gets NaN: its crust
+    /// carries the belt's part as anywhere, and it is in the belt's frame from the next step on.
     pub fn carry_frame(
         &mut self,
         w: usize,
@@ -674,14 +672,7 @@ impl FlexState {
                 .collect();
             return;
         }
-        let footprint = &self.footprint;
-        let in_system = |s: usize, id: f32| {
-            self.water_m[s].is_finite()
-                && (prev_plate[s] == id
-                    || footprint
-                        .binary_search_by_key(&(s as u32), |e| e.0)
-                        .is_ok_and(|k| footprint[k].1 == id))
-        };
+        let in_system = |s: usize, id: f32| self.water_m[s].is_finite() && prev_plate[s] == id;
         let belt = &self.belt_m;
         let framed = frame
             .par_iter()
@@ -2783,15 +2774,6 @@ pub fn step(
         },
     );
     st.seen_elevation_m = seen;
-    // ledger: ISO-133
-    st.footprint = if x.carrier_plate_id.is_some() {
-        (0..n)
-            .into_par_iter()
-            .filter_map(|c| x.carrier(c).map(|(id, _)| (c as u32, id)))
-            .collect()
-    } else {
-        Vec::new()
-    };
     if !yielded.is_empty() {
         out.yielded_cells = yielded.iter().filter(|&&v| v != 0.0).count();
         // The gap budget's split: what the plate let go as it yielded is load let go.
@@ -4269,6 +4251,39 @@ mod tests {
             };
             assert_eq!(got, want, "row {j}");
         }
+    }
+
+    /// ISO-136: a foreland cell takes the belt's part from the place's own crust of the bending
+    /// plate a step ago, never from the belt over it. Rows 118 to 127 are the belt (plate 0's
+    /// crust, carried by plate 1), its root 16 km of the belt's part; rows 128 on are plate 1's
+    /// foreland with 1 km. A source between the belt and the foreland takes the foreland's 1 km
+    /// (with the belt's corners it took 8.5 km, the root's step that the gap 6b traces showed);
+    /// a source on the belt alone takes none (NaN: its crust carries its own).
+    #[test]
+    fn a_place_that_held_the_belt_gives_its_foreland_no_belt_part() {
+        let (w, h) = (8usize, 256usize);
+        let n = w * h;
+        let mut s = FlexState::fresh(n);
+        s.water_m = vec![0.0; n];
+        let prev_plate: Vec<f32> = (0..n).map(|c| if c / w >= 128 { 1.0 } else { 0.0 }).collect();
+        s.belt_m = (0..n)
+            .map(|c| match c / w {
+                118..128 => 16_000.0,
+                128.. => 1000.0,
+                _ => 0.0,
+            })
+            .collect();
+        let frame = [
+            (128 * w + 3, 1.0f32, 0.0f32, [3.0, 127.5]),
+            (129 * w + 3, 1.0, 0.0, [3.5, 130.0]),
+            (130 * w + 3, 1.0, 0.0, [3.0, 125.0]),
+        ];
+        s.carry_frame(w, h, &frame, Some(&prev_plate));
+        let got: Vec<f32> = s.framed.iter().map(|e| e.1).collect();
+        assert_eq!(got[0], 1000.0, "between the belt and the foreland");
+        assert_eq!(got[1], 1000.0, "on the foreland");
+        assert!(got[2].is_nan(), "on the belt: {}", got[2]);
+        assert!(s.framed.iter().all(|e| e.2 == 0.0));
     }
 
     /// ISO-136: crust that comes into a belt's frame from under a belt or from another belt's
