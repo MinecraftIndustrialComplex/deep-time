@@ -116,6 +116,9 @@ def main():
                                  "largest_share_of_sea": float(ssz.max() / ssz.sum()),
                                  "bodies_ge0.1_Mkm2": sorted([round(float(x), 2) for x in ssz if 0.1 <= x < 50])}
     sea_ok = slab[ok]
+    body_km2 = np.where(z > 0, np.inf, ssz[sea_ok] * 1e6)
+    for name, keep in (("no_sheets", ~sh), ("all", None)):
+        res["grid"][name]["fixed_measure"] = m5lib.fixed_measure(p, z, body_km2, n, sp, keep=keep)
     for lim in (0.1, 1.0):
         zl = z.copy()
         zl[(~(z > 0)) & (ssz[sea_ok] < lim)] = 1.0
