@@ -1198,6 +1198,26 @@ solve took that water's restoring density; without that booking the flexure of a
 sea moved 3.4 m off the case at rest already behind the belt (the bound is 1 m). Crust new at a
 place takes the belt's part where it is and moves nothing.
 
+Three rules came from the first arm's traces (g6b-both2, "On the pool" below):
+
+- **The yield is the belt's too.** Where the belt bends its foreland past what the plate holds
+  (ISO-120), the plate yields there, and the belt's part yields with the whole: off the belt it
+  holds `−ρ_m × belt_m`, and where that pushes the same way as the whole it gives up its share of
+  the sinking, all of it where the rest pushes the other way. Left with the rest, the belt's part
+  over a foreland kept the elastic answer, 18 to 38 km on the traced run where the plate holds about
+  2.75 km of mantle, and the frame moved that over the crust each step for the yield to take back.
+- **Crust coming into a foreland moves nothing.** The flexure names, for each cell, the belt whose
+  frame it is in or that it stood under a belt (`FlexState::belt_of`, carried with the crust). Crust
+  that comes into a belt's foreland from under a belt or from another belt's foreland carries a belt
+  part that is not this belt's far field, so it takes this belt's part where it is, without a move.
+  Crust from beyond any foreland moves as before: it carries the belt's far field, and the sliding
+  tests need that move (blocking it put the crust that had just entered 1.1 to 1.5 m off the case at
+  rest).
+- **A foreland ends where another belt is nearer.** With the reach of 1,180 km, belts' forelands
+  overlapped and a place's frame could change from one step to the next. A cell nearer, measured
+  over any crust, to another belt than to its own is that belt's to bend, and is in no other's
+  frame.
+
 **The foreland's stiffness** (ISO-137, ISO-138). A continental plate's strength is in two layers:
 the upper crust, strong down to about 300 °C (quartz), and the mantle under the Moho, strong down to
 about 750 °C (olivine) (Burov & Diament 1995, Figure 2's caption). Between them the weak lower
@@ -1248,6 +1268,15 @@ depth (B&D's point).
   `a_foreland_under_the_sea_sliding_under_its_belt_bends_as_one_at_rest`: the belt stands still and
   the foreland slides under it at 10 and 30 km/Myr; the flexure and the elevation are those of the
   case at rest to the metre within the reach, on land and under the sea.
+- `where_a_belt_bends_its_foreland_past_its_strength_the_yield_is_the_belts`: a belt rising 3 mm/yr
+  bends its foreland past the yield (380 mGal); the foreland yields, and there the belt's part is
+  still the whole deflection, to 5 cm.
+- `crust_coming_into_a_belts_frame_moves_nothing`: a 3 km deflection on crust entering a foreland
+  moves with the frame when the crust came from beyond any foreland or was in this belt's frame
+  already, and does not when it stood under a belt or in another belt's frame; the frame's cells
+  are named for the belt and the crust under the belt is marked.
+- `a_belts_foreland_ends_where_another_belt_is_nearer`: two belts on three plates; each foreland is
+  its carrier's crust within reach and nearer to its own belt than to the other.
 - `the_continental_te_follows_its_lithospheres_geotherm`: the isotherms against the geotherm's
   closed form, the table's values (84.4, 80.0, 70.8, 42.4, 21.9 and 11.2 km), `Te` rising with the
   thermal age and falling with the crust, and the belt's reach.
