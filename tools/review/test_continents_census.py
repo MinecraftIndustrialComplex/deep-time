@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""Fixture tests of M5's three measure fixes (RLC-052; docs/research/notes/m5-coast-high-ground-2026-10-25.md):
+"""Fixture tests of M5's three measure fixes (RLC-055; docs/research/notes/m5-coast-high-ground-2026-10-25.md):
 
   1. a closed body of sea is land, not the sea (a lake's shore is not a coast);
   2. the 200 km are over land (a strait wider than 1.6 spacings blocks the reach);

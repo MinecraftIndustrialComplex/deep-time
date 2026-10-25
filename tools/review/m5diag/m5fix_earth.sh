@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M5 measure fixes (RLC-052): Earth's present (SRTM15+) and the 109 PaleoDEMs on the new code (VM).
+# M5 measure fixes (RLC-055): Earth's present (SRTM15+) and the 109 PaleoDEMs on the new code (VM).
 # Writes /data/ban/deeptime-runs/m5fix/earth-*.txt. Needs the data of tools/review/earth-paleodem.py's header.
 set -uo pipefail
 cd "$(dirname "$0")/../../.."

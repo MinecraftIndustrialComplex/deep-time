@@ -275,7 +275,7 @@ def coast_metrics(p, z, spacing_km, groups=None, gnames=(), exclude=None, prefix
     the coast by the coast's); points in `exclude` count for the geometry but not in the shares.
 
     The sea is the world ocean and the reach is over land (coast_geometry); M5 means this since
-    2026-10-25 (RLC-052). The shares of the land (`land`, `hi_of_land`) are of the land above the
+    2026-10-25 (RLC-055). The shares of the land (`land`, `hi_of_land`) are of the land above the
     datum, as before; `coast_points` and `coast_hi_points` are the counts behind `coast_with_hi`."""
     keep = np.ones(z.size, bool) if exclude is None else ~exclude
     geo = coast_geometry(p, z, spacing_km, closed_as_land=closed_as_land, over_land=over_land)

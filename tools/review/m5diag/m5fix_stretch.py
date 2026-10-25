@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""What the over-land reach takes from M5 and what the lattice stretch would have taken (RLC-052).
+"""What the over-land reach takes from M5 and what the lattice stretch would have taken (RLC-055).
 
     python3 -I tools/review/m5diag/m5fix_stretch.py <run folder> [<run folder> ...]
 
