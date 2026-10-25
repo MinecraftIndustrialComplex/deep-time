@@ -31,7 +31,8 @@
 //! snapshot is not at a resampling) for
 //! `tools/review/continent-budget.py`, and the same samples' plate ids to
 //! `plate/t<Myr>.bin` (little-endian u32, one per record; [`CrustBudget::write_plates`]) for the
-//! front lane's boundary geometry (`tools/review/pool/measure_boundgeom.py`). Each snapshot also splits the land by the origin of its
+//! front lane's boundary geometry (`tools/review/pool/measure_boundgeom.py`), and their rock
+//! pools to `pools/t<Myr>.bin` ([`POOL_FIELDS`]). Each snapshot also splits the land by the origin of its
 //! crust (`cb_origin`: island arc, collision, Andean margin, the rest).
 //!
 //! Off unless [`ON_ENV`] is set; it changes nothing the model does.
@@ -717,6 +718,38 @@ fn write_map(
     }
     let path = dir.join(format!("t{:04.0}.bin", t_myr.round()));
     if let Err(e) = std::fs::create_dir_all(dir).and_then(|()| std::fs::write(&path, &buf)) {
+        eprintln!("crust_budget: cannot write {}: {e}", path.display());
+    }
+    write_pools(dir, samples, t_myr);
+}
+
+/// The f32 fields of a pools record (`pools/t<Myr>.bin`, the map's records in order): the rock
+/// pools ([`pool::NAMES`]), the basement ([`Sample::basement`]) and when the crust formed.
+pub const POOL_FIELDS: [&str; pool::COUNT + 2] = [
+    "sediment",
+    "sedimentary",
+    "metamorphic",
+    "felsic_plutonic",
+    "felsic_volcanic",
+    "mafic_volcanic",
+    "mafic_plutonic",
+    "basement",
+    "formed_myr",
+];
+
+/// Writes the visible samples' rock pools to `<dir>/pools/t<Myr>.bin`, little-endian f32 records
+/// of [`POOL_FIELDS`] in the map's order (the drowning diagnosis: what the thick ocean crust is
+/// made of; measurement only, a failure is reported and ignored).
+fn write_pools(dir: &std::path::Path, samples: &[Sample], t_myr: f64) {
+    let mut buf: Vec<u8> = Vec::with_capacity(samples.len() * 4 * POOL_FIELDS.len());
+    for s in samples.iter().filter(|s| !s.is_hidden()) {
+        for x in s.pools.iter().copied().chain([s.basement(), s.formed_myr]) {
+            buf.extend_from_slice(&x.to_le_bytes());
+        }
+    }
+    let dir = dir.join("pools");
+    let path = dir.join(format!("t{:04.0}.bin", t_myr.round()));
+    if let Err(e) = std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, &buf)) {
         eprintln!("crust_budget: cannot write {}: {e}", path.display());
     }
 }
