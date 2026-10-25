@@ -1959,46 +1959,46 @@ fn over_the_slab(
     // extent along it, radians: [lo, hi], with the front read out to `reach`.
     let lines = |reach: f64| -> Vec<(DVec3, DVec3, f64, f64)> {
         sources
-        .par_iter()
-        .enumerate()
-        .map(|(l, &(v, ..))| {
-            let p = at(v as usize);
-            // The front within the reach, front sample by front sample.
-            let mut seen = std::collections::HashSet::from([l as u32]);
-            let mut queue = vec![l as u32];
-            let mut next = 0;
-            while let Some(&a) = queue.get(next) {
-                next += 1;
-                for &b in &near[a as usize] {
-                    let w = sources[b as usize].0 as usize;
-                    if (at(w) - p).length() <= reach && seen.insert(b) {
-                        queue.push(b);
+            .par_iter()
+            .enumerate()
+            .map(|(l, &(v, ..))| {
+                let p = at(v as usize);
+                // The front within the reach, front sample by front sample.
+                let mut seen = std::collections::HashSet::from([l as u32]);
+                let mut queue = vec![l as u32];
+                let mut next = 0;
+                while let Some(&a) = queue.get(next) {
+                    next += 1;
+                    for &b in &near[a as usize] {
+                        let w = sources[b as usize].0 as usize;
+                        if (at(w) - p).length() <= reach && seen.insert(b) {
+                            queue.push(b);
+                        }
                     }
                 }
-            }
-            // Its direction: square to its normals, each by its share of the front (one front
-            // sample's own normal turns at a lattice corner, and most at a front's end).
-            let mean: DVec3 = queue
-                .iter()
-                .map(|&b| {
+                // Its direction: square to its normals, each by its share of the front (one front
+                // sample's own normal turns at a lattice corner, and most at a front's end).
+                let mean: DVec3 = queue
+                    .iter()
+                    .map(|&b| {
+                        let w = sources[b as usize].0 as usize;
+                        normals[w] * shares[w]
+                    })
+                    .sum();
+                let mut t = p.cross(mean).normalize_or_zero();
+                if t == DVec3::ZERO {
+                    t = p.cross(normals[v as usize]).normalize_or_zero();
+                }
+                let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+                for &b in &queue {
                     let w = sources[b as usize].0 as usize;
-                    normals[w] * shares[w]
-                })
-                .sum();
-            let mut t = p.cross(mean).normalize_or_zero();
-            if t == DVec3::ZERO {
-                t = p.cross(normals[v as usize]).normalize_or_zero();
-            }
-            let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
-            for &b in &queue {
-                let w = sources[b as usize].0 as usize;
-                let tau = (at(w) - p).dot(t);
-                lo = lo.min(tau - 0.5 * shares[w]);
-                hi = hi.max(tau + 0.5 * shares[w]);
-            }
-            (p, t, lo, hi)
-        })
-        .collect()
+                    let tau = (at(w) - p).dot(t);
+                    lo = lo.min(tau - 0.5 * shares[w]);
+                    hi = hi.max(tau + 0.5 * shares[w]);
+                }
+                (p, t, lo, hi)
+            })
+            .collect()
     };
     let spacing = norm.spacing_rad();
     let near_lines = lines(band + 2.0 * spacing);

@@ -802,7 +802,12 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // of seeds 1 to 24 with the slab pull at the arcs' fronts on by default, PLT-560, 2026-10-24,
     // the sweep `weld_seed_sweep`: 1 to 6, 10, 14, 15, 18, 21, 23 and 24, seed 1 three times,
     // seeds 2, 6 and 15 twice, seeds 7, 8, 11, 12 and 20 no more; this test and the recording
-    // test pass on all 13, so seed 1).
+    // test pass on all 13, so seed 1; 10 of seeds 1 to 24 with the arcs' band and the margin at
+    // the slab's ends on by default, PLT-561 and PLT-562, 2026-10-24, the sweep
+    // `weld_seed_sweep`: 1, 2, 6, 9, 10, 12, 16, 20, 21 and 23, seed 1 three times, seeds 6, 10,
+    // 12 and 16 twice, seeds 3, 4, 5, 14, 15, 18 and 24 no more; seed 1 here and seed 2 in the
+    // recording test still weld and pass, so they stay; from the supercontinent 6, 10, 15, 18, 19
+    // and 20, seed 15 three times).
     let p = preset(8000, 300.0, "scattered_continents", 1);
     let mut life = CollisionLives::default();
     let world = run_stage(&p, |_, _, st| {
