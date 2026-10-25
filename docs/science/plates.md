@@ -9296,3 +9296,23 @@ outruns its own drag, so the sliver that moves is small and bounded by the new r
 or a suction law with a source (pp. 170-171: "may be proportional to the descent rate of the slab";
 PLT-540's saturating law is a version of this, but its premise is `from-memory`). Until one of them
 is built, PLT-585 stays a switch that is off.
+
+**With incipient subduction (the front lane's switch).** The front lane is building incipient
+subduction (Gurnis et al. 2004; decisions log 2026-10-25) behind its own switch: a contact stays
+incipient until its slab reaches 100 km, and until then its front resists with a plastic 2.5 × 10¹²
+N/m (5 × 10¹¹ at a ridge), linearised as the collision term is, and builds no arc. That is a
+friction-like resistance on a converging front, and PLT-585's colliding resistance F_CR acts on the
+same front (a trench's friction is counted at the overriding sample's front, above). With both
+switches on, the rule is: **an incipient contact's front takes the incipient resistance alone, and
+PLT-585's friction (F_CR, or F_TF where the 60 degree rule calls the front a transform) only once the
+contact is mature.** Forsyth & Uyeda fitted F_CR on Earth's mature trenches and mountain belts
+("no distinction between the resisting force at trenches and the resisting force at mountain belts",
+p. 170), and the incipient resistance is the whole resistance of a front whose slab has not yet
+formed, so counting both on one front counts that front's resistance twice. In size, F_CR is 0.16 /
+6.43 × 3 × 10¹³ = 7.5 × 10¹¹ N/m (computed), so the incipient front resists 3.4 times as hard as a
+mature one, and 0.67 times at a ridge. The code is two conditions in the friction pass of
+`forces.rs` (`if friction`): the front's link is skipped while its contact is incipient, and the
+loop over the other boundaries skips a plate that holds an incipient contact with the sample's plate
+from either side, so neither side adds a half share in its place. Whichever of the two lanes lands
+second adds them, with a unit test that an incipient front carries one resistance and a mature one
+F_CR alone.

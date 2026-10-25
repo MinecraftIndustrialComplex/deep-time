@@ -156,7 +156,10 @@ whatever the speed, and a boundary whose drive is smaller slips under the floor.
 is a transform where the relative motion lies more than 60 degrees from its normal, Forsyth &
 Uyeda's own dividing rule (p. 183, FRC-035); colliding where the plates converge across it
 otherwise; nothing where they part. A trench's friction is counted once, at the overriding sample's
-front, over the front's metres (PLT-560); other boundaries count from both sides, half each. c_b
+front, over the front's metres (PLT-560); other boundaries count from both sides, half each. An
+incipient contact (the front lane's incipient subduction, its own switch) takes its incipient
+resistance alone and no PLT-585 friction, from either side, until it is mature (plates.md, "With
+incipient subduction"). c_b
 here is half the old law's 2.5 × 10¹⁴: 0.31 MPa at 8 cm/yr against Forsyth & Uyeda's "roughly 5
 bars", an asthenosphere of 1.2 × 10¹⁹ Pa s over 100 km. The column energy, the collision link and the
 speed guard are kept. What the balance does on the planet: [plates.md](plates.md), "Plate speed,
@@ -334,7 +337,9 @@ diagnosis of its own, not traced here.
 - Forsyth & Uyeda's frictions as links linearised about the step's motion, a trench's counted at its
   overriding front and the rest half from each side (FRC-035; agent, build log 2026-10-25). The 60
   degree rule that divides transforms from colliding boundaries is theirs (p. 183), so the friction
-  does not use V1 gap 2's Bird's 20 degrees (PLT-311).
+  does not use V1 gap 2's Bird's 20 degrees (PLT-311). With incipient subduction on as well, an
+  incipient contact takes no PLT-585 friction, so its front's resistance is counted once (agent,
+  2026-10-25).
 
 ## Open questions
 
