@@ -695,7 +695,9 @@ pub(in crate::plates) mod tests {
     /// (z = 0: both pieces hold a stretch of it) and along it (y < -0.3 is the new piece, which
     /// borders the other plate only across the ridge, away from the trench's ends at the poles,
     /// and its copy of the slab pulls nothing). A slab that hung with no front hangs on along each
-    /// piece's own stretch of the border, with the parent's pull between them. ledger: PLT-534
+    /// piece's own stretch of the border, with the parent's pull between them. With `front_pull`
+    /// (PLT-560) a split across the trench holds to about a spacing of it (see the tolerance).
+    /// ledger: PLT-534
     #[test]
     fn a_split_plates_pieces_pull_with_the_parents_slab_force() {
         use crate::plates::forces::slab_torques;
@@ -703,16 +705,22 @@ pub(in crate::plates) mod tests {
         let k = TectonicParams::default();
         let e = env(&k);
         let w = DVec3::Z * e.norm.omega_of_speed(50.0);
-        // (the plate that splits, the new piece's side, the slab hung, the new piece pulls)
-        type Case = (u32, fn(DVec3) -> bool, bool, bool);
+        // One spacing of the slab's pull at the planet's radius, at most (the weight's cap,
+        // FRC-004).
+        let c = crate::plates::forces::Coeffs::new(&k, &e.norm, e.gravity, 1.0, DVec3::Z, 0.0);
+        let spacing_pull = 1.5 * c.pull_n_m * c.spacing_m * c.radius_m;
+        // (the plate that splits, the new piece's side, the slab hung, the new piece pulls, the
+        // pieces' junctions on the boundary that pulls: the trench's z = 0 crossing, or for the
+        // hung slab the whole border's two y = -0.3 crossings)
+        type Case = (u32, fn(DVec3) -> bool, bool, bool, u32);
         let cases: [Case; 5] = [
-            (1, |p| p.z < 0.0, false, true),
-            (0, |p| p.z < 0.0, false, true),
-            (0, |p| p.y < -0.3, false, false),
-            (1, |p| p.y < -0.3, false, false),
-            (1, |p| p.y < -0.3, true, true),
+            (1, |p| p.z < 0.0, false, true, 1),
+            (0, |p| p.z < 0.0, false, true, 1),
+            (0, |p| p.y < -0.3, false, false, 0),
+            (1, |p| p.y < -0.3, false, false, 0),
+            (1, |p| p.y < -0.3, true, true, 2),
         ];
-        for (i, (parent, side, hung, pulls)) in cases.into_iter().enumerate() {
+        for (i, (parent, side, hung, pulls, junctions)) in cases.into_iter().enumerate() {
             let mut st = one_plate(&geo, 5, |_| old_floor());
             add_plate(&mut st, &geo, 1, |p| p.x >= 0.0);
             st.plates[1].omega = w.to_array();
@@ -754,9 +762,28 @@ pub(in crate::plates) mod tests {
             let pull: DVec3 = under.iter().map(|&p| after[p].0).sum();
             let suck: DVec3 = over.iter().map(|&p| after[p].1).sum();
             assert!(before[1].0.length() > 0.0, "case {i}: the slab pulls");
+            // With `front_pull` (PLT-560) a sample pulls over its share of the straight boundary
+            // to the plate its front (or its hanging slab) takes, along the boundary's normal. At
+            // a junction of the pieces on the boundary that pulls, an overriding sample's share
+            // counts its crossing to one piece alone and the normals beside it are the chords of
+            // their own piece's stretch, so the pieces' pull may differ from the parent's by
+            // about a spacing of pull at each junction (measured 2026-10-24: 0.58 spacings at the
+            // weight's cap in case 0, 0.10 in case 1, 0.66 over case 4's two). Off, exactly.
+            let off_by = if k.front_pull {
+                f64::from(junctions) * spacing_pull
+            } else {
+                0.0
+            };
             for (got, want, what) in [(pull, before[1].0, "pull"), (suck, before[0].1, "suction")] {
+                eprintln!(
+                    "case {i}: the pieces' {what} differs from the parent's by {:.2e} of it, {:.2} \
+                     spacings of pull at the weight's cap",
+                    (got - want).length() / want.length(),
+                    (got - want).length() / spacing_pull,
+                );
+                let tol = off_by + 1e-9 * want.length();
                 assert!(
-                    (got - want).length() <= 1e-9 * want.length(),
+                    (got - want).length() <= tol,
                     "case {i}: the pieces' {what} {got} against the parent's {want}"
                 );
             }
