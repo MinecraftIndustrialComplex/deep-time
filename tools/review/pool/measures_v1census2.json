@@ -1,0 +1,119 @@
+{
+ "_doc": "Extra registry: the new-definition census as `v1census2`, beside `v1census` (which this branch also moves to version 2). Delete this file once every lane reads v1census at version 2.",
+ "measures": {
+  "v1census2": {
+   "version": 2,
+   "doc": "v1census version 2 under another name (the M5 measure fixes, RLC-052), so tables that read v1census keep working until the coordinator switches: pass --registry tools/review/pool/measures_v1census2.json --measures v1census2. V1 item 1's seven measures on the final frame (decisions log 2026-10-21); since 2026-10-23 they are realism checks whose targets are where each fires, outside Earth's Phanerozoic range (docs/science/realism-checks.md, RLC-014 to RLC-075) plus the crust's net change and the sea over the datum; definitions in measure_v1census.py. Version 2 (2026-10-25, RLC-052): coast_hi on Fibonacci points, the sea the world ocean, the reach over land; coast_hi_old is version 1's value",
+   "command": [
+    "{py}",
+    "-I",
+    "{tools}/measure_v1census.py",
+    "{run}"
+   ],
+   "python": "numpy",
+   "needs": [
+    "fields",
+    "plate",
+    "rec"
+   ],
+   "fields": [
+    "elevation",
+    "plates/crust_type",
+    "climate/ice_thickness_m"
+   ],
+   "columns": [
+    {
+     "key": "land",
+     "label": "land",
+     "target": [
+      0.13,
+      0.36
+     ],
+     "digits": 3
+    },
+    {
+     "key": "largest",
+     "label": "largest landmass",
+     "target": [
+      0.06,
+      null
+     ],
+     "digits": 3
+    },
+    {
+     "key": "under_sea",
+     "label": "continental crust under the sea",
+     "target": [
+      null,
+      0.56
+     ],
+     "digits": 3
+    },
+    {
+     "key": "above_2km",
+     "label": "land above 2 km",
+     "target": [
+      null,
+      0.07
+     ],
+     "digits": 3
+    },
+    {
+     "key": "coast_hi",
+     "label": "coast with high ground",
+     "target": [
+      null,
+      0.11
+     ],
+     "digits": 3
+    },
+    {
+     "key": "under_ice",
+     "label": "land under ice",
+     "target": [
+      null,
+      0.32
+     ],
+     "digits": 3
+    },
+    {
+     "key": "collisions",
+     "label": "collisions per 100 Myr",
+     "target": [
+      null,
+      6
+     ],
+     "digits": 2
+    },
+    {
+     "key": "crust_net",
+     "label": "continental crust's net change over the run",
+     "target": null,
+     "digits": 3,
+     "signed": true
+    },
+    {
+     "special": "criteria",
+     "label": "criteria met per run: median, mean"
+    },
+    {
+     "key": "sea_after100_m",
+     "key2": "sea_end_m",
+     "label": "sea over the datum, median after 100 Myr / end, m",
+     "target": null,
+     "digits": 0,
+     "pair": true
+    }
+   ],
+   "criteria": [
+    "land",
+    "largest",
+    "under_sea",
+    "above_2km",
+    "coast_hi",
+    "under_ice",
+    "collisions"
+   ]
+  }
+ }
+}

@@ -147,31 +147,125 @@ def largest_high(p, z, spacing_km, level=3000.0, exclude=None, mask=False):
     return out + (sel,) if mask else out
 
 
-def coast_metrics(p, z, spacing_km, groups=None, gnames=(), exclude=None, prefix="  "):
+def fib_points(n):
+    """N Fibonacci points (latitude, longitude in degrees, longitude in [-180, 180)), the way
+    earth-coast.py and PLT-360's Earth control place them."""
+    i = np.arange(n) + 0.5
+    return np.degrees(np.arcsin(1 - 2 * i / n)), np.degrees((np.pi * (1 + 5 ** 0.5) * i) % (2 * np.pi) - np.pi)
+
+
+def fib_sample(h, w, r, n=None):
+    """The census grid (h rows of w cells, r blocks a cell, equal-area cylindrical) resampled to
+    Fibonacci points by the nearest cell: (row, column, unit vectors) of N points, N the grid's
+    count of planet cells by default. The grid's north-south step is 39.1 km / cos(latitude), so
+    above about 51 degrees it is wider than the 62.6 km coast band and the grid's own points lose
+    the coast that faces north or south (and split a landmass into rows); an even point set keeps
+    them (M5 diagnosis, docs/research/notes/m5-coast-high-ground-2026-10-25.md, Q5 a)."""
+    _lat, ok_r = lat_of_rows(h, r, w * r)
+    if n is None:
+        n = int(ok_r.sum()) * w
+    plat, plon = fib_points(n)
+    big_r = w * r / (2 * np.pi)  # blocks
+    zo = h * r / 2
+    # Row j sits at z = -zo + r j and latitude asin(-z / R): equal-area, so nearest in sin(lat).
+    row = np.rint((zo - big_r * np.sin(np.radians(plat))) / r).astype(int)
+    first, last = np.nonzero(ok_r)[0][[0, -1]]
+    row = np.clip(row, first, last)
+    col = np.rint((plon % 360.0) / 360.0 * w).astype(int) % w
+    return row, col, xyz(plat, plon)
+
+
+def ice_sheets(plat, plon):
+    """Antarctica and Greenland, the two ice sheets whose surfaces stand above 2 km, as a box
+    (the by-rock stand-in of Earth's shares; PLT-360)."""
+    return (plat < -60.0) | ((plat > 59.5) & (plon > -74.0) & (plon < -10.0) & ~((plat < 66.7) & (plon > -25.0)))
+
+
+def world_ocean(p, sea, spacing_km):
+    """The sea points joined to the world ocean: the largest body of sea points, bodies being
+    points joined within 1.6 point spacings (the rule that joins landmasses). A body of sea below the
+    datum that is not joined to it is a closed basin (the Caspian's kind), not the sea."""
+    lab = components(p, sea, spacing_km)
+    if not sea.any():
+        return sea.copy()
+    return sea & (lab == int(np.argmax(np.bincount(lab[sea]))))
+
+
+def coast_geometry(p, z, spacing_km, level=2000.0, closed_as_land=True, over_land=True):
+    """The coast and the high ground by it, on points (unit vectors p, heights above the sea z in m,
+    about `spacing_km` apart). Returns a dict of masks and distances over the points:
+
+      ground    the ground of the geometry: land (z > 0), and with `closed_as_land` the closed
+                bodies of sea (world_ocean) as well, since a coast is a coast of the connected ocean
+      ocean     the sea of the geometry: all points at or under the datum, or with `closed_as_land`
+                the world ocean only
+      d_sea     km from each ground point to the nearest ocean point (great circle; 0 elsewhere)
+      coast     ground within 1.6 spacings of the ocean
+      hi        land above `level`
+      reach     km from each ground point to the nearest high point, inf beyond 200 km; with
+                `over_land` along the ground (the shortest path over points joined within 1.6
+                spacings, which a strait wider than that blocks), else the straight line within
+                the same landmass (the first version, which crosses a bay)
+      has       coast with high ground within the reach
+
+    `closed_as_land=False, over_land=False` is the census as it read until 2026-10-25."""
+    sea = z <= 0
+    ocean = world_ocean(p, sea, spacing_km) if closed_as_land else sea
+    ground = ~ocean
+    hi = (z > level) & ground
+    d_sea = np.zeros(z.size)
+    if ocean.any():
+        ds, _ = cKDTree(p[ocean]).query(p[ground])
+        d_sea[ground] = arc_km(ds)
+    else:
+        d_sea[ground] = np.inf
+    coast = ground & (d_sea <= 1.6 * spacing_km)
+    reach = np.full(z.size, np.inf)
+    if over_land:
+        from scipy.sparse import coo_matrix
+        from scipy.sparse.csgraph import dijkstra
+        gi = np.nonzero(ground)[0]
+        hl = np.nonzero(hi[gi])[0]
+        if hl.size:
+            pg = p[gi]
+            pairs = cKDTree(pg).query_pairs(chord(1.6 * spacing_km), output_type="ndarray")
+            wt = arc_km(np.linalg.norm(pg[pairs[:, 0]] - pg[pairs[:, 1]], axis=1))
+            g = coo_matrix((wt, (pairs[:, 0], pairs[:, 1])), shape=(gi.size, gi.size)).tocsr()
+            reach[gi] = dijkstra(g, directed=False, indices=hl, limit=200.0, min_only=True)
+    else:
+        comp = components(p, ground, spacing_km)
+        for c in np.unique(comp[hi]):
+            hm, cm = np.nonzero(hi & (comp == c))[0], np.nonzero(coast & (comp == c))[0]
+            if cm.size:
+                d, _ = cKDTree(p[hm]).query(p[cm], distance_upper_bound=chord(200.0))
+                fin = np.isfinite(d)
+                reach[cm[fin]] = arc_km(d[fin])
+    has = coast & (reach <= 200.0)
+    return {"ground": ground, "ocean": ocean, "d_sea": d_sea, "coast": coast, "hi": hi, "reach": reach, "has": has}
+
+
+def coast_metrics(p, z, spacing_km, groups=None, gnames=(), exclude=None, prefix="  ", closed_as_land=True,
+                  over_land=True):
     """The high ground by the coast, on points (unit vectors p, heights above the sea z in m, about
     `spacing_km` apart): the land above 2 km within 200 km of the sea (great circle to the nearest
     sea point), and the coast (land within 1.6 spacings of the sea) with land above 2 km of the same
-    landmass within 200 km. `groups` splits both by an origin per point (the high ground by its own,
-    the coast by the coast's); points in `exclude` count for the geometry but not in the shares."""
+    landmass within 200 km inland. `groups` splits both by an origin per point (the high ground by its own,
+    the coast by the coast's); points in `exclude` count for the geometry but not in the shares.
+
+    The sea is the world ocean and the reach is over land (coast_geometry); M5 means this since
+    2026-10-25 (RLC-052). The shares of the land (`land`, `hi_of_land`) are of the land above the
+    datum, as before; `coast_points` and `coast_hi_points` are the counts behind `coast_with_hi`."""
     keep = np.ones(z.size, bool) if exclude is None else ~exclude
+    geo = coast_geometry(p, z, spacing_km, closed_as_land=closed_as_land, over_land=over_land)
     land = z > 0
-    d_sea = np.zeros(z.size)
-    ds, _ = cKDTree(p[~land]).query(p[land])
-    d_sea[land] = arc_km(ds)
-    coast = land & (d_sea <= 1.6 * spacing_km)
     hi = land & (z > 2000)
-    comp = components(p, land, spacing_km)
-    has = np.zeros(z.size, bool)
-    for c in np.unique(comp[hi]):
-        hm, cm = hi & (comp == c), coast & (comp == c)
-        if cm.any():
-            d, _ = cKDTree(p[hm]).query(p[cm], distance_upper_bound=chord(200.0))
-            has[np.nonzero(cm)[0][np.isfinite(d)]] = True
+    coast, has, d_sea = geo["coast"], geo["has"], geo["d_sea"]
     near = d_sea <= 200.0
     L, H, C = land & keep, hi & keep, coast & keep
     res = {"land": L.sum() / max(keep.sum(), 1), "hi_of_land": H.sum() / max(L.sum(), 1),
            "hi_near_coast": (H & near).sum() / max(H.sum(), 1), "coast_with_hi": (C & has).sum() / max(C.sum(), 1),
-           "land_near_coast": (L & near).sum() / max(L.sum(), 1)}
+           "land_near_coast": (L & near).sum() / max(L.sum(), 1), "coast_points": int(C.sum()),
+           "coast_hi_points": int((C & has).sum())}
     print(f"{prefix}land {res['land']:.4f}; above 2 km {res['hi_of_land']:.4f} of the land, of it within 200 km of"
           f" the sea {res['hi_near_coast']:.3f} (all land {res['land_near_coast']:.3f}); coast points {C.sum()},"
           f" with land above 2 km within 200 km on the same landmass {res['coast_with_hi']:.3f}")
@@ -364,8 +458,9 @@ def fields_report(d):
                   f" ground p50 {pct(z[sel], 50):.0f} m; warmest month p10/50/90 {pct(tw[sel], 10):.1f}/"
                   f"{pct(tw[sel], 50):.1f}/{pct(tw[sel], 90):.1f} C; ELA p50 {pct(ela[sel][np.isfinite(ela[sel])], 50):.0f} m;"
                   f" glacier share {(ice[sel] >= ICE_MIN_M).mean():.2f}")
-    print("  coastal high ground on the grid's cells, by plates/orogeny_type:")
-    coast_metrics(xyz(lat[ok], lon[ok]), z[ok], np.sqrt(cell_km2), np.round(oro[ok]).astype(int),
+    print("  coastal high ground on Fibonacci points of the grid's count (nearest cell), by plates/orogeny_type:")
+    frow, fcol, fp = fib_sample(h, w, r)
+    coast_metrics(fp, z[frow, fcol], np.sqrt(cell_km2), np.round(oro[frow, fcol]).astype(int),
                   ("none", "Andean", "Himalayan"))
     g = g["globals"]
     keys = [k for k in sorted(g) if k.startswith("plates/") and k.endswith("_km3")]
@@ -623,13 +718,11 @@ def earth_report(bnds, relief, ns):
             best = (v, float(la[j]), float(lo[i]))
     print(f"Earth: highest mean elevation of a 1,000 km box {best[0]:.0f} m at lat {best[1]:.1f} lon {best[2]:.1f}")
     for n in ns:
-        i = np.arange(n) + 0.5
-        plat = np.degrees(np.arcsin(1 - 2 * i / n))
-        plon = np.degrees((np.pi * (1 + 5 ** 0.5) * i) % (2 * np.pi) - np.pi)
+        plat, plon = fib_points(n)
         iy = np.clip(np.searchsorted(la, plat), 0, len(la) - 1)
         ix = np.clip(np.searchsorted(lo, plon), 0, len(lo) - 1)
         z = zg[iy, ix]
-        sheets = (plat < -60.0) | ((plat > 59.5) & (plon > -74.0) & (plon < -10.0) & ~((plat < 66.7) & (plon > -25.0)))
+        sheets = ice_sheets(plat, plon)
         zl = z[z > 0]
         print(f"Earth N={n}: land {np.mean(z > 0):.4f}; above 1/2/3/4/5 km of land "
               + "/".join(f"{np.mean(zl > k * 1000):.4f}" for k in (1, 2, 3, 4, 5))
