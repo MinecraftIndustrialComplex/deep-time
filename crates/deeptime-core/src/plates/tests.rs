@@ -3192,13 +3192,28 @@ fn the_reference_plate_on_the_lattice_term_by_term() {
 /// What sets the planet's plate speed (the plate speed lane, 2026-10-25; plates.md, "Plate
 /// speed"): two planets of a preset's plate stage (`SPEED_DIAG_PRESET`, default the pool's
 /// `earthlike_quick_16k`; `SPEED_DIAG_N` samples, default 100,000; `SPEED_DIAG_MYR`, default 600;
-/// the plate stage alone, so no erosion and the datum's sea), and every 50 Myr after the first 100 the
-/// force balance solved again on the step's state with one term changed at a time, the basal drag
-/// coefficient c_b kept unless the row says otherwise. A diagnosis of the speed level CHK-020
-/// reads, not a check, and one step's response only (the motion relaxes towards the balance; the
-/// slabs, fronts and collisions the faster motion would make are not in it). Prints, per change,
-/// the balance's RMS speed over the planet (visible samples' weight, the plates' centroid speeds,
-/// as CHK-020), over the plates with a slab pull and over the rest, and the area share pulled.
+/// the plate stage alone, so no erosion and the datum's sea), and every 50 Myr after the first
+/// 100 the force balance solved again on the step's state with one term changed at a time, the
+/// basal drag coefficient c_b kept unless the row says otherwise. A diagnosis of the speed level
+/// CHK-020 reads, not a check, and one step's response only (the motion relaxes towards the
+/// balance; the slabs, fronts and collisions the faster motion would make are not in it). Prints,
+/// per change, the balance's RMS speed over the planet (visible samples' weight, the plates'
+/// centroid speeds, as CHK-020), over the plates with a slab pull and over the rest, and the area
+/// share pulled.
+///
+/// Measured (2026-10-25, the defaults, 100,000 samples, 11 looks from 100 to 600 Myr; the
+/// supercontinent's seed 1, then the scattered continents' seed 2): the motion's RMS 24.9 and
+/// 26.4 mm/yr (the pool reads about 26); the balance 27.3 and 29.3, the pulled plates 29.0 and
+/// 30.6, the rest 15.5 and 15.5, the area pulled 0.851 and 0.901. One term at a time (RMS): the
+/// suction unsaturated 29.4, 31.2 (the rest 22.4, 20.0); no suction 31.5, 34.2; no edge energy
+/// 24.9, 26.8; no keels 28.8, 31.0; no collision buoyancy 28.7, 30.8; no boundary resistance 45.8,
+/// 48.7; no slab resistance 90.2, 101.9; boundary resistance 1 by the definition 25.6, 27.3; the
+/// speed scale ×1.5 40.8, 43.7; F&U's ratios and terminal velocity 51.3, 60.0 (pulled 43.8, 46.8,
+/// the rest 80.8, 151.7); F&U's ratios with the speed scale kept 35.8, 41.8 (30.5, 32.5; 57.0,
+/// 105.9). At 40,000 samples the same pattern (the motion 27.7 and 32.7). `plates_quick_16k`'s
+/// ridge and floor (-1,000 and -10,000 m) give a ridge push several times Earth's, so it is no
+/// guide to the pool's planet (the motion 39.2 and 40.8 at 100,000 samples, 29.7 and 32.8 without
+/// the edge energy).
 #[test]
 #[ignore = "diagnosis: 600 Myr at 100k samples, two planets; run with --release -- --ignored --nocapture"]
 fn what_sets_the_planets_plate_speed() {
@@ -3215,6 +3230,7 @@ fn what_sets_the_planets_plate_speed() {
     // 0.89 cm/yr; keel (0.82 + 5.65) / 0.82; suction 0.50 / 6.43, independent of speed (F&U
     // p. 171). F&U's transform and colliding resistances do not depend on speed and act on
     // transforms and convergent boundaries only, so boundary_resistance (viscous, all round) is 0.
+    // The reference plate's area and trench are FRC-016's. ledger: PLT-575
     fn fu(k: &mut TectonicParams, keep_scale: bool) {
         let a0_km2 = 4.0 * std::f64::consts::PI * 6370.0f64.powi(2) / 14.0;
         let s = 0.89 * 3000.0 / (0.82e-5 * a0_km2);
