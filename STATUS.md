@@ -148,6 +148,48 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | A server config key for far terrain (on by default; `-Ddeeptime.dh=false` stays), added when the config file next changes | build log 2026-10-01 "P3-04 Distant Horizons far terrain" | small |
 
 ## Build log
+### 2026-10-25: Front lane: the back-arc and front-length diagnosis on base14 (what the model calls back arc and what sets its width; why the subduction front is long; whether either moves the old-arc and collision-belt high ground); diagnosis only, no law changed (coordinator's task; agent worktree .claude/worktrees/agent-aeaabcd72dfe5f0b8, branch front-pull, master 56edfd16 merged in by fast-forward; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
+- **Tool.** `tools/review/m5diag/backarc.sh ac619d59fdab,a963c9ac56ee base14b` runs `backarc.py` over base14's 24 runs (argkey cd665cef) at the final frame and pools them with `backarc_read.py` into /data/ban/deeptime-runs/m5diag/ba/read-base14b.txt. It finds the fronts from the fields grid's trench cells, the plate velocities from rec.json's prev_omega (the model_km scale fits 6,370 km, spread 1.005), the overriding plate from the arc and back-arc cells, and Vup (Heuret & Lallemand 2005's sign, positive toward the trench) in the model frame and the no-net-rotation frame. The model's net rotation is 6 mm/yr at the equator. Earth readers: `pb_sub_pairs.py` (PB2002's SUB by plate pair) and `earth_trench_nnr.py` (Becker's NNR file of H&L's trenches).
+- **Q1: the back arc.**
+  - Regime 4 is a label. Every visible overriding sample within `subduction_distance_km` of a front, reached through the plate, gets SUBDUCTION_ZONE (subduction.rs, fronts_and_uplift). The quick preset's 800 km is HYP-015 (`calibrated`): the Central Andes' 400 to 900 km from trench to foreland thrust front, with no source cited.
+  - On base14 the band holds 15.1 % of the planet (64 % oceanic), 1,073 km of area per km of the record's SUB front. Its distance to its own plate's SUB front is p10 83, p50 397 and p90 676 km, which is a band filled out to 800 km.
+  - Inside the band:
+    - Cortial's uplift f(d) g h peaks at 300 km (PLT-036, `game-choice`).
+    - The cordillera thickens within 440 km at a fixed 1.7 mm/yr, fed from 440 to 800 km (PLT-048, PLT-320). The rate is not tied to Vup.
+    - Continental lithosphere heats to 60 km over the whole band (PLT-461). Currie & Hyndman's hot back-arcs are "250 to >900 km" wide.
+  - There is no back-arc deformation law and no opening law. Rigid plates give Vt = Vup and Vd = 0, H&L's "perfectly free slab".
+  - Vup at converging SUB fronts (NNR): p10 -7.2, p50 7.6 and p90 28.1 mm/yr; 25 % below 0. Earth's NNR trench motion (Becker's file): median 7.9, p10 -21.8, p90 44.6; 39 % landward.
+  - High ground behind fronts follows Vup. Of the land behind a front in each band, this share is high: ret_fast 0.014, ret 0.030, neutral 0.056, adv 0.077, adv_fast 0.104. All high ground behind retreating upper plates is 0.0053 of the land.
+- **Q2: the front length.**
+  - Base14's record (steps from -900 Myr) has 73,300 km of SUB on the lattice, against Earth's 53,500 lattice km (Bird's 51,310 geodesic times 1.04), so 1.37 times. The 1.7 was base13's figure, before incipient subduction.
+  - The Benioff column (PLT-615) gives 65,838 km (1.23 times) and an OCB of 1.06 times Earth's.
+  - The excess is ocean-ocean: 35,500 km against Stern & Scholl's 0.35 x 53,500 = 18,700 (1.9 times). Ocean-continent is 37,800 against 34,800 (1.09 times).
+  - Of the ocean-ocean fronts, 11,300 km lie 150 to 300 km off a coast, just past the 200 km arc distance that makes a front ocean-continent (PLT-370). The split moves with that threshold; the total does not.
+  - The four candidates:
+    - Plate count: 26.6 plates against PB2002's 52, and the total boundary is 1.075 times.
+    - Sinuosity: the lattice adds 4 %. At t0000 the model has 69 contacts (37 of 500 km or more), p50 595 km, the top five 0.31 of the length. PB2002 has 53 SUB pairs (35 of 500 km or more), p50 731 km, top five 0.31.
+    - Contact life: 36 % of SUB km sits on contacts older than 100 Myr.
+    - Initiation: contacts under 24 Myr hold about 13 %.
+  - Factors: boundary 1.075, converging share 1.006, oceanic share of the converging 1.10 (collision fronts 0.78 times Bird's CCB), SUB within the oceanic converging 1.15 (1.03 with the Benioff column).
+- **Q3: what moves the excess.**
+  - Old Andean plus untagged arcs hold 0.0145 of the land against Earth's about 0.0055:
+    - 0.0070 behind active SUB fronts (0.0070 behind ocean-continent fronts, 0.0002 behind ocean-ocean ones; 0.0006 behind retreating upper plates);
+    - 0.0050 beside collision fronts;
+    - 0.0025 away from any front.
+  - High ground behind ocean-ocean fronts is 0.001 of the land in all classes. So cutting the ocean-ocean front would leave M4 almost where it is.
+  - A back-arc law tied to Vup < 0 reaches at most 0.0053 of M4 and 0.0006 of the old-arc excess.
+  - Young collision belts: 0.0308 of 0.0343 lie within 800 km of a collision front, and that front is 0.78 times Earth's. The excess is per km of collision front.
+  - The old-arc excess is persistence at dead or collision-side margins. That is the M4 lane's question (denudation; only Himalayan belts lose their roots).
+- **Proposals, not built.** Sourced, behind switches, tests first:
+  - PLT-650, `backarc_follows_upper_plate`: the cordillera's 1.7 mm/yr only where Vup > 0, at most Vup. H&L 2005: "Vd and Vt could not exceed Vup". No new constant; a small effect.
+  - PLT-651, `backarc_opening`: the overriding plate splits at its arc where the slab is normal oceanic older than 55 Myr and the upper plate moves away from the trench (Sdrolias & Müller 2006). The force balance decides whether it opens. Spreading goes on whatever the upper plate does next. It is the piece PLT-585 lacks (plates.md, "Plate speed (2026-10-25)"). It makes marginal seas but hardly moves M4.
+- **Traps.**
+  - maps/t0000 (and t-800, t-900) are resamplings with no front flags. Take the fronts from the fields grid's regime 2.
+  - 17 % of regime 2's trench cells are stale (convergence below 0).
+  - Pairing a trench cell with the nearest map sample gets the polarity wrong for about 8 % of cells. Pair by the arc and back-arc cells.
+  - Becker's NNR file holds the trench and the subducting plate, not the upper plate.
+- **Next.** The coordinator's call on PLT-650 and PLT-651. Nothing is queued.
+
 ### 2026-10-25: M5 lane: m4-trace (the keels on base13 hold 2 % of M4 at the end); denudation by class and age (the sim removes crust with its Airy rebound, old belts at 0.06 to 0.2 of Pinet & Souriau's law, low-relief land at a quarter of Montgomery & Brandon's eq. 2 with no chemical term); the cold line (a fixed frame for ISO-110, and on Earth's cold platforms the crust past about 40 km carries almost no height); diagnosis only, no law changed (coordinator's (b) and items 1 and 2; agent worktree .claude/worktrees/agent-a447f975b05e919a2, branch worktree-agent-a447f975b05e919a2, master c5e27599 merged in at 5436d675; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **m4-trace.** The arm ran on master 7f8f3ca0 (key 26ea8ec0342f, argkey 7fceeae3): base13's planet, both starts, seeds 1 to 4, 1000 Myr, the crust-budget env plus `+DEEPTIME_FRONT_TRACE=@RUN@/trace`. Its 8 runs equal base13's seeds 1 to 4.
   - Read with `m4keel.py` over the 8 runs.
