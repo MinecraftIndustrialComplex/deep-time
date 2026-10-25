@@ -378,9 +378,9 @@ public final class EditorModelGameTests {
                 return;
             }
             int sea = t.data().manifest().seaLevelY(), land = 0, n = 0;
-            int c = t.circumference(), s = c / 4;   // the cube's four band faces, z in (-s/2, s/2)
+            int c = t.circumference(), face = c / 4;   // the cube's four band faces, z in (-face/2, face/2)
             for (int i = 0; i < 400; i++) {
-                int x = -c / 2 + (i * 97) % c, z = ((i * 61) % (s - 32)) - s / 2 + 16;
+                int x = -c / 2 + (i * 97) % c, z = ((i * 61) % (face - 32)) - face / 2 + 16;
                 double h = t.height(x, z);
                 helper.assertTrue(Double.isFinite(h), "height at " + x + "," + z);
                 n++;
