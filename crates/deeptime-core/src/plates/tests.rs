@@ -2793,7 +2793,10 @@ fn the_margin_stops_at_the_slabs_ends() {
                 );
                 check(
                     farthest[0] > 1.25,
-                    format!("{name}, {lon_deg} degrees, {what}: off, the farthest {:.2}", farthest[0]),
+                    format!(
+                        "{name}, {lon_deg} degrees, {what}: off, the farthest {:.2}",
+                        farthest[0]
+                    ),
                 );
                 check(
                     beyond[1] == 0,
@@ -2806,7 +2809,9 @@ fn the_margin_stops_at_the_slabs_ends() {
                 if m < 4 {
                     check(
                         differ == 0,
-                        format!("{name}, {lon_deg} degrees, {what}: {differ} samples inside differ"),
+                        format!(
+                            "{name}, {lon_deg} degrees, {what}: {differ} samples inside differ"
+                        ),
                     );
                 }
             }
