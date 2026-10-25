@@ -347,8 +347,8 @@ impl Coeffs {
                 )
             } else {
                 let v = k.plate_speed_scale_mm_yr * 1.0e-3 / YEAR_S;
-                let drag = f_ref * trench
-                    / ((1.0 + k.slab_resistance + k.boundary_resistance) * area * v); // ledger: FRC-016
+                let drag =
+                    f_ref * trench / ((1.0 + k.slab_resistance + k.boundary_resistance) * area * v); // ledger: FRC-016
                 (
                     drag,
                     k.keel_drag,
@@ -1665,14 +1665,20 @@ mod tests {
     #[test]
     fn the_resistances_are_forsyth_and_uyedas_table_6() {
         let k = quiet();
-        assert!(k.forsyth_uyeda_balance && !k.suction_saturates, "the defaults");
+        assert!(
+            k.forsyth_uyeda_balance && !k.suction_saturates,
+            "the defaults"
+        );
         let c = coeffs(&k);
         let v_t = c.pull_n_m / c.slab_res * 1.0e3 * YEAR_S;
         assert!(
             (v_t / (FU_SLAB_PULL / FU_SLAB_RESISTANCE * 10.0) - 1.0).abs() < 1e-12,
             "{v_t}"
         );
-        assert!((v_t / 70.0 - 1.0).abs() < 0.05, "the paper's 7.0 cm/yr: {v_t}");
+        assert!(
+            (v_t / 70.0 - 1.0).abs() < 0.05,
+            "the paper's 7.0 cm/yr: {v_t}"
+        );
         assert!((7.5..8.5).contains(&c.keel), "{}", c.keel);
         assert!((c.suction_share - 0.50 / 6.43).abs() < 1e-12);
         assert_eq!(c.boundary_res, 0.0);
@@ -1698,7 +1704,11 @@ mod tests {
             (c.drag, c.keel, c.slab_res, c.boundary_res)
         );
         assert_eq!(
-            (other.suction_share, other.transform_n_m, other.colliding_n_m),
+            (
+                other.suction_share,
+                other.transform_n_m,
+                other.colliding_n_m
+            ),
             (c.suction_share, c.transform_n_m, c.colliding_n_m)
         );
         // The old law has no friction.
@@ -1748,10 +1758,13 @@ mod tests {
         let speed = |w: DVec3| w.cross(DVec3::Z).length() * c.radius_m * 1.0e3 * YEAR_S;
         let free = speed(base.solve().unwrap()[0]);
         let expect = v_t * s / (1.0 + s);
-        assert!((free / expect - 1.0).abs() < 0.05, "{free} against {expect}");
+        assert!(
+            (free / expect - 1.0).abs() < 0.05,
+            "{free} against {expect}"
+        );
         // Friction all round the rim.
-        let rim_m = 2.0 * std::f64::consts::PI * c.radius_m * rim[0].0.z.acos().sin()
-            / rim.len() as f64;
+        let rim_m =
+            2.0 * std::f64::consts::PI * c.radius_m * rim[0].0.z.acos().sin() / rim.len() as f64;
         let rim3: Vec<_> = rim.iter().map(|&(x, out)| (x, out, rim_m)).collect();
         let (w, bal, its) = plastic(&base, &rim3);
         let v = speed(w);
@@ -1789,7 +1802,10 @@ mod tests {
         assert!((wf - w).length() < 1e-6 * w.length(), "{wf} {w}");
         // The budget books the friction with the boundary resistance.
         let ans = bal.answers(&[w])[0].unwrap();
-        assert!(ans.boundary_resistance > 0.0 && ans.residual < 1e-6, "{ans:?}");
+        assert!(
+            ans.boundary_resistance > 0.0 && ans.residual < 1e-6,
+            "{ans:?}"
+        );
     }
 
     /// Friction is plastic (FRC-035): a drive that outweighs it moves the plate as a fixed force
@@ -1838,9 +1854,12 @@ mod tests {
     /// the old law's speed (the plate speed lane's diagnosis: the plates with no slab pull at 81
     /// and 152 mm/yr RMS under Table 6's resistances alone, 15.5 under the old law). The friction
     /// on its transforms and its colliding front takes most of that away: at Table 6's own ridge
-    /// push (0.36 per km against the pull's 6.43) the plate is held, and at the model's (the
-    /// column energy at the pool preset's ridge and old floor, about 0.1 of the pull) it moves at
-    /// about a quarter of its frictionless speed.
+    /// push (0.36 per km against the pull's 6.43) the friction about balances the push and the
+    /// plate creeps at the floor speed (Forsyth & Uyeda's plates with no slab are slow: "continental
+    /// drag is the primary regulator of the velocity of plates not attached to downgoing slabs",
+    /// p. 190); at the model's (the column energy at the pool preset's ridge and old floor, about
+    /// 0.1 of the pull) an oceanic plate moves at about two fifths of its frictionless speed,
+    /// still faster than under the old law, and a continental one slower than under the old law.
     #[test]
     fn friction_holds_back_a_plate_with_no_slab() {
         let pool = |k: TectonicParams| TectonicParams {
@@ -1851,8 +1870,8 @@ mod tests {
         let c = coeffs(&pool(quiet()));
         let old = coeffs(&pool(old_law()));
         let (_, pts, rim) = reference_cap(&c);
-        let rim_m = 2.0 * std::f64::consts::PI * c.radius_m * rim[0].0.z.acos().sin()
-            / rim.len() as f64;
+        let rim_m =
+            2.0 * std::f64::consts::PI * c.radius_m * rim[0].0.z.acos().sin() / rim.len() as f64;
         let model_push = c.edge_scale * (c.energy(-2600.0, false) - c.energy(-5651.0, false));
         assert!(
             (0.08..0.12).contains(&(model_push / c.pull_n_m)),
@@ -1862,10 +1881,10 @@ mod tests {
         let table_push = c.pull_n_m * 0.36 / FU_SLAB_PULL;
         let speed = |w: DVec3| w.cross(DVec3::Z).length() * c.radius_m * 1.0e3 * YEAR_S;
         // The ridge: the back of the rim (140 degrees about longitude 180), pushing towards +X.
-        let build = |c: Coeffs, push: f64| {
+        let build = |c: Coeffs, push: f64, continental: bool| {
             let mut bal = Balance::new(c, &[DVec3::Z]);
             for &x in &pts {
-                bal.add_area(0, x, false);
+                bal.add_area(0, x, continental);
             }
             for &(x, out) in &rim {
                 if x.y.atan2(x.x).to_degrees().abs() > 110.0 {
@@ -1885,22 +1904,31 @@ mod tests {
             bal
         };
         let rim3: Vec<_> = rim.iter().map(|&(x, out)| (x, out, rim_m)).collect();
-        let old_v = speed(build(old, model_push).solve().unwrap()[0]);
-        let frictionless = speed(build(c, model_push).solve().unwrap()[0]);
-        let (w, _, _) = plastic(&build(c, model_push), &rim3);
+        let old_v = speed(build(old, model_push, false).solve().unwrap()[0]);
+        let frictionless = speed(build(c, model_push, false).solve().unwrap()[0]);
+        let (w, _, _) = plastic(&build(c, model_push, false), &rim3);
         let with = speed(w);
-        let (w, _, _) = plastic(&build(c, table_push), &rim3);
+        let (w, _, _) = plastic(&build(c, table_push, false), &rim3);
         let held = speed(w);
+        let old_cont = speed(build(old, model_push, true).solve().unwrap()[0]);
+        let (w, _, _) = plastic(&build(c, model_push, true), &rim3);
+        let with_cont = speed(w);
         eprintln!(
             "a plate with no slab: the old law {old_v:.1}, Table 6 without friction \
-             {frictionless:.1}, with friction {with:.1}; at Table 6's ridge push {held:.2} mm/yr"
+             {frictionless:.1}, with friction {with:.1}; at Table 6's ridge push {held:.2} mm/yr; \
+             continental: the old law {old_cont:.1}, with friction {with_cont:.1}"
         );
         assert!(frictionless > 4.0 * old_v, "{frictionless} {old_v}");
         assert!(
-            (0.1..0.4).contains(&(with / frictionless)),
+            (0.25..0.5).contains(&(with / frictionless)),
             "{with} {frictionless}"
         );
-        assert!(held < c.floor_mm_yr, "{held}");
+        // Held at the floor: the friction is the push to within a few percent on this cap.
+        assert!(
+            held < 1.5 * c.floor_mm_yr && held < 0.02 * frictionless,
+            "{held}"
+        );
+        assert!(with_cont < old_cont, "{with_cont} {old_cont}");
     }
 
     #[test]
