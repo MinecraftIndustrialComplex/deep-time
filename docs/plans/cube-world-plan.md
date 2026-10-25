@@ -879,7 +879,14 @@ the only Deep Time world types; see the note under 7.4.)
   (coordinator's call, 2026-10-24); a first start on one runs on the dev level types
   `deeptime:test_planet_lambert` and `_32k` (GameTest resources and
   `tools/smoke/datapacks/deeptime-lambert-frame`). `lambda_c_deg` keeps its name: the rename to
-  `lambda0_deg` (here and in G13) is still open.
+  `lambda0_deg` (here and in G13) is still open. What it takes (cleanup lane, 2026-10-24; not done, because it
+  edits `params.rs` and all twelve built-in presets, which are in the pool's source key, so every cached run
+  would need a `pool.sh alias`): the field and its `d_lambda_c_deg` default in `params.rs` (the `SCALE_KEYS`
+  entry, the 0 to 360 check, `LAMBDA_C_AUTO`), the two readers (`bake/project_cube.rs`, `deposits/mod.rs`) and
+  `cube_turn.rs`'s `set_by` string, the `scale.lambda_c_deg` line of the twelve preset JSONs plus
+  `tests/presets/planet_world_4k.json`, `editor_fields.json`, the `deeptime.editor.field.lambda_c_deg` lang key,
+  `tools/review/seafloor/calib.sh` and the docs. The simulation's output stays bit-identical (a key's name is
+  not read by any law); the rename is one commit that needs a fresh pool base.
 
   Check: `Presets` JUnit; `FirstStartGenerator` on both level types.
 - **G13. The Create World screen.**
@@ -1190,6 +1197,12 @@ part of done"):
   - `latlon_to_block` and `box_on_world` take the map.
 
   `find_places.py`, `sections_shots.py`, `deposits_shots.py` and `test_preview.py` follow.
+
+  Done (cleanup lane, 2026-10-24): `latlon_to_block` and `box_on_world` take the run's world data and place a
+  cube world's latitude and longitude with `deeptime inspect-column --latlon` (the Rust `block_of`; no closed
+  form exists), the Lambert formula stays for the synthetic worlds only; `find_places.py` places volcanoes the same
+  way and its plate-carree fjord scan is gone; `test_preview.py` passes (its two reds were a symlinked temp path
+  and a stale plate-carree z). `pole_z` stays for the Lambert-frame worlds.
 - **T5. Period bugs in the test tools.** `tools/smoke/run.py` and `tools/client/dh-client-check.sh`
   use the notional size (16,384) as the period. That is already wrong at 13,312 and would be wrong at
   15,360. Both read the period from the probe or the manifest.

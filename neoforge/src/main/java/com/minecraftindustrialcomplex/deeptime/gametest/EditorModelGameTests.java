@@ -146,7 +146,7 @@ public final class EditorModelGameTests {
     public static void acceptBuildsGenerator(GameTestHelper helper) {
         RegistryAccess registries = helper.getLevel().getServer().registryAccess();
         WorldDimensions fresh = planetDimensions(registries);
-        helper.assertTrue(PlanetGenerators.overworld(fresh).isPresent(), "deeptime:planet has a Deep Time overworld");
+        helper.assertTrue(PlanetGenerators.overworld(fresh).isPresent(), "deeptime:planet_cube has a Deep Time overworld");
         helper.assertTrue(PlanetGenerators.createBlock(fresh, gameDir(), true) == PlanetGenerators.CreateBlock.NOT_SIMULATED,
                 "Create is blocked before any run");
         helper.assertTrue(PlanetGenerators.createBlock(fresh, gameDir(), false) == PlanetGenerators.CreateBlock.NATIVES,
