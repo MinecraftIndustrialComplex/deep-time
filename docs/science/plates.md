@@ -8458,3 +8458,72 @@ age written on each reached sample still run on the whole distance field, so the
 volcanoes and the deposits) see a subduction zone past a front's ends. They make no relief or crust
 of their own; the coordinator's call (2026-10-25): leave them until those readers are checked, then
 stop them at the slab's ends in a step of their own.
+
+### The ocean-continent dip on base10's maps (2026-10-25, no simulation)
+
+Step 8 left open what turns the mature ocean-continent fronts transform at a resampling, and step 9's
+two-plate probe found no dip on a head-on margin. This reads base10's 24 runs (key 37c894cc0de0,
+`+DEEPTIME_CRUST_BUDGET=1`) without a new run: the records over their 1,140 resamplings after the
+first 100 Myr, and the 50-Myr maps, whose flags carry the boundary mix's fronts (256 on the
+overriding side of a subduction front) and whose current geometry (the Delaunay triangulation of
+the visible samples) is what a resampling rebuilds the lattice from.
+
+**The records** (the step before a resampling against the first step on the new lattice, means):
+the ocean-continent front 56,100 km, -12,900; ocean-ocean +3,600; judged a transform +12,400; rift
+-9,100; ridge +8,800; the lost ocean-continent length is the slab's 600 km or longer (-14,800) and
+the contacts' 50 Myr or older, as on base7. The plates' slab pull falls by 32 % and comes back over
+the cycle; the visible-weighted speed does not move (about 21 mm/yr). The plate count's change does
+not explain it.
+
+**The maps**, binned by Myr since the last resampling (a 2-Myr map is the first step on the new
+lattice), samples a map; a front is on the current boundary when it has a Delaunay neighbour of
+another plate; ocean-continent as the mix splits it (continental crust of its plate within two
+steps):
+
+| Myr since the resampling | 2 | 4 to 6 | 8 to 12 | 14 on |
+|---|---|---|---|---|
+| maps | 47 | 98 | 100 | 115 |
+| front on the current boundary | 1,204 | 1,243 | 1,212 | 1,185 |
+| of it ocean-continent / ocean-ocean | 572 / 631 | 610 / 633 | 617 / 595 | 652 / 533 |
+| front off the current boundary | 77 | 100 | 151 | 230 |
+| of it ocean-continent / ocean-ocean | 43 / 34 | 56 / 44 | 95 / 56 | 171 / 59 |
+| off fronts' distance to the nearest sample of another plate, mean km | 134 | 168 | 228 | 304 |
+| of the off fronts, a hole (no sample within 70 km) on the way there | 0.006 | 0.069 | 0.181 | 0.293 |
+| current boundary samples | 7,864 | 7,450 | 6,832 | 6,538 |
+| holes (no visible sample within 70 km), 10⁶ km² | 1.5 | 8.6 | 22.7 | 41.0 |
+| of them within 190 km of both a trench and a front sample | 0.12 | 0.38 | 0.66 | 0.92 |
+
+The maps show the records' dip: the ocean-continent front 823 a map late in a cycle against 615 on
+the new lattice (-25 %; the records -23 %), ocean-ocean 592 against 665.
+
+- **The fronts on the current boundary do not dip** (1,185 against 1,204). Within them 80 a map
+  move from ocean-continent to ocean-ocean (652 to 572, 533 to 631): fronts the new lattice puts
+  farther than two steps from their plate's continent. The records' ocean-ocean fronts move off the
+  coast the same way (the 150 km band -3,100 km, the 300, 600 and 1,200 km bands +2,500, +2,200
+  and +1,600).
+- **The rest, three fifths of the dip (128 of 208 a map), is fronts off the current boundary**:
+  overriding samples that `subduction::fronts_begin` and `dynamics::boundary_mix` still class a
+  front through a lattice neighbour of the other plate (both take such a neighbour whether it is
+  hidden or not), with no sample of another plate beside them now. They build up through the cycle
+  (6 % of the front two Myr after a resampling, 16 % late; 7 % to 21 % of the ocean-continent
+  front), lie deeper behind the boundary as it goes (134 to 304 km), and the new lattice drops
+  them. They are a band behind a real front, not a second front: 99 % of those with only their
+  own plate on the way have an on-boundary front sample between them and the other plate, 90 % are
+  of their plate's biggest group. Late in a cycle 29 % face a hole, crust of the subducting plate
+  that went under and that no overriding sample covers (0.9 × 10⁶ km² of hole beside both a trench
+  and a front, against 0.12 on a new lattice), which a resampling fills with new ocean floor.
+- **The gain in the boundary judged a transform is not on the maps** (they carry no class but the
+  fronts). It comes with the current boundary's return at a resampling (6,538 boundary samples a
+  map late in a cycle, 7,864 on the new lattice), when the holes, 41 × 10⁶ km² late in a cycle and
+  59 % of them beside divergent samples, are filled with ocean floor and ridge segments. So step
+  8's "to the boundary judged a transform" is a match of totals, not shown margin by margin.
+
+So the late-cycle ocean-continent front and the slab pull read on it carry a band the frozen
+lattice keeps behind the margin, up to a fifth of that front. A likely source, not shown: one-way
+subduction (PLT-542) keeps the subducting plate's crust hidden once it went under, so where the
+convergence is oblique to an irregular margin its trench follows the envelope of the overriding
+outline swept along the motion, and the overriding samples in the lee keep only hidden neighbours
+of it. The maps hold visible samples only, so whether the band's neighbours are hidden or moved off
+is not in them; that, and the margins followed through a resampling, needs a trace of the lattice
+at a few resamplings of one run (measurement only), which is the coordinator's to call. The
+scripts are `build/front/recdip.py`, `recdip2.py`, `mapdip.py` to `mapdip4.py` (not kept).
