@@ -118,7 +118,7 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
 | Task | From (build log or design) | Size |
 |---|---|---|
 | Tell Ben when V1's item 1 (the planet looks right) is met: the built physics on by default, every one of the seven realism checks passing on master's 24-run base or firing from sourced physics, shown as the cause (Ben, 2026-10-24, "Met if physics-backed"; bands in docs/science/realism-checks.md, adopted in tools/review/pool/measures.json), and Ben's own look at a world finding nothing that clearly does not seem real; then a gated build in his Prism instances; the launch video follows on his word | decisions log 2026-10-21, 2026-10-23, 2026-10-24 | coordinator |
-| Proposed V1 item, parked by the coordinator (2026-10-25; he sets its priority once the arm m5-unfreeze reads): a supply-limited ocean, the sourced return of chemical denudation's dissolved load. Today the load (ERO-205) leaves the mass budget, since no sink can take it without counting the cations' carbonate twice. On m5-chemden, as estimates from the last step only (the pool keeps no series): 0.92 m/Myr of solid rock over the planet, 1.35 m/Myr over the ocean floor, so 1,350 m in 1,000 Myr; or a standing stock of about 114 m if it lay on a floor of mean age 92 Myr and went down with it. The sea over the datum ends at 278 m. On Earth the river load's Ca and Mg leave the ocean as carbonate (neritic platforms, and pelagic ooze above the CCD) and its silica as biogenic opal, with some evaporite. Burial matches supply over the residence times: Ca about 1 Myr, dissolved silica 10 to 20 kyr (from-memory). The sketch: one ocean reservoir per species (Ca + Mg carbonate, SiO₂), fed each step by the dissolved load. Burial takes the reservoir's supply and splits it between the sinks already built: the neritic carbonate (Bosscher & Schlager), the pelagic chalk (ERO-191) and the periplatform tracer, which become sinks sharing the supply instead of free production laws, plus biogenic silica on the floor. The CCD is set by the balance (carbonate compensation: it deepens when the supply rises; Broecker & Peng 1982, from-memory). Evaporite only where the closed-basin salt rules put it now. Mass is conserved, and the carbon cycle's books and its cap carbonate stay as they are. Needs: sources for the CCD's response and the split between shelf and deep sea; unit tests that burial equals supply at steady state; one pool arm | build log 2026-10-25 "M5 lane: chemical denudation"; erosion-and-sediment.md, Chemical denudation, Limits; ERO-205 note | large |
+| Proposed V1 item, parked by the coordinator (2026-10-25; he sets its priority once the arm m5-unfreeze reads): a supply-limited ocean, the sourced return of chemical denudation's dissolved load. Today the load (ERO-205) leaves the mass budget, since no sink can take it without counting the cations' carbonate twice. On m5-chemden, as estimates from the last step only (the pool keeps no series): 0.92 m/Myr of solid rock over the planet, 1.35 m/Myr over the ocean floor, so 1,350 m in 1,000 Myr; or a standing stock of about 114 m if it lay on a floor of mean age 92 Myr and went down with it. The sea over the datum ends at 278 m. On m5-unfreeze (the same estimates): 0.856 m/Myr over the ocean floor, so 855 m in 1,000 Myr, and a standing stock of about 116 m on a floor of mean age 140 Myr; the sea ends at 687 m. On Earth the river load's Ca and Mg leave the ocean as carbonate (neritic platforms, and pelagic ooze above the CCD) and its silica as biogenic opal, with some evaporite. Burial matches supply over the residence times: Ca about 1 Myr, dissolved silica 10 to 20 kyr (from-memory). The sketch: one ocean reservoir per species (Ca + Mg carbonate, SiO₂), fed each step by the dissolved load. Burial takes the reservoir's supply and splits it between the sinks already built: the neritic carbonate (Bosscher & Schlager), the pelagic chalk (ERO-191) and the periplatform tracer, which become sinks sharing the supply instead of free production laws, plus biogenic silica on the floor. The CCD is set by the balance (carbonate compensation: it deepens when the supply rises; Broecker & Peng 1982, from-memory). Evaporite only where the closed-basin salt rules put it now. Mass is conserved, and the carbon cycle's books and its cap carbonate stay as they are. Needs: sources for the CCD's response and the split between shelf and deep sea; unit tests that burial equals supply at steady state; one pool arm | build log 2026-10-25 "M5 lane: chemical denudation"; erosion-and-sediment.md, Chemical denudation, Limits; ERO-205 note | large |
 | Differential erosion: the river and hillslope laws read the rock at the depth they cut (hard over soft makes waterfalls that retreat, escarpments, stepped canyon walls), sourced physics, no knob; start after V1 of the mod is completed | decisions log 2026-10-25 (Ben: "After V1 of the mod is completed") | large |
 | `riverbiomes` and the peatland share pass with nothing checked on master 5110ac5f's 4k test planet (0 river samples, 0 cold wetland after the round features moved it: true land 0.0676 to 0.0398, lakes 16 to 5); give `riverbiomes` a minimum sample count once the test planet has wide rivers again | build log 2026-10-24, the -PwithEe peatland red (BIO-189) | small |
 | With Expanded Ecosphere, `minecraft:ocean` lands on part of vanilla's coast band that the land call treats as land (a channel above the sea at -785, 433 took an ocean biome) | build log 2026-10-24, BIO-189 | small |
@@ -170,7 +170,51 @@ Work left behind by questions decided under Ben's rule of 2026-10-16 (decide wha
   - extra thickness acting as rock of 3,200 to 3,300 kg/m³;
   - Durrheim & Mooney 1994, Stadtlander et al. 1999 and Hacker 2015 as pointers.
   - No fetch, no law.
-- **The arm m5-unfreeze** (chemical denudation plus the fix, 4d5cf4dd, key 67edbe8a8914; `pool.sh run m5-unfreeze --seeds 1,2,3,4 --measures v1census,guard`): running.
+- **The arm m5-unfreeze** (chemical denudation plus the fix, 4d5cf4dd, key 67edbe8a8914, argkey bd0dbb14; `pool.sh run m5-unfreeze --seeds 1,2,3,4 --measures v1census,guard`). All 8 runs reached their end. Read against base14 (`pool.sh table`, Mann-Whitney; m4table and m4decay on base14s4; `build/m4b/ends.py`, `cont.py`, `frozen.py`, `steps.py`, `leak.py`). **Land drowns, and it is not crust loss.**
+  - v1census, base14 to unfreeze:
+    - land 0.319 to 0.193 (p < 0.001);
+    - largest landmass 0.205 to 0.055, which fails its 0.06;
+    - continental crust under the sea 0.202 to 0.566, which fails its 0.56;
+    - above 2 km 0.085 to 0.016, now passing;
+    - coast with high ground 0.201 to 0.091, now passing;
+    - under ice 0.099 to 0.059 (p 0.17);
+    - collisions per 100 Myr 1.70 to 5.60;
+    - crust net change -0.043 to -0.021;
+    - criteria met per run, median 5 to 6, mean 5.42 to 5.38 (p 0.67);
+    - the sea over the datum 277 to 469 m after 100 Myr, 409 to 687 m at the end.
+  - Guard:
+    - worst 10,109 to 10,103 m (p 0.81);
+    - no step beyond 2 reliefs;
+    - highest plate elevation 6,122 to 5,097 m (p < 0.001).
+  - Continental share (`cont` p50):
+    - 0.377 to 0.402 against base14's matching 8;
+    - that is 192 to 205 million km² (cont × 5.1e8 km²);
+    - land over cont 0.817 to 0.474.
+    - Over each run's second half (`steps.py`): continental area +7 %, land -39 %, plates alive 29.1 to 22.4, the floor's median age 73 to 92 Myr.
+  - The freeze is gone: 0.027 of plate-steps keep their rotation (base14 0.351).
+  - Collisions end by stall-weld far more often (after the first 100 Myr):
+    - 125 to 424 welds, 1.72 to 6.11 per run per 100 Myr (m5-chemden 1.78);
+    - weld duration p50/p90/max 76/202/350 to 44/68/124 Myr;
+    - transfers 2,612 to 2,140.
+  - m4decay section 4:
+    - train duration p50/p90/max 8/66/518 to 10/50/144 Myr;
+    - trains over 110 Myr 166 to 6, their share of front-time 0.67 to 0.02;
+    - of the 6, 0.50 sutured, 0.33 closed and 0.17 parted.
+  - m4table:
+    - M4 p50 0.0770 to 0.0159;
+    - young belts 0.0405 to 0.0053;
+    - land in the 55-70 km band 0.0516 to 0.0063, in the 45-55 km band 0.060 to 0.041;
+    - the 35-40 km band's rock height p50 546 to 108 m, its Airy height over the sea 498 to 88 m.
+  - The leak, as estimates from the last step only:
+    - 0.675 m/Myr over the planet and 0.856 m/Myr over the ocean floor;
+    - so 855 m in 1,000 Myr;
+    - the standing stock about 116 m, on a floor of mean age 140 Myr;
+    - the sea over the datum is 687 m.
+  - **The reading.**
+    - The frozen collisions used to run on as long trains that stacked crust to 55-70 km. Now they weld after tens of Myr, and the crust stays at 35-45 km.
+    - The same crust spread thinner covers 0.025 more of the planet, so the basins shrink. The area alone gives roughly 190 m of the sea's 280 m rise, despite the older, deeper floor.
+    - The thin crust stands about 100 m over the sea, so that rise drowns it.
+  - **Next (proposed to the coordinator; sourced physics only, no knob):** where Earth's continental area goes and what holds its thickness. The candidates are collisional thickening that lasts past the weld (root and plateau, then the decay already built), crust lost at subduction (subduction erosion, sediment subduction, delamination), and the hypsometry of crust near 40 km. Earth's continental share of about 0.41, shelves included, is from memory.
 - **Traps.** The worktree guard refuses heredocs, even `cat >> file <<EOF`, and loops over runtime variables. A pool run folder's fields/globals.json holds only the last step's globals. The surface's km³ totals are in the bake's frame (dx = r x m_per_block_h, a 7.74e6 km² planet), while the climate's dissolved thickness uses Earth's 5.10e8 km², so compare them as planet-average thickness rates.
 ### 2026-10-25: The gate red `lakeiceandsaltfollowtheclimate` on master 56edfd16 was a test defect: the 14 "blackstone, not salt" columns are a fresh aa lava flow lying over a playa, which the flows' own order allows (LavaFlowPass runs after PlayaPass, VOL-162); the test now reads a column topped by the block the flow paints there as flow (coordinator's task; agent worktree .claude/worktrees/agent-ac569a2411d021d06, branch worktree-agent-ac569a2411d021d06-lakered from master c57f685f, 56edfd16 plus docs commits; sub-agent of session f981c0d3-5144-49ec-8686-2946d755872c; not merged)
 - **The red.** In all five sets of the gate on 56edfd16 (logs copied to the worktree's VM copy, neoforge/build/magma-seam/gate-*.log): `springsOnPlaya=1 (ringRead=20 ringWrong=14)`, every one `minecraft:blackstone` at x 1885 to 1889, z -129 to -132, y 79 to 81, in the ring the test reads round the spring POOL at (1874, -97) (the site's reach plus RING = 20, so 33 to 35 blocks off is inside it).
