@@ -8,19 +8,22 @@
 #   tools/remote/mac.sh -- tools/remote/detach.sh start cube2-shots bash tools/review/world-choice/shots.sh [steps...]
 # steps: walk pg-near cube-near pg-far cube-far (default all, in that order); pg-edges, cube-edges
 # shoot the near pass again from vista 9 (the edges) into its folder
+# RETIRED in part (cube plan 7.4): walk, pg-near, pg-far and pg-edges need the Petroff-Guyou world and
+# the deeptime:planet level type, both deleted; they refuse. The cube steps (cube-near, cube-far,
+# cube-edges) still run on a kept cube16 world. The default is now the cube steps.
 set -uo pipefail
 cd "$(dirname "$0")/../../.."
 CMP=${CMP:-/Volumes/Graphide/ban/deeptime-runs/cube2-cmp}
-STEPS=("$@"); [ ${#STEPS[@]} -gt 0 ] || STEPS=(walk pg-near cube-near pg-far cube-far)
+STEPS=("$@"); [ ${#STEPS[@]} -gt 0 ] || STEPS=(cube-near cube-far)
 BUILT=0
 build() { if [ "$BUILT" = 1 ]; then echo --no-build; fi; }
 for s in "${STEPS[@]}"; do
   case "$s" in
-    walk)
-      tools/client/vm-client.sh --name cmp-pg-walk --no-guidance --no-create --prop worldtype=deeptime:planet
-      echo "SHOTS walk rc=$?"
+    walk|pg-near|pg-far|pg-edges)
+      echo "world-choice/shots.sh: step $s is retired: it needs the Petroff-Guyou world (deeptime:planet), deleted in cube plan 7.4." >&2
+      exit 2
       ;;
-    pg-near|cube-near|pg-far|cube-far)
+    cube-near|cube-far)
       w="${s%-*}16"; kind="${s#*-}"
       settle=45; [ "$kind" = far ] && settle=240
       V=$(cat "$CMP/vistas-$w-$kind.txt")
@@ -30,7 +33,7 @@ for s in "${STEPS[@]}"; do
       echo "SHOTS $s rc=$?"
       BUILT=1
       ;;
-    pg-edges|cube-edges)
+    cube-edges)
       # The near pass again from vista 9 (the edges, three with F3) into the near folder.
       w="${s%-*}16"
       V=$(cat "$CMP/vistas-$w-near.txt")

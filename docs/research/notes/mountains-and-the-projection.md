@@ -471,6 +471,12 @@ corrected either way.
 
 ## 7. How it was measured
 
+- **Rerunning it (cube plan 7.4, 2026-10-24).** The `planet` step cannot be run again: it baked the Lambert
+  world and projected it to the Petroff-Guyou one with `deeptime project`, and both that command and the
+  Petroff-Guyou world are deleted (the cube is the only world type). `run.sh planet`, `heightmaps` and `all`
+  now stop with that message. `cube` (the τ tables) still runs, and `analyse` and `render` still read a work
+  folder that already holds `lambert/` and `pg/` bakes from before the deletion. The numbers in this note are
+  the record of the PG-versus-cube comparison and stay as measured.
 - Tools: `tools/research/mountains-projection/` (`run.sh` verbs planet, cube, analyse, render; `geom.py` the maps
   and the Petroff-Guyou forward; `cube_table.py` the τ tables at n = 512; `analyse.py` the numbers; `render.py`
   the pictures). Run on the test VM, detached and admitted, e.g. `tools/remote/mac.sh -- tools/remote/detach.sh

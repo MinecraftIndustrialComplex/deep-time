@@ -18,6 +18,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.levelgen.Aquifer;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -56,7 +57,12 @@ public final class LavaGameTests {
      *   <li>{@code seaOnLava}: no sea column whose water stands on lava (the first block under the
      *       water is never lava). The old rule turned the sea below y −54 into lava;</li>
      *   <li>{@code floorNotLava}: under ground that stands clear of it, open space below the lava
-     *       floor ({@link LavaRules#floodY}, y −342) is lava, as in vanilla's bottom ten blocks;</li>
+     *       floor ({@link LavaRules#floodY}, y −342) is lava, as in vanilla's bottom ten blocks. Open
+     *       space that deep is rare (the cube test planet's sampled columns have none: {@code floorOpen}
+     *       0), so the check does not hang on it: every block below the floor in a clear column is read
+     *       back ({@code floorBlocks}, never 0: the test fails when it reads none) and the level's own
+     *       global fluid picker, the one the aquifer asks for any open block there, must answer lava at
+     *       every one of them ({@code floorPickerLava} equals {@code floorBlocks});</li>
      *   <li>the premises: a sea bed below y −60 was sampled ({@code deepSeaColumns}), and open space
      *       exists between the lava lakes and y −54 ({@code openDeep}: caves the old rule flooded).</li>
      * </ul>
@@ -110,7 +116,8 @@ public final class LavaGameTests {
             sites.add(deep);
         Site deepestSite = deepest;
 
-        long[] n = new long[9];   // lava, lavaAboveLakes, seaOnLava, floorOpen, floorNotLava, openDeep, deepSeaColumns, columns, magmaLava
+        long[] n = new long[11];   // lava, lavaAboveLakes, seaOnLava, floorOpen, floorNotLava, openDeep, deepSeaColumns, columns, magmaLava, floorBlocks, floorPickerLava
+        Aquifer.FluidPicker picker = g.globalFluidPicker.get();
         int[] topLava = {Integer.MIN_VALUE};
         StringBuilder detail = new StringBuilder();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
@@ -155,10 +162,15 @@ public final class LavaGameTests {
                         boolean open = b.isAir() || !b.getFluidState().isEmpty();
                         if (open && y < -54 && y > lakeTop && !inSea)
                             n[5]++;
-                        if (open && y < flood && clear) {
-                            n[3]++;
-                            if (!lava)
-                                n[4]++;
+                        if (y < flood && clear) {
+                            n[9]++;   // a block of the world's floor, read back (solid or open)
+                            if (picker.computeFluid(x, y, z).at(y).is(Blocks.LAVA))
+                                n[10]++;
+                            if (open) {
+                                n[3]++;
+                                if (!lava)
+                                    n[4]++;
+                            }
                         }
                     }
                 }
@@ -166,15 +178,21 @@ public final class LavaGameTests {
         }, () -> {
             DeepTime.LOGGER.info("[gametest] lavaStaysAtTheFloor rules={} minY={} lavaFloorY={} highestLakeY={} sites={} columns={} "
                             + "deepSeaColumns={} (deepest bed y {}) lava={} topLavaY={} lavaAboveLakes={} seaOnLava={} openDeep={} "
-                            + "floorOpen={} floorNotLava={} magmaLava={}{}",
+                            + "floorOpen={} floorNotLava={} magmaLava={} floorBlocks={} floorPickerLava={}{}",
                     rules, minY, flood, lakeTop, sites, n[7], n[6], (int) Math.floor(deepestSite.h), n[0],
-                    topLava[0] == Integer.MIN_VALUE ? "-" : topLava[0], n[1], n[2], n[5], n[3], n[4], n[8], detail);
+                    topLava[0] == Integer.MIN_VALUE ? "-" : topLava[0], n[1], n[2], n[5], n[3], n[4], n[8], n[9], n[10], detail);
             helper.assertTrue(n[6] > 0, "no sea bed below y -60 was sampled (deepest: y " + deepestSite.h
                     + "): the planet has no sea the old lava level would have reached");
             helper.assertTrue(n[5] > 0, "no open space between y " + lakeTop + " and y -54 in the sampled chunks: nothing the old lava level would have flooded");
             helper.assertTrue(n[1] == 0, n[1] + " lava blocks above y " + lakeTop + " (the highest a lava lake may stand):" + detail);
             helper.assertTrue(n[2] == 0, n[2] + " sea columns stand on lava:" + detail);
             helper.assertTrue(n[4] == 0, n[4] + " of " + n[3] + " open blocks below the lava floor (y " + flood + ") are not lava");
+            // Never pass vacuously (Ben, decisions log 2026-10-01: a test that reads nothing is not a pass): the
+            // floor check read nothing on the cube test planet, whose sampled columns have no open space down there.
+            helper.assertTrue(n[9] > 0, "the floor check read no block below the lava floor (y " + flood
+                    + "): no sampled column stands clear of it, so nothing was checked");
+            helper.assertTrue(n[10] == n[9], (n[9] - n[10]) + " of " + n[9] + " blocks below the lava floor (y " + flood
+                    + ") are not lava in the level's global fluid picker");
             helper.succeed();
         });
     }
