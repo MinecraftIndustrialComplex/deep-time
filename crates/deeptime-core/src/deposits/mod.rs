@@ -3399,12 +3399,6 @@ impl DepositStage {
             cluster::wrap_x(f.c, cx + (rng.uniform() - 0.5) * r),
             cz + (rng.uniform() - 0.5) * r,
         );
-        // SCRATCH PROBE (remove before commit)
-        eprintln!(
-            "PROBE_PLACER draw z={z:.2} pole={:.2} past={}",
-            f.grid.projection().pole_z(),
-            !f.grid.projection().inside_poles(z)
-        );
         let model = SizeModel::new(&child.sizing);
         let mut size = model.draw(rng);
         // The gravel scales with the share of the parent that eroded, then the placer's gold is
