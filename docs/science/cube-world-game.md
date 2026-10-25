@@ -226,6 +226,8 @@ the game uses them:
       faces; a box wholly off them is left as it is.
     - *Site chunks* (`compat/SiteChunks`). A site's chunk volumes count columns on the faces only,
       so a void chunk is never a site's best chunk and never deflates the shares of its real ones.
+      On the 2026-10-25 test planet 2 of 97 ore sites reach past a turning edge (391 of their 1,230
+      blocks were in void chunks); `CompatGameTests.siteFootprintsStayOnTheFaces` checks every one.
 
 ## Equations and constants
 
