@@ -4615,7 +4615,7 @@ Toroidal World (MIT) docs, Immersive Portals source, TFC Eratosthenes, Civilizat
 - Reference: Syracuse, E. M., Abers, G. A. (2006). Global compilation of variations in slab depth beneath arc volcanoes and implications. Geochemistry, Geophysics, Geosystems 7(5):Q05017.
 - DOI or URL: 10.1029/2005GC001045.
 - Cited as: not cited; candidate source for arc-slab depth (flag 10; PLT-042).
-- Ledger ids: (supports 042, 061, 164); notes: supports 042, 061, 164; PLT-042 (2026-10-21 note)
+- Ledger ids: (supports 042, 061, 164); notes: supports 042, 061, 164; PLT-042 (2026-10-21 note); PLT-561
 - Read in the plate-geometry task (2026-10-21): abstract (OpenAlex; in the library as `Syracuse2006/abstract_openalex.txt`): "33,000 km of the global arc system at 839 volcanic centers"; the depth to the slab's top under the volcanoes, "averaged over 500-km-long arc segments, H ranges from 72 to 173 km with a global average of 105 km". A depth, not the arc's distance from the trench (PLT-042); the distance needs the slab's dip, which the abstract does not give per arc.
 - Access: open (G3).
 - Library (the project's source library, not distributed): not fetched. Reason: the publisher or host refuses scripted access (HTTP 403/405/429); open access status as recorded under Access.
@@ -7710,10 +7710,10 @@ The sources of the plate-geometry task (build log 2026-10-21 "The plate geometry
 - Reference: England, P., Engdahl, R. and Thatcher, W. (2004). Systematic variation in the depths of slabs beneath arc volcanoes. Geophysical Journal International 156(2):377-408 (from memory; the abstract was fetched without its record's metadata).
 - DOI or URL: 10.1111/j.1365-246X.2003.02132.x (from memory).
 - Cited as: "England et al. 2004 (abstract)".
-- Ledger ids: PLT-042 (2026-10-21 note)
+- Ledger ids: PLT-042 (2026-10-21 note); PLT-561
 - Access: open at the publisher (from memory); only the abstract was fetched.
 - Library (the project's source library, not distributed): the abstract from OpenAlex, 2026-10-21. File: `England2004/abstract_openalex.txt`.
-- Read so far (by the project): abstract, 2026-10-21: the depths to the tops of the intermediate-depth seismicity under arc volcanoes are "constant, to within a few kilometres, within individual arc segments, but differ by tens of kilometres from one arc segment to another. The range in depths is from 65 km to 130 km"; they correlate inversely "with the descent speed of the subducting plate". A depth, not a distance from the trench.
+- Read so far (by the project): abstract, 2026-10-21: the depths to the tops of the intermediate-depth seismicity under arc volcanoes are "constant, to within a few kilometres, within individual arc segments, but differ by tens of kilometres from one arc segment to another. The range in depths is from 65 km to 130 km"; they correlate inversely "with the descent speed of the subducting plate". A depth, not a distance from the trench. Read again in part, 2026-10-24 (the front lane's lookup agent, through a fetch tool, cut off near equation 14): the introduction, "It is generally accepted that the volcanic front at subduction zones lies above the place where the slab has reached a critical depth"; section 2.3, "The mean depth is 101 km, with a standard deviation of 16 km" (PLT-561).
 
 ## The plateau's warmth (CLM-225 to CLM-231, MOI-085), added 2026-10-21
 
@@ -8886,3 +8886,54 @@ The sources of the front lane's level-set membership (plates.md "Step 3c").
 - Access: paywalled; the UCLA CAM report copy did not answer (2026-10-24).
 - Library: not kept.
 - Read so far (by the project): abstract only, 2026-10-24 (the OSTI record): "The interface between the two fluids is considered to be sharp and is described as the zero level set of a smooth function." That the level-set function is kept a signed distance by reinitialising it from its zero level set, which PLT-536 does after every resampling, is the paper's method as the lane remembers it (from-memory).
+
+## The arcs' ends at the slab's edge (PLT-561), added 2026-10-24
+
+The sources of the front lane's step 10 (plates.md "Step 10"). England, Engdahl & Thatcher 2004 and
+Syracuse & Abers 2006 are above, read again for this step. A lookup sub-agent of the front lane read
+them on 2026-10-24; the quotes are from that reading, and its downloads were not kept.
+
+### ThorkelsonBreitsprecher2005
+- Reference: Thorkelson, D. J. and Breitsprecher, K. (2005). Partial melting of slab window margins: genesis of adakitic and non-adakitic magmas. Lithos 79(1-2):25-41 (the title from memory).
+- DOI or URL: not checked.
+- Cited as: "Thorkelson & Breitsprecher 2005".
+- Ledger ids: PLT-561
+- Access: an author copy (PDF).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-24 (the front lane's lookup agent): section 2, p. 27, "we show how 'normal' arc volcanism is interrupted in the vicinity of the slab window, and replaced by a broader but possibly less voluminous volcanic field of wide-ranging compositions"; the caption of Fig. 1, p. 26, "Volcanic arc (yellow volcanoes) is interrupted by field of anomalous magmatism".
+
+### JohnstonThorkelson1997
+- Reference: Johnston, S. T. and Thorkelson, D. J. (1997). Cocos-Nazca slab window beneath Central America. Earth and Planetary Science Letters 146:465-474 (the title from memory).
+- DOI or URL: not checked.
+- Cited as: "Johnston & Thorkelson 1997".
+- Ledger ids: PLT-561
+- Access: full text read (the lookup agent's copy).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-24 (the front lane's lookup agent): the abstract, p. 465, "The absence of a Wadati-Benioff zone from southeastern Costa Rica through Panama corresponds to the position of the slab window", the basalts there from an ocean-island-type source unlike "the rest of the arc, in Nicaragua, El Salvador and Guatemala".
+
+### Levin2002
+- Reference: Levin, V., Shapiro, N., Park, J. and Ritzwoller, M. (2002). Seismic evidence for catastrophic slab loss beneath Kamchatka. Nature 418:763-767 (the authors and title from memory).
+- DOI or URL: not checked.
+- Cited as: "Levin et al. 2002".
+- Ledger ids: PLT-561
+- Access: paywalled; the abstract on Europe PMC.
+- Library: not kept.
+- Read so far (by the project): abstract only, 2026-10-24 (the front lane's lookup agent): "About 5 to 10 Myr ago, catastrophic slab loss shut down island-arc volcanic activity north of the Aleutian-Kamchatka junction"; "no relict slab underlies the extinct northern Kamchatka volcanic arc".
+
+### Yogodzinski2001
+- Reference: Yogodzinski, G. M., Lees, J. M., Churikova, T. G., Dorendorf, F., Wöerner, G. and Volynets, O. N. (2001). Geochemical evidence for the melting of subducting oceanic lithosphere at plate edges. Nature 409:500-504 (the authors from memory).
+- DOI or URL: not checked.
+- Cited as: "Yogodzinski et al. 2001".
+- Ledger ids: PLT-561 (the slab-edge volcanism the model leaves out)
+- Access: paywalled; the abstract.
+- Library: not kept.
+- Read so far (by the project): abstract only, 2026-10-24 (the front lane's lookup agent): "adakites are likely to form whenever the edge of a subducting plate is warmed or ablated by mantle flow".
+
+### Cocchi2017
+- Reference: Cocchi, L., Passaro, S., Tontini, F. C. and Ventura, G. (2017). Volcanism in slab tear faults is larger than in island-arcs and back-arcs. Nature Communications 8:1451 (the authors and title from memory).
+- DOI or URL: not checked.
+- Cited as: "Cocchi et al. 2017".
+- Ledger ids: PLT-561 (the slab-edge volcanism the model leaves out)
+- Access: open (Nature Communications).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-24 (the front lane's lookup agent): "Volcanoes at STEP are located at the lateral margins of retreating slabs"; "The few subduction settings with non-volcanic STEP, as the Sulawesi and Hellenic arcs, also lack of a well-developed volcanic arc and/or back-arc."
