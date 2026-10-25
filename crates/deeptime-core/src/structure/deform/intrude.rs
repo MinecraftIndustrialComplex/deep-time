@@ -256,6 +256,11 @@ pub fn emplace(
                 f.rise = RISE;
                 f.rock = index("basalt");
             }
+            if !frame.projection().inside_poles(bz) {
+                // Drawn past the pole (DEF-081, as emplace.rs): no ground there.
+                counts.past_pole += 1;
+                continue;
+            }
             *next_id += 1;
             counts.add(kind);
             features.push(f);
