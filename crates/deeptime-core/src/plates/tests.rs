@@ -2622,6 +2622,226 @@ fn the_arcs_band_stops_at_the_slabs_ends() {
     assert!(failed.is_empty(), "{failed:#?}");
 }
 
+/// The overriding margin at the slab's ends (the front lane, step 11; plates.md, "Step 11"), on
+/// [`a_front_of_known_length`]'s straight front, plate 1 converging at 80 mm/yr under no sediment
+/// (an erosive margin, PLT-442). Past a front's ends there is no slab, so no forearc, no arc crust
+/// thickening and no slab-driven shortening. With `tectonics.margin_slab_ends` off (PLT-562), the
+/// subduction uplift and the folds (out to `subduction_distance_km`), the cordillera (its range
+/// and the crust behind it that shortens into it, out to the same distance), subduction erosion's
+/// forearc band (to `arc_distance_km`) and the one-way subduction's forearc (a spacing further)
+/// run round each end of the front on the whole distance field; on, each stops at the slab's ends
+/// by the arcs' test (`arc_slab_ends`, PLT-561, on in both), and nothing changes further than the
+/// lattice's front reaches past the meridians of the front's ends (1.25 spacings, as for the
+/// arcs). A spacing or more inside the meridians, the uplift, the folds, the forearc's loss and
+/// the one-way forearc are exactly what they were off. The range there takes in what it took off,
+/// within the share its contact's sources meet (`met`), and the crust behind it shortens no less:
+/// it no longer shares the strain with the crust round the ends. The erosion takes thirty
+/// columns' spare crust (an ocean's column, 7 km, under a continent's, 35.1 km) per spacing of
+/// front, so every forearc's band goes down to the ocean's column. Fronts of 20 and 40 degrees,
+/// on the equator and on a great circle tilted 60 degrees from it, at 40,000 samples. Measured
+/// (2026-10-24): plates.md, "Step 11".
+#[test]
+fn the_margin_stops_at_the_slabs_ends() {
+    let base = preset(40_000, 20.0, "supercontinent", 5);
+    let rate = {
+        let stage = PlatesStage::new(base.clone());
+        let env = stage.env(&base.tectonics, 1);
+        let spare_km = f64::from(
+            pools::thickness(&pools::continental_column())
+                - pools::thickness(&pools::oceanic_column()),
+        ) / 1000.0;
+        30.0 * spare_km * env.norm.sample_area_km2()
+            / (env.norm.km(env.norm.spacing_rad()) * env.dt_myr)
+    };
+    const MEASURES: [&str; 5] = [
+        "the uplift",
+        "the folds",
+        "the forearc's loss",
+        "the one-way forearc",
+        "the range",
+    ];
+    // Every case is printed before the test fails on any.
+    let mut failed: Vec<String> = Vec::new();
+    let mut check = |ok: bool, what: String| {
+        if !ok {
+            failed.push(what);
+        }
+    };
+    for (name, frame) in [
+        ("equator", glam::DQuat::IDENTITY),
+        ("tilted", glam::DQuat::from_rotation_y(60f64.to_radians())),
+    ] {
+        let to_frame = frame.inverse();
+        for lon_deg in [20.0_f64, 40.0] {
+            // Off, then on, per sample: the change of elevation (m) and of the fold, the
+            // forearc's loss of crust (m), the one-way forearc (1 or 0), all with no cordillera;
+            // and with the cordillera and no erosion, the change of thickness less the arc's
+            // crust (m), the range's gain or the crust behind it thinned. Per sample, how far past
+            // the meridians of the front's ends it lies, spacings (negative between them).
+            let mut change: [[Vec<f64>; 5]; 2] = Default::default();
+            let mut past: Vec<f64> = Vec::new();
+            for (j, on) in [false, true].into_iter().enumerate() {
+                for range in [false, true] {
+                    let mut p = base.clone();
+                    p.tectonics.arc_slab_ends = true;
+                    p.tectonics.margin_slab_ends = on;
+                    p.tectonics.cordillera_shortening_mm_yr = if range { 1.7 } else { 0.0 };
+                    p.tectonics.subduction_erosion_km3_per_km_myr = if range { 0.0 } else { rate };
+                    let stage = PlatesStage::new(p.clone());
+                    let env = stage.env(&p.tectonics, 1);
+                    let spacing_deg = env.norm.spacing_rad().to_degrees();
+                    let (mut st, geo, pos) =
+                        a_front_of_known_length(&p, &env, frame, lon_deg, 15.0, 0.02, 80.0);
+                    let before = st.samples.clone();
+                    let mut cones = vec![[0.0; 2]; st.samples.len()];
+                    let pull =
+                        subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+                    past = pos
+                        .iter()
+                        .map(|&x| {
+                            let x = to_frame * x;
+                            let lon = x.y.atan2(x.x).to_degrees();
+                            (-lon).max(lon - lon_deg) / spacing_deg
+                        })
+                        .collect();
+                    let c = &mut change[j];
+                    if range {
+                        let arc = |s: &state::Sample| {
+                            f64::from(s.arc_continental_m) + f64::from(s.arc_oceanic_m)
+                        };
+                        c[4] = before
+                            .iter()
+                            .zip(&st.samples)
+                            .map(|(a, b)| {
+                                f64::from(b.thickness_m) - f64::from(a.thickness_m) - arc(b)
+                                    + arc(a)
+                            })
+                            .collect();
+                        continue;
+                    }
+                    let lifted = st.samples.clone();
+                    c[0] = before
+                        .iter()
+                        .zip(&lifted)
+                        .map(|(a, b)| f64::from(b.elevation_m) - f64::from(a.elevation_m))
+                        .collect();
+                    c[1] = before
+                        .iter()
+                        .zip(&lifted)
+                        .map(|(a, b)| {
+                            a.fold
+                                .iter()
+                                .zip(&b.fold)
+                                .map(|(x, y)| f64::from(y - x).powi(2))
+                                .sum::<f64>()
+                                .sqrt()
+                        })
+                        .collect();
+                    subduction::erode_forearcs(&mut st, &env, pull.forearcs.as_ref().unwrap());
+                    c[2] = lifted
+                        .iter()
+                        .zip(&st.samples)
+                        .map(|(a, b)| f64::from(a.thickness_m) - f64::from(b.thickness_m))
+                        .collect();
+                    c[3] = st
+                        .one_way
+                        .as_ref()
+                        .unwrap()
+                        .forearc
+                        .iter()
+                        .map(|&f| f64::from(u8::from(f)))
+                        .collect();
+                }
+            }
+            let n = past.len();
+            for (m, what) in MEASURES.into_iter().enumerate() {
+                // Off, then on: the farthest sample changed past the meridians (spacings), the
+                // samples changed further than 1.25 spacings past them, and their change summed.
+                let mut farthest = [0.0_f64; 2];
+                let mut beyond = [0_usize; 2];
+                let mut beyond_sum = [0.0_f64; 2];
+                for j in 0..2 {
+                    for (i, &x) in change[j][m].iter().enumerate() {
+                        if x != 0.0 && past[i] > 0.0 {
+                            farthest[j] = farthest[j].max(past[i]);
+                            if past[i] > 1.25 {
+                                beyond[j] += 1;
+                                beyond_sum[j] += x;
+                            }
+                        }
+                    }
+                }
+                let differ = (0..n)
+                    .filter(|&i| past[i] <= -1.0 && change[0][m][i] != change[1][m][i])
+                    .count();
+                eprintln!(
+                    "{name}, front of {lon_deg} degrees, {what}: off, the farthest change {:.2} \
+                     spacings past the meridians, {} samples beyond 1.25 (summed {:.3}); on, \
+                     {:.2}, {} ({:.3}); {differ} samples a spacing or more inside differ",
+                    farthest[0], beyond[0], beyond_sum[0], farthest[1], beyond[1], beyond_sum[1],
+                );
+                check(
+                    farthest[0] > 1.25,
+                    format!("{name}, {lon_deg} degrees, {what}: off, the farthest {:.2}", farthest[0]),
+                );
+                check(
+                    beyond[1] == 0,
+                    format!(
+                        "{name}, {lon_deg} degrees, {what}: on, {} samples changed beyond 1.25 \
+                         spacings past the meridians, the farthest {:.2}",
+                        beyond[1], farthest[1]
+                    ),
+                );
+                if m < 4 {
+                    check(
+                        differ == 0,
+                        format!("{name}, {lon_deg} degrees, {what}: {differ} samples inside differ"),
+                    );
+                }
+            }
+            // The range a spacing or more inside the meridians: its gain, sample by sample, and
+            // the crust behind it thinned, summed.
+            let (mut gain, mut thinned) = ([0.0_f64; 2], [0.0_f64; 2]);
+            let mut worst = 0.0_f64;
+            for i in (0..n).filter(|&i| past[i] <= -1.0) {
+                let (off, on) = (change[0][4][i], change[1][4][i]);
+                if off > 1.0 {
+                    gain[0] += off;
+                    gain[1] += on;
+                    worst = worst.max((on / off - 1.0).abs());
+                } else if off < -1.0 {
+                    thinned[0] -= off;
+                    thinned[1] -= on;
+                }
+            }
+            eprintln!(
+                "{name}, front of {lon_deg} degrees, the range inside: gain off {:.0} m, on {:.0} \
+                 ({:.4}), the worst sample {worst:.4} from off; the crust behind it thinned off \
+                 {:.0} m, on {:.0} ({:.3})",
+                gain[0],
+                gain[1],
+                gain[1] / gain[0],
+                thinned[0],
+                thinned[1],
+                thinned[1] / thinned[0],
+            );
+            check(
+                worst < 0.05,
+                format!("{name}, {lon_deg} degrees: the range inside, the worst sample {worst:.4}"),
+            );
+            check(
+                thinned[1] >= thinned[0],
+                format!(
+                    "{name}, {lon_deg} degrees: the crust behind the range thinned {:.0} m on, \
+                     {:.0} off",
+                    thinned[1], thinned[0]
+                ),
+            );
+        }
+    }
+    assert!(failed.is_empty(), "{failed:#?}");
+}
+
 /// The slab pull at the arcs' fronts (`tectonics.front_pull`, PLT-560; plates.md, "Step 9"), on
 /// [`a_front_of_known_length`]'s front of 40 degrees, plate 1 converging at 50 mm/yr at an angle
 /// θ to the front's normal. On, a full-length slab's pull has the torque of the reference pull
