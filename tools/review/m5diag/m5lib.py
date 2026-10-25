@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""Shared helpers of the M5 diagnosis (coast with high ground; build/m5diag/).
+"""Shared helpers of the M5 diagnosis (coast with high ground; tools/review/m5diag/).
 
 The coast and the high ground exactly as tools/review/continents_census.py's coast_metrics counts
 them (its helpers, not a copy of its rule): land is z > 0, the coast is land within 1.6 point
@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial import cKDTree
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "review"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import continents_census as cc  # noqa: E402
 
 REACH_KM = 200.0
