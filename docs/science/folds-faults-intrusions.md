@@ -96,6 +96,12 @@ keeps a list of structures that ride on their plates.
    Poisson distribution and each structure is placed in a cell with probability in proportion to its
    strain times area (DEF-022, DEF-023). Shortening makes fold trains and thrusts, extension normal
    faults and dykes, shear strike-slip faults; shortening in collisions and arcs also makes stocks.
+   A structure is placed at a random point of its cell, and the grid's last rows lie past the
+   poles (the map's rows run on to a whole number of 64-block quanta), so a draw can land where
+   there is no ground: it is not started, after all its random draws are made, so every other
+   structure stays as it was and the count follows the strain on the planet (DEF-081). Started
+   there, a fault was baked through the cube map's Jacobian at the pole into a window billions of
+   blocks long whose slip moved half the planet's strata off the map.
 3. **Sizes and attitudes.** A fold train's wavelength is drawn about 16 km, its amplitude follows from
    how much the cover there has shortened (DEF-001, DEF-005 to DEF-007), times the stretch X
    (DEF-011). In a collision the shortening is the collision's own: the convergence integrated over

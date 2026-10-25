@@ -146,6 +146,9 @@ pub struct Counts {
     pub strike_slip_faults: u64,
     /// Not started because enough structures of the kind were already there.
     pub saturated: u64,
+    /// Not started because drawn past a pole, in a grid row beyond it (DEF-081).
+    #[serde(default)]
+    pub past_pole: u64,
     /// Old structures that gave way to a new one at a place that was full.
     pub overprinted: u64,
     /// Lost: no continental crust under them for longer than [`LOST_AFTER_MYR`].
