@@ -178,8 +178,8 @@ pub(crate) fn provinces_on_world(notes: Option<&mut Value>, bytes: &mut [u8]) ->
     };
     let listed = list["province"].as_array().map_or(0, Vec::len);
     let mut world_cells = vec![0u64; listed];
-    for c in bytes.chunks_exact(2) {
-        if let Some(n) = world_cells.get_mut(usize::from(u16::from_le_bytes([c[0], c[1]]))) {
+    for c in bytes.as_chunks::<2>().0 {
+        if let Some(n) = world_cells.get_mut(usize::from(u16::from_le_bytes(*c))) {
             *n += 1;
         }
     }
@@ -197,10 +197,9 @@ pub(crate) fn provinces_on_world(notes: Option<&mut Value>, bytes: &mut [u8]) ->
         kept.push(e);
     }
     if !dropped.is_empty() {
-        for c in bytes.chunks_exact_mut(2) {
-            let id = usize::from(u16::from_le_bytes([c[0], c[1]]));
-            if let Some(&to) = remap.get(id) {
-                c.copy_from_slice(&to.to_le_bytes());
+        for c in bytes.as_chunks_mut::<2>().0 {
+            if let Some(&to) = remap.get(usize::from(u16::from_le_bytes(*c))) {
+                *c = to.to_le_bytes();
             }
         }
     }
@@ -483,8 +482,10 @@ mod tests {
         let note = provinces_on_world(Some(&mut bake), &mut bytes);
         assert_eq!(note, json!({"listed": 3, "kept": 2, "dropped": 1}));
         let got: Vec<u16> = bytes
-            .chunks_exact(2)
-            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|&c| u16::from_le_bytes(c))
             .collect();
         assert_eq!(got, [0, 0, 1, 1, 1, 0]);
         let p = &bake["meta"]["provinces"];
