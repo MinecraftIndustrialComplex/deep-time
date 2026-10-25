@@ -314,6 +314,19 @@ pub struct ClimateParams {
     /// Earth's rivers carried ~20 Gt/yr before people (14 Gt suspended, Syvitski et al. 2005, plus
     /// dissolved and bed load): the supply is the grid's × this (2).
     pub weathering_supply_scale: f64,
+    /// Chemical denudation: the land's silicate weathering takes its rock away in solution. The
+    /// Ca + Mg the carbon cycle weathers over a step (band by band, as its reservoirs drew it) is
+    /// placed on the land cells by each cell's own weathering and taken off the ground by the
+    /// surface stage, `dissolved_kg_per_mol` of rock per mol, with the isostatic response of any
+    /// other denudation (`carbon::place_dissolved`). Off: the weathered rock stays in place.
+    pub chemical_denudation: bool,
+    /// Rock that leaves in solution per mol of Ca + Mg the silicate weathering releases, kg/mol:
+    /// the cations and the dissolved silica of silicate weathering against its Ca + Mg. 0.26 is
+    /// the upper crust's Ca + Mg + Na + K weight fraction (0.1) × the cratons' median dissolved
+    /// silicate load over its cations ((SCDR + SiO₂)/SCDR = 3.31, Grenville; 1.72 to 5.24 over
+    /// the five cratons of West, Galy & Bickle 2005, Table 2) ÷ the 1.26 mol of Ca + Mg per kg
+    /// (`weathering_rock_mol_kg`).
+    pub dissolved_kg_per_mol: f64,
     /// Seafloor weathering's share of Earth's present silicate weathering (the rest is the land's;
     /// COPSE reloaded, Lenton et al. 2018: 3 of 15 Tmol/yr; 0: none). It needs no land, so a
     /// land-poor planet keeps a thermostat when its weathering is supply-limited.
@@ -506,6 +519,8 @@ impl Default for ClimateParams {
             weathering_rock_mol_kg: 1.26,         // ledger: CLM-153
             weathering_min_denudation_m_myr: 2.0, // ledger: CLM-155
             weathering_supply_scale: 2.0,         // ledger: CLM-156
+            chemical_denudation: true,            // ledger: ERO-205 (on since 2026-10-25)
+            dissolved_kg_per_mol: 0.26,           // ledger: ERO-206
             seafloor_weathering_share: 0.2,       // ledger: CLM-158
             solar_brightening: true,
             present_age_gyr: 4.57,
@@ -763,6 +778,7 @@ impl ClimateParams {
                 0.01,
                 100.0,
             ),
+            (self.dissolved_kg_per_mol, "dissolved_kg_per_mol", 0.0, 1.0),
             (
                 self.seafloor_weathering_share,
                 "seafloor_weathering_share",
