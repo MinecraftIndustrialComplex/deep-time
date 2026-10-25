@@ -8985,12 +8985,13 @@ The sources of the front lane's overriding-plate shortening (plates.md "The over
 
 ### vanHinsbergen2011Tectonics
 - Reference: van Hinsbergen, D. J. J., Kapp, P., Dupont-Nivet, G., Lippert, P. C., DeCelles, P. G. and Torsvik, T. H. (2011). Restoration of Cenozoic deformation in Asia and the size of Greater India. Tectonics 30:TC5003 (authors after the first and the title from memory; not checked against Crossref here).
-- DOI or URL: 10.1029/2011TC002908
-- Cited as: "van Hinsbergen et al. 2011 (Tectonics)"; not the same paper as their 2011 JGR paper on the convergence rates (10.1029/2010JB008051).
-- Ledger ids: PLT-652 (the validation readout)
-- Access: a full-text copy was read 2026-10-25 for the front lane's diagnosis (agent's scratch, not in the library; the URL was not recorded).
+- DOI or URL: 10.1029/2011TC002908; open copy on the group's page, http://www.earthdynamics.org/papers-ED/2011/2011-vanHinsbergen_etal_Tectonics.pdf
+- Cited as: "van Hinsbergen et al. 2011 (Tectonics)", or "van Hinsbergen et al. 2011, Tectonics" inside parentheses (and, in the M5 lane's collision-duration readout, "van Hinsbergen et al. 2011"); not the same paper as their 2011 JGR paper on the convergence rates (10.1029/2010JB008051), which has no entry here. Folded 2026-10-25 with the M5 lane's key `vanHinsbergen2011` (the same paper, added the same day): this key is kept because a ledger row (PLT-652) and more of the docs cite it.
+- Ledger ids: PLT-652 (the validation readout); the M5 lane's collision-duration readout (build log 2026-10-25, no ledger row)
+- Access: open (the group's page). Read twice on 2026-10-25: a full-text copy for the front lane's diagnosis (agent's scratch, not in the library; the URL was not recorded), and the group's PDF above by a Sonnet sub-agent of the M5 lane.
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-25 (the front lane's collision-front diagnosis): "since 50 Ma ~2400-3200 km (west to east) of India-Asia convergence occurred, much more than the 450-900 km of documented Himalayan shortening" (abstract); 600 to 1,050 km of shortening in Asia, extrusion about 250 km, the Himalaya about 275 km wide ([85]). So Asia took 0.40 to 0.70 of the documented shortening (computed: 600 / 1,500 to 1,050 / 1,500).
+- Read again 2026-10-25 (the M5 lane's sub-agent, the group's PDF, full text): "600-750 km of N-S Cenozoic shortening across, and north of, the Tibetan Plateau. The Pamir-Hindu Kush region accommodated ~1050 km of N-S convergence"; "the India-Asia convergence rate around 50 Ma was more than 150 km/Myr".
 
 ### EnglandHousemanSonder1985
 - Reference: England, P., Houseman, G. and Sonder, L. (1985). Length scales for continental deformation in convergent, divergent, and strike-slip environments: analytical and approximate solutions for a thin viscous sheet model. Journal of Geophysical Research 90(B5):3551-3557 (from memory; not checked against Crossref here).
@@ -9051,7 +9052,7 @@ The sources of the dissolved load the surface stage takes off the land (erosion-
 
 ## India's post-contact convergence (the M5 lane's collision-duration readout), added 2026-10-25
 
-Earth's convergence after India touched Asia, the readout the collision-duration diagnosis sets the model's long collisions against (build log 2026-10-25, M5 lane). Read by a Sonnet sub-agent of the M5 lane on 2026-10-25. The 2,500 to 3,600 km quoted earlier from memory is replaced by these readings.
+Earth's convergence after India touched Asia, the readout the collision-duration diagnosis sets the model's long collisions against (build log 2026-10-25, M5 lane). Read by a Sonnet sub-agent of the M5 lane on 2026-10-25. Its van Hinsbergen et al. 2011 (Tectonics) is the entry `vanHinsbergen2011Tectonics` above ("The overriding plate's share (PLT-652)"), folded 2026-10-25. The 2,500 to 3,600 km quoted earlier from memory is replaced by these readings.
 
 ### vanHinsbergen2012
 - Reference: van Hinsbergen, D. J. J., Lippert, P. C., Dupont-Nivet, G., McQuarrie, N., Doubrovine, P. V., Spakman, W. and Torsvik, T. H. (2012). Greater India Basin hypothesis and a two-stage Cenozoic collision between India and Asia. Proceedings of the National Academy of Sciences 109(20):7659-7664 (authors and title from memory).
@@ -9061,15 +9062,6 @@ Earth's convergence after India touched Asia, the readout the collision-duration
 - Access: open (the group's page).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): "Since 52 Ma, the two plates have converged up to 3,600 +-35 km, yet the upper crustal shortening documented from the geological record of Asia and the Himalaya is up to approximately 2,350-km less"; "2,860 +-30 and 3,600 +-35 km of post-52 Ma India-Asia convergence for the western and eastern Himalayan syntaxes, respectively"; "Since approximately 25-20 Ma, the total amount of plate convergence is up to 1,300-1,000 km in the eastern Himalaya"; "hard" collision "around 25-20 Ma".
-
-### vanHinsbergen2011
-- Reference: van Hinsbergen, D. J. J., Kapp, P., Dupont-Nivet, G., Lippert, P. C., DeCelles, P. G. and Torsvik, T. H. (2011). Restoration of Cenozoic deformation in Asia and the size of Greater India. Tectonics 30:TC5003 (authors and title from memory).
-- DOI or URL: http://www.earthdynamics.org/papers-ED/2011/2011-vanHinsbergen_etal_Tectonics.pdf
-- Cited as: "van Hinsbergen et al. 2011".
-- Ledger ids: none yet (a readout)
-- Access: open (the group's page).
-- Library: not kept.
-- Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): "since 50 Ma ~2400-3200 km (west to east) of India-Asia convergence occurred, much more than the 450-900 km of documented Himalayan shortening"; "600-750 km of N-S Cenozoic shortening across, and north of, the Tibetan Plateau. The Pamir-Hindu Kush region accommodated ~1050 km of N-S convergence"; "the India-Asia convergence rate around 50 Ma was more than 150 km/Myr".
 
 ### MolnarStock2009
 - Reference: Molnar, P. and Stock, J. M. (2009). Slowing of India's convergence with Eurasia since 20 Ma and its implications for Tibetan mantle dynamics. Tectonics 28:TC3001 (title from memory).
