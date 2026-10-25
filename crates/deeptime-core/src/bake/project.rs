@@ -1382,6 +1382,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
     let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
     let mut shares = serde_json::Map::new();
     let mut closed_note = json!(null);
+    let mut provinces_note = json!(null);
     // The block-scale relief (`bake::relief`) reads the world's ice cover (L2, resampled before the
     // elevation's L3) and the simulation's rivers and standing volcanoes. The cover is a biome
     // layer too (BIO-177): its manifest entry, for the land call after the relief.
@@ -1469,6 +1470,16 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
                     "millis": ms(tl),
                 });
             }
+        }
+        // The province list true to the world's layer (`meta::provinces_on_world`).
+        if let Some(k) = srcs
+            .iter()
+            .position(|s| s.layer.desc.name == "meta/province")
+        {
+            provinces_note = crate::bake::meta::provinces_on_world(
+                m.notes.get_mut(crate::bake::NOTES_KEY),
+                &mut outs[k],
+            );
         }
         // The block-scale relief on the world's own ground, before anything reads it: the sea and
         // land and the closed basins stay as they are (`bake::relief`).
@@ -1934,6 +1945,7 @@ pub fn project_folder(dir: &Path, p: &PlanetPreset, m: &mut Manifest) -> Result<
         "pole_anisotropy": aniso,
         "top_raise": tops_note,
         "closed_basin": closed_note,
+        "provinces": provinces_note,
         "biome_land": biome_land_note,
         "vector": Value::Object(vec_note),
         "millis": {

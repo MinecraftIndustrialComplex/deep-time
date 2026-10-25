@@ -185,6 +185,15 @@ pub struct Sample {
     pub lithosphere_km: f32,
     #[serde(default)]
     pub keel_km: f32,
+    /// With `tectonics.collision_underthrust`, in an active collision's footprint (its belt and
+    /// its wedge, `belts.rs`): the plate whose lithosphere is under the column, plus 1 (0: none,
+    /// the column's own), and that lithosphere's depth, km (`thermal.rs`'s L: the median of the
+    /// incoming plate's foreland). Stamped again each step the collision has a front, like
+    /// `collision_mm_yr`. ledger: PLT-546
+    #[serde(default)]
+    pub carrier: u32,
+    #[serde(default)]
+    pub carrier_lithosphere_km: f32,
 }
 
 impl Sample {
@@ -218,6 +227,8 @@ impl Sample {
             crust_uplift_mm_yr: 0.0,
             lithosphere_km: 0.0,
             keel_km: 0.0,
+            carrier: 0,
+            carrier_lithosphere_km: 0.0,
         }
     }
 

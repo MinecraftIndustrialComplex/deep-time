@@ -1480,6 +1480,7 @@ pub fn project_folder_cube(
     let mut world_stack: Option<(usize, LayerDesc, Vec<u8>)> = None;
     let mut shares = serde_json::Map::new();
     let mut closed_note = json!(null);
+    let mut provinces_note = json!(null);
     // The ice cover, for the relief, then held with the biome layers (BIO-177).
     let mut world_ice: Option<LoadedLayer> = None;
     let mut ice_entry: Option<usize> = None;
@@ -1568,6 +1569,16 @@ pub fn project_folder_cube(
                     "millis": ms(tl),
                 });
             }
+        }
+        // The province list true to the world's layer (`meta::provinces_on_world`).
+        if let Some(k) = srcs
+            .iter()
+            .position(|s| s.layer.desc.name == "meta/province")
+        {
+            provinces_note = crate::bake::meta::provinces_on_world(
+                m.notes.get_mut(crate::bake::NOTES_KEY),
+                &mut outs[k],
+            );
         }
         // The block-scale relief, per face across the seams (SCL-123).
         if let Some(k) = srcs.iter().position(|s| s.entry == elev_entry) {
@@ -2060,6 +2071,7 @@ pub fn project_folder_cube(
         "seam_steps": Value::Object(steps_note),
         "top_raise": tops_note,
         "closed_basin": closed_note,
+        "provinces": provinces_note,
         "biome_land": biome_land_note,
         "vector": Value::Object(vec_note),
         "millis": {
