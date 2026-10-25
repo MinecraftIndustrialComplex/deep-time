@@ -26,7 +26,7 @@ import java.util.UUID;
  * <p>Sable (2.0.5, PolyForm Shield) is compileOnly and absent from the GameTest server, so its
  * types must never appear in a GameTest holder's method signatures: NeoForge's registration
  * loads every declared method of an enabled holder (cold-read review 2, gap 2). This class and
- * {@link SablePoleCap} (P1-18, the pole cap's wind) are the only places that name Sable types,
+ * {@link SableBorder} (the cube border's push on ships) are the only places that name Sable types,
  * and their public methods take and return vanilla, JDK and Deep Time types only. Callers check
  * {@code ModList.get().isLoaded("sable")} before the first call, which is when this class (and
  * Sable's) would load.

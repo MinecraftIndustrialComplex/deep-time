@@ -554,8 +554,8 @@ fn vanilla(material: &str) -> Option<f64> {
         .filter(|v| *v > 0.0)
 }
 
-/// Blocks from pole to pole (Lambert) or edge to edge (Petroff–Guyou): the world's north–south
-/// extent.
+/// Blocks from pole to pole (a synthetic Lambert world) or across the cube's window: the world's
+/// north–south extent.
 fn pole_to_pole_blocks(m: &deeptime_format::Manifest) -> i64 {
     let (z0, z1) = m.world_projection().z_range();
     (z1 - z0) as i64
@@ -1114,8 +1114,8 @@ fn essential_sources(
             ("essential", ess.region_blocks),
             ("fine", FINE_REGION_BLOCKS),
         ] {
-            // The world's own grid (a Petroff–Guyou world's frame, DEP-220), as the playability
-            // pass counts it.
+            // The world's own grid (a cube world's frame, DEP-220), as the playability pass counts
+            // it.
             let r = Regions::in_frame(w.manifest.world_projection().index_frame(), size);
             let land = land_regions(&r);
             let regions_of = |list: &[&Site]| -> HashSet<usize> {

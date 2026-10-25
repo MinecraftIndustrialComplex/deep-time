@@ -3,7 +3,7 @@
 Status of this page: `stage 1 (written with the feature, cube plan phase 2, 2026-10-23; nothing here
 is physical, every row is a game choice)`.
 
-Ledger ids on this page: `SCL-210`, `SCL-211`, `SCL-215`, `POL-031`, with `SCL-108`, `SCL-127` and `POL-022`
+Ledger ids on this page: `SCL-210`, `SCL-211`, `SCL-215`, `POL-031`, with `SCL-108`, `SCL-127` and `POL-023`
 to `POL-024` from earlier pages (see [claims.md](claims.md)).
 
 ## What you see in the world
@@ -66,15 +66,15 @@ the game uses them:
    keep vanilla's warm search.
 3. **Deep ocean past the corners** (SCL-211). Columns in no band are the level's default rock up
    to 64 blocks below sea level and water above, in the deep ocean biome.
-4. **The border** (`wrap/CubeBorder`, `wrap/EdgeBorder`, POL-031 with POL-022 and POL-023). The
+4. **The border** (`wrap/CubeBorder`, `wrap/EdgeBorder`, POL-031 with SCL-088 and POL-023). The
    playable area A(d) is the six faces shrunk by d at every turning edge. Each tick a survival,
    adventure or creative player (or the vehicle they ride) outside A(1) is moved to the nearest
    point of A(1.05); a player more than 16 blocks outside the planet is first folded to their
    partner point instead. Within 24 blocks of a turning edge (measured through every east-west
    period image) the action bar warns. A Sable ship is held by its bounds: when a corner of its
    global bounds is outside A(1), the part of its velocity that points out of the planet is taken
-   away and it gets 1 block/s back each tick (POL-011's wind at the stop line), every tick until
-   the bounds are inside again (`CubeBorder.outward`, `SablePoleCap.tickCube`). The way out is the
+   away and it gets 1 block/s back each tick (`EdgeBorder.SABLE_PUSH`, the retired pole cap's wind at its stop line; POL-031), every tick until
+   the bounds are inside again (`CubeBorder.outward`, `SableBorder.tickCube`). The way out is the
    sum of the outside corners' offsets from their nearest points of A(1), so a ship that runs
    diagonally into F0's corner is pushed straight back out of the void square, and one held at the
    end of a segment slides on along the other side.
@@ -213,7 +213,7 @@ the game uses them:
 | SCL-210 | the fill off the faces | partners' biomes; partners' terrain copied and turned at the surface step; no starts, features or mobs | rule | docs/design/cube-game.md section 2 | `game-choice` |
 | SCL-211 | deep ocean past the corners | OCEAN_DEPTH = 64 below sea level | blocks | docs/design/cube-game.md section 2 | `game-choice` |
 | SCL-215 | the detail noise on the cube's surface | value noise on a surface lattice, m = max(1, round(s/λ)) cells per cube edge, fade f²(3 − 2f), octaves as the plain noise | blocks | cube-world-plan.md G3; FORMAT.md "The detail layer" | `game-choice` |
-| POL-022 | the stop line's inset | 1 block inside each turning edge; put back 0.05 block inside it | blocks | FORMAT.md "The world's layout" | `game-choice` |
+| POL-031 | the stop line's inset | 1 block inside each turning edge (SCL-088); put back 0.05 block inside it | blocks | FORMAT.md "The cube world's layout" | `game-choice` |
 | POL-023 | the warning band | 24 blocks, every 40 ticks | blocks, ticks | code | `game-choice` |
 | POL-031 | arrivals folded | FOLD_DEPTH = 16 outside the planet | blocks | docs/design/cube-game.md section 5 | `game-choice` |
 | POL-024, SCL-127 | spawn margins | 64 from a turning edge, 256 from a corner image | blocks | cube-world-plan.md B4, W5 | `game-choice` |

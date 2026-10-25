@@ -11,7 +11,6 @@ import com.minecraftindustrialcomplex.deeptime.rock.RockPalette;
 import com.minecraftindustrialcomplex.deeptime.server.DeepTimeCommands;
 import com.minecraftindustrialcomplex.deeptime.server.SpawnHandler;
 import com.minecraftindustrialcomplex.deeptime.server.WorldDataBinder;
-import com.minecraftindustrialcomplex.deeptime.wrap.PoleCap;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -57,7 +56,6 @@ public final class DeepTime {
         // Wrap engine (docs/design/wrap-engine.md): nothing without -Ddeeptime.wrapengine=true.
         com.minecraftindustrialcomplex.deeptime.wrapengine.WrapEngine.init();
         DeepTimeNetwork.init(modBus);
-        PoleCap.init();
         com.minecraftindustrialcomplex.deeptime.wrap.EdgeBorder.init();
         // COE and CDG hooks (P1-16): their mixins' targets load now, so a drifted signature fails the boot.
         CompatHooks.preloadTargets();
@@ -65,7 +63,7 @@ public final class DeepTime {
         com.minecraftindustrialcomplex.deeptime.compat.dh.DhFarTerrain.init();
         NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class,
                 e -> com.minecraftindustrialcomplex.deeptime.server.FarTerrainCommand.register(e.getDispatcher()));
-        // The F3 line and the polar storm; never loaded on a dedicated server.
+        // The F3 line; never loaded on a dedicated server.
         if (FMLEnvironment.dist == Dist.CLIENT)
             com.minecraftindustrialcomplex.deeptime.client.DeepTimeClient.init(modBus);
         loadNatives();

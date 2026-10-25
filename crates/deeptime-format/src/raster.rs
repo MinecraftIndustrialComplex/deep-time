@@ -82,14 +82,10 @@ pub enum Codec {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ZEdges {
-    /// Rows clamp to [0, H − 1] (the simulation's grids and Lambert worlds: the rows stop at the
-    /// poles).
+    /// Rows clamp to [0, H − 1] (the simulation's grids and the Lambert frame's synthetic worlds:
+    /// the rows stop at the poles).
     #[default]
     Clamp,
-    /// Rows 0 and H − 1 lie on the world's north and south edges, each glued onto itself by a
-    /// half-turn about its midpoint (block x = 0, which is column W/2): row −k is row k and
-    /// row H − 1 + k is row H − 1 − k, both at column W − i (Petroff–Guyou worlds).
-    HalfTurn,
     /// A cube world's six faces, n × n cells each, stacked F0 to S down the rows (W = n, H = 6n):
     /// an index off a face resolves through the face adjacency, and beyond two sides at once
     /// through the side it is further out of ([`GridDesc::face_cell`]; FORMAT.md "Cube grids").
@@ -98,12 +94,10 @@ pub enum ZEdges {
 
 /// A raster in block space (plan §5.2), laid out by the world's projection
 /// ([`crate::projection`]). Cell (i, j) is the **point sample** at block
-/// (origin_block_x + i·r, origin_block_z + j·r). On the simulation's grids and Lambert worlds
-/// column 0 sits on the seam x = −C/2 and row 0 at z = −Zo, at or just past the north pole
-/// ([`Projection::grid_half_extent`]); rows are uniform in sin φ; indices wrap in x (mod W) and
-/// clamp in z to [0, H−1]. On a Petroff–Guyou world ([`crate::projection::PetroffGuyou::grid`])
-/// column 0 sits on x = −b, row 0 on the north edge and row H − 1 on the south edge, and a row
-/// past either folds through the edge's half-turn ([`ZEdges::HalfTurn`], [`GridDesc::cell`]).
+/// (origin_block_x + i·r, origin_block_z + j·r). On the simulation's grids and the Lambert frame's
+/// synthetic worlds column 0 sits on the seam x = −C/2 and row 0 at z = −Zo, at or just past the
+/// north pole ([`Projection::grid_half_extent`]); rows are uniform in sin φ; indices wrap in x
+/// (mod W) and clamp in z to [0, H−1].
 ///
 /// A cube world's grid ([`GridDesc::for_cube`], [`ZEdges::Cube`]) is different: six planes of
 /// n × n cells, one per face in the format's order, stacked down the rows; cell (i, j) of a face
@@ -579,9 +573,9 @@ impl GridDesc {
         crate::projection::clamp_row(j, i64::from(self.h)) as u32
     }
 
-    /// The stored cell of any index pair: columns wrap; rows clamp, or fold through the edges'
-    /// half-turns ([`ZEdges::HalfTurn`]: row −k is row k and row H − 1 + k row H − 1 − k, at
-    /// column W − i). Every world-data reader samples through this.
+    /// The stored cell of any index pair: columns wrap and rows clamp, or on a cube grid the index
+    /// resolves through the face adjacency ([`GridDesc::face_cell`]). Every world-data reader
+    /// samples through this.
     #[inline]
     pub fn cell(&self, i: i64, j: i64) -> (u32, u32) {
         match self.z_edges {
@@ -592,26 +586,6 @@ impl GridDesc {
                 let k = j.div_euclid(n.max(1)).clamp(0, 5);
                 let face = Face::from_index(k as usize).expect("a face index");
                 self.face_cell(face, i, j - k * n)
-            }
-            ZEdges::HalfTurn => {
-                let last = i64::from(self.h) - 1;
-                let w = i64::from(self.w);
-                let (mut i, mut j) = (i, j);
-                if last <= 0 {
-                    return (self.wrap_i(i), 0);
-                }
-                for _ in 0..64 {
-                    if j < 0 {
-                        j = -j;
-                        i = w - i;
-                    } else if j > last {
-                        j = 2 * last - j;
-                        i = w - i;
-                    } else {
-                        break;
-                    }
-                }
-                (self.wrap_i(i), j.clamp(0, last) as u32)
             }
         }
     }

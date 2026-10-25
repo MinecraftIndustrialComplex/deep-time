@@ -42,7 +42,7 @@ class MagmaTest {
     }
 
     private static Magma one(Magma.Heights h, Magma.Wet wet, MagmaRules rules) {
-        return Magma.build(List.of(volcano(1, 100, 50, 0.9)), rules, h, wet, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
+        return Magma.build(List.of(volcano(1, 100, 50, 0.9)), rules, h, wet, C, SEA, LAVA_FLOOR, MH, MV);
     }
 
     private static final Magma.Wet DRY = (x, z) -> false;
@@ -90,7 +90,7 @@ class MagmaTest {
                 best = Math.max(best, cone(200 + 400 * i, 0, 182, 70).at(x, z));
             return best;
         };
-        Magma m = Magma.build(vs, new MagmaRules(3.0, 1.0, 0.25, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
+        Magma m = Magma.build(vs, new MagmaRules(3.0, 1.0, 0.25, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV);
         assertEquals(1, m.bodies().stream().filter(Magma.Body::lake).count(), "a quarter of four");
         Magma.Body b = m.bodies().stream().filter(Magma.Body::lake).findFirst().orElseThrow();
         assertEquals(2, b.id(), "the most active one");
@@ -111,13 +111,9 @@ class MagmaTest {
         assertEquals(Magma.Part.LAKE_SHELL, b.at(3, 3, b.lakeBottom() - 1));
         assertEquals(Magma.Part.CONDUIT, b.at(0, 0, b.lakeBottom() - 1), "the conduit opens into the lake's floor");
         assertEquals(b.lakeBottom() - 1, b.conduitTop());
-        // Nobody reaches a volcano beyond the pole cap's line: no lake there, whatever its activity.
-        Magma polar = Magma.build(vs, new MagmaRules(3.0, 1.0, 1.0, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, -1);
-        assertEquals(0, polar.bodies().stream().filter(Magma.Body::lake).count());
-        assertEquals(4, polar.bodies().stream().filter(x -> x.chamberRh() > 0).count(), "they keep their chambers");
         // Every share from none to all.
         for (double share : new double[]{0.0, 0.5, 1.0}) {
-            Magma n = Magma.build(vs, new MagmaRules(3.0, 1.0, share, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
+            Magma n = Magma.build(vs, new MagmaRules(3.0, 1.0, share, true), h, DRY, C, SEA, LAVA_FLOOR, MH, MV);
             assertEquals(Math.round(share * 4), n.bodies().stream().filter(Magma.Body::lake).count(), "share " + share);
         }
     }
@@ -220,7 +216,7 @@ class MagmaTest {
     @Test
     void bodiesAreFoundAcrossTheSeam() {
         Magma m = Magma.build(List.of(volcano(7, -C / 2 + 2, 0, 0.5)), new MagmaRules(3.0, 1.0, 0.0, true),
-                cone(-C / 2 + 2, 0, 182, 70), DRY, C, SEA, LAVA_FLOOR, MH, MV, (int) com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(C));
+                cone(-C / 2 + 2, 0, 182, 70), DRY, C, SEA, LAVA_FLOOR, MH, MV);
         Magma.Body b = m.bodies().get(0);
         assertEquals(-C / 2 + 2, b.x());
         // The chunk just west of the seam (x up to C/2 − 1) holds part of the chamber.
@@ -267,7 +263,7 @@ class MagmaTest {
     void whereTwoBodiesOverlapEitherOnesLavaIsMolten() {
         Magma.Heights a = cone(100, 50, 182, 70), c = cone(130, 50, 182, 70);
         Magma m = Magma.build(List.of(shield(1, 100, 50), shield(2, 130, 50)), new MagmaRules(3.0, 1.0, 0.0, true),
-                (x, z) -> Math.max(a.at(x, z), c.at(x, z)), DRY, C, SEA, LAVA_FLOOR, MH, MV, C / 4);
+                (x, z) -> Math.max(a.at(x, z), c.at(x, z)), DRY, C, SEA, LAVA_FLOOR, MH, MV);
         assertEquals(2, m.bodies().size());
         Magma.Body first = m.bodies().get(0), second = m.bodies().get(1);
         long overlap = 0, shellOverLava = 0;
@@ -296,7 +292,7 @@ class MagmaTest {
 
     private static Magma kindOf(String kind, boolean silicic, double radiusM, double activity, MagmaRules rules, int lavaFloor, int minY) {
         var v = new Volcanoes.Volcano(1, kind, 100, 50, radiusM, 2_000, activity, "shield".equals(kind), silicic, 3_600, 120, false);
-        return Magma.build(List.of(v), rules, cone(100, 50, 182, 70), DRY, C, SEA, lavaFloor, minY, MH, MV, C / 4);
+        return Magma.build(List.of(v), rules, cone(100, 50, 182, 70), DRY, C, SEA, lavaFloor, minY, MH, MV);
     }
 
     /** Molten blocks of a body, by enumerating its box (before the cover rule of the pass). */

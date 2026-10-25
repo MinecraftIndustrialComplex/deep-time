@@ -23,10 +23,7 @@
 //! of a tile samples block `(x0 + i·s, z0 + j·s)`, the top left of the block it draws at one block
 //! a pixel, so block columns line up with pixels there. x wraps. The frame spans z ∈ [−C/4, C/4)
 //! (`Projection::tile_frame_z`). On a Lambert world it is wider than the planet: the poles are at
-//! z = ∓R = ∓C/2π, and pixels past them are drawn as the page's background. On a Petroff–Guyou
-//! world (format 0.5, the default) the frame is exactly the world: x ∈ [−b, b) with C = 2b, z from
-//! −b/2 to b/2, every pixel on the planet; rows past the north and south edges fold through their
-//! half-turns (`GridDesc::cell`), so the map continues through the seams. A cube world (format 0.7)
+//! z = ∓R = ∓C/2π, and pixels past them are drawn as the page's background. A cube world (format 0.7)
 //! is read on its net (cube plan G14): its layers, stored as six face planes, are read as the net
 //! window's flat raster, x ∈ [−3s/2, 5s/2) wrapping with the period 4s, z ∈ [−3s/2, 3s/2], each net
 //! cell its face's cell and the void's cells the copies the fold brings in, so a frame
@@ -122,7 +119,7 @@ fn cube_net_cell(cube: &Cube, n: i64, r: f64, i: i64, j: i64) -> Option<(Face, i
 /// A cube world's six stacked face planes (`n` × `6n` cells of `r` blocks, as a cube grid stores
 /// them, row-major) as a flat raster of its net window: `4n` × `3n` cells from (−3s/2, −3s/2),
 /// each the face cell [`cube_net_cell`] names (NaN past the net's corners). The renderer's flat
-/// readers (x wraps, z clamps) then read a cube world as they read a Petroff–Guyou one.
+/// readers (x wraps, z clamps) then read a cube world as they read a Lambert one.
 fn cube_net(cube: &Cube, n: usize, r: f64, stacked: &[f32]) -> Vec<f32> {
     let (w, h) = (4 * n, 3 * n);
     let mut out = vec![f32::NAN; w * h];
@@ -370,8 +367,7 @@ impl LayerStore {
         for jj in 0..h {
             let row = &mut data[jj * w..(jj + 1) * w];
             for (ii, out) in row.iter_mut().enumerate() {
-                // Columns wrap; rows clamp (Lambert) or fold through the edges (Petroff–Guyou);
-                // a cube's net cells are their faces' cells.
+                // Columns wrap; rows clamp (Lambert); a cube's net cells are their faces' cells.
                 let (i, j) = (i0 + ii as i64, j0 + jj as i64);
                 let (ci, cj) = match cube {
                     Some(cube) => match cube_net_cell(cube, i64::from(g.w), f64::from(g.r), i, j) {
@@ -1537,10 +1533,9 @@ impl BakeMap {
         let mut out = vec![1f32; TILE * TILE];
         let lambert = match self.meta.projection {
             deeptime_format::projection::WorldProjection::Lambert(p) => Some(p),
-            deeptime_format::projection::WorldProjection::PetroffGuyou(_)
-            | deeptime_format::projection::WorldProjection::Cube(_) => None,
+            deeptime_format::projection::WorldProjection::Cube(_) => None,
         };
-        // A Petroff–Guyou or cube world's blocks are what a player walks: slopes in its own block
+        // A cube world's blocks are what a player walks: slopes in its own block
         // metric, a block `m_per_block_h` wide (the cube's nominal width; its local σ is within
         // a few percent of it).
         let metres_px = if lambert.is_some() {
@@ -1584,7 +1579,6 @@ impl BakeMap {
             Layer::Overlay => self.paint_overlay(&hg, cov.as_ref()),
         };
         // Past the poles there is no planet: the page's background (transparent on the overlay).
-        // A Petroff–Guyou frame is all planet.
         let (zlo, zhi) = self.meta.projection.z_range();
         let beyond: [u8; 4] = if layer.opaque() { BEYOND_POLE } else { [0; 4] };
         for j in 0..TILE {

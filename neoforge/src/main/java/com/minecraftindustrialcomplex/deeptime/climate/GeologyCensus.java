@@ -2,7 +2,6 @@
 package com.minecraftindustrialcomplex.deeptime.climate;
 
 import com.google.gson.JsonObject;
-import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologyGround;
 import com.minecraftindustrialcomplex.deeptime.worldgen.RegionSpawnTarget;
@@ -80,7 +79,7 @@ public final class GeologyCensus {
         return b.unwrapKey().map(k -> k.location().toString()).orElse("?");
     }
 
-    /** Samples every {@code step} blocks inside the pole edge less {@code poleMargin}. */
+    /** Samples every {@code step} blocks inside the world's z edge ({@code zHalf}) less {@code poleMargin}. */
     public static Result run(ServerLevel level, int step, int poleMargin) {
         if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g) || !(g.terrain() instanceof WorldDataTerrain t))
             throw new IllegalStateException(level.dimension().location() + " is not a Deep Time level on world data");
@@ -93,7 +92,7 @@ public final class GeologyCensus {
         // One query binds the level's biome rules; the gate is every exclusive rule with a ground condition.
         biomes.getNoiseBiome(0, QuartPos.fromBlock(sea), 0, sampler);
         Map<Holder<Biome>, Integer> gated = GeologyBiomes.gated(marker.volcanic().rules());
-        int c = t.circumference(), zp = (int) Projection.poleZ(c);
+        int c = t.circumference(), zp = (int) t.zHalf();
         Side now = new Side(), plain = new Side();
         Map<String, Integer> replaced = new HashMap<>();
         int holes = 0, differ = 0, differByRules = 0;

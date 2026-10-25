@@ -23,7 +23,7 @@ import java.util.List;
  * @param dimension    the level's id
  * @param planet       the level is a Deep Time planet
  * @param note         a line for the readout (why there are no pictures, or the frame they share)
- * @param kind         the projection the server drew with ({@code lambert} or {@code petroff_guyou})
+ * @param kind         the projection the server drew with ({@code cube}, or {@code lambert} on a test level)
  * @param period       its x period, blocks (the client checks it against Deep Time's)
  * @param imageW       the frame's width, pixels (0: no frame)
  * @param imageH       its height

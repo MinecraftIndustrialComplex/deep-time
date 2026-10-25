@@ -10,8 +10,8 @@ import java.util.List;
 /**
  * The latitude/longitude graticule in block space, swept through Deep Time's own
  * {@link WorldProjection#blockOf}: each meridian and parallel is sampled every {@code sampleDeg} and
- * cut into polylines wherever the projection jumps (a Petroff–Guyou line crossing a turning edge
- * comes back in at the mirrored point). Across the x wrap a line is not cut: its points are
+ * cut into polylines wherever the projection jumps (a line crossing one of the cube's turning edges
+ * comes back in on another face). Across the x wrap a line is not cut: its points are
  * unwrapped (x may run past ±period/2), and the map draws every polyline once per period.
  *
  * <p>On a cube a line is cut exactly where it crosses a turning seam: where two consecutive samples

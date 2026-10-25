@@ -1220,7 +1220,7 @@ pub struct Settled {
 /// The biome bake's land call on the world's ground (ledger: BIO-170, BIO-171, BIO-172).
 ///
 /// [`map`] decides land from the simulation grid (its height above sea level, its closed basins);
-/// the world is another grid (the Petroff–Guyou projection's, a footprint mean of the height with
+/// the world is another grid (the cube's, a footprint mean of the height with
 /// its own closed-basin flag, HYD-105) and the game puts the sea where the *world's* rule says
 /// (`deeptime_format::water::sea_covers`: top block under sea level − 1, not closed), so the two
 /// differ on some nodes. `sea[k]` is that rule at node k, read by the caller from the world's

@@ -94,8 +94,8 @@ public record Manifest(String formatVersion, String source, String createdUtc, i
         } catch (RuntimeException e) {
             throw new WorldDataException(file + ": malformed manifest: " + e.getMessage(), e);
         }
-        // A cube world is 0.7 and only a cube world is (FORMAT.md "Polar and cube worlds side by side"; Rust
-        // Manifest::read).
+        // A cube world is 0.7 and only a cube world is (FORMAT.md "Lambert-frame and cube worlds side by side";
+        // Rust Manifest::read).
         WorldProjection.Kind kind = m.layout() == null ? WorldProjection.Kind.LAMBERT : m.layout().kind();
         String want = FormatVersion.forKind(kind);
         if (!want.equals(m.formatVersion()))
@@ -118,8 +118,8 @@ public record Manifest(String formatVersion, String source, String createdUtc, i
     }
 
     /**
-     * The world's projection ({@code projection}, FORMAT.md "The world's layout"): Petroff–Guyou,
-     * Lambert or the cube ({@link WorldProjection.Cube}); a manifest without the block is a Lambert
+     * The world's projection ({@code projection}, FORMAT.md "The world's layout"): the cube
+     * ({@link WorldProjection.Cube}) or the Lambert frame; a manifest without the block is a Lambert
      * world of {@link #circumference}. A new object per call: keep it ({@link WorldData#projection}
      * does).
      *

@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The satellite picture the server sends ({@code ServerMaps}: {@link NativeWorldMap} over the dev
- * map's {@link MapFrame}) on the real test planet (C = 4096, Petroff-Guyou, {@code planet4k} from
+ * map's {@link MapFrame}) on the real test planet (the cube world of period 4096, {@code planet4k} from
  * {@code ./gradlew testWorlds}): it covers the frame, and it lies where the world is. Deep sea in the
  * world data (the elevation picture's source) is the satellite palette's sea blue, dry land is not,
  * and the same check a quarter of the world east fails, so the agreement is the picture's

@@ -3,17 +3,16 @@ package com.minecraftindustrialcomplex.deeptime.worlddata;
 
 /**
  * The projection a world's data is laid out in (manifest {@code projection}, FORMAT.md "The world's
- * layout"): Lambert's cylinder ({@link Lambert}, the formulas of {@link Projection}) or the seamless
- * Petroff–Guyou world ({@link PetroffGuyou}, the default from format 0.5). The twin of Rust's
- * {@code deeptime_format::projection::WorldProjection}. Every reader that turns a block into a
- * latitude and longitude, or the other way, goes through this.
+ * layout"): the cube world ({@link Cube}, format 0.7, the only world the game plays) or Lambert's
+ * cylinder ({@link Lambert}: the simulation's frame, in which the synthetic test worlds are laid out).
+ * The twin of Rust's {@code deeptime_format::projection::WorldProjection}. Every reader that turns a
+ * block into a latitude and longitude, or the other way, goes through this.
  */
 public interface WorldProjection {
 
     /** {@code projection.kind}. */
     enum Kind {
         LAMBERT("lambert"),
-        PETROFF_GUYOU("petroff_guyou"),
         /**
          * The cube world (docs/plans/cube-world-plan.md, format 0.7): six faces in a net, {@link CubeLayout},
          * {@link CubeMap}, {@link CubeWorld}; the projection {@link Cube}.
@@ -48,7 +47,7 @@ public interface WorldProjection {
     /** The radius of the equal-area sphere the world's blocks stand for, blocks. */
     double radius();
 
-    /** The world's z range: the poles (Lambert) or the turning edges (Petroff–Guyou). */
+    /** The world's z range: the poles (Lambert) or the net's window (cube). */
     double zMin();
 
     double zMax();
@@ -56,10 +55,10 @@ public interface WorldProjection {
     /** x wrapped into [−period/2, period/2). */
     double wrapX(double x);
 
-    /** The canonical point {x, z} of any point (x wrapped; Lambert clamps z to the poles, Petroff–Guyou folds it). */
+    /** The canonical point {x, z} of any point (x wrapped; Lambert clamps z to the poles, the cube folds it). */
     double[] canonical(double x, double z);
 
-    /** Whether the point's canonical image is turned half round (an odd number of half-turns; never on Lambert). */
+    /** Whether the point's canonical image is turned half round (a half-turn edge; never on Lambert). */
     boolean flipped(double x, double z);
 
     /** The block cell brought into the domain, {x, z, half-turns} (Lambert: x wrapped, z unchanged). */
@@ -102,8 +101,8 @@ public interface WorldProjection {
     }
 
     /**
-     * The unit vector of geographic north in block space at (x, z), {dx, dz} (Rust
-     * {@code PetroffGuyou::north}: from the local Jacobian over half a block, through the fold).
+     * The unit vector of geographic north in block space at (x, z), {dx, dz}: from the local Jacobian
+     * over half a block (each world overrides it with its exact answer).
      */
     default double[] north(double x, double z) {
         double h = 0.5;
@@ -134,9 +133,8 @@ public interface WorldProjection {
 
     /**
      * The local linear scale at (x, z): blocks of the equal-area sphere ({@link #radius}) per world
-     * block, √|det J| of the map's Jacobian. 1 on the equal-area Lambert and Petroff–Guyou worlds (a
-     * block's area is the same everywhere there, though it can be longer one way and shorter the
-     * other); a cube world's conformal map has one scale in every direction, which varies across each
+     * block, √|det J| of the map's Jacobian. 1 on the equal-area Lambert world (a block's area is the
+     * same everywhere there, though it is longer one way and shorter the other); a cube world's conformal map has one scale in every direction, which varies across each
      * face. Times the manifest's {@code m_per_block_h} it is metres per block. NaN off the planet.
      */
     default double scale(double x, double z) {
@@ -203,8 +201,6 @@ public interface WorldProjection {
     static WorldProjection of(WorldLayout layout, int c) {
         if (layout != null && layout.kind() == Kind.CUBE)
             return Cube.of(layout);
-        if (layout != null && layout.kind() == Kind.PETROFF_GUYOU)
-            return new PetroffGuyou(layout.hemisphereBlocks() > 0 ? layout.hemisphereBlocks() : c / 2, layout.lambdaCDeg());
         return new Lambert(c);
     }
 
@@ -285,7 +281,7 @@ public interface WorldProjection {
             return cube().window()[3];
         }
 
-        /** x wrapped into the window [−3s/2, 5s/2) (not the polar worlds' [−period/2, period/2)). */
+        /** x wrapped into the window [−3s/2, 5s/2) (not the Lambert frame's [−period/2, period/2)). */
         @Override
         public double wrapX(double x) {
             return cube().wrapXPoint(x);
@@ -379,8 +375,64 @@ public interface WorldProjection {
         }
     }
 
-    /** Lambert's cylindrical equal-area world of circumference C ({@link Projection}'s formulas). */
+    /**
+     * Lambert's cylindrical equal-area world of circumference C: the simulation's frame (decisions log
+     * 2026-10-02, "Lambert for now"; ledger: SCL-049, the equal-area property SCL-052), in which the
+     * synthetic test worlds are laid out. The game plays only the cube world (decisions log 2026-10-24,
+     * "Cube only"); this frame goes with the Lambert simulation grid (cube plan §7.4 item 2).
+     * <ul>
+     *   <li>A planet of circumference C blocks has radius R = C / 2π blocks.</li>
+     *   <li>Longitude λ = 360°·(x + C/2)/C in [0°, 360°): the seam x = −C/2 is 0°, x wraps.</li>
+     *   <li>Latitude φ = asin(−z / R), north (−z) positive; the poles are at z = ∓R and φ clamps to
+     *       ±90° beyond them.</li>
+     *   <li>Grids run from z = −Zo to Zo ({@link #gridHalfExtent}: the smallest multiple of the
+     *       quantum at or past the pole); so do the spatial indexes.</li>
+     * </ul>
+     * The formulas are Rust's {@code deeptime_format::Projection}'s, in the same order;
+     * {@code ColumnParityTest} checks both give the same latitudes, z of latitudes and pole.
+     */
     record Lambert(int circumference) implements WorldProjection {
+
+        /** The largest quantum of the grids' z extent, blocks (Rust {@code QUANTUM_MAX}). */
+        public static final int QUANTUM_MAX = 64;
+
+        /** The planet's radius R = C / 2π, blocks (true scale on the equator). */
+        public static double radius(double circumference) {
+            return circumference / (2 * Math.PI);
+        }
+
+        /** sin φ of block z, clamped to [−1, 1] (north is −z). */
+        public static double sinLat(double circumference, double z) {
+            return Math.max(-1.0, Math.min(1.0, -z / radius(circumference)));
+        }
+
+        /** cos φ of block z (0 at and beyond the poles). */
+        public static double cosLat(double circumference, double z) {
+            double s = sinLat(circumference, z);
+            return Math.sqrt(Math.max(0.0, 1.0 - s * s));
+        }
+
+        /**
+         * The quantum the grids' z extent is a multiple of: the largest power of two up to
+         * {@link #QUANTUM_MAX} that divides C/2 and is at most R/2 (64 for every planet size).
+         */
+        public static int quantum(double circumference) {
+            long half = Math.round(circumference / 2.0);
+            double r = radius(circumference);
+            int q = QUANTUM_MAX;
+            while (q > 1 && (half % q != 0 || q > r / 2.0))
+                q /= 2;
+            return q;
+        }
+
+        /**
+         * The half-extent Zo of the planet's grids: the smallest multiple of the quantum at or past the
+         * pole, the same for every grid (Rust {@code Projection::grid_half_extent}).
+         */
+        public static long gridHalfExtent(double circumference) {
+            double q = quantum(circumference);
+            return (long) (Math.ceil(radius(circumference) / q) * q);
+        }
 
         @Override
         public Kind kind() {
@@ -394,22 +446,27 @@ public interface WorldProjection {
 
         @Override
         public double radius() {
-            return Projection.radius(circumference);
+            return radius(circumference);
         }
 
+        /** The pole z = −R. */
         @Override
         public double zMin() {
-            return -Projection.poleZ(circumference);
+            return -radius(circumference);
         }
 
+        /** The pole z = R. */
         @Override
         public double zMax() {
-            return Projection.poleZ(circumference);
+            return radius(circumference);
         }
 
+        /** x wrapped into [−C/2, C/2). */
         @Override
         public double wrapX(double x) {
-            return Projection.wrapX(circumference, x);
+            double c = circumference;
+            double t = ((x + 0.5 * c) % c + c) % c;
+            return (t >= c ? 0.0 : t) - 0.5 * c;
         }
 
         @Override
@@ -435,36 +492,52 @@ public interface WorldProjection {
             return new double[]{Math.cos(lat) * Math.cos(lon), Math.cos(lat) * Math.sin(lon), Math.sin(lat)};
         }
 
+        /**
+         * Latitude asin(−z / R), clamped to ±90° past the poles; longitude 360°·(x + C/2)/C in [0, 360),
+         * the seam x = −C/2 at 0°.
+         */
         @Override
         public double[] latLon(double x, double z) {
-            return new double[]{Projection.latitudeDeg(circumference, z), Projection.longitudeDeg(circumference, x)};
+            double lat = Math.toDegrees(Math.asin(sinLat(circumference, z)));
+            double c = circumference;
+            double lon = 360.0 * (wrapX(x) + 0.5 * c) / c;
+            double w = ((lon % 360.0) + 360.0) % 360.0;
+            return new double[]{lat, w >= 360.0 ? 0.0 : w};
         }
 
+        /** x of the longitude east of the seam, in [−C/2, C/2); z = −R sin φ, φ clamped to ±90°. */
         @Override
         public double[] blockOf(double latDeg, double lonDeg) {
-            return new double[]{Projection.xOfLongitude(circumference, lonDeg), Projection.zOfLatitude(circumference, latDeg)};
+            double c = circumference;
+            double l = ((lonDeg % 360.0) + 360.0) % 360.0;
+            double x = wrapX(l / 360.0 * c - 0.5 * c);
+            double z = -radius(c) * Math.sin(Math.toRadians(Math.max(-90.0, Math.min(90.0, latDeg))));
+            return new double[]{x, z};
         }
 
         @Override
         public GridDesc grid(String name, int r) {
-            long zo = Projection.gridHalfExtent(circumference, r);
+            long zo = gridHalfExtent(circumference);
             long oz = -zo;
             return new GridDesc(name, circumference / r, (int) ((2 * zo + r - 1) / r), r, true, -(circumference / 2), oz, GridDesc.ZEdges.CLAMP);
         }
 
+        /** −C/2, the seam (lookup frames, not geography; Rust {@code Projection::index_origin}). */
         @Override
         public long indexOriginBlockX() {
-            return Projection.indexOriginBlockX(circumference);
+            return -(circumference / 2);
         }
 
+        /** −Zo, the grids' first row. */
         @Override
         public long indexOriginBlockZ() {
-            return Projection.indexOriginBlockZ(circumference);
+            return -gridHalfExtent(circumference);
         }
 
+        /** 2·Zo. */
         @Override
         public long indexSpanBlockZ() {
-            return 2 * Projection.gridHalfExtent(circumference, 1);
+            return 2 * gridHalfExtent(circumference);
         }
 
         @Override

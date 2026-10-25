@@ -704,7 +704,7 @@ public final class DevMapScreen extends Screen {
         lines.add("Projection: " + c.projectionName() + "   Planet: " + planet);
         double x = mc.player.getX(), y = mc.player.getY(), z = mc.player.getZ();
         lines.addAll(c.readout(x, y, z, true));
-        String f3 = PlanetDebugLine.format(c.info(), x, z, 0f);
+        String f3 = PlanetDebugLine.format(c.info(), x, z);
         lines.add("Deep Time's F3 line: " + (f3 == null ? "(none)" : f3));
         if (!Double.isNaN(hoverX)) {
             double[] ll = PlanetGeometry.displayLatLon(c.projection(), hoverX, hoverZ);

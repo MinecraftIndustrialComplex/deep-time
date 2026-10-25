@@ -1,0 +1,6 @@
+{
+  "pack": {
+    "pack_format": 48,
+    "description": "Deep Time dev: the Lambert-frame level types deeptime:test_planet_lambert[_32k] for synthetic worlds and test terrains (tools/smoke/install.sh, tools/workbench/preview.py). Never shipped."
+  }
+}

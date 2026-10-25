@@ -50,7 +50,7 @@ class WorldDataTest {
                 .replace("\"format_version\": \"" + FormatVersion.CURRENT + "\"", "\"format_version\": \"0.9\"");
         Files.writeString(manifest, text);
         WorldDataException e = assertThrows(WorldDataException.class, () -> WorldData.open(w));
-        assertEquals("world data 0.9, this Deep Time reads 0.6 (polar worlds) and 0.7 (cube worlds)"
+        assertEquals("world data 0.9, this Deep Time reads 0.6 (Lambert-frame worlds) and 0.7 (cube worlds)"
                 + "; before 1.0 worlds are not migrated", e.getMessage());
     }
 

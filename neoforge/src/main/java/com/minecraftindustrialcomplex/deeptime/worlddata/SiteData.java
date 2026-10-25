@@ -77,10 +77,14 @@ public final class SiteData {
         this.ids = ids;
     }
 
-    /** A registry with no sites (a world without {@code sites/}). */
+    /**
+     * A registry with no sites (a world without {@code sites/}): one empty cell at the Lambert frame's
+     * index origin, which no query can tell from any other frame's (it holds nothing).
+     */
     public static SiteData empty(int circumference) {
+        WorldProjection.Lambert frame = new WorldProjection.Lambert(circumference);
         return new SiteData(List.of(), circumference, 512, 1, 1,
-                (int) Projection.indexOriginBlockX(circumference), (int) Projection.indexOriginBlockZ(circumference),
+                (int) frame.indexOriginBlockX(), (int) frame.indexOriginBlockZ(),
                 new int[]{0, 0}, new int[0]);
     }
 

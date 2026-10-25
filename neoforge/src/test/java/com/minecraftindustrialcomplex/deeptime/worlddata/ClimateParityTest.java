@@ -60,7 +60,7 @@ class ClimateParityTest {
     void everySampleOfTheFixtureIsEqual() throws IOException {
         JsonObject doc = fixture();
         WorldData wd = WorldData.open(ColumnParityTest.world());
-        assertEquals(FormatVersion.CURRENT, doc.get("format_version").getAsString());
+        assertEquals(FormatVersion.CUBE, doc.get("format_version").getAsString());   // a cube world (cube plan §7.4)
         ClimateLayers cl = ClimateLayers.of(wd);
         assertNotNull(cl, "the real planet bakes the twelve months");
         assertEquals(doc.get("lapse_c_per_km").getAsDouble(), cl.lapseCPerKm());

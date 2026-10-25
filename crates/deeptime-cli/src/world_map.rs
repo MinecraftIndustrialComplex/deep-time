@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! `deeptime world-map`: whole-world pictures of a baked world-data folder, in the world's own
-//! block space (on a Petroff–Guyou world, format 0.5, the 2b × b rectangle itself), for reviewing a
-//! bake without the workbench:
+//! block space, for reviewing a bake without the workbench:
 //!
 //! - `satellite.png`: the workbench's "Final world" satellite look (`deeptime_tiles`), its tile
 //!   pyramid at `--zoom` stitched (2^(z+1) × 2^z tiles of 256 pixels);

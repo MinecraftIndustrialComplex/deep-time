@@ -141,8 +141,8 @@
     }, 500);
   }
   const C = () => S.info.circumference;
-  // The world's projection (the manifest's layout block, world.json `projection`): Petroff–Guyou
-  // by default (format 0.5), where the tile frame is exactly the world, or Lambert.
+  // The world's projection (the manifest's layout block, world.json `projection`): the Lambert
+  // frame until plan T1 wires the cube world in.
   const Wp = () => {
     if (!S.info) return proj.world(null, 16384);
     if (!S.info._wp) S.info._wp = proj.world(S.info.projection, S.info.circumference);
@@ -315,8 +315,8 @@
     const x0 = ((b.x0 + c / 2) % c + c) % c - c / 2;       // folded; a box across the seam is split by the runner
     const box = { x0, z0: b.z0, x1: x0 + (b.x1 - b.x0), z1: b.z1 };
     let ll;
-    if (Wp().isPetroff) {
-      // A block box of the Petroff–Guyou world is no lat/lon box: its corners' latitudes and
+    if (Wp().kind !== 'lambert') {
+      // A block box of a non-Lambert world is no lat/lon box: its corners' latitudes and
       // longitudes, for the preview's label.
       const c0 = Wp().latLon(box.x0, box.z0), c1 = Wp().latLon(box.x1, box.z1);
       ll = { north: Math.max(c0[0], c1[0]), south: Math.min(c0[0], c1[0]), west: c0[1], east: c1[1] };
