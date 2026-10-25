@@ -22,7 +22,7 @@ How the census counts (RLC-004; `tools/review/pool/measure_v1census.py`):
 | M2 largest landmass | the largest 8-connected landmass, joined over the x seam, a share of the planet | the ice-free surface |
 | M3 continental crust under the sea | cells the plate model flags continental (target thickness at the rifted edge 20 km, PLT-261) and not land, over the continental cells | the ice-free surface |
 | M4 land above 2 km | land with the surface above 2,000 m, a share of the land | **by rock** |
-| M5 coast with high ground | coast cells (land within 1.6 cell spacings of the sea) with land above 2 km on the same landmass within 200 km inland, a share of the coast | **by rock** |
+| M5 coast with high ground | coast points (land within 1.6 point spacings, 62.6 km at the census's 39.1 km, of the world ocean) with land above 2 km within 200 km inland, measured over land, a share of the coast; sampled on 332,800 Fibonacci points (since 2026-10-25, RLC-055) | **by rock** |
 | M6 land under ice | land with 1 m of glacier ice or more (`climate/ice_thickness_m`), a share of the land | ice, apart from the rock |
 | M7 collisions | the plate check's `collisions_per_100myr`: a terrane of at least 0.1 of the average starting plate (510.07 / 14 = 36.4 million km2, so 3.64 million km2) that ends in a weld or a transfer, dated at its end | not a map measure |
 
@@ -40,11 +40,11 @@ Earth's range, by measure. "Last 250 Myr" and "Phanerozoic" are ranges over the 
 | M2 largest landmass, share of the planet | at least 0.12 | 0.156 | 0.070 to 0.363 | 0.070 to 0.363 | PaleoDEMs run by the project (`cited-unverified`) |
 | M3 continental crust under the sea | at most 0.25 | 0.248 by the census's 20 km edge, 0.292 by the continental polygons | 0.258 to 0.528 by polygons, 0.21 to 0.48 after the 0.044 offset | up to 0.600 by polygons, 0.56 after the offset | Marcilly et al. 2022 Table 1 read (`verified`); the offset is the project's subtraction |
 | M4 land above 2 km, share of the land | at most 0.12 | 0.047 to 0.055 by rock (0.104 by surface) | up to 0.062 | up to 0.062 | PaleoDEMs run by the project (`cited-unverified`); today's by HYP-041, PLT-360 |
-| M5 coast with high ground | at most 0.15 | 0.076 by rock (0.104 by surface) | up to 0.092 on the 40,000-point grid, about 0.10 at the census's resolution | the same | PaleoDEMs run by the project (`cited-unverified`) |
+| M5 coast with high ground | at most 0.15 | 0.063 by rock (0.095 by surface; 0.076 and 0.104 on the first measure) | up to 0.100 at the census's 332,800 points (0.090 on the 40,000-point grid) | the same | PaleoDEMs and SRTM15+ run by the project on the corrected measure (`cited-unverified`) |
 | M6 land under ice, share of the land | at most 0.15 outside a glaciation | 0.10 to 0.107 | 0 (greenhouse) to 0.25 or 0.32 (Last Glacial Maximum) | the same; the Late Paleozoic ice age has no area figure | NSIDC and USGS (via Wikipedia) read (`verified`); greenhouse list tertiary (`cited-unverified`) |
 | M7 collisions per 100 Myr | 2 to 6 | not defined for today; the three large ones are still going | about 0 to 2 by the writer's count | about 0 to 4 by the writer's count, one to 20 for a looser definition | the writer's count `from-memory`; Condie et al. 2015 abstract only; Macdonald et al. 2019 read (a different count) |
 
-Proposed bands (RLC-014, 021, 032, 042, 052, 063, 075), against the registry's, with what the master default's median (the D6 arm of [physics-gap-audit.md](physics-gap-audit.md), not re-run here) does under each:
+Proposed bands (RLC-014, 021, 032, 042, 052, 063, 075; M5's re-read on the corrected measure, RLC-055), against the registry's, with what the master default's median (the D6 arm of [physics-gap-audit.md](physics-gap-audit.md), not re-run here) does under each:
 
 | Measure | Registry band | Does Earth itself pass it? | Proposed: fires | Proposed: watch | D6 median | D6 under the registry | D6 under the proposal |
 |---|---|---|---|---|---|---|---|
@@ -52,7 +52,7 @@ Proposed bands (RLC-014, 021, 032, 042, 052, 063, 075), against the registry's, 
 | M2 | at least 0.12 | no: 13 of 51 maps from 0 to 250 Ma, 10 of 21 from 0 to 100 Ma | below 0.06 | below 0.07 | 0.124 | in | in |
 | M3 | at most 0.25 | no: all 26 Marcilly steps from 0 to 250 Ma exceed it by polygons, 22 of 26 after the offset | above 0.56 | above 0.48 | 0.278 | out | in |
 | M4 | at most 0.12 | yes, with room: none of 109 maps above it | above 0.07 | above 0.05 | 0.271 | out | out, at about 4 times Earth's maximum |
-| M5 | at most 0.15 | yes, with room: none of 109 maps above it | above 0.11 | above 0.08 | 0.411 | out | out, at about 4 times Earth's maximum |
+| M5 | at most 0.15 | yes, with room: none of 109 maps above it | above 0.11 (unchanged by the corrected measure) | above 0.07 (was 0.08) | 0.411 (first measure; not re-run) | out | out; on the corrected measure the 24-run base12 reads 0.229 against 0.248 on the first, still about 2 times Earth's maximum |
 | M6 | at most 0.15 outside a glaciation | only in an interglacial: the Last Glacial Maximum was 0.25 to 0.32 | above 0.32 | above 0.11 if the planet is not in an ice age | 0.170 | out | in |
 | M7 | 2 to 6 | the floor, no: Earth had very few from 0 to 150 Ma; the ceiling, yes | above 6 | above 4 | 1.80 | out (below the floor) | in |
 
@@ -146,13 +146,21 @@ What a player sees. At the master default's 0.27, more than a quarter of all lan
 
 ### M5 coast with high ground
 
-Definition: coast cells (land within 1.6 cell spacings of the sea) with land above 2 km on the same landmass within 200 km inland, a share of the coast (RLC-050). 200 km is about 670 blocks.
+Definition (RLC-050, RLC-055): coast points are land within 1.6 point spacings of the **world ocean**, and a coast point counts when land above 2 km lies within 200 km of it **measured over land**; the share is of the coast points. The census samples the final fields on N = 332,800 Fibonacci points (equal area, spacing 39.1 km, so the coast band is 1.6 x 39.1 = 62.6 km wide), not on its 1024 x 328 equal-area grid. 200 km is about 670 blocks.
 
-Earth today: 0.104 by surface at the census's 332,800 points (PLT-360); 0.076 without the two ice sheets, the by-rock figure; the pipeline's 40,000-point control reads 0.0949, 0.91 of the census resolution's figure (RLC-003).
+Three defects in the first measure (2026-10-25 diagnosis, [m5-coast-high-ground-2026-10-25.md](../research/notes/m5-coast-high-ground-2026-10-25.md); the first measure is `v1census` version 1, the corrected one version 2 and `v1census2`), each a case of the check differing from this definition:
 
-Earth's history (PaleoDEMs at 40,000 points; RLC-051): the maximum of 109 maps is the 0 Ma map, 0.0917, then 0.0867 (380 Ma), 0.0721 (10 Ma), 0.0700 (5 Ma) and 0.0683 (280 Ma); the median over 0 to 250 Ma is 0.0223 and the minimum 0.0027 (115 Ma). At the census's resolution the figures read 1.10 times higher (0.104 / 0.0949), so Earth's maximum is about 0.10. None of 109 maps is above the registry's 0.15. The value depends on resolution (the coast band is 181 km wide at 40,000 points where the census's is about 25 km), so it is compared with the control, not with the census's own numbers.
+1. **Lakes counted as sea.** The first measure took any cell at or below the sea datum as sea, so the shore of a closed water body (a Caspian, a Chad) was coast. The census had no ocean connectivity rule; the corrected one is connectivity: the world ocean is the largest body of sea points joined within 1.6 spacings, and every other body is ground. (A size cut would have been arbitrary, and the hydro model's open-sea rule of 5,000 km2 answers a different question.) On base12 the world ocean is 96.7 to 99.6 percent of the sea, so no large second ocean is closed by this rule; the closed bodies are a median 0.44 percent of the sea's area.
+2. **The 200 km crossed water.** The first measure took the straight-line distance to the nearest high point, which reaches over a bay or a strait to high ground on another coast. The corrected reach is the shorter of the straight run when its nine interior samples all fall on ground, and a path over ground points (joined within 1.6 spacings, limit 200 km). The path alone is up to 15 percent longer than the straight run on the lattice, which would have taken coast that is within 200 km over land; the straight run removes that bias.
+3. **The Lambert grid was coarser than the coast band above about 51 degrees.** A cell is 39.1 km wide but 39.1 / cos(latitude) km tall, which passes the 62.6 km band at 51 degrees, so above that latitude the first measure's coast was decided by the grid's rows. Fibonacci points are even in every direction. The other six checks are equal-area shares or raster labels and have no such defect, so they are unchanged (24 of 24 runs identical for M1, M2, M3, M4, M6, M7).
 
-Proposed band: fires above 0.11 (0.10 rounded outward); watch above 0.08 (today's by-rock 0.076). The registry's 0.15 is loose, not wrong, as M4's.
+Two errors in this page's earlier text: the coast band was called "about 25 km" (it is 62.6 km at the census's resolution and 181 km at the 40,000-point control), and "the census's 332,800 points" meant Fibonacci points, which the census did not sample until now (its grid has 332,800 planet cells, which is the same count, not the same layout).
+
+Earth today, on the corrected measure (SRTM15+ at 15 arc-minutes, same code, N = 332,800): 0.0947 by surface (0.1042 on the first measure; PLT-360 had 0.104), and **0.0634 by rock**, without the Antarctica and Greenland box (0.0756 on the first measure). The same at N = 100,000: 0.0628 by rock (first 0.0681); at 40,000: 0.0610 (first 0.0654). The first measure was resolution-dependent by a factor of 1.15 between 40,000 and 332,800 points (0.0654 to 0.0756); the corrected one moves 4 percent (0.0610 to 0.0634). The legs at N = 332,800 by surface: the first rule 0.1042, the world ocean with the straight reach 0.0951, the full rule 0.0947.
+
+Earth's history (109 PaleoDEMs; RLC-051), corrected measure. At N = 332,800: the maximum is the 0 Ma map, 0.1003 (first measure 0.1088), then 0.0832 (380 Ma), 0.0769 (280 Ma), 0.0715 (10 Ma) and 0.0711 (5 Ma); the median over 0 to 250 Ma is 0.0265 (first 0.0228) and the minimum 0.0030 (115 Ma); none of 109 maps is above the registry's 0.15, or 0.11. At the 40,000-point grid the maximum is the 380 Ma map, 0.0902, then the 0 Ma map 0.0862, 0.0697 (10 Ma) and 0.0696 (280 Ma); there the coast band is 181 km wide, so compare maps with each other and with the control. The effect on single maps is mixed (the present falls, 380 Ma rises at 40,000 points); the 0 to 250 Ma median rises.
+
+Proposed band, by RLC-002 applied to the corrected numbers (no new rule): **fires above 0.11, unchanged** (the Phanerozoic extreme at the census's resolution is the 0 Ma map's 0.1003, rounded outward to 0.01; the first measure's 0.1088 rounded to the same 0.11). **Watch above 0.07, was 0.08** (today's by-rock value 0.0634 rounded outward; the first measure's was 0.0756 to 0.08). The registry's 0.15 is loose, not wrong, as M4's. Base12 (24 runs) reads a median 0.2292 [0.1883, 0.2685] on the corrected measure against 0.2478 [0.2108, 0.3063] on the first; all 24 runs move. One fix at a time on base12, medians: Fibonacci points alone 0.2718, plus closed bodies as land 0.2373, plus the reach over land 0.2292. So the fixes together take 0.019 off the median and the planet still fires at about twice Earth's maximum.
 
 What a player sees. At the master default's 0.41, four coastlines in ten have a 57-block rise within 670 blocks of the shore. From a boat a large part of the shore is a mountain wall, and the coastal plains that harbours and deltas need are scarce. Earth's value is 0.08 to 0.10, one coast in ten or twelve (the Andean and Alaskan coasts are the kind of shore it counts; named from memory).
 
@@ -190,7 +198,7 @@ What a player sees. Far above 6 (the design's 2026-10 measurement had 10, range 
 | M2 largest landmass | 0.156 | pipeline on SRTM15+ and the 0 Ma PaleoDEM | 0.124 | D6 median |
 | M3 continental crust under the sea | 0.248 (20 km edge) | CRUST1.0 (HYP-042, PLT-361) | 0.278 | D6 median |
 | M4 land above 2 km | 0.047 to 0.055 by rock; maximum of 109 maps 0.062 | HYP-041, PLT-360; PaleoDEMs | 0.271 | D6 median |
-| M5 coast with high ground | 0.076 by rock; maximum of 109 maps about 0.10 at census resolution | PLT-360; PaleoDEMs | 0.411 | D6 median |
+| M5 coast with high ground | 0.063 by rock; maximum of 109 maps 0.100 at census resolution | SRTM15+ and PaleoDEMs on the corrected measure (RLC-055) | 0.411 (first measure; base12 on the corrected one reads 0.229) | D6 median |
 | M6 land under ice | 0.105 today; 0.25 to 0.32 at the Last Glacial Maximum | NSIDC, USGS via Wikipedia | 0.170 | D6 median |
 | M7 collisions per 100 Myr | about 0 to 4 by the writer's count | RLC-074 (`from-memory`) | 1.80 | D6 median |
 
@@ -199,7 +207,7 @@ The mod's column is the median of the D6 arm as the audit printed it. This page 
 ## Simplifications and limits
 
 - **The PaleoDEMs are a model of the past, not data.** Their authors call them a first draft, say the highest elevations are likely overestimated, and the maps of the two phases are not homogeneous. The extremes quoted for M2, M4 and M5 are extremes of a model. The 0 Ma map differs from the real Earth (land 0.276 against 0.291).
-- **Resolution.** The pipeline runs the census's helpers on a grid 111 km at the equator where the census's is about 16 km, and on 40,000 points where the census used 332,800. M5 reads 0.91 of the census's value on the control; maps are compared with each other and with the control, not with the census's own numbers.
+- **Resolution.** The pipeline runs the census's helpers on a grid 111 km at the equator where the census's is about 16 km, and on 40,000 points where the census used 332,800. Since 2026-10-25 (RLC-055) M5 is run at N = 332,800 too, where a 1 degree map has several points a node; on the control it reads 0.96 of the census-resolution value at 40,000 points (0.0610 / 0.0634 by rock), where the first measure read 0.86. Maps are still compared with each other and with the control.
 - **Two sources disagree on the Pangaean land share** by up to 0.09, and the proposed M1 ceiling follows the higher.
 - **The 0.044 offset for M3** is today's difference between two definitions of the continent's edge; whether it held in the past is not checked.
 - **A range is not a distribution.** Earth's history is one path, its neighbouring maps are not independent, and a planet in a run is at an arbitrary stage. The bands say what has been, not what is likely.
@@ -220,7 +228,7 @@ Each with a recommendation; none blocks anything.
 
 1. **Adopt the proposed bands?** Recommendation: yes for M1, M2, M3 and M7's floor, where the registry band is one Earth fails; optional for M4 and M5, where it is loose. Both fire on the master default either way.
 2. **M6: unconditional or conditional on a glaciation?** The census has no glaciation flag, and the planet's final state is arbitrary. Recommendation: the unconditional 0.32 ceiling now, with 0.11 as a watch line; condition it only if the climate model exposes an ice-age state.
-3. **M4 and M5 by rock.** The census's elevation is rock. Recommendation: keep it by rock and compare with Earth's by-rock figures (0.05 and 0.08), and let M6 carry the ice.
+3. **M4 and M5 by rock.** The census's elevation is rock. Recommendation: keep it by rock and compare with Earth's by-rock figures (0.05 and 0.06), and let M6 carry the ice.
 4. **M7's Earth rate for the model's own definition.** Recommendation: drop the floor of 2 now, keep a ceiling of 6, and have a geologist rebuild the count from a suture compilation (the Condie and Macdonald data sets are the candidates; the Macdonald code and data are public on GitHub, Swanson-Hysell-Group/Arc_Continent_Analysis, not downloaded here).
 5. **Sources not read.** Condie et al. 2015 full text (abstract only), Kocsis and Scotese 2021 (ScienceDirect 403), Mitchell et al. 2021 and Nance 2022 (searched, not read for numbers), Zachos et al. 2001 (the abstract only). Recommendation: read Condie first.
 6. **Which land-share history for M1's ceiling?** Marcilly's 0.29 or Scotese's 0.35. The proposal takes the higher; if the coordinator wants the narrower, use 0.30.
