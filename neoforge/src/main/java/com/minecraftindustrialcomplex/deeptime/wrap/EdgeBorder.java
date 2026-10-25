@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.wrap;
 
-import com.minecraftindustrialcomplex.deeptime.compat.sable.SablePoleCap;
+import com.minecraftindustrialcomplex.deeptime.compat.sable.SableBorder;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.wrapengine.WrapEngine;
 import net.minecraft.ChatFormatting;
@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.vehicle.VehicleEntity;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.common.NeoForge;
@@ -26,41 +27,45 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * The <b>temporary</b> border at a Petroff–Guyou world's north and south edges (FORMAT.md "The world's
- * layout", {@code border}: {@code edge_stop}; Ben, decisions log 2026-10-04, "Engine only; pause IP").
- * Each of those edges is glued onto itself by a half-turn that only the wrap engine can make walkable;
- * until it installs the layout's topology on the level, players, the vehicles they ride and Sable ships
- * are stopped {@link #INSET} blocks inside the edge, like the pole cap's hard stop on a Lambert world.
- * The terrain past the edge is the folded copy of the glued side (the grids fold through the
- * half-turns), so the view across the border is the right one; only the crossing waits.
+ * The <b>temporary</b> border at the cube world's 12 turning edges (FORMAT.md "The cube world's
+ * layout", {@code border}: {@code edge_stop}; cube plan W3 and W4, docs/design/cube-game.md section 5;
+ * Ben, decisions log 2026-10-04, "Engine only; pause IP"). Each of those edges is glued to another by
+ * a turn that only the wrap engine can make walkable; until it installs the layout's topology on the
+ * level, players, the vehicles they ride and Sable ships are stopped {@link #INSET} blocks inside the
+ * edge ({@link CubeBorder}). The terrain past the edge is the folded copy of the glued side (the grids
+ * fold through the turns), so the view across the border is the right one; only the crossing waits.
  *
- * <p>The border is off when the level's generator is not a Petroff–Guyou or cube Deep Time planet, when
- * the world's preset asked for none ({@code scale.edge_border = none}: the manifest's layout block has
- * no border), and as soon as {@link WrapEngine#topology} is set on the level. Creative players are
- * stopped too (as at the pole cap); spectators pass. Within {@link #WARN_BLOCKS} of the stop line the
- * action bar says the edge is closed for now.
+ * <p>A player or vehicle past the stop line is put back at the nearest point of the planet that is the
+ * inset inside every segment. A player who arrives more than {@link #FOLD_DEPTH} blocks outside the
+ * planet (a teleport, a pearl, a portal) is folded onto the partner block instead, the heading turned
+ * by the edge's motion: the terrain there is the same as where they landed, turned. A Sable ship whose
+ * bounds leave that region loses its outward velocity and is blown back ({@code SableBorder.tickCube}),
+ * never teleported.
  *
- * <p><b>The cube world</b> (cube plan W3 and W4, docs/design/cube-game.md section 5) stops at its 12
- * turning edges ({@link CubeBorder}): a player or vehicle past the stop line is put back at the nearest
- * point of the planet that is the inset inside every segment. A player who arrives more than
- * {@link #FOLD_DEPTH} blocks outside the planet (a teleport, a pearl, a portal) is folded onto the
- * partner block instead, the heading turned by the edge's motion: the terrain there is the same as
- * where they landed, turned. A Sable ship whose bounds leave that region loses its outward velocity
- * and is blown back ({@code SablePoleCap.tickCube}), never teleported.
+ * <p>The border is off when the level's generator is not a cube Deep Time planet, when the world's
+ * preset asked for none ({@code scale.edge_border = none}: the manifest's layout block has no border),
+ * and as soon as {@link WrapEngine#topology} is set on the level. Creative players are stopped too;
+ * spectators pass. Within {@link #WARN_BLOCKS} of the stop line the action bar says the edge is closed
+ * for now. (The Petroff–Guyou world's north and south edge stop went with that world, cube plan §7.4,
+ * decisions log 2026-10-24.)
  */
 public final class EdgeBorder {
 
     /** How far inside the edge the stop line is, blocks (the layout block's {@code inset_blocks} default). */
-    public static final double INSET = 1.0; // ledger: POL-022, SCL-088 (game-choice)
+    public static final double INSET = 1.0; // ledger: POL-031, SCL-088 (game-choice)
     /** The warning band inside the stop line, blocks. */
     public static final double WARN_BLOCKS = 24.0; // ledger: POL-023 (game-choice)
     /** How often the warning repeats while in the band, ticks. */
     public static final int BAR_EVERY = 40; // ledger: POL-023 (game-choice)
     /** How far inside the stop line a stopped player or vehicle is put, blocks. */
-    static final double STOP_INSET = 0.05; // ledger: POL-022 (game-choice)
+    static final double STOP_INSET = 0.05; // ledger: POL-031 (game-choice)
 
-    public static final String KEY_NEAR = "deeptime.edgeborder.near";
-    public static final String KEY_STOP = "deeptime.edgeborder.stop";
+    /**
+     * The push that turns a Sable ship back at the border, blocks per second added per tick (20 blocks/s²):
+     * the pole cap's Sable wind at its stop line, which the border kept when the cap went.
+     */
+    public static final double SABLE_PUSH = 1.0; // ledger: POL-031 (game-choice)
+
     public static final String KEY_CUBE_NEAR = "deeptime.edgeborder.cube.near";
     public static final String KEY_CUBE_STOP = "deeptime.edgeborder.cube.stop";
 
@@ -86,21 +91,6 @@ public final class EdgeBorder {
     }
 
     /**
-     * The |z| of the stop line on {@code level}, or NaN when the level has no edge border now (not a
-     * Petroff–Guyou planet, a world without a border, or the wrap engine joins the edges).
-     */
-    public static double stopZ(ServerLevel level) {
-        if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g) || !g.dataRef().petroffGuyou())
-            return Double.NaN;
-        if (WrapEngine.topology(level) != null)
-            return Double.NaN;
-        double inset = g.borderInset();
-        if (Double.isNaN(inset))
-            return Double.NaN;
-        return g.dataRef().hemisphereBlocks() / 2.0 - inset;
-    }
-
-    /**
      * The cube border on {@code level}, or null when it has none now (not a cube planet, a world
      * without a border, or the wrap engine joins the edges).
      */
@@ -117,11 +107,6 @@ public final class EdgeBorder {
 
     private static void onLevelTick(LevelTickEvent.Post event) {
         if (event.getLevel() instanceof ServerLevel level) {
-            double stop = stopZ(level);
-            if (!Double.isNaN(stop)) {
-                tick(level, stop);
-                return;
-            }
             CubeStop cube = cubeStop(level);
             if (cube != null)
                 tickCube(level, cube);
@@ -159,7 +144,7 @@ public final class EdgeBorder {
                 if (c.border().zone(v.getX(), v.getZ(), c.inset(), WARN_BLOCKS) == 2)
                     stopVehicleCube(level, c, v);
         if (sable)
-            SablePoleCap.tickCube(level, c.border(), c.inset());
+            SableBorder.tickCube(level, c.border(), c.inset());
     }
 
     /** The cube world's action-bar line (plain text fallbacks match en_us.json). */
@@ -185,14 +170,14 @@ public final class EdgeBorder {
         if (p == null)
             return false;
         double[] q = b.nearest(b.frameX(p.x()), p.z(), c.inset() + STOP_INSET);
-        double y = PoleCap.freeY(level, player, q[0], player.getY(), q[1]);
+        double y = freeY(level, player, q[0], player.getY(), q[1]);
         player.connection.teleport(q[0], y, q[1], CubeBorder.turnYaw(player.getYRot(), p.iso()), player.getXRot());
         return true;
     }
 
     static void stopPlayerCube(ServerLevel level, CubeStop c, ServerPlayer player) {
         double[] q = c.border().nearest(player.getX(), player.getZ(), c.inset() + STOP_INSET);
-        double y = PoleCap.freeY(level, player, q[0], player.getY(), q[1]);
+        double y = freeY(level, player, q[0], player.getY(), q[1]);
         player.connection.teleport(q[0], y, q[1], player.getYRot(), player.getXRot());
     }
 
@@ -209,7 +194,7 @@ public final class EdgeBorder {
             return;
         }
         double[] q = c.border().nearest(vehicle.getX(), vehicle.getZ(), c.inset() + STOP_INSET);
-        double y = PoleCap.freeY(level, vehicle, q[0], vehicle.getY(), q[1]);
+        double y = freeY(level, vehicle, q[0], vehicle.getY(), q[1]);
         double nx = vehicle.getX() - q[0], nz = vehicle.getZ() - q[1];
         vehicle.teleportTo(q[0], y, q[1]);
         // Take away the part of the motion that points out of the planet.
@@ -222,88 +207,18 @@ public final class EdgeBorder {
             driver.connection.send(new ClientboundMoveVehiclePacket(vehicle));
     }
 
-    /** The zone of z: 0 open, 1 in the warning band, 2 past the stop line. */
-    public static int zone(double stopZ, double z) {
-        double a = Math.abs(z);
-        if (a > stopZ)
-            return 2;
-        return a > stopZ - WARN_BLOCKS ? 1 : 0;
-    }
-
-    /** z put back on the stop line's inner side, or unchanged. */
-    public static double clampZ(double stopZ, double z) {
-        double limit = stopZ - STOP_INSET;
-        return z > limit ? limit : (z < -limit ? -limit : z);
-    }
-
-    /** One tick of the border on {@code level}. */
-    public static void tick(ServerLevel level, double stopZ) {
-        long now = level.getGameTime();
-        Map<Entity, Boolean> vehicles = null;
-        for (ServerPlayer player : List.copyOf(level.players())) {
-            if (player instanceof FakePlayer || player.isRemoved() || player.isDeadOrDying() || player.isSpectator())
-                continue;
-            Entity root = player.getRootVehicle();
-            int zone = zone(stopZ, root.getZ());
-            if (root != player) {
-                if (vehicles == null)
-                    vehicles = new IdentityHashMap<>();
-                vehicles.put(root, Boolean.TRUE);
-            } else if (zone == 2) {
-                stopPlayer(level, stopZ, player);
-            }
-            if (zone != 0) {
-                Long last = LAST_BAR.get(player.getUUID());
-                if (zone == 2 || last == null || now - last >= BAR_EVERY || now < last) {
-                    player.displayClientMessage(warning(root.getZ(), zone), true);
-                    LAST_BAR.put(player.getUUID(), now);
-                }
-            }
+    /**
+     * The lowest y from {@code y} up at which {@code entity} fits at (x, z): the stop line can run
+     * through rising ground (ledger: POL-031). The destination is loaded first (it usually is: it is
+     * next to the entity).
+     */
+    static double freeY(ServerLevel level, Entity entity, double x, double y, double z) {
+        level.getChunk((int) Math.floor(x) >> 4, (int) Math.floor(z) >> 4);
+        AABB box = entity.getBoundingBox().move(x - entity.getX(), y - entity.getY(), z - entity.getZ());
+        for (int dy = 0; dy <= 64 && y + dy < level.getMaxBuildHeight(); dy++) {
+            if (level.noCollision(entity, box.move(0, dy, 0)))
+                return y + dy;
         }
-        if (vehicles != null)
-            for (Entity v : vehicles.keySet())
-                if (zone(stopZ, v.getZ()) == 2)
-                    stopVehicle(level, stopZ, v);
-        if (sable)
-            SablePoleCap.tickEdge(level, stopZ);
-    }
-
-    /** The action-bar line (plain text fallbacks match en_us.json). */
-    static Component warning(double z, int zone) {
-        String edge = z < 0 ? "north" : "south";
-        if (zone == 2)
-            return Component.translatableWithFallback(KEY_STOP,
-                    "The world's %s edge is closed for now: the seam that joins it is not built yet", edge).withStyle(ChatFormatting.RED);
-        return Component.translatableWithFallback(KEY_NEAR,
-                "Near the world's %s edge: a temporary border stops you here until the seam is built", edge).withStyle(ChatFormatting.GOLD);
-    }
-
-    static void stopPlayer(ServerLevel level, double stopZ, ServerPlayer player) {
-        double z = clampZ(stopZ, player.getZ());
-        double y = PoleCap.freeY(level, player, player.getX(), player.getY(), z);
-        player.connection.teleport(player.getX(), y, z, player.getYRot(), player.getXRot());
-    }
-
-    static void stopVehicle(ServerLevel level, double stopZ, Entity vehicle) {
-        if (!(vehicle instanceof VehicleEntity || vehicle instanceof LivingEntity)) {
-            List<ServerPlayer> riders = new ArrayList<>();
-            for (Entity e : vehicle.getIndirectPassengers())
-                if (e instanceof ServerPlayer p && !(p instanceof FakePlayer) && !p.isSpectator())
-                    riders.add(p);
-            for (ServerPlayer p : riders) {
-                p.stopRiding();
-                stopPlayer(level, stopZ, p);
-            }
-            return;
-        }
-        double z = clampZ(stopZ, vehicle.getZ());
-        double y = PoleCap.freeY(level, vehicle, vehicle.getX(), vehicle.getY(), z);
-        vehicle.teleportTo(vehicle.getX(), y, z);
-        Vec3 v = vehicle.getDeltaMovement();
-        if (v.z * z > 0)
-            vehicle.setDeltaMovement(v.x, v.y, 0);
-        vehicle.hurtMarked = true;
-        if (vehicle.getControllingPassenger() instanceof ServerPlayer driver && !(driver instanceof FakePlayer))
-            driver.connection.send(new ClientboundMoveVehiclePacket(vehicle));
+        return y;
     }
 }

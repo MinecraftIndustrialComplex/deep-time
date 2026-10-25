@@ -630,8 +630,8 @@ def region_chunks(path):
 
 def region_span(period):
     """The region columns (rx) that hold Toroidal World's lap x in [-P/2, P/2): (lowest, highest).
-    A period that is not a multiple of 1,024 (26,112 on a 32k Petroff-Guyou world) ends the lap
-    inside a region, which then holds both ends."""
+    A period that is not a multiple of 1,024 (15,360 on a 16k cube world, 29,696 on a 32k one) ends
+    the lap inside a region, which then holds both ends."""
     half = period // 2
     return (-half) // 512, (half - 1) // 512
 
@@ -1076,8 +1076,7 @@ def main():
                 m = PROBE.search(out)
                 steps.check("/deeptime probe column 0 0 answers", "[deeptime-probe] JSON", out[:200], m is not None)
                 # The east-west period (cube plan T5): the generator's circumference, which is the
-                # notional size only on a Lambert world (13,312 on a 16k Petroff-Guyou world, 4s =
-                # 15,360 on a 16k cube). The seam probes and the region span below use it.
+                # notional size only on a Lambert-frame world (4s = 15,360 on a 16k cube). The seam probes and the region span below use it.
                 try:
                     period = int(json.loads(m.group(1)).get("circumference") or 0) or period if m else period
                 except ValueError:

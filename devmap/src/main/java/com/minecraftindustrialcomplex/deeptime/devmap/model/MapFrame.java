@@ -7,7 +7,7 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
  * Where the map's pictures (satellite and elevation) sit in block space: pixel column i covers block x in
  * [x0 + i·s, x0 + (i + 1)·s), row j block z in [z0 + j·s, z0 + (j + 1)·s), s blocks a pixel. The
  * image covers the world's whole domain: x over one period from the seam (−period/2), z from the
- * world's north limit (the north pole on Lambert, the north edge on Petroff–Guyou) south. On a cube
+ * world's north limit (the north pole on a Lambert-frame test level) south. On a cube
  * it covers the net's window, 4s by 3s from (−3s/2, −3s/2) ({@link PlanetGeometry#west}), and the
  * pictures leave the void off the faces transparent ({@link BaseImage#maskVoid}).
  *

@@ -2338,8 +2338,8 @@ impl DepositStage {
             // continental interiors at the first step.
             "bif_basins": world.globals.get(crate::surface::BIF_BASINS_GLOBAL),
             "bif_basin_share": world.globals.get(crate::surface::BIF_BASIN_SHARE_GLOBAL),
-            // The world the playability pass counted regions in: for a Petroff–Guyou world the
-            // stage's forecast of the λc the projection chooses (DEP-220).
+            // The world the playability pass counted regions in: for a planet the stage's
+            // forecast of the turn the cube pass chooses (DEP-220, SCL-129).
             "world_frame": frame_note,
             "province": self.params.province.name(),
             "province_km": self.params.province_km,
@@ -3600,13 +3600,12 @@ impl DepositStage {
     }
 
     /// The world the playability pass counts its regions in ([`WorldFrame`]): the simulation's
-    /// own frame for a Lambert planet (and a synthetic history, or no essentials to place), else
-    /// the Petroff–Guyou world as the stage forecasts it. The projection chooses λc on the baked
-    /// land (`bake::project::world_of`, SCL-087), which the young landscape and the amplifier have
-    /// yet to draw, so the stage applies the same rule to its present L1 land at a coarser
-    /// resolution ([`FORECAST_SEARCH`]); where the forecast misses, the anchor's top-up adds the
-    /// sources the world's own regions lack (`anchor::top_up`, DEP-220). Returns the frame and
-    /// its record for the census.
+    /// own frame for a synthetic history (or no essentials to place), else the cube world as the
+    /// stage forecasts it ([`Self::cube_frame`]). The cube pass turns the cube on the baked land,
+    /// which the young landscape and the amplifier have yet to draw, so the stage applies the same
+    /// rule to its present L1 land at a coarser resolution; where the forecast misses, the
+    /// anchor's top-up adds the sources the world's own regions lack (`anchor::top_up`, DEP-220).
+    /// Returns the frame and its record for the census.
     fn world_frame(&self, f: &Finish, ctx: &StageContext<'_>) -> (WorldFrame, Value) {
         let src = deeptime_format::Projection::new(f.c as u32);
         if self.params.essentials.is_empty() {
@@ -3615,13 +3614,8 @@ impl DepositStage {
                 json!({"projection": "lambert", "why": "no essentials"}),
             );
         }
-        use deeptime_format::projection::ProjectionKind;
-        let Some(p) = self.planet.as_deref().filter(|p| {
-            matches!(
-                p.scale.projection,
-                ProjectionKind::PetroffGuyou | ProjectionKind::Cube
-            )
-        }) else {
+        // A synthetic history (no planet preset: the deposit world) keeps the simulation's frame.
+        let Some(p) = self.planet.as_deref() else {
             return (WorldFrame::Lambert(src), json!({"projection": "lambert"}));
         };
         // No wall-clock time in the note: the census must not differ between two runs (the
@@ -3631,21 +3625,7 @@ impl DepositStage {
             let (x, z) = src.block_of(lat, lon);
             f.elev[cluster::cell_of(&f.grid, x, z) as usize] >= 0.0
         };
-        if p.scale.projection == ProjectionKind::Cube {
-            return Self::cube_frame(p, &land, src, f.c as u32, ctx);
-        }
-        let (g, choice) = ctx
-            .pool
-            .install(|| crate::bake::project::world_of_at(p, &land, FORECAST_SEARCH));
-        let note = json!({
-            "projection": "petroff_guyou",
-            "hemisphere_blocks": g.hemisphere(),
-            "lambda_c_deg": g.lambda_c_deg(),
-            "land": "present L1 elevation at or above sea level, nearest cell",
-            "forecast": true,
-            "lambda_c": crate::bake::project::lambda_note(choice.as_ref(), FORECAST_SEARCH),
-        });
-        (WorldFrame::PetroffGuyou { g, src }, note)
+        Self::cube_frame(p, &land, src, f.c as u32, ctx)
     }
 
     /// The cube world's frame for the playability pass: the conformal cube turned as the bake's
@@ -3727,8 +3707,8 @@ impl DepositStage {
         // present L1 coast is not the world's (the young landscape and the amplifier redraw
         // it), and where every cell of a region scored alike the first land cell in index order
         // won, at the coast or the pole; 6 of a planet's 8 guaranteed iron deposits lay under
-        // the world's sea. A Petroff–Guyou world's blocks per simulation block vary with the
-        // place, so each cell's distance is scaled by its own.
+        // the world's sea. A cube world's blocks per simulation block vary with the place, so
+        // each cell's distance is scaled by its own.
         let scale = world_scale(&f.grid, &world_xz, world_c);
         let inland = inland_cells_scaled(&f.grid, &f.elev, INLAND_MARGIN_BLOCKS, &scale);
         // Where the player starts, as the bake picks it (`synth::spawn_candidates`): the land
@@ -4150,17 +4130,6 @@ fn union_aabb(bodies: &[Body]) -> [[i32; 3]; 2] {
     [lo, hi]
 }
 
-/// The resolution of the stage's forecast of the projection's λc ([`DepositStage::world_frame`]):
-/// candidates 1° apart, rings 0.5° apart of 72 directions (game-choice, DEP-220: the forecast is
-/// read on land the young landscape and the amplifier redraw, and the bake's 0.25°, 0.1° and 360
-/// directions cost the stage 0.8 s on a full planet).
-pub const FORECAST_SEARCH: crate::bake::project::LambdaSearch =
-    crate::bake::project::LambdaSearch {
-        step_deg: 1.0,
-        ring_deg: 0.5,
-        directions: 72,
-    };
-
 /// How far inland (blocks, simulation frame) the playability pass looks first for a guaranteed
 /// deposit's cell. game-choice (coordinator, 2026-10-20, DEP-222): two L1 cells at 16k, the
 /// distance the young landscape and the amplifier move a coast; a region with no such cell
@@ -4171,7 +4140,8 @@ pub const INLAND_MARGIN_BLOCKS: f64 = 128.0;
 const ESSENTIAL_REGION_PROBE: u32 = 4096;
 
 /// The smallest world blocks per simulation block [`inland_cells_scaled`] reads distances with
-/// (the cone points of a Petroff–Guyou world shrink the land to nothing): it bounds the search
+/// (a projection's cone points can shrink the land to nothing; the cube's corners shrink it): it
+/// bounds the search
 /// (game-choice, DEP-222).
 const MIN_WORLD_SCALE: f64 = 0.25;
 

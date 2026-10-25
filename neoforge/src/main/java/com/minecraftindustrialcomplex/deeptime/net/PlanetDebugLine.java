@@ -1,26 +1,25 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.net;
 
-import com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve;
-
 import java.util.Locale;
 
 /**
- * The F3 line (plan §7.15): {@code Deep Time: 12.345° N 67.890° W · <planet> (C 16384, 300 m/block)},
- * plus {@code · polar storm 62%} inside the cap band; on a cube world
- * {@code Deep Time: 12.345° N 67.890° W · face F1 · north 352.2° · 337 m/block here · <planet> (C 16384, 300 m/block)},
+ * The F3 line (plan §7.15) on a cube world:
+ * {@code Deep Time: 12.345° N 67.890° W · face F1 · north 352.2° · 337 m/block here · <planet> (C 15360, 300 m/block)},
  * with {@code F1 (folded)} past a turning seam: north's bearing (degrees clockwise from −z, {@link
  * com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection#northBearingDeg}) and the metres a
  * block spans there (the nominal {@code m_per_block_h} times the conformal map's scale, SCL-107), as
  * climate API 5 answers them (cube plan G10). Common code, so a GameTest can check the text; the
- * client-only overlay ({@code client/DeepTimeClient}) adds it to the debug screen's left column.
+ * client-only overlay ({@code client/DeepTimeClient}) adds it to the debug screen's left column. On a
+ * Lambert-frame test level (the analytic test terrains) the line is
+ * {@code Deep Time: 12.345° N 67.890° W · <planet> (C 16384, 300 m/block)}, in the simulation's frame.
  */
 public final class PlanetDebugLine {
 
     private PlanetDebugLine() {}
 
-    /** The line for a camera at (x, z) with the given drawn storm, or null when {@code info} is not a planet. */
-    public static String format(WorldInfoPayload info, double x, double z, float storm) {
+    /** The line for a camera at (x, z), or null when {@code info} is not a planet. */
+    public static String format(WorldInfoPayload info, double x, double z) {
         if (info == null || !info.planet() || info.circumference() <= 0)
             return null;
         int c = info.circumference();
@@ -55,21 +54,13 @@ public final class PlanetDebugLine {
             return String.format(Locale.ROOT, "Deep Time: %.3f° %s %.3f° %s · face %s · north %s · %.0f m/block here · %s (C %d, %.0f m/block)",
                     Math.abs(lat), lat >= 0 ? "N" : "S", Math.abs(lon), lon >= 0 ? "E" : "W", face, bearing, here,
                     info.planetName(), c, info.mPerBlockH());
-        } else if (info.petroffGuyou()) {
-            // The seamless world: latitude and longitude depend on x and z (FORMAT.md "The world's
-            // layout"); the longitude in the simulation's frame, shown in [−180°, 180°).
-            double[] ll = info.worldProjection().latLon(x, z);
-            lat = ll[0];
-            lon = ll[1] >= 180.0 ? ll[1] - 360.0 : ll[1];
-        } else {
-            lat = PoleCapCurve.latitudeDeg(c, z);
-            lon = PoleCapCurve.longitudeDeg(c, x);
         }
-        StringBuilder s = new StringBuilder(String.format(Locale.ROOT, "Deep Time: %.3f° %s %.3f° %s · %s (C %d, %.0f m/block)",
+        // A Lambert-frame test level: the simulation's latitude and longitude, shown in [−180°, 180°).
+        double[] ll = info.worldProjection().latLon(x, z);
+        lat = ll[0];
+        lon = ll[1] >= 180.0 ? ll[1] - 360.0 : ll[1];
+        return String.format(Locale.ROOT, "Deep Time: %.3f° %s %.3f° %s · %s (C %d, %.0f m/block)",
                 Math.abs(lat), lat >= 0 ? "N" : "S", Math.abs(lon), lon >= 0 ? "E" : "W",
-                info.planetName(), c, info.mPerBlockH()));
-        if (storm > 0.005f)
-            s.append(String.format(Locale.ROOT, " · polar storm %d%%", Math.round(storm * 100)));
-        return s.toString();
+                info.planetName(), c, info.mPerBlockH());
     }
 }

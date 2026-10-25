@@ -54,7 +54,7 @@ public final class RegionCensus {
         Optional<RegionSource> src = sourceOf(level);
         var sampler = level.getChunkSource().randomState().sampler();
         int c = t.circumference(), sea = g.getSeaLevel();
-        int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
+        int zp = (int) t.zHalf();   // the net's outer edges on the cube (3s/2), the poles on a Lambert-frame world
         int w = c / step, h = 2 * zp / step;
         short[] province = new short[w * h];
         short[] region = new short[w * h];

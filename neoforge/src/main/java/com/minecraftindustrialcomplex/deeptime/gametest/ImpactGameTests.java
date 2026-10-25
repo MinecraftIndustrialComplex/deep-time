@@ -42,13 +42,14 @@ public final class ImpactGameTests {
     private static final int[][] FLOOR_COLUMNS = {{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}};
 
     /**
-     * The cosine of the latitude (about 59°) poleward of which the bake's projection pass widens its
-     * footprint along the parallels, up to eight times: a crater there is averaged into the ground
-     * round it by design, so none there is read. On the planet of master 7d60fc4a (2026-10-19) a
-     * fresh crater 3.9 km across with 8.4 blocks of relief in the list, 110 blocks from the north
-     * edge, showed none in the terrain, which sloped through it without a dip.
+     * The cosine of the latitude (about 59°) poleward of which no crater is read: there the cube bake's
+     * footprint (SCL-124) spans 1 / cos φ simulation cells along the parallel, two or more, so a small
+     * crater is averaged into the ground round it. Until cube plan §7.4 this was where the Petroff–Guyou
+     * pass widened its footprint by design (SCL-090, retired): on the planet of master 7d60fc4a
+     * (2026-10-19) a fresh crater 3.9 km across with 8.4 blocks of relief in the list, 110 blocks from
+     * the north edge, showed none in the terrain, which sloped through it without a dip.
      */
-    static final double POLAR_WIDEN_FROM_COS = 0.52;   // ledger: SCL-090 (game-choice)
+    static final double POLAR_WIDEN_FROM_COS = 0.52;   // game-choice (agent, 2026-10-19): the test's own cut; ledger SCL-124 is the footprint
 
     /**
      * How far the bake's projection pass may average a crater for the crater to be read, as a share of
@@ -61,7 +62,7 @@ public final class ImpactGameTests {
      * Lambert blocks (narrow east–west on the planet), crater 572 (2.6 km across at 57°, 7.8 blocks of
      * relief) was averaged over 0.56 of its radius and its floor stood 2.4 blocks under its rim.
      */
-    static final double FOOTPRINT_SHARE = 0.5;   // game-choice (agent, 2026-10-23): the test's tolerance; the footprint itself is ledger SCL-090
+    static final double FOOTPRINT_SHARE = 0.5;   // game-choice (agent, 2026-10-23): the test's tolerance; the footprint itself is ledger SCL-124
 
     /**
      * The ground a crater was cut into, as the plane fitted (least squares) to the terrain on four
@@ -154,10 +155,9 @@ public final class ImpactGameTests {
      * {@code D / 2 / mPerBlockH} of them: a distance is {@code radius} times the angle between the unit
      * vectors, and a bearing an angle from east toward north. On the conformal cube world such a circle
      * is a circle in world blocks too, of that radius times the projection's local scale (the plain world
-     * frame up to that scale); on the Petroff–Guyou world, which is equal-area and not conformal (the
-     * 4,096-block test planet here is one), it is the map's own ellipse there (1.78 : 1 at the median,
-     * up to 2.67 : 1), so the plain world frame would read it wrong; on a Lambert world it is wide
-     * east–west by 1 / cos² φ. This frame follows it on all three. From 2026-10-23 to the sphere fix
+     * frame up to that scale); on a Lambert-frame world it is wide east–west by 1 / cos² φ. This
+     * frame follows it on both (and followed the retired Petroff–Guyou world's own ellipse, 1.78 : 1 at
+     * the median, when the 4,096-block test planet here was one). From 2026-10-23 to the sphere fix
      * the same day this read the simulation's Lambert blocks, where it then drew its craters round
      * (crater 537 of master 4ab29084, 8.9 km across at 55° south, showed a bowl of 1.5 blocks read round
      * on the sphere and 3.3 in Lambert's frame); before that, a circle in world blocks.
@@ -218,10 +218,11 @@ public final class ImpactGameTests {
      * The half-width of the bake's projection footprint at world point (x, z) beyond the bilinear read,
      * in metres of the planet (as a crater's radius is), along the parallel where that read is
      * narrowest: (d − cell · cos φ) / 2 with d = max(stretch · cell, cell / cos φ), the footprint's
-     * diameter on the planet (SCL-090, {@code bake::project::Mapping::footprint}; stretch the largest
-     * metres on the planet per metre of world block there), and cell · cos φ the planet's metres of one
-     * source cell along the parallel. The source grid's cell is taken as the world elevation grid's: the
-     * simulation's block is about 6% shorter than the Petroff–Guyou world's, so this is a little wide.
+     * diameter on the planet (an isotropic stand-in for the cube pass's Gaussian along the composed
+     * Jacobian's axes, SCL-124; written for the retired Petroff–Guyou pass's footprint, SCL-090; stretch
+     * the largest metres on the planet per metre of world block there), and cell · cos φ the planet's
+     * metres of one source cell along the parallel. The source grid's cell is taken as the world
+     * elevation grid's, which is not exactly the simulation's, so this is approximate.
      * Until the sphere fix of 2026-10-23 it was (d / cos φ − cell) / 2, in the Lambert metres the
      * simulation then drew craters in.
      */
@@ -290,8 +291,11 @@ public final class ImpactGameTests {
         List<Craters.Crater> all = wd.craters().list();
         Set<String> fates = Set.of("fresh", "degraded", "buried", "eroded_to_roots");
         for (Craters.Crater k : all) {
+            // A crater stands at a canonical point of the world: on the cube, on a face of the net's
+            // window (x in [−3s/2, 5s/2)), as craters.json gives it.
+            double[] canon = wd.projection().canonical(k.x(), k.z());
             if (!(k.diameterM() > 0) || !fates.contains(k.fate()) || k.reliefM() > 1.01 * k.depthM() + 1 || k.reliefM() < 0
-                    || Math.abs(k.x()) > c / 2.0 || Math.abs(k.z()) > wd.projection().zMax()) {
+                    || !(Math.abs(canon[0] - k.x()) < 1e-6 && Math.abs(canon[1] - k.z()) < 1e-6)) {
                 helper.fail("crater " + k.id() + " is not sane: " + k);
                 return;
             }
@@ -365,7 +369,9 @@ public final class ImpactGameTests {
         StringBuilder profile = new StringBuilder();
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         ChunkSampling.forEach(helper, FLOOR_COLUMNS.length, i -> {
-            int x = cx + FLOOR_COLUMNS[i][0], z = cz + FLOOR_COLUMNS[i][1];
+            // The column's block x in Toroidal World's frame [−c/2, c/2), where its chunk is generated
+            // (a crater's x is in the cube net's window, which reaches c/2 past it).
+            int x = Math.floorMod(cx + FLOOR_COLUMNS[i][0] + c / 2, c) - c / 2, z = cz + FLOOR_COLUMNS[i][1];
             ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.SURFACE, true);
             int top = (int) Math.ceil(t.height(x, z));
             if (i == 0)

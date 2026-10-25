@@ -18,7 +18,7 @@ import java.util.SplittableRandom;
 /**
  * {@code /deeptime probe geothermal} (P2-14): the settings, the palette, every site
  * ({@link Geothermal}), and what it means for a player: from {@link #POINTS} land columns drawn
- * evenly over the planet inside the pole cap's soft line (the seed {@code probe magma} uses, so the
+ * evenly over the playable planet (the seed {@code probe magma} uses, so the
  * two reports describe the same points), the distance to the nearest site of any kind, to the nearest
  * hot-spring pool, to the nearest vent, and, for comparison, to the nearest active volcano on land,
  * as 10th percentile, median and 90th percentile.
@@ -82,18 +82,16 @@ public final class GeothermalProbe {
 
         // What it means for a player: land columns drawn evenly over the playable planet.
         int c = t.circumference();
-        int zMax = (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(c, com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve.DEFAULT_CAP_DEG));
+        int zMax = (int) t.zHalf();
         SplittableRandom rnd = new SplittableRandom(20261001L);
         double[] any = new double[POINTS], pool = new double[POINTS], vent = new double[POINTS], volcano = new double[POINTS];
         int count = 0;
         for (int tries = 0; count < POINTS && tries < POINTS * 40; tries++) {
             int x = rnd.nextInt(-c / 2, c / 2), z = rnd.nextInt(-zMax, zMax);
-            if (t.height(x, z) <= sea + 1)
+            if (!MagmaProbe.onPlanet(wd.projection(), x, z) || t.height(x, z) <= sea + 1)
                 continue;
             double dAny = Double.POSITIVE_INFINITY, dPool = dAny, dVent = dAny, dVolcano = dAny;
             for (Geothermal.Site s : geo.sites()) {
-                if (Math.abs(s.z()) > zMax)
-                    continue;   // beyond the pole cap's line
                 double d = Math.hypot(geo.dx(x, s), z - s.z());
                 dAny = Math.min(dAny, d);
                 if (s.kind() == Geothermal.Kind.POOL)
@@ -102,7 +100,7 @@ public final class GeothermalProbe {
                     dVent = Math.min(dVent, d);
             }
             for (Magma.Body b : magma.bodies()) {
-                if (b.chamberRh() <= 0 || b.submerged() || Math.abs(b.z()) > zMax)
+                if (b.chamberRh() <= 0 || b.submerged())
                     continue;
                 dVolcano = Math.min(dVolcano, Math.hypot(magma.dx(x, b), z - b.z()));
             }

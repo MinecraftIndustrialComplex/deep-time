@@ -18,7 +18,6 @@ pub mod fsutil;
 pub mod keyframes;
 pub mod lazy;
 pub mod manifest;
-pub mod petroff;
 pub mod portable_math;
 pub mod projection;
 pub mod ramps;
@@ -58,16 +57,16 @@ pub const FORMAT_VERSION: &str = env!("DEEPTIME_FORMAT_VERSION");
 /// The minor part of [`FORMAT_VERSION`], written into every file header (plan §5.7.2).
 pub const FORMAT_MINOR: u16 = 6;
 
-/// The format version of a cube world's `manifest.json` (FORMAT.md "Polar and cube worlds side by
-/// side"). Until the game reads cube worlds (cube plan phase 2), only a cube world's manifest says
-/// 0.7: polar worlds stay [`FORMAT_VERSION`], and every file header of either keeps
-/// [`FORMAT_MINOR`]. The game, which reads 0.6, refuses a cube world by its version.
+/// The format version of a cube world's `manifest.json` (FORMAT.md "Lambert-frame and cube worlds
+/// side by side"). Only a cube world's manifest says 0.7: the synthetic test worlds, laid out in
+/// the simulation's Lambert frame, stay [`FORMAT_VERSION`], and every file header of either keeps
+/// [`FORMAT_MINOR`].
 pub const CUBE_FORMAT_VERSION: &str = "0.7";
 
 /// What [`manifest::Manifest::read`] accepts, as its refusal names it.
 pub const READS_VERSIONS: &str = concat!(
     env!("DEEPTIME_FORMAT_VERSION"),
-    " (polar worlds) and 0.7 (cube worlds)"
+    " (Lambert-frame worlds) and 0.7 (cube worlds)"
 );
 
 #[cfg(test)]

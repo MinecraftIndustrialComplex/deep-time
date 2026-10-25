@@ -162,8 +162,8 @@ class RealRunWiringTest {
     }
 
     /**
-     * Cube plan G13 on a real run: the real 4k planet with the editor's projection set to the cube
-     * (what a cube world type picks), cut to 50 Myr. The finished run has the cube's outline for the
+     * Cube plan G13 on a real run: the real 4k planet, a cube world as every planet is (cube plan
+     * §7.4), cut to 50 Myr. The finished run has the cube's outline for the
      * globe (twelve edges, six of them the border); the review's final map is the net, 4 : 3, from the
      * world data, with the void transparent, the hints as a picture over it and the spawn on a face;
      * Accept binds a cube world of period 4,096.
@@ -172,7 +172,6 @@ class RealRunWiringTest {
     void aCubeRunThroughTheEditor() throws Exception {
         EditorModel m = editor();
         assertTrue(m.importShareCode(ShareCode.encode(planet4k())).isEmpty(), "the real preset imports");
-        m.setChoice(EditorFields.byId("projection"), "cube");
         m.setStart("supercontinent");
         m.setLengthText("50");
         m.refreshEstimate();

@@ -33,11 +33,10 @@ use std::path::Path;
 use rayon::prelude::*;
 use serde_json::{Value, json};
 
-use deeptime_format::raster::{RasterRead, ZEdges, bilinear_weights};
+use deeptime_format::raster::{RasterRead, bilinear_weights};
 use deeptime_format::rivers::Rivers;
 use deeptime_format::{GridDesc, LayerDesc, LoadedLayer};
 
-use crate::bake::project::Mapping;
 use crate::error::CoreError;
 use crate::surface::volcanoes::{Kind, VolcanoState};
 
@@ -99,8 +98,8 @@ pub fn read_standing(dir: &Path) -> Result<Option<Value>, CoreError> {
 }
 
 /// The world's layout as the relief sees it: world points to the sphere and back, and the image
-/// of a point nearest another through the world's edges. The projection pass gives its
-/// [`crate::bake::project::Mapping`]; a cube's faces would give theirs.
+/// of a point nearest another through the world's edges. The cube pass gives its
+/// `bake::project_cube::CubeMapping`.
 pub trait Frame: Sync {
     /// The sphere point (unit vector) of world point (x, z).
     fn unit(&self, x: f64, z: f64) -> [f64; 3];
@@ -235,7 +234,7 @@ pub fn width_deg(e: f64) -> f64 {
 }
 
 /// How many gullies a cone of width angle `deg` has: the whole round over the angle, in fours (a
-/// pattern of even angular harmonics reads the same through the world's half-turns and a cube's
+/// pattern of even angular harmonics reads the same through the cube's half-turns and
 /// quarter-turns), 8 to 16 (O'Hara §4.3: more than 10 summit basins on most cones; the cone's
 /// radius over the outlets' spacing 1 to 3, so 6 to 19 round its foot).
 pub fn gully_count(deg: f64) -> u32 {
@@ -618,22 +617,6 @@ pub fn cone_gullies(
         let y = e.get(c);
         e.set(c, y - f64::from(cut));
     }
-    // A half-turn grid's edge rows hold each point twice (cell i is cell w − i) and a cone's box
-    // reaches only one of them: both take the cut.
-    if g.grid.z_edges == ZEdges::HalfTurn {
-        let (w, h) = (g.grid.w as usize, g.grid.h as usize);
-        for j in [0, h - 1] {
-            for i in 1..w / 2 {
-                let (a, b) = (j * w + i, j * w + (w - i));
-                let (ya, yb) = (e.get(a), e.get(b));
-                if ya < yb {
-                    e.set(b, ya);
-                } else if yb < ya {
-                    e.set(a, yb);
-                }
-            }
-        }
-    }
     // The active cones and the dead ones apart: a dead cone's gullies are faded (VOL-105).
     let group = |active: bool| -> Value {
         let mine: Vec<&ConeRecord> = records
@@ -928,21 +911,6 @@ pub fn steep_texture(e: &mut Elev, g: &Ground, rock: &Rock, calm: &[u8]) -> Valu
         let y = e.get(c);
         e.set(c, y + d);
     }
-    // A half-turn grid's edge rows hold each point twice (cell i is cell w − i): both take the
-    // mean of what the two were given.
-    if grid.z_edges == ZEdges::HalfTurn {
-        for j in [0, h - 1] {
-            for i in 1..w / 2 {
-                let (a, b) = (j * w + i, j * w + (w - i));
-                let (ya, yb) = (e.get(a), e.get(b));
-                if ya != yb {
-                    let m = 0.5 * (ya + yb);
-                    e.set(a, m);
-                    e.set(b, m);
-                }
-            }
-        }
-    }
     let moved = up + down;
     let r2 = |v: f64| (v * 100.0).round() / 100.0;
     json!({
@@ -959,20 +927,6 @@ pub fn steep_texture(e: &mut Elev, g: &Ground, rock: &Rock, calm: &[u8]) -> Valu
 
 // --- the projection pass's call --------------------------------------------------------------------
 
-impl Frame for Mapping {
-    fn unit(&self, x: f64, z: f64) -> [f64; 3] {
-        self.g.unit(x, z)
-    }
-
-    fn point(&self, v: [f64; 3]) -> (f64, f64) {
-        self.g.point_of_unit(v)
-    }
-
-    fn nearest_image(&self, p: (f64, f64), q: (f64, f64)) -> (f64, f64) {
-        Mapping::nearest_image(self, p, q).0
-    }
-}
-
 /// A world's [`Frame`] with the simulation's (Lambert) grid behind it: what [`OnWorld`] reads the
 /// rivers and the standing volcanoes through.
 pub(crate) trait SimFrame: Frame {
@@ -980,17 +934,6 @@ pub(crate) trait SimFrame: Frame {
     fn sim_block(&self, v: [f64; 3]) -> (f64, f64);
     /// The sphere point of the simulation's block (xs, zs).
     fn sim_unit(&self, xs: f64, zs: f64) -> [f64; 3];
-}
-
-impl SimFrame for Mapping {
-    fn sim_block(&self, v: [f64; 3]) -> (f64, f64) {
-        let (xs, zs, _) = self.src_block(v);
-        (xs, zs)
-    }
-
-    fn sim_unit(&self, xs: f64, zs: f64) -> [f64; 3] {
-        self.src.unit(xs, zs)
-    }
 }
 
 /// What the projection pass hands the relief: the world's grid of the elevation and the layers and
@@ -1128,7 +1071,7 @@ impl<M: SimFrame> OnWorld<'_, M> {
 mod tests {
     use super::*;
     use deeptime_format::DType;
-    use deeptime_format::projection::PetroffGuyou;
+    use deeptime_format::raster::ZEdges;
 
     const MH: f64 = 300.0;
 
@@ -1417,40 +1360,6 @@ mod tests {
     }
 
     #[test]
-    fn a_cone_on_a_petroff_guyou_edge_keeps_the_edge_glued() {
-        // The north edge is glued onto itself by a half-turn: cells (i, 0) and (W − i, 0) are one
-        // point of the planet, so they must keep one height.
-        let c_sim = 4096;
-        let pg = PetroffGuyou::new(PetroffGuyou::hemisphere_for(c_sim), 30.0);
-        let map = Mapping::new(pg, c_sim, 16);
-        let grid = pg.grid("L3", 2).unwrap();
-        let b = pg.hemisphere() as f64;
-        let rm = f64::from(c_sim) / TAU * MH;
-        let v = (300.0, -b / 2.0 + 14.0);
-        let (desc, bytes) = cone_world(&grid, &map, rm, v, FOOT);
-        let g = ground(&grid);
-        let k = cone(&map, v, 2.0, None);
-        let (after, rec) = gullied(&g, &map, rm, &k, &desc, &bytes);
-        assert!(rec.removed > 0.1, "{rec:?}");
-        let w = grid.w as usize;
-        let mut cut = 0;
-        for i in 1..w {
-            let (a, m) = (i, w - i);
-            let (ya, ym) = (read(&desc, &after, a), read(&desc, &after, m));
-            let (ba, bm) = (read(&desc, &bytes, a), read(&desc, &bytes, m));
-            assert!(
-                (ya - ym).abs() <= (ba - bm).abs() + 1.0 / 16.0 + 1e-9,
-                "edge cells {a} and {m}: {ya} and {ym} (before {ba} and {bm})"
-            );
-            cut += usize::from(ya < ba);
-        }
-        assert!(
-            cut > 4,
-            "the cone's gullies reach the edge row: {cut} cells"
-        );
-    }
-
-    #[test]
     fn a_shield_is_not_gullied_but_calms_the_ground_over_it() {
         let (grid, frame, rm) = flat();
         let v = (0.0, 0.0);
@@ -1682,43 +1591,6 @@ mod tests {
             }
         }
         assert!(moved > 10_000, "{moved} cells textured");
-    }
-
-    #[test]
-    fn the_texture_keeps_a_petroff_guyou_edge_glued_and_runs_alike_twice() {
-        let c_sim = 4096;
-        let pg = PetroffGuyou::new(PetroffGuyou::hemisphere_for(c_sim), 30.0);
-        let map = Mapping::new(pg, c_sim, 16);
-        let grid = pg.grid("L3", 2).unwrap();
-        let noise = deeptime_format::Noise::for_world(
-            SEED,
-            pg.period() as u32,
-            &deeptime_format::projection::WorldProjection::PetroffGuyou(pg),
-        );
-        // Steep ground everywhere, a function of the sphere point so the edges start glued.
-        let (desc, bytes) = elevation(&grid, |x, z| {
-            let v = Frame::unit(&map, x, z);
-            600.0 + 1200.0 * v[0] * v[1] + 300.0 * v[2]
-        });
-        let g = ground(&grid);
-        let rock = |_: f64, _: f64| (1.0, 1.0);
-        let (after, _) = textured(&g, &noise, &rock, &[], &desc, &bytes);
-        let w = grid.w as usize;
-        let h = grid.h as usize;
-        let mut moved = 0;
-        for j in [0, h - 1] {
-            for i in 1..w {
-                let (a, m) = (j * w + i, j * w + (w - i));
-                assert!(
-                    (read(&desc, &after, a) - read(&desc, &after, m)).abs() <= 1.0 / 16.0 + 1e-9,
-                    "edge cells {a} and {m}"
-                );
-                moved += usize::from(read(&desc, &after, a) != read(&desc, &bytes, a));
-            }
-        }
-        assert!(moved > 100, "{moved} edge cells textured");
-        let (again, _) = textured(&g, &noise, &rock, &[], &desc, &bytes);
-        assert_eq!(after, again);
     }
 
     #[test]

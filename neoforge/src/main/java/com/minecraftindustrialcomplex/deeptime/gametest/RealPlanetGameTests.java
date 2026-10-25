@@ -80,7 +80,9 @@ public final class RealPlanetGameTests {
      *
      * <p>A column whose chunk another test has already generated past the noise step is skipped and
      * counted: its heightmap then holds what the surface step and the features put on the terrain
-     * (the ice cover, a tree), not the terrain. Which columns those are depends on the planet.
+     * (the ice cover, a tree), not the terrain. Which columns those are depends on the planet. So is
+     * a column off the cube's faces ({@link ChunkSampling#onFaces}): its chunk is filled after the
+     * noise step, from its partner (about a third of the samples, on the 4k test planet).
      */
     @GameTest(template = GameTestSupport.TEMPLATE, timeoutTicks = 2400)
     public static void realPlanetHeightMatchesTheBake(GameTestHelper helper) {
@@ -94,6 +96,7 @@ public final class RealPlanetGameTests {
         int[] clipped = {0, Integer.MIN_VALUE};   // columns whose baked top is above the build limit, the highest of them
         int[] outside = {0};                      // columns between corners whose top is outside their cell's corner tops
         int[] further = {0};                      // columns in chunks already generated past the noise step
+        int[] offFaces = {0};                     // columns off the cube's faces (not read)
         StringBuilder outsideDetail = new StringBuilder();
         ChunkSampling.HeightTally tally = new ChunkSampling.HeightTally();
         ChunkSampling.forEach(helper, 96, i -> {
@@ -103,6 +106,10 @@ public final class RealPlanetGameTests {
             if (!corner) {
                 x += 1 + (i % 3);
                 z += 2;
+            }
+            if (!ChunkSampling.onFaces(wd, x, z)) {
+                offFaces[0]++;
+                return false;   // off the cube's faces: a copy made after the noise step, empty at it
             }
             if (wd.detail(t.wrapX(x), z) != 0.0)
                 detailed[0]++;
@@ -143,9 +150,9 @@ public final class RealPlanetGameTests {
             return true;
         }, () -> {
             DeepTime.LOGGER.info("[gametest] realPlanetHeightMatchesTheBake columns={} cornerColumns={} cornerMaxAbsDiff={} "
-                    + "maxAbsDiff={} outsideCellCorners={} generatedFurther={} withDetail={} aboveBuildLimit={} (limit y {}, "
+                    + "maxAbsDiff={} outsideCellCorners={} generatedFurther={} offFaces={} withDetail={} aboveBuildLimit={} (limit y {}, "
                     + "highest baked top {}) worst={}",
-                    tally.checked, tally.corners, tally.cornerMax, tally.maxDiff, outside[0], further[0], detailed[0], clipped[0], limit,
+                    tally.checked, tally.corners, tally.cornerMax, tally.maxDiff, outside[0], further[0], offFaces[0], detailed[0], clipped[0], limit,
                     clipped[0] == 0 ? "-" : clipped[1], tally.worst);
             helper.assertTrue(tally.corners >= 24, "only " + tally.corners + " corner columns above the floor band");
             helper.assertTrue(tally.cornerMax == 0, "corner columns differ by up to " + tally.cornerMax + ": " + tally.worst);
@@ -284,8 +291,8 @@ public final class RealPlanetGameTests {
                 return false;
             JsonObject col = fixture.get(k).getAsJsonObject();
             int x = col.get("wx").getAsInt(), z = col.get("z").getAsInt();
-            if (Math.abs(z) > wd.projection().zMax() - 32)
-                return false;   // past the pole edge (the beyond-pole mask) or near a turning edge (the folded copy)
+            if (Math.abs(z) > wd.projection().zMax() - 32 || !ChunkSampling.onFaces(wd, x, z))
+                return false;   // near the net's outer edge, or off the faces (a turned copy of the partner's chunk)
             n[0]++;
             ChunkAccess chunk = level.getChunkSource().getChunk(x >> 4, z >> 4, ChunkStatus.SURFACE, true);
             int surface = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x, z);

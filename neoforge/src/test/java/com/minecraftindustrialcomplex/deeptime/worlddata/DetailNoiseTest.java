@@ -38,7 +38,7 @@ class DetailNoiseTest {
 
     /** The 4k test cube's net (s = 1024), as Rust's {@code detail::tests::cube_fixture}. */
     private static DetailNoise cubeNoise() {
-        return new DetailNoise(0xDEAD_BEEF_0123_4567L, 4096, 1729, 3, 32.0, 0L, CubeLayout.shared(1024));
+        return new DetailNoise(0xDEAD_BEEF_0123_4567L, 4096, 1729, 3, 32.0, CubeLayout.shared(1024));
     }
 
     /** A cube world's noise (cube plan G3): the values Rust's {@code detail::tests::cube_known_values} pins. */

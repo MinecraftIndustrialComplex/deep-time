@@ -776,7 +776,7 @@ fn dot(p: [f64; 3], q: [f64; 3]) -> f64 {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WorldJacobian {
     /// [[east, north] per block of net +x, [east, north] per block of net +z], planet metres
-    /// (the layout of `PetroffGuyou::jacobian`). For the conformal map a scalar times a rotation
+    /// (one row per net axis). For the conformal map a scalar times a rotation
     /// and a reflection (net +z is south-ish).
     pub m: [[f64; 2]; 2],
     /// √|det m|: planet metres per block (the conformal map's one scale; for another map the

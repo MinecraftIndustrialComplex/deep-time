@@ -34,7 +34,7 @@ import java.nio.file.Path;
  * climate fixture ({@code parity/climate.json}, written by {@code deeptime parity} in gametest.sh)
  * exactly, the tropics are warmer than the high latitudes and the lapse rate applies with height;
  * on a synthetic world-data level it reports no climate, and on a level Deep Time did not generate
- * it reports nothing at all. The planet's geometry (API 2, 4 and 5) on Lambert, Petroff–Guyou and
+ * it reports nothing at all. The planet's geometry (API 2, 4 and 5) on a Lambert-frame level and
  * the cube world: latitude, longitude, north's bearing and the metres per block.
  */
 @GameTestHolder(GameTestSupport.NS)
@@ -91,12 +91,16 @@ public final class ClimateApiGameTests {
         // this holds over the sea too). The small test planet may have no tropical land at all.
         int c = t.circumference(), sea = level.getSeaLevel();
         double tropics = 0, high = 0;
-        int nt = 0, nh = 0, land = 0, lapsed = 0, n = 400;
-        for (int i = 0; i < n; i++) {
+        int nt = 0, nh = 0, land = 0, lapsed = 0, n = 0;
+        for (int i = 0; i < 400; i++) {
             int x = -c / 2 + (i * 97) % c;
-            int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
+            int zp = (int) t.zHalf();   // the net's outer edges on the cube (3s/2)
             int z = ((i * 61) % (2 * zp)) - zp;
             double lat = DeepTimeClimate.latitudeDeg(level, x, z);
+            // The cube's window is half void (no planet point; the generator fills it with folded copies).
+            if (Double.isNaN(lat))
+                continue;
+            n++;
             int y = Math.max((int) Math.ceil(t.height(x, z)), sea);
             ClimateSample s = climate.at(x, y, z).orElseThrow();
             if (!s.isSea())
@@ -111,18 +115,11 @@ public final class ClimateApiGameTests {
             if (climate.at(x, y + 50, z).orElseThrow().meanC() < s.meanC())
                 lapsed++;
         }
-        // API 5 on an equal-area world: north is -z along the equator, the scale is the nominal one.
+        // The real planet is the cube world (cube plan §7.4); API 5's north and scale on it are the
+        // conformal map's, checked by climateApiOnTheCube below.
         String kind = t.data().projection().kind().id();
-        double nominal = t.data().manifest().mPerBlockH(), worstNorth = 0;
-        int scaled = 0;
-        for (int i = 0; i < 40; i++) {
-            double x = -c / 2.0 + i * c / 40.0 + 13.5, z = ((i * 61) % (2 * (int) t.zHalf())) - t.zHalf();
-            double b = DeepTimeClimate.northBearingDeg(level, x, 0.0);
-            worstNorth = Math.max(worstNorth, Math.min(b, 360.0 - b));
-            if (DeepTimeClimate.metresPerBlock(level, x, z) == nominal)
-                scaled++;
-        }
-        helper.assertTrue(kind.equals("petroff_guyou") || kind.equals("lambert"), "the real planet's projection: " + kind);
+        double nominal = t.data().manifest().mPerBlockH();
+        helper.assertTrue(kind.equals("cube"), "the real planet's projection: " + kind);
         // The planet API on the real planet: one object per world, the equal-area sphere's radius, and
         // the climate API's geometry its answers.
         DeepTimePlanet planet = DeepTimePlanet.of(level).orElse(null);
@@ -130,21 +127,20 @@ public final class ClimateApiGameTests {
         helper.assertTrue(planet != null && DeepTimePlanet.of(level).orElseThrow() == planet
                         && Math.abs(planet.radiusMetres() - radius) <= 1e-9 * radius,
                 "the real planet's sphere: " + planet + " vs R " + radius + " m");
-        int same = 0;
+        int same = 0, band = c / 8;   // the four side faces, |z| < s/2: every x is on the planet
         for (int i = 0; i < 40; i++) {
-            double x = -c / 2.0 + i * c / 40.0 + 7.5, z = ((i * 37) % (2 * (int) t.zHalf())) - t.zHalf() + 0.5;
+            double x = -c / 2.0 + i * c / 40.0 + 7.5, z = ((i * 37) % (2 * band - 2)) - band + 1.5;
             LocalFrame f = planet.frame(x, z).orElseThrow();
             if (planet.latitudeDeg(x, z) == DeepTimeClimate.latitudeDeg(level, x, z) && planet.longitudeDeg(x, z) == DeepTimeClimate.longitudeDeg(level, x, z)
                     && f.northBearingDeg() == DeepTimeClimate.northBearingDeg(level, x, z) && f.metresPerBlock() == DeepTimeClimate.metresPerBlock(level, x, z))
                 same++;
         }
         helper.assertTrue(same == 40, "the climate API's geometry is the planet API's at " + same + " of 40");
-        helper.assertTrue(worstNorth < 0.1, "north on the equator is -z within " + worstNorth + "°");
-        helper.assertTrue(scaled == 40 && nominal > 0, "the equal-area scale is the nominal " + nominal + " at " + scaled + " of 40");
         DeepTime.LOGGER.info("[gametest] climateApiOnTheRealPlanet fixture={} equal={} tropics={} meanC={} "
-                        + "highLat={} meanC={} land={} colderHigher={} of {} firstBad={} kind={} worstNorthOnTheEquator={} metresPerBlock={}",
+                        + "highLat={} meanC={} land={} colderHigher={} of {} firstBad={} kind={} metresPerBlock={}",
                 samples.size(), equal, nt, nt == 0 ? Double.NaN : tropics / nt, nh, nh == 0 ? Double.NaN : high / nh,
-                land, lapsed, n, firstBad, kind, worstNorth, nominal);
+                land, lapsed, n, firstBad, kind, nominal);
+        helper.assertTrue(n > 150, "on-planet samples " + n + " of 400");
         helper.assertTrue(samples.size() == 500, "the fixture has " + samples.size() + " samples");
         helper.assertTrue(equal == samples.size(), (samples.size() - equal) + " samples differ from Rust's: " + firstBad);
         helper.assertTrue(nt > 5 && nh > 5, "samples: tropics " + nt + ", high latitudes " + nh);
@@ -180,7 +176,7 @@ public final class ClimateApiGameTests {
         // nothing past the poles.
         String kind = sg == null ? "" : sg.dataRef().projection();
         helper.assertTrue(kind.equals("lambert"), "the synthetic planet is a Lambert world: " + kind);
-        double pole = com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c);
+        double pole = com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Lambert.radius(c);
         helper.assertTrue(DeepTimeClimate.latitudeDeg(synthetic, 17, -pole) == 90.0
                         && Math.abs(DeepTimeClimate.latitudeDeg(synthetic, -300, pole / 2) + 30.0) < 1e-9
                         && Double.isNaN(DeepTimeClimate.latitudeDeg(synthetic, 5, -c / 4.0)) && !planet.isOnPlanet(5, -c / 4.0)

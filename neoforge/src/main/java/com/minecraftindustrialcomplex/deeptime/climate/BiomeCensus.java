@@ -5,7 +5,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.minecraftindustrialcomplex.deeptime.worlddata.ClimateLayers;
 import com.minecraftindustrialcomplex.deeptime.worlddata.IceCover;
-import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.RasterSampler;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
@@ -367,7 +366,7 @@ public final class BiomeCensus {
         RasterSampler wetlandLayer = wd.has(Peatland.LAYER) ? wd.layer(Peatland.LAYER) : null;
         var sampler = level.getChunkSource().randomState().sampler();
         int c = t.circumference(), sea = g.getSeaLevel();
-        int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
+        int zp = (int) t.zHalf();   // the net's outer edges on the cube (3s/2), the poles on a Lambert-frame world
         int w = c / step, h = 2 * zp / step;
         short[] biomeIdx = new short[w * h];
         byte[] koppen = new byte[w * h];
@@ -531,7 +530,7 @@ public final class BiomeCensus {
                     }
                 }
                 if (land && cloudActive) {
-                    boolean candidate = cloudClass(k) && Math.abs(Projection.latitudeDeg(c, z)) < CLOUD_LAT_DEG
+                    boolean candidate = cloudClass(k) && Math.abs(wd.projection().latitudeDeg(x, z)) < CLOUD_LAT_DEG
                             && (y - sea) * mV > CLOUD_HEIGHT_M;
                     if (candidate && b.is(VolcanicBiomes.KEEP_OUT)) {
                         candidate = false;

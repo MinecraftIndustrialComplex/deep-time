@@ -684,8 +684,8 @@
     return [clamp(proj.latOfY(y, p.canvas.height), -90, 90), proj.wrapLon(proj.lonOfPicX(x, p.canvas.width))];
   }
   // The world a run's bake is laid out in (the manifest's `projection` block, read once from
-  // `api/runs/<id>/world.json`): Petroff–Guyou by default (format 0.5), Lambert for a Lambert
-  // preset or until the bake is there. The keyframes stay the simulation's Lambert pictures; a point
+  // `api/runs/<id>/world.json`): the Lambert frame until plan T1 wires the cube world in. The
+  // keyframes stay the simulation's Lambert pictures; a point
   // picked on them is a latitude and longitude, and this says which world block it is.
   function worldOf(run) {
     if (!run) return proj.world(null, 16384);
@@ -701,16 +701,16 @@
     return proj.world(null, circ(run));
   }
   // Block coordinates of a point in the run's world (the static viewer's inspect, the 3D preview,
-  // sections): Lambert x from the seam at −C/2 and north −z; Petroff–Guyou through its projection.
+  // sections): Lambert x from the seam at −C/2 and north −z; another world through its projection.
   function blockXZ(run, lat, lon) {
     const [x, z] = worldOf(run).blockOf(lat, lon);
     return [Math.round(x), Math.round(z)];
   }
-  // A preview box of a lat/lon box in the run's world: its corners on Lambert; on Petroff–Guyou,
+  // A preview box of a lat/lon box in the run's world: its corners on Lambert; on another world,
   // where a lat/lon box is no block box, the same size in blocks round its centre.
   function boxBlocks(run, b) {
     const w = worldOf(run);
-    if (!w.isPetroff) {
+    if (w.kind === 'lambert') {
       const [x0, z0] = blockXZ(run, b.north, b.west), [x1, z1] = blockXZ(run, b.south, b.east);
       return { x0, z0, x1, z1 };
     }
@@ -2080,7 +2080,7 @@
     const { label: ln } = layerLabel(s ? s.name : layer);
     const v = valueText(s);
     $('details').innerHTML =
-      `<div class="dh" style="--c:#fff"><span class="d" style="background:${s ? `rgb(${s.rgb.join(',')})` : '#fff'}"></span><div><h4>${esc(latLonText(lat, lon))}</h4><div class="id">x ${fmtInt(bx)} · z ${fmtInt(bz)} on ${worldOf(r).isPetroff ? `the ${fmtInt(worldOf(r).period)} × ${fmtInt(worldOf(r).b)} world` : `C = ${fmtInt(circ(r))}`}</div></div></div>` +
+      `<div class="dh" style="--c:#fff"><span class="d" style="background:${s ? `rgb(${s.rgb.join(',')})` : '#fff'}"></span><div><h4>${esc(latLonText(lat, lon))}</h4><div class="id">x ${fmtInt(bx)} · z ${fmtInt(bz)} on ${worldOf(r).kind === 'lambert' ? `C = ${fmtInt(circ(r))}` : `the world of period ${fmtInt(worldOf(r).period)}`}</div></div></div>` +
       `<div class="kv"><div>${esc(ln || 'Layer')}</div><div>${esc(v || '—')}</div><div>Latitude</div><div>${esc(latText(lat))}</div><div>Longitude</div><div>${esc(lonText(lon))} of the seam</div>` +
       `<div>Block x, z</div><div class="tnum">${fmtInt(bx)}, ${fmtInt(bz)}</div><div>Run</div><div>${esc(runName(r))}</div></div>` +
       `<div class="callout" style="margin-top:12px">${ic('info')}<div>Values are read back from the map's colours, so they are approximate.</div></div>` +

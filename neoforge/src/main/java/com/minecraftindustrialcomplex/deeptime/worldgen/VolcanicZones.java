@@ -22,9 +22,8 @@ import java.util.Map;
  * two biome cells; a ring (the ash and lava fields round a cone) is a zone of lower priority than the
  * cone's, and is left out when it would be narrower than {@link #MIN_RING}. Where zones overlap,
  * {@link Role}'s order decides. The simulation draws a cone as a circle on the planet (since
- * 2026-10-23; a circle in its Lambert blocks before), which a Lambert world shows wide east–west, the
- * conformal cube round and the equal-area Petroff–Guyou world with its own local shape stretch (median
- * 1.78 : 1); a volcano's zones take the projection's local stretch at the vent
+ * 2026-10-23; a circle in its Lambert blocks before), which a Lambert-frame world shows wide east–west
+ * and the conformal cube round; a volcano's zones take the projection's local stretch at the vent
  * ({@link #stretch}), so they lie on the cone, its crater and its flanks as the terrain draws them.
  * Every number here is a game choice (ledger BIO-104 to BIO-113, BIO-182).
  */
@@ -335,8 +334,8 @@ public final class VolcanicZones {
      * circle on the planet (ledger SCL-230: its distances are great-circle ones, the azimuthal equidistant
      * frame at the vent; {@code deeptime volcano-census} measures in the same frame), which a world shows
      * as the ellipse its projection makes of it there: wide east–west by 1/cos φ and narrow north–south by
-     * cos φ on a Lambert world, round on the conformal cube, by the map's own stretch on Petroff–Guyou
-     * (equal-area, so not conformal: 1.78 : 1 at the median, up to 2.67 : 1). The local
+     * cos φ on a Lambert-frame world, round on the conformal cube (and by any other map's own stretch:
+     * the retired Petroff–Guyou world's was 1.78 : 1 at the median). The local
      * Jacobian J of the map from world blocks to the planet's tangent plane at the vent (east and south,
      * central differences over one block, in {@code radius()} blocks a radian) gives it: a circle of
      * radius s there is the world ellipse of semi-axes s/σ, σ the singular values of J, its semi-major

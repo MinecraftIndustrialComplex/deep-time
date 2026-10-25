@@ -158,7 +158,7 @@ def section_html(rel=""):
     stats = {}
     p = os.path.join(OUT, "scale-stats.json")
     if os.path.exists(p):
-        # The manifest's metres per block is the world's own (a Petroff-Guyou world's block is not the preset's), so match each
+        # The manifest's metres per block is the world's own (a cube world's block is not the preset's), so match each
         # scale to the statistics row nearest its preset value.
         rows = json.load(open(p))
         for _, m in SCALES:
@@ -196,7 +196,7 @@ def section_html(rel=""):
         note = (f"Each window is {REGION:,} × {REGION:,} blocks ({where}), chosen on its own bake so that the three land shares agree within "
                 f"{100 * region.get('land_tol', 0.05):.0f} points ({shares}; target {100 * region.get('land_target', 0):.0f} %) and the slope statistics "
                 f"compare like with like.")
-    return (f'<div class="scale"><p>Three planets from one seed (start and length equal), simulation C = {C:,} blocks (the Petroff-Guyou world is a little smaller: 26,112 x 13,056 blocks), vertical scale 35 m per block at every scale: only '
+    return (f'<div class="scale"><p>Three planets from one seed (start and length equal), simulation C = {C:,} blocks (the cube world is a little smaller: its faces are 7,424 blocks a side), vertical scale 35 m per block at every scale: only '
             f'the metres a block stands for change. {esc(note)} Wider features take more blocks at 1:100; at Earth proportions a mountain range '
             f'a few hundred kilometres wide is a few hundred blocks and a plain is the size of a Minecraft village.</p>'
             f'<div class="cols">{"".join(cols)}</div></div>')
