@@ -8967,3 +8967,83 @@ The sources of the plate speed lane's diagnosis (plates.md "Plate speed (2026-10
 - Access: paywalled at the publisher; a full-text copy was fetched 2026-10-25 (agent's scratch, not in the library; the URL was not recorded).
 - Library: not kept.
 - Read so far (by the project): full text, 2026-10-25 (the plate speed lane): "trench migration is primarily controlled by the subducting plate velocity Vsub, which largely depends on its age at the trench"; "Vt = 0.5Vsub − 2.3 (in cm a−1) in the HS3 reference" frame; in neutral subduction zones the velocity of the trench equals the velocity of the upper plate (Vt = Vup). No limit of rollback by the slab's sinking speed is stated.
+
+## Chemical denudation (ERO-205 to ERO-207; notes on CLM-153, CLM-155, CLM-156), added 2026-10-25
+
+The sources of the dissolved load the surface stage takes off the land (erosion-and-sediment.md "Chemical denudation (M5 lane, 2026-10-25)"). All were read by a Sonnet sub-agent of the M5 lane on 2026-10-25 (downloads in its scratch, not in the library). Rudnick & Gao 2003 (RudnickGao2003, above) was not readable; a search snippet of an OCR copy gave SiO2 66.6, Al2O3 15.4 and MgO 2.48 wt% (CLM-153's note).
+
+### West2005
+- Reference: West, A. J., Galy, A. and Bickle, M. (2005). Tectonic and climatic controls on silicate weathering. Earth and Planetary Science Letters 235:211-228.
+- DOI or URL: 10.1016/j.epsl.2005.03.020 (from memory, not looked up); read at https://sseh.uchicago.edu/doc/West_et_al_2005.pdf (a mirror).
+- Cited as: "West, Galy & Bickle 2005"; "West 2005" (the coordinator's task).
+- Ledger ids: ERO-205, ERO-206, ERO-207; CLM-153, CLM-155 (notes)
+- Access: paywalled at the publisher; the mirror above is open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): abstract, "At lower erosion rates mineral supply limits weathering. At higher erosion rates there is abundant material but kinetic and therefore climatic factors limit weathering" and "In the transport-limited case, the supply of silicate cations from weathering is directly proportional to the supply of material by erosion"; sec. 4.1, the cratons "define a linear array ... with a slope close to one (0.96 +- 0.09, 1 sigma) and a value of A = 0.08 +- 0.02, comparable to the weight fraction of Ca + Mg + Na + K (0.1) in average silicate upper crust"; SCDR is "the silicate-derived Ca + Mg + Na + K ... reported in elemental weight units"; Table 2, the cratons (SCDR, SiO2, total denudation TDR in t/km2/yr; runoff mm/yr; T degC): Slave 0.25, 0.18, 3.2, 100, 4.0; Siberia 0.77, 1.61, 15, 270, 2.0; Africa 0.80, 2.96, 10, 250, 24.1; Grenville 1.14, 2.63, 13, 580, 4.5; Guyana 2.40, 10.18, 35, 1680, 25.0. The kinetic fit: K = 2.28 +- 1.09 t/km2/yr, Ea = 74 +- 29 kJ/mol. The paper gives no rate in m/Myr.
+
+### DixonVonBlanckenburg2012
+- Reference: Dixon, J. L. and von Blanckenburg, F. (2012). Soils as pacemakers and limiters of global silicate weathering. Comptes Rendus Geoscience 344:597-609.
+- DOI or URL: 10.1016/j.crte.2012.10.012 (from memory, not looked up); read at https://gfzpublic.gfz.de/pubman/item/item_246138_1/component/file_246137/19570.pdf (author postprint).
+- Cited as: "Dixon & von Blanckenburg 2012".
+- Ledger ids: ERO-206, ERO-207; CLM-155, CLM-156 (notes)
+- Access: open (author postprint).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): soil production has "a median of 70 t km-2 yr-1 (equivalent to 27 mm ky-1)"; "a soil production speed limit of between 320 to 450 t km-2 y-1 and the associated weathering rate speed limit of roughly 150 t km-2 y-1"; sec. 3.6, "most rocks of granitic composition ... lose <= 50% of their mass when they are converted from rock to soil"; high-mountain rivers sit at a chemical depletion fraction of 0 to 0.15; river dissolved loads of felsic and sedimentary catchments: median 13, 95 % limit 63 t/km2/yr. No cratonic range in m/Myr.
+
+### Riebe2004
+- Reference: Riebe, C. S., Kirchner, J. W. and Finkel, R. C. (2004). Erosional and climatic effects on long-term chemical weathering rates in granitic landscapes spanning diverse climate regimes. Earth and Planetary Science Letters 224:547-562.
+- DOI or URL: 10.1016/j.epsl.2004.05.019 (from memory, not looked up); read at https://seismo.berkeley.edu/~kirchner/reprints/2004_71_Riebe_wx_synthesis.pdf.
+- Cited as: "Riebe, Kirchner & Finkel 2004".
+- Ledger ids: ERO-205; CLM-156 (note)
+- Access: open (the author's reprint page).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): eq. 2, "W/D = 1 - [Zr]rock/[Zr]soil = CDF where CDF, the 'chemical depletion fraction', is the ratio of the chemical weathering rate to the total denudation rate"; "chemical weathering rates increase proportionally with fresh-material supply rates. We refer to this as 'supply-limited' weathering"; denudation 23 to 755 and chemical weathering 0 to 173 t/km2/yr; Table 2, the depletion fraction from 0.00 +- 0.02 to 0.61 +- 0.02 (Rio Icacos).
+
+### MillimanFarnsworth2011
+- Reference: Milliman, J. D. and Farnsworth, K. L. (2011). River Discharge to the Coastal Ocean: A Global Synthesis. Cambridge University Press (title from memory).
+- DOI or URL: preview read at https://api.pageplace.de/preview/DT0400.9780511911538_A23683446/preview-9780511911538_A23683446.pdf
+- Cited as: "Milliman & Farnsworth 2011".
+- Ledger ids: CLM-156 (note)
+- Access: book; the preview chapter is open.
+- Library: not kept.
+- Read so far (by the project): the preview chapter only, 2026-10-25 (a Sonnet sub-agent): rivers discharge "about 36 thousand km3 of freshwater and more than 20 billion tons (Bt) of solid and dissolved material to the world ocean".
+
+### Treguer2021
+- Reference: Tréguer, P. J. et al. (2021). Reviews and syntheses: The biogeochemical cycle of silicon in the modern ocean. Biogeosciences 18:1269-1289 (title and pages from memory).
+- DOI or URL: https://bg.copernicus.org/articles/18/1269/2021/bg-18-1269-2021.pdf
+- Cited as: "Tréguer et al. 2021".
+- Ledger ids: none (erosion-and-sediment.md "Chemical denudation", Limits)
+- Access: open.
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): "The best estimate for the riverine input (FR) of dSi ... remains at FR dSi = 6.2(+-1.8) Tmol Si yr-1 (Tréguer and De La Rocha, 2013)" (a restatement; the 2013 paper not read).
+
+## India's post-contact convergence (the M5 lane's collision-duration readout), added 2026-10-25
+
+Earth's convergence after India touched Asia, the readout the collision-duration diagnosis sets the model's long collisions against (build log 2026-10-25, M5 lane). Read by a Sonnet sub-agent of the M5 lane on 2026-10-25. The 2,500 to 3,600 km quoted earlier from memory is replaced by these readings.
+
+### vanHinsbergen2012
+- Reference: van Hinsbergen, D. J. J., Lippert, P. C., Dupont-Nivet, G., McQuarrie, N., Doubrovine, P. V., Spakman, W. and Torsvik, T. H. (2012). Greater India Basin hypothesis and a two-stage Cenozoic collision between India and Asia. Proceedings of the National Academy of Sciences 109(20):7659-7664 (authors and title from memory).
+- DOI or URL: http://www.earthdynamics.org/papers-ED/2012/2012-vanHinsbergen-etal-PNAS.pdf
+- Cited as: "van Hinsbergen et al. 2012".
+- Ledger ids: none yet (a readout)
+- Access: open (the group's page).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): "Since 52 Ma, the two plates have converged up to 3,600 +-35 km, yet the upper crustal shortening documented from the geological record of Asia and the Himalaya is up to approximately 2,350-km less"; "2,860 +-30 and 3,600 +-35 km of post-52 Ma India-Asia convergence for the western and eastern Himalayan syntaxes, respectively"; "Since approximately 25-20 Ma, the total amount of plate convergence is up to 1,300-1,000 km in the eastern Himalaya"; "hard" collision "around 25-20 Ma".
+
+### vanHinsbergen2011
+- Reference: van Hinsbergen, D. J. J., Kapp, P., Dupont-Nivet, G., Lippert, P. C., DeCelles, P. G. and Torsvik, T. H. (2011). Restoration of Cenozoic deformation in Asia and the size of Greater India. Tectonics 30:TC5003 (authors and title from memory).
+- DOI or URL: http://www.earthdynamics.org/papers-ED/2011/2011-vanHinsbergen_etal_Tectonics.pdf
+- Cited as: "van Hinsbergen et al. 2011".
+- Ledger ids: none yet (a readout)
+- Access: open (the group's page).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): "since 50 Ma ~2400-3200 km (west to east) of India-Asia convergence occurred, much more than the 450-900 km of documented Himalayan shortening"; "600-750 km of N-S Cenozoic shortening across, and north of, the Tibetan Plateau. The Pamir-Hindu Kush region accommodated ~1050 km of N-S convergence"; "the India-Asia convergence rate around 50 Ma was more than 150 km/Myr".
+
+### MolnarStock2009
+- Reference: Molnar, P. and Stock, J. M. (2009). Slowing of India's convergence with Eurasia since 20 Ma and its implications for Tibetan mantle dynamics. Tectonics 28:TC3001 (title from memory).
+- DOI or URL: https://authors.library.caltech.edu/records/zhah0-71484/files/Molnar2009p2548Tectonics.pdf
+- Cited as: "Molnar & Stock 2009".
+- Ledger ids: none yet (a readout)
+- Access: open (Caltech's repository).
+- Library: not kept.
+- Read so far (by the project): full text, 2026-10-25 (a Sonnet sub-agent): "India's convergence rate with Eurasia slowed by more than 40% between 20 and 10 Ma"; "India collided with southern Eurasia at 45-55 Ma"; "drops in convergence rates of 30-38% (118 to 83 mm a-1 in northeastern India and 109 to 59 mm a-1 in northwestern India) at 40-45 Ma and of 45% (59-34 and 83-44 mm a-1) between 10 and 20 Ma"; "the essentially constant rate since 11 Ma".
