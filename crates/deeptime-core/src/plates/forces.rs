@@ -246,15 +246,87 @@ pub fn incipient(k: &TectonicParams, slab_km: f64) -> bool {
     slab_km < incipient_km(k)
 }
 
+/// Law 3 (`tectonics.incipient_resistance_by_thickness`, PLT-657): the incipient resistance of
+/// floor of [`INCIPIENT_CASE1_AGE_MYR`], N per metre at Earth's gravity. Gurnis, Hall & Lavier
+/// 2004 [59], their Case 1 (30 Myr homogeneous lithosphere): a peak of "3 × 10^12 N/m".
+pub const INCIPIENT_CASE1_N_M: f64 = 3.0e12; // ledger: PLT-657
+/// … the age of Case 1's floor, Myr ([46]: "Case 1, with an age of 30 Myr").
+pub const INCIPIENT_CASE1_AGE_MYR: f64 = 30.0; // ledger: PLT-657
+/// … and the growth of the force with the floor's thickness: [46], "the force required to cause
+/// one plate to underthrust another increases by a factor of 2.2 as He increases" from 8.5 km (7
+/// Myr floor) to 15 km (30 Myr floor), with both friction and cohesion. A power law through the
+/// two points, F ∝ He^n with n = ln 2.2 / ln(15 / 8.5) ≈ 1.39; beyond 15 km it is extrapolated
+/// (the agent's reading; [67] puts the initial bending force "between 10^12 and 10^13 N/m").
+pub const INCIPIENT_THICKNESS_FACTOR: f64 = 2.2; // ledger: PLT-657
+/// … the thin end of [46]'s pair, km …
+pub const INCIPIENT_THIN_KM: f64 = 8.5; // ledger: PLT-657
+/// … and the thick end, km.
+pub const INCIPIENT_THICK_KM: f64 = 15.0; // ledger: PLT-657
+
+/// The exponent n of law 3's power law in the elastic thickness (PLT-657), about 1.39.
+pub fn incipient_thickness_exponent() -> f64 {
+    INCIPIENT_THICKNESS_FACTOR.ln() / (INCIPIENT_THICK_KM / INCIPIENT_THIN_KM).ln()
+}
+
+/// Law 3's factor on Case 1's force for floor of `age_myr` (PLT-657): (Te(age) / Te(30 Myr))^n,
+/// with Te the model's elastic thickness of ocean floor, 2.7 √age km and at most 40 km (ISO-048,
+/// ISO-049, `surface::flexure`): 0.47 at 10 Myr, 1 at 30, 1.98 at 80, 3.46 at 180, and at most
+/// 3.98 from 219 Myr on.
+pub fn thickness_scale(age_myr: f64) -> f64 {
+    let f = crate::surface::flexure::FlexureParams::default();
+    let te = |a: f64| f.elastic_thickness_km(true, a, f64::INFINITY, false);
+    (te(age_myr) / te(INCIPIENT_CASE1_AGE_MYR)).powf(incipient_thickness_exponent())
+}
+
 /// An incipient front's resistance, N per metre of front, where the floor going under is
-/// `age_myr` old, at gravity `g`: scaled with gravity as the slab pull is (FRC-002).
-pub fn incipient_resistance_n_m(age_myr: f64, g: f64) -> f64 {
+/// `age_myr` old, at gravity `g`: scaled with gravity as the slab pull is (FRC-002). Floor
+/// younger than [`SLAB_BUOYANT_MYR`] is a ridge (PLT-613); older floor resists with PLT-612's
+/// single value, or with law 3 on, Case 1's force scaled with its elastic thickness
+/// ([`thickness_scale`], PLT-657).
+pub fn incipient_resistance_n_m(k: &TectonicParams, age_myr: f64, g: f64) -> f64 {
     let f = if age_myr < SLAB_BUOYANT_MYR {
         INCIPIENT_RIDGE_N_M // ledger: PLT-613
+    } else if k.incipient_resistance_by_thickness {
+        INCIPIENT_CASE1_N_M * thickness_scale(age_myr) // ledger: PLT-657
     } else {
         INCIPIENT_RESISTANCE_N_M // ledger: PLT-612
     };
     f * g / G_EARTH
+}
+
+/// Law 2's margin strength (PLT-658, the fallback): the integrated strength, N per metre of
+/// margin, that a slab's pull must beat to cut a passive margin's floor off its continent, where
+/// the floor at the cut is `age_myr` old, at gravity `g`. No source read gives a verified
+/// integrated strength of a passive margin, so this is PLT-517's transference force (3 × 10¹²
+/// N/m, Gurnis et al. 2004's Case 1 peak), scaled with the floor's thickness by law 3 when it is
+/// on (and constant when it is off). It is the fallback the coordinator set (2026-10-25); the
+/// age dependence of Zhou et al. 2020's propagation (old slabs propagate, young ones break off)
+/// does not follow from it.
+pub fn margin_strength_n_m(k: &TectonicParams, age_myr: f64, g: f64) -> f64 {
+    let s = if k.incipient_resistance_by_thickness {
+        thickness_scale(age_myr.max(SLAB_BUOYANT_MYR))
+    } else {
+        1.0
+    };
+    super::collision::TRANSFERENCE_FORCE_N_M * s * g / G_EARTH // ledger: PLT-658, PLT-517
+}
+
+/// Law 2's pull along a margin (PLT-656): the slab pull per metre (FRC-002, FRC-004) of a
+/// slab `slab_km` long of floor `age_myr` old at gravity `g`, the share `cos_theta` of it
+/// that acts across the margin (no pull for cos θ ≤ 0).
+pub fn margin_pull_n_m(
+    k: &TectonicParams,
+    slab_km: f64,
+    age_myr: f64,
+    cos_theta: f64,
+    g: f64,
+) -> f64 {
+    let depth = k.slab_depth_km.max(1.0);
+    SLAB_PULL_N_M * g / G_EARTH
+        * k.slab_pull
+        * slab_weight(age_myr)
+        * (slab_km.max(0.0).min(depth) / depth)
+        * cos_theta.max(0.0)
 }
 
 /// The ridge-push coefficient `C` of the sea floor's potential energy, N/m³: a floor `d` metres
@@ -1616,7 +1688,8 @@ fn balance_step(
                     // collision's; booked with the collision resistance.
                     if young.contains(&ci) {
                         let force =
-                            incipient_resistance_n_m(su.age_myr(env.t_myr), env.gravity) * sf.len_m;
+                            incipient_resistance_n_m(k, su.age_myr(env.t_myr), env.gravity)
+                                * sf.len_m;
                         let speed = sf.conv.max(floor) * 1.0e-3 / YEAR_S;
                         *incipient_n.entry(ci).or_default() += force;
                         bal.add_link(Link {
@@ -2160,6 +2233,59 @@ mod tests {
         assert!((slab_weight(80.0) - 1.0).abs() < 1e-12);
         assert!((slab_weight(20.0) - 0.5).abs() < 1e-12);
         assert!((slab_weight(400.0) - 1.5).abs() < 1e-12);
+    }
+
+    /// Law 3 (PLT-657) against its source, Gurnis, Hall & Lavier 2004: the power law runs
+    /// through [46]'s two points (a factor of 2.2 from an elastic thickness of 8.5 km to 15 km),
+    /// it is Case 1's 3 × 10¹² N/m at 30 Myr ([59]), it grows with age to the model's 40 km cap
+    /// (ISO-049, from 219 Myr) and stays inside [67]'s "between 10^12 and 10^13 N/m" for the
+    /// floor that sinks, up to 180 Myr. The ridge (PLT-613) and gravity scaling are unchanged;
+    /// law 2's margin strength (PLT-658) is PLT-517's force scaled the same way, constant with
+    /// law 3 off.
+    #[test]
+    fn law_3_scales_the_incipient_resistance_with_the_elastic_thickness() {
+        let n = incipient_thickness_exponent();
+        assert!(
+            ((INCIPIENT_THICK_KM / INCIPIENT_THIN_KM).powf(n) - INCIPIENT_THICKNESS_FACTOR).abs()
+                < 1e-12
+        );
+        assert!((n - 1.388).abs() < 0.001, "{n}");
+        assert!((thickness_scale(30.0) - 1.0).abs() < 1e-12);
+        let mut last = 0.0;
+        for age in [10.0, 20.0, 30.0, 80.0, 180.0, 219.0] {
+            let s = thickness_scale(age);
+            assert!(s > last, "not growing at {age} Myr: {s}");
+            last = s;
+        }
+        // The model's Te at 10 Myr is √(10/30) of 30 Myr's.
+        assert!((thickness_scale(10.0) - (10.0f64 / 30.0).sqrt().powf(n)).abs() < 1e-12);
+        assert!((thickness_scale(400.0) - thickness_scale(250.0)).abs() < 1e-12);
+        let on = TectonicParams::default();
+        let off = TectonicParams {
+            incipient_resistance_by_thickness: false,
+            ..on.clone()
+        };
+        let g = G_EARTH;
+        assert!((incipient_resistance_n_m(&on, 30.0, g) - 3.0e12).abs() < 1.0);
+        for age in [10.0, 80.0, 180.0] {
+            let f = incipient_resistance_n_m(&on, age, g);
+            assert!((1.0e12..=1.1e13).contains(&f), "{age} Myr: {f:e}");
+            assert_eq!(incipient_resistance_n_m(&off, age, g), INCIPIENT_RESISTANCE_N_M);
+            assert!((incipient_resistance_n_m(&on, age, 0.5 * g) - 0.5 * f).abs() < 1.0);
+        }
+        assert_eq!(incipient_resistance_n_m(&on, 5.0, g), INCIPIENT_RIDGE_N_M);
+        // Law 2's margin strength: PLT-517 at 30 Myr, Case 1's growth with age, constant off.
+        let t = super::super::collision::TRANSFERENCE_FORCE_N_M;
+        assert!((margin_strength_n_m(&on, 30.0, g) - t).abs() < 1.0);
+        assert!(margin_strength_n_m(&on, 120.0, g) > margin_strength_n_m(&on, 40.0, g));
+        assert_eq!(margin_strength_n_m(&off, 120.0, g), t);
+        assert_eq!(margin_strength_n_m(&on, 2.0, g), margin_strength_n_m(&on, 10.0, g));
+        // Law 2's pull: FRC-002 at 80 Myr with a full slab, along the margin's normal only.
+        let full = on.slab_depth_km;
+        assert!((margin_pull_n_m(&on, full, 80.0, 1.0, g) - SLAB_PULL_N_M).abs() < 1.0);
+        assert!((margin_pull_n_m(&on, full / 2.0, 80.0, 0.5, g) - SLAB_PULL_N_M / 4.0).abs() < 1.0);
+        assert_eq!(margin_pull_n_m(&on, full, 80.0, -0.3, g), 0.0);
+        assert_eq!(margin_pull_n_m(&on, full, 5.0, 1.0, g), 0.0);
     }
 
     #[test]

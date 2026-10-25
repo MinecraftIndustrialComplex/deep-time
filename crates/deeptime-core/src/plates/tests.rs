@@ -5361,12 +5361,20 @@ fn cumulative_convergence_ends_the_incipient_stage() {
 #[test]
 fn a_ridge_under_compression_resists_less() {
     let g = forces::G_EARTH;
-    assert_eq!(forces::incipient_resistance_n_m(80.0, g), 2.5e12);
-    assert_eq!(forces::incipient_resistance_n_m(5.0, g), 5.0e11);
-    assert_eq!(
-        forces::incipient_resistance_n_m(80.0, 0.5 * g),
-        0.5 * forces::incipient_resistance_n_m(80.0, g)
-    );
+    let on = crate::params::TectonicParams::default();
+    let off = crate::params::TectonicParams {
+        incipient_resistance_by_thickness: false,
+        ..on.clone()
+    };
+    assert_eq!(forces::incipient_resistance_n_m(&off, 80.0, g), 2.5e12);
+    assert_eq!(forces::incipient_resistance_n_m(&off, 5.0, g), 5.0e11);
+    assert_eq!(forces::incipient_resistance_n_m(&on, 5.0, g), 5.0e11);
+    for k in [&on, &off] {
+        assert_eq!(
+            forces::incipient_resistance_n_m(k, 80.0, 0.5 * g),
+            0.5 * forces::incipient_resistance_n_m(k, 80.0, g)
+        );
+    }
     let resistance = |age: f64| {
         let (p, mut st, geo, pos, _) = an_incipient_reference(true, 40.0, 0.5, age);
         let stage = PlatesStage::new(p.clone());
@@ -5377,7 +5385,8 @@ fn a_ridge_under_compression_resists_less() {
     let (ridge, old) = (resistance(5.0), resistance(forces::SLAB_AGE_REF_MYR));
     eprintln!("the incipient resistance: floor 5 Myr old {ridge:.4e} N, 80 Myr {old:.4e} N");
     assert!(old > 0.0);
-    let want = forces::INCIPIENT_RIDGE_N_M / forces::INCIPIENT_RESISTANCE_N_M;
+    let want = forces::INCIPIENT_RIDGE_N_M
+        / forces::incipient_resistance_n_m(&on, forces::SLAB_AGE_REF_MYR, g);
     assert!(
         (ridge / old - want).abs() < 1e-9,
         "{} of the old floor's",
@@ -5585,7 +5594,11 @@ fn an_incipient_front_takes_no_forsyth_uyeda_friction() {
     // Incipient: the incipient resistance alone.
     assert_eq!(fr(&young, over, under), 0.0);
     assert_eq!(fr(&young, under, over), 0.0);
-    let expect = forces::incipient_resistance_n_m(forces::SLAB_AGE_REF_MYR, g) * front_m;
+    let expect = forces::incipient_resistance_n_m(
+        &crate::params::TectonicParams::default(),
+        forces::SLAB_AGE_REF_MYR,
+        g,
+    ) * front_m;
     assert!(
         ((incip - expect) / expect).abs() < 1e-9,
         "{incip} against {expect}"

@@ -1023,6 +1023,28 @@ pub struct TectonicParams {
     /// overlap, which put the parent under in 1,494 of 1,998 such contacts on base15 (build log
     /// 2026-10-25). ledger: PLT-655
     pub initiation_polarity_by_age: bool,
+    /// Along-strike propagation of subduction onto a passive margin (the floor-age lane's law 2,
+    /// 2026-10-25; Zhou, Li, Gerya & Stern 2020: "With increasing slab pull, the subduction zone
+    /// propagates laterally"; Govers & Wortel 2005's STEP tear): where a plate's trench reaches
+    /// within reach of the plate's own continental margin and its slab is past the critical
+    /// convergence, the margin's ocean floor is cut off the continent along the margin, with a
+    /// tear from the margin to the plate's nearest other boundary, when the slab's pull along
+    /// the cut beats the margin's strength (`forces::margin_strength_n_m`, the fallback of
+    /// PLT-658). The continent and the floor beyond the cut become a new plate K' that the
+    /// trench's plate U keeps converging on; each further critical convergence (100 km) past the
+    /// cut, under the same force test, moves the next stretch of the margin's floor from K' to U.
+    /// The rule replaces PLT-064's clearance: with it on, a new subduction initiation keeps one
+    /// lattice spacing from a front, not `subduction_initiation_clearance_km` (Crameri et al.
+    /// 2020: most initiations start within 500 km of another subduction zone). ledger: PLT-656
+    pub margin_propagation: bool,
+    /// Law 3: the resistance an incipient subduction zone pushes against scales with the elastic
+    /// thickness of the floor going under (Gurnis, Hall & Lavier 2004 [46]: the force to start
+    /// underthrusting "increases by a factor of 2.2" from 7 Myr to 30 Myr floor, elastic thickness
+    /// 8.5 km to 15 km, anchored on their Case 1 peak of 3 × 10¹² N/m for 30 Myr floor, [59]),
+    /// with the model's elastic thickness law (ISO-048, ISO-049). It replaces PLT-612's single
+    /// 2.5 × 10¹² N/m above the ridge floor (PLT-613, kept) and scales law 2's margin strength.
+    /// Off, PLT-612 as before. ledger: PLT-657
+    pub incipient_resistance_by_thickness: bool,
     /// Subduction initiation off the passive margin (V1 gap 2's stage C1): the old floor within
     /// the reach of the arc the new trench builds (`arc_distance_km` + `arc_width_km`, and one
     /// lattice spacing for where on the lattice the front falls; great circle) of the plate's
@@ -1254,6 +1276,8 @@ impl Default for TectonicParams {
             initiation_slab_km: 150.0,            // ledger: PLT-270
             incipient_subduction: true,           // ledger: PLT-610 (on since 2026-10-25)
             initiation_polarity_by_age: true,     // ledger: PLT-655
+            margin_propagation: true,             // ledger: PLT-656
+            incipient_resistance_by_thickness: true, // ledger: PLT-657
             subduction_initiation_offshore: true, // ledger: PLT-503 (on since 2026-10-23)
             initiation_stress_mpa: 20.0, // ledger: PLT-505 (game-choice; on since 2026-10-23)
             transference: false,         // ledger: PLT-516
