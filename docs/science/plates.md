@@ -4786,7 +4786,8 @@ by PLT-413), L the lithosphere's 100 km (FRC-010), and η = η_0 e^(a / τ_s) wi
 the column's last orogenic uplift and τ_s = 62.8 Myr, McKenzie (1978)'s thermal time (PLT-415: the
 exponential form is the model's; η is 100 times η_0 at 290 Myr). A column releases the larger of
 this and the threshold law's q. Crust no orogeny raised (cratons, platforms) does not flow: the
-audit's minimal strength field. At η_0 = 10²² Pa s a 4.2 km column under a sea at the datum
+audit's minimal strength field (since 2026-10-25 the sheet reads the lithosphere's thermal state in
+the tag's place: "The collapse reads the thermal state", PLT-581). At η_0 = 10²² Pa s a 4.2 km column under a sea at the datum
 (ΔU about 5 × 10¹² N/m, England & Houseman's figure) thins 3.9 % per Myr as its orogeny ends
 (an e-fold of 26 Myr), a 2 km one 1.3 % (75 Myr); a 255 m eclogite root pull (PLT-281) brings the
 test column to 3.56 % per Myr.
@@ -8586,9 +8587,301 @@ run-checks against fl-ends' 195 (base10 567 of 792).
 **Recommendation.** On by default (done in this branch): the law is the margin standing over its
 slab, as the arc does; the test bounds hold, nothing diverges or binds on the pool, and no V1 measure
 moves. The cordillera's lost crust is the range that stood round the slab's ends, not to be made up
-with a knob. Left on the whole distance field, and a question for the coordinator: the
-subduction-zone flag and the convergence, obliquity and slab age written on each reached sample
-(their readers, the volcanoes and the deposits, would see a subduction zone past a front's ends).
+with a knob.
+
+**Open item, for a later step.** The subduction-zone flag and the convergence, obliquity and slab
+age written on each reached sample still run on the whole distance field, so their readers (the
+volcanoes and the deposits) see a subduction zone past a front's ends. They make no relief or crust
+of their own; the coordinator's call (2026-10-25): leave them until those readers are checked, then
+stop them at the slab's ends in a step of their own.
+
+### The ocean-continent dip on base10's maps (2026-10-25, no simulation)
+
+Step 8 left open what turns the mature ocean-continent fronts transform at a resampling, and step 9's
+two-plate probe found no dip on a head-on margin. This reads base10's 24 runs (key 37c894cc0de0,
+`+DEEPTIME_CRUST_BUDGET=1`) without a new run: the records over their 1,140 resamplings after the
+first 100 Myr, and the 50-Myr maps, whose flags carry the boundary mix's fronts (256 on the
+overriding side of a subduction front) and whose current geometry (the Delaunay triangulation of
+the visible samples) is what a resampling rebuilds the lattice from.
+
+**The records** (the step before a resampling against the first step on the new lattice, means):
+the ocean-continent front 56,100 km, -12,900; ocean-ocean +3,600; judged a transform +12,400; rift
+-9,100; ridge +8,800; the lost ocean-continent length is the slab's 600 km or longer (-14,800) and
+the contacts' 50 Myr or older, as on base7. The plates' slab pull falls by 32 % and comes back over
+the cycle; the visible-weighted speed does not move (about 21 mm/yr). The plate count's change does
+not explain it.
+
+**The maps**, binned by Myr since the last resampling (a 2-Myr map is the first step on the new
+lattice), samples a map; a front is on the current boundary when it has a Delaunay neighbour of
+another plate; ocean-continent as the mix splits it (continental crust of its plate within two
+steps):
+
+| Myr since the resampling | 2 | 4 to 6 | 8 to 12 | 14 on |
+|---|---|---|---|---|
+| maps | 47 | 98 | 100 | 115 |
+| front on the current boundary | 1,204 | 1,243 | 1,212 | 1,185 |
+| of it ocean-continent / ocean-ocean | 572 / 631 | 610 / 633 | 617 / 595 | 652 / 533 |
+| front off the current boundary | 77 | 100 | 151 | 230 |
+| of it ocean-continent / ocean-ocean | 43 / 34 | 56 / 44 | 95 / 56 | 171 / 59 |
+| off fronts' distance to the nearest sample of another plate, mean km | 134 | 168 | 228 | 304 |
+| of the off fronts, a hole (no sample within 70 km) on the way there | 0.006 | 0.069 | 0.181 | 0.293 |
+| current boundary samples | 7,864 | 7,450 | 6,832 | 6,538 |
+| holes (no visible sample within 70 km), 10⁶ km² | 1.5 | 8.6 | 22.7 | 41.0 |
+| of them within 190 km of both a trench and a front sample | 0.12 | 0.38 | 0.66 | 0.92 |
+
+The maps show the records' dip: the ocean-continent front 823 a map late in a cycle against 615 on
+the new lattice (-25 %; the records -23 %), ocean-ocean 592 against 665.
+
+- **The fronts on the current boundary do not dip** (1,185 against 1,204). Within them 80 a map
+  move from ocean-continent to ocean-ocean (652 to 572, 533 to 631): fronts the new lattice puts
+  farther than two steps from their plate's continent. The records' ocean-ocean fronts move off the
+  coast the same way (the 150 km band -3,100 km, the 300, 600 and 1,200 km bands +2,500, +2,200
+  and +1,600).
+- **The rest, three fifths of the dip (128 of 208 a map), is fronts off the current boundary**:
+  overriding samples that `subduction::fronts_begin` and `dynamics::boundary_mix` still class a
+  front through a lattice neighbour of the other plate (both take such a neighbour whether it is
+  hidden or not), with no sample of another plate beside them now. They build up through the cycle
+  (6 % of the front two Myr after a resampling, 16 % late; 7 % to 21 % of the ocean-continent
+  front), lie deeper behind the boundary as it goes (134 to 304 km), and the new lattice drops
+  them. They are a band behind a real front, not a second front: 99 % of those with only their
+  own plate on the way have an on-boundary front sample between them and the other plate, 90 % are
+  of their plate's biggest group. Late in a cycle 29 % face a hole, crust of the subducting plate
+  that went under and that no overriding sample covers (0.9 × 10⁶ km² of hole beside both a trench
+  and a front, against 0.12 on a new lattice), which a resampling fills with new ocean floor.
+- **The gain in the boundary judged a transform is not on the maps** (they carry no class but the
+  fronts). It comes with the current boundary's return at a resampling (6,538 boundary samples a
+  map late in a cycle, 7,864 on the new lattice), when the holes, 41 × 10⁶ km² late in a cycle and
+  59 % of them beside divergent samples, are filled with ocean floor and ridge segments. So step
+  8's "to the boundary judged a transform" is a match of totals, not shown margin by margin.
+
+So the late-cycle ocean-continent front and the slab pull read on it carry a band the frozen
+lattice keeps behind the margin, up to a fifth of that front. A likely source, not shown: one-way
+subduction (PLT-542) keeps the subducting plate's crust hidden once it went under, so where the
+convergence is oblique to an irregular margin its trench follows the envelope of the overriding
+outline swept along the motion, and the overriding samples in the lee keep only hidden neighbours
+of it. The maps hold visible samples only, so whether the band's neighbours are hidden or moved off
+is not in them; that, and the margins followed through a resampling, needs a trace of the lattice
+at a few resamplings of one run (measurement only), which is the coordinator's to call. The
+scripts are `build/front/recdip.py`, `recdip2.py`, `mapdip.py` to `mapdip4.py` (not kept).
+
+### The front trace (2026-10-25, measurement only, PLT-580)
+
+Two questions the maps cannot answer, asked of one run behind one variable,
+`DEEPTIME_FRONT_TRACE=<folder>` (`plates/front_trace.rs`); no rule reads either, and the world is
+the same with it on or off (the test `the_front_trace_changes_nothing`; on the pool, `pool.sh alias`
+of the commit against master's key).
+
+- **The dip trace**: are the band's front neighbours hidden? At the step a resampling ends, the step
+  after it and halfway through the next cycle, each visible sample with a lattice neighbour of
+  another plate gets a row: its class from the boundary mix, the front `subduction::fronts_begin`
+  found for it (that neighbour hidden or not, its distance now, the convergence along the
+  boundary's normal, the contact, its slab's length and age), the neighbour the mix's front reads,
+  and the distance to the nearest visible sample of another plate.
+- **The thickening attribution**: which process last took a continental column past 45 km (the
+  lower edge of the crust budget's 45-55 km bin; a measurement threshold, game-choice), and what
+  has thickened it since. The step's processes are bracketed as the gap budget brackets them; a
+  resampling hands each new sample the record of its blend's major corner and books the blend and
+  the crust accreted under it (the stack) as two parts of their own. Every 50 Myr a file holds the
+  visible continental samples with their record, orogeny tag and age, lithosphere and keel.
+
+#### What the trace found (supercontinent seed 1, 300 Myr, 2026-10-25)
+
+One run (`pool.sh run fl-trace`, key 188b5e2f2852, aliased to master's base12 runs), read with
+`build/front/trdip.py`, `trdip2.py` and `tratt.py` (not kept). The lattice spacing is about 60 km.
+
+*The dip.* The band is real and it is the frozen lattice. Taking "on the boundary" as a visible
+sample of another plate within 1.5 spacings now, 91 % of the off-boundary fronts read a hidden front
+neighbour, and so do 90 % of the on-boundary fronts by a cycle's end; the frozen front neighbour
+stands 1,015 km away now (median) off the boundary and 704 km on it at a cycle's end, against 60 to
+70 km on a new lattice. The ocean-continent fronts per step, and what a rule on the current geometry
+would keep:
+
+| rule | end of a cycle | new lattice | mid-cycle | change at a resampling |
+|---|---|---|---|---|
+| today's (a lattice neighbour of another plate) | 708 | 498 | 590 | −29.7 % |
+| a visible lattice neighbour of another plate | 94 | 97 | 77 | |
+| a visible sample of another plate within 2 spacings now | 485 | 469 | 510 | −3.4 % |
+| within 3 spacings | 551 | 494 | 558 | −10.3 % |
+
+On a new lattice 97 % of the ocean-continent fronts have a visible sample of another plate within
+2.25 spacings. Two spacings is the rule the coordinator took on 2026-10-25 (below, "The front on the
+current geometry").
+
+*The thickening.* At 300 Myr the land above 2 km is 0.125 of the land: 4,113 samples, of them 2,813
+Himalayan, 546 Andean and 754 untagged. 377 untagged columns stand at 49 to 51 km, T_c (50 km in
+the run), every one above 2 km: 93.6 % crossed 45 km in the founder (`collapse::founder`, the
+excess over `crust_max_km` spread to continental room thinner than T_c, filled up to T_c), and 87 %
+of what they gained since came from it; their peak was 50.0 to 50.3 km. Their lithosphere is 61,
+78 and 137 km (quartiles), keel 0: hot crust, not cratons (the untagged 35 to 45 km columns are at
+225 km). The founder's receivers keep no orogeny, so PLT-415's tag gate leaves them where it put
+them. The coast with high ground (land within 1.6 spacings of the sea with land above 2 km within
+200 km; v1census's landmass test left out) is 0.231: its nearest high ground is Himalayan in 66 %
+(stamped 0, 0 and 14 Myr ago, quartiles), untagged in 22 % (parked at T_c in 5 %) and Andean in 12 %,
+68, 80 and 134 km thick. The coast cells themselves carry no front flag; 20 % carry the foreland
+flag. Coastal high ground is mostly young collision belts running out to the sea, not the parked
+columns.
+
+### The collapse reads the thermal state (2026-10-25, PLT-581)
+
+*Is the tag gate physics?* No: a stand-in. PLT-415 says why crust no orogeny raised does not flow:
+"the audit's minimal strength field: cratons and old belts stay". The tag stood for the crust's
+strength. Since ISO-112 the sheet's viscosity already reads the lithosphere's thermal age in place
+of the orogeny's, so the gate is the last place where the tag stands in for the thermal state, and
+it is wrong where the two part: crust thickened by something other than an orogeny (the founder's
+receivers, the lower-crustal flow of PLT-300, which carries no tag either) over a hot lithosphere.
+Reading the thermal state directly is the cleaner fix than handing the tag on (the coordinator's
+call of 2026-10-25: the thermal reading, not the inheritance).
+
+*The source.* Clark & Royden (2000, full text read 2026-10-25) fit the topography of eastern Tibet
+with flow in a lower-crustal channel and draw where it goes by the crust's strength, not by its
+history. Fig. 5's caption (p. 706): "Areas shaded in dark gray represent regions of cold, strong,
+continental material; light gray area represents intermediate strength; and white areas represent
+weak crustal regions. Thus, lower crust escapes from beneath thickened, elevated central plateau
+through regions where crust is weak." The Sichuan Basin is the strong case (p. 706): "the strength
+of the crust beneath the Sichuan Basin inhibits flow of lower crustal material from central Tibet".
+Their best fit had the channel "uniformly weak at the initiation of flux into the channel,
+suggesting that the low-gradient margins of Tibet were already weak before the onset of crustal
+thickening" (p. 705): the margin's crust flowed because it was weak, before any orogeny thickened
+it. Beaumont et al. (2001, author manuscript read 2026-10-25) tie the weakness to heat: the channel
+is 10¹⁹ Pa s where it is at 750 °C or more (p. 1), and "Isotherms are advected pro-ward by channel
+flow" (p. 2), so hot crust that flowed out of a belt is still hot.
+
+*The law.* With `tectonics.collapse_sheet_thermal` (on by default) and the thermal state and
+strength on, the sheet's gate on the orogeny goes: crust no orogeny raised thins at ε̇ = ΔU / (4 η L)
+too, with η = η_0 e^(t_eq / τ_s) at its lithosphere's thermal age (PLT-414, PLT-415, ISO-112). A
+craton at L_cold has an infinite thermal age, so an infinite η: it stays rigid, as the gate kept it,
+now because it is cold. A sample the state has not reached (L = 0) keeps the gate. Off, or without
+`thermal_strength`, the sheet is PLT-415's as before.
+
+*The test.* `the_founders_receivers_flow_where_the_lithosphere_is_hot` (`plates/collapse.rs`): a
+belt 95 km thick inside a continent on a 78 km lithosphere (the parked columns' median), a craton at
+L_cold beside it and a thinned margin as room. The founder fills its receivers to exactly T_c with
+no orogeny; gated (the switch off), every receiver is still at T_c after 100 Myr while the belt
+thins past it; with the switch, the hot receivers thin below T_c − 1 km and the craton's stay at
+T_c. The rate itself: a 15 km excess flows on a 78 km lithosphere, not on L_cold, not without a
+state, not with the switch off.
+
+### The front on the current geometry (2026-10-25, PLT-582)
+
+*The rule.* With `tectonics.front_current_geometry` (on by default), `subduction::fronts_begin` and
+`dynamics::boundary_mix` read an overriding sample's lattice neighbour of a subducting plate (a
+plate with an active contact under the sample's plate) as a front only while a visible sample of
+that plate stands within `subduction::trench_row_rad` of it now. The radius is two lattice spacings,
+computed from the run's spacing: one spacing for the step to the neighbour across the boundary, and
+one for the trench's single hidden row. The overlaps hide the subducting plate's edge sample once it
+crosses the overriding outline (PLT-553), so the sample that has just gone under is hidden and the
+next one in is still visible. The radius is not tuned to a length. On a new lattice, where every
+front's neighbour is beside it, 97 % of the ocean-continent fronts meet 2.25 spacings (the trace
+above). The change at a resampling falls from −29.7 % to −3.4 % at two spacings; three spacings
+keep more of the band (−10.3 %).
+
+The query runs on the step's tree of every sample, the one the overlaps search. It is asked only of
+samples that have such a neighbour, and once per plate met. The mix drops a converging neighbour by
+the same test, so a sample with nothing else across it is no boundary. It asks nothing of an
+opening or a transform between the same two plates: the gap an opening leaves between resamplings
+is the opening's, which the next resampling fills, and the boundary is there (the arm below found
+the mix asking every neighbour, and `an_opening_boundary_of_a_subducting_plate_stays_in_the_mix`
+holds it to this). The full adjacency rebuild (the lattice's edges from the current geometry) stays
+a follow-up, for a residue the trace can see; the arm found none.
+
+*The plate asked.* The trace's rule asked for a visible sample of any other plate; the code asks for
+the subducting plate itself. A third plate's crust beside an overriding sample is no slab of the
+plate the front reads, and counting it would keep a front where that plate has gone. The difference
+was not measured on the trace (the front lane's call, which can be undone).
+
+*The tests.* `an_oblique_promontory_through_a_resampling` was written first. It drives an ocean at
+50 mm/yr, 30 degrees oblique, onto a continent with a promontory 4 spacings deep and 8 wide, at
+80,000 samples, so that the forearc's reach covers the promontory. The ocean moves 12 spacings and
+the lattice is then resampled. The test was meant to show the band, and found none:
+
+- 137 fronts at every step before the resampling and 131 after it, the same with the rule off and
+  on;
+- the mix's ocean-continent boundary 10,938 km before and 10,459 km after.
+
+The forearc holds the ocean that goes down the trench along the margin (PLT-542). The promontory's
+corner, though, has no front and so no forearc. The ocean passing under it is not held, and the lee
+fills again from the ocean coming in behind, so every front keeps a visible ocean sample beside it.
+At 45 degrees the band was one front of 193 at three steps of eight. So the test holds the rule to
+what it must not do: on a live margin, oblique and irregular, it keeps every front. It does not show
+which of the planet's margins carry the trace's band.
+
+`a_consumed_slab_leaves_no_front` shows the band. It drives an ocean plate 3 spacings deep and 30
+degrees long (`a_front_of_known_length`) north under a continent at 50 mm/yr, at 20,000 samples,
+until all of the plate is under. The contact stays active, because the slab's hidden samples still
+overlap the continent. The fronts per step, off and on:
+
+| step | 1 to 3 | 4 | 5 | 6 to 9 |
+|---|---|---|---|---|
+| off | 24 | 24 | 24 | 24 |
+| on | 24 | 22 | 15 | 0 |
+
+- **Off**, the margin keeps all 24 fronts (3,832 km of ocean-continent boundary in the mix) to the
+  end, 8 Myr after the last of the slab went under.
+- **On**, the fronts fall as the slab's trailing edge reaches the trench, and are gone once it is
+  under; the mix has 0 km.
+- The live margin of the first steps keeps all 24 fronts either way.
+
+`an_opening_boundary_of_a_subducting_plate_stays_in_the_mix` holds the mix to the fronts' reading.
+On the plates of `converging_plates`, the ocean has turned 4 spacings about the x axis, so it runs
+under the continent on one half and opens a gap on the other. The contact is active. The mix's rift
+is 21,556 km with the rule off. With the rule asking every neighbour of the subducting plate, as
+the arm ran it, the rift was 12,774 km. Asking only a converging neighbour, it is 21,556 km, and the
+ocean-continent front is 21,715 km either way.
+
+### The stage's arm: the collapse and the front (2026-10-25, PLT-581 and PLT-582)
+
+The arm `fl-n2th` (source key d9242330d508) ran both switches on, as one stage: both starts, seeds 1
+to 4, 1,000 Myr, with the crust-budget env. It is read against base12's matched 8
+(`ct-base12-s1to4`). The table gives medians, with the Mann-Whitney p in brackets:
+
+| measure | base12, matched 8 | arm |
+|---|---|---|
+| land | 0.309 | 0.311 (0.96) |
+| largest landmass | 0.204 | 0.199 (0.96) |
+| continental crust under the sea | 0.198 | 0.186 (0.51) |
+| land above 2 km | 0.128 | 0.114 (0.80) |
+| coast with high ground | 0.230 | 0.218 (0.72) |
+| land under ice | 0.100 | 0.126 (0.38) |
+| collisions per 100 Myr | 1.95 | 1.60 (0.46) |
+| crust's net change | −0.065 | −0.072 (0.80) |
+| the guard's worst, m | 10,105 | 10,632 (0.28) |
+| plate excess over Airy, m | 2,782 | 2,641 (0.65) |
+
+- **Against base12's 24 runs**, land above 2 km goes from 0.128 to 0.114 (p 0.56), and coast with
+  high ground from 0.229 to 0.218 (p 0.48).
+- Both arms meet 5 criteria per run. Neither has a step beyond two Earth reliefs.
+- The sea over the datum is 250 m after 100 Myr and 352 m at the end, against 297 m and 442 m.
+
+Nothing moved significantly, so the switches were not split into separate arms.
+
+*The collapse.* Continental columns at T_c (49 to 51 km of crust) that no orogeny raised, on the
+t = 0 map, are the founder's parked receivers. base12's runs have 262 such samples (the mean; the
+median is 274), 0.84 % of the land. The arm has 149 (median 110), 0.47 % of the land. Most of them
+stand above 2 km in both arms: 244 of base12's and 145 of the arm's.
+
+*The front at a resampling.* This is the mix's ocean-continent boundary at the step of a resampling
+and the steps after it, over 378 resamplings (base12) and 379 (the arm).
+
+- **base12.** 55,829 km at the resampling, then −21.9 % one step later and −14.0 % three steps
+  later. Through a cycle it grows from 43,868 km (1 to 2 Myr after a resampling) to 56,073 km at the
+  next (+28 %). The loss at a resampling is in fast-converging fronts (40 mm/yr or more across the
+  boundary: −11,051 km), the band reading a neighbour that went under and on.
+- **The arm.** 38,806 km at the resampling, then +5.8 % and +12.5 %. Through a cycle it runs from
+  41,311 km to 38,997 km (−6 %). The fast-converging change is +164 km.
+
+What the arm gains at a resampling is new contacts, with no slab yet: +3,078 km, where base12 gains
++3,187 km. So the band is gone, and nothing is left that calls for the full adjacency rebuild.
+
+*Trench share of the coast.* M5's attribution reads the share of the coast within 200 km of a
+trench on the t = 0 maps. It is 0.238 for base12's matched 8 and 0.256 for the arm (medians,
+p 0.33). Earth's is 0.122, so the rule leaves the excess where it was.
+
+*The mix's records.* Through each cycle, the arm's records lost a fifth of the ridge length: from
+103,703 km at 1 to 2 Myr after a resampling to 84,222 km at the next, where base12 held 108,000 to
+116,000 km. The mix had asked the rule of every neighbour of a subducting plate, including one that
+opens. It now asks only a converging neighbour. The mix is measurement only, so the arm's planet
+stands as measured, but its records' ridge, rift and other lengths are the old reading's.
+
 
 ## Plate speed (2026-10-25)
 

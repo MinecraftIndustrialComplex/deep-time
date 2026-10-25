@@ -451,6 +451,9 @@ pub(super) struct Sheet {
     /// (ledger: ISO-110), and with `thermal_strength` its thermal age stands for the orogeny's
     /// (ledger: ISO-112).
     thermal: super::thermal::Switches,
+    /// `collapse_sheet_thermal` with `thermal_strength`: crust no orogeny raised flows at its
+    /// lithosphere's thermal age too (ledger: PLT-581).
+    untagged: bool,
 }
 
 impl Sheet {
@@ -480,14 +483,18 @@ impl Sheet {
             z_0,
             gravity: env.gravity,
             thermal: super::thermal::Switches::of(k),
+            untagged: k.collapse_sheet_thermal && k.thermal_state && k.thermal_strength,
         })
     }
 
     /// The column's thinning rate, per Myr: ε̇ = ΔU / (4 η L) for plane strain in a sheet L thick
     /// (FRC-010), ΔU its potential energy at its Airy height over the normal column's; 0 for
-    /// crust no orogeny raised or no higher than the normal column.
+    /// crust no higher than the normal column, and for crust no orogeny raised unless the sheet
+    /// reads the lithosphere's thermal state (`collapse_sheet_thermal`, PLT-581) and the column
+    /// has one.
     pub(super) fn rate_per_myr(&self, s: &Sample) -> f64 {
-        if s.orogeny == OROGENY_NONE {
+        // ledger: PLT-415 (the gate), PLT-581 (the thermal state in its place)
+        if s.orogeny == OROGENY_NONE && !(self.untagged && s.lithosphere_km > 0.0) {
             return 0.0;
         }
         let z =
@@ -821,8 +828,9 @@ pub(in crate::plates) mod tests {
 
     impl Fx {
         /// The threshold law alone: the column from the sea, its cap and the sheet (PLT-412 to
-        /// PLT-414) and the lithosphere's thermal state and strength (PLT-460, ISO-112), all on
-        /// by default since 2026-10-23, are off here, and each test turns on the law it tests.
+        /// PLT-414), the lithosphere's thermal state and strength (PLT-460, ISO-112), all on by
+        /// default since 2026-10-23, and the sheet's thermal reading (PLT-581, on since
+        /// 2026-10-25) are off here, and each test turns on the law it tests.
         pub(in crate::plates) fn new() -> Fx {
             let k = TectonicParams {
                 collapse_myr: 25.0,
@@ -834,6 +842,7 @@ pub(in crate::plates) mod tests {
                 collapse_sheet_viscosity_pa_s: 0.0,
                 thermal_state: false,
                 thermal_strength: false,
+                collapse_sheet_thermal: false,
                 ..TectonicParams::default()
             };
             Fx {
@@ -1274,6 +1283,172 @@ pub(in crate::plates) mod tests {
             old >= t_c - 50.0 && (old - none).abs() < 50.0,
             "{old} {none}"
         );
+    }
+
+    /// The founder's receivers park at T_c (the front lane's attribution, 2026-10-25: 94 % of the
+    /// untagged columns at 49-51 km on supercontinent seed 1 at 300 Myr were filled by the founder,
+    /// all above 2 km): a belt beyond `crust_max_km` inside a continent spreads its excess into the
+    /// continental crust around it, which fills to exactly T_c and keeps no orogeny. With the sheet
+    /// gated on the orogeny (`collapse_sheet_thermal` off) those columns stand still at T_c even
+    /// over a back-arc's hot lithosphere, while the belt itself, as hot and tagged, thins past T_c.
+    /// With the sheet reading the thermal state (PLT-581) the hot receivers thin on below T_c,
+    /// and the receivers on a craton (L = L_cold, an infinite thermal age) stay rigid at T_c:
+    /// lower crust escapes "through regions where crust is weak" (Clark & Royden 2000, p. 706).
+    #[test]
+    fn the_founders_receivers_flow_where_the_lithosphere_is_hot() {
+        const L_COLD: f32 = crate::plates::thermal::L_COLD_KM as f32;
+        // The craton: the continent north of the belt. The room the collapse fills (crust
+        // thinner than the normal column): the continent's margin, thinned to 20 km.
+        let craton = |p: DVec3| p.y >= 0.935;
+        let belt = |p: DVec3| p.x < -0.3 && p.y > 0.9 && p.y < 0.93;
+        let thin = |p: DVec3| p.y > 0.766 && p.y < 0.86;
+        let run = |thermal: bool| {
+            let mut fx = Fx::new();
+            fx.k.collapse_thickness_km = 50.0;
+            fx.k.collapse_sheet_viscosity_pa_s = 1.0e22;
+            fx.k.thermal_state = true;
+            fx.k.thermal_strength = true;
+            fx.k.collapse_sheet_thermal = thermal;
+            let t_c = fx.k.collapse_thickness_km * 1000.0;
+            // A belt inside the continent (which is y > 0.766), 95 km thick and just raised.
+            let mut st = planet(&fx.geo, belt, 60_000.0);
+            for (i, s) in st.samples.iter_mut().enumerate() {
+                if s.kind == CONTINENTAL {
+                    let p = fx.geo.points()[i];
+                    // A back-arc's hot lithosphere under the rest of the continent (the parked
+                    // columns' median on the run was 78 km), a craton's north of the belt.
+                    s.lithosphere_km = if craton(p) { L_COLD } else { 78.0 };
+                    if belt(p) {
+                        s.orogeny = OROGENY_HIMALAYAN;
+                        s.orogeny_myr = 0.0;
+                    }
+                    if thin(p) {
+                        let f = 20_000.0 / s.thickness_m;
+                        for x in &mut s.pools {
+                            *x *= f;
+                        }
+                        s.thickness_m = s.pools.iter().sum();
+                    }
+                }
+            }
+            let before = st.samples.clone();
+            founder(&mut st, &fx.geo, &fx.env(1), &mut Collapse::default(), 0.0);
+            let filled: Vec<usize> = (0..st.samples.len())
+                .filter(|&i| {
+                    !belt(fx.geo.points()[i])
+                        && before[i].kind == CONTINENTAL
+                        && st.samples[i].thickness_m > before[i].thickness_m + 1000.0
+                })
+                .collect();
+            for &i in &filled {
+                let s = &st.samples[i];
+                assert!(f64::from(s.thickness_m) <= t_c + 1.0, "{}", s.thickness_m);
+                assert_eq!(s.orogeny, OROGENY_NONE);
+            }
+            // Filled to exactly T_c, but for the last few the excess ran out on.
+            let receivers: Vec<usize> = filled
+                .iter()
+                .copied()
+                .filter(|&i| f64::from(st.samples[i].thickness_m) >= t_c - 1.0)
+                .collect();
+            assert!(
+                receivers.len() * 10 >= filled.len() * 9,
+                "{} {}",
+                receivers.len(),
+                filled.len()
+            );
+            let crust0 = crust_m(&st);
+            // A hundred Myr of collapse.
+            for step in 2..=51 {
+                founder(
+                    &mut st,
+                    &fx.geo,
+                    &fx.env(step),
+                    &mut Collapse::default(),
+                    0.0,
+                );
+                step_once(&fx, &mut st, step);
+            }
+            assert!((crust_m(&st) - crust0).abs() < 1e-6 * crust0, "volume kept");
+            let (cold, hot): (Vec<usize>, Vec<usize>) =
+                receivers.iter().partition(|&&i| craton(fx.geo.points()[i]));
+            let km = |set: &[usize]| -> Vec<f64> {
+                set.iter()
+                    .map(|&i| f64::from(st.samples[i].thickness_m))
+                    .collect()
+            };
+            let belt_min = (0..st.samples.len())
+                .filter(|&i| belt(fx.geo.points()[i]))
+                .map(|i| f64::from(st.samples[i].thickness_m))
+                .fold(f64::MAX, f64::min);
+            assert!(
+                belt_min < t_c - 3000.0,
+                "the belt thins past T_c: {belt_min}"
+            );
+            (km(&hot), km(&cold), t_c)
+        };
+        let max = |v: &[f64]| v.iter().copied().fold(f64::MIN, f64::max);
+        let min = |v: &[f64]| v.iter().copied().fold(f64::MAX, f64::min);
+        let sum = |v: &[f64]| format!("n {} min {:.0} max {:.0}", v.len(), min(v), max(v));
+        // Gated on the orogeny: every receiver stays at T_c.
+        let (hot, cold, t_c) = run(false);
+        assert!(
+            hot.len() > 10 && cold.len() > 5,
+            "{} {}",
+            sum(&hot),
+            sum(&cold)
+        );
+        assert!(
+            min(&hot) >= t_c - 1.0 && min(&cold) >= t_c - 1.0,
+            "{} {}",
+            sum(&hot),
+            sum(&cold)
+        );
+        // Reading the thermal state: the hot receivers thin below T_c, the craton's stay.
+        let (hot, cold, t_c) = run(true);
+        assert!(
+            hot.len() > 10 && cold.len() > 5,
+            "{} {}",
+            sum(&hot),
+            sum(&cold)
+        );
+        assert!(
+            max(&hot) < t_c - 1000.0,
+            "the hot receivers flow: {}",
+            sum(&hot)
+        );
+        assert!(
+            min(&cold) >= t_c - 1.0,
+            "the craton is rigid: {}",
+            sum(&cold)
+        );
+        // The rate itself: an untagged column 15 km over the normal one flows over a hot
+        // lithosphere, not on a craton, not without a thermal state, and not with the switch off.
+        let mut fx = Fx::new();
+        fx.k.collapse_sheet_viscosity_pa_s = 1.0e22;
+        fx.k.thermal_state = true;
+        fx.k.thermal_strength = true;
+        fx.k.collapse_sheet_thermal = true;
+        let env = fx.env(0);
+        let t_n = normal_thickness_m();
+        let sheet = Sheet::new(&fx.k, &env, t_n, 0.0).unwrap();
+        let mut s = Sample::blank(0);
+        s.kind = CONTINENTAL;
+        s.pools = continental_column();
+        s.pools[pool::METAMORPHIC] += 15_000.0;
+        s.thickness_m = s.pools.iter().sum();
+        s.lithosphere_km = 78.0;
+        assert!(sheet.release(&s) > 0.0);
+        s.lithosphere_km = L_COLD;
+        assert_eq!(sheet.release(&s), 0.0);
+        s.lithosphere_km = 0.0;
+        assert_eq!(sheet.release(&s), 0.0);
+        let mut off = Fx::new();
+        off.k = fx.k.clone();
+        off.k.collapse_sheet_thermal = false;
+        let gated = Sheet::new(&off.k, &off.env(0), t_n, 0.0).unwrap();
+        s.lithosphere_km = 78.0;
+        assert_eq!(gated.release(&s), 0.0);
     }
 
     /// With `collapse_continent_first` the crust a belt at the continent's edge releases goes to
