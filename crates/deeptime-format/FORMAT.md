@@ -2246,7 +2246,8 @@ game-side pieces, no world-data layer of their own:
   parameter ranges choose among them, out-of-range biomes included.
 - **Shipped files**: `deeptime:peatland` (requires `#deeptime:peatland`; cold wetland takes a member of the
   tag `#deeptime:peatland`: wythers:fen, wythers:berry_bog, wythers:snowy_bog, wythers:snowy_fen,
-  biomesoplenty:bog, biomesoplenty:muskeg, regions_unexplored:fen, clifftree:bog, all optional) and
+  biomesoplenty:bog, biomesoplenty:muskeg, regions_unexplored:fen, clifftree:bog, all optional; a column the
+  search made a beach, `#minecraft:is_beach` or `#c:is_beach`, keeps it) and
   `deeptime:expanded_ecosphere` (requires wythers:ice_cap or wythers:fen; 19 rules, docs/science/biomes.md,
   "Expanded Ecosphere and the biome rules"), `deeptime:rock_named` (requires `#deeptime:geology`; the geology
   gate below) and `deeptime:snow_line` (always active; two rules: where the climate search gives a biome of
