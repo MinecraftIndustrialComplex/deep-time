@@ -767,7 +767,8 @@ pub(in crate::plates) mod tests {
             // a junction of the pieces on the boundary that pulls, an overriding sample's share
             // counts its crossing to one piece alone and the normals beside it are the chords of
             // their own piece's stretch, so the pieces' pull may differ from the parent's by
-            // about a spacing of pull at each junction (MEASURED). Off, exactly.
+            // about a spacing of pull at each junction (measured 2026-10-24: 0.58 spacings at the
+            // weight's cap in case 0, 0.10 in case 1, 0.66 over case 4's two). Off, exactly.
             let off_by = if k.front_pull {
                 f64::from(junctions) * spacing_pull
             } else {
