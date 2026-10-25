@@ -172,6 +172,51 @@ normal approximation is not.
   0.599) still fails. The floors were never meant to catch a small error. They catch a broken
   mapping, not a wrong climate (Game choices, below).
 
+### The censuses count the faces only (2026-10-25)
+
+On a cube world the net's window is twice the planet: half of it is void squares, whose columns
+show a partner face's ground turned (ledger SCL-210) or deep ocean past the net's corners
+(SCL-211). The censuses walked the whole window, so a face column counted once more for each
+copy of it in a void square, and the copies do not cover the faces evenly (a void square shows the
+parts of its partners nearest the turning edges), so the shares leaned toward that ground. Since 2026-10-25 `BiomeCensus`, `GeologyCensus`, `VolcanicCensus`
+and `RegionCensus` count the columns on the six faces only (`WorldDataTerrain.onFaces`); the maps
+they write still hold the whole window. `VolcanicCensus`'s lone-cell count skips a cell off the
+faces and reads a neighbour there as the game shows it (`CubeFill.foldedBiome`), which is the
+cell's neighbour on the planet across the edge (cube-world-game.md, item 15).
+
+No floor had to move. The GameTests that read these censuses are `climateConsistent` (the family
+floors of BIO-072, set 2026-10-01 to 2026-10-03 over ten planets that were not cubes, and its
+40-column minimum), `BiomeRuleGameTests` (BIO-130's 20 columns of cold wetland and the 0.9 peat
+share), `PlacementPackGameTests` (BIO-154's 0.3 cloud forest floor, 2026-10-17),
+`VolcanicBiomeGameTests` (BIO-114's 0.05 lone-cell share, 2026-10-03) and `GeologyBiomeGameTests`
+(more than 100 land columns). The test planet became a cube on 2026-10-24 (cube plan 7.4), and no
+floor or minimum in those classes has changed since 2026-10-22, so none was set on the doubled
+counts.
+
+On the test planet (master 1cf62cb9's, the incipient-subduction planet), before (the gate on
+56edfd16, the same planet) and after (the five sets on the branch):
+
+| Count or share | Before | After |
+|---|---|---|
+| Land columns (the volcanic and geology censuses, every set) | 15,530 | 12,343 |
+| Sea columns, dry inland columns (`climateConsistent`'s sea call) | 43,178, 4,062 | 20,556, 3,239 |
+| Family A, standalone: columns, share | 840, 0.794 | 730, 0.790 |
+| Family C, standalone | 1,094, 0.882 | 778, 0.907 |
+| Family C, `-PwithMic` | 1,124, 0.831 | 778, 0.866 |
+| Family D, `-PwithMic` | 112, 1.000 | 53, 1.000 |
+| Family E, standalone | 171, 0.918 | 86, 0.965 |
+| Family E:snow, `-PwithMic` | 129, 0.860 | 44, 0.818 |
+| EF columns (`EF:no_red`, `EF:no_cherry`) | 105 | 26 |
+| Volcanic columns, surface cells, lone cells, `-PwithMic` | 2,288, 9,389, 4 | the same |
+| Cloud forest ground, `-PwithMic`: columns, on cloud forest | 20, 14 | the same |
+
+The copies leaned to the cold ground: the void squares beside the north and south faces show the
+high-latitude strips of the faces round them, so E lost half to four fifths of its columns
+(by set) and D two fifths to a half, while A lost an eighth to a fifth and BW and Af nothing. Every active volcano, pool and cloud
+forest column of this planet is on the faces, so those counts did not move. No family that had
+40 columns before has fewer now (E under TerraBlender had 38 before and 9 now; it was logged, not
+checked, both times), and all five sets pass.
+
 ## Cold deserts
 
 Köppen tests dry land before polar (Peel et al. 2007, Table 1; BIO-002), so cold dry land is BWk or BSk and not ET or EF.

@@ -72,7 +72,8 @@ public final class StructureBurialPass {
             return start;
         BoundingBox box = union.get();
         TerrainSource terrain = g.terrain();
-        int ground = StructureBurial.leastGround(terrain::height, box.minX(), box.maxX(), box.minZ(), box.maxZ());
+        int ground = StructureBurial.leastGround(StructureBurial.onFaces(terrain::height, g.cubeLayout()),
+                box.minX(), box.maxX(), box.minZ(), box.maxZ());
         int dy = StructureBurial.plan(box.minY(), box.maxY(), ground, heights.getMinBuildHeight());
         String id = idOf(structure, access);
         if (dy == 0) {
