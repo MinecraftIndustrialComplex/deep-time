@@ -11,6 +11,8 @@ import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.Geothermal;
+import com.minecraftindustrialcomplex.deeptime.worldgen.LavaFlowPalette;
+import com.minecraftindustrialcomplex.deeptime.worldgen.LavaFlows;
 import com.minecraftindustrialcomplex.deeptime.worldgen.WorldDataTerrain;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -35,7 +37,9 @@ import java.util.List;
  * ({@code deeptime:test_planet_real}; Ben, decisions log 2026-10-01): a lake the climate freezes
  * ({@link LakeIce}) has ice on it whatever the biome, a lake it keeps open has water on top even in
  * a biome cold enough to freeze water (vanilla's {@code freeze_top_layer} ran over it), and the
- * floor of a playa is the salt the bake's {@code playa} layer puts there.
+ * floor of a playa is the salt the bake's {@code playa} layer puts there, except where an active
+ * volcano's lava flow lies on it: a flow is laid after the salt ({@code LavaFlowPass} runs after
+ * {@code PlayaPass}), as a flow that ran onto a salt flat stands over it (ledger VOL-162).
  *
  * <p>The test asserts the rule on whatever the planet holds (a planet may have no frozen lake, no
  * open lake in a cold biome, or no playa: the log line says how many of each it checked);
@@ -86,6 +90,15 @@ public final class LakeGameTests {
      */
     static boolean packSalt(BlockState top) {
         return ModList.get().isLoaded(BiomeRuleGameTests.EE) && (top.is(Blocks.WHITE_CONCRETE_POWDER) || top.is(Blocks.WHITE_CONCRETE));
+    }
+
+    /**
+     * The block an active volcano's lava flow paints on column (x, z), as {@code LavaFlowPass} lays it, or null where no
+     * flow shows (none, or one under the vegetation). A salt column whose top is this block is a flow over the flat.
+     */
+    private static BlockState flowBlock(LavaFlows flows, LavaFlowPalette palette, int x, int z) {
+        int code = flows.code(x, z);
+        return code > 0 ? palette.block(code, LavaFlowPalette.key(flows.wrap(x), z)) : null;
     }
 
     private static Ground ground(ServerLevel level, int x, int z) {
@@ -141,6 +154,8 @@ public final class LakeGameTests {
         Water.Spec spec = Water.Spec.of(wd, g.waterReach());
         var settings = g.generatorSettings().value();
         Geothermal geo = w.geothermal(g.waterReach(), settings.noiseSettings().minY(), settings.seaLevel());
+        LavaFlows flows = w.lavaFlows(g.waterReach());
+        LavaFlowPalette flowPalette = LavaFlowPalette.get();
         // Lake columns a block or more deep, frozen and open, and playa cells, spread over the planet.
         List<Spot> frozen = new ArrayList<>(), open = new ArrayList<>(), salt = new ArrayList<>();
         RasterSampler levels = wd.layer(WorldData.WATER_LEVEL), playa = wd.layer(Playa.LAYER);
@@ -179,7 +194,8 @@ public final class LakeGameTests {
         }
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         StringBuilder detail = new StringBuilder();
-        int wrong = 0, frozenWarm = 0, openCold = 0, frozenRead = 0, openRead = 0, saltRead = 0, overhung = 0;
+        int wrong = 0, frozenWarm = 0, openCold = 0, frozenRead = 0, openRead = 0, saltRead = 0, overhung = 0, underFlow = 0;
+        StringBuilder flowDetail = new StringBuilder();
         for (Spot s : frozen) {
             BlockState top = level.getChunk(s.x() >> 4, s.z() >> 4).getBlockState(pos.set(s.x(), s.top(), s.z()));
             boolean cold = level.getBiome(pos).value().coldEnoughToSnow(pos);
@@ -214,6 +230,10 @@ public final class LakeGameTests {
             if (bad == null)
                 continue;   // under water or under the ice cover: not this pass's surface
             saltRead++;
+            if (!bad.isEmpty() && gr.top() == flowBlock(flows, flowPalette, s.x(), s.z())) {
+                underFlow++;   // a lava flow over the flat
+                continue;
+            }
             if (!bad.isEmpty()) {
                 wrong++;
                 detail.append(' ').append(bad).append('(').append(s.x()).append(',').append(gr.y()).append(',').append(s.z()).append(' ')
@@ -223,7 +243,7 @@ public final class LakeGameTests {
         // Round every hot spring by a playa, the flat it does not claim is salt too: no role biome comes within
         // VolcanicBiomes.PLAYA_MARGIN of a playa (BIO-165; before it, Biomes O' Plenty's hot springs dug ponds into the
         // flat and ringed them with thermal calcite, which the sparse grid above found only where it happened to fall).
-        int springs = 0, ringRead = 0, ringWrong = 0;
+        int springs = 0, ringRead = 0, ringWrong = 0, ringUnderFlow = 0;
         for (Geothermal.Site site : geo.sites()) {
             if (springs >= MOST)
                 break;
@@ -246,6 +266,14 @@ public final class LakeGameTests {
                 ringRead++;
                 if (bad.isEmpty())
                     continue;
+                if (gr.top() == flowBlock(flows, flowPalette, c[0], c[1])) {
+                    if (ringUnderFlow++ < 4)
+                        flowDetail.append(" flow:").append(LavaFlows.Paint.of(flows.code(c[0], c[1])).id).append(':')
+                                .append(BuiltInRegistries.BLOCK.getKey(gr.top().getBlock())).append('(').append(c[0]).append(',')
+                                .append(gr.y()).append(',').append(c[1]).append(" spring ").append(site.kind()).append('@')
+                                .append(site.x()).append(',').append(site.z()).append(')');
+                    continue;   // a lava flow over the flat beside the spring
+                }
                 if (ringWrong++ < 12)
                     detail.append(" spring-ring:").append(bad).append('(').append(c[0]).append(',').append(gr.y()).append(',').append(c[1])
                             .append(' ').append(biome(level, c[0], gr.y(), c[1])).append(" spring ").append(site.kind()).append('@')
@@ -255,10 +283,10 @@ public final class LakeGameTests {
         wrong += ringWrong;
         DeepTime.LOGGER.info("[gametest] lakeIceAndSaltFollowTheClimate lakeCells={} playaCells={} frozenLakeColumns={} (iceRead={} inWarmBiome={}) "
                         + "openLakeColumns={} (waterRead={} inColdBiome={}) playaColumns={} (saltRead={} underCanopy={} onSpring={} salt={}) "
-                        + "springsOnPlaya={} (ringRead={} ringWrong={}) threshold={} wrong={}{}",
+                        + "underFlow={} springsOnPlaya={} (ringRead={} ringWrong={} ringUnderFlow={}) threshold={} wrong={}{}{}",
                 lakeCells, playaCells, frozen.size(), frozenRead, frozenWarm, open.size(), openRead, openCold, salt.size(), saltRead, overhung, onSpring,
-                saltBlock == null ? "none" : BuiltInRegistries.BLOCK.getKey(saltBlock.getBlock()), springs, ringRead, ringWrong, ice.threshold(), wrong,
-                detail);
+                saltBlock == null ? "none" : BuiltInRegistries.BLOCK.getKey(saltBlock.getBlock()), underFlow, springs, ringRead, ringWrong,
+                ringUnderFlow, ice.threshold(), wrong, flowDetail, detail);
         helper.assertTrue(wrong == 0, wrong + " columns break the lake-ice or salt rule:" + detail);
         helper.succeed();
     }
