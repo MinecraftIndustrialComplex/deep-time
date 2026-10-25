@@ -900,6 +900,9 @@ pub struct Forearcs {
     dist: Vec<f64>,
     label: Vec<u32>,
     reached: Vec<u32>,
+    /// With `margin_slab_ends` (PLT-562): per sample, whether it stands over its front's slab
+    /// (`over_the_slab`); a forearc is only there.
+    over: Option<Vec<bool>>,
 }
 
 /// World global: the overriding plates' crust subduction erosion took to the mantle over the run,
@@ -1244,27 +1247,33 @@ pub fn fronts_finish(
             c.carried &= f;
         }
     }
+    let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
+    let pts = geo.points();
+    // Which reached samples stand over their front's slab, with `arc_slab_ends` (the arcs,
+    // PLT-561) or `margin_slab_ends` (the uplift, the folds, the cordillera and the forearc,
+    // PLT-562).
+    let over_slab = (k.arc_slab_ends || k.margin_slab_ends).then(|| {
+        over_the_slab(
+            geo, &rots, &normals, &shares, &sources, &key, &dist, &label, &reached, env,
+        )
+    });
+    let over = over_slab.as_deref();
+    let slab_arc = |i: usize| !k.arc_slab_ends || over.is_none_or(|o| o[i]);
+    let slab_margin = |i: usize| !k.margin_slab_ends || over.is_none_or(|o| o[i]);
     // One-way subduction: the forearc and arc that the next step's hiding reads, within the arc's
     // distance of a front and one lattice spacing for where the front falls, as PLT-503's reach
-    // (ledger: PLT-542, PLT-042).
+    // (ledger: PLT-542, PLT-042), over the slab with `margin_slab_ends` (PLT-562).
     if let Some(ow) = state.one_way.as_mut() {
         let reach_km = k.arc_distance_km + norm.km(norm.spacing_rad());
         ow.forearc = dist
             .iter()
             .zip(&state.samples)
-            .map(|(&d, s)| d.is_finite() && !s.is_hidden() && norm.km(d) <= reach_km)
+            .enumerate()
+            .map(|(i, (&d, s))| {
+                d.is_finite() && !s.is_hidden() && norm.km(d) <= reach_km && slab_margin(i)
+            })
             .collect();
     }
-    let rots: Vec<DQuat> = state.groups.iter().map(|g| quat(g.rot)).collect();
-    let pts = geo.points();
-    // Which reached samples stand over their front's slab, with `arc_slab_ends` (PLT-561).
-    let over = k.arc_slab_ends.then(|| {
-        over_the_slab(
-            geo, &rots, &normals, &shares, &sources, &key, &label, &reached, env,
-        )
-    });
-    let over = over.as_deref();
-    let slab = |i: usize| over.is_none_or(|o| o[i]);
     let mut info: Vec<Source> = Vec::new();
     let mut front_len = vec![0.0; state.plates.len()];
     let (mut front_continental, mut front_oceanic) = (0.0_f64, 0.0_f64);
@@ -1429,7 +1438,7 @@ pub fn fronts_finish(
                 island_axis_m
             };
             // Past the slab's ends no arc (`arc_slab_ends`, PLT-561).
-            let magma_m = if slab(i) {
+            let magma_m = if slab_arc(i) {
                 axis * w_arc_of(d_km, k) * g
             } else {
                 0.0
@@ -1438,7 +1447,13 @@ pub fn fronts_finish(
                 magma_m,
                 ..Plan::default()
             };
-            if shorten_km > 0.0 && continental && plate_of[i] == contacts[src.contact].over {
+            // Past the slab's ends no range and no crust shortened into it (`margin_slab_ends`,
+            // PLT-562).
+            if shorten_km > 0.0
+                && continental
+                && plate_of[i] == contacts[src.contact].over
+                && slab_margin(i)
+            {
                 if d_km < range_edge_km {
                     let w = (-((d_km - k.arc_distance_km) / k.cordillera_width_km).powi(2)).exp();
                     // Thickened arc crust spreads under its own weight: the range thickens until
@@ -1492,7 +1507,7 @@ pub fn fronts_finish(
         if !src.oceanic_slab {
             continue;
         }
-        if slab(i) {
+        if slab_arc(i) {
             band_weight += w_arc_of(norm.km(dist[i]), k);
         }
         let b = &mut budget[src.contact];
@@ -1574,8 +1589,10 @@ pub fn fronts_finish(
             let (mut added_continental, mut added_oceanic, mut cordillera) =
                 (0.0_f64, 0.0_f64, 0.0_f64);
             // Cortial's h(z̃) uplift is the oceanic slab's: where continental crust comes in, the
-            // collision belt (`belts.rs`) builds the relief from the crust shortened.
-            let lifted = if src.oceanic_slab {
+            // collision belt (`belts.rs`) builds the relief from the crust shortened. Past the
+            // slab's ends none, and no folds (`margin_slab_ends`, PLT-562).
+            let margin = slab_margin(i);
+            let lifted = if src.oceanic_slab && margin {
                 z + u0_m * f * g * h * ceiling(z - sea_m, z_ceiling)
             } else {
                 z
@@ -1660,10 +1677,13 @@ pub fn fronts_finish(
             s.obliquity_deg = src.obliquity_deg as f32;
             s.slab_age_myr = src.slab_age as f32;
             // Folds follow the relative motion, weighted by the deformation.
-            let rot = rots[s.group as usize];
-            let p = rot * pts[i];
-            let fold = to_world(rot, s.fold) + tangent(p, src.rel).normalize_or_zero() * (f * g);
-            s.fold = to_group(rot, tangent(p, fold));
+            if margin {
+                let rot = rots[s.group as usize];
+                let p = rot * pts[i];
+                let fold =
+                    to_world(rot, s.fold) + tangent(p, src.rel).normalize_or_zero() * (f * g);
+                s.fold = to_group(rot, tangent(p, fold));
+            }
             // An island arc's uplift marks an Andean orogeny where it stands above the sea.
             // ledger: PLT-060
             let andean = dz >= orogeny_m && (continental || f64::from(s.elevation_m) > sea_m);
@@ -1714,6 +1734,7 @@ pub fn fronts_finish(
             dist,
             label,
             reached,
+            over: over_slab.filter(|_| k.margin_slab_ends),
         }),
     }
 }
@@ -1746,8 +1767,10 @@ pub fn erode_forearcs(state: &mut PlateState, env: &Env, forearcs: &Forearcs) ->
     if k.erosion_retreat {
         return retreat_forearcs(state, env, forearcs, out);
     }
-    // The forearcs' samples, by front, the nearest first (ties by sample).
+    // The forearcs' samples, by front, the nearest first (ties by sample); over the slab with
+    // `margin_slab_ends` (ledger: PLT-562).
     let width_rad = norm.rad(k.arc_distance_km); // ledger: PLT-441 (the forearc: to the arc's axis)
+    let over = forearcs.over.as_deref();
     let mut band: Vec<(u32, f64, u32)> = forearcs
         .reached
         .iter()
@@ -1757,7 +1780,8 @@ pub fn erode_forearcs(state: &mut PlateState, env: &Env, forearcs: &Forearcs) ->
             (d.is_finite()
                 && d < width_rad
                 && forearcs.loss_km3[f as usize] > 0.0
-                && !state.samples[i as usize].is_hidden())
+                && !state.samples[i as usize].is_hidden()
+                && over.is_none_or(|o| o[i as usize]))
             .then_some((f, d, i))
         })
         .collect();
@@ -1863,20 +1887,30 @@ fn retreat_forearcs(
     out
 }
 
-/// Per sample, whether a sample the arcs' distance field reaches stands over its front's slab
-/// (`tectonics.arc_slab_ends`; the front lane's step 10, plates.md "Step 10"; ledger: PLT-561):
-/// between the ends of the front its nearest front sample (its label) stands on, along that
-/// front. The front is the label and the front samples joined to it, one by one, within two
-/// lattice edges in the same group (a zigzag boundary's second row, a corner), out to the band's
-/// reach; its line runs through the label square to the front's normals (PLT-310), each weighted
+/// Per sample, whether a sample the fronts' distance field reaches stands over its front's slab
+/// (`tectonics.arc_slab_ends`, the front lane's step 10, plates.md "Step 10", ledger: PLT-561;
+/// `tectonics.margin_slab_ends`, step 11, "Step 11", PLT-562): between the ends of the front its
+/// foot stands on, along that front. Its foot is the front sample nearest it on the sphere, found
+/// from its label (its nearest front sample by the lattice's distance) front sample by front
+/// sample along the front: the lattice's distance runs up to 2/√3 longer than the straight line,
+/// by the edges' direction, so the label can lie along the front by a good part of the distance
+/// (some hundreds of km at the uplift's 1,800), and a front's line read there, on a curved front,
+/// is not the sample's. The front is the foot and the front samples joined to it, one by one,
+/// within two lattice edges in the same group (a zigzag boundary's second row, a corner), out to
+/// a reach; its line runs through the foot square to the front's normals (PLT-310), each weighted
 /// by its share of the straight front (PLT-530), and each front sample covers its share along the
 /// line, centred on it. A sample whose distance along that line falls outside the front's extent
-/// lies past the slab's end. The
-/// reach is the band's (`arc_distance_km` and two `arc_width_km`, past which its weight is under
-/// e^-4) and two lattice spacings: a sample's label need not be its nearest front sample on the
-/// sphere (the lattice's distance runs up to 2/√3 longer than the straight line, by the edges'
-/// direction), and the front must run on past it at least that far before its ends are read.
-/// The other samples are false.
+/// lies past the slab's end. The reach, the front the line is read along and that must run on
+/// past the foot before its ends are read, is two lattice spacings more than the sample's tier:
+/// the arc band's (`arc_distance_km` and two `arc_width_km`, past which its weight is under e^-4)
+/// for a sample within that distance of the front (the arcs, the forearc, most of the range),
+/// and the margin's (`subduction_distance_km`) for one further out. The lattice gives a front's
+/// direction only to about its zigzag over the stretch it is read along (a few degrees over the
+/// band's reach at a front's end, where the normals turn), which moves the end's meridian by the
+/// sample's distance times that angle: read over the band's reach, the uplift and the range ran
+/// on up to 2.1 spacings past a straight front's end, where the front itself reaches 1.25 (the
+/// front lane's step 11). A curved front's far field reads the chord of its last
+/// `subduction_distance_km`. The other samples are false.
 #[allow(clippy::too_many_arguments)]
 fn over_the_slab(
     geo: &Geo,
@@ -1885,6 +1919,7 @@ fn over_the_slab(
     shares: &[f64],
     sources: &[(u32, f64, u32)],
     key: &[u32],
+    dist: &[f64],
     label: &[u32],
     reached: &[u32],
     env: &Env,
@@ -1917,57 +1952,99 @@ fn over_the_slab(
         })
         .collect();
     let norm = env.norm;
-    let reach =
-        norm.rad(env.k.arc_distance_km + 2.0 * env.k.arc_width_km) + 2.0 * norm.spacing_rad();
+    // The tiers: the arc band's distance and the margin's, rad.
+    let band = norm.rad(env.k.arc_distance_km + 2.0 * env.k.arc_width_km);
+    let margin = norm.rad(env.k.subduction_distance_km).max(band);
     // Each front sample's line (its position and the front's direction there) and the front's
-    // extent along it, radians: [lo, hi].
-    let extent: Vec<(DVec3, DVec3, f64, f64)> = sources
-        .par_iter()
-        .enumerate()
-        .map(|(l, &(v, ..))| {
-            let p = at(v as usize);
-            // The front within the reach, front sample by front sample.
-            let mut seen = std::collections::HashSet::from([l as u32]);
-            let mut queue = vec![l as u32];
-            let mut next = 0;
-            while let Some(&a) = queue.get(next) {
-                next += 1;
-                for &b in &near[a as usize] {
-                    let w = sources[b as usize].0 as usize;
-                    if (at(w) - p).length() <= reach && seen.insert(b) {
-                        queue.push(b);
+    // extent along it, radians: [lo, hi], with the front read out to `reach`.
+    let lines = |reach: f64| -> Vec<(DVec3, DVec3, f64, f64)> {
+        sources
+            .par_iter()
+            .enumerate()
+            .map(|(l, &(v, ..))| {
+                let p = at(v as usize);
+                // The front within the reach, front sample by front sample.
+                let mut seen = std::collections::HashSet::from([l as u32]);
+                let mut queue = vec![l as u32];
+                let mut next = 0;
+                while let Some(&a) = queue.get(next) {
+                    next += 1;
+                    for &b in &near[a as usize] {
+                        let w = sources[b as usize].0 as usize;
+                        if (at(w) - p).length() <= reach && seen.insert(b) {
+                            queue.push(b);
+                        }
                     }
                 }
-            }
-            // Its direction: square to its normals, each by its share of the front (one front
-            // sample's own normal turns at a lattice corner, and most at a front's end).
-            let mean: DVec3 = queue
-                .iter()
-                .map(|&b| {
+                // Its direction: square to its normals, each by its share of the front (one front
+                // sample's own normal turns at a lattice corner, and most at a front's end).
+                let mean: DVec3 = queue
+                    .iter()
+                    .map(|&b| {
+                        let w = sources[b as usize].0 as usize;
+                        normals[w] * shares[w]
+                    })
+                    .sum();
+                let mut t = p.cross(mean).normalize_or_zero();
+                if t == DVec3::ZERO {
+                    t = p.cross(normals[v as usize]).normalize_or_zero();
+                }
+                let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+                for &b in &queue {
                     let w = sources[b as usize].0 as usize;
-                    normals[w] * shares[w]
-                })
-                .sum();
-            let mut t = p.cross(mean).normalize_or_zero();
-            if t == DVec3::ZERO {
-                t = p.cross(normals[v as usize]).normalize_or_zero();
+                    let tau = (at(w) - p).dot(t);
+                    lo = lo.min(tau - 0.5 * shares[w]);
+                    hi = hi.max(tau + 0.5 * shares[w]);
+                }
+                (p, t, lo, hi)
+            })
+            .collect()
+    };
+    let spacing = norm.spacing_rad();
+    let near_lines = lines(band + 2.0 * spacing);
+    let far = |i: usize| dist[i] > band;
+    let far_lines = if margin > band && reached.iter().any(|&i| far(i as usize)) {
+        lines(margin + 2.0 * spacing)
+    } else {
+        Vec::new()
+    };
+    // Each reached sample's foot on its front: from its label, front sample by front sample along
+    // the front (within two lattice edges), to the nearest on the sphere.
+    let foot = |i: usize| {
+        let x = at(i);
+        let mut a = label[i] as usize;
+        let mut best = (at(sources[a].0 as usize) - x).length_squared();
+        loop {
+            let mut step = None;
+            for &b in &near[a] {
+                let e = (at(sources[b as usize].0 as usize) - x).length_squared();
+                if e < best {
+                    best = e;
+                    step = Some(b as usize);
+                }
             }
-            let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
-            for &b in &queue {
-                let w = sources[b as usize].0 as usize;
-                let tau = (at(w) - p).dot(t);
-                lo = lo.min(tau - 0.5 * shares[w]);
-                hi = hi.max(tau + 0.5 * shares[w]);
+            match step {
+                Some(b) => a = b,
+                None => return a,
             }
-            (p, t, lo, hi)
+        }
+    };
+    let found: Vec<bool> = reached
+        .par_iter()
+        .map(|&i| {
+            let i = i as usize;
+            let (p, t, lo, hi) = if far(i) && !far_lines.is_empty() {
+                far_lines[foot(i)]
+            } else {
+                near_lines[foot(i)]
+            };
+            let tau = (at(i) - p).dot(t);
+            t == DVec3::ZERO || (lo..=hi).contains(&tau)
         })
         .collect();
     let mut over = vec![false; n];
-    for &i in reached {
-        let i = i as usize;
-        let (p, t, lo, hi) = extent[label[i] as usize];
-        let tau = (at(i) - p).dot(t);
-        over[i] = t == DVec3::ZERO || (lo..=hi).contains(&tau);
+    for (&i, f) in reached.iter().zip(found) {
+        over[i as usize] = f;
     }
     over
 }
