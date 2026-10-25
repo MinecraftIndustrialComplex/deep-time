@@ -2,8 +2,8 @@
   "_doc": "V1 gap 2's measures (plate boundary organisation, 2026-10-23): the boundary mix against Bird 2003 Table 3, how the trenches face their convergence, the active share of the continental margin, the collision front's length and the collisions' durations. Pass it with --registry tools/review/pool/measures_boundary.json (or DEEPTIME_POOL_MEASURES) and --measures v1census,boundary,collcoast (gap 4's coastset: add --registry tools/review/pool/measures_gap4.json). Definitions in measure_boundary.py and measure_collcoast.py; Earth's arc-continent sutures for collcoast's hand-off counts are Macdonald 2019's 15 to 46 per 100 Myr (ledger PLT-157). The share bands are Bird's shares with room for the lattice (game-choice: tolerance, agent 2026-10-23; the plate check's own bands where it has one: subducting 15 to 25 %, the active margin 0.25 to 0.40, collision length 15 to 50 Myr and at most 120). The collision front's bound is Stern & Scholl 2010's 12,000 km of active suture today (ledger PLT-500).",
   "measures": {
     "boundary": {
-      "version": 2,
-      "doc": "the boundary's shares by class against Bird 2003, the trenches' facing, the active margin, the collision front and the collisions' lengths, the plate counts and the rifts and initiations per 100 Myr; definitions in measure_boundary.py",
+      "version": 3,
+      "doc": "the boundary's shares by class against Bird 2003, the trenches' facing, the active margin, the collision front and the collisions' lengths, the plate counts and the rifts and initiations per 100 Myr; definitions in measure_boundary.py (version 3, 2026-10-25: the incipient fronts, Bird's OCB with them, and the subducting boundary whose slab reaches 100 km under its arc, ledger PLT-614 and PLT-615)",
       "command": ["{py}", "-I", "{tools}/measure_boundary.py", "{run}"],
       "python": "numpy",
       "needs": ["plate", "rec"],
@@ -13,6 +13,8 @@
         {"key": "spread", "label": "spreading (Bird OSR + CRB 0.363)", "target": [0.30, 0.42], "digits": 3},
         {"key": "coll", "label": "in collision (Bird CCB 0.088)", "target": [0.05, 0.13], "digits": 3},
         {"key": "nocontact", "label": "converging, no slab (Bird OCB 0.067)", "target": null, "digits": 3},
+        {"key": "incipient", "key2": "ocb", "label": "incipient fronts / converging with no subduction zone, both (Bird OCB 0.067)", "target": null, "digits": 3, "pair": true},
+        {"key": "sub_benioff", "label": "subducting with its slab 100 km under the arc (Bird SUB 0.197, a Benioff zone and/or an arc)", "target": null, "digits": 3},
         {"key": "oo_of_sub", "label": "ocean-ocean share of subducting (Stern & Scholl 0.35)", "target": null, "digits": 3},
         {"key": "sub_km", "key2": "total_km", "label": "subducting / all boundary, lattice km (Bird 51,310 / 260,487 geodesic, 53,500 / 271,700 on the lattice at 1.04x, PLT-530)", "target": null, "digits": 0, "pair": true},
         {"key": "facing", "key2": "facing_cont", "label": "trench convergence across / full, capped (Bird SUB 0.854): all / continental", "target": null, "digits": 3, "pair": true},

@@ -8882,6 +8882,149 @@ p 0.33). Earth's is 0.122, so the rule leaves the excess where it was.
 opens. It now asks only a converging neighbour. The mix is measurement only, so the arm's planet
 stands as measured, but its records' ridge, rift and other lengths are the old reading's.
 
+### Step 12: incipient subduction (PLT-610 to PLT-614) and the Benioff census (PLT-615) (2026-10-25)
+
+The model made every front a working subduction zone from its first step: a contact found by the
+overlaps pulled with its slab, built an arc and counted as subducting boundary at once. On Earth a
+new subduction zone is forced before it sinks by itself. Gurnis, Hall & Lavier 2004 (G-cubed
+5:Q07001, read in full) model forced convergence across a fracture zone: the resisting force
+grows "as the plate begins bending, reaching a maximum value dependent on plate thickness, but
+typically ranging from 2 to 3 × 10^12 N/m for cases that become self-sustaining", and
+"Cumulative convergence, not the rate of convergence, is the dominant control", the critical
+convergence "only varies between 100 and 130 km (Table 3)". Hall et al. 2003 (abstract): "a
+fracture zone could be converted into a self-sustaining subduction zone after approximately 100 km
+of convergence". Crameri et al. 2020: "The progression from no subduction to subduction, marked by
+a slab reaching around 100 km depth". And Bird 2003 [126] defines his SUB steps by "a Benioff zone
+of intermediate to deep earthquakes and/or a parallel volcanic arc with Quaternary activity"; his
+other convergent oceanic steps are OCB (17,449 km, 6.7 % of the boundary).
+
+**The law** (`tectonics.incipient_subduction`, PLT-610). A front whose contact's slab, before the
+step, is shorter than 100 km (PLT-611, the bottom of Gurnis's table, as transference's PLT-518)
+is incipient:
+
+- The force balance adds the bending's resistance against its convergence, 2.5 × 10^12 N/m of
+  front (PLT-612, the middle of Gurnis's range), or 5 × 10^11 N/m where the floor going under is
+  younger than 10 Myr (PLT-613: "The entire initial hump in resisting force is eliminated when
+  lithosphere with a typical thermal model of a spreading center is subject to compression", the
+  ridge's topography adding "an additional 5 × 10^11 N/m"), both scaled with gravity as the slab
+  pull. The force is plastic (it does not grow with speed), so it enters the linear solve as a
+  collision's resistance does: a coefficient of the force over max(convergence, 1 mm/yr) (FRC-011).
+  It is booked in the record's collision resistance.
+- It builds no arc (`subduction::fronts_finish`: no arc magma and no arc band weight).
+- The boundary mix counts it as class other, converging, in the record's new
+  `front_bands.incipient` (not in `other_converging`, nor in the slab, normal and age bands), and
+  the margins count no subduction margin at it (PLT-614).
+
+The slab grows by the convergence as before (FRC-020), so the stage ends at the first step whose
+slab starts at 100 km or more. A subduction initiation's planted slab (PLT-270, 150 km) starts past
+it, so the model's spontaneous initiations are not held back: they stand for a zone that has
+already passed its forced stage. The slabs are kept by plate pair (`PlateState::slabs`), so a
+resampling's re-found contact keeps its stage.
+
+*Speed-dependent terms (for the force balance lane).* The incipient link is a plastic force
+linearised at the step's convergence, floored at 1 mm/yr: on Forsyth & Uyeda's balance it would be
+`add_friction`, a force whatever the speed.
+
+**The census column (B)** (PLT-615, measurement only). Beside `sub`, which counts every front past
+its incipient stage, the record now counts the subducting fronts whose slab reaches 100 km under
+their arc (`front_bands.benioff`): a slab at least hypot(`arc_distance_km`, 100) km long, 223.6
+km at the presets' 200, a straight slab from the trench to that depth under the arc's axis.
+`measure_boundary.py` version 3 adds `incipient`, `ocb` (no contact plus incipient, Bird's OCB)
+and `sub_benioff`; `transform` no longer counts the incipient fronts. The depth is read (Crameri
+2020; Syracuse & Abers 2006, abstract: "H ranges from 72 to 173 km with a global average of 105
+km"); the arc's distance is PLT-042's 200 km, which is `uncited`, so the column inherits its flag.
+
+**The tests** (`plates/tests.rs`, 20,000 samples):
+
+- `an_incipient_front_holds_its_plate_and_is_no_subduction_zone`: the reference plate with a
+  40-km slab (its pull about 1.7 × 10^12 N/m, under the resistance). On, the trench moves at 0.59
+  mm/yr in the balance (under the 1 mm/yr floor: a plastic force larger than the drive stalls the
+  plate), the mix has 3,832 km of incipient front and no ocean-continent front, and no coastal
+  sample of 127 is a subduction margin. Off, 3.03 mm/yr, 3,832 km of ocean-continent front, 31
+  subduction margins.
+- `cumulative_convergence_ends_the_incipient_stage`: the reference plate pushed at 10 and at 25
+  mm/yr from no slab (Gurnis's forced models), 2-Myr steps. The resistance is the same at both
+  rates (8.145 × 10^18 N over the front). It acts while the slab starts under 100 km and stops at
+  the first step that starts past it (114.6 km at 10 mm/yr, 143.3 km at 25). The balance's speed
+  then jumps from 6.28 to 10.60 mm/yr (10 mm/yr) and from 9.25 to 14.64 (25), more than the slab's
+  growth alone gives. On a straight front, the arcs over a 90-km slab: 0 m of magma on, 6,486 m
+  off; over a 110-km slab the arcs are the same on and off, bit for bit.
+- `a_ridge_under_compression_resists_less`: floor 5 Myr old resists a fifth of the 80-Myr floor's.
+- `an_initiations_planted_slab_is_past_the_incipient_stage`: every built-in preset plants at least
+  100 km; with the planted 150 km the reference plate has no incipient front.
+- `a_slabs_length_survives_a_resampling`: the head-on plates through carry, resampling and the
+  overlaps found again. With a 700-km slab the ocean-continent front holds (21,715 km before,
+  22,993 km after) with no incipient front; with none, the whole front is incipient on both sides.
+- `incipient_subduction_changes_nothing_past_its_stage`: with a full slab the balance, the slab,
+  the mix and the arcs are the same on and off, bit for bit; off, a 40-km slab has no incipient
+  front.
+- `an_incipient_front_takes_no_forsyth_uyeda_friction` (the guard with PLT-585, below): with both
+  switches on, plate 1 under plate 0 on a 3,258 km front, the incipient front takes no friction
+  between the pair (0 N either way) and the incipient resistance alone (8.1446 × 10^18 N, the same
+  with PLT-585 off); once mature, the front takes F_CR × its length (2.432 × 10^18 N, F_CR 7.465 ×
+  10^11 N/m) and no incipient resistance. The other pairs' friction is the same in both cases.
+
+**With Forsyth & Uyeda's balance (PLT-585).** That lane landed first, so the guard is this lane's
+(plate-forces.md "With incipient subduction", FRC-035): while a contact is incipient its oceanic
+front samples take the incipient resistance alone, and the loop over the other boundaries skips an
+incipient partner from either side. A continental sample on an incipient front keeps its friction:
+it is a collision's drag, as at a mature contact (the agent's choice, 2026-10-25). With the switch
+off the set of incipient pairs is empty, so the guard changes nothing.
+
+**On by default** (2026-10-25, the rule that physics goes on once it is correct). The flip moved
+which seeds weld on stall: the release sweep (`weld_seed_sweep`, 8,000 samples, 300 Myr, 24 seeds
+per start) welds on 9 scattered seeds and 8 supercontinent seeds with incipient subduction on
+(11 and 5 before), so `collisions_weld_on_stall_and_transfer_on_shortening` now uses scattered 2
+and `sutures_and_initiations_keep_continents_whole` supercontinent 5; the five fixture tests that
+build a front with no slab pin the switch off, as their geometry is a working subduction zone.
+
+The pool arm `fl-incip` (8 runs, seeds 1 to 4 on both starts, `earthlike_quick_16k`, 1000 Myr,
+`+DEEPTIME_CRUST_BUDGET=1`, key a963c9ac56ee: this branch on master 17ab80b7, PLT-585 off and
+PLT-540 on) against base13 (24 runs, key 89e867370c1f), medians and the two-sided Mann-Whitney p
+(`pool.sh table --base base13 --arm fl-incip`, measures `v1census`, `guard` and `boundary` version
+3). Every run ran its 1000 Myr; no step beyond 2 Earth reliefs on any run.
+
+| Measure | base13 | fl-incip | p |
+|---|---|---|---|
+| land | 0.313 | 0.310 | 0.95 |
+| largest landmass | 0.166 | 0.177 | 1.0 |
+| continental crust under the sea | 0.214 | 0.215 | 0.98 |
+| land above 2 km (realism ≤ 0.07) | 0.097 | 0.077 | 0.40 |
+| coast with high ground (≤ 0.11) | 0.196 | 0.187 | 0.51 |
+| land under ice | 0.083 | 0.098 | 0.85 |
+| collisions per 100 Myr | 1.70 | 1.55 | 0.60 |
+| V1 criteria met per run (median, mean) | 5, 5.38 | 5.5, 5.50 | 0.42 |
+| the guard's worst, m | 10,047 | 10,020 | 0.65 |
+| plate cells' largest excess over Airy, m | 2,411 | 2,511 | 0.27 |
+| subducting, share of boundary (Bird SUB 0.197) | 0.291 | 0.250 | < 0.001 |
+| incipient fronts | | 0.035 | |
+| converging with no subduction zone (Bird OCB 0.067) | 0.006 | 0.041 | |
+| slab 100 km under the arc, column (B) (Bird SUB 0.197) | | 0.224 | |
+| oceanic front under 10 / at 80 or more mm/yr | 0.130 / 0.073 | 0.087 / 0.082 | |
+| convergence across the oceanic front, mm/yr (Bird 53.2) | 38.3 | 41.1 | < 0.001 |
+| active share of continental margin (0.25 to 0.40) | 0.379 | 0.337 | < 0.001 |
+| boundary criteria met per run (median, mean) | 2, 1.88 | 2.5, 2.75 | 0.004 |
+
+Base13's `incipient` and `sub_benioff` are blank: its record has no such bands. The M4 lane's split
+(`tools/review/m5diag/m4split.sh`, the land above 2 km by class, means over the runs; Earth's from
+its table on base13) reads where the high ground went:
+
+| Class, share of the land | base13 | fl-incip | Earth |
+|---|---|---|---|
+| all above 2 km | 0.0978 | 0.0833 | |
+| collision belts under 10 Myr | 0.0368 | 0.0405 | 0.026 |
+| Andean margins under 10 Myr | 0.0137 | 0.0090 | 0.0085 |
+| older Andean margins and untagged arcs | 0.0159 | 0.0116 | about 0.0055 |
+
+The young Andean high ground falls to Earth's: a new front builds no arc until its slab reaches
+100 km. The collision belts do not move (8 runs against 24), and the older
+Andean margins and arcs stay about twice Earth's.
+
+Off, the planet is base13's bit for bit: one pool run of the merged head (b935cea7, key
+ac619d59fdab, `--set tectonics.incipient_subduction=false`, supercontinent 1, base13's other
+arguments) has the state_sha256 (adf20d4c...) and fields_sha256 of base13's run. Its rec_sha256
+differs, as it should: the record gains the `incipient` and `benioff` front bands.
+
 
 ## Plate speed (2026-10-25)
 
@@ -9346,6 +9489,11 @@ formed, so counting both on one front counts that front's resistance twice. In s
 mature one, and 0.67 times at a ridge. The code is two conditions in the friction pass of
 `forces.rs` (`if friction`): the front's link is skipped while its contact is incipient, and the
 loop over the other boundaries skips a plate that holds an incipient contact with the sample's plate
-from either side, so neither side adds a half share in its place. Whichever of the two lanes lands
-second adds them, with a unit test that an incipient front carries one resistance and a mature one
-F_CR alone.
+from either side, so neither side adds a half share in its place. The front lane landed second and
+added them (2026-10-25), with the unit test `an_incipient_front_takes_no_forsyth_uyeda_friction`
+(both switches on: an incipient front carries the incipient resistance alone, the same as with
+PLT-585 off, and no friction between its two plates; a mature one F_CR alone, from the overriding
+side, and no incipient resistance; the other boundaries' friction the same in both). The incipient
+contacts are the ones the arcs and the boundary mix read, by the slab before the step's growth. A
+continental sample at an incipient contact's front takes no incipient resistance (it is a
+collision's, PLT-610), so it keeps the front's friction there as at a mature contact.

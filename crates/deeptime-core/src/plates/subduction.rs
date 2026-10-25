@@ -813,6 +813,8 @@ struct Source {
     /// The subducting crust at the front is oceanic (a continental arc's cordillera needs an
     /// oceanic slab; continental crust forced under builds the collision's own relief).
     oceanic_slab: bool,
+    /// The front is incipient (PLT-610): its slab has not yet sunk far enough to melt an arc.
+    incipient: bool,
 }
 
 /// World global: arc crust added to continental crust over the run, km³ (Earth-normalized).
@@ -1356,6 +1358,24 @@ pub fn fronts_finish(
             })
             .collect();
     }
+    // Incipient contacts (PLT-610): no arc until the slab, before this step's growth as the
+    // force balance reads it, reaches the critical convergence.
+    let young: Vec<bool> = if k.incipient_subduction {
+        let km: BTreeMap<(u32, u32), f64> = state
+            .slabs
+            .iter()
+            .map(|s| ((s.under, s.over), s.km))
+            .collect();
+        state
+            .contacts
+            .iter()
+            .map(|c| {
+                super::forces::incipient(k, km.get(&(c.under, c.over)).copied().unwrap_or(0.0))
+            })
+            .collect()
+    } else {
+        vec![false; state.contacts.len()]
+    };
     let mut info: Vec<Source> = Vec::new();
     let mut front_len = vec![0.0; state.plates.len()];
     let (mut front_continental, mut front_oceanic) = (0.0_f64, 0.0_f64);
@@ -1446,6 +1466,7 @@ pub fn fronts_finish(
                 slab_age: su.age_myr(t_myr),
                 sediment: f64::from(su.pools[pool::SEDIMENT]),
                 oceanic_slab: su.kind != CONTINENTAL,
+                incipient: young[c],
             });
             // Only an oceanic slab counts as a front that pulls: continental crust at the front
             // is buoyant, and where it comes in the collision resists instead (`forces.rs`).
@@ -1519,8 +1540,9 @@ pub fn fronts_finish(
             } else {
                 island_axis_m
             };
-            // Past the slab's ends no arc (`arc_slab_ends`, PLT-561).
-            let magma_m = if slab_arc(i) {
+            // Past the slab's ends no arc (`arc_slab_ends`, PLT-561), and none over an incipient
+            // slab (PLT-610).
+            let magma_m = if slab_arc(i) && !src.incipient {
                 axis * w_arc_of(d_km, k) * g
             } else {
                 0.0
@@ -1589,7 +1611,7 @@ pub fn fronts_finish(
         if !src.oceanic_slab {
             continue;
         }
-        if slab_arc(i) {
+        if slab_arc(i) && !src.incipient {
             band_weight += w_arc_of(norm.km(dist[i]), k);
         }
         let b = &mut budget[src.contact];
