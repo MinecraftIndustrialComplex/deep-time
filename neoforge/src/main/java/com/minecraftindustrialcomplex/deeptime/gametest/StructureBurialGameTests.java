@@ -225,7 +225,9 @@ public final class StructureBurialGameTests {
                 continue;
             }
             BoundingBox vb = union(vanilla);
-            int ground = StructureBurial.leastGround(t::height, vb.minX(), vb.maxX(), vb.minZ(), vb.maxZ());
+            var gen = (GeologicChunkGenerator) level.getChunkSource().getGenerator();
+            int ground = StructureBurial.leastGround(StructureBurial.onFaces(t::height, gen.cubeLayout()), vb.minX(), vb.maxX(),
+                    vb.minZ(), vb.maxZ());
             int dy = c.covered() ? StructureBurial.plan(vb.minY(), vb.maxY(), ground, minY) : 0;
             log.append(' ').append(id).append(": vanilla y ").append(vb.minY()).append("..").append(vb.maxY())
                     .append(" least ground ").append(ground).append(" dy ").append(dy == StructureBurial.DROP ? "DROP" : dy).append(';');

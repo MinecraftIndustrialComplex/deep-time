@@ -38,7 +38,7 @@ class VolcanicZonesTest {
     }
 
     private static Magma.Body body(int id, int x, int z, int rh) {
-        return new Magma.Body(id, "stratovolcano", 0.5, x, z, 100, 40, rh, 6, 90, 94, false, false, 0, 0, 0, rh + 2, null);
+        return new Magma.Body(id, "stratovolcano", 0.5, x, z, 100, 40, rh, 6, 90, 94, false, false, 0, 0, 0, rh + 2, null, null);
     }
 
     private static boolean has(int bits, Role r) {
@@ -198,6 +198,40 @@ class VolcanicZonesTest {
         double want = st.major() / st.minor();
         assertEquals(want, cone.radius() / cone.minor(), 0.02 * want, cone + " " + st);
         assertEquals(1.0, want, 0.02, "the conformal cube draws a circle round: " + st);
+    }
+
+    /**
+     * Off a cube world's faces a query reads the partner column the void shows ({@code CubeFill.foldedBiome} reads
+     * the biome there), never the net-plane part of a disc past a turning edge: a cone 8 blocks inside N's west
+     * edge reaches into the void on the net, but the void there shows F3's top, which holds no zone; a second cone
+     * put where a void column's partner lies is read at that void column. Before the fold the void held the first
+     * cone's roles.
+     */
+    @Test
+    void offACubesFacesAQueryReadsThePartnerColumn() {
+        CubeLayout net = CubeLayout.of(1024);
+        int c = (int) net.period();
+        var proj = new WorldProjection.Cube(new CubeWorld(net, CubeMap.world(), CubeTurn.IDENTITY, 1.0));
+        int west = -512, zv = -1000;
+        var nearEdge = volcano(1, "stratovolcano", west + 8, zv, 80, 0.8, 6, false);
+        var one = VolcanicZones.build(List.of(nearEdge), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, c, proj);
+        assertTrue(net.faceOfBlock(west + 8, zv) != null && net.faceOfBlock(west - 4, zv) == null, "the cone sits by N's west edge");
+        assertTrue(has(one.rolesAt(west + 8, zv), Role.CRATER), "its own face holds it");
+        var flat = VolcanicZones.build(List.of(nearEdge), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, c);
+        assertTrue(has(flat.rolesAt(west - 4, zv), Role.CONE), "the net-plane disc reaches past the edge");
+        for (int dx = 1; dx <= 40; dx++)
+            assertEquals(0, one.rolesAt(west - dx, zv), "the void " + dx + " blocks past the edge shows F3's top, no zone");
+        assertTrue(one.outsideSurfaceZones(west - 4, zv) > 40, "and lies far from every zone on the planet");
+        CubeLayout.Fold f = net.fold(west - 10, zv);
+        assertTrue(f instanceof CubeLayout.Outside, "a band column: " + f);
+        var o = (CubeLayout.Outside) f;
+        var partner = volcano(2, "stratovolcano", o.x(), o.z(), 80, 0.8, 6, false);
+        var two = VolcanicZones.build(List.of(nearEdge, partner), List.of(), List.of(), VolcanicBiomeRules.DEFAULT, MH, c, proj);
+        assertTrue(has(two.rolesAt(west - 10, zv), Role.CRATER), "the void reads the partner's crater");
+        for (int dz = -30; dz <= 30; dz += 3)
+            for (int dx = 1; dx <= 30; dx += 3)
+                if (net.fold(west - dx, zv + dz) instanceof CubeLayout.Outside p)
+                    assertEquals(two.rolesAt((int) p.x(), (int) p.z()), two.rolesAt(west - dx, zv + dz));
     }
 
     /**

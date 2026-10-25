@@ -109,10 +109,108 @@ public final class Magma {
     /** Where the shield, and where the silicic share of the column differ: the mush is this much broader under a shield. */
     public static final double MUSH_SHIELD = 1.1; // ledger: MAG-054
 
+    /**
+     * Columns between a body and a turning edge of a cube world's net that hold only its shell: no
+     * lava, no plug and no mush in them, open blocks there become basalt (see {@link Seam}).
+     */
+    public static final int SEAM_GAP = 2; // ledger: MAG-059 (game-choice)
+
     /** Terrain height H(x, z), blocks. */
     @FunctionalInterface
     public interface Heights {
         double at(int x, int z);
+    }
+
+    /**
+     * Whether column (x, z) lies on the planet's own ground: a cube world's six faces (x wraps). Off
+     * them a chunk is a turned copy of its partner face's ({@code CubeFill}, ledger SCL-210), so no
+     * body is built or read there.
+     */
+    @FunctionalInterface
+    public interface Faces {
+        boolean on(int x, int z);
+
+        /** A world with no ground off its planet (Lambert and Petroff-Guyou worlds, and the tests). */
+        Faces ALL = (x, z) -> true;
+    }
+
+    /**
+     * Where a body's reach leaves a cube world's faces (Deep Time's cube net, cube-world-game.md): per
+     * column of its reach box, on the faces, in the seam band (within {@link #SEAM_GAP} columns,
+     * corners included, of a column off the faces) or off them. Off the faces a chunk is a copy of
+     * its partner face's chunk and holds none of this body's shell, so the body is cut at the turning
+     * edge and sealed on its own face: off the faces it has no part, and in the band its lava, conduit
+     * and lake parts are its shell, its plug is left out and its mush is not placed. A cut lens or
+     * chamber thus ends against a wall at least two columns thick of the ground's own rock, with
+     * basalt where that was open. Immutable.
+     */
+    public static final class Seam {
+        static final byte ON = 0, BAND = 1, OFF = 2;
+        private final int r, w;
+        private final byte[] state;
+
+        private Seam(int r, byte[] state) {
+            this.r = r;
+            this.w = 2 * r + 1;
+            this.state = state;
+        }
+
+        /** The column's state at offset (dx, dz): on the faces outside the reach box (the body has no part there). */
+        byte state(int dx, int dz) {
+            if (Math.abs(dx) > r || Math.abs(dz) > r)
+                return ON;
+            return state[(dz + r) * w + dx + r];
+        }
+
+        /** Columns of the reach box off the faces, and in the band. */
+        public int[] counts() {
+            int off = 0, band = 0;
+            for (byte b : state) {
+                if (b == OFF)
+                    off++;
+                else if (b == BAND)
+                    band++;
+            }
+            return new int[]{off, band};
+        }
+
+        /** The seam of a body centred on (x, z) with this reach, or null when its reach and band stay on the faces. */
+        static Seam of(Faces faces, int x, int z, int reach, int circumference) {
+            if (faces == Faces.ALL)
+                return null;
+            int g = SEAM_GAP, e = reach + g, we = 2 * e + 1;
+            boolean[] off = new boolean[we * we];
+            boolean any = false;
+            for (int dz = -e; dz <= e; dz++)
+                for (int dx = -e; dx <= e; dx++) {
+                    long gx = (long) x + dx;
+                    if (circumference > 0)
+                        gx = Math.floorMod(gx + circumference / 2, (long) circumference) - circumference / 2;
+                    boolean o = !faces.on((int) gx, z + dz);
+                    off[(dz + e) * we + dx + e] = o;
+                    any |= o;
+                }
+            if (!any)
+                return null;
+            int w = 2 * reach + 1;
+            byte[] state = new byte[w * w];
+            for (int dz = -reach; dz <= reach; dz++)
+                for (int dx = -reach; dx <= reach; dx++) {
+                    byte s = ON;
+                    if (off[(dz + e) * we + dx + e]) {
+                        s = OFF;
+                    } else {
+                        for (int ez = dz - g; ez <= dz + g && s == ON; ez++)
+                            for (int ex = dx - g; ex <= dx + g; ex++)
+                                if (off[(ez + e) * we + ex + e]) {
+                                    s = BAND;
+                                    break;
+                                }
+                    }
+                    state[(dz + reach) * w + dx + reach] = s;
+                }
+            return new Seam(reach, state);
+        }
     }
 
     /** Whether column (x, z) holds or borders water (the sea, a lake, a river, a bank). */
@@ -147,15 +245,37 @@ public final class Magma {
      * @param reach      horizontal radius that holds everything, blocks
      * @param deep       the crust-deep column under the chamber (stacked lenses, conduits and the body of
      *                   altered hot rock around them); null: the volcano has none
+     * @param seam       where its reach leaves a cube world's faces ({@link Seam}); null: it stays on them
      */
     public record Body(int id, String kind, double activity, int x, int z, int floorY, int chamberY, int chamberRh,
                        int chamberRv, int conduitTop, int plugTop, boolean submerged, boolean lake, int lakeRadius,
-                       int lakeTop, int lakeBottom, int reach, Deep deep) {
+                       int lakeTop, int lakeBottom, int reach, Deep deep, Seam seam) {
 
         /** What the block at offset (dx, dz) from the centre column and height y is. */
         public Part at(int dx, int dz, int y) {
             if (chamberRh <= 0)
                 return Part.NONE;
+            if (seam == null)
+                return plain(dx, dz, y);
+            byte s = seam.state(dx, dz);
+            if (s == Seam.OFF)
+                return Part.NONE;
+            Part p = plain(dx, dz, y);
+            if (s == Seam.ON)
+                return p;
+            // In the seam band: the body's shell, sealing the cut on its own face.
+            return switch (p) {
+                case CHAMBER -> Part.CHAMBER_SHELL;
+                case CONDUIT -> Part.CONDUIT_SHELL;
+                case LENS -> Part.LENS_SHELL;
+                case LAKE -> Part.LAKE_SHELL;
+                case PLUG -> Part.NONE;
+                default -> p;
+            };
+        }
+
+        /** The body's part at an offset as if the planet had no edge (the body whole). */
+        private Part plain(int dx, int dz, int y) {
             long d2 = (long) dx * dx + (long) dz * dz;
             if (lake) {
                 int r = lakeRadius;
@@ -194,7 +314,7 @@ public final class Magma {
 
         /** Whether the block at offset (dx, dz) and height y lies in the body of altered hot rock around the column. */
         public boolean mush(int dx, int dz, int y) {
-            return chamberRh > 0 && deep != null && deep.mush(dx, dz, y);
+            return chamberRh > 0 && deep != null && (seam == null || seam.state(dx, dz) == Seam.ON) && deep.mush(dx, dz, y);
         }
 
         /** The lowest and highest y any part of the body may occupy. */
@@ -513,9 +633,21 @@ public final class Magma {
     /** As {@link #build(List, MagmaRules, Heights, Wet, int, int, int, double, double)} with the world's floor given. */
     public static Magma build(List<Volcanoes.Volcano> volcanoes, MagmaRules rules, Heights heights, Wet wet, int circumference,
                               int seaLevel, int lavaFloorY, int minY, double mH, double mV) {
+        return build(volcanoes, rules, heights, wet, circumference, seaLevel, lavaFloorY, minY, mH, mV, Faces.ALL);
+    }
+
+    /**
+     * As {@link #build(List, MagmaRules, Heights, Wet, int, int, int, int, double, double)} on a world
+     * whose planet is {@code faces}: every body is shaped from its own face's ground and water and cut
+     * and sealed at a turning edge ({@link Seam}); a crater lake needs its ring and the seam band
+     * round it on the faces.
+     */
+    public static Magma build(List<Volcanoes.Volcano> volcanoes, MagmaRules rules, Heights heights, Wet wet, int circumference,
+                              int seaLevel, int lavaFloorY, int minY, double mH, double mV, Faces faces) {
         if (rules.chamberSize() <= 0.0 || volcanoes.isEmpty())
             return new Magma(List.of(), circumference);
         List<Draft> drafts = new ArrayList<>();
+        Faces own = (ax, az) -> faces.on(circumference > 0 ? Math.floorMod(ax + circumference / 2, circumference) - circumference / 2 : ax, az);
         for (Volcanoes.Volcano v : volcanoes) {
             int x = (int) Math.round(v.x()), z = (int) Math.round(v.z());
             if (circumference > 0)
@@ -535,15 +667,25 @@ public final class Magma {
             }
             if (rv < 3)
                 rh = 0;   // no room between the ground and the lava floor
+            if (!own.on(x, z))
+                rh = 0;   // a vent off the planet's faces (none should be): nothing of it is built
+            // The water round the vent, on its own face: off the faces the columns are the partner's.
             boolean submerged = floorY <= seaLevel + 2;
             for (int dx = -2; dx <= 2 && !submerged; dx++)
                 for (int dz = -2; dz <= 2 && !submerged; dz++)
-                    submerged = wet.at(x + dx, z + dz);
+                    submerged = own.on(x + dx, z + dz) && wet.at(x + dx, z + dz);
             // A lake's level: one block under the lowest ground of the ring around it.
             int r = v.craterRadiusM() > 0.0
                     ? Math.clamp(Math.round(0.5 * v.craterRadiusM() / mH), LAKE_MIN_RADIUS, LAKE_MAX_RADIUS) : LAKE_MIN_RADIUS;
             int lakeTop = Integer.MAX_VALUE;
             boolean fits = rh > 0 && !submerged;
+            // The ring and the seam band round it on the vent's own face: a lake cut by a turning edge
+            // would rest on the partner's ground there, so the volcano keeps its plug.
+            int rf = r + 2 + SEAM_GAP;
+            for (int dx = -rf; dx <= rf && fits && faces != Faces.ALL; dx++)
+                for (int dz = -rf; dz <= rf && fits; dz++)
+                    if (dx * dx + dz * dz <= rf * rf && !own.on(x + dx, z + dz))
+                        fits = false;
             for (int dx = -r - 2; dx <= r + 2 && fits; dx++)
                 for (int dz = -r - 2; dz <= r + 2 && fits; dz++) {
                     int d2 = dx * dx + dz * dz;
@@ -578,8 +720,9 @@ public final class Magma {
             int reach = Math.max(d.rh + 2, lake ? d.lakeRadius + 2 : 2);
             if (d.deep != null)
                 reach = Math.max(reach, d.deep.reach);
+            Seam seam = d.rh > 0 ? Seam.of(faces, d.x, d.z, reach, circumference) : null;
             out.add(new Body(d.v.id(), d.v.kind(), d.v.activity(), d.x, d.z, d.floorY, d.cy, d.rh, d.rv, conduitTop, plugTop,
-                    d.submerged, lake, d.lakeRadius, lake ? d.lakeTop : 0, lakeBottom, reach, d.deep));
+                    d.submerged, lake, d.lakeRadius, lake ? d.lakeTop : 0, lakeBottom, reach, d.deep, seam));
         }
         return new Magma(out, circumference);
     }

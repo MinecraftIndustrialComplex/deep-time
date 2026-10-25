@@ -2,7 +2,10 @@
 package com.minecraftindustrialcomplex.deeptime.climate;
 
 import com.google.gson.JsonObject;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
+import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
+import com.minecraftindustrialcomplex.deeptime.worldgen.CubeFill;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
 import com.minecraftindustrialcomplex.deeptime.worldgen.Geothermal;
 import com.minecraftindustrialcomplex.deeptime.worldgen.RegionSpawnTarget;
@@ -102,7 +105,10 @@ public final class VolcanicCensus {
         return b.unwrapKey().map(k -> k.location().toString()).orElse("?");
     }
 
-    /** Samples every {@code step} blocks inside the pole edge less {@code poleMargin}. */
+    /**
+     * Samples every {@code step} blocks inside the pole edge less {@code poleMargin}; on a cube world the faces only
+     * ({@link WorldDataTerrain#onFaces}: a void column shows its partner's, so each planet column counts once).
+     */
     public static Result run(ServerLevel level, int step, int poleMargin) {
         if (!(level.getChunkSource().getGenerator() instanceof GeologicChunkGenerator g) || !(g.terrain() instanceof WorldDataTerrain t))
             throw new IllegalStateException(level.dimension().location() + " is not a Deep Time level on world data");
@@ -133,6 +139,8 @@ public final class VolcanicCensus {
             if (Math.abs(z) > zp - poleMargin)
                 continue;
             for (int x = -c / 2 + step / 2; x < c / 2; x += step) {
+                if (!t.onFaces(x, z))
+                    continue;
                 double y = t.height(x, z);
                 if (y <= sea)
                     continue;
@@ -267,18 +275,25 @@ public final class VolcanicCensus {
         return best;
     }
 
-    /** Isolated volcanic biome cells at the surface over every surface zone's box, both placements. */
+    /**
+     * Isolated volcanic biome cells at the surface over every surface zone's box, both placements. On a cube world
+     * a cell off the faces is not counted, and a neighbour there is the cell the game shows (its partner's,
+     * {@link CubeFill#foldedBiome}), the cell's neighbour on the planet across a turning edge.
+     */
     private static void specks(VolcanicZones zones, WorldDataTerrain t, net.minecraft.world.level.biome.BiomeSource biomes,
                                Climate.Sampler sampler, Side now, Side plain) {
         Map<Long, Holder<Biome>[]> cells = new HashMap<>();
+        CubeLayout cube = t.data().projection() instanceof WorldProjection.Cube cp ? cp.cube() : null;
+        Holder<Biome> deep = cube == null ? null : CubeFill.deepOcean(biomes);
         java.util.function.LongFunction<Holder<Biome>[]> at = key -> cells.computeIfAbsent(key, k -> {
             long kk = k;
             int qx = (int) (kk >> 32), qz = (int) kk;
             int x = QuartPos.toBlock(qx) + 2, z = QuartPos.toBlock(qz) + 2;
             int qy = QuartPos.fromBlock((int) Math.floor(t.height(x, z)));
+            java.util.function.Supplier<Holder<Biome>> game = cube == null ? () -> biomes.getNoiseBiome(qx, qy, qz, sampler)
+                    : () -> CubeFill.foldedBiome(cube, biomes, sampler, deep, qx, qy, qz);
             @SuppressWarnings("unchecked")
-            Holder<Biome>[] pair = new Holder[]{biomes.getNoiseBiome(qx, qy, qz, sampler),
-                    VolcanicBiomes.plain(() -> biomes.getNoiseBiome(qx, qy, qz, sampler))};
+            Holder<Biome>[] pair = new Holder[]{game.get(), VolcanicBiomes.plain(game)};
             return pair;
         });
         java.util.Set<Long> seen = new java.util.HashSet<>();
@@ -289,7 +304,7 @@ public final class VolcanicCensus {
             for (int qx = QuartPos.fromBlock(zn.x() - r); qx <= QuartPos.fromBlock(zn.x() + r); qx++)
                 for (int qz = QuartPos.fromBlock(zn.z() - r); qz <= QuartPos.fromBlock(zn.z() + r); qz++) {
                     long k = key(qx, qz);
-                    if (!seen.add(k))
+                    if (!seen.add(k) || !t.onFaces(QuartPos.toBlock(qx) + 2, QuartPos.toBlock(qz) + 2))
                         continue;
                     Holder<Biome>[] here = at.apply(k);
                     for (int side = 0; side < 2; side++) {

@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.compat;
 
 import com.minecraftindustrialcomplex.deeptime.api.Site;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Body;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Deposits;
 import com.minecraftindustrialcomplex.deeptime.worldgen.LevelSites;
 import net.minecraft.world.level.ChunkPos;
@@ -22,7 +23,9 @@ import java.util.function.Predicate;
  * volume (blocks) of its {@code ore} bodies ({@link Body#locate}, the deposit feature's own test,
  * erosion clip included) in every chunk column it reaches; lithocaps and gossans do not count.
  * Chunk x is taken in the canonical span, so a body across the seam fills the chunks on both
- * sides. Computed once per site and world data (every block of the bodies' bounds; a body bigger
+ * sides. On a cube world a chunk wholly off the faces counts nothing: it places no ore of its own
+ * ({@code CubeFill}, ledger SCL-210; it holds a turned copy of its partner's, whose own sites count
+ * there), so the part of a body past a turning edge is not in the game. Computed once per site and world data (every block of the bodies' bounds; a body bigger
  * than {@link #MAX_SAMPLES} evaluations is sampled on a coarser lattice, each sample standing for
  * stride³ blocks) and kept while the world data is loaded.
  */
@@ -89,14 +92,18 @@ public final class SiteChunks {
     public static Footprint footprint(LevelSites sites, Site site) {
         Deposits d = sites.deposits();
         Map<Integer, Footprint> perSite = CACHE.computeIfAbsent(d, k -> new ConcurrentHashMap<>());
-        return perSite.computeIfAbsent(site.id(), id -> compute(d, id));
+        return perSite.computeIfAbsent(site.id(), id -> compute(d, id, sites.cube()));
     }
 
-    private static Footprint compute(Deposits d, int siteId) {
-        List<Body> ore = d.bodies().ofSite(siteId).stream().filter(b -> ORE_ROLE.equals(b.role())).toList();
+    private static Footprint compute(Deposits d, int siteId, CubeLayout cube) {
+        return compute(d.bodies().ofSite(siteId), d.circumference(), cube, siteId);
+    }
+
+    /** The footprint of a site's bodies on a planet of circumference {@code c} ({@code cube}: a cube world's net, or null). */
+    static Footprint compute(List<Body> bodies, int c, CubeLayout cube, int siteId) {
+        List<Body> ore = bodies.stream().filter(b -> ORE_ROLE.equals(b.role())).toList();
         if (ore.isEmpty())
             return new Footprint(siteId, Map.of(), 0, 1);
-        int c = d.circumference();
         // A site's ore bodies are disjoint (one per seam of a stacked deposit, FORMAT.md "Bodies"),
         // so each is sampled over its own bounds and the counts add. The lattice step is set by
         // the bounds' total volume: a stack of thin seams is not one tall box.
@@ -118,6 +125,8 @@ public final class SiteChunks {
                 int cx = canonicalChunkX(c, x >> 4);
                 for (long zl = min[2]; zl <= max[2]; zl += stride) {
                     int z = (int) zl;
+                    if (cube != null && cube.faceOfBlock(x, z) == null)
+                        continue;   // a void chunk: none of this body is placed there
                     long key = ChunkPos.asLong(cx, z >> 4);
                     double column = 0;
                     for (long yl = min[1]; yl <= max[1]; yl += stride)

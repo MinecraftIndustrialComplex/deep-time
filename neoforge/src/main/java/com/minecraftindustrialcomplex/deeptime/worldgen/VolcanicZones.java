@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 
@@ -150,17 +151,20 @@ public final class VolcanicZones {
         }
     }
 
-    public static final VolcanicZones NONE = new VolcanicZones(List.of(), 0);
+    public static final VolcanicZones NONE = new VolcanicZones(List.of(), 0, null);
 
     private static final int CELL = 64;
 
     private final List<Zone> zones;
     private final int circumference;
+    /** A cube world's net, whose off-face columns a query folds onto the partner they show; null on Lambert. */
+    private final CubeLayout cube;
     private final int nx;
     private final double cellW;
     private final Map<Long, int[]> grid = new HashMap<>();
 
-    private VolcanicZones(List<Zone> zones, int circumference) {
+    private VolcanicZones(List<Zone> zones, int circumference, CubeLayout cube) {
+        this.cube = cube;
         List<Zone> sorted = new ArrayList<>(zones);
         sorted.sort(java.util.Comparator.comparingInt((Zone z) -> z.role.ordinal()));
         this.zones = List.copyOf(sorted);
@@ -207,12 +211,33 @@ public final class VolcanicZones {
     }
 
     /**
+     * Column (x, z) as a query reads it: itself on Lambert and on a cube face; off a cube world's faces the
+     * partner column it shows ({@link CubeLayout#fold}, as {@code CubeFill.foldedBiome} reads the biome
+     * there); null past the net's corners, where no zone lies. A zone is a disc on the net plane round
+     * its own face's source, so the part of it past a turning edge is not the planet's and is never read.
+     */
+    private long[] onPlanet(int x, int z) {
+        if (cube == null)
+            return new long[]{x, z};
+        CubeLayout.Fold f = cube.fold(x, z);
+        if (f instanceof CubeLayout.Outside o)
+            return new long[]{o.x(), o.z()};
+        return f instanceof CubeLayout.OnFace ? new long[]{x, z} : null;
+    }
+
+    /**
      * The roles whose discs hold block column (x, z), as a bit set over {@link Role#ordinal()} (bit i:
-     * role i); 0 outside every zone. Surface and cave roles both.
+     * role i); 0 outside every zone. Surface and cave roles both. Off a cube world's faces, the partner
+     * column's roles ({@link #onPlanet}).
      */
     public int rolesAt(int x, int z) {
         if (zones.isEmpty())
             return 0;
+        long[] p = onPlanet(x, z);
+        if (p == null)
+            return 0;
+        if (p[0] != x || p[1] != z)
+            return rolesAt((int) p[0], (int) p[1]);
         int[] ids = grid.get(key(cellX(x), Math.floorDiv(z, CELL)));
         if (ids == null)
             return 0;
@@ -229,10 +254,16 @@ public final class VolcanicZones {
 
     /**
      * How far block column (x, z) lies outside every zone of a surface role, in blocks ({@link Zone#outside});
-     * 0 or less inside one. {@code Double.POSITIVE_INFINITY} with no zone.
+     * 0 or less inside one. {@code Double.POSITIVE_INFINITY} with no zone and past a cube net's corners; off
+     * a cube world's faces, the partner column's distance ({@link #onPlanet}).
      */
     public double outsideSurfaceZones(int x, int z) {
         double best = Double.POSITIVE_INFINITY;
+        long[] p = onPlanet(x, z);
+        if (p == null)
+            return best;
+        x = (int) p[0];
+        z = (int) p[1];
         for (Zone zn : zones) {
             if (zn.role.cave)
                 continue;
@@ -287,7 +318,7 @@ public final class VolcanicZones {
                                       VolcanicBiomeRules rules, double mH, int circumference, WorldProjection projection,
                                       Ground ground) {
         if (rules.off())
-            return new VolcanicZones(List.of(), circumference);
+            return new VolcanicZones(List.of(), circumference, cubeOf(projection));
         double reach = rules.reach();
         List<Zone> out = new ArrayList<>();
         for (Volcanoes.Volcano v : volcanoes) {
@@ -340,7 +371,11 @@ public final class VolcanicZones {
         for (Magma.Body b : bodies)
             if (b.chamberRh() > 0)
                 out.add(new Zone(Role.THERMAL_CAVES, b.id(), b.x(), b.z(), Math.max(MIN_RADIUS, CAVE_SHARE * b.chamberRh())));
-        return new VolcanicZones(out, circumference);
+        return new VolcanicZones(out, circumference, cubeOf(projection));
+    }
+
+    private static CubeLayout cubeOf(WorldProjection projection) {
+        return projection instanceof WorldProjection.Cube c ? c.cube() : null;
     }
 
     /**
