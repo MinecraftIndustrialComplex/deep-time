@@ -3,6 +3,7 @@ package com.minecraftindustrialcomplex.deeptime.worldgen;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 
 import java.util.Set;
 
@@ -144,6 +145,17 @@ public final class StructureBurial {
                     least = h;
             }
         return Double.isInfinite(least) ? Integer.MAX_VALUE : (int) Math.floor(least);
+    }
+
+    /**
+     * The ground a start is buried against on a cube world: {@code height} on the faces, NaN off them, which
+     * {@link #leastGround} skips. A chunk wholly off the faces places no structure piece ({@code CubeFill}, ledger
+     * SCL-210), so the ground the void shows past a turning edge (the partner face's, folded) carries nothing of
+     * the start; before 2026-10-25 a start by a seam was buried against it, deeper than its own ground asked or
+     * dropped. {@code height} itself with no cube.
+     */
+    public static Height onFaces(Height height, CubeLayout cube) {
+        return cube == null ? height : (x, z) -> cube.faceOfBlock(x, z) != null ? height.at(x, z) : Double.NaN;
     }
 
     /** {@link #leastGround} on {@link #GRID}. */

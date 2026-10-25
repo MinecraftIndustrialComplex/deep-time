@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonParser;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,23 @@ class StructureBurialTest {
     void theRuleDoesNotOverflowOnAnEmptyGroundSample() {
         assertEquals(0, plan(-40, 17, Integer.MAX_VALUE), "no ground sample: nothing to bury against");
         assertEquals(StructureBurial.DROP, plan(-40, 17, Integer.MIN_VALUE + 100));
+    }
+
+    /**
+     * On a cube world the ground past a turning edge is skipped: the void's chunks place no piece, so a trench the
+     * void shows beside N's west edge (the partner face's ground) neither buries a start by the seam nor drops it.
+     * Before the filter the trench set the least ground.
+     */
+    @Test
+    void theGroundPastATurningEdgeIsSkipped() {
+        CubeLayout cube = CubeLayout.of(1024);
+        int west = -512;
+        StructureBurial.Height trench = (x, z) -> cube.faceOfBlock(x, z) == null ? -300.0 : -20.0;
+        assertEquals(-300, StructureBurial.leastGround(trench, west - 40, west + 70, -1100, -1000), "the plain rule reads the void");
+        assertEquals(-20, StructureBurial.leastGround(StructureBurial.onFaces(trench, cube), west - 40, west + 70, -1100, -1000));
+        assertEquals(Integer.MAX_VALUE, StructureBurial.leastGround(StructureBurial.onFaces(trench, cube), west - 90, west - 1, -1100, -1000),
+                "a box wholly off the faces has nothing to bury against");
+        assertTrue(StructureBurial.onFaces(trench, null) == trench, "no cube, no filter");
     }
 
     @Test

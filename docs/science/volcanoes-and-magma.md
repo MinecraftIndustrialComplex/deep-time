@@ -602,6 +602,17 @@ What the previews show:
   blackstone or smooth basalt on a band of a noise (both ends within ±1.5); a one-sided threshold
   stays, so Terralith's Yellowstone keeps its calcite patches, and a pack that drew stripes some
   other way would keep them.
+- **A magma body ends at a cube world's turning edge.** A vent stands on a face, but its lenses (5 to
+  90 blocks across), its mush and its lake ring can reach past a turning seam, where the ground is a
+  turned copy of the partner face (cube-world-game.md, item 15). The body is cut there and sealed on
+  its own face (MAG-059): within two columns of the edge its lava, conduit and lake are basalt shell,
+  its plug and mush left out, so a lens ends against a two-column wall of its face's rock. A real
+  body would go on under the partner face; folding the body onto it as the lava flows are (item 14)
+  would keep it whole, but every lens, the mush and the lake would have to be turned into the partner
+  face's frame, and the partner's chunks would have to look for bodies across each edge; the cut keeps
+  the rule the seal already states (MAG-041). Its vent's water test and
+  its lake's ring read its own face only, and a lake whose ring would cross the edge leaves the
+  volcano its plug.
 
 ## Game choices
 
@@ -623,6 +634,7 @@ What the previews show:
 | A quarter of able volcanoes have an open lava lake (MAG-019), though persistent lava lakes are rare on Earth | "a player should be able to find one" | agent, build log 2026-10-01 |
 | Vanilla's cave carvers are kept 6 blocks from the underwater face of a sea cliff (MAG-057) | the carvers cut arches into the underwater base of the sea cliffs beside a volcano; the arches are an artefact of the carvers, not geology | Ben's report, 2026-10-02 (the setting is `sea_cliff_skin_blocks`; 0 gives vanilla's carving) |
 | Lava is sealed in smooth basalt and never touches water (MAG-010, MAG-011, MAG-041) | lava pools were found overlapping the ocean | agent, build log 2026-10-01, after Ben's report |
+| A body reaching past a cube world's turning edge is cut there and sealed with a shell two columns thick, not shrunk, dropped or folded onto the partner face (MAG-059) | MAG-041's rule (every body sealed) at the cut; shrinking or dropping would break the size rules (MAG-003, MAG-048, MAG-054) or take an active volcano's magma away | agent, coordinator's follow-up task, 2026-10-25 |
 | Arc volcanoes at least 60 km apart (VOL-039) | keeps the doubled cones apart; one cone stands for a large long-lived centre | agent, build log 2026-09-30; reviewed WP-2 2026-10-02 |
 | Summit crater at least 2 km across (VOL-091) | a typical real crater (0.5 km, Pike & Clow 1981) would be under two blocks wide; the drawn one is of Grosse et al. 2014's size class, so it takes their median depth, 240 m (VOL-026) | agent, build log 2026-09-30; the depth Ben, 2026-10-22 |
 | A cone is laid on the ground from its vent: the vent's ground level inside 0.4 of its radius, fading to its foot (VOL-080, VOL-081) | a cone is built by eruptions from its vent, so its summit is the vent; how far a real cone's onlap reaches down a slope was not read in a source | agent, coordinator's call, 2026-10-22, after Ben's volcano 27476 |

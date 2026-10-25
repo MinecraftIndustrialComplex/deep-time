@@ -334,7 +334,8 @@ public final class BiomeCensus {
     }
 
     /**
-     * Samples every {@code step} blocks inside the pole edge (|z| ≤ R − {@code poleMargin}, R = C/2π the pole).
+     * Samples every {@code step} blocks inside the pole edge (|z| ≤ R − {@code poleMargin}, R = C/2π the pole); on a
+     * cube world the counts read the faces only ({@link WorldDataTerrain#onFaces}), the map the whole window.
      *
      * @param mapFile write the whole grid (palette, biome indices, Köppen classes, heights) here as
      *                JSON with base64 arrays, or null
@@ -458,6 +459,10 @@ public final class BiomeCensus {
                 koppen[cell] = (byte) k;
                 height[cell] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(y)));
                 if (Math.abs(z) > zp - poleMargin)
+                    continue;
+                // The map holds the whole window; the counts hold a cube world's faces only (a void column shows its
+                // partner's, so each planet column counts once).
+                if (!t.onFaces(x, z))
                     continue;
                 int call = seaCall(wd, elevation, sea, x, z);
                 if (call >= 0) {
