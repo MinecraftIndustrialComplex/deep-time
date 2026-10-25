@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: LGPL-3.0-or-later
-"""How much of the over-land reach's fall is the water and how much the lattice's stretch (RLC-052).
+"""What the over-land reach takes from M5 and what the lattice stretch would have taken (RLC-052).
 
     python3 -I tools/review/m5diag/m5fix_stretch.py <run folder> [<run folder> ...]
 
-Per run, on the Fibonacci points of the final fields with the closed bodies as land: the coast the
-straight-line reach (version 1, same landmass) qualifies and the over-land reach does not, as shares of
-the coast, split by the straight-line distance to the nearest high point: up to 170 km (a strait or a
-bay stands in the way; a path stretched by the lattice, at most 1.15, still fits 200 km) and 170 to
-200 km (the stretch alone could do it). Prints one JSON line per run and the medians.
-Needs numpy and scipy."""
+Per run, on the Fibonacci points of the final fields with the closed bodies as land: the coast that the
+straight-line reach (version 1, same landmass) qualifies and the over-land reach (the straight run when
+it stays on ground, else the path) does not, as shares of the coast ("lost"), split by the straight-line
+distance to the nearest high point: up to 170 km and 170 to 200 km. "path_only" is the share the path
+alone (Dijkstra over points joined within 1.6 spacings, no straight run) would qualify: its gap to
+"qualified_path" is the lattice's stretch, which the straight run removes. Prints one JSON line per run
+and the medians. Needs numpy and scipy."""
 import contextlib
 import io
 import json
@@ -35,6 +36,18 @@ def one(folder):
     with contextlib.redirect_stdout(io.StringIO()):
         straight = cc.coast_geometry(p, z, sp, over_land=False)
         path = cc.coast_geometry(p, z, sp)
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import dijkstra
+    from scipy.spatial import cKDTree
+    ground = path["ground"]
+    gi = np.nonzero(ground)[0]
+    pg = p[gi]
+    pairs = cKDTree(pg).query_pairs(cc.chord(1.6 * sp), output_type="ndarray")
+    wt = cc.arc_km(np.linalg.norm(pg[pairs[:, 0]] - pg[pairs[:, 1]], axis=1))
+    g = coo_matrix((wt, (pairs[:, 0], pairs[:, 1])), shape=(gi.size, gi.size)).tocsr()
+    dist = np.full(z.size, np.inf)
+    dist[gi] = dijkstra(g, directed=False, indices=np.nonzero(path["hi"][gi])[0], limit=200.0, min_only=True)
+    path_only = path["coast"] & (dist <= 200.0)
     coast = path["coast"]
     n = max(int(coast.sum()), 1)
     lost = straight["has"] & ~path["has"]
@@ -42,7 +55,7 @@ def one(folder):
             "qualified_path": path["has"].sum() / n, "lost": lost.sum() / n,
             "lost_to_170": (lost & (straight["reach"] <= 170.0)).sum() / n,
             "lost_170_to_200": (lost & (straight["reach"] > 170.0)).sum() / n,
-            "gained": (path["has"] & ~straight["has"]).sum() / n}
+            "path_only": path_only.sum() / n}
 
 
 def main():
