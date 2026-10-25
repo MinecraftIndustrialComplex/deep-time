@@ -26,7 +26,7 @@ import java.util.Map;
  * and the conformal cube round; a volcano's zones take the projection's local stretch at the vent
  * ({@link #stretch}), so they lie on the cone, its crater and its flanks as the terrain draws them.
  * An oceanic volcano's zones are sized on the part of its edifice above the sea, not on its basal radius on the
- * sea floor ({@link #subaerialShare}; ledger BIO-196). Every number here is a game choice (ledger BIO-104 to
+ * sea floor ({@link #subaerialShare}; ledger BIO-198). Every number here is a game choice (ledger BIO-104 to
  * BIO-113, BIO-182).
  */
 public final class VolcanicZones {
@@ -75,7 +75,7 @@ public final class VolcanicZones {
     public static final int MIN_RING = 8; // ledger: BIO-105 (game-choice)
     /**
      * The cone zone: summit and upper flanks, as a share of the basal radius (times the reach setting); of an
-     * oceanic volcano's radius above the sea ({@link #subaerialShare}, ledger: BIO-196).
+     * oceanic volcano's radius above the sea ({@link #subaerialShare}, ledger: BIO-198).
      */
     public static final double CONE_SHARE = 0.45; // ledger: BIO-106 (game-choice)
     /** The ash and lava fields reach this share of the basal radius (an oceanic volcano's above the sea), times the reach setting. */
@@ -297,7 +297,7 @@ public final class VolcanicZones {
             // World blocks per planet block along the stretch's two axes (equal on the conformal cube).
             Stretch st = stretch(projection, v.x(), v.z()); // ledger: BIO-182 (game-choice)
             double basal = Math.max(6.0, v.radiusM() / mH);
-            // An oceanic volcano's biomes lie on the part of the edifice above the sea (ledger: BIO-196).
+            // An oceanic volcano's biomes lie on the part of the edifice above the sea (ledger: BIO-198).
             if (v.oceanic() && ground != null)
                 basal = Math.max(6.0, subaerialShare(v, x, z, ground) * v.radiusM() / mH);
             double crater = v.craterRadiusM() / mH;
@@ -344,7 +344,7 @@ public final class VolcanicZones {
     }
 
     /**
-     * The share of an oceanic volcano's basal radius that stands above the sea (ledger: BIO-196): its radial profile
+     * The share of an oceanic volcano's basal radius that stands above the sea (ledger: BIO-198): its radial profile
      * (the simulation's, {@code Shape::profile}: stratovolcano (1 - rho)^1.5, shield (1 - rho^2)^1.5, caldera complex
      * (1 - rho^2)^2; ledger VOL-016 to VOL-018) scaled so that its summit, the vent, stands {@code heightM} over the
      * foot, and cut at the sea. The vent's height over the sea is the world's ground there ({@code ground}); the sea
@@ -364,9 +364,9 @@ public final class VolcanicZones {
         if (!(f > 0.0))
             return 1.0;
         return switch (v.kind()) {
-            case stratovolcano -> 1.0 - Math.pow(f, 1.0 / 1.5);
-            case shield -> Math.sqrt(1.0 - Math.pow(f, 1.0 / 1.5));
-            case caldera_complex -> Math.sqrt(1.0 - Math.sqrt(f));
+            case "stratovolcano" -> 1.0 - Math.pow(f, 1.0 / 1.5);
+            case "shield" -> Math.sqrt(1.0 - Math.pow(f, 1.0 / 1.5));
+            case "caldera_complex" -> Math.sqrt(1.0 - Math.sqrt(f));
             default -> 1.0;
         };
     }

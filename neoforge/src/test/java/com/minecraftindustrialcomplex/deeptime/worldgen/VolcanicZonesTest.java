@@ -284,7 +284,7 @@ class VolcanicZonesTest {
     }
 
     /**
-     * An oceanic shield's zones are sized on the part of the edifice above the sea (BIO-196), not on its basal radius
+     * An oceanic shield's zones are sized on the part of the edifice above the sea (BIO-198), not on its basal radius
      * on the sea floor: a shield standing 10.8 blocks above the sea at its vent, 3,000 m over a 220-block foot, has its
      * coast where its profile (1 - rho^2)^1.5 falls to the sea, 64 blocks out, and its cone zone (0.45 of that) lies
      * inside it. Sized on the foot the cone zone reached 99 blocks, past the coast.
