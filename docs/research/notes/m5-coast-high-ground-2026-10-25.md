@@ -337,6 +337,22 @@ Not terms:
    points of the census's count (PLT-360's own row says so). On the census's Lambert grid Earth reads
    0.093 by surface and 0.084 without the sheets.
 
+## Applied (2026-10-25, the measure-fix lane, RLC-055)
+
+The three defects of the measure are fixed in `tools/review/continents_census.py` and
+`pool/measure_v1census.py` (version 2, measure name `v1census2`): the world ocean (largest body of sea
+points joined within 1.6 spacings; every other body is ground), the reach over land (the straight run when
+its nine interior samples are ground, else a path over ground points), and Fibonacci sampling of the final
+fields. The two errors above are corrected in realism-checks.md. Fixture tests: `tools/review/test_continents_census.py`.
+On base12 the medians of M5 are 0.2478 on the first measure and 0.2292 on the corrected one (Fibonacci alone
+0.2718, plus closed bodies 0.2373, plus reach 0.2292); the other six checks are unchanged in 24 of 24 runs.
+Earth by rock at N = 332,800 is 0.0634 (was 0.0756), the 0 Ma PaleoDEM is 0.1003 (was 0.1088). Under RLC-002
+the fire edge stays at 0.11 and the watch line moves from 0.08 to 0.07. Two things the note's plan got
+differently: the closed-body rule is connectivity, not the 1 Mkm2 size cut (a 1 Mkm2 cut would close
+bodies that are not closed), and the reach takes the straight run when it is clear because the path alone
+adds up to 15 percent of lattice stretch, which cut Earth's reach more than the model's (Earth's high ground
+sits 100 to 200 km back). `tools/review/m5diag/m5fix_*` reproduce the numbers.
+
 ## Traps
 
 - **The map at 0 (`maps/t0000.bin`) has no flags.** It is a fresh lattice with exactly 100,000
