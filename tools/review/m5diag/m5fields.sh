@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# M5 diagnosis: the census-grid analysis of base12's 24 runs (VM, cached pool folders only).
+# M5 diagnosis: the census-grid analysis of an arm's runs (VM, cached pool folders only): m5fields.sh [workers] [out] [runs];
+# M5DIAG_RUNS names the arm's folder (default base12's).
 set -uo pipefail
 cd "$(dirname "$0")/../../.."
 mkdir -p /data/ban/deeptime-runs/m5diag
