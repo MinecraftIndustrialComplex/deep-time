@@ -38,10 +38,11 @@
 //!   thickness factor ([`slab_weight`]), `L` the contact's tracked slab length and `D`
 //!   `slab_depth_km`. Continental crust in the trench pulls nothing.
 //! - **Slab suction** (drives the overriding plate, towards the trench): `slab_suction_share` of
-//!   that pull (Forsyth & Uyeda's 0.50 / 6.43 with `forsyth_uyeda_balance`). With `suction_saturates` (PLT-540) it is a traction towards the flow the sinking
-//!   slab drives, `k (v_t − u)`: `u` the overriding plate's speed towards the trench, `v_t` the
-//!   slab's terminal velocity (its pull over its slab resistance, Forsyth & Uyeda 1975), `k v_t`
-//!   the share of the pull. At rest it is the share; it falls to nothing as the plate catches up
+//!   that pull (Forsyth & Uyeda's 0.50 / 6.43 with `forsyth_uyeda_balance`, whatever the
+//!   speed). With `suction_saturates` (PLT-540) and without that it is a traction towards the
+//!   flow the sinking slab drives, `k (v_t − u)`: `u` the overriding plate's speed towards the
+//!   trench, `v_t` the slab's terminal velocity (its pull over its slab resistance, Forsyth &
+//!   Uyeda 1975), `k v_t` the share of the pull. At rest it is the share; it falls to nothing as the plate catches up
 //!   with the slab, so no overriding plate is drawn faster than the slab sinks.
 //! - **Edge energy** (ridge push and the weight of high ground): at every boundary sample of a
 //!   plate, `(U(edge) − Ū) · edge_energy / EDGE_ENERGY_PHYSICAL` per metre, pushing the plate
@@ -51,7 +52,7 @@
 //!   At a collision front the belt's weight acts as the collision resistance instead (below).
 //! - **Basal drag** (resists): per m², `c_b (v − v_flow)`, `keel_drag` times more under
 //!   continental crust. `c_b` is set by `plate_speed_scale_mm_yr` (see [`Coeffs::new`]); with
-//!   `forsyth_uyeda_balance` (PLT-585, the default) it and every other resistance's size are
+//!   `forsyth_uyeda_balance` (PLT-585, off by default) it and every other resistance's size are
 //!   Forsyth & Uyeda's (1975, Table 6) against the reference pull, the continental factor theirs
 //!   too, and the speed scale is not read.
 //! - **Mantle flow** (drives, weakly): the drag of a slow degree-2 flow ([`flow_velocity`]) of
@@ -280,7 +281,8 @@ pub struct Coeffs {
     /// Slab pull per metre of trench of the reference slab, N/m (with `slab_pull` and gravity).
     pub pull_n_m: f64,
     pub suction_share: f64,
-    /// The suction saturates at the slab's terminal velocity (`suction_saturates`, PLT-540).
+    /// The suction saturates at the slab's terminal velocity (`suction_saturates`, PLT-540; never
+    /// with `forsyth_uyeda_balance`, whose suction does not depend on speed).
     pub suction_saturates: bool,
     /// The edge energy's multiplier (`edge_energy / EDGE_ENERGY_PHYSICAL`).
     pub edge_scale: f64,
@@ -380,7 +382,7 @@ impl Coeffs {
             spacing_m,
             pull_n_m: f_ref * k.slab_pull,
             suction_share,
-            suction_saturates: k.suction_saturates,
+            suction_saturates: k.suction_saturates && !k.forsyth_uyeda_balance, // ledger: PLT-540, PLT-585
             edge_scale: k.edge_energy / EDGE_ENERGY_PHYSICAL,
             buoyancy: k.collision_buoyancy,
             drag,
@@ -1637,6 +1639,14 @@ mod tests {
         }
     }
 
+    /// Forsyth & Uyeda's balance (PLT-585, off by default), for its own tests.
+    fn fu() -> TectonicParams {
+        TectonicParams {
+            forsyth_uyeda_balance: true,
+            ..quiet()
+        }
+    }
+
     /// The old law, for its own tests: the speed scale and the viscous resistances (the
     /// 2026-10-02 calibration, FRC-016), the suction saturating (PLT-540).
     fn old_law() -> TectonicParams {
@@ -1661,10 +1671,10 @@ mod tests {
 
     /// `base` (plate 0 and everything but friction) solved with friction against the mantle at
     /// the rim points `(x, outward normal, length m)`, classified as the balance step does: by
-    /// Forsyth & Uyeda's rule on the plate's motion against the boundary's normal, a transform, a colliding
-    /// boundary or, where the plate pulls away, nothing. The friction is linearised about the last
-    /// answer until the answer stops changing: the fixed point the plates' motion relaxes to. The
-    /// rotation (rad/s), the last system and the solves it took.
+    /// Forsyth & Uyeda's rule on the plate's motion against the boundary's normal, a transform, a
+    /// colliding boundary or, where the plate pulls away, nothing. The friction is linearised
+    /// about the last answer until the answer stops changing: the fixed point the plates' motion
+    /// relaxes to. The rotation (rad/s), the last system and the solves it took.
     fn plastic(base: &Balance, rim: &[(DVec3, DVec3, f64)]) -> (DVec3, Balance, usize) {
         let c = base.c;
         let mut w = base.solve().expect("solvable")[0];
@@ -1700,12 +1710,10 @@ mod tests {
     /// reference plate the slab resistance is 8.9 times the basal drag.
     #[test]
     fn the_resistances_are_forsyth_and_uyedas_table_6() {
-        let k = quiet();
-        assert!(
-            k.forsyth_uyeda_balance && !k.suction_saturates,
-            "the defaults"
-        );
+        let k = fu();
         let c = coeffs(&k);
+        // One switch: the saturating suction (PLT-540, on by default) is not read with it.
+        assert!(k.suction_saturates && !c.suction_saturates);
         let v_t = c.pull_n_m / c.slab_res * 1.0e3 * YEAR_S;
         assert!(
             (v_t / (FU_SLAB_PULL / FU_SLAB_RESISTANCE * 10.0) - 1.0).abs() < 1e-12,
@@ -1733,7 +1741,7 @@ mod tests {
             boundary_resistance: 7.0,
             keel_drag: 1.0,
             slab_suction_share: 0.9,
-            ..quiet()
+            ..fu()
         });
         assert_eq!(
             (other.drag, other.keel, other.slab_res, other.boundary_res),
@@ -1763,7 +1771,7 @@ mod tests {
     /// forces in its place has the same answer.
     #[test]
     fn the_reference_plate_moves_near_its_slabs_terminal_velocity() {
-        let c = coeffs(&quiet());
+        let c = coeffs(&fu());
         let (area, pts, rim) = reference_cap(&c);
         let mut base = Balance::new(c, &[DVec3::Z]);
         for &x in &pts {
@@ -1850,7 +1858,7 @@ mod tests {
     /// floor speed.
     #[test]
     fn friction_resists_with_its_force_whatever_the_speed() {
-        let c = coeffs(&quiet());
+        let c = coeffs(&fu());
         let (pts, _) = cap(&c, 25.0);
         let x0 = on_sphere(0.0, 65.0);
         let dir = tangent(x0, DVec3::X).normalize();
@@ -1890,11 +1898,11 @@ mod tests {
     /// Table 6's basal drag (half the old law's) and no boundary resistance let it run many times
     /// the old law's speed (the plate speed lane's diagnosis: the plates with no slab pull at 135
     /// and 95 mm/yr RMS under Table 6's resistances alone, 19.5 and 15.5 under the old law). The
-    /// friction on its transforms and its colliding front takes most of that away: at Table 6's own ridge
-    /// push (0.36 per km against the pull's 6.43) the friction about balances the push and the
-    /// plate creeps at the floor speed (Forsyth & Uyeda's plates with no slab are slow: "continental
-    /// drag is the primary regulator of the velocity of plates not attached to downgoing slabs",
-    /// p. 190); at the model's (the column energy at the pool preset's ridge and old floor, about
+    /// friction on its transforms and its colliding front takes most of that away: at Table 6's
+    /// own ridge push (0.36 per km against the pull's 6.43) the friction about balances the push
+    /// and the plate creeps at the floor speed (Forsyth & Uyeda's plates with no slab are slow:
+    /// "continental drag is the primary regulator of the velocity of plates not attached to
+    /// downgoing slabs", p. 190); at the model's (the column energy at the pool preset's ridge and old floor, about
     /// 0.1 of the pull) an oceanic plate moves at about a quarter of its frictionless speed,
     /// still faster than under the old law, and a continental one slower than under the old law.
     #[test]
@@ -1904,7 +1912,7 @@ mod tests {
             oceanic_floor_elevation_m: -5651.0,
             ..k
         };
-        let c = coeffs(&pool(quiet()));
+        let c = coeffs(&pool(fu()));
         let old = coeffs(&pool(old_law()));
         let (_, pts, rim) = reference_cap(&c);
         let rim_m =
