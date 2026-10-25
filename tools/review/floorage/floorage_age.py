@@ -14,6 +14,9 @@ and by place, the places not exclusive:
   giant     on a plate over 0.2 of the planet;
   notrench  on a plate none of whose visible samples is TRENCH-flagged (it subducts nowhere);
   nofront   on a plate with no TRENCH, front-subduction or front-collision flag (it touches no convergent front);
+  the floor older than 180 Myr in the margin zone and beyond it by its distance to the nearest TRENCH-flagged sample of
+  its own plate (where its plate goes down) and of any plate (0-500, 500-1000, 1000-2000, 2000+ km, none), and the
+  age of the floor at that own-plate trench;
   and two exclusive partitions: margin / interior-not-margin / the rest, and the initiation status of floor older than
   each gate (PLT-062's 150 Myr and Crameri et al. 2020's 117.4 Myr) as rifting.rs maybe_initiate_subduction reads it.
 The status reads the map's end-of-step flags, without hidden trench samples, so it is close, not exact; the ages and the
@@ -36,6 +39,7 @@ MARGIN_KM = 200.0 + 60.0  # PLT-503: arc distance + width, plus one spacing (add
 GIANT = 0.2
 GATES = (150.0, 117.4)  # PLT-062; Crameri et al. 2020's oldest initiation age
 AGE_EDGES = [0, 10, 30, 60, 100, 150, 180, 250, 1e9]
+DT_EDGES = [0, 500, 1000, 2000]  # km; a fifth band, no such trench (an infinite distance)
 NB = len(AGE_EDGES) - 1
 T_FROM = -500.0
 
@@ -58,6 +62,12 @@ def nearest_km(p_from, p_to):
 
 def band(x):
     return np.clip(np.searchsorted(AGE_EDGES, x, side="right") - 1, 0, NB - 1)
+
+
+def dist_bands(d):
+    idx = np.where(np.isfinite(d), np.searchsorted(DT_EDGES, np.where(np.isfinite(d), d, 0.0), side="right") - 1,
+                   len(DT_EDGES))
+    return np.bincount(idx, minlength=len(DT_EDGES) + 1).astype(int).tolist()
 
 
 def bands(age, sel):
@@ -109,6 +119,24 @@ def snapshot(run, path, N, step_of):
            "giant": bands(age, giant), "notrench": bands(age, notrench), "nofront": bands(age, nofront),
            "x_interior_rest": bands(age, interior & ~margin), "x_neither": bands(age, oc & ~margin & ~interior),
            "x_giant_notrench": bands(age, giant & notrench), "x_margin_notrench": bands(age, margin & notrench)}
+    # For a trench to come to it: the floor older than 180 Myr, in the margin zone and beyond it, by its distance to
+    # the nearest trench of its own plate (a TRENCH flag on the subducting side: its plate goes down there) and to any
+    # trench, and the age of the floor at that own-plate trench.
+    dt_own = np.full(n, np.inf)
+    own_age = np.full(n, np.nan)
+    for k in range(len(ids)):
+        m = inv == k
+        mt, mo = m & trench, m & oc
+        if mt.any() and mo.any():
+            d, j = cKDTree(p[mt]).query(p[mo])
+            dt_own[mo] = km(d)
+            own_age[mo] = age[np.flatnonzero(mt)[j]]
+    old = oc & (age > 180.0)
+    for name, sel in (("margin", old & margin), ("open", old & ~margin)):
+        out[f"old180_{name}_dt_own"] = dist_bands(dt_own[sel])
+        out[f"old180_{name}_dt_any"] = dist_bands(dt[sel])
+        ta = own_age[sel & np.isfinite(own_age)]
+        out[f"old180_{name}_own_trench_age"] = bands(ta, np.ones(len(ta), bool))
     # The initiation status of floor older than each gate, as maybe_initiate_subduction reads it.
     for g in GATES:
         old = oc & (age > g)
