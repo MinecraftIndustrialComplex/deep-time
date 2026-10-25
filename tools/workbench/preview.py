@@ -124,12 +124,17 @@ def fold(x, c):
     return (x + c // 2) % c - c // 2
 
 
-# The planet's projection (the twin of deeptime_format::projection, docs/design/equal-area-projection.md
-# §2): Lambert's equal-area cylinder, R = C/2π; the seam x = −C/2 is longitude 0°, north is −z,
-# latitude φ = asin(−z/R), the poles at z = ∓R.
+# The worlds' blocks. A planet is the cube world (cube plan §7.4): its blocks are the net's, and a
+# latitude and longitude reach a block only through the world data's map and turn
+# (`cube_blocks_of`, which asks the Rust evaluator). The Lambert frame is the simulation's own and
+# only synthetic worlds are laid out in it (deposits_world_16k, the preview world): the twin of
+# deeptime_format::projection, docs/design/equal-area-projection.md §2, Lambert's equal-area
+# cylinder, R = C/2π; the seam x = −C/2 is longitude 0°, north is −z, latitude φ = asin(−z/R), the
+# poles at z = ∓R.
 def pole_z(c):
-    """|z| of the poles, whole blocks (inside them); on a cube world (its period 4s in CUBE_PERIODS)
-    the net window's z edge 3s/2 less a block (the polar faces N and S end there)."""
+    """|z| of the poles, whole blocks (inside them), in the Lambert frame; on a cube world (its
+    period 4s in CUBE_PERIODS) the net window's z edge 3s/2 less a block (the polar faces N and S end
+    there)."""
     if c in CUBE_PERIODS:
         return 3 * (c // 4) // 2 - 1
     return int(c / (2 * math.pi))
@@ -143,7 +148,10 @@ def lambert_frame_preset(p):
     """Whether a preset file is laid out in the simulation's Lambert frame (a synthetic preset that
     says "projection": "lambert", e.g. deposits_world_16k); built-in names and share codes are planets."""
     try:
-        return os.path.isfile(p) and re.search(r'"projection"\s*:\s*"lambert"', open(p).read()) is not None
+        if not os.path.isfile(p):
+            return False
+        with open(p) as f:
+            return re.search(r'"projection"\s*:\s*"lambert"', f.read()) is not None
     except OSError:
         return False
 
@@ -997,24 +1005,79 @@ def preview_world_note(run, why=""):
             f"longitude you picked. Its sites cluster near x -5,600, z -1,000.")
 
 
-def latlon_to_block(lat, lon, c=PREVIEW_C):
-    """workbench.js blockXZ through the projection (pole_z's twin, projection.js xOfLon/zOfLat): x =
-    longitude east of the seam scaled to C from −C/2; north is −z."""
+def cube_blocks_of(world_data, points):
+    """The blocks (x, z) of (latitude, longitude) points on a cube world, in the net's window, from
+    the world data's own map and turn. There is no closed form to restate here (the map is a table,
+    `deeptime_format::cube_map`, and the manifest carries the turn), so the Rust evaluator places
+    them: `deeptime inspect-column --points - --latlon` runs `WorldProjection::block_of` (the one the
+    game's own lat/lon go through) and prints one column a line with its rounded `x` and `z`.
+    One call places any number of points."""
+    exe = deeptime_bin()
+    if not exe:
+        raise ValueError("no deeptime binary to ask (set " + DEEPTIME_ENV + ")")
+    text = "".join(f"{max(-90.0, min(90.0, float(la)))!r} {float(lo)!r}\n" for la, lo in points)
+    p = subprocess.run([exe, "inspect-column", "--world-data", world_data, "--points", "-", "--latlon", "--parity"],
+                       input=text.encode(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+    if p.returncode != 0:
+        raise ValueError("deeptime inspect-column: " + p.stderr.decode(errors="replace").strip()[-400:])
+    try:
+        cols = [json.loads(line) for line in p.stdout.decode().splitlines() if line.strip()]
+        out = [(int(col["x"]), int(col["z"])) for col in cols]
+    except (ValueError, KeyError, TypeError):
+        raise ValueError("deeptime inspect-column did not answer with a column for every point")
+    if len(out) != len(points):
+        raise ValueError(f"deeptime inspect-column placed {len(out)} of {len(points)} points")
+    return out
+
+
+def latlon_to_block(lat, lon, c=PREVIEW_C, world_data=None):
+    """The block (x, z) of a latitude and longitude in the world of circumference c.
+
+    A cube world (c in CUBE_PERIODS, the only planet since cube plan §7.4) places it through its map
+    and turn, which only the world data holds: give `world_data` (the run's bake folder). The
+    simulation's Lambert frame (a synthetic world: c itself) is closed form, the twin of
+    projection.js xOfLon/zOfLat: x = longitude east of the seam scaled to C from −C/2; north is −z."""
+    if c in CUBE_PERIODS:
+        if not world_data:
+            raise ValueError("a cube world places a latitude and longitude through its world data's map: "
+                             "give the world data (or the box in blocks)")
+        return cube_blocks_of(world_data, [(lat, lon)])[0]
     lat = max(-90.0, min(90.0, lat))
     return round(lon / 360 * c - c / 2), round(-c / (2 * math.pi) * math.sin(math.radians(lat)))
 
 
-def box_on_world(req, c=PREVIEW_C):
+def cube_box_of_lat_lon_box(ll, c, world_data):
+    """A lat/lon box on a cube world, in blocks: a latitude and longitude box is no block box there
+    (its edges bend on the net, and a corner may sit across a turning edge), so, as workbench.js
+    boxBlocks does, the box is the corners' block spans (at most MAX_SIDE, cut round the centre by
+    box_on_world) round the block of its centre."""
+    north, south, west, east = (float(ll[k]) for k in ("north", "south", "west", "east"))
+    if east < west:
+        east += 360.0   # across the antimeridian
+    (cx, cz), (ax, az), (bx, bz) = cube_blocks_of(
+        world_data, [((north + south) / 2, (west + east) / 2), (north, west), (south, east)])
+    w, d = abs(fold(bx - ax, c)), abs(bz - az)
+    return cx - w // 2, cz - d // 2, cx - w // 2 + w, cz - d // 2 + d
+
+
+def box_on_world(req, c=PREVIEW_C, world_data=None):
     """The request's box on the planet of circumference c (from lat_lon when given), at most
-    256 × 256 around its centre; returns (box, a note about any shrinking)."""
+    256 × 256 around its centre; returns (box, a note about any shrinking). `world_data` is the
+    run's bake folder, which a cube world needs to place a latitude and longitude."""
     ll = req.get("lat_lon") or {}
     # A cube world's blocks are not Lambert's: the page sends the box in the world's own blocks
     # (workbench.js boxBlocks), so it wins there.
     if c in CUBE_PERIODS and isinstance(req.get("box"), dict):
         ll = {}
     if all(isinstance(ll.get(k), (int, float)) for k in ("north", "south", "west", "east")):
-        x0, z0 = latlon_to_block(ll["north"], ll["west"], c)
-        x1, z1 = latlon_to_block(ll["south"], ll["east"], c)
+        if c in CUBE_PERIODS:
+            if not world_data:
+                raise ValueError("a cube world places a latitude and longitude box through its world data's "
+                                 "map: give the world data (or the box in blocks)")
+            x0, z0, x1, z1 = cube_box_of_lat_lon_box(ll, c, world_data)
+        else:
+            x0, z0 = latlon_to_block(ll["north"], ll["west"], c)
+            x1, z1 = latlon_to_block(ll["south"], ll["east"], c)
     else:
         b = req.get("box") or {}
         try:
@@ -1064,7 +1127,7 @@ def workbench_preview(req):
     bake, why = run_bake(run)
     profile = os.environ.get("DEEPTIME_WORKBENCH_PROFILE", "mic")
     if bake:
-        box, shrink = box_on_world(req, bake["c"])
+        box, shrink = box_on_world(req, bake["c"], bake["dir"])
         spec = {"profile": profile, "size": bake["c"], "boxes": [box],
                 "world": {"world_data": bake["dir"]},
                 "note": shrink + run_terrain_note(run, bake), "note_kind": "run", "request": request}
@@ -1114,15 +1177,22 @@ def workbench_inspect(q):
     run = q.get("run", "?")
     bake, why = run_bake(run)
     c = bake["c"] if bake else PREVIEW_C
+    # Read the numbers first, then place them: a failure of the placement (no deeptime binary, a world
+    # the evaluator cannot read) must say so, not "give x and z".
     try:
         if bake and q.get("x") not in (None, "") and q.get("z") not in (None, ""):
             x, z = int(float(q["x"])), int(float(q["z"]))
+            lat_lon = None
         elif q.get("lat") not in (None, "") and q.get("lon") not in (None, ""):
-            x, z = latlon_to_block(float(q["lat"]), float(q["lon"]), c)
+            x = z = None
+            lat_lon = (float(q["lat"]), float(q["lon"]))
         else:
             x, z = int(q["x"]), int(q["z"])
+            lat_lon = None
     except (KeyError, ValueError):
         raise ValueError("give x and z (or lat and lon)")
+    if lat_lon:
+        x, z = latlon_to_block(lat_lon[0], lat_lon[1], c, bake["dir"] if bake else None)
     x = fold(x, c)
     if bake:
         return 200, inspect_bake(run, bake, x, z)
