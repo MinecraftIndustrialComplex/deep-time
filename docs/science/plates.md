@@ -9497,3 +9497,73 @@ side, and no incipient resistance; the other boundaries' friction the same in bo
 contacts are the ones the arcs and the boundary mix read, by the slab before the step's growth. A
 continental sample at an incipient contact's front takes no incipient resistance (it is a
 collision's, PLT-610), so it keeps the front's friction there as at a mature contact.
+
+## The overriding plate's share (PLT-652, 2026-10-25)
+
+The collision-front diagnosis (build log 2026-10-25, "Front lane: what sets the crust added per km of
+collision front") found base14's fronts carrying Earth's crust per km (1.16 times Bird's CCB over the
+run) but keeping 0.89 of it within 400 km of the front, where the planet stacks 1.81 times Earth's
+excess crust per km and 2.8 times its crust over 55 km. Earth's overriding plates take much of a
+collision's convergence away from the front: of Arabia's 440 km since 22 Ma, 135 km went into the
+Zagros and 230 km into Central Iran and the Alborz behind it (52 %, Mouthereau 2011), and Asia took
+600 to 1,050 km of India's convergence beside the Himalaya's 450 to 900 (an Asia share of 0.40 to 0.70,
+van Hinsbergen et al. 2011, Tectonics). The model's overriding plate had no way to do that.
+
+### The law (`tectonics.collision_upper_plate_shortening`)
+
+The continental lithosphere deforms as a thin viscous sheet (England & McKenzie 1982; Houseman &
+England 1986), so where it shortens is set by its strength, and the model already has that strength:
+PLT-414's sheet, ε̇ = ΔU / (4 η L), with PLT-415's η = η_0 e^(t_eq / τ_s) at the lithosphere's thermal
+age (ISO-112). PLT-652 puts the belt's push where ΔU stands:
+
+- **The push.** A mountain range pushes on the lowland beside it with its gravitational potential
+  energy over the lowland's (Molnar & Lyon-Caen 1988: Tibet's 6 to 7 × 10¹² N/m). That is the
+  balance's edge term (FRC-018) read across the belt (`forces::belt_push_n_m`): the mean column
+  energy of the belt's continental samples (within the belt's 400 km of the front) over the mean of
+  the interior's strip (below), the lowland it pushes on. A 5 km belt pushes with 6.7 × 10¹² N/m, a belt at the 40 MPa strength height (1.46 km)
+  with about 1.5 × 10¹².
+- **The interior** behind the belt carries that push as a thin sheet. Along the strip behind the
+  front (the overriding plate's visible continental samples beyond the belt's 400 km, between the
+  front's ends along it and not ahead of it), each column shortens at ε̇ = F / (4 η L), so the
+  interior shortens at v = F / (4 η_0 L) ∫ w dx, with w = η_0 / η = e^(−t_eq / τ_s) (PLT-470's
+  form). At w = 1 that is 158 mm/yr per 1,000 km of strip for 2 × 10¹³ N/m, 53 mm/yr for a 5 km
+  belt's push.
+- **The share.** The interior takes v / v_n of the convergence, at most all of it. That share of the
+  crust the step keeps goes to the strip's columns in proportion to T w (each column thickens by its
+  own strain), the rest to the wedge and the belt by their own rules (PLT-242's share, PLT-600 and
+  PLT-601's taper, PLT-253's strength height unchanged).
+
+There is no share constant and no new value: η_0 (10²² Pa s), τ_s (62.8 Myr) and L (100 km) are
+PLT-414's and PLT-415's, the column energy and the edge scale the balance's. The belt sets its own
+height. A fresh front has no belt and no push, so the front takes the first step; the belt then
+rises until its push drives the interior at the rest of the convergence, which is how a thin sheet
+grows a plateau in front of an indenter (England & Houseman 1986). The weakness sets where that
+balance falls. A start continent's keel (200 km, `thermal_keel_km`) has t_eq 384 Myr and w 0.0022;
+a lithosphere of 150 km has w 0.078, of 120 km 0.23, and the hot limit (60 km) 1. So a keeled
+craton behind a front takes almost nothing even under a belt at its strength height, and a hot,
+thinned plate takes most or all under a low belt. Crust is conserved: the interior's crust is the
+crossing's mix, counted in `kept` and in its own column of the crust budget (`upper`).
+
+In the unit fixture (a head-on collision at 30 mm/yr, the overriding continent's strip about 2,050 km
+deep behind the belt), the twelfth step's share is 0.008 at 200 km of lithosphere under a push of
+6.6 × 10¹² N/m, 0.055 at 180, 0.14 at 165, 0.25 at 150, 0.55 at 120 and 0.82 at 60 under 1.4 × 10¹²
+N/m: behind the hot plate the belt stays low. Over the twelve steps the 60 km interior took 0.67 of the
+crust kept, the 200 km one 0.006.
+
+The push is not the collision's resistance in the balance. The balance resists a collision with the
+edge term and the buoyancy of the continental lithosphere dragged down (FRC-030), a plastic
+resistance whose capacity grows with the shortening to about 9 × 10¹³ N/m at the slab's full depth.
+That buoyancy is the mantle's hold on the slab, not a horizontal force carried by the overriding
+plate, and it is an order of magnitude over what a range pushes with. The first build read it as
+the force on the interior: in the unit fixture the force grew by 6.5 × 10¹² N/m a step with the
+shortening, and a plate of 150 km took all of the convergence from the fourth step. That reading
+was dropped before any arm ran.
+
+Two choices are this lane's, neither a fitted value. The strip is one-dimensional: it carries the
+front's force undiminished to the plate's far side, where a two-dimensional sheet spreads a
+boundary's stress over a length scale of the order of the boundary's width (England, Houseman &
+Sonder 1985, from memory), so the share is the interior's largest. And the law is kinematic: the
+balance's resistance and the plates' motion are as before; only where the crust goes changes. The interior's columns
+are stamped as a collision orogeny (fold along the front), so the collapse, the root removal and
+the erosion treat them as such, but they stay out of the belt's record (its height, width and
+footprint are the front's).

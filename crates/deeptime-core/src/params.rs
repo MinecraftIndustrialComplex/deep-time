@@ -689,6 +689,16 @@ pub struct TectonicParams {
     /// (flexure.md "The superposition and the foreland's stiffness (gap 6b)").
     /// ledger: PLT-546, ISO-131, ISO-136
     pub collision_underthrust: bool,
+    /// The overriding plate takes part of a collision's convergence as distributed shortening of
+    /// its interior (England & Houseman 1986's thin sheet): behind the belt, along the strip
+    /// behind the front, each continental column shortens at ε̇ = F / (4 η L) under the
+    /// collision's resistance F (the force balance's, FRC-018 and FRC-030), with the collapse's
+    /// sheet viscosity at its thermal age (η = η_0 e^(t_eq / τ_s), PLT-414, PLT-415, ISO-112), up
+    /// to the whole convergence. That share of the crust the step keeps thickens the interior in
+    /// proportion to T ε̇ instead of stacking at the front; nothing is created. A cold, keeled
+    /// craton takes almost none, a hot plate most. Needs `thermal_state` and a sheet viscosity.
+    /// ledger: PLT-652
+    pub collision_upper_plate_shortening: bool,
     /// The cordillera's back-arc source from the state: the crust behind an arc's range gives
     /// its share of the range's shortening in proportion to its weakness, the thin sheet's
     /// η_0 / η at its thermal age, so a cold, keeled craton is a backstop that hardly thins and a
@@ -1168,6 +1178,7 @@ impl Default for TectonicParams {
             thermal_reference_km: 225.0,  // ledger: ISO-111
             thermal_strength: true,       // ledger: ISO-112 (on since 2026-10-23)
             collision_underthrust: false, // ledger: PLT-546, ISO-131, ISO-136 (off: step noise on the pool)
+            collision_upper_plate_shortening: false, // ledger: PLT-652 (built 2026-10-25, off)
             thermal_backstop: false,      // ledger: PLT-470 (off: a stand-in, not physics)
             thermal_keel_km: crate::plates::thermal::KEEL_KM, // ledger: PLT-463
             heat_flow_refresh: true, // ledger: PLT-469 (game-choice: on since 2026-10-23, the coordinator's call)
@@ -1587,6 +1598,15 @@ impl PlanetPreset {
             k.thermal_state || (k.thermal_isostasy_m == 0.0 && !k.thermal_backstop),
             "$.tectonics.thermal_state",
             "thermal_isostasy_m and thermal_backstop need thermal_state",
+        )?;
+        // PLT-652 reads the sheet's strength at the lithosphere's thermal age.
+        check(
+            !k.collision_upper_plate_shortening
+                || (k.thermal_state
+                    && k.collapse_sheet_viscosity_pa_s > 0.0
+                    && k.collapse_sheet_viscosity_pa_s.is_finite()),
+            "$.tectonics.collision_upper_plate_shortening",
+            "needs thermal_state and collapse_sheet_viscosity_pa_s > 0",
         )?;
         // The force balance.
         pos(

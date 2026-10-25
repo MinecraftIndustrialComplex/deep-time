@@ -56,9 +56,13 @@ def main():
         show("thickness crossing crossed/crossed_km2, km", lambda d: d["crossed"] / max(d["crossed_km2"], 1e-9))
         show("crossed per km of front per Myr, km3", lambda d: d["crossed"] / max(d["front_km_myr"], 1e-9))
         show("kept per km of front per Myr, km3", lambda d: d["kept"] / max(d["front_km_myr"], 1e-9))
-        for k in ("kept", "kept_wedge", "noroom_sliver", "noroom_capped", "noroom_clipped", "taper_toe",
+        for k in ("kept", "kept_wedge", "upper", "noroom_sliver", "noroom_capped", "noroom_clipped", "taper_toe",
                   "crossed_restack", "crossed_above", "crossed_recent"):
             show(f"{k} / crossed", lambda d, k=k: d.get(k, 0.0) / max(d["crossed"], 1e-9))
+        # PLT-652: kept at the front (the wedge and the belt) and the overriding interior's share.
+        show("kept at the front (kept - upper) / crossed", lambda d: (d["kept"] - d.get("upper", 0.0)) / max(d["crossed"], 1e-9))
+        for k in ("upper_km2", "upper_most_km2"):
+            show(f"{k} / crossed_km2", lambda d, k=k: d.get(k, 0.0) / max(d["crossed_km2"], 1e-9))
         show("lost (crossed - kept) per km per Myr, km3", lambda d: (d["crossed"] - d["kept"]) / max(d["front_km_myr"], 1e-9))
         for k in ("collapse_moved", "channel_flow", "foundered", "collapse_unplaced"):
             show(f"{k} / kept", lambda d, k=k: d.get(k, 0.0) / max(d["kept"], 1e-9))
