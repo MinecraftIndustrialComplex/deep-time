@@ -121,6 +121,10 @@ pub const SLIVER_GLOBAL: &str = "plates/collision_noroom_sliver_km3";
 pub const CAPPED_GLOBAL: &str = "plates/collision_noroom_capped_km3";
 /// … and what the ceiling and the highest elevation clipped off the rises.
 pub const CLIPPED_GLOBAL: &str = "plates/collision_noroom_clipped_km3";
+/// Crust the critical-taper belt took after it was full to its width, km³ of crust (measurement
+/// only; ledger: PLT-601): the toe advancing, so whether the width `collision_belt_km` (PLT-241)
+/// bounds the belt at all. Zero without `collision_belt_taper`.
+pub const TOE_GLOBAL: &str = "plates/collision_taper_toe_km3";
 /// How young a collision orogeny on the incoming crust counts as raised by this collision's
 /// wedge, Myr (measurement only; the agent's window, ledger: PLT-401).
 const RECENT_MYR: f64 = 30.0;
@@ -159,6 +163,9 @@ pub struct Stacked {
     pub sliver_km2_m: f64,
     pub capped_km2_m: f64,
     pub clipped_km2_m: f64,
+    /// What the critical-taper belt took after it was full to its width, km² × m of crust
+    /// (measurement only, [`TOE_GLOBAL`]).
+    pub toe_km2_m: f64,
     /// Crust added to the belt and to the wedge, km² × m: Σ added thickness × a sample's area.
     pub belt_km2_m: f64,
     pub wedge_km2_m: f64,
@@ -613,7 +620,7 @@ fn stack_front(
     let across = |d: f64, in_wedge: bool| {
         if in_wedge { norm.km(d) } else { -norm.km(d) }
     };
-    let (mut sliver_km2_m, mut capped_km2_m) = (0.0, 0.0);
+    let (mut sliver_km2_m, mut capped_km2_m, mut toe_km2_m) = (0.0, 0.0, 0.0);
     if belt_weight > 0.0 && belt_rise_km2_m > 0.0 {
         let cap_m = k.strength_height_m(env.gravity);
         let z_of: Vec<f64> = belt
@@ -632,7 +639,8 @@ fn stack_front(
             let d_km: Vec<f64> = order.iter().map(|&j| norm.km(belt_d[j].2)).collect();
             let z_near: Vec<f64> = order.iter().map(|&j| z_of[j]).collect();
             let kept_km2_m = keep * belt_rise_km2_m;
-            let near = fill_taper(&d_km, &z_near, z_front, tan, kept_km2_m, area, cap_m);
+            let (near, toe) = fill_taper(&d_km, &z_near, z_front, tan, kept_km2_m, area, cap_m);
+            toe_km2_m = toe * COLUMN_ISOSTATIC_FACTOR;
             let mut given = vec![0.0f64; belt_d.len()];
             for (&j, g) in order.iter().zip(near) {
                 given[j] = g;
@@ -673,6 +681,7 @@ fn stack_front(
             restack_m,
             sliver_km2_m,
             capped_km2_m,
+            toe_km2_m,
             wedge_km,
             ..Default::default()
         },
@@ -889,7 +898,8 @@ fn fill_belt(
 /// are the belt's samples' distances behind the front, ascending, `z` their elevations, m;
 /// `z_front` the front's height, m, where the surface starts; `tan` its slope; `rise_km2_m` the
 /// step's crust to place (km² × m of Airy rise) on samples of `area` km²; `cap_m` the strength
-/// height (≤ 0: no limit). Returns each sample's rise, m.
+/// height (≤ 0: no limit). Returns each sample's rise, m, and the part of the crust placed after
+/// the belt was full under the surface (the toe advancing), km² × m of rise.
 ///
 /// The surface is `min(cap, z_front + d tan α)`. Ground under it is raised to it nearest the
 /// front first, samples at the same distance alike, until the step's crust runs out: a critical
@@ -910,11 +920,11 @@ fn fill_taper(
     rise_km2_m: f64,
     area: f64,
     cap_m: f64,
-) -> Vec<f64> {
+) -> (Vec<f64>, f64) {
     let n = d_km.len();
     let mut given = vec![0.0f64; n];
     if n == 0 || rise_km2_m <= 0.0 || area <= 0.0 {
-        return given;
+        return (given, 0.0);
     }
     debug_assert!(d_km.windows(2).all(|w| w[0] <= w[1]), "distances ascending");
     let surface = |h: f64, d: f64| {
@@ -934,7 +944,7 @@ fn fill_taper(
             for (i, g) in given.iter_mut().enumerate().take(k).skip(j) {
                 *g = f * deficit(z_front, i);
             }
-            return given;
+            return (given, 0.0);
         }
         for (i, g) in given.iter_mut().enumerate().take(k).skip(j) {
             *g = deficit(z_front, i);
@@ -943,6 +953,7 @@ fn fill_taper(
         j = k;
     }
     // The belt is full under the surface: it rises in place.
+    let full = total - left;
     let fill = |h: f64| (0..n).map(|i| deficit(h, i)).sum::<f64>();
     let mut hi = if cap_m > 0.0 {
         cap_m
@@ -967,7 +978,8 @@ fn fill_taper(
     for (i, g) in given.iter_mut().enumerate() {
         *g = deficit(hi, i);
     }
-    given
+    let toe = (given.iter().sum::<f64>() - full).max(0.0) * area;
+    (given, toe)
 }
 
 /// Distance (rad) to km and the bin width of the foreland's profile.
@@ -1776,7 +1788,7 @@ mod tests {
     /// cannot hold at the strength height is left over.
     #[test]
     fn the_taper_belt_rises_from_the_front_at_the_slope_and_keeps_the_volume() {
-        let tan = 1.6f64.to_radians().tan();
+        let tan = 1.5f64.to_radians().tan();
         let (z0, cap, area) = (300.0, 5200.0, 25.0);
         // A line of samples every 5 km behind the front, out to the belt's 400 km.
         let d: Vec<f64> = (0..=80).map(|j| 5.0 * f64::from(j)).collect();
@@ -1788,8 +1800,9 @@ mod tests {
         // 1. Part of the ramp: the surface rises from the front's height at the slope out to the
         //    last sample filled (that one in part); nothing beyond it rises.
         let rise = 600_000.0;
-        let g = fill_taper(&d, &flat, z0, tan, rise, area, cap);
+        let (g, toe) = fill_taper(&d, &flat, z0, tan, rise, area, cap);
         assert!(close(placed(&g), rise), "{} placed of {rise}", placed(&g));
+        assert_eq!(toe, 0.0, "the belt is not full: the toe stays");
         let last = g.iter().rposition(|&x| x > 0.0).unwrap();
         assert!(last > 5 && last < 30, "{last}");
         assert_eq!(g[0], 0.0, "the front stands at its own height, the toe's");
@@ -1803,7 +1816,8 @@ mod tests {
 
         // 2. Past the strength height: a ramp from the front, then a plateau at the limit.
         let rise = 4_000_000.0;
-        let g = fill_taper(&d, &flat, z0, tan, rise, area, cap);
+        let (g, toe) = fill_taper(&d, &flat, z0, tan, rise, area, cap);
+        assert_eq!(toe, 0.0);
         assert!(close(placed(&g), rise), "{} placed of {rise}", placed(&g));
         let last = g.iter().rposition(|&x| x > 0.0).unwrap();
         let toe_to_cap = (cap - z0) / (1000.0 * tan);
@@ -1816,8 +1830,9 @@ mod tests {
         //    the same slope; all of it placed.
         let full_width: f64 = d.iter().map(|&x| surface(z0, x) - z0).sum::<f64>() * area;
         let rise = full_width + 500_000.0;
-        let g = fill_taper(&d, &flat, z0, tan, rise, area, cap);
+        let (g, toe) = fill_taper(&d, &flat, z0, tan, rise, area, cap);
         assert!(close(placed(&g), rise), "{} placed of {rise}", placed(&g));
+        assert!(close(toe, 500_000.0), "the toe took {toe} of the 500000 past full");
         let h = z0 + g[0];
         assert!(h > z0 + 1.0, "the toe advanced: the front rose {}", g[0]);
         for j in 0..d.len() {
@@ -1826,20 +1841,21 @@ mod tests {
 
         // 4. More than the belt holds at the strength height: every sample at the limit, the
         //    rest left over (the caller sends it down with the slab).
-        let g = fill_taper(&d, &flat, z0, tan, 2.0e7, area, cap);
+        let (g, toe) = fill_taper(&d, &flat, z0, tan, 2.0e7, area, cap);
         assert!(g.iter().all(|&x| close(z0 + x, cap)), "{g:?}");
         assert!(close(placed(&g), (cap - z0) * area * d.len() as f64));
+        assert!(close(toe, placed(&g) - full_width), "{toe}");
 
         // 5. Ground already above the surface takes nothing and the fill passes it; samples at
         //    the same distance share the last of it alike.
         let mut z = flat.clone();
         z[4] = 4000.0;
-        let g = fill_taper(&d, &z, z0, tan, 600_000.0, area, cap);
+        let (g, _) = fill_taper(&d, &z, z0, tan, 600_000.0, area, cap);
         assert_eq!(g[4], 0.0);
         assert!(close(z0 + g[5], surface(z0, d[5])));
         assert!(close(placed(&g), 600_000.0));
         let d2 = [0.0, 10.0, 10.0, 20.0];
-        let g = fill_taper(&d2, &[z0; 4], z0, tan, 0.5 * 1000.0 * 10.0 * tan * area, area, cap);
+        let (g, _) = fill_taper(&d2, &[z0; 4], z0, tan, 0.5 * 1000.0 * 10.0 * tan * area, area, cap);
         assert!(g[1] > 0.0 && close(g[1], g[2]) && g[3] == 0.0, "{g:?}");
     }
 
