@@ -125,7 +125,8 @@ public final class VolcanicCensus {
 
         Side now = new Side(), plain = new Side();
         Map<String, Integer> replaced = new HashMap<>();
-        int holes = 0, differ = 0, differByRules = 0;
+        int holes = 0, differ = 0, differByRules = 0, land = 0;
+        int[] landInRole = new int[VolcanicZones.Role.values().length];   // land columns inside a zone of each role (ledger: BIO-198)
         int zp = (int) t.zHalf();   // the net's outer edges on the cube (3s/2), the poles on a Lambert-frame world
         TagKey<Biome> ocean = c("is_ocean"), river = c("is_river"), cave = c("is_cave"), underground = c("is_underground");
         for (int z = -zp + step / 2; z < zp; z += step) {
@@ -135,6 +136,11 @@ public final class VolcanicCensus {
                 double y = t.height(x, z);
                 if (y <= sea)
                     continue;
+                land++;
+                int inZones = zones.rolesAt(x, z);
+                for (VolcanicZones.Role role : VolcanicZones.Role.values())
+                    if ((inZones & (1 << role.ordinal())) != 0)
+                        landInRole[role.ordinal()]++;
                 int qx = QuartPos.fromBlock(x), qy = QuartPos.fromBlock((int) Math.floor(y)), qz = QuartPos.fromBlock(z);
                 Holder<Biome> b = biomes.getNoiseBiome(qx, qy, qz, sampler);
                 String why = VolcanicBiomes.lastDecision();
@@ -204,6 +210,17 @@ public final class VolcanicCensus {
             zj.add(e.getKey(), z);
         }
         o.add("zones", zj);
+        // The land columns each role's zones hold (all land columns sampled, zones overlap): an oceanic volcano's zones
+        // lie on the part of its edifice above the sea (BIO-198), so a cone zone is a share of the land, not a coast.
+        JsonObject lz = new JsonObject();
+        lz.addProperty("land_columns", land);
+        for (VolcanicZones.Role role : VolcanicZones.Role.values()) {
+            JsonObject r = new JsonObject();
+            r.addProperty("columns", landInRole[role.ordinal()]);
+            r.addProperty("share", land == 0 ? null : round(landInRole[role.ordinal()] / (double) land, 4));
+            lz.add(role.id, r);
+        }
+        o.add("land_in_zone", lz);
         RegionSpawnTarget rt = marker;
         JsonObject rj = new JsonObject();
         for (VolcanicZones.Role role : VolcanicZones.Role.values()) {

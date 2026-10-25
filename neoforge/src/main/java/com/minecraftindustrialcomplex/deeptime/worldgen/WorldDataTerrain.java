@@ -318,8 +318,18 @@ public final class WorldDataTerrain implements TerrainSource {
                     WorldData wd = data();
                     Magma m = magma(cell, minY, seaLevel);
                     Geothermal g = geothermal(cell, minY, seaLevel);
+                    VolcanicZones.Ground ground = new VolcanicZones.Ground((gx, gz) -> wd.height(wrapX(gx), gz), seaLevel,
+                            wd.manifest().mPerBlockV());
                     volcanicZones = VolcanicZones.build(wd.volcanoes().list(), g.sites(), m.bodies(), volcanicBiomeRules(),
-                            wd.manifest().mPerBlockH(), wd.circumference(), wd.projection());
+                            wd.manifest().mPerBlockH(), wd.circumference(), wd.projection(), ground);
+                    for (var v : wd.volcanoes().list())
+                        if (v.oceanic())
+                            DeepTime.LOGGER.info("[deeptime] oceanic volcano {} ({}): basal radius {} blocks, vent {} blocks above the sea, "
+                                            + "{} of the radius above the sea", v.id(), v.kind(),
+                                    Math.round(v.radiusM() / wd.manifest().mPerBlockH()),
+                                    Math.round(10.0 * (wd.height(v.x(), v.z()) - seaLevel)) / 10.0,
+                                    Math.round(1000.0 * VolcanicZones.subaerialShare(v, wrapX((int) Math.round(v.x())),
+                                            (int) Math.round(v.z()), ground)) / 1000.0);
                     java.util.Map<VolcanicZones.Role, Long> byRole = new java.util.EnumMap<>(VolcanicZones.Role.class);
                     for (VolcanicZones.Zone zn : volcanicZones.zones())
                         byRole.merge(zn.role(), 1L, Long::sum);
