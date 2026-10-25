@@ -2788,8 +2788,7 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
         let w = ans.omega[1].expect("plate 1 in the balance");
         let centroid = DVec3::from_array(st.plates[1].centroid);
         let speed = env.norm.velocity_mm_yr(w, centroid).length();
-        let held = ans.omega[0]
-            .map_or(0.0, |w0| env.norm.velocity_mm_yr(w0, centroid).length());
+        let held = ans.omega[0].map_or(0.0, |w0| env.norm.velocity_mm_yr(w0, centroid).length());
         // The reference pull per metre over the rim's trench along its outward normal.
         let c = forces::Coeffs::new(k, &env.norm, env.gravity, st.a0_km2, DVec3::Z, 0.0);
         let steps = 2000;
@@ -2816,9 +2815,17 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
             {
                 continue;
             }
-            let normal = shortening::boundary_normal(&geo, &pos, &rots, &st.samples, &plate_of, v, 1);
+            let normal =
+                shortening::boundary_normal(&geo, &pos, &rots, &st.samples, &plate_of, v, 1);
             let share = shortening::front_share_rad(
-                &geo, &pos, &rots, &st.samples, &plate_of, v, 1, normal,
+                &geo,
+                &pos,
+                &rots,
+                &st.samples,
+                &plate_of,
+                v,
+                1,
+                normal,
             );
             let cross = shortening::crossing_sum(
                 &geo,
@@ -2883,6 +2890,10 @@ fn the_reference_plate_on_the_lattice_moves_at_the_speed_scale() {
     assert!(off.0 > on.0, "{speeds:?}");
 }
 
+/// A class's row of [`the_margin_as_the_mix_sees_it`]: samples, normals over 70 degrees off, their
+/// mean angle (degrees), samples beside hidden crust.
+type MarginRow = (usize, usize, f64, usize);
+
 /// The continent's margin towards plate 1 as the boundary mix sees it (`dynamics::boundary_mix`),
 /// on the converging half (y > 0.2, away from the rotation's poles at ±x): per class (the mix's
 /// index, `None` last), the samples, those whose boundary normal lies more than 70 degrees from
@@ -2893,10 +2904,11 @@ fn the_margin_as_the_mix_sees_it(
     geo: &Geo,
     pos: &[DVec3],
     env: &Env<'_>,
-) -> (Vec<(usize, usize, f64, usize)>, f64, f64) {
+) -> (Vec<MarginRow>, f64, f64) {
     let n = st.samples.len();
-    let classes: Vec<std::sync::atomic::AtomicU8> =
-        (0..n).map(|_| std::sync::atomic::AtomicU8::new(0)).collect();
+    let classes: Vec<std::sync::atomic::AtomicU8> = (0..n)
+        .map(|_| std::sync::atomic::AtomicU8::new(0))
+        .collect();
     let mix = dynamics::boundary_mix(st, geo, pos, env, Some(&classes));
     let plate_of: Vec<u32> = (0..n).map(|i| st.plate_of(i)).collect();
     let rots: Vec<glam::DQuat> = st.groups.iter().map(|g| kinematics::quat(g.rot)).collect();
@@ -3010,12 +3022,20 @@ fn the_ocean_continent_front_through_a_resampling() {
     let oc = dynamics::mix::OCEAN_CONTINENT;
     assert!(before.0[oc].0 > 20, "{:?}", before.0);
     for (when, (rows, km, _)) in [("after", &after), ("a step on", &on)] {
-        assert!(*km >= 0.9 * before.1, "{when}: {km:.0} km, {:.0} before", before.1);
+        assert!(
+            *km >= 0.9 * before.1,
+            "{when}: {km:.0} km, {:.0} before",
+            before.1
+        );
         assert!(rows[oc].0 > 20, "{when}: {:?}", rows);
     }
     for (when, (rows, _, _)) in [("before", &before), ("after", &after), ("a step on", &on)] {
         let off: usize = rows.iter().map(|r| r.1).sum();
-        assert_eq!(off, 0, "{when}: margin normals over 70 degrees off: {:?}", rows);
+        assert_eq!(
+            off, 0,
+            "{when}: margin normals over 70 degrees off: {:?}",
+            rows
+        );
     }
     assert!(st.contacts[0].active(env3.step));
 }
