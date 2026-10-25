@@ -832,14 +832,18 @@ fn collisions_weld_on_stall_and_transfer_on_shortening() {
     // `weld_seed_sweep`: 1, 2, 6, 9, 10, 12, 16, 20, 21 and 23, seed 1 three times, seeds 6, 10,
     // 12 and 16 twice, seeds 3, 4, 5, 14, 15, 18 and 24 no more; seed 1 here and seed 2 in the
     // recording test still weld and pass, so they stay; from the supercontinent 6, 10, 15, 18, 19
-    // and 20, seed 15 three times).
+    // and 20, seed 15 three times; 11 of seeds 1 to 24 with the collapse's thermal reading and the
+    // front on the current geometry on by default, PLT-581 and PLT-582, 2026-10-25: 1, 4, 7, 8,
+    // 10, 11, 16 to 18, 21 and 23, seed 23 twice, seeds 2, 6, 9, 12 and 20 no more; seed 1 here
+    // still welds and passes, the recording test goes to seed 4; from the supercontinent 5, 7, 8,
+    // 11 and 17).
     let mut p = preset(8000, 300.0, "scattered_continents", 1);
-    // The old law (PLT-585 off, PLT-540 on): under Forsyth & Uyeda's balance on this small
-    // planet, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m,
-    // floor -10,000 m), the speed guard binds on every welding seed of 1 to 24 but supercontinent
-    // 11 (`weld_seed_sweep`, 2026-10-25: 10 scattered and 10 supercontinent seeds weld, the guard
-    // holding 3 to 90 plate-steps in 300 Myr), and this seed welds no more. A collision's life
-    // cycle is the same under either law.
+    // The old law (PLT-585 off, PLT-540 on), whatever the defaults: under Forsyth & Uyeda's
+    // balance on this small planet, whose ridge push is several times Earth's
+    // (`plates_quick_16k`, ridge -1,000 m, floor -10,000 m), the speed guard bound on every
+    // welding seed of 1 to 24 but supercontinent 11 (`weld_seed_sweep`, 2026-10-25, before
+    // PLT-582: 10 scattered and 10 supercontinent seeds welded, the guard holding 3 to 90
+    // plate-steps in 300 Myr). A collision's life cycle is the same under either law.
     p.tectonics.forsyth_uyeda_balance = false;
     p.tectonics.suction_saturates = true;
     let mut life = CollisionLives::default();
@@ -1011,13 +1015,16 @@ fn recording_does_not_change_the_world_and_matches_the_run() {
     // seed 20 again since the contact carry went on by default, PLT-550, the same day, when seed
     // 19 no longer welds: all 12 welding seeds pass; seed 2 since the slab pull at the arcs'
     // fronts went on by default, PLT-560, the same day, when seed 20 no longer welds: all 13
-    // welding seeds pass, and seed 2 welds twice).
-    let mut p = preset(8000, 300.0, "scattered_continents", 2);
-    // The old law (PLT-585 off, PLT-540 on): the guard asserted below binds under Forsyth &
-    // Uyeda's balance on every welding seed of 1 to 24 of this small planet but supercontinent
-    // 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge -1,000 m, floor
-    // -10,000 m; `weld_seed_sweep`, 2026-10-25: 7 plate-steps in 300 Myr on this seed). The
-    // record is measurement only under either law.
+    // welding seeds pass, and seed 2 welds twice; seed 4 since the collapse's thermal reading and
+    // the front on the current geometry went on by default, PLT-581 and PLT-582, 2026-10-25, when
+    // seed 2 no longer welds: seed 4 is the first welding seed after seed 1, which the weld test
+    // above takes).
+    let mut p = preset(8000, 300.0, "scattered_continents", 4);
+    // The old law (PLT-585 off, PLT-540 on), whatever the defaults: the guard asserted below
+    // bound under Forsyth & Uyeda's balance on every welding seed of 1 to 24 of this small planet
+    // but supercontinent 11, whose ridge push is several times Earth's (`plates_quick_16k`, ridge
+    // -1,000 m, floor -10,000 m; `weld_seed_sweep`, 2026-10-25, before PLT-582). The record is
+    // measurement only under either law.
     p.tectonics.forsyth_uyeda_balance = false;
     p.tectonics.suction_saturates = true;
     let total = PlatesStage::new(p.clone()).total_steps();
@@ -1401,6 +1408,83 @@ fn the_crust_budget_changes_nothing() {
     let without = run_stage_with(PlatesStage::new(p.clone()), &p, |_, _, _| {});
     assert!(!without.notes.contains_key(super::CRUST_BUDGET_NOTE));
     same_world(&with, &without);
+}
+
+/// The front trace (`front_trace.rs`, measurement only) changes nothing, writes its dip rows at
+/// the steps around the resamplings and the attribution at every 50 Myr, and its attribution
+/// agrees with the columns it describes.
+#[test]
+fn the_front_trace_changes_nothing() {
+    let p = preset(8000, 200.0, "scattered_continents", 6);
+    let dir = temp_dir("front_trace");
+    let with = run_stage_with(
+        PlatesStage::new(p.clone()).with_front_trace(dir.clone()),
+        &p,
+        |_, _, _| {},
+    );
+    let without = run_stage_with(PlatesStage::new(p.clone()), &p, |_, _, _| {});
+    same_world(&with, &without);
+    let st = with.plates.as_ref().unwrap();
+    assert!(st.counters.resamplings > 1);
+    let index = std::fs::read_to_string(dir.join("dip_index.txt")).expect("the dip index");
+    for phase in 0..3 {
+        assert!(
+            index.contains(&format!("phase={phase} ")),
+            "phase {phase}: {index}"
+        );
+    }
+    let floats = |file: &str| -> Vec<f32> {
+        let bytes = std::fs::read(dir.join(file)).unwrap();
+        assert_eq!(bytes.len() % 4, 0);
+        bytes
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|b| f32::from_le_bytes(*b))
+            .collect()
+    };
+    // Some step's rows hold fronts (the first steps have no active contact yet).
+    let f = front_trace::DIP_FIELDS;
+    let mut fronts = 0;
+    for line in index.lines() {
+        let rows = floats(line.rsplit("file=").next().unwrap());
+        assert_eq!(rows.len() % f, 0, "{line}");
+        fronts += rows.chunks_exact(f).filter(|r| r[20] >= 0.0).count();
+    }
+    assert!(fronts > 0, "{index}");
+    let att = std::fs::read_to_string(dir.join("att_index.txt")).expect("the attribution index");
+    assert_eq!(att.lines().count(), 4, "{att}");
+    // The last snapshot's rows are the visible continental samples, and the columns 45 km or
+    // thicker have a crossing (none was at the start), at or before now.
+    let last = att.lines().last().unwrap();
+    let t_now: f32 = last
+        .split_whitespace()
+        .find_map(|w| w.strip_prefix("t="))
+        .and_then(|x| x.parse().ok())
+        .unwrap();
+    let rows = floats(last.rsplit("file=").next().unwrap());
+    let f = front_trace::ATT_FIELDS;
+    let n = st
+        .samples
+        .iter()
+        .filter(|s| s.is_continental() && !s.is_hidden())
+        .count();
+    assert_eq!(rows.len(), n * f);
+    let thick: Vec<&[f32]> = rows
+        .chunks_exact(f)
+        .filter(|r| r[2] >= front_trace::THICK_M)
+        .collect();
+    let crossed = thick.iter().filter(|r| r[9] >= 0.0).count();
+    eprintln!("{} thick columns, {crossed} with a crossing", thick.len());
+    assert!(
+        crossed * 10 >= thick.len() * 9,
+        "{crossed} of {}",
+        thick.len()
+    );
+    for r in &thick {
+        assert!(r[9] < 0.0 || r[10] <= t_now, "crossed in the future: {r:?}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// The fronts' lengths as the slab pull and the arcs count them (measurement only, PLT-554; the
@@ -2437,7 +2521,7 @@ fn a_contact_whose_plates_slide_past_has_no_arc_front() {
         let (mut st, geo, pos) = two_plates(&p, &env, 0.1);
         assert!(!st.contacts.is_empty());
         st.plates[1].omega = (axis * env.norm.omega_of_speed(50.0)).to_array();
-        subduction::fronts_begin(&st, &geo, &pos, &env).front_count()
+        subduction::fronts_begin(&st, &geo, &pos, &Tree::over(&pos, |_| true), &env).front_count()
     };
     // About x: the ocean moves north across the equator, towards the continent where y > 0.
     let head_on = fronts(DVec3::X);
@@ -2574,7 +2658,8 @@ fn the_arcs_band_stops_at_the_slabs_ends() {
                 let (mut st, geo, pos) =
                     a_front_of_known_length(&p, &env, frame, lon_deg, 15.0, 0.02, 50.0);
                 let length = env.norm.km(lon_deg.to_radians());
-                let begun = subduction::fronts_begin(&st, &geo, &pos, &env);
+                let tree = Tree::over(&pos, |_| true);
+                let begun = subduction::fronts_begin(&st, &geo, &pos, &tree, &env);
                 let (dist, _, reached) = subduction::fronts_reach(&geo, &begun, &env);
                 let mut cones = vec![[0.0; 2]; st.samples.len()];
                 let pull =
@@ -3885,7 +3970,14 @@ fn the_margin_as_the_mix_sees_it(
     let classes: Vec<std::sync::atomic::AtomicU8> = (0..n)
         .map(|_| std::sync::atomic::AtomicU8::new(0))
         .collect();
-    let mix = dynamics::boundary_mix(st, geo, pos, env, Some(&classes));
+    let mix = dynamics::boundary_mix(
+        st,
+        geo,
+        pos,
+        &Tree::over(pos, |_| true),
+        env,
+        Some(&classes),
+    );
     let plate_of: Vec<u32> = (0..n).map(|i| st.plate_of(i)).collect();
     let rots: Vec<glam::DQuat> = st.groups.iter().map(|g| kinematics::quat(g.rot)).collect();
     let mut rows = vec![(0usize, 0usize, 0.0f64, 0usize); dynamics::mix::NAMES.len() + 1];
@@ -4016,6 +4108,257 @@ fn the_ocean_continent_front_through_a_resampling() {
     assert!(st.contacts[0].active(env3.step));
 }
 
+/// The fronts `subduction::fronts_begin` finds and the boundary mix's ocean-continent km on one
+/// state, with the front on the current geometry (`tectonics.front_current_geometry`, PLT-582)
+/// off (`off`'s switches) and on (`on`'s).
+fn fronts_off_on(
+    st: &PlateState,
+    geo: &Geo,
+    pos: &[DVec3],
+    off: &Env<'_>,
+    on: &Env<'_>,
+) -> [(usize, f64); 2] {
+    let tree = Tree::over(pos, |_| true);
+    [off, on].map(|env| {
+        let fronts = subduction::fronts_begin(st, geo, pos, &tree, env).front_count();
+        let mix = dynamics::boundary_mix(st, geo, pos, &tree, env, None);
+        (fronts, mix.km[dynamics::mix::OCEAN_CONTINENT])
+    })
+}
+
+/// The plates move a step on `env` and their overlaps are resolved, as a step begins; the new
+/// positions.
+fn move_and_resolve(
+    st: &mut PlateState,
+    world: &mut WorldState,
+    geo: &Geo,
+    env: &Env<'_>,
+) -> Vec<DVec3> {
+    kinematics::advance(st, env.dt_yr);
+    let pos = geometry::positions(st, geo);
+    st.recount(&pos);
+    let tree = Tree::over(&pos, |_| true);
+    let overlaps = subduction::overlaps(st, geo, &pos, &tree, env);
+    subduction::resolve(st, world, geo, &overlaps, &pos, env).unwrap();
+    pos
+}
+
+/// The front on the current geometry on a live margin, oblique and irregular (the front lane,
+/// 2026-10-25; PLT-582; plates.md, "The front on the current geometry"): an ocean converging 30
+/// degrees obliquely on a continent with a promontory, stepped for a cycle (the ocean moves 12
+/// spacings) and resampled, the fronts counted with the rule off and on at every step. Written
+/// first, to show the band the front trace found (fronts behind the real front, reading a lattice
+/// neighbour that went under and on) and the rule removing it. It shows no band: the forearc holds
+/// the ocean that goes down the trench along the margin (one-way subduction, PLT-542), but the
+/// promontory's corner has no front and so no forearc, the ocean passing under it is not held, and
+/// the lee fills again from the ocean coming in behind; every front keeps a visible ocean sample
+/// beside it. So this test holds the rule to what it must not do: on a live margin, oblique and
+/// irregular, it keeps every front, before the resampling and after. The band is
+/// [`a_consumed_slab_leaves_no_front`]'s.
+#[test]
+fn an_oblique_promontory_through_a_resampling() {
+    // Fine enough that the forearc's reach (`arc_distance_km` and a spacing, about 4.5 spacings
+    // here) covers the promontory, as it covers a real margin's irregularities at 60 km spacing.
+    let p = preset(80_000, 20.0, "supercontinent", 5);
+    let mut off = p.tectonics.clone();
+    off.front_current_geometry = false;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    assert!(env.k.front_current_geometry, "on by default");
+    let spacing = env.norm.spacing_rad();
+    // The continent north of the equator, with a promontory 4 spacings deep and 8 wide on the
+    // converging half.
+    let (half, deep) = (4.0 * spacing, 4.0 * spacing);
+    let promontory = |q: DVec3| q.z > 0.0 || (q.y > 0.0 && q.x.abs() < half && q.z > -deep);
+    let (mut st, mut geo, mut pos) = plates_split(&p, &env, 0.5 * spacing, promontory);
+    st.dynamics = Some(dynamics::Dynamics::default());
+    if p.tectonics.level_set_membership {
+        level_set::reinit(&mut st, &geo, spacing);
+    }
+    // West-north-west at 50 mm/yr where y = 1: 30 degrees from the equator, so the promontory's lee
+    // stretches along the margin.
+    let axis = DVec3::new(1.0, 0.0, 3f64.sqrt()).normalize();
+    st.plates[1].omega = (axis * env.norm.omega_of_speed(50.0)).to_array();
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    let mut cones = vec![[0.0; 2]; st.samples.len()];
+    let mut seen = Vec::new();
+    // A cycle: the ocean moves 12 spacings at y = 1.
+    let per_step = env.norm.omega_of_speed(50.0) * env.dt_yr;
+    let steps = (12.0 * spacing / per_step).ceil() as u64;
+    for k in 1..=steps {
+        let env = stage.env(&p.tectonics, k);
+        pos = move_and_resolve(&mut st, &mut world, &geo, &env);
+        seen.push(fronts_off_on(&st, &geo, &pos, &stage.env(&off, k), &env));
+        // The fronts as the step finds them: the forearc they leave holds the ocean floor that
+        // went down the trench under it (one-way subduction, PLT-542).
+        subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+    }
+    let env = stage.env(&p.tectonics, steps);
+    subduction::carry(&mut st, env.step, p.tectonics.contact_carry);
+    let tree = Tree::over(&pos, |_| true);
+    geo = ridges::resample(&mut st, &mut world, &pos, &tree, &geo, &env).unwrap();
+    if p.tectonics.level_set_membership {
+        level_set::reinit(&mut st, &geo, spacing);
+    }
+    let pos = geometry::positions(&st, &geo);
+    let env = stage.env(&p.tectonics, steps + 1);
+    let tree = Tree::over(&pos, |_| true);
+    let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env);
+    subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env).unwrap();
+    seen.push(fronts_off_on(
+        &st,
+        &geo,
+        &pos,
+        &stage.env(&off, steps + 1),
+        &env,
+    ));
+    for (k, [o, n]) in seen.iter().enumerate() {
+        eprintln!(
+            "step {}: fronts off {} on {}, ocean-continent off {:.0} km on {:.0} km",
+            k + 1,
+            o.0,
+            n.0,
+            o.1,
+            n.1
+        );
+    }
+    for (k, [o, n]) in seen.iter().enumerate() {
+        assert!(o.0 > 50, "step {}: {o:?}", k + 1);
+        assert_eq!(
+            n,
+            o,
+            "step {}: the rule keeps a live margin's fronts",
+            k + 1
+        );
+    }
+    let (late, fresh) = (seen[steps as usize - 1][1], seen[steps as usize][1]);
+    assert!(
+        10 * fresh.0 >= 9 * late.0,
+        "the resampling: {fresh:?} after, {late:?} before"
+    );
+}
+
+/// The band behind a front, and the front on the current geometry removing it (the front lane,
+/// 2026-10-25; PLT-582; plates.md, "The front on the current geometry"): an ocean plate 3
+/// spacings deep and 30 degrees long ([`a_front_of_known_length`]) driven north under a continent
+/// at 50 mm/yr until all of it is under. Between resamplings the lattice is frozen, so the
+/// continent's margin samples keep their lattice neighbours of the ocean plate after those went
+/// under and were carried on, and the contact stays active while the slab lies under the
+/// continent (its samples still overlap it). Off, the margin keeps its front with no ocean left
+/// beside it: the band, as the front trace found it behind the real fronts (the neighbour read
+/// 1,015 km away, the median). On, a front stands only while a visible sample of the ocean plate
+/// is within `subduction::trench_row_rad` (two spacings) of it, so the band goes, and the live
+/// margin of the first step keeps every front. The boundary mix reads the margin the same way.
+#[test]
+fn a_consumed_slab_leaves_no_front() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let mut off = p.tectonics.clone();
+    off.front_current_geometry = false;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    let spacing = env.norm.spacing_rad();
+    let box_deg = (3.0 * spacing).to_degrees();
+    let (mut st, geo, mut pos) = a_front_of_known_length(
+        &p,
+        &env,
+        glam::DQuat::IDENTITY,
+        30.0,
+        box_deg,
+        0.5 * spacing,
+        50.0,
+    );
+    st.dynamics = Some(dynamics::Dynamics::default());
+    let mut world = WorldState::new(1, 16_384, p.t_start_years());
+    let mut cones = vec![[0.0; 2]; st.samples.len()];
+    let mut seen = vec![fronts_off_on(&st, &geo, &pos, &stage.env(&off, 1), &env)];
+    subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+    // Until the box's southern edge is past the equator by more than the row.
+    let per_step = env.norm.omega_of_speed(50.0) * env.dt_yr;
+    let steps = (5.0 * spacing / per_step).ceil() as u64;
+    for k in 2..=steps + 1 {
+        let env = stage.env(&p.tectonics, k);
+        pos = move_and_resolve(&mut st, &mut world, &geo, &env);
+        seen.push(fronts_off_on(&st, &geo, &pos, &stage.env(&off, k), &env));
+        subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+    }
+    let visible = (0..st.samples.len())
+        .filter(|&i| st.plate_of(i) == 1 && !st.samples[i].is_hidden())
+        .count();
+    for (k, [o, n]) in seen.iter().enumerate() {
+        eprintln!(
+            "step {}: fronts off {} on {}, ocean-continent off {:.0} km on {:.0} km",
+            k + 1,
+            o.0,
+            n.0,
+            o.1,
+            n.1
+        );
+    }
+    let active = st
+        .contacts
+        .iter()
+        .any(|c| c.under == 1 && c.over == 0 && c.active(steps + 1));
+    eprintln!(
+        "at the end: the ocean plate's visible samples {visible}, its contact active {active}"
+    );
+    let ([o0, n0], [o1, n1]) = (seen[0], seen[seen.len() - 1]);
+    assert!(o0.0 > 20, "a front to begin with: {o0:?}");
+    assert_eq!(n0, o0, "the live margin keeps every front");
+    assert_eq!(visible, 0, "the slab all under");
+    assert!(
+        2 * o1.0 > o0.0,
+        "off, the band: the margin's fronts with no slab beside them, {o1:?} of {o0:?}"
+    );
+    assert_eq!(n1.0, 0, "on, no front without the slab beside it");
+    assert!(
+        n1.1 < 0.05 * o1.1,
+        "the mix's ocean-continent, on {:.0} km, off {:.0} km",
+        n1.1,
+        o1.1
+    );
+}
+
+/// The front on the current geometry asks only of a front's neighbour (the front lane, 2026-10-25;
+/// PLT-582): the plates of [`converging_plates`], the ocean turned 4 spacings about the x axis
+/// since the last resampling, so it runs under the continent where y > 0 and opens a gap where
+/// y < 0. The contact is active, and on the opening half the ocean's nearest visible sample stands
+/// up to 4 spacings from the continent's edge, beyond `subduction::trench_row_rad`. That gap is the
+/// opening's, which the next resampling fills; the boundary is there, so the boundary mix keeps
+/// the rift with the rule on as off (the pool arm's records lost a fifth of the ridge length
+/// through each cycle while the rule asked of every neighbour of the subducting plate).
+#[test]
+fn an_opening_boundary_of_a_subducting_plate_stays_in_the_mix() {
+    let p = preset(20_000, 20.0, "supercontinent", 5);
+    let mut off = p.tectonics.clone();
+    off.front_current_geometry = false;
+    let stage = PlatesStage::new(p.clone());
+    let env = stage.env(&p.tectonics, 1);
+    assert!(
+        0.1 > 3.0 * subduction::trench_row_rad(env.norm.spacing_rad()) / 2.0,
+        "the gap is wider than the row"
+    );
+    let (mut st, geo, pos) = converging_plates(&p, &env);
+    st.dynamics = Some(dynamics::Dynamics::default());
+    let mut cones = vec![[0.0; 2]; st.samples.len()];
+    subduction::fronts_and_uplift(&mut st, &geo, &pos, &env, &mut cones, 0.0);
+    assert!(
+        st.contacts
+            .iter()
+            .any(|c| c.under == 1 && c.over == 0 && c.active(1)),
+        "the ocean subducts under the continent"
+    );
+    let tree = Tree::over(&pos, |_| true);
+    let [o, n] = [stage.env(&off, 1), env]
+        .map(|e| dynamics::boundary_mix(&st, &geo, &pos, &tree, &e, None).km);
+    eprintln!("the mix, km: off {o:?}, on {n:?}");
+    assert!(o[dynamics::mix::RIFT] > 1000.0, "the opening half: {o:?}");
+    assert!(
+        o[dynamics::mix::OCEAN_CONTINENT] > 1000.0,
+        "the converging half: {o:?}"
+    );
+    assert_eq!(n, o, "the rule keeps an opening boundary and a live front");
+}
+
 /// A subduction zone goes on through a resampling (`tectonics.contact_carry`, PLT-550; plates.md,
 /// "Step 7"). The resampling gives both plates of [`converging_plates`] fresh crust with no
 /// overlap, so at the next step, before the plates move, the contact sees none. Carried, it keeps
@@ -4034,7 +4377,8 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
         let (mut st, geo, pos) = converging_plates(&p, &env);
         assert_eq!(st.contacts.len(), 1);
         assert!(!st.contacts[0].carried);
-        let before = subduction::fronts_begin(&st, &geo, &pos, &env).front_count();
+        let before = subduction::fronts_begin(&st, &geo, &pos, &Tree::over(&pos, |_| true), &env)
+            .front_count();
         let mut world = WorldState::new(1, 16_384, p.t_start_years());
         subduction::carry(&mut st, env.step, on);
         assert_eq!(st.contacts[0].carried, on);
@@ -4045,7 +4389,8 @@ fn a_subduction_zone_goes_on_through_a_resampling() {
         let tree = Tree::over(&pos, |_| true);
         let overlaps = subduction::overlaps(&st, &geo, &pos, &tree, &env2);
         subduction::resolve(&mut st, &mut world, &geo, &overlaps, &pos, &env2).unwrap();
-        let after = subduction::fronts_begin(&st, &geo, &pos, &env2).front_count();
+        let tree = Tree::over(&pos, |_| true);
+        let after = subduction::fronts_begin(&st, &geo, &pos, &tree, &env2).front_count();
         (st, geo, pos, world, before, after)
     };
     let (_, _, _, _, before_off, after_off) = run(false);
