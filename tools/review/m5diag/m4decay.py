@@ -103,6 +103,42 @@ def near_km(pts, front):
     return out
 
 
+K0, H0, H_MAX, HEX = 1500.0, 15.0, 30.0, 2.0 / 3.0  # flow.rs (PLT-300, PLT-301), crust_channel_km2_myr
+NEIGHBOUR_KM = 105.0  # the 100,000-sample lattice's spacing is 77 km; the second ring stands at 133
+TAG = 2
+# gap_budget::Part, in order
+PARTS = ["birth", "erosion", "rebound", "water", "flexure", "roots", "released", "flex_rest", "spread", "later",
+         "carry", "subduction", "shortening", "belts", "arcs", "forearc", "founder", "collapse", "flow",
+         "transition", "collision", "rifting", "hotspots", "settle", "rate", "plate_surface", "finish", "bury",
+         "resample_blend", "resample_accrete", "other"]
+
+
+def flow_inflow(a, idx):
+    """Lower-crustal flow into the samples `idx` of the trace snapshot `a` (all its continental rows), km/Myr:
+    flow.rs's explicit rule on the lattice edges (same plate), K of the thicker column's channel, the hexagonal
+    Laplacian's weight 2/3 per edge over the edge's length squared. Also the part from columns in their quiet
+    time (tag 2, under 10 Myr since the stamp)."""
+    pts = unit(a[:, 0], a[:, 1])
+    T = a[:, 2] / 1000.0
+    held = (np.rint(a[:, 4]) >= 1) & (a[:, 5] < 10)
+    plate = a[:, 8]
+    out, out_h = np.zeros(len(idx)), np.zeros(len(idx))
+    cos_r = math.cos(NEIGHBOUR_KM / R_KM)
+    for c in range(0, len(idx), 512):
+        ii = idx[c:c + 512]
+        dots = pts[ii] @ pts.T
+        rk, j = np.nonzero(dots > cos_r)
+        i = ii[rk]
+        keep = (plate[j] == plate[i]) & (j != i)
+        rk, i, j = rk[keep], i[keep], j[keep]
+        d = np.arccos(np.clip(dots[rk, j], -1.0, 1.0)) * R_KM
+        h = np.clip(np.maximum(T[j], T[i]) - T_C / 1000.0, 0.0, H_MAX)
+        f = HEX * K0 * (h / H0) ** 3 * (T[j] - T[i]) / d ** 2
+        out[c:c + len(ii)] = np.bincount(rk, weights=f, minlength=len(ii))
+        out_h[c:c + len(ii)] = np.bincount(rk, weights=f * held[j], minlength=len(ii))
+    return out, out_h
+
+
 def runs_of(args):
     out = []
     for a in args:
@@ -194,7 +230,13 @@ def live_fronts(rec, maps, t):
 
 
 def main():
-    runs = runs_of(sys.argv[1:])
+    global TAG
+    args = sys.argv[1:]
+    if args and args[0].startswith("tag"):
+        # the orogeny the class takes: tag2 (collision, the default) or tag1 (Andean)
+        TAG = int(args.pop(0)[3:])
+    print(f"the class: orogeny tag {TAG}")
+    runs = runs_of(args)
     print(f"{len(runs)} runs")
     # A. collision trains
     durs, fronts, cvs, opens, contact = [], [], [], [], []
@@ -231,6 +273,7 @@ def main():
     # B. the end snapshot's belt high ground, aged 10 to 50 Myr
     print("\nB. end snapshot: collision-belt high ground (tag 2, 10 <= Myr since the stamp < 50, > 2 km over the sea)")
     groups = defaultdict(lambda: defaultdict(list))
+    ends = defaultdict(int)
     land_n = 0
     for run in runs:
         rec = json.loads((run / "rec.json").read_text())
@@ -253,15 +296,22 @@ def main():
             continue
         # the land: every visible sample over the sea (the maps), else the continental ones (the trace)
         land_n += int(np.sum(maps[0][:, 2] > sea)) if maps is not None else int(np.sum(z - sea > 0))
-        cls = (np.rint(tag) == 2) & (age >= 10) & (age < 50) & (z - sea > 2000)
+        cls = (np.rint(tag) == TAG) & (age >= 10) & (age < 50) & (z - sea > 2000)
         fr, live = live_fronts(rec, maps, t_end)
+        if maps is not None:
+            ends["front samples"] += int(((maps[0][:, 10].astype(np.int64) & 512) != 0).sum())
+        ends["on live contacts"] += len(fr)
+        ends["live trains"] += sum(1 for tr in trains(rec) if tr["e"] >= t_end - DT - 1e-6)
         pts = unit(lat[cls], lon[cls])
         dkm = near_km(pts, fr)
+        hm = (np.rint(tag) >= 1) & (age < 10) & (T > T_C)
+        dheld = near_km(pts, unit(lat[hm], lon[hm]))
         nearest = None
         if len(fr) and len(pts):
             nearest = np.argmax(np.clip(pts @ fr.T, -1, 1), axis=1)
         for j, i in enumerate(np.flatnonzero(cls)):
-            g = "(i) <= 400 km of a live front" if dkm[j] <= 400 else "(ii) not"
+            g = ("(i-a) <= 400 km of a live collision front" if dkm[j] <= 400 else "(i-b) <= 200 km of a held column"
+                 " (quiet time, over T_c), no live front" if dheld[j] <= 200 else "(ii) neither")
             for name, v in (("T", T[i]), ("zs", z[i] - sea), ("L", L[i]), ("K", K[i]), ("age", age[i]),
                             ("d", dkm[j]), ("peak", peak[i])):
                 groups[g][name].append(v)
@@ -269,10 +319,15 @@ def main():
                                     else float("nan"))
             groups[g]["eps0"].append(float(sheet_rate(np.array([T[i]]), np.array([L[i]]), sea, eta_f=1.0)[0]))
             groups[g]["gains"].append(gains[i])
-            if g.startswith("(i)") and nearest is not None:
+            if att is not None:
+                p_ = int(att[i, 14])
+                groups[g]["touch"].append((PARTS[p_] if 0 <= p_ < len(PARTS) else "none", att[i, 15]))
+            if g.startswith("(i-a)") and nearest is not None:
                 trs = live[nearest[j]]
                 groups[g]["train"].append(max(t_end - tr["s"] + DT for tr in trs))
                 groups[g]["cv"].append(max(max(tr["cv"]) for tr in trs))
+    print("  at the end, all runs: " + ", ".join(f"{k} {v}" for k, v in ends.items())
+          + " (the maps' collision-front flags; none at a resampling step)")
     for g in sorted(groups):
         v = groups[g]
         n = len(v["T"])
@@ -287,6 +342,13 @@ def main():
         if v["gains"] and np.isfinite(np.array(v["gains"])).any():
             gm = np.nanmean(np.array(v["gains"]), axis=0) / 1000
             print("      gains since crossing 45 km, mean km: " + ", ".join(f"{a} {b:.1f}" for a, b in zip(GROUPS, gm)))
+        if v.get("touch"):
+            tl = defaultdict(list)
+            for nm, dm in v["touch"]:
+                tl[nm].append(dm)
+            top = sorted(tl.items(), key=lambda x: -len(x[1]))[:5]
+            print("      last part to change T: " + "; ".join(f"{nm} {len(x) / n:.2f} (dm p50 {q(x):+.0f} m)"
+                                                       for nm, x in top))
         if v.get("train"):
             print(f"      the live train: duration p50 {q(v['train']):.0f}, p90 {q(v['train'], 90):.0f} Myr;"
                   f" peak convergence p50 {q(v['cv']):.1f} mm/yr; distance to the front p50 {q(v['d']):.0f} km")
@@ -309,21 +371,32 @@ def main():
             maps = load_maps(run, t)
             if atts:
                 a = read_att(atts[t])
-                m = (np.rint(a[:, 4]) == 2) & (a[:, 7] < 100) & (a[:, 5] < 60)
+                m = (np.rint(a[:, 4]) == TAG) & (a[:, 7] < 100) & (a[:, 5] < 60)
                 lat, lon, age, T, zs, L = a[m, 0], a[m, 1], a[m, 5], a[m, 2], a[m, 3] - sea, a[m, 6]
                 gain = a[m][:, [18 + GROUPS.index(g) for g in ("flow", "stack", "collision", "other")]]
+                held = (np.rint(a[:, 4]) >= 1) & (a[:, 5] < 10) & (a[:, 2] > T_C)
+                young = unit(a[held, 0], a[held, 1])
+                fin, fin_h = flow_inflow(a, np.flatnonzero(m))
+                touch = np.column_stack([a[m, 14], a[m, 15], t - a[m, 16]])
             elif maps is not None:
                 src = "maps (no keel or lithosphere: every belt sample, the sheet at eta0)"
                 a = maps[0]
-                m = (a[:, 4] > 0.5) & (np.rint(a[:, 5]) == 2) & (a[:, 6] < 60)
+                m = (a[:, 4] > 0.5) & (np.rint(a[:, 5]) == TAG) & (a[:, 6] < 60)
                 lat, lon, age, T, zs = a[m, 0], a[m, 1], a[m, 6], a[m, 3], a[m, 2] - sea
                 L = np.full(len(T), L_HOT)
                 gain = np.full((len(T), 4), np.nan)
+                held = (a[:, 4] > 0.5) & (np.rint(a[:, 5]) >= 1) & (a[:, 6] < 10) & (a[:, 3] > T_C)
+                young = unit(a[held, 0], a[held, 1])
+                fin = fin_h = np.full(len(T), np.nan)
+                touch = np.full((len(T), 3), np.nan)
             else:
                 continue
             fr, _ = live_fronts(rec, maps, t)
-            d = near_km(unit(lat, lon), fr)
-            rows.append(np.column_stack([age, T, zs, L, np.full(len(T), sea), d, gain]))
+            pts = unit(lat, lon)
+            d = near_km(pts, fr)
+            # the nearest column still in its quiet time and over T_c: lower-crustal flow's source (flow.rs)
+            dy = near_km(pts, young)
+            rows.append(np.column_stack([age, T, zs, L, np.full(len(T), sea), d, gain, dy, fin, fin_h, touch]))
     if not rows:
         return
     r = np.concatenate(rows)
@@ -380,6 +453,39 @@ def main():
         if tm is not None and to is not None:
             print(f"  T to {thr / 1000:.0f} km: the path at age {tm}, observed at {to}: {(to - 10) / max(tm - 10, 1):.1f}"
                   f" times the path's time")
+
+    # D. the samples still above 2 km against those under, past the quiet time
+    print("\nD. past the quiet time, above 2 km over the sea against under: n, T p50 km, L p50 km, eta/eta0 p50,"
+          " sea p50 m, sheet p50 %/Myr, <= 400 km of a live front, km to the nearest held column (quiet time, over"
+          " T_c) p50, share within 200 km of one, mean gains since 45 km (flow, stack, collision, other)")
+    for lo, hi in ((10, 20), (20, 30), (30, 50)):
+        for up in (True, False):
+            k = (r[:, 0] >= lo) & (r[:, 0] < hi) & ((r[:, 2] > 2000) == up)
+            if k.sum() < 10:
+                continue
+            g = np.nanmean(r[k, 6:10], axis=0) / 1000 if np.isfinite(r[k, 6:10]).any() else None
+            gs = "" if g is None else "  gains " + " ".join(f"{x:5.1f}" for x in g)
+            eps = np.array([float(sheet_rate(np.array([a]), np.array([b]), c)[0]) for a, b, c in
+                            zip(r[k, 1], r[k, 3], r[k, 4])])
+            print(f"  {lo:2d}-{hi:2d} {'above' if up else 'under'}: n {int(k.sum()):6d}  T {q(r[k, 1]) / 1000:5.1f}"
+                  f"  L {q(r[k, 3]):4.0f}  eta {q(eta_factor(r[k, 3])):5.2f}  sea {q(r[k, 4]):4.0f}"
+                  f"  sheet {100 * q(eps):5.2f}  near {np.mean(r[k, 5] <= 400):.2f}  held km {q(r[k, 10]):5.0f}"
+                  f"  <=200 {np.mean(r[k, 10] <= 200):.2f}{gs}")
+            if np.isfinite(r[k, 11]).any():
+                pc = np.array([pace(a, b) for a, b in zip(r[k, 1], r[k, 3])])
+                fin, fh = r[k, 11], r[k, 12]
+                print(f"         flow in p50 {q(fin):5.2f} km/Myr (mean {np.mean(fin):5.2f}; from held columns mean"
+                      f" {np.mean(fh):5.2f}), the collapse's pace p50 {q(pc):5.2f} (mean {np.mean(pc):5.2f}); flow in"
+                      f" >= half the pace {np.mean(fin >= 0.5 * pc):.2f}, >= the pace {np.mean(fin >= pc):.2f}")
+            if np.isfinite(r[k, 13]).any():
+                tp, tdm, tago = r[k, 13], r[k, 14], r[k, 15]
+                parts = defaultdict(list)
+                for p_, d_, a_ in zip(tp, tdm, tago):
+                    parts[PARTS[int(p_)] if 0 <= p_ < len(PARTS) else "none"].append((d_, a_))
+                top = sorted(parts.items(), key=lambda x: -len(x[1]))[:5]
+                print("         last part to change T (>= 1 m while over 45 km): " + "; ".join(
+                    f"{nm} {len(v) / k.sum():.2f} (dm p50 {q([x[0] for x in v]):+.0f} m, {q([x[1] for x in v]):.0f}"
+                    f" Myr ago)" for nm, v in top))
 
 
 if __name__ == "__main__":
