@@ -11,7 +11,6 @@ import com.minecraftindustrialcomplex.deeptime.worldgen.BackgroundScatterFeature
 import com.minecraftindustrialcomplex.deeptime.worldgen.DelegatingRuleSource;
 import com.minecraftindustrialcomplex.deeptime.worldgen.DepositFeature;
 import com.minecraftindustrialcomplex.deeptime.worldgen.GeologicChunkGenerator;
-import com.minecraftindustrialcomplex.deeptime.worldgen.density.BeyondPoleDensity;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.DepthDensity;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.LavaLakesDensity;
 import com.minecraftindustrialcomplex.deeptime.worldgen.density.RasterDensity;
@@ -55,7 +54,6 @@ public final class DeepTimeRegistries {
         DENSITY_FUNCTIONS.register("terrain", () -> TerrainDensity.MAP_CODEC);
         DENSITY_FUNCTIONS.register("depth", () -> DepthDensity.MAP_CODEC);
         DENSITY_FUNCTIONS.register("raster", () -> RasterDensity.MAP_CODEC);
-        DENSITY_FUNCTIONS.register("beyond_pole", () -> BeyondPoleDensity.MAP_CODEC);
         DENSITY_FUNCTIONS.register("lava_lakes", () -> LavaLakesDensity.MAP_CODEC);
         DENSITY_FUNCTIONS.register("water_shield", () -> WaterShieldDensity.MAP_CODEC);
         RULES.register("delegate", () -> DelegatingRuleSource.MAP_CODEC);

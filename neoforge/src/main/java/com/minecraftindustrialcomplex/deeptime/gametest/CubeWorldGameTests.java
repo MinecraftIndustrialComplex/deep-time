@@ -152,18 +152,17 @@ public final class CubeWorldGameTests {
         helper.assertTrue(layout.border() != null && layout.border().temporary(), "a temporary border: " + layout.border());
         EdgeBorder.CubeStop stop = EdgeBorder.cubeStop(level);
         helper.assertTrue(stop != null && stop.border().segmentCount() == 12, "the cube border is in force: " + stop);
-        helper.assertTrue(Double.isNaN(EdgeBorder.stopZ(level)), "no Petroff–Guyou stop line on a cube world");
 
         // The planet info: the client builds the same projection from it.
         WorldInfoPayload info = WorldInfoPayload.forLevel(level);
-        helper.assertTrue(info.cube() && info.circumference() == 4096 && info.poleCap() == null && info.worldProjection() != null,
+        helper.assertTrue(info.cube() && info.circumference() == 4096 && info.worldProjection() != null,
                 "the planet info: " + info);
         WorldProjection.Cube wp = (WorldProjection.Cube) wd.projection();
         WorldProjection.Cube cp = (WorldProjection.Cube) info.worldProjection();
         for (CubeLayout.Face f : CubeLayout.Face.all()) {
             double x = cube.faceCentreX(f) + 0.5, z = cube.faceCentreZ(f) + 0.5;
             double[] a = wp.latLon(x, z), b = cp.latLon(x, z);
-            String line = PlanetDebugLine.format(info, x, z, 0f);
+            String line = PlanetDebugLine.format(info, x, z);
             DeepTime.LOGGER.info("[gametest] cubeWorldLayout face {} centre ({}, {}): {}", f, x, z, line);
             helper.assertTrue(!Double.isNaN(a[0]) && Math.abs(a[0] - b[0]) < 1e-9 && Math.abs(a[1] - b[1]) < 1e-9,
                     "face " + f + " centre: the server's and the client's lat/lon agree: " + a[0] + "," + a[1] + " vs " + b[0] + "," + b[1]);
@@ -172,7 +171,7 @@ public final class CubeWorldGameTests {
         }
         ChunkPos ocean = oceanChunk(cube);
         helper.assertTrue(ocean != null, "a chunk past the net's corners");
-        String off = PlanetDebugLine.format(info, ocean.getMiddleBlockX() + 0.5, ocean.getMiddleBlockZ() + 0.5, 0f);
+        String off = PlanetDebugLine.format(info, ocean.getMiddleBlockX() + 0.5, ocean.getMiddleBlockZ() + 0.5);
         helper.assertTrue(off != null && off.contains("off the planet"), "the debug line past the corners: " + off);
 
         // Every seam joins: a point just inside an edge and its neighbour across the seam (the fold of

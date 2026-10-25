@@ -2,7 +2,10 @@
 package com.minecraftindustrialcomplex.deeptime.worldgen;
 
 import com.google.gson.JsonParser;
-import com.minecraftindustrialcomplex.deeptime.worlddata.PetroffGuyou;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeMap;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeTurn;
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeWorld;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Volcanoes;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 import com.minecraftindustrialcomplex.deeptime.worldgen.VolcanicZones.Role;
@@ -181,21 +184,20 @@ class VolcanicZonesTest {
     }
 
     /**
-     * On a Petroff–Guyou world a cone's zones are its circle on the planet, which this equal-area (not conformal) map
-     * draws with its own local shape stretch: the cone zone's long over short axis is the map's stretch at the vent.
-     * The old zones fail it: they were the cone's circle in the simulation's Lambert blocks, which at 55° is about
-     * three times (1/cos²) longer one way than the other on the planet.
+     * On the cube world (a turned 16k cube, a vent well inside a band face) a cone's zones are its circle on the
+     * planet, which the conformal map draws round: the cone zone's long over short axis is the map's stretch at
+     * the vent, about 1. (Until cube plan §7.4 this was the Petroff–Guyou world's test, whose equal-area map drew
+     * the circle 1.78 : 1 at the median.)
      */
     @Test
-    void onAPetroffGuyouWorldTheZonesAreTheConesCircleOnThePlanet() {
-        var pg = new PetroffGuyou(6656, 100.5);
-        double[] at = pg.blockOf(55.0, 150.0);
-        // The rays stop past 1.1 R (88 planet blocks, a few hundred world blocks at most): clear of the z edge.
-        assertTrue(Math.abs(at[1]) < pg.zMax() - 500, "the test point is well inside the world's z range: " + at[1]);
-        VolcanicZones.Zone cone = assertRoundOnThePlanet(pg, at[0], at[1]);
-        VolcanicZones.Stretch st = VolcanicZones.stretch(pg, at[0], at[1]);
+    void onTheCubeWorldTheZonesAreTheConesCircleOnThePlanet() {
+        var cube = new WorldProjection.Cube(new CubeWorld(CubeLayout.of(3840), CubeMap.world(), CubeTurn.polar(30.0), 1.0));
+        double[] at = cube.cube().pointOfLocal(CubeLayout.Face.F1, 0.3, -0.2);
+        VolcanicZones.Zone cone = assertRoundOnThePlanet(cube, at[0], at[1]);
+        VolcanicZones.Stretch st = VolcanicZones.stretch(cube, at[0], at[1]);
         double want = st.major() / st.minor();
         assertEquals(want, cone.radius() / cone.minor(), 0.02 * want, cone + " " + st);
+        assertEquals(1.0, want, 0.02, "the conformal cube draws a circle round: " + st);
     }
 
     /**

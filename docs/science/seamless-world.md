@@ -1,5 +1,15 @@
 # The seamless world: Petroff's equal-area map in the Guyou layout
 
+> **Retired 2026-10-24** (cube plan §7.4, 2026-10-24; Ben, decisions log 2026-10-24: "Cube only (Recommended)"). The Petroff–Guyou world is deleted: its map (`petroff.rs`,
+> `Petroff.java`, projection.js's Petroff), its layout, the λc search, the half-turn edge blend, the
+> polar widening of its projection pass, its world types `deeptime:planet` and `deeptime:planet_32k`
+> and the SW-1 seamless-evidence tools. Its rows SCL-083, SCL-084, SCL-086, SCL-087, SCL-089,
+> SCL-090 and POL-022 are retired (`merged`, the text kept); SCL-088 is now the cube world's border
+> and SCL-091 the bodies' fallback. The world the game plays is the cube world
+> ([cube-world-bake.md](cube-world-bake.md), [cube-world-game.md](cube-world-game.md)). The page is
+> kept as the record of that world; nothing in it below describes code that still exists, except its
+> last section on the cube world.
+
 Status of this page: `stage 2 (written with the code, 2026-10-04; Petroff's paper and code read in
 full, the map's properties tested; the layout and its sizes are game choices; the forward's
 degenerate lines fixed 2026-10-20)`. The section "The cube world" at the end: `stage 1 (written

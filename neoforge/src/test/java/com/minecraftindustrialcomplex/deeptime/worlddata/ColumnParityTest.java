@@ -175,8 +175,7 @@ class ColumnParityTest {
      * The world's projection (FORMAT.md "The world's layout"): Java's {@link WorldProjection}, built
      * from the fixture world's manifest, gives the kind, z range and index frame Rust gave, the
      * latitude and longitude of every column of the fixture and the block of every lattice latitude
-     * and longitude: bit for bit on a Petroff–Guyou world (both run on the portable trigonometry),
-     * to 1e-9 on a Lambert one (the platforms' own trigonometry).
+     * and longitude, to 1e-9 (a point on a cube edge may come back as its other image in the net).
      */
     @Test
     void theProjectionIsRusts() throws IOException {
@@ -189,8 +188,7 @@ class ColumnParityTest {
         JsonObject p = doc.getAsJsonObject("projection");
         assertEquals(p.get("kind").getAsString(), wp.kind().id(), "the projection");
         boolean cube = wp instanceof WorldProjection.Cube;
-        boolean exact = wp instanceof PetroffGuyou;
-        double tol = exact ? 0.0 : 1e-9;
+        double tol = 1e-9;
         JsonArray zr = p.getAsJsonArray("z_range");
         assertEquals(zr.get(0).getAsDouble(), wp.zMin(), 1e-9, "z range");
         assertEquals(zr.get(1).getAsDouble(), wp.zMax(), 1e-9, "z range");
@@ -213,7 +211,7 @@ class ColumnParityTest {
             JsonArray q = e.getAsJsonArray();
             double[] b = wp.blockOf(q.get(0).getAsDouble(), q.get(1).getAsDouble());
             // At a pole every longitude is the same point: compare the planet points then.
-            if (Math.abs(q.get(0).getAsDouble()) == 90.0 && !exact)
+            if (Math.abs(q.get(0).getAsDouble()) == 90.0)
                 continue;
             if (cube) {
                 // A point on a cube edge has two images in the net: either is Rust's answer when both
@@ -229,16 +227,16 @@ class ColumnParityTest {
                 }
                 continue;
             }
-            assertEquals(q.get(2).getAsDouble(), b[0], exact ? 0.0 : 1e-6, "x of " + q);
-            assertEquals(q.get(3).getAsDouble(), b[1], exact ? 0.0 : 1e-6, "z of " + q);
+            assertEquals(q.get(2).getAsDouble(), b[0], 1e-6, "x of " + q);
+            assertEquals(q.get(3).getAsDouble(), b[1], 1e-6, "z of " + q);
         }
         if (p.has("lambert")) {
             JsonObject l = p.getAsJsonObject("lambert");
             int c = doc.get("circumference").getAsInt();
-            assertEquals(l.get("pole_z").getAsDouble(), Projection.poleZ(c), 1e-9, "the z of the poles");
+            assertEquals(l.get("pole_z").getAsDouble(), WorldProjection.Lambert.radius(c), 1e-9, "the z of the poles");
             for (JsonElement e : l.getAsJsonArray("latitudes")) {
                 JsonArray q = e.getAsJsonArray();
-                assertEquals(q.get(1).getAsDouble(), Projection.zOfLatitude(c, q.get(0).getAsDouble()), 1e-9, "z of " + q);
+                assertEquals(q.get(1).getAsDouble(), new WorldProjection.Lambert(c).blockOf(q.get(0).getAsDouble(), 0.0)[1], 1e-9, "z of " + q);
             }
         }
     }
@@ -247,7 +245,8 @@ class ColumnParityTest {
     void everyColumnOfTheFixtureIsEqual() throws IOException {
         JsonObject doc = fixture();
         WorldData wd = WorldData.open(world());
-        assertEquals(FormatVersion.CURRENT, doc.get("format_version").getAsString());
+        // The test planet is a cube world, as every planet is since cube plan §7.4.
+        assertEquals(FormatVersion.CUBE, doc.get("format_version").getAsString());
         assertEquals(wd.circumference(), doc.get("circumference").getAsInt());
         assertTrue(wd.detailNoise() != null, "the real planet has a detail term");
         JsonArray cols = doc.getAsJsonArray("columns");

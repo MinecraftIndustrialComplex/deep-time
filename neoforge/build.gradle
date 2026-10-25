@@ -58,7 +58,7 @@ def extractToroidalWorld = tasks.register('extractToroidalWorld', Copy) {
 
 // ---------------------------------------------------------------------------
 // Sable (PolyForm Shield): compileOnly, for compat/sable/ only (SableTestOps, the planet-server
-// tests' helper; SablePoleCap, the pole cap's ship wind, called only when Sable is loaded). Never
+// tests' helper; SableBorder, the cube border's push on ships, called only when Sable is loaded). Never
 // on a run's classpath (the planet server loads Sable
 // from the standalone set's mods/ folder) and never in the jar. Its companion jar (math
 // types used in the API's signatures) is nested, so it is extracted for javac.
@@ -848,7 +848,8 @@ def depositWorldDump = tasks.register('testWorldDeposits4k', Exec) {
     commandLine 'cargo', 'run', '--release', '--locked', '-p', 'deeptime-cli', '--',
             'dump-deposits', '--world', world.get().asFile.absolutePath, '--out', dump.get().asFile.absolutePath
 }
-// P1-08: a small real planet (every stage, baked: format 0.1) and Rust's column evaluator on 500 of
+// P1-08: a small real planet (every stage, baked as the cube world: format 0.7, s = 1,024, period
+// 4,096; cube plan §7.4) and Rust's column evaluator on 500 of
 // its columns (`deeptime parity` -> planet4k/parity/columns.json), for ColumnParityTest and
 // NativeLinkTest.sampleColumnIsTheParityFixture.
 def planetWorldRun = tasks.register('testWorldPlanet4kRun', Exec) {

@@ -15,7 +15,6 @@ import com.minecraftindustrialcomplex.deeptime.devmap.net.TeleportPayload;
 import com.minecraftindustrialcomplex.deeptime.nativebridge.NativeWorldMap;
 import com.minecraftindustrialcomplex.deeptime.net.WorldInfoPayload;
 import com.minecraftindustrialcomplex.deeptime.screen.model.Ramps;
-import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.TileCache;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
@@ -265,8 +264,8 @@ public final class ServerMaps {
 
     /**
      * A map teleport: operators only (level 2). The point is brought into the world's domain (x
-     * wrapped, z folded), kept {@link #EDGE_MARGIN} blocks inside the edge border (Petroff–Guyou)
-     * or inside the pole stop (Lambert), its chunk loaded and the player put on top of the highest
+     * wrapped, z folded), kept {@link #EDGE_MARGIN} blocks inside the cube's border (or inside the
+     * poles of a Lambert-frame test level), its chunk loaded and the player put on top of the highest
      * motion-blocking block there (leaves skipped).
      */
     public static void onTeleport(TeleportPayload req, IPayloadContext ctx) {
@@ -284,7 +283,7 @@ public final class ServerMaps {
         WorldProjection p = WorldInfoPayload.forLevel(level).worldProjection();
         if (p == null)
             return;
-        double[] target = target(p, g.dataRef(), g.borderInset(), req.x(), req.z());
+        double[] target = target(p, g.borderInset(), req.x(), req.z());
         int bx = (int) Math.floor(target[0]), bz = (int) Math.floor(target[1]);
         level.getChunk(bx >> 4, bz >> 4);
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz);
@@ -325,11 +324,12 @@ public final class ServerMaps {
     }
 
     /**
-     * Where a teleport to (x, z) lands, {x, z}: canonical, and inside the edge border or the pole
-     * stop; on a cube the nearest point at least the border's inset and {@link #EDGE_MARGIN} inside
-     * its segments ({@code CubeBorder.nearest}: the nearest point of the planet, never a void copy).
+     * Where a teleport to (x, z) lands, {x, z}: on a cube the nearest point at least the border's
+     * inset and {@link #EDGE_MARGIN} inside its segments ({@code CubeBorder.nearest}: the nearest
+     * point of the planet, never a void copy); on a Lambert-frame test level canonical and
+     * {@link #EDGE_MARGIN} inside the poles.
      */
-    static double[] target(WorldProjection p, WorldDataRef ref, double borderInset, double x, double z) {
+    static double[] target(WorldProjection p, double borderInset, double x, double z) {
         WorldProjection.Cube cube = PlanetGeometry.cube(p);
         if (cube != null) {
             double inset = Double.isNaN(borderInset) ? 0.0 : borderInset;
@@ -337,16 +337,7 @@ public final class ServerMaps {
             return new double[]{cube.wrapX(n[0]), n[1]};
         }
         double[] c = p.canonical(x, z);
-        double lo, hi;
-        if (PlanetGeometry.petroffGuyou(p)) {
-            double inset = Double.isNaN(borderInset) ? 0.0 : borderInset;
-            lo = p.zMin() + inset + EDGE_MARGIN;
-            hi = p.zMax() - inset - EDGE_MARGIN;
-        } else {
-            double stop = Projection.zOfLatitude(p.period(), Math.max(0.0, ref.poleStopDeg() - 0.5));
-            lo = Math.max(p.zMin(), stop) + EDGE_MARGIN;
-            hi = Math.min(p.zMax(), -stop) - EDGE_MARGIN;
-        }
+        double lo = p.zMin() + EDGE_MARGIN, hi = p.zMax() - EDGE_MARGIN;
         return new double[]{c[0], Math.max(lo, Math.min(hi, c[1]))};
     }
 }

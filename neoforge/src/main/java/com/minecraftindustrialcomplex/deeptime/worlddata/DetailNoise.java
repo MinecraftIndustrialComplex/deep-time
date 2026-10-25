@@ -21,27 +21,14 @@ import com.google.gson.JsonObject;
  * @param salt          the salt of the first octave (a u32)
  * @param octaves       octaves of {@link #fbm}
  * @param wavelength    the first octave's wavelength, blocks
- * @param halfTurnB     b of a Petroff–Guyou world (format 0.5), whose north and south edges are glued
- *                      onto themselves by half-turns and {@link #at} folds and blends there; 0 on a
- *                      Lambert or synthetic world
  * @param cube          a cube world's net (format 0.7), on which {@link #at} reads the noise on the
- *                      cube's surface ({@link #cubeAt}); null on any other world
+ *                      cube's surface ({@link #cubeAt}); null on a Lambert-frame world
  */
-public record DetailNoise(long seed, int circumference, int salt, int octaves, double wavelength, long halfTurnB,
-                          CubeLayout cube) {
+public record DetailNoise(long seed, int circumference, int salt, int octaves, double wavelength, CubeLayout cube) {
 
-    /** The width of the band inside a Petroff–Guyou world's turning edges where the noise is blended
-     *  towards its half-turn-symmetric mean, blocks (Rust {@code EDGE_BLEND_BLOCKS}; ledger: SCL-089, game-choice). */
-    public static final double EDGE_BLEND_BLOCKS = 32.0; // ledger: SCL-089 (game-choice)
-
-    /** A world without turning edges. */
+    /** A world without turning edges (the Lambert frame). */
     public DetailNoise(long seed, int circumference, int salt, int octaves, double wavelength) {
-        this(seed, circumference, salt, octaves, wavelength, 0L, null);
-    }
-
-    /** A Petroff–Guyou world's ({@code halfTurnB} &gt; 0) or a world without turning edges (0). */
-    public DetailNoise(long seed, int circumference, int salt, int octaves, double wavelength, long halfTurnB) {
-        this(seed, circumference, salt, octaves, wavelength, halfTurnB, null);
+        this(seed, circumference, salt, octaves, wavelength, null);
     }
 
     /** The layer the amplitude comes from ({@code notes.bake.detail.layer}). */
@@ -65,9 +52,8 @@ public record DetailNoise(long seed, int circumference, int salt, int octaves, d
             if (octaves < 1 || octaves > 16 || !(wavelength > 0) || Double.isInfinite(wavelength))
                 throw new WorldDataException("notes.bake.detail: octaves " + octaves + ", wavelength " + wavelength);
             WorldProjection wp = m.projection();
-            long b = wp instanceof PetroffGuyou g ? g.hemisphere() : 0L;
             CubeLayout cube = wp instanceof WorldProjection.Cube c ? c.cube() : null;
-            return new DetailNoise(seed, m.circumference(), salt, octaves, wavelength, b, cube);
+            return new DetailNoise(seed, m.circumference(), salt, octaves, wavelength, cube);
         } catch (RuntimeException e) {
             if (e instanceof WorldDataException w)
                 throw w;
@@ -138,46 +124,13 @@ public record DetailNoise(long seed, int circumference, int salt, int octaves, d
     }
 
     /**
-     * N at block (x, z) with this world's octaves, wavelength and salt (Rust {@code DetailSpec::noise}).
-     * On a Petroff–Guyou world a point past the north or south edge is first folded through the edge's
-     * half-turn, and within {@link #EDGE_BLEND_BLOCKS} of an edge the noise is blended towards its
-     * half-turn-symmetric mean S = ½(N + N(mirror)), so the detail term is continuous through the seam.
-     * On a cube world it is {@link #cubeAt}.
+     * N at block (x, z) with this world's octaves, wavelength and salt (Rust {@code DetailSpec::noise}):
+     * the {@link #fbm}, or on a cube world {@link #cubeAt}.
      */
     public double at(double x, double z) {
         if (cube != null)
             return cubeAt(x, z);
-        if (halfTurnB == 0L)
-            return fbm(x, z, wavelength, octaves, salt);
-        double b = (double) halfTurnB;
-        double h = 0.5 * b;
-        for (int k = 0; k < 64; k++) {
-            if (z < -h) {
-                x = -x;
-                z = -b - z;
-            } else if (z > h) {
-                x = -x;
-                z = b - z;
-            } else {
-                break;
-            }
-        }
-        double n = fbm(x, z, wavelength, octaves, salt);
-        double d, mz;
-        if (z < 0.0) {
-            d = z + h;
-            mz = -b - z;
-        } else {
-            d = h - z;
-            mz = b - z;
-        }
-        if (d >= EDGE_BLEND_BLOCKS)
-            return n;
-        double m = fbm(-x, mz, wavelength, octaves, salt);
-        double s = 0.5 * (n + m);
-        double t = d / EDGE_BLEND_BLOCKS;
-        double w = t * t * (3.0 - 2.0 * t);
-        return s + (n - s) * w;
+        return fbm(x, z, wavelength, octaves, salt);
     }
 
     /** The lattice value at the point (ix, iy, iz) of a cube's surface lattice for {@code salt} (a u32), in [−1, 1]. */

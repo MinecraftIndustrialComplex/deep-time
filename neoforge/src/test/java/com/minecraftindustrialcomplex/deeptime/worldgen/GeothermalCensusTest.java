@@ -34,7 +34,7 @@ class GeothermalCensusTest {
         Magma.Heights h = (x, z) -> wd.height(Math.floorMod(x + c / 2, c) - c / 2, z);
         LavaRules lava = LavaRules.of(wd.manifest().notes());
         Magma magma = Magma.build(wd.volcanoes().list(), MagmaRules.of(wd.manifest().notes()), h, wet, c, sea, lava.floodY(minY, sea),
-                wd.manifest().mPerBlockH(), wd.manifest().mPerBlockV(), (int) Math.abs(com.minecraftindustrialcomplex.deeptime.worlddata.Projection.zOfLatitude(c, com.minecraftindustrialcomplex.deeptime.wrap.PoleCapCurve.DEFAULT_CAP_DEG)));
+                wd.manifest().mPerBlockH(), wd.manifest().mPerBlockV());
         GeothermalEnv env = new GeothermalEnv(wd);
         System.out.println("CENSUS world C=" + c + " volcanoes=" + wd.volcanoes().list().size() + " rules=" + rules);
         for (double heatDensity : new double[]{0.0, rules.heatDensity()}) {
@@ -54,13 +54,13 @@ class GeothermalCensusTest {
                     + " volcanoesWithSites=" + volcanoes + " by=" + by + " buildMs=" + ms);
         }
         // The hot ground: the share of land columns (a coarse grid) at each heat-flow level, over the world's own
-        // z span (the projection's, as the fields use; the Lambert pole is not the Petroff-Guyou planet's edge).
+        // z span (the projection's, as the fields use).
         int step = 16;
         long land = 0, withData = 0, nanContinental = 0, nanNearestHas = 0, nanOceanic = 0;
         double[] bars = {41, 45, 50, 55, 60, 70, 80, 100, 120, 150};
         long[] over = new long[bars.length];
         double qMax = Double.NEGATIVE_INFINITY;
-        int pole = (int) (Double.isNaN(env.zHalf()) ? com.minecraftindustrialcomplex.deeptime.worlddata.Projection.poleZ(c) : env.zHalf());
+        int pole = (int) (Double.isNaN(env.zHalf()) ? com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection.Lambert.radius(c) : env.zHalf());
         var crust = wd.has("meta/crust_type") ? wd.layer("meta/crust_type") : null;
         var heat = wd.has("meta/heat_flow_mw_m2") ? wd.layer("meta/heat_flow_mw_m2") : null;
         for (int z = -pole + step / 2; z < pole; z += step)

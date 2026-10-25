@@ -354,7 +354,7 @@
     const h = helpers || {};
     const yr = s.y_range || [s.y, s.y];
     // The world's block (`block`); `x` and `z` are the simulation's frame the overlay is drawn in,
-    // another place on a Petroff–Guyou world.
+    // another place on a cube world.
     const [bx, bz] = s.block || [s.x, s.z];
     const rows = [
       ['Family', esc(s.family.label)],

@@ -2,7 +2,6 @@
 package com.minecraftindustrialcomplex.deeptime.api.planet;
 
 import com.minecraftindustrialcomplex.deeptime.worlddata.CubeWorld;
-import com.minecraftindustrialcomplex.deeptime.worlddata.Projection;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldProjection;
 
 import java.util.Optional;
@@ -146,7 +145,7 @@ final class ProjectionPlanet implements DeepTimePlanet {
         }
         if (p instanceof WorldProjection.Lambert l) {
             // x = R λ + const, z = −R sin φ: east R cos φ dλ = cos φ per +x, north R dφ = −1 / cos φ per +z.
-            double cos = Projection.cosLat(l.circumference(), z);
+            double cos = WorldProjection.Lambert.cosLat(l.circumference(), z);
             return new double[][]{{cos, 0.0}, {0.0, -1.0 / cos}};
         }
         double[][] fr = WorldProjection.localFrame(v);

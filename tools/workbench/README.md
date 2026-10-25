@@ -94,9 +94,9 @@ runner where the runs are (`DEEPTIME_WORKBENCH_RUNS`) and which binary to ask fo
 (`DEEPTIME_WORKBENCH_DEEPTIME`, its own executable). `preview.py run_bake(run)` accepts a run whose
 manifest is format >= 0.1, has `notes.bake`, is not a placeholder and has the terrain and strata layers.
 - **A run with a bake** is previewed as **its own terrain**: the job's `world_data` is the run's bake
-  (copied without `keyframes/`; the box is in the run's block coordinates, C from the manifest, 16,384
-  or 32,768), the real mod boots on a world that uses it, and `note` (with `note_kind: "run"`) says
-  so. A bake is the planet at the end of the run: the frame the page was showing does not matter.
+  (copied without `keyframes/`; the box is in the run's block coordinates, C from the manifest: a
+  cube world's period 4s, 15,360 or 29,696, or a Lambert-frame test world's 16,384 or 32,768), the
+  real mod boots on a world that uses it, and `note` (with `note_kind: "run"`) says so. A bake is the planet at the end of the run: the frame the page was showing does not matter.
 - **A run without one** (a placeholder, a run older than format 0.1, one still running) keeps the
   earlier behaviour: **the synthetic deposit world** (`crates/deeptime-core/tests/presets/deposits_world_16k.json`,
   500 Myr, C = 16,384) at the latitude and longitude drawn on the map, and a `note` (`note_kind:

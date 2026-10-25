@@ -150,15 +150,15 @@ def main():
         os.chmod(pw_path, 0o600)
     pw = open(pw_path).read().strip()
     open(os.path.join(RUN, "eula.txt"), "w").write("eula=true\n")  # accepted for test servers (plan §2.7)
-    # The analytic test terrains are Lambert worlds (C itself): the Lambert level types (format 0.5;
-    # deeptime:planet[_32k] are the Petroff-Guyou worlds, 13,312 / 26,112 blocks round).
-    level_type = "deeptime\\:planet_lambert" if a.size == 16384 else "deeptime\\:planet_lambert_32k"
+    # The analytic test terrains are laid out in the simulation's Lambert frame (C itself): the dev
+    # level types of the GameTest resources (cube plan §7.4 removed the playable Lambert world).
+    level_type = "deeptime\\:test_planet_lambert" if a.size == 16384 else "deeptime\\:test_planet_lambert_32k"
     if a.cube_4k:
         # World data, not a test terrain: the bake writes world/deeptime before the server starts.
         level_type, a.test_terrain = "deeptime\\:test_planet_cube_4k", ""
         dev = [] if os.environ.get("IN_NIX_SHELL") else ["nix", "develop", "-c"]
         bake = subprocess.run([*dev, "cargo", "run", "--release", "-q", "-p", "deeptime-cli", "--", "run", "--preset",
-                               "crates/deeptime-core/tests/presets/planet_world_4k.json", "--set", "scale.projection=cube",
+                               "crates/deeptime-core/tests/presets/planet_world_4k.json",
                                "--out", os.path.join(RUN, "world", "deeptime")], cwd=REPO)
         if bake.returncode != 0:
             sys.exit("run_planet.py: the 4k cube bake failed")

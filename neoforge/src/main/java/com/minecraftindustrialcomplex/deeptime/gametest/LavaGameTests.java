@@ -46,8 +46,8 @@ public final class LavaGameTests {
      * Lava is measured from the world's floor, not from y 0 ({@link LavaRules}). Vanilla's two
      * hard-coded heights (lava below y −54, lava lakes at y −10 and lower) put lava in every cave
      * and every stretch of sea below y −54 of a world whose floor is y −352. Chunks are generated
-     * around the planet's deepest sea, a sea about 150 blocks deep, a coast and high ground, and
-     * every block is read back:
+     * around the planet's deepest sea, a sea about 150 blocks deep, a coast and high ground (on the
+     * cube's faces, {@link ChunkSampling#onFaces}), and every block is read back:
      * <ul>
      *   <li>{@code lavaAboveLakes}: no lava above the highest level a lava lake can have
      *       ({@link LavaRules#highestLakeY}, y −288 by default), the magma of active volcanoes
@@ -85,9 +85,16 @@ public final class LavaGameTests {
         // Sites from the world data: the deepest sea, a sea about 150 blocks deep, a coast, high ground.
         int c = t.circumference();
         Site deepest = null, deep = null, coast = null, high = null;
-        int zp = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
+        int zp = (int) t.zHalf();   // the net's outer edges on the cube (3s/2), the poles on a Lambert-frame world
         for (int z = -zp + 64; z < zp - 64; z += 16)
             for (int x = -c / 2; x < c / 2; x += 16) {
+                // The SIDE x SIDE chunks of a site lie on the faces (off a cube's faces a chunk is filled
+                // after the noise step, from its partner: empty at the step this test reads).
+                boolean on = true;
+                for (int k = 0; k < SIDE * SIDE; k++)
+                    on &= ChunkSampling.onFaces(t.data(), x + 16 * (k % SIDE), z + 16 * (k / SIDE));
+                if (!on)
+                    continue;
                 double h = t.height(x, z);
                 if (deepest == null || h < deepest.h)
                     deepest = new Site("deepest sea", x, z, h);
@@ -366,7 +373,7 @@ public final class LavaGameTests {
     /**
      * No cave of any kind reaches the underwater face of a sea cliff ({@link SeaCliffGuard}, Ben's
      * report of 2026-10-02: arches cut into the underwater base of sea cliffs). On the level with
-     * noise caves and aquifers, the planet is scanned for chunks where the ground drops by the guard's
+     * noise caves and aquifers, the planet's faces are scanned for chunks where the ground drops by the guard's
      * skin or more within the skin, beside water under the sea level; up to six, far apart, are
      * generated through the carving step and read back: in every guarded block under the ground's top
      * block there is no air and no water (lava is the lava floor's and the volcanoes'). A planet with
@@ -394,9 +401,13 @@ public final class LavaGameTests {
         // that lies under the sea.
         List<int[]> chunks = new ArrayList<>();
         int[][] ring = {{skin, 0}, {-skin, 0}, {0, skin}, {0, -skin}, {skin, skin}, {-skin, -skin}, {skin, -skin}, {-skin, skin}};
-        int pole = (int) t.zHalf();   // the poles (Lambert) or the turning edges (Petroff–Guyou)
+        int pole = (int) t.zHalf();   // the net's outer edges on the cube (3s/2), the poles on a Lambert-frame world
         for (int z = -pole; z < pole && chunks.size() < 6; z += 16)
             for (int x = -c / 2; x < c / 2 && chunks.size() < 6; x += 16) {
+                // Off a cube's faces a chunk is a turned copy of its partner's, and a void square's
+                // diagonal joins two partners' terrain: a drop across it is no cliff the guard saw.
+                if (!ChunkSampling.onFaces(t.data(), x, z))
+                    continue;
                 int own = (int) Math.ceil(t.height(x, z)) - 1;
                 int low = own;
                 for (int[] d : ring)

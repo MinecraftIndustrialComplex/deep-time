@@ -4,6 +4,7 @@ package com.minecraftindustrialcomplex.deeptime.worldgen;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.minecraftindustrialcomplex.deeptime.worlddata.CubeLayout;
 import com.minecraftindustrialcomplex.deeptime.worlddata.Water;
 import com.minecraftindustrialcomplex.deeptime.worlddata.WorldData;
 import org.junit.jupiter.api.Test;
@@ -63,19 +64,25 @@ class WaterCaveShieldTest {
     /**
      * Every water column of a sparse grid over the planet, and every column within
      * {@link WaterCaveShield#FULL_BLOCKS} − 1 of it, has the full shield (the shallow sea's only
-     * where that column's ground is shallow too); prints how many of each were seen.
+     * where that column's ground is shallow too); prints how many of each were seen. The test planet is a cube world
+     * (cube plan §7.4): the grid covers the net's window, and only the columns on its six faces count (the void beyond
+     * a border edge is generated as the partner's copy, {@code CubeFill}, never from these rules).
      */
     @Test
     void everyWaterColumnAndItsShoreAreShielded() {
         WorldData wd = world();
+        assertTrue(wd.manifest().cube(), "the test planet is a cube world");
+        CubeLayout net = CubeLayout.shared(wd.circumference() / 4);
         Water.Spec spec = Water.Spec.of(wd, CELL);
         WaterCaveShield shield = new WaterCaveShield(wd, spec);
         int c = wd.circumference(), seaTop = spec.seaLevel() - 1;
-        int zHalf = c / 4 - 8;
+        int zHalf = (int) (3 * net.side() / 2) - 8;
         int river = 0, lake = 0, shallow = 0, deep = 0, checked = 0;
         int ring = (int) WaterCaveShield.FULL_BLOCKS - 1;
         for (int z = -zHalf; z < zHalf; z += 7) {
             for (int x = -c / 2; x < c / 2; x += 13) {
+                if (net.faceOfBlock(x, z) == null)
+                    continue;
                 Water.Core q = Water.core(wd, spec, x, z);
                 switch (q.kind()) {
                     case RIVER -> river++;
@@ -98,6 +105,8 @@ class WaterCaveShieldTest {
                         if (dx * dx + dz * dz > ring * ring)
                             continue;
                         int px = Math.floorMod(x + dx + c / 2, c) - c / 2, pz = z + dz;
+                        if (net.faceOfBlock(px, pz) == null)
+                            continue;
                         if (q.kind() == Water.Kind.SEA
                                 && wd.height(px, pz) < seaTop - WaterCaveShield.SHALLOW_FULL_BLOCKS)
                             continue;   // deeper ground beside a shallow sea column: the aquifer's
